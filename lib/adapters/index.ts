@@ -282,6 +282,7 @@ export function checkedAdapter<S extends TObject>(
 		revokeByGrantId: (grantId) => raw.revokeByGrantId(grantId),
 		consume: (id) => raw.consume(id),
 		create: (id, payload, expiresIn) => raw.create(id, payload, expiresIn),
+		increment: (id, field, expiresIn) => raw.increment(id, field, expiresIn),
 		destroyByOwner: (field, value) => raw.destroyByOwner(field, value),
 		destroyUnusedSince: (markerField, usedField, ageField, before) =>
 			raw.destroyUnusedSince(markerField, usedField, ageField, before)

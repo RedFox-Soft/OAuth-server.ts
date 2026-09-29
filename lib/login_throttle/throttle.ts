@@ -17,10 +17,10 @@ import { LoginThrottlePayload } from './types.js';
  *
  * WHY THIS IS A NEAR-COPY OF lib/totp/verify.ts's failure window, and deliberately so: that is the
  * same throttle for the adjacent secret, and it settled every question this one faces — check before
- * verifying, write only on failure, destroy on success, one message for every failure. The one place
- * the two diverge is ownership: TotpAttempt is account-owned and carries `accountId`, while this area
- * must hold counters for addresses that resolve to no account at all (FR-002), so it is addressed and
- * unowned. That is why they cannot be one area.
+ * verifying, count the attempt atomically before verifying it, destroy on success, one message for
+ * every failure. The one place the two diverge is ownership: TotpAttempt is account-owned and carries
+ * `accountId`, while this area must hold counters for addresses that resolve to no account at all
+ * (FR-002), so it is addressed and unowned. That is why they cannot be one area.
  *
  * THE TWO HORIZONS, which are the easiest thing here to get wrong. `windowStart + windowFor(step)` is
  * when the *door* reopens; `exp` is when the *record* dies, 24 hours after the most recent failure.
@@ -120,69 +120,78 @@ export async function isThrottled(
 }
 
 /*
- * One more failure for this address.
+ * One more attempt for this address, counted before its password is verified, and whether the door
+ * admits it.
  *
  * Written for any address submitted to an open door, including one that resolves to no account: a
  * counter that existed only for real accounts would make the throttle's behaviour — and any future
  * divergence in the refusal — an account-existence oracle, and would let an attacker probe existence
- * by watching for it (FR-002).
+ * by watching for it (FR-002). A password that then verifies clears the count (`clearFailures`), so
+ * what is left counted is exactly the failures.
  *
- * A read-modify-write, with no atomic increment because `ModelAdapter` has none and adding one is a
- * change to the storage interface. Concurrent attempts inside a single round-trip can therefore let
- * one extra verification through; lib/totp/verify.ts accepts the same race for the same shape, and the
- * per-origin limiter's `strict` allowance bounds how many an attacker can land.
+ * Counted first, and atomically, because counting a failure after verifying it was a read-modify-
+ * write: a burst of parallel guesses all found the door open, all had their password verified, and
+ * together advanced the counter by one. `increment` answers each attempt its own number, so of a
+ * burst only the cap's worth are admitted; the same write keeps the record alive for the retention
+ * period after the most recent attempt, which is what lets the escalation survive a waited-out window.
+ *
+ * Opening a window is an insert-if-absent. Rolling an elapsed one is still a plain write, and a burst
+ * landing on the exact moment a window rolls can each reset the count once — a race bounded to that
+ * instant, once per window, where the old one was open for every guess.
  */
-export async function recordFailure(
+export async function recordAttempt(
 	bucketId: string,
-	email: string
-): Promise<void> {
+	email: string,
+	secondFactorRequired = false
+): Promise<boolean> {
 	const key = throttleKey(bucketId, email);
 	const now = epochTime();
 	const prior = await held(key);
 	/*
-	 * The ceiling does not matter for the write: it only decides how long a window lasts, and what is
-	 * being decided here is whether the current one is over. Passing the configured ceiling keeps the
+	 * The ceiling does not matter for the bookkeeping: it only decides how long a window lasts, and what
+	 * is being decided here is whether the current one is over. Passing the configured ceiling keeps the
 	 * step advancing on the same schedule for every bucket, so a bucket that later turns its second
-	 * factor off does not find its counters mysteriously behind.
+	 * factor off does not find its counters mysteriously behind. Admission below uses the bucket's own.
 	 */
 	const bounds = boundsFor(false);
 
-	const next = (() => {
-		if (!prior) {
-			return { failures: 1, windowStart: now, step: 0 };
-		}
-		const windowOpen =
-			now - prior.windowStart <
-			windowFor(prior.step, bounds.window, bounds.ceiling);
-		if (windowOpen) {
-			/*
-			 * Already at the cap: the door is shut, so this attempt is refused without extending anything.
-			 * `failures` still climbs — it costs nothing and says how hard the address is being worked —
-			 * but `windowStart` and `step` stay put, which is what stops an attacker who keeps knocking
-			 * from holding the door shut indefinitely by knocking.
-			 */
-			return {
-				failures: prior.failures + 1,
-				windowStart: prior.windowStart,
-				step: prior.step
-			};
-		}
+	let window: { windowStart: number; step: number };
+	if (!prior) {
+		window = { windowStart: now, step: 0 };
+		await counters().create(
+			key,
+			{ failures: 0, ...window, exp: now + LOGIN_RETENTION_SECONDS },
+			LOGIN_RETENTION_SECONDS
+		);
+	} else if (
+		now - prior.windowStart <
+		windowFor(prior.step, bounds.window, bounds.ceiling)
+	) {
+		window = { windowStart: prior.windowStart, step: prior.step };
+	} else {
 		/*
-		 * The window has elapsed. If it was exhausted, this failure opens the next, longer one; if it was
+		 * The window has elapsed. If it was exhausted, this attempt opens the next, longer one; if it was
 		 * not, the address simply gets a fresh window at the same step.
 		 */
 		const exhausted = prior.failures >= bounds.cap;
-		return {
-			failures: 1,
+		window = {
 			windowStart: now,
 			step: exhausted ? prior.step + 1 : prior.step
 		};
-	})();
+		await counters().upsert(
+			key,
+			{ failures: 0, ...window, exp: now + LOGIN_RETENTION_SECONDS },
+			LOGIN_RETENTION_SECONDS
+		);
+	}
 
-	await counters().upsert(
-		key,
-		{ ...next, exp: now + LOGIN_RETENTION_SECONDS },
-		LOGIN_RETENTION_SECONDS
+	// Absent only when a verified password cleared the record in between: a fresh slate, and this its first.
+	const attempts =
+		(await counters().increment(key, 'failures', LOGIN_RETENTION_SECONDS)) ?? 1;
+	return !shut(
+		{ failures: attempts - 1, ...window, exp: now + LOGIN_RETENTION_SECONDS },
+		now,
+		boundsFor(secondFactorRequired)
 	);
 }
 

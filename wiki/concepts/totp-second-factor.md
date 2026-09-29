@@ -4,7 +4,7 @@ title: 'The TOTP second factor'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-27
-updated: 2026-09-28
+updated: 2026-09-29
 graph:
   node_type: concept
   relationships:
@@ -99,6 +99,13 @@ expressible.
 which costs an attacker a single request — hence the per-account window as well. Every failure answers
 with the same words (`Invalid code`), throttled included: a distinct "too many attempts" tells someone
 guessing that the account is real and that their guesses are landing.
+
+The per-account window counts each attempt **before** checking the code, through the adapter's atomic
+`increment`, and opens a window with `create` (corrected 2026-09-29). Writing a failure after checking
+was a read-modify-write, so a burst of parallel guesses behind a known password advanced the count by
+one and the cap of ten never bound; see [[single-use-under-concurrency]]. The per-interaction cap is
+still a count on the interaction payload and still racy — it is not the one that has to hold, since a
+new interaction costs one request.
 
 **No account window on enrolment**, only the per-interaction cap. The pending secret already expires on
 its own, and an account-wide lockout there would let a stranger who knows an email stop a real person

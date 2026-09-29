@@ -25,7 +25,7 @@ import {
 import {
 	clearFailures,
 	isThrottled,
-	recordFailure
+	recordAttempt
 } from '../login_throttle/throttle.js';
 import {
 	consentServer,
@@ -543,12 +543,26 @@ export const ui = new Elysia()
 				return refuse();
 			}
 
+			/*
+			 * Counted before the lookup and the verification, and for an address with no account too, so
+			 * the counter's existence — and any future divergence in this refusal — can never be read as
+			 * evidence that an account exists. The check above is the cheap path for a door already shut;
+			 * this is the one that holds when a burst of attempts all found it open.
+			 */
+			if (
+				!(await recordAttempt(
+					bucketId,
+					body.username,
+					loginOptions.totpRequired
+				))
+			) {
+				eventBus.emit('login_throttled', { bucketId });
+				return refuse();
+			}
+
 			const userStore = getUserStore(bucketId);
 			const user = await userStore.findByEmail(body.username);
 			if (!user) {
-				// Counted for an address with no account too, so the counter's existence — and any future
-				// divergence in this refusal — can never be read as evidence that an account exists.
-				await recordFailure(bucketId, body.username);
 				return refuse();
 			}
 			const validPassword = await Bun.password.verify(
@@ -556,7 +570,6 @@ export const ui = new Elysia()
 				user.password
 			);
 			if (!validPassword) {
-				await recordFailure(bucketId, body.username);
 				return refuse();
 			}
 			/*

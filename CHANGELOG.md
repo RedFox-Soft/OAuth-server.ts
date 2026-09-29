@@ -63,6 +63,12 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   captured client assertion or DPoP proof authenticated every concurrent replay. The adapter's
   `consume` now answers whether this call spent the record, a new `create` stores only when the id is
   free, and every caller decides on that answer, in all three backends.
+- **Attempt caps hold against a burst of parallel guesses.** The emailed verification code, the TOTP
+  failure window and the password door each read their count, verified, and wrote the count plus one,
+  so a burst advanced them by one: fifteen passwords were hashed against a cap of five, and the right
+  code was accepted after fifteen wrong ones. Each now counts the attempt first through a new atomic
+  `increment` and admits it only within the cap; the verification code's expiry is also checked on
+  read.
 
 ## [0.6.0] - 2026-09-28
 

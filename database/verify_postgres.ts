@@ -293,6 +293,23 @@ check(
 	createdBy.join(', ')
 );
 
+const counterId = `fidelity-counter-${Date.now()}`;
+await adapter('LoginThrottle').upsert(
+	counterId,
+	{ failures: 0, windowStart: 0, step: 0, exp: 9e9 },
+	3600
+);
+const counted = await Promise.all(
+	Array.from({ length: 5 }, () =>
+		adapter('LoginThrottle').increment(counterId, 'failures')
+	)
+);
+check(
+	'five simultaneous increments of one counter: each is answered its own value',
+	[...counted].sort().join(',') === '1,2,3,4,5',
+	counted.join(', ')
+);
+
 const staleId = `fidelity-stale-${Date.now()}`;
 await adapter('ReplayDetection').upsert(staleId, { iss: 'fidelity' }, -1);
 check(

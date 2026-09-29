@@ -68,9 +68,34 @@ export class MemoryAdapter<
 		return true;
 	}
 
-	/* An expired entry is already gone here: the store drops it on its own `maxAge`. */
+	/* Atomic for the same reason `consume` is: nothing awaits between the read and the write. */
+	async increment(id: string, field: string, expiresIn?: number) {
+		const stored = recordAt(this.key(id));
+		if (!stored) return undefined;
+		const current = stored[field];
+		const next = (typeof current === 'number' ? current : 0) + 1;
+		if (expiresIn === undefined) {
+			stored[field] = next;
+		} else {
+			await this.upsert(
+				id,
+				{ ...stored, [field]: next, exp: epochTime() + expiresIn },
+				expiresIn
+			);
+		}
+		return next;
+	}
+
+	/*
+	 * The store drops an entry on its own `maxAge`, but a record can also say it has expired while it is
+	 * still held — its `exp` in the past, as a MongoDB record reads in the minute before the TTL monitor
+	 * reaps it. Either way it counts as free, which is what the contract promises.
+	 */
 	async create(id: string, payload: StoredRecord, expiresIn: number) {
-		if (recordAt(this.key(id))) return false;
+		const existing = recordAt(this.key(id));
+		const expired =
+			typeof existing?.exp === 'number' && existing.exp <= epochTime();
+		if (existing && !expired) return false;
 		await this.upsert(id, payload, expiresIn);
 		return true;
 	}

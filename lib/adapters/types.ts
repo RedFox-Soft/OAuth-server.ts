@@ -78,6 +78,19 @@ export interface ModelAdapter<TPayload = unknown> {
 	 */
 	create(id: string, payload: TPayload, expiresIn: number): Promise<boolean>;
 	/*
+	 * Adds one to a numeric payload field of an existing record and answers the new value, or
+	 * `undefined` when there is no record. One atomic write, so racing callers each get a distinct value
+	 * — which is what lets an attempt cap count a burst of parallel guesses as a burst. With `expiresIn`
+	 * the same write moves the record's expiry (and its `exp`) to that many seconds from now.
+	 *
+	 * `field` always comes from code, never from a caller — the rule `destroyByOwner` states below.
+	 */
+	increment(
+		id: string,
+		field: string,
+		expiresIn?: number
+	): Promise<number | undefined>;
+	/*
 	 * Destroys every record in *this* area whose `field` equals `value`, returning how many went. The
 	 * one way to reach a principal's records: nothing else can enumerate by owner, and a grant walk
 	 * misses ClientCredentials (no grantId) and RegistrationAccessToken (no expiry) entirely.

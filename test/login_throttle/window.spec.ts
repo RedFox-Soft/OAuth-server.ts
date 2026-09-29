@@ -11,7 +11,7 @@ import {
 import {
 	clearFailures,
 	isThrottled,
-	recordFailure,
+	recordAttempt,
 	throttleKey
 } from 'lib/login_throttle/throttle.ts';
 import { LoginThrottlePayload } from 'lib/login_throttle/types.ts';
@@ -48,7 +48,7 @@ function record(email: string): LoginThrottlePayload | undefined {
 /* Exhaust one window's worth of attempts. */
 async function exhaust(email: string): Promise<void> {
 	for (let i = 0; i < CAP; i += 1) {
-		await recordFailure(BUCKET, email);
+		await recordAttempt(BUCKET, email);
 	}
 }
 
@@ -107,7 +107,7 @@ describe('login throttle: counting', () => {
 	it('opens a window at step zero on the first failure', async () => {
 		const email = address();
 		const before = epochTime();
-		await recordFailure(BUCKET, email);
+		await recordAttempt(BUCKET, email);
 
 		const held = record(email);
 		expect(held).toBeDefined();
@@ -120,7 +120,7 @@ describe('login throttle: counting', () => {
 	it('is not throttled below the cap', async () => {
 		const email = address();
 		for (let i = 0; i < CAP - 1; i += 1) {
-			await recordFailure(BUCKET, email);
+			await recordAttempt(BUCKET, email);
 		}
 		expect(await isThrottled(BUCKET, email, false)).toBe(false);
 	});
@@ -133,9 +133,9 @@ describe('login throttle: counting', () => {
 
 	it('counts up inside an open window without moving the window or the step', async () => {
 		const email = address();
-		await recordFailure(BUCKET, email);
+		await recordAttempt(BUCKET, email);
 		const first = record(email);
-		await recordFailure(BUCKET, email);
+		await recordAttempt(BUCKET, email);
 		const second = record(email);
 
 		expect(second?.failures).toBe(2);
@@ -148,7 +148,7 @@ describe('login throttle: counting', () => {
 		await exhaust(email);
 		const shut = record(email);
 
-		await recordFailure(BUCKET, email);
+		await recordAttempt(BUCKET, email);
 
 		const after = record(email);
 		expect(after?.windowStart).toBe(shut?.windowStart);
@@ -227,7 +227,7 @@ describe('login throttle: escalation', () => {
 		});
 
 		expect(await isThrottled(BUCKET, email, false)).toBe(false);
-		await recordFailure(BUCKET, email);
+		await recordAttempt(BUCKET, email);
 		expect(record(email)?.step).toBe(0);
 		expect(record(email)?.failures).toBe(1);
 	});
@@ -274,7 +274,7 @@ describe('login throttle: clearing and keying', () => {
 
 		const spellings = ['Alice@x.io', 'aLICE@x.io', 'ALICE@X.IO', 'alice@x.IO'];
 		for (let i = 0; i < CAP; i += 1) {
-			await recordFailure(
+			await recordAttempt(
 				BUCKET,
 				present(spellings[i % spellings.length], 'a spelling')
 			);

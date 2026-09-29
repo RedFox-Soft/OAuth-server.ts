@@ -60,20 +60,40 @@ export async function verifyForAccount(
 		return { ok: false, reason: 'throttled' };
 	}
 
+	/*
+	 * The attempt is counted before the code is checked, in one atomic write that answers this
+	 * attempt's own number. Counting a failure after checking was a read-modify-write, and a burst of
+	 * parallel guesses all read the same count and together advanced it by one. A right code is counted
+	 * too, harmlessly: success destroys the record.
+	 *
+	 * Opening a window is an insert-if-absent for the same reason, and the record dies with its window
+	 * rather than outliving it — so a lockout cannot become permanent, and an expired record is one
+	 * `create` treats as absent.
+	 */
+	if (!windowActive) {
+		await attempts().create(
+			key,
+			{
+				accountId,
+				failures: 0,
+				windowStart: now,
+				exp: now + ACCOUNT_WINDOW_SECONDS
+			},
+			ACCOUNT_WINDOW_SECONDS
+		);
+	}
+	// Absent only when a concurrent success cleared the record in between, which makes this attempt the
+	// first of a fresh slate.
+	const attempt = (await attempts().increment(key, 'failures')) ?? 1;
+	if (attempt > ACCOUNT_FAILURE_CAP) {
+		return { ok: false, reason: 'throttled' };
+	}
+
 	const step = verifyAt(decodeBase32(user.totp.secret), code, now, {
 		after: user.totp.lastStep
 	});
 
 	if (step === null) {
-		const failures = windowActive ? prior.failures + 1 : 1;
-		const windowStart = windowActive ? prior.windowStart : now;
-		// The record dies with the window rather than outliving it, so a lockout cannot become permanent.
-		const ttl = Math.max(1, windowStart + ACCOUNT_WINDOW_SECONDS - now);
-		await attempts().upsert(
-			key,
-			{ accountId, failures, windowStart, exp: now + ttl },
-			ttl
-		);
 		return { ok: false, reason: 'invalid' };
 	}
 

@@ -165,6 +165,47 @@ export class SqlAdapter<
 	}
 
 	/*
+	 * One UPDATE answering the value it wrote, so racing callers each read back their own. `field` is a
+	 * code constant and travels as a bound parameter in both the path and the read, never as SQL text.
+	 */
+	async increment(
+		_id: string,
+		field: string,
+		expiresIn?: number
+	): Promise<number | undefined> {
+		const handle = sql();
+		// `handle.array`: Bun binds a bare JS array as text PostgreSQL cannot read as an array.
+		const counted = handle`
+			jsonb_set(
+				payload,
+				${handle.array([field], 'text')},
+				to_jsonb(COALESCE((payload->>${field})::numeric, 0) + 1)
+			)
+		`;
+		const rows =
+			expiresIn === undefined
+				? await handle`
+						UPDATE ${handle(this.name)}
+						SET payload = ${counted}
+						WHERE id = ${_id}
+						RETURNING (payload->>${field})::float8 AS value
+					`
+				: await handle`
+						UPDATE ${handle(this.name)}
+						SET payload = jsonb_set(
+								${counted},
+								'{exp}',
+								to_jsonb(${Math.floor(Date.now() / 1000) + expiresIn}::bigint)
+							),
+							expires_at = ${new Date(Date.now() + expiresIn * 1000)}
+						WHERE id = ${_id}
+						RETURNING (payload->>${field})::float8 AS value
+					`;
+		const value: unknown = rows[0]?.value;
+		return typeof value === 'number' ? value : undefined;
+	}
+
+	/*
 	 * Inserts, or replaces a row whose expiry has passed but which the sweeper has not reaped yet; a live
 	 * row is left alone and nothing is returned for it. One statement, so the primary key decides a race.
 	 */

@@ -160,10 +160,31 @@ export async function verifyCode(
 	code: string
 ): Promise<CodeOutcome> {
 	const challenge = await challenges().find(ref);
-	if (!challenge || challenge.method !== 'code') {
+	/*
+	 * Expiry compared here as well as reaped by the store: MongoDB's TTL monitor deletes lazily, and a
+	 * code that outlived its window by a minute is a minute of guessing nobody granted.
+	 */
+	if (
+		!challenge ||
+		challenge.method !== 'code' ||
+		challenge.exp <= epochTime()
+	) {
 		return { ok: false, reason: 'invalid' };
 	}
 	if (challenge.attempts >= CODE_MAX_ATTEMPTS) {
+		return { ok: false, reason: 'too_many' };
+	}
+	/*
+	 * The attempt is counted before the code is compared, in one atomic write that answers this
+	 * attempt's own number. Counting a wrong guess after comparing it was a read-modify-write: a burst
+	 * of parallel guesses all read the same count and together advanced it by one, so the cap never
+	 * bound. A right code is counted too, harmlessly — the challenge is destroyed with it.
+	 */
+	const attempt = await challenges().increment(ref, 'attempts');
+	if (attempt === undefined) {
+		return { ok: false, reason: 'invalid' };
+	}
+	if (attempt > CODE_MAX_ATTEMPTS) {
 		return { ok: false, reason: 'too_many' };
 	}
 	if (challenge.codeHash === hashCode(code)) {
@@ -175,12 +196,9 @@ export async function verifyCode(
 		return { ok: true };
 	}
 
-	const attempts = challenge.attempts + 1;
-	const remainingTtl = Math.max(1, challenge.exp - epochTime());
-	await challenges().upsert(ref, { ...challenge, attempts }, remainingTtl);
 	return {
 		ok: false,
-		reason: attempts >= CODE_MAX_ATTEMPTS ? 'too_many' : 'wrong'
+		reason: attempt >= CODE_MAX_ATTEMPTS ? 'too_many' : 'wrong'
 	};
 }
 

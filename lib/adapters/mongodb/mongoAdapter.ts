@@ -144,6 +144,30 @@ export class MongoAdapter<
 		}
 	}
 
+	/*
+	 * `$inc` answered with the document after the write, so each racing caller reads back its own
+	 * value. `field` is a code constant, never caller input, and the interpolation cannot produce an
+	 * operator for the reason `destroyByOwner` gives.
+	 */
+	async increment(_id: string, field: string, expiresIn?: number) {
+		const expiry =
+			expiresIn === undefined
+				? {}
+				: {
+						$set: {
+							expiresAt: new Date(Date.now() + expiresIn * 1000),
+							'payload.exp': Math.floor(Date.now() / 1000) + expiresIn
+						}
+					};
+		const result = await this.coll().findOneAndUpdate(
+			{ _id },
+			{ $inc: { [`payload.${field}`]: 1 }, ...expiry },
+			{ returnDocument: 'after', projection: { payload: 1 } }
+		);
+		const value = payloadOf(result)?.[field];
+		return typeof value === 'number' ? value : undefined;
+	}
+
 	coll(name: string = this.name) {
 		return db.collection<{ _id: string; payload?: unknown }>(name);
 	}

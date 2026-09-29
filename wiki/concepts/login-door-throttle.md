@@ -4,7 +4,7 @@ title: 'Sign-in brute-force throttle'
 tags: [architecture, contract, gotcha, config]
 sources: [oauth-server-codebase]
 created: 2026-08-28
-updated: 2026-08-28
+updated: 2026-09-29
 graph:
   node_type: concept
   relationships:
@@ -26,9 +26,22 @@ re-derived from reading the code, and they are why this page exists.
 
 `lib/totp/verify.ts` already held this exact mechanism for the code step, backed by `TotpAttempt`:
 keyed on an identity, checked **before** verifying so a locked account is refused even with a correct
-secret, written only on failure, destroyed on success, and given a record whose lifetime bounds the
-lockout. Spec 027 gave the second factor a throttle and left the password door with none — so this
-feature is that pattern applied to the other secret, deliberately and visibly.
+secret, destroyed on success, and given a record whose lifetime bounds the lockout. Spec 027 gave the
+second factor a throttle and left the password door with none — so this feature is that pattern
+applied to the other secret, deliberately and visibly.
+
+**Counted before verifying, not after a failure** (corrected 2026-09-29). Both throttles used to read
+the counter, verify, and write one more failure — a read-modify-write, so a burst of parallel guesses
+all found the door open, all were verified, and together advanced the counter by one: fifteen
+passwords were tested against a cap of five. `recordAttempt` (`lib/login_throttle/throttle.ts:142`) now
+counts the attempt through the adapter's atomic `increment` *before* the lookup and the hash, and
+answers whether that attempt's own number is within the cap; a verified password clears the count, so
+what remains counted is the failures. `isThrottled` stays in front as the cheap path for a door already
+shut. The same `increment` moves the record's expiry to 24 hours after the attempt, which keeps the
+retention horizon below exact. Opening a window is an insert-if-absent (`create`); rolling an elapsed one
+is still a plain write, so a burst landing on the exact instant of a roll can reset the count once per
+window. `test/login_throttle/concurrent_guesses.spec.ts` counts the hashes a burst buys. See
+[[single-use-under-concurrency]] for the adapter operations.
 
 The one place the two diverge is ownership, and it is forced:
 

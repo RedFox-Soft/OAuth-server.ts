@@ -49,11 +49,23 @@ real round-trip opens; the delay goes *after* the read, since a delay before it 
 out. Real-datastore evidence is `database/verify_postgres.ts` §4 for PostgreSQL; MongoDB was checked
 against a scratch database when the change was made.
 
-## Not covered by this page
+## Attempt counters: the third operation
 
-Attempt counters — a verification code's attempts, the TOTP failure window, the login door throttle — are
-the same shape, a read-modify-write, and a burst of parallel guesses advances them by one. They count
-rather than spend, so `consume` does not fit them; see [[login-door-throttle]] and [[totp-second-factor]].
+A verification code's attempts, the TOTP failure window and the login door throttle had the same shape —
+read the count, check, verify, write the count plus one — and a burst of parallel guesses advanced them by
+one: fifteen passwords were hashed against a cap of five, and the right emailed code was accepted after a
+burst of fifteen wrong ones. They count rather than spend, so the adapter gained `increment(id, field,
+expiresIn?)` (`lib/adapters/types.ts:88`): one atomic write that answers the new value, `$inc` with
+`returnDocument: 'after'` in MongoDB and `UPDATE … RETURNING` in PostgreSQL.
+
+Every counter now counts the attempt **before** verifying it and admits it only if its own number is
+within the cap (`lib/verification/challenge.ts:183`, `lib/totp/verify.ts`, `recordAttempt` in
+`lib/login_throttle/throttle.ts`). A right answer is counted too, harmlessly, because success destroys or
+clears the record. Opening a window is `create`; the TOTP window's record dies with the window, so an
+expired one is simply free, while the login throttle's outlives it for the escalation and rolls with a
+plain write — see [[login-door-throttle]] for what that leaves. [[totp-second-factor]] has the rest of
+the TOTP design. The specs are `test/*/concurrent_guesses.spec.ts`; `database/verify_postgres.ts` checks
+that five simultaneous increments are answered 1 to 5.
 
 ## Related
 
