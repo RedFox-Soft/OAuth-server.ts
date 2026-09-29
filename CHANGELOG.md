@@ -56,6 +56,13 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   and the sector refusal repeated the status the target answered. They now share the address check,
   per-hop redirect check, timeout and streaming byte bound the client ID metadata document fetch had,
   and the sector refusal is one message whatever went wrong.
+- **Codes, rotating refresh tokens, pushed requests and assertion `jti`s are single use under
+  concurrency.** Each was checked on a copy read earlier in the request and then spent with an
+  unconditional write, so parallel requests all won: one authorization code yielded five sets of
+  tokens, a rotating refresh token forked into several chains without tripping reuse detection, and a
+  captured client assertion or DPoP proof authenticated every concurrent replay. The adapter's
+  `consume` now answers whether this call spent the record, a new `create` stores only when the id is
+  free, and every caller decides on that answer, in all three backends.
 
 ## [0.6.0] - 2026-09-28
 

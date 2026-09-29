@@ -123,6 +123,10 @@ to a green hermetic suite. Both scripts refuse any database whose name does not 
 its adapter imports until after that guard has spoken — the adapter index chooses a backend as it
 evaluates, so a static import would connect before the name was checked.
 
+A fourth property joined them on 2026-09-29: that of five simultaneous `consume` or `create` calls on
+one record exactly one wins (§4 of the script). The in-memory store cannot show a race a real
+round-trip opens — see [[single-use-under-concurrency]].
+
 The tier grows by accident, which is why the reverse review is a requirement of the feature rather
 than a courtesy: anything a database-free test could prove moves back into `bun test`. This is the
 one place with no gate on it.

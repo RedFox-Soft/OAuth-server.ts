@@ -35,12 +35,15 @@ export default async function respond(
 		);
 	}
 
-	if (pushedAuthorizationRequest?.payload.consumed) {
+	if (
+		pushedAuthorizationRequest &&
+		(pushedAuthorizationRequest.payload.consumed ||
+			!(await pushedAuthorizationRequest.consume()))
+	) {
 		throw new InvalidRequestUri(
 			'request_uri is invalid, expired, or was already used'
 		);
 	}
-	await pushedAuthorizationRequest?.consume();
 
 	const out = await processResponseTypes(oidc);
 

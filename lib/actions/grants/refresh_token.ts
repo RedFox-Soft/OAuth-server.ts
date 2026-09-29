@@ -143,13 +143,22 @@ export const handler = async function refreshTokenHandler(
 
 	oidc.entity('Account', account);
 
-	if (refreshToken.payload.consumed) {
+	/*
+	 * Reuse of a rotated token revokes the whole grant, whether the earlier use was a request that has
+	 * finished or one racing this one — the second is what a stolen token's holder and its owner
+	 * refreshing at once looks like, and it must not yield two live chains.
+	 */
+	const reused = async () => {
 		const { grantId: consumedGrantId } = refreshToken.payload;
 		await Promise.all([
 			refreshToken.destroy(),
 			consumedGrantId && revoke(consumedGrantId, oidc)
 		]);
-		throw new InvalidGrant('refresh token already used');
+		return new InvalidGrant('refresh token already used');
+	};
+
+	if (refreshToken.payload.consumed) {
+		throw await reused();
 	}
 
 	if (oidc.params.authorization_details && !rarSupported(refreshToken)) {
@@ -159,7 +168,9 @@ export const handler = async function refreshTokenHandler(
 	}
 
 	if (await rotateRefreshToken(oidc)) {
-		await refreshToken.consume();
+		if (!(await refreshToken.consume())) {
+			throw await reused();
+		}
 		oidc.entity('RotatedRefreshToken', refreshToken);
 
 		refreshToken = new RefreshToken({

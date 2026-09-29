@@ -109,12 +109,10 @@ export const handler = async function authorizationCodeHandler(
 		throw new InvalidGrant('authorization code redirect_uri mismatch');
 	}
 
-	if (code.payload.consumed) {
+	if (code.payload.consumed || !(await code.consume())) {
 		await revoke(code.payload.grantId, oidc);
 		throw new InvalidGrant('authorization code already consumed');
 	}
-
-	await code.consume();
 
 	oidc.entity('AuthorizationCode', code);
 	oidc.entity('Grant', grant);

@@ -146,13 +146,44 @@ export class SqlAdapter<
 		return rows.length;
 	}
 
-	async consume(_id: string): Promise<void> {
+	/*
+	 * The unconsumed state is part of the WHERE, so of racing callers only one updates the row; the
+	 * others find nothing to update and are told so. An absent key is a record written before `consumed`
+	 * defaulted to `false`.
+	 */
+	async consume(_id: string): Promise<boolean> {
 		const handle = sql();
 		const consumedAt = Math.floor(Date.now() / 1000);
-		await handle`
+		const rows = await handle`
 			UPDATE ${handle(this.name)}
 			SET payload = jsonb_set(payload, '{consumed}', to_jsonb(${consumedAt}::bigint))
 			WHERE id = ${_id}
+			AND (payload->'consumed' IS NULL OR payload->'consumed' = 'false'::jsonb)
+			RETURNING id
 		`;
+		return rows.length === 1;
+	}
+
+	/*
+	 * Inserts, or replaces a row whose expiry has passed but which the sweeper has not reaped yet; a live
+	 * row is left alone and nothing is returned for it. One statement, so the primary key decides a race.
+	 */
+	async create(
+		_id: string,
+		payload: StoredRecord,
+		expiresIn: number
+	): Promise<boolean> {
+		const handle = sql();
+		const expiresAt = new Date(Date.now() + expiresIn * 1000);
+		const table = handle(this.name);
+		const rows = await handle`
+			INSERT INTO ${table} (id, payload, expires_at)
+			VALUES (${_id}, ${payload}, ${expiresAt})
+			ON CONFLICT (id) DO UPDATE
+			SET payload = EXCLUDED.payload, expires_at = EXCLUDED.expires_at
+			WHERE ${table}.expires_at IS NOT NULL AND ${table}.expires_at <= now()
+			RETURNING id
+		`;
+		return rows.length === 1;
 	}
 }

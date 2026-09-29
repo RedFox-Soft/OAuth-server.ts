@@ -263,6 +263,43 @@ check(
 	declaredTwice.map((r) => r.status).join(', ')
 );
 
+/* Single use, which the hermetic suite cannot show: the in-memory store answers within one turn of the
+ * event loop, so the window between a read and a write that let a code be redeemed twice never opens
+ * there. Here it is a real round-trip, and exactly one caller may win. */
+const codeId = `fidelity-code-${Date.now()}`;
+await adapter('AuthorizationCode').upsert(
+	codeId,
+	{ consumed: false, exp: 9e9 },
+	3600
+);
+const consumedBy = await Promise.all(
+	Array.from({ length: 5 }, () => adapter('AuthorizationCode').consume(codeId))
+);
+check(
+	'five simultaneous consumptions of one record: exactly one is told it consumed it',
+	consumedBy.filter(Boolean).length === 1,
+	consumedBy.join(', ')
+);
+
+const replayId = `fidelity-replay-${Date.now()}`;
+const createdBy = await Promise.all(
+	Array.from({ length: 5 }, () =>
+		adapter('ReplayDetection').create(replayId, { iss: 'fidelity' }, 60)
+	)
+);
+check(
+	'five simultaneous creations of one identifier: exactly one stores it',
+	createdBy.filter(Boolean).length === 1,
+	createdBy.join(', ')
+);
+
+const staleId = `fidelity-stale-${Date.now()}`;
+await adapter('ReplayDetection').upsert(staleId, { iss: 'fidelity' }, -1);
+check(
+	'an identifier held only by an expired, unreaped row can be created again',
+	await adapter('ReplayDetection').create(staleId, { iss: 'fidelity' }, 60)
+);
+
 /* ---- 5. the sweeper removes what expired, and nothing else ---------------------------------- */
 
 await adapter('AccessToken').upsert('fidelity-expired', { exp: 1 }, -1);

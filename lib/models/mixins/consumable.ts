@@ -30,9 +30,15 @@ export default function consumable<
 			super(payload);
 		}
 
-		async consume() {
-			await this.adapter.consume(this.id);
-			this.emit('consumed');
+		/*
+		 * Whether this call consumed it. A caller that checked `payload.consumed` first has checked a copy
+		 * read earlier in the same request, which another request may have consumed since; the answer here
+		 * is the datastore's, taken in the same write that spends it.
+		 */
+		async consume(): Promise<boolean> {
+			const consumed = await this.adapter.consume(this.id);
+			if (consumed) this.emit('consumed');
+			return consumed;
 		}
 
 		get isValid() {

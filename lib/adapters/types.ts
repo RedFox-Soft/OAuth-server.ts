@@ -62,7 +62,21 @@ export interface ModelAdapter<TPayload = unknown> {
 	findByUid(uid: string): Promise<TPayload | undefined>;
 	destroy(id: string): Promise<void>;
 	revokeByGrantId(grantId: string): Promise<void>;
-	consume(id: string): Promise<void>;
+	/*
+	 * Marks the record consumed, and answers whether *this* call did: `false` when it was already
+	 * consumed or is not there. One conditional write, so of several callers racing for the same record
+	 * exactly one is told `true` — which is what makes a code, a refresh token or a pushed request single
+	 * use under concurrency rather than only in sequence. A caller decides on the answer, never on a
+	 * `consumed` it read earlier.
+	 */
+	consume(id: string): Promise<boolean>;
+	/*
+	 * Stores the record only when no live one holds the id, and answers whether it did. A record past
+	 * its expiry counts as free although the datastore may not have reaped it yet. The insert-if-absent
+	 * that a lookup followed by `upsert` cannot be, because two callers can both look before either
+	 * writes.
+	 */
+	create(id: string, payload: TPayload, expiresIn: number): Promise<boolean>;
 	/*
 	 * Destroys every record in *this* area whose `field` equals `value`, returning how many went. The
 	 * one way to reach a principal's records: nothing else can enumerate by owner, and a grant walk

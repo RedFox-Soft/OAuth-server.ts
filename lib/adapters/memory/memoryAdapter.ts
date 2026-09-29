@@ -57,11 +57,22 @@ export class MemoryAdapter<
 		getStorage().delete(this.key(id));
 	}
 
+	/*
+	 * Atomic by construction rather than by the datastore: there is no `await` between the read and the
+	 * write, so no other request can run between them.
+	 */
 	async consume(id: string) {
 		const stored = recordAt(this.key(id));
-		if (stored) {
-			stored.consumed = epochTime();
-		}
+		if (!stored || stored.consumed) return false;
+		stored.consumed = epochTime();
+		return true;
+	}
+
+	/* An expired entry is already gone here: the store drops it on its own `maxAge`. */
+	async create(id: string, payload: StoredRecord, expiresIn: number) {
+		if (recordAt(this.key(id))) return false;
+		await this.upsert(id, payload, expiresIn);
+		return true;
 	}
 
 	async find(id: string) {

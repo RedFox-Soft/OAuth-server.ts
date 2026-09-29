@@ -63,12 +63,10 @@ export const handler = async function deviceCodeHandler(
 		throw new AuthorizationPending();
 	}
 
-	if (code.payload.consumed) {
+	if (code.payload.consumed || !(await code.consume())) {
 		if (code.payload.grantId) await revoke(code.payload.grantId, oidc);
 		throw new InvalidGrant('device code already consumed');
 	}
-
-	await code.consume();
 
 	if (code.payload.error) {
 		throw errors.errorForCode(
