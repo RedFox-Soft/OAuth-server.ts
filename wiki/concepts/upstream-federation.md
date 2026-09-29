@@ -216,7 +216,10 @@ the third distinct way this page has lost content it had rendered.
 
 `jose`'s `createRemoteJWKSet` supplies the whole key-caching contract — TTL, plus one refetch on an unknown
 `kid` within its cooldown — so none of it is hand-written; `lib/federation/jwks.ts` adds only a bound on how
-many providers are held, because the URL comes from a document an operator edits.
+many providers are held, because the URL comes from a document an operator edits — and, since
+2026-09-29, routes jose's fetch through the egress boundary (`customFetch`), so the key set, like discovery
+and the code exchange, cannot be pointed at a private address or return an unbounded body. See
+[[mcp-server-authorization]] for the boundary; discovery also refuses any endpoint that is not https.
 `lib/helpers/jwt.ts` is deliberately **not** extended: it takes this server's own keystore object, so
 adapting an upstream key set to that shape would mean writing a second keystore implementation to reach a
 verifier jose already exposes.

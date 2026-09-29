@@ -2,7 +2,13 @@ import {
 	knownProviderByIssuer,
 	type IssuerRule
 } from '../consts/known_providers.js';
-import { DISCOVERY_TTL_MS, PROVIDER_CACHE_LIMIT } from './consts.js';
+import {
+	DISCOVERY_TTL_MS,
+	MAX_UPSTREAM_DOCUMENT_BYTES,
+	PROVIDER_CACHE_LIMIT,
+	UPSTREAM_TIMEOUT_MS
+} from './consts.js';
+import { guardedFetch, readBounded } from '../shared/egress.js';
 
 /*
  * The upstream provider's published metadata: fetched, checked for self-consistency, and cached.
@@ -97,6 +103,21 @@ function parse(
 	};
 
 	/*
+	 * Every endpoint on https. The document is the issuer's, and the issuer is a group member's to set, so
+	 * without this an https issuer could send the code exchange — client credentials included — or the key
+	 * set fetch over plain http, to wherever it liked.
+	 */
+	for (const [key, value] of [
+		['authorization_endpoint', metadata.authorizationEndpoint],
+		['token_endpoint', metadata.tokenEndpoint],
+		['jwks_uri', metadata.jwksUri]
+	] as const) {
+		if (URL.parse(value)?.protocol !== 'https:') {
+			throw new DiscoveryError('malformed', `${key} is not an https URL`);
+		}
+	}
+
+	/*
 	 * OIDC Discovery 1.0 §4.3: the document's own issuer must equal the one used to fetch it. This is the
 	 * check that catches a copy-pasted tenant URL, a redirect, or a stray trailing slash — and catching it
 	 * at configuration time is why the admin write calls this too.
@@ -152,25 +173,36 @@ export async function discover(issuer: string): Promise<ProviderMetadata> {
 		return cached.metadata;
 	}
 
-	let response: Response;
+	/*
+	 * Through the egress boundary: the issuer is any group member's to set, and an unauthenticated visitor
+	 * sets this request off again by starting a sign-in, so it must not be able to reach a private address,
+	 * follow a redirect somewhere unchecked, or hold a request open.
+	 */
+	let text: string;
 	try {
-		response = await fetch(
-			`${issuer.replace(/\/$/, '')}/.well-known/openid-configuration`
+		const response = await guardedFetch(
+			`${issuer.replace(/\/$/, '')}/.well-known/openid-configuration`,
+			{
+				headers: { accept: 'application/json' },
+				timeoutMs: UPSTREAM_TIMEOUT_MS,
+				httpsRedirectsOnly: true
+			}
 		);
+		if (!response.ok) {
+			throw new DiscoveryError('unreachable', `status ${response.status}`);
+		}
+		text = await readBounded(response, MAX_UPSTREAM_DOCUMENT_BYTES);
 	} catch (err) {
+		if (err instanceof DiscoveryError) throw err;
 		throw new DiscoveryError(
 			'unreachable',
 			err instanceof Error ? err.message : undefined
 		);
 	}
 
-	if (!response.ok) {
-		throw new DiscoveryError('unreachable', `status ${response.status}`);
-	}
-
 	let document: unknown;
 	try {
-		document = await response.json();
+		document = JSON.parse(text);
 	} catch {
 		throw new DiscoveryError('malformed', 'body is not JSON');
 	}

@@ -2,7 +2,12 @@ import crypto from 'crypto';
 
 import { issuerFor, type RequestBucket } from '../configs/issuer.js';
 import { knownProviderByIssuer } from '../consts/known_providers.js';
-import { FEDERATION_CALLBACK_PATH } from './consts.js';
+import {
+	FEDERATION_CALLBACK_PATH,
+	MAX_UPSTREAM_DOCUMENT_BYTES,
+	UPSTREAM_TIMEOUT_MS
+} from './consts.js';
+import { guardedFetch, readBounded } from '../shared/egress.js';
 import { clientCredential } from './credential.js';
 import type { ProviderMetadata } from './discovery.js';
 import type { FederationProvider } from './types.js';
@@ -171,27 +176,34 @@ export async function exchangeCode(
 		headers.authorization = `Basic ${Buffer.from(credentials).toString('base64')}`;
 	}
 
-	let response: Response;
+	/*
+	 * Through the egress boundary: the endpoint comes from a discovery document a group member's issuer
+	 * serves, and this request carries the provider's client credential. A redirect answering a POST is
+	 * returned unfollowed and refused as a non-success below.
+	 */
+	let text: string;
 	try {
-		response = await fetch(metadata.tokenEndpoint, {
+		const response = await guardedFetch(metadata.tokenEndpoint, {
 			method: 'POST',
 			headers,
-			body
+			body,
+			timeoutMs: UPSTREAM_TIMEOUT_MS
 		});
+		if (!response.ok) {
+			throw new ExchangeError('unreachable', `status ${response.status}`);
+		}
+		text = await readBounded(response, MAX_UPSTREAM_DOCUMENT_BYTES);
 	} catch (err) {
+		if (err instanceof ExchangeError) throw err;
 		throw new ExchangeError(
 			'unreachable',
 			err instanceof Error ? err.message : undefined
 		);
 	}
 
-	if (!response.ok) {
-		throw new ExchangeError('unreachable', `status ${response.status}`);
-	}
-
 	let parsed: unknown;
 	try {
-		parsed = await response.json();
+		parsed = JSON.parse(text);
 	} catch {
 		throw new ExchangeError('malformed', 'body is not JSON');
 	}

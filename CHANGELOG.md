@@ -79,6 +79,11 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   meant that asking twice within a minute told anybody the address was registered; the SMTP send,
   awaited only for such an address, told the same by response time. Every outcome now renders the
   one accepted page, which states the limits, and the mail is sent after the response.
+- **Requests to an upstream identity provider go through the egress boundary.** Discovery, the code
+  exchange, GitHub's token exchange and the upstream key set used plain `fetch`, although any group
+  member can set a provider's issuer and an unauthenticated visitor re-triggers the requests by
+  starting a sign-in; they now share the address, redirect, time and size checks, and discovery
+  refuses a document naming any endpoint that is not https.
 - **A client that skips consent does so only for its own group's users.** Any group member could
   create a project with no bucket and a consent-free client in it; such a client signs into the shared
   default bucket, where it received any signed-in user's claims with `prompt=none` and no page shown.

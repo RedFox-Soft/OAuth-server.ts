@@ -68,3 +68,12 @@ export const PROVIDER_CACHE_LIMIT = 64;
 
 /* How long fetched discovery metadata is trusted before it is fetched again. */
 export const DISCOVERY_TTL_MS = 10 * 60 * 1000;
+
+/*
+ * Bounds on every request to an upstream provider. A discovery document, a token response or a key set
+ * is a few kilobytes from any real provider; 256 KB leaves room for a large key set with certificate
+ * chains, and ten seconds for a slow one, while refusing a host that would hold a sign-in open or stream
+ * an unbounded body into memory.
+ */
+export const MAX_UPSTREAM_DOCUMENT_BYTES = 256 * 1024;
+export const UPSTREAM_TIMEOUT_MS = 10_000;

@@ -3,6 +3,8 @@ import { clientCredential } from '../credential.js';
 import { IdentityError } from './contract.js';
 import type { IdentityRequest, UpstreamIdentity } from './contract.js';
 import { githubProfile } from './github.js';
+import { MAX_UPSTREAM_DOCUMENT_BYTES, UPSTREAM_TIMEOUT_MS } from '../consts.js';
+import { guardedFetch, readBounded } from '../../shared/egress.js';
 
 /*
  * An identity read back from the provider, for a provider that asserts none.
@@ -47,9 +49,10 @@ async function exchangeForApiToken(
 	});
 	if (codeVerifier) body.set('code_verifier', codeVerifier);
 
-	let response: Response;
+	// Through the egress boundary, as every upstream request is (see lib/federation/flow.ts).
+	let text: string;
 	try {
-		response = await fetch(tokenEndpoint, {
+		const response = await guardedFetch(tokenEndpoint, {
 			method: 'POST',
 			headers: {
 				'content-type': 'application/x-www-form-urlencoded',
@@ -60,22 +63,24 @@ async function exchangeForApiToken(
 				 */
 				accept: 'application/json'
 			},
-			body
+			body,
+			timeoutMs: UPSTREAM_TIMEOUT_MS
 		});
+		if (!response.ok) {
+			throw new IdentityError('upstream', `status ${response.status}`);
+		}
+		text = await readBounded(response, MAX_UPSTREAM_DOCUMENT_BYTES);
 	} catch (err) {
+		if (err instanceof IdentityError) throw err;
 		throw new IdentityError(
 			'upstream',
 			err instanceof Error ? err.message : 'unreachable'
 		);
 	}
 
-	if (!response.ok) {
-		throw new IdentityError('upstream', `status ${response.status}`);
-	}
-
 	let parsed: unknown;
 	try {
-		parsed = await response.json();
+		parsed = JSON.parse(text);
 	} catch {
 		throw new IdentityError('upstream', 'token response is not JSON');
 	}

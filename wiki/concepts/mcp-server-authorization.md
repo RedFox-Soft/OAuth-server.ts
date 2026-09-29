@@ -119,9 +119,12 @@ four go through them. The sector refusal is now one message whatever went wrong.
 `test/egress/client_addresses.spec.ts` is the attack, and `test/preload.ts` resolves every name to one
 public address so no spec depends on the machine's DNS.
 
-Still outside it: federation discovery, token exchange and upstream key sets
-(`lib/federation/discovery.ts`, `flow.ts`, `jwks.ts`). Those addresses are an administrator's, not a
-stranger's, and jose's remote key set does its own fetching.
+Federation's requests joined it on 2026-09-29 — discovery, the code exchange, GitHub's token exchange
+and the upstream key set (`lib/federation/discovery.ts`, `flow.ts`, `identity/profile_api.ts`, `jwks.ts`,
+the last through jose's `customFetch`). They had been left out as "an administrator's addresses, not a
+stranger's", which undersold both halves: any group member can set an issuer, the discovery document it
+serves names the token endpoint and key set, and an unauthenticated visitor sets the requests off again by
+starting a sign-in. Discovery now also refuses an endpoint that is not https.
 
 Three traps live here.
 
