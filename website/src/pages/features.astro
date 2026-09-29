@@ -7,7 +7,11 @@ import Button from '../components/ui/Button.astro';
 import Section from '../components/ui/Section.astro';
 import CompareLinks from '../components/CompareLinks.astro';
 import { backendList } from '../data/storage.ts';
+import { loadExport } from '../data/export.ts';
 import Eyebrow from '../components/ui/Eyebrow.astro';
+
+// Counted from the catalogue the build exports, so the number cannot drift from the tool list.
+const mcpToolCount = loadExport().mcp.tools.length;
 
 const rfc = (n: string) => ({
 	label: `RFC ${n}`,
@@ -222,13 +226,13 @@ const groups: {
 			},
 			{
 				title: 'Administration over MCP',
-				body: '65 tools served to an AI agent at POST /mcp as an OAuth 2.1 protected resource, with two-call confirmation on high-consequence operations.',
+				body: `${mcpToolCount} tools served to an AI agent at POST /mcp as an OAuth 2.1 protected resource, with two-call confirmation on high-consequence operations.`,
 				flag: 'mcp.enabled',
 				spec: rfc('9728')
 			},
 			{
 				title: 'Authorization for your own MCP servers',
-				body: 'Declare a third-party MCP server as a protected resource of a project and this server mints tokens whose audience is exactly that resource, with no code change here and no restart. Tokens are self-contained by default, so the resource verifies them against the published keys without credentials of its own.',
+				body: 'Declare a third-party MCP server as a protected resource of a project and this server mints tokens whose audience is exactly that resource, with no code change here and no restart. In a bucket with an address of its own the declaration needs nothing from the resource — it can be internal, on localhost or not yet deployed — and another tenant may declare the same URL without affecting yours. Tokens are self-contained by default, so the resource verifies them against its bucket’s published keys without credentials of its own.',
 				spec: rfc('8707')
 			},
 			{
@@ -258,7 +262,7 @@ const groups: {
 			},
 			{
 				title: 'A bucket addressed by a path or a host',
-				body: 'Each user bucket is its own issuer, reached at a path beneath the server or at a hostname of its own — one or the other, never both. A hostname lets the browser isolate that bucket’s sign-in cookie by origin and publishes one metadata location instead of two; it costs a DNS record and a certificate you provide. Changing an address is its own operation: it shows you which clients it will break before it breaks them.'
+				body: 'Each user bucket is its own issuer, with its own metadata and signing keys, reached at a path beneath the server or at a hostname of its own — one or the other, never both. A hostname lets the browser isolate that bucket’s sign-in cookie by origin and publishes one metadata location instead of two; it costs a DNS record and a certificate you provide. Changing an address is its own operation: it shows you which clients it will break before it breaks them.'
 			},
 			{
 				title: 'End-user self-service',
@@ -271,7 +275,7 @@ const groups: {
 			},
 			{
 				title: 'Signing key management',
-				body: 'View, generate and delete keys over the key store; a generated key is applied to the live keystore and published at /jwks.'
+				body: 'Each bucket with an address of its own signs with keys of its own, published at its own jwks_uri, so one tenant’s token never verifies at another’s resource server. The bucket’s owning group rotates them — a new key is published before it may sign, and a retired one stays published until its tokens expire — while the instance key set stays a super administrator’s.'
 			}
 		]
 	},

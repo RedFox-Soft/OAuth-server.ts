@@ -202,6 +202,9 @@ signed, which is every image on the internet. The same two values verify by hand
 - Signing keys are loaded once at startup from the database. Generating one in the console
   hot-applies it to the replica that served that request only, so the others must be restarted or
   they will disagree about what `/jwks` advertises. The console's key page reports exactly this
-  drift, between the stored key set and the one the process booted with.
+  drift, between the stored key set and the one the process booted with. That is the instance key
+  set only: a bucket's own keys are read from the database and cached for thirty seconds per replica,
+  so a change to them reaches every replica within that time without a restart — which is why a new
+  bucket key cannot be promoted to signing until it has been published for a minute.
 - Server settings are read at boot too. A settings change applies on the next rollout:
   `kubectl rollout restart deployment/oauth-server`.

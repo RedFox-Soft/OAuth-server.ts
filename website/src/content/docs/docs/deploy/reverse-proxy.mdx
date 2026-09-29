@@ -141,6 +141,45 @@ auth.example.com {
 
 Caddy obtains and renews the certificate itself, which is most of why its block is so much shorter.
 
+## Client certificates (mTLS)
+
+Only for [RFC 8705](https://www.rfc-editor.org/rfc/rfc8705) — clients authenticating with a TLS
+certificate, or certificate-bound access tokens. TLS ends at the proxy, so the server never sees the
+handshake: the proxy has to verify the client certificate and forward it in a header, and the server
+has to be told to believe that header.
+
+The header is RFC 9440's `Client-Cert`: the DER certificate as a byte sequence, base64 between
+colons. A bare base64 `X-Client-Cert` is read when `Client-Cert` is absent, for proxies configured
+before RFC 9440. The server reads neither until
+[`mTLS.trustProxyCertificateHeader`](/docs/reference/settings/#mTLS.trustProxyCertificateHeader) is
+on, and that setting has a wrong answer in each direction: off, no certificate is ever read; on
+behind a proxy that passes an incoming header through, anyone can send a certificate — which is
+public — and be believed.
+
+So the proxy must **set** the header on every request, overwriting whatever the client sent, and
+remove the other one. In Caddy:
+
+```caddy
+auth.example.com {
+	tls {
+		client_auth {
+			mode verify_if_given
+			trust_pool file /etc/caddy/client-ca.pem
+		}
+	}
+	reverse_proxy 127.0.0.1:3000 {
+		header_up Client-Cert ":{http.request.tls.client.certificate_der_base64}:"
+		header_up -X-Client-Cert
+	}
+}
+```
+
+`verify_if_given` keeps every other client working without a certificate. nginx has no variable
+holding the DER certificate as base64 — `$ssl_client_escaped_cert` is URL-encoded PEM, which this
+server does not read — so behind nginx either put a proxy that can produce `Client-Cert` in front of
+the server, or override `features.mTLS.getCertificate` to read nginx's form. Whichever you choose,
+clear both headers on requests that carry no certificate, then switch the setting on.
+
 ## Checking it worked
 
 ```bash

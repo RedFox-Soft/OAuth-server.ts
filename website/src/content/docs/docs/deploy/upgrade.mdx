@@ -127,10 +127,11 @@ admin API) as part of the change.
   [settings reference](/docs/reference/settings/) for anything the release added. A setting that
   genuinely cannot be applied to a running server says so on its card and in the console, and there
   are none at present.
-- **Signing keys persist in the database**, through the `jwksStore` adapter, and are loaded once at
-  startup. An upgrade neither rotates nor invalidates them: tokens issued before it still verify,
-  and `/jwks` serves the same key set. Keys are not environment configuration and there is nothing
-  to carry across by hand.
+- **Signing keys persist in the database** — the instance key set through the `jwksStore` adapter,
+  loaded once at startup, and each addressable bucket's own keys in `bucketKeys`. An upgrade neither
+  rotates nor invalidates them: tokens issued before it still verify, and every `/jwks` serves the same
+  key set it did. Keys are not environment configuration and there is nothing to carry across by hand.
+  The one exception is the release that gave buckets keys of their own, below.
 - **SMTP settings** are read live from their own store on every send, so they are unaffected by a
   restart in either direction.
 - **Tokens, sessions and grants survive**, since they live in the database. Users are not signed
@@ -155,6 +156,28 @@ it is listed here so the support question is expected rather than alarming.
 The console is unaffected in one respect worth naming: it stays at `/admin`. An earlier plan moved
 it to free that word for a bucket address, and that turned out not to be necessary — the
 administrators bucket is served at the root and never puts its name in a URL.
+
+## One upgrade gives each bucket keys of its own
+
+Upgrading **to the release that gave addressable buckets their own signing keys and resource
+namespaces** changes three things an integration can see. The instance's own issuer, its metadata and
+its `/jwks` are unchanged; everything below concerns buckets with a path or a hostname of their own.
+
+- **A bucket signs with its own key from its first use.** Before, every bucket signed with the instance
+  keys and its discovery pointed `jwks_uri` at the instance's `/jwks`. Now its `jwks_uri` is beneath its
+  own issuer — `https://auth.example.com/acme/jwks`, or its hostname's `/jwks` — and holds only its own
+  keys. A resource server that re-reads the bucket's metadata picks this up by itself; one configured
+  with the instance's `/jwks` by hand has to be pointed at the bucket's.
+- **Tokens a bucket issued before the upgrade stop verifying at its resource servers.** They were
+  signed with the instance keys, which the bucket no longer publishes. The switch is immediate, with no
+  overlap, because an overlap would keep one tenant's tokens verifiable at another's. Access and ID
+  tokens are short-lived and refresh tokens are unaffected, so clients recover on their next refresh;
+  plan the upgrade for a quiet moment if long-lived access tokens are in use.
+- **The release carries its first schema migration, and it cannot be undone.** It re-keys declared
+  protected resources so that an identifier is unique per issuer rather than across the instance.
+  `db:migrate --plan` names it; take a backup before `db:migrate`, which step 4 above runs. From then
+  on, declaring a resource in a bucket of one's own needs nothing from the resource, and at the
+  instance's root issuer only a super administrator declares.
 
 ## After the restart
 

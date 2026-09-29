@@ -9,6 +9,7 @@ import Eyebrow from '../components/ui/Eyebrow.astro';
 import CompareLinks from '../components/CompareLinks.astro';
 import { organization, softwareApplication } from '../data/structured.ts';
 import { backendChoice } from '../data/storage.ts';
+import { loadExport } from '../data/export.ts';
 
 /*
  * `license` is the abbreviation this page visibly shows in its badge row, not a URL: the guardrail
@@ -16,6 +17,8 @@ import { backendChoice } from '../data/storage.ts';
  * structured claim and the visible copy cannot drift apart unnoticed.
  */
 const jsonLd = [organization(), softwareApplication({ license: 'FSL-1.1-ALv2' })];
+// Counted from the catalogue the build exports, so the number cannot drift from the tool list.
+const mcpToolCount = loadExport().mcp.tools.length;
 
 const quickstart = `curl -O https://raw.githubusercontent.com/RedFox-Soft/OAuth-server.ts/main/docker-compose.yml
 docker compose up
@@ -37,7 +40,7 @@ const audiences = [
 		points: [
 			'Declare your MCP server; get audience-bound tokens (RFC 8707)',
 			'Client ID Metadata Documents, so an agent host needs no setup',
-			'65 MCP tools for administration, off until you set mcp.enabled'
+			`${mcpToolCount} MCP tools for administration, off until you set mcp.enabled`
 		]
 	},
 	{
@@ -333,7 +336,7 @@ server ← { "appliedKeys": ["deviceFlow.enabled"],
 				<p class="mt-4 max-w-prose text-gray-600 dark:text-gray-400">
 					Turn on <code class="font-mono text-sm">mcp.enabled</code> and the management API is
 					served to an AI agent at <code class="font-mono text-sm">POST /mcp</code> as an OAuth
-					2.1 protected resource. Each of the 65 tools rebuilds the request the console would
+					2.1 protected resource. Each of the {mcpToolCount} tools rebuilds the request the console would
 					have sent and runs the console's own permission checks, validation and audit write,
 					so no privileged back door can drift away from the console.
 				</p>
@@ -346,7 +349,7 @@ server ← { "appliedKeys": ["deviceFlow.enabled"],
 						Protect your MCP server
 					</Button>
 					<Button href="/docs/reference/mcp-tools/" variant="secondary">
-						All 65 MCP tools
+						All {mcpToolCount} MCP tools
 					</Button>
 				</p>
 			</div>
