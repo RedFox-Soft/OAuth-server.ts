@@ -30,6 +30,13 @@ on:
       - 'NOTICE'
       - 'package.json'
       - '.github/workflows/site.yml'
+  # Again once a release is published. The push above builds main before its tag exists — the tag is
+  # pushed after the commit it names — so version.ts correctly stamps that build unreleased, and nothing
+  # rebuilt it once the tag landed: 0.7.0 went out with the site calling it unreleased. A workflow_run
+  # builds the default branch, which is the tagged commit whenever a release is cut from main's head.
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -44,6 +51,8 @@ concurrency:
 
 jobs:
   build:
+    # A failed release publishes nothing, so there is nothing new for the site to say.
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
