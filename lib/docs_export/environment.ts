@@ -39,6 +39,13 @@ export const ENVIRONMENT_VARIABLES: readonly EnvironmentVariable[] = [
 		example: 'postgres://user:password@localhost:5432/oauth'
 	},
 	{
+		name: 'MTLS_PROXY_SECRET',
+		requirement: 'optional',
+		description:
+			'The secret the TLS-terminating proxy sends in `x-client-cert-secret` beside the client certificate it forwards in `x-client-cert`. Needed only with the mTLS features on. TLS ends at the proxy, so a certificate can only arrive in a header, and any caller can send a header; without this secret, or with the wrong one, a certificate header is ignored rather than believed. Configure the proxy to set both headers and to strip any incoming copies of them.',
+		example: 'a-long-random-value'
+	},
+	{
 		name: 'NODE_ENV',
 		requirement: 'optional',
 		description:

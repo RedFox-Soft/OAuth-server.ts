@@ -53,13 +53,14 @@ scripts under `database/` are scripts, not specs, precisely so the default run c
 
 ## Environment variables
 
-| Variable        | Required       | Description                                                |
-| --------------- | -------------- | ---------------------------------------------------------- |
-| `ISSUER`        | yes            | Canonical server URL (e.g. `https://auth.example.com`)     |
-| `MONGODB_URI`   | one of the two | MongoDB connection string — and what selects MongoDB       |
-| `DATABASE_NAME` | with MongoDB   | MongoDB database name                                      |
-| `POSTGRES_URL`  | one of the two | PostgreSQL connection string — and what selects PostgreSQL |
-| `NODE_ENV`      | test only      | Set to `test` to use in-memory adapter                     |
+| Variable            | Required       | Description                                                                                      |
+| ------------------- | -------------- | ------------------------------------------------------------------------------------------------ |
+| `ISSUER`            | yes            | Canonical server URL (e.g. `https://auth.example.com`)                                           |
+| `MONGODB_URI`       | one of the two | MongoDB connection string — and what selects MongoDB                                             |
+| `DATABASE_NAME`     | with MongoDB   | MongoDB database name                                                                            |
+| `POSTGRES_URL`      | one of the two | PostgreSQL connection string — and what selects PostgreSQL                                       |
+| `NODE_ENV`          | test only      | Set to `test` to use in-memory adapter                                                           |
+| `MTLS_PROXY_SECRET` | with mTLS      | Secret the TLS proxy sends as `x-client-cert-secret`; without it certificate headers are ignored |
 
 - **Exactly one connection string may be set**; both is refused at startup, neither selects the
   in-memory adapter (`lib/adapters/selectBackend.ts`). Bun loads `.env` and `.env.local` on its own, so

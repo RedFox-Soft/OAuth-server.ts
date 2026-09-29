@@ -1,6 +1,8 @@
 import { X509Certificate } from 'node:crypto';
 
 import { mustChange } from './_warn.ts';
+import { mtlsProxySecret } from '../configs/env.js';
+import constantEquals from '../helpers/constant_equals.js';
 import type { OIDCContext } from '../helpers/oidc_context.ts';
 
 // RFC 8705 does not mandate how the TLS-terminating proxy forwards the client certificate, so the
@@ -8,9 +10,27 @@ import type { OIDCContext } from '../helpers/oidc_context.ts';
 // encoded in the `x-client-cert` header; deployments whose proxy uses a different header (e.g.
 // `x-ssl-client-cert`) override `features.mTLS.getCertificate`. `oidc` is the request context, whose
 // `get()` reads a request header.
+//
+// A header is something any caller can send, and the certificate is public — a self-signed client
+// publishes it in its key set — so the header is believed only beside `x-client-cert-secret` carrying
+// MTLS_PROXY_SECRET, which the proxy alone holds. Without it, any caller the proxy did not strip the
+// header from could authenticate as a self-signed TLS client, or present a stolen certificate-bound
+// token with its certificate. No secret configured means no certificate at all.
 export function getCertificate(oidc: OIDCContext) {
 	const cert = oidc.get('x-client-cert');
 	if (!cert) {
+		return undefined;
+	}
+	const secret = mtlsProxySecret();
+	if (!secret) {
+		mustChange(
+			'features.mTLS.getCertificate',
+			'trust a client certificate header: set MTLS_PROXY_SECRET and have the TLS-terminating proxy send it as x-client-cert-secret (certificate headers are ignored until then)'
+		);
+		return undefined;
+	}
+	const vouched = oidc.get('x-client-cert-secret');
+	if (typeof vouched !== 'string' || !constantEquals(vouched, secret)) {
 		return undefined;
 	}
 	try {

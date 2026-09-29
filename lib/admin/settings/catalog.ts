@@ -398,7 +398,7 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 		summary: 'Authenticate clients by TLS certificate',
 		type: 'boolean',
 		description:
-			'Enables Mutual TLS client authentication / certificate-bound tokens.'
+			'Enables Mutual TLS client authentication / certificate-bound tokens. TLS ends at the proxy in front of this server, so the proxy forwards the client certificate base64-encoded in `x-client-cert` and must also send the MTLS_PROXY_SECRET environment value in `x-client-cert-secret`; a certificate header without that secret is ignored, because any caller could otherwise send one.'
 	},
 	{
 		key: 'mTLS.certificateBoundAccessTokens',
