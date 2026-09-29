@@ -90,9 +90,16 @@ function orderedForDisplay<T extends { id: string; issuer: string }>(
 }
 
 /* The same answer, reached from the client that started the interaction — which is the only trustworthy
- * route to a bucket: a bucket id taken from a request would let anyone aim the page at any tenant. */
+ * route to a bucket: a bucket id taken from a request would let anyone aim the page at any tenant.
+ *
+ * `resource` is required, not optional, because leaving it out resolves a different bucket than the
+ * sign-in does for a client in no project: the page then shows, and the enrolment step then enforces,
+ * the default bucket's options instead of the bucket the request named. */
 export async function loginOptionsForClient(
-	clientId: string | undefined
+	clientId: string | undefined,
+	resource: string | readonly string[] | undefined
 ): Promise<LoginOptions> {
-	return loginOptionsForBucket(await resolveBucketForRequest(clientId));
+	return loginOptionsForBucket(
+		await resolveBucketForRequest(clientId, resource)
+	);
 }

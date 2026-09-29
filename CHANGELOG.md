@@ -79,6 +79,12 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   meant that asking twice within a minute told anybody the address was registered; the SMTP send,
   awaited only for such an address, told the same by response time. Every outcome now renders the
   one accepted page, which states the limits, and the mail is sent after the response.
+- **A bucket's password, reset, registration and second-factor policy holds for a client in no
+  project.** Those doors resolved the bucket from the client alone while the sign-in used the resource
+  the request named, so a federated-only bucket reached through a declared resource verified
+  passwords, mailed resets that set a password on a federated account, and accepted registrations,
+  while its required enrolment looped back to the login page. They now resolve the same bucket, and a
+  bucket with password sign-in off also refuses a reset link issued before it closed.
 - **The outbound address check no longer depends on how an address is spelled.** It matched text, and
   URL parsing rewrites `https://[::ffff:169.254.169.254]/` to the host `[::ffff:a9fe:a9fe]`, which the
   dotted-form pattern let through to the cloud metadata endpoint; NAT64, 6to4 and compatible forms and

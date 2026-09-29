@@ -165,7 +165,13 @@ export async function request(
 	}
 
 	const bucket = await getBucketStore().find(bucketId);
-	if (!bucket) {
+	/*
+	 * A bucket with no password door has no password to reset, and a reset is exactly how a password
+	 * would reach an account whose users are meant to sign in only through their identity provider —
+	 * around its factors and its offboarding. The door refuses first; this holds for any path that
+	 * did not pass it.
+	 */
+	if (!bucket || bucket.passwordLogin === false) {
 		return { ok: true, sent: false };
 	}
 
@@ -221,7 +227,8 @@ export async function load(token: string): Promise<LoadOutcome> {
 	}
 
 	const bucket = await getBucketStore().find(challenge.bucketId);
-	if (!bucket) {
+	// Also a link issued before the bucket closed its password door: it must not set a password now.
+	if (!bucket || bucket.passwordLogin === false) {
 		return { ok: false };
 	}
 

@@ -108,3 +108,4 @@ Operations:
 - 2026-09-29 — corrected [[group-ownership]]: a personal group is found by its first member (the owner), not by membership; being added to someone else's personal group made it your default scope.
 - 2026-09-29 — corrected [[self-service-password-reset]]: the rate-limited page (429) is gone — it showed only for registered addresses, so asking twice was an existence oracle; every outcome renders the accepted page, and the reset mail is sent off the request path.
 - 2026-09-29 — corrected [[mcp-server-authorization]]: the egress range check is numeric (`BlockList`) and judges embedded IPv4; the text version let `[::ffff:a9fe:a9fe]` through.
+- 2026-09-29 — corrected [[mcp-server-authorization]] and [[self-service-password-reset]]: the password, reset, registration and enrolment doors resolve the bucket with the request's resource; a federated-only bucket also refuses resets at issue and at redemption.

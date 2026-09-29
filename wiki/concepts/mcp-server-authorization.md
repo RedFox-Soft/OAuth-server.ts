@@ -70,6 +70,15 @@ first: login resolved the project bucket and found the user, `findAccount` resol
 not, so `loadGrant` left the grant unset and the consent prompt crashed with a 500 rather than
 refusing. A caller that omits the resource silently resolves a different bucket than login did.
 
+It happened again, and that time it was a hole rather than a crash (corrected 2026-09-29). The password
+door, the reset door, the registration door and the enrolment step's second-factor check resolved the
+bucket from the client alone, so for a client in no project they read the *default* bucket's policy while
+the sign-in used the resource's. A federated-only bucket reached through a declared resource verified
+passwords against its accounts, mailed resets that set a password on a federated account — around the
+provider's factors and offboarding — and let registration create password accounts. `passwordDoorClosed`
+now takes the interaction and `loginOptionsForClient` a required `resource`, so the omission no longer
+type-checks; `test/cimd/resource_bucket_doors.spec.ts` is the attack.
+
 ## A machine token goes only to the declaring project's clients
 
 Rule 3 is safe for a sign-in because an end user consents: any client, one belonging to no project

@@ -80,6 +80,12 @@ changing console credentials from the console's own sign-in page. `request()` re
 same non-committal page as any other unresolvable address; operator password changes stay in the audited
 admin-plane route. The next end-user feature mounted under `/ui` will have to make the same call.
 
+A bucket with `passwordLogin: false` is refused the same way, at both ends (added 2026-09-29): `request()`
+issues nothing for it and `load()` refuses a link that names it, so a link issued before the bucket closed
+its password door cannot set one afterwards. The door in front refuses first; this is what holds for any
+path that did not pass it, which was every path from a client in no project until the doors learned to
+resolve the bucket with the request's resource (see [[mcp-server-authorization]]).
+
 ## One response, and the one bounded exception
 
 Registered, unregistered, another bucket's address, deactivated, admin bucket, and *delivery failed* all

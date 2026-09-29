@@ -278,12 +278,21 @@ async function createGrant(interaction: Interaction) {
  * non-committal handling of an address that already exists: with the door shut there is nothing to be
  * non-committal about, and the refusal reveals a bucket setting rather than anything about an account.
  */
+/*
+ * Takes the interaction rather than the client id so the bucket is resolved the way the sign-in resolves
+ * it — with the resource the request names. Resolved from the client alone it was the default bucket for
+ * a client in no project, so a federated-only bucket reached through a declared resource had its password,
+ * reset and registration doors judged by the default bucket's policy and left open.
+ */
 async function passwordDoorClosed(
-	clientId: string | undefined,
+	interaction: Interaction,
 	uid: string
 ): Promise<Response | undefined> {
 	const bucket = await getBucketStore().find(
-		await resolveBucketForRequest(clientId)
+		await resolveBucketForRequest(
+			clientIdOf(interaction),
+			resourceOf(interaction)
+		)
 	);
 	// `=== false` exactly: absent means available, which is what a bucket predating the field must get.
 	return bucket?.passwordLogin === false
@@ -480,7 +489,7 @@ export const ui = new Elysia()
 			return loginServer(uid, {
 				notice: resolveNotice(query.notice),
 				handOffTo: redirectUriOf(interaction),
-				...(await loginOptionsForClient(clientId))
+				...(await loginOptionsForClient(clientId, resourceOf(interaction)))
 			});
 		},
 		{ query: t.Object({ notice: t.Optional(t.String()) }) }
@@ -490,7 +499,7 @@ export const ui = new Elysia()
 		async ({ body, params: { uid }, interaction, cookie }) => {
 			const clientId = clientIdOf(interaction);
 			// Before the lookup, so this cannot be used to probe which addresses exist.
-			const closed = await passwordDoorClosed(clientId, uid);
+			const closed = await passwordDoorClosed(interaction, uid);
 			if (closed) return closed;
 
 			const bucketId = await resolveBucketForRequest(
@@ -753,7 +762,10 @@ export const ui = new Elysia()
 			clientId,
 			resourceOf(interaction)
 		);
-		const { totpRequired } = await loginOptionsForClient(clientId);
+		const { totpRequired } = await loginOptionsForClient(
+			clientId,
+			resourceOf(interaction)
+		);
 		// Lowered while this person was mid-flow: there is nothing left to enrol for.
 		if (!totpRequired) {
 			return Response.redirect(buildUILoginPath(uid), 303);
@@ -1011,7 +1023,7 @@ export const ui = new Elysia()
 		}
 	)
 	.get('ui/:uid/forgot-password', async ({ params: { uid }, interaction }) => {
-		const closed = await passwordDoorClosed(clientIdOf(interaction), uid);
+		const closed = await passwordDoorClosed(interaction, uid);
 		// There is no password to reset, so offering the form would be a dead end dressed as help.
 		return closed ?? resetRequestPage(uid);
 	})
@@ -1019,7 +1031,7 @@ export const ui = new Elysia()
 		'ui/:uid/forgot-password',
 		async ({ body, params: { uid }, interaction }) => {
 			const clientId = clientIdOf(interaction);
-			const closed = await passwordDoorClosed(clientId, uid);
+			const closed = await passwordDoorClosed(interaction, uid);
 			if (closed) return closed;
 
 			/*
@@ -1053,11 +1065,11 @@ export const ui = new Elysia()
 	 */
 	.get('ui/:uid/registration', async ({ params: { uid }, interaction }) => {
 		const clientId = clientIdOf(interaction);
-		const closed = await passwordDoorClosed(clientId, uid);
+		const closed = await passwordDoorClosed(interaction, uid);
 		if (closed) return closed;
 
 		const bucket = await getBucketStore().find(
-			await resolveBucketForRequest(clientId)
+			await resolveBucketForRequest(clientId, resourceOf(interaction))
 		);
 		if (bucket && !bucket.registrationOpen) {
 			return registrationClosedPage();
@@ -1069,7 +1081,7 @@ export const ui = new Elysia()
 		async ({ body, params: { uid }, interaction }) => {
 			const clientId = clientIdOf(interaction);
 			// Ahead of the non-committal existing-address handling below, deliberately.
-			const closed = await passwordDoorClosed(clientId, uid);
+			const closed = await passwordDoorClosed(interaction, uid);
 			if (closed) return closed;
 
 			const bucketId = await resolveBucketForRequest(
