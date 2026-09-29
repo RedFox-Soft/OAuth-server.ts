@@ -9,7 +9,7 @@ run needs — because most of the cost of a conformance run is not the run.
 
 ## Where it stands
 
-**The measurement predates 0.4.0 and has not been repeated against it, 0.5.0 or 0.6.0.** The first two
+**The measurement predates 0.4.0 and has not been repeated against it, 0.5.0, 0.6.0 or 0.7.0.** The first two
 releases made a user bucket addressable — in the URL, then at a hostname of its own — and its own
 issuer, which is the subject these plans probe most directly: the issuer identifier, the well-known
 locations an issuer carrying a path has, and the `iss` in an authorization response. The numbers below
@@ -18,7 +18,8 @@ unchanged, so they still describe what a client integrated before them meets. Th
 _named_ bucket's metadata, at either kind of address, which no run has covered. 0.6.0 moves several
 error codes to the ones the RFCs name — `unsupported_grant_type`, `unauthorized_client`,
 `invalid_target`, the OIDC Core §3.1.2.6 registration codes — which a run would see, and is one more
-reason for it. A run for both profiles is the open item.
+reason for it. 0.7.0 gives a named bucket keys of its own and moves its `jwks_uri` beneath its issuer, which is
+exactly the named-bucket metadata no run has covered. A run for both profiles is the open item.
 
 Measured 2026-09-14, across two instance profiles (below). Twelve plans: nine testing this server as
 an **OpenID Provider**, three testing it as a **Relying Party** — because `lib/federation/` makes it

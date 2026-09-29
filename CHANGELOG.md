@@ -9,6 +9,29 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-29
+
+Tenants stop sharing what should have been theirs alone. A declared protected resource is unique per
+issuer rather than across the instance, and a bucket with an address of its own signs with keys of its
+own, so one tenant can neither claim another's MCP server nor mint a token that verifies at another's
+resource server. A security audit found the rest: sign-ins that another browser could continue,
+single-use artifacts and attempt caps that parallel requests got through, outbound requests that
+reached private addresses, client metadata that named internal attributes, an agent token that worked
+on the management API directly, and a consent waiver and password policy that did not hold for every
+bucket. Each is fixed below, and so are signed responses from a named bucket that named the root
+issuer.
+
+**Upgrading asks four things of an operator.** Take a backup, then run `db:setup` and `db:migrate` in
+that order: this release carries the first schema migration, it re-keys declared resources, and it
+cannot be undone. A resource server of a bucket with an address must verify against that bucket's own
+`jwks_uri`, which the bucket's metadata now names; tokens the bucket signed before the upgrade stop
+verifying there, and the instance issuer's keys and metadata are unchanged. A deployment reading a
+forwarded client certificate switches on `mTLS.trustProxyCertificateHeader` once its proxy sets
+`Client-Cert` and strips any incoming copy — no certificate is read until then. And declaring a
+resource for a project without a bucket of its own is now a super administrator's; give such a project
+a bucket with an address to declare it yourself. The [upgrade
+guide](https://foxauth.dev/docs/deploy/upgrade/) walks through each.
+
 ### Security
 
 - **A sign-in can be continued only in the browser that began it.** The sign-in screens checked that an
@@ -88,11 +111,6 @@ dup key: { email: "…" }`, and the fault's message is stored and sent. The user
   checked, then acted, then marked, so parallel requests all got through: two setups made two super
   administrators, two submissions of one reset link both set a password, and two acceptances of one
   invitation both applied. Each is now claimed once, atomically, before anything is written.
-- **Declaring a protected resource requires the resource to vouch for it.** Identifiers are unique
-  across the instance and first wins, so any group member could declare another tenant's MCP server,
-  lock its owner out with a 409 and route its clients into their own bucket. A declaration by anyone
-  but a super administrator now needs the resource's RFC 9728 metadata to describe that identifier and
-  list the project bucket's issuer.
 - **A forwarded client certificate is read only when the operator says the proxy sets it.** With the
   mTLS features on, the default hook took the certificate from any `x-client-cert` header, and a
   certificate is public, so a caller the proxy did not strip the header from could authenticate as a
@@ -1283,7 +1301,8 @@ found`. The refusal text existed and never ran: the call that delivered it sat i
 - The DPoP nonce secret is self-provisioned at startup, making the requireNonce-without-secret 500
   state unrepresentable (spec 014)
 
-[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.3.0...v0.4.0
