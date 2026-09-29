@@ -49,6 +49,24 @@ real round-trip opens; the delay goes *after* the read, since a delay before it 
 out. Real-datastore evidence is `database/verify_postgres.ts` §4 for PostgreSQL; MongoDB was checked
 against a scratch database when the change was made.
 
+## Claims held by `ReplayDetection.unique`
+
+Three more rules had the same shape outside the model areas — look, then act, then mark — and are now
+claimed through `ReplayDetection.unique`, whose insert-if-absent answers exactly one of racing callers
+(added 2026-09-29):
+
+- **a password reset link** (`consume` in `lib/password_reset/challenge.ts`), claimed by its record id for
+  the link's lifetime before it is destroyed; two submissions used to both set a password;
+- **a group invitation** (`lib/admin/groups/accept.ts`), claimed by its id for the invitation's lifetime;
+  two acceptances used to both go through, one writing membership from a stale copy;
+- **first-run setup** (`lib/admin/auth/setup.ts`), claimed around the bootstrap and released in `finally`
+  (`ReplayDetection.release`) — a success closes setup through `hasSuperAdmin`, and a failure must leave it
+  open; the claim also expires after a minute should the process die holding it. Two setups used to make
+  two super administrators.
+
+Claiming through this model rather than a new area keeps the storage inventory unchanged: each claim is
+an identifier used once, which is what the area already records.
+
 ## Attempt counters: the third operation
 
 A verification code's attempts, the TOTP failure window and the login door throttle had the same shape —

@@ -45,6 +45,27 @@ export const invitationAcceptRoutes = new Elysia({ name: 'admin-invitations' })
 			);
 			if (!invitation || invitation.acceptedAt) throw invalid();
 
+			/*
+			 * Claimed in one insert-if-absent before anything is written. Checking `acceptedAt` and marking it
+			 * last let two acceptances arriving together both go through, one of them writing the group's
+			 * membership from a copy read before the other's change. The claim lives as long as the
+			 * invitation does; `acceptedAt` keeps refusing it after that.
+			 *
+			 * Imported here rather than at the top: the model graph must not be entered cold from a module
+			 * the admin routes load (wiki/concepts/model-graph-import-order.md).
+			 */
+			const { ReplayDetection } =
+				await import('../../models/replay_detection.js');
+			if (
+				!(await ReplayDetection.unique(
+					'group-invitation',
+					invitation._id,
+					Math.floor(invitation.expiresAt.getTime() / 1000)
+				))
+			) {
+				throw invalid();
+			}
+
 			const group = await getGroupStore().find(invitation.groupId);
 			if (!group) throw invalid();
 

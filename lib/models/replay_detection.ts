@@ -17,6 +17,16 @@ export class ReplayDetection extends BaseModel<ReplayDetectionPayloadType> {
 	 * lookup and a save: with those two, several requests presenting the same captured assertion or
 	 * DPoP proof at once all looked before any saved, and every one of them was told it was first.
 	 */
+	/*
+	 * Forgets an identifier, for a caller that uses `unique` as a claim held only while it works and
+	 * released when it is done — first-run setup, which must not stay closed if it fails half way.
+	 */
+	static async release(iss: string, jti: string) {
+		await this.adapter.destroy(
+			crypto.hash('sha256', `${iss}${jti}`, 'base64url')
+		);
+	}
+
 	static async unique(iss: string, jti: string, exp: number) {
 		const id = crypto.hash('sha256', `${iss}${jti}`, 'base64url');
 		const inst = new this({ jti: id, iss });

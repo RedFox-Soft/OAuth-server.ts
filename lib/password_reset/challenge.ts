@@ -22,6 +22,7 @@ import {
 	type RateBounds
 } from '../helpers/rate_window.js';
 import { sendPasswordResetEmail } from '../mail/send.js';
+import { ReplayDetection } from '../models/replay_detection.js';
 import {
 	RESET_TTL_SECONDS,
 	REQUEST_COOLDOWN_SECONDS,
@@ -268,6 +269,14 @@ export async function consume(
 	}
 
 	const { id, challenge } = loaded;
+	/*
+	 * Claimed in one insert-if-absent before anything is spent. Looking the secret up and then destroying
+	 * it let two submissions arriving together both find it and both set a password; of several racing
+	 * requests exactly one wins the claim, and the rest are answered as for a spent link.
+	 */
+	if (!(await ReplayDetection.unique('password-reset', id, challenge.exp))) {
+		return { ok: false, reason: 'invalid' };
+	}
 	await challenges().destroy(id);
 	await throttles().destroy(throttleKey(challenge.bucketId, challenge.email));
 

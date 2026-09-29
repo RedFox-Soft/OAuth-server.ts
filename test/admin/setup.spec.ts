@@ -38,4 +38,28 @@ describe('first-run setup', () => {
 		expect(second.status).toBe(409);
 		expect(await hasSuperAdmin()).toBe(true);
 	});
+
+	/*
+	 * The check that setup is still open and the creation it guards sit either side of a password hash,
+	 * so two requests arriving together both found it open. Whoever raced the operator at first boot
+	 * ended up a silent second super administrator rather than a visible refusal.
+	 */
+	it('creates exactly one super_admin when two setups arrive at once', async () => {
+		const results = await Promise.all([
+			client.admin.api.setup.post({
+				email: 'operator@x.io',
+				password: 'correct horse battery'
+			}),
+			client.admin.api.setup.post({
+				email: 'racer@x.io',
+				password: 'another long password'
+			})
+		]);
+
+		const supers = (await getUserStore(ADMIN_BUCKET_ID).list()).filter((u) =>
+			u.roles.includes('super_admin')
+		);
+		expect(supers).toHaveLength(1);
+		expect(results.map((r) => r.status).sort()).toEqual([201, 409]);
+	});
 });

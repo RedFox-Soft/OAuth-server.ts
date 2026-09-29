@@ -79,6 +79,10 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   meant that asking twice within a minute told anybody the address was registered; the SMTP send,
   awaited only for such an address, told the same by response time. Every outcome now renders the
   one accepted page, which states the limits, and the mail is sent after the response.
+- **First-run setup, reset links and group invitations are single use under concurrency.** Each
+  checked, then acted, then marked, so parallel requests all got through: two setups made two super
+  administrators, two submissions of one reset link both set a password, and two acceptances of one
+  invitation both applied. Each is now claimed once, atomically, before anything is written.
 - **Declaring a protected resource requires the resource to vouch for it.** Identifiers are unique
   across the instance and first wins, so any group member could declare another tenant's MCP server,
   lock its owner out with a 409 and route its clients into their own bucket. A declaration by anyone

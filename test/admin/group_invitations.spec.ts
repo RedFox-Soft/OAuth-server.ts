@@ -118,6 +118,26 @@ describe('group invitations', () => {
 		expect(present(account, 'account')._id).toBe(existing.userId);
 	});
 
+	/*
+	 * Once under concurrency too. Acceptance read the invitation, checked it unaccepted and marked it
+	 * accepted last, so two submissions arriving together both went through — one of them writing the
+	 * group's membership from a copy read before the other's change.
+	 */
+	it('accepts once when two acceptances arrive at the same time', async () => {
+		const owner = await admin();
+		const existing = await admin();
+		const group = await groupOwnedBy(owner.cookie);
+		await invite(owner.cookie, group._id, existing.email);
+		const token = tokenFor(existing.email);
+
+		const results = await Promise.all([
+			client.admin.api.invitations.accept.post({ token }),
+			client.admin.api.invitations.accept.post({ token })
+		]);
+
+		expect(results.map((r) => r.status).sort()).toEqual([200, 400]);
+	});
+
 	it('accepts once and no more', async () => {
 		const owner = await admin();
 		const group = await groupOwnedBy(owner.cookie);
