@@ -1,0 +1,322 @@
+---
+title: Your rate limiter is not a brute-force throttle
+description: >-
+  Per-address limits stop floods, not password guessing. What a sign-in throttle has to count,
+  where it has to keep the count, and the four ways I got it wrong.
+publishedAt: '2026-09-29'
+tags: [passwords, brute-force, sign-in, security]
+---
+
+The dashboard was flat. Requests per second normal, error rate normal, the rate limiter had not
+fired once all night. And the count of failed sign-ins for one account was a little over two
+thousand.
+
+The attacker had done nothing clever. A few thousand addresses, each trying one password against
+the same email every twenty seconds or so, each comfortably inside a per-address allowance that
+was tuned for a browser doing something silly. The limiter did precisely what it was built to do,
+which is stop any single origin from hammering the server. Nobody was hammering the server. They
+were guessing a password, slowly, from everywhere at once.
+
+I had believed, for longer than I like to admit, that a rate limiter in front of the login endpoint
+was brute-force protection. It is not, and the reason is not a tuning problem. It is that a rate
+limiter is keyed on the one thing the attacker gets to choose.
+
+## Key the counter on the thing the attacker cannot choose
+
+An attacker picks the source address. They pick how fast to go, how many machines to use, and when
+to stop and start. The one thing they cannot pick is the identity they are attacking, because that
+is the point of the exercise. So the counter that bounds guessing has to be keyed on the identity,
+not the caller, and everything else about its design follows from that one decision.
+
+The second thing that follows is where the count lives. A per-origin limiter in our server keeps its
+counters in process memory, and that is fine for what it is: the allowance multiplies by the number
+of replicas, resets on restart, and quietly fails open when addresses rotate faster than the
+windows, and none of that matters for a resource protection because the worst case is a server
+that is busier than it should be. The worst case for a login throttle is an account. So its counter
+goes through the same database adapter everything else persists through, and it is the same count
+from every replica, before and after a restart, however many addresses the guesses arrive from.
+
+<svg viewBox="0 0 800 380" width="100%" role="img" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">
+  <title>A per-origin rate limiter and a per-identity sign-in throttle compared: what each is keyed on, where it keeps the count, what a restart does to it, and what a thousand rotating addresses guessing one password do to it</title>
+  <defs>
+    <marker id="throttle-arrow-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--diagram-accent, #d9480f)"/></marker>
+  </defs>
+  <text x="400" y="30" text-anchor="middle" font-size="15" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">1,000 source addresses, one password each, against one account</text>
+  <line x1="400" y1="40" x2="215" y2="88" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5" marker-end="url(#throttle-arrow-a)"/>
+  <line x1="400" y1="40" x2="585" y2="88" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5" marker-end="url(#throttle-arrow-a)"/>
+  <rect x="30" y="90" width="360" height="230" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <text x="210" y="120" text-anchor="middle" font-size="16" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">Per-origin rate limiter</text>
+  <text x="50" y="158" font-size="14" fill="var(--diagram-fg, #1a1a1a)">keyed on: the caller's address</text>
+  <text x="50" y="190" font-size="14" fill="var(--diagram-fg, #1a1a1a)">kept in: process memory, one copy per replica</text>
+  <text x="50" y="222" font-size="14" fill="var(--diagram-fg, #1a1a1a)">after a restart: forgotten</text>
+  <text x="50" y="254" font-size="14" fill="var(--diagram-fg, #1a1a1a)">sees: one guess per address, never fires</text>
+  <text x="50" y="300" font-size="13" fill="var(--diagram-line, #555)">a resource protection: keeps the server up</text>
+  <rect x="410" y="90" width="360" height="230" rx="8" fill="none" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5"/>
+  <text x="590" y="120" text-anchor="middle" font-size="16" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">Sign-in throttle</text>
+  <text x="430" y="158" font-size="14" fill="var(--diagram-fg, #1a1a1a)">keyed on: bucket + the address under attack</text>
+  <text x="430" y="190" font-size="14" fill="var(--diagram-fg, #1a1a1a)">kept in: the database, shared by every replica</text>
+  <text x="430" y="222" font-size="14" fill="var(--diagram-fg, #1a1a1a)">after a restart: still counting</text>
+  <text x="430" y="254" font-size="14" fill="var(--diagram-accent, #d9480f)">sees: 1,000 guesses at one address, shuts at 5</text>
+  <text x="430" y="300" font-size="13" fill="var(--diagram-line, #555)">a security boundary: keeps the account closed</text>
+  <text x="400" y="358" text-anchor="middle" font-size="13" fill="var(--diagram-line, #555)">Both run. Neither replaces the other, because they answer different questions.</text>
+</svg>
+
+Both of these run in front of our sign-in endpoint, and I want to be clear that the limiter is not
+wrong. It is just not this. The moment I stopped expecting it to be this, the design of the actual
+throttle became a list of decisions about one persisted counter, and each decision had a way to get
+it wrong that every test I had would have missed.
+
+## Doubling windows, and the counter that died with the door
+
+The simplest throttle is a cap and a window: five wrong passwords, then the door shuts for fifteen
+minutes. It is also nearly useless against anyone patient. Fifteen minutes is 96 windows a day, five
+guesses each, 480 guesses a day against one account, and the attacker who reads your error page
+learns the schedule on the first lockout and sets a timer. So the window has to grow. Ours doubles
+each time an address exhausts it, from fifteen minutes to a ceiling of an hour, which holds a
+sustained attack to about 120 guesses a day. NIST SP 800-63B puts the line at 100 consecutive
+failures, and 120 is where we landed once the lockouts had to remain survivable by a person who
+mistypes.
+
+The escalation is what I got wrong first, and I got it wrong by doing the natural thing. The record
+that holds the count has a TTL, and the obvious TTL is the lockout itself: the door reopens, the
+record is gone, clean slate. That is what our second-factor throttle does, and it is right there,
+because a code throttle has nothing to remember between windows. A password throttle does. It has
+to remember how many windows this address has already burned, and if the record dies with the
+door, it forgets, and the next exhaustion starts again at fifteen minutes. An attacker who simply
+waits keeps the shortest window for ever. Nothing reports a problem. Every test of "the door reopens
+after the window" passes, because it does.
+
+<svg viewBox="0 0 800 300" width="100%" role="img" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">
+  <title>Timeline of one address being throttled: five guesses shut the door for fifteen minutes, five more for thirty, five more for sixty, while the record holding the escalation step lives twenty-four hours past the last failure</title>
+  <line x1="40" y1="120" x2="770" y2="120" stroke="var(--diagram-line, #555)" stroke-width="1"/>
+  <text x="40" y="145" font-size="12" fill="var(--diagram-line, #555)">0</text>
+  <text x="330" y="145" font-size="12" fill="var(--diagram-line, #555)">1 h</text>
+  <text x="620" y="145" font-size="12" fill="var(--diagram-line, #555)">2 h</text>
+  <rect x="40" y="80" width="6" height="40" fill="var(--diagram-accent, #d9480f)"/>
+  <text x="43" y="70" text-anchor="middle" font-size="13" fill="var(--diagram-accent, #d9480f)">5 wrong</text>
+  <rect x="46" y="96" width="72" height="24" fill="var(--diagram-line, #555)" opacity="0.35"/>
+  <text x="82" y="112" text-anchor="middle" font-size="12" fill="var(--diagram-fg, #1a1a1a)">shut 15 min</text>
+  <rect x="118" y="80" width="6" height="40" fill="var(--diagram-accent, #d9480f)"/>
+  <text x="121" y="70" text-anchor="middle" font-size="13" fill="var(--diagram-accent, #d9480f)">5 wrong</text>
+  <rect x="124" y="96" width="145" height="24" fill="var(--diagram-line, #555)" opacity="0.35"/>
+  <text x="196" y="112" text-anchor="middle" font-size="12" fill="var(--diagram-fg, #1a1a1a)">shut 30 min</text>
+  <rect x="269" y="80" width="6" height="40" fill="var(--diagram-accent, #d9480f)"/>
+  <text x="272" y="70" text-anchor="middle" font-size="13" fill="var(--diagram-accent, #d9480f)">5 wrong</text>
+  <rect x="275" y="96" width="290" height="24" fill="var(--diagram-line, #555)" opacity="0.35"/>
+  <text x="420" y="112" text-anchor="middle" font-size="12" fill="var(--diagram-fg, #1a1a1a)">shut 60 min, the ceiling; every later window is 60 min</text>
+  <rect x="565" y="80" width="6" height="40" fill="var(--diagram-accent, #d9480f)"/>
+  <text x="568" y="70" text-anchor="middle" font-size="13" fill="var(--diagram-accent, #d9480f)">5 wrong</text>
+  <text x="400" y="40" text-anchor="middle" font-size="14" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">When the door reopens: windowStart + window(step)</text>
+  <rect x="40" y="190" width="730" height="24" rx="4" fill="none" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="405" y="206" text-anchor="middle" font-size="12" fill="var(--diagram-fg, #1a1a1a)">the record, and with it the step, lives 24 h past the most recent failure, well off the right edge</text>
+  <text x="400" y="180" text-anchor="middle" font-size="14" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">When the record dies: exp</text>
+  <text x="400" y="250" text-anchor="middle" font-size="13" fill="var(--diagram-line, #555)">If the record died when the door reopened, step would reset to 0 and every lockout would be 15 minutes.</text>
+  <text x="400" y="272" text-anchor="middle" font-size="13" fill="var(--diagram-line, #555)">Waiting would be a complete defeat, and no test of "the door reopens" would notice.</text>
+</svg>
+
+So there are two deadlines over one record, and they are different things. The window says when
+the door reopens, and it is minutes. The expiry says when the record is forgotten, and it is
+twenty-four hours after the most recent failure. The second has to outlive the first, always, and
+rather than ask an operator to keep two numbers in the right order, the configuration validator
+refuses a ceiling above the retention at boot. Measuring the retention from the last failure rather
+than the first is what lets the escalation decay by itself after a quiet day, so an honest user who
+had a bad Monday is not still on the sixty-minute step on Friday.
+
+## Count before you verify, or a burst gets fifteen guesses against a cap of five
+
+The second mistake I made is the one I am least proud of, because it is a textbook race and I wrote
+it anyway. The handler read the counter, verified the password, and on failure wrote the counter
+back with one more failure. Read, modify, write. Send five wrong passwords one after another and it
+works perfectly. Send fifteen at once and every one of them finds the door open and every one of them
+gets its password verified. The counter may well read high enough afterwards to shut the door, which
+is why a test that checks the door once the burst is over passes. A test that counts how many hashes
+the burst bought does not, and that is the test we have now.
+
+The fix is to count the attempt before verifying it, atomically, and let the count decide whether
+this attempt is admitted at all:
+
+```ts
+export async function recordAttempt(bucketId: string, email: string): Promise<boolean> {
+	const key = throttleKey(bucketId, email);
+	const now = epochTime();
+	const prior = await held(key);
+
+	if (!prior) {
+		await counters().create(key, { failures: 0, windowStart: now, step: 0 }, RETENTION);
+	} else if (now - prior.windowStart >= windowFor(prior.step)) {
+		const exhausted = prior.failures >= cap();
+		await counters().upsert(
+			key,
+			{ failures: 0, windowStart: now, step: exhausted ? prior.step + 1 : prior.step },
+			RETENTION
+		);
+	}
+
+	// One atomic $inc, answering this attempt its own number. Fifteen at once get 1..15.
+	const attempts = (await counters().increment(key, 'failures', RETENTION)) ?? 1;
+	return attempts <= cap();
+}
+```
+
+That increment is one statement on either backend, a `findOneAndUpdate` with `$inc` on MongoDB and
+an `UPDATE` with `RETURNING` over the jsonb column on PostgreSQL, so fifteen concurrent callers
+receive fifteen different numbers and only the first five are under the cap. The same write pushes the record's expiry out to twenty-four hours from now,
+which is how "retention from the last failure" costs no second write. What you cannot see in that
+function is the thing that makes it honest: a password that then verifies clears the record, so what
+stays counted is exactly the failures, and a wrong guess that was refused at the door never reaches
+the hash at all.
+
+That last point is not a nicety. Argon2 verification is deliberately expensive, and before the check
+sat in front of the lookup, every guess against a known address bought the server a full hash. A
+throttle placed after verification bounds the guesses and leaves the CPU cost exactly where it was.
+Placed before, a shut door costs one indexed read.
+
+<svg viewBox="0 0 800 460" width="100%" role="img" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">
+  <title>The order of checks on a password sign-in: is the door shut, count this attempt atomically, look up the account, verify the hash, clear the counter, then the remaining gates; every refusal renders the same page</title>
+  <defs>
+    <marker id="throttle-arrow-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--diagram-line, #555)"/></marker>
+  </defs>
+  <rect x="40" y="20" width="400" height="44" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <text x="240" y="47" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">1  door shut for bucket:email?  (one read, no hash)</text>
+  <rect x="40" y="90" width="400" height="44" rx="8" fill="none" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5"/>
+  <text x="240" y="117" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">2  count this attempt, atomically. Over the cap?</text>
+  <rect x="40" y="160" width="400" height="44" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <text x="240" y="187" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">3  look up the account by address</text>
+  <rect x="40" y="230" width="400" height="44" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <text x="240" y="257" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">4  verify the argon2 hash</text>
+  <rect x="40" y="300" width="400" height="44" rx="8" fill="none" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5"/>
+  <text x="240" y="327" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">5  clear the counter: the password was proved</text>
+  <rect x="40" y="370" width="400" height="44" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <text x="240" y="397" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">6  inactive? unverified? second factor?</text>
+  <line x1="240" y1="64" x2="240" y2="88" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#throttle-arrow-b)"/>
+  <line x1="240" y1="134" x2="240" y2="158" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#throttle-arrow-b)"/>
+  <line x1="240" y1="204" x2="240" y2="228" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#throttle-arrow-b)"/>
+  <line x1="240" y1="274" x2="240" y2="298" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#throttle-arrow-b)"/>
+  <line x1="240" y1="344" x2="240" y2="368" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#throttle-arrow-b)"/>
+  <text x="240" y="440" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">signed in</text>
+  <line x1="240" y1="414" x2="240" y2="428" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <rect x="520" y="160" width="250" height="120" rx="8" fill="none" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5"/>
+  <text x="645" y="195" text-anchor="middle" font-size="14" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">One refusal</text>
+  <text x="645" y="220" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">"Invalid username or password"</text>
+  <text x="645" y="242" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">same page, same bytes, one expression</text>
+  <text x="645" y="262" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">from steps 1, 2, 3, 4 and 6 alike</text>
+  <line x1="440" y1="42" x2="518" y2="180" stroke="var(--diagram-line, #555)" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#throttle-arrow-b)"/>
+  <line x1="440" y1="112" x2="518" y2="200" stroke="var(--diagram-line, #555)" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#throttle-arrow-b)"/>
+  <line x1="440" y1="182" x2="518" y2="220" stroke="var(--diagram-line, #555)" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#throttle-arrow-b)"/>
+  <line x1="440" y1="252" x2="518" y2="240" stroke="var(--diagram-line, #555)" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#throttle-arrow-b)"/>
+  <line x1="440" y1="392" x2="518" y2="262" stroke="var(--diagram-line, #555)" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#throttle-arrow-b)"/>
+</svg>
+
+Step 5 sits above step 6 on purpose. An account that is deactivated, or has not verified its email,
+still gets refused, but its counter is cleared first, because the credential was proved and a
+proved credential is not being guessed. Put the clear beside the success at the bottom and a user
+with the right password and an unverified address is throttled for knowing it.
+
+## The refusal has to say nothing, and the counter has to exist for nobody
+
+Everything on that right-hand box is the third thing I got wrong, and I got it wrong by being
+helpful. The version I wanted to write, and have shipped elsewhere, said "too many attempts, try
+again in 14 minutes". It was a kind message and a precise oracle: it told an attacker that the address they were probing had an account, since
+why else count, and it told them exactly when to come back.
+
+The fix has two halves and the second is less obvious than the first. The first is that every
+refusal on this door is one expression rendering one page, so a shut door, an unknown address, a
+wrong password and a deactivated account are byte-identical, structurally rather than by four
+copies of a string staying in step. The second is that the counter is written for any address
+submitted, including one that resolves to no account. If the throttle only counted real accounts,
+its behaviour would differ for real and fake addresses, and the moment anything about that
+difference is observable, timing, a header, a future bug, the throttle itself becomes the
+enumeration attack. So the storage area holding these counters is deliberately unowned. It carries
+no account id because a counter for a nonexistent account cannot have one, and it carries no
+address either, because the address is the key and a field repeating it would be a second, indexable
+list of every email anyone ever typed into the form.
+
+That decision reaches the event bus too. The server emits an event when it throttles, and the event
+names the bucket and nothing else. An operator needs to know which population is under attack. They
+do not need a log they could read names out of.
+
+## Sixty-five thousand spellings of one address
+
+The fourth mistake is the one that passed every test I had and would have kept passing. The account
+lookup is case-insensitive, so `alice@example.com` and `Alice@Example.com` are the same user. The
+counter was keyed on the address as submitted. That gives the address as many independent counters
+as it has capitalisations, which for sixteen letters is 65,536, times a cap of five. Every test used
+a lowercase address. Every test passed.
+
+```ts
+/*
+ * THE RULE IS PARITY WITH THE ACCOUNT LOOKUP, not "lower-case it". findByEmail is
+ * case-insensitive, so two spellings that resolve to one account must resolve to
+ * one counter. If the lookup ever starts trimming, folding Unicode or stripping
+ * +tags, this function is what has to follow it.
+ */
+export function emailScopedId(bucketId: string, email: string): string {
+	return `${bucketId}:${email.toLowerCase()}`;
+}
+```
+
+The interesting part is the comment, not the code. It would be easy to read this as "remember to
+lowercase" and move on. The actual rule is that whatever normalisation the lookup applies, the key
+applies too, and the day someone teaches the lookup to ignore dots in Gmail addresses is the day
+lowercasing stops being sufficient. Writing the rule as parity rather than as a transformation is
+what makes the next person change the right thing. It is also why this is one function shared by
+the three storage areas keyed on an address, rather than the same expression written three times,
+because the third copy had already dropped the lowercase call and was only harmless because one of
+our two user stores happens to normalise what it stores.
+
+## The honest user needs a way out that the attacker does not have
+
+Escalating lockouts are only tolerable if the person who owns the account has a route back in that
+the person guessing does not. Otherwise you have built a denial-of-service tool that anyone can
+point at any email address, and a sixty-minute ceiling is an hour of somebody's day, repeatable.
+
+The obvious route is "enter the code we emailed you to keep trying", and I went a fair way down it
+before listing why it is wrong. It is only truthful for an address that has an account, so showing
+it selectively rebuilds the oracle. It sends an email on demand to any address anyone types, so it is
+an email-bombing vector, so it needs its own cap, so it has only moved the lockout. It makes the
+mailer a hard dependency of sign-in on a server where mail is best-effort everywhere else. And it
+cannot serve the administrators' own bucket, which has no self-service reset at all.
+
+What we do instead is narrower and I think correct. A completed password reset clears the counter.
+A requested one does not. The distinction is what each proves: asking for a reset proves nothing,
+and clearing on request would hand anyone who knows an address a way to wipe the count that is
+holding them off. Consuming the single-use secret that was delivered to the address on file proves
+control of that mailbox, which is the same evidence the "enter the code" step would have collected,
+gathered by a flow that already exists and already has its own cooldown and daily cap.
+
+The administrators' bucket is the case that shaped the ceiling. Its operators sign in through this
+same door and have no reset flow to escape with, so a deep escalation against an admin address is
+the one lockout nobody can undo. The rule that protects them is not written as "if this is the
+admin bucket". It is written as "a bucket that requires a second factor stays at the first window
+however often it is tripped", because a guessed password there does not complete a sign-in, so deep
+escalation buys little and risks a lot. Stated that way it says the real reason, and it corrects
+itself: turn a bucket's second factor off and its escalation deepens, with nothing to remember.
+
+## What I would not do
+
+I would not give it an off switch, and ours has none, which surprised the first person to look for
+one in the settings console. Three numbers are there, the cap, the first window and the ceiling,
+each bounded by the same validator the server boots through, so the console cannot save a
+configuration the server would refuse to start with, and the cap stops at 100 because that is where
+a throttle stops being one. There is no boolean. A kill switch on a security boundary is a switch
+that reopens the vulnerability, and the console is where switches get flipped at two in the morning
+and never flipped back.
+
+I would not let it fail open either. No storage error is caught. The counter read sits one line
+ahead of the account lookup, which reaches the same database, so a failure there would have been a
+failure a moment later anyway, and catching it would answer "invalid username or password" to a user
+whose sign-in was never refused for that reason.
+
+And I would not pretend it finishes the job. A per-identity throttle bounds guesses against one
+account. It does nothing against password spraying, one common password tried once against ten
+thousand accounts, because every account sees a single failure and no counter ever moves. The
+per-origin limiter catches the naive version of that and a botnet defeats it the same way it defeated
+mine. What actually ends spraying is refusing passwords that appear in breach corpora and requiring
+a second factor, and I have come round to the view that a login throttle is mostly there to make the
+second factor's absence survivable until you have one.
+
+The defaults in our server are five failures, a fifteen-minute first window and a one-hour ceiling,
+and the [settings reference](/docs/reference/settings/#loginThrottle.failureCap) documents the three
+numbers and their bounds. The [threat model](/docs/security/threat-model/) lists what each check on
+the sign-in door is there to stop, and, as the section on limitations says in as many words, which
+of the counters in this server are boundaries and which are merely resource protections.
