@@ -58,6 +58,13 @@ not a third). Model records differ on purpose: a token that fails its schema is 
   `ABSENT_UNDEFINED` (`lib/adapters/mongodb/write_options.ts`) on every insert and on the bucket update,
   so new documents carry no such null; the read rule stays for the ones already stored. The option is
   never put on an operation whose filter could hold undefined — there it drops the condition.
+  Corrected 2026-09-30: the **model** adapter was left out. `MongoAdapter.upsert` and `create`
+  (`lib/adapters/mongodb/mongoAdapter.ts`) wrote protocol records without the option, and model reads go
+  through `BaseModel.fromStored`, not this translation — so a nested null failed the model's schema and
+  the whole record read as not found. A sign-out with no `id_token_hint` leaves `Session.state.clientId`
+  and `postLogoutRedirectUri` undefined; stored as nulls, the session vanished and the confirmation
+  answered "could not find logout details". The conformance suite's `rp-initiated-logout` plan found it;
+  both writes now pass the option.
 
 Nothing is sniffed from the value: a string that looks like a date stays a string unless the schema
 declares a date there.

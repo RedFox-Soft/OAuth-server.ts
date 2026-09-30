@@ -1,4 +1,5 @@
 import { db } from './db.js';
+import { ABSENT_UNDEFINED } from './write_options.js';
 import type { ModelAdapter } from '../types.js';
 import { isRecord } from '../../helpers/_/object.js';
 
@@ -39,10 +40,15 @@ export class MongoAdapter<
 			expiresAt = new Date(Date.now() + expiresIn * 1000);
 		}
 
+		/*
+		 * Absent, not null, for a member the model left undefined — at any depth. A session's pending
+		 * sign-out names no client when no id_token_hint was sent; stored as nulls, the record failed its
+		 * schema on the way back and was read as no session at all. The filter is an id, never undefined.
+		 */
 		await this.coll().updateOne(
 			{ _id },
 			{ $set: { payload, ...(expiresAt ? { expiresAt } : undefined) } },
-			{ upsert: true }
+			{ upsert: true, ...ABSENT_UNDEFINED }
 		);
 	}
 
@@ -135,7 +141,8 @@ export class MongoAdapter<
 			await this.coll().updateOne(
 				{ _id, expiresAt: { $lte: new Date() } },
 				{ $set: { payload, expiresAt } },
-				{ upsert: true }
+				// As in upsert: the filter's members are an id and a date, never undefined.
+				{ upsert: true, ...ABSENT_UNDEFINED }
 			);
 			return true;
 		} catch (error) {

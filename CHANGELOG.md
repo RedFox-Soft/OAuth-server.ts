@@ -16,6 +16,11 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   claim answers `invalid_request_object` rather than `invalid_request` (RFC 9101 §6.2); a bad
   authorization parameter inside the object is still refused as that parameter. The first alone refused
   every signed push in FAPI 2.0 Message Signing.
+- **A sign-out without `id_token_hint` can be confirmed on MongoDB.** The pending sign-out's unset
+  members were stored as nulls, the session then failed its schema and read as no session, and the
+  confirmation answered "could not find logout details". Protocol records are now written with undefined
+  members absent, as the admin stores already were. Found by the conformance suite's RP-initiated
+  logout plan; the in-memory adapter the test suite runs on could not show it.
 - **A federated sign-in refuses an ID token with no `iat`, and follows an upstream key rotation.** The
   claim is REQUIRED (OIDC Core §2) and was checked only when present; a rotation refused sign-ins for 30
   seconds, or for ten minutes when the new key carried no `kid`. Both found by the conformance suite's

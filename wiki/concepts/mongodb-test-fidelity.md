@@ -39,7 +39,12 @@ constitutional change to exist. It is `mongo_bson_round_trip.spec.ts`, and it co
 secrets' byte round trip plus the two translation commitments the store's own comment makes: any
 binary subtype is unwrapped, and a value that is not binary passes through for the caller to refuse.
 Since 2026-09-28 it also runs the real admin-session and bucket stores, to prove a member their writers
-leave undefined is stored as absent rather than as BSON null.
+leave undefined is stored as absent rather than as BSON null — and since 2026-09-30 the model adapter,
+with a session holding a sign-out that names no client. Corrected 2026-09-30: until then those cases
+proved nothing. The fake collection serialised with bare `BSON.serialize`, whose default drops an
+undefined member, while the driver passes `ignoreUndefined: false` unless a write says otherwise — so a
+store with the option removed stayed green. The fake now takes the driver's default, and removing the
+option from `adminSessionStore.ts` fails its case.
 Removing the unwrap now fails three of its cases. The `Date` in `expiresAt`, and any other field a
 store reads back and type-checks, remain uncovered and are the obvious next additions.
 

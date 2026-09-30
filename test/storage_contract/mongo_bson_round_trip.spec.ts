@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, mock } from 'bun:test';
 import { BSON, Binary, ObjectId } from 'mongodb';
 import { Type } from '@sinclair/typebox';
 
-import { shaped } from 'test/shape.js';
+import { present, shaped } from 'test/shape.js';
 
 /*
  * The tier `wiki/concepts/mongodb-test-fidelity.md` described and nobody built. Recorded as G-008.
@@ -33,13 +33,20 @@ const documents = new Map<string, Record<string, unknown>>();
 /*
  * What the driver does to a document on the way to disk and back. The whole point of the file. The
  * options are the write's own: `ignoreUndefined` is what decides whether an undefined member reaches
- * the disk as null.
+ * the disk as null. The default is the *driver's*, not bson's: bare `BSON.serialize` drops an undefined
+ * member, while the driver passes `ignoreUndefined: false` unless the write says otherwise
+ * (node_modules/mongodb/lib/bson.js), so taking bson's default here would store as absent exactly
+ * what a real deployment stores as null.
  */
 function throughBSON(
 	doc: Record<string, unknown>,
 	options?: { ignoreUndefined?: boolean }
 ): Record<string, unknown> {
-	return BSON.deserialize(BSON.serialize(doc, options));
+	return BSON.deserialize(
+		BSON.serialize(doc, {
+			ignoreUndefined: options?.ignoreUndefined ?? false
+		})
+	);
 }
 
 // The secret stores key by a derived ObjectId, the others by a string id.
@@ -71,13 +78,17 @@ mock.module('lib/adapters/mongodb/db.js', () => ({
 			},
 			async updateOne(
 				filter: { _id: unknown },
-				update: { $set: Record<string, unknown> }
+				update: { $set: Record<string, unknown> },
+				options?: { upsert?: boolean; ignoreUndefined?: boolean }
 			) {
 				const key = keyOf(filter._id);
 				const current = documents.get(key);
-				if (!current) return { matchedCount: 0 };
-				documents.set(key, throughBSON({ ...current, ...update.$set }));
-				return { matchedCount: 1 };
+				if (!current && !options?.upsert) return { matchedCount: 0 };
+				documents.set(
+					key,
+					throughBSON({ _id: filter._id, ...current, ...update.$set }, options)
+				);
+				return { matchedCount: current ? 1 : 0 };
 			}
 		})
 	},
@@ -90,6 +101,8 @@ const { AdminSessionStore } =
 	await import('lib/adapters/mongodb/adminSessionStore.js');
 const { UserBucketStore } =
 	await import('lib/adapters/mongodb/userBucketStore.js');
+const { MongoAdapter } = await import('lib/adapters/mongodb/mongoAdapter.js');
+const { Session } = await import('lib/models/session.js');
 
 /* The store derives its _id from the document name, so seeding a case directly uses the same rule. */
 function idFor(documentName: string): string {
@@ -218,6 +231,38 @@ describe('an optional member left undefined in MongoDB storage', () => {
 			'accessToken',
 			'idToken'
 		]);
+	});
+
+	/*
+	 * A model record, through the model adapter every protocol record is written by. A sign-out that
+	 * names no client — no id_token_hint, so no client, no post_logout_redirect_uri — leaves those
+	 * members of the session's pending logout undefined. Stored as nulls, the session no longer matched
+	 * its schema and was read as no session at all: the confirmation answered "could not find logout
+	 * details", and the sign-in it was meant to end had silently gone with it.
+	 */
+	it('reads back a session holding a sign-out that names no client', async () => {
+		const adapter = new MongoAdapter('Session');
+		await adapter.upsert(
+			'session-1',
+			{
+				kind: 'Session',
+				jti: 'session-1',
+				uid: 'uid-1',
+				accountId: 'account-1',
+				exp: Math.floor(Date.now() / 1000) + 600,
+				state: {
+					secret: 'xsrf',
+					clientId: undefined,
+					state: undefined,
+					postLogoutRedirectUri: undefined
+				}
+			},
+			600
+		);
+
+		const stored = present(await adapter.find('session-1'), 'stored session');
+		const session = present(await Session.fromStored(stored), 'session');
+		expect(session.payload.state?.secret).toBe('xsrf');
 	});
 
 	/* A bucket addressed by its host carries no slug. */
