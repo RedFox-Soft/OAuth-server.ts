@@ -12,7 +12,8 @@ import { loadBucketForUsers } from '../buckets/access.js';
 import {
 	CreateEndUserBody,
 	UpdateEndUserBody,
-	ResetPasswordBody
+	ResetPasswordBody,
+	RESERVED_CLAIMS
 } from './schema.js';
 import { recordAdminAudit } from '../audit/record.js';
 import {
@@ -33,6 +34,19 @@ function assertRolesSubset(
 		throw new AdminError(
 			422,
 			`roles not declared on bucket: ${bad.join(', ')}`
+		);
+	}
+}
+
+function assertClaimsAssignable(claims: Record<string, unknown> | undefined) {
+	if (!claims) return;
+	const reserved = Object.keys(claims).filter((name) =>
+		RESERVED_CLAIMS.includes(name)
+	);
+	if (reserved.length) {
+		throw new AdminError(
+			422,
+			`claims the server derives cannot be set on an account: ${reserved.join(', ')}`
 		);
 	}
 }
@@ -85,6 +99,7 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 			const ctx = assertAuth(admin as AdminContext | null);
 			const bucket = await loadBucketForUsers(ctx, params.id);
 			assertRolesSubset(body.roles, bucket);
+			assertClaimsAssignable(body.claims);
 			const store = getUserStore(params.id);
 			if (await store.findByEmail(body.email)) {
 				throw new AdminError(409, 'email already exists');
@@ -96,13 +111,17 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 			await recordAdminAudit(ctx, 'enduser.create', userId, {
 				targetScope: params.id
 			});
-			const user = await store.create(
+			const created = await store.create(
 				body.email,
 				hash,
 				body.roles ?? [],
 				true,
 				userId
 			);
+			const user = body.claims
+				? ((await store.update(created._id, { claims: body.claims })) ??
+					created)
+				: created;
 			set.status = 201;
 			return presentUser(user);
 		},
@@ -114,6 +133,8 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 			const ctx = assertAuth(admin as AdminContext | null);
 			const bucket = await loadBucketForUsers(ctx, params.id);
 			assertRolesSubset(body.roles, bucket);
+			assertClaimsAssignable(body.claims);
+			// Names only: the values are personal data, and the trail is kept longer than the account.
 			await recordAdminAudit(ctx, 'enduser.update', params.uid, {
 				targetScope: params.id,
 				attributes: Object.keys(body)

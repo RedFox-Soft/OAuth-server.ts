@@ -6,6 +6,7 @@ import { bucketRoutes } from 'lib/admin/buckets/routes.ts';
 import { endUserRoutes } from 'lib/admin/users-end/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
+	adminAuditStore,
 	getUserStore,
 	getBucketStore,
 	getProjectStore
@@ -91,6 +92,115 @@ describe('end-user API', () => {
 			.delete(undefined, { headers: { cookie } });
 		expect(del.status).toBe(200);
 		expect(await getUserStore(bucket._id).find(uid)).toBeNull();
+	});
+
+	it('creates a user holding the claims it was given', async () => {
+		const { cookie } = await sessionCookieFor(['super_admin']);
+		const bucket = await makeBucket();
+		const created = await client.admin.api
+			.buckets({ id: bucket._id })
+			.users.post(
+				{
+					email: 'claims-create@x.io',
+					password: 'supersecret',
+					claims: { name: 'Ada Lovelace', locale: 'en-GB' }
+				},
+				{ headers: { cookie } }
+			);
+
+		expect(created.status).toBe(201);
+		expect(answered(created.data).claims).toEqual({
+			name: 'Ada Lovelace',
+			locale: 'en-GB'
+		});
+	});
+
+	it('replaces a user’s claims with the ones an edit carries', async () => {
+		const { cookie } = await sessionCookieFor(['super_admin']);
+		const bucket = await makeBucket();
+		const user = await getUserStore(bucket._id).create('claims-edit@x.io', 'h');
+		await getUserStore(bucket._id).update(user._id, {
+			claims: { name: 'Before', nickname: 'old' }
+		});
+
+		const res = await client.admin.api
+			.buckets({ id: bucket._id })
+			.users({ uid: user._id })
+			.patch(
+				{ claims: { name: 'After', address: { country: 'GB' } } },
+				{ headers: { cookie } }
+			);
+
+		expect(res.status).toBe(200);
+		expect(answered(res.data).claims).toEqual({
+			name: 'After',
+			address: { country: 'GB' }
+		});
+	});
+
+	/*
+	 * A claim is released as the account says it is, and `findAccount` spreads the stored claims last —
+	 * so a stored `sub`, `email` or `email_verified` would stand in for the account's identity, and a
+	 * protocol claim would stand in for what the server itself asserts about the sign-in.
+	 */
+	for (const reserved of [
+		'sub',
+		'email',
+		'email_verified',
+		'iss',
+		'aud',
+		'exp',
+		'iat',
+		'nbf',
+		'jti',
+		'nonce',
+		'azp',
+		'acr',
+		'amr',
+		'auth_time',
+		'sid',
+		'at_hash',
+		'c_hash'
+	]) {
+		it(`refuses to set the ${reserved} claim on an account`, async () => {
+			const { cookie } = await sessionCookieFor(['super_admin']);
+			const bucket = await makeBucket();
+			const user = await getUserStore(bucket._id).create(
+				`reserved-${reserved}@x.io`,
+				'h'
+			);
+
+			const res = await client.admin.api
+				.buckets({ id: bucket._id })
+				.users({ uid: user._id })
+				.patch({ claims: { [reserved]: 'forged' } }, { headers: { cookie } });
+
+			expect(res.status).toBe(422);
+			expect(
+				(await getUserStore(bucket._id).find(user._id))?.claims
+			).toBeUndefined();
+		});
+	}
+
+	it('keeps the claim values out of the audit trail', async () => {
+		const { cookie } = await sessionCookieFor(['super_admin']);
+		const bucket = await makeBucket();
+		const user = await getUserStore(bucket._id).create(
+			'claims-audit@x.io',
+			'h'
+		);
+
+		await client.admin.api
+			.buckets({ id: bucket._id })
+			.users({ uid: user._id })
+			.patch(
+				{ claims: { phone_number: '+44 20 7946 0000' } },
+				{ headers: { cookie } }
+			);
+
+		const { entries } = await adminAuditStore.list({ targetId: user._id });
+		expect(entries.length).toBeGreaterThan(0);
+		expect(JSON.stringify(entries)).not.toContain('7946');
 	});
 
 	it('rejects roles not in the bucket set with 422', async () => {

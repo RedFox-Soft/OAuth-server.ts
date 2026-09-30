@@ -15,6 +15,11 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   catalog as a JSON value, so `profile`, `email`, `address` and `phone` — or any scope of your own — can
   be defined from the console or by an agent and are advertised in discovery as soon as they are saved.
   A definition that is neither a claim nor a list of claim names is now refused, at boot and on save.
+- **An end user's claims can be set from the console and by an agent.** Creating or editing an account
+  now takes the claims it releases — name, locale, address and the rest — replacing the whole set. The
+  identity claims (`sub`, `email`, `email_verified`) and the protocol claims the server asserts itself
+  are refused, and the audit trail records that claims changed, never their values. The agent tool's
+  description no longer promises an email change it never made.
 
 ### Fixed
 

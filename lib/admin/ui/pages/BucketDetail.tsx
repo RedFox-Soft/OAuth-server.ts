@@ -35,6 +35,50 @@ interface CreateValues {
 	email: string;
 	password: string;
 	roles?: string[];
+	claimsText?: string;
+}
+
+interface EditValues {
+	roles?: string[];
+	active: boolean;
+	claimsText?: string;
+}
+
+/*
+ * The claims an account releases, edited as JSON text. Parsed here only to refuse what is not an object
+ * before a round trip; which names are allowed is the server's rule, and its refusal is shown as is.
+ */
+function parseClaims(text: string | undefined): Record<string, unknown> {
+	const trimmed = text?.trim();
+	if (!trimmed) return {};
+	const value: unknown = JSON.parse(trimmed);
+	if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+		throw new TypeError('claims must be a JSON object');
+	}
+	return value as Record<string, unknown>;
+}
+
+function ClaimsField() {
+	return (
+		<Form.Item
+			name="claimsText"
+			label="Claims"
+			tooltip='JSON, e.g. {"name":"Ada Lovelace","locale":"en-GB"}. Released to a client only when the claims setting names them under a scope the client was granted. sub, email and email_verified come from the account itself and cannot be set here.'
+			rules={[
+				{
+					validator: async (_rule, text: string | undefined) => {
+						parseClaims(text);
+					}
+				}
+			]}
+		>
+			<Input.TextArea
+				rows={4}
+				spellCheck={false}
+				placeholder='{"name":"Ada Lovelace"}'
+			/>
+		</Form.Item>
+	);
 }
 
 export function BucketDetail({
@@ -55,7 +99,7 @@ export function BucketDetail({
 	const [bucketEditOpen, setBucketEditOpen] = useState(false);
 	const [saving, setSaving] = useState(false);
 	const [createForm] = Form.useForm<CreateValues>();
-	const [editForm] = Form.useForm<{ roles?: string[]; active: boolean }>();
+	const [editForm] = Form.useForm<EditValues>();
 	const [pwForm] = Form.useForm<{ password: string }>();
 	const [bucketForm] = Form.useForm<{
 		name: string;
@@ -107,10 +151,12 @@ export function BucketDetail({
 		return true;
 	}
 
-	async function onCreate(values: CreateValues) {
+	async function onCreate({ claimsText, ...values }: CreateValues) {
+		const claims = parseClaims(claimsText);
 		setSaving(true);
 		try {
-			if (await post('/users', values, 'create user')) {
+			const body = Object.keys(claims).length ? { ...values, claims } : values;
+			if (await post('/users', body, 'create user')) {
 				setCreateOpen(false);
 				createForm.resetFields();
 				await load();
@@ -120,15 +166,19 @@ export function BucketDetail({
 		}
 	}
 
-	async function onEdit(values: { roles?: string[]; active: boolean }) {
+	async function onEdit({ claimsText, ...values }: EditValues) {
 		if (!editUserId) return;
+		// An emptied field clears the claims: an edit replaces the account's whole set.
 		const res = await fetch(`${base}/users/${editUserId}`, {
 			method: 'PATCH',
 			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify(values)
+			body: JSON.stringify({ ...values, claims: parseClaims(claimsText) })
 		});
 		if (!res.ok) {
-			message.error('failed to update user');
+			const detail = (await res.json().catch(() => null)) as {
+				message?: string;
+			} | null;
+			message.error(detail?.message || 'failed to update user');
 			return;
 		}
 		setEditOpen(false);
@@ -308,7 +358,10 @@ export function BucketDetail({
 										setEditUserId(row._id);
 										editForm.setFieldsValue({
 											roles: row.roles,
-											active: row.active
+											active: row.active,
+											claimsText: row.claims
+												? JSON.stringify(row.claims, null, 2)
+												: ''
 										});
 										setEditOpen(true);
 									}}
@@ -417,6 +470,7 @@ export function BucketDetail({
 							options={roleOptions}
 						/>
 					</Form.Item>
+					<ClaimsField />
 				</Form>
 			</Modal>
 
@@ -448,6 +502,7 @@ export function BucketDetail({
 					>
 						<Switch />
 					</Form.Item>
+					<ClaimsField />
 				</Form>
 			</Modal>
 

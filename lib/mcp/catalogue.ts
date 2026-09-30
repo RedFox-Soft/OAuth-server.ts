@@ -906,7 +906,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'uid'],
 		summary:
-			"Change an end-user's email, roles, active state, or claims. Deactivating is a sign-in decision, not a deletion."
+			"Change an end-user's roles, active state, or claims. Claims replace the account's whole set; sub, email, email_verified and the protocol claims are refused, and a claim is released to a client only once the `claims` setting names it under a scope. Deactivating is a sign-in decision, not a deletion."
 	},
 	{
 		tool: 'bucket_user_totp_clear',
