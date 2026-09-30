@@ -62,6 +62,21 @@ describe('request parameter features', () => {
 		signOptions?: { audience?: string | string[]; expiresIn?: number };
 	};
 
+	// The error code the client receives: in the redirect for /auth, in the body for /device/auth.
+	function deliveredError(authResp: {
+		response: Response;
+		error?: { value: unknown } | null;
+	}): string | null {
+		const location = authResp.response.headers.get('location');
+		if (location) {
+			return new URL(location).searchParams.get('error');
+		}
+		const value = authResp.error?.value;
+		return typeof value === 'object' && value !== null && 'error' in value
+			? String(value.error)
+			: null;
+	}
+
 	async function authorization(
 		client_id: string,
 		{
@@ -264,7 +279,7 @@ describe('request parameter features', () => {
 					const spy = mock();
 					eventBus.once(errorEvt, spy);
 
-					await authorizationRequest('client', {
+					const resp = await authorizationRequest('client', {
 						jwtPayload: {
 							scope: ['openid', 'profile']
 						},
@@ -276,10 +291,7 @@ describe('request parameter features', () => {
 					});
 
 					expect(spy).toHaveBeenCalledTimes(1);
-					expect(spy.mock.calls[0][0]).toHaveProperty(
-						'message',
-						'invalid_request_object'
-					);
+					expect(deliveredError(resp)).toBe('invalid_request');
 				});
 
 				it('can contain claims parameter as JSON', async function () {
@@ -396,7 +408,7 @@ describe('request parameter features', () => {
 					const spy = mock();
 					eventBus.once(errorEvt, spy);
 
-					await authorizationRequest('client', {
+					const resp = await authorizationRequest('client', {
 						jwtPayload: {
 							scope: 'openid',
 							request: 'request inception'
@@ -409,17 +421,14 @@ describe('request parameter features', () => {
 					});
 
 					expect(spy).toHaveBeenCalledTimes(1);
-					expect(spy.mock.calls[0][0]).toHaveProperty(
-						'message',
-						'invalid_request_object'
-					);
+					expect(deliveredError(resp)).toBe('invalid_request_object');
 				});
 
 				it('doesnt allow requestUri inception', async function () {
 					const spy = mock();
 					eventBus.once(errorEvt, spy);
 
-					await authorizationRequest('client', {
+					const resp = await authorizationRequest('client', {
 						jwtPayload: {
 							scope: 'openid',
 							request_uri: 'request uri inception'
@@ -432,10 +441,7 @@ describe('request parameter features', () => {
 					});
 
 					expect(spy).toHaveBeenCalledTimes(1);
-					expect(spy.mock.calls[0][0]).toHaveProperty(
-						'message',
-						'invalid_request_object'
-					);
+					expect(deliveredError(resp)).toBe('invalid_request_object');
 				});
 
 				if (route !== '/device/auth') {
@@ -716,6 +722,24 @@ describe('request parameter features', () => {
 					expect(spy).toHaveBeenCalledTimes(1);
 					expect(spy.mock.calls[0][0]).toBeInstanceOf(ValidationError);
 				});
+
+				// The device flow takes no PKCE, so the parameter is ignored there rather than refused.
+				if (route !== '/device/auth') {
+					it('a request object carrying an unsupported code_challenge_method is refused with invalid_request', async function () {
+						const spy = mock();
+						eventBus.once(errorEvt, spy);
+
+						const resp = await authorizationRequest('client', {
+							jwtPayload: { scope: 'openid', code_challenge_method: 'plain' },
+							payload: { scope: 'openid' },
+							verb,
+							isError: true
+						});
+
+						expect(spy).toHaveBeenCalledTimes(1);
+						expect(deliveredError(resp)).toBe('invalid_request');
+					});
+				}
 
 				it('a request object without a jti is accepted', async function () {
 					const spy = mock();

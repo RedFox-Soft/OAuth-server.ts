@@ -15,7 +15,7 @@ import {
 	type TSchema,
 	ValidationError
 } from 'elysia';
-import { isPlainObject } from 'lib/helpers/_/object.js';
+import { JWTparameters } from 'lib/consts/param_list.js';
 import {
 	declaredParams,
 	ignoreUnknownIn
@@ -45,6 +45,13 @@ function isOneOf<T extends string>(
 function messageOf(err: unknown): string {
 	return err instanceof Error ? err.message : String(err);
 }
+
+// The members whose refusal is a refusal of the Request Object itself rather than of a parameter.
+const OBJECT_MEMBERS = new Set([
+	...Object.keys(JWTparameters.properties),
+	'request',
+	'request_uri'
+]);
 
 function copyParam<K extends keyof PipelineParams>(
 	target: PipelineParams,
@@ -159,21 +166,25 @@ export default async function processRequestObject(
 	if (!validator.Check(payload)) {
 		const refusal = new ValidationError('requestObject', validator, payload);
 		const first = mapValueError(refusal.valueError);
-		const named: unknown = first?.schema.error;
 		/*
-		 * RFC 9101 §6.2: what is wrong inside the object is invalid_request_object, not the
-		 * invalid_request a schema refusal answers at the endpoint itself. A member that names a
-		 * registered code of its own keeps it — `registration` is OIDC Core §3.1.2.6's
-		 * registration_not_supported wherever it arrives.
+		 * A registered claim of the object that is missing or malformed, or a `request`/`request_uri`
+		 * nested inside it, makes the *object* invalid: RFC 9101 §6.2's invalid_request_object. An
+		 * authorization parameter carried inside it is judged as that parameter, as if it had arrived
+		 * beside it — a `plain` code_challenge_method is still RFC 7636 §4.4.1's invalid_request, and
+		 * `registration` still registration_not_supported. The conformance suite holds both halves:
+		 * `ensure-request-object-without-exp-fails` and `par-authorization-request-containing-request_uri`
+		 * on one side, `par-plain-pkce-rejected` on the other.
 		 */
-		if (isPlainObject(named) && typeof named.error === 'string') {
-			throw refusal;
+		const member = first?.path.split('/')[1];
+		if (member !== undefined && OBJECT_MEMBERS.has(member)) {
+			const described: unknown = first?.schema.error;
+			throw new InvalidRequestObject(
+				typeof described === 'string' && described
+					? described
+					: first?.summary || 'Request Object is invalid'
+			);
 		}
-		throw new InvalidRequestObject(
-			typeof named === 'string' && named
-				? named
-				: first?.summary || 'Request Object is invalid'
-		);
+		throw refusal;
 	}
 
 	// Validated just above against this endpoint's own request schema, whose members are pipeline parameters.
