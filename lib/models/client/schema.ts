@@ -100,11 +100,11 @@ function valueSetContext(): ValueSetContext {
 		authorizationDetailsTypes: Object.keys(
 			ApplicationConfig['richAuthorizationRequests.types']
 		),
-		idTokenSigningAlgs: idTokenSigningAlgValues,
-		userinfoSigningAlgs: userinfoSigningAlgValues,
-		introspectionSigningAlgs: introspectionSigningAlgValues,
-		authorizationSigningAlgs: authorizationSigningAlgValues,
-		requestObjectEncryptionAlgs: requestObjectEncryptionAlgValues,
+		idTokenSigningAlgs: idTokenSigningAlgValues(),
+		userinfoSigningAlgs: userinfoSigningAlgValues(),
+		introspectionSigningAlgs: introspectionSigningAlgValues(),
+		authorizationSigningAlgs: authorizationSigningAlgValues(),
+		requestObjectEncryptionAlgs: requestObjectEncryptionAlgValues(),
 		clientAuthSigningAlgs: clientAuthSigningAlgValues
 	};
 }

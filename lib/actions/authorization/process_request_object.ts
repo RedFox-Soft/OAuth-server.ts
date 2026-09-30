@@ -99,7 +99,7 @@ export default async function processRequestObject(
 		try {
 			const header = JWT.header(params.request);
 
-			if (!isOneOf(requestObjectEncryptionAlgValues, header.alg)) {
+			if (!isOneOf(requestObjectEncryptionAlgValues(), header.alg)) {
 				throw new TypeError('unsupported encrypted request alg');
 			}
 			if (!isOneOf(requestObjectEncryptionEncValues, header.enc)) {

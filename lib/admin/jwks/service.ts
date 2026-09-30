@@ -6,11 +6,8 @@ import {
 	type PublicJWK
 } from '../../configs/keystore.js';
 import { generateJWKS } from '../../helpers/jwks.js';
-import {
-	getAlgorithm,
-	type UnnormalizedJWK
-} from '../../configs/verifyJWKs.js';
-import { JWKS_KEYS } from '../../configs/keys.js';
+import { type UnnormalizedJWK } from '../../configs/verifyJWKs.js';
+import { idTokenSigningAlgValues } from '../../configs/jwaAlgorithms.js';
 import { recordAdminAudit } from '../audit/record.js';
 import { AdminError, type AdminContext } from '../auth/rbac.js';
 
@@ -38,19 +35,13 @@ export interface JwksState {
 }
 
 /*
- * The signing algorithms the running server tells clients it supports.
- *
- * Derived at module load from the boot key set (`lib/configs/jwaAlgorithms.ts`) and published in the
- * discovery document, which means it does NOT follow a key generated since — generation hot-applies a
- * key for *signing*, but nothing recomputes what discovery advertises.
- *
- * That gap is why this is measured rather than assumed. An operator who generates the ES256 key a
- * FAPI 2.0 deployment needs, and is told no restart is required, has a server that can sign ES256 and
- * a discovery document that never mentions it — so no client ever asks. The same boot snapshot the
- * advertisement is built from is read here, so the comparison cannot drift from the claim.
+ * The signing algorithms the running server tells clients it supports — the very list discovery
+ * publishes, read here so the comparison cannot drift from the claim. It follows the live key set, so
+ * a generated key's algorithm is advertised at once; the check remains for a key in the store that
+ * this process does not hold.
  */
 function advertisedSigningAlgorithms(): Set<string> {
-	return new Set(getAlgorithm(JWKS_KEYS).sign);
+	return new Set(idTokenSigningAlgValues());
 }
 
 // A key counts as a signing key by its published `use` — explicit, else inferred from `alg`, by
@@ -120,8 +111,8 @@ export async function getJwksState(): Promise<JwksState> {
 }
 
 // Generate a new asymmetric signing key, persist it, and hot-apply it to the live keystore so it
-// can sign immediately. A key whose algorithm this server did not boot with still needs a restart
-// before discovery advertises it, which getJwksState reports. Audit-first: the audit entry is
+// can sign immediately — and, since the algorithm lists read the live set, be advertised and
+// registrable at once, whatever algorithm the server booted with. Audit-first: the audit entry is
 // written before any state change, so a failed audit write aborts before a key is created. The key
 // is added at the END of the keystore, so the existing key keeps signing
 // (publish-for-verification-only); a later rotation makes the new key the signer by removing the

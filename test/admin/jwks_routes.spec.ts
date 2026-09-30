@@ -14,7 +14,9 @@ import { generateJWKS } from 'lib/helpers/jwks.ts';
 import { calculateKid } from 'lib/configs/verifyJWKs.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { sessionFor } from '../admin_session.ts';
-import { present } from 'test/shape.js';
+import { present, shaped } from 'test/shape.js';
+import { Type } from '@sinclair/typebox';
+import { send } from '../feature_gate/helpers.js';
 
 const app = new Elysia().use(resolveAdmin).use(jwksRoutes);
 const client = treaty(app);
@@ -249,13 +251,11 @@ describe('admin JWKS API — generate (US2)', () => {
 		assertNoPrivateMaterial(body.keys);
 	});
 
-	it('reports a generated algorithm the running server does not advertise as awaiting a restart', async () => {
+	it('advertises a generated algorithm the server did not boot with, without a restart', async () => {
 		const { cookie } = await sessionCookieFor(['super_admin']);
 		const before = keySet(
 			(await client.admin.api.jwks.get({ headers: { cookie } })).data
 		);
-		expect(before.unadvertisedAlgorithms).toEqual([]);
-		expect(before.restartRequired).toBe(false);
 
 		// Derived rather than named, so the case does not depend on which algorithms this deployment
 		// happens to have booted with.
@@ -273,12 +273,21 @@ describe('admin JWKS API — generate (US2)', () => {
 		const body = keySet(res.data);
 
 		/*
-		 * The key signs at once, but the discovery document is built from the boot key set — so until a
-		 * restart no client learns the algorithm exists. An operator told "no restart required" would
-		 * have a server that signs what nothing ever asks it to sign.
+		 * The key signs at once, and until 2026-09-30 that was all: discovery was built from the boot key
+		 * set, so no client learned the algorithm existed until a restart. What an operator is told and
+		 * what a client can use now agree.
 		 */
-		expect(body.unadvertisedAlgorithms).toContain(unbooted);
-		expect(body.restartRequired).toBe(true);
+		expect(body.unadvertisedAlgorithms).toEqual([]);
+		expect(body.restartRequired).toBe(false);
+		const discovery = shaped(
+			Type.Object({
+				id_token_signing_alg_values_supported: Type.Array(Type.String())
+			}),
+			await (
+				await send('/.well-known/openid-configuration', { method: 'GET' })
+			).json()
+		);
+		expect(discovery.id_token_signing_alg_values_supported).toContain(unbooted);
 	});
 
 	it('rejects a symmetric algorithm with 422', async () => {

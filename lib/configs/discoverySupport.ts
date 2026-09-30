@@ -133,7 +133,7 @@ export function calculateDiscovery(
 	const acrValues = deriveAcrValues(config);
 	/*
 	 * A bucket with keys of its own advertises what those keys sign and decrypt with; the root's lists
-	 * are the ones fixed at boot from the instance key set. HS256 and the symmetric key-wrapping
+	 * are read from the instance's live key set. HS256 and the symmetric key-wrapping
 	 * algorithms use the client's own secret, so every issuer offers them.
 	 */
 	const signing = <T extends string>(root: T[]): T[] =>
@@ -141,13 +141,10 @@ export function calculateDiscovery(
 			? (['HS256', ...keys.signingAlgorithms] as T[])
 			: root;
 	const requestObjectEncryption = keys?.encryptionAlgorithms
-		? ([
-				...keys.encryptionAlgorithms,
-				'A128KW',
-				'A256KW',
-				'dir'
-			] as typeof requestObjectEncryptionAlgValues)
-		: requestObjectEncryptionAlgValues;
+		? ([...keys.encryptionAlgorithms, 'A128KW', 'A256KW', 'dir'] as ReturnType<
+				typeof requestObjectEncryptionAlgValues
+			>)
+		: requestObjectEncryptionAlgValues();
 	/*
 	 * Every endpoint below is built from the issuer of the bucket this document is being served for, so
 	 * a client reading it reaches that bucket and no other. Absent a bucket this is the instance's own
@@ -194,7 +191,7 @@ export function calculateDiscovery(
 			: ['form_post', 'query'],
 		subject_types_supported: ['public', 'pairwise'],
 		code_challenge_methods_supported: ['S256'],
-		id_token_signing_alg_values_supported: signing(idTokenSigningAlgValues),
+		id_token_signing_alg_values_supported: signing(idTokenSigningAlgValues()),
 		token_endpoint_auth_signing_alg_values_supported:
 			clientAuthSigningAlgValues,
 		authorization_response_iss_parameter_supported: true,
@@ -230,12 +227,12 @@ export function calculateDiscovery(
 		request_object_encryption_enc_values_supported:
 			requestObjectEncryptionEncValues,
 
-		userinfo_signing_alg_values_supported: signing(userinfoSigningAlgValues),
+		userinfo_signing_alg_values_supported: signing(userinfoSigningAlgValues()),
 		userinfo_encryption_alg_values_supported: userinfoEncryptionAlgValues,
 		userinfo_encryption_enc_values_supported: userinfoEncryptionEncValues,
 
 		authorization_signing_alg_values_supported: signing(
-			authorizationSigningAlgValues
+			authorizationSigningAlgValues()
 		),
 		authorization_encryption_alg_values_supported:
 			authorizationEncryptionAlgValues,
@@ -243,7 +240,7 @@ export function calculateDiscovery(
 			authorizationEncryptionEncValues,
 
 		introspection_signing_alg_values_supported: signing(
-			introspectionSigningAlgValues
+			introspectionSigningAlgValues()
 		),
 		introspection_encryption_alg_values_supported:
 			introspectionEncryptionAlgValues,

@@ -49,10 +49,12 @@ between the two writes is the thing to know:
   deployment, which needs PS256 or ES256, could not be assembled through the console at all.
 - **Deletion waits for a restart.** The key stays served and honoured, reported as `pending removal`,
   because dropping it from the live `/jwks` would break verification of tokens already signed with it.
-- A key in an algorithm the process **did not boot with** signs at once but is advertised in discovery
-  only after a restart: the algorithm sets are derived once at module scope and nothing re-runs them.
-  The state reports `restartRequired` for this separately from key drift, since the remedy is the same
-  but the reason is not.
+- A key in an algorithm the process **did not boot with** is advertised and registrable at once.
+  Corrected 2026-09-30: the algorithm sets (`lib/configs/jwaAlgorithms.ts`) were derived once at module
+  scope, so such a key signed but discovery never named its algorithm and client registration refused
+  it until a restart — the only restart a conformance deployment needed. They are now functions of the
+  live `publicJWKS`, read by discovery and client validation on every call. `unadvertisedAlgorithms`
+  remains in the state, and is non-empty only for a stored key this process does not hold.
 
 Status is the drift between the persisted store and the boot-time `JWKS_KEYS`. Private members are never
 returned. Both writes are audit-first — see [[admin-audit-trail]].

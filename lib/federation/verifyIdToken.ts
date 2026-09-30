@@ -92,7 +92,9 @@ export interface VerifiedAssertion {
  * because "cannot happen" is a claim.
  */
 function acceptableAlgorithms(metadata: ProviderMetadata): string[] {
-	const ours = new Set<string>(idTokenSigningAlgValues as unknown as string[]);
+	const ours = new Set<string>(
+		idTokenSigningAlgValues() as unknown as string[]
+	);
 	const advertised = metadata.signingAlgValues.filter((alg) => ours.has(alg));
 	if (advertised.length === 0) {
 		throw new FederationIdTokenRejected('algorithm');

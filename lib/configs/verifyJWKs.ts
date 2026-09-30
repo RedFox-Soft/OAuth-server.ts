@@ -188,7 +188,10 @@ export const calculateKid = (jwk: UnnormalizedJWK) => {
 	return crypto.hash('sha256', JSON.stringify(components), 'base64url');
 };
 
-export function getAlgorithm(keys: JWKS[]) {
+// Reads only a key's `use` and `alg`, so the boot set and the live public projection both serve.
+export function getAlgorithm(
+	keys: readonly { readonly use?: string; readonly alg: string }[]
+) {
 	const signAlg = new Set<string>();
 	const encAlg = new Set<string>();
 	for (const key of keys) {

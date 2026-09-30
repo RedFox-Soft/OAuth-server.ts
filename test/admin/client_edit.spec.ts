@@ -120,7 +120,7 @@ function fixtures(): ({ clientId: string } & Record<string, unknown>)[] {
 		authorization_signed_response_alg: 'ES256',
 		authorization_encrypted_response_alg: authorizationEncryptionAlgValues[0],
 		authorization_encrypted_response_enc: authorizationEncryptionEncValues[0],
-		request_object_encryption_alg: requestObjectEncryptionAlgValues[0],
+		request_object_encryption_alg: requestObjectEncryptionAlgValues()[0],
 		request_object_encryption_enc: requestObjectEncryptionEncValues[0],
 		require_signed_request_object: true,
 		post_logout_redirect_uris: [`${RP}/bye`],

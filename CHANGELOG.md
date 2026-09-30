@@ -28,6 +28,9 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- **A signing key in a new algorithm is usable without a restart.** Generating, say, the ES256 key a
+  FAPI 2.0 deployment needs signed at once, but discovery did not advertise ES256 and a client could not
+  register for it until the server restarted. The advertised algorithms now follow the live key set.
 - **Seven settings no longer claim to need a restart.** The rate limiter, the three sign-in throttle
   settings, federation, the MCP control plane and Sentry reporting all apply on save, as the console
   already reported, while their descriptions still ended "Applied at startup". A catalog guard now

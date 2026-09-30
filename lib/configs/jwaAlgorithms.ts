@@ -1,5 +1,5 @@
 import { getAlgorithm } from 'lib/configs/verifyJWKs.js';
-import { JWKS_KEYS } from './keys.js';
+import { publicJWKS } from './keystore.js';
 import {
 	type asymmetricSigningAlgType,
 	type encryptionEncValues,
@@ -21,55 +21,40 @@ export const clientAuthSigningAlgValues: signingAlgValues[] = [
 	'EdDSA'
 ];
 
-const alg = getAlgorithm(JWKS_KEYS);
 /*
- * idTokenSigningAlgValues
- *
- * description: JWS "alg" Algorithm values the authorization server supports to sign ID Tokens with.
- * Base on Global Keystore which will be fill startup application, Symmetric algorithm should be added manually.
+ * What the instance's own keys sign and decrypt with, read from the live key set on every call rather
+ * than from the one the server booted with. A key generated from the console signs at once; before
+ * 2026-09-30 these lists were computed when this module loaded, so discovery never advertised the new
+ * algorithm and a client could not register for it until a restart. Symmetric algorithms use the
+ * client's own secret and are added by hand.
  */
-export const idTokenSigningAlgValues: signingAlgValues[] = [
+function live() {
+	return getAlgorithm(publicJWKS.keys);
+}
+
+// JWS algorithms the server signs ID Tokens with.
+export const idTokenSigningAlgValues = (): signingAlgValues[] => [
 	'HS256',
-	...alg.sign
+	...live().sign
 ];
-/*
- * userinfoSigningAlgValues
- *
- * description: JWS "alg" Algorithm values the authorization server supports to sign UserInfo responses with
- * Base on Global Keystore which will be fill startup application, Symmetric algorithm should be added manually.
- */
-export const userinfoSigningAlgValues: signingAlgValues[] = [
+// JWS algorithms the server signs UserInfo responses with.
+export const userinfoSigningAlgValues = (): signingAlgValues[] => [
 	'HS256',
-	...alg.sign
+	...live().sign
 ];
-/*
- * introspectionSigningAlgValues
- *
- * description: JWS "alg" Algorithm values the authorization server supports to sign JWT Introspection responses with
- * Base on Global Keystore which will be fill startup application, Symmetric algorithm should be added manually.
- */
-export const introspectionSigningAlgValues: signingAlgValues[] = [
+// JWS algorithms the server signs JWT introspection responses with.
+export const introspectionSigningAlgValues = (): signingAlgValues[] => [
 	'HS256',
-	...alg.sign
+	...live().sign
 ];
-/*
- * authorizationSigningAlgValues
- *
- * description: JWS "alg" Algorithm values the authorization server supports to sign JWT Authorization Responses (`JARM`) with
- * Base on Global Keystore which will be fill startup application, Symmetric algorithm should be added manually.
- */
-export const authorizationSigningAlgValues: signingAlgValues[] = [
+// JWS algorithms the server signs JWT authorization responses (JARM) with.
+export const authorizationSigningAlgValues = (): signingAlgValues[] => [
 	'HS256',
-	...alg.sign
+	...live().sign
 ];
-/*
- * requestObjectEncryptionAlgValues
- *
- * description: JWE "alg" Algorithm values the authorization server supports to receive encrypted Request Objects (`JAR`) with
- * Base on Global Keystore which will be fill startup application, Symmetric algorithm should be added manually.
- */
-export const requestObjectEncryptionAlgValues: encryptionAlgValues[] = [
-	...alg.enc,
+// JWE algorithms the server accepts encrypted Request Objects (JAR) under.
+export const requestObjectEncryptionAlgValues = (): encryptionAlgValues[] => [
+	...live().enc,
 	'A128KW',
 	'A256KW',
 	'dir'

@@ -90,9 +90,9 @@ function deriveSymmetricKeys(client: Client): KeyStore {
 			requestObjectSigningAlgValues.forEach(Set.prototype.add.bind(algs));
 		}
 
-		requestObjectEncryptionAlgValues.forEach(Set.prototype.add.bind(algs));
+		requestObjectEncryptionAlgValues().forEach(Set.prototype.add.bind(algs));
 
-		if (requestObjectEncryptionAlgValues.includes('dir')) {
+		if (requestObjectEncryptionAlgValues().includes('dir')) {
 			requestObjectEncryptionEncValues.forEach(Set.prototype.add.bind(algs));
 		}
 
