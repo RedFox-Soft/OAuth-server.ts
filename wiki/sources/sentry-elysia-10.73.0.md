@@ -7,7 +7,7 @@ url: https://www.npmjs.com/package/@sentry/elysia
 raw: null
 ingested: 2026-09-02
 created: 2026-09-03
-updated: 2026-09-03
+updated: 2026-09-30
 ---
 
 # @sentry/elysia 10.73.0 (plugin source)
@@ -20,15 +20,16 @@ had to happen at all.
 
 ## Why this is a source page with no raw file
 
-The package is **not installed**. `package.json` depends on `@sentry/bun` at `10.73.0` and nothing
-else from the SDK; `@sentry/elysia` appears in neither the manifest nor `node_modules`, and two
-assertions in `test/sentry/no_instrumentation.spec.ts:98,111` pin that absence so a later
-convenience install fails the suite rather than passing review.
+The package is **not installed**. `package.json` depends on `@sentry/bun` (exact-pinned, `11.1.0`
+since 2026-09-30) and nothing else from the SDK; `@sentry/elysia` appears in neither the manifest
+nor `node_modules`, and two assertions in `test/sentry/no_instrumentation.spec.ts:102,115` pin that
+absence so a later convenience install fails the suite rather than passing review.
 
 So `raw:` is null: there is no vendored copy under `raw/` and no tree in this repository to cite.
-What makes the reading checkable instead is the **version**, `10.73.0` — the same version line as
-the installed `@sentry/bun`, which is what a reader needs to fetch the same code and confirm or
-refute a claim.
+What makes the reading checkable instead is the **version**, `10.73.0`, which is what a reader
+needs to fetch the same code and confirm or refute a claim. It was the installed `@sentry/bun`
+version line when the plugin was read; the dependency has since moved to the 11.x line, so the
+reading is now one major behind and nothing re-read the plugin at 11.x.
 
 ## What was read
 
