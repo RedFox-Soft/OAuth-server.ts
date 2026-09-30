@@ -28,6 +28,10 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- **Seven settings no longer claim to need a restart.** The rate limiter, the three sign-in throttle
+  settings, federation, the MCP control plane and Sentry reporting all apply on save, as the console
+  already reported, while their descriptions still ended "Applied at startup". A catalog guard now
+  refuses a description that contradicts the setting's own apply behaviour.
 - **A refused client registration reaches the console as the admin plane's error.** It arrived as `400`
   in the protocol's shape, with no message to show, although the admin routes' tests expected `422` —
   they mounted the routes alone. It is now `422` with the validator's reason.

@@ -127,6 +127,21 @@ describe('settings catalog', () => {
 		).toBe(false);
 	});
 
+	/*
+	 * The console tells an operator a setting is in force the moment it is saved unless its descriptor
+	 * says `apply: 'restart'`. Seven descriptions still ended "Applied at startup." long after every
+	 * one of them was made to apply on save — so the only text an operator reads said the opposite of
+	 * what the server does, and nothing noticed.
+	 */
+	it('describes no setting that applies on save as needing a restart', () => {
+		const claimsRestart =
+			/applied at startup|after (a |the next )?restart|requires? a restart|on (the next )?restart/i;
+		const contradicted = SETTINGS_CATALOG.filter(
+			(d) => d.apply !== 'restart' && claimsRestart.test(d.description)
+		).map((d) => d.key);
+		expect(contradicted).toEqual([]);
+	});
+
 	it('excludes structured/function/Buffer keys', () => {
 		const keys = SETTINGS_CATALOG.map((d) => d.key);
 		for (const forbidden of [

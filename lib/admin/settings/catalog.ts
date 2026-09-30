@@ -585,7 +585,7 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 		type: 'boolean',
 		risk: 'security',
 		description:
-			'Refuses requests from one origin past its allowance inside a window, before the endpoint does any work. Allowances are tiered by route class, so the token endpoint and a static asset are not held to the same number. On by default; turn it off as an incident kill switch if it starts refusing traffic it should not. Applied at startup.'
+			'Refuses requests from one origin past its allowance inside a window, before the endpoint does any work. Allowances are tiered by route class, so the token endpoint and a static asset are not held to the same number. On by default; turn it off as an incident kill switch if it starts refusing traffic it should not.'
 	},
 	{
 		key: 'rateLimit.trustedProxy',
@@ -698,7 +698,7 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 		type: 'number',
 		unit: 'attempts',
 		description:
-			'How many wrong passwords one address may submit before the sign-in door shuts for that address. Once shut it refuses every attempt, including one with the correct password, until the window ends — and the refusal looks exactly like an ordinary wrong password, so it tells an attacker nothing. Raising this hands a guessing attack proportionally more tries; lowering it locks out people who mistype. Matches the verification code’s attempt cap by default. Applied at startup.'
+			'How many wrong passwords one address may submit before the sign-in door shuts for that address. Once shut it refuses every attempt, including one with the correct password, until the window ends — and the refusal looks exactly like an ordinary wrong password, so it tells an attacker nothing. Raising this hands a guessing attack proportionally more tries; lowering it locks out people who mistype. Matches the verification code’s attempt cap by default.'
 	},
 	{
 		key: 'loginThrottle.windowSeconds',
@@ -709,7 +709,7 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 		type: 'number',
 		unit: 'seconds',
 		description:
-			'How long the door stays shut the first time an address runs out of attempts, and the length each further lockout doubles from. This is also the shortest wait an honest user who trips the throttle will face, so it is the number to lower if legitimate lockouts are the complaint. A bucket that requires a one-time code stays at this length however often it is tripped, because a guessed password there does not sign anyone in. Applied at startup.'
+			'How long the door stays shut the first time an address runs out of attempts, and the length each further lockout doubles from. This is also the shortest wait an honest user who trips the throttle will face, so it is the number to lower if legitimate lockouts are the complaint. A bucket that requires a one-time code stays at this length however often it is tripped, because a guessed password there does not sign anyone in.'
 	},
 	{
 		key: 'loginThrottle.windowCeilingSeconds',
@@ -720,7 +720,7 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 		type: 'number',
 		unit: 'seconds',
 		description:
-			'The longest the door will ever shut, however many times one address has run out of attempts. With the defaults the lockouts run 15 → 30 → 60 minutes, which holds a sustained attack to roughly 120 guesses a day. Cannot be shorter than the first lockout, and cannot exceed 24 hours — beyond that the counter would be forgotten before its own lockout ended, which would reopen the door. Someone locked out this long can still get straight back in by completing a password reset. Applied at startup.'
+			'The longest the door will ever shut, however many times one address has run out of attempts. With the defaults the lockouts run 15 → 30 → 60 minutes, which holds a sustained attack to roughly 120 guesses a day. Cannot be shorter than the first lockout, and cannot exceed 24 hours — beyond that the counter would be forgotten before its own lockout ended, which would reopen the door. Someone locked out this long can still get straight back in by completing a password reset.'
 	},
 
 	/*
@@ -736,7 +736,7 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 		summary: 'Let a bucket offer sign-in through an upstream provider',
 		type: 'boolean',
 		description:
-			'Lets a user bucket offer sign-in through external OpenID Providers configured on that bucket, alongside or instead of its password form. Off by default: this is the only capability that lets an outside party’s assertion produce a session here, and with it off no federation route is served and no provider button renders, whatever a bucket holds. Configuring providers stays available either way, so a provider can be prepared before switching this on and removed after switching it off. Applied at startup.'
+			'Lets a user bucket offer sign-in through external OpenID Providers configured on that bucket, alongside or instead of its password form. Off by default: this is the only capability that lets an outside party’s assertion produce a session here, and with it off no federation route is served and no provider button renders, whatever a bucket holds. Configuring providers stays available either way, so a provider can be prepared before switching this on and removed after switching it off.'
 	},
 
 	/*
@@ -752,7 +752,7 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 		summary: 'Let an AI agent administer this server over MCP',
 		type: 'boolean',
 		description:
-			'Serves this control plane to an AI agent over MCP at /mcp, as an OAuth 2.1 protected resource of this server. An agent acts as the administrator who authorized it and gets exactly that account’s permissions: every operation runs through the same routes, the same checks and the same audit trail as the console, and each entry records both the operator and the agent. Deleting a project or a user bucket is withheld from agents entirely and stays console-only. Off by default — with it off, neither /mcp nor its metadata document is served. Applied at startup.'
+			'Serves this control plane to an AI agent over MCP at /mcp, as an OAuth 2.1 protected resource of this server. An agent acts as the administrator who authorized it and gets exactly that account’s permissions: every operation runs through the same routes, the same checks and the same audit trail as the console, and each entry records both the operator and the agent. Deleting a project or a user bucket is withheld from agents entirely and stays console-only. Off by default — with it off, neither /mcp nor its metadata document is served.'
 	},
 
 	{
@@ -853,7 +853,7 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 		 */
 		dependsOn: 'errorStore.enabled',
 		description:
-			'Sends every fault the error store records to an external Sentry project, so a failure raises an alert instead of waiting to be found here. This is an additional destination, never an alternative: the fault is recorded locally first and the outbound event is built from that record, which is why this cannot be switched on unless the error store is. Only the endpoint, the kind of failure and the reference are sent — never a request URL, header, cookie, body, or any end-user identity. Off by default; requires the ingestion credential below. Applied at startup.'
+			'Sends every fault the error store records to an external Sentry project, so a failure raises an alert instead of waiting to be found here. This is an additional destination, never an alternative: the fault is recorded locally first and the outbound event is built from that record, which is why this cannot be switched on unless the error store is. Only the endpoint, the kind of failure and the reference are sent — never a request URL, header, cookie, body, or any end-user identity. Off by default; requires the ingestion credential below.'
 	},
 	/*
 	 * `sentry.environment`, `sentry.release` and `sentry.queueDepth` are deliberately absent too, for
