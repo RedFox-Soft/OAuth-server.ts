@@ -80,7 +80,17 @@ function renderLogoutForm(secret: string, confirmAction: string) {
 	);
 }
 
-export function logout(secret: string, confirmAction: string) {
+/*
+ * `postLogoutRedirectUri` is where confirming will send the browser, already checked against the
+ * client's registration. It reaches the policy because `form-action` governs the submission's whole
+ * redirect chain: with 'self' alone the browser blocked the 303 to the relying party after the session
+ * had ended, and left the user on this page.
+ */
+export function logout(
+	secret: string,
+	confirmAction: string,
+	postLogoutRedirectUri?: string
+) {
 	const form = renderLogoutForm(secret, confirmAction);
 	const styleText = extractStyle(cache);
 
@@ -90,5 +100,5 @@ export function logout(secret: string, confirmAction: string) {
   <style>${styleText}</style>
 </head><body>${renderToStaticMarkup(form)}</body></html>`;
 
-	return htmlResponse(html);
+	return htmlResponse(html, { handOffTo: postLogoutRedirectUri });
 }

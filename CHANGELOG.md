@@ -55,6 +55,9 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- **A confirmed sign-out returns to the relying party.** The confirmation page's `form-action 'self'`
+  had Chrome block the 303 to `post_logout_redirect_uri`, after the session had already ended, so the
+  user stayed on "Do you want to sign-out?". The page now admits the validated address's origin.
 - **A sign-out at a path-addressed bucket can be confirmed.** Its confirmation form posted to the
   default bucket's `/logout/confirm`, which holds none of that sign-out's state, so it failed with
   "could not find logout details".

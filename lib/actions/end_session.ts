@@ -199,7 +199,11 @@ async function endSession(
 
 	await setCookies();
 	if (oidc.session.payload.accountId) {
-		return logout(secret, `${oidc.issuer}${routeNames.end_session_confirm}`);
+		return logout(
+			secret,
+			`${oidc.issuer}${routeNames.end_session_confirm}`,
+			oidc.params.post_logout_redirect_uri
+		);
 	}
 	return logoutSuccess();
 }

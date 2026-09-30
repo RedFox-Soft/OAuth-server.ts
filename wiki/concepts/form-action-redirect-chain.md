@@ -4,7 +4,7 @@ title: "form-action governs the whole redirect chain"
 tags: [contract, gotcha, oauth]
 sources: [oauth-server-codebase]
 created: 2026-08-25
-updated: 2026-08-25
+updated: 2026-09-30
 graph:
   node_type: concept
   relationships:
@@ -60,6 +60,24 @@ timed out. Any diagnosis that reads server state alone concludes the flow worked
 It took a real browser to find: driving the flow in Chromium via Playwright reproduced it in one click.
 For anything CSP-, cookie-, or navigation-shaped, a headless fetch script is not a browser and cannot
 stand in for one.
+
+## The sign-out confirmation had the same defect (fixed 2026-09-30)
+
+The fix above was threaded through the interaction routes only, and the sign-out confirmation is not
+one of them. Its form posts to `…/logout/confirm` on this origin, and confirming answers 303 to the
+relying party's `post_logout_redirect_uri` — so with `form-action 'self'` Chrome blocked that hop,
+reporting the same-origin confirm URL exactly as it had reported the consent URL. The session had
+already ended server-side; the user was left on "Do you want to sign-out?" with nothing happening.
+It affected GET and POST alike, and every end-session test passed.
+
+`logout()` (`lib/html/logout.tsx`) now takes the validated `post_logout_redirect_uri` and hands it to
+`htmlResponse` as `handOffTo` (`lib/actions/end_session.ts`, `endSession`). A sign-out naming no
+address still gets `'self'` alone, since confirming then renders a page here. Found by the browser
+walkthrough of spec 064 ([[cross-site-sign-out-post]]); `test/end_session/end_session.spec.ts` now
+asserts the header, which is the only part of this a test at the HTTP boundary can observe.
+
+**The general lesson this adds:** a hand-off fix applied route by route leaves every page that was not
+on the list. Any page whose form's response is a redirect off this origin needs `handOffTo`.
 
 ## Related
 

@@ -53,6 +53,14 @@ async function getIdToken(options = {}, cookie = '') {
 	return data.id_token;
 }
 
+function formActionOf(policy: string | null): string | undefined {
+	return policy
+		?.split(';')
+		.map((directive) => directive.trim())
+		.find((directive) => directive.startsWith('form-action '))
+		?.slice('form-action '.length);
+}
+
 /**
  * @proves A user logs out, chooses whether to end every session or one, and is redirected only
  * to a post-logout target the client registered, behind a CSRF check.
@@ -146,6 +154,37 @@ describe('logout endpoint', () => {
 				expect(postLogoutRedirectUri).toBe(
 					'https://client.example.com/logout/cb'
 				);
+			});
+
+			/*
+			 * `form-action` governs the whole redirect chain of a submission, so the confirmation's own
+			 * same-origin form is not enough: confirming answers 303 to the relying party, and a policy of
+			 * 'self' alone had Chrome block that hop — after the session had already ended, leaving the user
+			 * on the confirmation page. The browser enforces this, so the header is the observable surface.
+			 */
+			it('lets the confirmation hand off to the registered post-logout address', async function () {
+				const { response } = await agent.logout.get({
+					query: {
+						id_token_hint: idToken,
+						post_logout_redirect_uri: 'https://client.example.com/logout/cb'
+					},
+					headers: { cookie }
+				});
+
+				expect(
+					formActionOf(response.headers.get('content-security-policy'))
+				).toBe("'self' https://client.example.com");
+			});
+
+			it('lets the confirmation post nowhere but this server without a post-logout address', async function () {
+				const { response } = await agent.logout.get({
+					query: { id_token_hint: idToken },
+					headers: { cookie }
+				});
+
+				expect(
+					formActionOf(response.headers.get('content-security-policy'))
+				).toBe("'self'");
 			});
 
 			it('allows to redirect there (with client_id)', async function () {
