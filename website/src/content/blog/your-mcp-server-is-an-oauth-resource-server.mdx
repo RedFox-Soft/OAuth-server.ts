@@ -1,0 +1,382 @@
+---
+title: Your MCP server is an OAuth resource server
+description: >-
+  MCP authorization is three documents and one claim: what an MCP server must publish, what the
+  token must carry, and two questions the spec leaves to you.
+publishedAt: '2026-09-30'
+tags: [mcp, resource-indicators, client-id-metadata-documents, security]
+---
+
+The token that opened every tool on the MCP server had been issued for the internal wiki.
+
+The server did what most first attempts do. It fetched the identity provider's public keys, checked
+the signature and the expiry, read the subject out of the payload and called it authenticated.
+Every one of those checks passed, because the token was genuine. It was a perfectly good token for
+the wiki, and the MCP server never asked who it was for. Anyone holding any token from that provider,
+for anything, could list and call the tools as whoever the token named.
+
+That is the bug the MCP authorization specification exists to prevent, and once you see it, the rest
+of the specification stops looking like a new protocol and starts looking like what it is: an
+ordinary OAuth 2.1 resource server, with the discovery steps written down so that a client that
+knows nothing but a URL can find its way to a token. I have spent a fair amount of time on the
+authorization-server side of it, and my summary is that it is three documents and one claim, and
+almost every real problem is in the one claim.
+
+## Three documents and one claim
+
+The agent host knows one thing: the URL of your MCP server. From there it has to learn who
+protects you, how to talk to that authorization server, and how to identify itself, and then it has
+to come back with a token that is for you and nobody else. Each of those is a document, and the last
+is a claim in the token.
+
+<svg viewBox="0 0 800 520" width="100%" role="img" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">
+  <title>Sequence of an agent host discovering and obtaining a token for an MCP server: a 401 with resource_metadata, the protected resource metadata document, the authorization server metadata, the client identified by a metadata document, the authorization and token requests carrying the resource parameter, and the audience-bound token presented back</title>
+  <defs>
+    <marker id="mcp-arrow-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--diagram-line, #555)"/></marker>
+  </defs>
+  <rect x="30" y="20" width="170" height="40" rx="8" fill="none" stroke="var(--diagram-fg, #1a1a1a)" stroke-width="1.5"/>
+  <text x="115" y="46" text-anchor="middle" font-size="15" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">Agent host (client)</text>
+  <rect x="315" y="20" width="170" height="40" rx="8" fill="none" stroke="var(--diagram-fg, #1a1a1a)" stroke-width="1.5"/>
+  <text x="400" y="46" text-anchor="middle" font-size="15" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">MCP server</text>
+  <rect x="600" y="20" width="170" height="40" rx="8" fill="none" stroke="var(--diagram-fg, #1a1a1a)" stroke-width="1.5"/>
+  <text x="685" y="46" text-anchor="middle" font-size="15" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">Authorization server</text>
+  <line x1="115" y1="60" x2="115" y2="500" stroke="var(--diagram-line, #555)" stroke-width="1" stroke-dasharray="4 4"/>
+  <line x1="400" y1="60" x2="400" y2="500" stroke="var(--diagram-line, #555)" stroke-width="1" stroke-dasharray="4 4"/>
+  <line x1="685" y1="60" x2="685" y2="500" stroke="var(--diagram-line, #555)" stroke-width="1" stroke-dasharray="4 4"/>
+  <line x1="115" y1="95" x2="398" y2="95" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#mcp-arrow-a)"/>
+  <text x="257" y="88" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">1  POST /mcp, no token</text>
+  <line x1="400" y1="135" x2="117" y2="135" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5" marker-end="url(#mcp-arrow-a)"/>
+  <text x="257" y="114" text-anchor="middle" font-size="13" fill="var(--diagram-accent, #d9480f)">2  401  WWW-Authenticate: Bearer</text>
+  <text x="257" y="129" text-anchor="middle" font-size="12" fill="var(--diagram-accent, #d9480f)">resource_metadata="…", scope="mcp:tools-basic"</text>
+  <line x1="115" y1="175" x2="398" y2="175" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#mcp-arrow-a)"/>
+  <text x="257" y="168" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">3  GET the protected resource metadata (RFC 9728)</text>
+  <line x1="400" y1="210" x2="117" y2="210" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#mcp-arrow-a)"/>
+  <text x="257" y="203" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">resource, authorization_servers, scopes_supported</text>
+  <line x1="115" y1="250" x2="683" y2="250" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#mcp-arrow-a)"/>
+  <text x="400" y="243" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">4  GET the authorization server metadata (RFC 8414 or OIDC discovery)</text>
+  <line x1="685" y1="285" x2="117" y2="285" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#mcp-arrow-a)"/>
+  <text x="400" y="278" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">issuer, endpoints, code_challenge_methods_supported, client_id_metadata_document_supported</text>
+  <line x1="115" y1="330" x2="683" y2="330" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#mcp-arrow-a)"/>
+  <text x="400" y="309" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">5  /authorize  client_id=host.example/client.json  resource=mcp.example.com/mcp</text>
+  <text x="400" y="324" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">PKCE; the server fetches client.json for the name and redirect targets; the user consents</text>
+  <line x1="115" y1="375" x2="683" y2="375" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#mcp-arrow-a)"/>
+  <text x="400" y="368" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">6  /token  code + code_verifier + the same resource</text>
+  <line x1="685" y1="415" x2="117" y2="415" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5" marker-end="url(#mcp-arrow-a)"/>
+  <text x="400" y="408" text-anchor="middle" font-size="13" fill="var(--diagram-accent, #d9480f)">7  access token with aud = mcp.example.com/mcp</text>
+  <line x1="115" y1="455" x2="398" y2="455" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#mcp-arrow-a)"/>
+  <text x="257" y="448" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">8  POST /mcp  Authorization: Bearer …</text>
+  <line x1="400" y1="490" x2="117" y2="490" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#mcp-arrow-a)"/>
+  <text x="257" y="483" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">9  200, after checking signature, iss, exp and aud</text>
+</svg>
+
+Step 2 is the only part of all this that the specification makes a MUST for an MCP server, and it is
+two lines. When a request arrives with no token, or with one you reject, you answer 401 and say
+where your metadata is:
+
+```http
+HTTP/1.1 401 Unauthorized
+WWW-Authenticate: Bearer resource_metadata="https://mcp.example.com/.well-known/oauth-protected-resource",
+                         scope="mcp:tools-basic"
+```
+
+And the metadata itself is a JSON document, RFC 9728, that says who protects you:
+
+```json
+{
+  "resource": "https://mcp.example.com/mcp",
+  "authorization_servers": ["https://auth.example.com/acme"],
+  "scopes_supported": ["mcp:tools-basic"],
+  "bearer_methods_supported": ["header"]
+}
+```
+
+Everything after that is the authorization server's problem and the client's. The client takes the
+issuer from the document, fetches that server's metadata by the well-known forms RFC 8414 and OpenID
+Connect Discovery define, and it has to try both, because the specification only requires the server
+to publish one. Then it runs an ordinary authorization code flow with PKCE, and in both the
+authorization request and the token request it sends one parameter that is not ordinary at all in
+practice, even though it has had an RFC since 2020.
+
+## The resource parameter is the whole point
+
+RFC 8707 lets a client say what it wants the token for. The MCP specification makes it mandatory in
+both requests, and it is what turns "a token from the provider" into "a token for this MCP server".
+The authorization server mints the token with that URI as its audience, and the MCP server refuses
+any token whose audience is not exactly its own identifier. That is the line the wiki token failed
+at, and it is the only line that would have stopped it.
+
+Here is what the server hands back for the flow above, decoded:
+
+```json
+{
+  "iss": "https://auth.example.com/acme",
+  "aud": "https://mcp.example.com/mcp",
+  "sub": "248289761001",
+  "client_id": "https://host.example/client.json",
+  "scope": "mcp:tools-basic",
+  "iat": 1759226400,
+  "exp": 1759227300,
+  "jti": "o1S6Qw3bH9c_UZL0"
+}
+```
+
+The check on the MCP server's side is four claims, and two of them are ones you have to state
+yourself, because a JWT library cannot guess them:
+
+```js
+import { createRemoteJWKSet, jwtVerify } from 'jose';
+
+const keys = createRemoteJWKSet(new URL('https://auth.example.com/acme/jwks'));
+
+export async function principalFor(authorization) {
+	const token = authorization?.replace(/^Bearer /i, '');
+	if (!token) return null;
+	const { payload } = await jwtVerify(token, keys, {
+		issuer: 'https://auth.example.com/acme',
+		audience: 'https://mcp.example.com/mcp'
+	});
+	return { subject: payload.sub, scopes: (payload.scope ?? '').split(' ') };
+}
+```
+
+The signature and `exp` are the library's. `issuer` and `audience` are yours, and the second is the
+one the first attempt left out. Any library in any language does the same four checks; the shape is
+the checklist.
+
+What took me longer to appreciate is that the same string now appears in three places that were
+written by three different parties, and it has to be the same string in all of them. The MCP server
+publishes it in its metadata as `resource`. The operator of the authorization server declares it as
+the identifier of a protected resource. The client sends it as `resource` and the token carries it as
+`aud`. The comparison is exact, after canonicalization, and it is exact on purpose: no prefix match,
+no "a token for the parent path is good for the child", because that is precisely how one
+integration's token ends up working at another's.
+
+<svg viewBox="0 0 800 330" width="100%" role="img" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">
+  <title>The same identifier in three places written by three parties: the resource field of the MCP server's metadata, the declaration on the authorization server, and the resource parameter the client sends which becomes the token's aud claim; the issuer likewise ties the metadata's authorization_servers to the token's iss</title>
+  <defs>
+    <marker id="mcp-arrow-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--diagram-accent, #d9480f)"/></marker>
+  </defs>
+  <rect x="30" y="30" width="230" height="120" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <text x="145" y="56" text-anchor="middle" font-size="14" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">MCP server publishes</text>
+  <text x="145" y="84" text-anchor="middle" font-size="13" fill="var(--diagram-accent, #d9480f)">resource: mcp.example.com/mcp</text>
+  <text x="145" y="108" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">authorization_servers: [acme issuer]</text>
+  <text x="145" y="132" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">scopes_supported: [mcp:tools-basic]</text>
+  <rect x="285" y="30" width="230" height="120" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <text x="400" y="56" text-anchor="middle" font-size="14" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">Operator declares</text>
+  <text x="400" y="84" text-anchor="middle" font-size="13" fill="var(--diagram-accent, #d9480f)">identifier: mcp.example.com/mcp</text>
+  <text x="400" y="108" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">in project acme, whose issuer is /acme</text>
+  <text x="400" y="132" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">scopes: [mcp:tools-basic]</text>
+  <rect x="540" y="30" width="230" height="120" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <text x="655" y="56" text-anchor="middle" font-size="14" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">Client sends</text>
+  <text x="655" y="84" text-anchor="middle" font-size="13" fill="var(--diagram-accent, #d9480f)">resource=mcp.example.com/mcp</text>
+  <text x="655" y="108" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">to /acme/authorize and /acme/token</text>
+  <text x="655" y="132" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">scope from the challenge</text>
+  <rect x="220" y="215" width="360" height="90" rx="8" fill="none" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5"/>
+  <text x="400" y="242" text-anchor="middle" font-size="14" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">The token</text>
+  <text x="400" y="267" text-anchor="middle" font-size="13" fill="var(--diagram-accent, #d9480f)">aud: mcp.example.com/mcp   iss: acme issuer</text>
+  <text x="400" y="290" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">scope: what was asked ∩ what was declared</text>
+  <line x1="145" y1="150" x2="330" y2="213" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5" marker-end="url(#mcp-arrow-b)"/>
+  <line x1="400" y1="150" x2="400" y2="213" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5" marker-end="url(#mcp-arrow-b)"/>
+  <line x1="655" y1="150" x2="470" y2="213" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5" marker-end="url(#mcp-arrow-b)"/>
+  <text x="400" y="185" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">one string, compared exactly after canonicalization, in every place</text>
+</svg>
+
+Canonicalization is where the first version of ours had a bug that reasoning found and the tests did
+not. The specification says clients should use the form without a trailing slash, and that servers
+should accept an uppercase scheme or host, so we canonicalize both the declaration and the request
+through one function, and that function takes an option for a resource whose slash is meaningful.
+The bug was that the comparison canonicalized the request with the default options while the
+declaration had been stored with the slash kept, so the slash was stripped from one side only and a
+resource that declared the slash significant collapsed into its slash-free sibling. Both sides have
+to go through the same function with the same options, and if that sounds obvious, it was obvious to
+me too, after.
+
+The other thing I would say about the audience is that it is the whole of what makes a declared
+resource safe to be data. In our server, declaring an MCP server is a form in the console: an
+identifier, a name for the consent screen, the scopes it recognises. Nothing is restarted and no
+code changes, and the declaration is read on every token request, with no cache in front of it,
+because a deleted declaration has to stop issuance on the next request rather than after some
+memo expires. We had already learned that lesson once, with a client cache that served a stale
+client to the admin plane, and did not need to learn it again.
+
+## Who the client is, when there is nobody to type a client id
+
+The agent host has a URL and nowhere for you to paste a client identifier. The specification's first
+answer used to be dynamic client registration: the client POSTs a description of itself, gets a
+`client_id` back, and the authorization server accumulates a row per host that ever connected. The
+current revision marks that deprecated and puts Client ID Metadata Documents first, which I think is
+the right call and also the part of the specification most worth being nervous about.
+
+The idea is that the `client_id` is itself an HTTPS URL, and at that URL sits a JSON document
+describing the client:
+
+```json
+{
+  "client_id": "https://host.example/client.json",
+  "client_name": "Example Agent Host",
+  "redirect_uris": ["http://127.0.0.1:52123/callback", "https://host.example/oauth/callback"],
+  "token_endpoint_auth_method": "none",
+  "grant_types": ["authorization_code", "refresh_token"]
+}
+```
+
+The authorization server fetches it on demand, validates it, and stores nothing. No registration
+endpoint, no table of clients that grows by one per laptop, and the client's name on the consent
+screen comes from a document the client's operator controls at a domain they demonstrably hold.
+
+What that costs is that an unauthenticated stranger can now make your authorization server issue an
+HTTP request to a URL of their choosing. Every mitigation for that has to be on the server, and ours
+is one module that knows about the network and nothing else: it refuses private, loopback and
+link-local address ranges by comparing addresses as numbers rather than as text, because the URL
+parser will happily rewrite an IPv4-mapped IPv6 address into a form a string check misses; it
+follows redirects by hand and re-checks every hop; it stops reading at five kilobytes; and it is
+bounded in time. The feature is off by default, and the reason is exactly that sentence about the
+stranger. Once the document is in hand, the checks are short and each one closes a specific trick:
+the `client_id` inside the document must equal the URL byte for byte, so that hosting a document
+naming somebody else's identifier gets you nothing; `redirect_uris` must be present and non-empty;
+a symmetric client secret is refused, because a secret in a world-readable document is not one; and
+a key-based authentication method must say where its keys are.
+
+The part I would call genuinely unresolved is loopback. A native agent host listens on
+`127.0.0.1` on some port for the callback, so its document lists a loopback redirect. The document
+proves that whoever wrote it controls the domain. It cannot prove which local process is listening
+on that port. An attacker on the same machine can present the real host's `client_id`, bind their
+own port, and the user sees the real host's name on the consent screen. The specification knows
+this, says the server should warn, and leaves it there. For an ordinary resource we carry that risk
+the way everyone does. For the one place a document-identified client can hold administrative
+authority over the authorization server itself, we turned the warning into an interlock: a document
+offering only loopback redirects cannot be permitted until an administrator acknowledges, in words,
+what that does not prove.
+
+## Which users an agent signs in
+
+Here is a question the specification does not ask, because it assumes one authorization server
+protects one MCP server for one population of users, and that is not what an authorization server
+looks like once more than one team uses it.
+
+Suppose the server hosts several tenants, each with its own users, and an agent host arrives
+identified by a metadata document. It belongs to no tenant. It is a URL. Whose users does it sign in?
+The answer we settled on is that the resource decides: an administrator of a tenant declared that MCP
+server in a project of theirs, and a request naming that resource signs into that project's users.
+That is safe for a reason worth stating precisely. The client did not create the option, an
+administrator did, in a project they own, so the parameter selects among an operator's declarations
+and cannot manufacture one.
+
+It was safe, that is, against attackers without a console account. Anyone with one could declare
+anything, identifiers were unique across the whole instance, and first won. So a hostile tenant
+could declare somebody else's MCP server, leave the real owner a permanent conflict, and route that
+server's users into their own bucket. The first fix made every declaration prove itself by fetching
+the resource's own metadata and checking that it named this issuer, which is the natural fix and
+also refused every MCP server on an internal network, on localhost during development, or not
+deployed yet. It lasted a day.
+
+<svg viewBox="0 0 800 340" width="100%" role="img" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">
+  <title>Two tenants on one authorization server, each with an issuer of its own, each declaring the same MCP server identifier; a request at one tenant's issuer resolves only that tenant's declaration, and the shared root issuer accepts declarations from a super administrator only</title>
+  <defs>
+    <marker id="mcp-arrow-c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--diagram-line, #555)"/></marker>
+  </defs>
+  <rect x="30" y="30" width="230" height="130" rx="8" fill="none" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5"/>
+  <text x="145" y="56" text-anchor="middle" font-size="14" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">issuer auth.example.com/acme</text>
+  <text x="145" y="82" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">acme's users, acme's keys</text>
+  <text x="145" y="110" text-anchor="middle" font-size="13" fill="var(--diagram-accent, #d9480f)">declares mcp.example.com/mcp</text>
+  <text x="145" y="140" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">any acme admin, no fetch, no proof</text>
+  <rect x="285" y="30" width="230" height="130" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <text x="400" y="56" text-anchor="middle" font-size="14" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">issuer auth.example.com/globex</text>
+  <text x="400" y="82" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">globex's users, globex's keys</text>
+  <text x="400" y="110" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">declares mcp.example.com/mcp too</text>
+  <text x="400" y="140" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">a claim on its own namespace only</text>
+  <rect x="540" y="30" width="230" height="130" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="655" y="56" text-anchor="middle" font-size="14" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">root issuer auth.example.com</text>
+  <text x="655" y="82" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">shared by tenants with no address</text>
+  <text x="655" y="110" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">declarations: super administrator only</text>
+  <text x="655" y="140" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">metadata names the issuer, not a tenant</text>
+  <rect x="30" y="220" width="230" height="90" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <text x="145" y="248" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">/acme/authorize?resource=…/mcp</text>
+  <text x="145" y="272" text-anchor="middle" font-size="13" fill="var(--diagram-accent, #d9480f)">resolves acme's declaration</text>
+  <text x="145" y="296" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">an acme user; globex's is invisible</text>
+  <line x1="145" y1="218" x2="145" y2="162" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5" marker-end="url(#mcp-arrow-c)"/>
+  <rect x="285" y="220" width="230" height="90" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <text x="400" y="248" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">/globex/authorize?resource=…/mcp</text>
+  <text x="400" y="272" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">resolves globex's declaration</text>
+  <text x="400" y="296" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">same identifier, a different token</text>
+  <line x1="400" y1="218" x2="400" y2="162" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#mcp-arrow-c)"/>
+  <text x="655" y="265" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">/authorize?resource=…/mcp</text>
+  <text x="655" y="289" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">invalid_target unless declared at the root</text>
+</svg>
+
+What replaced it is namespaces, and it is the arrangement I would now recommend to anyone building
+this. A tenant with an address of its own is its own issuer, with its own signing keys, and a
+resource identifier is unique only within an issuer. Two tenants may declare the same MCP server
+and neither ever sees the other's declaration, because every resolution reads only the namespace of
+the address the request arrived at. A declaration in your own namespace makes no outbound request
+at all, since it can only be a claim about your own users. And the one namespace that is genuinely
+shared, the root issuer that every tenant without an address is served at, accepts declarations from
+a super administrator only, because there a resource's metadata can say it trusts the issuer and
+still cannot say which of those tenants it belongs to. No proof closes squatting there, so nobody
+but the operator gets to try.
+
+Two more holes in the same area, both of the form "a caller forgot to pass the resource", and both
+worth knowing because they are the kind of thing this design makes possible. The account resolver
+resolved a different tenant's users than the login step had, because the login passed the resource
+and the resolver did not, and the symptom was a 500 in the consent screen rather than a refusal. And
+the password, reset and registration doors resolved policy from the client alone, so a tenant whose
+users only sign in through an upstream provider could be reached with a password through a declared
+resource. Both were closed by making the resource a required argument, so an omission no longer
+type-checks. If you take one engineering rule from this section, take that one: when a parameter
+selects a tenant, make it impossible to call the function without it.
+
+The last one is machine tokens. An end user consents, so any client, including one that belongs to
+nobody, may ask a person for a token to a declared resource. A client credentials token asks nobody.
+Until we noticed, any confidential client of any tenant, or one that registered itself, could ask a
+victim tenant's token endpoint for a token with the victim's resource as audience and the victim's
+issuer, and receive one. Now a machine token for a declared resource goes only to a client of the
+project that declared it. There is nothing in the specification about this. There would not be; it
+is a multi-tenant question.
+
+## The scope list is a grant, not a menu
+
+One small thing that surprised me. If your challenge carries no `scope`, the specification tells the
+client to request every scope in your `scopes_supported`, and calls that intended: a general-purpose
+client cannot choose sensibly among names it does not understand. So a long list in your metadata is
+not a catalogue of options, it is what every agent that ever connects will be granted. Put the scope
+your tools actually need in the challenge, keep `scopes_supported` to the minimum for basic use,
+and ask for more with a 403 and `insufficient_scope` when a privileged tool is first called. The
+client is required to treat the challenge's scope as authoritative and to accumulate scopes across
+step-ups itself, which is why the authorization server can stay stateless about it. Our own
+administrative MCP endpoint advertises `openid` and nothing else, because its authority comes from
+the administrator's roles, not from scopes, and a scope it cannot be missing is not one to publish.
+
+## Two questions the specification leaves to you
+
+The first is token format, and the specification is careful not to decide it. An MCP server must
+reject tokens not intended for it "or otherwise verify that they are the intended recipient", which
+admits both a self-contained token checked against published keys and an opaque one checked by
+introspection. We default to self-contained with a fifteen-minute lifetime, because introspection
+obliges your MCP server to hold credentials of its own and the ten-minute setup guide has no room
+for that step. The trade is that a self-contained token is valid until it expires. If a revoked
+token has to stop working within seconds rather than minutes, declare the resource opaque, give your
+MCP server a client of its own, and pay for introspection on every call. Neither answer is wrong;
+what is wrong is not knowing which one you chose.
+
+The second is the confused deputy, and it is not the authorization server's to solve. An MCP server
+that proxies a third-party API with one static client id, registers its own MCP clients dynamically,
+and forwards codes without a consent screen of its own is the setup the security guidance describes
+attack by attack. The mitigation is per-client consent at the proxy, before the third-party flow
+starts, and audience checking so that a token the proxy receives is never simply passed through.
+Every piece of the specification I have described helps with that, and none of it does the work for
+you.
+
+What I do not know yet is how the trust policy for metadata documents shakes out in practice. The
+specification allows an authorization server to accept any HTTPS `client_id`, allowlist domains, or
+apply reputation checks, and every option is a different phishing surface, since the name on the
+consent screen is whatever the document says. Open by default is what makes the ecosystem work and
+allowlists are what an enterprise will want, and I suspect the answer is both, per tenant, which is
+one more question the specification will keep leaving to whoever runs the server.
+
+If you want to see the shape of it end to end, [Protect your MCP server with
+OAuth](/docs/get-started/protect-your-mcp-server/) walks the declaration, the two documents, the
+token check and both proofs in about ten minutes. The two settings that decide how an agent host
+may identify itself are
+[`clientIdMetadataDocument.enabled`](/docs/reference/settings/#clientIdMetadataDocument.enabled)
+and [`registration.enabled`](/docs/reference/settings/#registration.enabled), and the
+[endpoint reference](/docs/reference/endpoints/) lists what each discovery URL answers.
