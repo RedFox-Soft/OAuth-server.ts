@@ -120,6 +120,31 @@ function toSet(name: string, value: unknown): Set<string> {
 	return new Set(value);
 }
 
+/*
+ * Each member either stands alone (null) or defines a scope by the claims it releases — a list of names,
+ * or the map `unpackArrayClaims` turns that list into. Anything else used to be carried silently: a
+ * string made no scope and no claim, and a number in a list became a claim named "42". Checked here so
+ * boot and the admin PUT refuse the same values.
+ */
+function checkClaims(claims: unknown) {
+	if (!isPlainObject(claims)) {
+		throw new TypeError('claims must be an object');
+	}
+	for (const [name, value] of Object.entries(claims)) {
+		const valid =
+			value === null ||
+			(Array.isArray(value) &&
+				value.every((claim) => typeof claim === 'string')) ||
+			(isPlainObject(value) &&
+				Object.values(value).every((claim) => claim === null));
+		if (!valid) {
+			throw new TypeError(
+				`claims.${name} must be null or a list of claim names`
+			);
+		}
+	}
+}
+
 function collectScopes(scopes: Set<string>, claims: ClaimsConfig) {
 	const claimDefinedScopes: string[] = [];
 	Object.entries(claims).forEach(([key, value]) => {
@@ -646,6 +671,7 @@ export function validateConfiguration(
 		'clientAuthMethods',
 		config.clientAuthMethods
 	);
+	checkClaims(config.claims);
 	const claims = structuredClone(merge({}, config.claims));
 
 	// Order is significant: each claims pass below builds on the one before it.

@@ -29,6 +29,14 @@ const ALTERNATIVES: Record<string, unknown> = {
 	},
 	scopes: ['openid'],
 	acrValues: { password: 'pwd', multi_factor: 'mfa', federated: 'fed' },
+	claims: {
+		acr: null,
+		sid: null,
+		auth_time: null,
+		iss: null,
+		openid: ['sub'],
+		profile: ['name']
+	},
 	clientAuthMethods: ['client_secret_basic', 'none']
 };
 

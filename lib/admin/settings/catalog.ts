@@ -939,6 +939,16 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 		description: 'Scopes advertised in discovery. Must include openid.'
 	},
 	{
+		key: 'claims',
+		domain: 'endpoints',
+		group: 'Discovery',
+		label: 'Claims and the scopes that release them',
+		summary: 'Which claims each scope releases, and which stand alone',
+		type: 'json',
+		description:
+			'Which end-user claims this server can release, and under which scope, e.g. {"openid":["sub"],"profile":["name","given_name","family_name"],"email":["email","email_verified"],"acr":null,"sid":null,"auth_time":null,"iss":null}. A member whose value is a list of claim names defines a scope: that scope is advertised in discovery and a client granted it receives those claims. A member whose value is null is a claim of its own, released when requested by name. `openid` is required and always carries `sub`. A claim an end user holds but no entry names is never released, which is why the claims you set on an account in a bucket reach a client only once a scope here names them.'
+	},
+	{
 		key: 'acrValues',
 		domain: 'endpoints',
 		group: 'Discovery',

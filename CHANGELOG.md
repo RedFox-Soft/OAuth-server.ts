@@ -9,6 +9,13 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+### Added
+
+- **The claims each scope releases are a setting an operator can edit.** `claims` joins the settings
+  catalog as a JSON value, so `profile`, `email`, `address` and `phone` — or any scope of your own — can
+  be defined from the console or by an agent and are advertised in discovery as soon as they are saved.
+  A definition that is neither a claim nor a list of claim names is now refused, at boot and on save.
+
 ### Fixed
 
 - **A Request Object is held to its own rules, not a client assertion's.** `jti` is optional and `aud`

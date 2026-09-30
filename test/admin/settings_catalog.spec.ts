@@ -130,7 +130,6 @@ describe('settings catalog', () => {
 	it('excludes structured/function/Buffer keys', () => {
 		const keys = SETTINGS_CATALOG.map((d) => d.key);
 		for (const forbidden of [
-			'claims',
 			// discovery lives on ApplicationConfig but is deliberately not operator-editable:
 			// it is relocated, not exposed. Absence from the catalog is the whole enforcement.
 			'discovery',
@@ -155,6 +154,17 @@ describe('settings catalog', () => {
 		);
 		expect(types?.type).toBe('json');
 		expect(types?.dependsOn).toBe('richAuthorizationRequests.enabled');
+	});
+
+	/*
+	 * `claims` sat on the forbidden list above with no reason recorded, and so the scopes an operator
+	 * advertises could not be given any claims to release from the console or an agent — `profile`,
+	 * `email` and the rest existed only for whoever could edit the database. Its value is a plain map,
+	 * so it is exposed the way richAuthorizationRequests.types was: explicitly, as `json`.
+	 */
+	it('exposes claims as a structured json setting', () => {
+		const claims = SETTINGS_CATALOG.find((d) => d.key === 'claims');
+		expect(claims?.type).toBe('json');
 	});
 
 	/*
