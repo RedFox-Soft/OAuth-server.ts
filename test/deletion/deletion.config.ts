@@ -11,7 +11,6 @@ export const ApplicationConfig = {
 	'introspection.enabled': true,
 	'revocation.enabled': true,
 	'clientCredentials.enabled': true,
-	'refreshToken.enabled': true,
 	'registration.enabled': true,
 	'registrationManagement.enabled': true,
 	'deviceFlow.enabled': true,

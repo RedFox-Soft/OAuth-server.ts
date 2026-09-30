@@ -2,12 +2,16 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { createCache, extractStyle, StyleProvider } from '@ant-design/cssinjs';
 import { Button, Form } from 'antd';
 import { Card, Flex } from 'antd';
-import { routeNames } from 'lib/consts/param_list.js';
 import { htmlResponse } from './csp.js';
 import { versionedAsset } from './versionedAsset.js';
 
 const cache = createCache();
-function renderLogoutForm(secret: string) {
+/*
+ * The confirmation address is handed in rather than read from `routeNames`: a root-relative
+ * `/logout/confirm` sends a path-addressed bucket's confirmation to the default bucket, whose session
+ * cookie holds none of this sign-out's state.
+ */
+function renderLogoutForm(secret: string, confirmAction: string) {
 	return (
 		<StyleProvider cache={cache}>
 			<Flex
@@ -38,7 +42,7 @@ function renderLogoutForm(secret: string) {
 						<p>Do you want to sign-out?</p>
 					</div>
 					<Form
-						action={routeNames.end_session_confirm}
+						action={confirmAction}
 						component="form"
 						method="post"
 					>
@@ -76,8 +80,8 @@ function renderLogoutForm(secret: string) {
 	);
 }
 
-export function logout(secret: string) {
-	const form = renderLogoutForm(secret);
+export function logout(secret: string, confirmAction: string) {
+	const form = renderLogoutForm(secret, confirmAction);
 	const styleText = extractStyle(cache);
 
 	const html = `<!DOCTYPE html>

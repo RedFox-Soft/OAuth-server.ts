@@ -28,8 +28,9 @@ export async function expiresWithSession(
 	return !code.scopes.has('offline_access');
 }
 
-// Decides whether a refresh token is issued for this exchange (grant advertisement
-// is a separate concern owned by ApplicationConfig['refreshToken.enabled']).
+// Decides whether a refresh token is issued for this exchange. Whether the grant is supported at
+// all is not decided here: it follows `offline_access` among the supported scopes
+// (supportedGrantTypes), so an override issuing without that scope issues tokens /token refuses.
 export async function issueRefreshToken(
 	_oidc: OIDCContext,
 	client: Client,

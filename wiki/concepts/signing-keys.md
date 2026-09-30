@@ -24,7 +24,7 @@ area, its three adapters and `configs/keys.ts` are gone; the root is now the own
 cache every bucket uses. The first key is created exactly once: `ensureRootKey()`
 (`lib/keys/issuer_keys.ts:135`) inserts an RS256 key under the fixed id `'#root #initial'` with
 `createIfAbsent`, so concurrent first boots leave one. Boot calls `rootKeys()` right after the migration
-gate (`lib/index.ts:227`); `bun run db:setup` and `bun run db:setup:pg` write the same first key, and
+gate (`lib/index.ts:233`); `bun run db:setup` and `bun run db:setup:pg` write the same first key, and
 write none while legacy keys still await the migration below. Tests seed the in-memory store from
 `test/preload.ts` (`writeRootKeys`, `test/root_keys.ts`), once, and it is never reset between spec files.
 

@@ -71,10 +71,7 @@ export const ApplicationConfig = {
 	'introspection.enabled': true,
 	'par.enabled': true,
 	'requestObjects.enabled': true,
-	'requestObjects.request': true,
-	// This suite issues refresh tokens without requesting offline_access, so the grant is advertised
-	// explicitly rather than inferred from the issueRefreshToken override.
-	'refreshToken.enabled': true
+	'requestObjects.request': true
 };
 
 export const clients = [

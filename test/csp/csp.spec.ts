@@ -259,7 +259,7 @@ describe('content security policy: every rendered page', () => {
 				})
 		],
 		['device success', () => deviceSuccessPage({ client: {} })],
-		['logout confirmation', () => logout('xsrf')],
+		['logout confirmation', () => logout('xsrf', `${ISSUER}/logout/confirm`)],
 		['logout success', () => logoutSuccess()],
 		['email verified', () => verifySuccessPage()],
 		['verification failed', () => verifyFailurePage('expired')],
@@ -545,7 +545,7 @@ describe('content security policy: every rendered page', () => {
 	it('leaves the terminal pages inlining their own styles', async () => {
 		for (const render of [
 			() => getErrorHtmlResponse(404, 'not_found', 'nope'),
-			() => logout('xsrf'),
+			() => logout('xsrf', `${ISSUER}/logout/confirm`),
 			() => logoutSuccess(),
 			() => deviceSuccessPage({ client: {} })
 		]) {

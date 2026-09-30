@@ -18,9 +18,9 @@ describe('Provider configuration', () => {
 		};
 
 		expect(() => validateConfiguration(withNested)).not.toThrow();
-		// The flat key is what decides, and the nested object did not override it.
-		expect(validateConfiguration(withNested).grantTypes).toEqual(
-			validateConfiguration({ ...ApplicationConfig }).grantTypes
+		// The flat keys are what decide, and the nested object changed nothing that was derived.
+		expect(validateConfiguration(withNested)).toEqual(
+			validateConfiguration({ ...ApplicationConfig })
 		);
 	});
 

@@ -4,7 +4,7 @@ title: 'A user bucket is a tenant with its own issuer'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-09-15
-updated: 2026-09-29
+updated: 2026-09-30
 graph:
   node_type: concept
   relationships:
@@ -158,6 +158,14 @@ resolved the bucket without the request host, so at a bucket host it read the de
 The existing cases passed through both, because they asserted the metadata's issuer and a refusal —
 `test/host_buckets/addressing.spec.ts` now completes a sign-in and a sign-out at the host and reads
 `iss` off the authorization response.
+
+**The path-addressed half of the sign-out (fixed 2026-09-30, spec 064).** The confirmation form
+rendered by `/:bucket/logout` posted to the root-relative `/logout/confirm` — the *default* bucket's
+confirmation, which reads a different session cookie and answered "could not find logout details". A
+host-addressed bucket was spared only because a root-relative path resolves against its own host.
+`logout()` (`lib/html/logout.tsx`) now takes the confirmation address, built from the addressed
+issuer. `test/end_session/per_bucket.spec.ts` had claimed to follow the form the browser is shown
+while building the prefixed URL itself; it now reads the form's `action`, and so does the host case.
 
 The path stays `/` for every bucket and deliberately does not carry the partition. It would, if every
 bucket were prefixed — but the default bucket is served at the root, so its cookie must live at

@@ -183,6 +183,16 @@ export const DiscoveryResponse = t.Object(
 		claims_supported: t.Optional(t.Array(t.String())),
 		grant_types_supported: t.Optional(t.Array(t.String())),
 		token_endpoint_auth_methods_supported: t.Optional(t.Array(t.String())),
+		introspection_endpoint_auth_methods_supported: t.Optional(
+			t.Array(t.String())
+		),
+		introspection_endpoint_auth_signing_alg_values_supported: t.Optional(
+			t.Array(t.String())
+		),
+		revocation_endpoint_auth_methods_supported: t.Optional(t.Array(t.String())),
+		revocation_endpoint_auth_signing_alg_values_supported: t.Optional(
+			t.Array(t.String())
+		),
 		acr_values_supported: t.Optional(t.Array(t.String())),
 		response_types_supported: t.Optional(t.Array(t.String())),
 		response_modes_supported: t.Optional(t.Array(t.String())),

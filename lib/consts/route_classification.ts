@@ -123,6 +123,11 @@ const bareGatedRoutes: readonly GatedRoute[] = [
 	},
 	{
 		method: 'POST',
+		path: routeNames.end_session,
+		flag: 'rpInitiatedLogout.enabled'
+	},
+	{
+		method: 'POST',
 		path: routeNames.end_session_confirm,
 		flag: 'rpInitiatedLogout.enabled'
 	},

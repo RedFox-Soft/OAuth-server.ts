@@ -282,14 +282,28 @@ describe('a bucket addressed by a host of its own (US1)', () => {
 		const page = await at(TENANT_HOST, '/logout', {
 			headers: { cookie: session, accept: 'text/html' }
 		});
+		const html = await page.text();
 		const xsrf =
 			/name="xsrf"[^>]*value="([^"]+)"|value="([^"]+)"[^>]*name="xsrf"/.exec(
-				await page.text()
+				html
 			);
 		const secret = xsrf?.[1] ?? xsrf?.[2];
 		if (!secret) throw new Error('expected a confirmation secret');
 
-		const confirmed = await at(TENANT_HOST, '/logout/confirm', {
+		/*
+		 * Followed from the form, as the browser does, rather than written here: the confirmation must be
+		 * addressed at this host, and the page's own policy must let the form submit there.
+		 */
+		const action = /<form[^>]*action="([^"]+)"/.exec(html)?.[1] ?? '';
+		const confirmAt = new URL(action, `http://${TENANT_HOST}/logout`);
+		expect(confirmAt.href).toBe(`http://${TENANT_HOST}/logout/confirm`);
+		expect(page.headers.get('content-security-policy') ?? '').toMatch(
+			new RegExp(
+				`form-action[^;]*('self'|http://${TENANT_HOST.replace('.', '\\.')})`
+			)
+		);
+
+		const confirmed = await at(TENANT_HOST, confirmAt.pathname, {
 			method: 'POST',
 			headers: {
 				'content-type': 'application/x-www-form-urlencoded',

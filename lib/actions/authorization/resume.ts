@@ -1,5 +1,5 @@
 import type { OIDCContext } from 'lib/helpers/oidc_context.js';
-import type { PipelineParams } from 'lib/consts/param_list.js';
+import { routeNames, type PipelineParams } from 'lib/consts/param_list.js';
 import type { Interaction } from 'lib/models/interaction.js';
 import nanoid from '../../helpers/nanoid.js';
 import { ISSUER } from 'lib/configs/env.js';
@@ -74,7 +74,9 @@ export default async function resumeAction(
 			postLogoutRedirectUri: `${ISSUER}/ui/${interaction.uid}/resume`
 		};
 
-		return logout(secret);
+		// The bare address, as before: this screen is reached at /ui/, which no bucket prefixes, and
+		// which session cookie its confirmation must read is a question of its own.
+		return logout(secret, routeNames.end_session_confirm);
 	}
 
 	await interaction.destroy();

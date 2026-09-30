@@ -46,7 +46,8 @@ install versus what you switch on deliberately — the distinction is load-beari
 - **OpenID Connect** — OIDC Core 1.0 with ID tokens, UserInfo endpoint, and discovery
 - **Authorization-response issuer identification** — `iss` on every authorization response ([RFC 9207](https://datatracker.ietf.org/doc/html/rfc9207))
 - **Resource Indicators** — audience-restricted tokens via `resource` ([RFC 8707](https://datatracker.ietf.org/doc/html/rfc8707))
-- **RP-initiated logout** — with a confirmation step
+- **Refresh Token grant** — with rotation and reuse detection; offered while `offline_access` is among the supported `scopes`, which it is by default
+- **RP-initiated logout** — by GET or form POST, with a confirmation step
 - **JWT tokens** — access and ID tokens signed with the algorithms your key store holds; `bun run db:setup` provisions an initial RS256 key, and ES256 and EdDSA keys are supported. Keys live in the database, are generated on first run, and are published at `/jwks`
 - **Database-backed clients** — clients live in this server's own store and are created through the admin API, dynamic registration, or `bun run db:setup`. There is no static client configuration file
 - **Administration console** — projects, OAuth clients, administrators, user buckets, end-users, upstream identity providers, settings, SMTP, signing keys and an append-only audit trail
@@ -70,7 +71,6 @@ Implemented, and off until the flag is set. Set them in the console under **Sett
 | Capability                                                                                                          | Flag                                |
 | ------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
 | Client Credentials grant                                                                                            | `clientCredentials.enabled`         |
-| Refresh Token grant                                                                                                 | `refreshToken.enabled`              |
 | **DPoP** — sender-constrained tokens, including nonces ([RFC 9449](https://datatracker.ietf.org/doc/html/rfc9449))  | `dpop.enabled`                      |
 | **Pushed Authorization Requests** ([RFC 9126](https://datatracker.ietf.org/doc/html/rfc9126))                       | `par.enabled`                       |
 | Token introspection ([RFC 7662](https://datatracker.ietf.org/doc/html/rfc7662))                                     | `introspection.enabled`             |

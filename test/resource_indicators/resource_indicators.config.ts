@@ -60,11 +60,7 @@ export const ApplicationConfig = {
 	'introspection.enabled': true,
 	'deviceFlow.enabled': true,
 	'ciba.enabled': true,
-	'resourceIndicators.enabled': true,
-	// This suite issues refresh tokens (issueRefreshToken override returns true)
-	// without requesting offline_access, so advertise the grant explicitly now
-	// that it is no longer inferred from a customized issueRefreshToken (FR-016).
-	'refreshToken.enabled': true
+	'resourceIndicators.enabled': true
 };
 
 export const clients = [

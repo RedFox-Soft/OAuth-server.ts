@@ -4,7 +4,7 @@ title: "One owner per cookie family, because two schemas can name one cookie"
 tags: [contract, gotcha, architecture]
 sources: [oauth-server-codebase]
 created: 2026-08-27
-updated: 2026-09-15
+updated: 2026-09-30
 graph:
   node_type: concept
   relationships:
@@ -71,7 +71,10 @@ not working rather than failing.
 
 `lax` is not a relaxation of the property that matters. It still withholds both cookies on
 cross-site POSTs and on subresource requests, which is the CSRF boundary; every form on these
-screens posts same-site to a page this server served. The admin console's cookie is a separate
+screens posts same-site to a page this server served. One cross-site POST is legitimate: a relying
+party's sign-out form (`POST /logout`, since spec 064). It arrives without the cookie by design, and
+is bounced once through a same-origin form rather than handled bare — see
+[[cross-site-sign-out-post]] for why handling it directly would sign the browser out wrongly. The admin console's cookie is a separate
 constant (`lib/admin/auth/session.ts`) and stays `strict`, because nothing legitimately navigates to
 `/admin` from another site.
 

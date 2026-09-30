@@ -30,9 +30,20 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   retired key keeps verifying for a day and is then hidden — kept on record, never deleted. Promote and
   retire are in the console, the admin API and MCP (`jwks_promote`, `jwks_retire`, both confirmed
   twice); the restart-gated delete and `jwks_delete` are gone.
+- **Sign-out by form post.** `POST /logout` answers as the GET does, at every bucket's address, as
+  RP-Initiated Logout requires. A cross-site post arrives without the `Lax` session cookie, so it is
+  re-posted once from this origin rather than handled bare — handled bare it would say "signed out"
+  and replace the sign-in with an empty one.
+- **Discovery says how to authenticate to introspection and revocation.**
+  `introspection_endpoint_auth_methods_supported`, `revocation_endpoint_auth_methods_supported` and
+  their signing-algorithm companions (RFC 8414) are published while each endpoint is enabled.
 
 ### Changed
 
+- **The token endpoint accepts exactly the grant types discovery advertises.** `refresh_token` is
+  supported while `offline_access` is a supported scope; without it a refresh token is refused as
+  `unsupported_grant_type`, one issued earlier included. `refreshToken.enabled`, which changed
+  nothing observable, is removed.
 - **Retiring a key names it.** A retire, instance or bucket, is refused unless its body carries
   `{ "confirm": "<kid>" }`, and the console makes the operator type the kid.
 - **One key signs per algorithm, not per key type**, so an issuer can sign RS256 for its default clients
@@ -44,6 +55,9 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- **A sign-out at a path-addressed bucket can be confirmed.** Its confirmation form posted to the
+  default bucket's `/logout/confirm`, which holds none of that sign-out's state, so it failed with
+  "could not find logout details".
 - **A signing key in a new algorithm is usable without a restart.** Generating, say, the ES256 key a
   FAPI 2.0 deployment needs signed at once, but discovery did not advertise ES256 and a client could not
   register for it until the server restarted. The advertised algorithms now follow the live key set.

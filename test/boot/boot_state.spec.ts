@@ -52,7 +52,6 @@ process.stdout.write(JSON.stringify({
 	pairwiseSaltUsable: ps.isUsablePairwiseSalt(salt),
 	pairwiseSaltBytes: salt === null ? null : salt.byteLength,
 	scopes: [...app.configuration.scopes],
-	grantTypes: [...app.configuration.grantTypes],
 	claimsSupported: [...app.configuration.claimsSupported],
 	openidClaims: Object.keys(app.configuration.claims.openid ?? {})
 }));
@@ -132,9 +131,9 @@ describe('a freshly booted server, with no reload and no harness', () => {
 
 	it('has its settings validated and derived', () => {
 		// The derived values, not just any values: `openid` and its mandatory `sub` claim come from
-		// the claims processing, and authorization_code from the grant-type collection.
+		// the claims processing. Grant types are not derived at boot; they are read live, and
+		// test/grants/grant_parity.spec.ts covers them.
 		expect(booted.scopes).toContain('openid');
-		expect(booted.grantTypes).toContain('authorization_code');
 		expect(booted.claimsSupported).toContain('sub');
 		expect(booted.openidClaims).toContain('sub');
 	});

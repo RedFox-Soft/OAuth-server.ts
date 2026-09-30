@@ -27,7 +27,11 @@ import { userinfo } from './actions/userinfo.js';
 import { backchannelAuth, deviceAuth } from './actions/authorization/device.js';
 import { codeVerification } from './actions/code_verification.js';
 import { introspect } from './actions/introspection.js';
-import { logoutAction, logoutConfirmAction } from './actions/end_session.js';
+import {
+	logoutAction,
+	logoutConfirmAction,
+	logoutPostAction
+} from './actions/end_session.js';
 import { revocation } from './actions/revocation.js';
 import { jwks } from './actions/jwks.js';
 import { registration } from './actions/registration.js';
@@ -142,6 +146,7 @@ export const elysia = new Elysia({ strictPath: true, normalize: false })
 	.use(tokenAction)
 	.use(registration)
 	.use(logoutAction)
+	.use(logoutPostAction)
 	.use(logoutConfirmAction)
 	.use(userinfo)
 	.use(ui)
@@ -183,6 +188,7 @@ export const elysia = new Elysia({ strictPath: true, normalize: false })
 			.use(backchannelAuth)
 			.use(registration)
 			.use(logoutAction)
+			.use(logoutPostAction)
 			.use(logoutConfirmAction)
 			/*
 			 * A bucket's upstream providers return to a callback beneath its own address. The provider

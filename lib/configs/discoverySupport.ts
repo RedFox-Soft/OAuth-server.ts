@@ -29,8 +29,9 @@ type Config = typeof ApplicationConfig;
 
 // The collection-type discovery values are derived here from the live ApplicationConfig
 // so a runtime change is reflected on the next fetch. These rules intentionally mirror
-// lib/configs/configuration.ts (collectScopes/collectClaims/collectGrantTypes/checkAuthMethods);
-// the parity fixture test guards against divergence.
+// lib/configs/configuration.ts (collectScopes/collectClaims/checkAuthMethods); the parity
+// fixture test guards against divergence. Grant types mirror nothing: they are decided here
+// alone (supportedGrantTypes), and test/grants/grant_parity.spec.ts holds /token to it.
 
 // Mirrors lib/configs/configuration.ts: the advertised set is the values assigned to the
 // distinctions, so an operator cannot advertise a context that no sign-in here produces.
@@ -48,7 +49,13 @@ function deriveScopes(config: Config): string[] {
 	return [...scopes];
 }
 
-function deriveGrantTypes(config: Config): string[] {
+/*
+ * The one answer to which grants this server processes. Discovery advertises it and the token
+ * endpoint gates on it, so the two cannot disagree: a grant advertised here is never refused as
+ * unsupported, and a grant missing here is — including a refresh token issued before
+ * `offline_access` was withdrawn, since withdrawing the scope is withdrawing offline access.
+ */
+export function supportedGrantTypes(config: Config): string[] {
 	const grantTypes = new Set<string>(['authorization_code']);
 	if (config.scopes.includes('offline_access')) {
 		grantTypes.add('refresh_token');
@@ -151,6 +158,18 @@ export function calculateDiscovery(
 	 * issuer, which is what the default bucket's document says and what it said before tenancy existed.
 	 */
 	const issuer = bucket ? issuerFor(bucket) : ISSUER;
+	/*
+	 * One list for three endpoints, because it is one decision: token, introspection and revocation all
+	 * authenticate the caller through the same code against the method the client registered, and the
+	 * methods a client may register are these. Publishing a copy per endpoint would let one drift.
+	 */
+	const clientAuthMethods = deriveClientAuthMethods(config);
+	// RFC 8414 §2: required while a signed-assertion method is listed, and meaningless otherwise.
+	const assertionAlgorithms = clientAuthMethods.some(
+		(method) => method === 'private_key_jwt' || method === 'client_secret_jwt'
+	)
+		? clientAuthSigningAlgValues
+		: undefined;
 
 	return {
 		issuer,
@@ -181,8 +200,13 @@ export function calculateDiscovery(
 
 		scopes_supported: deriveScopes(config),
 		claims_supported: deriveClaimsSupported(config),
-		grant_types_supported: deriveGrantTypes(config),
-		token_endpoint_auth_methods_supported: deriveClientAuthMethods(config),
+		grant_types_supported: supportedGrantTypes(config),
+		token_endpoint_auth_methods_supported: clientAuthMethods,
+		introspection_endpoint_auth_methods_supported: clientAuthMethods,
+		introspection_endpoint_auth_signing_alg_values_supported:
+			assertionAlgorithms,
+		revocation_endpoint_auth_methods_supported: clientAuthMethods,
+		revocation_endpoint_auth_signing_alg_values_supported: assertionAlgorithms,
 		acr_values_supported: acrValues.length ? acrValues : undefined,
 
 		response_types_supported: ['none', 'code'],
@@ -320,6 +344,22 @@ export const metadataClassification: Record<DiscoveryKey, MetadataAudience> = {
 		audience: 'both',
 		registeredBy: 'RFC 8414'
 	},
+	introspection_endpoint_auth_methods_supported: {
+		audience: 'both',
+		registeredBy: 'RFC 8414'
+	},
+	introspection_endpoint_auth_signing_alg_values_supported: {
+		audience: 'both',
+		registeredBy: 'RFC 8414'
+	},
+	revocation_endpoint_auth_methods_supported: {
+		audience: 'both',
+		registeredBy: 'RFC 8414'
+	},
+	revocation_endpoint_auth_signing_alg_values_supported: {
+		audience: 'both',
+		registeredBy: 'RFC 8414'
+	},
 	code_challenge_methods_supported: {
 		audience: 'both',
 		registeredBy: 'RFC 8414'
@@ -453,12 +493,20 @@ export const featuresKeyMap: Partial<Record<FeatureFlagKey, DiscoveryKey[]>> = {
 		'require_pushed_authorization_requests'
 	],
 	'dpop.enabled': ['dpop_signing_alg_values_supported'],
-	'introspection.enabled': ['introspection_endpoint'],
+	'introspection.enabled': [
+		'introspection_endpoint',
+		'introspection_endpoint_auth_methods_supported',
+		'introspection_endpoint_auth_signing_alg_values_supported'
+	],
 	'claimsParameter.enabled': ['claims_parameter_supported'],
 	'deviceFlow.enabled': ['device_authorization_endpoint'],
 	'rpInitiatedLogout.enabled': ['end_session_endpoint'],
 	'registration.enabled': ['registration_endpoint'],
-	'revocation.enabled': ['revocation_endpoint'],
+	'revocation.enabled': [
+		'revocation_endpoint',
+		'revocation_endpoint_auth_methods_supported',
+		'revocation_endpoint_auth_signing_alg_values_supported'
+	],
 	'backchannelLogout.enabled': [
 		'backchannel_logout_supported',
 		'backchannel_logout_session_supported'

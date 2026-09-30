@@ -57,6 +57,7 @@ import * as refresh_token from './refresh_token.ts';
 import * as device_code from './device_code.ts';
 import * as ciba from './ciba.ts';
 import { ApplicationConfig as config } from 'lib/configs/application.js';
+import { supportedGrantTypes } from 'lib/configs/discoverySupport.js';
 import type { DPoPProof } from 'lib/helpers/validate_dpop.js';
 
 // Grant handlers always resolve to the grant-dependent token response body. No handler returns a
@@ -74,21 +75,12 @@ export const grantStore: Map<string, GrantHandler> = new Map([
 	['urn:openid:params:grant-type:ciba', ciba.handler]
 ]);
 
-// Server-level feature flag gating each optional grant. Mirrors deriveGrantTypes in
-// lib/configs/discoverySupport.ts so token dispatch and discovery advertise the same set.
-const grantFeatureFlags = {
-	client_credentials: 'clientCredentials.enabled',
-	'urn:ietf:params:oauth:grant-type:device_code': 'deviceFlow.enabled',
-	'urn:openid:params:grant-type:ciba': 'ciba.enabled'
-} as const;
-
+// Read from the same derivation discovery advertises, never a second table of flags: two lists
+// agreed on the optional grants and disagreed on refresh_token, which was processed while unadvertised.
 export function hasGrant(grantType: string): boolean {
-	const flag = grantFeatureFlags[grantType as keyof typeof grantFeatureFlags];
-	if (flag && !config[flag]) {
-		return false;
-	}
-
-	return grantStore.has(grantType);
+	return (
+		grantStore.has(grantType) && supportedGrantTypes(config).includes(grantType)
+	);
 }
 
 export async function executeGrant(

@@ -40,7 +40,6 @@ export interface Configuration {
 	acrMap: AcrValues;
 	clientAuthMethods: Set<string>;
 	claims: ClaimsConfig;
-	grantTypes: Set<string>;
 	claimsSupported: Set<string>;
 }
 
@@ -201,31 +200,6 @@ function collectClaims(scopes: Set<string>, claims: ClaimsConfig): Set<string> {
 	});
 
 	return claimsSupported;
-}
-
-function collectGrantTypes(
-	config: ConfigurationInput,
-	scopes: Set<string>
-): Set<string> {
-	const grantTypes = new Set(['authorization_code']);
-
-	if (scopes.has('offline_access') || config['refreshToken.enabled']) {
-		grantTypes.add('refresh_token');
-	}
-
-	if (config['clientCredentials.enabled']) {
-		grantTypes.add('client_credentials');
-	}
-
-	if (config['deviceFlow.enabled']) {
-		grantTypes.add('urn:ietf:params:oauth:grant-type:device_code');
-	}
-
-	if (config['ciba.enabled']) {
-		grantTypes.add('urn:openid:params:grant-type:ciba');
-	}
-
-	return grantTypes;
 }
 
 // The five common data fields RFC 9396 §2 defines. `identifier` is single-valued, so a descriptor
@@ -679,7 +653,6 @@ export function validateConfiguration(
 	unpackArrayClaims(claims);
 	ensureOpenIdSub(claims);
 	const claimsSupported = collectClaims(scopes, claims);
-	const grantTypes = collectGrantTypes(config, scopes);
 
 	checkDependantFeatures(config);
 	checkDeviceFlow(config);
@@ -697,7 +670,6 @@ export function validateConfiguration(
 		acrMap,
 		clientAuthMethods,
 		claims,
-		grantTypes,
 		claimsSupported
 	};
 }

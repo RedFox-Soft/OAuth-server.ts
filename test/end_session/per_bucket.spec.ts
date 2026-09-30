@@ -53,11 +53,28 @@ async function signInToAcme(held: string): Promise<string> {
 	return present(written, 'a session cookie').split(';')[0];
 }
 
-/* Signs out at a bucket's address, following the confirmation the browser is shown. */
-async function signOutAt(prefix: string, cookie: string) {
+/*
+ * Signs out at a bucket's address the way a browser does: the sign-out request by link or by form
+ * post, then the confirmation posted to whatever address the confirmation form names. Following the
+ * form's `action` is the point — building the confirm URL here instead is what once let a form that
+ * posted to the default bucket pass this spec.
+ */
+async function signOutAt(
+	prefix: string,
+	cookie: string,
+	method: 'GET' | 'POST' = 'GET'
+) {
 	const page = await elysia.handle(
 		new Request(`http://localhost${prefix}/logout`, {
-			headers: { cookie, accept: 'text/html' }
+			method,
+			headers: {
+				cookie,
+				accept: 'text/html',
+				...(method === 'POST'
+					? { 'content-type': 'application/x-www-form-urlencoded' }
+					: {})
+			},
+			...(method === 'POST' ? { body: '' } : {})
 		})
 	);
 	const pageCookie =
@@ -69,9 +86,13 @@ async function signOutAt(prefix: string, cookie: string) {
 		);
 	const secret = xsrf?.[1] ?? xsrf?.[2];
 	expect(secret).toBeTruthy();
+	const action = present(
+		/<form[^>]*action="([^"]+)"/.exec(html)?.[1],
+		'the confirmation form action'
+	);
 
-	return elysia.handle(
-		new Request(`http://localhost${prefix}/logout/confirm`, {
+	const confirmed = await elysia.handle(
+		new Request(new URL(action, `http://localhost${prefix}/logout`), {
 			method: 'POST',
 			headers: {
 				'content-type': 'application/x-www-form-urlencoded',
@@ -83,6 +104,22 @@ async function signOutAt(prefix: string, cookie: string) {
 				logout: 'true'
 			})
 		})
+	);
+	expect(confirmed.status).toBeLessThan(400);
+	return confirmed;
+}
+
+async function authorizeAtAcme(cookie: string) {
+	const auth = new AuthorizationRequest({
+		client_id: 'acme-logout-app',
+		scope: 'openid',
+		redirect_uri: 'https://acmeout.example.com/cb'
+	});
+	return elysia.handle(
+		new Request(
+			`http://localhost/${SLUG}/auth?${jsonToFormUrlEncoded(auth.params)}`,
+			{ headers: { cookie } }
+		)
 	);
 }
 
@@ -166,5 +203,19 @@ describe('signing out at one bucket while signed in to two', () => {
 		}
 
 		expect(notified).not.toContain('default-app');
+	});
+
+	it('ends the bucket’s own sign-in when a sign-out posted at its address is confirmed', async () => {
+		const held = await setup.login({ accountId: 'ana' });
+		const acmeCookie = await signInToAcme(held);
+
+		await signOutAt(`/${SLUG}`, `${held}; ${acmeCookie}`, 'POST');
+
+		expect(
+			(await authorizeAtAcme(`${held}; ${acmeCookie}`)).headers.get('location')
+		).toContain('/ui/');
+		expect((await authorizeAtDefault(held)).headers.get('location')).toContain(
+			'code='
+		);
 	});
 });
