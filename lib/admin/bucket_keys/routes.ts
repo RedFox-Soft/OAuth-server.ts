@@ -1,4 +1,4 @@
-import { Elysia } from 'elysia';
+import { Elysia, t } from 'elysia';
 import {
 	assertAuth,
 	AdminError,
@@ -14,7 +14,7 @@ import {
 	promoteKey,
 	retireKey
 } from './service.js';
-import type { SupportedAlg } from '../jwks/schema.js';
+import { RetireKeyBody, type SupportedAlg } from '../jwks/schema.js';
 
 /*
  * An addressable bucket's own signing keys. Authorization is the bucket's — its owning group, or a
@@ -56,7 +56,11 @@ export const bucketKeyRoutes = new Elysia({ name: 'admin-bucket-keys' })
 			return promoteKey(ctx, params.id, params.kid);
 		}
 	)
-	.delete('/admin/api/buckets/:id/keys/:kid', async ({ admin, params }) => {
-		const ctx = assertAuth(admin as AdminContext | null);
-		return retireKey(ctx, params.id, params.kid);
-	});
+	.delete(
+		'/admin/api/buckets/:id/keys/:kid',
+		async ({ admin, params, body }) => {
+			const ctx = assertAuth(admin as AdminContext | null);
+			return retireKey(ctx, params.id, params.kid, body?.confirm);
+		},
+		{ body: t.Optional(RetireKeyBody) }
+	);

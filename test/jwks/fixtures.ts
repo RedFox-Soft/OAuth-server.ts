@@ -2,7 +2,7 @@ import { type JWKS } from 'lib/configs/verifyJWKs.ts';
 
 /*
  * Deterministic private signing keys for tests. These replace the former `JWKS` env var seed:
- * the preload seeds them into the in-memory jwksStore so the store-loading path is exercised with
+ * the preload seeds them as the root issuer's key records so the store-loading path is exercised with
  * known `kid`s. Keys for testing purposes only — never use in production.
  */
 

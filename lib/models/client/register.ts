@@ -3,6 +3,7 @@ import { adapter } from '../../adapters/index.js';
 import { type Client, type ClientRecord } from './types.ts';
 import { validateClient } from './validate.ts';
 import { toStored } from './projection.ts';
+import { rootKeys } from '../../keys/issuer_keys.js';
 
 /*
  * The one way a client is written, whichever surface writes it — dynamic registration, registration
@@ -19,6 +20,13 @@ export async function registerClient(
 	record: ClientRecord,
 	{ store }: { store: boolean }
 ): Promise<Client> {
+	/*
+	 * Validation checks a client's signing algorithms against the ones the root issuer can sign with,
+	 * read synchronously from the mirror its key set keeps (lib/keys/issuer_keys.ts). Reading the set
+	 * here — cached, so almost always free — is what keeps that mirror current on an instance where another
+	 * instance promoted a key, rather than only once something here happens to sign.
+	 */
+	await rootKeys();
 	const client = validateClient(record);
 
 	if (client.sectorIdentifierUri !== undefined) {

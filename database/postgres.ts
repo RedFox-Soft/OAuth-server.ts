@@ -14,7 +14,7 @@ import {
 	provisionUserArea,
 	sql,
 	tableExists,
-	JWKSStore
+	BucketKeysStore
 } from '../lib/adapters/postgres/index.js';
 import {
 	duplicateEmailReport,
@@ -23,7 +23,8 @@ import {
 	type ProvisioningSummary
 } from './provisioning_report.js';
 import { generateJWKS } from '../lib/helpers/jwks.js';
-import { MIGRATIONS } from '../lib/consts/migrations.js';
+import { LEGACY_ROOT_KEYS_AREA, MIGRATIONS } from '../lib/consts/migrations.js';
+import { ROOT_KEY_OWNER } from '../lib/consts/key_owner.js';
 import { migrationBackend } from '../lib/migrations/backend.js';
 import { baseline } from '../lib/migrations/runner.js';
 
@@ -247,20 +248,43 @@ for (const area of FIXED_AREAS) {
 const provisionedFromEmpty = summary.collectionsCreated === FIXED_AREAS.length;
 
 /*
- * The initial signing key, so a freshly provisioned database already holds a persisted RS256 key. The
- * runtime loader keeps an equivalent generate-on-empty fallback, but doing it here means the key
- * exists before anything reads it — and makes the provisioning run, rather than the first request,
- * the moment a deployment's key is created.
+ * The root issuer's first signing key, so a freshly provisioned database already holds one — created the
+ * way the server creates it, under the fixed id that makes it exactly once. Only when there is no root key
+ * and nothing left to migrate: a deploy runs this before `db:migrate`, and a first key created beside
+ * legacy keys still awaiting migration would be a second signer the migration then competes with. The
+ * legacy table is read by its literal name for that reason alone.
  */
-const jwks = new JWKSStore();
-if ((await jwks.getAll()).length === 0) {
+const rootKeyStore = new BucketKeysStore();
+const rootKeySql = sql();
+const [legacyTable] =
+	await rootKeySql`SELECT to_regclass(${LEGACY_ROOT_KEYS_AREA}) AS t`;
+const legacyLeft = legacyTable?.t
+	? Number(
+			(
+				await rootKeySql`SELECT count(*)::int AS n FROM ${rootKeySql(LEGACY_ROOT_KEYS_AREA)}`
+			)[0].n
+		)
+	: 0;
+if (
+	legacyLeft === 0 &&
+	(await rootKeyStore.listByBucket(ROOT_KEY_OWNER)).length === 0
+) {
 	const {
-		keys: [key]
-	} = await generateJWKS();
-	if (key?.kid) {
-		await jwks.set(key.kid, key);
-		console.log(`created the initial RS256 signing key ${key.kid}`);
-	}
+		keys: [jwk]
+	} = await generateJWKS('RS256');
+	const now = new Date();
+	const created = await rootKeyStore.createIfAbsent({
+		_id: `${ROOT_KEY_OWNER} #initial`,
+		bucketId: ROOT_KEY_OWNER,
+		kid: jwk.kid,
+		jwk,
+		alg: 'RS256',
+		use: 'sig',
+		state: 'signing',
+		createdAt: now,
+		stateChangedAt: now
+	});
+	if (created) console.log(`created the initial RS256 signing key ${jwk.kid}`);
 }
 
 /*

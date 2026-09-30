@@ -6,7 +6,7 @@ import { testSigningKeys } from './fixtures.js';
 const [, ecKey] = testSigningKeys;
 
 // The former "uses setup.jwks over the store" case is gone with the capability it asserted: keys
-// are single-sourced from the jwksStore adapter (as clients are from the Client store), so there is
+// are single-sourced from their records in the key store (as clients are from the Client store), so there is
 // no per-instance key input left for the store to take precedence over. What remains worth pinning
 // is that the store — and only the store — decides the published set.
 /**

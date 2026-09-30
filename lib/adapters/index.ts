@@ -1,6 +1,5 @@
 import {
 	MemoryAdapter,
-	JWKSStore as MemoryJWKS,
 	UserStore as MemoryUser,
 	GroupStore as MemoryGroupStore,
 	GroupInvitationStore as MemoryGroupInvitationStore,
@@ -31,10 +30,8 @@ import type {
 	GroupInvitationStoreInstance,
 	AdminSessionStoreConstructor,
 	AdminSessionStoreInstance,
-	JWKSStoreConstructor,
 	McpConfirmationStoreConstructor,
 	McpConfirmationStoreInstance,
-	JWKSStoreInstance,
 	ModelAdapter,
 	ModelAdapterConstructor,
 	ProjectStoreConstructor,
@@ -65,7 +62,6 @@ import { withDeadline } from '../helpers/deadline.js';
 
 let Adapter: ModelAdapterConstructor = MemoryAdapter;
 let UserStore: UserStoreConstructor = MemoryUser;
-let JWKSStoreClass: JWKSStoreConstructor = MemoryJWKS;
 let GroupStoreClass: GroupStoreConstructor = MemoryGroupStore;
 let GroupInvitationStoreClass: GroupInvitationStoreConstructor =
 	MemoryGroupInvitationStore;
@@ -104,7 +100,6 @@ if (backend === 'postgres') {
 	Adapter = postgres.SqlAdapter;
 	configStore = postgres.configStore;
 	UserStore = postgres.UserStore;
-	JWKSStoreClass = postgres.JWKSStore;
 	GroupStoreClass = postgres.GroupStore;
 	GroupInvitationStoreClass = postgres.GroupInvitationStore;
 	ProjectStoreClass = postgres.ProjectStore;
@@ -135,7 +130,6 @@ if (backend === 'mongodb') {
 	Adapter = mongodb.MongoAdapter;
 	configStore = mongodb.configStore;
 	UserStore = mongodb.UserStore;
-	JWKSStoreClass = mongodb.JWKSStore;
 	GroupStoreClass = mongodb.GroupStore;
 	GroupInvitationStoreClass = mongodb.GroupInvitationStore;
 	ProjectStoreClass = mongodb.ProjectStore;
@@ -157,7 +151,6 @@ if (process.env.NODE_ENV === 'test') {
 	Adapter = (await import('../../test/models.js')).TestAdapter;
 }
 
-export const jwksStore: JWKSStoreInstance = new JWKSStoreClass();
 export const adminSessionStore: AdminSessionStoreInstance =
 	new AdminSessionStoreClass();
 export const adminAuditStore: AdminAuditStoreInstance =

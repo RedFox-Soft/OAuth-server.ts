@@ -619,7 +619,7 @@ describe('admin audit coverage: keys and settings', () => {
 		await ensureAdminSeed();
 	});
 
-	it('records key generation and deletion against the kid', async () => {
+	it('records key generation and retirement against the kid', async () => {
 		const { cookie, userId } = await superCookie();
 
 		const before = await client.admin.api.jwks.get({ headers: { cookie } });
@@ -630,11 +630,8 @@ describe('admin audit coverage: keys and settings', () => {
 			{ headers: { cookie } }
 		);
 		expect(generated.status).toBe(200);
-		const state = answered(generated.data);
-		// A generated key is hot-applied, so it is active rather than "changed" — the new kid is the one
-		// the previous listing did not have.
-		const kid = state.keys.find((k) => !beforeKids.has(k.kid))?.kid;
-		expect(kid).toBeString();
+		const kid = answered(generated.data).kid;
+		expect(beforeKids.has(kid)).toBe(false);
 
 		expectEntry(await soleEntry(present(kid, 'kid')), {
 			action: 'jwks.generate',
@@ -642,18 +639,18 @@ describe('admin audit coverage: keys and settings', () => {
 			actorId: userId
 		});
 
-		const removed = await client.admin.api
+		const retired = await client.admin.api
 			.jwks({ kid: present(kid, 'kid') })
-			.delete(undefined, { headers: { cookie } });
-		expect(removed.status).toBe(200);
+			.delete({ confirm: kid }, { headers: { cookie } });
+		expect(retired.status).toBe(200);
 
 		const { entries } = await adminAuditStore.list({
 			targetId: present(kid, 'kid'),
-			action: 'jwks.delete'
+			action: 'jwks.retire'
 		});
 		expect(entries).toHaveLength(1);
 		expectEntry(present(entries[0], 'entries[0]'), {
-			action: 'jwks.delete',
+			action: 'jwks.retire',
 			targetType: 'jwks',
 			actorId: userId
 		});

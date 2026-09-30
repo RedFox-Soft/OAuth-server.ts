@@ -175,8 +175,9 @@ describe('MCP tool catalogue', () => {
 			'federation_identity_delete',
 			'federation_provider_delete',
 			'group_member_remove',
-			'jwks_delete',
 			'jwks_generate',
+			'jwks_promote',
+			'jwks_retire',
 			/*
 			 * Removing a declared resource stops token issuance for that audience on the next request, so a
 			 * live third-party integration loses access as its current tokens expire. Destructive to

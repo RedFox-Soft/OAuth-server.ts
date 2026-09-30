@@ -14,10 +14,10 @@ import {
 	adapter,
 	getBucketStore,
 	getProjectStore,
-	getUserStore,
-	jwksStore
+	getUserStore
 } from '../lib/adapters/index.ts';
-import { reloadJWKSKeys } from '../lib/configs/keys.ts';
+import { invalidateRootKeys, rootKeys } from '../lib/keys/issuer_keys.ts';
+import { writeRootKeys } from './root_keys.js';
 import { verifyJWKs } from '../lib/configs/verifyJWKs.ts';
 import { UserStore as MemoryUserStore } from '../lib/adapters/memory/userStore.ts';
 import { testSigningKeys } from './jwks/fixtures.js';
@@ -62,10 +62,10 @@ const testClaims = sharedTestClaims().claims;
 /*
  * seedJwks
  *
- * The provider's signing keys are single-sourced from the jwksStore adapter, exactly as clients are
- * single-sourced from the Client store. So a spec that needs its own keys writes them to the store
- * and reloads, rather than handing them to the provider. Called for every spec so one spec's keys
- * can never leak into the next.
+ * The root issuer's keys are single-sourced from their records in the key store, exactly as clients are
+ * single-sourced from the Client store. So a spec that needs its own keys writes them there and reloads,
+ * rather than handing them to the provider. Called for every spec so one spec's keys can never leak into
+ * the next.
  */
 export async function seedJwks(keys: Array<Record<string, unknown>>) {
 	// verifyJWKs assigns a kid to any key that lacks one (RFC 7638 thumbprint). Doing it up front
@@ -75,20 +75,9 @@ export async function seedJwks(keys: Array<Record<string, unknown>>) {
 	const seeded = { keys: structuredClone(keys) };
 	verifyJWKs(seeded);
 
-	for (const existing of await jwksStore.getAll()) {
-		// A key with no kid is not addressable in a store keyed by kid, so it cannot be cleared and
-		// would leak into every later spec. Fail loudly instead — that leak has been diagnosed twice.
-		if (!existing.kid) {
-			throw new Error(
-				'the key store holds a key with no kid; it cannot be cleared by kid and would leak between specs'
-			);
-		}
-		await jwksStore.delete(existing.kid);
-	}
-	for (const key of seeded.keys) {
-		await jwksStore.set(key.kid, key);
-	}
-	await reloadJWKSKeys();
+	await writeRootKeys(seeded.keys);
+	invalidateRootKeys();
+	await rootKeys();
 }
 
 const { info, warn } = console;

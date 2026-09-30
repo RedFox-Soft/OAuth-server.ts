@@ -3,8 +3,7 @@ import type { SecretStoreInstance } from '../adapters/types.js';
 
 /*
  * The server's pairwise identifier salt, resolved once at startup — the sibling of
- * configs/nonceSecret.ts and configs/keys.ts, which resolve their own material from a store the same
- * way.
+ * configs/nonceSecret.ts, which resolves its own material from a store the same way.
  *
  * This module imports nothing but the store's type, and that is load-bearing rather than tidy. Its
  * consumer is addon/tokens.ts, a leaf that half the server imports; if this module reached for
@@ -121,8 +120,8 @@ export async function resolvePairwiseSalt(
 }
 
 /*
- * The resolved salt, as module state — the same arrangement as JWKS_KEYS in configs/keys.ts, and for
- * the same reason: this is key material single-sourced from a store, not an input to the provider.
+ * The resolved salt, as module state — key material single-sourced from a store, not an input to the
+ * provider.
  *
  * Held behind an accessor rather than exported directly so that a caller cannot capture a stale
  * binding, and so a test can re-resolve against a store it controls (which is what stands in for a

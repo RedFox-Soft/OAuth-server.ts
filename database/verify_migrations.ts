@@ -15,11 +15,10 @@ import { close, sql } from '../lib/adapters/postgres/index.js';
  * DESTRUCTIVE, and refuses any database whose name does not say it is disposable — the same guard
  * `verify_postgres.ts` carries, for the same reason.
  *
- * Runs against a FIXTURE migration set, not the declared one. The declared set ships empty, so
- * verifying it would verify nothing; the machinery is what has to work before the first real
- * migration is written, and this is the only place it meets a real database — records that survive a
- * process, a lease two runners actually contend for, and a failure that leaves the earlier steps
- * recorded.
+ * Runs against a FIXTURE migration set, not the declared one. Each declared migration is checked
+ * against the data it moves, in `verify_mongodb.ts` and `verify_postgres.ts`; what this checks is the
+ * machinery, and this is the only place it meets a real database — records that survive a process, a
+ * lease two runners actually contend for, and a failure that leaves the earlier steps recorded.
  */
 
 const THROWAWAY =

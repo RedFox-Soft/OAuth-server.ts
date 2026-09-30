@@ -7,23 +7,27 @@ import {
 	resolveAdmin,
 	type AdminContext
 } from '../auth/rbac.js';
-import { getJwksState, generateKey, deleteKey } from './service.js';
+import { KeyActionRefused } from '../key_lifecycle.js';
+import { RetireKeyBody } from './schema.js';
+import { generateKey, listKeys, promoteKey, retireKey } from './service.js';
 
-// Super-admin JWKS (signing-key) management. Every action flows through this management API
-// with the same auth/validation as other admin operations (no privileged bypass), and every
-// mutation is recorded in the append-only admin audit trail (see service.ts).
+// Super-admin management of the root issuer's keys. Every action flows through this management API
+// with the same auth/validation as other admin operations (no privileged bypass), and every mutation is
+// recorded in the append-only admin audit trail before it takes effect (see ../key_lifecycle.ts).
 export const jwksRoutes = new Elysia({ name: 'admin-jwks' })
 	.use(resolveAdmin)
 	.onError(({ error, set }) => {
 		if (error instanceof AdminError) {
 			set.status = error.status;
-			return adminErrorBody(error);
+			return error instanceof KeyActionRefused
+				? { ...adminErrorBody(error), ...error.detail }
+				: adminErrorBody(error);
 		}
 	})
 	.get('/admin/api/jwks', async ({ admin }) => {
 		const ctx = assertAuth(admin as AdminContext | null);
 		assertRole(ctx, 'super_admin');
-		return getJwksState();
+		return listKeys(ctx);
 	})
 	.post(
 		'/admin/api/jwks',
@@ -36,8 +40,17 @@ export const jwksRoutes = new Elysia({ name: 'admin-jwks' })
 		// shape (matching the settings module) rather than a generic TypeBox error.
 		{ body: t.Record(t.String(), t.Unknown()) }
 	)
-	.delete('/admin/api/jwks/:kid', async ({ admin, params }) => {
+	.post('/admin/api/jwks/:kid/promote', async ({ admin, params }) => {
 		const ctx = assertAuth(admin as AdminContext | null);
 		assertRole(ctx, 'super_admin');
-		return deleteKey(ctx, params.kid);
-	});
+		return promoteKey(ctx, params.kid);
+	})
+	.delete(
+		'/admin/api/jwks/:kid',
+		async ({ admin, params, body }) => {
+			const ctx = assertAuth(admin as AdminContext | null);
+			assertRole(ctx, 'super_admin');
+			return retireKey(ctx, params.kid, body?.confirm);
+		},
+		{ body: t.Optional(RetireKeyBody) }
+	);

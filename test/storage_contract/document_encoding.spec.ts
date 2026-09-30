@@ -214,7 +214,8 @@ describe('a document written to PostgreSQL', () => {
 
 		const files = new Set(found.map((b) => b.file));
 		expect(files).toContain('sqlAdapter.ts');
-		expect(files).toContain('jwksStore.ts');
+		// The store the root and every bucket keep their keys in.
+		expect(files).toContain('bucketKeysStore.ts');
 
 		const columns = new Set(found.map((b) => b.column));
 		expect([...columns].sort()).toEqual(['doc', 'payload']);

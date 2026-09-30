@@ -36,7 +36,7 @@ import {
 import { PublishedSettingsBody } from '../admin/settings/schema.js';
 import { UpdateSmtpBody } from '../admin/settings/smtp/schema.js';
 import { UpdateSentryBody } from '../admin/settings/sentry/schema.js';
-import { GenerateKeyBody } from '../admin/jwks/schema.js';
+import { GenerateKeyBody, RetireKeyBody } from '../admin/jwks/schema.js';
 import { GenerateBucketKeyBody } from '../admin/bucket_keys/schema.js';
 import { AuditQuery } from '../admin/audit/schema.js';
 import {
@@ -436,7 +436,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: [],
 		summary:
-			'The signing keys, each with its status, plus whether a restart is needed to apply pending changes. Public key material only — private components are never returned.'
+			'The instance (root) signing keys, each with its state — published (verifies, may be promoted once promotableAt has passed), signing (one per algorithm), or retired (still verifies until removableAt, then hidden). Nothing here needs a restart. No key material is returned; the public keys are at the root /jwks.'
 	},
 	{
 		tool: 'bucket_key_list',
@@ -1021,20 +1021,33 @@ const catalogue = [
 		querySchema: null,
 		pathParams: [],
 		summary:
-			'Generate a signing key for the instance key set, in any supported algorithm. It is published and can sign at once; an algorithm the instance did not boot with is advertised in discovery only after a restart.'
+			'Generate a signing key for the instance key set, in any supported algorithm. The key is published at once and signs only once promoted, which the server allows after the publication window so every instance serves it first.'
 	},
 	{
-		tool: 'jwks_delete',
-		method: 'DELETE',
-		path: '/admin/api/jwks/:kid',
-		action: 'jwks.delete',
+		tool: 'jwks_promote',
+		method: 'POST',
+		path: '/admin/api/jwks/:kid/promote',
+		action: 'jwks.promote',
 		consequence: 'high',
 		requiredRole: 'super_admin',
 		bodySchema: null,
 		querySchema: null,
 		pathParams: ['kid'],
 		summary:
-			'Delete a signing key of the instance key set. Refused if it would leave no signing key. The key keeps being served and honoured until a restart, after which tokens signed with it stop verifying.'
+			"Make a published key the one the instance signs with in its algorithm; its algorithm is advertised in discovery at once. The key it replaces returns to published and keeps verifying. Refused before the key's promotableAt. Every root-served client is affected, which is why it is gated."
+	},
+	{
+		tool: 'jwks_retire',
+		method: 'DELETE',
+		path: '/admin/api/jwks/:kid',
+		action: 'jwks.retire',
+		consequence: 'high',
+		requiredRole: 'super_admin',
+		bodySchema: RetireKeyBody,
+		querySchema: null,
+		pathParams: ['kid'],
+		summary:
+			'Retire a key of the instance key set. The body must name the key again — { "confirm": "<kid>" } — or nothing happens. The key stops signing at once, keeps verifying until removableAt so tokens already issued stay valid, and is then hidden for good. Refused for a key that signs: promote its replacement first.'
 	},
 	{
 		tool: 'bucket_key_generate',
@@ -1060,7 +1073,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'kid'],
 		summary:
-			"Make a published key the one the bucket signs with for its key type. The key it replaces keeps verifying. Refused before the key's promotableAt, and when it would leave no key in an algorithm the bucket's clients require."
+			"Make a published key the one the bucket signs with in its algorithm. The key it replaces in that algorithm keeps verifying. Refused before the key's promotableAt."
 	},
 	{
 		tool: 'bucket_key_retire',
@@ -1069,11 +1082,11 @@ const catalogue = [
 		action: 'bucket.key.retire',
 		consequence: 'high',
 		requiredRole: null,
-		bodySchema: null,
+		bodySchema: RetireKeyBody,
 		querySchema: null,
 		pathParams: ['id', 'kid'],
 		summary:
-			'Retire a key the bucket no longer signs with. It stays published until every token it could have signed has expired, then tokens signed with it stop verifying. Refused for the signing key. High-consequence: describe it and confirm before running.'
+			'Retire a key the bucket no longer signs with. The body must name the key again — { "confirm": "<kid>" } — or nothing happens. It stays published until every token it could have signed has expired, then is hidden and tokens signed with it stop verifying. Refused for the signing key. High-consequence: describe it and confirm before running.'
 	},
 
 	/* ------------------------------------------------ writes: settings (3) */

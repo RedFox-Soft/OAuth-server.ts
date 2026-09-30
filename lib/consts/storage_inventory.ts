@@ -121,10 +121,10 @@ export type ModelAreaName = (typeof MODEL_AREAS)[number];
  * replaced is how `serviceConfig` came to be used at runtime and never provisioned.
  */
 export const STORE_AREAS = {
-	jwks: 'jwks',
 	/*
-	 * The signing and encryption keys of each addressable bucket, which is its own issuer. The root
-	 * issuer's keys are `jwks` above.
+	 * The signing and encryption keys of every issuer: each addressable bucket's, and the root issuer's
+	 * under the reserved owner `ROOT_KEY_OWNER` (lib/consts/key_owner.ts). The root's used to be a flat
+	 * `jwks` area; the 2026-09-30-root-keys-lifecycle migration moves them here.
 	 */
 	bucketKeys: 'bucketKeys',
 	projects: 'projects',
@@ -430,13 +430,6 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 		unowned('addressed by the computed id `${bucketId}:${email}`, never swept')
 	),
 
-	/* Signing keys never expire; they are addressed by a unique kid. */
-	storeArea(
-		STORE_AREAS.jwks,
-		null,
-		unowned('server signing keys; no principal owns them'),
-		[{ key: { kid: 1 }, unique: true }]
-	),
 	/*
 	 * Never reaped by age: a key leaves when its state says so — retired, and past the lifetime of every
 	 * token it could have signed — which a TTL on the record could not know. Owned by a bucket, which is
@@ -447,7 +440,7 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 		STORE_AREAS.bucketKeys,
 		null,
 		unowned(
-			'owned by a bucket, which is not a principal; cascaded by the bucket-delete route'
+			'owned by a bucket, which is not a principal, and cascaded by the bucket-delete route — or by the root issuer (owner #root), which no bucket deletion reaches'
 		),
 		[{ key: { bucketId: 1 } }]
 	),

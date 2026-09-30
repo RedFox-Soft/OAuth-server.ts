@@ -14,7 +14,7 @@ function publishedKeySet() {
 	return createLocalJWKSet({ keys });
 }
 
-// Rotation is performed the way a deployment performs it: write the jwksStore and reload, since
+// Rotation is performed here by rewriting the root key records and reloading, since
 // the store is the single source for the server's keys. The reload rebuilds the keystore and the
 // published JWKS in place (configs/keystore.ts) — no provider re-initialisation is involved.
 /**

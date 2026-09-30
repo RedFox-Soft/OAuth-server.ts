@@ -161,6 +161,51 @@ check(
 	`${forProject} document(s) for the project`
 );
 
+/*
+ * The root keys migration, against legacy flat keys in the order MongoDB returns them: two RS256 keys, an
+ * ES256 key and an encryption key. The first RS256 key in natural order signed before the upgrade and must
+ * be the one that signs after it; applying the migration twice must change nothing.
+ */
+const rootKeys = MIGRATIONS.find((m) => m.id.endsWith('root-keys-lifecycle'));
+const { LEGACY_ROOT_KEYS_AREA } = await import('../lib/consts/migrations.js');
+const { ROOT_KEY_OWNER } = await import('../lib/consts/key_owner.js');
+const legacyArea = db.collection<Record<string, unknown>>(
+	LEGACY_ROOT_KEYS_AREA
+);
+const [firstRsa, secondRsa, ec] = await Promise.all([
+	generateJWKS('RS256'),
+	generateJWKS('RS256'),
+	generateJWKS('ES256')
+]).then((sets) => sets.map((set) => set.keys[0]));
+await legacyArea.insertMany([
+	{ ...firstRsa, updatedAt: new Date() },
+	{ ...secondRsa, updatedAt: new Date() },
+	{ ...ec, updatedAt: new Date() },
+	{
+		...firstRsa,
+		kid: `enc-${stamp}`,
+		alg: 'RSA-OAEP-256',
+		use: 'enc',
+		updatedAt: new Date()
+	}
+]);
+if (rootKeys && !('noop' in rootKeys.mongodb)) {
+	await rootKeys.mongodb.apply(db);
+	await rootKeys.mongodb.apply(db);
+}
+const migrated = await new BucketKeysStore().listByBucket(ROOT_KEY_OWNER);
+const stateOf = (kid: string) => migrated.find((key) => key.kid === kid)?.state;
+check(
+	'the root keys migration keeps the key that signed, per algorithm, applied twice',
+	migrated.length === 4 &&
+		stateOf(firstRsa.kid) === 'signing' &&
+		stateOf(secondRsa.kid) === 'published' &&
+		stateOf(ec.kid) === 'signing' &&
+		stateOf(`enc-${stamp}`) === 'published' &&
+		(await legacyArea.countDocuments()) === 0,
+	migrated.map((key) => `${key.alg}:${key.state}`).join(', ')
+);
+
 console.log(
 	`\n${failures === 0 ? 'all fidelity checks passed' : `${failures} check(s) FAILED`}`
 );

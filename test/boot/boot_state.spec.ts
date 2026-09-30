@@ -6,8 +6,9 @@ import * as path from 'node:path';
 /*
  * What a freshly booted server has, before anything reloads or reconfigures it.
  *
- * Two things are set up as modules load: configs/keys.ts resolves the jwksStore into
- * configs/keystore.ts, and configs/application.ts validates the settings and derives
+ * Two things are set up as a server starts: the root issuer's key set is read from its records — the
+ * first key created on an empty store — the first time anything asks for it (lib/index.ts does, right
+ * after the migration gate), and configs/application.ts validates the settings and derives
  * `configuration` from them. Every other spec arrives at that state through the harness — seedJwks()
  * and reloadConfiguration() — so no other spec can tell a working boot from one that derives nothing
  * at all. Both failures are total: a server that cannot sign anything, or one whose every scope and
@@ -17,7 +18,7 @@ import * as path from 'node:path';
  * test harness, and look at what it ended up with. That is what justifies the subprocess.
  *
  * The child starts on an empty in-memory store (the preload's fixture keys are not in its process),
- * so it also covers the auto-provisioning fallback in resolveKeys — and, since spec 014, the same
+ * so it also covers the creation of the first root key — and, since spec 014, the same
  * fallback for the DPoP nonce secret and, since spec 023, the pairwise identifier salt. The
  * `stderr: ''` assertion below is load-bearing for both, and for one more thing since spec 023: the
  * salt's default implementation used to emit a mustChange warning on every derivation, calling itself
@@ -35,6 +36,7 @@ const at = (rel) => pathToFileURL(path.join(process.cwd(), rel)).href;
 
 await import(at('lib/event_bus.ts'));
 const ks = await import(at('lib/configs/keystore.ts'));
+const root = await (await import(at('lib/keys/issuer_keys.ts'))).rootKeys();
 const app = await import(at('lib/configs/application.ts'));
 const ps = await import(at('lib/configs/pairwiseSalt.ts'));
 
@@ -42,9 +44,9 @@ const nonceSecret = app.ApplicationConfig['dpop.nonceSecret'];
 const salt = ps.pairwiseSalt();
 
 process.stdout.write(JSON.stringify({
-	published: ks.publicJWKS.keys.length,
+	published: root.publicJWKS.keys.length,
 	held: [...ks.keystore].length,
-	canSign: ks.keystore.selectForSign({ alg: 'RS256' }).length > 0,
+	canSign: root.signing.selectForSign({ alg: 'RS256' }).length > 0,
 	nonceSecretIsBuffer: Buffer.isBuffer(nonceSecret),
 	nonceSecretBytes: Buffer.isBuffer(nonceSecret) ? nonceSecret.byteLength : null,
 	pairwiseSaltUsable: ps.isUsablePairwiseSalt(salt),

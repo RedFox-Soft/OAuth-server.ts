@@ -2,7 +2,6 @@ export { MemoryAdapter } from './memoryAdapter.js';
 export { UserStore } from './userStore.js';
 export { configStore } from './configStore.js';
 export { setStorage, type StoredValue } from './storage.js';
-export { JWKSStore } from './jwksStore.js';
 export { GroupStore } from './groupStore.js';
 export { GroupInvitationStore } from './groupInvitationStore.js';
 export { ProjectStore } from './projectStore.js';

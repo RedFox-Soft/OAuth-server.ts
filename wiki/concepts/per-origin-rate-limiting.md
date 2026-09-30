@@ -122,10 +122,10 @@ to cross the allowance first — 1039 failures, on the first full run after moun
 in `test/preload.ts`'s global `afterEach`, not in `bootstrap()`: the specs that trip it are the ones
 calling `bootstrap` in `beforeAll`, where a per-file reset comes too late.
 
-The counters are not the only store shaped this way. The same preload seeds `jwksStore` with three
-signing keys once, at process start, and that one is *never* reset — so a spec that deletes a key
-changes what every later file sees, and a "delete the last signing key" case has to reduce the store
-itself rather than assume it starts at one. The hazard is the module state, not the hook: a
+The counters are not the only store shaped this way. The same preload seeds the root signing keys (the
+`'#root'` records of `bucketKeys`, formerly `jwksStore`) once, at process start, and that one is
+*never* reset — so a spec that retires or promotes a root key changes what every later file sees, and
+restores the seeded set itself (`seedJwks`, `writeRootKeys`) rather than assume it starts clean. The hazard is the module state, not the hook: a
 top-level `beforeEach` does fire for `describe`-nested tests (checked against bun 1.4.0, in both
 declaration orders), so per-file placement is not what rescues these.
 

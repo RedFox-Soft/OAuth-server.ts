@@ -17,6 +17,7 @@ import { resolveClientDocument } from '../../client_metadata_document/resolve.js
 import { validateJWK } from './keystore.ts';
 import { registerClient } from './register.ts';
 import { BASE_METADATA_KEYS } from './wire.ts';
+import { rootKeys } from '../../keys/issuer_keys.js';
 
 // Validate raw metadata → plain, frozen client object (defaults applied,
 // recognised metadata camelCased) or throw InvalidClientMetadata. Key material
@@ -108,6 +109,8 @@ onSettingsApplied(() => clientCache.clear());
 // re-validation. Nullable variant behind `Client.tryFind`; the strict
 // `Client.find` wraps this and throws on miss.
 export async function tryFindClient(id: string): Promise<Client | undefined> {
+	// Validation reads the root issuer's algorithms synchronously; this keeps them current (see register.ts).
+	await rootKeys();
 	const properties = await adapter('Client').find(id);
 	if (!properties) {
 		/*

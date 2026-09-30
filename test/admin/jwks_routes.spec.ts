@@ -1,44 +1,76 @@
-import { describe, it, expect, beforeEach } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach, spyOn } from 'bun:test';
 import { Elysia } from 'elysia';
-import { treaty } from '@elysiajs/eden';
+import { Type } from '@sinclair/typebox';
+
+import '../test_helper.js';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { jwksRoutes } from 'lib/admin/jwks/routes.ts';
 import {
 	adminAuditStore,
-	getUserStore,
-	jwksStore
+	getBucketKeysStore,
+	getUserStore
 } from 'lib/adapters/index.ts';
-import { JWKS_KEYS } from 'lib/configs/keys.ts';
-import { keystore, publicJWKS } from 'lib/configs/keystore.ts';
+import {
+	invalidateRootKeys,
+	KEY_PUBLICATION_SECONDS,
+	rootKeys
+} from 'lib/keys/issuer_keys.ts';
+import { ROOT_KEY_OWNER } from 'lib/consts/key_owner.ts';
 import { generateJWKS } from 'lib/helpers/jwks.ts';
-import { calculateKid } from 'lib/configs/verifyJWKs.ts';
+import type { SupportedAlg } from 'lib/admin/jwks/schema.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { sessionFor } from '../admin_session.ts';
-import { present, shaped } from 'test/shape.js';
-import { Type } from '@sinclair/typebox';
 import { send } from '../feature_gate/helpers.js';
+import { testSigningKeys } from '../jwks/fixtures.js';
+import { writeRootKeys } from '../root_keys.js';
+import { shaped } from '../shape.js';
 
 const app = new Elysia().use(resolveAdmin).use(jwksRoutes);
-const client = treaty(app);
 
 const PRIVATE_FIELDS = ['d', 'p', 'q', 'dp', 'dq', 'qi', 'oth'];
+const [bootRsa] = testSigningKeys;
 
-interface KeyView {
-	kid: string;
-	kty: string;
-	alg?: string;
-	use?: string;
-	status: string;
-	[k: string]: unknown;
-}
-type JwksAnswer = NonNullable<
-	Awaited<ReturnType<typeof client.admin.api.jwks.get>>['data']
->;
+const KeyView = Type.Object(
+	{
+		kid: Type.String(),
+		alg: Type.String(),
+		use: Type.String(),
+		state: Type.String(),
+		promotableAt: Type.Optional(Type.String()),
+		removableAt: Type.Optional(Type.String())
+	},
+	{ additionalProperties: true }
+);
+const KeySet = Type.Object(
+	{
+		keys: Type.Array(KeyView),
+		supportedAlgorithms: Type.Array(Type.String()),
+		publicationSeconds: Type.Number()
+	},
+	{ additionalProperties: true }
+);
 
-// The key-set view a call answered with, rather than the admin error arm; fails the case otherwise.
-function keySet(data: JwksAnswer | null) {
-	if (!data || 'error' in data) throw new Error('expected the key-set view');
-	return data;
+async function call(
+	method: string,
+	path: string,
+	cookie?: string,
+	body?: unknown
+) {
+	const response = await app.handle(
+		new Request(`http://e.ly${path}`, {
+			method,
+			headers: {
+				'content-type': 'application/json',
+				...(cookie ? { cookie } : {})
+			},
+			body: body === undefined ? undefined : JSON.stringify(body)
+		})
+	);
+	const text = await response.text();
+	return {
+		status: response.status,
+		body: (text ? JSON.parse(text) : {}) as Record<string, unknown>
+	};
 }
 
 async function sessionCookieFor(roles: string[]) {
@@ -51,344 +83,304 @@ async function sessionCookieFor(roles: string[]) {
 	return { cookie: `${ADMIN_SESSION_COOKIE}=${s._id}`, userId: user._id };
 }
 
-function assertNoPrivateMaterial(keys: KeyView[]) {
-	for (const key of keys) {
-		for (const field of PRIVATE_FIELDS) {
-			expect(key[field]).toBeUndefined();
-		}
-	}
+async function view(cookie: string) {
+	const res = await call('GET', '/admin/api/jwks', cookie);
+	expect(res.status).toBe(200);
+	return shaped(KeySet, res.body);
 }
 
-// The server's live key material. Generation hot-applies keys into these, so tests must restore
-// them between runs alongside the persisted store.
-const BOOT_RUNNING = publicJWKS.keys.slice();
-
-// The store is keyed by kid, so a key carrying none is not addressable and cannot be cleared here —
-// it would survive into every later spec. The case is real (a key provisioned out of band), so a
-// test that creates one has to remove it by the store key itself; this fails loudly rather than
-// leaking, which is a bug this suite has had to diagnose twice.
-async function clearStore() {
-	for (const k of await jwksStore.getAll()) {
-		if (!k.kid) {
-			throw new Error(
-				'key store holds a key with no kid; clear it by its store key'
-			);
-		}
-		await jwksStore.delete(k.kid);
-	}
+async function stateOf(cookie: string, kid: string) {
+	return (await view(cookie)).keys.find((key) => key.kid === kid)?.state;
 }
 
-// Restore both the persisted store and the live key material to the boot key set so desired ==
-// running: all keys `active`, no drift.
-async function resetStore() {
-	await clearStore();
-	for (const k of JWKS_KEYS) await jwksStore.set(k.kid, k);
-	keystore.clear();
-	for (const k of JWKS_KEYS) keystore.add(structuredClone(k));
-	publicJWKS.keys.length = 0;
-	publicJWKS.keys.push(...BOOT_RUNNING);
+const generate = (cookie: string, alg: string) =>
+	call('POST', '/admin/api/jwks', cookie, { alg });
+const promote = (cookie: string, kid: string) =>
+	call('POST', `/admin/api/jwks/${encodeURIComponent(kid)}/promote`, cookie);
+const retire = (cookie: string, kid: string, confirm: string | null = kid) =>
+	call(
+		'DELETE',
+		`/admin/api/jwks/${encodeURIComponent(kid)}`,
+		cookie,
+		confirm === null ? undefined : { confirm }
+	);
+
+/* Moves the clock forward by `seconds`, from the time it is called. */
+function later(seconds: number) {
+	const now = Date.now();
+	spyOn(Date, 'now').mockReturnValue(now + seconds * 1000);
+}
+
+async function actions(targetId: string) {
+	const { entries } = await adminAuditStore.list({ targetId });
+	return entries.map((entry) => entry.action);
+}
+
+/* A generated key, past its publication window. */
+async function publishedKey(cookie: string, alg: string) {
+	const res = await generate(cookie, alg);
+	expect(res.status).toBe(200);
+	const kid = String(shaped(KeyView, res.body).kid);
+	later(KEY_PUBLICATION_SECONDS + 1);
+	return kid;
+}
+
+async function resetRootKeys() {
+	await writeRootKeys(testSigningKeys);
+	invalidateRootKeys();
+	await rootKeys();
 }
 
 /**
- * @proves A super administrator views and rotates signing keys, never sees private material, is
- * told when a deletion needs a restart, and cannot remove the last key.
+ * @proves A super administrator rotates the root issuer's keys without a restart — a generated key is
+ * published before it may sign, a promoted key signs in place of its predecessor in that algorithm, and
+ * a key leaves service only when the retirement names it — while every step is audited before it takes
+ * effect and nothing ever shows private key material.
  */
-describe('admin JWKS API — view (US1)', () => {
-	beforeEach(resetStore);
-
-	it('rejects anonymous access', async () => {
-		const res = await client.admin.api.jwks.get();
-		expect(res.status).toBe(401);
+describe('the root key set, administered', () => {
+	beforeEach(resetRootKeys);
+	afterEach(() => {
+		(Date.now as unknown as { mockRestore?: () => void }).mockRestore?.();
 	});
 
-	it('forbids a project_admin', async () => {
+	it('is refused to an anonymous caller', async () => {
+		expect((await call('GET', '/admin/api/jwks')).status).toBe(401);
+	});
+
+	it('is refused to a project administrator', async () => {
 		const { cookie } = await sessionCookieFor(['project_admin']);
-		const res = await client.admin.api.jwks.get({ headers: { cookie } });
-		expect(res.status).toBe(403);
+		expect((await call('GET', '/admin/api/jwks', cookie)).status).toBe(403);
+		expect((await generate(cookie, 'RS256')).status).toBe(403);
 	});
 
-	it('lists the boot key as active with no private material and no drift', async () => {
+	it('lists every root key with its state, and no private material', async () => {
 		const { cookie } = await sessionCookieFor(['super_admin']);
-		const res = await client.admin.api.jwks.get({ headers: { cookie } });
-		expect(res.status).toBe(200);
-		const body = keySet(res.data);
-		expect(body.keys.length).toBe(JWKS_KEYS.length);
-		expect(body.keys.every((k) => k.status === 'active')).toBe(true);
-		expect(body.restartRequired).toBe(false);
-		expect(body.changedKeys).toEqual([]);
-		assertNoPrivateMaterial(body.keys);
+		const res = await call('GET', '/admin/api/jwks', cookie);
+		const body = shaped(KeySet, res.body);
+
+		expect(body.keys.map((key) => key.kid).sort()).toEqual(
+			testSigningKeys.map((key) => key.kid).sort()
+		);
+		expect(body.keys.every((key) => key.state === 'signing')).toBe(true);
+		expect(res.body).not.toHaveProperty('restartRequired');
+		for (const key of body.keys) {
+			for (const field of PRIVATE_FIELDS) {
+				expect(key).not.toHaveProperty(field);
+			}
+		}
 	});
 
 	it('offers only algorithms it can actually produce a key for', async () => {
 		const { cookie } = await sessionCookieFor(['super_admin']);
-		const res = await client.admin.api.jwks.get({ headers: { cookie } });
-		const { supportedAlgorithms } = keySet(res.data);
+		const { supportedAlgorithms } = await view(cookie);
 
 		expect(supportedAlgorithms.length).toBeGreaterThan(0);
 		for (const alg of supportedAlgorithms) {
 			const {
 				keys: [key]
-			} = await generateJWKS(alg);
-			// The key's own `alg` is what selection and the discovery document both read, so a
-			// generator that produced a key stamped with anything else would advertise one algorithm
-			// and sign with another.
-			expect(key.alg).toBe(alg);
+			} = await generateJWKS(alg as SupportedAlg);
+			expect(String(key.alg)).toBe(alg);
 			expect(key.use).toBe('sig');
 		}
 	});
 
-	// The view reads the persisted store directly, so it sees keys exactly as an operator wrote
-	// them — a key provisioned out of band may carry only the members its schema requires. `use`
-	// is inferred from `alg` (as verifyJWKs does at boot) rather than reported as absent, so the
-	// admin view and /jwks agree about what the key is for.
-	it('infers `use` for a store key provisioned without one', async () => {
+	it('refuses to generate a symmetric key', async () => {
 		const { cookie } = await sessionCookieFor(['super_admin']);
-		const {
-			keys: [key]
-		} = await generateJWKS('RS256');
-		const { use, ...withoutUse } = key;
-		expect(use).toBe('sig'); // guard: the fixture really did carry a `use` to strip
-		await jwksStore.set(key.kid, withoutUse);
-
-		const res = await client.admin.api.jwks.get({ headers: { cookie } });
-		const body = keySet(res.data);
-		const view = body.keys.find((k) => k.kid === key.kid);
-		expect(view?.use).toBe('sig');
+		expect((await generate(cookie, 'HS256')).status).toBe(422);
 	});
 
-	// A key provisioned without a `kid` is reported under the RFC 7638 thumbprint the server would
-	// itself assign at boot. Every id in the response has to be that same derived kid: reporting
-	// the raw (absent) one would put `undefined` in changedKeys and leave the entry uncorrelatable
-	// with the key it describes.
-	it('reports a store key provisioned without a kid under its derived kid', async () => {
-		const { cookie } = await sessionCookieFor(['super_admin']);
-		const {
-			keys: [key]
-		} = await generateJWKS('RS256');
-		const { kid, ...withoutKid } = key;
-		await jwksStore.set(kid, withoutKid);
+	describe('generating', () => {
+		it('publishes the new key without letting it sign', async () => {
+			const { cookie } = await sessionCookieFor(['super_admin']);
 
-		// Removed by the store key, not in resetStore: that deletes by each key's own `kid`, which
-		// this one does not have, so it would outlive the spec and leak into every later one.
-		try {
-			const res = await client.admin.api.jwks.get({ headers: { cookie } });
-			const body = keySet(res.data);
+			const res = await generate(cookie, 'ES256');
 
-			// Not the store's map key — the thumbprint, which is what verifyJWKs would assign.
-			const derived = calculateKid(withoutKid);
-			expect(derived).not.toBe(kid);
+			expect(res.status).toBe(200);
+			const key = shaped(KeyView, res.body);
+			expect(key.state).toBe('published');
+			expect(key.promotableAt).toBeDefined();
+			const root = await rootKeys();
+			expect(root.publicJWKS.keys.map((k) => k.kid)).toContain(key.kid);
+			const signingKids = [...root.signing].map((k) => k.kid);
+			expect(signingKids).not.toContain(key.kid);
+		});
 
-			const view = body.keys.find((k) => k.kid === derived);
-			expect(view).toBeDefined();
-			// Not live until a restart normalizes it into the running set.
-			expect(view?.status).toBe('pending activation');
-			expect(body.changedKeys).toContain(derived);
-			expect(body.changedKeys.every((k) => typeof k === 'string')).toBe(true);
-			expect(body.keys.every((k) => typeof k.kid === 'string')).toBe(true);
-		} finally {
-			await jwksStore.delete(kid);
+		it('records the generation in the audit trail, naming the key', async () => {
+			const { cookie } = await sessionCookieFor(['super_admin']);
+			const res = await generate(cookie, 'ES256');
+			const { kid } = shaped(KeyView, res.body);
+
+			expect(await actions(kid)).toContain('jwks.generate');
+		});
+	});
+
+	describe('promoting', () => {
+		it('is refused before the key has been published for the publication window', async () => {
+			const { cookie } = await sessionCookieFor(['super_admin']);
+			const { kid } = shaped(KeyView, (await generate(cookie, 'RS256')).body);
+
+			const res = await promote(cookie, kid);
+
+			expect(res.status).toBe(409);
+			expect(res.body.reason).toBe('too_soon');
+			expect(res.body.promotableAt).toBeDefined();
+		});
+
+		it('is refused for the key that already signs', async () => {
+			const { cookie } = await sessionCookieFor(['super_admin']);
+
+			const res = await promote(cookie, bootRsa.kid);
+
+			expect(res.status).toBe(409);
+			expect(res.body.reason).toBe('not_promotable');
+		});
+
+		it('makes the key sign, and returns the one it replaces in its algorithm to published', async () => {
+			const { cookie } = await sessionCookieFor(['super_admin']);
+			const kid = await publishedKey(cookie, 'RS256');
+
+			const res = await promote(cookie, kid);
+
+			expect(res.status).toBe(200);
+			expect(res.body.demoted).toBe(bootRsa.kid);
+			expect(await stateOf(cookie, kid)).toBe('signing');
+			expect(await stateOf(cookie, bootRsa.kid)).toBe('published');
+		});
+
+		it('advertises the algorithm of a promoted key the server did not boot with, without a restart', async () => {
+			const { cookie } = await sessionCookieFor(['super_admin']);
+			const kid = await publishedKey(cookie, 'PS256');
+			const before = shaped(
+				Type.Object(
+					{ id_token_signing_alg_values_supported: Type.Array(Type.String()) },
+					{ additionalProperties: true }
+				),
+				await (
+					await send('/.well-known/openid-configuration', { method: 'GET' })
+				).json()
+			);
+			expect(before.id_token_signing_alg_values_supported).not.toContain(
+				'PS256'
+			);
+
+			await promote(cookie, kid);
+
+			const after = shaped(
+				Type.Object(
+					{ id_token_signing_alg_values_supported: Type.Array(Type.String()) },
+					{ additionalProperties: true }
+				),
+				await (
+					await send('/.well-known/openid-configuration', { method: 'GET' })
+				).json()
+			);
+			expect(after.id_token_signing_alg_values_supported).toContain('PS256');
+		});
+
+		it('records the promotion in the audit trail, naming the key', async () => {
+			const { cookie } = await sessionCookieFor(['super_admin']);
+			const kid = await publishedKey(cookie, 'RS256');
+
+			await promote(cookie, kid);
+
+			expect(await actions(kid)).toContain('jwks.promote');
+		});
+
+		it('answers 404 for a key the instance does not hold', async () => {
+			const { cookie } = await sessionCookieFor(['super_admin']);
+			expect((await promote(cookie, 'no-such-kid')).status).toBe(404);
+		});
+	});
+
+	describe('retiring', () => {
+		for (const [label, confirm] of [
+			['without a confirmation', null],
+			['whose confirmation names another key', 'not-this-key']
+		] as const) {
+			it(`is refused ${label}, and nothing changes or is recorded`, async () => {
+				const { cookie } = await sessionCookieFor(['super_admin']);
+				const { kid } = shaped(KeyView, (await generate(cookie, 'ES256')).body);
+
+				const res = await retire(cookie, kid, confirm);
+
+				expect(res.status).toBe(422);
+				expect(res.body.reason).toBe('confirmation_mismatch');
+				expect(await stateOf(cookie, kid)).toBe('published');
+				expect(await actions(kid)).not.toContain('jwks.retire');
+			});
 		}
+
+		it('is refused for the key that signs, so the server always keeps one', async () => {
+			const { cookie } = await sessionCookieFor(['super_admin']);
+
+			const res = await retire(cookie, bootRsa.kid);
+
+			expect(res.status).toBe(409);
+			expect(res.body.reason).toBe('signing_key');
+			expect(await stateOf(cookie, bootRsa.kid)).toBe('signing');
+		});
+
+		it('is refused for a key already retired', async () => {
+			const { cookie } = await sessionCookieFor(['super_admin']);
+			const { kid } = shaped(KeyView, (await generate(cookie, 'ES256')).body);
+			await retire(cookie, kid);
+
+			const res = await retire(cookie, kid);
+
+			expect(res.status).toBe(409);
+			expect(res.body.reason).toBe('already_retired');
+		});
+
+		it('takes a confirmed key out of service with the time it will be hidden', async () => {
+			const { cookie } = await sessionCookieFor(['super_admin']);
+			const { kid } = shaped(KeyView, (await generate(cookie, 'ES256')).body);
+
+			const res = await retire(cookie, kid);
+
+			expect(res.status).toBe(200);
+			expect(res.body.state).toBe('retired');
+			expect(res.body.removableAt).toBeDefined();
+		});
+
+		it('records the retirement in the audit trail, naming the key', async () => {
+			const { cookie } = await sessionCookieFor(['super_admin']);
+			const { kid } = shaped(KeyView, (await generate(cookie, 'ES256')).body);
+
+			await retire(cookie, kid);
+
+			expect(await actions(kid)).toContain('jwks.retire');
+		});
 	});
-});
 
-describe('admin JWKS API — generate (US2)', () => {
-	beforeEach(resetStore);
+	/*
+	 * What the view reports against what the server actually does, after each step of a full rotation —
+	 * the view is what an operator acts on, so it may never disagree with the key set.
+	 */
+	it('reports after every step exactly what the key set publishes and signs with', async () => {
+		const { cookie } = await sessionCookieFor(['super_admin']);
+		const agree = async () => {
+			const listed = (await view(cookie)).keys;
+			invalidateRootKeys();
+			const root = await rootKeys();
+			const published = root.publicJWKS.keys.map((key) => key.kid).sort();
+			const signing = [...root.signing].map((key) => String(key.kid)).sort();
+			expect(listed.map((key) => key.kid).sort()).toEqual(published);
+			expect(
+				listed
+					.filter((key) => key.state === 'signing')
+					.map((key) => key.kid)
+					.sort()
+			).toEqual(signing);
+		};
 
-	it('generates a signing key that is live immediately (active), audited, no private material', async () => {
-		const { cookie, userId } = await sessionCookieFor(['super_admin']);
-		const before = keySet(
-			(await client.admin.api.jwks.get({ headers: { cookie } })).data
-		);
-		const beforeKids = new Set(before.keys.map((k) => k.kid));
-		const res = await client.admin.api.jwks.post(
-			{ alg: 'RS256' },
-			{ headers: { cookie } }
-		);
-		expect(res.status).toBe(200);
-		const body = keySet(res.data);
-		expect(body.keys.length).toBe(before.keys.length + 1);
-		const created = body.keys.find((k) => !beforeKids.has(k.kid));
-		expect(created).toBeDefined();
-		expect(created?.alg).toBe('RS256');
-		// Hot-applied into the running provider: live at once, no restart required.
-		expect(created?.status).toBe('active');
-		expect(body.restartRequired).toBe(false);
-		expect(body.changedKeys).not.toContain(present(created, 'created').kid);
-		assertNoPrivateMaterial(body.keys);
-		// Served live at /jwks (present in the running published set).
+		const kid = await publishedKey(cookie, 'RS256');
+		await agree();
+		await promote(cookie, kid);
+		await agree();
+		await retire(cookie, bootRsa.kid);
+		await agree();
 		expect(
-			publicJWKS.keys.some((k) => k.kid === present(created, 'created').kid)
-		).toBe(true);
-
-		const { entries: audit } = await adminAuditStore.list({
-			targetType: 'jwks',
-			targetId: present(created, 'created').kid
-		});
-		expect(audit.length).toBe(1);
-		expect(audit[0].action).toBe('jwks.generate');
-		expect(audit[0].actorId).toBe(userId);
-		expect(audit[0].actorEmail).toBeTruthy();
-	});
-
-	it('generates the ES256 key a FAPI 2.0 deployment needs', async () => {
-		const { cookie } = await sessionCookieFor(['super_admin']);
-		const before = keySet(
-			(await client.admin.api.jwks.get({ headers: { cookie } })).data
-		);
-		const beforeKids = new Set(before.keys.map((k) => k.kid));
-
-		const res = await client.admin.api.jwks.post(
-			{ alg: 'ES256' },
-			{ headers: { cookie } }
-		);
-		expect(res.status).toBe(200);
-		const body = keySet(res.data);
-
-		const created = body.keys.find((k) => !beforeKids.has(k.kid));
-		expect(created?.alg).toBe('ES256');
-		expect(created?.kty).toBe('EC');
-		expect(created?.status).toBe('active');
-		assertNoPrivateMaterial(body.keys);
-	});
-
-	it('advertises a generated algorithm the server did not boot with, without a restart', async () => {
-		const { cookie } = await sessionCookieFor(['super_admin']);
-		const before = keySet(
-			(await client.admin.api.jwks.get({ headers: { cookie } })).data
-		);
-
-		// Derived rather than named, so the case does not depend on which algorithms this deployment
-		// happens to have booted with.
-		const bootAlgs = new Set(JWKS_KEYS.map((k) => k.alg));
-		const unbooted = before.supportedAlgorithms.find((a) => !bootAlgs.has(a));
-		if (!unbooted) {
-			throw new Error('every offered algorithm is already a boot key');
-		}
-
-		const res = await client.admin.api.jwks.post(
-			{ alg: unbooted },
-			{ headers: { cookie } }
-		);
-		expect(res.status).toBe(200);
-		const body = keySet(res.data);
-
-		/*
-		 * The key signs at once, and until 2026-09-30 that was all: discovery was built from the boot key
-		 * set, so no client learned the algorithm existed until a restart. What an operator is told and
-		 * what a client can use now agree.
-		 */
-		expect(body.unadvertisedAlgorithms).toEqual([]);
-		expect(body.restartRequired).toBe(false);
-		const discovery = shaped(
-			Type.Object({
-				id_token_signing_alg_values_supported: Type.Array(Type.String())
-			}),
-			await (
-				await send('/.well-known/openid-configuration', { method: 'GET' })
-			).json()
-		);
-		expect(discovery.id_token_signing_alg_values_supported).toContain(unbooted);
-	});
-
-	it('rejects a symmetric algorithm with 422', async () => {
-		const { cookie } = await sessionCookieFor(['super_admin']);
-		// HS256 is a signing algorithm this server knows, and is not one a key set can hold: the
-		// refusal is about what may be generated, not about an unrecognised string.
-		const res = await client.admin.api.jwks.post(
-			{ alg: 'HS256' },
-			{ headers: { cookie } }
-		);
-		expect(res.status).toBe(422);
-	});
-
-	it('rejects anonymous and project_admin generation', async () => {
-		const anon = await client.admin.api.jwks.post({ alg: 'RS256' });
-		expect(anon.status).toBe(401);
-		const { cookie } = await sessionCookieFor(['project_admin']);
-		const forbidden = await client.admin.api.jwks.post(
-			{ alg: 'RS256' },
-			{ headers: { cookie } }
-		);
-		expect(forbidden.status).toBe(403);
-	});
-});
-
-describe('admin JWKS API — retire (US3)', () => {
-	beforeEach(resetStore);
-
-	// Seed a second signing key directly via the store (independent of the generate endpoint)
-	// so this story is testable on its own.
-	async function seedSecondKey(): Promise<string> {
-		const {
-			keys: [key]
-		} = await generateJWKS('RS256');
-		const { kid } = key;
-		await jwksStore.set(kid, key);
-		return kid;
-	}
-
-	it('deletes a non-last key and records an audit entry', async () => {
-		const { cookie, userId } = await sessionCookieFor(['super_admin']);
-		const seededKid = await seedSecondKey();
-		const res = await client.admin.api
-			.jwks({ kid: seededKid })
-			.delete(undefined, { headers: { cookie } });
-		expect(res.status).toBe(200);
-		const body = keySet(res.data);
-		expect(body.keys.some((k) => k.kid === seededKid)).toBe(false);
-
-		const { entries: audit } = await adminAuditStore.list({
-			targetType: 'jwks',
-			targetId: seededKid
-		});
-		expect(audit.length).toBe(1);
-		expect(audit[0].action).toBe('jwks.delete');
-		expect(audit[0].actorId).toBe(userId);
-	});
-
-	it('marks a deleted active (running) key as pending removal', async () => {
-		const { cookie } = await sessionCookieFor(['super_admin']);
-		await seedSecondKey(); // keep >=1 signing key after removing the boot key
-		const bootKid = JWKS_KEYS[0].kid;
-		const res = await client.admin.api
-			.jwks({ kid: bootKid })
-			.delete(undefined, { headers: { cookie } });
-		expect(res.status).toBe(200);
-		const body = keySet(res.data);
-		const view = body.keys.find((k) => k.kid === bootKid);
-		expect(view?.status).toBe('pending removal');
-		expect(body.restartRequired).toBe(true);
-		expect(body.changedKeys).toContain(bootKid);
-	});
-
-	it('refuses to remove the last signing key with 422', async () => {
-		const { cookie } = await sessionCookieFor(['super_admin']);
-		// Reduce the store to a single signing key so its removal would empty the set.
-		await clearStore();
-		const soleKid = JWKS_KEYS[0].kid;
-		await jwksStore.set(soleKid, JWKS_KEYS[0]);
-		const res = await client.admin.api
-			.jwks({ kid: soleKid })
-			.delete(undefined, { headers: { cookie } });
-		expect(res.status).toBe(422);
-	});
-
-	it('returns 404 for an unknown kid', async () => {
-		const { cookie } = await sessionCookieFor(['super_admin']);
-		const res = await client.admin.api
-			.jwks({ kid: 'does-not-exist' })
-			.delete(undefined, { headers: { cookie } });
-		expect(res.status).toBe(404);
-	});
-
-	it('rejects anonymous and project_admin deletion', async () => {
-		const seededKid = await seedSecondKey();
-		const anon = await client.admin.api.jwks({ kid: seededKid }).delete();
-		expect(anon.status).toBe(401);
-		const { cookie } = await sessionCookieFor(['project_admin']);
-		const forbidden = await client.admin.api
-			.jwks({ kid: seededKid })
-			.delete(undefined, { headers: { cookie } });
-		expect(forbidden.status).toBe(403);
+			(await getBucketKeysStore().find(ROOT_KEY_OWNER, bootRsa.kid))?.state
+		).toBe('retired');
 	});
 });

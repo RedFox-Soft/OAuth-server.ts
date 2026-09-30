@@ -259,27 +259,24 @@ describe('individual tool behaviours', () => {
 	});
 
 	// US4 AS-5: the last signing key cannot be deleted.
-	it('refuses to delete the only signing key', async () => {
+	it('refuses to retire a key the instance signs with, even confirmed', async () => {
 		const { token } = await session();
 
 		const listed = await rpc(call('jwks_list', {}), token);
 		const { keys } = result(
 			Type.Object({
 				keys: Type.Array(
-					Type.Object({ kid: Type.String(), use: Type.Optional(Type.String()) })
+					Type.Object({ kid: Type.String(), state: Type.String() })
 				)
 			}),
 			listed
 		);
-		const signing = keys.filter((k) => k.use === 'sig' || k.use === undefined);
+		const signer = keys.find((k) => k.state === 'signing');
+		if (!signer) throw new Error('expected the instance to have a signing key');
 
-		// Delete down to one, then assert the last is refused.
-		for (const key of signing.slice(1)) {
-			await perform(token, 'jwks_delete', { kid: key.kid });
-		}
-
-		const refused = await perform(token, 'jwks_delete', {
-			kid: signing[0].kid
+		const refused = await perform(token, 'jwks_retire', {
+			kid: signer.kid,
+			confirm: signer.kid
 		});
 		expect(refused.result?.isError).toBe(true);
 	});

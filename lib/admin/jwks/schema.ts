@@ -46,3 +46,14 @@ export const GenerateKeyBody = t.Object({
 		)
 	)
 });
+
+/*
+ * A retirement's body: the key it retires, named again. Retirement ends a key — once its window closes
+ * nothing it signed verifies — so it is refused unless the caller says which key it means, and the
+ * console asks the operator to type it. Loose here, like the generate body, so a missing or wrong value
+ * is refused by the lifecycle in the admin error shape (`confirmation_mismatch`) rather than as a
+ * generic schema error; used by the instance and the bucket retire routes alike.
+ */
+export const RetireKeyBody = t.Object({
+	confirm: t.Optional(t.String())
+});

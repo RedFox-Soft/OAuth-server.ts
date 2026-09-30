@@ -3,18 +3,19 @@ import { signingAlgs } from './jwaConsts.js';
 import { calculateKid, type UnnormalizedJWK } from './verifyJWKs.js';
 
 /*
- * The server's live key material — the in-memory keystore used to sign, verify, encrypt and
- * decrypt, and the JWKS document served at /jwks.
+ * A mirror of the root issuer's signing and decryption keys, for the readers that need them
+ * synchronously — the key-derived algorithm lists in `jwaAlgorithms.ts`. The keys themselves are
+ * records in the key store, assembled and cached by `lib/keys/issuer_keys.ts`, which signs, verifies,
+ * decrypts and serves /jwks; every reload there refreshes this mirror.
  *
  * This module is deliberately a leaf: it imports nothing that reaches the adapters, the
  * ApplicationConfig or the models (the key type comes in as a type-only import, so it adds no
- * runtime edge). Loading keys is asynchronous (see configs/keys.ts, which reads the jwksStore
- * adapter behind a top-level await); holding the loaded result here keeps that await out of the
- * model import graph, where it reorders module evaluation and trips the
+ * runtime edge). Loading keys is asynchronous; keeping that out of this module keeps the await out of
+ * the model import graph, where it reorders module evaluation and trips the
  * base_model -> provider -> models cycle.
  *
  * Both exports are mutated in place and never reassigned, so every module holding the imported
- * reference sees the current keys. The admin JWKS API relies on this to hot-apply a new key.
+ * reference sees the current keys.
  */
 /*
  * A key as published: normalized (`kid` and `use` always present) and carrying only client-safe
@@ -73,8 +74,8 @@ export function toPublicJwk(key: UnnormalizedJWK): PublicJWK {
 /*
  * loadKeys
  *
- * Replace the live key material with `keys`, in place. Called once at boot and again on every
- * reload from the key store (see configs/keys.ts) — the server's keys are never set any other way.
+ * Replace the mirrored key material with `keys`, in place. Called by `lib/keys/issuer_keys.ts` on every
+ * reload of the root issuer's key set — the mirror is never set any other way.
  */
 export function loadKeys(keys: UnnormalizedJWK[]): void {
 	keystore.clear();

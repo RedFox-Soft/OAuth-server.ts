@@ -377,7 +377,13 @@ const routes = [
 		targetType: 'jwks'
 	},
 	{
-		action: 'jwks.delete',
+		action: 'jwks.promote',
+		method: 'POST',
+		path: '/admin/api/jwks/:kid/promote',
+		targetType: 'jwks'
+	},
+	{
+		action: 'jwks.retire',
 		method: 'DELETE',
 		path: '/admin/api/jwks/:kid',
 		targetType: 'jwks'

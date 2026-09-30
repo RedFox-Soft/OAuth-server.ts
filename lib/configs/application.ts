@@ -880,7 +880,7 @@ ApplicationConfig['dpop.nonceSecret'] = await resolveNonceSecret(
  * ApplicationConfig key. The nonce secret is one because the validator below cross-checks it against
  * dpop.requireNonce; nothing validates the salt against another setting, so a key would buy nothing
  * and cost the catalogue exclusion, the settings-merge exclusion and the test that pins its absence.
- * It lives as module state in configs/pairwiseSalt.ts, the way signing keys live in configs/keys.ts.
+ * It lives as module state in configs/pairwiseSalt.ts, single-sourced from its store.
  *
  * Driven from here rather than resolved inside that module because its consumer, addon/tokens.ts, is a
  * leaf the model graph imports: a store import there would close a cycle back into a module still

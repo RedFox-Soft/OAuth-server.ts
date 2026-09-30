@@ -20,6 +20,7 @@
 import { STORE_AREAS } from './storage_inventory.js';
 import { isServedAtTheRoot } from '../admin/consts.js';
 import { declarationId, ROOT_NAMESPACE } from '../resources/declaration_id.js';
+import { ROOT_KEY_OWNER } from './key_owner.js';
 
 /*
  * One backend's half of a migration.
@@ -181,4 +182,174 @@ const namespacedProtectedResources: Migration = {
 	}
 };
 
-export const MIGRATIONS: readonly Migration[] = [namespacedProtectedResources];
+/*
+ * Where the root issuer's keys lived before they took the lifecycle every issuer's keys follow: flat JWKs
+ * keyed by `kid`, with no state. Named here, by its literal, because the area is gone from the inventory
+ * — this migration and the provisioning scripts' "anything left to migrate?" check are its only readers.
+ */
+export const LEGACY_ROOT_KEYS_AREA = 'jwks';
+
+/*
+ * Which legacy keys become `signing`: per algorithm, the key the server was signing with — the first
+ * signing key of that algorithm in the order the store returned (key selection took the first match),
+ * or, where the store has no order, the lowest kid in byte order, a rule the operator can read and then
+ * override with a promotion. An algorithm that already has a migrated signer — a run interrupted part-way
+ * — gets no second one. Encryption keys never sign.
+ */
+export function rootSignersOf(
+	keys: readonly { kid: string; alg: string; use?: string }[],
+	{
+		ordered,
+		alreadySigning = []
+	}: { ordered: boolean; alreadySigning?: readonly string[] }
+): Set<string> {
+	const candidates = keys.filter((key) => key.use !== 'enc');
+	const inOrder = ordered
+		? candidates
+		: [...candidates].sort((a, b) =>
+				a.kid < b.kid ? -1 : a.kid > b.kid ? 1 : 0
+			);
+	const taken = new Set(alreadySigning);
+	const signers = new Set<string>();
+	for (const key of inOrder) {
+		if (taken.has(key.alg)) continue;
+		taken.add(key.alg);
+		signers.add(key.kid);
+	}
+	return signers;
+}
+
+/* A legacy flat JWK as the new record, or the reason it cannot be one. */
+function rootKeyRecord(jwk: Doc, signing: boolean, at: Date): Doc {
+	const { _id: _legacyId, updatedAt: _updatedAt, ...material } = jwk;
+	if (typeof material.kid !== 'string' || typeof material.alg !== 'string') {
+		throw new Error(
+			'a stored root key has no kid or no alg; give it both before migrating, as every key the server generates has'
+		);
+	}
+	const use = material.use === 'enc' ? 'enc' : 'sig';
+	return {
+		_id: `${ROOT_KEY_OWNER} ${material.kid}`,
+		bucketId: ROOT_KEY_OWNER,
+		kid: material.kid,
+		jwk: { ...material, use },
+		alg: material.alg,
+		use,
+		state: signing && use === 'sig' ? 'signing' : 'published',
+		createdAt: at,
+		stateChangedAt: at
+	};
+}
+
+function reportSigners(records: readonly Doc[]) {
+	for (const record of records) {
+		if (record.state === 'signing') {
+			console.log(
+				`root key ${String(record.kid)} (${String(record.alg)}) signs`
+			);
+		}
+	}
+}
+
+const rootKeysLifecycle: Migration = {
+	id: '2026-09-30-root-keys-lifecycle',
+	description:
+		"Give the root issuer's keys the lifecycle every issuer's keys follow: move them into the key area under the root owner, the key that signed per algorithm as signing and every other as published",
+	reversible: false,
+	rerunnable:
+		'A legacy key is written with an insert that does nothing when its record already exists, and deleted only after; an algorithm that already has a migrated signer is given no second one. A run interrupted part-way re-writes nothing and finishes the rest.',
+	mongodb: {
+		async apply(handle) {
+			// The runner passes the selected backend's handle; for MongoDB that is the driver's `Db`.
+			const db = handle as MongoHandle;
+			const legacy = await db
+				.collection(LEGACY_ROOT_KEYS_AREA)
+				.find({})
+				.toArray();
+			if (legacy.length === 0) return;
+			const keys = db.collection(STORE_AREAS.bucketKeys);
+			const alreadySigning = (
+				await keys
+					.find({ bucketId: ROOT_KEY_OWNER, state: 'signing' })
+					.toArray()
+			).map((record) => String(record.alg));
+			// Natural order is the order key selection saw, which is what decided the signer.
+			const signers = rootSignersOf(
+				legacy.map((jwk) => ({
+					kid: String(jwk.kid),
+					alg: String(jwk.alg),
+					use: typeof jwk.use === 'string' ? jwk.use : undefined
+				})),
+				{ ordered: true, alreadySigning }
+			);
+			const at = new Date();
+			const records = legacy.map((jwk) =>
+				rootKeyRecord(jwk, signers.has(String(jwk.kid)), at)
+			);
+			for (const record of records) {
+				await keys.updateOne(
+					{ _id: record._id },
+					{ $setOnInsert: record },
+					{ upsert: true }
+				);
+			}
+			for (const jwk of legacy) {
+				await db.collection(LEGACY_ROOT_KEYS_AREA).deleteOne({ _id: jwk._id });
+			}
+			reportSigners(records);
+		}
+	},
+	postgres: {
+		async apply(handle) {
+			// The runner passes the selected backend's handle; for PostgreSQL that is Bun's SQL client.
+			const sql = handle as PostgresHandle;
+			// A database provisioned after this migration was declared has no legacy table at all.
+			const [exists] =
+				await sql`SELECT to_regclass(${LEGACY_ROOT_KEYS_AREA}) AS t`;
+			if (!exists?.t) return;
+			const legacyArea = sql(LEGACY_ROOT_KEYS_AREA);
+			const legacy = await sql`SELECT id, doc FROM ${legacyArea}`;
+			if (legacy.length === 0) return;
+			const area = sql(STORE_AREAS.bucketKeys);
+			const alreadySigning = (
+				await sql`
+					SELECT doc FROM ${area}
+					WHERE doc->>'bucketId' = ${ROOT_KEY_OWNER} AND doc->>'state' = 'signing'
+				`
+			).map((row) => String((row.doc as Doc).alg));
+			const docs: Doc[] = legacy.map((row) => ({
+				...(row.doc as Doc),
+				kid: row.id
+			}));
+			// A table has no order to recover, so the rule is the lowest kid — printed below.
+			const signers = rootSignersOf(
+				docs.map((jwk) => ({
+					kid: String(jwk.kid),
+					alg: String(jwk.alg),
+					use: typeof jwk.use === 'string' ? jwk.use : undefined
+				})),
+				{ ordered: false, alreadySigning }
+			);
+			const at = new Date();
+			const records = docs.map((jwk) =>
+				rootKeyRecord(jwk, signers.has(String(jwk.kid)), at)
+			);
+			for (const record of records) {
+				await sql`
+					INSERT INTO ${area} (id, doc, expires_at)
+					VALUES (${String(record._id)}, ${record}, NULL)
+					ON CONFLICT (id) DO NOTHING
+				`;
+			}
+			for (const row of legacy) {
+				await sql`DELETE FROM ${legacyArea} WHERE id = ${String(row.id)}`;
+			}
+			reportSigners(records);
+		}
+	}
+};
+
+export const MIGRATIONS: readonly Migration[] = [
+	namespacedProtectedResources,
+	rootKeysLifecycle
+];

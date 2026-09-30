@@ -5,6 +5,7 @@ import { ISSUER } from 'lib/configs/env.ts';
 import { ADMIN_CLIENT_ID } from 'lib/admin/consts.ts';
 
 import generatedKeys from '../keys.ts';
+import { rootKeys } from 'lib/keys/issuer_keys.js';
 
 /*
  * Admin ID token fixtures.
@@ -45,8 +46,12 @@ export function liveSigningKey(alg = 'RS256'): Record<string, unknown> {
  * The RSA key in the live set whose modulus matches `n`. Used after seeding an extra RS256 key, where
  * selectForSign returns several candidates and the test needs one specific member.
  */
-export function liveKeyByModulus(n: unknown): Record<string, unknown> {
-	for (const key of keystore) {
+export async function liveKeyByModulus(
+	n: unknown
+): Promise<Record<string, unknown>> {
+	// The root's verification set, not the signing mirror: a second key in an algorithm is published —
+	// it verifies — while only one per algorithm signs.
+	for (const key of (await rootKeys()).verification) {
 		if (key.kty === 'RSA' && key.n === n) return key;
 	}
 	throw new Error('no live RSA key with that modulus');

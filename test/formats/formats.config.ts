@@ -9,7 +9,7 @@ export const addons: Partial<AddonImplementations> = {
 };
 
 // Provide an additional PS256 RSA signing key so the JWT format tests can exercise PS256 (the
-// default RSA key is pinned to RS256). Seeded into the jwksStore for this spec by the harness;
+// default RSA key is pinned to RS256). Seeded as a root key record for this spec by the harness;
 // the default keys are retained so RS256 resolution is unchanged. Every key in the store must
 // declare its `alg`, so this one is pinned to PS256 rather than left unspecified.
 const baseKeys = testSigningKeys;

@@ -26,19 +26,13 @@ export async function assertMigrationsCurrent(): Promise<void> {
 		await import('../adapters/index.js');
 
 	/*
-	 * Reachability first — belt and braces rather than the mechanism, and worth being accurate about.
+	 * Reachability first, and since 2026-09-30 it is the mechanism rather than belt and braces.
 	 *
-	 * The lazy PostgreSQL handle looked like it would let a server start against a dead database and
-	 * fail on the first request. Measured against a stopped container, it does not: `lib/configs/keys.ts`
-	 * reads the key store while the model graph evaluates, so the boot already dies during imports —
-	 * before this line, with the driver's own error.
-	 *
-	 * This stays because depending on that is depending on an import-order accident. Move key loading,
-	 * or give a backend a lazy key store, and the gap opens again silently. What it costs is one query
-	 * per start; what it buys is that the intent is written down rather than inferred.
-	 *
-	 * The limit is worth stating too: because the key loader gets there first, the message an operator
-	 * actually sees for an unreachable datastore is the driver's, not this one's.
+	 * The lazy PostgreSQL handle would let a server start against a dead database and fail on the first
+	 * request. Until the root keys took their lifecycle, reading the key store while the model graph
+	 * evaluated happened to kill the boot during imports first; the root key set is now loaded after this
+	 * gate (lib/index.ts), so this check is what stops a server that cannot reach its datastore. What it
+	 * costs is one query per start.
 	 */
 	try {
 		await storagePing();

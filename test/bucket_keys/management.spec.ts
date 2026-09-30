@@ -35,11 +35,18 @@ async function promote(bucketId: string, cookie: string, kid: string) {
 	);
 }
 
-async function retire(bucketId: string, cookie: string, kid: string) {
+async function retire(
+	bucketId: string,
+	cookie: string,
+	kid: string,
+	// null sends no body at all; a default parameter would stand in for an explicit undefined.
+	confirm: string | null = kid
+) {
 	return call(
 		'DELETE',
 		`/admin/api/buckets/${bucketId}/keys/${encodeURIComponent(kid)}`,
-		cookie
+		cookie,
+		confirm === null ? undefined : { confirm }
 	);
 }
 
@@ -114,6 +121,29 @@ describe('the owning group administrator', () => {
 		expect(res.status).toBe(409);
 	});
 
+	/*
+	 * Retirement ends a key once its window closes, so the operator has to name the key they mean. Checked
+	 * before anything is recorded: a retire that does not name it is not a retire that happened.
+	 */
+	for (const [label, confirm] of [
+		['without a confirmation', null],
+		['whose confirmation names another key', 'not-this-key']
+	] as const) {
+		it(`is refused retiring a key ${label}, and the key keeps its state`, async () => {
+			const { cookie, groupId } = await administrator(['project_admin']);
+			const bucket = await ownedBucket(groupId);
+			const { body } = await generate(bucket._id, cookie, 'ES256');
+			const kid = String(body.kid);
+
+			const res = await retire(bucket._id, cookie, kid, confirm);
+
+			expect(res.status).toBe(422);
+			expect(res.body.reason).toBe('confirmation_mismatch');
+			const key = (await listed(bucket._id, cookie)).find((k) => k.kid === kid);
+			expect(key?.state).toBe('published');
+		});
+	}
+
 	it('retires a key that keeps being published until every token it signed has expired', async () => {
 		const { cookie, groupId } = await administrator(['project_admin']);
 		const bucket = await ownedBucket(groupId);
@@ -129,9 +159,15 @@ describe('the owning group administrator', () => {
 		expect(await publishedKids(bucket.slug ?? '')).not.toContain(kid);
 	});
 
-	it('is refused promoting a key that would leave no key in an algorithm a client requires', async () => {
+	/*
+	 * One signer per algorithm: a client relying on RS256 — here by default, having registered nothing — and a
+	 * FAPI client wanting PS256 are both served, from two RSA keys at once. Promoting the PS256 key takes
+	 * nothing away from the RS256 client.
+	 */
+	it('keeps signing in RS256 for a client relying on it when a key in another algorithm is promoted', async () => {
 		const { cookie, groupId } = await administrator(['project_admin']);
 		const bucket = await ownedBucket(groupId);
+		const [initial] = await listed(bucket._id, cookie);
 		const clientId = `keys-client-${Math.random().toString(36).slice(2)}`;
 		seedClient({
 			clientId,
@@ -142,8 +178,8 @@ describe('the owning group administrator', () => {
 		});
 		await getProjectStore().create({
 			ownerGroupId: groupId,
-			name: 'Needs RS256',
-			slug: `needs-${Math.random().toString(36).slice(2)}`,
+			name: 'Relies on RS256',
+			slug: `relies-${Math.random().toString(36).slice(2)}`,
 			bucketId: bucket._id,
 			clientIds: [clientId]
 		});
@@ -152,8 +188,13 @@ describe('the owning group administrator', () => {
 
 		const res = await promote(bucket._id, cookie, String(body.kid));
 
-		expect(res.status).toBe(409);
-		expect(res.body.algorithms).toEqual(['RS256']);
+		expect(res.status).toBe(200);
+		expect(res.body.demoted).toBeUndefined();
+		const states = Object.fromEntries(
+			(await listed(bucket._id, cookie)).map((key) => [key.kid, key.state])
+		);
+		expect(states[initial.kid]).toBe('signing');
+		expect(states[String(body.kid)]).toBe('signing');
 	});
 
 	it('records every key action in the audit trail', async () => {

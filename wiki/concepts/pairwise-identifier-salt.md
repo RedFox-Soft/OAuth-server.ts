@@ -68,7 +68,8 @@ Two structural choices are worth knowing before touching it:
 - **It is module state, not an `ApplicationConfig` key.** The DPoP nonce secret is a config key
   because the validator cross-checks it against `dpop.requireNonce`; nothing cross-checks the salt,
   so a key would only add a catalogue exclusion, a settings-merge exclusion, and a test pinning its
-  absence. It follows `lib/configs/keys.ts` instead — key material single-sourced from a store.
+  absence. It follows the signing keys instead — key material single-sourced from a store (the keys' own
+  loader, `lib/configs/keys.ts`, was replaced by `rootKeys()` on 2026-09-30; see [[signing-keys]]).
 - **Resolution is driven from `configs/application.ts`, with the store passed in.** The resolver
   module imports nothing but the store's *type*, and that is load-bearing: its consumer,
   `addon/tokens.ts`, is a leaf the model graph imports, so a store import there would close a cycle

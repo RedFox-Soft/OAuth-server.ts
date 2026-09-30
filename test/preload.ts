@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, setDefaultTimeout } from 'bun:test';
 
-import { jwksStore } from '../lib/adapters/index.js';
+import { writeRootKeys } from './root_keys.js';
 import { resetToBaseline } from './addon_baseline.js';
 import { installFetchInterception } from './fetch_mock.js';
 import { resolver } from '../lib/shared/egress.js';
@@ -43,11 +43,9 @@ beforeEach(() => {
 	resolver.lookup = async () => ['93.184.216.34'];
 });
 
-// Seed the in-memory jwksStore before any provider import so the store-loading path resolves to
-// known keys (replacing the former JWKS env-var seed). Runs as a Bun `preload`, ahead of all specs.
-for (const key of testSigningKeys) {
-	await jwksStore.set(key.kid, key);
-}
+// Seed the root keys before any provider import so the first load resolves to known keys. Runs as a Bun
+// `preload`, ahead of all specs.
+await writeRootKeys(testSigningKeys);
 
 // The settings baseline every bootstrap restores, taken now — after the keys above, before any spec.
 await import('./config_baseline.js');

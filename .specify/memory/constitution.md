@@ -1,6 +1,39 @@
 <!--
 SYNC IMPACT REPORT
 ==================
+Version change: 3.0.1 → 3.1.0 (MINOR — Principle VI signing rule corrected and extended), 2026-09-30
+Modified principles:
+  VI. Security-First — the sentence "JWT access and ID tokens MUST be RS256-signed from the
+    configured JWKS" is replaced by a per-issuer, per-client rule. Title unchanged; the rest of VI,
+    including "Key rotation MUST NOT invalidate currently valid tokens", is unchanged.
+Rationale (Governance §1):
+  The old sentence had not described the server for several releases, and following it literally
+  would make the server non-conformant. FAPI 2.0 permits only PS256 and ES256 for signed artefacts
+  and forbids RS256 for FAPI clients; OIDC Dynamic Client Registration lets a client register
+  id_token_signed_response_alg and authorization_signed_response_alg; and since 2026-09-29 every
+  addressable bucket is its own issuer and signs with keys of its own, so "the configured JWKS" no
+  longer names one key set. The conformance runs of 2026-09-30 — FAPI 2.0 Message Signing passing
+  with ES256 ID Tokens and JARM — are the server doing what the old text forbade.
+  The replacement keeps what the old sentence was protecting — asymmetric signing, from a key set
+  the verifier can fetch — and states the obligation it left implicit: an issuer must not lose the
+  last key in an algorithm one of its clients relies on, RS256 included when a client registered no
+  algorithm. That obligation surfaced while specifying root key retirement (spec 063), where a
+  client with no registered algorithm would otherwise not count as needing RS256, and retiring the
+  last RSA key would silently break every such client.
+  MINOR rather than MAJOR: no behaviour compliant under 3.0.1 becomes non-compliant except a key
+  set that drops an algorithm its clients depend on, which was already a defect.
+Added sections: none
+Removed sections: none
+Templates requiring updates:
+  ✅ .specify/templates/plan-template.md, spec-template.md, tasks-template.md — no reference to the
+    signing algorithm; unchanged.
+  ✅ AGENTS.md, README.md — neither states the RS256-only rule; README already describes the
+    supported algorithms. Unchanged.
+Follow-up TODOs:
+  - spec 063 (root key lifecycle): its required-algorithm check must count a client's default
+    (RS256) as well as registered algorithms — deferred to that feature, not done here.
+
+Previous amendment:
 Version change: 2.2.0 → 3.0.0 (MAJOR — Principle V redefined, backward-incompatible)
                 3.0.0 → 3.0.1 (PATCH — completeness template widened to admit property-based tests)
   The PATCH was found by applying the rule rather than by reading it. Classifying
@@ -206,9 +239,11 @@ written and confirmed failing before implementation begins.
 
 PKCE is mandatory for all public clients; the server MUST reject authorization requests
 from public clients that omit a code challenge. DPoP binding MUST be validated on every
-request when a token is DPoP-bound. JWT access and ID tokens MUST be RS256-signed from
-the configured JWKS. Introspection and revocation endpoints MUST require authentication.
-Key rotation MUST NOT invalidate currently valid tokens.
+request when a token is DPoP-bound. JWT access and ID tokens MUST be signed with an
+asymmetric key from the issuing issuer's own published key set, in the algorithm the client
+registered — RS256 when it registered none; an issuer MUST keep a signing key in every
+algorithm one of its clients relies on, the default included. Introspection and revocation
+endpoints MUST require authentication. Key rotation MUST NOT invalidate currently valid tokens.
 
 ### VII. Code Discipline
 
@@ -275,4 +310,4 @@ requires deviating from a principle, the deviation MUST be documented in the PR
 description and, if the exception is long-lived, reflected as an amendment here.
 Runtime development guidance is maintained in `AGENTS.md`.
 
-**Version**: 3.0.1 | **Ratified**: 2026-06-19 | **Last Amended**: 2026-09-10
+**Version**: 3.1.0 | **Ratified**: 2026-06-19 | **Last Amended**: 2026-09-30

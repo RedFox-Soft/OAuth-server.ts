@@ -425,6 +425,64 @@ check(
 	rekeyed?.identifier === legacyIdentifier && leftovers.length === 1,
 	`${leftovers.length} row(s) for the project`
 );
+
+/*
+ * The root keys migration, against legacy flat keys in a table that has no order: two RS256 keys and an
+ * ES256 key. With no order to recover, the lowest kid of each algorithm signs;
+ * applying the migration twice must change nothing.
+ */
+{
+	const rootKeysMigration = MIGRATIONS.find((m) =>
+		m.id.endsWith('root-keys-lifecycle')
+	);
+	const { LEGACY_ROOT_KEYS_AREA } = await import('../lib/consts/migrations.js');
+	const { ROOT_KEY_OWNER } = await import('../lib/consts/key_owner.js');
+	await handle`
+		CREATE TABLE IF NOT EXISTS ${handle(LEGACY_ROOT_KEYS_AREA)} (
+			id TEXT PRIMARY KEY, doc JSONB NOT NULL, expires_at TIMESTAMPTZ
+		)
+	`;
+	// A scratch database kept between runs holds the keys an earlier provisioning or run left behind.
+	await handle`DELETE FROM ${handle(LEGACY_ROOT_KEYS_AREA)}`;
+	await handle`
+		DELETE FROM ${handle(STORE_AREAS.bucketKeys)} WHERE doc->>'bucketId' = ${ROOT_KEY_OWNER}
+	`;
+	const legacyKeys = await Promise.all([
+		generateJWKS('RS256'),
+		generateJWKS('RS256'),
+		generateJWKS('ES256')
+	]).then((sets) => sets.map((set) => set.keys[0]));
+	for (const key of legacyKeys) {
+		await handle`
+			INSERT INTO ${handle(LEGACY_ROOT_KEYS_AREA)} (id, doc, expires_at)
+			VALUES (${key.kid}, ${key}, NULL)
+		`;
+	}
+	if (rootKeysMigration && !('noop' in rootKeysMigration.postgres)) {
+		await rootKeysMigration.postgres.apply(handle);
+		await rootKeysMigration.postgres.apply(handle);
+	}
+	const migrated = await bucketKeys.listByBucket(ROOT_KEY_OWNER);
+	const rsaKids = legacyKeys
+		.filter((key) => key.alg === 'RS256')
+		.map((key) => key.kid)
+		.sort();
+	const stateOf = (kid: string) =>
+		migrated.find((key) => key.kid === kid)?.state;
+	const [legacyLeft] = await handle`
+		SELECT count(*)::int AS n FROM ${handle(LEGACY_ROOT_KEYS_AREA)}
+	`;
+	check(
+		'the root keys migration makes the lowest kid of each algorithm sign, applied twice',
+		stateOf(rsaKids[0]) === 'signing' &&
+			stateOf(rsaKids[1]) === 'published' &&
+			stateOf(legacyKeys[2].kid) === 'signing' &&
+			Number(legacyLeft.n) === 0,
+		migrated.map((key) => `${key.alg}:${key.state}`).join(', ')
+	);
+	await handle`DROP TABLE ${handle(LEGACY_ROOT_KEYS_AREA)}`;
+}
+
 /* The fixture rows go, so the provisioning checks below see only what provisioning made. */
 await handle`DELETE FROM ${handle(STORE_AREAS.protectedResources)} WHERE doc->>'projectId' = ${legacyProject}`;
 await handle`DELETE FROM ${handle(STORE_AREAS.projects)} WHERE id = ${legacyProject}`;

@@ -455,7 +455,7 @@ describe('admin sign-in: ID token verification', () => {
 		const login = await startLogin();
 		// Read the key back out of the live set: seedJwks assigns the RFC 7638 kid, so the token must
 		// advertise the kid the server knows it by.
-		const seeded = liveKeyByModulus(extra.n);
+		const seeded = await liveKeyByModulus(extra.n);
 		const res = await callback(
 			login,
 			await mintAdminIdToken(claims({}, login), { key: seeded })
@@ -485,7 +485,7 @@ describe('admin sign-in: ID token verification', () => {
 
 		const retry = await startLogin();
 		const fresh = await mintAdminIdToken(claims({}, retry), {
-			key: liveKeyByModulus(replacement.n)
+			key: await liveKeyByModulus(replacement.n)
 		});
 		const res = await callback(retry, fresh);
 		expect(res.status).toBe(302);

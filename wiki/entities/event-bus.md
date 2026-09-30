@@ -44,14 +44,13 @@ This is why documentation or code that constructs a provider, or reads model cla
 describing the pre-`e37d4c9` shape of the server. CIBA delivery moved out of it in the same
 refactor.
 
-## Two constraints that look like accidents
+## A constraint that looks like an accident
 
-**It imports the key store for its side effect.** `import './configs/keys.js'` sits at the top not
-because the bus needs keys, but because reading the key store is asynchronous and this is the
-highest module every entry path imports that does not itself start a server (`lib/index.ts` calls
-`.listen` at module scope). Other modules reach `configs/keys.ts` incidentally, but nothing
-guarantees a given entry path touches one — without this line, importing the bus alone leaves a
-server holding no signing keys. Covered by `test/boot/boot_state.spec.ts`.
+**It no longer imports the key store.** Corrected 2026-09-30 (spec 063): the bus used to carry
+`import './configs/keys.js'` purely for its side effect, so that importing the bus alone still loaded
+the signing keys. `configs/keys.ts` is gone; every reader of the root keys awaits `rootKeys()`
+(`lib/keys/issuer_keys.ts`), which loads them on first use, so no entry path depends on an import
+order for them — see [[signing-keys]]. `test/boot/boot_state.spec.ts` covers the loaded set.
 
 **It must import no model.** The module is a leaf, and keeping it one is load-bearing. It previously
 needed an explicit `import './models/id_token.js'` anchor because it pulled in `Client` and `Grant`

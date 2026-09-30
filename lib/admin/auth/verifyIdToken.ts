@@ -2,7 +2,7 @@ import { errors as joseErrors } from 'jose';
 
 import * as JWT from '../../helpers/jwt.js';
 import epochTime from '../../helpers/epoch_time.js';
-import { keystore } from '../../configs/keystore.js';
+import { rootKeys } from '../../keys/issuer_keys.js';
 import { clockTolerance } from '../../configs/liveTime.js';
 import { ISSUER } from '../../configs/env.js';
 import { Client } from '../../models/client.js';
@@ -133,7 +133,8 @@ export async function verifyAdminIdToken(
 
 	let payload;
 	try {
-		({ payload } = await JWT.verify(idToken, keystore, {
+		// The administrators bucket is root-served, so the console's ID Token is the root issuer's.
+		({ payload } = await JWT.verify(idToken, (await rootKeys()).verification, {
 			algorithm: alg,
 			issuer: ISSUER,
 			audience: ADMIN_CLIENT_ID,

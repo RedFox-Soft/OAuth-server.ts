@@ -47,6 +47,7 @@ import { passwordResetRoutes } from './routes/password_reset.js';
 import { federationRoutes } from './federation/routes.js';
 import { initSentry } from './sentry/client.js';
 import { reportStartupFailure } from './sentry/startup.js';
+import { rootKeys } from './keys/issuer_keys.js';
 
 /*
  * Armed before the app is built, and deliberately not as a plugin.
@@ -216,6 +217,14 @@ export const elysia = new Elysia({ strictPath: true, normalize: false })
  * reason: a server that cannot safely write should not first accept a request and then discover it.
  */
 await assertMigrationsCurrent();
+
+/*
+ * The root issuer's keys, loaded — and on a fresh store the first one created — only now: before the gate
+ * a database whose root keys still await migration would be handed a second signer. Every signing path
+ * reaches the same set through keysFor, cached and reloaded from the store, so this only warms it and the
+ * algorithm lists that read its mirror.
+ */
+await rootKeys();
 
 try {
 	elysia.listen(3000);

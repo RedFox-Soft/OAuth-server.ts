@@ -1,4 +1,4 @@
-import { StoredJWK, type UnnormalizedJWK } from 'lib/configs/verifyJWKs.ts';
+import { StoredJWK } from 'lib/configs/verifyJWKs.ts';
 import { Type as t, type Static } from '@sinclair/typebox';
 import { FederatedIdentity, FederationProvider } from '../federation/types.js';
 
@@ -272,35 +272,16 @@ export interface UserStoreConstructor {
 }
 
 /*
- * The key store reads back what was persisted, so what it returns is `UnnormalizedJWK`, not `JWKS`:
- * a key provisioned out of band may be missing `kid` or `use`, which only verifyJWKs fills in. The
- * store used to claim `JWKS` — normalization it never performs — which is precisely how a bug that
- * compared a stored key's absent `kid` against a live one went unnoticed by the compiler.
- *
- * `set` accepts either, since `JWKS` is the normalized form of the same key.
- */
-export interface JWKSStoreInstance {
-	get(keyId: string): Promise<UnnormalizedJWK | null>;
-	set(keyId: string, key: UnnormalizedJWK): Promise<void>;
-	delete(keyId: string): Promise<void>;
-	getAll(): Promise<UnnormalizedJWK[]>;
-}
-
-export interface JWKSStoreConstructor {
-	new (): JWKSStoreInstance;
-}
-
-/*
- * One signing or encryption key of an addressable bucket, which is its own issuer and so signs with
- * keys of its own. The root issuer's keys stay in `jwksStore`; a bucket with no address has no issuer
- * of its own and signs with those.
+ * One signing or encryption key of an issuer: an addressable bucket, which is its own issuer, or the root
+ * issuer, whose keys are stored under the reserved owner `ROOT_KEY_OWNER` (lib/consts/key_owner.ts) and
+ * which a bucket with no address signs with.
  *
  * `state` is what makes rotation safe across instances that each cache the set for a short while: a
  * key is `published` before it may sign, so every instance serves it before any signs with it, and a
  * `retired` key stays published until every token it could have signed has expired.
  *
- * The private members are stored the way `jwksStore` stores the root's, and never leave the server:
- * every surface projects a key through `toPublicJwk`.
+ * The private members are stored with the key and never leave the server: every surface projects a key
+ * through `toPublicJwk`.
  */
 export const BucketKey = t.Object({
 	_id: t.String(),

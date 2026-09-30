@@ -25,6 +25,22 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   authorization, DPoP-bound tokens, signed Request Objects and their algorithm — plus ID Token and JARM
   signing algorithms, back-channel logout and pairwise subjects. Each is checked by the same validator
   as a self-registered client; on an edit, null removes one.
+- **The instance's signing keys rotate without a restart.** They take the lifecycle a bucket's keys
+  have: a generated key is published first, can be promoted to sign once every instance serves it, and a
+  retired key keeps verifying for a day and is then hidden — kept on record, never deleted. Promote and
+  retire are in the console, the admin API and MCP (`jwks_promote`, `jwks_retire`, both confirmed
+  twice); the restart-gated delete and `jwks_delete` are gone.
+
+### Changed
+
+- **Retiring a key names it.** A retire, instance or bucket, is refused unless its body carries
+  `{ "confirm": "<kid>" }`, and the console makes the operator type the kid.
+- **One key signs per algorithm, not per key type**, so an issuer can sign RS256 for its default clients
+  and PS256 for a FAPI client at once. The bucket keys' required-algorithm refusal is gone: no step can
+  leave an algorithm without a signer any more.
+- **Upgrading: run `bun run db:migrate`.** Migration `2026-09-30-root-keys-lifecycle` moves the stored
+  root keys into the new store, keeping the key that signed as the signer of its algorithm (on
+  PostgreSQL, the lowest kid) and printing its choice; startup refuses a database that has not run it.
 
 ### Fixed
 

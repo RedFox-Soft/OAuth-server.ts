@@ -2,8 +2,8 @@ import { randomBytes } from 'node:crypto';
 import type { SecretStoreInstance } from '../adapters/types.js';
 
 /*
- * The server's DPoP nonce secret, resolved once at startup — the sibling of configs/keys.ts, which
- * resolves signing keys from a store the same way.
+ * The server's DPoP nonce secret, resolved once at startup from a store, the way the pairwise salt is
+ * (configs/pairwiseSalt.ts).
  *
  * This module imports nothing but the store's type, and takes both the store and any in-process
  * candidate as parameters. That is what lets configs/application.ts drive it as a statement between

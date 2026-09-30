@@ -20,7 +20,7 @@ import {
 	isWithinDeploymentDomain
 } from 'lib/admin/auth/bucketAddress.js';
 import { hostOfRequest, normaliseHost } from 'lib/consts/request_host.js';
-import { keysFor } from 'lib/keys/issuer_keys.js';
+import { keysFor, rootKeys } from 'lib/keys/issuer_keys.js';
 
 type BucketAddress = { _id: string; slug?: string; host?: string };
 
@@ -63,20 +63,24 @@ function gateAndExtend(body: DiscoveryDocument): DiscoveryDocument {
 }
 
 /*
- * Compute the full candidate document from the live ApplicationConfig, then gate it. The bucket's keys
- * are read here, where awaiting is free, so the document itself stays a pure function of what it is
- * handed.
+ * Compute the full candidate document from the live ApplicationConfig, then gate it. The issuer's keys —
+ * the bucket's, or the root's — are read here, where awaiting is free, so the document itself stays a
+ * pure function of what it is handed, and the algorithms it advertises follow the key set every instance
+ * reloads rather than the one this process booted with.
  */
 async function openidConfiguration(bucket?: BucketAddress) {
 	return gateAndExtend(
-		calculateDiscovery(bucket, bucket ? await keysFor(bucket) : undefined)
+		calculateDiscovery(
+			bucket,
+			bucket ? await keysFor(bucket) : await rootKeys()
+		)
 	);
 }
 
 async function oauthAuthorizationServer(bucket?: BucketAddress) {
 	const body: DiscoveryDocument = calculateDiscovery(
 		bucket,
-		bucket ? await keysFor(bucket) : undefined
+		bucket ? await keysFor(bucket) : await rootKeys()
 	);
 
 	/*

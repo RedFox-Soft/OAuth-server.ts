@@ -1,7 +1,6 @@
 import KeyStore from '../helpers/keystore.js';
 import {
-	keystore as rootKeystore,
-	publicJWKS as rootPublicJWKS,
+	loadKeys as mirrorRootKeys,
 	toPublicJwk,
 	type PublicJWK
 } from '../configs/keystore.js';
@@ -10,6 +9,7 @@ import { isAddressable } from '../admin/auth/bucketAddress.js';
 import { generateJWKS } from '../helpers/jwks.js';
 import type { BucketKey } from '../adapters/types.js';
 import type { RequestBucket } from '../configs/issuer.js';
+import { ROOT_KEY_OWNER } from '../consts/key_owner.js';
 
 /*
  * The keys each issuer signs, verifies and decrypts with.
@@ -17,9 +17,9 @@ import type { RequestBucket } from '../configs/issuer.js';
  * An addressable bucket is its own issuer and has keys of its own, so a token one bucket mints fails
  * signature verification at a resource server trusting another's — tenant separation no longer rests
  * on every third-party resource server checking `iss`. Everything served at the root — the default
- * bucket, the administrators bucket, a bucket with no address — shares the root issuer and so the
- * instance key set in `configs/keystore.ts`, unchanged, because giving one issuer two key sets would
- * publish keys some of its own tokens do not verify against.
+ * bucket, the administrators bucket, a bucket with no address — shares the root issuer and its one key
+ * set, stored under `ROOT_KEY_OWNER` beside the buckets' and following the same lifecycle, because
+ * giving one issuer two key sets would publish keys some of its own tokens do not verify against.
  *
  * Kept out of `configs/keystore.ts`, which must stay a leaf: this module reaches the adapters, and an
  * await inside the model import graph reorders module evaluation (wiki: model-graph-import-order).
@@ -47,24 +47,21 @@ export interface IssuerKeys {
 	readonly verification: KeyStore;
 	readonly decryption: KeyStore;
 	readonly publicJWKS: { keys: PublicJWK[] };
-	/* The algorithms this issuer signs with; `undefined` for the root, whose lists are fixed at boot. */
+	/* The algorithms this issuer signs and decrypts with. */
 	readonly signingAlgorithms: readonly string[] | undefined;
 	readonly encryptionAlgorithms: readonly string[] | undefined;
 }
 
-const ROOT: IssuerKeys = {
-	signing: rootKeystore,
-	verification: rootKeystore,
-	decryption: rootKeystore,
-	publicJWKS: rootPublicJWKS,
-	signingAlgorithms: undefined,
-	encryptionAlgorithms: undefined
-};
+export { ROOT_KEY_OWNER };
 
 const cache = new Map<string, { keys: IssuerKeys; loadedAt: number }>();
 
 export function invalidateBucketKeys(bucketId: string): void {
 	cache.delete(bucketId);
+}
+
+export function invalidateRootKeys(): void {
+	cache.delete(ROOT_KEY_OWNER);
 }
 
 export function retiredKeyRemovableAt(key: BucketKey): Date {
@@ -130,23 +127,80 @@ export async function ensureBucketKey(bucketId: string): Promise<void> {
 	invalidateBucketKeys(bucketId);
 }
 
-export async function keysFor(bucket: RequestBucket): Promise<IssuerKeys> {
-	if (!isAddressable(bucket)) return ROOT;
+/*
+ * The root issuer's first key, created exactly once, as a bucket's is. Never at import: the key store is
+ * read after the migration gate (lib/index.ts), because a database whose root keys still await migration
+ * would otherwise be given a second signer before the gate refused to start on it.
+ */
+export async function ensureRootKey(): Promise<void> {
+	const {
+		keys: [jwk]
+	} = await generateJWKS('RS256');
+	const now = new Date();
+	await getBucketKeysStore().createIfAbsent({
+		_id: `${ROOT_KEY_OWNER} #initial`,
+		bucketId: ROOT_KEY_OWNER,
+		kid: jwk.kid,
+		jwk,
+		alg: 'RS256',
+		use: 'sig',
+		state: 'signing',
+		createdAt: now,
+		stateChangedAt: now
+	});
+	invalidateRootKeys();
+}
 
+async function load(ownerId: string, ensure: () => Promise<void>) {
 	const now = Date.now();
-	const cached = cache.get(bucket._id);
+	const cached = cache.get(ownerId);
 	if (cached && now - cached.loadedAt < KEY_CACHE_SECONDS * 1000) {
-		return cached.keys;
+		return { keys: cached.keys, fresh: false, records: undefined };
 	}
 
 	const store = getBucketKeysStore();
-	let records = await store.listByBucket(bucket._id);
+	let records = await store.listByBucket(ownerId);
 	if (records.length === 0) {
-		await ensureBucketKey(bucket._id);
-		records = await store.listByBucket(bucket._id);
+		await ensure();
+		records = await store.listByBucket(ownerId);
 	}
 
 	const keys = assemble(records, now);
-	cache.set(bucket._id, { keys, loadedAt: now });
+	cache.set(ownerId, { keys, loadedAt: now });
+	return { keys, fresh: true, records };
+}
+
+/*
+ * The root issuer's set, read from its records like any bucket's and cached the same way, so a key
+ * promoted or retired on one instance reaches the others within the cache bound — no restart.
+ *
+ * Each reload mirrors the signing and decryption keys, in place, into `configs/keystore.ts`: that leaf
+ * module is what the key-derived algorithm lists (`jwaAlgorithms.ts`) read synchronously, and it may not
+ * import this one.
+ */
+export async function rootKeys(): Promise<IssuerKeys> {
+	const { keys, fresh, records } = await load(ROOT_KEY_OWNER, ensureRootKey);
+	if (fresh && records) {
+		const now = Date.now();
+		/*
+		 * Signing and decryption keys only, not everything published: the lists derived from the mirror are
+		 * what discovery advertises and client registration accepts, and advertising the algorithm of a key
+		 * that does not sign yet would let a client register for signatures nothing can produce.
+		 */
+		mirrorRootKeys(
+			records
+				.filter(
+					(key) =>
+						stillPublished(key, now) &&
+						(key.use === 'enc' || key.state === 'signing')
+				)
+				.map((key) => structuredClone(key.jwk))
+		);
+	}
 	return keys;
+}
+
+export async function keysFor(bucket: RequestBucket): Promise<IssuerKeys> {
+	if (!isAddressable(bucket)) return rootKeys();
+	return (await load(bucket._id, () => ensureBucketKey(bucket._id))).keys;
 }

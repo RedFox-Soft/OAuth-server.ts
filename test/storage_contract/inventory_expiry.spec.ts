@@ -77,11 +77,10 @@ const REAPED_ON_EXPIRES_AT = [
 
 const PERMANENT = [
 	'Client',
-	'jwks',
 	/*
-	 * A bucket's keys leave by their state — retired, and past the lifetime of every token they could
-	 * have signed — never by the record's age. An expiry here would drop the key a bucket is signing
-	 * with, and every token it minted would stop verifying at once.
+	 * An issuer's keys — each bucket's and the root's — leave by their state — retired, and past the
+	 * lifetime of every token they could have signed — never by the record's age. An expiry here would
+	 * drop the key an issuer is signing with, and every token it minted would stop verifying at once.
 	 */
 	'bucketKeys',
 	'projects',

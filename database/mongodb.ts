@@ -23,7 +23,8 @@ import {
 	type ProvisioningSummary
 } from './provisioning_report.js';
 import { generateJWKS } from '../lib/helpers/jwks.js';
-import { MIGRATIONS } from '../lib/consts/migrations.js';
+import { LEGACY_ROOT_KEYS_AREA, MIGRATIONS } from '../lib/consts/migrations.js';
+import { ROOT_KEY_OWNER } from '../lib/consts/key_owner.js';
 import { checksumOf } from '../lib/migrations/state.js';
 import { ISSUER } from '../lib/configs/env.js';
 import {
@@ -167,15 +168,39 @@ for (const area of FIXED_AREAS) {
  */
 const provisionedFromEmpty = summary.collectionsCreated === FIXED_AREAS.length;
 
-// Provision the initial signing key at schema-creation time so a freshly created database already
-// holds a persisted RS256 signing key. The runtime loader (lib/configs/keys.ts) keeps an equivalent
-// generate-on-empty fallback for the in-memory adapter and any un-provisioned store.
-const jwks = db.collection(STORE_AREAS.jwks);
-if ((await jwks.countDocuments()) === 0) {
+/*
+ * The root issuer's first signing key, so a freshly provisioned database already holds one — created the
+ * way the server creates it, under the fixed id that makes it exactly once. Only when there is no root key
+ * and nothing left to migrate: a deploy runs this before `db:migrate`, and a first key created beside
+ * legacy keys still awaiting migration would be a second signer the migration then competes with. The
+ * legacy collection is read by its literal name for that reason alone.
+ */
+const rootKeyArea = db.collection<{ _id: string }>(STORE_AREAS.bucketKeys);
+const legacyLeft = await db.collection(LEGACY_ROOT_KEYS_AREA).countDocuments();
+if (
+	legacyLeft === 0 &&
+	(await rootKeyArea.countDocuments({ bucketId: ROOT_KEY_OWNER })) === 0
+) {
 	const {
-		keys: [key]
+		keys: [jwk]
 	} = await generateJWKS('RS256');
-	await jwks.insertOne({ ...key, updatedAt: new Date() });
+	const now = new Date();
+	await rootKeyArea.updateOne(
+		{ _id: `${ROOT_KEY_OWNER} #initial` },
+		{
+			$setOnInsert: {
+				bucketId: ROOT_KEY_OWNER,
+				kid: jwk.kid,
+				jwk,
+				alg: 'RS256',
+				use: 'sig',
+				state: 'signing',
+				createdAt: now,
+				stateChangedAt: now
+			}
+		},
+		{ upsert: true }
+	);
 }
 
 // Idempotent seed of the reserved admin project + bucket + OAuth client. Written
