@@ -8,6 +8,7 @@ import {
 } from '../../models/client.js';
 import { adapter } from '../../adapters/index.js';
 import { AdminError } from '../auth/rbac.js';
+import { OIDCProviderError } from '../../helpers/errors.js';
 
 export interface AdminClientView {
 	clientId: string;
@@ -23,9 +24,95 @@ export interface AdminClientView {
 	backchannelTokenDeliveryMode?: string;
 	backchannelClientNotificationEndpoint?: string;
 	authorizationDetailsTypes?: string[];
+	jwks?: unknown;
+	jwksUri?: string;
+	tokenEndpointAuthSigningAlg?: string;
+	idTokenSignedResponseAlg?: string;
+	authorizationSignedResponseAlg?: string;
+	requestObjectSigningAlg?: string;
+	requireSignedRequestObject?: boolean;
+	requirePushedAuthorizationRequests?: boolean;
+	dpopBoundAccessTokens?: boolean;
+	backchannelLogoutUri?: string;
+	backchannelLogoutSessionRequired?: boolean;
+	subjectType?: string;
+	sectorIdentifierUri?: string;
 }
 
-export interface CreateClientInput {
+/*
+ * The key and request-protection attributes, each as the admin surface names it, the key the stored
+ * record holds it under (a base attribute canonically, recognised metadata under its wire name), and
+ * the property a validated client exposes it as. One table so the three cannot drift apart: a field
+ * the route accepts but this builder does not forward is silently discarded, which is the defect the
+ * allow-list below already had once.
+ */
+const KEY_AND_REQUEST_ATTRIBUTES = {
+	jwks: { stored: 'jwks', property: 'jwks' },
+	jwksUri: { stored: 'jwks_uri', property: 'jwksUri' },
+	tokenEndpointAuthSigningAlg: {
+		stored: 'token_endpoint_auth_signing_alg',
+		property: 'tokenEndpointAuthSigningAlg'
+	},
+	idTokenSignedResponseAlg: {
+		stored: 'id_token_signed_response_alg',
+		property: 'idTokenSignedResponseAlg'
+	},
+	authorizationSignedResponseAlg: {
+		stored: 'authorization_signed_response_alg',
+		property: 'authorizationSignedResponseAlg'
+	},
+	requestObjectSigningAlg: {
+		stored: 'requestObject.signingAlg',
+		property: 'requestObject.signingAlg'
+	},
+	requireSignedRequestObject: {
+		stored: 'require_signed_request_object',
+		property: 'requireSignedRequestObject'
+	},
+	requirePushedAuthorizationRequests: {
+		stored: 'authorization.requirePushedAuthorizationRequests',
+		property: 'authorization.requirePushedAuthorizationRequests'
+	},
+	dpopBoundAccessTokens: {
+		stored: 'dpop_bound_access_tokens',
+		property: 'dpopBoundAccessTokens'
+	},
+	backchannelLogoutUri: {
+		stored: 'backchannel_logout_uri',
+		property: 'backchannelLogoutUri'
+	},
+	backchannelLogoutSessionRequired: {
+		stored: 'backchannel_logout_session_required',
+		property: 'backchannelLogoutSessionRequired'
+	},
+	subjectType: { stored: 'subjectType', property: 'subjectType' },
+	sectorIdentifierUri: {
+		stored: 'sector_identifier_uri',
+		property: 'sectorIdentifierUri'
+	}
+} as const;
+
+type KeyAndRequestAttribute = keyof typeof KEY_AND_REQUEST_ATTRIBUTES;
+type KeyAndRequestInput = {
+	[K in KeyAndRequestAttribute]?: AdminClientView[K] | null;
+};
+
+// Writes each attribute the input names; `null` removes one the record already holds.
+function applyKeyAndRequestAttributes(
+	metadata: Record<string, unknown>,
+	input: KeyAndRequestInput
+) {
+	for (const [name, { stored }] of Object.entries(KEY_AND_REQUEST_ATTRIBUTES)) {
+		const value = input[name as KeyAndRequestAttribute];
+		if (value === null) {
+			delete metadata[stored];
+		} else if (value !== undefined) {
+			metadata[stored] = value;
+		}
+	}
+}
+
+export interface CreateClientInput extends KeyAndRequestInput {
 	/*
 	 * Supplied when the caller has already allocated the id — which the admin route does, because the
 	 * client's audit entry must name it before the client exists. Generated here otherwise.
@@ -88,6 +175,7 @@ function toMetadata(input: CreateClientInput, clientId: string) {
 	if (input.authorizationDetailsTypes !== undefined) {
 		metadata.authorization_details_types = input.authorizationDetailsTypes;
 	}
+	applyKeyAndRequestAttributes(metadata, input);
 	return metadata;
 }
 
@@ -109,14 +197,39 @@ function toView(client: Client): AdminClientView {
 			client.backchannelClientNotificationEndpoint,
 		authorizationDetailsTypes: client.authorizationDetailsTypes && [
 			...client.authorizationDetailsTypes
-		]
+		],
+		...keyAndRequestView(client)
 	};
 }
 
-// Validation refuses bad metadata with InvalidClientMetadata; the route layer
-// maps that to HTTP 422.
-function validateAndStore(metadata: Record<string, unknown>) {
-	return registerClient(metadata, { store: true });
+// Copied rather than handed out: a validated client is frozen, and the key set is nested.
+function keyAndRequestView(client: Client): Partial<AdminClientView> {
+	const view: Record<string, unknown> = {};
+	const source = client as unknown as Record<string, unknown>;
+	for (const [name, { property }] of Object.entries(
+		KEY_AND_REQUEST_ATTRIBUTES
+	)) {
+		const value = source[property];
+		if (value !== undefined) view[name] = structuredClone(value);
+	}
+	return view as Partial<AdminClientView>;
+}
+
+/*
+ * Validation refuses bad metadata with a protocol error — InvalidClientMetadata, InvalidRedirectUri —
+ * and a protocol error leaving an admin route reaches the OAuth error handler first, which answers it
+ * as 400 in the protocol's shape: the console got no `message` to show. Re-raised here as the admin
+ * plane's own refusal, which that handler stands aside for (wiki/concepts/admin-plane-error-shape.md).
+ */
+async function validateAndStore(metadata: Record<string, unknown>) {
+	try {
+		return await registerClient(metadata, { store: true });
+	} catch (error) {
+		if (error instanceof OIDCProviderError) {
+			throw new AdminError(422, error.error_description || error.message);
+		}
+		throw error;
+	}
 }
 
 export async function createClient(
@@ -183,6 +296,8 @@ export async function updateClient(
 		...stored,
 		...toMetadata(merged, clientId)
 	};
+	// Only what the patch names: the rest of these already survive in `stored`.
+	applyKeyAndRequestAttributes(metadata, patch);
 	// Mirror createClient's secret logic on the merged (post-patch) metadata, not
 	// the pre-patch existing client — otherwise a confidential -> public transition
 	// leaves a stale clientSecret (so rotateSecret wrongly succeeds on what is now

@@ -1,6 +1,5 @@
 import { Elysia } from 'elysia';
 import { getProjectStore } from '../../adapters/index.js';
-import { InvalidClientMetadata } from '../../helpers/errors.js';
 import {
 	assertAuth,
 	assertProjectAccess,
@@ -47,11 +46,6 @@ export const clientRoutes = new Elysia({ name: 'admin-clients' })
 		if (error instanceof AdminError) {
 			set.status = error.status;
 			return adminErrorBody(error);
-		}
-		// Client metadata validation failure → 422.
-		if (error instanceof InvalidClientMetadata) {
-			set.status = 422;
-			return { error: 'invalid_client_metadata', message: error.message };
 		}
 	})
 	.get('/admin/api/projects/:id/clients', async ({ admin, params }) => {

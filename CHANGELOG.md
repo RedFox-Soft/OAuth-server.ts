@@ -20,9 +20,17 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   identity claims (`sub`, `email`, `email_verified`) and the protocol claims the server asserts itself
   are refused, and the audit trail records that claims changed, never their values. The agent tool's
   description no longer promises an email change it never made.
+- **The console and agents register every client dynamic registration can.** `private_key_jwt` and
+  `client_secret_jwt`, a key set or its URL, and the per-client protections FAPI asks for — pushed
+  authorization, DPoP-bound tokens, signed Request Objects and their algorithm — plus ID Token and JARM
+  signing algorithms, back-channel logout and pairwise subjects. Each is checked by the same validator
+  as a self-registered client; on an edit, null removes one.
 
 ### Fixed
 
+- **A refused client registration reaches the console as the admin plane's error.** It arrived as `400`
+  in the protocol's shape, with no message to show, although the admin routes' tests expected `422` —
+  they mounted the routes alone. It is now `422` with the validator's reason.
 - **A Request Object is held to its own rules, not a client assertion's.** `jti` is optional and `aud`
   may be a list naming this server (RFC 9101 §4, RFC 7519 §4.1.3), and a missing or malformed registered
   claim answers `invalid_request_object` rather than `invalid_request` (RFC 9101 §6.2); a bad

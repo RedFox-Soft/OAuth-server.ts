@@ -60,6 +60,17 @@ the channel operators watch for genuine faults.
 Pinned by `test/admin/admin_error_shape.spec.ts`, which now asserts through the composed app as well as
 the standalone mount.
 
+## A protocol error raised inside an admin route is the same fault
+
+Added 2026-09-30. The marker only helps an error that carries it. Registering a client from the console
+runs the protocol's own validator, whose refusals are `InvalidClientMetadata` and `InvalidRedirectUri` —
+OAuth errors, which the root handler answers first: `400` with `error_description`, no `message`. The
+client routes' `onError` mapped them to `422`, and `test/admin/clients_routes.spec.ts` asserted that — on
+the standalone mount, so it held while production answered otherwise. `lib/admin/clients/service.ts`
+now re-raises any `OIDCProviderError` from `registerClient` as `AdminError(422)`, and the dead mapping is
+gone. `test/admin/client_keys.spec.ts` asserts it through the composed server. Any other admin route that
+calls into protocol code can fall into this again.
+
 ## Related
 
 - [[deletion-and-revocation]] — the `blockers` and `failedAreas` fields this shape carries.

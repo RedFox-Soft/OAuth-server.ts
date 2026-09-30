@@ -11,6 +11,7 @@ import {
 	Popconfirm,
 	Switch,
 	Tag,
+	Collapse,
 	message
 } from 'antd';
 import { PlusOutlined, ArrowLeftOutlined } from '@ant-design/icons';
@@ -29,8 +30,54 @@ const GRANT_OPTIONS = [
 const AUTH_OPTIONS = [
 	{ label: 'none (public / PKCE)', value: 'none' },
 	{ label: 'client_secret_basic', value: 'client_secret_basic' },
-	{ label: 'client_secret_post', value: 'client_secret_post' }
+	{ label: 'client_secret_post', value: 'client_secret_post' },
+	{ label: 'client_secret_jwt', value: 'client_secret_jwt' },
+	{ label: 'private_key_jwt (key set below)', value: 'private_key_jwt' }
 ];
+
+/*
+ * The key and request-protection attributes, as text fields and switches. Algorithms are free text:
+ * the set a deployment supports is the server's to check, and a picker here would be a second copy
+ * of it. An emptied text field on an edit removes the attribute.
+ */
+const KEY_TEXT_FIELDS = [
+	['jwksUri', 'Key set URL (jwks_uri)', 'https://app.example.com/jwks'],
+	['tokenEndpointAuthSigningAlg', 'Client assertion signing alg', 'PS256'],
+	['idTokenSignedResponseAlg', 'ID Token signing alg', 'RS256'],
+	['authorizationSignedResponseAlg', 'JARM signing alg', 'PS256'],
+	['requestObjectSigningAlg', 'Request Object signing alg', 'PS256'],
+	[
+		'backchannelLogoutUri',
+		'Back-channel logout URI',
+		'https://app.example.com/logout'
+	],
+	[
+		'sectorIdentifierUri',
+		'Sector identifier URI (pairwise)',
+		'https://app.example.com/sector.json'
+	]
+] as const;
+const KEY_SWITCHES = [
+	['requirePushedAuthorizationRequests', 'Require pushed authorization (PAR)'],
+	['dpopBoundAccessTokens', 'Require DPoP-bound access tokens'],
+	['requireSignedRequestObject', 'Require signed Request Objects'],
+	['backchannelLogoutSessionRequired', 'Send sid in logout tokens']
+] as const;
+type KeyTextField = (typeof KEY_TEXT_FIELDS)[number][0];
+type KeySwitch = (typeof KEY_SWITCHES)[number][0];
+type KeyAttributes = { [K in KeyTextField]?: string } & {
+	[K in KeySwitch]?: boolean;
+} & { subjectType?: 'public' | 'pairwise'; jwks?: unknown };
+
+function parseJwks(text: string | undefined): unknown {
+	const trimmed = text?.trim();
+	if (!trimmed) return undefined;
+	const value: unknown = JSON.parse(trimmed);
+	if (typeof value !== 'object' || value === null || !('keys' in value)) {
+		throw new TypeError('a key set is a JSON object with a "keys" array');
+	}
+	return value;
+}
 const CIBA_GRANT_TYPE = 'urn:openid:params:grant-type:ciba';
 // Mirrors the request schema's union, which is the server's real answer on what it will accept.
 const CIBA_DELIVERY_MODE_OPTIONS = [
@@ -52,7 +99,9 @@ interface ClientView {
 	authorizationDetailsTypes?: string[];
 	registeredDynamically?: boolean;
 }
-interface FormValues {
+type ClientRow = ClientView & KeyAttributes;
+interface FormValues extends Omit<KeyAttributes, 'jwks'> {
+	jwksText?: string;
 	clientName?: string;
 	applicationType: 'web' | 'native';
 	grantTypes: string[];
@@ -80,7 +129,7 @@ export function Clients({
 	onBack: () => void;
 }) {
 	const base = `/admin/api/projects/${project._id}/clients`;
-	const [rows, setRows] = useState<ClientView[]>([]);
+	const [rows, setRows] = useState<ClientRow[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [open, setOpen] = useState(false);
 	const [mode, setMode] = useState<'create' | 'edit'>('create');
@@ -94,7 +143,7 @@ export function Clients({
 	const fetchClients = useCallback(async () => {
 		try {
 			const res = await fetch(base);
-			if (res.ok) setRows((await res.json()) as ClientView[]);
+			if (res.ok) setRows((await res.json()) as ClientRow[]);
 		} finally {
 			setLoading(false);
 		}
@@ -114,7 +163,7 @@ export function Clients({
 		setOpen(true);
 	}
 
-	function openEditModal(row: ClientView) {
+	function openEditModal(row: ClientRow) {
 		setMode('edit');
 		setEditingClientId(row.clientId);
 		form.setFieldsValue({
@@ -128,13 +177,41 @@ export function Clients({
 			authorizationDetailsTypes: row.authorizationDetailsTypes,
 			backchannelTokenDeliveryMode: row.backchannelTokenDeliveryMode,
 			backchannelClientNotificationEndpoint:
-				row.backchannelClientNotificationEndpoint
+				row.backchannelClientNotificationEndpoint,
+			jwksText: row.jwks ? JSON.stringify(row.jwks, null, 2) : '',
+			subjectType: row.subjectType,
+			...Object.fromEntries(
+				KEY_TEXT_FIELDS.map(([name]) => [name, row[name] ?? ''])
+			),
+			...Object.fromEntries(
+				KEY_SWITCHES.map(([name]) => [name, row[name] ?? false])
+			)
 		});
 		setOpen(true);
 	}
 
-	function buildBody(values: FormValues) {
+	/*
+	 * On create an attribute is sent only when set. On an edit every one is sent, an emptied text
+	 * field as null — which removes it — so what the form shows is what the client then holds.
+	 */
+	function keyAttributes(values: FormValues, editing: boolean) {
+		const body: Record<string, unknown> = {};
+		const jwks = parseJwks(values.jwksText);
+		if (jwks !== undefined || editing) body.jwks = jwks ?? null;
+		for (const [name] of KEY_TEXT_FIELDS) {
+			const value = values[name]?.trim();
+			if (value || editing) body[name] = value || null;
+		}
+		for (const [name] of KEY_SWITCHES) {
+			if (values[name] || editing) body[name] = Boolean(values[name]);
+		}
+		if (values.subjectType) body.subjectType = values.subjectType;
+		return body;
+	}
+
+	function buildBody(values: FormValues, editing = false) {
 		return {
+			...keyAttributes(values, editing),
 			clientName: values.clientName,
 			applicationType: values.applicationType,
 			grantTypes: values.grantTypes,
@@ -186,7 +263,7 @@ export function Clients({
 		const res = await fetch(`${base}/${encodeURIComponent(clientId)}`, {
 			method: 'PATCH',
 			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify(buildBody(values))
+			body: JSON.stringify(buildBody(values, true))
 		});
 		const body = (await res.json().catch(() => null)) as {
 			message?: string;
@@ -444,6 +521,72 @@ export function Clients({
 							);
 						}}
 					</Form.Item>
+					<Collapse
+						ghost
+						items={[
+							{
+								key: 'keys',
+								label: 'Key & request security',
+								forceRender: true,
+								children: (
+									<>
+										<Form.Item
+											name="jwksText"
+											label="Key set (jwks)"
+											tooltip="The client's public keys, for private_key_jwt and signed Request Objects. Public material only — a private key is refused. Use this or the key set URL, not both."
+											rules={[
+												{
+													validator: async (
+														_rule,
+														text: string | undefined
+													) => {
+														parseJwks(text);
+													}
+												}
+											]}
+										>
+											<Input.TextArea
+												rows={4}
+												spellCheck={false}
+												placeholder='{"keys":[{"kty":"EC","crv":"P-256","x":"…","y":"…"}]}'
+											/>
+										</Form.Item>
+										{KEY_TEXT_FIELDS.map(([name, label, placeholder]) => (
+											<Form.Item
+												key={name}
+												name={name}
+												label={label}
+											>
+												<Input placeholder={placeholder} />
+											</Form.Item>
+										))}
+										<Form.Item
+											name="subjectType"
+											label="Subject type"
+										>
+											<Select
+												allowClear
+												options={[
+													{ label: 'public', value: 'public' },
+													{ label: 'pairwise', value: 'pairwise' }
+												]}
+											/>
+										</Form.Item>
+										{KEY_SWITCHES.map(([name, label]) => (
+											<Form.Item
+												key={name}
+												name={name}
+												label={label}
+												valuePropName="checked"
+											>
+												<Switch />
+											</Form.Item>
+										))}
+									</>
+								)
+							}
+						]}
+					/>
 				</Form>
 			</Modal>
 			<Modal

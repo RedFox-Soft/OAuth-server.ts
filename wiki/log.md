@@ -124,5 +124,6 @@ Operations:
 - 2026-09-29 — added [[per-issuer-isolation]]: why the issuer is the unit of isolation for resource namespaces and signing keys.
 - 2026-09-30 — corrected [[upstream-federation]]: jose's JWKS cooldown is off and a failed signature against a cached key set is retried once, so an upstream key rotation no longer refuses sign-ins.
 - 2026-09-30 — corrected [[stored-document-schemas]] and [[mongodb-test-fidelity]]: the model adapter now stores undefined as absent (a sign-out without id_token_hint made the session unreadable), and the BSON fake takes the driver's default, which had left the undefined-as-absent cases vacuous.
+- 2026-09-30 — corrected [[admin-plane-error-shape]]: a protocol error from client registration left the admin routes as 400 in the OAuth shape; the client service now re-raises it as AdminError(422).
 
 ## [2026-09-30] ingest | [[sentry-elysia-10.73.0]] — `@sentry/bun` moved from `10.73.0` to `11.1.0` (still exact-pinned), which falsified the claim that the page's pinned version is "the same version line as the installed `@sentry/bun`". The reading itself stays at 10.73.0 and is now recorded as one major behind; the spec citation for the two absence assertions moved from `:98,111` to `:102,115`.

@@ -275,7 +275,8 @@ describe('editing a client through the console', () => {
 		await expect(
 			updateClient('edit-refused', { redirectUris: [] })
 		).rejects.toMatchObject({
-			error_description: 'redirectUris must contain members'
+			status: 422,
+			message: 'redirectUris must contain members'
 		});
 
 		expect(await adapter('Client').find('edit-refused')).toEqual(before);
@@ -314,7 +315,8 @@ describe('editing a pairwise client with a sector identifier', () => {
 				redirectUris: [`${RP}/cb`, `${RP}/unlisted`]
 			})
 		).rejects.toMatchObject({
-			error_description:
+			status: 422,
+			message:
 				'all registered redirectUris must be included in the sector_identifier_uri response'
 		});
 
