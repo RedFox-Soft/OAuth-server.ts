@@ -61,6 +61,11 @@ export interface IdpStub {
 	idToken(claims: Record<string, unknown>, opts?: SignOptions): Promise<string>;
 	/* The public key set this stub serves, for a case that needs it inline. */
 	publicJwks(): Promise<{ keys: Record<string, unknown>[] }>;
+	/*
+	 * Replace the signing key, as a provider rotating it would: the next token is signed with the new one
+	 * and the next sign-in publishes a key set holding only it. `kid: null` publishes and signs with none.
+	 */
+	rotateKey(kid: string | null): Promise<void>;
 }
 
 export interface SignOptions {
@@ -74,6 +79,8 @@ export interface SignOptions {
 	issuedIn?: number;
 	/* Omit `sub` entirely. */
 	noSubject?: boolean;
+	/* Omit `iat` entirely. */
+	noIssuedAt?: boolean;
 	/* Sign with a key the stub does not publish, for the unknown-kid and bad-signature cases. */
 	foreignKey?: boolean;
 	/* Emit an unsecured token, which must be refused as an algorithm violation. */
@@ -100,9 +107,9 @@ export async function idpStub(
 	origin: string,
 	overrides: Record<string, unknown> = {}
 ): Promise<IdpStub> {
-	const keyPair = await generateKeyPair(ALG, { extractable: true });
+	let keyPair = await generateKeyPair(ALG, { extractable: true });
 	const foreignPair = await generateKeyPair(ALG, { extractable: true });
-	const kid = 'stub-key-1';
+	let kid: string | undefined = 'stub-key-1';
 
 	const metadata = { ...DEFAULT_METADATA(origin), ...overrides };
 	const target = mock(origin);
@@ -116,7 +123,15 @@ export async function idpStub(
 
 	async function publicJwks() {
 		const jwk = await exportJWK(keyPair.publicKey);
-		return { keys: [{ ...jwk, alg: ALG, use: 'sig', kid }] };
+		return {
+			keys: [{ ...jwk, alg: ALG, use: 'sig', ...(kid ? { kid } : {}) }]
+		};
+	}
+
+	async function rotateKey(next: string | null) {
+		keyPair = await generateKeyPair(ALG, { extractable: true });
+		kid = next ?? undefined;
+		jwksPublished = false;
 	}
 
 	async function idToken(
@@ -132,6 +147,7 @@ export async function idpStub(
 			...claims
 		};
 		if (opts.noSubject) delete payload.sub;
+		if (opts.noIssuedAt) delete payload.iat;
 
 		if (opts.unsecured) {
 			// Hand-assembled: jose will not produce an unsecured JWS, which is itself the point.
@@ -144,7 +160,7 @@ export async function idpStub(
 		}
 
 		return new SignJWT(payload)
-			.setProtectedHeader({ alg: opts.alg ?? ALG, kid })
+			.setProtectedHeader({ alg: opts.alg ?? ALG, ...(kid ? { kid } : {}) })
 			.setExpirationTime(now + (opts.expiresIn ?? 300))
 			.sign(opts.foreignKey ? foreignPair.privateKey : keyPair.privateKey);
 	}
@@ -220,6 +236,7 @@ export async function idpStub(
 		expectTokenFailure,
 		expectDiscoveryFailure,
 		idToken,
-		publicJwks
+		publicJwks,
+		rotateKey
 	};
 }

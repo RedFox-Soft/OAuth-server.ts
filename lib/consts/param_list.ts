@@ -135,10 +135,15 @@ export const DeviceAuthorizationParameters = t.Partial(
 	])
 );
 
+/*
+ * The registered claims of a Request Object. Not a client assertion's (RFC 7523 §3), which demands `jti`
+ * and one audience: RFC 9101 §4 and OIDC Core §6.1 make `jti` optional here, and RFC 7519 §4.1.3 lets
+ * `aud` be a list — this server need only be among its values, which the signature check establishes.
+ */
 export const JWTparameters = t.Object({
-	jti: t.String(),
+	jti: t.Optional(t.String()),
 	iss: t.String(),
-	aud: t.String({ format: 'uri' }),
+	aud: t.Union([t.String({ format: 'uri' }), t.Array(t.String())]),
 	exp: t.Integer({ minimum: 0 }),
 	iat: t.Optional(t.Integer({ minimum: 0 })),
 	nbf: t.Optional(t.Integer({ minimum: 0 }))

@@ -147,6 +147,43 @@ describe('federated sign-in', () => {
 		assertNoPendingInterceptors();
 	});
 
+	/*
+	 * The provider rotates its signing key between two sign-ins, seconds apart — inside the window in which
+	 * a key set just fetched is not fetched again. The second sign-in must still succeed, with and without
+	 * a `kid` naming the new key.
+	 */
+	for (const [label, nextKid] of [
+		['a new kid', 'stub-key-2'],
+		['no kid', null]
+	] as const) {
+		it(`follows a provider's key rotation to a key with ${label}`, async () => {
+			const idp = await idpStub(
+				`https://idp-rotate-${nextKid ?? 'nokid'}.test`
+			);
+			await seedBucket(CLIENT, {
+				federation: [provider(idp.origin, { emailTrusted: true })]
+			});
+			idp.expectDiscovery();
+
+			const first = await startInteraction();
+			const before = await walk(first.uid, first.cookie, {
+				idp,
+				claims: { email: 'rotate@acme.test', email_verified: true }
+			});
+			expect(before.complete?.status).toBe(303);
+
+			await idp.rotateKey(nextKid);
+
+			const second = await startInteraction();
+			const after = await walk(second.uid, second.cookie, {
+				idp,
+				claims: { email: 'rotate@acme.test', email_verified: true }
+			});
+			expect(after.complete?.status).toBe(303);
+			assertNoPendingInterceptors();
+		});
+	}
+
 	it('provisions an account for an unknown address, with no usable password and no roles', async () => {
 		const idp = await idpStub('https://idp-jit.test');
 		const bucketId = await seedBucket(CLIENT, {

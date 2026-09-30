@@ -484,6 +484,11 @@ describe('federated sign-in: the round trip and the assertion are refused', () =
 		},
 		{ name: 'no subject', reason: 'subject', opts: { noSubject: true } },
 		{
+			name: 'no issued-at time',
+			reason: 'issued_at',
+			opts: { noIssuedAt: true }
+		},
+		{
 			name: 'a signature from a key the provider does not publish',
 			reason: 'signature',
 			opts: { foreignKey: true }

@@ -40,9 +40,10 @@ one, and no OP plan reaches that code.
 | `oidcc-client-config-certification-test-plan`                   | 285        | 3, all of them the runner's         |
 | `oidcc-client-refreshtoken-test-plan`                           | 216        | none — subject not exercised        |
 
-**16 680 conditions. Five defects are open**, all found by the three plans run for the first time on
+**16 680 conditions. Five defects were found**, all by the three plans run for the first time on
 2026-09-14 (Message Signing and the client family); the nine plans above them are unchanged and still
-carry no failure attributable to this server.
+carry no failure attributable to this server. **All five are fixed as of 2026-09-30, and no run has
+confirmed it yet** — the table above is the measurement before the fix.
 
 Twelve defects the suite found earlier have been fixed: `830713b` (PAR content type), `1437341`
 (unknown request parameters, widened from the one endpoint reported to six), `6cdb9ec`
@@ -53,7 +54,11 @@ its own error code), `b891075` (key generation for any asymmetric signing algori
 could not escape), `2b83c91` (unknown members inside `claims` are ignored; a pushed request is spent
 after a login, not only when no login was needed). The detail is in those commits.
 
-## The five open defects
+## The five defects found on 2026-09-14
+
+Fixed on 2026-09-30, each pinned by a test (`test/request/jwt_request.spec.ts`,
+`test/federation/refusals.spec.ts`, `test/federation/signin.spec.ts`). What follows is the defect as the
+run found it; the line references are to the code as it stood then.
 
 ### 1–3. One schema, three wrong answers about Request Objects
 
@@ -214,7 +219,7 @@ assumptions do not hold against it. This is design, not omission, but it bounds 
 What it _does_ prove is the verification, and there the result is worth having: `iss`, `aud`, `exp`,
 the algorithm allowlist, `alg: none`, a bad signature, a `kid` that is absent with several keys
 published, a mismatched `nonce`, a missing `sub`, and a discovery document whose `issuer` disagrees
-with the URL it came from — each refused, each correctly. Only `iat` gets through (defect 4).
+with the URL it came from — each refused, each correctly. Only `iat` got through (defect 4, since fixed).
 
 ## Two instance profiles
 
@@ -350,8 +355,9 @@ accepts either branch.
 
 Every applicable OP plan has been run, and the client family is now open rather than untouched.
 
-Still to run, in the order they are worth it: **FAPI 2.0 Message Signing again once defects 1–3 are
-fixed** (the plan has never completed without a local patch); the remaining client plans that a login
+Still to run, in the order they are worth it: **FAPI 2.0 Message Signing again, now that defects 1–3
+are fixed** (the plan has never completed without a local patch), and the client plans again for
+defects 4–5; the remaining client plans that a login
 broker can satisfy; **FAPI-CIBA ID1**, which needs only `ciba.enabled` and the `poll` delivery mode;
 and **FAPI 1.0 Advanced**, which is the expensive one — the profile requires certificate-bound access
 tokens, so the rig needs client certificates plumbed through the nginx terminator, and the `jarm`

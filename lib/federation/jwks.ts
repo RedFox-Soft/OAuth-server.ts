@@ -10,12 +10,15 @@ import { guardedFetch, readBounded } from '../shared/egress.js';
 /*
  * The upstream provider's signing keys.
  *
- * jose's own RemoteJWKSet supplies the whole caching contract this feature needs, verified against its
- * source rather than assumed: `getKey` reloads when its freshness window (`cacheMaxAge`, 10 minutes by
- * default) has elapsed, and on a `JWKSNoMatchingKey` — an unknown `kid`, i.e. an upstream that rotated on
- * its own schedule — reloads **once** if the cooldown has passed, then retries. Writing that by hand would
- * be reimplementing a documented library behaviour, so this module does exactly one thing jose does not:
- * it bounds how many providers are held.
+ * jose's own RemoteJWKSet supplies the caching, verified against its source rather than assumed: `getKey`
+ * reloads when its freshness window (`cacheMaxAge`, 10 minutes by default) has elapsed, and on a
+ * `JWKSNoMatchingKey` — an unknown `kid`, i.e. an upstream that rotated on its own schedule — reloads
+ * **once** unless the cooldown is running, then retries. The cooldown is switched off: its default of 30
+ * seconds refused every sign-in in the half-minute after a rotation (the conformance suite's
+ * `signing-key-rotation` module found it), and it defends against nothing here — the token is read from the
+ * provider's own token endpoint, so only the provider can present an unknown `kid`. A rotation to a key with
+ * *no* `kid` never raises `JWKSNoMatchingKey` at all; verifyIdToken.ts handles that one. Beyond those, this
+ * module does one thing jose does not: it bounds how many providers are held.
  *
  * The bound matters because the URL is read from a bucket document an operator edits. jose holds one
  * instance per URL and knows nothing about how many URLs exist.
@@ -42,6 +45,7 @@ export function keySetFor(jwksUri: string): RemoteKeySet {
 	}
 
 	const created = createRemoteJWKSet(new URL(jwksUri), {
+		cooldownDuration: 0,
 		[customFetch]: fetchThroughBoundary
 	});
 	sets.set(jwksUri, created);

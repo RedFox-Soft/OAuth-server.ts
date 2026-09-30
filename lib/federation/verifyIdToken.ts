@@ -30,6 +30,7 @@ export type IdTokenRejectionReason =
 	| 'audience'
 	| 'azp'
 	| 'expired'
+	| 'issued_at'
 	| 'issued_in_future'
 	| 'subject'
 	| 'nonce'
@@ -99,6 +100,37 @@ function acceptableAlgorithms(metadata: ProviderMetadata): string[] {
 	return advertised;
 }
 
+/*
+ * A provider that rotates to a key carrying no `kid` never makes jose reload: the cached set's one key is
+ * selected, the signature fails, and nothing refetches until the cache expires ten minutes later. So a
+ * signature that fails against a *cached* set is retried once against a fresh one. Against a set fetched
+ * for this very call there is nothing newer to read, and no retry. Only the provider can cause the retry,
+ * for the same reason jwks.ts gives for the cooldown: the token arrived from its token endpoint.
+ */
+async function verifyRotating(
+	idToken: string,
+	keySet: ReturnType<typeof keySetFor>,
+	options: Parameters<typeof jwtVerify>[2]
+) {
+	const cached = keySet.fresh;
+	try {
+		return await jwtVerify(idToken, keySet, options);
+	} catch (err) {
+		if (
+			!cached ||
+			!(err instanceof joseErrors.JWSSignatureVerificationFailed)
+		) {
+			throw err;
+		}
+		try {
+			await keySet.reload();
+		} catch {
+			throw err;
+		}
+		return jwtVerify(idToken, keySet, options);
+	}
+}
+
 export async function verifyFederatedIdToken(
 	idToken: string | undefined,
 	expected: {
@@ -136,7 +168,7 @@ export async function verifyFederatedIdToken(
 
 	let payload: Record<string, unknown>;
 	try {
-		const verified = await jwtVerify(
+		const verified = await verifyRotating(
 			idToken,
 			keySetFor(expected.metadata.jwksUri),
 			{
@@ -179,13 +211,18 @@ export async function verifyFederatedIdToken(
 	}
 
 	/*
+	 * OIDC Core §2 makes `iat` REQUIRED, and jose demands it only when `maxTokenAge` is set — so its
+	 * absence is refused here or it never is.
+	 */
+	if (typeof payload.iat !== 'number') {
+		throw new FederationIdTokenRejected('issued_at');
+	}
+
+	/*
 	 * jose compares `iat` against now only when `exp` is absent, and an ID token always carries `exp` — so
 	 * this comparison has to live here or it never runs. Same reasoning as the admin verifier's.
 	 */
-	if (
-		typeof payload.iat === 'number' &&
-		payload.iat > epochTime() + clockTolerance
-	) {
+	if (payload.iat > epochTime() + clockTolerance) {
 		throw new FederationIdTokenRejected('issued_in_future');
 	}
 

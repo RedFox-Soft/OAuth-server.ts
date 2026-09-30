@@ -193,7 +193,7 @@ describe('FAPI 2.0 Final behaviours', async () => {
 				'state'
 			]);
 			auth.validateClientLocation(res.response);
-			auth.validateError(res.response, 'invalid_request');
+			auth.validateError(res.response, 'invalid_request_object');
 			auth.validateErrorDescription(res.response, "Property 'exp' is missing");
 		});
 

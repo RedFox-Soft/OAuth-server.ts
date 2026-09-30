@@ -58,6 +58,8 @@ describe('request parameter features', () => {
 		isError?: boolean;
 		jwtKey?: crypto.KeyObject | CryptoKey | Uint8Array;
 		alg?: string;
+		// Replaces the registered claims the helper signs by default; an `undefined` member omits it.
+		signOptions?: { audience?: string | string[]; expiresIn?: number };
 	};
 
 	async function authorization(
@@ -68,7 +70,8 @@ describe('request parameter features', () => {
 			verb = 'get',
 			isError = false,
 			jwtKey,
-			alg = 'HS256'
+			alg = 'HS256',
+			signOptions
 		}: RequestCase = {}
 	) {
 		const code_verifier = crypto.randomBytes(32).toString('base64url');
@@ -85,7 +88,7 @@ describe('request parameter features', () => {
 			},
 			jwtKey ?? Buffer.from('secret'),
 			alg,
-			{ issuer: client_id, audience: ISSUER, expiresIn: 30 }
+			{ issuer: client_id, audience: ISSUER, expiresIn: 30, ...signOptions }
 		);
 
 		const cookie = await setup.login({
@@ -146,7 +149,8 @@ describe('request parameter features', () => {
 			payload = {},
 			isError = false,
 			jwtKey,
-			alg = 'HS256'
+			alg = 'HS256',
+			signOptions
 		}: RequestCase = {}
 	) {
 		const request = await JWT.sign(
@@ -157,7 +161,7 @@ describe('request parameter features', () => {
 			},
 			jwtKey ?? Buffer.from('secret'),
 			alg,
-			{ issuer: client_id, audience: ISSUER, expiresIn: 30 }
+			{ issuer: client_id, audience: ISSUER, expiresIn: 30, ...signOptions }
 		);
 
 		// No sign-in: the device authorization request comes from the device, which holds no session.
@@ -272,7 +276,10 @@ describe('request parameter features', () => {
 					});
 
 					expect(spy).toHaveBeenCalledTimes(1);
-					expect(spy.mock.calls[0][0]).toBeInstanceOf(ValidationError);
+					expect(spy.mock.calls[0][0]).toHaveProperty(
+						'message',
+						'invalid_request_object'
+					);
 				});
 
 				it('can contain claims parameter as JSON', async function () {
@@ -402,7 +409,10 @@ describe('request parameter features', () => {
 					});
 
 					expect(spy).toHaveBeenCalledTimes(1);
-					expect(spy.mock.calls[0][0]).toBeInstanceOf(ValidationError);
+					expect(spy.mock.calls[0][0]).toHaveProperty(
+						'message',
+						'invalid_request_object'
+					);
 				});
 
 				it('doesnt allow requestUri inception', async function () {
@@ -422,7 +432,10 @@ describe('request parameter features', () => {
 					});
 
 					expect(spy).toHaveBeenCalledTimes(1);
-					expect(spy.mock.calls[0][0]).toBeInstanceOf(ValidationError);
+					expect(spy.mock.calls[0][0]).toHaveProperty(
+						'message',
+						'invalid_request_object'
+					);
 				});
 
 				if (route !== '/device/auth') {
@@ -702,6 +715,73 @@ describe('request parameter features', () => {
 
 					expect(spy).toHaveBeenCalledTimes(1);
 					expect(spy.mock.calls[0][0]).toBeInstanceOf(ValidationError);
+				});
+
+				it('a request object without a jti is accepted', async function () {
+					const spy = mock();
+					eventBus.once(successEvt, spy);
+
+					await authorizationRequest('client', {
+						jwtPayload: { scope: 'openid', jti: undefined },
+						payload: { scope: 'openid' },
+						verb
+					});
+
+					expect(spy).toHaveBeenCalledTimes(1);
+				});
+
+				it('a request object whose aud is a list naming this server is accepted', async function () {
+					const spy = mock();
+					eventBus.once(successEvt, spy);
+
+					await authorizationRequest('client', {
+						jwtPayload: { scope: 'openid' },
+						payload: { scope: 'openid' },
+						verb,
+						signOptions: {
+							audience: [ISSUER, 'https://other1.example.com', 'invalid']
+						}
+					});
+
+					expect(spy).toHaveBeenCalledTimes(1);
+				});
+
+				it('a request object whose aud is a list without this server is refused', async function () {
+					const spy = mock();
+					eventBus.once(errorEvt, spy);
+
+					await authorizationRequest('client', {
+						jwtPayload: { scope: 'openid' },
+						payload: { scope: 'openid' },
+						verb,
+						isError: true,
+						signOptions: { audience: ['https://other1.example.com'] }
+					});
+
+					expect(spy).toHaveBeenCalledTimes(1);
+					expect(spy.mock.calls[0][0]).toHaveProperty(
+						'message',
+						'invalid_request_object'
+					);
+				});
+
+				it('a request object without exp is refused with invalid_request_object', async function () {
+					const spy = mock();
+					eventBus.once(errorEvt, spy);
+
+					await authorizationRequest('client', {
+						jwtPayload: { scope: 'openid' },
+						payload: { scope: 'openid' },
+						verb,
+						isError: true,
+						signOptions: { expiresIn: undefined }
+					});
+
+					expect(spy).toHaveBeenCalledTimes(1);
+					expect(spy.mock.calls[0][0]).toHaveProperty(
+						'message',
+						'invalid_request_object'
+					);
 				});
 
 				it('an unknown member of the request object is ignored rather than refused', async function () {

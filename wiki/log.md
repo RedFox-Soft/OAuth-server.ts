@@ -122,5 +122,6 @@ Operations:
 - 2026-09-29 — corrected [[signing-keys]]: a bucket's owning group rotates its keys (generate, promote after the publication window, retire with a day's grace) through the console and MCP.
 - 2026-09-29 — corrected [[mcp-server-authorization]]: the RFC 9728 check is now a non-blocking diagnostic (`checkVouching`) following the full MCP discovery order, challenge header first.
 - 2026-09-29 — added [[per-issuer-isolation]]: why the issuer is the unit of isolation for resource namespaces and signing keys.
+- 2026-09-30 — corrected [[upstream-federation]]: jose's JWKS cooldown is off and a failed signature against a cached key set is retried once, so an upstream key rotation no longer refuses sign-ins.
 
 ## [2026-09-30] ingest | [[sentry-elysia-10.73.0]] — `@sentry/bun` moved from `10.73.0` to `11.1.0` (still exact-pinned), which falsified the claim that the page's pinned version is "the same version line as the installed `@sentry/bun`". The reading itself stays at 10.73.0 and is now recorded as one major behind; the spec citation for the two absence assertions moved from `:98,111` to `:102,115`.

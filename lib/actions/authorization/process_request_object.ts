@@ -9,7 +9,13 @@ import {
 	InvalidRequestObject,
 	OIDCProviderError
 } from '../../helpers/errors.ts';
-import { getSchemaValidator, type TSchema, ValidationError } from 'elysia';
+import {
+	getSchemaValidator,
+	mapValueError,
+	type TSchema,
+	ValidationError
+} from 'elysia';
+import { isPlainObject } from 'lib/helpers/_/object.js';
 import {
 	declaredParams,
 	ignoreUnknownIn
@@ -151,7 +157,23 @@ export default async function processRequestObject(
 
 	const validator = getSchemaValidator(schema);
 	if (!validator.Check(payload)) {
-		throw new ValidationError('requestObject', validator, payload);
+		const refusal = new ValidationError('requestObject', validator, payload);
+		const first = mapValueError(refusal.valueError);
+		const named: unknown = first?.schema.error;
+		/*
+		 * RFC 9101 §6.2: what is wrong inside the object is invalid_request_object, not the
+		 * invalid_request a schema refusal answers at the endpoint itself. A member that names a
+		 * registered code of its own keeps it — `registration` is OIDC Core §3.1.2.6's
+		 * registration_not_supported wherever it arrives.
+		 */
+		if (isPlainObject(named) && typeof named.error === 'string') {
+			throw refusal;
+		}
+		throw new InvalidRequestObject(
+			typeof named === 'string' && named
+				? named
+				: first?.summary || 'Request Object is invalid'
+		);
 	}
 
 	// Validated just above against this endpoint's own request schema, whose members are pipeline parameters.

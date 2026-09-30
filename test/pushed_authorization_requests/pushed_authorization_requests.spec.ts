@@ -688,7 +688,7 @@ describe('Pushed Request Object', async () => {
 							if (!error) throw new Error('expected error response');
 							expect(error.status).toBe(400);
 							expect(error.value).toEqual({
-								error: 'invalid_request',
+								error: 'invalid_request_object',
 								error_description: "Property 'exp' is missing"
 							});
 						});

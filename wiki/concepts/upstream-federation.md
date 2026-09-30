@@ -214,9 +214,12 @@ the third distinct way this page has lost content it had rendered.
 
 ## What the upstream is trusted for, and what it is not
 
-`jose`'s `createRemoteJWKSet` supplies the whole key-caching contract — TTL, plus one refetch on an unknown
-`kid` within its cooldown — so none of it is hand-written; `lib/federation/jwks.ts` adds only a bound on how
-many providers are held, because the URL comes from a document an operator edits — and, since
+`jose`'s `createRemoteJWKSet` supplies the key caching — TTL, plus one refetch on an unknown `kid` — and
+`lib/federation/jwks.ts` switches its 30-second cooldown off. Corrected 2026-09-30: that cooldown, and a
+rotation to a key with no `kid` (which never raises `JWKSNoMatchingKey`), each refused sign-ins after an
+upstream rotated; `verifyIdToken.ts` now retries a signature that fails against a *cached* set once against
+a fresh fetch. Neither retry is attacker-triggerable, because the token arrives from the provider's token
+endpoint. The module otherwise adds a bound on how many providers are held, because the URL comes from a document an operator edits — and, since
 2026-09-29, routes jose's fetch through the egress boundary (`customFetch`), so the key set, like discovery
 and the code exchange, cannot be pointed at a private address or return an unbounded body. See
 [[mcp-server-authorization]] for the boundary; discovery also refuses any endpoint that is not https.

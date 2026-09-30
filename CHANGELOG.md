@@ -9,6 +9,17 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A Request Object is held to its own rules, not a client assertion's.** `jti` is optional and `aud`
+  may be a list naming this server (RFC 9101 §4, RFC 7519 §4.1.3), and a malformed one answers
+  `invalid_request_object` rather than `invalid_request` (RFC 9101 §6.2). The first alone refused every
+  signed push in FAPI 2.0 Message Signing.
+- **A federated sign-in refuses an ID token with no `iat`, and follows an upstream key rotation.** The
+  claim is REQUIRED (OIDC Core §2) and was checked only when present; a rotation refused sign-ins for 30
+  seconds, or for ten minutes when the new key carried no `kid`. Both found by the conformance suite's
+  client plans.
+
 ## [0.7.0] - 2026-09-29
 
 Tenants stop sharing what should have been theirs alone. A declared protected resource is unique per
