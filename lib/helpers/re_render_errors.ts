@@ -28,6 +28,15 @@ export class AbortedError extends ReRenderError {
 		super('the interaction was aborted');
 	}
 }
+/*
+ * The device request ended in failure and the device has been told (its next poll reports why). Distinct
+ * from AbortedError, which is the person's own choice, so the page does not call a failure a decision.
+ */
+export class UnfinishedError extends ReRenderError {
+	constructor() {
+		super('the sign-in could not be completed');
+	}
+}
 export class AlreadyUsedError extends ReRenderError {
 	constructor(userCode?: string) {
 		super('code has already been used', userCode);

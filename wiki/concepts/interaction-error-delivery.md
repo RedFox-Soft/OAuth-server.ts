@@ -95,7 +95,14 @@ form carries exactly what the redirect would have. See [[untrusted-redirect-conf
 
 ## Not covered
 
-- The device flow's resume step stays on-page: RFC 8628 delivers a denial through polling.
+- The device flow has no redirect, so its errors are never delivered this way. Since spec 067 the same
+  boundary governs it from the other side: `resume()` hands a device interaction to
+  `completeDeviceInteraction` (`lib/interactions/index.ts:188`, `:294`), which records every error
+  raised after the stored request is restored (`:326`) on the device code, with its own code, for the
+  device's next poll (RFC 8628 §3.5). Before that, no completing page reached the device completion at
+  all — a person who had to sign in or consent was shown `invalid_redirect_uri` — and a browser with no
+  session could not get past the verification page, whose anti-forgery secret was kept on a session it
+  never sent (`Session#keep`, `lib/models/session.ts:157`).
 - Recoverable interaction-page errors (wrong password, wrong code, an upstream sign-in that did not
   complete) never reach `resume()`.
 - Before spec 066 the authorization endpoint redirected request errors before the user was

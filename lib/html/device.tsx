@@ -87,6 +87,12 @@ export function deviceInputPage({
 		);
 	} else if (err && failure.name === 'AbortedError') {
 		message = <p className="red">The Sign-in request was interrupted</p>;
+	} else if (err && failure.name === 'UnfinishedError') {
+		message = (
+			<p className="red">
+				The sign-in could not be completed. Your device has been told.
+			</p>
+		);
 	} else if (err) {
 		message = <p className="red">There was an error processing your request</p>;
 	} else {

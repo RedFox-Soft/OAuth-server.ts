@@ -55,6 +55,11 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- **A device can be approved by someone who is not already signed in.** The verification page now sends
+  the session its anti-forgery check needs, and signing in or consenting during a device sign-in finishes
+  it instead of failing with `invalid_redirect_uri`. Every failure on that step — an unmet
+  authentication context, a withdrawn resource, a fault — now reaches the device's next poll with its own
+  error code instead of leaving it on `authorization_pending` until the code expires.
 - **This server can no longer be used to forward users to an attacker-registered site.** For a client
   whose redirect URIs no operator vouched for — created by dynamic registration or described by a
   metadata document — an authorization error (a malformed request, a declined consent, a silent

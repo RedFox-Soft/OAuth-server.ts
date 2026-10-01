@@ -75,6 +75,8 @@ export const codeVerification = new Elysia()
 			const charset = ApplicationConfig['deviceFlow.charset'];
 			const secret = crypto.randomBytes(24).toString('hex');
 			oidc.session.payload.state = { secret };
+			// The submission checks this secret against the session, so a first visit must leave one.
+			oidc.session.keep();
 
 			const action = oidc.urlFor('code_verification');
 			await setCookies();

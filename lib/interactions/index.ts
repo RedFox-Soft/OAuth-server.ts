@@ -44,17 +44,19 @@ import {
 } from 'lib/totp/enrollment.js';
 import { MAX_ATTEMPTS_PER_INTERACTION } from 'lib/totp/consts.js';
 import {
-	AccessDenied,
 	CustomOIDCProviderError,
+	errorForCode,
 	InvalidClient,
 	InvalidRedirectUri,
 	SessionNotFound
 } from 'lib/helpers/errors.js';
 import {
 	deliverAuthorizationError,
+	getObjFromError,
 	refusesRedirect,
 	type DeliveryCapture
 } from 'lib/shared/authorization_error_delivery.js';
+import { captureFault } from 'lib/error_store/capture.js';
 import sessionHandler from 'lib/shared/session.js';
 import respond from 'lib/actions/authorization/respond.js';
 import getResume from 'lib/actions/authorization/resume.js';
@@ -77,7 +79,8 @@ import {
 	ExpiredError,
 	NotFoundError,
 	AbortedError,
-	ReRenderError
+	ReRenderError,
+	UnfinishedError
 } from 'lib/helpers/re_render_errors.js';
 import { deviceInputPage } from 'lib/html/device.js';
 import deviceVerificationResponse from 'lib/actions/authorization/device_user_flow_response.js';
@@ -176,6 +179,17 @@ async function resume(
 	{ route, request }: { route: string; request: Request }
 ) {
 	/*
+	 * An interaction begun from a device request is finished by the device flow, never by the redirect
+	 * flow below. Every page that completes an interaction calls this function, and a device request
+	 * carries no redirect URI — so before this line, a person who had to sign in or consent to approve a
+	 * device was shown `invalid_redirect_uri` and the device was told nothing. Decided here, on the
+	 * interaction, so no completing page has to remember it.
+	 */
+	if (interaction.payload.deviceCode) {
+		return completeDeviceInteraction(interaction, cookie, { route, request });
+	}
+
+	/*
 	 * The population this interaction belongs to, recovered from the request that started it.
 	 *
 	 * Nothing about the original address survives into a resumption — the browser arrives here from a
@@ -259,6 +273,155 @@ async function resume(
 		return await respond(oidc);
 	} catch (err) {
 		return deliverToClient(oidc, err, setCookies, capture);
+	}
+}
+
+/*
+ * The device flow's completion: binding the approved sign-in to the device code, or recording why it
+ * failed, so the device learns the outcome on its next poll (RFC 8628 §3.5).
+ *
+ * Reached from `resume()` for every completing page, and from `GET /ui/:uid/device_resume`; the route
+ * guard has already run in both cases.
+ *
+ * An outcome is recorded only after `getResume()` has restored the stored request — the boundary spec
+ * 065 draws for the redirect flow. Every way a request can fail to belong to this browser, address or
+ * session is raised before it, so writing an outcome onto someone's code stays out of reach of a
+ * request that could not prove it is theirs. After it, every error that ends the request is recorded
+ * with its own code: RFC 8628 §3.5 tells a client to stop polling on any code but the two "keep going"
+ * ones, so a specific code is more use to it than a blanket `access_denied` — and the alternative was a
+ * device left waiting for its code to expire.
+ */
+async function completeDeviceInteraction(
+	interaction: Interaction,
+	cookie: OIDCCookies,
+	{ route, request }: { route: string; request: Request }
+) {
+	/* Recovered from the interaction for the reason given in `resume()` above. */
+	const bucket = await issuingBucket(
+		await resolveBucketForRequest(
+			clientIdOf(interaction),
+			resourceOf(interaction),
+			await addressedBucketOf(interaction)
+		)
+	);
+	const oidc = new OIDCContext<PipelineParams>({
+		params: {},
+		route: 'ui.device_resume',
+		bucket,
+		cookie
+	});
+
+	const setCookies = await sessionHandler(oidc);
+	const action = oidc.urlFor('code_verification');
+	let code: DeviceCode | undefined;
+	let restored = false;
+
+	try {
+		const confirmPage = await getResume(oidc, interaction);
+		if (confirmPage) {
+			// subject changed — logout confirmation self-submitting form, whose state must be saved
+			await setCookies();
+			return confirmPage;
+		}
+		restored = true;
+
+		if (oidc.result?.error) {
+			throw errorForCode(oidc.result.error, oidc.result.error_description);
+		}
+
+		cookie._interaction.set(expiredInteractionCookie(interaction.uid));
+
+		const { deviceCode } = interaction.payload;
+		if (!deviceCode) {
+			throw new NotFoundError();
+		}
+		code = await DeviceCode.find(deviceCode, {
+			ignoreExpiration: true,
+			ignoreSessionBinding: true,
+			error: new NotFoundError()
+		});
+
+		if (code.isExpired) {
+			throw new ExpiredError();
+		} else if (code.payload.error || code.payload.accountId) {
+			throw new AlreadyUsedError();
+		}
+		oidc.entity('DeviceCode', code);
+
+		await checkClient(oidc);
+		await checkResource(oidc);
+		eventBus.emit('interaction.ended', oidc);
+		assignClaims(oidc);
+		await loadAccount(oidc);
+		await loadGrant(oidc);
+		const destination = await interactions(oidc);
+		await setCookies();
+
+		if (destination) {
+			return Response.redirect(destination, 303);
+		}
+
+		return await deviceVerificationResponse(oidc);
+	} catch (err) {
+		let renderErr = err;
+
+		if (restored && !(err instanceof ReRenderError)) {
+			const errored =
+				code ??
+				(interaction.payload.deviceCode
+					? await DeviceCode.tryFind(interaction.payload.deviceCode, {
+							ignoreExpiration: true,
+							ignoreSessionBinding: true
+						})
+					: undefined);
+			// The first outcome wins, and an expired code has already answered `expired_token`.
+			if (
+				errored &&
+				!errored.isExpired &&
+				!errored.payload.error &&
+				!errored.payload.accountId
+			) {
+				const { error, error_description: description } = getObjFromError(
+					'UNKNOWN',
+					err
+				);
+				Object.assign(errored.payload, {
+					error,
+					errorDescription:
+						description ??
+						(error === 'access_denied'
+							? 'End-User aborted interaction'
+							: undefined)
+				});
+				await errored.save();
+				/*
+				 * Filed here, where the fault happened. The device's poll later answers it as a 400 — a stored
+				 * outcome the token endpoint is reporting, not a failure of its own — so it is not filed twice.
+				 */
+				if (error === 'server_error') {
+					captureFault({
+						surface: 'interaction',
+						route,
+						method: request.method,
+						status: 500,
+						errorCode: 'server_error',
+						error: err,
+						headers: request.headers
+					});
+				}
+				renderErr =
+					error === 'access_denied'
+						? new AbortedError()
+						: new UnfinishedError();
+			}
+		}
+
+		// The page offers the code form again, so it needs a secret the next submission can be checked against.
+		const secret = crypto.randomBytes(24).toString('hex');
+		oidc.session.payload.state = { secret };
+		oidc.session.keep();
+		await setCookies();
+		return deviceInputPage({ action, secret, err: renderErr });
 	}
 }
 
@@ -1308,95 +1471,8 @@ export const ui = new Elysia()
 	.get('ui/:uid/resume', async ({ interaction, cookie, route, request }) =>
 		resume(interaction, cookie, { route, request })
 	)
-	.get('ui/:uid/device_resume', async ({ interaction, cookie }) => {
-		/* Recovered from the interaction for the reason given in `resume()` above. */
-		const bucket = await issuingBucket(
-			await resolveBucketForRequest(
-				clientIdOf(interaction),
-				resourceOf(interaction),
-				await addressedBucketOf(interaction)
-			)
-		);
-		const oidc = new OIDCContext<PipelineParams>({
-			params: {},
-			route: 'ui.device_resume',
-			bucket,
-			cookie
-		});
-
-		const setCookies = await sessionHandler(oidc);
-		const action = oidc.urlFor('code_verification');
-		let code;
-
-		try {
-			const confirmPage = await getResume(oidc, interaction);
-			if (confirmPage) {
-				// subject changed — logout confirmation self-submitting form, whose state must be saved
-				await setCookies();
-				return confirmPage;
-			}
-
-			if (oidc.result?.error) {
-				throw new AccessDenied(undefined, oidc.result.error_description);
-			}
-
-			cookie._interaction.set(expiredInteractionCookie(interaction.uid));
-
-			const { deviceCode } = interaction.payload;
-			if (!deviceCode) {
-				throw new NotFoundError();
-			}
-			code = await DeviceCode.find(deviceCode, {
-				ignoreExpiration: true,
-				ignoreSessionBinding: true,
-				error: new NotFoundError()
-			});
-
-			if (code.isExpired) {
-				throw new ExpiredError();
-			} else if (code.payload.error || code.payload.accountId) {
-				throw new AlreadyUsedError();
-			}
-			oidc.entity('DeviceCode', code);
-
-			await checkClient(oidc);
-			await checkResource(oidc);
-			eventBus.emit('interaction.ended', oidc);
-			assignClaims(oidc);
-			await loadAccount(oidc);
-			await loadGrant(oidc);
-			const destination = await interactions(oidc);
-			await setCookies();
-
-			if (destination) {
-				return Response.redirect(destination, 303);
-			}
-
-			return await deviceVerificationResponse(oidc);
-		} catch (err) {
-			let renderErr = err;
-
-			if (!(err instanceof ReRenderError)) {
-				const errored =
-					code ||
-					(interaction.payload.deviceCode
-						? await DeviceCode.tryFind(interaction.payload.deviceCode, {
-								ignoreExpiration: true,
-								ignoreSessionBinding: true
-							})
-						: undefined);
-				if (errored && err instanceof AccessDenied) {
-					Object.assign(errored.payload, {
-						error: 'access_denied',
-						errorDescription:
-							err.error_description ?? 'End-User aborted interaction'
-					});
-					await errored.save();
-					renderErr = new AbortedError();
-				}
-			}
-
-			const secret = crypto.randomBytes(24).toString('hex');
-			return deviceInputPage({ action, secret, err: renderErr });
-		}
-	});
+	.get(
+		'ui/:uid/device_resume',
+		async ({ interaction, cookie, route, request }) =>
+			completeDeviceInteraction(interaction, cookie, { route, request })
+	);

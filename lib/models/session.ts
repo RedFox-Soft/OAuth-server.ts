@@ -148,6 +148,16 @@ export class Session extends BaseModel<SessionPayloadType> {
 		this.touched = true;
 	}
 
+	/*
+	 * Says that this session now holds something the next request needs, so it is saved and its cookie
+	 * sent even though nobody has signed in. Assigning to `payload` does not do it: the session handler
+	 * persists a session only when it already had a cookie, carries an account, or is touched — which
+	 * left a browser with no session unable to get past a page that keeps its anti-forgery secret here.
+	 */
+	keep() {
+		this.touched = true;
+	}
+
 	authTime() {
 		return this.payload.loginTs;
 	}
