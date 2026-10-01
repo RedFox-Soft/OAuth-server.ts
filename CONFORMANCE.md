@@ -6,108 +6,154 @@ is not the run.
 
 ## Where it stands
 
-**Measured 2026-09-30 against the deployed `conformance.foxauth.dev`**, with the suite running locally
-and reaching the instance over the internet — real TLS, a real hostname, no terminator of our own in
-between. The instance ran `7be92fc` (0.7.0 plus the fixes below); FAPI 2.0 Message Signing was run
-again at `15ab771`, after a signing-key rotation, with the same result. Every client the suite uses, its
-end user, the scope definitions and each profile switch were set up through the MCP control plane, not
-by hand-written seed data.
+### What passes
+
+**Measured 2026-10-01 against the deployed `conformance.foxauth.dev` at `e61a5a1`**, the current
+`main`, with the suite (`conformance-suite:latest`, built 2026-09-30) running locally and reaching the
+instance over the internet — real TLS, a real hostname, no terminator of our own in between. Every
+client the suite uses, its end user, the scope definitions and each profile switch were set up through
+the MCP control plane, not by hand-written seed data, and each profile was switched on save, with no
+restart.
 
 Eight plans test this server as an **OpenID Provider**. None of them reports a failure attributable to
 it:
 
-| Plan                                                | Conditions | Failures                              |
-| --------------------------------------------------- | ---------- | ------------------------------------- |
-| `oidcc-config-certification-test-plan`              | 41         | **none**                              |
-| `oidcc-basic-certification-test-plan`               | 1 901      | 4, all the scripted browser's         |
-| `oidcc-formpost-basic-certification-test-plan`      | 2 007      | **none**, and no warnings             |
-| `oidcc-rp-initiated-logout-certification-test-plan` | 551        | **none**                              |
-| `oidcc-3rdparty-init-login-certification-test-plan` | 50         | **none**                              |
-| `oidcc-dynamic-certification-test-plan`             | 855        | 11, none of them this server          |
-| `fapi2-security-profile-final-test-plan`            | 4 146      | 7, all needing a human or the browser |
-| `fapi2-message-signing-final-test-plan`             | 5 447      | 4, all needing a human                |
+| Plan                                                | Conditions | Failures                     |
+| --------------------------------------------------- | ---------- | ---------------------------- |
+| `oidcc-config-certification-test-plan`              | 41         | **none**                     |
+| `oidcc-basic-certification-test-plan`               | 1 855      | **none**, and no warnings    |
+| `oidcc-formpost-basic-certification-test-plan`      | 2 007      | **none**, and no warnings    |
+| `oidcc-rp-initiated-logout-certification-test-plan` | 551        | **none**                     |
+| `oidcc-3rdparty-init-login-certification-test-plan` | 50         | **none**                     |
+| `oidcc-dynamic-certification-test-plan`             | 852        | 12, none of them this server |
+| `fapi2-security-profile-final-test-plan`            | 4 057      | 4, all needing a human       |
+| `fapi2-message-signing-final-test-plan`             | 5 447      | 4, all needing a human       |
 
-**14 998 conditions, and no server defect.** Message Signing completes for the first time: 61 of its
-66 modules pass, against 64 of 71 only with a local patch in the previous round.
+**14 860 conditions, and no server defect.** Every plan ran once, start to finish, with nothing re-run
+by hand. Each remaining failure is explained under
+[Failures that are not this server](#failures-that-are-not-this-server).
 
-Not re-run in this round, for one reason — each needs this server to **call the suite**, and a suite on
-a laptop cannot be reached from a deployed server, while a local server refuses to call a private address
-at all (the egress boundary, `lib/shared/egress.ts`, since 0.7.0):
+This run covers the five commits that changed what these plans exercise after the 2026-09-30
+measurement (at `7be92fc`): `7c8632a` and `7245d8f` (sign-out by `POST`, the confirmation's hand-off
+to the relying party, introspection and revocation metadata, one source for `grant_types_supported`),
+`a4d4382` (an error raised after an interaction is delivered to the client), `01f3d71` (an error for a
+client no operator vouched for stops at a confirmation page — see [Dynamic](#dynamic--12)) and
+`e61a5a1` (`amr` in every ID token and in `claims_supported`). The only difference any plan shows is
+the one `01f3d71` intends.
 
-| Plan                                                            | Last measured | Then                                |
-| --------------------------------------------------------------- | ------------- | ----------------------------------- |
-| `oidcc-backchannel-rp-initiated-logout-certification-test-plan` | 2026-09-14    | 101 conditions, none failed         |
-| `oidcc-client-basic-certification-test-plan`                    | 2026-09-14    | none — **and one wrong acceptance** |
-| `oidcc-client-config-certification-test-plan`                   | 2026-09-14    | 3, all of them the runner's         |
-| `oidcc-client-refreshtoken-test-plan`                           | 2026-09-14    | none — subject not exercised        |
+Four plans were last measured on 2026-09-14 and not since, because each needs this server to
+**call the suite** (see [What still has to run](#what-still-has-to-run)):
+
+| Plan                                                            | Then                                |
+| --------------------------------------------------------------- | ----------------------------------- |
+| `oidcc-backchannel-rp-initiated-logout-certification-test-plan` | 101 conditions, none failed         |
+| `oidcc-client-basic-certification-test-plan`                    | none — **and one wrong acceptance** |
+| `oidcc-client-config-certification-test-plan`                   | 3, all of them the runner's         |
+| `oidcc-client-refreshtoken-test-plan`                           | none — subject not exercised        |
 
 The three client plans test this server as a **Relying Party**, because `lib/federation/` makes it one
-and no OP plan reaches that code. The two defects they found (4 and 5 below) are fixed and pinned by
-tests, but no suite run has confirmed either yet.
+and no OP plan reaches that code.
 
-**Every run so far used the default bucket.** Since 0.4.0 a user bucket can be addressed by a path or a
-hostname and is then an issuer of its own, with its own well-known locations and, since 0.7.0, its own
-keys beneath its own `jwks_uri`. That is exactly what these plans probe, and no run has covered it.
+### Open defects
 
-## Defects found
+**None the suite has found.** Every defect it reported is fixed — see
+[Defects found and fixed](#defects-found-and-fixed). Two results it will keep reporting are not
+defects: the Dynamic profile's demand for the implicit flow, which this server refuses on purpose, and
+`request_uri` by reference (RFC 9101), which it does not implement and refuses with the registered
+`request_uri_not_supported`.
 
-### In the 2026-09-30 round
+One gap is known **outside** the suite, and it is server-wide rather than one claim's. OIDC Core §5.5.1
+says a claim whose value does not match a `value`/`values` in the `claims` request "is not included in
+the response"; this server selects claims by name only and applies that rule to **no** claim (`sub` and
+`acr`, which carry failure rules of their own, are enforced). It is reachable only with
+`claimsParameter.enabled`, which ships off, and for an array-valued claim such as `amr` the equality
+comparison the text prescribes is undefined.
 
-Each was found by a run, fixed, and the plan re-run clean:
+### What still has to run
 
-- **A sign-out without `id_token_hint` lost the session** on MongoDB (`70f3598`). The adapter stored the
-  absent client as BSON `null`, the schema refused the record on read, and the confirmation answered
-  `400 could not find logout details`. Three RP-initiated-logout modules failed; the in-memory adapter
-  `bun test` runs on could not show it.
-- **Too many refusals inside a Request Object answered `invalid_request_object`** (`390cbda`). Only the
-  object's own registered claims, and a nested `request`/`request_uri`, are refused that way; any other
-  member is refused as the parameter it is — `par-plain-pkce-rejected` expects `invalid_request` for a
-  `plain` `code_challenge_method` (RFC 7636 §4.4.1).
+In the order they are worth it:
 
-Four more gaps were found by **setting the instance up** rather than by a module — each forced a step
-outside the console and the MCP surface, which the constitution does not allow:
+| What                                                                 | Why                                                                                            | What it needs                                                       |
+| -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Back-channel logout                                                  | last run 2026-09-14, and the sign-out path has been rewritten since                            | a suite this server can reach                                       |
+| The three client plans                                               | defects 4 and 5 are fixed and pinned by tests, but no run has confirmed either                 | a suite this server can reach                                       |
+| A named bucket, at a path and at a hostname                          | its own issuer, well-known locations and keys — what these plans probe most, and never covered | a bucket with an address, and suite configs naming its issuer       |
+| A real browser: `user-rejects-authentication`, screenshots, sign-out | HtmlUnit enforces neither CSP nor SameSite — `7245d8f` fixed a defect the suite passed         | a person and a real browser; certification requires it anyway       |
+| `oidcc-server-rotate-keys` with an operator rotating                 | possible without a restart since `15ab771`, untried                                            | an operator running `jwks_generate` while the module waits          |
+| FAPI-CIBA ID1                                                        | never run                                                                                      | `ciba.enabled` and the `poll` delivery mode                         |
+| FAPI 1.0 Advanced                                                    | never run                                                                                      | client certificates through the rig; its `jarm` variant to reach it |
 
-- The claims each scope releases were not a setting (`73b2d85`); an end user's claims could not be set
-  (`faa0ea8`); a `private_key_jwt` or FAPI client could not be registered from the console or by an agent
-  (`7be92fc`).
-- A signing key in an algorithm the server did not boot with was not advertised until a restart
-  (`bebc524`), and the root signing keys could not be rotated without one (`15ab771`) — see
-  [Signing keys](#signing-keys-for-a-fapi-run) below.
+"A suite this server can reach" is the hosted one at `www.certification.openid.net`, which is also the
+one certification counts: a deployed instance cannot call a suite on a laptop, and a local instance
+refuses private addresses by design (the egress boundary, `lib/shared/egress.ts`, since 0.7.0).
 
-### In the 2026-09-14 round
+## Defects found and fixed
 
-Five defects, all fixed on 2026-09-30:
+| Found      | Defect                                                                                       | Fixed in  | Found by                     | Confirmed by a run |
+| ---------- | -------------------------------------------------------------------------------------------- | --------- | ---------------------------- | ------------------ |
+| 2026-09-30 | a confirmed sign-out never reached the relying party in a browser                            | `7245d8f` | Chromium, not the suite      | no — it cannot be  |
+| 2026-09-30 | no `POST` end-session; introspection/revocation auth metadata missing; grant types disagreed | `7c8632a` | reading the specs (#7)       | passes; unseen     |
+| 2026-09-30 | a sign-out without `id_token_hint` lost the session on MongoDB                               | `70f3598` | RP-initiated logout          | yes                |
+| 2026-09-13 | an error raised after an interaction was rendered, not returned to the client (#47)          | `a4d4382` | reading the code             | needs a human      |
+| 2026-09-13 | an ID token never carried `amr` (#46)                                                        | `e61a5a1` | reading the code             | no — not checked   |
+| 2026-09-30 | too many refusals inside a Request Object answered `invalid_request_object`                  | `390cbda` | Message Signing              | yes                |
+| 2026-09-14 | 1–3: a Request Object held to a client assertion's schema                                    | `f2b37e0` | Message Signing              | yes                |
+| 2026-09-14 | 4: the relying party accepted an ID token with no `iat`                                      | `f2b37e0` | client Basic, and the runner | not yet            |
+| 2026-09-14 | 5: the relying party could not follow an upstream key rotation                               | `f2b37e0` | client Config                | not yet            |
+| earlier    | twelve, listed below                                                                         | below     | the OP plans                 | yes                |
 
-**1–3. One schema, three wrong answers about Request Objects** (`f2b37e0`). The Request Object was
-validated against the schema of a **client assertion** (RFC 7523 §3), and every difference was wrong in
-the strict direction: `jti` was demanded (RFC 9101 §4 makes it optional — and since every Message
-Signing module starts with a signed PAR push, the whole plan died in its first block, 49 modules in 0.1
-s each); `aud` could not be an array (RFC 7519 §4.1.3); and a refused object answered `invalid_request`
-rather than `invalid_request_object` (RFC 9101 §6.2), because the schema refusal was a TypeBox error
-that the shared handler formats generically. **Confirmed fixed by this round's Message Signing run** —
-`ensure-request-object-with-multiple-aud-succeeds` and `ensure-request-object-without-exp-fails` pass.
+"Passes; unseen" means the plans run clean with the fix, but no module exercises it: the suite signs
+out by `GET` and never compares the grants it is told about with the grants `/token` accepts. "Needs
+a human" means the module that would show it is `user-rejects-authentication`, which needs someone to
+press cancel.
 
-**4. The relying party accepted an ID token with no `iat`** (`f2b37e0`, `lib/federation/verifyIdToken.ts`).
-The value was checked, the presence was not, and jose does not require `iat` unless `maxTokenAge` is
-set. OIDC Core §2 makes it REQUIRED. **The suite cannot see this defect, and that is the point.** Its OP
+**The sign-out defect is the one to learn from.** The confirmation page carried `form-action 'self'`,
+and `form-action` governs every hop of a submission's navigation, so Chrome blocked the 303 to the
+client's `post_logout_redirect_uri` — after the session had already ended. The RP-initiated logout plan
+passed throughout, because HtmlUnit does not enforce CSP. A browser-enforced property can only be shown
+by a browser.
+
+**`amr` (#46) was invisible to every plan.** The suite does not check the claim (`ValidateIdToken`:
+"amr - not currently checked"), so no run could have found it and none can confirm the fix. A sign-in
+recorded its methods and every hop carried them; the ID token dropped them because nothing in a default
+request asks for `amr`. It is now written into every ID token from a sign-in and advertised in
+`claims_supported` whatever the stored claims setting holds — see `wiki/concepts/amr-reporting.md`.
+
+**1–3. One schema, three wrong answers about Request Objects.** The object was validated against the
+schema of a **client assertion** (RFC 7523 §3), and every difference was wrong in the strict direction:
+`jti` was demanded (RFC 9101 §4 makes it optional — and since every Message Signing module starts with
+a signed PAR push, the whole plan died in its first block); `aud` could not be an array (RFC 7519
+§4.1.3); and a refused object answered `invalid_request` rather than `invalid_request_object` (RFC 9101
+§6.2). `390cbda` then narrowed that last rule: only the object's own registered claims, and a nested
+`request`/`request_uri`, are refused as the object — `par-plain-pkce-rejected` expects
+`invalid_request` for a `plain` `code_challenge_method` (RFC 7636 §4.4.1).
+
+**4. The relying party accepted an ID token with no `iat`** (`lib/federation/verifyIdToken.ts`). The
+value was checked, the presence was not, and jose does not require `iat` unless `maxTokenAge` is set;
+OIDC Core §2 makes it REQUIRED. **The suite cannot see this defect, and that is the point.** Its OP
 cannot observe whether the RP rejected what it sent, so every negative client module reports PASSED;
 the runner here supplies the missing half by recording the HTTP status this server returned. Seven of
 the eight negatives answered 400 and aborted the sign-in; this one answered 303 and finished it.
 
-**5. The relying party could not follow an upstream key rotation** (`f2b37e0`, `lib/federation/jwks.ts`).
-jose's remote key set caches for ten minutes and forces a reload only on `JWKSNoMatchingKey`, and only
-after a 30-second cooldown. A second sign-in 3 s after a rotation was refused and one 45 s after it
-succeeded; a new key with **no `kid`** never raises `JWKSNoMatchingKey` at all, so the lockout lasts the
-whole ten-minute cache.
+**5. The relying party could not follow an upstream key rotation** (`lib/federation/jwks.ts`). jose's
+remote key set caches for ten minutes and forces a reload only on `JWKSNoMatchingKey`, and only after a
+30-second cooldown. A second sign-in 3 s after a rotation was refused and one 45 s after it succeeded;
+a new key with **no `kid`** never raises `JWKSNoMatchingKey` at all, so the lockout lasts the whole
+ten-minute cache.
 
-Twelve defects the suite found before that are fixed too: `830713b` (PAR content type), `1437341`
-(unknown request parameters, widened from the one endpoint reported to six), `6cdb9ec` (`code_verifier`
-alphabet), `848c179` (schema refusals answer 400, not 422), `dcc4c08` and `3589d48` (`/userinfo`
-challenge and POST body), `0353f4b` (form_post reaches a module-less browser; PAR names its own error
-code), `b891075` (key generation for any asymmetric signing algorithm), `87d44e8` (`pkce.required`),
-`a99c81a` (`acr`, which also closed an interaction loop an essential `acr` claim could not escape),
-`2b83c91` (unknown members inside `claims` are ignored; a pushed request is spent after a login, not only
-when no login was needed). The detail is in those commits.
+**The earlier twelve:** `830713b` (PAR content type), `1437341` (unknown request parameters, widened
+from the one endpoint reported to six), `6cdb9ec` (`code_verifier` alphabet), `848c179` (schema refusals
+answer 400, not 422), `dcc4c08` and `3589d48` (`/userinfo` challenge and POST body), `0353f4b`
+(form_post reaches a module-less browser; PAR names its own error code), `b891075` (key generation for
+any asymmetric signing algorithm), `87d44e8` (`pkce.required`), `a99c81a` (`acr`, which also closed an
+interaction loop an essential `acr` claim could not escape), `2b83c91` (unknown members inside `claims`
+are ignored; a pushed request is spent after a login, not only when no login was needed).
+
+Setting the instance up through the MCP surface found four more gaps that no module would — each forced
+a step outside the console and the agent's tools: scope claims were not a setting (`73b2d85`), an end
+user's claims could not be set (`faa0ea8`), a key-authenticated or FAPI client could not be registered
+(`7be92fc`), and a new signing algorithm needed a restart to be advertised (`bebc524`) or rotated
+(`15ab771`) — see [Signing keys for a FAPI run](#signing-keys-for-a-fapi-run).
 
 ## Failures that are not this server
 
@@ -129,12 +175,12 @@ The previous round's other failures are gone rather than explained away: the fou
 `RequireOnlyBCP195RecommendedCiphersForTLS12` failures tested the local nginx terminator, which a
 deployed instance does not have, and the one unexplained `Socket closed` did not recur.
 
-### FAPI 2.0 Security Profile — 7
+### FAPI 2.0 Security Profile — 4
 
-4 are `user-rejects-authentication` again. 3 are `par-ensure-reused-request-uri…` in its first run,
-before the browser override existed: the browser arrived already signed in, from an earlier module's
-session, and the module refuses its own precondition. Run alone with the override it concluded in REVIEW
-with no failed condition. The same two modules are skipped as in Message Signing, for the same reasons.
+All 4 are `user-rejects-authentication` again. `par-ensure-reused-request-uri…` ends in REVIEW with the
+same browser override as in Message Signing; on 2026-09-30 it failed three conditions once, in the run
+made before that override existed. The same two modules are skipped as in Message Signing, for the same
+reasons.
 
 One correction from an earlier run is preserved because the mistake is instructive. Three modules push
 a `client_assertion` whose `aud` is an array, the PAR endpoint URL or the token endpoint URL, and each
@@ -148,22 +194,23 @@ configuration problem; it reports a security defect that is not there.** Defect 
 shape in the other direction — an array `aud` in a Request Object must be accepted — and the two are
 worth reading together before touching either.
 
-### Basic — 4
+### Basic — none
 
-`prompt-login` and `max-age-1` each timed out in the scripted browser waiting for the second login
-page, two failed conditions apiece. Re-run alone, each concluded in REVIEW with no failed condition; the
-review is the screenshot of that second login page (see [Screenshots](#screenshots)).
+No failure. `prompt-login` and `max-age-1` conclude in REVIEW — the screenshot of the second login page
+(see [Screenshots](#screenshots)). On 2026-09-30 both had timed out once in the scripted browser
+waiting for that page and passed when re-run alone; on 2026-10-01 neither did.
 
-### Dynamic — 11
+### Dynamic — 12
 
 **Dynamic OP certification is unreachable as the server stands, and for the same reason PKCE is the
 default.** The profile requires `response_types_supported` to contain `code`, `id_token` and
 `token id_token`, and `grant_types_supported` to contain `implicit`. This server offers `code` and
 `none`, and no implicit grant — a deliberate OAuth 2.1 posture, so the profile is inapplicable rather
-than unfinished. That is 2 of the 11.
+than unfinished. That is 2 of the 12.
 
-- 3 are `request_uri` by reference (RFC 9101), which this server does not implement and refuses with the
-  registered `request_uri_not_supported`.
+- 4 are `request_uri` by reference (RFC 9101), which this server does not implement and refuses with the
+  registered `request_uri_not_supported` — two of them the scripted browser waiting at the confirmation
+  page described below.
 - 5, in three modules, need this server to fetch a document **from the suite** — a client's
   `jwks_uri` (at registration and on RP key rotation, each answered `401` because the key cannot be
   fetched) and a `sector_identifier_uri` (answered `400`, three conditions). From a deployed instance
@@ -172,6 +219,19 @@ than unfinished. That is 2 of the 11.
 - 1 is `oidcc-server-rotate-keys`, which fetches `/jwks`, waits for the operator to rotate the signing
   key, and fetches it again. Nobody rotated. Since `15ab771` this can be done mid-run without a restart —
   `jwks_generate` publishes the new key in `/jwks` at once — but no run has tried it yet.
+
+**One module now stops at a page of this server's, by design.** Since `01f3d71` (RFC 9700 §4.11.2),
+an authorization _error_ for a client whose redirect URIs no operator vouched for — one created by
+dynamic registration, or resolved from a client ID metadata document — is not redirected: the server
+answers with a confirmation page of its own (the error's status, `frame-ancestors 'none'`, and a link
+that delivers the identical answer when clicked). This plan registers every client dynamically, and
+the one module in it whose authorization request is refused is `oidcc-request-uri-signed-rs256`: its
+`request_uri_not_supported` used to arrive at the suite's callback, and since `01f3d71` the scripted
+browser stays on `/auth` until it times out — one more failed condition, which is how the 11 of
+2026-09-30 became the 12 of 2026-10-01. It is the third attack that section lists, closed on purpose,
+and not a new failure class. Successful responses, and every client an administrator created, are
+unaffected — which is why the Basic plan's `oidcc-prompt-none-not-logged-in`, run with static clients,
+still receives its `login_required` redirect.
 
 The plan is still worth running: it is the only one that exercises dynamic registration.
 
@@ -320,20 +380,8 @@ the error to the registered `redirect_uri` instead of rendering a page, and the 
 
 ## Scope
 
-Still to run, in the order they are worth it:
-
-1. **Back-channel logout and the three client plans** — the latter to confirm defects 4 and 5 — which
-   need a suite this server can reach.
-2. **A named bucket**, at a path and at a hostname, through the OP plans above.
-3. **`user-rejects-authentication` and the screenshot modules**, by hand, in a real browser. HtmlUnit
-   does not enforce SameSite, so this is also the first run in which a browser does; the end-user
-   cookies are `lax` since `510b8da` precisely so that `_session` survives the cross-site navigation
-   from a relying party to `/auth`.
-4. **FAPI-CIBA ID1**, which needs only `ciba.enabled` and the `poll` delivery mode.
-5. **FAPI 1.0 Advanced**, the expensive one: it requires certificate-bound access tokens, so the rig needs
-   client certificates, and its `jarm` variant is what makes it reachable without `code id_token`.
-
-Certification itself has not been applied for.
+What is still to run is listed [above](#what-still-has-to-run). Certification itself has not been
+applied for.
 
 Inapplicable by design, not unfinished: Hybrid, Implicit and their form_post variants, because
 `response_types_supported` is `code` and `none`; Dynamic, for the reason above; Session Management and

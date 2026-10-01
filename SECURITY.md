@@ -93,7 +93,7 @@ What does not exist yet:
 - **No paid bug bounty.** A confirmed report earns credit in the release notes and our thanks, not
   money. The scope and safe harbour above are the whole programme.
 - **No OpenID Foundation certification.** The conformance suite has been run and `CONFORMANCE.md`
-  records the result — on 2026-09-30, eight OP plans against the deployed instance, 14 998 conditions
+  records the result — on 2026-10-01, eight OP plans against the deployed instance, 14 860 conditions
   and no server defect, plus the plans not yet re-run and why. Certification itself has not been
   applied for, so standards compliance remains this project's own claim.
 
