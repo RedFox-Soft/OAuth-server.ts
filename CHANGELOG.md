@@ -55,6 +55,11 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- **This server can no longer be used to forward users to an attacker-registered site.** For a client
+  whose redirect URIs no operator vouched for — created by dynamic registration or described by a
+  metadata document — an authorization error (a malformed request, a declined consent, a silent
+  `prompt=none`) is offered on this server's page, naming the destination host, instead of redirected
+  (RFC 9700 §4.11.2). Administrator-created clients and successful responses are unchanged.
 - **Errors after sign-in reach the client** (#47). Declining consent, an unmet authentication context,
   a resource withdrawn mid-flow or a fault while completing sign-in now redirect to the client's
   `redirect_uri` with the error, `state` and `iss`, in the requested response mode, instead of leaving

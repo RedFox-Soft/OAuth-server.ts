@@ -84,13 +84,23 @@ returned (`lib/shared/authorization_error_delivery.ts:174`) — a delivery that 
 handler, which records it there, so it is one record either way — filed at status 500, and the reference
 is not put in the redirect. See [[error-store-capture-sites]].
 
+## An untrusted client is offered the error, not sent it
+
+Since spec 066 the module decides one more thing before delivering: whether an operator vouched for the
+client's redirect URIs (`redirectUrisVouchedFor`, `lib/models/client/provenance.ts:23`). For a
+self-registered or document-described client the answer is offered on a confirmation page instead of
+redirected (`lib/shared/authorization_error_delivery.ts:175`) — RFC 9700 §4.11.2. The response modes
+describe the answer rather than only send it (`lib/response_modes/describe.ts`), so the page's link or
+form carries exactly what the redirect would have. See [[untrusted-redirect-confirmation]].
+
 ## Not covered
 
 - The device flow's resume step stays on-page: RFC 8628 delivers a denial through polling.
 - Recoverable interaction-page errors (wrong password, wrong code, an upstream sign-in that did not
   complete) never reach `resume()`.
-- The authorization endpoint itself still redirects request errors before the user is authenticated,
-  which RFC 9700 §4.11.2 does not allow; that is the endpoint's question, not this rule's.
+- Before spec 066 the authorization endpoint redirected request errors before the user was
+  authenticated for every client; it now does so only for clients an operator created, the reading of
+  RFC 9700 §4.11.2 its editors give (see the section above).
 
 ## Related
 

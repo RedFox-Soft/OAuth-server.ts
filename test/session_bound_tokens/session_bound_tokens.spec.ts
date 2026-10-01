@@ -1,4 +1,4 @@
-import { describe, it, beforeAll, expect, spyOn } from 'bun:test';
+import { describe, it, beforeAll, afterAll, expect, spyOn } from 'bun:test';
 
 import bootstrap, {
 	agent,
@@ -26,10 +26,22 @@ function codeFromResponse(response: Response) {
  */
 describe('session bound tokens behaviours', () => {
 	let setup: Setup;
+	let noPrompts: { mockRestore(): void };
 	beforeAll(async () => {
 		setup = await bootstrap(import.meta.url);
 		// consent/prompt skip: keep the authorization request from bouncing to an interaction
-		spyOn(OIDCContext.prototype, 'promptPending').mockReturnValue(false);
+		noPrompts = spyOn(OIDCContext.prototype, 'promptPending').mockReturnValue(
+			false
+		);
+	});
+
+	/*
+	 * Restored here because nothing else will: the spy is on a prototype, so it outlives this file, and
+	 * every spec after it ran against a server that never asks for sign-in or consent — passing where
+	 * it should not, and failing only for the first one that depended on a prompt.
+	 */
+	afterAll(() => {
+		noPrompts.mockRestore();
 	});
 
 	describe('authorization_code flow', () => {

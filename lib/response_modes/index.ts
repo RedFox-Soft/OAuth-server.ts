@@ -1,5 +1,10 @@
 import query from './query.ts';
-import jwt from './jwt.ts';
+import jwt, { describeJwt } from './jwt.ts';
+import {
+	describeFormPost,
+	describeQuery,
+	type AnswerDescription
+} from './describe.ts';
 import { formPost } from '../html/formPost.js';
 import { ApplicationConfig } from '../configs/application.js';
 import type { OIDCContext } from '../helpers/oidc_context.ts';
@@ -11,6 +16,13 @@ export type ResponseModeHandler = (
 	redirectUri: string,
 	payload: Record<string, string>
 ) => Response | Promise<Response>;
+
+// The same inputs, answered with the response's description instead of the response (describe.ts).
+export type ResponseModeDescriber = (
+	oidc: OIDCContext<PipelineParams>,
+	redirectUri: string,
+	payload: Record<string, string>
+) => AnswerDescription | Promise<AnswerDescription>;
 
 // Response-mode handlers are plain modules, so they are resolved from here directly instead of
 // being registered into a Map held on the provider at initialisation. None of them uses `this`,
@@ -31,6 +43,21 @@ const JWT_SECURED: Record<
 	'form_post.jwt': jwt
 };
 
+const DESCRIBE_BASE: Record<keyof typeof BASE, ResponseModeDescriber> = {
+	query: (_oidc, redirectUri, payload) => describeQuery(redirectUri, payload),
+	form_post: (_oidc, redirectUri, payload) =>
+		describeFormPost(redirectUri, payload)
+};
+
+const DESCRIBE_JWT_SECURED: Record<
+	keyof typeof JWT_SECURED,
+	ResponseModeDescriber
+> = {
+	jwt: describeJwt,
+	'query.jwt': describeJwt,
+	'form_post.jwt': describeJwt
+};
+
 type ResponseModeName = keyof typeof BASE | keyof typeof JWT_SECURED;
 
 export const responseModes = {
@@ -43,6 +70,19 @@ export const responseModes = {
 	},
 	has(name: string) {
 		return responseModes.get(name) !== undefined;
+	},
+	// Gated exactly as `get` is, so a mode that cannot be sent cannot be described either.
+	describe(name: string): ResponseModeDescriber | undefined {
+		if (name in DESCRIBE_BASE) {
+			return DESCRIBE_BASE[name as keyof typeof DESCRIBE_BASE];
+		}
+		if (
+			ApplicationConfig['responseMode.jwt.enabled'] &&
+			name in DESCRIBE_JWT_SECURED
+		) {
+			return DESCRIBE_JWT_SECURED[name as keyof typeof DESCRIBE_JWT_SECURED];
+		}
+		return undefined;
 	}
 };
 

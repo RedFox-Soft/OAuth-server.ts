@@ -38,6 +38,8 @@ export {
 
 export { sectorIdentifier } from './client/sector.ts';
 
+export { redirectUrisVouchedFor } from './client/provenance.ts';
+
 export { clientKeys, type ClientKeys } from './client/keys.ts';
 
 // The validated client, under the same name as the lookup object below.

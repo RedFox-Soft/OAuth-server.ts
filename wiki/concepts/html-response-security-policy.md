@@ -4,7 +4,7 @@ title: "Rendered pages and their content security policy"
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-04
-updated: 2026-08-28
+updated: 2026-10-01
 graph:
   node_type: concept
   relationships:
@@ -111,6 +111,13 @@ its protection is `form-action`, pinned to the callback's origin.
 from a single evaluation: `pagePolicy` returns `{ policy, deniesFraming }`, and `deniesFraming` is the
 same `!foreignTargets.length` that gates the `frame-ancestors` directive. They cannot drift apart
 because nothing keeps them in agreement; there is one decision.
+
+**A foreign form no longer implies "framable" on its own (spec 066, 2026-10-01).** The confirmation page
+offered instead of an error redirect to an untrusted client also has a form posting off-origin — and is
+the opposite case: its one control leaves for that client, so framed it is a clickjacking target, and a
+hidden-frame silent request is precisely what it exists to stop answering. `htmlResponse` therefore takes
+`denyFraming: true` (`lib/html/csp.ts:294`), which forces both headers whatever the forms say. It can only
+strengthen a page, so the `form_post` exception above is untouched. See [[untrusted-redirect-confirmation]].
 
 **Do not move `X-Frame-Options` to the blanket plugin.** It is not a stylistic split. The plugin writes
 to `set.headers` from a pre-routing `onRequest`, and a returned `Response` can *override* a name that

@@ -209,7 +209,8 @@ function foreignFormTargets(html: string): string[] {
  */
 function pagePolicy(
 	html: string,
-	handOffTo?: string
+	handOffTo?: string,
+	denyFraming = false
 ): { policy: string; deniesFraming: boolean } {
 	const scripts = scriptOrigins(html);
 	const scriptSrc = [...scripts, ...inlineScripts(html).map(hash)];
@@ -283,7 +284,14 @@ function pagePolicy(
 	 * frame-busting it would break the flow for no benefit — it carries no interactive UI to hijack,
 	 * and its protection is the form-action above, pinned to the callback's origin.
 	 */
-	const deniesFraming = !foreignTargets.length;
+	/*
+	 * Unless the page says it must not be framed whatever its forms post to. The confirmation page offered
+	 * instead of an error redirect to an untrusted client (RFC 9700 §4.11.2) is the other page with an
+	 * off-origin form, and the opposite case: its one control is a button that leaves for that client, so
+	 * framed it is a clickjacking target, and a hidden-frame silent request is exactly what it exists to
+	 * stop answering automatically.
+	 */
+	const deniesFraming = denyFraming || !foreignTargets.length;
 	if (deniesFraming) {
 		directives.push("frame-ancestors 'none'");
 	}
@@ -330,9 +338,15 @@ export function htmlResponse(
 		headers?: Record<string, string>;
 		/* The pending authorization request's redirect_uri — see contentSecurityPolicyFor. */
 		handOffTo?: string;
+		/* Deny framing even though a form posts off-origin — see pagePolicy. Can only strengthen. */
+		denyFraming?: boolean;
 	} = {}
 ): Response {
-	const { policy, deniesFraming } = pagePolicy(html, init.handOffTo);
+	const { policy, deniesFraming } = pagePolicy(
+		html,
+		init.handOffTo,
+		init.denyFraming
+	);
 
 	return new Response(html, {
 		status: init.status,

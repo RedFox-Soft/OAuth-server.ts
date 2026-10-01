@@ -3,6 +3,9 @@ import { TransformDecodeCheckError } from '@sinclair/typebox/value';
 import { OIDCProviderError } from '../helpers/errors.ts';
 import { isPlainObject } from 'lib/helpers/_/object.js';
 import { responseModes } from 'lib/response_modes/index.js';
+import { send } from 'lib/response_modes/describe.js';
+import { redirectUrisVouchedFor } from 'lib/models/client.js';
+import { confirmationPage } from 'lib/interactions/confirmationPage.js';
 import { captureFault } from 'lib/error_store/capture.js';
 import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import type { PipelineParams } from 'lib/consts/param_list.js';
@@ -152,13 +155,26 @@ export async function deliverAuthorizationError(
 	};
 
 	const requested = oidc.responseMode;
-	const handler =
-		(requested !== undefined && responseModes.get(requested)) ||
-		responseModes.get('query');
-	if (!handler) {
+	const describe =
+		(requested !== undefined && responseModes.describe(requested)) ||
+		responseModes.describe('query');
+	if (!describe) {
 		throw new Error('the query response mode is always available');
 	}
-	const response = await handler(oidc, redirectUri, out);
+	const answer = await describe(oidc, redirectUri, out);
+
+	/*
+	 * RFC 9700 §4.11.2: the server "SHOULD only automatically redirect the user agent if it trusts the
+	 * redirection URI", and otherwise "MAY inform the user and rely on the user". Trust is read as the
+	 * section's editors state it — by how the redirect URI was registered — so an error for a client an
+	 * operator created is redirected at once, before sign-in or after, as OAuth 2.1 §4.1.2.1 delivers it;
+	 * an error for a self-registered or document-described client is offered, never sent. Without this,
+	 * such a client is three ways of sending anyone to its site from this server's address: a malformed
+	 * request, a request the user declines, and a silent one.
+	 */
+	const response = (await redirectUrisVouchedFor(oidc.client))
+		? send(oidc, answer)
+		: confirmationPage({ answer, error: body.error, redirectUri });
 
 	/*
 	 * A fault reported to the client still has to be findable by the operator, and the shared handler's
