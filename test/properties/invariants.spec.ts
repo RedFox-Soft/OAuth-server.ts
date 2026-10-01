@@ -1,7 +1,7 @@
 /*
  * The invariants, checked against generated input rather than examples.
  *
- * WHY this file exists, and why these four functions rather than any others. Each one is a place where
+ * WHY this file exists, and why these functions rather than any others. Each one is a place where
  * a hand-written example passed while the property did not hold, and the escaping and tag-matching pair
  * cost three rounds each to find: a fix was written for the one spelling that had been reported, the
  * suite went green, and the next spelling arrived on the next scan. An example answers "does it handle
@@ -25,6 +25,7 @@ import getWWWAuthenticate from 'lib/shared/authorization_error_handler.js';
 import { contentSecurityPolicyFor } from 'lib/html/csp.js';
 import { esc } from 'lib/html/escape.js';
 import { encodeBase32, decodeBase32 } from 'lib/totp/base32.js';
+import { restrictDescription } from 'lib/shared/authorization_error_delivery.js';
 
 function sha256(text: string): string {
 	return `'sha256-${crypto.hash('sha256', text, 'base64')}'`;
@@ -52,8 +53,9 @@ const hostile = fc.oneof(
 );
 
 /**
- * @proves Four invariants proven over generated input rather than examples: header injection,
- * CSP tag matching, HTML escaping and base32 round-tripping.
+ * @proves Invariants proven over generated input rather than examples: header injection, CSP tag
+ * matching, HTML escaping, base32 round-tripping, and the character set of a delivered error
+ * description.
  */
 describe('the WWW-Authenticate challenge', () => {
 	/*
@@ -189,6 +191,61 @@ describe('the HTML escaper', () => {
 				expect(esc(value)).not.toMatch(/[<>"]/);
 			}),
 			{ numRuns: 500 }
+		);
+	});
+});
+
+/*
+ * RFC 6749 §4.1.2.1 confines `error_description` to %x20-21 / %x23-5B / %x5D-7E. The descriptions the
+ * server delivers to a client are partly built from what the request sent, so no list of today's
+ * messages can show this holds — only the property can.
+ */
+describe('the description delivered with an authorization error', () => {
+	const outside = fc.string({
+		unit: fc.constantFrom(
+			'"',
+			'\\',
+			'\n',
+			'\t',
+			'\x7f',
+			'\x00',
+			'é',
+			'—',
+			'😀',
+			'a',
+			' '
+		),
+		maxLength: 40
+	});
+	const allowed = fc
+		.string({
+			unit: fc
+				.integer({ min: 0x20, max: 0x7e })
+				.filter((c) => c !== 0x22 && c !== 0x5c)
+				.map((c) => String.fromCharCode(c)),
+			maxLength: 60
+		})
+		.filter((s) => s.trim() === s);
+
+	it('never carries a character outside the set RFC 6749 permits', () => {
+		fc.assert(
+			fc.property(fc.oneof(outside, text(60)), (description) => {
+				const delivered = restrictDescription(description);
+				if (delivered !== undefined) {
+					expect(delivered).toMatch(/^[\x20\x21\x23-\x5b\x5d-\x7e]+$/);
+				}
+			}),
+			{ numRuns: 500 }
+		);
+	});
+
+	it('reaches the client unchanged when it is already inside the set', () => {
+		fc.assert(
+			fc.property(allowed, (description) => {
+				expect(restrictDescription(description)).toBe(
+					description === '' ? undefined : description
+				);
+			})
 		);
 	});
 });

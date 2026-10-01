@@ -1,12 +1,15 @@
 import { hostOfRequest } from 'lib/consts/request_host.js';
 import { eventBus } from 'lib/event_bus.js';
-import { responseModes } from 'lib/response_modes/index.js';
 import { OIDCProviderError } from '../helpers/errors.ts';
 import { getErrorHtmlResponse } from '../html/error.tsx';
 import { routeNames } from 'lib/consts/param_list.js';
-import { ErrorContext, mapValueError, ValidationError } from 'elysia';
-import { TransformDecodeCheckError } from '@sinclair/typebox/value';
-import { isPlainObject } from 'lib/helpers/_/object.js';
+import { ErrorContext, ValidationError } from 'elysia';
+import {
+	deliverAuthorizationError,
+	getFirstError,
+	getObjFromError,
+	refusesRedirect
+} from './authorization_error_delivery.ts';
 
 /*
  * What this handler reads off the context Elysia hands onError. Structural on purpose: the app
@@ -65,31 +68,6 @@ function surfaceFor(route: string): ErrorSurface {
 	return 'oauth';
 }
 
-/*
- * The first schema violation behind a VALIDATION code, if there is one. Elysia reports two kinds under
- * that code: its own ValidationError, and TypeBox's TransformDecodeCheckError when a member fails to
- * decode (a query value that is not the JSON its schema expects), which carries the violation inside.
- */
-function getFirstError(
-	error: unknown
-): { path: string; schemaError: unknown; summary?: string } | undefined {
-	if (error instanceof ValidationError) {
-		const first = mapValueError(error.valueError);
-		return (
-			first && {
-				path: first.path,
-				schemaError: first.schema.error,
-				summary: first.summary
-			}
-		);
-	}
-	if (error instanceof TransformDecodeCheckError) {
-		const { path, schema, message } = error.error;
-		return { path, schemaError: schema.error, summary: message };
-	}
-	return undefined;
-}
-
 export default function getWWWAuthenticate(
 	authorization: string,
 	isDpop: boolean,
@@ -126,46 +104,6 @@ export default function getWWWAuthenticate(
 		.join(', ');
 
 	return `${scheme} ${wwwAuth}`;
-}
-
-function getObjFromError(
-	code: string | number,
-	errorObj: unknown
-): { error: string; error_description?: string } {
-	if (errorObj instanceof OIDCProviderError) {
-		const { error, error_description } = errorObj;
-		return { error, ...(error_description ? { error_description } : {}) };
-	}
-	if (code === 'VALIDATION') {
-		const firstError = getFirstError(errorObj);
-		/*
-		 * A schema names the refusal for a member in one of two shapes (lib/consts/param_list.ts): a
-		 * description, answered as invalid_request, or the whole `{ error, error_description }`.
-		 */
-		const schemaError = firstError?.schemaError;
-		if (typeof schemaError === 'string' && schemaError) {
-			return {
-				error: 'invalid_request',
-				error_description: schemaError
-			};
-		}
-		if (isPlainObject(schemaError) && typeof schemaError.error === 'string') {
-			const { error, error_description } = schemaError;
-			return {
-				error,
-				...(typeof error_description === 'string' ? { error_description } : {})
-			};
-		}
-		const error_description = firstError?.summary || 'Validation error';
-		return {
-			error: 'invalid_request',
-			error_description
-		};
-	}
-	return {
-		error: 'server_error',
-		error_description: 'An unexpected error occurred'
-	};
 }
 
 /*
@@ -419,12 +357,7 @@ export async function errorHandler(obj: ErrorHandlerContext) {
 
 	if (
 		bareRoute(route) === routeNames.authorization &&
-		!(
-			typeof error === 'object' &&
-			error !== null &&
-			'allow_redirect' in error &&
-			error.allow_redirect === false
-		)
+		!refusesRedirect(error)
 	) {
 		try {
 			return await authorizationErrorHandler(obj);
@@ -569,19 +502,17 @@ async function authorizationErrorHandler({
 		await requestBucketFor(slugOf(route, request.url), hostOfRequest(request))
 	);
 
-	const state = redirectObj.state;
-	const out = {
-		...getObjFromError(code, error),
-		...(state ? { state } : {}),
-		iss: redirectObj.oidc.issuer
-	};
-	// Read after the request object merge, which can name a response mode of its own.
-	const requested = redirectObj.oidc.params.response_mode;
-	const handler =
-		(typeof requested === 'string' && responseModes.get(requested)) ||
-		responseModes.get('query');
-	if (!handler) {
-		throw new Error('the query response mode is always available');
-	}
-	return await handler(redirectObj.oidc, redirectObj.redirect_uri, out);
+	// The context is read after the request object merge, which can name a response mode of its own.
+	return await deliverAuthorizationError(
+		redirectObj.oidc,
+		redirectObj.redirect_uri,
+		code,
+		error,
+		{
+			surface: 'oauth',
+			route,
+			request,
+			submittedFields: fieldNamesOf(query)
+		}
+	);
 }

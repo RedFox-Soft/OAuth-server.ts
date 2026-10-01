@@ -55,6 +55,13 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- **Errors after sign-in reach the client** (#47). Declining consent, an unmet authentication context,
+  a resource withdrawn mid-flow or a fault while completing sign-in now redirect to the client's
+  `redirect_uri` with the error, `state` and `iss`, in the requested response mode, instead of leaving
+  the user on an error page; a cancelled interaction can no longer be resumed into a code. A client or
+  redirect URI removed while the user was signing in is refused on-page and is no longer sent a code.
+  Faults delivered as `server_error` are now recorded in the error store, and a redirected
+  `error_description` stays within RFC 6749's character set.
 - **A confirmed sign-out returns to the relying party.** The confirmation page's `form-action 'self'`
   had Chrome block the 303 to `post_logout_redirect_uri`, after the session had already ended, so the
   user stayed on "Do you want to sign-out?". The page now admits the validated address's origin.

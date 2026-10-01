@@ -4,7 +4,7 @@ title: 'Error store capture sites'
 tags: [architecture, gotcha, contract]
 sources: [oauth-server-codebase]
 created: 2026-08-26
-updated: 2026-09-23
+updated: 2026-10-01
 graph:
   node_type: concept
   relationships:
@@ -18,7 +18,8 @@ graph:
 
 # Error store capture sites
 
-Recorded faults are captured in **two** places, and the reason is easy to get backwards.
+Recorded faults are captured in **three** places, and the reason for the first two is easy to get
+backwards. (Two until 2026-10-01; the third is a fault delivered to a client by redirect, below.)
 
 `errorHandler` in `lib/shared/authorization_error_handler.ts` stands aside for admin-plane errors — but
 it keys that on the `adminPlane` **marker**, which only a deliberate `AdminError` carries. So:
@@ -31,6 +32,23 @@ it keys that on the `adminPlane` **marker**, which only a deliberate `AdminError
 
 Capture only at the global handler would therefore miss exactly the faults the admin plane took the
 trouble to explain, which is the wrong half to lose.
+
+## A fault delivered by redirect is recorded where it is delivered
+
+An authorization request that faults is answered to the client as `server_error` at its redirect URI
+(RFC 6749 §4.1.2.1 defines that code because a 500 cannot travel in a redirect). That answer returns
+before the global handler's `captureFault`, so until spec 065 a fault at `/auth` was announced on
+`server_error` and never stored. `deliverAuthorizationError`
+(`lib/shared/authorization_error_delivery.ts:174`) now records it — for `/auth` and for the resume step
+of an interaction alike — only **after** the response-mode handler has returned: a delivery that fails
+goes back to the global handler, which records the fault there, so it is one record either way.
+
+It is filed at **500**, not at the redirect's 303. The handler's rule that a fault is "filed under the
+status the caller actually received" (`lib/shared/authorization_error_handler.ts:398`) is about status
+*corrections* — DPoP's 400 becoming a 401 — and a fault whose transport happens to be a redirect is
+still a fault; filed at 303 it would vanish from every filter an operator
+uses. The reference is not put in the redirect, for the reason in "The reference identifier". See
+[[interaction-error-delivery]].
 
 ## Only defects are recorded
 

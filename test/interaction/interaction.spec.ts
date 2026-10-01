@@ -178,7 +178,7 @@ describe('interaction UI', async () => {
 	});
 
 	describe('navigate to abort', () => {
-		it('rejects the request with access_denied when the End-User cancels consent', async function () {
+		async function declineConsent() {
 			const login = await setup.login();
 			const auth = new AuthorizationRequest({
 				scope: 'openid',
@@ -197,26 +197,33 @@ describe('interaction UI', async () => {
 			const cookie = [getHeader(res, 'set-cookie'), login].join('; ');
 
 			const before = grantCount();
-			const { response: aborted, error } = await agent
-				.ui({ uid: uid })
-				.consent.post(
-					{
-						action: 'cancel'
-					},
-					{
-						headers: {
-							cookie
-						}
+			const { response: declined } = await agent.ui({ uid: uid }).consent.post(
+				{
+					action: 'cancel'
+				},
+				{
+					headers: {
+						cookie
 					}
-				);
-			if (!error) throw new Error('expected error response');
+				}
+			);
+			return { auth, declined, before };
+		}
 
-			expect(aborted.status).toBe(400);
-			expect(error.value).toEqual({
-				error: 'access_denied',
-				error_description: 'End-User denied consent'
-			});
-			// SC-005: refusing consent issues no grant.
+		it('returns the end user to the client with access_denied when they decline consent', async function () {
+			const { auth, declined } = await declineConsent();
+
+			expect(declined.status).toBe(303);
+			auth.validateClientLocation(declined);
+			auth.validateError(declined, 'access_denied');
+			auth.validateErrorDescription(declined, 'End-User denied consent');
+			auth.validateState(declined);
+			auth.validateIss(declined);
+		});
+
+		it('creates no grant when the end user declines consent', async function () {
+			const { before } = await declineConsent();
+
 			expect(grantCount()).toBe(before);
 		});
 	});

@@ -387,7 +387,7 @@ describe('BASIC code', () => {
 				if (verb === 'get') {
 					auth.validateErrorDescription(
 						response,
-						'Duplicate query parameter "scope, state, response_type" detected'
+						"Duplicate query parameter 'scope, state, response_type' detected"
 					);
 				}
 				if (verb === 'post') {
@@ -419,7 +419,7 @@ describe('BASIC code', () => {
 				if (verb === 'get') {
 					auth.validateErrorDescription(
 						response,
-						'Duplicate query parameter "state" detected'
+						"Duplicate query parameter 'state' detected"
 					);
 				}
 				if (verb === 'post') {
@@ -428,6 +428,27 @@ describe('BASIC code', () => {
 						"Expected property 'state' to be string but found: foo,bar"
 					);
 				}
+			});
+
+			/*
+			 * RFC 6749 §4.1.2.1 confines a redirected description to %x20-21 / %x23-5B / %x5D-7E, and a
+			 * refusal that quotes what the request sent would otherwise carry whatever the request held.
+			 */
+			it('delivers a description inside the character set RFC 6749 permits when the refusal quotes the request', async function () {
+				const auth = new AuthorizationRequest({
+					scope,
+					// @ts-expect-error the case sends the parameter twice
+					state: ['fo"o', 'b\\aré']
+				});
+
+				const { response } = await authRequest(auth);
+				expect(response.status).toBe(303);
+				auth.validateClientLocation(response);
+				auth.validateError(response, 'invalid_request');
+				auth.validateErrorDescription(
+					response,
+					/^[\x20\x21\x23-\x5b\x5d-\x7e]+$/
+				);
 			});
 
 			it('refuses a duplicated response_mode rather than resolving it', async function () {
@@ -449,7 +470,7 @@ describe('BASIC code', () => {
 				if (verb === 'get') {
 					auth.validateErrorDescription(
 						response,
-						'Duplicate query parameter "response_mode" detected'
+						"Duplicate query parameter 'response_mode' detected"
 					);
 				}
 				if (verb === 'post') {
@@ -533,7 +554,7 @@ describe('BASIC code', () => {
 				auth.validateErrorDescription(
 					response,
 					verb === 'get'
-						? 'Duplicate query parameter "ui_locales" detected'
+						? "Duplicate query parameter 'ui_locales' detected"
 						: "Expected property 'ui_locales' to be string but found: fr,en"
 				);
 			});

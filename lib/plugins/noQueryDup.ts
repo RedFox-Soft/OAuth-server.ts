@@ -21,7 +21,7 @@ export const noQueryDup = (allowList: string[] = []) => {
 
 		if (keys.size > 0) {
 			throw new InvalidRequest(
-				`Duplicate query parameter "${Array.from(keys).join(', ')}" detected`
+				`Duplicate query parameter '${Array.from(keys).join(', ')}' detected`
 			);
 		}
 	};

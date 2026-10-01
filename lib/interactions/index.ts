@@ -45,9 +45,16 @@ import {
 import { MAX_ATTEMPTS_PER_INTERACTION } from 'lib/totp/consts.js';
 import {
 	AccessDenied,
-	SessionNotFound,
-	UnmetAuthenticationRequirements
+	CustomOIDCProviderError,
+	InvalidClient,
+	InvalidRedirectUri,
+	SessionNotFound
 } from 'lib/helpers/errors.js';
+import {
+	deliverAuthorizationError,
+	refusesRedirect,
+	type DeliveryCapture
+} from 'lib/shared/authorization_error_delivery.js';
 import sessionHandler from 'lib/shared/session.js';
 import respond from 'lib/actions/authorization/respond.js';
 import getResume from 'lib/actions/authorization/resume.js';
@@ -85,8 +92,7 @@ import { issueAndSend } from 'lib/verification/challenge.js';
 import { request as requestPasswordReset } from 'lib/password_reset/challenge.js';
 import { resetRequestPage, resetRequestAcceptedPage } from './resetPages.js';
 import { Grant } from 'lib/models/grant.js';
-import { Client } from 'lib/models/client.js';
-import { responseModes } from 'lib/response_modes/index.js';
+import { Client, redirectUriAllowed } from 'lib/models/client.js';
 import { resolveBucketForRequest } from 'lib/admin/auth/resolveBucket.js';
 import { ADMIN_BUCKET_ID } from 'lib/admin/consts.js';
 import {
@@ -115,7 +121,60 @@ const INVALID_CODE = 'Invalid code';
 import { ApplicationConfig, configuration } from 'lib/configs/application.js';
 import { isPlainObject } from 'lib/helpers/_/object.js';
 
-async function resume(interaction: Interaction, cookie: OIDCCookies) {
+/*
+ * Returns an error that ended a resumed authorization request to the client that made it.
+ *
+ * The stored request passed redirect-URI validation when it began, but delivery goes to the
+ * registration as it stands now: a client deleted, or a redirect URI withdrawn, while the end user was
+ * signing in is no longer one this server may redirect to (RFC 6749 §4.1.2.1, RFC 9700 §4.11.2). The
+ * refusal that says so is thrown instead, and the shared handler renders it on this server's page.
+ *
+ * The client is resolved here even when the pipeline already did, because an error can end the
+ * request before it did — and a JWT response mode cannot be signed without one.
+ */
+async function deliverToClient(
+	oidc: OIDCContext<PipelineParams>,
+	error: unknown,
+	setCookies: () => Promise<void>,
+	capture: DeliveryCapture
+): Promise<Response> {
+	if (refusesRedirect(error)) {
+		throw error;
+	}
+	const unknownClient = new InvalidClient(
+		'client is invalid',
+		'client not found'
+	);
+	const { client_id: clientId, redirect_uri: redirectUri } = oidc.params;
+	if (clientId === undefined) {
+		throw unknownClient;
+	}
+	const client = await Client.find(clientId, { error: unknownClient });
+	if (
+		typeof redirectUri !== 'string' ||
+		!redirectUriAllowed(client, redirectUri)
+	) {
+		throw new InvalidRedirectUri();
+	}
+	oidc.entity('Client', client);
+
+	// Saved first, as for a successful response: a sign-in that happened during the interaction did
+	// happen, and the expired interaction cookie has to reach the browser either way.
+	await setCookies();
+	return deliverAuthorizationError(
+		oidc,
+		redirectUri,
+		'UNKNOWN',
+		error,
+		capture
+	);
+}
+
+async function resume(
+	interaction: Interaction,
+	cookie: OIDCCookies,
+	{ route, request }: { route: string; request: Request }
+) {
 	/*
 	 * The population this interaction belongs to, recovered from the request that started it.
 	 *
@@ -152,70 +211,55 @@ async function resume(interaction: Interaction, cookie: OIDCCookies) {
 	cookie._interaction.set(expiredInteractionCookie(interaction.uid));
 
 	/*
-	 * The stored parameters are the ones the authorization pipeline kept after `presence` established
-	 * `redirect_uri` there, so this cannot refuse a request that began at the authorization endpoint;
-	 * it is what lets the response below be addressed without taking that on trust.
+	 * From here on, anything that ends the authorization request is the client's to receive.
+	 *
+	 * The boundary is the restored request rather than a list of errors. Every way an interaction can
+	 * fail to belong to this browser, this address or this session is raised before this line — by the
+	 * guard on the route, or by `getResume` before it assigns the stored parameters — and before it there
+	 * is no redirect URI to deliver to in any case. After it, an error nobody anticipated is delivered as
+	 * surely as one somebody did, which a list could only promise for the errors it named.
 	 */
-	presence(oidc, 'redirect_uri');
-
-	/*
-	 * Aborting the authorization request back to the client, which this route has to do for itself:
-	 * the shared onError only redirects on the authorization route, and this is `ui.resume`. The
-	 * stored interaction's params already passed redirect_uri validation, so there is nothing left
-	 * to check here.
-	 */
-	const abortToClient = async (error: string, errorDescription?: string) => {
-		const out = {
-			error,
-			...(errorDescription ? { error_description: errorDescription } : {}),
-			...(oidc.params.state !== undefined ? { state: oidc.params.state } : {}),
-			// The issuer of the bucket this began at, which is the one the client discovered (RFC 9207).
-			iss: oidc.issuer
-		};
-		await setCookies();
-		const mode = oidc.responseMode ?? 'query';
-		const handler = responseModes.get(mode);
-		if (!handler) {
-			// The stored request passed checkResponseMode; an unknown mode here is a defect.
-			throw new Error(`no handler for response mode ${mode}`);
-		}
-		return await handler(oidc, oidc.params.redirect_uri, out);
-	};
-
-	// An interaction that resolved with an error result aborts the authorization request and
-	// redirects the User-Agent back to the client with that error (mirrors device_resume and the
-	// authorization error handler).
-	if (oidc.result?.error) {
-		const { error, error_description: errorDescription } = oidc.result;
-		return abortToClient(error, errorDescription);
-	}
-
-	await checkClient(oidc);
-	await checkResource(oidc);
-	eventBus.emit('interaction.ended', oidc);
-	assignClaims(oidc);
-	await loadAccount(oidc);
-	await loadGrant(oidc);
-	let redirectUri;
+	const capture = { surface: 'interaction' as const, route, request };
 	try {
-		redirectUri = await interactions(oidc);
-	} catch (err) {
 		/*
-		 * The end user authenticated and the required authentication context still is not met, so the
-		 * policy refused rather than minting another interaction. It has to be delivered here: on
-		 * this route the shared error handler would render it instead of returning it to the client.
+		 * The stored parameters are the ones the authorization pipeline kept after `presence` established
+		 * `redirect_uri` there, so this cannot refuse a request that began at the authorization endpoint;
+		 * it is what lets the response below be addressed without taking that on trust.
 		 */
-		if (err instanceof UnmetAuthenticationRequirements) {
-			return abortToClient(err.error, err.error_description);
+		presence(oidc, 'redirect_uri');
+
+		if (oidc.result?.error) {
+			const { error, error_description: errorDescription } = oidc.result;
+			throw new CustomOIDCProviderError(error, errorDescription ?? '');
 		}
-		throw err;
-	}
-	if (redirectUri) {
+
+		await checkClient(oidc);
+		/*
+		 * Judged against the registration as it stands now, for a code as much as for an error: the
+		 * stored request was checked when it began, and a redirect URI an administrator withdrew while
+		 * the end user was signing in is no longer one this server may send an authorization code to.
+		 */
+		const { redirect_uri: redirectUri } = oidc.params;
+		if (
+			typeof redirectUri !== 'string' ||
+			!redirectUriAllowed(oidc.client, redirectUri)
+		) {
+			throw new InvalidRedirectUri();
+		}
+		await checkResource(oidc);
+		eventBus.emit('interaction.ended', oidc);
+		assignClaims(oidc);
+		await loadAccount(oidc);
+		await loadGrant(oidc);
+		const nextStep = await interactions(oidc);
 		await setCookies();
-		return Response.redirect(redirectUri, 303);
+		if (nextStep) {
+			return Response.redirect(nextStep, 303);
+		}
+		return await respond(oidc);
+	} catch (err) {
+		return deliverToClient(oidc, err, setCookies, capture);
 	}
-	await setCookies();
-	return respond(oidc);
 }
 
 async function createGrant(interaction: Interaction) {
@@ -516,7 +560,7 @@ export const ui = new Elysia()
 	)
 	.post(
 		'ui/:uid/login',
-		async ({ body, params: { uid }, interaction, cookie }) => {
+		async ({ body, params: { uid }, interaction, cookie, route, request }) => {
 			const clientId = clientIdOf(interaction);
 			// Before the lookup, so this cannot be used to probe which addresses exist.
 			const closed = await passwordDoorClosed(interaction, uid);
@@ -665,7 +709,7 @@ export const ui = new Elysia()
 				}
 			};
 			await settlePendingLink(interaction.payload, bucketId);
-			return resume(interaction, cookie);
+			return resume(interaction, cookie, { route, request });
 		},
 		{
 			body: t.Object({
@@ -702,7 +746,7 @@ export const ui = new Elysia()
 	})
 	.post(
 		'ui/:uid/totp',
-		async ({ body, params: { uid }, interaction, cookie }) => {
+		async ({ body, params: { uid }, interaction, cookie, route, request }) => {
 			const pending = interaction.payload.secondFactor;
 			if (!pending) {
 				return Response.redirect(buildUILoginPath(uid), 303);
@@ -764,7 +808,7 @@ export const ui = new Elysia()
 			};
 			delete interaction.payload.secondFactor;
 			await settlePendingLink(interaction.payload, bucketId);
-			return resume(interaction, cookie);
+			return resume(interaction, cookie, { route, request });
 		},
 		{ body: t.Object({ code: t.String() }) }
 	)
@@ -821,7 +865,7 @@ export const ui = new Elysia()
 	})
 	.post(
 		'ui/:uid/totp/enroll',
-		async ({ body, params: { uid }, interaction, cookie }) => {
+		async ({ body, params: { uid }, interaction, cookie, route, request }) => {
 			const pending = interaction.payload.secondFactor;
 			if (!pending) {
 				return Response.redirect(buildUILoginPath(uid), 303);
@@ -900,7 +944,7 @@ export const ui = new Elysia()
 			};
 			delete interaction.payload.secondFactor;
 			await settlePendingLink(interaction.payload, bucketId);
-			return resume(interaction, cookie);
+			return resume(interaction, cookie, { route, request });
 		},
 		{ body: t.Object({ code: t.String() }) }
 	)
@@ -982,7 +1026,7 @@ export const ui = new Elysia()
 	 */
 	.get(
 		'ui/:uid/federation/complete',
-		async ({ params: { uid }, query, interaction, cookie }) => {
+		async ({ params: { uid }, query, interaction, cookie, route, request }) => {
 			const handoff = await consumeHandoff(query.ref, uid);
 			if (!handoff?.accountId) {
 				return federationExpiredPage();
@@ -1043,7 +1087,7 @@ export const ui = new Elysia()
 				login: { accountId: user._id, acr: configuration.acrMap.federated }
 			};
 			await settlePendingLink(interaction.payload, bucketId);
-			return resume(interaction, cookie);
+			return resume(interaction, cookie, { route, request });
 		},
 		{
 			params: t.Object({ uid: t.String() }),
@@ -1237,13 +1281,23 @@ export const ui = new Elysia()
 	})
 	.post(
 		'ui/:uid/consent',
-		async ({ body, interaction, cookie }) => {
+		async ({ body, interaction, cookie, route, request }) => {
 			if (body.action === 'allow') {
 				await createGrant(interaction);
-				return resume(interaction, cookie);
+				return resume(interaction, cookie, { route, request });
 			}
 
-			throw new AccessDenied('End-User denied consent');
+			/*
+			 * Declining finishes the interaction rather than throwing out of it. A throw here was rendered to
+			 * the browser and left the interaction standing, so the client never heard and the same uid could
+			 * still be resumed into a code; as a result it is consumed and delivered like any other.
+			 */
+			interaction.payload.result = {
+				...(interaction.payload.result ?? {}),
+				error: 'access_denied',
+				error_description: 'End-User denied consent'
+			};
+			return resume(interaction, cookie, { route, request });
 		},
 		{
 			body: t.Object({
@@ -1251,8 +1305,8 @@ export const ui = new Elysia()
 			})
 		}
 	)
-	.get('ui/:uid/resume', async ({ interaction, cookie }) =>
-		resume(interaction, cookie)
+	.get('ui/:uid/resume', async ({ interaction, cookie, route, request }) =>
+		resume(interaction, cookie, { route, request })
 	)
 	.get('ui/:uid/device_resume', async ({ interaction, cookie }) => {
 		/* Recovered from the interaction for the reason given in `resume()` above. */

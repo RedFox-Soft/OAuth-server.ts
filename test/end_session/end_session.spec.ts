@@ -90,7 +90,7 @@ describe('logout endpoint', () => {
 		expect(response.status).toBe(400);
 		expect(await response.json()).toEqual({
 			error: 'invalid_request',
-			error_description: 'Duplicate query parameter "state" detected'
+			error_description: "Duplicate query parameter 'state' detected"
 		});
 	});
 

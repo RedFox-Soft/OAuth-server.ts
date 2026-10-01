@@ -115,7 +115,10 @@ Each rule is the part that is easy to break. Read the named page before changing
   request-scoped event receives the context itself, first. → `entities/addon-registry.md`,
   `entities/event-bus.md`
 - **Errors** — throw an `OIDCProviderError` subclass (`lib/helpers/errors.ts`); one shared `onError`
-  (`lib/shared/authorization_error_handler.ts`) formats every one. → `admin-plane-error-shape.md`
+  (`lib/shared/authorization_error_handler.ts`) formats every one. An error that ends an authorization
+  request — at `/auth` or after an interaction's stored request is restored — is delivered to the
+  client by `lib/shared/authorization_error_delivery.ts`, never by hand.
+  → `admin-plane-error-shape.md`, `interaction-error-delivery.md`
 - **Configuration** — every setting lives on exactly one of three surfaces: `ApplicationConfig`
   (flat dotted keys, applied to the running process on save), `ClientDefaults` (camelCase only), or
   `lib/addon/*` (behaviour). Import `configuration` from `lib/configs/application.ts`, never off the

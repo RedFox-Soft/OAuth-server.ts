@@ -4,7 +4,7 @@ title: "Reporting the authentication context a sign-in satisfied"
 tags: [oidc, contract, gotcha, config]
 sources: [oauth-server-codebase]
 created: 2026-09-13
-updated: 2026-09-13
+updated: 2026-10-01
 graph:
   node_type: concept
   relationships:
@@ -68,7 +68,7 @@ Confirmed by construction rather than by reading, before anything was changed: a
 `Session` with `acr` set printed `session.acr = undefined`, `session.payload.acr = "2"`, and no
 accessor anywhere in the prototype chain.
 
-## Where the refusal is raised, and why the resume route needs its own delivery
+## Where the refusal is raised, and how it reaches the client
 
 OIDC Core §5.5.1.1: an essential `acr` that cannot be met **MUST** be treated as a failed
 authentication attempt. Before this, it was treated as a reason to show the login page again — every
@@ -84,13 +84,12 @@ when `oidc.result?.login` is present and the failing prompt's reasons name an AC
 page, and *"tried, and it is still not enough"*. The `max_age` check and both consent checks already
 read it for precisely that; the two ACR checks were the ones that did not.
 
-**The delivery is the awkward part.** `lib/shared/authorization_error_handler.ts` redirects an error
-to the client only when `route === routeNames.authorization`, and an interaction resumes on
-`/ui/:uid/resume`. So a throw there renders to the browser instead of returning to the relying
-party, and `resume()` has to deliver it itself — which it already did for an interaction `result.error`,
-and now does for this too. That is the second hand-rolled workaround for one missing rule; widening
-the handler's condition would change delivery for every error thrown during a resume, so it is filed
-as issue #47 rather than done in passing.
+**The delivery was the awkward part.** The shared handler redirected an error to the client only on
+the authorization route, and an interaction resumes on `/ui/:uid/resume`, so a throw there rendered to
+the browser. Spec 045 worked around it with a catch for this one error beside the existing hand-rolled
+delivery of an interaction `result.error`. Since spec 065 (issue #47, 2026-10-01) neither exists: every
+error raised after the stored request is restored is delivered by one rule, and this refusal reaches the
+client the same way as any other — see [[interaction-error-delivery]].
 
 ## The backchannel breaks the same invariant from the other end
 
