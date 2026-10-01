@@ -100,6 +100,11 @@ export async function triggerAuthenticationDevice(
 	 * authentication it did not perform. Where the client made the claim *essential*, a reported
 	 * context that does not match (or none at all) is recorded as a failed transaction instead of
 	 * issuing a token, per OIDC Core §5.5.1.1.
+	 *
+	 * Report the methods the same way, as `amr` beside `acr` — values registered by RFC 8176, such as
+	 * `['pwd', 'otp', 'mfa']`. They reach the ID token and survive refresh unchanged; reported none,
+	 * the token carries none, for the reason above. Unlike `acr`, `amr` has no essential semantics
+	 * (OIDC Core §5.5.1), so nothing a client asks of it can fail the transaction.
 	 */
 	mustChange(
 		'features.ciba.triggerAuthenticationDevice',

@@ -14,7 +14,6 @@ import {
 } from 'lib/adapters/index.ts';
 import { elysia } from 'lib/index.ts';
 import { encodeBase32, decodeBase32 } from 'lib/totp/base32.ts';
-import { Session } from 'lib/models/session.ts';
 import { hotp, stepFor } from 'lib/totp/code.ts';
 import {
 	ACCOUNT_FAILURE_CAP,
@@ -119,12 +118,6 @@ async function getPage(path: string, cookie?: string) {
 		csp: res.headers.get('content-security-policy'),
 		contentType: res.headers.get('content-type') ?? ''
 	};
-}
-
-/* The `amr` recorded on a session, read back through the model. */
-async function amrOf(sessionId: string): Promise<string[] | undefined> {
-	const session = await Session.find(sessionId);
-	return session.payload.amr;
 }
 
 /* An account that already holds an authenticator, without driving the enrolment flow to create one. */
@@ -462,48 +455,6 @@ describe('second factor at sign-in (US3)', () => {
 		expect(res.status).toBe(400);
 		expect(res.text).toContain(INVALID_CREDENTIALS);
 		expect(res.text).not.toContain(INVALID_CODE);
-	});
-
-	/*
-	 * FR-023. The session is where `amr` is recorded, and lib/helpers/process_response_types.ts reads it
-	 * from there onto the ID token — so asserting the session carries it is asserting the whole chain,
-	 * without exchanging a code for tokens to read a claim this server already puts there for every
-	 * other `amr` producer.
-	 */
-	it('records two factors on the resulting session', async () => {
-		const email = `amr-${Math.random()}@x.io`;
-		await seedEnrolled(requiredBucketId, email);
-		const { uid, cookie } = await passwordStep('totp-required-app', email);
-
-		const res = await postForm(`/ui/${uid}/totp`, cookie, {
-			code: currentCode()
-		});
-		expectSignedIn(res);
-
-		const sessionId = new RegExp(`${SESSION_COOKIE_PREFIX}[^=]+=([^;]+)`).exec(
-			res.setCookie ?? ''
-		)?.[1];
-		expect(sessionId).toBeTruthy();
-		expect(await amrOf(present(sessionId, 'a session cookie'))).toEqual([
-			'pwd',
-			'otp'
-		]);
-	});
-
-	it('leaves amr absent on a password-only sign-in, changing nothing for it', async () => {
-		const email = `amr-absent-${Math.random()}@x.io`;
-		await getUserStore(optionalBucketId).create(
-			email,
-			await Bun.password.hash(PASSWORD),
-			[],
-			true
-		);
-		const { res } = await passwordStep('totp-optional-app', email);
-
-		const sessionId = new RegExp(`${SESSION_COOKIE_PREFIX}[^=]+=([^;]+)`).exec(
-			res.setCookie ?? ''
-		)?.[1];
-		expect(await amrOf(present(sessionId, 'a session cookie'))).toBeUndefined();
 	});
 
 	describe('a bucket that does not require the second factor', () => {

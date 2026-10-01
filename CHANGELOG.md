@@ -55,6 +55,12 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- **ID tokens state how the end user signed in (`amr`).** Recorded since the second factor shipped but
+  never emitted, it is now in every ID token from a sign-in — code, device, CIBA and refresh alike —
+  as `["pwd"]`, or `["pwd", "otp", "mfa"]` with a one-time code; a federated sign-in carries none, and a
+  CIBA integration's reported methods are passed through. It is listed in `claims_supported` whatever
+  the stored claims setting holds. **Behaviour change:** password-only ID tokens gain `"amr": ["pwd"]`;
+  test for `otp` or `mfa`, not for the claim's presence (#46).
 - **A device can be approved by someone who is not already signed in.** The verification page now sends
   the session its anti-forgery check needs, and signing in or consenting during a device sign-in finishes
   it instead of failing with `invalid_redirect_uri`. Every failure on that step — an unmet

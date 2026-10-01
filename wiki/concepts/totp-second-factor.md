@@ -4,7 +4,7 @@ title: 'The TOTP second factor'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-27
-updated: 2026-09-29
+updated: 2026-10-01
 graph:
   node_type: concept
   relationships:
@@ -125,10 +125,14 @@ them (`lib/totp/enrollment.ts:84`), and `confirm` refuses anyone else as expired
 
 ## What deliberately did not change
 
-`amr` is set to `['pwd', 'otp']` on a two-factor sign-in and a password-only sign-in is left carrying no
-`amr` at all. Stamping `['pwd']` on the latter would be an observable change to the ID token of every
-bucket that does not use this feature, so the test a relying party makes is "does `amr` contain `otp`".
-Both values are registered in RFC 8176.
+**`amr` is no longer among the things that did not change either** (2026-10-01, issue #46). This
+section used to say a two-factor sign-in reaches the ID token with `['pwd', 'otp']` while a password-only
+one is left with no `amr`, so its tokens stay byte-identical. The first half was never true: the value
+was recorded on the session and dropped before the ID token, because no request ever asked for the
+claim. Both halves are now replaced — a two-factor sign-in reports `['pwd', 'otp', 'mfa']`, a
+password-only one `['pwd']` — and the reasoning, including why the byte-identical choice was reversed,
+is in [[amr-reporting]]. The test a relying party makes for a second factor is still "does `amr` contain
+`otp`" (or `mfa`), never "is `amr` present".
 
 **`acr` is no longer among the things that did not change.** As of commit `4101b93` a two-factor
 sign-in records the `multi_factor` authentication context alongside its `amr`, and `acr_values`
@@ -212,4 +216,5 @@ failing anywhere to reveal it.
   ceiling there reads this bucket's second-factor setting rather than the bucket's id.
 - [[html-response-security-policy]] — both new pages build through `htmlResponse`; the QR is inline SVG
   and needs no directive.
-- [[token-payload-access-contract]] — `amr` reaches the ID token via `session.payload.amr`.
+- [[token-payload-access-contract]] — `amr` is read off the session via `session.payload.amr`.
+- [[amr-reporting]] — how `amr` reaches the ID token, and the values each sign-in reports.

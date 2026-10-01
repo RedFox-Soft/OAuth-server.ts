@@ -223,6 +223,7 @@ export const handler = async function deviceCodeHandler(
 
 		token.set('nonce', code.payload.nonce);
 		token.set('sid', code.payload.sid);
+		if (code.payload.amr?.length) token.set('amr', code.payload.amr);
 
 		idToken = await token.issue('idtoken');
 	}

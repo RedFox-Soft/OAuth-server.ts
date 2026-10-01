@@ -228,6 +228,7 @@ export const handler = async function cibaHandler(
 
 		token.set('nonce', request.payload.nonce);
 		token.set('sid', request.payload.sid);
+		if (request.payload.amr?.length) token.set('amr', request.payload.amr);
 
 		idToken = await token.issue('idtoken');
 	}

@@ -653,6 +653,13 @@ export function validateConfiguration(
 	unpackArrayClaims(claims);
 	ensureOpenIdSub(claims);
 	const claimsSupported = collectClaims(scopes, claims);
+	/*
+	 * `amr` describes the sign-in, like `sid`, and every ID token from a sign-in carries it whatever
+	 * the request asked; it is not the claims setting's to release. Added here rather than to the
+	 * setting's default because a stored setting replaces that default whole, so an instance whose
+	 * operator once saved it would emit a claim it never advertised. Mirrored in discoverySupport.ts.
+	 */
+	claimsSupported.add('amr');
 
 	checkDependantFeatures(config);
 	checkDeviceFlow(config);

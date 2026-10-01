@@ -664,6 +664,7 @@ export const ApplicationConfig = {
 	 *
 	 * description: Claims map used to derive `claims_supported` and claim-defined scopes for discovery.
 	 *   `{ claimName: null }` exposes a standalone claim; `{ scopeName: ['claim', ...] }` groups claims under a scope.
+	 *   `amr` is supported whatever this holds (lib/configs/configuration.ts says why), so it needs no entry.
 	 */
 	claims: setting<ClaimsSetting>({
 		acr: null,

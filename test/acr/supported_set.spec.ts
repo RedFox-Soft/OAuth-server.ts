@@ -8,16 +8,20 @@ import { shaped } from 'test/shape.ts';
 
 /*
  * Every mounted way of finishing a sign-in, and whether completing it records an authentication
- * context on the session. Declared here and checked against the routes the constructed application
- * actually mounts, so the defect this closes is the sign-in path somebody adds later and forgets to
- * give a context — which no example-based case can close, because the defect is the path nobody
- * thought of.
+ * context — and the authentication methods — on the session. Declared here and checked against the
+ * routes the constructed application actually mounts, so the defect this closes is the sign-in path
+ * somebody adds later and forgets to give a context or methods — which no example-based case can
+ * close, because the defect is the path nobody thought of.
  */
-const SIGN_IN_ROUTES: Record<string, 'records a context' | 'records none'> = {
-	'POST /ui/:uid/login': 'records a context',
-	'POST /ui/:uid/totp': 'records a context',
-	'POST /ui/:uid/totp/enroll': 'records a context',
-	'GET /ui/:uid/federation/complete': 'records a context',
+const SIGN_IN_ROUTES: Record<
+	string,
+	'records a context and methods' | 'records a context only' | 'records none'
+> = {
+	'POST /ui/:uid/login': 'records a context and methods',
+	'POST /ui/:uid/totp': 'records a context and methods',
+	'POST /ui/:uid/totp/enroll': 'records a context and methods',
+	// This server observed no method of its own; it does not repeat the upstream provider's.
+	'GET /ui/:uid/federation/complete': 'records a context only',
 	// Stages a pending sign-in and hands off; it writes no login result of its own.
 	'POST /ui/:uid/registration': 'records none',
 	// Neither finishes an authentication: one records consent, the other abandons the request.

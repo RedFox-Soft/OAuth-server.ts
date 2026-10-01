@@ -313,6 +313,9 @@ export const handler = async function refreshTokenHandler(
 
 		token.set('nonce', refreshToken.payload.nonce);
 		token.set('sid', refreshToken.payload.sid);
+		if (refreshToken.payload.amr?.length) {
+			token.set('amr', refreshToken.payload.amr);
+		}
 
 		idToken = await token.issue('idtoken');
 	}

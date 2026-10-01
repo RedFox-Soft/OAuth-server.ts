@@ -1,4 +1,5 @@
 import { hostOfRequest } from 'lib/consts/request_host.js';
+import { AMR_FOR_DISTINCTION } from 'lib/consts/amr.js';
 import {
 	END_USER_PASSWORD_MIN_LENGTH,
 	END_USER_PASSWORD_TOO_SHORT
@@ -868,6 +869,7 @@ export const ui = new Elysia()
 					 * a second factor never reaches here — it stages `secondFactor` above, and the
 					 * context is decided once the code is verified.
 					 */
+					amr: [...AMR_FOR_DISTINCTION.password],
 					acr: configuration.acrMap.password
 				}
 			};
@@ -958,14 +960,7 @@ export const ui = new Elysia()
 				login: {
 					accountId: pending.accountId,
 					transient: pending.transient,
-					/*
-					 * Both values are registered in RFC 8176. This is what tells a relying party two factors
-					 * were used: resume.ts reads `amr` off the login result onto the session, and the ID
-					 * token takes it from there. A password-only sign-in is left carrying no `amr` at all,
-					 * so "otp is present" is the test, and nothing changes for a bucket that does not
-					 * require the factor.
-					 */
-					amr: ['pwd', 'otp'],
+					amr: [...AMR_FOR_DISTINCTION.multi_factor],
 					acr: configuration.acrMap.multi_factor
 				}
 			};
@@ -1101,7 +1096,7 @@ export const ui = new Elysia()
 				login: {
 					accountId: pending.accountId,
 					transient: pending.transient,
-					amr: ['pwd', 'otp'],
+					amr: [...AMR_FOR_DISTINCTION.multi_factor],
 					acr: configuration.acrMap.multi_factor
 				}
 			};
@@ -1246,7 +1241,8 @@ export const ui = new Elysia()
 			}
 
 			interaction.payload.result = {
-				// No `transient`: there is no "remember me" on a federated sign-in.
+				// No `transient`: there is no "remember me" on a federated sign-in. No `amr` either: this
+				// server observed no method of its own (lib/consts/amr.ts).
 				login: { accountId: user._id, acr: configuration.acrMap.federated }
 			};
 			await settlePendingLink(interaction.payload, bucketId);

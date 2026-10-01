@@ -17,7 +17,7 @@ graph:
     - predicate: complements
       object: concept:totp-second-factor
       source: oauth-server-codebase
-      evidence: "amr: ['pwd', 'otp'], acr: configuration.acrMap.multi_factor"
+      evidence: "amr: [...AMR_FOR_DISTINCTION.multi_factor], acr: configuration.acrMap.multi_factor"
       confidence: high
       status: current
 ---
@@ -39,9 +39,12 @@ split is forced by the matching rule: comparing a requested context against a sa
 `urn:mace:incommon:iap:silver` must be able to say so, while nobody may invent a distinction the
 server cannot make and then advertise it.
 
-`acr_values_supported` and the `acr` entry in `claims_supported` are **derived** from the map's
-values in both mirrored implementations (`lib/configs/configuration.ts`, `lib/configs/discoverySupport.ts`)
-rather than stated beside them, so the advertised set and the producible set cannot disagree. The
+`acr_values_supported` is **derived** from the map's values in both mirrored implementations
+(`lib/configs/configuration.ts`, `lib/configs/discoverySupport.ts`) rather than stated beside them, so
+the advertised set and the producible set cannot disagree. (Corrected 2026-10-01: this page used to say
+the `acr` entry in `claims_supported` is derived the same way. It is not — it comes from `acr: null` in
+the `claims` setting, so an operator who saves that setting without it stops advertising the claim.
+`amr`, which is keyed on the same distinctions, is advertised unconditionally — see [[amr-reporting]].) The
 conditional that used to drop `acr` when no values were configured is gone, because a complete map
 is now a validation requirement: every distinction present, values unique, none of them `"0"` —
 OIDC Core §2 reserves that for an authentication carrying no confidence that the same person is
@@ -151,8 +154,8 @@ a claims-parameter finding: see [[feature-flag-gating]] for the general shape.
 
 - [[token-payload-access-contract]] — the contract the broken getter violated; this is its second
   recorded instance, and the one that cost a protocol feature rather than one delivery path.
-- [[totp-second-factor]] — where the multi-factor distinction comes from, and the `amr` decision
-  taken alongside it.
+- [[totp-second-factor]] — where the multi-factor distinction comes from.
+- [[amr-reporting]] — the authentication methods, derived from the same distinctions.
 - [[feature-flag-gating]] — why a flag that is off by default can hide a conformance obligation.
 - [[unknown-request-parameters]] — the other conformance finding whose scope widened once the
   governing text was read rather than the reported endpoint.
