@@ -99,9 +99,11 @@ decision.
 - **Fail anything.** OIDC Core §5.5.1 gives only `sub` and `acr` a failure rule; an essential `amr`
   request, or one naming values the sign-in did not use, completes and is answered with the methods
   used. Core also says a claim whose value does not match a requested `value`/`values` "is not
-  included" — this server applies that to **no** claim (selection is by key in `filter_claims.ts` and
-  `Claims.result()`), and the equality comparison it prescribes is undefined for an array, so `amr`
-  follows the server-wide behaviour. Recorded in `CONFORMANCE.md` as a server-wide gap.
+  included". Since 2026-10-05 the server applies that to every account claim (`valueDiffers` in
+  `lib/helpers/claims.ts`, a JSON-value comparison), but `amr` is one of the three it exempts with
+  `sub` and `acr` (`OWN_VALUE_RULES`): the grants set it on the token after the mask, and a literal
+  comparison of the method array against the method names clients actually send (`values: ["hwk"]`)
+  would drop `amr` for every such request. Until 2026-10-05 the rule applied to no claim at all.
 - **Drive authorization.** Policy stays on `acr`; RFC 8176 warns that depending on specific methods
   makes brittle systems, and RFC 9470 step-up never mentions `amr`.
 - **Appear anywhere but the ID token.** Not in userinfo (`amr` is a reserved name on the account

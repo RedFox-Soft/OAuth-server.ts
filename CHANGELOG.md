@@ -55,6 +55,10 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- **A requested claim value is honoured (OIDC Core §5.5.1).** With `claimsParameter.enabled`, a
+  subject named only in `sub.values` was ignored and a code issued for whoever was signed in; it now
+  fails like `sub.value`. A claim whose value differs from a requested `value`/`values` is left out
+  of the ID token and userinfo (`sub`, `acr` and `amr` keep their own rules).
 - **ID tokens state how the end user signed in (`amr`).** Recorded since the second factor shipped but
   never emitted, it is now in every ID token from a sign-in — code, device, CIBA and refresh alike —
   as `["pwd"]`, or `["pwd", "otp", "mfa"]` with a one-time code; a federated sign-in carries none, and a

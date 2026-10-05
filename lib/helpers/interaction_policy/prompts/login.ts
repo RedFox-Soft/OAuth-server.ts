@@ -96,8 +96,21 @@ class LoginPromt extends Prompt {
 				 * with no constraint, like `null`.
 				 */
 				const request = claimRequest(oidc.claims.id_token?.sub);
-				if (!('value' in request)) {
+				const hasValue = 'value' in request;
+				const hasValues = 'values' in request;
+				if (!hasValue && !hasValues) {
 					return false;
+				}
+				/*
+				 * OIDC Core §5.5.1 processes `values` "equivalently to a value request", so a subject named
+				 * only among `values` binds the response to that end user too. Reading `value` alone
+				 * answered such a request with whoever was signed in, which §3.1.2.2 forbids. A `values`
+				 * that is not a list is refused rather than ignored: ignoring it would drop the constraint.
+				 */
+				if (hasValues && !Array.isArray(request.values)) {
+					throw new errors.InvalidRequest(
+						'invalid claims.id_token.sub.values type'
+					);
 				}
 				let sub = oidc.session.payload.accountId;
 				if (sub === undefined) {
@@ -106,7 +119,10 @@ class LoginPromt extends Prompt {
 				if (oidc.client.subjectType === 'pairwise') {
 					sub = await pairwiseIdentifier(sub, oidc.client);
 				}
-				if (request.value !== sub) {
+				if (hasValue && request.value !== sub) {
+					return true;
+				}
+				if (Array.isArray(request.values) && !request.values.includes(sub)) {
 					return true;
 				}
 				return false;

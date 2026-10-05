@@ -31,9 +31,9 @@ const expire = new Date();
 
 expire.setDate(expire.getDate() + 1);
 /**
- * @proves A relying party receives the individual claims it requested, is refused when it names a
- * different subject or an unmet authentication context, and a malformed claims parameter is
- * refused.
+ * @proves A relying party receives the individual claims it requested, and none whose value differs
+ * from the one it asked for; it is refused when it names a different subject or an unmet
+ * authentication context, and a malformed claims parameter is refused.
  */
 ['get', 'post'].forEach((verb) => {
 	function authRequest(
@@ -211,6 +211,112 @@ expire.setDate(expire.getDate() + 1);
 			});
 		});
 
+		/*
+		 * OIDC Core §5.5.1: "When the Claim value does not match the requested value, the Claim is not
+		 * included in the response", by an equality comparison, and `values` is processed the same way.
+		 */
+		describe('a claim requested with a particular value', () => {
+			async function idTokenFor(request: Record<string, unknown>) {
+				const auth = new AuthorizationRequest({
+					scope: 'openid',
+					claims: { id_token: request }
+				});
+				const cookie = await setup.login({
+					claims: {
+						id_token: Object.fromEntries(
+							Object.keys(request).map((name) => [name, null])
+						)
+					}
+				});
+				const { id_token } = await getToken(auth, { cookie });
+				return decodeJWT(id_token).payload;
+			}
+
+			it('is omitted from the ID token when the end user has a different value', async function () {
+				const payload = await idTokenFor({
+					email: { value: 'someone.else@example.com' },
+					locale: null
+				});
+				expect(payload).not.toContainKey('email');
+				expect(payload.locale).toBe('en-US');
+			});
+
+			it('is returned in the ID token when the end user has that value', async function () {
+				const payload = await idTokenFor({
+					email: { value: 'johndoe@example.com' }
+				});
+				expect(payload.email).toBe('johndoe@example.com');
+			});
+
+			it('is omitted from the ID token when the end user has none of the requested values', async function () {
+				const payload = await idTokenFor({
+					locale: { values: ['de-DE', 'fr-FR'] }
+				});
+				expect(payload).not.toContainKey('locale');
+			});
+
+			it('is returned in the ID token when the end user has one of the requested values', async function () {
+				const payload = await idTokenFor({
+					locale: { values: ['de-DE', 'en-US'] }
+				});
+				expect(payload.locale).toBe('en-US');
+			});
+
+			it('compares a structured claim by its content', async function () {
+				const payload = await idTokenFor({
+					address: { value: structuredClone(fullProfileClaims.address) }
+				});
+				expect(payload.address).toEqual(fullProfileClaims.address);
+			});
+
+			it('compares by type as well as by text', async function () {
+				const payload = await idTokenFor({
+					email_verified: { value: 'false' }
+				});
+				expect(payload).not.toContainKey('email_verified');
+			});
+
+			it('is omitted from the userinfo response when the end user has a different value', async function () {
+				const auth = new AuthorizationRequest({
+					scope: 'openid',
+					claims: {
+						userinfo: {
+							email: { value: 'someone.else@example.com' },
+							locale: null
+						}
+					}
+				});
+				const cookie = await setup.login({
+					claims: { userinfo: { email: null, locale: null } }
+				});
+				const { access_token } = await getToken(auth, { cookie });
+				const { data, response } = await agent.userinfo.get({
+					headers: { authorization: `Bearer ${access_token}` }
+				});
+
+				expect(response.status).toBe(200);
+				expect(data).not.toContainKey('email');
+				expect(data).toContainKey('locale');
+			});
+
+			/*
+			 * §5.5.1.1 overrides the general rule for acr: a voluntary request whose value cannot be
+			 * met SHOULD be answered with the session's current context, not by leaving acr out.
+			 */
+			it('still carries the authentication context the session has when a voluntary acr request names another', async function () {
+				const cookie = await setup.login();
+				setup.getSession().acr = '1';
+
+				const auth = new AuthorizationRequest({
+					scope: 'openid',
+					claims: { id_token: { acr: { values: ['2'] } } }
+				});
+				const { id_token } = await getToken(auth, { cookie });
+
+				expect(decodeJWT(id_token).payload.acr).toBe('1');
+			});
+		});
+
 		describe('related interactions', () => {
 			describe('are met', () => {
 				it('session subject value differs from the one requested [1/2]', async function () {
@@ -247,6 +353,29 @@ expire.setDate(expire.getDate() + 1);
 							id_token: {
 								sub: {
 									value: `${session.accountId}-pairwise`
+								}
+							}
+						}
+					});
+
+					const { response } = await authRequest(auth, { cookie });
+					expect(response.status).toBe(303);
+					auth.validatePresence(response, ['code', 'state']);
+					auth.validateState(response);
+					auth.validateClientLocation(response);
+				});
+
+				it('issues a code when the signed-in end user is among the requested subject values', async function () {
+					const cookie = await setup.login();
+					const session = setup.getSession();
+					const auth = new AuthorizationRequest({
+						client_id: 'client-pairwise',
+						scope: 'openid',
+						prompt: 'none',
+						claims: {
+							id_token: {
+								sub: {
+									values: ['someone-else', `${session.accountId}-pairwise`]
 								}
 							}
 						}
@@ -464,6 +593,65 @@ expire.setDate(expire.getDate() + 1);
 						'login',
 						'claims_id_token_sub_value',
 						'no_session'
+					);
+				});
+
+				/*
+				 * OIDC Core §5.5.1 processes `values` "equivalently to a value request", so a subject
+				 * named only among `values` binds the response to that end user just as `value` does
+				 * (§3.1.2.2: never an ID Token for a different user).
+				 */
+				it('refuses to answer for the signed-in end user when none of the requested subject values is theirs', async function () {
+					const auth = new AuthorizationRequest({
+						client_id: 'client',
+						scope: 'openid',
+						prompt: 'none',
+						claims: {
+							id_token: {
+								sub: {
+									values: ['iexpectthisid', 'orthisone']
+								}
+							}
+						}
+					});
+
+					const cookie = await setup.login();
+					const { response } = await authRequest(auth, { cookie });
+
+					expect(response.status).toBe(303);
+					auth.validateState(response);
+					auth.validateClientLocation(response);
+					auth.validateError(response, 'login_required');
+					auth.validateErrorDescription(
+						response,
+						'requested subject could not be obtained'
+					);
+				});
+
+				it('refuses a subject request whose values are not a list', async function () {
+					const auth = new AuthorizationRequest({
+						client_id: 'client',
+						scope: 'openid',
+						prompt: 'none',
+						claims: {
+							id_token: {
+								sub: {
+									values: 'iexpectthisid'
+								}
+							}
+						}
+					});
+
+					const cookie = await setup.login();
+					const { response } = await authRequest(auth, { cookie });
+
+					expect(response.status).toBe(303);
+					auth.validateState(response);
+					auth.validateClientLocation(response);
+					auth.validateError(response, 'invalid_request');
+					auth.validateErrorDescription(
+						response,
+						'invalid claims.id_token.sub.values type'
 					);
 				});
 
