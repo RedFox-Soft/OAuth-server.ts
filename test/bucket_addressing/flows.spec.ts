@@ -30,6 +30,7 @@ import { TestAdapter } from 'test/models.js';
 import { acmeClient } from './flows.config.js';
 import { Type } from '@sinclair/typebox';
 import { shaped } from 'test/shape.js';
+import { SignJWT } from 'jose';
 
 const SLUG = 'acme';
 const BUCKET_ID = 'acme-bucket';
@@ -344,6 +345,57 @@ describe('a flow started at a named bucket address', () => {
 		expect(atBucket.status).toBe(303);
 		expect(atBucket.headers.get('location')).toContain('/login');
 		expect(await atBare.text()).toContain('unauthorized_client');
+	});
+
+	it("accepts a client assertion audienced at the bucket's token endpoint, and refuses the instance's", async () => {
+		const registered = await elysia.handle(
+			new Request(`http://localhost/${SLUG}/reg`, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					redirect_uris: ['https://registered.example.com/cb'],
+					grant_types: ['authorization_code'],
+					response_types: ['code'],
+					token_endpoint_auth_method: 'client_secret_jwt'
+				})
+			})
+		);
+		const { client_id, client_secret } = shaped(
+			Type.Object({ client_id: Type.String(), client_secret: Type.String() }),
+			await registered.json()
+		);
+		const exchange = async (aud: string) => {
+			const assertion = await new SignJWT({ jti: nanoid() })
+				.setProtectedHeader({ alg: 'HS256' })
+				.setIssuer(client_id)
+				.setSubject(client_id)
+				.setAudience(aud)
+				.setIssuedAt()
+				.setExpirationTime('1m')
+				.sign(new TextEncoder().encode(client_secret));
+			const response = await elysia.handle(
+				new Request(`http://localhost/${SLUG}/token`, {
+					method: 'POST',
+					headers: { 'content-type': 'application/x-www-form-urlencoded' },
+					body: jsonToFormUrlEncoded({
+						grant_type: 'authorization_code',
+						code: 'not-a-code',
+						redirect_uri: 'https://registered.example.com/cb',
+						client_id,
+						client_assertion_type:
+							'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
+						client_assertion: assertion
+					})
+				})
+			);
+			return shaped(ErrorBody, await response.json()).error;
+		};
+
+		// Authenticated, and then refused for the code alone.
+		expect(await exchange(`${ACME_ISSUER}/token`)).toBe('invalid_grant');
+		expect(await exchange(ACME_ISSUER)).toBe('invalid_grant');
+		expect(await exchange(`${ISSUER}/token`)).toBe('invalid_client');
+		expect(await exchange(ISSUER)).toBe('invalid_client');
 	});
 
 	it('does not let a registration at the bare address name the bucket it belongs to', async () => {

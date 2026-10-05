@@ -59,6 +59,10 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   advertises its own `/reg`, but a client registered there was refused `unauthorized_client` at that
   bucket's `/auth` and accepted at the root. The registration now records the bucket, from the address
   alone; a registration at the root is unchanged.
+- **A client assertion is checked against the bucket it was sent to.** At a bucket's address the
+  accepted `aud` values were the instance's, so `private_key_jwt` and `client_secret_jwt` clients were
+  refused when they named the bucket's issuer or token endpoint, and accepted when they named the root.
+  An assertion naming the root is now refused at a bucket's address.
 - **The sign-out pages are styled on their first showing.** Their styles were extracted before the
   page was rendered, so the first one after a restart came out unstyled and later ones carried whatever
   earlier renders had left behind.

@@ -2,7 +2,7 @@ import { InvalidClientAuth } from '../helpers/errors.js';
 import * as JWT from '../helpers/jwt.js';
 import { ReplayDetection } from 'lib/models/replay_detection.js';
 import { clockTolerance } from 'lib/configs/liveTime.js';
-import { ISSUER } from 'lib/configs/env.js';
+import { issuerFor } from 'lib/configs/issuer.js';
 import { routeNames } from 'lib/consts/param_list.js';
 import { assertJwtClientAuthClaimsAndHeader } from 'lib/addon/index.js';
 import { ApplicationConfig as config } from 'lib/configs/application.js';
@@ -48,10 +48,21 @@ export async function tokenJwtAuth(
 	if (assertion === undefined) {
 		throw new InvalidClientAuth('client_assertion must be provided');
 	}
+	/*
+	 * The addressed bucket's identifiers, not the instance's: every bucket is its own authorization
+	 * server, so `/acme/token` is identified by `<issuer>/acme` and `<issuer>/acme/token`. Built from the
+	 * instance's alone, the check refused an assertion that named the bucket it was sent to and accepted
+	 * one naming the root — a captured assertion for one issuer spendable at another.
+	 */
+	const issuer = issuerFor(oidc.bucket);
+	// The matched route is a pattern, so a path-addressed bucket's carries its `/:bucket` prefix.
+	const endpoint = oidc.route.startsWith('/:bucket/')
+		? oidc.route.slice('/:bucket'.length)
+		: oidc.route;
 	const auds = new Set([
-		ISSUER,
-		`${ISSUER}${routeNames.token}`,
-		`${ISSUER}${oidc.route}`
+		issuer,
+		`${issuer}${routeNames.token}`,
+		`${issuer}${endpoint}`
 	]);
 	const { header, payload } = JWT.decode(assertion);
 
@@ -95,11 +106,11 @@ export async function tokenJwtAuth(
 	 * profile: the server "shall only accept its issuer identifier value (as defined in RFC 8414) as a
 	 * string in the `aud` claim received in client authentication assertions". §5.3.3.1 cl. 5 adds that
 	 * it is sent "as a string not as an item in an array", which the strict equality below enforces
-	 * without a separate check — a one-element array is not `=== ISSUER`.
+	 * without a separate check — a one-element array is not `=== issuer`.
 	 */
 	const isFapi = config['fapi.enabled'];
 	if (isFapi) {
-		if (payload.aud !== ISSUER) {
+		if (payload.aud !== issuer) {
 			throw new InvalidClientAuth(
 				'audience (aud) must equal the issuer identifier url'
 			);

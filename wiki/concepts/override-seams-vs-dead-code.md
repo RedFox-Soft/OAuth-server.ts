@@ -41,7 +41,7 @@ So grepping "who imports `assertClaimsParameter`" finds `lib/addon/index.ts` and
 call site is one indirection further out, and an importer census reports the function as dead. It
 is not: `lib/actions/authorization/check_claims.ts:32` invokes it on every authorization request
 carrying a `claims` parameter while `claimsParameter.enabled` is set, and
-`lib/shared/token_jwt_auth.ts:91` invokes `assertJwtClientAuthClaimsAndHeader` on every JWT client
+`lib/shared/token_jwt_auth.ts:120` invokes `assertJwtClientAuthClaimsAndHeader` on every JWT client
 authentication.
 
 ## The test before deleting an inert-looking function

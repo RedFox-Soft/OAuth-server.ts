@@ -207,6 +207,13 @@ the default bucket's, refused `unauthorized_client` at `/acme/auth` and accepted
 found by running the conformance suite against a named bucket. A registration at the root records
 nothing, and the field is written from the address alone, never from the body.
 
+**A client assertion is audienced at the addressed issuer.** Corrected 2026-10-05: the accepted `aud`
+values (`lib/shared/token_jwt_auth.ts`) were the instance's — `ISSUER`, its token endpoint and the
+bare route — at every address, so an assertion naming `/acme/token` was refused at `/acme/token` while
+one naming the root was accepted there, and FAPI's single-issuer rule compared against the root too.
+They are now `issuerFor(oidc.bucket)` and the endpoints beneath it; the route is stripped of its
+`/:bucket` pattern first, since the matched route is a pattern, not a path.
+
 ## A token records the bucket that issued it
 
 `bucketId` is declared on `BaseTokenPayload` and set at issuance. Recorded, not derived, and the reason
