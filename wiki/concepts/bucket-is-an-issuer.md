@@ -221,6 +221,13 @@ token exchange — found by FAPI 2.0 run against `/named`. The addressed issuer 
 argument: the token endpoint, PAR and userinfo pass `issuerFor(oidc.bucket)`, and `/mcp`, served at the
 root only, passes `ISSUER` explicitly.
 
+**`oidc.route` is the bare endpoint at every address.** Elysia hands a handler the matched pattern, so at
+a bucket's address the route was `/:bucket/par`, and every comparison against a bare name quietly took
+the other branch — a pushed request with an unregistered `redirect_uri` was refused with the
+registration code `invalid_redirect_uri` instead of `invalid_request` (RFC 9126 §2.3), and the PAR-only
+`par.allowUnregisteredRedirectUris` allowance never applied. `OIDCContext` now strips the prefix once,
+in its constructor (`lib/helpers/oidc_context.ts`); which bucket was addressed is `oidc.bucket`'s to say.
+
 ## A token records the bucket that issued it
 
 `bucketId` is declared on `BaseTokenPayload` and set at issuance. Recorded, not derived, and the reason

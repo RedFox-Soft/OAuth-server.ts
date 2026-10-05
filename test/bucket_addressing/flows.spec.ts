@@ -454,6 +454,43 @@ describe('a flow started at a named bucket address', () => {
 		}
 	});
 
+	it('refuses an unregistered redirect_uri at the bucket PAR endpoint with the code PAR defines', async () => {
+		const restore = ApplicationConfig['par.enabled'];
+		ApplicationConfig['par.enabled'] = true;
+		try {
+			const registered = await elysia.handle(
+				new Request(`http://localhost/${SLUG}/reg`, {
+					method: 'POST',
+					headers: { 'content-type': 'application/json' },
+					body: JSON.stringify({
+						redirect_uris: ['https://registered.example.com/cb'],
+						grant_types: ['authorization_code'],
+						response_types: ['code']
+					})
+				})
+			);
+			const { client_id, client_secret } = shaped(
+				Type.Object({ client_id: Type.String(), client_secret: Type.String() }),
+				await registered.json()
+			);
+
+			const response = await post(`/${SLUG}/par`, client_id, client_secret, {
+				response_type: 'code',
+				scope: 'openid',
+				redirect_uri: 'https://elsewhere.example.com/cb',
+				code_challenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
+				code_challenge_method: 'S256'
+			});
+
+			// RFC 9126 §2.3: a pushed request is refused with `invalid_request`, not a registration code.
+			expect(shaped(ErrorBody, await response.json()).error).toBe(
+				'invalid_request'
+			);
+		} finally {
+			ApplicationConfig['par.enabled'] = restore;
+		}
+	});
+
 	it('does not let a registration at the bare address name the bucket it belongs to', async () => {
 		const registered = await elysia.handle(
 			new Request('http://localhost/reg', {

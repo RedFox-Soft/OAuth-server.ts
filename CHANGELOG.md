@@ -66,6 +66,10 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 - **A DPoP proof is checked against the bucket it was sent to.** Its `htu` was compared with the
   instance's URL at every address, so every DPoP-bound exchange at a bucket's address failed with
   `invalid_dpop_proof`. It is now compared with the addressed bucket's endpoint.
+- **A bucket's endpoints know which endpoint they are.** At a bucket's address the request context
+  carried the route pattern `/:bucket/par`, so checks against the endpoint's name failed there: a
+  pushed request with an unregistered `redirect_uri` was refused as `invalid_redirect_uri` rather than
+  `invalid_request`, and `par.allowUnregisteredRedirectUris` never applied.
 - **The sign-out pages are styled on their first showing.** Their styles were extracted before the
   page was rendered, so the first one after a restart came out unstyled and later ones carried whatever
   earlier renders had left behind.

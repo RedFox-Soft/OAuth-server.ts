@@ -55,14 +55,11 @@ export async function tokenJwtAuth(
 	 * one naming the root — a captured assertion for one issuer spendable at another.
 	 */
 	const issuer = issuerFor(oidc.bucket);
-	// The matched route is a pattern, so a path-addressed bucket's carries its `/:bucket` prefix.
-	const endpoint = oidc.route.startsWith('/:bucket/')
-		? oidc.route.slice('/:bucket'.length)
-		: oidc.route;
+	// `oidc.route` is already bare: the context strips a bucket's `/:bucket` prefix.
 	const auds = new Set([
 		issuer,
 		`${issuer}${routeNames.token}`,
-		`${issuer}${endpoint}`
+		`${issuer}${oidc.route}`
 	]);
 	const { header, payload } = JWT.decode(assertion);
 

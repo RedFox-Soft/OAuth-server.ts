@@ -128,8 +128,9 @@ export class OIDCContext<T extends Record<string, unknown> = RequestParams> {
 
 	/*
 	 * A route name ('registration', 'ui.resume') for contexts built directly, the Elysia route path
-	 * ('/token') for those built by the auth plugin. Readers compare against both; unifying them would
-	 * change the audience a JWT client assertion is checked against.
+	 * ('/token') for those built by the auth plugin — always without the `/:bucket` prefix, which the
+	 * constructor strips. Readers compare against both; unifying them would change the audience a JWT
+	 * client assertion is checked against.
 	 */
 	readonly route: string;
 
@@ -191,7 +192,17 @@ export class OIDCContext<T extends Record<string, unknown> = RequestParams> {
 	}: OIDCContextInit<T>) {
 		this.params = params;
 		this.#headers = headers;
-		this.route = route;
+		/*
+		 * Every endpoint is mounted twice, bare and beneath `/:bucket`, and Elysia hands over the matched
+		 * pattern — so at a bucket's address the route arrived as `/:bucket/par`. Every reader compares it
+		 * with a bare name, and at a bucket each comparison quietly took the other branch: a pushed
+		 * request was refused with the registration code `invalid_redirect_uri`, and the PAR-only
+		 * allowance for unregistered redirect URIs never applied. `bucket` says where the request was
+		 * addressed; the route says only which endpoint it is.
+		 */
+		this.route = route.startsWith('/:bucket/')
+			? route.slice('/:bucket'.length)
+			: route;
 		this.bucket = bucket;
 		this.signInBucket = bucket;
 		this.cookie = cookie;
