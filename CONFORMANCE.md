@@ -34,21 +34,23 @@ by hand. Each remaining failure is explained under
 
 ### At a named bucket
 
-**Measured 2026-10-05 at `19e4bb8`** against a bucket addressed by path (`/named`) — its own issuer
-`https://conformance.foxauth.dev/named`, its own discovery document, endpoints and signing key, and its
-own project, clients and end user, all set up through MCP. The OIDC plans answer exactly as they do at
-the root, condition for condition:
+**Measured 2026-10-05 at `19e4bb8`** against two buckets with addresses of their own, one of each form:
+`/named`, addressed by path (issuer `https://conformance.foxauth.dev/named`), and
+`tenant.conformance.foxauth.dev`, addressed by hostname (issuer `https://tenant.conformance.foxauth.dev`,
+a wildcard DNS name and a Fly certificate). Each has its own discovery document, endpoints and signing
+key, and its own project, clients and end user, all set up through MCP. Both answer exactly as the root
+does, condition for condition:
 
-| Plan                                                | Conditions | Failures                                      |
-| --------------------------------------------------- | ---------- | --------------------------------------------- |
-| `oidcc-config-certification-test-plan`              | 41         | **none**                                      |
-| `oidcc-basic-certification-test-plan`               | 1 855      | **none**                                      |
-| `oidcc-formpost-basic-certification-test-plan`      | 2 007      | **none**                                      |
-| `oidcc-rp-initiated-logout-certification-test-plan` | 551        | **none**                                      |
-| `oidcc-dynamic-certification-test-plan`             | 852        | 12 — the same twelve as at the root (Dynamic) |
+| Plan                                                | Conditions | Failures at `/named` and at `tenant.` |
+| --------------------------------------------------- | ---------- | ------------------------------------- |
+| `oidcc-config-certification-test-plan`              | 41         | **none**                              |
+| `oidcc-basic-certification-test-plan`               | 1 855      | **none**                              |
+| `oidcc-formpost-basic-certification-test-plan`      | 2 007      | **none**                              |
+| `oidcc-rp-initiated-logout-certification-test-plan` | 551        | **none**                              |
+| `oidcc-dynamic-certification-test-plan`             | 852        | 12 — the root's twelve (Dynamic)      |
 
-Two Basic modules were re-run alone after a network interruption between the suite and the instance;
-both passed.
+Two Basic modules at `/named` were re-run alone after a network interruption between the suite and the
+instance; both passed.
 
 ### In a real browser
 
@@ -94,14 +96,13 @@ reachable only with `claimsParameter.enabled`, which ships off.
 
 In the order they are worth it:
 
-| What                           | Why                                                                                               | What it needs                                                                                                                      |
-| ------------------------------ | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Back-channel logout            | last run against a build whose sign-out has since been rewritten                                  | a suite this server can reach                                                                                                      |
-| The three client plans         | the relying party's `iat` check and its key-rotation reload are pinned by tests, not yet by a run | a suite this server can reach                                                                                                      |
-| A bucket addressed by hostname | the other address form, with its own origin and cookies; only the path form has been run          | a DNS name beneath `conformance.foxauth.dev` and a Fly certificate for it                                                          |
-| FAPI 2.0 at a named bucket     | FAPI's signing keys and clients are per issuer, and only the root's have been set up              | a PS256/ES256 signer promoted in the bucket, and FAPI clients in its project                                                       |
-| FAPI-CIBA ID1                  | never run                                                                                         | a CIBA integration: how a person approves on their device is a deployment's to write (`lib/addon/ciba.ts`)                         |
-| FAPI 1.0 Advanced              | never run                                                                                         | mutual TLS end to end — Fly terminates TLS and does not pass the client certificate on — and its `jarm` variant to reach it at all |
+| What                       | Why                                                                                               | What it needs                                                                                                                      |
+| -------------------------- | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Back-channel logout        | last run against a build whose sign-out has since been rewritten                                  | a suite this server can reach                                                                                                      |
+| The three client plans     | the relying party's `iat` check and its key-rotation reload are pinned by tests, not yet by a run | a suite this server can reach                                                                                                      |
+| FAPI 2.0 at a named bucket | FAPI's signing keys and clients are per issuer, and only the root's have been set up              | a PS256/ES256 signer promoted in the bucket, and FAPI clients in its project                                                       |
+| FAPI-CIBA ID1              | never run                                                                                         | a CIBA integration: how a person approves on their device is a deployment's to write (`lib/addon/ciba.ts`)                         |
+| FAPI 1.0 Advanced          | never run                                                                                         | mutual TLS end to end — Fly terminates TLS and does not pass the client certificate on — and its `jarm` variant to reach it at all |
 
 "A suite this server can reach" is the hosted one at `www.certification.openid.net`, which is also the
 one certification counts: a deployed instance cannot call a suite on a laptop, and a local instance
