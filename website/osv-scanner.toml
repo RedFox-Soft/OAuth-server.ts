@@ -1,0 +1,4 @@
+# Read by OSV-Scanner, which Scorecard's Vulnerabilities check runs over every lockfile it finds.
+[[PackageOverrides]]
+vulnerability.ignore = true
+reason = "website/ is the static foxauth.dev site, built in its own workflow and never part of the server image; only production dependencies gate (scripts/audit_production.ts). Dependabot keeps this lockfile current."

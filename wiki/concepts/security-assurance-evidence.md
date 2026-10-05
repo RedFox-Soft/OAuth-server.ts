@@ -4,14 +4,14 @@ title: "Security assurance: what evidence the project publishes, and what it ref
 tags: [architecture, contract]
 sources: [oauth-server-codebase]
 created: 2026-09-07
-updated: 2026-09-07
+updated: 2026-10-05
 graph:
   node_type: concept
   relationships:
     - predicate: depends_on
       object: subsystem:ci-workflows
       source: oauth-server-codebase
-      evidence: ".github/workflows/security.yml — CodeQL (javascript-typescript, actions), bun audit --audit-level=high on both lockfiles, dependency-review on PRs, Trivy image scan uploaded as SARIF; .github/workflows/scorecard.yml — ossf/scorecard-action with publish_results: true"
+      evidence: ".github/workflows/security.yml — CodeQL (javascript-typescript, actions), scripts/audit_production.ts (bun audit of a production install) since 2026-10-05, dependency-review on PRs, Trivy image scan uploaded as SARIF; .github/workflows/scorecard.yml — ossf/scorecard-action with publish_results: true"
       confidence: high
       status: current
 ---
@@ -39,8 +39,8 @@ page records what was published to close it and, more usefully, the decisions in
   finding, where the result is read, and a section titled "What has not been done" — no external
   audit, no paid bounty, no OpenID Foundation certification, no fuzzing or signed releases.
 - **`.github/workflows/security.yml`**: CodeQL over `javascript-typescript` *and* `actions` with the
-  `security-extended` suite; `bun audit --audit-level=high` on both lockfiles (server and
-  `website/`), which fails the run; `actions/dependency-review-action` on pull requests; a Trivy scan
+  `security-extended` suite; a dependency audit that fails the run on a high or critical advisory
+  (since 2026-10-05 only against a production install of the server — see below); `actions/dependency-review-action` on pull requests; a Trivy scan
   of the image built from the real `Dockerfile`, uploaded to code scanning under category
   `trivy-image`. Triggers: push to `main`, pull requests, weekly cron, manual.
 - **`.github/workflows/scorecard.yml`** publishing an OpenSSF Scorecard, and
@@ -76,6 +76,18 @@ originally got backwards.
 that runs a browser; it is not exempt because it is "just the site". On 2026-09-07 the root lockfile
 carried one high advisory (picomatch 4.0.3, a dev-only transitive of typescript-eslint); `bun audit
 fix` moved it to 4.0.4 so the new gate was green from its first run.
+
+**Superseded 2026-10-05 — only what the image ships gates.** By the owner's decision, an advisory
+against development tooling or `website/` no longer fails the run. The trigger was GHSA-vfj7-8cjw-p6xm
+(braces ≤3.0.3, no fixed release), reachable only through the site build's `starlight-llms-txt >
+micromatch`, which turned main's Security run red with nothing in the repository's power to fix it.
+`bun audit` reads the whole lockfile and has no production mode, so `scripts/audit_production.ts`
+installs `bun install --production` into a temporary copy — exactly what the Dockerfile ships, peers
+such as `typescript` included — and keeps an advisory only when a version it names is installed there.
+Scorecard runs OSV-Scanner, which assigns no dependency group to `bun.lock` packages (checked with
+v2.6.0), so `group = "dev"` cannot express this: `website/osv-scanner.toml` ignores the site's
+vulnerabilities wholesale, and the server's development-only packages still count against Scorecard's
+Vulnerabilities score. Dependabot keeps both lockfiles current regardless.
 
 **Actions are referenced by major tag, not SHA.** Consistent with the four existing workflows.
 Scorecard's `Pinned-Dependencies` check will score this down, and that is accepted for now: the

@@ -65,21 +65,11 @@ jobs:
         with:
           bun-version: latest
 
-      # Two lockfiles, two audits. The website is an independent Bun project (its own package.json
-      # and lockfile) and ships a build pipeline that runs a browser, so it is not exempt.
-      - name: Install the server
-        run: bun install --frozen-lockfile
-
-      - name: Audit the server's dependencies
-        run: bun audit --audit-level=high
-
-      - name: Install the site
-        working-directory: website
-        run: bun install --frozen-lockfile
-
-      - name: Audit the site's dependencies
-        working-directory: website
-        run: bun audit --audit-level=high
+      # Only what the image ships gates the run: the script audits a production install, the way the
+      # Dockerfile makes one. Development tooling and website/ (a static site built elsewhere, never
+      # part of the image) are kept current by Dependabot instead of blocking on an advisory.
+      - name: Audit the production dependencies
+        run: bun scripts/audit_production.ts
 
   dependency-review:
     name: Dependency review

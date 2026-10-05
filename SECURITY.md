@@ -57,8 +57,8 @@ What exists:
   each threat the control in this repository that answers it and the test that holds the control.
 - **Automated scanning on every push, every pull request and every week** — the
   [Security workflow](https://github.com/RedFox-Soft/OAuth-server.ts/actions/workflows/security.yml)
-  runs CodeQL over the TypeScript and over the workflows themselves, audits both Bun lockfiles and
-  fails on a high or critical advisory, reviews the dependencies a pull request adds, and scans the
+  runs CodeQL over the TypeScript and over the workflows themselves, audits the server's production
+  dependencies and fails on a high or critical advisory, reviews the dependencies a pull request adds, and scans the
   published container image. Run logs are public; findings land in the repository's code scanning
   alerts. [foxauth.dev/docs/security/assurance](https://foxauth.dev/docs/security/assurance/)
   describes each check and where to read its result.

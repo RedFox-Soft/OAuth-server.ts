@@ -52,6 +52,9 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 - **Upgrading: run `bun run db:migrate`.** Migration `2026-09-30-root-keys-lifecycle` moves the stored
   root keys into the new store, keeping the key that signed as the signer of its algorithm (on
   PostgreSQL, the lowest kid) and printing its choice; startup refuses a database that has not run it.
+- **The dependency audit gates on what the image ships.** It audits a production install of the
+  server, as the Dockerfile makes one; an advisory against development tooling or the website no longer
+  fails the run, and Scorecard no longer reads the website's lockfile.
 
 ### Fixed
 
