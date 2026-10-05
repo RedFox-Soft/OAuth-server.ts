@@ -73,18 +73,39 @@ The failures the tables attribute to a missing person have been run by one, in t
 page returns `access_denied` to both clients, as a signed JARM response in Message Signing — and
 `oidcc-server-rotate-keys` passes with a key generated through MCP while the module waited.
 
-Four plans were last measured on 2026-09-14, against an older build, because each needs this server to
-**call the suite** (see [What still has to run](#what-still-has-to-run)):
+### On the hosted suite
 
-| Plan                                                            | Then                                         |
-| --------------------------------------------------------------- | -------------------------------------------- |
-| `oidcc-backchannel-rp-initiated-logout-certification-test-plan` | 101 conditions, none failed                  |
-| `oidcc-client-basic-certification-test-plan`                    | none — and one wrong acceptance, since fixed |
-| `oidcc-client-config-certification-test-plan`                   | 3, all of them the runner's                  |
-| `oidcc-client-refreshtoken-test-plan`                           | none — subject not exercised                 |
+**2026-10-05, at `f37bf2d`**, on the suite at `www.certification.openid.net` (5.3.1), against the
+deployed `conformance.foxauth.dev` — the plans that need this server to **call the suite**, which a
+local suite cannot be:
+
+| Plan                                                            | Result                                             |
+| --------------------------------------------------------------- | -------------------------------------------------- |
+| `oidcc-backchannel-rp-initiated-logout-certification-test-plan` | 101 conditions, **none failed**                    |
+| `oidcc-dynamic-certification-test-plan`                         | 918 conditions, 6 failed, none of them this server |
+| `oidcc-client-basic-certification-test-plan`                    | 14 modules, **every verdict right**                |
+| `oidcc-client-config-certification-test-plan`                   | 6 modules, **every verdict right**                 |
+| `oidcc-client-refreshtoken-test-plan`                           | 3 modules, no failure — subject not exercised      |
+
+In Dynamic, the five the egress boundary caused locally — a client's `jwks_uri` at registration and on
+RP key rotation, and `sector_identifier_uri` in both modules — **pass**. What is left is the implicit
+demand (2), `request_uri` (3) and `rotate-keys` (1), each explained under
+[Dynamic](#dynamic--12); the fourth `request_uri` failure counted locally was the scripted browser
+timing out on the confirmation page, which the hosted config clicks through.
 
 The three client plans test this server as a **Relying Party**, because `lib/federation/` makes it one
-and no OP plan reaches that code.
+and no OP plan reaches that code. Each module ran at a provider on `/named` repointed at its own suite
+alias; the verdicts are the RP's own answers (see [The client plans](#the-client-plans)):
+
+- **Refused** — `invalid-iss`, `missing-sub`, `invalid-aud`, `missing-iat`, `kid-absent-multiple-jwks`,
+  `invalid-sig-rs256`, `nonce-invalid`, and `idtoken-sig-none` in both plans (a refusal is one of the
+  two answers that module accepts). `discovery-issuer-mismatch` is refused when the provider is
+  written, before any sign-in: the discovery document names a different issuer.
+- **Accepted** — `oidcc-client-test`, `client-secret-basic`, `idtoken-sig-rs256`,
+  `kid-absent-single-jwks`, `discovery-jwks-uri-keys`, `signing-key-rotation-just-before-signing`, and
+  `signing-key-rotation` across both of its sign-ins, the second after the suite rotated its key.
+- **Not exercised** — `userinfo-invalid-sub`, `scope-userinfo-claims` and the three refresh-token
+  modules, whose subject is a call this RP never makes; each first sign-in is accepted.
 
 ### Open defects
 
@@ -104,17 +125,16 @@ reachable only with `claimsParameter.enabled`, which ships off.
 
 In the order they are worth it:
 
-| What                   | Why                                                                                               | What it needs                                                                                                                      |
-| ---------------------- | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Back-channel logout    | last run against a build whose sign-out has since been rewritten                                  | a suite this server can reach                                                                                                      |
-| The three client plans | the relying party's `iat` check and its key-rotation reload are pinned by tests, not yet by a run | a suite this server can reach                                                                                                      |
-| FAPI-CIBA ID1          | never run                                                                                         | a CIBA integration: how a person approves on their device is a deployment's to write (`lib/addon/ciba.ts`)                         |
-| FAPI 1.0 Advanced      | never run                                                                                         | mutual TLS end to end — Fly terminates TLS and does not pass the client certificate on — and its `jarm` variant to reach it at all |
+| What              | Why       | What it needs                                                                                                                      |
+| ----------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| FAPI-CIBA ID1     | never run | a CIBA integration: how a person approves on their device is a deployment's to write (`lib/addon/ciba.ts`)                         |
+| FAPI 1.0 Advanced | never run | mutual TLS end to end — Fly terminates TLS and does not pass the client certificate on — and its `jarm` variant to reach it at all |
 
-"A suite this server can reach" is the hosted one at `www.certification.openid.net`, which is also the
-one certification counts: a deployed instance cannot call a suite on a laptop, and a local instance
-refuses private addresses by design (the egress boundary, `lib/shared/egress.ts`). It needs an account
-there, signed in once in the browser the runs use.
+Everything that needs this server to call the suite has run on the hosted one
+([On the hosted suite](#on-the-hosted-suite)), which is also the one certification counts. Re-run those
+plans there after a change to sign-out or to `lib/federation/`: a local suite cannot be reached from a
+deployed instance, and a local instance refuses private addresses by design (the egress boundary,
+`lib/shared/egress.ts`).
 
 Repeat the real-browser pass after any change to a page this server renders. HtmlUnit enforces neither
 CSP nor SameSite and draws nothing, so a page a browser blocks, or one that arrives unstyled, passes
@@ -157,8 +177,8 @@ than unfinished. That is 2 of the 12.
 - 5, in three modules, need this server to fetch a document **from the suite** — a client's
   `jwks_uri` (at registration and on RP key rotation, each answered `401` because the key cannot be
   fetched) and a `sector_identifier_uri` (answered `400`, three conditions). From a deployed instance
-  the suite is unreachable; from a local one the egress boundary refuses it. Both are the environment,
-  not the rule.
+  a local suite is unreachable; from a local one the egress boundary refuses it. Both are the
+  environment, not the rule: on the hosted suite all five pass.
 - 1 is `oidcc-server-rotate-keys`, which fetches `/jwks`, waits for the operator to rotate the signing
   key, and fetches it again. Nobody rotates in an automated run. Run alone, with `jwks_generate` called
   through MCP while it waits, it passes: a generated key is in `/jwks` at once, and the old one stays.
@@ -173,23 +193,19 @@ authorization request is refused is `oidcc-request-uri-signed-rs256`, so the scr
 unaffected — which is why the Basic plan's `oidcc-prompt-none-not-logged-in`, run with static clients,
 receives its `login_required` redirect.
 
-The plan is still worth running: it is the only one that exercises dynamic registration.
-
-### The client plans — 3, all the runner's (2026-09-14)
-
-All three are in `oidcc-client-config-certification-test-plan`, and all three are the runner driving a
-module more times than the module expects: `idtoken-sig-none` and
-`signing-key-rotation-just-before-signing` want one sign-in and got two, and `discovery-openid-config`
-concludes as soon as the RP has fetched discovery, so the runner carried on into a finished test. The fix
-is a per-module drive count; nothing about it reflects on the server.
+The plan is still worth running: it is the only one that exercises dynamic registration. So is the
+back-channel logout plan, which also registers dynamically and meets the same page after its sign-out —
+a `prompt=none` request answered `login_required`. A browser script that clicks the page's link, as a
+person would, gets the identical answer to the suite, and both plans pass.
 
 ## What an RP run does and does not prove
 
 `lib/federation/` is a **login broker**, not a general-purpose OpenID client, and three of the plans'
 assumptions do not hold against it. This is design, not omission, but it bounds what the result means.
 
-- **It never calls `/userinfo`.** Six of the fourteen Basic client modules therefore never conclude and
-  are stopped rather than finished; `userinfo-invalid-sub` and `scope-userinfo-claims` prove nothing.
+- **It never calls `/userinfo`.** A client module that waits for that call never concludes, so nearly
+  every one is stopped rather than finished; `userinfo-invalid-sub` and `scope-userinfo-claims` prove
+  nothing.
 - **It never uses a refresh token** and does not request `offline_access`, so the whole
   `oidcc-client-refreshtoken` plan runs clean without touching its subject.
 - **It only ever runs a code flow**, which is why the hybrid, implicit, session-management and
@@ -312,9 +328,11 @@ module asks about, and fills the placeholder while the module waits for it.
 
 **Nothing this server sends can reach a local suite.** Back-channel logout, a client's `jwks_uri`, a
 `sector_identifier_uri` and every client plan need this server to call the suite. A deployed instance
-cannot reach a laptop, and a local one refuses private addresses by design. Those plans need a suite
-the server can reach — the hosted one at `www.certification.openid.net`, which is also the one
-certification counts.
+cannot reach a laptop, and a local one refuses private addresses by design. Those plans run on the
+hosted suite at `www.certification.openid.net`: `run-hosted.sh` is `run-plan.sh` pointed there, with an
+API token created in that suite's own UI and an alias of its own (aliases there are shared by every
+user). Its dynamic config adds one browser task, which clicks the link on this server's error
+confirmation page (see [Dynamic](#dynamic--12)).
 
 ### The client plans
 
@@ -333,11 +351,19 @@ deployment — start at `/auth`, follow it to `/ui/:uid/login`, hit
   it cleanly.
 - **Read the conditions, not the module status.** A finished negative module reports `PASSED` whether or
   not the RP rejected anything. Record the failed-condition list from `/api/log/{id}`, paired with the
-  HTTP status the RP itself returned: a refusal is a 400 that aborts the sign-in, an acceptance a 303
-  that finishes it.
-- **Link an account first.** The suite's OP issues no `email` claim, so the target bucket needs an
-  account already linked to its subject (`user-subject-1234531`), or the sign-in stops at "your identity
-  provider sent no email address" before any interesting check runs.
+  answer the RP itself gave at its callback.
+- **An accepted assertion stops at "no email".** The suite's OP issues no `email` claim, so a sign-in
+  whose ID token verified ends on the 400 page "Your identity provider sent no email address", and a
+  refused one on the 400 page "Sign-in could not be completed". Read the page, not the status. No
+  account has to be linked first.
+- **Ask for `email` and `profile`.** With the provider's scopes at `openid` alone, the suite's OP
+  refuses `scope-userinfo-claims`'s authorization request before any token is issued.
+
+`client-plan.py` in the rig does the two scripted halves — `create` a plan and module under a fresh
+alias, then `drive` the sign-in, record each hop and the module's conditions, and stop it — and the
+provider is repointed through MCP in between. `discovery-openid-config` and `discovery-issuer-mismatch`
+take no sign-in: the first concludes when writing the provider fetches discovery, and the second is
+refused right there.
 
 ## Screenshots
 
