@@ -228,6 +228,12 @@ registration code `invalid_redirect_uri` instead of `invalid_request` (RFC 9126 
 `par.allowUnregisteredRedirectUris` allowance never applied. `OIDCContext` now strips the prefix once,
 in its constructor (`lib/helpers/oidc_context.ts`); which bucket was addressed is `oidc.bucket`'s to say.
 
+**And a request object's `aud`.** Corrected the same day: `processRequestObject` checked a signed request
+object against the instance's identifier, so every FAPI 2.0 Message Signing push at `/named/par` was
+refused 400. It now expects `issuerFor(oidc.bucket)`, and the unsigned request PAR stores for a plain
+push carries the same audience (`pushed_authorization_request_response.ts`) — so a `request_uri` handed
+out by one issuer is not accepted by another.
+
 ## A token records the bucket that issued it
 
 `bucketId` is declared on `BaseTokenPayload` and set at issuance. Recorded, not derived, and the reason

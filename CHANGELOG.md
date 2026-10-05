@@ -66,6 +66,9 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 - **A DPoP proof is checked against the bucket it was sent to.** Its `htu` was compared with the
   instance's URL at every address, so every DPoP-bound exchange at a bucket's address failed with
   `invalid_dpop_proof`. It is now compared with the addressed bucket's endpoint.
+- **A request object is checked against the bucket it was sent to.** Its `aud` was compared with the
+  instance's identifier, so a signed request object pushed to a bucket's PAR endpoint was refused. A
+  `request_uri` one issuer hands out is no longer accepted by another.
 - **A bucket's endpoints know which endpoint they are.** At a bucket's address the request context
   carried the route pattern `/:bucket/par`, so checks against the endpoint's name failed there: a
   pushed request with an unregistered `redirect_uri` was refused as `invalid_redirect_uri` rather than

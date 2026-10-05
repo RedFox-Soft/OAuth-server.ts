@@ -141,3 +141,4 @@ Operations:
 - 2026-10-05 — corrected [[bucket-is-an-issuer]] and [[override-seams-vs-dead-code]]: a client assertion's accepted `aud` is the addressed bucket's issuer and endpoints, not the instance's (`lib/shared/token_jwt_auth.ts`); the cited line moved to :120.
 - 2026-10-05 — corrected [[bucket-is-an-issuer]]: a DPoP proof's `htu` is compared with the addressed bucket's endpoint, not the instance's (`dpopValidate` now takes the issuer); found by FAPI 2.0 against a named bucket.
 - 2026-10-05 — corrected [[bucket-is-an-issuer]]: `OIDCContext` strips the `/:bucket` prefix from its route, so endpoint-name checks hold at a bucket's address (PAR refused an unregistered redirect_uri with `invalid_redirect_uri` there); found by FAPI 2.0 against `/named`.
+- 2026-10-05 — corrected [[bucket-is-an-issuer]]: a request object's `aud`, and the one PAR stores, are the addressed bucket's issuer, not the instance's; found by FAPI 2.0 Message Signing against `/named`.

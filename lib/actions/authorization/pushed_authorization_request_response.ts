@@ -5,7 +5,7 @@ import { UnsecuredJWT } from 'jose';
 import { PUSHED_REQUEST_URN } from '../../consts/index.ts';
 import epochTime from '../../helpers/epoch_time.ts';
 import * as JWT from '../../helpers/jwt.ts';
-import { ISSUER } from 'lib/configs/env.js';
+import { issuerFor } from 'lib/configs/issuer.js';
 import { nanoid } from 'nanoid';
 import { PushedAuthorizationRequest } from 'lib/models/pushed_authorization_request.js';
 import { eventBus } from 'lib/event_bus.ts';
@@ -44,7 +44,7 @@ export default async function pushedAuthorizationRequestResponse(
 			.setJti(nanoid())
 			.setIssuedAt(now)
 			.setIssuer(oidc.client.clientId)
-			.setAudience(ISSUER)
+			.setAudience(issuerFor(oidc.bucket))
 			.setExpirationTime(now + MAX_TTL)
 			.setNotBefore(now)
 			.encode();

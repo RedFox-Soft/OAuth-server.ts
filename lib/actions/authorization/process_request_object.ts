@@ -20,7 +20,7 @@ import {
 	declaredParams,
 	ignoreUnknownIn
 } from 'lib/plugins/ignore_unknown_params.js';
-import { ISSUER } from 'lib/configs/env.js';
+import { issuerFor } from 'lib/configs/issuer.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { clockTolerance } from 'lib/configs/liveTime.js';
 import {
@@ -245,9 +245,16 @@ export default async function processRequestObject(
 		);
 	}
 
+	/*
+	 * The addressed issuer, not the instance's: a request object is meant for the authorization server it
+	 * is sent to, and every bucket with an address is its own. Checked against the instance's identifier,
+	 * an object audienced at `/acme` was refused at `/acme/par`. The pushed request PAR stores for an
+	 * unsigned push carries the same audience (`pushed_authorization_request_response.ts`), so a
+	 * `request_uri` one issuer handed out is not accepted by another.
+	 */
 	const opts = {
 		issuer: client.clientId,
-		audience: ISSUER,
+		audience: issuerFor(oidc.bucket),
 		clockTolerance
 	};
 

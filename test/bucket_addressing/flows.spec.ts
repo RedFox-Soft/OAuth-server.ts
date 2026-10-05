@@ -491,6 +491,65 @@ describe('a flow started at a named bucket address', () => {
 		}
 	});
 
+	it("accepts a signed request object audienced at the bucket's issuer, and refuses the instance's", async () => {
+		const restore = {
+			par: ApplicationConfig['par.enabled'],
+			requestObjects: ApplicationConfig['requestObjects.enabled']
+		};
+		ApplicationConfig['par.enabled'] = true;
+		ApplicationConfig['requestObjects.enabled'] = true;
+		try {
+			const { publicKey, privateKey } = await generateKeyPair('ES256');
+			const registered = await elysia.handle(
+				new Request(`http://localhost/${SLUG}/reg`, {
+					method: 'POST',
+					headers: { 'content-type': 'application/json' },
+					body: JSON.stringify({
+						redirect_uris: ['https://registered.example.com/cb'],
+						grant_types: ['authorization_code'],
+						response_types: ['code'],
+						jwks: {
+							keys: [
+								{ ...(await exportJWK(publicKey)), alg: 'ES256', use: 'sig' }
+							]
+						}
+					})
+				})
+			);
+			const { client_id, client_secret } = shaped(
+				Type.Object({ client_id: Type.String(), client_secret: Type.String() }),
+				await registered.json()
+			);
+			const push = async (aud: string) => {
+				const request = await new SignJWT({
+					client_id,
+					response_type: 'code',
+					scope: 'openid',
+					redirect_uri: 'https://registered.example.com/cb',
+					code_challenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
+					code_challenge_method: 'S256'
+				})
+					.setProtectedHeader({ alg: 'ES256' })
+					.setIssuer(client_id)
+					.setAudience(aud)
+					.setIssuedAt()
+					.setNotBefore('0s')
+					.setExpirationTime('1m')
+					.sign(privateKey);
+				const response = await post(`/${SLUG}/par`, client_id, client_secret, {
+					request
+				});
+				return response.status;
+			};
+
+			expect(await push(ACME_ISSUER)).toBe(201);
+			expect(await push(ISSUER)).toBe(400);
+		} finally {
+			ApplicationConfig['par.enabled'] = restore.par;
+			ApplicationConfig['requestObjects.enabled'] = restore.requestObjects;
+		}
+	});
+
 	it('does not let a registration at the bare address name the bucket it belongs to', async () => {
 		const registered = await elysia.handle(
 			new Request('http://localhost/reg', {
