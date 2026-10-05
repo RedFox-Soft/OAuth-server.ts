@@ -1,4 +1,5 @@
 import { hostOfRequest } from 'lib/consts/request_host.js';
+import { issuerFor } from 'lib/configs/issuer.js';
 import { Elysia, t, ValidationError } from 'elysia';
 
 import checkRar from '../../shared/check_rar.ts';
@@ -356,7 +357,8 @@ export const par = new Elysia()
 
 			// DPOP Verification
 			const dPoP = await dpopValidate(headers.dpop, {
-				route: routeNames.pushed_authorization_request
+				route: routeNames.pushed_authorization_request,
+				issuer: issuerFor(oidc.bucket)
 			});
 			setNonceHeader(set.headers, dPoP);
 			await validateReplay(client.clientId, dPoP);

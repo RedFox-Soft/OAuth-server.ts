@@ -214,6 +214,13 @@ one naming the root was accepted there, and FAPI's single-issuer rule compared a
 They are now `issuerFor(oidc.bucket)` and the endpoints beneath it; the route is stripped of its
 `/:bucket` pattern first, since the matched route is a pattern, not a path.
 
+**So is a DPoP proof's `htu`.** Corrected the same day, for the same reason: `dpopValidate`
+(`lib/helpers/validate_dpop.ts`) compared `htu` with `ISSUER + route`, so at `/acme/token` a proof naming
+`/acme/token` was refused `invalid_dpop_proof` and every DPoP-bound flow at a named bucket failed at the
+token exchange — found by FAPI 2.0 run against `/named`. The addressed issuer is now a required
+argument: the token endpoint, PAR and userinfo pass `issuerFor(oidc.bucket)`, and `/mcp`, served at the
+root only, passes `ISSUER` explicitly.
+
 ## A token records the bucket that issued it
 
 `bucketId` is declared on `BaseTokenPayload` and set at issuance. Recorded, not derived, and the reason

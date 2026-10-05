@@ -63,6 +63,9 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   accepted `aud` values were the instance's, so `private_key_jwt` and `client_secret_jwt` clients were
   refused when they named the bucket's issuer or token endpoint, and accepted when they named the root.
   An assertion naming the root is now refused at a bucket's address.
+- **A DPoP proof is checked against the bucket it was sent to.** Its `htu` was compared with the
+  instance's URL at every address, so every DPoP-bound exchange at a bucket's address failed with
+  `invalid_dpop_proof`. It is now compared with the addressed bucket's endpoint.
 - **The sign-out pages are styled on their first showing.** Their styles were extracted before the
   page was rendered, so the first one after a restart came out unstyled and later ones carried whatever
   earlier renders had left behind.

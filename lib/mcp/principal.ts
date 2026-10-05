@@ -12,6 +12,7 @@ import {
 import { getUserStore } from '../adapters/index.js';
 import { ADMIN_BUCKET_ID } from '../admin/consts.js';
 import { ADMIN_MCP_CLIENT_ID, MCP_RESOURCE, MCP_ROUTE } from './consts.js';
+import { ISSUER } from '../configs/env.js';
 import { Client } from '../models/client.js';
 import { mcpClientPermissionStore } from '../adapters/index.js';
 
@@ -150,7 +151,9 @@ export async function resolveMcpPrincipal(
 		dPoP = await dpopValidate(headers.dpop, {
 			accessTokenId,
 			method,
-			route: MCP_ROUTE
+			route: MCP_ROUTE,
+			// `/mcp` is served at the instance's own address only.
+			issuer: ISSUER
 		});
 	} catch (err) {
 		// A nonce challenge is a legitimate protocol step, not a rejection to flatten into the generic

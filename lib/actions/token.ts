@@ -1,4 +1,5 @@
 import { Elysia, t, type Static } from 'elysia';
+import { issuerFor } from 'lib/configs/issuer.js';
 import { UnauthorizedClient, UnsupportedGrantType } from '../helpers/errors.js';
 import {
 	cibaGrantParameters,
@@ -66,7 +67,10 @@ export const tokenAction = new Elysia()
 		routeNames.token,
 		async ({ body, headers, route, set, oidc }) => {
 			const client = oidc.client;
-			const dPoP = await dpopValidate(headers.dpop, { route });
+			const dPoP = await dpopValidate(headers.dpop, {
+				route,
+				issuer: issuerFor(oidc.bucket)
+			});
 			setNonceHeader(set.headers, dPoP);
 			await validateReplay(client.clientId, dPoP);
 

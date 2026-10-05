@@ -30,7 +30,8 @@ import { TestAdapter } from 'test/models.js';
 import { acmeClient } from './flows.config.js';
 import { Type } from '@sinclair/typebox';
 import { shaped } from 'test/shape.js';
-import { SignJWT } from 'jose';
+import { SignJWT, exportJWK, generateKeyPair } from 'jose';
+import { ApplicationConfig } from 'lib/configs/application.js';
 
 const SLUG = 'acme';
 const BUCKET_ID = 'acme-bucket';
@@ -396,6 +397,61 @@ describe('a flow started at a named bucket address', () => {
 		expect(await exchange(ACME_ISSUER)).toBe('invalid_grant');
 		expect(await exchange(`${ISSUER}/token`)).toBe('invalid_client');
 		expect(await exchange(ISSUER)).toBe('invalid_client');
+	});
+
+	it("accepts a DPoP proof whose htu is the bucket's token endpoint, and refuses the instance's", async () => {
+		const restore = ApplicationConfig['dpop.enabled'];
+		ApplicationConfig['dpop.enabled'] = true;
+		try {
+			const registered = await elysia.handle(
+				new Request(`http://localhost/${SLUG}/reg`, {
+					method: 'POST',
+					headers: { 'content-type': 'application/json' },
+					body: JSON.stringify({
+						redirect_uris: ['https://registered.example.com/cb'],
+						grant_types: ['authorization_code'],
+						response_types: ['code']
+					})
+				})
+			);
+			const { client_id, client_secret } = shaped(
+				Type.Object({ client_id: Type.String(), client_secret: Type.String() }),
+				await registered.json()
+			);
+			const { publicKey, privateKey } = await generateKeyPair('ES256');
+			const exchange = async (htu: string) => {
+				const proof = await new SignJWT({ htm: 'POST', htu, jti: nanoid() })
+					.setProtectedHeader({
+						alg: 'ES256',
+						typ: 'dpop+jwt',
+						jwk: await exportJWK(publicKey)
+					})
+					.setIssuedAt()
+					.sign(privateKey);
+				const response = await elysia.handle(
+					new Request(`http://localhost/${SLUG}/token`, {
+						method: 'POST',
+						headers: {
+							'content-type': 'application/x-www-form-urlencoded',
+							dpop: proof,
+							...AuthorizationRequest.basicAuthHeader(client_id, client_secret)
+						},
+						body: jsonToFormUrlEncoded({
+							grant_type: 'authorization_code',
+							code: 'not-a-code',
+							redirect_uri: 'https://registered.example.com/cb'
+						})
+					})
+				);
+				return shaped(ErrorBody, await response.json()).error;
+			};
+
+			// The proof is accepted, and the exchange then refused for the code alone.
+			expect(await exchange(`${ACME_ISSUER}/token`)).toBe('invalid_grant');
+			expect(await exchange(`${ISSUER}/token`)).toBe('invalid_dpop_proof');
+		} finally {
+			ApplicationConfig['dpop.enabled'] = restore;
+		}
 	});
 
 	it('does not let a registration at the bare address name the bucket it belongs to', async () => {

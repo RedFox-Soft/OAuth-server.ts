@@ -1,4 +1,5 @@
 import { hostOfRequest } from 'lib/consts/request_host.js';
+import { issuerFor } from 'lib/configs/issuer.js';
 import { Elysia, t, type Context } from 'elysia';
 import certificateThumbprint from '../helpers/certificate_thumbprint.ts';
 import { findAccount } from '../addon/account.js';
@@ -130,7 +131,8 @@ async function userInfo({
 	const dPoP = await dpopValidate(headers.dpop, {
 		accessTokenId,
 		method,
-		route: routeNames.userinfo
+		route: routeNames.userinfo,
+		issuer: issuerFor(oidc.bucket)
 	});
 	setNonceHeader(set.headers, dPoP);
 

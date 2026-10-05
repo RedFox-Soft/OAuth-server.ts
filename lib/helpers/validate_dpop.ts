@@ -10,7 +10,6 @@ import {
 import { ApplicationConfig as config } from 'lib/configs/application.js';
 import { InvalidHeaderAuthorization, InvalidToken } from './errors.js';
 import epochTime from './epoch_time.js';
-import { ISSUER } from 'lib/configs/env.js';
 import { DPoPNonces } from './dpop_nonces.js';
 import { dPoPSigningAlgValues } from 'lib/configs/jwaAlgorithms.js';
 import { HTTPHeaders } from 'elysia/types';
@@ -34,6 +33,13 @@ type options = {
 	// The request's method, which the proof's `htm` must name (RFC 9449 §4.3).
 	method?: string;
 	route?: string;
+	/*
+	 * The identifier of the issuer the request was addressed to, which the proof's `htu` is built from.
+	 * Required, because every bucket with an address is its own authorization server: built from the
+	 * instance's identifier, `htu` matched the root's URL at every address, so a proof that named
+	 * `/acme/token` was refused there.
+	 */
+	issuer: string;
 };
 
 // A verified DPoP proof, or undefined where none was presented or DPoP is off.
@@ -41,7 +47,7 @@ export type DPoPProof = Awaited<ReturnType<typeof dpopValidate>>;
 
 export async function dpopValidate(
 	proof: string | undefined,
-	{ accessTokenId, method = 'POST', route }: options = {}
+	{ accessTokenId, method = 'POST', route, issuer }: options
 ) {
 	if (!config['dpop.enabled'] || !proof) {
 		return;
@@ -97,7 +103,11 @@ export async function dpopValidate(
 			actual.hash = '';
 			actual.search = '';
 
-			if (actual?.href !== ISSUER + route) {
+			// A route mounted beneath `/:bucket` arrives as that pattern; the issuer already carries the path.
+			const endpoint = route?.startsWith('/:bucket/')
+				? route.slice('/:bucket'.length)
+				: route;
+			if (actual?.href !== issuer + endpoint) {
 				throw new InvalidDpopProof('DPoP proof htu mismatch');
 			}
 		}
