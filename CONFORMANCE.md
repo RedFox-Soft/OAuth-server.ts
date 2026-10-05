@@ -52,6 +52,14 @@ does, condition for condition:
 Two Basic modules at `/named` were re-run alone after a network interruption between the suite and the
 instance; both passed.
 
+FAPI 2.0 at `/named`, at `f37bf2d`, with an ES256 signer promoted in the bucket and FAPI clients in its
+own project, answers as the root does too:
+
+| Plan                                     | Conditions | Failures at `/named`   |
+| ---------------------------------------- | ---------- | ---------------------- |
+| `fapi2-security-profile-final-test-plan` | 4 017      | 4, all needing a human |
+| `fapi2-message-signing-final-test-plan`  | 5 407      | 4, all needing a human |
+
 ### In a real browser
 
 **2026-10-05**: Basic, Formpost and RP-initiated logout were run in Chromium (Playwright,
@@ -96,13 +104,12 @@ reachable only with `claimsParameter.enabled`, which ships off.
 
 In the order they are worth it:
 
-| What                       | Why                                                                                               | What it needs                                                                                                                      |
-| -------------------------- | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Back-channel logout        | last run against a build whose sign-out has since been rewritten                                  | a suite this server can reach                                                                                                      |
-| The three client plans     | the relying party's `iat` check and its key-rotation reload are pinned by tests, not yet by a run | a suite this server can reach                                                                                                      |
-| FAPI 2.0 at a named bucket | FAPI's signing keys and clients are per issuer, and only the root's have been set up              | a PS256/ES256 signer promoted in the bucket, and FAPI clients in its project                                                       |
-| FAPI-CIBA ID1              | never run                                                                                         | a CIBA integration: how a person approves on their device is a deployment's to write (`lib/addon/ciba.ts`)                         |
-| FAPI 1.0 Advanced          | never run                                                                                         | mutual TLS end to end — Fly terminates TLS and does not pass the client certificate on — and its `jarm` variant to reach it at all |
+| What                   | Why                                                                                               | What it needs                                                                                                                      |
+| ---------------------- | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Back-channel logout    | last run against a build whose sign-out has since been rewritten                                  | a suite this server can reach                                                                                                      |
+| The three client plans | the relying party's `iat` check and its key-rotation reload are pinned by tests, not yet by a run | a suite this server can reach                                                                                                      |
+| FAPI-CIBA ID1          | never run                                                                                         | a CIBA integration: how a person approves on their device is a deployment's to write (`lib/addon/ciba.ts`)                         |
+| FAPI 1.0 Advanced      | never run                                                                                         | mutual TLS end to end — Fly terminates TLS and does not pass the client certificate on — and its `jarm` variant to reach it at all |
 
 "A suite this server can reach" is the hosted one at `www.certification.openid.net`, which is also the
 one certification counts: a deployed instance cannot call a suite on a laptop, and a local instance
@@ -261,7 +268,14 @@ for it. **A generated key does not sign until it is promoted**, and promotion is
 60 seconds, while every instance picks the key up. Registration checks a client's algorithm against the
 keys that sign, so the order is: `jwks_generate` in ES256 (or PS256), wait out the window, `jwks_promote`,
 then register the FAPI clients. There is one signer per algorithm, so promoting ES256 leaves the RS256
-signer the OIDC clients use in place.
+signer the OIDC clients use in place. A bucket with an address of its own has keys of its own, so the
+same steps run against it with `bucket_key_generate` and `bucket_key_promote`.
+
+Register the Message Signing clients while `responseMode.jwt.enabled` is on, or set their
+`authorizationSignedResponseAlg` afterwards. The attribute is accepted only while JARM is enabled and
+otherwise falls back to RS256, which FAPI 2.0 forbids: a client registered in the Security Profile's
+settings signs every JARM response RS256, and nearly every Message Signing module fails
+`FAPI2ValidateJarmSigningAlg`.
 
 ## Running the suite
 
