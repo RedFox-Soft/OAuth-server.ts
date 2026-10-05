@@ -8,7 +8,10 @@ import { ApplicationConfig } from 'lib/configs/application.js';
 import { idFactory, secretFactory } from '../addon/index.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { hostOfRequest } from 'lib/consts/request_host.js';
-import { requestBucketFor } from 'lib/admin/auth/bucketAddress.js';
+import {
+	isAddressable,
+	requestBucketFor
+} from 'lib/admin/auth/bucketAddress.js';
 import {
 	Client,
 	fromWire,
@@ -150,8 +153,8 @@ async function validateInitialAccessToken(
 
 /*
  * The management address a response hands back is built from the request's issuer, so it has to be
- * the address the request was made at. No refusal accompanies it: a registration names no bucket, and
- * the association a client needs is decided at authorization time (see `create`).
+ * the address the request was made at. A registration at a bucket's own address also records that
+ * bucket on the client (see `create`); no refusal accompanies either.
  */
 function bucketOf(params: { bucket?: string } | undefined, request: Request) {
 	return requestBucketFor(params?.bucket, hostOfRequest(request));
@@ -210,11 +213,21 @@ async function create({
 	 * There is deliberately no per-project acceptance check here, and the absence is a decision rather
 	 * than an omission. A registration request names no project — RFC 7591 has no field for one — so a
 	 * per-project rule could only rest on a project-scoped registration endpoint, which would hand an
-	 * unauthenticated caller an oracle for which projects exist. The association this client needs is
-	 * supplied at authorization time instead, from the declared resource the request names
-	 * (`resolveBucketForRequest`), which is the same rule a document-identified client follows.
+	 * unauthenticated caller an oracle for which projects exist. The bucket, which the address does name,
+	 * is recorded below; anything finer is supplied at authorization time, from the declared resource the
+	 * request names (`resolveBucketForRequest`), the same rule a document-identified client follows.
 	 */
 	properties.registeredDynamically = true;
+	/*
+	 * The address names the bucket the body cannot. A bucket's discovery advertises `<issuer>/reg`, so a
+	 * client that followed it is that bucket's client — and without this record it belonged to the
+	 * default bucket, was refused `unauthorized_client` at the very issuer it registered with, and was
+	 * accepted at the root instead. Only a bucket with an address of its own is recorded: a registration
+	 * at the root keeps the default, as before.
+	 */
+	if (isAddressable(oidc.bucket)) {
+		properties.registeredAtBucket = oidc.bucket._id;
+	}
 
 	/*
 	 * Housekeeping, here because this is the only moment that both correlates with growth and is
@@ -353,6 +366,7 @@ async function update({ params, body, headers, request, set }: ClientContext) {
 	 */
 	Object.assign(properties, {
 		registeredDynamically: client.registeredDynamically,
+		registeredAtBucket: client.registeredAtBucket,
 		registrationUsedAt: client.registrationUsedAt
 	});
 

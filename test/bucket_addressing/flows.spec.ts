@@ -308,4 +308,75 @@ describe('a flow started at a named bucket address', () => {
 
 		expect(body.registration_client_uri).toStartWith(`${ACME_ISSUER}/reg/`);
 	});
+
+	it('signs a client registered at the bucket address in at that bucket, and refuses it at the bare address', async () => {
+		const registered = await elysia.handle(
+			new Request(`http://localhost/${SLUG}/reg`, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					redirect_uris: ['https://registered.example.com/cb'],
+					grant_types: ['authorization_code'],
+					response_types: ['code']
+				})
+			})
+		);
+		const { client_id } = shaped(
+			Type.Object({ client_id: Type.String() }),
+			await registered.json()
+		);
+		const query = new URLSearchParams({
+			client_id,
+			redirect_uri: 'https://registered.example.com/cb',
+			response_type: 'code',
+			scope: 'openid',
+			code_challenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
+			code_challenge_method: 'S256'
+		});
+
+		const atBucket = await elysia.handle(
+			new Request(`http://localhost/${SLUG}/auth?${query}`)
+		);
+		const atBare = await elysia.handle(
+			new Request(`http://localhost/auth?${query}`)
+		);
+
+		expect(atBucket.status).toBe(303);
+		expect(atBucket.headers.get('location')).toContain('/login');
+		expect(await atBare.text()).toContain('unauthorized_client');
+	});
+
+	it('does not let a registration at the bare address name the bucket it belongs to', async () => {
+		const registered = await elysia.handle(
+			new Request('http://localhost/reg', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					redirect_uris: ['https://registered.example.com/cb'],
+					grant_types: ['authorization_code'],
+					response_types: ['code'],
+					registeredAtBucket: BUCKET_ID,
+					registered_at_bucket: BUCKET_ID
+				})
+			})
+		);
+		const { client_id } = shaped(
+			Type.Object({ client_id: Type.String() }),
+			await registered.json()
+		);
+		const query = new URLSearchParams({
+			client_id,
+			redirect_uri: 'https://registered.example.com/cb',
+			response_type: 'code',
+			scope: 'openid',
+			code_challenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
+			code_challenge_method: 'S256'
+		});
+
+		const atBucket = await elysia.handle(
+			new Request(`http://localhost/${SLUG}/auth?${query}`)
+		);
+
+		expect(await atBucket.text()).toContain('unauthorized_client');
+	});
 });

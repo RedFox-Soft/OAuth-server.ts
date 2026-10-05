@@ -198,8 +198,14 @@ so a flow at `/acme/device/auth` recorded the default bucket and yielded the ins
 was the only reason they did not need the refusal. Honouring their address without it would have let a
 default client start a flow at `acme` and receive `acme`-issued tokens, so both now call `checkBucket`
 after the resource is final and before anything is stored (`lib/actions/authorization/device.ts`).
-Registration also honours its address, for the management URI it returns, but refuses nothing: a
-registration names no bucket.
+Registration also honours its address, for the management URI it returns and — corrected 2026-10-05 —
+for the client it creates. A registration at a bucket's own address records that bucket on the client
+(`registeredAtBucket`, `lib/actions/registration.ts`), and `resolveBucketForRequest` reads it right after
+the project rule, so the client signs in that bucket's end users and is refused at any other address.
+Before, a registration "named no bucket": a client that followed `/acme`'s discovery to `/acme/reg` was
+the default bucket's, refused `unauthorized_client` at `/acme/auth` and accepted at the bare `/auth` —
+found by running the conformance suite against a named bucket. A registration at the root records
+nothing, and the field is written from the address alone, never from the body.
 
 ## A token records the bucket that issued it
 

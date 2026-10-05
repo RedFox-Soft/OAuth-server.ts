@@ -1,4 +1,5 @@
 import {
+	adapter,
 	getProjectStore,
 	mcpClientPermissionStore
 } from '../../adapters/index.js';
@@ -13,6 +14,7 @@ import { MCP_RESOURCE } from '../../mcp/consts.js';
  *
  *   1. the reserved admin client → the admin bucket
  *   2. a client assigned to a project → that project's bucket
+ *   2b. a client that registered itself at a bucket's own address → that bucket
  *   3. a request naming ONE resource declared in the addressed issuer's namespace → that resource's
  *      project's bucket
  *   4. a permitted client identity naming the administrative MCP audience → the admin bucket
@@ -50,6 +52,9 @@ export async function resolveBucketForRequest(
 	if (clientId) {
 		const project = await getProjectStore().findByClientId(clientId);
 		if (project?.bucketId) return project.bucketId;
+
+		const registeredAt = await registeredAtBucketOf(clientId);
+		if (registeredAt) return registeredAt;
 	}
 
 	const derived = await bucketForResource(resource, namespaceOf(addressed));
@@ -60,6 +65,24 @@ export async function resolveBucketForRequest(
 	}
 
 	return 'redfox';
+}
+
+/*
+ * Rule 2b: a client that registered itself at a bucket's own address belongs to that bucket.
+ *
+ * Read from the stored record rather than from a resolved client, because this runs for every caller
+ * with only an identifier in hand. The registration endpoint writes the field from the address and
+ * nothing else (`lib/actions/registration.ts`), so a request cannot steer it — the property D6 asked of
+ * every rule here. A client identified by a document it hosts has no record and so no such field.
+ */
+async function registeredAtBucketOf(
+	clientId: string
+): Promise<string | undefined> {
+	const stored = await adapter('Client').find(clientId);
+	const registeredAt = stored?.registeredAtBucket;
+	return typeof registeredAt === 'string' && registeredAt
+		? registeredAt
+		: undefined;
 }
 
 /*

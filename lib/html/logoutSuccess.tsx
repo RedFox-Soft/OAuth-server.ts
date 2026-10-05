@@ -41,15 +41,21 @@ function renderLogoutForm() {
 	);
 }
 
+/*
+ * Rendered before the styles are extracted: cssinjs registers a component's styles while it renders, so
+ * extracting first left the first page after a restart unstyled and every later one wearing whatever
+ * earlier renders had registered. `extractStyle` returns complete `<style>` elements, which is why they
+ * are not wrapped in another.
+ */
 export function logoutSuccess() {
-	const form = renderLogoutForm();
+	const body = renderToStaticMarkup(renderLogoutForm());
 	const styleText = extractStyle(cache);
 
 	const html = `<!DOCTYPE html>
 <html><head>
   <title>Logging Out</title>
-  <style>${styleText}</style>
-</head><body>${renderToStaticMarkup(form)}</body></html>`;
+  ${styleText}
+</head><body>${body}</body></html>`;
 
 	return htmlResponse(html);
 }

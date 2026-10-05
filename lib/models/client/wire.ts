@@ -61,6 +61,7 @@ export const BASE_METADATA_KEYS = [
 	 * picked by the validator.
 	 */
 	'registeredDynamically',
+	'registeredAtBucket',
 	'registrationUsedAt'
 ];
 

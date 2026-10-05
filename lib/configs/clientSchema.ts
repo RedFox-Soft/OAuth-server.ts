@@ -151,6 +151,16 @@ export const ClientSchema = t.Object({
 	registeredDynamically: t.Optional(t.Boolean()),
 
 	/*
+	 * registeredAtBucket
+	 *
+	 * description: The bucket whose own address a self-registered client registered at — its
+	 * `<issuer>/reg`, advertised by that bucket's discovery. Absent for a registration at the root and
+	 * for every client an administrator created. `resolveBucketForRequest` reads it after the project
+	 * rule, so the client signs in that bucket's end users, and is refused at any other address.
+	 */
+	registeredAtBucket: t.Optional(t.String()),
+
+	/*
 	 * registrationUsedAt
 	 *
 	 * description: When a self-registered client first completed an authorization, in epoch seconds.

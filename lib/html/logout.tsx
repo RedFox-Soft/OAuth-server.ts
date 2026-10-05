@@ -91,14 +91,15 @@ export function logout(
 	confirmAction: string,
 	postLogoutRedirectUri?: string
 ) {
-	const form = renderLogoutForm(secret, confirmAction);
+	// Rendered before extracting, and not re-wrapped — for the reasons given at `logoutSuccess`.
+	const body = renderToStaticMarkup(renderLogoutForm(secret, confirmAction));
 	const styleText = extractStyle(cache);
 
 	const html = `<!DOCTYPE html>
 <html><head>
   <title>Logging Out</title>
-  <style>${styleText}</style>
-</head><body>${renderToStaticMarkup(form)}</body></html>`;
+  ${styleText}
+</head><body>${body}</body></html>`;
 
 	return htmlResponse(html, { handOffTo: postLogoutRedirectUri });
 }

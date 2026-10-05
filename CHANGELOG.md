@@ -55,6 +55,13 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- **A client registered at a bucket's address belongs to that bucket.** A bucket's discovery
+  advertises its own `/reg`, but a client registered there was refused `unauthorized_client` at that
+  bucket's `/auth` and accepted at the root. The registration now records the bucket, from the address
+  alone; a registration at the root is unchanged.
+- **The sign-out pages are styled on their first showing.** Their styles were extracted before the
+  page was rendered, so the first one after a restart came out unstyled and later ones carried whatever
+  earlier renders had left behind.
 - **A requested claim value is honoured (OIDC Core §5.5.1).** With `claimsParameter.enabled`, a
   subject named only in `sub.values` was ignored and a code issued for whoever was signed in; it now
   fails like `sub.value`. A claim whose value differs from a requested `value`/`values` is left out
