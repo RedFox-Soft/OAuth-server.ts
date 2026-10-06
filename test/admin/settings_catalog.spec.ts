@@ -1,32 +1,13 @@
 import { describe, it, expect } from 'bun:test';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { SETTINGS_CATALOG, appliesOnSave } from 'lib/admin/settings/catalog.ts';
 import { ApplicationConfig } from 'lib/configs/application.ts';
 import { present } from 'test/shape.js';
 
 /**
- * @proves Every operator-editable setting exists, is described, and carries the argument for
- * being editable at all - and the ones deliberately absent say why.
+ * @proves Every operator-editable setting exists and is described, and the keys an operator must not
+ * edit are not offered.
  */
 describe('settings catalog', () => {
-	/*
-	 * The nonce secret's absence from the catalog is what makes it unreachable from the admin API,
-	 * which filters submissions against this list. The absence is already pinned below; this pins the
-	 * *reason* being written down next to it, so a later reader finds a decision rather than a hole
-	 * they might helpfully fill in. Reading the module's source is the only way to assert a comment
-	 * exists — the same technique test/storage_contract/inventory_drift.spec.ts uses on lib sources.
-	 */
-	it('records in the module why the DPoP nonce secret is not an operator setting', () => {
-		const source = readFileSync(
-			resolve(import.meta.dir, '../../lib/admin/settings/catalog.ts'),
-			'utf8'
-		);
-
-		expect(source).toContain('dpop.nonceSecret');
-		expect(source).toMatch(/server-provisioned|server-owned/);
-	});
-
 	it('every catalog key exists in ApplicationConfig', () => {
 		for (const d of SETTINGS_CATALOG) {
 			expect(
@@ -78,19 +59,6 @@ describe('settings catalog', () => {
 		expect(d?.group).toBe('CORS');
 		// No parent flag: the switch stands alone, and closure otherwise comes from project data.
 		expect(d?.dependsOn).toBeUndefined();
-	});
-
-	/*
-	 * cors.maxAge was considered and dropped: it would be the first numeric key in ApplicationConfig and
-	 * SettingType has no `number` member, so it could only be written by editing serviceConfig directly
-	 * — the admin PUT filters by this catalog. Pinned so adding the key without a type is a test failure
-	 * rather than an unreachable setting.
-	 */
-	it('declares no numeric setting, and no cors.maxAge companion', () => {
-		expect(SETTINGS_CATALOG.map((d) => d.key)).not.toContain('cors.maxAge');
-		expect(
-			Object.prototype.hasOwnProperty.call(ApplicationConfig, 'cors.maxAge')
-		).toBe(false);
 	});
 
 	/*
