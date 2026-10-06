@@ -1,4 +1,5 @@
 import { STORE_AREAS } from '../lib/consts/storage_inventory.js';
+import { verifyEndUserIdentity } from './verify_end_user_identity.js';
 
 /*
  * Storage fidelity for the MongoDB backend, against a real MongoDB — the properties of per-issuer
@@ -25,7 +26,7 @@ if (!process.env.MONGODB_URI || !THROWAWAY.test(database)) {
 delete process.env.POSTGRES_URL;
 
 /* After the guard, for the reason verify_postgres.ts gives: importing the adapters connects. */
-const { BucketKeysStore, ProtectedResourceStore } =
+const { BucketKeysStore, ProtectedResourceStore, UserBucketStore, UserStore } =
 	await import('../lib/adapters/mongodb/index.js');
 const { db } = await import('../lib/adapters/mongodb/db.js');
 const { MIGRATIONS } = await import('../lib/consts/migrations.js');
@@ -205,6 +206,13 @@ check(
 		(await legacyArea.countDocuments()) === 0,
 	migrated.map((key) => `${key.alg}:${key.state}`).join(', ')
 );
+
+/* A bucket created here, so its user area carries the indexes declared today. */
+const identityBucket = await new UserBucketStore().create({
+	name: `identity-${stamp}`,
+	ownerGroupId: 'unassigned'
+});
+await verifyEndUserIdentity(new UserStore(identityBucket._id), check);
 
 console.log(
 	`\n${failures === 0 ? 'all fidelity checks passed' : `${failures} check(s) FAILED`}`

@@ -7,31 +7,6 @@ import { t } from 'elysia';
  */
 const EndUserClaims = t.Record(t.String(), t.Unknown());
 
-/*
- * Names an account's stored claims may not carry. `findAccount` spreads the stored claims last, so the
- * first three would stand in for the account's identity — `sub` also feeds the pairwise derivation —
- * and the rest for what the server itself asserts about a token or a sign-in.
- */
-export const RESERVED_CLAIMS: readonly string[] = [
-	'sub',
-	'email',
-	'email_verified',
-	'iss',
-	'aud',
-	'exp',
-	'iat',
-	'nbf',
-	'jti',
-	'nonce',
-	'azp',
-	'acr',
-	'amr',
-	'auth_time',
-	'sid',
-	'at_hash',
-	'c_hash'
-];
-
 export const CreateEndUserBody = t.Object({
 	email: t.String({ minLength: 3 }),
 	password: t.String({ minLength: 8 }),
@@ -47,4 +22,12 @@ export const UpdateEndUserBody = t.Object({
 
 export const ResetPasswordBody = t.Object({
 	password: t.String({ minLength: 8 })
+});
+
+/*
+ * Why an administrator locked a user. Kept on the record rather than in the audit trail: it may name a person
+ * or an incident, and the trail is kept longer than the account.
+ */
+export const LockEndUserBody = t.Object({
+	reason: t.String({ minLength: 1, maxLength: 500 })
 });

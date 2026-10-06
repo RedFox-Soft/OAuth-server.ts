@@ -58,6 +58,12 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- **Deactivating, locking or deleting an end user ends their access at once.** Deactivation used to block
+  only new sign-ins: sessions stayed alive, access tokens introspected as active, no relying party was told.
+  Now each session gets a back-channel logout and every session, grant and token is swept. Alongside it
+  (spec 069, groundwork for SCIM): an emergency lock only an administrator lifts, a username, external
+  identifier and profile on the user — released under `profile`/`phone`, now mapped by default on new
+  instances — and users a provisioning connection owns are read-only in the console.
 - **A client registered at a bucket's address belongs to that bucket.** A bucket's discovery
   advertises its own `/reg`, but a client registered there was refused `unauthorized_client` at that
   bucket's `/auth` and accepted at the root. The registration now records the bucket, from the address

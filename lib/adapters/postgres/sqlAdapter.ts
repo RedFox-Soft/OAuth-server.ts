@@ -108,6 +108,21 @@ export class SqlAdapter<
 	 * each one is a plain identifier — which is what lets it be a bound parameter to `->>` here, as it
 	 * is safe interpolated into a filter on the other backend.
 	 */
+	/* `field` is a declared inventory value bound as a parameter, exactly as in `destroyByOwner`. */
+	async findByOwner(field: string, value: string): Promise<StoredRecord[]> {
+		const handle = sql();
+		const rows = await handle`
+			SELECT payload FROM ${handle(this.name)}
+			WHERE payload->>${field} = ${value}
+		`;
+		return rows
+			.map((row: unknown) => payloadOf(row))
+			.filter(
+				(payload: StoredRecord | undefined): payload is StoredRecord =>
+					payload !== undefined
+			);
+	}
+
 	async destroyByOwner(field: string, value: string): Promise<number> {
 		const handle = sql();
 		const rows = await handle`

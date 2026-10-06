@@ -170,6 +170,8 @@ describe('MCP tool catalogue', () => {
 			'bucket_key_retire',
 			'bucket_user_delete',
 			'bucket_user_password_reset',
+			/* Re-admits an account an administrator locked as compromised. */
+			'bucket_user_unlock',
 			'client_delete',
 			'client_secret_rotate',
 			'federation_identity_delete',

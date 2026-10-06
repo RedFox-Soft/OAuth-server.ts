@@ -228,11 +228,14 @@ describe('storage inventory: per-bucket user areas', () => {
 		 * Kept as an exact list, not a containment check: the point of asserting the whole set is that an
 		 * index added by accident fails here. The second entry resolves an account from the upstream
 		 * identity it holds and is deliberately non-unique — see the comment on the declaration for why
-		 * uniqueness lives in code instead.
+		 * uniqueness lives in code instead. The last two hold a provisioned username and external
+		 * identifier unique, sparse because most users carry neither.
 		 */
 		expect(indexesFor(area)).toEqual([
 			{ key: { email: 1 }, unique: true },
-			{ key: { 'federated.providerId': 1, 'federated.sub': 1 } }
+			{ key: { 'federated.providerId': 1, 'federated.sub': 1 } },
+			{ key: { userNameKey: 1 }, unique: true, sparse: true },
+			{ key: { externalIdKey: 1 }, unique: true, sparse: true }
 		]);
 	});
 

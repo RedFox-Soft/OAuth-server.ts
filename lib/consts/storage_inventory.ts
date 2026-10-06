@@ -243,7 +243,17 @@ const perBucketArea: StorageArea = {
 		 * Bare field names, not `payload.*`: this area is written by UserStore directly rather than through
 		 * the model adapter, so its documents have no `payload` wrapper.
 		 */
-		{ key: { 'federated.providerId': 1, 'federated.sub': 1 } }
+		{ key: { 'federated.providerId': 1, 'federated.sub': 1 } },
+		/*
+		 * A provisioned username, unique per bucket case-insensitively, and an external identifier, unique
+		 * per managing connection. Both are derived scalars (lib/adapters/end_user_keys.ts) rather than a
+		 * collation or a compound index, and that is what lets `sparse` alone be correct here: a compound
+		 * `{ provisionedBy, externalId }` index would index `(connection, null)` and make two users of one
+		 * connection without an identifier collide — the partialFilterExpression problem the comment above
+		 * records, avoided rather than modelled.
+		 */
+		{ key: { userNameKey: 1 }, unique: true, sparse: true },
+		{ key: { externalIdKey: 1 }, unique: true, sparse: true }
 	]
 };
 

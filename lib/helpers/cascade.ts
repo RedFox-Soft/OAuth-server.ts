@@ -125,6 +125,18 @@ export async function endSessionsForAccount(
 	]);
 }
 
+/*
+ * Every record naming this account as its owner — its sessions, grants, tokens, codes and pending
+ * interactions — and nothing addressed by its email. What ending an account's access sweeps, as opposed to
+ * deleting it: the email-addressed areas are rate limits, not access, and clearing a login throttle on an
+ * account an administrator is responding to would reset a brute-force counter mid-attack.
+ */
+export async function sweepAccountOwned(
+	accountId: string
+): Promise<CascadeResult> {
+	return runSweeps(ownerSweeps('account', accountId));
+}
+
 /* Every record naming this client as its owner, across every area that declares a client owner. */
 export async function cascadeForClient(
 	clientId: string
@@ -154,7 +166,7 @@ export async function cascadeForAccount(
 	accountId: string,
 	emailScopedId: string | null
 ): Promise<CascadeResult> {
-	const sweeps: AreaSweep[] = ownerSweeps('account', accountId);
+	const sweeps: AreaSweep[] = [];
 
 	if (emailScopedId !== null) {
 		for (const area of EMAIL_SCOPED_AREAS) {
@@ -172,5 +184,5 @@ export async function cascadeForAccount(
 		}
 	}
 
-	return runSweeps(sweeps);
+	return merge(await sweepAccountOwned(accountId), await runSweeps(sweeps));
 }

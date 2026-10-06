@@ -298,6 +298,18 @@ const routes = [
 		targetType: 'EndUser'
 	},
 	{
+		action: 'enduser.lock',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/users/:uid/lock',
+		targetType: 'EndUser'
+	},
+	{
+		action: 'enduser.unlock',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/users/:uid/unlock',
+		targetType: 'EndUser'
+	},
+	{
 		action: 'enduser.totp.clear',
 		method: 'DELETE',
 		path: '/admin/api/buckets/:id/users/:uid/totp',

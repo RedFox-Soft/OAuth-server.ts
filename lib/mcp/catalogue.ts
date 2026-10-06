@@ -27,7 +27,8 @@ import {
 import {
 	CreateEndUserBody,
 	UpdateEndUserBody,
-	ResetPasswordBody
+	ResetPasswordBody,
+	LockEndUserBody
 } from '../admin/users-end/schema.js';
 import {
 	CreateProviderBody,
@@ -882,7 +883,7 @@ const catalogue = [
 			"Change a bucket's name, roles, managers, or its registration, verification and second-factor settings. Editing the bucket entity needs manager access to the bucket itself, not merely to a project it backs. `totpRequired` governs password sign-in only — it is accepted but inert while `passwordLogin` is off, and it never gates a federated sign-in, so it is not a way to secure a bucket that signs in through an upstream provider."
 	},
 
-	/* ----------------------------------------------- writes: end-users (4) */
+	/* ----------------------------------------------- writes: end-users (7) */
 	{
 		tool: 'bucket_user_create',
 		method: 'POST',
@@ -906,7 +907,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'uid'],
 		summary:
-			"Change an end-user's roles, active state, or claims. Claims replace the account's whole set; sub, email, email_verified and the protocol claims are refused, and a claim is released to a client only once the `claims` setting names it under a scope. Deactivating is a sign-in decision, not a deletion."
+			"Change an end-user's roles, active state, or claims. Claims replace the account's whole set; sub, email, email_verified and the protocol claims are refused, and a claim is released to a client only once the `claims` setting names it under a scope. Deactivating ends the user's access at once — every session and token, with a logout notice to each relying party registered for one — but keeps the account; reactivating restores sign-in only, never the old tokens or consents."
 	},
 	{
 		tool: 'bucket_user_totp_clear',
@@ -925,6 +926,37 @@ const catalogue = [
 		pathParams: ['id', 'uid'],
 		summary:
 			"Clear an end-user's authenticator enrolment. Their existing authenticator stops working at once and their sessions end; they set a new one up at their next sign-in. Use when someone has lost the device holding their codes. Their password, grants and tokens are untouched."
+	},
+	{
+		tool: 'bucket_user_lock',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/users/:uid/lock',
+		action: 'enduser.lock',
+		/*
+		 * Ordinary, as deactivating through bucket_user_update is: it is the protective act, and what it costs
+		 * the user is signing in and consenting again once it is lifted.
+		 */
+		consequence: 'ordinary',
+		requiredRole: null,
+		bodySchema: LockEndUserBody,
+		querySchema: null,
+		pathParams: ['id', 'uid'],
+		summary:
+			'Lock an end-user out, at once: every session and token ends and relying parties registered for back-channel logout are told. Works on users a provisioning connection manages, and the connection cannot undo it — only bucket_user_unlock can. Use when an account is suspected compromised.'
+	},
+	{
+		tool: 'bucket_user_unlock',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/users/:uid/unlock',
+		action: 'enduser.unlock',
+		/* High: it re-admits an account an administrator judged compromised. */
+		consequence: 'high',
+		requiredRole: null,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id', 'uid'],
+		summary:
+			"Lift an end-user's lock. Nothing is restored: they sign in afresh, and only if their account is also active."
 	},
 	{
 		tool: 'bucket_user_password_reset',
@@ -950,7 +982,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'uid'],
 		summary:
-			'Permanently delete an end-user account and everything issued to it. Irreversible.'
+			'Permanently delete an end-user account and everything issued to it; relying parties registered for back-channel logout are told the user signed out. Irreversible.'
 	},
 
 	/* ---------------------------------------------- writes: federation (4) */

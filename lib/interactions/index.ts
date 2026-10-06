@@ -65,6 +65,7 @@ import checkClient from 'lib/actions/authorization/check_client.js';
 import checkResource from 'lib/shared/check_resource.js';
 import assignClaims from 'lib/actions/authorization/assign_claims.js';
 import loadAccount from 'lib/actions/authorization/load_account.js';
+import { canSignIn } from 'lib/end_users/can_sign_in.js';
 import loadGrant from 'lib/actions/authorization/load_grant.js';
 import interactions, {
 	expiredInteractionCookie
@@ -813,7 +814,7 @@ export const ui = new Elysia()
 			 * by position rather than by remembering to repeat it.
 			 */
 			await clearFailures(bucketId, body.username);
-			if (!user.active) {
+			if (!canSignIn(user)) {
 				return refuse();
 			}
 			const loginBucket = await getBucketStore().find(bucketId);
@@ -1198,7 +1199,7 @@ export const ui = new Elysia()
 			);
 			const user = await getUserStore(bucketId).find(handoff.accountId);
 			// Re-read rather than trusted from the record: an account frozen between hops must not sign in.
-			if (!user || !user.active) {
+			if (!user || !canSignIn(user)) {
 				return federationInactivePage();
 			}
 

@@ -143,3 +143,5 @@ Operations:
 - 2026-10-05 — corrected [[bucket-is-an-issuer]]: `OIDCContext` strips the `/:bucket` prefix from its route, so endpoint-name checks hold at a bucket's address (PAR refused an unregistered redirect_uri with `invalid_redirect_uri` there); found by FAPI 2.0 against `/named`.
 - 2026-10-05 — corrected [[bucket-is-an-issuer]]: a request object's `aud`, and the one PAR stores, are the addressed bucket's issuer, not the instance's; found by FAPI 2.0 Message Signing against `/named`.
 - 2026-10-05 — corrected [[security-assurance-evidence]]: the dependency audit gates only on a production install of the server (`scripts/audit_production.ts`), and `website/osv-scanner.toml` takes the site out of Scorecard; OSV-Scanner assigns no dev group to `bun.lock`, so the server's dev-only packages still count there.
+
+- 2026-10-06 — added [[end-user-lifecycle]] (spec 069): deactivation ends access at once, local lock, provisioned users read-only, derived uniqueness keys, profile claims; corrected [[account-resolution]] (deactivation is no longer only lazy; `canSignIn`) and [[deletion-and-revocation]] (a fourth operation, ending access).

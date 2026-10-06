@@ -98,6 +98,16 @@ export class MongoAdapter<
 		return result.deletedCount;
 	}
 
+	async findByOwner(field: string, value: string) {
+		/* `field` is a declared inventory value, never caller input — the rule `destroyByOwner` states. */
+		const found = await this.coll()
+			.find({ [`payload.${field}`]: value }, { projection: { payload: 1 } })
+			.toArray();
+		return found
+			.map((document) => payloadOf(document))
+			.filter((payload): payload is StoredRecord => payload !== undefined);
+	}
+
 	async destroyUnusedSince(
 		markerField: string,
 		usedField: string,

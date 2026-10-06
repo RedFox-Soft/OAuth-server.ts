@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { STORAGE_DIVERGENCES } from '../lib/consts/storage_divergences.js';
+import { verifyEndUserIdentity } from './verify_end_user_identity.js';
 import {
 	FIXED_AREAS,
 	STORE_AREAS,
@@ -658,6 +659,8 @@ check(
 	'an update that clears a field removes it',
 	cleared !== null && !('federated' in cleared)
 );
+
+await verifyEndUserIdentity(runtimeUsers, check);
 
 const audit = new AdminAuditStore();
 const auditGroup = `fidelity-group-${Date.now()}`;

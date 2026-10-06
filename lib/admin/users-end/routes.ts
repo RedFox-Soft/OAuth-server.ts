@@ -1,6 +1,5 @@
 import { Elysia } from 'elysia';
 import { getUserStore } from '../../adapters/index.js';
-import type { UserBucket } from '../../adapters/types.js';
 import {
 	assertAuth,
 	AdminError,
@@ -11,43 +10,37 @@ import {
 import { loadBucketForUsers } from '../buckets/access.js';
 import {
 	CreateEndUserBody,
+	LockEndUserBody,
 	UpdateEndUserBody,
-	ResetPasswordBody,
-	RESERVED_CLAIMS
+	ResetPasswordBody
 } from './schema.js';
 import { recordAdminAudit } from '../audit/record.js';
-import {
-	cascadeForAccount,
-	endSessionsForAccount
-} from '../../helpers/cascade.js';
-import { emailScopedId } from '../../helpers/email_scoped_id.js';
+import { endSessionsForAccount } from '../../helpers/cascade.js';
 import { clearAttempts } from '../../totp/verify.js';
 import nanoid from '../../helpers/nanoid.js';
+import {
+	createEndUser,
+	EndUserError,
+	lockEndUser,
+	removeEndUser,
+	resetEndUserPassword,
+	unlockEndUser,
+	updateEndUser,
+	type EndUserActor
+} from '../../end_users/service.js';
 
-function assertRolesSubset(
-	roles: string[] | undefined,
-	bucket: UserBucket
-): void {
-	if (!roles) return;
-	const bad = roles.filter((r) => !bucket.roles.includes(r));
-	if (bad.length) {
-		throw new AdminError(
-			422,
-			`roles not declared on bucket: ${bad.join(', ')}`
-		);
-	}
-}
+/* Every change made here is an administrator's. */
+const ADMIN: EndUserActor = { kind: 'admin' };
 
-function assertClaimsAssignable(claims: Record<string, unknown> | undefined) {
-	if (!claims) return;
-	const reserved = Object.keys(claims).filter((name) =>
-		RESERVED_CLAIMS.includes(name)
-	);
-	if (reserved.length) {
-		throw new AdminError(
-			422,
-			`claims the server derives cannot be set on an account: ${reserved.join(', ')}`
-		);
+/* The service's refusals, in the admin plane's own error shape. */
+async function asAdmin<T>(operation: Promise<T>): Promise<T> {
+	try {
+		return await operation;
+	} catch (error) {
+		if (error instanceof EndUserError) {
+			throw new AdminError(error.status, error.message);
+		}
+		throw error;
 	}
 }
 
@@ -67,11 +60,23 @@ function assertClaimsAssignable(claims: Record<string, unknown> | undefined) {
  * test/mcp/secrecy.spec.ts sweeps every published read for exactly this.
  */
 const presentUser = <
-	T extends { password?: string; totp?: { enrolledAt: Date } }
+	T extends {
+		password?: string;
+		totp?: { enrolledAt: Date };
+		userNameKey?: string;
+		externalIdKey?: string;
+	}
 >(
 	user: T
 ) => {
-	const { password: _password, totp, ...safe } = user;
+	/* The derived keys are index material, not facts about the person; they stay with the store. */
+	const {
+		password: _password,
+		totp,
+		userNameKey: _userNameKey,
+		externalIdKey: _externalIdKey,
+		...safe
+	} = user;
 	return {
 		...safe,
 		totpEnrolled: Boolean(totp),
@@ -98,30 +103,27 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 		async ({ admin, params, body, set }) => {
 			const ctx = assertAuth(admin as AdminContext | null);
 			const bucket = await loadBucketForUsers(ctx, params.id);
-			assertRolesSubset(body.roles, bucket);
-			assertClaimsAssignable(body.claims);
-			const store = getUserStore(params.id);
-			if (await store.findByEmail(body.email)) {
-				throw new AdminError(409, 'email already exists');
-			}
-			const hash = await Bun.password.hash(body.password);
 			// Allocated here so the entry names the account that is about to exist. The bucket travels as
 			// the scope: these users live in per-bucket storage, so an id alone resolves to nobody.
 			const userId = nanoid();
-			await recordAdminAudit(ctx, 'enduser.create', userId, {
-				targetScope: params.id
-			});
-			const created = await store.create(
-				body.email,
-				hash,
-				body.roles ?? [],
-				true,
-				userId
+			const user = await asAdmin(
+				createEndUser(
+					bucket,
+					ADMIN,
+					{
+						id: userId,
+						email: body.email,
+						password: body.password,
+						verified: true,
+						roles: body.roles,
+						claims: body.claims
+					},
+					() =>
+						recordAdminAudit(ctx, 'enduser.create', userId, {
+							targetScope: params.id
+						})
+				)
 			);
-			const user = body.claims
-				? ((await store.update(created._id, { claims: body.claims })) ??
-					created)
-				: created;
 			set.status = 201;
 			return presentUser(user);
 		},
@@ -132,16 +134,28 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 		async ({ admin, params, body }) => {
 			const ctx = assertAuth(admin as AdminContext | null);
 			const bucket = await loadBucketForUsers(ctx, params.id);
-			assertRolesSubset(body.roles, bucket);
-			assertClaimsAssignable(body.claims);
-			// Names only: the values are personal data, and the trail is kept longer than the account.
-			await recordAdminAudit(ctx, 'enduser.update', params.uid, {
-				targetScope: params.id,
-				attributes: Object.keys(body)
-			});
-			const updated = await getUserStore(params.id).update(params.uid, body);
-			if (!updated) throw new AdminError(404, 'user not found');
-			return presentUser(updated);
+			const { user, revoked } = await asAdmin(
+				updateEndUser(bucket, ADMIN, params.uid, body, () =>
+					// Names only: the values are personal data, and the trail is kept longer than the account.
+					recordAdminAudit(ctx, 'enduser.update', params.uid, {
+						targetScope: params.id,
+						attributes: Object.keys(body)
+					})
+				)
+			);
+			/*
+			 * Reported the way the authenticator reset beside it reports a partial sweep: the user is already
+			 * unable to sign in, so nothing is unsafe, but the operator is told what survived and that
+			 * deactivating again sweeps again. Not in the audit entry — that is written before the change.
+			 */
+			if (revoked && revoked.failedAreas.length > 0) {
+				throw new AdminError(
+					500,
+					`the user was deactivated, but their access survives in: ${revoked.failedAreas.join(', ')}`,
+					{ failedAreas: revoked.failedAreas }
+				);
+			}
+			return presentUser(user);
 		},
 		{ body: UpdateEndUserBody }
 	)
@@ -149,20 +163,65 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 		'/admin/api/buckets/:id/users/:uid/password',
 		async ({ admin, params, body }) => {
 			const ctx = assertAuth(admin as AdminContext | null);
-			await loadBucketForUsers(ctx, params.id);
-			const hash = await Bun.password.hash(body.password);
-			// The reset is the recorded fact. No attribute names either: naming the field would say
-			// nothing the action does not, and the value must never be near the trail.
-			await recordAdminAudit(ctx, 'enduser.password.reset', params.uid, {
-				targetScope: params.id
-			});
-			const updated = await getUserStore(params.id).update(params.uid, {
-				password: hash
-			});
-			if (!updated) throw new AdminError(404, 'user not found');
+			const bucket = await loadBucketForUsers(ctx, params.id);
+			await asAdmin(
+				resetEndUserPassword(bucket, ADMIN, params.uid, body.password, () =>
+					// The reset is the recorded fact. No attribute names either: naming the field would say
+					// nothing the action does not, and the value must never be near the trail.
+					recordAdminAudit(ctx, 'enduser.password.reset', params.uid, {
+						targetScope: params.id
+					})
+				)
+			);
 			return { ok: true };
 		},
 		{ body: ResetPasswordBody }
+	)
+	/*
+	 * The emergency block: ends the user's access at once and holds until an administrator lifts it, whatever
+	 * the user's provisioning connection sends. The reason lives on the record, not in the trail.
+	 */
+	.post(
+		'/admin/api/buckets/:id/users/:uid/lock',
+		async ({ admin, params, body }) => {
+			const ctx = assertAuth(admin as AdminContext | null);
+			const bucket = await loadBucketForUsers(ctx, params.id);
+			const { user, revoked } = await asAdmin(
+				lockEndUser(
+					bucket,
+					params.uid,
+					{ by: ctx.userId, reason: body.reason },
+					() =>
+						recordAdminAudit(ctx, 'enduser.lock', params.uid, {
+							targetScope: params.id
+						})
+				)
+			);
+			if (revoked && revoked.failedAreas.length > 0) {
+				throw new AdminError(
+					500,
+					`the user was locked, but their access survives in: ${revoked.failedAreas.join(', ')}`,
+					{ failedAreas: revoked.failedAreas }
+				);
+			}
+			return presentUser(user);
+		},
+		{ body: LockEndUserBody }
+	)
+	.post(
+		'/admin/api/buckets/:id/users/:uid/unlock',
+		async ({ admin, params }) => {
+			const ctx = assertAuth(admin as AdminContext | null);
+			const bucket = await loadBucketForUsers(ctx, params.id);
+			const user = await asAdmin(
+				unlockEndUser(bucket, params.uid, () =>
+					recordAdminAudit(ctx, 'enduser.unlock', params.uid, {
+						targetScope: params.id
+					})
+				)
+			);
+			return presentUser(user);
+		}
 	)
 	/*
 	 * Recovery for a lost authenticator: clear the enrolment, and the account enrols afresh at its next
@@ -209,30 +268,14 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 	)
 	.delete('/admin/api/buckets/:id/users/:uid', async ({ admin, params }) => {
 		const ctx = assertAuth(admin as AdminContext | null);
-		await loadBucketForUsers(ctx, params.id);
-		const store = getUserStore(params.id);
-		const user = await store.find(params.uid);
-		if (!user) {
-			throw new AdminError(404, 'user not found');
-		}
-		/*
-		 * The email is read here, before the row goes, because the email-scoped areas
-		 * (VerificationResend, PasswordResetThrottle, LoginThrottle) are addressed by
-		 * `${bucketId}:${email}` and nothing else records it. Destroy first and those records are
-		 * unreachable — skipped in silence, with no error anywhere to notice.
-		 *
-		 * Built through the shared helper rather than inline: this line spelled the id itself and left
-		 * out the `toLowerCase()` every writer applies, so under the in-memory adapter — which, unlike
-		 * MongoDB's, stores the address as given — a mixed-case account's records were missed here and
-		 * the cascade reported success.
-		 */
-		const scopedId = user.email ? emailScopedId(params.id, user.email) : null;
-		await recordAdminAudit(ctx, 'enduser.delete', params.uid, {
-			targetScope: params.id
-		});
-		await store.destroy(params.uid);
-		/* Audit, then destroy the principal, then cascade; a failed sweep is reported, never rolled back. */
-		const cascade = await cascadeForAccount(params.uid, scopedId);
+		const bucket = await loadBucketForUsers(ctx, params.id);
+		const cascade = await asAdmin(
+			removeEndUser(bucket, ADMIN, params.uid, () =>
+				recordAdminAudit(ctx, 'enduser.delete', params.uid, {
+					targetScope: params.id
+				})
+			)
+		);
 		if (cascade.failedAreas.length > 0) {
 			throw new AdminError(
 				500,

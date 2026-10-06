@@ -94,6 +94,7 @@ lib/
   interactions/         ← login/consent/registration UI endpoints (React + Ant Design)
   shared/               ← session, the shared onError, token auth, client notifications, resource validation
   resources/            ← declared protected resources: canonical form, matching, descriptors
+  end_users/            ← the end-user service (every change to an end user), canSignIn, ending access
   client_metadata_document/ ← a client_id that is a URL: form rules, SSRF-bounded fetch, cache
   admin/                ← the administrative control plane
     routes.ts           ← THE admin API route set; mounted by the console and by lib/mcp/dispatch.ts
@@ -160,6 +161,10 @@ Each rule is the part that is easy to break. Read the named page before changing
   instance-wide things stay super-admin-only. → `group-ownership.md`
 - **Audit** — a mutating admin route records audit-first, after authorization, inside the handler.
   → `admin-audit-trail.md`
+- **End users** — change an end user only through `lib/end_users/service.ts`, never the user store
+  from a route; whether a user may sign in is `canSignIn`, and anything that makes them unable to runs
+  `revokeAccountAccess`. A provisioned user is read-only to administrators except the local lock.
+  → `end-user-lifecycle.md`
 - **Error store** — only defects (5xx) are recorded, from two capture sites; recording never blocks a
   request; the read surface is not flag-gated. → `error-store-capture-sites.md`,
   `error-store-is-not-flag-gated.md`

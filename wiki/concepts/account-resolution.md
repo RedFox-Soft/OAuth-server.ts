@@ -4,7 +4,7 @@ title: "Account resolution (findAccount)"
 tags: [contract, architecture, oidc]
 sources: [oauth-server-codebase]
 created: 2026-07-31
-updated: 2026-09-24
+updated: 2026-10-06
 graph:
   node_type: concept
   relationships:
@@ -78,15 +78,21 @@ The token side of that expression is also a concrete instance of
 ## Active status is enforced at every resolution, not just at login
 
 A missing **or deactivated** user resolves to `undefined` so the calling flow rejects it
-(`account.ts:18-24`). The comment states the security property directly: active status is enforced
+(`account.ts:61`). The comment states the security property directly: active status is enforced
 at every account resolution, so "a user deactivated after login can no longer mint tokens via
 refresh/device/CIBA". Deactivation is therefore effective immediately across all grant types rather
 than only blocking new logins.
 
+Since spec 069 the test is `canSignIn(user)` — `active && !lockedLocally` — shared with both sign-in
+doors, and this lazy check is no longer the whole of deactivation: the admin operation also ends the
+user's sessions, grants and tokens and notifies relying parties at once. See [[end-user-lifecycle]].
+
 ## Claims live on the user record
 
 Extra claims — profile fields and distributed/aggregated claims — are stored on the user record and
-merged into the returned account's claims (`account.ts:26-30`). There is no separate claims
+merged into the returned account's claims (`account.ts:80-86`). Since spec 069 a provisioned `profile`
+also yields standard claims through `lib/consts/profile_claims.ts`, merged before the stored claims so
+an administrator's value still wins ([[end-user-lifecycle]]). There is no separate claims
 configuration and no per-deployment claims override; the provider masks the returned claims by
 granted scope automatically. Test harnesses seed accounts together with their claims rather than
 supplying overrides.

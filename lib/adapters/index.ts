@@ -283,6 +283,10 @@ export function checkedAdapter<S extends TObject>(
 		create: (id, payload, expiresIn) => raw.create(id, payload, expiresIn),
 		increment: (id, field, expiresIn) => raw.increment(id, field, expiresIn),
 		destroyByOwner: (field, value) => raw.destroyByOwner(field, value),
+		findByOwner: async (field, value) =>
+			(await raw.findByOwner(field, value)).map((record) =>
+				documentOf(name, schema, record)
+			),
 		destroyUnusedSince: (markerField, usedField, ageField, before) =>
 			raw.destroyUnusedSince(markerField, usedField, ageField, before)
 	};

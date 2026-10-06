@@ -1,4 +1,22 @@
-import { type User, type UserStoreInstance } from '../types.js';
+import {
+	clampPage,
+	derivedKeysOf,
+	FIELD_OF_KEY,
+	matchesStored,
+	storedFilterOf,
+	storedPatchOf,
+	uniqueValuesAfter
+} from '../end_user_keys.js';
+import {
+	DuplicateEndUserError,
+	MAX_END_USER_PAGE,
+	type EndUserFilter,
+	type EndUserPage,
+	type EndUserPatch,
+	type EndUserQueryResult,
+	type User,
+	type UserStoreInstance
+} from '../types.js';
 
 export class UserStore implements UserStoreInstance {
 	private users = new Map<string, User>();
@@ -37,10 +55,54 @@ export class UserStore implements UserStoreInstance {
 			// And seeding an enrolment is how a spec sets up "this account already holds an
 			// authenticator" without driving the enrolment flow — which is what lets the operator-side
 			// specs (clearing an enrolment) run without the interaction-side ones existing.
-			totp: user.totp
+			totp: user.totp,
+			userName: user.userName,
+			externalId: user.externalId,
+			provisionedBy: user.provisionedBy,
+			profile: user.profile,
+			lockedLocally: user.lockedLocally
 		};
+		Object.assign(full, derivedKeysOf(full));
+		for (const [field, value] of Object.entries(full)) {
+			if (value === undefined) Reflect.deleteProperty(full, field);
+		}
 		this.users.set(full._id, full);
 		return full;
+	}
+
+	/*
+	 * The unique indexes the other two stores declare, enforced by scan. Checked in the order a caller
+	 * most wants to hear about: the email is the login.
+	 */
+	private duplicateOf(
+		candidate: Pick<User, 'email' | 'userNameKey' | 'externalIdKey'>,
+		excludeId?: string
+	): DuplicateEndUserError | null {
+		for (const field of ['email', 'userNameKey', 'externalIdKey'] as const) {
+			const value = candidate[field];
+			if (value === undefined) continue;
+			for (const user of this.users.values()) {
+				if (user._id !== excludeId && user[field] === value) {
+					return new DuplicateEndUserError(FIELD_OF_KEY[field]);
+				}
+			}
+		}
+		return null;
+	}
+
+	async query(
+		filter: EndUserFilter,
+		page: EndUserPage
+	): Promise<EndUserQueryResult> {
+		const stored = storedFilterOf(filter);
+		const { offset, limit } = clampPage(page, MAX_END_USER_PAGE);
+		const matches = [...this.users.values()]
+			.filter((user) => matchesStored(user, stored))
+			.sort((a, b) => (a._id < b._id ? -1 : a._id > b._id ? 1 : 0));
+		return {
+			users: matches.slice(offset, offset + limit),
+			totalResults: matches.length
+		};
 	}
 
 	async findByEmail(email: string): Promise<User | null> {
@@ -82,7 +144,7 @@ export class UserStore implements UserStoreInstance {
 		id?: string
 	): Promise<User> {
 		if (await this.findByEmail(email)) {
-			throw new Error('User with this email already exists');
+			throw new DuplicateEndUserError('email');
 		}
 		const now = new Date();
 		const user: User = {
@@ -116,22 +178,19 @@ export class UserStore implements UserStoreInstance {
 		return [...this.users.values()];
 	}
 
-	async update(
-		_id: string,
-		patch: Partial<
-			Pick<
-				User,
-				'roles' | 'active' | 'password' | 'verified' | 'claims' | 'federated'
-			>
-		>
-	): Promise<User | null> {
+	async update(_id: string, patch: EndUserPatch): Promise<User | null> {
 		const user = this.users.get(_id);
 		if (!user) return null;
-		Object.assign(user, patch, { updatedAt: new Date() });
+		const effective = await storedPatchOf(patch, async () => user);
+		/* Refused before anything is written, as a unique index refuses the whole write. */
+		const duplicate = this.duplicateOf(uniqueValuesAfter(user, effective), _id);
+		if (duplicate) throw duplicate;
+
+		Object.assign(user, effective, { updatedAt: new Date() });
 		// Converged with the MongoDB store, which translates the same shape into `$unset`: a key present
 		// with an undefined value means remove the field, not store an undefined one. Leaving the key
 		// behind here would make the two adapters disagree about what a cleared enrolment looks like.
-		for (const [field, value] of Object.entries(patch)) {
+		for (const [field, value] of Object.entries(effective)) {
 			if (value === undefined) {
 				Reflect.deleteProperty(user, field);
 			}

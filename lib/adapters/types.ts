@@ -2,6 +2,65 @@ import { StoredJWK } from 'lib/configs/verifyJWKs.ts';
 import { Type as t, type Static } from '@sinclair/typebox';
 import { FederatedIdentity, FederationProvider } from '../federation/types.js';
 
+const ProfileString = t.String({ maxLength: 256 });
+const ProfileContact = t.Object(
+	{
+		value: ProfileString,
+		type: t.Optional(t.String({ maxLength: 64 })),
+		primary: t.Optional(t.Boolean())
+	},
+	{ additionalProperties: false }
+);
+
+/*
+ * What a provisioning system maintains about a person, in SCIM's own structure (RFC 7643 §4.1, and §4.3 for
+ * `enterprise`), so a value round-trips exactly as it was sent. Closed rather than open on purpose: a
+ * credential can never ride in here, and an attribute is added by changing this schema, not by whatever a
+ * caller happens to send. Which of these reach a token is lib/consts/profile_claims.ts.
+ */
+export const EndUserProfile = t.Object(
+	{
+		name: t.Optional(
+			t.Object(
+				{
+					formatted: t.Optional(t.String({ maxLength: 2048 })),
+					familyName: t.Optional(ProfileString),
+					givenName: t.Optional(ProfileString),
+					middleName: t.Optional(ProfileString),
+					honorificPrefix: t.Optional(ProfileString),
+					honorificSuffix: t.Optional(ProfileString)
+				},
+				{ additionalProperties: false }
+			)
+		),
+		displayName: t.Optional(ProfileString),
+		nickName: t.Optional(ProfileString),
+		title: t.Optional(ProfileString),
+		preferredLanguage: t.Optional(ProfileString),
+		locale: t.Optional(ProfileString),
+		timezone: t.Optional(ProfileString),
+		phoneNumbers: t.Optional(t.Array(ProfileContact, { maxItems: 10 })),
+		emails: t.Optional(t.Array(ProfileContact, { maxItems: 10 })),
+		enterprise: t.Optional(
+			t.Object(
+				{
+					employeeNumber: t.Optional(ProfileString),
+					costCenter: t.Optional(ProfileString),
+					organization: t.Optional(ProfileString),
+					division: t.Optional(ProfileString),
+					department: t.Optional(ProfileString),
+					manager: t.Optional(
+						t.Object({ value: ProfileString }, { additionalProperties: false })
+					)
+				},
+				{ additionalProperties: false }
+			)
+		)
+	},
+	{ additionalProperties: false }
+);
+export type EndUserProfile = Static<typeof EndUserProfile>;
+
 export const User = t.Object({
 	_id: t.String(),
 	email: t.String(),
@@ -51,9 +110,99 @@ export const User = t.Object({
 			 */
 			lastStep: t.Number()
 		})
+	),
+	/*
+	 * The identity a provisioning system knows this person by. `userName` and `externalId` are stored
+	 * exactly as sent; the `*Key` fields beside them are derived by the store (lib/adapters/end_user_keys.ts),
+	 * never accepted from a caller, and are what the unique indexes hold — see the per-bucket area in
+	 * lib/consts/storage_inventory.ts for why uniqueness rides on derived scalars.
+	 *
+	 * `externalId` is scoped to the connection that issued it (RFC 7643 §3.1), which is why its key embeds
+	 * `provisionedBy`. None of these ever becomes the `sub`: `_id` is this server's and stays so.
+	 */
+	userName: t.Optional(t.String()),
+	userNameKey: t.Optional(t.String()),
+	externalId: t.Optional(t.String()),
+	externalIdKey: t.Optional(t.String()),
+	/* The provisioning connection that owns this record. Absent ⇒ a local user an administrator manages. */
+	provisionedBy: t.Optional(t.String()),
+	profile: t.Optional(EndUserProfile),
+	/*
+	 * An administrator's emergency block, separate from `active` because `active` belongs to whoever
+	 * manages the user — a provisioning system, for a managed one — and its next sync would undo a local
+	 * deactivation. Nothing a connection sends can set or clear this.
+	 */
+	lockedLocally: t.Optional(
+		t.Object({ at: t.Date(), by: t.String(), reason: t.String() })
 	)
 });
 export type User = Static<typeof User>;
+
+/*
+ * A uniqueness violation in a bucket's user area, naming the field rather than leaving the caller to parse a
+ * driver message. The email message is the one every adapter has always thrown, so a caller that matched on it
+ * still does.
+ */
+export class DuplicateEndUserError extends Error {
+	readonly field: 'email' | 'userName' | 'externalId';
+
+	constructor(field: 'email' | 'userName' | 'externalId') {
+		super(
+			field === 'email'
+				? 'User with this email already exists'
+				: `User with this ${field} already exists`
+		);
+		this.name = 'DuplicateEndUserError';
+		this.field = field;
+	}
+}
+
+/*
+ * Equality on fixed fields, ANDed. Deliberately not a query language: each store maps these members to
+ * its own field names, so nothing a caller supplies is ever a field name. `userName` is compared
+ * case-insensitively and `externalId` only together with the connection that issued it.
+ */
+export interface EndUserFilter {
+	id?: string;
+	userName?: string;
+	email?: string;
+	provisionedBy?: string;
+	externalId?: string;
+}
+
+/* `startIndex` is 1-based, as SCIM's is; `count` is clamped to MAX_END_USER_PAGE. */
+export interface EndUserPage {
+	startIndex: number;
+	count: number;
+}
+
+export const MAX_END_USER_PAGE = 1000;
+
+export interface EndUserQueryResult {
+	users: User[];
+	totalResults: number;
+}
+
+/* The fields an update may carry. The derived keys are not among them: the store computes those. */
+export type EndUserPatch = Partial<
+	Pick<
+		User,
+		| 'roles'
+		| 'active'
+		| 'password'
+		| 'verified'
+		| 'claims'
+		| 'federated'
+		/* Set when an enrolment is confirmed, and set back to undefined when an operator clears one. */
+		| 'totp'
+		| 'email'
+		| 'userName'
+		| 'externalId'
+		| 'provisionedBy'
+		| 'profile'
+		| 'lockedLocally'
+	>
+>;
 
 export interface ModelAdapter<TPayload = unknown> {
 	upsert(id: string, payload: TPayload, expiresIn?: number): Promise<void>;
@@ -101,6 +250,14 @@ export interface ModelAdapter<TPayload = unknown> {
 	 * cannot silently work.
 	 */
 	destroyByOwner(field: string, value: string): Promise<number>;
+	/*
+	 * Reads every record in this area whose `field` equals `value` — as stored, like `find`, so judging
+	 * expiry stays with the model reading it. The reading twin of
+	 * `destroyByOwner`, under the same rule and for the same reason: `field` comes only from
+	 * lib/consts/storage_inventory.ts. Exists because ending an account's access must tell the relying
+	 * parties about each session before the sweep destroys it, and a session's `sid` is gone afterwards.
+	 */
+	findByOwner(field: string, value: string): Promise<TPayload[]>;
 	/*
 	 * Destroys every record in this area whose `markerField` is set, whose `usedField` is absent, and
 	 * whose `ageField` is older than `before`. Returns how many went.
@@ -238,26 +395,20 @@ export interface UserStoreInstance {
 	): Promise<User | null>;
 	list(): Promise<User[]>;
 	/*
+	 * A page of the users matching `filter`, ordered by `_id` so pages do not shift between requests, with
+	 * the total match count. `externalId` without `provisionedBy` is a programming error and throws.
+	 */
+	query(filter: EndUserFilter, page: EndUserPage): Promise<EndUserQueryResult>;
+	/*
 	 * `claims` and `federated` are patchable because a just-in-time provisioned account is created and
 	 * then completed: create() takes positional arguments and neither value is always present, so widening
-	 * the patch beats a sixth and seventh parameter at every existing call site.
+	 * the patch beats a sixth and seventh parameter at every existing call site. The provisioned-identity
+	 * fields ride the same way. A key present with an undefined value removes the field.
+	 *
+	 * Throws DuplicateEndUserError, writing nothing, when the patch would collide on email, username or
+	 * external identifier.
 	 */
-	update(
-		id: string,
-		patch: Partial<
-			Pick<
-				User,
-				| 'roles'
-				| 'active'
-				| 'password'
-				| 'verified'
-				| 'claims'
-				| 'federated'
-				/* Set when an enrolment is confirmed, and set back to undefined when an operator clears one. */
-				| 'totp'
-			>
-		>
-	): Promise<User | null>;
+	update(id: string, patch: EndUserPatch): Promise<User | null>;
 	destroy(id: string): Promise<void>;
 	/*
 	 * Destroys the area itself, called when its bucket is deleted — the half of bucket deletion that was

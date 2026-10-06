@@ -1,7 +1,7 @@
-import crypto from 'crypto';
-
 import { getUserStore } from '../adapters/index.js';
 import type { User, UserBucket } from '../adapters/types.js';
+import { unusablePassword } from '../helpers/unusable_password.js';
+import { canSignIn } from '../end_users/can_sign_in.js';
 import { COPIED_CLAIMS } from './consts.js';
 import type { FederationProvider, PendingLinkIdentity } from './types.js';
 
@@ -41,15 +41,6 @@ export type Resolution =
 			account: User;
 			link: PendingLinkIdentity;
 	  };
-
-/*
- * A password no one can type. The hash is of 32 random bytes discarded on the next line — deliberately not
- * a sentinel string, which would be a value someone could eventually guess, submit, or find in this source.
- * A federated account acquires a usable password only through the self-service reset.
- */
-async function unusablePassword(): Promise<string> {
-	return Bun.password.hash(crypto.randomBytes(32).toString('base64url'));
-}
 
 function emailFrom(
 	claims: Record<string, unknown>,
@@ -157,7 +148,7 @@ export async function resolveFederatedAccount(input: {
 		if (!trustedVerified(claims, provider)) {
 			return { ok: false, reason: 'link_not_permitted' };
 		}
-		if (!existing.active) {
+		if (!canSignIn(existing)) {
 			return { ok: false, reason: 'inactive' };
 		}
 		const identity: PendingLinkIdentity = {
@@ -214,7 +205,7 @@ export async function resolveFederatedAccount(input: {
 	const account = completed ?? created;
 	// 6. Written as the rule rather than skipped as impossible, so it stays right if provisioning ever
 	// gains a default that is not active.
-	if (!account.active) {
+	if (!canSignIn(account)) {
 		return { ok: false, reason: 'inactive' };
 	}
 	return { ok: true, account, provisioned: true };

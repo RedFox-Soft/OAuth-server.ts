@@ -665,13 +665,33 @@ export const ApplicationConfig = {
 	 * description: Claims map used to derive `claims_supported` and claim-defined scopes for discovery.
 	 *   `{ claimName: null }` exposes a standalone claim; `{ scopeName: ['claim', ...] }` groups claims under a scope.
 	 *   `amr` is supported whatever this holds (lib/configs/configuration.ts says why), so it needs no entry.
+	 *   `profile` and `phone` carry the OpenID Connect Core §5.4 lists, which is what a provisioned profile
+	 *   is released under. A deployment that saved this setting keeps what it saved: the stored object replaces
+	 *   this default whole, and whether profile data is released is that operator's decision.
 	 */
 	claims: setting<ClaimsSetting>({
 		acr: null,
 		sid: null,
 		auth_time: null,
 		iss: null,
-		openid: ['sub']
+		openid: ['sub'],
+		profile: [
+			'name',
+			'family_name',
+			'given_name',
+			'middle_name',
+			'nickname',
+			'preferred_username',
+			'profile',
+			'picture',
+			'website',
+			'gender',
+			'birthdate',
+			'zoneinfo',
+			'locale',
+			'updated_at'
+		],
+		phone: ['phone_number', 'phone_number_verified']
 	}),
 
 	/*

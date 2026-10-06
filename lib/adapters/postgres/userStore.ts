@@ -1,11 +1,64 @@
 import crypto from 'crypto';
 
+import type { SQL } from 'bun';
+
 import { sql } from './db.js';
 import { docOf } from './json.js';
 import { isUniqueViolation } from './sqlState.js';
 import { userAreaFor } from '../../consts/storage_inventory.js';
 import { documentOf } from '../documents.js';
-import { User, type UserStoreInstance } from '../types.js';
+import {
+	clampPage,
+	FIELD_OF_KEY,
+	storedFilterOf,
+	storedPatchOf,
+	type StoredEndUserFilter
+} from '../end_user_keys.js';
+import {
+	DuplicateEndUserError,
+	MAX_END_USER_PAGE,
+	User,
+	type EndUserFilter,
+	type EndUserPage,
+	type EndUserPatch,
+	type EndUserQueryResult,
+	type UserStoreInstance
+} from '../types.js';
+
+/*
+ * One equality per filter member, each written out with its own literal path. Spelled as a switch rather
+ * than a map of path strings so that no path is ever spliced into SQL text: a field name in a query is
+ * always one of these literals, and every value is a bound parameter.
+ */
+function equalityFor(
+	handle: SQL,
+	field: keyof StoredEndUserFilter,
+	value: string
+) {
+	switch (field) {
+		case '_id':
+			return handle`id = ${value}`;
+		case 'userNameKey':
+			return handle`doc->>'userNameKey' = ${value}`;
+		case 'email':
+			return handle`doc->>'email' = ${value}`;
+		case 'provisionedBy':
+			return handle`doc->>'provisionedBy' = ${value}`;
+		case 'externalIdKey':
+			return handle`doc->>'externalIdKey' = ${value}`;
+	}
+}
+
+function conditionsFor(handle: SQL, filter: StoredEndUserFilter) {
+	let where = handle`TRUE`;
+	for (const field of Object.keys(filter) as Array<keyof StoredEndUserFilter>) {
+		const value = filter[field];
+		if (value !== undefined) {
+			where = handle`${where} AND ${equalityFor(handle, field, value)}`;
+		}
+	}
+	return where;
+}
 
 export class UserStore implements UserStoreInstance {
 	name = 'redfox';
@@ -77,7 +130,7 @@ export class UserStore implements UserStoreInstance {
 	): Promise<User> {
 		const existingUser = await this.findByEmail(email);
 		if (existingUser) {
-			throw new Error('User with this email already exists');
+			throw new DuplicateEndUserError('email');
 		}
 
 		const now = new Date();
@@ -108,13 +161,60 @@ export class UserStore implements UserStoreInstance {
 			 * and no driver text naming the address travels on into the error store.
 			 */
 			if (isUniqueViolation(error)) {
-				// eslint-disable-next-line preserve-caught-error -- the cause quotes the address this drops
-				throw new Error('User with this email already exists');
+				throw new DuplicateEndUserError('email');
 			}
 			throw error;
 		}
 
 		return user;
+	}
+
+	async query(
+		filter: EndUserFilter,
+		page: EndUserPage
+	): Promise<EndUserQueryResult> {
+		const stored = storedFilterOf(filter);
+		const { offset, limit } = clampPage(page, MAX_END_USER_PAGE);
+		const handle = sql();
+		const where = conditionsFor(handle, stored);
+		const [rows, counted] = await Promise.all([
+			limit === 0
+				? Promise.resolve([])
+				: handle`
+					SELECT doc FROM ${handle(this.area)} WHERE ${where}
+					ORDER BY id LIMIT ${limit} OFFSET ${offset}
+				`,
+			handle`SELECT count(*)::int AS total FROM ${handle(this.area)} WHERE ${where}`
+		]);
+		return {
+			users: rows
+				.map((row: unknown) => this.userOf(row))
+				.filter((user: User | null): user is User => user !== null),
+			totalResults: Number(counted[0]?.total ?? 0)
+		};
+	}
+
+	/*
+	 * Which unique key a refused write collided on. Read back rather than parsed from the driver's
+	 * constraint name, because the index name is a provisioning detail that may be hashed when long
+	 * (provision.ts `indexName`), while the values the write carried are in hand.
+	 */
+	private async duplicateFor(
+		_id: string,
+		stored: Partial<Pick<User, 'email' | 'userNameKey' | 'externalIdKey'>>
+	): Promise<DuplicateEndUserError | null> {
+		const handle = sql();
+		for (const key of ['email', 'userNameKey', 'externalIdKey'] as const) {
+			const value = stored[key];
+			if (value === undefined) continue;
+			const rows = await handle`
+				SELECT 1 FROM ${handle(this.area)}
+				WHERE ${equalityFor(handle, key, value)} AND id <> ${_id}
+				LIMIT 1
+			`;
+			if (rows.length) return new DuplicateEndUserError(FIELD_OF_KEY[key]);
+		}
+		return null;
 	}
 
 	async list(): Promise<User[]> {
@@ -135,41 +235,35 @@ export class UserStore implements UserStoreInstance {
 	 * So removals are subtracted before the merge. `doc - text[]` takes an empty array happily, which is
 	 * why this needs no branch, unlike MongoDB's `$unset` that must be omitted when it has no work.
 	 */
-	async update(
-		_id: string,
-		patch: Partial<
-			Pick<
-				User,
-				| 'roles'
-				| 'active'
-				| 'password'
-				| 'verified'
-				| 'claims'
-				| 'federated'
-				| 'totp'
-			>
-		>
-	): Promise<User | null> {
+	async update(_id: string, patch: EndUserPatch): Promise<User | null> {
+		const stored = await storedPatchOf(patch, () => this.find(_id));
 		const set: Record<string, unknown> = { updatedAt: new Date() };
 		const remove: string[] = [];
-		for (const [field, value] of Object.entries(patch)) {
+		for (const [field, value] of Object.entries(stored)) {
 			if (value === undefined) remove.push(field);
 			else set[field] = value;
 		}
 
 		const handle = sql();
-		/*
-		 * `handle.array`, not `${remove}::text[]`: Bun binds a bare JS array as text PostgreSQL cannot read
-		 * as an array ("malformed array literal"), so every update threw — found by a round trip against a
-		 * real server, which the in-memory suite cannot see.
-		 */
-		const rows = await handle`
-			UPDATE ${handle(this.area)}
-			SET doc = (doc - ${handle.array(remove, 'text')}) || ${set}
-			WHERE id = ${_id}
-			RETURNING doc
-		`;
-		return this.userOf(rows[0]);
+		try {
+			/*
+			 * `handle.array`, not `${remove}::text[]`: Bun binds a bare JS array as text PostgreSQL cannot
+			 * read as an array ("malformed array literal"), so every update threw — found by a round trip
+			 * against a real server, which the in-memory suite cannot see.
+			 */
+			const rows = await handle`
+				UPDATE ${handle(this.area)}
+				SET doc = (doc - ${handle.array(remove, 'text')}) || ${set}
+				WHERE id = ${_id}
+				RETURNING doc
+			`;
+			return this.userOf(rows[0]);
+		} catch (error) {
+			if (!isUniqueViolation(error)) throw error;
+			const duplicate = await this.duplicateFor(_id, stored);
+
+			throw duplicate ?? error;
+		}
 	}
 
 	async destroy(_id: string): Promise<void> {

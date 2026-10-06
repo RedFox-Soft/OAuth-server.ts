@@ -4,6 +4,8 @@ import { resolveBucketForRequest } from '../admin/auth/resolveBucket.js';
 import { DEFAULT_REQUEST_BUCKET } from '../configs/issuer.js';
 import type { OIDCContext } from '../helpers/oidc_context.ts';
 import { consentWaived } from '../shared/consent_waiver.js';
+import { canSignIn } from '../end_users/can_sign_in.js';
+import { profileClaims } from '../consts/profile_claims.js';
 
 // The token an account is loaded for at the token and userinfo endpoints.
 type AccountToken = {
@@ -56,7 +58,7 @@ export async function findAccount<
 	// rejects it. Active-status is therefore enforced at every account
 	// resolution, not only at login (a user deactivated after login can no
 	// longer mint tokens via refresh/device/CIBA).
-	if (!user || !user.active) {
+	if (!user || !canSignIn(user)) {
 		return undefined;
 	}
 
@@ -71,10 +73,15 @@ export async function findAccount<
 			_claims?: unknown,
 			_rejected?: readonly string[]
 		) {
+			/*
+			 * A provisioned profile yields standard claims (lib/consts/profile_claims.ts); the stored claims an
+			 * administrator set come last and win, as they always have.
+			 */
 			return {
 				sub,
 				email: user.email,
 				email_verified: user.verified,
+				...profileClaims(user),
 				...user.claims
 			};
 		}

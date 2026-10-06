@@ -207,6 +207,25 @@ export class MemoryAdapter<
 		return destroyed;
 	}
 
+	async findByOwner(field: string, value: string) {
+		const storage = getStorage();
+		const prefix = `${this.model}:`;
+		/* Snapshot first, for the same reason `destroyByOwner` does. */
+		const keys = new Set(storage.keys());
+
+		const found = [];
+		for (const key of keys) {
+			if (!key.startsWith(prefix)) {
+				continue;
+			}
+			const stored = recordAt(key);
+			if (stored && stringField(stored, field) === value) {
+				found.push(stored);
+			}
+		}
+		return found;
+	}
+
 	async destroyUnusedSince(
 		markerField: string,
 		usedField: string,

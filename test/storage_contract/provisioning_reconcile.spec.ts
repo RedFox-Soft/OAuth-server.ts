@@ -173,6 +173,18 @@ describe('missingIndexes', () => {
 			{
 				name: 'federated.providerId_1_federated.sub_1',
 				key: { 'federated.providerId': 1, 'federated.sub': 1 }
+			},
+			{
+				name: 'userNameKey_1',
+				key: { userNameKey: 1 },
+				unique: true,
+				sparse: true
+			},
+			{
+				name: 'externalIdKey_1',
+				key: { externalIdKey: 1 },
+				unique: true,
+				sparse: true
 			}
 		];
 
@@ -268,7 +280,8 @@ describe('staleExpiryIndexes', () => {
 	it('leaves a per-bucket user area alone when it is correctly constrained', () => {
 		/*
 		 * "Correctly constrained" is the full declared set, so this fixture grows with the declaration —
-		 * the federated-identity index joined it when federation landed. Listing one index short would
+		 * the federated-identity index joined it when federation landed, the provisioned-identity keys with
+		 * spec 069. Listing one index short would
 		 * make the assertion claim reconciliation is idle on an area that is in fact missing an index.
 		 */
 		const existing: ExistingIndex[] = [
@@ -277,6 +290,18 @@ describe('staleExpiryIndexes', () => {
 			{
 				name: 'federated.providerId_1_federated.sub_1',
 				key: { 'federated.providerId': 1, 'federated.sub': 1 }
+			},
+			{
+				name: 'userNameKey_1',
+				key: { userNameKey: 1 },
+				unique: true,
+				sparse: true
+			},
+			{
+				name: 'externalIdKey_1',
+				key: { externalIdKey: 1 },
+				unique: true,
+				sparse: true
 			}
 		];
 

@@ -13,6 +13,7 @@ import type { User, UserBucket } from '../adapters/types.js';
 import { ADMIN_BUCKET_ID } from '../admin/consts.js';
 import { ISSUER } from '../configs/env.js';
 import { endSessionsForAccount } from '../helpers/cascade.js';
+import { canSignIn } from '../end_users/can_sign_in.js';
 import { emailScopedId } from '../helpers/email_scoped_id.js';
 import epochTime from '../helpers/epoch_time.js';
 import { clearFailures } from '../login_throttle/throttle.js';
@@ -161,7 +162,7 @@ export async function request(
 	}
 
 	const user = await getUserStore(bucketId).findByEmail(email);
-	if (!user || !user.active) {
+	if (!user || !canSignIn(user)) {
 		return { ok: true, sent: false };
 	}
 
@@ -234,7 +235,7 @@ export async function load(token: string): Promise<LoadOutcome> {
 	}
 
 	const user = await getUserStore(challenge.bucketId).find(challenge.accountId);
-	if (!user || !user.active) {
+	if (!user || !canSignIn(user)) {
 		return { ok: false };
 	}
 

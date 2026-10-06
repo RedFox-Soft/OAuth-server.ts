@@ -4,7 +4,7 @@ title: 'Deletion and revocation'
 tags: [architecture, contract, gotcha, oauth]
 sources: [oauth-server-codebase]
 created: 2026-08-04
-updated: 2026-09-16
+updated: 2026-10-06
 graph:
   node_type: concept
 ---
@@ -17,6 +17,7 @@ Three different operations are easy to confuse, and the code has always distingu
 |---|---|---|
 | **Protocol revocation** (RFC 7009, end-session) | every token under one grant | the `Grant` record — the consent itself |
 | **Principal deletion** (client, end-user) | the principal, then every record naming it as owner, including its grants | nothing of that principal |
+| **Ending an end user's access** (deactivate, lock; spec 069) | every account-owned record — sessions, grants, tokens, codes — after a back-channel logout per session | the account, and its email-addressed throttles |
 | **Container deletion** (project, bucket) | nothing, unless the caller elected to take the contents — then every principal inside, each by the principal cascade above | the bucket a project merely pointed at, always |
 
 "Revoke" reads as "remove everything" and the code disagrees. A grant is the record that a user
@@ -136,8 +137,9 @@ client issued, least of all during an incident.
 - A project refuses deletion while any id in `clientIds` still **resolves** via `Client.tryFind`. An
   unresolvable id must never make a project permanently undeletable — and a refused request prunes
   nothing, because **a conflict changes nothing at all**, audit entry included.
-- A bucket refuses while any user exists, **including `active: false` accounts**: deactivation is a
-  sign-in decision, not absence.
+- A bucket refuses while any user exists, **including `active: false` accounts**: deactivation ends
+  access (since 069 it sweeps the account's sessions and tokens — [[end-user-lifecycle]]) but is not
+  absence.
 - An assigned bucket is not a blocker on its own. Buckets are shared and outlive projects.
 
 A refusal answers 409 with `blockers: [{ kind, count, ids? }]`. Client ids are listed; end-user blockers
