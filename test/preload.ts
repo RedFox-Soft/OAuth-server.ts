@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, setDefaultTimeout } from 'bun:test';
+import { afterEach, beforeEach } from 'bun:test';
 
 import { writeRootKeys } from './root_keys.js';
 import { resetToBaseline } from './addon_baseline.js';
@@ -7,19 +7,13 @@ import { resolver } from '../lib/shared/egress.js';
 import { testSigningKeys } from './jwks/fixtures.js';
 
 /*
- * A bound on how long any one case may consume, set here because there is nowhere else to set it.
- * `timeout` is not a bunfig key — Bun's [test] parser handles eighteen and that is not one of them —
- * and the command line is no use either: the merge gate is the bare `bun test`, which resolves to the
- * builtin subcommand, so a `test` script in package.json would be shadowed and a contributor typing
- * the documented command would silently get no bound at all.
- *
- * What it prevents is silence rather than slowness. A case over the limit is interrupted and named;
- * without one, a wedged case prints nothing and idles, which is indistinguishable from a deadlock —
- * a federation case once burned 52 minutes that way and dragged a whole run to 3,226 s. 20 s against
- * a suite that completes 4,036 tests in 66 s leaves every legitimate case two orders of magnitude of
- * headroom. A case that genuinely needs longer passes its own third argument to `it(...)`.
+ * No time limit is set here, though one was for a long while: `setDefaultTimeout` applies to "all tests
+ * in the current file" (Bun's reference), so called from a preload it bounded only the first spec of a
+ * run at 20 s, and every other spec has always run under Bun's own default of 5 s. Neither a bunfig
+ * `timeout` key nor a preload hook carries a default across files; only `bun test --timeout` does, and
+ * the gate is the bare command. 5 s is therefore the bound every case actually has. A case that needs
+ * longer passes its own third argument to `it(...)`.
  */
-setDefaultTimeout(20_000);
 
 /*
  * No test reaches the real network, in any file order.

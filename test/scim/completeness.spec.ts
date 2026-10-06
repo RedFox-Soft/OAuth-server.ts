@@ -133,6 +133,7 @@ describe('the SCIM surface as mounted', () => {
 		})
 	};
 
+	/* Some 24 users are created, each hashing an unusable password (~100 ms): past Bun's 5 s under load. */
 	it('for every mutating SCIM route, writes exactly one audit entry on success and none on refusal', async () => {
 		const mutating = mountedScimRoutes().filter((r) => MUTATING.has(r.method));
 		expect(mutating.length).toBeGreaterThan(0);
@@ -160,7 +161,7 @@ describe('the SCIM surface as mounted', () => {
 				`${route.method} ${route.path} refused`
 			).toBe(1);
 		}
-	});
+	}, 20_000);
 
 	it('for every SCIM route, answers an error in the SCIM format with nothing internal in it', async () => {
 		const routes = mountedScimRoutes();

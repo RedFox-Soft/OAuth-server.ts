@@ -196,13 +196,13 @@ and a stored model record through `TestAdapter.for(name).syncFindAs(<the model's
 A mocked `fetch` is `fetchAnswering(...)` over a real `Response`. `@ts-expect-error` is for input that is
 off-schema on purpose, with the reason on the directive.
 
-**Two properties hold for every spec**, set once in `test/preload.ts` so no spec has to remember them and
-no file order can change them:
+**Two properties hold for every spec**, so no spec has to remember them and no file order can change them:
 
-- **A case is bounded at 20 s.** `setDefaultTimeout` lives there rather than in `bunfig.toml` because
-  `timeout` is not a `[test]` key Bun parses, and not on the command line because the gate is the bare
-  `bun test`, which would shadow a `test` script. A case that genuinely needs longer passes its own third
-  argument to `it(...)`. The bound catches a case that _awaits_ too long; it cannot preempt one that
+- **A case is bounded at 5 s** — Bun's default. It cannot be raised for the whole suite from one place:
+  `setDefaultTimeout` applies only to the file that calls it (a call in `test/preload.ts` once bounded the
+  first spec of a run at 20 s and no other), `timeout` is not a `[test]` key Bun parses, and the gate is
+  the bare `bun test`. A case that genuinely needs longer passes its own third argument to `it(...)`, with
+  the reason beside it. The bound catches a case that _awaits_ too long; it cannot preempt one that
   blocks the event loop, which still reports its full duration — that is how to recognise it.
 - **No test reaches the real network.** `test/fetch_mock.ts` intercepts every outbound `fetch`, and a
   request to an origin nobody registered with `mock(origin)` is **refused by name** rather than sent. If

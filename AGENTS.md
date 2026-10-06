@@ -191,7 +191,7 @@ Pages are under `wiki/concepts/` unless the path says otherwise.
 one.** In one line: a test proves a User Case or a Security Invariant, never that the code is the code
 it is — and a test that proves neither is deleted, not reviewed. That file also holds the mechanics:
 Bun matchers with Sinon (no Chai), the `*.config.ts` named exports, `bootstrap(import.meta.url)`, and
-what `test/preload.ts` guarantees for every spec (a 20 s bound, no real network).
+what holds for every spec (a 5 s bound per case, no real network).
 
 ---
 
