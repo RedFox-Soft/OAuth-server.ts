@@ -88,9 +88,11 @@ delete is refused with 409 naming the connection, before the audit write, so a r
 a local one, answers 404 to it. Clearing an authenticator stays allowed — it is account recovery, not a
 profile edit.
 
-**Why `provisionedBy` and not `managedBy`.** `managedBy` is the name of a retired ownership field, and
-`test/admin/retired_migration.spec.ts` fails if the identifier reappears in code — it guards against the
-old migration being resurrected. A new field with the old name would have read as exactly that.
+**Why `provisionedBy` and not `managedBy`.** `managedBy` is the name of a retired ownership field (the
+manager list that group ownership replaced). A new field with the old name would have read as that field
+come back. (Until 2026-10-06 a guard, `test/admin/retired_migration.spec.ts`, failed on the identifier
+anywhere in code; it was removed under Principle V — it tested that removed code stayed removed, which no
+audience depends on.)
 
 ## Uniqueness rides on derived scalar keys
 
