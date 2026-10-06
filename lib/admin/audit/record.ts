@@ -3,6 +3,7 @@ import type { AdminAuditEntry } from '../../adapters/types.js';
 import {
 	auditTargetTypeFor,
 	BOOTSTRAP_ACTOR,
+	CONNECTION_ACTOR_PREFIX,
 	type AuditAction
 } from '../../consts/admin_audit_routes.js';
 import { AdminError, type AdminContext } from '../auth/rbac.js';
@@ -115,6 +116,32 @@ export function recordBootstrapAudit(
 	});
 }
 
+/*
+ * A change made by a SCIM provisioning connection under its own credential — the one actor in the trail that
+ * is neither a person nor the bootstrap. Recorded as the sentinel `connection:<id>` in both actor fields, the
+ * bootstrap's convention (a ':' and no '@'), so no reader mistakes it for an administrator, and with
+ * `viaSurface: 'scim'` so the trail can be filtered to it (IPSIE AL SCIM §8: every SCIM change is logged).
+ *
+ * Audit-first holds here as everywhere: called after the connection is authenticated and the change has
+ * passed every check, before it is written.
+ */
+export function recordConnectionAudit(
+	connectionId: string,
+	action: AuditAction,
+	targetId: string,
+	detail: AuditDetail = {}
+): Promise<AdminAuditEntry> {
+	const actor = `${CONNECTION_ACTOR_PREFIX}${connectionId}`;
+	return write({
+		actorId: actor,
+		actorEmail: actor,
+		action,
+		targetId,
+		detail,
+		viaSurface: 'scim'
+	});
+}
+
 async function write(input: {
 	actorId: string;
 	actorEmail: string;
@@ -122,6 +149,7 @@ async function write(input: {
 	targetId: string;
 	detail: AuditDetail;
 	viaClientId?: string;
+	viaSurface?: 'scim';
 }): Promise<AdminAuditEntry> {
 	try {
 		return await adminAuditStore.record({
@@ -150,7 +178,10 @@ async function write(input: {
 			 */
 			...(input.viaClientId === undefined
 				? {}
-				: { viaClientId: input.viaClientId, viaSurface: 'mcp' as const })
+				: { viaClientId: input.viaClientId, viaSurface: 'mcp' as const }),
+			...(input.viaSurface === undefined
+				? {}
+				: { viaSurface: input.viaSurface })
 		});
 	} catch (err) {
 		/*

@@ -1,3 +1,5 @@
+import crypto from 'node:crypto';
+
 import { type Client } from './types.ts';
 import epochTime from '../../helpers/epoch_time.ts';
 import constantEquals from '../../helpers/constant_equals.ts';
@@ -38,9 +40,18 @@ function isHmac(this: Readonly<Record<string, unknown>>, prop: string) {
 
 // Constant-time compare with the preserved 1000ms floor.
 export function compareClientSecret(
-	client: Pick<Client, 'clientSecret'>,
+	client: Pick<Client, 'clientSecret' | 'clientSecretDigest'>,
 	actual: string
 ): boolean {
+	/*
+	 * A provisioning connection's client stores only the SHA-256 of its secret (specs/070 R3), so the
+	 * presented value is hashed and the digests compared. Ordinary clients still hold the plaintext,
+	 * because client_secret_jwt and the symmetric keys derive from it.
+	 */
+	if (client.clientSecretDigest !== undefined) {
+		const presented = crypto.createHash('sha256').update(actual).digest('hex');
+		return constantEquals(client.clientSecretDigest, presented, 1000);
+	}
 	return constantEquals(client.clientSecret, actual, 1000);
 }
 

@@ -321,6 +321,52 @@ const routes = [
 		path: '/admin/api/buckets/:id/users/:uid',
 		targetType: 'EndUser'
 	},
+	/*
+	 * Handing a local user to a provisioning connection — from then on the user is read-only to every
+	 * administrator, so the act is recorded against the user, with the connection named in `attributes`.
+	 */
+	{
+		action: 'enduser.connection.assign',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/users/:uid/connection',
+		targetType: 'EndUser'
+	},
+
+	/*
+	 * SCIM provisioning connections. The create entry names the provider it binds (the connection's id is
+	 * allocated by the store); the rest name the connection. A credential's kind is recorded, its value never
+	 * — the issue response is the only place a secret or static token ever appears.
+	 */
+	{
+		action: 'provisioning.connection.create',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/provisioning-connections',
+		targetType: 'ProvisioningConnection'
+	},
+	{
+		action: 'provisioning.connection.update',
+		method: 'PATCH',
+		path: '/admin/api/buckets/:id/provisioning-connections/:connectionId',
+		targetType: 'ProvisioningConnection'
+	},
+	{
+		action: 'provisioning.connection.delete',
+		method: 'DELETE',
+		path: '/admin/api/buckets/:id/provisioning-connections/:connectionId',
+		targetType: 'ProvisioningConnection'
+	},
+	{
+		action: 'provisioning.credential.issue',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/provisioning-connections/:connectionId/credentials',
+		targetType: 'ProvisioningConnection'
+	},
+	{
+		action: 'provisioning.credential.revoke',
+		method: 'DELETE',
+		path: '/admin/api/buckets/:id/provisioning-connections/:connectionId/credentials/:kind',
+		targetType: 'ProvisioningConnection'
+	},
 
 	/*
 	 * Upstream federation providers. `targetType` is the bucket, because a provider has no identity outside
@@ -471,6 +517,12 @@ export const excludedAdminRoutes: readonly {
  * nanoid, and neither ever contains ':'.
  */
 export const BOOTSTRAP_ACTOR = 'system:bootstrap';
+
+/*
+ * Prefix of the actor recorded for a change a SCIM provisioning connection made: `connection:<id>`. The
+ * bootstrap's convention, so it too is told apart from a person without a lookup.
+ */
+export const CONNECTION_ACTOR_PREFIX = 'connection:';
 
 /* Target ids of the singleton configuration documents, which have no entity id of their own. */
 export const SETTINGS_TARGET_ID = 'settings';

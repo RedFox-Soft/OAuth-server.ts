@@ -16,9 +16,11 @@ import {
 	staleExpiryIndexes,
 	toExistingIndexes
 } from './reconcile.js';
+import { isReservedBucketName } from '../lib/consts/reserved_names.js';
 import {
 	duplicateEmailReport,
 	exitCodeFor,
+	reservedAddressReport,
 	type DuplicateEmailRow,
 	type ProvisioningSummary
 } from './provisioning_report.js';
@@ -357,9 +359,12 @@ await db.collection<{ _id: string }>(CLIENT_AREA).updateOne(
  * UserBucketStore.create instead.
  */
 const buckets = await db
-	.collection<{ _id: string }>(STORE_AREAS.userBuckets)
-	.find({}, { projection: { _id: 1 } })
+	.collection<{ _id: string; slug?: string }>(STORE_AREAS.userBuckets)
+	.find({}, { projection: { _id: 1, slug: 1 } })
 	.toArray();
+
+const reservedAddresses = reservedAddressReport(buckets, isReservedBucketName);
+if (reservedAddresses) console.error(reservedAddresses);
 
 /*
  * Addresses already duplicated in a bucket, which a unique index cannot be created over. Pre-checked

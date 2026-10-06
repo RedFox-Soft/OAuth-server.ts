@@ -48,6 +48,12 @@ import {
 	CreateInvitationBody
 } from '../admin/groups/schema.js';
 import { ErrorQuery, ErrorSummaryQuery } from '../admin/errors/schema.js';
+import {
+	AssignConnectionBody,
+	CreateConnectionBody,
+	IssueCredentialBody,
+	UpdateConnectionBody
+} from '../admin/provisioning/schema.js';
 
 /*
  * THE published surface of the administrative MCP control plane: one entry per tool, mapped to the one
@@ -354,6 +360,32 @@ const catalogue = [
 		pathParams: ['id'],
 		summary:
 			'The upstream identity providers configured on a bucket. Never returns a provider client secret.'
+	},
+	{
+		tool: 'provisioning_connection_list',
+		method: 'GET',
+		path: '/admin/api/buckets/:id/provisioning-connections',
+		action: null,
+		consequence: 'read',
+		requiredRole: null,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			'The SCIM provisioning connections of a bucket, each with its SCIM base URL, token endpoint, client id, managed-user count and warnings. Never returns a secret or a static token.'
+	},
+	{
+		tool: 'provisioning_connection_get',
+		method: 'GET',
+		path: '/admin/api/buckets/:id/provisioning-connections/:connectionId',
+		action: null,
+		consequence: 'read',
+		requiredRole: null,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id', 'connectionId'],
+		summary:
+			'One SCIM provisioning connection: everything a directory administrator needs to configure it, and which credentials it holds. Never returns a secret or a static token.'
 	},
 	{
 		/*
@@ -1039,6 +1071,97 @@ const catalogue = [
 		pathParams: ['id', 'uid', 'providerId'],
 		summary:
 			"Sever one end-user's link to one upstream provider. The account survives; only the link is removed."
+	},
+
+	/* ---------------------------------------- writes: SCIM provisioning (6) */
+	{
+		tool: 'provisioning_connection_create',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/provisioning-connections',
+		action: 'provisioning.connection.create',
+		/* Ordinary: a connection without a credential can do nothing; issuing one is the gated act. */
+		consequence: 'ordinary',
+		requiredRole: null,
+		bodySchema: CreateConnectionBody,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			'Create a SCIM provisioning connection on a bucket, bound to one of its federation providers. That provider stops creating accounts on first sign-in: from now on the directory creates them. Holds no credential until one is issued.'
+	},
+	{
+		tool: 'provisioning_connection_update',
+		method: 'PATCH',
+		path: '/admin/api/buckets/:id/provisioning-connections/:connectionId',
+		action: 'provisioning.connection.update',
+		consequence: 'ordinary',
+		requiredRole: null,
+		bodySchema: UpdateConnectionBody,
+		querySchema: null,
+		pathParams: ['id', 'connectionId'],
+		summary:
+			'Rename, enable or disable a SCIM provisioning connection, or change its correlation rule or email trust. Disabling refuses every SCIM request through it and leaves its users as they are.'
+	},
+	{
+		tool: 'provisioning_connection_delete',
+		method: 'DELETE',
+		path: '/admin/api/buckets/:id/provisioning-connections/:connectionId',
+		action: 'provisioning.connection.delete',
+		/* High: it ends a customer's provisioning, and its credentials stop working at once. */
+		consequence: 'high',
+		requiredRole: null,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id', 'connectionId'],
+		summary:
+			'Delete a SCIM provisioning connection and revoke every token it obtained. Refused while it still manages any user — disable it instead.'
+	},
+	{
+		tool: 'provisioning_credential_issue',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/provisioning-connections/:connectionId/credentials',
+		action: 'provisioning.credential.issue',
+		/*
+		 * High: it hands out the authority to create, change and delete a bucket's people, and the secret or
+		 * static token it returns is shown exactly once.
+		 */
+		consequence: 'high',
+		requiredRole: null,
+		bodySchema: IssueCredentialBody,
+		querySchema: null,
+		pathParams: ['id', 'connectionId'],
+		summary:
+			'Issue a credential for a SCIM provisioning connection: public keys (signed client assertion), a client secret (Microsoft Entra ID), or a static token (Okta). A secret or token is returned exactly once. Replaces the previous credential of that kind and revokes its tokens.'
+	},
+	{
+		tool: 'provisioning_credential_revoke',
+		method: 'DELETE',
+		path: '/admin/api/buckets/:id/provisioning-connections/:connectionId/credentials/:kind',
+		action: 'provisioning.credential.revoke',
+		/* Ordinary: it only removes access. */
+		consequence: 'ordinary',
+		requiredRole: null,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id', 'connectionId', 'kind'],
+		summary:
+			'Revoke a SCIM provisioning connection\'s OAuth credential ("oauth") or static token ("static_token"), with every token it obtained.'
+	},
+	{
+		tool: 'bucket_user_assign_connection',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/users/:uid/connection',
+		action: 'enduser.connection.assign',
+		/*
+		 * High: from this moment the user is read-only to every administrator and belongs to an external
+		 * directory, which cannot be undone through this surface.
+		 */
+		consequence: 'high',
+		requiredRole: null,
+		bodySchema: AssignConnectionBody,
+		querySchema: null,
+		pathParams: ['id', 'uid'],
+		summary:
+			'Hand a local end-user to a SCIM provisioning connection, under the userName and/or externalId the directory knows them by, so the directory adopts them instead of creating a duplicate. Afterwards only the directory can change them.'
 	},
 
 	/* ---------------------------------------------------- writes: keys (5) */

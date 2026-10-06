@@ -30,6 +30,12 @@ naming who did it, what they did, which entity it affected and when. The constit
 permanent: the storage area declares no expiry, the store interface exposes no update or delete, and no
 product surface offers either (`lib/adapters/types.ts`, `lib/consts/storage_inventory.ts`).
 
+Since 2026-10-06 the trail also records an actor that is not a person: a SCIM provisioning connection, as the
+sentinel `connection:<id>` (the bootstrap's convention — a `:` and no `@`), with `viaSurface: 'scim'` and the
+bucket's `ownerGroupId` so that bucket's administrators see it (`recordConnectionAudit`,
+`lib/admin/audit/record.ts`). It reuses the `enduser.*` actions; the console's audit page filters by
+surface. See [[scim-provisioning]].
+
 ## Audit-first, and authorization-first — the order is not interchangeable
 
 The record is written **before** the mutation it describes, and a failed write aborts the request, so a

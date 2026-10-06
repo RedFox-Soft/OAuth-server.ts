@@ -149,7 +149,7 @@ const UNATTRIBUTED = 'unknown';
  * Truncated because the header is attacker-controlled in length, and an untruncated key is a memory
  * amplifier even behind the LRU bound. Same 64 characters lib/error_store/redact.ts:82 settled on.
  */
-function originOf(request: Request, server: unknown): string {
+export function originOf(request: Request, server: unknown): string {
 	if (ApplicationConfig['rateLimit.trustedProxy'] === true) {
 		const forwarded =
 			request.headers.get('fly-client-ip')?.trim() ||

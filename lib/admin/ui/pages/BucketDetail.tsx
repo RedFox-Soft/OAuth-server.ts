@@ -19,6 +19,7 @@ import type { UserBucket, User } from '../../../adapters/types.js';
 import { FederationPanel } from './FederationPanel.js';
 import { BucketKeysPanel } from './BucketKeysPanel.js';
 import { UserIdentities } from './UserIdentities.js';
+import { ProvisioningPanel, type ConnectionView } from './ProvisioningPanel.js';
 
 /*
  * What the API actually returns, which is not the stored record: `presentUser` removes the password
@@ -36,6 +37,12 @@ interface CreateValues {
 	password: string;
 	roles?: string[];
 	claimsText?: string;
+}
+
+interface AssignValues {
+	connectionId: string;
+	userName?: string;
+	externalId?: string;
 }
 
 interface EditValues {
@@ -96,11 +103,21 @@ export function BucketDetail({
 	const [editOpen, setEditOpen] = useState(false);
 	const [pwUser, setPwUser] = useState<EndUser | null>(null);
 	const [identitiesUser, setIdentitiesUser] = useState<EndUser | null>(null);
+	const [assignUser, setAssignUser] = useState<EndUser | null>(null);
+	const [connections, setConnections] = useState<ConnectionView[]>([]);
+	/*
+	 * The two panels below each fetch their own list, and each changes what the other shows: a connection
+	 * closes its provider to just-in-time creation, and a provider's state is a connection's warning. A
+	 * bumped key is how one tells the other to look again without either holding the other's state.
+	 */
+	const [federationKey, setFederationKey] = useState(0);
+	const [provisioningKey, setProvisioningKey] = useState(0);
 	const [bucketEditOpen, setBucketEditOpen] = useState(false);
 	const [saving, setSaving] = useState(false);
 	const [createForm] = Form.useForm<CreateValues>();
 	const [editForm] = Form.useForm<EditValues>();
 	const [pwForm] = Form.useForm<{ password: string }>();
+	const [assignForm] = Form.useForm<AssignValues>();
 	const [bucketForm] = Form.useForm<{
 		name: string;
 		roles?: string[];
@@ -193,6 +210,35 @@ export function BucketDetail({
 			message.success('password reset');
 			setPwUser(null);
 			pwForm.resetFields();
+		}
+	}
+
+	async function onAssign(values: AssignValues) {
+		if (!assignUser) return;
+		const userName = values.userName?.trim();
+		const externalId = values.externalId?.trim();
+		const body = {
+			connectionId: values.connectionId,
+			...(userName ? { userName } : {}),
+			...(externalId ? { externalId } : {})
+		};
+		setSaving(true);
+		try {
+			if (
+				await post(
+					`/users/${encodeURIComponent(assignUser._id)}/connection`,
+					body,
+					'assign to connection'
+				)
+			) {
+				message.success('user assigned — the directory now manages them');
+				setAssignUser(null);
+				assignForm.resetFields();
+				setProvisioningKey((k) => k + 1);
+				await load();
+			}
+		} finally {
+			setSaving(false);
 		}
 	}
 
@@ -349,76 +395,149 @@ export function BucketDetail({
 							)
 					},
 					{
+						/*
+						 * Who owns the record. A connection's display name where it is known; its id
+						 * otherwise, because a stale list must not make a managed user look local.
+						 */
+						title: 'Managed by',
+						dataIndex: 'provisionedBy',
+						render: (provisionedBy: string | undefined) =>
+							provisionedBy ? (
+								<Tag color="purple">
+									{connections.find((c) => c.id === provisionedBy)
+										?.displayName ?? provisionedBy}
+								</Tag>
+							) : (
+								<Typography.Text type="secondary">local</Typography.Text>
+							)
+					},
+					{
 						title: 'Actions',
-						render: (_: unknown, row: EndUser) => (
-							<Space>
-								<Button
-									size="small"
-									onClick={() => {
-										setEditUserId(row._id);
-										editForm.setFieldsValue({
-											roles: row.roles,
-											active: row.active,
-											claimsText: row.claims
-												? JSON.stringify(row.claims, null, 2)
-												: ''
-										});
-										setEditOpen(true);
-									}}
-								>
-									Edit
-								</Button>
-								<Button
-									size="small"
-									onClick={() => setPwUser(row)}
-								>
-									Reset password
-								</Button>
-								<Button
-									size="small"
-									onClick={() => setIdentitiesUser(row)}
-								>
-									Identities
-								</Button>
-								{/* Offered only where there is something to clear, and stating the two
-								    consequences an operator cannot see from here: the old codes stop working,
-								    and the person is signed out everywhere. */}
-								{row.totpEnrolled && (
-									<Popconfirm
-										title="Clear this authenticator?"
-										description="Their current authenticator stops working immediately and they are signed out everywhere. They set up a new one at their next sign-in."
-										okText="Clear and sign out"
-										onConfirm={() => onClearTotp(row._id)}
-									>
-										<Button size="small">Clear authenticator</Button>
-									</Popconfirm>
-								)}
-								{/* The consequence, stated: deleting an account also ends the sessions and tokens
-								    it is currently using, which is the half an operator cannot see from here. */}
-								<Popconfirm
-									title="Delete this user?"
-									description="Their sign-in sessions, consents and every issued token are destroyed immediately — they are signed out everywhere."
-									okText="Delete and sign out"
-									onConfirm={() => onDelete(row._id)}
-								>
+						render: (_: unknown, row: EndUser) => {
+							/*
+							 * The directory owns a provisioned record, and the server refuses these three for
+							 * one. Disabled rather than hidden, so the operator learns where the change belongs
+							 * instead of wondering why the buttons vanished.
+							 */
+							const managedNotice = row.provisionedBy
+								? `Managed by ${
+										connections.find((c) => c.id === row.provisionedBy)
+											?.displayName ?? row.provisionedBy
+									} — change this user in the directory`
+								: undefined;
+							return (
+								<Space>
+									<Tooltip title={managedNotice}>
+										<Button
+											size="small"
+											disabled={managedNotice !== undefined}
+											onClick={() => {
+												setEditUserId(row._id);
+												editForm.setFieldsValue({
+													roles: row.roles,
+													active: row.active,
+													claimsText: row.claims
+														? JSON.stringify(row.claims, null, 2)
+														: ''
+												});
+												setEditOpen(true);
+											}}
+										>
+											Edit
+										</Button>
+									</Tooltip>
+									<Tooltip title={managedNotice}>
+										<Button
+											size="small"
+											disabled={managedNotice !== undefined}
+											onClick={() => setPwUser(row)}
+										>
+											Reset password
+										</Button>
+									</Tooltip>
 									<Button
 										size="small"
-										danger
+										onClick={() => setIdentitiesUser(row)}
 									>
-										Delete
+										Identities
 									</Button>
-								</Popconfirm>
-							</Space>
-						)
+									{!row.provisionedBy && connections.length > 0 && (
+										<Button
+											size="small"
+											onClick={() => {
+												assignForm.resetFields();
+												setAssignUser(row);
+											}}
+										>
+											Assign to connection
+										</Button>
+									)}
+									{/* Offered only where there is something to clear, and stating the two
+								    consequences an operator cannot see from here: the old codes stop working,
+								    and the person is signed out everywhere. */}
+									{row.totpEnrolled && (
+										<Popconfirm
+											title="Clear this authenticator?"
+											description="Their current authenticator stops working immediately and they are signed out everywhere. They set up a new one at their next sign-in."
+											okText="Clear and sign out"
+											onConfirm={() => onClearTotp(row._id)}
+										>
+											<Button size="small">Clear authenticator</Button>
+										</Popconfirm>
+									)}
+									{/* The consequence, stated: deleting an account also ends the sessions and tokens
+								    it is currently using, which is the half an operator cannot see from here. */}
+									{managedNotice ? (
+										<Tooltip title={managedNotice}>
+											<Button
+												size="small"
+												danger
+												disabled
+											>
+												Delete
+											</Button>
+										</Tooltip>
+									) : (
+										<Popconfirm
+											title="Delete this user?"
+											description="Their sign-in sessions, consents and every issued token are destroyed immediately — they are signed out everywhere."
+											okText="Delete and sign out"
+											onConfirm={() => onDelete(row._id)}
+										>
+											<Button
+												size="small"
+												danger
+											>
+												Delete
+											</Button>
+										</Popconfirm>
+									)}
+								</Space>
+							);
+						}
 					}
 				]}
 			/>
 
 			<FederationPanel
+				key={federationKey}
 				bucketId={bucketId}
 				// The bucket's own settings depend on this list, so a change here refreshes what the
 				// password-sign-in switch is validated against.
-				onChanged={() => void load()}
+				onChanged={() => {
+					void load();
+					setProvisioningKey((k) => k + 1);
+				}}
+			/>
+
+			<ProvisioningPanel
+				bucketId={bucketId}
+				refreshKey={provisioningKey}
+				onConnections={setConnections}
+				onChanged={(event) => {
+					void load();
+					if (event === 'created') setFederationKey((k) => k + 1);
+				}}
 			/>
 
 			<BucketKeysPanel bucketId={bucketId} />
@@ -471,6 +590,64 @@ export function BucketDetail({
 						/>
 					</Form.Item>
 					<ClaimsField />
+				</Form>
+			</Modal>
+
+			<Modal
+				title={assignUser ? `Assign ${assignUser.email} to a connection` : ''}
+				open={assignUser !== null}
+				onCancel={() => setAssignUser(null)}
+				onOk={() => assignForm.submit()}
+				confirmLoading={saving}
+				destroyOnHidden
+			>
+				<Typography.Paragraph type="secondary">
+					The directory then owns this account: it is read-only here except for
+					a local lock. Give the names the directory knows this person by, so
+					its next sync matches them instead of creating someone new.
+				</Typography.Paragraph>
+				<Form<AssignValues>
+					form={assignForm}
+					layout="vertical"
+					onFinish={onAssign}
+				>
+					<Form.Item
+						name="connectionId"
+						label="Connection"
+						rules={[{ required: true }]}
+					>
+						<Select
+							options={connections.map((c) => ({
+								label: c.displayName,
+								value: c.id
+							}))}
+						/>
+					</Form.Item>
+					<Form.Item
+						name="userName"
+						label="userName"
+					>
+						<Input autoComplete="off" />
+					</Form.Item>
+					<Form.Item
+						name="externalId"
+						label="externalId"
+						dependencies={['userName']}
+						rules={[
+							({ getFieldValue }) => ({
+								validator: async (_rule, value: string | undefined) => {
+									const userName = (
+										getFieldValue('userName') as string | undefined
+									)?.trim();
+									if (!userName && !value?.trim()) {
+										throw new Error('give a userName, an externalId, or both');
+									}
+								}
+							})
+						]}
+					>
+						<Input autoComplete="off" />
+					</Form.Item>
 				</Form>
 			</Modal>
 

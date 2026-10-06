@@ -12,12 +12,14 @@ import {
 	FIELD_OF_KEY,
 	storedFilterOf,
 	storedPatchOf,
+	withCreateFields,
 	type StoredEndUserFilter
 } from '../end_user_keys.js';
 import {
 	DuplicateEndUserError,
 	MAX_END_USER_PAGE,
 	User,
+	type EndUserCreateFields,
 	type EndUserFilter,
 	type EndUserPage,
 	type EndUserPatch,
@@ -126,7 +128,8 @@ export class UserStore implements UserStoreInstance {
 		password: string,
 		roles: string[] = [],
 		verified = false,
-		id?: string
+		id?: string,
+		fields?: EndUserCreateFields
 	): Promise<User> {
 		const existingUser = await this.findByEmail(email);
 		if (existingUser) {
@@ -134,19 +137,22 @@ export class UserStore implements UserStoreInstance {
 		}
 
 		const now = new Date();
-		const user: User = {
-			// Caller-supplied when the account's audit entry has to name the id before the account
-			// exists; generated here otherwise.
-			_id: id ?? crypto.randomUUID().replaceAll('-', ''),
-			email: email.toLowerCase(),
-			verified,
-			password,
-			active: true,
-			roles,
-			createdAt: now,
-			updatedAt: now,
-			lastLoginAt: null
-		};
+		const user: User = withCreateFields(
+			{
+				// Caller-supplied when the account's audit entry has to name the id before the account
+				// exists; generated here otherwise.
+				_id: id ?? crypto.randomUUID().replaceAll('-', ''),
+				email: email.toLowerCase(),
+				verified,
+				password,
+				active: true,
+				roles,
+				createdAt: now,
+				updatedAt: now,
+				lastLoginAt: null
+			},
+			fields
+		);
 
 		const handle = sql();
 		try {
@@ -156,12 +162,15 @@ export class UserStore implements UserStoreInstance {
 			`;
 		} catch (error) {
 			/*
-			 * The unique email index refused a concurrent registration of the same address, which the lookup
-			 * above could not see. The same error that lookup raises, so every caller handles one outcome —
-			 * and no driver text naming the address travels on into the error store.
+			 * A unique index refused the insert — a concurrent registration of the same address the lookup
+			 * above could not see, or a username or external identifier already held. Read back to name the
+			 * field, so no driver text naming the value travels on into the error store.
 			 */
 			if (isUniqueViolation(error)) {
-				throw new DuplicateEndUserError('email');
+				throw (
+					(await this.duplicateFor(user._id, user)) ??
+					new DuplicateEndUserError('email')
+				);
 			}
 			throw error;
 		}

@@ -25,6 +25,12 @@ export const RESERVED_BUCKET_NAMES: readonly string[] = [
 	'reg',
 	'userinfo',
 	'backchannel',
+	/*
+	 * The default bucket's SCIM endpoint is `/scim/v2`. A bucket named `scim` would serve its own at
+	 * `/scim/scim/v2` — not a collision the router gets wrong, but an address an operator would misread as
+	 * the default bucket's when pasting it into a customer's directory.
+	 */
+	'scim',
 
 	// End-user surfaces, unconditional by design
 	'ui',

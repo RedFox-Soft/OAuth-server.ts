@@ -254,6 +254,50 @@ async function seedSecretHolders(token: string) {
 		fromEmail: 'ops@example.com'
 	});
 
+	/*
+	 * A SCIM provisioning connection holding both credentials a third party's system is given: a secret
+	 * (Entra) and a static token (Okta). Issued through this surface, so the issue response is the one place
+	 * each value may appear — and every read below must then never carry either.
+	 */
+	const connection = await rpc(
+		call('provisioning_connection_create', {
+			id: bucketId,
+			displayName: 'Directory',
+			providerId: 'okta'
+		}),
+		token
+	);
+	const { id: connectionId } = shaped(
+		Type.Object({ id: Type.String() }),
+		connection.result?.structuredContent?.result
+	);
+	const issuedSecret = await performGated(
+		token,
+		'provisioning_credential_issue',
+		{
+			id: bucketId,
+			connectionId,
+			kind: 'secret'
+		}
+	);
+	const issuedToken = await performGated(
+		token,
+		'provisioning_credential_issue',
+		{
+			id: bucketId,
+			connectionId,
+			kind: 'static_token'
+		}
+	);
+	const { secret: connectionSecret } = shaped(
+		Type.Object({ secret: Type.String() }),
+		issuedSecret.result?.structuredContent?.result
+	);
+	const { token: staticToken } = shaped(
+		Type.Object({ token: Type.String() }),
+		issuedToken.result?.structuredContent?.result
+	);
+
 	return {
 		project,
 		clientId: createdBody.clientId,
@@ -265,7 +309,10 @@ async function seedSecretHolders(token: string) {
 		 * newline-free base64 line appears verbatim either way.
 		 */
 		signingKey: longestLine(apple.signingKey),
-		bucketId
+		bucketId,
+		connectionId,
+		connectionSecret,
+		staticToken
 	};
 }
 
@@ -336,10 +383,18 @@ describe('MCP surface leaks no secrets', () => {
 			 * The other kind of credential a provider can hold. Swept by the same list rather than by a
 			 * case of its own, so a read added later is covered for both without anybody remembering.
 			 */
-			seeded.signingKey
+			seeded.signingKey,
+			/* A provisioning connection's secret and static token, each shown once at issue. */
+			seeded.connectionSecret,
+			seeded.staticToken
 		];
 
 		const args: Record<string, Record<string, unknown>> = {
+			provisioning_connection_list: { id: seeded.bucketId },
+			provisioning_connection_get: {
+				id: seeded.bucketId,
+				connectionId: seeded.connectionId
+			},
 			project_get: { id: seeded.project._id },
 			client_list: { id: seeded.project._id },
 			client_get: { id: seeded.project._id, clientId: seeded.clientId },

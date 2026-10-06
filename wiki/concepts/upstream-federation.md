@@ -75,7 +75,12 @@ records carry no `accountId`, are matched by no sweep, and simply expire.
 
 `lib/federation/resolve.ts`, in this order:
 
-1. **existing link** → sign in. The link *is* the identity; the email is only how one is established.
+1. **existing link** → sign in, if `canSignIn` (since 2026-10-06; it read `active` only, so a locally
+   locked account was caught later, at the door). The link *is* the identity; the email is only how one is
+   established.
+1a. **a provider bound to a SCIM provisioning connection ends the ladder here** (since 2026-10-06, spec
+   070): the connection's correlation rule names one provisioned user or the sign-in is refused, and the email
+   steps below are never reached — see [[scim-provisioning]].
 2. **email** at the provider's `emailClaim` → absent means refuse; a subject alone matches no human.
 3. **domain** allow-list → **before** the collision check. Reversed, it would answer "does an account exist
    for this address?" for addresses the provider is not allowed to speak for.

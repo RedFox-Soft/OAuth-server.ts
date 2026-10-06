@@ -1,5 +1,11 @@
 import type { ApplicationConfigType } from 'lib/configs/application.js';
 import { routeNames } from './param_list.js';
+import {
+	SCIM_BASE_PATH,
+	SCIM_METADATA_BUCKET_ROUTE,
+	SCIM_METADATA_ROUTE,
+	SCIM_ROUTES
+} from './scim.js';
 
 export type FeatureFlagKey = keyof ApplicationConfigType;
 
@@ -75,7 +81,8 @@ export const bucketScopedPaths: readonly string[] = [
 	'/.well-known/openid-configuration',
 	'/.well-known/oauth-authorization-server',
 	'/federation/callback',
-	routeNames.code_verification
+	routeNames.code_verification,
+	SCIM_BASE_PATH
 ];
 
 /* RFC 8414 §3 places the well-known segment before the issuer's path, so these two cannot be produced
@@ -209,7 +216,19 @@ const bareGatedRoutes: readonly GatedRoute[] = [
 		method: 'POST',
 		path: '/federation/callback',
 		flag: 'federation.enabled'
-	}
+	},
+	/*
+	 * SCIM provisioning, and its metadata document with it for the reason `/mcp`'s is: metadata describing
+	 * an endpoint that is not served advertises a resource a client then cannot reach. The routes that
+	 * *manage* connections stay under the `/admin` prefix, ungated, so a connection can be prepared before
+	 * the capability is on and removed after it is switched off — federation's arrangement.
+	 */
+	...SCIM_ROUTES.map(({ method, path }) => ({
+		method,
+		path,
+		flag: 'scim.enabled' as const
+	})),
+	{ method: 'GET', path: SCIM_METADATA_ROUTE, flag: 'scim.enabled' }
 
 	/*
 	 * The error store's read surface is deliberately NOT here, though `errorStore.enabled` exists and it
@@ -231,7 +250,9 @@ const bareGatedRoutes: readonly GatedRoute[] = [
  * would keep serving something the instance turned off. Derived, like the tables below. */
 export const gatedRoutes: readonly GatedRoute[] = [
 	...bareGatedRoutes,
-	...beneathBucket(bareGatedRoutes, bucketScopedPaths)
+	...beneathBucket(bareGatedRoutes, bucketScopedPaths),
+	/* RFC 9728 §3.1 inserts the well-known segment before the bucket's path, so this one is named. */
+	{ method: 'GET', path: SCIM_METADATA_BUCKET_ROUTE, flag: 'scim.enabled' }
 ];
 
 /*
@@ -507,13 +528,27 @@ const bareRateRoutes: readonly RateRoute[] = [
 	{ method: 'GET', path: '/.well-known/security.txt', rate: 'public' },
 	{ method: 'GET', path: routeNames.mcp_metadata, rate: 'public' },
 	{ method: 'GET', path: routeNames.jwks, rate: 'public' },
-	{ method: 'GET', path: '/public/*', rate: 'public' }
+	{ method: 'GET', path: '/public/*', rate: 'public' },
+	{ method: 'GET', path: SCIM_METADATA_ROUTE, rate: 'public' },
+	/*
+	 * Exempt from the per-origin limiter, and limited instead inside the SCIM plugin per connection
+	 * (lib/scim/rate_limit.ts). The ordinary class is five requests a second per address; IPSIE AL SCIM
+	 * §4.3 requires at least 25 per tenant, and Entra and Okta send many tenants' traffic from a few
+	 * addresses. Not unmetered: an unauthenticated request is charged per origin there with the strict
+	 * bounds, so the exemption moves the limit rather than removing it.
+	 */
+	...SCIM_ROUTES.map(({ method, path }) => ({
+		method,
+		path,
+		rate: 'exempt' as const
+	}))
 ];
 
 /* Same derivation, same reason. */
 export const rateRoutes: readonly RateRoute[] = [
 	...bareRateRoutes,
 	...beneathBucket(bareRateRoutes, bucketScopedPaths),
+	{ method: 'GET', path: SCIM_METADATA_BUCKET_ROUTE, rate: 'public' },
 	...INSERTED_METADATA_PATHS.map((path) => ({
 		method: 'GET' as const,
 		path,

@@ -5,6 +5,7 @@ import { join } from 'node:path';
 
 import { STORAGE_DIVERGENCES } from '../lib/consts/storage_divergences.js';
 import { verifyEndUserIdentity } from './verify_end_user_identity.js';
+import { verifyProvisioningConnections } from './verify_provisioning_connections.js';
 import {
 	FIXED_AREAS,
 	STORE_AREAS,
@@ -65,6 +66,7 @@ const {
 	AdminAuditStore,
 	BucketKeysStore,
 	ProtectedResourceStore,
+	ProvisioningConnectionStore,
 	SingletonSecretStore,
 	UserBucketStore,
 	UserStore,
@@ -661,6 +663,7 @@ check(
 );
 
 await verifyEndUserIdentity(runtimeUsers, check);
+await verifyProvisioningConnections(new ProvisioningConnectionStore(), check);
 
 const audit = new AdminAuditStore();
 const auditGroup = `fidelity-group-${Date.now()}`;

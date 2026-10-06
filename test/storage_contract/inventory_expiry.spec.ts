@@ -90,6 +90,11 @@ const PERMANENT = [
 	 * the same failure mode as an expiring project, one level down.
 	 */
 	'protectedResources',
+	/*
+	 * A SCIM provisioning connection lives until an administrator deletes it. An expiry here would stop a
+	 * customer's directory provisioning, and its credentials working, with nothing to say why.
+	 */
+	'provisioningConnections',
 	'userBuckets',
 	/*
 	 * Groups own every project and bucket, so an expiring group would silently orphan whatever it

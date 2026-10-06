@@ -152,6 +152,8 @@ export interface CreateEndUserInput {
 	userName?: string;
 	externalId?: string;
 	profile?: EndUserProfile;
+	/* Absent ⇒ active. A new account holds no session or token, so creating it inactive ends nothing. */
+	active?: boolean;
 }
 
 export async function createEndUser(
@@ -176,33 +178,29 @@ export async function createEndUser(
 			: await Bun.password.hash(input.password);
 
 	await record();
-	const created = await store
+	/*
+	 * One insert carrying every identity field, so the unique indexes decide a race for a username or an
+	 * external identifier atomically. A follow-up update — what this used to do — left the account behind
+	 * without the colliding field, and a provisioning client retrying the refused create then collided on the
+	 * email of that half-made account for ever (specs/070 R13).
+	 */
+	return store
 		.create(
 			input.email,
 			hash,
 			input.roles ?? [],
 			input.verified ?? true,
-			input.id
+			input.id,
+			{
+				claims: input.claims,
+				userName: input.userName,
+				externalId: input.externalId,
+				profile: input.profile,
+				provisionedBy,
+				active: input.active
+			}
 		)
 		.catch(duplicateAsError);
-
-	/*
-	 * Completed by a follow-up update, as a just-in-time federated account is: create() is positional and
-	 * none of these is always present. A collision here (a username taken between the check and now) leaves
-	 * the account without the colliding field, and the refusal is reported.
-	 */
-	const completion: EndUserPatch = {};
-	if (input.claims) completion.claims = input.claims;
-	if (input.userName !== undefined) completion.userName = input.userName;
-	if (input.externalId !== undefined) completion.externalId = input.externalId;
-	if (input.profile !== undefined) completion.profile = input.profile;
-	if (provisionedBy !== undefined) completion.provisionedBy = provisionedBy;
-	if (Object.keys(completion).length === 0) return created;
-
-	const completed = await store
-		.update(created._id, completion)
-		.catch(duplicateAsError);
-	return completed ?? created;
 }
 
 export interface UpdateEndUserInput {
@@ -213,6 +211,11 @@ export interface UpdateEndUserInput {
 	userName?: string;
 	externalId?: string;
 	profile?: EndUserProfile;
+	/*
+	 * Honoured for a connection only: whether its addresses are verified is the connection's email trust
+	 * policy, and an administrator does not assert verification here.
+	 */
+	verified?: boolean;
 }
 
 /*
@@ -237,9 +240,23 @@ export async function updateEndUser(
 	assertActorMayChange(actor, user);
 	assertExternalIdScoped(input.externalId, user.provisionedBy);
 
+	const patch: EndUserPatch = { ...input };
+	if (actor.kind !== 'connection') delete patch.verified;
+	/*
+	 * A new login address is not verified by having been typed. Left as it was, a changed address would
+	 * inherit the old one's verification — and the password-reset door mails whatever address is on file.
+	 */
+	if (
+		input.email !== undefined &&
+		input.email.toLowerCase() !== user.email &&
+		patch.verified === undefined
+	) {
+		patch.verified = false;
+	}
+
 	await record();
 	const updated = await getUserStore(bucket._id)
-		.update(id, input)
+		.update(id, patch)
 		.catch(duplicateAsError);
 	if (!updated) throw new EndUserError(404, 'user not found');
 
@@ -311,6 +328,50 @@ export async function lockEndUser(
 	});
 	if (!locked) throw new EndUserError(404, 'user not found');
 	return { user: locked, revoked: await revokeAccountAccess(id) };
+}
+
+/*
+ * Hands a local user to a provisioning connection: the administrator's answer when the directory a bucket
+ * now provisions from already has people in it (specs/070 FR-007a). Explicit and audited, never automatic —
+ * a connection taking over an existing account by matching its email is the takeover the series refuses.
+ *
+ * The user keeps its id, sessions, grants and federated links; from here on it is read-only to
+ * administrators and visible to that connection's SCIM requests. One update, so the unique indexes refuse a
+ * colliding username or external identifier without leaving the user half-assigned.
+ */
+export async function assignEndUserToConnection(
+	bucket: UserBucket,
+	id: string,
+	assignment: { connectionId: string; userName?: string; externalId?: string },
+	record: RecordChange
+): Promise<User> {
+	const user = await existing(bucket._id, id);
+	if (user.provisionedBy !== undefined) {
+		throw new EndUserError(
+			409,
+			`user is managed by connection ${user.provisionedBy}`
+		);
+	}
+	if (
+		assignment.userName === undefined &&
+		assignment.externalId === undefined
+	) {
+		throw new EndUserError(
+			422,
+			'name the user as the directory knows it: a userName, an externalId, or both'
+		);
+	}
+	const patch: EndUserPatch = { provisionedBy: assignment.connectionId };
+	if (assignment.userName !== undefined) patch.userName = assignment.userName;
+	if (assignment.externalId !== undefined)
+		patch.externalId = assignment.externalId;
+
+	await record();
+	const assigned = await getUserStore(bucket._id)
+		.update(id, patch)
+		.catch(duplicateAsError);
+	if (!assigned) throw new EndUserError(404, 'user not found');
+	return assigned;
 }
 
 /* Lifts the lock and restores nothing: the user signs in afresh, and only if also active. */

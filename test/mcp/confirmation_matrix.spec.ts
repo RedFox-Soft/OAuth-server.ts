@@ -109,6 +109,8 @@ const BODIES: Record<string, Record<string, unknown>> = {
 		password: 'a new password that is long enough'
 	},
 	jwks_generate: { alg: 'RS256' },
+	bucket_user_assign_connection: { connectionId: 'any', userName: 'someone' },
+	provisioning_credential_issue: { kind: 'static_token' },
 
 	settings_update: { 'dpop.requireNonce': true },
 	smtp_settings_update: {
@@ -149,7 +151,7 @@ describe('every high-consequence tool is gated', () => {
 		 * membership is named in catalogue_drift rather than counted here.
 		 */
 		expect(HIGH.length).toBeGreaterThan(0);
-		expect(HIGH.length).toBe(18);
+		expect(HIGH.length).toBe(21);
 	});
 
 	it.each(HIGH.map((t) => [t.tool, t] as const))(

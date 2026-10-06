@@ -168,6 +168,8 @@ describe('MCP tool catalogue', () => {
 			'admin_deactivate',
 			'bucket_address_change',
 			'bucket_key_retire',
+			/* Makes a local user read-only to every administrator, for good. */
+			'bucket_user_assign_connection',
 			'bucket_user_delete',
 			'bucket_user_password_reset',
 			/* Re-admits an account an administrator locked as compromised. */
@@ -180,6 +182,10 @@ describe('MCP tool catalogue', () => {
 			'jwks_generate',
 			'jwks_promote',
 			'jwks_retire',
+			/* Ends a customer's provisioning and revokes its tokens at once. */
+			'provisioning_connection_delete',
+			/* Hands out the authority to change a bucket's people; the secret it returns is shown once. */
+			'provisioning_credential_issue',
 			/*
 			 * Removing a declared resource stops token issuance for that audience on the next request, so a
 			 * live third-party integration loses access as its current tokens expire. Destructive to

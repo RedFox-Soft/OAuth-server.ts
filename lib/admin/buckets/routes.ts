@@ -3,8 +3,10 @@ import {
 	getBucketKeysStore,
 	getBucketStore,
 	getProjectStore,
+	getProvisioningConnectionStore,
 	getUserStore
 } from '../../adapters/index.js';
+import { destroyConnectionsOf } from '../../provisioning/service.js';
 import {
 	assertAuth,
 	assertActiveGroup,
@@ -461,10 +463,18 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			 * not been told what the change costs, which is why the write refuses without `confirm`.
 			 */
 			const affected = await clientsLosingTheirIssuer(params.id);
+			/*
+			 * A SCIM connection's base URL and token audience are both derived from the address, so a
+			 * customer's directory stops provisioning until its administrator re-enters them.
+			 */
+			const connections = (
+				await getProvisioningConnectionStore().listByBucket(params.id)
+			).map((c) => ({ id: c._id, displayName: c.displayName }));
 			const preview = {
 				from: bucket.host ?? bucket.slug ?? null,
 				to: address.host ?? address.slug ?? null,
 				clientsNeedingReconfiguration: affected,
+				provisioningConnectionsNeedingReconfiguration: connections,
 				consequence:
 					'the issuer identifier changes, so every client listed stops validating tokens until it is reconfigured; the previous address stops answering and everyone signed in signs in again'
 			};
@@ -611,6 +621,14 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			 */
 			await getBucketKeysStore().destroyByBucket(params.id);
 			invalidateBucketKeys(params.id);
+			/*
+			 * Its SCIM provisioning connections go too, and every token they obtained with them: a token
+			 * outliving its bucket would fail at the SCIM principal anyway, but a customer's directory should
+			 * see its credential refused at the token endpoint, not answered with a token for nothing.
+			 */
+			for (const swept of await destroyConnectionsOf(params.id)) {
+				failedAreas.push(...swept.failedAreas);
+			}
 			/* The address is gone; a cached entry would keep answering for a bucket that no longer exists. */
 			forgetBucketAddresses();
 			/* The half that was missing: without this a deleted bucket left its `user_<bucket>` area behind

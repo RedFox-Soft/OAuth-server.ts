@@ -755,6 +755,84 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 			'Serves this control plane to an AI agent over MCP at /mcp, as an OAuth 2.1 protected resource of this server. An agent acts as the administrator who authorized it and gets exactly that account’s permissions: every operation runs through the same routes, the same checks and the same audit trail as the console, and each entry records both the operator and the agent. Deleting a project or a user bucket is withheld from agents entirely and stays console-only. Off by default — with it off, neither /mcp nor its metadata document is served.'
 	},
 
+	/*
+	 * Three of these five are deviation flags (Constitution Principle I), and each description says what
+	 * it departs from and which identity systems stop working in the other position, because an operator
+	 * has to be able to decide from this page alone (specs/070 FR-034b). The rationale for each default is
+	 * in wiki/concepts/scim-provisioning.md.
+	 */
+	{
+		key: 'scim.enabled',
+		domain: 'integrations',
+		group: 'SCIM provisioning',
+		label: 'Enable SCIM 2.0 provisioning',
+		summary: 'Let an enterprise directory manage a bucket’s users over SCIM',
+		type: 'boolean',
+		description:
+			'Serves SCIM 2.0 /Users at each bucket’s <issuer>/scim/v2, so an enterprise directory such as Microsoft Entra ID or Okta can create, update, deactivate and delete the bucket’s end users through a provisioning connection you set up on the bucket. A deactivation over SCIM ends the user’s sessions and tokens at once. Off by default, because it lets a third party’s system write to end-user accounts. With it off no SCIM path or metadata document is served; connections can still be prepared and are kept.'
+	},
+	{
+		key: 'scim.secretCredentials',
+		domain: 'integrations',
+		group: 'SCIM provisioning',
+		label: 'Allow client-secret credentials for SCIM',
+		summary: 'Needed by Microsoft Entra ID; a deviation from IPSIE §4.1',
+		type: 'boolean',
+		dependsOn: 'scim.enabled',
+		risk: 'security',
+		description:
+			'Lets a provisioning connection hold a client secret and obtain its SCIM token with it. Microsoft Entra ID can only authenticate this way, so turning this off stops every Entra connection from obtaining a token. The OpenID IPSIE SCIM profile (§4.1) requires a signed JWT client assertion instead, which the key credential provides — turn this off if you certify against IPSIE and no connection uses a secret. Turning it off does not delete secrets; turning it back on restores them.'
+	},
+	{
+		key: 'scim.staticTokens',
+		domain: 'integrations',
+		group: 'SCIM provisioning',
+		label: 'Allow static tokens for SCIM',
+		summary: 'Needed by Okta; a deviation from IPSIE §4.1',
+		type: 'boolean',
+		dependsOn: 'scim.enabled',
+		risk: 'security',
+		description:
+			'Lets a provisioning connection hold a long-lived bearer token that the directory presents directly. Okta cannot use the client-credentials grant for SCIM, so turning this off disconnects every Okta connection. The OpenID IPSIE SCIM profile (§4.1) requires a short-lived OAuth access token instead — turn this off if you certify against IPSIE and no connection uses a static token. A static token is stored only as a hash and can be rotated at any time; turning this setting off does not delete it.'
+	},
+	{
+		key: 'scim.strict',
+		domain: 'integrations',
+		group: 'SCIM provisioning',
+		label: 'Strict SCIM: refuse non-conformant requests',
+		summary:
+			'On only to certify against the profiles; breaks Entra and Okta defaults',
+		type: 'boolean',
+		dependsOn: 'scim.enabled',
+		risk: 'security',
+		description:
+			'Off (the default), the server accepts the request forms Entra ID and Okta actually send: a PATCH without a path, an operation name in capitals, true or false written as a string, attributes this server does not store (they are ignored), and a password (ignored, never stored). On, each of those is refused with 400 and the server declares conformance to the SCIM 2.0 Interoperability Profile (§6.5.1.1) and the OpenID IPSIE SCIM profile (§6.1.2). Turn it on only if you certify against those profiles: with it on, Okta cannot deactivate users or create them, and Entra with its default attribute mappings fails.'
+	},
+	{
+		key: 'scim.rateLimit.max',
+		domain: 'integrations',
+		group: 'SCIM provisioning',
+		label: 'Per-connection allowance — requests per window',
+		summary: 'SCIM requests one connection may send per window',
+		type: 'number',
+		unit: 'requests',
+		dependsOn: 'scim.enabled',
+		description:
+			'How many SCIM requests one provisioning connection may send per window before it receives 429 with Retry-After. Counted per connection, not per address, because Entra and Okta send many customers’ traffic from a few addresses. Must allow at least 25 requests a second together with the window (an IPSIE requirement); a lower value is refused. The default, 3,000 a minute, is 50 a second.'
+	},
+	{
+		key: 'scim.rateLimit.windowSeconds',
+		domain: 'integrations',
+		group: 'SCIM provisioning',
+		label: 'Per-connection allowance — window length in seconds',
+		summary: 'Window the per-connection SCIM allowance is measured over',
+		type: 'number',
+		unit: 'seconds',
+		dependsOn: 'scim.enabled',
+		description:
+			'The period the per-connection SCIM allowance is measured over. A longer window absorbs a directory’s bursts — an initial import sends far more than its steady rate — at the cost of letting one connection spend the whole allowance at once.'
+	},
+
 	{
 		key: 'errorStore.enabled',
 		domain: 'diagnostics',

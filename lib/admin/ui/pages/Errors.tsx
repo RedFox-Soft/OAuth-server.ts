@@ -409,10 +409,12 @@ export function Errors() {
 						style={{ width: 140 }}
 						allowClear
 						value={filters.surface === '' ? undefined : filters.surface}
-						options={['oauth', 'admin', 'mcp', 'interaction'].map((s) => ({
-							label: s,
-							value: s
-						}))}
+						options={['oauth', 'admin', 'mcp', 'interaction', 'scim'].map(
+							(s) => ({
+								label: s,
+								value: s
+							})
+						)}
 						onChange={(v) => set('surface')(v ?? '')}
 					/>
 					<Input

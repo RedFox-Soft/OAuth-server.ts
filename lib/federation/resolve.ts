@@ -1,5 +1,13 @@
-import { getUserStore } from '../adapters/index.js';
-import type { User, UserBucket } from '../adapters/types.js';
+import {
+	getProvisioningConnectionStore,
+	getUserStore
+} from '../adapters/index.js';
+import type {
+	ProvisioningConnection,
+	User,
+	UserBucket
+} from '../adapters/types.js';
+import { eventBus } from '../event_bus.js';
 import { unusablePassword } from '../helpers/unusable_password.js';
 import { canSignIn } from '../end_users/can_sign_in.js';
 import { COPIED_CLAIMS } from './consts.js';
@@ -25,7 +33,18 @@ export type RefusalReason =
 	/* No account, and this provider does not provision. */
 	| 'provisioning_closed'
 	/* Whichever branch produced it, the account is frozen. */
-	| 'inactive';
+	| 'inactive'
+	/*
+	 * The provider is bound to a SCIM provisioning connection, and no user that connection provisioned
+	 * answers to this sign-in's correlation claim. Accounts here are created by the directory, never by a
+	 * first sign-in, and never found by email.
+	 */
+	| 'not_provisioned'
+	/*
+	 * The correlated user is already linked to a different subject at this provider. Not re-linked: two
+	 * upstream identities claiming one provisioned person is an incident to look at, not a sign-in.
+	 */
+	| 'link_conflict';
 
 export type Resolution =
 	| { ok: true; account: User; provisioned: boolean }
@@ -113,6 +132,54 @@ export async function linkIdentity(
 	});
 }
 
+async function connectionForProvider(
+	bucketId: string,
+	providerId: string
+): Promise<ProvisioningConnection | null> {
+	return getProvisioningConnectionStore().findByProvider(bucketId, providerId);
+}
+
+async function correlate(
+	store: ReturnType<typeof getUserStore>,
+	provider: FederationProvider,
+	connection: ProvisioningConnection,
+	subject: string,
+	claims: Record<string, unknown>
+): Promise<Resolution> {
+	const value = claims[connection.correlation.claim];
+	if (typeof value !== 'string' || value.trim() === '') {
+		return { ok: false, reason: 'not_provisioned' };
+	}
+	const filter =
+		connection.correlation.attribute === 'externalId'
+			? { provisionedBy: connection._id, externalId: value }
+			: { provisionedBy: connection._id, userName: value };
+	const { users } = await store.query(filter, { startIndex: 1, count: 2 });
+	/* Both keys are unique per connection, so more than one match is a defect; refuse rather than guess. */
+	if (users.length !== 1) return { ok: false, reason: 'not_provisioned' };
+	const [account] = users;
+
+	if (account.federated?.some((link) => link.providerId === provider.id)) {
+		eventBus.emit('federation.link.conflict', {
+			providerId: provider.id,
+			connectionId: connection._id
+		});
+		return { ok: false, reason: 'link_conflict' };
+	}
+	/*
+	 * Linked without copying the upstream's profile claims: a provisioned user's profile belongs to the
+	 * directory, which keeps it current over SCIM.
+	 */
+	const updated =
+		(await linkIdentity(store, account, {
+			providerId: provider.id,
+			sub: subject
+		})) ?? account;
+	return canSignIn(updated)
+		? { ok: true, account: updated, provisioned: false }
+		: { ok: false, reason: 'inactive' };
+}
+
 export async function resolveFederatedAccount(input: {
 	bucket: UserBucket;
 	provider: FederationProvider;
@@ -125,9 +192,22 @@ export async function resolveFederatedAccount(input: {
 	// 1. An existing link is the identity. Nothing else is consulted, and nothing is written.
 	const linked = await store.findByFederatedIdentity(provider.id, subject);
 	if (linked) {
-		return linked.active
+		/* `canSignIn`, not `active`: a locally locked account is refused here, not only at the door after. */
+		return canSignIn(linked)
 			? { ok: true, account: linked, provisioned: false }
 			: { ok: false, reason: 'inactive' };
+	}
+
+	/*
+	 * 1a. A provider bound to a SCIM provisioning connection ends the ladder here (specs/070 R14). The
+	 * directory created the account; the connection's correlation rule names which one, by a claim the
+	 * directory also sent over SCIM (Entra's `oid` as `externalId`). The email steps below are never reached:
+	 * matching by address is the takeover the series refuses, and a provisioned account holding no password
+	 * would otherwise be sent to a password step it can never complete.
+	 */
+	const connection = await connectionForProvider(bucket._id, provider.id);
+	if (connection) {
+		return correlate(store, provider, connection, subject, claims);
 	}
 
 	// 2. No address means nothing to match a human by.

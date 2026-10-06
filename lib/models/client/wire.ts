@@ -62,7 +62,14 @@ export const BASE_METADATA_KEYS = [
 	 */
 	'registeredDynamically',
 	'registeredAtBucket',
-	'registrationUsedAt'
+	'registrationUsedAt',
+	/*
+	 * A provisioning connection's client, synthesized from the connection and never stored
+	 * (lib/provisioning/client.ts). Base keys for the reason the three above are: no wire input may claim
+	 * to be a connection's client or present a digest in place of a secret.
+	 */
+	'provisioningConnectionId',
+	'clientSecretDigest'
 ];
 
 const CANONICAL_ONLY = new Set(BASE_METADATA_KEYS);

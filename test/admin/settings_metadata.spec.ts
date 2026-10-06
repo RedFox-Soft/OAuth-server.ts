@@ -138,7 +138,10 @@ describe('settings catalog presentation metadata', () => {
 				'par.allowUnregisteredRedirectUris',
 				'pkce.required',
 				'rateLimit.enabled',
-				'rateLimit.trustedProxy'
+				'rateLimit.trustedProxy',
+				'scim.secretCredentials',
+				'scim.staticTokens',
+				'scim.strict'
 			].sort()
 		);
 		/*

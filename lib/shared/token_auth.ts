@@ -159,7 +159,17 @@ export async function tokenAuth(
 		tokenEndpointAuthMethod: clientAuthMethod,
 		tokenEndpointAuthSigningAlg: clientAuthSigningAlg
 	} = client;
-	if (!auth.methods.includes(clientAuthMethod)) {
+	/*
+	 * A provisioning connection's secret is accepted in the header or the body alike (specs/070 R2): Entra
+	 * lets its administrator choose either, and a wrong guess surfaces as `invalid_client` on the customer's
+	 * "Test connection", with nothing on this side to explain it. Only a connection's client carries the
+	 * digest, so every registered client keeps its one registered method.
+	 */
+	const secretEitherWay =
+		client.clientSecretDigest !== undefined &&
+		(auth.methods.includes('client_secret_basic') ||
+			auth.methods.includes('client_secret_post'));
+	if (!secretEitherWay && !auth.methods.includes(clientAuthMethod)) {
 		throw new InvalidClientAuth(
 			'the provided authentication mechanism does not match the registered client authentication method'
 		);

@@ -16,9 +16,11 @@ import {
 	tableExists,
 	BucketKeysStore
 } from '../lib/adapters/postgres/index.js';
+import { isReservedBucketName } from '../lib/consts/reserved_names.js';
 import {
 	duplicateEmailReport,
 	exitCodeFor,
+	reservedAddressReport,
 	type DuplicateEmailRow,
 	type ProvisioningSummary
 } from './provisioning_report.js';
@@ -337,6 +339,16 @@ if (marked.length > 0) {
  */
 const handle = sql();
 const bucketRows = await handle`SELECT id FROM ${handle('userBuckets')}`;
+const reservedAddresses = reservedAddressReport(
+	(
+		await handle`SELECT id, doc->>'slug' AS slug FROM ${handle('userBuckets')}`
+	).map((row: { id: string; slug: string | null }) => ({
+		_id: row.id,
+		slug: row.slug
+	})),
+	isReservedBucketName
+);
+if (reservedAddresses) console.error(reservedAddresses);
 for (const row of bucketRows) {
 	const bucketId = (row as { id: string }).id;
 	const area = areaForBucket(bucketId);

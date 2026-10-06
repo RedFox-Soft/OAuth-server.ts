@@ -5,11 +5,13 @@ import {
 	matchesStored,
 	storedFilterOf,
 	storedPatchOf,
-	uniqueValuesAfter
+	uniqueValuesAfter,
+	withCreateFields
 } from '../end_user_keys.js';
 import {
 	DuplicateEndUserError,
 	MAX_END_USER_PAGE,
+	type EndUserCreateFields,
 	type EndUserFilter,
 	type EndUserPage,
 	type EndUserPatch,
@@ -141,35 +143,41 @@ export class UserStore implements UserStoreInstance {
 		password: string,
 		roles: string[] = [],
 		verified = false,
-		id?: string
+		id?: string,
+		fields?: EndUserCreateFields
 	): Promise<User> {
 		if (await this.findByEmail(email)) {
 			throw new DuplicateEndUserError('email');
 		}
 		const now = new Date();
-		const user: User = {
-			// Caller-supplied when the account's audit entry has to name the id before the account
-			// exists; generated here otherwise, as it always was.
-			_id: id ?? crypto.randomUUID(),
-			/*
-			 * Normalised on write, matching the MongoDB store. The two disagreed until now — that one
-			 * lower-cases here, this one kept whatever case it was given — and because `findByEmail`
-			 * lower-cases both sides, sign-in behaved identically and the difference stayed invisible.
-			 * It was not invisible to anything reading the *stored* value: the end-user delete route
-			 * built its email-scoped cascade id from `user.email`, so under this adapter a mixed-case
-			 * account's throttle and resend records were skipped, in silence, with the cascade
-			 * reporting success. Constitution III.3 requires such a divergence to be converged or
-			 * declared; this is the convergence.
-			 */
-			email: email.toLowerCase(),
-			verified,
-			password,
-			active: true,
-			roles,
-			createdAt: now,
-			updatedAt: now,
-			lastLoginAt: null
-		};
+		const user: User = withCreateFields(
+			{
+				// Caller-supplied when the account's audit entry has to name the id before the account
+				// exists; generated here otherwise, as it always was.
+				_id: id ?? crypto.randomUUID(),
+				/*
+				 * Normalised on write, matching the MongoDB store. The two disagreed until now — that one
+				 * lower-cases here, this one kept whatever case it was given — and because `findByEmail`
+				 * lower-cases both sides, sign-in behaved identically and the difference stayed invisible.
+				 * It was not invisible to anything reading the *stored* value: the end-user delete route
+				 * built its email-scoped cascade id from `user.email`, so under this adapter a mixed-case
+				 * account's throttle and resend records were skipped, in silence, with the cascade
+				 * reporting success. Constitution III.3 requires such a divergence to be converged or
+				 * declared; this is the convergence.
+				 */
+				email: email.toLowerCase(),
+				verified,
+				password,
+				active: true,
+				roles,
+				createdAt: now,
+				updatedAt: now,
+				lastLoginAt: null
+			},
+			fields
+		);
+		const duplicate = this.duplicateOf(user);
+		if (duplicate) throw duplicate;
 		this.users.set(user._id, user);
 		return user;
 	}

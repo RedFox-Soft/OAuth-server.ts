@@ -110,6 +110,13 @@ fails the guard. Making omission mean *unlimited* would turn forgetting the tabl
 protection, silently. The guard still pins `strict`, `public` and `exempt` as exact sets, so the
 decision cannot be skipped; it just fails toward more protection rather than less.
 
+Since 2026-10-06 the SCIM routes are `exempt` too, and not because they are unmetered: the ordinary class is
+five requests a second per address, IPSIE AL SCIM §4.3 asks for 25 per tenant, and Entra and Okta send many
+tenants' traffic from a few addresses. They are limited per **connection** inside the SCIM plugin instead,
+and a request whose credential fails is charged per origin there with the `strict` bounds — so the
+exemption moves the limit rather than removing it. It also gives the 429 SCIM's own error shape, which a
+refusal thrown here, before routing, never could. See [[scim-provisioning]].
+
 Every `OPTIONS` is `public` on the method alone. A preflight never reaches the route table —
 `corsPreflight` short-circuits it — and charging it to the class of the request it precedes would
 halve a browser client's real allowance, refusing it for requests it never sent.

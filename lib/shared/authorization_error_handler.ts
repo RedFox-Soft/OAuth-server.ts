@@ -3,6 +3,7 @@ import { eventBus } from 'lib/event_bus.js';
 import { OIDCProviderError } from '../helpers/errors.ts';
 import { getErrorHtmlResponse } from '../html/error.tsx';
 import { routeNames } from 'lib/consts/param_list.js';
+import { isScimRoute } from 'lib/consts/scim.js';
 import { ErrorContext, ValidationError } from 'elysia';
 import {
 	deliverAuthorizationError,
@@ -54,6 +55,9 @@ import type { ErrorSurface } from 'lib/adapters/types.js';
 function surfaceFor(route: string): ErrorSurface {
 	if (route === routeNames.mcp || route === routeNames.mcp_metadata) {
 		return 'mcp';
+	}
+	if (isScimRoute(route)) {
+		return 'scim';
 	}
 	if (route.startsWith('/admin')) {
 		return 'admin';
@@ -323,6 +327,17 @@ export async function errorHandler(obj: ErrorHandlerContext) {
 	 * credential-less call under `server_error`.
 	 */
 	if (code === 'VALIDATION' && route === routeNames.mcp) {
+		return;
+	}
+
+	/*
+	 * Every error on a SCIM route is the SCIM plugin's to render, in SCIM's own shape (RFC 7644 §3.12) —
+	 * its deliberate refusals, Elysia's own validation and parse failures, and a fault it did not expect.
+	 * Keyed on the route rather than a marker because the last two carry none, and a SCIM client handed an
+	 * OAuth body cannot read it. The plugin's handler also records the 5xx, which is why this exit sits
+	 * ahead of the capture below (wiki/concepts/error-store-capture-sites.md).
+	 */
+	if (isScimRoute(route)) {
 		return;
 	}
 	// Elysia's not-found carries its own status but does not assign set.status before onError runs, so

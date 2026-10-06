@@ -171,6 +171,24 @@ export const ClientSchema = t.Object({
 	registrationUsedAt: t.Optional(t.Number({ minimum: 0, multipleOf: 1 })),
 
 	/*
+	 * provisioningConnectionId
+	 *
+	 * description: The SCIM provisioning connection this client is, when it is one. Such a client is
+	 * synthesized from the connection on every resolution and never stored (lib/provisioning/client.ts);
+	 * the token endpoint lets it obtain a `scim` token for its own bucket's SCIM resource and nothing else.
+	 */
+	provisioningConnectionId: t.Optional(t.String()),
+
+	/*
+	 * clientSecretDigest
+	 *
+	 * description: The SHA-256 (hex) of a provisioning connection's client secret, held in place of the
+	 * secret itself. Only a connection's client carries it; ordinary clients keep the plaintext because
+	 * client_secret_jwt and the symmetric keys derive from it.
+	 */
+	clientSecretDigest: t.Optional(t.String({ pattern: '^[0-9a-f]{64}$' })),
+
+	/*
 	 * The remaining members describe the full shape of a *validated* client
 	 * object: the schema engine (lib/models/client/schema.ts) projects the
 	 * recognised snake_case metadata onto these camelCased properties. They are

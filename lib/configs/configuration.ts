@@ -359,6 +359,31 @@ function checkRateLimit(config: ConfigurationInput) {
 }
 
 /*
+ * The per-connection SCIM allowance. A floor rather than only a positive integer, because the floor is a
+ * conformance requirement (IPSIE AL SCIM §4.3: at least 25 requests a second per tenant), and a value under
+ * it is accepted today and discovered as a provisioning backlog during a customer's mass onboarding.
+ */
+export const SCIM_MIN_REQUESTS_PER_SECOND = 25;
+
+function checkScimRateLimit(config: ConfigurationInput) {
+	const max = config['scim.rateLimit.max'];
+	const windowSeconds = config['scim.rateLimit.windowSeconds'];
+	for (const [key, value] of [
+		['scim.rateLimit.max', max],
+		['scim.rateLimit.windowSeconds', windowSeconds]
+	] as const) {
+		if (!Number.isSafeInteger(value) || value < 1) {
+			throw new TypeError(`${key} must be a positive integer`);
+		}
+	}
+	if (max / windowSeconds < SCIM_MIN_REQUESTS_PER_SECOND) {
+		throw new TypeError(
+			`scim.rateLimit.max / scim.rateLimit.windowSeconds must allow at least ${SCIM_MIN_REQUESTS_PER_SECOND} requests a second`
+		);
+	}
+}
+
+/*
  * The login throttle's numbers, checked at boot for the reason checkRateLimit states — a bad value
  * here fails silently at runtime — plus one this feature adds: the range is what stands in for the
  * `enabled` switch it deliberately does not have. A cap of a million is a disabled throttle spelled
@@ -669,6 +694,7 @@ export function validateConfiguration(
 	checkErrorStore(config);
 	checkSentry(config);
 	checkRateLimit(config);
+	checkScimRateLimit(config);
 	checkLoginThrottle(config);
 
 	return {

@@ -134,6 +134,11 @@ export const STORE_AREAS = {
 	 * the primary key rather than a rule a route has to remember.
 	 */
 	protectedResources: 'protectedResources',
+	/*
+	 * SCIM provisioning connections: one customer directory's right to provision one bucket, bound to one
+	 * of that bucket's federation providers. The `_id` is what an end user's `provisionedBy` holds.
+	 */
+	provisioningConnections: 'provisioningConnections',
 	userBuckets: 'userBuckets',
 	/* The owner of every project and user bucket, and the only thing that grants access to one. */
 	groups: 'groups',
@@ -492,6 +497,28 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 			'owned by a project, which is not a principal; cascaded by the project-delete route'
 		),
 		[{ key: { projectId: 1 } }]
+	),
+	/*
+	 * Never reaped: a connection that expired on its own would stop a customer's provisioning with nothing
+	 * to say why. Owned by a bucket, which is not a principal, so the bucket-delete and connection-delete
+	 * routes cascade it — and revoke its tokens, which are `ClientCredentials` rows owned by the client
+	 * `scim-<_id>` and so reached by the client cascade.
+	 *
+	 * `providerKey` is unique because a provider binds to at most one connection; `staticTokenDigest` is
+	 * unique and sparse because a static token is looked up by its digest on every SCIM request that
+	 * presents one, and most connections hold none.
+	 */
+	storeArea(
+		STORE_AREAS.provisioningConnections,
+		null,
+		unowned(
+			'owned by a bucket, which is not a principal; cascaded by the bucket-delete and connection-delete routes'
+		),
+		[
+			{ key: { bucketId: 1 } },
+			{ key: { providerKey: 1 }, unique: true },
+			{ key: { staticTokenDigest: 1 }, unique: true, sparse: true }
+		]
 	),
 	/*
 	 * Permanent, and read on every administrative MCP request — which is what makes a withdrawal land

@@ -12,6 +12,7 @@ import { machineTokenPermitted } from '../../resources/registry.js';
 import { namespaceOf } from '../../resources/namespace.js';
 import { ClientCredentials } from 'lib/models/client_credentials.js';
 import type { DPoPProof } from 'lib/helpers/validate_dpop.js';
+import { SCIM_SCOPE } from '../../consts/scim.js';
 
 export async function clientCredentials(
 	oidc: OIDCContext<TokenParams>,
@@ -28,7 +29,28 @@ export async function clientCredentials(
 
 	await checkResource(oidc);
 
-	const scopes = [...new Set(oidc.params.scope?.split(' '))];
+	let scopes = [...new Set(oidc.params.scope?.split(' '))];
+
+	/*
+	 * A provisioning connection's client may hold one token only: `scim`, for its own bucket's SCIM resource
+	 * (IPSIE AL SCIM §4.1 — the scope and nothing broader). Neither Entra nor Okta names a scope, so its
+	 * absence means `scim`; any other scope is refused rather than silently dropped, so a misconfigured
+	 * directory learns why. The resource itself was decided by getResourceServerInfo; its absence here means
+	 * the bucket has no SCIM address to give.
+	 */
+	if (client.provisioningConnectionId) {
+		const asked = scopes.filter(Boolean);
+		const stray = asked.find((scope) => scope !== SCIM_SCOPE);
+		if (stray) {
+			throw new InvalidScope('requested scope is not allowed', stray);
+		}
+		scopes = [SCIM_SCOPE];
+		if (Object.keys(oidc.resourceServers).length === 0) {
+			throw new InvalidTarget(
+				'the client is not permitted to access this resource'
+			);
+		}
+	}
 
 	if (client.scope) {
 		const allowList = new Set(client.scope.split(' '));

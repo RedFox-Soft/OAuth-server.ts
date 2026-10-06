@@ -4,6 +4,7 @@ import {
 	Button,
 	Card,
 	Input,
+	Select,
 	Space,
 	Table,
 	Tag,
@@ -20,8 +21,25 @@ interface AuditEntry {
 	targetScope: string | null;
 	attributes: string[];
 	cascade: Record<string, number> | null;
+	/* Absent or null on an entry made in the console: the field was added after the trail began. */
+	viaSurface?: 'mcp' | 'scim' | null;
+	viaClientId?: string | null;
 	timestamp: string;
 }
+
+type Surface = 'console' | 'mcp' | 'scim';
+
+const SURFACE_OPTIONS: { label: string; value: Surface }[] = [
+	{ label: 'Console', value: 'console' },
+	{ label: 'MCP', value: 'mcp' },
+	{ label: 'SCIM', value: 'scim' }
+];
+
+/*
+ * The sentinel a provisioning connection is recorded under (lib/admin/audit/record.ts). Shown as what it is,
+ * because the raw value in the email column reads as a malformed address rather than as a directory.
+ */
+const CONNECTION_ACTOR_PREFIX = 'connection:';
 
 interface AuditPage {
 	entries: AuditEntry[];
@@ -38,6 +56,7 @@ interface Filters {
 	targetScope: string;
 	from: string;
 	to: string;
+	viaSurface: Surface | '';
 }
 
 const EMPTY_FILTERS: Filters = {
@@ -47,7 +66,8 @@ const EMPTY_FILTERS: Filters = {
 	targetId: '',
 	targetScope: '',
 	from: '',
-	to: ''
+	to: '',
+	viaSurface: ''
 };
 
 const TEXT_FILTERS = [
@@ -75,6 +95,7 @@ function buildQuery(filters: Filters, page: number, pageSize: number): string {
 	}
 	if (filters.from) params.set('from', toBound(filters.from, 'start'));
 	if (filters.to) params.set('to', toBound(filters.to, 'end'));
+	if (filters.viaSurface) params.set('viaSurface', filters.viaSurface);
 	params.set('page', String(page));
 	params.set('pageSize', String(pageSize));
 	return params.toString();
@@ -140,7 +161,11 @@ export function Audit() {
 					direction="vertical"
 					size={0}
 				>
-					<Typography.Text>{email}</Typography.Text>
+					<Typography.Text>
+						{row.actorId.startsWith(CONNECTION_ACTOR_PREFIX)
+							? `SCIM connection ${row.actorId.slice(CONNECTION_ACTOR_PREFIX.length)}`
+							: email}
+					</Typography.Text>
 					<Typography.Text
 						type="secondary"
 						copyable
@@ -150,6 +175,23 @@ export function Audit() {
 					</Typography.Text>
 				</Space>
 			)
+		},
+		{
+			title: 'Surface',
+			dataIndex: 'viaSurface',
+			render: (surface: AuditEntry['viaSurface'], row: AuditEntry) =>
+				surface === 'mcp' ? (
+					<Tag
+						color="geekblue"
+						title={row.viaClientId ? `agent ${row.viaClientId}` : undefined}
+					>
+						MCP
+					</Tag>
+				) : surface === 'scim' ? (
+					<Tag color="purple">SCIM</Tag>
+				) : (
+					<Tag>Console</Tag>
+				)
 		},
 		{
 			title: 'Action',
@@ -269,6 +311,17 @@ export function Audit() {
 					 * `max`/`min` cross-bound the two fields, so a backwards window cannot be submitted from
 					 * here at all and the server's 422 stays a backstop rather than a routine error.
 					 */}
+					<Select<Surface>
+						placeholder="Surface"
+						aria-label="Surface"
+						allowClear
+						style={{ width: 140 }}
+						options={SURFACE_OPTIONS}
+						value={filters.viaSurface || undefined}
+						onChange={(value) =>
+							setFilters({ ...filters, viaSurface: value ?? '' })
+						}
+					/>
 					<Input
 						type="date"
 						aria-label="From date"

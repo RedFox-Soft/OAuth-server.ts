@@ -216,7 +216,12 @@ export default function getSchema() {
 
 		required() {
 			const checked = [];
-			if (needsSecret(this)) {
+			/*
+			 * A provisioning connection's client holds only the digest of its secret (specs/070 R3); the
+			 * digest satisfies the requirement, because comparison works against it. `clientSecretDigest` is a
+			 * base key, which wire input cannot set, so no registered client can reach this exemption.
+			 */
+			if (needsSecret(this) && this.metadata.clientSecretDigest === undefined) {
 				checked.push('clientSecret');
 			}
 

@@ -186,7 +186,14 @@ async function completeReturn(params: ReturnParams) {
 					return federationDomainRefusedPage();
 				case 'link_not_permitted':
 					return federationLinkRefusedPage(uid);
+				/*
+				 * The two refusals of a provider bound to a SCIM connection render the provisioning-closed page:
+				 * to the person signing in, both mean "your organisation has not given you access here yet",
+				 * and which of the two it was is not theirs to learn (the conflict is reported on the event bus).
+				 */
 				case 'provisioning_closed':
+				case 'not_provisioned':
+				case 'link_conflict':
 					return federationProvisioningClosedPage();
 				case 'inactive':
 					return federationInactivePage();

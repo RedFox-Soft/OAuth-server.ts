@@ -26,7 +26,9 @@ recorded.
 `lib/resources/` owns two things: the canonical form of an identifier and the lookup that turns one
 into a `ResourceServer` descriptor. The addon default gained a middle arm — built-in MCP audience,
 then the store, then the existing `mustChange` stub — so an override still wins for everything else and
-the failure mode for an unknown audience is unchanged.
+the failure mode for an unknown audience is unchanged. (Since 2026-10-06 a SCIM arm comes first: the
+addressed bucket's `<issuer>/scim/v2`, held only by that bucket's provisioning connections, whose clients are
+refused every other indicator, MCP's included — see [[scim-provisioning]].)
 
 **There is deliberately no cache in front of the store.** A deleted declaration has to stop issuance on
 the *next* request, which a memo would defer; `test/resources/issuance.spec.ts` pins it. Same reasoning

@@ -7,12 +7,14 @@ import {
 	clampPage,
 	FIELD_OF_KEY,
 	storedFilterOf,
-	storedPatchOf
+	storedPatchOf,
+	withCreateFields
 } from '../end_user_keys.js';
 import {
 	DuplicateEndUserError,
 	MAX_END_USER_PAGE,
 	User,
+	type EndUserCreateFields,
 	type EndUserFilter,
 	type EndUserPage,
 	type EndUserPatch,
@@ -98,39 +100,43 @@ export class UserStore implements UserStoreInstance {
 		password: string,
 		roles: string[] = [],
 		verified = false,
-		id?: string
+		id?: string,
+		fields?: EndUserCreateFields
 	): Promise<User> {
 		const existingUser = await this.findByEmail(email);
 		if (existingUser) {
 			throw new DuplicateEndUserError('email');
 		}
 		const now = new Date();
-		const user: User = {
-			// Caller-supplied when the account's audit entry has to name the id before the account
-			// exists; generated here otherwise, as it always was.
-			_id: id ?? crypto.randomUUID().replaceAll('-', ''),
-			email: email.toLowerCase(),
-			verified,
-			password,
-			active: true,
-			roles,
-			createdAt: now,
-			updatedAt: now,
-			lastLoginAt: null
-		};
+		const user: User = withCreateFields(
+			{
+				// Caller-supplied when the account's audit entry has to name the id before the account
+				// exists; generated here otherwise, as it always was.
+				_id: id ?? crypto.randomUUID().replaceAll('-', ''),
+				email: email.toLowerCase(),
+				verified,
+				password,
+				active: true,
+				roles,
+				createdAt: now,
+				updatedAt: now,
+				lastLoginAt: null
+			},
+			fields
+		);
 		try {
 			await db
 				.collection<User>(this.collectionName)
 				.insertOne(user, ABSENT_UNDEFINED);
 		} catch (error) {
 			/*
-			 * The unique email index refused a concurrent registration of the same address, which the lookup
-			 * above could not see. The same error that lookup raises, so every caller handles one outcome —
-			 * and the driver's E11000 text, which quotes the address, never reaches the error store.
+			 * A unique index refused the insert — a concurrent registration of the same address the lookup
+			 * above could not see, or a username or external identifier already held. Named by the index
+			 * that refused it, so the driver's E11000 text, which quotes the value, never reaches the error
+			 * store.
 			 */
-			if (duplicateFrom(error)) {
-				throw new DuplicateEndUserError('email');
-			}
+			const duplicate = duplicateFrom(error);
+			if (duplicate) throw duplicate;
 			throw error;
 		}
 		return user;

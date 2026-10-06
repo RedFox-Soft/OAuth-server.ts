@@ -59,7 +59,7 @@ async function asAdmin<T>(operation: Promise<T>): Promise<T> {
  *
  * test/mcp/secrecy.spec.ts sweeps every published read for exactly this.
  */
-const presentUser = <
+export const presentUser = <
 	T extends {
 		password?: string;
 		totp?: { enrolledAt: Date };

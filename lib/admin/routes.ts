@@ -15,6 +15,7 @@ import { adminUserRoutes } from './users/routes.js';
 import { bucketRoutes } from './buckets/routes.js';
 import { federationAdminRoutes } from './federation/routes.js';
 import { endUserRoutes } from './users-end/routes.js';
+import { provisioningRoutes } from './provisioning/routes.js';
 import { settingsRoutes } from './settings/routes.js';
 import { smtpSettingsRoutes } from './settings/smtp/routes.js';
 import { sentrySettingsRoutes } from './settings/sentry/routes.js';
@@ -71,6 +72,7 @@ export const adminApiRoutes = new Elysia({ name: 'admin-api' })
 	.use(bucketRoutes)
 	.use(federationAdminRoutes)
 	.use(endUserRoutes)
+	.use(provisioningRoutes)
 	.use(settingsRoutes)
 	.use(smtpSettingsRoutes)
 	.use(sentrySettingsRoutes)

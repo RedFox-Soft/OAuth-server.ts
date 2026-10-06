@@ -101,6 +101,8 @@ lib/
     auth/rbac.ts        ← session cookie OR an MCP-audience bearer token → one AdminContext
     audit/              ← append-only trail; written before the mutation, inside the handler
   mcp/                  ← catalogue.ts (published tools), dispatch.ts, confirm.ts (two-call gate)
+  provisioning/         ← SCIM provisioning connections: service, the synthesized client, token policy
+  scim/                 ← the SCIM 2.0 surface: principal, filter, patch, resource mapping, own errors and limiter
   error_store/          ← the one place a fault becomes a record (capture.ts is the choke point)
   sentry/               ← optional outbound reporting; registers NO Elysia hook
 database/               ← provisioning (mongodb.ts, postgres.ts), migrate.ts, real-DB verify scripts
@@ -165,7 +167,12 @@ Each rule is the part that is easy to break. Read the named page before changing
   from a route; whether a user may sign in is `canSignIn`, and anything that makes them unable to runs
   `revokeAccountAccess`. A provisioned user is read-only to administrators except the local lock.
   → `end-user-lifecycle.md`
-- **Error store** — only defects (5xx) are recorded, from two capture sites; recording never blocks a
+- **SCIM provisioning** — a connection's OAuth client `scim-<id>` is synthesized from the connection and
+  never stored; its tokens are opaque and only the addressed bucket's SCIM arm (ahead of MCP's) may mint
+  them; a bound provider's unlinked sign-in correlates by the connection's rule and never reaches the email
+  steps; SCIM routes render their own errors and are rate-limited per connection, not per origin; every
+  request-format tolerance sits behind `scim.strict`. → `scim-provisioning.md`
+- **Error store** — only defects (5xx) are recorded, from four capture sites; recording never blocks a
   request; the read surface is not flag-gated. → `error-store-capture-sites.md`,
   `error-store-is-not-flag-gated.md`
 - **Sentry** — reporting is off the request path: `lib/sentry/` mounts nothing into Elysia, and

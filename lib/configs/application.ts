@@ -753,6 +753,64 @@ export const ApplicationConfig = {
 	'mcp.enabled': false,
 
 	/*
+	 * scim.enabled
+	 *
+	 * title: SCIM 2.0 provisioning
+	 *
+	 * description: Serves SCIM 2.0 `/Users` at each bucket's `<issuer>/scim/v2`, so an enterprise
+	 *   directory (Entra ID, Okta) can create, update, deactivate and delete the bucket's end users
+	 *   through a provisioning connection an administrator set up.
+	 *
+	 * Off by default: the surface accepts writes to end-user accounts from a third party's system, so
+	 * a deployment should switch it on deliberately. Connections can be prepared while it is off; the
+	 * management routes are not gated, for the reason federation's are not.
+	 */
+	'scim.enabled': false,
+	/*
+	 * scim.secretCredentials
+	 *
+	 * A deviation flag (Constitution Principle I). IPSIE AL SCIM §4.1 requires JWT client
+	 * authentication (RFC 7523 §2.2) for the token a SCIM client presents; a client secret is not that.
+	 * On by default because Microsoft Entra ID can authenticate to a token endpoint only with a client
+	 * secret (until workload identity federation, part 4 of the series). Off: secret credentials can
+	 * neither be issued nor used, and Entra cannot obtain a token.
+	 */
+	'scim.secretCredentials': true,
+	/*
+	 * scim.staticTokens
+	 *
+	 * A deviation flag (Constitution Principle I). IPSIE §4.1 requires an OAuth access token from the
+	 * client-credentials grant; a long-lived bearer token is not one. On by default because Okta cannot
+	 * use client credentials for SCIM at all — its options are a header token or the authorization
+	 * code grant. Off: static tokens can neither be issued nor used, and Okta cannot connect.
+	 */
+	'scim.staticTokens': true,
+	/*
+	 * scim.strict
+	 *
+	 * A deviation flag (Constitution Principle I), inverted: off means tolerant. The SCIM 2.0
+	 * Interoperability Profile requires refusing a path-less PATCH (§6.5.1.1) and unknown attributes,
+	 * and IPSIE §6.1.2 forbids the `password` attribute. Okta deactivates with a path-less PATCH and
+	 * sends `password` on every create; Entra sends path-less multi-attribute replaces, `"False"` as a
+	 * string and capitalised operations, and its default mappings send `addresses`. Tolerant by default,
+	 * because both v1 clients would otherwise fail. One switch rather than one per tolerance: no partial
+	 * combination is conformant, and the operator's question is a single one — certifying against the
+	 * profiles, or connecting Entra and Okta.
+	 */
+	'scim.strict': false,
+	/*
+	 * scim.rateLimit.*
+	 *
+	 * The per-connection allowance on SCIM requests. IPSIE §4.3 requires at least 25 requests a second
+	 * per tenant, which the per-origin limiter could not give: its ordinary class is five a second, and
+	 * Entra and Okta send many tenants' traffic from a few addresses. So SCIM routes are exempt from the
+	 * per-origin limiter and limited here per connection instead. Fifty a second by default; any pair
+	 * below 25 a second is refused at boot and on save.
+	 */
+	'scim.rateLimit.max': 3000,
+	'scim.rateLimit.windowSeconds': 60,
+
+	/*
 	 * errorStore.enabled
 	 *
 	 * title: Server error store — record unexpected internal faults for later analysis

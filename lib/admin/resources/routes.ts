@@ -13,6 +13,7 @@ import { recordAdminAudit } from '../audit/record.js';
 import { canonicalizeResourceIdentifier } from '../../resources/canonical.js';
 import { validateScopes, scopeFailureMessage } from '../../resources/scopes.js';
 import { isMcpResource } from '../../mcp/resource_server.js';
+import { SCIM_BASE_PATH } from '../../consts/scim.js';
 import { CreateResourceBody, UpdateResourceBody } from './schema.js';
 import {
 	namespaceOfProject,
@@ -60,13 +61,31 @@ function canonicalIdentifier(
 				: 'a resource identifier must be an absolute URI'
 		);
 	}
-	if (isMcpResource(result.identifier)) {
+	if (
+		isMcpResource(result.identifier) ||
+		namesOwnScimEndpoint(result.identifier)
+	) {
 		throw new AdminError(
 			409,
 			'that identifier names an audience this server serves itself'
 		);
 	}
 	return result.identifier;
+}
+
+/*
+ * A bucket's SCIM endpoint is built in (lib/provisioning/token_policy.ts) and held only by that bucket's
+ * connections. A declaration of it would never resolve where the built-in arm answers first, and elsewhere it
+ * would mint a token every SCIM principal refuses — so it is refused here, where an operator can be told why,
+ * rather than accepted as a declaration that silently does nothing. Matched on this server's own origin; a
+ * directory's SCIM server elsewhere is somebody else's resource and may be declared.
+ */
+function namesOwnScimEndpoint(identifier: string): boolean {
+	const url = new URL(identifier);
+	return (
+		url.origin === new URL(ISSUER).origin &&
+		(url.pathname === SCIM_BASE_PATH || url.pathname.endsWith(SCIM_BASE_PATH))
+	);
 }
 
 /*

@@ -81,3 +81,25 @@ export function duplicateEmailReport(
 		'  resolve these and re-run; no records were changed.'
 	);
 }
+
+/*
+ * Buckets whose address is a name the server has since reserved for its own route (lib/consts/reserved_names.ts).
+ * Reported, never changed: renaming a bucket changes its issuer identifier, which every integrated client
+ * notices, so it is an operator's decision made through the address-change route. Nothing is refused either —
+ * the router still resolves such a bucket, because a static route wins over a bucket segment; what the report
+ * prevents is an operator handing a customer an address that reads as the server's own.
+ */
+export function reservedAddressReport(
+	buckets: readonly { _id: string; slug?: string | null }[],
+	isReserved: (name: string) => boolean
+): string | null {
+	const clashing = buckets.filter(
+		(bucket) => typeof bucket.slug === 'string' && isReserved(bucket.slug)
+	);
+	if (clashing.length === 0) return null;
+	return (
+		'these buckets use an address the server now reserves for its own routes; give each a new address ' +
+		'through POST /admin/api/buckets/:id/address:\n' +
+		clashing.map((bucket) => `  ${bucket._id} at /${bucket.slug}`).join('\n')
+	);
+}

@@ -18,6 +18,7 @@ import { validateJWK } from './keystore.ts';
 import { registerClient } from './register.ts';
 import { BASE_METADATA_KEYS } from './wire.ts';
 import { rootKeys } from '../../keys/issuer_keys.js';
+import { connectionClientRecord } from '../../provisioning/client.js';
 
 // Validate raw metadata → plain, frozen client object (defaults applied,
 // recognised metadata camelCased) or throw InvalidClientMetadata. Key material
@@ -111,7 +112,15 @@ onSettingsApplied(() => clientCache.clear());
 export async function tryFindClient(id: string): Promise<Client | undefined> {
 	// Validation reads the root issuer's algorithms synchronously; this keeps them current (see register.ts).
 	await rootKeys();
-	const properties = await adapter('Client').find(id);
+	/*
+	 * A provisioning connection's client is synthesized from the connection rather than read from the
+	 * Client area (lib/provisioning/client.ts). Consulted only after the adapter read, for the reason the
+	 * metadata-document branch below gives: a stored record always wins, so no stored client can be
+	 * shadowed by a connection — and a stored id is server-generated, so none can claim the `scim-` prefix
+	 * on purpose either.
+	 */
+	const properties =
+		(await adapter('Client').find(id)) ?? (await connectionClientRecord(id));
 	if (!properties) {
 		/*
 		 * A `client_id` that is an https URL naming a document describing the client, resolved by

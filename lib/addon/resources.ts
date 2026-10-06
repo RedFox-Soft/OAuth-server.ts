@@ -3,6 +3,12 @@ import * as errors from '../helpers/errors.ts';
 import { MCP_RESOURCE_SERVER, isMcpResource } from '../mcp/resource_server.js';
 import { resolveDeclaredResource } from '../resources/registry.js';
 import { namespaceOf } from '../resources/namespace.js';
+import { scimBaseUrl } from '../provisioning/addresses.js';
+import {
+	assertConnectionMayMint,
+	isScimResourceOf,
+	scimResourceServer
+} from '../provisioning/token_policy.js';
 import type { OIDCContext } from '../helpers/oidc_context.ts';
 import type { ResourceServerInfo } from '../helpers/resource_server.ts';
 import type { Client } from '../models/client.ts';
@@ -12,8 +18,8 @@ import type { DeviceCode } from '../models/device_code.ts';
 import type { RefreshToken } from '../models/refresh_token.ts';
 
 export async function defaultResource(
-	_oidc: OIDCContext,
-	_client: Client,
+	oidc: OIDCContext,
+	client: Client,
 	oneOf?: string | string[]
 ): Promise<string | string[] | undefined> {
 	// @param oidc - the request context (OIDCContext)
@@ -24,6 +30,14 @@ export async function defaultResource(
 	//                           Authorization Code / Refresh Token / Device Code exchanges.
 
 	if (oneOf) return oneOf;
+	/*
+	 * A provisioning connection's client asks for one thing only, and neither Entra nor Okta sends a
+	 * `resource` — so it is supplied here, as the addressed bucket's SCIM resource. Whether this client may
+	 * have it is still decided where every other request is (lib/provisioning/token_policy.ts).
+	 */
+	if (client?.provisioningConnectionId && oidc) {
+		return scimBaseUrl(oidc.bucket) ?? undefined;
+	}
 	return undefined;
 }
 
@@ -44,7 +58,7 @@ export async function useGrantedResource(
 export async function getResourceServerInfo(
 	oidc: OIDCContext,
 	resourceIndicator: string,
-	_client: Client
+	client: Client
 ): Promise<ResourceServerInfo> {
 	// @param oidc - the request context (OIDCContext)
 	// @param resourceIndicator - resource indicator value either requested or resolved by the defaultResource helper.
@@ -61,6 +75,23 @@ export async function getResourceServerInfo(
 	 * A deployment override still wins for every other indicator, because the registry resolves this
 	 * whole function; only the MCP identifier is claimed.
 	 */
+	/*
+	 * The addressed bucket's SCIM endpoint, built in for the reason the MCP arm below is: it is an endpoint
+	 * this server serves, so no deployment could declare it correctly. Only that bucket's enabled
+	 * connections may hold it — any other client, on any flow, is refused here rather than handed a token a
+	 * SCIM principal would then have to reject. And a connection's client holds nothing else, so for it
+	 * every other indicator is refused too — first, before the MCP arm could hand it an administrative
+	 * audience.
+	 */
+	if (
+		oidc &&
+		(isScimResourceOf(oidc.bucket, resourceIndicator) ||
+			client?.provisioningConnectionId)
+	) {
+		await assertConnectionMayMint(client ?? {}, oidc.bucket, resourceIndicator);
+		return scimResourceServer(resourceIndicator);
+	}
+
 	if (isMcpResource(resourceIndicator)) {
 		return MCP_RESOURCE_SERVER;
 	}

@@ -5,6 +5,7 @@ import {
 	GroupInvitationStore as MemoryGroupInvitationStore,
 	ProjectStore as MemoryProjectStore,
 	ProtectedResourceStore as MemoryProtectedResourceStore,
+	ProvisioningConnectionStore as MemoryProvisioningConnectionStore,
 	BucketKeysStore as MemoryBucketKeysStore,
 	McpClientPermissionStore as MemoryMcpClientPermissionStore,
 	UserBucketStore as MemoryUserBucketStore,
@@ -37,6 +38,8 @@ import type {
 	ProjectStoreConstructor,
 	ProjectStoreInstance,
 	ProtectedResourceStoreConstructor,
+	ProvisioningConnectionStoreConstructor,
+	ProvisioningConnectionStoreInstance,
 	BucketKeysStoreConstructor,
 	BucketKeysStoreInstance,
 	ProtectedResourceStoreInstance,
@@ -68,6 +71,8 @@ let GroupInvitationStoreClass: GroupInvitationStoreConstructor =
 let ProjectStoreClass: ProjectStoreConstructor = MemoryProjectStore;
 let ProtectedResourceStoreClass: ProtectedResourceStoreConstructor =
 	MemoryProtectedResourceStore;
+let ProvisioningConnectionStoreClass: ProvisioningConnectionStoreConstructor =
+	MemoryProvisioningConnectionStore;
 let BucketKeysStoreClass: BucketKeysStoreConstructor = MemoryBucketKeysStore;
 let McpClientPermissionStoreClass: McpClientPermissionStoreConstructor =
 	MemoryMcpClientPermissionStore;
@@ -104,6 +109,7 @@ if (backend === 'postgres') {
 	GroupInvitationStoreClass = postgres.GroupInvitationStore;
 	ProjectStoreClass = postgres.ProjectStore;
 	ProtectedResourceStoreClass = postgres.ProtectedResourceStore;
+	ProvisioningConnectionStoreClass = postgres.ProvisioningConnectionStore;
 	BucketKeysStoreClass = postgres.BucketKeysStore;
 	McpClientPermissionStoreClass = postgres.McpClientPermissionStore;
 	BucketStoreClass = postgres.UserBucketStore;
@@ -134,6 +140,7 @@ if (backend === 'mongodb') {
 	GroupInvitationStoreClass = mongodb.GroupInvitationStore;
 	ProjectStoreClass = mongodb.ProjectStore;
 	ProtectedResourceStoreClass = mongodb.ProtectedResourceStore;
+	ProvisioningConnectionStoreClass = mongodb.ProvisioningConnectionStore;
 	BucketKeysStoreClass = mongodb.BucketKeysStore;
 	McpClientPermissionStoreClass = mongodb.McpClientPermissionStore;
 	BucketStoreClass = mongodb.UserBucketStore;
@@ -348,6 +355,21 @@ export function getProtectedResourceStore(): ProtectedResourceStoreInstance {
 }
 
 /*
+ * SCIM provisioning connections. No memo in front of it, for the reason the protected-resource store has
+ * none: it is read on every SCIM request and every connection-client token request, and a disabled or
+ * deleted connection has to stop working on the very next one.
+ */
+let provisioningConnectionStoreSingleton: ProvisioningConnectionStoreInstance | null =
+	null;
+export function getProvisioningConnectionStore(): ProvisioningConnectionStoreInstance {
+	if (!provisioningConnectionStoreSingleton) {
+		provisioningConnectionStoreSingleton =
+			new ProvisioningConnectionStoreClass();
+	}
+	return provisioningConnectionStoreSingleton;
+}
+
+/*
  * Addressable buckets' own signing keys. Read through the per-instance cache in lib/keys/issuer_keys.ts
  * rather than on every signature.
  */
@@ -410,4 +432,5 @@ export function resetAdminMemoryStores(): void {
 	bucketStoreSingleton = null;
 	groupStoreSingleton = null;
 	groupInvitationStoreSingleton = null;
+	provisioningConnectionStoreSingleton = null;
 }

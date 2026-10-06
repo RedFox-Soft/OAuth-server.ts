@@ -216,6 +216,8 @@ describe('route classification', () => {
 			'GET /.well-known/openid-configuration/:bucket',
 			'GET /.well-known/oauth-authorization-server/:bucket',
 			'GET /.well-known/oauth-protected-resource/mcp',
+			'GET /.well-known/oauth-protected-resource/scim/v2',
+			'GET /.well-known/oauth-protected-resource/:bucket/scim/v2',
 			'GET /.well-known/security.txt',
 			'GET /jwks',
 			'GET /public/*',
@@ -229,7 +231,26 @@ describe('route classification', () => {
 
 		// The platform probes this every 30s. A refused health check takes the machine out of the proxy.
 		// Exempt only because it touches nothing — see `GET /ready` above, which does and is not.
-		const EXEMPT = ['GET /health'];
+		//
+		// SCIM is exempt from the per-origin limiter for the opposite reason: not because it is unmetered,
+		// but because it is metered per connection inside its own plugin (IPSIE AL SCIM §4.3 asks for 25
+		// requests a second per tenant; the ordinary class gives five per address).
+		const EXEMPT = [
+			'GET /health',
+			...alsoBeneathBucket([
+				'GET /scim/v2/ServiceProviderConfig',
+				'GET /scim/v2/ResourceTypes',
+				'GET /scim/v2/ResourceTypes/:resourceTypeId',
+				'GET /scim/v2/Schemas',
+				'GET /scim/v2/Schemas/:schemaId',
+				'GET /scim/v2/Users',
+				'POST /scim/v2/Users',
+				'GET /scim/v2/Users/:userId',
+				'PUT /scim/v2/Users/:userId',
+				'PATCH /scim/v2/Users/:userId',
+				'DELETE /scim/v2/Users/:userId'
+			])
+		];
 
 		it('declares no entry for a route the server does not serve', () => {
 			const mountedKeys = new Set(mounted.map(key));

@@ -18,8 +18,11 @@ graph:
 
 # Error store capture sites
 
-Recorded faults are captured in **three** places, and the reason for the first two is easy to get
-backwards. (Two until 2026-10-01; the third is a fault delivered to a client by redirect, below.)
+Recorded faults are captured in **four** places, and the reason for the first two is easy to get
+backwards. (Two until 2026-10-01; the third is a fault delivered to a client by redirect, below. The
+fourth, since 2026-10-06 and spec 070, is the SCIM plugin's own `onError` in `lib/scim/index.ts`: the global
+handler stands aside for every SCIM route by route key, so a fault rendered in SCIM's error shape is
+recorded there, under the `scim` surface — see [[scim-provisioning]].)
 
 `errorHandler` in `lib/shared/authorization_error_handler.ts` stands aside for admin-plane errors — but
 it keys that on the `adminPlane` **marker**, which only a deliberate `AdminError` carries. So:

@@ -1,5 +1,6 @@
 import { STORE_AREAS } from '../lib/consts/storage_inventory.js';
 import { verifyEndUserIdentity } from './verify_end_user_identity.js';
+import { verifyProvisioningConnections } from './verify_provisioning_connections.js';
 
 /*
  * Storage fidelity for the MongoDB backend, against a real MongoDB — the properties of per-issuer
@@ -26,8 +27,13 @@ if (!process.env.MONGODB_URI || !THROWAWAY.test(database)) {
 delete process.env.POSTGRES_URL;
 
 /* After the guard, for the reason verify_postgres.ts gives: importing the adapters connects. */
-const { BucketKeysStore, ProtectedResourceStore, UserBucketStore, UserStore } =
-	await import('../lib/adapters/mongodb/index.js');
+const {
+	BucketKeysStore,
+	ProtectedResourceStore,
+	ProvisioningConnectionStore,
+	UserBucketStore,
+	UserStore
+} = await import('../lib/adapters/mongodb/index.js');
 const { db } = await import('../lib/adapters/mongodb/db.js');
 const { MIGRATIONS } = await import('../lib/consts/migrations.js');
 const { generateJWKS } = await import('../lib/helpers/jwks.js');
@@ -213,6 +219,7 @@ const identityBucket = await new UserBucketStore().create({
 	ownerGroupId: 'unassigned'
 });
 await verifyEndUserIdentity(new UserStore(identityBucket._id), check);
+await verifyProvisioningConnections(new ProvisioningConnectionStore(), check);
 
 console.log(
 	`\n${failures === 0 ? 'all fidelity checks passed' : `${failures} check(s) FAILED`}`

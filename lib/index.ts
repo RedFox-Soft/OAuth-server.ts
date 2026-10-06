@@ -45,6 +45,7 @@ import { corsPreflight } from './plugins/cors.js';
 import { InvalidDpopProof, UseDpopNonce } from './helpers/validate_dpop.js';
 import { adminApp } from './admin/index.js';
 import { mcpApp } from './mcp/index.js';
+import { scimApp, scimMetadataApp } from './scim/index.js';
 import { verificationRoutes } from './routes/verification.js';
 import { passwordResetRoutes } from './routes/password_reset.js';
 /* Its own top-level instance because it cannot satisfy the `ui` guard: see lib/federation/routes.ts. */
@@ -198,6 +199,19 @@ export const elysia = new Elysia({ strictPath: true, normalize: false })
 			.use(federationRoutes)
 			.use(codeVerification)
 	);
+
+/*
+ * SCIM provisioning: the default bucket's, and any host-addressed bucket's, at the bare `/scim/v2`, and a
+ * path-addressed bucket's beneath its segment. The metadata documents are mounted once — RFC 9728 inserts
+ * the well-known segment before the bucket's path, so neither form is produced by prefixing.
+ *
+ * Statements of their own rather than links in the chain above, because `.use` mutates the instance: the
+ * routes register exactly as a chained mount would, while the exported app's inferred type — which the
+ * chain had already brought to TypeScript's instantiation limit (TS2589 once these were added) — does not
+ * grow. Nothing reads SCIM routes off that type; SCIM is driven over plain HTTP.
+ */
+elysia.use(scimApp).use(scimMetadataApp);
+elysia.group('/:bucket', (bucketScoped) => bucketScoped.use(scimApp));
 
 /*
  * Binding the port, and the one startup failure this module can report.

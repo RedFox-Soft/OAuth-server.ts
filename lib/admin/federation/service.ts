@@ -1,4 +1,7 @@
-import { getBucketStore } from '../../adapters/index.js';
+import {
+	getBucketStore,
+	getProvisioningConnectionStore
+} from '../../adapters/index.js';
 import { AdminError } from '../auth/rbac.js';
 import {
 	DiscoveryError,
@@ -311,6 +314,13 @@ export async function updateProvider(
 	body: Partial<Omit<FederationProvider, 'id'>>
 ): Promise<FederationProvider> {
 	const current = find(bucket, providerId);
+	if (body.provisioning === 'jit') {
+		await assertNotBound(
+			bucket,
+			providerId,
+			'switched to just-in-time creation'
+		);
+	}
 
 	const next: FederationProvider = {
 		...current,
@@ -355,11 +365,35 @@ export async function updateProvider(
 	return next;
 }
 
+/*
+ * A provider a SCIM provisioning connection is bound to belongs to that connection's arrangement: its users
+ * sign in through it, matched by the connection's correlation rule, and it creates no account of its own —
+ * the directory does. Deleting it would strand every provisioned user; switching it to just-in-time creation
+ * would let a first sign-in race the directory's create and leave two accounts for one person (issue #62).
+ */
+async function assertNotBound(
+	bucket: UserBucket,
+	providerId: string,
+	what: string
+): Promise<void> {
+	const bound = await getProvisioningConnectionStore().findByProvider(
+		bucket._id,
+		providerId
+	);
+	if (bound) {
+		throw new AdminError(
+			409,
+			`provider ${providerId} is bound to provisioning connection ${bound._id} and cannot be ${what}`
+		);
+	}
+}
+
 export async function deleteProvider(
 	bucket: UserBucket,
 	providerId: string
 ): Promise<void> {
 	find(bucket, providerId);
+	await assertNotBound(bucket, providerId, 'deleted');
 	const federation = providersOf(bucket).filter((p) => p.id !== providerId);
 	assertSomeWayToSignIn({
 		passwordLogin: bucket.passwordLogin !== false,

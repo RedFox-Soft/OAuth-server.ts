@@ -3,7 +3,6 @@ import { describe, it, beforeAll, expect } from 'bun:test';
 import {
 	createEndUser,
 	EndUserError,
-	removeEndUser,
 	updateEndUser,
 	type EndUserActor
 } from 'lib/end_users/service.ts';
@@ -43,34 +42,13 @@ async function refusal(operation: Promise<unknown>) {
  */
 
 /**
- * @proves A provisioned identity is unique where its issuer says it is: a username across the
- * bucket regardless of letter case, an external identifier within the connection that issued it —
- * and the sign-in address stays unique when it changes (spec 069, FR-010, FR-013, FR-015).
+ * @proves An external identifier is scoped to the connection that issued it, and the sign-in address stays
+ * unique when it changes (spec 069, FR-010, FR-013). The username and same-connection cases are proved at the
+ * SCIM surface now (test/scim/users_create.spec.ts, test/scim/users_lifecycle.spec.ts).
  */
 describe('provisioned identities in a bucket', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);
-	});
-
-	it('refuses a username differing only in letter case from an existing one', async () => {
-		const taken = `Grace.Hopper.${nanoid()}`;
-		await provision(CONN_A, { userName: taken });
-
-		const error = await refusal(
-			provision(CONN_A, { userName: taken.toLowerCase() })
-		);
-
-		expect(error.status).toBe(409);
-		expect(error.message).toBe('userName already exists');
-	});
-
-	it('refuses an external identifier twice within one connection', async () => {
-		const externalId = nanoid();
-		await provision(CONN_A, { externalId });
-
-		const error = await refusal(provision(CONN_A, { externalId }));
-
-		expect(error.status).toBe(409);
 	});
 
 	it('accepts the same external identifier from another connection', async () => {
@@ -116,20 +94,5 @@ describe('provisioned identities in a bucket', () => {
 		const store = getUserStore((await defaultBucket())._id);
 		expect((await store.findByEmail(moved))?._id).toBe(user._id);
 		expect(await store.findByEmail(previous)).toBeNull();
-	});
-
-	it('lets a username be taken again once its user is deleted', async () => {
-		const userName = `released-${nanoid()}`;
-		const first = await provision(CONN_A, { userName });
-		await removeEndUser(
-			await defaultBucket(),
-			CONN_A,
-			first._id,
-			async () => {}
-		);
-
-		const second = await provision(CONN_A, { userName });
-
-		expect(second.userName).toBe(userName);
 	});
 });

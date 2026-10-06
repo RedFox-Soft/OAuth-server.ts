@@ -183,6 +183,24 @@ export interface EndUserQueryResult {
 	totalResults: number;
 }
 
+/*
+ * Identity and profile fields written in the same insert as the account, so the unique indexes decide a race
+ * for one username or external identifier atomically. Writing them in a follow-up update — which is what
+ * create() used to require — left an account behind without them whenever that update collided.
+ */
+export type EndUserCreateFields = Partial<
+	Pick<
+		User,
+		| 'userName'
+		| 'externalId'
+		| 'provisionedBy'
+		| 'profile'
+		| 'claims'
+		/* A directory may create a user already deactivated (RFC 7643 `active: false`). */
+		| 'active'
+	>
+>;
+
 /* The fields an update may carry. The derived keys are not among them: the store computes those. */
 export type EndUserPatch = Partial<
 	Pick<
@@ -377,7 +395,8 @@ export interface UserStoreInstance {
 		password: string,
 		roles?: string[],
 		verified?: boolean,
-		id?: string
+		id?: string,
+		fields?: EndUserCreateFields
 	): Promise<User>;
 	/*
 	 * Resolve an account by the upstream identity it holds. A point read in MongoDB, served by the
@@ -608,9 +627,15 @@ export const AdminAuditEntry = t.Object({
 	 * The actor stays the administrator. These record *who else* was involved, never instead of them,
 	 * which is what lets the constitution's "attributable to the agent and the authorizing principal"
 	 * hold without redefining an existing field.
+	 *
+	 * `scim` is the one surface whose actor is not an administrator: a provisioning connection acting
+	 * under its own credential, recorded as the sentinel `connection:<id>` in `actorId`. It carries no
+	 * `viaClientId`, because the connection is the actor rather than an agent standing beside one.
 	 */
 	viaClientId: t.Optional(t.Union([t.String(), t.Null()])),
-	viaSurface: t.Optional(t.Union([t.Literal('mcp'), t.Null()])),
+	viaSurface: t.Optional(
+		t.Union([t.Literal('mcp'), t.Literal('scim'), t.Null()])
+	),
 	timestamp: t.Date()
 });
 export type AdminAuditEntry = Static<typeof AdminAuditEntry>;
@@ -727,7 +752,8 @@ export const ErrorSurface = t.Union([
 	t.Literal('oauth'),
 	t.Literal('admin'),
 	t.Literal('mcp'),
-	t.Literal('interaction')
+	t.Literal('interaction'),
+	t.Literal('scim')
 ]);
 export type ErrorSurface = Static<typeof ErrorSurface>;
 
@@ -1167,6 +1193,113 @@ export interface ProtectedResourceStoreInstance {
 
 export interface ProtectedResourceStoreConstructor {
 	new (): ProtectedResourceStoreInstance;
+}
+
+/*
+ * Which upstream ID-token claim names the same person as which SCIM attribute. The link between a SCIM
+ * record and a federated sign-in is decided by this pair and never by an email address (specs/070 R14).
+ */
+export const ConnectionCorrelation = t.Object(
+	{
+		claim: t.String({ minLength: 1, maxLength: 64 }),
+		attribute: t.Union([t.Literal('externalId'), t.Literal('userName')])
+	},
+	{ additionalProperties: false }
+);
+export type ConnectionCorrelation = Static<typeof ConnectionCorrelation>;
+
+/* Public keys only; `lib/models/client/keystore.ts` refuses private and symmetric members on resolution. */
+export const KeyCredential = t.Object({
+	kind: t.Literal('key'),
+	jwks: t.Optional(
+		t.Object({ keys: t.Array(t.Record(t.String(), t.Unknown())) })
+	),
+	jwksUri: t.Optional(t.String()),
+	signingAlg: t.Optional(t.String()),
+	issuedAt: t.Date()
+});
+export type KeyCredential = Static<typeof KeyCredential>;
+
+/* The secret itself is shown once at issue and never stored: only its SHA-256 digest is. */
+export const SecretCredential = t.Object({
+	kind: t.Literal('secret'),
+	digest: t.String(),
+	issuedAt: t.Date()
+});
+export type SecretCredential = Static<typeof SecretCredential>;
+
+/*
+ * One customer directory's right to provision one bucket over SCIM. Its `_id` is what an end user's
+ * `provisionedBy` holds, and `scim-<_id>` is the OAuth client the key and secret credentials authenticate
+ * as — synthesized from this record on resolution, never stored (specs/070 R2).
+ *
+ * `providerKey` is derived by the store from `bucketId` and `providerId` and never accepted from a caller,
+ * so "one connection per provider" is a unique index rather than a rule a route has to remember.
+ */
+export const ProvisioningConnection = t.Object({
+	_id: t.String(),
+	bucketId: t.String(),
+	displayName: t.String(),
+	enabled: t.Boolean(),
+	providerId: t.String(),
+	providerKey: t.String(),
+	correlation: ConnectionCorrelation,
+	emailTrust: t.Union([t.Literal('trusted'), t.Literal('untrusted')]),
+	oauthCredential: t.Union([KeyCredential, SecretCredential, t.Null()]),
+	staticTokenDigest: t.Optional(t.String()),
+	staticTokenIssuedAt: t.Optional(t.Date()),
+	lastUsedAt: t.Optional(t.Date()),
+	createdAt: t.Date(),
+	updatedAt: t.Date()
+});
+export type ProvisioningConnection = Static<typeof ProvisioningConnection>;
+
+/* A key present with an undefined value removes the field, as in the user store. */
+export type ProvisioningConnectionPatch = Partial<
+	Pick<
+		ProvisioningConnection,
+		| 'displayName'
+		| 'enabled'
+		| 'correlation'
+		| 'emailTrust'
+		| 'oauthCredential'
+		| 'staticTokenDigest'
+		| 'staticTokenIssuedAt'
+	>
+>;
+
+export type NewProvisioningConnection = Omit<
+	ProvisioningConnection,
+	'providerKey' | 'createdAt' | 'updatedAt'
+>;
+
+export interface ProvisioningConnectionStoreInstance {
+	/* Throws `UniqueValueTaken` (field `provider` or `staticToken`) when a unique key is already held. */
+	create(
+		connection: NewProvisioningConnection
+	): Promise<ProvisioningConnection>;
+	find(id: string): Promise<ProvisioningConnection | null>;
+	listByBucket(bucketId: string): Promise<ProvisioningConnection[]>;
+	findByProvider(
+		bucketId: string,
+		providerId: string
+	): Promise<ProvisioningConnection | null>;
+	findByStaticTokenDigest(
+		digest: string
+	): Promise<ProvisioningConnection | null>;
+	update(
+		id: string,
+		patch: ProvisioningConnectionPatch
+	): Promise<ProvisioningConnection | null>;
+	/* Writes `lastUsedAt` only, so a request's bookkeeping never races an administrator's edit. */
+	touch(id: string, at: Date): Promise<void>;
+	destroy(id: string): Promise<void>;
+	/* Answers the ids removed, because the bucket-delete route revokes each connection's tokens after. */
+	destroyByBucket(bucketId: string): Promise<string[]>;
+}
+
+export interface ProvisioningConnectionStoreConstructor {
+	new (): ProvisioningConnectionStoreInstance;
 }
 
 /*

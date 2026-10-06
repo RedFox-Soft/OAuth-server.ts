@@ -128,4 +128,7 @@ the stored object replaces the default whole (the same trap [[amr-reporting]] re
 - [[deletion-and-revocation]] — the cascade engine this reuses, and the three operations it distinguishes.
 - [[account-resolution]] — where `canSignIn` is enforced on every token issuance.
 - [[admin-audit-trail]] — why the sweep report cannot be in the entry.
-- [[upstream-federation]] — the sign-in path provisioned users will use (part 2).
+- [[upstream-federation]] — the sign-in path provisioned users use, through the correlation step part 2 added.
+- [[scim-provisioning]] — part 2 (spec 070): connections now exist, write through this service as the
+  `connection` actor, and `createEndUser` writes the identity fields in one insert (it used a follow-up
+  update, which left a half-made account behind whenever that update collided).

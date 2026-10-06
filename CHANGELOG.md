@@ -11,6 +11,12 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- **An enterprise directory can provision a bucket's users over SCIM 2.0.** An administrator connects
+  Microsoft Entra ID, Okta or any SCIM client to a bucket through a provisioning connection bound to one of
+  its sign-in providers; the directory then creates, updates, deactivates and deletes users at
+  `<bucket issuer>/scim/v2`, and they sign in through the same provider, matched by the directory's own
+  identifier rather than by email. Targets the OpenID IPSIE SCIM profile (AL1, AL2), with each deviation
+  behind a setting — see `CONFORMANCE.md`. Off by default (`scim.enabled`).
 - **The claims each scope releases are a setting an operator can edit.** `claims` joins the settings
   catalog as a JSON value, so `profile`, `email`, `address` and `phone` — or any scope of your own — can
   be defined from the console or by an agent and are advertised in discovery as soon as they are saved.

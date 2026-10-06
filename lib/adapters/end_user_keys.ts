@@ -1,4 +1,9 @@
-import type { EndUserFilter, EndUserPatch, User } from './types.js';
+import type {
+	EndUserCreateFields,
+	EndUserFilter,
+	EndUserPatch,
+	User
+} from './types.js';
 
 /*
  * The derived keys every user store maintains and every unique index on them holds. One definition for the
@@ -39,6 +44,24 @@ export function derivedKeysOf(
 				? externalIdKeyOf(user.provisionedBy, user.externalId)
 				: undefined
 	};
+}
+
+/*
+ * A new account with its identity fields and their derived keys, ready for one insert. Undefined members are
+ * left out rather than written, so no backend stores a key a unique index would then see as a value.
+ */
+export function withCreateFields(
+	user: User,
+	fields: EndUserCreateFields = {}
+): User {
+	const full: User = { ...user };
+	for (const [field, value] of Object.entries(fields)) {
+		if (value !== undefined) Object.assign(full, { [field]: value });
+	}
+	for (const [field, value] of Object.entries(derivedKeysOf(full))) {
+		if (value !== undefined) Object.assign(full, { [field]: value });
+	}
+	return full;
 }
 
 /* Whether a patch touches a field the derived keys are computed from. */
