@@ -30,8 +30,9 @@ import {
  * Tolerances, all governed by `scim.strict` (spec FR-034a): an operation name in any case, a path-less
  * add/replace (Okta's deactivation, Entra's multi-attribute updates), booleans as strings, a path naming
  * `password` or an attribute this server does not store (ignored), and a `replace` through a `type` filter
- * that matches nothing (Entra setting a work email the user did not have yet — appended). In strict mode
- * each is refused with 400.
+ * that matches nothing (Entra setting a work email the user did not have yet — appended), the manager
+ * given as its bare id, and a `replace` of the manager with an empty string meaning remove it (both Entra).
+ * In strict mode each is refused with 400.
  */
 
 type Op = 'add' | 'replace' | 'remove';
@@ -328,6 +329,23 @@ function applyToAttribute(
 		return;
 	}
 
+	if (
+		op !== 'remove' &&
+		value === '' &&
+		attribute.type === 'complex' &&
+		!attribute.multiValued
+	) {
+		/* Entra removes the manager with `replace` and an empty string rather than `remove`. */
+		if (leniency.strict) {
+			throw new ScimError(
+				400,
+				'invalidValue',
+				`${key} cannot be set to an empty string; remove it instead`
+			);
+		}
+		delete container[key];
+		return;
+	}
 	if (op === 'remove') {
 		delete container[key];
 		return;

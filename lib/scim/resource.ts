@@ -170,6 +170,21 @@ export function canonicalValue(
 		return readBoolean(value, attribute.name, leniency);
 	}
 	if (attribute.type !== 'complex') return value;
+	if (
+		!attribute.multiValued &&
+		typeof value === 'string' &&
+		attributeNamed(attribute.subAttributes ?? [], 'value')
+	) {
+		/* Entra sends the manager as the bare id, `"manager": "<id>"` (research R21). */
+		if (leniency.strict) {
+			throw new ScimError(
+				400,
+				'invalidSyntax',
+				`${attribute.name} must be an object`
+			);
+		}
+		return { value };
+	}
 	if (attribute.multiValued) {
 		return Array.isArray(value)
 			? value.map((v) =>

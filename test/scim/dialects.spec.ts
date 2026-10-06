@@ -97,6 +97,25 @@ describe('real SCIM clients’ request forms', () => {
 		expect(stored?.email).toBe('entra.three.new@contoso.com');
 	});
 
+	it('sets, replaces and clears the manager the way Entra sends it', async () => {
+		const id = await create('entra.four@contoso.com');
+		const path = `${ENTERPRISE}:manager`;
+
+		const added = await patch(id, [{ op: 'Add', path, value: 'mgr-1' }]);
+		const replaced = await patch(id, [{ op: 'Replace', path, value: 'mgr-2' }]);
+		const cleared = await patch(id, [{ op: 'Replace', path, value: '' }]);
+
+		expect(added.status).toBe(200);
+		expect(added.json[ENTERPRISE]).toMatchObject({
+			manager: { value: 'mgr-1' }
+		});
+		expect(replaced.json[ENTERPRISE]).toMatchObject({
+			manager: { value: 'mgr-2' }
+		});
+		expect(cleared.status).toBe(200);
+		expect(cleared.json[ENTERPRISE]).not.toHaveProperty('manager');
+	});
+
 	it('deactivates a user on Okta’s path-less replace', async () => {
 		const id = await create('okta.one@contoso.com');
 
@@ -132,6 +151,12 @@ describe('real SCIM clients’ request forms', () => {
 				await patch(id, [{ op: 'Replace', path: 'active', value: false }]),
 				await patch(id, [{ op: 'replace', path: 'active', value: 'False' }]),
 				await patch(id, [{ op: 'replace', path: 'addresses', value: [] }]),
+				await patch(id, [
+					{ op: 'replace', path: `${ENTERPRISE}:manager`, value: 'mgr-1' }
+				]),
+				await patch(id, [
+					{ op: 'replace', path: `${ENTERPRISE}:manager`, value: '' }
+				]),
 				await scim('POST', `${c.base}/Users`, {
 					token: c.token,
 					body: scimUser('strict.two@contoso.com', { password: 'x' })

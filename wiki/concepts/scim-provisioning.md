@@ -139,8 +139,10 @@ catalog (`lib/admin/settings/catalog.ts`).
 - **`scim.strict`** (off, `:800`), inverted — off means tolerant. The interop profile (§6.5.1.1) requires
   refusing a path-less PATCH and unknown attributes, and IPSIE §6.1.2 forbids `password`. **Off because both
   v1 clients would fail strict**: Okta deactivates with a path-less PATCH and sends `password` on every create;
-  Entra sends path-less multi-attribute replaces, `"False"`, capitalised operations, and `addresses` in its
-  default mappings. On: each of those is a 400, and `/ServiceProviderConfig` declares
+  Entra sends path-less multi-attribute replaces, `"False"`, capitalised operations, `addresses` in its
+  default mappings, and the enterprise `manager` as its bare id — `"value": "<id>"` to set it, `""` in a
+  `replace` to clear it (`lib/scim/resource.ts`, `lib/scim/patch.ts`; found by Microsoft's SCIM validator on
+  2026-10-06, which failed Add/Replace/Remove Manager until then). On: each of those is a 400, and `/ServiceProviderConfig` declares
   `interopProfileConformant` — the only mode in which it does. **One switch rather than one per tolerance**,
   because no partial combination is conformant and the operator's question is a single one: certifying
   against the profiles, or connecting Entra and Okta. RFC 7644 itself permits a path-less `add`/`replace`;

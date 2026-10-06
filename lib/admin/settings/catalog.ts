@@ -806,7 +806,7 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 		dependsOn: 'scim.enabled',
 		risk: 'security',
 		description:
-			'Off (the default), the server accepts the request forms Entra ID and Okta actually send: a PATCH without a path, an operation name in capitals, true or false written as a string, attributes this server does not store (they are ignored), and a password (ignored, never stored). On, each of those is refused with 400 and the server declares conformance to the SCIM 2.0 Interoperability Profile (§6.5.1.1) and the OpenID IPSIE SCIM profile (§6.1.2). Turn it on only if you certify against those profiles: with it on, Okta cannot deactivate users or create them, and Entra with its default attribute mappings fails.'
+			'Off (the default), the server accepts the request forms Entra ID and Okta actually send: a PATCH without a path, an operation name in capitals, true or false written as a string, a manager given as a bare id or cleared with an empty string, attributes this server does not store (they are ignored), and a password (ignored, never stored). On, each of those is refused with 400 and the server declares conformance to the SCIM 2.0 Interoperability Profile (§6.5.1.1) and the OpenID IPSIE SCIM profile (§6.1.2). Turn it on only if you certify against those profiles: with it on, Okta cannot deactivate users or create them, and Entra with its default attribute mappings fails.'
 	},
 	{
 		key: 'scim.rateLimit.max',
