@@ -231,14 +231,6 @@ describe('Back-Channel Logout 1.0', () => {
 			expect(typeof sidOf(rtData.id_token)).toBe('string');
 		});
 
-		// SKIPPED (source bug, not obsolete): lib/actions/end_session.ts reads the top-level
-		// `session.authorizations` (line 158) and `session.accountId` (line 168), but these
-		// accessors were removed with IN_PAYLOAD — on a reconstructed Session instance they are
-		// undefined (only `session.payload.*` is populated). As a result the confirm handler's
-		// backchannel loop iterates over `Object.keys(undefined || {})` === [] and never invokes
-		// any client's backchannelLogout. These 3 cases cannot pass until the source reads
-		// `session.payload.authorizations` / `session.payload.accountId`. Verified: endpoint
-		// returns 303 but no logout token is ever POSTed.
 		it('triggers the backchannelLogout for all visited clients [when global logout]', async function () {
 			const session = setup.getSession();
 			session.state = {

@@ -144,12 +144,6 @@ describe('settings catalog presentation metadata', () => {
 				'scim.strict'
 			].sort()
 		);
-		/*
-		 * `dpop.allowReplay` was the seventh until the settings audit demoted it to boot configuration.
-		 * A flag is only useful on a setting the console can reach, so its absence here follows from its
-		 * absence from the catalog — asserted at the source in settings_catalog.spec.ts.
-		 */
-		expect(flagged).not.toContain('dpop.allowReplay');
 	});
 
 	it('admits no risk value other than the declared one', () => {
