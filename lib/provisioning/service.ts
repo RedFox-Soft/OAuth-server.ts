@@ -7,6 +7,7 @@ import {
 } from '../adapters/index.js';
 import type {
 	ConnectionCorrelation,
+	DeprovisioningThreshold,
 	KeyCredential,
 	ProvisioningConnection,
 	ProvisioningConnectionPatch,
@@ -86,6 +87,8 @@ export interface CreateConnectionInput {
 	providerId: string;
 	correlation?: ConnectionCorrelation;
 	emailTrust?: 'trusted' | 'untrusted';
+	/* The mass-deprovisioning guard; absent or `null` leaves it off, the default (specs/072 FR-017). */
+	threshold?: DeprovisioningThreshold | null;
 }
 
 /*
@@ -131,7 +134,8 @@ export async function createConnection(
 			providerId: provider.id,
 			correlation: input.correlation ?? defaultCorrelationFor(provider),
 			emailTrust: input.emailTrust ?? 'untrusted',
-			oauthCredential: null
+			oauthCredential: null,
+			...(input.threshold ? { threshold: { ...input.threshold } } : {})
 		});
 	} catch (error) {
 		if (isUniqueValueTaken(error)) {
@@ -160,21 +164,59 @@ export interface UpdateConnectionInput {
 	enabled?: boolean;
 	correlation?: ConnectionCorrelation;
 	emailTrust?: 'trusted' | 'untrusted';
+	/* A threshold sets or changes the guard; `null` removes it; absent leaves it as it is. */
+	threshold?: DeprovisioningThreshold | null;
 }
 
+function sameThreshold(
+	a: DeprovisioningThreshold | undefined,
+	b: DeprovisioningThreshold | null
+): boolean {
+	return (
+		(a === undefined && b === null) ||
+		(a !== undefined &&
+			b !== null &&
+			a.count === b.count &&
+			a.windowSeconds === b.windowSeconds)
+	);
+}
+
+/*
+ * No field here reaches the hold: `enabled`, a new threshold or any other edit leaves a held connection held,
+ * because only an explicit release may end it (FR-023). Removing the threshold is refused while held, so a hold
+ * never outlives the guard that set it without an administrator having released it first.
+ */
 export async function updateConnection(
 	bucket: UserBucket,
 	connectionId: string,
 	input: UpdateConnectionInput,
 	record: RecordChange
 ): Promise<ProvisioningConnection> {
-	await loadConnection(bucket, connectionId);
+	const connection = await loadConnection(bucket, connectionId);
 	assertCorrelation(input.correlation);
 	const patch: ProvisioningConnectionPatch = {};
 	if (input.displayName !== undefined) patch.displayName = input.displayName;
 	if (input.enabled !== undefined) patch.enabled = input.enabled;
 	if (input.correlation !== undefined) patch.correlation = input.correlation;
 	if (input.emailTrust !== undefined) patch.emailTrust = input.emailTrust;
+	if (
+		input.threshold !== undefined &&
+		!sameThreshold(connection.threshold, input.threshold)
+	) {
+		if (input.threshold === null && connection.hold) {
+			throw new ProvisioningError(
+				409,
+				'the connection is held; release the hold before removing the guard'
+			);
+		}
+		/* An undefined value removes the field (the stores' patch convention). */
+		patch.threshold = input.threshold ?? undefined;
+		/*
+		 * A changed or removed threshold starts the count afresh (FR-024): the slots taken under the old one
+		 * were sized and timed by it, and are left to expire under the old generation's ids.
+		 */
+		patch.tallyEpoch = (connection.tallyEpoch ?? 0) + 1;
+	}
 
 	await record();
 	const updated = await store().update(connectionId, patch);
@@ -384,6 +426,28 @@ export async function revokeCredential(
 	return updated;
 }
 
+/*
+ * Ends a connection's hold and restarts its count, in one write (FR-023). Refused when the connection is not
+ * held, so a release in the trail always ended a hold. The store re-checks the hold in the same write, which is
+ * what settles two administrators releasing together: the second is told the connection is not held.
+ */
+export async function releaseConnection(
+	bucket: UserBucket,
+	connectionId: string,
+	record: RecordChange
+): Promise<ProvisioningConnection> {
+	const connection = await loadConnection(bucket, connectionId);
+	if (!connection.hold) {
+		throw new ProvisioningError(409, 'the connection is not held');
+	}
+	await record();
+	const released = await store().releaseHold(connection._id);
+	if (!released) {
+		throw new ProvisioningError(409, 'the connection is not held');
+	}
+	return released;
+}
+
 /* Revokes every token a bucket's connections obtained; called by the bucket-delete route after the users go. */
 export async function destroyConnectionsOf(
 	bucketId: string
@@ -421,6 +485,10 @@ export interface ConnectionView {
 		| { kind: 'secret'; issuedAt: string }
 		| null;
 	staticToken: { issuedAt: string } | null;
+	/* The mass-deprovisioning guard, absent when off. The tally's generation is bookkeeping and never shown. */
+	threshold?: DeprovisioningThreshold;
+	/* Present while held: when it began, and the threshold count that was reached. */
+	hold?: { since: string; count: number };
 	managedUsers: number;
 	lastUsedAt: string | null;
 	createdAt: string;
@@ -482,6 +550,15 @@ export function presentConnection(
 		staticToken: connection.staticTokenIssuedAt
 			? { issuedAt: connection.staticTokenIssuedAt.toISOString() }
 			: null,
+		...(connection.threshold ? { threshold: { ...connection.threshold } } : {}),
+		...(connection.hold
+			? {
+					hold: {
+						since: connection.hold.since.toISOString(),
+						count: connection.hold.count
+					}
+				}
+			: {}),
 		managedUsers,
 		lastUsedAt: connection.lastUsedAt?.toISOString() ?? null,
 		createdAt: connection.createdAt.toISOString(),

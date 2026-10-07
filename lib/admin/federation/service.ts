@@ -18,12 +18,16 @@ import {
 } from '../../consts/known_providers.js';
 import type { UserBucket } from '../../adapters/types.js';
 import type { FederationProvider } from '../../federation/types.js';
+import { ApplicationConfig } from '../../configs/application.js';
+import { issuerFor } from '../../configs/issuer.js';
+import { routeNames } from '../../consts/param_list.js';
 import {
 	CredentialError,
 	clientCredential
 } from '../../federation/credential.js';
 import {
 	assertAppleIdentifiers,
+	assertCanAcceptRevocation,
 	assertClientIdShape,
 	assertEmailDomains,
 	assertIssuer,
@@ -49,7 +53,10 @@ import {
  * Applied on every read, for every role including super-admin: the value is write-only, and the audit
  * trail's names-not-values rule means it cannot reach a reader that way either.
  */
-export function present(provider: FederationProvider) {
+export function present(
+	provider: FederationProvider,
+	bucket?: Pick<UserBucket, '_id' | 'slug' | 'host'>
+) {
 	/*
 	 * Both secret-bearing fields, and masked only where one is actually stored — so a reader can still tell
 	 * "a value is held" from "none is", which is what the mask exists for.
@@ -64,12 +71,30 @@ export function present(provider: FederationProvider) {
 	return {
 		...provider,
 		...(provider.clientSecret ? { clientSecret: SECRET_MASK } : {}),
-		...(provider.signingKey ? { signingKey: SECRET_MASK } : {})
+		...(provider.signingKey ? { signingKey: SECRET_MASK } : {}),
+		/*
+		 * The address an administrator pastes into the provider's logout configuration (specs/072 FR-005), shown
+		 * only while it would be answered — an address that 404s is worse than none.
+		 */
+		...(bucket &&
+		provider.acceptsGlobalTokenRevocation === true &&
+		ApplicationConfig['globalTokenRevocation.enabled'] === true
+			? {
+					globalTokenRevocationEndpoint: `${issuerFor(bucket)}${routeNames.global_token_revocation}`
+				}
+			: {})
 	};
 }
 
-export function presentAll(bucket: Pick<UserBucket, 'federation'>) {
-	return (bucket.federation ?? []).map(present);
+/* A caller holding only the providers gets no endpoint address, since there is no issuer to build it from. */
+export function presentAll(
+	bucket: Pick<UserBucket, 'federation'> &
+		Partial<Pick<UserBucket, '_id' | 'slug' | 'host'>>
+) {
+	const { _id } = bucket;
+	return (bucket.federation ?? []).map((provider) =>
+		present(provider, _id === undefined ? undefined : { ...bucket, _id })
+	);
 }
 
 function providersOf(bucket: Pick<UserBucket, 'federation'>) {
@@ -226,6 +251,7 @@ export async function createProvider(
 		provisioning?: 'jit' | 'existing_only';
 		allowedEmailDomains?: string[];
 		emailClaim?: string;
+		acceptsGlobalTokenRevocation?: boolean;
 	}
 ): Promise<FederationProvider> {
 	const existing = providersOf(bucket);
@@ -291,10 +317,13 @@ export async function createProvider(
 		emailTrusted: body.emailTrusted ?? entry?.emailTrusted ?? false,
 		provisioning: body.provisioning ?? 'jit',
 		allowedEmailDomains: body.allowedEmailDomains ?? [],
-		emailClaim: body.emailClaim ?? entry?.emailClaim ?? 'email'
+		emailClaim: body.emailClaim ?? entry?.emailClaim ?? 'email',
+		/* Opted into deliberately: it lets a third party end any of this provider's users' sessions here. */
+		acceptsGlobalTokenRevocation: body.acceptsGlobalTokenRevocation ?? false
 	};
 
 	assertScopes(provider.scopes, entry?.protocol.kind ?? 'oidc');
+	assertCanAcceptRevocation(provider, entry?.protocol.kind ?? 'oidc');
 	assertEmailDomains(provider.allowedEmailDomains);
 	if (provider.tenant) assertTenant(provider.tenant);
 	if (provider.teamId || provider.keyId) {
@@ -345,6 +374,7 @@ export async function updateProvider(
 		await assertIssuerResolves(next.issuer);
 	}
 	assertScopes(next.scopes, entry?.protocol.kind ?? 'oidc');
+	assertCanAcceptRevocation(next, entry?.protocol.kind ?? 'oidc');
 	assertEmailDomains(next.allowedEmailDomains);
 	if (next.tenant) assertTenant(next.tenant);
 	if (next.teamId || next.keyId) {

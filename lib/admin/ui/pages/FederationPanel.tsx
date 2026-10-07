@@ -40,7 +40,13 @@ interface ProviderValues {
 	allowedEmailDomains?: string[];
 	emailClaim?: string;
 	enabled?: boolean;
+	acceptsGlobalTokenRevocation?: boolean;
 }
+
+/* A provider as the API presents it: the address to paste into its logout settings rides along when it applies. */
+type PresentedProvider = FederationProvider & {
+	globalTokenRevocationEndpoint?: string;
+};
 
 /*
  * What the server says it takes to connect a recognised provider to this bucket.
@@ -112,10 +118,10 @@ export function FederationPanel({
 	onChanged?: () => void;
 }) {
 	const base = `/admin/api/buckets/${encodeURIComponent(bucketId)}/federation`;
-	const [rows, setRows] = useState<FederationProvider[]>([]);
+	const [rows, setRows] = useState<PresentedProvider[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [open, setOpen] = useState(false);
-	const [editing, setEditing] = useState<FederationProvider | null>(null);
+	const [editing, setEditing] = useState<PresentedProvider | null>(null);
 	const [saving, setSaving] = useState(false);
 	const [form] = Form.useForm<ProviderValues>();
 	const [guidance, setGuidance] = useState<Guidance[]>([]);
@@ -356,6 +362,9 @@ export function FederationPanel({
 						render: (_, row) => (
 							<Space size={4}>
 								{row.emailTrusted && <Tag color="blue">trusted</Tag>}
+								{row.acceptsGlobalTokenRevocation && (
+									<Tag color="purple">Universal Logout</Tag>
+								)}
 								<Tag>
 									{row.provisioning === 'jit' ? 'auto-create' : 'existing only'}
 								</Tag>
@@ -643,7 +652,8 @@ export function FederationPanel({
 						scopes: ['openid', 'email', 'profile'],
 						provisioning: 'jit',
 						emailClaim: 'email',
-						enabled: true
+						enabled: true,
+						acceptsGlobalTokenRevocation: false
 					}}
 				>
 					{!editing && (
@@ -728,6 +738,24 @@ export function FederationPanel({
 					>
 						<Switch />
 					</Form.Item>
+					<Form.Item
+						name="acceptsGlobalTokenRevocation"
+						label="Accept global token revocation (Okta Universal Logout)"
+						tooltip="Lets this provider end everything one of its users holds here — sessions and tokens — with a request signed by its own keys. The account is not deactivated. Also needs Global Token Revocation switched on in Settings."
+						valuePropName="checked"
+					>
+						<Switch />
+					</Form.Item>
+					{editing?.globalTokenRevocationEndpoint && (
+						<Form.Item label="Logout endpoint to give the provider">
+							<Typography.Text
+								copyable
+								code
+							>
+								{editing.globalTokenRevocationEndpoint}
+							</Typography.Text>
+						</Form.Item>
+					)}
 					<Form.Item
 						name="provisioning"
 						label="First-time users"

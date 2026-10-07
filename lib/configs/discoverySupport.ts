@@ -201,6 +201,18 @@ export function calculateDiscovery(
 			issuer,
 			routeNames.backchannel_authentication
 		),
+		/*
+		 * draft-parecki-oauth-global-token-revocation-06 §5. The only method accepted is a JWT signed by the
+		 * calling provider's own key, which is `private_key_jwt` in the IANA token-endpoint registry the draft
+		 * points this member at.
+		 */
+		global_token_revocation_endpoint: endpoint(
+			issuer,
+			routeNames.global_token_revocation
+		),
+		global_token_revocation_endpoint_auth_methods_supported: [
+			'private_key_jwt'
+		],
 
 		scopes_supported: deriveScopes(config),
 		claims_supported: deriveClaimsSupported(config),
@@ -364,6 +376,18 @@ export const metadataClassification: Record<DiscoveryKey, MetadataAudience> = {
 		audience: 'both',
 		registeredBy: 'RFC 8414'
 	},
+	/*
+	 * Never IANA-registered: the draft defining them expired unadopted (2026-08-28), so the revision is the only
+	 * truthful registrar to name.
+	 */
+	global_token_revocation_endpoint: {
+		audience: 'both',
+		registeredBy: 'draft-parecki-oauth-global-token-revocation-06'
+	},
+	global_token_revocation_endpoint_auth_methods_supported: {
+		audience: 'both',
+		registeredBy: 'draft-parecki-oauth-global-token-revocation-06'
+	},
 	code_challenge_methods_supported: {
 		audience: 'both',
 		registeredBy: 'RFC 8414'
@@ -510,6 +534,10 @@ export const featuresKeyMap: Partial<Record<FeatureFlagKey, DiscoveryKey[]>> = {
 		'revocation_endpoint',
 		'revocation_endpoint_auth_methods_supported',
 		'revocation_endpoint_auth_signing_alg_values_supported'
+	],
+	'globalTokenRevocation.enabled': [
+		'global_token_revocation_endpoint',
+		'global_token_revocation_endpoint_auth_methods_supported'
 	],
 	'backchannelLogout.enabled': [
 		'backchannel_logout_supported',

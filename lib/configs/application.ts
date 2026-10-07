@@ -257,6 +257,21 @@ export const ApplicationConfig = {
 	'revocation.enabled': false,
 
 	/*
+	 * globalTokenRevocation.enabled
+	 *
+	 * title: Global Token Revocation (Okta Universal Logout)
+	 *
+	 * description: Serves `<issuer>/global-token-revocation` at each bucket, through which a bucket's
+	 *   upstream identity provider — one an administrator opted in — ends everything a user holds here.
+	 *
+	 * Off by default: it lets a third party end any of its users' sessions here, and it implements an
+	 * individual Internet-Draft (draft-parecki-oauth-global-token-revocation-06) that expired unadopted on
+	 * 2026-08-28, in the shape Okta Universal Logout sends. Isolated behind this flag for that reason
+	 * (Constitution Principle I); see wiki/concepts/global-token-revocation.md.
+	 */
+	'globalTokenRevocation.enabled': false,
+
+	/*
 	 * features.userinfo
 	 *
 	 * description: Enables the UserInfo endpoint.

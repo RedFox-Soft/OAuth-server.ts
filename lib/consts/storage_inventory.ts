@@ -94,6 +94,7 @@ export const MODEL_AREAS = [
 	'BackchannelAuthenticationRequest',
 	'Client',
 	'ClientCredentials',
+	'DeprovisionSlot',
 	'DeviceCode',
 	'FederationState',
 	'Grant',
@@ -399,6 +400,18 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 	 * expiry, so it is the only residue a partial failure would leave unbounded.
 	 */
 	modelArea('RegistrationAccessToken', EXPIRES_AT, byClient),
+	/*
+	 * A provisioning connection's deprovisioning tally (specs/072): a ring of slots, each held for the
+	 * threshold's window by one admitted deprovisioning. Expiry is the mechanism, not housekeeping — a slot
+	 * frees itself exactly one window after it was taken, which is what makes the count a rolling one.
+	 */
+	modelArea(
+		'DeprovisionSlot',
+		EXPIRES_AT,
+		unowned(
+			'keyed by connection and tally epoch; a count, not a record of anyone'
+		)
+	),
 	modelArea(
 		'ReplayDetection',
 		EXPIRES_AT,

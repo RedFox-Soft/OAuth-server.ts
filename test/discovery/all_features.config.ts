@@ -13,6 +13,7 @@ export const ApplicationConfig = {
 	'rpInitiatedLogout.enabled': true,
 	'registration.enabled': true,
 	'revocation.enabled': true,
+	'globalTokenRevocation.enabled': true,
 	'backchannelLogout.enabled': true,
 	'mTLS.enabled': true,
 	'mTLS.certificateBoundAccessTokens': true,

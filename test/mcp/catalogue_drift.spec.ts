@@ -190,6 +190,8 @@ describe('MCP tool catalogue', () => {
 			'jwks_retire',
 			/* Ends a customer's provisioning and revokes its tokens at once. */
 			'provisioning_connection_delete',
+			/* Re-admits the mass deprovisioning a connection's guard held. */
+			'provisioning_connection_release',
 			/* Hands out the authority to change a bucket's people; the secret it returns is shown once. */
 			'provisioning_credential_issue',
 			/*

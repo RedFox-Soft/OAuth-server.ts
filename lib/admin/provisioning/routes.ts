@@ -22,6 +22,7 @@ import {
 	managedUserCount,
 	presentConnection,
 	ProvisioningError,
+	releaseConnection,
 	revokeCredential,
 	updateConnection
 } from '../../provisioning/service.js';
@@ -181,6 +182,29 @@ export const provisioningRoutes = new Elysia({ name: 'admin-provisioning' })
 				);
 			}
 			return { ok: true };
+		}
+	)
+	/*
+	 * Ends a mass-deprovisioning hold and restarts the count: the directory's next retries go through. The
+	 * bucket's edit right, as every other connection write, because what it re-admits is the deprovisioning of
+	 * the bucket's people. 409 when the connection is not held.
+	 */
+	.post(
+		'/admin/api/buckets/:id/provisioning-connections/:connectionId/release',
+		async ({ admin, params }) => {
+			const ctx = assertAuth(admin as AdminContext | null);
+			const bucket = await loadBucketForEdit(ctx, params.id);
+			await asAdmin(
+				releaseConnection(bucket, params.connectionId, () =>
+					recordAdminAudit(
+						ctx,
+						'provisioning.connection.release',
+						params.connectionId,
+						scope(bucket)
+					)
+				)
+			);
+			return asAdmin(view(bucket, params.connectionId));
 		}
 	)
 	/*

@@ -111,6 +111,22 @@ export function assertScopes(
 }
 
 /*
+ * A provider that publishes no signing keys — one read through its own API, like GitHub — cannot authenticate a
+ * global token revocation request, so it cannot be opted in to one (specs/072).
+ */
+export function assertCanAcceptRevocation(
+	provider: Pick<FederationProvider, 'acceptsGlobalTokenRevocation'>,
+	protocol: 'oidc' | 'profile_api'
+): void {
+	if (provider.acceptsGlobalTokenRevocation === true && protocol !== 'oidc') {
+		throw new AdminError(
+			422,
+			'this provider publishes no signing keys, so it cannot accept global token revocation'
+		);
+	}
+}
+
+/*
  * Every value the named provider asks for is present, and none it does not ask for was sent.
  *
  * Driven entirely by the entry's own `requiredValues`, so this function knows about no provider in

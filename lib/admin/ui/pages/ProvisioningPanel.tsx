@@ -6,6 +6,7 @@ import {
 	Drawer,
 	Form,
 	Input,
+	InputNumber,
 	Modal,
 	Popconfirm,
 	Radio,
@@ -95,6 +96,213 @@ function parseJwks(text: string | undefined): {
 
 function when(iso: string | null | undefined): string {
 	return iso ? new Date(iso).toLocaleString() : 'never';
+}
+
+/*
+ * The guard's window, shown in the largest unit that states it exactly. The server takes seconds; an
+ * administrator thinks in minutes, hours or days, so the picker offers those and the bounds are said in them.
+ */
+const WINDOW_UNITS = [
+	{ label: 'minutes', value: 60 },
+	{ label: 'hours', value: 3600 },
+	{ label: 'days', value: 86400 }
+];
+const MIN_WINDOW_SECONDS = 300;
+const MAX_WINDOW_SECONDS = 604800;
+
+function windowParts(seconds: number): { amount: number; unit: number } {
+	const unit =
+		[...WINDOW_UNITS].reverse().find((u) => seconds % u.value === 0)?.value ??
+		60;
+	return { amount: seconds / unit, unit };
+}
+
+function describeWindow(seconds: number): string {
+	const { amount, unit } = windowParts(seconds);
+	const label = WINDOW_UNITS.find((u) => u.value === unit)?.label ?? 'minutes';
+	return `${amount} ${amount === 1 ? label.replace(/s$/, '') : label}`;
+}
+
+interface GuardValues {
+	on: boolean;
+	count?: number;
+	windowAmount?: number;
+	windowUnit: number;
+}
+
+type Threshold = { count: number; windowSeconds: number };
+
+/*
+ * The mass-deprovisioning guard of one connection: off by default, and when turned on it suggests 500 within
+ * one hour (specs/072 FR-017). Saving sends the whole threshold, or `null` to remove it — which the server
+ * refuses while the connection is held, so a hold is only ever ended by the release beside it.
+ */
+function DeprovisioningGuard({
+	connection,
+	onSave,
+	onRelease
+}: {
+	connection: ConnectionView;
+	onSave: (threshold: Threshold | null) => Promise<boolean>;
+	onRelease: () => Promise<boolean>;
+}) {
+	const [form] = Form.useForm<GuardValues>();
+	const [saving, setSaving] = useState(false);
+	const on = Form.useWatch('on', form);
+	const current = connection.threshold;
+	const held = connection.hold;
+	const initial: GuardValues = current
+		? {
+				on: true,
+				count: current.count,
+				windowAmount: windowParts(current.windowSeconds).amount,
+				windowUnit: windowParts(current.windowSeconds).unit
+			}
+		: { on: false, count: 500, windowAmount: 1, windowUnit: 3600 };
+
+	async function submit(values: GuardValues) {
+		setSaving(true);
+		try {
+			await onSave(
+				values.on
+					? {
+							count: values.count ?? 500,
+							windowSeconds: (values.windowAmount ?? 1) * values.windowUnit
+						}
+					: null
+			);
+		} finally {
+			setSaving(false);
+		}
+	}
+
+	return (
+		<Space
+			direction="vertical"
+			size="small"
+			style={{ width: '100%' }}
+		>
+			<Typography.Title
+				level={5}
+				style={{ margin: 0 }}
+			>
+				Mass-deprovisioning guard
+			</Typography.Title>
+			{held && (
+				<Alert
+					type="error"
+					showIcon
+					message={`Held since ${when(held.since)}, after ${held.count} deprovisioning${held.count === 1 ? '' : 's'}`}
+					description="Every deactivation and deletion from the directory is refused and retried later; creates and updates still go through. The people it is trying to remove keep their access until the hold is released."
+					action={
+						<Popconfirm
+							title="Release the hold?"
+							description="The directory's retried deactivations and deletions go through, and those people lose access at once. Check the directory for the mistake that tripped the guard first. The count starts again from zero."
+							okText="Release"
+							okButtonProps={{ danger: true }}
+							onConfirm={() => onRelease()}
+						>
+							<Button
+								size="small"
+								danger
+							>
+								Release
+							</Button>
+						</Popconfirm>
+					}
+				/>
+			)}
+			<Typography.Paragraph type="secondary">
+				Holds the connection when the directory deactivates or deletes more
+				people than this within the window, so a wrong rule in the directory
+				cannot remove everyone. Off by default: while held, people the directory
+				removes keep their access until an administrator releases the hold.
+			</Typography.Paragraph>
+			<Form<GuardValues>
+				form={form}
+				layout="inline"
+				initialValues={initial}
+				onFinish={(values) => void submit(values)}
+			>
+				<Form.Item
+					name="on"
+					valuePropName="checked"
+					tooltip={
+						held && current
+							? 'Release the hold before turning the guard off'
+							: undefined
+					}
+				>
+					<Switch
+						aria-label="Mass-deprovisioning guard"
+						disabled={held !== undefined && current !== undefined}
+					/>
+				</Form.Item>
+				{on && (
+					<>
+						<Form.Item
+							name="count"
+							label="At most"
+							rules={[{ required: true }]}
+						>
+							<InputNumber
+								min={1}
+								max={100000}
+								precision={0}
+								style={{ width: 110 }}
+							/>
+						</Form.Item>
+						<Form.Item
+							name="windowAmount"
+							label="within"
+							dependencies={['windowUnit']}
+							rules={[
+								{ required: true },
+								({ getFieldValue }) => ({
+									validator: async (_rule, amount: number | undefined) => {
+										const seconds =
+											(amount ?? 0) * Number(getFieldValue('windowUnit'));
+										if (
+											seconds < MIN_WINDOW_SECONDS ||
+											seconds > MAX_WINDOW_SECONDS
+										) {
+											throw new Error('between 5 minutes and 7 days');
+										}
+									}
+								})
+							]}
+						>
+							<InputNumber
+								min={1}
+								precision={0}
+								style={{ width: 80 }}
+							/>
+						</Form.Item>
+						<Form.Item name="windowUnit">
+							<Select
+								options={WINDOW_UNITS}
+								style={{ width: 110 }}
+							/>
+						</Form.Item>
+					</>
+				)}
+				<Form.Item>
+					<Button
+						htmlType="submit"
+						loading={saving}
+					>
+						Save
+					</Button>
+				</Form.Item>
+			</Form>
+			{current && (
+				<Typography.Text type="secondary">
+					In force: at most {current.count} within{' '}
+					{describeWindow(current.windowSeconds)}.
+				</Typography.Text>
+			)}
+		</Space>
+	);
 }
 
 /* A value an administrator carries into somebody else's console, offered as one copy action. */
@@ -233,6 +441,35 @@ export function ProvisioningPanel({
 		} finally {
 			setSaving(false);
 		}
+	}
+
+	async function saveThreshold(
+		row: ConnectionView,
+		threshold: Threshold | null
+	): Promise<boolean> {
+		if (
+			!(await send(`${base}/${encodeURIComponent(row.id)}`, 'PATCH', {
+				threshold
+			}))
+		) {
+			return false;
+		}
+		message.success(
+			threshold ? 'mass-deprovisioning guard saved' : 'guard removed'
+		);
+		await changed('changed');
+		return true;
+	}
+
+	async function release(row: ConnectionView): Promise<boolean> {
+		if (
+			!(await send(`${base}/${encodeURIComponent(row.id)}/release`, 'POST'))
+		) {
+			return false;
+		}
+		message.success('hold released — the directory’s retries will go through');
+		await changed('changed');
+		return true;
 	}
 
 	async function onToggle(row: ConnectionView, enabled: boolean) {
@@ -379,7 +616,22 @@ export function ProvisioningPanel({
 				dataSource={rows}
 				pagination={false}
 				columns={[
-					{ title: 'Name', dataIndex: 'displayName' },
+					{
+						title: 'Name',
+						dataIndex: 'displayName',
+						render: (name: string, row) => (
+							<Space size={4}>
+								{name}
+								{row.hold && (
+									<Tooltip
+										title={`Mass-deprovisioning guard tripped ${when(row.hold.since)} — open Setup to release`}
+									>
+										<Tag color="red">Held</Tag>
+									</Tooltip>
+								)}
+							</Space>
+						)
+					},
 					{ title: 'Provider', dataIndex: 'providerId' },
 					{
 						title: 'Enabled',
@@ -706,6 +958,14 @@ export function ProvisioningPanel({
 								</Button>
 							</Popconfirm>
 						</Space>
+
+						{/* Keyed on what it shows, so a save or a release resets the form to the server's state. */}
+						<DeprovisioningGuard
+							key={`${setup.id}:${JSON.stringify(setup.threshold ?? null)}:${setup.hold?.since ?? ''}`}
+							connection={setup}
+							onSave={(threshold) => saveThreshold(setup, threshold)}
+							onRelease={() => release(setup)}
+						/>
 					</Space>
 				) : null}
 			</Drawer>

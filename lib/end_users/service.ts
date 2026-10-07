@@ -310,6 +310,22 @@ export async function lockEndUser(
 }
 
 /*
+ * Ends a user's access everywhere without changing the account: no flag is written, so the user may sign in
+ * again at once and consents afresh. What an administrator's "sign out everywhere" does, and what a bucket's
+ * upstream identity provider asks for through global token revocation (specs/072) — one operation, so the two
+ * cannot drift apart. Allowed on a provisioned user: it ends access, it edits nothing the connection owns.
+ */
+export async function revokeEndUserAccess(
+	bucket: UserBucket,
+	id: string,
+	record: RecordChange
+): Promise<UpdatedEndUser> {
+	const user = await existing(bucket._id, id);
+	await record();
+	return { user, revoked: await revokeAccountAccess(id) };
+}
+
+/*
  * Hands a local user to a provisioning connection: the administrator's answer when the directory a bucket
  * now provisions from already has people in it (specs/070 FR-007a). Explicit and audited, never automatic —
  * a connection taking over an existing account by matching its email is the takeover the series refuses.

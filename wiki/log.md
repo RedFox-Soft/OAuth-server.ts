@@ -155,3 +155,7 @@ Operations:
 ## [2026-10-07] update | [[scim-provisioning]]: an unserved path beneath an enabled SCIM base answers a SCIM 404 (recognised by path, since it has no route key); every unserved path now answers `not_found` instead of a `server_error` body that reported a fault that never happened. Found by Okta's SCIM 2.0 Spec Test.
 
 ## [2026-10-07] create | [[bucket-groups]]: spec 071 — roles replaced by bucket groups and Super administrators; the `groups` claim; SCIM `/Groups`; the roles-to-groups migration. Corrected [[group-ownership]] (a second system group; accounts carry no roles), [[admin-audit-trail]] (scoped read keys on `superAdmin`), [[scim-provisioning]] (part 3 done; `/Bulk` is now the unserved example) and [[totp-second-factor]] (the admin bucket no longer has a role list).
+
+## [2026-10-07] create | [[global-token-revocation]]: spec 072 — the global token revocation endpoint, the format-neutral upstream core, the presented-key cache, "sign out everywhere" and the `upstream` audit surface. Corrected [[admin-audit-trail]] (a third non-person actor; the five places a surface literal touches), [[end-user-lifecycle]], [[upstream-federation]] and [[event-bus]] (new signals).
+
+## [2026-10-07] update | [[scim-provisioning]]: spec 072 — the mass-deprovisioning guard (opt-in per-connection threshold, a ring of expiring slots for an exact rolling count without transactions, one alert per hold through a conditional write, 429 + `Retry-After: 300` and why); part 4 split into several specs.

@@ -230,6 +230,13 @@ endpoint. The module otherwise adds a bound on how many providers are held, beca
 2026-09-29, routes jose's fetch through the egress boundary (`customFetch`), so the key set, like discovery
 and the code exchange, cannot be pointed at a private address or return an unbounded body. See
 [[mcp-server-authorization]] for the boundary; discovery also refuses any endpoint that is not https.
+
+**A second cache for presented JWTs** (spec 072). "Neither retry is attacker-triggerable" holds only for tokens
+read from the provider's token endpoint. A JWT a third party *presents* — a global token revocation request —
+can carry any `kid`, so `presentedKeySetFor` (`lib/federation/jwks.ts:64`) keeps jose's default cooldown, and
+that path does not do the cached-set signature retry either. The provider record also gained
+`acceptsGlobalTokenRevocation` (optional, read as `=== true`, refused for a provider that publishes no keys). See
+[[global-token-revocation]].
 `lib/helpers/jwt.ts` is deliberately **not** extended: it takes this server's own keystore object, so
 adapting an upstream key set to that shape would mean writing a second keystore implementation to reach a
 verifier jose already exposes.

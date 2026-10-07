@@ -149,6 +149,63 @@ export class UnknownBucket extends OIDCProviderError {
 	}
 }
 
+/*
+ * The four refusals of global token revocation (specs/072) that no existing error states. The draft defines
+ * the statuses and leaves the bodies open, so each carries the OAuth error shape every other endpoint here
+ * answers with. None redirects: the caller is an identity provider's back channel, not a browser.
+ */
+
+/* The provider's discovery document or keys could not be fetched — the draft's 422, so the provider retries. */
+export class UpstreamKeysUnavailable extends OIDCProviderError {
+	allow_redirect = false;
+	error_description = "the identity provider's signing keys could not be read";
+
+	constructor(detail?: string) {
+		super(422, 'temporarily_unavailable');
+		Error.captureStackTrace(this, this.constructor);
+		Object.assign(this, { error_detail: detail });
+	}
+}
+
+/* An authenticated provider that is disabled, or not opted in to revocation. */
+export class UpstreamNotPermitted extends OIDCProviderError {
+	allow_redirect = false;
+	error_description =
+		'this identity provider is not permitted to revoke access here';
+
+	constructor() {
+		super(403, 'access_denied');
+		Error.captureStackTrace(this, this.constructor);
+	}
+}
+
+/*
+ * The named user does not exist, or is not one the provider may name. One error, one description, for both:
+ * telling them apart would let a provider enumerate the bucket's other users.
+ */
+export class UnknownSubject extends OIDCProviderError {
+	allow_redirect = false;
+	error_description = 'no such user';
+
+	constructor() {
+		super(404, 'not_found');
+		Error.captureStackTrace(this, this.constructor);
+	}
+}
+
+/* The access-ending sweep left areas behind; a 500 the error store records, and a retry sweeps again. */
+export class UpstreamSweepIncomplete extends OIDCProviderError {
+	allow_redirect = false;
+	error_description =
+		"the user's access could not be ended completely; retry the request";
+
+	constructor(failedAreas: readonly string[]) {
+		super(500, 'server_error');
+		Error.captureStackTrace(this, this.constructor);
+		Object.assign(this, { error_detail: failedAreas.join(', ') });
+	}
+}
+
 export class InvalidClientAuth extends OIDCProviderError {
 	error_description = 'client authentication failed';
 

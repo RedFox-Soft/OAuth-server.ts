@@ -196,6 +196,7 @@ export const routeNames = {
 	device_authorization: '/device/auth',
 	end_session: '/logout',
 	end_session_confirm: '/logout/confirm',
+	global_token_revocation: '/global-token-revocation',
 	introspect: '/token/introspect',
 	jwks: '/jwks',
 	mcp: '/mcp',

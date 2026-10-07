@@ -44,7 +44,9 @@ export const CreateProviderBody = t.Object({
 	emailTrusted: t.Optional(t.Boolean()),
 	provisioning: t.Optional(Provisioning),
 	allowedEmailDomains: t.Optional(t.Array(t.String({ minLength: 1 }))),
-	emailClaim: t.Optional(t.String({ minLength: 1 }))
+	emailClaim: t.Optional(t.String({ minLength: 1 })),
+	/* Whether the provider may end its users' access here (global token revocation, specs/072). Off unless set. */
+	acceptsGlobalTokenRevocation: t.Optional(t.Boolean())
 });
 
 /*
@@ -70,5 +72,6 @@ export const UpdateProviderBody = t.Object({
 	emailTrusted: t.Optional(t.Boolean()),
 	provisioning: t.Optional(Provisioning),
 	allowedEmailDomains: t.Optional(t.Array(t.String({ minLength: 1 }))),
-	emailClaim: t.Optional(t.String({ minLength: 1 }))
+	emailClaim: t.Optional(t.String({ minLength: 1 })),
+	acceptsGlobalTokenRevocation: t.Optional(t.Boolean())
 });

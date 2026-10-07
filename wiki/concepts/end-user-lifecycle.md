@@ -28,7 +28,9 @@ an opaque access token answered `active: true` at introspection until it expired
 told. An administrator responding to a compromised account had no way to end access *now*.
 
 Now deactivation, the local lock and deletion all run `revokeAccountAccess`
-(`lib/end_users/revoke_access.ts:51`), in this order:
+(`lib/end_users/revoke_access.ts:51`) — and, since spec 072, so does **"sign out everywhere"**
+(`revokeEndUserAccess`, `lib/end_users/service.ts:318`), which ends access without writing any flag, for an
+administrator and for a bucket's upstream provider through [[global-token-revocation]] — in this order:
 
 1. The caller has already written the flag, so account resolution refuses the user from that moment.
 2. **Back-channel logout for every session** (`notifyRelyingParties`, `revoke_access.ts:17`). Sessions are

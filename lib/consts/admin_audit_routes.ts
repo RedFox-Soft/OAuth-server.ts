@@ -326,6 +326,16 @@ const routes = [
 		path: '/admin/api/buckets/:id/users/:uid/unlock',
 		targetType: 'EndUser'
 	},
+	/*
+	 * Ending a user's access without changing the account. An upstream identity provider's global token
+	 * revocation records the same action under the `upstream:` actor (specs/072), because it does the same.
+	 */
+	{
+		action: 'enduser.signout',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/users/:uid/sign-out',
+		targetType: 'EndUser'
+	},
 	{
 		action: 'enduser.totp.clear',
 		method: 'DELETE',
@@ -413,6 +423,16 @@ const routes = [
 		action: 'provisioning.connection.delete',
 		method: 'DELETE',
 		path: '/admin/api/buckets/:id/provisioning-connections/:connectionId',
+		targetType: 'ProvisioningConnection'
+	},
+	/*
+	 * Ending a mass-deprovisioning hold (specs/072). The hold itself has no route: the connection records it
+	 * under `provisioning.connection.update` with the attribute `hold`, because its record is what changed.
+	 */
+	{
+		action: 'provisioning.connection.release',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/provisioning-connections/:connectionId/release',
 		targetType: 'ProvisioningConnection'
 	},
 	{
@@ -583,6 +603,12 @@ export const BOOTSTRAP_ACTOR = 'system:bootstrap';
  * bootstrap's convention, so it too is told apart from a person without a lookup.
  */
 export const CONNECTION_ACTOR_PREFIX = 'connection:';
+
+/*
+ * Prefix of the actor recorded when a bucket's upstream identity provider asked for a user's access to
+ * end: `upstream:<bucketId>:<providerId>` (specs/072).
+ */
+export const UPSTREAM_ACTOR_PREFIX = 'upstream:';
 
 /* Target ids of the singleton configuration documents, which have no entity id of their own. */
 export const SETTINGS_TARGET_ID = 'settings';

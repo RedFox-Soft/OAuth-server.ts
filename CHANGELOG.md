@@ -11,6 +11,19 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- **An upstream identity provider can sign a user out of everything here (Okta Universal Logout).** With
+  `globalTokenRevocation.enabled` on and a federation provider opted in, a request to
+  `<bucket issuer>/global-token-revocation` signed with the provider's own keys ends every session and token the
+  user holds, with back-channel logout to relying parties; the account stays active. It implements an expired
+  individual draft (draft-parecki-oauth-global-token-revocation-06) in the shape Okta sends, so it is off by
+  default. Administrators get the same action as **Sign out everywhere** (console, admin API, MCP
+  `bucket_user_sign_out`).
+
+- **A mass-deprovisioning guard per SCIM connection.** An optional threshold (deprovisionings per rolling window)
+  holds the connection once exceeded: further deactivations and deletions answer `429` and are retried by the
+  directory after an administrator releases the hold; everything else keeps flowing, and the bucket's
+  administrators are emailed. **Re-run `bun run db:setup` / `db:setup:pg`** for the new `DeprovisionSlot` area.
+
 - **Roles are replaced by groups.** A bucket's roles become bucket groups — named sets of end users, kept by
   an administrator or owned by a SCIM connection — with their own routes, console tab and agent tools, and
   relying parties read them from a built-in `groups` scope and claim (display names; above 200, a userinfo

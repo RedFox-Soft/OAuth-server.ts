@@ -1,5 +1,6 @@
 import type { VerificationMethod } from '../adapters/types.js';
 import { deliver } from './mailer.js';
+import { deprovisioningHeldEmail } from './templates/deprovisioning_held.js';
 import { groupInvitationEmail } from './templates/group_invitation.js';
 import { passwordResetEmail } from './templates/password_reset.js';
 import {
@@ -57,6 +58,22 @@ export async function sendPasswordResetEmail(
  * owner inviting somebody deliberately: they need to know the mail did not go, and there is nothing
  * to leak, because they already chose the address.
  */
+/*
+ * Tells one administrator that a provisioning connection's mass-deprovisioning guard has held it. Throws on
+ * delivery failure like the others; the guard catches it, because a hold must never depend on mail going.
+ */
+export async function sendDeprovisioningHeldEmail(params: {
+	email: string;
+	connectionName: string;
+	bucketName: string;
+	since: Date;
+	count: number;
+	consoleUrl: string;
+}): Promise<void> {
+	const { email, ...rest } = params;
+	await deliver({ to: email, ...deprovisioningHeldEmail(rest) });
+}
+
 export async function sendGroupInvitationEmail(params: {
 	email: string;
 	appName: string;

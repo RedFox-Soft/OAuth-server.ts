@@ -1,4 +1,5 @@
 import type {
+	DeprovisioningHold,
 	NewProvisioningConnection,
 	ProvisioningConnection,
 	ProvisioningConnectionPatch,
@@ -110,6 +111,24 @@ export class ProvisioningConnectionStore implements ProvisioningConnectionStoreI
 	async touch(id: string, at: Date): Promise<void> {
 		const current = this.connections.get(id);
 		if (current) current.lastUsedAt = at;
+	}
+
+	/* Nothing awaits between the read and the write, so racing callers are serialised as the databases do. */
+	async holdIfFree(id: string, hold: DeprovisioningHold): Promise<boolean> {
+		const current = this.connections.get(id);
+		if (!current || current.hold) return false;
+		current.hold = structuredClone(hold);
+		current.updatedAt = new Date();
+		return true;
+	}
+
+	async releaseHold(id: string): Promise<ProvisioningConnection | null> {
+		const current = this.connections.get(id);
+		if (!current?.hold) return null;
+		Reflect.deleteProperty(current, 'hold');
+		current.tallyEpoch = (current.tallyEpoch ?? 0) + 1;
+		current.updatedAt = new Date();
+		return structuredClone(current);
 	}
 
 	async destroy(id: string): Promise<void> {

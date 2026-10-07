@@ -80,7 +80,13 @@ export const FederationProvider = t.Object({
 	 * update, the mask refused as a value, never in the audit trail. Masked by the *containing* bucket's
 	 * projections as well; see the comment on `presentBucket`.
 	 */
-	signingKey: t.Optional(t.String())
+	signingKey: t.Optional(t.String()),
+	/*
+	 * Whether this provider may end its users' access here through global token revocation (specs/072) —
+	 * Okta Universal Logout. Opt-in per provider, read as `=== true`: absent on every provider stored before
+	 * it existed, which is off, so there was no migration.
+	 */
+	acceptsGlobalTokenRevocation: t.Optional(t.Boolean())
 });
 export type FederationProvider = Static<typeof FederationProvider>;
 

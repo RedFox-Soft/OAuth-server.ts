@@ -6,6 +6,11 @@ import {
 	type OriginCounter,
 	type RateBounds
 } from '../helpers/rate_limit_window.js';
+import {
+	chargeFailedCredential,
+	resetUnauthenticatedCharge,
+	setUnauthenticatedChargeClock
+} from '../helpers/unauthenticated_charge.js';
 import { ScimError } from './errors.js';
 
 /*
@@ -16,7 +21,8 @@ import { ScimError } from './errors.js';
  * So two counters live here instead:
  *   - per connection, once the credential is resolved — the tenant IPSIE means;
  *   - per origin, for requests whose credential failed, with the strict bounds, so a token-guesser gets
- *     no more room on this surface than on the token endpoint.
+ *     no more room on this surface than on the token endpoint — the counter shared with global token
+ *     revocation (lib/helpers/unauthenticated_charge.ts).
  *
  * The refusal is thrown from inside the SCIM plugin, after routing, so it renders in SCIM's error shape —
  * which the per-origin limiter's, thrown before routing, never could.
@@ -27,20 +33,18 @@ const MAX_TRACKED = 10_000;
 const byConnection = new QuickLRU<string, OriginCounter>({
 	maxSize: MAX_TRACKED
 });
-const unauthenticatedByOrigin = new QuickLRU<string, OriginCounter>({
-	maxSize: MAX_TRACKED
-});
 
 /* The clock, injectable for the tests only — a spec that waited out a window would be a spec nobody runs. */
 let clock: () => number = () => Math.floor(Date.now() / 1000);
 
 export function setScimRateLimitClock(next: (() => number) | null): void {
 	clock = next ?? (() => Math.floor(Date.now() / 1000));
+	setUnauthenticatedChargeClock(next);
 }
 
 export function resetScimRateLimiter(): void {
 	byConnection.clear();
-	unauthenticatedByOrigin.clear();
+	resetUnauthenticatedCharge();
 }
 
 /*
@@ -51,13 +55,6 @@ function connectionBounds(): RateBounds {
 	return {
 		max: ApplicationConfig['scim.rateLimit.max'] as number,
 		windowSeconds: ApplicationConfig['scim.rateLimit.windowSeconds'] as number
-	};
-}
-
-function strictBounds(): RateBounds {
-	return {
-		max: ApplicationConfig['rateLimit.strict.max'] as number,
-		windowSeconds: ApplicationConfig['rateLimit.strict.windowSeconds'] as number
 	};
 }
 
@@ -82,11 +79,16 @@ export function chargeConnection(connectionId: string): void {
 	charge(byConnection, connectionId, connectionBounds());
 }
 
-/*
- * Charged only when authentication failed. Skipped while the per-origin limiter is switched off, so one
- * switch still turns all request limiting off for an operator diagnosing a false refusal.
- */
+/* Charged only when authentication failed. */
 export function chargeUnauthenticated(origin: string): void {
-	if (ApplicationConfig['rateLimit.enabled'] !== true) return;
-	charge(unauthenticatedByOrigin, origin, strictBounds());
+	chargeFailedCredential(
+		origin,
+		(retryAfterSeconds) =>
+			new ScimError(
+				429,
+				undefined,
+				'too many requests; retry after the interval in Retry-After',
+				{ 'Retry-After': String(retryAfterSeconds) }
+			)
+	);
 }

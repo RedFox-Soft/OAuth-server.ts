@@ -22,6 +22,11 @@ const REAPED_ON_EXPIRES_AT = [
 	'AuthorizationCode',
 	'BackchannelAuthenticationRequest',
 	'ClientCredentials',
+	/*
+	 * A provisioning connection's deprovisioning tally. Expiry is the mechanism rather than housekeeping:
+	 * a slot frees itself one threshold window after it was taken, which is what makes the count rolling.
+	 */
+	'DeprovisionSlot',
 	'DeviceCode',
 	// Both stages of a federated sign-in's round-trip record are short-lived by design (600s, then 120s
 	// for the handoff), so this area must reap. A round-trip record that outlived its interaction would

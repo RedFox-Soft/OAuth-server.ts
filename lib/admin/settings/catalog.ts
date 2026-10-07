@@ -371,6 +371,19 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 	},
 
 	{
+		key: 'globalTokenRevocation.enabled',
+		domain: 'endpoints',
+		group: 'Global Token Revocation',
+		label: 'Enable Global Token Revocation (Okta Universal Logout)',
+		summary:
+			'Let an upstream identity provider sign its users out of everything here',
+		type: 'boolean',
+		risk: 'security',
+		description:
+			'Serves <issuer>/global-token-revocation at each bucket. An upstream identity provider of the bucket that you opted in (on its federation provider) can then end everything one of its users holds here: every session, refresh token and access token this server can revoke, with relying parties told by back-channel logout. The account is not deactivated; the user can sign in again. Switch it on when a bucket federates to Okta and you want Okta Universal Logout (Identity Threat Protection) to reach this server. The request must be a JWT signed by the provider’s own published keys; unsigned or shared-secret requests are always refused. This implements an expired individual Internet-Draft (draft-parecki-oauth-global-token-revocation-06, expired 2026-08-28) in the shape Okta sends, so its format may change. Off: the path is not served and discovery does not advertise it.'
+	},
+
+	{
 		key: 'rpInitiatedLogout.enabled',
 		domain: 'endpoints',
 		group: 'RP-Initiated Logout',

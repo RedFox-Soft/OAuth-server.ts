@@ -18,12 +18,42 @@ const Correlation = t.Object(
 
 const EmailTrust = t.Union([t.Literal('trusted'), t.Literal('untrusted')]);
 
+/*
+ * The mass-deprovisioning guard (specs/072 FR-017): at most `count` deprovisionings in a rolling window of
+ * `windowSeconds`, or `null` to remove it. The bounds mirror the stored type in lib/adapters/types.ts, as
+ * whole numbers by `multipleOf` (the resource body's spelling) because `t.Integer` coerces through an
+ * `integer` format the schema compiler does not know and warns about on every load; the
+ * message is set on the union because a value outside them fails the union as a whole, and Elysia renders the
+ * failing schema's `error` — so the refusal names the permitted range rather than a TypeBox path.
+ */
+const Threshold = t.Union(
+	[
+		t.Null(),
+		t.Object(
+			{
+				count: t.Number({ minimum: 1, maximum: 100000, multipleOf: 1 }),
+				windowSeconds: t.Number({
+					minimum: 300,
+					maximum: 604800,
+					multipleOf: 1
+				})
+			},
+			{ additionalProperties: false }
+		)
+	],
+	{
+		error:
+			'threshold must be null, or a count of 1–100000 deprovisionings within a windowSeconds of 300–604800 seconds (5 minutes to 7 days)'
+	}
+);
+
 export const CreateConnectionBody = t.Object(
 	{
 		displayName: t.String({ minLength: 1, maxLength: 100 }),
 		providerId: t.String({ minLength: 1, maxLength: 32 }),
 		correlation: t.Optional(Correlation),
-		emailTrust: t.Optional(EmailTrust)
+		emailTrust: t.Optional(EmailTrust),
+		threshold: t.Optional(Threshold)
 	},
 	{ additionalProperties: false }
 );
@@ -34,7 +64,8 @@ export const UpdateConnectionBody = t.Object(
 		displayName: t.Optional(t.String({ minLength: 1, maxLength: 100 })),
 		enabled: t.Optional(t.Boolean()),
 		correlation: t.Optional(Correlation),
-		emailTrust: t.Optional(EmailTrust)
+		emailTrust: t.Optional(EmailTrust),
+		threshold: t.Optional(Threshold)
 	},
 	{ additionalProperties: false }
 );

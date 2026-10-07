@@ -82,6 +82,7 @@ export const bucketScopedPaths: readonly string[] = [
 	'/.well-known/oauth-authorization-server',
 	'/federation/callback',
 	routeNames.code_verification,
+	routeNames.global_token_revocation,
 	SCIM_BASE_PATH
 ];
 
@@ -216,6 +217,11 @@ const bareGatedRoutes: readonly GatedRoute[] = [
 		method: 'POST',
 		path: '/federation/callback',
 		flag: 'federation.enabled'
+	},
+	{
+		method: 'POST',
+		path: routeNames.global_token_revocation,
+		flag: 'globalTokenRevocation.enabled'
 	},
 	/*
 	 * SCIM provisioning, and its metadata document with it for the reason `/mcp`'s is: metadata describing

@@ -77,7 +77,7 @@ export const federationAdminRoutes = new Elysia({ name: 'admin-federation' })
 			});
 			const created = await createProvider(bucket, body);
 			set.status = 201;
-			return present(created);
+			return present(created, bucket);
 		},
 		{ body: CreateProviderBody }
 	)
@@ -89,7 +89,10 @@ export const federationAdminRoutes = new Elysia({ name: 'admin-federation' })
 			await recordAdminAudit(ctx, 'federation.provider.update', params.id, {
 				attributes: Object.keys(body)
 			});
-			return present(await updateProvider(bucket, params.providerId, body));
+			return present(
+				await updateProvider(bucket, params.providerId, body),
+				bucket
+			);
 		},
 		{ body: UpdateProviderBody }
 	)

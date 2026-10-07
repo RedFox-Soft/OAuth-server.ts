@@ -6,6 +6,7 @@ import { UniqueValueTaken } from '../conflicts.js';
 import { providerKeyOf } from '../connection_keys.js';
 import {
 	ProvisioningConnection,
+	type DeprovisioningHold,
 	type NewProvisioningConnection,
 	type ProvisioningConnectionPatch,
 	type ProvisioningConnectionStoreInstance
@@ -141,6 +142,28 @@ export class ProvisioningConnectionStore implements ProvisioningConnectionStoreI
 
 	async touch(id: string, at: Date): Promise<void> {
 		await this.collection.updateOne({ _id: id }, { $set: { lastUsedAt: at } });
+	}
+
+	/* Tested by type, so an absent field and a BSON null (the driver writes undefined as null) are both free. */
+	async holdIfFree(id: string, hold: DeprovisioningHold): Promise<boolean> {
+		const result = await this.collection.updateOne(
+			{ _id: id, hold: { $not: { $type: 'object' } } },
+			{ $set: { hold, updatedAt: new Date() } }
+		);
+		return result.modifiedCount === 1;
+	}
+
+	async releaseHold(id: string): Promise<ProvisioningConnection | null> {
+		const released = await this.collection.findOneAndUpdate(
+			{ _id: id, hold: { $type: 'object' } },
+			{
+				$unset: { hold: '' },
+				$inc: { tallyEpoch: 1 },
+				$set: { updatedAt: new Date() }
+			},
+			{ returnDocument: 'after' }
+		);
+		return connectionOf(released);
 	}
 
 	async destroy(id: string): Promise<void> {

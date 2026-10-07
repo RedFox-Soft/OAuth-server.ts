@@ -4,6 +4,7 @@ import {
 	auditTargetTypeFor,
 	BOOTSTRAP_ACTOR,
 	CONNECTION_ACTOR_PREFIX,
+	UPSTREAM_ACTOR_PREFIX,
 	type AuditAction
 } from '../../consts/admin_audit_routes.js';
 import { AdminError, type AdminContext } from '../auth/rbac.js';
@@ -142,6 +143,31 @@ export function recordConnectionAudit(
 	});
 }
 
+/*
+ * A bucket's upstream identity provider asking for a user's access to end (specs/072) — an actor that is
+ * neither a person, the bootstrap nor a connection. The sentinel names the bucket as well as the provider,
+ * because a provider id is unique only within its bucket. Recorded under the same action an administrator's
+ * "sign out everywhere" uses, since the effect is the same and the audit table admits only route-backed
+ * actions.
+ */
+export function recordUpstreamAudit(
+	bucketId: string,
+	providerId: string,
+	action: AuditAction,
+	targetId: string,
+	detail: AuditDetail = {}
+): Promise<AdminAuditEntry> {
+	const actor = `${UPSTREAM_ACTOR_PREFIX}${bucketId}:${providerId}`;
+	return write({
+		actorId: actor,
+		actorEmail: actor,
+		action,
+		targetId,
+		detail,
+		viaSurface: 'upstream'
+	});
+}
+
 async function write(input: {
 	actorId: string;
 	actorEmail: string;
@@ -149,7 +175,7 @@ async function write(input: {
 	targetId: string;
 	detail: AuditDetail;
 	viaClientId?: string;
-	viaSurface?: 'scim';
+	viaSurface?: 'scim' | 'upstream';
 }): Promise<AdminAuditEntry> {
 	try {
 		return await adminAuditStore.record({

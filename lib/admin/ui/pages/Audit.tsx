@@ -22,17 +22,18 @@ interface AuditEntry {
 	attributes: string[];
 	cascade: Record<string, number> | null;
 	/* Absent or null on an entry made in the console: the field was added after the trail began. */
-	viaSurface?: 'mcp' | 'scim' | null;
+	viaSurface?: 'mcp' | 'scim' | 'upstream' | null;
 	viaClientId?: string | null;
 	timestamp: string;
 }
 
-type Surface = 'console' | 'mcp' | 'scim';
+type Surface = 'console' | 'mcp' | 'scim' | 'upstream';
 
 const SURFACE_OPTIONS: { label: string; value: Surface }[] = [
 	{ label: 'Console', value: 'console' },
 	{ label: 'MCP', value: 'mcp' },
-	{ label: 'SCIM', value: 'scim' }
+	{ label: 'SCIM', value: 'scim' },
+	{ label: 'Upstream provider', value: 'upstream' }
 ];
 
 /*
@@ -40,6 +41,20 @@ const SURFACE_OPTIONS: { label: string; value: Surface }[] = [
  * because the raw value in the email column reads as a malformed address rather than as a directory.
  */
 const CONNECTION_ACTOR_PREFIX = 'connection:';
+
+/* An upstream identity provider's global token revocation: `upstream:<bucketId>:<providerId>` (specs/072). */
+const UPSTREAM_ACTOR_PREFIX = 'upstream:';
+
+function actorLabel(row: AuditEntry, email: string): string {
+	if (row.actorId.startsWith(CONNECTION_ACTOR_PREFIX)) {
+		return `SCIM connection ${row.actorId.slice(CONNECTION_ACTOR_PREFIX.length)}`;
+	}
+	if (row.actorId.startsWith(UPSTREAM_ACTOR_PREFIX)) {
+		const provider = row.actorId.split(':').at(-1);
+		return `Identity provider ${provider ?? ''}`.trim();
+	}
+	return email;
+}
 
 interface AuditPage {
 	entries: AuditEntry[];
@@ -161,11 +176,7 @@ export function Audit() {
 					direction="vertical"
 					size={0}
 				>
-					<Typography.Text>
-						{row.actorId.startsWith(CONNECTION_ACTOR_PREFIX)
-							? `SCIM connection ${row.actorId.slice(CONNECTION_ACTOR_PREFIX.length)}`
-							: email}
-					</Typography.Text>
+					<Typography.Text>{actorLabel(row, email)}</Typography.Text>
 					<Typography.Text
 						type="secondary"
 						copyable
@@ -189,6 +200,8 @@ export function Audit() {
 					</Tag>
 				) : surface === 'scim' ? (
 					<Tag color="purple">SCIM</Tag>
+				) : surface === 'upstream' ? (
+					<Tag color="volcano">Upstream</Tag>
 				) : (
 					<Tag>Console</Tag>
 				)

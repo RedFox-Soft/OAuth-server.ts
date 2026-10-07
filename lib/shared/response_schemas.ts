@@ -177,6 +177,10 @@ export const DiscoveryResponse = t.Object(
 		device_authorization_endpoint: t.Optional(t.String()),
 		end_session_endpoint: t.Optional(t.String()),
 		revocation_endpoint: t.Optional(t.String()),
+		global_token_revocation_endpoint: t.Optional(t.String()),
+		global_token_revocation_endpoint_auth_methods_supported: t.Optional(
+			t.Array(t.String())
+		),
 		introspection_endpoint: t.Optional(t.String()),
 		pushed_authorization_request_endpoint: t.Optional(t.String()),
 		backchannel_authentication_endpoint: t.Optional(t.String()),

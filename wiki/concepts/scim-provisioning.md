@@ -22,7 +22,8 @@ Spec 070 — part 2 of 4 of the SCIM series (issue #62). An enterprise directory
 provisions a bucket's end users over SCIM 2.0 through a **provisioning connection**, and those users sign in
 through the same directory by federation. Part 1 ([[end-user-lifecycle]]) built the record and the
 access-ending operation this calls; part 3 ([[bucket-groups]], spec 071) adds `/Groups` and the `groups`
-claim, part 4 shared signals and `/Bulk`.
+claim, part 4 (split by the owner on 2026-10-07 into several specs) starts with spec 072: the
+mass-deprovisioning guard below and [[global-token-revocation]].
 
 ## A connection is its own record, bound to one provider
 
@@ -169,6 +170,43 @@ both. The JWT bullet wins: §10 repeats it, and §4.1 carries an editor's note t
 bootstrap's sentinel convention — with `viaSurface: 'scim'` and the bucket's `ownerGroupId`, so the bucket's
 own administrators see it ([[admin-audit-trail]]). SCIM computes the attribute names that change before the
 write, so a request asserting what is already stored writes nothing and audits nothing.
+
+## The mass-deprovisioning guard
+
+Spec 072. Part 1 made deprovisioning instant and total, so a wrong scoping rule in Entra or a compromised
+directory credential could end a whole bucket's access — sessions, grants, consents — in minutes. A connection
+may carry an optional `threshold` (`count` 1–100,000 within `windowSeconds` 300–604,800; absent by default):
+the first deprovisioning beyond it **holds** the connection, and while held every deprovisioning is refused and
+everything else keeps flowing. Only an explicit release ends a hold (`releaseConnection`,
+`lib/provisioning/service.ts:434`; route `…/provisioning-connections/:connectionId/release`; MCP
+`provisioning_connection_release`, **high**). No edit can end one: `hold` is not in the patch type, and removing
+the threshold of a held connection is refused 409.
+
+- **What counts.** A PUT or PATCH whose `input.active === false` — which `updateFor` sets only for a real
+  active-to-inactive change — and a DELETE of an existing user of the connection. The gate sits in the SCIM
+  `record` closures (`lib/scim/users.ts:305`, `:355`), the one point after every refusal and before any write, so a
+  refused request applies nothing, including the profile half of a PUT that also deactivates.
+- **Exact without a transaction: a ring of slots** (`claimSlot`, `lib/provisioning/deprovision_guard.ts:88`). A
+  counter hands each caller a distinct sequence number (`increment`), and the caller takes slot
+  `seq mod count` with an insert-if-absent that treats an expired record as free (`create`), held for
+  `windowSeconds` (area `DeprovisionSlot`). Both are single atomic writes on all three backends, so at most
+  `count` are admitted in any window of that length, even on a standalone `mongod`. It errs only toward
+  stopping sooner (a refused claim burns a number; two concurrent deactivations of one user both count). The
+  login throttle's counter-and-window pattern was rejected: its own comment admits a burst at the roll resets
+  the count. A release or a threshold change moves `tallyEpoch` on, which renames every slot — the old ones expire.
+  `database/verify_deprovision_guard.ts` proves it on real databases (MongoDB: 100 concurrent, exactly 10
+  admitted, 2026-10-07).
+- **One alert per hold.** `holdIfFree` is a conditional write; only the caller told `true` records the hold
+  (`provisioning.connection.update`, `attributes: ['hold']`, under the connection) and mails the administrators
+  of the owning group (super administrators for `unassigned`), fire-and-forget (`hold`, `deprovision_guard.ts:185`).
+  That audit entry follows the write rather than preceding it — the one departure from audit-first, because
+  written before, every refused request in a burst would record a hold only one of them set.
+- **429 with `Retry-After: 300`** (`deprovision_guard.ts:42`): the only status Okta retries by itself (it turns a
+  5xx into a task an administrator retries by hand); Entra escrows any failure and retries it on its own schedule
+  (next cycle, then 6, 12, 24 h), and quarantines a job only from ≥5,000 failures above 40 % — or on 401/403/404 at
+  any count, which is why none of those is used. A 5xx would also be captured as a defect.
+- **An IPSIE departure, isolated by the threshold itself**: a held leaver keeps access until the release.
+  Opt-in per connection, documented in `CONFORMANCE.md`.
 
 ## Gotchas found while building it
 

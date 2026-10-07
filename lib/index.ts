@@ -46,6 +46,7 @@ import { InvalidDpopProof, UseDpopNonce } from './helpers/validate_dpop.js';
 import { adminApp } from './admin/index.js';
 import { mcpApp } from './mcp/index.js';
 import { scimApp, scimMetadataApp } from './scim/index.js';
+import { globalTokenRevocation } from './upstream_signals/global_token_revocation.js';
 import { verificationRoutes } from './routes/verification.js';
 import { passwordResetRoutes } from './routes/password_reset.js';
 /* Its own top-level instance because it cannot satisfy the `ui` guard: see lib/federation/routes.ts. */
@@ -110,7 +111,11 @@ export const elysia = new Elysia({ strictPath: true, normalize: false })
 		unsupported_response_mode: errors.UnsupportedResponseMode,
 		use_dpop_nonce: UseDpopNonce,
 		invalid_dpop_proof: InvalidDpopProof,
-		rate_limited: errors.RateLimited
+		rate_limited: errors.RateLimited,
+		upstream_keys_unavailable: errors.UpstreamKeysUnavailable,
+		upstream_not_permitted: errors.UpstreamNotPermitted,
+		unknown_subject: errors.UnknownSubject,
+		upstream_sweep_incomplete: errors.UpstreamSweepIncomplete
 	})
 	.onError(errorHandler)
 	.use(healthCheck)
@@ -212,6 +217,16 @@ export const elysia = new Elysia({ strictPath: true, normalize: false })
  */
 elysia.use(scimApp).use(scimMetadataApp);
 elysia.group('/:bucket', (bucketScoped) => bucketScoped.use(scimApp));
+
+/*
+ * Global token revocation (specs/072), bare and beneath a bucket's segment, as statements of their own for the
+ * reason SCIM's are: the chain above is at TypeScript's instantiation limit, and nothing reads these routes off
+ * the app's type.
+ */
+elysia.use(globalTokenRevocation);
+elysia.group('/:bucket', (bucketScoped) =>
+	bucketScoped.use(globalTokenRevocation)
+);
 
 /*
  * Binding the port, and the one startup failure this module can report.

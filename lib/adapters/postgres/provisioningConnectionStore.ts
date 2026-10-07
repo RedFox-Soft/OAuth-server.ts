@@ -7,6 +7,7 @@ import { UniqueValueTaken } from '../conflicts.js';
 import { providerKeyOf } from '../connection_keys.js';
 import {
 	ProvisioningConnection,
+	type DeprovisioningHold,
 	type NewProvisioningConnection,
 	type ProvisioningConnectionPatch,
 	type ProvisioningConnectionStoreInstance
@@ -117,6 +118,30 @@ export class ProvisioningConnectionStore implements ProvisioningConnectionStoreI
 			UPDATE ${handle(this.area)} SET doc = doc || ${{ lastUsedAt: at }}
 			WHERE id = ${id}
 		`;
+	}
+
+	/* Tested by type rather than key presence, so a stored JSON null reads as "not held" as absence does. */
+	async holdIfFree(id: string, hold: DeprovisioningHold): Promise<boolean> {
+		const handle = sql();
+		const rows = await handle`
+			UPDATE ${handle(this.area)}
+			SET doc = doc || ${{ hold, updatedAt: new Date() }}
+			WHERE id = ${id} AND jsonb_typeof(doc->'hold') IS DISTINCT FROM 'object'
+			RETURNING id
+		`;
+		return rows.length === 1;
+	}
+
+	async releaseHold(id: string): Promise<ProvisioningConnection | null> {
+		const handle = sql();
+		const rows = await handle`
+			UPDATE ${handle(this.area)}
+			SET doc = ((doc - 'hold') || ${{ updatedAt: new Date() }})
+				|| jsonb_build_object('tallyEpoch', COALESCE((doc->>'tallyEpoch')::int, 0) + 1)
+			WHERE id = ${id} AND jsonb_typeof(doc->'hold') = 'object'
+			RETURNING doc
+		`;
+		return this.connectionOf(rows[0]);
 	}
 
 	async destroy(id: string): Promise<void> {

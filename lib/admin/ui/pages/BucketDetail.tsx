@@ -284,6 +284,22 @@ export function BucketDetail({
 		await load();
 	}
 
+	async function onSignOut(uid: string) {
+		const res = await fetch(`${base}/users/${uid}/sign-out`, {
+			method: 'POST'
+		});
+		if (!res.ok) {
+			// The server's own reason: a partial sweep names the areas whose records survived.
+			const detail = (await res.json().catch(() => null)) as {
+				message?: string;
+			} | null;
+			message.error(detail?.message ?? 'failed to sign the user out');
+			return;
+		}
+		message.success('signed out everywhere — they can sign in again');
+		await load();
+	}
+
 	async function onClearTotp(uid: string) {
 		const res = await fetch(`${base}/users/${uid}/totp`, { method: 'DELETE' });
 		if (!res.ok) {
@@ -510,6 +526,15 @@ export function BucketDetail({
 									{/* Offered only where there is something to clear, and stating the two
 								    consequences an operator cannot see from here: the old codes stop working,
 								    and the person is signed out everywhere. */}
+									{/* Allowed on a provisioned user too: it ends access and edits nothing the connection owns. */}
+									<Popconfirm
+										title="Sign this user out everywhere?"
+										description="Every session and token ends at once and relying parties are told. The account stays active: they can sign in again, and will be asked to consent again."
+										okText="Sign out everywhere"
+										onConfirm={() => onSignOut(row._id)}
+									>
+										<Button size="small">Sign out everywhere</Button>
+									</Popconfirm>
 									{row.totpEnrolled && (
 										<Popconfirm
 											title="Clear this authenticator?"

@@ -91,7 +91,9 @@ Signals with no request context: `server_error (error)` and `<endpoint>.error (e
 `onError`; `<model>.saved|issued|destroyed (model)` from `BaseModel`; `feature_disabled ({ method,
 path, flag })`, emitted once per gated refusal ([[feature-flag-gating]]) and deliberately not routed to
 `server_error`; `rate_limited`, `login_throttled ({ bucketId })`, `settings_applied ({ keys })`,
-`admin.login.error`, `federation.*.error`, `mcp.auth.error ({ reason })`.
+`admin.login.error`, `federation.*.error`, `mcp.auth.error ({ reason })`; from spec 072,
+`upstream.revocation.refused ({ bucketId, reason })`, `upstream.revocation.success ({ bucketId, providerId,
+accountId })` and `global_token_revocation.error (error)` ([[global-token-revocation]]).
 
 Verified against [[oauth-server-codebase]] at commit `2125ad0`; the table above against
 `060-typed-oidc-context`.

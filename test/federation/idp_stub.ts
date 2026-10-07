@@ -66,6 +66,37 @@ export interface IdpStub {
 	 * and the next sign-in publishes a key set holding only it. `kid: null` publishes and signs with none.
 	 */
 	rotateKey(kid: string | null): Promise<void>;
+	/*
+	 * Mint a global token revocation assertion (specs/072) in the shape Okta Universal Logout sends: typed
+	 * `global-token-revocation+jwt`, issued by this provider, its subject our client id there, a not-before
+	 * five minutes back and an expiry five minutes ahead. `opts` breaks it in exactly one way per field.
+	 */
+	revocationAssertion(
+		claims: { sub: string; aud: string | string[] } & Record<string, unknown>,
+		opts?: AssertionOptions
+	): Promise<string>;
+}
+
+export interface AssertionOptions {
+	/* The header's `typ`; `null` omits it. */
+	typ?: string | null;
+	/* Claim an algorithm other than the key's. */
+	alg?: string;
+	/* Sign with a key the stub does not publish. */
+	foreignKey?: boolean;
+	/* Emit an unsecured (`alg: none`) assertion. */
+	unsecured?: boolean;
+	/* Sign with HS256 under this shared secret instead of the provider's key. */
+	hmacSecret?: string;
+	/* Seconds from now for `exp` (default 300); negative mints an expired assertion. */
+	expiresIn?: number;
+	/* Seconds from now for `iat` (default 0). */
+	issuedIn?: number;
+	/* Seconds from now for `nbf` (default −300, as Okta sends); `null` omits it. */
+	notBefore?: number | null;
+	noJti?: boolean;
+	noExp?: boolean;
+	noIssuedAt?: boolean;
 }
 
 export interface SignOptions {
@@ -165,6 +196,47 @@ export async function idpStub(
 			.sign(opts.foreignKey ? foreignPair.privateKey : keyPair.privateKey);
 	}
 
+	async function revocationAssertion(
+		claims: { sub: string; aud: string | string[] } & Record<string, unknown>,
+		opts: AssertionOptions = {}
+	): Promise<string> {
+		const now = Math.floor(Date.now() / 1000);
+		const payload: Record<string, unknown> = {
+			iss: origin,
+			iat: now + (opts.issuedIn ?? 0),
+			exp: now + (opts.expiresIn ?? 300),
+			jti: crypto.randomUUID(),
+			...claims
+		};
+		if (opts.notBefore !== null) payload.nbf = now + (opts.notBefore ?? -300);
+		if (opts.noJti) delete payload.jti;
+		if (opts.noExp) delete payload.exp;
+		if (opts.noIssuedAt) delete payload.iat;
+		const typ =
+			opts.typ === null
+				? {}
+				: { typ: opts.typ ?? 'global-token-revocation+jwt' };
+
+		if (opts.unsecured) {
+			// Hand-assembled: jose will not produce an unsecured JWS, which is itself the point.
+			const b64 = (value: object) =>
+				Buffer.from(JSON.stringify(value)).toString('base64url');
+			return `${b64({ alg: 'none', ...typ })}.${b64(payload)}.`;
+		}
+		if (opts.hmacSecret !== undefined) {
+			return new SignJWT(payload)
+				.setProtectedHeader({ alg: 'HS256', ...typ })
+				.sign(new TextEncoder().encode(opts.hmacSecret));
+		}
+		return new SignJWT(payload)
+			.setProtectedHeader({
+				alg: opts.alg ?? ALG,
+				...typ,
+				...(kid ? { kid } : {})
+			})
+			.sign(opts.foreignKey ? foreignPair.privateKey : keyPair.privateKey);
+	}
+
 	function expectDiscovery() {
 		target
 			.intercept({ path: '/.well-known/openid-configuration' })
@@ -237,6 +309,7 @@ export async function idpStub(
 		expectDiscoveryFailure,
 		idToken,
 		publicJwks,
-		rotateKey
+		rotateKey,
+		revocationAssertion
 	};
 }

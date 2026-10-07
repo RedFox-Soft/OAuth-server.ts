@@ -25,6 +25,7 @@ import {
 	lockEndUser,
 	removeEndUser,
 	resetEndUserPassword,
+	revokeEndUserAccess,
 	unlockEndUser,
 	updateEndUser,
 	type EndUserActor
@@ -257,6 +258,33 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 					})
 				)
 			);
+			return presentUser(user);
+		}
+	)
+	/*
+	 * Sign out everywhere: the user's access ends exactly as a lock would end it, but the account is left
+	 * as it was — active, unlocked, free to sign in again. The answer to a stolen laptop rather than a
+	 * compromised person, and what a bucket's upstream identity provider can also ask for (specs/072).
+	 */
+	.post(
+		'/admin/api/buckets/:id/users/:uid/sign-out',
+		async ({ admin, params }) => {
+			const ctx = assertAuth(admin as AdminContext | null);
+			const bucket = await loadBucketForUsers(ctx, params.id);
+			const { user, revoked } = await asAdmin(
+				revokeEndUserAccess(bucket, params.uid, () =>
+					recordAdminAudit(ctx, 'enduser.signout', params.uid, {
+						targetScope: params.id
+					})
+				)
+			);
+			if (revoked && revoked.failedAreas.length > 0) {
+				throw new AdminError(
+					500,
+					`the user was signed out, but their access survives in: ${revoked.failedAreas.join(', ')}`,
+					{ failedAreas: revoked.failedAreas }
+				);
+			}
 			return presentUser(user);
 		}
 	)

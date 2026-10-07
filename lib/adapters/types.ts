@@ -630,10 +630,18 @@ export const AdminAuditEntry = t.Object({
 	 * `scim` is the one surface whose actor is not an administrator: a provisioning connection acting
 	 * under its own credential, recorded as the sentinel `connection:<id>` in `actorId`. It carries no
 	 * `viaClientId`, because the connection is the actor rather than an agent standing beside one.
+	 *
+	 * `upstream` is the other: a bucket's upstream identity provider asking for a user's access to end
+	 * (specs/072), recorded as the sentinel `upstream:<bucketId>:<providerId>`.
 	 */
 	viaClientId: t.Optional(t.Union([t.String(), t.Null()])),
 	viaSurface: t.Optional(
-		t.Union([t.Literal('mcp'), t.Literal('scim'), t.Null()])
+		t.Union([
+			t.Literal('mcp'),
+			t.Literal('scim'),
+			t.Literal('upstream'),
+			t.Null()
+		])
 	),
 	timestamp: t.Date()
 });
@@ -1228,6 +1236,25 @@ export const SecretCredential = t.Object({
 export type SecretCredential = Static<typeof SecretCredential>;
 
 /*
+ * The most deprovisionings a connection may make within a rolling window before it is held (specs/072
+ * FR-017). Bounded so a slip cannot disable the guard by setting a window of a second or a count nobody reaches.
+ */
+export const DeprovisioningThreshold = t.Object(
+	{
+		count: t.Integer({ minimum: 1, maximum: 100000 }),
+		windowSeconds: t.Integer({ minimum: 300, maximum: 604800 })
+	},
+	{ additionalProperties: false }
+);
+export type DeprovisioningThreshold = Static<typeof DeprovisioningThreshold>;
+
+export const DeprovisioningHold = t.Object({
+	since: t.Date(),
+	count: t.Integer()
+});
+export type DeprovisioningHold = Static<typeof DeprovisioningHold>;
+
+/*
  * One customer directory's right to provision one bucket over SCIM. Its `_id` is what an end user's
  * `provisionedBy` holds, and `scim-<_id>` is the OAuth client the key and secret credentials authenticate
  * as — synthesized from this record on resolution, never stored (specs/070 R2).
@@ -1248,6 +1275,17 @@ export const ProvisioningConnection = t.Object({
 	staticTokenDigest: t.Optional(t.String()),
 	staticTokenIssuedAt: t.Optional(t.Date()),
 	lastUsedAt: t.Optional(t.Date()),
+	threshold: t.Optional(DeprovisioningThreshold),
+	/*
+	 * Which generation of the deprovisioning tally is counting (absent = 0). Moving it on is how a release
+	 * or a threshold change starts the count afresh: the old generation's records are left to expire.
+	 */
+	tallyEpoch: t.Optional(t.Integer({ minimum: 0 })),
+	/*
+	 * Present while the connection is held. Not in the patch type below: only `holdIfFree` sets it and only
+	 * `releaseHold` clears it, so no edit of the connection can end a hold as a side effect (specs/072 FR-023).
+	 */
+	hold: t.Optional(DeprovisioningHold),
 	createdAt: t.Date(),
 	updatedAt: t.Date()
 });
@@ -1264,6 +1302,8 @@ export type ProvisioningConnectionPatch = Partial<
 		| 'oauthCredential'
 		| 'staticTokenDigest'
 		| 'staticTokenIssuedAt'
+		| 'threshold'
+		| 'tallyEpoch'
 	>
 >;
 
@@ -1292,6 +1332,17 @@ export interface ProvisioningConnectionStoreInstance {
 	): Promise<ProvisioningConnection | null>;
 	/* Writes `lastUsedAt` only, so a request's bookkeeping never races an administrator's edit. */
 	touch(id: string, at: Date): Promise<void>;
+	/*
+	 * Sets `hold` only where none is present, in one conditional write, and answers whether *this* call set
+	 * it. Of many requests tripping the threshold together exactly one is told `true`, and only that one
+	 * records the hold and alerts — a burst of refusals must not mail the administrators a hundred times.
+	 */
+	holdIfFree(id: string, hold: DeprovisioningHold): Promise<boolean>;
+	/*
+	 * Clears `hold` and moves `tallyEpoch` on, in one write, only where a hold is present; answers the
+	 * released connection, or `null` when it was not held (or does not exist).
+	 */
+	releaseHold(id: string): Promise<ProvisioningConnection | null>;
 	destroy(id: string): Promise<void>;
 	/* Answers the ids removed, because the bucket-delete route revokes each connection's tokens after. */
 	destroyByBucket(bucketId: string): Promise<string[]>;

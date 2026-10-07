@@ -36,6 +36,15 @@ bucket's `ownerGroupId` so that bucket's administrators see it (`recordConnectio
 `lib/admin/audit/record.ts`). It reuses the `enduser.*` actions; the console's audit page filters by
 surface. See [[scim-provisioning]].
 
+Since 2026-10-07 (spec 072) there is a third non-person actor: a bucket's upstream identity provider ending a
+user's access through global token revocation, recorded as `upstream:<bucketId>:<providerId>` with
+`viaSurface: 'upstream'` (`recordUpstreamAudit`). It needed a route-backed action, because the table admits no
+other; it records the action of the new administrator operation "sign out everywhere", `enduser.signout`.
+**A new surface literal touches five places** — the entry schema union (validated *on read* by MongoDB and
+PostgreSQL, so a miss breaks the audit list in production while `bun test` stays green), the Mongo surface
+filter, `write()`'s input type, the console audit page and the MCP `audit_list` summary. See
+[[global-token-revocation]].
+
 ## Audit-first, and authorization-first — the order is not interchangeable
 
 The record is written **before** the mutation it describes, and a failed write aborts the request, so a

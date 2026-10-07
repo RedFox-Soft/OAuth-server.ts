@@ -52,6 +52,33 @@ export function keySetFor(jwksUri: string): RemoteKeySet {
 	return created;
 }
 
+const presentedSets = new Map<string, RemoteKeySet>();
+
+/*
+ * The same provider's keys, for a JWT a third party *presents* to this server — global token revocation
+ * (specs/072), and every later inbound signal. A separate cache with jose's default cooldown, because the
+ * argument that switched the cooldown off above does not hold here: anyone can present a JWT carrying a
+ * random `kid`, and without a cooldown each such request would make this server refetch the provider's keys.
+ * A genuine rotation is still honoured, once per cooldown.
+ */
+export function presentedKeySetFor(jwksUri: string): RemoteKeySet {
+	const existing = presentedSets.get(jwksUri);
+	if (existing) {
+		return existing;
+	}
+
+	if (presentedSets.size >= PROVIDER_CACHE_LIMIT) {
+		const oldest = presentedSets.keys().next().value;
+		if (oldest !== undefined) presentedSets.delete(oldest);
+	}
+
+	const created = createRemoteJWKSet(new URL(jwksUri), {
+		[customFetch]: fetchThroughBoundary
+	});
+	presentedSets.set(jwksUri, created);
+	return created;
+}
+
 /*
  * jose's own fetch already refuses redirects and times out; it does not know which addresses this server
  * must not reach or how large a body it will hold. The URL comes from a discovery document a group

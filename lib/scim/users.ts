@@ -21,6 +21,7 @@ import {
 	updateEndUser,
 	type EndUserActor
 } from '../end_users/service.js';
+import { admitDeprovisioning } from '../provisioning/deprovision_guard.js';
 import { ScimError } from './errors.js';
 import { parseUserFilter } from './filter.js';
 import { applyPatch } from './patch.js';
@@ -292,13 +293,24 @@ async function applyDesired(
 		actorOf(context.connection),
 		user._id,
 		input,
-		() =>
-			recordConnectionAudit(
+		/*
+		 * The mass-deprovisioning guard sits in `record` because the service calls it at the one point after
+		 * every refusal and before any write: a request refused for another reason never counts, and one the
+		 * guard refuses changes nothing — a replace that also edits the profile is refused whole.
+		 * `input.active` is false only for a real active-to-inactive change (`updateFor`), so re-asserting an
+		 * inactive user does not count.
+		 */
+		async () => {
+			if (input.active === false) {
+				await admitDeprovisioning(context.bucket, context.connection);
+			}
+			await recordConnectionAudit(
 				context.connection._id,
 				'enduser.update',
 				user._id,
 				auditDetail(context, changes)
-			)
+			);
+		}
 	).catch(asScim);
 	assertSweepComplete(revoked);
 	return { status: 200, body: await view(context, updated) };
@@ -338,13 +350,16 @@ export async function deleteUser(
 		context.bucket,
 		actorOf(context.connection),
 		user._id,
-		() =>
-			recordConnectionAudit(
+		/* Counted here for the reason the update's `record` counts: after every refusal, before any write. */
+		async () => {
+			await admitDeprovisioning(context.bucket, context.connection);
+			await recordConnectionAudit(
 				context.connection._id,
 				'enduser.delete',
 				user._id,
 				auditDetail(context, [])
-			)
+			);
+		}
 	).catch(asScim);
 	assertSweepComplete(result);
 	return { status: 204 };

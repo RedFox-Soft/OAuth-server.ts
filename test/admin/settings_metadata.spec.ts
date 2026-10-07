@@ -134,6 +134,7 @@ describe('settings catalog presentation metadata', () => {
 				'buckets.reservedHostnames',
 				'conformIdTokenClaims',
 				'cors.enabled',
+				'globalTokenRevocation.enabled',
 				'mTLS.trustProxyCertificateHeader',
 				'par.allowUnregisteredRedirectUris',
 				'pkce.required',

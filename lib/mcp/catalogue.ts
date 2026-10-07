@@ -547,7 +547,7 @@ const catalogue = [
 		querySchema: AuditQuery,
 		pathParams: [],
 		summary:
-			'The administrative audit trail for the groups this administrator belongs to, newest first, filterable by actor, action, target, surface and time window. A super administrator sees the whole instance, including actions that belong to no group. Filter `viaSurface=mcp` for actions taken through an agent. An entry means an authorized actor reached the point of applying a change, not that the change took effect.'
+			'The administrative audit trail for the groups this administrator belongs to, newest first, filterable by actor, action, target, surface and time window. A super administrator sees the whole instance, including actions that belong to no group. Filter `viaSurface=mcp` for actions taken through an agent, `viaSurface=scim` for changes a provisioning connection made and `viaSurface=upstream` for sign-outs an upstream identity provider requested. An entry means an authorized actor reached the point of applying a change, not that the change took effect.'
 	},
 	{
 		tool: 'error_list',
@@ -1055,6 +1055,20 @@ const catalogue = [
 			'Lock an end-user out, at once: every session and token ends and relying parties registered for back-channel logout are told. Works on users a provisioning connection manages, and the connection cannot undo it — only bucket_user_unlock can. Use when an account is suspected compromised.'
 	},
 	{
+		tool: 'bucket_user_sign_out',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/users/:uid/sign-out',
+		action: 'enduser.signout',
+		/* Ordinary, as the lock is: the same protective act, minus the block on signing in again. */
+		consequence: 'ordinary',
+		superAdminOnly: false,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id', 'uid'],
+		summary:
+			'Sign an end-user out everywhere: every session and token ends and relying parties registered for back-channel logout are told, but the account stays active and unlocked, so they can sign in again at once (and consent afresh). Works on users a provisioning connection manages. Use for a lost or stolen device; use bucket_user_lock when the person must not get back in.'
+	},
+	{
 		tool: 'bucket_user_unlock',
 		method: 'POST',
 		path: '/admin/api/buckets/:id/users/:uid/unlock',
@@ -1151,7 +1165,7 @@ const catalogue = [
 			"Sever one end-user's link to one upstream provider. The account survives; only the link is removed."
 	},
 
-	/* ---------------------------------------- writes: SCIM provisioning (6) */
+	/* ---------------------------------------- writes: SCIM provisioning (7) */
 	{
 		tool: 'provisioning_connection_create',
 		method: 'POST',
@@ -1177,7 +1191,24 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'connectionId'],
 		summary:
-			'Rename, enable or disable a SCIM provisioning connection, or change its correlation rule or email trust. Disabling refuses every SCIM request through it and leaves its users as they are.'
+			'Rename, enable or disable a SCIM provisioning connection, change its correlation rule or email trust, or set its mass-deprovisioning guard: threshold {count 1–100000, windowSeconds 300–604800} holds the connection after that many deactivations or deletions within the window; null removes it (refused while held). Disabling refuses every SCIM request through it and leaves its users as they are; no edit releases a hold.'
+	},
+	{
+		tool: 'provisioning_connection_release',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/provisioning-connections/:connectionId/release',
+		action: 'provisioning.connection.release',
+		/*
+		 * High: it re-admits what the guard judged a runaway — every deactivation and deletion the directory has
+		 * been retrying goes through, and each ends a person's access. Precedent: bucket_user_unlock.
+		 */
+		consequence: 'high',
+		superAdminOnly: false,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id', 'connectionId'],
+		summary:
+			"Release a SCIM provisioning connection held by its mass-deprovisioning guard, and restart its count. The directory's next retries of the deactivations and deletions it was refused go through, ending those users' access — check the directory for the mistake that tripped the guard first. Refused (409) when the connection is not held."
 	},
 	{
 		tool: 'provisioning_connection_delete',

@@ -148,7 +148,8 @@ const mapErrorCode: Record<string, string> = {
 	[routeNames.userinfo]: 'userinfo.error',
 	[routeNames.end_session]: 'end_session.error',
 	[routeNames.end_session_confirm]: 'end_session_confirm.error',
-	[routeNames.revocation]: 'revocation.error'
+	[routeNames.revocation]: 'revocation.error',
+	[routeNames.global_token_revocation]: 'global_token_revocation.error'
 };
 
 /*

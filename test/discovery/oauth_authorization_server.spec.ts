@@ -49,7 +49,9 @@ const OAUTH_EXTENSIONS = [
 	'request_object_signing_alg_values_supported',
 	'backchannel_authentication_endpoint',
 	'backchannel_token_delivery_modes_supported',
-	'authorization_signing_alg_values_supported'
+	'authorization_signing_alg_values_supported',
+	'global_token_revocation_endpoint',
+	'global_token_revocation_endpoint_auth_methods_supported'
 ];
 
 // RFC 8414 §2 marks these two REQUIRED; §3.3 requires the response be JSON. Everything else in the
@@ -146,6 +148,7 @@ describe('/.well-known/oauth-authorization-server at all features', () => {
 		['dpop.enabled', 'dpop_signing_alg_values_supported'],
 		['introspection.enabled', 'introspection_endpoint'],
 		['revocation.enabled', 'revocation_endpoint'],
+		['globalTokenRevocation.enabled', 'global_token_revocation_endpoint'],
 		['registration.enabled', 'registration_endpoint'],
 		['deviceFlow.enabled', 'device_authorization_endpoint'],
 		['mTLS.enabled', 'tls_client_certificate_bound_access_tokens'],
