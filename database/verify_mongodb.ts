@@ -7,7 +7,11 @@ import { verifyBucketGroups } from './verify_bucket_groups.js';
  * Storage fidelity for the MongoDB backend, against a real MongoDB — the properties of per-issuer
  * namespaces and bucket keys an in-memory double cannot exhibit.
  *
+ *   MONGODB_URI=mongodb://localhost:27017 DATABASE_NAME=oauth_scratch_x  bun run db:setup
  *   MONGODB_URI=mongodb://localhost:27017 DATABASE_NAME=oauth_scratch_x  bun database/verify_mongodb.ts
+ *
+ * Provision the database before every run: the uniqueness checks are the provisioned indexes' to pass, and the
+ * script drops the database when it is done.
  *
  * DESTRUCTIVE, and refuses any database whose name does not say it is disposable — the guard
  * `verify_postgres.ts` carries, for the same reason. A script rather than a spec, so `bun test` can
@@ -181,6 +185,16 @@ const { ROOT_KEY_OWNER } = await import('../lib/consts/key_owner.js');
 const legacyArea = db.collection<Record<string, unknown>>(
 	LEGACY_ROOT_KEYS_AREA
 );
+/*
+ * A provisioned scratch database — which the uniqueness checks above need — already holds the root key
+ * `db:setup` generated, and one kept between runs holds the last run's. The migration then finds a signer it did
+ * not create and the count is off by one: the fixture must start from no root keys, as verify_postgres.ts's does.
+ * Not a state an upgrade reaches: `db:setup` generates no root key while legacy keys await the migration.
+ */
+await legacyArea.deleteMany({});
+await db
+	.collection(STORE_AREAS.bucketKeys)
+	.deleteMany({ bucketId: ROOT_KEY_OWNER });
 const [firstRsa, secondRsa, ec] = await Promise.all([
 	generateJWKS('RS256'),
 	generateJWKS('RS256'),
