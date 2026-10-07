@@ -9,6 +9,18 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-07
+
+A sign-out at the upstream provider now reaches this server. A bucket accepts OpenID Connect Back-Channel Logout
+from the Keycloak, Auth0 or Ping providers an administrator opts in, and ends the sessions that came from the
+upstream session it names; signing in through Keycloak, which could not complete before, does. Releases now deploy
+themselves as the signed image they published, the image takes Alpine's security patches on every build again,
+and a Compose deployment upgraded by pulling a newer image runs its migrations instead of refusing to start.
+
+**Upgrading asks one thing of an operator:** run `db:setup` (or `db:setup:pg`) for the new `UpstreamSession` area.
+This release declares no migration. A Compose deployment that skipped `db:migrate` when moving to 0.7.0 or 0.8.0
+gets it from the updated `docker-compose.yml`; take the backup those releases asked for first.
+
 ### Added
 
 - **A sign-out at Keycloak, Auth0 or Ping now signs the person out here.** A bucket receives OpenID Connect
@@ -1517,7 +1529,8 @@ found`. The refusal text existed and never ran: the call that delivered it sat i
 - The DPoP nonce secret is self-provisioned at startup, making the requireNonce-without-secret 500
   state unrepresentable (spec 014)
 
-[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.5.0...v0.6.0
