@@ -1,72 +1,124 @@
 name: Deploy
 
-# Manual only, deliberately. There is no push trigger: a deploy runs `bun run db:setup` as its
-# release command (see fly.toml), so it touches the target's datastore and should be an explicit
-# act rather than a side effect of merging.
+# Two ways in, and production has only the first.
+#
+# A release deploys itself. release.yml calls this workflow once its image is published and signed:
+# conformance first, then — for a release tag, not a pre-release — production. What reaches a Machine
+# is the signed image by digest, verified here against the release run that signed it, so production
+# runs exactly the bytes the release attested to and no second build exists to drift from them. The
+# image was published only after release.yml's own suite passed, so nothing is tested again here.
+#
+# By hand, only the conformance instance. Certification runs are made against commits that are not
+# releases yet, so a manual run builds the dispatched ref from source, as Fly's builder does, after
+# checking that CI passed for that exact commit — the suite is not run a third time, it is looked up.
+# Production has no manual path: a production deploy runs `db:setup` and `db:migrate` against the
+# datastore people depend on, and the only thing allowed to do that is a signed release.
 on:
-  workflow_dispatch:
+  workflow_call:
     inputs:
       target:
-        description: Which deployment to update
-        type: choice
-        default: production
-        options:
-          - production
-          - conformance
+        description: Which deployment to update (production or conformance)
+        type: string
+        required: true
+      tag:
+        description: The release tag whose signed image to deploy, e.g. v0.8.0
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: A release tag to deploy its signed image instead of building the dispatched ref
+        type: string
+        required: false
 
 permissions:
   contents: read
 
-concurrency:
-  # Per target, because the two deployments share no Fly app and no database: a conformance deploy
-  # has no reason to queue behind production's, and serialising them would only make a certification
-  # run wait on an unrelated release.
-  group: fly-deploy-${{ inputs.target }}
-  # Never cancel a deploy in flight — the release command may be mid-provisioning.
-  cancel-in-progress: false
+env:
+  IMAGE: ghcr.io/redfox-soft/oauth-server-ts
 
 jobs:
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version: latest
-
-      - run: bun install --frozen-lockfile
-
-      # No coverage upload here — that is ci.yml's job. This run exists only to gate the deploy, and
-      # it cannot reach the deployment it is gating: no connection string is set, so the suite runs
-      # on the in-memory adapter by construction rather than by convention.
-      - run: bun test
-
   deploy:
-    name: Deploy ${{ inputs.target }} to Fly
-    needs: test
+    name: Deploy ${{ inputs.target || 'conformance' }} to Fly
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Looking up CI's result for the dispatched commit, in place of running the suite again.
+      actions: read
     # One GitHub environment per target, so required reviewers or a wait timer can be demanded of
     # production without also slowing down a test bed.
-    environment: ${{ inputs.target }}
+    environment: ${{ inputs.target || 'conformance' }}
+    # Per target, because the two deployments share no Fly app and no database. At job level rather
+    # than workflow level because a called workflow takes its caller's name, so a workflow-level group
+    # would be shared with release.yml. Never cancel a deploy in flight — the release command may be
+    # mid-provisioning.
+    concurrency:
+      group: fly-deploy-${{ inputs.target || 'conformance' }}
+      cancel-in-progress: false
     env:
+      TARGET: ${{ inputs.target || 'conformance' }}
+      TAG: ${{ inputs.tag }}
       # The whole difference between the two deployments is which file describes it; app name,
       # issuer, database and machine policy all follow from that one choice.
-      CONFIG: ${{ inputs.target == 'production' && 'fly.toml' || 'fly.conformance.toml' }}
+      CONFIG: ${{ (inputs.target || 'conformance') == 'production' && 'fly.toml' || 'fly.conformance.toml' }}
     steps:
+      - name: Refuse anything but a signed release for production
+        if: env.TARGET == 'production' && env.TAG == ''
+        run: |
+          echo "production is deployed only from a release tag" >&2
+          exit 1
+
+      # The config comes from the same commit as the image, so a release deploys with the fly.toml it
+      # shipped with rather than whatever main holds by the time it runs.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag || github.sha }}
 
       - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6
 
-      # --remote-only builds on Fly's builder, so the runner needs no Docker daemon.
+      - name: Check CI passed for this commit
+        if: env.TAG == ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          passed=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${GITHUB_SHA}&status=success" --jq '.total_count')
+          if [ "$passed" = "0" ]; then
+            echo "CI has not passed for ${GITHUB_SHA}; push it to main or open a pull request first" >&2
+            exit 1
+          fi
+          echo "CI passed for ${GITHUB_SHA}"
+
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        if: env.TAG != ''
+
+      # The tag is resolved to a digest once, and everything after uses the digest: a tag is a mutable
+      # pointer, and verifying one name and deploying another would prove nothing. The identity is
+      # pinned to release.yml at this exact tag, so an image signed by any other workflow or for any
+      # other release is refused.
+      - name: Resolve and verify the signed image
+        if: env.TAG != ''
+        run: |
+          digest=$(docker buildx imagetools inspect "${IMAGE}:${TAG#v}" --format '{{json .Manifest}}' | jq -r .digest)
+          echo "${IMAGE}:${TAG#v} is ${digest}"
+          cosign verify \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            --certificate-identity "https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yml@refs/tags/${TAG}" \
+            "${IMAGE}@${digest}" > /dev/null
+          echo "REF=${IMAGE}@${digest}" >> "$GITHUB_ENV"
+
       # The config's release_command runs db:setup and db:migrate on a temporary Machine first and
       # aborts the deploy on a non-zero exit, which is what db:setup returns when a declared storage
-      # constraint is not in force.
+      # constraint is not in force. --remote-only builds on Fly's builder, so the runner needs no
+      # Docker daemon.
       - name: Deploy
-        run: flyctl deploy --remote-only -c "$CONFIG"
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          if [ -n "${REF:-}" ]; then
+            flyctl deploy -c "$CONFIG" --image "$REF"
+          else
+            flyctl deploy --remote-only -c "$CONFIG"
+          fi
 
       # Fly's own checks prove the probes answer. This proves the deployment is the one the config
       # describes, which is a different question: ISSUER is baked into the seeded console client's

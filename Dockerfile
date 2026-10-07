@@ -35,6 +35,16 @@ WORKDIR /app
 ENV NODE_ENV="production"
 
 
+# The production dependencies, in a stage of their own that sees only the lockfile and the manifest.
+# Installed after the build instead, they were reinstalled on every code change — the slowest step of
+# a deploy, and a fresh layer to push each time for bytes that had not changed. Here the layer is
+# rebuilt only when `bun.lock` or `package.json` is.
+FROM base AS deps
+
+COPY bun.lock package.json ./
+RUN bun install --production --frozen-lockfile
+
+
 # Throw-away build stage to reduce size of final image
 FROM base AS build
 
@@ -48,19 +58,18 @@ COPY . .
 # Build application
 RUN bun run build
 
-# Remove development dependencies. `--ci` is not a bun flag — bun ignores it silently and exits 0,
-# so the previous form reinstalled devDependencies and pruned nothing. Verified safe: nothing under
-# lib/ or database/ imports a devDependency, so the server and the db:setup release command both run
-# on the production set alone.
-RUN rm -rf node_modules && \
-    bun install --production --frozen-lockfile
+# Drop the development dependencies; the final stage takes the production set from `deps`. Verified
+# safe: nothing under lib/ or database/ imports a devDependency, so the server and the db:setup
+# release command both run on the production set alone.
+RUN rm -rf node_modules
 
 
 # Final stage for app image
 FROM base
 
-# Copy built application
+# Copy built application, then the production dependencies
 COPY --from=build /app /app
+COPY --from=deps /app/node_modules /app/node_modules
 
 # Start the server by default, this can be overwritten at runtime
 EXPOSE 3000

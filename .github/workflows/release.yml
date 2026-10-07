@@ -16,8 +16,11 @@ name: Release
 # The image is still the artifact that matters most, and it carries more: a signature over its
 # digest, an SBOM, and a build record. See the image job below.
 #
-# Deliberately separate from deploy.yml: publishing an image and release notes touches nothing in
-# production. Deploying stays a manual act.
+# A release also deploys itself, through deploy.yml: once the image is signed, the conformance instance
+# takes it, and then production does — the conformance deploy runs the release's migrations against a
+# database nobody depends on first, so a release that cannot provision stops there. A pre-release tag
+# (one with a hyphen) goes to conformance only. Both deploy the signed image by digest, so what runs
+# is what was attested, and neither builds or tests anything again.
 on:
   push:
     tags:
@@ -228,3 +231,28 @@ jobs:
             dist/docs-export.json
             dist/release-assets.intoto.jsonl
             CHANGELOG.md
+
+  deploy-conformance:
+    name: Deploy conformance
+    needs: image
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/deploy.yml
+    with:
+      target: conformance
+      tag: ${{ github.ref_name }}
+    secrets: inherit
+
+  deploy-production:
+    name: Deploy production
+    needs: deploy-conformance
+    if: ${{ !contains(github.ref_name, '-') }}
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/deploy.yml
+    with:
+      target: production
+      tag: ${{ github.ref_name }}
+    secrets: inherit

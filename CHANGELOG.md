@@ -9,6 +9,14 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+### Changed
+
+- **A release deploys itself, and only a release reaches production.** A version tag's signed image is deployed
+  by digest, its signature verified first, to the conformance instance and then (pre-releases excepted) to
+  production, with nothing rebuilt or retested. The manual deploy is now the conformance instance's alone, from
+  source, once CI has passed for the commit. The image installs its production dependencies in a stage cached
+  by the lockfile, so a code change no longer reinstalls them.
+
 ## [0.8.0] - 2026-10-07
 
 An enterprise directory can now run a bucket's users. Microsoft Entra ID, Okta or any SCIM 2.0 client creates,

@@ -1,7 +1,8 @@
 # fly.conformance.toml — the instance the OpenID conformance suite is pointed at.
 #
-# Deployed with `flyctl deploy --remote-only -c fly.conformance.toml`, or by running
-# `.github/workflows/deploy.yml` with target `conformance`.
+# Every release deploys here before production (`.github/workflows/release.yml`). An unreleased commit
+# gets here by running `.github/workflows/deploy.yml` by hand, or with
+# `flyctl deploy --remote-only -c fly.conformance.toml`.
 #
 # It is a separate Fly app rather than a process group of the production one, and separate is the
 # whole point: a certification run is a few hours of a test harness driving every flow it can reach,

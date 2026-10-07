@@ -131,16 +131,19 @@ one allowance, and all traffic is refused within seconds. The origin resolver re
 first, which is exactly the header Fly sets. [Behind a reverse proxy](/docs/deploy/reverse-proxy/)
 covers the other direction, where the same default is wrong.
 
-<Aside type="note" title="Deploys are manual on purpose">
+<Aside type="note" title="A release deploys itself, and only a release reaches production">
 
-The shipped `.github/workflows/deploy.yml` is `workflow_dispatch` only, with no push trigger,
-because a deploy runs `db:setup` against a real datastore and should be an explicit act instead of a
-side effect of merging. It takes the target as an input (only a choice of configuration file), runs
-`bun test` first as a gate, deploys with `flyctl deploy --remote-only -c`, and then probes both
-health endpoints and compares the advertised issuer with the one the config asks for. That last
-comparison is the part worth keeping. In our experience the issuer is the value a deploy is most
-likely to get wrong with nothing else catching it, and reading the expected value out of the config
-is what stops the check from merely agreeing with itself.
+A deploy runs `db:setup` against a real datastore, so merging never triggers one. Pushing a version
+tag does: `.github/workflows/release.yml` publishes and signs the image, then calls
+`.github/workflows/deploy.yml` for the conformance instance and, once that succeeds, for production.
+Each deploy resolves the tag to a digest, verifies the signature against the release run that made
+it, and hands Fly that digest with `flyctl deploy --image`, so production runs exactly the attested
+bytes and nothing is built or tested a second time. The only manual path is the conformance
+instance, built from source with `--remote-only` once CI has passed for the commit. Every deploy then
+probes both health endpoints and compares the advertised issuer with the one the config asks for.
+That last comparison is the part worth keeping. In our experience the issuer is the value a deploy is
+most likely to get wrong with nothing else catching it, and reading the expected value out of the
+config is what stops the check from merely agreeing with itself.
 
 </Aside>
 
