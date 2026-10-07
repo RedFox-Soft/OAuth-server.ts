@@ -127,11 +127,11 @@ admin API) as part of the change.
   [settings reference](/docs/reference/settings/) for anything the release added. A setting that
   genuinely cannot be applied to a running server says so on its card and in the console, and there
   are none at present.
-- **Signing keys persist in the database** — the instance key set through the `jwksStore` adapter,
-  loaded once at startup, and each addressable bucket's own keys in `bucketKeys`. An upgrade neither
-  rotates nor invalidates them: tokens issued before it still verify, and every `/jwks` serves the same
-  key set it did. Keys are not environment configuration and there is nothing to carry across by hand.
-  The one exception is the release that gave buckets keys of their own, below.
+- **Signing keys persist in the database** — every issuer's, the instance's included, as records in
+  `bucketKeys`. An upgrade neither rotates nor invalidates them: tokens issued before it still verify,
+  and every `/jwks` serves the same key set it did. Keys are not environment configuration and there
+  is nothing to carry across by hand. The one exception is the release that gave buckets keys of their
+  own, below; 0.8.0's migration moved the instance's keys into `bucketKeys` without changing them.
 - **SMTP settings** are read live from their own store on every send, so they are unaffected by a
   restart in either direction.
 - **Tokens, sessions and grants survive**, since they live in the database. Users are not signed

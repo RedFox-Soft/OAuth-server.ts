@@ -48,7 +48,7 @@ groups:
         us:
           {
             status: yes,
-            text: 'End users live in buckets, managed through the console or the management API.'
+            text: 'End users live in buckets, managed through the console or the management API, or provisioned by a directory over SCIM 2.0.'
           }
         them:
           {
@@ -79,7 +79,7 @@ groups:
         us:
           {
             status: yes,
-            text: 'OAuth 2.1 with PKCE mandatory for every client, OIDC Core and Discovery.'
+            text: 'OAuth 2.1 with PKCE mandatory for every client, OIDC Core and Discovery, RP-initiated and back-channel logout.'
           }
         them:
           {
@@ -87,7 +87,7 @@ groups:
             text: 'RFC 6749 with PKCE, OIDC Core, Discovery, and front- and back-channel logout.'
           }
         verdict: even
-        why: 'Both are complete against the core specifications, and Hydra also documents front- and back-channel logout.'
+        why: 'Both are complete against the core specifications and both do back-channel logout; Hydra also documents front-channel logout, which FoxAuth does not implement.'
       - dimension: Device flow
         us: { status: yes, text: 'RFC 8628, behind a feature flag.' }
         them:

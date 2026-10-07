@@ -1,15 +1,15 @@
 ---
 title: FoxAuth compared with Zitadel
 competitor: Zitadel
-description: Zitadel is a multi-tenant identity platform with SAML, SCIM and a managed cloud. FoxAuth is a smaller OAuth 2.1 server with the banking-grade profiles built in.
+description: Zitadel is a multi-tenant identity platform with SAML and a managed cloud. FoxAuth is a smaller OAuth 2.1 server with the banking-grade profiles built in.
 lastChecked: '2026-09-18'
 sources:
   - https://github.com/zitadel/zitadel
   - https://zitadel.com/self-hosted
   - https://zitadel.com/docs
-bottomLine: 'Pick Zitadel if you need SAML, SCIM provisioning or a managed cloud with an enterprise contract behind it. Pick FoxAuth for OAuth 2.1 behaviour by default, the banking-grade profiles without a plan tier, and a licence other than AGPL.'
+bottomLine: 'Pick Zitadel if you need SAML or a managed cloud with an enterprise contract behind it. Pick FoxAuth for OAuth 2.1 behaviour by default, the banking-grade profiles without a plan tier, and a licence other than AGPL.'
 chooseThem:
-  - 'You need SAML 2.0 or SCIM 2.0 provisioning as well as OpenID Connect.'
+  - 'You need SAML 2.0 as well as OpenID Connect.'
   - 'You want a managed cloud option and an enterprise support contract from the vendor.'
   - 'You want a mature multi-tenant model with organisations built into the product.'
   - 'AGPL-3.0 is acceptable to you, or you will buy the commercial licence that replaces it.'
@@ -20,11 +20,11 @@ chooseUs:
   - 'You want an AI agent administering the instance through the same audited path a human uses.'
 faq:
   - question: 'Does FoxAuth support SAML like Zitadel does?'
-    answer: "FoxAuth does not support SAML. It implements OAuth 2.1 and OpenID Connect only, and there is no SAML support planned. Zitadel documents SAML 2.0 and SCIM 2.0 alongside OIDC. If any application in your estate can only speak SAML, that settles it in Zitadel's favour and no other row on this page matters."
+    answer: "FoxAuth does not support SAML, and none is planned. Besides OAuth 2.1 and OpenID Connect it serves SCIM 2.0, so a directory can provision users and groups into it, but it never speaks SAML. Zitadel documents SAML 2.0 and SCIM 2.0 alongside OIDC. If any application in your estate can only speak SAML, that settles it in Zitadel's favour and no other row on this page matters."
   - question: 'How do the licences differ?'
     answer: "Zitadel is AGPL-3.0 with Apache 2.0 and MIT exceptions for specific directories, and sells an enterprise contract whose commercial licence replaces the AGPL. FoxAuth is FSL-1.1-ALv2: you may read, modify, self-host and redistribute it and build a business around it, but not offer it as a competing hosted service. Each version converts to Apache 2.0 two years after it ships. AGPL's network-copyleft and FSL's competing-service restriction rule out different things, so which is the problem depends on what you are building."
   - question: 'Can I migrate from Zitadel to FoxAuth?'
-    answer: "OIDC clients port over with an issuer and client id change. What does not port is anything relying on Zitadel's SAML or SCIM support, its organisation model, or its management API. FoxAuth models tenancy as user buckets: each is its own issuer, addressed either by a path beneath the server's URL or by a hostname of its own, so a client integrates with one exactly as it would with any authorization server. Assess the migration by how much of your estate is OIDC-only, because that part is usually straightforward and the rest is not."
+    answer: "OIDC clients port over with an issuer and client id change. What does not port is anything relying on Zitadel's SAML support, its organisation model, or its management API; a directory that provisions over SCIM can be pointed at a FoxAuth bucket's `/scim/v2` instead. FoxAuth models tenancy as user buckets: each is its own issuer, addressed either by a path beneath the server's URL or by a hostname of its own, so a client integrates with one exactly as it would with any authorization server. Assess the migration by how much of your estate is OIDC-only, because that part is usually straightforward and the rest is not."
   - question: 'Which is more production-ready?'
     answer: "Zitadel is the more mature of the two, on deployment history and on having a vendor-operated cloud and enterprise contracts behind it. FoxAuth is at a 0.8.0 release, so its HTTP surface and admin API may still change between minor versions. FoxAuth's advantage lies in specific protocol coverage and licence terms; it has none in maturity, and this page will not pretend otherwise."
 groups:
@@ -33,12 +33,12 @@ groups:
       - dimension: Protocols beyond OAuth and OIDC
         us:
           {
-            status: no,
-            text: 'OAuth 2.1 and OpenID Connect only. No SAML, and none planned.'
+            status: flag,
+            text: 'SCIM 2.0 provisioning of users and groups, behind scim.enabled. No SAML, and none planned.'
           }
         them: { status: yes, text: 'SAML 2.0 and SCIM 2.0 alongside OIDC.' }
         verdict: them
-        why: 'A single SAML-only application in your estate decides this comparison on its own.'
+        why: 'Both serve SCIM; a single SAML-only application in your estate decides this comparison on its own.'
         note: 'The repository lists "SAML 2.0" and "SCIM 2.0 Server" among its features.'
       - dimension: Runtime and stack
         us:
@@ -172,7 +172,8 @@ groups:
 ## The row that usually decides it
 
 If anything in your estate speaks SAML and only SAML, this comparison is over: Zitadel documents
-SAML 2.0 and SCIM 2.0, FoxAuth implements neither and has no plans to. That is not a gap waiting to
+SAML 2.0 and FoxAuth does not implement it and has no plans to. (Both serve SCIM 2.0 for
+provisioning, so that half of the old answer no longer separates them.) That is not a gap waiting to
 be filled. It is a scope boundary we chose, and it is the honest reason to choose Zitadel.
 
 ## Where FoxAuth is genuinely ahead

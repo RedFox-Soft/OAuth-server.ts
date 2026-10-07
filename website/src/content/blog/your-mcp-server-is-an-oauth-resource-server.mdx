@@ -344,7 +344,7 @@ and ask for more with a 403 and `insufficient_scope` when a privileged tool is f
 client is required to treat the challenge's scope as authoritative and to accumulate scopes across
 step-ups itself, which is why the authorization server can stay stateless about it. Our own
 administrative MCP endpoint advertises `openid` and nothing else, because its authority comes from
-the administrator's roles, not from scopes, and a scope it cannot be missing is not one to publish.
+the administrator's group memberships, not from scopes, and a scope it cannot be missing is not one to publish.
 
 ## Two questions the specification leaves to you
 

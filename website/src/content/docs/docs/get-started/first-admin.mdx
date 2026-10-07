@@ -53,7 +53,8 @@ after the deployment comes up, and do not leave a reachable, un-provisioned inst
 Signing in to the console is an OpenID Connect authorization code flow against the very server the
 console administers, using the first-party `admin-panel` client that `db:setup` seeds. There is no
 second password store and no admin-only credential path: an administrator is an end-user in the
-reserved administrator bucket, holding a role that the admin API checks.
+reserved administrator bucket, and what the admin API lets them do follows from the groups they
+belong to.
 
 Two consequences follow, and both come up in practice:
 
@@ -87,7 +88,10 @@ throttle. The throttle's own settings are `loginThrottle.failureCap`,
 ## What an administrator can reach
 
 The console's super-admin surface covers the instance itself: server settings, signing keys, SMTP,
-administrator accounts and the fault store. A project administrator creates projects, buckets and
+administrator accounts and the fault store. Being a super administrator is membership of the reserved
+**Super administrators** group, granted and withdrawn as operations of their own (the switch on
+**Admins**, or `admin_super_grant` and `admin_super_withdraw` for an agent); the last active member
+can be neither withdrawn nor deactivated. Any other administrator creates projects, buckets and
 groups, invites people into their groups by e-mail, and reads the audit trail for their own
 groups. Ownership is by group: belonging to a container's owning group is what grants access to
 it.

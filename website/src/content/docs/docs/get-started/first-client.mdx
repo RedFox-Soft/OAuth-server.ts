@@ -108,7 +108,8 @@ Login routing is decided by the project a client belongs to, never by the client
 
 1. the reserved console client always goes to the administrator bucket;
 2. a client assigned to a project goes to **that project's bucket**;
-3. anything else (an unassigned or dynamically registered client) goes to the default `redfox`
+3. a client registered dynamically at a bucket's address (its `/reg`) belongs to that bucket;
+4. anything else (an unassigned client, or one registered at the root) goes to the default `redfox`
    bucket.
 
 So a client with no project signs users in from the default bucket, which is rarely what you want.

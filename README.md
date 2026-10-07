@@ -48,9 +48,9 @@ install versus what you switch on deliberately — the distinction is load-beari
 - **Resource Indicators** — audience-restricted tokens via `resource` ([RFC 8707](https://datatracker.ietf.org/doc/html/rfc8707))
 - **Refresh Token grant** — with rotation and reuse detection; offered while `offline_access` is among the supported `scopes`, which it is by default
 - **RP-initiated logout** — by GET or form POST, with a confirmation step
-- **JWT tokens** — access and ID tokens signed with the algorithms your key store holds; `bun run db:setup` provisions an initial RS256 key, and ES256 and EdDSA keys are supported. Keys live in the database, are generated on first run, and are published at `/jwks`
+- **JWT tokens** — access and ID tokens signed with the algorithms your key store holds; `bun run db:setup` provisions an initial RS256 key, and ES256 and EdDSA keys are supported. Keys live in the database, are generated on first run, and are published at `/jwks` — and each bucket with an address of its own publishes its own at its own `jwks_uri`
 - **Database-backed clients** — clients live in this server's own store and are created through the admin API, dynamic registration, or `bun run db:setup`. There is no static client configuration file
-- **Administration console** — projects, OAuth clients, administrators, user buckets, end-users, upstream identity providers, settings, SMTP, signing keys and an append-only audit trail
+- **Administration console** — projects, OAuth clients, administrators, user buckets, end-users and their groups, upstream identity providers, SCIM provisioning connections, settings, SMTP, signing keys and an append-only audit trail
 - **End-user self-service** — email verification and password reset, each with per-identity attempt and cooldown caps
 - **TOTP second factor** — per-bucket, optionally enforced for the admin console ([RFC 6238](https://datatracker.ietf.org/doc/html/rfc6238))
 - **Pairwise subject identifiers** — per-sector `sub` values, salted from the database
@@ -58,7 +58,7 @@ install versus what you switch on deliberately — the distinction is load-beari
 - **Sign-in brute-force throttle** — persisted per-address failure counters with escalating lockouts, and no way to tell a throttled refusal from a wrong password
 - **Security headers** — HSTS, `Permissions-Policy`, framing and content-type protections
 - **CORS closed by data** — an origin is readable only if it is listed on the project owning the calling client
-- **Pluggable storage** — adapter architecture with MongoDB and in-memory implementations
+- **Pluggable storage** — adapter architecture with MongoDB, PostgreSQL and in-memory implementations
 - **Consent & login UI** — built-in authentication and consent screens (React + Ant Design)
 - **Scope-based access control** — fine-grained, per-client scope enforcement
 - **Extensible** — 31 named behaviour seams (account lookup, interaction policy, refresh-token rotation, resource resolution, pairwise identifiers, RAR handling and more) replaced at call time via `addons.override()`
@@ -66,7 +66,7 @@ install versus what you switch on deliberately — the distinction is load-beari
 ### Opt-in capabilities
 
 Implemented, and off until the flag is set. Set them in the console under **Settings** or on
-`ApplicationConfig`; they apply at the next restart.
+`ApplicationConfig`; a change saved in the console applies at once.
 
 | Capability                                                                                                          | Flag                                |
 | ------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
@@ -91,6 +91,8 @@ Implemented, and off until the flag is set. Set them in the console under **Sett
 | Token and response encryption                                                                                       | `encryption.enabled`                |
 | Sign in with Google, Microsoft, Apple or GitHub, or any other OIDC provider by hand                                 | `federation.enabled`                |
 | Administration over MCP — the same management API, served to an AI agent                                            | `mcp.enabled`                       |
+| SCIM 2.0 provisioning of a bucket's users and groups from Microsoft Entra ID, Okta or any SCIM client               | `scim.enabled`                      |
+| Okta Universal Logout — global token revocation (an expired individual draft, hence opt-in)                         | `globalTokenRevocation.enabled`     |
 | Error-store recording (its read surface is always served, deliberately)                                             | `errorStore.enabled`                |
 
 ## Quick Start
@@ -117,7 +119,7 @@ is safe to repeat.
 
 ### From source
 
-**Prerequisites:** [Bun](https://bun.sh/) v1.3+ and a running MongoDB instance.
+**Prerequisites:** [Bun](https://bun.sh/) v1.3+ and a running MongoDB or PostgreSQL instance.
 
 ```bash
 git clone https://github.com/RedFox-Soft/OAuth-server.ts.git
@@ -140,7 +142,7 @@ server ever starts against an empty key store it also generates and persists one
 user bucket, and the first-party `admin-panel` OAuth client. The seed is idempotent — **re-run
 `bun run db:setup` after upgrading an existing install** so the admin client/project/bucket exist.
 On first visit to `/admin`, a one-time setup screen creates the first administrator and makes them a
-member of Super administrators; the setup route is closed once that group has an active member. The admin panel requires a MongoDB-backed deployment
+member of Super administrators; the setup route is closed once that group has an active member. The admin panel requires a database-backed deployment, MongoDB or PostgreSQL
 (the in-memory adapter does not persist seeded data across restarts).
 
 ## Configuration
@@ -153,12 +155,13 @@ member of Super administrators; the setup route is closed once that group has an
 
 ### Signing keys
 
-Signing and decryption keys are stored in the database via the `jwksStore` adapter, not in an
-environment variable. The initial RS256 signing key is created when you provision the schema
-(`bun run db:setup`); the server also generates and persists one automatically if it starts against
-an empty store. On subsequent restarts the existing keys are reused. Keys are loaded once at startup
-— to rotate, update the store and reload the server. Additional keys (for example encryption keys)
-can be provisioned by populating the store.
+Signing keys are stored in the database, not in an environment variable — every issuer's in the
+`bucketKeys` area, the instance's included. The initial RS256 signing key is created when you
+provision the schema (`bun run db:setup`); the server also generates and persists one automatically
+if it starts against an empty store. Rotation needs no restart: generate a key (it is published
+first), promote it to sign once every instance serves it, and retire the old one, which keeps
+verifying for a day — in the console, the admin API, or over MCP (`jwks_generate`, `jwks_promote`,
+`jwks_retire`). One key signs per algorithm, so RS256 and PS256 can sign side by side.
 
 ### Rate limiting
 
@@ -179,7 +182,7 @@ enough to protect the token endpoint would refuse the console's asset burst:
 | exempt     | `GET /health` only — a refused liveness probe would take the machine out of the load balancer                                      | never counted |
 
 All of it is settable from the admin console under **Settings → Rate limiting**, or directly on
-`ApplicationConfig`. Changes apply at the next restart, like every other server setting.
+`ApplicationConfig`. A change saved in the console applies at once, like every other server setting.
 
 | Setting                       | Default | Notes                                    |
 | ----------------------------- | ------- | ---------------------------------------- |
@@ -210,7 +213,7 @@ all independently of anything here.
 **Tuning.** Raise `strict.max` if a legitimate server-to-server integration behind one address, or
 many users behind one corporate NAT, start seeing refusals. Raise `public.max` if the admin console
 stutters while loading. Lower `maxTrackedOrigins` under memory pressure. Set `rateLimit.enabled` to
-`false` and restart to switch the whole thing off during an incident.
+`false` to switch the whole thing off during an incident; it applies on save.
 
 ### Sign-in brute-force throttle
 
@@ -288,7 +291,7 @@ docker run -p 3000:3000 --env-file .env oauth-server-ts
 served at all** — not merely that discovery stops advertising it. The refusal is deliberately
 indistinguishable from a path the server does not have, so if a request below returns `404`, check the
 flag before suspecting a defect. Flags are set in the admin console under **Settings**, or directly on
-`ApplicationConfig`, and apply at the next restart.
+`ApplicationConfig`, and a change saved in the console applies at once.
 
 ### Always available
 
@@ -309,7 +312,7 @@ Flag-governed, but on unless you turn them off.
 | Endpoint               | Description         | Flag                        |
 | ---------------------- | ------------------- | --------------------------- |
 | `GET, POST /userinfo`  | UserInfo endpoint   | `userinfo.enabled`          |
-| `GET  /logout`         | RP-initiated logout | `rpInitiatedLogout.enabled` |
+| `GET, POST /logout`    | RP-initiated logout | `rpInitiatedLogout.enabled` |
 | `POST /logout/confirm` | Logout confirmation | `rpInitiatedLogout.enabled` |
 
 ### Opt-in
@@ -330,6 +333,8 @@ Absent from a default install until the flag is set.
 | `POST, GET /mcp`                                 | Administration over MCP                            | `mcp.enabled`                    |
 | `GET  /.well-known/oauth-protected-resource/mcp` | Protected resource metadata for `/mcp` (RFC 9728)  | `mcp.enabled`                    |
 | `GET, POST /federation/callback`                 | Upstream identity provider callback                | `federation.enabled`             |
+| `/scim/v2/*` (Users, Groups and discovery)       | SCIM 2.0 provisioning, at each bucket's address    | `scim.enabled`                   |
+| `POST /global-token-revocation`                  | Okta Universal Logout, at each bucket's address    | `globalTokenRevocation.enabled`  |
 
 Reading your own registration follows `registration.enabled` rather than
 `registrationManagement.enabled`: the registration response hands the client that URI, so refusing the
@@ -370,8 +375,8 @@ The same management API is available to an AI agent over the Model Context Proto
 protected resource of this server. It is **off by default** — the capability hands an agent the
 authority of the administrator who authorized it, so a deployment should switch it on deliberately:
 
-1. In the console, **Settings → Administration → Enable the administrative MCP control plane**, then
-   restart (settings apply at boot).
+1. In the console, **Settings → Administration → Enable the administrative MCP control plane** (it
+   applies on save).
 2. Point your MCP client at `https://your-server/mcp` with client id **`admin-mcp`** and resource
    `https://your-server/mcp`.
 
@@ -379,8 +384,10 @@ An agent then acts as the administrator who signed in, with exactly that account
 change it makes runs through the same routes, the same checks and the same audit trail as the console's,
 and each audit entry names both the operator and the agent.
 
-Two things it deliberately cannot do: **delete a project** and **delete a user bucket**. Those destroy a
-container of clients or of accounts with nothing left afterwards to inspect, so they stay console-only.
+A few things it deliberately cannot do: **delete a project, a user bucket or a group**, **purge the fault
+store**, and **change which client identities may administer the instance**. The deletions destroy a
+container with nothing left afterwards to inspect, and the last is a privilege-escalation path, so they
+stay console-only.
 Everything else destructive takes two steps — the agent describes what would change and you confirm that
 specific operation.
 
@@ -399,7 +406,7 @@ The same protocol surface works for an MCP server that is not this one. Declare 
 resource** of a project — its canonical URI, the scopes it recognises, how its tokens are verified —
 and this server mints tokens whose audience is exactly that resource, with no code change here and no
 restart. An agent host discovers it, signs your end-users in, and comes back with a token your MCP
-server verifies against `GET /jwks` without asking anything.
+server verifies against the `jwks_uri` its issuer's metadata names, without asking anything.
 
 [**Protect your MCP server with OAuth**](https://foxauth.dev/docs/get-started/protect-your-mcp-server/)
 walks it end to end — including what a correct refusal looks like, so you can tell "protected" from

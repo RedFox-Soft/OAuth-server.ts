@@ -21,7 +21,7 @@ faq:
   - question: 'What is the difference between FoxAuth and authentik?'
     answer: 'authentik is an identity provider for single sign-on across an estate: it describes itself as supporting "SAML, OAuth2/OIDC, LDAP, RADIUS, and more", which is usually what you want when the things logging in are bought software you do not control. FoxAuth is an OAuth 2.1 and OpenID Connect authorization server for applications you do control, and it speaks nothing else. They overlap on OIDC and diverge everywhere else.'
   - question: 'Does FoxAuth support LDAP or RADIUS?'
-    answer: 'FoxAuth supports neither LDAP nor RADIUS, and neither is planned. It implements OAuth 2.1 and OpenID Connect only. authentik supports LDAP and RADIUS as well as SAML, so if you need to put a login in front of an appliance or a legacy application that speaks one of those, FoxAuth cannot do it and authentik can.'
+    answer: 'FoxAuth supports neither LDAP nor RADIUS, and neither is planned. For sign-in it implements OAuth 2.1 and OpenID Connect only; SCIM 2.0, which it also serves, provisions users and signs no one in. authentik supports LDAP and RADIUS as well as SAML, so if you need to put a login in front of an appliance or a legacy application that speaks one of those, FoxAuth cannot do it and authentik can.'
   - question: 'Is FoxAuth lighter to run than authentik?'
     answer: 'FoxAuth is a single Bun process and one database, PostgreSQL or MongoDB. authentik documents a minimum of a host with at least 2 CPU cores and 2 GB of RAM, and its repository contains Python, Go, Rust and TypeScript components with PostgreSQL behind them. That is a broader surface, and it is broader because authentik does considerably more. Whether the extra weight is worth carrying depends on whether you need the protocols it adds.'
   - question: 'Can I migrate from authentik to FoxAuth?'
@@ -33,7 +33,7 @@ groups:
         us:
           {
             status: no,
-            text: 'OAuth 2.1 and OpenID Connect only. No SAML, LDAP or RADIUS.'
+            text: 'For sign-in, OAuth 2.1 and OpenID Connect only; SCIM 2.0 provisioning behind scim.enabled. No SAML, LDAP or RADIUS.'
           }
         them: { status: yes, text: 'SAML, OAuth2/OIDC, LDAP and RADIUS.' }
         verdict: them
@@ -150,7 +150,7 @@ Most comparisons on this site weigh two implementations of the same thing. This 
 authentik is an identity provider for single sign-on. Its value is that it speaks SAML, LDAP and
 RADIUS as well as OIDC, which is what you need when the things logging in are appliances and bought
 software you cannot change. FoxAuth is an OAuth 2.1 authorization server: it issues tokens to
-applications you build, and it speaks nothing but OAuth and OpenID Connect.
+applications you build, and for sign-in it speaks nothing but OAuth and OpenID Connect.
 
 Anyone consolidating logins across an estate wants authentik's category of product, and FoxAuth is
 not in it. If you are securing your own applications and every one of them speaks OIDC, the extra

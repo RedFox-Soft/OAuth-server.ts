@@ -28,9 +28,9 @@ chooseUs:
   - 'You want an AI agent administering the instance through the same audited path a human uses.'
 faq:
   - question: 'Can I migrate from Auth0 to FoxAuth?'
-    answer: "Users, clients and their metadata port over. FoxAuth stores end users in buckets you provision through the admin console or the management API, and OAuth clients can be created there or by dynamic client registration. What does not port is anything written in Auth0's own extension model: Rules, Actions and Hooks have no equivalent and are rewritten as override seams, of which FoxAuth exposes 31, each resolved at call time. Budget the migration by how much logic lives in Actions; the user count has little to do with it."
+    answer: "Users, clients and their metadata port over. FoxAuth stores end users in buckets you provision through the admin console, the management API or, from an enterprise directory, SCIM 2.0, and OAuth clients can be created there or by dynamic client registration. What does not port is anything written in Auth0's own extension model: Rules, Actions and Hooks have no equivalent and are rewritten as override seams, of which FoxAuth exposes 31, each resolved at call time. Budget the migration by how much logic lives in Actions; the user count has little to do with it."
   - question: 'Does FoxAuth support social logins like Google and GitHub?'
-    answer: 'Google, Microsoft, Apple and GitHub are recognised by name: FoxAuth tells you what to do at the provider, shows you the exact callback address to register, and asks only for the values that provider issues — two for Google and GitHub, three for Microsoft, four for Apple. Any other provider speaking OpenID Connect can be configured by hand, per user bucket. Two caveats worth knowing before you compare: you still register the application at the provider yourself, because none of them lets a third party do it for you, and four recognised providers is not the connection catalogue Auth0 ships, which runs to dozens and includes enterprise directories FoxAuth does not speak to at all.'
+    answer: 'Google, Microsoft, Apple and GitHub are recognised by name: FoxAuth tells you what to do at the provider, shows you the exact callback address to register, and asks only for the values that provider issues — two for Google and GitHub, three for Microsoft, four for Apple. Any other provider speaking OpenID Connect can be configured by hand, per user bucket. Two caveats worth knowing before you compare: you still register the application at the provider yourself, because none of them lets a third party do it for you, and four recognised providers is not the connection catalogue Auth0 ships, which runs to dozens and includes SAML and AD/LDAP enterprise connections FoxAuth does not speak. Microsoft Entra ID and Okta can instead provision users and groups into FoxAuth over SCIM.'
   - question: 'Is FoxAuth cheaper than Auth0?'
     answer: 'The bill has a different shape, and it is not uniformly smaller. FoxAuth is free to self-host under FSL-1.1-ALv2; what it costs you is a database, a container and the engineering time to keep them healthy, so the cost grows with infrastructure and is indifferent to monthly active users. Auth0 bills per monthly active user. At small scale that is usually the cheaper option, and at large scale it is what teams tend to come to us about.'
   - question: 'Do I get FAPI, DPoP and PAR without an enterprise plan?'
@@ -78,7 +78,7 @@ groups:
         us:
           {
             status: flag,
-            text: 'Google, Microsoft, Apple and GitHub by name; any other OIDC provider by hand. Per user bucket, behind federation.enabled. No enterprise directories.'
+            text: 'Google, Microsoft, Apple and GitHub by name; any other OIDC provider by hand. Per user bucket, behind federation.enabled. Entra ID, Okta or any SCIM 2.0 directory provisions users and groups (scim.enabled); no SAML or AD/LDAP connections.'
           }
         them:
           {
@@ -86,7 +86,7 @@ groups:
             text: 'A catalogue of social and enterprise connections out of the box.'
           }
         verdict: them
-        why: "Auth0's catalogue runs to dozens and covers enterprise directories; four named providers plus hand configuration does not."
+        why: "Auth0's catalogue runs to dozens, SAML and AD/LDAP included; four named providers, hand configuration and SCIM provisioning do not."
       - dimension: Operations burden
         us:
           {
@@ -222,7 +222,7 @@ groups:
         us:
           {
             status: flag,
-            text: "The server itself is the MCP resource: 73 tools, the console's own checks and audit trail, two-call confirmation. Behind mcp.enabled."
+            text: "The server itself is the MCP resource: every console operation as a tool, bar a few withheld on purpose, the console's own checks and audit trail, two-call confirmation. Behind mcp.enabled."
           }
         them:
           {

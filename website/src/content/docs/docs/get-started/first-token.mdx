@@ -70,7 +70,9 @@ default `redfox` bucket, which is served at the root.
    the scope **and** `prompt=consent` in this URL **and** `refresh_token` among the client's grant
    types. A console-created client has only `authorization_code` by default. If any of the three is
    missing the scope is dropped silently, with no error: you get a token response with no
-   `refresh_token` in it.
+   `refresh_token` in it. The server must also list `offline_access` among its supported scopes, as
+   it does by default; while it does not, the token endpoint refuses every refresh token as
+   `unsupported_grant_type`.
 
 3. **Sign in and consent.** The server redirects to its own interaction screens: a sign-in form for
    the bucket this client's project points at, then a consent screen listing the scopes (consent is
@@ -121,7 +123,9 @@ default `redfox` bucket, which is served at the root.
 
    Check `iss` against your `ISSUER`, `aud` against your client id, and `nonce` against step 2. A
    real client verifies the signature as well, against a key from `GET /jwks` selected by the
-   token's `kid`.
+   token's `kid`. The payload also says how the user signed in: `amr` is `["pwd"]` for a password,
+   or `["pwd", "otp", "mfa"]` with a one-time code, so to require a second factor test for `mfa`,
+   not for the claim being present.
 
 6. **Call the UserInfo endpoint** with the access token:
 
