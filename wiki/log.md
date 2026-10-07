@@ -159,3 +159,5 @@ Operations:
 ## [2026-10-07] create | [[global-token-revocation]]: spec 072 — the global token revocation endpoint, the format-neutral upstream core, the presented-key cache, "sign out everywhere" and the `upstream` audit surface. Corrected [[admin-audit-trail]] (a third non-person actor; the five places a surface literal touches), [[end-user-lifecycle]], [[upstream-federation]] and [[event-bus]] (new signals).
 
 ## [2026-10-07] update | [[scim-provisioning]]: spec 072 — the mass-deprovisioning guard (opt-in per-connection threshold, a ring of expiring slots for an exact rolling count without transactions, one alert per hold through a conditional write, 429 + `Retry-After: 300` and why); part 4 split into several specs.
+
+## [2026-10-07] update | [[sentry-elysia-10.73.0]] — `@sentry/bun` moved from `11.1.0` to `11.5.0`, still exact-pinned, with the in-range dependency refresh; the reading itself is unchanged.

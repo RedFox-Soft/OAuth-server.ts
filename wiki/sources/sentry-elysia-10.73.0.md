@@ -7,7 +7,7 @@ url: https://www.npmjs.com/package/@sentry/elysia
 raw: null
 ingested: 2026-09-02
 created: 2026-09-03
-updated: 2026-09-30
+updated: 2026-10-07
 ---
 
 # @sentry/elysia 10.73.0 (plugin source)
@@ -20,8 +20,8 @@ had to happen at all.
 
 ## Why this is a source page with no raw file
 
-The package is **not installed**. `package.json` depends on `@sentry/bun` (exact-pinned, `11.1.0`
-since 2026-09-30) and nothing else from the SDK; `@sentry/elysia` appears in neither the manifest
+The package is **not installed**. `package.json` depends on `@sentry/bun` (exact-pinned, `11.5.0`
+since 2026-10-07) and nothing else from the SDK; `@sentry/elysia` appears in neither the manifest
 nor `node_modules`, and two assertions in `test/sentry/no_instrumentation.spec.ts:102,115` pin that
 absence so a later convenience install fails the suite rather than passing review.
 
