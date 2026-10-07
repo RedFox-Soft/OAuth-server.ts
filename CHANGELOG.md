@@ -9,6 +9,26 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-07
+
+An enterprise directory can now run a bucket's users. Microsoft Entra ID, Okta or any SCIM 2.0 client creates,
+updates, deactivates and deletes them and their groups through a provisioning connection, an upstream provider
+can sign one of them out of everything, and a guard holds a connection that starts deprovisioning too many at
+once. Roles become groups, which relying parties read in a `groups` claim, and ending a user's access — by
+deactivation, a lock or deletion — now ends their sessions and tokens at once rather than only their next
+sign-in. The instance's signing keys rotate without a restart, and the rest is the protocol held to its specs:
+`amr` in every ID token, the grant types discovery advertises and no others, and a client, assertion, DPoP proof
+or request object checked against the bucket it was sent to.
+
+**Upgrading asks three things of an operator.** Take a backup, then run `db:setup` and `db:migrate` in that
+order: this release carries two schema migrations — the root signing keys move into the store a bucket's keys
+use, and every role and its holders become a group and its members — and neither can be undone. A deployment
+whose clients refresh without the `offline_access` scope among the supported scopes will see
+`unsupported_grant_type` from now on, and `refreshToken.enabled` is gone. And a script or agent that sets
+`roles` on an administrator, a bucket or an end user — through the admin API or over MCP — now grants membership
+of Super administrators (`admin_super_grant`, `admin_super_withdraw`) or of a bucket group instead. The
+[upgrade guide](https://foxauth.dev/docs/deploy/upgrade/) walks through the steps.
+
 ### Added
 
 - **An upstream identity provider can sign a user out of everything here (Okta Universal Logout).** With
@@ -1462,7 +1482,8 @@ found`. The refusal text existed and never ran: the call that delivered it sat i
 - The DPoP nonce secret is self-provisioned at startup, making the requireNonce-without-secret 500
   state unrepresentable (spec 014)
 
-[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.4.0...v0.5.0
