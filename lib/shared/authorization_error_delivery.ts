@@ -84,6 +84,17 @@ export function getObjFromError(
 			error_description
 		};
 	}
+	/*
+	 * A path nobody serves, and a feature-gated endpoint that answers as one. It used to fall through to
+	 * `server_error` — a 404 whose body reported a fault that never happened, which a client or an operator
+	 * reading it would chase as one. OAuth registers no code for this; `not_found` names what it is.
+	 */
+	if (code === 'NOT_FOUND') {
+		return {
+			error: 'not_found',
+			error_description: 'The requested resource was not found'
+		};
+	}
 	return {
 		error: 'server_error',
 		error_description: 'An unexpected error occurred'

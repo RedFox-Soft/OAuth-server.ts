@@ -3,7 +3,8 @@ import { eventBus } from 'lib/event_bus.js';
 import { OIDCProviderError } from '../helpers/errors.ts';
 import { getErrorHtmlResponse } from '../html/error.tsx';
 import { routeNames } from 'lib/consts/param_list.js';
-import { isScimRoute } from 'lib/consts/scim.js';
+import { isScimPath, isScimRoute, SCIM_MEDIA_TYPE } from 'lib/consts/scim.js';
+import { scimErrorBody } from 'lib/scim/errors.js';
 import { ErrorContext, ValidationError } from 'elysia';
 import {
 	deliverAuthorizationError,
@@ -339,6 +340,28 @@ export async function errorHandler(obj: ErrorHandlerContext) {
 	 */
 	if (isScimRoute(route)) {
 		return;
+	}
+	/*
+	 * A path beneath a SCIM base that nothing serves — `/Groups` before groups exist, a typo — matched no
+	 * route, so the exit above cannot see it and the SCIM plugin's handler never runs. A directory reading
+	 * the body still expects RFC 7644 §3.12's shape. Only while SCIM is served: with `scim.enabled` off the
+	 * whole base must answer as any unserved path does, or the SCIM-shaped 404 would announce the surface.
+	 */
+	if (
+		code === 'NOT_FOUND' &&
+		!(error instanceof FeatureDisabled) &&
+		ApplicationConfig['scim.enabled'] === true &&
+		isScimPath(new URL(request.url).pathname)
+	) {
+		return new Response(
+			JSON.stringify(
+				scimErrorBody({ status: 404, detail: 'no such SCIM endpoint' })
+			),
+			{
+				status: 404,
+				headers: { 'content-type': `${SCIM_MEDIA_TYPE}; charset=utf-8` }
+			}
+		);
 	}
 	// Elysia's not-found carries its own status but does not assign set.status before onError runs, so
 	// the HTML branch below rendered every missing route as a 200 page titled "200". Applies to a

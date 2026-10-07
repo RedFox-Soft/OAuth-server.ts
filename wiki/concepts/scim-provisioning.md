@@ -86,7 +86,11 @@ in the suite. `.use` mutates, so the routes register identically.
   (`lib/shared/authorization_error_handler.ts:340`), so Elysia's own validation and parse failures render in
   SCIM's shape too; the plugin records 5xx itself (`lib/scim/index.ts:200`) — a fourth capture site
   ([[error-store-capture-sites]]). Elysia wraps anything a parse hook throws in a `ParseError`, so the 413
-  rides as its `cause`.
+  rides as its `cause`. A path beneath a SCIM base that no route matches (`/Groups` before part 3) has no
+  route key, so the root handler recognises it by path (`isScimPath`, `lib/consts/scim.ts`) and answers a
+  SCIM 404 — only while `scim.enabled` is on; off, it answers as any unserved path, so the surface stays
+  unannounced ([[feature-flag-gating]]). Found by Okta's SCIM 2.0 Spec Test on 2026-10-07, whose optional
+  `/Groups` probe got a 404 whose body read `server_error`; every unserved path now answers `not_found`.
 - **Its own parser.** Elysia dispatches on `contentType.charCodeAt(12)` and leaves `application/scim+json`
   unparsed; the plugin's `onParse` reads both JSON types, caps the body at 256 KiB first, and lets other types
   reach a 415.

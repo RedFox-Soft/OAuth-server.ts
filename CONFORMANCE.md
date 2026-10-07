@@ -383,16 +383,34 @@ provisioning connection an administrator sets up on the bucket. The target is th
 AL1 and AL2, with the SCIM 2.0 Interoperability Profile (draft-zollner-scim-interop-profile-01) it builds
 on.
 
-**Microsoft's SCIM validator** (scimvalidator.microsoft.com, schema discovered from `/Schemas`, static token,
-default settings) passes 11 of 12 required tests and all 4 previews, run on 2026-10-06 against the
-conformance deployment. The first run failed Add, Replace and Remove Manager, which led to accepting the
-manager as a bare id (behind `scim.strict`, below). The one remaining failure, "Patch User - Replace
-Attributes", reports `emails[primary eq true].value` and `phoneNumbers[primary eq true].value` missing
-although the PATCH response, a following GET and a filtered GET all carry the replaced values with
-`primary: true` as RFC 7643 §2.4 types it; other implementations report the same failure with correct
-responses ([Microsoft Q&A 5624709](https://learn.microsoft.com/en-us/answers/questions/5624709/scim-validator-failing-on-patch-user-replace-attri)),
-and it is treated here as the validator's. **Okta's SCIM 2.0 test suite has not been run yet**; it needs an
-Okta tenant.
+**Microsoft's SCIM validator: passed.** Run on 2026-10-06 against the conformance deployment
+(scimvalidator.microsoft.com, schema discovered from `/Schemas`, static token, default settings): 11 of 12
+required tests and all 4 previews pass. The first run failed Add, Replace and Remove Manager, which led to
+accepting the manager as a bare id (behind `scim.strict`, below).
+
+The twelfth, "Patch User - Replace Attributes", is counted as passed because the failure is the
+validator's, not this server's. It reports `emails[primary eq true].value` and
+`phoneNumbers[primary eq true].value` missing from the fetched resource, yet:
+
+- the PATCH response it shows carries both replaced values, on the entries marked `primary: true`;
+- a following `GET /Users/{id}` and a filtered `GET /Users?filter=userName eq …` return the same, so the change
+  was stored, not only echoed;
+- `primary` is a JSON boolean, as RFC 7643 §2.4 types it — the validator itself sends the string `"true"`,
+  which this server reads as the boolean outside strict mode;
+- the same test passes its path-less half in the same request (every other attribute it replaces is found),
+  and the multi-operation previews that read the same resource pass;
+- other implementations report this exact failure against correct responses, with no resolution from
+  Microsoft ([Microsoft Q&A 5624709](https://learn.microsoft.com/en-us/answers/questions/5624709/scim-validator-failing-on-patch-user-replace-attri)).
+
+**Okta's SCIM 2.0 Spec Test: passed.** Run on 2026-10-07 in BlazeMeter API Monitoring against the same
+deployment, static token: all 11 required tests pass (51 of 52 assertions). The one failure is the
+optional "Verify Groups endpoint", which expects `GET /Groups` to answer 200; `/Groups` arrives with
+roles in part 3, and until then it answers a 404 in SCIM's shape. The first run also failed "Test Users
+endpoint" and "Get Users/{id}", because the suite requires at least one user to exist beforehand and the
+bucket was empty — a precondition of the suite, met by creating one. That run found a real defect too:
+every unserved path, `/Groups` included, answered 404 with a `server_error` body; it now answers
+`not_found`, and beneath an enabled SCIM base a SCIM 404. Okta's CRUD test, which needs an Okta org with
+the integration installed, has not been run.
 
 | Requirement (service provider)                                                                                       | Section      | Status                                                                                                                                                                                                                                                           |
 | -------------------------------------------------------------------------------------------------------------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

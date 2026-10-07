@@ -69,6 +69,17 @@ export function isScimRoute(route: string | undefined): boolean {
 }
 
 /*
+ * Whether a request path lies beneath a SCIM base — the root one or a bucket's — whether or not anything
+ * is mounted there. For a request no route matched, which has no pattern for `isScimRoute` to read.
+ */
+export function isScimPath(pathname: string): boolean {
+	const bare = /^\/[^/]+\/scim\/v2(\/|$)/.test(pathname)
+		? pathname.slice(pathname.indexOf('/', 1))
+		: pathname;
+	return bare === SCIM_BASE_PATH || bare.startsWith(`${SCIM_BASE_PATH}/`);
+}
+
+/*
  * RFC 9728 metadata for a bucket's SCIM resource. The well-known segment is inserted before the resource's
  * path (§3.1), so a path-addressed bucket's document cannot be produced by prefixing and is its own route.
  */

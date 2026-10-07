@@ -4,8 +4,8 @@ import { elysia } from '../../lib/index.ts';
 import { ISSUER } from 'lib/configs/env.js';
 
 // A path the server deliberately does not serve. Every off-state assertion compares against a live
-// request to this path rather than a hard-coded body, so the eventual not-found-body cleanup
-// (backlog task 14) cannot silently break these specs.
+// request to this path rather than a hard-coded body, so a change to the not-found body (it has changed
+// once: from `server_error` to `not_found`) cannot silently break these specs.
 export const UNSERVED_PATH = '/_not_a_mounted_route';
 
 export interface ProbeInit {

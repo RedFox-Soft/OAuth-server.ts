@@ -6,7 +6,7 @@ import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { gatedRoutes } from 'lib/consts/route_classification.js';
 import { TestAdapter } from 'test/models.js';
-import { expectUnservedEquivalent, send } from './helpers.js';
+import { expectUnservedEquivalent, send, UNSERVED_PATH } from './helpers.js';
 
 const json = { 'content-type': 'application/json' };
 const form = { 'content-type': 'application/x-www-form-urlencoded' };
@@ -194,6 +194,17 @@ describe('feature gate — capability off', () => {
 				body: 'client_id=client-device&scope=openid&login_hint=accountId'
 			});
 		});
+	});
+
+	/*
+	 * The body every refusal above shares. It was `server_error` / "An unexpected error occurred" — a 404
+	 * reporting a fault that never happened, which a client or an operator would chase as one.
+	 */
+	it('answers a path nobody serves as not found, never as a server fault', async () => {
+		const res = await send(UNSERVED_PATH, { method: 'GET' });
+
+		expect(res.status).toBe(404);
+		expect(await res.json()).toMatchObject({ error: 'not_found' });
 	});
 
 	it('refuses userinfo even for a request bearing a valid access token', async () => {

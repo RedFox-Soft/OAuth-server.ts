@@ -151,3 +151,5 @@ Operations:
 ## [2026-10-06] update | [[scim-provisioning]]: the `scim.strict` tolerances gain Entra's manager forms — the enterprise `manager` as a bare id, and `replace` with `""` to clear it. Found by Microsoft's SCIM validator against the conformance deployment, which then passed 11 of 12 required tests; the remaining "Replace Attributes" failure is recorded in CONFORMANCE.md as the validator's.
 
 ## [2026-10-06] update | [[scim-provisioning]] and [[upstream-federation]]: the unusable password of a passwordless account is hashed once per process instead of once per account — an argon2 hash per SCIM create (~100 ms of CPU) could not have sustained an initial directory import; the preimage is still discarded, so sharing the hash opens nothing.
+
+## [2026-10-07] update | [[scim-provisioning]]: an unserved path beneath an enabled SCIM base answers a SCIM 404 (recognised by path, since it has no route key); every unserved path now answers `not_found` instead of a `server_error` body that reported a fault that never happened. Found by Okta's SCIM 2.0 Spec Test.

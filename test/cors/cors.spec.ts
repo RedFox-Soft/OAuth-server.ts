@@ -621,8 +621,8 @@ describe('CORS', () => {
 			expect(res.headers.get('vary')).toBe('Origin');
 		});
 
-		// Compared against a live unrouted probe rather than a literal: the not-found body is slated to
-		// change (backlog task 14) and this equality must survive that.
+		// Compared against a live unrouted probe rather than a literal, so the equality survives a change to
+		// the not-found body (it has changed once: from `server_error` to `not_found`).
 		it('carries the same no-store headers a 404 carries', async () => {
 			const flight = await preflight('/token', 'POST');
 			const unserved = await send('/_not_a_mounted_route', {
