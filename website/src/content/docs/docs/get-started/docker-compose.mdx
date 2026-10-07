@@ -42,16 +42,19 @@ server. Nothing needs configuring beyond the one value discussed below.
 
 ## What the three services do
 
-| Service | Image                                        | Role                                                                                                              |
-| ------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `mongo` | `mongo:8`                                    | The datastore, on a named `mongo-data` volume, with a `mongosh` ping healthcheck the other services wait for      |
-| `setup` | `ghcr.io/redfox-soft/oauth-server-ts:latest` | Runs `bun run db:setup` once and exits: collections, indexes, the initial RS256 signing key, the admin panel seed |
-| `oauth` | `ghcr.io/redfox-soft/oauth-server-ts:latest` | The server itself on port 3000, started only after `setup` completes successfully                                 |
+| Service | Image                                        | Role                                                                                                                                                               |
+| ------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `mongo` | `mongo:8`                                    | The datastore, on a named `mongo-data` volume, with a `mongosh` ping healthcheck the other services wait for                                                       |
+| `setup` | `ghcr.io/redfox-soft/oauth-server-ts:latest` | Runs `bun run db:setup` and `bun run db:migrate`, then exits: collections, indexes, the initial RS256 signing key, the admin panel seed, and any schema migrations |
+| `oauth` | `ghcr.io/redfox-soft/oauth-server-ts:latest` | The server itself on port 3000, started only after `setup` completes successfully                                                                                  |
 
 The ordering matters. Without the reserved admin project, bucket and `admin-panel` client that
 `setup` seeds, the console's sign-in redirects to a client no `Client` document matches. The
-first-run setup page still works in that state, which can make it look like a login bug. `setup` is
-idempotent, so re-running `docker compose up` after pulling a newer image is also the upgrade path.
+first-run setup page still works in that state, which can make it look like a login bug. The server
+also refuses to start against a database whose migrations have not run, which is why `setup` runs
+`db:migrate` after `db:setup`. Both are safe to repeat, so re-running `docker compose up` after
+pulling a newer image is also the upgrade path; take a backup first when the release notes name a
+migration that cannot be undone.
 
 <Aside type="caution" title="Set ISSUER before the first docker compose up">
 

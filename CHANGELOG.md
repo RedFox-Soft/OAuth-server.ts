@@ -24,6 +24,10 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   callback refused any parameter it did not declare, so no Keycloak sign-in could finish; unknown return
   parameters are now ignored, as RFC 6749 §4.1.2 requires. Found by running back-channel logout against a real
   Keycloak 26.8.0.
+- **Upgrading a Compose deployment runs the migrations too.** The shipped `docker-compose.yml` and
+  `docker-compose.postgres.yml` ran only `db:setup`, so pulling 0.7.0 or 0.8.0 over an existing database left a
+  server that refused to start; their `setup` service now runs `db:migrate` after it, as `fly.toml` does, and the
+  Kubernetes and Atlas guides say the same.
 
 ### Security
 

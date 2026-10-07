@@ -41,8 +41,10 @@ shortest path to having that backed up.
    MONGODB_URI='mongodb+srv://…' DATABASE_NAME=OAuth ISSUER=https://auth.example.com bun run db:setup
    ```
 
-   On Fly this is the `release_command` and you do not run it by hand; on Kubernetes it is the
-   provisioning Job; under Compose it is the `setup` service.
+   On an upgrade, follow it with `bun run db:migrate`: the server refuses to start against a
+   database whose migrations have not run. On Fly both are the `release_command` and you do not run
+   them by hand; on Kubernetes they are the provisioning Job; under Compose they are the `setup`
+   service.
 
 </Steps>
 

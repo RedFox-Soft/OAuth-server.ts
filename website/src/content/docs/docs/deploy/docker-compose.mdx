@@ -16,7 +16,7 @@ changes make it something you can leave running.
 services:
   setup:
     image: ghcr.io/redfox-soft/oauth-server-ts:<version>
-    command: ['bun', 'run', 'db:setup']
+    command: ['sh', '-c', 'bun run db:setup && bun run db:migrate']
     env_file: .env
     restart: 'no'
 
@@ -118,7 +118,9 @@ docker compose pull
 docker compose up -d
 ```
 
-`setup` re-runs on every `up`, which is intended: it is idempotent, and it is what applies a new
-release's collections, indexes and seed changes. The server waits for it to complete successfully
-before starting. The full checklist, including what a restart does and does not carry over, is in
+`setup` re-runs on every `up`, which is intended: both of its commands are safe to repeat, and
+together they apply a new release's collections, indexes, seed changes and schema migrations. The
+server waits for it to complete successfully before starting, and would refuse to start without the
+migrations anyway. When the release notes name a migration that cannot be undone, take a backup
+before the `up`. The full checklist, including what a restart does and does not carry over, is in
 [Upgrading](/docs/deploy/upgrade/).

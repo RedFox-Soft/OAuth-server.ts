@@ -7,10 +7,12 @@
 # POSTGRES_URL and MONGODB_URI makes the server refuse to start rather than silently pick one, so the
 # two files are alternatives and never combined.
 #
-# The setup service runs `bun run db:setup:pg` and exits. It must finish before the server starts:
-# without the reserved admin project, bucket and client it seeds, the console's sign-in redirects to
-# a client that does not exist. It is idempotent, so re-running after pulling a newer image is the
-# upgrade path — followed by `bun run db:migrate` when a release declares new migrations.
+# The setup service runs `bun run db:setup:pg`, then `bun run db:migrate`, and exits. It must finish
+# before the server starts: without the reserved admin project, bucket and client it seeds, the
+# console's sign-in redirects to a client that does not exist, and the server refuses to start
+# against a database whose migrations have not run. Both are safe to repeat, so re-running after
+# pulling a newer image is the upgrade path. Take a backup first when the release notes name a
+# migration that cannot be undone.
 #
 # ISSUER must be the URL a browser reaches the server at. Set it to its final public URL BEFORE the
 # first `up`: the seeded admin client's redirect URI is derived from it once, and a later change is
@@ -40,7 +42,7 @@ services:
 
   setup:
     image: ghcr.io/redfox-soft/oauth-server-ts:latest
-    command: ['bun', 'run', 'db:setup:pg']
+    command: ['sh', '-c', 'bun run db:setup:pg && bun run db:migrate']
     environment:
       ISSUER: http://localhost:3000
       POSTGRES_URL: postgres://oauth:oauth@postgres:5432/OAuth

@@ -43,7 +43,7 @@ on the
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: oauth-server-setup-0-1-0
+  name: oauth-server-setup-<version>
 spec:
   backoffLimit: 2
   template:
@@ -52,7 +52,7 @@ spec:
       containers:
         - name: setup
           image: ghcr.io/redfox-soft/oauth-server-ts:<version>
-          command: ['bun', 'run', 'db:setup']
+          command: ['sh', '-c', 'bun run db:setup && bun run db:migrate']
           envFrom:
             - secretRef:
                 name: oauth-server
@@ -60,7 +60,7 @@ spec:
 
 Run this to completion **before** rolling the Deployment, and gate the rollout on it: an
 `argocd.argoproj.io/hook: PreSync` annotation, a Helm `pre-install,pre-upgrade` hook, or simply
-`kubectl wait --for=condition=complete job/oauth-server-setup-0-1-0` in your pipeline.
+`kubectl wait --for=condition=complete job/oauth-server-setup-<version>` in your pipeline.
 
 The reason is the same one that puts `release_command` in the shipped `fly.toml`: without the
 reserved admin project, bucket and client the seed creates, `GET /admin/login` redirects to `/auth`
@@ -69,9 +69,13 @@ still answers. From outside, that is easy to mistake for a login bug when the se
 missing. The Job also provisions the TTL and unique-e-mail indexes the collections would otherwise
 be created without.
 
-`db:setup` is idempotent, so re-running it is safe; it exits non-zero when a constraint it declares
-is not in force, so a failed Job is a real signal and should stop the rollout. Name the Job after
-the release (as above) so each upgrade runs its own.
+`db:migrate` follows it in the same Job because the server refuses to start against a database whose
+migrations have not run: a release that declares one would otherwise roll out pods that cannot boot.
+Both are safe to repeat; `db:setup` exits non-zero when a constraint it declares is not in force, so
+a failed Job is a real signal and should stop the rollout. Name the Job after the release (as above)
+so each upgrade runs its own, and take a backup before one whose release notes name a migration that
+cannot be undone — `bun run db:migrate --plan` lists what would run and exits non-zero when work is
+outstanding, so a pipeline can stop there for it.
 
 ## Deployment and Service
 
@@ -199,12 +203,10 @@ signed, which is every image on the internet. The same two values verify by hand
 
 - Sessions, tokens, codes and interactions live in the database and never in process memory, so more
   than one replica is fine as far as the protocol is concerned.
-- Signing keys are loaded once at startup from the database. Generating one in the console
-  hot-applies it to the replica that served that request only, so the others must be restarted or
-  they will disagree about what `/jwks` advertises. The console's key page reports exactly this
-  drift, between the stored key set and the one the process booted with. That is the instance key
-  set only: a bucket's own keys are read from the database and cached for thirty seconds per replica,
-  so a change to them reaches every replica within that time without a restart — which is why a new
-  bucket key cannot be promoted to signing until it has been published for a minute.
-- Server settings are read at boot too. A settings change applies on the next rollout:
-  `kubectl rollout restart deployment/oauth-server`.
+- Signing keys need no restart. Every issuer's key set, the instance's included, is read from the
+  database and cached for thirty seconds per replica, so a generated, promoted or retired key reaches
+  every replica within that time — which is why a new key cannot be promoted to signing until it has
+  been published for a minute.
+- Server settings are the exception, as the caution above says: a save applies to the replica that
+  served it, and the others take it on their next restart
+  (`kubectl rollout restart deployment/oauth-server`).
