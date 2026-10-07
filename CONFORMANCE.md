@@ -383,12 +383,16 @@ through a provisioning connection an administrator sets up on the bucket. The ta
 AL1 and AL2, with the SCIM 2.0 Interoperability Profile (draft-zollner-scim-interop-profile-01) it builds
 on.
 
-**Microsoft's SCIM validator: passed.** Run on 2026-10-06 against the conformance deployment
-(scimvalidator.microsoft.com, schema discovered from `/Schemas`, static token, default settings): 11 of 12
-required tests and all 4 previews pass. The first run failed Add, Replace and Remove Manager, which led to
-accepting the manager as a bare id (behind `scim.strict`, below).
+**Microsoft's SCIM validator: passed.** Run on 2026-10-07 against the conformance deployment, with
+`/Groups` (scimvalidator.microsoft.com, schema discovered from `/Schemas` — `displayName` as the group's
+joining property, `externalId` — static token, default settings): 23 of 24 required tests and all 7
+previews pass. All 12 group tests pass: get by id and filter by `displayName` excluding members, filter
+existing, absent and in another letter case, create and a duplicate create, replace attributes, rename,
+add and remove a member, delete; and the previews' multi-operation group PATCH and deleting an absent or
+already-deleted group. The first run, on 2026-10-06 without groups, failed Add, Replace and Remove Manager,
+which led to accepting the manager as a bare id (behind `scim.strict`, below).
 
-The twelfth, "Patch User - Replace Attributes", is counted as passed because the failure is the
+The one failure, "Patch User - Replace Attributes", is the same in both runs and is counted as passed because the failure is the
 validator's, not this server's. It reports `emails[primary eq true].value` and
 `phoneNumbers[primary eq true].value` missing from the fetched resource, yet:
 
@@ -403,9 +407,9 @@ validator's, not this server's. It reports `emails[primary eq true].value` and
   Microsoft ([Microsoft Q&A 5624709](https://learn.microsoft.com/en-us/answers/questions/5624709/scim-validator-failing-on-patch-user-replace-attri)).
 
 **Okta's SCIM 2.0 Spec Test: passed.** Run on 2026-10-07 in BlazeMeter API Monitoring against the same
-deployment, static token: all 11 required tests pass (51 of 52 assertions). The one failure is the
-optional "Verify Groups endpoint", which expected `GET /Groups` to answer 200; `/Groups` has since been
-added (spec 071), and neither validator has yet been re-run with its group tests. The first run also failed "Test Users
+deployment, static token, with `/Groups`: all 11 required tests and the optional "Verify Groups endpoint"
+pass — 12 of 12 steps, 53 of 53 assertions. An earlier run that day, before `/Groups`, failed only that
+optional test (51 of 52). The first run also failed "Test Users
 endpoint" and "Get Users/{id}", because the suite requires at least one user to exist beforehand and the
 bucket was empty — a precondition of the suite, met by creating one. That run found a real defect too:
 every unserved path, `/Groups` included, answered 404 with a `server_error` body; it now answers
