@@ -24,7 +24,12 @@ FROM oven/bun:1.4.2-alpine@sha256:d888c0ae6c86d7866ff10c5aafdd9077b36aee6455b33d
 # known-vulnerable package is reproducible in the way a photograph is. Within a single run the scan
 # and the release still build identically, which is the property the pipeline actually depends on, and
 # `bun.lock` still pins everything the application itself runs on.
-RUN apk upgrade --no-cache
+#
+# The floor on zlib is CVE-2026-85091 (fixed in 1.3.2-r1). The upgrade alone did not deliver it: this
+# layer is served from the build cache until its line or the base image changes, so the published
+# image kept 1.3.2-r0 after Alpine had shipped the fix.
+RUN apk upgrade --no-cache && \
+    apk add --no-cache 'zlib>=1.3.2-r1'
 
 LABEL fly_launch_runtime="Bun"
 
