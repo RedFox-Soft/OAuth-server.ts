@@ -11,28 +11,6 @@
 # direction worth having.
 FROM oven/bun:1.4.2-alpine@sha256:d888c0ae6c86d7866ff10c5aafdd9077b36aee6455b33dd270fb93c0dd5cef6f AS base
 
-# Then take the distribution's security patches, because the pin alone would ship known-vulnerable
-# packages. The two clocks are not the same: CVE-2026-14456 was fixed in Alpine's libssl3 3.5.8-r0 and
-# served from the v3.22 repository while this base image still carried 3.5.7-r0 — one OpenSSL, twenty
-# image-scan alerts. Waiting for the base image to be rebuilt means deploying the vulnerable one until
-# it is.
-#
-# This is in tension with the pin above and the tension is deliberate: the digest fixes what is
-# inherited, and this line refuses to inherit the unpatched half of it. What is given up is
-# build-to-build reproducibility over time — the same Dockerfile produces different packages as the
-# repository moves — and that is the cheaper thing to give up, since a build pinned to a
-# known-vulnerable package is reproducible in the way a photograph is. Within a single run the scan
-# and the release still build identically, which is the property the pipeline actually depends on, and
-# `bun.lock` still pins everything the application itself runs on.
-#
-# The floor on zlib is CVE-2026-85091 (fixed in 1.3.2-r1). The upgrade alone did not deliver it: this
-# layer is served from the build cache until its line or the base image changes, so the published
-# image kept 1.3.2-r0 after Alpine had shipped the fix.
-RUN apk upgrade --no-cache && \
-    apk add --no-cache 'zlib>=1.3.2-r1'
-
-LABEL fly_launch_runtime="Bun"
-
 # Bun app lives here
 WORKDIR /app
 
@@ -70,7 +48,34 @@ RUN rm -rf node_modules
 
 
 # Final stage for app image
-FROM base
+FROM base AS runtime
+
+# Take the distribution's security patches, because the pin alone would ship known-vulnerable
+# packages. The two clocks are not the same: CVE-2026-14456 was fixed in Alpine's libssl3 3.5.8-r0 and
+# served from the v3.22 repository while this base image still carried 3.5.7-r0 — one OpenSSL, twenty
+# image-scan alerts. Waiting for the base image to be rebuilt means deploying the vulnerable one until
+# it is.
+#
+# This is in tension with the pin above and the tension is deliberate: the digest fixes what is
+# inherited, and this line refuses to inherit the unpatched half of it. What is given up is
+# build-to-build reproducibility over time — the same Dockerfile produces different packages as the
+# repository moves — and that is the cheaper thing to give up, since a build pinned to a
+# known-vulnerable package is reproducible in the way a photograph is. Within a single run the scan
+# and the release still build identically, which is the property the pipeline actually depends on, and
+# `bun.lock` still pins everything the application itself runs on.
+#
+# It runs here, in the stage that ships, and not in `base`, because a build cache serves this layer
+# for as long as its line and the base image are unchanged: 0.8.0 shipped zlib 1.3.2-r0 for that
+# reason after Alpine had published 1.3.2-r1 (CVE-2026-85091). Every workflow that builds an image —
+# release, scan, and a conformance deploy from source — passes its run id as PACKAGES_AS_OF, and a new
+# value is a cache miss on the line below, so each of those builds takes the repository as it is that
+# day. A local build without the argument keeps the cache. Keeping the upgrade out of `base` is what
+# lets `deps` and `build` stay cached meanwhile: they produce only files, which the OS packages they
+# were built beside never reach.
+ARG PACKAGES_AS_OF
+RUN apk upgrade --no-cache
+
+LABEL fly_launch_runtime="Bun"
 
 # Copy built application, then the production dependencies
 COPY --from=build /app /app

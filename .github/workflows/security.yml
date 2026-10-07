@@ -112,6 +112,8 @@ jobs:
           tags: oauth-server-ts:scan
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # A fresh `apk upgrade` per run; see the comment above it in the Dockerfile.
+          build-args: PACKAGES_AS_OF=${{ github.run_id }}
 
       # Findings go to code scanning, where they stay visible and dated, instead of failing the run:
       # most of what an image scan finds is in the base image, and a fix for that is a rebuild once

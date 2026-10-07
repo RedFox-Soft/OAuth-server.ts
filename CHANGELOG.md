@@ -11,8 +11,10 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Security
 
-- **The image carries zlib 1.3.2-r1 (CVE-2026-85091).** Its `apk upgrade` layer was served from the build cache,
-  so 0.8.0 shipped 1.3.2-r0 after Alpine had published the fix; the Dockerfile now requires the patched version.
+- **The image takes Alpine's security patches on every build again.** Its `apk upgrade` layer was served from
+  the build cache, so 0.8.0 shipped zlib 1.3.2-r0 after Alpine had published 1.3.2-r1 (CVE-2026-85091). The
+  upgrade now runs in the final stage and is re-run by every release, scan and deploy build, while the
+  dependency and build stages stay cached.
 
 ### Changed
 

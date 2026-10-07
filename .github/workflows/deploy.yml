@@ -117,7 +117,7 @@ jobs:
           if [ -n "${REF:-}" ]; then
             flyctl deploy -c "$CONFIG" --image "$REF"
           else
-            flyctl deploy --remote-only -c "$CONFIG"
+            flyctl deploy --remote-only -c "$CONFIG" --build-arg "PACKAGES_AS_OF=${GITHUB_RUN_ID}"
           fi
 
       # Fly's own checks prove the probes answer. This proves the deployment is the one the config
