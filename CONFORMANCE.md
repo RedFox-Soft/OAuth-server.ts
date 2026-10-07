@@ -484,6 +484,34 @@ is why the endpoint is behind its own switch.
 Not yet run against a real Okta organisation (it needs Identity Threat Protection); the request shape Okta
 documents is replayed by the test suite with a stub provider's keys.
 
+## Back-channel logout received from upstream providers
+
+Each bucket serves `<bucket issuer>/federation/backchannel-logout` while federation is on, for the upstream
+providers an administrator opted in one by one. This is [OpenID Connect Back-Channel Logout
+1.0](https://openid.net/specs/openid-connect-backchannel-1_0.html) from the relying party's side: Keycloak (24.0.0
+or later, or 22.0.8 / 23.0.4), Auth0 and Ping send it; Okta, Entra ID and Google do not.
+
+| Requirement                                                         | Section    | Status                                                                                                                                                                                                                  |
+| ------------------------------------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Logout token delivered as a form-encoded `logout_token`             | §2.5       | Met; any other body is refused.                                                                                                                                                                                         |
+| Claims: `iss`, `aud`, `iat`, `exp`, `jti`, `events`, `sub` or `sid` | §2.4       | Met, `exp` included — Keycloak releases before the fix in keycloak/keycloak#25753 send none and are refused. At most five minutes from `iat` and from now; `jti` single use.                                            |
+| Validation: signature by the provider's keys, `nonce` absent, event | §2.6       | Met: asymmetric algorithms only whatever is configured, `typ` absent, `JWT` or `logout+jwt`, one audience equal to our client id at the provider.                                                                       |
+| Log out the sessions identified by `sid`, or the subject's          | §2.6, §2.7 | Met: the sessions here that came from that upstream session (only the subject's, when both are sent), or every session of the subject that came through that provider. Relying parties are told by back-channel logout. |
+| Offline access survives the logout                                  | §2.7       | Met. Keycloak's non-standard `revoke_offline_access` event member is ignored.                                                                                                                                           |
+| 200 on success, 400 with a JSON error otherwise; `no-store`         | §2.8       | Met. An unknown session answers 200. A fault answers `400 logout_failed` and is recorded as a fault. The failed-credential rate limit answers 429.                                                                      |
+
+Choices the specification leaves open: a session signed in before this release, or kept alive more than 14 days
+after its federated sign-in, is not reached by a token carrying only `sid` (one carrying `sub` still reaches it);
+a logout landing while a sign-in through that session is still completing does not end it.
+
+Run against a real **Keycloak 26.8.0** on 2026-10-07 (a throwaway stand behind a public HTTPS name, removed
+afterwards): a person signed in through Keycloak, then signed out in Keycloak's own logout screen; Keycloak posted a
+logout token, this server answered 200 and the session here ended — once with "Backchannel logout session required"
+on (a token with `sid`) and once with it off (`sub` only). Auth0 and Ping are covered by the test suite replaying
+the shapes they document. The same run found that a sign-in through Keycloak could not complete at all: Keycloak
+adds `session_state` to its return and the callback refused any parameter it did not declare; it now ignores
+them, as RFC 6749 §4.1.2 requires.
+
 ## Scope
 
 What is still to run is listed [above](#what-still-has-to-run). Certification itself has not been

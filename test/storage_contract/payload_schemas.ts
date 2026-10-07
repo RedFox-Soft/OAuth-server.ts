@@ -39,6 +39,7 @@ import {
 	VerificationResendPayload
 } from 'lib/verification/types.js';
 import { TotpAttemptPayload, TotpEnrollmentPayload } from 'lib/totp/types.js';
+import { UpstreamSessionPayload } from 'lib/upstream_signals/types.js';
 
 export interface ReadableSchema {
 	readonly properties: Record<string, unknown>;
@@ -65,6 +66,7 @@ export const PAYLOAD_SCHEMAS: Readonly<Record<string, ReadableSchema>> = {
 	Session: SessionPayload,
 	TotpAttempt: TotpAttemptPayload,
 	TotpEnrollment: TotpEnrollmentPayload,
+	UpstreamSession: UpstreamSessionPayload,
 	VerificationChallenge: VerificationChallengePayload,
 	VerificationResend: VerificationResendPayload
 };

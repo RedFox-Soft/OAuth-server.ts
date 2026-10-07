@@ -46,6 +46,7 @@ import { InvalidDpopProof, UseDpopNonce } from './helpers/validate_dpop.js';
 import { adminApp } from './admin/index.js';
 import { mcpApp } from './mcp/index.js';
 import { scimApp, scimMetadataApp } from './scim/index.js';
+import { federationBackChannelLogout } from './upstream_signals/back_channel_logout.js';
 import { globalTokenRevocation } from './upstream_signals/global_token_revocation.js';
 import { verificationRoutes } from './routes/verification.js';
 import { passwordResetRoutes } from './routes/password_reset.js';
@@ -226,6 +227,14 @@ elysia.group('/:bucket', (bucketScoped) => bucketScoped.use(scimApp));
 elysia.use(globalTokenRevocation);
 elysia.group('/:bucket', (bucketScoped) =>
 	bucketScoped.use(globalTokenRevocation)
+);
+
+/*
+ * Inbound back-channel logout from upstream providers (specs/073), the same way and for the same reason.
+ */
+elysia.use(federationBackChannelLogout);
+elysia.group('/:bucket', (bucketScoped) =>
+	bucketScoped.use(federationBackChannelLogout)
 );
 
 /*

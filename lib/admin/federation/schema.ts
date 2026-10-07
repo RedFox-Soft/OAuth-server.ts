@@ -46,7 +46,9 @@ export const CreateProviderBody = t.Object({
 	allowedEmailDomains: t.Optional(t.Array(t.String({ minLength: 1 }))),
 	emailClaim: t.Optional(t.String({ minLength: 1 })),
 	/* Whether the provider may end its users' access here (global token revocation, specs/072). Off unless set. */
-	acceptsGlobalTokenRevocation: t.Optional(t.Boolean())
+	acceptsGlobalTokenRevocation: t.Optional(t.Boolean()),
+	/* Whether the provider's back-channel logout tokens are received (specs/073). Off unless set. */
+	acceptsBackChannelLogout: t.Optional(t.Boolean())
 });
 
 /*
@@ -73,5 +75,6 @@ export const UpdateProviderBody = t.Object({
 	provisioning: t.Optional(Provisioning),
 	allowedEmailDomains: t.Optional(t.Array(t.String({ minLength: 1 }))),
 	emailClaim: t.Optional(t.String({ minLength: 1 })),
-	acceptsGlobalTokenRevocation: t.Optional(t.Boolean())
+	acceptsGlobalTokenRevocation: t.Optional(t.Boolean()),
+	acceptsBackChannelLogout: t.Optional(t.Boolean())
 });

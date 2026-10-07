@@ -9,6 +9,22 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+### Added
+
+- **A sign-out at Keycloak, Auth0 or Ping now signs the person out here.** A bucket receives OpenID Connect
+  Back-Channel Logout from upstream providers an administrator opted in (`acceptsBackChannelLogout`), at
+  `<bucket issuer>/federation/backchannel-logout`, and ends the sessions that came from the upstream session named,
+  telling its relying parties and keeping offline access. Signatures are checked as global token revocation's are,
+  with no setting to relax them. Run `db:setup` / `db:setup:pg` for the new `UpstreamSession` area; sessions from
+  before the upgrade are not reached.
+
+### Fixed
+
+- **Signing in through Keycloak completes.** Keycloak adds `session_state` to every return, and the federation
+  callback refused any parameter it did not declare, so no Keycloak sign-in could finish; unknown return
+  parameters are now ignored, as RFC 6749 §4.1.2 requires. Found by running back-channel logout against a real
+  Keycloak 26.8.0.
+
 ### Security
 
 - **The image takes Alpine's security patches on every build again.** Its `apk upgrade` layer was served from

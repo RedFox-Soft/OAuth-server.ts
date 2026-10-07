@@ -18,11 +18,15 @@ graph:
 
 # Error store capture sites
 
-Recorded faults are captured in **four** places, and the reason for the first two is easy to get
+Recorded faults are captured in **five** places, and the reason for the first two is easy to get
 backwards. (Two until 2026-10-01; the third is a fault delivered to a client by redirect, below. The
 fourth, since 2026-10-06 and spec 070, is the SCIM plugin's own `onError` in `lib/scim/index.ts`: the global
 handler stands aside for every SCIM route by route key, so a fault rendered in SCIM's error shape is
-recorded there, under the `scim` surface — see [[scim-provisioning]].)
+recorded there, under the `scim` surface — see [[scim-provisioning]]. The fifth, since 2026-10-07 and spec 073,
+is the upstream back-channel logout receiver (`lib/upstream_signals/back_channel_logout.ts:188`): Back-Channel
+Logout 1.0 §2.8 requires `400` for a logout that failed, so a fault there is answered `400 logout_failed` and
+recorded where it is answered, filed at 500 under the `oauth` surface — the redirect rule below, applied to a
+status the specification fixes — see [[upstream-back-channel-logout]].)
 
 `errorHandler` in `lib/shared/authorization_error_handler.ts` stands aside for admin-plane errors — but
 it keys that on the `adminPlane` **marker**, which only a deliberate `AdminError` carries. So:

@@ -172,10 +172,13 @@ export class UpstreamNotPermitted extends OIDCProviderError {
 	allow_redirect = false;
 	error_description =
 		'this identity provider is not permitted to revoke access here';
+	/* Authenticated by now, so the provider is known: reported to the operator, never sent to the caller. */
+	readonly providerId: string | undefined;
 
-	constructor() {
+	constructor(providerId?: string) {
 		super(403, 'access_denied');
 		Error.captureStackTrace(this, this.constructor);
+		this.providerId = providerId;
 	}
 }
 

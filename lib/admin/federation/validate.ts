@@ -112,16 +112,27 @@ export function assertScopes(
 
 /*
  * A provider that publishes no signing keys — one read through its own API, like GitHub — cannot authenticate a
- * global token revocation request, so it cannot be opted in to one (specs/072).
+ * global token revocation request (specs/072) or a back-channel logout token (specs/073), so it cannot be opted
+ * in to either.
  */
-export function assertCanAcceptRevocation(
-	provider: Pick<FederationProvider, 'acceptsGlobalTokenRevocation'>,
+export function assertCanAcceptUpstreamSignals(
+	provider: Pick<
+		FederationProvider,
+		'acceptsGlobalTokenRevocation' | 'acceptsBackChannelLogout'
+	>,
 	protocol: 'oidc' | 'profile_api'
 ): void {
-	if (provider.acceptsGlobalTokenRevocation === true && protocol !== 'oidc') {
+	if (protocol === 'oidc') return;
+	if (provider.acceptsGlobalTokenRevocation === true) {
 		throw new AdminError(
 			422,
 			'this provider publishes no signing keys, so it cannot accept global token revocation'
+		);
+	}
+	if (provider.acceptsBackChannelLogout === true) {
+		throw new AdminError(
+			422,
+			'this provider publishes no signing keys, so it cannot accept back-channel logout'
 		);
 	}
 }

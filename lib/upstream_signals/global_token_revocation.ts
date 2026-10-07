@@ -103,6 +103,7 @@ async function revoke(
 		const { provider } = await (async () => {
 			try {
 				return await authenticateUpstream(bucket, bearerOf(request), {
+					clientIdClaim: 'sub',
 					audience,
 					types: ASSERTION_TYPES,
 					replayNamespace: 'gtr',

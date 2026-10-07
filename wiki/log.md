@@ -161,3 +161,7 @@ Operations:
 ## [2026-10-07] update | [[scim-provisioning]]: spec 072 — the mass-deprovisioning guard (opt-in per-connection threshold, a ring of expiring slots for an exact rolling count without transactions, one alert per hold through a conditional write, 429 + `Retry-After: 300` and why); part 4 split into several specs.
 
 ## [2026-10-07] update | [[sentry-elysia-10.73.0]] — `@sentry/bun` moved from `11.1.0` to `11.5.0`, still exact-pinned, with the in-range dependency refresh; the reading itself is unchanged.
+
+## [2026-10-07] create | [[upstream-back-channel-logout]]: spec 073 — inbound Back-Channel Logout from upstream providers, the session's upstream origin and the `UpstreamSession` index, the per-format client-id claim in the upstream core, 400 + capture at delivery. Corrected [[global-token-revocation]] (lookup per format, shifted citations, 4b no longer later), [[error-store-capture-sites]] (five sites), [[event-bus]] (`upstream.logout.*`) and [[upstream-federation]] (the handoff and session carry the upstream origin).
+
+## [2026-10-07] update | [[upstream-back-channel-logout]] verified against a real Keycloak 26.8.0 (`sid` and `sub`-only logouts); [[upstream-federation]] gained the gotcha it found — the callback refused Keycloak's `session_state`, now ignored per RFC 6749 §4.1.2.

@@ -32,7 +32,7 @@ built anyway because, as researched on 2026-10-07, it is the only server-side "e
 workforce IdP sends to a generic application — Okta, under its Identity Threat Protection licence. Entra sends
 nothing at all to a third-party client (no back-channel logout, no external Shared Signals; continuous access
 evaluation is Microsoft-only); Google sends only RISC for consumer accounts; Ping, Auth0 and Keycloak send OIDC
-Back-Channel Logout, which is a later spec (#62 4b). Among 16 peer products only Auth0 receives this request,
+Back-Channel Logout, received since spec 073 (#62 4b, [[upstream-back-channel-logout]]). Among 16 peer products only Auth0 receives this request,
 in the same shape: one endpoint, the IdP's own keys, `iss_sub`.
 
 Three hedges follow from building on it:
@@ -48,12 +48,14 @@ Three hedges follow from building on it:
 ## One core, many formats
 
 `lib/upstream_signals/` holds the request "an upstream provider of this bucket asks to end a user's access"
-separately from any wire format. `authenticateUpstream` (`lib/upstream_signals/assertion.ts:117`) decides who may
+separately from any wire format. `authenticateUpstream` (`lib/upstream_signals/assertion.ts:137`) decides who may
 ask and how they are authenticated; `resolveReachableUser` (`lib/upstream_signals/subject.ts:22`) decides whom
 they may name; `endAccessForUpstream` (`lib/upstream_signals/end_access.ts`) ends it. The GTR plugin
-(`lib/upstream_signals/global_token_revocation.ts`) supplies only its audience, accepted `typ`s, replay namespace
-and the provider option that admits it. Inbound back-channel logout or a CAEP `session-revoked` event becomes
-another file there and inherits every refusal below.
+(`lib/upstream_signals/global_token_revocation.ts`) supplies only which claim carries our client id (`sub` here), its
+audience, accepted `typ`s, replay namespace and the provider option that admits it. Inbound back-channel logout is
+the second such file since spec 073 (`lib/upstream_signals/back_channel_logout.ts`, [[upstream-back-channel-logout]]),
+which made the client-id claim per format (`clientIdClaim`, a logout token carries it as `aud`) and added a
+per-format claims check; a CAEP `session-revoked` event would be a third and inherits every refusal below.
 
 ## The refusals are the feature
 
@@ -63,16 +65,16 @@ needs — the provider's issuer, our client id there, a user's upstream subject 
 tokens for a provider whose signature validation an operator had switched off. So:
 
 - **No setting can relax verification.** Asymmetric algorithms only, a constant
-  (`assertion.ts:45`) intersected with what the provider advertises; `none` and `HS*` are refused whatever any
+  (`assertion.ts:46`) intersected with what the provider advertises; `none` and `HS*` are refused whatever any
   provider, bucket or instance field says.
-- **The provider is found by (issuer, client id) as two values** (`assertion.ts:83`), never a composed key —
+- **The provider is found by (issuer, client id) as two values** (`assertion.ts:95`), never a composed key —
   Keycloak #42209 broke brokered logout with a dot in a provider alias.
 - `aud` exactly the endpoint; `exp`, `iat`, `jti` required; lifetime ≤ 300 s measured as `exp − iat` and
-  `exp − now` (`assertion.ts:36`). **`nbf` never counts toward the lifetime** — Okta's `nbf` is five minutes in the
+  `exp − now` (`assertion.ts:37`). **`nbf` never counts toward the lifetime** — Okta's `nbf` is five minutes in the
   past, so `exp − nbf` is ten minutes and would refuse every real request.
-- `jti` single-use through `ReplayDetection` under `gtr:<bucket>:<provider>:` (`assertion.ts:203`). The trailing
+- `jti` single-use through `ReplayDetection` under `gtr:<bucket>:<provider>:` (`assertion.ts:236`). The trailing
   `:` matters: the replay id is `sha256(namespace + jti)` with no separator of its own.
-- A disabled or not-opted-in provider is refused **403 only after authentication** (`assertion.ts:211`).
+- A disabled or not-opted-in provider is refused **403 only after authentication** (`assertion.ts:244`).
 - A user the provider may not name and a user who does not exist get the **same 404** body; the reason goes only
   to `upstream.revocation.refused`.
 - A failed credential is charged at the strict per-origin rate, on a counter shared with SCIM

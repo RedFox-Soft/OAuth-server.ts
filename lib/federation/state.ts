@@ -111,6 +111,7 @@ export async function openHandoff(handoff: {
 	interactionUid: string;
 	accountId: string;
 	link?: PendingLinkIdentity;
+	upstream?: { providerId: string; sid?: string };
 }): Promise<string> {
 	const ref = secret();
 	await records().upsert(
@@ -120,6 +121,7 @@ export async function openHandoff(handoff: {
 			interactionUid: handoff.interactionUid,
 			accountId: handoff.accountId,
 			...(handoff.link ? { link: handoff.link } : {}),
+			...(handoff.upstream ? { upstream: handoff.upstream } : {}),
 			exp: epochTime() + HANDOFF_TTL_SECONDS
 		},
 		HANDOFF_TTL_SECONDS

@@ -33,7 +33,12 @@ export async function settlePendingLink(
 	if (!findEnabledProvider(bucket, pending.providerId)) return;
 
 	const store = getUserStore(bucketId);
-	if (await store.findByFederatedIdentity(pending.providerId, pending.sub)) {
+	const holder = await store.findByFederatedIdentity(
+		pending.providerId,
+		pending.sub
+	);
+	if (holder) {
+		if (holder._id === pending.accountId) cameThrough(payload, pending);
 		return;
 	}
 	const account = await store.find(pending.accountId);
@@ -44,4 +49,21 @@ export async function settlePendingLink(
 		sub: pending.sub,
 		claims: pending.claims
 	});
+	cameThrough(payload, pending);
+}
+
+/*
+ * The sign-in completing the link was proven at the provider too, so the session it makes answers to that
+ * upstream session's logout (specs/073) — but only when the identity ended up on this account.
+ */
+function cameThrough(
+	payload: InteractionPayloadType,
+	pending: { providerId: string; sid?: string }
+): void {
+	const login = payload.result?.login;
+	if (!login) return;
+	login.upstream = {
+		providerId: pending.providerId,
+		...(pending.sid ? { sid: pending.sid } : {})
+	};
 }

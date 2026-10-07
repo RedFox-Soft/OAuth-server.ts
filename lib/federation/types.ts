@@ -86,7 +86,14 @@ export const FederationProvider = t.Object({
 	 * Okta Universal Logout. Opt-in per provider, read as `=== true`: absent on every provider stored before
 	 * it existed, which is off, so there was no migration.
 	 */
-	acceptsGlobalTokenRevocation: t.Optional(t.Boolean())
+	acceptsGlobalTokenRevocation: t.Optional(t.Boolean()),
+	/*
+	 * Whether this provider's OpenID Connect back-channel logout tokens are received (specs/073) — Keycloak,
+	 * Auth0 and Ping send them. Its own option rather than a reading of the one above: a logout ends one
+	 * upstream session's sessions here, a revocation ends everything, and an operator may want either alone.
+	 * Read as `=== true`, so every provider stored before it is off and there was no migration.
+	 */
+	acceptsBackChannelLogout: t.Optional(t.Boolean())
 });
 export type FederationProvider = Static<typeof FederationProvider>;
 
@@ -124,7 +131,9 @@ export type FederatedIdentity = Static<typeof FederatedIdentity>;
 export const PendingLinkIdentity = t.Object({
 	providerId: t.String(),
 	sub: t.String(),
-	claims: t.Optional(t.Record(t.String(), t.Unknown()))
+	claims: t.Optional(t.Record(t.String(), t.Unknown())),
+	/* The upstream session the identity was proven in, so the sign-in that completes the link answers to its logout. */
+	sid: t.Optional(t.String())
 });
 export type PendingLinkIdentity = Static<typeof PendingLinkIdentity>;
 
@@ -159,6 +168,15 @@ export const FederationStatePayload = t.Object({
 	 * nobody is signed in by this handoff.
 	 */
 	link: t.Optional(PendingLinkIdentity),
+	/*
+	 * Stage 2 only: which provider this sign-in came through and, when its ID token carried one, the
+	 * provider's own session identifier — what a back-channel logout from that provider will later name
+	 * (specs/073). The raw `sid` may sit here because this record lives only as long as the handoff; the
+	 * session that outlives it stores a digest.
+	 */
+	upstream: t.Optional(
+		t.Object({ providerId: t.String(), sid: t.Optional(t.String()) })
+	),
 	/*
 	 * Epoch seconds. Mirrors the adapter's expiry *and* is compared to now on every read: MongoDB's TTL
 	 * monitor deletes lazily, so a record can outlive its expiry by a minute or more — and a stale handoff

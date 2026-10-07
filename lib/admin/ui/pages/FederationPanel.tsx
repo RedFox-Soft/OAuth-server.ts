@@ -41,11 +41,13 @@ interface ProviderValues {
 	emailClaim?: string;
 	enabled?: boolean;
 	acceptsGlobalTokenRevocation?: boolean;
+	acceptsBackChannelLogout?: boolean;
 }
 
 /* A provider as the API presents it: the address to paste into its logout settings rides along when it applies. */
 type PresentedProvider = FederationProvider & {
 	globalTokenRevocationEndpoint?: string;
+	backChannelLogoutEndpoint?: string;
 };
 
 /*
@@ -365,6 +367,9 @@ export function FederationPanel({
 								{row.acceptsGlobalTokenRevocation && (
 									<Tag color="purple">Universal Logout</Tag>
 								)}
+								{row.acceptsBackChannelLogout && (
+									<Tag color="purple">Back-channel logout</Tag>
+								)}
 								<Tag>
 									{row.provisioning === 'jit' ? 'auto-create' : 'existing only'}
 								</Tag>
@@ -653,7 +658,8 @@ export function FederationPanel({
 						provisioning: 'jit',
 						emailClaim: 'email',
 						enabled: true,
-						acceptsGlobalTokenRevocation: false
+						acceptsGlobalTokenRevocation: false,
+						acceptsBackChannelLogout: false
 					}}
 				>
 					{!editing && (
@@ -753,6 +759,27 @@ export function FederationPanel({
 								code
 							>
 								{editing.globalTokenRevocationEndpoint}
+							</Typography.Text>
+						</Form.Item>
+					)}
+					<Form.Item
+						name="acceptsBackChannelLogout"
+						label="Accept back-channel logout (Keycloak, Auth0, Ping)"
+						tooltip="When a person signs out at this provider, or an administrator there ends their session, the sessions here that sign-in reached end too. Offline access they granted is kept, and the account is not deactivated."
+						valuePropName="checked"
+					>
+						<Switch />
+					</Form.Item>
+					{editing?.backChannelLogoutEndpoint && (
+						<Form.Item
+							label="Back-channel logout URL to register at the provider"
+							extra="Register this address at the provider as this application's back-channel logout URL. When a person signs out there, or an administrator ends their session, they are signed out of every application here that their sign-in through this provider reached. Offline access they granted is kept. Turn on the provider's “session required” option (Keycloak: Backchannel logout session required) so only the session they signed out of ends; without it, every session they opened through this provider ends. Keycloak must be 24.0.0 or later (22.0.8 and 23.0.4 also work): earlier releases send logout tokens without an expiry, which are refused."
+						>
+							<Typography.Text
+								copyable
+								code
+							>
+								{editing.backChannelLogoutEndpoint}
 							</Typography.Text>
 						</Form.Item>
 					)}

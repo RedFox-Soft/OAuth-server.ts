@@ -81,6 +81,7 @@ export const bucketScopedPaths: readonly string[] = [
 	'/.well-known/openid-configuration',
 	'/.well-known/oauth-authorization-server',
 	'/federation/callback',
+	routeNames.federation_backchannel_logout,
 	routeNames.code_verification,
 	routeNames.global_token_revocation,
 	SCIM_BASE_PATH
@@ -222,6 +223,17 @@ const bareGatedRoutes: readonly GatedRoute[] = [
 		method: 'POST',
 		path: routeNames.global_token_revocation,
 		flag: 'globalTokenRevocation.enabled'
+	},
+	/*
+	 * Inbound back-channel logout (specs/073) is gated with the rest of federation rather than by a flag of
+	 * its own: with federation off there are no providers and nothing signed in through one, and Back-Channel
+	 * Logout 1.0 is a final specification, so there is no deviation to isolate. The per-provider option is
+	 * the opt-in.
+	 */
+	{
+		method: 'POST',
+		path: routeNames.federation_backchannel_logout,
+		flag: 'federation.enabled'
 	},
 	/*
 	 * SCIM provisioning, and its metadata document with it for the reason `/mcp`'s is: metadata describing

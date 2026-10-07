@@ -62,6 +62,11 @@ const REAPED_ON_EXPIRES_AT = [
 	 */
 	'TotpAttempt',
 	'TotpEnrollment',
+	/*
+	 * Which account an upstream session signed in. Reaped one session lifetime after the sign-in: a record
+	 * that outlived every session it could reach would map a provider's session to an account for good.
+	 */
+	'UpstreamSession',
 	'VerificationChallenge',
 	'VerificationResend',
 	'adminSession',

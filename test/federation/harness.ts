@@ -150,6 +150,8 @@ export async function walk(
 		 * authorization request otherwise — so this is that provider's contract, not a variation.
 		 */
 		returnBy?: 'GET' | 'POST';
+		/* Parameters a provider adds to its return beside `code` and `state`, as Keycloak adds `session_state`. */
+		extraReturnParams?: Record<string, string>;
 	} = {}
 ) {
 	const providerId = options.providerId ?? 'acme-sso';
@@ -177,7 +179,11 @@ export async function walk(
 	// The return leg carries no cookie: it is a cross-site top-level navigation from the provider.
 	const query =
 		options.callbackQuery ??
-		`code=upstream-code&state=${encodeURIComponent(state)}`;
+		new URLSearchParams({
+			code: 'upstream-code',
+			state,
+			...options.extraReturnParams
+		}).toString();
 	const callback =
 		options.returnBy === 'POST'
 			? await post('/federation/callback', query)

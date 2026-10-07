@@ -27,7 +27,7 @@ import {
 } from '../../federation/credential.js';
 import {
 	assertAppleIdentifiers,
-	assertCanAcceptRevocation,
+	assertCanAcceptUpstreamSignals,
 	assertClientIdShape,
 	assertEmailDomains,
 	assertIssuer,
@@ -81,6 +81,14 @@ export function present(
 		ApplicationConfig['globalTokenRevocation.enabled'] === true
 			? {
 					globalTokenRevocationEndpoint: `${issuerFor(bucket)}${routeNames.global_token_revocation}`
+				}
+			: {}),
+		/* The address to register as this application's back-channel logout URL there (specs/073), on the same terms. */
+		...(bucket &&
+		provider.acceptsBackChannelLogout === true &&
+		ApplicationConfig['federation.enabled'] === true
+			? {
+					backChannelLogoutEndpoint: `${issuerFor(bucket)}${routeNames.federation_backchannel_logout}`
 				}
 			: {})
 	};
@@ -252,6 +260,7 @@ export async function createProvider(
 		allowedEmailDomains?: string[];
 		emailClaim?: string;
 		acceptsGlobalTokenRevocation?: boolean;
+		acceptsBackChannelLogout?: boolean;
 	}
 ): Promise<FederationProvider> {
 	const existing = providersOf(bucket);
@@ -319,11 +328,13 @@ export async function createProvider(
 		allowedEmailDomains: body.allowedEmailDomains ?? [],
 		emailClaim: body.emailClaim ?? entry?.emailClaim ?? 'email',
 		/* Opted into deliberately: it lets a third party end any of this provider's users' sessions here. */
-		acceptsGlobalTokenRevocation: body.acceptsGlobalTokenRevocation ?? false
+		acceptsGlobalTokenRevocation: body.acceptsGlobalTokenRevocation ?? false,
+		/* Opted into deliberately too: it lets a third party end sessions here, if only ones it began. */
+		acceptsBackChannelLogout: body.acceptsBackChannelLogout ?? false
 	};
 
 	assertScopes(provider.scopes, entry?.protocol.kind ?? 'oidc');
-	assertCanAcceptRevocation(provider, entry?.protocol.kind ?? 'oidc');
+	assertCanAcceptUpstreamSignals(provider, entry?.protocol.kind ?? 'oidc');
 	assertEmailDomains(provider.allowedEmailDomains);
 	if (provider.tenant) assertTenant(provider.tenant);
 	if (provider.teamId || provider.keyId) {
@@ -374,7 +385,7 @@ export async function updateProvider(
 		await assertIssuerResolves(next.issuer);
 	}
 	assertScopes(next.scopes, entry?.protocol.kind ?? 'oidc');
-	assertCanAcceptRevocation(next, entry?.protocol.kind ?? 'oidc');
+	assertCanAcceptUpstreamSignals(next, entry?.protocol.kind ?? 'oidc');
 	assertEmailDomains(next.allowedEmailDomains);
 	if (next.tenant) assertTenant(next.tenant);
 	if (next.teamId || next.keyId) {

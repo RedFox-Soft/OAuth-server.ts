@@ -71,6 +71,11 @@ design. `unowned` was therefore unimplementable, and owning it is also the bette
 account's outstanding handoff dies with it, which `test/storage_contract/federated_links.spec.ts` pins. Stage-one
 records carry no `accountId`, are matched by no sweep, and simply expire.
 
+Since spec 073 the stage-two record also carries `upstream: { providerId, sid? }` — the provider and its session
+identifier from the verified ID token — and the session the sign-in makes keeps the provider and a digest of the
+`sid` (`session.payload.upstream`, replaced or cleared at every sign-in), so that provider's back-channel logout can
+find it. See [[upstream-back-channel-logout]].
+
 ## The decision ladder, and why the order is the contract
 
 `lib/federation/resolve.ts`, in this order:
@@ -149,6 +154,13 @@ field was the deliberate choice: the absence of that field is what makes provena
 impossible, and adding the three later entries needed no migration for the same reason Google did not.
 
 ## Gotchas
+
+### The callback ignores return parameters it does not know
+
+RFC 6749 §4.1.2 says a client MUST. The app runs `normalize: false`, so a closed query schema answered 400 to
+Keycloak's `session_state` and no Keycloak sign-in could complete until 2026-10-07 (`lib/federation/routes.ts`,
+`additionalProperties: true`); found by the live check of [[upstream-back-channel-logout]]. No test had a provider
+adding a parameter of its own; `test/federation/signin.spec.ts` now has one.
 
 ### A guarded route's schema is composed, not overridden
 
@@ -236,7 +248,8 @@ read from the provider's token endpoint. A JWT a third party *presents* — a gl
 can carry any `kid`, so `presentedKeySetFor` (`lib/federation/jwks.ts:64`) keeps jose's default cooldown, and
 that path does not do the cached-set signature retry either. The provider record also gained
 `acceptsGlobalTokenRevocation` (optional, read as `=== true`, refused for a provider that publishes no keys). See
-[[global-token-revocation]].
+[[global-token-revocation]]. Spec 073's back-channel logout tokens are presented JWTs too and use the same cache;
+their provider option is `acceptsBackChannelLogout`, under the same rules ([[upstream-back-channel-logout]]).
 `lib/helpers/jwt.ts` is deliberately **not** extended: it takes this server's own keystore object, so
 adapting an upstream key set to that shape would mean writing a second keystore implementation to reach a
 verifier jose already exposes.

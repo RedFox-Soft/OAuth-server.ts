@@ -93,7 +93,9 @@ path, flag })`, emitted once per gated refusal ([[feature-flag-gating]]) and del
 `server_error`; `rate_limited`, `login_throttled ({ bucketId })`, `settings_applied ({ keys })`,
 `admin.login.error`, `federation.*.error`, `mcp.auth.error ({ reason })`; from spec 072,
 `upstream.revocation.refused ({ bucketId, reason })`, `upstream.revocation.success ({ bucketId, providerId,
-accountId })` and `global_token_revocation.error (error)` ([[global-token-revocation]]).
+accountId })` and `global_token_revocation.error (error)` ([[global-token-revocation]]); from spec 073,
+`upstream.logout.success ({ bucketId, providerId, ended })` and `upstream.logout.refused ({ bucketId,
+providerId?, reason })` — neither carries the token's `sub` or `sid` ([[upstream-back-channel-logout]]).
 
 Verified against [[oauth-server-codebase]] at commit `2125ad0`; the table above against
 `060-typed-oidc-context`.

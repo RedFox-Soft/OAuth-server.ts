@@ -1244,7 +1244,11 @@ export const ui = new Elysia()
 			interaction.payload.result = {
 				// No `transient`: there is no "remember me" on a federated sign-in. No `amr` either: this
 				// server observed no method of its own (lib/consts/amr.ts).
-				login: { accountId: user._id, acr: configuration.acrMap.federated }
+				login: {
+					accountId: user._id,
+					acr: configuration.acrMap.federated,
+					...(handoff.upstream ? { upstream: handoff.upstream } : {})
+				}
 			};
 			await settlePendingLink(interaction.payload, bucketId);
 			return resume(interaction, cookie, { route, request });

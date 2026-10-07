@@ -99,7 +99,9 @@ export const InteractionPayload = t.Object({
 			bucketId: t.String(),
 			providerId: t.String(),
 			sub: t.String(),
-			claims: t.Optional(t.Record(t.String(), t.Unknown()))
+			claims: t.Optional(t.Record(t.String(), t.Unknown())),
+			/* Declared here as well as in lib/federation/types.ts: undeclared, it would be dropped on persist. */
+			sid: t.Optional(t.String())
 		})
 	),
 	result: t.Optional(Outcome)

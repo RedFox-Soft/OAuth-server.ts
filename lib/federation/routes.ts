@@ -35,22 +35,29 @@ import { consumePending, openHandoff } from './state.js';
 /*
  * What an upstream sends back, however it sends it.
  *
- * `iss` is RFC 9207 and must be tolerated; `error`/`error_description` are how a provider reports a
- * decline. All are declared because the app runs `normalize: false` — an undeclared parameter a real
- * provider sends would 422 the request before the handler ran. Only `state` is required: without it there
- * is no round trip to identify.
+ * `iss` is RFC 9207; `error`/`error_description` are how a provider reports a decline. Only `state` is
+ * required: without it there is no round trip to identify.
+ *
+ * Any other member is admitted and left unread, because RFC 6749 §4.1.2 says a client MUST ignore response
+ * parameters it does not recognise — and real providers send them: Keycloak adds OIDC Session Management's
+ * `session_state` to every return. The app runs `normalize: false`, so an object closed to undeclared
+ * members answered that 400 before the handler ran, and no Keycloak sign-in could complete (found by the
+ * live check of specs/073).
  *
  * One provider also posts a `user` field on a first authorization, carrying the name it will never send
  * again. Declared for that reason, and read by the identity layer rather than here.
  */
-const ReturnParams = t.Object({
-	state: t.String(),
-	code: t.Optional(t.String()),
-	iss: t.Optional(t.String()),
-	error: t.Optional(t.String()),
-	error_description: t.Optional(t.String()),
-	user: t.Optional(t.String())
-});
+const ReturnParams = t.Object(
+	{
+		state: t.String(),
+		code: t.Optional(t.String()),
+		iss: t.Optional(t.String()),
+		error: t.Optional(t.String()),
+		error_description: t.Optional(t.String()),
+		user: t.Optional(t.String())
+	},
+	{ additionalProperties: true }
+);
 
 type ReturnParams = typeof ReturnParams.static;
 
@@ -166,6 +173,17 @@ async function completeReturn(params: ReturnParams) {
 		});
 
 		/*
+		 * Where this sign-in came from, carried to the session it makes: the provider, and its own session
+		 * identifier when the verified assertion has one — what that provider's back-channel logout will name
+		 * (specs/073). Read only from the verified claims; a provider without an ID token sends none.
+		 */
+		const sid =
+			typeof identity.claims.sid === 'string' && identity.claims.sid
+				? identity.claims.sid
+				: undefined;
+		const upstream = { providerId: provider.id, ...(sid ? { sid } : {}) };
+
+		/*
 		 * Handed back like a sign-in, because leg three is where the interaction cookie applies again and so
 		 * the only place the identity may be written onto the interaction. Leg three signs nobody in for it.
 		 */
@@ -173,7 +191,7 @@ async function completeReturn(params: ReturnParams) {
 			const ref = await openHandoff({
 				interactionUid: uid,
 				accountId: resolution.account._id,
-				link: resolution.link
+				link: { ...resolution.link, ...(sid ? { sid } : {}) }
 			});
 			return Response.redirect(buildUIFederationCompletePath(uid, ref), 303);
 		}
@@ -206,7 +224,8 @@ async function completeReturn(params: ReturnParams) {
 		 */
 		const ref = await openHandoff({
 			interactionUid: uid,
-			accountId: resolution.account._id
+			accountId: resolution.account._id,
+			upstream
 		});
 		return Response.redirect(buildUIFederationCompletePath(uid, ref), 303);
 	}

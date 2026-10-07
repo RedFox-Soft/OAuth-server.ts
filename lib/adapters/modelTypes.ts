@@ -23,6 +23,7 @@ import type {
 	TotpAttemptPayload,
 	TotpEnrollmentPayload
 } from '../totp/types.js';
+import type { UpstreamSessionPayload } from '../upstream_signals/types.js';
 import type {
 	VerificationChallengePayload,
 	VerificationResendPayload
@@ -65,6 +66,7 @@ export interface ModelPayloadByName {
 	Session: SessionPayloadType;
 	TotpAttempt: TotpAttemptPayload;
 	TotpEnrollment: TotpEnrollmentPayload;
+	UpstreamSession: UpstreamSessionPayload;
 	VerificationChallenge: VerificationChallengePayload;
 	VerificationResend: VerificationResendPayload;
 }

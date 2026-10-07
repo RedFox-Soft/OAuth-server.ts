@@ -23,8 +23,9 @@ import { EgressRefused } from '../shared/egress.js';
 /*
  * The request "an upstream provider of this bucket asks to end a user's access", whatever format it arrives in
  * (specs/072 FR-006b). Who may ask, how the asker is authenticated, and the refusals that follow from both are
- * decided here once; a format — global token revocation now, inbound back-channel logout or a CAEP event later
- * — supplies only its audience, the token types it accepts, its replay namespace and which provider option
+ * decided here once; a format — global token revocation, inbound back-channel logout (specs/073), a CAEP event
+ * later — supplies only which claim carries this server's client identifier, its audience, the token types it
+ * accepts, any claims its own specification forbids or requires, its replay namespace and which provider option
  * admits it. A later format therefore inherits every refusal below rather than restating them.
  *
  * Everything presented here is adversarial input. The sign-in verifier (lib/federation/verifyIdToken.ts) is
@@ -56,8 +57,19 @@ const ASYMMETRIC_ALGORITHMS = new Set([
 ]);
 
 export interface UpstreamExpectation {
-	/* The exact address the assertion must be audienced to. */
-	audience: string;
+	/*
+	 * Where the format carries this server's client identifier at the provider: Okta's revocation assertion
+	 * names it as the subject, a logout token as the audience (its subject is the user). Declared by the
+	 * format and never guessed, or a token could choose which provider it is judged against.
+	 */
+	clientIdClaim: 'sub' | 'aud';
+	/* The exact audience the assertion must carry: fixed, or the provider's own value. */
+	audience: string | ((provider: FederationProvider) => string);
+	/*
+	 * The format's own claim rules, judged after the signature and lifetime and before the identifier is spent,
+	 * so a token refused for its claims costs no replay record. Answers the refusal reason, or nothing.
+	 */
+	claimsRefusal?: (claims: JWTPayload) => string | undefined;
 	/* Accepted `typ` values beside an absent one, lowercase, without an `application/` prefix. */
 	types: readonly string[];
 	/* Keeps one format's assertion identifiers apart from every other use of the replay store. */
@@ -83,11 +95,20 @@ function refused(reason: string): InvalidToken {
 function providerFor(
 	bucket: UserBucket,
 	iss: string,
-	sub: string
+	clientId: string
 ): FederationProvider | undefined {
 	return bucket.federation?.find(
-		(provider) => provider.issuer === iss && provider.clientId === sub
+		(provider) => provider.issuer === iss && provider.clientId === clientId
 	);
+}
+
+/* One audience only, as a string or a one-element array: a token audienced to several parties is not ours alone. */
+function soleAudience(aud: JWTPayload['aud']): string | undefined {
+	if (typeof aud === 'string') return aud || undefined;
+	if (Array.isArray(aud) && aud.length === 1 && typeof aud[0] === 'string') {
+		return aud[0] || undefined;
+	}
+	return undefined;
 }
 
 function typeAccepted(typ: unknown, types: readonly string[]): boolean {
@@ -110,8 +131,7 @@ function keysUnreadable(err: unknown): boolean {
 }
 
 function audienceIs(aud: JWTPayload['aud'], expected: string): boolean {
-	if (typeof aud === 'string') return aud === expected;
-	return Array.isArray(aud) && aud.length === 1 && aud[0] === expected;
+	return soleAudience(aud) === expected;
 }
 
 export async function authenticateUpstream(
@@ -128,10 +148,16 @@ export async function authenticateUpstream(
 		throw refused('malformed');
 	}
 	const { iss, sub } = unverified;
-	if (typeof iss !== 'string' || !iss || typeof sub !== 'string' || !sub) {
-		throw refused('unattributable');
+	if (typeof iss !== 'string' || !iss) throw refused('unattributable');
+	let clientId: string | undefined;
+	if (expected.clientIdClaim === 'sub') {
+		if (typeof sub !== 'string' || !sub) throw refused('unattributable');
+		clientId = sub;
+	} else {
+		clientId = soleAudience(unverified.aud);
+		if (!clientId) throw refused('audience');
 	}
-	const provider = providerFor(bucket, iss, sub);
+	const provider = providerFor(bucket, iss, clientId);
 	if (!provider) throw refused('unknown_provider');
 
 	if (!typeAccepted(header.typ, expected.types)) throw refused('type');
@@ -175,7 +201,11 @@ export async function authenticateUpstream(
 		);
 	}
 
-	if (!audienceIs(claims.aud, expected.audience)) throw refused('audience');
+	const audience =
+		typeof expected.audience === 'function'
+			? expected.audience(provider)
+			: expected.audience;
+	if (!audienceIs(claims.aud, audience)) throw refused('audience');
 	const { exp, iat, jti } = claims;
 	if (typeof exp !== 'number' || typeof iat !== 'number') {
 		throw refused('lifetime');
@@ -195,6 +225,9 @@ export async function authenticateUpstream(
 		throw refused('lifetime');
 	}
 
+	const claimsReason = expected.claimsRefusal?.(claims);
+	if (claimsReason) throw refused(claimsReason);
+
 	/*
 	 * The namespace ends in a delimiter because the replay record's id is `sha256(namespace + jti)` with no
 	 * separator of its own (lib/models/replay_detection.ts); bucket and provider ids contain no `:`, so two
@@ -208,7 +241,7 @@ export async function authenticateUpstream(
 	if (!fresh) throw refused('replayed');
 
 	if (!provider.enabled || !expected.permits(provider)) {
-		throw new UpstreamNotPermitted();
+		throw new UpstreamNotPermitted(provider.id);
 	}
 	return { provider, claims };
 }

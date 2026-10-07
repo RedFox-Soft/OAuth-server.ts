@@ -47,6 +47,42 @@ describe('federated sign-in', () => {
 		resetAdminMemoryStores();
 	});
 
+	/* RFC 6749 §4.1.2: a client ignores response parameters it does not recognise. Keycloak sends one on every return. */
+	it('completes a sign-in whose return carries a parameter this server does not know', async () => {
+		const idp = await idpStub('https://idp-session-state.test');
+		const bucketId = await seedBucket(CLIENT, {
+			federation: [provider(idp.origin)]
+		});
+		const store = getUserStore(bucketId);
+		const existing = await store.create(
+			'session-state@acme.test',
+			'irrelevant-hash',
+			true
+		);
+		await store.update(existing._id, {
+			federated: [
+				{
+					providerId: 'acme-sso',
+					sub: 'upstream-subject-1',
+					linkedAt: new Date()
+				}
+			]
+		});
+
+		idp.expectDiscovery();
+		const { uid, cookie } = await startInteraction();
+		const { complete } = await walk(
+			uid,
+			cookie,
+			{ idp, claims: { email: 'session-state@acme.test' } },
+			{ extraReturnParams: { session_state: 'keycloak-session-state' } }
+		);
+
+		expect(complete?.status).toBe(303);
+		expect(signedInAccountIds()).toContain(existing._id);
+		assertNoPendingInterceptors();
+	});
+
 	it('signs in an account that already holds the upstream identity, writing nothing new', async () => {
 		const idp = await idpStub('https://idp-existing.test');
 		const bucketId = await seedBucket(CLIENT, {

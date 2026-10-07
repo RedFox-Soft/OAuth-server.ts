@@ -110,6 +110,7 @@ export const MODEL_AREAS = [
 	'Session',
 	'TotpAttempt',
 	'TotpEnrollment',
+	'UpstreamSession',
 	'VerificationChallenge',
 	'VerificationResend'
 ] as const;
@@ -443,6 +444,13 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 	 */
 	modelArea('TotpAttempt', EXPIRES_AT, byAccount),
 	modelArea('TotpEnrollment', EXPIRES_AT, byAccount),
+	/*
+	 * An upstream session at one provider of one bucket → the account it signed in, keyed by
+	 * `sha256("<bucketId>:<providerId>:<sid>")`. Read only by the back-channel logout receiver, to resolve a
+	 * logout token that names the upstream session alone (specs/073 R4). Account-owned so the cascade sweeps
+	 * it with the account; it expires one session lifetime after the sign-in that wrote it.
+	 */
+	modelArea('UpstreamSession', EXPIRES_AT, byAccount),
 	/*
 	 * Verification challenges and resend counters are written with a TTL and were never provisioned,
 	 * so before this table they auto-created on first write with no expiry index at all: expired

@@ -6,6 +6,10 @@ import { ISSUER } from 'lib/configs/env.js';
 import { logout } from 'lib/html/logout.js';
 import { SessionNotFound } from '../../helpers/errors.js';
 import { resolveBucketForRequest } from '../../admin/auth/resolveBucket.js';
+import {
+	originOf,
+	rememberUpstreamSession
+} from '../../upstream_signals/upstream_session.js';
 
 export default async function resumeAction(
 	oidc: OIDCContext<PipelineParams>,
@@ -86,7 +90,14 @@ export default async function resumeAction(
 	oidc.redirectUriCheckPerformed = true;
 
 	if (result?.login) {
-		const { transient, accountId, ts: loginTs, amr, acr } = result.login;
+		const {
+			transient,
+			accountId,
+			ts: loginTs,
+			amr,
+			acr,
+			upstream
+		} = result.login;
 
 		session.loginAccount({
 			accountId,
@@ -94,8 +105,13 @@ export default async function resumeAction(
 			loginTs,
 			amr,
 			acr,
-			transient
+			transient,
+			upstream: upstream && originOf(upstream)
 		});
+		/* Written here, the one place every sign-in passes, so a federated one cannot skip it (specs/073). */
+		if (upstream) {
+			await rememberUpstreamSession(bucketId, upstream, accountId);
+		}
 	}
 
 	oidc.result = result;

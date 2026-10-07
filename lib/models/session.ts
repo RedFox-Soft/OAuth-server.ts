@@ -28,6 +28,18 @@ export const SessionPayload = t.Object({
 	loginTs: t.Optional(t.Number()),
 	amr: t.Optional(t.Array(t.String())),
 	acr: t.Optional(t.String()),
+	/*
+	 * The upstream provider this session's latest sign-in came through, and a digest of the provider's own
+	 * session identifier when its ID token carried one — what lets that provider's back-channel logout end
+	 * this session and no other (specs/073). A digest because the value is the provider's session handle and
+	 * nothing here needs it back; the match is digest to digest.
+	 */
+	upstream: t.Optional(
+		t.Object({
+			providerId: t.String(),
+			sidDigest: t.Optional(t.String())
+		})
+	),
 	transient: t.Optional(t.Boolean()),
 	// `state` carries the CSRF secret plus interaction context (logout/device confirmation).
 	// It is an object across end_session, interaction resume, and the device flow; the schema
@@ -212,6 +224,7 @@ export class Session extends BaseModel<SessionPayloadType> {
 		loginTs?: number;
 		amr?: string[];
 		acr?: string;
+		upstream?: { providerId: string; sidDigest?: string };
 	}) {
 		const {
 			transient = false,
@@ -219,7 +232,8 @@ export class Session extends BaseModel<SessionPayloadType> {
 			bucketId,
 			loginTs = epochTime(),
 			amr,
-			acr
+			acr,
+			upstream
 		} = details;
 		if (typeof accountId !== 'string' || !accountId) {
 			throw new TypeError(
@@ -250,6 +264,16 @@ export class Session extends BaseModel<SessionPayloadType> {
 			this.payload.transient = true;
 		} else {
 			delete this.payload.transient;
+		}
+
+		/*
+		 * Replaced, or cleared, at every sign-in for the reason `transient` is: a session re-authenticated by
+		 * password must stop answering to the provider it first came through.
+		 */
+		if (upstream) {
+			this.payload.upstream = upstream;
+		} else {
+			delete this.payload.upstream;
 		}
 	}
 }

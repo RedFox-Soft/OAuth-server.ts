@@ -94,6 +94,8 @@ export interface InteractionResult {
 		ts?: number;
 		amr?: string[];
 		acr?: string;
+		/* Set only by a federated sign-in: the provider, and its session identifier when it sent one (specs/073). */
+		upstream?: { providerId: string; sid?: string };
 		[key: string]: unknown;
 	};
 	consent?: { grantId?: string; [key: string]: unknown };

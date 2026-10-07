@@ -75,7 +75,20 @@ export interface IdpStub {
 		claims: { sub: string; aud: string | string[] } & Record<string, unknown>,
 		opts?: AssertionOptions
 	): Promise<string>;
+	/*
+	 * Mint an OpenID Connect back-channel logout token (specs/073) as Back-Channel Logout 1.0 §2.4 shapes it:
+	 * typed `logout+jwt`, issued by this provider, audienced to our client id there, two minutes long, with
+	 * the logout event. `claims` adds or overrides (`sub`, `sid`, `events`, `nonce`, …; `undefined` deletes);
+	 * `opts` breaks it in exactly one way per field, as for the revocation assertion.
+	 */
+	logoutToken(
+		claims: { aud: string | string[] | undefined } & Record<string, unknown>,
+		opts?: AssertionOptions
+	): Promise<string>;
 }
+
+export const BACKCHANNEL_LOGOUT_EVENT =
+	'http://schemas.openid.net/event/backchannel-logout';
 
 export interface AssertionOptions {
 	/* The header's `typ`; `null` omits it. */
@@ -209,13 +222,40 @@ export async function idpStub(
 			...claims
 		};
 		if (opts.notBefore !== null) payload.nbf = now + (opts.notBefore ?? -300);
+		return signAssertion(payload, opts, 'global-token-revocation+jwt');
+	}
+
+	async function logoutToken(
+		claims: { aud: string | string[] | undefined } & Record<string, unknown>,
+		opts: AssertionOptions = {}
+	): Promise<string> {
+		const now = Math.floor(Date.now() / 1000);
+		const payload: Record<string, unknown> = {
+			iss: origin,
+			iat: now + (opts.issuedIn ?? 0),
+			exp: now + (opts.expiresIn ?? 120),
+			jti: crypto.randomUUID(),
+			events: { [BACKCHANNEL_LOGOUT_EVENT]: {} },
+			...claims
+		};
+		if (opts.notBefore !== undefined && opts.notBefore !== null) {
+			payload.nbf = now + opts.notBefore;
+		}
+		for (const [name, value] of Object.entries(payload)) {
+			if (value === undefined) delete payload[name];
+		}
+		return signAssertion(payload, opts, 'logout+jwt');
+	}
+
+	async function signAssertion(
+		payload: Record<string, unknown>,
+		opts: AssertionOptions,
+		defaultTyp: string
+	): Promise<string> {
 		if (opts.noJti) delete payload.jti;
 		if (opts.noExp) delete payload.exp;
 		if (opts.noIssuedAt) delete payload.iat;
-		const typ =
-			opts.typ === null
-				? {}
-				: { typ: opts.typ ?? 'global-token-revocation+jwt' };
+		const typ = opts.typ === null ? {} : { typ: opts.typ ?? defaultTyp };
 
 		if (opts.unsecured) {
 			// Hand-assembled: jose will not produce an unsecured JWS, which is itself the point.
@@ -310,6 +350,7 @@ export async function idpStub(
 		idToken,
 		publicJwks,
 		rotateKey,
-		revocationAssertion
+		revocationAssertion,
+		logoutToken
 	};
 }
