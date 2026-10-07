@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'bun:test';
 import {
-	assertRole,
+	assertSuperAdmin,
 	assertProjectAccess,
 	AdminError,
 	type AdminContext
@@ -10,16 +10,16 @@ import type { Project } from 'lib/adapters/types.ts';
 const superAdmin: AdminContext = {
 	userId: 'u1',
 	email: 'super@x.io',
-	roles: ['super_admin'],
+	superAdmin: true,
 	bucketId: 'admin',
-	// A super administrator belongs to no group by virtue of the role; their reach is instance-wide.
+	// Super administrators owns nothing, so it is not among the memberships; their reach is instance-wide.
 	memberships: [],
 	activeGroupId: ''
 };
 const projectAdmin: AdminContext = {
 	userId: 'u2',
 	email: 'pa@x.io',
-	roles: ['project_admin'],
+	superAdmin: false,
 	bucketId: 'admin',
 	memberships: [{ groupId: 'g1', role: 'owner' as const }],
 	activeGroupId: 'g1'
@@ -43,10 +43,10 @@ const project = (over: Partial<Project>): Project => ({
  * reaches a project only through the group that owns it.
  */
 describe('RBAC guards', () => {
-	it('assertRole passes for super_admin, throws 403 otherwise', () => {
-		expect(() => assertRole(superAdmin, 'super_admin')).not.toThrow();
+	it('lets a super administrator through an instance-wide check and refuses anyone else with 403', () => {
+		expect(() => assertSuperAdmin(superAdmin)).not.toThrow();
 		try {
-			assertRole(projectAdmin, 'super_admin');
+			assertSuperAdmin(projectAdmin);
 			throw new Error('should have thrown');
 		} catch (e) {
 			if (!(e instanceof AdminError)) throw e;

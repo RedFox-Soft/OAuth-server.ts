@@ -11,6 +11,14 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- **Roles are replaced by groups.** A bucket's roles become bucket groups — named sets of end users, kept by
+  an administrator or owned by a SCIM connection — with their own routes, console tab and agent tools, and
+  relying parties read them from a built-in `groups` scope and claim (display names; above 200, a userinfo
+  reference). SCIM gains `/Groups` (IPSIE AL2 §6.2). The administrator `super_admin` role becomes membership of
+  a reserved Super administrators group, granted and withdrawn by operations of their own; `project_admin`,
+  which granted nothing, is gone. **Run `bun run db:migrate`**: it turns every role and assignment into a group
+  and membership, losing none.
+
 - **An enterprise directory can provision a bucket's users over SCIM 2.0.** An administrator connects
   Microsoft Entra ID, Okta or any SCIM client to a bucket through a provisioning connection bound to one of
   its sign-in providers; the directory then creates, updates, deactivates and deletes users at

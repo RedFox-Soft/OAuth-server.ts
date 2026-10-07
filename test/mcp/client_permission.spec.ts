@@ -5,8 +5,7 @@ import { elysia } from 'lib/index.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { adapter, getUserStore } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID } from 'lib/admin/consts.ts';
+import { adapter } from 'lib/adapters/index.ts';
 import {
 	ADMIN_MCP_CLIENT_ID,
 	MCP_RESOURCE,
@@ -17,6 +16,7 @@ import {
 	permitHost,
 	permitIdentifier
 } from './permissions.ts';
+import { createAdministrator } from '../administrators.ts';
 
 /*
  * Which client identities may reach the administrative MCP plane.
@@ -45,10 +45,9 @@ async function seedDocumentClient(clientId: string) {
 }
 
 async function tokenFor(clientId: string) {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`admin-${Math.random()}@x.io`,
-		'hash',
-		['super_admin']
+	const user = await createAdministrator(
+		'super',
+		`admin-${Math.random()}@x.io`
 	);
 	const at = new AccessToken({
 		client: await Client.find(clientId),

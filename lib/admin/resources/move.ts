@@ -43,7 +43,7 @@ export async function planMove(
 	);
 	if (moving.length === 0) return { from, to, count: 0 };
 
-	if (to === ROOT_NAMESPACE && !ctx.roles.includes('super_admin')) {
+	if (to === ROOT_NAMESPACE && !ctx.superAdmin) {
 		throw new AdminError(403, ROOT_DECLARATION_REFUSAL);
 	}
 

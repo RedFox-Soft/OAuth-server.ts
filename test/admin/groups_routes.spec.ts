@@ -6,10 +6,10 @@ import { groupRoutes } from 'lib/admin/groups/routes.ts';
 import { projectRoutes } from 'lib/admin/projects/routes.ts';
 import { scopeRoutes } from 'lib/admin/scope/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { getUserStore } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
 import { answered } from './answered.ts';
+import { createAdministrator, type AdminKind } from '../administrators.ts';
 
 const app = new Elysia()
 	.use(resolveAdmin)
@@ -18,11 +18,10 @@ const app = new Elysia()
 	.use(projectRoutes);
 const client = treaty(app);
 
-async function admin(roles: string[] = ['project_admin']) {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`g-${Math.random().toString(36).slice(2)}@x.io`,
-		'hash',
-		roles
+async function admin(kind: AdminKind = 'plain') {
+	const user = await createAdministrator(
+		kind,
+		`g-${Math.random().toString(36).slice(2)}@x.io`
 	);
 	const session = await sessionFor(user);
 	return {

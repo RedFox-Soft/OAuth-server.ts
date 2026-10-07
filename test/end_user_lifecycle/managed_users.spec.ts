@@ -35,7 +35,7 @@ describe('an administrator acting on a user managed by a provisioning connection
 		const res = await admin.admin.api
 			.buckets({ id: DEFAULT_BUCKET_ID })
 			.users({ uid: user._id })
-			.patch({ roles: [] }, { headers: { cookie } });
+			.patch({ claims: {} }, { headers: { cookie } });
 
 		expect(res.status).toBe(409);
 		expect(res.error?.value).toHaveProperty(

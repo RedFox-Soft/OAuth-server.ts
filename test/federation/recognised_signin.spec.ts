@@ -382,7 +382,6 @@ describe('signing in through a recognised provider', () => {
 		const existing = await store.create(
 			'claimed@acme.test',
 			'irrelevant-hash',
-			[],
 			true
 		);
 

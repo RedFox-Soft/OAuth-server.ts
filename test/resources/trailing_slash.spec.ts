@@ -8,18 +8,15 @@ import { ISSUER } from 'lib/configs/env.ts';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { resourceRoutes } from 'lib/admin/resources/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import {
-	getBucketStore,
-	getProjectStore,
-	getUserStore
-} from 'lib/adapters/index.ts';
+import { getBucketStore, getProjectStore } from 'lib/adapters/index.ts';
 import { forgetBucketAddresses } from 'lib/admin/auth/bucketAddress.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { decode } from 'lib/helpers/jwt.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
 import { answered } from '../admin/answered.ts';
 import { Type } from '@sinclair/typebox';
 import { shaped } from 'test/shape.ts';
+import { createAdministrator } from '../administrators.ts';
 
 const SLUG = 'slashco';
 const WITH_SLASH = 'https://mcp.slash.example/mcp/';
@@ -62,10 +59,9 @@ describe('a resource declared with a significant trailing slash', () => {
 		await ensureAdminSeed();
 		forgetBucketAddresses();
 
-		const user = await getUserStore(ADMIN_BUCKET_ID).create(
-			`slash-${Math.random()}@x.io`,
-			'hash',
-			['project_admin']
+		const user = await createAdministrator(
+			'plain',
+			`slash-${Math.random()}@x.io`
 		);
 		cookie = `${ADMIN_SESSION_COOKIE}=${(await sessionFor(user))._id}`;
 		const ownerGroupId = await personalGroupId(user._id);

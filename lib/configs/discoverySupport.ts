@@ -4,6 +4,7 @@ import { routeNames } from 'lib/consts/param_list.js';
 import { ClientDefaults } from 'lib/configs/clientBase.js';
 import { ApplicationConfig } from './application.js';
 import { isPlainObject } from '../helpers/_/object.js';
+import { withGroupsScope } from '../consts/groups_claim.js';
 import type { IssuerKeys } from '../keys/issuer_keys.js';
 import {
 	authorizationEncryptionAlgValues,
@@ -41,7 +42,8 @@ function deriveAcrValues(config: Config): string[] {
 
 function deriveScopes(config: Config): string[] {
 	const scopes = new Set<string>(config.scopes);
-	for (const [key, value] of Object.entries(config.claims)) {
+	// Mirrors lib/configs/configuration.ts: the `groups` scope is built in.
+	for (const [key, value] of Object.entries(withGroupsScope(config.claims))) {
 		if (isPlainObject(value) || Array.isArray(value)) {
 			scopes.add(key);
 		}
@@ -75,7 +77,7 @@ export function supportedGrantTypes(config: Config): string[] {
 function deriveClaimsSupported(config: Config): string[] {
 	// Clone so the shared ApplicationConfig.claims is never mutated by the unpack/prune below.
 	const claims: Record<string, unknown> = {};
-	for (const [key, value] of Object.entries(config.claims)) {
+	for (const [key, value] of Object.entries(withGroupsScope(config.claims))) {
 		if (Array.isArray(value)) {
 			claims[key] = value.reduce<Record<string, null>>((acc, claim) => {
 				acc[claim] = null;

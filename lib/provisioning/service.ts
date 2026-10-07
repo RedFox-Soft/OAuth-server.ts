@@ -14,6 +14,7 @@ import type {
 } from '../adapters/types.js';
 import { isUniqueValueTaken } from '../adapters/conflicts.js';
 import { ADMIN_BUCKET_ID } from '../admin/consts.js';
+import { ownedGroupCount } from '../bucket_groups/service.js';
 import { ApplicationConfig } from '../configs/application.js';
 import { cascadeForClient, type CascadeResult } from '../helpers/cascade.js';
 import { OIDCProviderError } from '../helpers/errors.js';
@@ -183,9 +184,10 @@ export async function updateConnection(
 }
 
 /*
- * Refused while the connection manages anyone (spec FR-007): deleting people must never be a side effect
- * of deleting a piece of configuration, and releasing them to local administration silently would break
- * the directory's claim to be their source of truth. Disabling is the alternative while that is decided.
+ * Refused while the connection manages anyone or any group (spec 070 FR-007, spec 071 FR-012): deleting
+ * people — or the groups relying parties authorize on — must never be a side effect of deleting a piece of
+ * configuration, and releasing them to local administration silently would break the directory's claim to
+ * be their source of truth. Disabling is the alternative while that is decided.
  */
 export async function deleteConnection(
 	bucket: UserBucket,
@@ -194,11 +196,21 @@ export async function deleteConnection(
 ): Promise<CascadeResult> {
 	const connection = await loadConnection(bucket, connectionId);
 	const managed = await managedUserCount(bucket._id, connection._id);
-	if (managed > 0) {
+	const groups = await ownedGroupCount(bucket._id, connection._id);
+	if (managed > 0 || groups > 0) {
+		const owned = [
+			...(managed > 0 ? [`${managed} user${managed === 1 ? '' : 's'}`] : []),
+			...(groups > 0 ? [`${groups} group${groups === 1 ? '' : 's'}`] : [])
+		].join(' and ');
 		throw new ProvisioningError(
 			409,
-			`connection manages ${managed} user${managed === 1 ? '' : 's'}; disable it instead, or remove them through the directory first`,
-			{ blockers: [{ kind: 'enduser', count: managed }] }
+			`connection manages ${owned}; disable it instead, or remove them through the directory first`,
+			{
+				blockers: [
+					...(managed > 0 ? [{ kind: 'enduser', count: managed }] : []),
+					...(groups > 0 ? [{ kind: 'bucketgroup', count: groups }] : [])
+				]
+			}
 		);
 	}
 	await record();

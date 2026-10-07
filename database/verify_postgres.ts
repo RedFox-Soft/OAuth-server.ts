@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { STORAGE_DIVERGENCES } from '../lib/consts/storage_divergences.js';
 import { verifyEndUserIdentity } from './verify_end_user_identity.js';
 import { verifyProvisioningConnections } from './verify_provisioning_connections.js';
+import { verifyBucketGroups } from './verify_bucket_groups.js';
 import {
 	FIXED_AREAS,
 	STORE_AREAS,
@@ -64,6 +65,7 @@ if (!THROWAWAY.test(database)) {
  */
 const {
 	AdminAuditStore,
+	BucketGroupStore,
 	BucketKeysStore,
 	ProtectedResourceStore,
 	ProvisioningConnectionStore,
@@ -664,6 +666,109 @@ check(
 
 await verifyEndUserIdentity(runtimeUsers, check);
 await verifyProvisioningConnections(new ProvisioningConnectionStore(), check);
+
+/*
+ * Roles to groups (specs/071), against legacy records as a release before it wrote them. The bucket is made
+ * through the store so its user area exists with today's indexes, then given the roles an older release
+ * stored; applied twice, the second application must change nothing.
+ */
+{
+	const rolesMigration = MIGRATIONS.find((m) =>
+		m.id.endsWith('roles-to-groups')
+	);
+	const rolesBucket = await new UserBucketStore().create({
+		name: `roles-${Date.now()}`,
+		ownerGroupId: 'unassigned'
+	});
+	await handle`
+		UPDATE ${handle(STORE_AREAS.userBuckets)} SET doc = doc || ${{ roles: ['editor', 'viewer'] }}
+		WHERE id = ${rolesBucket._id}
+	`;
+	for (const [id, roles] of [
+		['u1', ['editor']],
+		['u2', ['Editor', 'viewer']],
+		['u3', ['auditor', '  ']]
+	] as const) {
+		await handle`
+			INSERT INTO ${handle(`user_${rolesBucket._id}`)} (id, doc, expires_at)
+			VALUES (${id}, ${{ _id: id, email: `${id}@x.io`, roles }}, NULL)
+		`;
+	}
+	const stamp = Date.now();
+	/* The administrators' area exists on a provisioned instance; made here when this database has none yet. */
+	const { provisionUserArea } =
+		await import('../lib/adapters/postgres/provision.js');
+	await provisionUserArea(handle, 'admin');
+	for (const [id, active, roles] of [
+		[`root-${stamp}`, true, ['super_admin', 'project_admin']],
+		[`retired-${stamp}`, false, ['super_admin']],
+		[`pa-${stamp}`, true, ['project_admin']]
+	] as const) {
+		await handle`
+			INSERT INTO ${handle('user_admin')} (id, doc, expires_at)
+			VALUES (${id}, ${{ _id: id, email: `${id}@x.io`, active, roles }}, NULL)
+		`;
+	}
+	const snapshot = async () =>
+		JSON.stringify({
+			groups: (
+				await handle`SELECT count(*)::int AS n FROM ${handle(STORE_AREAS.bucketGroups)} WHERE doc->>'bucketId' = ${rolesBucket._id}`
+			)[0]?.n,
+			memberships: (
+				await handle`SELECT count(*)::int AS n FROM ${handle(STORE_AREAS.bucketGroupMembers)} WHERE doc->>'bucketId' = ${rolesBucket._id}`
+			)[0]?.n
+		});
+	let report: readonly string[] = [];
+	let afterFirst = '';
+	if (rolesMigration && !('noop' in rolesMigration.postgres)) {
+		const lines = await rolesMigration.postgres.apply(handle);
+		report = Array.isArray(lines) ? lines.map(String) : [];
+		afterFirst = await snapshot();
+		await rolesMigration.postgres.apply(handle);
+	}
+	const groupStore = new BucketGroupStore();
+	const migrated = (
+		await groupStore.query(
+			{ bucketId: rolesBucket._id },
+			{ startIndex: 1, count: 100 }
+		)
+	).groups;
+	const membersByName: Record<string, string[]> = {};
+	for (const group of migrated.sort((a, b) =>
+		a.displayName < b.displayName ? -1 : 1
+	)) {
+		membersByName[group.displayName] = await groupStore.memberIds(group._id);
+	}
+	check(
+		'every declared and held role becomes a group with exactly its holders',
+		JSON.stringify(membersByName) ===
+			JSON.stringify({ auditor: ['u3'], editor: ['u1', 'u2'], viewer: ['u2'] }),
+		JSON.stringify(membersByName)
+	);
+	const [superRow] = await handle`
+		SELECT doc FROM ${handle(STORE_AREAS.groups)} WHERE id = 'super-administrators'
+	`;
+	const superMembers = (
+		(superRow?.doc as { members?: { userId: string }[] } | undefined)
+			?.members ?? []
+	).map((m) => m.userId);
+	check(
+		'every super_admin holder, active or not, and nobody else, is a member of Super administrators',
+		superMembers.includes(`root-${stamp}`) &&
+			superMembers.includes(`retired-${stamp}`) &&
+			!superMembers.includes(`pa-${stamp}`),
+		superMembers.join(', ')
+	);
+	check(
+		'the roles migration applied twice changes nothing the second time',
+		(await snapshot()) === afterFirst,
+		afterFirst
+	);
+	for (const line of report) console.log(`       ${line}`);
+	for (const line of await verifyBucketGroups(groupStore, check)) {
+		console.log(`       ${line}`);
+	}
+}
 
 const audit = new AdminAuditStore();
 const auditGroup = `fidelity-group-${Date.now()}`;

@@ -20,6 +20,7 @@ import { FederationPanel } from './FederationPanel.js';
 import { BucketKeysPanel } from './BucketKeysPanel.js';
 import { UserIdentities } from './UserIdentities.js';
 import { ProvisioningPanel, type ConnectionView } from './ProvisioningPanel.js';
+import { BucketGroupsPanel, type GroupView } from './BucketGroupsPanel.js';
 
 /*
  * What the API actually returns, which is not the stored record: `presentUser` removes the password
@@ -30,12 +31,12 @@ import { ProvisioningPanel, type ConnectionView } from './ProvisioningPanel.js';
 type EndUser = Omit<User, 'password' | 'totp'> & {
 	totpEnrolled: boolean;
 	totpEnrolledAt: string | null;
+	groups?: { id: string; displayName: string; provisionedBy?: string }[];
 };
 
 interface CreateValues {
 	email: string;
 	password: string;
-	roles?: string[];
 	claimsText?: string;
 }
 
@@ -46,9 +47,10 @@ interface AssignValues {
 }
 
 interface EditValues {
-	roles?: string[];
 	active: boolean;
 	claimsText?: string;
+	/* The groups administrators keep that this user is in; a directory's groups are not edited here. */
+	groupIds?: string[];
 }
 
 /*
@@ -112,6 +114,8 @@ export function BucketDetail({
 	 */
 	const [federationKey, setFederationKey] = useState(0);
 	const [provisioningKey, setProvisioningKey] = useState(0);
+	const [groupsKey, setGroupsKey] = useState(0);
+	const [bucketGroups, setBucketGroups] = useState<GroupView[]>([]);
 	const [bucketEditOpen, setBucketEditOpen] = useState(false);
 	const [saving, setSaving] = useState(false);
 	const [createForm] = Form.useForm<CreateValues>();
@@ -120,18 +124,12 @@ export function BucketDetail({
 	const [assignForm] = Form.useForm<AssignValues>();
 	const [bucketForm] = Form.useForm<{
 		name: string;
-		roles?: string[];
 		passwordLogin?: boolean;
 		registrationOpen?: boolean;
 		emailVerificationRequired?: boolean;
 		verificationMethod?: 'link' | 'code';
 		totpRequired?: boolean;
 	}>();
-
-	const roleOptions = (bucket?.roles ?? []).map((r) => ({
-		label: r,
-		value: r
-	}));
 
 	// Every state write follows an await, so the mount effect calls this without setting
 	// `loading` first; `load` is the reload, which does.
@@ -183,8 +181,43 @@ export function BucketDetail({
 		}
 	}
 
-	async function onEdit({ claimsText, ...values }: EditValues) {
+	async function onEdit({ claimsText, groupIds, ...values }: EditValues) {
 		if (!editUserId) return;
+		/*
+		 * Membership is changed through the group's own routes, one per group that changed, so a change made
+		 * here and one made from the group read the same in the audit trail.
+		 */
+		const kept = new Set(
+			bucketGroups.filter((g) => !g.provisionedBy).map((g) => g.id)
+		);
+		const before = new Set(
+			(rows.find((r) => r._id === editUserId)?.groups ?? [])
+				.map((g) => g.id)
+				.filter((id) => kept.has(id))
+		);
+		const after = new Set(groupIds ?? []);
+		const groupsBase = `${base}/groups`;
+		for (const gid of after) {
+			if (before.has(gid)) continue;
+			const res = await fetch(
+				`${groupsBase}/${encodeURIComponent(gid)}/members`,
+				{
+					method: 'POST',
+					headers: { 'content-type': 'application/json' },
+					body: JSON.stringify({ userIds: [editUserId] })
+				}
+			);
+			if (!res.ok) message.error('failed to add the user to a group');
+		}
+		for (const gid of before) {
+			if (after.has(gid)) continue;
+			const res = await fetch(
+				`${groupsBase}/${encodeURIComponent(gid)}/members/${encodeURIComponent(editUserId)}`,
+				{ method: 'DELETE' }
+			);
+			if (!res.ok) message.error('failed to remove the user from a group');
+		}
+		setGroupsKey((k) => k + 1);
 		// An emptied field clears the claims: an edit replaces the account's whole set.
 		const res = await fetch(`${base}/users/${editUserId}`, {
 			method: 'PATCH',
@@ -270,7 +303,6 @@ export function BucketDetail({
 
 	async function onSaveBucket(values: {
 		name: string;
-		roles?: string[];
 		passwordLogin?: boolean;
 		registrationOpen?: boolean;
 		emailVerificationRequired?: boolean;
@@ -325,7 +357,6 @@ export function BucketDetail({
 							bucketForm.setFieldsValue({
 								passwordLogin: bucket?.passwordLogin !== false,
 								name: bucket?.name ?? '',
-								roles: bucket?.roles ?? [],
 								registrationOpen: bucket?.registrationOpen ?? true,
 								emailVerificationRequired:
 									bucket?.emailVerificationRequired ?? false,
@@ -346,11 +377,6 @@ export function BucketDetail({
 					</Button>
 				</Space>
 			</Space>
-			<div style={{ marginBottom: 12 }}>
-				{(bucket?.roles ?? []).map((r) => (
-					<Tag key={r}>{r}</Tag>
-				))}
-			</div>
 			<Table<EndUser>
 				rowKey="_id"
 				loading={loading}
@@ -358,10 +384,17 @@ export function BucketDetail({
 				columns={[
 					{ title: 'Email', dataIndex: 'email' },
 					{
-						title: 'Roles',
-						dataIndex: 'roles',
-						render: (roles: string[]) =>
-							roles.map((r) => <Tag key={r}>{r}</Tag>)
+						title: 'Groups',
+						dataIndex: 'groups',
+						render: (groups: EndUser['groups']) =>
+							(groups ?? []).map((g) => (
+								<Tag
+									key={g.id}
+									color={g.provisionedBy ? 'purple' : undefined}
+								>
+									{g.displayName}
+								</Tag>
+							))
 					},
 					{
 						title: 'Active',
@@ -434,7 +467,9 @@ export function BucketDetail({
 											onClick={() => {
 												setEditUserId(row._id);
 												editForm.setFieldsValue({
-													roles: row.roles,
+													groupIds: (row.groups ?? [])
+														.filter((g) => !g.provisionedBy)
+														.map((g) => g.id),
 													active: row.active,
 													claimsText: row.claims
 														? JSON.stringify(row.claims, null, 2)
@@ -519,6 +554,15 @@ export function BucketDetail({
 				]}
 			/>
 
+			<BucketGroupsPanel
+				bucketId={bucketId}
+				users={rows}
+				connections={connections}
+				refreshKey={groupsKey}
+				onGroups={setBucketGroups}
+				onChanged={() => void load()}
+			/>
+
 			<FederationPanel
 				key={federationKey}
 				bucketId={bucketId}
@@ -578,15 +622,6 @@ export function BucketDetail({
 						<Input.Password
 							autoComplete="new-password"
 							placeholder="at least 8 characters"
-						/>
-					</Form.Item>
-					<Form.Item
-						name="roles"
-						label="Roles"
-					>
-						<Select
-							mode="multiple"
-							options={roleOptions}
 						/>
 					</Form.Item>
 					<ClaimsField />
@@ -664,12 +699,16 @@ export function BucketDetail({
 					onFinish={onEdit}
 				>
 					<Form.Item
-						name="roles"
-						label="Roles"
+						name="groupIds"
+						label="Groups"
+						tooltip="Groups administrators keep. A directory's groups are changed in the directory."
 					>
 						<Select
 							mode="multiple"
-							options={roleOptions}
+							optionFilterProp="label"
+							options={bucketGroups
+								.filter((g) => !g.provisionedBy)
+								.map((g) => ({ label: g.displayName, value: g.id }))}
 						/>
 					</Form.Item>
 					<Form.Item
@@ -724,16 +763,6 @@ export function BucketDetail({
 						rules={[{ required: true }]}
 					>
 						<Input />
-					</Form.Item>
-					<Form.Item
-						name="roles"
-						label="Roles"
-						tooltip="Role set users in this bucket may hold"
-					>
-						<Select
-							mode="tags"
-							placeholder="add role names"
-						/>
 					</Form.Item>
 					<Form.Item
 						name="passwordLogin"

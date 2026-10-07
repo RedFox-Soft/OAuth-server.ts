@@ -4,22 +4,22 @@ import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { bucketKeyRoutes } from 'lib/admin/bucket_keys/routes.ts';
 import { jwksRoutes } from 'lib/admin/jwks/routes.ts';
 import { ensurePersonalGroup } from 'lib/admin/groups/personal.ts';
-import { getBucketStore, getUserStore } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import { getBucketStore } from 'lib/adapters/index.ts';
+import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { forgetBucketAddresses } from 'lib/admin/auth/bucketAddress.ts';
 import { keysFor } from 'lib/keys/issuer_keys.ts';
 import { sessionFor } from '../admin_session.ts';
+import { createAdministrator, type AdminKind } from '../administrators.ts';
 
 const app = new Elysia({ normalize: false })
 	.use(resolveAdmin)
 	.use(bucketKeyRoutes)
 	.use(jwksRoutes);
 
-export async function administrator(roles: string[]) {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`keys-${roles.join('-')}-${Math.random()}@x.io`,
-		'hash',
-		roles
+export async function administrator(kind: AdminKind) {
+	const user = await createAdministrator(
+		kind,
+		`keys-${kind}-${Math.random()}@x.io`
 	);
 	const group = await ensurePersonalGroup(user._id, user.email);
 	return {

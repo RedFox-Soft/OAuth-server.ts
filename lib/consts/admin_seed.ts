@@ -39,6 +39,15 @@ export const SYSTEM_GROUP_SEED = {
 } as const;
 
 /*
+ * Super administrators: membership is the instance privilege. Seeded empty — first-run setup adds the first
+ * administrator — and its name, like the holding group's, is set on every run rather than kept out of reach.
+ */
+export const SUPER_ADMINS_GROUP_SEED = {
+	kind: 'system',
+	members: []
+} as const;
+
+/*
  * The reserved administrator bucket. Password login stays on and no providers are accepted: the
  * console is a relying party on this server's own issuer, and a second identity source for operators
  * is a separate decision. Both the bucket PATCH and the provider routes refuse it.
@@ -53,7 +62,6 @@ export const ADMIN_BUCKET_SEED = {
 	 */
 	slug: 'admin',
 	ownerGroupId: UNASSIGNED_GROUP_ID,
-	roles: ['super_admin', 'project_admin'],
 	passwordLogin: true,
 	federation: [],
 	/* The reserved admin bucket never accepts self-service registration. */
@@ -77,7 +85,6 @@ export const DEFAULT_BUCKET_SEED = {
 	 */
 	slug: 'default',
 	ownerGroupId: UNASSIGNED_GROUP_ID,
-	roles: [],
 	passwordLogin: true,
 	federation: [],
 	registrationOpen: true,

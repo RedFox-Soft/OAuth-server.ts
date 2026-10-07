@@ -1,4 +1,5 @@
 import type {
+	BucketGroup,
 	EndUserCreateFields,
 	EndUserFilter,
 	EndUserPatch,
@@ -28,6 +29,39 @@ export function externalIdKeyOf(
 	externalId: string
 ): string {
 	return `${provisionedBy}:${externalId}`;
+}
+
+/*
+ * A bucket group's name is unique within its bucket in any letter case (RFC 7643 declares Group `displayName`
+ * `caseExact: false`; IPSIE §6.2.1 asks that names not repeat), so the key is the bucket and the username key
+ * of the name — one rule for "the same name" across users and groups. Bucket ids are nanoids, with no `:`.
+ */
+export function displayNameKeyOf(
+	bucketId: string,
+	displayName: string
+): string {
+	return `${bucketId}:${userNameKeyOf(displayName)}`;
+}
+
+/* The membership record's id. Deterministic, so adding a member twice writes the same record once. */
+export function membershipIdOf(groupId: string, userId: string): string {
+	return `${groupId}:${userId}`;
+}
+
+/* The keys a group record should hold; `undefined` means the key must be absent. */
+export function bucketGroupKeysOf(
+	group: Pick<
+		BucketGroup,
+		'bucketId' | 'displayName' | 'externalId' | 'provisionedBy'
+	>
+): Pick<BucketGroup, 'displayNameKey' | 'externalIdKey'> {
+	return {
+		displayNameKey: displayNameKeyOf(group.bucketId, group.displayName),
+		externalIdKey:
+			group.externalId !== undefined && group.provisionedBy !== undefined
+				? externalIdKeyOf(group.provisionedBy, group.externalId)
+				: undefined
+	};
 }
 
 type DerivedKeys = Pick<User, 'userNameKey' | 'externalIdKey'>;

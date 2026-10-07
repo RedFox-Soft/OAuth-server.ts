@@ -210,7 +210,6 @@ describe('a bucket addressed by a host of its own (US1)', () => {
 		await getUserStore(tenantBucketId).create(
 			email,
 			await Bun.password.hash(PASSWORD),
-			[],
 			true
 		);
 
@@ -234,7 +233,6 @@ describe('a bucket addressed by a host of its own (US1)', () => {
 		await getUserStore(tenantBucketId).create(
 			email,
 			await Bun.password.hash(PASSWORD),
-			[],
 			true
 		);
 
@@ -256,7 +254,6 @@ describe('a bucket addressed by a host of its own (US1)', () => {
 		await getUserStore(tenantBucketId).create(
 			email,
 			await Bun.password.hash(PASSWORD),
-			[],
 			true
 		);
 		const { session } = await completeSignIn(
@@ -323,7 +320,6 @@ describe('a bucket addressed by a host of its own (US1)', () => {
 		await getUserStore(tenantBucketId).create(
 			email,
 			await Bun.password.hash(PASSWORD),
-			[],
 			true
 		);
 
@@ -366,7 +362,6 @@ describe('an interaction belongs to the address it began at (US1)', () => {
 		await getUserStore(tenantBucketId).create(
 			email,
 			await Bun.password.hash(PASSWORD),
-			[],
 			true
 		);
 

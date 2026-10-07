@@ -99,7 +99,7 @@ function namesOwnScimEndpoint(identifier: string): boolean {
  * made would have the same reach by another route.
  */
 function assertMayWrite(ctx: AdminContext, namespace: string): void {
-	if (namespace === ROOT_NAMESPACE && !ctx.roles.includes('super_admin')) {
+	if (namespace === ROOT_NAMESPACE && !ctx.superAdmin) {
 		throw new AdminError(403, ROOT_DECLARATION_REFUSAL);
 	}
 }

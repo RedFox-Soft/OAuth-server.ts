@@ -97,9 +97,8 @@ export const invitationAcceptRoutes = new Elysia({ name: 'admin-invitations' })
 				const created = await users.create(
 					invitation.email,
 					await Bun.password.hash(body.password),
-					// Never `super_admin`: an invitation grants membership of one group, and the instance
-					// role it confers is the least one that can hold a group at all.
-					['project_admin'],
+					// An invitation grants membership of the inviting group and nothing else — never the
+					// instance privilege, which only a super administrator grants, by its own operation.
 					true
 				);
 				userId = created._id;

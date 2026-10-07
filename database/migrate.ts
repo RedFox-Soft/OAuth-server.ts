@@ -127,6 +127,10 @@ try {
 	report('applying', before.outstanding);
 
 	const result = await run(MIGRATIONS, backend);
+	for (const [id, lines] of Object.entries(result.reports ?? {})) {
+		console.log(`\n${id}:`);
+		for (const line of lines) console.log(`  ${line}`);
+	}
 	console.log(
 		`\ndone: ${result.applied.length} applied, ${result.skipped.length} recorded as no-ops here`
 	);

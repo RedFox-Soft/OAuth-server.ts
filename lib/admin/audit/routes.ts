@@ -91,7 +91,7 @@ export const auditRoutes = new Elysia({ name: 'admin-audit' })
 			 * entries (settings, keys, administrator accounts) are readable at all: they belong to no group,
 			 * so no group restriction can ever match them.
 			 */
-			const ownerGroupIds = ctx.roles.includes('super_admin')
+			const ownerGroupIds = ctx.superAdmin
 				? undefined
 				: ctx.memberships.map((m) => m.groupId);
 

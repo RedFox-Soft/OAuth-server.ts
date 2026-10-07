@@ -76,6 +76,15 @@ export const UNASSIGNED_GROUP_ID = 'unassigned';
  * meantime. The id stays `unassigned` — renaming it would be a data migration for no visible gain.
  */
 export const SYSTEM_GROUP_NAME = 'System';
+/*
+ * The reserved administrator group whose membership is the instance-wide privilege — what the
+ * `super_admin` role used to be (specs/071). A `system` group like `unassigned`: it owns nothing, is never
+ * a working group, cannot be renamed, deleted or invited into, and changes only through the
+ * grant/withdraw routes. It sits among administrator groups, never bucket groups, so no SCIM request and no
+ * token can reach it.
+ */
+export const SUPER_ADMINS_GROUP_ID = 'super-administrators';
+export const SUPER_ADMINS_GROUP_NAME = 'Super administrators';
 export const ADMIN_CLIENT_ID = 'admin-panel';
 export const ADMIN_SESSION_COOKIE = '_admin_session';
 

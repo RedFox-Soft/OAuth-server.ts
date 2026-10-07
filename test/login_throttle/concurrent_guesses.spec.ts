@@ -89,7 +89,6 @@ describe('a password guessed concurrently', () => {
 			await getUserStore(bucket._id).create(
 				email,
 				await Bun.password.hash(PASSWORD),
-				[],
 				true
 			);
 		}

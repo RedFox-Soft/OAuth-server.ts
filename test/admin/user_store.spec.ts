@@ -2,27 +2,18 @@ import { describe, it, expect, beforeEach } from 'bun:test';
 import { UserStore } from 'lib/adapters/memory/userStore.ts';
 
 /**
- * @proves An end-user record round-trips through the store with its roles, and a deletion
- * actually removes it.
+ * @proves End-user records are listed from the store, and a deletion actually removes one.
  */
-describe('UserStore (memory) roles', () => {
+describe('UserStore (memory)', () => {
 	let store: UserStore;
 	beforeEach(() => {
 		store = new UserStore('admin');
 	});
 
-	it('creates a user with roles and returns it', async () => {
-		const u = await store.create('a@x.io', 'hash', ['super_admin']);
-		expect(u.roles).toEqual(['super_admin']);
-		expect(u._id).toBeString();
-	});
-
-	it('lists users and updates roles', async () => {
-		await store.create('a@x.io', 'hash', ['super_admin']);
-		const u = await store.create('b@x.io', 'hash');
+	it('lists users', async () => {
+		await store.create('a@x.io', 'hash');
+		await store.create('b@x.io', 'hash');
 		expect(await store.list()).toHaveLength(2);
-		await store.update(u._id, { roles: ['project_admin'] });
-		expect((await store.find(u._id))?.roles).toEqual(['project_admin']);
 	});
 
 	it('hard-deletes a user', async () => {

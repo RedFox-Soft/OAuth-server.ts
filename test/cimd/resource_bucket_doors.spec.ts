@@ -125,7 +125,6 @@ describe('the doors of a bucket reached through a declared resource', () => {
 		await getUserStore(federatedBucketId).create(
 			'federated@x.io',
 			await Bun.password.hash(PASSWORD),
-			[],
 			true
 		);
 
@@ -133,7 +132,6 @@ describe('the doors of a bucket reached through a declared resource', () => {
 		await getUserStore(totpBucketId).create(
 			'enrolling@x.io',
 			await Bun.password.hash(PASSWORD),
-			[],
 			true
 		);
 	});

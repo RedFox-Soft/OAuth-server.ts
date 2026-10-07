@@ -30,7 +30,6 @@ describe('authentication methods after a federated sign-in', () => {
 		const account = await store.create(
 			'amr@acme.test',
 			'irrelevant-hash',
-			[],
 			true
 		);
 		await store.update(account._id, {

@@ -148,7 +148,6 @@ describe('signing in at a provider bound to a provisioning connection', () => {
 		const local = await getUserStore(bucket._id).create(
 			'tess@contoso.com',
 			'hash',
-			[],
 			true
 		);
 

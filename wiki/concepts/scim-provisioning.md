@@ -21,7 +21,8 @@ graph:
 Spec 070 — part 2 of 4 of the SCIM series (issue #62). An enterprise directory (Microsoft Entra ID, Okta)
 provisions a bucket's end users over SCIM 2.0 through a **provisioning connection**, and those users sign in
 through the same directory by federation. Part 1 ([[end-user-lifecycle]]) built the record and the
-access-ending operation this calls; part 3 adds groups, part 4 shared signals and `/Bulk`.
+access-ending operation this calls; part 3 ([[bucket-groups]], spec 071) adds `/Groups` and the `groups`
+claim, part 4 shared signals and `/Bulk`.
 
 ## A connection is its own record, bound to one provider
 
@@ -86,7 +87,7 @@ in the suite. `.use` mutates, so the routes register identically.
   (`lib/shared/authorization_error_handler.ts:340`), so Elysia's own validation and parse failures render in
   SCIM's shape too; the plugin records 5xx itself (`lib/scim/index.ts:200`) — a fourth capture site
   ([[error-store-capture-sites]]). Elysia wraps anything a parse hook throws in a `ParseError`, so the 413
-  rides as its `cause`. A path beneath a SCIM base that no route matches (`/Groups` before part 3) has no
+  rides as its `cause`. A path beneath a SCIM base that no route matches (`/Bulk`; `/Groups` before part 3) has no
   route key, so the root handler recognises it by path (`isScimPath`, `lib/consts/scim.ts`) and answers a
   SCIM 404 — only while `scim.enabled` is on; off, it answers as any unserved path, so the surface stays
   unannounced ([[feature-flag-gating]]). Found by Okta's SCIM 2.0 Spec Test on 2026-10-07, whose optional

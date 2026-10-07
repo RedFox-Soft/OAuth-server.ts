@@ -33,7 +33,7 @@ describe('ensureAdminSeed', () => {
 		const bucket = await getBucketStore().find(ADMIN_BUCKET_ID);
 
 		expect(project).toMatchObject({ type: 'admin', bucketId: ADMIN_BUCKET_ID });
-		expect(bucket?.roles).toEqual(['super_admin', 'project_admin']);
+		expect(bucket?._id).toBe(ADMIN_BUCKET_ID);
 
 		const client = await Client.find(ADMIN_CLIENT_ID);
 		expect(client).toBeTruthy();

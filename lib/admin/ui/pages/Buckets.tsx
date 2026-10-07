@@ -6,7 +6,6 @@ import {
 	Form,
 	Input,
 	Radio,
-	Select,
 	Space,
 	Tag,
 	Tooltip,
@@ -25,7 +24,6 @@ interface CreateBucketValues {
 	addressForm: 'path' | 'host';
 	slug?: string;
 	host?: string;
-	roles?: string[];
 }
 
 export function Buckets({ isSuperAdmin }: { isSuperAdmin: boolean }) {
@@ -207,12 +205,6 @@ export function Buckets({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 								</Tooltip>
 							);
 						}
-					},
-					{
-						title: 'Roles',
-						dataIndex: 'roles',
-						render: (roles: string[]) =>
-							roles.map((r) => <Tag key={r}>{r}</Tag>)
 					},
 					{
 						title: 'Projects',
@@ -401,15 +393,6 @@ export function Buckets({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 								</Form.Item>
 							)
 						}
-					</Form.Item>
-					<Form.Item
-						name="roles"
-						label="Roles"
-					>
-						<Select
-							mode="tags"
-							placeholder="add role names"
-						/>
 					</Form.Item>
 				</Form>
 			</Modal>

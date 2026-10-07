@@ -67,7 +67,6 @@ export const User = t.Object({
 	verified: t.Boolean(),
 	password: t.String(),
 	active: t.Boolean(),
-	roles: t.Array(t.String()),
 	createdAt: t.Date(),
 	updatedAt: t.Date(),
 	lastLoginAt: t.Union([t.Date(), t.Null()]),
@@ -205,7 +204,6 @@ export type EndUserCreateFields = Partial<
 export type EndUserPatch = Partial<
 	Pick<
 		User,
-		| 'roles'
 		| 'active'
 		| 'password'
 		| 'verified'
@@ -393,7 +391,6 @@ export interface UserStoreInstance {
 	create(
 		email: string,
 		password: string,
-		roles?: string[],
 		verified?: boolean,
 		id?: string,
 		fields?: EndUserCreateFields
@@ -418,6 +415,8 @@ export interface UserStoreInstance {
 	 * the total match count. `externalId` without `provisionedBy` is a programming error and throws.
 	 */
 	query(filter: EndUserFilter, page: EndUserPage): Promise<EndUserQueryResult>;
+	/* Up to MAX_END_USER_PAGE users by id, in no particular order; unknown ids are simply absent. */
+	findMany(ids: string[]): Promise<User[]>;
 	/*
 	 * `claims` and `federated` are patchable because a just-in-time provisioned account is created and
 	 * then completed: create() takes positional arguments and neither value is always present, so widening
@@ -948,7 +947,7 @@ export interface ErrorStoreConstructor {
  * be deleted; `member` is equal to an owner over everything the group owns and has no say over
  * membership. The distinction is a property of the membership, not a role on the account — the same
  * administrator is an owner of one group and a plain member of another — which is why it cannot live
- * on the user record beside `roles`.
+ * on the user record.
  */
 export const GroupMember = t.Object({
 	userId: t.String(),
@@ -1303,6 +1302,115 @@ export interface ProvisioningConnectionStoreConstructor {
 }
 
 /*
+ * A named set of one bucket's end users — what a bucket's roles always meant to be: flat, and a person may
+ * be in any number of them. Kept by administrators, or owned by exactly one provisioning connection
+ * (`provisionedBy`, the same field and meaning as on `User`), never both.
+ *
+ * Its members are not on this record. They are `BucketGroupMember` records, one per membership, so a change
+ * to a 100,000-member group costs what the change costs rather than what the group costs (specs/071 research R1).
+ */
+export const BucketGroup = t.Object({
+	_id: t.String(),
+	bucketId: t.String(),
+	displayName: t.String(),
+	/* Unique per bucket, case-insensitively; derived on every write (lib/adapters/end_user_keys.ts). */
+	displayNameKey: t.String(),
+	externalId: t.Optional(t.String()),
+	/* Unique per connection; present only beside `externalId` and `provisionedBy`. */
+	externalIdKey: t.Optional(t.String()),
+	provisionedBy: t.Optional(t.String()),
+	createdAt: t.Date(),
+	updatedAt: t.Date()
+});
+export type BucketGroup = Static<typeof BucketGroup>;
+
+/* The id is `groupId:userId`, so adding the same member twice is the same record (membershipIdOf). */
+export const BucketGroupMember = t.Object({
+	_id: t.String(),
+	groupId: t.String(),
+	userId: t.String(),
+	bucketId: t.String(),
+	createdAt: t.Date()
+});
+export type BucketGroupMember = Static<typeof BucketGroupMember>;
+
+export type NewBucketGroup = Pick<
+	BucketGroup,
+	'_id' | 'bucketId' | 'displayName' | 'externalId' | 'provisionedBy'
+>;
+
+/* Equality on fixed fields, ANDed, as `EndUserFilter`; `member` resolves through the membership area. */
+export interface BucketGroupFilter {
+	bucketId: string;
+	provisionedBy?: string;
+	id?: string;
+	displayName?: string;
+	externalId?: string;
+	member?: string;
+}
+
+export interface BucketGroupQueryResult {
+	groups: BucketGroup[];
+	totalResults: number;
+}
+
+/*
+ * One accepted change to a group. Every refusal a caller can provoke is decided before this reaches the
+ * store; what the store may still refuse is a unique key, and it refuses that before touching a membership.
+ * A key present with an undefined value removes the field.
+ */
+export interface BucketGroupChange {
+	attributes?: Partial<
+		Pick<BucketGroup, 'displayName' | 'externalId' | 'provisionedBy'>
+	>;
+	add?: string[];
+	remove?: string[];
+}
+
+export interface BucketGroupStoreInstance {
+	/* Throws UniqueValueTaken ('displayName' | 'externalId') before writing any membership. */
+	create(group: NewBucketGroup, memberIds?: string[]): Promise<BucketGroup>;
+	find(id: string): Promise<BucketGroup | null>;
+	/* Up to MAX_END_USER_PAGE groups by id, in no particular order. */
+	findMany(ids: string[]): Promise<BucketGroup[]>;
+	/* Ordered by `_id`; `count: 0` answers only the total. */
+	query(
+		filter: BucketGroupFilter,
+		page: EndUserPage
+	): Promise<BucketGroupQueryResult>;
+	/* Member ids ordered by user id; the whole set without a page. */
+	memberIds(groupId: string, page?: EndUserPage): Promise<string[]>;
+	memberCount(groupId: string): Promise<number>;
+	/*
+	 * Each user's group ids in the bucket, optionally only those of one connection — the claim's read for one
+	 * user and a SCIM `/Users` page's for many.
+	 */
+	groupIdsOf(
+		bucketId: string,
+		userIds: string[],
+		provisionedBy?: string
+	): Promise<Map<string, string[]>>;
+	/*
+	 * Attributes first, then additions, then removals; `updatedAt` advances. One transaction where the
+	 * backend has one (lib/consts/storage_divergences.ts, `bucket-group-change-atomicity`). Answers null for an
+	 * unknown group. Throws UniqueValueTaken, having written nothing, on a taken name or external identifier.
+	 */
+	change(
+		groupId: string,
+		change: BucketGroupChange
+	): Promise<BucketGroup | null>;
+	/* Deletes the user's memberships in the bucket — the user is being deleted. */
+	removeUser(bucketId: string, userId: string): Promise<void>;
+	/* Memberships first, then the group: an interrupted delete leaves a smaller group, never orphans. */
+	destroy(id: string): Promise<void>;
+	destroyByBucket(bucketId: string): Promise<void>;
+}
+
+export interface BucketGroupStoreConstructor {
+	new (): BucketGroupStoreInstance;
+}
+
+/*
  * A super administrator's decision that one client description document, or one host publishing them,
  * may reach the administrative MCP plane.
  *
@@ -1417,7 +1525,6 @@ export const UserBucket = t.Object({
 	hostLastSeenAt: t.Optional(t.Date()),
 	/* The group that owns this bucket. Every access decision resolves through it. */
 	ownerGroupId: t.String(),
-	roles: t.Array(t.String()),
 	/*
 	 * Whether this bucket accepts an email and a password at all. Replaces `authMethods`, which was a
 	 * dead field: nothing read it, and the admin bodies omitted it entirely, so no operator could set it.
@@ -1475,7 +1582,6 @@ export interface UserBucketStoreInstance {
 		name: string;
 		slug?: string;
 		ownerGroupId: string;
-		roles?: string[];
 		passwordLogin?: boolean;
 		federation?: FederationProvider[];
 		registrationOpen?: boolean;
@@ -1528,7 +1634,6 @@ export interface UserBucketStoreInstance {
 				| 'name'
 				| 'slug'
 				| 'ownerGroupId'
-				| 'roles'
 				| 'passwordLogin'
 				| 'federation'
 				| 'registrationOpen'

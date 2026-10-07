@@ -17,8 +17,8 @@ describe('who may manage a bucket key', () => {
 	});
 
 	it('refuses another group administrator listing the keys', async () => {
-		const owner = await administrator(['project_admin']);
-		const outsider = await administrator(['project_admin']);
+		const owner = await administrator('plain');
+		const outsider = await administrator('plain');
 		const bucket = await ownedBucket(owner.groupId);
 
 		const res = await call(
@@ -31,8 +31,8 @@ describe('who may manage a bucket key', () => {
 	});
 
 	it('refuses another group administrator generating a key', async () => {
-		const owner = await administrator(['project_admin']);
-		const outsider = await administrator(['project_admin']);
+		const owner = await administrator('plain');
+		const outsider = await administrator('plain');
 		const bucket = await ownedBucket(owner.groupId);
 
 		const res = await call(
@@ -46,7 +46,7 @@ describe('who may manage a bucket key', () => {
 	});
 
 	it('refuses a group administrator the instance key set', async () => {
-		const { cookie } = await administrator(['project_admin']);
+		const { cookie } = await administrator('plain');
 
 		const res = await call('POST', '/admin/api/jwks', cookie, { alg: 'ES256' });
 
@@ -54,7 +54,7 @@ describe('who may manage a bucket key', () => {
 	});
 
 	it('refuses the bucket routes for a bucket that signs with the instance keys', async () => {
-		const { cookie } = await administrator(['super_admin']);
+		const { cookie } = await administrator('super');
 
 		const res = await call(
 			'POST',
@@ -67,8 +67,8 @@ describe('who may manage a bucket key', () => {
 	});
 
 	it('lets a super administrator generate a key for a bucket of any group', async () => {
-		const owner = await administrator(['project_admin']);
-		const { cookie } = await administrator(['super_admin']);
+		const owner = await administrator('plain');
+		const { cookie } = await administrator('super');
 		const bucket = await ownedBucket(owner.groupId);
 
 		const res = await call(

@@ -153,3 +153,5 @@ Operations:
 ## [2026-10-06] update | [[scim-provisioning]] and [[upstream-federation]]: the unusable password of a passwordless account is hashed once per process instead of once per account — an argon2 hash per SCIM create (~100 ms of CPU) could not have sustained an initial directory import; the preimage is still discarded, so sharing the hash opens nothing.
 
 ## [2026-10-07] update | [[scim-provisioning]]: an unserved path beneath an enabled SCIM base answers a SCIM 404 (recognised by path, since it has no route key); every unserved path now answers `not_found` instead of a `server_error` body that reported a fault that never happened. Found by Okta's SCIM 2.0 Spec Test.
+
+## [2026-10-07] create | [[bucket-groups]]: spec 071 — roles replaced by bucket groups and Super administrators; the `groups` claim; SCIM `/Groups`; the roles-to-groups migration. Corrected [[group-ownership]] (a second system group; accounts carry no roles), [[admin-audit-trail]] (scoped read keys on `superAdmin`), [[scim-provisioning]] (part 3 done; `/Bulk` is now the unserved example) and [[totp-second-factor]] (the admin bucket no longer has a role list).

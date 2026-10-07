@@ -35,6 +35,7 @@ import {
 	SMTP_TARGET_ID
 } from 'lib/consts/admin_audit_routes.ts';
 import { present } from 'test/shape.js';
+import { createAdministrator } from '../administrators.ts';
 
 /*
  * One audit entry per state-changing admin operation — all 23 of them, driven through the real HTTP
@@ -62,16 +63,14 @@ const app = new Elysia()
 	.use(jwksRoutes);
 
 const client = treaty(app);
+const superAdminOf = (id: string) =>
+	client.admin.api.admins({ id })['super-admin'];
 
 let seq = 0;
 const unique = (prefix: string) => `${prefix}-${Date.now()}-${(seq += 1)}`;
 
 async function superCookie() {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`${unique('super')}@x.io`,
-		'hash',
-		['super_admin']
-	);
+	const user = await createAdministrator('super', `${unique('super')}@x.io`);
 	const session = await sessionFor(user);
 	return {
 		cookie: `${ADMIN_SESSION_COOKIE}=${session._id}`,
@@ -141,7 +140,7 @@ const CLIENT_BODY = {
 
 /*
  * First-run setup runs before anything else in this file and against a deliberately emptied admin
- * bucket: the route closes itself as soon as one super_admin exists, and earlier specs in this process
+ * bucket: the route closes itself as soon as one super administrator exists, and earlier specs in this process
  * have seeded several.
  */
 /**
@@ -373,8 +372,7 @@ describe('admin audit coverage: administrators', () => {
 		const res = await client.admin.api.admins.post(
 			{
 				email: `${unique('made')}@x.io`,
-				password: 'a-long-enough-password',
-				roles: ['project_admin']
+				password: 'a-long-enough-password'
 			},
 			{ headers: { cookie } }
 		);
@@ -390,32 +388,68 @@ describe('admin audit coverage: administrators', () => {
 
 	it('records an administrator update', async () => {
 		const { cookie, userId } = await superCookie();
-		const target = await getUserStore(ADMIN_BUCKET_ID).create(
-			`${unique('target')}@x.io`,
-			'hash',
-			['project_admin']
+		const target = await createAdministrator(
+			'plain',
+			`${unique('target')}@x.io`
 		);
 
 		const res = await client.admin.api
 			.admins({ id: target._id })
-			.patch({ roles: ['super_admin'] }, { headers: { cookie } });
+			.patch({ active: true }, { headers: { cookie } });
 		expect(res.status).toBe(200);
 
 		expectEntry(await soleEntry(target._id), {
 			action: 'admin.update',
 			targetType: 'AdminUser',
 			actorId: userId,
-			attributes: ['roles']
+			attributes: ['active']
+		});
+	});
+
+	it('records making an administrator a super administrator', async () => {
+		const { cookie, userId } = await superCookie();
+		const target = await createAdministrator(
+			'plain',
+			`${unique('target')}@x.io`
+		);
+
+		const res = await superAdminOf(target._id).post(undefined, {
+			headers: { cookie }
+		});
+		expect(res.status).toBe(200);
+
+		expectEntry(await soleEntry(target._id), {
+			action: 'admin.superadmin.grant',
+			targetType: 'AdminUser',
+			actorId: userId
+		});
+	});
+
+	it('records withdrawing the super administrator privilege', async () => {
+		const { cookie, userId } = await superCookie();
+		const target = await createAdministrator(
+			'super',
+			`${unique('target')}@x.io`
+		);
+
+		const res = await superAdminOf(target._id).delete(undefined, {
+			headers: { cookie }
+		});
+		expect(res.status).toBe(200);
+
+		expectEntry(await soleEntry(target._id), {
+			action: 'admin.superadmin.withdraw',
+			targetType: 'AdminUser',
+			actorId: userId
 		});
 	});
 
 	// The route sets active:false and keeps the row, so the action must not claim a deletion.
 	it('records a deactivation as a deactivation, not a deletion', async () => {
 		const { cookie, userId } = await superCookie();
-		const target = await getUserStore(ADMIN_BUCKET_ID).create(
-			`${unique('target')}@x.io`,
-			'hash',
-			['project_admin']
+		const target = await createAdministrator(
+			'plain',
+			`${unique('target')}@x.io`
 		);
 
 		const res = await client.admin.api

@@ -44,7 +44,6 @@ async function seedUser(email: string) {
 	return getUserStore(bucketId).create(
 		email,
 		await Bun.password.hash(PASSWORD),
-		[],
 		true
 	);
 }

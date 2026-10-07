@@ -36,7 +36,7 @@ describe('federated links and deletion', () => {
 			name: 'deletion'
 		});
 		const store = getUserStore(bucket._id);
-		const user = await store.create('linked@acme.test', 'hash', [], true);
+		const user = await store.create('linked@acme.test', 'hash', true);
 		await store.update(user._id, { federated: [LINK] });
 
 		expect(
@@ -59,7 +59,7 @@ describe('federated links and deletion', () => {
 			name: 'handoff-sweep'
 		});
 		const store = getUserStore(bucket._id);
-		const user = await store.create('inflight@acme.test', 'hash', [], true);
+		const user = await store.create('inflight@acme.test', 'hash', true);
 
 		// A sign-in mid-flight: the account has been resolved and the handoff written, and then the operator
 		// deletes the account.
@@ -83,7 +83,7 @@ describe('federated links and deletion', () => {
 			name: 'area'
 		});
 		const store = getUserStore(bucket._id);
-		const user = await store.create('last@acme.test', 'hash', [], true);
+		const user = await store.create('last@acme.test', 'hash', true);
 		await store.update(user._id, { federated: [LINK] });
 
 		/*

@@ -65,6 +65,23 @@ export const STORAGE_DIVERGENCES: readonly StorageDivergence[] = [
 			'Safe by construction, and the reason `rerunnable` is a required field rather than a boolean.'
 	},
 	{
+		id: 'bucket-group-change-atomicity',
+		subject:
+			'whether a bucket group change is one write on a standalone `mongod`',
+		mongodb:
+			'a transaction on a replica set or sharded cluster; on a standalone `mongod`, ordered writes, ' +
+			'each idempotent: attributes, then additions, then removals',
+		postgres: 'one transaction',
+		reason:
+			'A standalone `mongod` is a supported topology and has no multi-document transaction. Every ' +
+			'refusal a client can provoke is decided before the first write, so only a database failure ' +
+			'mid-request can leave part of a change applied, and each write is idempotent, so the ' +
+			"client's retry of the same request converges.",
+		observable:
+			'only on a standalone `mongod`, after a database failure mid-request, which answers 500: the ' +
+			'group shows part of the change until the identity system retries.'
+	},
+	{
 		id: 'unprovisioned-area-on-first-write',
 		subject:
 			'what a write to an area the database was never provisioned with does',

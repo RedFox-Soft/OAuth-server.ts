@@ -7,16 +7,12 @@ import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
 	adminAuditStore,
 	getBucketStore,
-	getProjectStore,
-	getUserStore
+	getProjectStore
 } from 'lib/adapters/index.ts';
-import {
-	ADMIN_BUCKET_ID,
-	ADMIN_SESSION_COOKIE,
-	UNASSIGNED_GROUP_ID
-} from 'lib/admin/consts.ts';
+import { ADMIN_SESSION_COOKIE, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
 import { answered } from '../admin/answered.ts';
+import { createAdministrator, type AdminKind } from '../administrators.ts';
 
 const app = new Elysia().use(resolveAdmin).use(bucketRoutes);
 const client = treaty(app);
@@ -26,18 +22,14 @@ const unique = (prefix: string) => `${prefix}-${Date.now()}-${(seq += 1)}`;
 /* A bucket's slug is an address, so it is lowercase where its display name need not be. */
 const uniqueSlug = (prefix: string) => unique(prefix).toLowerCase();
 
-async function sessionCookieFor(roles: string[]) {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`${unique(roles.join('-'))}@x.io`,
-		'hash',
-		roles
-	);
+async function sessionCookieFor(kind: AdminKind) {
+	const user = await createAdministrator(kind, `${unique(kind)}@x.io`);
 	const session = await sessionFor(user);
 	return { cookie: `${ADMIN_SESSION_COOKIE}=${session._id}`, userId: user._id };
 }
 
 async function superCookie() {
-	return (await sessionCookieFor(['super_admin'])).cookie;
+	return (await sessionCookieFor('super')).cookie;
 }
 
 /**
@@ -213,7 +205,7 @@ describe('bucket sign-in method setting', () => {
 
 	it('refuses a caller with no rights over the bucket, changing nothing', async () => {
 		const cookie = await superCookie();
-		const outsider = await sessionCookieFor(['project_admin']);
+		const outsider = await sessionCookieFor('plain');
 		const bucket = answered(
 			(
 				await client.admin.api.buckets.post(
@@ -258,7 +250,7 @@ describe('bucket sign-in method setting', () => {
 	 * current one and the ordered entries naming this field give every flip since the `false` default.
 	 */
 	it('records the change against the actor, naming the field and not its value', async () => {
-		const admin = await sessionCookieFor(['super_admin']);
+		const admin = await sessionCookieFor('super');
 		const bucket = answered(
 			(
 				await client.admin.api.buckets.post(
@@ -309,7 +301,7 @@ describe('bucket sign-in method setting', () => {
 
 	it('keeps the setting out of a project-scoped manager they do not manage', async () => {
 		const cookie = await superCookie();
-		const manager = await sessionCookieFor(['project_admin']);
+		const manager = await sessionCookieFor('plain');
 		const bucket = await getBucketStore().create({
 			name: unique('Managed'),
 			ownerGroupId: await personalGroupId(manager.userId)

@@ -5,6 +5,8 @@ import { adminSetup, hasSuperAdmin } from 'lib/admin/auth/setup.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { getUserStore, resetAdminMemoryStores } from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID } from 'lib/admin/consts.ts';
+import { isSuperAdmin, superAdminIds } from 'lib/admin/super_admins.ts';
+import { present } from 'test/shape.js';
 
 const app = new Elysia().use(adminSetup);
 const client = treaty(app);
@@ -13,7 +15,7 @@ const client = treaty(app);
  * @proves First-run setup creates the first super administrator and then closes permanently.
  */
 describe('first-run setup', () => {
-	// This spec asserts a clean admin bucket (no super_admin yet); reset the
+	// This spec asserts a clean admin bucket (no super administrator yet); reset the
 	// process-wide store singletons so users seeded by earlier specs in the same
 	// `bun test` run don't leak in.
 	beforeEach(async () => {
@@ -21,7 +23,7 @@ describe('first-run setup', () => {
 		await ensureAdminSeed();
 	});
 
-	it('creates the first super_admin then hard-gates', async () => {
+	it('creates the first super administrator then hard-gates', async () => {
 		expect(await hasSuperAdmin()).toBe(false);
 		const first = await client.admin.api.setup.post({
 			email: 'root@x.io',
@@ -29,7 +31,7 @@ describe('first-run setup', () => {
 		});
 		expect(first.status).toBe(201);
 		const user = await getUserStore(ADMIN_BUCKET_ID).findByEmail('root@x.io');
-		expect(user?.roles).toEqual(['super_admin']);
+		expect(await isSuperAdmin(present(user, 'user')._id)).toBe(true);
 
 		const second = await client.admin.api.setup.post({
 			email: 'evil@x.io',
@@ -44,7 +46,7 @@ describe('first-run setup', () => {
 	 * so two requests arriving together both found it open. Whoever raced the operator at first boot
 	 * ended up a silent second super administrator rather than a visible refusal.
 	 */
-	it('creates exactly one super_admin when two setups arrive at once', async () => {
+	it('creates exactly one super administrator when two setups arrive at once', async () => {
 		const results = await Promise.all([
 			client.admin.api.setup.post({
 				email: 'operator@x.io',
@@ -56,10 +58,7 @@ describe('first-run setup', () => {
 			})
 		]);
 
-		const supers = (await getUserStore(ADMIN_BUCKET_ID).list()).filter((u) =>
-			u.roles.includes('super_admin')
-		);
-		expect(supers).toHaveLength(1);
+		expect(await superAdminIds()).toHaveLength(1);
 		expect(results.map((r) => r.status).sort()).toEqual([201, 409]);
 	});
 });

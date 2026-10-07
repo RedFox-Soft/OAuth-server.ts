@@ -28,7 +28,6 @@ export class UserBucketStore implements UserBucketStoreInstance {
 		slug?: string;
 		host?: string;
 		ownerGroupId: string;
-		roles?: string[];
 		passwordLogin?: boolean;
 		federation?: FederationProvider[];
 		registrationOpen?: boolean;
@@ -47,7 +46,6 @@ export class UserBucketStore implements UserBucketStoreInstance {
 			slug: data.slug,
 			...(data.host !== undefined ? { host: data.host } : {}),
 			ownerGroupId: data.ownerGroupId,
-			roles: data.roles ?? [],
 			// A bucket accepts passwords unless someone says otherwise, and holds no providers until one is
 			// configured. Defaulted here and on read, so a document written before these fields existed
 			// behaves exactly as it did.
@@ -140,7 +138,6 @@ export class UserBucketStore implements UserBucketStoreInstance {
 				UserBucket,
 				| 'name'
 				| 'ownerGroupId'
-				| 'roles'
 				| 'passwordLogin'
 				| 'federation'
 				| 'registrationOpen'

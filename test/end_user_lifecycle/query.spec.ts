@@ -23,7 +23,7 @@ describe('finding users in a bucket', () => {
 		const bucketId = `q-${nanoid()}`;
 		const store = getUserStore(bucketId);
 		for (let i = 0; i <= MAX_END_USER_PAGE; i += 1) {
-			await store.create(`${i}-${nanoid()}@x.io`, 'hash', [], true);
+			await store.create(`${i}-${nanoid()}@x.io`, 'hash', true);
 		}
 
 		const { users, totalResults } = await store.query(

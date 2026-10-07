@@ -54,8 +54,7 @@ describe('interaction login bucket routing', () => {
 		// Seeded ONLY in the admin bucket.
 		await getUserStore(ADMIN_BUCKET_ID).create(
 			'admin-only@x.io',
-			await Bun.password.hash(PASSWORD),
-			['project_admin']
+			await Bun.password.hash(PASSWORD)
 		);
 		// Seeded ONLY in the default ('redfox') bucket.
 		await getUserStore().create(
@@ -105,8 +104,7 @@ describe('interaction login bucket routing', () => {
 	it('never gates the admin bucket on email verification', async () => {
 		const unverified = await getUserStore(ADMIN_BUCKET_ID).create(
 			'unverified-admin@x.io',
-			await Bun.password.hash(PASSWORD),
-			['project_admin']
+			await Bun.password.hash(PASSWORD)
 		);
 		expect(unverified.verified).toBe(false);
 

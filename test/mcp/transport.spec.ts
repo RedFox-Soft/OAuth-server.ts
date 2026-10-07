@@ -6,8 +6,8 @@ import { elysia } from 'lib/index.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { getUserStore, getProjectStore } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { getProjectStore } from 'lib/adapters/index.ts';
+import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import {
 	ADMIN_MCP_CLIENT_ID,
 	MCP_RESOURCE,
@@ -15,6 +15,7 @@ import {
 	MCP_ROUTE
 } from 'lib/mcp/consts.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
+import { createAdministrator, type AdminKind } from '../administrators.ts';
 
 /*
  * End-to-end proof that the surface actually serves: a real MCP client protocol exchange over the real
@@ -68,13 +69,12 @@ async function mcp(
 
 /* An access token of exactly the shape the token endpoint mints for `resource=<issuer>/mcp`. */
 async function tokenFor(
-	roles: string[],
+	kind: AdminKind,
 	overrides: Record<string, unknown> = {}
 ) {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`mcp-${roles.join('-')}-${Math.random()}@x.io`,
-		'hash',
-		roles
+	const user = await createAdministrator(
+		kind,
+		`mcp-${kind}-${Math.random()}@x.io`
 	);
 	const at = new AccessToken({
 		client: await Client.find(ADMIN_MCP_CLIENT_ID),
@@ -151,10 +151,9 @@ describe('MCP transport', () => {
 	});
 
 	it('refuses a token minted for another audience', async () => {
-		const user = await getUserStore(ADMIN_BUCKET_ID).create(
-			`other-aud-${Math.random()}@x.io`,
-			'hash',
-			['super_admin']
+		const user = await createAdministrator(
+			'super',
+			`other-aud-${Math.random()}@x.io`
 		);
 		const at = new AccessToken({
 			client: await Client.find(ADMIN_MCP_CLIENT_ID),
@@ -169,10 +168,9 @@ describe('MCP transport', () => {
 	});
 
 	it('refuses a token with no audience at all', async () => {
-		const user = await getUserStore(ADMIN_BUCKET_ID).create(
-			`no-aud-${Math.random()}@x.io`,
-			'hash',
-			['super_admin']
+		const user = await createAdministrator(
+			'super',
+			`no-aud-${Math.random()}@x.io`
 		);
 		const at = new AccessToken({
 			client: await Client.find(ADMIN_MCP_CLIENT_ID),
@@ -186,7 +184,7 @@ describe('MCP transport', () => {
 	});
 
 	it('completes an initialize handshake for an authorized administrator', async () => {
-		const { token } = await tokenFor(['super_admin']);
+		const { token } = await tokenFor('super');
 		const { status, payload } = await mcp(
 			'initialize',
 			{
@@ -203,7 +201,7 @@ describe('MCP transport', () => {
 	});
 
 	it('lists the read tools and withholds the container deletions', async () => {
-		const { token } = await tokenFor(['super_admin']);
+		const { token } = await tokenFor('super');
 		await mcp(
 			'initialize',
 			{
@@ -229,7 +227,7 @@ describe('MCP transport', () => {
 	});
 
 	it('answers whoami from the real admin route, as the authorizing administrator', async () => {
-		const { token, user } = await tokenFor(['super_admin']);
+		const { token, user } = await tokenFor('super');
 		await mcp(
 			'initialize',
 			{
@@ -249,13 +247,13 @@ describe('MCP transport', () => {
 
 		const structured = payload.result?.structuredContent?.result;
 		expect(structured?.userId).toBe(user._id);
-		expect(structured?.roles).toContain('super_admin');
+		expect(structured?.superAdmin).toBe(true);
 		// The agent is recorded as the acting client, distinct from the administrator.
 		expect(structured?.viaClientId).toBe(ADMIN_MCP_CLIENT_ID);
 	});
 
 	it('scopes a read to what the administrator may see', async () => {
-		const { token } = await tokenFor(['project_admin']);
+		const { token } = await tokenFor('plain');
 		await getProjectStore().create({
 			name: 'Not theirs',
 			slug: `nt-${Math.floor(Math.random() * 1e6)}`,
@@ -276,12 +274,12 @@ describe('MCP transport', () => {
 			token
 		);
 		const projects = payload.result?.structuredContent?.result ?? [];
-		// A project_admin manages none of them, so the list is empty even though projects exist.
+		// A project administrator manages none of them, so the list is empty even though projects exist.
 		expect(projects).toEqual([]);
 	});
 
 	it('refuses a super-admin-gated read to a non-super-administrator, as forbidden', async () => {
-		const { token } = await tokenFor(['project_admin']);
+		const { token } = await tokenFor('plain');
 		await mcp(
 			'initialize',
 			{
@@ -301,7 +299,7 @@ describe('MCP transport', () => {
 	});
 
 	it('is absent entirely when the capability is switched off', async () => {
-		const { token } = await tokenFor(['super_admin']);
+		const { token } = await tokenFor('super');
 		ApplicationConfig['mcp.enabled'] = false;
 
 		const { status } = await mcp('tools/list', {}, token);

@@ -43,13 +43,16 @@ resolved (`lib/adapters/types.ts`):
   "Personal — owner@email" for anyone else's. Two display sites labelling this differently is how a
   super administrator ended up reading a list of identical "Personal" rows.
 - `regular` — a company or a team.
-- `system` — the reserved `unassigned` holding group (`UNASSIGNED_GROUP_ID` in `lib/admin/consts.ts`),
-  displayed as **System** (`SYSTEM_GROUP_NAME`, which `groupLabel` prefers over the stored name so a
-  database seeded before the rename does not show the old one). No members, exempt from the
-  at-least-one-owner rule, reachable only by super administrators.
+- `system` — two reserved groups. The `unassigned` holding group (`UNASSIGNED_GROUP_ID` in
+  `lib/admin/consts.ts`), displayed as **System** (`SYSTEM_GROUP_NAME`, which `groupLabel` prefers over the
+  stored name so a database seeded before the rename does not show the old one): no members, exempt from the
+  at-least-one-owner rule, reachable only by super administrators. And **Super administrators**
+  (`SUPER_ADMINS_GROUP_ID`, since spec 071): its membership *is* the instance privilege `super_admin` used to
+  be; it owns nothing, is never a working scope, and is invisible to the group routes ([[bucket-groups]]). A
+  system group cannot be renamed.
 
 `assertActiveGroup` (`lib/admin/auth/rbac.ts`) returns `unassigned` for a super administrator, who
-belongs to no group by virtue of the role. That is deliberate and keeps one rule: it is exactly what
+belongs to no working group by virtue of the privilege (Super administrators is not among `memberships`). That is deliberate and keeps one rule: it is exactly what
 `managedBy: []` already meant, and it is the same rule the migration applies to an unmanaged container.
 
 ## Owner and member are properties of a membership, not roles
@@ -57,10 +60,10 @@ belongs to no group by virtue of the role. That is deliberate and keeps one rule
 `GroupMember.role` is `owner` or `member`. An owner decides who is in the group and whether it may be
 deleted; a member is equal to an owner over everything the group owns and has no say over membership.
 
-This cannot live on the account beside `roles`. The same administrator is an owner of one group and a
-plain member of another, so `assertGroupOwner` refuses by membership kind while `assertRole` refuses by
-instance role — two independent dimensions, and conflating them is the mistake a third `group_owner`
-instance role would have been.
+This cannot live on the account. The same administrator is an owner of one group and a plain member of
+another, so `assertGroupOwner` refuses by membership kind while `assertSuperAdmin` refuses by membership of
+Super administrators — two independent dimensions, and conflating them is the mistake a `group_owner`
+privilege would have been. (Accounts carry no roles at all since spec 071; [[bucket-groups]].)
 
 ## The hot path
 

@@ -167,7 +167,6 @@ describe('SCIM input over generated cases', () => {
 						const user = await store.create(
 							`u${i}@contoso.com`,
 							'x',
-							[],
 							true,
 							undefined,
 							{
@@ -178,7 +177,7 @@ describe('SCIM input over generated cases', () => {
 						created.add(user._id);
 					}
 					/* A user of no connection, which no page may ever show. */
-					await store.create(`local-${population}@contoso.com`, 'x', [], true);
+					await store.create(`local-${population}@contoso.com`, 'x', true);
 					const seen: string[] = [];
 					let total = -1;
 					for (let start = 1; start <= population; start += pageSize) {

@@ -51,7 +51,6 @@ export class UserBucketStore implements UserBucketStoreInstance {
 		slug?: string;
 		host?: string;
 		ownerGroupId: string;
-		roles?: string[];
 		passwordLogin?: boolean;
 		federation?: FederationProvider[];
 		registrationOpen?: boolean;
@@ -71,7 +70,6 @@ export class UserBucketStore implements UserBucketStoreInstance {
 			 */
 			...(data.host !== undefined ? { host: data.host } : {}),
 			ownerGroupId: data.ownerGroupId,
-			roles: data.roles ?? [],
 			passwordLogin: data.passwordLogin ?? true,
 			federation: data.federation ?? [],
 			registrationOpen: data.registrationOpen ?? true,
@@ -160,7 +158,6 @@ export class UserBucketStore implements UserBucketStoreInstance {
 				UserBucket,
 				| 'name'
 				| 'ownerGroupId'
-				| 'roles'
 				| 'passwordLogin'
 				| 'federation'
 				| 'registrationOpen'

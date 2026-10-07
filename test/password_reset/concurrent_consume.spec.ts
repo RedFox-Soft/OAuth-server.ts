@@ -33,7 +33,6 @@ describe('a reset link redeemed concurrently', () => {
 		await getUserStore(bucketId).create(
 			'racing@x.io',
 			await Bun.password.hash('the old password'),
-			[],
 			true
 		);
 		await requestReset('racing@x.io', bucketId);

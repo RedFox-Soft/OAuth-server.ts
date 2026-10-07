@@ -12,7 +12,7 @@ import {
 import { configStore } from '../../../adapters/index.js';
 import {
 	assertAuth,
-	assertRole,
+	assertSuperAdmin,
 	AdminError,
 	adminErrorBody,
 	resolveAdmin,
@@ -102,14 +102,14 @@ export const sentrySettingsRoutes = new Elysia({
 		 * for the whole server, by requirement — so there is no scoped view of it that would mean
 		 * anything to a project administrator.
 		 */
-		assertRole(ctx, 'super_admin');
+		assertSuperAdmin(ctx);
 		return present(await storedOverrides());
 	})
 	.put(
 		'/admin/api/settings/sentry',
 		async ({ admin, body }) => {
 			const ctx = assertAuth(admin as AdminContext | null);
-			assertRole(ctx, 'super_admin');
+			assertSuperAdmin(ctx);
 
 			const stored = await storedOverrides();
 

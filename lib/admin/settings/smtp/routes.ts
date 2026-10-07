@@ -3,7 +3,7 @@ import { getSmtpSettingsStore } from '../../../adapters/index.js';
 import type { SmtpSettings } from '../../../adapters/types.js';
 import {
 	assertAuth,
-	assertRole,
+	assertSuperAdmin,
 	AdminError,
 	adminErrorBody,
 	resolveAdmin,
@@ -51,14 +51,14 @@ export const smtpSettingsRoutes = new Elysia({ name: 'admin-settings-smtp' })
 	})
 	.get('/admin/api/settings/smtp', async ({ admin }) => {
 		const ctx = assertAuth(admin as AdminContext | null);
-		assertRole(ctx, 'super_admin');
+		assertSuperAdmin(ctx);
 		return present(await getSmtpSettingsStore().get());
 	})
 	.put(
 		'/admin/api/settings/smtp',
 		async ({ admin, body }) => {
 			const ctx = assertAuth(admin as AdminContext | null);
-			assertRole(ctx, 'super_admin');
+			assertSuperAdmin(ctx);
 
 			if (!body.host.trim()) throw new AdminError(422, 'host is required');
 			if (!EMAIL_RE.test(body.fromEmail)) {

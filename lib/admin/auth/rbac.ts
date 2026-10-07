@@ -14,11 +14,16 @@ import {
 	ADMIN_SESSION_TTL_SECONDS,
 	UNASSIGNED_GROUP_ID
 } from '../consts.js';
+import { isSuperAdminsGroup } from '../super_admins.js';
 
 export interface AdminContext {
 	userId: string;
 	email: string;
-	roles: string[];
+	/*
+	 * Membership of Super administrators — the instance-wide privilege, which is a group and not a role
+	 * (specs/071). Read from the same membership lookup as `memberships`, so it costs nothing extra.
+	 */
+	superAdmin: boolean;
 	bucketId: string;
 	/*
 	 * Every group this administrator belongs to, and how. Replaces `managedProjectIds`, which named
@@ -27,6 +32,8 @@ export interface AdminContext {
 	 *
 	 * Re-read on every request rather than cached at sign-in, so removing somebody from a group takes
 	 * effect on their next call rather than at their next sign-in.
+	 *
+	 * Without Super administrators, which owns nothing and so is never a scope to act in.
 	 */
 	memberships: { groupId: string; role: 'owner' | 'member' }[];
 	/*
@@ -120,9 +127,9 @@ export function assertAuth(admin: AdminContext | null): AdminContext {
 	return admin;
 }
 
-export function assertRole(admin: AdminContext, role: string): void {
-	if (!admin.roles.includes(role)) {
-		throw new AdminError(403, `role ${role} required`);
+export function assertSuperAdmin(admin: AdminContext): void {
+	if (!admin.superAdmin) {
+		throw new AdminError(403, 'super administrator required');
 	}
 }
 
@@ -134,7 +141,7 @@ export function assertRole(admin: AdminContext, role: string): void {
  * makes support and recovery possible for a group whose last owner has gone.
  */
 export function assertGroupMember(admin: AdminContext, groupId: string): void {
-	if (admin.roles.includes('super_admin')) return;
+	if (admin.superAdmin) return;
 	if (!admin.memberships.some((m) => m.groupId === groupId)) {
 		throw new AdminError(403, 'no access to this group');
 	}
@@ -146,7 +153,7 @@ export function assertGroupMember(admin: AdminContext, groupId: string): void {
  * and is a plain member of another, so this can never be expressed as a role on the account.
  */
 export function assertGroupOwner(admin: AdminContext, groupId: string): void {
-	if (admin.roles.includes('super_admin')) return;
+	if (admin.superAdmin) return;
 	const membership = admin.memberships.find((m) => m.groupId === groupId);
 	if (!membership || membership.role !== 'owner') {
 		throw new AdminError(403, 'group owner required');
@@ -168,7 +175,7 @@ export function assertGroupOwner(admin: AdminContext, groupId: string): void {
  */
 export function assertActiveGroup(admin: AdminContext): string {
 	if (admin.activeGroupId) return admin.activeGroupId;
-	if (admin.roles.includes('super_admin')) return UNASSIGNED_GROUP_ID;
+	if (admin.superAdmin) return UNASSIGNED_GROUP_ID;
 	throw new AdminError(
 		500,
 		'no active group: this administrator has no personal group'
@@ -179,7 +186,7 @@ export function assertProjectAccess(
 	admin: AdminContext,
 	project: Project
 ): void {
-	if (admin.roles.includes('super_admin')) return;
+	if (admin.superAdmin) return;
 	// Checked before ownership: the reserved admin project is outside the group model entirely, so a
 	// membership can never be the thing that grants access to it.
 	if (project.type === 'admin') {
@@ -194,7 +201,7 @@ export function assertBucketAccess(
 	admin: AdminContext,
 	bucket: UserBucket
 ): void {
-	if (admin.roles.includes('super_admin')) return;
+	if (admin.superAdmin) return;
 	if (!admin.memberships.some((m) => m.groupId === bucket.ownerGroupId)) {
 		throw new AdminError(403, 'no access to this bucket');
 	}
@@ -212,7 +219,7 @@ export async function assertBucketUserAccess(
 	admin: AdminContext,
 	bucket: UserBucket
 ): Promise<void> {
-	if (admin.roles.includes('super_admin')) return;
+	if (admin.superAdmin) return;
 	if (admin.memberships.some((m) => m.groupId === bucket.ownerGroupId)) return;
 	const store = getProjectStore();
 	for (const membership of admin.memberships) {
@@ -223,7 +230,7 @@ export async function assertBucketUserAccess(
 }
 
 /*
- * Builds the context from an account, re-reading roles and group memberships. Shared by both
+ * Builds the context from an account, re-reading its group memberships (Super administrators among them). Shared by both
  * credential types below so neither can resolve a different authority from the same account — the
  * whole point of the MCP surface being an additional front door rather than a second, more permissive
  * one.
@@ -239,21 +246,22 @@ async function contextFor(
 ): Promise<AdminContext | null> {
 	const user = await getUserStore(bucketId).find(userId);
 	if (!user || !user.active) return null;
-	const groups = await getGroupStore().listByMember(user._id);
+	const all = await getGroupStore().listByMember(user._id);
+	const superAdmin = all.some((g) => isSuperAdminsGroup(g._id));
+	const groups = all.filter((g) => !isSuperAdminsGroup(g._id));
 	const memberships = groups.map((g) => ({
 		groupId: g._id,
-		role: (g.members.find((m) => m.userId === user._id)?.role ?? 'member') as
-			'owner' | 'member'
+		role: g.members.find((m) => m.userId === user._id)?.role ?? 'member'
 	}));
 	return {
 		userId: user._id,
 		email: user.email,
-		roles: user.roles,
+		superAdmin,
 		bucketId,
 		memberships,
 		activeGroupId: await resolveActiveGroup(
 			user._id,
-			user.roles,
+			superAdmin,
 			memberships,
 			groups,
 			sessionGroupId
@@ -282,7 +290,7 @@ async function contextFor(
  */
 async function resolveActiveGroup(
 	userId: string,
-	roles: string[],
+	superAdmin: boolean,
 	memberships: { groupId: string; role: 'owner' | 'member' }[],
 	groups: Group[],
 	sessionGroupId?: string
@@ -291,7 +299,7 @@ async function resolveActiveGroup(
 		return sessionGroupId;
 	}
 	// One indexed read, and only for a super administrator whose scope is a group they are not in.
-	if (sessionGroupId && roles.includes('super_admin')) {
+	if (sessionGroupId && superAdmin && !isSuperAdminsGroup(sessionGroupId)) {
 		const chosen = await getGroupStore().find(sessionGroupId);
 		if (chosen && chosen.kind !== 'personal') return chosen._id;
 	}

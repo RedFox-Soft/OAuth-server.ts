@@ -15,14 +15,11 @@ import {
 	getProjectStore,
 	getBucketStore
 } from 'lib/adapters/index.ts';
-import {
-	ADMIN_BUCKET_ID,
-	ADMIN_SESSION_COOKIE,
-	UNASSIGNED_GROUP_ID
-} from 'lib/admin/consts.ts';
+import { ADMIN_SESSION_COOKIE, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { sessionFor } from '../admin_session.ts';
 import { answered } from './answered.ts';
 import { present } from 'test/shape.js';
+import { createAdministrator } from '../administrators.ts';
 
 /*
  * No secret value may reach the trail — from any operation, in any field.
@@ -52,11 +49,7 @@ const PASSWORD_MARKER = 'do-not-record-this-password-1';
 const MAIL_PASSWORD_MARKER = 'do-not-record-this-mail-password';
 
 async function superCookie() {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`${unique('super')}@x.io`,
-		'hash',
-		['super_admin']
-	);
+	const user = await createAdministrator('super', `${unique('super')}@x.io`);
 	const session = await sessionFor(user);
 	return `${ADMIN_SESSION_COOKIE}=${session._id}`;
 }
@@ -230,8 +223,7 @@ describe('admin audit secrecy', () => {
 				await client.admin.api.admins.post(
 					{
 						email: `${unique('made')}@x.io`,
-						password: `${PASSWORD_MARKER}-admin`,
-						roles: ['project_admin']
+						password: `${PASSWORD_MARKER}-admin`
 					},
 					{ headers: { cookie } }
 				)

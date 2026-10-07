@@ -8,6 +8,7 @@ import {
 	rarForIntrospectionResponse
 } from '../addon/index.js';
 import { issuingBucket } from 'lib/admin/auth/bucketAddress.js';
+import { groupsMembersOf } from 'lib/consts/groups_claim.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { IdToken } from 'lib/models/id_token.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
@@ -77,6 +78,8 @@ type IntrospectedPayload = {
 	scope?: string;
 	jkt?: string;
 	'x5t#S256'?: string;
+	groups?: string[];
+	groupsSource?: string;
 };
 
 // The JSON answer (the JWT form is built from it by the handler).
@@ -182,6 +185,8 @@ async function renderTokenResponse(
 		}
 		body.sub = sub;
 	}
+
+	Object.assign(body, groupsMembersOf(payload));
 
 	if (payload.rar) {
 		const details = await rarForIntrospectionResponse(oidc, token);

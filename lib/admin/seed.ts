@@ -13,6 +13,7 @@ import {
 	SYSTEM_GROUP_NAME
 } from './consts.js';
 import { ADMIN_MCP_CLIENT_ID } from '../mcp/consts.js';
+import { ensureSuperAdminsGroup } from './super_admins.js';
 import {
 	ADMIN_BUCKET_SEED,
 	ADMIN_MCP_CLIENT_SEED,
@@ -41,6 +42,7 @@ export async function ensureAdminSeed(): Promise<void> {
 			members: [...SYSTEM_GROUP_SEED.members]
 		});
 	}
+	await ensureSuperAdminsGroup();
 
 	const buckets = getBucketStore();
 	/*
@@ -64,7 +66,6 @@ export async function ensureAdminSeed(): Promise<void> {
 		if (!existing) {
 			await buckets.create({
 				...seed,
-				roles: [...seed.roles],
 				federation: [...seed.federation]
 			});
 			return;

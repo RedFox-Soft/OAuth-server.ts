@@ -1,7 +1,8 @@
 import crypto from 'node:crypto';
 
-import { getUserStore } from '../adapters/index.js';
+import { getBucketGroupStore, getUserStore } from '../adapters/index.js';
 import type {
+	BucketGroup,
 	ProvisioningConnection,
 	User,
 	UserBucket
@@ -107,6 +108,44 @@ async function ownUser(context: ScimRequestContext, id: string): Promise<User> {
 	return user;
 }
 
+/*
+ * Each user's groups owned by this connection — the read-only `groups` attribute. Two reads for any number of
+ * users: their memberships, then those groups' names. Another owner's groups never appear.
+ */
+async function groupsOf(
+	context: ScimRequestContext,
+	users: User[]
+): Promise<Map<string, BucketGroup[]>> {
+	const store = getBucketGroupStore();
+	const ids = await store.groupIdsOf(
+		context.bucket._id,
+		users.map((u) => u._id),
+		context.connection._id
+	);
+	const groups = new Map(
+		(await store.findMany([...new Set([...ids.values()].flat())])).map((g) => [
+			g._id,
+			g
+		])
+	);
+	return new Map(
+		[...ids].map(([userId, groupIds]) => [
+			userId,
+			groupIds
+				.map((id) => groups.get(id))
+				.filter((g): g is BucketGroup => g !== undefined)
+		])
+	);
+}
+
+async function view(context: ScimRequestContext, user: User) {
+	return toScim(
+		user,
+		context.base,
+		(await groupsOf(context, [user])).get(user._id)
+	);
+}
+
 function auditDetail(context: ScimRequestContext, attributes: string[]) {
 	return {
 		attributes,
@@ -154,7 +193,7 @@ export async function getUser(
 ): Promise<ScimReply> {
 	return {
 		status: 200,
-		body: toScim(await ownUser(context, id), context.base)
+		body: await view(context, await ownUser(context, id))
 	};
 }
 
@@ -223,6 +262,7 @@ export async function listUsers(
 			totalResults = page.totalResults;
 		}
 	}
+	const groups = await groupsOf(context, users);
 	return {
 		status: 200,
 		body: {
@@ -230,7 +270,9 @@ export async function listUsers(
 			totalResults,
 			startIndex,
 			itemsPerPage: users.length,
-			Resources: users.map((user) => toScim(user, context.base))
+			Resources: users.map((user) =>
+				toScim(user, context.base, groups.get(user._id))
+			)
 		}
 	};
 }
@@ -243,7 +285,7 @@ async function applyDesired(
 	const { input, changes } = updateFor(user, desired, context.connection);
 	/* Asserting what is already stored writes nothing and audits nothing (spec FR-040). */
 	if (changes.length === 0) {
-		return { status: 200, body: toScim(user, context.base) };
+		return { status: 200, body: await view(context, user) };
 	}
 	const { user: updated, revoked } = await updateEndUser(
 		context.bucket,
@@ -259,7 +301,7 @@ async function applyDesired(
 			)
 	).catch(asScim);
 	assertSweepComplete(revoked);
-	return { status: 200, body: toScim(updated, context.base) };
+	return { status: 200, body: await view(context, updated) };
 }
 
 /* RFC 7644 §3.5.1, with `active` left as it is when the body omits it (spec FR-024). */

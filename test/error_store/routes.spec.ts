@@ -6,11 +6,12 @@ import { ApplicationConfig } from 'lib/configs/application.ts';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { errorRoutes } from 'lib/admin/errors/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { errorStore, getUserStore } from 'lib/adapters/index.ts';
+import { errorStore } from 'lib/adapters/index.ts';
 import type { ErrorOccurrence } from 'lib/adapters/types.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { sessionFor } from '../admin_session.ts';
 import { shaped } from 'test/shape.js';
+import { createAdministrator, type AdminKind } from '../administrators.ts';
 
 /*
  * The read surface — specs/025-server-error-store/contracts/admin-api.md.
@@ -28,12 +29,8 @@ const enabled = ApplicationConfig['errorStore.enabled'];
 let seq = 0;
 const unique = (prefix: string) => `${prefix}-${Date.now()}-${(seq += 1)}`;
 
-async function cookieFor(roles: string[]) {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`${unique('admin')}@x.io`,
-		'hash',
-		roles
-	);
+async function cookieFor(kind: AdminKind) {
+	const user = await createAdministrator(kind, `${unique('admin')}@x.io`);
 	const session = await sessionFor(user);
 	return `${ADMIN_SESSION_COOKIE}=${session._id}`;
 }
@@ -112,7 +109,7 @@ describe('GET /admin/api/errors', () => {
 		 * watching which requests are refused differently.
 		 */
 		it('refuses a non-super-admin without disclosing whether records exist', async () => {
-			const cookie = await cookieFor(['project_admin']);
+			const cookie = await cookieFor('plain');
 			const withRecords = unique('/r');
 			await seedFault(withRecords);
 			const withoutRecords = unique('/r');
@@ -132,7 +129,7 @@ describe('GET /admin/api/errors', () => {
 		});
 
 		it('serves a super-admin', async () => {
-			const cookie = await cookieFor(['super_admin']);
+			const cookie = await cookieFor('super');
 			const route = unique('/r');
 			await seedFault(route);
 
@@ -143,7 +140,7 @@ describe('GET /admin/api/errors', () => {
 
 	describe('listing', () => {
 		it('returns matching groups with a total independent of the limit', async () => {
-			const cookie = await cookieFor(['super_admin']);
+			const cookie = await cookieFor('super');
 			const route = unique('/r');
 			await seedFault(route);
 			await seedFault(route);
@@ -169,7 +166,7 @@ describe('GET /admin/api/errors', () => {
 		});
 
 		it('refuses an unknown query parameter rather than answering unfiltered', async () => {
-			const cookie = await cookieFor(['super_admin']);
+			const cookie = await cookieFor('super');
 
 			const response = await get(
 				'/admin/api/errors?rout=/typo-in-the-name',
@@ -185,7 +182,7 @@ describe('GET /admin/api/errors', () => {
 		});
 
 		it('refuses a backwards window rather than answering with nothing', async () => {
-			const cookie = await cookieFor(['super_admin']);
+			const cookie = await cookieFor('super');
 
 			const response = await get(
 				'/admin/api/errors?from=2026-02-01T00:00:00Z&to=2026-01-01T00:00:00Z',
@@ -195,7 +192,7 @@ describe('GET /admin/api/errors', () => {
 		});
 
 		it('refuses an unparseable date', async () => {
-			const cookie = await cookieFor(['super_admin']);
+			const cookie = await cookieFor('super');
 			const response = await get('/admin/api/errors?from=not-a-date', cookie);
 			expect(response.status).toBe(422);
 		});
@@ -203,7 +200,7 @@ describe('GET /admin/api/errors', () => {
 
 	describe('detail', () => {
 		it('returns one group with its samples', async () => {
-			const cookie = await cookieFor(['super_admin']);
+			const cookie = await cookieFor('super');
 			const route = unique('/r');
 			const created = must(await seedFault(route), 'the seeded group');
 
@@ -222,7 +219,7 @@ describe('GET /admin/api/errors', () => {
 		});
 
 		it('answers 404 for an unknown id', async () => {
-			const cookie = await cookieFor(['super_admin']);
+			const cookie = await cookieFor('super');
 			const response = await get('/admin/api/errors/no-such-group', cookie);
 			expect(response.status).toBe(404);
 		});
@@ -233,7 +230,7 @@ describe('GET /admin/api/errors', () => {
 		 * reached — so it is asserted positively: `summary` answers as itself.
 		 */
 		it('does not treat a reserved sub-path as a group id', async () => {
-			const cookie = await cookieFor(['super_admin']);
+			const cookie = await cookieFor('super');
 			const response = await get('/admin/api/errors/summary', cookie);
 			const body = shaped(
 				Type.Object({ byRoute: Type.Optional(Type.Unknown()) }),

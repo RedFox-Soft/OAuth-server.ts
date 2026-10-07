@@ -164,7 +164,6 @@ describe('a bucket that only accepts federated sign-in', () => {
 		await store.create(
 			'real@acme.test',
 			await Bun.password.hash('correct'),
-			[],
 			true
 		);
 		const { uid, cookie } = await startInteractionFor(FEDERATED);

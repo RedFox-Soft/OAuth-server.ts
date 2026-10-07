@@ -1,11 +1,11 @@
 import { Type, type Static } from '@sinclair/typebox';
 
-import { getUserStore } from 'lib/adapters/index.js';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.js';
+import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.js';
 
 import { sessionFor } from '../admin_session.js';
 import { send } from '../feature_gate/helpers.js';
 import { shaped } from '../shape.js';
+import { createAdministrator } from '../administrators.ts';
 
 /*
  * A signed-in super administrator, because every case in this area changes a setting the way an
@@ -13,10 +13,9 @@ import { shaped } from '../shape.js';
  * assignment is what the harness does between spec files, and proving it would prove the harness.
  */
 export async function superAdminCookie(): Promise<string> {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`super-${Math.random()}@settings-apply.test`,
-		'hash',
-		['super_admin']
+	const user = await createAdministrator(
+		'super',
+		`super-${Math.random()}@settings-apply.test`
 	);
 	const session = await sessionFor(user);
 	return `${ADMIN_SESSION_COOKIE}=${session._id}`;

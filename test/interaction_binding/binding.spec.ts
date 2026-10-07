@@ -56,7 +56,6 @@ async function seedUser(bucketId: string): Promise<string> {
 	await getUserStore(bucketId).create(
 		email,
 		await Bun.password.hash(PASSWORD),
-		[],
 		true
 	);
 	return email;

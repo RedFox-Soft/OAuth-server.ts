@@ -149,8 +149,17 @@ async function seed(
 	const bucket = await api<Created>(ctx, 'POST', '/admin/api/buckets', {
 		name: 'Acme customers',
 		slug: BUCKET_SLUG,
-		roles: ['customer', 'support'],
 		registrationOpen: true
+	});
+	/* The bucket's groups of end users, which relying parties receive in the `groups` claim. */
+	const customers = await api<{ id: string }>(
+		ctx,
+		'POST',
+		`/admin/api/buckets/${bucket._id}/groups`,
+		{ displayName: 'Customers' }
+	);
+	await api(ctx, 'POST', `/admin/api/buckets/${bucket._id}/groups`, {
+		displayName: 'Support'
 	});
 	await api(ctx, 'PUT', `/admin/api/projects/${project._id}/bucket`, {
 		bucketId: bucket._id
@@ -203,11 +212,18 @@ async function seed(
 		'sam.okafor@example.com',
 		'lee.tanaka@example.com'
 	]) {
-		await api(ctx, 'POST', `/admin/api/buckets/${bucket._id}/users`, {
-			email,
-			password: USER_PASSWORD,
-			roles: ['customer']
-		});
+		const user = await api<Created>(
+			ctx,
+			'POST',
+			`/admin/api/buckets/${bucket._id}/users`,
+			{ email, password: USER_PASSWORD }
+		);
+		await api(
+			ctx,
+			'POST',
+			`/admin/api/buckets/${bucket._id}/groups/${customers.id}/members`,
+			{ userIds: [user._id] }
+		);
 	}
 	await api(ctx, 'PUT', '/admin/api/settings', {
 		'clientCredentials.enabled': true,

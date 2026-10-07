@@ -75,7 +75,7 @@ describe('federated sign-in: the decision ladder refuses', () => {
 			federation: [provider(idp.origin)]
 		});
 		const store = getUserStore(bucketId);
-		const existing = await store.create('taken@acme.test', 'hash', [], true);
+		const existing = await store.create('taken@acme.test', 'hash', true);
 
 		idp.expectDiscovery();
 		const { uid, cookie } = await startInteraction();
@@ -100,7 +100,7 @@ describe('federated sign-in: the decision ladder refuses', () => {
 			federation: [provider(idp.origin, { emailTrusted: true })]
 		});
 		const store = getUserStore(bucketId);
-		await store.create('taken2@acme.test', 'hash', [], true);
+		await store.create('taken2@acme.test', 'hash', true);
 
 		idp.expectDiscovery();
 		const { uid, cookie } = await startInteraction();
@@ -120,7 +120,7 @@ describe('federated sign-in: the decision ladder refuses', () => {
 			federation: [provider(idp.origin, { emailTrusted: true })]
 		});
 		const store = getUserStore(bucketId);
-		await store.create('truthy@acme.test', 'hash', [], true);
+		await store.create('truthy@acme.test', 'hash', true);
 
 		idp.expectDiscovery();
 		const { uid, cookie } = await startInteraction();
@@ -241,7 +241,7 @@ describe('federated sign-in: the decision ladder refuses', () => {
 			federation: [provider(idp.origin)]
 		});
 		const store = getUserStore(bucketId);
-		const account = await store.create('frozen@acme.test', 'hash', [], true);
+		const account = await store.create('frozen@acme.test', 'hash', true);
 		await store.update(account._id, {
 			active: false,
 			federated: [
@@ -271,7 +271,7 @@ describe('federated sign-in: the decision ladder refuses', () => {
 			federation: [provider(idp.origin, { emailTrusted: true })]
 		});
 		const store = getUserStore(bucketId);
-		const account = await store.create('frozen2@acme.test', 'hash', [], true);
+		const account = await store.create('frozen2@acme.test', 'hash', true);
 		await store.update(account._id, { active: false });
 
 		idp.expectDiscovery();
@@ -292,7 +292,7 @@ describe('federated sign-in: the decision ladder refuses', () => {
 			federation: [provider(idp.origin, { emailTrusted: true })]
 		});
 		const store = getUserStore(bucketId);
-		const linked = await store.create('linked@acme.test', 'hash', [], true);
+		const linked = await store.create('linked@acme.test', 'hash', true);
 		await store.update(linked._id, {
 			federated: [
 				{
@@ -302,7 +302,7 @@ describe('federated sign-in: the decision ladder refuses', () => {
 				}
 			]
 		});
-		const other = await store.create('other@acme.test', 'hash', [], true);
+		const other = await store.create('other@acme.test', 'hash', true);
 
 		idp.expectDiscovery();
 		const { uid, cookie } = await startInteraction();

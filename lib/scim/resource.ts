@@ -2,6 +2,7 @@ import { Value } from '@sinclair/typebox/value';
 
 import {
 	EndUserProfile,
+	type BucketGroup,
 	type ProvisioningConnection,
 	type User
 } from '../adapters/types.js';
@@ -9,6 +10,7 @@ import {
 	FORBIDDEN_KEYS,
 	SCIM_ENTERPRISE_ATTRIBUTES,
 	SCIM_ENTERPRISE_USER_SCHEMA,
+	SCIM_GROUP_SCHEMA,
 	SCIM_READ_ONLY_ATTRIBUTES,
 	SCIM_USER_ATTRIBUTES,
 	SCIM_USER_SCHEMA,
@@ -34,12 +36,23 @@ export interface Leniency {
 	strict: boolean;
 }
 
-export function scimLocation(base: string, id: string): string {
-	return `${base}/Users/${encodeURIComponent(id)}`;
+export function scimLocation(
+	base: string,
+	id: string,
+	type: 'Users' | 'Groups' = 'Users'
+): string {
+	return `${base}/${type}/${encodeURIComponent(id)}`;
 }
 
-/* The SCIM view of a user. Absent values are omitted, never null; nothing about credentials, ever. */
-export function toScim(user: User, base: string): ScimObject {
+/*
+ * The SCIM view of a user. Absent values are omitted, never null; nothing about credentials, ever. `groups`
+ * are the requesting connection's groups the user is in (RFC 7643 §4.1.2, read-only), omitted when none.
+ */
+export function toScim(
+	user: User,
+	base: string,
+	groups: readonly Pick<BucketGroup, '_id' | 'displayName'>[] = []
+): ScimObject {
 	const profile = user.profile ?? {};
 	const emails = profile.emails?.length
 		? profile.emails.map((e) => ({ ...e }))
@@ -65,6 +78,14 @@ export function toScim(user: User, base: string): ScimObject {
 	resource.emails = emails;
 	if (profile.phoneNumbers?.length) {
 		resource.phoneNumbers = profile.phoneNumbers.map((p) => ({ ...p }));
+	}
+	if (groups.length) {
+		resource.groups = groups.map((g) => ({
+			value: g._id,
+			display: g.displayName,
+			$ref: scimLocation(base, g._id, 'Groups'),
+			type: 'direct'
+		}));
 	}
 	if (profile.enterprise && Object.keys(profile.enterprise).length) {
 		resource.schemas = [SCIM_USER_SCHEMA, SCIM_ENTERPRISE_USER_SCHEMA];
@@ -265,6 +286,17 @@ export function canonicalUser(body: unknown, leniency: Leniency): ScimObject {
 			}
 			continue;
 		}
+		if (attribute.mutability === 'readOnly') {
+			/* RFC 7644 §3.5.1: ignored. A User's `groups` changes through /Groups. */
+			if (leniency.strict) {
+				throw new ScimError(
+					400,
+					'mutability',
+					`${attribute.name} is read-only`
+				);
+			}
+			continue;
+		}
 		out[attribute.name] = canonicalValue(attribute, raw, leniency);
 	}
 	return out;
@@ -456,4 +488,36 @@ export function patchableView(user: User, base: string): ScimObject {
 	delete view.id;
 	delete view.meta;
 	return view;
+}
+
+/*
+ * The SCIM view of a group. `members` is omitted when the caller excluded it (`excludedAttributes=members`,
+ * which IPSIE AL SCIM §6.2.3 asks clients to send when listing) and `[]` when the group is empty; a member
+ * carries no `display`, which RFC 7643 makes optional and which would cost a read of every member.
+ */
+export function toScimGroup(
+	group: BucketGroup,
+	base: string,
+	members: readonly string[] | undefined
+): ScimObject {
+	const resource: ScimObject = {
+		schemas: [SCIM_GROUP_SCHEMA],
+		id: group._id
+	};
+	if (group.externalId !== undefined) resource.externalId = group.externalId;
+	resource.displayName = group.displayName;
+	if (members !== undefined) {
+		resource.members = members.map((id) => ({
+			value: id,
+			$ref: scimLocation(base, id),
+			type: 'User'
+		}));
+	}
+	resource.meta = {
+		resourceType: 'Group',
+		created: group.createdAt.toISOString(),
+		lastModified: group.updatedAt.toISOString(),
+		location: scimLocation(base, group._id, 'Groups')
+	};
+	return resource;
 }

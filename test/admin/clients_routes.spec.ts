@@ -10,26 +10,22 @@ import {
 } from 'lib/admin/clients/schema.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { getUserStore, getProjectStore } from 'lib/adapters/index.ts';
+import { getProjectStore } from 'lib/adapters/index.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
 import { answered } from './answered.ts';
 import {
-	ADMIN_BUCKET_ID,
 	ADMIN_PROJECT_ID,
 	ADMIN_CLIENT_ID,
 	ADMIN_SESSION_COOKIE,
 	UNASSIGNED_GROUP_ID
 } from 'lib/admin/consts.ts';
+import { createAdministrator, type AdminKind } from '../administrators.ts';
 
 const app = new Elysia().use(resolveAdmin).use(projectRoutes).use(clientRoutes);
 const client = treaty(app);
 
-async function sessionCookieFor(roles: string[]) {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`${roles.join('-')}-${Math.random()}@x.io`,
-		'hash',
-		roles
-	);
+async function sessionCookieFor(kind: AdminKind) {
+	const user = await createAdministrator(kind, `${kind}-${Math.random()}@x.io`);
 	const s = await sessionFor(user);
 	return { cookie: `${ADMIN_SESSION_COOKIE}=${s._id}`, userId: user._id };
 }
@@ -58,7 +54,7 @@ describe('clients API', () => {
 	});
 
 	it('creates, lists, and links a client to the project', async () => {
-		const { cookie } = await sessionCookieFor(['super_admin']);
+		const { cookie } = await sessionCookieFor('super');
 		const proj = await makeProject();
 		const created = await client.admin.api
 			.projects({ id: proj._id })
@@ -85,7 +81,7 @@ describe('clients API', () => {
 	});
 
 	it('returns a confidential secret once on create, never on GET', async () => {
-		const { cookie } = await sessionCookieFor(['super_admin']);
+		const { cookie } = await sessionCookieFor('super');
 		const proj = await makeProject();
 		const created = await client.admin.api
 			.projects({ id: proj._id })
@@ -108,7 +104,7 @@ describe('clients API', () => {
 	});
 
 	it('maps invalid client metadata to 422', async () => {
-		const { cookie } = await sessionCookieFor(['super_admin']);
+		const { cookie } = await sessionCookieFor('super');
 		const proj = await makeProject();
 		// authorization_code with no redirect_uris is invalid
 		const res = await client.admin.api
@@ -145,7 +141,7 @@ describe('clients API', () => {
 	});
 
 	it('still accepts the two delivery modes the server does implement', async () => {
-		const { cookie } = await sessionCookieFor(['super_admin']);
+		const { cookie } = await sessionCookieFor('super');
 		const proj = await makeProject();
 		ApplicationConfig['ciba.enabled'] = true;
 		ApplicationConfig['ciba.deliveryModes'] = ['poll', 'ping'];
@@ -175,12 +171,12 @@ describe('clients API', () => {
 		}
 	});
 
-	it('scopes project_admin to managed projects and 404s cross-project reads', async () => {
-		const su = await sessionCookieFor(['super_admin']);
-		const pa = await sessionCookieFor(['project_admin']);
+	it('scopes a project administrator to managed projects and 404s cross-project reads', async () => {
+		const su = await sessionCookieFor('super');
+		const pa = await sessionCookieFor('plain');
 		const mine = await makeProject(await personalGroupId(pa.userId));
 		const other = await makeProject();
-		// create a client in `other` as super_admin
+		// create a client in `other` as super administrator
 		const created = await client.admin.api
 			.projects({ id: other._id })
 			.clients.post(
@@ -192,7 +188,7 @@ describe('clients API', () => {
 				{ headers: { cookie: su.cookie } }
 			);
 		const otherClientId = answered(created.data).clientId;
-		// project_admin cannot list `other`
+		// project administrator cannot list `other`
 		const denied = await client.admin.api
 			.projects({ id: other._id })
 			.clients.get({ headers: { cookie: pa.cookie } });
@@ -206,7 +202,7 @@ describe('clients API', () => {
 	});
 
 	it('refuses to manage the reserved admin-panel client', async () => {
-		const { cookie } = await sessionCookieFor(['super_admin']);
+		const { cookie } = await sessionCookieFor('super');
 		const res = await client.admin.api
 			.projects({ id: ADMIN_PROJECT_ID })
 			.clients({ clientId: ADMIN_CLIENT_ID })
@@ -215,7 +211,7 @@ describe('clients API', () => {
 	});
 
 	it('deletes a client and unlinks it from the project', async () => {
-		const { cookie } = await sessionCookieFor(['super_admin']);
+		const { cookie } = await sessionCookieFor('super');
 		const proj = await makeProject();
 		const created = await client.admin.api
 			.projects({ id: proj._id })
@@ -238,7 +234,7 @@ describe('clients API', () => {
 	});
 
 	it('updates a client via PATCH', async () => {
-		const { cookie } = await sessionCookieFor(['super_admin']);
+		const { cookie } = await sessionCookieFor('super');
 		const proj = await makeProject();
 		const created = await client.admin.api
 			.projects({ id: proj._id })
@@ -269,7 +265,7 @@ describe('clients API', () => {
 	});
 
 	it('rotates a confidential client secret; 400s for a public client', async () => {
-		const { cookie } = await sessionCookieFor(['super_admin']);
+		const { cookie } = await sessionCookieFor('super');
 		const proj = await makeProject();
 		const confidential = await client.admin.api
 			.projects({ id: proj._id })
@@ -304,8 +300,8 @@ describe('clients API', () => {
 		expect(pubRotate.status).toBe(400);
 	});
 
-	it('404s cross-project ownership even for super_admin', async () => {
-		const { cookie } = await sessionCookieFor(['super_admin']);
+	it('404s cross-project ownership even for a super administrator', async () => {
+		const { cookie } = await sessionCookieFor('super');
 		const projA = await makeProject();
 		const projB = await makeProject();
 		const created = await client.admin.api

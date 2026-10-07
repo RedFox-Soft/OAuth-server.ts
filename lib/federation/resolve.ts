@@ -269,7 +269,6 @@ export async function resolveFederatedAccount(input: {
 	const created = await store.create(
 		email,
 		await unusablePassword(),
-		[],
 		// Verified by the same test that governs linking, so a provisioned account is never more trusted
 		// than the assertion that created it.
 		trustedVerified(claims, provider)

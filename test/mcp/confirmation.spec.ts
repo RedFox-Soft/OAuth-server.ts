@@ -6,12 +6,11 @@ import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
-	getUserStore,
 	getProjectStore,
 	adminAuditStore,
 	mcpConfirmationStore
 } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import {
 	ADMIN_MCP_CLIENT_ID,
 	MCP_RESOURCE,
@@ -21,6 +20,7 @@ import { mcpCatalogue } from 'lib/mcp/catalogue.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { shaped } from 'test/shape.js';
 import { Type } from '@sinclair/typebox';
+import { createAdministrator, type AdminKind } from '../administrators.ts';
 
 /*
  * The two-step gate on high-consequence operations.
@@ -63,11 +63,10 @@ async function rpc(body: unknown, token?: string) {
 	return { status: res.status, payload };
 }
 
-async function tokenFor(roles: string[]) {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`conf-${roles.join('-')}-${Math.random()}@x.io`,
-		'hash',
-		roles
+async function tokenFor(kind: AdminKind) {
+	const user = await createAdministrator(
+		kind,
+		`conf-${kind}-${Math.random()}@x.io`
 	);
 	const at = new AccessToken({
 		client: await Client.find(ADMIN_MCP_CLIENT_ID),
@@ -78,8 +77,8 @@ async function tokenFor(roles: string[]) {
 	return { token: await at.save(), user };
 }
 
-async function session(roles: string[]) {
-	const { token, user } = await tokenFor(roles);
+async function session(kind: AdminKind) {
+	const { token, user } = await tokenFor(kind);
 	await rpc(
 		{
 			jsonrpc: '2.0',
@@ -145,11 +144,11 @@ describe('MCP confirmation gate', () => {
 
 	it('declares a confirmation argument on every high-consequence tool', () => {
 		const high = mcpCatalogue.filter((t) => t.consequence === 'high');
-		expect(high.length).toBe(21);
+		expect(high.length).toBe(25);
 	});
 
 	it('describes instead of acting, and changes nothing', async () => {
-		const { token } = await session(['super_admin']);
+		const { token } = await session('super');
 		const { project, clientId } = await projectWithClient(token);
 
 		const described = await rpc(
@@ -172,7 +171,7 @@ describe('MCP confirmation gate', () => {
 	});
 
 	it('writes no audit entry for the description', async () => {
-		const { token, user } = await session(['super_admin']);
+		const { token, user } = await session('super');
 		const { project, clientId } = await projectWithClient(token);
 
 		const before = await adminAuditStore.list({ actor: user._id });
@@ -185,7 +184,7 @@ describe('MCP confirmation gate', () => {
 	});
 
 	it('performs the operation when the token is presented back', async () => {
-		const { token } = await session(['super_admin']);
+		const { token } = await session('super');
 		const { project, clientId } = await projectWithClient(token);
 
 		const described = await rpc(
@@ -209,7 +208,7 @@ describe('MCP confirmation gate', () => {
 	});
 
 	it('refuses a replayed confirmation', async () => {
-		const { token } = await session(['super_admin']);
+		const { token } = await session('super');
 		const { project, clientId } = await projectWithClient(token);
 
 		const described = await rpc(
@@ -235,7 +234,7 @@ describe('MCP confirmation gate', () => {
 	});
 
 	it('refuses a confirmation aimed at a different target', async () => {
-		const { token } = await session(['super_admin']);
+		const { token } = await session('super');
 		const first = await projectWithClient(token);
 		const second = await projectWithClient(token);
 
@@ -275,7 +274,7 @@ describe('MCP confirmation gate', () => {
 	});
 
 	it('refuses a confirmation issued for a different operation', async () => {
-		const { token } = await session(['super_admin']);
+		const { token } = await session('super');
 		const { project, clientId } = await projectWithClient(token);
 
 		const described = await rpc(
@@ -301,8 +300,8 @@ describe('MCP confirmation gate', () => {
 	});
 
 	it('refuses a confirmation issued to a different administrator', async () => {
-		const alice = await session(['super_admin']);
-		const bob = await session(['super_admin']);
+		const alice = await session('super');
+		const bob = await session('super');
 		const { project, clientId } = await projectWithClient(alice.token);
 
 		const described = await rpc(
@@ -324,7 +323,7 @@ describe('MCP confirmation gate', () => {
 	});
 
 	it('refuses when the parameters changed after the description', async () => {
-		const { token } = await session(['super_admin']);
+		const { token } = await session('super');
 		const bucket = await rpc(
 			call('bucket_create', { name: 'Conf bucket', slug: 'conf-bucket-1' }),
 			token
@@ -375,7 +374,7 @@ describe('MCP confirmation gate', () => {
 	});
 
 	it('refuses a confirmation offered to an ordinary tool', async () => {
-		const { token } = await session(['super_admin']);
+		const { token } = await session('super');
 		const refused = await rpc(
 			call('project_create', {
 				name: 'X',
@@ -397,7 +396,7 @@ describe('MCP confirmation gate', () => {
 	});
 
 	it('issues no confirmation to a caller who lacks the role', async () => {
-		const { token } = await session(['project_admin']);
+		const { token } = await session('plain');
 		const before = await mcpConfirmationStore.count();
 
 		const refused = await rpc(call('jwks_generate', { alg: 'RS256' }), token);

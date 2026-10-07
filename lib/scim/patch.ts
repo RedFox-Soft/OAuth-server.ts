@@ -2,6 +2,8 @@ import {
 	FORBIDDEN_KEYS,
 	SCIM_ENTERPRISE_ATTRIBUTES,
 	SCIM_ENTERPRISE_USER_SCHEMA,
+	SCIM_GROUP_ATTRIBUTES,
+	SCIM_GROUP_SCHEMA,
 	SCIM_PATCH_OP,
 	SCIM_READ_ONLY_ATTRIBUTES,
 	SCIM_USER_ATTRIBUTES,
@@ -37,8 +39,29 @@ import {
 
 type Op = 'add' | 'replace' | 'remove';
 
-const CORE_PREFIX = `${SCIM_USER_SCHEMA}:`;
-const ENTERPRISE_PREFIX = `${SCIM_ENTERPRISE_USER_SCHEMA}:`;
+/*
+ * The resource a patch applies to: its core schema and, for a User, the enterprise extension. One applier for
+ * both resources, so the hardening — forbidden keys, the allow-list of attributes, the strict-mode refusals —
+ * is one code path rather than a copy kept in step.
+ */
+export interface PatchResource {
+	readonly coreUrn: string;
+	readonly core: readonly ScimAttribute[];
+	readonly extensionUrn?: string;
+	readonly extension?: readonly ScimAttribute[];
+}
+
+export const USER_PATCH: PatchResource = {
+	coreUrn: SCIM_USER_SCHEMA,
+	core: SCIM_USER_ATTRIBUTES,
+	extensionUrn: SCIM_ENTERPRISE_USER_SCHEMA,
+	extension: SCIM_ENTERPRISE_ATTRIBUTES
+};
+
+export const GROUP_PATCH: PatchResource = {
+	coreUrn: SCIM_GROUP_SCHEMA,
+	core: SCIM_GROUP_ATTRIBUTES
+};
 
 function startsWithCi(text: string, prefix: string): boolean {
 	return text.toLowerCase().startsWith(prefix.toLowerCase());
@@ -154,19 +177,27 @@ function splitPath(path: string): {
 	};
 }
 
-export function resolvePath(path: string, leniency: Leniency): Target {
+export function resolvePath(
+	path: string,
+	leniency: Leniency,
+	resource: PatchResource = USER_PATCH
+): Target {
 	if (FORBIDDEN_KEYS.some((k) => path.includes(k))) {
 		throw invalidPath('the path names a forbidden key');
 	}
 	let scope: 'core' | 'enterprise' = 'core';
 	let rest = path;
-	if (startsWithCi(rest, ENTERPRISE_PREFIX)) {
+	const extension = resource.extensionUrn;
+	if (extension !== undefined && startsWithCi(rest, `${extension}:`)) {
 		scope = 'enterprise';
-		rest = rest.slice(ENTERPRISE_PREFIX.length);
-	} else if (rest.toLowerCase() === SCIM_ENTERPRISE_USER_SCHEMA.toLowerCase()) {
+		rest = rest.slice(extension.length + 1);
+	} else if (
+		extension !== undefined &&
+		rest.toLowerCase() === extension.toLowerCase()
+	) {
 		return { kind: 'enterpriseWhole' };
-	} else if (startsWithCi(rest, CORE_PREFIX)) {
-		rest = rest.slice(CORE_PREFIX.length);
+	} else if (startsWithCi(rest, `${resource.coreUrn}:`)) {
+		rest = rest.slice(resource.coreUrn.length + 1);
 	}
 	const { attr, filter, sub } = splitPath(rest);
 	const lower = attr.toLowerCase();
@@ -185,13 +216,20 @@ export function resolvePath(path: string, leniency: Leniency): Target {
 		);
 	}
 	const attribute = named(
-		scope === 'core' ? SCIM_USER_ATTRIBUTES : SCIM_ENTERPRISE_ATTRIBUTES,
+		scope === 'core' ? resource.core : (resource.extension ?? []),
 		attr
 	);
 	if (!attribute) {
 		return refuseOrIgnore(
 			leniency,
 			invalidPath(`${attr} is not an attribute of this resource`)
+		);
+	}
+	if (attribute.mutability === 'readOnly') {
+		/* RFC 7644 §3.5.1 ignores a read-only attribute's value; strict mode says so instead (a User's `groups`). */
+		return refuseOrIgnore(
+			leniency,
+			new ScimError(400, 'mutability', `${attribute.name} is read-only`)
 		);
 	}
 	if (
@@ -217,10 +255,11 @@ export function resolvePath(path: string, leniency: Leniency): Target {
 
 function containerFor(
 	view: ScimObject,
-	scope: 'core' | 'enterprise'
+	scope: 'core' | 'enterprise',
+	resource: PatchResource
 ): ScimObject {
-	if (scope === 'core') return view;
-	const existing = view[SCIM_ENTERPRISE_USER_SCHEMA];
+	if (scope === 'core' || resource.extensionUrn === undefined) return view;
+	const existing = view[resource.extensionUrn];
 	if (
 		typeof existing === 'object' &&
 		existing !== null &&
@@ -229,7 +268,7 @@ function containerFor(
 		return existing as ScimObject;
 	}
 	const created: ScimObject = {};
-	view[SCIM_ENTERPRISE_USER_SCHEMA] = created;
+	view[resource.extensionUrn] = created;
 	return created;
 }
 
@@ -253,9 +292,10 @@ function applyToAttribute(
 	op: Op,
 	target: Extract<Target, { kind: 'attribute' }>,
 	value: unknown,
-	leniency: Leniency
+	leniency: Leniency,
+	resource: PatchResource
 ): void {
-	const container = containerFor(view, target.scope);
+	const container = containerFor(view, target.scope, resource);
 	const { attribute, filter, sub } = target;
 	const key = attribute.name;
 
@@ -346,6 +386,32 @@ function applyToAttribute(
 		delete container[key];
 		return;
 	}
+	if (op === 'remove' && attribute.multiValued && value !== undefined) {
+		/*
+		 * Entra removes group members with `{"op":"Remove","path":"members","value":[{"value":"<id>"}]}` — a value
+		 * list naming what to take out, where RFC 7644 §3.5.2.2 would remove the whole attribute. Outside strict
+		 * mode it removes exactly the named entries, which is what the client meant.
+		 */
+		if (leniency.strict) {
+			throw new ScimError(
+				400,
+				'invalidSyntax',
+				'remove takes no value; name the entries with a value filter in the path'
+			);
+		}
+		const named = new Set(
+			(Array.isArray(value) ? value : [value])
+				.map((v) => (isObject(v) ? v.value : v))
+				.filter((v): v is string => typeof v === 'string')
+		);
+		const existing = Array.isArray(container[key])
+			? (container[key] as unknown[])
+			: [];
+		container[key] = existing.filter(
+			(e) => !(isObject(e) && typeof e.value === 'string' && named.has(e.value))
+		);
+		return;
+	}
 	if (op === 'remove') {
 		delete container[key];
 		return;
@@ -384,13 +450,15 @@ function applyOne(
 	op: Op,
 	path: string,
 	value: unknown,
-	leniency: Leniency
+	leniency: Leniency,
+	resource: PatchResource
 ): void {
-	const target = resolvePath(path, leniency);
+	const target = resolvePath(path, leniency, resource);
 	if (target.kind === 'ignored') return;
 	if (target.kind === 'enterpriseWhole') {
+		const extension = resource.extensionUrn ?? SCIM_ENTERPRISE_USER_SCHEMA;
 		if (op === 'remove') {
-			delete view[SCIM_ENTERPRISE_USER_SCHEMA];
+			delete view[extension];
 			return;
 		}
 		if (!isObject(value)) {
@@ -401,14 +469,14 @@ function applyOne(
 			);
 		}
 		for (const [key, v] of Object.entries(value)) {
-			applyOne(view, op, `${ENTERPRISE_PREFIX}${key}`, v, leniency);
+			applyOne(view, op, `${extension}:${key}`, v, leniency, resource);
 		}
 		return;
 	}
 	if (op !== 'remove' && value === undefined) {
 		throw new ScimError(400, 'invalidValue', `${op} needs a value`);
 	}
-	applyToAttribute(view, op, target, value, leniency);
+	applyToAttribute(view, op, target, value, leniency, resource);
 }
 
 function operationsOf(body: unknown): unknown[] {
@@ -443,7 +511,8 @@ function operationsOf(body: unknown): unknown[] {
 export function applyPatch(
 	view: ScimObject,
 	body: unknown,
-	leniency: Leniency
+	leniency: Leniency,
+	resource: PatchResource = USER_PATCH
 ): ScimObject {
 	assertNoForbiddenKeys(body, 'the request body');
 	const working = structuredClone(view);
@@ -491,14 +560,14 @@ export function applyPatch(
 				);
 			}
 			for (const [key, v] of Object.entries(value)) {
-				applyOne(working, op, key, v, leniency);
+				applyOne(working, op, key, v, leniency, resource);
 			}
 			continue;
 		}
 		if (typeof path !== 'string') {
 			throw new ScimError(400, 'invalidPath', 'path must be a string');
 		}
-		applyOne(working, op, path, value, leniency);
+		applyOne(working, op, path, value, leniency, resource);
 	}
 	return working;
 }

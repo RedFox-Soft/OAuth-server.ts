@@ -17,18 +17,20 @@ The server administers itself. There is no seeded password to look up in a log a
    `http://localhost:3000/admin`.
 
 2. The **Create the first super admin** screen asks for an e-mail address and a password of at
-   least twelve characters. The account goes into the reserved "Administrators" user bucket with
-   the `super_admin` role, and gets a personal group like any other administrator.
+   least twelve characters. The account goes into the reserved "Administrators" user bucket, is made a
+   member of **Super administrators** — the group whose members administer the whole instance — and
+   gets a personal group like any other administrator.
 
 3. Submit, then sign in with those credentials.
 
 </Steps>
 
-The setup route closes as soon as any `super_admin` exists, and answers `409 already_initialized`
-from then on. `/admin` becomes a sign-in, and further administrators are created from inside the
-console under **Admins**: an e-mail address, a password of at least twelve characters, and one or
-both of the `super_admin` and `project_admin` roles. (Group membership, separately, is offered by
-e-mail invitation.) If you reach a setup screen on a deployment that is supposed to have
+The setup route closes as soon as Super administrators has an active member, and answers
+`409 already_initialized` from then on. `/admin` becomes a sign-in, and further administrators are
+created from inside the console under **Admins** with an e-mail address and a password of at least
+twelve characters. A new administrator is never a super administrator: a super administrator grants
+that separately, with the switch beside the account. (Membership of an ordinary group, separately,
+is offered by e-mail invitation.) If you reach a setup screen on a deployment that is supposed to have
 administrators, that is worth investigating: it means the account collection this server reads
 holds none.
 

@@ -4,25 +4,18 @@ import { treaty } from '@elysiajs/eden';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { smtpSettingsRoutes } from 'lib/admin/settings/smtp/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import {
-	adminAuditStore,
-	getUserStore,
-	getSmtpSettingsStore
-} from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import { adminAuditStore, getSmtpSettingsStore } from 'lib/adapters/index.ts';
+import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { SMTP_PASSWORD_MASK } from 'lib/admin/settings/smtp/schema.ts';
 import { sessionFor } from '../admin_session.ts';
 import { answered } from './answered.ts';
+import { createAdministrator, type AdminKind } from '../administrators.ts';
 
 const app = new Elysia().use(resolveAdmin).use(smtpSettingsRoutes);
 const client = treaty(app);
 
-async function cookieFor(roles: string[]) {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`${roles.join('-')}-${Math.random()}@x.io`,
-		'hash',
-		roles
-	);
+async function cookieFor(kind: AdminKind) {
+	const user = await createAdministrator(kind, `${kind}-${Math.random()}@x.io`);
 	const s = await sessionFor(user);
 	return `${ADMIN_SESSION_COOKIE}=${s._id}`;
 }
@@ -47,7 +40,7 @@ describe('SMTP settings API', () => {
 	});
 
 	it('stores settings and returns a masked password on GET', async () => {
-		const cookie = await cookieFor(['super_admin']);
+		const cookie = await cookieFor('super');
 		const put = await client.admin.api.settings.smtp.put(VALID, {
 			headers: { cookie }
 		});
@@ -67,7 +60,7 @@ describe('SMTP settings API', () => {
 	});
 
 	it('keeps the stored password when the masked sentinel is submitted', async () => {
-		const cookie = await cookieFor(['super_admin']);
+		const cookie = await cookieFor('super');
 		await client.admin.api.settings.smtp.put(VALID, { headers: { cookie } });
 		await client.admin.api.settings.smtp.put(
 			{ ...VALID, password: SMTP_PASSWORD_MASK, fromName: 'Renamed' },
@@ -81,7 +74,7 @@ describe('SMTP settings API', () => {
 	// The card is a full replace, so it submits all seven fields whatever the operator touched. The
 	// trail has to describe the edit, not the form.
 	it('names only the field that moved, and never the kept password', async () => {
-		const cookie = await cookieFor(['super_admin']);
+		const cookie = await cookieFor('super');
 		await client.admin.api.settings.smtp.put(VALID, { headers: { cookie } });
 
 		const res = await client.admin.api.settings.smtp.put(
@@ -97,7 +90,7 @@ describe('SMTP settings API', () => {
 	});
 
 	it('records nothing when a resubmitted form changes no field', async () => {
-		const cookie = await cookieFor(['super_admin']);
+		const cookie = await cookieFor('super');
 		await client.admin.api.settings.smtp.put(VALID, { headers: { cookie } });
 		const before = (await adminAuditStore.list({ targetType: 'SmtpSettings' }))
 			.total;
@@ -118,7 +111,7 @@ describe('SMTP settings API', () => {
 	});
 
 	it('rejects non-super-admins', async () => {
-		const cookie = await cookieFor(['project_admin']);
+		const cookie = await cookieFor('plain');
 		const get = await client.admin.api.settings.smtp.get({
 			headers: { cookie }
 		});
@@ -130,7 +123,7 @@ describe('SMTP settings API', () => {
 	});
 
 	it('validates fromEmail and port', async () => {
-		const cookie = await cookieFor(['super_admin']);
+		const cookie = await cookieFor('super');
 		const badEmail = await client.admin.api.settings.smtp.put(
 			{ ...VALID, fromEmail: 'not-an-email' },
 			{ headers: { cookie } }

@@ -4,19 +4,19 @@ import { treaty } from '@elysiajs/eden';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { bucketRoutes } from 'lib/admin/buckets/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { getBucketStore, getUserStore } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import { getBucketStore } from 'lib/adapters/index.ts';
+import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { sessionFor } from '../admin_session.ts';
 import { answered } from './answered.ts';
+import { createAdministrator } from '../administrators.ts';
 
 const app = new Elysia().use(resolveAdmin).use(bucketRoutes);
 const client = treaty(app);
 
 async function superCookie() {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`naming-${Math.random()}@x.io`,
-		'hash',
-		['super_admin']
+	const user = await createAdministrator(
+		'super',
+		`naming-${Math.random()}@x.io`
 	);
 	const s = await sessionFor(user);
 	return `${ADMIN_SESSION_COOKIE}=${s._id}`;

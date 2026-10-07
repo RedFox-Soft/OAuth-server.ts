@@ -10,12 +10,10 @@ const EndUserClaims = t.Record(t.String(), t.Unknown());
 export const CreateEndUserBody = t.Object({
 	email: t.String({ minLength: 3 }),
 	password: t.String({ minLength: 8 }),
-	roles: t.Optional(t.Array(t.String())),
 	claims: t.Optional(EndUserClaims)
 });
 
 export const UpdateEndUserBody = t.Object({
-	roles: t.Optional(t.Array(t.String())),
 	active: t.Optional(t.Boolean()),
 	claims: t.Optional(EndUserClaims)
 });

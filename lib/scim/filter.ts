@@ -1,6 +1,7 @@
-import type { EndUserFilter } from '../adapters/types.js';
+import type { BucketGroupFilter, EndUserFilter } from '../adapters/types.js';
 import {
 	FORBIDDEN_KEYS,
+	SCIM_GROUP_SCHEMA,
 	SCIM_MAX_FILTER_LENGTH,
 	SCIM_USER_SCHEMA
 } from '../consts/scim.js';
@@ -259,4 +260,94 @@ export function parseUserFilter(
 		}
 	}
 	return { filter, emailType, impossible };
+}
+
+const GROUP_PREFIX = `${SCIM_GROUP_SCHEMA}:`.toLowerCase();
+
+/* What a `/Groups` filter asks the store for. `provisionedBy` is always the requesting connection's. */
+export interface ParsedGroupFilter {
+	filter: Omit<BucketGroupFilter, 'bucketId'> & { provisionedBy: string };
+	impossible: boolean;
+}
+
+type GroupField = 'displayName' | 'externalId' | 'id' | 'member';
+
+/*
+ * One `/Groups` term: `displayName eq`, `externalId eq`, `id eq`, `members[value eq "…"]` or
+ * `members.value eq "…"` — what IPSIE AL SCIM §6.2.5 requires and what Entra's membership check
+ * (`id eq "…" and members[value eq "…"]`) sends. Everything else is `invalidFilter`.
+ */
+function groupTerm(cursor: Cursor): { field: GroupField; value: string } {
+	const attr = cursor.next();
+	if (attr?.kind !== 'word') throw invalidFilter('unsupported filter');
+	if (
+		FORBIDDEN_KEYS.some((k) =>
+			attr.text.toLowerCase().includes(k.toLowerCase())
+		)
+	) {
+		throw invalidFilter('unsupported filter');
+	}
+	const lower = attr.text.toLowerCase();
+	const name = lower.startsWith(GROUP_PREFIX)
+		? lower.slice(GROUP_PREFIX.length)
+		: lower;
+
+	if (name === 'members' && cursor.peek()?.kind === 'punct') {
+		if (cursor.next()?.text !== '[') throw invalidFilter('unsupported filter');
+		const inner = cursor.next();
+		if (inner?.kind !== 'word' || inner.text.toLowerCase() !== 'value') {
+			throw invalidFilter('only value can be filtered inside members[…]');
+		}
+		expectEq(cursor);
+		const value = expectString(cursor);
+		if (cursor.next()?.text !== ']') {
+			throw invalidFilter('a value filter is not closed');
+		}
+		return { field: 'member', value };
+	}
+
+	expectEq(cursor);
+	const value = expectString(cursor);
+	switch (name) {
+		case 'displayname':
+			return { field: 'displayName', value };
+		case 'externalid':
+			return { field: 'externalId', value };
+		case 'id':
+			return { field: 'id', value };
+		case 'members.value':
+			return { field: 'member', value };
+		default:
+			throw invalidFilter(`filtering on ${attr.text} is not supported`);
+	}
+}
+
+export function parseGroupFilter(
+	input: string,
+	connectionId: string
+): ParsedGroupFilter {
+	if (input.length > SCIM_MAX_FILTER_LENGTH) {
+		throw invalidFilter('the filter is too long');
+	}
+	const cursor = new Cursor(tokenize(input));
+	if (cursor.done()) throw invalidFilter('the filter is empty');
+
+	const filter: ParsedGroupFilter['filter'] = { provisionedBy: connectionId };
+	let impossible = false;
+	for (;;) {
+		const { field, value } = groupTerm(cursor);
+		const existing = filter[field];
+		/* `displayName` is compared case-insensitively, so two spellings of one name are not a conflict. */
+		const same =
+			field === 'displayName'
+				? existing?.toLowerCase() === value.toLowerCase()
+				: existing === value;
+		if (existing !== undefined && !same) impossible = true;
+		filter[field] = value;
+		if (cursor.done()) break;
+		if (!isKeyword(cursor.next(), 'and')) {
+			throw invalidFilter('terms may only be joined by and');
+		}
+	}
+	return { filter, impossible };
 }

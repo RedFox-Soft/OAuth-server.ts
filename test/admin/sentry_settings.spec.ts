@@ -5,16 +5,13 @@ import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { sentrySettingsRoutes } from 'lib/admin/settings/sentry/routes.ts';
 import { settingsRoutes } from 'lib/admin/settings/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import {
-	adminAuditStore,
-	configStore,
-	getUserStore
-} from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import { adminAuditStore, configStore } from 'lib/adapters/index.ts';
+import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { ApplicationConfig } from 'lib/configs/application.ts';
 import { SENTRY_DSN_MASK } from 'lib/admin/settings/sentry/schema.ts';
 import { sessionFor } from '../admin_session.ts';
 import { answered } from './answered.ts';
+import { createAdministrator, type AdminKind } from '../administrators.ts';
 
 // What the settings store holds; every read below follows a save, so an empty store is a failure.
 async function storedSettings(): Promise<Record<string, unknown>> {
@@ -41,12 +38,8 @@ const client = treaty(app);
 const DSN = 'https://publickey@o0.ingest.invalid/1';
 const OTHER_DSN = 'https://otherkey@o1.ingest.invalid/2';
 
-async function cookieFor(roles: string[]) {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`${roles.join('-')}-${Math.random()}@x.io`,
-		'hash',
-		roles
-	);
+async function cookieFor(kind: AdminKind) {
+	const user = await createAdministrator(kind, `${kind}-${Math.random()}@x.io`);
 	const s = await sessionFor(user);
 	return `${ADMIN_SESSION_COOKIE}=${s._id}`;
 }
@@ -94,7 +87,7 @@ describe('Sentry settings API', () => {
 	});
 
 	it('stores the credential and never returns it', async () => {
-		const cookie = await cookieFor(['super_admin']);
+		const cookie = await cookieFor('super');
 		const put = await client.admin.api.settings.sentry.put(VALID, {
 			headers: { cookie }
 		});
@@ -121,7 +114,7 @@ describe('Sentry settings API', () => {
 	 * is what this process holds.
 	 */
 	it('puts the credential in force in this process, with nothing left waiting', async () => {
-		const cookie = await cookieFor(['super_admin']);
+		const cookie = await cookieFor('super');
 
 		const put = await client.admin.api.settings.sentry.put(VALID, {
 			headers: { cookie }
@@ -133,7 +126,7 @@ describe('Sentry settings API', () => {
 	});
 
 	it('reports configured false before anything is stored', async () => {
-		const cookie = await cookieFor(['super_admin']);
+		const cookie = await cookieFor('super');
 		const got = await client.admin.api.settings.sentry.get({
 			headers: { cookie }
 		});
@@ -142,7 +135,7 @@ describe('Sentry settings API', () => {
 
 	/* The sentinel lets the console save the rest of the card without holding the secret. */
 	it('keeps the stored credential when the mask is sent back', async () => {
-		const cookie = await cookieFor(['super_admin']);
+		const cookie = await cookieFor('super');
 		await client.admin.api.settings.sentry.put(VALID, { headers: { cookie } });
 
 		const put = await client.admin.api.settings.sentry.put(
@@ -160,7 +153,7 @@ describe('Sentry settings API', () => {
 	 * is stored, so a blank submission cannot mean "untouched".
 	 */
 	it('clears the stored credential when an empty value is sent', async () => {
-		const cookie = await cookieFor(['super_admin']);
+		const cookie = await cookieFor('super');
 		await client.admin.api.settings.sentry.put(VALID, { headers: { cookie } });
 		await client.admin.api.settings.sentry.put(
 			{ ...VALID, dsn: '' },
@@ -172,7 +165,7 @@ describe('Sentry settings API', () => {
 	});
 
 	it('replaces the credential when a new one is sent', async () => {
-		const cookie = await cookieFor(['super_admin']);
+		const cookie = await cookieFor('super');
 		await client.admin.api.settings.sentry.put(VALID, { headers: { cookie } });
 		await client.admin.api.settings.sentry.put(
 			{ ...VALID, dsn: OTHER_DSN },
@@ -185,7 +178,7 @@ describe('Sentry settings API', () => {
 
 	/* Names in the trail, never values — the same rule the audit trail applies everywhere. */
 	it('records that the credential changed without recording it', async () => {
-		const cookie = await cookieFor(['super_admin']);
+		const cookie = await cookieFor('super');
 		await client.admin.api.settings.sentry.put(VALID, { headers: { cookie } });
 
 		const { entries } = await adminAuditStore.list({
@@ -203,7 +196,7 @@ describe('Sentry settings API', () => {
 	 * whole purpose is to be trusted about what did.
 	 */
 	it('records nothing when a submission changes nothing', async () => {
-		const cookie = await cookieFor(['super_admin']);
+		const cookie = await cookieFor('super');
 		await client.admin.api.settings.sentry.put(VALID, { headers: { cookie } });
 		const first = await adminAuditStore.list({
 			targetType: 'ApplicationConfig'
@@ -226,7 +219,7 @@ describe('Sentry settings API', () => {
 	 * configuration the server refuses, so the two cannot be separate steps.
 	 */
 	it('clears the credential and disables reporting together', async () => {
-		const cookie = await cookieFor(['super_admin']);
+		const cookie = await cookieFor('super');
 		ApplicationConfig['errorStore.enabled'] = true;
 		await client.admin.api.settings.sentry.put(
 			{ ...VALID, enabled: true },
@@ -247,7 +240,7 @@ describe('Sentry settings API', () => {
 	});
 
 	it('refuses enabling without a credential, naming what is missing', async () => {
-		const cookie = await cookieFor(['super_admin']);
+		const cookie = await cookieFor('super');
 		ApplicationConfig['errorStore.enabled'] = true;
 
 		const put = await client.admin.api.settings.sentry.put(
@@ -260,7 +253,7 @@ describe('Sentry settings API', () => {
 
 	/* The prerequisite that makes "reported but not recorded" unreachable. */
 	it('refuses enabling without the error store, naming it', async () => {
-		const cookie = await cookieFor(['super_admin']);
+		const cookie = await cookieFor('super');
 		ApplicationConfig['errorStore.enabled'] = false;
 
 		const put = await client.admin.api.settings.sentry.put(
@@ -273,7 +266,7 @@ describe('Sentry settings API', () => {
 
 	/* The dispatch bound is a constant, so it is neither reported nor accepted here. */
 	it('neither reports nor accepts a dispatch bound', async () => {
-		const cookie = await cookieFor(['super_admin']);
+		const cookie = await cookieFor('super');
 		const got = await client.admin.api.settings.sentry.get({
 			headers: { cookie }
 		});
@@ -281,7 +274,7 @@ describe('Sentry settings API', () => {
 	});
 
 	it('refuses a project-scoped administrator on both verbs', async () => {
-		const cookie = await cookieFor(['project_admin']);
+		const cookie = await cookieFor('plain');
 		const got = await client.admin.api.settings.sentry.get({
 			headers: { cookie }
 		});
@@ -303,7 +296,7 @@ describe('Sentry settings API', () => {
 	 * generic read surface from ever returning it and the generic PUT from writing it.
 	 */
 	it('is absent from the generic settings surface', async () => {
-		const cookie = await cookieFor(['super_admin']);
+		const cookie = await cookieFor('super');
 		await client.admin.api.settings.sentry.put(VALID, { headers: { cookie } });
 
 		const got = await client.admin.api.settings.get({ headers: { cookie } });
@@ -322,7 +315,7 @@ describe('Sentry settings API', () => {
 	});
 
 	it('is refused by the generic settings PUT', async () => {
-		const cookie = await cookieFor(['super_admin']);
+		const cookie = await cookieFor('super');
 		const put = await client.admin.api.settings.put(
 			{ 'sentry.dsn': OTHER_DSN },
 			{ headers: { cookie } }
@@ -337,7 +330,7 @@ describe('Sentry settings API', () => {
 	 * on the next unrelated settings edit.
 	 */
 	it('survives an unrelated generic settings save', async () => {
-		const cookie = await cookieFor(['super_admin']);
+		const cookie = await cookieFor('super');
 		await client.admin.api.settings.sentry.put(VALID, { headers: { cookie } });
 
 		await client.admin.api.settings.put(

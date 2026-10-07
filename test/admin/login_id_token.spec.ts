@@ -13,6 +13,7 @@ import bootstrap, { agent, getHeader, seedJwks } from '../test_helper.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { getUserStore, resetAdminMemoryStores } from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import { grantSuperAdmin } from 'lib/admin/super_admins.ts';
 import { testSigningKeys } from '../jwks/fixtures.ts';
 import {
 	foreignKey,
@@ -102,15 +103,15 @@ describe('admin sign-in: ID token verification', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'admin' });
 		// Cross-suite isolation: other specs seed the admin store singletons, and findByClientId
-		// returns the first match — so drop the cached stores, re-seed, then plant our own super_admin
+		// returns the first match — so drop the cached stores, re-seed, then plant our own super administrator
 		// whose _id is the `sub` every minted token carries.
 		resetAdminMemoryStores();
 		await ensureAdminSeed();
 		const superAdmin = await getUserStore(ADMIN_BUCKET_ID).create(
 			'verify@x.io',
-			await Bun.password.hash('correct horse battery'),
-			['super_admin']
+			await Bun.password.hash('correct horse battery')
 		);
+		await grantSuperAdmin(superAdmin._id);
 		superAdminId = superAdmin._id;
 	});
 
@@ -141,7 +142,7 @@ describe('admin sign-in: ID token verification', () => {
 		const me = await agent.admin.api.me.get({ headers: { cookie: session } });
 		expect(me.status).toBe(200);
 		expect(me.data).toMatchObject({
-			roles: ['super_admin'],
+			superAdmin: true,
 			bucketId: ADMIN_BUCKET_ID,
 			email: 'verify@x.io'
 		});

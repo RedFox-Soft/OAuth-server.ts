@@ -10,11 +10,7 @@ import {
 	getProjectStore,
 	getBucketStore
 } from 'lib/adapters/index.ts';
-import {
-	ADMIN_BUCKET_ID,
-	ADMIN_SESSION_COOKIE,
-	UNASSIGNED_GROUP_ID
-} from 'lib/admin/consts.ts';
+import { ADMIN_SESSION_COOKIE, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import {
 	ADMIN_MCP_CLIENT_ID,
 	MCP_RESOURCE,
@@ -25,6 +21,7 @@ import { ApplicationConfig } from 'lib/configs/application.js';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
 import { shaped } from 'test/shape.js';
 import { Type } from '@sinclair/typebox';
+import { createAdministrator } from '../administrators.ts';
 
 /*
  * SC-002 / FR-025: an operator reading the agent's answer and the console side by side sees the same
@@ -67,11 +64,7 @@ async function rpc(body: unknown, token: string) {
 }
 
 async function principal() {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`par-${Math.random()}@x.io`,
-		'hash',
-		['super_admin']
-	);
+	const user = await createAdministrator('super', `par-${Math.random()}@x.io`);
 	const at = new AccessToken({
 		client: await Client.find(ADMIN_MCP_CLIENT_ID),
 		accountId: user._id,
@@ -172,8 +165,7 @@ describe('agent answers match the console, field for field', () => {
 		);
 		const endUser = await getUserStore(bucket._id).create(
 			`member-${Math.random()}@x.io`,
-			'hash',
-			[]
+			'hash'
 		);
 
 		const ARGS: Record<string, Record<string, string>> = {
@@ -254,10 +246,9 @@ describe('agent answers match the console, field for field', () => {
 	it('reports the same refusal for the same forbidden read', async () => {
 		// The comparison has to hold for failures too, or an agent could be told "not found" where the
 		// console says "forbidden" and an operator would chase the wrong thing.
-		const user = await getUserStore(ADMIN_BUCKET_ID).create(
-			`par-scoped-${Math.random()}@x.io`,
-			'hash',
-			['project_admin']
+		const user = await createAdministrator(
+			'plain',
+			`par-scoped-${Math.random()}@x.io`
 		);
 		const at = new AccessToken({
 			client: await Client.find(ADMIN_MCP_CLIENT_ID),

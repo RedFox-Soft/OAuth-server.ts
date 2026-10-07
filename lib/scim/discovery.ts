@@ -1,6 +1,8 @@
 import {
 	SCIM_ENTERPRISE_ATTRIBUTES,
 	SCIM_ENTERPRISE_USER_SCHEMA,
+	SCIM_GROUP_ATTRIBUTES,
+	SCIM_GROUP_SCHEMA,
 	SCIM_LIST_RESPONSE,
 	SCIM_MAX_PAGE,
 	SCIM_RESOURCE_TYPE_SCHEMA,
@@ -102,8 +104,30 @@ function schemaResources(base: string): Record<string, unknown>[] {
 			'EnterpriseUser',
 			'Enterprise attributes of an end user',
 			SCIM_ENTERPRISE_ATTRIBUTES
+		),
+		schemaResource(
+			base,
+			SCIM_GROUP_SCHEMA,
+			'Group',
+			'A group of this bucket’s end users',
+			SCIM_GROUP_ATTRIBUTES
 		)
 	];
+}
+
+function groupResourceType(base: string): Record<string, unknown> {
+	return {
+		schemas: [SCIM_RESOURCE_TYPE_SCHEMA],
+		id: 'Group',
+		name: 'Group',
+		endpoint: '/Groups',
+		description: 'Groups of this bucket’s end users',
+		schema: SCIM_GROUP_SCHEMA,
+		meta: {
+			resourceType: 'ResourceType',
+			location: `${base}/ResourceTypes/Group`
+		}
+	};
 }
 
 function userResourceType(base: string): Record<string, unknown> {
@@ -147,15 +171,14 @@ export function schemaById(base: string, id: string): Record<string, unknown> {
 }
 
 export function resourceTypes(base: string): Record<string, unknown> {
-	return listOf([userResourceType(base)]);
+	return listOf([userResourceType(base), groupResourceType(base)]);
 }
 
 export function resourceTypeById(
 	base: string,
 	id: string
 ): Record<string, unknown> {
-	if (id.toLowerCase() !== 'user') {
-		throw new ScimError(404, undefined, 'no such resource type');
-	}
-	return userResourceType(base);
+	if (id.toLowerCase() === 'user') return userResourceType(base);
+	if (id.toLowerCase() === 'group') return groupResourceType(base);
+	throw new ScimError(404, undefined, 'no such resource type');
 }

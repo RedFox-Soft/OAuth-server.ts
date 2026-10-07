@@ -98,7 +98,6 @@ export class UserStore implements UserStoreInstance {
 	async create(
 		email: string,
 		password: string,
-		roles: string[] = [],
 		verified = false,
 		id?: string,
 		fields?: EndUserCreateFields
@@ -117,7 +116,6 @@ export class UserStore implements UserStoreInstance {
 				verified,
 				password,
 				active: true,
-				roles,
 				createdAt: now,
 				updatedAt: now,
 				lastLoginAt: null
@@ -165,6 +163,15 @@ export class UserStore implements UserStoreInstance {
 			users: found.map((user) => documentOf(this.collectionName, User, user)),
 			totalResults
 		};
+	}
+
+	async findMany(ids: string[]): Promise<User[]> {
+		if (ids.length === 0) return [];
+		const found = await db
+			.collection<User>(this.collectionName)
+			.find({ _id: { $in: ids.slice(0, MAX_END_USER_PAGE) } })
+			.toArray();
+		return found.map((user) => documentOf(this.collectionName, User, user));
 	}
 
 	async list(): Promise<User[]> {

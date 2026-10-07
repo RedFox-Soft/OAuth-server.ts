@@ -28,7 +28,7 @@ export async function loadProject(
 ): Promise<Project> {
 	const project = await getProjectStore().find(id);
 	if (!project) {
-		if (admin.roles.includes('super_admin')) {
+		if (admin.superAdmin) {
 			throw new AdminError(404, 'project not found');
 		}
 		throw new AdminError(403, 'no access to this project');

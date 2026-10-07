@@ -4,12 +4,13 @@ import { treaty } from '@elysiajs/eden';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { auditRoutes } from 'lib/admin/audit/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { adminAuditStore, getUserStore } from 'lib/adapters/index.ts';
+import { adminAuditStore } from 'lib/adapters/index.ts';
 import type { AdminAuditEntry } from 'lib/adapters/types.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { sessionFor } from '../admin_session.ts';
 import { answered } from './answered.ts';
 import { present } from 'test/shape.js';
+import { createAdministrator, type AdminKind } from '../administrators.ts';
 
 /*
  * The read surface — specs/016-admin-audit-completeness/contracts/admin-audit-api.md.
@@ -28,12 +29,8 @@ const client = treaty(app);
 let seq = 0;
 const unique = (prefix: string) => `${prefix}-${Date.now()}-${(seq += 1)}`;
 
-async function cookieFor(roles: string[]) {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`${unique('admin')}@x.io`,
-		'hash',
-		roles
-	);
+async function cookieFor(kind: AdminKind) {
+	const user = await createAdministrator(kind, `${unique('admin')}@x.io`);
 	const session = await sessionFor(user);
 	return {
 		cookie: `${ADMIN_SESSION_COOKIE}=${session._id}`,
@@ -93,7 +90,7 @@ describe('GET /admin/api/audit', () => {
 		it('serves a project administrator only their own groups’ entries', async () => {
 			const scope = unique('scope');
 			await seed(scope);
-			const { cookie } = await cookieFor(['project_admin']);
+			const { cookie } = await cookieFor('plain');
 
 			const res = await client.admin.api.audit.get({
 				query: {},
@@ -108,7 +105,7 @@ describe('GET /admin/api/audit', () => {
 		it('serves a super administrator', async () => {
 			const scope = unique('scope');
 			await seed(scope);
-			const { cookie } = await cookieFor(['super_admin']);
+			const { cookie } = await cookieFor('super');
 
 			const res = await client.admin.api.audit.get({
 				query: { targetScope: scope },
@@ -138,7 +135,7 @@ describe('GET /admin/api/audit', () => {
 				{ targetId: 'newest' },
 				new Date('2026-06-01T00:00:00Z')
 			);
-			const { cookie } = await cookieFor(['super_admin']);
+			const { cookie } = await cookieFor('super');
 
 			const res = await client.admin.api.audit.get({
 				query: { targetScope: scope },
@@ -153,7 +150,7 @@ describe('GET /admin/api/audit', () => {
 		});
 
 		it('presents an absent scope as null and absent attributes as an empty list', async () => {
-			const { cookie } = await cookieFor(['super_admin']);
+			const { cookie } = await cookieFor('super');
 			const targetId = unique('unscoped');
 			await adminAuditStore.record({
 				actorId: 'actor-1',
@@ -176,7 +173,7 @@ describe('GET /admin/api/audit', () => {
 		it('reports the page and page size it applied', async () => {
 			const scope = unique('scope');
 			await seed(scope);
-			const { cookie } = await cookieFor(['super_admin']);
+			const { cookie } = await cookieFor('super');
 
 			const res = await client.admin.api.audit.get({
 				query: { targetScope: scope },
@@ -194,7 +191,7 @@ describe('GET /admin/api/audit', () => {
 			const scope = unique('scope');
 			await seed(scope, { actorId: 'a-one', actorEmail: 'one@x.io' });
 			await seed(scope, { actorId: 'a-two', actorEmail: 'two@x.io' });
-			const { cookie } = await cookieFor(['super_admin']);
+			const { cookie } = await cookieFor('super');
 
 			const byId = await client.admin.api.audit.get({
 				query: { targetScope: scope, actor: 'a-one' },
@@ -229,7 +226,7 @@ describe('GET /admin/api/audit', () => {
 				targetType: 'EndUser',
 				targetId: 'u-gone'
 			});
-			const { cookie } = await cookieFor(['super_admin']);
+			const { cookie } = await cookieFor('super');
 
 			const byAction = await client.admin.api.audit.get({
 				query: { targetScope: scope, action: 'project.delete' },
@@ -268,7 +265,7 @@ describe('GET /admin/api/audit', () => {
 				actorEmail: 'gone@x.io',
 				targetId: 'deleted-project'
 			});
-			const { cookie } = await cookieFor(['super_admin']);
+			const { cookie } = await cookieFor('super');
 
 			const res = await client.admin.api.audit.get({
 				query: { targetScope: scope },
@@ -295,7 +292,7 @@ describe('GET /admin/api/audit', () => {
 		it('bounds inclusively, with each bound usable alone', async () => {
 			const scope = unique('scope');
 			await seedThree(scope);
-			const { cookie } = await cookieFor(['super_admin']);
+			const { cookie } = await cookieFor('super');
 
 			const since = await client.admin.api.audit.get({
 				query: { targetScope: scope, from: march.toISOString() },
@@ -336,7 +333,7 @@ describe('GET /admin/api/audit', () => {
 			for (let i = 0; i < 60; i += 1) {
 				await seed(scope, { targetId: `recent-${i}` }, june);
 			}
-			const { cookie } = await cookieFor(['super_admin']);
+			const { cookie } = await cookieFor('super');
 
 			const res = await client.admin.api.audit.get({
 				query: {
@@ -353,7 +350,7 @@ describe('GET /admin/api/audit', () => {
 		});
 
 		it('refuses a backwards window instead of returning an empty page', async () => {
-			const { cookie } = await cookieFor(['super_admin']);
+			const { cookie } = await cookieFor('super');
 
 			const res = await client.admin.api.audit.get({
 				query: {
@@ -370,7 +367,7 @@ describe('GET /admin/api/audit', () => {
 		});
 
 		it('refuses an unparseable bound', async () => {
-			const { cookie } = await cookieFor(['super_admin']);
+			const { cookie } = await cookieFor('super');
 
 			const res = await client.admin.api.audit.get({
 				query: { from: 'last-tuesday' },
@@ -389,7 +386,7 @@ describe('GET /admin/api/audit', () => {
 			for (let i = 0; i < 7; i += 1) {
 				written.push((await seed(scope, { targetId: `c-${i}` }, stamp))._id);
 			}
-			const { cookie } = await cookieFor(['super_admin']);
+			const { cookie } = await cookieFor('super');
 
 			const seen: string[] = [];
 			for (const page of [1, 2, 3]) {
@@ -408,7 +405,7 @@ describe('GET /admin/api/audit', () => {
 		it('clamps an oversized page size rather than refusing it', async () => {
 			const scope = unique('scope');
 			await seed(scope);
-			const { cookie } = await cookieFor(['super_admin']);
+			const { cookie } = await cookieFor('super');
 
 			const res = await client.admin.api.audit.get({
 				query: { targetScope: scope, pageSize: '5000' },
@@ -422,7 +419,7 @@ describe('GET /admin/api/audit', () => {
 		it('treats a page below one as the first page', async () => {
 			const scope = unique('scope');
 			await seed(scope);
-			const { cookie } = await cookieFor(['super_admin']);
+			const { cookie } = await cookieFor('super');
 
 			const res = await client.admin.api.audit.get({
 				query: { targetScope: scope, page: '0' },
@@ -436,7 +433,7 @@ describe('GET /admin/api/audit', () => {
 		it('returns an empty page past the end, with the real total', async () => {
 			const scope = unique('scope');
 			await seed(scope);
-			const { cookie } = await cookieFor(['super_admin']);
+			const { cookie } = await cookieFor('super');
 
 			const res = await client.admin.api.audit.get({
 				query: { targetScope: scope, page: '99' },
@@ -453,7 +450,7 @@ describe('GET /admin/api/audit', () => {
 		// A mistyped filter must not silently answer with the unfiltered trail — the one failure mode
 		// that turns an audit read into a wrong answer rather than an error.
 		it('refuses an unknown query parameter', async () => {
-			const { cookie } = await cookieFor(['super_admin']);
+			const { cookie } = await cookieFor('super');
 
 			const res = await client.admin.api.audit.get({
 				// @ts-expect-error a mistyped filter name; the route must refuse it
@@ -465,7 +462,7 @@ describe('GET /admin/api/audit', () => {
 		});
 
 		it('serves no mutating method on the trail', async () => {
-			const { cookie } = await cookieFor(['super_admin']);
+			const { cookie } = await cookieFor('super');
 			const scope = unique('scope');
 			const entry = await seed(scope);
 

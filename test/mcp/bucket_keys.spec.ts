@@ -5,12 +5,8 @@ import { elysia } from 'lib/index.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import {
-	getBucketKeysStore,
-	getBucketStore,
-	getUserStore
-} from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { getBucketKeysStore, getBucketStore } from 'lib/adapters/index.ts';
+import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import {
 	ADMIN_MCP_CLIENT_ID,
 	MCP_RESOURCE,
@@ -18,6 +14,7 @@ import {
 } from 'lib/mcp/consts.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { keysFor } from 'lib/keys/issuer_keys.ts';
+import { createAdministrator } from '../administrators.ts';
 
 let rpcId = 0;
 
@@ -53,10 +50,9 @@ function call(name: string, args: Record<string, unknown>) {
 }
 
 async function agent() {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`keys-agent-${Math.random()}@x.io`,
-		'hash',
-		['super_admin']
+	const user = await createAdministrator(
+		'super',
+		`keys-agent-${Math.random()}@x.io`
 	);
 	const at = new AccessToken({
 		client: await Client.find(ADMIN_MCP_CLIENT_ID),

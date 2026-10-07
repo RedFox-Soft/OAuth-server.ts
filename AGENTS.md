@@ -100,9 +100,12 @@ lib/
     routes.ts           ← THE admin API route set; mounted by the console and by lib/mcp/dispatch.ts
     auth/rbac.ts        ← session cookie OR an MCP-audience bearer token → one AdminContext
     audit/              ← append-only trail; written before the mutation, inside the handler
+    bucket-groups/      ← routes over a bucket's groups of end users (the service is lib/bucket_groups/)
+    super_admins.ts     ← the instance privilege: membership of Super administrators, its only writer
   mcp/                  ← catalogue.ts (published tools), dispatch.ts, confirm.ts (two-call gate)
   provisioning/         ← SCIM provisioning connections: service, the synthesized client, token policy
   scim/                 ← the SCIM 2.0 surface: principal, filter, patch, resource mapping, own errors and limiter
+  bucket_groups/        ← every change to a bucket group (admin and SCIM), and the `groups` claim
   error_store/          ← the one place a fault becomes a record (capture.ts is the choke point)
   sentry/               ← optional outbound reporting; registers NO Elysia hook
 database/               ← provisioning (mongodb.ts, postgres.ts), migrate.ts, real-DB verify scripts
@@ -160,7 +163,10 @@ Each rule is the part that is easy to break. Read the named page before changing
   administrator declares at the root. → `bucket-is-an-issuer.md`, `per-issuer-isolation.md`,
   `cookie-path-scoping.md`, `account-resolution.md`
 - **Ownership** — a group owns every project and bucket, and membership is the only grant of access;
-  instance-wide things stay super-admin-only. → `group-ownership.md`
+  instance-wide things stay super-admin-only. There are no roles: the instance privilege is membership of
+  Super administrators (`lib/admin/super_admins.ts`), and end users are grouped only by bucket groups, whose
+  members are records — change them through `lib/bucket_groups/service.ts`, never a member list read and
+  written back. → `group-ownership.md`, `bucket-groups.md`
 - **Audit** — a mutating admin route records audit-first, after authorization, inside the handler.
   → `admin-audit-trail.md`
 - **End users** — change an end user only through `lib/end_users/service.ts`, never the user store

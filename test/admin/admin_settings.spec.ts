@@ -11,6 +11,7 @@ import {
 } from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { sessionFor } from '../admin_session.ts';
+import { createAdministrator, type AdminKind } from '../administrators.ts';
 
 /*
  * `normalize: false` because that is how lib/index.ts constructs the real app, and this suite has an
@@ -26,12 +27,8 @@ const client = treaty(app);
 let seq = 0;
 const unique = (prefix: string) => `${prefix}-${Date.now()}-${(seq += 1)}`;
 
-async function sessionCookieFor(roles: string[]) {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`${unique(roles.join('-'))}@x.io`,
-		'hash',
-		roles
-	);
+async function sessionCookieFor(kind: AdminKind) {
+	const user = await createAdministrator(kind, `${unique(kind)}@x.io`);
 	const session = await sessionFor(user);
 	return { cookie: `${ADMIN_SESSION_COOKIE}=${session._id}`, userId: user._id };
 }
@@ -45,7 +42,7 @@ describe('admin bucket settings', () => {
 
 	beforeEach(async () => {
 		await ensureAdminSeed();
-		admin = await sessionCookieFor(['super_admin']);
+		admin = await sessionCookieFor('super');
 		await getBucketStore().update(ADMIN_BUCKET_ID, { totpRequired: false });
 	});
 
@@ -101,13 +98,13 @@ describe('admin bucket settings', () => {
 		);
 		expect(patched.status).toBe(200);
 		// The per-admin route would have answered 404 for a user called `settings`, or 422 for a body
-		// carrying neither `roles` nor `active`.
+		// not carrying `active`.
 		expect(patched.data).toEqual({ totpRequired: true });
 		expect(await getUserStore(ADMIN_BUCKET_ID).find('settings')).toBeNull();
 	});
 
 	it('refuses a project administrator', async () => {
-		const weaker = await sessionCookieFor(['project_admin']);
+		const weaker = await sessionCookieFor('plain');
 
 		const read = await client.admin.api.admins.settings.get({
 			headers: { cookie: weaker.cookie }

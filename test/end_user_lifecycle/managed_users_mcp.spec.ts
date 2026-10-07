@@ -1,9 +1,8 @@
 import { describe, it, beforeAll, expect } from 'bun:test';
 
 import { elysia } from 'lib/index.js';
-import { getUserStore } from 'lib/adapters/index.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { ADMIN_BUCKET_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
+import { DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { createEndUser } from 'lib/end_users/service.ts';
 import nanoid from 'lib/helpers/nanoid.js';
 import { AccessToken } from 'lib/models/access_token.js';
@@ -15,6 +14,7 @@ import {
 } from 'lib/mcp/consts.ts';
 import bootstrap from '../test_helper.js';
 import { defaultBucket } from './fixtures.ts';
+import { createAdministrator } from '../administrators.ts';
 
 let rpcId = 0;
 
@@ -42,11 +42,7 @@ async function rpc(method: string, params: unknown, token: string) {
 /* An agent acting for a super administrator, as the MCP surface authenticates one. */
 async function agentToken(): Promise<string> {
 	await ensureAdminSeed();
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`agent-${nanoid()}@x.io`,
-		'hash',
-		['super_admin']
-	);
+	const user = await createAdministrator('super', `agent-${nanoid()}@x.io`);
 	const at = new AccessToken({
 		client: await Client.find(ADMIN_MCP_CLIENT_ID),
 		accountId: user._id,
@@ -88,7 +84,7 @@ describe('an AI agent acting on a user managed by a provisioning connection', ()
 			'tools/call',
 			{
 				name: 'bucket_user_update',
-				arguments: { id: DEFAULT_BUCKET_ID, uid: user._id, roles: [] }
+				arguments: { id: DEFAULT_BUCKET_ID, uid: user._id, claims: {} }
 			},
 			token
 		);

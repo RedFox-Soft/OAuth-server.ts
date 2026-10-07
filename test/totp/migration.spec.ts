@@ -129,7 +129,6 @@ describe('bringing existing accounts under the requirement (US4)', () => {
 		await getUserStore(bucketId).create(
 			email,
 			await Bun.password.hash(PASSWORD),
-			[],
 			true
 		);
 		return email;

@@ -39,8 +39,7 @@ type PageKey =
 	| 'errors';
 
 export function Layout({ me }: { me: AdminContext | null }) {
-	const roles = me?.roles ?? [];
-	const isSuperAdmin = roles.includes('super_admin');
+	const isSuperAdmin = me?.superAdmin === true;
 	const [selected, setSelected] = useState<PageKey>('projects');
 
 	/*

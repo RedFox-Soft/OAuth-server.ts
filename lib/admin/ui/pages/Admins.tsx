@@ -6,7 +6,7 @@ import {
 	Modal,
 	Form,
 	Input,
-	Select,
+	Popconfirm,
 	Space,
 	Switch,
 	Tag,
@@ -16,18 +16,15 @@ import {
 import { PlusOutlined } from '@ant-design/icons';
 import type { User } from '../../../adapters/types.js';
 
-type AdminUser = Omit<User, 'password'>;
+/* What the list answers: the account without its password, and whether it holds the instance privilege. */
+type AdminUser = Pick<User, '_id' | 'email' | 'active'> & {
+	superAdmin: boolean;
+};
 
 interface CreateAdminValues {
 	email: string;
 	password: string;
-	roles: string[];
 }
-
-const ROLE_OPTIONS = [
-	{ label: 'Super admin', value: 'super_admin' },
-	{ label: 'Project admin', value: 'project_admin' }
-];
 
 export function Admins() {
 	const [admins, setAdmins] = useState<AdminUser[]>([]);
@@ -89,6 +86,25 @@ export function Admins() {
 	useEffect(() => {
 		void fetchAdmins();
 	}, [fetchAdmins]);
+
+	/*
+	 * The instance privilege is granted and withdrawn by operations of its own, never by an account edit, and
+	 * the server refuses withdrawing it from the last active super administrator — its reason is shown as is.
+	 */
+	async function onSetSuperAdmin(target: AdminUser, next: boolean) {
+		const res = await fetch(
+			`/admin/api/admins/${encodeURIComponent(target._id)}/super-admin`,
+			{ method: next ? 'POST' : 'DELETE' }
+		);
+		if (!res.ok) {
+			const body = (await res.json().catch(() => null)) as {
+				message?: string;
+			} | null;
+			message.error(body?.message || 'failed to change super administrator');
+			return;
+		}
+		await load();
+	}
 
 	async function onCreate(values: CreateAdminValues) {
 		setCreating(true);
@@ -172,14 +188,25 @@ export function Admins() {
 				columns={[
 					{ title: 'Email', dataIndex: 'email' },
 					{
-						title: 'Roles',
-						dataIndex: 'roles',
-						render: (roles: string[]) => (
-							<>
-								{roles.map((role) => (
-									<Tag key={role}>{role}</Tag>
-								))}
-							</>
+						title: 'Super administrator',
+						dataIndex: 'superAdmin',
+						render: (superAdmin: boolean, row: AdminUser) => (
+							<Popconfirm
+								title={
+									superAdmin
+										? 'Withdraw super-administrator status?'
+										: 'Make this administrator a super administrator?'
+								}
+								description={
+									superAdmin
+										? 'They keep their groups but lose authority over the whole instance.'
+										: 'They gain authority over every group, setting and key of this instance.'
+								}
+								okText={superAdmin ? 'Withdraw' : 'Grant'}
+								onConfirm={() => onSetSuperAdmin(row, !superAdmin)}
+							>
+								<Switch checked={superAdmin} />
+							</Popconfirm>
 						)
 					},
 					{
@@ -202,7 +229,6 @@ export function Admins() {
 					form={form}
 					layout="vertical"
 					onFinish={onCreate}
-					initialValues={{ roles: ['project_admin'] }}
 				>
 					{/*
 					 * An address beside a password is a sign-in form as far as a browser is concerned, and it
@@ -225,16 +251,6 @@ export function Admins() {
 						<Input.Password
 							autoComplete="new-password"
 							placeholder="at least 12 characters"
-						/>
-					</Form.Item>
-					<Form.Item
-						name="roles"
-						label="Roles"
-						rules={[{ required: true }]}
-					>
-						<Select
-							mode="multiple"
-							options={ROLE_OPTIONS}
 						/>
 					</Form.Item>
 				</Form>

@@ -1,7 +1,6 @@
 import { describe, it, beforeAll, expect } from 'bun:test';
 
-import { getUserStore } from 'lib/adapters/index.js';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import bootstrap from '../test_helper.js';
 import { groupIdFor, sessionFor } from '../admin_session.ts';
 import { admin } from '../provisioning/helpers.ts';
@@ -14,6 +13,7 @@ import {
 	scimUser,
 	type Connected
 } from './helpers.ts';
+import { createAdministrator } from '../administrators.ts';
 
 interface Entry {
 	actorId: string;
@@ -45,10 +45,9 @@ describe('the audit trail of SCIM changes', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'scim' });
 		/* An administrator of the bucket's group, not a super administrator: what they see is scoped. */
-		const user = await getUserStore(ADMIN_BUCKET_ID).create(
-			`owner-${Math.random()}@x.io`,
-			'hash',
-			[]
+		const user = await createAdministrator(
+			'plain',
+			`owner-${Math.random()}@x.io`
 		);
 		const session = await sessionFor(user);
 		cookie = `${ADMIN_SESSION_COOKIE}=${session._id}`;

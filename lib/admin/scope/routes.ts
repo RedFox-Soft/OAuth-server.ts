@@ -8,6 +8,7 @@ import {
 	type AdminContext
 } from '../auth/rbac.js';
 import { ADMIN_SESSION_COOKIE } from '../consts.js';
+import { isSuperAdminsGroup } from '../super_admins.js';
 import { SwitchScopeBody } from './schema.js';
 
 /*
@@ -50,11 +51,13 @@ export const scopeRoutes = new Elysia({ name: 'admin-scope' })
 		 * same carve-out the switch below enforces, so the control never offers a scope the switch would
 		 * refuse.
 		 */
-		const available = ctx.roles.includes('super_admin')
-			? (await getGroupStore().list()).filter(
-					(g) => g.kind !== 'personal' || isMember(ctx, g._id)
-				)
-			: await getGroupStore().listByMember(ctx.userId);
+		const available = (
+			ctx.superAdmin
+				? (await getGroupStore().list()).filter(
+						(g) => g.kind !== 'personal' || isMember(ctx, g._id)
+					)
+				: await getGroupStore().listByMember(ctx.userId)
+		).filter((g) => !isSuperAdminsGroup(g._id));
 		return {
 			activeGroupId: ctx.activeGroupId,
 			available: available.map((g) => ({
@@ -90,12 +93,15 @@ export const scopeRoutes = new Elysia({ name: 'admin-scope' })
 			 * All three refusals say the same thing, so a switch cannot be used to discover which group
 			 * ids are real or which of them are personal.
 			 */
-			const group = await getGroupStore().find(body.groupId);
+			/* Super administrators owns nothing, so there is nothing to act in. */
+			const group = isSuperAdminsGroup(body.groupId)
+				? null
+				: await getGroupStore().find(body.groupId);
 			if (!group) throw new AdminError(403, 'no access to this group');
 			if (group.kind === 'personal' && !isMember(ctx, group._id)) {
 				throw new AdminError(403, 'no access to this group');
 			}
-			if (!ctx.roles.includes('super_admin') && !isMember(ctx, body.groupId)) {
+			if (!ctx.superAdmin && !isMember(ctx, body.groupId)) {
 				throw new AdminError(403, 'no access to this group');
 			}
 

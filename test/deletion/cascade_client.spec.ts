@@ -12,16 +12,13 @@ import { BackchannelAuthenticationRequest } from 'lib/models/backchannel_authent
 import { RegistrationAccessToken } from 'lib/models/registration_access_token.js';
 import { Grant } from 'lib/models/grant.js';
 import { Client } from 'lib/models/client.js';
-import { adapter, getProjectStore, getUserStore } from 'lib/adapters/index.ts';
+import { adapter, getProjectStore } from 'lib/adapters/index.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import {
-	ADMIN_BUCKET_ID,
-	ADMIN_SESSION_COOKIE,
-	UNASSIGNED_GROUP_ID
-} from 'lib/admin/consts.ts';
+import { ADMIN_SESSION_COOKIE, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { updateClient } from 'lib/admin/clients/service.ts';
 import { sessionFor } from '../admin_session.ts';
 import { shaped } from 'test/shape.js';
+import { createAdministrator } from '../administrators.ts';
 
 // User Story 1 — deleting a client destroys everything it issued.
 //
@@ -78,11 +75,7 @@ describe('deletion cascade: client', () => {
 	}
 
 	async function superAdminCookie(): Promise<string> {
-		const user = await getUserStore(ADMIN_BUCKET_ID).create(
-			`sa-${Math.random()}@x.io`,
-			'hash',
-			['super_admin']
-		);
+		const user = await createAdministrator('super', `sa-${Math.random()}@x.io`);
 		const session = await sessionFor(user);
 		return `${ADMIN_SESSION_COOKIE}=${session._id}`;
 	}

@@ -60,7 +60,6 @@ async function seedUser(email: string, area = bucketId) {
 	return getUserStore(area).create(
 		email,
 		await Bun.password.hash(OLD_PASSWORD),
-		[],
 		true
 	);
 }
@@ -654,7 +653,6 @@ describe('password reset — not a prober, not a mailer (US4)', () => {
 		const user = await getUserStore(otherBucketId).create(
 			email,
 			await Bun.password.hash(OLD_PASSWORD),
-			[],
 			false
 		);
 		expect(user.verified).toBeFalse();

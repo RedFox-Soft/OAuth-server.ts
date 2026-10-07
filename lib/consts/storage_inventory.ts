@@ -139,6 +139,13 @@ export const STORE_AREAS = {
 	 * of that bucket's federation providers. The `_id` is what an end user's `provisionedBy` holds.
 	 */
 	provisioningConnections: 'provisioningConnections',
+	/*
+	 * A bucket's groups of end users — what its roles became. Distinct from `groups`, which hold administrators
+	 * and own projects and buckets; the two are never the same record.
+	 */
+	bucketGroups: 'bucketGroups',
+	/* One record per membership of a bucket group, so a change to a large group costs only the change. */
+	bucketGroupMembers: 'bucketGroupMembers',
 	userBuckets: 'userBuckets',
 	/* The owner of every project and user bucket, and the only thing that grants access to one. */
 	groups: 'groups',
@@ -519,6 +526,37 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 			{ key: { providerKey: 1 }, unique: true },
 			{ key: { staticTokenDigest: 1 }, unique: true, sparse: true }
 		]
+	),
+	/*
+	 * Never reaped: a group that expired on its own would silently change what every relying party lets its
+	 * members do. `displayNameKey` is unique because a relying party reading the `groups` claim cannot tell
+	 * two groups of one name apart; `externalIdKey` is unique and sparse because an external identifier
+	 * means something only inside the connection that issued it, and administrator-kept groups have none.
+	 */
+	storeArea(
+		STORE_AREAS.bucketGroups,
+		null,
+		unowned(
+			'owned by a bucket, which is not a principal; destroyed with the bucket'
+		),
+		[
+			{ key: { displayNameKey: 1 }, unique: true },
+			{ key: { externalIdKey: 1 }, unique: true, sparse: true },
+			{ key: { bucketId: 1, provisionedBy: 1 } }
+		]
+	),
+	/*
+	 * One record per (group, user), keyed `groupId:userId`, so adding a member twice is one record and a
+	 * write never rewrites the rest of the group. `groupId` serves "who is in this group"; `bucketId, userId`
+	 * serves "which groups is this user in", the `groups` claim's read.
+	 */
+	storeArea(
+		STORE_AREAS.bucketGroupMembers,
+		null,
+		unowned(
+			'a link between a bucket group and an end user, destroyed with either; an end user is not a principal of the inventory'
+		),
+		[{ key: { groupId: 1, userId: 1 } }, { key: { bucketId: 1, userId: 1 } }]
 	),
 	/*
 	 * Permanent, and read on every administrative MCP request — which is what makes a withdrawal land

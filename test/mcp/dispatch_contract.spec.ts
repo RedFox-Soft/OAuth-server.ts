@@ -15,15 +15,12 @@ import { smtpSettingsRoutes } from 'lib/admin/settings/smtp/routes.ts';
 import { jwksRoutes } from 'lib/admin/jwks/routes.ts';
 import { auditRoutes } from 'lib/admin/audit/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { getUserStore, getProjectStore } from 'lib/adapters/index.ts';
-import {
-	ADMIN_BUCKET_ID,
-	ADMIN_SESSION_COOKIE,
-	UNASSIGNED_GROUP_ID
-} from 'lib/admin/consts.ts';
+import { getProjectStore } from 'lib/adapters/index.ts';
+import { ADMIN_SESSION_COOKIE, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { sessionFor } from '../admin_session.ts';
 import { shaped } from 'test/shape.js';
 import { Type } from '@sinclair/typebox';
+import { createAdministrator, type AdminKind } from '../administrators.ts';
 
 /*
  * The dispatch contract: what a composition of the admin route plugins does and does not carry.
@@ -70,11 +67,10 @@ const withValidationArm = new Elysia({ strictPath: true, normalize: false })
 	.use(projectRoutes)
 	.use(bucketRoutes);
 
-async function sessionCookieFor(roles: string[]) {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`spike-${roles.join('-')}-${Math.random()}@x.io`,
-		'hash',
-		roles
+async function sessionCookieFor(kind: AdminKind) {
+	const user = await createAdministrator(
+		kind,
+		`spike-${kind}-${Math.random()}@x.io`
 	);
 	const s = await sessionFor(user);
 	return { cookie: `${ADMIN_SESSION_COOKIE}=${s._id}`, userId: user._id };
@@ -117,7 +113,7 @@ describe('in-process re-dispatch into the admin routes', () => {
 
 	// Q1. Does `.handle(new Request(...))` reach a route at all outside the root instance?
 	it('routes a Request to a mounted admin handler', async () => {
-		const { cookie } = await sessionCookieFor(['super_admin']);
+		const { cookie } = await sessionCookieFor('super');
 		const res = await get(composed, '/admin/api/projects', cookie);
 		expect(res.status).toBe(200);
 		expect(await res.json()).toBeArray();
@@ -131,7 +127,7 @@ describe('in-process re-dispatch into the admin routes', () => {
 		// `/admin/api/admins` is role-gated. `/admin/api/buckets` deliberately is NOT — it is
 		// scope-filtered (a non-super-admin gets the buckets they manage), which is why it answers
 		// 200 with a narrower list rather than 403.
-		const { cookie } = await sessionCookieFor(['project_admin']);
+		const { cookie } = await sessionCookieFor('plain');
 		const forbidden = await get(composed, '/admin/api/admins', cookie);
 		expect(forbidden.status).toBe(403);
 
@@ -144,7 +140,7 @@ describe('in-process re-dispatch into the admin routes', () => {
 	// group owns this arm itself, so the expectation is yes — and that is worth pinning, because it
 	// means the dispatcher does not have to reproduce it.
 	it('maps AdminError to the admin_error body with its status', async () => {
-		const { cookie } = await sessionCookieFor(['super_admin']);
+		const { cookie } = await sessionCookieFor('super');
 		const res = await get(composed, '/admin/api/projects/nope', cookie);
 		expect(res.status).toBe(404);
 		expect(await res.json()).toEqual({
@@ -154,7 +150,7 @@ describe('in-process re-dispatch into the admin routes', () => {
 	});
 
 	it('carries structured blockers through the admin_error body', async () => {
-		const { cookie } = await sessionCookieFor(['super_admin']);
+		const { cookie } = await sessionCookieFor('super');
 		expect(new AdminError(409, 'x', { blockers: [] }).adminPlane).toBe(true);
 
 		const proj = await getProjectStore().create({
@@ -206,7 +202,7 @@ describe('in-process re-dispatch into the admin routes', () => {
 	// Q4. The VALIDATION -> 422 arm. It lives only on `adminApp`, so a bare composition should NOT
 	// produce 422 — and the composition that carries the arm should.
 	it('refuses a malformed tool call as invalid rather than accepting it', async () => {
-		const { cookie } = await sessionCookieFor(['super_admin']);
+		const { cookie } = await sessionCookieFor('super');
 		const bad = { slug: 'no-name-field' };
 
 		const bare = await post(composed, '/admin/api/projects', bad, cookie);
@@ -230,7 +226,7 @@ describe('in-process re-dispatch into the admin routes', () => {
 	// Q5. strictPath / normalize:false semantics, which the root instance sets and the dispatcher
 	// must not silently relax.
 	it('honours strictPath: a trailing slash is not the same route', async () => {
-		const { cookie } = await sessionCookieFor(['super_admin']);
+		const { cookie } = await sessionCookieFor('super');
 		const exact = await get(composed, '/admin/api/projects', cookie);
 		const slashed = await get(composed, '/admin/api/projects/', cookie);
 		expect(exact.status).toBe(200);

@@ -10,6 +10,7 @@
  */
 
 export const SCIM_USER_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:User';
+export const SCIM_GROUP_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:Group';
 export const SCIM_ENTERPRISE_USER_SCHEMA =
 	'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User';
 export const SCIM_LIST_RESPONSE =
@@ -56,7 +57,13 @@ export const SCIM_ROUTES = [
 	{ method: 'GET', path: `${SCIM_BASE_PATH}/Users/:userId`, mutates: false },
 	{ method: 'PUT', path: `${SCIM_BASE_PATH}/Users/:userId`, mutates: true },
 	{ method: 'PATCH', path: `${SCIM_BASE_PATH}/Users/:userId`, mutates: true },
-	{ method: 'DELETE', path: `${SCIM_BASE_PATH}/Users/:userId`, mutates: true }
+	{ method: 'DELETE', path: `${SCIM_BASE_PATH}/Users/:userId`, mutates: true },
+	{ method: 'GET', path: `${SCIM_BASE_PATH}/Groups`, mutates: false },
+	{ method: 'POST', path: `${SCIM_BASE_PATH}/Groups`, mutates: true },
+	{ method: 'GET', path: `${SCIM_BASE_PATH}/Groups/:groupId`, mutates: false },
+	{ method: 'PUT', path: `${SCIM_BASE_PATH}/Groups/:groupId`, mutates: true },
+	{ method: 'PATCH', path: `${SCIM_BASE_PATH}/Groups/:groupId`, mutates: true },
+	{ method: 'DELETE', path: `${SCIM_BASE_PATH}/Groups/:groupId`, mutates: true }
 ] as const;
 
 /* Whether a route pattern (as Elysia reports it) is a SCIM route, bare or beneath a bucket. */
@@ -211,6 +218,58 @@ export const SCIM_USER_ATTRIBUTES: readonly ScimAttribute[] = [
 		type: 'complex',
 		multiValued: true,
 		subAttributes: contactParts
+	},
+	/*
+	 * Read-only, as RFC 7643 §4.1.2 declares it: membership is changed through the Group resource. Lists only the
+	 * requesting connection's groups — another owner's groups are not this client's business.
+	 */
+	{
+		...simple(
+			'groups',
+			'The groups of this connection the user belongs to. Changed through /Groups, never here.',
+			{ mutability: 'readOnly' }
+		),
+		type: 'complex',
+		multiValued: true,
+		subAttributes: [
+			simple('value', 'The group’s id.', { mutability: 'readOnly' }),
+			simple('$ref', 'The group’s URI.', { mutability: 'readOnly' }),
+			simple('display', 'The group’s displayName.', { mutability: 'readOnly' }),
+			simple('type', '"direct": groups do not nest.', {
+				mutability: 'readOnly'
+			})
+		]
+	}
+];
+
+/*
+ * The Group resource (RFC 7643 §4.2) as IPSIE AL SCIM §6.2.1 requires it: `displayName`, `members`, and the
+ * client's `externalId`. Groups are flat, so a member is always a User.
+ */
+export const SCIM_GROUP_ATTRIBUTES: readonly ScimAttribute[] = [
+	simple(
+		'displayName',
+		'The group’s name, unique in the bucket in any letter case. Relying parties receive it in the groups claim.',
+		{ required: true, uniqueness: 'server' }
+	),
+	simple(
+		'externalId',
+		'The identifier the directory assigned. Unique within the provisioning connection (RFC 7643 §3.1).',
+		{ caseExact: true }
+	),
+	{
+		...simple(
+			'members',
+			'The group’s members — users of this connection. At least 50 may be added or removed in one PATCH.'
+		),
+		type: 'complex',
+		multiValued: true,
+		subAttributes: [
+			simple('value', 'The member’s user id.', { caseExact: true }),
+			simple('$ref', 'The member’s URI.', { mutability: 'readOnly' }),
+			simple('type', 'Always "User": groups do not nest.'),
+			simple('display', 'Accepted and not stored.', { mutability: 'readOnly' })
+		]
 	}
 ];
 

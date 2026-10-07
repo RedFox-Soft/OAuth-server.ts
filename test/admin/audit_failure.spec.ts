@@ -7,18 +7,14 @@ import { bucketRoutes } from 'lib/admin/buckets/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
 	adminAuditStore,
-	getUserStore,
 	getProjectStore,
 	getBucketStore
 } from 'lib/adapters/index.ts';
-import {
-	ADMIN_BUCKET_ID,
-	ADMIN_SESSION_COOKIE,
-	UNASSIGNED_GROUP_ID
-} from 'lib/admin/consts.ts';
+import { ADMIN_SESSION_COOKIE, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { Type } from '@sinclair/typebox';
 import { sessionFor } from '../admin_session.ts';
 import { shaped } from 'test/shape.js';
+import { createAdministrator } from '../administrators.ts';
 
 /*
  * What an operator sees when the trail itself refuses a write, and what the deployment does about it.
@@ -40,11 +36,7 @@ let seq = 0;
 const unique = (prefix: string) => `${prefix}-${Date.now()}-${(seq += 1)}`;
 
 async function superCookie() {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`${unique('super')}@x.io`,
-		'hash',
-		['super_admin']
-	);
+	const user = await createAdministrator('super', `${unique('super')}@x.io`);
 	const session = await sessionFor(user);
 	return `${ADMIN_SESSION_COOKIE}=${session._id}`;
 }

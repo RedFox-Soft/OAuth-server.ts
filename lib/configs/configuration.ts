@@ -26,6 +26,7 @@ import {
 // malformed value — and reused rather than restated for the reason the two imports above give: a
 // second copy of the rule drifts from the one that actually decides.
 import { dsnFromString } from '@sentry/core';
+import { withGroupsScope } from '../consts/groups_claim.js';
 
 /*
  * The server settings that cannot be read straight off ApplicationConfig: collections turned into
@@ -671,7 +672,12 @@ export function validateConfiguration(
 		config.clientAuthMethods
 	);
 	checkClaims(config.claims);
-	const claims = structuredClone(merge({}, config.claims));
+	/*
+	 * `groups` is built in beside `amr` below, and for the same reason: a stored setting replaces the default
+	 * whole, so a default entry would never reach an instance whose operator once saved it. Mirrored in
+	 * discoverySupport.ts.
+	 */
+	const claims = structuredClone(merge({}, withGroupsScope(config.claims)));
 
 	// Order is significant: each claims pass below builds on the one before it.
 	collectScopes(scopes, claims);

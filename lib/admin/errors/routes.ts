@@ -4,7 +4,7 @@ import { errorStore } from '../../adapters/index.js';
 import type { ErrorStoreQuery } from '../../adapters/types.js';
 import {
 	assertAuth,
-	assertRole,
+	assertSuperAdmin,
 	AdminError,
 	adminErrorBody,
 	resolveAdmin,
@@ -135,7 +135,7 @@ export const errorRoutes = new Elysia({ name: 'admin-errors' })
 		'/admin/api/errors',
 		async ({ admin, query, request }) => {
 			const ctx = assertAuth(admin as AdminContext | null);
-			assertRole(ctx, 'super_admin');
+			assertSuperAdmin(ctx);
 			assertNoUnknownParams(request.url, ALLOWED_ERROR_PARAMS);
 
 			const page = await errorStore.list(toStoreQuery(query));
@@ -162,7 +162,7 @@ export const errorRoutes = new Elysia({ name: 'admin-errors' })
 		'/admin/api/errors/summary',
 		async ({ admin, query, request }) => {
 			const ctx = assertAuth(admin as AdminContext | null);
-			assertRole(ctx, 'super_admin');
+			assertSuperAdmin(ctx);
 			assertNoUnknownParams(request.url, ALLOWED_ERROR_SUMMARY_PARAMS);
 
 			const summary = await errorStore.summarize(toStoreQuery(query));
@@ -183,7 +183,7 @@ export const errorRoutes = new Elysia({ name: 'admin-errors' })
 		'/admin/api/errors/purge-preview',
 		async ({ admin, query, request }) => {
 			const ctx = assertAuth(admin as AdminContext | null);
-			assertRole(ctx, 'super_admin');
+			assertSuperAdmin(ctx);
 			assertNoUnknownParams(request.url, ALLOWED_ERROR_PARAMS);
 
 			return errorStore.previewPurge(toStoreQuery(query));
@@ -198,7 +198,7 @@ export const errorRoutes = new Elysia({ name: 'admin-errors' })
 		'/admin/api/errors',
 		async ({ admin, query, request }) => {
 			const ctx = assertAuth(admin as AdminContext | null);
-			assertRole(ctx, 'super_admin');
+			assertSuperAdmin(ctx);
 			assertNoUnknownParams(request.url, ALLOWED_ERROR_PARAMS);
 
 			return purgeErrors(ctx, toStoreQuery(query));
@@ -217,7 +217,7 @@ export const errorRoutes = new Elysia({ name: 'admin-errors' })
 		'/admin/api/errors/reference/:reference',
 		async ({ admin, params, set }) => {
 			const ctx = assertAuth(admin as AdminContext | null);
-			assertRole(ctx, 'super_admin');
+			assertSuperAdmin(ctx);
 
 			const notFound = () => {
 				set.status = 404;
@@ -237,7 +237,7 @@ export const errorRoutes = new Elysia({ name: 'admin-errors' })
 	 */
 	.get('/admin/api/errors/:id', async ({ admin, params, set }) => {
 		const ctx = assertAuth(admin as AdminContext | null);
-		assertRole(ctx, 'super_admin');
+		assertSuperAdmin(ctx);
 
 		const group = await errorStore.get(params.id);
 		if (!group) {

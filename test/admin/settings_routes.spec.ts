@@ -3,16 +3,13 @@ import { Elysia } from 'elysia';
 import { treaty } from '@elysiajs/eden';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { settingsRoutes } from 'lib/admin/settings/routes.ts';
-import {
-	adminAuditStore,
-	getUserStore,
-	configStore
-} from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import { adminAuditStore, configStore } from 'lib/adapters/index.ts';
+import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import bootstrap from '../test_helper.ts';
 import { sessionFor as adminSessionFor } from '../admin_session.ts';
 import { answered } from './answered.ts';
 import { present } from 'test/shape.js';
+import { createAdministrator, type AdminKind } from '../administrators.ts';
 
 // What the settings store holds; every read below follows a save, so an empty store is a failure.
 async function storedSettings(): Promise<Record<string, unknown>> {
@@ -24,18 +21,14 @@ async function storedSettings(): Promise<Record<string, unknown>> {
 const app = new Elysia().use(resolveAdmin).use(settingsRoutes);
 const client = treaty(app);
 
-async function sessionFor(roles: string[]) {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`${roles.join('-')}-${Math.random()}@x.io`,
-		'hash',
-		roles
-	);
+async function sessionFor(kind: AdminKind) {
+	const user = await createAdministrator(kind, `${kind}-${Math.random()}@x.io`);
 	const s = await adminSessionFor(user);
 	return { cookie: `${ADMIN_SESSION_COOKIE}=${s._id}`, userId: user._id };
 }
 
-async function sessionCookieFor(roles: string[]) {
-	return (await sessionFor(roles)).cookie;
+async function sessionCookieFor(kind: AdminKind) {
+	return (await sessionFor(kind)).cookie;
 }
 
 const SETTINGS_TARGET = 'ApplicationConfig';
@@ -68,14 +61,14 @@ describe('settings API', () => {
 		expect(res.status).toBe(401);
 	});
 
-	it('forbids a project_admin', async () => {
-		const cookie = await sessionCookieFor(['project_admin']);
+	it('forbids a project administrator', async () => {
+		const cookie = await sessionCookieFor('plain');
 		const res = await client.admin.api.settings.get({ headers: { cookie } });
 		expect(res.status).toBe(403);
 	});
 
 	it('GET returns the catalog with no restart required when nothing is persisted', async () => {
-		const cookie = await sessionCookieFor(['super_admin']);
+		const cookie = await sessionCookieFor('super');
 		const res = await client.admin.api.settings.get({ headers: { cookie } });
 		expect(res.status).toBe(200);
 		const body = answered(res.data);
@@ -95,7 +88,7 @@ describe('settings API', () => {
 	 * reachable through this endpoint.
 	 */
 	it('GET serves the panes the console navigates by, and files every setting onto one', async () => {
-		const cookie = await sessionCookieFor(['super_admin']);
+		const cookie = await sessionCookieFor('super');
 		const res = await client.admin.api.settings.get({ headers: { cookie } });
 		const body = answered(res.data);
 
@@ -114,7 +107,7 @@ describe('settings API', () => {
 	});
 
 	it('persists a change and reports it as in force, with nothing waiting', async () => {
-		const cookie = await sessionCookieFor(['super_admin']);
+		const cookie = await sessionCookieFor('super');
 		const before = answered(
 			(await client.admin.api.settings.get({ headers: { cookie } })).data
 		);
@@ -137,7 +130,7 @@ describe('settings API', () => {
 	});
 
 	it('preserves unedited stored overrides across a second PUT', async () => {
-		const cookie = await sessionCookieFor(['super_admin']);
+		const cookie = await sessionCookieFor('super');
 		await client.admin.api.settings.put(
 			{ 'par.enabled': true },
 			{ headers: { cookie } }
@@ -152,7 +145,7 @@ describe('settings API', () => {
 	});
 
 	it('persists authorization.allowOmittingSingleRegisteredRedirectUri (boolean) and round-trips', async () => {
-		const cookie = await sessionCookieFor(['super_admin']);
+		const cookie = await sessionCookieFor('super');
 		const put = await client.admin.api.settings.put(
 			{ 'authorization.allowOmittingSingleRegisteredRedirectUri': true },
 			{ headers: { cookie } }
@@ -172,7 +165,7 @@ describe('settings API', () => {
 	});
 
 	it('rejects a non-boolean authorization.allowOmittingSingleRegisteredRedirectUri with 422', async () => {
-		const cookie = await sessionCookieFor(['super_admin']);
+		const cookie = await sessionCookieFor('super');
 		const res = await client.admin.api.settings.put(
 			{ 'authorization.allowOmittingSingleRegisteredRedirectUri': 'yes' },
 			{ headers: { cookie } }
@@ -196,7 +189,7 @@ describe('settings API', () => {
 		};
 
 		it('persists a descriptor map and round-trips it unchanged', async () => {
-			const cookie = await sessionCookieFor(['super_admin']);
+			const cookie = await sessionCookieFor('super');
 			const put = await client.admin.api.settings.put(
 				{
 					'richAuthorizationRequests.enabled': true,
@@ -213,7 +206,7 @@ describe('settings API', () => {
 		});
 
 		it('refuses enabling the feature with no types, leaving storage untouched', async () => {
-			const cookie = await sessionCookieFor(['super_admin']);
+			const cookie = await sessionCookieFor('super');
 			const before = await configStore.get();
 
 			const res = await client.admin.api.settings.put(
@@ -229,7 +222,7 @@ describe('settings API', () => {
 		});
 
 		it('refuses a malformed descriptor, leaving storage untouched', async () => {
-			const cookie = await sessionCookieFor(['super_admin']);
+			const cookie = await sessionCookieFor('super');
 			const before = await configStore.get();
 
 			for (const bad of [
@@ -251,7 +244,7 @@ describe('settings API', () => {
 		});
 
 		it('refuses a value that is not a JSON object at all', async () => {
-			const cookie = await sessionCookieFor(['super_admin']);
+			const cookie = await sessionCookieFor('super');
 			for (const bad of [[], 'nope', 5]) {
 				const res = await client.admin.api.settings.put(
 					{ 'richAuthorizationRequests.types': bad },
@@ -266,7 +259,7 @@ describe('settings API', () => {
 		 * an unrunnable companion is refused whole, so the valid half is not half-applied.
 		 */
 		it('refuses the whole batch when one setting makes it unrunnable', async () => {
-			const cookie = await sessionCookieFor(['super_admin']);
+			const cookie = await sessionCookieFor('super');
 			const before = await configStore.get();
 
 			const res = await client.admin.api.settings.put(
@@ -284,7 +277,7 @@ describe('settings API', () => {
 	});
 
 	it('rejects an unknown key with 422', async () => {
-		const cookie = await sessionCookieFor(['super_admin']);
+		const cookie = await sessionCookieFor('super');
 		const res = await client.admin.api.settings.put(
 			{ 'not.a.real.setting': true },
 			{ headers: { cookie } }
@@ -293,7 +286,7 @@ describe('settings API', () => {
 	});
 
 	it('rejects a wrong-typed value with 422', async () => {
-		const cookie = await sessionCookieFor(['super_admin']);
+		const cookie = await sessionCookieFor('super');
 		const res = await client.admin.api.settings.put(
 			{ 'par.enabled': 'yes' },
 			{ headers: { cookie } }
@@ -302,7 +295,7 @@ describe('settings API', () => {
 	});
 
 	it('rejects a string-array element outside the option set with 422', async () => {
-		const cookie = await sessionCookieFor(['super_admin']);
+		const cookie = await sessionCookieFor('super');
 		const res = await client.admin.api.settings.put(
 			{ 'ciba.deliveryModes': ['poll', 'carrier-pigeon'] },
 			{ headers: { cookie } }
@@ -311,7 +304,7 @@ describe('settings API', () => {
 	});
 
 	it('rejects scopes without openid with 422', async () => {
-		const cookie = await sessionCookieFor(['super_admin']);
+		const cookie = await sessionCookieFor('super');
 		const res = await client.admin.api.settings.put(
 			{ scopes: ['offline_access'] },
 			{ headers: { cookie } }
@@ -324,8 +317,8 @@ describe('settings API', () => {
 		expect(res.status).toBe(401);
 	});
 
-	it('forbids PUT from a project_admin with 403', async () => {
-		const cookie = await sessionCookieFor(['project_admin']);
+	it('forbids PUT from a project administrator with 403', async () => {
+		const cookie = await sessionCookieFor('plain');
 		const res = await client.admin.api.settings.put(
 			{ 'par.enabled': true },
 			{ headers: { cookie } }
@@ -334,7 +327,7 @@ describe('settings API', () => {
 	});
 
 	it('rejects an invalid deviceFlow.charset enum value with 422', async () => {
-		const cookie = await sessionCookieFor(['super_admin']);
+		const cookie = await sessionCookieFor('super');
 		const res = await client.admin.api.settings.put(
 			{ 'deviceFlow.charset': 'nope' },
 			{ headers: { cookie } }
@@ -343,7 +336,7 @@ describe('settings API', () => {
 	});
 
 	it('rejects an empty ciba.deliveryModes (merged-config invariant) with 422', async () => {
-		const cookie = await sessionCookieFor(['super_admin']);
+		const cookie = await sessionCookieFor('super');
 		const res = await client.admin.api.settings.put(
 			{ 'ciba.deliveryModes': [] },
 			{ headers: { cookie } }
@@ -352,7 +345,7 @@ describe('settings API', () => {
 	});
 
 	it('rejects an invalid deviceFlow.mask while deviceFlow is enabled with 422', async () => {
-		const cookie = await sessionCookieFor(['super_admin']);
+		const cookie = await sessionCookieFor('super');
 		const res = await client.admin.api.settings.put(
 			{ 'deviceFlow.enabled': true, 'deviceFlow.mask': '0000-0000' },
 			{ headers: { cookie } }
@@ -367,7 +360,7 @@ describe('settings API', () => {
 	 * because this is the route a super-admin actually uses.
 	 */
 	it('rejects a deviceFlow.mask with no asterisk with 422', async () => {
-		const cookie = await sessionCookieFor(['super_admin']);
+		const cookie = await sessionCookieFor('super');
 		for (const mask of ['---', '', '-  -']) {
 			const res = await client.admin.api.settings.put(
 				{ 'deviceFlow.enabled': true, 'deviceFlow.mask': mask },
@@ -378,7 +371,7 @@ describe('settings API', () => {
 	});
 
 	it('accepts a valid deviceFlow.mask while deviceFlow is enabled', async () => {
-		const cookie = await sessionCookieFor(['super_admin']);
+		const cookie = await sessionCookieFor('super');
 		const res = await client.admin.api.settings.put(
 			{ 'deviceFlow.enabled': true, 'deviceFlow.mask': '****-****' },
 			{ headers: { cookie } }
@@ -387,7 +380,7 @@ describe('settings API', () => {
 	});
 
 	it('rejects jwtIntrospection enabled without introspection enabled with 422', async () => {
-		const cookie = await sessionCookieFor(['super_admin']);
+		const cookie = await sessionCookieFor('super');
 		const res = await client.admin.api.settings.put(
 			{ 'jwtIntrospection.enabled': true },
 			{ headers: { cookie } }
@@ -396,7 +389,7 @@ describe('settings API', () => {
 	});
 
 	it('accepts jwtIntrospection enabled together with introspection enabled', async () => {
-		const cookie = await sessionCookieFor(['super_admin']);
+		const cookie = await sessionCookieFor('super');
 		const res = await client.admin.api.settings.put(
 			{ 'introspection.enabled': true, 'jwtIntrospection.enabled': true },
 			{ headers: { cookie } }
@@ -408,7 +401,7 @@ describe('settings API', () => {
 	// ApplicationConfig — it is relocated there but deliberately given no descriptor, so the
 	// catalog gate is the only thing keeping it out of the admin surface.
 	it('never exposes the relocated-but-unlisted discovery key', async () => {
-		const cookie = await sessionCookieFor(['super_admin']);
+		const cookie = await sessionCookieFor('super');
 		const res = await client.admin.api.settings.get({ headers: { cookie } });
 		expect(res.status).toBe(200);
 		const body = answered(res.data);
@@ -420,7 +413,7 @@ describe('settings API', () => {
 	});
 
 	it('rejects a PUT of the relocated-but-unlisted discovery key with 422', async () => {
-		const cookie = await sessionCookieFor(['super_admin']);
+		const cookie = await sessionCookieFor('super');
 		const res = await client.admin.api.settings.put(
 			{
 				discovery: { op_tos_uri: 'https://evil.example.com' }
@@ -435,7 +428,7 @@ describe('settings API', () => {
 	});
 
 	it('persists nothing when a batch mixes a valid setting with discovery', async () => {
-		const cookie = await sessionCookieFor(['super_admin']);
+		const cookie = await sessionCookieFor('super');
 		const res = await client.admin.api.settings.put(
 			{
 				'revocation.enabled': true,
@@ -455,7 +448,7 @@ describe('settings API', () => {
 	});
 
 	it('persists conformIdTokenClaims (boolean) and round-trips', async () => {
-		const cookie = await sessionCookieFor(['super_admin']);
+		const cookie = await sessionCookieFor('super');
 		const put = await client.admin.api.settings.put(
 			{ conformIdTokenClaims: false },
 			{ headers: { cookie } }
@@ -469,7 +462,7 @@ describe('settings API', () => {
 	});
 
 	it('rejects a non-boolean conformIdTokenClaims with 422', async () => {
-		const cookie = await sessionCookieFor(['super_admin']);
+		const cookie = await sessionCookieFor('super');
 		const res = await client.admin.api.settings.put(
 			{ conformIdTokenClaims: 'nope' },
 			{ headers: { cookie } }
@@ -478,7 +471,7 @@ describe('settings API', () => {
 	});
 
 	it('audits a successful PUT with the acting admin and the changed keys', async () => {
-		const { cookie, userId } = await sessionFor(['super_admin']);
+		const { cookie, userId } = await sessionFor('super');
 		const before = (await settingsAudit()).total;
 		const res = await client.admin.api.settings.put(
 			{ 'revocation.enabled': true, 'par.enabled': true },
@@ -500,7 +493,7 @@ describe('settings API', () => {
 	});
 
 	it('writes no audit entry when a PUT is rejected', async () => {
-		const cookie = await sessionCookieFor(['super_admin']);
+		const cookie = await sessionCookieFor('super');
 		const before = (await settingsAudit()).total;
 		const res = await client.admin.api.settings.put(
 			{ 'par.enabled': 'nope' },
@@ -516,7 +509,7 @@ describe('settings API', () => {
 	 * changed" cannot say what an operator actually did.
 	 */
 	it('audits only the edited key when the whole catalogue is submitted', async () => {
-		const cookie = await sessionCookieFor(['super_admin']);
+		const cookie = await sessionCookieFor('super');
 		const before = (await settingsAudit()).total;
 		const state = answered(
 			(await client.admin.api.settings.get({ headers: { cookie } })).data
@@ -542,7 +535,7 @@ describe('settings API', () => {
 	});
 
 	it('records nothing and persists nothing when no value actually changes', async () => {
-		const cookie = await sessionCookieFor(['super_admin']);
+		const cookie = await sessionCookieFor('super');
 		const state = answered(
 			(await client.admin.api.settings.get({ headers: { cookie } })).data
 		);
@@ -559,7 +552,7 @@ describe('settings API', () => {
 	});
 
 	it('treats re-saving what a successful save returned as no change at all', async () => {
-		const cookie = await sessionCookieFor(['super_admin']);
+		const cookie = await sessionCookieFor('super');
 		const applied = answered(
 			(
 				await client.admin.api.settings.put(
@@ -580,7 +573,7 @@ describe('settings API', () => {
 	});
 
 	it('still refuses an unknown key inside an otherwise unchanged body', async () => {
-		const cookie = await sessionCookieFor(['super_admin']);
+		const cookie = await sessionCookieFor('super');
 		const state = answered(
 			(await client.admin.api.settings.get({ headers: { cookie } })).data
 		);
@@ -605,7 +598,7 @@ describe('settings API', () => {
 	 */
 	describe('DPoP nonce enforcement', () => {
 		it('accepts arming nonce enforcement, because the server holds its own secret', async () => {
-			const cookie = await sessionCookieFor(['super_admin']);
+			const cookie = await sessionCookieFor('super');
 
 			const res = await client.admin.api.settings.put(
 				{ 'dpop.enabled': true, 'dpop.requireNonce': true },
@@ -618,7 +611,7 @@ describe('settings API', () => {
 		});
 
 		it('refuses to accept the nonce secret as a setting', async () => {
-			const cookie = await sessionCookieFor(['super_admin']);
+			const cookie = await sessionCookieFor('super');
 
 			// Server-owned state, not an operator override. The catalog is the allow-list, and the
 			// secret is deliberately absent from it, so this is rejected as an unknown key rather than
@@ -632,7 +625,7 @@ describe('settings API', () => {
 		});
 
 		it('never discloses the nonce secret through the settings surface', async () => {
-			const cookie = await sessionCookieFor(['super_admin']);
+			const cookie = await sessionCookieFor('super');
 
 			const res = await client.admin.api.settings.get({ headers: { cookie } });
 
@@ -646,7 +639,7 @@ describe('settings API', () => {
 		});
 
 		it('refuses a batch whose merged result would not run, without partially applying it', async () => {
-			const cookie = await sessionCookieFor(['super_admin']);
+			const cookie = await sessionCookieFor('super');
 			const before = await configStore.get();
 
 			// jwtIntrospection without introspection is one of the invariants the boot validator

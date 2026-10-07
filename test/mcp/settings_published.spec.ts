@@ -5,8 +5,6 @@ import { elysia } from 'lib/index.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { getUserStore } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID } from 'lib/admin/consts.ts';
 import {
 	ADMIN_MCP_CLIENT_ID,
 	MCP_RESOURCE,
@@ -14,6 +12,7 @@ import {
 } from 'lib/mcp/consts.ts';
 import { shaped } from 'test/shape.js';
 import { Type, type Static } from '@sinclair/typebox';
+import { createAdministrator } from '../administrators.ts';
 
 /*
  * The schema an agent reads is the one `tools/list` returns, and that is two layers below where the
@@ -54,11 +53,7 @@ async function rpc(body: unknown, token: string) {
 }
 
 async function session() {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`pub-${Math.random()}@x.io`,
-		'hash',
-		['super_admin']
-	);
+	const user = await createAdministrator('super', `pub-${Math.random()}@x.io`);
 	const at = new AccessToken({
 		client: await Client.find(ADMIN_MCP_CLIENT_ID),
 		accountId: user._id,

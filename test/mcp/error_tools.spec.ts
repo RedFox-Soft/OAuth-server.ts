@@ -5,8 +5,7 @@ import { elysia } from 'lib/index.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { errorStore, getUserStore } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID } from 'lib/admin/consts.ts';
+import { errorStore } from 'lib/adapters/index.ts';
 import {
 	ADMIN_MCP_CLIENT_ID,
 	MCP_RESOURCE,
@@ -15,12 +14,13 @@ import {
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { shaped } from 'test/shape.js';
 import { Type } from '@sinclair/typebox';
+import { createAdministrator, type AdminKind } from '../administrators.ts';
 
 /*
  * US5 — the agent's view of recorded faults.
  *
  * The reads exist to be identical to the console's, which they are by construction: every tool
- * re-dispatches through the same admin route, forwarding the agent's own token, so `assertRole` in the
+ * re-dispatches through the same admin route, forwarding the agent's own token, so `assertSuperAdmin` in the
  * handler *is* the agent's authorization check. What is worth testing is therefore not that the reads
  * work but that the purge is withheld by default and says why — and that a preview stays available
  * either way, because reading the consequence of a deletion is not destructive.
@@ -64,12 +64,8 @@ function call(name: string, args: Record<string, unknown> = {}) {
 	};
 }
 
-async function agentFor(roles: string[]) {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`et-${Math.random()}@x.io`,
-		'hash',
-		roles
-	);
+async function agentFor(kind: AdminKind) {
+	const user = await createAdministrator(kind, `et-${Math.random()}@x.io`);
 	const at = new AccessToken({
 		client: await Client.find(ADMIN_MCP_CLIENT_ID),
 		accountId: user._id,
@@ -160,7 +156,7 @@ describe('error store tools over MCP', () => {
 	});
 
 	it('publishes the five reads and never the purge', async () => {
-		const { token } = await agentFor(['super_admin']);
+		const { token } = await agentFor('super');
 		const listed = await rpc(
 			{ jsonrpc: '2.0', id: ++rpcId, method: 'tools/list', params: {} },
 			token
@@ -183,7 +179,7 @@ describe('error store tools over MCP', () => {
 	});
 
 	it('lets an agent read what is failing', async () => {
-		const { token } = await agentFor(['super_admin']);
+		const { token } = await agentFor('super');
 		const route = unique('/agent-read');
 		await seedFault(route);
 
@@ -195,12 +191,12 @@ describe('error store tools over MCP', () => {
 	});
 
 	it('refuses every error tool for a principal without the privilege', async () => {
-		const { token } = await agentFor(['project_admin']);
+		const { token } = await agentFor('plain');
 
 		for (const tool of ['error_list', 'error_summary', 'error_purge_preview']) {
 			const result = await rpc(call(tool), token);
-			// Refused exactly as the console refuses the same principal — same handler, same assertRole.
-			expect(JSON.stringify(result)).toContain('super_admin');
+			// Refused exactly as the console refuses the same principal — same handler, same privilege check.
+			expect(JSON.stringify(result)).toContain('super administrator');
 		}
 	});
 
@@ -218,7 +214,7 @@ describe('error store tools over MCP', () => {
 		 * not-found as a typo. Absence from `tools/list` is unchanged and asserted separately.
 		 */
 		it('is not callable at all while withheld', async () => {
-			const { token } = await agentFor(['super_admin']);
+			const { token } = await agentFor('super');
 			const result = await rpc(call('error_purge', { route: '/x' }), token);
 
 			expect(result.result?.isError).toBe(true);
@@ -232,7 +228,7 @@ describe('error store tools over MCP', () => {
 
 		// Reading the consequence of a deletion is not destructive, so it stays available either way.
 		it('still previews what a purge would remove', async () => {
-			const { token } = await agentFor(['super_admin']);
+			const { token } = await agentFor('super');
 			const route = unique('/agent-preview');
 			await seedFault(route);
 
@@ -243,7 +239,7 @@ describe('error store tools over MCP', () => {
 		});
 
 		it('destroys nothing while withheld, however it is asked', async () => {
-			const { token } = await agentFor(['super_admin']);
+			const { token } = await agentFor('super');
 			const route = unique('/agent-insist');
 			await seedFault(route);
 
@@ -257,7 +253,7 @@ describe('error store tools over MCP', () => {
 		});
 
 		it('announces the withheld purge in the server instructions', async () => {
-			const { init } = await agentFor(['super_admin']);
+			const { init } = await agentFor('super');
 			const instructions: string = init.result?.instructions ?? '';
 
 			// So an agent can say where to do it instead, without a tool to discover the absence from.
@@ -271,7 +267,7 @@ describe('error store tools over MCP', () => {
 	 * surface too, since the agent reads the same records by a different path.
 	 */
 	it('exposes no credential value through a fault', async () => {
-		const { token } = await agentFor(['super_admin']);
+		const { token } = await agentFor('super');
 		const route = unique('/agent-secrets');
 		await seedFault(route);
 

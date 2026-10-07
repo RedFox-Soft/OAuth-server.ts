@@ -12,13 +12,10 @@ import {
 	getUserStore
 } from 'lib/adapters/index.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import {
-	ADMIN_BUCKET_ID,
-	ADMIN_SESSION_COOKIE,
-	UNASSIGNED_GROUP_ID
-} from 'lib/admin/consts.ts';
+import { ADMIN_SESSION_COOKIE, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { sessionFor } from '../admin_session.ts';
 import { shaped } from 'test/shape.js';
+import { createAdministrator } from '../administrators.ts';
 
 // User Story 4 — an operator can see the consequences, before and after.
 //
@@ -67,10 +64,9 @@ describe('deletion reporting', () => {
 	});
 
 	async function superAdminCookie(): Promise<string> {
-		const admin = await getUserStore(ADMIN_BUCKET_ID).create(
-			`sa-${Math.random()}@x.io`,
-			'hash',
-			['super_admin']
+		const admin = await createAdministrator(
+			'super',
+			`sa-${Math.random()}@x.io`
 		);
 		const session = await sessionFor(admin);
 		return `${ADMIN_SESSION_COOKIE}=${session._id}`;
@@ -123,7 +119,6 @@ describe('deletion reporting', () => {
 		const cookie = await superAdminCookie();
 		const bucket = await getBucketStore().create({
 			name: `b-${Math.random()}`,
-			roles: [],
 			ownerGroupId: UNASSIGNED_GROUP_ID
 		});
 		const store = getUserStore(bucket._id);
@@ -190,7 +185,6 @@ describe('deletion reporting', () => {
 		const cookie = await superAdminCookie();
 		const bucket = await getBucketStore().create({
 			name: `b-${Math.random()}`,
-			roles: [],
 			ownerGroupId: UNASSIGNED_GROUP_ID
 		});
 		const user = await getUserStore(bucket._id).create(

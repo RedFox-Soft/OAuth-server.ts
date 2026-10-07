@@ -18,10 +18,9 @@ import {
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
 	adminAuditStore,
-	getUserStore,
 	mcpClientPermissionStore
 } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { clearDocumentCache } from 'lib/client_metadata_document/cache.ts';
 import { resolver } from 'lib/client_metadata_document/fetch.ts';
 import { serveDocument, mock } from '../cimd/document_host.js';
@@ -29,6 +28,7 @@ import { sessionFor } from '../admin_session.ts';
 import { clearPermissions } from './permissions.ts';
 import { shaped } from 'test/shape.js';
 import { Type } from '@sinclair/typebox';
+import { createAdministrator } from '../administrators.ts';
 
 /*
  * Granting a client identity administrative authority, and the one thing an operator has to be told
@@ -49,10 +49,9 @@ const api = treaty(app);
 const publicAddress = '93.184.216.34';
 
 async function superAdmin() {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`super-${Math.random()}@x.io`,
-		'hash',
-		['super_admin']
+	const user = await createAdministrator(
+		'super',
+		`super-${Math.random()}@x.io`
 	);
 	const session = await sessionFor(user);
 	return {
@@ -62,11 +61,7 @@ async function superAdmin() {
 }
 
 async function projectAdmin() {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`proj-${Math.random()}@x.io`,
-		'hash',
-		['project_admin']
-	);
+	const user = await createAdministrator('plain', `proj-${Math.random()}@x.io`);
 	const session = await sessionFor(user);
 	return { cookie: `${ADMIN_SESSION_COOKIE}=${session._id}` };
 }

@@ -5,12 +5,7 @@ import { elysia } from 'lib/index.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import {
-	getUserStore,
-	adminAuditStore,
-	mcpConfirmationStore
-} from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID } from 'lib/admin/consts.ts';
+import { adminAuditStore, mcpConfirmationStore } from 'lib/adapters/index.ts';
 import {
 	ADMIN_MCP_CLIENT_ID,
 	MCP_RESOURCE,
@@ -18,6 +13,7 @@ import {
 } from 'lib/mcp/consts.ts';
 import { mcpCatalogue, pathArgName } from 'lib/mcp/catalogue.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
+import { createAdministrator } from '../administrators.ts';
 
 /*
  * SC-005: zero high-consequence operations take effect without a matching prior confirmation.
@@ -71,11 +67,7 @@ function call(name: string, args: Record<string, unknown>) {
 }
 
 async function session() {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`mx-${Math.random()}@x.io`,
-		'hash',
-		['super_admin']
-	);
+	const user = await createAdministrator('super', `mx-${Math.random()}@x.io`);
 	const at = new AccessToken({
 		client: await Client.find(ADMIN_MCP_CLIENT_ID),
 		accountId: user._id,
@@ -110,6 +102,7 @@ const BODIES: Record<string, Record<string, unknown>> = {
 	},
 	jwks_generate: { alg: 'RS256' },
 	bucket_user_assign_connection: { connectionId: 'any', userName: 'someone' },
+	bucket_group_assign_connection: { connectionId: 'any' },
 	provisioning_credential_issue: { kind: 'static_token' },
 
 	settings_update: { 'dpop.requireNonce': true },
@@ -151,7 +144,7 @@ describe('every high-consequence tool is gated', () => {
 		 * membership is named in catalogue_drift rather than counted here.
 		 */
 		expect(HIGH.length).toBeGreaterThan(0);
-		expect(HIGH.length).toBe(21);
+		expect(HIGH.length).toBe(25);
 	});
 
 	it.each(HIGH.map((t) => [t.tool, t] as const))(

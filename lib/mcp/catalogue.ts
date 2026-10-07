@@ -41,6 +41,13 @@ import { GenerateKeyBody, RetireKeyBody } from '../admin/jwks/schema.js';
 import { GenerateBucketKeyBody } from '../admin/bucket_keys/schema.js';
 import { AuditQuery } from '../admin/audit/schema.js';
 import {
+	AddBucketGroupMembersBody,
+	AssignBucketGroupConnectionBody,
+	BucketGroupMemberPageQuery,
+	CreateBucketGroupBody,
+	RenameBucketGroupBody
+} from '../admin/bucket-groups/schema.js';
+import {
 	CreateGroupBody,
 	UpdateGroupBody,
 	AddMemberBody,
@@ -97,14 +104,14 @@ export interface McpTool {
 	readonly consequence: Consequence;
 	/*
 	 * Documentation and tool annotation only — NEVER the enforcement point. Enforcement stays in the
-	 * handler's own `assertRole`, which the tool reaches by re-dispatch. Present so a description can
+	 * handler's own `assertSuperAdmin`, which the tool reaches by re-dispatch. Present so a description can
 	 * tell an agent what it needs, and so a drift test can compare it against the handler.
 	 *
-	 * `null` covers two different things on purpose: a route open to any authenticated administrator,
-	 * and a route that is scope-filtered rather than role-gated (`bucket_list` returns the buckets the
-	 * caller manages; `project_list` likewise). Neither refuses by role, so neither names one.
+	 * `false` covers two different things on purpose: a route open to any authenticated administrator,
+	 * and a route that is scope-filtered rather than privilege-gated (`bucket_list` returns the buckets the
+	 * caller manages; `project_list` likewise). Neither refuses a non-super administrator outright.
 	 */
-	readonly requiredRole: 'super_admin' | null;
+	readonly superAdminOnly: boolean;
 	readonly bodySchema: TSchema | null;
 	readonly querySchema: TSchema | null;
 	readonly pathParams: readonly string[];
@@ -135,12 +142,12 @@ const catalogue = [
 		path: '/admin/api/me',
 		action: null,
 		consequence: 'read',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: [],
 		summary:
-			'The administrator this agent is acting as: their id, email, roles, and the projects they manage.'
+			'The administrator this agent is acting as: their id, email, whether they are a super administrator, and the groups they belong to.'
 	},
 	{
 		tool: 'project_list',
@@ -148,7 +155,7 @@ const catalogue = [
 		path: '/admin/api/projects',
 		action: null,
 		consequence: 'read',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: [],
@@ -161,7 +168,7 @@ const catalogue = [
 		path: '/admin/api/projects/:id',
 		action: null,
 		consequence: 'read',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: ['id'],
@@ -174,7 +181,7 @@ const catalogue = [
 		path: '/admin/api/projects/:id/resources',
 		action: null,
 		consequence: 'read',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: ['id'],
@@ -187,7 +194,7 @@ const catalogue = [
 		path: '/admin/api/projects/:id/resources/:resourceId',
 		action: null,
 		consequence: 'read',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: ['id', 'resourceId'],
@@ -200,7 +207,7 @@ const catalogue = [
 		path: '/admin/api/projects/:id/resources/:resourceId/vouching',
 		action: null,
 		consequence: 'read',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: ['id', 'resourceId'],
@@ -213,7 +220,7 @@ const catalogue = [
 		path: '/admin/api/projects/:id/clients',
 		action: null,
 		consequence: 'read',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: ['id'],
@@ -226,7 +233,7 @@ const catalogue = [
 		path: '/admin/api/projects/:id/clients/:clientId',
 		action: null,
 		consequence: 'read',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: ['id', 'clientId'],
@@ -239,11 +246,12 @@ const catalogue = [
 		path: '/admin/api/admins',
 		action: null,
 		consequence: 'read',
-		requiredRole: 'super_admin',
+		superAdminOnly: true,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: [],
-		summary: 'The administrator accounts of this instance, with their roles.'
+		summary:
+			'The administrator accounts of this instance, each marked when it is a super administrator.'
 	},
 	{
 		tool: 'admin_settings_read',
@@ -251,7 +259,7 @@ const catalogue = [
 		path: '/admin/api/admins/settings',
 		action: null,
 		consequence: 'read',
-		requiredRole: 'super_admin',
+		superAdminOnly: true,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: [],
@@ -264,7 +272,7 @@ const catalogue = [
 		path: '/admin/api/groups',
 		action: null,
 		consequence: 'read',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: [],
@@ -277,7 +285,7 @@ const catalogue = [
 		path: '/admin/api/groups/:id',
 		action: null,
 		consequence: 'read',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: ['id'],
@@ -290,7 +298,7 @@ const catalogue = [
 		path: '/admin/api/groups/:id/invitations',
 		action: null,
 		consequence: 'read',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: ['id'],
@@ -303,7 +311,7 @@ const catalogue = [
 		path: '/admin/api/scope',
 		action: null,
 		consequence: 'read',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: [],
@@ -316,7 +324,7 @@ const catalogue = [
 		path: '/admin/api/buckets',
 		action: null,
 		consequence: 'read',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: [],
@@ -329,12 +337,12 @@ const catalogue = [
 		path: '/admin/api/buckets/:id',
 		action: null,
 		consequence: 'read',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'One user bucket: its name, roles, managers, and registration and verification settings.'
+			'One user bucket: its name, owning group, and registration and verification settings. Its groups of end users are read with bucket_group_list.'
 	},
 	{
 		tool: 'bucket_user_list',
@@ -342,7 +350,7 @@ const catalogue = [
 		path: '/admin/api/buckets/:id/users',
 		action: null,
 		consequence: 'read',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: ['id'],
@@ -354,7 +362,7 @@ const catalogue = [
 		path: '/admin/api/buckets/:id/federation',
 		action: null,
 		consequence: 'read',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: ['id'],
@@ -362,12 +370,51 @@ const catalogue = [
 			'The upstream identity providers configured on a bucket. Never returns a provider client secret.'
 	},
 	{
+		tool: 'bucket_group_list',
+		method: 'GET',
+		path: '/admin/api/buckets/:id/groups',
+		action: null,
+		consequence: 'read',
+		superAdminOnly: false,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			"A bucket's groups of end users, each with its member count and, for one a SCIM directory manages, the connection that owns it. Group names are what relying parties see in the `groups` claim."
+	},
+	{
+		tool: 'bucket_group_get',
+		method: 'GET',
+		path: '/admin/api/buckets/:id/groups/:gid',
+		action: null,
+		consequence: 'read',
+		superAdminOnly: false,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id', 'gid'],
+		summary:
+			'One bucket group: its name, external id and owning connection if a directory manages it, and its member count.'
+	},
+	{
+		tool: 'bucket_group_member_list',
+		method: 'GET',
+		path: '/admin/api/buckets/:id/groups/:gid/members',
+		action: null,
+		consequence: 'read',
+		superAdminOnly: false,
+		bodySchema: null,
+		querySchema: BucketGroupMemberPageQuery,
+		pathParams: ['id', 'gid'],
+		summary:
+			"A page of a bucket group's members (id, email, userName), up to 1,000 at a time, with the total."
+	},
+	{
 		tool: 'provisioning_connection_list',
 		method: 'GET',
 		path: '/admin/api/buckets/:id/provisioning-connections',
 		action: null,
 		consequence: 'read',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: ['id'],
@@ -380,7 +427,7 @@ const catalogue = [
 		path: '/admin/api/buckets/:id/provisioning-connections/:connectionId',
 		action: null,
 		consequence: 'read',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: ['id', 'connectionId'],
@@ -399,7 +446,7 @@ const catalogue = [
 		path: '/admin/api/buckets/:id/federation/catalogue',
 		action: null,
 		consequence: 'read',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: ['id'],
@@ -412,7 +459,7 @@ const catalogue = [
 		path: '/admin/api/buckets/:id/users/:uid/identities',
 		action: null,
 		consequence: 'read',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: ['id', 'uid'],
@@ -425,7 +472,7 @@ const catalogue = [
 		path: '/admin/api/settings',
 		action: null,
 		consequence: 'read',
-		requiredRole: 'super_admin',
+		superAdminOnly: true,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: [],
@@ -438,7 +485,7 @@ const catalogue = [
 		path: '/admin/api/settings/smtp',
 		action: null,
 		consequence: 'read',
-		requiredRole: 'super_admin',
+		superAdminOnly: true,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: [],
@@ -451,7 +498,7 @@ const catalogue = [
 		path: '/admin/api/settings/sentry',
 		action: null,
 		consequence: 'read',
-		requiredRole: 'super_admin',
+		superAdminOnly: true,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: [],
@@ -464,7 +511,7 @@ const catalogue = [
 		path: '/admin/api/jwks',
 		action: null,
 		consequence: 'read',
-		requiredRole: 'super_admin',
+		superAdminOnly: true,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: [],
@@ -477,7 +524,7 @@ const catalogue = [
 		path: '/admin/api/buckets/:id/keys',
 		action: null,
 		consequence: 'read',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: ['id'],
@@ -495,7 +542,7 @@ const catalogue = [
 		 * route serves everyone: an administrator sees the trail of the groups they belong to, a super
 		 * administrator sees the instance. Naming a role here would be a claim the handler does not make.
 		 */
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: null,
 		querySchema: AuditQuery,
 		pathParams: [],
@@ -508,7 +555,7 @@ const catalogue = [
 		path: '/admin/api/errors',
 		action: null,
 		consequence: 'read',
-		requiredRole: 'super_admin',
+		superAdminOnly: true,
 		bodySchema: null,
 		querySchema: ErrorQuery,
 		pathParams: [],
@@ -521,7 +568,7 @@ const catalogue = [
 		path: '/admin/api/errors/summary',
 		action: null,
 		consequence: 'read',
-		requiredRole: 'super_admin',
+		superAdminOnly: true,
 		bodySchema: null,
 		querySchema: ErrorSummaryQuery,
 		pathParams: [],
@@ -534,7 +581,7 @@ const catalogue = [
 		path: '/admin/api/errors/purge-preview',
 		action: null,
 		consequence: 'read',
-		requiredRole: 'super_admin',
+		superAdminOnly: true,
 		bodySchema: null,
 		querySchema: ErrorQuery,
 		pathParams: [],
@@ -547,7 +594,7 @@ const catalogue = [
 		path: '/admin/api/errors/reference/:reference',
 		action: null,
 		consequence: 'read',
-		requiredRole: 'super_admin',
+		superAdminOnly: true,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: ['reference'],
@@ -560,7 +607,7 @@ const catalogue = [
 		path: '/admin/api/errors/:id',
 		action: null,
 		consequence: 'read',
-		requiredRole: 'super_admin',
+		superAdminOnly: true,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: ['id'],
@@ -575,7 +622,8 @@ const catalogue = [
 		path: '/admin/api/projects',
 		action: 'project.create',
 		consequence: 'ordinary',
-		requiredRole: 'super_admin',
+		/* Its route has no privilege gate: any administrator creates into their own scope. */
+		superAdminOnly: false,
 		bodySchema: CreateProjectBody,
 		querySchema: null,
 		pathParams: [],
@@ -588,7 +636,7 @@ const catalogue = [
 		path: '/admin/api/projects/:id',
 		action: 'project.update',
 		consequence: 'ordinary',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: UpdateProjectBody,
 		querySchema: null,
 		pathParams: ['id'],
@@ -601,7 +649,7 @@ const catalogue = [
 		path: '/admin/api/projects/:id/bucket',
 		action: 'project.bucket.assign',
 		consequence: 'ordinary',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: SetBucketBody,
 		querySchema: null,
 		pathParams: ['id'],
@@ -618,7 +666,7 @@ const catalogue = [
 		 * authenticate, which is disruptive, but it destroys nothing and is reversed by assigning again.
 		 */
 		consequence: 'ordinary',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: ['id'],
@@ -633,7 +681,7 @@ const catalogue = [
 		path: '/admin/api/projects/:id/resources',
 		action: 'resource.create',
 		consequence: 'ordinary',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: CreateResourceBody,
 		querySchema: null,
 		pathParams: ['id'],
@@ -646,7 +694,7 @@ const catalogue = [
 		path: '/admin/api/projects/:id/resources/:resourceId',
 		action: 'resource.update',
 		consequence: 'ordinary',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: UpdateResourceBody,
 		querySchema: null,
 		pathParams: ['id', 'resourceId'],
@@ -659,7 +707,7 @@ const catalogue = [
 		path: '/admin/api/projects/:id/resources/:resourceId',
 		action: 'resource.delete',
 		consequence: 'high',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: ['id', 'resourceId'],
@@ -674,7 +722,7 @@ const catalogue = [
 		path: '/admin/api/projects/:id/clients',
 		action: 'client.create',
 		consequence: 'ordinary',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: CreateClientBody,
 		querySchema: null,
 		pathParams: ['id'],
@@ -687,7 +735,7 @@ const catalogue = [
 		path: '/admin/api/projects/:id/clients/:clientId',
 		action: 'client.update',
 		consequence: 'ordinary',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: UpdateClientBody,
 		querySchema: null,
 		pathParams: ['id', 'clientId'],
@@ -700,7 +748,7 @@ const catalogue = [
 		path: '/admin/api/projects/:id/clients/:clientId/secret',
 		action: 'client.secret.rotate',
 		consequence: 'high',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: ['id', 'clientId'],
@@ -713,7 +761,7 @@ const catalogue = [
 		path: '/admin/api/projects/:id/clients/:clientId',
 		action: 'client.delete',
 		consequence: 'high',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: ['id', 'clientId'],
@@ -733,7 +781,7 @@ const catalogue = [
 		 * destructive either, since enrolments are retained.
 		 */
 		consequence: 'ordinary',
-		requiredRole: 'super_admin',
+		superAdminOnly: true,
 		bodySchema: AdminSettingsBody,
 		querySchema: null,
 		pathParams: [],
@@ -746,7 +794,7 @@ const catalogue = [
 		path: '/admin/api/admins',
 		action: 'admin.create',
 		consequence: 'ordinary',
-		requiredRole: 'super_admin',
+		superAdminOnly: true,
 		bodySchema: CreateAdminBody,
 		querySchema: null,
 		pathParams: [],
@@ -758,11 +806,12 @@ const catalogue = [
 		path: '/admin/api/admins/:id',
 		action: 'admin.update',
 		consequence: 'ordinary',
-		requiredRole: 'super_admin',
+		superAdminOnly: true,
 		bodySchema: UpdateAdminBody,
 		querySchema: null,
 		pathParams: ['id'],
-		summary: "Change an administrator's roles or details."
+		summary:
+			'Activate or deactivate an administrator. Never grants or withdraws super-administrator status — that is admin_super_grant and admin_super_withdraw.'
 	},
 	{
 		tool: 'admin_deactivate',
@@ -770,12 +819,40 @@ const catalogue = [
 		path: '/admin/api/admins/:id',
 		action: 'admin.deactivate',
 		consequence: 'high',
-		requiredRole: 'super_admin',
+		superAdminOnly: true,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
 			'Deactivate an administrator: the account is kept but can no longer sign in. Refused for the last active super-administrator.'
+	},
+	{
+		tool: 'admin_super_grant',
+		method: 'POST',
+		path: '/admin/api/admins/:id/super-admin',
+		action: 'admin.superadmin.grant',
+		/* High: instance-wide authority, over every group, setting and key. */
+		consequence: 'high',
+		superAdminOnly: true,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			'Make an administrator a super administrator — a member of Super administrators, with authority over the whole instance. Refused for an inactive administrator.'
+	},
+	{
+		tool: 'admin_super_withdraw',
+		method: 'DELETE',
+		path: '/admin/api/admins/:id/super-admin',
+		action: 'admin.superadmin.withdraw',
+		/* High: it can take the authority away from the only people able to restore it. */
+		consequence: 'high',
+		superAdminOnly: true,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			'Withdraw super-administrator status from an administrator. Refused for the last active super administrator.'
 	},
 
 	/* ------------------------------------------------- writes: buckets (2) */
@@ -785,7 +862,7 @@ const catalogue = [
 		path: '/admin/api/groups',
 		action: 'group.create',
 		consequence: 'ordinary',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: CreateGroupBody,
 		querySchema: null,
 		pathParams: [],
@@ -798,7 +875,7 @@ const catalogue = [
 		path: '/admin/api/groups/:id',
 		action: 'group.update',
 		consequence: 'ordinary',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: UpdateGroupBody,
 		querySchema: null,
 		pathParams: ['id'],
@@ -811,7 +888,7 @@ const catalogue = [
 		path: '/admin/api/groups/:id/members',
 		action: 'group.member.add',
 		consequence: 'ordinary',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: AddMemberBody,
 		querySchema: null,
 		pathParams: ['id'],
@@ -824,7 +901,7 @@ const catalogue = [
 		path: '/admin/api/groups/:id/members/:userId',
 		action: 'group.member.update',
 		consequence: 'ordinary',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: UpdateMemberBody,
 		querySchema: null,
 		pathParams: ['id', 'userId'],
@@ -837,7 +914,7 @@ const catalogue = [
 		path: '/admin/api/groups/:id/members/:userId',
 		action: 'group.member.remove',
 		consequence: 'high',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: ['id', 'userId'],
@@ -850,7 +927,7 @@ const catalogue = [
 		path: '/admin/api/groups/:id/invitations',
 		action: 'invitation.create',
 		consequence: 'ordinary',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: CreateInvitationBody,
 		querySchema: null,
 		pathParams: ['id'],
@@ -863,7 +940,7 @@ const catalogue = [
 		path: '/admin/api/groups/:id/invitations/:inviteId',
 		action: 'invitation.revoke',
 		consequence: 'ordinary',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: ['id', 'inviteId'],
@@ -875,7 +952,8 @@ const catalogue = [
 		path: '/admin/api/buckets',
 		action: 'bucket.create',
 		consequence: 'ordinary',
-		requiredRole: 'super_admin',
+		/* Its route has no privilege gate: any administrator creates into their own scope. */
+		superAdminOnly: false,
 		bodySchema: CreateBucketBody,
 		querySchema: null,
 		pathParams: [],
@@ -894,7 +972,7 @@ const catalogue = [
 		 * is a route of its own rather than a field on `bucket_update`.
 		 */
 		consequence: 'high',
-		requiredRole: 'super_admin',
+		superAdminOnly: true,
 		bodySchema: ChangeBucketAddressBody,
 		querySchema: null,
 		pathParams: ['id'],
@@ -907,12 +985,12 @@ const catalogue = [
 		path: '/admin/api/buckets/:id',
 		action: 'bucket.update',
 		consequence: 'ordinary',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: UpdateBucketBody,
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			"Change a bucket's name, roles, managers, or its registration, verification and second-factor settings. Editing the bucket entity needs manager access to the bucket itself, not merely to a project it backs. `totpRequired` governs password sign-in only — it is accepted but inert while `passwordLogin` is off, and it never gates a federated sign-in, so it is not a way to secure a bucket that signs in through an upstream provider."
+			"Change a bucket's name, or its registration, verification and second-factor settings. Editing the bucket entity needs manager access to the bucket itself, not merely to a project it backs. `totpRequired` governs password sign-in only — it is accepted but inert while `passwordLogin` is off, and it never gates a federated sign-in, so it is not a way to secure a bucket that signs in through an upstream provider."
 	},
 
 	/* ----------------------------------------------- writes: end-users (7) */
@@ -922,7 +1000,7 @@ const catalogue = [
 		path: '/admin/api/buckets/:id/users',
 		action: 'enduser.create',
 		consequence: 'ordinary',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: CreateEndUserBody,
 		querySchema: null,
 		pathParams: ['id'],
@@ -934,12 +1012,12 @@ const catalogue = [
 		path: '/admin/api/buckets/:id/users/:uid',
 		action: 'enduser.update',
 		consequence: 'ordinary',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: UpdateEndUserBody,
 		querySchema: null,
 		pathParams: ['id', 'uid'],
 		summary:
-			"Change an end-user's roles, active state, or claims. Claims replace the account's whole set; sub, email, email_verified and the protocol claims are refused, and a claim is released to a client only once the `claims` setting names it under a scope. Deactivating ends the user's access at once — every session and token, with a logout notice to each relying party registered for one — but keeps the account; reactivating restores sign-in only, never the old tokens or consents."
+			"Change an end-user's active state or claims. Their groups are changed with bucket_group_member_add and bucket_group_member_remove. Claims replace the account's whole set; sub, email, email_verified and the protocol claims are refused, and a claim is released to a client only once the `claims` setting names it under a scope. Deactivating ends the user's access at once — every session and token, with a logout notice to each relying party registered for one — but keeps the account; reactivating restores sign-in only, never the old tokens or consents."
 	},
 	{
 		tool: 'bucket_user_totp_clear',
@@ -952,7 +1030,7 @@ const catalogue = [
 		 * re-enrolment at their next sign-in.
 		 */
 		consequence: 'ordinary',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: ['id', 'uid'],
@@ -969,7 +1047,7 @@ const catalogue = [
 		 * the user is signing in and consenting again once it is lifted.
 		 */
 		consequence: 'ordinary',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: LockEndUserBody,
 		querySchema: null,
 		pathParams: ['id', 'uid'],
@@ -983,7 +1061,7 @@ const catalogue = [
 		action: 'enduser.unlock',
 		/* High: it re-admits an account an administrator judged compromised. */
 		consequence: 'high',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: ['id', 'uid'],
@@ -996,7 +1074,7 @@ const catalogue = [
 		path: '/admin/api/buckets/:id/users/:uid/password',
 		action: 'enduser.password.reset',
 		consequence: 'high',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: ResetPasswordBody,
 		querySchema: null,
 		pathParams: ['id', 'uid'],
@@ -1009,7 +1087,7 @@ const catalogue = [
 		path: '/admin/api/buckets/:id/users/:uid',
 		action: 'enduser.delete',
 		consequence: 'high',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: ['id', 'uid'],
@@ -1024,7 +1102,7 @@ const catalogue = [
 		path: '/admin/api/buckets/:id/federation',
 		action: 'federation.provider.create',
 		consequence: 'ordinary',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: CreateProviderBody,
 		querySchema: null,
 		pathParams: ['id'],
@@ -1039,7 +1117,7 @@ const catalogue = [
 		path: '/admin/api/buckets/:id/federation/:providerId',
 		action: 'federation.provider.update',
 		consequence: 'ordinary',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: UpdateProviderBody,
 		querySchema: null,
 		pathParams: ['id', 'providerId'],
@@ -1052,7 +1130,7 @@ const catalogue = [
 		path: '/admin/api/buckets/:id/federation/:providerId',
 		action: 'federation.provider.delete',
 		consequence: 'high',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: ['id', 'providerId'],
@@ -1065,7 +1143,7 @@ const catalogue = [
 		path: '/admin/api/buckets/:id/users/:uid/identities/:providerId',
 		action: 'federation.identity.delete',
 		consequence: 'high',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: ['id', 'uid', 'providerId'],
@@ -1081,7 +1159,7 @@ const catalogue = [
 		action: 'provisioning.connection.create',
 		/* Ordinary: a connection without a credential can do nothing; issuing one is the gated act. */
 		consequence: 'ordinary',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: CreateConnectionBody,
 		querySchema: null,
 		pathParams: ['id'],
@@ -1094,7 +1172,7 @@ const catalogue = [
 		path: '/admin/api/buckets/:id/provisioning-connections/:connectionId',
 		action: 'provisioning.connection.update',
 		consequence: 'ordinary',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: UpdateConnectionBody,
 		querySchema: null,
 		pathParams: ['id', 'connectionId'],
@@ -1108,7 +1186,7 @@ const catalogue = [
 		action: 'provisioning.connection.delete',
 		/* High: it ends a customer's provisioning, and its credentials stop working at once. */
 		consequence: 'high',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: ['id', 'connectionId'],
@@ -1125,7 +1203,7 @@ const catalogue = [
 		 * static token it returns is shown exactly once.
 		 */
 		consequence: 'high',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: IssueCredentialBody,
 		querySchema: null,
 		pathParams: ['id', 'connectionId'],
@@ -1139,7 +1217,7 @@ const catalogue = [
 		action: 'provisioning.credential.revoke',
 		/* Ordinary: it only removes access. */
 		consequence: 'ordinary',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: ['id', 'connectionId', 'kind'],
@@ -1156,12 +1234,97 @@ const catalogue = [
 		 * directory, which cannot be undone through this surface.
 		 */
 		consequence: 'high',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: AssignConnectionBody,
 		querySchema: null,
 		pathParams: ['id', 'uid'],
 		summary:
 			'Hand a local end-user to a SCIM provisioning connection, under the userName and/or externalId the directory knows them by, so the directory adopts them instead of creating a duplicate. Afterwards only the directory can change them.'
+	},
+
+	/* ------------------------------------------------- writes: bucket groups (6) */
+	{
+		tool: 'bucket_group_create',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/groups',
+		action: 'bucketgroup.create',
+		consequence: 'ordinary',
+		superAdminOnly: false,
+		bodySchema: CreateBucketGroupBody,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			'Create a group of end users in a bucket. The name must be unique in the bucket in any letter case, and it is the value relying parties receive in the `groups` claim.'
+	},
+	{
+		tool: 'bucket_group_update',
+		method: 'PATCH',
+		path: '/admin/api/buckets/:id/groups/:gid',
+		action: 'bucketgroup.update',
+		consequence: 'ordinary',
+		superAdminOnly: false,
+		bodySchema: RenameBucketGroupBody,
+		querySchema: null,
+		pathParams: ['id', 'gid'],
+		summary:
+			'Rename a bucket group. Relying parties see the new name in the next token each member receives, so an authorization rule keyed on the old name stops matching. A group a SCIM directory manages is read-only here.'
+	},
+	{
+		tool: 'bucket_group_delete',
+		method: 'DELETE',
+		path: '/admin/api/buckets/:id/groups/:gid',
+		action: 'bucketgroup.delete',
+		/* High: every member loses whatever relying parties grant for the group, and nothing restores it. */
+		consequence: 'high',
+		superAdminOnly: false,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id', 'gid'],
+		summary:
+			'Delete a bucket group and every membership in it. The users themselves are untouched. A group a SCIM directory manages is read-only here.'
+	},
+	{
+		tool: 'bucket_group_member_add',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/groups/:gid/members',
+		action: 'bucketgroup.member.add',
+		consequence: 'ordinary',
+		superAdminOnly: false,
+		bodySchema: AddBucketGroupMembersBody,
+		querySchema: null,
+		pathParams: ['id', 'gid'],
+		summary:
+			'Add end users of the bucket to a group, up to 1,000 at a time. Users already in it are left as they are. Provisioned users may be added to a group administrators keep; a group a SCIM directory manages is read-only here.'
+	},
+	{
+		tool: 'bucket_group_member_remove',
+		method: 'DELETE',
+		path: '/admin/api/buckets/:id/groups/:gid/members/:uid',
+		action: 'bucketgroup.member.remove',
+		consequence: 'ordinary',
+		superAdminOnly: false,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id', 'gid', 'uid'],
+		summary:
+			'Remove one end user from a bucket group. Their sessions and tokens are untouched; the next token they receive no longer names the group.'
+	},
+	{
+		tool: 'bucket_group_assign_connection',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/groups/:gid/connection',
+		action: 'bucketgroup.connection.assign',
+		/*
+		 * High: from this moment the group belongs to an external directory and is read-only to every
+		 * administrator, which cannot be undone through this surface.
+		 */
+		consequence: 'high',
+		superAdminOnly: false,
+		bodySchema: AssignBucketGroupConnectionBody,
+		querySchema: null,
+		pathParams: ['id', 'gid'],
+		summary:
+			'Hand a group administrators keep to a SCIM provisioning connection, so the directory adopts it instead of failing to create one of the same name. Refused while any member is someone the connection does not manage. Afterwards only the directory can change it.'
 	},
 
 	/* ---------------------------------------------------- writes: keys (5) */
@@ -1171,7 +1334,7 @@ const catalogue = [
 		path: '/admin/api/jwks',
 		action: 'jwks.generate',
 		consequence: 'high',
-		requiredRole: 'super_admin',
+		superAdminOnly: true,
 		bodySchema: GenerateKeyBody,
 		querySchema: null,
 		pathParams: [],
@@ -1184,7 +1347,7 @@ const catalogue = [
 		path: '/admin/api/jwks/:kid/promote',
 		action: 'jwks.promote',
 		consequence: 'high',
-		requiredRole: 'super_admin',
+		superAdminOnly: true,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: ['kid'],
@@ -1197,7 +1360,7 @@ const catalogue = [
 		path: '/admin/api/jwks/:kid',
 		action: 'jwks.retire',
 		consequence: 'high',
-		requiredRole: 'super_admin',
+		superAdminOnly: true,
 		bodySchema: RetireKeyBody,
 		querySchema: null,
 		pathParams: ['kid'],
@@ -1210,7 +1373,7 @@ const catalogue = [
 		path: '/admin/api/buckets/:id/keys',
 		action: 'bucket.key.generate',
 		consequence: 'ordinary',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: GenerateBucketKeyBody,
 		querySchema: null,
 		pathParams: ['id'],
@@ -1223,7 +1386,7 @@ const catalogue = [
 		path: '/admin/api/buckets/:id/keys/:kid/promote',
 		action: 'bucket.key.promote',
 		consequence: 'ordinary',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: ['id', 'kid'],
@@ -1236,7 +1399,7 @@ const catalogue = [
 		path: '/admin/api/buckets/:id/keys/:kid',
 		action: 'bucket.key.retire',
 		consequence: 'high',
-		requiredRole: null,
+		superAdminOnly: false,
 		bodySchema: RetireKeyBody,
 		querySchema: null,
 		pathParams: ['id', 'kid'],
@@ -1251,7 +1414,7 @@ const catalogue = [
 		path: '/admin/api/settings',
 		action: 'settings.update',
 		consequence: 'high',
-		requiredRole: 'super_admin',
+		superAdminOnly: true,
 		bodySchema: PublishedSettingsBody,
 		querySchema: null,
 		pathParams: [],
@@ -1264,7 +1427,7 @@ const catalogue = [
 		path: '/admin/api/settings/smtp',
 		action: 'smtp.settings.update',
 		consequence: 'high',
-		requiredRole: 'super_admin',
+		superAdminOnly: true,
 		bodySchema: UpdateSmtpBody,
 		querySchema: null,
 		pathParams: [],
@@ -1277,7 +1440,7 @@ const catalogue = [
 		path: '/admin/api/settings/sentry',
 		action: 'sentry.settings.update',
 		consequence: 'high',
-		requiredRole: 'super_admin',
+		superAdminOnly: true,
 		bodySchema: UpdateSentryBody,
 		querySchema: null,
 		pathParams: [],

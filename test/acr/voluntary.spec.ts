@@ -51,7 +51,6 @@ async function seedUser(bucketId: string, email: string, enrolled = false) {
 	const user = await getUserStore(bucketId).create(
 		email,
 		await Bun.password.hash(PASSWORD),
-		[],
 		true
 	);
 	if (enrolled) {

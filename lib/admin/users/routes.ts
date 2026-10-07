@@ -2,7 +2,7 @@ import { Elysia } from 'elysia';
 import { getBucketStore, getUserStore } from '../../adapters/index.js';
 import {
 	assertAuth,
-	assertRole,
+	assertSuperAdmin,
 	AdminError,
 	adminErrorBody,
 	resolveAdmin,
@@ -17,6 +17,13 @@ import {
 import { recordAdminAudit } from '../audit/record.js';
 import nanoid from '../../helpers/nanoid.js';
 import { ensurePersonalGroup } from '../groups/personal.js';
+import {
+	activeSuperAdminsWithout,
+	grantSuperAdmin,
+	isSuperAdmin,
+	superAdminIds,
+	withdrawSuperAdmin
+} from '../super_admins.js';
 
 const store = () => getUserStore(ADMIN_BUCKET_ID);
 
@@ -31,26 +38,20 @@ async function adminBucket() {
 	return bucket;
 }
 
-// Count how many active super_admins would remain if the target admin's roles /
-// active flag were changed as described. Used to prevent removing the last active
-// super_admin, which would lock everyone out (resolveAdmin requires an active
-// user, yet first-run setup stays closed while any super_admin row exists).
-async function activeSuperAdminCountAfter(
-	targetId: string,
-	change: { roles?: string[]; active?: boolean }
-): Promise<number> {
-	const users = await store().list();
-	let count = 0;
-	for (const u of users) {
-		const roles =
-			u._id === targetId && change.roles !== undefined ? change.roles : u.roles;
-		const active =
-			u._id === targetId && change.active !== undefined
-				? change.active
-				: u.active;
-		if (active && roles.includes('super_admin')) count += 1;
+/*
+ * Refuses a change that would leave no active super administrator: nobody could then grant the privilege
+ * again, and first-run setup stays closed while the group has any member, so the instance would be locked.
+ */
+async function assertNotLastSuperAdmin(targetId: string): Promise<void> {
+	if (
+		(await isSuperAdmin(targetId)) &&
+		(await activeSuperAdminsWithout(targetId)) === 0
+	) {
+		throw new AdminError(
+			409,
+			'cannot remove the last active super administrator'
+		);
 	}
-	return count;
 }
 
 export const adminUserRoutes = new Elysia({ name: 'admin-users' })
@@ -63,8 +64,12 @@ export const adminUserRoutes = new Elysia({ name: 'admin-users' })
 	})
 	.get('/admin/api/admins', async ({ admin }) => {
 		const ctx = assertAuth(admin as AdminContext | null);
-		assertRole(ctx, 'super_admin');
-		return (await store().list()).map(({ password: _password, ...u }) => u);
+		assertSuperAdmin(ctx);
+		const supers = new Set(await superAdminIds());
+		return (await store().list()).map(({ password: _password, ...u }) => ({
+			...u,
+			superAdmin: supers.has(u._id)
+		}));
 	})
 	/*
 	 * The reserved admin bucket's own policy, which the generic bucket routes refuse to touch — their
@@ -77,14 +82,14 @@ export const adminUserRoutes = new Elysia({ name: 'admin-users' })
 	 */
 	.get('/admin/api/admins/settings', async ({ admin }) => {
 		const ctx = assertAuth(admin as AdminContext | null);
-		assertRole(ctx, 'super_admin');
+		assertSuperAdmin(ctx);
 		return { totpRequired: (await adminBucket()).totpRequired === true };
 	})
 	.patch(
 		'/admin/api/admins/settings',
 		async ({ admin, body }) => {
 			const ctx = assertAuth(admin as AdminContext | null);
-			assertRole(ctx, 'super_admin');
+			assertSuperAdmin(ctx);
 			// Audit-first, like every other state-changing admin action. Field names, never values.
 			await recordAdminAudit(ctx, 'admin.settings.update', ADMIN_BUCKET_ID, {
 				attributes: Object.keys(body)
@@ -106,7 +111,7 @@ export const adminUserRoutes = new Elysia({ name: 'admin-users' })
 		'/admin/api/admins',
 		async ({ admin, body, set }) => {
 			const ctx = assertAuth(admin as AdminContext | null);
-			assertRole(ctx, 'super_admin');
+			assertSuperAdmin(ctx);
 			if (await store().findByEmail(body.email)) {
 				throw new AdminError(409, 'email already exists');
 			}
@@ -115,19 +120,13 @@ export const adminUserRoutes = new Elysia({ name: 'admin-users' })
 			// check, so a refused duplicate leaves no entry describing an account nobody created.
 			const userId = nanoid();
 			await recordAdminAudit(ctx, 'admin.create', userId);
-			const user = await store().create(
-				body.email,
-				hash,
-				body.roles,
-				false,
-				userId
-			);
+			const user = await store().create(body.email, hash, false, userId);
 			// Every administrator owns exactly one personal group, created with the account: it is the
 			// scope their console opens in, and without it they would sign in pointed at nothing.
 			await ensurePersonalGroup(user._id, user.email);
 			set.status = 201;
 			const { password: _password, ...safe } = user;
-			return safe;
+			return { ...safe, superAdmin: false };
 		},
 		{ body: CreateAdminBody }
 	)
@@ -135,36 +134,61 @@ export const adminUserRoutes = new Elysia({ name: 'admin-users' })
 		'/admin/api/admins/:id',
 		async ({ admin, params, body }) => {
 			const ctx = assertAuth(admin as AdminContext | null);
-			assertRole(ctx, 'super_admin');
-			if (
-				(body.roles !== undefined || body.active !== undefined) &&
-				(await activeSuperAdminCountAfter(params.id, body)) === 0
-			) {
-				throw new AdminError(409, 'cannot remove the last active super_admin');
-			}
+			assertSuperAdmin(ctx);
+			if (body.active === false) await assertNotLastSuperAdmin(params.id);
 			// After the last-super-admin guard: an entry for a request that guard refused would record a
-			// role change that never happened.
+			// change that never happened.
 			await recordAdminAudit(ctx, 'admin.update', params.id, {
 				attributes: Object.keys(body)
 			});
 			const updated = await store().update(params.id, body);
 			if (!updated) throw new AdminError(404, 'admin not found');
 			const { password: _password, ...safe } = updated;
-			return safe;
+			return { ...safe, superAdmin: await isSuperAdmin(updated._id) };
 		},
 		{ body: UpdateAdminBody }
 	)
+	/*
+	 * The instance privilege, granted and withdrawn as membership of Super administrators — operations of
+	 * their own, `high` on the agent surface, so that making somebody all-powerful is never a side effect of
+	 * an account edit. Asserting what is already true changes nothing and records nothing.
+	 */
+	.post('/admin/api/admins/:id/super-admin', async ({ admin, params }) => {
+		const ctx = assertAuth(admin as AdminContext | null);
+		assertSuperAdmin(ctx);
+		const target = await store().find(params.id);
+		if (!target) throw new AdminError(404, 'admin not found');
+		if (!target.active) {
+			throw new AdminError(
+				409,
+				'an inactive administrator cannot be granted it'
+			);
+		}
+		if (!(await isSuperAdmin(target._id))) {
+			await recordAdminAudit(ctx, 'admin.superadmin.grant', target._id);
+			await grantSuperAdmin(target._id);
+		}
+		return { _id: target._id, email: target.email, superAdmin: true };
+	})
+	.delete('/admin/api/admins/:id/super-admin', async ({ admin, params }) => {
+		const ctx = assertAuth(admin as AdminContext | null);
+		assertSuperAdmin(ctx);
+		const target = await store().find(params.id);
+		if (!target) throw new AdminError(404, 'admin not found');
+		if (await isSuperAdmin(target._id)) {
+			await assertNotLastSuperAdmin(target._id);
+			await recordAdminAudit(ctx, 'admin.superadmin.withdraw', target._id);
+			await withdrawSuperAdmin(target._id);
+		}
+		return { _id: target._id, email: target.email, superAdmin: false };
+	})
 	.delete('/admin/api/admins/:id', async ({ admin, params }) => {
 		const ctx = assertAuth(admin as AdminContext | null);
-		assertRole(ctx, 'super_admin');
+		assertSuperAdmin(ctx);
 		if (params.id === ctx.userId) {
 			throw new AdminError(409, 'cannot deactivate yourself');
 		}
-		if (
-			(await activeSuperAdminCountAfter(params.id, { active: false })) === 0
-		) {
-			throw new AdminError(409, 'cannot remove the last active super_admin');
-		}
+		await assertNotLastSuperAdmin(params.id);
 		// `admin.deactivate`, not a delete: the row survives with active:false.
 		await recordAdminAudit(ctx, 'admin.deactivate', params.id);
 		const updated = await store().update(params.id, { active: false });

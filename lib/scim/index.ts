@@ -38,6 +38,14 @@ import {
 	type ScimReply,
 	type ScimRequestContext
 } from './users.js';
+import {
+	createGroupResource,
+	deleteGroupResource,
+	getGroupResource,
+	listGroups,
+	patchGroup,
+	replaceGroup
+} from './groups.js';
 
 /*
  * SCIM 2.0 at `<bucket issuer>/scim/v2` — mounted bare (the default bucket, and any bucket addressed by its
@@ -289,6 +297,47 @@ export const scimApp = new Elysia({ name: 'scim' })
 		`${SCIM_BASE_PATH}/Users/:userId`,
 		async ({ request, params, server }) =>
 			serve(request, params, server, (c) => deleteUser(c, params.userId))
+	)
+	.get(`${SCIM_BASE_PATH}/Groups`, async ({ request, params, server }) =>
+		serve(request, params, server, (c) =>
+			listGroups(c, new URL(request.url).searchParams)
+		)
+	)
+	.post(`${SCIM_BASE_PATH}/Groups`, async ({ request, params, server, body }) =>
+		serve(request, params, server, (c) => {
+			assertJsonBody(request);
+			return createGroupResource(c, body);
+		})
+	)
+	.get(
+		`${SCIM_BASE_PATH}/Groups/:groupId`,
+		async ({ request, params, server }) =>
+			serve(request, params, server, (c) =>
+				getGroupResource(c, params.groupId, new URL(request.url).searchParams)
+			)
+	)
+	.put(
+		`${SCIM_BASE_PATH}/Groups/:groupId`,
+		async ({ request, params, server, body }) =>
+			serve(request, params, server, (c) => {
+				assertJsonBody(request);
+				return replaceGroup(c, params.groupId, body);
+			})
+	)
+	.patch(
+		`${SCIM_BASE_PATH}/Groups/:groupId`,
+		async ({ request, params, server, body }) =>
+			serve(request, params, server, (c) => {
+				assertJsonBody(request);
+				return patchGroup(c, params.groupId, body);
+			})
+	)
+	.delete(
+		`${SCIM_BASE_PATH}/Groups/:groupId`,
+		async ({ request, params, server }) =>
+			serve(request, params, server, (c) =>
+				deleteGroupResource(c, params.groupId)
+			)
 	);
 
 async function serve(

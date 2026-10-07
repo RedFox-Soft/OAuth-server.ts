@@ -4,7 +4,6 @@ import bootstrap from '../test_helper.js';
 import { elysia } from 'lib/index.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
-	getUserStore,
 	getProjectStore,
 	getBucketStore,
 	adminAuditStore
@@ -18,6 +17,7 @@ import { ApplicationConfig } from 'lib/configs/application.js';
 import { sessionFor } from '../admin_session.ts';
 import { shaped } from 'test/shape.js';
 import { Type } from '@sinclair/typebox';
+import { createAdministrator, type AdminKind } from '../administrators.ts';
 
 /*
  * FR-036: the console keeps both container deletions in full, and nothing about the agent surface
@@ -35,11 +35,10 @@ import { Type } from '@sinclair/typebox';
  * withheld from the agent.
  */
 
-async function cookieFor(roles: string[]) {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`console-${roles.join('-')}-${Math.random()}@x.io`,
-		'hash',
-		roles
+async function cookieFor(kind: AdminKind) {
+	const user = await createAdministrator(
+		kind,
+		`console-${kind}-${Math.random()}@x.io`
 	);
 	const s = await sessionFor(user);
 	return { cookie: `${ADMIN_SESSION_COOKIE}=${s._id}`, user };
@@ -81,7 +80,7 @@ describe.each([
 	});
 
 	it('still deletes an empty project', async () => {
-		const { cookie } = await cookieFor(['super_admin']);
+		const { cookie } = await cookieFor('super');
 		const project = await getProjectStore().create({
 			name: 'Deletable',
 			slug: slug(),
@@ -97,7 +96,7 @@ describe.each([
 	});
 
 	it('still deletes an empty bucket', async () => {
-		const { cookie } = await cookieFor(['super_admin']);
+		const { cookie } = await cookieFor('super');
 		const created = await admin('/admin/api/buckets', {
 			method: 'POST',
 			cookie,
@@ -118,7 +117,7 @@ describe.each([
 	});
 
 	it('still refuses a populated project with its structured blockers', async () => {
-		const { cookie } = await cookieFor(['super_admin']);
+		const { cookie } = await cookieFor('super');
 		const project = await getProjectStore().create({
 			name: 'Populated',
 			slug: slug(),
@@ -161,7 +160,7 @@ describe.each([
 	});
 
 	it('resolves a cookie-authenticated administrator exactly as before', async () => {
-		const { cookie, user } = await cookieFor(['super_admin']);
+		const { cookie, user } = await cookieFor('super');
 
 		const res = await admin('/admin/api/me', { cookie });
 		expect(res.status).toBe(200);
@@ -172,7 +171,7 @@ describe.each([
 
 		expect(me.userId).toBe(user._id);
 		expect(me.email).toBe(user.email);
-		expect(me.roles).toEqual(['super_admin']);
+		expect(me.superAdmin).toBe(true);
 		expect(me.bucketId).toBe(ADMIN_BUCKET_ID);
 		// `managedProjectIds` was replaced by group memberships when ownership moved to groups.
 		expect(me.memberships).toBeArray();
@@ -183,7 +182,7 @@ describe.each([
 	});
 
 	it('writes console audit entries with no agent attribution', async () => {
-		const { cookie, user } = await cookieFor(['super_admin']);
+		const { cookie, user } = await cookieFor('super');
 
 		const created = await admin('/admin/api/projects', {
 			method: 'POST',

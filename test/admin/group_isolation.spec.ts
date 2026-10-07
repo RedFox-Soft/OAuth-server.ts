@@ -8,10 +8,10 @@ import { groupRoutes } from 'lib/admin/groups/routes.ts';
 import { scopeRoutes } from 'lib/admin/scope/routes.ts';
 import { adminUserRoutes } from 'lib/admin/users/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { getUserStore } from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
 import { answered } from './answered.ts';
+import { createAdministrator, type AdminKind } from '../administrators.ts';
 
 /*
  * The suite that has to hold for this feature to be safe to ship.
@@ -34,6 +34,8 @@ const app = new Elysia()
 	.use(scopeRoutes)
 	.use(adminUserRoutes);
 const client = treaty(app);
+const superAdminOf = (id: string) =>
+	client.admin.api.admins({ id })['super-admin'];
 
 /*
  * A slug the route will accept. `Math.random()` alone yields a dot, which `^[a-z0-9-]+$` refuses —
@@ -43,11 +45,10 @@ function slug(prefix: string): string {
 	return `${prefix}-${Math.random().toString(36).slice(2)}`;
 }
 
-async function tenant(label: string, roles = ['project_admin']) {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`${label}-${Math.random()}@x.io`,
-		'hash',
-		roles
+async function tenant(label: string, kind: AdminKind = 'plain') {
+	const user = await createAdministrator(
+		kind,
+		`${label}-${Math.random()}@x.io`
 	);
 	const session = await sessionFor(user);
 	return {
@@ -231,15 +232,12 @@ describe('group isolation', () => {
 	 * the claim that stops being true after a refactor — so each route is asked directly.
 	 */
 	describe('no self-escalation', () => {
-		it('cannot grant itself the super-administrator role', async () => {
+		it('cannot make itself a super administrator', async () => {
 			const a = await tenant('a');
 
-			const res = await client.admin.api
-				.admins({ id: a.userId })
-				.patch(
-					{ roles: ['super_admin', 'project_admin'] },
-					{ headers: { cookie: a.cookie } }
-				);
+			const res = await superAdminOf(a.userId).post(undefined, {
+				headers: { cookie: a.cookie }
+			});
 			expect(res.status).toBe(403);
 		});
 
@@ -303,7 +301,7 @@ describe('group isolation', () => {
 	 * boundary holds against the caller who can cross every other one.
 	 */
 	it("refuses even a super administrator the scope of somebody's personal group", async () => {
-		const root = await tenant('root', ['super_admin']);
+		const root = await tenant('root', 'super');
 		const a = await tenant('a');
 
 		const res = await client.admin.api.scope.put(

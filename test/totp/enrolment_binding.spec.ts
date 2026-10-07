@@ -95,7 +95,6 @@ async function seedAccount(email: string, secret?: string) {
 	const user = await store.create(
 		email,
 		await Bun.password.hash(PASSWORD),
-		[],
 		true
 	);
 	if (secret) {

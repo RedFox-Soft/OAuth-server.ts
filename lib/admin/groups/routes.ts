@@ -17,6 +17,7 @@ import {
 	type AdminContext
 } from '../auth/rbac.js';
 import { ADMIN_BUCKET_ID } from '../consts.js';
+import { isSuperAdminsGroup } from '../super_admins.js';
 import { recordAdminAudit } from '../audit/record.js';
 import nanoid from '../../helpers/nanoid.js';
 import {
@@ -41,9 +42,15 @@ import { sendGroupInvitationEmail } from '../../mail/send.js';
  * between "does not exist" and "exists but is not yours" is an oracle for enumerating group ids.
  */
 async function loadGroup(admin: AdminContext, id: string): Promise<Group> {
+	/*
+	 * Super administrators is not a group anyone works in or manages through these routes: its membership is
+	 * the instance privilege, changed only by the grant and withdraw operations. To this surface it does not
+	 * exist, for every caller.
+	 */
+	if (isSuperAdminsGroup(id)) throw new AdminError(404, 'group not found');
 	const group = await getGroupStore().find(id);
 	if (!group) {
-		if (admin.roles.includes('super_admin')) {
+		if (admin.superAdmin) {
 			throw new AdminError(404, 'group not found');
 		}
 		throw new AdminError(403, 'no access to this group');
@@ -143,10 +150,10 @@ export const groupRoutes = new Elysia({ name: 'admin-groups' })
 		 * scope: the list is what the scope switcher is built from, so restricting it to the current scope
 		 * would leave an administrator no way to reach their other groups.
 		 */
-		if (ctx.roles.includes('super_admin')) {
-			return getGroupStore().list();
-		}
-		return getGroupStore().listByMember(ctx.userId);
+		const groups = ctx.superAdmin
+			? await getGroupStore().list()
+			: await getGroupStore().listByMember(ctx.userId);
+		return groups.filter((g) => !isSuperAdminsGroup(g._id));
 	})
 	.post(
 		'/admin/api/groups',
@@ -179,8 +186,12 @@ export const groupRoutes = new Elysia({ name: 'admin-groups' })
 		'/admin/api/groups/:id',
 		async ({ admin, params, body }) => {
 			const ctx = assertAuth(admin as AdminContext | null);
-			await loadGroup(ctx, params.id);
+			const group = await loadGroup(ctx, params.id);
 			assertGroupOwner(ctx, params.id);
+			/* A system group's name is the console's label for a reserved purpose; the seed sets it. */
+			if (group.kind === 'system') {
+				throw new AdminError(403, 'a system group cannot be renamed');
+			}
 			await recordAdminAudit(ctx, 'group.update', params.id, {
 				attributes: Object.keys(body),
 				ownerGroupId: params.id

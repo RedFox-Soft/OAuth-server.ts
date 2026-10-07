@@ -175,8 +175,7 @@ than left to the schema, because the flag only has to become settable once.
 The rest fail on their own merits. `passwordLogin: false` is a permanent lockout — this bucket accepts
 no providers, and `assertSomeWayToSignIn` looks for an *enabled provider*, so it would not catch it.
 `registrationOpen: true` would let anyone who can reach `/admin/login` create a row in the reserved
-bucket through the ordinary registration page. `roles` is inert: nothing constrains an
-administrator's roles against it. `managedBy` is meaningless where access is by role, `federation` is
+bucket through the ordinary registration page. `managedBy` is meaningless where access is by group membership, `federation` is
 refused by its own routes and is a separate decision, and `name` is cosmetic — though no longer
 invisible, since it is the issuer label an authenticator app displays.
 

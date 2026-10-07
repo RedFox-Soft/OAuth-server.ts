@@ -123,7 +123,7 @@ function challenge(set: McpContext['set']) {
 	 * for something this challenge already knows.
 	 *
 	 * The value is the descriptor's own scope, so the two cannot disagree — this surface takes its
-	 * authority from the administrator's roles rather than from scopes, and `openid` is the whole of it.
+	 * authority from the administrator's own standing rather than from scopes, and `openid` is the whole of it.
 	 */
 	set.headers['www-authenticate'] =
 		`Bearer resource_metadata="${issuer}${MCP_METADATA_ROUTE}", scope="${MCP_RESOURCE_SERVER.scope}", error="invalid_token"`;
@@ -139,7 +139,7 @@ function challenge(set: McpContext['set']) {
  *
  * Included for shape conformance — the specification defines this response and a client implements a
  * step-up flow against it — and honestly noted as unreachable today: every tool on this surface is
- * authorized by the administrator's roles, and the descriptor declares `openid` alone, so there is no
+ * authorized by the administrator's own standing, and the descriptor declares `openid` alone, so there is no
  * scope a valid token here can be missing. Exported rather than inlined so it is testable as the shape
  * it is, rather than left as a branch nothing exercises.
  */

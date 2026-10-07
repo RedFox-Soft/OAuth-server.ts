@@ -10,12 +10,12 @@ import { forgetBucketAddresses } from 'lib/admin/auth/bucketAddress.ts';
 import {
 	getBucketStore,
 	getProjectStore,
-	getProtectedResourceStore,
-	getUserStore
+	getProtectedResourceStore
 } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { ROOT_NAMESPACE } from 'lib/resources/namespace.ts';
 import { sessionFor } from '../admin_session.ts';
+import { createAdministrator, type AdminKind } from '../administrators.ts';
 
 const app = new Elysia({ normalize: false })
 	.use(resolveAdmin)
@@ -24,11 +24,10 @@ const app = new Elysia({ normalize: false })
 
 const AUDIENCE = 'https://mcp.moving.example/mcp';
 
-async function administrator(roles: string[]) {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`move-${roles.join('-')}-${Math.random()}@x.io`,
-		'hash',
-		roles
+async function administrator(kind: AdminKind) {
+	const user = await createAdministrator(
+		kind,
+		`move-${kind}-${Math.random()}@x.io`
 	);
 	const group = await ensurePersonalGroup(user._id, user.email);
 	const session = await sessionFor(user);
@@ -94,7 +93,7 @@ describe('a project with declarations changing bucket', () => {
 	});
 
 	it('is refused, and nothing moves, when an identifier is taken in the target bucket', async () => {
-		const { cookie, groupId } = await administrator(['project_admin']);
+		const { cookie, groupId } = await administrator('plain');
 		const from = await bucket(groupId, unique('from'));
 		const to = await bucket(groupId, unique('to'));
 		const moving = await projectIn(groupId, from._id);
@@ -123,7 +122,7 @@ describe('a project with declarations changing bucket', () => {
 	});
 
 	it('refuses a group administrator clearing the bucket of a project that declares resources', async () => {
-		const { cookie, groupId } = await administrator(['project_admin']);
+		const { cookie, groupId } = await administrator('plain');
 		const from = await bucket(groupId, unique('clear'));
 		const project = await projectIn(groupId, from._id);
 		await declare(from._id, project._id);
@@ -144,7 +143,7 @@ describe('a project with declarations changing bucket', () => {
 	});
 
 	it('moves the declarations with the project into its new bucket', async () => {
-		const { cookie, groupId } = await administrator(['project_admin']);
+		const { cookie, groupId } = await administrator('plain');
 		const from = await bucket(groupId, unique('old'));
 		const to = await bucket(groupId, unique('new'));
 		const project = await projectIn(groupId, from._id);
@@ -167,7 +166,7 @@ describe('a project with declarations changing bucket', () => {
 	});
 
 	it('moves a legacy bucket declarations out of the root when it gains an address', async () => {
-		const { cookie, groupId } = await administrator(['super_admin']);
+		const { cookie, groupId } = await administrator('super');
 		const legacy = await bucket(groupId);
 		const project = await projectIn(groupId, legacy._id);
 		await declare(ROOT_NAMESPACE, project._id);

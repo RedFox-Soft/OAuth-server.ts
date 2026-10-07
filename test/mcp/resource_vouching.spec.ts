@@ -7,10 +7,9 @@ import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
 	getProjectStore,
-	getProtectedResourceStore,
-	getUserStore
+	getProtectedResourceStore
 } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import {
 	ADMIN_MCP_CLIENT_ID,
 	MCP_RESOURCE,
@@ -20,6 +19,7 @@ import { ApplicationConfig } from 'lib/configs/application.js';
 import { ROOT_NAMESPACE } from 'lib/resources/namespace.ts';
 import { assertNoPendingInterceptors } from '../fetch_mock.ts';
 import { serveResourceMetadata } from '../resources/resource_metadata.ts';
+import { createAdministrator } from '../administrators.ts';
 
 let rpcId = 0;
 
@@ -55,10 +55,9 @@ function call(name: string, args: Record<string, unknown>) {
 }
 
 async function agent() {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`vouch-agent-${Math.random()}@x.io`,
-		'hash',
-		['super_admin']
+	const user = await createAdministrator(
+		'super',
+		`vouch-agent-${Math.random()}@x.io`
 	);
 	const at = new AccessToken({
 		client: await Client.find(ADMIN_MCP_CLIENT_ID),

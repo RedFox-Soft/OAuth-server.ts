@@ -5,11 +5,7 @@ import { Type } from '@sinclair/typebox';
 import '../test_helper.js';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { jwksRoutes } from 'lib/admin/jwks/routes.ts';
-import {
-	adminAuditStore,
-	getBucketKeysStore,
-	getUserStore
-} from 'lib/adapters/index.ts';
+import { adminAuditStore, getBucketKeysStore } from 'lib/adapters/index.ts';
 import {
 	invalidateRootKeys,
 	KEY_PUBLICATION_SECONDS,
@@ -18,12 +14,13 @@ import {
 import { ROOT_KEY_OWNER } from 'lib/consts/key_owner.ts';
 import { generateJWKS } from 'lib/helpers/jwks.ts';
 import type { SupportedAlg } from 'lib/admin/jwks/schema.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { sessionFor } from '../admin_session.ts';
 import { send } from '../feature_gate/helpers.js';
 import { testSigningKeys } from '../jwks/fixtures.js';
 import { writeRootKeys } from '../root_keys.js';
 import { shaped } from '../shape.js';
+import { createAdministrator, type AdminKind } from '../administrators.ts';
 
 const app = new Elysia().use(resolveAdmin).use(jwksRoutes);
 
@@ -73,12 +70,8 @@ async function call(
 	};
 }
 
-async function sessionCookieFor(roles: string[]) {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`${roles.join('-')}-${Math.random()}@x.io`,
-		'hash',
-		roles
-	);
+async function sessionCookieFor(kind: AdminKind) {
+	const user = await createAdministrator(kind, `${kind}-${Math.random()}@x.io`);
 	const s = await sessionFor(user);
 	return { cookie: `${ADMIN_SESSION_COOKIE}=${s._id}`, userId: user._id };
 }
@@ -148,13 +141,13 @@ describe('the root key set, administered', () => {
 	});
 
 	it('is refused to a project administrator', async () => {
-		const { cookie } = await sessionCookieFor(['project_admin']);
+		const { cookie } = await sessionCookieFor('plain');
 		expect((await call('GET', '/admin/api/jwks', cookie)).status).toBe(403);
 		expect((await generate(cookie, 'RS256')).status).toBe(403);
 	});
 
 	it('lists every root key with its state, and no private material', async () => {
-		const { cookie } = await sessionCookieFor(['super_admin']);
+		const { cookie } = await sessionCookieFor('super');
 		const res = await call('GET', '/admin/api/jwks', cookie);
 		const body = shaped(KeySet, res.body);
 
@@ -171,7 +164,7 @@ describe('the root key set, administered', () => {
 	});
 
 	it('offers only algorithms it can actually produce a key for', async () => {
-		const { cookie } = await sessionCookieFor(['super_admin']);
+		const { cookie } = await sessionCookieFor('super');
 		const { supportedAlgorithms } = await view(cookie);
 
 		expect(supportedAlgorithms.length).toBeGreaterThan(0);
@@ -185,13 +178,13 @@ describe('the root key set, administered', () => {
 	});
 
 	it('refuses to generate a symmetric key', async () => {
-		const { cookie } = await sessionCookieFor(['super_admin']);
+		const { cookie } = await sessionCookieFor('super');
 		expect((await generate(cookie, 'HS256')).status).toBe(422);
 	});
 
 	describe('generating', () => {
 		it('publishes the new key without letting it sign', async () => {
-			const { cookie } = await sessionCookieFor(['super_admin']);
+			const { cookie } = await sessionCookieFor('super');
 
 			const res = await generate(cookie, 'ES256');
 
@@ -206,7 +199,7 @@ describe('the root key set, administered', () => {
 		});
 
 		it('records the generation in the audit trail, naming the key', async () => {
-			const { cookie } = await sessionCookieFor(['super_admin']);
+			const { cookie } = await sessionCookieFor('super');
 			const res = await generate(cookie, 'ES256');
 			const { kid } = shaped(KeyView, res.body);
 
@@ -216,7 +209,7 @@ describe('the root key set, administered', () => {
 
 	describe('promoting', () => {
 		it('is refused before the key has been published for the publication window', async () => {
-			const { cookie } = await sessionCookieFor(['super_admin']);
+			const { cookie } = await sessionCookieFor('super');
 			const { kid } = shaped(KeyView, (await generate(cookie, 'RS256')).body);
 
 			const res = await promote(cookie, kid);
@@ -227,7 +220,7 @@ describe('the root key set, administered', () => {
 		});
 
 		it('is refused for the key that already signs', async () => {
-			const { cookie } = await sessionCookieFor(['super_admin']);
+			const { cookie } = await sessionCookieFor('super');
 
 			const res = await promote(cookie, bootRsa.kid);
 
@@ -236,7 +229,7 @@ describe('the root key set, administered', () => {
 		});
 
 		it('makes the key sign, and returns the one it replaces in its algorithm to published', async () => {
-			const { cookie } = await sessionCookieFor(['super_admin']);
+			const { cookie } = await sessionCookieFor('super');
 			const kid = await publishedKey(cookie, 'RS256');
 
 			const res = await promote(cookie, kid);
@@ -248,7 +241,7 @@ describe('the root key set, administered', () => {
 		});
 
 		it('advertises the algorithm of a promoted key the server did not boot with, without a restart', async () => {
-			const { cookie } = await sessionCookieFor(['super_admin']);
+			const { cookie } = await sessionCookieFor('super');
 			const kid = await publishedKey(cookie, 'PS256');
 			const before = shaped(
 				Type.Object(
@@ -278,7 +271,7 @@ describe('the root key set, administered', () => {
 		});
 
 		it('records the promotion in the audit trail, naming the key', async () => {
-			const { cookie } = await sessionCookieFor(['super_admin']);
+			const { cookie } = await sessionCookieFor('super');
 			const kid = await publishedKey(cookie, 'RS256');
 
 			await promote(cookie, kid);
@@ -287,7 +280,7 @@ describe('the root key set, administered', () => {
 		});
 
 		it('answers 404 for a key the instance does not hold', async () => {
-			const { cookie } = await sessionCookieFor(['super_admin']);
+			const { cookie } = await sessionCookieFor('super');
 			expect((await promote(cookie, 'no-such-kid')).status).toBe(404);
 		});
 	});
@@ -298,7 +291,7 @@ describe('the root key set, administered', () => {
 			['whose confirmation names another key', 'not-this-key']
 		] as const) {
 			it(`is refused ${label}, and nothing changes or is recorded`, async () => {
-				const { cookie } = await sessionCookieFor(['super_admin']);
+				const { cookie } = await sessionCookieFor('super');
 				const { kid } = shaped(KeyView, (await generate(cookie, 'ES256')).body);
 
 				const res = await retire(cookie, kid, confirm);
@@ -311,7 +304,7 @@ describe('the root key set, administered', () => {
 		}
 
 		it('is refused for the key that signs, so the server always keeps one', async () => {
-			const { cookie } = await sessionCookieFor(['super_admin']);
+			const { cookie } = await sessionCookieFor('super');
 
 			const res = await retire(cookie, bootRsa.kid);
 
@@ -321,7 +314,7 @@ describe('the root key set, administered', () => {
 		});
 
 		it('is refused for a key already retired', async () => {
-			const { cookie } = await sessionCookieFor(['super_admin']);
+			const { cookie } = await sessionCookieFor('super');
 			const { kid } = shaped(KeyView, (await generate(cookie, 'ES256')).body);
 			await retire(cookie, kid);
 
@@ -332,7 +325,7 @@ describe('the root key set, administered', () => {
 		});
 
 		it('takes a confirmed key out of service with the time it will be hidden', async () => {
-			const { cookie } = await sessionCookieFor(['super_admin']);
+			const { cookie } = await sessionCookieFor('super');
 			const { kid } = shaped(KeyView, (await generate(cookie, 'ES256')).body);
 
 			const res = await retire(cookie, kid);
@@ -343,7 +336,7 @@ describe('the root key set, administered', () => {
 		});
 
 		it('records the retirement in the audit trail, naming the key', async () => {
-			const { cookie } = await sessionCookieFor(['super_admin']);
+			const { cookie } = await sessionCookieFor('super');
 			const { kid } = shaped(KeyView, (await generate(cookie, 'ES256')).body);
 
 			await retire(cookie, kid);
@@ -357,7 +350,7 @@ describe('the root key set, administered', () => {
 	 * the view is what an operator acts on, so it may never disagree with the key set.
 	 */
 	it('reports after every step exactly what the key set publishes and signs with', async () => {
-		const { cookie } = await sessionCookieFor(['super_admin']);
+		const { cookie } = await sessionCookieFor('super');
 		const agree = async () => {
 			const listed = (await view(cookie)).keys;
 			invalidateRootKeys();

@@ -17,7 +17,7 @@ import {
  * found" is what actually helps them.
  */
 function notFoundStatus(admin: AdminContext): number {
-	return admin.roles.includes('super_admin') ? 404 : 403;
+	return admin.superAdmin ? 404 : 403;
 }
 
 function assertNotReserved(id: string): void {

@@ -10,12 +10,12 @@ import {
 	adminAuditStore,
 	getBucketStore,
 	getProjectStore,
-	getProtectedResourceStore,
-	getUserStore
+	getProtectedResourceStore
 } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
 import { answered } from './answered.ts';
+import { createAdministrator } from '../administrators.ts';
 
 /*
  * The audit trail for protected-resource operations, and the one cascade a project delete performs.
@@ -34,10 +34,9 @@ const AUDIENCE = 'https://mcp.example.com/mcp';
 const encoded = encodeURIComponent(AUDIENCE);
 
 async function admin() {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`auditor-${Math.random()}@x.io`,
-		'hash',
-		['project_admin']
+	const user = await createAdministrator(
+		'plain',
+		`auditor-${Math.random()}@x.io`
 	);
 	const session = await sessionFor(user);
 	return {

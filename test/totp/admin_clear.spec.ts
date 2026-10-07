@@ -10,12 +10,13 @@ import {
 	getBucketStore,
 	getUserStore
 } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { encodeBase32 } from 'lib/totp/base32.ts';
 import { attemptKey } from 'lib/totp/verify.ts';
 import epochTime from 'lib/helpers/epoch_time.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
 import { present } from 'test/shape.js';
+import { createAdministrator, type AdminKind } from '../administrators.ts';
 
 const app = new Elysia().use(resolveAdmin).use(endUserRoutes);
 const client = treaty(app);
@@ -25,12 +26,8 @@ const SECRET = encodeBase32(Buffer.from('12345678901234567890', 'ascii'));
 let seq = 0;
 const unique = (prefix: string) => `${prefix}-${Date.now()}-${(seq += 1)}`;
 
-async function sessionCookieFor(roles: string[]) {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`${unique(roles.join('-'))}@x.io`,
-		'hash',
-		roles
-	);
+async function sessionCookieFor(kind: AdminKind) {
+	const user = await createAdministrator(kind, `${unique(kind)}@x.io`);
 	const session = await sessionFor(user);
 	return { cookie: `${ADMIN_SESSION_COOKIE}=${session._id}`, userId: user._id };
 }
@@ -38,8 +35,7 @@ async function sessionCookieFor(roles: string[]) {
 async function enrolledAccount(bucketId: string) {
 	const user = await getUserStore(bucketId).create(
 		`${unique('member')}@x.io`,
-		'hash',
-		[]
+		'hash'
 	);
 	await getUserStore(bucketId).update(user._id, {
 		totp: { secret: SECRET, enrolledAt: new Date(), lastStep: 42 }
@@ -57,7 +53,7 @@ describe('clearing a lost authenticator (US5)', () => {
 
 	beforeEach(async () => {
 		await ensureAdminSeed();
-		admin = await sessionCookieFor(['super_admin']);
+		admin = await sessionCookieFor('super');
 		const bucket = await getBucketStore().create({
 			name: unique('Recovery'),
 			ownerGroupId: await personalGroupId(admin.userId),
@@ -84,8 +80,7 @@ describe('clearing a lost authenticator (US5)', () => {
 	it('reports an unenrolled account as such', async () => {
 		const user = await getUserStore(bucketId).create(
 			`${unique('plain')}@x.io`,
-			'hash',
-			[]
+			'hash'
 		);
 		const res = await client.admin.api
 			.buckets({ id: bucketId })
@@ -174,8 +169,7 @@ describe('clearing a lost authenticator (US5)', () => {
 	it('succeeds on an account that holds no authenticator', async () => {
 		const user = await getUserStore(bucketId).create(
 			`${unique('none')}@x.io`,
-			'hash',
-			[]
+			'hash'
 		);
 		const res = await client.admin.api
 			.buckets({ id: bucketId })
@@ -195,7 +189,7 @@ describe('clearing a lost authenticator (US5)', () => {
 
 	it('refuses a caller with no rights over the bucket, changing nothing', async () => {
 		const user = await enrolledAccount(bucketId);
-		const outsider = await sessionCookieFor(['project_admin']);
+		const outsider = await sessionCookieFor('plain');
 
 		const res = await client.admin.api
 			.buckets({ id: bucketId })

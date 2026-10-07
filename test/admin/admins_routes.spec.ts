@@ -8,16 +8,17 @@ import { getUserStore } from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { sessionFor } from '../admin_session.ts';
 import { answered } from './answered.ts';
+import { isSuperAdmin } from 'lib/admin/super_admins.ts';
+import { present } from 'test/shape.js';
+import { createAdministrator, type AdminKind } from '../administrators.ts';
 
 const app = new Elysia().use(resolveAdmin).use(adminUserRoutes);
 const client = treaty(app);
+const superAdminOf = (id: string) =>
+	client.admin.api.admins({ id })['super-admin'];
 
-async function cookieFor(roles: string[]) {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`${roles.join('-')}-${Math.random()}@x.io`,
-		'hash',
-		roles
-	);
+async function cookieFor(kind: AdminKind) {
+	const user = await createAdministrator(kind, `${kind}-${Math.random()}@x.io`);
 	const s = await sessionFor(user);
 	return { cookie: `${ADMIN_SESSION_COOKIE}=${s._id}`, userId: user._id };
 }
@@ -31,28 +32,26 @@ describe('admin-accounts API', () => {
 		await ensureAdminSeed();
 	});
 
-	it('super_admin creates a project_admin', async () => {
-		const { cookie } = await cookieFor(['super_admin']);
+	it('a super administrator creates an administrator who is not a super administrator', async () => {
+		const { cookie } = await cookieFor('super');
 		const res = await client.admin.api.admins.post(
 			{
 				email: 'pa@x.io',
-				password: 'correct horse battery',
-				roles: ['project_admin']
+				password: 'correct horse battery'
 			},
 			{ headers: { cookie } }
 		);
 		expect(res.status).toBe(201);
 		const created = await getUserStore(ADMIN_BUCKET_ID).findByEmail('pa@x.io');
-		expect(created?.roles).toEqual(['project_admin']);
+		expect(await isSuperAdmin(present(created, 'created')._id)).toBe(false);
 	});
 
 	it('never returns the password field, on create or list', async () => {
-		const { cookie } = await cookieFor(['super_admin']);
+		const { cookie } = await cookieFor('super');
 		const created = await client.admin.api.admins.post(
 			{
 				email: 'nopw@x.io',
-				password: 'correct horse battery',
-				roles: ['project_admin']
+				password: 'correct horse battery'
 			},
 			{ headers: { cookie } }
 		);
@@ -63,18 +62,17 @@ describe('admin-accounts API', () => {
 	});
 
 	it('a project administrator cannot list administrator accounts', async () => {
-		const { cookie } = await cookieFor(['project_admin']);
+		const { cookie } = await cookieFor('plain');
 		const res = await client.admin.api.admins.get({ headers: { cookie } });
 		expect(res.status).toBe(403);
 	});
 
-	it('project_admin is forbidden from creating admins', async () => {
-		const { cookie } = await cookieFor(['project_admin']);
+	it('a project administrator is forbidden from creating admins', async () => {
+		const { cookie } = await cookieFor('plain');
 		const res = await client.admin.api.admins.post(
 			{
 				email: 'blocked@x.io',
-				password: 'correct horse battery',
-				roles: ['project_admin']
+				password: 'correct horse battery'
 			},
 			{ headers: { cookie } }
 		);
@@ -86,9 +84,9 @@ describe('admin-accounts API', () => {
 		expect(res.status).toBe(401);
 	});
 
-	it('super_admin deactivates another admin via DELETE', async () => {
-		const { cookie } = await cookieFor(['super_admin']);
-		const target = await cookieFor(['project_admin']);
+	it('a super administrator deactivates another admin via DELETE', async () => {
+		const { cookie } = await cookieFor('super');
+		const target = await cookieFor('plain');
 		const res = await client.admin.api
 			.admins({ id: target.userId })
 			.delete(undefined, { headers: { cookie } });
@@ -98,22 +96,21 @@ describe('admin-accounts API', () => {
 	});
 
 	it('rejects self-deactivation with 409', async () => {
-		const { cookie, userId } = await cookieFor(['super_admin']);
+		const { cookie, userId } = await cookieFor('super');
 		const res = await client.admin.api
 			.admins({ id: userId })
 			.delete(undefined, { headers: { cookie } });
 		expect(res.status).toBe(409);
 	});
 
-	it('super_admin patches roles/active on an admin', async () => {
-		const { cookie } = await cookieFor(['super_admin']);
-		const target = await cookieFor(['project_admin']);
-		const res = await client.admin.api
-			.admins({ id: target.userId })
-			.patch({ roles: ['super_admin'] }, { headers: { cookie } });
+	it('a super administrator makes another administrator a super administrator', async () => {
+		const { cookie } = await cookieFor('super');
+		const target = await cookieFor('plain');
+		const res = await superAdminOf(target.userId).post(undefined, {
+			headers: { cookie }
+		});
 		expect(res.status).toBe(200);
 		expect(res.data).not.toHaveProperty('password');
-		const found = await getUserStore(ADMIN_BUCKET_ID).find(target.userId);
-		expect(found?.roles).toEqual(['super_admin']);
+		expect(await isSuperAdmin(target.userId)).toBe(true);
 	});
 });

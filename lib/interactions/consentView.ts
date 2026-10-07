@@ -94,6 +94,7 @@ const OIDC_SCOPE_LABELS: Record<string, string> = {
 	email: 'Your email address',
 	address: 'Your postal address',
 	phone: 'Your phone number',
+	groups: 'Your group memberships',
 	offline_access: 'Offline access (stay signed in)'
 };
 

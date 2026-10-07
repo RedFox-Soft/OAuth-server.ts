@@ -139,8 +139,8 @@ server ever starts against an empty key store it also generates and persists one
 `bun run db:setup` also provisions the admin panel: the reserved admin project, its "Administrators"
 user bucket, and the first-party `admin-panel` OAuth client. The seed is idempotent — **re-run
 `bun run db:setup` after upgrading an existing install** so the admin client/project/bucket exist.
-On first visit to `/admin`, a one-time setup screen creates the initial `super_admin`; the setup
-route is closed once any super_admin exists. The admin panel requires a MongoDB-backed deployment
+On first visit to `/admin`, a one-time setup screen creates the first administrator and makes them a
+member of Super administrators; the setup route is closed once that group has an active member. The admin panel requires a MongoDB-backed deployment
 (the in-memory adapter does not persist seeded data across restarts).
 
 ## Configuration

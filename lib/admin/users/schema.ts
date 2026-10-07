@@ -1,17 +1,15 @@
 import { t } from 'elysia';
 
+/*
+ * A new administrator is never a super administrator: the instance privilege is granted by its own
+ * operation (`POST /admin/api/admins/:id/super-admin`), so creating an account cannot hand it out.
+ */
 export const CreateAdminBody = t.Object({
 	email: t.String({ format: 'email' }),
-	password: t.String({ minLength: 12 }),
-	roles: t.Array(
-		t.Union([t.Literal('super_admin'), t.Literal('project_admin')])
-	)
+	password: t.String({ minLength: 12 })
 });
 
 export const UpdateAdminBody = t.Object({
-	roles: t.Optional(
-		t.Array(t.Union([t.Literal('super_admin'), t.Literal('project_admin')]))
-	),
 	active: t.Optional(t.Boolean())
 });
 
@@ -30,8 +28,7 @@ export const UpdateAdminBody = t.Object({
  *   `assertSomeWayToSignIn` looks for an enabled provider, so it would not even catch it.
  * - `registrationOpen: true` would let anyone who can reach /admin/login create a row in the reserved
  *   bucket through the ordinary registration page.
- * - `roles` is inert — nothing constrains an administrator's roles against it.
- * - `managedBy` is meaningless where access is by role, `federation` is refused by its own routes and
+ * - `managedBy` is meaningless where access is by group membership, `federation` is refused by its own routes and
  *   is a separate decision, and `name` is cosmetic.
  *
  * Any of them arriving here is refused with a 422 rather than dropped, which matters: a field accepted

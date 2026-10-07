@@ -171,6 +171,23 @@ const routes = [
 		path: '/admin/api/admins/:id',
 		targetType: 'AdminUser'
 	},
+	/*
+	 * The instance-wide privilege — membership of Super administrators — granted and withdrawn by operations
+	 * of their own, so the trail and the agent surface give it its own weight rather than folding it into an
+	 * ordinary account edit.
+	 */
+	{
+		action: 'admin.superadmin.grant',
+		method: 'POST',
+		path: '/admin/api/admins/:id/super-admin',
+		targetType: 'AdminUser'
+	},
+	{
+		action: 'admin.superadmin.withdraw',
+		method: 'DELETE',
+		path: '/admin/api/admins/:id/super-admin',
+		targetType: 'AdminUser'
+	},
 
 	/*
 	 * Groups: the owner of every project and bucket, and therefore the thing that decides who may reach
@@ -330,6 +347,49 @@ const routes = [
 		method: 'POST',
 		path: '/admin/api/buckets/:id/users/:uid/connection',
 		targetType: 'EndUser'
+	},
+
+	/*
+	 * A bucket's groups of end users. Membership is recorded with the member ids, so the trail answers "when
+	 * did this person gain or lose this group" — which is what a group means to every relying party reading
+	 * the `groups` claim. A SCIM change records the same actions under the connection.
+	 */
+	{
+		action: 'bucketgroup.create',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/groups',
+		targetType: 'BucketGroup'
+	},
+	{
+		action: 'bucketgroup.update',
+		method: 'PATCH',
+		path: '/admin/api/buckets/:id/groups/:gid',
+		targetType: 'BucketGroup'
+	},
+	{
+		action: 'bucketgroup.delete',
+		method: 'DELETE',
+		path: '/admin/api/buckets/:id/groups/:gid',
+		targetType: 'BucketGroup'
+	},
+	{
+		action: 'bucketgroup.member.add',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/groups/:gid/members',
+		targetType: 'BucketGroup'
+	},
+	{
+		action: 'bucketgroup.member.remove',
+		method: 'DELETE',
+		path: '/admin/api/buckets/:id/groups/:gid/members/:uid',
+		targetType: 'BucketGroup'
+	},
+	/* From then on the group is the connection's and read-only to every administrator. */
+	{
+		action: 'bucketgroup.connection.assign',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/groups/:gid/connection',
+		targetType: 'BucketGroup'
 	},
 
 	/*

@@ -7,14 +7,11 @@ import { groupRoutes } from 'lib/admin/groups/routes.ts';
 import { scopeRoutes } from 'lib/admin/scope/routes.ts';
 import { ensurePersonalGroup } from 'lib/admin/groups/personal.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import {
-	adminSessionStore,
-	getGroupStore,
-	getUserStore
-} from 'lib/adapters/index.ts';
+import { adminSessionStore, getGroupStore } from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { sessionFor } from '../admin_session.ts';
 import { answered } from './answered.ts';
+import { createAdministrator } from '../administrators.ts';
 
 /*
  * A personal group may be shared, so an administrator can be a member of somebody else's. Which one is
@@ -33,9 +30,7 @@ function email(prefix: string): string {
 }
 
 async function account() {
-	return getUserStore(ADMIN_BUCKET_ID).create(email('adm'), 'hash', [
-		'project_admin'
-	]);
+	return createAdministrator('plain', email('adm'));
 }
 
 /* An older administrator who adds a newer one to their own personal group. */

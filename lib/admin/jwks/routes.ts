@@ -1,7 +1,7 @@
 import { Elysia, t } from 'elysia';
 import {
 	assertAuth,
-	assertRole,
+	assertSuperAdmin,
 	AdminError,
 	adminErrorBody,
 	resolveAdmin,
@@ -26,14 +26,14 @@ export const jwksRoutes = new Elysia({ name: 'admin-jwks' })
 	})
 	.get('/admin/api/jwks', async ({ admin }) => {
 		const ctx = assertAuth(admin as AdminContext | null);
-		assertRole(ctx, 'super_admin');
+		assertSuperAdmin(ctx);
 		return listKeys(ctx);
 	})
 	.post(
 		'/admin/api/jwks',
 		async ({ admin, body }) => {
 			const ctx = assertAuth(admin as AdminContext | null);
-			assertRole(ctx, 'super_admin');
+			assertSuperAdmin(ctx);
 			return generateKey(ctx, (body as { alg?: unknown }).alg);
 		},
 		// Loose body + manual validation in the service, so failures return the admin_error
@@ -42,14 +42,14 @@ export const jwksRoutes = new Elysia({ name: 'admin-jwks' })
 	)
 	.post('/admin/api/jwks/:kid/promote', async ({ admin, params }) => {
 		const ctx = assertAuth(admin as AdminContext | null);
-		assertRole(ctx, 'super_admin');
+		assertSuperAdmin(ctx);
 		return promoteKey(ctx, params.kid);
 	})
 	.delete(
 		'/admin/api/jwks/:kid',
 		async ({ admin, params, body }) => {
 			const ctx = assertAuth(admin as AdminContext | null);
-			assertRole(ctx, 'super_admin');
+			assertSuperAdmin(ctx);
 			return retireKey(ctx, params.kid, body?.confirm);
 		},
 		{ body: t.Optional(RetireKeyBody) }

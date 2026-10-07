@@ -117,8 +117,8 @@ export function inputSchemaFor(tool: McpTool): Record<string, unknown> {
 
 function describe(tool: McpTool): string {
 	const parts = [tool.summary];
-	if (tool.requiredRole) {
-		parts.push(`Requires the ${tool.requiredRole} role.`);
+	if (tool.superAdminOnly) {
+		parts.push('Requires a super administrator.');
 	}
 	if (tool.consequence === 'high') {
 		parts.push(
@@ -151,7 +151,7 @@ function consequenceReport(
 /*
  * Who the admin plane says the caller is, asked once per gated call.
  *
- * Dispatches `GET /admin/api/me`, so the identity and roles are the ones `resolveAdmin` resolved for
+ * Dispatches `GET /admin/api/me`, so the identity and privilege are the ones `resolveAdmin` resolved for
  * this request — not a copy this module keeps. Both facts come from the one dispatch deliberately: the
  * role check and the principal binding were two separate `whoami` round-trips, which cost twice as much
  * and, worse, could disagree — a role revoked between them would pass the check and then bind a
@@ -165,7 +165,7 @@ function consequenceReport(
  */
 interface ResolvedCaller {
 	readonly userId: string;
-	readonly roles: readonly string[];
+	readonly superAdmin: boolean;
 }
 
 async function resolveCaller(
@@ -177,10 +177,10 @@ async function resolveCaller(
 	if (!me) return null;
 	const outcome = toOutcome(await dispatchTool(me, {}, credential));
 	if (!outcome.ok) return null;
-	const data = outcome.data as { userId?: string; roles?: string[] } | null;
+	const data = outcome.data as { userId?: string; superAdmin?: boolean } | null;
 	const userId = data?.userId;
 	if (typeof userId !== 'string' || userId.length === 0) return null;
-	return { userId, roles: data?.roles ?? [] };
+	return { userId, superAdmin: data?.superAdmin === true };
 }
 
 /*
@@ -194,8 +194,7 @@ async function resolveCaller(
  * that the real route then authorizes for itself.
  */
 function holdsRequiredRole(tool: McpTool, caller: ResolvedCaller): boolean {
-	if (!tool.requiredRole) return true;
-	return caller.roles.includes(tool.requiredRole);
+	return !tool.superAdminOnly || caller.superAdmin;
 }
 
 /*
@@ -311,13 +310,13 @@ export function buildMcpServer(ctx: McpRequestContext): McpServer {
 								content: [
 									{
 										type: 'text',
-										text: `forbidden: the ${tool.requiredRole} role is required, so this operation cannot be confirmed.`
+										text: 'forbidden: a super administrator is required, so this operation cannot be confirmed.'
 									}
 								],
 								structuredContent: {
 									ok: false,
 									reason: 'forbidden',
-									message: `the ${tool.requiredRole} role is required`
+									message: 'a super administrator is required'
 								},
 								isError: true
 							};

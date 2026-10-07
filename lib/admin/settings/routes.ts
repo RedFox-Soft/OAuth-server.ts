@@ -8,7 +8,7 @@ import {
 import { configStore } from '../../adapters/index.js';
 import {
 	assertAuth,
-	assertRole,
+	assertSuperAdmin,
 	AdminError,
 	adminErrorBody,
 	resolveAdmin,
@@ -180,14 +180,14 @@ export const settingsRoutes = new Elysia({ name: 'admin-settings' })
 	})
 	.get('/admin/api/settings', async ({ admin }) => {
 		const ctx = assertAuth(admin as AdminContext | null);
-		assertRole(ctx, 'super_admin');
+		assertSuperAdmin(ctx);
 		return currentState();
 	})
 	.put(
 		'/admin/api/settings',
 		async ({ admin, body }) => {
 			const ctx = assertAuth(admin as AdminContext | null);
-			assertRole(ctx, 'super_admin');
+			assertSuperAdmin(ctx);
 			const stored = ((await configStore.get()) ?? {}) as Record<
 				string,
 				unknown

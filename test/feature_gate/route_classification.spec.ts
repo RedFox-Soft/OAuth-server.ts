@@ -248,7 +248,13 @@ describe('route classification', () => {
 				'GET /scim/v2/Users/:userId',
 				'PUT /scim/v2/Users/:userId',
 				'PATCH /scim/v2/Users/:userId',
-				'DELETE /scim/v2/Users/:userId'
+				'DELETE /scim/v2/Users/:userId',
+				'GET /scim/v2/Groups',
+				'POST /scim/v2/Groups',
+				'GET /scim/v2/Groups/:groupId',
+				'PUT /scim/v2/Groups/:groupId',
+				'PATCH /scim/v2/Groups/:groupId',
+				'DELETE /scim/v2/Groups/:groupId'
 			])
 		];
 

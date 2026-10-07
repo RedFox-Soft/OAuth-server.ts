@@ -1,7 +1,7 @@
 import { describe, it, beforeAll, expect } from 'bun:test';
 
 import { adminAuditStore } from 'lib/adapters/index.js';
-import { isScimRoute } from 'lib/consts/scim.js';
+import { isScimRoute, SCIM_GROUP_SCHEMA } from 'lib/consts/scim.js';
 import { elysia } from 'lib/index.js';
 import bootstrap from '../test_helper.js';
 import {
@@ -44,6 +44,14 @@ describe('the SCIM surface as mounted', () => {
 		const res = await scim('POST', `${c.base}/Users`, {
 			token: c.token,
 			body: scimUser(`m-${Math.random()}@contoso.com`)
+		});
+		return res.json.id as string;
+	}
+
+	async function freshGroup(): Promise<string> {
+		const res = await scim('POST', `${c.base}/Groups`, {
+			token: c.token,
+			body: { schemas: [SCIM_GROUP_SCHEMA], displayName: `g-${Math.random()}` }
 		});
 		return res.json.id as string;
 	}
@@ -130,6 +138,73 @@ describe('the SCIM surface as mounted', () => {
 				await scim('DELETE', `${base}/Users/${id}`, { token: 'not-a-token' });
 				return id;
 			}
+		}),
+		'POST /Groups': async (base) => ({
+			ok: freshGroup,
+			refused: async () => {
+				const taken = await freshGroup();
+				const displayName = (
+					await scim('GET', `${base}/Groups/${taken}`, { token: c.token })
+				).json.displayName as string;
+				await scim('POST', `${base}/Groups`, {
+					token: c.token,
+					body: { schemas: [SCIM_GROUP_SCHEMA], displayName }
+				});
+				return taken;
+			}
+		}),
+		'PUT /Groups/:groupId': async (base) => ({
+			ok: async () => {
+				const id = await freshGroup();
+				await scim('PUT', `${base}/Groups/${id}`, {
+					token: c.token,
+					body: {
+						schemas: [SCIM_GROUP_SCHEMA],
+						displayName: `r-${Math.random()}`
+					}
+				});
+				return id;
+			},
+			refused: async () => {
+				const id = await freshGroup();
+				await scim('PUT', `${base}/Groups/${id}`, {
+					token: c.token,
+					body: { schemas: [SCIM_GROUP_SCHEMA] }
+				});
+				return id;
+			}
+		}),
+		'PATCH /Groups/:groupId': async (base) => ({
+			ok: async () => {
+				const id = await freshGroup();
+				await scim('PATCH', `${base}/Groups/${id}`, {
+					token: c.token,
+					body: patchOf([
+						{ op: 'replace', path: 'displayName', value: `p-${Math.random()}` }
+					])
+				});
+				return id;
+			},
+			refused: async () => {
+				const id = await freshGroup();
+				await scim('PATCH', `${base}/Groups/${id}`, {
+					token: c.token,
+					body: patchOf([{ op: 'replace', path: 'id', value: 'x' }])
+				});
+				return id;
+			}
+		}),
+		'DELETE /Groups/:groupId': async (base) => ({
+			ok: async () => {
+				const id = await freshGroup();
+				await scim('DELETE', `${base}/Groups/${id}`, { token: c.token });
+				return id;
+			},
+			refused: async () => {
+				const id = await freshGroup();
+				await scim('DELETE', `${base}/Groups/${id}`, { token: 'not-a-token' });
+				return id;
+			}
 		})
 	};
 
@@ -169,6 +244,7 @@ describe('the SCIM surface as mounted', () => {
 			const path = route.path
 				.replace('/:bucket', `/${c.bucket.slug}`)
 				.replace(':userId', 'nobody')
+				.replace(':groupId', 'nobody')
 				.replace(':schemaId', 'nothing')
 				.replace(':resourceTypeId', 'nothing');
 			const res = await elysia.handle(

@@ -125,7 +125,6 @@ async function seedEnrolled(bucketId: string, email: string) {
 	const user = await getUserStore(bucketId).create(
 		email,
 		await Bun.password.hash(PASSWORD),
-		[],
 		true
 	);
 	await getUserStore(bucketId).update(user._id, {
@@ -463,7 +462,6 @@ describe('second factor at sign-in (US3)', () => {
 			await getUserStore(optionalBucketId).create(
 				email,
 				await Bun.password.hash(PASSWORD),
-				[],
 				true
 			);
 			const { res } = await passwordStep('totp-optional-app', email);

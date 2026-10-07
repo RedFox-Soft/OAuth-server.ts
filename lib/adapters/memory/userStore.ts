@@ -46,7 +46,6 @@ export class UserStore implements UserStoreInstance {
 			verified: user.verified ?? true,
 			password: user.password ?? 'seeded',
 			active: user.active ?? true,
-			roles: user.roles ?? [],
 			createdAt: user.createdAt ?? now,
 			updatedAt: user.updatedAt ?? now,
 			lastLoginAt: user.lastLoginAt ?? null,
@@ -107,6 +106,13 @@ export class UserStore implements UserStoreInstance {
 		};
 	}
 
+	async findMany(ids: string[]): Promise<User[]> {
+		return ids
+			.slice(0, MAX_END_USER_PAGE)
+			.map((id) => this.users.get(id))
+			.filter((user): user is User => user !== undefined);
+	}
+
 	async findByEmail(email: string): Promise<User | null> {
 		for (const user of this.users.values()) {
 			if (user.email.toLowerCase() === email.toLowerCase()) {
@@ -141,7 +147,6 @@ export class UserStore implements UserStoreInstance {
 	async create(
 		email: string,
 		password: string,
-		roles: string[] = [],
 		verified = false,
 		id?: string,
 		fields?: EndUserCreateFields
@@ -169,7 +174,6 @@ export class UserStore implements UserStoreInstance {
 				verified,
 				password,
 				active: true,
-				roles,
 				createdAt: now,
 				updatedAt: now,
 				lastLoginAt: null

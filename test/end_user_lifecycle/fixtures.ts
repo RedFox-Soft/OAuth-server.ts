@@ -6,18 +6,18 @@ import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { endUserRoutes } from 'lib/admin/users-end/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
-	ADMIN_BUCKET_ID,
 	ADMIN_SESSION_COOKIE,
 	DEFAULT_BUCKET_ID,
 	UNASSIGNED_GROUP_ID
 } from 'lib/admin/consts.ts';
-import { getBucketStore, getUserStore } from 'lib/adapters/index.ts';
+import { getBucketStore } from 'lib/adapters/index.ts';
 import type { UserBucket } from 'lib/adapters/types.ts';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { present } from 'test/shape.js';
 import { sessionFor } from '../admin_session.ts';
 import { agent, redirectParameter, type Setup } from '../test_helper.js';
+import { createAdministrator } from '../administrators.ts';
 
 /* The admin API as the console reaches it: the real routes behind the real admin resolver. */
 const adminApp = new Elysia().use(resolveAdmin).use(endUserRoutes);
@@ -26,10 +26,9 @@ export const admin = treaty(adminApp);
 /* A super administrator's console cookie. */
 export async function adminCookie(): Promise<string> {
 	await ensureAdminSeed();
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`super-${Math.random()}@x.io`,
-		'hash',
-		['super_admin']
+	const user = await createAdministrator(
+		'super',
+		`super-${Math.random()}@x.io`
 	);
 	const session = await sessionFor(user);
 	return `${ADMIN_SESSION_COOKIE}=${session._id}`;

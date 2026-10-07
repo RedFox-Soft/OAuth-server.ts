@@ -5,11 +5,7 @@ import { elysia } from 'lib/index.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import {
-	getUserStore,
-	adminSessionStore,
-	adminAuditStore
-} from 'lib/adapters/index.ts';
+import { adminSessionStore, adminAuditStore } from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import {
 	ADMIN_MCP_CLIENT_ID,
@@ -18,6 +14,7 @@ import {
 } from 'lib/mcp/consts.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { createAdministrator } from '../administrators.ts';
 
 /*
  * Agent attribution in the audit trail.
@@ -59,11 +56,7 @@ async function rpc(body: unknown, token: string) {
 }
 
 async function adminAndToken() {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`attr-${Math.random()}@x.io`,
-		'hash',
-		['super_admin']
-	);
+	const user = await createAdministrator('super', `attr-${Math.random()}@x.io`);
 	const at = new AccessToken({
 		client: await Client.find(ADMIN_MCP_CLIENT_ID),
 		accountId: user._id,

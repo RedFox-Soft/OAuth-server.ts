@@ -99,7 +99,7 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 		 * group their console is pointed at — not every group they belong to, because the console has one
 		 * active scope and a list mixing two tenants is the thing scope switching exists to prevent.
 		 */
-		const all = ctx.roles.includes('super_admin')
+		const all = ctx.superAdmin
 			? (await store.list()).filter((p) => p.type === 'regular')
 			: (await store.listByGroup(ctx.activeGroupId)).filter(
 					(p) => p.type === 'regular'

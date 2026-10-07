@@ -21,6 +21,7 @@ import { mock } from '../fetch_mock.ts';
 import { idpStub } from '../federation/idp_stub.ts';
 import { sessionFor } from '../admin_session.ts';
 import { answered } from './answered.ts';
+import { createAdministrator, type AdminKind } from '../administrators.ts';
 
 /*
  * Configuring providers, and severing an account's link to one.
@@ -33,12 +34,8 @@ import { answered } from './answered.ts';
 const app = new Elysia().use(resolveAdmin).use(federationAdminRoutes);
 const client = treaty(app);
 
-async function cookieFor(roles: string[]) {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`${roles.join('-')}-${Math.random()}@x.io`,
-		'hash',
-		roles
-	);
+async function cookieFor(kind: AdminKind) {
+	const user = await createAdministrator(kind, `${kind}-${Math.random()}@x.io`);
 	const session = await sessionFor(user);
 	return { cookie: `${ADMIN_SESSION_COOKIE}=${session._id}`, user };
 }
@@ -67,7 +64,7 @@ describe('provider management', () => {
 	});
 
 	it('creates a provider with the cautious defaults and never returns its secret', async () => {
-		const { cookie } = await cookieFor(['super_admin']);
+		const { cookie } = await cookieFor('super');
 		const idp = await idpStub('https://idp-admin-create.test');
 		idp.expectDiscovery();
 		const bucket = await getBucketStore().create({
@@ -97,7 +94,7 @@ describe('provider management', () => {
 	});
 
 	it('masks the secret on every read', async () => {
-		const { cookie } = await cookieFor(['super_admin']);
+		const { cookie } = await cookieFor('super');
 		const idp = await idpStub('https://idp-admin-read.test');
 		idp.expectDiscovery();
 		const bucket = await getBucketStore().create({
@@ -119,7 +116,7 @@ describe('provider management', () => {
 	});
 
 	it('keeps the stored secret when an update omits it, and when it echoes the mask', async () => {
-		const { cookie } = await cookieFor(['super_admin']);
+		const { cookie } = await cookieFor('super');
 		const idp = await idpStub('https://idp-admin-keep.test');
 		idp.expectDiscovery();
 		const bucket = await getBucketStore().create({
@@ -155,7 +152,7 @@ describe('provider management', () => {
 	});
 
 	it('replaces the secret when a real one is supplied', async () => {
-		const { cookie } = await cookieFor(['super_admin']);
+		const { cookie } = await cookieFor('super');
 		const idp = await idpStub('https://idp-admin-rotate.test');
 		idp.expectDiscovery();
 		const bucket = await getBucketStore().create({
@@ -176,7 +173,7 @@ describe('provider management', () => {
 	});
 
 	it('records an audit entry naming the fields and never their values', async () => {
-		const { cookie } = await cookieFor(['super_admin']);
+		const { cookie } = await cookieFor('super');
 		const idp = await idpStub('https://idp-admin-audit.test');
 		idp.expectDiscovery();
 		const bucket = await getBucketStore().create({
@@ -205,7 +202,7 @@ describe('provider management', () => {
 	});
 
 	it('deletes a provider and records it', async () => {
-		const { cookie } = await cookieFor(['super_admin']);
+		const { cookie } = await cookieFor('super');
 		const idp = await idpStub('https://idp-admin-delete.test');
 		idp.expectDiscovery();
 		const bucket = await getBucketStore().create({
@@ -231,7 +228,7 @@ describe('provider management', () => {
 	});
 
 	it('refuses a provider whose issuer cannot be reached', async () => {
-		const { cookie } = await cookieFor(['super_admin']);
+		const { cookie } = await cookieFor('super');
 		const idp = await idpStub('https://idp-admin-down.test');
 		idp.expectDiscoveryFailure(500);
 		const bucket = await getBucketStore().create({
@@ -249,7 +246,7 @@ describe('provider management', () => {
 	});
 
 	it('refuses an issuer whose document names a different one', async () => {
-		const { cookie } = await cookieFor(['super_admin']);
+		const { cookie } = await cookieFor('super');
 		// The document claims to be somebody else — a copy-pasted tenant URL, a redirect, a trailing slash.
 		const idp = await idpStub('https://idp-admin-mismatch.test', {
 			issuer: 'https://somebody-else.test'
@@ -269,7 +266,7 @@ describe('provider management', () => {
 	});
 
 	it('refuses a non-https issuer without reaching for it', async () => {
-		const { cookie } = await cookieFor(['super_admin']);
+		const { cookie } = await cookieFor('super');
 		const bucket = await getBucketStore().create({
 			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'b'
@@ -284,7 +281,7 @@ describe('provider management', () => {
 	});
 
 	it('refuses a malformed id, a duplicate id, missing openid, and a bad domain', async () => {
-		const { cookie } = await cookieFor(['super_admin']);
+		const { cookie } = await cookieFor('super');
 		const idp = await idpStub('https://idp-admin-validate.test');
 		const bucket = await getBucketStore().create({
 			ownerGroupId: UNASSIGNED_GROUP_ID,
@@ -328,7 +325,7 @@ describe('provider management', () => {
 	});
 
 	it('refuses disabling or deleting the last enabled provider of a federated-only bucket', async () => {
-		const { cookie } = await cookieFor(['super_admin']);
+		const { cookie } = await cookieFor('super');
 		const idp = await idpStub('https://idp-admin-lockout.test');
 		idp.expectDiscovery();
 		const bucket = await getBucketStore().create({
@@ -358,7 +355,7 @@ describe('provider management', () => {
 	});
 
 	it('keeps two buckets on the same issuer entirely separate', async () => {
-		const { cookie } = await cookieFor(['super_admin']);
+		const { cookie } = await cookieFor('super');
 		const idp = await idpStub('https://idp-admin-shared.test');
 		idp.expectDiscovery();
 		const a = await getBucketStore().create({
@@ -395,7 +392,7 @@ describe('provider management', () => {
 	});
 
 	it('refuses provider writes to the reserved admin bucket', async () => {
-		const { cookie } = await cookieFor(['super_admin']);
+		const { cookie } = await cookieFor('super');
 		const idp = await idpStub('https://idp-admin-reserved.test');
 
 		const res = await client.admin.api
@@ -411,7 +408,7 @@ describe('provider management', () => {
 	});
 
 	it('refuses a caller who does not manage the bucket', async () => {
-		const { cookie } = await cookieFor(['project_admin']);
+		const { cookie } = await cookieFor('plain');
 		const idp = await idpStub('https://idp-admin-outsider.test');
 		const bucket = await getBucketStore().create({
 			name: 'someone-elses',
@@ -438,7 +435,7 @@ describe("an account's upstream identities", () => {
 
 	async function seedLinkedUser(bucketId: string) {
 		const store = getUserStore(bucketId);
-		const user = await store.create('linked@acme.test', 'hash', [], true);
+		const user = await store.create('linked@acme.test', 'hash', true);
 		await store.update(user._id, {
 			federated: [
 				{
@@ -452,7 +449,7 @@ describe("an account's upstream identities", () => {
 	}
 
 	it('lists which providers an account is linked to', async () => {
-		const { cookie } = await cookieFor(['super_admin']);
+		const { cookie } = await cookieFor('super');
 		const bucket = await getBucketStore().create({
 			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'b'
@@ -472,7 +469,7 @@ describe("an account's upstream identities", () => {
 	});
 
 	it('severs a link, records it with the bucket as scope, and leaves the account', async () => {
-		const { cookie } = await cookieFor(['super_admin']);
+		const { cookie } = await cookieFor('super');
 		const bucket = await getBucketStore().create({
 			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'b'
@@ -502,7 +499,7 @@ describe("an account's upstream identities", () => {
 	});
 
 	it('answers 404 for a link the account does not hold', async () => {
-		const { cookie } = await cookieFor(['super_admin']);
+		const { cookie } = await cookieFor('super');
 		const bucket = await getBucketStore().create({
 			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'b'
@@ -525,7 +522,7 @@ describe("an account's upstream identities", () => {
 	});
 
 	it('refuses a caller who does not manage the bucket', async () => {
-		const { cookie } = await cookieFor(['project_admin']);
+		const { cookie } = await cookieFor('plain');
 		const bucket = await getBucketStore().create({
 			name: 'someone-elses',
 			ownerGroupId: 'a-group-nobody-here-belongs-to'

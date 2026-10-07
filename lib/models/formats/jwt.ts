@@ -6,6 +6,7 @@ import { keysFor } from 'lib/keys/issuer_keys.js';
 import type { RequestBucket } from 'lib/configs/issuer.js';
 import { issuerFor } from 'lib/configs/issuer.js';
 import { issuingBucket } from 'lib/admin/auth/bucketAddress.js';
+import { groupsMembersOf } from 'lib/consts/groups_claim.js';
 import { ClientDefaults } from 'lib/configs/clientBase.js';
 import { pairwiseIdentifier } from '../../addon/index.js';
 import type { JWK } from 'jose';
@@ -217,7 +218,8 @@ export const jwt = {
 			client_id: clientId,
 			iss,
 			aud,
-			...(x5t || jkt ? { cnf } : undefined)
+			...(x5t || jkt ? { cnf } : undefined),
+			...groupsMembersOf(payload)
 		};
 
 		const structuredToken = { payload: tokenPayload };

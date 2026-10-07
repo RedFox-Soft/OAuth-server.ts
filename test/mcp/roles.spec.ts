@@ -5,11 +5,7 @@ import { elysia } from 'lib/index.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import {
-	getUserStore,
-	getProjectStore,
-	getBucketStore
-} from 'lib/adapters/index.ts';
+import { getProjectStore, getBucketStore } from 'lib/adapters/index.ts';
 import {
 	ADMIN_BUCKET_ID,
 	ADMIN_SESSION_COOKIE,
@@ -25,6 +21,7 @@ import { ApplicationConfig } from 'lib/configs/application.js';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
 import { shaped } from 'test/shape.js';
 import { Type } from '@sinclair/typebox';
+import { createAdministrator, type AdminKind } from '../administrators.ts';
 
 /*
  * SC-006: no agent-initiated operation succeeds with permissions the same account would not have in the
@@ -76,11 +73,10 @@ function call(name: string, args: Record<string, unknown>) {
 }
 
 /* One administrator, reachable both ways: an MCP token and a console cookie. */
-async function principal(roles: string[]) {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`role-${roles.join('-')}-${Math.random()}@x.io`,
-		'hash',
-		roles
+async function principal(kind: AdminKind) {
+	const user = await createAdministrator(
+		kind,
+		`role-${kind}-${Math.random()}@x.io`
 	);
 	const at = new AccessToken({
 		client: await Client.find(ADMIN_MCP_CLIENT_ID),
@@ -153,10 +149,10 @@ describe('agent permissions match the console, per role', () => {
 		await ensureAdminSeed();
 	});
 
-	it.each([['super_admin'], ['project_admin']])(
-		'answers every parameterless read identically over both surfaces for %s',
+	it.each([['super'], ['plain']] as const)(
+		'answers every parameterless read identically over both surfaces for a %s administrator',
 		async (role) => {
-			const { token, cookie } = await principal([role]);
+			const { token, cookie } = await principal(role);
 
 			for (const tool of READS.filter((t) => t.pathParams.length === 0)) {
 				const agent = await viaAgent(tool.tool, {}, token);
@@ -171,7 +167,7 @@ describe('agent permissions match the console, per role', () => {
 	);
 
 	it('scopes a project read to what the account manages, on both surfaces', async () => {
-		const { token, cookie, user } = await principal(['project_admin']);
+		const { token, cookie, user } = await principal('plain');
 
 		const mine = await getProjectStore().create({
 			name: 'Mine',
@@ -206,7 +202,7 @@ describe('agent permissions match the console, per role', () => {
 	});
 
 	it('grants bucket-user access to a project manager but not bucket-entity access', async () => {
-		const { token, user } = await principal(['project_admin']);
+		const { token, user } = await principal('plain');
 
 		const bucket = await getBucketStore().create({
 			ownerGroupId: UNASSIGNED_GROUP_ID,
@@ -235,7 +231,7 @@ describe('agent permissions match the console, per role', () => {
 	});
 
 	it('refuses the reserved administrator bucket through the bucket tools', async () => {
-		const { token, cookie } = await principal(['super_admin']);
+		const { token, cookie } = await principal('super');
 
 		// Even to a super-administrator: administrators are managed through their own tools, and the
 		// reserved bucket is not a place end-user operations may reach.
@@ -255,9 +251,9 @@ describe('agent permissions match the console, per role', () => {
 	});
 
 	it('refuses every super-admin-gated tool to a non-super-administrator', async () => {
-		const { token } = await principal(['project_admin']);
+		const { token } = await principal('plain');
 
-		const gated = mcpCatalogue.filter((t) => t.requiredRole === 'super_admin');
+		const gated = mcpCatalogue.filter((t) => t.superAdminOnly);
 		expect(gated.length).toBeGreaterThan(0);
 
 		for (const tool of gated) {
@@ -265,18 +261,38 @@ describe('agent permissions match the console, per role', () => {
 			for (const param of tool.pathParams) {
 				args[pathArgName(tool, param)] = `no-such-${param}`;
 			}
-			// A body is not needed: the role check happens before anything reads one. Where a schema
+			// A body is not needed: the privilege check happens before anything reads one. Where a schema
 			// requires fields the call is refused by validation, which is also not success.
 			const reason = await viaAgent(tool.tool, args, token);
 			expect(
 				reason,
-				`${tool.tool} was not refused to a project_admin`
+				`${tool.tool} was not refused to a non-super administrator`
 			).not.toBe('ok');
 		}
 	});
 
+	it('lets a non-super administrator create a project and a bucket into their own scope', async () => {
+		const { token } = await principal('plain');
+		const suffix = Math.floor(Math.random() * 1e6);
+
+		expect(
+			await viaAgent(
+				'project_create',
+				{ name: 'Own project', slug: `own-${suffix}` },
+				token
+			)
+		).toBe('ok');
+		expect(
+			await viaAgent(
+				'bucket_create',
+				{ name: 'Own bucket', slug: `own-bucket-${suffix}` },
+				token
+			)
+		).toBe('ok');
+	});
+
 	it('cannot escalate by asking a different tool for the same thing', async () => {
-		const { token } = await principal(['project_admin']);
+		const { token } = await principal('plain');
 
 		/*
 		 * The audit trail is no longer super-admin only: it is scope-filtered, so a project administrator

@@ -1,6 +1,7 @@
 import { STORE_AREAS } from '../lib/consts/storage_inventory.js';
 import { verifyEndUserIdentity } from './verify_end_user_identity.js';
 import { verifyProvisioningConnections } from './verify_provisioning_connections.js';
+import { verifyBucketGroups } from './verify_bucket_groups.js';
 
 /*
  * Storage fidelity for the MongoDB backend, against a real MongoDB — the properties of per-issuer
@@ -28,6 +29,7 @@ delete process.env.POSTGRES_URL;
 
 /* After the guard, for the reason verify_postgres.ts gives: importing the adapters connects. */
 const {
+	BucketGroupStore,
 	BucketKeysStore,
 	ProtectedResourceStore,
 	ProvisioningConnectionStore,
@@ -212,6 +214,118 @@ check(
 		(await legacyArea.countDocuments()) === 0,
 	migrated.map((key) => `${key.alg}:${key.state}`).join(', ')
 );
+
+/*
+ * Roles to groups (specs/071), against legacy records as a release before it wrote them: a bucket declaring
+ * roles, its users holding them — one in two spellings, one undeclared, one blank — and administrators holding
+ * super_admin (one deactivated) and project_admin. Applied twice; the second application must change nothing.
+ */
+const rolesMigration = MIGRATIONS.find((m) => m.id.endsWith('roles-to-groups'));
+const rolesBucket = `fidelity-roles-${stamp}`;
+await db.collection<{ _id: string }>(STORE_AREAS.userBuckets).insertOne({
+	_id: rolesBucket,
+	name: 'roles',
+	ownerGroupId: 'unassigned',
+	roles: ['editor', 'viewer']
+} as { _id: string });
+/* Raw legacy documents, in the shape the release before this one wrote. */
+type Raw = { _id: string } & Record<string, unknown>;
+await db.collection<Raw>(`user_${rolesBucket}`).insertMany([
+	{ _id: 'u1', email: 'u1@x.io', roles: ['editor'] },
+	{ _id: 'u2', email: 'u2@x.io', roles: ['Editor', 'viewer'] },
+	{ _id: 'u3', email: 'u3@x.io', roles: ['auditor', '  '] }
+]);
+await db.collection<Raw>('user_admin').insertMany([
+	{
+		_id: `root-${stamp}`,
+		email: 'root@x.io',
+		active: true,
+		roles: ['super_admin', 'project_admin']
+	},
+	{
+		_id: `retired-${stamp}`,
+		email: 'retired@x.io',
+		active: false,
+		roles: ['super_admin']
+	},
+	{
+		_id: `pa-${stamp}`,
+		email: 'pa@x.io',
+		active: true,
+		roles: ['project_admin']
+	}
+]);
+const snapshot = async () => ({
+	groups: await db
+		.collection(STORE_AREAS.bucketGroups)
+		.countDocuments({ bucketId: rolesBucket }),
+	memberships: await db
+		.collection(STORE_AREAS.bucketGroupMembers)
+		.countDocuments({ bucketId: rolesBucket })
+});
+let roleReport: readonly string[] = [];
+let afterFirst = { groups: -1, memberships: -1 };
+if (rolesMigration && !('noop' in rolesMigration.mongodb)) {
+	const lines = await rolesMigration.mongodb.apply(db);
+	roleReport = Array.isArray(lines) ? lines.map(String) : [];
+	afterFirst = await snapshot();
+	await rolesMigration.mongodb.apply(db);
+}
+const bucketGroupStore = new BucketGroupStore();
+const migratedGroups = (
+	await bucketGroupStore.query(
+		{ bucketId: rolesBucket },
+		{ startIndex: 1, count: 100 }
+	)
+).groups;
+const membersByName: Record<string, string[]> = {};
+for (const group of migratedGroups) {
+	membersByName[group.displayName] = await bucketGroupStore.memberIds(
+		group._id
+	);
+}
+check(
+	'every declared and held role becomes a group with exactly its holders',
+	JSON.stringify(membersByName) ===
+		JSON.stringify({ auditor: ['u3'], editor: ['u1', 'u2'], viewer: ['u2'] }) ||
+		JSON.stringify(Object.fromEntries(Object.entries(membersByName).sort())) ===
+			JSON.stringify({ auditor: ['u3'], editor: ['u1', 'u2'], viewer: ['u2'] }),
+	JSON.stringify(membersByName)
+);
+const superGroup = await db
+	.collection<Raw>('groups')
+	.findOne({ _id: 'super-administrators' });
+const superMembers = ((superGroup?.members ?? []) as { userId: string }[]).map(
+	(m) => m.userId
+);
+check(
+	'every super_admin holder, active or not, and nobody else, is a member of Super administrators',
+	superMembers.includes(`root-${stamp}`) &&
+		superMembers.includes(`retired-${stamp}`) &&
+		!superMembers.includes(`pa-${stamp}`),
+	superMembers.join(', ')
+);
+check(
+	'the roles migration applied twice changes nothing the second time',
+	JSON.stringify(await snapshot()) === JSON.stringify(afterFirst),
+	JSON.stringify(afterFirst)
+);
+check(
+	'no migrated record still carries roles',
+	(await db
+		.collection(`user_${rolesBucket}`)
+		.countDocuments({ roles: { $exists: true } })) === 0 &&
+		(await db
+			.collection('user_admin')
+			.countDocuments({ roles: { $exists: true } })) === 0 &&
+		(await db
+			.collection(STORE_AREAS.userBuckets)
+			.countDocuments({ roles: { $exists: true } })) === 0
+);
+for (const line of roleReport) console.log(`       ${line}`);
+for (const line of await verifyBucketGroups(bucketGroupStore, check)) {
+	console.log(`       ${line}`);
+}
 
 /* A bucket created here, so its user area carries the indexes declared today. */
 const identityBucket = await new UserBucketStore().create({

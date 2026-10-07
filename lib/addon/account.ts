@@ -1,11 +1,14 @@
 import { Grant } from '../models/grant.js';
 import { getUserStore } from '../adapters/index.js';
 import { resolveBucketForRequest } from '../admin/auth/resolveBucket.js';
-import { DEFAULT_REQUEST_BUCKET } from '../configs/issuer.js';
+import { DEFAULT_REQUEST_BUCKET, issuerFor } from '../configs/issuer.js';
 import type { OIDCContext } from '../helpers/oidc_context.ts';
 import { consentWaived } from '../shared/consent_waiver.js';
 import { canSignIn } from '../end_users/can_sign_in.js';
 import { profileClaims } from '../consts/profile_claims.js';
+import { routeNames } from '../consts/param_list.js';
+import { groupsClaimFor } from '../bucket_groups/claim.js';
+import { isRecord } from '../helpers/_/object.js';
 
 // The token an account is loaded for at the token and userinfo endpoints.
 type AccountToken = {
@@ -62,28 +65,51 @@ export async function findAccount<
 		return undefined;
 	}
 
+	const userinfoEndpoint = `${issuerFor(oidc?.bucket ?? DEFAULT_REQUEST_BUCKET)}${routeNames.userinfo}`;
+
 	return {
 		accountId: sub,
 		// @param use {string} - "id_token" or "userinfo"; the provider masks the
 		//   returned claims by granted scope automatically. Any extra claims stored
 		//   on the record (profile, distributed/aggregated) are merged in.
 		async claims(
-			_use?: string,
+			use?: string,
 			_scope?: string,
 			_claims?: unknown,
 			_rejected?: readonly string[]
 		) {
 			/*
 			 * A provisioned profile yields standard claims (lib/consts/profile_claims.ts); the stored claims an
-			 * administrator set come last and win, as they always have.
+			 * administrator set come last and win, as they always have — except `groups`, which is always the
+			 * user's actual membership: a stored value would let whoever can edit an account's claims forge what
+			 * every relying party authorizes on.
 			 */
-			return {
+			const { groups: _stored, ...stored } = user.claims ?? {};
+			const claims: Record<string, unknown> = {
 				sub,
 				email: user.email,
 				email_verified: user.verified,
 				...profileClaims(user),
-				...user.claims
+				...stored
 			};
+			const groups = await groupsClaimFor(bucketId, sub, {
+				reference: use === 'id_token',
+				userinfoEndpoint
+			});
+			if (groups.kind === 'list') {
+				claims.groups = groups.names;
+			} else if (groups.kind === 'reference') {
+				/* Beside any distributed or aggregated claims the account's stored claims already declare. */
+				claims._claim_names = {
+					...(isRecord(claims._claim_names) ? claims._claim_names : {}),
+					...groups.claimNames
+				};
+				claims._claim_sources = {
+					...(isRecord(claims._claim_sources) ? claims._claim_sources : {}),
+					...groups.claimSources
+				};
+			}
+			return claims;
 		}
 	};
 }

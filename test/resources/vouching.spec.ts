@@ -7,10 +7,9 @@ import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { ensurePersonalGroup } from 'lib/admin/groups/personal.ts';
 import {
 	getProjectStore,
-	getProtectedResourceStore,
-	getUserStore
+	getProtectedResourceStore
 } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { ISSUER } from 'lib/configs/env.ts';
 import { ROOT_NAMESPACE } from 'lib/resources/namespace.ts';
 import { assertNoPendingInterceptors, mock } from '../fetch_mock.ts';
@@ -19,6 +18,7 @@ import {
 	challengeWithMetadata,
 	serveResourceMetadata
 } from './resource_metadata.ts';
+import { createAdministrator } from '../administrators.ts';
 
 const app = new Elysia({ normalize: false })
 	.use(resolveAdmin)
@@ -60,10 +60,9 @@ function unique(label: string) {
 describe("a declared resource's published metadata", () => {
 	beforeEach(async () => {
 		await ensureAdminSeed();
-		const user = await getUserStore(ADMIN_BUCKET_ID).create(
-			`vouch-${Math.random()}@x.io`,
-			'hash',
-			['project_admin']
+		const user = await createAdministrator(
+			'plain',
+			`vouch-${Math.random()}@x.io`
 		);
 		const group = await ensurePersonalGroup(user._id, user.email);
 		cookie = `${ADMIN_SESSION_COOKIE}=${(await sessionFor(user))._id}`;

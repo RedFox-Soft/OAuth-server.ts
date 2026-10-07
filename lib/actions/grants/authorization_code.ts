@@ -24,6 +24,9 @@ import { Grant } from 'lib/models/grant.js';
 import ResourceServer from 'lib/helpers/resource_server.js';
 import { markRegistrationUsed } from '../../models/client/dynamic_registration.js';
 import type { DPoPProof } from 'lib/helpers/validate_dpop.js';
+import { resourceTokenGroups } from '../../bucket_groups/claim.js';
+import { issuerFor } from '../../configs/issuer.js';
+import { routeNames } from '../../consts/param_list.js';
 
 const gty = 'authorization_code';
 
@@ -179,6 +182,16 @@ export const handler = async function authorizationCodeHandler(
 		);
 		at.resourceServer = new ResourceServer(resource, resourceServerInfo);
 		at.payload.scope = grant.getResourceScopeFiltered(resource, code.scopes);
+		/* The user's groups, when the authorization granted them (specs/071 research R9). */
+		Object.assign(
+			at.payload,
+			await resourceTokenGroups(
+				grant.getOIDCScopeFiltered(code.scopes),
+				code.payload.bucketId,
+				at.payload.accountId,
+				`${issuerFor(oidc.bucket)}${routeNames.userinfo}`
+			)
+		);
 	} else {
 		at.payload.claims = code.payload.claims;
 		at.payload.scope = grant.getOIDCScopeFiltered(code.scopes);

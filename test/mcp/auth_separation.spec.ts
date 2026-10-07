@@ -14,6 +14,7 @@ import {
 } from 'lib/mcp/consts.ts';
 import { routeNames } from 'lib/consts/param_list.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
+import { createAdministrator } from '../administrators.ts';
 
 /*
  * FR-013, both directions.
@@ -57,11 +58,7 @@ async function callUserinfo(token: string) {
 }
 
 async function adminAccount() {
-	return getUserStore(ADMIN_BUCKET_ID).create(
-		`sep-${Math.random()}@x.io`,
-		'hash',
-		['super_admin']
-	);
+	return createAdministrator('super', `sep-${Math.random()}@x.io`);
 }
 
 async function tokenWithAudience(audience: string | undefined) {

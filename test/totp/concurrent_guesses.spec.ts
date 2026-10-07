@@ -36,7 +36,6 @@ describe('a second factor guessed concurrently', () => {
 		const user = await store.create(
 			`burst-${Math.random()}@x.io`,
 			'hash',
-			[],
 			true
 		);
 		await store.update(user._id, {

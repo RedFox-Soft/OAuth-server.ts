@@ -20,10 +20,8 @@ describe('UserBucketStore (memory)', () => {
 		expect(await store.find(b._id)).toMatchObject({ name: 'Dev users' });
 	});
 
-	it('lists by owning group and updates roles', async () => {
-		const b = await store.create({ name: 'Dev', ownerGroupId: 'g1' });
+	it('lists by owning group', async () => {
+		await store.create({ name: 'Dev', ownerGroupId: 'g1' });
 		expect(await store.listByGroup('g1')).toHaveLength(1);
-		await store.update(b._id, { roles: ['viewer', 'editor'] });
-		expect((await store.find(b._id))?.roles).toEqual(['viewer', 'editor']);
 	});
 });

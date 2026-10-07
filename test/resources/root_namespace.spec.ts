@@ -10,10 +10,9 @@ import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { ensurePersonalGroup } from 'lib/admin/groups/personal.ts';
 import {
 	getProjectStore,
-	getProtectedResourceStore,
-	getUserStore
+	getProtectedResourceStore
 } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { AccessToken } from 'lib/models/access_token.ts';
 import { Client } from 'lib/models/client.ts';
 import {
@@ -24,6 +23,7 @@ import {
 import { ApplicationConfig } from 'lib/configs/application.ts';
 import { ROOT_NAMESPACE } from 'lib/resources/namespace.ts';
 import { sessionFor } from '../admin_session.ts';
+import { createAdministrator, type AdminKind } from '../administrators.ts';
 
 /*
  * A project with no bucket of its own is served at the root issuer, whose namespace every such tenant
@@ -44,11 +44,10 @@ const body = {
 	scopes: ['mcp:tools-basic']
 };
 
-async function administrator(roles: string[]) {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`root-${roles.join('-')}-${Math.random()}@x.io`,
-		'hash',
-		roles
+async function administrator(kind: AdminKind) {
+	const user = await createAdministrator(
+		kind,
+		`root-${kind}-${Math.random()}@x.io`
 	);
 	const group = await ensurePersonalGroup(user._id, user.email);
 	const session = await sessionFor(user);
@@ -141,7 +140,7 @@ describe('a project without an addressable bucket', () => {
 	});
 
 	it('refuses a group administrator declaring a resource, naming both ways out', async () => {
-		const { cookie, groupId } = await administrator(['project_admin']);
+		const { cookie, groupId } = await administrator('plain');
 		const project = await rootProject(groupId);
 
 		const res = await api.admin.api
@@ -156,7 +155,7 @@ describe('a project without an addressable bucket', () => {
 	});
 
 	it('refuses a group administrator amending a resource declared there', async () => {
-		const { cookie, groupId } = await administrator(['project_admin']);
+		const { cookie, groupId } = await administrator('plain');
 		const project = await rootProject(groupId);
 		await declaredAtRoot(project._id);
 
@@ -169,7 +168,7 @@ describe('a project without an addressable bucket', () => {
 	});
 
 	it('refuses a group administrator removing a resource declared there', async () => {
-		const { cookie, groupId } = await administrator(['project_admin']);
+		const { cookie, groupId } = await administrator('plain');
 		const project = await rootProject(groupId);
 		await declaredAtRoot(project._id);
 
@@ -183,7 +182,7 @@ describe('a project without an addressable bucket', () => {
 	});
 
 	it('lets a super administrator declare a resource with no outbound request', async () => {
-		const { cookie, groupId } = await administrator(['super_admin']);
+		const { cookie, groupId } = await administrator('super');
 		const project = await rootProject(groupId);
 
 		const res = await api.admin.api
@@ -197,7 +196,7 @@ describe('a project without an addressable bucket', () => {
 	});
 
 	it('refuses an agent acting for a group administrator declaring a resource', async () => {
-		const { user, groupId } = await administrator(['project_admin']);
+		const { user, groupId } = await administrator('plain');
 		const project = await rootProject(groupId);
 		const token = await agentFor(user._id);
 

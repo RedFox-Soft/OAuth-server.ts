@@ -6,15 +6,12 @@ import { ApplicationConfig } from 'lib/configs/application.ts';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { errorRoutes } from 'lib/admin/errors/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import {
-	adminAuditStore,
-	errorStore,
-	getUserStore
-} from 'lib/adapters/index.ts';
+import { adminAuditStore, errorStore } from 'lib/adapters/index.ts';
 import type { ErrorOccurrence } from 'lib/adapters/types.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { sessionFor } from '../admin_session.ts';
 import { shaped } from 'test/shape.js';
+import { createAdministrator } from '../administrators.ts';
 
 /*
  * US4 — the purge, and what the trail says about it.
@@ -36,11 +33,7 @@ let seq = 0;
 const unique = (prefix: string) => `${prefix}-${Date.now()}-${(seq += 1)}`;
 
 async function superCookie() {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`${unique('super')}@x.io`,
-		'hash',
-		['super_admin']
-	);
+	const user = await createAdministrator('super', `${unique('super')}@x.io`);
 	const session = await sessionFor(user);
 	return `${ADMIN_SESSION_COOKIE}=${session._id}`;
 }
@@ -193,10 +186,9 @@ describe('error store purge', () => {
 				401
 			);
 
-			const user = await getUserStore(ADMIN_BUCKET_ID).create(
-				`${unique('plain')}@x.io`,
-				'hash',
-				['project_admin']
+			const user = await createAdministrator(
+				'plain',
+				`${unique('plain')}@x.io`
 			);
 			const session = await sessionFor(user);
 			const refused = await call(

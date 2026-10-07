@@ -39,7 +39,6 @@ export const CreateBucketBody = t.Object({
 	name: t.String({ minLength: 1 }),
 	slug: t.Optional(BucketSlug),
 	host: t.Optional(BucketHost),
-	roles: t.Optional(t.Array(t.String())),
 	passwordLogin: t.Optional(t.Boolean()),
 	registrationOpen: t.Optional(t.Boolean()),
 	emailVerificationRequired: t.Optional(t.Boolean()),
@@ -81,7 +80,6 @@ export const UpdateBucketBody = t.Object({
 	 * `high` classification — and that is a feature rather than a field. Until it exists, an address is
 	 * chosen once.
 	 */
-	roles: t.Optional(t.Array(t.String())),
 	passwordLogin: t.Optional(t.Boolean()),
 	registrationOpen: t.Optional(t.Boolean()),
 	emailVerificationRequired: t.Optional(t.Boolean()),

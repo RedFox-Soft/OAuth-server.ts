@@ -34,7 +34,9 @@ import {
 	ADMIN_BUCKET_ID,
 	ADMIN_CLIENT_ID,
 	UNASSIGNED_GROUP_ID,
-	SYSTEM_GROUP_NAME
+	SYSTEM_GROUP_NAME,
+	SUPER_ADMINS_GROUP_ID,
+	SUPER_ADMINS_GROUP_NAME
 } from '../lib/admin/consts.js';
 import { ADMIN_MCP_CLIENT_ID } from '../lib/mcp/consts.js';
 import {
@@ -43,6 +45,7 @@ import {
 	ADMIN_PROJECT_SEED,
 	DEFAULT_BUCKET_SEED,
 	SYSTEM_GROUP_SEED,
+	SUPER_ADMINS_GROUP_SEED,
 	adminConsoleClientSeed
 } from '../lib/consts/admin_seed.js';
 
@@ -235,6 +238,19 @@ await db.collection<{ _id: string }>(STORE_AREAS.groups).updateOne(
 		$set: { name: SYSTEM_GROUP_NAME },
 		$setOnInsert: {
 			...SYSTEM_GROUP_SEED,
+			createdAt: seedNow,
+			updatedAt: seedNow
+		}
+	},
+	{ upsert: true }
+);
+/* Super administrators: membership is the instance privilege. Mirrors `ensureSuperAdminsGroup`. */
+await db.collection<{ _id: string }>(STORE_AREAS.groups).updateOne(
+	{ _id: SUPER_ADMINS_GROUP_ID },
+	{
+		$set: { name: SUPER_ADMINS_GROUP_NAME },
+		$setOnInsert: {
+			...SUPER_ADMINS_GROUP_SEED,
 			createdAt: seedNow,
 			updatedAt: seedNow
 		}

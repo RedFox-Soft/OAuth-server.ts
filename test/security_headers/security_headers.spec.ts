@@ -19,8 +19,7 @@ import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { routeNames } from 'lib/consts/param_list.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { getUserStore } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 
 import {
 	gatedRoutes,
@@ -34,6 +33,7 @@ import {
 	expectProfileByKind
 } from './profile.js';
 import { present } from 'test/shape.js';
+import { createAdministrator } from '../administrators.ts';
 
 /*
  * Contract of record: specs/026-non-html-security-headers/contracts/response-headers.md.
@@ -348,10 +348,9 @@ describe('security headers: the administrative control plane', () => {
 	});
 
 	async function superAdminCookie(): Promise<string> {
-		const user = await getUserStore(ADMIN_BUCKET_ID).create(
-			`headers-${Math.random()}@x.io`,
-			'hash',
-			['super_admin']
+		const user = await createAdministrator(
+			'super',
+			`headers-${Math.random()}@x.io`
 		);
 		const session = await sessionFor(user);
 		return `${ADMIN_SESSION_COOKIE}=${session._id}`;

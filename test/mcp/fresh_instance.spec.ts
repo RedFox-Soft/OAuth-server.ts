@@ -9,7 +9,6 @@ import { ISSUER } from 'lib/configs/env.js';
 import { issuingBucket } from 'lib/admin/auth/bucketAddress.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { getUserStore } from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID } from 'lib/admin/consts.ts';
 import { resolveBucketForRequest } from 'lib/admin/auth/resolveBucket.ts';
 import {
@@ -19,6 +18,7 @@ import {
 } from 'lib/mcp/consts.ts';
 import { clearPermissions } from './permissions.ts';
 import { DEFAULT_REQUEST_BUCKET } from 'lib/configs/issuer.ts';
+import { createAdministrator } from '../administrators.ts';
 
 /*
  * The refusal an operator cannot see.
@@ -108,10 +108,9 @@ describe('connecting an agent to a freshly provisioned instance', () => {
 	});
 
 	it('needs no allowlist entry for the reserved agent client', async () => {
-		const operator = await getUserStore(ADMIN_BUCKET_ID).create(
-			`admin-${Math.random()}@x.io`,
-			'hash',
-			['super_admin']
+		const operator = await createAdministrator(
+			'super',
+			`admin-${Math.random()}@x.io`
 		);
 
 		const response = await callMcp(await tokenForAccount(operator._id));
@@ -154,10 +153,9 @@ describe('connecting an agent to a freshly provisioned instance', () => {
 	 * the token that is wrong.
 	 */
 	it('carries the instance issuer in a token minted for the administrators bucket', async () => {
-		const operator = await getUserStore(ADMIN_BUCKET_ID).create(
-			`admin-${Math.random()}@x.io`,
-			'hash',
-			['super_admin']
+		const operator = await createAdministrator(
+			'super',
+			`admin-${Math.random()}@x.io`
 		);
 		const token = new IdToken(
 			await Client.find(ADMIN_MCP_CLIENT_ID),

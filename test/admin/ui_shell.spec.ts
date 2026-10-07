@@ -1,16 +1,16 @@
 import { describe, it, expect, beforeAll } from 'bun:test';
 import bootstrap, { agent } from '../test_helper.ts';
-import { getUserStore, resetAdminMemoryStores } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import { resetAdminMemoryStores } from 'lib/adapters/index.ts';
+import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { sessionFor } from '../admin_session.ts';
 import { shaped } from 'test/shape.js';
 import { Type } from '@sinclair/typebox';
+import { createAdministrator, type AdminKind } from '../administrators.ts';
 
-async function cookieFor(roles: string[]): Promise<string> {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`shell-${roles.join('-')}-${Date.now()}@x.io`,
-		'hash',
-		roles
+async function cookieFor(kind: AdminKind): Promise<string> {
+	const user = await createAdministrator(
+		kind,
+		`shell-${kind}-${Date.now()}@x.io`
 	);
 	const session = await sessionFor(user);
 	return `${ADMIN_SESSION_COOKIE}=${session._id}`;
@@ -24,13 +24,13 @@ describe('admin UI shell', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'admin' });
 		// Cross-suite isolation: other admin specs (login_flow, interactions_bucket)
-		// seed a super_admin into the shared in-memory admin bucket earlier in the
+		// seed a super administrator into the shared in-memory admin bucket earlier in the
 		// same `bun test` process. Drop the cached store singletons so this spec
 		// sees a genuinely empty admin bucket before asserting on first-run setup.
 		resetAdminMemoryStores();
 	});
 
-	it('serves the setup screen when no super_admin exists', async () => {
+	it('serves the setup screen when no super administrator exists', async () => {
 		const res = await agent.admin.get();
 		const html = shaped(Type.String(), res.data);
 		expect(res.response.headers.get('content-type')).toContain('text/html');
@@ -50,7 +50,7 @@ describe('admin UI shell', () => {
 	 * so asserting on public/admin.js only ever passed on a locally built artifact.
 	 *
 	 * The sessions are minted here rather than in beforeAll because the first test above must see an
-	 * admin bucket with no super_admin in it.
+	 * admin bucket with no super administrator in it.
 	 *
 	 * This covers the nav gate only; the API's own scoping for a non-super-admin is pinned in
 	 * audit_group_scope.spec.ts, which is where it actually matters.
@@ -64,14 +64,14 @@ describe('admin UI shell', () => {
 		expect(forbidden.status).toBe(401);
 
 		const superAdmin = await agent.admin.get({
-			headers: { cookie: await cookieFor(['super_admin']) }
+			headers: { cookie: await cookieFor('super') }
 		});
 		const superShell = shaped(Type.String(), superAdmin.data);
 		expect(superShell).toContain('Settings');
 		expect(superShell).toContain('Keys');
 
 		const projectAdmin = await agent.admin.get({
-			headers: { cookie: await cookieFor(['project_admin']) }
+			headers: { cookie: await cookieFor('plain') }
 		});
 		const shell = shaped(Type.String(), projectAdmin.data);
 		expect(shell).not.toContain('Settings');

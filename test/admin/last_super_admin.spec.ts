@@ -4,57 +4,56 @@ import { treaty } from '@elysiajs/eden';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { adminUserRoutes } from 'lib/admin/users/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { getUserStore, resetAdminMemoryStores } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import { resetAdminMemoryStores } from 'lib/adapters/index.ts';
+import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { sessionFor } from '../admin_session.ts';
+import { createAdministrator, type AdminKind } from '../administrators.ts';
 
 const app = new Elysia().use(resolveAdmin).use(adminUserRoutes);
 const client = treaty(app);
+const superAdminOf = (id: string) =>
+	client.admin.api.admins({ id })['super-admin'];
 
-async function makeAdmin(roles: string[]) {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`${Math.random()}@x.io`,
-		'hash',
-		roles
-	);
+async function makeAdmin(kind: AdminKind) {
+	const user = await createAdministrator(kind, `${Math.random()}@x.io`);
 	const s = await sessionFor(user);
 	return { cookie: `${ADMIN_SESSION_COOKIE}=${s._id}`, userId: user._id };
 }
 
-// Reset the shared admin stores each test so the active-super_admin count is
-// deterministic (other specs seed many super_admins into the same process).
+// Reset the shared admin stores each test so the active super administrator count is
+// deterministic (other specs seed many super administrators into the same process).
 /**
- * @proves The instance can never be left with no active super administrator, by demotion or by
+ * @proves The instance can never be left with no active super administrator, by withdrawal or by
  * deactivation.
  */
-describe('last active super_admin guard', () => {
+describe('last active super administrator guard', () => {
 	beforeEach(async () => {
 		resetAdminMemoryStores();
 		await ensureAdminSeed();
 	});
 
-	it('blocks demoting the only active super_admin (PATCH roles) with 409', async () => {
-		const su = await makeAdmin(['super_admin']);
-		const res = await client.admin.api
-			.admins({ id: su.userId })
-			.patch({ roles: ['project_admin'] }, { headers: { cookie: su.cookie } });
+	it('refuses to withdraw the only active super administrator with 409', async () => {
+		const su = await makeAdmin('super');
+		const res = await superAdminOf(su.userId).delete(undefined, {
+			headers: { cookie: su.cookie }
+		});
 		expect(res.status).toBe(409);
 	});
 
-	it('blocks deactivating the only active super_admin (PATCH active:false) with 409', async () => {
-		const su = await makeAdmin(['super_admin']);
+	it('refuses to deactivate the only active super administrator with 409', async () => {
+		const su = await makeAdmin('super');
 		const res = await client.admin.api
 			.admins({ id: su.userId })
 			.patch({ active: false }, { headers: { cookie: su.cookie } });
 		expect(res.status).toBe(409);
 	});
 
-	it('allows demoting a super_admin while another active super_admin remains', async () => {
-		const a = await makeAdmin(['super_admin']);
-		const b = await makeAdmin(['super_admin']);
-		const res = await client.admin.api
-			.admins({ id: b.userId })
-			.patch({ roles: ['project_admin'] }, { headers: { cookie: a.cookie } });
+	it('withdraws a super administrator while another active one remains', async () => {
+		const a = await makeAdmin('super');
+		const b = await makeAdmin('super');
+		const res = await superAdminOf(b.userId).delete(undefined, {
+			headers: { cookie: a.cookie }
+		});
 		expect(res.status).toBe(200);
 	});
 });

@@ -12,7 +12,6 @@ import { elysia } from 'lib/index.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { getUserStore } from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID } from 'lib/admin/consts.ts';
 import { ApplicationConfig } from 'lib/configs/application.ts';
 import {
@@ -26,6 +25,7 @@ import { resolver } from 'lib/client_metadata_document/fetch.ts';
 import { serveDocument, mock } from '../cimd/document_host.js';
 import { clearPermissions, permitIdentifier } from './permissions.ts';
 import { DEFAULT_REQUEST_BUCKET } from 'lib/configs/issuer.ts';
+import { createAdministrator } from '../administrators.ts';
 
 /*
  * Does the administrative plane actually work through a client identity document, end to end?
@@ -41,10 +41,9 @@ import { DEFAULT_REQUEST_BUCKET } from 'lib/configs/issuer.ts';
 const publicAddress = '93.184.216.34';
 
 async function tokenFor(clientId: string) {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`admin-${Math.random()}@x.io`,
-		'hash',
-		['super_admin']
+	const user = await createAdministrator(
+		'super',
+		`admin-${Math.random()}@x.io`
 	);
 	const at = new AccessToken({
 		client: await Client.find(clientId),

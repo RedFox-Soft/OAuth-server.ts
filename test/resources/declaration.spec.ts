@@ -8,12 +8,12 @@ import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
 	getBucketStore,
 	getProjectStore,
-	getProtectedResourceStore,
-	getUserStore
+	getProtectedResourceStore
 } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
 import { answered } from '../admin/answered.ts';
+import { createAdministrator, type AdminKind } from '../administrators.ts';
 
 /*
  * Declaring a protected resource through the admin API.
@@ -39,12 +39,8 @@ const AUDIENCE = 'https://mcp.example.com/mcp';
 /* The identifier is a URL inside a path segment, and Eden treaty does not encode those for you. */
 const encoded = encodeURIComponent(AUDIENCE);
 
-async function admin(roles = ['project_admin']) {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`${roles.join('-')}-${Math.random()}@x.io`,
-		'hash',
-		roles
-	);
+async function admin(kind: AdminKind = 'plain') {
+	const user = await createAdministrator(kind, `${kind}-${Math.random()}@x.io`);
 	const session = await sessionFor(user);
 	return {
 		cookie: `${ADMIN_SESSION_COOKIE}=${session._id}`,

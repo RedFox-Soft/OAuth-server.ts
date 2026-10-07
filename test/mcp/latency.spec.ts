@@ -5,12 +5,8 @@ import { elysia } from 'lib/index.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { getUserStore, getProjectStore } from 'lib/adapters/index.ts';
-import {
-	ADMIN_BUCKET_ID,
-	ADMIN_SESSION_COOKIE,
-	UNASSIGNED_GROUP_ID
-} from 'lib/admin/consts.ts';
+import { getProjectStore } from 'lib/adapters/index.ts';
+import { ADMIN_SESSION_COOKIE, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import {
 	ADMIN_MCP_CLIENT_ID,
 	MCP_RESOURCE,
@@ -18,6 +14,7 @@ import {
 } from 'lib/mcp/consts.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { sessionFor } from '../admin_session.ts';
+import { createAdministrator } from '../administrators.ts';
 
 /*
  * plan.md's performance goal: a tool call within 2× the admin route it wraps, and no regression on the
@@ -58,11 +55,7 @@ async function rpc(body: unknown, token: string) {
 }
 
 async function setup() {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`lat-${Math.random()}@x.io`,
-		'hash',
-		['super_admin']
-	);
+	const user = await createAdministrator('super', `lat-${Math.random()}@x.io`);
 	const at = new AccessToken({
 		client: await Client.find(ADMIN_MCP_CLIENT_ID),
 		accountId: user._id,

@@ -17,8 +17,14 @@
  * without a datastore.
  */
 
-import { STORE_AREAS } from './storage_inventory.js';
-import { isServedAtTheRoot } from '../admin/consts.js';
+import { STORE_AREAS, userAreaFor } from './storage_inventory.js';
+import {
+	ADMIN_BUCKET_ID,
+	isServedAtTheRoot,
+	SUPER_ADMINS_GROUP_ID,
+	SUPER_ADMINS_GROUP_NAME
+} from '../admin/consts.js';
+import { displayNameKeyOf, membershipIdOf } from '../adapters/end_user_keys.js';
 import { declarationId, ROOT_NAMESPACE } from '../resources/declaration_id.js';
 import { ROOT_KEY_OWNER } from './key_owner.js';
 
@@ -31,7 +37,11 @@ import { ROOT_KEY_OWNER } from './key_owner.js';
  * per backend.
  */
 export interface MigrationStep {
-	readonly apply: (handle: unknown) => Promise<void>;
+	/*
+	 * May answer report lines — what the step found and did, for the operator running it (counts, never
+	 * personal data). `database/migrate.ts` prints them under the migration's id.
+	 */
+	readonly apply: (handle: unknown) => Promise<unknown>;
 }
 
 /*
@@ -349,7 +359,395 @@ const rootKeysLifecycle: Migration = {
 	}
 };
 
+/*
+ * Bucket roles become bucket groups, and `super_admin` becomes membership of Super administrators
+ * (specs/071). What follows is the decision — pure, so a spec can hold it to its promises without a
+ * datastore — and then the two backends' steps that carry it out.
+ */
+
+/* What one end-user bucket's roles become. Names are trimmed; blank ones are skipped and reported. */
+export interface RoleMigrationPlan {
+	groups: { displayName: string; key: string; memberIds: string[] }[];
+	/* Spellings folded into one group because they differ only in letter case. */
+	merges: string[][];
+	/* Names users held that the bucket never declared — kept as groups, so no assignment is lost. */
+	undeclared: string[];
+	skipped: number;
+}
+
+/* The same fold the store's unique key uses (lib/adapters/end_user_keys.ts), so the plan and the index agree. */
+function foldOf(name: string): string {
+	return name.normalize('NFC').toLowerCase();
+}
+
+export function planRoleMigration(
+	declared: readonly unknown[] | undefined,
+	users: readonly { _id: string; roles?: unknown }[]
+): RoleMigrationPlan {
+	let skipped = 0;
+	const named = (value: unknown): string | null => {
+		const name = typeof value === 'string' ? value.trim() : '';
+		if (!name) {
+			skipped += 1;
+			return null;
+		}
+		return name;
+	};
+	const declaredSpelling = new Map<string, string>();
+	for (const raw of declared ?? []) {
+		const name = named(raw);
+		if (name !== null && !declaredSpelling.has(foldOf(name))) {
+			declaredSpelling.set(foldOf(name), name);
+		}
+	}
+	const spellings = new Map<string, Set<string>>();
+	const members = new Map<string, Set<string>>();
+	for (const name of declaredSpelling.values()) {
+		spellings.set(foldOf(name), new Set([name]));
+		members.set(foldOf(name), new Set());
+	}
+	for (const user of users) {
+		const held = Array.isArray(user.roles) ? user.roles : [];
+		for (const raw of held) {
+			const name = named(raw);
+			if (name === null) continue;
+			const key = foldOf(name);
+			if (!spellings.has(key)) spellings.set(key, new Set());
+			spellings.get(key)?.add(name);
+			if (!members.has(key)) members.set(key, new Set());
+			members.get(key)?.add(user._id);
+		}
+	}
+	const groups: RoleMigrationPlan['groups'] = [];
+	const merges: string[][] = [];
+	const undeclared: string[] = [];
+	for (const [key, names] of [...spellings].sort(([a], [b]) =>
+		a < b ? -1 : 1
+	)) {
+		const sorted = [...names].sort();
+		const displayName = declaredSpelling.get(key) ?? sorted[0];
+		if (sorted.length > 1) merges.push(sorted);
+		if (!declaredSpelling.has(key)) undeclared.push(displayName);
+		groups.push({
+			displayName,
+			key,
+			memberIds: [...(members.get(key) ?? [])].sort()
+		});
+	}
+	return { groups, merges, undeclared, skipped };
+}
+
+/*
+ * Which administrators become members of Super administrators: every holder of `super_admin`, active or not —
+ * a deactivated one reactivated later must come back with the authority they had — and nobody else. The
+ * `project_admin` holdings are only counted: the role granted nothing.
+ */
+export function planSuperAdmins(
+	admins: readonly { _id: string; roles?: unknown }[]
+): { superAdmins: string[]; projectAdmins: number } {
+	const superAdmins: string[] = [];
+	let projectAdmins = 0;
+	for (const admin of admins) {
+		const roles = Array.isArray(admin.roles) ? admin.roles : [];
+		if (roles.includes('super_admin')) superAdmins.push(admin._id);
+		if (roles.includes('project_admin')) projectAdmins += 1;
+	}
+	return { superAdmins, projectAdmins };
+}
+
+/* The report every backend's step returns: counts only. */
+function roleMigrationReport(totals: {
+	groups: number;
+	memberships: number;
+	undeclared: number;
+	merges: number;
+	skipped: number;
+	superAdmins: number;
+	projectAdmins: number;
+}): string[] {
+	return [
+		`bucket groups created from roles: ${totals.groups}`,
+		`memberships written: ${totals.memberships}`,
+		`role names held but never declared, kept as groups: ${totals.undeclared}`,
+		`role names merged because they differed only in letter case: ${totals.merges}`,
+		`blank role names skipped: ${totals.skipped}`,
+		`administrators made members of Super administrators: ${totals.superAdmins}`,
+		`project_admin holdings dropped (the role granted nothing): ${totals.projectAdmins}`
+	];
+}
+
+function newGroupId(): string {
+	return globalThis.crypto.randomUUID().replaceAll('-', '');
+}
+
+const rolesToGroups: Migration = {
+	id: '2026-10-08-roles-to-groups',
+	description:
+		'Bucket roles become bucket groups, and super_admin becomes membership of Super administrators',
+	reversible: false,
+	rerunnable:
+		'Only records still carrying `roles` are read; a group is inserted only when its key is absent and a membership record only when its `_id` is absent, and a record’s `roles` is removed only after everything derived from it is written — so a run interrupted anywhere resumes, and a second run finds nothing.',
+	mongodb: {
+		async apply(handle) {
+			// The runner passes the selected backend's handle; for MongoDB that is the driver's `Db`.
+			const db = handle as MongoHandle;
+			const now = new Date();
+			const totals = {
+				groups: 0,
+				memberships: 0,
+				undeclared: 0,
+				merges: 0,
+				skipped: 0,
+				superAdmins: 0,
+				projectAdmins: 0
+			};
+
+			const adminGroups = db.collection(STORE_AREAS.groups);
+			await adminGroups.updateOne(
+				{ _id: SUPER_ADMINS_GROUP_ID },
+				{
+					$set: { name: SUPER_ADMINS_GROUP_NAME },
+					$setOnInsert: {
+						kind: 'system',
+						members: [],
+						createdAt: now,
+						updatedAt: now
+					}
+				},
+				{ upsert: true }
+			);
+			const admins = db.collection(userAreaFor(ADMIN_BUCKET_ID));
+			const holders = await admins.find({ roles: { $exists: true } }).toArray();
+			const decided = planSuperAdmins(
+				holders.map((a) => ({ _id: String(a._id), roles: a.roles }))
+			);
+			totals.projectAdmins = decided.projectAdmins;
+			for (const userId of decided.superAdmins) {
+				const group = await adminGroups.findOne({ _id: SUPER_ADMINS_GROUP_ID });
+				const members = Array.isArray(group?.members) ? group.members : [];
+				if (!members.some((m: Doc) => m.userId === userId)) {
+					await adminGroups.updateOne(
+						{ _id: SUPER_ADMINS_GROUP_ID },
+						{
+							$set: {
+								members: [...members, { userId, role: 'member' }],
+								updatedAt: now
+							}
+						},
+						{}
+					);
+					totals.superAdmins += 1;
+				}
+			}
+			/* After the memberships derived from them are written, so an interrupted run resumes. */
+			for (const holder of holders) {
+				await admins.updateOne(
+					{ _id: holder._id },
+					{ $unset: { roles: '' } },
+					{}
+				);
+			}
+
+			const buckets = db.collection(STORE_AREAS.userBuckets);
+			const groups = db.collection(STORE_AREAS.bucketGroups);
+			const memberships = db.collection(STORE_AREAS.bucketGroupMembers);
+			for (const bucket of await buckets.find({}).toArray()) {
+				const bucketId = String(bucket._id);
+				if (bucketId !== ADMIN_BUCKET_ID) {
+					const users = db.collection(userAreaFor(bucketId));
+					const holders = await users
+						.find({ roles: { $exists: true } })
+						.toArray();
+					const plan = planRoleMigration(
+						Array.isArray(bucket.roles) ? bucket.roles : [],
+						holders.map((u) => ({ _id: String(u._id), roles: u.roles }))
+					);
+					totals.undeclared += plan.undeclared.length;
+					totals.merges += plan.merges.length;
+					totals.skipped += plan.skipped;
+					for (const planned of plan.groups) {
+						const displayNameKey = displayNameKeyOf(
+							bucketId,
+							planned.displayName
+						);
+						const existing = await groups.findOne({ displayNameKey });
+						let groupId = existing ? String(existing._id) : null;
+						if (!groupId) {
+							groupId = newGroupId();
+							await groups.updateOne(
+								{ displayNameKey },
+								{
+									$setOnInsert: {
+										_id: groupId,
+										bucketId,
+										displayName: planned.displayName,
+										displayNameKey,
+										createdAt: now,
+										updatedAt: now
+									}
+								},
+								{ upsert: true }
+							);
+							groupId = String(
+								(await groups.findOne({ displayNameKey }))?._id ?? groupId
+							);
+							totals.groups += 1;
+						}
+						for (const userId of planned.memberIds) {
+							await memberships.updateOne(
+								{ _id: membershipIdOf(groupId, userId) },
+								{ $setOnInsert: { groupId, userId, bucketId, createdAt: now } },
+								{ upsert: true }
+							);
+							totals.memberships += 1;
+						}
+					}
+					/* After every membership derived from them is written, so an interrupted run resumes. */
+					for (const holder of holders) {
+						await users.updateOne(
+							{ _id: holder._id },
+							{ $unset: { roles: '' } },
+							{}
+						);
+					}
+				}
+				await buckets.updateOne(
+					{ _id: bucket._id },
+					{ $unset: { roles: '' } },
+					{}
+				);
+			}
+			return roleMigrationReport(totals);
+		}
+	},
+	postgres: {
+		async apply(handle) {
+			// The runner passes the selected backend's handle; for PostgreSQL that is Bun's SQL client.
+			const sql = handle as PostgresHandle;
+			const now = new Date();
+			const totals = {
+				groups: 0,
+				memberships: 0,
+				undeclared: 0,
+				merges: 0,
+				skipped: 0,
+				superAdmins: 0,
+				projectAdmins: 0
+			};
+			/*
+			 * Quoted, as lib/adapters/postgres/provision.ts `tableExists` explains: `to_regclass` folds a bare name to
+			 * lower case, so `user_<id>` with a capital in the id would read as missing and its roles be skipped.
+			 */
+			const exists = async (area: string) =>
+				(
+					await sql`SELECT to_regclass(${`"${area.replaceAll('"', '""')}"`}) IS NOT NULL AS present`
+				)[0]?.present === true;
+
+			const adminGroups = sql(STORE_AREAS.groups);
+			await sql`
+				INSERT INTO ${adminGroups} (id, doc, expires_at)
+				VALUES (${SUPER_ADMINS_GROUP_ID}, ${{ _id: SUPER_ADMINS_GROUP_ID, name: SUPER_ADMINS_GROUP_NAME, kind: 'system', members: [], createdAt: now, updatedAt: now }}, NULL)
+				ON CONFLICT (id) DO NOTHING
+			`;
+			if (await exists(userAreaFor(ADMIN_BUCKET_ID))) {
+				const admins = sql(userAreaFor(ADMIN_BUCKET_ID));
+				const holders =
+					await sql`SELECT id, doc FROM ${admins} WHERE doc ? 'roles'`;
+				const decided = planSuperAdmins(
+					holders.map((row) => ({
+						_id: String(row.id),
+						roles: (row.doc as Doc).roles
+					}))
+				);
+				totals.projectAdmins = decided.projectAdmins;
+				for (const userId of decided.superAdmins) {
+					const [group] =
+						await sql`SELECT doc FROM ${adminGroups} WHERE id = ${SUPER_ADMINS_GROUP_ID}`;
+					const stored = (group?.doc as Doc | undefined)?.members;
+					const members = Array.isArray(stored) ? stored : [];
+					if (!members.some((m: Doc) => m.userId === userId)) {
+						await sql`
+							UPDATE ${adminGroups}
+							SET doc = doc || ${{ members: [...members, { userId, role: 'member' }], updatedAt: now }}
+							WHERE id = ${SUPER_ADMINS_GROUP_ID}
+						`;
+						totals.superAdmins += 1;
+					}
+				}
+				/* After the memberships derived from them are written, so an interrupted run resumes. */
+				for (const holder of holders) {
+					await sql`UPDATE ${admins} SET doc = doc - 'roles' WHERE id = ${String(holder.id)}`;
+				}
+			}
+
+			const buckets = sql(STORE_AREAS.userBuckets);
+			const groups = sql(STORE_AREAS.bucketGroups);
+			const memberships = sql(STORE_AREAS.bucketGroupMembers);
+			for (const bucket of await sql`SELECT id, doc FROM ${buckets}`) {
+				const bucketId = String(bucket.id);
+				const doc = bucket.doc as Doc;
+				if (
+					bucketId !== ADMIN_BUCKET_ID &&
+					(await exists(userAreaFor(bucketId)))
+				) {
+					const users = sql(userAreaFor(bucketId));
+					const holders =
+						await sql`SELECT id, doc FROM ${users} WHERE doc ? 'roles'`;
+					const plan = planRoleMigration(
+						Array.isArray(doc.roles) ? doc.roles : [],
+						holders.map((u) => ({
+							_id: String(u.id),
+							roles: (u.doc as Doc).roles
+						}))
+					);
+					totals.undeclared += plan.undeclared.length;
+					totals.merges += plan.merges.length;
+					totals.skipped += plan.skipped;
+					for (const planned of plan.groups) {
+						const displayNameKey = displayNameKeyOf(
+							bucketId,
+							planned.displayName
+						);
+						const found = async () =>
+							(
+								await sql`SELECT id FROM ${groups} WHERE doc->>'displayNameKey' = ${displayNameKey}`
+							)[0]?.id;
+						let groupId = await found();
+						if (typeof groupId !== 'string') {
+							const id = newGroupId();
+							/* Any unique violation — the name taken meanwhile — leaves the existing group to be read back. */
+							await sql`
+								INSERT INTO ${groups} (id, doc, expires_at)
+								VALUES (${id}, ${{ _id: id, bucketId, displayName: planned.displayName, displayNameKey, createdAt: now, updatedAt: now }}, NULL)
+								ON CONFLICT DO NOTHING
+							`;
+							groupId = await found();
+							totals.groups += 1;
+						}
+						for (const userId of planned.memberIds) {
+							const membershipId = membershipIdOf(String(groupId), userId);
+							await sql`
+								INSERT INTO ${memberships} (id, doc, expires_at)
+								VALUES (${membershipId}, ${{ _id: membershipId, groupId: String(groupId), userId, bucketId, createdAt: now }}, NULL)
+								ON CONFLICT (id) DO NOTHING
+							`;
+							totals.memberships += 1;
+						}
+					}
+					/* After every membership derived from them is written, so an interrupted run resumes. */
+					for (const holder of holders) {
+						await sql`UPDATE ${users} SET doc = doc - 'roles' WHERE id = ${String(holder.id)}`;
+					}
+				}
+				await sql`UPDATE ${buckets} SET doc = doc - 'roles' WHERE id = ${bucketId}`;
+			}
+			return roleMigrationReport(totals);
+		}
+	}
+};
+
 export const MIGRATIONS: readonly Migration[] = [
 	namespacedProtectedResources,
-	rootKeysLifecycle
+	rootKeysLifecycle,
+	rolesToGroups
 ];

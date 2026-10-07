@@ -30,7 +30,6 @@ describe('built-in findAccount (DB-backed)', () => {
 		const user = await getUserStore('redfox').create(
 			'jane@example.com',
 			'pw',
-			[],
 			true
 		);
 
@@ -54,7 +53,6 @@ describe('built-in findAccount (DB-backed)', () => {
 		const user = await getUserStore('redfox').create(
 			'inactive@example.com',
 			'pw',
-			[],
 			true
 		);
 		await getUserStore('redfox').update(user._id, { active: false });

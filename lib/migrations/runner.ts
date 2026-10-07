@@ -40,6 +40,8 @@ export interface RunResult {
 	/* Declared as a no-op for this backend: recorded as applied, with no effect performed. */
 	readonly skipped: string[];
 	readonly status: MigrationComparison['status'];
+	/* What each applied step reported, by migration id; absent for a step that reported nothing. */
+	readonly reports?: Readonly<Record<string, readonly string[]>>;
 }
 
 function halfFor(migration: Migration, backend: MigrationBackend) {
@@ -84,6 +86,7 @@ export async function run(
 		const outstanding = new Set(state.outstanding);
 		const applied: string[] = [];
 		const skipped: string[] = [];
+		const reports: Record<string, readonly string[]> = {};
 
 		for (const migration of declared) {
 			if (!outstanding.has(migration.id)) continue;
@@ -92,7 +95,14 @@ export async function run(
 			if (isNoop(half)) {
 				skipped.push(migration.id);
 			} else {
-				await (half as MigrationStep).apply(backend.handle);
+				const lines = await (half as MigrationStep).apply(backend.handle);
+				if (
+					Array.isArray(lines) &&
+					lines.length &&
+					lines.every((line) => typeof line === 'string')
+				) {
+					reports[migration.id] = lines;
+				}
 				applied.push(migration.id);
 			}
 
@@ -103,7 +113,7 @@ export async function run(
 			});
 		}
 
-		return { applied, skipped, status: 'current' };
+		return { applied, skipped, status: 'current', reports };
 	});
 }
 

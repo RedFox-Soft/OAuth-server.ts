@@ -107,12 +107,7 @@ async function poll(deviceCode: string) {
 
 async function newUser() {
 	const email = `tv-${Math.random()}@x.io`;
-	await getUserStore().create(
-		email,
-		await Bun.password.hash(PASSWORD),
-		[],
-		true
-	);
+	await getUserStore().create(email, await Bun.password.hash(PASSWORD), true);
 	return email;
 }
 

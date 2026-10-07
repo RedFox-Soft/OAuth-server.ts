@@ -12,12 +12,8 @@ import { elysia } from 'lib/index.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import {
-	getUserStore,
-	getProjectStore,
-	adminAuditStore
-} from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { getProjectStore, adminAuditStore } from 'lib/adapters/index.ts';
+import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import {
 	ADMIN_MCP_CLIENT_ID,
 	MCP_RESOURCE,
@@ -30,6 +26,7 @@ import { idpStub } from '../federation/idp_stub.ts';
 import { appleStub } from '../federation/recognised_stubs.ts';
 import { shaped } from 'test/shape.js';
 import { Type } from '@sinclair/typebox';
+import { createAdministrator } from '../administrators.ts';
 
 /*
  * FR-023 / SC-007: no secret may reach the agent surface, on any tool, in a success or an error, or in
@@ -93,11 +90,7 @@ function call(name: string, args: Record<string, unknown>) {
 }
 
 async function superAdminSession() {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`sec-${Math.random()}@x.io`,
-		'hash',
-		['super_admin']
-	);
+	const user = await createAdministrator('super', `sec-${Math.random()}@x.io`);
 	const at = new AccessToken({
 		client: await Client.find(ADMIN_MCP_CLIENT_ID),
 		accountId: user._id,

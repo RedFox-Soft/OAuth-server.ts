@@ -7,6 +7,7 @@ export { GroupInvitationStore } from './groupInvitationStore.js';
 export { ProjectStore } from './projectStore.js';
 export { ProtectedResourceStore } from './protectedResourceStore.js';
 export { ProvisioningConnectionStore } from './provisioningConnectionStore.js';
+export { BucketGroupStore } from './bucketGroupStore.js';
 export { BucketKeysStore } from './bucketKeysStore.js';
 export { McpClientPermissionStore } from './mcpClientPermissionStore.js';
 export { UserBucketStore } from './userBucketStore.js';

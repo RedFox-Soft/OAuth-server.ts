@@ -67,7 +67,7 @@ describe('the owning group administrator', () => {
 	});
 
 	it('generates a key that is published at once and does not sign', async () => {
-		const { cookie, groupId } = await administrator(['project_admin']);
+		const { cookie, groupId } = await administrator('plain');
 		const bucket = await ownedBucket(groupId);
 
 		const res = await generate(bucket._id, cookie, 'ES256');
@@ -80,7 +80,7 @@ describe('the owning group administrator', () => {
 	});
 
 	it('is refused promoting a key before its publication window has passed', async () => {
-		const { cookie, groupId } = await administrator(['project_admin']);
+		const { cookie, groupId } = await administrator('plain');
 		const bucket = await ownedBucket(groupId);
 		const { body } = await generate(bucket._id, cookie, 'RS256');
 
@@ -91,7 +91,7 @@ describe('the owning group administrator', () => {
 	});
 
 	it('promotes a key to sign, and the key it replaces keeps verifying', async () => {
-		const { cookie, groupId } = await administrator(['project_admin']);
+		const { cookie, groupId } = await administrator('plain');
 		const bucket = await ownedBucket(groupId);
 		const [initial] = await listed(bucket._id, cookie);
 		const { body } = await generate(bucket._id, cookie, 'RS256');
@@ -112,7 +112,7 @@ describe('the owning group administrator', () => {
 	});
 
 	it('is refused retiring the key the bucket signs with', async () => {
-		const { cookie, groupId } = await administrator(['project_admin']);
+		const { cookie, groupId } = await administrator('plain');
 		const bucket = await ownedBucket(groupId);
 		const [initial] = await listed(bucket._id, cookie);
 
@@ -130,7 +130,7 @@ describe('the owning group administrator', () => {
 		['whose confirmation names another key', 'not-this-key']
 	] as const) {
 		it(`is refused retiring a key ${label}, and the key keeps its state`, async () => {
-			const { cookie, groupId } = await administrator(['project_admin']);
+			const { cookie, groupId } = await administrator('plain');
 			const bucket = await ownedBucket(groupId);
 			const { body } = await generate(bucket._id, cookie, 'ES256');
 			const kid = String(body.kid);
@@ -145,7 +145,7 @@ describe('the owning group administrator', () => {
 	}
 
 	it('retires a key that keeps being published until every token it signed has expired', async () => {
-		const { cookie, groupId } = await administrator(['project_admin']);
+		const { cookie, groupId } = await administrator('plain');
 		const bucket = await ownedBucket(groupId);
 		const { body } = await generate(bucket._id, cookie, 'ES256');
 		const kid = String(body.kid);
@@ -165,7 +165,7 @@ describe('the owning group administrator', () => {
 	 * nothing away from the RS256 client.
 	 */
 	it('keeps signing in RS256 for a client relying on it when a key in another algorithm is promoted', async () => {
-		const { cookie, groupId } = await administrator(['project_admin']);
+		const { cookie, groupId } = await administrator('plain');
 		const bucket = await ownedBucket(groupId);
 		const [initial] = await listed(bucket._id, cookie);
 		const clientId = `keys-client-${Math.random().toString(36).slice(2)}`;
@@ -198,7 +198,7 @@ describe('the owning group administrator', () => {
 	});
 
 	it('records every key action in the audit trail', async () => {
-		const { cookie, groupId, userId } = await administrator(['project_admin']);
+		const { cookie, groupId, userId } = await administrator('plain');
 		const bucket = await ownedBucket(groupId);
 		const { body } = await generate(bucket._id, cookie, 'RS256');
 		later(KEY_PUBLICATION_SECONDS + 1);

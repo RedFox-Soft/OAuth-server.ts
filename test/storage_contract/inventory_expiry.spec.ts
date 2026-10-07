@@ -95,6 +95,12 @@ const PERMANENT = [
 	 * customer's directory provisioning, and its credentials working, with nothing to say why.
 	 */
 	'provisioningConnections',
+	/*
+	 * A bucket group and its memberships live until an administrator or the owning directory removes them.
+	 * An expiry here would silently change what every relying party lets those people do.
+	 */
+	'bucketGroups',
+	'bucketGroupMembers',
 	'userBuckets',
 	/*
 	 * Groups own every project and bucket, so an expiring group would silently orphan whatever it

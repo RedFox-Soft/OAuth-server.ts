@@ -9,7 +9,8 @@ import {
 } from './auth/rbac.js';
 
 /*
- * Who the caller is, as the admin plane resolved them: id, email, roles, bucket and managed projects.
+ * Who the caller is, as the admin plane resolved them: id, email, whether a super administrator, bucket
+ * and the groups they belong to.
  *
  * Its own plugin rather than an inline route on `adminApp`, because two surfaces mount it. It was
  * inline until the MCP control plane needed it: the `whoami` tool re-dispatches into this route, and

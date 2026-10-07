@@ -2,6 +2,7 @@ import { Elysia } from 'elysia';
 import {
 	getBucketKeysStore,
 	getBucketStore,
+	getBucketGroupStore,
 	getProjectStore,
 	getProvisioningConnectionStore,
 	getUserStore
@@ -301,7 +302,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 		 * could administer but never see was the result.
 		 */
 		let all;
-		if (ctx.roles.includes('super_admin')) {
+		if (ctx.superAdmin) {
 			all = await store.list();
 		} else {
 			const owned = await store.listByGroup(ctx.activeGroupId);
@@ -342,7 +343,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			 * operator's own domain under their control — an escalation out of the group boundary, and out
 			 * of whatever else that domain is used for.
 			 */
-			if (address.host !== undefined && !ctx.roles.includes('super_admin')) {
+			if (address.host !== undefined && !ctx.superAdmin) {
 				throw new AdminError(
 					403,
 					'only an administrator of this instance may give a bucket a hostname of its own'
@@ -357,7 +358,6 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 					_id: bucketId,
 					name: body.name,
 					...address,
-					roles: body.roles ?? [],
 					ownerGroupId,
 					passwordLogin: body.passwordLogin,
 					registrationOpen: body.registrationOpen,
@@ -433,7 +433,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			 * bucket's address could break every client integrated with it, and one who could name a
 			 * hostname would reach into the operator's domain.
 			 */
-			if (!ctx.roles.includes('super_admin')) {
+			if (!ctx.superAdmin) {
 				throw new AdminError(
 					403,
 					'only an administrator of this instance may change a bucket address'
@@ -629,6 +629,8 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			for (const swept of await destroyConnectionsOf(params.id)) {
 				failedAreas.push(...swept.failedAreas);
 			}
+			/* Its groups and every membership in them; nothing outside the bucket refers to either. */
+			await getBucketGroupStore().destroyByBucket(params.id);
 			/* The address is gone; a cached entry would keep answering for a bucket that no longer exists. */
 			forgetBucketAddresses();
 			/* The half that was missing: without this a deleted bucket left its `user_<bucket>` area behind

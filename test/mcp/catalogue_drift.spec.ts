@@ -166,7 +166,13 @@ describe('MCP tool catalogue', () => {
 		const high = mcpCatalogue.filter((t) => t.consequence === 'high');
 		expect(high.map((t) => t.tool).sort()).toEqual([
 			'admin_deactivate',
+			'admin_super_grant',
+			'admin_super_withdraw',
 			'bucket_address_change',
+			/* Makes a group read-only to every administrator and hands it to an external directory. */
+			'bucket_group_assign_connection',
+			/* Every member loses what relying parties grant for the group. */
+			'bucket_group_delete',
 			'bucket_key_retire',
 			/* Makes a local user read-only to every administrator, for good. */
 			'bucket_user_assign_connection',

@@ -18,7 +18,13 @@ export const AccessTokenPayload = t.Object({
 	sid: t.Optional(t.String()),
 	gty: t.Optional(t.String()),
 	'x5t#S256': t.Optional(t.String()),
-	jkt: t.Optional(t.String())
+	jkt: t.Optional(t.String()),
+	/*
+	 * The user's groups when the authorization granted `groups` and the token is for a resource (specs/071
+	 * research R9): the display names, or — above GROUPS_TOKEN_LIMIT — the userinfo URL to fetch them from.
+	 */
+	groups: t.Optional(t.Array(t.String())),
+	groupsSource: t.Optional(t.String())
 });
 export type AccessTokenPayloadType = Static<typeof AccessTokenPayload>;
 

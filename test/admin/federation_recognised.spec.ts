@@ -5,12 +5,8 @@ import { treaty } from '@elysiajs/eden';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { federationAdminRoutes } from 'lib/admin/federation/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import {
-	getBucketStore,
-	getUserStore,
-	resetAdminMemoryStores
-} from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import { getBucketStore, resetAdminMemoryStores } from 'lib/adapters/index.ts';
+import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { SECRET_MASK } from 'lib/federation/consts.ts';
 import { mock } from '../fetch_mock.ts';
@@ -23,6 +19,7 @@ import { sessionFor } from '../admin_session.ts';
 import { answered } from './answered.ts';
 import type { ProviderGuidance } from 'lib/admin/federation/guidance.ts';
 import { present } from 'test/shape.js';
+import { createAdministrator, type AdminKind } from '../administrators.ts';
 
 /*
  * Connecting Microsoft, Apple and GitHub through the administrative surface: what each asks for, and what
@@ -39,12 +36,8 @@ const TENANT = '11112222-bbbb-3333-cccc-4444dddd5555';
 const app = new Elysia().use(resolveAdmin).use(federationAdminRoutes);
 const client = treaty(app);
 
-async function cookieFor(roles: string[] = ['super_admin']) {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`${roles.join('-')}-${Math.random()}@x.io`,
-		'hash',
-		roles
-	);
+async function cookieFor(kind: AdminKind = 'super') {
+	const user = await createAdministrator(kind, `${kind}-${Math.random()}@x.io`);
 	const session = await sessionFor(user);
 	return `${ADMIN_SESSION_COOKIE}=${session._id}`;
 }

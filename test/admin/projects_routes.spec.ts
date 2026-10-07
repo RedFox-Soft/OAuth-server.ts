@@ -4,11 +4,7 @@ import { treaty } from '@elysiajs/eden';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { projectRoutes } from 'lib/admin/projects/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import {
-	getUserStore,
-	getProjectStore,
-	getBucketStore
-} from 'lib/adapters/index.ts';
+import { getProjectStore, getBucketStore } from 'lib/adapters/index.ts';
 import {
 	ADMIN_BUCKET_ID,
 	ADMIN_PROJECT_ID,
@@ -19,18 +15,15 @@ import { Type } from '@sinclair/typebox';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
 import { shaped } from 'test/shape.js';
 import { answered } from './answered.ts';
+import { createAdministrator, type AdminKind } from '../administrators.ts';
 
 const MessageBody = Type.Object({ message: Type.String() });
 
 const app = new Elysia().use(resolveAdmin).use(projectRoutes);
 const client = treaty(app);
 
-async function sessionCookieFor(roles: string[]) {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`${roles.join('-')}-${Math.random()}@x.io`,
-		'hash',
-		roles
-	);
+async function sessionCookieFor(kind: AdminKind) {
+	const user = await createAdministrator(kind, `${kind}-${Math.random()}@x.io`);
 	const s = await sessionFor(user);
 	return { cookie: `${ADMIN_SESSION_COOKIE}=${s._id}`, userId: user._id };
 }
@@ -49,8 +42,8 @@ describe('projects API', () => {
 		expect(res.status).toBe(401);
 	});
 
-	it('super_admin creates and lists projects', async () => {
-		const { cookie } = await sessionCookieFor(['super_admin']);
+	it('a super administrator creates and lists projects', async () => {
+		const { cookie } = await sessionCookieFor('super');
 		const created = await client.admin.api.projects.post(
 			{ name: 'Acme', slug: 'acme' },
 			{ headers: { cookie } }
@@ -62,13 +55,13 @@ describe('projects API', () => {
 	});
 
 	/*
-	 * Rewritten for group ownership. It used to assert that a project_admin "cannot create" — the very
-	 * refusal this feature removes — and that they see projects a super_admin named them on. Both halves
+	 * Rewritten for group ownership. It used to assert that a project administrator "cannot create" — the very
+	 * refusal this feature removes — and that they see projects a super administrator named them on. Both halves
 	 * now read the other way: they create their own, and see their own group's.
 	 */
-	it('project_admin creates into their own group and sees only that group', async () => {
-		const superSession = await sessionCookieFor(['super_admin']);
-		const pa = await sessionCookieFor(['project_admin']);
+	it('a project administrator creates into their own group and sees only that group', async () => {
+		const superSession = await sessionCookieFor('super');
+		const pa = await sessionCookieFor('plain');
 
 		const mine = await client.admin.api.projects.post(
 			{ name: 'Mine', slug: 'mine' },
@@ -104,7 +97,7 @@ describe('projects API', () => {
 	});
 
 	it('never lists the admin project, even for a manager of it', async () => {
-		const pa = await sessionCookieFor(['project_admin']);
+		const pa = await sessionCookieFor('plain');
 		await getProjectStore().update(ADMIN_PROJECT_ID, {
 			ownerGroupId: await personalGroupId(pa.userId)
 		});
@@ -117,23 +110,23 @@ describe('projects API', () => {
 		).toBe(false);
 	});
 
-	it('rejects modifying the admin project even for super_admin', async () => {
-		const { cookie } = await sessionCookieFor(['super_admin']);
+	it('rejects modifying the admin project even for a super administrator', async () => {
+		const { cookie } = await sessionCookieFor('super');
 		const res = await client.admin.api
 			.projects({ id: ADMIN_PROJECT_ID })
 			.patch({ name: 'Hacked' }, { headers: { cookie } });
 		expect(res.status).toBe(403);
 	});
 
-	it('denies assigning a bucket the project_admin does not manage', async () => {
-		const superSession = await sessionCookieFor(['super_admin']);
-		const pa = await sessionCookieFor(['project_admin']);
+	it('denies assigning a bucket the project administrator does not manage', async () => {
+		const superSession = await sessionCookieFor('super');
+		const pa = await sessionCookieFor('plain');
 		const proj = await getProjectStore().create({
 			name: 'PA Project',
 			slug: `pa-${Math.random()}`,
 			ownerGroupId: await personalGroupId(pa.userId)
 		});
-		// Bucket managed by someone else — the project_admin must not attach it.
+		// Bucket managed by someone else — the project administrator must not attach it.
 		const bucket = await getBucketStore().create({
 			name: 'Foreign bucket',
 			ownerGroupId: 'a-group-nobody-here-belongs-to'
@@ -165,7 +158,7 @@ describe('projects API', () => {
 	 * ordinary project become the accounts that administer the instance.
 	 */
 	it('refuses the reserved administrator bucket as a project bucket', async () => {
-		const su = await sessionCookieFor(['super_admin']);
+		const su = await sessionCookieFor('super');
 		const proj = await getProjectStore().create({
 			name: 'Opportunist',
 			slug: `opp-${Math.random().toString(36).slice(2)}`,
@@ -192,7 +185,7 @@ describe('projects API', () => {
 	 * empty `bucketId`.
 	 */
 	it('clears the bucket it was given', async () => {
-		const su = await sessionCookieFor(['super_admin']);
+		const su = await sessionCookieFor('super');
 		const ownerGroupId = await personalGroupId(su.userId);
 		const bucket = await getBucketStore().create({
 			name: 'Own bucket',
@@ -214,7 +207,7 @@ describe('projects API', () => {
 	});
 
 	it('denies clearing the bucket of a project the caller does not manage', async () => {
-		const pa = await sessionCookieFor(['project_admin']);
+		const pa = await sessionCookieFor('plain');
 		const proj = await getProjectStore().create({
 			name: 'Someone else',
 			slug: `else-${Math.random().toString(36).slice(2)}`,
@@ -239,7 +232,7 @@ describe('projects API', () => {
 	 */
 	describe('corsOrigins', () => {
 		it('accepts origins on create and returns them', async () => {
-			const { cookie } = await sessionCookieFor(['super_admin']);
+			const { cookie } = await sessionCookieFor('super');
 			const created = await client.admin.api.projects.post(
 				{
 					name: 'Browser app',
@@ -256,7 +249,7 @@ describe('projects API', () => {
 		});
 
 		it('defaults to an empty list when omitted', async () => {
-			const { cookie } = await sessionCookieFor(['super_admin']);
+			const { cookie } = await sessionCookieFor('super');
 			const created = await client.admin.api.projects.post(
 				{
 					name: 'No origins',
@@ -269,7 +262,7 @@ describe('projects API', () => {
 		});
 
 		it('replaces the list on patch, and clears it with an empty array', async () => {
-			const { cookie } = await sessionCookieFor(['super_admin']);
+			const { cookie } = await sessionCookieFor('super');
 			const project = await getProjectStore().create({
 				ownerGroupId: UNASSIGNED_GROUP_ID,
 				name: 'Patch me',
@@ -295,7 +288,7 @@ describe('projects API', () => {
 		});
 
 		it('leaves the list untouched when the key is omitted', async () => {
-			const { cookie } = await sessionCookieFor(['super_admin']);
+			const { cookie } = await sessionCookieFor('super');
 			const project = await getProjectStore().create({
 				ownerGroupId: UNASSIGNED_GROUP_ID,
 				name: 'Rename only',
@@ -313,7 +306,7 @@ describe('projects API', () => {
 		});
 
 		it('normalizes host case and collapses duplicates', async () => {
-			const { cookie } = await sessionCookieFor(['super_admin']);
+			const { cookie } = await sessionCookieFor('super');
 			const created = await client.admin.api.projects.post(
 				{
 					name: 'Normalize',
@@ -339,7 +332,7 @@ describe('projects API', () => {
 			['app.example.com', 'no scheme'],
 			['', 'the empty string']
 		])('rejects %s (%s) and names the value', async (origin) => {
-			const { cookie } = await sessionCookieFor(['super_admin']);
+			const { cookie } = await sessionCookieFor('super');
 			const project = await getProjectStore().create({
 				ownerGroupId: UNASSIGNED_GROUP_ID,
 				name: 'Guarded',
@@ -363,7 +356,7 @@ describe('projects API', () => {
 		});
 
 		it('rejects the whole list when only one entry is invalid', async () => {
-			const { cookie } = await sessionCookieFor(['super_admin']);
+			const { cookie } = await sessionCookieFor('super');
 			const project = await getProjectStore().create({
 				ownerGroupId: UNASSIGNED_GROUP_ID,
 				name: 'Partial',
@@ -397,8 +390,8 @@ describe('projects API', () => {
 			expect(res.status).toBe(401);
 		});
 
-		it('refuses a project_admin who does not manage the project', async () => {
-			const pa = await sessionCookieFor(['project_admin']);
+		it('refuses a project administrator who does not manage the project', async () => {
+			const pa = await sessionCookieFor('plain');
 			const project = await getProjectStore().create({
 				name: 'Foreign',
 				slug: `foreign-${Math.random().toString(36).slice(2)}`,
@@ -415,8 +408,8 @@ describe('projects API', () => {
 			expect(res.status).toBe(403);
 		});
 
-		it('lets a project_admin who manages the project set origins', async () => {
-			const pa = await sessionCookieFor(['project_admin']);
+		it('lets a project administrator who manages the project set origins', async () => {
+			const pa = await sessionCookieFor('plain');
 			const project = await getProjectStore().create({
 				ownerGroupId: await personalGroupId(pa.userId),
 				name: 'Mine',
@@ -435,8 +428,8 @@ describe('projects API', () => {
 
 		// The admin project is refused before validation runs, so the guard cannot be probed by
 		// submitting a deliberately invalid origin to it.
-		it('refuses the admin project even for a super_admin', async () => {
-			const { cookie } = await sessionCookieFor(['super_admin']);
+		it('refuses the admin project even for a super administrator', async () => {
+			const { cookie } = await sessionCookieFor('super');
 
 			const res = await client.admin.api
 				.projects({ id: ADMIN_PROJECT_ID })

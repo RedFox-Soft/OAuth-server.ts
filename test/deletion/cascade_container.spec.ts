@@ -9,14 +9,11 @@ import {
 	getUserStore
 } from 'lib/adapters/index.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import {
-	ADMIN_BUCKET_ID,
-	ADMIN_SESSION_COOKIE,
-	UNASSIGNED_GROUP_ID
-} from 'lib/admin/consts.ts';
+import { ADMIN_SESSION_COOKIE, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { Client } from 'lib/models/client.js';
 import { sessionFor } from '../admin_session.ts';
 import { answered } from '../admin/answered.ts';
+import { createAdministrator } from '../administrators.ts';
 
 // A container may take its contents with it, on an election the administrator makes separately from
 // confirming the deletion.
@@ -42,10 +39,9 @@ describe('deletion cascade: containers', () => {
 	});
 
 	async function superAdminCookie(): Promise<string> {
-		const admin = await getUserStore(ADMIN_BUCKET_ID).create(
-			`sa-${Math.random()}@x.io`,
-			'hash',
-			['super_admin']
+		const admin = await createAdministrator(
+			'super',
+			`sa-${Math.random()}@x.io`
 		);
 		const session = await sessionFor(admin);
 		return `${ADMIN_SESSION_COOKIE}=${session._id}`;
@@ -76,7 +72,6 @@ describe('deletion cascade: containers', () => {
 	async function bucket() {
 		return getBucketStore().create({
 			name: `b-${Math.random()}`,
-			roles: [],
 			ownerGroupId: UNASSIGNED_GROUP_ID
 		});
 	}

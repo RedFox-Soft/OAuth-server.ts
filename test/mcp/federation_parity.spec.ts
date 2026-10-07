@@ -14,11 +14,10 @@ import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
 	getBucketStore,
-	getUserStore,
 	adminAuditStore,
 	resetAdminMemoryStores
 } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import {
 	ADMIN_MCP_CLIENT_ID,
 	MCP_RESOURCE,
@@ -33,6 +32,7 @@ import {
 } from '../federation/recognised_stubs.ts';
 import { shaped } from 'test/shape.js';
 import { Type } from '@sinclair/typebox';
+import { createAdministrator } from '../administrators.ts';
 
 /*
  * An agent connects a recognised provider through the same operation the console uses.
@@ -83,10 +83,9 @@ function call(name: string, args: Record<string, unknown>) {
 }
 
 async function agentSession() {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`fed-parity-${Math.random()}@x.io`,
-		'hash',
-		['super_admin']
+	const user = await createAdministrator(
+		'super',
+		`fed-parity-${Math.random()}@x.io`
 	);
 	const at = new AccessToken({
 		client: await Client.find(ADMIN_MCP_CLIENT_ID),

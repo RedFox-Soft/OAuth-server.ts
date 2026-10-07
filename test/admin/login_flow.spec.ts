@@ -11,6 +11,7 @@ import bootstrap, { agent, getHeader } from '../test_helper.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { getUserStore, resetAdminMemoryStores } from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID } from 'lib/admin/consts.ts';
+import { grantSuperAdmin } from 'lib/admin/super_admins.ts';
 import { routeNames } from 'lib/consts/param_list.ts';
 import { Session } from 'lib/models/session.ts';
 import { mintAdminIdToken } from './id_token_fixture.ts';
@@ -71,14 +72,14 @@ describe('admin OIDC login (BFF)', () => {
 		await bootstrap(import.meta.url, { config: 'admin' });
 		// Cross-suite isolation: drop cached admin store singletons other specs
 		// seeded, re-seed the admin bucket/project/client, then plant our own
-		// super_admin whose _id will be the id_token `sub` in the stubbed exchange.
+		// super administrator whose _id will be the id_token `sub` in the stubbed exchange.
 		resetAdminMemoryStores();
 		await ensureAdminSeed();
 		const superAdmin = await getUserStore(ADMIN_BUCKET_ID).create(
 			'root@x.io',
-			await Bun.password.hash('correct horse battery'),
-			['super_admin']
+			await Bun.password.hash('correct horse battery')
 		);
+		await grantSuperAdmin(superAdmin._id);
 		superAdminId = superAdmin._id;
 	});
 
@@ -128,7 +129,7 @@ describe('admin OIDC login (BFF)', () => {
 		expect(res.status).toBe(400);
 	});
 
-	it('callback exchanges the code, sets a session, and /me returns roles', async () => {
+	it('callback exchanges the code, sets a session, and /me reports a super administrator', async () => {
 		// Drive the real /admin/login to obtain the signed admin_oauth cookie and
 		// the matching state, so the callback's CSRF check passes.
 		const login = await agent.admin.login.get();
@@ -173,7 +174,7 @@ describe('admin OIDC login (BFF)', () => {
 		});
 		expect(me.status).toBe(200);
 		const meData = answered(me.data);
-		expect(meData.roles).toContain('super_admin');
+		expect(meData.superAdmin).toBe(true);
 		expect(meData.bucketId).toBe(ADMIN_BUCKET_ID);
 		// The admin shell header renders the email (not the raw user id).
 		expect(meData.email).toBe('root@x.io');

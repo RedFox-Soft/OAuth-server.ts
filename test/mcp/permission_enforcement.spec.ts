@@ -5,12 +5,13 @@ import { elysia } from 'lib/index.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { adapter, getUserStore } from 'lib/adapters/index.ts';
+import { adapter } from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID } from 'lib/admin/consts.ts';
 import { MCP_RESOURCE, MCP_ROUTE } from 'lib/mcp/consts.ts';
 import { resolveBucketForRequest } from 'lib/admin/auth/resolveBucket.ts';
 import { clearPermissions, permitIdentifier } from './permissions.ts';
 import { DEFAULT_REQUEST_BUCKET } from 'lib/configs/issuer.ts';
+import { createAdministrator } from '../administrators.ts';
 
 /*
  * The three refusals the allowlist has to make, and the one thing it must never break.
@@ -38,10 +39,9 @@ async function seedClientRecord(
 }
 
 async function tokenFor(clientId: string) {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`admin-${Math.random()}@x.io`,
-		'hash',
-		['super_admin']
+	const user = await createAdministrator(
+		'super',
+		`admin-${Math.random()}@x.io`
 	);
 	const at = new AccessToken({
 		client: await Client.find(clientId),

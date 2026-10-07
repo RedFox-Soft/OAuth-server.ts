@@ -6,25 +6,21 @@ import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { bucketRoutes } from 'lib/admin/buckets/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { forgetBucketAddresses } from 'lib/admin/auth/bucketAddress.ts';
-import {
-	getBucketKeysStore,
-	getBucketStore,
-	getUserStore
-} from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import { getBucketKeysStore, getBucketStore } from 'lib/adapters/index.ts';
+import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { decode } from 'lib/helpers/jwt.ts';
 import { sessionFor } from '../admin_session.ts';
 import { addresses, machineToken, tenant } from './tenants.ts';
+import { createAdministrator, type AdminKind } from '../administrators.ts';
 
 const admin = new Elysia({ normalize: false })
 	.use(resolveAdmin)
 	.use(bucketRoutes);
 
-async function cookieFor(roles: string[]) {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`first-${roles.join('-')}-${Math.random()}@x.io`,
-		'hash',
-		roles
+async function cookieFor(kind: AdminKind) {
+	const user = await createAdministrator(
+		kind,
+		`first-${kind}-${Math.random()}@x.io`
 	);
 	return `${ADMIN_SESSION_COOKIE}=${(await sessionFor(user))._id}`;
 }
@@ -80,7 +76,7 @@ describe('an addressable bucket without keys of its own', () => {
 	});
 
 	it('has its key before it issues anything when created through the console', async () => {
-		const cookie = await cookieFor(['project_admin']);
+		const cookie = await cookieFor('plain');
 
 		const res = await send('POST', '/admin/api/buckets', cookie, {
 			name: 'Console made',
@@ -93,7 +89,7 @@ describe('an addressable bucket without keys of its own', () => {
 	});
 
 	it('has a key of its own once a legacy bucket gains an address', async () => {
-		const cookie = await cookieFor(['super_admin']);
+		const cookie = await cookieFor('super');
 		const legacy = await getBucketStore().create({
 			ownerGroupId: 'unassigned',
 			name: 'Legacy'
@@ -114,7 +110,7 @@ describe('an addressable bucket without keys of its own', () => {
 	});
 
 	it('keeps its keys when its address changes', async () => {
-		const cookie = await cookieFor(['super_admin']);
+		const cookie = await cookieFor('super');
 		const bucket = await getBucketStore().create({
 			ownerGroupId: 'unassigned',
 			name: 'Moving keys',

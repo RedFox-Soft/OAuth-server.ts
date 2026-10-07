@@ -3,8 +3,8 @@ import { Elysia } from 'elysia';
 import { treaty } from '@elysiajs/eden';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { settingsRoutes } from 'lib/admin/settings/routes.ts';
-import { getUserStore, configStore } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import { configStore } from 'lib/adapters/index.ts';
+import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { sessionFor as adminSessionFor } from '../admin_session.ts';
 import {
 	ApplicationConfig,
@@ -12,15 +12,15 @@ import {
 	reloadConfiguration
 } from 'lib/configs/application.js';
 import { DEFAULT_ACR_VALUES } from 'lib/consts/acr.ts';
+import { createAdministrator } from '../administrators.ts';
 
 const app = new Elysia().use(resolveAdmin).use(settingsRoutes);
 const client = treaty(app);
 
 async function superAdminCookie() {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`acr-admin-${Math.random()}@x.io`,
-		'hash',
-		['super_admin']
+	const user = await createAdministrator(
+		'super',
+		`acr-admin-${Math.random()}@x.io`
 	);
 	const session = await adminSessionFor(user);
 	return `${ADMIN_SESSION_COOKIE}=${session._id}`;

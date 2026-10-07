@@ -17,7 +17,7 @@ graph:
     - predicate: constrained_by
       object: concept:group-ownership
       source: oauth-server-codebase
-      evidence: "lib/admin/audit/routes.ts:94 scopes the read by owning group rather than by role alone: 'const ownerGroupIds = ctx.roles.includes(...super_admin...)', spread into the query at line 135."
+      evidence: "lib/admin/audit/routes.ts:94 scopes the read by owning group, a super administrator excepted: 'const ownerGroupIds = ctx.superAdmin ? ...', spread into the query at line 135."
       confidence: high
       status: current
 ---

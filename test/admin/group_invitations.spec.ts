@@ -15,6 +15,8 @@ import {
 	extractInvitationToken
 } from '../mail_capture.ts';
 import { present } from 'test/shape.js';
+import { isSuperAdmin } from 'lib/admin/super_admins.ts';
+import { createAdministrator, type AdminKind } from '../administrators.ts';
 
 const app = new Elysia()
 	.use(resolveAdmin)
@@ -24,9 +26,9 @@ const client = treaty(app);
 
 const unique = () => Math.random().toString(36).slice(2);
 
-async function admin(roles: string[] = ['project_admin']) {
+async function admin(kind: AdminKind = 'plain') {
 	const email = `inv-${unique()}@x.io`;
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(email, 'hash', roles);
+	const user = await createAdministrator(kind, email);
 	const session = await sessionFor(user);
 	return {
 		userId: user._id,
@@ -85,8 +87,8 @@ describe('group invitations', () => {
 
 		const account = await getUserStore(ADMIN_BUCKET_ID).findByEmail(invitee);
 		expect(account).not.toBeNull();
-		// Exactly one instance role, and never the super one.
-		expect(present(account, 'account').roles).toEqual(['project_admin']);
+		// Never a super administrator.
+		expect(await isSuperAdmin(present(account, 'account')._id)).toBe(false);
 
 		const joined = await getGroupStore().find(group._id);
 		expect(present(joined, 'joined').members.map((m) => m.userId)).toContain(

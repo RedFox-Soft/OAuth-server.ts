@@ -6,11 +6,11 @@ import { auditRoutes } from 'lib/admin/audit/routes.ts';
 import { groupRoutes } from 'lib/admin/groups/routes.ts';
 import { projectRoutes } from 'lib/admin/projects/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { getUserStore } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { sessionFor } from '../admin_session.ts';
 import { answered } from './answered.ts';
 import { present } from 'test/shape.js';
+import { createAdministrator, type AdminKind } from '../administrators.ts';
 
 /*
  * The tenant boundary of the audit trail.
@@ -31,12 +31,8 @@ function slug(prefix: string): string {
 	return `${prefix}-${Math.random().toString(36).slice(2)}`;
 }
 
-async function tenant(roles: string[] = ['project_admin']) {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`${slug('a')}@x.io`,
-		'hash',
-		roles
-	);
+async function tenant(kind: AdminKind = 'plain') {
+	const user = await createAdministrator(kind, `${slug('a')}@x.io`);
 	const session = await sessionFor(user);
 	const cookie = `${ADMIN_SESSION_COOKIE}=${session._id}`;
 	return { userId: user._id, cookie };
@@ -188,7 +184,7 @@ describe('group-scoped audit read', () => {
 	});
 
 	it('serves a super administrator the whole trail', async () => {
-		const su = await tenant(['super_admin']);
+		const su = await tenant('super');
 		const a = await tenant();
 		const project = answered(
 			(

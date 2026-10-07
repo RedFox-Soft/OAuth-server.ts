@@ -77,7 +77,11 @@ export const IntrospectionResponse = t.Union([
 			jti: t.Optional(t.String()),
 			sid: t.Optional(t.String()),
 			cnf: t.Optional(t.Record(t.String(), t.String())),
-			authorization_details: t.Optional(t.Array(t.Unknown()))
+			authorization_details: t.Optional(t.Array(t.Unknown())),
+			/* specs/071: the user's groups recorded in a resource-bound token, or where to fetch them. */
+			groups: t.Optional(t.Array(t.String())),
+			_claim_names: t.Optional(t.Record(t.String(), t.String())),
+			_claim_sources: t.Optional(t.Record(t.String(), t.Unknown()))
 		},
 		{ additionalProperties: true }
 	),

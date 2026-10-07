@@ -1,4 +1,4 @@
-import { getUserStore } from '../adapters/index.js';
+import { getBucketGroupStore, getUserStore } from '../adapters/index.js';
 import {
 	DuplicateEndUserError,
 	type EndUserPatch,
@@ -59,22 +59,10 @@ export const RESERVED_CLAIMS: readonly string[] = [
 	'auth_time',
 	'sid',
 	'at_hash',
-	'c_hash'
+	'c_hash',
+	/* Always the user's actual bucket groups (lib/addon/account.ts); a stored value would forge authorization. */
+	'groups'
 ];
-
-function assertRolesSubset(
-	roles: string[] | undefined,
-	bucket: UserBucket
-): void {
-	if (!roles) return;
-	const bad = roles.filter((r) => !bucket.roles.includes(r));
-	if (bad.length) {
-		throw new EndUserError(
-			422,
-			`roles not declared on bucket: ${bad.join(', ')}`
-		);
-	}
-}
 
 function assertClaimsAssignable(claims: Record<string, unknown> | undefined) {
 	if (!claims) return;
@@ -147,7 +135,6 @@ export interface CreateEndUserInput {
 	/* Absent ⇒ an account no password opens (sign-in through federation, or a reset later). */
 	password?: string;
 	verified?: boolean;
-	roles?: string[];
 	claims?: Record<string, unknown>;
 	userName?: string;
 	externalId?: string;
@@ -162,7 +149,6 @@ export async function createEndUser(
 	input: CreateEndUserInput,
 	record: RecordChange
 ): Promise<User> {
-	assertRolesSubset(input.roles, bucket);
 	assertClaimsAssignable(input.claims);
 	const provisionedBy =
 		actor.kind === 'connection' ? actor.connectionId : undefined;
@@ -185,26 +171,18 @@ export async function createEndUser(
 	 * email of that half-made account for ever (specs/070 R13).
 	 */
 	return store
-		.create(
-			input.email,
-			hash,
-			input.roles ?? [],
-			input.verified ?? true,
-			input.id,
-			{
-				claims: input.claims,
-				userName: input.userName,
-				externalId: input.externalId,
-				profile: input.profile,
-				provisionedBy,
-				active: input.active
-			}
-		)
+		.create(input.email, hash, input.verified ?? true, input.id, {
+			claims: input.claims,
+			userName: input.userName,
+			externalId: input.externalId,
+			profile: input.profile,
+			provisionedBy,
+			active: input.active
+		})
 		.catch(duplicateAsError);
 }
 
 export interface UpdateEndUserInput {
-	roles?: string[];
 	active?: boolean;
 	claims?: Record<string, unknown>;
 	email?: string;
@@ -234,7 +212,6 @@ export async function updateEndUser(
 	input: UpdateEndUserInput,
 	record: RecordChange
 ): Promise<UpdatedEndUser> {
-	assertRolesSubset(input.roles, bucket);
 	assertClaimsAssignable(input.claims);
 	const user = await existing(bucket._id, id);
 	assertActorMayChange(actor, user);
@@ -302,6 +279,8 @@ export async function removeEndUser(
 	await record();
 	/* Told while the sessions still exist; the cascade below destroys them, and their `sid` with them. */
 	await notifyRelyingParties(id);
+	/* Before the account, so no membership outlives it: a deleted user is in no group (specs/071 FR-004). */
+	await getBucketGroupStore().removeUser(bucket._id, id);
 	await getUserStore(bucket._id).destroy(id);
 	return cascadeForAccount(id, scopedId);
 }

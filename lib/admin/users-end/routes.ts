@@ -1,5 +1,6 @@
 import { Elysia } from 'elysia';
-import { getUserStore } from '../../adapters/index.js';
+import { getBucketGroupStore, getUserStore } from '../../adapters/index.js';
+import { MAX_END_USER_PAGE, type User } from '../../adapters/types.js';
 import {
 	assertAuth,
 	AdminError,
@@ -84,6 +85,43 @@ export const presentUser = <
 	};
 };
 
+/* Each user with the groups they are in — the console's view of what a role column used to show. */
+async function withGroups(bucketId: string, users: User[]) {
+	const store = getBucketGroupStore();
+	const groupIds = new Map<string, string[]>();
+	for (let i = 0; i < users.length; i += MAX_END_USER_PAGE) {
+		const page = await store.groupIdsOf(
+			bucketId,
+			users.slice(i, i + MAX_END_USER_PAGE).map((u) => u._id)
+		);
+		for (const [userId, ids] of page) groupIds.set(userId, ids);
+	}
+	const wanted = [...new Set([...groupIds.values()].flat())];
+	const groups = new Map<
+		string,
+		{ id: string; displayName: string; provisionedBy?: string }
+	>();
+	for (let i = 0; i < wanted.length; i += MAX_END_USER_PAGE) {
+		for (const g of await store.findMany(
+			wanted.slice(i, i + MAX_END_USER_PAGE)
+		)) {
+			groups.set(g._id, {
+				id: g._id,
+				displayName: g.displayName,
+				...(g.provisionedBy === undefined
+					? {}
+					: { provisionedBy: g.provisionedBy })
+			});
+		}
+	}
+	return users.map((user) => ({
+		...presentUser(user),
+		groups: (groupIds.get(user._id) ?? [])
+			.map((id) => groups.get(id))
+			.filter((g) => g !== undefined)
+	}));
+}
+
 export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 	.use(resolveAdmin)
 	.onError(({ error, set }) => {
@@ -96,7 +134,7 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 		const ctx = assertAuth(admin as AdminContext | null);
 		await loadBucketForUsers(ctx, params.id);
 		const users = await getUserStore(params.id).list();
-		return users.map(presentUser);
+		return withGroups(params.id, users);
 	})
 	.post(
 		'/admin/api/buckets/:id/users',
@@ -115,7 +153,6 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 						email: body.email,
 						password: body.password,
 						verified: true,
-						roles: body.roles,
 						claims: body.claims
 					},
 					() =>

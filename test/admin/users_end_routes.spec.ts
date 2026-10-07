@@ -18,27 +18,20 @@ import {
 } from 'lib/admin/consts.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
 import { answered } from './answered.ts';
+import { createAdministrator, type AdminKind } from '../administrators.ts';
 
 const app = new Elysia().use(resolveAdmin).use(bucketRoutes).use(endUserRoutes);
 const client = treaty(app);
 
-async function sessionCookieFor(roles: string[]) {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`${roles.join('-')}-${Math.random()}@x.io`,
-		'hash',
-		roles
-	);
+async function sessionCookieFor(kind: AdminKind) {
+	const user = await createAdministrator(kind, `${kind}-${Math.random()}@x.io`);
 	const s = await sessionFor(user);
 	return { cookie: `${ADMIN_SESSION_COOKIE}=${s._id}`, userId: user._id };
 }
 
-async function makeBucket(
-	roles: string[] = [],
-	ownerGroupId = UNASSIGNED_GROUP_ID
-) {
+async function makeBucket(ownerGroupId = UNASSIGNED_GROUP_ID) {
 	return getBucketStore().create({
 		name: `b-${Math.random()}`,
-		roles,
 		ownerGroupId
 	});
 }
@@ -59,12 +52,12 @@ describe('end-user API', () => {
 	});
 
 	it('creates, lists (no password), edits, and deletes a user', async () => {
-		const { cookie } = await sessionCookieFor(['super_admin']);
-		const bucket = await makeBucket(['viewer']);
+		const { cookie } = await sessionCookieFor('super');
+		const bucket = await makeBucket();
 		const created = await client.admin.api
 			.buckets({ id: bucket._id })
 			.users.post(
-				{ email: 'u@x.io', password: 'supersecret', roles: ['viewer'] },
+				{ email: 'u@x.io', password: 'supersecret' },
 				{ headers: { cookie } }
 			);
 		expect(created.status).toBe(201);
@@ -95,7 +88,7 @@ describe('end-user API', () => {
 	});
 
 	it('creates a user holding the claims it was given', async () => {
-		const { cookie } = await sessionCookieFor(['super_admin']);
+		const { cookie } = await sessionCookieFor('super');
 		const bucket = await makeBucket();
 		const created = await client.admin.api
 			.buckets({ id: bucket._id })
@@ -116,7 +109,7 @@ describe('end-user API', () => {
 	});
 
 	it('replaces a user’s claims with the ones an edit carries', async () => {
-		const { cookie } = await sessionCookieFor(['super_admin']);
+		const { cookie } = await sessionCookieFor('super');
 		const bucket = await makeBucket();
 		const user = await getUserStore(bucket._id).create('claims-edit@x.io', 'h');
 		await getUserStore(bucket._id).update(user._id, {
@@ -163,7 +156,7 @@ describe('end-user API', () => {
 		'c_hash'
 	]) {
 		it(`refuses to set the ${reserved} claim on an account`, async () => {
-			const { cookie } = await sessionCookieFor(['super_admin']);
+			const { cookie } = await sessionCookieFor('super');
 			const bucket = await makeBucket();
 			const user = await getUserStore(bucket._id).create(
 				`reserved-${reserved}@x.io`,
@@ -183,7 +176,7 @@ describe('end-user API', () => {
 	}
 
 	it('keeps the claim values out of the audit trail', async () => {
-		const { cookie } = await sessionCookieFor(['super_admin']);
+		const { cookie } = await sessionCookieFor('super');
 		const bucket = await makeBucket();
 		const user = await getUserStore(bucket._id).create(
 			'claims-audit@x.io',
@@ -203,20 +196,8 @@ describe('end-user API', () => {
 		expect(JSON.stringify(entries)).not.toContain('7946');
 	});
 
-	it('rejects roles not in the bucket set with 422', async () => {
-		const { cookie } = await sessionCookieFor(['super_admin']);
-		const bucket = await makeBucket(['viewer']);
-		const res = await client.admin.api
-			.buckets({ id: bucket._id })
-			.users.post(
-				{ email: 'bad@x.io', password: 'supersecret', roles: ['admin'] },
-				{ headers: { cookie } }
-			);
-		expect(res.status).toBe(422);
-	});
-
 	it('rejects a duplicate email with 409', async () => {
-		const { cookie } = await sessionCookieFor(['super_admin']);
+		const { cookie } = await sessionCookieFor('super');
 		const bucket = await makeBucket();
 		const body = { email: 'dup@x.io', password: 'supersecret' };
 		await client.admin.api
@@ -229,7 +210,7 @@ describe('end-user API', () => {
 	});
 
 	it('resets a password (stores a new hash)', async () => {
-		const { cookie } = await sessionCookieFor(['super_admin']);
+		const { cookie } = await sessionCookieFor('super');
 		const bucket = await makeBucket();
 		const created = await client.admin.api
 			.buckets({ id: bucket._id })
@@ -248,8 +229,8 @@ describe('end-user API', () => {
 		expect(after).not.toBe(before);
 	});
 
-	it('lets a project_admin manage users of a bucket backing their project', async () => {
-		const pa = await sessionCookieFor(['project_admin']);
+	it('lets a project administrator manage users of a bucket backing their project', async () => {
+		const pa = await sessionCookieFor('plain');
 		const bucket = await makeBucket(); // not owned by pa
 		const proj = await getProjectStore().create({
 			name: 'PM',
@@ -266,8 +247,8 @@ describe('end-user API', () => {
 		expect(res.status).toBe(201);
 	});
 
-	it('denies a project_admin a bucket they neither own nor reach via a project', async () => {
-		const pa = await sessionCookieFor(['project_admin']);
+	it('denies a project administrator a bucket they neither own nor reach via a project', async () => {
+		const pa = await sessionCookieFor('plain');
 		const bucket = await makeBucket();
 		const res = await client.admin.api
 			.buckets({ id: bucket._id })
@@ -276,7 +257,7 @@ describe('end-user API', () => {
 	});
 
 	it('refuses to manage users of the reserved admin bucket', async () => {
-		const { cookie } = await sessionCookieFor(['super_admin']);
+		const { cookie } = await sessionCookieFor('super');
 		const res = await client.admin.api
 			.buckets({ id: ADMIN_BUCKET_ID })
 			.users.get({ headers: { cookie } });

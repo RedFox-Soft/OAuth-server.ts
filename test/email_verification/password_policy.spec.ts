@@ -74,7 +74,6 @@ describe('the password an end user chooses', () => {
 		const user = await getUserStore(bucketId).create(
 			'resetting@x.io',
 			await Bun.password.hash('the old password'),
-			[],
 			true
 		);
 		await requestReset('resetting@x.io', bucketId);

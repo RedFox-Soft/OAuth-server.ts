@@ -3,26 +3,19 @@ import { Elysia } from 'elysia';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { bucketRoutes } from 'lib/admin/buckets/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { getBucketStore, getUserStore } from 'lib/adapters/index.ts';
-import {
-	ADMIN_BUCKET_ID,
-	ADMIN_SESSION_COOKIE,
-	UNASSIGNED_GROUP_ID
-} from 'lib/admin/consts.ts';
+import { getBucketStore } from 'lib/adapters/index.ts';
+import { ADMIN_SESSION_COOKIE, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { forgetBucketAddresses } from 'lib/admin/auth/bucketAddress.ts';
 import { sessionFor } from '../admin_session.ts';
 import { ApplicationConfig } from 'lib/configs/application.ts';
+import { createAdministrator, type AdminKind } from '../administrators.ts';
 
 const app = new Elysia().use(resolveAdmin).use(bucketRoutes);
 
 const TAKEN_HOST = 'taken.e.ly';
 
-async function cookieFor(roles: string[]) {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`${roles.join('-')}-${Math.random()}@x.io`,
-		'hash',
-		roles
-	);
+async function cookieFor(kind: AdminKind) {
+	const user = await createAdministrator(kind, `${kind}-${Math.random()}@x.io`);
 	const session = await sessionFor(user);
 	return `${ADMIN_SESSION_COOKIE}=${session._id}`;
 }
@@ -50,7 +43,7 @@ describe('refusing an address that cannot work or should not exist (US2)', () =>
 	beforeEach(async () => {
 		await ensureAdminSeed();
 		forgetBucketAddresses();
-		superCookie = await cookieFor(['super_admin']);
+		superCookie = await cookieFor('super');
 		if (!(await getBucketStore().findByHost(TAKEN_HOST))) {
 			await getBucketStore().create({
 				ownerGroupId: UNASSIGNED_GROUP_ID,
@@ -61,7 +54,7 @@ describe('refusing an address that cannot work or should not exist (US2)', () =>
 	});
 
 	it('refuses a hostname supplied by an administrator who administers only a group', async () => {
-		const projectAdmin = await cookieFor(['project_admin']);
+		const projectAdmin = await cookieFor('plain');
 
 		const { status } = await createBucket(projectAdmin, {
 			name: 'Escalated',

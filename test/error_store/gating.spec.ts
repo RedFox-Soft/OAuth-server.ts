@@ -7,11 +7,12 @@ import { errorHandler } from 'lib/shared/authorization_error_handler.ts';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { errorRoutes } from 'lib/admin/errors/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { errorStore, getUserStore } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import { errorStore } from 'lib/adapters/index.ts';
+import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { flushForTest, resetQueue } from 'lib/error_store/queue.ts';
 import { sessionFor } from '../admin_session.ts';
 import { shaped } from 'test/shape.js';
+import { createAdministrator } from '../administrators.ts';
 
 /*
  * What the capability switch does, and — as importantly — what it deliberately does NOT do.
@@ -37,11 +38,7 @@ let seq = 0;
 const unique = (prefix: string) => `${prefix}-${Date.now()}-${(seq += 1)}`;
 
 async function superCookie() {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`${unique('super')}@x.io`,
-		'hash',
-		['super_admin']
-	);
+	const user = await createAdministrator('super', `${unique('super')}@x.io`);
 	const session = await sessionFor(user);
 	return `${ADMIN_SESSION_COOKIE}=${session._id}`;
 }

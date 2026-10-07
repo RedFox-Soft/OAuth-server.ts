@@ -5,15 +5,16 @@ import { recordBootstrapAudit } from '../audit/record.js';
 import nanoid from '../../helpers/nanoid.js';
 import { ensurePersonalGroup } from '../groups/personal.js';
 import epochTime from '../../helpers/epoch_time.js';
+import { grantSuperAdmin, hasActiveSuperAdmin } from '../super_admins.js';
 
 /* The claim that decides which of several concurrent setup requests runs. Held seconds, not minutes. */
 const SETUP_CLAIM_ISSUER = 'admin-setup';
 const SETUP_CLAIM_ID = 'bootstrap';
 const SETUP_CLAIM_SECONDS = 60;
 
+/* Setup stays closed while Super administrators has an active member. */
 export async function hasSuperAdmin(): Promise<boolean> {
-	const users = await getUserStore(ADMIN_BUCKET_ID).list();
-	return users.some((u) => u.roles.includes('super_admin'));
+	return hasActiveSuperAdmin();
 }
 
 /*
@@ -83,13 +84,13 @@ async function bootstrap(
 	const user = await getUserStore(ADMIN_BUCKET_ID).create(
 		body.email,
 		hash,
-		['super_admin'],
 		false,
 		userId
 	);
 	// The bootstrap administrator gets a personal group like any other, so first-run setup and the
-	// admin-create route leave an account in the same shape.
+	// admin-create route leave an account in the same shape — and is the first super administrator.
 	await ensurePersonalGroup(user._id, user.email);
+	await grantSuperAdmin(user._id);
 	set.status = 201;
 	return { ok: true };
 }

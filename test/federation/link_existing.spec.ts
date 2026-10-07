@@ -54,7 +54,6 @@ async function passwordAccount(bucketId: string, email: string) {
 	return getUserStore(bucketId).create(
 		email,
 		await Bun.password.hash(PASSWORD),
-		[],
 		true
 	);
 }

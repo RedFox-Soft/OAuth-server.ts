@@ -3,7 +3,7 @@ import { Elysia } from 'elysia';
 import { mcpClientPermissionStore } from '../../adapters/index.js';
 import {
 	assertAuth,
-	assertRole,
+	assertSuperAdmin,
 	AdminError,
 	adminErrorBody,
 	resolveAdmin,
@@ -126,14 +126,14 @@ export const mcpClientRoutes = new Elysia({ name: 'admin-mcp-clients' })
 	})
 	.get('/admin/api/mcp/clients', async ({ admin }) => {
 		const ctx = assertAuth(admin as AdminContext | null);
-		assertRole(ctx, 'super_admin');
+		assertSuperAdmin(ctx);
 		return mcpClientPermissionStore.list();
 	})
 	.post(
 		'/admin/api/mcp/clients',
 		async ({ admin, body, set }) => {
 			const ctx = assertAuth(admin as AdminContext | null);
-			assertRole(ctx, 'super_admin');
+			assertSuperAdmin(ctx);
 
 			const value = validateValue(body.kind, body.value);
 			if (await mcpClientPermissionStore.find(value)) {
@@ -167,7 +167,7 @@ export const mcpClientRoutes = new Elysia({ name: 'admin-mcp-clients' })
 		'/admin/api/mcp/clients/:entryId',
 		async ({ admin, params, body }) => {
 			const ctx = assertAuth(admin as AdminContext | null);
-			assertRole(ctx, 'super_admin');
+			assertSuperAdmin(ctx);
 
 			const entryId = decodeURIComponent(params.entryId);
 			if (!(await mcpClientPermissionStore.find(entryId))) {
@@ -184,7 +184,7 @@ export const mcpClientRoutes = new Elysia({ name: 'admin-mcp-clients' })
 	)
 	.delete('/admin/api/mcp/clients/:entryId', async ({ admin, params, set }) => {
 		const ctx = assertAuth(admin as AdminContext | null);
-		assertRole(ctx, 'super_admin');
+		assertSuperAdmin(ctx);
 
 		const entryId = decodeURIComponent(params.entryId);
 		if (!(await mcpClientPermissionStore.find(entryId))) {

@@ -16,7 +16,7 @@ import { MCP_RESOURCE } from './consts.js';
  * immediate. Opaque keeps revocation instant, which matters for a credential that carries
  * administrative authority.
  *
- * `scope` is 'openid' alone: the tool surface takes its authority from the administrator's roles, not
+ * `scope` is 'openid' alone: the tool surface takes its authority from the administrator's own standing, not
  * from scopes, so there is no scope here for an agent to ask for and nothing a wider scope would grant.
  */
 export const MCP_RESOURCE_SERVER = {

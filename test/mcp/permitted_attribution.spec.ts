@@ -8,12 +8,11 @@ import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
 	adapter,
 	adminAuditStore,
-	getProjectStore,
-	getUserStore
+	getProjectStore
 } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID } from 'lib/admin/consts.ts';
 import { MCP_RESOURCE, MCP_ROUTE } from 'lib/mcp/consts.ts';
 import { clearPermissions, permitIdentifier } from './permissions.ts';
+import { createAdministrator } from '../administrators.ts';
 
 /*
  * Who the audit trail names when an agent acts through a permitted client identity.
@@ -84,10 +83,9 @@ describe('attributing an action taken through a permitted identity', () => {
 	});
 
 	it('names both the administrator and the client identity', async () => {
-		const user = await getUserStore(ADMIN_BUCKET_ID).create(
-			`admin-${Math.random()}@x.io`,
-			'hash',
-			['super_admin']
+		const user = await createAdministrator(
+			'super',
+			`admin-${Math.random()}@x.io`
 		);
 		const at = new AccessToken({
 			client: await Client.find(DOC),

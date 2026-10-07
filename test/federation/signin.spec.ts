@@ -32,7 +32,7 @@ import { present } from 'test/shape.js';
 
 /**
  * @proves A federated sign-in links to the existing account rather than making a second,
- * provisions with no usable password and no roles, stores no upstream token, and — offering no
+ * provisions with no usable password, stores no upstream token, and — offering no
  * remember-me choice — leaves the end user signed in past the browsing session.
  */
 describe('federated sign-in', () => {
@@ -56,7 +56,6 @@ describe('federated sign-in', () => {
 		const existing = await store.create(
 			'linked@acme.test',
 			'irrelevant-hash',
-			[],
 			true
 		);
 		await store.update(existing._id, {
@@ -108,7 +107,6 @@ describe('federated sign-in', () => {
 		const existing = await store.create(
 			'both@acme.test',
 			await Bun.password.hash('both-password'),
-			[],
 			true
 		);
 
@@ -184,7 +182,7 @@ describe('federated sign-in', () => {
 		});
 	}
 
-	it('provisions an account for an unknown address, with no usable password and no roles', async () => {
+	it('provisions an account for an unknown address, with no usable password', async () => {
 		const idp = await idpStub('https://idp-jit.test');
 		const bucketId = await seedBucket(CLIENT, {
 			federation: [provider(idp.origin, { emailTrusted: true })]
@@ -209,7 +207,6 @@ describe('federated sign-in', () => {
 		expect(all).toHaveLength(1);
 		const created = present(all[0], 'all[0]');
 		expect(created.email).toBe('new@acme.test');
-		expect(created.roles).toEqual([]);
 		// Trusted provider + verified assertion, so the account is verified by the same test that allowed
 		// the link.
 		expect(created.verified).toBe(true);

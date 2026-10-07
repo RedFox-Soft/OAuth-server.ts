@@ -6,6 +6,7 @@ import {
 	ProjectStore as MemoryProjectStore,
 	ProtectedResourceStore as MemoryProtectedResourceStore,
 	ProvisioningConnectionStore as MemoryProvisioningConnectionStore,
+	BucketGroupStore as MemoryBucketGroupStore,
 	BucketKeysStore as MemoryBucketKeysStore,
 	McpClientPermissionStore as MemoryMcpClientPermissionStore,
 	UserBucketStore as MemoryUserBucketStore,
@@ -40,6 +41,8 @@ import type {
 	ProtectedResourceStoreConstructor,
 	ProvisioningConnectionStoreConstructor,
 	ProvisioningConnectionStoreInstance,
+	BucketGroupStoreConstructor,
+	BucketGroupStoreInstance,
 	BucketKeysStoreConstructor,
 	BucketKeysStoreInstance,
 	ProtectedResourceStoreInstance,
@@ -73,6 +76,7 @@ let ProtectedResourceStoreClass: ProtectedResourceStoreConstructor =
 	MemoryProtectedResourceStore;
 let ProvisioningConnectionStoreClass: ProvisioningConnectionStoreConstructor =
 	MemoryProvisioningConnectionStore;
+let BucketGroupStoreClass: BucketGroupStoreConstructor = MemoryBucketGroupStore;
 let BucketKeysStoreClass: BucketKeysStoreConstructor = MemoryBucketKeysStore;
 let McpClientPermissionStoreClass: McpClientPermissionStoreConstructor =
 	MemoryMcpClientPermissionStore;
@@ -110,6 +114,7 @@ if (backend === 'postgres') {
 	ProjectStoreClass = postgres.ProjectStore;
 	ProtectedResourceStoreClass = postgres.ProtectedResourceStore;
 	ProvisioningConnectionStoreClass = postgres.ProvisioningConnectionStore;
+	BucketGroupStoreClass = postgres.BucketGroupStore;
 	BucketKeysStoreClass = postgres.BucketKeysStore;
 	McpClientPermissionStoreClass = postgres.McpClientPermissionStore;
 	BucketStoreClass = postgres.UserBucketStore;
@@ -141,6 +146,7 @@ if (backend === 'mongodb') {
 	ProjectStoreClass = mongodb.ProjectStore;
 	ProtectedResourceStoreClass = mongodb.ProtectedResourceStore;
 	ProvisioningConnectionStoreClass = mongodb.ProvisioningConnectionStore;
+	BucketGroupStoreClass = mongodb.BucketGroupStore;
 	BucketKeysStoreClass = mongodb.BucketKeysStore;
 	McpClientPermissionStoreClass = mongodb.McpClientPermissionStore;
 	BucketStoreClass = mongodb.UserBucketStore;
@@ -367,6 +373,14 @@ export function getProvisioningConnectionStore(): ProvisioningConnectionStoreIns
 			new ProvisioningConnectionStoreClass();
 	}
 	return provisioningConnectionStoreSingleton;
+}
+
+let bucketGroupStoreSingleton: BucketGroupStoreInstance | null = null;
+export function getBucketGroupStore(): BucketGroupStoreInstance {
+	if (!bucketGroupStoreSingleton) {
+		bucketGroupStoreSingleton = new BucketGroupStoreClass();
+	}
+	return bucketGroupStoreSingleton;
 }
 
 /*

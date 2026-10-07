@@ -48,9 +48,9 @@ describe('SCIM discovery', () => {
 		expect(names).not.toContain('"name":"password"');
 	});
 
-	it('answers a resource it does not serve, such as /Groups, with a SCIM 404 a directory can read', async () => {
+	it('answers a resource it does not serve, such as /Bulk, with a SCIM 404 a directory can read', async () => {
 		for (const base of [c.base, '/scim/v2']) {
-			const { status, json, headers } = await scim('GET', `${base}/Groups`, {
+			const { status, json, headers } = await scim('GET', `${base}/Bulk`, {
 				token: c.token
 			});
 
@@ -66,7 +66,7 @@ describe('SCIM discovery', () => {
 	it('answers that path as any unserved one while SCIM is off, so nothing announces the surface', async () => {
 		ApplicationConfig['scim.enabled'] = false;
 		try {
-			await expectUnservedEquivalent(`${c.base}/Groups`, { method: 'GET' });
+			await expectUnservedEquivalent(`${c.base}/Bulk`, { method: 'GET' });
 		} finally {
 			ApplicationConfig['scim.enabled'] = true;
 		}

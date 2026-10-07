@@ -18,6 +18,7 @@ import {
 import { Client } from 'lib/models/client.js';
 import { userAreaFor } from 'lib/consts/storage_inventory.js';
 import { sessionFor } from '../admin_session.ts';
+import { createAdministrator } from '../administrators.ts';
 
 // User Story 3 — a container refuses deletion while it still holds something.
 //
@@ -43,10 +44,9 @@ describe('deletion guards: containers', () => {
 	});
 
 	async function superAdminCookie(): Promise<string> {
-		const admin = await getUserStore(ADMIN_BUCKET_ID).create(
-			`sa-${Math.random()}@x.io`,
-			'hash',
-			['super_admin']
+		const admin = await createAdministrator(
+			'super',
+			`sa-${Math.random()}@x.io`
 		);
 		const session = await sessionFor(admin);
 		return `${ADMIN_SESSION_COOKIE}=${session._id}`;
@@ -77,7 +77,6 @@ describe('deletion guards: containers', () => {
 	async function bucket() {
 		return getBucketStore().create({
 			name: `b-${Math.random()}`,
-			roles: [],
 			ownerGroupId: UNASSIGNED_GROUP_ID
 		});
 	}

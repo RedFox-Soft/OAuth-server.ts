@@ -7,7 +7,6 @@ const bucket = (id: string, ownerGroupId: string): UserBucket => ({
 	_id: id,
 	name: id,
 	ownerGroupId,
-	roles: [],
 	passwordLogin: true,
 	federation: [],
 	registrationOpen: false,

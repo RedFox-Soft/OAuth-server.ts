@@ -6,12 +6,11 @@ import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
-	getUserStore,
 	getProjectStore,
 	adminAuditStore,
 	resetAdminMemoryStores
 } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import {
 	ADMIN_MCP_CLIENT_ID,
 	MCP_RESOURCE,
@@ -20,6 +19,7 @@ import {
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { shaped } from 'test/shape.js';
 import { Type, type TSchema } from '@sinclair/typebox';
+import { createAdministrator } from '../administrators.ts';
 
 /*
  * The named acceptance scenarios of user stories 2, 3 and 4 that the surface-wide guards do not reach:
@@ -71,11 +71,7 @@ function call(name: string, args: Record<string, unknown>) {
 }
 
 async function session() {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`beh-${Math.random()}@x.io`,
-		'hash',
-		['super_admin']
-	);
+	const user = await createAdministrator('super', `beh-${Math.random()}@x.io`);
 	const at = new AccessToken({
 		client: await Client.find(ADMIN_MCP_CLIENT_ID),
 		accountId: user._id,
@@ -226,8 +222,8 @@ describe('individual tool behaviours', () => {
 	 * `admin_deactivate` (DELETE) refuses self-deactivation *before* it counts super-administrators, and a
 	 * caller must be an active super-administrator to get that far — so the count guard is unreachable
 	 * through that tool, and is defence in depth behind the self-check. The guard is reached through
-	 * `admin_update`, by the last super-administrator deactivating or demoting themselves, which is how
-	 * `test/admin/last_super_admin.spec.ts` reaches it too.
+	 * `admin_update` and `admin_super_withdraw`, by the last super-administrator deactivating themselves or
+	 * withdrawing their own privilege, which is how `test/admin/last_super_admin.spec.ts` reaches it too.
 	 *
 	 * The stores are reset because the count is process-wide and other specs seed super-administrators
 	 * into the same memory adapter — without it this asserts nothing.
@@ -243,14 +239,13 @@ describe('individual tool behaviours', () => {
 		);
 		expect(deactivated.result?.isError).toBe(true);
 		expect(deactivated.result?.structuredContent?.message).toContain(
-			'super_admin'
+			'super administrator'
 		);
 
-		const demoted = await rpc(
-			call('admin_update', { id: user._id, roles: ['project_admin'] }),
-			token
-		);
-		expect(demoted.result?.isError).toBe(true);
+		const withdrawn = await perform(token, 'admin_super_withdraw', {
+			id: user._id
+		});
+		expect(withdrawn.result?.isError).toBe(true);
 
 		// And the self-check on the deactivate tool, which is what an operator actually meets first.
 		const self = await perform(token, 'admin_deactivate', { id: user._id });

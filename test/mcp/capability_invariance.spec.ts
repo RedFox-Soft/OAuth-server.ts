@@ -12,8 +12,6 @@ import { elysia } from 'lib/index.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { getUserStore } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID } from 'lib/admin/consts.ts';
 import {
 	ADMIN_MCP_CLIENT_ID,
 	MCP_RESOURCE,
@@ -28,6 +26,7 @@ import { mock } from '../fetch_mock.ts';
 import { idpStub } from '../federation/idp_stub.ts';
 import { shaped } from 'test/shape.js';
 import { Type } from '@sinclair/typebox';
+import { createAdministrator } from '../administrators.ts';
 
 /*
  * FR-006, FR-037, SC-012: the published operation set does not vary with the instance's capability
@@ -85,11 +84,7 @@ function call(name: string, args: Record<string, unknown>) {
 }
 
 async function session() {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`inv-${Math.random()}@x.io`,
-		'hash',
-		['super_admin']
-	);
+	const user = await createAdministrator('super', `inv-${Math.random()}@x.io`);
 	const at = new AccessToken({
 		client: await Client.find(ADMIN_MCP_CLIENT_ID),
 		accountId: user._id,

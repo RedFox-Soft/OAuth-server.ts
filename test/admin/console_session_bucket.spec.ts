@@ -70,8 +70,7 @@ describe('console session bucket', () => {
 		await ensureAdminSeed();
 		await getUserStore(ADMIN_BUCKET_ID).create(
 			'admin-only@x.io',
-			await Bun.password.hash(PASSWORD),
-			['project_admin']
+			await Bun.password.hash(PASSWORD)
 		);
 		await getUserStore().create(
 			'default-only@x.io',

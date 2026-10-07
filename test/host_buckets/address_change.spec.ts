@@ -3,13 +3,8 @@ import { Elysia } from 'elysia';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { bucketRoutes } from 'lib/admin/buckets/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
+import { getBucketStore, getProjectStore } from 'lib/adapters/index.ts';
 import {
-	getBucketStore,
-	getProjectStore,
-	getUserStore
-} from 'lib/adapters/index.ts';
-import {
-	ADMIN_BUCKET_ID,
 	ADMIN_SESSION_COOKIE,
 	DEFAULT_BUCKET_ID,
 	UNASSIGNED_GROUP_ID
@@ -19,15 +14,12 @@ import { issuerFor } from 'lib/configs/issuer.ts';
 import { sessionFor } from '../admin_session.ts';
 import { Type } from '@sinclair/typebox';
 import { present, shaped } from 'test/shape.ts';
+import { createAdministrator, type AdminKind } from '../administrators.ts';
 
 const app = new Elysia().use(resolveAdmin).use(bucketRoutes);
 
-async function cookieFor(roles: string[]) {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`${roles.join('-')}-${Math.random()}@x.io`,
-		'hash',
-		roles
-	);
+async function cookieFor(kind: AdminKind) {
+	const user = await createAdministrator(kind, `${kind}-${Math.random()}@x.io`);
 	const session = await sessionFor(user);
 	return `${ADMIN_SESSION_COOKIE}=${session._id}`;
 }
@@ -84,7 +76,7 @@ describe('moving a bucket to a different address (US3)', () => {
 	beforeEach(async () => {
 		await ensureAdminSeed();
 		forgetBucketAddresses();
-		superCookie = await cookieFor(['super_admin']);
+		superCookie = await cookieFor('super');
 		counter += 1;
 	});
 
@@ -209,7 +201,7 @@ describe('moving a bucket to a different address (US3)', () => {
 
 	it('refuses an address change from an administrator who administers only a group', async () => {
 		const id = await seedBucketWithClients(`escalate-${counter}`, []);
-		const projectAdmin = await cookieFor(['project_admin']);
+		const projectAdmin = await cookieFor('plain');
 
 		const { status } = await changeAddress(projectAdmin, id, {
 			host: `escalate-${counter}.e.ly`,

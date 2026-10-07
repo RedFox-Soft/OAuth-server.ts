@@ -5,14 +5,15 @@ import { elysia } from 'lib/index.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { getProjectStore, getUserStore } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { getProjectStore } from 'lib/adapters/index.ts';
+import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import {
 	ADMIN_MCP_CLIENT_ID,
 	MCP_RESOURCE,
 	MCP_ROUTE
 } from 'lib/mcp/consts.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
+import { createAdministrator } from '../administrators.ts';
 
 /*
  * An agent's token administers the server through `/mcp` and nowhere else. The operations withheld from
@@ -23,10 +24,9 @@ import { ApplicationConfig } from 'lib/configs/application.js';
  */
 
 async function agentToken() {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`agent-${Math.random()}@x.io`,
-		'hash',
-		['super_admin']
+	const user = await createAdministrator(
+		'super',
+		`agent-${Math.random()}@x.io`
 	);
 	const at = new AccessToken({
 		client: await Client.find(ADMIN_MCP_CLIENT_ID),

@@ -6,14 +6,11 @@ import { groupRoutes } from 'lib/admin/groups/routes.ts';
 import { scopeRoutes } from 'lib/admin/scope/routes.ts';
 import { projectRoutes } from 'lib/admin/projects/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { adminAuditStore, getUserStore } from 'lib/adapters/index.ts';
-import {
-	ADMIN_BUCKET_ID,
-	ADMIN_SESSION_COOKIE,
-	UNASSIGNED_GROUP_ID
-} from 'lib/admin/consts.ts';
+import { adminAuditStore } from 'lib/adapters/index.ts';
+import { ADMIN_SESSION_COOKIE, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
 import { answered } from './answered.ts';
+import { createAdministrator, type AdminKind } from '../administrators.ts';
 
 const app = new Elysia()
 	.use(resolveAdmin)
@@ -26,12 +23,8 @@ function slug(prefix: string): string {
 	return `${prefix}-${Math.random().toString(36).slice(2)}`;
 }
 
-async function admin(roles: string[] = ['project_admin']) {
-	const user = await getUserStore(ADMIN_BUCKET_ID).create(
-		`${slug('s')}@x.io`,
-		'hash',
-		roles
-	);
+async function admin(kind: AdminKind = 'plain') {
+	const user = await createAdministrator(kind, `${slug('s')}@x.io`);
 	const session = await sessionFor(user);
 	return {
 		userId: user._id,
@@ -212,7 +205,7 @@ describe('active scope', () => {
 	 * the id is supplied by hand.
 	 */
 	it("never offers or accepts another administrator's personal group, even to a super administrator", async () => {
-		const root = await admin(['super_admin']);
+		const root = await admin('super');
 		const other = await admin();
 		const theirs = await personalGroupId(other.userId);
 		const shared = answered(
@@ -252,7 +245,7 @@ describe('active scope', () => {
 	 * discarded, and the creation below landed in the holding group while the console showed the group.
 	 */
 	it('keeps a super administrator in a group they do not belong to', async () => {
-		const root = await admin(['super_admin']);
+		const root = await admin('super');
 		const other = await admin();
 		const theirs = answered(
 			(
