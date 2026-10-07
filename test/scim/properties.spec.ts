@@ -159,8 +159,8 @@ describe('SCIM input over generated cases', () => {
 					);
 					const created = new Set<string>();
 					/*
-					 * Seeded through the store: the property is about reading pages, and a SCIM create hashes an
-					 * unusable password on purpose slowly, which would spend the whole time bound on setup.
+					 * Seeded through the store: the property is about reading pages, so the setup stays out of
+					 * the SCIM surface it is measuring.
 					 */
 					const store = getUserStore(c.bucket._id);
 					for (let i = 0; i < population; i++) {

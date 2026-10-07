@@ -173,9 +173,10 @@ write, so a request asserting what is already stored writes nothing and audits n
 - **Elysia passes `params` as `undefined`** on a bare route with no path parameter, not `{}`.
 - **The MCP layer cannot build a tool input from a union body schema**: `IssueCredentialBody` is one closed
   object with a `kind` literal union, and the service refuses key fields on other kinds.
-- **A SCIM create is slow by design** (it hashes an unusable password), so a property test that creates
-  hundreds of users through SCIM exceeds the 20-second bound in `test/preload.ts`; seed through the store when
-  the property is about reading.
+- **A SCIM create hashed an unusable password each time** — an argon2 hash, ~100 ms of CPU per user, which
+  a directory's initial import at the 25 requests a second IPSIE asks for could not have sustained. Since
+  2026-10-06 the unusable password is hashed once per process (`lib/helpers/unusable_password.ts`); its
+  preimage is still discarded, so sharing it opens nothing. Fifty creates went from ~12 s to ~0.13 s.
 
 ## Related
 

@@ -108,7 +108,9 @@ Keycloak's first-broker-login "verify existing account by re-authentication" bot
 `test/federation/link_existing.spec.ts` is the attack.
 
 A provisioned account's password is a hash of 32 bytes discarded on the next line — deliberately not a
-sentinel string, which would be a value someone could eventually type.
+sentinel string, which would be a value someone could eventually type. Since 2026-10-06 that hash is drawn
+once per process and shared by every passwordless account it creates (`lib/helpers/unusable_password.ts`),
+because an argon2 hash per account made a SCIM import CPU-bound; see [[scim-provisioning]].
 
 ## Recognised providers are data, and that is what makes them safe
 

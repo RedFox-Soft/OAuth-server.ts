@@ -149,3 +149,5 @@ Operations:
 - 2026-10-06 — corrected [[end-user-lifecycle]]: `test/admin/retired_migration.spec.ts` is gone (a test that removed code stayed removed proves nothing an audience depends on, Principle V); the reason for the name `provisionedBy` stands on its own.
 
 ## [2026-10-06] update | [[scim-provisioning]]: the `scim.strict` tolerances gain Entra's manager forms — the enterprise `manager` as a bare id, and `replace` with `""` to clear it. Found by Microsoft's SCIM validator against the conformance deployment, which then passed 11 of 12 required tests; the remaining "Replace Attributes" failure is recorded in CONFORMANCE.md as the validator's.
+
+## [2026-10-06] update | [[scim-provisioning]] and [[upstream-federation]]: the unusable password of a passwordless account is hashed once per process instead of once per account — an argon2 hash per SCIM create (~100 ms of CPU) could not have sustained an initial directory import; the preimage is still discarded, so sharing the hash opens nothing.
