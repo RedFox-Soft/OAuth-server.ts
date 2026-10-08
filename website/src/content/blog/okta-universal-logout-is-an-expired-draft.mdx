@@ -12,9 +12,9 @@ everywhere, now, the provider should be able to tell us. Not at the next sign-in
 tomorrow. Now: sessions, refresh tokens, the lot.
 
 So I went looking for the standard way an identity provider tells a relying party "end everything this
-person has". There is not one. There is a final specification for a narrower thing, one for a broader
-thing that the big providers do not send to third parties, and an individual Internet-Draft that
-expired without being adopted, which happens to be the one Okta sends.
+person has". There is not one. There is a final specification for a narrower thing, and one for a
+broader thing that the big providers do not send to third parties. And there is an individual
+Internet-Draft that expired without being adopted, which happens to be the one Okta sends.
 
 ## Only one big workforce IdP pushes "end everything", and it pushes a draft
 
@@ -52,15 +52,15 @@ survive it. Shared Signals and CAEP are the broad standard for "this session is 
 the big workforce providers pushes them to an arbitrary relying party. Entra sends a third-party client
 nothing at all. That leaves Okta's Universal Logout, which is draft-parecki-oauth-global-token-revocation.
 Revision 06 is from February 2026. It expired on 28 August without the OAuth working group adopting it,
-and there is no `draft-ietf-` successor. When we looked at sixteen comparable products, exactly one other,
-Auth0, receives this request.
+and there is no `draft-ietf-` successor. Of the sixteen comparable products we looked at, exactly one
+other, Auth0, receives this request.
 
 I built it anyway, and I think that was right, but only with three hedges that I would now insist on
-for anything built on an expired draft. The target is the request Okta documents, not the draft read
-as though it were a standard. Everything sits behind its own switch, `globalTokenRevocation.enabled`,
-off by default, whose description in the console says the draft expired. And the wire format is one
-small module over a core that knows nothing about it, so that when the format changes, or dies, the
-part that decides who may end whose access does not move.
+for anything built on an expired draft. First, the target is the request Okta documents, not the
+draft read as though it were a standard. Second, everything sits behind its own switch,
+`globalTokenRevocation.enabled`, which is off by default and whose description in the console says
+the draft expired. Third, the wire format is one small module over a core that knows nothing about
+it. When the format changes, or dies, the part that decides who may end whose access does not move.
 
 ## What Okta actually sends
 
@@ -75,7 +75,7 @@ Content-Type: application/json
 { "sub_id": { "format": "iss_sub", "iss": "https://acme.okta.com", "sub": "00u1a2b3c4d5e6f7g8h9" } }
 ```
 
-Decoded, the assertion says who is asking and for which endpoint:
+Decoded, that JWT (the assertion, from here on) says who is asking and for which endpoint:
 
 ```json
 { "typ": "global-token-revocation+jwt", "alg": "RS256", "kid": "q8J1..." }
@@ -90,17 +90,21 @@ Decoded, the assertion says who is asking and for which endpoint:
 }
 ```
 
-`iss` is the Okta organisation and `sub` is our client id there, so the pair identifies one upstream
-provider configured on one bucket. The body's `sub_id` identifies the person, as their subject at that
+`iss` is the Okta organisation and `sub` is our client id there, which Okta documents as
+`client_id/appInstanceId`; only a real run will settle the exact form. The pair identifies one
+upstream provider configured on one bucket, this server's name for a set of end users with its own
+sign-in rules and, once it has an address, its own issuer. The body's `sub_id` identifies the person: by their subject at that
 provider or, in Okta's other format, by email. A user can be named only if that provider signs them in
-here, or its bound SCIM connection provisioned them. Everyone else, including people who do not exist,
+here, or its bound SCIM connection (a provisioning connection, the record that links one directory to
+one bucket) provisioned them. Everyone else, including people who do not exist,
 gets the same `404`, so the endpoint cannot be used to ask who has an account.
 
 What it ends is everything: sessions, grants, refresh tokens and opaque access tokens, with a
 back-channel logout to each relying party. The account stays active, so the person can sign in again
-at once and consents afresh. That is more than the draft's MUST, which is refresh tokens plus
-re-authentication, and the draft permits it. One access-ending operation for every path was a decision
-we made deliberately, and our administrators get the same thing as "sign out everywhere".
+at once, and consents afresh. That is more than the draft's MUST (refresh tokens plus
+re-authentication), and the draft permits it. Every path that ends access (an administrator's action,
+this request from Okta, a SCIM deactivation) goes through one operation, and that was a deliberate
+decision: our administrators get the same thing from the "Sign out everywhere" button.
 
 ## Measure the lifetime from iat, never from nbf
 
@@ -132,8 +136,9 @@ request is refused, and the refusal reads like a correct security check.
   <text x="400" y="40" text-anchor="middle" font-size="14" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">One assertion, two ways to measure how long it lives</text>
 </svg>
 
-So the lifetime is measured from the issue time, and from now, and `nbf` is checked only for what it
-means, that the assertion is not yet valid before it:
+So we measure the lifetime from the issue time and from now, and check `nbf` only for what it means
+(the assertion is not valid before it). `nbf` itself is checked by jose's `jwtVerify` before this
+runs:
 
 ```ts
 const { exp, iat, jti } = claims;
@@ -158,36 +163,37 @@ issuer's clock for anything more than which way time runs.
 
 ## The checks are constants, because someone will turn a setting off
 
-An endpoint that ends sessions is a lever over a whole workforce. The inputs an attacker needs to pull
-it are the provider's issuer, our client id at the provider and one user's subject there, and none of
-those is a secret. So every check on this endpoint is written as if the request is hostile, because a
+An endpoint that ends sessions is a lever over a whole workforce. To pull it, an attacker needs the
+provider's issuer, our client id at the provider and one user's subject there. None of those is a
+secret. So every check on this endpoint is written as if the request is hostile, because a
 fair share of the requests that will ever reach it will be.
 
 Keycloak's CVE-2026-18569, from August, is the case I keep in front of me. Its back-channel logout
 receiver accepted logout tokens signed with `alg: none` for any provider whose signature validation an
-operator had switched off. I doubt anyone switches signature validation off in production on purpose. I
-suspect they switch it off once, to debug a provider that will not connect, and forget. So in our server the set of
-acceptable algorithms is a constant, asymmetric algorithms only, intersected with what the provider
-advertises, and there is no provider, bucket or instance setting that can widen it. `none` and every
+operator had switched off. I doubt anyone switches signature validation off in production on purpose.
+I suspect they switch it off once, to debug a provider that will not connect, and forget. So in our
+server the set of acceptable algorithms is a constant: asymmetric algorithms only, intersected with
+what the provider advertises. No provider, bucket or instance setting can widen it. `none` and every
 `HS*` are refused, the latter because nobody but the provider may hold the key that signs these.
 
-The rest follow the same rule. The provider is looked up by issuer and client id as two separate
+The rest follow the same rule: each is a constant, and none can be configured. The provider is looked up by issuer and client id as two separate
 values, never one composed key, because Keycloak #42209 broke brokered logout for any provider whose
 alias contained a dot. The `aud` must be exactly this endpoint. `exp`, `iat` and `jti` are required,
-and each `jti` is accepted once, recorded under a namespace of bucket and provider that ends in a
-delimiter, because the replay record's id is a hash of namespace and `jti` concatenated with nothing
-in between. A provider that has not been opted in is refused with `403`, but only after it has
-authenticated, so the refusal tells an unauthenticated caller nothing about which providers are opted in. And
-a failed credential is charged against the strict per-origin rate limit, the same counter the SCIM
+and each `jti` is accepted once. It is recorded under a namespace of bucket and provider that ends in
+a delimiter, because the replay record's id is a hash of the namespace and the `jti` concatenated
+with nothing in between. A provider that has not been opted in is refused with `403`, but only after
+it has authenticated, so the refusal tells an unauthenticated caller nothing about which providers are
+opted in. And a failed credential is charged against the strict per-origin rate limit, the same counter the SCIM
 endpoint uses.
 
 ## A key cache that anyone can poke needs its cooldown back
 
 There is one more trap, and it is in the key cache rather than the checks. On the federated sign-in
 path, our server switches off jose's thirty-second cooldown between refetches of a provider's key set.
-We switched it off because the conformance suite's key-rotation test showed sign-ins failing for half a
-minute after every upstream rotation, and the cooldown defends against nothing there: the ID token is
-read from the provider's own token endpoint, so only the provider can present an unknown `kid`.
+We switched it off because the OpenID Foundation conformance suite's key-rotation test showed sign-ins failing for half a
+minute after every upstream rotation. And on that path the cooldown defends against nothing: the ID
+token is read from the provider's own token endpoint, so only the provider can present an unknown
+`kid`.
 
 A revocation request is the opposite. Anyone can send one, with any `kid` they like, and a cache
 without a cooldown refetches the provider's keys for every unknown `kid`. That turns our server into a
@@ -208,8 +214,8 @@ export function presentedKeySetFor(jwksUri: string): RemoteKeySet {
 }
 ```
 
-The cost is that a genuine rotation at Okta is honoured at most once per thirty seconds, and a revocation
-that arrives inside that window with the new `kid` is refused. I would take that trade
+The cost is that a genuine rotation at Okta is honoured at most once per thirty seconds, and a
+revocation that arrives inside that window with the new `kid` is refused. I would take that trade
 every time over an endpoint that fetches on command.
 
 ## Build the core once, and the draft as a plugin
@@ -221,25 +227,26 @@ accepts, a replay namespace and which provider option admits it.
 
 That split paid for itself almost at once. Inbound back-channel logout from Keycloak, Auth0 and Ping is
 the second module on the same core, and it inherited every refusal above without restating one. The only
-thing it had to change was where our client id lives, which a logout token carries as its `aud` and
-Okta's assertion as its `sub`, and that is declared by the format rather than guessed, since a guess
-would let a token choose which provider it is judged against. Back-channel logout has been run against a
+thing it had to change was where our client id lives: a logout token carries it as its `aud`, Okta's
+assertion as its `sub`. That is declared by the format rather than guessed, because a guess would let
+a token choose which provider it is judged against. Back-channel logout has been run against a
 real Keycloak 26.8.0. A CAEP `session-revoked` event, if any provider ever sends one, would be a third
 module.
 
 ## When I would turn it on
 
 I would turn it on for a deployment whose customers run Okta with Identity Threat Protection and expect
-Universal Logout to reach every application, with the switch documented as experimental and someone
-watching the refusal events for the first week. I would leave it off everywhere else, because an
+Universal Logout to reach every application. Even then, the switch would be documented as
+experimental, and someone would watch the refusal events for the first week. I would leave it off everywhere else, because an
 endpoint you do not need is one more way in.
 
 And I would be honest about the state of it, as I am trying to be here. It has not been run against a
-real Okta organisation; it needs Identity Threat Protection, and the test suite replays the request Okta
-documents with a stub provider's keys. Okta documents its `sub` as `client_id/appInstanceId`, which may
-not be the bare client id the provider is configured with, and a provider configured with a custom
-authorization server's issuer may not match the organisation issuer that Okta's request carries. Only a real run will settle either. The SCIM
-side that usually comes with it has its own gaps: Okta's CRUD test has not been run, and there is no
+real Okta organisation, because that needs Identity Threat Protection. The test suite replays the
+request Okta documents, signed with a stub provider's keys. Okta documents its `sub` as
+`client_id/appInstanceId`, which may not be the bare client id the provider is configured with. And a
+provider configured with a custom authorization server's issuer may not match the organisation issuer
+that Okta's request carries. Only a real run will settle either question. The SCIM side that usually
+comes with it has its own gaps: Okta's CRUD test has not been run, and there is no
 `/Bulk`. None of it has been put forward for certification. If the draft is revived and changes, the
 module changes with it. If it stays dead, Okta will presumably move to something else, and the core
 will still be the part worth having written.

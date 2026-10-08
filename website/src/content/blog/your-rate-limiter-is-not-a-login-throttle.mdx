@@ -11,14 +11,14 @@ The dashboard was flat. Requests per second normal, error rate normal, the rate 
 fired once all night. And the count of failed sign-ins for one account was a little over two
 thousand.
 
-The attacker had done nothing clever. A few thousand addresses, each trying one password against
-the same email every twenty seconds or so, each comfortably inside a per-address allowance that
-was tuned for a browser doing something silly. The limiter did precisely what it was built to do,
-which is stop any single origin from hammering the server. Nobody was hammering the server. They
-were guessing a password, slowly, from everywhere at once.
+The attacker had done nothing clever. A few thousand source addresses, each trying one password
+against the same email every twenty seconds or so, each comfortably inside a per-address allowance
+that was tuned for a browser doing something silly. The limiter did precisely what it was built to
+do, which is to stop any single origin from hammering the server. Nobody was hammering the server.
+They were guessing a password, slowly, from everywhere at once.
 
-I had believed, for longer than I like to admit, that a rate limiter in front of the login endpoint
-was brute-force protection. It is not, and the reason is not a tuning problem. It is that a rate
+I had believed, for longer than I like to admit, that a rate limiter in front of the sign-in
+endpoint was brute-force protection. It is not, and the reason is not a tuning problem. It is that a rate
 limiter is keyed on the one thing the attacker gets to choose.
 
 ## Key the counter on the thing the attacker cannot choose
@@ -28,13 +28,15 @@ to stop and start. The one thing they cannot pick is the identity they are attac
 is the point of the exercise. So the counter that bounds guessing has to be keyed on the identity,
 not the caller, and everything else about its design follows from that one decision.
 
-The second thing that follows is where the count lives. A per-origin limiter in our server keeps its
-counters in process memory, and that is fine for what it is: the allowance multiplies by the number
-of replicas, resets on restart, and quietly fails open when addresses rotate faster than the
-windows, and none of that matters for a resource protection because the worst case is a server
-that is busier than it should be. The worst case for a login throttle is an account. So its counter
-goes through the same database adapter everything else persists through, and it is the same count
-from every replica, before and after a restart, however many addresses the guesses arrive from.
+The second thing that follows is where the count lives. The per-origin limiter in our server keeps
+its counters in process memory, and for what it is, that is fine. Its allowance multiplies by the
+number of replicas, resets on restart, and quietly fails open when a flood of rotating addresses
+evicts counters from its bounded table, handing an origin a fresh allowance. None of that matters
+for a resource protection, because there the worst case is a server that is busier than it should
+be. The worst case for a sign-in throttle is a taken-over account. So
+its counter goes through the same database adapter everything else persists through, and it is the
+same count from every replica, before and after a restart, however many source addresses the
+guesses arrive from.
 
 <svg viewBox="0 0 800 380" width="100%" role="img" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">
   <title>A per-origin rate limiter and a per-identity sign-in throttle compared: what each is keyed on, where it keeps the count, what a restart does to it, and what a thousand rotating addresses guessing one password do to it</title>
@@ -62,27 +64,28 @@ from every replica, before and after a restart, however many addresses the guess
 </svg>
 
 Both of these run in front of our sign-in endpoint, and I want to be clear that the limiter is not
-wrong. It is just not this. The moment I stopped expecting it to be this, the design of the actual
-throttle became a list of decisions about one persisted counter, and each decision had a way to get
-it wrong that every test I had would have missed.
+wrong. It is just not a sign-in throttle. The moment I stopped expecting it to be one, designing
+the actual throttle became a list of decisions about one persisted counter. Each decision had a way
+to go wrong that every test I had would have missed.
 
 ## Doubling windows, and the counter that died with the door
 
 The simplest throttle is a cap and a window: five wrong passwords, then the door shuts for fifteen
 minutes. It is also nearly useless against anyone patient. Fifteen minutes is 96 windows a day, five
-guesses each, 480 guesses a day against one account, and the attacker who reads your error page
-learns the schedule on the first lockout and sets a timer. So the window has to grow. Ours doubles
-each time an address exhausts it, from fifteen minutes to a ceiling of an hour, which holds a
-sustained attack to about 120 guesses a day. NIST SP 800-63B puts the line at 100 consecutive
-failures, and 120 is where we landed once the lockouts had to remain survivable by a person who
-mistypes.
+guesses each: 480 guesses a day against one account. And an attacker who reads your error page
+learns the schedule at the first lockout and sets a timer. So the window has to grow. Ours doubles
+each time an email address exhausts it, from fifteen minutes up to a ceiling of an hour, which
+holds a sustained attack to about 120 guesses a day. NIST SP 800-63B puts the line at 100 consecutive
+failures, which is a different unit: ours is a daily rate with no limit on the number of days, so a
+sustained attack passes 100 consecutive failures in about a day. 120 a day is where we landed once
+the lockouts had to remain survivable by a person who mistypes.
 
 The escalation is what I got wrong first, and I got it wrong by doing the natural thing. The record
 that holds the count has a TTL, and the obvious TTL is the lockout itself: the door reopens, the
 record is gone, clean slate. That is what our second-factor throttle does, and it is right there,
-because a code throttle has nothing to remember between windows. A password throttle does. It has
-to remember how many windows this address has already burned, and if the record dies with the
-door, it forgets, and the next exhaustion starts again at fifteen minutes. An attacker who simply
+because that throttle has nothing to remember between windows. A password throttle does. It has to
+remember how many windows this address has already burned. If the record dies with the door, the
+throttle forgets, and the next exhaustion starts at fifteen minutes again. An attacker who simply
 waits keeps the shortest window for ever. Nothing reports a problem. Every test of "the door reopens
 after the window" passes, because it does.
 
@@ -114,11 +117,11 @@ after the window" passes, because it does.
   <text x="400" y="272" text-anchor="middle" font-size="13" fill="var(--diagram-line, #555)">Waiting would be a complete defeat, and no test of "the door reopens" would notice.</text>
 </svg>
 
-So there are two deadlines over one record, and they are different things. The window says when
-the door reopens, and it is minutes. The expiry says when the record is forgotten, and it is
-twenty-four hours after the most recent failure. The second has to outlive the first, always, and
-rather than ask an operator to keep two numbers in the right order, the configuration validator
-refuses a ceiling above the retention at boot. Measuring the retention from the last failure rather
+So there are two deadlines on one record, and they are different things. The window says when the
+door reopens, and it is measured in minutes. The expiry, or retention, says when the record is
+forgotten, and it is twenty-four hours after the most recent failure. The second always has to
+outlive the first. Rather than ask an operator to keep two numbers in the right order, the
+configuration validator refuses, at boot, a ceiling longer than the retention. Measuring the retention from the last failure rather
 than the first is what lets the escalation decay by itself after a quiet day, so an honest user who
 had a bad Monday is not still on the sixty-minute step on Friday.
 
@@ -127,8 +130,8 @@ had a bad Monday is not still on the sixty-minute step on Friday.
 The second mistake I made is the one I am least proud of, because it is a textbook race and I wrote
 it anyway. The handler read the counter, verified the password, and on failure wrote the counter
 back with one more failure. Read, modify, write. Send five wrong passwords one after another and it
-works perfectly. Send fifteen at once and every one of them finds the door open and every one of them
-gets its password verified. The counter may well read high enough afterwards to shut the door, which
+works perfectly. Send fifteen at once, and every one of them finds the door open and every one of
+them gets its password verified. The counter may well read high enough afterwards to shut the door, which
 is why a test that checks the door once the burst is over passes. A test that counts how many hashes
 the burst bought does not, and that is the test we have now.
 
@@ -158,16 +161,16 @@ export async function recordAttempt(bucketId: string, email: string): Promise<bo
 }
 ```
 
-That increment is one statement on either backend, a `findOneAndUpdate` with `$inc` on MongoDB and
-an `UPDATE` with `RETURNING` over the jsonb column on PostgreSQL, so fifteen concurrent callers
-receive fifteen different numbers and only the first five are under the cap. The same write pushes the record's expiry out to twenty-four hours from now,
-which is how "retention from the last failure" costs no second write. What you cannot see in that
-function is the thing that makes it honest: a password that then verifies clears the record, so what
-stays counted is exactly the failures, and a wrong guess that was refused at the door never reaches
-the hash at all.
+That increment is one statement on either backend: a `findOneAndUpdate` with `$inc` on MongoDB, an
+`UPDATE` with `RETURNING` over the jsonb column on PostgreSQL. So fifteen concurrent callers receive
+fifteen different numbers, and only the first five are under the cap. The same write pushes the
+record's expiry out to twenty-four hours from now, which is how "retention from the last failure"
+costs no second write. What you cannot see in that function is the thing that makes it honest: a
+password that then verifies clears the record, so what stays counted is exactly the failures. And a
+wrong guess that was refused at the door never reaches the hash at all.
 
 That last point is not a nicety. Argon2 verification is deliberately expensive, and before the check
-sat in front of the lookup, every guess against a known address bought the server a full hash. A
+sat in front of the lookup, every guess against a known address cost the server a full hash. A
 throttle placed after verification bounds the guesses and leaves the CPU cost exactly where it was.
 Placed before, a shut door costs one indexed read.
 
@@ -214,25 +217,28 @@ with the right password and an unverified address is throttled for knowing it.
 
 ## The refusal has to say nothing, and the counter has to exist for nobody
 
-Everything on that right-hand box is the third thing I got wrong, and I got it wrong by being
+Everything in that right-hand box is the third thing I got wrong, and I got it wrong by being
 helpful. The version I wanted to write, and have shipped elsewhere, said "too many attempts, try
-again in 14 minutes". It was a kind message and a precise oracle: it told an attacker that the address they were probing had an account, since
-why else count, and it told them exactly when to come back.
+again in 14 minutes". It was a kind message and a precise oracle: a response that answers a
+question an attacker should not be able to ask. It told an attacker that the
+address they were probing had an account (why else count?), and it told them exactly when to come
+back.
 
-The fix has two halves and the second is less obvious than the first. The first is that every
-refusal on this door is one expression rendering one page, so a shut door, an unknown address, a
-wrong password and a deactivated account are byte-identical, structurally rather than by four
-copies of a string staying in step. The second is that the counter is written for any address
-submitted, including one that resolves to no account. If the throttle only counted real accounts,
-its behaviour would differ for real and fake addresses, and the moment anything about that
-difference is observable, timing, a header, a future bug, the throttle itself becomes the
-enumeration attack. So the storage area holding these counters is deliberately unowned. It carries
-no account id because a counter for a nonexistent account cannot have one, and it carries no
-address either, because the address is the key and a field repeating it would be a second, indexable
-list of every email anyone ever typed into the form.
+The fix has two halves, and the second is less obvious than the first. The first is that every
+refusal at this door is one expression rendering one page. So a shut door, an unknown address, a
+wrong password and a deactivated account are byte-identical, and they are identical by structure,
+not because four copies of a string stay in step. The second is that the counter is written for
+any address submitted, including one that resolves to no account. If the throttle only counted
+real accounts, its behaviour would differ for real and fake addresses. The moment anything about
+that difference becomes observable — timing, a header, a future bug — the throttle itself becomes
+the enumeration attack. So the storage area holding these counters is deliberately unowned. It
+carries no account id, because a counter for a nonexistent account cannot have one, and it carries
+no separate address field: the address is already in the key, and repeating it in a field would
+only add another indexed copy of every email anyone ever typed into the form.
 
 That decision reaches the event bus too. The server emits an event when it throttles, and the event
-names the bucket and nothing else. An operator needs to know which population is under attack. They
+names the bucket — this server's name for a set of end users with its own sign-in rules
+and, once it has an address, its own issuer — and nothing else. An operator needs to know which population is under attack. They
 do not need a log they could read names out of.
 
 ## Sixty-five thousand spellings of one address
@@ -240,8 +246,8 @@ do not need a log they could read names out of.
 The fourth mistake is the one that passed every test I had and would have kept passing. The account
 lookup is case-insensitive, so `alice@example.com` and `Alice@Example.com` are the same user. The
 counter was keyed on the address as submitted. That gives the address as many independent counters
-as it has capitalisations, which for sixteen letters is 65,536, times a cap of five. Every test used
-a lowercase address. Every test passed.
+as it has capitalisations: for sixteen letters, 65,536 of them, each with its own cap of five.
+Every test used a lowercase address. Every test passed.
 
 ```ts
 /*
@@ -257,12 +263,13 @@ export function emailScopedId(bucketId: string, email: string): string {
 
 The interesting part is the comment, not the code. It would be easy to read this as "remember to
 lowercase" and move on. The actual rule is that whatever normalisation the lookup applies, the key
-applies too, and the day someone teaches the lookup to ignore dots in Gmail addresses is the day
+applies too. The day someone teaches the lookup to ignore dots in Gmail addresses is the day
 lowercasing stops being sufficient. Writing the rule as parity rather than as a transformation is
-what makes the next person change the right thing. It is also why this is one function shared by
-the three storage areas keyed on an address, rather than the same expression written three times,
-because the third copy had already dropped the lowercase call and was only harmless because one of
-our two user stores happens to normalise what it stores.
+what makes the next person change the right thing. It is also why this is one function, shared by
+the three storage areas keyed on an address (LoginThrottle, PasswordResetThrottle and
+VerificationResend), rather than the same expression written three times. The third copy had
+already dropped the lowercase call, and it was harmless only because the MongoDB user store, the
+only production one then (PostgreSQL came later), happens to normalise what it stores.
 
 ## The honest user needs a way out that the attacker does not have
 
@@ -277,46 +284,51 @@ an email-bombing vector, so it needs its own cap, so it has only moved the locko
 mailer a hard dependency of sign-in on a server where mail is best-effort everywhere else. And it
 cannot serve the administrators' own bucket, which has no self-service reset at all.
 
-What we do instead is narrower and I think correct. A completed password reset clears the counter.
-A requested one does not. The distinction is what each proves: asking for a reset proves nothing,
-and clearing on request would hand anyone who knows an address a way to wipe the count that is
-holding them off. Consuming the single-use secret that was delivered to the address on file proves
-control of that mailbox, which is the same evidence the "enter the code" step would have collected,
-gathered by a flow that already exists and already has its own cooldown and daily cap.
+What we do instead is narrower and, I think, correct. A completed password reset clears the
+counter. A requested one does not. The distinction is what each proves. Asking for a reset proves
+nothing, and clearing on request would hand anyone who knows an address a way to wipe the count
+that is holding them off. Consuming the single-use secret that was delivered to the address on file
+proves control of that mailbox. That is the same evidence the "enter the code" step would have
+collected, only gathered by a flow that already exists and already has its own cooldown and daily
+cap.
 
-The administrators' bucket is the case that shaped the ceiling. Its operators sign in through this
-same door and have no reset flow to escape with, so a deep escalation against an admin address is
-the one lockout nobody can undo. The rule that protects them is not written as "if this is the
-admin bucket". It is written as "a bucket that requires a second factor stays at the first window
-however often it is tripped", because a guessed password there does not complete a sign-in, so deep
-escalation buys little and risks a lot. Stated that way it says the real reason, and it corrects
-itself: turn a bucket's second factor off and its escalation deepens, with nothing to remember.
+The administrators' bucket is the case that shaped the rule below, not the one-hour value of the
+ceiling. Administrators sign in through this same door and have no reset flow to escape with, so a
+deep escalation against an admin address is the one lockout nobody can undo. The rule that protects
+them is not written as "if this is the admin bucket". It is written as "a bucket that requires a
+second factor stays at the first window however often it is tripped" — which the administrators'
+bucket does once its operator turns the second factor on, as the first-administrator guide says to
+do first — because a guessed password there does not complete a sign-in, so deep
+escalation buys little and risks a lot. Stated that way, the rule names the real reason, and it
+corrects itself: turn a bucket's second factor off and its escalation deepens, without anyone
+having to remember to change anything.
 
 ## What I would not do
 
 I would not give it an off switch, and ours has none, which surprised the first person to look for
-one in the settings console. Three numbers are there, the cap, the first window and the ceiling,
-each bounded by the same validator the server boots through, so the console cannot save a
-configuration the server would refuse to start with, and the cap stops at 100 because that is where
-a throttle stops being one. There is no boolean. A kill switch on a security boundary is a switch
+one in the settings console. Three numbers are there — the cap, the first window and the ceiling —
+each bounded by the same validator the server boots through. So the console cannot save a
+configuration the server would refuse to start with, and the cap stops at 100, because that is
+where a throttle stops being one. There is no boolean. A kill switch on a security boundary is a switch
 that reopens the vulnerability, and the console is where switches get flipped at two in the morning
 and never flipped back.
 
 I would not let it fail open either. No storage error is caught. The counter read sits one line
 ahead of the account lookup, which reaches the same database, so a failure there would have been a
-failure a moment later anyway, and catching it would answer "invalid username or password" to a user
-whose sign-in was never refused for that reason.
+failure a moment later anyway. And catching it would answer "invalid username or password" to a
+user whose sign-in was never refused for that reason.
 
 And I would not pretend it finishes the job. A per-identity throttle bounds guesses against one
-account. It does nothing against password spraying, one common password tried once against ten
-thousand accounts, because every account sees a single failure and no counter ever moves. The
-per-origin limiter catches the naive version of that and a botnet defeats it the same way it defeated
-mine. What actually ends spraying is refusing passwords that appear in breach corpora and requiring
-a second factor, and I have come round to the view that a login throttle is mostly there to make the
-second factor's absence survivable until you have one.
+account. It does nothing against password spraying — one common password tried once against ten
+thousand accounts — because every account sees a single failure and no counter ever moves. The
+per-origin limiter catches the naive version of that, and a botnet gets past it exactly the way it
+got past mine on the night this post began with. What actually ends spraying is refusing passwords
+that appear in breach corpora and requiring a second factor. I have come round to the view that a
+sign-in throttle is mostly there to make the absence of a second factor survivable until you have
+one.
 
 The defaults in our server are five failures, a fifteen-minute first window and a one-hour ceiling,
 and the [settings reference](/docs/reference/settings/#loginThrottle.failureCap) documents the three
 numbers and their bounds. The [threat model](/docs/security/threat-model/) lists what each check on
-the sign-in door is there to stop, and, as the section on limitations says in as many words, which
-of the counters in this server are boundaries and which are merely resource protections.
+the sign-in door is there to stop. Its section on limitations also says, in as many words, which of
+the counters in this server are security boundaries and which are merely resource protections.

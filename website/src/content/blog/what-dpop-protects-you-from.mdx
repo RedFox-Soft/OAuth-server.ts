@@ -9,21 +9,21 @@ tags: [dpop, tokens, security]
 
 The token turned up in a crash report.
 
-A mobile client integrating with an API I ran used an HTTP library that, on an unhandled exception,
+A mobile client was integrating with an API I ran. Its HTTP library, on an unhandled exception,
 serialised the failing request and shipped it to a third-party crash service. Headers included. So
 somewhere in that vendor's dashboard sat `Authorization: Bearer eyJhbGci...`, valid for another
 fourteen minutes and readable by everyone on their support rota. Nobody did anything with it, as far
 as I know. Nothing in the protocol would have stopped them if they had.
 
-That is not a bug in anyone's implementation. RFC 6750 says it in its definition of the term: any
+That is not a bug in anyone's implementation. RFC 6750 says so in its definition of the term: any
 party in possession of a bearer token can use it. The resource server checks the signature, the expiry, the
-audience and the scope, and never asks the one question that mattered that afternoon, which is
-whether the caller is the party the token was issued to. It cannot ask, because there is nothing in
-the request to ask about.
+audience and the scope. It never asks the one question that mattered that afternoon: is the caller
+the party the token was issued to? It cannot ask, because there is nothing in the request to ask
+about.
 
 DPoP, RFC 9449, puts something in the request to ask about. I want to be precise about what that
-does and does not buy, because I have watched it get sold as "stops token theft", and it does
-something narrower and more useful than that.
+does and does not buy, because I have watched it get sold as "stops token theft". It does something
+narrower, and more useful.
 
 ## What the client signs
 
@@ -48,8 +48,8 @@ looks like this:
 }
 ```
 
-Each claim is there because a specific replay goes through the hole it closes, and the diagram
-below is the map of which claim closes which. Read the arrows: every one of them leaves the proof
+Each claim is there to close a hole that a specific replay would otherwise go through, and the
+diagram below maps which claim closes which. Read the arrows: every one of them leaves the proof
 and lands on something the server can check independently of the client.
 
 <svg viewBox="0 0 800 400" width="100%" role="img" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">
@@ -87,7 +87,8 @@ and lands on something the server can check independently of the client.
   <text x="620" y="378" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">iat: within ±300 s of server time, unless a nonce is present</text>
 </svg>
 
-The accent arrow is the one the whole scheme hangs on. The access token carries a confirmation claim,
+The accent arrow is the one the whole scheme hangs on: it is the sender-constraint, binding a token
+to a key its sender must prove it holds. The access token carries a confirmation claim,
 `cnf.jkt`, which is the RFC 7638 thumbprint of the public key that signed the proof. A resource
 server that has never spoken to the client can still recover which key the token belongs to, from
 the token alone, and then check that this proof was signed by that key. `ath` stops a proof being
@@ -128,8 +129,8 @@ Cache-Control: no-store
 now on. The client sends `Authorization: DPoP <token>` rather than `Bearer`, and a server that
 receives a DPoP-bound token under the `Bearer` scheme should refuse it, because a client that does
 not know it holds a bound token is a client that will also fail to send the proof. If the access
-token is a JWT, the binding is in its payload; if it is opaque, the introspection response carries
-the same `cnf` member.
+token is opaque, the introspection response carries the binding as a `cnf` member. If it is a JWT,
+as this one is, the same member sits in its payload:
 
 ```json
 {
@@ -182,8 +183,9 @@ resource server, and the verification block is the part worth staring at.
 </svg>
 
 Now run the crash report through it. The vendor's support engineer has the access token. They do
-not have K, so they cannot sign a proof, so step 4 fails at the second line and the token is worth
-nothing on its own. Suppose instead they captured a whole request, token and proof together. That
+not have K, so they cannot sign a proof with it. A proof signed with any other key fails step 4 at
+the thumbprint line, and on its own the token
+is worth nothing. Suppose instead they captured a whole request, token and proof together. That
 proof is good for one method, one URL, one token, and either five minutes of `iat` or one nonce, and
 if the resource server keeps a replay store it is good exactly once. The attacker has gone from
 holding a fourteen-minute password to holding a single request they may or may not be able to
@@ -199,7 +201,7 @@ those the attacker ends up with the token and not the key.
 It does nothing against an attacker running code where the key lives. Cross-site scripting in a
 single-page app that keeps the key in IndexedDB does not need to exfiltrate anything. It signs
 proofs with the real key and calls the API as the real user, from the real page, and every check in
-step 4 passes because they should. Binding a token to a key the attacker can also use protects
+step 4 passes, as it should. Binding a token to a key the attacker can also use protects
 nothing. I have seen "we use DPoP" offered as the answer to "what happens if the frontend is
 compromised" in more than one design review, and it is not an answer to that question at all. It
 stops the replay of a stolen token from somewhere else. It does not stop the compromise of the place
@@ -231,10 +233,10 @@ DPoP-Nonce: eyJ7S_zG8SxF0SbEjb-5aYW7Xbt9Jd_kKdIaI4BbX2o
 ```
 
 The client reads `DPoP-Nonce`, signs a new proof with it, and retries. Every subsequent response
-may carry a fresh `DPoP-Nonce`, which the client swaps in for the next request, so a busy client
-never sees the 401 again and an idle one sees it once more after a few minutes. That is the round
-trip the diagram shows, and it is the one that a client library has to implement as a loop rather
-than as an error.
+may carry a fresh `DPoP-Nonce`, which the client swaps in for the next request. So a busy client
+never sees the 401 again, and an idle one sees it once more after a few minutes. That is the round
+trip the diagram below shows, and a client library has to implement it as a loop rather than as an
+error.
 
 <svg viewBox="0 0 800 300" width="100%" role="img" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">
   <title>The DPoP nonce round trip: a first request without a nonce is refused with use_dpop_nonce and a DPoP-Nonce header, the retry carries that nonce and succeeds, and the success response hands over the next nonce</title>
@@ -262,12 +264,13 @@ than as an error.
 
 Two things in that exchange cost us real time, and neither is cryptography. The first is the
 status code. RFC 9449 wants the authorization server to report a bad proof as a 400 with the error
-in the body, the way every other token endpoint error is reported, and a resource server to report
-it as a 401 with the error in `WWW-Authenticate`, the way RFC 6750 does. Same error class, two
-statuses, decided by which role the endpoint is playing. We had both of our protected resources
-correcting the status themselves in a catch block before we moved the decision into the shared error
-handler, keyed on the route, so a third resource could not be added without it. The second is CORS.
-A browser cannot read `WWW-Authenticate` or `DPoP-Nonce` from a cross-origin response unless the
+in the body, the way every other token endpoint error is reported. A resource server reports it as a
+401 with the error in `WWW-Authenticate`, the way RFC 6750 does. Same error class, two statuses,
+decided by which role the endpoint is playing. Both of our protected resources were correcting the
+status themselves in a catch block until we moved the decision into the shared error handler, keyed
+on the route, so a third resource could not be added without it.
+
+The second is CORS. A browser cannot read `WWW-Authenticate` or `DPoP-Nonce` from a cross-origin response unless the
 server lists them in `Access-Control-Expose-Headers`, and without them the single-page app sees an
 opaque 401 and can never perform the retry. The spec mentions this in passing. It is the difference
 between DPoP working in a browser and not.
@@ -294,11 +297,11 @@ export function nextNonce(secret: Uint8Array): string {
 
 export function acceptsNonce(secret: Uint8Array, nonce: string): boolean {
 	const now = Math.floor(Date.now() / 1000 / STEP);
-	let mismatch = 0;
+	let matched = 0;
 	for (const offset of [-2, -1, 0, 1, 2]) {
-		mismatch |= constantTimeCompare(nonceFor(secret, now + offset), nonce);
+		matched |= Number(constantTimeEqual(nonceFor(secret, now + offset), nonce));
 	}
-	return mismatch === 0;
+	return matched === 1;
 }
 ```
 
@@ -316,25 +319,25 @@ not.
 ## Replay detection is a database on your hot path
 
 `jti` uniqueness means remembering every proof identifier you have accepted, per client, for as
-long as a proof could still be valid, which with a 300-second window is 300 seconds. That is a write
+long as a proof could still be accepted: five minutes, or up to ten for a proof dated ahead of the
+server's clock. That is a write
 on every authenticated API call and a read before it. For a resource server that is an
 autoscaled function with no state of its own, it is a new dependency that did not exist before
-DPoP, and the first time someone notices it is usually when the replay store is the thing paging
-them.
+DPoP. The first time someone notices it is usually when the replay store is the thing paging them.
 
 The temptation is to switch it off, and here I want to be candid about a decision we made. Our
 server has a switch that disables replay detection. It is boot configuration, and it is deliberately
-absent from the administrative console and from the management API: it exists for a conformance
-suite that replays one proof on purpose and for a person repeating a request while diagnosing
-something, and neither of those is administration. A switch that removes a security property while
+absent from the administrative console and from the management API. It exists for a conformance
+suite that replays one proof on purpose, and for a person repeating a request while diagnosing
+something; neither of those is administration. A switch that removes a security property while
 discovery goes on advertising the feature is exactly the kind of thing that gets flipped at two in
 the morning during an incident and never flipped back, and the console is where two in the morning
 happens. So it is not there.
 
 What you actually lose without it is narrower than "DPoP stops working". An attacker who captured a
-complete request, token and proof, can replay that identical request, same method and URL, until
-the proof's nonce or `iat` ages out. Five minutes of replaying one `GET /orders` is a real leak and
-not a catastrophe; five minutes of replaying one `POST /transfers` is a different conversation. If
+complete request — token and proof — can replay that identical request, with the same method and
+URL, until the proof's nonce or `iat` ages out. Five minutes of replaying one `GET /orders` is a
+real leak, not a catastrophe; five minutes of replaying one `POST /transfers` is a different conversation. If
 your API is idempotent and read-heavy you may reasonably decide the store is not worth it. I would
 not make that decision by default, and I would not make it reversible from a web page.
 
@@ -348,26 +351,26 @@ client's authentication method is `none`, the refresh token inherits the access 
 
 I think that clause is the strongest argument for DPoP in a browser, stronger than anything about
 the access token. In a single-page app the access token lives for fifteen minutes and the refresh
-token lives for days, held in the one place an attacker with a leaked backup or a shared machine is
-most likely to find it. Before DPoP a stolen refresh token from a browser was the keys to the
+token lives for days, held in browser storage, the one place an attacker with a leaked profile backup
+or a shared machine is most likely to find it. Before DPoP a stolen refresh token from a browser was the keys to the
 account for as long as rotation let it live. With DPoP and a non-extractable WebCrypto key, a stolen
 refresh token is a string that cannot be exchanged, because the exchange itself requires a proof
 signed by a key that did not leave the origin. Rotation still matters, but it is now catching an
 attacker who has already been stopped rather than one who is already inside.
 
 The same idea reaches back one step further with `dpop_jkt`, an authorization request parameter
-that binds the authorization code to the key before the code is even issued, so a code intercepted
-between the redirect and the exchange cannot be redeemed with a different key. PKCE already covers
+that binds the authorization code to the key before the code is even issued. A code intercepted
+between the redirect and the exchange then cannot be redeemed with a different key. PKCE already covers
 most of that ground, and our server fills `dpop_jkt` in automatically when a proof arrives with a
-pushed authorization request, so in practice it costs nothing. I would not turn DPoP on for it. I
-would not turn it off either.
+pushed authorization request, so in practice it costs nothing. It is not a reason to turn DPoP on, and
+not a reason to turn it off either.
 
 ## Where I would use it, and where I would not
 
 The cost is three things, and none of them is the signature. The client needs a key, a place to keep
-it and a proof on every request, which in a browser means a non-extractable `CryptoKey` in IndexedDB
-and in a native app means the platform keystore, and an extractable key quietly gives back most of
-what you paid for. The client needs to treat `use_dpop_nonce` as a retry, not a failure, and the
+it and a proof on every request. In a browser that means a non-extractable `CryptoKey` in IndexedDB,
+in a native app the platform keystore, and an extractable key quietly gives back most of what you
+paid for. The client needs to treat `use_dpop_nonce` as a retry, not a failure, and the
 server needs to expose two headers to cross-origin callers or the retry can never happen. And
 somebody has to own a replay store with a five-minute expiry, or own the decision not to.
 
@@ -379,14 +382,14 @@ five-minute tokens and a tight audience, I would not bother; mTLS-bound tokens o
 bearer tokens buy the same thing for less client code.
 
 The question I do not have an answer to is what browsers do next. Device Bound Session Credentials,
-Chrome's proposal and now an IETF draft, is an attempt at the same property for cookies, with the key held by the browser
-rather than the page, which is precisely the boundary DPoP cannot cross. If that lands and grows an
+Chrome's proposal and now an IETF draft, is an attempt at the same property for cookies. The key is
+held by the browser rather than the page, which is precisely the boundary DPoP cannot cross. If that lands and grows an
 API-token story, a lot of client-side DPoP code becomes something the platform does for you. If it
 stays a cookie feature, DPoP remains the only sender-constraint a browser client can use without a
 client certificate. I would build for the second and be pleased by the first.
 
-If you want to see the shape of it in a running server, FoxAuth switches DPoP on server-wide and
-then per client through the `dpop_bound_access_tokens` client attribute, the nonce requirement is a
+If you want to see the shape of it in a running server: FoxAuth switches DPoP on server-wide, and
+then per client through the `dpop_bound_access_tokens` client attribute. The nonce requirement is a
 setting, and the replay switch is the one described above, absent from the console on purpose. The
 [settings reference](/docs/reference/settings/) lists the options, the
 [endpoint reference](/docs/reference/endpoints/) shows which endpoints accept a proof, and the

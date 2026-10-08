@@ -1,10 +1,10 @@
 ---
 title: Entra、Okta 的 SCIM 方言
 description: 遵循互操作规范的 SCIM 服务器会拒绝 Entra 和 Okta 的真实请求。两者使用的请求形式，以及为何一个开关就能全部涵盖。
-source: 57f2b7895583
+source: 12553d200c12
 ---
 
-这是 Okta 通过 SCIM 停用一个用户的方式，形状与它自己的协议参考文档一致，发往我们的一个桶：
+下面是 Okta 通过 SCIM 停用用户的请求，格式与它自己的协议参考文档完全一致，发往我们的一个用户桶（这是本服务器对一组终端用户的叫法：这组用户有自己的登录规则，一旦用户桶有了地址，它还有自己的签发者）：
 
 ```http
 PATCH /acme/scim/v2/Users/2819c223-7f76-453a-919d-413861904646 HTTP/1.1
@@ -18,32 +18,32 @@ Content-Type: application/scim+json
 }
 ```
 
-这里没有 `path`。SCIM 2.0 互操作规范（interoperability profile）规定，服务器必须拒绝没有 path 的 PATCH 操作，而我们所针对的 OpenID IPSIE SCIM 规范正是建立在它之上的。RFC 7644 本身允许这种操作；是互操作规范收紧了它，而且理由充分，因为不带 path 的操作，正是 SCIM patch 语义中所有歧义的藏身之处。所以一个照规范行事的服务器会用 `400` 回应这个请求，而昨天已经离职的那个人仍然处于启用状态。
+这里没有 `path`。SCIM 2.0 互操作规范（interoperability profile）规定，服务器必须拒绝没有 path 的 PATCH 操作，而我们所针对的 OpenID IPSIE SCIM 规范（IPSIE 即 Interoperability Profiling for Secure Identity in the Enterprise）正是建立在它之上的。RFC 7644 本身允许这种操作；是互操作规范收紧了这条规则，理由也很充分：不带 path 的操作，正是 SCIM patch 语义中所有歧义的藏身之处。所以一个照规范行事的服务器会用 `400` 回应这个请求，而昨天已经离职的那个人仍然处于启用状态。
 
-在写服务器的第一行代码之前，我仔细读过这两份规范，但我仍然以为有意思的工作在于遵循它们。并非如此。大多数客户实际使用的两个目录服务，没有一个能向严格遵循这些规范的服务器进行预配，真正有用的知识，是它们各自究竟如何偏离规范。
+在写服务器的第一行代码之前，我仔细读过这两份规范，却仍以为真正有意思的工作在于遵循它们。事实并非如此。大多数客户实际使用的两个目录服务，都无法向严格遵循这些规范的服务器进行预配。真正值得了解的，是它们各自究竟如何偏离规范。
 
 ## Okta 用规范所禁止的请求来停用用户 {#okta-deactivates-with-a-request-the-profile-forbids}
 
-Okta 的方言很小，因此容易被低估。要紧的形式有两种。第一种是上面那个不带 path 的 `replace`，Okta 就是用它来停用和重新启用用户的，这是预配客户端所做的最重要的一件事。第二种是 Okta 在创建用户时会发送 `password` 属性。IPSIE 在用户 schema 中彻底禁止 `password`，因为把密码推送到每个应用的目录服务，正是联合部署本应摆脱的东西，何况我们的用户本来就是通过目录服务登录的。
+Okta 的方言很小，因此容易被低估。要紧的形式有两种。第一种是上面那个不带 path 的 `replace`。Okta 正是用它来停用和重新启用用户，而这是预配客户端所做的最重要的一件事。第二种是创建用户时附带的 `password` 属性。IPSIE 在用户 schema 中彻底禁止 `password`：把密码推送到每个应用的目录服务，恰恰是联合部署本应摆脱的东西。何况我们的用户本来就是通过目录服务登录的。
 
-认证方式也是一种方言，而且最让人意外。Okta 根本无法为 SCIM 使用 OAuth 客户端凭据授权。它发送一个静态令牌，而在它的请求头模式下，它把令牌作为整个 `Authorization` 值发送，前面没有 `Bearer` 方案。这就是我们的静态令牌以 `scimst_` 开头的原因：这个前缀让服务器无需查询就能把它与访问令牌区分开，不带方案也能接受它，还能让密钥扫描工具识别出泄漏到代码仓库里的令牌。它以 SHA-256 摘要的形式存储，并且只显示一次。
+认证方式也是一种方言，而且最让人意外。Okta 根本无法为 SCIM 使用 OAuth 客户端凭据授权。它发送的是静态令牌，而且在请求头模式下，它把令牌直接作为整个 `Authorization` 值发送，前面不带 `Bearer` 方案。这就是我们的静态令牌以 `scimst_` 开头的原因。有了这个前缀，服务器无需查询就能把它与访问令牌区分开，不带方案也能接受它；密钥扫描工具也能识别出泄漏到代码仓库里的令牌。令牌以 SHA-256 摘要的形式存储，并且只显示一次。
 
 ## Entra 说的是一种方言，并用一个开关承认了这一点 {#entra-speaks-a-dialect-and-admits-it-with-a-flag}
 
 Microsoft Entra ID 的清单更长，也更古怪：
 
-- 操作名用大写，`"op": "Replace"`，而 RFC 7644 定义的是小写；
+- 操作名首字母大写，`"op": "Replace"`，而 RFC 7644 定义的是小写；
 - 布尔值写成字符串，`"value": "False"`；
 - 不带 path 的 `replace` 操作一次设置多个属性，键是带点号的子属性名和完整的扩展 URN，`name.givenName` 与 `urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:department` 并列；
 - 其默认属性映射中包含 `addresses`，而我们的用户 schema 并未声明这个属性；
 - 通过一个什么都匹配不到的过滤器做 `replace`，比如对一个还没有工作邮箱的用户发送 `emails[type eq "work"].value`，RFC 7644 规定此时返回 `noTarget`，而 Entra 的意思是「添加它」；
 - 还有企业扩展中的 `manager`，以裸 ID 发送，`"value": "mgr-1"`，而 schema 规定的是 `{ "value": "mgr-1" }`；清除它时用的是值为空字符串的 `replace`，而不是 `remove`。
 
-这份清单的大部分来自 Microsoft 的文档和其他实现者的实地报告。manager 这一对不是。我们是在 Microsoft 自己的 SCIM 验证器对我们的 Add、Replace 和 Remove Manager 测试失败时才发现它的，这也是我最不喜欢的一项：一种没人写下来的方言，由厂商自己的一致性测试发现。
+这份清单的大部分来自 Microsoft 的文档和其他实现者的实地报告。manager 的这两处怪癖不是，也正是我最不喜欢的。直到 Microsoft 自己的 SCIM 验证器在 Add、Replace 和 Remove Manager 测试中判我们失败，我们才发现它们：一种没人写下来的方言，却被厂商自己的一致性测试发现了。
 
-Microsoft 在文档中记载了一个功能开关 `aadOptscim062020`，附加在租户 URL 后面，它会把 Entra 的一部分旧行为切换为合规形式，字符串布尔值就是其中之一。这是我所知道的、对这种方言真实存在的最明确的承认，而服务器不能假定每个客户的租户 URL 都带着它。
+Microsoft 在文档中记载了一个功能开关 `aadOptscim062020`，附加在租户 URL 后面，可以把 Entra 的一部分旧行为（包括字符串布尔值）切换为合规形式。这是我所知道的、对这种方言真实存在的最明确的承认。而服务器不能假定每个客户的租户 URL 都带着它。
 
-下面把全貌放在一处。把每一行当作一句话来读：这个客户端发送这个，严格解读会拒绝它，而宽容的服务器会这样处理。
+下面把全貌汇总在一处。把每一行当作一句话来读：这个客户端发送这个，严格解读会拒绝它，而宽容的服务器会这样处理。
 
 <svg viewBox="0 0 800 400" width="100%" role="img" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">
   <title>Okta 和 Entra 发送给 SCIM 服务器的六种请求形式：分别由谁发送、互操作规范的要求，以及宽容的服务器如何解读</title>
@@ -84,11 +84,11 @@ Microsoft 在文档中记载了一个功能开关 `aadOptscim062020`，附加在
 
 ## 这些库在错误的地方很严格 {#the-libraries-were-strict-in-the-wrong-places}
 
-我们的计划为难点指定了两个广泛使用的库：一个过滤器解析器和一个 patch 应用器。两个最后都被扔掉了，而扔掉它们的理由比替代品更值得一说。
+我们的计划为最难的部分选定了两个广泛使用的库：一个过滤器解析器和一个 patch 应用器。两个最后都被扔掉了，而扔掉它们的理由比替代品更值得一说。
 
-那个过滤器解析器的带引号字符串模式，在遇到一串未终止的换行符时会发生指数级回溯，而过滤器是以查询字符串的形式从目录服务传来的，所以任何持有 SCIM 令牌的人都能触发一次拒绝服务。那个 patch 库拒绝 `REPLACE`，在不带 path 的 `remove` 上抛出 `TypeError`，把 `"False"` 原样存成字符串 `"False"`，在 SCIM 规定不区分大小写的地方区分大小写地匹配属性名，并且今年出了两份原型污染（prototype pollution）安全公告。所以它恰好在真实客户端所做的那些事情上很严格，却在唯一真正危险的事情上很宽松：外部系统所控制的请求体中出现 `__proto__` 这样的键。
+那个过滤器解析器的带引号字符串模式，在遇到一串未终止的换行符时会发生指数级回溯。而过滤器是以查询字符串的形式从目录服务传来的，所以任何持有 SCIM 令牌的人都能借此发起拒绝服务攻击。那个 patch 库拒绝 `REPLACE`，在不带 path 的 `remove` 上抛出 `TypeError`，把 `"False"` 原样存成字符串 `"False"`，在 SCIM 规定不区分大小写的地方区分大小写地匹配属性名，并且今年出了两份原型污染（prototype pollution）安全公告。所以它恰好对真实客户端的那些做法很严格，却对唯一真正危险的东西很宽松：外部系统所控制的请求体中出现 `__proto__` 这样的键。
 
-真实客户端使用的语法很小，所以替代品也很小。过滤器解析器是一个单遍分词器，只接受 IPSIE 所列过滤器的白名单，并由一个基于属性的测试（property test）保证它在线性时间内完成。patch 应用器对照已声明的属性表解析每一个 path，拒绝请求体中任何位置出现的 `__proto__`、`constructor` 和 `prototype`，并把每一项宽容处理都放在同一个条件之后：
+真实客户端使用的语法很小，所以替代品也很小。过滤器解析器是一个单遍分词器，只接受 IPSIE 所列过滤器组成的白名单，并由一个基于属性的测试（property test）保证它在线性时间内完成。patch 应用器对照已声明的属性表解析每一个 path，拒绝请求体中任何位置出现的 `__proto__`、`constructor` 和 `prototype`，并把每一项宽容处理都放在同一个条件之后：
 
 ```ts
 const op = opText.toLowerCase();
@@ -124,16 +124,16 @@ if (path === undefined || path === '') {
 }
 ```
 
-这里有两点是刻意为之。宽容分支是正常路径，拒绝才是特例，因为正常的流量就是方言。而不带 path 的 `remove` 在任何模式下都会被拒绝，因为在那里宽容解读就成了「删除什么？」，而靠猜测，正是目录服务删掉用户整份资料的方式。
+这里有两点是刻意为之。宽容分支是常规情况，拒绝才是例外，因为常规流量本身就是方言。而不带 path 的 `remove` 在任何模式下都会被拒绝。在那里，宽容解读就成了「删除什么？」，而一旦靠猜，目录服务就会删掉用户的整份资料。
 
 ## 只设一个开关，因为不存在半严格的合规服务器 {#one-switch-because-no-half-strict-server-is-conformant}
 
-上面每一种形式本可以各有一个设置，有一段时间设计里确实有好几个。最后只剩一个：`scim.strict`，默认关闭。我认为一个是对的，理由关乎运维者而不是代码。运维者要回答的只有一个问题：我是要按这些规范认证这台服务器，还是要把 Entra 和 Okta 接到它上面？宽容项只开一半的任何组合都不合规，因此一组彼此独立的开关会提供几十种组合，而其中除了两种之外，每一种对这两个目的来说都是错的。在严格模式下，表中的每一种形式都是 `400`，也只有在这时，`/ServiceProviderConfig` 才会声明 `interopProfileConformant`。哪怕只宽容了一种形式的服务器，也没有资格这么说。
+上面每一种形式本可以各有一个设置，有一段时间设计里确实有好几个。最后只剩一个：`scim.strict`，默认关闭。我认为只设一个是对的，理由关乎运维者而不是代码。运维者要回答的只有一个问题：我是要按这些规范认证这台服务器，还是要把 Entra 和 Okta 接到它上面？只开启部分宽容项的组合，没有一种是合规的。因此一组彼此独立的开关会提供几十种组合，而除了其中两种，其余每一种对这两个目的来说都是错的。在严格模式下，表中的每一种形式都会得到 `400`，也只有在这时，`/ServiceProviderConfig` 才会声明 `interopProfileConformant`。哪怕只宽容了一种形式，服务器也没有资格这样声明。
 
-同样的原则也约束着凭据。Entra 用客户端密钥向桶的令牌端点进行认证，按其管理员的选择通过 Basic 或在请求体中发送，因为在工作负载身份联合（workload identity federation）覆盖到预配之前，密钥是它唯一能发送的东西。Okta 发送它的静态令牌。两者都不是 IPSIE 所要求的，各自位于一个具名设置之后，即 `scim.secretCredentials` 和 `scim.staticTokens`，默认都开启，这样想要规范所要求形式的运维者可以关掉另外两种，并确切地看到什么不再工作。
+凭据遵循同样的规则：运维者真正要做的每一个决定对应一个开关，而这里有两个决定。Entra 用客户端密钥向用户桶的令牌端点进行认证，密钥按其管理员的选择通过 Basic 或在请求体中发送。在工作负载身份联合（workload identity federation）覆盖到预配之前，密钥是它唯一能发送的东西。Okta 发送它的静态令牌。两者都不是 IPSIE 所要求的。它们各自由一个具名设置控制，即 `scim.secretCredentials` 和 `scim.staticTokens`，默认都开启。这样，想要采用规范所要求形式的运维者可以把这两个设置都关掉，并确切地看到哪些东西会停止工作。
 
 <svg viewBox="0 0 800 330" width="100%" role="img" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">
-  <title>目录服务向桶的 SCIM 端点认证的三种方式：Entra 在令牌端点使用客户端密钥，合规客户端在令牌端点使用签名的 JWT 断言，Okta 则把静态令牌直接发送到 SCIM 端点；每种方式都由各自的设置控制</title>
+  <title>目录服务向用户桶的 SCIM 端点认证的三种方式：Entra 在令牌端点使用客户端密钥，合规客户端在令牌端点使用签名的 JWT 断言，Okta 则把静态令牌直接发送到 SCIM 端点；每种方式都由各自的设置控制</title>
   <defs>
     <marker id="scim-arrow-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"> <path d="M0,0 L10,5 L0,10 z" fill="var(--diagram-line, #555)"/></marker>
     <marker id="scim-arrow-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"> <path d="M0,0 L10,5 L0,10 z" fill="var(--diagram-accent, #d9480f)"/></marker>
@@ -149,7 +149,7 @@ if (path === undefined || path === '') {
   <text x="410" y="125" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">客户端 scim-&lt;连接 ID&gt;</text>
   <rect x="610" y="150" width="170" height="70" rx="8" fill="none" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5"/>
   <text x="695" y="180" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">/scim/v2</text>
-  <text x="695" y="200" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">仅限一个桶</text>
+  <text x="695" y="200" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">仅限一个用户桶</text>
   <line x1="190" y1="65" x2="318" y2="100" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#scim-arrow-a)"/>
   <text x="250" y="60" text-anchor="middle" font-size="12" fill="var(--diagram-fg, #1a1a1a)">客户端密钥</text>
   <line x1="190" y1="155" x2="318" y2="120" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#scim-arrow-a)"/>
@@ -163,22 +163,22 @@ if (path === undefined || path === '') {
   <text x="400" y="318" text-anchor="middle" font-size="13" fill="var(--diagram-line, #555)">只有中间那条路径是 IPSIE 所要求的。真实目录服务使用的另外两条，各有一个开关。</text>
 </svg>
 
-令牌端点这条路径有一个我不愿放弃的性质。OAuth 客户端 `scim-<connection id>` 每次被解析时都由连接现场合成，不存储在任何地方，因此整个令牌端点都是白得的，包括断言的重放保护和常数时间比较；轮换一个凭据只需一次写入，没有任何隐藏的东西需要保持同步。它签发的令牌是不透明的，只携带 `scim`，以一个桶的 SCIM URL 作为受众，并在凭据被重新签发的那一刻失效。
+令牌端点这条路径有一个我不愿放弃的性质。OAuth 客户端 `scim-<connection id>` 每次被解析时都由连接现场合成（这里的连接指预配连接，即把一个目录服务与一个用户桶关联起来的那条记录），不存储在任何地方。因此整个令牌端点都是白得的，包括断言的重放保护和常数时间比较。轮换一个凭据也只需一次写入，没有任何隐藏的东西需要保持同步。它签发的令牌是不透明的，只携带 `scim`，以一个用户桶的 SCIM URL 作为受众，并在凭据被重新签发的那一刻失效。
 
 ## IPSIE §4.1 要求两件没有客户端能同时做到的事 {#ipsie-41-asks-for-two-things-no-client-can-do-at-once}
 
-如果规范的要求至少是自洽的，那会方便得多，那样合规就只是不受欢迎而已。可它们并不自洽。IPSIE SCIM 规范第 4.1 节要求使用客户端凭据授权，「with JWT Client Authentication as defined in RFC7523 section 2.2」（使用 RFC7523 第 2.2 节定义的 JWT 客户端认证），几行之后又要求「HTTP Basic authentication in the Authorization request header」（在 Authorization 请求头中使用 HTTP Basic 认证），并补充说禁止在请求体中传输 `client_assertion` 或 `client_secret` 之类的客户端凭据。
+如果规范的要求至少是自洽的，那会方便得多，那样合规就只是不受欢迎而已。可它们并不自洽。IPSIE SCIM 规范第 4.1 节要求使用客户端凭据授权，「with JWT Client Authentication as defined in RFC7523 section 2.2」（使用 RFC7523 第 2.2 节定义的 JWT 客户端认证）。几行之后，它又要求「HTTP Basic authentication in the Authorization request header」（在 Authorization 请求头中使用 HTTP Basic 认证），并补充说禁止在请求体中传输 `client_assertion` 或 `client_secret` 之类的客户端凭据。
 
-RFC 7523 §2.2 把断言放在请求体中传送。这正是该节所定义的内容。Basic 传送的是共享密钥。没有客户端能同时满足这两条，也没有服务器能告诉客户端该违反哪一条。我们遵循 JWT 那条要求，因为 §10 重复了它，而 §4.1 带有一条编者注，说它应当被扩展；我们在一致性说明中写明了这一点，而不是悄悄挑一个。这是 00 版草案。它会被修正的。在那之前，任何告诉你他们的服务器完全符合 §4.1 的人，都是在告诉你他们没有把它读第二遍。
+RFC 7523 §2.2 把断言放在请求体中传送，这正是该节所定义的内容。Basic 传送的则是共享密钥。没有客户端能同时满足这两条，也没有服务器能告诉客户端该违反哪一条。我们遵循 JWT 那条要求，因为 §10 重复了它，而 §4.1 带有一条编者注，说这一节应当被扩展。我们在一致性说明中写明了这一点，而不是悄悄挑一个。这是 00 版草案。它会被修正的。在那之前，任何告诉你他们的服务器完全符合 §4.1 的人，都是在告诉你他们没有把它读第二遍。
 
 ## 验证器怎么说 {#what-the-validators-said}
 
-在我们的一致性测试部署上，Microsoft 的 SCIM 验证器通过了 24 项必需测试中的 23 项以及全部七项预览测试，包括组相关的测试。唯一的失败项「Patch User - Replace Attributes」报告资源中缺少主电子邮件和电话号码，而它所显示的 PATCH 响应中两者都有，随后的读取也返回了两者，其他实现者也报告了在正确响应下出现的完全相同的失败，Microsoft 没有回应。我把它算作验证器的问题，我们的一致性说明给出了理由，任何人都可以提出异议。Okta 的 SCIM 2.0 Spec Test 通过了全部十一项必需测试和可选的组测试，53 项断言全部通过。它的第一次运行就发现了我们的一个真实缺陷：SCIM 基路径下一个未提供服务的路径返回了 404，响应体写的却是 `server_error`。
+在 Microsoft 的 SCIM 验证器中，我们的一致性测试部署通过了 24 项必需测试中的 23 项，以及全部七项预览测试，包括组相关的测试。唯一的失败项「Patch User - Replace Attributes」报告资源中缺少主电子邮件和电话号码。可它自己显示的 PATCH 响应中两者都有，随后的读取也返回了两者。其他实现者也报告过在正确响应下出现的完全相同的失败，Microsoft 一直没有回应。我把它算作验证器的问题，我们的一致性说明给出了理由，任何人都可以提出异议。在 Okta 的 SCIM 2.0 Spec Test 中，该部署通过了全部十一项必需测试和可选的组测试，53 项断言全部通过。这项测试第一次运行就发现了我们的一个真实缺陷：SCIM 基路径下一个未提供服务的路径返回了 404，响应体写的却是 `server_error`。
 
-尚未运行的部分同样重要。Okta 的 CRUD 测试需要一个安装了该集成的 Okta 组织，我们还没有运行它。没有 `/Bulk` 端点；Entra 和 Okta 都不调用它，它已与异步批量处理一起列入计划，但一份列出了它的规范，缺了它就不算完全满足。Okta 的 Universal Logout 所调用的全局令牌撤销端点，也从未在真实的 Okta 组织上运行过。而且这些我们都还没有申请认证。
+尚未运行的部分同样重要。Okta 的 CRUD 测试需要一个安装了该集成的 Okta 组织，我们还没有运行它。我们没有 `/Bulk` 端点。Entra 和 Okta 都不调用它，它已列入后续计划，将与异步批量操作一起实现，但既然规范列出了它，缺了它就不算完全满足规范。Okta 的 Universal Logout 所调用的全局令牌撤销端点，也从未在真实的 Okta 组织上测试过。而且以上这些，我们都还没有申请认证。
 
 ## 何时开启严格模式，何时不开 {#when-i-would-turn-strict-on-and-when-i-would-not}
 
-如果你要接入 Entra ID 或 Okta，就让 `scim.strict` 保持关闭，并把它的关闭理解为对客户端事实的陈述，而不是对你的服务器的放宽。它所宽容的每一种形式都是有界的：被宽容的属性要对照一张已声明的表来匹配，未声明的属性会被忽略而不是存储，危险的输入在两种模式下都会被拒绝。
+如果你要接入 Entra ID 或 Okta，就让 `scim.strict` 保持关闭，并把这理解为对客户端现状的如实陈述，而不是对你的服务器的放宽。此时服务器所宽容的每一种形式都是有界的：被宽容的属性要对照一张已声明的表来匹配，未声明的属性会被忽略而不是存储，危险的输入在两种模式下都会被拒绝。
 
-在做认证测试时开启它，或者当唯一的客户端是你按规范自己编写的客户端时开启它，并把结果当作对那个客户端的测试。如果你自己的客户端在严格模式下失败，那是一个你能修复的 bug，这比任何人对 Entra 的 manager 所能说的都多。如果你正从零开始编写一个 SCIM 服务器，请从上面那张表开始，而不是从 RFC 开始。RFC 告诉你什么是允许的。那张表告诉你，当客户的目录服务第一次运行完整同步时，凌晨三点会到达什么。
+在做认证测试时开启它，或者当唯一的客户端是你按规范自己编写的客户端时开启它，并把结果当作对那个客户端的测试。如果你自己的客户端在严格模式下失败，那是一个你能修复的 bug——而对 Entra 的 manager，谁也没法这么说。如果你正从零开始编写一个 SCIM 服务器，请从上面那张表开始，而不是从 RFC 开始。RFC 告诉你什么是允许的。那张表告诉你，凌晨三点客户的目录服务第一次运行完整同步时，真正会到达的是什么。
