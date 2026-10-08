@@ -1,36 +1,40 @@
 ---
-title: Your MCP server is an OAuth resource server
+title: Your MCP server must check who a token is for
 description: >-
-  MCP authorization is three documents and one claim: what an MCP server must publish, what the
-  token must carry, and two questions the spec leaves to you.
+  MCP authorization in plain terms: what your MCP server must publish, which token field must name
+  it, and two questions the spec leaves to you.
 publishedAt: '2026-09-30'
 tags: [mcp, resource-indicators, client-id-metadata-documents, security]
 ---
 
-The token that opened every tool on the MCP server had been issued for the internal wiki.
+The token was issued for the internal wiki. It opened every tool on the MCP server.
 
-The server did what most first attempts do. It fetched the identity provider's public keys, checked
-the signature and the expiry, read the subject out of the payload and called it authenticated.
-Every one of those checks passed, because the token was genuine. It was a perfectly good token for
-the wiki, and the MCP server never asked who it was for. Anyone holding any token from that provider,
-for anything, could list and call the tools as whoever the token named.
+The MCP server did what most first attempts do. It downloaded the public keys of the identity
+provider, the service that issues the tokens. It checked the token's signature and expiry time. It
+read the subject, the user the token names, and treated the request as authenticated. Every one of
+those checks passed, because the token was genuine. It was a perfectly good token for the wiki. But
+the MCP server never asked who the token was for. So anyone holding any token from that provider,
+issued for anything at all, could list the tools and call them, acting as whoever the token named.
 
-That is the bug the MCP authorization specification exists to prevent. Once you see it, the rest of
-the specification stops looking like a new protocol and starts looking like what it is: an ordinary
-OAuth 2.1 resource server, with the discovery steps written down so that a client that knows nothing
-but a URL can find its way to a token. I have spent a fair amount of time on the authorization-server
-side of it, and my summary is this: it is three documents and one claim, and almost every real
-problem is in the one claim.
+The MCP authorization specification exists to prevent exactly this bug. Once you see the bug, the
+rest of the specification stops looking like a new protocol. An MCP server is an ordinary OAuth 2.1
+resource server: a server that accepts tokens and, in return, lets the caller use what it holds (here,
+its tools). What the specification adds is the discovery steps, written down: how a client that knows
+nothing but the server's URL finds its way to a token. I have spent a fair amount of time on the
+other side, building the authorization server, the server that issues the tokens. My summary is
+this: MCP authorization is three documents and one claim (a claim is a field inside the token).
+Almost every real problem is in that one claim.
 
-## Three documents and one claim
+## From one URL to a token: three documents and one claim {#three-documents-and-one-claim}
 
-The agent host knows one thing: the URL of your MCP server. From there it has to learn who
-protects you, how to talk to that authorization server, and how to identify itself, and then it has
-to come back with a token that is for you and nobody else. The first three are documents; the last
-is a claim in the token.
+The agent host is the program the AI agent runs in; in OAuth terms it is the client. It knows one
+thing: the URL of your MCP server. From that URL it has to learn three things: which authorization
+server protects you, how to talk to that server, and how to identify itself to it. Then it has to
+come back with a token that is for you and nobody else. Documents answer the first three questions.
+The last part is a claim in the token.
 
 <svg viewBox="0 0 800 520" width="100%" role="img" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">
-  <title>Sequence of an agent host discovering and obtaining a token for an MCP server: a 401 with resource_metadata, the protected resource metadata document, the authorization server metadata, the client identified by a metadata document, the authorization and token requests carrying the resource parameter, and the audience-bound token presented back</title>
+  <title>How an agent host gets a token for an MCP server: a 401 that points to the server's metadata, that metadata, the authorization server's metadata, an authorization request and a token request that both name the MCP server in the resource parameter, and a token the MCP server checks was issued for it</title>
   <defs>
     <marker id="mcp-arrow-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--diagram-line, #555)"/></marker>
   </defs>
@@ -69,10 +73,12 @@ is a claim in the token.
   <text x="257" y="483" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">9  200, after checking signature, iss, exp and aud</text>
 </svg>
 
-Step 2 is the part an ordinary resource server would not already do, and the specification makes it
-a MUST, as it does the metadata document it points to (step 3) and the audience check (step 9). It
-is two lines. When a request arrives with no token, or with one you reject, you answer 401 and say
-where your metadata is:
+Step 2 is the one an ordinary resource server would not already do. The specification makes it a
+MUST. It does the same for the metadata document that step 2 points to (step 3) and for the audience
+check (step 9). The audience is the token's `aud` claim: it names the server the token was issued
+for. Step 2 itself is two lines. When a request arrives with no token, or with a token you reject,
+you answer 401 and say where your metadata is. This answer is called a challenge: in its
+`WWW-Authenticate` header the server tells the client how to get access:
 
 ```http
 HTTP/1.1 401 Unauthorized
@@ -80,7 +86,8 @@ WWW-Authenticate: Bearer resource_metadata="https://mcp.example.com/.well-known/
                          scope="mcp:tools-basic"
 ```
 
-The metadata itself is a JSON document (RFC 9728) that says who protects you:
+The metadata is a JSON document defined by RFC 9728, called protected resource metadata. In it, the
+MCP server says which authorization server protects it:
 
 ```json
 {
@@ -91,22 +98,27 @@ The metadata itself is a JSON document (RFC 9728) that says who protects you:
 }
 ```
 
-Everything after that is the authorization server's problem and the client's. The client takes the
-issuer from the document and fetches that server's metadata using the well-known forms that RFC 8414
-and OpenID Connect Discovery define. It has to try both, because the specification only requires the
-server to publish one. Then it runs an ordinary authorization code flow with PKCE. In both the
-authorization request and the token request it sends one parameter that has had an RFC since 2020
-and is still not ordinary at all in practice.
+From here on, the work belongs to the authorization server and the client. The client takes the
+issuer from the document. The issuer is the authorization server's name, written as a URL; every
+token it signs carries that URL as `iss`. With that URL the client fetches the authorization
+server's own metadata. There are two standard (well-known) addresses for it: one defined by RFC 8414
+and one by OpenID Connect Discovery. The client has to try both, because the specification only
+requires the server to publish one. Then the client runs an ordinary authorization code flow with
+PKCE: it gets a code through the browser and exchanges it for a token, and PKCE stops anyone who
+intercepts the code from using it. In both the authorization request and the token request, the
+client sends one more parameter. That parameter has had an RFC since 2020, and in practice it is
+still anything but ordinary.
 
-## The resource parameter is the whole point
+## The resource parameter makes a token good for your server only {#the-resource-parameter-is-the-whole-point}
 
-RFC 8707 lets a client say what it wants the token for. The MCP specification makes the parameter
-mandatory in both requests, and it is what turns "a token from the provider" into "a token for this
-MCP server". The authorization server mints the token with that URI as its audience, and the MCP
-server refuses any token whose audience is not exactly its own identifier. That is the line the wiki
-token would have failed at, and the only line that would have stopped it.
+The parameter is `resource`, from RFC 8707 (Resource Indicators). With it, the client says which
+server it wants the token for. The MCP specification makes it mandatory in both requests. It is what
+turns "a token from the provider" into "a token for this MCP server". The authorization server puts
+that URI into the token as its audience (`aud`). The MCP server refuses any token whose audience is
+not exactly its own identifier. The wiki token would have failed that check, and nothing else would
+have stopped it.
 
-Here is what the authorization server hands back for the flow above, decoded:
+Here is the token the authorization server returns for the flow above, decoded:
 
 ```json
 {
@@ -121,8 +133,8 @@ Here is what the authorization server hands back for the flow above, decoded:
 }
 ```
 
-On the MCP server's side it comes down to four checks, and two of them you have to state yourself,
-because a JWT library cannot guess them:
+On the MCP server's side, checking this token comes down to four checks. You have to state two of
+them yourself, because a JWT library cannot guess them:
 
 ```js
 import { createRemoteJWKSet, jwtVerify } from 'jose';
@@ -140,20 +152,21 @@ export async function principalFor(authorization) {
 }
 ```
 
-The signature and `exp` are the library's. `issuer` and `audience` are yours, and the second is the
-one the first attempt left out. Any library in any language does the same four checks; the shape of
-the code above is the checklist.
+The library checks the signature and the expiry (`exp`) on its own. `issuer` and `audience` are
+yours to supply, and `audience` is the one the first attempt left out. Any library in any language
+does the same four checks. The code above is, in effect, the checklist.
 
-What took me longer to appreciate is that the same string now appears in three places, written by
-three different parties, and it has to be identical in all of them. The MCP server
-publishes it in its metadata as `resource`. The operator of the authorization server declares it as
-the identifier of a protected resource. The client sends it as `resource` and the token carries it as
-`aud`. The comparison is exact, after canonicalization, and it is exact on purpose: no prefix match,
-no "a token for the parent path is good for the child", because that is precisely how one
-integration's token ends up working at another's.
+What took me longer to appreciate is that the same string now appears in three places. Three
+different parties write it, and it has to be identical in all of them. The MCP server publishes it
+in its metadata as `resource`. The operator of the authorization server declares it, that is,
+registers it as the identifier of a protected resource. The client sends it as `resource`, and the
+token carries it as `aud`. The comparison is exact, after canonicalization: each side's URL is first
+rewritten into one standard spelling (more on that below). It is exact on purpose. There is no prefix
+match, and no "a token for the parent path is good for the child path". That is precisely how one
+integration's token ends up working at another integration.
 
 <svg viewBox="0 0 800 330" width="100%" role="img" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">
-  <title>The same identifier in three places written by three parties: the resource field of the MCP server's metadata, the declaration on the authorization server, and the resource parameter the client sends which becomes the token's aud claim; the issuer likewise ties the metadata's authorization_servers to the token's iss</title>
+  <title>One identifier in three places, written by three parties: the resource field in the MCP server's metadata, the operator's declaration on the authorization server, and the resource parameter the client sends, which becomes the token's aud. The issuer links the metadata's authorization_servers to the token's iss in the same way</title>
   <defs>
     <marker id="mcp-arrow-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--diagram-accent, #d9480f)"/></marker>
   </defs>
@@ -182,35 +195,39 @@ integration's token ends up working at another's.
   <text x="400" y="185" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">one string, compared exactly after canonicalization, in every place</text>
 </svg>
 
-Canonicalization is where our first version had a bug, one that reasoning found and the tests did
-not. The specification says clients should use the form without a trailing slash, and that servers
-should accept an uppercase scheme or host. So we canonicalize both the declaration and the request
-through one function, which takes an option for a resource whose trailing slash is meaningful. The
-bug was that the comparison canonicalized the request with the default options, while the
-declaration had been stored with its slash kept. The slash was stripped from one side only, and a
-resource that declared its slash significant collapsed into its slash-free sibling. Both sides have
-to go through the same function with the same options. If that sounds obvious, it was obvious to me
-too, after.
+Canonicalization is where our first version had a bug. We found it by reasoning about the code; the
+tests did not catch it. The specification says clients should write the URL without a trailing
+slash, and that servers should accept a scheme or host in uppercase. So we canonicalize both the
+declaration and the incoming request through one function. That function takes an option for a
+resource whose trailing slash is meaningful. Here is the bug. The declaration was stored with its
+slash kept. But when comparing, we canonicalized the request with the default options. So the slash
+was stripped from one side only. As a result, a resource that declared its slash significant
+collapsed into its twin without the slash: two different resources were treated as one. Both sides
+have to go through the same function with the same options. If that sounds obvious, it was obvious
+to me too, afterwards.
 
-One more thing about the audience: because every token is bound to exactly one declared resource
-(an API or MCP server an administrator registers as a protected resource), declaring one can safely
-be data rather than code. In our server, declaring an MCP server is a form in the console: an
-identifier, a name for the consent screen, the scopes it recognises. Nothing is restarted. The
-declaration is read on every token request, with no cache in front of it, because a deleted
-declaration has to stop issuance on the very next request, not after some cached copy expires. We
-had already learned that lesson once, with a client cache that served a stale client to the admin
-plane, and did not need to learn it again.
+One more thing about the audience. Every token is bound to exactly one declared resource: an API or
+MCP server that an administrator has registered as a protected resource. Because of that, declaring
+a resource can safely be data rather than code. In our server, declaring an MCP server means filling
+in a form in the console: an identifier, a name to show on the consent screen, and the scopes the
+server recognises. A scope is a named permission that a token can carry, such as `mcp:tools-basic`.
+Nothing is restarted. The declaration is read on every token request, with no cache in front of it.
+The reason: once a declaration is deleted, tokens for it must stop on the very next request, not
+after some cached copy expires. We had already learned that lesson once, when a client cache served
+an out-of-date client to the admin console. We did not need to learn it again.
 
-## Who the client is, when there is nobody to type a client id
+## An agent identifies itself with a document URL: convenient, and risky {#who-the-client-is-when-there-is-nobody-to-type-a-client-id}
 
-The agent host has a URL and nowhere for you to paste a client identifier. The specification's first
-answer used to be dynamic client registration: the client POSTs a description of itself, gets a
-`client_id` back, and the authorization server accumulates a row per host that ever connected. The
-current revision marks that as deprecated and puts Client ID Metadata Documents first. I think that
-is the right call, and it is also the part of the specification most worth being nervous about.
+The agent host has your MCP server's URL and nothing else. There is nowhere for you to paste a client
+identifier (`client_id`) into it. The specification's first answer used to be dynamic client
+registration. The client POSTs a description of itself and gets a `client_id` back. The
+authorization server keeps one record for every host that has ever connected. The current revision
+of the specification marks this as deprecated. In its place it puts Client ID Metadata Documents
+first. I think that is the right call. It is also the part of the specification most worth being
+nervous about.
 
-The idea is that the `client_id` is itself an HTTPS URL, and at that URL sits a JSON document
-describing the client:
+The idea: the `client_id` is itself an HTTPS URL. At that URL sits a JSON document that describes
+the client, its metadata document:
 
 ```json
 {
@@ -222,61 +239,72 @@ describing the client:
 }
 ```
 
-The authorization server fetches it on demand, validates it, and stores nothing. There is no
-registration endpoint and no table of clients that grows by one per laptop. And the client's name on
-the consent screen comes from a document the client's operator controls, at a domain they
-demonstrably hold.
+The authorization server fetches this document when it needs it, checks it and stores nothing.
+There is no registration endpoint, and no table of clients that grows by one row for every laptop.
+The client name on the consent screen comes from the document. The client's operator controls that
+document, and it sits on a domain the operator demonstrably holds.
 
-The cost is that an unauthenticated stranger can now make your authorization server issue an HTTP
-request to a URL of their choosing. Every mitigation for that has to be on the server. Ours is one
-module that knows about the network and nothing else. It refuses private, loopback and link-local
-address ranges, comparing addresses as numbers rather than as text, because the URL parser will
-happily rewrite an IPv4-mapped IPv6 address into a form a string check misses. It follows redirects
-by hand and re-checks every hop. It stops reading at five kilobytes, and it is bounded in time. The
-feature is off by default, and the reason is exactly that sentence about the stranger.
+The cost is that a stranger, with no account and no credentials, can now make your authorization
+server send an HTTP request to any URL they choose. Every defence against that has to live on the
+server. Ours is one module that deals with the network and nothing else. It refuses private,
+loopback and link-local addresses. A loopback address is the machine's own address, such as
+`127.0.0.1`; a link-local address works only inside the local network segment. The module compares
+addresses as numbers, not as text. The reason is that the URL parser will happily rewrite an
+IPv4-mapped IPv6 address (an IPv4 address written in IPv6 form) into a form that a text check
+misses. The module follows redirects by hand and re-checks every hop. It stops reading after five
+kilobytes, and it has a time limit. The feature is off by default, and the reason is exactly that
+first sentence about the stranger.
 
-Once the document is in hand, the checks are short, and each one closes a specific trick:
-the `client_id` inside the document must equal the URL byte for byte, so that hosting a document
-naming somebody else's identifier gets you nothing; `redirect_uris` must be present and non-empty;
-a symmetric client secret is refused, because a secret in a world-readable document is not one; and
-a key-based authentication method must say where its keys are.
+Once the server has the document, the checks are short. Each one blocks a specific trick. The
+`client_id` inside the document must equal the document's URL byte for byte, so hosting a document
+that names somebody else's identifier gets you nothing. `redirect_uris`, the addresses the browser
+may be sent back to after sign-in, must be present and non-empty. A symmetric client secret (a
+password shared by the client and the server) is refused, because a secret in a document anyone can
+read is not a secret. And if the client authenticates with keys, the document must say where its
+keys are.
 
-The part I would call genuinely unresolved is loopback. A native agent host listens on
-`127.0.0.1` on some port for the callback, so its document lists a loopback redirect. The document
-proves that whoever wrote it controls the domain. It cannot prove which local process is listening
-on that port. An attacker on the same machine can present the real host's `client_id`, bind their
-own port, and the user sees the real host's name on the consent screen. The specification knows
-this, says the server should warn, and leaves it there. For an ordinary resource we carry that risk
-the way everyone does. For the one place such a client can hold administrative authority, this
-server's own MCP control plane, we turned the warning into an interlock: a document offering only
-loopback redirects cannot be permitted until an administrator accepts a written statement of what
-that does not prove.
+The part I would call genuinely unresolved is loopback redirects. A native agent host is an app on
+the user's own computer. It waits for the sign-in callback on `127.0.0.1`, on some port, so its
+document lists a loopback redirect. The document proves that whoever wrote it controls the domain.
+It cannot prove which local program is listening on that port. An attacker on the same machine can
+present the real host's `client_id` and listen on a port of their own. The user then sees the real
+host's name on the consent screen. The specification knows this, says the server should warn, and
+stops there. For an ordinary resource we carry that risk the way everyone does.
 
-## Which users an agent signs in
+There is one place where such a client can get administrative rights: this server's own MCP control
+plane, the MCP endpoint through which an agent manages the server. There we turned the warning into
+a hard stop. A document that offers only loopback redirects cannot be permitted until an
+administrator accepts a written statement of what such a document does not prove.
 
-Here is a question the specification does not ask, because it assumes one authorization server
-protects one MCP server for one population of users. That is not what an authorization server looks
-like once more than one team uses it.
+## Whose users an agent signs in when several teams share the server {#which-users-an-agent-signs-in}
 
-Suppose the server hosts several tenants, each with its own users, and an agent host arrives
-identified by a metadata document. It belongs to no tenant. It is a URL. Whose users does it sign in?
-The answer we settled on is that the resource decides: an administrator of a tenant declared that MCP
-server in a project of theirs, and a request naming that resource signs in that project's users.
-That is safe for a reason worth stating precisely. The client did not create the option; an
-administrator did, in a project they own. So the parameter selects among an operator's declarations
-and cannot manufacture one.
+Here is a question the specification does not ask. It assumes that one authorization server protects
+one MCP server for one group of users. An authorization server stops looking like that once more
+than one team uses it.
 
-It was safe, that is, against attackers without a console account. Anyone with an account could
-declare anything; identifiers were unique across the whole instance, and the first to declare won.
-So a hostile tenant could declare somebody else's MCP server, leave the real owner a permanent
-conflict, and route that server's users into their own bucket (a bucket is this server's name for a
-set of end users with its own sign-in rules and, once it has an address, its own issuer). The first fix made every declaration
-prove itself: fetch the resource's own metadata and check that it names this issuer. It is the
-natural fix, and it also refused every MCP server on an internal network, on localhost during
-development, or not deployed yet. It lasted a day.
+Suppose the server hosts several tenants. A tenant is a team that shares the server but has its own
+users. Now an agent host arrives, identified by a metadata document. It belongs to no tenant; it is
+just a URL. Whose users does it sign in? The answer we settled on: the resource decides. An
+administrator of a tenant declared that MCP server in one of their projects. So a request that names
+that resource signs in that project's users. It is worth saying precisely why this is safe. The
+client did not link this resource to this project; an administrator did, in a project they own. So
+the `resource` parameter can only choose among declarations an operator has made. It cannot create a
+new one.
+
+More precisely, it was safe against attackers without a console account. Anyone with an account
+could declare anything. Identifiers were unique across the whole instance, and whoever declared one
+first kept it. So a hostile tenant could declare somebody else's MCP server. The real owner would
+then run into a conflict every time they tried to declare it, for good. And sign-ins for that MCP
+server would go to the hostile tenant's bucket. A bucket is this server's name for a set of end users
+with its own sign-in rules. Once a bucket has an address of its own, it is also its own issuer.
+
+The first fix made every declaration prove itself. The server fetched the resource's own metadata
+and checked that it named this issuer. It is the natural fix. But it also refused every MCP server
+whose metadata the authorization server could not fetch: one on an internal network, one on
+localhost during development, one not deployed yet. It lasted a day.
 
 <svg viewBox="0 0 800 340" width="100%" role="img" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">
-  <title>Two tenants on one authorization server, each with an issuer of its own, each declaring the same MCP server identifier; a request at one tenant's issuer resolves only that tenant's declaration, and the shared root issuer accepts declarations from a super administrator only</title>
+  <title>Two tenants on one authorization server, each its own issuer, both declare the same MCP server identifier. A request at one tenant's issuer sees only that tenant's declaration. At the shared root issuer, only a super administrator can declare</title>
   <defs>
     <marker id="mcp-arrow-c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--diagram-line, #555)"/></marker>
   </defs>
@@ -310,84 +338,104 @@ development, or not deployed yet. It lasted a day.
 </svg>
 
 What replaced it is namespaces, and it is the arrangement I would now recommend to anyone building
-this. A tenant with an address of its own is its own issuer, with its own signing keys, and a
-resource identifier is unique only within an issuer. Two tenants may declare the same MCP server
-and neither ever sees the other's declaration, because every resolution reads only the namespace of
-the address the request arrived at. A declaration in your own namespace makes no outbound request
-at all, since it can only be a statement about your own users. The one namespace that is genuinely
-shared is the root issuer, where every tenant without an address of its own is served. It accepts
-declarations from a super administrator only, because there a resource's metadata can say it trusts
-the issuer and still cannot say which of those tenants it belongs to. No proof closes squatting
-there, so nobody but a super administrator gets to try.
+this. A namespace here is the set of declarations that belong to one issuer. A tenant with an
+address of its own is its own issuer, with its own signing keys. A resource identifier only has to
+be unique within one issuer. Two tenants may declare the same MCP server, and neither ever sees the
+other's declaration. That is because every lookup reads only the namespace of the address the
+request arrived at. A declaration in your own namespace needs no proof, so the server fetches
+nothing: such a declaration can only be a statement about your own users.
 
-That left three more holes in the same area. The first two have the form "a caller forgot to pass
-the resource", and both are worth knowing because they are the kind of thing this design makes
-possible. The account resolver looked up a different tenant's users than the login step had,
-because the login passed the resource and the resolver did not. The symptom was a 500 on the
-consent screen rather than a refusal. And the password, reset and registration doors resolved policy
-from the client alone, so a tenant whose users only sign in through an upstream provider could be
-reached with a password through a declared resource. Both were closed by making the resource a
-required argument, so an omission no longer type-checks. If you take one engineering rule from this
-section, take this one: when a parameter selects a tenant, make it impossible to call the function
-without it.
+Only one namespace is genuinely shared: the root issuer. Every tenant without an address of its own
+is served there. The root accepts declarations from a super administrator only. The reason: at the
+root, a resource's metadata can say it trusts the issuer, but it cannot say which of those tenants
+it belongs to. So no proof can stop squatting there, that is, a tenant taking somebody else's
+identifier first. That is why only a super administrator may declare at the root.
 
-The last one is machine tokens. An end user consents, so any client, including one that belongs to
-nobody, may ask a person for a token to a declared resource. A client credentials token asks nobody.
-Until we noticed, any confidential client of any tenant, or one that registered itself, could ask a
-victim tenant's token endpoint for a token with the victim's resource as audience and the victim's
-issuer, and receive one. Now a machine token for a declared resource goes only to a client of the
-project that declared it. There is nothing in the specification about this. There would not be; it
-is a multi-tenant question.
+That left three more holes in the same place, around declared resources. The first two have the
+same shape: "a caller forgot to pass the resource". Both are worth knowing, because this design
+makes exactly this kind of mistake
+possible.
 
-## The scope list is a grant, not a menu
+The first: the account resolver (the code that finds the user who is signing in) looked for the user
+in a different tenant than the sign-in step had used. The sign-in step passed the resource, and the
+resolver did not. The symptom was a 500 error on the consent screen instead of a refusal.
 
-One small thing that surprised me. If the challenge in your 401 carries no `scope`, the
-specification tells the client to request every scope in your `scopes_supported`, and calls that
+The second: password sign-in, password reset and registration chose their policy from the client
+alone. Take a tenant whose users may only sign in through an upstream provider, that is, an external
+identity provider. Through a declared resource, someone could still reach that tenant with a
+password.
+
+We closed both by making the resource a required argument, so code that leaves it out no longer
+type-checks. If you take one engineering rule from this section, take this one: when a parameter
+selects a tenant, make it impossible to call the function without it.
+
+The last hole is machine tokens. When a token is requested for a person, that person gives consent.
+So any client, even one that belongs to nobody, may ask a person for a token to a declared resource.
+A client credentials token is different: the client gets it for itself, and nobody is asked. Until
+we noticed, the following worked. Any confidential client (a client with a secret of its own) of any
+tenant, or a client that had registered itself, could ask a victim tenant's token endpoint for a
+token. And it got one, with the victim's resource as the audience and the victim's issuer. Now a
+machine token for a declared resource goes only to a client of the project that declared that
+resource. The specification says nothing about this. It would not: the question only exists when
+several tenants share one server.
+
+## Every agent may be granted every scope you list, so keep the list short {#the-scope-list-is-a-grant-not-a-menu}
+
+One small thing surprised me. Suppose the challenge in your 401 response carries no `scope`. Then the
+specification tells the client to request every scope in your `scopes_supported`, and says this is
 intended: a general-purpose client cannot choose sensibly among names it does not understand. So a
-long list in your metadata is not a catalogue of options; it is what every agent that ever connects
-will be granted. Put the scope
-your tools actually need in the challenge, keep `scopes_supported` to the minimum for basic use,
-and ask for more with a 403 and `insufficient_scope` when a privileged tool is first called. The
-client is required to treat the challenge's scope as authoritative and to accumulate scopes across
-step-ups itself, which is why the authorization server can stay stateless about it. Our own
-administrative MCP endpoint advertises `openid` and nothing else. Its authority comes from the
-administrator's group memberships, not from scopes, and a scope the endpoint never checks is not one
-to publish.
+long list in your metadata is not a menu of options. It is what every agent that ever connects will
+be granted.
 
-## Two questions the specification leaves to you
+So put the scope your tools actually need into the challenge. Keep `scopes_supported` to the minimum
+needed for basic use. When a privileged tool is first called, ask for more with a 403 response and
+the `insufficient_scope` error. The client is required to treat the scope in the challenge as
+authoritative. It also has to keep track, by itself, of the scopes it collects as it steps up, that
+is, asks for more rights one step at a time. That is why the authorization server does not have to
+remember any of it.
 
-The first is token format, and the specification is careful not to decide it. An MCP server must
-reject tokens not intended for it "or otherwise verify that they are the intended recipient", which
-admits both a self-contained token checked against published keys and an opaque one checked by
-introspection. We default to self-contained tokens with a fifteen-minute lifetime, because
-introspection obliges your MCP server to hold credentials of its own, and the ten-minute setup guide
-has no room for that step. The trade-off is that a self-contained token is valid until it expires. If a revoked
-token has to stop working within seconds rather than minutes, declare the resource opaque, give your
-MCP server a client of its own, and pay for introspection on every call. Neither answer is wrong;
-what is wrong is not knowing which one you chose.
+Our own administrative MCP endpoint lists `openid` and nothing else. Its authority comes from the
+groups the administrator belongs to, not from scopes. And a scope the endpoint never checks is not
+one to publish.
 
-The second is the confused deputy problem: an intermediary trusted with someone else's authority is
-turned against its owner. It is not the authorization server's to solve. Take
-an MCP server that proxies a third-party API with one static client id, registers its own MCP
-clients dynamically, and forwards codes without a consent screen of its own. That is exactly the
-setup the security guidance walks through, attack by attack. The mitigation is per-client consent at
-the proxy, before the third-party flow starts, and audience checking, so that a token the proxy
-receives is never simply passed through.
-Every piece of the specification I have described helps with that, and none of it does the work for
-you.
+## What the specification leaves to you: token format and the confused deputy {#two-questions-the-specification-leaves-to-you}
 
-What I do not know yet is how the trust policy for metadata documents shakes out in practice. The
-specification allows an authorization server to accept any HTTPS `client_id`, allowlist domains, or
-apply reputation checks, and every option is a different phishing surface, since the name on the
-consent screen is whatever the document says. Open by default is what makes the ecosystem work, and
-allowlists are what an enterprise will want. I suspect the answer is both, per tenant: one more
-question the specification will keep leaving to whoever runs the server.
+The first question is the token format, and the specification is careful not to decide it. An MCP
+server must reject tokens not intended for it "or otherwise verify that they are the intended
+recipient". That wording allows two kinds of token. A self-contained token, like the example above,
+carries its data inside it and is checked against the published keys. An opaque token is a random
+string with no content. It is checked by introspection, which means asking the authorization server
+whether the token is still valid. We default to self-contained tokens that live fifteen minutes. The
+reason: introspection requires your MCP server to hold credentials of its own, and the ten-minute
+setup guide has no room for that step. The trade-off is that a self-contained token stays valid
+until it expires. If a revoked token has to stop working within seconds rather than minutes, declare
+the resource as opaque, give your MCP server a client of its own, and pay for an introspection
+request on every call. Neither answer is wrong. What is wrong is not knowing which one you chose.
 
-If you want to see the shape of it end to end, [Protect your MCP server with
-OAuth](/docs/get-started/protect-your-mcp-server/) walks through the declaration, the two
-things your server publishes (its metadata and the 401 challenge), the token check, and both
-outcomes, a refusal and a success, in about ten minutes. The two settings that decide how an agent host
-may identify itself are
+The second question is the confused deputy problem: a middleman trusted with someone else's
+authority gets turned against its owner. Solving it is not the authorization server's job. Take an
+MCP server that proxies a third-party API. It uses one fixed client id with that API. It registers
+its own MCP clients dynamically. And it forwards authorization codes without showing a consent
+screen of its own. That is exactly the setup the security guidance walks through, attack by attack.
+The defence has two parts. First, the proxy asks for consent per client itself, before
+authorization at the third-party API starts. Second, it checks the audience, so that a token the
+proxy receives is never simply passed on. Every part of the specification I have described helps
+with this. None of it does the work for you.
+
+What I do not know yet is how the trust policy for metadata documents will settle in practice, that
+is, which client URLs an authorization server should accept. The specification allows three
+approaches: accept any HTTPS `client_id`, allow only listed domains, or apply reputation checks.
+Each one opens a different way to phish users, because the name on the consent screen is whatever
+the document says. Open by default is what makes the ecosystem work. Allowlists are what an
+enterprise will want. I suspect the answer is both, chosen per tenant. That is one more question the
+specification will keep leaving to whoever runs the server.
+
+If you want to see the whole thing end to end, [Protect your MCP server with
+OAuth](/docs/get-started/protect-your-mcp-server/) takes about ten minutes. It walks through the
+declaration, the two things your server publishes (its metadata and the 401 challenge), the token
+check, and both outcomes: a refusal and a success. Two settings decide how an agent host may
+identify itself:
 [`clientIdMetadataDocument.enabled`](/docs/reference/settings/#clientIdMetadataDocument.enabled)
-and [`registration.enabled`](/docs/reference/settings/#registration.enabled), and the
-[endpoint reference](/docs/reference/endpoints/) lists what each discovery URL answers.
+for metadata documents and [`registration.enabled`](/docs/reference/settings/#registration.enabled)
+for dynamic registration. The [endpoint reference](/docs/reference/endpoints/) lists what each
+discovery URL returns.

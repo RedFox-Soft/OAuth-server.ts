@@ -136,8 +136,13 @@ export function languageScriptSource(): string {
 	};
 	// Indentation and line breaks are most of the serialised function's weight, and it ships inline in
 	// every page; every statement in the transpiled source ends in `;` or a brace, so joining lines is
-	// safe (the build parses the result before it is used — see the check below).
-	const body = languageScript.toString().replace(/\n\s*/g, '');
+	// safe (the build parses the result before it is used — see the check below). Whole-line comments
+	// go first: the dev server's transform keeps them, and once lines are joined the first `//` would
+	// comment out the rest of the function.
+	const body = languageScript
+		.toString()
+		.replace(/^\s*\/\/.*$/gm, '')
+		.replace(/\n\s*/g, '');
 	const source = `(${body})(${JSON.stringify(config)});`;
 	new Function(source);
 	return source;
