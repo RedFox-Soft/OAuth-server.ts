@@ -1,20 +1,35 @@
 ---
 import Brand from './Brand.astro';
 import Button from './ui/Button.astro';
+import LanguageSwitch from './LanguageSwitch.astro';
+import { chrome } from '../i18n/chrome.ts';
+import { localizedHref, localizedRoute } from '../i18n/locale.ts';
+import type { LocaleKey } from '../data/seo.ts';
 
 /*
- * No client JavaScript anywhere on the marketing pages, so the small-screen menu is a <details>
- * element: the browser owns the open/closed state.
+ * No client JavaScript on the marketing pages except the inline language script in <head>, which
+ * only reads the browser's language list — a static host cannot — and leaves a page that works the
+ * same without it. So the small-screen menu is a <details> element: the browser owns the
+ * open/closed state.
  */
-const links = [
-	{ href: '/features/', label: 'Features' },
-	{ href: '/pricing/', label: 'Pricing' },
-	{ href: '/compare/', label: 'Compare' },
-	{ href: '/blog/', label: 'Blog' },
-	{ href: '/docs/', label: 'Docs' },
-	{ href: '/changelog/', label: 'Changelog' },
-	{ href: 'https://github.com/RedFox-Soft/OAuth-server.ts', label: 'GitHub' }
-];
+interface Props {
+	locale?: LocaleKey;
+}
+const { locale = 'en' } = Astro.props;
+const t = chrome(locale);
+
+const links = await Promise.all(
+	[
+		{ href: '/features/', label: t.nav.features },
+		{ href: '/pricing/', label: t.nav.pricing },
+		{ href: '/compare/', label: t.nav.compare },
+		{ href: '/blog/', label: t.nav.blog },
+		{ href: '/docs/', label: t.nav.docs },
+		{ href: '/changelog/', label: t.nav.changelog },
+		{ href: 'https://github.com/RedFox-Soft/OAuth-server.ts', label: t.nav.github }
+	].map(async (link) => ({ ...link, href: await localizedHref(link.href, locale) }))
+);
+const getStarted = await localizedHref('/docs/get-started/docker-compose/', locale);
 const linkClass =
 	'rounded-control px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-accent-50 hover:text-accent-700 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-accent-200';
 ---
@@ -23,27 +38,49 @@ const linkClass =
 	class="sticky top-0 z-30 border-b border-gray-200 bg-white/90 backdrop-blur dark:border-gray-800 dark:bg-gray-950/90"
 >
 	<div class="mx-auto flex max-w-6xl items-center gap-4 px-6 py-2.5">
-		<Brand size={40} />
+		<Brand
+			size={40}
+			href={localizedRoute('/', locale)}
+		/>
 
-		<nav aria-label="Main" class="ml-auto hidden items-center gap-1 md:flex">
+		<nav
+			aria-label={t.ariaMain}
+			class="ml-auto hidden items-center gap-1 md:flex"
+		>
 			{links.map((link) => <a href={link.href} class={linkClass}>{link.label}</a>)}
 		</nav>
 
+		<LanguageSwitch
+			variant="links"
+			class="hidden items-center md:flex"
+		/>
+
 		<div class="ml-auto md:ml-2">
-			<Button href="/docs/get-started/docker-compose/" size="md">Get started</Button>
+			<Button
+				href={getStarted}
+				size="md">{t.getStarted}</Button
+			>
 		</div>
 
 		<details class="relative md:hidden">
 			<summary
 				class="flex h-10 w-10 cursor-pointer items-center justify-center rounded-control border border-gray-300 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
-				aria-label="Menu"><span aria-hidden="true">☰</span></summary
+				aria-label={t.ariaMenu}><span aria-hidden="true">☰</span></summary
 			>
 			<nav
-				aria-label="Main menu"
+				aria-label={t.ariaMainMenu}
 				class="absolute right-0 mt-2 flex w-56 flex-col gap-1 rounded-card border border-gray-200 bg-white p-2 shadow-lg dark:border-gray-700 dark:bg-gray-900"
 			>
 				{links.map((link) => <a href={link.href} class={linkClass}>{link.label}</a>)}
+				<LanguageSwitch
+					variant="links"
+					class="flex flex-col"
+				/>
 			</nav>
 		</details>
 	</div>
+	<LanguageSwitch
+		variant="notice"
+		class="mx-auto max-w-6xl px-6 pb-2"
+	/>
 </header>

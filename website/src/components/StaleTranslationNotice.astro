@@ -1,0 +1,27 @@
+---
+/*
+ * Shown on a translation made from an older revision of its English page (FR-017). It never fails the
+ * build — the English page moving on is not a mistake in the translation — but a reader is told, in
+ * their language, that the English version may say more, and given the way to it.
+ */
+import RichText from './RichText.astro';
+import { chrome } from '../i18n/chrome.ts';
+import type { LocaleKey } from '../data/seo.ts';
+
+interface Props {
+	locale: LocaleKey;
+	/* The English page this translation was made from. */
+	english: string;
+	class?: string;
+}
+const { locale, english, class: className } = Astro.props;
+---
+
+<p
+	class:list={[
+		'rounded-card border border-accent-300 bg-accent-50 p-4 text-sm text-gray-700 dark:border-accent-700 dark:bg-accent-950 dark:text-gray-200',
+		className
+	]}
+>
+	<RichText text={chrome(locale).staleTranslation(english)} />
+</p>

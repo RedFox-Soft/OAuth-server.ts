@@ -10,16 +10,127 @@
 
 export const SITE_ORIGIN = 'https://foxauth.dev';
 
+export interface Band {
+	min: number;
+	max: number;
+}
+
 /*
  * Bands, not targets. Above the upper bound a search engine truncates; below the lower bound the
  * slot is wasted on something that carries no query intent. Non-indexable pages are exempt.
  */
-export const TITLE_BAND = { min: 15, max: 60 } as const;
-export const DESCRIPTION_BAND = { min: 70, max: 160 } as const;
+export const TITLE_BAND: Band = { min: 15, max: 60 };
+export const DESCRIPTION_BAND: Band = { min: 70, max: 160 };
+
+/*
+ * The languages the site can be built in. English is the site; the other two exist for readers
+ * whose browser puts that language first, and nobody else is shown them (see
+ * src/i18n/language-script.ts).
+ *
+ * `eligible` is matched, lower-cased, against the first entry of the browser's language list only.
+ * A trailing `*` matches any subtag. Traditional Chinese (zh-TW, zh-HK, zh-MO, zh-Hant) is
+ * deliberately absent: this translation is Simplified, and offering it to a Traditional reader
+ * would be the wrong script, not a convenience.
+ *
+ * Chinese has its own bands because every Han character is one code unit to `.length` but takes two
+ * Latin widths in a result snippet: 60 characters of Chinese is twice what a search engine shows.
+ */
+export type LocaleKey = 'en' | 'ru' | 'zh-cn';
+
+export interface Locale {
+	key: LocaleKey;
+	/* <html lang>, hreflang and the feed's <language>. */
+	lang: string;
+	/* In its own script — the switcher names a language the way its readers write it. */
+	label: string;
+	ogLocale: string;
+	eligible: readonly string[];
+	titleBand: Band;
+	descriptionBand: Band;
+}
+
+export const LOCALE_DEFINITIONS: Readonly<Record<LocaleKey, Locale>> = {
+	en: {
+		key: 'en',
+		lang: 'en',
+		label: 'English',
+		ogLocale: 'en_US',
+		eligible: [],
+		titleBand: TITLE_BAND,
+		descriptionBand: DESCRIPTION_BAND
+	},
+	ru: {
+		key: 'ru',
+		lang: 'ru',
+		label: 'Русский',
+		ogLocale: 'ru_RU',
+		eligible: ['ru', 'ru-*'],
+		titleBand: TITLE_BAND,
+		descriptionBand: DESCRIPTION_BAND
+	},
+	'zh-cn': {
+		key: 'zh-cn',
+		lang: 'zh-CN',
+		label: '简体中文',
+		ogLocale: 'zh_CN',
+		eligible: ['zh', 'zh-cn', 'zh-sg', 'zh-hans', 'zh-hans-*'],
+		titleBand: { min: 8, max: 30 },
+		descriptionBand: { min: 30, max: 80 }
+	}
+};
+
+/*
+ * The languages this build publishes. There is no per-language switch: a language is in this list or
+ * it is not, and both translations reach main in one release, complete, or neither does.
+ */
+export const LOCALES: readonly Locale[] = [
+	LOCALE_DEFINITIONS.en,
+	LOCALE_DEFINITIONS.ru,
+	LOCALE_DEFINITIONS['zh-cn']
+];
+
+export function translatedLocales(): Locale[] {
+	return LOCALES.filter((locale) => locale.key !== 'en');
+}
+
+const PREFIXED: readonly LocaleKey[] = ['ru', 'zh-cn'];
+
+/* The language a route is written in, read from its first path segment. */
+export function localeOf(route: string): Locale {
+	const first = route.split('/').filter(Boolean)[0];
+	const key = PREFIXED.find((candidate) => candidate === first);
+	return LOCALE_DEFINITIONS[key ?? 'en'];
+}
+
+/* `/ru/docs/` → `/docs/`; an English route is returned unchanged. */
+export function stripLocale(route: string): string {
+	const { key } = localeOf(route);
+	if (key === 'en') return route;
+	const rest = route.slice(key.length + 1);
+	return rest === '' ? '/' : rest;
+}
+
+/*
+ * The documentation sections that are translated. Every other /<locale>/docs/ page is a Starlight
+ * fallback — the English body under translated navigation — which a reader can use but a search
+ * engine must not index as if it were Russian or Chinese.
+ */
+export const TRANSLATED_DOCS: readonly string[] = ['/docs/get-started/'];
+export const TRANSLATED_DOCS_EXACT: readonly string[] = ['/docs/'];
+
+export function isDocsFallback(route: string): boolean {
+	const normalised = normaliseRoute(route);
+	if (localeOf(normalised).key === 'en') return false;
+	const english = stripLocale(normalised);
+	if (!english.startsWith('/docs/')) return false;
+	if (TRANSLATED_DOCS_EXACT.includes(english)) return false;
+	return !TRANSLATED_DOCS.some((prefix) => english.startsWith(prefix));
+}
 
 /*
  * Routes kept out of search results, the sitemap and every machine-readable surface. Matched as
- * prefixes against the normalised route, so a section is excluded by listing its directory.
+ * prefixes against the normalised route with its language prefix removed, so a section is excluded
+ * by listing its directory once for every language.
  */
 export const NON_INDEXABLE_ROUTES: readonly string[] = ['/styleguide/', '/404'];
 
@@ -207,12 +318,14 @@ export function cardSlug(route: string): string {
 
 export function isIndexable(route: string): boolean {
 	const normalised = normaliseRoute(route);
-	return !NON_INDEXABLE_ROUTES.some((prefix) => normalised.startsWith(prefix));
+	if (isDocsFallback(normalised)) return false;
+	const english = stripLocale(normalised);
+	return !NON_INDEXABLE_ROUTES.some((prefix) => english.startsWith(prefix));
 }
 
 /** Longest matching prefix, or undefined for a route nobody classified — which is a build failure. */
 export function coverageFor(route: string): CoverageEntry | undefined {
-	const normalised = normaliseRoute(route);
+	const normalised = stripLocale(normaliseRoute(route));
 	const exact = STRUCTURED_COVERAGE.find(
 		(entry) => entry.exact && entry.prefix === normalised
 	);
@@ -224,7 +337,7 @@ export function coverageFor(route: string): CoverageEntry | undefined {
 }
 
 export function sectionFor(route: string): SectionName | undefined {
-	const normalised = normaliseRoute(route);
+	const normalised = stripLocale(normaliseRoute(route));
 	for (const [prefix, section] of SECTION_PREFIXES) {
 		if (prefix === '/') continue;
 		if (normalised.startsWith(prefix)) return section;

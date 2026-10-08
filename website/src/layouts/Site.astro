@@ -3,6 +3,8 @@ import '../styles/global.css';
 import Seo from '../components/Seo.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
+import { chrome } from '../i18n/chrome.ts';
+import { LOCALE_DEFINITIONS, type LocaleKey } from '../data/seo.ts';
 
 import type { JsonLd } from '../data/structured.ts';
 
@@ -13,12 +15,30 @@ interface Props {
 	jsonLd?: JsonLd | JsonLd[];
 	noindex?: boolean;
 	breadcrumbLeaf?: string;
+	locale?: LocaleKey;
+	/* The one not-found page, which carries every language and lets the head script pick (404.astro). */
+	notFound?: boolean;
 }
-const { title, description, image, jsonLd, noindex, breadcrumbLeaf } = Astro.props;
+const {
+	title,
+	description,
+	image,
+	jsonLd,
+	noindex,
+	breadcrumbLeaf,
+	locale = 'en',
+	notFound = false
+} = Astro.props;
+const t = chrome(locale);
 ---
 
 <!doctype html>
-<html lang="en" class="motion-safe:scroll-smooth" data-layout="site">
+<html
+	lang={LOCALE_DEFINITIONS[locale].lang}
+	class="motion-safe:scroll-smooth"
+	data-layout="site"
+	data-not-found={notFound ? '' : undefined}
+>
 	<head>
 		<Seo
 			title={title}
@@ -27,16 +47,17 @@ const { title, description, image, jsonLd, noindex, breadcrumbLeaf } = Astro.pro
 			jsonLd={jsonLd}
 			noindex={noindex}
 			breadcrumbLeaf={breadcrumbLeaf}
+			locale={locale}
 		/>
 	</head>
 	<body class="bg-white text-gray-900 antialiased dark:bg-gray-950 dark:text-gray-100">
 		<a
 			href="#main"
 			class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-control focus:bg-white focus:px-4 focus:py-2 focus:text-gray-900 focus:outline-2 focus:outline-accent-500 dark:focus:bg-gray-900 dark:focus:text-gray-100"
-			>Skip to content</a
+			>{t.skipToContent}</a
 		>
-		<Header />
+		<Header locale={locale} />
 		<main id="main"><slot /></main>
-		<Footer />
+		<Footer locale={locale} />
 	</body>
 </html>

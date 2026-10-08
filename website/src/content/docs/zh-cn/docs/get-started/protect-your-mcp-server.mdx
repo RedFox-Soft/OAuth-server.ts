@@ -1,0 +1,162 @@
+---
+title: 用 OAuth 保护 MCP 服务器
+description: 十分钟内把你的 MCP 服务器变成 OAuth 2.1 受保护资源：在此声明、发布元数据、校验令牌，并验证两种结果。
+source: e1b24343801e
+sidebar:
+  order: 6
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+任何人都能调用的 MCP 服务器，就是一组没有大门的工具。MCP 授权规范通过让 MCP 服务器成为 **OAuth 2.1 受保护资源**来解决这个问题：智能体宿主（agent host）在没有令牌的情况下访问它时，会被告知去哪里获取令牌；它取得令牌后再回来，而这个令牌只为该 MCP 服务器签发，别无他用。
+
+本页涵盖完整的工作。你将在这里声明你的 MCP 服务器，从它那里发布两样东西，校验一个令牌，然后看着它拒绝匿名调用、接受经授权的调用。如果你已有正在运行的实例，大约需要十分钟。如果还没有，[使用 Docker Compose 运行](/zh-cn/docs/get-started/docker-compose/)大约还需要额外两分钟。
+
+<Aside
+	type="note"
+	title="开始之前需要准备"
+>
+	一个带有管理员账户的运行中实例（[创建第一个管理员](/zh-cn/docs/get-started/first-admin/)），以及一个带有用户桶的项目（[注册第一个客户端](/zh-cn/docs/get-started/first-client/)介绍了这一步）。你的
+	MCP 服务器可以只是一个桩（stub）；目前它除了响应 HTTP 之外什么都不用做。
+</Aside>
+
+## 1. 将你的 MCP 服务器声明为资源 {#1-declare-your-mcp-server-as-a-resource}
+
+在一个用户桶拥有独立地址的项目中声明它——地址可以是 `/acme` 这样的路径，也可以是一个主机名。这样的用户桶就是它自己的签发者，而资源标识符只需在其签发者内唯一，因此声明时不会获取或检查你的 MCP 服务器的任何信息。它可以位于内部网络，可以是开发期间的 `localhost`，也可以尚未部署。另一个拥有独立用户桶的租户也可以声明相同的 URL，而不会影响你的声明。
+
+没有独立用户桶的项目在实例的根签发者下提供服务，所有此类租户共享这个签发者。在那里，只有超级管理员才能声明资源，因为资源自身的元数据无法表明它属于这些租户中的哪一个。
+
+<Steps>
+
+1. 在控制台中打开你的项目，选择 **Resources**，然后选择 **Declare a resource**。
+
+2. 填写三项内容。
+
+   **Resource identifier**（资源标识符）——你的 MCP 服务器的规范 URI，与其客户端对它的称呼完全一致，例如 `https://mcp.example.com/mcp`。不带片段（fragment），也不带末尾斜杠：规范要求实现优先采用不带斜杠的形式，本服务器也按这种形式存储。
+
+   **Name**（名称）——最终用户在授权同意页面上看到的名称。
+
+   **Scopes it recognises**（它识别的 scope）——你的工具所区分的权限。先从一个开始，例如 `mcp:tools-basic`。
+
+3. 令牌设置保持不变即可。默认是自包含令牌，由你的 MCP 服务器依据本服务器公布的密钥进行验证，有效期为十五分钟。正因如此，下面的第 3 节「校验令牌」才不需要它自己的凭据。
+
+</Steps>
+
+<Aside
+	type="caution"
+	title="scope 列表是基线，而不是目录"
+>
+	没有得到任何 scope 指引的智能体宿主，会请求你的资源公布的**每一个**
+	scope。规范明确这样规定，并说明这是有意为之：通用客户端无法在它不理解的名称之间做出合理选择。所以一个长列表并不是一份可选菜单，而是把整个列表授予以后到来的每一个客户端。只列出你的工具真正区分的
+	scope，其余的留待以后再申请。
+</Aside>
+
+## 2. 发布 MCP 服务器必须发布的内容 {#2-publish-what-an-mcp-server-has-to-publish}
+
+两样东西，都由你自己的 MCP 服务器提供。
+
+### 受保护资源元数据 {#protected-resource-metadata}
+
+位于 `/.well-known/oauth-protected-resource` 的一个 JSON 文档，说明由哪个授权服务器保护你。这是规范对 MCP 服务器唯一规定为 `MUST` 的部分：
+
+```json
+{
+	"resource": "https://mcp.example.com/mcp",
+	"authorization_servers": ["https://auth.example.com/acme"],
+	"scopes_supported": ["mcp:tools-basic"],
+	"bearer_methods_supported": ["header"]
+}
+```
+
+`resource` 是你在第 1 步中声明的标识符，必须逐字符一致。`authorization_servers` 填写你的项目登录所用用户桶的签发者：如果该用户桶有独立地址，就是它自己的签发者——`https://auth.example.com/acme`，或其主机名——否则就是实例的 `ISSUER`。该文档可以位于 `/.well-known/oauth-protected-resource` 后接你的资源路径（即 RFC 9728 的构造方式），也可以如上所示位于根路径，或者位于下面的质询所指向的任何位置。
+
+控制台中该资源所在的行会显示这个文档当前是否为你的声明背书，以及是在这三个位置中的哪一个找到的。这只是诊断信息：它不会阻止任何操作。
+
+### 指明去向的质询 {#a-challenge-that-says-where-to-go}
+
+当请求没有携带令牌，或携带了被你拒绝的令牌时，返回 `401`，并附带指向该文档的 `WWW-Authenticate` 头：
+
+```http
+HTTP/1.1 401 Unauthorized
+WWW-Authenticate: Bearer resource_metadata="https://mcp.example.com/.well-known/oauth-protected-resource",
+                         scope="mcp:tools-basic"
+```
+
+`scope` 是规范要求提供、客户端也会使用的一项便利：没有它，客户端会回到你的元数据文档，请求 `scopes_supported` 中的全部内容。
+
+## 3. 校验令牌 {#3-validate-the-token}
+
+你的 MCP 服务器必须就每个令牌确认两件事：它是真实的，以及它是**为你**签发的。第二点不是可选的。接受为其他对象签发的令牌，正是受众绑定（audience binding）所要堵住的「混淆代理人」（confused deputy）漏洞，规范明令禁止这样做。
+
+使用默认令牌格式时，处理请求时无需向本服务器询问任何事。从签发者元数据公布的 `jwks_uri` 获取一次其公钥并缓存，然后检查四个声明。有独立地址的用户桶使用它自己的密钥签名，所以其密钥集位于它自己的签发者之下——即下面示例中的 `https://auth.example.com/acme/jwks`——并且不包含任何其他租户的密钥：
+
+```js
+import { createRemoteJWKSet, jwtVerify } from 'jose';
+
+const keys = createRemoteJWKSet(new URL('https://auth.example.com/acme/jwks'));
+
+export async function principalFor(authorization) {
+	const token = authorization?.replace(/^Bearer /i, '');
+	if (!token) return null;
+
+	const { payload } = await jwtVerify(token, keys, {
+		issuer: 'https://auth.example.com/acme',
+		// The identifier you declared. This is the check that makes the token yours.
+		audience: 'https://mcp.example.com/mcp'
+	});
+
+	return { subject: payload.sub, scopes: (payload.scope ?? '').split(' ') };
+}
+```
+
+`jwtVerify` 会替你检查签名和 `exp`；`issuer` 和 `audience` 是你必须明确指定的两项。任何语言的任何 JWT 库都会做同样的四项检查。上面的写法是一份检查清单；用哪个库由你决定。
+
+<Aside
+	type="tip"
+	title="如果你需要即时撤销"
+>
+	自包含令牌在过期之前一直有效，这就是默认有效期很短的原因。如果你的资源需要被撤销的令牌立即失效，请改用
+	**opaque**（不透明）令牌格式声明它，并通过 [`POST
+	/token/introspect`](/docs/reference/endpoints/)
+	检查每个令牌。该端点需要认证，因此你的 MCP 服务器需要有自己的凭据，并且要开启
+	[`introspection.enabled`](/docs/reference/settings/#introspection.enabled)。这就是你要做的取舍。
+</Aside>
+
+## 4. 让智能体宿主标识自己 {#4-let-an-agent-host-identify-itself}
+
+智能体宿主通常只知道一个 URL，也没有地方让你输入客户端标识符。当前规范给出的答案是 **Client ID Metadata Documents**（客户端 ID 元数据文档）：客户端的 `client_id` *本身就是*一个 HTTPS URL，指向一份描述该客户端的 JSON 文档；本服务器按需获取并校验该文档，完全不创建客户端记录。
+
+在 **Settings** 中开启它：[`clientIdMetadataDocument.enabled`](/docs/reference/settings/#clientIdMetadataDocument.enabled)。保存后立即生效。开启后，发现文档会公布 `client_id_metadata_document_supported`，客户端在尝试之前会检查这一项。
+
+<Aside type="note" title="旧版宿主，以及各个接口面的要求">
+有些智能体宿主只支持**动态客户端注册**，当前规范将其标记为已弃用，但仍予保留。它可以正常工作：开启 [`registration.enabled`](/docs/reference/settings/#registration.enabled)，这类客户端就会自行注册，然后完全按上述方式访问你的资源。
+
+`/mcp` 上的**管理用** MCP 平面更为严格，在尝试之前值得了解。动态注册的客户端无论其他配置如何，都永远不能管理实例。由文档标识的客户端可以，但前提是超级管理员在控制台的 **Agent access** 下指定了它。其他所有客户端都可以继续使用保留的 `admin-mcp` client id，无需任何登记。
+
+</Aside>
+
+## 5. 双向验证 {#5-prove-it-both-ways}
+
+三次调用。拒绝与成功同样重要，因为没有拒绝，就无法区分「受保护」和「还没访问到」。
+
+<Steps>
+
+1. **不带令牌调用你的 MCP 服务器**。你应该得到 `401`，以及第 2 步中的 `WWW-Authenticate` 头。如果得到 `200`，很可能是你的校验逻辑没有接入请求路径。
+
+   ```sh
+   curl -i https://mcp.example.com/mcp -X POST \
+     -H 'content-type: application/json' \
+     -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+   ```
+
+2. **获取令牌后再次调用**。将你的智能体宿主指向你的 MCP 服务器，让它完成整个流程：它应当读取你的元数据文档，发现本服务器，让你的最终用户登录，然后带着令牌回来。同样的调用现在会返回 `200`。
+
+3. **把令牌用在它不该用的地方**。声明第二个资源，为它获取一个令牌，然后把这个令牌出示给你的 MCP 服务器。它必须被拒绝——`aud` 声明不会匹配。正是这项检查阻止了一个集成的令牌在另一个集成上生效，值得亲眼看它失败一次。
+
+</Steps>
+
+## 你无需做的事 {#what-you-did-not-have-to-do}
+
+不需要在本服务器中写任何代码，资源本身也不需要重启：声明就是数据，每次令牌请求时都会读取。你的 MCP 服务器不需要客户端密钥，因为它依据公布的公钥验证令牌，而不必询问任何东西。对于普通资源，也不需要智能体宿主的允许列表：一个客户端可以让哪些最终用户登录，取决于它所指定的资源，因此拥有该资源的项目也就决定了这个答案。
+
+本页涉及的端点见[端点参考](/docs/reference/endpoints/)；上文提到的每项设置，连同其默认值和设立理由，都在[设置参考](/docs/reference/settings/)中。

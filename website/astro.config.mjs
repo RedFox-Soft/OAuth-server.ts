@@ -4,12 +4,54 @@ import starlightLinksValidator from 'starlight-links-validator';
 import starlightLlmsTxt from 'starlight-llms-txt';
 import tailwindcss from '@tailwindcss/vite';
 import sitemap from '@astrojs/sitemap';
-import { SITE_ORIGIN, isIndexable, normaliseRoute } from './src/data/seo.ts';
+import {
+	SITE_ORIGIN,
+	isIndexable,
+	normaliseRoute,
+	translatedLocales
+} from './src/data/seo.ts';
+import { satteri } from '@astrojs/markdown-satteri';
+import docsEnglish from './src/i18n/messages/docs/en.ts';
 import { lastModified } from './scripts/seo/lastmod.ts';
 import { sourcesFor } from './scripts/seo/sources.ts';
 
+/*
+ * Starlight's languages follow the site's: English at the root, and each translated language this
+ * build publishes under its own prefix. With none, the config is exactly the monolingual one.
+ */
+const translated = translatedLocales();
+const docsMessages = Object.fromEntries(
+	await Promise.all(
+		translated.map(async (locale) => [
+			locale.lang,
+			(await import(`./src/i18n/messages/docs/${locale.key}.ts`)).default
+		])
+	)
+);
+const sidebarLabel = (key) => ({
+	label: docsEnglish.sidebar[key],
+	...(translated.length > 0
+		? {
+				translations: Object.fromEntries(
+					Object.entries(docsMessages).map(([lang, messages]) => [
+						lang,
+						messages.sidebar[key]
+					])
+				)
+			}
+		: {})
+});
+const localePrefixed = (paths) =>
+	paths.flatMap((path) => [
+		path,
+		...translated.map((locale) => `/${locale.key}${path}`)
+	]);
+
 export default defineConfig({
 	site: SITE_ORIGIN,
+	// `## Заголовок {#english-id}`: a translated section keeps the English section's id, so the language
+	// switcher can carry `#section` across and links into the section keep working in every language.
+	markdown: { processor: satteri({ features: { headingAttributes: true } }) },
 	// Dev only (the build is static). Vite binds the first address `localhost` resolves to, which on
 	// Node ≥ 17 is `::1` alone — a browser or proxy that resolves localhost to 127.0.0.1 then gets
 	// "connection refused". `true` listens on both families.
@@ -53,7 +95,25 @@ export default defineConfig({
 			// Starlight renders its own <head>, so docs pages never reach Seo.astro. The override
 			// renders Starlight's head unchanged and adds only what it leaves out: the social card,
 			// the structured data, the last-modified signal and the Markdown alternate.
-			components: { Head: './src/components/StarlightHead.astro' },
+			components: {
+				Head: './src/components/StarlightHead.astro',
+				LanguageSelect: './src/components/LanguageSwitch.astro'
+			},
+			...(translated.length > 0
+				? {
+						defaultLocale: 'root',
+						locales: {
+							root: { label: 'English', lang: 'en' },
+							...Object.fromEntries(
+								translated.map((locale) => [
+									locale.key,
+									{ label: locale.label, lang: locale.lang }
+								])
+							)
+						}
+					}
+				: {}),
+			routeMiddleware: './src/route-middleware.ts',
 			// src/pages/404.astro is the site's one not-found page, so Starlight's own 404 route is a
 			// duplicate static route — Astro warns today and says it becomes a hard error later.
 			disable404Route: true,
@@ -68,7 +128,11 @@ export default defineConfig({
 			// (/docs/get-started/**, /docs/deploy/**) are validated normally.
 			plugins: [
 				starlightLinksValidator({
-					exclude: [
+					// A link from translated docs to an untranslated section goes to Starlight's fallback
+					// page in the reader's language, which is the intended reading path; validate it
+					// against the English page's headings rather than refusing it.
+					errorOnFallbackPages: false,
+					exclude: localePrefixed([
 						'/docs/reference/**',
 						'/changelog/',
 						'/security/',
@@ -78,37 +142,45 @@ export default defineConfig({
 						'/compare/**',
 						'/blog/**',
 						'/contact/'
-					]
+					])
 				}),
 				starlightLlmsTxt()
 			],
 			sidebar: [
 				{
-					label: 'Get started',
+					...sidebarLabel('getStarted'),
 					items: [{ autogenerate: { directory: 'docs/get-started' } }]
 				},
 				{
-					label: 'Deploy',
+					...sidebarLabel('deploy'),
 					items: [{ autogenerate: { directory: 'docs/deploy' } }]
 				},
 				{
-					label: 'Administer',
+					...sidebarLabel('administer'),
 					items: [{ autogenerate: { directory: 'docs/administer' } }]
 				},
 				{
-					label: 'Security',
+					...sidebarLabel('security'),
 					items: [{ autogenerate: { directory: 'docs/security' } }]
 				},
 				{
-					label: 'Reference',
+					...sidebarLabel('reference'),
+					// The Reference is generated from the server and published in English only, so these
+					// links stay English from every language's sidebar.
 					items: [
-						{ label: 'Settings', link: '/docs/reference/settings/' },
-						{ label: 'Endpoints', link: '/docs/reference/endpoints/' },
-						{ label: 'Admin API', link: '/docs/reference/admin-api/' },
-						{ label: 'MCP tools', link: '/docs/reference/mcp-tools/' },
-						{ label: 'Addon seams', link: '/docs/reference/addon-seams/' },
+						{ ...sidebarLabel('settings'), link: '/docs/reference/settings/' },
 						{
-							label: 'Environment variables',
+							...sidebarLabel('endpoints'),
+							link: '/docs/reference/endpoints/'
+						},
+						{ ...sidebarLabel('adminApi'), link: '/docs/reference/admin-api/' },
+						{ ...sidebarLabel('mcpTools'), link: '/docs/reference/mcp-tools/' },
+						{
+							...sidebarLabel('addonSeams'),
+							link: '/docs/reference/addon-seams/'
+						},
+						{
+							...sidebarLabel('environment'),
 							link: '/docs/reference/environment/'
 						}
 					]

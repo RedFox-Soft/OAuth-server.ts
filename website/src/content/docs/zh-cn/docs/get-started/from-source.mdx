@@ -1,0 +1,87 @@
+---
+title: 从源码运行
+description: 克隆代码仓库、初始化数据库，然后使用 Bun 在本地启动这台授权服务器。
+source: f96e9dddf50a
+sidebar:
+  order: 2
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+从源码运行是开发时的常规方式，也适合一边对照运行中的服务器一边阅读代码，以及任何想自己构建镜像的部署。
+
+**前置条件：** [Bun](https://bun.sh/) v1.3 或更新版本，以及一个你能连上的数据库：MongoDB 或 PostgreSQL，选你更愿意运行的那个。
+
+<Steps>
+
+1. 克隆并安装：
+
+   ```bash
+   git clone https://github.com/RedFox-Soft/OAuth-server.ts.git
+   cd OAuth-server.ts
+   bun install
+   ```
+
+2. 创建一个包含必需变量的 `.env` 文件：
+
+   ```ini
+   ISSUER=http://localhost:3000
+   MONGODB_URI=mongodb://localhost:27017
+   DATABASE_NAME=OAuth
+   ```
+
+   如果改用 PostgreSQL，请设置 `POSTGRES_URL`，并省略另外两个。数据库名包含在该 URL 中，因此不使用 `DATABASE_NAME`：
+
+   ```ini
+   ISSUER=http://localhost:3000
+   POSTGRES_URL=postgres://user:password@localhost:5432/oauth
+   ```
+
+   如果同时设置两个连接字符串，服务器会拒绝启动，而不是从中挑一个；参见 [PostgreSQL](/zh-cn/docs/deploy/postgresql/)。Bun 会自动加载 `.env`，其他都无需配置。每个变量的说明见[环境变量参考](/docs/reference/environment/)。`ISSUER` 是此服务器的规范公开 URL：它是每个令牌的 `iss`、发现文档中每个端点的基址，也是管理控制台客户端的重定向目标——所以在进行下一步之前，就把它设成最终值。
+
+3. 初始化数据库：
+
+   ```bash
+   bun run db:setup      # MongoDB
+   bun run db:setup:pg   # PostgreSQL
+   ```
+
+4. 将控制台和登录页面打包到 `public/`：
+
+   ```bash
+   bun run build
+   ```
+
+5. 启动服务器：
+
+   ```bash
+   bun start
+   ```
+
+   它监听 3000 端口。打开 `http://localhost:3000/admin` 访问控制台，或打开 `http://localhost:3000/.well-known/openid-configuration` 查看发现文档。
+
+</Steps>
+
+## `bun run db:setup` 初始化了什么 {#what-bun-run-dbsetup-provisions}
+
+`db:setup` 会针对 `MONGODB_URI` / `DATABASE_NAME` 运行 `database/mongodb.ts`，正是它把一个空数据库变成一个可用的部署：
+
+- **集合**：服务器写入的每个存储区域各一个。
+- **索引**：让令牌、授权码、会话和交互过期的 TTL 索引，以及每个桶的最终用户集合上的唯一电子邮件索引。它还会删除那些已不再写入过期字段的集合上残留的过期索引。
+- **初始 RS256 签名密钥**，与每个签发者的密钥一起存放在 `bucketKeys` 区域中，这就是为什么密钥在这里不是环境变量。（如果服务器启动时发现密钥存储为空，它会自行生成并持久化一个。）
+- **管理面板的种子数据**：保留的管理项目；它的「Administrators」用户桶，且关闭了注册；第一方 `admin-panel` OAuth 客户端，其重定向 URI 为 `$ISSUER/admin/callback`；保留的 `admin-mcp` 智能体客户端；一个系统组，持有不由任何管理员管理的容器；以及默认的 `redfox` 最终用户桶。
+
+它是**幂等**的：每次写入都是 upsert 或「不存在时才创建」，因此再次运行不会改变任何已存在的内容。升级现有安装后请重新运行它，因为新版本新增的集合、索引或种子文档只会在这里应用，别处都不会。然后运行 `bun run db:migrate`，它负责应用新版本需要重塑（而不只是新增）的内容；在它运行之前，服务器会拒绝启动。有些迁移无法撤销，所以当发布说明提到这样的迁移时，请先做备份。
+
+在 PostgreSQL 上，`bun run db:setup:pg` 完成同样的工作，只是用表代替集合。唯一的结构性差异在于过期：PostgreSQL 没有 TTL 索引，因此由运行中的服务器自行清理过期的行。`bun run db:migrate` 在两种后端上都是同一个命令。
+
+<Aside type="note">
+
+当 `db:setup` 声明的某个约束没有生效时，它会以非零状态码退出：例如，由于现有数据已经违反了某个唯一索引，导致无法创建该索引。部署流水线应当根据这个退出码让部署失败，而不是只记录一条警告；仓库自带的 `fly.toml` 正是这样做的。
+
+</Aside>
+
+## 说明 {#notes}
+
+- 管理控制台需要一个有数据库支撑的部署。设置 `NODE_ENV=test` 会换成内存适配器，而它不会在重启之间保留种子数据。
+- 服务器设置在启动时从配置存储中读取；在控制台中保存的修改会在保存它的实例上立即生效，其他实例则在下次重启时生效。所有设置都列在[设置参考](/docs/reference/settings/)中。

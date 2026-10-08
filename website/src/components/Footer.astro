@@ -2,7 +2,15 @@
 import { getCollection } from 'astro:content';
 import Brand from './Brand.astro';
 import { loadVersion } from '../data/version';
+import { chrome } from '../i18n/chrome.ts';
+import { localizedHref, localizedRoute } from '../i18n/locale.ts';
+import type { LocaleKey } from '../data/seo.ts';
 
+interface Props {
+	locale?: LocaleKey;
+}
+const { locale = 'en' } = Astro.props;
+const t = chrome(locale).footer;
 const v = loadVersion();
 
 /*
@@ -15,44 +23,51 @@ const comparisons = (await getCollection('compare'))
 	.sort((a, b) => a.data.competitor.localeCompare(b.data.competitor))
 	.map((entry) => ({ href: `/compare/${entry.id}/`, label: entry.data.competitor }));
 
-const columns = [
-	{
-		heading: 'Product',
-		links: [
-			{ href: '/features/', label: 'Features' },
-			{ href: '/pricing/', label: 'Pricing' },
-			{ href: '/compare/', label: 'Compare' },
-			{ href: '/blog/', label: 'Blog' },
-			...comparisons
-		]
-	},
-	{
-		heading: 'Docs',
-		links: [
-			{ href: '/docs/get-started/docker-compose/', label: 'Get started' },
-			{ href: '/docs/deploy/docker-compose/', label: 'Deploy' },
-			{ href: '/docs/reference/settings/', label: 'Reference' }
-		]
-	},
-	{
-		heading: 'Project',
-		links: [
-			{ href: 'https://github.com/RedFox-Soft/OAuth-server.ts', label: 'GitHub' },
-			{ href: '/changelog/', label: 'Changelog' },
-			{ href: '/security/', label: 'Security' },
-			{ href: '/license/', label: 'License' },
-			{ href: '/blog/rss.xml', label: 'Blog feed (RSS)' },
-			{ href: '/llms.txt', label: 'For LLMs (llms.txt)' }
-		]
-	},
-	{
-		heading: 'Contact',
-		links: [
-			{ href: '/contact/', label: 'Contact us' },
-			{ href: 'mailto:hello@foxauth.dev', label: 'hello@foxauth.dev' }
-		]
-	}
-];
+const columns = await Promise.all(
+	[
+		{
+			heading: t.product,
+			links: [
+				{ href: '/features/', label: t.features },
+				{ href: '/pricing/', label: t.pricing },
+				{ href: '/compare/', label: t.compare },
+				{ href: '/blog/', label: t.blog },
+				...comparisons
+			]
+		},
+		{
+			heading: t.docs,
+			links: [
+				{ href: '/docs/get-started/docker-compose/', label: t.getStarted },
+				{ href: '/docs/deploy/docker-compose/', label: t.deploy },
+				{ href: '/docs/reference/settings/', label: t.reference }
+			]
+		},
+		{
+			heading: t.project,
+			links: [
+				{ href: 'https://github.com/RedFox-Soft/OAuth-server.ts', label: t.github },
+				{ href: '/changelog/', label: t.changelog },
+				{ href: '/security/', label: t.security },
+				{ href: '/license/', label: t.license },
+				{ href: '/blog/rss.xml', label: t.feed },
+				{ href: '/llms.txt', label: t.llms }
+			]
+		},
+		{
+			heading: t.contact,
+			links: [
+				{ href: '/contact/', label: t.contactUs },
+				{ href: 'mailto:hello@foxauth.dev', label: 'hello@foxauth.dev' }
+			]
+		}
+	].map(async (column) => ({
+		...column,
+		links: await Promise.all(
+			column.links.map(async (link) => ({ ...link, href: await localizedHref(link.href, locale) }))
+		)
+	}))
+);
 ---
 
 <footer class="border-t border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900">
@@ -84,15 +99,13 @@ const columns = [
 		<div
 			class="mt-10 flex flex-col gap-4 border-t border-gray-200 pt-6 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between"
 		>
-			<Brand size={24} />
+			<Brand
+				size={24}
+				href={localizedRoute('/', locale)}
+			/>
 			<div class="text-sm text-gray-600 dark:text-gray-400">
-				<p>
-					FoxAuth is built on OAuth-server.ts, a source-available OAuth 2.1 / OpenID Connect
-					server.
-				</p>
-				<p class="mt-1">
-					Site version {v.version}{v.unreleased ? ' (unreleased)' : ''}
-				</p>
+				<p>{t.about}</p>
+				<p class="mt-1">{t.siteVersion(v.version, v.unreleased)}</p>
 			</div>
 		</div>
 	</div>

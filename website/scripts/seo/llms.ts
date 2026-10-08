@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import {
 	SECTION_ORDER,
+	localeOf,
 	sectionFor,
 	type SectionName
 } from '../../src/data/seo.ts';
@@ -31,10 +32,20 @@ function label(title: string): string {
 	return title.replace(/\s+[—–|]\s+FoxAuth\s*$/, '').trim();
 }
 
+/*
+ * Both files are English only. A retrieval client reads one index and answers in whatever language
+ * it is asked in; the translations would repeat every page it already has, three times over, and
+ * the docs body the plugin renders is English anyway. verify.ts's sitemap-parity rule exempts the
+ * translated routes for the same reason.
+ */
+function listed(page: PageRecord): boolean {
+	return page.indexable && localeOf(page.route).key === 'en';
+}
+
 export function indexEntries(pages: PageRecord[]): LlmsEntry[] {
 	const entries: LlmsEntry[] = [];
 	for (const page of pages) {
-		if (!page.indexable) continue;
+		if (!listed(page)) continue;
 		const section = sectionFor(page.route);
 		/*
 		 * Skipped rather than thrown on. This module used to throw here, which meant an
@@ -95,7 +106,7 @@ export function renderIndex(entries: LlmsEntry[], origin: string): string {
  */
 function nonDocsBody(pages: PageRecord[]): string {
 	const chosen = pages
-		.filter((page) => page.indexable && !page.route.startsWith('/docs/'))
+		.filter((page) => listed(page) && !page.route.startsWith('/docs/'))
 		.sort((a, b) => a.route.localeCompare(b.route));
 
 	return chosen

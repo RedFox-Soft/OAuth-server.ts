@@ -1,0 +1,75 @@
+---
+import Site from '../layouts/Site.astro';
+import ContactForm from '../components/ContactForm.astro';
+import Button from '../components/ui/Button.astro';
+import Card from '../components/ui/Card.astro';
+import Section from '../components/ui/Section.astro';
+import Eyebrow from '../components/ui/Eyebrow.astro';
+import RichText from '../components/RichText.astro';
+import StaleTranslationNotice from '../components/StaleTranslationNotice.astro';
+import { localizedHref } from '../i18n/locale.ts';
+import { isStale, messagesFor } from '../i18n/messages.ts';
+import english from '../i18n/messages/contact/en.ts';
+import type { LocaleKey } from '../data/seo.ts';
+
+interface Props {
+	locale: LocaleKey;
+}
+const { locale } = Astro.props;
+const t = messagesFor('contact', english, locale);
+
+const securityAddress = 'security@foxauth.dev';
+const securityPolicy = await localizedHref('/security/', locale);
+---
+
+<Site title={`${t.title} — FoxAuth`} description={t.description} locale={locale}>
+	<Section narrow>
+		<Eyebrow>{t.eyebrow}</Eyebrow>
+		<h1 class="text-4xl font-[650] leading-[1.15] tracking-tight text-balance">
+			{t.heading}
+		</h1>
+		<p class="mt-5 text-lg text-gray-600 dark:text-gray-400">
+			{t.lead}
+		</p>
+		{isStale('contact', locale) && <StaleTranslationNotice locale={locale} english="/contact/" class="mt-4" />}
+	</Section>
+
+	<Section tone="muted">
+		<div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
+			<div class="lg:col-span-2">
+				<Card>
+					<h2 class="text-xl font-[650] tracking-tight">{t.talk.heading}</h2>
+					<p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+						{t.talk.body}
+					</p>
+					<div class="mt-5"><ContactForm subject="FoxAuth enquiry" locale={locale} /></div>
+				</Card>
+			</div>
+
+			<div class="flex flex-col gap-6">
+				<Card>
+					<h2 class="text-base font-[650] tracking-tight">{t.vulnerability.heading}</h2>
+					<p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+						<RichText text={t.vulnerability.body(securityAddress, `mailto:${securityAddress}`)} />
+					</p>
+					<p class="mt-4">
+						<Button href={securityPolicy} variant="secondary">{t.vulnerability.policy}</Button>
+					</p>
+				</Card>
+
+				<Card>
+					<h2 class="text-base font-[650] tracking-tight">{t.bug.heading}</h2>
+					<p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+						{t.bug.body}
+					</p>
+					<p class="mt-4">
+						<Button
+							href="https://github.com/RedFox-Soft/OAuth-server.ts/issues"
+							variant="secondary">{t.bug.issues}</Button
+						>
+					</p>
+				</Card>
+			</div>
+		</div>
+	</Section>
+</Site>

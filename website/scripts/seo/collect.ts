@@ -3,7 +3,13 @@ import { join, relative, sep } from 'node:path';
 import { normaliseRoute } from '../../src/data/seo.ts';
 import { lastModified } from './lastmod.ts';
 import { sourcesFor } from './sources.ts';
-import type { ImageRecord, PageRecord, StructuredEntity } from './types.ts';
+import type {
+	Alternate,
+	ImageRecord,
+	PageRecord,
+	StorageScope,
+	StructuredEntity
+} from './types.ts';
 
 /*
  * One PageRecord per built page, read from the HTML that actually shipped rather than from the
@@ -38,7 +44,11 @@ interface Draft {
 	robots: string;
 	og: Record<string, string>;
 	twitter: Record<string, string>;
-	headings: { level: number; text: string }[];
+	headings: { level: number; text: string; id?: string }[];
+	ids: string[];
+	alternates: { hreflang: string; href: string }[];
+	storageScope?: StorageScope;
+	lastChecked?: string;
 	images: ImageRecord[];
 	links: string[];
 	jsonLd: string[];
@@ -155,6 +165,8 @@ async function parsePage(file: string): Promise<Draft> {
 		og: {},
 		twitter: {},
 		headings: [],
+		ids: [],
+		alternates: [],
 		images: [],
 		links: [],
 		jsonLd: [],
@@ -168,6 +180,7 @@ async function parsePage(file: string): Promise<Draft> {
 	let suppressText = 0;
 	let titleOpen = false;
 	let jsonLdOpen = false;
+	let scopeOpen: StorageScope | undefined;
 
 	const rewriter = new HTMLRewriter()
 		.on('html', {
@@ -201,9 +214,54 @@ async function parsePage(file: string): Promise<Draft> {
 				draft.canonical = el.getAttribute('href') ?? '';
 			}
 		})
+		.on('link[rel="alternate"][hreflang]', {
+			element(el) {
+				draft.alternates.push({
+					hreflang: el.getAttribute('hreflang') ?? '',
+					href: el.getAttribute('href') ?? ''
+				});
+			}
+		})
+		.on('[id]', {
+			element(el) {
+				const id = el.getAttribute('id');
+				if (id) draft.ids.push(id);
+			}
+		})
+		/*
+		 * Read from an attribute rather than matched in the sentence, because the sentence is now
+		 * written in three languages. The text is still collected: the exemption it grants is only
+		 * honest while the reader can see it.
+		 */
+		.on('[data-storage-scope]', {
+			element(el) {
+				if (draft.storageScope) return;
+				const scope: StorageScope = {
+					backend: el.getAttribute('data-storage-scope') ?? '',
+					text: ''
+				};
+				draft.storageScope = scope;
+				scopeOpen = scope;
+				el.onEndTag(() => {
+					scopeOpen = undefined;
+				});
+			},
+			text(t) {
+				if (scopeOpen) scopeOpen.text += t.text;
+			}
+		})
+		.on('[data-last-checked]', {
+			element(el) {
+				draft.lastChecked ??= el.getAttribute('data-last-checked') ?? undefined;
+			}
+		})
 		.on('h1, h2, h3, h4, h5, h6', {
 			element(el) {
-				draft.headings.push({ level: Number(el.tagName.slice(1)), text: '' });
+				draft.headings.push({
+					level: Number(el.tagName.slice(1)),
+					text: '',
+					id: el.getAttribute('id') ?? undefined
+				});
 			},
 			text(t) {
 				const last = draft.headings.at(-1);
@@ -320,6 +378,18 @@ function inSiteRoutes(hrefs: string[], origin: string): string[] {
 	return [...routes];
 }
 
+function inSiteAlternates(
+	links: { hreflang: string; href: string }[],
+	origin: string
+): Alternate[] {
+	const out: Alternate[] = [];
+	for (const { hreflang, href } of links) {
+		const [route] = inSiteRoutes([href], origin);
+		if (hreflang !== '' && route !== undefined) out.push({ hreflang, route });
+	}
+	return out;
+}
+
 export async function collectPages(
 	dist: string,
 	origin: string
@@ -350,8 +420,16 @@ export async function collectPages(
 			lastmod: lastModified(sourceFile, dataSources),
 			headings: draft.headings.map((h) => ({
 				level: h.level,
-				text: decodeEntities(h.text).trim()
+				text: decodeEntities(h.text).trim(),
+				id: h.id === undefined ? undefined : decodeEntities(h.id)
 			})),
+			ids: draft.ids.map(decodeEntities),
+			alternates: inSiteAlternates(draft.alternates, origin),
+			storageScope: draft.storageScope && {
+				backend: decodeEntities(draft.storageScope.backend).trim(),
+				text: flatten(decodeEntities(draft.storageScope.text))
+			},
+			lastChecked: draft.lastChecked?.trim() || undefined,
 			images: draft.images.map((img) => ({
 				...img,
 				alt: decodeEntities(img.alt),

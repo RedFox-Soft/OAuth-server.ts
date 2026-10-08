@@ -1,4 +1,4 @@
-import { FRESHNESS_LIMIT_DAYS } from '../../src/data/seo.ts';
+import { FRESHNESS_LIMIT_DAYS, stripLocale } from '../../src/data/seo.ts';
 import type { PageRecord } from './types.ts';
 
 /*
@@ -44,14 +44,21 @@ export function freshnessReport(
 ): FreshnessEntry[] {
 	const entries: FreshnessEntry[] = [];
 	for (const page of pages) {
-		if (!page.route.startsWith('/compare/') || page.route === '/compare/')
-			continue;
-		const match = page.text.match(/Last checked (\d{4}-\d{2}-\d{2})/);
-		if (!match) continue;
-		const lastChecked = match[1];
+		const route = stripLocale(page.route);
+		if (!route.startsWith('/compare/') || route === '/compare/') continue;
+		/*
+		 * The attribute first, because the sentence around the date is translated and a pattern
+		 * over English wording would quietly stop finding it. The English sentence is still read
+		 * for a page that does not carry the attribute, so a comparison is never dropped from the
+		 * report just because its markup predates it.
+		 */
+		const lastChecked =
+			page.lastChecked ??
+			page.text.match(/Last checked (\d{4}-\d{2}-\d{2})/)?.[1];
+		if (lastChecked === undefined) continue;
 		entries.push({
 			route: page.route,
-			competitor: page.route.replace('/compare/', '').replace('/', ''),
+			competitor: route.replace('/compare/', '').replace('/', ''),
 			lastChecked,
 			ageDays: ageInDays(lastChecked, now),
 			stale: isStale(lastChecked, now)

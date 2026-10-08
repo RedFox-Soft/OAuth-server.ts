@@ -1,0 +1,18 @@
+---
+import type { GetStaticPaths } from 'astro';
+import BlogPost from '../../../views/BlogPost.astro';
+import { publishedPosts, type BlogPost as Post } from '../../../data/blog.ts';
+
+export const getStaticPaths: GetStaticPaths = async () =>
+	(await publishedPosts('zh-cn')).map((post) => ({ params: { slug: post.slug }, props: { post } }));
+
+interface Props {
+	post: Post;
+}
+const { post } = Astro.props;
+---
+
+<BlogPost
+	post={post}
+	locale="zh-cn"
+/>

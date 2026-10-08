@@ -1,0 +1,97 @@
+---
+import Site from '../layouts/Site.astro';
+import Card from '../components/ui/Card.astro';
+import Section from '../components/ui/Section.astro';
+import Eyebrow from '../components/ui/Eyebrow.astro';
+import Button from '../components/ui/Button.astro';
+import RichText from '../components/RichText.astro';
+import StaleTranslationNotice from '../components/StaleTranslationNotice.astro';
+import { publishedPosts } from '../data/blog.ts';
+import { localizedHref, localizedRoute } from '../i18n/locale.ts';
+import { isStale, messagesFor } from '../i18n/messages.ts';
+import english from '../i18n/messages/blog/en.ts';
+import type { LocaleKey } from '../data/seo.ts';
+
+/*
+ * The article list, and the only path from the home page to an article — which is what keeps every
+ * article inside the three-link reachability limit the guardrail enforces. Once there are enough
+ * articles that this page needs paginating, that limit is the reason it is a correctness question
+ * and not only an ergonomic one.
+ */
+interface Props {
+	locale: LocaleKey;
+}
+const { locale } = Astro.props;
+const t = messagesFor('blog', english, locale);
+const posts = await publishedPosts(locale);
+
+const heading = t.index.heading;
+const feed = `${localizedRoute('/blog/', locale)}rss.xml`;
+const guide = await localizedHref('/docs/get-started/docker-compose/', locale);
+const changelog = await localizedHref('/changelog/', locale);
+---
+
+<Site
+	title={`${heading} — FoxAuth`}
+	description={t.index.description}
+	breadcrumbLeaf={heading}
+	locale={locale}
+>
+	<Section narrow>
+		<Eyebrow>{t.eyebrow}</Eyebrow>
+		<h1 class="text-4xl font-[650] leading-[1.15] tracking-tight text-balance">{heading}</h1>
+		<p class="mt-5 text-lg text-gray-600 dark:text-gray-400">{t.index.lead}</p>
+		<p class="mt-4 text-sm text-gray-600 dark:text-gray-400">
+			<RichText text={t.index.subscribe(feed, guide)} />
+		</p>
+		{
+			isStale('blog', locale) && (
+				<StaleTranslationNotice
+					locale={locale}
+					english="/blog/"
+					class="mt-4"
+				/>
+			)
+		}
+	</Section>
+
+	<Section
+		narrow
+		tone="muted"
+	>
+		{
+			posts.length === 0 ? (
+				<Card padding="lg">
+					<h2 class="text-2xl font-[650] tracking-tight">{t.index.emptyHeading}</h2>
+					<p class="mt-3 text-gray-600 dark:text-gray-400">{t.index.emptyBody}</p>
+					<div class="mt-6 flex flex-wrap gap-3">
+						<Button href={guide}>{t.index.readDocs}</Button>
+						<Button
+							href={changelog}
+							variant="secondary"
+						>
+							{t.index.seeShipped}
+						</Button>
+					</div>
+				</Card>
+			) : (
+				<ul class="flex flex-col gap-6">
+					{posts.map((post) => (
+						<li>
+							<Card href={localizedRoute(`/blog/${post.slug}/`, locale)}>
+								<p class="text-sm text-gray-500 dark:text-gray-400">
+									<time datetime={post.data.publishedAt}>{post.data.publishedAt}</time>
+									{post.data.updatedAt && t.index.updated(post.data.updatedAt)}
+								</p>
+								<h2 class="mt-2 text-2xl font-[650] tracking-tight text-balance">
+									{post.data.title}
+								</h2>
+								<p class="mt-3 text-gray-600 dark:text-gray-400">{post.data.description}</p>
+							</Card>
+						</li>
+					))}
+				</ul>
+			)
+		}
+	</Section>
+</Site>

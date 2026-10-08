@@ -1,0 +1,129 @@
+---
+import Site from '../layouts/Site.astro';
+import FaqSection from '../components/FaqSection.astro';
+import { faqPage } from '../data/structured.ts';
+import WaitlistForm from '../components/WaitlistForm.astro';
+import ContactForm from '../components/ContactForm.astro';
+import Button from '../components/ui/Button.astro';
+import Card from '../components/ui/Card.astro';
+import Badge from '../components/ui/Badge.astro';
+import Section from '../components/ui/Section.astro';
+import Eyebrow from '../components/ui/Eyebrow.astro';
+import StaleTranslationNotice from '../components/StaleTranslationNotice.astro';
+import { localizedHref } from '../i18n/locale.ts';
+import { isStale, messagesFor } from '../i18n/messages.ts';
+import english from '../i18n/messages/pricing/en.ts';
+import type { LocaleKey } from '../data/seo.ts';
+
+interface Props {
+	locale: LocaleKey;
+}
+const { locale } = Astro.props;
+const t = messagesFor('pricing', english, locale);
+
+const getStarted = await localizedHref('/docs/get-started/docker-compose/', locale);
+const license = await localizedHref('/license/', locale);
+const contact = await localizedHref('/contact/', locale);
+---
+
+<Site
+	jsonLd={faqPage(t.faq)}
+	title={`${t.title} — FoxAuth`}
+	description={t.description}
+	locale={locale}
+>
+	<Section narrow>
+		<Eyebrow>{t.eyebrow}</Eyebrow>
+		<h1 class="text-4xl font-[650] leading-[1.15] tracking-tight text-balance">
+			{t.heading}
+		</h1>
+		<p class="mt-5 text-lg text-gray-600 dark:text-gray-400">
+			{t.lead}
+		</p>
+		{isStale('pricing', locale) && <StaleTranslationNotice locale={locale} english="/pricing/" class="mt-4" />}
+	</Section>
+
+	<Section tone="muted">
+		<div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
+			<Card>
+				<Badge tone="accent">{t.selfHosted.badge}</Badge>
+				<h2 class="mt-4 text-xl font-[650] tracking-tight">{t.selfHosted.name}</h2>
+				<p class="mt-2 text-3xl font-[650] tracking-tight">{t.selfHosted.price}</p>
+				<p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+					{t.selfHosted.tagline}
+				</p>
+				<ul class="mt-5 flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
+					{
+						t.selfHosted.items.map((item) => (
+							<li class="flex gap-2">
+								<span aria-hidden="true" class="text-accent-700 dark:text-accent-200">
+									→
+								</span>
+								<span>{item}</span>
+							</li>
+						))
+					}
+				</ul>
+				<p class="mt-6">
+					<Button href={getStarted}>{t.selfHosted.cta}</Button>
+				</p>
+			</Card>
+
+			<Card id="cloud" tone="accent">
+				<Badge tone="neutral">{t.cloud.badge}</Badge>
+				<h2 class="mt-4 text-xl font-[650] tracking-tight">FoxAuth Cloud</h2>
+				<p class="mt-2 text-3xl font-[650] tracking-tight">{t.cloud.price}</p>
+				<p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+					{t.cloud.tagline}
+				</p>
+				<ul class="mt-5 flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
+					{
+						t.cloud.items.map((item) => (
+							<li class="flex gap-2">
+								<span aria-hidden="true" class="text-accent-700 dark:text-accent-200">
+									→
+								</span>
+								<span>{item}</span>
+							</li>
+						))
+					}
+				</ul>
+				<div class="mt-6"><WaitlistForm locale={locale} /></div>
+			</Card>
+
+			<Card>
+				<Badge tone="neutral">{t.enterprise.badge}</Badge>
+				<h2 class="mt-4 text-xl font-[650] tracking-tight">{t.enterprise.name}</h2>
+				<p class="mt-2 text-3xl font-[650] tracking-tight">{t.enterprise.price}</p>
+				<p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+					{t.enterprise.tagline}
+				</p>
+				<ul class="mt-5 flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
+					{
+						t.enterprise.items.map((item) => (
+							<li class="flex gap-2">
+								<span aria-hidden="true" class="text-accent-700 dark:text-accent-200">
+									→
+								</span>
+								<span>{item}</span>
+							</li>
+						))
+					}
+				</ul>
+				<div class="mt-6"><ContactForm subject="Enterprise" locale={locale} /></div>
+			</Card>
+		</div>
+	</Section>
+
+	<Section narrow>
+		<Eyebrow>{t.faqEyebrow}</Eyebrow>
+		<h2 class="text-3xl font-[650] tracking-tight text-balance">
+			{t.faqHeading}
+		</h2>
+		<FaqSection items={t.faq} class="mt-8" />
+		<p class="mt-8 flex flex-wrap gap-3">
+			<Button href={license} variant="secondary">{t.readLicense}</Button>
+			<Button href={contact} variant="ghost">{t.contactUs}</Button>
+		</p>
+	</Section>
+</Site>

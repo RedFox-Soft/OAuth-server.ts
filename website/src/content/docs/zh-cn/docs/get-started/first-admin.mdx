@@ -1,0 +1,61 @@
+---
+title: 创建第一个管理员
+description: 一次性设置页面、管理员登录的工作方式，以及在做任何其他事之前就应开启的第二因素认证。
+source: bddda04f69eb
+sidebar:
+  order: 3
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+import ScreenshotFigure from '../../../../../components/ScreenshotFigure.astro';
+
+服务器自己管理自己。没有需要去日志里查找的预置密码，也没有 `create-admin` 命令——第一个管理员在浏览器中创建，而且只创建一次。
+
+<Steps>
+
+1. 在一个刚完成初始化的部署上打开 `/admin`，例如 `http://localhost:3000/admin`。
+
+2. **Create the first super admin** 页面会要求输入一个电子邮件地址和一个至少十二个字符的密码。该账户会进入保留的「Administrators」用户桶，成为 **Super administrators**（其成员管理整个实例的组）的成员，并且像其他任何管理员一样获得一个个人组。
+
+3. 提交，然后用这些凭据登录。
+
+</Steps>
+
+一旦 Super administrators 有了一个活跃成员，设置路由就会关闭，此后一律返回 `409 already_initialized`。`/admin` 变成登录页面，后续的管理员在控制台的 **Admins** 下创建，同样需要一个电子邮件地址和一个至少十二个字符的密码。新管理员从来不是超级管理员：这一身份要由超级管理员通过账户旁边的开关单独授予。（另外，普通组的成员资格是通过电子邮件邀请提供的。）如果你在一个本应已有管理员的部署上看到了设置页面，就值得调查一下：这意味着此服务器读取的账户集合里一个账户都没有。
+
+<Aside type="caution">
+
+`/admin` 是一个向互联网开放的登录页面。首次运行流程的任何环节都没有经过身份验证，也不可能经过，因为此时还不存在任何账户。所以部署一启动，就立即创建第一个管理员，不要让一个可访问却尚未初始化的实例闲置在那里。
+
+</Aside>
+
+<ScreenshotFigure
+	name="admin-projects"
+	alt="登录后的管理控制台，列出当前组范围内的项目。"
+	caption="管理员登录后首先看到的页面：范围切换器当前指向的那个组的项目。"
+/>
+
+## 管理员通过此服务器自己的签发者登录 {#administrators-sign-in-through-this-servers-own-issuer}
+
+登录控制台是一次 OpenID Connect 授权码流程，针对的正是控制台所管理的这台服务器，使用的是 `db:setup` 预置的第一方 `admin-panel` 客户端。没有第二套密码存储，也没有仅供管理员使用的凭据路径：管理员就是保留管理员桶中的一个最终用户，管理 API 允许他们做什么，取决于他们所属的组。
+
+由此产生两个后果，两者在实践中都会遇到：
+
+- 预置客户端的重定向 URI 是 `$ISSUER/admin/callback`，只在该客户端首次插入时写入一次。如果在预置之后修改了 `ISSUER`，登录会重定向到一个该客户端并未登记的 URI 并因此失败；重新运行 `db:setup` 无法修复它。处理方法参见 [Compose 指南中的警告](/zh-cn/docs/get-started/docker-compose/)。
+- 没有种子数据就无法访问控制台。如果 `db:setup` 从未运行过，`/admin/login` 会带着一个没有任何客户端匹配的 `client_id` 重定向到 `/auth`。
+
+## 开启第二因素认证 {#turn-on-the-second-factor}
+
+管理员桶是一扇暴露在公共互联网上、只靠密码把守的门，所以我们的建议是：在做其他任何事之前，先要求它使用身份验证器应用。在控制台中进入 **Admins**（仅限超级管理员），打开 **Require an authenticator app**。
+
+之后登录除了密码，还需要一个六位数的验证码。开启它不会把任何人锁在门外：尚未绑定身份验证器的管理员会在下次登录时完成绑定。这也包括使用 `database/mongodb.ts` 预置的保留 `admin-mcp` 客户端登录的智能体，因为它走的是同一扇门。
+
+这件事比看上去更重要。失败的密码尝试按桶和电子邮件地址计数，达到上限的地址会在一段时间内被拒绝。按照设计，要求一次性验证码的桶无论被触发多少次，都停留在第一个锁定时间窗口：在那里猜中密码也无法让任何人登录。管理员也没有自助重置密码的途径来摆脱锁定。真正让这扇门变得坚固的是第二因素，而不是节流。节流本身的设置是[设置参考](/docs/reference/settings/#loginThrottle.failureCap)中的 `loginThrottle.failureCap`、`loginThrottle.windowSeconds` 和 `loginThrottle.windowCeilingSeconds`。
+
+## 管理员能触及什么 {#what-an-administrator-can-reach}
+
+控制台的超级管理员功能覆盖实例本身：服务器设置、签名密钥、SMTP、管理员账户和故障存储。超级管理员的身份，就是保留的 **Super administrators** 组的成员资格；它的授予和撤回各自是独立的操作（**Admins** 页面上的开关，对智能体而言则是 `admin_super_grant` 和 `admin_super_withdraw`）；最后一个活跃成员既不能被撤回，也不能被停用。其他任何管理员都可以创建项目、桶和组，通过电子邮件邀请他人加入自己的组，并读取自己所属组的审计日志。所有权按组划分：属于某个容器的所属组，就是获得其访问权限的方式。
+
+每一个改变状态的操作，无论来自控制台还是智能体，都会在变更发生之前写入只追加的审计日志，记录操作者、操作和目标。该存储不提供任何更新或删除接口。
+
+如果你发现的是安全问题而非配置问题，项目的漏洞披露政策和联系方式见[安全页面](/security/)。

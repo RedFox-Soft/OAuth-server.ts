@@ -9,6 +9,14 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+### Added
+
+- site: foxauth.dev in Russian (`/ru/`) and Simplified Chinese (`/zh-cn/`) — the marketing pages, the docs
+  landing page and Get started, and the whole blog — shown only to a reader whose browser puts that language
+  first, with a switch to English and back; everyone else sees the English site unchanged. A blog post is
+  published in every language or none, a stale translation says so on the page, and the build checks each
+  page's language, its Chinese title lengths and that every section keeps its English id. Spec 074.
+
 ## [0.9.0] - 2026-10-07
 
 A sign-out at the upstream provider now reaches this server. A bucket accepts OpenID Connect Back-Channel Logout

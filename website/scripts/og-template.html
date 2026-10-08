@@ -6,13 +6,23 @@
 		<!--
 			The Open Graph card, screenshotted at 1200x630 by scripts/capture.ts.
 
-			Self-contained on purpose: no font file, no stylesheet, no image request. The capture runs
-			offline in a headless browser and a missing external resource would either hang the shot or
-			land silently as a fallback nobody reviewed. The mark below is public/logo.svg inlined for
-			the same reason; the colours are the DESIGN.md tokens (gray-950 ground, accent-500 orange,
+			Self-contained on purpose: no network request of any kind. The capture runs offline in a
+			headless browser and a missing external resource would either hang the shot or land
+			silently as a fallback nobody reviewed. The mark below is public/logo.svg inlined for the
+			same reason; the colours are the DESIGN.md tokens (gray-950 ground, accent-500 orange,
 			accent-200 peach) written literally, because a template that imported the Tailwind theme
 			would need the build to render.
+
+			The one exception is the Chinese face, read from node_modules beside this file rather than
+			fetched: no system font can be counted on for Han text on a CI runner, where the cards
+			would otherwise be shot as rows of empty boxes. It is the card renderer's alone and never
+			reaches a visitor — the site itself names system CJK fonts and ships none. It is split by
+			unicode-range, so a card with no Han text loads nothing from it.
 		-->
+		<link
+			rel="stylesheet"
+			href="../node_modules/@fontsource/noto-sans-sc/500.css"
+		/>
 		<style>
 			* {
 				box-sizing: border-box;
@@ -37,6 +47,7 @@
 					Roboto,
 					'Helvetica Neue',
 					Arial,
+					'Noto Sans SC',
 					sans-serif;
 				-webkit-font-smoothing: antialiased;
 			}

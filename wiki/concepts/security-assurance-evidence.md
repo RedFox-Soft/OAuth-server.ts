@@ -26,7 +26,8 @@ page records what was published to close it and, more usefully, the decisions in
 ## What exists now
 
 - **A threat model** at `website/src/content/docs/docs/security/threat-model.mdx`, structured after
-  RFC 9700 §3 (attackers) and §4 (threats). Every control row names the source file and the spec
+  RFC 9700 §3 (attackers) and §4 (threats). It is English-only: the Russian and Chinese sites reach it
+  as a Starlight fallback page that is kept out of search ([[site-translations]], since 2026-10-08). Every control row names the source file and the spec
   under `test/` that holds it; the page's own maintenance rule is that a control without a test is
   a control that can vanish in a refactor unnoticed. It carries a **Known limitations** section
   that names the real gaps — secrets unencrypted at rest, CSRF resting on `SameSite` alone (`Strict`

@@ -315,8 +315,8 @@ a super administrator only, because there a resource's metadata can say it trust
 still cannot say which of those tenants it belongs to. No proof closes squatting there, so nobody
 but the operator gets to try.
 
-Two more holes in the same area, both of the form "a caller forgot to pass the resource", and both
-worth knowing because they are the kind of thing this design makes possible. The account resolver
+Three more holes in the same area. The first two have the form "a caller forgot to pass the
+resource", and both are worth knowing because they are the kind of thing this design makes possible. The account resolver
 resolved a different tenant's users than the login step had, because the login passed the resource
 and the resolver did not, and the symptom was a 500 in the consent screen rather than a refusal. And
 the password, reset and registration doors resolved policy from the client alone, so a tenant whose
@@ -344,7 +344,7 @@ and ask for more with a 403 and `insufficient_scope` when a privileged tool is f
 client is required to treat the challenge's scope as authoritative and to accumulate scopes across
 step-ups itself, which is why the authorization server can stay stateless about it. Our own
 administrative MCP endpoint advertises `openid` and nothing else, because its authority comes from
-the administrator's group memberships, not from scopes, and a scope it cannot be missing is not one to publish.
+the administrator's group memberships, not from scopes, and a scope the endpoint never checks is not one to publish.
 
 ## Two questions the specification leaves to you
 
@@ -360,8 +360,8 @@ what is wrong is not knowing which one you chose.
 
 The second is the confused deputy, and it is not the authorization server's to solve. An MCP server
 that proxies a third-party API with one static client id, registers its own MCP clients dynamically,
-and forwards codes without a consent screen of its own is the setup the security guidance describes
-attack by attack. The mitigation is per-client consent at the proxy, before the third-party flow
+and forwards codes without a consent screen of its own is exactly the setup the security guidance
+walks through, attack by attack. The mitigation is per-client consent at the proxy, before the third-party flow
 starts, and audience checking so that a token the proxy receives is never simply passed through.
 Every piece of the specification I have described helps with that, and none of it does the work for
 you.

@@ -91,7 +91,8 @@ here:
   each kind of page must carry, and a route matching no entry fails as `unclassified-page-type` — added
   after the comparison pages shipped with no article markup past twenty passing rules.
 
-So a new page needs a unique title (15–60 characters) and description (70–160), a section in the map, a
+So a new page needs a unique title (15–60 characters; 8–30 for a Chinese page) and description (70–160;
+30–80 in Chinese), a section in the map, a
 `STRUCTURED_COVERAGE` entry (`requires: []` is fine, but the `reason` is not optional), and a link from
 somewhere reachable within three hops of the home page, or the build stops.
 
@@ -115,6 +116,56 @@ Question sets are data: one array feeds both `FaqSection.astro` and `faqPage()`,
 machine-readable forms cannot drift, and the overclaim rule proves it. Comparison pages carry
 `lastChecked`; past `FRESHNESS_LIMIT_DAYS` the build warns and the page shows a "due for review" notice,
 but still passes — staleness is the passage of time, not a mistake to block on.
+
+## Translations
+
+The marketing pages, the docs landing page and **Get started**, and the whole blog also exist in Russian
+(`/ru/…`) and Simplified Chinese (`/zh-cn/…`). English is unprefixed and is the site: the other two are shown only
+to a reader whose browser lists that language **first**, and nobody else ever sees a switcher. Everything else —
+the other docs sections, comparison articles, Reference, changelog, security, licence — stays English. The why,
+and the traps, are in the wiki page `wiki/concepts/site-translations.md`.
+
+**Where each translation lives**
+
+| What                                   | English                                             | Translation                                                                          |
+| -------------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Marketing page text                    | `src/i18n/messages/<page>/en.ts`                    | `src/i18n/messages/<page>/{ru,zh-cn}.ts`                                             |
+| Header, footer, forms, notices, 404    | `src/i18n/messages/{chrome,forms,notFound,…}/en.ts` | same directory                                                                       |
+| Comparison cards on `/<lang>/compare/` | the comparison's frontmatter                        | `src/i18n/messages/compareCards/<lang>.ts`                                           |
+| Docs page                              | `src/content/docs/docs/<path>.mdx`                  | `src/content/docs/<lang>/docs/<path>.mdx`                                            |
+| Blog post                              | `src/content/blog/<slug>.mdx`                       | `src/content/blog/<lang>/<slug>.mdx` (title and description only in the frontmatter) |
+
+A page body lives once, in `src/views/<Page>.astro`; `src/pages/…`, `src/pages/ru/…` and `src/pages/zh-cn/…`
+are one-line route files rendering it with a `locale`. A message module in another language is typed
+`satisfies typeof english`, and the loader also refuses a list of a different length, so a dropped card fails
+the build rather than shipping a shorter page.
+
+**Writing a translation**
+
+- Every `##`–`####` heading in a translated `.mdx` ends with the English heading's id: `## Первый токен {#first-token}`.
+  A missing one fails the build (`counterpart-anchor`, a twenty-fourth rule); the switcher carries `#section`
+  across languages and other pages link into sections by id.
+- Never translate code, commands, setting names, endpoint paths, product or standard names, or the words
+  `PostgreSQL` and `MongoDB` — the datastore claim check matches them literally.
+- In Chinese, keep each paragraph on one line (a wrapped line becomes a space between two Han characters).
+- Settled Russian terms, so a new page reads like the rest: _grant type_ → «тип гранта», a stored _grant_ →
+  «выданное разрешение»; _issuer_ → «издатель (issuer)» at first use, then «issuer»; _confused deputy_ stays in
+  English with a one-line explanation at first use; _user bucket_ → «бакет пользователей».
+- After writing or updating a translation, `bun run i18n:stamp <file>` records the hash of the English file it was
+  made from. When the English changes, `bun run seo` lists the translation as stale and the page shows "the English
+  version is newer"; it never fails the build. Re-translate, then stamp — never stamp to silence it.
+
+**Publishing**
+
+A blog post is published in every language or in none: an English post whose translations do not all exist yet is
+held back, with a build warning naming the missing file. The languages a build publishes are `LOCALES` in
+`src/data/seo.ts`; a language not in it is not loaded at all, so work in progress on a branch cannot leak. Both
+languages shipped together and are kept together.
+
+**The one script.** The marketing pages carry no client JavaScript except an inline script at the end of `<head>`
+(`src/i18n/language-script.ts`): a static host cannot read `Accept-Language`, so the browser decides. It redirects
+an eligible reader to the page's own `hreflang` counterpart before anything is painted, reveals the switcher, and
+remembers a choice in `localStorage`. With scripts off, every page is what its address says.
 
 ## Adding a page type: copy the blog
 

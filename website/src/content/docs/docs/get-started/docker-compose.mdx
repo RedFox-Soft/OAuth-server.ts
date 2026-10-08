@@ -72,8 +72,9 @@ docker compose up
 ```
 
 Note that this destroys every account, client and signing key in that volume, so it is a fix for
-the first day only. On a deployment that already has data, seed a correctly named client through
-the console instead.
+the first day only. On a deployment that already has data there is no repair from the console: the
+reserved admin client is the one client the console will not edit, which is why `ISSUER` has to be
+right before the first start.
 
 </Aside>
 

@@ -1,0 +1,38 @@
+---
+/*
+ * Renders a message's inline parts. No `set:html`: a translation is content, but it is still not
+ * allowed to become markup.
+ */
+import type { RichText as Text } from '../i18n/types.ts';
+
+interface Props {
+	text: Text | string;
+	codeClass?: string;
+	linkClass?: string;
+}
+const {
+	text,
+	codeClass = 'font-mono text-sm',
+	linkClass = 'font-medium text-accent-700 dark:text-accent-200'
+} = Astro.props;
+const parts = typeof text === 'string' ? [text] : text;
+---
+
+{
+	parts.map((part) =>
+		typeof part === 'string' ? (
+			part
+		) : 'strong' in part ? (
+			<strong>{part.strong}</strong>
+		) : 'em' in part ? (
+			<em>{part.em}</em>
+		) : 'code' in part ? (
+			<code class={codeClass || undefined}>{part.code}</code>
+		) : (
+			<a
+				href={part.href}
+				class={linkClass}>{part.link}</a
+			>
+		)
+	)
+}

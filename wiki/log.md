@@ -168,3 +168,5 @@ Operations:
 
 
 ## [2026-10-08] update | [[end-user-lifecycle]] — the JWT that outlives a deactivation lives to the declared resource's `accessTokenTTL`, stored as 900 s when a declaration names none, not "1 h by default" (that is the fallback for a token with no declared resource, which is opaque); CONFORMANCE.md's SCIM row said the same and is corrected with it. Found while writing the site's new Administer docs section (federation, SCIM, upstream sign-out, groups, ending access, key rotation).
+
+## [2026-10-08] create | [[site-translations]] — spec 074: the public site gains `/ru/` and `/zh-cn/` (marketing, docs landing and Get started, the whole blog), shown only to readers whose first browser language is Russian or Simplified Chinese; records the first-language rule, the one inline script and its three traps, fallbacks, the one-release rule, hash freshness and the language-aware build checks.

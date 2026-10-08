@@ -1,0 +1,125 @@
+---
+import { getCollection } from 'astro:content';
+import Site from '../layouts/Site.astro';
+import Card from '../components/ui/Card.astro';
+import Section from '../components/ui/Section.astro';
+import Eyebrow from '../components/ui/Eyebrow.astro';
+import RichText from '../components/RichText.astro';
+import StaleTranslationNotice from '../components/StaleTranslationNotice.astro';
+import { localizedHref } from '../i18n/locale.ts';
+import { isStale, messagesFor } from '../i18n/messages.ts';
+import english from '../i18n/messages/compare/en.ts';
+import type { LocaleKey } from '../data/seo.ts';
+
+/*
+ * The header and footer both link "Compare"; without this index that link has nowhere to go once
+ * there is more than one comparison. It lists the collection, so a new .mdx file appears here.
+ *
+ * The comparisons themselves are English-only; a translated index links to them as they are.
+ */
+interface Props {
+	locale: LocaleKey;
+}
+const { locale } = Astro.props;
+const t = messagesFor('compare', english, locale);
+
+const entries = (await getCollection('compare')).sort((a, b) =>
+	a.data.competitor.localeCompare(b.data.competitor)
+);
+
+interface CardText {
+	title: string;
+	description: string;
+	bottomLine: string;
+}
+const englishCards: Record<string, CardText> = Object.fromEntries(
+	entries.map((entry) => [
+		entry.id,
+		{
+			title: entry.data.title,
+			description: entry.data.description,
+			bottomLine: entry.data.bottomLine
+		}
+	])
+);
+const cardText = messagesFor('compareCards', englishCards, locale);
+const cards = await Promise.all(
+	entries.map(async (entry) => ({
+		// The map was built from these entries, and messagesFor refuses a translation whose ids differ.
+		...cardText[entry.id]!,
+		href: await localizedHref(`/compare/${entry.id}/`, locale),
+		lastChecked: entry.data.lastChecked,
+		sources: entry.data.sources.length
+	}))
+);
+---
+
+<Site
+	title={`${t.title} — FoxAuth`}
+	description={t.description}
+	locale={locale}
+>
+	<Section narrow>
+		<Eyebrow>{t.eyebrow}</Eyebrow>
+		<h1 class="text-4xl font-[650] leading-[1.15] tracking-tight text-balance">
+			{t.heading}
+		</h1>
+		<p class="mt-5 text-lg text-gray-600 dark:text-gray-400">
+			{t.lead}
+		</p>
+		{
+			isStale('compare', locale) && (
+				<StaleTranslationNotice
+					locale={locale}
+					english="/compare/"
+					class="mt-4"
+				/>
+			)
+		}
+	</Section>
+
+	<Section
+		narrow
+		tone="muted"
+	>
+		<Eyebrow>{t.shortVersion.eyebrow}</Eyebrow>
+		<h2 class="text-3xl font-[650] tracking-tight text-balance">
+			{t.shortVersion.heading}
+		</h2>
+		<div class="mt-6 flex max-w-3xl flex-col gap-4 text-gray-600 dark:text-gray-400">
+			{
+				t.shortVersion.questions.map((item) => (
+					<p>
+						<strong class="text-gray-900 dark:text-gray-100">{item.question}</strong>{' '}
+						{item.answer}
+					</p>
+				))
+			}
+			<p>
+				<RichText
+					text={t.shortVersion.candour}
+					codeClass=""
+				/>
+			</p>
+		</div>
+	</Section>
+
+	<Section tone="muted">
+		<div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+			{
+				cards.map((card) => (
+					<Card href={card.href}>
+						<h2 class="text-lg font-[650] tracking-tight">{card.title}</h2>
+						<p class="mt-2 text-sm text-gray-600 dark:text-gray-400">{card.description}</p>
+						<p class="mt-3 text-sm font-medium text-gray-900 dark:text-gray-100">{card.bottomLine}</p>
+						<p class="mt-4 text-xs text-gray-500 dark:text-gray-400">
+							{t.lastChecked.before}
+							<span data-last-checked={card.lastChecked}>{card.lastChecked}</span>
+							{t.lastChecked.after(card.sources)}
+						</p>
+					</Card>
+				))
+			}
+		</div>
+	</Section>
+</Site>

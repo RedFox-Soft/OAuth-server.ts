@@ -39,7 +39,8 @@ less than the marketing pages suggest.
   <text x="560" y="183" font-size="13" fill="var(--diagram-fg, #1a1a1a)">consumer accounts only</text>
   <text x="40" y="233" font-size="14" fill="var(--diagram-fg, #1a1a1a)">Microsoft Entra ID</text>
   <text x="210" y="233" font-size="13" fill="var(--diagram-line, #555)">nothing</text>
-  <text x="560" y="233" font-size="13" fill="var(--diagram-line, #555)">continuous access evaluation is Microsoft's own</text>
+  <text x="560" y="226" font-size="13" fill="var(--diagram-line, #555)">continuous access evaluation</text>
+  <text x="560" y="243" font-size="13" fill="var(--diagram-line, #555)">is Microsoft's own</text>
   <line x1="30" y1="260" x2="770" y2="260" stroke="var(--diagram-line, #555)" stroke-width="1"/>
   <text x="400" y="292" text-anchor="middle" font-size="13" fill="var(--diagram-line, #555)">The one row that ends everything rests on a document no working group adopted.</text>
   <text x="400" y="314" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">Okta sends it under its Identity Threat Protection licence, as Universal Logout.</text>
@@ -237,7 +238,7 @@ And I would be honest about the state of it, as I am trying to be here. It has n
 real Okta organisation; it needs Identity Threat Protection, and the test suite replays the request Okta
 documents with a stub provider's keys. Okta documents its `sub` as `client_id/appInstanceId`, which may
 not be the bare client id the provider is configured with, and a provider configured with a custom
-authorization server's issuer may not match the organisation's. Only a real run will settle either. The SCIM
+authorization server's issuer may not match the organisation issuer that Okta's request carries. Only a real run will settle either. The SCIM
 side that usually comes with it has its own gaps: Okta's CRUD test has not been run, and there is no
 `/Bulk`. None of it has been put forward for certification. If the draft is revived and changes, the
 module changes with it. If it stays dead, Okta will presumably move to something else, and the core

@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { localeOf, stripLocale, type LocaleKey } from '../../src/data/seo.ts';
 
 /*
  * Which repository files a built route came from.
@@ -61,24 +62,91 @@ function candidates(route: string): string[] {
 	];
 }
 
+/*
+ * A translated marketing page's route file is a few lines that render the shared view; its words
+ * are in the page's message module. Without the module here, a re-translation would leave the
+ * page's date at whenever the route file was created. Keyed by the English route, because the
+ * module directory is named after the page, not the address.
+ */
+const MESSAGE_GROUPS: Record<string, string[]> = {
+	'/': ['home'],
+	'/features/': ['features'],
+	'/pricing/': ['pricing'],
+	'/contact/': ['contact'],
+	'/compare/': ['compare', 'compareCards'],
+	'/blog/': ['blog']
+};
+
+/*
+ * Where a translated route's own file can be, most specific first. Thin route files and translated
+ * docs sit under a locale directory at the top of their tree (`src/pages/ru/…`,
+ * `src/content/docs/ru/docs/…`), so the prefixed route maps onto them as it is. A blog translation
+ * sits under the locale *inside* its collection (`src/content/blog/ru/<slug>.mdx`), because the
+ * collection directory is the route's first segment and has to stay one directory.
+ */
+function translatedCandidates(locale: LocaleKey, english: string): string[] {
+	const rest = english === '/' ? '' : english.replace(/^\/|\/$/g, '');
+	const asPage = rest === '' ? 'index' : rest;
+	const found = [
+		`src/pages/${locale}/${asPage}.astro`,
+		`src/pages/${locale}/${asPage}/index.astro`,
+		`src/content/docs/${locale}/${asPage}.mdx`,
+		`src/content/docs/${locale}/${asPage}/index.mdx`,
+		`src/content/docs/${locale}/${asPage}.md`
+	];
+	const [collection, ...entry] = rest.split('/');
+	if (collection && entry.length > 0) {
+		found.push(`src/content/${collection}/${locale}/${entry.join('/')}.mdx`);
+	}
+	return found;
+}
+
+function firstExisting(candidateFiles: string[]): string | undefined {
+	return candidateFiles.find((rel) => existsSync(resolve(SITE, rel)));
+}
+
 export function sourcesFor(route: string): RouteSources {
-	const dataSources = (ROUTE_DATA[route] ?? []).filter((rel) =>
+	const locale = localeOf(route).key;
+	const english = stripLocale(route);
+	const dataSources = (ROUTE_DATA[english] ?? []).filter((rel) =>
 		existsSync(resolve(ROOT, rel))
 	);
 
-	for (const rel of candidates(route)) {
-		if (existsSync(resolve(SITE, rel))) {
-			return { sourceFile: `website/${rel}`, dataSources };
-		}
+	/*
+	 * A marketing page's words live in its message module, not in the thin route file, so an edit to
+	 * the English text alone has to move the English page's date too.
+	 */
+	for (const group of MESSAGE_GROUPS[english] ?? []) {
+		const rel = `website/src/i18n/messages/${group}/en.ts`;
+		if (locale === 'en' && existsSync(resolve(ROOT, rel)))
+			dataSources.push(rel);
 	}
 
-	// A dynamic route: fall back to the page template that produced it.
-	const dynamic = route.match(/^\/([^/]+)\//);
-	if (dynamic) {
-		const template = `src/pages/${dynamic[1]}/[slug].astro`;
-		if (existsSync(resolve(SITE, template))) {
-			return { sourceFile: `website/${template}`, dataSources };
+	if (locale !== 'en') {
+		for (const group of MESSAGE_GROUPS[english] ?? []) {
+			const rel = `website/src/i18n/messages/${group}/${locale}.ts`;
+			if (existsSync(resolve(ROOT, rel))) dataSources.push(rel);
 		}
+		const own = firstExisting(translatedCandidates(locale, english));
+		if (own) return { sourceFile: `website/${own}`, dataSources };
+	}
+
+	/*
+	 * An English route, or a translated one with no file of its own: a documentation fallback, or a
+	 * page rendered from an English collection entry, whose words — and so whose date — are the
+	 * English page's.
+	 */
+	const shared = firstExisting(candidates(english));
+	if (shared) return { sourceFile: `website/${shared}`, dataSources };
+
+	// A dynamic route: fall back to the page template that produced it.
+	const dynamic = english.match(/^\/([^/]+)\//);
+	if (dynamic) {
+		const templates = [`src/pages/${dynamic[1]}/[slug].astro`];
+		if (locale !== 'en')
+			templates.unshift(`src/pages/${locale}/${dynamic[1]}/[slug].astro`);
+		const template = firstExisting(templates);
+		if (template) return { sourceFile: `website/${template}`, dataSources };
 	}
 
 	return { sourceFile: undefined, dataSources };

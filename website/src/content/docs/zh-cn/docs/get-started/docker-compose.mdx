@@ -1,0 +1,72 @@
+---
+title: 使用 Docker Compose 运行
+description: 只需一条命令，即可启动 MongoDB、初始化数据库结构并运行授权服务器。
+source: 35f83f5d5b83
+sidebar:
+  order: 1
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+对大多数人来说，看到一个可用授权服务器的最快方式，就是仓库自带的 Compose 文件。它会启动三个服务：MongoDB、一个一次性的初始化步骤，以及服务器本身。除了下文讨论的那一个值，其他都无需配置。
+
+**前置条件：** 带有 Compose v2 的 Docker（`docker compose`，而不是旧版的 `docker-compose`）。
+
+## 启动 {#bring-it-up}
+
+<Steps>
+
+1. 获取 Compose 文件：
+
+   ```bash
+   curl -O https://raw.githubusercontent.com/RedFox-Soft/OAuth-server.ts/main/docker-compose.yml
+   ```
+
+2. 现在就确定 `ISSUER` 的值——下方的警告说明了原因。如果浏览器访问此服务器的地址不是 `http://localhost:3000`，请在 `docker-compose.yml` 的**两个** `environment:` 块中都修改它，即 `setup` 服务的和 `oauth` 服务的。只改其中一个，会让预置的重定向 URI 与对外公布的 issuer 不一致，而下方警告指出，这种不一致无法原地修复。
+
+3. 启动全部服务：
+
+   ```bash
+   docker compose up
+   ```
+
+4. 在 `http://localhost:3000/admin` 打开控制台。首次访问会显示一个一次性的设置页面，用于创建初始超级管理员。
+
+</Steps>
+
+## 三个服务各做什么 {#what-the-three-services-do}
+
+| 服务    | 镜像                                         | 作用                                                                                                                                    |
+| ------- | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `mongo` | `mongo:8`                                    | 数据存储，位于名为 `mongo-data` 的卷上，带有一个 `mongosh` ping 健康检查，其他服务会等待它通过                                          |
+| `setup` | `ghcr.io/redfox-soft/oauth-server-ts:latest` | 运行 `bun run db:setup` 和 `bun run db:migrate` 后退出：创建集合、索引、初始 RS256 签名密钥、管理面板的种子数据，并执行所有 schema 迁移 |
+| `oauth` | `ghcr.io/redfox-soft/oauth-server-ts:latest` | 服务器本身，监听 3000 端口，仅在 `setup` 成功完成后才启动                                                                               |
+
+顺序很重要。如果没有 `setup` 预置的保留管理项目、桶和 `admin-panel` 客户端，控制台的登录会重定向到一个没有任何 `Client` 文档能匹配的客户端。在这种状态下，首次运行的设置页面依然可用，这会让问题看起来像是登录 bug。服务器还会拒绝在迁移尚未运行的数据库上启动，这就是 `setup` 在 `db:setup` 之后运行 `db:migrate` 的原因。两者都可以安全地重复执行，因此在拉取更新的镜像后重新运行 `docker compose up`，也就是升级的方式；如果发布说明提到某个无法撤销的迁移，请先做备份。
+
+<Aside type="caution" title="在首次 docker compose up 之前设置 ISSUER">
+
+`ISSUER` 必须是浏览器访问服务器所用的 URL，并且必须在首次 `up` **之前**定下来。预置的管理客户端的重定向 URI 只会通过 `$setOnInsert` 从它派生一次，之后再修改，重新运行 `db:setup` 也无法修复。
+
+如果你已经用错误的值启动了，变通办法是删除数据存储并重新开始：
+
+```bash
+docker compose down -v   # removes the mongo-data volume
+# edit ISSUER in docker-compose.yml
+docker compose up
+```
+
+注意，这会销毁该卷中的所有账户、客户端和签名密钥，所以它只适用于第一天。在已有数据的部署上，无法通过控制台修复：保留的管理客户端是控制台唯一不允许编辑的客户端，所以必须在首次启动之前把 `ISSUER` 设置正确。
+
+</Aside>
+
+## 下一步 {#where-to-go-next}
+
+- 位于 `http://localhost:3000/admin` 的控制台，你将在那里[创建第一个管理员](/zh-cn/docs/get-started/first-admin/)。
+- 发现文档，它是客户端库所需端点 URL 的权威列表：`http://localhost:3000/.well-known/openid-configuration`。
+- 密钥集：`http://localhost:3000/jwks`。
+- 一个永不受限流的存活探针：`http://localhost:3000/health`，以及对应的就绪探针 `http://localhost:3000/ready`，后者还会访问数据库。
+
+此文件运行的是 MongoDB。它旁边的 `docker-compose.postgres.yml` 是基于 PostgreSQL 的同样三个服务，用 `docker compose -f docker-compose.postgres.yml up` 启动。两者二选一，从不组合使用。哪个变量选择哪种数据库，参见 [PostgreSQL](/zh-cn/docs/deploy/postgresql/)。
+
+如需更贴近生产环境的 Compose 文件（固定镜像标签、外部数据库，以及前置的 TLS 代理），请参见[使用 Docker Compose 部署](/zh-cn/docs/deploy/docker-compose/)。

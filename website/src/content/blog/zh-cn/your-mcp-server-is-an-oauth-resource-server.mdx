@@ -1,0 +1,235 @@
+---
+title: MCP 服务器即 OAuth 资源服务器
+description: MCP 授权就是三份文档加一个声明：MCP 服务器必须发布什么，令牌必须携带什么，以及规范留给你的两个问题。
+source: 321df5d80a63
+---
+
+在这台 MCP 服务器上打开了所有工具的那个令牌，其实是为内部 wiki 签发的。
+
+这台服务器的做法和大多数初次尝试一样。它获取身份提供商的公钥，校验签名和过期时间，从载荷中读出 subject，便认定请求已通过认证。每一项检查都通过了，因为这个令牌是真的。它是一个完全合格的 wiki 令牌，而 MCP 服务器从来没有问过它是给谁的。任何人只要持有该提供商签发的任意令牌，不管用于什么，都能以令牌所指明的身份列出并调用这些工具。
+
+MCP 授权规范要防止的正是这个漏洞。一旦看清了它，规范的其余部分就不再像一套新协议，而显出它的本来面目：一个普通的 OAuth 2.1 资源服务器，只是把发现步骤写了下来，让一个除了 URL 之外一无所知的客户端也能找到获取令牌的路。我在其中授权服务器这一侧花了不少时间，我的总结是：它就是三份文档加一个声明，而几乎所有真正的问题都出在那一个声明上。
+
+## 三份文档和一个声明 {#three-documents-and-one-claim}
+
+智能体宿主只知道一件事：你的 MCP 服务器的 URL。从这里出发，它必须弄清楚谁在保护你、如何与那个授权服务器通信、如何表明自己的身份，然后带回一个只给你、不给任何其他人的令牌。其中每一项都是一份文档，最后一项则是令牌中的一个声明。
+
+<svg viewBox="0 0 800 520" width="100%" role="img" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">
+  <title>智能体宿主为 MCP 服务器完成发现并获取令牌的时序：带 resource_metadata 的 401、受保护资源元数据文档、授权服务器元数据、由元数据文档标识的客户端、携带 resource 参数的授权请求和令牌请求，以及回传给 MCP 服务器的受众绑定令牌</title>
+  <defs>
+    <marker id="mcp-arrow-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--diagram-line, #555)"/></marker>
+  </defs>
+  <rect x="30" y="20" width="170" height="40" rx="8" fill="none" stroke="var(--diagram-fg, #1a1a1a)" stroke-width="1.5"/>
+  <text x="115" y="46" text-anchor="middle" font-size="15" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">智能体宿主（客户端）</text>
+  <rect x="315" y="20" width="170" height="40" rx="8" fill="none" stroke="var(--diagram-fg, #1a1a1a)" stroke-width="1.5"/>
+  <text x="400" y="46" text-anchor="middle" font-size="15" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">MCP 服务器</text>
+  <rect x="600" y="20" width="170" height="40" rx="8" fill="none" stroke="var(--diagram-fg, #1a1a1a)" stroke-width="1.5"/>
+  <text x="685" y="46" text-anchor="middle" font-size="15" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">授权服务器</text>
+  <line x1="115" y1="60" x2="115" y2="500" stroke="var(--diagram-line, #555)" stroke-width="1" stroke-dasharray="4 4"/>
+  <line x1="400" y1="60" x2="400" y2="500" stroke="var(--diagram-line, #555)" stroke-width="1" stroke-dasharray="4 4"/>
+  <line x1="685" y1="60" x2="685" y2="500" stroke="var(--diagram-line, #555)" stroke-width="1" stroke-dasharray="4 4"/>
+  <line x1="115" y1="95" x2="398" y2="95" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#mcp-arrow-a)"/>
+  <text x="257" y="88" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">1  POST /mcp，不带令牌</text>
+  <line x1="400" y1="135" x2="117" y2="135" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5" marker-end="url(#mcp-arrow-a)"/>
+  <text x="257" y="114" text-anchor="middle" font-size="13" fill="var(--diagram-accent, #d9480f)">2  401  WWW-Authenticate: Bearer</text>
+  <text x="257" y="129" text-anchor="middle" font-size="12" fill="var(--diagram-accent, #d9480f)">resource_metadata="…", scope="mcp:tools-basic"</text>
+  <line x1="115" y1="175" x2="398" y2="175" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#mcp-arrow-a)"/>
+  <text x="257" y="168" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">3  GET 受保护资源元数据（RFC 9728）</text>
+  <line x1="400" y1="210" x2="117" y2="210" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#mcp-arrow-a)"/>
+  <text x="257" y="203" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">resource, authorization_servers, scopes_supported</text>
+  <line x1="115" y1="250" x2="683" y2="250" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#mcp-arrow-a)"/>
+  <text x="400" y="243" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">4  GET 授权服务器元数据（RFC 8414 或 OIDC 发现）</text>
+  <line x1="685" y1="285" x2="117" y2="285" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#mcp-arrow-a)"/>
+  <text x="400" y="278" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">issuer, endpoints, code_challenge_methods_supported, client_id_metadata_document_supported</text>
+  <line x1="115" y1="330" x2="683" y2="330" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#mcp-arrow-a)"/>
+  <text x="400" y="309" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">5  /authorize  client_id=host.example/client.json  resource=mcp.example.com/mcp</text>
+  <text x="400" y="324" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">PKCE；服务器获取 client.json 以取得名称和重定向目标；用户授权同意</text>
+  <line x1="115" y1="375" x2="683" y2="375" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#mcp-arrow-a)"/>
+  <text x="400" y="368" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">6  /token  code + code_verifier + 同一个 resource</text>
+  <line x1="685" y1="415" x2="117" y2="415" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5" marker-end="url(#mcp-arrow-a)"/>
+  <text x="400" y="408" text-anchor="middle" font-size="13" fill="var(--diagram-accent, #d9480f)">7  aud = mcp.example.com/mcp 的访问令牌</text>
+  <line x1="115" y1="455" x2="398" y2="455" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#mcp-arrow-a)"/>
+  <text x="257" y="448" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">8  POST /mcp  Authorization: Bearer …</text>
+  <line x1="400" y1="490" x2="117" y2="490" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#mcp-arrow-a)"/>
+  <text x="257" y="483" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">9  校验签名、iss、exp 和 aud 后返回 200</text>
+</svg>
+
+第 2 步是这整个过程中规范唯一以 MUST 要求 MCP 服务器做的部分，而它只有两行。当请求没有携带令牌，或携带的令牌被你拒绝时，你返回 401，并说明你的元数据在哪里：
+
+```http
+HTTP/1.1 401 Unauthorized
+WWW-Authenticate: Bearer resource_metadata="https://mcp.example.com/.well-known/oauth-protected-resource",
+                         scope="mcp:tools-basic"
+```
+
+元数据本身是一份 JSON 文档（RFC 9728），说明谁在保护你：
+
+```json
+{
+  "resource": "https://mcp.example.com/mcp",
+  "authorization_servers": ["https://auth.example.com/acme"],
+  "scopes_supported": ["mcp:tools-basic"],
+  "bearer_methods_supported": ["header"]
+}
+```
+
+此后的一切都是授权服务器和客户端的事。客户端从文档中取出签发者，按照 RFC 8414 和 OpenID Connect Discovery 定义的 well-known 形式获取该服务器的元数据，而且两种都必须尝试，因为规范只要求服务器发布其中一种。然后它执行一次普通的带 PKCE 的授权码流程，并在授权请求和令牌请求中都发送一个参数：尽管它自 2020 年起就有了 RFC，在实践中却一点也不普通。
+
+## resource 参数才是关键 {#the-resource-parameter-is-the-whole-point}
+
+RFC 8707 让客户端可以说明它要这个令牌做什么。MCP 规范要求两个请求都必须携带它，正是它把「来自该提供商的一个令牌」变成了「给这台 MCP 服务器的令牌」。授权服务器以该 URI 作为受众签发令牌，而 MCP 服务器拒绝任何受众不完全等于其自身标识符的令牌。wiki 令牌本该卡在的就是这一关，也只有这一关能拦住它。
+
+下面是服务器为上面的流程返回的令牌，已解码：
+
+```json
+{
+  "iss": "https://auth.example.com/acme",
+  "aud": "https://mcp.example.com/mcp",
+  "sub": "248289761001",
+  "client_id": "https://host.example/client.json",
+  "scope": "mcp:tools-basic",
+  "iat": 1759226400,
+  "exp": 1759227300,
+  "jti": "o1S6Qw3bH9c_UZL0"
+}
+```
+
+MCP 服务器一侧的检查是四个声明，其中两个必须由你自己指定，因为 JWT 库无法猜出它们：
+
+```js
+import { createRemoteJWKSet, jwtVerify } from 'jose';
+
+const keys = createRemoteJWKSet(new URL('https://auth.example.com/acme/jwks'));
+
+export async function principalFor(authorization) {
+	const token = authorization?.replace(/^Bearer /i, '');
+	if (!token) return null;
+	const { payload } = await jwtVerify(token, keys, {
+		issuer: 'https://auth.example.com/acme',
+		audience: 'https://mcp.example.com/mcp'
+	});
+	return { subject: payload.sub, scopes: (payload.scope ?? '').split(' ') };
+}
+```
+
+签名和 `exp` 归库负责。`issuer` 和 `audience` 归你，而第一次尝试漏掉的正是第二个。任何语言的任何库都做同样的四项检查；这段代码的形状就是检查清单。
+
+我花了更久才体会到的是：同一个字符串现在出现在由三方分别写下的三个地方，而这三处必须是同一个字符串。MCP 服务器在元数据中把它发布为 `resource`。授权服务器的运营方把它声明为一个受保护资源的标识符。客户端把它作为 `resource` 发送，令牌则把它作为 `aud` 携带。比较在规范化之后精确进行，而且是有意为之：不做前缀匹配，也没有「父路径的令牌对子路径同样有效」，因为一个集成的令牌恰恰就是这样在另一个集成那里生效的。
+
+<svg viewBox="0 0 800 330" width="100%" role="img" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">
+  <title>同一个标识符出现在由三方写下的三个地方：MCP 服务器元数据的 resource 字段、授权服务器上的声明，以及客户端发送、随后成为令牌 aud 声明的 resource 参数；签发者同样把元数据的 authorization_servers 与令牌的 iss 绑在一起</title>
+  <defs>
+    <marker id="mcp-arrow-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--diagram-accent, #d9480f)"/></marker>
+  </defs>
+  <rect x="30" y="30" width="230" height="120" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <text x="145" y="56" text-anchor="middle" font-size="14" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">MCP 服务器发布</text>
+  <text x="145" y="84" text-anchor="middle" font-size="13" fill="var(--diagram-accent, #d9480f)">resource: mcp.example.com/mcp</text>
+  <text x="145" y="108" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">authorization_servers: [acme 签发者]</text>
+  <text x="145" y="132" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">scopes_supported: [mcp:tools-basic]</text>
+  <rect x="285" y="30" width="230" height="120" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <text x="400" y="56" text-anchor="middle" font-size="14" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">运营方声明</text>
+  <text x="400" y="84" text-anchor="middle" font-size="13" fill="var(--diagram-accent, #d9480f)">标识符：mcp.example.com/mcp</text>
+  <text x="400" y="108" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">位于项目 acme，其签发者为 /acme</text>
+  <text x="400" y="132" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">scope：[mcp:tools-basic]</text>
+  <rect x="540" y="30" width="230" height="120" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <text x="655" y="56" text-anchor="middle" font-size="14" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">客户端发送</text>
+  <text x="655" y="84" text-anchor="middle" font-size="13" fill="var(--diagram-accent, #d9480f)">resource=mcp.example.com/mcp</text>
+  <text x="655" y="108" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">发往 /acme/authorize 和 /acme/token</text>
+  <text x="655" y="132" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">scope 取自质询</text>
+  <rect x="220" y="215" width="360" height="90" rx="8" fill="none" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5"/>
+  <text x="400" y="242" text-anchor="middle" font-size="14" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">令牌</text>
+  <text x="400" y="267" text-anchor="middle" font-size="13" fill="var(--diagram-accent, #d9480f)">aud: mcp.example.com/mcp   iss: acme 签发者</text>
+  <text x="400" y="290" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">scope：所请求的 ∩ 所声明的</text>
+  <line x1="145" y1="150" x2="330" y2="213" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5" marker-end="url(#mcp-arrow-b)"/>
+  <line x1="400" y1="150" x2="400" y2="213" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5" marker-end="url(#mcp-arrow-b)"/>
+  <line x1="655" y1="150" x2="470" y2="213" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5" marker-end="url(#mcp-arrow-b)"/>
+  <text x="400" y="185" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">同一个字符串，在每一处都经规范化后精确比较</text>
+</svg>
+
+规范化正是我们第一个版本出 bug 的地方，这个 bug 是靠推理发现的，测试没有发现它。规范说客户端应当使用不带末尾斜杠的形式，服务器应当接受大写的 scheme 或主机名，所以我们让声明和请求都经过同一个函数做规范化，而这个函数接受一个选项，用于末尾斜杠有意义的资源。bug 在于：比较时用默认选项规范化请求，而声明在存储时保留了斜杠，于是斜杠只从一侧被去掉，一个声明了斜杠有意义的资源就塌缩成了它不带斜杠的兄弟。两侧必须经过同一个函数、使用同样的选项。如果这听起来显而易见，那它对我来说也是显而易见的，在事后。
+
+关于受众，我还想说一点：正是它让已声明的资源可以安全地作为数据存在。在我们的服务器中，声明一台 MCP 服务器就是在控制台里填一张表：一个标识符、一个在授权同意页面上显示的名称、它识别的 scope。不需要重启，也不需要改代码，并且每次令牌请求都会读取该声明，前面没有任何缓存，因为一条被删除的声明必须从下一个请求起就停止签发，而不是等到某个缓存过期之后。这个教训我们已经学过一次了，当时一个客户端缓存把过期的客户端提供给了管理平面，没必要再学一次。
+
+## 没有人能输入 client id 时，客户端是谁 {#who-the-client-is-when-there-is-nobody-to-type-a-client-id}
+
+智能体宿主只有一个 URL，没有任何地方可以让你粘贴客户端标识符。规范最初的答案是动态客户端注册：客户端 POST 一份对自身的描述，拿回一个 `client_id`，而授权服务器为每一个曾经连接过的宿主积累一行记录。当前修订版将其标为已弃用，把 Client ID Metadata Documents 放在首位。我认为这是正确的决定，同时也是规范中最值得为之紧张的部分。
+
+其思路是：`client_id` 本身就是一个 HTTPS URL，该 URL 上放着一份描述客户端的 JSON 文档：
+
+```json
+{
+  "client_id": "https://host.example/client.json",
+  "client_name": "Example Agent Host",
+  "redirect_uris": ["http://127.0.0.1:52123/callback", "https://host.example/oauth/callback"],
+  "token_endpoint_auth_method": "none",
+  "grant_types": ["authorization_code", "refresh_token"]
+}
+```
+
+授权服务器按需获取并校验它，什么也不存储。没有注册端点，没有每多一台笔记本电脑就多一行的客户端表，授权同意页面上显示的客户端名称来自一份由客户端运营方控制、位于其可证明拥有的域名上的文档。
+
+代价是：一个未经认证的陌生人现在可以让你的授权服务器向他选择的 URL 发出 HTTP 请求。针对这一点的所有缓解措施都必须放在服务器上，而我们的做法是一个只关心网络、别的什么都不管的模块：它拒绝私有、环回和链路本地地址段，并以数值而非文本的方式比较地址，因为 URL 解析器会毫不犹豫地把 IPv4 映射的 IPv6 地址改写成字符串检查发现不了的形式；它手动跟随重定向，并对每一跳重新检查；读到 5 KB 就停止读取；并且有时间上限。该功能默认关闭，原因正是关于陌生人的那句话。拿到文档之后，检查就很简短，每一项都封堵一种具体的伎俩：文档中的 `client_id` 必须与 URL 逐字节相等，这样托管一份写着别人标识符的文档就毫无用处；`redirect_uris` 必须存在且非空；对称的客户端密钥会被拒绝，因为放在一份人人可读的文档里的密钥就不再是密钥；基于密钥对的认证方法必须说明其密钥在哪里。
+
+我认为真正尚未解决的部分是环回。原生智能体宿主在 `127.0.0.1` 的某个端口上监听回调，因此它的文档列出一个环回重定向地址。文档能证明写它的人控制着那个域名，却无法证明本地是哪个进程在监听那个端口。同一台机器上的攻击者可以出示真实宿主的 `client_id`，绑定自己的端口，而用户在授权同意页面上看到的是真实宿主的名称。规范知道这一点，说服务器应当发出警告，然后就止步于此。对于普通资源，我们像所有人一样承担这一风险。而在唯一一个由文档标识的客户端可以对授权服务器本身持有管理权限的地方，我们把警告变成了联锁：一份只提供环回重定向的文档，在管理员用文字确认它无法证明什么之前，不能获得许可。
+
+## 智能体让哪些用户登录 {#which-users-an-agent-signs-in}
+
+这是一个规范没有提出的问题，因为它假设一个授权服务器为一个用户群体保护一台 MCP 服务器，而一旦有不止一个团队在使用，授权服务器就不是这个样子了。
+
+假设服务器承载多个租户，每个租户有自己的用户，这时来了一个由元数据文档标识的智能体宿主。它不属于任何租户，它只是一个 URL。它让谁的用户登录？我们最终确定的答案是由资源决定：某个租户的管理员在自己的项目中声明了那台 MCP 服务器，那么指明该资源的请求就让该项目的用户登录。这是安全的，而原因值得精确说明。这个选项不是客户端创建的，而是管理员在自己拥有的项目中创建的，所以该参数只是在运营方的声明之中做选择，无法凭空制造一条声明。
+
+也就是说，它对没有控制台账户的攻击者是安全的。任何有控制台账户的人都可以声明任何东西，标识符在整个实例范围内唯一，先到先得。于是一个恶意租户可以声明别人的 MCP 服务器，让真正的所有者永远面对冲突，并把那台服务器的用户导入自己的桶。第一个修复要求每条声明都自证：获取该资源自己的元数据，检查其中是否指明了本签发者。这是很自然的修复，但它也拒绝了所有位于内网、开发期间跑在 localhost 上、或者尚未部署的 MCP 服务器。它只撑了一天。
+
+<svg viewBox="0 0 800 340" width="100%" role="img" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">
+  <title>同一授权服务器上的两个租户，各有自己的签发者，各自声明了同一个 MCP 服务器标识符；到达某个租户签发者的请求只解析该租户的声明，而共享的根签发者只接受超级管理员的声明</title>
+  <defs>
+    <marker id="mcp-arrow-c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--diagram-line, #555)"/></marker>
+  </defs>
+  <rect x="30" y="30" width="230" height="130" rx="8" fill="none" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5"/>
+  <text x="145" y="56" text-anchor="middle" font-size="14" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">签发者 auth.example.com/acme</text>
+  <text x="145" y="82" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">acme 的用户、acme 的密钥</text>
+  <text x="145" y="110" text-anchor="middle" font-size="13" fill="var(--diagram-accent, #d9480f)">声明 mcp.example.com/mcp</text>
+  <text x="145" y="140" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">任一 acme 管理员，无需获取或证明</text>
+  <rect x="285" y="30" width="230" height="130" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <text x="400" y="56" text-anchor="middle" font-size="14" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">签发者 auth.example.com/globex</text>
+  <text x="400" y="82" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">globex 的用户、globex 的密钥</text>
+  <text x="400" y="110" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">同样声明 mcp.example.com/mcp</text>
+  <text x="400" y="140" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">只对自己的命名空间有效</text>
+  <rect x="540" y="30" width="230" height="130" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="655" y="56" text-anchor="middle" font-size="14" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">根签发者 auth.example.com</text>
+  <text x="655" y="82" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">由没有独立地址的租户共享</text>
+  <text x="655" y="110" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">声明：仅限超级管理员</text>
+  <text x="655" y="140" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">元数据只能指明签发者，无法指明租户</text>
+  <rect x="30" y="220" width="230" height="90" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <text x="145" y="248" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">/acme/authorize?resource=…/mcp</text>
+  <text x="145" y="272" text-anchor="middle" font-size="13" fill="var(--diagram-accent, #d9480f)">解析到 acme 的声明</text>
+  <text x="145" y="296" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">acme 的用户；globex 的声明不可见</text>
+  <line x1="145" y1="218" x2="145" y2="162" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5" marker-end="url(#mcp-arrow-c)"/>
+  <rect x="285" y="220" width="230" height="90" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <text x="400" y="248" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">/globex/authorize?resource=…/mcp</text>
+  <text x="400" y="272" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">解析到 globex 的声明</text>
+  <text x="400" y="296" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">同一个标识符，不同的令牌</text>
+  <line x1="400" y1="218" x2="400" y2="162" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#mcp-arrow-c)"/>
+  <text x="655" y="265" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">/authorize?resource=…/mcp</text>
+  <text x="655" y="289" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">未在根上声明则返回 invalid_target</text>
+</svg>
+
+取而代之的是命名空间，这也是我现在会推荐给任何构建这类系统的人的方案。拥有独立地址的租户本身就是一个签发者，有自己的签名密钥，而资源标识符只需在一个签发者内唯一。两个租户可以声明同一台 MCP 服务器，彼此永远看不到对方的声明，因为每次解析只读取请求所到达的那个地址的命名空间。在你自己的命名空间里做声明完全不会发出任何出站请求，因为它只能是关于你自己用户的主张。而唯一真正共享的命名空间，也就是所有没有独立地址的租户都在其下提供服务的根签发者，只接受超级管理员的声明，因为在那里，资源的元数据可以说它信任这个签发者，却仍然无法说明它属于其中哪个租户。在那里没有任何证明能杜绝抢注，所以除了运营方，谁都不许尝试。
+
+同一领域还有三个漏洞。前两个的形式都是「调用方忘了传入资源」，而且都值得了解，因为它们正是这种设计让其成为可能的那类问题。账户解析器解析到的租户用户与登录步骤所用的不同，因为登录传了资源而解析器没有，症状是授权同意页面上的一个 500，而不是一次拒绝。另外，密码、重置和注册这几道门只根据客户端来解析策略，于是一个用户只能通过上游提供商登录的租户，可以借助一个已声明的资源被人用密码进入。两者都通过把资源变成必填参数得以封堵，这样一旦遗漏就无法通过类型检查。如果你只从这一节带走一条工程规则，就带走这一条：当一个参数选择的是租户时，要让人无法在不传它的情况下调用该函数。
+
+最后一个是机器令牌。最终用户会给出授权同意，所以任何客户端，包括不属于任何人的客户端，都可以请一个人为已声明的资源授予令牌。客户端凭据令牌则不问任何人。在我们注意到之前，任何租户的任何机密客户端，或者一个自行注册的客户端，都可以向受害租户的令牌端点请求一个受众为受害者的资源、签发者为受害者签发者的令牌，并且真的能拿到。现在，已声明资源的机器令牌只发给声明它的那个项目的客户端。规范里对此只字未提。它也不会提；这是一个多租户问题。
+
+## scope 列表是授予，而不是菜单 {#the-scope-list-is-a-grant-not-a-menu}
+
+有一件小事让我意外。如果你的质询不带 `scope`，规范会让客户端请求你 `scopes_supported` 中的所有 scope，并说明这是有意为之：通用客户端无法在它不理解的名字之间做出合理选择。所以元数据中的一长串列表并不是一份可选项目录，而是今后每个连接进来的智能体都会被授予的东西。把你的工具真正需要的 scope 放进质询，让 `scopes_supported` 只保留基本使用所需的最小集合，等特权工具首次被调用时，再用 403 和 `insufficient_scope` 请求更多。客户端必须把质询中的 scope 视为权威，并自行在多次权限提升之间累积 scope，这也是授权服务器可以在这方面保持无状态的原因。我们自己的管理 MCP 端点只公布 `openid`，别的什么都不公布，因为它的权限来自管理员的组成员身份，而不是来自 scope；一个端点从不检查的 scope，没有必要公布。
+
+## 规范留给你的两个问题 {#two-questions-the-specification-leaves-to-you}
+
+第一个是令牌格式，规范刻意没有对此做出决定。MCP 服务器必须拒绝不是发给它的令牌，「或以其他方式验证自己是预期的接收方」，这既容许用已发布的密钥校验的自包含令牌，也容许通过内省检查的不透明令牌。我们默认使用有效期十五分钟的自包含令牌，因为内省要求你的 MCP 服务器持有自己的凭据，而十分钟的上手指南里容不下这一步。代价是自包含令牌在过期之前一直有效。如果被撤销的令牌必须在几秒而不是几分钟内失效，就把资源声明为不透明格式，给你的 MCP 服务器一个自己的客户端，并为每次调用的内省付出代价。两种答案都没有错；错的是不知道自己选了哪一个。
+
+第二个是混淆代理人问题，而它不该由授权服务器来解决。一台 MCP 服务器用一个静态 client id 代理第三方 API、动态注册自己的 MCP 客户端、并在没有自己的授权同意页面的情况下转发授权码，安全指南逐个攻击剖析的，恰恰就是这种配置。缓解措施是在代理处、在第三方流程开始之前做按客户端的授权同意，再加上受众检查，确保代理收到的令牌绝不会被原样转发出去。我描述过的规范的每一部分都对此有帮助，但没有哪一部分能替你完成这项工作。
+
+我还不知道的是，元数据文档的信任策略在实践中会如何尘埃落定。规范允许授权服务器接受任意 HTTPS `client_id`、按域名设置允许列表，或者做信誉检查，而每个选项都是一种不同的钓鱼攻击面，因为授权同意页面上的名称就是文档里写的那个名称。默认开放是让生态得以运转的前提，允许列表则是企业会想要的；我怀疑答案是两者兼有，按租户配置，而这又是规范会继续留给服务器运营者的一个问题。
+
+如果你想端到端地看清它的形态，[用 OAuth 保护 MCP 服务器](/zh-cn/docs/get-started/protect-your-mcp-server/) 会在大约十分钟内带你走完声明、两份文档、令牌检查和双向验证。决定智能体宿主如何标识自身的两个设置是 [`clientIdMetadataDocument.enabled`](/docs/reference/settings/#clientIdMetadataDocument.enabled) 和 [`registration.enabled`](/docs/reference/settings/#registration.enabled)，[端点参考](/docs/reference/endpoints/)列出了每个发现 URL 的响应内容。

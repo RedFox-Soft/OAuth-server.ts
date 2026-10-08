@@ -4,18 +4,52 @@ import { glob } from 'astro/loaders';
 import { docsLoader } from '@astrojs/starlight/loaders';
 import { docsSchema } from '@astrojs/starlight/schema';
 import { backendLabels } from './data/storage.ts';
+import { LOCALES } from './data/seo.ts';
 
 /*
  * `yes` built in · `flag` available but switched on, previewed or paid for · `no` not available ·
  * `unknown` the documentation did not say · `na` the question does not apply to this product.
  */
+/*
+ * Starlight's loader reads every language directory under src/content/docs/. A language whose
+ * translation is in progress but not yet in LOCALES would otherwise be published as English pages
+ * under /ru/ or /zh-cn/, so its directory is left out — the same glob Starlight uses, minus those
+ * directories, which keeps the entry ids identical. With every language published it is
+ * docsLoader() itself.
+ */
+const unpublished = (['ru', 'zh-cn'] as const).filter(
+	(key) => !LOCALES.some((locale) => locale.key === key)
+);
+
+function docsLoaderForPublishedLocales() {
+	if (unpublished.length === 0) return docsLoader();
+	return glob({
+		base: './src/content/docs',
+		pattern: [
+			'**/[^_]*.{markdown,mdown,mkdn,mkd,mdwn,md,mdx}',
+			...unpublished.map((key) => `!${key}/**`)
+		]
+	});
+}
+
 const CompareCell = z.object({
 	status: z.enum(['yes', 'flag', 'no', 'unknown', 'na']),
 	text: z.string()
 });
 
 export const collections = {
-	docs: defineCollection({ loader: docsLoader(), schema: docsSchema() }),
+	docs: defineCollection({
+		loader: docsLoaderForPublishedLocales(),
+		schema: docsSchema({
+			extend: z.object({
+				/* On a translated page: the hash of the English page it was made from. */
+				source: z
+					.string()
+					.regex(/^[0-9a-f]{12}$/)
+					.optional()
+			})
+		})
+	}),
 	/*
 	 * The repository's own documents, rendered rather than copied: a copy under website/ would be the
 	 * one that goes stale. The base is the repository root, one level above the Astro project.
@@ -130,12 +164,30 @@ export const collections = {
 	 * for one value is a second thing to keep in step. No `coverImage` — no binary asset is
 	 * committed to this repository, and the social card is rendered after the build.
 	 */
+	/*
+	 * A translation lives beside its source as `<locale>/<slug>.mdx` and is loaded by the same glob.
+	 * The schema cannot see an entry's id, so it cannot tell the two apart; src/data/blog.ts can, and
+	 * enforces the split there: an English post must carry `publishedAt`, a translation must carry
+	 * `source` and none of the editorial fields, which it inherits from the English post.
+	 */
 	blog: defineCollection({
-		loader: glob({ base: './src/content/blog', pattern: '**/*.mdx' }),
+		// Same reason as the docs loader: a language not yet in LOCALES is not loaded at all.
+		loader: glob({
+			base: './src/content/blog',
+			pattern: ['**/*.mdx', ...unpublished.map((key) => `!${key}/**`)]
+		}),
 		schema: z.object({
 			title: z.string().min(1),
 			description: z.string().min(1),
-			publishedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+			/* The hash of the English file a translation was made from (src/i18n/source-hash.ts). */
+			source: z
+				.string()
+				.regex(/^[0-9a-f]{12}$/)
+				.optional(),
+			publishedAt: z
+				.string()
+				.regex(/^\d{4}-\d{2}-\d{2}$/)
+				.optional(),
 			/*
 			 * An editorial claim to the reader, not a fact about the repository — the sitemap's
 			 * lastmod is the latter and comes from git. Kept separate on purpose: a typo fix moves
@@ -145,9 +197,9 @@ export const collections = {
 				.string()
 				.regex(/^\d{4}-\d{2}-\d{2}$/)
 				.optional(),
-			draft: z.boolean().default(false),
+			draft: z.boolean().optional(),
 			/* Shown on the article and used to relate articles. No page is generated per tag. */
-			tags: z.array(z.string()).default([]),
+			tags: z.array(z.string()).optional(),
 			/*
 			 * Set only by an article genuinely about running on one backend. It exempts the
 			 * article's prose from the rule that fails any marketing sentence naming one datastore

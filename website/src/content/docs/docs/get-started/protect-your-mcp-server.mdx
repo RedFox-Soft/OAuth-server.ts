@@ -15,7 +15,7 @@ token minted for that MCP server and nothing else.
 This page covers the whole job. You will declare your MCP server here, publish two things from it,
 check one token, and then watch it refuse an anonymous call and accept an authorized one. Call it ten
 minutes if you already have an instance running. If you do not, [Run with Docker
-Compose](/docs/get-started/docker-compose/) should take about two of them.
+Compose](/docs/get-started/docker-compose/) adds about two more.
 
 <Aside
 	type="note"
@@ -56,8 +56,8 @@ cannot say which of those tenants it belongs to.
    `mcp:tools-basic`.
 
 3. Leave the token settings alone. The defaults are a self-contained token your MCP server verifies
-   against this server's published keys, with a fifteen-minute lifetime. That is what lets step 3
-   below need no credentials of its own.
+   against this server's published keys, with a fifteen-minute lifetime. That is what lets section 3
+   below, _Validate the token_, need no credentials of its own.
 
 </Steps>
 
@@ -188,7 +188,7 @@ the console. Everything else can keep using the reserved `admin-mcp` client id, 
 
 ## 5. Prove it both ways
 
-Two calls. The refusal matters as much as the success, because without it there is no telling
+Three calls. The refusals matter as much as the success, because without them there is no telling
 "protected" from "not reached yet".
 
 <Steps>

@@ -1,0 +1,198 @@
+---
+title: 你的限流器不是防暴力破解的节流
+description: >-
+  按地址限流挡得住洪泛，挡不住猜密码。登录节流该计什么数、计数该存在哪里，以及我做错过的四个地方。
+source: 2c3756913e4c
+---
+
+仪表盘一片平稳。每秒请求数正常，错误率正常，限流器整晚一次都没有触发。而某一个账户的登录失败次数，是两千出头。
+
+攻击者没做任何巧妙的事。几千个源地址，每个大约每二十秒对同一个邮箱尝试一个密码，每个都稳稳落在按地址设定的额度之内——那个额度原本是照着浏览器犯点傻的情形调的。限流器不折不扣地完成了它被设计来做的事，也就是阻止任何单一来源猛烈冲击服务器。没有人在冲击服务器。他们是在猜一个密码，慢慢地，同时从四面八方。
+
+在比我愿意承认的更长的时间里，我一直相信登录端点前面的限流器就是暴力破解防护。它不是，而且原因不在调参。原因在于，限流器的计数键，恰恰是攻击者可以自己选择的那一样东西。
+
+## 用攻击者无法选择的东西作为计数键 {#key-the-counter-on-the-thing-the-attacker-cannot-choose}
+
+攻击者选择源地址。他们选择攻击速度、使用多少台机器、何时停下、何时重新开始。他们唯一无法选择的，是他们正在攻击的那个身份，因为那正是这件事的目的。所以，约束猜测的计数器必须以身份为键，而不是以调用方为键，其设计的其余一切都由这一个决定推导而来。
+
+随之而来的第二件事，是计数存在哪里。我们服务器里的按来源限流器把计数存在进程内存中，就它本身的用途而言这没问题：额度会随副本数量倍增，重启时归零，并且在地址轮换得比窗口还快时悄悄失效放行（fail open）——这些对资源保护都无关紧要，因为最坏情况不过是服务器比应有的更忙。而登录节流的最坏情况，是一个账户失守。所以它的计数器走的是其他所有持久化数据都在走的同一个数据库适配器，无论在哪个副本上、重启前还是重启后、猜测来自多少个地址，计数都是同一个。
+
+<svg viewBox="0 0 800 380" width="100%" role="img" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">
+  <title>按来源限流器与按身份登录节流的对比：各自以什么为键、计数存在哪里、重启对它有何影响，以及一千个轮换地址猜同一个密码时对它有何影响</title>
+  <defs>
+    <marker id="throttle-arrow-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--diagram-accent, #d9480f)"/></marker>
+  </defs>
+  <text x="400" y="30" text-anchor="middle" font-size="15" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">1,000 个源地址，各试一个密码，针对同一个账户</text>
+  <line x1="400" y1="40" x2="215" y2="88" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5" marker-end="url(#throttle-arrow-a)"/>
+  <line x1="400" y1="40" x2="585" y2="88" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5" marker-end="url(#throttle-arrow-a)"/>
+  <rect x="30" y="90" width="360" height="230" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <text x="210" y="120" text-anchor="middle" font-size="16" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">按来源限流器</text>
+  <text x="50" y="158" font-size="14" fill="var(--diagram-fg, #1a1a1a)">计数键：调用方的地址</text>
+  <text x="50" y="190" font-size="14" fill="var(--diagram-fg, #1a1a1a)">存放于：进程内存，每个副本一份</text>
+  <text x="50" y="222" font-size="14" fill="var(--diagram-fg, #1a1a1a)">重启之后：全部遗忘</text>
+  <text x="50" y="254" font-size="14" fill="var(--diagram-fg, #1a1a1a)">看到的：每个地址一次猜测，从不触发</text>
+  <text x="50" y="300" font-size="13" fill="var(--diagram-line, #555)">资源保护：让服务器保持运行</text>
+  <rect x="410" y="90" width="360" height="230" rx="8" fill="none" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5"/>
+  <text x="590" y="120" text-anchor="middle" font-size="16" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">登录节流</text>
+  <text x="430" y="158" font-size="14" fill="var(--diagram-fg, #1a1a1a)">计数键：桶 + 被攻击的邮箱地址</text>
+  <text x="430" y="190" font-size="14" fill="var(--diagram-fg, #1a1a1a)">存放于：数据库，所有副本共享</text>
+  <text x="430" y="222" font-size="14" fill="var(--diagram-fg, #1a1a1a)">重启之后：继续计数</text>
+  <text x="430" y="254" font-size="14" fill="var(--diagram-accent, #d9480f)">看到的：1,000 次猜同一地址，第 5 次即关门</text>
+  <text x="430" y="300" font-size="13" fill="var(--diagram-line, #555)">安全边界：让账户保持关闭</text>
+  <text x="400" y="358" text-anchor="middle" font-size="13" fill="var(--diagram-line, #555)">两者都在运行。谁也替代不了谁，因为它们回答的是不同的问题。</text>
+</svg>
+
+这两者都在我们的登录端点前运行，我想说清楚一点：限流器并没有错。它只是不是这个东西。当我不再指望它是这个东西的那一刻，真正的节流器的设计就变成了围绕一个持久化计数器的一系列决定，而每个决定都有一种做错的方式，是我当时手上的每个测试都会漏掉的。
+
+## 逐次加倍的窗口，以及随门一起消亡的计数器 {#doubling-windows-and-the-counter-that-died-with-the-door}
+
+最简单的节流是一个上限加一个窗口：五次密码错误，然后门关上十五分钟。对任何有耐心的人来说，它也几乎毫无用处。十五分钟意味着一天 96 个窗口，每个五次猜测，对一个账户一天 480 次猜测；而读过你错误页面的攻击者，在第一次锁定时就摸清了时间表，然后定个闹钟。所以窗口必须增长。我们的窗口在一个邮箱地址每次用尽它时加倍，从十五分钟起，封顶一小时，这把持续攻击压到每天约 120 次猜测。NIST SP 800-63B 把界线划在连续 100 次失败，而 120 是我们在锁定还必须让手误的人能够承受的前提下最终落定的数字。
+
+升级机制是我最先做错的地方，而我做错它的方式，就是做了最自然的事。保存计数的记录有一个 TTL，而显而易见的 TTL 就是锁定时长本身：门重新打开，记录消失，一切从头开始。我们的第二因素节流正是这样做的，而且在那里这样做是对的，因为验证码节流在窗口之间没有什么需要记住的。密码节流则有。它必须记住这个地址已经烧掉了多少个窗口；如果记录随门一起消亡，它就会遗忘，下一次用尽又从十五分钟开始。攻击者只要等着，就能永远保持最短的窗口。没有任何东西会报告问题。每一个「门在窗口结束后重新打开」的测试都会通过，因为门确实重新打开了。
+
+<svg viewBox="0 0 800 300" width="100%" role="img" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">
+  <title>一个邮箱地址被节流的时间线：五次猜测让门关上十五分钟，再五次关三十分钟，再五次关六十分钟，而保存升级阶梯的记录在最近一次失败后存活二十四小时</title>
+  <line x1="40" y1="120" x2="770" y2="120" stroke="var(--diagram-line, #555)" stroke-width="1"/>
+  <text x="40" y="145" font-size="12" fill="var(--diagram-line, #555)">0</text>
+  <text x="330" y="145" font-size="12" fill="var(--diagram-line, #555)">1 h</text>
+  <text x="620" y="145" font-size="12" fill="var(--diagram-line, #555)">2 h</text>
+  <rect x="40" y="80" width="6" height="40" fill="var(--diagram-accent, #d9480f)"/>
+  <text x="43" y="70" text-anchor="middle" font-size="13" fill="var(--diagram-accent, #d9480f)">错 5 次</text>
+  <rect x="46" y="96" width="72" height="24" fill="var(--diagram-line, #555)" opacity="0.35"/>
+  <text x="82" y="112" text-anchor="middle" font-size="12" fill="var(--diagram-fg, #1a1a1a)">关 15 分钟</text>
+  <rect x="118" y="80" width="6" height="40" fill="var(--diagram-accent, #d9480f)"/>
+  <text x="121" y="70" text-anchor="middle" font-size="13" fill="var(--diagram-accent, #d9480f)">错 5 次</text>
+  <rect x="124" y="96" width="145" height="24" fill="var(--diagram-line, #555)" opacity="0.35"/>
+  <text x="196" y="112" text-anchor="middle" font-size="12" fill="var(--diagram-fg, #1a1a1a)">关 30 分钟</text>
+  <rect x="269" y="80" width="6" height="40" fill="var(--diagram-accent, #d9480f)"/>
+  <text x="272" y="70" text-anchor="middle" font-size="13" fill="var(--diagram-accent, #d9480f)">错 5 次</text>
+  <rect x="275" y="96" width="290" height="24" fill="var(--diagram-line, #555)" opacity="0.35"/>
+  <text x="420" y="112" text-anchor="middle" font-size="12" fill="var(--diagram-fg, #1a1a1a)">关 60 分钟，已到封顶；之后每个窗口都是 60 分钟</text>
+  <rect x="565" y="80" width="6" height="40" fill="var(--diagram-accent, #d9480f)"/>
+  <text x="568" y="70" text-anchor="middle" font-size="13" fill="var(--diagram-accent, #d9480f)">错 5 次</text>
+  <text x="400" y="40" text-anchor="middle" font-size="14" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">门何时重开：windowStart + window(step)</text>
+  <rect x="40" y="190" width="730" height="24" rx="4" fill="none" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="405" y="206" text-anchor="middle" font-size="12" fill="var(--diagram-fg, #1a1a1a)">记录（连同 step）在最近一次失败后存活 24 h，远远超出右边缘</text>
+  <text x="400" y="180" text-anchor="middle" font-size="14" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">记录何时消亡：exp</text>
+  <text x="400" y="250" text-anchor="middle" font-size="13" fill="var(--diagram-line, #555)">如果记录在门重开时就消亡，step 会归零，每次锁定都只有 15 分钟。</text>
+  <text x="400" y="272" text-anchor="middle" font-size="13" fill="var(--diagram-line, #555)">只要等待就能彻底击败它，而任何「门会重开」的测试都察觉不到。</text>
+</svg>
+
+所以，同一条记录上有两个截止时间，它们是两回事。窗口决定门何时重新打开，以分钟计。过期时间决定记录何时被遗忘，是最近一次失败之后的二十四小时。后者必须始终比前者活得久；与其让运维人员自己维持两个数字的先后顺序，配置校验器会在启动时拒绝高于保留期的封顶值。保留期从最后一次失败而不是第一次失败开始计算，正是这一点让升级在平静的一天之后自行衰减，这样一个周一过得很糟的诚实用户，到周五时就不会还停留在六十分钟那一档上。
+
+## 先计数再验证，否则一次突发就能在上限为五的情况下猜十五次 {#count-before-you-verify-or-a-burst-gets-fifteen-guesses-against-a-cap-of-five}
+
+我犯的第二个错误，是我最不引以为豪的，因为它是一个教科书式的竞态条件，而我还是写出来了。处理器先读取计数器，再验证密码，失败时把计数器加一后写回。读取、修改、写入。一个接一个地发送五个错误密码，它工作得完美无缺。一次性发送十五个，每一个都发现门开着，每一个的密码都得到了验证。事后计数器的读数很可能已经高到足以关门，这就是为什么在突发结束后检查门状态的测试会通过。而统计这次突发换来了多少次哈希计算的测试则不会通过，我们现在有的正是这个测试。
+
+修复方法是在验证之前、以原子方式对这次尝试计数，并让计数来决定这次尝试是否被允许进行：
+
+```ts
+export async function recordAttempt(bucketId: string, email: string): Promise<boolean> {
+	const key = throttleKey(bucketId, email);
+	const now = epochTime();
+	const prior = await held(key);
+
+	if (!prior) {
+		await counters().create(key, { failures: 0, windowStart: now, step: 0 }, RETENTION);
+	} else if (now - prior.windowStart >= windowFor(prior.step)) {
+		const exhausted = prior.failures >= cap();
+		await counters().upsert(
+			key,
+			{ failures: 0, windowStart: now, step: exhausted ? prior.step + 1 : prior.step },
+			RETENTION
+		);
+	}
+
+	// One atomic $inc, answering this attempt its own number. Fifteen at once get 1..15.
+	const attempts = (await counters().increment(key, 'failures', RETENTION)) ?? 1;
+	return attempts <= cap();
+}
+```
+
+这个自增在两种后端上都是一条语句：在 MongoDB 上是带 `$inc` 的 `findOneAndUpdate`，在 PostgreSQL 上是对 jsonb 列执行的带 `RETURNING` 的 `UPDATE`，因此十五个并发调用方会拿到十五个不同的数字，只有前五个在上限之内。同一次写入把记录的过期时间推后到从现在起二十四小时，这正是「保留期从最后一次失败算起」无需第二次写入的原因。在这个函数里看不到的，是让它保持诚实的那一点：随后验证成功的密码会清除记录，所以留在计数里的恰好就是失败次数，而在门口就被拒绝的错误猜测，根本到不了哈希那一步。
+
+最后这一点并非锦上添花。Argon2 验证被刻意设计得代价高昂，在这项检查被放到账户查找之前以前，针对已知地址的每一次猜测，都让服务器付出一次完整的哈希计算。放在验证之后的节流约束了猜测次数，却让 CPU 成本原封不动。放在之前，一扇关着的门只需一次索引读取。
+
+<svg viewBox="0 0 800 460" width="100%" role="img" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">
+  <title>密码登录的检查顺序：门是否关闭、原子地计入本次尝试、查找账户、验证哈希、清除计数器，然后是其余各道关卡；每次拒绝都渲染同一个页面</title>
+  <defs>
+    <marker id="throttle-arrow-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--diagram-line, #555)"/></marker>
+  </defs>
+  <rect x="40" y="20" width="400" height="44" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <text x="240" y="47" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">1  bucket:email 的门关着吗？（一次读取，无哈希）</text>
+  <rect x="40" y="90" width="400" height="44" rx="8" fill="none" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5"/>
+  <text x="240" y="117" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">2  原子地计入本次尝试。超过上限了吗？</text>
+  <rect x="40" y="160" width="400" height="44" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <text x="240" y="187" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">3  按邮箱地址查找账户</text>
+  <rect x="40" y="230" width="400" height="44" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <text x="240" y="257" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">4  验证 argon2 哈希</text>
+  <rect x="40" y="300" width="400" height="44" rx="8" fill="none" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5"/>
+  <text x="240" y="327" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">5  清除计数器：密码已得到证明</text>
+  <rect x="40" y="370" width="400" height="44" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <text x="240" y="397" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">6  未激活？未验证？第二因素？</text>
+  <line x1="240" y1="64" x2="240" y2="88" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#throttle-arrow-b)"/>
+  <line x1="240" y1="134" x2="240" y2="158" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#throttle-arrow-b)"/>
+  <line x1="240" y1="204" x2="240" y2="228" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#throttle-arrow-b)"/>
+  <line x1="240" y1="274" x2="240" y2="298" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#throttle-arrow-b)"/>
+  <line x1="240" y1="344" x2="240" y2="368" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#throttle-arrow-b)"/>
+  <text x="240" y="440" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">登录成功</text>
+  <line x1="240" y1="414" x2="240" y2="428" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <rect x="520" y="160" width="250" height="120" rx="8" fill="none" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5"/>
+  <text x="645" y="195" text-anchor="middle" font-size="14" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">同一种拒绝</text>
+  <text x="645" y="220" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">"Invalid username or password"</text>
+  <text x="645" y="242" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">同一页面，同样的字节，同一个表达式</text>
+  <text x="645" y="262" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">第 1、2、3、4、6 步一律如此</text>
+  <line x1="440" y1="42" x2="518" y2="180" stroke="var(--diagram-line, #555)" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#throttle-arrow-b)"/>
+  <line x1="440" y1="112" x2="518" y2="200" stroke="var(--diagram-line, #555)" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#throttle-arrow-b)"/>
+  <line x1="440" y1="182" x2="518" y2="220" stroke="var(--diagram-line, #555)" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#throttle-arrow-b)"/>
+  <line x1="440" y1="252" x2="518" y2="240" stroke="var(--diagram-line, #555)" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#throttle-arrow-b)"/>
+  <line x1="440" y1="392" x2="518" y2="262" stroke="var(--diagram-line, #555)" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#throttle-arrow-b)"/>
+</svg>
+
+第 5 步刻意放在第 6 步之前。一个已停用或尚未验证邮箱的账户仍然会被拒绝，但它的计数器会先被清除，因为凭据已经得到证明，而一个已被证明的凭据并不是在被猜测。如果把清除放到最底部、和成功放在一起，那么一个密码正确但邮箱未验证的用户，就会因为知道自己的密码而被节流。
+
+## 拒绝必须什么都不透露，计数器必须不属于任何人 {#the-refusal-has-to-say-nothing-and-the-counter-has-to-exist-for-nobody}
+
+右侧那个框里的一切，就是我做错的第三件事，而我做错它，是因为想要帮忙。我原本想写、并且在别处也上线过的版本，会说「尝试次数过多，请 14 分钟后再试」。这是一条友善的消息，也是一个精确的预言机（oracle）：它告诉攻击者，他们正在探测的地址确实有账户——不然为什么要计数——还准确地告诉他们什么时候再来。
+
+修复分两半，第二半不如第一半显而易见。第一半是：这扇门上的每一次拒绝，都是一个表达式渲染出的同一个页面，因此关着的门、未知的地址、错误的密码和已停用的账户在字节上完全相同，这一点由结构保证，而不是靠一个字符串的四份副本保持同步。第二半是：对任何提交的地址都会写入计数器，包括那些对应不到任何账户的地址。如果节流只为真实账户计数，它对真实地址和虚假地址的行为就会不同，而一旦这种差异的任何方面可以被观察到——时间、一个响应头、一个未来的 bug——节流本身就成了枚举攻击。所以存放这些计数器的存储区域被刻意设计成无主的。它不带账户 ID，因为不存在的账户的计数器不可能有账户 ID；它也不带地址，因为地址就是键，再用一个字段重复它，就会成为第二份可被索引的列表，记录着任何人在表单里输入过的每一个邮箱。
+
+这个决定也延伸到了事件总线。服务器在节流时会发出一个事件，事件只指明桶，别的一概没有。运维人员需要知道哪个用户群体正在遭受攻击。他们不需要一份能从中读出名字的日志。
+
+## 同一个地址的六万五千种拼写 {#sixty-five-thousand-spellings-of-one-address}
+
+第四个错误，是那个通过了我所有测试、并且会一直通过下去的错误。账户查找不区分大小写，所以 `alice@example.com` 和 `Alice@Example.com` 是同一个用户。而计数器的键是提交时的原样地址。这让一个地址拥有和它的大小写组合一样多的独立计数器，对十六个字母来说是 65,536 个，每个再乘以上限五次。每个测试用的都是小写地址。每个测试都通过了。
+
+```ts
+/*
+ * THE RULE IS PARITY WITH THE ACCOUNT LOOKUP, not "lower-case it". findByEmail is
+ * case-insensitive, so two spellings that resolve to one account must resolve to
+ * one counter. If the lookup ever starts trimming, folding Unicode or stripping
+ * +tags, this function is what has to follow it.
+ */
+export function emailScopedId(bucketId: string, email: string): string {
+	return `${bucketId}:${email.toLowerCase()}`;
+}
+```
+
+有意思的是注释，而不是代码。把这段读成「记得转成小写」然后就此放过，是很容易的。真正的规则是：查找应用了什么规范化，键就应用什么规范化；而有人教会查找忽略 Gmail 地址里的点号的那一天，就是转小写不再足够的那一天。把规则写成「对等」而不是写成一个变换，正是这一点让下一个人去改对的地方。这也是为什么它是三个以地址为键的存储区域共享的一个函数，而不是把同一个表达式写三遍：第三份副本早已漏掉了转小写的调用，之所以无害，只是因为我们两个用户存储中的一个恰好会对存入的内容做规范化。
+
+## 诚实的用户需要一条攻击者没有的出路 {#the-honest-user-needs-a-way-out-that-the-attacker-does-not-have}
+
+逐级加长的锁定，只有在账户的主人拥有一条猜测者没有的回归路径时才可以接受。否则你就造出了一个任何人都能对准任何邮箱地址的拒绝服务工具，而六十分钟的封顶就是某人一天中的一个小时，还能反复来。
+
+显而易见的路径是「输入我们发到你邮箱的验证码以继续尝试」，在列出它为什么错之前，我在这条路上走了挺远。它只对有账户的地址是如实的，所以有选择地显示它，就重建了那个预言机。它会按需向任何人输入的任何地址发送邮件，所以它是一个邮件轰炸的载体，所以它需要自己的上限，所以它只是把锁定挪了个位置。在一个邮件在其他所有地方都只是尽力而为的服务器上，它让邮件发送器成了登录的硬依赖。而且它无法服务管理员自己的桶，那个桶根本没有自助重置。
+
+我们实际采用的做法更窄，而我认为是正确的。完成一次密码重置会清除计数器。仅仅请求重置则不会。区别在于各自证明了什么：请求重置什么也证明不了，而在请求时就清除，会让任何知道某个地址的人都有办法抹掉正在挡住他们的计数。消费那个发送到登记地址的一次性秘密，证明了对该邮箱的控制权，这和「输入验证码」那一步本该收集的证据相同，只不过是由一个已经存在、并且已经有自己的冷却时间和每日上限的流程收集的。
+
+管理员的桶，是塑造了封顶值的那个情形。这个桶里的管理员通过同一扇门登录，却没有重置流程可以脱身，所以针对管理员地址的深度升级，是唯一一种没人能撤销的锁定。保护他们的规则并没有写成「如果这是管理员桶」。它写成的是「要求第二因素的桶，无论被触发多少次，都停留在第一个窗口」，因为在那里猜中的密码并不能完成登录，所以深度升级收益甚微、风险却很大。这样表述，它说出了真正的理由，而且会自我纠正：关掉一个桶的第二因素，它的升级就会加深，无需任何人记住什么。
+
+## 我不会做的事 {#what-i-would-not-do}
+
+我不会给它一个关闭开关，我们的也没有，第一个去设置控制台里找它的人为此感到意外。那里有三个数字：上限、第一个窗口和封顶值，每一个都受服务器启动时所用的同一个校验器约束，因此控制台无法保存一个服务器会拒绝以之启动的配置；上限止于 100，因为过了那里，节流就不再是节流了。没有布尔值。安全边界上的关闭开关，就是一个重新打开漏洞的开关，而控制台正是开关在凌晨两点被拨动、然后再也没被拨回来的地方。
+
+我也不会让它失效放行。没有任何存储错误被捕获。计数器读取就在账户查找的前一行，而账户查找访问的是同一个数据库，所以那里的失败片刻之后本来也会是失败；捕获它，就等于对一个登录从未因这个原因被拒绝的用户回答「invalid username or password」。
+
+我也不会假装它把活儿干完了。按身份的节流约束的是针对一个账户的猜测。它对密码喷洒毫无作用——一个常见密码对一万个账户各尝试一次——因为每个账户只看到一次失败，没有哪个计数器会动。按来源限流器能抓住它的朴素版本，而僵尸网络会用击败我那个限流器的同样方式击败它。真正终结喷洒攻击的，是拒绝出现在泄露语料库中的密码，并要求第二因素；我逐渐认为，登录节流的主要作用，是在你拥有第二因素之前，让缺少它这件事变得可以承受。
+
+我们服务器的默认值是五次失败、十五分钟的第一个窗口和一小时的封顶，[设置参考](/docs/reference/settings/#loginThrottle.failureCap)记录了这三个数字及其取值范围。[威胁模型](/zh-cn/docs/security/threat-model/)列出了登录这扇门上的每项检查是为了阻止什么，并且，正如关于局限性的那一节明明白白写着的，也列出了这个服务器中哪些计数器是边界，哪些仅仅是资源保护。

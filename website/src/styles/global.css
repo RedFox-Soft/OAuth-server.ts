@@ -173,3 +173,70 @@
 	width: 100%;
 	height: auto;
 }
+
+/*
+ * Language switching (src/components/LanguageSwitch.astro, src/i18n/language-script.ts). Everything
+ * offered to a translated-language reader starts `hidden`; the head script stamps <html> with the
+ * reader's language before the body is parsed, and these rules reveal exactly the one item for it.
+ * Without the script none of them match, which is how an English reader — or anyone with scripts
+ * off — gets the page as it always was.
+ */
+html:not([data-lang-offer]) .lang-switch:has(> a[hidden]) {
+	display: none !important;
+}
+html[data-lang-offer='ru'] [data-lang-switch='ru'][hidden],
+html[data-lang-offer='zh-cn'] [data-lang-switch='zh-cn'][hidden] {
+	display: inline-block;
+}
+.lang-notice {
+	display: none;
+}
+html[data-english-only] .lang-notice {
+	display: block;
+}
+html[data-english-only][data-lang-offer='ru']
+	[data-english-only-notice='ru'][hidden],
+html[data-english-only][data-lang-offer='zh-cn']
+	[data-english-only-notice='zh-cn'][hidden] {
+	display: inline;
+}
+
+/*
+ * The not-found page is one file for every address (GitHub Pages serves a single 404.html), so it
+ * carries its text in each language and shows the one the head script selected — from the address,
+ * else the reader's first language, else English. With scripts off, English.
+ */
+[data-view-text]:not([data-view-text='en']) {
+	display: none;
+}
+html[data-view-lang='ru'] [data-view-text='en'],
+html[data-view-lang='zh-cn'] [data-view-text='en'] {
+	display: none;
+}
+html[data-view-lang='ru'] [data-view-text='ru'],
+html[data-view-lang='zh-cn'] [data-view-text='zh-cn'] {
+	display: inline;
+}
+
+/*
+ * Simplified Chinese. Inter has no Han glyphs, so each one falls through the stack; naming the
+ * Simplified system faces first is what stops Windows picking Japanese glyph forms for shared code
+ * points. No Han webfont is shipped — every system a reader of this language uses has one of these.
+ * Letter-spacing and upper-casing are Latin typography and only damage Han text, and system CJK
+ * faces come in discrete weights, so the 650 used for headings falls back to 600 explicitly.
+ */
+:lang(zh-CN) {
+	--font-sans:
+		'Inter Variable', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
+		'Noto Sans SC', 'Noto Sans CJK SC', ui-sans-serif, system-ui, sans-serif;
+	--sl-font: var(--font-sans);
+}
+:lang(zh-CN) :where(.tracking-tight, .tracking-wide) {
+	letter-spacing: normal;
+}
+:lang(zh-CN) :where(.uppercase) {
+	text-transform: none;
+}
+:lang(zh-CN) :where(.font-\[650\]) {
+	font-weight: 600;
+}

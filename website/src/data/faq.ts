@@ -6,40 +6,12 @@
  * nothing to keep in step, and the guardrail's existing overclaim rule proves it on every build by
  * requiring every answer to appear in the rendered text.
  *
- * Two constraints on the writing, both load-bearing:
- *
- *  - The question is phrased as a person would ask it, not assembled from search terms. The visible
- *    copy is the constraint; if a question reads as keyword stuffing to a human it is wrong,
- *    whatever it does for a crawler.
- *  - The answer stands alone. An assistant will quote it without its question and without its page,
- *    so "Yes, with caveats" is a failure — the caveats have to be in the sentence.
+ * The arrays themselves live in the page's message module (the pricing questions in
+ * src/i18n/messages/pricing/en.ts), so a translation changes the visible questions and the
+ * structured data together.
  */
 
 export interface QuestionAnswer {
 	question: string;
 	answer: string;
 }
-
-/* Migrated from an inline array on the pricing page, which rendered them but marked up none. */
-export const PRICING_FAQ: readonly QuestionAnswer[] = [
-	{
-		question: 'Is it open?',
-		answer:
-			'FoxAuth is source-available under FSL-1.1-ALv2. You may read, modify, self-host and redistribute the code, and build a business around it. The only thing you may not do is offer it to others as a competing hosted service. Two years after each version ships, that version converts to the Apache License 2.0, so the restriction expires on a published schedule with nothing left to our discretion.'
-	},
-	{
-		question: 'Can I run it in production today?',
-		answer:
-			'FoxAuth can run in production today, self-hosted. The current release is 0.9.0, and a 0.x version means the HTTP surface and the admin API may still change between minor releases. Read the changelog before upgrading, take a backup when it names a migration that cannot be undone, and run the setup and migrate steps afterwards. The protocol endpoints follow the specs, so a client written for FoxAuth is in practice written against the RFC and should move to another server with little change.'
-	},
-	{
-		question: 'What does the cloud waitlist commit me to?',
-		answer:
-			'The cloud waitlist commits you to nothing. We keep your address, mail you once when the managed FoxAuth instance opens, and delete it if you ask. There is no pricing to agree to yet.'
-	},
-	{
-		question: 'Do you offer consulting?',
-		answer:
-			'We offer consulting on FoxAuth: integration work, threat modelling and profile conformance for regulated deployments. Tell us the shape of yours and we will say whether we are the right people.'
-	}
-];

@@ -9,6 +9,22 @@ import type { SectionName } from '../../src/data/seo.ts';
 export interface Heading {
 	level: number;
 	text: string;
+	id?: string;
+}
+
+/*
+ * The visible line on an article that scopes it to one datastore. Both halves are kept: the
+ * attribute says which backend, language-independently, and the text is what makes the exemption
+ * public — an article that declared a scope without showing it would be excused silently.
+ */
+export interface StorageScope {
+	backend: string;
+	text: string;
+}
+
+export interface Alternate {
+	hreflang: string;
+	route: string;
 }
 
 export interface ImageRecord {
@@ -57,6 +73,13 @@ export interface PageRecord {
 	twitterCard: string;
 	lastmod?: string;
 	headings: Heading[];
+	/* Every element id on the page, so a deep link's target can be looked up anywhere, not only on headings. */
+	ids: string[];
+	/* In-site `hreflang` counterparts from the head, x-default included. */
+	alternates: Alternate[];
+	storageScope?: StorageScope;
+	/* A comparison's review date, from its `data-last-checked` attribute when the page carries one. */
+	lastChecked?: string;
 	images: ImageRecord[];
 	outboundLinks: string[];
 	structured: StructuredEntity[];

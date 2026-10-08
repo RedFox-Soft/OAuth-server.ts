@@ -66,7 +66,7 @@ with an OpenID Connect back-channel logout token per session, and a logout token
 `sid`. The session record is the only place that holds it. Delete first and you have nothing left to
 tell anyone with. Every session disappears correctly and every relying party keeps its user signed in.
 
-So the order is fixed, and it is visible in the function signature rather than left to a comment:
+So the order is fixed, and it is written into the function itself rather than left to a comment:
 
 ```ts
 export async function revokeAccountAccess(
@@ -213,8 +213,8 @@ our server also offers on its own, when the person is fine and the device is not
 and leaves the account active. Delete when the record itself should go, which also ends access, since
 deletion runs the same sequence first.
 
-Some of the machinery around this is younger than the sweep. The guard that holds a SCIM connection
-when it starts deprovisioning too many users at once has passed its tests, but Okta's CRUD test against a
+Some of the machinery around this is younger than the sweep. The guard that puts a SCIM connection
+on hold when it starts deprovisioning too many users at once has passed its tests, but Okta's CRUD test against a
 real organisation has not been run, and there is no `/Bulk` endpoint. Okta's Universal Logout, which calls
 the same sweep from upstream, has never been run against a real Okta organisation. None of it has been
 submitted for certification. The sweep itself was walked end to end against a running server: a logout

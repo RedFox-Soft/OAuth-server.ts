@@ -1,12 +1,12 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-	DESCRIPTION_BAND,
-	TITLE_BAND,
 	coverageFor,
 	isIndexable,
+	localeOf,
 	normaliseRoute,
-	sectionFor
+	sectionFor,
+	stripLocale
 } from '../../src/data/seo.ts';
 import { flatten } from './collect.ts';
 import type { PageRecord, VerificationResult } from './types.ts';
@@ -87,28 +87,33 @@ export function verify(input: VerifyInput): VerifyOutput {
 	const descriptions = new Map<string, string>();
 
 	for (const page of indexable) {
+		/*
+		 * Per language: a Han character is one code unit but two Latin widths in a result snippet,
+		 * so the English band would let a Chinese title run to twice what a search engine shows.
+		 */
+		const { titleBand, descriptionBand } = localeOf(page.route);
 		if (page.title === '') fail('missing-title', page.route, 'no <title>');
 		else if (
-			page.title.length < TITLE_BAND.min ||
-			page.title.length > TITLE_BAND.max
+			page.title.length < titleBand.min ||
+			page.title.length > titleBand.max
 		) {
 			fail(
 				'title-length',
 				page.route,
-				`${page.title.length} chars, band ${TITLE_BAND.min}–${TITLE_BAND.max}: ${JSON.stringify(page.title)}`
+				`${page.title.length} chars, band ${titleBand.min}–${titleBand.max}: ${JSON.stringify(page.title)}`
 			);
 		}
 
 		if (page.description === '')
 			fail('missing-description', page.route, 'no meta description');
 		else if (
-			page.description.length < DESCRIPTION_BAND.min ||
-			page.description.length > DESCRIPTION_BAND.max
+			page.description.length < descriptionBand.min ||
+			page.description.length > descriptionBand.max
 		) {
 			fail(
 				'description-length',
 				page.route,
-				`${page.description.length} chars, band ${DESCRIPTION_BAND.min}–${DESCRIPTION_BAND.max}`
+				`${page.description.length} chars, band ${descriptionBand.min}–${descriptionBand.max}`
 			);
 		}
 
@@ -138,7 +143,21 @@ export function verify(input: VerifyInput): VerifyOutput {
 				`is ${page.canonical || '(none)'}, expected ${expected}`
 			);
 		}
+		/*
+		 * Equal, not merely present. Every page used to say `lang="en"` from one layout, so presence
+		 * was the whole question; with three languages the failure that actually happens is a
+		 * translated page that inherits the English attribute, which a screen reader then pronounces
+		 * as English and a search engine files under the wrong language.
+		 */
+		const expectedLang = localeOf(page.route).lang;
 		if (page.lang === '') fail('missing-lang', page.route, 'no lang on <html>');
+		else if (page.lang !== expectedLang) {
+			fail(
+				'missing-lang',
+				page.route,
+				`<html lang="${page.lang}">, expected "${expectedLang}" for this route's language`
+			);
+		}
 
 		const h1s = page.headings.filter((h) => h.level === 1);
 		if (h1s.length !== 1)
@@ -158,6 +177,48 @@ export function verify(input: VerifyInput): VerifyOutput {
 				break;
 			}
 			previous = heading.level;
+		}
+	}
+
+	/*
+	 * --- counterpart anchors --------------------------------------------------------------------
+	 * The language switcher carries `#hash` across, and a link shared between readers of different
+	 * languages carries it too. Starlight slugifies heading text and keeps Cyrillic and Han
+	 * characters, so a translated heading without an explicit `{#english-id}` gets a different id,
+	 * and the deep link lands silently at the top of the page — nothing renders wrong, so nothing
+	 * else here would notice. Checked from the English side only: English is what every
+	 * translation is made from, and an id a translation adds is no link anybody holds.
+	 *
+	 * Counterparts are read from the page's own hreflang links rather than derived from the route,
+	 * so this checks exactly the pairs the switcher offers. Every element id counts, not only
+	 * headings', because a marketing view may put a section's id on its wrapper.
+	 */
+	const byRoute = new Map(pages.map((page) => [page.route, page]));
+	for (const page of pages) {
+		if (localeOf(page.route).key !== 'en') continue;
+		const anchors = page.headings.flatMap((h) =>
+			h.level >= 2 && h.level <= 4 && h.id ? [h.id] : []
+		);
+		if (anchors.length === 0) continue;
+
+		const counterparts = new Set(
+			page.alternates
+				.map((alternate) => alternate.route)
+				.filter((route) => route !== page.route)
+		);
+		for (const route of counterparts) {
+			const counterpart = byRoute.get(route);
+			if (!counterpart) continue;
+			const present = new Set(counterpart.ids);
+			for (const id of new Set(anchors)) {
+				if (!present.has(id)) {
+					fail(
+						'counterpart-anchor',
+						page.route,
+						`#${id} has no element with that id on ${route}`
+					);
+				}
+			}
 		}
 	}
 
@@ -213,7 +274,15 @@ export function verify(input: VerifyInput): VerifyOutput {
 				page.route,
 				'indexable but absent from the sitemap'
 			);
-		if (!llms.has(page.route) && sectionFor(page.route) !== undefined) {
+		/*
+		 * llms.txt is English only: a retrieval client reads one index, and listing every page three
+		 * times would triple it with translations of what it already has.
+		 */
+		if (
+			!llms.has(page.route) &&
+			sectionFor(page.route) !== undefined &&
+			localeOf(page.route).key === 'en'
+		) {
 			fail('sitemap-parity', page.route, 'indexable but absent from llms.txt');
 		}
 		if (page.lastmod === undefined) {
@@ -342,16 +411,35 @@ export function verify(input: VerifyInput): VerifyOutput {
 	 * reader it is scoped, so it cannot be excused silently, and the excuse rots in public where
 	 * somebody will see it. The sentence comes from `storageScope` in the article's front matter,
 	 * which the content schema validates against the backends that actually ship.
+	 *
+	 * The scope is read from the line's `data-storage-scope` attribute rather than matched in its
+	 * English wording, since the line is now written in three languages; and the line must still
+	 * name the backend in its visible text. Datastore names are never translated, so that holds in
+	 * every language, and it keeps the exemption something a reader can see.
 	 */
-	const SCOPE_NOTICE = /This article covers the .+? backend specifically/;
-	const claimSurface = (page: PageRecord): boolean =>
-		page.route === '/' ||
-		page.route.startsWith('/features/') ||
-		(page.route.startsWith('/blog/') && !SCOPE_NOTICE.test(page.text));
+	const scoped = (page: PageRecord): boolean =>
+		page.storageScope !== undefined &&
+		page.storageScope.backend !== '' &&
+		page.storageScope.text.includes(page.storageScope.backend);
+	const claimSurface = (page: PageRecord): boolean => {
+		const route = stripLocale(page.route);
+		return (
+			route === '/' ||
+			route.startsWith('/features/') ||
+			(route.startsWith('/blog/') && !scoped(page))
+		);
+	};
+
+	/*
+	 * Chinese ends a sentence with a full-width mark and no space after it, so those marks split
+	 * without requiring whitespace; the Latin marks still do, or "v1.4" and "e.g." would cut a
+	 * sentence in two.
+	 */
+	const SENTENCE_END = /(?<=[.!?;])\s+|(?<=[。！？；])/;
 
 	if (input.storageBackends.length > 1) {
 		for (const page of indexable.filter(claimSurface)) {
-			for (const sentence of page.text.split(/(?<=[.!?;])\s+/)) {
+			for (const sentence of page.text.split(SENTENCE_END)) {
 				const named = input.storageBackends.filter((backend) =>
 					sentence.includes(backend)
 				);

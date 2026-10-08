@@ -1,0 +1,131 @@
+---
+title: 获取第一个令牌
+description: 用 curl 手动走一遍授权码 + PKCE 流程：从 challenge 到解码 ID 令牌，再到调用 UserInfo。
+source: f8dc5adfcb86
+sidebar:
+  order: 5
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+import ScreenshotFigure from '../../../../../components/ScreenshotFigure.astro';
+
+这是针对本地部署、手动完成的一次完整的授权码 + PKCE 往返流程。每个客户端库都实现了这个流程，亲手走过一遍之后，调试客户端库通常会容易得多。
+
+示例假定 `ISSUER=http://localhost:3000`，以及一个 id 为 `demo` 的公开客户端，其注册的重定向 URI 为 `http://localhost:8080/callback`。请替换为你在[注册第一个客户端](/zh-cn/docs/get-started/first-client/)中得到的值。
+
+<Aside type="note">
+
+下面的端点路径是本服务器的默认值。不要在真实客户端中硬编码它们，而应读取 `GET /.well-known/openid-configuration` 并使用其中公布的地址。该文档也反映了哪些功能已启用，因此它才是「这个部署支持什么」的如实答案。
+
+这一点比以前更重要了。如果客户端所在项目指向你创建的用户桶，那么该用户桶就是它自己的签发者：其端点位于 `<ISSUER>/<slug>` 之下，发现文档位于 `<ISSUER>/<slug>/.well-known/openid-configuration`。此类客户端的请求如果发往不带路径的 `/auth`，会以 `unauthorized_client` 被拒绝——"client is not authorized at this address"——因为客户端只能在其所属用户桶的地址上使用。下面的演练使用默认的 `redfox` 用户桶，它在根路径提供服务。
+
+</Aside>
+
+<Steps>
+
+1. **生成 verifier 及其 challenge**。在这里，每个 `response_type=code` 请求都强制要求 PKCE，且 `S256` 是唯一接受的方法。
+
+   ```ts
+   // save as pkce.ts, run with: bun pkce.ts
+   const verifier = Buffer.from(
+   	crypto.getRandomValues(new Uint8Array(32))
+   ).toString('base64url');
+   const challenge = new Bun.CryptoHasher('sha256')
+   	.update(verifier)
+   	.digest('base64url');
+   console.log({ verifier, challenge });
+   ```
+
+   保存好 verifier；你将在第 4 步把它发送到令牌端点。
+
+2. **把浏览器引导到授权端点**。用你的 challenge 构造 URL：
+
+   ```
+   http://localhost:3000/auth
+     ?response_type=code
+     &client_id=demo
+     &redirect_uri=http%3A%2F%2Flocalhost%3A8080%2Fcallback
+     &scope=openid
+     &state=8f2c1d
+     &nonce=b41e07
+     &code_challenge=<challenge>
+     &code_challenge_method=S256
+   ```
+
+   （全部写在一行，去掉缩进。）`state` 由你在回调时自行校验；`nonce` 会被回显到 ID 令牌中，让你可以把令牌与本次请求关联起来。`scope=openid` 使这成为一个 OpenID Connect 请求，并产生 ID 令牌。若要获得刷新令牌，还需要 scope 中包含 `offline_access`，**并且**此 URL 中带上 `prompt=consent`，**并且**客户端的授权类型中包含 `refresh_token`。在控制台创建的客户端默认只有 `authorization_code`。三者缺一，该 scope 就会被静默丢弃，不报任何错误：你得到的令牌响应中没有 `refresh_token`。服务器还必须在其支持的 scope 中列出 `offline_access`（默认如此）；未列出期间，令牌端点会以 `unsupported_grant_type` 拒绝所有刷新令牌。
+
+3. **登录并同意授权**。服务器会重定向到它自己的交互页面：先是该客户端所在项目指向的用户桶的登录表单，然后是列出 scope 的授权同意页面（新客户端默认开启授权同意）。两者都通过后，浏览器会被发送到
+
+   ```
+   http://localhost:8080/callback?code=<code>&state=8f2c1d&iss=http%3A%2F%2Flocalhost%3A3000
+   ```
+
+   8080 端口上无需有任何程序在监听；从浏览器地址栏中复制 `code` 即可。检查 `state` 是否原样返回，以及 `iss` 是否是你的签发者。
+
+4. **在令牌端点用授权码换取令牌**。授权码只能使用一次，有效期 60 秒，所以要尽快完成。如果超时，请从第 2 步重新开始：
+
+   ```bash
+   curl -s http://localhost:3000/token \
+     -H 'Content-Type: application/x-www-form-urlencoded' \
+     -d grant_type=authorization_code \
+     -d code=<code> \
+     -d client_id=demo \
+     -d redirect_uri=http://localhost:8080/callback \
+     -d code_verifier=<verifier>
+   ```
+
+   `redirect_uri` 必须与第 2 步中的逐字节一致——授权流程会将它与记录在授权码上的值比较，不一致即拒绝。对于机密客户端，去掉请求体中的 `client_id`，改为进行客户端认证：`client_secret_basic` 用 `-u demo:<secret>`，`client_secret_post` 用 `-d client_id=demo -d client_secret=<secret>`。
+
+   响应是标准的令牌响应：
+
+   ```json
+   {
+   	"access_token": "…",
+   	"token_type": "Bearer",
+   	"expires_in": 3600,
+   	"id_token": "…",
+   	"scope": "openid"
+   }
+   ```
+
+5. **解码 ID 令牌**。它是一个已签名的 JWT；载荷是中间那一段，采用 base64url 编码：
+
+   ```bash
+   echo '<id_token>' | cut -d. -f2 | tr '_-' '/+' | base64 -d 2>/dev/null | jq .
+   ```
+
+   检查 `iss` 是否与你的 `ISSUER` 一致，`aud` 是否为你的 client id，`nonce` 是否与第 2 步一致。真实的客户端还要验证签名，所用密钥来自 `GET /jwks`，按令牌的 `kid` 选取。载荷还说明了用户的登录方式：密码登录时 `amr` 为 `["pwd"]`，使用一次性验证码时为 `["pwd", "otp", "mfa"]`；因此要求第二因素时，应检查是否包含 `mfa`，而不是检查该声明是否存在。
+
+6. **调用 UserInfo 端点**，带上访问令牌：
+
+   ```bash
+   curl -s http://localhost:3000/userinfo -H 'Authorization: Bearer <access_token>' | jq .
+   ```
+
+   返回什么，取决于授予的 scope 以及服务器上配置的声明（claims）。
+
+</Steps>
+
+在默认部署下，第 3 步会经过的两个页面：
+
+<ScreenshotFigure
+	name="sign-in"
+	alt="服务器的登录页面：用户名输入框、密码输入框、「记住我」选项和登录按钮。"
+	caption="登录页面，为客户端所在项目指向的用户桶提供。"
+/>
+
+<ScreenshotFigure
+	name="consent"
+	alt="授权同意页面，显示客户端名称并列出它所请求的 scope。"
+	caption="授权同意页面列出所请求的内容。只有当请求同时带有 `prompt=consent` 时，`offline_access` 才会出现。"
+/>
+
+## 默认开启，还是由开关控制 {#on-by-default-or-behind-a-flag}
+
+大多数端点都受某个功能开关控制，而**开关关闭意味着该端点根本不提供服务**。这种拒绝被刻意设计得与服务器不存在的路径无法区分。所以在这些端点上得到 `404` 是配置层面的答案，而不是缺陷：
+
+- **始终可用**，不受开关控制：`/health`、`/.well-known/openid-configuration`、`/.well-known/security.txt`、`/jwks`、`/auth` 和 `/token`。本演练中除第 6 步之外的所有内容都属于这一组。
+- **默认开启，可以关闭**：`/userinfo`（`userinfo.enabled`）和 RP 发起的登出（`rpInitiatedLogout.enabled`）。
+- **默认关闭，需要手动开启**：推送授权请求、令牌内省、令牌撤销、动态客户端注册、设备流程、CIBA 以及 MCP 控制平面。
+
+完整的表格以及控制每个端点的开关，见[端点参考](/docs/reference/endpoints/)；开关本身见[设置参考](/docs/reference/settings/)。设置保存后即生效。

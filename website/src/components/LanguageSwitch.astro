@@ -1,0 +1,106 @@
+---
+/*
+ * The two-way language switch, used in the marketing header and as Starlight's LanguageSelect.
+ *
+ * Starlight's own picker is a <select> listing every language to every visitor, which is exactly
+ * what this site must not do: the other languages exist only for readers whose browser puts that
+ * language first, and each of them is offered English and their own language, never the third.
+ *
+ * So everything here is plain links, and on an English page they start hidden. The language script
+ * in <head> (src/i18n/language-script.ts) reveals the one matching the reader's first language by
+ * stamping <html data-lang-offer>; global.css owns the rule. With scripts off nothing is revealed and
+ * the English page is the site as it always was. On a translated page the link back to English is
+ * always visible, because whoever opened that address must be able to leave it.
+ *
+ * A page that exists only in English has no link to offer; it carries the "only in English" notice
+ * instead, in each translated language, revealed the same way. It lives in the header rather than in
+ * <main> so the notice never becomes part of the text a search engine or the build verifier reads as
+ * the page.
+ */
+import { alternatesFor } from '../i18n/locale.ts';
+import { chrome } from '../i18n/chrome.ts';
+import {
+	LOCALE_DEFINITIONS,
+	isDocsFallback,
+	localeOf,
+	normaliseRoute,
+	stripLocale,
+	translatedLocales
+} from '../data/seo.ts';
+
+interface Props {
+	/* `links` for a navigation slot, `notice` for the English-only line, `all` where there is one slot. */
+	variant?: 'links' | 'notice' | 'all';
+	class?: string;
+}
+const { variant = 'all', class: className } = Astro.props;
+
+const route = normaliseRoute(Astro.url.pathname);
+const page = localeOf(route);
+const alternates = await alternatesFor(route);
+/*
+ * A docs fallback page (/ru/docs/deploy/…) has no alternates — it is not a translation — but it is
+ * still a page in the reader's language whose English original exists, so it offers the way back.
+ */
+const english =
+	alternates.find((alternate) => alternate.locale.key === 'en') ??
+	(isDocsFallback(route) ? { locale: LOCALE_DEFINITIONS.en, href: stripLocale(route) } : undefined);
+const offers = alternates.filter((alternate) => alternate.locale.key !== 'en');
+const englishOnly = page.key === 'en' && alternates.length === 0 && translatedLocales().length > 0;
+
+const showLinks = variant !== 'notice';
+const showNotice = variant !== 'links' && englishOnly;
+
+const linkClass =
+	'rounded-control px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-accent-50 hover:text-accent-700 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-accent-200';
+const t = chrome(page.key);
+---
+
+{
+	showLinks && page.key !== 'en' && english && (
+		<nav
+			aria-label={t.ariaLanguage}
+			class:list={['lang-switch', className]}
+		>
+			<a
+				href={english.href}
+				hreflang="en"
+				lang="en"
+				data-lang-switch="en"
+				class={linkClass}>English</a
+			>
+		</nav>
+	)
+}
+{
+	showLinks && page.key === 'en' && offers.length > 0 && (
+		<nav
+			aria-label={t.ariaLanguage}
+			class:list={['lang-switch', className]}
+		>
+			{offers.map((offer) => (
+				<a
+					href={offer.href}
+					hreflang={offer.locale.lang}
+					lang={offer.locale.lang}
+					data-lang-switch={offer.locale.key}
+					class={linkClass}
+					hidden>{offer.locale.label}</a
+				>
+			))}
+		</nav>
+	)
+}
+{
+	showNotice && (
+		<p class:list={['lang-notice text-sm text-gray-600 dark:text-gray-400', className]}>
+			{translatedLocales().map((locale) => (
+				<span
+					lang={locale.lang}
+					data-english-only-notice={locale.key}
+					hidden>{chrome(locale.key).englishOnly}</span
+				>
+			))}
+		</p>
+	)
+}

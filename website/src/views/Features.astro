@@ -1,0 +1,251 @@
+---
+import Site from '../layouts/Site.astro';
+import FeatureGrid from '../components/FeatureGrid.astro';
+import ScreenshotFigure from '../components/ScreenshotFigure.astro';
+import type { Feature } from '../components/FeatureGrid.astro';
+import Button from '../components/ui/Button.astro';
+import Section from '../components/ui/Section.astro';
+import CompareLinks from '../components/CompareLinks.astro';
+import StaleTranslationNotice from '../components/StaleTranslationNotice.astro';
+import { backendList } from '../data/storage.ts';
+import { loadExport } from '../data/export.ts';
+import Eyebrow from '../components/ui/Eyebrow.astro';
+import { localizedHref } from '../i18n/locale.ts';
+import { isStale, messagesFor } from '../i18n/messages.ts';
+import english from '../i18n/messages/features/en.ts';
+import type { LocaleKey } from '../data/seo.ts';
+
+interface Props {
+	locale: LocaleKey;
+}
+const { locale } = Astro.props;
+const t = messagesFor('features', english, locale);
+
+// Counted from the catalogue the build exports, so the number cannot drift from the tool list.
+const mcpToolCount = loadExport().mcp.tools.length;
+
+const rfc = (n: string) => ({
+	label: `RFC ${n}`,
+	href: `https://datatracker.ietf.org/doc/html/rfc${n}`
+});
+
+interface GroupText {
+	heading: string;
+	title: string;
+	blurb: string;
+}
+
+const group = (id: string, text: GroupText, items: Feature[]) => ({
+	id,
+	heading: text.heading,
+	title: text.title,
+	blurb: text.blurb,
+	items
+});
+
+/*
+ * The card text comes from the messages by name; what stays here is what is never translated — the
+ * setting key a card is gated by and the specification it cites.
+ */
+const protocol = t.groups.protocol.items;
+const security = t.groups.security.items;
+const administration = t.groups.administration.items;
+const extensibility = t.groups.extensibility.items;
+const operations = t.groups.operations.items;
+
+const groups = [
+	group('protocol', t.groups.protocol, [
+		{ ...protocol.pkce, spec: rfc('7636') },
+		{
+			...protocol.oidc,
+			spec: {
+				label: 'OIDC Core 1.0',
+				href: 'https://openid.net/specs/openid-connect-core-1_0.html'
+			}
+		},
+		{ ...protocol.issuerIdentification, spec: rfc('9207') },
+		{ ...protocol.resourceIndicators, flag: 'resourceIndicators.enabled', spec: rfc('8707') },
+		{ ...protocol.clientCredentials, flag: 'clientCredentials.enabled' },
+		{ ...protocol.refreshToken, flag: 'scopes' },
+		{ ...protocol.deviceFlow, flag: 'deviceFlow.enabled', spec: rfc('8628') },
+		{
+			...protocol.ciba,
+			flag: 'ciba.enabled',
+			spec: {
+				label: 'CIBA Core 1.0',
+				href: 'https://openid.net/specs/openid-client-initiated-backchannel-authentication-core-1_0.html'
+			}
+		},
+		{ ...protocol.par, flag: 'par.enabled', spec: rfc('9126') },
+		{ ...protocol.requestObjects, flag: 'requestObjects.enabled' },
+		{
+			...protocol.jarm,
+			flag: 'responseMode.jwt.enabled',
+			spec: {
+				label: 'JARM',
+				href: 'https://openid.net/specs/oauth-v2-jarm.html'
+			}
+		},
+		{ ...protocol.rar, flag: 'richAuthorizationRequests.enabled', spec: rfc('9396') },
+		{ ...protocol.introspection, flag: 'introspection.enabled', spec: rfc('7662') },
+		{ ...protocol.jwtIntrospection, flag: 'jwtIntrospection.enabled', spec: rfc('9701') },
+		{ ...protocol.revocation, flag: 'revocation.enabled', spec: rfc('7009') },
+		{ ...protocol.jwtUserinfo, flag: 'jwtUserinfo.enabled' },
+		{ ...protocol.claimsParameter, flag: 'claimsParameter.enabled' },
+		{ ...protocol.rpInitiatedLogout, flag: 'rpInitiatedLogout.enabled' },
+		{ ...protocol.backchannelLogout, flag: 'backchannelLogout.enabled' }
+	]),
+	group('security', t.groups.security, [
+		{ ...security.dpop, flag: 'dpop.enabled', spec: rfc('9449') },
+		{ ...security.mtls, flag: 'mTLS.enabled', spec: rfc('8705') },
+		{ ...security.fapi, flag: 'fapi.enabled' },
+		{ ...security.encryption, flag: 'encryption.enabled' },
+		{ ...security.totp, spec: rfc('6238') },
+		{ ...security.pairwise },
+		{ ...security.bruteForce },
+		{ ...security.rateLimit, flag: 'rateLimit.enabled' },
+		{ ...security.cors, flag: 'cors.enabled' },
+		{ ...security.headers },
+		{ ...security.scopes }
+	]),
+	group('administration', t.groups.administration, [
+		{ ...administration.console },
+		{ ...administration.audit },
+		{
+			title: administration.mcp.title,
+			body: administration.mcp.body(mcpToolCount),
+			flag: 'mcp.enabled',
+			spec: rfc('9728')
+		},
+		{ ...administration.mcpAuthorization, spec: rfc('8707') },
+		{ ...administration.clientIdMetadataDocument, flag: 'clientIdMetadataDocument.enabled' },
+		{ ...administration.registration, flag: 'registration.enabled', spec: rfc('7591') },
+		{
+			...administration.registrationManagement,
+			flag: 'registrationManagement.enabled',
+			spec: rfc('7592')
+		},
+		{ ...administration.databaseClients },
+		{ ...administration.groupOwnership },
+		{ ...administration.bucketAddress },
+		{ ...administration.selfService },
+		{ ...administration.federation, flag: 'federation.enabled' },
+		{ ...administration.signingKeys }
+	]),
+	group('extensibility', t.groups.extensibility, [
+		{ ...extensibility.overrideSeams },
+		{
+			title: extensibility.storage.title,
+			body: extensibility.storage.body(backendList(t.inMemoryBackend, locale))
+		},
+		{ ...extensibility.mountable },
+		{ ...extensibility.loginUi }
+	]),
+	group('operations', t.groups.operations, [
+		{ ...operations.containerImage },
+		{ ...operations.errorStore, flag: 'errorStore.enabled' },
+		{ ...operations.sentry, flag: 'sentry.enabled' },
+		{ ...operations.settings },
+		{ ...operations.machineReadable }
+	])
+];
+
+const getStarted = await localizedHref('/docs/get-started/docker-compose/', locale);
+const settingsReference = await localizedHref('/docs/reference/settings/', locale);
+const compare = await localizedHref('/compare/', locale);
+const pricing = await localizedHref('/pricing/', locale);
+---
+
+<Site
+	title={`${t.title} — FoxAuth`}
+	description={t.description}
+	locale={locale}
+>
+	<Section narrow>
+		<Eyebrow>{t.hero.eyebrow}</Eyebrow>
+		<h1 class="text-4xl font-[650] leading-[1.15] tracking-tight text-balance">
+			{t.hero.heading}
+		</h1>
+		<p class="mt-5 text-lg text-gray-600 dark:text-gray-400">
+			{t.hero.lead}
+		</p>
+		<p class="mt-5 text-gray-600 dark:text-gray-400">
+			{t.hero.flags}
+		</p>
+		{
+			isStale('features', locale) && (
+				<StaleTranslationNotice
+					locale={locale}
+					english="/features/"
+					class="mt-4"
+				/>
+			)
+		}
+		<div class="mt-8 flex flex-wrap gap-3">
+			<Button href={getStarted}>{t.hero.getStarted}</Button>
+			<Button
+				href={settingsReference}
+				variant="secondary"
+			>
+				{t.hero.settingsReference}
+			</Button>
+		</div>
+	</Section>
+
+	{
+		groups.map((group, i) => (
+			<Section
+				id={group.id}
+				tone={i % 2 === 0 ? 'muted' : 'default'}
+			>
+				<Eyebrow>{group.heading}</Eyebrow>
+				<h2 class="text-3xl font-[650] tracking-tight text-balance">{group.title}</h2>
+				<p class="mt-3 max-w-prose text-gray-600 dark:text-gray-400">{group.blurb}</p>
+				<div class="mt-10">
+					<FeatureGrid items={group.items} />
+				</div>
+				{group.id === 'security' && (
+					<div class="mt-10">
+						<ScreenshotFigure
+							name="admin-audit-trail"
+							alt={t.screenshots.auditTrail.alt}
+							caption={t.screenshots.auditTrail.caption}
+						/>
+					</div>
+				)}
+				{group.id === 'administration' && (
+					<div class="mt-10">
+						<ScreenshotFigure
+							name="admin-settings-grants"
+							alt={t.screenshots.settings.alt}
+							caption={t.screenshots.settings.caption}
+						/>
+					</div>
+				)}
+			</Section>
+		))
+	}
+
+	<Section narrow>
+		<Eyebrow>{t.next.eyebrow}</Eyebrow>
+		<h2 class="text-3xl font-[650] tracking-tight text-balance">
+			{t.next.heading}
+		</h2>
+		<p class="mt-3 text-gray-600 dark:text-gray-400">
+			{t.next.lead}
+		</p>
+		<CompareLinks
+			class="mt-3"
+			locale={locale}
+		/>
+		<div class="mt-8 flex flex-wrap gap-3">
+			<Button href={compare}>{t.next.allComparisons}</Button>
+			<Button
+				href={pricing}
+				variant="secondary"
+			>
+				{t.next.pricing}
+			</Button>
+		</div>
+	</Section>
+</Site>

@@ -1,0 +1,54 @@
+---
+title: 文档
+description: 如何运行、集成和管理 FoxAuth 背后的引擎 OAuth-server.ts：从第一个容器到生产环境部署。
+source: 813c7a0bd630
+---
+
+FoxAuth 构建于 **OAuth-server.ts** 之上。这是一个由你自己运行的 OAuth 2.1 与 OpenID Connect 授权服务器，源码可用（source-available，并非开源许可）。本文档涵盖三项工作：让服务器跑起来、把应用接入它，以及在真实用户依赖它之后运维它。选择你眼下正在做的那一项即可。
+
+## 让它跑起来 {#getting-it-running}
+
+从[使用 Docker Compose 运行](/zh-cn/docs/get-started/docker-compose/)开始。一条命令即可启动 MongoDB、初始化数据库结构并运行授权服务器，这很可能是看到一个可用实例的最快方式。如果你更想直接基于源码工作，[从源码运行](/zh-cn/docs/get-started/from-source/)会克隆仓库并用 Bun 启动它。
+
+无论哪种方式，下一步都是[创建第一个管理员](/zh-cn/docs/get-started/first-admin/)：全新的数据库里没有任何账户，第一个账户就是通过那个一次性设置页面创建的。在做其他任何事之前，先在那里开启第二因素认证。
+
+## 接入应用 {#connecting-an-application}
+
+应用以 **OAuth 客户端**的身份与服务器通信，而客户端必须先存在，才能请求令牌。[注册第一个客户端](/zh-cn/docs/get-started/first-client/)讲解了最容易让人栽跟头的几处：公共客户端与机密客户端的区别，为什么重定向 URI 总是精确匹配、从不按模式匹配，以及客户端让用户从哪个用户桶登录。
+
+接着，[获取第一个令牌](/zh-cn/docs/get-started/first-token/)使用 `curl` 端到端地走一遍带 PKCE 的授权码流程，从 code challenge 一直到解码后的 ID 令牌和一次 UserInfo 调用。PKCE 对每个客户端都是强制的，而不只是公共客户端。这是 OAuth 2.1 的要求；根据我们的经验，对于从 OAuth 2.0 服务器迁移过来的人，这是最常见的意外。
+
+如果你要接入的应用是 **MCP 服务器**，那么它不是 OAuth 客户端，而是受保护资源，形态差异大到值得单独成页：[用 OAuth 保护你的 MCP 服务器](/zh-cn/docs/get-started/protect-your-mcp-server/)会在这里声明它，发布 MCP 服务器必须发布的两样东西，校验令牌，并分别演示一次拒绝和一次成功。
+
+## 在生产环境中运行 {#running-it-in-production}
+
+[部署](/zh-cn/docs/deploy/fly/)涵盖了大家实际在用的目标：[Fly.io](/zh-cn/docs/deploy/fly/)、[Kubernetes](/zh-cn/docs/deploy/kubernetes/)，以及单台主机上的 [Docker Compose](/zh-cn/docs/deploy/docker-compose/)。数据库有两种可选：[MongoDB](/zh-cn/docs/deploy/mongodb-atlas/) 或 [PostgreSQL](/zh-cn/docs/deploy/postgresql/)，你设置的连接字符串决定用哪一个。无论选哪个，[位于反向代理之后](/zh-cn/docs/deploy/reverse-proxy/)都很重要。签发者（issuer）URL 必须是 `https://` 地址，并且必须与客户端配置的一致。代理在没有被要求的情况下改写请求头，通常就是令牌在本地校验通过、到了生产环境却失败的原因。
+
+在不同版本之间迁移之前，请先阅读[升级](/zh-cn/docs/deploy/upgrade/)。服务器目前处于 `0.x` 版本，这意味着 HTTP 接口和管理 API 在次版本之间仍可能发生变化；变更日志会说明改了什么。升级之后必须重新运行设置脚本，以便创建新的集合和索引，然后运行 `bun run db:migrate`，处理新版本需要重塑的部分。
+
+## 为真实用户运行 {#running-it-for-real-users}
+
+一旦有人通过它登录，工作重心就转到了控制台。[连接上游身份提供商](/zh-cn/docs/administer/federation/)让一个桶的用户可以通过 Google、Microsoft、Apple、GitHub 或任意 OpenID 提供商登录，并决定这样的登录可以创建或关联哪些账户。在此基础上，[从 Entra ID 或 Okta 预配用户](/zh-cn/docs/administer/scim/)通过 SCIM 把桶中用户和组的管理交给目录服务，而[来自上游提供商的登出](/zh-cn/docs/administer/upstream-logout/)让那边的登出能够结束这里的会话。
+
+[组与 groups 声明](/zh-cn/docs/administer/groups/)介绍了取代角色的机制，以及依赖方（relying party）如何读取它。[终止用户的访问](/zh-cn/docs/administer/ending-access/)比较了停用、锁定、全局登出和删除，并指出其中任何一种都无法收回的那一种令牌。[轮换签名密钥](/zh-cn/docs/administer/signing-keys/)演示如何在不重启的情况下，对实例的密钥和每个桶的密钥依次进行生成、提升和退役。
+
+## 决定是否信任它 {#deciding-whether-to-trust-it}
+
+授权服务器是它身后一切的前门。在把它放到真实用户面前之前，你有权追问：它防御什么，任何人又凭什么知道这一点。[威胁模型](/zh-cn/docs/security/threat-model/)回答第一个问题：资产、攻击者，以及针对每种威胁，代码中的控制措施和守住它的测试，还有当下确实存在的局限。[安全保证](/zh-cn/docs/security/assurance/)回答第二个问题：每次推送和每周运行的扫描、每项结果发布在哪里，以及哪些工作尚未完成。如何报告漏洞，见[安全策略](/security/)。
+
+## 查阅资料 {#looking-something-up}
+
+参考（Reference）部分在每次构建时由服务器自身的源码生成，因此它描述的是构建本站时所用的版本；其中没有任何内容是手工维护的：
+
+- **[设置](/docs/reference/settings/)** — 每个全局功能开关和选项、它的作用，以及修改它是否需要重启。
+- **[端点](/docs/reference/endpoints/)** — 服务器提供的每条路由、由哪个功能开关控制，以及它的 CORS 和限流类别。
+- **[管理 API](/docs/reference/admin-api/)** — 控制台背后的管理 API。
+- **[MCP 工具](/docs/reference/mcp-tools/)** — AI 智能体可以执行的操作：一份有意挑选的允许列表，比整个管理接口更窄。
+- **[Addon 扩展点](/docs/reference/addon-seams/)** — 可以换成你自己实现的具名函数，无需 fork。
+- **[环境变量](/docs/reference/environment/)** — 服务器启动之前必须设置的内容。
+
+## 它不是什么 {#what-this-server-is-not}
+
+它只支持 OAuth 2.1 和 OpenID Connect，别无其他。它不支持 SAML，也没有支持的计划。隐式授权（Implicit）和资源所有者密码凭据（Resource Owner Password Credentials）授权没有实现，因为 OAuth 2.1 移除了它们。如果某个应用依赖其中任何一种，必须先修改，才能使用此服务器。
+
+如果你还在决定究竟要不要运行它，[对比](/zh-cn/compare/)把它与团队通常拿来权衡的那些服务器放在一起，并注明了每条结论的核实日期。

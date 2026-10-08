@@ -3,26 +3,101 @@ import Site from '../layouts/Site.astro';
 import Button from '../components/ui/Button.astro';
 import Section from '../components/ui/Section.astro';
 import Eyebrow from '../components/ui/Eyebrow.astro';
+import { LOCALES } from '../data/seo.ts';
+import { messagesFor } from '../i18n/messages.ts';
+import english from '../i18n/messages/notFound/en.ts';
+
+/*
+ * GitHub Pages serves one 404.html for every address, so this page cannot be per language. Each
+ * text carries a span per published language and global.css shows the one the head script picked.
+ *
+ * The buttons keep their English targets: a span cannot change its link's href. The home link still
+ * reaches the reader's language, because the language script redirects an eligible reader from `/`.
+ */
+const views = LOCALES.map((locale) => ({
+	locale,
+	t: messagesFor('notFound', english, locale.key)
+}));
+type Text = Exclude<keyof typeof english, 'title' | 'description'>;
+const texts = (key: Text) =>
+	views.map(({ locale, t }) => ({ lang: locale.lang, key: locale.key, text: t[key] }));
 ---
 
 <Site
-	title="Page not found — FoxAuth"
-	description="There is nothing at this address. The home page and the documentation search are the quickest way back to whatever you were after."
+	title={english.title}
+	description={english.description}
 	noindex
+	notFound
 >
 	<Section narrow>
 		<Eyebrow>404</Eyebrow>
 		<h1 class="text-4xl font-[650] leading-[1.15] tracking-tight text-balance">
-			Page not found.
+			{
+				texts('heading').map((view) => (
+					<span
+						lang={view.lang}
+						data-view-text={view.key}
+					>
+						{view.text}
+					</span>
+				))
+			}
 		</h1>
 		<p class="mt-5 text-lg text-gray-600 dark:text-gray-400">
-			Either the link is wrong or the page has moved. If you know roughly what you were after, the
-			documentation search will probably get you there faster than guessing at a URL.
+			{
+				texts('body').map((view) => (
+					<span
+						lang={view.lang}
+						data-view-text={view.key}
+					>
+						{view.text}
+					</span>
+				))
+			}
 		</p>
 		<div class="mt-8 flex flex-wrap gap-3">
-			<Button href="/">Home</Button>
-			<Button href="/docs/" variant="secondary">Documentation</Button>
-			<Button href="/docs/reference/endpoints/" variant="ghost">Endpoint reference</Button>
+			<Button href="/">
+				{
+					texts('home').map((view) => (
+						<span
+							lang={view.lang}
+							data-view-text={view.key}
+						>
+							{view.text}
+						</span>
+					))
+				}
+			</Button>
+			<Button
+				href="/docs/"
+				variant="secondary"
+			>
+				{
+					texts('docs').map((view) => (
+						<span
+							lang={view.lang}
+							data-view-text={view.key}
+						>
+							{view.text}
+						</span>
+					))
+				}
+			</Button>
+			<Button
+				href="/docs/reference/endpoints/"
+				variant="ghost"
+			>
+				{
+					texts('endpoints').map((view) => (
+						<span
+							lang={view.lang}
+							data-view-text={view.key}
+						>
+							{view.text}
+						</span>
+					))
+				}
+			</Button>
 		</div>
 	</Section>
 </Site>

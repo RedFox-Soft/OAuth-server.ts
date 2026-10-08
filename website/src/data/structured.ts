@@ -1,4 +1,5 @@
-import { SITE_ORIGIN } from './seo.ts';
+import { SITE_ORIGIN, localeOf, stripLocale } from './seo.ts';
+import { chrome } from '../i18n/chrome.ts';
 
 /*
  * Typed builders for the structured data the site publishes.
@@ -69,13 +70,16 @@ export interface TechArticleInput {
 	description: string;
 	canonical: string;
 	dateModified?: string;
+	/* The page's <html lang>. */
+	inLanguage?: string;
 }
 
 export function techArticle({
 	headline,
 	description,
 	canonical,
-	dateModified
+	dateModified,
+	inLanguage
 }: TechArticleInput): JsonLd {
 	return {
 		'@context': 'https://schema.org',
@@ -85,7 +89,8 @@ export function techArticle({
 		url: canonical,
 		author: { '@type': 'Organization', name: 'FoxAuth' },
 		publisher: { '@type': 'Organization', name: 'FoxAuth' },
-		...(dateModified ? { dateModified } : {})
+		...(dateModified ? { dateModified } : {}),
+		...(inLanguage ? { inLanguage } : {})
 	};
 }
 
@@ -96,6 +101,7 @@ export interface BlogPostingInput {
 	canonical: string;
 	datePublished: string;
 	dateModified?: string;
+	inLanguage?: string;
 }
 
 /*
@@ -110,7 +116,8 @@ export function blogPosting({
 	description,
 	canonical,
 	datePublished,
-	dateModified
+	dateModified,
+	inLanguage
 }: BlogPostingInput): JsonLd {
 	return {
 		'@context': 'https://schema.org',
@@ -121,7 +128,8 @@ export function blogPosting({
 		author: { '@type': 'Organization', name: 'FoxAuth' },
 		publisher: { '@type': 'Organization', name: 'FoxAuth' },
 		datePublished,
-		...(dateModified ? { dateModified } : {})
+		...(dateModified ? { dateModified } : {}),
+		...(inLanguage ? { inLanguage } : {})
 	};
 }
 
@@ -164,28 +172,24 @@ export function breadcrumbList(crumbs: readonly Crumb[]): JsonLd {
 /*
  * Breadcrumbs derived from the route. Names come from the section map's vocabulary so they match
  * what the navigation calls each area; the leaf uses the page's own heading, which is the string
- * the page visibly shows.
+ * the page visibly shows. A translated route drops its language segment — `/ru/docs/` is
+ * Documentation under the Russian home page, not a page called "ru" — and is named in its language.
  */
-const SEGMENT_NAMES: Record<string, string> = {
-	docs: 'Documentation',
-	'get-started': 'Get started',
-	deploy: 'Deploy',
-	reference: 'Reference',
-	compare: 'Compare',
-	blog: 'Blog'
-};
-
 export function crumbsFor(route: string, leafName: string): Crumb[] {
-	const segments = route.split('/').filter(Boolean);
+	const locale = localeOf(route);
+	const breadcrumbs = chrome(locale.key).breadcrumbs;
+	const names: Record<string, string> = breadcrumbs;
+	const home = locale.key === 'en' ? '/' : `/${locale.key}/`;
+	const segments = stripLocale(route).split('/').filter(Boolean);
 	if (segments.length === 0) return [];
 
-	const crumbs: Crumb[] = [{ name: 'Home', url: '/' }];
-	let path = '';
+	const crumbs: Crumb[] = [{ name: breadcrumbs.home, url: home }];
+	let path = home.slice(0, -1);
 	segments.forEach((segment, index) => {
 		path += `/${segment}`;
 		const isLeaf = index === segments.length - 1;
 		crumbs.push({
-			name: isLeaf ? leafName : (SEGMENT_NAMES[segment] ?? segment),
+			name: isLeaf ? leafName : (names[segment] ?? segment),
 			url: `${path}/`
 		});
 	});

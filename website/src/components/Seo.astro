@@ -7,8 +7,16 @@
  * which astro.config.mjs reads for the sitemap filter and scripts/seo/verify.ts checks the built
  * output against. Before that, a page could say "noindex" here while the sitemap advertised it.
  */
-import { cardSlug, isIndexable, normaliseRoute } from '../data/seo.ts';
+import {
+	LOCALE_DEFINITIONS,
+	cardSlug,
+	isIndexable,
+	normaliseRoute,
+	type LocaleKey
+} from '../data/seo.ts';
 import { breadcrumbList, crumbsFor, type JsonLd } from '../data/structured.ts';
+import { alternatesFor, localizedRoute } from '../i18n/locale.ts';
+import { languageScriptSource } from '../i18n/language-script.ts';
 import { lastModified } from '../../scripts/seo/lastmod.ts';
 import { sourcesFor } from '../../scripts/seo/sources.ts';
 
@@ -22,12 +30,21 @@ interface Props {
 	noindex?: boolean;
 	/* The visible heading, used as the breadcrumb leaf so it matches what the page shows. */
 	breadcrumbLeaf?: string;
+	locale?: LocaleKey;
 }
-const { title, description, image, jsonLd, noindex, breadcrumbLeaf } = Astro.props;
+const { title, description, image, jsonLd, noindex, breadcrumbLeaf, locale = 'en' } = Astro.props;
 
 const route = normaliseRoute(Astro.url.pathname);
 const canonical = new URL(route, Astro.site);
 const hidden = noindex ?? !isIndexable(route);
+
+/*
+ * The language versions of this page that exist, itself included, with English as the default for
+ * every other language. A page with no translation declares none — not even x-default — so the
+ * language script has nothing to redirect to and the switcher nothing to offer.
+ */
+const alternates = hidden ? [] : await alternatesFor(route);
+const feed = localizedRoute('/blog/', locale) + 'rss.xml';
 
 /*
  * The per-page card, referenced unconditionally: scripts/seo/cards.ts renders one for every page
@@ -100,12 +117,30 @@ const plausible = import.meta.env.PUBLIC_PLAUSIBLE_DOMAIN;
 	 * Only on the blog: autodiscovery on a page with no feed behind it points a reader's tooling at
 	 * something that has nothing to do with what they are reading.
 	 */
-	route.startsWith('/blog/') && (
+	route.startsWith(localizedRoute('/blog/', locale)) && (
 		<link
 			rel="alternate"
 			type="application/rss+xml"
 			title="FoxAuth blog"
-			href="/blog/rss.xml"
+			href={feed}
+		/>
+	)
+}
+{
+	alternates.map((alternate) => (
+		<link
+			rel="alternate"
+			hreflang={alternate.locale.lang}
+			href={new URL(alternate.href, Astro.site).href}
+		/>
+	))
+}
+{
+	alternates.length > 0 && (
+		<link
+			rel="alternate"
+			hreflang="x-default"
+			href={new URL(alternates[0]!.href, Astro.site).href}
 		/>
 	)
 }
@@ -125,6 +160,10 @@ const plausible = import.meta.env.PUBLIC_PLAUSIBLE_DOMAIN;
 <meta
 	property="og:site_name"
 	content="FoxAuth"
+/>
+<meta
+	property="og:locale"
+	content={LOCALE_DEFINITIONS[locale].ogLocale}
 />
 <meta
 	property="og:title"
@@ -177,3 +216,8 @@ const plausible = import.meta.env.PUBLIC_PLAUSIBLE_DOMAIN;
 		/>
 	)
 }
+{/* Last, so the hreflang links above exist when it reads them. */}
+<script
+	is:inline
+	set:html={languageScriptSource()}
+/>

@@ -12,26 +12,63 @@
  * what is on the other end, and tells a reader scanning the page nothing either.
  */
 import { getCollection } from 'astro:content';
+import { chrome } from '../i18n/chrome.ts';
+import type { LocaleKey } from '../data/seo.ts';
+import { listParts } from '../data/storage.ts';
 
 interface Props {
 	/* `prose` reads as a sentence inside body copy; `list` is a plain set of links. */
 	variant?: 'prose' | 'list';
 	class?: string;
+	locale?: LocaleKey;
 }
-const { variant = 'prose', class: className } = Astro.props;
+const { variant = 'prose', class: className, locale = 'en' } = Astro.props;
+const t = chrome(locale).compareLinks;
 
 const entries = (await getCollection('compare')).sort((a, b) =>
 	a.data.competitor.localeCompare(b.data.competitor)
 );
+
+/*
+ * Comparison articles are English-only, so the links always point at the English pages. In another
+ * language the names are joined the way that language lists things («A, B и C», «A、B 和 C»), which
+ * Intl.ListFormat knows and a hard-coded ", " and " and " does not.
+ */
+const parts =
+	locale === 'en'
+		? undefined
+		: listParts(
+				entries.map((entry) => entry.id),
+				'conjunction',
+				locale
+			);
+const byId = new Map(entries.map((entry) => [entry.id, entry]));
 
 const linkClass =
 	'font-medium text-accent-700 underline underline-offset-2 hover:text-accent-800 dark:text-accent-200 dark:hover:text-accent-100';
 ---
 
 {
-	variant === 'prose' ? (
+	variant === 'prose' && parts ? (
 		<p class:list={['text-gray-600 dark:text-gray-400', className]}>
-			Already running something else? We keep dated, sourced comparisons with{' '}
+			{t.before}{' '}
+			{parts.map((part) =>
+				part.type === 'element' ? (
+					<a
+						href={`/compare/${part.value}/`}
+						class={linkClass}
+					>
+						{byId.get(part.value)?.data.competitor}
+					</a>
+				) : (
+					part.value
+				)
+			)}
+			{t.after}
+		</p>
+	) : variant === 'prose' ? (
+		<p class:list={['text-gray-600 dark:text-gray-400', className]}>
+			{t.before}{' '}
 			{entries.map((entry, index) => (
 				<Fragment>
 					<a
@@ -43,7 +80,7 @@ const linkClass =
 					{index < entries.length - 2 ? ', ' : index === entries.length - 2 ? ' and ' : ''}
 				</Fragment>
 			))}
-			, each listing the pages we read and the date we read them.
+			{t.after}
 		</p>
 	) : (
 		<ul class:list={['flex flex-col gap-1', className]}>
