@@ -1,0 +1,99 @@
+---
+title: Rotate signing keys
+description: Generate a key, wait while every instance publishes it, promote it, then retire the old one. Rotation without a restart for the instance and every bucket.
+sidebar:
+  order: 6
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+Every token this server signs carries the `kid` of the key that signed it, and every relying party
+verifies it against a published key set. Rotating a key means changing which key signs without leaving
+any instance, or any relying party, holding a token it cannot verify. It is three steps, each with a
+reason, and none of them needs a restart.
+
+## Whose keys
+
+Each issuer has its own keys, and so its own rotation:
+
+- **The instance's keys** sign for everything served at the root: the default bucket, the
+  administrators' bucket and any bucket without an address of its own. They are published at `/jwks`.
+  Only super administrators manage them, on the console's **Keys** page or with the `jwks_*` tools.
+- **A bucket's keys**, for a bucket with a path or a hostname of its own. It signs with them alone and
+  publishes them under its own issuer, `https://auth.example.com/acme/jwks` or its hostname's `/jwks`, so a
+  token from one bucket never verifies against another bucket's keys. The group that owns the bucket
+  manages them from the bucket's page, or with the `bucket_key_*` tools.
+
+A bucket without an address has no keys of its own; its key operations are refused and the console
+sends you to the instance's **Keys** page.
+
+## A key's life: published, signing, retired, hidden
+
+<Steps>
+
+1. **Generate.** The new key is _published_: it appears in the key set and verifies, but signs nothing.
+   Every algorithm the server supports is offered: RSA (`RS*`, `PS*`), elliptic curve (`ES*`) and
+   `EdDSA`.
+
+2. **Promote**, once the key has been published for 60 seconds. It becomes the signer of its algorithm,
+   and the key that signed that algorithm before goes back to published, so it keeps verifying the tokens
+   it already signed. The new signer is written first, so there is no moment with no signer.
+
+3. **Retire** the old key once you no longer need it to sign. Retiring asks you to type its `kid`, and
+   over the API the body must name it: `{ "confirm": "<kid>" }`. The key that currently signs cannot be
+   retired. Promote its replacement first.
+
+</Steps>
+
+A retired key stays published for one day, the longest anything it signed can live, and is then
+**hidden**: gone from the key set, from the console's list and from every verification. It is never
+deleted. The record is kept, and every operation on it answers `404`.
+
+<Aside
+	type="note"
+	title="Why sixty seconds"
+>
+	Each server instance caches every issuer's key set for 30 seconds, and
+	instances do not message each other. A key published for twice that long is
+	served by every instance before any instance signs with it, so no instance
+	ever hands out a token that another instance's `/jwks` does not yet show.
+	Promote is refused with `too_soon` until then.
+</Aside>
+
+Each step is recorded in the audit trail before it takes effect. For an agent, every instance key tool
+is high-consequence and asks for confirmation, and so is retiring a bucket key; generating and
+promoting a bucket key are ordinary.
+
+## One signer per algorithm
+
+An issuer has one signing key per algorithm, not one in total. Ordinary clients get `RS256`, and a FAPI
+2.0 client registered for `PS256` or `ES256` needs a signer in that algorithm too, so an issuer can sign
+with several keys at once, each for its own clients. Promoting a key replaces only its own algorithm's
+signer, so no step can leave a client's algorithm without one.
+
+A new algorithm needs no restart. Generate an `ES256` key, promote it, and discovery advertises `ES256`
+from then on, so clients can register for it straight away.
+
+## What a relying party has to do
+
+The sixty-second window protects this server's own instances. It cannot protect a relying party that
+caches the key set for an hour and never looks again. A relying party that copes with rotation:
+
+- reads `jwks_uri` from the issuer's discovery document rather than having it typed into its
+  configuration, so a bucket's own key set is found without anyone remembering it exists;
+- selects the verification key by the token's `kid`, never by assuming there is only one key;
+- re-reads the key set when it sees a `kid` it does not know, with a short cooldown so a stream of
+  forged `kid`s cannot make it fetch on every request.
+
+Most JWT libraries do all three when given the `jwks_uri`. If yours caches harder than that, generate the
+new key well ahead of promoting it, at least as long ahead as that cache lives.
+
+## A rotation, start to finish
+
+1. Generate a key in the same algorithm as the one you are replacing.
+2. Wait at least a minute, longer if a relying party caches the key set for longer, then promote it.
+3. Retire the old key, typing its `kid`. It keeps verifying for the day a retired key stays
+   published, which outlasts every token it signed, so there is nothing to wait for first.
+
+The upgrade to 0.8.0 moved the instance's keys into this lifecycle; [Upgrading](/docs/deploy/upgrade/)
+says how it chose which key signs.

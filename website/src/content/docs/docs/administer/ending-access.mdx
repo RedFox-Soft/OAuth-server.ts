@@ -1,0 +1,90 @@
+---
+title: End a user's access
+description: Deactivate, lock, sign out everywhere or delete an end user. What each one ends at once, what survives it, and the one token none of them can reach.
+sidebar:
+  order: 5
+---
+
+Four actions end an end user's access, and all four end it now rather than at the user's next sign-in.
+They differ in what is left afterwards and in who can undo them.
+
+| Action                  | What is left afterwards                       | Who undoes it                                                                          | Console                       | Agent                                     |
+| ----------------------- | --------------------------------------------- | -------------------------------------------------------------------------------------- | ----------------------------- | ----------------------------------------- |
+| **Deactivate**          | the account, marked inactive                  | whoever manages the account: an administrator, or the directory for a provisioned user | **Edit user**, **Active** off | `bucket_user_update` with `active: false` |
+| **Lock**                | the account, locked, with the reason recorded | an administrator only                                                                  | not in the console            | `bucket_user_lock`, `bucket_user_unlock`  |
+| **Sign out everywhere** | the account, active and free to sign in again | nobody needs to                                                                        | **Sign out everywhere**       | `bucket_user_sign_out`                    |
+| **Delete**              | nothing                                       | nobody can                                                                             | **Delete**                    | `bucket_user_delete`                      |
+
+The lock is also on the admin API (`POST /admin/api/buckets/:id/users/:uid/lock`, with a `reason`, and
+`…/unlock`), but has no button in the console yet.
+
+## What each of them ends
+
+Each runs the same sequence:
+
+1. The account is marked, so that from this moment no door lets it in: not the password form, not a
+   federated sign-in, not a refresh, the device flow or CIBA. Sign out everywhere skips this step,
+   which is the whole difference.
+2. Every session gets a back-channel logout to each relying party that registered for one. The
+   sessions are read before anything is removed, because the logout token has to carry the session's
+   `sid`, and the session is the only place that holds it. A relying party that is unreachable does not
+   stop the action.
+3. Everything the account owns is swept: sessions, grants and with them consents, refresh tokens,
+   opaque access tokens, authorization codes, pending device and CIBA requests, sign-ins and password
+   resets in progress. The list comes from
+   the storage inventory's owner declarations, so a kind of record added in a later release is swept
+   without anyone remembering to add it.
+
+Introspection answers `active: false` for an opaque access token from that moment, because the grant
+behind it is gone. Deletion then also removes the account, its upstream identity links and its group
+memberships.
+
+If the sweep fails partway, the action answers `500` naming the areas that survived. The account is
+already unable to sign in, and repeating the action sweeps again, which is why deactivating an
+already inactive user is allowed rather than refused as a no-op.
+
+Two things are deliberately not swept. The sign-in and password-reset throttles are keyed by email
+address and limit guessing; they are not access, and clearing them on an account under attack would
+reset the brute-force count mid-incident. And the audit trail records the action, never what it swept.
+
+## Reactivation restores nothing
+
+Turning a deactivated user back on, or unlocking a locked one, lets them sign in again. It does not
+bring back their sessions, refresh tokens or consents. They sign in and consent afresh, as the IPSIE
+profile requires when it says every access mechanism and authorization is to be deactivated.
+
+## Why the lock is not deactivation
+
+`active` belongs to whoever manages the account. For a user a [SCIM directory](/docs/administer/scim/)
+provisioned, that is the directory, and a local deactivation would be undone by the directory's next
+update. An incident response cannot wait on someone else's system, so the lock is a separate flag that
+only an administrator sets or clears, and nothing a directory sends reaches it. It touches sign-in only,
+never the profile.
+
+That is a deliberate departure from the IPSIE profile, which forbids local changes to users an identity
+service manages. Unlocking is a high-consequence MCP tool that asks for confirmation, because it
+re-admits an account an administrator judged compromised. Locking is not, like deactivation.
+
+An administrator's edit, password reset or deletion of a provisioned user is refused with `409`, naming
+the connection that owns them, so deactivate and delete such users in the directory. The lock, sign out
+everywhere and clearing an authenticator stay available, because none of them changes the profile.
+
+## Sign out everywhere is for the stolen laptop
+
+Deactivation and the lock answer "this person should not get in". Sign out everywhere answers "someone
+else may be holding this person's session": it ends every session and token the way a lock does, and
+leaves the account as it was. It is also exactly what an upstream provider asks for when it sends
+[global token revocation](/docs/administer/upstream-logout/), and the audit trail records both under
+the same action.
+
+## The token none of them can reach
+
+A JWT access token that a resource server validates on its own, against the published keys, never
+comes back to this server, so nothing here can recall it. It lives to its `exp`. Everything else above
+ends at once; that token does not.
+
+The bound on it is its lifetime, set as `accessTokenTTL` on the declared resource: fifteen minutes unless
+an administrator chose otherwise, and at most a day. Keep it short. IPSIE SL2 allows fifteen minutes for a
+token not bound to a key, and sixty for one bound with DPoP. A resource server that cannot tolerate even
+that should ask for opaque tokens and introspect them, which costs a call per request and sees a
+deactivation immediately.

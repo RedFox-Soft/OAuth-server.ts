@@ -4,7 +4,7 @@ title: 'End-user lifecycle: ending access, the local lock, provisioned users'
 tags: [architecture, contract, gotcha, oidc]
 sources: [oauth-server-codebase]
 created: 2026-10-06
-updated: 2026-10-06
+updated: 2026-10-08
 graph:
   node_type: concept
   relationships:
@@ -51,8 +51,12 @@ Introspection needed no change: it already answers `active: false` once the gran
 consents afresh. IPSIE requires "all access mechanisms and authorizations" to be deactivated.
 
 **The one thing this cannot reach** is a JWT access token a resource server validates locally — it lives to
-its own expiry (1 h by default). IPSIE SL2 allows 15 minutes for tokens not bound to a key, so a deployment
-that needs the bound sets a shorter `accessTokenTTL` on the resource.
+its own expiry: the declared resource's `accessTokenTTL`, which a declaration that names none stores as 900 s
+(`lib/adapters/mongodb/protectedResourceStore.ts:66`, the same in the other two stores) and an administrator may
+raise to a day (`lib/admin/resources/schema.ts:23`). IPSIE SL2 allows 15 minutes for tokens not bound to a key, so
+the default meets it and a raised value does not. (Corrected 2026-10-08: this said "1 h by default", which is
+`ttl.AccessToken`'s fallback in `lib/configs/liveTime.ts:47` for a token with no declared resource — and such a
+token is opaque, so it never reaches a resource server to be validated locally.)
 
 ### A partial sweep answers 500, not an audit detail
 

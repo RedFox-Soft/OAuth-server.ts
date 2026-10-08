@@ -204,7 +204,7 @@ signs afterwards is the key the old server was signing with; on PostgreSQL, whic
 order, that is the key with the lowest `kid`. The migration prints which key it chose for each algorithm,
 so check that output against what your relying parties expect. Every other key becomes published only:
 it is still served at `/jwks` and still verifies, but it does not sign. A migrated key can be promoted
-once the 60-second publication window has passed.
+once the 60-second publication window has passed. See [Rotate signing keys](/docs/administer/signing-keys/).
 
 **`2026-10-08-roles-to-groups`** removes roles. Every role a bucket declares, or an end user holds, becomes
 a bucket group with exactly the same holders as members. Role names that differ only in letter case are
@@ -219,7 +219,7 @@ What an integration sees after 0.8.0:
   administrator, a bucket or an end user is now refused, because the field is unknown. Super
   administrator standing is granted and withdrawn by operations of its own, `admin_super_grant` and
   `admin_super_withdraw`, and end users are grouped with the `bucket_group_*` tools. Relying parties that
-  read roles from a claim read the `groups` claim instead.
+  read roles from a claim read the [`groups` claim](/docs/administer/groups/) instead.
 - **Refresh tokens are served only while `offline_access` is a supported scope.** The token endpoint
   now accepts exactly the grant types discovery advertises, so with `offline_access` absent from the
   [`scopes`](/docs/reference/settings/#scopes) setting, a refresh, including one using a token issued
@@ -236,7 +236,7 @@ What an integration sees after 0.8.0:
 ### Then 0.9.0
 
 0.9.0 declares no migration. It adds one storage area, `UpstreamSession`, which
-back-channel logout from upstream providers needs, so run
+[back-channel logout from upstream providers](/docs/administer/upstream-logout/) needs, so run
 `db:setup` (or `db:setup:pg`) and restart.
 
 One fix in it concerns the upgrade you have just read about. The Compose files shipped before 0.9.0 ran

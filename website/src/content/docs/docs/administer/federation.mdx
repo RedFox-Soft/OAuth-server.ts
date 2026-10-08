@@ -1,0 +1,128 @@
+---
+title: Connect an upstream identity provider
+description: Let a bucket's users sign in through Google, Microsoft, Apple, GitHub or any OpenID provider, and decide which accounts such a sign-in may create or link.
+sidebar:
+  order: 1
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+A user bucket can carry upstream identity providers. Each enabled one becomes a button on that bucket's
+sign-in page. The user authenticates at the provider, and this server, acting as the provider's
+relying party, turns the assertion it gets back into an ordinary local session. Everything after that
+point is the same as a password sign-in: the same second-factor rules, the same consent, the same
+tokens.
+
+Providers are configured per bucket. Bucket A's Google application is not bucket B's, and whoever
+administers a bucket configures its providers without needing a super administrator.
+
+<Aside
+	type="note"
+	title="What you need first"
+>
+	The [`federation.enabled`](/docs/reference/settings/#federation.enabled)
+	setting on, which serves the sign-in legs of the flow. The management routes
+	are not gated by it, so you can prepare a provider before switching it on, and
+	remove one you stopped trusting after switching it off.
+</Aside>
+
+## Recognised providers need only their own values
+
+Four providers are recognised by name: **Google**, **Microsoft**, **Apple** and **GitHub**. Choose one
+from the catalogue when adding a provider, and you are asked only for the values that provider issues:
+
+| Provider  | What you supply                                               |
+| --------- | ------------------------------------------------------------- |
+| Google    | Client ID, client secret                                      |
+| Microsoft | Directory (tenant) ID, application (client) ID, client secret |
+| Apple     | Services ID, Team ID, Key ID, the key file (`.p8`)            |
+| GitHub    | Client ID, client secret                                      |
+
+The catalogue fills in the rest: issuer, scopes, which claim holds the email address, whether that
+provider's verified addresses can be trusted, and the steps to perform at the provider. Nothing is
+stored about where a provider came from, so a Google provider you configured by hand earlier is
+recognised as Google all the same.
+
+Three of the four needed more than a row of data, and each difference is visible to an operator:
+
+- **Microsoft's tenant is who may sign in.** `common` admits any Microsoft account, personal ones
+  included; `organizations` admits any work or school account; one directory's ID admits only that
+  organisation. The server checks the `tid` claim against it, because with a multi-organisation endpoint
+  every organisation's tokens verify correctly. Microsoft does not always send an `email` claim, so the
+  fallback `preferred_username` is used only when it looks like an address.
+- **Apple issues no secret.** It issues a signing key, and the credential presented to Apple is derived
+  from that key on every exchange, so there is nothing to expire six months from now. Apple sends a
+  person's name once, on their first authorization, and never again.
+- **GitHub does not speak OpenID Connect for sign-in.** The server exchanges the code, reads the
+  profile through GitHub's API and drops the token. The subject is the numeric account id, never the
+  login, which can be renamed and claimed by somebody else, and the address used is the primary one
+  GitHub marks verified.
+
+Any other OpenID Connect provider, such as Okta, Keycloak, Auth0 or Ping, is configured by its issuer.
+The server reads its discovery document, refuses one that names an endpoint which is not `https`, and
+checks that the document's issuer is the one you entered.
+
+## Register the callback address before you test
+
+<Steps>
+
+1. Open the bucket in the console, go to **Identity providers**, and add the provider.
+
+2. Copy **The redirect URI to register** from the provider's details. It is the bucket's issuer followed
+   by `/federation/callback`: `https://auth.example.com/acme/federation/callback` for a bucket at a
+   path, `https://login.acme.example/federation/callback` for a bucket with a hostname.
+
+3. Register exactly that address at the provider. Providers compare it character for character.
+
+</Steps>
+
+The address belongs to the bucket's address, so changing the bucket's path or hostname changes it, and
+the provider will then refuse every sign-in with a redirect mismatch on its own page. A bucket that has
+no address yet gets a callback built from its record id. The console warns about this when you copy it,
+because that address stops matching as soon as the bucket is given a path.
+
+## Who gets an account, and who gets linked
+
+**First-time users** decides whether a sign-in from someone with no account here creates one:
+**Create an account automatically**, or **Only allow accounts that already exist**. **Allowed email
+domains** narrows it further. Leave it empty and an enabled Google button creates an account for anyone
+with a Google account, which is the classic way this feature is misconfigured.
+
+When a sign-in arrives, the server works through the same questions in the same order every time, and
+the order is what keeps one person's address from opening another person's account:
+
+1. **Is this upstream identity already linked to an account?** Then that account signs in, if it is
+   active and not locked. The link is the identity from then on; the email address only matters the
+   first time.
+2. **Is the provider bound to a SCIM connection?** Then the connection's correlation rule names one
+   provisioned account or the sign-in is refused, and none of the email steps below runs. See
+   [Provision users with SCIM](/docs/administer/scim/).
+3. **Is there an email address in the claim you named?** No address, no sign-in. Corporate providers
+   often put it in `upn` rather than `email`.
+4. **Is its domain allowed?** This is checked before looking for an existing account, so the server
+   never reveals whether an account exists for an address the provider may not speak for.
+5. **Does an account with that address already exist?** It is linked only if **Trust this provider's
+   verified addresses** is on and the token says `email_verified` is exactly `true`. Even then, an
+   account that so far holds only a password is not linked on the spot: the user is sent to sign in to
+   that account with its password, and second factor where the bucket requires one, and the link is
+   made when that sign-in completes. Without this, anyone who registered a victim's address first would
+   inherit the victim's first federated sign-in.
+6. **Otherwise**, a new account is created or the sign-in refused, according to **First-time users**.
+
+An account created this way has no usable password. Upstream access and refresh tokens are never kept.
+The only claims copied from the provider are `name`, `given_name`, `family_name`, `picture` and `locale`.
+
+## Turning a provider off, and unlinking
+
+The **Enabled** switch keeps the provider's credentials, so taking it out of service during an
+incident costs nothing to undo. Removing it deletes them. To detach one person from an upstream
+identity without touching the provider, delete the link from the user's identities; their next
+federated sign-in then goes through the steps above again.
+
+An agent does the same through `federation_catalogue_list`, `federation_provider_create` (pass the
+catalogue entry and only the values it asks for), `federation_provider_update` and
+`federation_identity_delete`; see the [MCP tool reference](/docs/reference/mcp-tools/#federation_provider_update).
+
+Two options on a provider concern signing people out rather than in: accepting Okta's global token
+revocation, and accepting back-channel logout from Keycloak, Auth0 or Ping. They have a page of their own,
+[Sign-out from upstream providers](/docs/administer/upstream-logout/).

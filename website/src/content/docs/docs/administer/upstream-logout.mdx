@@ -1,0 +1,130 @@
+---
+title: Sign-out from upstream providers
+description: Let Okta Universal Logout end a user's access here, and let a sign-out at Keycloak, Auth0 or Ping end the sessions it began, with what each one reaches.
+sidebar:
+  order: 3
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+When a bucket's users sign in through an [upstream identity provider](/docs/administer/federation/),
+signing out of that provider does not, by itself, sign them out here. Their session on this server and
+the tokens its relying parties hold are this server's. Two inbound signals close that gap, and which one
+applies depends entirely on which provider you use:
+
+| Provider              | What it sends to an application like this one                               | Received here as                                      |
+| --------------------- | --------------------------------------------------------------------------- | ----------------------------------------------------- |
+| Okta                  | Universal Logout (global token revocation), with Identity Threat Protection | global token revocation, experimental, off by default |
+| Keycloak, Auth0, Ping | OpenID Connect Back-Channel Logout                                          | back-channel logout, on with federation               |
+| Microsoft Entra ID    | Nothing a third-party application can receive                               | —                                                     |
+| Google                | RISC events, for consumer accounts only                                     | —                                                     |
+
+Both are opted into one provider at a time, on the provider's own settings in the bucket's **Identity
+providers**. Neither is accepted from a provider that has not been opted in, whatever it signs.
+
+## Global token revocation: Okta Universal Logout
+
+<Aside
+	type="caution"
+	title="Experimental"
+>
+	The request Okta sends is described by
+	draft-parecki-oauth-global-token-revocation-06, an individual Internet-Draft
+	that expired without being adopted on 2026-08-28. The format may change, so
+	the endpoint sits behind its own switch, off by default. It has not yet been
+	run against a real Okta organisation; the test suite replays the request Okta
+	documents, signed with a stub provider's keys.
+</Aside>
+
+Turn on [`globalTokenRevocation.enabled`](/docs/reference/settings/#globalTokenRevocation.enabled), then,
+on the Okta provider, **Accept global token revocation (Okta Universal Logout)**. The provider's details
+show the **Logout endpoint to give the provider**: the bucket's issuer followed by
+`/global-token-revocation`. While the switch is on, each bucket's discovery document advertises it as
+`global_token_revocation_endpoint`.
+
+Okta's request is a JSON body naming the user, authenticated by a short-lived JWT that Okta signs with
+its own keys:
+
+```http
+POST /acme/global-token-revocation HTTP/1.1
+Host: auth.example.com
+Authorization: Bearer eyJ0eXAiOiJnbG9iYWwtdG9rZW4tcmV2b2NhdGlvbitqd3QiLCJhbGciOiJSUzI1NiJ9...
+Content-Type: application/json
+
+{ "sub_id": { "format": "iss_sub", "iss": "https://acme.okta.com", "sub": "00u1a2b3c4d5e6f7g8h9" } }
+```
+
+The JWT's `iss` is the Okta organisation, its `sub` is this server's client id at Okta, and its `aud`
+is the endpoint itself. The server finds the provider by that issuer and client id, checks the
+signature against the keys Okta publishes, and only then looks at whom it names. A user can be named
+by `iss_sub`, their subject at that provider, or by `email`. Okta may name only the users it signs in
+here, or the users its bound [SCIM connection](/docs/administer/scim/) provisioned. Anyone else gets the
+same `404` as a user who does not exist.
+
+What it ends is everything: every session, grant, refresh token and opaque access token the user holds,
+with a back-channel logout to each relying party that asked for one. The account itself stays active,
+so the user can sign in again straight away, and is asked for consent afresh. The answer is `204`.
+
+Two things about Okta's request are unconfirmed until it runs against a real organisation. Okta
+documents its `sub` as `client_id/appInstanceId`, and its `iss` as the organisation's base URL, so a
+provider configured with a custom authorization server's issuer may not match.
+
+## Back-channel logout: Keycloak, Auth0 and Ping
+
+OpenID Connect Back-Channel Logout 1.0 is a final specification, so this needs no switch of its own: it
+is served whenever [`federation.enabled`](/docs/reference/settings/#federation.enabled) is on. Opt the
+provider in with **Accept back-channel logout (Keycloak, Auth0, Ping)**, and register the **Back-channel
+logout URL to register at the provider** in the provider's client settings. It is the bucket's issuer
+followed by `/federation/backchannel-logout`. An agent sets the same option through
+`federation_provider_update`.
+
+From then on, each federated sign-in records which provider it came through and a digest of that
+provider's session id. When the provider posts a logout token:
+
+- a token naming a session (`sid`) ends the sessions here that began from that upstream session;
+- a token naming only a person (`sub`) ends every session of theirs whose latest sign-in came
+  through that provider, and never their password sessions or another provider's.
+
+Each matched session ends exactly as a sign-out here would end it. Relying parties are told, and the
+account is untouched. Offline access survives, as the specification requires: a logout reports a
+sign-out, not a compromise. Keycloak's own `revoke_offline_access` member is ignored. If a provider's
+logout should cut off refresh tokens too, deactivate or lock the user, or use global token revocation
+where the provider offers it.
+
+A token that matches nobody still gets `200`, so a provider learns nothing about who signed in here.
+A refused token gets `400` with one body, whatever the reason.
+
+Keycloak releases older than 24.0.0, except 22.0.8 and 23.0.4, send logout tokens with no `exp`, and are
+refused. The flow was run end to end against a real Keycloak 26.8.0, both with "Backchannel logout
+session required" on and with it off. Auth0 and Ping are covered by the test suite replaying the token
+shapes they document.
+
+Some sessions are out of reach:
+
+- sessions signed in before the upgrade to 0.9.0, which carry no record of where they came from;
+- a session kept alive more than 14 days after its federated sign-in, when the token names only `sid`
+  (tokens with `sub`, which all three providers send, still reach it);
+- a sign-in still completing when the logout arrives.
+
+A provider registers one logout URL per application, so an upstream application shared by two buckets
+is heard only by the bucket at the URL it was given, and changing a bucket's address changes the URL.
+
+## What both refuse
+
+An endpoint that ends sessions is a lever over a whole workforce, and what an attacker needs to aim it,
+the provider's issuer, your client id there and a user's subject, is not secret. So both signals are
+held to the same checks, and no setting relaxes them:
+
+- only asymmetric signatures, verified with the provider's own published keys, so `alg: none` and
+  shared-secret algorithms are refused whatever the provider advertises;
+- `aud`, `exp`, `iat` and `jti` required, a lifetime of at most five minutes measured from `iat`, and
+  each `jti` accepted once;
+- the provider must be opted in, which is checked only after it has authenticated;
+- a failed credential is charged at the strict per-origin rate.
+
+## Doing the same thing yourself
+
+An administrator can end a user's sessions and tokens without any provider involved: **Sign out
+everywhere** on the user, or `bucket_user_sign_out`. It does what global token revocation does, and is
+recorded in the audit trail under the same action. [End a user's access](/docs/administer/ending-access/)
+compares it with deactivation, the lock and deletion.

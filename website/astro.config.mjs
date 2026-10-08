@@ -92,6 +92,10 @@ export default defineConfig({
 					items: [{ autogenerate: { directory: 'docs/deploy' } }]
 				},
 				{
+					label: 'Administer',
+					items: [{ autogenerate: { directory: 'docs/administer' } }]
+				},
+				{
 					label: 'Security',
 					items: [{ autogenerate: { directory: 'docs/security' } }]
 				},

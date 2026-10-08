@@ -1,0 +1,98 @@
+---
+title: Groups and the groups claim
+description: Bucket groups gather a bucket's end users, and relying parties read their names in the groups claim. Where the claim appears, and what changes above 200 groups.
+sidebar:
+  order: 4
+---
+
+There are no roles. End users are grouped by **bucket groups**, and a relying party that needs to know
+what someone may do reads the names of their groups from the `groups` claim and decides for itself.
+
+## Two kinds of group, kept apart on purpose
+
+The word means two different things here, and the console and the API keep them apart:
+
+- **Bucket groups** are named sets of one bucket's end users. They grant nothing on this server; they
+  exist to be read by relying parties. Agents manage them with the `bucket_group_*` tools.
+- **Administrator groups** own projects and buckets, and membership is what gives an administrator
+  access to them. One of them, **Super administrators**, is the instance-wide privilege. Agents manage
+  administrator groups with the `group_*` tools, and super administrator standing with
+  `admin_super_grant` and `admin_super_withdraw`.
+
+They are separate entities so that nothing a directory writes over SCIM, and nothing in a token, can
+reach the set that grants privilege here. A SCIM directory writes bucket groups; it cannot touch an
+administrator group.
+
+## Who keeps a bucket group
+
+A bucket group is kept either by administrators or by exactly one
+[SCIM connection](/docs/administer/scim/):
+
+- An **administrator-kept** group is created in the bucket's **Groups** panel or with
+  `bucket_group_create`, and its members are edited there. It may hold provisioned users too; the
+  membership belongs to the group, and the directory never sees it.
+- A **connection-owned** group is created by the directory through `/Groups`. Administrators can read it
+  but not change it, and the connection may add only users it provisioned.
+
+Names are unique within a bucket regardless of letter case. If a directory tries to create a group whose
+name an administrator-kept group already holds, it is refused. An administrator can then hand the
+existing group over to the connection, once every member is someone that connection manages. The
+handover is never automatic.
+
+## The `groups` scope and claim
+
+A client asks for the `groups` scope, and the user's groups arrive as the `groups` claim: their display
+names, sorted.
+
+```json
+{
+	"sub": "248289761001",
+	"groups": ["Billing", "Engineering", "On-call"]
+}
+```
+
+The scope is built in. It releases the claim whatever the [claims setting](/docs/reference/settings/#claims)
+holds, and a `groups` value stored on an account's own claims can never stand in for it: the claim is
+always computed from membership.
+
+Where it appears:
+
+- **UserInfo**, always, when the access token carries the scope.
+- **The ID token** only if scope claims go there at all. With
+  [`conformIdTokenClaims`](/docs/reference/settings/#conformIdTokenClaims) on, the default, they do not
+  for the `code` flow, which is the only flow this server runs; turn it off and the claim is in the ID
+  token too.
+- **An access token for a declared resource**, and its introspection response, when the authorization
+  granted `groups`. This is a snapshot taken when the token was issued, as RFC 9068 describes, so a
+  membership change shows up in the next token, not in one already issued.
+
+Because the value is the display name, renaming a group changes what relying parties receive. That is
+intended, since only the group's owner can rename it and names are unique in the bucket, but a relying
+party that matches on a name has to learn the new one.
+
+## Above 200 groups
+
+A token cannot carry an unbounded list. For a user in more than 200 groups, which is the limit Entra ID
+applies to its own tokens and so the number relying parties already code against, the ID token and the
+access token carry an OpenID Connect distributed-claim reference instead of the list:
+
+```json
+{
+	"_claim_names": { "groups": "groups" },
+	"_claim_sources": {
+		"groups": { "endpoint": "https://auth.example.com/acme/userinfo" }
+	}
+}
+```
+
+The relying party fetches the list from UserInfo, which always carries all of it. There is one case
+this does not cover: a resource server holding an access token bound to its own audience cannot call
+UserInfo with it, so it cannot follow the reference. If a resource server needs the groups of people in
+more than 200 of them, give it another way to look them up.
+
+## Moving from roles
+
+The 0.8.0 upgrade turned every role into an administrator-kept bucket group with the same members, and
+every holder of `super_admin` into a member of Super administrators. [Upgrading](/docs/deploy/upgrade/)
+has the details. A relying party that read roles from a custom claim reads `groups` now; a script that
+set `roles` through the admin API sets group memberships instead.

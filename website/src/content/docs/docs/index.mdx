@@ -52,6 +52,21 @@ release, which means the HTTP surface and the admin API may still change between
 the changelog says what moved, and the setup script has to be re-run afterwards so new collections
 and indexes exist, followed by `bun run db:migrate` for anything a release has to reshape.
 
+## Running it for real users
+
+Once people sign in through it, the work moves to the console. [Connect an upstream identity
+provider](/docs/administer/federation/) lets a bucket's users sign in through Google, Microsoft, Apple,
+GitHub or any OpenID provider, and decides which accounts such a sign-in may create or link. With that in
+place, [Provision users from Entra ID or Okta](/docs/administer/scim/) hands the bucket's users and
+groups to the directory over SCIM, and [Sign-out from upstream
+providers](/docs/administer/upstream-logout/) lets a sign-out there end the sessions here.
+
+[Groups and the groups claim](/docs/administer/groups/) covers what replaced roles and how a relying
+party reads it. [End a user's access](/docs/administer/ending-access/) compares deactivation, the lock,
+signing out everywhere and deletion, and names the one token none of them can recall. [Rotate signing
+keys](/docs/administer/signing-keys/) walks the instance's and each bucket's keys through generate,
+promote and retire without a restart.
+
 ## Deciding whether to trust it
 
 An authorization server is the front door of everything behind it. Before you put one in front of

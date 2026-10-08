@@ -1,0 +1,176 @@
+---
+title: Provision users from Entra ID or Okta with SCIM
+description: Connect Microsoft Entra ID, Okta or any SCIM 2.0 client to a bucket, so the directory creates, updates, deactivates and deletes its users and groups.
+sidebar:
+  order: 2
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+With SCIM 2.0 the directory is the source of truth for who works here. Microsoft Entra ID, Okta or any
+SCIM client creates a bucket's users, keeps their profiles current, puts them in groups, and
+deactivates or deletes them when they leave. The same people then sign in through the same directory,
+and the sign-in finds their account by the directory's own identifier rather than by email address.
+
+All of that rests on one record per directory, the **provisioning connection**. It belongs to one
+bucket and is bound to one of that bucket's upstream identity providers.
+
+<Aside
+	type="note"
+	title="What you need first"
+>
+	Three things. The [`scim.enabled`](/docs/reference/settings/#scim.enabled)
+	setting on: it is off by default, because it lets a third party's system write
+	end-user accounts, and connections can be prepared while it is off. A bucket
+	with an address, meaning one at a path or a hostname of its own, or the
+	default bucket at the root; the administrators' bucket cannot be provisioned.
+	And the directory configured as an [upstream identity
+	provider](/docs/administer/federation/) of that bucket, because the connection
+	is bound to it.
+</Aside>
+
+## Create the connection
+
+<Steps>
+
+1. Open the bucket in the console, go to **Provisioning (SCIM)** and choose **New provisioning
+   connection**.
+
+2. Pick the **Identity provider** the directory's users will sign in with. One provider binds to at
+   most one connection.
+
+3. Check the **correlation rule**: the ID token claim and the SCIM attribute that must hold the same
+   value for a sign-in to land on a provisioned account. For Microsoft it starts as `oid` ↔
+   `externalId`, because Entra's `sub` differs per application while its object id is stable and is what
+   Entra sends to SCIM as `externalId`. For everything else it starts as `preferred_username` ↔
+   `userName`, which is what Okta sends.
+
+4. Choose what to do with **Email addresses from the directory**. **Untrusted**, the default, stores
+   them unverified. **Trusted** marks them verified, which you should choose only when the directory
+   verifies addresses itself.
+
+5. Save. The connection shows the **SCIM base URL**, the **Token endpoint** and the **Client id** you
+   will give the directory.
+
+</Steps>
+
+Creating the connection switches its provider to **Only allow accounts that already exist**, and keeps
+it there while the connection exists. A first sign-in that created an account would race the
+directory's own create and leave one person with two accounts.
+
+At a provider bound to a connection, sign-in never looks at email addresses. The correlation rule must
+name exactly one provisioned user: no match is refused as not provisioned, and a match already linked
+to a different upstream subject is refused rather than re-linked. Upstream claims are not copied onto a
+provisioned user, because the directory owns that profile.
+
+## The address the directory calls
+
+The SCIM base URL is the bucket's issuer followed by `/scim/v2`:
+
+```
+https://auth.example.com/acme/scim/v2
+https://login.acme.example/scim/v2
+```
+
+It serves `/Users`, `/Groups`, `/ServiceProviderConfig`, `/Schemas` and `/ResourceTypes`. There is no
+`/Bulk`, and neither Entra ID nor Okta calls it. Each connection is rate-limited on its own, 50 requests
+a second by default ([`scim.rateLimit.max`](/docs/reference/settings/#scim.rateLimit.max)), rather than
+per address, because Entra and Okta send many customers' traffic from a few addresses.
+
+## Microsoft Entra ID: client credentials
+
+Entra authenticates to the bucket's token endpoint as an OAuth client and presents the token it gets to
+the SCIM base URL. The client is `scim-<connectionId>`, shown on the connection as **Client id**. It is
+derived from the connection on every request and stored nowhere, so there is no second record to keep in
+step.
+
+Under **Authorization**, choose **Issue secret**. The secret is shown once. In Entra's provisioning
+settings, give it the SCIM base URL as the tenant URL, and the token endpoint, client id and secret for
+the client-credentials grant. Entra may send the secret by Basic authentication or in the form body;
+both are accepted. The token it gets carries the `scim` scope and nothing else, and works only at this
+bucket's SCIM URL.
+
+A client secret is a deviation from the IPSIE profile this server targets, which requires a signed JWT
+assertion. It exists because Entra can only send a secret, and it can be switched off with
+[`scim.secretCredentials`](/docs/reference/settings/#scim.secretCredentials). A client that can sign uses
+**Issue key credential** instead, with a key set pasted in or fetched from a URL. Issuing either kind
+replaces the connection's previous credential and ends every token it obtained.
+
+## Okta: a static token in header mode
+
+Okta cannot use the client-credentials grant for SCIM, so it gets a static token. Under
+**Authorization**, choose **Issue static token**. The token begins with `scimst_`, is shown once, and is
+stored only as a digest. In Okta's SCIM settings, choose header authentication and paste the token
+as it is. Okta sends it without a `Bearer` prefix, and the prefix is what lets this server recognise it.
+
+To rotate, issue a new static token. The old one stops working at that moment, and the connection has
+one static token at a time, so paste the new one into Okta straight away and use its credential test.
+Requests that arrive in between are refused as unauthenticated, so rotate when the directory is quiet.
+**Revoke the static token** removes it without issuing another. Static tokens are another deviation
+from the profile, switched by [`scim.staticTokens`](/docs/reference/settings/#scim.staticTokens).
+
+## Users and groups
+
+`/Users` creates, reads, filters, replaces, patches and deletes the bucket's end users. `userName` is
+unique in the bucket regardless of letter case; `externalId` is unique within the connection.
+Deactivating a user through SCIM ends their access at once, exactly as an administrator's deactivation
+does: see [End a user's access](/docs/administer/ending-access/).
+
+`/Groups` manages the bucket groups the connection owns, and their members. A group PATCH answers
+`204`, which is what Entra and Okta expect, and large groups are filled by PATCH batches of members
+rather than in the create. Relying parties read the result in the [`groups` claim](/docs/administer/groups/).
+
+Both directories send requests a strict SCIM server would refuse: a PATCH with no `path`, operations in
+capitals, booleans as the string `"False"`, attributes the schema does not declare, a `password` on
+every create, Entra's `manager` as a bare id. [`scim.strict`](/docs/reference/settings/#scim.strict),
+off by default, accepts them. Turn it on only if you are certifying against the profiles rather than
+connecting Entra or Okta; `/ServiceProviderConfig` then declares the interoperability profile conformant.
+It is one switch rather than one per tolerance because no partial combination is conformant.
+
+## Provisioned users are read-only here
+
+A user or group a connection created belongs to that connection. In the console its **Managed by**
+column names the connection, and an edit, password reset or deletion by an administrator is refused
+with `409`. A connection sees only its own users and groups. The exceptions are deliberate: an
+administrator can still clear a user's authenticator, which is account recovery rather than a profile
+edit, and can lock the account, a control the directory cannot reach or undo.
+
+An existing local user can be handed to a connection, with the names the directory knows them by.
+An administrator-kept group can be handed over the same way, once every member is someone that
+connection manages.
+
+## The mass-deprovisioning guard
+
+A wrong scoping rule in the directory, or a stolen credential, can deactivate a whole bucket in minutes,
+and deactivation here ends sessions, grants and consents. Each connection can carry a threshold:
+**at most** a number of deprovisionings, from 1 to 100,000, within a window of 5 minutes to 7 days.
+A deactivation and a deletion of an existing user each count.
+
+The first deprovisioning beyond the threshold **holds** the connection. While it is held, every
+deactivation and deletion is refused with `429` and `Retry-After: 300` and changes nothing, while
+creates, updates and group changes keep flowing. The bucket's administrators get one email. Both
+directories retry a `429` by themselves, so nothing is lost: the refused requests land once the hold is
+released.
+
+Only an explicit release ends a hold: **Release the hold?** in the console, or
+`provisioning_connection_release` for an agent, which is a high-consequence tool that asks for
+confirmation. No edit ends one, and removing the threshold of a held connection is refused. Look at what
+the directory was trying to do before releasing; the refused deprovisionings arrive as soon as you do.
+
+The guard is off until you set a threshold, and setting one departs from the IPSIE profile, which wants
+deprovisioning to end access promptly: a leaver caught by a hold keeps access until the release. That
+trade is yours to make per connection.
+
+## Deleting a connection
+
+A connection that still manages users or owns groups cannot be deleted, because deleting people must
+never be a side effect of deleting configuration. Disable it instead, or have the directory remove what
+it provisioned first.
+
+## What has and has not been tested
+
+Microsoft's SCIM validator and Okta's SCIM 2.0 Spec Test both pass against the conformance deployment,
+with users and groups. Okta's CRUD test, which needs an Okta organisation with the integration
+installed, has not been run, and certification has not been applied for. The detail, including the one
+validator failure counted as the validator's, is in
+[CONFORMANCE.md](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/CONFORMANCE.md#scim-provisioning-ipsie-al-scim-profile).

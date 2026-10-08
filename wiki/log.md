@@ -165,3 +165,6 @@ Operations:
 ## [2026-10-07] create | [[upstream-back-channel-logout]]: spec 073 — inbound Back-Channel Logout from upstream providers, the session's upstream origin and the `UpstreamSession` index, the per-format client-id claim in the upstream core, 400 + capture at delivery. Corrected [[global-token-revocation]] (lookup per format, shifted citations, 4b no longer later), [[error-store-capture-sites]] (five sites), [[event-bus]] (`upstream.logout.*`) and [[upstream-federation]] (the handoff and session carry the upstream origin).
 
 ## [2026-10-07] update | [[upstream-back-channel-logout]] verified against a real Keycloak 26.8.0 (`sid` and `sub`-only logouts); [[upstream-federation]] gained the gotcha it found — the callback refused Keycloak's `session_state`, now ignored per RFC 6749 §4.1.2.
+
+
+## [2026-10-08] update | [[end-user-lifecycle]] — the JWT that outlives a deactivation lives to the declared resource's `accessTokenTTL`, stored as 900 s when a declaration names none, not "1 h by default" (that is the fallback for a token with no declared resource, which is opaque); CONFORMANCE.md's SCIM row said the same and is corrected with it. Found while writing the site's new Administer docs section (federation, SCIM, upstream sign-out, groups, ending access, key rotation).
