@@ -29,12 +29,6 @@ before committing. Do not run Prettier on this directory: it reflows the SVGs, a
 ignores it on purpose. Braces inside an SVG `<text>` must be written `&#123;` and `&#125;`, or MDX
 reads them as an expression.
 
-## Written, awaiting review
-
-- `what-entra-and-okta-send-to-scim.mdx`
-- `deactivating-a-user-is-not-deprovisioning.mdx`
-- `okta-universal-logout-is-an-expired-draft.mdx`
-
 ## Ideas
 
 ### Rotate signing keys: publish, wait, promote
