@@ -80,7 +80,8 @@ Two things, both from your own MCP server.
 ### Protected resource metadata
 
 A JSON document at `/.well-known/oauth-protected-resource`, saying which authorization server protects
-you. This is the only part the specification makes a `MUST` for an MCP server:
+you. The specification makes it a `MUST` for an MCP server, as it does the challenge below that points
+to it and the audience check in step 3:
 
 ```json
 {

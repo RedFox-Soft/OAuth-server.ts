@@ -1,7 +1,7 @@
 ---
 title: 用 OAuth 保护 MCP 服务器
 description: 十分钟内把你的 MCP 服务器变成 OAuth 2.1 受保护资源：在此声明、发布元数据、校验令牌，并验证两种结果。
-source: e1b24343801e
+source: 966e103ebb86
 sidebar:
   order: 6
 ---
@@ -57,7 +57,7 @@ import { Steps, Aside } from '@astrojs/starlight/components';
 
 ### 受保护资源元数据 {#protected-resource-metadata}
 
-位于 `/.well-known/oauth-protected-resource` 的一个 JSON 文档，说明由哪个授权服务器保护你。这是规范对 MCP 服务器唯一规定为 `MUST` 的部分：
+位于 `/.well-known/oauth-protected-resource` 的一个 JSON 文档，说明由哪个授权服务器保护你。规范把它规定为 MCP 服务器的 `MUST`，下文指向它的 `WWW-Authenticate` 质询和第 3 步的受众（audience）校验同样如此：
 
 ```json
 {
