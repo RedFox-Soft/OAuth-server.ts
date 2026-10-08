@@ -17,6 +17,15 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   published in every language or none, a stale translation says so on the page, and the build checks each
   page's language, its Chinese title lengths and that every section keeps its English id. Spec 074.
 
+### Security
+
+- **A DPoP proof dated ahead of the server's clock can no longer be replayed after five minutes.** A proof
+  without a nonce is accepted while its `iat` is within 300 seconds of now, but its `jti` was remembered for
+  300 seconds from first use, so a captured request whose proof came from a fast client clock was accepted
+  again once the record lapsed. The record now lasts as long as the proof is acceptable (RFC 9449 §11.1).
+  The nonce check also counts matches instead of XOR-ing comparison results, which was correct only by
+  coincidence.
+
 ## [0.9.0] - 2026-10-07
 
 A sign-out at the upstream provider now reaches this server. A bucket accepts OpenID Connect Back-Channel Logout

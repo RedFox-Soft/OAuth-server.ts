@@ -175,10 +175,19 @@ export async function validateReplay(
 		return;
 	}
 	if (!config['dpop.allowReplay']) {
+		/*
+		 * A proof without a nonce is accepted while its iat is within the window of now, so one dated ahead
+		 * of this server's clock stays acceptable until iat + window, up to twice the window after it is first
+		 * seen. The record has to last that long: kept for the window from now, a captured request was
+		 * replayable once it expired. Clamped, because a proof carrying a nonce has its iat unchecked and
+		 * takes its freshness from the nonce, which ages out within the window.
+		 */
+		const now = epochTime();
+		const ahead = Math.min(Math.max(dPoP.iat - now, 0), DPOP_OK_WINDOW);
 		const unique = await ReplayDetection.unique(
 			clientId,
 			dPoP.jti,
-			epochTime() + DPOP_OK_WINDOW
+			now + DPOP_OK_WINDOW + ahead
 		);
 		if (!unique) {
 			throw new InvalidToken('DPoP proof JWT Replay detected');

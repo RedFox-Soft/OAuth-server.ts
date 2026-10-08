@@ -4,7 +4,7 @@ title: 'Single use under concurrency'
 tags: [contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-09-29
-updated: 2026-09-29
+updated: 2026-10-08
 graph:
   node_type: concept
 ---
@@ -34,6 +34,14 @@ and `ReplayDetection.unique` is built on it (`lib/models/replay_detection.ts:20`
 the record and resets whatever the first had marked. An expired row the datastore has not reaped yet
 counts as free in both real backends — a filter on `expiresAt` in MongoDB, `ON CONFLICT … WHERE
 expires_at <= now()` in PostgreSQL — which is what the memory store's `maxAge` does on its own.
+
+**The record has to outlive the thing it guards**, because an expired record counts as free. A DPoP
+proof without a nonce is accepted while its `iat` is within 300 s of now, so one dated ahead of the
+server stays acceptable until `iat + 300`. Until 2026-10-08 its `jti` was kept for 300 s from first use,
+which let a captured proof from a fast client clock be replayed once the record lapsed; `validateReplay`
+(`lib/helpers/validate_dpop.ts`) now keeps it for 300 s plus however far ahead the `iat` is, clamped to
+another 300 s because a proof with a nonce has its `iat` unchecked. RFC 9449 §11.1 states the rule:
+store the `jti` "for the time window in which the respective DPoP proof JWT would be accepted".
 
 A rotated refresh token lost to a racing request is treated as reuse, not as a transient failure: the
 token is destroyed and the grant revoked, because two requests refreshing one token at once is what the

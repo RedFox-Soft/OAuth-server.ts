@@ -6,7 +6,8 @@ import {
 	spyOn,
 	afterEach,
 	mock,
-	expect
+	expect,
+	setSystemTime
 } from 'bun:test';
 
 import {
@@ -506,7 +507,7 @@ describe('features.dPoP', async () => {
 									typ: 'dpop+jwt',
 									jwk
 								})
-								.setIssuedAt(epochTime() - 301)
+								.setIssuedAt(epochTime() + offset)
 								.setJti(randomUUID())
 								.sign(keypair.privateKey)
 						}
@@ -651,6 +652,55 @@ describe('features.dPoP', async () => {
 			expect(spy.mock.calls[0][0]).toHaveProperty(
 				'error_detail',
 				'failed jkt verification'
+			);
+		});
+	});
+
+	describe('replay of a proof dated ahead of the server', () => {
+		afterEach(() => {
+			setSystemTime();
+		});
+
+		/*
+		 * A proof without a nonce is accepted while its iat is within the window of the server's clock, so
+		 * one dated ahead of it — a client whose clock runs fast — stays acceptable for up to twice the
+		 * window after it is first presented. Its replay record has to last that long, or a captured
+		 * request becomes replayable once the record expires.
+		 */
+		it('is refused after the first five minutes, while its iat is still acceptable', async function () {
+			const at = new AccessToken({
+				accountId: setup.getAccountId(),
+				grantId: setup.getGrantId(),
+				client: await Client.find('client'),
+				scope: 'openid'
+			});
+			at.setThumbprint('jkt', thumbprint);
+			const dpop = await at.save();
+
+			const proof = await new SignJWT({
+				htm: 'GET',
+				htu: `${ISSUER}/userinfo`,
+				ath: ath(dpop)
+			})
+				.setProtectedHeader({ alg: 'ES256', typ: 'dpop+jwt', jwk })
+				.setIssuedAt(epochTime() + 290)
+				.setJti(randomUUID())
+				.sign(keypair.privateKey);
+			const headers = { authorization: `DPoP ${dpop}`, dpop: proof };
+
+			const first = await agent.userinfo.get({ headers });
+			expect(first.status).toBe(200);
+
+			setSystemTime(new Date(Date.now() + 310 * 1000));
+			const spy = mock();
+			eventBus.once('userinfo.error', spy);
+
+			const { error } = await agent.userinfo.get({ headers });
+			expect(error?.status).toBe(401);
+			expect(spy).toBeCalledTimes(1);
+			expect(spy.mock.calls[0][0]).toHaveProperty(
+				'error_detail',
+				'DPoP proof JWT Replay detected'
 			);
 		});
 	});

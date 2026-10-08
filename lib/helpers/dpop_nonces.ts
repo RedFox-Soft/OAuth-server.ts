@@ -83,8 +83,14 @@ export class DPoPNonces {
 		return this.#next;
 	}
 
+	/*
+	 * Every candidate is compared, whichever matches, so the time taken says nothing about which window the
+	 * nonce came from. The matches are counted as booleans: XOR-ing the raw comparison results was right only
+	 * because a mismatch of two 43-character values almost always saturates to the same value, so four of them
+	 * cancelled out — correct by coincidence, and broken by any change to `compare`.
+	 */
 	checkNonce(nonce: string): boolean {
-		let result = 0;
+		let matched = 0;
 
 		for (const server of [
 			this.#prevprev,
@@ -93,10 +99,10 @@ export class DPoPNonces {
 			this.#next,
 			this.#nextnext
 		]) {
-			result ^= compare(server, nonce);
+			matched |= Number(compare(server, nonce) === 0);
 		}
 
-		return result === 0;
+		return matched === 1;
 	}
 
 	static #singleton: DPoPNonces | undefined;
