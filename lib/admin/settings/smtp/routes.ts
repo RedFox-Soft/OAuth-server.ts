@@ -6,8 +6,7 @@ import {
 	assertSuperAdmin,
 	AdminError,
 	adminErrorBody,
-	resolveAdmin,
-	type AdminContext
+	resolveAdmin
 } from '../../auth/rbac.js';
 import { recordAdminAudit } from '../../audit/record.js';
 import { SMTP_TARGET_ID } from '../../../consts/admin_audit_routes.js';
@@ -50,14 +49,14 @@ export const smtpSettingsRoutes = new Elysia({ name: 'admin-settings-smtp' })
 		}
 	})
 	.get('/admin/api/settings/smtp', async ({ admin }) => {
-		const ctx = assertAuth(admin as AdminContext | null);
+		const ctx = assertAuth(admin);
 		assertSuperAdmin(ctx);
 		return present(await getSmtpSettingsStore().get());
 	})
 	.put(
 		'/admin/api/settings/smtp',
 		async ({ admin, body }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			assertSuperAdmin(ctx);
 
 			if (!body.host.trim()) throw new AdminError(422, 'host is required');

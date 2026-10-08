@@ -6,8 +6,7 @@ import {
 	assertSuperAdmin,
 	AdminError,
 	adminErrorBody,
-	resolveAdmin,
-	type AdminContext
+	resolveAdmin
 } from '../auth/rbac.js';
 import { recordAdminAudit } from '../audit/record.js';
 import {
@@ -125,14 +124,14 @@ export const mcpClientRoutes = new Elysia({ name: 'admin-mcp-clients' })
 		}
 	})
 	.get('/admin/api/mcp/clients', async ({ admin }) => {
-		const ctx = assertAuth(admin as AdminContext | null);
+		const ctx = assertAuth(admin);
 		assertSuperAdmin(ctx);
 		return mcpClientPermissionStore.list();
 	})
 	.post(
 		'/admin/api/mcp/clients',
 		async ({ admin, body, set }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			assertSuperAdmin(ctx);
 
 			const value = validateValue(body.kind, body.value);
@@ -166,7 +165,7 @@ export const mcpClientRoutes = new Elysia({ name: 'admin-mcp-clients' })
 	.patch(
 		'/admin/api/mcp/clients/:entryId',
 		async ({ admin, params, body }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			assertSuperAdmin(ctx);
 
 			const entryId = decodeURIComponent(params.entryId);
@@ -183,7 +182,7 @@ export const mcpClientRoutes = new Elysia({ name: 'admin-mcp-clients' })
 		{ body: UpdateMcpClientBody }
 	)
 	.delete('/admin/api/mcp/clients/:entryId', async ({ admin, params, set }) => {
-		const ctx = assertAuth(admin as AdminContext | null);
+		const ctx = assertAuth(admin);
 		assertSuperAdmin(ctx);
 
 		const entryId = decodeURIComponent(params.entryId);

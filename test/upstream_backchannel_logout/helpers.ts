@@ -159,7 +159,7 @@ async function federatedSignIn(
 	);
 	if (complete?.status !== 303) {
 		throw new Error(
-			`the federated sign-in did not complete (status ${complete?.status}): ${complete?.text.slice(0, 300)}`
+			`the federated sign-in did not complete (status ${String(complete?.status)}): ${complete?.text.slice(0, 300) ?? 'no response'}`
 		);
 	}
 	const consent = await consented(

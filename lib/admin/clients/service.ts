@@ -212,7 +212,7 @@ function keyAndRequestView(client: Client): Partial<AdminClientView> {
 		const value = source[property];
 		if (value !== undefined) view[name] = structuredClone(value);
 	}
-	return view as Partial<AdminClientView>;
+	return view;
 }
 
 /*
@@ -262,9 +262,7 @@ export async function updateClient(
 	if (!existing) throw new AdminError(404, 'client not found');
 	const merged: CreateClientInput = {
 		clientName: patch.clientName ?? existing.clientName,
-		applicationType: (patch.applicationType ??
-			existing.applicationType ??
-			'web') as 'web' | 'native',
+		applicationType: patch.applicationType ?? existing.applicationType ?? 'web',
 		grantTypes: patch.grantTypes ?? existing.grantTypes ?? [],
 		redirectUris: patch.redirectUris ?? existing.redirectUris ?? [],
 		postLogoutRedirectUris:
@@ -326,7 +324,7 @@ export async function rotateSecret(clientId: string): Promise<string> {
 	}
 	const secret = generateSecret();
 	const metadata = { ...toStored(existing), clientSecret: secret };
-	await validateAndStore(metadata as Record<string, unknown>);
+	await validateAndStore(metadata);
 	return secret;
 }
 

@@ -42,7 +42,7 @@ function directives(res: Response): Map<string, string> {
 	const header = res.headers.get('content-security-policy');
 	if (!header) {
 		throw new Error(
-			`no content security policy on a ${res.headers.get('content-type')} response`
+			`no content security policy on a ${String(res.headers.get('content-type'))} response`
 		);
 	}
 	return new Map(

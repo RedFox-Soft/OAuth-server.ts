@@ -5,8 +5,7 @@ import {
 	assertAuth,
 	AdminError,
 	adminErrorBody,
-	resolveAdmin,
-	type AdminContext
+	resolveAdmin
 } from '../auth/rbac.js';
 import {
 	AUDIT_PAGE_DEFAULT_LIMIT,
@@ -75,7 +74,7 @@ export const auditRoutes = new Elysia({ name: 'admin-audit' })
 	.get(
 		'/admin/api/audit',
 		async ({ admin, query, request }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			assertNoUnknownParams(request.url);
 			/*
 			 * No role gate. A group reads its own history — "who deleted our client" is a question a tenant

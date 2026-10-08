@@ -315,7 +315,7 @@ export function expectIndistinguishable(
 ): void {
 	if (!verdict.decided) {
 		throw new Error(
-			`undecided: ${subject} could not be measured here — ${verdict.reason}. ` +
+			`undecided: ${subject} could not be measured here — ${verdict.reason ?? 'no reason given'}. ` +
 				'This is not a pass. Raise the round count and re-run; note that loading the machine ' +
 				'suppresses this measurement rather than disturbing it, so an idle machine is the ' +
 				'honest place to repeat it.'

@@ -53,7 +53,7 @@ async function ping(
 		if (status !== 204 && status !== 200) {
 			throw Object.assign(
 				new Error(
-					`expected 204 No Content from ${endpoint}, got: ${status} ${STATUS_CODES[status]}`
+					`expected 204 No Content from ${endpoint}, got: ${status} ${STATUS_CODES[status] ?? 'Unknown'}`
 				),
 				{ response }
 			);
@@ -91,7 +91,8 @@ async function logout(
 	}
 
 	// String(): what new URL() does to an absent value itself; callers check the URI is registered.
-	return guardedFetch(String(client.backchannelLogoutUri), {
+	const endpoint = String(client.backchannelLogoutUri);
+	return guardedFetch(endpoint, {
 		method: 'POST',
 		headers: {
 			'content-type': 'application/x-www-form-urlencoded'
@@ -105,7 +106,7 @@ async function logout(
 		if (status !== 200 && status !== 204) {
 			throw Object.assign(
 				new Error(
-					`expected 200 OK from ${client.backchannelLogoutUri}, got: ${status} ${STATUS_CODES[status]}`
+					`expected 200 OK from ${endpoint}, got: ${status} ${STATUS_CODES[status] ?? 'Unknown'}`
 				),
 				{ response }
 			);

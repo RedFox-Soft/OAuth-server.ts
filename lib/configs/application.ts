@@ -1072,7 +1072,7 @@ export function applySettings(changes: Record<string, unknown>): ApplyOutcome {
 			...changes
 			// The spread widens every known key to `unknown`; the object is an ApplicationConfig with
 			// some values replaced, which the type system cannot express through a Record spread.
-		} as ApplicationConfigType);
+		});
 	} catch (err) {
 		return {
 			state: 'withheld',

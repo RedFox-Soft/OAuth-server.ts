@@ -430,7 +430,7 @@ describe('refusing a global token revocation', () => {
 
 	it('limits failed credentials at the strict per-origin rate', async () => {
 		const { provider, bucket, sub } = await target();
-		const max = ApplicationConfig['rateLimit.strict.max'] as number;
+		const max = ApplicationConfig['rateLimit.strict.max'];
 		const enabled = ApplicationConfig['rateLimit.enabled'];
 		ApplicationConfig['rateLimit.enabled'] = true;
 		try {

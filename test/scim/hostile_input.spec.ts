@@ -8,7 +8,8 @@ import {
 	scim,
 	scimBucket,
 	scimUser,
-	type Connected
+	type Connected,
+	slugOf
 } from './helpers.ts';
 
 /**
@@ -97,7 +98,7 @@ describe('hostile and malformed SCIM requests', () => {
 
 		expect(res.status).toBe(401);
 		expect(res.headers.get('www-authenticate')).toBe(
-			`Bearer resource_metadata="http://e.ly/.well-known/oauth-protected-resource/${c.bucket.slug}/scim/v2"`
+			`Bearer resource_metadata="http://e.ly/.well-known/oauth-protected-resource/${slugOf(c.bucket)}/scim/v2"`
 		);
 	});
 
@@ -127,11 +128,11 @@ describe('hostile and malformed SCIM requests', () => {
 		const users = await scim('GET', `${c.base}/Users`, { token: c.token });
 		const metadata = await scim(
 			'GET',
-			`/.well-known/oauth-protected-resource/${c.bucket.slug}/scim/v2`
+			`/.well-known/oauth-protected-resource/${slugOf(c.bucket)}/scim/v2`
 		);
 		const unserved = await scim(
 			'GET',
-			`/${c.bucket.slug}/nothing-here/v2/Users`,
+			`/${slugOf(c.bucket)}/nothing-here/v2/Users`,
 			{
 				token: c.token
 			}

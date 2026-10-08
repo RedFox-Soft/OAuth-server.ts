@@ -72,7 +72,7 @@ function storeFor(rateClass: RateClass): QuickLRU<string, OriginCounter> {
 		return existing;
 	}
 	const created = new QuickLRU<string, OriginCounter>({
-		maxSize: ApplicationConfig['rateLimit.maxTrackedOrigins'] as number
+		maxSize: ApplicationConfig['rateLimit.maxTrackedOrigins']
 	});
 	stores.set(rateClass, created);
 	return created;
@@ -92,7 +92,7 @@ onSettingsApplied((appliedKeys) => {
 	if (!appliedKeys.includes('rateLimit.maxTrackedOrigins')) {
 		return;
 	}
-	const maxSize = ApplicationConfig['rateLimit.maxTrackedOrigins'] as number;
+	const maxSize = ApplicationConfig['rateLimit.maxTrackedOrigins'];
 	for (const store of stores.values()) {
 		store.resize(maxSize);
 	}
@@ -124,8 +124,8 @@ function boundsFor(rateClass: RateClass): RateBounds {
 	const key =
 		rateClass === 'strict' || rateClass === 'public' ? rateClass : 'ordinary';
 	return {
-		max: ApplicationConfig[`rateLimit.${key}.max`] as number,
-		windowSeconds: ApplicationConfig[`rateLimit.${key}.windowSeconds`] as number
+		max: ApplicationConfig[`rateLimit.${key}.max`],
+		windowSeconds: ApplicationConfig[`rateLimit.${key}.windowSeconds`]
 	};
 }
 

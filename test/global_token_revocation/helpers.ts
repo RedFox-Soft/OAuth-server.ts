@@ -68,14 +68,16 @@ export async function defaultBucketWith(
 /* A path-addressed bucket holding these providers. */
 export async function pathBucketWith(
 	providers: FederationProvider[]
-): Promise<UserBucket> {
+): Promise<UserBucket & { slug: string }> {
 	seq += 1;
-	return getBucketStore().create({
+	const slug = `gtr${seq}-${Math.random().toString(36).slice(2, 8)}`;
+	const bucket = await getBucketStore().create({
 		ownerGroupId: UNASSIGNED_GROUP_ID,
 		name: `gtr-${seq}`,
-		slug: `gtr${seq}-${Math.random().toString(36).slice(2, 8)}`,
+		slug,
 		federation: providers
 	});
+	return { ...bucket, slug };
 }
 
 export interface Upstream {

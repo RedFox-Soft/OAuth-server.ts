@@ -10,7 +10,8 @@ import {
 	reload,
 	scim,
 	scimBucket,
-	scimUser
+	scimUser,
+	slugOf
 } from '../scim/helpers.ts';
 import { admin } from './helpers.ts';
 
@@ -40,11 +41,11 @@ describe('administering provisioning connections', () => {
 
 		expect(created.status).toBe(201);
 		expect(created.json).toMatchObject({
-			scimBaseUrl: `http://e.ly/${bucket.slug}/scim/v2`,
-			tokenEndpoint: `http://e.ly/${bucket.slug}/token`,
-			metadataUrl: `http://e.ly/.well-known/oauth-protected-resource/${bucket.slug}/scim/v2`,
+			scimBaseUrl: `http://e.ly/${slugOf(bucket)}/scim/v2`,
+			tokenEndpoint: `http://e.ly/${slugOf(bucket)}/token`,
+			metadataUrl: `http://e.ly/.well-known/oauth-protected-resource/${slugOf(bucket)}/scim/v2`,
 			scope: 'scim',
-			clientId: `scim-${created.json.id}`
+			clientId: `scim-${String(created.json.id)}`
 		});
 		const after = await reload(bucket);
 		expect(after.federation?.[0]?.provisioning).toBe('existing_only');

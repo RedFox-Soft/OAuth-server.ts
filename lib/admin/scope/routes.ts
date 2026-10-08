@@ -41,7 +41,7 @@ export const scopeRoutes = new Elysia({ name: 'admin-scope' })
 		}
 	})
 	.get('/admin/api/scope', async ({ admin }) => {
-		const ctx = assertAuth(admin as AdminContext | null);
+		const ctx = assertAuth(admin);
 		/*
 		 * Returns the groups themselves, not just their ids: the switcher needs names to render, and a
 		 * second round trip per group to fetch them would make the console's first paint depend on how
@@ -78,7 +78,7 @@ export const scopeRoutes = new Elysia({ name: 'admin-scope' })
 	.put(
 		'/admin/api/scope',
 		async ({ admin, body, cookie }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			/*
 			 * Validated against live membership, not against whatever the caller sends. This is the one
 			 * place a client names a group directly, so it is the one place a stale or invented id could

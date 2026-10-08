@@ -4,8 +4,7 @@ import {
 	assertSuperAdmin,
 	AdminError,
 	adminErrorBody,
-	resolveAdmin,
-	type AdminContext
+	resolveAdmin
 } from '../auth/rbac.js';
 import { KeyActionRefused } from '../key_lifecycle.js';
 import { RetireKeyBody } from './schema.js';
@@ -25,14 +24,14 @@ export const jwksRoutes = new Elysia({ name: 'admin-jwks' })
 		}
 	})
 	.get('/admin/api/jwks', async ({ admin }) => {
-		const ctx = assertAuth(admin as AdminContext | null);
+		const ctx = assertAuth(admin);
 		assertSuperAdmin(ctx);
 		return listKeys(ctx);
 	})
 	.post(
 		'/admin/api/jwks',
 		async ({ admin, body }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			assertSuperAdmin(ctx);
 			return generateKey(ctx, (body as { alg?: unknown }).alg);
 		},
@@ -41,14 +40,14 @@ export const jwksRoutes = new Elysia({ name: 'admin-jwks' })
 		{ body: t.Record(t.String(), t.Unknown()) }
 	)
 	.post('/admin/api/jwks/:kid/promote', async ({ admin, params }) => {
-		const ctx = assertAuth(admin as AdminContext | null);
+		const ctx = assertAuth(admin);
 		assertSuperAdmin(ctx);
 		return promoteKey(ctx, params.kid);
 	})
 	.delete(
 		'/admin/api/jwks/:kid',
 		async ({ admin, params, body }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			assertSuperAdmin(ctx);
 			return retireKey(ctx, params.kid, body?.confirm);
 		},

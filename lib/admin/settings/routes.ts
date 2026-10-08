@@ -11,8 +11,7 @@ import {
 	assertSuperAdmin,
 	AdminError,
 	adminErrorBody,
-	resolveAdmin,
-	type AdminContext
+	resolveAdmin
 } from '../auth/rbac.js';
 import { recordAdminAudit } from '../audit/record.js';
 import { SETTINGS_TARGET_ID } from '../../consts/admin_audit_routes.js';
@@ -53,12 +52,12 @@ function validateValue(descriptor: SettingDescriptor, value: unknown): void {
 		if (typeof value !== 'string' || !options?.includes(value))
 			throw new AdminError(
 				422,
-				`${key} must be one of: ${options?.join(', ')}`
+				`${key} must be one of: ${(options ?? []).join(', ')}`
 			);
 	} else if (type === 'string-array') {
 		if (!Array.isArray(value) || !value.every((v) => typeof v === 'string'))
 			throw new AdminError(422, `${key} must be an array of strings`);
-		if (options && !value.every((v) => options.includes(v as string)))
+		if (options && !value.every((v) => options.includes(v)))
 			throw new AdminError(
 				422,
 				`${key} values must be among: ${options.join(', ')}`
@@ -143,7 +142,7 @@ function stateFor(stored: Record<string, unknown>) {
 }
 
 async function currentState() {
-	return stateFor(((await configStore.get()) ?? {}) as Record<string, unknown>);
+	return stateFor((await configStore.get()) ?? {});
 }
 
 /*
@@ -179,19 +178,16 @@ export const settingsRoutes = new Elysia({ name: 'admin-settings' })
 		}
 	})
 	.get('/admin/api/settings', async ({ admin }) => {
-		const ctx = assertAuth(admin as AdminContext | null);
+		const ctx = assertAuth(admin);
 		assertSuperAdmin(ctx);
 		return currentState();
 	})
 	.put(
 		'/admin/api/settings',
 		async ({ admin, body }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			assertSuperAdmin(ctx);
-			const stored = ((await configStore.get()) ?? {}) as Record<
-				string,
-				unknown
-			>;
+			const stored = (await configStore.get()) ?? {};
 			const current = stateFor(stored);
 			const changes = realChanges(body, current.values);
 			// Only what is really changing is validated. A value already in force has been accepted once

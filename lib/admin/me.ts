@@ -4,8 +4,7 @@ import {
 	resolveAdmin,
 	assertAuth,
 	AdminError,
-	adminErrorBody,
-	type AdminContext
+	adminErrorBody
 } from './auth/rbac.js';
 
 /*
@@ -27,6 +26,6 @@ export const meRoutes = new Elysia({ name: 'admin-me' })
 		}
 	})
 	.get('/admin/api/me', ({ admin }) => {
-		const ctx = assertAuth(admin as AdminContext | null);
+		const ctx = assertAuth(admin);
 		return ctx;
 	});

@@ -14,7 +14,7 @@ async function fetchDocument(
 	name: (typeof DOCUMENTS)[number] = 'openid-configuration'
 ): Promise<Record<string, unknown>> {
 	const { data } = await agent['.well-known'][name].get();
-	return present(data, `the ${name} document`) as Record<string, unknown>;
+	return present(data, `the ${name} document`);
 }
 
 function setEndpoints(introspection: boolean, revocation: boolean) {

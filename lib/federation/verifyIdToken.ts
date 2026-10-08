@@ -92,9 +92,7 @@ export interface VerifiedAssertion {
  * because "cannot happen" is a claim.
  */
 function acceptableAlgorithms(metadata: ProviderMetadata): string[] {
-	const ours = new Set<string>(
-		idTokenSigningAlgValues() as unknown as string[]
-	);
+	const ours = new Set<string>(idTokenSigningAlgValues());
 	const advertised = metadata.signingAlgValues.filter((alg) => ours.has(alg));
 	if (advertised.length === 0) {
 		throw new FederationIdTokenRejected('algorithm');
@@ -187,7 +185,7 @@ export async function verifyFederatedIdToken(
 				clockTolerance
 			}
 		);
-		payload = verified.payload as Record<string, unknown>;
+		payload = verified.payload;
 	} catch (err) {
 		throw new FederationIdTokenRejected(reasonFor(err));
 	}

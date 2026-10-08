@@ -10,7 +10,8 @@ import {
 	scim,
 	scimBucket,
 	scimUser,
-	type Connected
+	type Connected,
+	slugOf
 } from './helpers.ts';
 
 const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
@@ -242,7 +243,7 @@ describe('the SCIM surface as mounted', () => {
 		expect(routes.length).toBeGreaterThan(0);
 		for (const route of routes) {
 			const path = route.path
-				.replace('/:bucket', `/${c.bucket.slug}`)
+				.replace('/:bucket', `/${slugOf(c.bucket)}`)
 				.replace(':userId', 'nobody')
 				.replace(':groupId', 'nobody')
 				.replace(':schemaId', 'nothing')

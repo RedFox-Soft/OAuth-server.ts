@@ -45,7 +45,9 @@ function renderError(
 				status={illustrationFor(status)}
 				title={status.toString()}
 				subTitle={
-					reference ? `${subTitle} (reference: ${reference})` : subTitle
+					reference
+						? [subTitle, `(reference: ${reference})`].filter(Boolean).join(' ')
+						: subTitle
 				}
 			/>
 		</StyleProvider>

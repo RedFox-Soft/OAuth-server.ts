@@ -117,7 +117,7 @@ export class Browser {
 
 export function uidOf(location: string | null): string {
 	const uid = location?.split('/')[2];
-	if (!uid) throw new Error(`expected an interaction, got ${location}`);
+	if (!uid) throw new Error(`expected an interaction, got ${String(location)}`);
 	return uid;
 }
 

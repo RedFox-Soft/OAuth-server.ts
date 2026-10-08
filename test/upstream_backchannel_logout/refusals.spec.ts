@@ -324,7 +324,7 @@ describe('refusing a back-channel logout', () => {
 
 	it('limits failed credentials at the strict per-origin rate', async () => {
 		const { endpoint } = await target();
-		const max = ApplicationConfig['rateLimit.strict.max'] as number;
+		const max = ApplicationConfig['rateLimit.strict.max'];
 		const enabled = ApplicationConfig['rateLimit.enabled'];
 		ApplicationConfig['rateLimit.enabled'] = true;
 		try {

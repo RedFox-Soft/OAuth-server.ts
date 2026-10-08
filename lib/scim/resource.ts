@@ -385,17 +385,17 @@ export function desiredUserOf(canonical: ScimObject): DesiredUser {
 			`${where} is not a valid value for this attribute`
 		);
 	}
-	const emails = (profile as EndUserProfile).emails ?? [];
+	const emails = profile.emails ?? [];
 	if (!emails.length || !emails.some((e) => e.value.trim() !== '')) {
 		/* The email is the account's password login and its reset address (spec, Assumptions). */
 		throw new ScimError(400, 'invalidValue', 'at least one email is required');
 	}
 	return {
 		userName,
-		externalId: externalId as string | undefined,
-		active: active as boolean | undefined,
+		externalId,
+		active,
 		email: loginEmailOf(emails),
-		profile: profile as EndUserProfile
+		profile
 	};
 }
 

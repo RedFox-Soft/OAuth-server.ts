@@ -13,6 +13,7 @@ import bootstrap, {
 	type Setup
 } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
+import { present } from 'test/shape.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { decode } from 'lib/helpers/jwt.js';
 import { clearDocumentCache } from 'lib/client_metadata_document/cache.ts';
@@ -135,7 +136,7 @@ describe('an authorization error for a client nobody here vouched for', () => {
 				'<input type="hidden" name="error" value="invalid_request"/>'
 			);
 			expect(page).toContain(
-				`<input type="hidden" name="state" value="${auth.params.state}"/>`
+				`<input type="hidden" name="state" value="${present(auth.params.state, 'a state')}"/>`
 			);
 			expect(page).not.toContain('<script');
 		});

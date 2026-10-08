@@ -144,7 +144,7 @@ export const groupRoutes = new Elysia({ name: 'admin-groups' })
 		}
 	})
 	.get('/admin/api/groups', async ({ admin }) => {
-		const ctx = assertAuth(admin as AdminContext | null);
+		const ctx = assertAuth(admin);
 		/*
 		 * Scope-filtered, not role-gated. Unlike projects and buckets this is NOT restricted to the active
 		 * scope: the list is what the scope switcher is built from, so restricting it to the current scope
@@ -158,7 +158,7 @@ export const groupRoutes = new Elysia({ name: 'admin-groups' })
 	.post(
 		'/admin/api/groups',
 		async ({ admin, body, set }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			// Allocated here so the audit entry can name the group that is about to exist.
 			const groupId = nanoid();
 			await recordAdminAudit(ctx, 'group.create', groupId, {
@@ -178,14 +178,14 @@ export const groupRoutes = new Elysia({ name: 'admin-groups' })
 		{ body: CreateGroupBody }
 	)
 	.get('/admin/api/groups/:id', async ({ admin, params }) => {
-		const ctx = assertAuth(admin as AdminContext | null);
+		const ctx = assertAuth(admin);
 		// A plain member may read the membership list; only an owner may change it.
 		return loadGroup(ctx, params.id);
 	})
 	.patch(
 		'/admin/api/groups/:id',
 		async ({ admin, params, body }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			const group = await loadGroup(ctx, params.id);
 			assertGroupOwner(ctx, params.id);
 			/* A system group's name is the console's label for a reserved purpose; the seed sets it. */
@@ -203,7 +203,7 @@ export const groupRoutes = new Elysia({ name: 'admin-groups' })
 		{ body: UpdateGroupBody }
 	)
 	.delete('/admin/api/groups/:id', async ({ admin, params }) => {
-		const ctx = assertAuth(admin as AdminContext | null);
+		const ctx = assertAuth(admin);
 		const group = await loadGroup(ctx, params.id);
 		assertGroupOwner(ctx, params.id);
 		assertDeletable(group);
@@ -234,7 +234,7 @@ export const groupRoutes = new Elysia({ name: 'admin-groups' })
 	.post(
 		'/admin/api/groups/:id/members',
 		async ({ admin, params, body }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			const group = await loadGroup(ctx, params.id);
 			assertGroupOwner(ctx, params.id);
 			assertMutableMembership(group);
@@ -262,7 +262,7 @@ export const groupRoutes = new Elysia({ name: 'admin-groups' })
 	.patch(
 		'/admin/api/groups/:id/members/:userId',
 		async ({ admin, params, body }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			const group = await loadGroup(ctx, params.id);
 			assertGroupOwner(ctx, params.id);
 			assertMutableMembership(group);
@@ -287,7 +287,7 @@ export const groupRoutes = new Elysia({ name: 'admin-groups' })
 	.delete(
 		'/admin/api/groups/:id/members/:userId',
 		async ({ admin, params }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			const group = await loadGroup(ctx, params.id);
 			assertGroupOwner(ctx, params.id);
 			assertMutableMembership(group);
@@ -309,7 +309,7 @@ export const groupRoutes = new Elysia({ name: 'admin-groups' })
 		}
 	)
 	.get('/admin/api/groups/:id/invitations', async ({ admin, params }) => {
-		const ctx = assertAuth(admin as AdminContext | null);
+		const ctx = assertAuth(admin);
 		await loadGroup(ctx, params.id);
 		// A plain member may see who has been invited, as they may see who is already in the group. The
 		// token is never part of an invitation record's readable shape, so nothing is masked here.
@@ -319,7 +319,7 @@ export const groupRoutes = new Elysia({ name: 'admin-groups' })
 	.post(
 		'/admin/api/groups/:id/invitations',
 		async ({ admin, params, body, set }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			const group = await loadGroup(ctx, params.id);
 			assertGroupOwner(ctx, params.id);
 			assertMutableMembership(group);
@@ -375,7 +375,7 @@ export const groupRoutes = new Elysia({ name: 'admin-groups' })
 	.delete(
 		'/admin/api/groups/:id/invitations/:inviteId',
 		async ({ admin, params }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			await loadGroup(ctx, params.id);
 			assertGroupOwner(ctx, params.id);
 			const invitation = await getGroupInvitationStore().find(params.inviteId);

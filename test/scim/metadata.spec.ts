@@ -5,7 +5,13 @@ import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import bootstrap from '../test_helper.js';
 import { adminCookie } from '../end_user_lifecycle/fixtures.ts';
 import { admin } from '../provisioning/helpers.ts';
-import { defaultScimBucket, provider, scim, scimBucket } from './helpers.ts';
+import {
+	defaultScimBucket,
+	provider,
+	scim,
+	scimBucket,
+	slugOf
+} from './helpers.ts';
 
 /**
  * @proves A SCIM client discovers where to get a token for a bucket's SCIM endpoint from the endpoint's
@@ -21,13 +27,13 @@ describe('a bucket’s SCIM protected-resource metadata', () => {
 
 		const res = await scim(
 			'GET',
-			`/.well-known/oauth-protected-resource/${bucket.slug}/scim/v2`
+			`/.well-known/oauth-protected-resource/${slugOf(bucket)}/scim/v2`
 		);
 
 		expect(res.status).toBe(200);
 		expect(res.json).toEqual({
-			resource: `http://e.ly/${bucket.slug}/scim/v2`,
-			authorization_servers: [`http://e.ly/${bucket.slug}`],
+			resource: `http://e.ly/${slugOf(bucket)}/scim/v2`,
+			authorization_servers: [`http://e.ly/${slugOf(bucket)}`],
 			scopes_supported: ['scim'],
 			bearer_methods_supported: ['header'],
 			resource_name: 'SCIM provisioning'
@@ -63,7 +69,7 @@ describe('a bucket’s SCIM protected-resource metadata', () => {
 			`/admin/api/projects/${project._id}/resources`,
 			cookie,
 			{
-				identifier: `http://e.ly/${bucket.slug}/scim/v2`,
+				identifier: `http://e.ly/${slugOf(bucket)}/scim/v2`,
 				name: 'Squatter',
 				scopes: ['scim']
 			}

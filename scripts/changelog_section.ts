@@ -19,7 +19,7 @@ export function changelogSection(markdown: string, version: string): string {
 
 	let end = lines.length;
 	for (let i = start + 1; i < lines.length; i++) {
-		const line = lines[i] as string;
+		const line = lines[i];
 		// The next version heading, or the link-reference block at the end of the file.
 		if (line.startsWith('## ') || /^\[[^\]]+\]: /.test(line)) {
 			end = i;

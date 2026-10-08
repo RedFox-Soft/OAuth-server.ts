@@ -5,8 +5,7 @@ import {
 	assertAuth,
 	AdminError,
 	adminErrorBody,
-	resolveAdmin,
-	type AdminContext
+	resolveAdmin
 } from '../auth/rbac.js';
 import { loadBucketForEdit, loadBucketForUsers } from '../buckets/access.js';
 import { recordAdminAudit } from '../audit/record.js';
@@ -44,7 +43,7 @@ export const federationAdminRoutes = new Elysia({ name: 'admin-federation' })
 		}
 	})
 	.get('/admin/api/buckets/:id/federation', async ({ admin, params }) => {
-		const ctx = assertAuth(admin as AdminContext | null);
+		const ctx = assertAuth(admin);
 		const bucket = await loadBucketForUsers(ctx, params.id);
 		return presentAll(bucket);
 	})
@@ -57,7 +56,7 @@ export const federationAdminRoutes = new Elysia({ name: 'admin-federation' })
 	.get(
 		'/admin/api/buckets/:id/federation/catalogue',
 		async ({ admin, params }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForUsers(ctx, params.id);
 			return { providers: guidanceForBucket(bucket) };
 		}
@@ -65,7 +64,7 @@ export const federationAdminRoutes = new Elysia({ name: 'admin-federation' })
 	.post(
 		'/admin/api/buckets/:id/federation',
 		async ({ admin, params, body, set }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForEdit(ctx, params.id);
 			/*
 			 * Recorded before the write, and after the validation that can refuse it: an entry for a request a
@@ -84,7 +83,7 @@ export const federationAdminRoutes = new Elysia({ name: 'admin-federation' })
 	.patch(
 		'/admin/api/buckets/:id/federation/:providerId',
 		async ({ admin, params, body }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForEdit(ctx, params.id);
 			await recordAdminAudit(ctx, 'federation.provider.update', params.id, {
 				attributes: Object.keys(body)
@@ -99,7 +98,7 @@ export const federationAdminRoutes = new Elysia({ name: 'admin-federation' })
 	.delete(
 		'/admin/api/buckets/:id/federation/:providerId',
 		async ({ admin, params }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForEdit(ctx, params.id);
 			await recordAdminAudit(ctx, 'federation.provider.delete', params.id);
 			await deleteProvider(bucket, params.providerId);
@@ -117,7 +116,7 @@ export const federationAdminRoutes = new Elysia({ name: 'admin-federation' })
 	.get(
 		'/admin/api/buckets/:id/users/:uid/identities',
 		async ({ admin, params }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			await loadBucketForUsers(ctx, params.id);
 			const user = await getUserStore(params.id).find(params.uid);
 			if (!user) throw new AdminError(404, 'user not found');
@@ -128,7 +127,7 @@ export const federationAdminRoutes = new Elysia({ name: 'admin-federation' })
 	.delete(
 		'/admin/api/buckets/:id/users/:uid/identities/:providerId',
 		async ({ admin, params }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			await loadBucketForUsers(ctx, params.id);
 			const store = getUserStore(params.id);
 			const user = await store.find(params.uid);

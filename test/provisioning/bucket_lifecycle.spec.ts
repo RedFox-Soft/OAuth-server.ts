@@ -3,7 +3,7 @@ import { describe, it, beforeAll, expect } from 'bun:test';
 import { ClientCredentials } from 'lib/models/client_credentials.js';
 import bootstrap from '../test_helper.js';
 import { adminCookie } from '../end_user_lifecycle/fixtures.ts';
-import { connect, scimBucket } from '../scim/helpers.ts';
+import { connect, scimBucket, slugOf } from '../scim/helpers.ts';
 import { admin, basic, token } from './helpers.ts';
 
 /**
@@ -42,7 +42,7 @@ describe('a bucket with provisioning connections', () => {
 			kind: 'secret'
 		});
 		const granted = await token(
-			`/${c.bucket.slug}/token`,
+			`/${slugOf(c.bucket)}/token`,
 			{ grant_type: 'client_credentials' },
 			basic(`scim-${c.connection._id}`, issued.json.secret as string)
 		);

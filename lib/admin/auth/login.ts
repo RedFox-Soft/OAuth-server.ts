@@ -66,7 +66,7 @@ export const adminLogin = new Elysia({ name: 'admin-login' })
 		async ({ query, cookie, redirect, set }) => {
 			// Elysia auto-parses JSON-looking cookie values into objects on read,
 			// so the stored `{ verifier, state, nonce }` may arrive already deserialised.
-			const rawSaved = cookie.admin_oauth.value as unknown;
+			const rawSaved = cookie.admin_oauth.value;
 			const saved =
 				rawSaved === undefined || rawSaved === null || rawSaved === ''
 					? null

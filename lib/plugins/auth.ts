@@ -34,7 +34,7 @@ export function withBody<T extends Record<string, unknown>>(
 ): OIDCContext<authParamsType & T> {
 	// The same object re-typed: the endpoint's body schema has just narrowed what `params` holds.
 	const typed = oidc as unknown as OIDCContext<authParamsType & T>;
-	typed.params = body as authParamsType & T;
+	typed.params = body;
 	return typed;
 }
 

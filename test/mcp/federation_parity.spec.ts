@@ -222,7 +222,7 @@ describe('an agent connecting a recognised provider', () => {
 			);
 			expect(
 				response.result?.isError,
-				`connecting ${body.catalogueId} through the agent surface failed: ${JSON.stringify(response.result)}`
+				`connecting ${String(body.catalogueId)} through the agent surface failed: ${JSON.stringify(response.result)}`
 			).toBeFalsy();
 		}
 

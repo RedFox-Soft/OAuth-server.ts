@@ -91,7 +91,7 @@ describe('the audit trail of SCIM changes', () => {
 		});
 		const unchanged = await scim(
 			'PATCH',
-			`${c.base}/Users/${created.json.id}`,
+			`${c.base}/Users/${String(created.json.id)}`,
 			{
 				token: c.token,
 				body: patchOf([{ op: 'replace', path: 'displayName', value: 'Zed' }])

@@ -93,7 +93,7 @@ describe('SCIM rate limiting', () => {
 
 	it('refuses an unauthenticated caller with 429 once over the strict per-address bound', async () => {
 		setScimRateLimitClock(() => now);
-		const strict = ApplicationConfig['rateLimit.strict.max'] as number;
+		const strict = ApplicationConfig['rateLimit.strict.max'];
 		const attempt = () =>
 			elysia.handle(
 				new Request(`http://e.ly${a.base}/Users`, {

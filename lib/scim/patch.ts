@@ -357,9 +357,7 @@ function applyToAttribute(
 	}
 
 	if (sub) {
-		const current = isObject(container[key])
-			? { ...(container[key] as ScimObject) }
-			: {};
+		const current = isObject(container[key]) ? { ...container[key] } : {};
 		if (attribute.multiValued) {
 			throw invalidPath(`a sub-attribute of ${key} needs a value filter`);
 		}
@@ -439,7 +437,7 @@ function applyToAttribute(
 		isObject(container[key])
 	) {
 		/* §3.5.2.1/§3.5.2.3: sub-attributes not given are left as they are. */
-		container[key] = { ...(container[key] as ScimObject), ...incoming };
+		container[key] = { ...container[key], ...incoming };
 		return;
 	}
 	container[key] = incoming;

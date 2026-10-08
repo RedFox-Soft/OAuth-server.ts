@@ -5,8 +5,7 @@ import {
 	assertAuth,
 	AdminError,
 	adminErrorBody,
-	resolveAdmin,
-	type AdminContext
+	resolveAdmin
 } from '../auth/rbac.js';
 import { loadBucketForUsers } from '../buckets/access.js';
 import {
@@ -132,7 +131,7 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 		}
 	})
 	.get('/admin/api/buckets/:id/users', async ({ admin, params }) => {
-		const ctx = assertAuth(admin as AdminContext | null);
+		const ctx = assertAuth(admin);
 		await loadBucketForUsers(ctx, params.id);
 		const users = await getUserStore(params.id).list();
 		return withGroups(params.id, users);
@@ -140,7 +139,7 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 	.post(
 		'/admin/api/buckets/:id/users',
 		async ({ admin, params, body, set }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForUsers(ctx, params.id);
 			// Allocated here so the entry names the account that is about to exist. The bucket travels as
 			// the scope: these users live in per-bucket storage, so an id alone resolves to nobody.
@@ -170,7 +169,7 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 	.patch(
 		'/admin/api/buckets/:id/users/:uid',
 		async ({ admin, params, body }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForUsers(ctx, params.id);
 			const { user, revoked } = await asAdmin(
 				updateEndUser(bucket, ADMIN, params.uid, body, () =>
@@ -200,7 +199,7 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 	.post(
 		'/admin/api/buckets/:id/users/:uid/password',
 		async ({ admin, params, body }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForUsers(ctx, params.id);
 			await asAdmin(
 				resetEndUserPassword(bucket, ADMIN, params.uid, body.password, () =>
@@ -222,7 +221,7 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 	.post(
 		'/admin/api/buckets/:id/users/:uid/lock',
 		async ({ admin, params, body }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForUsers(ctx, params.id);
 			const { user, revoked } = await asAdmin(
 				lockEndUser(
@@ -249,7 +248,7 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 	.post(
 		'/admin/api/buckets/:id/users/:uid/unlock',
 		async ({ admin, params }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForUsers(ctx, params.id);
 			const user = await asAdmin(
 				unlockEndUser(bucket, params.uid, () =>
@@ -269,7 +268,7 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 	.post(
 		'/admin/api/buckets/:id/users/:uid/sign-out',
 		async ({ admin, params }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForUsers(ctx, params.id);
 			const { user, revoked } = await asAdmin(
 				revokeEndUserAccess(bucket, params.uid, () =>
@@ -303,7 +302,7 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 	.delete(
 		'/admin/api/buckets/:id/users/:uid/totp',
 		async ({ admin, params }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			await loadBucketForUsers(ctx, params.id);
 
 			// Audit-first, as the password reset beside it is: a mutation is not reported successful
@@ -332,7 +331,7 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 		}
 	)
 	.delete('/admin/api/buckets/:id/users/:uid', async ({ admin, params }) => {
-		const ctx = assertAuth(admin as AdminContext | null);
+		const ctx = assertAuth(admin);
 		const bucket = await loadBucketForUsers(ctx, params.id);
 		const cascade = await asAdmin(
 			removeEndUser(bucket, ADMIN, params.uid, () =>

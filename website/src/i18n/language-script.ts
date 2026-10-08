@@ -103,12 +103,10 @@ function languageScript(config: ScriptConfig): void {
 				? event.target.closest('a[data-lang-switch]')
 				: null;
 		if (!(target instanceof HTMLAnchorElement)) return;
-		if (eligible) {
+		const lang = target.getAttribute('data-lang-switch');
+		if (eligible && lang !== null) {
 			try {
-				localStorage.setItem(
-					config.key,
-					`${target.getAttribute('data-lang-switch')}@${eligible.key}`
-				);
+				localStorage.setItem(config.key, `${lang}@${eligible.key}`);
 			} catch {
 				// As above: the switch still happens.
 			}

@@ -5,18 +5,14 @@ import {
 	applySettings
 } from '../../../configs/application.js';
 import { eventBus } from '../../../event_bus.js';
-import {
-	validateConfiguration,
-	type ConfigurationInput
-} from '../../../configs/configuration.js';
+import { validateConfiguration } from '../../../configs/configuration.js';
 import { configStore } from '../../../adapters/index.js';
 import {
 	assertAuth,
 	assertSuperAdmin,
 	AdminError,
 	adminErrorBody,
-	resolveAdmin,
-	type AdminContext
+	resolveAdmin
 } from '../../auth/rbac.js';
 import { recordAdminAudit } from '../../audit/record.js';
 import { eventLabels } from '../../../sentry/labels.js';
@@ -41,7 +37,7 @@ const SENTRY_KEYS = ['sentry.enabled', 'sentry.dsn'] as const;
 type StoredOverrides = Record<string, unknown>;
 
 async function storedOverrides(): Promise<StoredOverrides> {
-	return ((await configStore.get()) ?? {}) as StoredOverrides;
+	return (await configStore.get()) ?? {};
 }
 
 /* The value that would be in force after a restart: the stored override, else what is running. */
@@ -96,7 +92,7 @@ export const sentrySettingsRoutes = new Elysia({
 		}
 	})
 	.get('/admin/api/settings/sentry', async ({ admin }) => {
-		const ctx = assertAuth(admin as AdminContext | null);
+		const ctx = assertAuth(admin);
 		/*
 		 * Super-admin for the read as well as the write. The destination is instance-wide — one project
 		 * for the whole server, by requirement — so there is no scoped view of it that would mean
@@ -108,7 +104,7 @@ export const sentrySettingsRoutes = new Elysia({
 	.put(
 		'/admin/api/settings/sentry',
 		async ({ admin, body }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			assertSuperAdmin(ctx);
 
 			const stored = await storedOverrides();
@@ -147,7 +143,7 @@ export const sentrySettingsRoutes = new Elysia({
 				validateConfiguration({
 					...ApplicationConfig,
 					...merged
-				} as ConfigurationInput);
+				});
 			} catch (err) {
 				// Every failure it raises describes an unrunnable configuration, which is a refused
 				// submission here rather than a server fault.
@@ -186,7 +182,7 @@ export const sentrySettingsRoutes = new Elysia({
 			 * configuration it could not have booted with. applySettings judges exactly that before it
 			 * assigns anything.
 			 */
-			const outcome = applySettings(changes as Record<string, unknown>);
+			const outcome = applySettings(changes);
 			if (outcome.state === 'applied' && outcome.appliedKeys.length > 0) {
 				eventBus.emit('settings_applied', { keys: outcome.appliedKeys });
 			}

@@ -69,9 +69,10 @@ describe('adapter isolation', () => {
 	it('keeps every database driver import inside lib/adapters/', () => {
 		const leaked = files
 			.filter(({ shown }) => !shown.startsWith(ADAPTERS))
-			.map(({ shown, source }) => ({ shown, driver: importsDriver(source) }))
-			.filter((entry) => entry.driver !== null)
-			.map((entry) => `${entry.shown} imports ${entry.driver}`);
+			.flatMap(({ shown, source }) => {
+				const driver = importsDriver(source);
+				return driver === null ? [] : [`${shown} imports ${driver}`];
+			});
 
 		expect(leaked).toEqual([]);
 	});

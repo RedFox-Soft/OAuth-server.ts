@@ -53,8 +53,8 @@ export function resetScimRateLimiter(): void {
  */
 function connectionBounds(): RateBounds {
 	return {
-		max: ApplicationConfig['scim.rateLimit.max'] as number,
-		windowSeconds: ApplicationConfig['scim.rateLimit.windowSeconds'] as number
+		max: ApplicationConfig['scim.rateLimit.max'],
+		windowSeconds: ApplicationConfig['scim.rateLimit.windowSeconds']
 	};
 }
 

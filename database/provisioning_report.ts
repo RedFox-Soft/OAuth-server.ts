@@ -93,13 +93,13 @@ export function reservedAddressReport(
 	buckets: readonly { _id: string; slug?: string | null }[],
 	isReserved: (name: string) => boolean
 ): string | null {
-	const clashing = buckets.filter(
-		(bucket) => typeof bucket.slug === 'string' && isReserved(bucket.slug)
+	const clashing = buckets.flatMap(({ _id, slug }) =>
+		typeof slug === 'string' && isReserved(slug) ? [`  ${_id} at /${slug}`] : []
 	);
 	if (clashing.length === 0) return null;
 	return (
 		'these buckets use an address the server now reserves for its own routes; give each a new address ' +
 		'through POST /admin/api/buckets/:id/address:\n' +
-		clashing.map((bucket) => `  ${bucket._id} at /${bucket.slug}`).join('\n')
+		clashing.join('\n')
 	);
 }

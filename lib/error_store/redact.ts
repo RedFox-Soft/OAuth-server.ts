@@ -125,5 +125,5 @@ export function fieldNamesOf(source: unknown): string[] {
 	if (!source || typeof source !== 'object') {
 		return [];
 	}
-	return Object.keys(source as Record<string, unknown>).sort();
+	return Object.keys(source).sort();
 }

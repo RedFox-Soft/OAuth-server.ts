@@ -237,7 +237,7 @@ export class OIDCContext<T extends Record<string, unknown> = RequestParams> {
 			throw new Error(`no ${key} has been resolved on this request`);
 		}
 		// Checked just above; TypeScript does not narrow an indexed access through a generic key.
-		return value as OIDCEntities[K];
+		return value;
 	}
 
 	/* The cookie jar, on a route that keeps a session; asked for on one that does not, it is a defect. */

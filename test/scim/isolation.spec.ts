@@ -9,7 +9,8 @@ import {
 	scim,
 	scimBucket,
 	scimUser,
-	type Connected
+	type Connected,
+	slugOf
 } from './helpers.ts';
 import { issueCredential } from 'lib/provisioning/service.js';
 
@@ -25,7 +26,7 @@ async function oauthToken(
 		noAudit
 	);
 	const granted = await token(
-		`/${c.bucket.slug}/token`,
+		`/${slugOf(c.bucket)}/token`,
 		{ grant_type: 'client_credentials' },
 		basic(`scim-${c.connection._id}`, secret as string)
 	);
@@ -115,7 +116,7 @@ describe('a provisioning connection is fenced in', () => {
 			(await scim('GET', `${other.base}/Users`, { token: a.token })).status
 		).toBe(401);
 		expect(
-			(await call(`/${a.bucket.slug}/userinfo`)).status
+			(await call(`/${slugOf(a.bucket)}/userinfo`)).status
 		).toBeGreaterThanOrEqual(400);
 		expect((await call('/mcp', 'POST')).status).toBeGreaterThanOrEqual(400);
 		expect(
@@ -128,17 +129,17 @@ describe('a provisioning connection is fenced in', () => {
 		const auth = basic(`scim-${a.connection._id}`, secret);
 
 		const atOtherBucket = await token(
-			`/${other.bucket.slug}/token`,
+			`/${slugOf(other.bucket)}/token`,
 			{ grant_type: 'client_credentials' },
 			auth
 		);
 		const otherScope = await token(
-			`/${a.bucket.slug}/token`,
+			`/${slugOf(a.bucket)}/token`,
 			{ grant_type: 'client_credentials', scope: 'scim openid' },
 			auth
 		);
 		const otherResource = await token(
-			`/${a.bucket.slug}/token`,
+			`/${slugOf(a.bucket)}/token`,
 			{ grant_type: 'client_credentials', resource: 'http://e.ly/mcp' },
 			auth
 		);
@@ -150,10 +151,10 @@ describe('a provisioning connection is fenced in', () => {
 
 	it('gives no other client a token for a bucket’s SCIM resource', async () => {
 		const res = await token(
-			`/${a.bucket.slug}/token`,
+			`/${slugOf(a.bucket)}/token`,
 			{
 				grant_type: 'client_credentials',
-				resource: `http://e.ly/${a.bucket.slug}/scim/v2`
+				resource: `http://e.ly/${slugOf(a.bucket)}/scim/v2`
 			},
 			basic('client', 'secret')
 		);

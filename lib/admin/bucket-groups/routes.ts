@@ -4,8 +4,7 @@ import {
 	assertAuth,
 	AdminError,
 	adminErrorBody,
-	resolveAdmin,
-	type AdminContext
+	resolveAdmin
 } from '../auth/rbac.js';
 import { loadBucketForEdit, loadBucketForUsers } from '../buckets/access.js';
 import { recordAdminAudit } from '../audit/record.js';
@@ -102,7 +101,7 @@ export const bucketGroupRoutes = new Elysia({ name: 'admin-bucket-groups' })
 		}
 	})
 	.get('/admin/api/buckets/:id/groups', async ({ admin, params }) => {
-		const ctx = assertAuth(admin as AdminContext | null);
+		const ctx = assertAuth(admin);
 		const bucket = await loadBucketForUsers(ctx, params.id);
 		const groups: BucketGroup[] = [];
 		for (let startIndex = 1; ; startIndex += MAX_END_USER_PAGE) {
@@ -116,14 +115,14 @@ export const bucketGroupRoutes = new Elysia({ name: 'admin-bucket-groups' })
 		return { groups: await Promise.all(groups.map(present)) };
 	})
 	.get('/admin/api/buckets/:id/groups/:gid', async ({ admin, params }) => {
-		const ctx = assertAuth(admin as AdminContext | null);
+		const ctx = assertAuth(admin);
 		const bucket = await loadBucketForUsers(ctx, params.id);
 		return present(await asAdmin(loadGroup(bucket, ADMIN, params.gid)));
 	})
 	.get(
 		'/admin/api/buckets/:id/groups/:gid/members',
 		async ({ admin, params, query }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForUsers(ctx, params.id);
 			const group = await asAdmin(loadGroup(bucket, ADMIN, params.gid));
 			const store = getBucketGroupStore();
@@ -151,7 +150,7 @@ export const bucketGroupRoutes = new Elysia({ name: 'admin-bucket-groups' })
 	.post(
 		'/admin/api/buckets/:id/groups',
 		async ({ admin, params, body, set }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForEdit(ctx, params.id);
 			/* Allocated here so the entry names the group that is about to exist. */
 			const id = nanoid();
@@ -171,7 +170,7 @@ export const bucketGroupRoutes = new Elysia({ name: 'admin-bucket-groups' })
 	.patch(
 		'/admin/api/buckets/:id/groups/:gid',
 		async ({ admin, params, body }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForEdit(ctx, params.id);
 			const group = await asAdmin(loadGroup(bucket, ADMIN, params.gid));
 			const updated = await asAdmin(
@@ -194,7 +193,7 @@ export const bucketGroupRoutes = new Elysia({ name: 'admin-bucket-groups' })
 	.delete(
 		'/admin/api/buckets/:id/groups/:gid',
 		async ({ admin, params, set }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForEdit(ctx, params.id);
 			const group = await asAdmin(loadGroup(bucket, ADMIN, params.gid));
 			await asAdmin(
@@ -208,7 +207,7 @@ export const bucketGroupRoutes = new Elysia({ name: 'admin-bucket-groups' })
 	.post(
 		'/admin/api/buckets/:id/groups/:gid/members',
 		async ({ admin, params, body }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForUsers(ctx, params.id);
 			const group = await asAdmin(loadGroup(bucket, ADMIN, params.gid));
 			const updated = await asAdmin(
@@ -227,7 +226,7 @@ export const bucketGroupRoutes = new Elysia({ name: 'admin-bucket-groups' })
 	.delete(
 		'/admin/api/buckets/:id/groups/:gid/members/:uid',
 		async ({ admin, params }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForUsers(ctx, params.id);
 			const group = await asAdmin(loadGroup(bucket, ADMIN, params.gid));
 			const updated = await asAdmin(
@@ -244,7 +243,7 @@ export const bucketGroupRoutes = new Elysia({ name: 'admin-bucket-groups' })
 	.post(
 		'/admin/api/buckets/:id/groups/:gid/connection',
 		async ({ admin, params, body }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForEdit(ctx, params.id);
 			const group = await asAdmin(loadGroup(bucket, ADMIN, params.gid));
 			const connection = await asAdmin(

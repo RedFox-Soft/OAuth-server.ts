@@ -422,7 +422,7 @@ if (namespacing && !('noop' in namespacing.postgres)) {
 	await namespacing.postgres.apply(handle);
 }
 const rekeyed = await resources.find(legacyBucket, legacyIdentifier);
-const leftovers = await handle`
+const leftovers: unknown[] = await handle`
 	SELECT id FROM ${handle(STORE_AREAS.protectedResources)} WHERE doc->>'projectId' = ${legacyProject}
 `;
 check(
@@ -539,9 +539,9 @@ for (const area of FIXED_AREAS) {
 
 /* Read the bucket list from the table rather than naming the two seeded ones, so a bucket this run
  * created is swept too — that is the case the section-7 sweep below was added for. */
-const runtimeAreas = (
-	await handle`SELECT id FROM ${handle(STORE_AREAS.userBuckets)}`
-).map((row: { id: string }) => areaForBucket(row.id));
+const bucketRows: { id: string }[] =
+	await handle`SELECT id FROM ${handle(STORE_AREAS.userBuckets)}`;
+const runtimeAreas = bucketRows.map((row) => areaForBucket(row.id));
 
 for (const area of runtimeAreas) {
 	if (!(await tableExists(handle, area.name))) missing.push(area.name);
@@ -610,11 +610,8 @@ check(
 const loser = racingHosts.find((r) => r.status === 'rejected');
 check(
 	'and the loser is refused as a taken value, not as an internal fault',
-	loser !== undefined &&
-		(loser as PromiseRejectedResult).reason?.name === 'UniqueValueTaken',
-	loser === undefined
-		? 'nothing was rejected'
-		: String((loser as PromiseRejectedResult).reason?.name)
+	loser !== undefined && loser.reason?.name === 'UniqueValueTaken',
+	loser === undefined ? 'nothing was rejected' : String(loser.reason?.name)
 );
 
 /* Buckets without a hostname must not collide with one another — the reason the index is sparse. */

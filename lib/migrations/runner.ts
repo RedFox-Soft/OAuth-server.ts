@@ -1,8 +1,4 @@
-import {
-	isNoop,
-	type Migration,
-	type MigrationStep
-} from '../consts/migrations.js';
+import { isNoop, type Migration } from '../consts/migrations.js';
 import type { SchemaMigrationRecord } from '../adapters/types.js';
 import { checksumOf, compare, type MigrationComparison } from './state.js';
 
@@ -95,7 +91,7 @@ export async function run(
 			if (isNoop(half)) {
 				skipped.push(migration.id);
 			} else {
-				const lines = await (half as MigrationStep).apply(backend.handle);
+				const lines = await half.apply(backend.handle);
 				if (
 					Array.isArray(lines) &&
 					lines.length &&

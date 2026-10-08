@@ -485,7 +485,7 @@ export function FederationPanel({
 							type="info"
 							showIcon
 							message={`${connecting.displayName} is already connected to this bucket`}
-							description={`Edit the provider '${connecting.existingProviderId}' in the table below to change its credentials or settings. A bucket holds one connection per provider.`}
+							description={`Edit the provider '${connecting.existingProviderId ?? connecting.displayName}' in the table below to change its credentials or settings. A bucket holds one connection per provider.`}
 						/>
 					) : (
 						<>

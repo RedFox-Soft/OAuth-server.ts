@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from 'bun:test';
-import { createLocalJWKSet, jwtVerify, type JSONWebKeySet } from 'jose';
+import { createLocalJWKSet, jwtVerify } from 'jose';
 
 import bootstrap from '../test_helper.ts';
 import { ISSUER } from 'lib/configs/env.ts';
@@ -16,7 +16,7 @@ const {
 } = addresses('iso');
 
 async function verifiesAgainst(token: string, keySetUrl: string) {
-	const keys = (await publishedKeys(keySetUrl)) as JSONWebKeySet;
+	const keys = await publishedKeys(keySetUrl);
 	try {
 		await jwtVerify(token, createLocalJWKSet(keys));
 		return true;

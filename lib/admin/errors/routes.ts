@@ -7,8 +7,7 @@ import {
 	assertSuperAdmin,
 	AdminError,
 	adminErrorBody,
-	resolveAdmin,
-	type AdminContext
+	resolveAdmin
 } from '../auth/rbac.js';
 import { ApplicationConfig } from '../../configs/application.js';
 import { droppedCount } from '../../error_store/queue.js';
@@ -134,7 +133,7 @@ export const errorRoutes = new Elysia({ name: 'admin-errors' })
 	.get(
 		'/admin/api/errors',
 		async ({ admin, query, request }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			assertSuperAdmin(ctx);
 			assertNoUnknownParams(request.url, ALLOWED_ERROR_PARAMS);
 
@@ -161,7 +160,7 @@ export const errorRoutes = new Elysia({ name: 'admin-errors' })
 	.get(
 		'/admin/api/errors/summary',
 		async ({ admin, query, request }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			assertSuperAdmin(ctx);
 			assertNoUnknownParams(request.url, ALLOWED_ERROR_SUMMARY_PARAMS);
 
@@ -182,7 +181,7 @@ export const errorRoutes = new Elysia({ name: 'admin-errors' })
 	.get(
 		'/admin/api/errors/purge-preview',
 		async ({ admin, query, request }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			assertSuperAdmin(ctx);
 			assertNoUnknownParams(request.url, ALLOWED_ERROR_PARAMS);
 
@@ -197,7 +196,7 @@ export const errorRoutes = new Elysia({ name: 'admin-errors' })
 	.delete(
 		'/admin/api/errors',
 		async ({ admin, query, request }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			assertSuperAdmin(ctx);
 			assertNoUnknownParams(request.url, ALLOWED_ERROR_PARAMS);
 
@@ -216,7 +215,7 @@ export const errorRoutes = new Elysia({ name: 'admin-errors' })
 	.get(
 		'/admin/api/errors/reference/:reference',
 		async ({ admin, params, set }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			assertSuperAdmin(ctx);
 
 			const notFound = () => {
@@ -236,7 +235,7 @@ export const errorRoutes = new Elysia({ name: 'admin-errors' })
 	 * parsed as group identifiers.
 	 */
 	.get('/admin/api/errors/:id', async ({ admin, params, set }) => {
-		const ctx = assertAuth(admin as AdminContext | null);
+		const ctx = assertAuth(admin);
 		assertSuperAdmin(ctx);
 
 		const group = await errorStore.get(params.id);

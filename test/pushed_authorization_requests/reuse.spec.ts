@@ -9,6 +9,7 @@ import bootstrap, {
 	formAgent
 } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
+import { present as presentValue } from 'test/shape.js';
 import { PushedAuthorizationRequest } from 'lib/models/pushed_authorization_request.js';
 import { Interaction } from 'lib/models/interaction.js';
 import epochTime from 'lib/helpers/epoch_time.js';
@@ -105,7 +106,7 @@ describe('single use of a pushed request_uri', () => {
 
 		return agent.ui({ uid: 'resume' }).resume.get({
 			headers: {
-				cookie: `_interaction=cookieID; ${DEFAULT_SESSION_COOKIE}=${setup.getSession().jti}`
+				cookie: `_interaction=cookieID; ${DEFAULT_SESSION_COOKIE}=${presentValue(setup.getSession().jti, 'a session jti')}`
 			}
 		});
 	}

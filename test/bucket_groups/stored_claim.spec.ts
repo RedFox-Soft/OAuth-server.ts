@@ -10,6 +10,7 @@ import bootstrap, {
 	type Setup
 } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
+import { present } from 'test/shape.js';
 import { adminCookie, defaultBucket } from '../end_user_lifecycle/fixtures.ts';
 import { admin, endUser } from './helpers.ts';
 
@@ -63,7 +64,9 @@ describe('a stored groups claim', () => {
 		const { data } = await auth.getToken(redirectParameter(response, 'code'));
 
 		const info = await agent.userinfo.get({
-			headers: { authorization: `Bearer ${data?.access_token}` }
+			headers: {
+				authorization: `Bearer ${present(data?.access_token, 'an access token')}`
+			}
 		});
 
 		expect((info.data as Record<string, unknown>).groups).toBeUndefined();

@@ -35,8 +35,8 @@ export function resetUnauthenticatedCharge(): void {
 
 function strictBounds(): RateBounds {
 	return {
-		max: ApplicationConfig['rateLimit.strict.max'] as number,
-		windowSeconds: ApplicationConfig['rateLimit.strict.windowSeconds'] as number
+		max: ApplicationConfig['rateLimit.strict.max'],
+		windowSeconds: ApplicationConfig['rateLimit.strict.windowSeconds']
 	};
 }
 

@@ -63,12 +63,10 @@ interface Bounds {
  * that as `bucketId === ADMIN_BUCKET_ID` would both hide the reason and freeze it.
  */
 function boundsFor(secondFactorRequired: boolean): Bounds {
-	const window = ApplicationConfig['loginThrottle.windowSeconds'] as number;
-	const ceiling = ApplicationConfig[
-		'loginThrottle.windowCeilingSeconds'
-	] as number;
+	const window = ApplicationConfig['loginThrottle.windowSeconds'];
+	const ceiling = ApplicationConfig['loginThrottle.windowCeilingSeconds'];
 	return {
-		cap: ApplicationConfig['loginThrottle.failureCap'] as number,
+		cap: ApplicationConfig['loginThrottle.failureCap'],
 		window,
 		ceiling: secondFactorRequired ? window : ceiling
 	};

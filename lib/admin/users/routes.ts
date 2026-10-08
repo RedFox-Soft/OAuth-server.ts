@@ -5,8 +5,7 @@ import {
 	assertSuperAdmin,
 	AdminError,
 	adminErrorBody,
-	resolveAdmin,
-	type AdminContext
+	resolveAdmin
 } from '../auth/rbac.js';
 import { ADMIN_BUCKET_ID } from '../consts.js';
 import {
@@ -63,7 +62,7 @@ export const adminUserRoutes = new Elysia({ name: 'admin-users' })
 		}
 	})
 	.get('/admin/api/admins', async ({ admin }) => {
-		const ctx = assertAuth(admin as AdminContext | null);
+		const ctx = assertAuth(admin);
 		assertSuperAdmin(ctx);
 		const supers = new Set(await superAdminIds());
 		return (await store().list()).map(({ password: _password, ...u }) => ({
@@ -81,14 +80,14 @@ export const adminUserRoutes = new Elysia({ name: 'admin-users' })
 	 * rather than trusting the router's precedence to stay as it is.
 	 */
 	.get('/admin/api/admins/settings', async ({ admin }) => {
-		const ctx = assertAuth(admin as AdminContext | null);
+		const ctx = assertAuth(admin);
 		assertSuperAdmin(ctx);
 		return { totpRequired: (await adminBucket()).totpRequired === true };
 	})
 	.patch(
 		'/admin/api/admins/settings',
 		async ({ admin, body }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			assertSuperAdmin(ctx);
 			// Audit-first, like every other state-changing admin action. Field names, never values.
 			await recordAdminAudit(ctx, 'admin.settings.update', ADMIN_BUCKET_ID, {
@@ -110,7 +109,7 @@ export const adminUserRoutes = new Elysia({ name: 'admin-users' })
 	.post(
 		'/admin/api/admins',
 		async ({ admin, body, set }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			assertSuperAdmin(ctx);
 			if (await store().findByEmail(body.email)) {
 				throw new AdminError(409, 'email already exists');
@@ -133,7 +132,7 @@ export const adminUserRoutes = new Elysia({ name: 'admin-users' })
 	.patch(
 		'/admin/api/admins/:id',
 		async ({ admin, params, body }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			assertSuperAdmin(ctx);
 			if (body.active === false) await assertNotLastSuperAdmin(params.id);
 			// After the last-super-admin guard: an entry for a request that guard refused would record a
@@ -154,7 +153,7 @@ export const adminUserRoutes = new Elysia({ name: 'admin-users' })
 	 * an account edit. Asserting what is already true changes nothing and records nothing.
 	 */
 	.post('/admin/api/admins/:id/super-admin', async ({ admin, params }) => {
-		const ctx = assertAuth(admin as AdminContext | null);
+		const ctx = assertAuth(admin);
 		assertSuperAdmin(ctx);
 		const target = await store().find(params.id);
 		if (!target) throw new AdminError(404, 'admin not found');
@@ -171,7 +170,7 @@ export const adminUserRoutes = new Elysia({ name: 'admin-users' })
 		return { _id: target._id, email: target.email, superAdmin: true };
 	})
 	.delete('/admin/api/admins/:id/super-admin', async ({ admin, params }) => {
-		const ctx = assertAuth(admin as AdminContext | null);
+		const ctx = assertAuth(admin);
 		assertSuperAdmin(ctx);
 		const target = await store().find(params.id);
 		if (!target) throw new AdminError(404, 'admin not found');
@@ -183,7 +182,7 @@ export const adminUserRoutes = new Elysia({ name: 'admin-users' })
 		return { _id: target._id, email: target.email, superAdmin: false };
 	})
 	.delete('/admin/api/admins/:id', async ({ admin, params }) => {
-		const ctx = assertAuth(admin as AdminContext | null);
+		const ctx = assertAuth(admin);
 		assertSuperAdmin(ctx);
 		if (params.id === ctx.userId) {
 			throw new AdminError(409, 'cannot deactivate yourself');

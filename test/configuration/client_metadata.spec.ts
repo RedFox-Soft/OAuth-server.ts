@@ -328,7 +328,7 @@ describe('Client metadata validation', () => {
 				(err: unknown) => {
 					if (err instanceof InvalidClientMetadata) {
 						throw new Error(
-							`InvalidClientMetadata received ${err.message} ${err.error_description}`
+							`InvalidClientMetadata received ${err.message} ${String(err.error_description)}`
 						);
 					}
 				}

@@ -70,11 +70,12 @@ describe('the discovery document of a deployment that has configured nothing', (
 		// client to a server the issuer did not vouch for.
 		const endpoints = DEFAULT_MEMBERS.filter((m) => m.endsWith('_endpoint'));
 		expect(endpoints.length).toBeGreaterThan(0);
+		const issuer = present(doc.issuer, 'an issuer');
 
 		for (const member of endpoints) {
-			expect(doc[member], member).toStartWith(`${doc.issuer}/`);
+			expect(doc[member], member).toStartWith(`${issuer}/`);
 		}
-		expect(doc.jwks_uri).toStartWith(`${doc.issuer}/`);
+		expect(doc.jwks_uri).toStartWith(`${issuer}/`);
 	});
 
 	it('offers PKCE with S256', async () => {

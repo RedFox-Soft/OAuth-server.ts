@@ -352,7 +352,7 @@ expire.setDate(expire.getDate() + 1);
 						claims: {
 							id_token: {
 								sub: {
-									value: `${session.accountId}-pairwise`
+									value: `${present(session.accountId, 'a signed-in account')}-pairwise`
 								}
 							}
 						}
@@ -375,7 +375,10 @@ expire.setDate(expire.getDate() + 1);
 						claims: {
 							id_token: {
 								sub: {
-									values: ['someone-else', `${session.accountId}-pairwise`]
+									values: [
+										'someone-else',
+										`${present(session.accountId, 'a signed-in account')}-pairwise`
+									]
 								}
 							}
 						}

@@ -19,6 +19,7 @@ import {
 	SECOND_REDIRECT_URI
 } from './error_delivery.config.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
+import { present } from 'test/shape.js';
 import { decode } from 'lib/helpers/jwt.js';
 import { ISSUER } from 'lib/configs/env.js';
 let setup: Setup;
@@ -68,13 +69,13 @@ describe('an authorization error raised after the interaction', () => {
 
 			expect(response.status).toBe(200);
 			expect(page).toContain(
-				`form action="${auth.params.redirect_uri}" method="post"`
+				`form action="${present(auth.params.redirect_uri, 'a redirect_uri')}" method="post"`
 			);
 			expect(page).toContain(
 				'input type="hidden" name="error" value="access_denied"'
 			);
 			expect(page).toContain(
-				`input type="hidden" name="state" value="${auth.params.state}"`
+				`input type="hidden" name="state" value="${present(auth.params.state, 'a state')}"`
 			);
 			expect(page).toContain(
 				`input type="hidden" name="iss" value="${ISSUER}"`

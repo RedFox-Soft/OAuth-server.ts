@@ -75,7 +75,7 @@ async function enterCode(browser: Browser, userCode: string) {
 
 function uidOf(location: string | null) {
 	const uid = location?.split('/')[2];
-	if (!uid) throw new Error(`expected an interaction, got ${location}`);
+	if (!uid) throw new Error(`expected an interaction, got ${String(location)}`);
 	return uid;
 }
 

@@ -14,8 +14,7 @@ import {
 	assertBucketAccess,
 	AdminError,
 	adminErrorBody,
-	resolveAdmin,
-	type AdminContext
+	resolveAdmin
 } from '../auth/rbac.js';
 import type { UserBucket } from '../../adapters/types.js';
 import { isUniqueValueTaken } from '../../adapters/conflicts.js';
@@ -145,7 +144,7 @@ async function assertHostAvailable(value: string): Promise<string> {
 	 * otherwise be a reservation that does not hold.
 	 */
 	if (
-		(ApplicationConfig['buckets.reservedHostnames'] as string[]).some(
+		ApplicationConfig['buckets.reservedHostnames'].some(
 			(reserved) => normaliseHost(reserved) === host
 		)
 	) {
@@ -218,7 +217,7 @@ async function clientsLosingTheirIssuer(bucketId: string): Promise<string[]> {
  */
 function presentBucket<T extends Pick<UserBucket, 'federation'>>(bucket: T): T {
 	if (!bucket.federation?.length) return bucket;
-	return { ...bucket, federation: presentAll(bucket) as T['federation'] };
+	return { ...bucket, federation: presentAll(bucket) };
 }
 
 /*
@@ -293,7 +292,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 		}
 	})
 	.get('/admin/api/buckets', async ({ admin }) => {
-		const ctx = assertAuth(admin as AdminContext | null);
+		const ctx = assertAuth(admin);
 		const store = getBucketStore();
 		/*
 		 * Listing has to agree with access, or the console shows an administrator fewer buckets than it
@@ -321,7 +320,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 	.post(
 		'/admin/api/buckets',
 		async ({ admin, body, set }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			// No role gate: the authority is membership of the group the bucket will belong to.
 			const ownerGroupId = assertActiveGroup(ctx);
 			/*
@@ -382,7 +381,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 		{ body: CreateBucketBody }
 	)
 	.get('/admin/api/buckets/:id', async ({ admin, params }) => {
-		const ctx = assertAuth(admin as AdminContext | null);
+		const ctx = assertAuth(admin);
 		return withAddressGuidance(
 			presentBucket(await loadBucketForUsers(ctx, params.id))
 		);
@@ -390,7 +389,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 	.patch(
 		'/admin/api/buckets/:id',
 		async ({ admin, params, body }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForEdit(ctx, params.id);
 			/*
 			 * Checked before the audit entry and the write: an entry describing a change a 409 refused would
@@ -426,7 +425,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 	.post(
 		'/admin/api/buckets/:id/address',
 		async ({ admin, params, body, set }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 
 			/*
 			 * Instance-level, whichever form is being moved to. A group administrator who could rename a
@@ -537,7 +536,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 	.delete(
 		'/admin/api/buckets/:id',
 		async ({ admin, params, query }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			/*
 			 * First, before the bucket is even loaded, so the answer cannot depend on whether it happens
 			 * to be empty or on who is asking. This route does not go through `loadBucketForEdit`, which

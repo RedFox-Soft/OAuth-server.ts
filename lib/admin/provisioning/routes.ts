@@ -4,8 +4,7 @@ import {
 	assertAuth,
 	AdminError,
 	adminErrorBody,
-	resolveAdmin,
-	type AdminContext
+	resolveAdmin
 } from '../auth/rbac.js';
 import { loadBucketForEdit, loadBucketForUsers } from '../buckets/access.js';
 import { recordAdminAudit } from '../audit/record.js';
@@ -89,7 +88,7 @@ export const provisioningRoutes = new Elysia({ name: 'admin-provisioning' })
 	.get(
 		'/admin/api/buckets/:id/provisioning-connections',
 		async ({ admin, params }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForUsers(ctx, params.id);
 			const connections = await getProvisioningConnectionStore().listByBucket(
 				bucket._id
@@ -108,7 +107,7 @@ export const provisioningRoutes = new Elysia({ name: 'admin-provisioning' })
 	.get(
 		'/admin/api/buckets/:id/provisioning-connections/:connectionId',
 		async ({ admin, params }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForUsers(ctx, params.id);
 			return asAdmin(view(bucket, params.connectionId));
 		}
@@ -116,7 +115,7 @@ export const provisioningRoutes = new Elysia({ name: 'admin-provisioning' })
 	.post(
 		'/admin/api/buckets/:id/provisioning-connections',
 		async ({ admin, params, body, set }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForEdit(ctx, params.id);
 			const created = await asAdmin(
 				createConnection(bucket, body, async () => {
@@ -142,7 +141,7 @@ export const provisioningRoutes = new Elysia({ name: 'admin-provisioning' })
 	.patch(
 		'/admin/api/buckets/:id/provisioning-connections/:connectionId',
 		async ({ admin, params, body }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForEdit(ctx, params.id);
 			await asAdmin(
 				updateConnection(bucket, params.connectionId, body, () =>
@@ -161,7 +160,7 @@ export const provisioningRoutes = new Elysia({ name: 'admin-provisioning' })
 	.delete(
 		'/admin/api/buckets/:id/provisioning-connections/:connectionId',
 		async ({ admin, params }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForEdit(ctx, params.id);
 			const result = await asAdmin(
 				deleteConnection(bucket, params.connectionId, () =>
@@ -192,7 +191,7 @@ export const provisioningRoutes = new Elysia({ name: 'admin-provisioning' })
 	.post(
 		'/admin/api/buckets/:id/provisioning-connections/:connectionId/release',
 		async ({ admin, params }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForEdit(ctx, params.id);
 			await asAdmin(
 				releaseConnection(bucket, params.connectionId, () =>
@@ -214,7 +213,7 @@ export const provisioningRoutes = new Elysia({ name: 'admin-provisioning' })
 	.post(
 		'/admin/api/buckets/:id/provisioning-connections/:connectionId/credentials',
 		async ({ admin, params, body, set }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForEdit(ctx, params.id);
 			const issued = await asAdmin(
 				issueCredential(bucket, params.connectionId, body, () =>
@@ -238,7 +237,7 @@ export const provisioningRoutes = new Elysia({ name: 'admin-provisioning' })
 	.delete(
 		'/admin/api/buckets/:id/provisioning-connections/:connectionId/credentials/:kind',
 		async ({ admin, params }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForEdit(ctx, params.id);
 			await asAdmin(
 				revokeCredential(bucket, params.connectionId, params.kind, () =>
@@ -267,7 +266,7 @@ export const provisioningRoutes = new Elysia({ name: 'admin-provisioning' })
 	.post(
 		'/admin/api/buckets/:id/users/:uid/connection',
 		async ({ admin, params, body }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForEdit(ctx, params.id);
 			await asAdmin(loadConnection(bucket, body.connectionId));
 			const assigned = await asAdmin(

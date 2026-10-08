@@ -10,8 +10,7 @@ import {
 	assertBucketAccess,
 	AdminError,
 	adminErrorBody,
-	resolveAdmin,
-	type AdminContext
+	resolveAdmin
 } from '../auth/rbac.js';
 import {
 	CreateProjectBody,
@@ -92,7 +91,7 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 		}
 	})
 	.get('/admin/api/projects', async ({ admin }) => {
-		const ctx = assertAuth(admin as AdminContext | null);
+		const ctx = assertAuth(admin);
 		const store = getProjectStore();
 		/*
 		 * Scope-filtered, not role-gated. A super administrator sees the instance; everyone else sees the
@@ -109,7 +108,7 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 	.post(
 		'/admin/api/projects',
 		async ({ admin, body, set }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			/*
 			 * No role gate. Creating a project is what a project administrator signs in to do, and the
 			 * authority that matters is membership of the group it will belong to — checked below, on the
@@ -141,13 +140,13 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 		{ body: CreateProjectBody }
 	)
 	.get('/admin/api/projects/:id', async ({ admin, params }) => {
-		const ctx = assertAuth(admin as AdminContext | null);
+		const ctx = assertAuth(admin);
 		return loadProject(ctx, params.id);
 	})
 	.patch(
 		'/admin/api/projects/:id',
 		async ({ admin, params, body }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			const project = await loadProject(ctx, params.id);
 			if (project.type === 'admin')
 				throw new AdminError(403, 'cannot modify admin project');
@@ -168,7 +167,7 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 	.delete(
 		'/admin/api/projects/:id',
 		async ({ admin, params, query }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			const project = await loadProject(ctx, params.id);
 			if (project.type === 'admin')
 				throw new AdminError(403, 'cannot delete admin project');
@@ -288,7 +287,7 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 	.put(
 		'/admin/api/projects/:id/bucket',
 		async ({ admin, params, body }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			const project = await loadProject(ctx, params.id);
 			const bucket = await getBucketStore().find(body.bucketId);
 			if (!bucket) throw new AdminError(404, 'bucket not found');
@@ -353,7 +352,7 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 	 * default bucket, which is what `resolveBucketForRequest` falls through to on an empty `bucketId`.
 	 */
 	.delete('/admin/api/projects/:id/bucket', async ({ admin, params }) => {
-		const ctx = assertAuth(admin as AdminContext | null);
+		const ctx = assertAuth(admin);
 		const project = await loadProject(ctx, params.id);
 		/*
 		 * Project access only, deliberately. The entity changed is the project, and dropping a pointer

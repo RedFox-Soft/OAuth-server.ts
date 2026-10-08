@@ -110,7 +110,7 @@ describe('the groups claim', () => {
 		const res = await agent.token.post(
 			{
 				grant_type: 'authorization_code',
-				code: redirectParameter(response, 'code') as string,
+				code: redirectParameter(response, 'code'),
 				code_verifier: auth.code_verifier,
 				redirect_uri: 'https://client.example.com/cb',
 				...(resource ? { resource } : {})
@@ -129,7 +129,7 @@ describe('the groups claim', () => {
 	}
 
 	function claimsOf(jwt: string): Record<string, unknown> {
-		return decode(jwt).payload as Record<string, unknown>;
+		return decode(jwt).payload;
 	}
 
 	it('names the user’s groups at userinfo when the groups scope is granted', async () => {
@@ -206,7 +206,7 @@ describe('the groups claim', () => {
 		const refreshed = await agent.token.post(
 			{
 				grant_type: 'refresh_token',
-				refresh_token: tokens.refresh_token as string,
+				refresh_token: tokens.refresh_token,
 				resource: JWT_RESOURCE
 			},
 			basic
@@ -224,7 +224,7 @@ describe('the groups claim', () => {
 		const refreshed = await agent.token.post(
 			{
 				grant_type: 'refresh_token',
-				refresh_token: tokens.refresh_token as string
+				refresh_token: tokens.refresh_token
 			},
 			basic
 		);

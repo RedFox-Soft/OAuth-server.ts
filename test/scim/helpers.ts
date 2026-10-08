@@ -52,6 +52,13 @@ export async function scimBucket(
 	});
 }
 
+/* The path segment of a bucket made by `scimBucket`; the store's type allows a hostname instead. */
+export function slugOf(bucket: UserBucket): string {
+	if (typeof bucket.slug !== 'string')
+		throw new Error(`bucket ${bucket._id} is not path-addressed`);
+	return bucket.slug;
+}
+
 /* The default bucket, served at the root, with the given providers. */
 export async function defaultScimBucket(
 	providers: FederationProvider[] = [provider('corp')]

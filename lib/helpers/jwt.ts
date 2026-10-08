@@ -121,7 +121,9 @@ export function assertPayload(
 	if (Value.Check(jwtPayloadSchema, payload) === false) {
 		const error = Value.Errors(jwtPayloadSchema, payload).First();
 		throw new TypeError(
-			`invalid jwt payload: ${error?.path} ${error?.message}`
+			error
+				? `invalid jwt payload: ${error.path} ${error.message}`
+				: 'invalid jwt payload'
 		);
 	}
 

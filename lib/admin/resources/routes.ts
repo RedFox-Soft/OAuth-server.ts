@@ -148,14 +148,14 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 		}
 	})
 	.get('/admin/api/projects/:id/resources', async ({ admin, params }) => {
-		const ctx = assertAuth(admin as AdminContext | null);
+		const ctx = assertAuth(admin);
 		await loadProject(ctx, params.id);
 		return getProtectedResourceStore().listByProject(params.id);
 	})
 	.post(
 		'/admin/api/projects/:id/resources',
 		async ({ admin, params, body, set }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			const project = await loadProject(ctx, params.id);
 
 			const identifier = canonicalIdentifier(
@@ -212,7 +212,7 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 	.get(
 		'/admin/api/projects/:id/resources/:resourceId',
 		async ({ admin, params }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			const project = await loadProject(ctx, params.id);
 			return loadResource(
 				params.id,
@@ -233,7 +233,7 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 	.get(
 		'/admin/api/projects/:id/resources/:resourceId/vouching',
 		async ({ admin, params }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			const project = await loadProject(ctx, params.id);
 			const namespace = await namespaceOfProject(project);
 			const resource = await loadResource(
@@ -253,7 +253,7 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 	.patch(
 		'/admin/api/projects/:id/resources/:resourceId',
 		async ({ admin, params, body }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			const project = await loadProject(ctx, params.id);
 			const namespace = await namespaceOfProject(project);
 			assertMayWrite(ctx, namespace);
@@ -284,7 +284,7 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 	.delete(
 		'/admin/api/projects/:id/resources/:resourceId',
 		async ({ admin, params, set }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			const project = await loadProject(ctx, params.id);
 			const namespace = await namespaceOfProject(project);
 			assertMayWrite(ctx, namespace);

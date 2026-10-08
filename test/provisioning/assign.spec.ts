@@ -78,7 +78,7 @@ describe('handing a local user to a provisioning connection', () => {
 
 		const res = await admin(
 			'POST',
-			`/admin/api/buckets/${bucket._id}/users/${made.json.id}/connection`,
+			`/admin/api/buckets/${bucket._id}/users/${String(made.json.id)}/connection`,
 			cookie,
 			{ connectionId: b.connection._id, userName: 'pete2@contoso.com' }
 		);

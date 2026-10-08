@@ -3,8 +3,7 @@ import {
 	assertAuth,
 	AdminError,
 	adminErrorBody,
-	resolveAdmin,
-	type AdminContext
+	resolveAdmin
 } from '../auth/rbac.js';
 import { GenerateBucketKeyBody } from './schema.js';
 import {
@@ -31,13 +30,13 @@ export const bucketKeyRoutes = new Elysia({ name: 'admin-bucket-keys' })
 		}
 	})
 	.get('/admin/api/buckets/:id/keys', async ({ admin, params }) => {
-		const ctx = assertAuth(admin as AdminContext | null);
+		const ctx = assertAuth(admin);
 		return listKeys(ctx, params.id);
 	})
 	.post(
 		'/admin/api/buckets/:id/keys',
 		async ({ admin, params, body, set }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			const created = await generateKey(
 				ctx,
 				params.id,
@@ -52,14 +51,14 @@ export const bucketKeyRoutes = new Elysia({ name: 'admin-bucket-keys' })
 	.post(
 		'/admin/api/buckets/:id/keys/:kid/promote',
 		async ({ admin, params }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			return promoteKey(ctx, params.id, params.kid);
 		}
 	)
 	.delete(
 		'/admin/api/buckets/:id/keys/:kid',
 		async ({ admin, params, body }) => {
-			const ctx = assertAuth(admin as AdminContext | null);
+			const ctx = assertAuth(admin);
 			return retireKey(ctx, params.id, params.kid, body?.confirm);
 		},
 		{ body: t.Optional(RetireKeyBody) }

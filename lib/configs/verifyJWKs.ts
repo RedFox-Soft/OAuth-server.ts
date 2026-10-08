@@ -97,8 +97,10 @@ const ktyMap = {
 	OKP: OKPKey
 };
 
-function typeboxErrorMessage(error?: ValueError) {
-	return error?.schema.error ?? `${error?.path} ${error?.message}`;
+function typeboxErrorMessage(error: ValueError | undefined): string {
+	if (!error) return 'without a reported reason';
+	const custom: unknown = error.schema.error;
+	return typeof custom === 'string' ? custom : `${error.path} ${error.message}`;
 }
 
 /*

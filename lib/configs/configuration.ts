@@ -352,7 +352,7 @@ function checkRateLimit(config: ConfigurationInput) {
 
 	for (const key of positiveIntegers) {
 		const value = config[key];
-		if (!Number.isSafeInteger(value) || (value as number) < 1) {
+		if (!Number.isSafeInteger(value) || value < 1) {
 			// The key is named because an operator reading a failed boot has seven of these to choose from.
 			throw new TypeError(`${key} must be a positive integer`);
 		}
@@ -399,7 +399,7 @@ function checkLoginThrottle(config: ConfigurationInput) {
 	const window = config['loginThrottle.windowSeconds'];
 	const ceiling = config['loginThrottle.windowCeilingSeconds'];
 
-	if (!Number.isSafeInteger(cap) || (cap as number) < 1) {
+	if (!Number.isSafeInteger(cap) || cap < 1) {
 		throw new TypeError('loginThrottle.failureCap must be a positive integer');
 	}
 	/*
@@ -407,25 +407,22 @@ function checkLoginThrottle(config: ConfigurationInput) {
 	 * above it is refused rather than warned about: it would leave the door answering guesses at a rate
 	 * the throttle exists to end, while every test still passed.
 	 */
-	if ((cap as number) > 100) {
+	if (cap > 100) {
 		throw new TypeError(
 			'loginThrottle.failureCap must be at most 100 — a higher cap does not throttle'
 		);
 	}
-	if (!Number.isSafeInteger(window) || (window as number) < 60) {
+	if (!Number.isSafeInteger(window) || window < 60) {
 		throw new TypeError(
 			'loginThrottle.windowSeconds must be an integer of at least 60'
 		);
 	}
-	if (
-		!Number.isSafeInteger(ceiling) ||
-		(ceiling as number) < (window as number)
-	) {
+	if (!Number.isSafeInteger(ceiling) || ceiling < window) {
 		throw new TypeError(
 			'loginThrottle.windowCeilingSeconds must be an integer no smaller than loginThrottle.windowSeconds'
 		);
 	}
-	if ((ceiling as number) > LOGIN_RETENTION_SECONDS) {
+	if (ceiling > LOGIN_RETENTION_SECONDS) {
 		throw new TypeError(
 			`loginThrottle.windowCeilingSeconds must be at most ${LOGIN_RETENTION_SECONDS} — a window longer than a counter's retention would reopen the door by reaping the counter`
 		);

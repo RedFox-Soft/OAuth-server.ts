@@ -197,7 +197,7 @@ export class ClientKeyStore extends KeyStore {
 
 				if (status !== 200) {
 					throw new Error(
-						`unexpected jwks_uri response status code, expected 200 OK, got ${status} ${STATUS_CODES[status]}`
+						`unexpected jwks_uri response status code, expected 200 OK, got ${status} ${STATUS_CODES[status] ?? 'Unknown'}`
 					);
 				}
 

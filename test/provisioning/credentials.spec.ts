@@ -4,7 +4,13 @@ import { exportJWK, generateKeyPair, SignJWT } from 'jose';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import bootstrap from '../test_helper.js';
 import { adminCookie } from '../end_user_lifecycle/fixtures.ts';
-import { connect, scim, scimBucket, type Connected } from '../scim/helpers.ts';
+import {
+	connect,
+	scim,
+	scimBucket,
+	type Connected,
+	slugOf
+} from '../scim/helpers.ts';
 import { admin, basic, token } from './helpers.ts';
 
 function connectionPath(c: Connected): string {
@@ -12,7 +18,7 @@ function connectionPath(c: Connected): string {
 }
 
 function tokenPath(c: Connected): string {
-	return `/${c.bucket.slug}/token`;
+	return `/${slugOf(c.bucket)}/token`;
 }
 
 async function issueSecret(c: Connected, cookie: string): Promise<string> {

@@ -1,6 +1,7 @@
 import { describe, it, beforeAll, expect, mock, afterEach } from 'bun:test';
 import bootstrap, { agent, formAgent, type Setup } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
+import { present } from 'test/shape.js';
 import { eventBus } from 'lib/index.js';
 
 /**
@@ -43,10 +44,10 @@ describe('/auth', () => {
 					);
 					expect(data).toContain('input type="hidden" name="code" value=');
 					expect(data).toContain(
-						`input type="hidden" name="state" value="${auth.params.state}"`
+						`input type="hidden" name="state" value="${present(auth.params.state, 'a state')}"`
 					);
 					expect(data).toContain(
-						`form action="${auth.params.redirect_uri}" method="post"`
+						`form action="${present(auth.params.redirect_uri, 'a redirect_uri')}" method="post"`
 					);
 				});
 
@@ -146,7 +147,7 @@ describe('/auth', () => {
 					'text/html; charset=utf-8'
 				);
 				expect(error.value).toContain(
-					`form action="${auth.params.redirect_uri}" method="post"`
+					`form action="${present(auth.params.redirect_uri, 'a redirect_uri')}" method="post"`
 				);
 				expect(error.value).toContain('name="error"');
 			});
@@ -171,10 +172,10 @@ describe('/auth', () => {
 					'input type="hidden" name="error" value="login_required"'
 				);
 				expect(error.value).toContain(
-					`input type="hidden" name="state" value="${auth.params.state}"`
+					`input type="hidden" name="state" value="${present(auth.params.state, 'a state')}"`
 				);
 				expect(error.value).toContain(
-					`form action="${auth.params.redirect_uri}" method="post"`
+					`form action="${present(auth.params.redirect_uri, 'a redirect_uri')}" method="post"`
 				);
 				expect(spy).toHaveBeenCalled();
 			});
