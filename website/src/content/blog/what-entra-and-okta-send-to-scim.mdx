@@ -1,0 +1,277 @@
+---
+title: What Entra and Okta actually send to SCIM
+description: >-
+  A SCIM server that follows the interop profile refuses what Entra and Okta really send. The forms both use, and why one switch covers them all.
+publishedAt: '2026-10-08'
+draft: true
+tags: [scim, provisioning, entra, okta]
+---
+
+This is how Okta deactivates a user over SCIM, in the shape its own protocol reference documents,
+addressed to one of our buckets:
+
+```http
+PATCH /acme/scim/v2/Users/2819c223-7f76-453a-919d-413861904646 HTTP/1.1
+Host: auth.example.com
+Authorization: scimst_q3TqC1lG0iJ...
+Content-Type: application/scim+json
+
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "Operations": [{ "op": "replace", "value": { "active": false } }]
+}
+```
+
+There is no `path`. The SCIM 2.0 interoperability profile, which the OpenID IPSIE SCIM profile we
+target builds on, says a server must refuse a PATCH operation without one. RFC 7644 itself allows it;
+the profile tightens it, for good reasons, because a path-less operation is the shape every ambiguity
+in SCIM patch semantics hides in. So a server that does what the profile asks answers that request
+with `400`, and the person who left the company yesterday is still active.
+
+I had read both profiles carefully before writing a line of the server, and I still assumed the
+interesting work would be in following them. It was not. Neither of the two directories most
+customers actually use can provision a server that follows them, and the useful thing to know is
+exactly how each one deviates.
+
+## Okta deactivates with a request the profile forbids
+
+Okta's dialect is small, which makes it easy to underestimate. There are two forms that matter. The
+first is the path-less `replace` above, which is how Okta deactivates and reactivates a user, the
+single most important thing a provisioning client does. The second is that Okta sends a `password`
+attribute on create. IPSIE forbids `password` in the user schema outright, because a directory that
+pushes passwords into every application is the thing a federated deployment is supposed to have got
+rid of, and our users sign in through the directory anyway.
+
+The authentication is a dialect too, and it is the one that surprises people. Okta cannot use the
+OAuth client-credentials grant for SCIM at all. It sends a static token, and in its header mode it
+sends the token as the whole `Authorization` value, with no `Bearer` scheme in front. That is why our
+static tokens start with `scimst_`: the prefix lets the server tell one from an access token without a
+lookup, accept it without a scheme, and lets a secret scanner recognise one that leaked into a
+repository. It is stored as a SHA-256 digest and shown once.
+
+## Entra speaks a dialect, and admits it with a flag
+
+Microsoft Entra ID's list is longer and stranger:
+
+- operation names in capitals, `"op": "Replace"`, where RFC 7644 defines lower case;
+- booleans as strings, `"value": "False"`;
+- path-less `replace` operations that set several attributes at once, keyed by dotted sub-attribute
+  names and full extension URNs, `name.givenName` beside
+  `urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:department`;
+- `addresses` in its default attribute mappings, an attribute our user schema does not declare;
+- a `replace` through a filter that matches nothing, `emails[type eq "work"].value` for a user who has
+  no work email yet, where RFC 7644 says `noTarget` and Entra means "add it";
+- and the enterprise `manager`, sent as a bare id, `"value": "mgr-1"`, where the schema says
+  `{ "value": "mgr-1" }`, and cleared with a `replace` whose value is the empty string rather than a
+  `remove`.
+
+Most of that list came from Microsoft's documentation and the field reports of other implementers. The
+manager pair did not. We found it only when Microsoft's own SCIM validator failed Add, Replace and Remove
+Manager against us, which is the one I like least: a dialect nobody wrote down, discovered by the
+vendor's own test of conformance.
+
+Microsoft documents a feature flag, `aadOptscim062020`, appended to the tenant URL, that switches some of
+Entra's older behaviour to the compliant form, the string booleans among them. It is the clearest
+admission I know of that the dialect is real, and a server cannot assume every customer's tenant URL
+carries it.
+
+Here is the whole picture in one place. Read each row as a sentence: this client sends this, the
+strict reading refuses it, and this is what a tolerant server does instead.
+
+<svg viewBox="0 0 800 400" width="100%" role="img" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">
+  <title>Six request forms Okta and Entra send to a SCIM server, who sends each, what the interop profile requires, and how a tolerant server reads it</title>
+  <text x="20" y="30" font-size="14" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">What arrives</text>
+  <text x="380" y="30" font-size="14" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">From</text>
+  <text x="460" y="30" font-size="14" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">Strict</text>
+  <text x="560" y="30" font-size="14" font-weight="600" fill="var(--diagram-accent, #d9480f)">Tolerant reading</text>
+  <line x1="20" y1="42" x2="780" y2="42" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <text x="20" y="80" font-size="13" fill="var(--diagram-fg, #1a1a1a)">&#123;"op":"replace","value":&#123;"active":false&#125;&#125;</text>
+  <text x="380" y="80" font-size="13" fill="var(--diagram-fg, #1a1a1a)">Okta</text>
+  <text x="460" y="80" font-size="13" fill="var(--diagram-line, #555)">400</text>
+  <text x="560" y="80" font-size="13" fill="var(--diagram-accent, #d9480f)">deactivate</text>
+  <text x="20" y="130" font-size="13" fill="var(--diagram-fg, #1a1a1a)">"password" on create</text>
+  <text x="380" y="130" font-size="13" fill="var(--diagram-fg, #1a1a1a)">Okta</text>
+  <text x="460" y="130" font-size="13" fill="var(--diagram-line, #555)">400</text>
+  <text x="560" y="130" font-size="13" fill="var(--diagram-accent, #d9480f)">ignore it</text>
+  <text x="20" y="180" font-size="13" fill="var(--diagram-fg, #1a1a1a)">"op":"Replace", "value":"False"</text>
+  <text x="380" y="180" font-size="13" fill="var(--diagram-fg, #1a1a1a)">Entra</text>
+  <text x="460" y="180" font-size="13" fill="var(--diagram-line, #555)">400</text>
+  <text x="560" y="180" font-size="13" fill="var(--diagram-accent, #d9480f)">replace, false</text>
+  <text x="20" y="230" font-size="13" fill="var(--diagram-fg, #1a1a1a)">path-less replace of name.givenName + URN keys</text>
+  <text x="380" y="230" font-size="13" fill="var(--diagram-fg, #1a1a1a)">Entra</text>
+  <text x="460" y="230" font-size="13" fill="var(--diagram-line, #555)">400</text>
+  <text x="560" y="230" font-size="13" fill="var(--diagram-accent, #d9480f)">apply each key</text>
+  <text x="20" y="280" font-size="13" fill="var(--diagram-fg, #1a1a1a)">addresses, an undeclared attribute</text>
+  <text x="380" y="280" font-size="13" fill="var(--diagram-fg, #1a1a1a)">Entra</text>
+  <text x="460" y="280" font-size="13" fill="var(--diagram-line, #555)">400</text>
+  <text x="560" y="280" font-size="13" fill="var(--diagram-accent, #d9480f)">ignore it</text>
+  <text x="20" y="330" font-size="13" fill="var(--diagram-fg, #1a1a1a)">manager: "mgr-1", cleared with ""</text>
+  <text x="380" y="330" font-size="13" fill="var(--diagram-fg, #1a1a1a)">Entra</text>
+  <text x="460" y="330" font-size="13" fill="var(--diagram-line, #555)">400</text>
+  <text x="560" y="330" font-size="13" fill="var(--diagram-accent, #d9480f)">&#123; value: "mgr-1" &#125;, remove</text>
+  <line x1="20" y1="355" x2="780" y2="355" stroke="var(--diagram-line, #555)" stroke-width="1"/>
+  <text x="400" y="385" text-anchor="middle" font-size="13" fill="var(--diagram-line, #555)">Every row in the Strict column is what the profiles ask for. Every row in the last is what gets users provisioned.</text>
+</svg>
+
+The left column is not exotic. It is the ordinary traffic of the two clients that cover most of the
+enterprise market. If your server sits in the third column, it is conformant and nobody can use it.
+
+## The libraries were strict in the wrong places
+
+Our plan named two well-used libraries for the hard parts, a filter parser and a patch applier. Both
+went in the bin, and the reasons are worth more than the replacements.
+
+The filter parser's quoted-string pattern backtracks exponentially on an unterminated run of newlines,
+and the filter arrives in a query string from the directory, so that was a denial of service anyone
+holding a SCIM token could trigger. The patch library refused `REPLACE`, threw a `TypeError` on a
+path-less `remove`, stored `"False"` as the string `"False"`, matched attribute names case-sensitively
+where SCIM says they are not, and had two prototype-pollution advisories this year. So it was strict
+about exactly the things the real clients do, and lax about the one thing that is actually dangerous,
+keys like `__proto__` in a body an outside system controls.
+
+The grammar the real clients use is small, so the replacements are small. The filter parser is a
+single-pass tokenizer over an allow-list of the filters IPSIE names, and a property test holds it to
+linear time. The patch applier resolves every path against the declared attribute table, refuses
+`__proto__`, `constructor` and `prototype` anywhere in a body, and puts each tolerance behind one
+condition:
+
+```ts
+const op = opText.toLowerCase();
+if (op !== 'add' && op !== 'replace' && op !== 'remove') {
+	throw new ScimError(
+		400,
+		'invalidSyntax',
+		`${opText} is not a PATCH operation`
+	);
+}
+if (leniency.strict && opText !== op) {
+	throw new ScimError(400, 'invalidSyntax', 'the op must be lower case');
+}
+
+if (path === undefined || path === '') {
+	if (op === 'remove')
+		throw new ScimError(400, 'noTarget', 'remove needs a path');
+	/* Okta's {"op":"replace","value":{"active":false}}; Entra's multi-attribute replace. */
+	if (leniency.strict) {
+		throw new ScimError(400, 'invalidSyntax', 'an operation needs a path');
+	}
+	if (!isObject(value)) {
+		throw new ScimError(
+			400,
+			'invalidValue',
+			'a path-less operation needs an object value'
+		);
+	}
+	for (const [key, v] of Object.entries(value)) {
+		applyOne(working, op, key, v, leniency, resource);
+	}
+	continue;
+}
+```
+
+Two things in there are deliberate. The tolerant branch is the normal path and the refusal is the
+special case, because the normal traffic is the dialect. And a path-less `remove` is refused in every
+mode, because there the tolerant reading would be "remove what?", and guessing is how a directory
+deletes a user's whole profile.
+
+## One switch, because no half-strict server is conformant
+
+Each of those forms could have had its own setting, and for a while the design had several. It ended
+with one, `scim.strict`, off by default, and I think one is right for a reason that is about the
+operator rather than the code. The question an operator is answering is a single one: am I certifying
+this server against the profiles, or am I connecting Entra and Okta to it? There is no combination of
+half the tolerances that is conformant, so a panel of separate switches offers dozens of
+combinations, and every one of them but two is wrong for both purposes. In strict mode every form in the table is a `400`, and only then does
+`/ServiceProviderConfig` declare `interopProfileConformant`. A server that tolerates even one form does
+not get to say it.
+
+The same principle governs the credentials. Entra authenticates to the bucket's token endpoint with a
+client secret, sent by Basic or in the body as its administrator chooses, because until workload
+identity federation reaches provisioning a secret is all it can send. Okta sends its static token.
+Neither is what IPSIE asks for, and each sits behind a named setting, `scim.secretCredentials` and
+`scim.staticTokens`, both on by default, so an operator who wants the profile's form can turn the
+others off and see exactly what stops working.
+
+<svg viewBox="0 0 800 330" width="100%" role="img" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">
+  <title>Three ways a directory authenticates to a bucket's SCIM endpoint: Entra with a client secret at the token endpoint, a conformant client with a signed JWT assertion there, and Okta with a static token sent straight to the SCIM endpoint; each governed by its own setting</title>
+  <defs>
+    <marker id="scim-arrow-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"> <path d="M0,0 L10,5 L0,10 z" fill="var(--diagram-line, #555)"/></marker>
+    <marker id="scim-arrow-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"> <path d="M0,0 L10,5 L0,10 z" fill="var(--diagram-accent, #d9480f)"/></marker>
+  </defs>
+  <rect x="20" y="40" width="170" height="50" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <text x="105" y="70" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">Entra ID</text>
+  <rect x="20" y="130" width="170" height="50" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <text x="105" y="160" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">IPSIE client</text>
+  <rect x="20" y="240" width="170" height="50" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <text x="105" y="270" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">Okta</text>
+  <rect x="320" y="85" width="180" height="50" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <text x="410" y="108" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">POST /token</text>
+  <text x="410" y="125" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">client scim-&lt;connection id&gt;</text>
+  <rect x="610" y="150" width="170" height="70" rx="8" fill="none" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5"/>
+  <text x="695" y="180" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">/scim/v2</text>
+  <text x="695" y="200" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">one bucket only</text>
+  <line x1="190" y1="65" x2="318" y2="100" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#scim-arrow-a)"/>
+  <text x="250" y="60" text-anchor="middle" font-size="12" fill="var(--diagram-fg, #1a1a1a)">client secret</text>
+  <line x1="190" y1="155" x2="318" y2="120" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#scim-arrow-a)"/>
+  <text x="250" y="160" text-anchor="middle" font-size="12" fill="var(--diagram-fg, #1a1a1a)">signed JWT</text>
+  <line x1="500" y1="115" x2="608" y2="170" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#scim-arrow-a)"/>
+  <text x="560" y="128" text-anchor="middle" font-size="12" fill="var(--diagram-fg, #1a1a1a)">opaque token, scope scim</text>
+  <line x1="190" y1="265" x2="608" y2="205" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5" marker-end="url(#scim-arrow-b)"/>
+  <text x="400" y="262" text-anchor="middle" font-size="12" fill="var(--diagram-accent, #d9480f)">Authorization: scimst_… (no Bearer)</text>
+  <text x="250" y="45" text-anchor="middle" font-size="11" fill="var(--diagram-line, #555)">scim.secretCredentials</text>
+  <text x="400" y="282" text-anchor="middle" font-size="11" fill="var(--diagram-line, #555)">scim.staticTokens</text>
+  <text x="400" y="318" text-anchor="middle" font-size="13" fill="var(--diagram-line, #555)">Only the middle path is what IPSIE asks for. The two that real directories use each have a switch.</text>
+</svg>
+
+The token endpoint path has one property I would not give up. The OAuth client `scim-<connection id>`
+is synthesized from the connection every time it is resolved and stored nowhere, so the whole token
+endpoint comes for free, replay protection on assertions and constant-time comparison included, and
+rotating a credential is one write with nothing hidden to keep in step. The token it issues is opaque,
+carries `scim` and nothing else, names one bucket's SCIM URL as its audience, and dies the moment the
+credential is reissued.
+
+## IPSIE §4.1 asks for two things no client can do at once
+
+It would be convenient if the profile's demands were at least consistent, so that conformance were
+merely unpopular. They are not. Section 4.1 of the IPSIE SCIM profile requires the client-credentials
+grant "with JWT Client Authentication as defined in RFC7523 section 2.2", and a few lines later
+requires "HTTP Basic authentication in the Authorization request header", adding that transmitting
+client credentials such as `client_assertion` or `client_secret` in the request body is prohibited.
+
+RFC 7523 §2.2 carries the assertion in the request body. That is what the section defines. Basic
+carries a shared secret. No client can satisfy both bullets, and no server can tell a client which one
+to break. We follow the JWT requirement, because §10 repeats it and §4.1 carries an editor's note
+saying it should be expanded, and we say so in our conformance notes rather than quietly picking one.
+It is draft 00. It will be fixed. Until it is, anyone telling you their server is fully conformant to
+§4.1 is telling you they have not read it twice.
+
+## What the validators said
+
+Microsoft's SCIM validator passes 23 of its 24 required tests and all seven previews against our
+conformance deployment, groups included. The one failure, "Patch User - Replace Attributes", reports
+the primary email and phone number missing from the resource, while the PATCH response it displays
+carries both, a following read returns both, and other implementers report the identical failure
+against correct responses with no answer from Microsoft. I count it as the validator's, and our
+conformance notes give the reasoning so anyone can disagree with it. Okta's SCIM 2.0 Spec Test passes
+all eleven required tests and the optional groups test, 53 of 53 assertions. Its first run found a real
+defect of ours: an unserved path under the SCIM base answered 404 with a body that said `server_error`.
+
+What has not been run matters as much. Okta's CRUD test needs an Okta organisation with the
+integration installed, and we have not run it. There is no `/Bulk` endpoint; neither Entra nor Okta
+calls one, and it is planned with asynchronous bulk, but a profile that lists it is not fully met
+without it. The global token revocation endpoint that Okta's Universal Logout calls has never been run
+against a real Okta organisation either. And we have not applied for certification of any of this.
+
+## When I would turn strict on, and when I would not
+
+If you are connecting Entra ID or Okta, leave `scim.strict` off, and read its absence as a statement of
+fact about the clients rather than a relaxation of your server. The forms it tolerates are each
+bounded: a tolerated attribute is matched against a declared table, an undeclared one is ignored rather
+than stored, and the dangerous inputs are refused in both modes.
+
+Turn it on for a certification run, or when the only client is one you wrote against the profile, and
+use the result as a test of that client. If your own client fails strict mode, that is a bug you can
+fix, which is more than anyone can say about Entra's manager. And if you are writing a SCIM server
+from scratch, start from the table above rather than from the RFC. The RFC tells you what is allowed.
+The table tells you what will arrive at three in the morning when a customer's directory runs its first
+full sync.

@@ -1,0 +1,223 @@
+---
+title: Deactivating a user is not deprovisioning
+description: >-
+  A flag checked at the next sign-in leaves every session and token alive. What ending access at once takes, in what order, and what it cannot reach.
+publishedAt: '2026-10-08'
+draft: true
+tags: [deprovisioning, sessions, tokens, scim]
+---
+
+Take our own server at 0.7.0. Deactivate an end user in the console, then send the introspection
+endpoint the opaque access token that user's application received ten minutes earlier. The answer is
+`"active": true`. Open the application in the user's browser and they are still signed in. Look at the
+application's logs and nothing arrived to tell it otherwise.
+
+Nothing was broken, in the narrow sense. The account was inactive, and every place that resolved an
+account checked the flag: a new sign-in was refused, a refresh was refused, the device flow and CIBA
+were refused. That is how most deactivation works, and I had shipped it believing it was enough,
+because the check was in the right place for the question I had asked, which was "can this person get
+in?" The question an administrator is actually asking when they deactivate someone, usually in a
+hurry, is "is this person out?" Those have different answers, and the gap between them is every
+session and token issued before the click.
+
+## A flag checked at the next sign-in ends nothing
+
+A flag is a statement about the future. It stops the next sign-in. Everything the account already
+holds was granted by a check that passed at the time, and nothing makes it ask again. The browser
+session on the authorization server stays valid until it expires. The access token stays valid until
+its `exp`, and if it is opaque, introspection keeps saying so, because introspection asks whether the
+token and its grant exist, not whether the account behind them was disabled since. The relying party's
+own session, which is the one the user is actually looking at, lives as long as the relying party
+decides, and the relying party was never told.
+
+The picture below is the same deactivation in both versions of our server. The top half is what kept
+working after the click in 0.7.0. The bottom half is 0.8.0.
+
+<svg viewBox="0 0 800 340" width="100%" role="img" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">
+  <title>What survives an end-user deactivation over the following hour: before, the relying party session, the server session and an opaque access token all live on; after, everything ends at the moment of deactivation except a self-contained JWT access token, which lives to its expiry</title>
+  <line x1="200" y1="40" x2="200" y2="300" stroke="var(--diagram-accent, #d9480f)" stroke-width="2"/>
+  <text x="200" y="28" text-anchor="middle" font-size="14" font-weight="600" fill="var(--diagram-accent, #d9480f)">deactivated</text>
+  <text x="20" y="62" font-size="14" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">0.7.0</text>
+  <text x="20" y="92" font-size="13" fill="var(--diagram-fg, #1a1a1a)">relying party session</text>
+  <rect x="200" y="80" width="580" height="16" fill="var(--diagram-line, #555)" opacity="0.4"/>
+  <text x="20" y="122" font-size="13" fill="var(--diagram-fg, #1a1a1a)">server session</text>
+  <rect x="200" y="110" width="580" height="16" fill="var(--diagram-line, #555)" opacity="0.4"/>
+  <text x="20" y="152" font-size="13" fill="var(--diagram-fg, #1a1a1a)">opaque access token</text>
+  <rect x="200" y="140" width="400" height="16" fill="var(--diagram-line, #555)" opacity="0.4"/>
+  <text x="610" y="153" font-size="12" fill="var(--diagram-line, #555)">introspects active to exp</text>
+  <line x1="20" y1="180" x2="780" y2="180" stroke="var(--diagram-line, #555)" stroke-width="1" stroke-dasharray="4 4"/>
+  <text x="20" y="208" font-size="14" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">0.8.0</text>
+  <text x="20" y="238" font-size="13" fill="var(--diagram-fg, #1a1a1a)">sessions, grants, tokens</text>
+  <text x="212" y="238" font-size="12" fill="var(--diagram-fg, #1a1a1a)">ended; each relying party sent a logout token</text>
+  <text x="20" y="268" font-size="13" fill="var(--diagram-fg, #1a1a1a)">JWT access token</text>
+  <rect x="200" y="256" width="145" height="16" fill="var(--diagram-accent, #d9480f)" opacity="0.8"/>
+  <text x="355" y="269" font-size="12" fill="var(--diagram-accent, #d9480f)">lives to exp: 15 minutes by default</text>
+  <text x="200" y="318" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">0</text>
+  <text x="780" y="318" text-anchor="end" font-size="12" fill="var(--diagram-line, #555)">an hour later</text>
+</svg>
+
+So deprovisioning is not a flag. It is a flag plus an operation that goes and finds everything the
+flag cannot reach, and the operation has an order that matters more than I expected.
+
+## Read the sessions before you sweep them
+
+The obvious implementation is two lines: set `active: false`, then delete everything the account owns.
+It is wrong in a way no test of "the sessions are gone" can see. The relying parties have to be told,
+with an OpenID Connect back-channel logout token per session, and a logout token carries the session's
+`sid`. The session record is the only place that holds it. Delete first and you have nothing left to
+tell anyone with. Every session disappears correctly and every relying party keeps its user signed in.
+
+So the order is fixed, and it is visible in the function signature rather than left to a comment:
+
+```ts
+export async function revokeAccountAccess(
+	accountId: string
+): Promise<CascadeResult> {
+	await notifyRelyingParties(accountId);
+	return sweepAccountOwned(accountId);
+}
+```
+
+`notifyRelyingParties` reads every session the account owns, and that needed a new method on all
+three storage adapters, `findByOwner`. Until then the only way to enumerate a principal's records was
+the method that destroyed them. A relying party that is unreachable does not stop the operation. Its
+failure is reported as an event, the same as on an ordinary sign-out, because an account that must lose
+access does not keep it because one application's logout endpoint is down.
+
+<svg viewBox="0 0 800 380" width="100%" role="img" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">
+  <title>The order of operations when an administrator or a directory deactivates a user: the audit entry and the flag are written, the sessions are read, each relying party is sent a logout token carrying the session id, then every account-owned record is swept, and the answer is 200 or a 500 naming what survived</title>
+  <defs>
+    <marker id="deprov-arrow-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"> <path d="M0,0 L10,5 L0,10 z" fill="var(--diagram-line, #555)"/></marker>
+    <marker id="deprov-arrow-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"> <path d="M0,0 L10,5 L0,10 z" fill="var(--diagram-accent, #d9480f)"/></marker>
+  </defs>
+  <rect x="30" y="20" width="200" height="40" rx="8" fill="none" stroke="var(--diagram-fg, #1a1a1a)" stroke-width="1.5"/>
+  <text x="130" y="45" text-anchor="middle" font-size="14" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">Admin or directory</text>
+  <rect x="300" y="20" width="200" height="40" rx="8" fill="none" stroke="var(--diagram-fg, #1a1a1a)" stroke-width="1.5"/>
+  <text x="400" y="45" text-anchor="middle" font-size="14" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">Authorization server</text>
+  <rect x="570" y="20" width="200" height="40" rx="8" fill="none" stroke="var(--diagram-fg, #1a1a1a)" stroke-width="1.5"/>
+  <text x="670" y="45" text-anchor="middle" font-size="14" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">Relying parties</text>
+  <line x1="130" y1="60" x2="130" y2="360" stroke="var(--diagram-line, #555)" stroke-width="1" stroke-dasharray="4 4"/>
+  <line x1="400" y1="60" x2="400" y2="360" stroke="var(--diagram-line, #555)" stroke-width="1" stroke-dasharray="4 4"/>
+  <line x1="670" y1="60" x2="670" y2="360" stroke="var(--diagram-line, #555)" stroke-width="1" stroke-dasharray="4 4"/>
+  <line x1="130" y1="95" x2="398" y2="95" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#deprov-arrow-a)"/>
+  <text x="265" y="88" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">1 active: false</text>
+  <text x="410" y="130" font-size="13" fill="var(--diagram-fg, #1a1a1a)">2 audit entry, then the flag: no door opens now</text>
+  <text x="410" y="165" font-size="13" fill="var(--diagram-accent, #d9480f)">3 read every session (findByOwner)</text>
+  <line x1="400" y1="205" x2="668" y2="205" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5" marker-end="url(#deprov-arrow-b)"/>
+  <text x="535" y="198" text-anchor="middle" font-size="13" fill="var(--diagram-accent, #d9480f)">4 POST logout_token &#123; sid &#125;</text>
+  <text x="410" y="245" font-size="13" fill="var(--diagram-fg, #1a1a1a)">5 sweep sessions, grants, tokens, codes</text>
+  <text x="410" y="265" font-size="12" fill="var(--diagram-line, #555)">every area the inventory says the account owns</text>
+  <line x1="400" y1="310" x2="132" y2="310" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#deprov-arrow-a)"/>
+  <text x="265" y="303" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">6 200, or 500 with failedAreas</text>
+  <text x="400" y="350" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">Swap 3 and 5 and every test of "the sessions are gone" passes while no relying party is told.</text>
+</svg>
+
+The sweep itself is not a list of tables someone remembered. Every storage area in our server declares
+which field names its owner, and the sweep is a filter over that declaration, so an area added in a
+later release is swept because it exists, not because somebody added a line to a cascade. I have
+written the hand-maintained version of this more than once, and it fails silently the first time an
+area is added: the new records simply outlive the account, and nothing says so. Most of what it
+reaches would be missed by the other obvious design, walking the account's grants, because sessions,
+sign-ins in progress and enrolment challenges hang off the account, not off any grant.
+
+Introspection needed no change at all. It already answers `active: false` once the grant behind a token
+is gone, so sweeping grants is what turns every opaque access token off at once.
+
+## The login throttle is not access
+
+The sweep stops short of two areas the account is, loosely, associated with: the sign-in throttle and
+the password-reset throttle, both keyed by email address. It is easy to read that as an omission. It is
+the reverse. Those records are not access, they are the count of guesses against that address, and the
+moment you are most likely to be deactivating an account in a hurry is the moment it is under attack.
+Clearing the throttle then resets the brute-force counter mid-incident, for the attacker's benefit. So
+the rule is that the sweep ends what lets someone in and leaves what keeps someone out.
+
+## A partial sweep has to answer 500
+
+Our admin routes write their audit entry before the change, and the audit trail is append-only. Both
+are good rules, and together they make the obvious design for reporting a partial failure impossible:
+you cannot put "these three areas failed to clear" in an entry that was written before you tried.
+
+So a deactivation whose sweep left something behind answers `500`, naming the areas that survived. The
+account is already unable to sign in, since the flag went first, so the residue is bounded by each
+area's own expiry and never a way back in. And deactivating an account that is already inactive is
+allowed and sweeps again, rather than being refused as a no-op, because that repeat is the recovery.
+It looks like a strange idempotency choice until you have needed it.
+
+## Lock is not active, because active belongs to the directory
+
+Once a SCIM directory manages a user, the `active` flag is the directory's. Entra or Okta sets it, and
+the next sync sets it again. An administrator who deactivates a provisioned user locally, in an
+incident, has their decision quietly reversed by a scheduled job a few minutes later, and that is not a
+control anyone should rely on.
+
+<svg viewBox="0 0 800 220" width="100%" role="img" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">
+  <title>Two flags decide whether an end user may sign in: active, written by whoever manages the account, which for a provisioned user is the directory, and the local lock, written only by an administrator; sign-in requires active and not locked</title>
+  <defs>
+    <marker id="deprov-arrow-c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"> <path d="M0,0 L10,5 L0,10 z" fill="var(--diagram-line, #555)"/></marker>
+  </defs>
+  <rect x="30" y="30" width="220" height="50" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <text x="140" y="60" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">Directory over SCIM</text>
+  <rect x="30" y="130" width="220" height="50" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <text x="140" y="160" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">Administrator</text>
+  <rect x="320" y="30" width="160" height="50" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <text x="400" y="60" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">active</text>
+  <rect x="320" y="130" width="160" height="50" rx="8" fill="none" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5"/>
+  <text x="400" y="160" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">lockedLocally</text>
+  <rect x="560" y="80" width="210" height="50" rx="8" fill="none" stroke="var(--diagram-fg, #1a1a1a)" stroke-width="1.5"/>
+  <text x="665" y="103" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">canSignIn</text>
+  <text x="665" y="121" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">active and not locked</text>
+  <line x1="250" y1="55" x2="318" y2="55" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#deprov-arrow-c)"/>
+  <line x1="250" y1="155" x2="318" y2="155" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5" marker-end="url(#deprov-arrow-c)"/>
+  <line x1="480" y1="55" x2="558" y2="95" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#deprov-arrow-c)"/>
+  <line x1="480" y1="155" x2="558" y2="115" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#deprov-arrow-c)"/>
+  <text x="400" y="208" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">Nothing a directory sends reaches the lock, so its next sync cannot undo an incident response.</text>
+</svg>
+
+So the lock is a second flag, written only by an administrator, and the sign-in check is the
+conjunction of the two, in one function that every door calls. That last part matters as much as the
+flag. Two copies of "is this user allowed in" drift, and the drifted one is the door a locked user walks
+through. Ours had already drifted once: the federated sign-in path read `active` alone, so a locked
+account's existing upstream link passed that step, and only the door after it caught the lock.
+
+The lock departs from the IPSIE profile, which forbids local changes to users an identity service
+manages, and I am comfortable with that. It touches sign-in only, never the profile, and an incident
+response that has to wait for someone else's system to sync is not an incident response. Locking runs
+the same sweep as deactivating. Unlocking is the one we made harder, a high-consequence operation for an
+agent that asks for confirmation, because it re-admits an account an administrator judged compromised.
+
+Reactivating and unlocking restore nothing, by the way. Consents went with the grants, so the user
+signs in and consents again. That surprises people once, and it is what "all access mechanisms and
+authorizations" in IPSIE means.
+
+## The token you cannot reach
+
+There is one thing the whole operation cannot touch, and it is better to say so plainly than to let
+"deactivation ends access at once" stand unqualified. A JWT access token that a resource server
+validates on its own, against the published keys, never comes back to the authorization server. There
+is no call to intercept and no record to delete that the resource server would consult. It lives to its
+`exp`.
+
+The only lever is the lifetime. On a declared resource in our server it is fifteen minutes unless an
+administrator raises it, and it can be raised as far as a day. IPSIE SL2 allows fifteen minutes for a token
+not bound to a key and sixty for one bound with DPoP, which is a reasonable statement of how long an
+organisation should be willing to have a departed employee's token keep working. If a resource server
+cannot live with even that, it can ask for opaque tokens and introspect them, paying a round trip per
+request to see a deactivation the moment it happens. Most resource servers I have worked on would
+rather have the fifteen minutes.
+
+## When each one is the right button
+
+Deactivate when the person should not get in and you own the account. Lock when you need that answer
+now and a directory owns the account, or when you do not trust the next sync. Sign everyone out, which
+our server also offers on its own, when the person is fine and the device is not: it runs the same sweep
+and leaves the account active. Delete when the record itself should go, which also ends access, since
+deletion runs the same sequence first.
+
+Some of the machinery around this is younger than the sweep. The guard that holds a SCIM connection
+when it starts deprovisioning too many users at once has passed its tests, but Okta's CRUD test against a
+real organisation has not been run, and there is no `/Bulk` endpoint. Okta's Universal Logout, which calls
+the same sweep from upstream, has never been run against a real Okta organisation. None of it has been
+submitted for certification. The sweep itself was walked end to end against a running server: a logout
+token delivered, the refresh and the introspection refused, the consent asked for again after
+reactivation. That is the part I would copy.

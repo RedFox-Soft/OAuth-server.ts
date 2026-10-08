@@ -1,0 +1,245 @@
+---
+title: Okta Universal Logout is an expired draft
+description: >-
+  Okta Universal Logout rests on an Internet-Draft that expired unadopted. What Okta sends, the nbf trap, and the checks no setting may relax.
+publishedAt: '2026-10-08'
+draft: true
+tags: [logout, okta, federation, security]
+---
+
+The requirement sounded simple. A company's users sign in to our authorization server through their
+workforce identity provider, and when security at that company decides someone's access has to end,
+everywhere, now, the provider should be able to tell us. Not at the next sign-in, which might be
+tomorrow. Now: sessions, refresh tokens, the lot.
+
+So I went looking for the standard way an identity provider tells a relying party "end everything this
+person has". There is not one. There is a final specification for a narrower thing, one for a broader
+thing that the big providers do not send to third parties, and an individual Internet-Draft that
+expired without being adopted, which happens to be the one Okta sends.
+
+## Only one big workforce IdP pushes "end everything", and it pushes a draft
+
+Here is what each provider will actually send to an application like ours, as of October 2026. It is
+less than the marketing pages suggest.
+
+<svg viewBox="0 0 800 330" width="100%" role="img" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">
+  <title>What six identity providers send to a third-party relying party when a user's access should end: Okta sends global token revocation, Keycloak, Auth0 and Ping send OpenID Connect back-channel logout, Google sends RISC for consumer accounts only, and Microsoft Entra ID sends nothing</title>
+  <text x="30" y="34" font-size="14" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">Provider</text>
+  <text x="210" y="34" font-size="14" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">Sends to a third-party application</text>
+  <text x="560" y="34" font-size="14" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">Ends</text>
+  <line x1="30" y1="46" x2="770" y2="46" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <rect x="24" y="58" width="752" height="40" rx="6" fill="none" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5"/>
+  <text x="40" y="83" font-size="14" fill="var(--diagram-fg, #1a1a1a)">Okta</text>
+  <text x="210" y="83" font-size="13" fill="var(--diagram-accent, #d9480f)">global token revocation (expired draft)</text>
+  <text x="560" y="83" font-size="13" fill="var(--diagram-fg, #1a1a1a)">everything the user holds</text>
+  <text x="40" y="133" font-size="14" fill="var(--diagram-fg, #1a1a1a)">Keycloak, Auth0, Ping</text>
+  <text x="210" y="133" font-size="13" fill="var(--diagram-fg, #1a1a1a)">back-channel logout (final spec)</text>
+  <text x="560" y="133" font-size="13" fill="var(--diagram-fg, #1a1a1a)">sessions from one sign-in</text>
+  <text x="40" y="183" font-size="14" fill="var(--diagram-fg, #1a1a1a)">Google</text>
+  <text x="210" y="183" font-size="13" fill="var(--diagram-fg, #1a1a1a)">RISC events</text>
+  <text x="560" y="183" font-size="13" fill="var(--diagram-fg, #1a1a1a)">consumer accounts only</text>
+  <text x="40" y="233" font-size="14" fill="var(--diagram-fg, #1a1a1a)">Microsoft Entra ID</text>
+  <text x="210" y="233" font-size="13" fill="var(--diagram-line, #555)">nothing</text>
+  <text x="560" y="233" font-size="13" fill="var(--diagram-line, #555)">continuous access evaluation is Microsoft's own</text>
+  <line x1="30" y1="260" x2="770" y2="260" stroke="var(--diagram-line, #555)" stroke-width="1"/>
+  <text x="400" y="292" text-anchor="middle" font-size="13" fill="var(--diagram-line, #555)">The one row that ends everything rests on a document no working group adopted.</text>
+  <text x="400" y="314" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">Okta sends it under its Identity Threat Protection licence, as Universal Logout.</text>
+</svg>
+
+Back-channel logout is a final OpenID specification and a good one, but it reports a sign-out, not a
+compromise: it ends the sessions that came from one upstream session, and offline access is meant to
+survive it. Shared Signals and CAEP are the broad standard for "this session is revoked", and none of
+the big workforce providers pushes them to an arbitrary relying party. Entra sends a third-party client
+nothing at all. That leaves Okta's Universal Logout, which is draft-parecki-oauth-global-token-revocation.
+Revision 06 is from February 2026. It expired on 28 August without the OAuth working group adopting it,
+and there is no `draft-ietf-` successor. When we looked at sixteen comparable products, exactly one other,
+Auth0, receives this request.
+
+I built it anyway, and I think that was right, but only with three hedges that I would now insist on
+for anything built on an expired draft. The target is the request Okta documents, not the draft read
+as though it were a standard. Everything sits behind its own switch, `globalTokenRevocation.enabled`,
+off by default, whose description in the console says the draft expired. And the wire format is one
+small module over a core that knows nothing about it, so that when the format changes, or dies, the
+part that decides who may end whose access does not move.
+
+## What Okta actually sends
+
+Okta posts a JSON body naming the user, with a bearer JWT that it signs with its own keys:
+
+```http
+POST /acme/global-token-revocation HTTP/1.1
+Host: auth.example.com
+Authorization: Bearer eyJ0eXAiOiJnbG9iYWwtdG9rZW4tcmV2b2NhdGlvbitqd3QiLCJhbGciOiJSUzI1NiJ9...
+Content-Type: application/json
+
+{ "sub_id": { "format": "iss_sub", "iss": "https://acme.okta.com", "sub": "00u1a2b3c4d5e6f7g8h9" } }
+```
+
+Decoded, the assertion says who is asking and for which endpoint:
+
+```json
+{ "typ": "global-token-revocation+jwt", "alg": "RS256", "kid": "q8J1..." }
+{
+  "iss": "https://acme.okta.com",
+  "sub": "0oa1b2c3d4e5f6g7h8i9",
+  "aud": "https://auth.example.com/acme/global-token-revocation",
+  "iat": 1759917600,
+  "nbf": 1759917300,
+  "exp": 1759917900,
+  "jti": "1a8c3e0f-5b2d-4c7e-9f61-2d0b8a4e7c35"
+}
+```
+
+`iss` is the Okta organisation and `sub` is our client id there, so the pair identifies one upstream
+provider configured on one bucket. The body's `sub_id` identifies the person, as their subject at that
+provider or, in Okta's other format, by email. A user can be named only if that provider signs them in
+here, or its bound SCIM connection provisioned them. Everyone else, including people who do not exist,
+gets the same `404`, so the endpoint cannot be used to ask who has an account.
+
+What it ends is everything: sessions, grants, refresh tokens and opaque access tokens, with a
+back-channel logout to each relying party. The account stays active, so the person can sign in again
+at once and consents afresh. That is more than the draft's MUST, which is refresh tokens plus
+re-authentication, and the draft permits it. One access-ending operation for every path was a decision
+we made deliberately, and our administrators get the same thing as "sign out everywhere".
+
+## Measure the lifetime from iat, never from nbf
+
+Look at the three times in that payload. `nbf` is five minutes before `iat`, and `exp` is five minutes
+after. Okta does this on purpose, to tolerate clock skew on the receiving side, and it is entirely
+legitimate.
+
+We cap the lifetime of a presented assertion at 300 seconds, because a long-lived one is a long window
+for replay. The obvious way to measure a JWT's lifetime is from when it becomes valid to when it stops
+being valid, `exp - nbf`. For Okta's assertion that is 600 seconds. Measure it that way and every real
+request is refused, and the refusal reads like a correct security check.
+
+<svg viewBox="0 0 800 250" width="100%" role="img" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">
+  <title>Okta's assertion timeline: nbf five minutes before iat, exp five minutes after; measured from nbf the lifetime is 600 seconds and over the 300-second cap, measured from iat it is 300 seconds and within it</title>
+  <line x1="80" y1="110" x2="720" y2="110" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <line x1="120" y1="95" x2="120" y2="125" stroke="var(--diagram-fg, #1a1a1a)" stroke-width="2"/>
+  <text x="120" y="85" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">nbf</text>
+  <text x="120" y="145" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">−300 s</text>
+  <line x1="400" y1="95" x2="400" y2="125" stroke="var(--diagram-accent, #d9480f)" stroke-width="2"/>
+  <text x="400" y="85" text-anchor="middle" font-size="14" fill="var(--diagram-accent, #d9480f)">iat (now)</text>
+  <text x="400" y="145" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">0</text>
+  <line x1="680" y1="95" x2="680" y2="125" stroke="var(--diagram-fg, #1a1a1a)" stroke-width="2"/>
+  <text x="680" y="85" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">exp</text>
+  <text x="680" y="145" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">+300 s</text>
+  <rect x="120" y="170" width="560" height="22" rx="4" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="400" y="186" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">exp − nbf = 600 s: over the cap, every real request refused</text>
+  <rect x="400" y="205" width="280" height="22" rx="4" fill="none" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5"/>
+  <text x="540" y="221" text-anchor="middle" font-size="13" fill="var(--diagram-accent, #d9480f)">exp − iat = 300 s: accepted</text>
+  <text x="400" y="40" text-anchor="middle" font-size="14" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">One assertion, two ways to measure how long it lives</text>
+</svg>
+
+So the lifetime is measured from the issue time, and from now, and `nbf` is checked only for what it
+means, that the assertion is not yet valid before it:
+
+```ts
+const { exp, iat, jti } = claims;
+if (typeof exp !== 'number' || typeof iat !== 'number')
+	throw refused('lifetime');
+if (typeof jti !== 'string' || !jti) throw refused('identifier');
+
+const now = epochTime();
+if (iat > now + clockTolerance) throw refused('issued_in_future');
+if (
+	exp - iat > MAX_LIFETIME_SECONDS + clockTolerance ||
+	exp - now > MAX_LIFETIME_SECONDS + clockTolerance
+) {
+	throw refused('lifetime');
+}
+```
+
+The checks against now are the half people leave out. An assertion dated tomorrow with a five-minute
+lifetime passes `exp - iat` perfectly well, and by that measure alone it would be valid for a day.
+Refusing an `iat` in the future, and bounding the time left from now, closes that without trusting the
+issuer's clock for anything more than which way time runs.
+
+## The checks are constants, because someone will turn a setting off
+
+An endpoint that ends sessions is a lever over a whole workforce. The inputs an attacker needs to pull
+it are the provider's issuer, our client id at the provider and one user's subject there, and none of
+those is a secret. So every check on this endpoint is written as if the request is hostile, because a
+fair share of the requests that will ever reach it will be.
+
+Keycloak's CVE-2026-18569, from August, is the case I keep in front of me. Its back-channel logout
+receiver accepted logout tokens signed with `alg: none` for any provider whose signature validation an
+operator had switched off. I doubt anyone switches signature validation off in production on purpose. I
+suspect they switch it off once, to debug a provider that will not connect, and forget. So in our server the set of
+acceptable algorithms is a constant, asymmetric algorithms only, intersected with what the provider
+advertises, and there is no provider, bucket or instance setting that can widen it. `none` and every
+`HS*` are refused, the latter because nobody but the provider may hold the key that signs these.
+
+The rest follow the same rule. The provider is looked up by issuer and client id as two separate
+values, never one composed key, because Keycloak #42209 broke brokered logout for any provider whose
+alias contained a dot. The `aud` must be exactly this endpoint. `exp`, `iat` and `jti` are required,
+and each `jti` is accepted once, recorded under a namespace of bucket and provider that ends in a
+delimiter, because the replay record's id is a hash of namespace and `jti` concatenated with nothing
+in between. A provider that has not been opted in is refused with `403`, but only after it has
+authenticated, so the refusal tells an unauthenticated caller nothing about which providers are opted in. And
+a failed credential is charged against the strict per-origin rate limit, the same counter the SCIM
+endpoint uses.
+
+## A key cache that anyone can poke needs its cooldown back
+
+There is one more trap, and it is in the key cache rather than the checks. On the federated sign-in
+path, our server switches off jose's thirty-second cooldown between refetches of a provider's key set.
+We switched it off because the conformance suite's key-rotation test showed sign-ins failing for half a
+minute after every upstream rotation, and the cooldown defends against nothing there: the ID token is
+read from the provider's own token endpoint, so only the provider can present an unknown `kid`.
+
+A revocation request is the opposite. Anyone can send one, with any `kid` they like, and a cache
+without a cooldown refetches the provider's keys for every unknown `kid`. That turns our server into a
+reflector aimed at the customer's identity provider, one fetch per forged request. So the same provider
+has two key caches, and the one for presented JWTs keeps the cooldown:
+
+```ts
+export function presentedKeySetFor(jwksUri: string): RemoteKeySet {
+	const existing = presentedSets.get(jwksUri);
+	if (existing) return existing;
+	/* (the bound on how many providers are held is left out here) */
+	/* jose's default 30 s cooldown: a genuine rotation is honoured once per cooldown. */
+	const created = createRemoteJWKSet(new URL(jwksUri), {
+		[customFetch]: fetchThroughBoundary
+	});
+	presentedSets.set(jwksUri, created);
+	return created;
+}
+```
+
+The cost is that a genuine rotation at Okta is honoured at most once per thirty seconds, and a revocation
+that arrives inside that window with the new `kid` is refused. I would take that trade
+every time over an endpoint that fetches on command.
+
+## Build the core once, and the draft as a plugin
+
+The core under all of this does three things and knows nothing about Okta: it authenticates an upstream
+provider of this bucket, decides whom that provider may name, and ends that person's access. The global
+token revocation module supplies only which claim carries our client id, its audience, the token types it
+accepts, a replay namespace and which provider option admits it.
+
+That split paid for itself almost at once. Inbound back-channel logout from Keycloak, Auth0 and Ping is
+the second module on the same core, and it inherited every refusal above without restating one. The only
+thing it had to change was where our client id lives, which a logout token carries as its `aud` and
+Okta's assertion as its `sub`, and that is declared by the format rather than guessed, since a guess
+would let a token choose which provider it is judged against. Back-channel logout has been run against a
+real Keycloak 26.8.0. A CAEP `session-revoked` event, if any provider ever sends one, would be a third
+module.
+
+## When I would turn it on
+
+I would turn it on for a deployment whose customers run Okta with Identity Threat Protection and expect
+Universal Logout to reach every application, with the switch documented as experimental and someone
+watching the refusal events for the first week. I would leave it off everywhere else, because an
+endpoint you do not need is one more way in.
+
+And I would be honest about the state of it, as I am trying to be here. It has not been run against a
+real Okta organisation; it needs Identity Threat Protection, and the test suite replays the request Okta
+documents with a stub provider's keys. Okta documents its `sub` as `client_id/appInstanceId`, which may
+not be the bare client id the provider is configured with, and a provider configured with a custom
+authorization server's issuer may not match the organisation's. Only a real run will settle either. The SCIM
+side that usually comes with it has its own gaps: Okta's CRUD test has not been run, and there is no
+`/Bulk`. None of it has been put forward for certification. If the draft is revived and changes, the
+module changes with it. If it stays dead, Okta will presumably move to something else, and the core
+will still be the part worth having written.
