@@ -179,6 +179,73 @@ its `/jwks` are unchanged; everything below concerns buckets with a path or a ho
   on, declaring a resource in a bucket of one's own needs nothing from the resource, and at the
   instance's root issuer only a super administrator declares.
 
+## One upgrade turns roles into groups and moves the instance's keys
+
+Upgrading **to 0.8.0** carries two schema migrations, and neither can be undone. Do the steps in this
+order:
+
+<Steps>
+
+1. **Take a backup.** There is no way back from either migration except a restore.
+
+2. **Run `db:setup`** (or `db:setup:pg`). The release adds storage areas the migrations and the new
+   features write into — bucket groups and their memberships, provisioning connections, the
+   deprovisioning tally — and `db:migrate` expects them to exist.
+
+3. **Run `db:migrate --plan`**, then `db:migrate`. The plan names both migrations below. The server
+   refuses to start against a database that has not run them, so a skipped step stops the deploy
+   rather than serving from a half-converted database.
+
+</Steps>
+
+**`2026-09-30-root-keys-lifecycle`** moves the instance's signing keys into the store a bucket's keys
+already use, so that the instance's keys rotate without a restart too. For each algorithm, the key that
+signs afterwards is the key the old server was signing with; on PostgreSQL, which keeps no insertion
+order, that is the key with the lowest `kid`. The migration prints which key it chose for each algorithm,
+so check that output against what your relying parties expect. Every other key becomes published only:
+it is still served at `/jwks` and still verifies, but it does not sign. A migrated key can be promoted
+once the 60-second publication window has passed.
+
+**`2026-10-08-roles-to-groups`** removes roles. Every role a bucket declares, or an end user holds, becomes
+a bucket group with exactly the same holders as members. Role names that differ only in letter case are
+merged into one group, blank names are skipped, and a name some user held but the bucket never declared
+is kept as a group. The migration reports each of these as a count. On the administrator side, every
+holder of `super_admin`, active or deactivated, becomes a member of the Super administrators group.
+`project_admin` disappears without replacement, because it never granted anything.
+
+What an integration sees after 0.8.0:
+
+- **`roles` is gone from the admin API and from MCP.** A script or agent that set `roles` on an
+  administrator, a bucket or an end user is now refused, because the field is unknown. Super
+  administrator standing is granted and withdrawn by operations of its own, `admin_super_grant` and
+  `admin_super_withdraw`, and end users are grouped with the `bucket_group_*` tools. Relying parties that
+  read roles from a claim read the `groups` claim instead.
+- **Refresh tokens are served only while `offline_access` is a supported scope.** The token endpoint
+  now accepts exactly the grant types discovery advertises, so with `offline_access` absent from the
+  [`scopes`](/docs/reference/settings/#scopes) setting, a refresh, including one using a token issued
+  before the upgrade, is refused with `unsupported_grant_type`. `refreshToken.enabled`, which changed
+  nothing anyone could observe, is removed.
+- **ID tokens from a password sign-in now carry `"amr": ["pwd"]`.** Every ID token from a sign-in
+  states how the user authenticated: `["pwd"]`, or `["pwd", "otp", "mfa"]` with a one-time code; a
+  federated sign-in carries none. A test or relying party that treated the mere presence of `amr` as
+  "used a second factor" now gets that wrong. Look for `mfa` or `otp` in the array instead.
+- **`jwks_delete` is gone, and so is deleting a key.** Keys are retired instead, and a retire, of an
+  instance key or a bucket key, is refused unless its body names the key: `{ "confirm": "<kid>" }`.
+  The console makes the operator type the `kid`.
+
+### Then 0.9.0
+
+0.9.0 declares no migration. It adds one storage area, `UpstreamSession`, which
+back-channel logout from upstream providers needs, so run
+`db:setup` (or `db:setup:pg`) and restart.
+
+One fix in it concerns the upgrade you have just read about. The Compose files shipped before 0.9.0 ran
+only `db:setup` in their `setup` service, so pulling 0.7.0 or 0.8.0 over an existing database left a
+server that refused to start. The shipped `docker-compose.yml` and `docker-compose.postgres.yml` now run
+`db:migrate` after it. If you keep your own copy of an older file, add the step to its `setup` command.
+A Compose deployment that has refused to start since it moved to 0.7.0 or 0.8.0 is this: take the
+backup those releases asked for, then run `db:migrate` once.
+
 ## After the restart
 
 ```bash
