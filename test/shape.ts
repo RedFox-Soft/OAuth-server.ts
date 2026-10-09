@@ -1,5 +1,7 @@
 import { Value } from '@sinclair/typebox/value';
 import type { Static, TSchema } from '@sinclair/typebox';
+import { OIDCProviderError } from 'lib/helpers/errors.ts';
+import { jsonText } from 'lib/helpers/_/json_text.ts';
 
 /*
  * Data a test reads from outside the type system — a JSON body, a parsed page prop, a raw store record —
@@ -17,7 +19,7 @@ export function shaped<T extends TSchema>(
 	}
 	const first = Value.Errors(schema, value).First();
 	throw new Error(
-		`unexpected shape at '${first?.path ?? ''}': ${first?.message ?? 'no match'} — ${JSON.stringify(value)?.slice(0, 300)}`
+		`unexpected shape at '${first?.path ?? ''}': ${first?.message ?? 'no match'} — ${jsonText(value)?.slice(0, 300) ?? 'undefined'}`
 	);
 }
 
@@ -27,4 +29,20 @@ export function present<T>(value: T | null | undefined, what: string): T {
 		throw new Error(`expected ${what}`);
 	}
 	return value;
+}
+
+/*
+ * An endpoint's error event carries whatever its handler threw — a protocol error, or one of Elysia's own
+ * (not found, validation) — so a test reading `error_detail` first asserts which it got.
+ */
+export function providerError(value: unknown): OIDCProviderError {
+	if (!(value instanceof OIDCProviderError)) {
+		throw new Error(`expected a protocol error, got ${String(value)}`);
+	}
+	return value;
+}
+
+/* A response body as text: a page as itself, anything else as the JSON it is rather than "[object Object]". */
+export function textOf(value: unknown): string {
+	return typeof value === 'string' ? value : (jsonText(value) ?? '');
 }

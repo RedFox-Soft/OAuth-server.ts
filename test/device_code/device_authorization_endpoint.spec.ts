@@ -4,7 +4,7 @@ import bootstrap, { formAgent } from '../test_helper.js';
 import { addons } from 'lib/addon/index.js';
 import { TestAdapter } from 'test/models.js';
 import { normalize } from '../../lib/helpers/user_codes.ts';
-import { eventBus } from 'lib/event_bus.js';
+import { eventBus, type ServerListener } from 'lib/event_bus.js';
 import { DeviceCode } from 'lib/models/device_code.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 
@@ -29,7 +29,7 @@ describe('device_authorization_endpoint', () => {
 
 	describe('client validation', () => {
 		it('only responds to clients with urn:ietf:params:oauth:grant-type:device_code enabled', async () => {
-			const spy = mock();
+			const spy = mock<ServerListener<'device_authorization.error'>>();
 			eventBus.once('device_authorization.error', spy);
 
 			const { error } = await post({ client_id: 'client-not-allowed' });
@@ -45,7 +45,7 @@ describe('device_authorization_endpoint', () => {
 		});
 
 		it('rejects invalid clients', async () => {
-			const spy = mock();
+			const spy = mock<ServerListener<'device_authorization.error'>>();
 			eventBus.once('device_authorization.error', spy);
 
 			const { error } = await post({ client_id: 'not-found-client' });
@@ -97,7 +97,7 @@ describe('device_authorization_endpoint', () => {
 	});
 
 	it('responds with json 200', async () => {
-		const spy = mock();
+		const spy = mock<ServerListener<'device_authorization.success'>>();
 		eventBus.once('device_authorization.success', spy);
 
 		const { status, data } = await post({

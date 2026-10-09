@@ -1,5 +1,4 @@
-import type { SQL } from 'bun';
-import { sql } from './db.js';
+import { sql, type Sql, type Tx } from './db.js';
 import { docOf } from './json.js';
 import { isUniqueViolation } from './sqlState.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
@@ -24,7 +23,7 @@ import {
 } from '../types.js';
 
 /* A store method runs either on the pool or inside a transaction; both are tagged-template handles. */
-type Handle = SQL;
+type Handle = Sql;
 
 /*
  * Bucket groups and their membership records. Uniqueness is the unique indexes'; a change is one
@@ -117,7 +116,7 @@ export class BucketGroupStore implements BucketGroupStoreInstance {
 		const doc = withoutUndefined(group);
 		const handle = sql();
 		try {
-			await handle.begin(async (tx) => {
+			await handle.begin(async (tx: Tx) => {
 				await tx`
 					INSERT INTO ${tx(this.area)} (id, doc, expires_at)
 					VALUES (${group._id}, ${doc}, NULL)
@@ -185,11 +184,13 @@ export class BucketGroupStore implements BucketGroupStoreInstance {
 					SELECT doc FROM ${handle(this.area)} WHERE ${where}
 					ORDER BY id LIMIT ${limit} OFFSET ${offset}
 				`,
-			handle`SELECT count(*)::int AS total FROM ${handle(this.area)} WHERE ${where}`
+			handle<
+				{ total: number }[]
+			>`SELECT count(*)::int AS total FROM ${handle(this.area)} WHERE ${where}`
 		]);
 		return {
 			groups: this.groupsOf(rows),
-			totalResults: Number(counted[0]?.total ?? 0)
+			totalResults: counted.at(0)?.total ?? 0
 		};
 	}
 
@@ -216,11 +217,11 @@ export class BucketGroupStore implements BucketGroupStoreInstance {
 
 	async memberCount(groupId: string): Promise<number> {
 		const handle = sql();
-		const rows = await handle`
+		const rows = await handle<{ total: number }[]>`
 			SELECT count(*)::int AS total FROM ${handle(this.memberArea)}
 			WHERE doc->>'groupId' = ${groupId}
 		`;
-		return Number(rows[0]?.total ?? 0);
+		return rows.at(0)?.total ?? 0;
 	}
 
 	async groupIdsOf(
@@ -272,7 +273,7 @@ export class BucketGroupStore implements BucketGroupStoreInstance {
 		}
 		const handle = sql();
 		try {
-			return await handle.begin(async (tx) => {
+			return await handle.begin(async (tx: Tx) => {
 				const rows = await tx`
 					UPDATE ${tx(this.area)}
 					SET doc = (doc - ${tx.array(remove, 'text')}) || ${set}
@@ -306,7 +307,7 @@ export class BucketGroupStore implements BucketGroupStoreInstance {
 
 	async destroy(id: string): Promise<void> {
 		const handle = sql();
-		await handle.begin(async (tx) => {
+		await handle.begin(async (tx: Tx) => {
 			await tx`DELETE FROM ${tx(this.memberArea)} WHERE doc->>'groupId' = ${id}`;
 			await tx`DELETE FROM ${tx(this.area)} WHERE id = ${id}`;
 		});
@@ -314,7 +315,7 @@ export class BucketGroupStore implements BucketGroupStoreInstance {
 
 	async destroyByBucket(bucketId: string): Promise<void> {
 		const handle = sql();
-		await handle.begin(async (tx) => {
+		await handle.begin(async (tx: Tx) => {
 			await tx`DELETE FROM ${tx(this.memberArea)} WHERE doc->>'bucketId' = ${bucketId}`;
 			await tx`DELETE FROM ${tx(this.area)} WHERE doc->>'bucketId' = ${bucketId}`;
 		});

@@ -48,7 +48,7 @@ export function chargeFailedCredential(
 	origin: string,
 	refuse: (retryAfterSeconds: number) => Error
 ): void {
-	if (ApplicationConfig['rateLimit.enabled'] !== true) return;
+	if (!ApplicationConfig['rateLimit.enabled']) return;
 	const decision = decide(byOrigin.get(origin), clock(), strictBounds());
 	byOrigin.set(origin, decision.next);
 	if (decision.refused) throw refuse(decision.retryAfterSeconds);

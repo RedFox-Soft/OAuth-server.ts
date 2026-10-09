@@ -1,3 +1,4 @@
+import { Script } from 'node:vm';
 import { LOCALE_DEFINITIONS, translatedLocales } from '../data/seo.ts';
 
 /*
@@ -35,7 +36,7 @@ function languageScript(config: ScriptConfig): void {
 	const html = document.documentElement;
 	const pageKey = config.langToKey[html.lang] || 'en';
 	const first = (
-		(navigator.languages && navigator.languages[0]) ||
+		navigator.languages.at(0) ||
 		navigator.language ||
 		''
 	).toLowerCase();
@@ -144,6 +145,7 @@ export function languageScriptSource(): string {
 		.replace(/^\s*\/\/.*$/gm, '')
 		.replace(/\n\s*/g, '');
 	const source = `(${body})(${JSON.stringify(config)});`;
-	new Function(source);
+	// Compiled, never run: a syntax error fails the build here rather than in every reader's browser.
+	new Script(source);
 	return source;
 }

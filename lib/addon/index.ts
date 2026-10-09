@@ -40,7 +40,7 @@ export const issueRefreshToken: typeof tokensMod.issueRefreshToken = async (
 export const pairwiseIdentifier: typeof tokensMod.pairwiseIdentifier = async (
 	...args
 ) => resolve('pairwiseIdentifier', tokensMod.pairwiseIdentifier)(...args);
-export const rotateRefreshToken: typeof tokensMod.rotateRefreshToken = (
+export const rotateRefreshToken: typeof tokensMod.rotateRefreshToken = async (
 	...args
 ) => resolve('rotateRefreshToken', tokensMod.rotateRefreshToken)(...args);
 export const idFactory: typeof tokensMod.idFactory = (...args) =>
@@ -118,20 +118,20 @@ export const processLoginHint: typeof cibaMod.processLoginHint = async (
 ) => resolve('processLoginHint', cibaMod.processLoginHint)(...args);
 export const verifyUserCode: typeof cibaMod.verifyUserCode = async (...args) =>
 	resolve('verifyUserCode', cibaMod.verifyUserCode)(...args);
-export const rarForAuthorizationCode: typeof rarMod.rarForAuthorizationCode = (
+export const rarForAuthorizationCode: typeof rarMod.rarForAuthorizationCode =
+	async (...args) =>
+		resolve('rarForAuthorizationCode', rarMod.rarForAuthorizationCode)(...args);
+export const rarForCodeResponse: typeof rarMod.rarForCodeResponse = async (
 	...args
-) =>
-	resolve('rarForAuthorizationCode', rarMod.rarForAuthorizationCode)(...args);
-export const rarForCodeResponse: typeof rarMod.rarForCodeResponse = (...args) =>
-	resolve('rarForCodeResponse', rarMod.rarForCodeResponse)(...args);
+) => resolve('rarForCodeResponse', rarMod.rarForCodeResponse)(...args);
 export const rarForRefreshTokenResponse: typeof rarMod.rarForRefreshTokenResponse =
-	(...args) =>
+	async (...args) =>
 		resolve(
 			'rarForRefreshTokenResponse',
 			rarMod.rarForRefreshTokenResponse
 		)(...args);
 export const rarForIntrospectionResponse: typeof rarMod.rarForIntrospectionResponse =
-	(...args) =>
+	async (...args) =>
 		resolve(
 			'rarForIntrospectionResponse',
 			rarMod.rarForIntrospectionResponse

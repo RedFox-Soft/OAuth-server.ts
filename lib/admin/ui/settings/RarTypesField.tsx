@@ -103,7 +103,7 @@ export function RarTypesField({
 					type="warning"
 					showIcon
 					style={{ marginTop: 8 }}
-					message={
+					title={
 						issues.length === 1
 							? issues[0]
 							: `${issues.length} things to fix before this can be saved`
@@ -123,7 +123,7 @@ export function RarTypesField({
 			<Drawer
 				title="Authorization details types"
 				open={open}
-				width={720}
+				size={720}
 				onClose={() => setOpen(false)}
 				extra={
 					<Button

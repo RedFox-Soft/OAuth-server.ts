@@ -2,11 +2,13 @@ import {
 	describe,
 	it,
 	beforeAll,
+	beforeEach,
 	afterEach,
 	expect,
 	mock,
 	type Mock
 } from 'bun:test';
+import { providerError } from 'test/shape.ts';
 import { decode } from 'lib/helpers/jwt.js';
 
 import bootstrap, {
@@ -18,7 +20,7 @@ import bootstrap, {
 import { fullProfileClaims } from '../models.js';
 import { getUserStore } from 'lib/adapters/index.js';
 import epochTime from '../../lib/helpers/epoch_time.ts';
-import { eventBus } from 'lib/event_bus.js';
+import { eventBus, type ServerListener } from 'lib/event_bus.js';
 import { DeviceCode } from 'lib/models/device_code.js';
 import { TestAdapter } from 'test/models.js';
 import { ttl } from 'lib/configs/liveTime.js';
@@ -30,8 +32,8 @@ function claimsOf(idToken: string | undefined) {
 	return decode(idToken).payload;
 }
 
-function errorDetail(spy: Mock<(error: { error_detail?: string }) => void>) {
-	return spy.mock.calls[0][0].error_detail;
+function errorDetail(spy: Mock<ServerListener<'grant.error'>>) {
+	return providerError(spy.mock.calls[0][0]).error_detail;
 }
 
 const grant_type = 'urn:ietf:params:oauth:grant-type:device_code';
@@ -59,7 +61,7 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code w/ conformIdTo
 	});
 
 	it('returns the tokens a device expects, with scope-requested claims in the id_token', async () => {
-		const spy = mock();
+		const spy = mock<ServerListener<'grant.success'>>();
 		eventBus.once('grant.success', spy);
 
 		const deviceCode = new DeviceCode({
@@ -107,7 +109,7 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 	});
 
 	it('returns the tokens a device expects', async () => {
-		const spy = mock();
+		const spy = mock<ServerListener<'grant.success'>>();
 		eventBus.once('grant.success', spy);
 
 		const deviceCode = new DeviceCode({
@@ -153,7 +155,7 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 		});
 
 		it('an unknown device code is refused as invalid_grant', async () => {
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.error'>>();
 			eventBus.once('grant.error', spy);
 			const { error } = await agent.token.post({
 				client_id: 'client',
@@ -173,7 +175,7 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 			// the DB-backed findAccount now resolves nothing for this subject.
 			await getUserStore('redfox').destroy(setup.getAccountId());
 
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.error'>>();
 			eventBus.once('grant.error', spy);
 
 			const deviceCode = new DeviceCode({
@@ -203,7 +205,7 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 		});
 
 		it('a device code issued to another client is refused', async () => {
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.error'>>();
 			eventBus.once('grant.error', spy);
 
 			const deviceCode = new DeviceCode({
@@ -228,7 +230,7 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 
 		describe('expired', () => {
 			let prev: typeof ttl.DeviceCode;
-			beforeAll(() => {
+			beforeEach(() => {
 				prev = ttl.DeviceCode;
 				ttl.DeviceCode = () => 0;
 			});
@@ -281,7 +283,7 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 		});
 
 		it('a spent device code is refused', async () => {
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.error'>>();
 			eventBus.once('grant.error', spy);
 
 			const deviceCode = new DeviceCode({
@@ -350,7 +352,7 @@ describe('grant_type=urn:ietf:params:oauth:grant-type:device_code', () => {
 	});
 
 	it('responds with a built-in error if one is resolved with', async () => {
-		const spy = mock();
+		const spy = mock<ServerListener<'grant.error'>>();
 		eventBus.once('grant.error', spy);
 
 		const deviceCode = new DeviceCode({

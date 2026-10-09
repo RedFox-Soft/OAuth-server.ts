@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'bun:test';
 
 import bootstrap from '../test_helper.js';
-import { elysia } from 'lib/index.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
@@ -11,16 +10,13 @@ import {
 	mcpConfirmationStore
 } from 'lib/adapters/index.ts';
 import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
-import {
-	ADMIN_MCP_CLIENT_ID,
-	MCP_RESOURCE,
-	MCP_ROUTE
-} from 'lib/mcp/consts.ts';
+import { ADMIN_MCP_CLIENT_ID, MCP_RESOURCE } from 'lib/mcp/consts.ts';
 import { mcpCatalogue } from 'lib/mcp/catalogue.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { shaped } from 'test/shape.js';
 import { Type } from '@sinclair/typebox';
 import { createAdministrator, type AdminKind } from '../administrators.ts';
+import { rpc } from './rpc.ts';
 
 /*
  * The two-step gate on high-consequence operations.
@@ -33,35 +29,6 @@ import { createAdministrator, type AdminKind } from '../administrators.ts';
 let rpcId = 0;
 
 const Created = Type.Object({ _id: Type.String() });
-
-async function rpc(body: unknown, token?: string) {
-	const res = await elysia.handle(
-		new Request(`http://e.ly${MCP_ROUTE}`, {
-			method: 'POST',
-			headers: {
-				'content-type': 'application/json',
-				accept: 'application/json, text/event-stream',
-				...(token ? { authorization: `Bearer ${token}` } : {})
-			},
-			body: JSON.stringify(body)
-		})
-	);
-	const text = await res.text();
-	const isEvent = (res.headers.get('content-type') ?? '').includes(
-		'text/event-stream'
-	);
-	const line = isEvent
-		? text.split('\n').find((l) => l.startsWith('data:'))
-		: undefined;
-	const payload = isEvent
-		? line
-			? JSON.parse(line.slice('data:'.length).trim())
-			: undefined
-		: text
-			? JSON.parse(text)
-			: undefined;
-	return { status: res.status, payload };
-}
 
 async function tokenFor(kind: AdminKind) {
 	const user = await createAdministrator(
@@ -123,7 +90,7 @@ async function projectWithClient(token: string) {
 	);
 	const { clientId } = shaped(
 		Type.Object({ clientId: Type.String() }),
-		created.payload.result?.structuredContent?.result
+		created.result?.structuredContent?.result
 	);
 	return { project, clientId };
 }
@@ -155,9 +122,9 @@ describe('MCP confirmation gate', () => {
 			call('client_delete', { id: project._id, clientId }),
 			token
 		);
-		const structured = described.payload.result?.structuredContent;
+		const structured = described.result?.structuredContent;
 
-		expect(described.payload.result?.isError).not.toBe(true);
+		expect(described.result?.isError).not.toBe(true);
 		expect(structured?.status).toBe('confirmation_required');
 		expect(structured?.confirmationToken).toBeString();
 		expect(structured?.target).toContain(clientId);
@@ -167,7 +134,7 @@ describe('MCP confirmation gate', () => {
 			call('client_get', { id: project._id, clientId }),
 			token
 		);
-		expect(still.payload.result?.isError).not.toBe(true);
+		expect(still.result?.isError).not.toBe(true);
 	});
 
 	it('writes no audit entry for the description', async () => {
@@ -192,19 +159,19 @@ describe('MCP confirmation gate', () => {
 			token
 		);
 		const confirmationToken =
-			described.payload.result?.structuredContent?.confirmationToken;
+			described.result?.structuredContent?.confirmationToken;
 
 		const performed = await rpc(
 			call('client_delete', { id: project._id, clientId, confirmationToken }),
 			token
 		);
-		expect(performed.payload.result?.isError).not.toBe(true);
+		expect(performed.result?.isError).not.toBe(true);
 
 		const gone = await rpc(
 			call('client_get', { id: project._id, clientId }),
 			token
 		);
-		expect(gone.payload.result?.isError).toBe(true);
+		expect(gone.result?.isError).toBe(true);
 	});
 
 	it('refuses a replayed confirmation', async () => {
@@ -216,7 +183,7 @@ describe('MCP confirmation gate', () => {
 			token
 		);
 		const confirmationToken =
-			described.payload.result?.structuredContent?.confirmationToken;
+			described.result?.structuredContent?.confirmationToken;
 
 		await rpc(
 			call('client_delete', { id: project._id, clientId, confirmationToken }),
@@ -227,8 +194,8 @@ describe('MCP confirmation gate', () => {
 			token
 		);
 
-		expect(replayed.payload.result?.isError).toBe(true);
-		expect(replayed.payload.result?.structuredContent?.failure).toBe(
+		expect(replayed.result?.isError).toBe(true);
+		expect(replayed.result?.structuredContent?.failure).toBe(
 			'unknown_or_spent'
 		);
 	});
@@ -246,7 +213,7 @@ describe('MCP confirmation gate', () => {
 			token
 		);
 		const confirmationToken =
-			described.payload.result?.structuredContent?.confirmationToken;
+			described.result?.structuredContent?.confirmationToken;
 
 		const misaimed = await rpc(
 			call('client_delete', {
@@ -257,10 +224,8 @@ describe('MCP confirmation gate', () => {
 			token
 		);
 
-		expect(misaimed.payload.result?.isError).toBe(true);
-		expect(misaimed.payload.result?.structuredContent?.failure).toBe(
-			'wrong_target'
-		);
+		expect(misaimed.result?.isError).toBe(true);
+		expect(misaimed.result?.structuredContent?.failure).toBe('wrong_target');
 
 		// And the second client still exists — the misaimed confirmation performed nothing.
 		const still = await rpc(
@@ -270,7 +235,7 @@ describe('MCP confirmation gate', () => {
 			}),
 			token
 		);
-		expect(still.payload.result?.isError).not.toBe(true);
+		expect(still.result?.isError).not.toBe(true);
 	});
 
 	it('refuses a confirmation issued for a different operation', async () => {
@@ -282,7 +247,7 @@ describe('MCP confirmation gate', () => {
 			token
 		);
 		const confirmationToken =
-			described.payload.result?.structuredContent?.confirmationToken;
+			described.result?.structuredContent?.confirmationToken;
 
 		const wrongTool = await rpc(
 			call('client_secret_rotate', {
@@ -293,10 +258,8 @@ describe('MCP confirmation gate', () => {
 			token
 		);
 
-		expect(wrongTool.payload.result?.isError).toBe(true);
-		expect(wrongTool.payload.result?.structuredContent?.failure).toBe(
-			'wrong_tool'
-		);
+		expect(wrongTool.result?.isError).toBe(true);
+		expect(wrongTool.result?.structuredContent?.failure).toBe('wrong_tool');
 	});
 
 	it('refuses a confirmation issued to a different administrator', async () => {
@@ -309,17 +272,15 @@ describe('MCP confirmation gate', () => {
 			alice.token
 		);
 		const confirmationToken =
-			described.payload.result?.structuredContent?.confirmationToken;
+			described.result?.structuredContent?.confirmationToken;
 
 		const byBob = await rpc(
 			call('client_delete', { id: project._id, clientId, confirmationToken }),
 			bob.token
 		);
 
-		expect(byBob.payload.result?.isError).toBe(true);
-		expect(byBob.payload.result?.structuredContent?.failure).toBe(
-			'wrong_principal'
-		);
+		expect(byBob.result?.isError).toBe(true);
+		expect(byBob.result?.structuredContent?.failure).toBe('wrong_principal');
 	});
 
 	it('refuses when the parameters changed after the description', async () => {
@@ -330,7 +291,7 @@ describe('MCP confirmation gate', () => {
 		);
 		const { _id: bucketId } = shaped(
 			Created,
-			bucket.payload.result?.structuredContent?.result
+			bucket.result?.structuredContent?.result
 		);
 		const created = await rpc(
 			call('bucket_user_create', {
@@ -342,7 +303,7 @@ describe('MCP confirmation gate', () => {
 		);
 		const { _id: uid } = shaped(
 			Created,
-			created.payload.result?.structuredContent?.result
+			created.result?.structuredContent?.result
 		);
 
 		const described = await rpc(
@@ -354,7 +315,7 @@ describe('MCP confirmation gate', () => {
 			token
 		);
 		const confirmationToken =
-			described.payload.result?.structuredContent?.confirmationToken;
+			described.result?.structuredContent?.confirmationToken;
 
 		// Same tool, same target, different payload. This is the case a target-only binding would miss.
 		const swapped = await rpc(
@@ -367,8 +328,8 @@ describe('MCP confirmation gate', () => {
 			token
 		);
 
-		expect(swapped.payload.result?.isError).toBe(true);
-		expect(swapped.payload.result?.structuredContent?.failure).toBe(
+		expect(swapped.result?.isError).toBe(true);
+		expect(swapped.result?.structuredContent?.failure).toBe(
 			'arguments_changed'
 		);
 	});
@@ -389,8 +350,8 @@ describe('MCP confirmation gate', () => {
 		 * than a handler check — the operation cannot even be attempted — so the assertion is on the
 		 * refusal, not on which layer produced it.
 		 */
-		expect(refused.payload.result?.isError).toBe(true);
-		const text = refused.payload.result?.content?.[0]?.text ?? '';
+		expect(refused.result?.isError).toBe(true);
+		const text = refused.result?.content?.[0]?.text ?? '';
 		expect(text).toContain('project_create');
 		expect(text).toContain('additional properties');
 	});
@@ -401,8 +362,8 @@ describe('MCP confirmation gate', () => {
 
 		const refused = await rpc(call('jwks_generate', { alg: 'RS256' }), token);
 
-		expect(refused.payload.result?.isError).toBe(true);
-		expect(refused.payload.result?.structuredContent?.reason).toBe('forbidden');
+		expect(refused.result?.isError).toBe(true);
+		expect(refused.result?.structuredContent?.reason).toBe('forbidden');
 		// No token handed out for an operation that could never be performed.
 		expect(await mcpConfirmationStore.count()).toBe(before);
 	});

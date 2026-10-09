@@ -11,7 +11,7 @@ import {
 
 import bootstrap, { agent, getHeader } from '../test_helper.js';
 import { ISSUER } from 'lib/configs/env.js';
-import { eventBus } from 'lib/event_bus.js';
+import { eventBus, type ServerListener } from 'lib/event_bus.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { Client } from 'lib/models/client.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
@@ -224,7 +224,7 @@ describe('registration features', () => {
 		});
 
 		it('stores the client and emits an event', async () => {
-			const spy = mock();
+			const spy = mock<ServerListener<'registration_create.success'>>();
 			eventBus.once('registration_create.success', spy);
 			const adapter = TestAdapter.for('Client');
 			const upsert = spyOn(adapter, 'upsert');
@@ -465,7 +465,7 @@ describe('registration features', () => {
 		});
 
 		it('invalidates registration_access_token if used on the wrong client', async () => {
-			const spy = mock();
+			const spy = mock<ServerListener<'registration_access_token.destroyed'>>();
 			eventBus.once('registration_access_token.destroyed', spy);
 
 			const res = await agent

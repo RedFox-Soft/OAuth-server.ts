@@ -153,13 +153,13 @@ export function Audit() {
 
 	function apply() {
 		setCurrent(1);
-		load(filters, 1, pageSize);
+		void load(filters, 1, pageSize);
 	}
 
 	function reset() {
 		setFilters(EMPTY_FILTERS);
 		setCurrent(1);
-		load(EMPTY_FILTERS, 1, pageSize);
+		void load(EMPTY_FILTERS, 1, pageSize);
 	}
 
 	const columns = [
@@ -173,7 +173,7 @@ export function Audit() {
 			dataIndex: 'actorEmail',
 			render: (email: string, row: AuditEntry) => (
 				<Space
-					direction="vertical"
+					orientation="vertical"
 					size={0}
 				>
 					<Typography.Text>{actorLabel(row, email)}</Typography.Text>
@@ -216,7 +216,7 @@ export function Audit() {
 			dataIndex: 'targetId',
 			render: (targetId: string, row: AuditEntry) => (
 				<Space
-					direction="vertical"
+					orientation="vertical"
 					size={0}
 				>
 					<Typography.Text>{row.targetType}</Typography.Text>
@@ -289,7 +289,7 @@ export function Audit() {
 
 	return (
 		<Space
-			direction="vertical"
+			orientation="vertical"
 			style={{ width: '100%' }}
 			size="middle"
 		>
@@ -303,7 +303,7 @@ export function Audit() {
 			<Alert
 				type="info"
 				showIcon
-				message="Entries record what an authorized administrator was about to apply"
+				title="Entries record what an authorized administrator was about to apply"
 				description="Each entry is written immediately before its change, so a change is never applied without a record. An entry is not proof that the change took effect — a later conflict or failure can follow one. Entries are never modified or removed."
 			/>
 
@@ -331,7 +331,7 @@ export function Audit() {
 						style={{ width: 140 }}
 						options={SURFACE_OPTIONS}
 						value={filters.viaSurface || undefined}
-						onChange={(value) =>
+						onChange={(value: Surface | undefined) =>
 							setFilters({ ...filters, viaSurface: value ?? '' })
 						}
 					/>
@@ -376,7 +376,7 @@ export function Audit() {
 					onChange: (nextPage, nextSize) => {
 						setCurrent(nextPage);
 						setPageSize(nextSize);
-						load(filters, nextPage, nextSize);
+						void load(filters, nextPage, nextSize);
 					}
 				}}
 			/>

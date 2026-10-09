@@ -13,6 +13,7 @@
 import { cp, mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { member } from '../lib/helpers/_/object.ts';
 
 type Advisory = {
 	url: string;
@@ -42,12 +43,17 @@ async function installedPackages(
 			: [join(nodeModules, entry.name)];
 		for (const dir of dirs) {
 			try {
-				const manifest = JSON.parse(
+				const manifest: unknown = JSON.parse(
 					await readFile(join(dir, 'package.json'), 'utf8')
 				);
-				const versions = found.get(manifest.name) ?? new Set<string>();
-				versions.add(manifest.version);
-				found.set(manifest.name, versions);
+				const name = member(manifest, 'name');
+				const version = member(manifest, 'version');
+				// A manifest without both names no package; its nested node_modules are still walked.
+				if (typeof name === 'string' && typeof version === 'string') {
+					const versions = found.get(name) ?? new Set<string>();
+					versions.add(version);
+					found.set(name, versions);
+				}
 			} catch {
 				continue;
 			}

@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 
-import { describe, it, expect } from 'bun:test';
+import { describe, it, expect, beforeAll } from 'bun:test';
 import { Type } from '@sinclair/typebox';
 
 import bootstrap, { agent, formAgent } from '../test_helper.js';
@@ -146,8 +146,10 @@ const endpoints: {
  * parameter it does not define exactly as it answers the same request without it, so a client may
  * send what a later profile defines without the request failing.
  */
-describe('undefined request parameters', async () => {
-	await bootstrap(import.meta.url);
+describe('undefined request parameters', () => {
+	beforeAll(async () => {
+		await bootstrap(import.meta.url);
+	});
 
 	endpoints.forEach(({ name, send }) => {
 		describe(name, () => {

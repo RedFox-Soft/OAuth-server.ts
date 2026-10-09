@@ -97,9 +97,7 @@ function sameKey(
 	// Order-sensitive, because a compound index on (a, b) is not the index on (b, a).
 	return declaredEntries.every(([field, direction], i) => {
 		const actual = existingEntries[i];
-		return (
-			actual !== undefined && actual[0] === field && actual[1] === direction
-		);
+		return actual[0] === field && actual[1] === direction;
 	});
 }
 

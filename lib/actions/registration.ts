@@ -72,7 +72,7 @@ type RegistrationBody = Static<typeof RegistrationResponse>;
 function readBearer(authorization: string | undefined) {
 	if (typeof authorization === 'string') {
 		const [scheme, value] = authorization.split(' ');
-		if (scheme?.toLowerCase() === 'bearer' && value) {
+		if (scheme.toLowerCase() === 'bearer' && value) {
 			return value;
 		}
 	}
@@ -249,7 +249,7 @@ async function create({
 		delete properties.client_secret_expires_at;
 	}
 
-	const iatPolicies = oidc.entities.InitialAccessToken?.payload?.policies;
+	const iatPolicies = oidc.entities.InitialAccessToken?.payload.policies;
 	if (iatPolicies) {
 		await applyPolicies(iatPolicies, oidc, properties);
 

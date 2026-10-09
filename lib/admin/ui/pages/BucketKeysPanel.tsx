@@ -21,7 +21,7 @@ export function BucketKeysPanel({ bucketId }: { bucketId: string }) {
 				<Alert
 					type="info"
 					showIcon
-					message="This bucket signs with the instance keys"
+					title="This bucket signs with the instance keys"
 					description="It has no address of its own, so it shares the root issuer and its key set. Those keys are managed on the Keys page."
 				/>
 			</Card>

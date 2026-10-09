@@ -151,13 +151,27 @@ describe('features.richAuthorizationRequests.types validation', () => {
 		).toThrow(/validate must be a function/);
 	});
 
-	it('ignores the types map entirely when the feature is disabled', () => {
+	/*
+	 * The consent screen reads every type's label whether or not the feature is on, so a malformed map
+	 * stored while it was off broke consent for every client. Only the "at least one type" rule waits
+	 * for the switch: an empty map is the off state's default.
+	 */
+	it('refuses a malformed map even while the feature is disabled, but allows an empty one', () => {
+		const disabled = {
+			...ApplicationConfig,
+			'richAuthorizationRequests.enabled': false
+		};
 		expect(() =>
 			validateConfiguration({
-				...ApplicationConfig,
-				'richAuthorizationRequests.enabled': false,
+				...disabled,
 				// @ts-expect-error the case declares a malformed type descriptor
 				'richAuthorizationRequests.types': { 'urn:t': { nonsense: true } }
+			})
+		).toThrow(/label must be a non-empty string/);
+		expect(() =>
+			validateConfiguration({
+				...disabled,
+				'richAuthorizationRequests.types': {}
 			})
 		).not.toThrow();
 	});

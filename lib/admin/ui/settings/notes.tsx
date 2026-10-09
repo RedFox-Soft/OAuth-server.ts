@@ -47,7 +47,7 @@ function LoginThrottleNote({ values }: { values: Values }) {
 			type="info"
 			showIcon
 			style={{ marginBottom: 12 }}
-			message={
+			title={
 				<span>
 					About <strong>{rate.guessesPerDay.toLocaleString()}</strong> password
 					guesses a day against one address, once its lockouts have escalated —{' '}

@@ -36,7 +36,7 @@ export async function findAccount<
 	// Resolve the user bucket exactly as login does (resolveBucketForRequest):
 	// prefer the live client, falling back to the token's client for the
 	// token/userinfo flows where no client may be resolved (`entities.Client`).
-	const clientId = oidc?.entities.Client?.clientId ?? _token?.payload?.clientId;
+	const clientId = oidc?.entities.Client?.clientId ?? _token?.payload.clientId;
 	/*
 	 * The resource matters here for the same reason the client does, and leaving it out is not a
 	 * harmless omission: bucket resolution can derive a project from the declared resource a request
@@ -49,7 +49,7 @@ export async function findAccount<
 	 * Taken from the live request where there is one, and from the token otherwise, mirroring the
 	 * client fallback directly above.
 	 */
-	const resource = oidc?.params?.resource ?? _token?.payload?.resource;
+	const resource = oidc?.params.resource ?? _token?.payload.resource;
 	const bucketId = await resolveBucketForRequest(
 		clientId,
 		resource,

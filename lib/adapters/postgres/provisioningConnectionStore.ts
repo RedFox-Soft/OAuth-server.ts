@@ -1,3 +1,4 @@
+import { entriesOf } from '../../helpers/_/object.js';
 import { sql } from './db.js';
 import { docOf } from './json.js';
 import { isUniqueViolation } from './sqlState.js';
@@ -93,7 +94,7 @@ export class ProvisioningConnectionStore implements ProvisioningConnectionStoreI
 	): Promise<ProvisioningConnection | null> {
 		const set: Record<string, unknown> = { updatedAt: new Date() };
 		const remove: string[] = [];
-		for (const [field, value] of Object.entries(patch)) {
+		for (const [field, value] of entriesOf(patch)) {
 			if (value === undefined) remove.push(field);
 			else set[field] = value;
 		}
@@ -151,11 +152,11 @@ export class ProvisioningConnectionStore implements ProvisioningConnectionStoreI
 
 	async destroyByBucket(bucketId: string): Promise<string[]> {
 		const handle = sql();
-		const rows = await handle`
+		const rows = await handle<{ id: string }[]>`
 			DELETE FROM ${handle(this.area)} WHERE doc->>'bucketId' = ${bucketId}
 			RETURNING id
 		`;
-		return rows.map((row: { id: string }) => row.id);
+		return rows.map((row) => row.id);
 	}
 
 	/*

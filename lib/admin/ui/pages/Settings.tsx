@@ -60,7 +60,7 @@ export function Settings() {
 		setBaseline(body.values);
 		setPendingRestartKeys(body.pendingRestartKeys);
 		setNotInForceKeys(body.notInForceKeys);
-		setPane((current) => current ?? body.domains[0]?.id ?? null);
+		setPane((current) => current ?? body.domains.at(0)?.id ?? null);
 	}, []);
 
 	// Every state write follows an await: `loading` starts true, so the mount has nothing to set first.
@@ -192,7 +192,7 @@ export function Settings() {
 					type="warning"
 					showIcon
 					style={{ marginBottom: 16 }}
-					message="Saved changes are waiting for a restart"
+					title="Saved changes are waiting for a restart"
 					description={`These settings cannot be applied to a running server: ${pendingRestartKeys.join(', ')}`}
 				/>
 			)}
@@ -202,7 +202,7 @@ export function Settings() {
 					type="info"
 					showIcon
 					style={{ marginBottom: 16 }}
-					message="Saved, but not in force on this instance"
+					title="Saved, but not in force on this instance"
 					description={`Stored and applied elsewhere, or withheld here: ${notInForceKeys.join(', ')}. What this page reports is what the instance answering it is running.`}
 				/>
 			)}

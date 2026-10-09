@@ -65,7 +65,7 @@ export async function reportStartupFailure(
 		await Promise.race([
 			flush(timeoutMs),
 			new Promise<void>((resolve) => {
-				setTimeout(resolve, timeoutMs).unref?.();
+				setTimeout(resolve, timeoutMs).unref();
 			})
 		]);
 	} catch (error) {

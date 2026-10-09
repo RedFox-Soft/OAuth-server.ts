@@ -1,4 +1,5 @@
 import { elysia } from 'lib/index.js';
+import { isRecord } from 'lib/helpers/_/object.ts';
 
 /*
  * The admin API and the token endpoint as a console and a directory reach them: over HTTP, through the real
@@ -8,18 +9,21 @@ import { elysia } from 'lib/index.js';
 
 export interface Reply {
 	status: number;
-	json: Record<string, unknown> & { [key: string]: unknown };
+	// The parsed body as it came. A list route answers an array: read it from here, through shaped().
+	body: unknown;
+	// The body when it is an object, as nearly every route answers; empty when it is not one.
+	json: Record<string, unknown>;
 }
 
 async function read(response: Response): Promise<Reply> {
 	const text = await response.text();
-	let json: Record<string, unknown>;
+	let body: unknown;
 	try {
-		json = text ? JSON.parse(text) : {};
+		body = text ? JSON.parse(text) : {};
 	} catch {
-		json = { raw: text };
+		body = { raw: text };
 	}
-	return { status: response.status, json };
+	return { status: response.status, body, json: isRecord(body) ? body : {} };
 }
 
 export async function admin(

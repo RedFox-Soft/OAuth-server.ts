@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { STORAGE_DIVERGENCES } from '../lib/consts/storage_divergences.js';
+import { member } from '../lib/helpers/_/object.js';
 import { verifyEndUserIdentity } from './verify_end_user_identity.js';
 import { verifyProvisioningConnections } from './verify_provisioning_connections.js';
 import { verifyBucketGroups } from './verify_bucket_groups.js';
@@ -162,7 +163,7 @@ for (const name of ['dpopNonceSecret', 'pairwiseSalt', 'errorOriginSalt']) {
 	check(
 		`${name}: reads back as bytes a caller's guard accepts`,
 		readBack instanceof Uint8Array,
-		`got ${readBack === null ? 'null' : (readBack as object).constructor?.name}`
+		`got ${Object.prototype.toString.call(readBack)}`
 	);
 	check(
 		`${name}: round-trips byte for byte`,
@@ -197,17 +198,14 @@ for (const name of ['dpopNonceSecret', 'pairwiseSalt', 'errorOriginSalt']) {
 
 /* ---- 2. documents are jsonb objects, not jsonb strings -------------------------------------- */
 
-const shapes = await handle`
+const shapes = await handle<{ kind: string; held: number }[]>`
 	SELECT jsonb_typeof(doc) AS kind, count(*)::int AS held
 	FROM ${handle(STORE_AREAS.userBuckets)} GROUP BY 1
 `;
 check(
 	'stored documents are jsonb objects',
-	shapes.length > 0 &&
-		shapes.every((r: { kind: string }) => r.kind === 'object'),
-	shapes
-		.map((r: { kind: string; held: number }) => `${r.kind}×${r.held}`)
-		.join(', ')
+	shapes.length > 0 && shapes.every((r) => r.kind === 'object'),
+	shapes.map((r) => `${r.kind}×${r.held}`).join(', ')
 );
 
 /* The consequence, checked directly rather than inferred: a predicate that reaches inside the
@@ -474,7 +472,7 @@ check(
 		.sort();
 	const stateOf = (kid: string) =>
 		migrated.find((key) => key.kid === kid)?.state;
-	const [legacyLeft] = await handle`
+	const [legacyLeft] = await handle<{ n: number }[]>`
 		SELECT count(*)::int AS n FROM ${handle(LEGACY_ROOT_KEYS_AREA)}
 	`;
 	check(
@@ -482,7 +480,7 @@ check(
 		stateOf(rsaKids[0]) === 'signing' &&
 			stateOf(rsaKids[1]) === 'published' &&
 			stateOf(legacyKeys[2].kid) === 'signing' &&
-			Number(legacyLeft.n) === 0,
+			legacyLeft.n === 0,
 		migrated.map((key) => `${key.alg}:${key.state}`).join(', ')
 	);
 	await handle`DROP TABLE ${handle(LEGACY_ROOT_KEYS_AREA)}`;
@@ -610,8 +608,10 @@ check(
 const loser = racingHosts.find((r) => r.status === 'rejected');
 check(
 	'and the loser is refused as a taken value, not as an internal fault',
-	loser !== undefined && loser.reason?.name === 'UniqueValueTaken',
-	loser === undefined ? 'nothing was rejected' : String(loser.reason?.name)
+	member(loser?.reason, 'name') === 'UniqueValueTaken',
+	loser === undefined
+		? 'nothing was rejected'
+		: String(member(loser.reason, 'name'))
 );
 
 /* Buckets without a hostname must not collide with one another — the reason the index is sparse. */
@@ -709,10 +709,14 @@ await verifyProvisioningConnections(new ProvisioningConnectionStore(), check);
 	const snapshot = async () =>
 		JSON.stringify({
 			groups: (
-				await handle`SELECT count(*)::int AS n FROM ${handle(STORE_AREAS.bucketGroups)} WHERE doc->>'bucketId' = ${rolesBucket._id}`
+				await handle<
+					{ n: number }[]
+				>`SELECT count(*)::int AS n FROM ${handle(STORE_AREAS.bucketGroups)} WHERE doc->>'bucketId' = ${rolesBucket._id}`
 			)[0]?.n,
 			memberships: (
-				await handle`SELECT count(*)::int AS n FROM ${handle(STORE_AREAS.bucketGroupMembers)} WHERE doc->>'bucketId' = ${rolesBucket._id}`
+				await handle<
+					{ n: number }[]
+				>`SELECT count(*)::int AS n FROM ${handle(STORE_AREAS.bucketGroupMembers)} WHERE doc->>'bucketId' = ${rolesBucket._id}`
 			)[0]?.n
 		});
 	let report: readonly string[] = [];
@@ -742,13 +746,12 @@ await verifyProvisioningConnections(new ProvisioningConnectionStore(), check);
 			JSON.stringify({ auditor: ['u3'], editor: ['u1', 'u2'], viewer: ['u2'] }),
 		JSON.stringify(membersByName)
 	);
-	const [superRow] = await handle`
+	const superRow = (
+		await handle<{ doc: { members?: { userId: string }[] } | null }[]>`
 		SELECT doc FROM ${handle(STORE_AREAS.groups)} WHERE id = 'super-administrators'
-	`;
-	const superMembers = (
-		(superRow?.doc as { members?: { userId: string }[] } | undefined)
-			?.members ?? []
-	).map((m) => m.userId);
+	`
+	).at(0);
+	const superMembers = (superRow?.doc?.members ?? []).map((m) => m.userId);
 	check(
 		'every super_admin holder, active or not, and nobody else, is a member of Super administrators',
 		superMembers.includes(`root-${stamp}`) &&
@@ -891,9 +894,11 @@ function declared(id: string): boolean {
 const untimed = 'fidelity-untimed';
 await adapter('Client').upsert(untimed, { clientId: untimed }, 3600);
 await adapter('Client').upsert(untimed, { clientId: untimed });
-const [afterUntimed] = await handle`
+const afterUntimed = (
+	await handle<{ expires_at: Date | null }[]>`
 	SELECT expires_at FROM ${handle('Client')} WHERE id = ${untimed}
-`;
+`
+).at(0);
 check(
 	"'stale-expiry-on-untimed-upsert' still describes what this backend does",
 	declared('stale-expiry-on-untimed-upsert') &&

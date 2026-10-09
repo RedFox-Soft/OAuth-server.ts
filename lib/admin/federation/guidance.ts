@@ -102,7 +102,7 @@ function guidanceFor(
 	 * Through the entry's own rule rather than by string equality, because one entry's issuer contains the
 	 * organisation and so differs per deployment.
 	 */
-	const existing = (bucket.federation ?? []).find((provider) =>
+	const existing = bucket.federation.find((provider) =>
 		matchesKnownProvider(entry, provider.issuer)
 	);
 

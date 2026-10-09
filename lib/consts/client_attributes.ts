@@ -352,9 +352,11 @@ const STRING: string[] = [
 		.filter(([, rules]) => rules.string && !rules.array)
 		.map(([name]) => name)
 		.sort(),
-	...ARYS.filter((name) => ATTRIBUTES[name]?.string)
+	...ARYS.filter((name) => ATTRIBUTES[name].string)
 ];
 
+// The precedence lists are written by hand, so a name in one may have no rules.
+const rulesOf = (name: string): AttributeRules | undefined => ATTRIBUTES[name];
 const WHEN: Record<string, readonly [string] | readonly [string, string]> = {};
 const companionOrder: string[] = [
 	...COMPANION_PRECEDENCE,
@@ -363,7 +365,7 @@ const companionOrder: string[] = [
 		.filter((name) => !COMPANION_PRECEDENCE.some((listed) => listed === name))
 ];
 for (const name of companionOrder) {
-	const when = ATTRIBUTES[name]?.when;
+	const when = rulesOf(name)?.when;
 	if (when) {
 		WHEN[name] = when;
 	}
@@ -396,7 +398,7 @@ const VALUE_SETS: ReadonlyArray<readonly [string, ValueSetRule]> = [
 		.map(([name]) => name)
 		.filter((name) => !VALUE_SET_PRECEDENCE.some((listed) => listed === name))
 ].flatMap((name): Array<readonly [string, ValueSetRule]> => {
-	const values = ATTRIBUTES[name]?.values;
+	const values = rulesOf(name)?.values;
 	return values ? [[name, values]] : [];
 });
 

@@ -1,6 +1,7 @@
 import { createHmac, randomBytes } from 'node:crypto';
 
 import { errorOriginSaltStore } from '../adapters/index.js';
+import { ORIGIN_NOT_CAPTURED } from '../consts/error_origin.js';
 import type { ErrorRecord, OriginCaptureLevel } from '../adapters/types.js';
 import { truncate } from './fingerprint.js';
 
@@ -63,9 +64,9 @@ export function resetOriginSalt(): void {
 export async function captureOrigin(
 	headers: Headers,
 	level: OriginCaptureLevel
-): Promise<string | null | 'not-captured'> {
+): Promise<string | null> {
 	if (level === 'omitted') {
-		return 'not-captured';
+		return ORIGIN_NOT_CAPTURED;
 	}
 
 	/*

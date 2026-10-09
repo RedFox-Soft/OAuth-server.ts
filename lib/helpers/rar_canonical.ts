@@ -11,6 +11,8 @@
  * A key rather than a predicate, because the callers ask set questions ("is this detail already
  * granted?") on every authorization request, and a Set lookup beats pairwise deep comparison.
  */
+import { jsonText } from './_/json_text.ts';
+
 function canonicalize(value: unknown): unknown {
 	if (Array.isArray(value)) {
 		// Element order in actions/locations/… is data, not member ordering: it is preserved.
@@ -30,7 +32,7 @@ function canonicalize(value: unknown): unknown {
 }
 
 export function canonicalKey(detail: unknown): string {
-	return JSON.stringify(canonicalize(detail)) ?? 'undefined';
+	return jsonText(canonicalize(detail)) ?? 'undefined';
 }
 
 export function canonicalKeySet(details: unknown): Set<string> {

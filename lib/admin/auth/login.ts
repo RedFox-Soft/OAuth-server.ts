@@ -11,10 +11,7 @@ import { IdTokenRejected, verifyAdminIdToken } from './verifyIdToken.js';
 import { eventBus } from '../../event_bus.js';
 import { routeNames, sessionCookieName } from '../../consts/param_list.js';
 import { Session } from '../../models/session.js';
-import {
-	clearLegacySessionCookie,
-	expiredSessionCookie
-} from '../../shared/session.js';
+import { expiredSessionCookie } from '../../shared/session.js';
 import { ADMIN_REQUEST_BUCKET } from '../../configs/issuer.js';
 import { destroyProviderSession } from '../../shared/destroy_session.js';
 import {
@@ -174,7 +171,7 @@ export const adminLogin = new Elysia({ name: 'admin-login' })
 	 * stale browser cookie can never outlive the record it points at.
 	 */
 	.post('/admin/api/logout', async ({ cookie }) => {
-		const id = cookie[ADMIN_SESSION_COOKIE]?.value as string | undefined;
+		const id = cookie[ADMIN_SESSION_COOKIE].value as string | undefined;
 		if (id) await adminSessionStore.destroy(id);
 		cookie[ADMIN_SESSION_COOKIE].set(expiredSessionCookieAttributes());
 
@@ -185,13 +182,12 @@ export const adminLogin = new Elysia({ name: 'admin-login' })
 		 * administrator out of unrelated applications as a side effect of leaving the console.
 		 */
 		const adminBucketCookie = sessionCookieName(ADMIN_REQUEST_BUCKET);
-		const providerSessionId = cookie[adminBucketCookie]?.value;
+		const providerSessionId = cookie[adminBucketCookie].value;
 		if (typeof providerSessionId === 'string' && providerSessionId) {
 			const session = await Session.tryFind(providerSessionId);
 			if (session) await destroyProviderSession(session);
 		}
 		cookie[adminBucketCookie].set(expiredSessionCookie());
-		clearLegacySessionCookie(cookie);
 
 		return { ok: true };
 	});

@@ -97,7 +97,7 @@ function providerFor(
 	iss: string,
 	clientId: string
 ): FederationProvider | undefined {
-	return bucket.federation?.find(
+	return bucket.federation.find(
 		(provider) => provider.issuer === iss && provider.clientId === clientId
 	);
 }

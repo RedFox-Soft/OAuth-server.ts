@@ -31,7 +31,8 @@ export interface SentryFailureEvent {
 	 * repurposing it would leave an operator's saved filters working and quietly meaning something
 	 * else. `codeLocation` below is the code one. Neither name may migrate onto the other.
 	 */
-	origin: string | null | 'not-captured';
+	// ORIGIN_NOT_CAPTURED (lib/consts/error_origin.ts) when capture was omitted.
+	origin: string | null;
 	/*
 	 * Where in the server the fault arose, copied from the record rather than derived. The record
 	 * parses it out of the stack with the message discarded, so it is the one form of "where" that is

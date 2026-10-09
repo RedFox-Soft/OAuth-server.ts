@@ -150,7 +150,7 @@ const UNATTRIBUTED = 'unknown';
  * amplifier even behind the LRU bound. Same 64 characters lib/error_store/redact.ts:82 settled on.
  */
 export function originOf(request: Request, server: unknown): string {
-	if (ApplicationConfig['rateLimit.trustedProxy'] === true) {
+	if (ApplicationConfig['rateLimit.trustedProxy']) {
 		const forwarded =
 			request.headers.get('fly-client-ip')?.trim() ||
 			request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
@@ -171,7 +171,7 @@ export function originOf(request: Request, server: unknown): string {
 
 export const rateLimit = (app: Elysia) =>
 	app.onRequest(({ request, server }) => {
-		if (ApplicationConfig['rateLimit.enabled'] !== true) {
+		if (!ApplicationConfig['rateLimit.enabled']) {
 			return;
 		}
 

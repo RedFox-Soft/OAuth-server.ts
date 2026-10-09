@@ -113,7 +113,7 @@ async function actions(targetId: string) {
 async function publishedKey(cookie: string, alg: string) {
 	const res = await generate(cookie, alg);
 	expect(res.status).toBe(200);
-	const kid = String(shaped(KeyView, res.body).kid);
+	const kid = shaped(KeyView, res.body).kid;
 	later(KEY_PUBLICATION_SECONDS + 1);
 	return kid;
 }
@@ -172,7 +172,8 @@ describe('the root key set, administered', () => {
 			const {
 				keys: [key]
 			} = await generateJWKS(alg as SupportedAlg);
-			expect(String(key.alg)).toBe(alg);
+			const keyAlg: string = key.alg;
+			expect(keyAlg).toBe(alg);
 			expect(key.use).toBe('sig');
 		}
 	});

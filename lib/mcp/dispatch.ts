@@ -58,6 +58,18 @@ function buildPath(tool: McpTool, args: Record<string, unknown>): string {
 	return path;
 }
 
+/* A query member is a scalar; the tool's schema admits nothing else, so another value is a defect here. */
+function queryValue(name: string, value: unknown): string {
+	if (
+		typeof value === 'string' ||
+		typeof value === 'number' ||
+		typeof value === 'boolean'
+	) {
+		return String(value);
+	}
+	throw new TypeError(`query argument ${name} is not a scalar`);
+}
+
 function buildQuery(tool: McpTool, args: Record<string, unknown>): string {
 	if (!tool.querySchema) return '';
 	const allowed = Object.keys(
@@ -67,7 +79,11 @@ function buildQuery(tool: McpTool, args: Record<string, unknown>): string {
 	for (const name of allowed) {
 		const value = args[name];
 		if (value === undefined || value === null) continue;
-		params.set(name, String(value));
+		// A list is repeated members, as the console sends `client` on a project deletion; joined into
+		// one string it named a single client `a,b`.
+		for (const item of Array.isArray(value) ? value : [value]) {
+			params.append(name, queryValue(name, item));
+		}
 	}
 	const qs = params.toString();
 	return qs ? `?${qs}` : '';
@@ -80,10 +96,7 @@ function buildQuery(tool: McpTool, args: Record<string, unknown>): string {
  * letting the route refuse it is the behaviour FR-037 asks for, and it is why a field added to an admin
  * schema needs no change here.
  */
-function buildBody(
-	tool: McpTool,
-	args: Record<string, unknown>
-): unknown | undefined {
+function buildBody(tool: McpTool, args: Record<string, unknown>): unknown {
 	if (!tool.bodySchema) return undefined;
 	const consumed = new Set<string>([
 		...tool.pathParams.map((name) => pathArgName(tool, name)),

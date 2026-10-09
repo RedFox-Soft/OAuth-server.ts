@@ -172,6 +172,12 @@ _what for_.
 it — a chained `expect(x).to.equal(y)` fails at runtime with `undefined is not an object`, because `.to`
 does not exist.
 
+**Await `rejects` and `resolves`.** Bun 1.4 still waits for the promise inside the matcher and asserts on
+the spot, but its documentation awaits them, and oven-sh/bun#33289 makes them return a promise as Jest's
+do; an assertion left unawaited then checks nothing the test waits for. `patches/bun-types@*.patch` types
+them as that promise ahead of the release, so the type-aware lint asks for the `await` rather than
+reporting it. Drop the patch once a Bun release carries #33289.
+
 **A feature area is two files.**
 
 - `*.config.ts` — the area's settings, entirely as **named exports** the harness applies (nothing is

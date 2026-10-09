@@ -1,6 +1,4 @@
-import type { SQL } from 'bun';
-
-import { sql } from './db.js';
+import { sql, type Sql } from './db.js';
 import { docOf } from './json.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
 import { documentOf } from '../documents.js';
@@ -35,7 +33,7 @@ function isoBound(value: Date): string {
  * Builds the WHERE clause. Every clause is an exact match except the time window, and the actor is a
  * two-arm OR because one filter has to reach both actorId and actorEmail — both are indexed for it.
  */
-function conditionsFor(handle: SQL, query: AdminAuditQuery) {
+function conditionsFor(handle: Sql, query: AdminAuditQuery) {
 	let where = handle`TRUE`;
 	/* Typed from the value rather than named: a tagged-template call and the identifier helper share
 	 * the `SQL` callable, so `ReturnType<SQL>` resolves to the wrong one of the two. */

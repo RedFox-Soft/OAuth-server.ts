@@ -101,16 +101,12 @@ describe('sentry client options', () => {
 	 * under one heading — so the resolver omits the option entirely rather than sending a blank.
 	 */
 	it('labels the release with the package version', async () => {
-		const manifest = await import('../../package.json', {
-			with: { type: 'json' }
-		}).catch(() => null);
+		const { version } = (
+			await import('../../package.json', { with: { type: 'json' } })
+		).default;
+		expect(version).not.toBe('');
 		initSentry();
-		const release = initOptionsForTest()?.release;
-		expect(release).toBeString();
-		expect(release).not.toBe('');
-		if (manifest?.default?.version) {
-			expect(release).toBe(manifest.default.version);
-		}
+		expect(initOptionsForTest()?.release).toBe(version);
 	});
 
 	it('is idempotent', () => {

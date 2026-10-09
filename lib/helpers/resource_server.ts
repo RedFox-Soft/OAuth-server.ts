@@ -3,6 +3,7 @@
  * audience its tokens carry and how they look (opaque unless it says otherwise).
  */
 import type { KeyObject } from 'node:crypto';
+import { member } from './_/object.ts';
 
 // A key a resource server's JWT access tokens are signed or encrypted with, as a deployment gives it.
 // Raw bytes or a string are a secret, read as utf8 as crypto.createSecretKey does.
@@ -28,6 +29,34 @@ export type ResourceServerInfo = {
 	jwt?: ResourceServerJwt;
 };
 
+/*
+ * What getResourceServerInfo answered is checked once, here, because an override is deployment code this
+ * server never type-checked — and a deployment moving from node-oidc-provider may still answer `paseto`.
+ * Every token minted for the resource reads these members, so a malformed answer fails at the start of
+ * the request rather than as a token with no scopes or an unknown format.
+ */
+function assertResourceServerInfo(
+	identifier: string,
+	data: unknown
+): asserts data is ResourceServerInfo {
+	const scope = member(data, 'scope');
+	const accessTokenFormat = member(data, 'accessTokenFormat');
+	if (typeof scope !== 'string') {
+		throw new TypeError(
+			`getResourceServerInfo for ${identifier} must answer a scope string`
+		);
+	}
+	if (
+		accessTokenFormat !== undefined &&
+		accessTokenFormat !== 'jwt' &&
+		accessTokenFormat !== 'opaque'
+	) {
+		throw new TypeError(
+			`getResourceServerInfo for ${identifier} answered an unsupported accessTokenFormat`
+		);
+	}
+}
+
 export default class ResourceServer {
 	private _identifier: string;
 	audience: ResourceServerInfo['audience'];
@@ -37,6 +66,7 @@ export default class ResourceServer {
 	jwt: ResourceServerInfo['jwt'];
 
 	constructor(identifier: string, data: ResourceServerInfo) {
+		assertResourceServerInfo(identifier, data);
 		this._identifier = identifier;
 		this.audience = data.audience;
 		this.scope = data.scope;
@@ -46,7 +76,7 @@ export default class ResourceServer {
 	}
 
 	get scopes() {
-		return new Set(this.scope?.split(' '));
+		return new Set(this.scope.split(' '));
 	}
 
 	identifier() {

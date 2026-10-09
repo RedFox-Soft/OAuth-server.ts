@@ -4,7 +4,9 @@ import presence from '../../helpers/validate_presence.ts';
 import { InvalidRequest } from '../../helpers/errors.ts';
 
 export default function cibaRequired(oidc: OIDCContext<PipelineParams>) {
-	const required = new Set<keyof PipelineParams>(['scope']);
+	// The narrow key type matters: presence() asserts every key the set may hold, so a set typed
+	// over all of PipelineParams would mark every parameter present, requested_expiry included.
+	const required = new Set<'scope' | 'client_notification_token'>(['scope']);
 
 	if (oidc.client.backchannelTokenDeliveryMode !== 'poll') {
 		required.add('client_notification_token');
@@ -14,7 +16,7 @@ export default function cibaRequired(oidc: OIDCContext<PipelineParams>) {
 
 	if (
 		oidc.params.requested_expiry !== undefined &&
-		!(Number(oidc.params.requested_expiry) > 0)
+		oidc.params.requested_expiry <= 0
 	) {
 		throw new InvalidRequest('invalid requested_expiry parameter value');
 	}

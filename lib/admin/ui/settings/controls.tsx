@@ -18,7 +18,7 @@ interface BespokeProps {
  * cannot: the type says "a string" or "an object", and what the operator is actually choosing is
  * something narrower that a plain field lets them get wrong and only learn about from a 422.
  */
-const BESPOKE: Record<string, (props: BespokeProps) => ReactNode> = {
+const BESPOKE: Partial<Record<string, (props: BespokeProps) => ReactNode>> = {
 	'deviceFlow.mask': ({ values, disabled, onChange }) => (
 		<MaskField
 			value={values['deviceFlow.mask']}
@@ -155,7 +155,7 @@ export function Control({
 				mode={d.options ? 'multiple' : 'tags'}
 				style={{ minWidth: 320, maxWidth: 480 }}
 				disabled={disabled}
-				value={(value as string[]) ?? []}
+				value={(value as string[] | undefined) ?? []}
 				options={(d.options ?? []).map((o) => ({ label: o, value: o }))}
 				onChange={set}
 			/>
@@ -176,7 +176,7 @@ export function Control({
 		<Input
 			style={{ maxWidth: 320 }}
 			disabled={disabled}
-			value={(value as string) ?? ''}
+			value={(value as string | undefined) ?? ''}
 			onChange={(e) => set(e.target.value)}
 		/>
 	);

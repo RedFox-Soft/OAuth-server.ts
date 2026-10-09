@@ -1,4 +1,4 @@
-import { spyOn } from 'bun:test';
+import { spyOn, type Mock } from 'bun:test';
 
 // Bun-native replacement for undici's MockAgent, used to intercept the provider's OUTBOUND
 // `fetch` calls (backchannel logout, sector_identifier_uri, jwks_uri). Bun's global fetch is not
@@ -24,7 +24,7 @@ type MockInterceptor = {
 const mockInterceptors: MockInterceptor[] = [];
 const mockedOrigins = new Set<string>();
 /* No handle on the real `fetch` is kept, deliberately: nothing here may fall back to it. */
-let fetchSpy: ReturnType<typeof spyOn> | undefined;
+let fetchSpy: Mock<typeof fetch> | undefined;
 
 /*
  * Marks the `fetch` this module installed. Everything above is module state, which outlives a spec
@@ -94,8 +94,16 @@ async function dispatchFetch(
 					? raw.toString()
 					: typeof raw === 'string'
 						? raw
-						: String(raw);
-		if (interceptor.bodyMatcher(bodyText) === false) {
+						: ArrayBuffer.isView(raw) || raw instanceof ArrayBuffer
+							? new TextDecoder().decode(raw)
+							: undefined;
+		// A Blob, FormData or stream would read as "[object …]"; no stub matches on one, so say so.
+		if (bodyText === undefined) {
+			throw new Error(
+				`mock body matcher cannot read a ${method} ${url.href} body of this kind`
+			);
+		}
+		if (!interceptor.bodyMatcher(bodyText)) {
 			throw new Error(`mock body matcher rejected ${method} ${url.href}`);
 		}
 	}

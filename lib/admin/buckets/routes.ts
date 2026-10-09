@@ -195,10 +195,15 @@ async function refusingATakenHostname<T>(write: () => Promise<T>): Promise<T> {
  */
 async function clientsLosingTheirIssuer(bucketId: string): Promise<string[]> {
 	const projects = await getProjectStore().list();
-	return projects
-		.filter((project) => project.bucketId === bucketId)
-		.flatMap((project) => project.clientIds ?? [])
-		.sort();
+	return (
+		projects
+			.filter((project) => project.bucketId === bucketId)
+			// As stored: a project document written before `clientIds` existed has none.
+			.flatMap(
+				(project: { clientIds?: readonly string[] }) => project.clientIds ?? []
+			)
+			.sort()
+	);
 }
 
 /*
@@ -216,7 +221,7 @@ async function clientsLosingTheirIssuer(bucketId: string): Promise<string[]> {
  * every published read rather than the ones somebody thought to check.
  */
 function presentBucket<T extends Pick<UserBucket, 'federation'>>(bucket: T): T {
-	if (!bucket.federation?.length) return bucket;
+	if (!bucket.federation.length) return bucket;
 	return { ...bucket, federation: presentAll(bucket) };
 }
 
@@ -272,7 +277,7 @@ function withAddressGuidance<
 function withInertTotpAdvisory<
 	T extends Pick<UserBucket, 'totpRequired' | 'passwordLogin'>
 >(bucket: T): T | (T & { advisory: string }) {
-	if (!bucket.totpRequired || bucket.passwordLogin !== false) return bucket;
+	if (!bucket.totpRequired || bucket.passwordLogin) return bucket;
 	return {
 		...bucket,
 		advisory:

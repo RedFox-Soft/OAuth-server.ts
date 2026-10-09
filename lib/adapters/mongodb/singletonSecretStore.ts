@@ -50,7 +50,7 @@ export class SingletonSecretStore implements SecretStoreInstance {
 		const result = await db
 			.collection(this.collectionName)
 			.findOne({ _id: this.secretId });
-		const secret = result?.secret ?? null;
+		const secret: unknown = result?.secret ?? null;
 		return secret instanceof Binary ? secret.value() : secret;
 	}
 

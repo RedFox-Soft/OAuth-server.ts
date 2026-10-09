@@ -130,7 +130,7 @@ describe('pairwise identifiers: unusable salt', () => {
 		// An operator learns the reason from the server's own log and from error_detail. A client learns
 		// only that the request cannot be served right now — the stored value, its length and its shape
 		// are all server state and none of them belong in a response.
-		const body = JSON.stringify(data ?? error?.value ?? {});
+		const body = JSON.stringify(data ?? error.value);
 		for (const leak of ['salt', 'Buffer', 'byte', 'pairwiseSalt']) {
 			expect(body).not.toContain(leak);
 		}

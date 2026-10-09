@@ -267,8 +267,8 @@ describe('feature gate — capability off', () => {
 			body: `token=${token}`
 		});
 
+		// find() throws for a token that is gone, so reaching the assertion already means it was kept.
 		const stillThere = await AccessToken.find(token);
-		expect(stillThere).toBeDefined();
-		expect(stillThere?.isValid).toBe(true);
+		expect(stillThere.isValid).toBe(true);
 	});
 });

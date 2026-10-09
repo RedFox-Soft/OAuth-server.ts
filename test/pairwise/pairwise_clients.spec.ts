@@ -7,6 +7,7 @@ import { Claims } from 'lib/helpers/claims.js';
 import { Client, registerClient, sectorIdentifier } from 'lib/models/client.js';
 import { configStore } from 'lib/adapters/index.js';
 import { saveSettings, superAdminCookie } from '../settings_apply/helpers.js';
+import { providerError } from '../shape.js';
 
 /**
  * @proves A pairwise client sector is resolved or refused at registration, verified against a
@@ -68,10 +69,10 @@ describe('pairwise features', () => {
 					(client) => {
 						expect(client).toBeFalsy();
 					},
-					(err) => {
-						expect(err).toBeTruthy();
-						expect(err.message).toBe('invalid_client_metadata');
-						expect(err.error_description).toBe(
+					(err: unknown) => {
+						const error = providerError(err);
+						expect(error.message).toBe('invalid_client_metadata');
+						expect(error.error_description).toBe(
 							'sector_identifier_uri is mandatory property'
 						);
 					}
@@ -180,14 +181,15 @@ describe('pairwise features', () => {
 					(client) => {
 						expect(client).toBeFalsy();
 					},
-					(err) => {
-						expect(err.message).toBe('invalid_client_metadata');
+					(err: unknown) => {
+						const error = providerError(err);
+						expect(error.message).toBe('invalid_client_metadata');
 						// The https-uri shape check moved to the TypeBox ClientSchema, which
 						// reports a generic error_description and the specifics in error_detail.
-						expect(err.error_description).toBe(
+						expect(error.error_description).toBe(
 							'client metadata validation error'
 						);
-						expect(err.error_detail).toContain(
+						expect(error.error_detail).toContain(
 							"/sectorIdentifierUri Expected string to match 'https-uri' format"
 						);
 					}
@@ -223,10 +225,10 @@ describe('pairwise features', () => {
 					(client) => {
 						expect(client).toBeFalsy();
 					},
-					(err) => {
-						expect(err).toBeTruthy();
-						expect(err.message).toBe('invalid_client_metadata');
-						expect(err.error_description).toBe(
+					(err: unknown) => {
+						const error = providerError(err);
+						expect(error.message).toBe('invalid_client_metadata');
+						expect(error.error_description).toBe(
 							'all registered redirectUris must be included in the sector_identifier_uri response'
 						);
 					}
@@ -263,10 +265,10 @@ describe('pairwise features', () => {
 						(client) => {
 							expect(client).toBeFalsy();
 						},
-						(err) => {
-							expect(err).toBeTruthy();
-							expect(err.message).toBe('invalid_client_metadata');
-							expect(err.error_description).toBe(
+						(err: unknown) => {
+							const error = providerError(err);
+							expect(error.message).toBe('invalid_client_metadata');
+							expect(error.error_description).toBe(
 								"client's jwks_uri must be included in the sector_identifier_uri response"
 							);
 						}
@@ -303,10 +305,10 @@ describe('pairwise features', () => {
 						(client) => {
 							expect(client).toBeFalsy();
 						},
-						(err) => {
-							expect(err).toBeTruthy();
-							expect(err.message).toBe('invalid_client_metadata');
-							expect(err.error_description).toBe(
+						(err: unknown) => {
+							const error = providerError(err);
+							expect(error.message).toBe('invalid_client_metadata');
+							expect(error.error_description).toBe(
 								"client's jwks_uri must be included in the sector_identifier_uri response"
 							);
 						}
@@ -337,10 +339,10 @@ describe('pairwise features', () => {
 					(client) => {
 						expect(client).toBeFalsy();
 					},
-					(err) => {
-						expect(err).toBeTruthy();
-						expect(err.message).toBe('invalid_client_metadata');
-						expect(err.error_description).toBe(
+					(err: unknown) => {
+						const error = providerError(err);
+						expect(error.message).toBe('invalid_client_metadata');
+						expect(error.error_description).toBe(
 							'failed to parse sector_identifier_uri JSON response'
 						);
 					}
@@ -370,10 +372,10 @@ describe('pairwise features', () => {
 					(client) => {
 						expect(client).toBeFalsy();
 					},
-					(err) => {
-						expect(err).toBeTruthy();
-						expect(err.message).toBe('invalid_client_metadata');
-						expect(err.error_description).toBe(
+					(err: unknown) => {
+						const error = providerError(err);
+						expect(error.message).toBe('invalid_client_metadata');
+						expect(error.error_description).toBe(
 							'sector_identifier_uri must return single JSON array'
 						);
 					}
@@ -403,10 +405,10 @@ describe('pairwise features', () => {
 					(client) => {
 						expect(client).toBeFalsy();
 					},
-					(err) => {
-						expect(err).toBeTruthy();
-						expect(err.message).toBe('invalid_client_metadata');
-						expect(err.error_description).toBe(
+					(err: unknown) => {
+						const error = providerError(err);
+						expect(error.message).toBe('invalid_client_metadata');
+						expect(error.error_description).toBe(
 							'sector_identifier_uri could not be retrieved'
 						);
 					}
@@ -436,10 +438,10 @@ describe('pairwise features', () => {
 					(client) => {
 						expect(client).toBeFalsy();
 					},
-					(err) => {
-						expect(err).toBeTruthy();
-						expect(err.message).toBe('invalid_client_metadata');
-						expect(err.error_description).toBe(
+					(err: unknown) => {
+						const error = providerError(err);
+						expect(error.message).toBe('invalid_client_metadata');
+						expect(error.error_description).toBe(
 							'sector_identifier_uri could not be retrieved'
 						);
 					}

@@ -224,7 +224,7 @@ export function McpClients() {
 					type="error"
 					showIcon
 					style={{ marginBottom: 16 }}
-					message="No agent can reach this instance at all"
+					title="No agent can reach this instance at all"
 					description={surfaceOff}
 				/>
 			) : null}
@@ -233,7 +233,7 @@ export function McpClients() {
 					type="warning"
 					showIcon
 					style={{ marginBottom: 16 }}
-					message="Entries below cannot take effect yet"
+					title="Entries below cannot take effect yet"
 					description={
 						<>
 							{documentsOff} The reserved <code>admin-mcp</code> client is
@@ -248,7 +248,7 @@ export function McpClients() {
 				type="info"
 				showIcon
 				style={{ marginBottom: 16 }}
-				message="Client identities permitted to administer this instance"
+				title="Client identities permitted to administer this instance"
 				description="An agent connecting with one of these identities acts with the permissions of the administrator who signed in through it. The reserved admin-mcp client works without an entry here. A client that registered itself dynamically can never administer the instance, whatever this list says."
 			/>
 
@@ -277,7 +277,7 @@ export function McpClients() {
 						dataIndex: '_id',
 						render: (value: string, row: PermissionView) => (
 							<Space
-								direction="vertical"
+								orientation="vertical"
 								size={0}
 							>
 								<Typography.Text code>{value}</Typography.Text>
@@ -362,7 +362,7 @@ export function McpClients() {
 						<Alert
 							type="warning"
 							showIcon
-							message="This needs your acknowledgement"
+							title="This needs your acknowledgement"
 							description={acknowledgement}
 						/>
 					) : null}

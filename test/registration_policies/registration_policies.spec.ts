@@ -13,7 +13,7 @@ import {
 } from 'bun:test';
 
 import bootstrap, { agent, type Setup } from '../test_helper.js';
-import { eventBus, errors } from '../../lib/index.ts';
+import { eventBus, errors, type ServerListener } from '../../lib/index.ts';
 import { validateConfiguration } from 'lib/configs/configuration.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { InitialAccessToken } from 'lib/models/initial_access_token.js';
@@ -66,7 +66,7 @@ describe('client registration policies', () => {
 
 	describe('Registration & InitialAccessToken', () => {
 		it('allows policies to run to be stored on an InitialAccessToken', async () => {
-			const spy = mock();
+			const spy = mock<ServerListener<'initial_access_token.saved'>>();
 			eventBus.once('initial_access_token.saved', spy);
 			const value = await new InitialAccessToken({
 				policies: ['empty-policy']
@@ -178,7 +178,7 @@ describe('client registration policies', () => {
 				policies: ['empty-policy']
 			}).save();
 
-			const spy = mock();
+			const spy = mock<ServerListener<'registration_access_token.saved'>>();
 			eventBus.once('registration_access_token.saved', spy);
 
 			const res = await agent.reg.post(
@@ -206,7 +206,7 @@ describe('client registration policies', () => {
 				policies: ['change-rat-policy']
 			}).save();
 
-			const spy = mock();
+			const spy = mock<ServerListener<'registration_access_token.saved'>>();
 			eventBus.once('registration_access_token.saved', spy);
 
 			const res = await agent.reg.post(
@@ -448,7 +448,7 @@ describe('client registration policies', () => {
 					{ policies: ['empty-policy'] }
 				);
 
-				const spy = mock();
+				const spy = mock<ServerListener<'registration_access_token.saved'>>();
 				eventBus.once('registration_access_token.saved', spy);
 
 				const res = await agent

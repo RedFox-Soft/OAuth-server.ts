@@ -8,6 +8,7 @@ import {
 } from 'bun:test';
 
 import bootstrap from '../test_helper.ts';
+import { present } from '../shape.ts';
 import { getUserStore, resetAdminMemoryStores } from 'lib/adapters/index.ts';
 import { assertNoPendingInterceptors, mock } from '../fetch_mock.ts';
 import { eventBus } from 'lib/event_bus.ts';
@@ -36,7 +37,7 @@ import {
 function captureReasons(event: string) {
 	const seen: string[] = [];
 	const listener = (payload: { reason?: string }) => {
-		if (payload?.reason) seen.push(payload.reason);
+		if (payload.reason) seen.push(payload.reason);
 	};
 	eventBus.on(event, listener);
 	return {
@@ -168,8 +169,11 @@ describe('federated sign-in: the decision ladder refuses', () => {
 		});
 
 		expect(complete?.status).toBe(303);
-		const created = (await getUserStore(bucketId).list())[0];
-		expect(created?.email).toBe('corp@acme.test');
+		const created = present(
+			(await getUserStore(bucketId).list()).at(0),
+			'the provisioned account'
+		);
+		expect(created.email).toBe('corp@acme.test');
 	});
 
 	it('admits an allowed domain case-insensitively and refuses a lookalike suffix', async () => {
@@ -617,10 +621,13 @@ describe('federated sign-in: the round trip and the assertion are refused', () =
 		expect(complete?.status).toBe(303);
 		expect(complete?.location).toBe(`/ui/${uid}/login?notice=verify`);
 
-		const account = (await getUserStore(bucketId).list())[0];
-		expect(account?.verified).toBe(false);
+		const account = present(
+			(await getUserStore(bucketId).list()).at(0),
+			'the provisioned account'
+		);
+		expect(account.verified).toBe(false);
 		// Provisioned, but not signed in: verification is a gate, not a formality.
-		expect(signedInAccountIds()).not.toContain(account?._id);
+		expect(signedInAccountIds()).not.toContain(account._id);
 	});
 
 	it('reads the provider metadata once for two sign-ins', async () => {

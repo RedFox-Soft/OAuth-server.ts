@@ -48,7 +48,10 @@ describe('a deployment upgraded to per-bucket issuers', () => {
 		const response = await get('/.well-known/oauth-authorization-server');
 
 		expect(response.status).toBe(200);
-		expect((await response.json()).issuer).toBe(ISSUER);
+		expect(
+			shaped(Type.Object({ issuer: Type.String() }), await response.json())
+				.issuer
+		).toBe(ISSUER);
 	});
 
 	/*

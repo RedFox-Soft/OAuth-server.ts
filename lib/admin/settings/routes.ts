@@ -34,48 +34,61 @@ const sameValue = (a: unknown, b: unknown): boolean =>
 // type/option/invariant violation.
 function validateValue(descriptor: SettingDescriptor, value: unknown): void {
 	const { key, type, options } = descriptor;
-	if (type === 'boolean') {
-		if (typeof value !== 'boolean')
-			throw new AdminError(422, `${key} must be a boolean`);
-	} else if (type === 'string') {
-		if (typeof value !== 'string')
-			throw new AdminError(422, `${key} must be a string`);
-	} else if (type === 'number') {
-		/*
-		 * Type only. The bound itself — positive, integral — belongs to validateConfiguration, which
-		 * validateEffectiveConfig calls below, for the reason the `json` branch gives: restating a rule
-		 * here is the drift this module's own comment warns about.
-		 */
-		if (typeof value !== 'number' || !Number.isFinite(value))
-			throw new AdminError(422, `${key} must be a number`);
-	} else if (type === 'enum') {
-		if (typeof value !== 'string' || !options?.includes(value))
+	switch (type) {
+		case 'boolean':
+			if (typeof value !== 'boolean')
+				throw new AdminError(422, `${key} must be a boolean`);
+			return;
+		case 'string':
+			if (typeof value !== 'string')
+				throw new AdminError(422, `${key} must be a string`);
+			return;
+		case 'number':
+			/*
+			 * Type only. The bound itself — positive, integral — belongs to validateConfiguration, which
+			 * validateEffectiveConfig calls below, for the reason the `json` branch gives: restating a rule
+			 * here is the drift this module's own comment warns about.
+			 */
+			if (typeof value !== 'number' || !Number.isFinite(value))
+				throw new AdminError(422, `${key} must be a number`);
+			return;
+		case 'enum':
+			if (typeof value !== 'string' || !options?.includes(value))
+				throw new AdminError(
+					422,
+					`${key} must be one of: ${(options ?? []).join(', ')}`
+				);
+			return;
+		case 'string-array':
+			if (!Array.isArray(value) || !value.every((v) => typeof v === 'string'))
+				throw new AdminError(422, `${key} must be an array of strings`);
+			if (options && !value.every((v) => options.includes(v)))
+				throw new AdminError(
+					422,
+					`${key} values must be among: ${options.join(', ')}`
+				);
+			if (key === 'scopes' && !value.includes('openid'))
+				throw new AdminError(422, 'scopes must include "openid"');
+			return;
+		case 'json':
+			// Shape only. The semantic rules live in validateConfiguration, which validateEffectiveConfig
+			// calls below — restating them here is the drift this module's own comment warns about.
+			if (typeof value !== 'object' || value === null || Array.isArray(value))
+				throw new AdminError(422, `${key} must be a JSON object`);
+			return;
+		default: {
+			/*
+			 * Deliberately loud. This used to be the `string-array` branch, so every setting type added
+			 * after it silently inherited array-of-strings validation — a submission refused with a
+			 * misleading message at best, and accepted wrongly at worst. A new type also fails to compile
+			 * here, before it can reach this throw.
+			 */
+			const unhandled: never = type;
 			throw new AdminError(
-				422,
-				`${key} must be one of: ${(options ?? []).join(', ')}`
+				500,
+				`unknown setting type ${String(unhandled)} for ${key}`
 			);
-	} else if (type === 'string-array') {
-		if (!Array.isArray(value) || !value.every((v) => typeof v === 'string'))
-			throw new AdminError(422, `${key} must be an array of strings`);
-		if (options && !value.every((v) => options.includes(v)))
-			throw new AdminError(
-				422,
-				`${key} values must be among: ${options.join(', ')}`
-			);
-		if (key === 'scopes' && !value.includes('openid'))
-			throw new AdminError(422, 'scopes must include "openid"');
-	} else if (type === 'json') {
-		// Shape only. The semantic rules live in validateConfiguration, which validateEffectiveConfig
-		// calls below — restating them here is the drift this module's own comment warns about.
-		if (typeof value !== 'object' || value === null || Array.isArray(value))
-			throw new AdminError(422, `${key} must be a JSON object`);
-	} else {
-		/*
-		 * Deliberately loud. This used to be the `string-array` branch, so every setting type added
-		 * after it silently inherited array-of-strings validation — a submission refused with a
-		 * misleading message at best, and accepted wrongly at worst.
-		 */
-		throw new AdminError(500, `unknown setting type for ${key}`);
+		}
 	}
 }
 

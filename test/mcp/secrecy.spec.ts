@@ -8,17 +8,12 @@ import {
 } from 'bun:test';
 
 import bootstrap from '../test_helper.js';
-import { elysia } from 'lib/index.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { getProjectStore, adminAuditStore } from 'lib/adapters/index.ts';
 import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
-import {
-	ADMIN_MCP_CLIENT_ID,
-	MCP_RESOURCE,
-	MCP_ROUTE
-} from 'lib/mcp/consts.ts';
+import { ADMIN_MCP_CLIENT_ID, MCP_RESOURCE } from 'lib/mcp/consts.ts';
 import { mcpCatalogue } from 'lib/mcp/catalogue.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { mock } from '../fetch_mock.ts';
@@ -27,6 +22,7 @@ import { appleStub } from '../federation/recognised_stubs.ts';
 import { shaped } from 'test/shape.js';
 import { Type } from '@sinclair/typebox';
 import { createAdministrator } from '../administrators.ts';
+import { call, rpc } from './rpc.ts';
 
 /*
  * FR-023 / SC-007: no secret may reach the agent surface, on any tool, in a success or an error, or in
@@ -51,43 +47,6 @@ const SECRETS = {
 const NEWLINE = String.fromCharCode(10);
 
 let rpcId = 0;
-
-async function rpc(body: unknown, token: string) {
-	const res = await elysia.handle(
-		new Request(`http://e.ly${MCP_ROUTE}`, {
-			method: 'POST',
-			headers: {
-				'content-type': 'application/json',
-				accept: 'application/json, text/event-stream',
-				authorization: `Bearer ${token}`
-			},
-			body: JSON.stringify(body)
-		})
-	);
-	const text = await res.text();
-	const isEvent = (res.headers.get('content-type') ?? '').includes(
-		'text/event-stream'
-	);
-	const line = isEvent
-		? text.split('\n').find((l) => l.startsWith('data:'))
-		: undefined;
-	return isEvent
-		? line
-			? JSON.parse(line.slice('data:'.length).trim())
-			: undefined
-		: text
-			? JSON.parse(text)
-			: undefined;
-}
-
-function call(name: string, args: Record<string, unknown>) {
-	return {
-		jsonrpc: '2.0',
-		id: ++rpcId,
-		method: 'tools/call',
-		params: { name, arguments: args }
-	};
-}
 
 async function superAdminSession() {
 	const user = await createAdministrator('super', `sec-${Math.random()}@x.io`);
@@ -382,7 +341,7 @@ describe('MCP surface leaks no secrets', () => {
 			seeded.staticToken
 		];
 
-		const args: Record<string, Record<string, unknown>> = {
+		const args: Partial<Record<string, Record<string, unknown>>> = {
 			provisioning_connection_list: { id: seeded.bucketId },
 			provisioning_connection_get: {
 				id: seeded.bucketId,

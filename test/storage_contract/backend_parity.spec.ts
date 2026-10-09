@@ -31,8 +31,7 @@ function areasNamedBy(backend: string): Set<string> {
 		if (!entry.endsWith('.ts')) continue;
 		const source = readFileSync(join(dir, entry), 'utf8');
 		for (const match of source.matchAll(/STORE_AREAS\.([A-Za-z]\w*)/g)) {
-			const key = match[1];
-			if (key !== undefined) found.add(key);
+			found.add(match[1]);
 		}
 	}
 

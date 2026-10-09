@@ -41,6 +41,12 @@ async function storedOverrides(): Promise<StoredOverrides> {
 }
 
 /* The value that would be in force after a restart: the stored override, else what is running. */
+// The DSN in force, read as the string the settings API stored; anything else counts as none.
+function storedDsn(stored: StoredOverrides): string {
+	const dsn = inForce(stored, 'sentry.dsn');
+	return typeof dsn === 'string' ? dsn : '';
+}
+
 function inForce(stored: StoredOverrides, key: (typeof SENTRY_KEYS)[number]) {
 	return Object.prototype.hasOwnProperty.call(stored, key)
 		? stored[key]
@@ -53,7 +59,7 @@ function inForce(stored: StoredOverrides, key: (typeof SENTRY_KEYS)[number]) {
  * value whose whole point is to be unreadable once written.
  */
 function present(stored: StoredOverrides) {
-	const dsn = String(inForce(stored, 'sentry.dsn') ?? '');
+	const dsn = storedDsn(stored);
 	const running = ApplicationConfig as Record<string, unknown>;
 	/*
 	 * Reported the way the settings page reports its own keys, and for the same reason: the card used
@@ -122,10 +128,7 @@ export const sentrySettingsRoutes = new Elysia({
 			 * the two travel in one request and the validator below is what enforces that.
 			 */
 			const submitted = body.dsn.trim();
-			const dsn =
-				submitted === SENTRY_DSN_MASK
-					? String(inForce(stored, 'sentry.dsn') ?? '')
-					: submitted;
+			const dsn = submitted === SENTRY_DSN_MASK ? storedDsn(stored) : submitted;
 
 			const changes: StoredOverrides = {
 				'sentry.enabled': body.enabled,

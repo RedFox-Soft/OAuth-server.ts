@@ -1,4 +1,5 @@
 import { spyOn } from 'bun:test';
+import { Type } from '@sinclair/typebox';
 
 import { getUserStore } from 'lib/adapters/index.js';
 import type { UserBucket } from 'lib/adapters/types.js';
@@ -308,13 +309,18 @@ export async function sendLogout(
 		})
 	);
 	const text = await response.text();
-	let json: Record<string, unknown>;
+	let parsed: unknown;
 	try {
-		json = text ? JSON.parse(text) : {};
+		parsed = text ? JSON.parse(text) : {};
 	} catch {
-		json = { raw: text };
+		parsed = { raw: text };
 	}
-	return { status: response.status, text, json, headers: response.headers };
+	return {
+		status: response.status,
+		text,
+		json: shaped(Type.Record(Type.String(), Type.Unknown()), parsed),
+		headers: response.headers
+	};
 }
 
 /* The relying party at `origin` accepting `times` logout notices, each recorded as it arrives. */

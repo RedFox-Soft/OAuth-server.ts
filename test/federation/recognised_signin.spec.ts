@@ -467,12 +467,13 @@ describe('signing in through a recognised provider', () => {
 		await walk(uid, cookie, undefined, { providerId: 'github' });
 
 		const users = await getUserStore(bucketId).list();
-		const identity = (users[0]?.federated ?? [])[0];
+		const identity = (users.at(0)?.federated ?? []).at(0);
 		/*
 		 * A login can be renamed and the freed name claimed by somebody else, so a login as subject means a
 		 * renamed account becomes a stranger and a reused name inherits an existing account.
 		 */
-		expect(identity?.sub).toBe('5151');
-		expect(identity?.sub).not.toBe('before-the-rename');
+		const { sub } = present(identity, 'the federated identity');
+		expect(sub).toBe('5151');
+		expect(sub).not.toBe('before-the-rename');
 	});
 });

@@ -86,11 +86,11 @@ describe('ErrorStore (memory)', () => {
 			const group = must(await store.record(occurrence(), bounds), 'the group');
 
 			expect(group).toBeDefined();
-			expect(group?._id).toBeTruthy();
-			expect(group?.occurrences).toBe(1);
-			expect(group?.samples).toHaveLength(1);
-			expect(group?.firstSeenAt).toBeInstanceOf(Date);
-			expect(group?.expiresAt.getTime()).toBeGreaterThan(
+			expect(group._id).toBeTruthy();
+			expect(group.occurrences).toBe(1);
+			expect(group.samples).toHaveLength(1);
+			expect(group.firstSeenAt).toBeInstanceOf(Date);
+			expect(group.expiresAt.getTime()).toBeGreaterThan(
 				group.lastSeenAt.getTime()
 			);
 		});
@@ -100,7 +100,7 @@ describe('ErrorStore (memory)', () => {
 			await store.record(occurrence(), bounds);
 			const group = must(await store.record(occurrence(), bounds), 'the group');
 
-			expect(group?.occurrences).toBe(3);
+			expect(group.occurrences).toBe(3);
 			const page = await store.list();
 			expect(page.total).toBe(1);
 		});

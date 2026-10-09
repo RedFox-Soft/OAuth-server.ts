@@ -172,3 +172,19 @@ Operations:
 ## [2026-10-08] create | [[site-translations]] — spec 074: the public site gains `/ru/` and `/zh-cn/` (marketing, docs landing and Get started, the whole blog), shown only to readers whose first browser language is Russian or Simplified Chinese; records the first-language rule, the one inline script and its three traps, fallbacks, the one-release rule, hash freshness and the language-aware build checks.
 
 ## [2026-10-08] update | [[single-use-under-concurrency]] — a replay record has to outlive what it guards: a DPoP proof dated ahead of the server stayed acceptable after its `jti` record lapsed, so `validateReplay` now keeps it until the proof stops being acceptable (RFC 9449 §11.1).
+
+## [2026-10-08] update | [[rich-authorization-requests]], [[addon-registry]] — two checks moved to where the data enters: the RAR types map is shape-checked even while the feature is off (the consent screen reads its labels on every render), and a `getResourceServerInfo` answer is checked once in the `ResourceServer` constructor instead of its format at every mint. Found by `no-unnecessary-condition` while enabling typed linting.
+
+## [2026-10-08] update | [[cookie-path-scoping]] — `clearLegacySessionCookie` removed: the bare `_session` it expired as legacy has been a host-addressed bucket's own session cookie since `536d9b7`, so on that origin it cleared the live cookie and an anonymous session not re-issued in the same response was lost. On the issuer's origin the old cookie is never read and reaches no host bucket.
+
+## [2026-10-08] update | [[feature-flag-gating]] — stored setting overrides are type-checked at boot against their defaults (`assertStoredSettingTypes`); a wrongly typed one refuses startup. Flags were read as `=== true` because a stored `"false"` would otherwise read as on; they are read plainly now.
+
+## [2026-10-09] update | [[event-bus]] — the bus is `EventEmitter<ServerEvents>`: every event name and its arguments are a type, exported from `lib/index.ts` for deployments, and test spies are typed from it (`ServerListener<K>`), which surfaced tests reading spy arguments wrongly. `assign.client` may carry no client; `code_verification.error` carries an unknown.
+
+## [2026-10-09] update | [[postgresql-backend]] — Postgres rows are typed `unknown[]` by default (`Sql` / `Tx` in `lib/adapters/postgres/db.ts`) instead of Bun's `any`, so documents are read only through `docOf` / `payloadOf` and the schema; type arguments remain for projections the query fixes.
+
+## [2026-10-09] update | [[addon-registry]] — `Overridable` lets an override be more synchronous than its default, never less, so the awaited seams with a sync default (`rotateRefreshToken`, the four `rarFor*` transforms) are now `async`; seams whose callers do not await stay sync. Also re-pointed [[refresh-token-chain-bound]]'s `rotateRefreshToken` citation to `tokens.ts:91-113`.
+
+## [2026-10-09] update | [[group-ownership]] — the `Grant` constructor no longer derives `trusted` from a client's `consent.require` (it would have skipped `consentWaived`'s bucket-ownership check; no caller passed a client, so it never ran); a new grant is untrusted unless the caller says so.
+
+## [2026-10-09] update | [[two-meanings-of-origin]] — `ErrorRecord.origin` is typed `string | null`; the not-captured marker is `ORIGIN_NOT_CAPTURED` (`lib/consts/error_origin.ts`), since a literal in a string union is no type at all. Re-pointed both `types.ts` citations.

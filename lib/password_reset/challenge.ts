@@ -173,7 +173,7 @@ export async function request(
 	 * around its factors and its offboarding. The door refuses first; this holds for any path that
 	 * did not pass it.
 	 */
-	if (!bucket || bucket.passwordLogin === false) {
+	if (!bucket || !bucket.passwordLogin) {
 		return { ok: true, sent: false };
 	}
 
@@ -230,7 +230,7 @@ export async function load(token: string): Promise<LoadOutcome> {
 
 	const bucket = await getBucketStore().find(challenge.bucketId);
 	// Also a link issued before the bucket closed its password door: it must not set a password now.
-	if (!bucket || bucket.passwordLogin === false) {
+	if (!bucket || !bucket.passwordLogin) {
 		return { ok: false };
 	}
 

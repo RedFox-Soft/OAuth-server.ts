@@ -68,7 +68,7 @@ if (process.argv.includes('--watch')) {
 	watch('./lib', { recursive: true }, () => {
 		if (timer) clearTimeout(timer);
 		timer = setTimeout(() => {
-			buildAll().catch((err) => console.error(err));
+			buildAll().catch((err: unknown) => console.error(err));
 		}, 150);
 	});
 }

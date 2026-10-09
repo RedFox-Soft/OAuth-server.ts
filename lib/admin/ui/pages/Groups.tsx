@@ -155,8 +155,7 @@ function MembersEditor({
 						style={{ minWidth: 240 }}
 						value={userId}
 						onChange={setUserId}
-						showSearch
-						optionFilterProp="label"
+						showSearch={{ optionFilterProp: 'label' }}
 						options={admins
 							.filter((a) => !group.members.some((m) => m.userId === a._id))
 							.map((a) => ({ value: a._id, label: a.email }))}

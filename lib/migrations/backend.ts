@@ -32,7 +32,7 @@ export function holderId(): string {
 export function migrationBackend(
 	name: Exclude<BackendName, 'memory'>,
 	stores: MigrationStores,
-	handle: unknown = undefined
+	handle?: unknown
 ): MigrationBackend {
 	const holder = holderId();
 

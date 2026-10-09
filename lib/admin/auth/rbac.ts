@@ -311,7 +311,7 @@ async function resolveActiveGroup(
 	const personal = groups.find(
 		(g) => g.kind === 'personal' && g.members[0]?.userId === userId
 	);
-	return personal?._id ?? memberships[0]?.groupId ?? '';
+	return personal?._id ?? memberships.at(0)?.groupId ?? '';
 }
 
 export const resolveAdmin = new Elysia({ name: 'admin-resolve' }).derive(
@@ -321,7 +321,7 @@ export const resolveAdmin = new Elysia({ name: 'admin-resolve' }).derive(
 		headers,
 		request
 	}): Promise<{ admin: AdminContext | null }> => {
-		const sessionId = cookie[ADMIN_SESSION_COOKIE]?.value as string | undefined;
+		const sessionId = cookie[ADMIN_SESSION_COOKIE].value as string | undefined;
 		if (sessionId) {
 			const session = await adminSessionStore.find(sessionId);
 			if (!session) return { admin: null };

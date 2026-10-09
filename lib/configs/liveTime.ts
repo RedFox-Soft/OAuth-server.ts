@@ -8,7 +8,6 @@ import type { DeviceCode } from 'lib/models/device_code.js';
 import type { Grant } from 'lib/models/grant.js';
 import type { RefreshToken } from 'lib/models/refresh_token.js';
 import epochTime from 'lib/helpers/epoch_time.js';
-import { isRecord } from 'lib/helpers/_/object.js';
 
 /*
  * The constant which determines how many bits of randomness the opaque token should have. 256 bits is the same as the default for uuidv4, and is considered sufficient for security purposes. It also results in a token length of 43 characters when using nanoid, which is a reasonable length for an opaque token.
@@ -53,16 +52,9 @@ export const ttl = {
 		request: BackchannelAuthenticationRequest,
 		_client: Client | undefined
 	) {
-		const { params } = request.payload;
-		const requestedExpiry = isRecord(params)
-			? params.requested_expiry
-			: undefined;
-		if (
-			requestedExpiry &&
-			(typeof requestedExpiry === 'number' ||
-				typeof requestedExpiry === 'string')
-		) {
-			return Math.min(10 * 60, +requestedExpiry); // 10 minutes in seconds or requested_expiry, whichever is shorter
+		const requestedExpiry = request.payload.params?.requested_expiry;
+		if (requestedExpiry) {
+			return Math.min(10 * 60, requestedExpiry); // 10 minutes in seconds or requested_expiry, whichever is shorter
 		}
 
 		return 10 * 60; // 10 minutes in seconds

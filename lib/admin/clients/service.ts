@@ -191,7 +191,7 @@ function toView(client: Client): AdminClientView {
 		postLogoutRedirectUris: [...(client.postLogoutRedirectUris ?? [])],
 		tokenEndpointAuthMethod: client.tokenEndpointAuthMethod,
 		scope: client.scope,
-		requireConsent: client['consent.require'] !== false,
+		requireConsent: client['consent.require'],
 		backchannelTokenDeliveryMode: client.backchannelTokenDeliveryMode,
 		backchannelClientNotificationEndpoint:
 			client.backchannelClientNotificationEndpoint,
@@ -262,18 +262,15 @@ export async function updateClient(
 	if (!existing) throw new AdminError(404, 'client not found');
 	const merged: CreateClientInput = {
 		clientName: patch.clientName ?? existing.clientName,
-		applicationType: patch.applicationType ?? existing.applicationType ?? 'web',
-		grantTypes: patch.grantTypes ?? existing.grantTypes ?? [],
-		redirectUris: patch.redirectUris ?? existing.redirectUris ?? [],
+		applicationType: patch.applicationType ?? existing.applicationType,
+		grantTypes: patch.grantTypes ?? existing.grantTypes,
+		redirectUris: patch.redirectUris ?? existing.redirectUris,
 		postLogoutRedirectUris:
 			patch.postLogoutRedirectUris ?? existing.postLogoutRedirectUris ?? [],
 		tokenEndpointAuthMethod:
-			patch.tokenEndpointAuthMethod ??
-			existing.tokenEndpointAuthMethod ??
-			'none',
+			patch.tokenEndpointAuthMethod ?? existing.tokenEndpointAuthMethod,
 		scope: patch.scope ?? existing.scope,
-		requireConsent:
-			patch.requireConsent ?? existing['consent.require'] !== false,
+		requireConsent: patch.requireConsent ?? existing['consent.require'],
 		backchannelTokenDeliveryMode:
 			patch.backchannelTokenDeliveryMode ??
 			existing.backchannelTokenDeliveryMode,

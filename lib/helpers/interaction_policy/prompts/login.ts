@@ -141,7 +141,7 @@ class LoginPromt extends Prompt {
 			error: 'unmet_authentication_requirements',
 			check: (oidc) => {
 				const request = claimRequest(oidc.claims.id_token?.acr);
-				if (!request?.essential || !request?.values) {
+				if (!request.essential || !request.values) {
 					return false;
 				}
 				if (!Array.isArray(request.values)) {
@@ -163,7 +163,7 @@ class LoginPromt extends Prompt {
 			error: 'unmet_authentication_requirements',
 			check: (oidc) => {
 				const request = claimRequest(oidc.claims.id_token?.acr);
-				if (!request?.essential || !request?.value) {
+				if (!request.essential || !request.value) {
 					return false;
 				}
 				if (request.value === oidc.acr) {

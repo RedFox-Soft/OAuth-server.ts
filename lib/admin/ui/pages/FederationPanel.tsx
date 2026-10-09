@@ -20,6 +20,7 @@ import { PlusOutlined } from '@ant-design/icons';
 /* The login page's own marks, not a second copy: one table, corrected in one place. */
 import { providerMark } from '../../../interactions/providerMark.js';
 import type { FederationProvider } from '../../../federation/types.js';
+import { readJson } from '../json.ts';
 
 /*
  * A bucket's upstream identity providers.
@@ -138,9 +139,14 @@ export function FederationPanel({
 				fetch(base),
 				fetch(`${base}/catalogue`)
 			]);
-			setRows(providers.ok ? await providers.json() : []);
+			setRows(
+				providers.ok ? await readJson<PresentedProvider[]>(providers) : []
+			);
 			setGuidance(
-				catalogue.ok ? ((await catalogue.json()).providers ?? []) : []
+				catalogue.ok
+					? ((await readJson<{ providers?: Guidance[] }>(catalogue))
+							.providers ?? [])
+					: []
 			);
 		} finally {
 			setLoading(false);
@@ -460,7 +466,7 @@ export function FederationPanel({
 						<Alert
 							type="warning"
 							showIcon
-							message="This address will change"
+							title="This address will change"
 							description="This bucket has no address of its own yet, so the address above is built from its internal id. Giving the bucket a slug changes it, and whatever you registered with the provider stops matching. Set the slug first."
 						/>
 					)}
@@ -484,7 +490,7 @@ export function FederationPanel({
 						<Alert
 							type="info"
 							showIcon
-							message={`${connecting.displayName} is already connected to this bucket`}
+							title={`${connecting.displayName} is already connected to this bucket`}
 							description={`Edit the provider '${connecting.existingProviderId ?? connecting.displayName}' in the table below to change its credentials or settings. A bucket holds one connection per provider.`}
 						/>
 					) : (
@@ -537,7 +543,7 @@ export function FederationPanel({
 									style={{ marginBottom: 16 }}
 									type="warning"
 									showIcon
-									message="Give this bucket a slug first"
+									title="Give this bucket a slug first"
 									description="This bucket has no address of its own, so the address above is built from its internal id and will change the moment you assign a slug — silently invalidating what you registered."
 								/>
 							)}

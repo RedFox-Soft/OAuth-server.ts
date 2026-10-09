@@ -4,11 +4,16 @@ import { readFileSync } from 'node:fs';
 import key from '../client.sig.key.js';
 import getConfig from '../default.config.js';
 import type { AddonImplementations } from 'lib/addon/types.js';
+import { Type } from '@sinclair/typebox';
+import { shaped } from '../shape.ts';
 
-const mtlsKeys = JSON.parse(
-	readFileSync('test/jwks/jwks.json', {
-		encoding: 'utf-8'
-	})
+const mtlsKeys = shaped(
+	Type.Object({ keys: Type.Array(Type.Record(Type.String(), Type.Unknown())) }),
+	JSON.parse(
+		readFileSync('test/jwks/jwks.json', {
+			encoding: 'utf-8'
+		})
+	)
 );
 
 const config = getConfig();

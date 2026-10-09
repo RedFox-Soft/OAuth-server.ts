@@ -49,4 +49,3 @@ type Missing = Exclude<
 >;
 // Fails to compile when AddonImplementations gains a key the list above does not name.
 const _everySeamIsListed: [Missing] extends [never] ? true : never = true;
-void _everySeamIsListed;

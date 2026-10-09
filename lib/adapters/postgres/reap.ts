@@ -74,7 +74,7 @@ export function startSweeper(
 		});
 	}, intervalMs);
 
-	timer.unref?.();
+	timer.unref();
 
 	return () => clearInterval(timer);
 }

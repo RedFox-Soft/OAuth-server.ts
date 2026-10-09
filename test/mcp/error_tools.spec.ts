@@ -1,20 +1,16 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'bun:test';
 
 import bootstrap from '../test_helper.js';
-import { elysia } from 'lib/index.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { errorStore } from 'lib/adapters/index.ts';
-import {
-	ADMIN_MCP_CLIENT_ID,
-	MCP_RESOURCE,
-	MCP_ROUTE
-} from 'lib/mcp/consts.ts';
+import { ADMIN_MCP_CLIENT_ID, MCP_RESOURCE } from 'lib/mcp/consts.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { shaped } from 'test/shape.js';
 import { Type } from '@sinclair/typebox';
 import { createAdministrator, type AdminKind } from '../administrators.ts';
+import { call, rpc } from './rpc.ts';
 
 /*
  * US5 — the agent's view of recorded faults.
@@ -26,43 +22,6 @@ import { createAdministrator, type AdminKind } from '../administrators.ts';
  * either way, because reading the consequence of a deletion is not destructive.
  */
 let rpcId = 0;
-
-async function rpc(body: unknown, token: string) {
-	const res = await elysia.handle(
-		new Request(`http://e.ly${MCP_ROUTE}`, {
-			method: 'POST',
-			headers: {
-				'content-type': 'application/json',
-				accept: 'application/json, text/event-stream',
-				authorization: `Bearer ${token}`
-			},
-			body: JSON.stringify(body)
-		})
-	);
-	const text = await res.text();
-	const isEvent = (res.headers.get('content-type') ?? '').includes(
-		'text/event-stream'
-	);
-	const line = isEvent
-		? text.split('\n').find((l) => l.startsWith('data:'))
-		: undefined;
-	return isEvent
-		? line
-			? JSON.parse(line.slice('data:'.length).trim())
-			: undefined
-		: text
-			? JSON.parse(text)
-			: undefined;
-}
-
-function call(name: string, args: Record<string, unknown> = {}) {
-	return {
-		jsonrpc: '2.0',
-		id: ++rpcId,
-		method: 'tools/call',
-		params: { name, arguments: args }
-	};
-}
 
 async function agentFor(kind: AdminKind) {
 	const user = await createAdministrator(kind, `et-${Math.random()}@x.io`);

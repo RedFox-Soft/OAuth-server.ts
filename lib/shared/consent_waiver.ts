@@ -31,7 +31,7 @@ export function consentWaived(oidc: OIDCContext): Promise<boolean> {
 
 async function decide(oidc: OIDCContext): Promise<boolean> {
 	const { client } = oidc;
-	if (client['consent.require'] !== false) return false;
+	if (client['consent.require']) return false;
 
 	const project = await getProjectStore().findByClientId(client.clientId);
 	if (!project) return true;
@@ -39,7 +39,7 @@ async function decide(oidc: OIDCContext): Promise<boolean> {
 	const bucket = await getBucketStore().find(
 		await resolveBucketForRequest(
 			client.clientId,
-			oidc.params?.resource,
+			oidc.params.resource,
 			oidc.bucket
 		)
 	);

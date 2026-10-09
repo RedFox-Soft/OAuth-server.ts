@@ -13,7 +13,7 @@ import {
 } from 'bun:test';
 
 import nanoid from '../../lib/helpers/nanoid.ts';
-import { eventBus } from '../../lib/index.ts';
+import { eventBus, type ServerListener } from '../../lib/index.ts';
 import bootstrap, { agent, changeClient } from '../test_helper.js';
 import {
 	mock as mockHttp,
@@ -25,7 +25,7 @@ import { ISSUER } from 'lib/configs/env.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { Client, clientKeys } from 'lib/models/client.js';
 
-const mtlsKeys = JSON.parse(
+const mtlsKeys: unknown = JSON.parse(
 	readFileSync('test/jwks/jwks.json', {
 		encoding: 'utf-8'
 	})
@@ -90,7 +90,7 @@ describe('client authentication options', () => {
 		});
 
 		it('rejects the "auth" if secret was also provided', async function () {
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.error'>>();
 			eventBus.once('grant.error', spy);
 			const { status, error } = await agent.token.post({
 				grant_type: 'client_credentials',
@@ -284,7 +284,7 @@ describe('client authentication options', () => {
 		});
 
 		it('rejects invalid secrets', async function () {
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.error'>>();
 			eventBus.once('grant.error', spy);
 
 			const { error } = await agent.token.post(
@@ -416,7 +416,7 @@ describe('client authentication options', () => {
 		});
 
 		it('rejects invalid secrets', async function () {
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.error'>>();
 			eventBus.once('grant.error', spy);
 
 			const { error } = await agent.token.post({
@@ -436,7 +436,7 @@ describe('client authentication options', () => {
 		});
 
 		it('requires the client_secret to be sent', async function () {
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.error'>>();
 			eventBus.once('grant.error', spy);
 
 			const { error } = await agent.token.post({
@@ -610,7 +610,7 @@ describe('client authentication options', () => {
 		});
 
 		it('rejects the auth if this is actually a none-client', async function () {
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.error'>>();
 			eventBus.once('grant.error', spy);
 
 			const assertion = await JWT.sign(
@@ -724,7 +724,7 @@ describe('client authentication options', () => {
 		});
 
 		it('an assertion with no exp is refused', async function () {
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.error'>>();
 			eventBus.once('grant.error', spy);
 
 			const assertion = await JWT.sign(
@@ -761,7 +761,7 @@ describe('client authentication options', () => {
 		});
 
 		it('an assertion with no audience is refused', async function () {
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.error'>>();
 			eventBus.once('grant.error', spy);
 			const assertion = await JWT.sign(
 				{
@@ -795,7 +795,7 @@ describe('client authentication options', () => {
 		});
 
 		it('an assertion with no jti is refused', async function () {
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.error'>>();
 			eventBus.once('grant.error', spy);
 			const assertion = await JWT.sign(
 				{
@@ -830,7 +830,7 @@ describe('client authentication options', () => {
 		});
 
 		it('refuses a client assertion with no iss', async function () {
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.error'>>();
 			eventBus.once('grant.error', spy);
 
 			const assertion = await JWT.sign(
@@ -866,7 +866,7 @@ describe('client authentication options', () => {
 		});
 
 		it('refuses a client assertion with no sub', async function () {
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.error'>>();
 			eventBus.once('grant.error', spy);
 
 			const assertion = await JWT.sign(
@@ -902,7 +902,7 @@ describe('client authentication options', () => {
 		});
 
 		it('an assertion whose issuer is not the client is refused', async function () {
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.error'>>();
 			eventBus.once('grant.error', spy);
 
 			const assertion = await JWT.sign(
@@ -1036,7 +1036,7 @@ describe('client authentication options', () => {
 		});
 
 		it('rejects valid format and signature but expired/invalid jwts', async function () {
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.error'>>();
 			eventBus.once('grant.error', spy);
 			const assertion = await JWT.sign(
 				{
@@ -1105,7 +1105,7 @@ describe('client authentication options', () => {
 
 		describe('JTI uniqueness', () => {
 			it('reused jtis must be rejected', async function () {
-				const spy = mock();
+				const spy = mock<ServerListener<'grant.error'>>();
 				eventBus.once('grant.error', spy);
 				const assertion = await JWT.sign(
 					{
@@ -1169,7 +1169,7 @@ describe('client authentication options', () => {
 			});
 
 			it('rejects signatures with different algorithm', async function () {
-				const spy = mock();
+				const spy = mock<ServerListener<'grant.error'>>();
 				eventBus.once('grant.error', spy);
 
 				const assertion = await JWT.sign(

@@ -23,8 +23,12 @@ Two different things in the fault-reporting path are called `origin`, and they m
 
 | Path | Type | Meaning |
 |---|---|---|
-| `ErrorOccurrence.origin` (`lib/adapters/types.ts:487`) | `ErrorOrigin` — `{file, line, frame}` | where in **the server's source** the fault arose |
-| `ErrorRecord.origin` (`lib/adapters/types.ts:443`) | `string \| null \| 'not-captured'` | the **caller's network address**, at the configured redaction level |
+| `ErrorOccurrence.origin` (`lib/adapters/types.ts:850`) | `ErrorOrigin` — `{file, line, frame}` | where in **the server's source** the fault arose |
+| `ErrorRecord.origin` (`lib/adapters/types.ts:804`) | `string \| null`, `ORIGIN_NOT_CAPTURED` when capture is omitted | the **caller's network address**, at the configured redaction level |
+
+The marker is a plain string in the same field as a captured address, so a type cannot tell them apart
+(`string | 'not-captured'` collapses to `string`). Since 2026-10-09 it is named once, in
+`lib/consts/error_origin.ts`, and every reader compares against the constant.
 
 Both reach the outbound event, under deliberately different names:
 

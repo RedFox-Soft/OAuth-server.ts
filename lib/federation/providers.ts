@@ -14,14 +14,14 @@ import type { FederationProvider } from './types.js';
  */
 
 export function federationEnabled(): boolean {
-	return ApplicationConfig['federation.enabled'] === true;
+	return ApplicationConfig['federation.enabled'];
 }
 
 export function enabledProviders(
 	bucket: Pick<UserBucket, 'federation'> | null | undefined
 ): FederationProvider[] {
 	if (!federationEnabled() || !bucket) return [];
-	return (bucket.federation ?? []).filter((provider) => provider.enabled);
+	return bucket.federation.filter((provider) => provider.enabled);
 }
 
 /*

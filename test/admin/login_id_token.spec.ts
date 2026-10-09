@@ -8,7 +8,7 @@ import {
 	spyOn,
 	type Mock
 } from 'bun:test';
-import { eventBus } from 'lib/event_bus.ts';
+import { eventBus, type ServerListener } from 'lib/event_bus.ts';
 import bootstrap, { agent, getHeader, seedJwks } from '../test_helper.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { getUserStore, resetAdminMemoryStores } from 'lib/adapters/index.ts';
@@ -390,7 +390,7 @@ describe('admin sign-in: ID token verification', () => {
 
 	it('reports the failed check on the event bus, and nothing else', async () => {
 		const login = await startLogin();
-		const observed = mock();
+		const observed = mock<ServerListener<'admin.login.error'>>();
 		eventBus.once('admin.login.error', observed);
 
 		expectRefused(
@@ -436,7 +436,7 @@ describe('admin sign-in: ID token verification', () => {
 
 		for (const [expectedReason, mint] of cases) {
 			const login = await startLogin();
-			const observed = mock();
+			const observed = mock<ServerListener<'admin.login.error'>>();
 			eventBus.once('admin.login.error', observed);
 
 			expectRefused(await callback(login, await mint(login)));

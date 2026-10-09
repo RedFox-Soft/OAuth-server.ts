@@ -17,16 +17,21 @@ import { keystore } from 'lib/configs/keystore.js';
 import ResourceServer from '../../lib/helpers/resource_server.ts';
 import epochTime from '../../lib/helpers/epoch_time.ts';
 import bootstrap from '../test_helper.js';
-import { eventBus } from 'lib/event_bus.js';
+import { eventBus, type ServerListener } from 'lib/event_bus.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { TestAdapter } from 'test/models.js';
 import { Client } from 'lib/models/client.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { ClientCredentials } from 'lib/models/client_credentials.js';
+import { Type } from '@sinclair/typebox';
+import { shaped } from '../shape.ts';
 
 const generateKeyPair = util.promisify(crypto.generateKeyPair);
 function decode(b64urljson: string) {
-	return JSON.parse(base64url.decode(b64urljson));
+	return shaped(
+		Type.Record(Type.String(), Type.Unknown()),
+		JSON.parse(base64url.decode(b64urljson))
+	);
 }
 
 /**
@@ -760,7 +765,7 @@ describe('jwt format', () => {
 		const upsert = spyOn(TestAdapter.for('AccessToken'), 'upsert');
 		const client = await Client.find(clientId);
 		const token = new AccessToken({ client, ...fullPayload });
-		const issued = mock();
+		const issued = mock<ServerListener<'access_token.issued'>>();
 		eventBus.on('access_token.issued', issued);
 		const jwt = await token.save();
 
@@ -790,7 +795,7 @@ describe('jwt format', () => {
 		const upsert = spyOn(TestAdapter.for('AccessToken'), 'upsert');
 		const client = await Client.find('pairwise');
 		const token = new AccessToken({ client, ...fullPayload });
-		const issued = mock();
+		const issued = mock<ServerListener<'access_token.issued'>>();
 		eventBus.on('access_token.issued', issued);
 		const jwt = await token.save();
 
@@ -823,7 +828,7 @@ describe('jwt format', () => {
 			client,
 			...fullPayload
 		});
-		const issued = mock();
+		const issued = mock<ServerListener<'client_credentials.issued'>>();
 		eventBus.on('client_credentials.issued', issued);
 		const jwt = await token.save();
 

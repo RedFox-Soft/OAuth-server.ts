@@ -26,8 +26,13 @@ import type { User } from '../lib/adapters/types.ts';
 
 import { TestAdapter } from './models.js';
 import { present, shaped } from './shape.js';
+import { Type } from '@sinclair/typebox';
+import type { AddonImplementations } from 'lib/addon/types.js';
 import { SessionPayload } from '../lib/models/session.ts';
-import { AuthorizationRequest } from './AuthorizationRequest.js';
+import {
+	AuthorizationRequest,
+	type SeedClient
+} from './AuthorizationRequest.js';
 import { setAddonBaseline } from './addon_baseline.js';
 import { interactionPolicy } from '../lib/addon/index.js';
 import { base as basePolicy } from '../lib/helpers/interaction_policy/index.js';
@@ -81,17 +86,22 @@ export async function seedJwks(keys: Array<Record<string, unknown>>) {
 }
 
 const { info, warn } = console;
-console.info = function (...args) {
-	if (!args[0].includes('NOTICE: ')) info.apply(this, args);
+const mentions = (args: unknown[], marker: string) =>
+	typeof args[0] === 'string' && args[0].includes(marker);
+console.info = function (...args: unknown[]) {
+	if (!mentions(args, 'NOTICE: ')) info.apply(this, args);
 };
-console.warn = function (...args) {
-	if (!args[0].includes('WARNING: ')) warn.apply(this, args);
+console.warn = function (...args: unknown[]) {
+	if (!mentions(args, 'WARNING: ')) warn.apply(this, args);
 };
 
 process.env.NODE_ENV = process.env.NODE_ENV || 'test';
 
-const jwt = (token: string) =>
-	JSON.parse(base64url.decode(token.split('.')[1])).jti;
+const jwt = (token: string): string =>
+	shaped(
+		Type.Object({ jti: Type.String() }),
+		JSON.parse(base64url.decode(token.split('.')[1])) as unknown
+	).jti;
 
 export const agent = treaty(elysia);
 
@@ -113,8 +123,14 @@ export function encodeParams(params: Record<string, unknown>): URLSearchParams {
 			encoded.append(key, JSON.stringify(value));
 		} else if (Array.isArray(value)) {
 			value.forEach((item) => encoded.append(key, String(item)));
-		} else {
+		} else if (
+			typeof value === 'string' ||
+			typeof value === 'number' ||
+			typeof value === 'boolean'
+		) {
 			encoded.append(key, String(value));
+		} else {
+			encoded.append(key, JSON.stringify(value));
 		}
 	}
 	return encoded;
@@ -174,7 +190,7 @@ export function passInteractionChecks(
 		disabled.length = 0;
 	});
 
-	return fn();
+	fn();
 }
 
 // eden treaty types the destructured `headers` as the loose `HeadersInit`
@@ -252,9 +268,8 @@ export function seedAccount(
  * The session cookie's name now varies by bucket, so a spec that cares about *the* session cookie
  * rather than about which population wrote it asks for it by prefix.
  *
- * The bare `_session=` is deliberately excluded: it is the legacy name, and the only thing the server
- * ever writes under it now is the clear that expires it. Matching it would hand a spec an empty value
- * and a 1970 expiry where it expected a live sign-in.
+ * The bare `_session=` is deliberately excluded: it belongs only to a bucket addressed by a hostname of
+ * its own, and the specs that read the session through this prefix sign in at path and root buckets.
  */
 export const SESSION_COOKIE_PREFIX = `${cookieNames.session}_`;
 
@@ -275,7 +290,7 @@ export function seedClient(
 			`duplicate client_id '${metadata.clientId}' seeded into the Client store`
 		);
 	}
-	adapter('Client').upsert(metadata.clientId, metadata);
+	void adapter('Client').upsert(metadata.clientId, metadata);
 }
 
 /*
@@ -420,6 +435,19 @@ export function jsonToFormUrlEncoded(json: Record<string, unknown>) {
 	return searchParams.toString();
 }
 
+/*
+ * What a spec's *.config.ts may export, every member optional. Loaded by path at run time, so the shape
+ * is stated here rather than inferred from any one config.
+ */
+interface SpecConfig {
+	clients?: SeedClient[];
+	client?: SeedClient;
+	ApplicationConfig?: Partial<typeof applicationDefaultSettings>;
+	ClientDefaults?: Partial<typeof clientDefaultSettings>;
+	addons?: Partial<AddonImplementations>;
+	jwks?: { keys: Array<Record<string, unknown>> };
+}
+
 async function bootstrap(
 	importMetaUrl: string,
 	{ config: base }: { config?: string } = {}
@@ -437,12 +465,8 @@ async function bootstrap(
 		ClientDefaults: clientSettings,
 		addons: addonOverrides,
 		jwks: jwksOverride
-	} = await import(conf);
-	let clients = clientsExport;
-
-	if (client && !clients) {
-		clients = [client];
-	}
+	} = (await import(conf)) as SpecConfig;
+	const clients: SeedClient[] = clientsExport ?? (client ? [client] : []);
 	AuthorizationRequest.clients = clients;
 
 	// Behavior functions are overridden through the addon registry, not the
@@ -491,7 +515,7 @@ async function bootstrap(
 
 	// Clients now live in the Client store (single source of truth); seed each
 	// exported client so tryFindClient resolves it from the adapter.
-	for (const cl of clients ?? []) {
+	for (const cl of clients) {
 		seedClient(cl);
 	}
 
@@ -548,7 +572,9 @@ async function bootstrap(
 
 		session.payload.authorizations = {};
 		const requested: ClaimsParameter | undefined =
-			typeof claims === 'string' ? JSON.parse(claims) : claims;
+			typeof claims === 'string'
+				? (JSON.parse(claims) as ClaimsParameter)
+				: claims;
 		for (const cl of clients) {
 			const grant = new Grant({ clientId: cl.clientId, accountId });
 			grant.addOIDCScope(scope);
@@ -607,7 +633,7 @@ async function bootstrap(
 		const session = getSession();
 
 		if (!clientId && client) clientId = client.clientId;
-		if (!clientId && clients) clientId = clients[0].clientId;
+		if (!clientId) clientId = clients.at(0)?.clientId;
 		try {
 			if (!clientId) throw new Error('no client');
 			return present(session.authorizations?.[clientId]?.grantId, 'a grant');

@@ -1,42 +1,21 @@
 import { describe, it, beforeAll, expect } from 'bun:test';
 
-import { elysia } from 'lib/index.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { createEndUser } from 'lib/end_users/service.ts';
 import nanoid from 'lib/helpers/nanoid.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
-import {
-	ADMIN_MCP_CLIENT_ID,
-	MCP_RESOURCE,
-	MCP_ROUTE
-} from 'lib/mcp/consts.ts';
+import { ADMIN_MCP_CLIENT_ID, MCP_RESOURCE } from 'lib/mcp/consts.ts';
 import bootstrap from '../test_helper.js';
 import { defaultBucket } from './fixtures.ts';
 import { createAdministrator } from '../administrators.ts';
+import { rpc as mcpRpc } from '../mcp/rpc.ts';
 
 let rpcId = 0;
 
 async function rpc(method: string, params: unknown, token: string) {
-	const res = await elysia.handle(
-		new Request(`http://e.ly${MCP_ROUTE}`, {
-			method: 'POST',
-			headers: {
-				'content-type': 'application/json',
-				accept: 'application/json, text/event-stream',
-				authorization: `Bearer ${token}`
-			},
-			body: JSON.stringify({ jsonrpc: '2.0', id: ++rpcId, method, params })
-		})
-	);
-	const text = await res.text();
-	const line = (res.headers.get('content-type') ?? '').includes(
-		'text/event-stream'
-	)
-		? text.split('\n').find((l) => l.startsWith('data:'))
-		: undefined;
-	return JSON.parse(line ? line.slice('data:'.length).trim() : text);
+	return mcpRpc({ jsonrpc: '2.0', id: ++rpcId, method, params }, token);
 }
 
 /* An agent acting for a super administrator, as the MCP surface authenticates one. */

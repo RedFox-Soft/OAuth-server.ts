@@ -56,8 +56,9 @@ function helperAreas(source: string): Map<string, string> {
 	const pattern =
 		/function\s+([A-Za-z_$][\w$]*)\s*\(\s*\)\s*\{\s*return\s+(?:adapter\(\s*'([^']+)'\s*\)|checkedAdapter\(\s*'([^']+)'\s*,\s*[A-Za-z_$][\w$]*\s*\))\s*;?\s*\}/g;
 	for (const match of source.matchAll(pattern)) {
-		const [, name, literal, checked] = match;
-		const area = literal ?? checked;
+		const name = match[1];
+		// One arm of the alternation matched, so the other capture is undefined.
+		const area = match.at(2) ?? match.at(3);
 		if (name && area) helpers.set(name, area);
 	}
 	return helpers;
@@ -147,10 +148,7 @@ function upsertCallSites(): { sites: CallSite[]; unresolved: string[] } {
 		const shown = relative(LIB, file).replaceAll('\\', '/');
 
 		for (const match of source.matchAll(RECEIVER)) {
-			const captured = match[1];
-			if (captured === undefined || match.index === undefined) continue;
-
-			const receiver = captured.trim();
+			const receiver = match[1].trim();
 			const open = match.index + match[0].length - 1;
 			const passesTtl = argumentCount(source, open) >= 3;
 

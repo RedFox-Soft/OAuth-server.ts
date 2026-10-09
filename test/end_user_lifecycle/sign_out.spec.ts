@@ -7,6 +7,7 @@ import {
 	mock,
 	spyOn
 } from 'bun:test';
+import { Type } from '@sinclair/typebox';
 
 import { DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { adapter, getUserStore } from 'lib/adapters/index.ts';
@@ -15,6 +16,7 @@ import { createEndUser } from 'lib/end_users/service.ts';
 import * as base64url from 'lib/helpers/base64url.js';
 import nanoid from 'lib/helpers/nanoid.js';
 import bootstrap, { type Setup } from '../test_helper.js';
+import { present, shaped } from '../shape.ts';
 import {
 	mock as mockHttp,
 	assertNoPendingInterceptors
@@ -40,10 +42,13 @@ function signOut(cookie: string, uid: string) {
 	return user['sign-out'].post(undefined, { headers: { cookie } });
 }
 
-function sidOfLogoutToken(body: string): unknown {
+function sidOfLogoutToken(body: string): string {
 	const match = body.match(/^logout_token=([\w-]+)\.([\w-]+)\.([\w-]+)$/);
 	if (!match?.[2]) throw new Error('expected a logout token');
-	return JSON.parse(base64url.decode(match[2])).sid;
+	return shaped(
+		Type.Object({ sid: Type.String() }),
+		JSON.parse(base64url.decode(match[2]))
+	).sid;
 }
 
 function acceptLogouts(): void {
@@ -108,8 +113,11 @@ describe('signing an end user out everywhere', () => {
 		await signOut(cookie, user.accountId);
 
 		expect(delivered).toEqual({
-			client: authorizations.client?.sid,
-			'second-client': authorizations['second-client']?.sid
+			client: present(authorizations.client, 'the client authorization').sid,
+			'second-client': present(
+				authorizations['second-client'],
+				'the second client authorization'
+			).sid
 		});
 	});
 

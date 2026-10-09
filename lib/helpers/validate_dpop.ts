@@ -107,7 +107,7 @@ export async function dpopValidate(
 			const endpoint = route?.startsWith('/:bucket/')
 				? route.slice('/:bucket'.length)
 				: route;
-			if (actual?.href !== issuer + endpoint) {
+			if (endpoint === undefined || actual.href !== issuer + endpoint) {
 				throw new InvalidDpopProof('DPoP proof htu mismatch');
 			}
 		}

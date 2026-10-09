@@ -45,7 +45,7 @@ export const addons: Partial<AddonImplementations> = {
 	},
 	verifyUserCode(oidc, account, userCode) {
 		assert(oidc instanceof OIDCContext);
-		assert(account?.accountId && typeof account.claims === 'function');
+		assert(account.accountId && typeof account.claims === 'function');
 		assert(userCode === undefined || typeof userCode === 'string');
 		emitter.emit('verifyUserCode', ...arguments);
 	},

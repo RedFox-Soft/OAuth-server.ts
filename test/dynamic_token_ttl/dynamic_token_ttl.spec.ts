@@ -69,7 +69,7 @@ describe('dynamic ttl', () => {
 		expect(device.response.status).toBe(200);
 		if (!device.data) throw new Error('expected response data');
 		expect(device.data.expires_in).toBe(123);
-		if (!device.data?.device_code) throw new Error('expected a device code');
+		if (!device.data.device_code) throw new Error('expected a device code');
 		const device_code = device.data.device_code;
 
 		expect(deviceCodeSpy).toBeCalledTimes(1);

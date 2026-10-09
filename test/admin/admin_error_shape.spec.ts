@@ -43,7 +43,7 @@ describe('admin API error shape through the real app', () => {
 		expect(res.status).toBe(401);
 		const body = shaped(
 			Type.Object({ error: Type.String(), message: Type.String() }),
-			res.data ?? res.error?.value
+			res.data ?? res.error.value
 		);
 		expect(body.error).toBe('admin_error');
 		expect(body.message).toBe('authentication required');

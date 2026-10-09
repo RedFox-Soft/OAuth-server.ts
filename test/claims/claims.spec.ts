@@ -6,10 +6,11 @@ import {
 	beforeEach,
 	afterEach
 } from 'bun:test';
+import { Type } from '@sinclair/typebox';
 
 import { decode as decodeJWT } from '../../lib/helpers/jwt.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
-import { present } from 'test/shape.js';
+import { present, shaped } from 'test/shape.js';
 import bootstrap, {
 	agent,
 	setSeedClaims,
@@ -28,6 +29,10 @@ import { Interaction } from 'lib/models/interaction.js';
 
 const route = '/auth';
 const expire = new Date();
+const ClaimsRequest = Type.Object({
+	id_token: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
+	userinfo: Type.Optional(Type.Record(Type.String(), Type.Unknown()))
+});
 
 expire.setDate(expire.getDate() + 1);
 /**
@@ -422,26 +427,22 @@ expire.setDate(expire.getDate() + 1);
 							uid: 'resume',
 							cookieID: 'cookieID'
 						});
-						if (auth) {
-							const cookie = `_interaction=cookieID; path=/ui/resume/resume; expires=${expire.toUTCString()}; httponly`;
-							cookies.push(cookie);
-							/*
-							 * `claims` is stored as an object, the way a real interaction stores it. A case
-							 * may hand it over as JSON text; storing that string here made
-							 * `oidc.claims` a string on resume, so `oidc.claims.id_token` was
-							 * undefined and every acr check returned early without comparing anything —
-							 * the cases below passed while proving nothing.
-							 */
-							const params = { ...auth.params };
-							if (typeof params.claims === 'string') {
-								params.claims = JSON.parse(params.claims);
-							}
-							Object.assign(sess.payload, { params });
+						const cookie = `_interaction=cookieID; path=/ui/resume/resume; expires=${expire.toUTCString()}; httponly`;
+						cookies.push(cookie);
+						/*
+						 * `claims` is stored as an object, the way a real interaction stores it. A case
+						 * may hand it over as JSON text; storing that string here made
+						 * `oidc.claims` a string on resume, so `oidc.claims.id_token` was
+						 * undefined and every acr check returned early without comparing anything —
+						 * the cases below passed while proving nothing.
+						 */
+						const params = { ...auth.params };
+						if (typeof params.claims === 'string') {
+							params.claims = shaped(ClaimsRequest, JSON.parse(params.claims));
 						}
+						Object.assign(sess.payload, { params });
 
-						if (result) {
-							Object.assign(sess.payload, { result });
-						}
+						Object.assign(sess.payload, { result });
 
 						await sess.save(30);
 						return cookies;

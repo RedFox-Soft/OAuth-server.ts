@@ -185,10 +185,12 @@ export class Session extends BaseModel<SessionPayloadType> {
 	}
 
 	authorizationFor(clientId: string) {
-		this.payload.authorizations ||= {};
-		this.payload.authorizations[clientId] ||= {};
-
-		return this.payload.authorizations[clientId];
+		const authorizations = (this.payload.authorizations ||= {});
+		// An own member only: a client id such as `constructor` must not answer Object.prototype's.
+		if (!Object.hasOwn(authorizations, clientId)) {
+			authorizations[clientId] = {};
+		}
+		return authorizations[clientId];
 	}
 
 	sidFor(clientId: string, value?: string) {

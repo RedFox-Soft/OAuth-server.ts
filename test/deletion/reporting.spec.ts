@@ -109,8 +109,8 @@ describe('deletion reporting', () => {
 		expect(res.status).toBe(409);
 		const body = bodyOf(Refusal, res);
 		// The existing envelope is unchanged; blockers ride alongside it.
-		expect(body?.error).toBe('admin_error');
-		expect(body?.blockers).toEqual([
+		expect(body.error).toBe('admin_error');
+		expect(body.blockers).toEqual([
 			{ kind: 'client', count: 2, ids: [first, second] }
 		]);
 	});
@@ -131,7 +131,7 @@ describe('deletion reporting', () => {
 
 		expect(res.status).toBe(409);
 		const body = bodyOf(Refusal, res);
-		expect(body?.blockers).toEqual([{ kind: 'enduser', count: 2 }]);
+		expect(body.blockers).toEqual([{ kind: 'enduser', count: 2 }]);
 		// A bucket can hold thousands of accounts; their identities are not the caller's business.
 		expect(JSON.stringify(body)).not.toContain(one._id);
 		expect(JSON.stringify(body)).not.toContain('one@example.com');
@@ -247,7 +247,7 @@ describe('deletion reporting', () => {
 				Type.Object({ failedAreas: Type.Optional(Type.Array(Type.String())) }),
 				res
 			);
-			expect(body?.failedAreas).toEqual(['Grant']);
+			expect(body.failedAreas).toEqual(['Grant']);
 		} finally {
 			spy.mockRestore();
 		}

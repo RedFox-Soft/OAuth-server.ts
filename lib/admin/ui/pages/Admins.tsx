@@ -145,7 +145,7 @@ export function Admins() {
 					style={{ justifyContent: 'space-between', width: '100%' }}
 				>
 					<Space
-						direction="vertical"
+						orientation="vertical"
 						size={2}
 					>
 						<Typography.Text strong>

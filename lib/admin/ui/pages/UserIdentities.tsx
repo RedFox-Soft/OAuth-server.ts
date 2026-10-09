@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Modal, List, Button, Typography, Popconfirm, message } from 'antd';
 import type { FederatedIdentity } from '../../../federation/types.js';
+import { readJson } from '../json.ts';
 
 /*
  * One account's upstream identities, and the means to sever one.
@@ -35,7 +36,7 @@ export function UserIdentities({
 		if (!userId) return;
 		try {
 			const res = await fetch(base);
-			setLinks(res.ok ? await res.json() : []);
+			setLinks(res.ok ? await readJson<FederatedIdentity[]>(res) : []);
 			setLinksOf(userId);
 		} finally {
 			setReloading(false);
@@ -107,11 +108,7 @@ export function UserIdentities({
 							description={
 								// The subject is the provider's own identifier for this person; an operator
 								// diagnosing a duplicate account needs to see it.
-								`subject ${link.sub}${
-									link.linkedAt
-										? ` — linked ${new Date(link.linkedAt).toLocaleString()}`
-										: ''
-								}`
+								`subject ${link.sub} — linked ${new Date(link.linkedAt).toLocaleString()}`
 							}
 						/>
 					</List.Item>

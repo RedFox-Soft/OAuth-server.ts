@@ -16,7 +16,7 @@ import bootstrap, {
 	type Setup,
 	formAgent
 } from '../test_helper.js';
-import { eventBus } from 'lib/event_bus.js';
+import { eventBus, type ServerListener } from 'lib/event_bus.js';
 import { DEFAULT_SESSION_COOKIE } from '../test_helper.ts';
 import { DeviceCode } from 'lib/models/device_code.js';
 import { Client } from 'lib/models/client.js';
@@ -110,7 +110,7 @@ describe('POST code_verification endpoint w/o verification', () => {
 	});
 
 	it('re-renders on no submitted code', async () => {
-		const errSpy = mock();
+		const errSpy = mock<ServerListener<'code_verification.error'>>();
 		eventBus.once('code_verification.error', errSpy);
 
 		const { status, data } = await post({ xsrf });
@@ -123,7 +123,7 @@ describe('POST code_verification endpoint w/o verification', () => {
 	});
 
 	it('re-renders on not found code', async () => {
-		const errSpy = mock();
+		const errSpy = mock<ServerListener<'code_verification.error'>>();
 		eventBus.once('code_verification.error', errSpy);
 
 		const { status, data } = await post({ xsrf, user_code: 'FOO-NOT-FOUND' });
@@ -136,7 +136,7 @@ describe('POST code_verification endpoint w/o verification', () => {
 	});
 
 	it('re-renders on found but expired code', async () => {
-		const errSpy = mock();
+		const errSpy = mock<ServerListener<'code_verification.error'>>();
 		eventBus.once('code_verification.error', errSpy);
 		await new DeviceCode({ clientId: 'client', userCode: 'FOOEXPIRED' }).save();
 
@@ -151,7 +151,7 @@ describe('POST code_verification endpoint w/o verification', () => {
 	});
 
 	it('re-renders on found but already used code', async () => {
-		const errSpy = mock();
+		const errSpy = mock<ServerListener<'code_verification.error'>>();
 		eventBus.once('code_verification.error', errSpy);
 		await new DeviceCode({
 			clientId: 'client',
@@ -169,7 +169,7 @@ describe('POST code_verification endpoint w/o verification', () => {
 	});
 
 	it('re-renders on invalid client', async () => {
-		const errSpy = mock();
+		const errSpy = mock<ServerListener<'code_verification.error'>>();
 		eventBus.once('code_verification.error', errSpy);
 		await new DeviceCode({
 			userCode: 'FOONOTFOUNDCLIENT',
@@ -192,7 +192,7 @@ describe('POST code_verification endpoint w/o verification', () => {
 	});
 
 	it('re-renders on missing session state', async () => {
-		const errSpy = mock();
+		const errSpy = mock<ServerListener<'code_verification.error'>>();
 		eventBus.once('code_verification.error', errSpy);
 		await new DeviceCode({ clientId: 'client', userCode: 'FOOCSRF1' }).save();
 
@@ -208,7 +208,7 @@ describe('POST code_verification endpoint w/o verification', () => {
 	});
 
 	it('re-renders on invalid csrf', async () => {
-		const errSpy = mock();
+		const errSpy = mock<ServerListener<'code_verification.error'>>();
 		eventBus.once('code_verification.error', errSpy);
 		await new DeviceCode({ clientId: 'client', userCode: 'FOOCSRF2' }).save();
 

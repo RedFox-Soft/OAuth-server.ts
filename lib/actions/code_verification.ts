@@ -39,7 +39,7 @@ import { eventBus } from '../event_bus.js';
 function renderInputError(oidc: OIDCContext<PipelineParams>, err: unknown) {
 	const charset = ApplicationConfig['deviceFlow.charset'];
 	const secret =
-		oidc.entities.Session?.payload?.state?.secret ??
+		oidc.entities.Session?.payload.state?.secret ??
 		crypto.randomBytes(24).toString('hex');
 	const action = oidc.urlFor('code_verification');
 

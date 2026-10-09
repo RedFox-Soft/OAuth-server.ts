@@ -178,21 +178,31 @@ export class IdToken {
 					// handled in checkResponseMode
 					checkClientSecretExpiration(client, format(messages.sig[use], alg));
 				}
-				[jwk] = clientKeys(client).symmetric.selectForSign({ alg, use: 'sig' });
+				jwk = clientKeys(client)
+					.symmetric.selectForSign({ alg, use: 'sig' })
+					.at(0);
+				if (!jwk) {
+					throw new InvalidClientMetadata(
+						`no suitable signing key found (${alg})`
+					);
+				}
 				key = clientKeys(client).symmetric.getKeyObject(jwk);
 			} else {
 				// The issuing bucket's own keys: a token of one bucket must not verify against another's.
 				const { signing } = await keysFor(this.bucket);
-				[jwk] = signing.selectForSign({
-					alg,
-					use: 'sig'
-				});
+				jwk = signing
+					.selectForSign({
+						alg,
+						use: 'sig'
+					})
+					.at(0);
+				if (!jwk) {
+					throw new Error(`the issuing bucket holds no ${alg} signing key`);
+				}
 				key = signing.getKeyObject(jwk);
 			}
 
-			if (jwk) {
-				signOptions.fields = { kid: jwk.kid };
-			}
+			signOptions.fields = { kid: jwk.kid };
 
 			return JWT.sign(payload, key, alg, signOptions);
 		})();
@@ -219,30 +229,36 @@ export class IdToken {
 		let jwk;
 		let encryptionKey;
 		if (encryption.alg === 'dir') {
-			[jwk] = clientKeys(client).symmetric.selectForEncrypt({
-				alg: encryption.enc,
-				use: 'enc'
-			});
+			jwk = clientKeys(client)
+				.symmetric.selectForEncrypt({
+					alg: encryption.enc,
+					use: 'enc'
+				})
+				.at(0);
 			if (jwk)
 				encryptionKey = clientKeys(client).symmetric.getKeyObject(jwk, true);
 		} else if (encryption.alg.startsWith('A')) {
-			[jwk] = clientKeys(client).symmetric.selectForEncrypt({
-				alg: encryption.alg,
-				use: 'enc'
-			});
+			jwk = clientKeys(client)
+				.symmetric.selectForEncrypt({
+					alg: encryption.alg,
+					use: 'enc'
+				})
+				.at(0);
 			if (jwk)
 				encryptionKey = clientKeys(client).symmetric.getKeyObject(jwk, true);
 		} else {
 			await clientKeys(client).asymmetric.refresh();
-			[jwk] = clientKeys(client).asymmetric.selectForEncrypt({
-				alg: encryption.alg,
-				use: 'enc'
-			});
+			jwk = clientKeys(client)
+				.asymmetric.selectForEncrypt({
+					alg: encryption.alg,
+					use: 'enc'
+				})
+				.at(0);
 			if (jwk)
 				encryptionKey = clientKeys(client).asymmetric.getKeyObject(jwk, true);
 		}
 
-		if (!encryptionKey) {
+		if (!jwk || !encryptionKey) {
 			throw new InvalidClientMetadata(
 				`no suitable encryption key found (${encryption.alg})`
 			);

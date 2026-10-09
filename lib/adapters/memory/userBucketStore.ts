@@ -70,11 +70,15 @@ export class UserBucketStore implements UserBucketStoreInstance {
 	 * door on every existing bucket.
 	 */
 	private withDefaults(bucket: UserBucket): UserBucket {
-		bucket.passwordLogin ??= true;
-		bucket.federation ??= [];
+		// As held, not as typed: update() writes a patch's explicit undefined as it comes.
+		const held: Partial<
+			Pick<UserBucket, 'passwordLogin' | 'federation' | 'totpRequired'>
+		> = bucket;
+		held.passwordLogin ??= true;
+		held.federation ??= [];
 		// Same reasoning in the other direction: undefined is falsy, and reading it as "not required"
 		// is exactly right for a bucket written before the second factor existed.
-		bucket.totpRequired ??= false;
+		held.totpRequired ??= false;
 		return bucket;
 	}
 

@@ -1,0 +1,42 @@
+diff --git a/test.d.ts b/test.d.ts
+index 714a2f71d6d10ccfc77559a7dcda572d96cc1bce..ed352c7574ff8e789530533d5ef0b7ccf639f9df 100644
+--- a/test.d.ts
++++ b/test.d.ts
+@@ -750,6 +750,19 @@ declare module "bun:test" {
+    */
+   export interface Matchers<T = unknown> extends MatchersBuiltin<T> {}
+ 
++  /**
++   * Patched (OAuth-server.ts): the matchers reached through `.resolves` / `.rejects`, typed as the
++   * promise they are documented to be awaited as (docs/test/writing-tests.mdx) and that
++   * oven-sh/bun#33289 makes them return. Remove the patch when that ships.
++   */
++  export type AsyncMatchers<T = unknown> = {
++    [K in keyof Matchers<T>]: K extends "not"
++      ? AsyncMatchers<unknown>
++      : Matchers<T>[K] extends (...args: infer A) => void
++        ? (...args: A) => Promise<void>
++        : Matchers<T>[K];
++  };
++
+   /**
+    * Extend this interface with declaration merging to add type support for custom asymmetric matchers.
+    * @example
+@@ -925,7 +938,7 @@ declare module "bun:test" {
+      * @example
+      * expect(Promise.resolve(1)).resolves.toBe(1);
+      */
+-    resolves: Matchers<Awaited<T>>;
++    resolves: AsyncMatchers<Awaited<T>>;
+ 
+     /**
+      * Expects the value to be a promise that rejects.
+@@ -933,7 +946,7 @@ declare module "bun:test" {
+      * @example
+      * expect(Promise.reject("error")).rejects.toBe("error");
+      */
+-    rejects: Matchers<unknown>;
++    rejects: AsyncMatchers<unknown>;
+ 
+     /**
+      * Assertion which passes.

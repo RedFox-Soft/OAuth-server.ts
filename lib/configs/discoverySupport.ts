@@ -3,7 +3,7 @@ import { ISSUER } from 'lib/configs/env.js';
 import { routeNames } from 'lib/consts/param_list.js';
 import { ClientDefaults } from 'lib/configs/clientBase.js';
 import { ApplicationConfig } from './application.js';
-import { isPlainObject } from '../helpers/_/object.js';
+import { isList, isPlainObject } from '../helpers/_/object.js';
 import { withGroupsScope } from '../consts/groups_claim.js';
 import type { IssuerKeys } from '../keys/issuer_keys.js';
 import {
@@ -78,7 +78,7 @@ function deriveClaimsSupported(config: Config): string[] {
 	// Clone so the shared ApplicationConfig.claims is never mutated by the unpack/prune below.
 	const claims: Record<string, unknown> = {};
 	for (const [key, value] of Object.entries(withGroupsScope(config.claims))) {
-		if (Array.isArray(value)) {
+		if (isList(value)) {
 			claims[key] = value.reduce<Record<string, null>>((acc, claim) => {
 				acc[claim] = null;
 				return acc;

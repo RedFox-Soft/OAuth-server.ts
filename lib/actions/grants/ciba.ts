@@ -2,6 +2,7 @@ import type { X509Certificate } from 'node:crypto';
 import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import type { TokenParams } from 'lib/actions/token.js';
 import * as errors from '../../helpers/errors.ts';
+import { member } from '../../helpers/_/object.ts';
 import presence from '../../helpers/validate_presence.ts';
 import { findAccount } from '../../addon/account.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
@@ -31,7 +32,9 @@ export const handler = async function cibaHandler(
 ) {
 	presence(oidc, 'auth_req_id');
 
-	if (oidc.params.authorization_details) {
+	// Unreachable while the /token schema refuses the parameter: the seam RFC 9396 §7 support plugs
+	// into (wiki/concepts/rich-authorization-requests.md), read as the unknown it would then be.
+	if (member(oidc.params, 'authorization_details')) {
 		throw new errors.InvalidRequest(
 			'authorization_details is unsupported for this grant_type'
 		);

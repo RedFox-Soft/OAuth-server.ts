@@ -264,17 +264,12 @@ export const logoutPostAction = new Elysia().post(
 		 * `signInBucket` is the addressed bucket until an authorization request resolves another, and this
 		 * is not one. See wiki/concepts/cross-site-sign-out-post.md.
 		 */
-		if (!resubmitted && !cookie[sessionCookieName(bucket)]?.value) {
-			const present = Object.fromEntries(
-				Object.entries(fields).filter(
-					(entry): entry is [string, string] => entry[1] !== undefined
-				)
-			);
+		if (!resubmitted && !cookie[sessionCookieName(bucket)].value) {
 			return formPost(
 				undefined,
 				`${issuerFor(bucket)}${routeNames.end_session}`,
 				{
-					...present,
+					...fields,
 					_resubmitted: '1'
 				}
 			);

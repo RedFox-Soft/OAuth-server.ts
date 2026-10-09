@@ -17,6 +17,7 @@ import {
 	Tag,
 	Typography
 } from 'antd';
+import { ORIGIN_NOT_CAPTURED } from '../../../consts/error_origin.js';
 
 interface ErrorSample {
 	reference: string;
@@ -66,7 +67,8 @@ interface Summary {
 	recording: boolean;
 }
 
-interface Filters {
+// A type alias rather than an interface, so Object.entries reads its values as strings.
+type Filters = {
 	errorCode: string;
 	route: string;
 	surface: string;
@@ -75,7 +77,7 @@ interface Filters {
 	actor: string;
 	from: string;
 	to: string;
-}
+};
 
 const EMPTY_FILTERS: Filters = {
 	errorCode: '',
@@ -152,7 +154,7 @@ export function Errors() {
 			}
 			await fetch(`/admin/api/errors?${params}`, { method: 'DELETE' });
 			setPurgePreview(null);
-			load(filters, 1, pageSize);
+			void load(filters, 1, pageSize);
 			setCurrent(1);
 		} finally {
 			setPurging(false);
@@ -218,18 +220,18 @@ export function Errors() {
 	}
 
 	useEffect(() => {
-		load(EMPTY_FILTERS, 1, 50);
+		void load(EMPTY_FILTERS, 1, 50);
 	}, []);
 
 	function apply() {
 		setCurrent(1);
-		load(filters, 1, pageSize);
+		void load(filters, 1, pageSize);
 	}
 
 	function reset() {
 		setFilters(EMPTY_FILTERS);
 		setCurrent(1);
-		load(EMPTY_FILTERS, 1, pageSize);
+		void load(EMPTY_FILTERS, 1, pageSize);
 	}
 
 	const set = (name: keyof Filters) => (value: string) =>
@@ -255,7 +257,7 @@ export function Errors() {
 			dataIndex: 'route',
 			render: (route: string, row: ErrorGroup) => (
 				<Space
-					direction="vertical"
+					orientation="vertical"
 					size={0}
 				>
 					<Typography.Text code>
@@ -272,7 +274,7 @@ export function Errors() {
 			dataIndex: 'message',
 			render: (message: string, row: ErrorGroup) => (
 				<Space
-					direction="vertical"
+					orientation="vertical"
 					size={0}
 				>
 					<Typography.Text>{message}</Typography.Text>
@@ -288,7 +290,7 @@ export function Errors() {
 			dataIndex: 'status',
 			render: (status: number, row: ErrorGroup) => (
 				<Space
-					direction="vertical"
+					orientation="vertical"
 					size={0}
 				>
 					<Tag color="red">{status}</Tag>
@@ -301,7 +303,7 @@ export function Errors() {
 	return (
 		<Card>
 			<Space
-				direction="vertical"
+				orientation="vertical"
 				style={{ width: '100%' }}
 				size="middle"
 			>
@@ -316,11 +318,11 @@ export function Errors() {
 				 * really happened, and an operator reading an incomplete list as complete would draw the
 				 * opposite conclusion from the evidence.
 				 */}
-				{page && page.recording === false ? (
+				{page && !page.recording ? (
 					<Alert
 						type="info"
 						showIcon
-						message="Fault recording is switched off"
+						title="Fault recording is switched off"
 						description="Nothing is being recorded, so an empty list here does not mean the server has had no faults. Switch it on under Settings → Error Store."
 					/>
 				) : null}
@@ -386,7 +388,7 @@ export function Errors() {
 					<Alert
 						type="warning"
 						showIcon
-						message={lookupError}
+						title={lookupError}
 						closable
 					/>
 				) : null}
@@ -415,7 +417,7 @@ export function Errors() {
 								value: s
 							})
 						)}
-						onChange={(v) => set('surface')(v ?? '')}
+						onChange={(v: string | undefined) => set('surface')(v ?? '')}
 					/>
 					<Input
 						placeholder="status"
@@ -474,7 +476,7 @@ export function Errors() {
 					<Alert
 						type="warning"
 						showIcon
-						message={`${page.dropped} fault(s) could not be recorded`}
+						title={`${page.dropped} fault(s) could not be recorded`}
 						description="Recording fell behind, so this list is incomplete. Raise the pending write queue depth in Settings, or investigate why the store is slow."
 					/>
 				) : null}
@@ -496,7 +498,7 @@ export function Errors() {
 						onChange: (nextPage, nextSize) => {
 							setCurrent(nextPage);
 							setPageSize(nextSize);
-							load(filters, nextPage, nextSize);
+							void load(filters, nextPage, nextSize);
 						}
 					}}
 				/>
@@ -513,7 +515,7 @@ export function Errors() {
 				onCancel={() => setPurgePreview(null)}
 			>
 				{purgePreview ? (
-					<Space direction="vertical">
+					<Space orientation="vertical">
 						<Typography.Text>
 							{purgePreview.groups} distinct fault(s), covering{' '}
 							{purgePreview.occurrences} occurrence(s), match the current
@@ -528,14 +530,14 @@ export function Errors() {
 			</Modal>
 
 			<Drawer
-				width={640}
+				size={640}
 				open={selected !== null}
 				onClose={() => setSelected(null)}
 				title={selected ? `${selected.method} ${selected.route}` : ''}
 			>
 				{selected ? (
 					<Space
-						direction="vertical"
+						orientation="vertical"
 						size="middle"
 						style={{ width: '100%' }}
 					>
@@ -598,7 +600,7 @@ export function Errors() {
 									{sample.actor?.email ?? '—'}
 								</Descriptions.Item>
 								<Descriptions.Item label="Origin">
-									{sample.origin === 'not-captured'
+									{sample.origin === ORIGIN_NOT_CAPTURED
 										? 'not captured'
 										: (sample.origin ?? '—')}
 								</Descriptions.Item>

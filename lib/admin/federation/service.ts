@@ -78,7 +78,7 @@ export function present(
 		 */
 		...(bucket &&
 		provider.acceptsGlobalTokenRevocation === true &&
-		ApplicationConfig['globalTokenRevocation.enabled'] === true
+		ApplicationConfig['globalTokenRevocation.enabled']
 			? {
 					globalTokenRevocationEndpoint: `${issuerFor(bucket)}${routeNames.global_token_revocation}`
 				}
@@ -86,7 +86,7 @@ export function present(
 		/* The address to register as this application's back-channel logout URL there (specs/073), on the same terms. */
 		...(bucket &&
 		provider.acceptsBackChannelLogout === true &&
-		ApplicationConfig['federation.enabled'] === true
+		ApplicationConfig['federation.enabled']
 			? {
 					backChannelLogoutEndpoint: `${issuerFor(bucket)}${routeNames.federation_backchannel_logout}`
 				}
@@ -100,13 +100,13 @@ export function presentAll(
 		Partial<Pick<UserBucket, '_id' | 'slug' | 'host'>>
 ) {
 	const { _id } = bucket;
-	return (bucket.federation ?? []).map((provider) =>
+	return bucket.federation.map((provider) =>
 		present(provider, _id === undefined ? undefined : { ...bucket, _id })
 	);
 }
 
 function providersOf(bucket: Pick<UserBucket, 'federation'>) {
-	return bucket.federation ?? [];
+	return bucket.federation;
 }
 
 function find(
@@ -398,7 +398,7 @@ export async function updateProvider(
 	// Disabling the last enabled provider on a bucket with no password door is a lockout, checked by the
 	// same function the bucket PATCH uses.
 	assertSomeWayToSignIn({
-		passwordLogin: bucket.passwordLogin !== false,
+		passwordLogin: bucket.passwordLogin,
 		federation
 	});
 
@@ -437,7 +437,7 @@ export async function deleteProvider(
 	await assertNotBound(bucket, providerId, 'deleted');
 	const federation = providersOf(bucket).filter((p) => p.id !== providerId);
 	assertSomeWayToSignIn({
-		passwordLogin: bucket.passwordLogin !== false,
+		passwordLogin: bucket.passwordLogin,
 		federation
 	});
 	await getBucketStore().update(bucket._id, { federation });

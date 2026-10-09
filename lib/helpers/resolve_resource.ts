@@ -31,7 +31,7 @@ export default async function resolveResource(
 			case Array.isArray(model.payload.resource) &&
 				model.payload.resource.length === 0:
 				break;
-			case model.payload.resource && !!(await useGrantedResource(oidc, model)):
+			case model.payload.resource && (await useGrantedResource(oidc, model)):
 			case !oidc.params.resource &&
 				(!ApplicationConfig['userinfo.enabled'] || !scopes.has('openid')):
 				resource = model.payload.resource;

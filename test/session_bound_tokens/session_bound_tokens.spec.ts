@@ -110,7 +110,7 @@ describe('session bound tokens behaviours', () => {
 
 			const { data: tokenData } = await auth.getToken(code);
 			if (!tokenData) throw new Error('expected response data');
-			if ('refresh_token' in tokenData === false || !tokenData.refresh_token)
+			if (!('refresh_token' in tokenData) || !tokenData.refresh_token)
 				throw new Error('expected refresh token');
 			let access_token = tokenData.access_token;
 			let refresh_token = tokenData.refresh_token;
@@ -132,7 +132,7 @@ describe('session bound tokens behaviours', () => {
 				grant_type: 'refresh_token'
 			});
 			if (!refreshed) throw new Error('expected response data');
-			if ('refresh_token' in refreshed === false || !refreshed.refresh_token)
+			if (!('refresh_token' in refreshed) || !refreshed.refresh_token)
 				throw new Error('expected refresh token');
 			access_token = refreshed.access_token;
 			refresh_token = refreshed.refresh_token;
@@ -183,7 +183,7 @@ describe('session bound tokens behaviours', () => {
 
 			const { data: tokenData } = await auth.getToken(code);
 			if (!tokenData) throw new Error('expected response data');
-			if ('refresh_token' in tokenData === false || !tokenData.refresh_token)
+			if (!('refresh_token' in tokenData) || !tokenData.refresh_token)
 				throw new Error('expected refresh token');
 			let access_token = tokenData.access_token;
 			let refresh_token = tokenData.refresh_token;
@@ -205,7 +205,7 @@ describe('session bound tokens behaviours', () => {
 				grant_type: 'refresh_token'
 			});
 			if (!refreshed) throw new Error('expected response data');
-			if ('refresh_token' in refreshed === false || !refreshed.refresh_token)
+			if (!('refresh_token' in refreshed) || !refreshed.refresh_token)
 				throw new Error('expected refresh token');
 			access_token = refreshed.access_token;
 			refresh_token = refreshed.refresh_token;
@@ -228,10 +228,7 @@ describe('session bound tokens behaviours', () => {
 				grant_type: 'refresh_token'
 			});
 			if (!refreshedAgain) throw new Error('expected response data');
-			if (
-				'refresh_token' in refreshedAgain === false ||
-				!refreshedAgain.refresh_token
-			)
+			if (!('refresh_token' in refreshedAgain) || !refreshedAgain.refresh_token)
 				throw new Error('expected refresh token');
 			access_token = refreshedAgain.access_token;
 			refresh_token = refreshedAgain.refresh_token;

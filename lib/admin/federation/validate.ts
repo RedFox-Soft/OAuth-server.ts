@@ -265,7 +265,7 @@ export function prospectiveBucket(
 	}
 ): { passwordLogin: boolean; federation: FederationProvider[] } {
 	return {
-		passwordLogin: patch.passwordLogin ?? bucket.passwordLogin !== false,
-		federation: patch.federation ?? bucket.federation ?? []
+		passwordLogin: patch.passwordLogin ?? bucket.passwordLogin,
+		federation: patch.federation ?? bucket.federation
 	};
 }

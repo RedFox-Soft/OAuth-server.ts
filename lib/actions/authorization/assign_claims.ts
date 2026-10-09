@@ -41,7 +41,7 @@ export default function assignClaims(oidc: OIDCContext<PipelineParams>) {
 	 * and merging was not deterministic in the way that matters: it kept `essential: true` from one
 	 * form and took `values` from the other, composing a requirement the client never expressed.
 	 */
-	if (acrValues && !oidc.claims?.id_token?.acr) {
+	if (acrValues && !oidc.claims.id_token?.acr) {
 		merge(oidc.claims, {
 			id_token: { acr: { values: acrValues.split(' ') } }
 		});

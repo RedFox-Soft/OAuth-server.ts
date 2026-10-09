@@ -62,7 +62,7 @@ export function tokenize(
 			while (i < input.length) {
 				const d = input[i];
 				if (d === '\\') {
-					const next = input[i + 1];
+					const next = input.at(i + 1);
 					if (next === undefined) break;
 					text += next === 'n' ? '\n' : next === 't' ? '\t' : next;
 					i += 2;

@@ -9,19 +9,16 @@ const uriMapTypes: Record<string, string> = {
 	'urn:ietf:params:oauth:token-type:refresh_token': 'refresh_token'
 };
 
+// Arrow properties, not methods: findToken calls them detached from this object.
 const tokenTypes = {
-	access_token(token: string) {
-		return AccessToken.tryFind(token);
-	},
-	async client_credentials(token: string) {
+	access_token: (token: string) => AccessToken.tryFind(token),
+	client_credentials: async (token: string) => {
 		if (!hasGrant('client_credentials')) {
 			return;
 		}
 		return ClientCredentials.tryFind(token);
 	},
-	refresh_token(token: string) {
-		return RefreshToken.tryFind(token);
-	}
+	refresh_token: (token: string) => RefreshToken.tryFind(token)
 };
 type TokenType = keyof typeof tokenTypes;
 

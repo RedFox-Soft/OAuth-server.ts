@@ -61,7 +61,9 @@ describe('storage contract: Session', () => {
 				reloaded.payload.state
 			).extra
 		).toBe('must-be-kept');
-		expect(reloaded.payload.authorizations?.client?.grantId).toBe('grant-1');
+		expect(reloaded.payload.authorizations).toMatchObject({
+			client: { grantId: 'grant-1' }
+		});
 	});
 
 	it('persists nothing outside the schema', async () => {

@@ -6,6 +6,7 @@ import {
 	InvalidScope,
 	InvalidRequest
 } from '../../helpers/errors.js';
+import { member } from '../../helpers/_/object.js';
 import { configuration } from 'lib/configs/application.js';
 import checkResource from '../../shared/check_resource.ts';
 import { machineTokenPermitted } from '../../resources/registry.js';
@@ -21,7 +22,9 @@ export async function clientCredentials(
 	const { client } = oidc;
 	const { scopes: statics } = configuration;
 
-	if (oidc.params.authorization_details) {
+	// Unreachable while the /token schema refuses the parameter: the seam RFC 9396 §7 support plugs
+	// into (wiki/concepts/rich-authorization-requests.md), read as the unknown it would then be.
+	if (member(oidc.params, 'authorization_details')) {
 		throw new InvalidRequest(
 			'authorization_details is unsupported for this grant_type'
 		);
@@ -69,9 +72,10 @@ export async function clientCredentials(
 		scope: scopes.join(' ') || undefined
 	});
 
-	const { 0: resourceServer, length } = Object.values(oidc.resourceServers);
+	const resourceServers = Object.values(oidc.resourceServers);
+	const resourceServer = resourceServers.at(0);
 	if (resourceServer) {
-		if (length !== 1) {
+		if (resourceServers.length !== 1) {
 			throw new InvalidTarget(
 				'only a single resource indicator value is supported for this grant type'
 			);

@@ -4,7 +4,7 @@ title: "Rich Authorization Requests and its conformance boundary"
 tags: [oauth, config, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-07-31
-updated: 2026-09-28
+updated: 2026-10-08
 graph:
   node_type: concept
   relationships:
@@ -38,7 +38,9 @@ function may still be registered in an in-process bootstrap as an escape hatch, 
 surfaces as `invalid_authorization_details` rather than a server fault.
 
 Enabling the feature with an **empty** map fails validation, at boot and through the admin settings API,
-because every request would otherwise be refused. `identifier` is single-valued, so a descriptor may mark
+because every request would otherwise be refused. The map's **shape** is validated whether or not the
+feature is on (since 2026-10-08): the consent screen reads every type's label on each render, so a
+malformed map stored while RAR was off used to reach it unchecked. `identifier` is single-valued, so a descriptor may mark
 it required but cannot fix a permitted value set for it.
 
 Per-client opt-in is mandatory: `authorization_details_types` defaults to `[]`, so a client that does not

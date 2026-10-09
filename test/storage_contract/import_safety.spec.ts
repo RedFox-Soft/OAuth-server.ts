@@ -65,7 +65,7 @@ describe('postgres adapter import safety', () => {
 		// The positive half. Importing succeeding proves nothing on its own — a module that silently
 		// built a handle against `undefined` would also import fine. What proves the handle was never
 		// built is that asking for one now still complains about the variable.
-		const { sql } = await import(pathToFileURL(join(POSTGRES, 'db.ts')).href);
+		const { sql } = await import('../../lib/adapters/postgres/db.ts');
 
 		expect(() => sql()).toThrow(/POSTGRES_URL/);
 	});

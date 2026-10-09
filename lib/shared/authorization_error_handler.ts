@@ -351,7 +351,7 @@ export async function errorHandler(obj: ErrorHandlerContext) {
 	if (
 		code === 'NOT_FOUND' &&
 		!(error instanceof FeatureDisabled) &&
-		ApplicationConfig['scim.enabled'] === true &&
+		ApplicationConfig['scim.enabled'] &&
 		isScimPath(new URL(request.url).pathname)
 	) {
 		return new Response(

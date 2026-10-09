@@ -44,7 +44,8 @@ export class Prompt<
 
 	async executeChecks(oidc: OIDCContext<PipelineParams>): Promise<{
 		name: string;
-		details: T;
+		// What the prompt and each failing check contributed; no one of them supplies every field.
+		details: Partial<T>;
 		reasons: string[];
 		firstError: { error: string; error_description: string };
 	} | null> {
@@ -68,14 +69,15 @@ export class Prompt<
 			return null;
 		}
 
+		const details: Partial<T> = { ...(await this.details(oidc)) };
+		for (const contributed of Object.values(results)) {
+			Object.assign(details, contributed);
+		}
+
 		return {
 			name: this.name,
 			reasons: Object.keys(results),
-			details: Object.assign(
-				{},
-				await this.details(oidc),
-				...Object.values(results)
-			),
+			details,
 			firstError
 		};
 	}

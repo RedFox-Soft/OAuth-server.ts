@@ -1,5 +1,6 @@
 import { describe, it, beforeAll, afterEach, expect, mock } from 'bun:test';
 import url from 'node:url';
+import { Type } from '@sinclair/typebox';
 
 import * as base64url from 'lib/helpers/base64url.js';
 
@@ -11,7 +12,9 @@ import {
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { Client } from 'lib/models/client.js';
 import { clientNotifications } from 'lib/shared/client_notifications.ts';
-import { present } from 'test/shape.js';
+import { present, shaped } from 'test/shape.js';
+
+const Subject = Type.Object({ sub: Type.String() });
 
 /*
  * A pairwise client's logout token must name the subject that client already knows — spec 023,
@@ -35,7 +38,7 @@ function decodeLogoutToken(value: string) {
 	const match = value.match(/^logout_token=(([\w-]+\.?){3})$/);
 	expect(match).toBeTruthy();
 	const [, payload] = present(match, 'match')[1].split('.');
-	return JSON.parse(base64url.decode(payload));
+	return shaped(Subject, JSON.parse(base64url.decode(payload)));
 }
 
 /**
@@ -73,7 +76,10 @@ describe('back-channel logout: pairwise client', () => {
 		if (!data?.id_token) {
 			throw new Error(`no id_token: ${JSON.stringify(data)}`);
 		}
-		idTokenSub = JSON.parse(base64url.decode(data.id_token.split('.')[1])).sub;
+		idTokenSub = shaped(
+			Subject,
+			JSON.parse(base64url.decode(data.id_token.split('.')[1]))
+		).sub;
 
 		expect(idTokenSub).not.toBe(ACCOUNT);
 	});

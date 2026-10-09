@@ -1,7 +1,6 @@
 import { Session } from 'lib/models/session.js';
-import type { OIDCContext, OIDCCookies } from 'lib/helpers/oidc_context.js';
+import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import {
-	cookieNames,
 	endUserCookieAttributes,
 	sessionCookieName
 } from '../consts/param_list.js';
@@ -40,18 +39,6 @@ export function expiredSessionCookie() {
 	};
 }
 
-/*
- * The un-suffixed name every session cookie carried before buckets were populations of their own.
- *
- * Expired rather than ignored on the first request that presents it. Left in place the browser keeps
- * sending it forever, and a later change that reintroduced the bare name would find a stale value
- * waiting for it — a sign-in nobody can account for.
- */
-export function clearLegacySessionCookie(cookie: OIDCCookies): void {
-	if (!cookie[cookieNames.session]?.value) return;
-	cookie[cookieNames.session].set(expiredSessionCookie());
-}
-
 export default async function sessionHandler<T extends Record<string, unknown>>(
 	oidc: OIDCContext<T>
 ) {
@@ -59,10 +46,9 @@ export default async function sessionHandler<T extends Record<string, unknown>>(
 
 	return async function setCookies() {
 		const cookies = oidc.requireCookies();
-		clearLegacySessionCookie(cookies);
 		// The bucket the sign-in is for, exactly as `Session.get` read it — a cookie written under one
 		// name and read back under another is a sign-in that completes and then does not exist.
-		const cookie = cookies[sessionCookieName(oidc.signInBucket ?? oidc.bucket)];
+		const cookie = cookies[sessionCookieName(oidc.signInBucket)];
 		// Persist and (re)issue the session cookie when the session is worth
 		// keeping: it already had a cookie (returning user — refresh it), it now
 		// carries an authenticated account (a login just resolved), or it was

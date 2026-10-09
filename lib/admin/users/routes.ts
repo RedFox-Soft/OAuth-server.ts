@@ -82,7 +82,7 @@ export const adminUserRoutes = new Elysia({ name: 'admin-users' })
 	.get('/admin/api/admins/settings', async ({ admin }) => {
 		const ctx = assertAuth(admin);
 		assertSuperAdmin(ctx);
-		return { totpRequired: (await adminBucket()).totpRequired === true };
+		return { totpRequired: (await adminBucket()).totpRequired };
 	})
 	.patch(
 		'/admin/api/admins/settings',
@@ -102,7 +102,7 @@ export const adminUserRoutes = new Elysia({ name: 'admin-users' })
 			 * through enrolment at their next sign-in, which is the same path that brings any existing
 			 * account under the requirement.
 			 */
-			return { totpRequired: updated.totpRequired === true };
+			return { totpRequired: updated.totpRequired };
 		},
 		{ body: AdminSettingsBody }
 	)

@@ -34,11 +34,9 @@ export class MongoAdapter<
 	}
 
 	async upsert(_id: string, payload: StoredRecord, expiresIn: number) {
-		let expiresAt!: Date;
-
-		if (expiresIn) {
-			expiresAt = new Date(Date.now() + expiresIn * 1000);
-		}
+		const expiresAt = expiresIn
+			? new Date(Date.now() + expiresIn * 1000)
+			: undefined;
 
 		/*
 		 * Absent, not null, for a member the model left undefined — at any depth. A session's pending

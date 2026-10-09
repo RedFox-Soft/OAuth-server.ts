@@ -2,7 +2,7 @@ import { describe, it, beforeAll, expect, mock, afterEach } from 'bun:test';
 import bootstrap, { agent, formAgent, type Setup } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { present } from 'test/shape.js';
-import { eventBus } from 'lib/index.js';
+import { eventBus, type ServerListener } from 'lib/index.js';
 
 /**
  * @proves The form_post response mode delivers a response or an error through a self-submitting
@@ -159,7 +159,7 @@ describe('/auth', () => {
 					scope: 'openid'
 				});
 
-				const spy = mock();
+				const spy = mock<ServerListener<'authorization.error'>>();
 				eventBus.once('authorization.error', spy);
 
 				const { response, error } = await authRequest(auth, true);

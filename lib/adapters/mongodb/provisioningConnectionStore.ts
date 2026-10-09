@@ -1,3 +1,4 @@
+import { entriesOf } from '../../helpers/_/object.js';
 import { db } from './db.js';
 import { ABSENT_UNDEFINED } from './write_options.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
@@ -120,7 +121,7 @@ export class ProvisioningConnectionStore implements ProvisioningConnectionStoreI
 	): Promise<ProvisioningConnection | null> {
 		const set: Record<string, unknown> = { updatedAt: new Date() };
 		const unset: Record<string, ''> = {};
-		for (const [field, value] of Object.entries(patch)) {
+		for (const [field, value] of entriesOf(patch)) {
 			if (value === undefined) unset[field] = '';
 			else set[field] = value;
 		}

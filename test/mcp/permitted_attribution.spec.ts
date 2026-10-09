@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'bun:test';
 
 import bootstrap from '../test_helper.js';
-import { elysia } from 'lib/index.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
@@ -10,9 +9,10 @@ import {
 	adminAuditStore,
 	getProjectStore
 } from 'lib/adapters/index.ts';
-import { MCP_RESOURCE, MCP_ROUTE } from 'lib/mcp/consts.ts';
+import { MCP_RESOURCE } from 'lib/mcp/consts.ts';
 import { clearPermissions, permitIdentifier } from './permissions.ts';
 import { createAdministrator } from '../administrators.ts';
+import { rpc } from './rpc.ts';
 
 /*
  * Who the audit trail names when an agent acts through a permitted client identity.
@@ -31,34 +31,6 @@ import { createAdministrator } from '../administrators.ts';
 const DOC = 'https://agent.example.com/oauth/client-metadata.json';
 
 let rpcId = 0;
-
-async function rpc(body: unknown, token: string) {
-	const res = await elysia.handle(
-		new Request(`http://e.ly${MCP_ROUTE}`, {
-			method: 'POST',
-			headers: {
-				'content-type': 'application/json',
-				accept: 'application/json, text/event-stream',
-				authorization: `Bearer ${token}`
-			},
-			body: JSON.stringify(body)
-		})
-	);
-	const text = await res.text();
-	const isEvent = (res.headers.get('content-type') ?? '').includes(
-		'text/event-stream'
-	);
-	const line = isEvent
-		? text.split('\n').find((l) => l.startsWith('data:'))
-		: undefined;
-	return isEvent
-		? line
-			? JSON.parse(line.slice('data:'.length).trim())
-			: undefined
-		: text
-			? JSON.parse(text)
-			: undefined;
-}
 
 /**
  * @proves An action taken through a permitted client identity names both the administrator and
@@ -122,7 +94,7 @@ describe('attributing an action taken through a permitted identity', () => {
 			},
 			token
 		);
-		expect(response?.result?.isError).not.toBe(true);
+		expect(response.result?.isError).not.toBe(true);
 
 		const created = await getProjectStore().findBySlug(slug);
 		expect(created).toBeTruthy();

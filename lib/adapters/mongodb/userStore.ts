@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { entriesOf } from '../../helpers/_/object.js';
 import { db } from './db.js';
 import { ABSENT_UNDEFINED } from './write_options.js';
 import { userAreaFor } from '../../consts/storage_inventory.js';
@@ -193,7 +194,7 @@ export class UserStore implements UserStoreInstance {
 		const stored = await storedPatchOf(patch, () => this.find(_id));
 		const set: Record<string, unknown> = { updatedAt: new Date() };
 		const unset: Record<string, ''> = {};
-		for (const [field, value] of Object.entries(stored)) {
+		for (const [field, value] of entriesOf(stored)) {
 			if (value === undefined) {
 				unset[field] = '';
 			} else {

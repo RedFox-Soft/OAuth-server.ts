@@ -71,7 +71,7 @@ describe('discovery metadata classification', () => {
 
 			if (!(anchor in document)) {
 				orphaned.push(`${member} → ${anchor} (no longer produced)`);
-			} else if (anchorClassification?.audience !== 'both') {
+			} else if (anchorClassification.audience !== 'both') {
 				orphaned.push(
 					`${member} → ${anchor} (anchor is not in both documents)`
 				);

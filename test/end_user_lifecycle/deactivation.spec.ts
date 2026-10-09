@@ -1,7 +1,9 @@
 import { describe, it, beforeAll, afterEach, expect, mock } from 'bun:test';
+import { Type } from '@sinclair/typebox';
 
 import * as base64url from 'lib/helpers/base64url.js';
 import bootstrap, { type Setup } from '../test_helper.js';
+import { present, shaped } from '../shape.ts';
 import {
 	mock as mockHttp,
 	assertNoPendingInterceptors
@@ -15,10 +17,13 @@ import {
 	signIn
 } from './fixtures.ts';
 
-function sidOfLogoutToken(body: string): unknown {
+function sidOfLogoutToken(body: string): string {
 	const match = body.match(/^logout_token=([\w-]+)\.([\w-]+)\.([\w-]+)$/);
 	if (!match?.[2]) throw new Error('expected a logout token');
-	return JSON.parse(base64url.decode(match[2])).sid;
+	return shaped(
+		Type.Object({ sid: Type.String() }),
+		JSON.parse(base64url.decode(match[2]))
+	).sid;
 }
 
 /**
@@ -67,8 +72,11 @@ describe('deactivating an end user', () => {
 
 		expect(res.status).toBe(200);
 		expect(delivered).toEqual({
-			client: authorizations.client?.sid,
-			'second-client': authorizations['second-client']?.sid
+			client: present(authorizations.client, 'the client authorization').sid,
+			'second-client': present(
+				authorizations['second-client'],
+				'the second client authorization'
+			).sid
 		});
 	});
 

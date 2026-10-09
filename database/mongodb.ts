@@ -218,7 +218,6 @@ if (
  * address the document by `_id` in the filter, and repeating it in `$setOnInsert` is an error. */
 function withoutId<T extends { _id: unknown }>(seed: T): Omit<T, '_id'> {
 	const { _id, ...rest } = seed;
-	void _id;
 	return rest;
 }
 

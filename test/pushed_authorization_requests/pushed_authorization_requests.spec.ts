@@ -14,11 +14,12 @@ import { importJWK, decodeProtectedHeader, decodeJwt } from 'jose';
 
 import * as JWT from '../../lib/helpers/jwt.ts';
 import bootstrap, {
+	type Setup,
 	agent,
 	formAgent,
 	redirectParameter
 } from '../test_helper.js';
-import { eventBus } from 'lib/event_bus.js';
+import { eventBus, type ServerListener } from 'lib/event_bus.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
@@ -48,8 +49,11 @@ function expectDictatedTtl(actual: number | undefined, seconds: number) {
  * single-use request_uri, and cannot use PAR to modify a signed request or act as another
  * client.
  */
-describe('Pushed Request Object', async () => {
-	const setup = await bootstrap(import.meta.url);
+describe('Pushed Request Object', () => {
+	let setup: Setup;
+	beforeAll(async () => {
+		setup = await bootstrap(import.meta.url);
+	});
 	afterEach(() => {
 		mock.restore();
 	});
@@ -129,8 +133,8 @@ describe('Pushed Request Object', async () => {
 					const request_uri = par.data?.request_uri ?? '';
 					const id = request_uri.split(':').at(-1) ?? '';
 
-					const { request } =
-						(await PushedAuthorizationRequest.find(id))?.payload || {};
+					const { request } = (await PushedAuthorizationRequest.find(id))
+						.payload;
 					if (!request) {
 						throw new Error('Request not found in PushedAuthorizationRequest');
 					}
@@ -308,7 +312,8 @@ describe('Pushed Request Object', async () => {
 						});
 
 						it('stores a request object and returns a uri', async function () {
-							const spy = mock();
+							const spy =
+								mock<ServerListener<'pushed_authorization_request.success'>>();
 							eventBus.once('pushed_authorization_request.success', spy);
 							const spy2 = mock((_par: PushedAuthorizationRequest) => {});
 							eventBus.once('pushed_authorization_request.saved', spy2);
@@ -501,7 +506,7 @@ describe('Pushed Request Object', async () => {
 							auth.validatePresence(response, ['code']);
 
 							expect(
-								(await PushedAuthorizationRequest.find(id))?.payload.consumed
+								(await PushedAuthorizationRequest.find(id)).payload.consumed
 							).toBeTruthy();
 						});
 
@@ -554,7 +559,7 @@ describe('Pushed Request Object', async () => {
 							auth.validatePresence(response, ['code']);
 
 							expect(
-								(await PushedAuthorizationRequest.find(id))?.payload.consumed
+								(await PushedAuthorizationRequest.find(id)).payload.consumed
 							).toBeTruthy();
 						});
 					});
@@ -617,7 +622,8 @@ describe('Pushed Request Object', async () => {
 				describe('using a JAR request parameter', () => {
 					describe('Pushed Authorization Request Endpoint', () => {
 						it('stores a request object and returns a uri', async function () {
-							const spy = mock();
+							const spy =
+								mock<ServerListener<'pushed_authorization_request.success'>>();
 							eventBus.once('pushed_authorization_request.success', spy);
 							const code_verifier = randomBytes(32).toString('base64');
 							const code_challenge = createHash('sha256')
@@ -656,7 +662,8 @@ describe('Pushed Request Object', async () => {
 						});
 
 						it('a pushed request with no expiry is refused rather than stored without one', async function () {
-							const spy = mock();
+							const spy =
+								mock<ServerListener<'pushed_authorization_request.success'>>();
 							eventBus.once('pushed_authorization_request.success', spy);
 							const code_verifier = randomBytes(32).toString('base64');
 							const code_challenge = createHash('sha256')
@@ -694,7 +701,13 @@ describe('Pushed Request Object', async () => {
 						});
 
 						it('uses the expiration from JWT when below MAX_TTL', async function () {
-							const spy = mock();
+							const spy =
+								mock<
+									ServerListener<
+										| 'pushed_authorization_request.saved'
+										| 'pushed_authorization_request.success'
+									>
+								>();
 							eventBus.once('pushed_authorization_request.success', spy);
 							const code_verifier = randomBytes(32).toString('base64');
 							const code_challenge = createHash('sha256')
@@ -1029,7 +1042,7 @@ describe('Pushed Request Object', async () => {
 							auth.validatePresence(response, ['code']);
 
 							expect(
-								(await PushedAuthorizationRequest.find(id))?.payload.consumed
+								(await PushedAuthorizationRequest.find(id)).payload.consumed
 							).toBeTruthy();
 						});
 

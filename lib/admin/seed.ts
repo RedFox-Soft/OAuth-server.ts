@@ -89,7 +89,9 @@ export async function ensureAdminSeed(): Promise<void> {
 		 * client exists but belongs to no project, `resolveBucketForClient` routes it to the default
 		 * bucket, and an administrator cannot sign an agent in.
 		 */
-		const existingClientIds = existingAdminProject.clientIds ?? [];
+		// As stored, not as typed: a document written before the field existed has none.
+		const held: { clientIds?: readonly string[] } = existingAdminProject;
+		const existingClientIds = held.clientIds ?? [];
 		const missing = ADMIN_PROJECT_SEED.clientIds.filter(
 			(id) => !existingClientIds.includes(id)
 		);

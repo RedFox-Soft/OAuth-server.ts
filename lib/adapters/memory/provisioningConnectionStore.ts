@@ -1,3 +1,4 @@
+import { entriesOf } from '../../helpers/_/object.js';
 import type {
 	DeprovisioningHold,
 	NewProvisioningConnection,
@@ -99,7 +100,7 @@ export class ProvisioningConnectionStore implements ProvisioningConnectionStoreI
 			updatedAt: new Date()
 		};
 		/* A key present with an undefined value removes the field, as the user store's patch does. */
-		for (const [field, value] of Object.entries(patch)) {
+		for (const [field, value] of entriesOf(patch)) {
 			if (value === undefined) Reflect.deleteProperty(next, field);
 		}
 		const taken = this.takenBy(next, id);

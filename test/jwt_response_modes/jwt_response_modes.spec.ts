@@ -8,7 +8,7 @@ import bootstrap, {
 import { decode } from '../../lib/helpers/jwt.ts';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { ISSUER } from 'lib/configs/env.js';
-import { eventBus } from 'lib/event_bus.js';
+import { eventBus, type ServerListener } from 'lib/event_bus.js';
 
 /**
  * @proves JARM delivers a signed response by the mode the client asked for, defaulting to the
@@ -244,7 +244,7 @@ describe('configuration features.jwtResponseModes', () => {
 					scope: 'openid'
 				});
 
-				const spy = mock();
+				const spy = mock<ServerListener<'authorization.error'>>();
 				eventBus.once('authorization.error', spy);
 
 				const { status } = await agent.auth.get({
@@ -255,7 +255,7 @@ describe('configuration features.jwtResponseModes', () => {
 			});
 
 			it('a client whose symmetric secret has expired cannot obtain a signed JARM response', async function () {
-				const spy = mock();
+				const spy = mock<ServerListener<'authorization.error'>>();
 				eventBus.once('authorization.error', spy);
 
 				const auth = new AuthorizationRequest({

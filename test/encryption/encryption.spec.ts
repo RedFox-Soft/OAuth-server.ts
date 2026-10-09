@@ -103,7 +103,7 @@ describe('encryption', () => {
 				return query;
 			}
 			const { data, error } = await auth.getToken(query.code);
-			return data ?? error?.value;
+			return data ?? error.value;
 		}
 
 		// A token the flow must have produced; the case cannot go on without it.

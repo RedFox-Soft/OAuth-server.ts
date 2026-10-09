@@ -30,7 +30,7 @@ export function ScopeSwitcher() {
 	const [switching, setSwitching] = useState(false);
 
 	useEffect(() => {
-		(async () => {
+		void (async () => {
 			const res = await fetch('/admin/api/scope');
 			if (res.ok) setScope((await res.json()) as ScopeView);
 		})();

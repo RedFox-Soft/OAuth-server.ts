@@ -4,7 +4,7 @@ title: "Feature flags and endpoint gating"
 tags: [config, architecture, oauth, contract]
 sources: [oauth-server-codebase]
 created: 2026-07-31
-updated: 2026-09-23
+updated: 2026-10-08
 graph:
   node_type: concept
   relationships:
@@ -33,7 +33,12 @@ flag, for instance, records that it is a deliberate deviation from strict OAuth 
 a flag and defaulted off, secure-by-default.
 
 Defaults are overlaid with persisted settings at module scope
-(`application.ts`, `Object.assign(ApplicationConfig, await configStore.get())`).
+(`application.ts`, `Object.assign(ApplicationConfig, storedSettings)`). Since 2026-10-08 each stored
+override of a flag, number or string setting must have its default's type first
+(`assertStoredSettingTypes`), or the process refuses to boot. The settings API checked types on the way
+in but nothing checked what came back, so a value that reached the store another way was trusted as
+typed — a stored `"false"` is truthy — and code read flags defensively as `=== true`. It now reads them
+plainly.
 
 **The overrides document holds only the keys an operator has actually changed**, and this is a
 property worth defending rather than an accident. `PUT /admin/api/settings` compares each submitted

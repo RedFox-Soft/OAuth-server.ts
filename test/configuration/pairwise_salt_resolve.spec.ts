@@ -107,7 +107,7 @@ class StubStore implements SecretStoreInstance {
 	}
 }
 
-const mangled = () => JSON.parse(JSON.stringify(Buffer.alloc(32, 1)));
+const mangled = (): unknown => JSON.parse(JSON.stringify(Buffer.alloc(32, 1)));
 
 const quiet = () => spyOn(console, 'warn').mockImplementation(() => {});
 

@@ -121,9 +121,9 @@ async function bucketForResource(
 	const identifiers =
 		resource === undefined
 			? []
-			: Array.isArray(resource)
-				? resource
-				: [resource as string];
+			: typeof resource === 'string'
+				? [resource]
+				: resource;
 	if (identifiers.length !== 1) return undefined;
 
 	/*

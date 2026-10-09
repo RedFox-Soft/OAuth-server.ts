@@ -42,8 +42,8 @@ interface Draft {
 	canonical: string;
 	lang: string;
 	robots: string;
-	og: Record<string, string>;
-	twitter: Record<string, string>;
+	og: Partial<Record<string, string>>;
+	twitter: Partial<Record<string, string>>;
 	headings: { level: number; text: string; id?: string }[];
 	ids: string[];
 	alternates: { hreflang: string; href: string }[];
@@ -384,7 +384,7 @@ function inSiteAlternates(
 ): Alternate[] {
 	const out: Alternate[] = [];
 	for (const { hreflang, href } of links) {
-		const [route] = inSiteRoutes([href], origin);
+		const route = inSiteRoutes([href], origin).at(0);
 		if (hreflang !== '' && route !== undefined) out.push({ hreflang, route });
 	}
 	return out;

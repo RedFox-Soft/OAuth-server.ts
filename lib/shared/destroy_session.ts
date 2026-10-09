@@ -36,7 +36,7 @@ export async function backchannelLogoutFor(
 								sid
 							);
 						},
-						(err) => {
+						(err: unknown) => {
 							eventBus.emit(
 								'backchannel.error',
 								oidc,

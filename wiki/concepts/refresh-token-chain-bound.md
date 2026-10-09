@@ -11,7 +11,7 @@ updated: 2026-09-24
 
 A public web client — a single-page application, `applicationType: 'web'` with
 `token_endpoint_auth_method: 'none'` — whose refresh tokens are **not** sender-constrained has its
-tokens rotated on every use (`rotateRefreshToken`, `lib/addon/tokens.ts:74-95`). Rotation alone does
+tokens rotated on every use (`rotateRefreshToken`, `lib/addon/tokens.ts:91-113`). Rotation alone does
 not bound anything: if every rotated token got a fresh lifetime, a stolen token could be kept alive
 indefinitely just by using it. So for exactly these clients the rotated token inherits the *remaining*
 lifetime of its chain, and the chain ends when its first token would have.

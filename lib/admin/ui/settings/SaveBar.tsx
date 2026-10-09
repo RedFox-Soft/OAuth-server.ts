@@ -2,14 +2,15 @@ import { useState } from 'react';
 import { Button, Drawer, Modal, Table, Tag, Typography } from 'antd';
 import { ExclamationCircleOutlined } from '@ant-design/icons';
 import { restartingChanges, riskyChanges, type Change } from './model.js';
+import { jsonText } from '../../../helpers/_/json_text.ts';
 
 const show = (v: unknown): string => {
 	if (v === undefined) return '—';
 	if (typeof v === 'string') return v === '' ? '(empty)' : v;
 	if (typeof v === 'boolean') return v ? 'on' : 'off';
 	if (Array.isArray(v)) return v.length ? v.join(', ') : '(none)';
-	if (typeof v === 'object' && v !== null) return JSON.stringify(v);
-	return String(v);
+	if (typeof v === 'number' || typeof v === 'bigint') return String(v);
+	return jsonText(v) ?? '—';
 };
 
 /*
@@ -30,7 +31,7 @@ function ReviewDrawer({
 		<Drawer
 			title={`${changes.length} unsaved ${changes.length === 1 ? 'change' : 'changes'}`}
 			open={open}
-			width={640}
+			size={640}
 			onClose={onClose}
 		>
 			<Table<Change>

@@ -9,6 +9,8 @@ import { ADMIN_BUCKET_ID, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import bootstrap from '../test_helper.js';
 import { adminCookie } from '../end_user_lifecycle/fixtures.ts';
 import { connect, scim, scimBucket, scimUser } from '../scim/helpers.ts';
+import { shaped } from '../shape.ts';
+import { Type } from '@sinclair/typebox';
 import {
 	addMembers,
 	admin,
@@ -194,8 +196,9 @@ describe('a bucket group kept by an administrator', () => {
 
 		const res = await admin('GET', `/admin/api/buckets/${b}/users`, cookie);
 
-		const listed = (
-			res.json as unknown as { _id: string; groups: unknown }[]
+		const listed = shaped(
+			Type.Array(Type.Object({ _id: Type.String(), groups: Type.Unknown() })),
+			res.body
 		).find((u) => u._id === uid);
 		expect(listed?.groups).toEqual([{ id: gid, displayName: 'Readers' }]);
 	});

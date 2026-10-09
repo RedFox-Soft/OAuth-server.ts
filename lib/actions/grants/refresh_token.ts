@@ -7,6 +7,7 @@ import {
 	InvalidGrant,
 	InvalidScope
 } from '../../helpers/errors.ts';
+import { member } from '../../helpers/_/object.ts';
 import presence from '../../helpers/validate_presence.ts';
 import { findAccount } from '../../addon/account.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
@@ -37,7 +38,7 @@ import { routeNames } from '../../consts/param_list.js';
 
 function rarSupported(token: RefreshToken) {
 	// The payload's `gty`: the model has no top-level accessor for it (token-payload-access-contract).
-	const [origin] = (token.payload.gty ?? '').split(' ');
+	const [origin] = token.payload.gty.split(' ');
 	return origin !== cibaGty && origin !== deviceCodeGty;
 }
 
@@ -164,7 +165,12 @@ export const handler = async function refreshTokenHandler(
 		throw await reused();
 	}
 
-	if (oidc.params.authorization_details && !rarSupported(refreshToken)) {
+	// Unreachable while the /token schema refuses the parameter: the seam RFC 9396 §7 support plugs
+	// into (wiki/concepts/rich-authorization-requests.md), read as the unknown it would then be.
+	if (
+		member(oidc.params, 'authorization_details') &&
+		!rarSupported(refreshToken)
+	) {
 		throw new InvalidRequest(
 			'authorization_details is unsupported for this refresh token'
 		);
@@ -281,7 +287,7 @@ export const handler = async function refreshTokenHandler(
 		refreshToken.payload.rar
 	) {
 		const rar = await rarForRefreshTokenResponse(oidc, at.resourceServer);
-		if (rar?.length) {
+		if (rar.length) {
 			at.payload.rar = rar;
 		}
 	}

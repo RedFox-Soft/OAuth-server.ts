@@ -678,9 +678,6 @@ function patternMatchesPath(pattern: string, pathname: string): boolean {
 
 	return patternSegments.every((segment, i) => {
 		const actual = pathSegments[i];
-		if (actual === undefined) {
-			return false;
-		}
 		return (segment.startsWith(':') && actual.length > 0) || segment === actual;
 	});
 }

@@ -8,15 +8,10 @@ import {
 } from 'bun:test';
 
 import bootstrap from '../test_helper.js';
-import { elysia } from 'lib/index.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import {
-	ADMIN_MCP_CLIENT_ID,
-	MCP_RESOURCE,
-	MCP_ROUTE
-} from 'lib/mcp/consts.ts';
+import { ADMIN_MCP_CLIENT_ID, MCP_RESOURCE } from 'lib/mcp/consts.ts';
 import { mcpCatalogue } from 'lib/mcp/catalogue.ts';
 import {
 	ApplicationConfig,
@@ -27,6 +22,7 @@ import { idpStub } from '../federation/idp_stub.ts';
 import { shaped } from 'test/shape.js';
 import { Type } from '@sinclair/typebox';
 import { createAdministrator } from '../administrators.ts';
+import { call, rpc } from './rpc.ts';
 
 /*
  * FR-006, FR-037, SC-012: the published operation set does not vary with the instance's capability
@@ -45,43 +41,6 @@ import { createAdministrator } from '../administrators.ts';
 let rpcId = 0;
 
 const Created = Type.Object({ _id: Type.String() });
-
-async function rpc(body: unknown, token: string) {
-	const res = await elysia.handle(
-		new Request(`http://e.ly${MCP_ROUTE}`, {
-			method: 'POST',
-			headers: {
-				'content-type': 'application/json',
-				accept: 'application/json, text/event-stream',
-				authorization: `Bearer ${token}`
-			},
-			body: JSON.stringify(body)
-		})
-	);
-	const text = await res.text();
-	const isEvent = (res.headers.get('content-type') ?? '').includes(
-		'text/event-stream'
-	);
-	const line = isEvent
-		? text.split('\n').find((l) => l.startsWith('data:'))
-		: undefined;
-	return isEvent
-		? line
-			? JSON.parse(line.slice('data:'.length).trim())
-			: undefined
-		: text
-			? JSON.parse(text)
-			: undefined;
-}
-
-function call(name: string, args: Record<string, unknown>) {
-	return {
-		jsonrpc: '2.0',
-		id: ++rpcId,
-		method: 'tools/call',
-		params: { name, arguments: args }
-	};
-}
 
 async function session() {
 	const user = await createAdministrator('super', `inv-${Math.random()}@x.io`);

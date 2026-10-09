@@ -19,7 +19,7 @@ const COMMON_FIELDS = [...LIST_FIELDS, 'identifier'];
  * stores it parsed and a request object carries it as JSON by construction. Parsing only strings is
  * what made RAR over PAR or a signed request object fail outright.
  */
-function readDetails(value: unknown) {
+function readDetails(value: unknown): unknown {
 	if (Array.isArray(value)) {
 		return value;
 	}
@@ -81,8 +81,11 @@ export default async function checkRar(oidc: OIDCContext) {
 					);
 				}
 
-				const config =
-					ApplicationConfig['richAuthorizationRequests.types'][detail.type];
+				// An own member only: a `type` such as `constructor` must not find Object.prototype's.
+				const types = ApplicationConfig['richAuthorizationRequests.types'];
+				const config = Object.hasOwn(types, detail.type)
+					? types[detail.type]
+					: undefined;
 				if (!config) {
 					throw new InvalidAuthorizationDetails(
 						`unsupported authorization details type value (authorization details index ${i})`

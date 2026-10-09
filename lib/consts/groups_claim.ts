@@ -25,23 +25,28 @@ export const GROUPS_SOURCE = GROUPS_CLAIM;
 
 type ClaimsEntry = null | readonly string[] | Readonly<Record<string, null>>;
 
+// Array.isArray narrows a readonly array to any[]; this keeps its type.
+const isList = (entry: ClaimsEntry): entry is readonly string[] =>
+	Array.isArray(entry);
+
 /*
  * The claims setting with the `groups` scope guaranteed to release the `groups` claim. Whatever the setting
  * says under `groups` is kept beside it, so an operator's own additions to the scope still apply.
  */
-export function withGroupsScope<
-	T extends Readonly<Record<string, ClaimsEntry>>
->(claims: T): Record<string, ClaimsEntry> {
+export function withGroupsScope(
+	// Partial: a setting need not name the scope at all.
+	claims: Readonly<Partial<Record<string, ClaimsEntry>>>
+): Record<string, ClaimsEntry> {
 	const existing = claims[GROUPS_SCOPE];
 	let scope: ClaimsEntry;
-	if (Array.isArray(existing)) {
+	if (existing === undefined || existing === null) {
+		scope = [GROUPS_CLAIM];
+	} else if (isList(existing)) {
 		scope = existing.includes(GROUPS_CLAIM)
 			? existing
 			: [...existing, GROUPS_CLAIM];
-	} else if (existing !== null && typeof existing === 'object') {
-		scope = { ...existing, [GROUPS_CLAIM]: null };
 	} else {
-		scope = [GROUPS_CLAIM];
+		scope = { ...existing, [GROUPS_CLAIM]: null };
 	}
 	return { ...claims, [GROUPS_SCOPE]: scope };
 }

@@ -14,6 +14,7 @@ import { Client } from 'lib/models/client.js';
 import { sessionFor } from '../admin_session.ts';
 import { answered } from '../admin/answered.ts';
 import { createAdministrator } from '../administrators.ts';
+import { present } from '../shape.ts';
 
 // A container may take its contents with it, on an election the administrator makes separately from
 // confirming the deletion.
@@ -264,8 +265,11 @@ describe('deletion cascade: containers', () => {
 		const proj = await project([clientId]);
 		await deleteProject(proj._id, { cascade: 'clients', client: [clientId] });
 
-		const [projectEntry] = await entriesFor(proj._id, 'project.delete');
-		expect(projectEntry?.cascade).toEqual({ clients: 1 });
+		const projectEntry = present(
+			(await entriesFor(proj._id, 'project.delete')).at(0),
+			'the project.delete entry'
+		);
+		expect(projectEntry.cascade).toEqual({ clients: 1 });
 		expect(JSON.stringify(projectEntry)).not.toContain(clientId);
 
 		const held = await bucket();
@@ -275,8 +279,11 @@ describe('deletion cascade: containers', () => {
 		);
 		await deleteBucket(held._id, { cascade: 'endusers', expect: 1 });
 
-		const [bucketEntry] = await entriesFor(held._id, 'bucket.delete');
-		expect(bucketEntry?.cascade).toEqual({ endusers: 1 });
+		const bucketEntry = present(
+			(await entriesFor(held._id, 'bucket.delete')).at(0),
+			'the bucket.delete entry'
+		);
+		expect(bucketEntry.cascade).toEqual({ endusers: 1 });
 		const serialised = JSON.stringify(bucketEntry);
 		expect(serialised).not.toContain('private@example.com');
 		expect(serialised).not.toContain(account._id);
@@ -290,7 +297,11 @@ describe('deletion cascade: containers', () => {
 		const empty = await project([]);
 		await deleteProject(empty._id);
 
-		const [entry] = await entriesFor(empty._id, 'project.delete');
-		expect(entry?.cascade ?? null).toBeNull();
+		// Present first: with no entry at all, `cascade` would read as absent and the case would pass.
+		const entry = present(
+			(await entriesFor(empty._id, 'project.delete')).at(0),
+			'the project.delete entry'
+		);
+		expect(entry.cascade ?? null).toBeNull();
 	});
 });

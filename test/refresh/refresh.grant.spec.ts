@@ -11,6 +11,8 @@ import {
 	setSystemTime,
 	type Mock
 } from 'bun:test';
+import { Type } from '@sinclair/typebox';
+import { providerError, shaped } from 'test/shape.ts';
 
 import * as base64url from 'lib/helpers/base64url.js';
 
@@ -20,20 +22,22 @@ import bootstrap, {
 	type Setup
 } from '../test_helper.js';
 import { getUserStore } from 'lib/adapters/index.js';
-import { eventBus } from 'lib/event_bus.js';
+import { eventBus, type ServerListener } from 'lib/event_bus.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
 import { ttl } from 'lib/configs/liveTime.js';
 
-function errorDetail(spy: Mock<(error: { error_detail?: string }) => void>) {
-	return spy.mock.calls[0][0].error_detail;
+function errorDetail(spy: Mock<ServerListener<'grant.error'>>) {
+	return providerError(spy.mock.calls[0][0]).error_detail;
 }
+
+const Claims = Type.Record(Type.String(), Type.Unknown());
 
 // The claims of an id_token the response must carry.
 function claimsOf(idToken: string | undefined) {
 	if (!idToken) throw new Error('expected an id_token');
-	return JSON.parse(base64url.decode(idToken.split('.')[1]));
+	return shaped(Claims, JSON.parse(base64url.decode(idToken.split('.')[1])));
 }
 
 /**
@@ -88,7 +92,7 @@ describe('grant_type=refresh_token', () => {
 	});
 
 	it('returns a new access token and a rotated refresh token', async function () {
-		const spy = mock();
+		const spy = mock<ServerListener<'grant.success'>>();
 		eventBus.on('grant.success', spy);
 
 		const { data, status } = await agent.token.post(
@@ -119,7 +123,7 @@ describe('grant_type=refresh_token', () => {
 	describe('validates', () => {
 		it('an expired refresh token is refused as invalid_grant', async function () {
 			setSystemTime(Date.now() + 10 * 1000);
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.error'>>();
 			eventBus.on('grant.error', spy);
 
 			const { error } = await agent.token.post(
@@ -142,7 +146,7 @@ describe('grant_type=refresh_token', () => {
 		});
 
 		it("another client's refresh token is refused", async function () {
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.error'>>();
 			eventBus.on('grant.error', spy);
 
 			const { error } = await agent.token.post(
@@ -203,7 +207,8 @@ describe('grant_type=refresh_token', () => {
 		});
 
 		it('scopes can get slimmer (1/2) - no openid scope, ID Token is not issued', async function () {
-			const spy = mock();
+			const spy =
+				mock<ServerListener<'access_token.issued' | 'access_token.saved'>>();
 			eventBus.on('access_token.saved', spy);
 			eventBus.on('access_token.issued', spy);
 
@@ -228,7 +233,8 @@ describe('grant_type=refresh_token', () => {
 		});
 
 		it('scopes can get slimmer (2/2) - openid scope is present, ID Token is issued', async function () {
-			const spy = mock();
+			const spy =
+				mock<ServerListener<'access_token.issued' | 'access_token.saved'>>();
 			eventBus.on('access_token.saved', spy);
 			eventBus.on('access_token.issued', spy);
 
@@ -260,7 +266,7 @@ describe('grant_type=refresh_token', () => {
 			// the DB-backed findAccount now resolves nothing for this subject.
 			await getUserStore('redfox').destroy(setup.getAccountId());
 
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.error'>>();
 			eventBus.on('grant.error', spy);
 
 			const { error } = await agent.token.post(
@@ -303,7 +309,7 @@ describe('grant_type=refresh_token', () => {
 	});
 
 	it('an unknown refresh token is refused as invalid_grant', async function () {
-		const spy = mock();
+		const spy = mock<ServerListener<'grant.error'>>();
 		eventBus.on('grant.error', spy);
 
 		const { error } = await agent.token.post(
@@ -332,8 +338,8 @@ describe('grant_type=refresh_token', () => {
 		});
 
 		it('issues a new refresh token and consumes the old one', async function () {
-			const consumeSpy = mock();
-			const issueSpy = mock();
+			const consumeSpy = mock<ServerListener<'refresh_token.consumed'>>();
+			const issueSpy = mock<ServerListener<'refresh_token.saved'>>();
 			eventBus.on('refresh_token.consumed', consumeSpy);
 			eventBus.on('refresh_token.saved', issueSpy);
 
@@ -365,8 +371,13 @@ describe('grant_type=refresh_token', () => {
 		});
 
 		it('the new refresh token has identical scope to the old one', async function () {
-			const consumeSpy = mock();
-			const issueSpy = mock();
+			const consumeSpy = mock<ServerListener<'refresh_token.consumed'>>();
+			const issueSpy =
+				mock<
+					ServerListener<
+						'access_token.issued' | 'access_token.saved' | 'refresh_token.saved'
+					>
+				>();
 			eventBus.on('refresh_token.consumed', consumeSpy);
 			eventBus.on('refresh_token.saved', issueSpy);
 			eventBus.on('access_token.saved', issueSpy);
@@ -395,8 +406,13 @@ describe('grant_type=refresh_token', () => {
 		});
 
 		it('the new refresh token has identical scope to the old one even if the access token is requested with less scopes', async function () {
-			const consumeSpy = mock();
-			const issueSpy = mock();
+			const consumeSpy = mock<ServerListener<'refresh_token.consumed'>>();
+			const issueSpy =
+				mock<
+					ServerListener<
+						'access_token.issued' | 'access_token.saved' | 'refresh_token.saved'
+					>
+				>();
 			eventBus.on('refresh_token.consumed', consumeSpy);
 			eventBus.on('refresh_token.saved', issueSpy);
 			eventBus.on('access_token.saved', issueSpy);
@@ -430,8 +446,8 @@ describe('grant_type=refresh_token', () => {
 		});
 
 		it('revokes the complete grant if the old token is used again', async function () {
-			const grantRevokeSpy = mock();
-			const tokenDestroySpy = mock();
+			const grantRevokeSpy = mock<ServerListener<'grant.revoked'>>();
+			const tokenDestroySpy = mock<ServerListener<'refresh_token.destroyed'>>();
 			eventBus.on('grant.revoked', grantRevokeSpy);
 			eventBus.on('refresh_token.destroyed', tokenDestroySpy);
 
@@ -467,8 +483,8 @@ describe('grant_type=refresh_token', () => {
 		});
 
 		it('issues a new refresh token and consumes the old one', async function () {
-			const consumeSpy = mock();
-			const issueSpy = mock();
+			const consumeSpy = mock<ServerListener<'refresh_token.consumed'>>();
+			const issueSpy = mock<ServerListener<'refresh_token.saved'>>();
 			eventBus.on('refresh_token.consumed', consumeSpy);
 			eventBus.on('refresh_token.saved', issueSpy);
 
@@ -500,8 +516,8 @@ describe('grant_type=refresh_token', () => {
 		});
 
 		it('the new refresh token has identical scope to the old one', async function () {
-			const consumeSpy = mock();
-			const issueSpy = mock();
+			const consumeSpy = mock<ServerListener<'refresh_token.consumed'>>();
+			const issueSpy = mock<ServerListener<'refresh_token.saved'>>();
 			eventBus.on('refresh_token.consumed', consumeSpy);
 			eventBus.on('refresh_token.saved', issueSpy);
 
@@ -528,8 +544,13 @@ describe('grant_type=refresh_token', () => {
 		});
 
 		it('the new refresh token has identical scope to the old one even if the access token is requested with less scopes', async function () {
-			const consumeSpy = mock();
-			const issueSpy = mock();
+			const consumeSpy = mock<ServerListener<'refresh_token.consumed'>>();
+			const issueSpy =
+				mock<
+					ServerListener<
+						'access_token.issued' | 'access_token.saved' | 'refresh_token.saved'
+					>
+				>();
 			eventBus.on('refresh_token.consumed', consumeSpy);
 			eventBus.on('refresh_token.saved', issueSpy);
 			eventBus.on('access_token.saved', issueSpy);
@@ -563,8 +584,8 @@ describe('grant_type=refresh_token', () => {
 		});
 
 		it('revokes the complete grant if the old token is used again', async function () {
-			const grantRevokeSpy = mock();
-			const tokenDestroySpy = mock();
+			const grantRevokeSpy = mock<ServerListener<'grant.revoked'>>();
+			const tokenDestroySpy = mock<ServerListener<'refresh_token.destroyed'>>();
 			eventBus.on('grant.revoked', grantRevokeSpy);
 			eventBus.on('refresh_token.destroyed', tokenDestroySpy);
 
@@ -632,7 +653,7 @@ describe('grant_type=refresh_token', () => {
 				'Client',
 				'AccessToken',
 				'RefreshToken'
-			]).toEqual(expect.arrayContaining(entities));
+			]).toContainValues(entities);
 			const refreshToken = spy.mock.calls.find(
 				(call) => call[0] === 'RefreshToken'
 			);

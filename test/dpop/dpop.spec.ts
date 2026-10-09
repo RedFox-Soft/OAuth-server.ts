@@ -7,7 +7,8 @@ import {
 	afterEach,
 	mock,
 	expect,
-	setSystemTime
+	setSystemTime,
+	beforeAll
 } from 'bun:test';
 
 import {
@@ -15,21 +16,23 @@ import {
 	exportJWK,
 	calculateJwkThumbprint,
 	generateKeyPair,
-	type GenerateKeyPairResult
+	type GenerateKeyPairResult,
+	type JWK
 } from 'jose';
 
 import nanoid from '../../lib/helpers/nanoid.ts';
 import epochTime from '../../lib/helpers/epoch_time.ts';
 import bootstrap, {
+	type Setup,
 	agent,
+	formAgent,
 	getHeader,
 	locationParameter,
-	seedAccount,
-	formAgent
+	seedAccount
 } from '../test_helper.js';
 import * as base64url from '../../lib/helpers/base64url.ts';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
-import { eventBus } from 'lib/event_bus.js';
+import { eventBus, type ServerListener } from 'lib/event_bus.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
@@ -38,7 +41,7 @@ import { AccessToken } from 'lib/models/access_token.js';
 import { ApplicationConfig as config } from 'lib/configs/application.js';
 import { AuthorizationCodePayload } from 'lib/models/authorization_code.js';
 import { BackchannelAuthenticationRequestPayload } from 'lib/models/backchannel_authentication_request.js';
-import { present } from 'test/shape.js';
+import { present, providerError } from 'test/shape.js';
 
 function ath(accessToken: string) {
 	return hash('sha256', accessToken, 'base64url');
@@ -78,14 +81,21 @@ async function DPoP(
  * @proves A DPoP proof binds a token to a key the client holds, is refused for every wrong typ,
  * algorithm, method, URL, age, key shape or nonce, and the binding survives refresh.
  */
-describe('features.dPoP', async () => {
-	const setup = await bootstrap(import.meta.url);
-	// The CIBA grant tests resolve login_hint 'accountId' without login().
-	seedAccount('accountId');
-	const cookie = await setup.login({ scope: 'openid offline_access' });
-	const keypair = await generateKeyPair('ES256', { extractable: true });
-	const jwk = await exportJWK(keypair.publicKey);
-	const thumbprint = await calculateJwkThumbprint(jwk);
+describe('features.dPoP', () => {
+	let setup: Setup;
+	let cookie: string;
+	let keypair: Awaited<ReturnType<typeof generateKeyPair>>;
+	let jwk: JWK;
+	let thumbprint: string;
+	beforeAll(async () => {
+		setup = await bootstrap(import.meta.url);
+		// The CIBA grant tests resolve login_hint 'accountId' without login().
+		seedAccount('accountId');
+		cookie = await setup.login({ scope: 'openid offline_access' });
+		keypair = await generateKeyPair('ES256', { extractable: true });
+		jwk = await exportJWK(keypair.publicKey);
+		thumbprint = await calculateJwkThumbprint(jwk);
+	});
 
 	beforeEach(function () {
 		spyOn(OIDCContext.prototype, 'promptPending').mockReturnValue(false);
@@ -197,7 +207,7 @@ describe('features.dPoP', async () => {
 			});
 
 			it('a proof whose typ is not dpop+jwt is refused', async function () {
-				const spy = mock();
+				const spy = mock<ServerListener<'userinfo.error'>>();
 				eventBus.on('userinfo.error', spy);
 
 				for (const value of ['JWT', 'secevent+jwt']) {
@@ -229,12 +239,14 @@ describe('features.dPoP', async () => {
 				}
 
 				for (const [err] of spy.mock.calls) {
-					expect(err.error_detail).toBe('unexpected "typ" JWT header value');
+					expect(providerError(err).error_detail).toBe(
+						'unexpected "typ" JWT header value'
+					);
 				}
 			});
 
 			it('a proof signed with an algorithm the header does not declare is refused', async function () {
-				const spy = mock();
+				const spy = mock<ServerListener<'userinfo.error'>>();
 				eventBus.on('userinfo.error', spy);
 
 				for (const value of [1, true, 'none', 'HS256', 'unsupported']) {
@@ -260,7 +272,7 @@ describe('features.dPoP', async () => {
 				}
 
 				for (const [err] of spy.mock.calls) {
-					expect(err.error_detail).toBeOneOf([
+					expect(providerError(err).error_detail).toBeOneOf([
 						'"alg" (Algorithm) Header Parameter value not allowed',
 						'JWS "alg" (Algorithm) Header Parameter missing or invalid'
 					]);
@@ -268,7 +280,7 @@ describe('features.dPoP', async () => {
 			});
 
 			it('a proof carrying no embedded public key is refused', async function () {
-				const spy = mock();
+				const spy = mock<ServerListener<'userinfo.error'>>();
 				eventBus.on('userinfo.error', spy);
 
 				for (const value of [undefined, '', 1, true, null, 'foo', []]) {
@@ -301,14 +313,14 @@ describe('features.dPoP', async () => {
 				}
 
 				for (const [err] of spy.mock.calls) {
-					expect(err.error_detail).toBe(
+					expect(providerError(err).error_detail).toBe(
 						'"jwk" (JSON Web Key) Header Parameter must be a JSON object'
 					);
 				}
 			});
 
 			it('a proof whose embedded key carries private material is refused', async function () {
-				const spy = mock();
+				const spy = mock<ServerListener<'userinfo.error'>>();
 				eventBus.on('userinfo.error', spy);
 
 				const { error, response } = await agent.userinfo.get({
@@ -338,14 +350,14 @@ describe('features.dPoP', async () => {
 				);
 
 				for (const [err] of spy.mock.calls) {
-					expect(err.error_detail).toBe(
+					expect(providerError(err).error_detail).toBe(
 						'"jwk" (JSON Web Key) Header Parameter must be a public key'
 					);
 				}
 			});
 
 			it('a proof whose embedded key is symmetric is refused', async function () {
-				const spy = mock();
+				const spy = mock<ServerListener<'userinfo.error'>>();
 				eventBus.on('userinfo.error', spy);
 
 				const { error, response } = await agent.userinfo.get({
@@ -375,7 +387,7 @@ describe('features.dPoP', async () => {
 				);
 
 				for (const [err] of spy.mock.calls) {
-					expect(err.error_detail).toBe(
+					expect(providerError(err).error_detail).toBe(
 						'Invalid or unsupported JWK "alg" (Algorithm) Parameter value'
 					);
 				}
@@ -579,7 +591,7 @@ describe('features.dPoP', async () => {
 			});
 			expect(user.status).toBe(200);
 
-			let spy = mock();
+			let spy = mock<ServerListener<'userinfo.error'>>();
 			eventBus.once('userinfo.error', spy);
 
 			let { error } = await agent.userinfo.get({
@@ -692,7 +704,7 @@ describe('features.dPoP', async () => {
 			expect(first.status).toBe(200);
 
 			setSystemTime(new Date(Date.now() + 310 * 1000));
-			const spy = mock();
+			const spy = mock<ServerListener<'userinfo.error'>>();
 			eventBus.once('userinfo.error', spy);
 
 			const { error } = await agent.userinfo.get({ headers });
@@ -754,7 +766,7 @@ describe('features.dPoP', async () => {
 		});
 
 		it('binds the access token to the jwk', async function () {
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.success'>>();
 			eventBus.once('grant.success', spy);
 
 			const res = await agent.token.post(
@@ -778,12 +790,17 @@ describe('features.dPoP', async () => {
 			const {
 				entities: { AccessToken: accessToken, RefreshToken: refreshToken }
 			} = spy.mock.calls[0][0];
-			expect(accessToken.payload).toHaveProperty('jkt', thumbprint);
-			expect(refreshToken.payload).not.toHaveProperty('jkt');
+			expect(present(accessToken, 'the access token').payload).toHaveProperty(
+				'jkt',
+				thumbprint
+			);
+			expect(
+				present(refreshToken, 'the refresh token').payload
+			).not.toHaveProperty('jkt');
 		});
 
 		it('binds the refresh token to the jwk for public clients', async function () {
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.success'>>();
 			eventBus.once('grant.success', spy);
 
 			// changes the code to client-none
@@ -814,8 +831,14 @@ describe('features.dPoP', async () => {
 			const {
 				entities: { AccessToken, RefreshToken }
 			} = spy.mock.calls[0][0];
-			expect(AccessToken.payload).toHaveProperty('jkt', thumbprint);
-			expect(RefreshToken.payload).toHaveProperty('jkt', thumbprint);
+			expect(present(AccessToken, 'the access token').payload).toHaveProperty(
+				'jkt',
+				thumbprint
+			);
+			expect(present(RefreshToken, 'the refresh token').payload).toHaveProperty(
+				'jkt',
+				thumbprint
+			);
 		});
 	});
 
@@ -838,7 +861,7 @@ describe('features.dPoP', async () => {
 		});
 
 		it('binds the access token to the jwk', async function () {
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.success'>>();
 			eventBus.once('grant.success', spy);
 
 			const { status } = await agent.token.post(
@@ -861,12 +884,17 @@ describe('features.dPoP', async () => {
 			const {
 				entities: { AccessToken: accessToken, RefreshToken: refreshToken }
 			} = spy.mock.calls[0][0];
-			expect(accessToken.payload).toHaveProperty('jkt', thumbprint);
-			expect(refreshToken.payload).not.toHaveProperty('jkt');
+			expect(present(accessToken, 'the access token').payload).toHaveProperty(
+				'jkt',
+				thumbprint
+			);
+			expect(
+				present(refreshToken, 'the refresh token').payload
+			).not.toHaveProperty('jkt');
 		});
 
 		it('binds the refresh token to the jwk for public clients', async function () {
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.success'>>();
 			eventBus.once('grant.success', spy);
 
 			// changes the code to client-none
@@ -906,8 +934,14 @@ describe('features.dPoP', async () => {
 			const {
 				entities: { AccessToken: accessToken, RefreshToken: refreshToken }
 			} = spy.mock.calls[0][0];
-			expect(accessToken.payload).toHaveProperty('jkt', thumbprint);
-			expect(refreshToken.payload).toHaveProperty('jkt', thumbprint);
+			expect(present(accessToken, 'the access token').payload).toHaveProperty(
+				'jkt',
+				thumbprint
+			);
+			expect(present(refreshToken, 'the refresh token').payload).toHaveProperty(
+				'jkt',
+				thumbprint
+			);
 		});
 	});
 
@@ -1063,9 +1097,12 @@ describe('features.dPoP', async () => {
 
 	describe('authorization flow', () => {
 		describe('without dpop_jkt', () => {
-			const auth = new AuthorizationRequest({
-				scope: 'openid offline_access',
-				prompt: 'consent'
+			let auth: AuthorizationRequest;
+			beforeAll(() => {
+				auth = new AuthorizationRequest({
+					scope: 'openid offline_access',
+					prompt: 'consent'
+				});
 			});
 			let code = '';
 
@@ -1080,7 +1117,7 @@ describe('features.dPoP', async () => {
 			});
 
 			it('authorization_code binds the access token to the jwk', async function () {
-				const spy = mock();
+				const spy = mock<ServerListener<'grant.success'>>();
 				eventBus.once('grant.success', spy);
 
 				const res = await agent.token.post(
@@ -1106,16 +1143,24 @@ describe('features.dPoP', async () => {
 				const {
 					entities: { AccessToken, RefreshToken }
 				} = spy.mock.calls[0][0];
-				expect(AccessToken.payload).toHaveProperty('jkt', thumbprint);
-				expect(RefreshToken.payload).not.toHaveProperty('jkt');
+				expect(present(AccessToken, 'the access token').payload).toHaveProperty(
+					'jkt',
+					thumbprint
+				);
+				expect(
+					present(RefreshToken, 'the refresh token').payload
+				).not.toHaveProperty('jkt');
 			});
 		});
 
 		describe('with dpop_jkt', () => {
-			const auth = new AuthorizationRequest({
-				scope: 'openid offline_access',
-				prompt: 'consent',
-				dpop_jkt: thumbprint
+			let auth: AuthorizationRequest;
+			beforeAll(() => {
+				auth = new AuthorizationRequest({
+					scope: 'openid offline_access',
+					prompt: 'consent',
+					dpop_jkt: thumbprint
+				});
 			});
 			let code = '';
 
@@ -1130,7 +1175,7 @@ describe('features.dPoP', async () => {
 			});
 
 			it('authorization_code binds the access token to the jwk', async function () {
-				const spy = mock();
+				const spy = mock<ServerListener<'grant.success'>>();
 				eventBus.once('grant.success', spy);
 
 				const res = await agent.token.post(
@@ -1156,12 +1201,17 @@ describe('features.dPoP', async () => {
 				const {
 					entities: { AccessToken, RefreshToken }
 				} = spy.mock.calls[0][0];
-				expect(AccessToken.payload).toHaveProperty('jkt', thumbprint);
-				expect(RefreshToken.payload).not.toHaveProperty('jkt');
+				expect(present(AccessToken, 'the access token').payload).toHaveProperty(
+					'jkt',
+					thumbprint
+				);
+				expect(
+					present(RefreshToken, 'the refresh token').payload
+				).not.toHaveProperty('jkt');
 			});
 
 			it('authorization_code checks the dpop_jkt matches the proof jwk thumbprint', async function () {
-				const spy = mock();
+				const spy = mock<ServerListener<'grant.error'>>();
 				eventBus.once('grant.error', spy);
 
 				const { error, status } = await agent.token.post(
@@ -1193,13 +1243,13 @@ describe('features.dPoP', async () => {
 
 				expect(spy).toBeCalledTimes(1);
 				const err = spy.mock.calls[0][0];
-				expect(err.error_detail).toBe(
+				expect(providerError(err).error_detail).toBe(
 					'DPoP proof key thumbprint does not match dpop_jkt'
 				);
 			});
 
 			it('authorization_code requires dpop to be used when dpop_jkt was present', async function () {
-				const spy = mock();
+				const spy = mock<ServerListener<'grant.error'>>();
 				eventBus.once('grant.error', spy);
 
 				const { error, status } = await agent.token.post(
@@ -1222,14 +1272,17 @@ describe('features.dPoP', async () => {
 
 				expect(spy).toBeCalledTimes(1);
 				const err = spy.mock.calls[0][0];
-				expect(err.error_detail).toBe('missing DPoP proof JWT');
+				expect(providerError(err).error_detail).toBe('missing DPoP proof JWT');
 			});
 		});
 
 		describe('refresh_token', () => {
-			const auth = new AuthorizationRequest({
-				scope: 'openid offline_access',
-				prompt: 'consent'
+			let auth: AuthorizationRequest;
+			beforeAll(() => {
+				auth = new AuthorizationRequest({
+					scope: 'openid offline_access',
+					prompt: 'consent'
+				});
 			});
 			let refresh_token = '';
 
@@ -1266,7 +1319,7 @@ describe('features.dPoP', async () => {
 			});
 
 			it('binds the access token to the jwk', async function () {
-				const spy = mock();
+				const spy = mock<ServerListener<'grant.success'>>();
 				eventBus.once('grant.success', spy);
 
 				const res = await agent.token.post(
@@ -1290,8 +1343,13 @@ describe('features.dPoP', async () => {
 				const {
 					entities: { AccessToken, RefreshToken }
 				} = spy.mock.calls[0][0];
-				expect(AccessToken.payload).toHaveProperty('jkt', thumbprint);
-				expect(RefreshToken.payload.jkt).toBeEmpty();
+				expect(present(AccessToken, 'the access token').payload).toHaveProperty(
+					'jkt',
+					thumbprint
+				);
+				expect(
+					present(RefreshToken, 'the refresh token').payload.jkt
+				).toBeEmpty();
 			});
 		});
 	});
@@ -1314,7 +1372,7 @@ describe('features.dPoP', async () => {
 		});
 
 		it('authorization_code binds the access token to the jwk', async function () {
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.success'>>();
 			eventBus.once('grant.success', spy);
 
 			const res = await agent.token.post(
@@ -1340,8 +1398,14 @@ describe('features.dPoP', async () => {
 			const {
 				entities: { AccessToken, RefreshToken }
 			} = spy.mock.calls[0][0];
-			expect(AccessToken.payload).toHaveProperty('jkt', thumbprint);
-			expect(RefreshToken.payload).toHaveProperty('jkt', thumbprint);
+			expect(present(AccessToken, 'the access token').payload).toHaveProperty(
+				'jkt',
+				thumbprint
+			);
+			expect(present(RefreshToken, 'the refresh token').payload).toHaveProperty(
+				'jkt',
+				thumbprint
+			);
 		});
 
 		describe('refresh_token', () => {
@@ -1371,7 +1435,7 @@ describe('features.dPoP', async () => {
 			});
 
 			it('binds the access token to the jwk', async function () {
-				const spy = mock();
+				const spy = mock<ServerListener<'grant.success'>>();
 				eventBus.once('grant.success', spy);
 
 				const res = await agent.token.post(
@@ -1395,12 +1459,17 @@ describe('features.dPoP', async () => {
 				const {
 					entities: { AccessToken, RefreshToken }
 				} = spy.mock.calls[0][0];
-				expect(AccessToken.payload).toHaveProperty('jkt', thumbprint);
-				expect(RefreshToken.payload).toHaveProperty('jkt', thumbprint);
+				expect(present(AccessToken, 'the access token').payload).toHaveProperty(
+					'jkt',
+					thumbprint
+				);
+				expect(
+					present(RefreshToken, 'the refresh token').payload
+				).toHaveProperty('jkt', thumbprint);
 			});
 
 			it('verifies the request made with the same cert jwk', async function () {
-				const spy = mock();
+				const spy = mock<ServerListener<'grant.error'>>();
 				eventBus.once('grant.error', spy);
 
 				const res = await agent.token.post(
@@ -1437,7 +1506,7 @@ describe('features.dPoP', async () => {
 	});
 
 	it('client_credentials binds the access token to the jwk', async function () {
-		const spy = mock();
+		const spy = mock<ServerListener<'grant.success'>>();
 		eventBus.once('grant.success', spy);
 
 		const res = await agent.token.post(
@@ -1458,7 +1527,9 @@ describe('features.dPoP', async () => {
 		const {
 			entities: { ClientCredentials }
 		} = spy.mock.calls[0][0];
-		expect(ClientCredentials.payload).toHaveProperty('jkt', thumbprint);
+		expect(
+			present(ClientCredentials, 'the client credentials').payload
+		).toHaveProperty('jkt', thumbprint);
 	});
 
 	describe('status codes at the token endpoint', () => {

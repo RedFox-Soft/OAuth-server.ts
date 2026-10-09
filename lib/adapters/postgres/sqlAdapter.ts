@@ -199,13 +199,13 @@ export class SqlAdapter<
 		`;
 		const rows =
 			expiresIn === undefined
-				? await handle`
+				? await handle<{ value: unknown }[]>`
 						UPDATE ${handle(this.name)}
 						SET payload = ${counted}
 						WHERE id = ${_id}
 						RETURNING (payload->>${field})::float8 AS value
 					`
-				: await handle`
+				: await handle<{ value: unknown }[]>`
 						UPDATE ${handle(this.name)}
 						SET payload = jsonb_set(
 								${counted},

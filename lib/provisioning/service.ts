@@ -107,7 +107,7 @@ export async function createConnection(
 			'the administrators’ bucket cannot be provisioned by a directory'
 		);
 	}
-	const provider = bucket.federation?.find((p) => p.id === input.providerId);
+	const provider = bucket.federation.find((p) => p.id === input.providerId);
 	if (!provider) {
 		throw new ProvisioningError(
 			422,
@@ -149,7 +149,7 @@ export async function createConnection(
 
 	if (provider.provisioning !== 'existing_only') {
 		await getBucketStore().update(bucket._id, {
-			federation: (bucket.federation ?? []).map((p) =>
+			federation: bucket.federation.map((p) =>
 				p.id === provider.id
 					? { ...p, provisioning: 'existing_only' as const }
 					: p
@@ -503,7 +503,7 @@ export function presentConnection(
 	const warnings: ConnectionWarning[] = [];
 	if (!ApplicationConfig['scim.enabled']) warnings.push('scim_disabled');
 	if (scimBaseUrl(bucket) === null) warnings.push('bucket_unaddressed');
-	const provider = bucket.federation?.find(
+	const provider = bucket.federation.find(
 		(p) => p.id === connection.providerId
 	);
 	if (!provider?.enabled || !ApplicationConfig['federation.enabled']) {

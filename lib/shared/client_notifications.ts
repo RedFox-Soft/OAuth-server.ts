@@ -23,11 +23,10 @@ async function ping(
 	backchannelAuthenticationRequest: BackchannelAuthenticationRequest
 ) {
 	const notificationToken =
-		backchannelAuthenticationRequest?.payload.params?.client_notification_token;
+		backchannelAuthenticationRequest.payload.params?.client_notification_token;
 	if (
 		!client.backchannelClientNotificationEndpoint ||
 		client.backchannelTokenDeliveryMode !== 'ping' ||
-		!backchannelAuthenticationRequest ||
 		!backchannelAuthenticationRequest.jti ||
 		backchannelAuthenticationRequest.payload.kind !==
 			'BackchannelAuthenticationRequest' ||

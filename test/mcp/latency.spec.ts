@@ -7,14 +7,11 @@ import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { getProjectStore } from 'lib/adapters/index.ts';
 import { ADMIN_SESSION_COOKIE, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
-import {
-	ADMIN_MCP_CLIENT_ID,
-	MCP_RESOURCE,
-	MCP_ROUTE
-} from 'lib/mcp/consts.ts';
+import { ADMIN_MCP_CLIENT_ID, MCP_RESOURCE } from 'lib/mcp/consts.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { sessionFor } from '../admin_session.ts';
 import { createAdministrator } from '../administrators.ts';
+import { postMcp } from './rpc.ts';
 
 /*
  * plan.md's performance goal: a tool call within 2× the admin route it wraps, and no regression on the
@@ -39,19 +36,7 @@ import { createAdministrator } from '../administrators.ts';
 let rpcId = 0;
 
 async function rpc(body: unknown, token: string) {
-	const res = await elysia.handle(
-		new Request(`http://e.ly${MCP_ROUTE}`, {
-			method: 'POST',
-			headers: {
-				'content-type': 'application/json',
-				accept: 'application/json, text/event-stream',
-				authorization: `Bearer ${token}`
-			},
-			body: JSON.stringify(body)
-		})
-	);
-	await res.text();
-	return res.status;
+	return (await postMcp(body, token)).status;
 }
 
 async function setup() {

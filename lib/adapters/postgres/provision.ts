@@ -1,5 +1,3 @@
-import type { SQL } from 'bun';
-
 import {
 	STORE_AREAS,
 	areaForBucket,
@@ -9,6 +7,7 @@ import {
 } from '../../consts/storage_inventory.js';
 import { columnFor, jsonPath, translateIndex } from './jsonPath.js';
 import { sqlState } from './sqlState.js';
+import type { Sql } from './db.js';
 
 /*
  * Applying the inventory to a PostgreSQL database.
@@ -172,7 +171,7 @@ export function isInsufficientPrivilege(error: unknown): boolean {
 	return sqlState(error) === INSUFFICIENT_PRIVILEGE;
 }
 
-export async function tableExists(sql: SQL, name: string): Promise<boolean> {
+export async function tableExists(sql: Sql, name: string): Promise<boolean> {
 	/*
 	 * to_regclass returns null rather than raising for an absent relation, so this is one round trip
 	 * with no error handling — the direct equivalent of the MongoDB applier's listCollections check.
@@ -183,8 +182,9 @@ export async function tableExists(sql: SQL, name: string): Promise<boolean> {
 	 * re-created thirty-two areas it had created moments earlier, and `--check` called a healthy schema
 	 * broken — the three areas it got right were the ones already spelled in lower case.
 	 */
-	const rows =
-		await sql`SELECT to_regclass(${quote(name)}) IS NOT NULL AS present`;
+	const rows = await sql<
+		{ present: unknown }[]
+	>`SELECT to_regclass(${quote(name)}) IS NOT NULL AS present`;
 	return Boolean(rows[0]?.present);
 }
 
@@ -196,7 +196,7 @@ export async function tableExists(sql: SQL, name: string): Promise<boolean> {
  * MongoDB applier records at the same seam.
  */
 export async function ensureTable(
-	sql: SQL,
+	sql: Sql,
 	area: StorageArea
 ): Promise<boolean> {
 	if (await tableExists(sql, area.name)) return false;
@@ -215,7 +215,7 @@ export interface AppliedIndexes {
  * empty array applies nothing, which is the correct reading rather than a no-op to guard against.
  */
 export async function applyIndexes(
-	sql: SQL,
+	sql: Sql,
 	area: StorageArea,
 	only?: readonly PlannedIndex[]
 ): Promise<AppliedIndexes> {
@@ -245,7 +245,7 @@ export async function applyIndexes(
  * duplicate-registration race reachable on the other backend.
  */
 export async function provisionUserArea(
-	sql: SQL,
+	sql: Sql,
 	bucketId: string
 ): Promise<AppliedIndexes> {
 	const area = areaForBucket(bucketId);

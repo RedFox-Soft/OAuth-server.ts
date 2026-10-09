@@ -94,7 +94,8 @@ export class Browser {
 				new Request(`http://e.ly${path}`, {
 					redirect: 'manual',
 					...init,
-					headers: { ...(init.headers ?? {}), cookie: this.cookie }
+					// Built rather than spread: a Headers instance spreads as an empty object.
+					headers: withCookie(init.headers, this.cookie)
 				})
 			)
 		);
@@ -165,4 +166,10 @@ export function amrOf(res: TokenResponse): string[] | undefined {
 
 export function memberOf(res: TokenResponse, name: string): unknown {
 	return isPlainObject(res.data) ? res.data[name] : undefined;
+}
+
+function withCookie(init: HeadersInit | undefined, cookie: string): Headers {
+	const headers = new Headers(init);
+	headers.set('cookie', cookie);
+	return headers;
 }

@@ -2,11 +2,9 @@ import { describe, it, expect } from 'bun:test';
 
 // Warm the model graph before the addon index: a cold entry through lib/addon/index.ts reaches
 // lib/models/ and throws a TDZ ReferenceError (wiki/concepts/model-graph-import-order.md).
-import { elysia } from '../../lib/index.ts';
+import '../../lib/index.ts';
 import * as addonIndex from 'lib/addon/index.ts';
 import { ADDON_SEAMS } from 'lib/addon/seams.ts';
-
-void elysia;
 
 /*
  * The documentation export lists the seams from ADDON_SEAMS, and the index is what a deployment

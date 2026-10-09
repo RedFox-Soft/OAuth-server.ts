@@ -13,7 +13,7 @@ import bootstrap, {
 	type Setup
 } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
-import { present } from 'test/shape.js';
+import { present, textOf } from 'test/shape.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { decode } from 'lib/helpers/jwt.js';
 import { clearDocumentCache } from 'lib/client_metadata_document/cache.ts';
@@ -200,7 +200,7 @@ describe('an authorization error for a client nobody here vouched for', () => {
 			const { response, error } = await agent
 				.ui({ uid })
 				.consent.post({ action: 'cancel' }, { headers: { cookie } });
-			const page = String(error?.value);
+			const page = textOf(error?.value);
 
 			expect(response.status).toBeGreaterThanOrEqual(400);
 			expect(response.headers.get('location')).toBeNull();

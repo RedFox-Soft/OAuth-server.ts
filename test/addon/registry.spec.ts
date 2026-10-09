@@ -66,14 +66,14 @@ describe('addon override registry', () => {
 	 * un-overridden transform resolves and returns a value. The override precedence it is really
 	 * guarding is covered by the cases above.
 	 */
-	it('resolves a working default for an un-overridden RAR transform', () => {
+	it('resolves a working default for an un-overridden RAR transform', async () => {
 		const oidc = {
 			params: {},
 			entities: { AuthorizationCode: { payload: { rar: [{ type: 'a' }] } } }
 		};
-		expect(rarForCodeResponse(oidc, { identifier: () => 'urn:rs' })).toEqual([
-			{ type: 'a' }
-		]);
+		expect(
+			await rarForCodeResponse(oidc, { identifier: () => 'urn:rs' })
+		).toEqual([{ type: 'a' }]);
 	});
 
 	it('restores the default after an explicit reset', () => {

@@ -34,7 +34,7 @@ const settingsUpdate = mcpCatalogue.find((t) => t.tool === 'settings_update');
 if (!settingsUpdate) throw new Error('settings_update is not published');
 
 const published = inputSchemaFor(settingsUpdate);
-const properties = shaped(
+const declared = shaped(
 	Type.Record(
 		Type.String(),
 		Type.Object({
@@ -44,6 +44,8 @@ const properties = shaped(
 	),
 	published.properties
 );
+// Partial: a setting the catalogue lists but the schema omits is the defect these cases look for.
+const properties: Partial<typeof declared> = declared;
 
 /**
  * @proves An agent is told what every editable setting accepts, so it sends a typed value rather

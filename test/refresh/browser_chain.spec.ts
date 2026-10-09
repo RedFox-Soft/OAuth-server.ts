@@ -169,7 +169,7 @@ describe('a browser application refreshing its tokens', () => {
 		at(14, 5);
 		const { error } = await refresh(current);
 		if (!error) throw new Error('expected a refusal');
-		expect(Number(error.status)).toBe(400);
+		expect(error.status).toBe(400);
 		expect(error.value).toHaveProperty('error', 'invalid_grant');
 	});
 

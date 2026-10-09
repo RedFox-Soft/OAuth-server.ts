@@ -4,7 +4,11 @@ import { DEFAULT_BUCKET_ID, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { issuerFor } from 'lib/configs/issuer.js';
 import type { FederationProvider } from 'lib/federation/types.js';
 import { elysia } from 'lib/index.js';
+import { Type } from '@sinclair/typebox';
 import { idpStub, type IdpStub } from '../federation/idp_stub.js';
+import { shaped } from '../shape.ts';
+
+const JsonObject = Type.Record(Type.String(), Type.Unknown());
 
 /*
  * Shared scaffolding for the global token revocation suites: a bucket whose upstream provider is a stub
@@ -153,13 +157,17 @@ export async function revoke(
 		})
 	);
 	const text = await response.text();
-	let json: Record<string, unknown>;
+	let parsed: unknown;
 	try {
-		json = text ? JSON.parse(text) : {};
+		parsed = text ? JSON.parse(text) : {};
 	} catch {
-		json = { raw: text };
+		parsed = { raw: text };
 	}
-	return { status: response.status, json, headers: response.headers };
+	return {
+		status: response.status,
+		json: shaped(JsonObject, parsed),
+		headers: response.headers
+	};
 }
 
 /* The body naming a user by the provider's subject for them. */

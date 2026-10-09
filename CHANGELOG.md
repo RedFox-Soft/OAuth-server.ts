@@ -16,6 +16,34 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   first, with a switch to English and back; everyone else sees the English site unchanged. A blog post is
   published in every language or none, a stale translation says so on the page, and the build checks each
   page's language, its Chinese title lengths and that every section keeps its English id. Spec 074.
+- `eventBus` is typed: `ServerEvents`, `ServerEventName` and `ServerListener` are exported from the
+  package entry, so a subscriber to an event the server does not emit, or one expecting arguments it does
+  not pass, fails to compile instead of never running.
+
+### Changed
+
+- `richAuthorizationRequests.types` is shape-checked even while RAR is off, because the consent screen reads
+  its labels on every render; an instance whose stored map is malformed now refuses to start until it is
+  fixed. A `getResourceServerInfo` override must answer a `scope` string and an `accessTokenFormat` of `jwt`
+  or `opaque`; anything else is refused when the resource is resolved instead of minting a token with no
+  scopes.
+- A stored setting override whose type is not its setting's — a flag stored as the string `"false"`, a
+  number stored as text — now refuses startup, naming the key. The settings API never wrote one; a value
+  edited into the database by hand would otherwise have been trusted as typed.
+- The `rotateRefreshToken` and `rarFor*` addon defaults are async, so an override of one may now be async
+  too; every caller already awaited them. A Set-valued setting holding a member that is not a string now
+  refuses startup instead of being stored.
+
+### Fixed
+
+- A bucket addressed by its own hostname no longer has its session cookie expired on every request. Its
+  cookie is the bare `_session`, which the server still cleared as a pre-bucket legacy name, so an
+  anonymous session not re-issued in the same response was dropped.
+- `GET /session/end` with an `id_token_hint` whose claims set is JSON `null` answered 500, and filed a
+  defect in the error store, to an unauthenticated caller; a JWT whose header or claims set is not an
+  object is now refused as undecodable (`invalid_request`).
+- Changing a protected resource's access-token lifetime in the admin console failed with 422: the field
+  sent the number as a string. It is a number input now.
 
 ### Security
 

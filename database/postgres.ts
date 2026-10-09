@@ -258,14 +258,17 @@ const provisionedFromEmpty = summary.collectionsCreated === FIXED_AREAS.length;
  */
 const rootKeyStore = new BucketKeysStore();
 const rootKeySql = sql();
-const [legacyTable] =
-	await rootKeySql`SELECT to_regclass(${LEGACY_ROOT_KEYS_AREA}) AS t`;
+const legacyTable = (
+	await rootKeySql<
+		{ t: string | null }[]
+	>`SELECT to_regclass(${LEGACY_ROOT_KEYS_AREA}) AS t`
+).at(0);
 const legacyLeft = legacyTable?.t
-	? Number(
-			(
-				await rootKeySql`SELECT count(*)::int AS n FROM ${rootKeySql(LEGACY_ROOT_KEYS_AREA)}`
-			)[0].n
-		)
+	? ((
+			await rootKeySql<
+				{ n: number }[]
+			>`SELECT count(*)::int AS n FROM ${rootKeySql(LEGACY_ROOT_KEYS_AREA)}`
+		).at(0)?.n ?? 0)
 	: 0;
 if (
 	legacyLeft === 0 &&
@@ -341,8 +344,10 @@ const handle = sql();
 const bucketRows = await handle`SELECT id FROM ${handle('userBuckets')}`;
 const reservedAddresses = reservedAddressReport(
 	(
-		await handle`SELECT id, doc->>'slug' AS slug FROM ${handle('userBuckets')}`
-	).map((row: { id: string; slug: string | null }) => ({
+		await handle<
+			{ id: string; slug: string | null }[]
+		>`SELECT id, doc->>'slug' AS slug FROM ${handle('userBuckets')}`
+	).map((row) => ({
 		_id: row.id,
 		slug: row.slug
 	})),

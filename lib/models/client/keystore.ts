@@ -9,7 +9,7 @@ import KeyStore from '../../helpers/keystore.ts';
 import epochTime from '../../helpers/epoch_time.ts';
 import certificateThumbprint from '../../helpers/certificate_thumbprint.ts';
 import { InvalidClientMetadata } from '../../helpers/errors.ts';
-import { isPlainObject } from '../../helpers/_/object.js';
+import { isPlainObject, member } from '../../helpers/_/object.js';
 import { ECCurves, OKPCurves } from '../../configs/jwaConsts.js';
 import { guardedFetch, readBounded } from '../../shared/egress.js';
 
@@ -176,7 +176,9 @@ export class ClientKeyStore extends KeyStore {
 					timeoutMs: JWKS_FETCH_TIMEOUT_MS
 				});
 
-				const body = JSON.parse(await readBounded(response, MAX_JWKS_BYTES));
+				const body: unknown = JSON.parse(
+					await readBounded(response, MAX_JWKS_BYTES)
+				);
 				const { headers, status } = response;
 
 				// min refetch in 60 seconds unless cache headers say a longer response ttl
@@ -188,9 +190,9 @@ export class ClientKeyStore extends KeyStore {
 				}
 
 				const cacheControl = headers.get('cache-control');
-				if (cacheControl && /max-age=(\d+)/.test(cacheControl)) {
-					const maxAge = parseInt(RegExp.$1, 10);
-					freshUntil.push(epochTime() + maxAge);
+				const maxAge = cacheControl && /max-age=(\d+)/.exec(cacheControl);
+				if (maxAge) {
+					freshUntil.push(epochTime() + parseInt(maxAge[1], 10));
 				}
 
 				this.freshUntil = Math.max(...freshUntil.filter(Boolean));
@@ -201,26 +203,28 @@ export class ClientKeyStore extends KeyStore {
 					);
 				}
 
-				if (body !== undefined) {
-					if (!Array.isArray(body?.keys) || !body.keys.every(isPlainObject)) {
-						throw new InvalidClientMetadata(
-							'client JSON Web Key Set is invalid'
-						);
-					}
+				const keys = member(body, 'keys');
+				if (!Array.isArray(keys) || !keys.every(isPlainObject)) {
+					throw new InvalidClientMetadata('client JSON Web Key Set is invalid');
 				}
 
 				this.clear();
-				body.keys
+				keys
 					.map(validateJWK)
-					.filter(Boolean)
+					.filter((key): key is PublicJWK => key !== undefined)
 					.forEach(ClientKeyStore.prototype.add.bind(this));
 
 				delete this.lock;
-			})().catch((err) => {
+			})().catch((err: unknown) => {
 				delete this.lock;
+				const description = member(err, 'error_description');
 				throw new InvalidClientMetadata(
 					'client JSON Web Key Set failed to be refreshed',
-					err.error_description || err.message
+					typeof description === 'string' && description
+						? description
+						: err instanceof Error
+							? err.message
+							: undefined
 				);
 			});
 		}

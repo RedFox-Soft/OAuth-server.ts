@@ -24,6 +24,24 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+/*
+ * Object.entries typed the way the values really read. TypeScript's own declaration drops `undefined`
+ * from an optional member, so a loop treating a present-but-undefined member as "remove this field" —
+ * the stores' patch contract — looks to the checker like a test that can never pass.
+ */
+export function entriesOf(object: object): [string, unknown][] {
+	return Object.entries(object);
+}
+
+/*
+ * Array.isArray, typed the way its answer is meant: TypeScript's own declaration narrows to `any[]`, which
+ * turns an unknown value into one nothing checks, and a readonly array into one that loses its element
+ * type. From a union this keeps the array member; from an unknown it gives readonly unknown[].
+ */
+export function isList(value: unknown): value is readonly unknown[] {
+	return Array.isArray(value);
+}
+
 /* A member read off a value that may not be an object at all — a thrown error, a driver's row. */
 export function member(value: unknown, name: string): unknown {
 	return isRecord(value) ? value[name] : undefined;

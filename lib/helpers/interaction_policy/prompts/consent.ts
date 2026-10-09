@@ -97,7 +97,7 @@ class ConsentPromt extends Prompt {
 			reason: 'rs_scopes_missing',
 			description: 'requested scopes not granted',
 			check: (oidc) => {
-				let missing: Record<string, string[]> | undefined;
+				let missing: Partial<Record<string, string[]>> | undefined;
 
 				for (const [indicator, resourceServer] of Object.entries(
 					oidc.resourceServers
@@ -113,8 +113,7 @@ class ConsentPromt extends Prompt {
 					for (const scope of requestedScopes) {
 						if (availableScopes.has(scope) && !encounteredScopes.has(scope)) {
 							missing ||= {};
-							missing[indicator] ||= [];
-							missing[indicator].push(scope);
+							(missing[indicator] ||= []).push(scope);
 						}
 					}
 				}

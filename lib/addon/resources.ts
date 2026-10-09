@@ -35,7 +35,7 @@ export async function defaultResource(
 	 * `resource` — so it is supplied here, as the addressed bucket's SCIM resource. Whether this client may
 	 * have it is still decided where every other request is (lib/provisioning/token_policy.ts).
 	 */
-	if (client?.provisioningConnectionId && oidc) {
+	if (client.provisioningConnectionId) {
 		return scimBaseUrl(oidc.bucket) ?? undefined;
 	}
 	return undefined;
@@ -84,11 +84,10 @@ export async function getResourceServerInfo(
 	 * audience.
 	 */
 	if (
-		oidc &&
-		(isScimResourceOf(oidc.bucket, resourceIndicator) ||
-			client?.provisioningConnectionId)
+		isScimResourceOf(oidc.bucket, resourceIndicator) ||
+		client.provisioningConnectionId
 	) {
-		await assertConnectionMayMint(client ?? {}, oidc.bucket, resourceIndicator);
+		await assertConnectionMayMint(client, oidc.bucket, resourceIndicator);
 		return scimResourceServer(resourceIndicator);
 	}
 
@@ -108,9 +107,10 @@ export async function getResourceServerInfo(
 	 * Looked up only in the namespace of the address this request arrived at: the same identifier may be
 	 * declared by another tenant with an issuer of its own, and that declaration is not this one.
 	 */
-	const declared = oidc
-		? await resolveDeclaredResource(resourceIndicator, namespaceOf(oidc.bucket))
-		: undefined;
+	const declared = await resolveDeclaredResource(
+		resourceIndicator,
+		namespaceOf(oidc.bucket)
+	);
 	if (declared) {
 		return declared;
 	}

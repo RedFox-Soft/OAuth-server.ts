@@ -1,7 +1,11 @@
 import { describe, it, beforeEach, afterEach, expect, mock } from 'bun:test';
 
 import bootstrap from '../test_helper.js';
-import { eventBus } from 'lib/event_bus.js';
+import {
+	eventBus,
+	type ServerEventName,
+	type ServerListener
+} from 'lib/event_bus.js';
 import { expectUnservedEquivalent, send } from './helpers.js';
 
 // Every channel a refused request could plausibly land in if the gate leaked into the routed error
@@ -22,10 +26,11 @@ const CAPABILITY_CHANNELS = [
  * fault, and the response is identical whether anything is listening.
  */
 describe('feature gate — observability', () => {
-	const listeners: Array<[string, (...args: unknown[]) => void]> = [];
+	const listeners: Array<[ServerEventName, ServerListener<ServerEventName>]> =
+		[];
 
-	function listen(channel: string) {
-		const spy = mock();
+	function listen(channel: ServerEventName) {
+		const spy = mock<ServerListener<ServerEventName>>();
 		eventBus.on(channel, spy);
 		listeners.push([channel, spy]);
 		return spy;

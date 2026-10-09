@@ -1,8 +1,7 @@
+import { entriesOf } from '../../helpers/_/object.js';
 import crypto from 'crypto';
 
-import type { SQL } from 'bun';
-
-import { sql } from './db.js';
+import { sql, type Sql } from './db.js';
 import { docOf } from './json.js';
 import { isUniqueViolation } from './sqlState.js';
 import { userAreaFor } from '../../consts/storage_inventory.js';
@@ -33,7 +32,7 @@ import {
  * always one of these literals, and every value is a bound parameter.
  */
 function equalityFor(
-	handle: SQL,
+	handle: Sql,
 	field: keyof StoredEndUserFilter,
 	value: string
 ) {
@@ -51,7 +50,7 @@ function equalityFor(
 	}
 }
 
-function conditionsFor(handle: SQL, filter: StoredEndUserFilter) {
+function conditionsFor(handle: Sql, filter: StoredEndUserFilter) {
 	let where = handle`TRUE`;
 	for (const field of Object.keys(filter) as Array<keyof StoredEndUserFilter>) {
 		const value = filter[field];
@@ -191,13 +190,15 @@ export class UserStore implements UserStoreInstance {
 					SELECT doc FROM ${handle(this.area)} WHERE ${where}
 					ORDER BY id LIMIT ${limit} OFFSET ${offset}
 				`,
-			handle`SELECT count(*)::int AS total FROM ${handle(this.area)} WHERE ${where}`
+			handle<
+				{ total: number }[]
+			>`SELECT count(*)::int AS total FROM ${handle(this.area)} WHERE ${where}`
 		]);
 		return {
 			users: rows
 				.map((row: unknown) => this.userOf(row))
 				.filter((user: User | null): user is User => user !== null),
-			totalResults: Number(counted[0]?.total ?? 0)
+			totalResults: counted.at(0)?.total ?? 0
 		};
 	}
 
@@ -258,7 +259,7 @@ export class UserStore implements UserStoreInstance {
 		const stored = await storedPatchOf(patch, () => this.find(_id));
 		const set: Record<string, unknown> = { updatedAt: new Date() };
 		const remove: string[] = [];
-		for (const [field, value] of Object.entries(stored)) {
+		for (const [field, value] of entriesOf(stored)) {
 			if (value === undefined) remove.push(field);
 			else set[field] = value;
 		}

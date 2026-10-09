@@ -1,7 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 
 import bootstrap from '../test_helper.js';
-import { elysia } from 'lib/index.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
@@ -10,39 +9,20 @@ import {
 	getProtectedResourceStore
 } from 'lib/adapters/index.ts';
 import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
-import {
-	ADMIN_MCP_CLIENT_ID,
-	MCP_RESOURCE,
-	MCP_ROUTE
-} from 'lib/mcp/consts.ts';
+import { ADMIN_MCP_CLIENT_ID, MCP_RESOURCE } from 'lib/mcp/consts.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { ROOT_NAMESPACE } from 'lib/resources/namespace.ts';
 import { assertNoPendingInterceptors } from '../fetch_mock.ts';
 import { serveResourceMetadata } from '../resources/resource_metadata.ts';
 import { createAdministrator } from '../administrators.ts';
+import { postMcp } from './rpc.ts';
+import { present } from '../shape.ts';
 
 let rpcId = 0;
 
 async function rpc(body: unknown, token: string) {
-	const res = await elysia.handle(
-		new Request(`http://e.ly${MCP_ROUTE}`, {
-			method: 'POST',
-			headers: {
-				'content-type': 'application/json',
-				accept: 'application/json, text/event-stream',
-				authorization: `Bearer ${token}`
-			},
-			body: JSON.stringify(body)
-		})
-	);
-	const text = await res.text();
-	const line = text.split('\n').find((l) => l.startsWith('data:'));
-	return {
-		raw: text,
-		payload: line
-			? JSON.parse(line.slice('data:'.length).trim())
-			: JSON.parse(text)
-	};
+	const { raw, message } = await postMcp(body, token);
+	return { raw, payload: present(message, 'a JSON-RPC message') };
 }
 
 function call(name: string, args: Record<string, unknown>) {

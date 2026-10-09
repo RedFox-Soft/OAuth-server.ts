@@ -36,7 +36,7 @@ export function validateClient(metadata: ClientRecord): Client {
 	// The schema pass above already rejects an absent value when responseTypes are
 	// present (mandatory), so reaching here with no redirectUris means none are
 	// required — normalise to the empty list before the structural check.
-	if (clientMetadataInput.redirectUris === undefined) {
+	if (metadata.redirectUris === undefined) {
 		clientMetadataInput.redirectUris = [];
 	}
 

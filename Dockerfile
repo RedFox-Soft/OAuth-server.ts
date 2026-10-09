@@ -21,10 +21,12 @@ ENV NODE_ENV="production"
 # The production dependencies, in a stage of their own that sees only the lockfile and the manifest.
 # Installed after the build instead, they were reinstalled on every code change — the slowest step of
 # a deploy, and a fresh layer to push each time for bytes that had not changed. Here the layer is
-# rebuilt only when `bun.lock` or `package.json` is.
+# rebuilt only when `bun.lock`, `package.json` or a dependency patch is. The lockfile names the patches,
+# so an install without `patches/` fails even when the patched package is a dev dependency it skips.
 FROM base AS deps
 
 COPY bun.lock package.json ./
+COPY patches ./patches
 RUN bun install --production --frozen-lockfile
 
 
@@ -33,6 +35,7 @@ FROM base AS build
 
 # Install node modules
 COPY bun.lock package.json ./
+COPY patches ./patches
 RUN bun install --frozen-lockfile
 
 # Copy application code

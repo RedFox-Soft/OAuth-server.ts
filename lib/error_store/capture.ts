@@ -114,7 +114,7 @@ export function captureFault(input: CaptureInput): string | undefined {
 				 */
 				reportFault(occurrence);
 			})
-			.catch((error) => {
+			.catch((error: unknown) => {
 				// Assembling a record failed, which is not the caller's problem and must not become an
 				// unhandled rejection. The console is the fallback the server used before this feature.
 				console.error('error store could not assemble a record:', error);

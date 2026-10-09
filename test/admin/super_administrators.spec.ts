@@ -10,6 +10,8 @@ import bootstrap from '../test_helper.js';
 import { sessionFor } from '../admin_session.ts';
 import { createAdministrator, type AdminKind } from '../administrators.ts';
 import { admin } from '../provisioning/helpers.ts';
+import { shaped } from '../shape.ts';
+import { Type } from '@sinclair/typebox';
 
 async function signedIn(kind: AdminKind) {
 	const user = await createAdministrator(kind);
@@ -150,7 +152,7 @@ describe('Super administrators', () => {
 		const scope = await admin('GET', '/admin/api/scope', root.cookie);
 
 		expect(
-			(groups.json as unknown as { _id: string }[]).some(
+			shaped(Type.Array(Type.Object({ _id: Type.String() })), groups.body).some(
 				(g) => g._id === SUPER_ADMINS_GROUP_ID
 			)
 		).toBe(false);

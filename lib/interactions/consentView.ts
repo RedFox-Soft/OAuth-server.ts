@@ -134,7 +134,12 @@ function rarDetailItems(detail: Record<string, unknown>): PermissionItem[] {
 		if (value === undefined) {
 			continue;
 		}
-		const rendered = Array.isArray(value) ? value.join(', ') : String(value);
+		// check_rar admits strings and lists of strings here; anything else is shown as the JSON it is.
+		const rendered = Array.isArray(value)
+			? value.join(', ')
+			: typeof value === 'string'
+				? value
+				: JSON.stringify(value);
 		// `token` stays the machine field name so it is a stable key; the label carries the whole
 		// readable line, because a field and its values are one statement rather than a token plus an
 		// explanation of it.
@@ -183,7 +188,7 @@ export function buildConsentView(args: {
 		for (const [indicator, scopes] of Object.entries(
 			details.missingResourceScopes
 		)) {
-			if (scopes?.length) {
+			if (scopes.length) {
 				permissions.push({
 					kind: 'resource-scope',
 					resourceIndicator: indicator,

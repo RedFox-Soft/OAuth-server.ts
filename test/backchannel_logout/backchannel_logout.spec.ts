@@ -24,12 +24,15 @@ import {
 	assertNoPendingInterceptors
 } from '../fetch_mock.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
-import { eventBus } from 'lib/event_bus.js';
+import { eventBus, type ServerListener } from 'lib/event_bus.js';
 import { Client } from 'lib/models/client.js';
 import { adapter } from 'lib/adapters/index.js';
 import { clientNotifications } from 'lib/shared/client_notifications.ts';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
-import { present } from 'test/shape.js';
+import { present, shaped } from 'test/shape.js';
+import { Type } from '@sinclair/typebox';
+
+const JsonObject = Type.Record(Type.String(), Type.Unknown());
 
 // Decode a JWS compact serialization sent as `logout_token=<jwt>` in the POST body.
 // The old test relied on RegExp.$1 side effects of chai's `.match`; bun's matchers don't set
@@ -39,8 +42,8 @@ function decodeLogoutToken(value: string) {
 	expect(match).toBeTruthy();
 	const [header, payload] = present(match, 'match')[1].split('.');
 	return {
-		header: JSON.parse(base64url.decode(header)),
-		payload: JSON.parse(base64url.decode(payload))
+		header: shaped(JsonObject, JSON.parse(base64url.decode(header))),
+		payload: shaped(JsonObject, JSON.parse(base64url.decode(payload)))
 	};
 }
 
@@ -256,9 +259,9 @@ describe('Back-Channel Logout 1.0', () => {
 				.intercept({ path: '/backchannel_logout', method: 'POST' })
 				.reply(500);
 
-			const successSpy = mock();
+			const successSpy = mock<ServerListener<'backchannel.success'>>();
 			eventBus.once('backchannel.success', successSpy);
-			const errorSpy = mock();
+			const errorSpy = mock<ServerListener<'backchannel.error'>>();
 			eventBus.once('backchannel.error', errorSpy);
 
 			const { accountId } = session;

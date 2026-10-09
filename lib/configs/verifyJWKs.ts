@@ -1,6 +1,7 @@
 import { Type as t, type Static } from '@sinclair/typebox';
 import { Value, type ValueError } from '@sinclair/typebox/value';
 import crypto from 'node:crypto';
+import { isList } from '../helpers/_/object.ts';
 import {
 	ECCurves,
 	ECOKPEncAlg,
@@ -117,7 +118,7 @@ export function verifyJWKs(jwks: unknown): asserts jwks is { keys: JWKS[] } {
 		typeof jwks !== 'object' ||
 		jwks === null ||
 		!('keys' in jwks) ||
-		!Array.isArray(jwks.keys) ||
+		!isList(jwks.keys) ||
 		jwks.keys.length === 0
 	) {
 		throw new Error('keystore must be a JSON Web Key Set formatted object');

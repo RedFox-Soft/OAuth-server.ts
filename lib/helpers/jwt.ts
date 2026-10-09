@@ -12,7 +12,7 @@ import { Type as t, type Static } from '@sinclair/typebox';
 import { Value } from '@sinclair/typebox/value';
 import * as base64url from './base64url.ts';
 import epochTime from './epoch_time.ts';
-import { isPlainObject } from './_/object.ts';
+import { isPlainObject, isRecord } from './_/object.ts';
 import type KeyStore from './keystore.ts';
 
 /*
@@ -80,13 +80,27 @@ export function decode(jwt: string): {
 		throw new TypeError('invalid JWT.decode input');
 	}
 	return {
-		header: JSON.parse(base64url.decode(protectedHeader)),
-		payload: JSON.parse(base64url.decode(payload))
+		header: decodeObject(protectedHeader),
+		// Only an object is checked here; the claims inside are each verifier's to check.
+		payload: decodeObject(payload)
 	};
 }
 
 export function header(jwt: string): Record<string, unknown> {
-	return JSON.parse(base64url.decode(jwt.split('.')[0]));
+	return decodeObject(jwt.split('.')[0]);
+}
+
+/*
+ * A JWT's header and claims set are JSON objects (RFC 7519 §5, §7.2). Valid JSON that is not one — `null`
+ * is the dangerous case — used to be returned as if it were, and a caller destructuring it outside its
+ * own try threw a TypeError that surfaced as a server fault on an unauthenticated request.
+ */
+function decodeObject(segment: string): Record<string, unknown> {
+	const value: unknown = JSON.parse(base64url.decode(segment));
+	if (!isRecord(value)) {
+		throw new TypeError('invalid JWT.decode input');
+	}
+	return value;
 }
 
 const jwtPayloadSchema = t.Object({
@@ -118,7 +132,7 @@ export function assertPayload(
 ): asserts payload is payloadType {
 	const timestamp = epochTime();
 
-	if (Value.Check(jwtPayloadSchema, payload) === false) {
+	if (!Value.Check(jwtPayloadSchema, payload)) {
 		const error = Value.Errors(jwtPayloadSchema, payload).First();
 		throw new TypeError(
 			error
@@ -191,7 +205,7 @@ export async function verify(
 				try {
 					verified = await compactVerify(
 						jwt,
-						await keystore.getKeyObject(key, true),
+						keystore.getKeyObject(key, true),
 						{ algorithms: options.algorithm ? [options.algorithm] : undefined }
 					);
 				} catch {

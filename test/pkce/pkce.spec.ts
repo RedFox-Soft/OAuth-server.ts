@@ -177,7 +177,7 @@ describe('PKCE RFC7636', () => {
 		});
 	});
 
-	describe('token grant_type=authorization_code', async () => {
+	describe('token grant_type=authorization_code', () => {
 		it('a client presenting a valid S256 challenge is accepted', async function () {
 			const authCode = new AuthorizationCode({
 				accountId: setup.getAccountId(),

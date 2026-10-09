@@ -5,7 +5,7 @@ import { getBucketStore, getUserStore } from 'lib/adapters/index.ts';
 import { request as requestReset } from 'lib/password_reset/challenge.ts';
 import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { lastEmail, extractResetUrl } from '../mail_capture.ts';
-import { present } from 'test/shape.js';
+import { present, textOf } from 'test/shape.js';
 
 /*
  * A reset link is single use under concurrency, not only in sequence. Redeeming one looked the secret up
@@ -54,7 +54,7 @@ describe('a reset link redeemed concurrently', () => {
 		);
 
 		const updated = results.filter((res) =>
-			String(res.data ?? '').includes('Password updated')
+			textOf(res.data).includes('Password updated')
 		);
 		expect(updated).toHaveLength(1);
 	});

@@ -45,8 +45,6 @@ import {
  */
 const _catalogIsAssignableToConsoleShape: Descriptor[] = SETTINGS_CATALOG;
 const _domainsAreAssignableToConsoleShape: DomainMeta[] = SETTING_DOMAINS;
-void _catalogIsAssignableToConsoleShape;
-void _domainsAreAssignableToConsoleShape;
 
 const d = (over: Partial<Descriptor> & { key: string }): Descriptor => ({
 	domain: 'grants',

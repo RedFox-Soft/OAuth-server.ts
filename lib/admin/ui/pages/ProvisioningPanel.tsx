@@ -178,7 +178,7 @@ function DeprovisioningGuard({
 
 	return (
 		<Space
-			direction="vertical"
+			orientation="vertical"
 			size="small"
 			style={{ width: '100%' }}
 		>
@@ -192,7 +192,7 @@ function DeprovisioningGuard({
 				<Alert
 					type="error"
 					showIcon
-					message={`Held since ${when(held.since)}, after ${held.count} deprovisioning${held.count === 1 ? '' : 's'}`}
+					title={`Held since ${when(held.since)}, after ${held.count} deprovisioning${held.count === 1 ? '' : 's'}`}
 					description="Every deactivation and deletion from the directory is refused and retried later; creates and updates still go through. The people it is trying to remove keep their access until the hold is released."
 					action={
 						<Popconfirm
@@ -801,14 +801,14 @@ export function ProvisioningPanel({
 			</Modal>
 
 			<Drawer
-				width={640}
+				size={640}
 				open={setup !== null}
 				onClose={() => setSetupId(null)}
 				title={setup ? `Set up ${setup.displayName}` : ''}
 			>
 				{setup ? (
 					<Space
-						direction="vertical"
+						orientation="vertical"
 						size="middle"
 						style={{ width: '100%' }}
 					>
@@ -816,7 +816,7 @@ export function ProvisioningPanel({
 							<Alert
 								type="warning"
 								showIcon
-								message="The directory's requests will be refused until this is fixed"
+								title="The directory's requests will be refused until this is fixed"
 								description={
 									<ul style={{ margin: 0, paddingInlineStart: 20 }}>
 										{setup.warnings.map((w) => (

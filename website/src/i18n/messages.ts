@@ -18,9 +18,11 @@ interface MessageModule {
 	source?: string;
 }
 
-const modules = import.meta.glob<MessageModule>('./messages/*/*.ts', {
-	eager: true
-});
+// Partial: a locale file can be missing, which is what the lookups below report.
+const modules: Partial<Record<string, MessageModule>> =
+	import.meta.glob<MessageModule>('./messages/*/*.ts', {
+		eager: true
+	});
 
 function modulePath(group: string, locale: LocaleKey): string {
 	return `./messages/${group}/${locale}.ts`;

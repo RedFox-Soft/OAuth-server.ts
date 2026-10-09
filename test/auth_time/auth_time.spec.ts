@@ -9,7 +9,11 @@ import {
 	spyOn
 } from 'bun:test';
 import { decodeJwt } from 'jose';
-import bootstrap, { agent, redirectParameter } from '../test_helper.js';
+import bootstrap, {
+	type Setup,
+	agent,
+	redirectParameter
+} from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 
@@ -17,8 +21,11 @@ import { OIDCContext } from 'lib/helpers/oidc_context.js';
  * @proves A relying party that asks how recently the user authenticated - by max_age, by prompt,
  * or by its own registration - gets auth_time in the id_token.
  */
-describe('responds with a id_token containing auth_time', async () => {
-	const setup = await bootstrap(import.meta.url);
+describe('responds with a id_token containing auth_time', () => {
+	let setup: Setup;
+	beforeAll(async () => {
+		setup = await bootstrap(import.meta.url);
+	});
 	let cookie = '';
 	beforeAll(async function () {
 		cookie = await setup.login();

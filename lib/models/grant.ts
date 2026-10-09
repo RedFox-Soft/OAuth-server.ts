@@ -2,6 +2,7 @@ import { Type as t, type Static } from '@sinclair/typebox';
 import { BaseToken, BaseTokenPayload } from './base_token.js';
 import { canonicalKey, canonicalKeySet } from 'lib/helpers/rar_canonical.js';
 import { ttl } from '../configs/liveTime.js';
+import { isList } from '../helpers/_/object.js';
 
 const NON_REJECTABLE_CLAIMS = new Set([
 	'sub',
@@ -207,8 +208,14 @@ export class Grant extends BaseToken<GrantPayloadType> {
 		super(payload);
 		this.payload.createdAt ||= Date.now();
 		this.payload.lastModifiedAt ||= Date.now();
-		this.payload.trusted ??=
-			this.client?.['consent.require'] === false || false;
+		/*
+		 * Untrusted unless the caller says otherwise. Whether a client may skip consent is consentWaived's
+		 * to decide (lib/shared/consent_waiver.ts), and it honours consent.require: false only in a bucket
+		 * the client's own group owns; reading the flag off a client here would skip that check.
+		 */
+		if (payload.trusted === undefined) {
+			this.payload.trusted = false;
+		}
 	}
 
 	clean() {
@@ -350,12 +357,12 @@ export class Grant extends BaseToken<GrantPayloadType> {
 	 * It lives on the model rather than in the overridable rarForAuthorizationCode default so that a
 	 * deployment shaping its own details cannot lose trusted-client handling.
 	 */
-	getRarFiltered(requested: unknown) {
-		if (!Array.isArray(requested)) {
+	getRarFiltered(requested: unknown): unknown[] {
+		if (!isList(requested)) {
 			return [];
 		}
 		if (this.payload.trusted) {
-			return requested;
+			return [...requested];
 		}
 		const granted = canonicalKeySet(this.payload.rar);
 		return requested.filter((detail) => granted.has(canonicalKey(detail)));

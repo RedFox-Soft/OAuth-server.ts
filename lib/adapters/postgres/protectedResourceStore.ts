@@ -1,4 +1,4 @@
-import { sql } from './db.js';
+import { sql, type Tx } from './db.js';
 import { docOf } from './json.js';
 import { isUniqueViolation } from './sqlState.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
@@ -147,7 +147,7 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 		if (taken.length > 0) return { conflicts: taken };
 
 		try {
-			await handle.begin(async (tx) => {
+			await handle.begin(async (tx: Tx) => {
 				for (const resource of moving) {
 					const copy = {
 						...resource,

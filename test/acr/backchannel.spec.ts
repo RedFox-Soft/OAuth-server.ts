@@ -60,7 +60,7 @@ async function collect(authReqId: string, clientId: string) {
 		grant_type: 'urn:openid:params:grant-type:ciba',
 		auth_req_id: authReqId
 	});
-	const body: unknown = res.data ?? res.error?.value;
+	const body: unknown = res.data ?? res.error.value;
 	return {
 		data: isPlainObject(body) ? body : {},
 		status: res.response.status

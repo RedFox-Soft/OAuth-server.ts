@@ -116,13 +116,19 @@ function ipv6Bytes(address: string): number[] {
 		const [a, b, c, d] = tail[1].split('.').map(Number);
 		text = `${text.slice(0, -tail[1].length)}${((a << 8) | b).toString(16)}:${((c << 8) | d).toString(16)}`;
 	}
-	const [head, rest] = text.split('::');
+	const halves = text.split('::');
+	const head = halves[0];
+	const rest = halves.at(1);
 	const left = head ? head.split(':') : [];
 	const right = rest ? rest.split(':') : [];
 	const groups =
 		rest === undefined
 			? left
-			: [...left, ...Array(8 - left.length - right.length).fill('0'), ...right];
+			: [
+					...left,
+					...Array<string>(8 - left.length - right.length).fill('0'),
+					...right
+				];
 	return groups.flatMap((group) => {
 		const value = parseInt(group, 16);
 		return [value >> 8, value & 0xff];

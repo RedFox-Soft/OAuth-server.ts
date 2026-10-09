@@ -171,7 +171,7 @@ export function Clients({
 			applicationType: row.applicationType as 'web' | 'native',
 			grantTypes: row.grantTypes,
 			tokenEndpointAuthMethod: row.tokenEndpointAuthMethod,
-			redirectUris: (row.redirectUris ?? []).join('\n'),
+			redirectUris: row.redirectUris.join('\n'),
 			scope: row.scope,
 			requireConsent: row.requireConsent,
 			authorizationDetailsTypes: row.authorizationDetailsTypes,
@@ -495,12 +495,13 @@ export function Clients({
 							placeholder="https://scheme.example/payment"
 						/>
 					</Form.Item>
-					<Form.Item
+					<Form.Item<FormValues>
 						shouldUpdate={(prev, cur) => prev.grantTypes !== cur.grantTypes}
 					>
 						{() => {
-							const grantTypes: string[] =
-								form.getFieldValue('grantTypes') ?? [];
+							const grantTypes =
+								(form.getFieldValue('grantTypes') as string[] | undefined) ??
+								[];
 							if (!grantTypes.includes(CIBA_GRANT_TYPE)) return null;
 							return (
 								<>

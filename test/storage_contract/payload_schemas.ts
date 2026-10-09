@@ -45,7 +45,9 @@ export interface ReadableSchema {
 	readonly properties: Record<string, unknown>;
 }
 
-export const PAYLOAD_SCHEMAS: Readonly<Record<string, ReadableSchema>> = {
+export const PAYLOAD_SCHEMAS: Readonly<
+	Partial<Record<string, ReadableSchema>>
+> = {
 	AccessToken: AccessTokenPayload,
 	AuthorizationCode: AuthorizationCodePayload,
 	BackchannelAuthenticationRequest: BackchannelAuthenticationRequestPayload,

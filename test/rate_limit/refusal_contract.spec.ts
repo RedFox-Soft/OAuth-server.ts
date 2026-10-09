@@ -4,6 +4,11 @@ import bootstrap from '../test_helper.js';
 import { ApplicationConfig } from 'lib/configs/application.ts';
 import { eventBus } from 'lib/event_bus.js';
 import { ORIGIN_A, flood, resetRateLimiter, send } from './helper.js';
+import { Type } from '@sinclair/typebox';
+import { shaped } from '../shape.ts';
+
+// A refusal body: a JSON object whose members each case asserts for itself.
+const Body = Type.Record(Type.String(), Type.Unknown());
 
 const STRICT = () => ApplicationConfig['rateLimit.strict.max'];
 const ORDINARY = () => ApplicationConfig['rateLimit.ordinary.max'];
@@ -87,7 +92,7 @@ describe('rate limit refusal contract', () => {
 
 		it('answers in the standard machine-readable error shape', async () => {
 			const refused = await refusalOn('/token', STRICT(), { method: 'POST' });
-			const body = await refused.json();
+			const body = shaped(Body, await refused.json());
 
 			expect(body.error).toBe('temporarily_unavailable');
 			expect(typeof body.error_description).toBe('string');
@@ -97,7 +102,7 @@ describe('rate limit refusal contract', () => {
 		// is attached, and none should be.
 		it('attaches no error reference', async () => {
 			const refused = await refusalOn('/token', STRICT(), { method: 'POST' });
-			const body = await refused.json();
+			const body = shaped(Body, await refused.json());
 
 			expect(body.error_reference).toBeUndefined();
 		});
@@ -111,7 +116,7 @@ describe('rate limit refusal contract', () => {
 		 */
 		it('answers the MCP surface in the same shape, not JSON-RPC', async () => {
 			const refused = await refusalOn('/mcp', ORDINARY(), { method: 'POST' });
-			const body = await refused.json();
+			const body = shaped(Body, await refused.json());
 
 			expect(refused.status).toBe(429);
 			expect(body.error).toBe('temporarily_unavailable');
@@ -131,7 +136,7 @@ describe('rate limit refusal contract', () => {
 		 */
 		it('answers in the admin shape', async () => {
 			const refused = await refusalOn('/admin/api/me', ORDINARY());
-			const body = await refused.json();
+			const body = shaped(Body, await refused.json());
 
 			expect(refused.status).toBe(429);
 			expect(body.error).toBe('admin_error');

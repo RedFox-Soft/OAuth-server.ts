@@ -158,7 +158,8 @@ describe('sentry fault location', () => {
 	 */
 	it('reports a fault whose location cannot be resolved', async () => {
 		const app = new Elysia().onError(errorHandler).get('/loc-unknown', () => {
-			throw 'a string, not an Error';
+			const thrown: unknown = 'a string, not an Error';
+			throw thrown;
 		});
 		await app.handle(new Request('http://e.ly/loc-unknown'));
 		await settle();

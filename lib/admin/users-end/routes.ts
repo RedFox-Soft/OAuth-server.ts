@@ -81,7 +81,7 @@ export const presentUser = <
 	return {
 		...safe,
 		totpEnrolled: Boolean(totp),
-		totpEnrolledAt: totp?.enrolledAt?.toISOString() ?? null
+		totpEnrolledAt: totp?.enrolledAt.toISOString() ?? null
 	};
 };
 

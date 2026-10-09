@@ -391,7 +391,7 @@ export function BucketGroupsPanel({
 							placeholder="Add users"
 							value={adding}
 							onChange={setAdding}
-							optionFilterProp="label"
+							showSearch={{ optionFilterProp: 'label' }}
 							options={users.map((u) => ({ label: u.email, value: u._id }))}
 						/>
 						<Button

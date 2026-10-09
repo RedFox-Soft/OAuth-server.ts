@@ -1,7 +1,7 @@
 import { describe, it, beforeAll, afterEach, expect, mock } from 'bun:test';
 
 import bootstrap, { agent, getHeader } from '../test_helper.js';
-import { eventBus } from 'lib/event_bus.js';
+import { eventBus, type ServerListener } from 'lib/event_bus.js';
 import { Client, toStored } from 'lib/models/client.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
@@ -247,7 +247,7 @@ describe('OAuth 2.0 Dynamic Client Registration Management Protocol', () => {
 
 		it('emits an event', async () => {
 			const client = await register();
-			const spy = mock();
+			const spy = mock<ServerListener<'registration_update.success'>>();
 			eventBus.once('registration_update.success', spy);
 			const res = await agent
 				.reg({ clientId: client.client_id })
@@ -309,7 +309,8 @@ describe('OAuth 2.0 Dynamic Client Registration Management Protocol', () => {
 
 			it('destroys the old RegistrationAccessToken', async () => {
 				const client = await register();
-				const spy = mock();
+				const spy =
+					mock<ServerListener<'registration_access_token.destroyed'>>();
 				eventBus.once('registration_access_token.destroyed', spy);
 				const res = await agent
 					.reg({ clientId: client.client_id })
@@ -322,7 +323,7 @@ describe('OAuth 2.0 Dynamic Client Registration Management Protocol', () => {
 
 			it('issues and returns a new, different RegistrationAccessToken', async () => {
 				const client = await register();
-				const saved = mock();
+				const saved = mock<ServerListener<'registration_access_token.saved'>>();
 				eventBus.once('registration_access_token.saved', saved);
 				const res = await agent
 					.reg({ clientId: client.client_id })
@@ -341,7 +342,7 @@ describe('OAuth 2.0 Dynamic Client Registration Management Protocol', () => {
 				const rotated = await RegistrationAccessToken.find(
 					res.data.registration_access_token
 				);
-				expect(rotated?.payload.clientId).toBe(client.client_id);
+				expect(rotated.payload.clientId).toBe(client.client_id);
 			});
 		});
 
@@ -386,7 +387,7 @@ describe('OAuth 2.0 Dynamic Client Registration Management Protocol', () => {
 
 		it('emits an event', async () => {
 			const client = await register();
-			const spy = mock();
+			const spy = mock<ServerListener<'registration_delete.success'>>();
 			eventBus.once('registration_delete.success', spy);
 			const res = await agent
 				.reg({ clientId: client.client_id })

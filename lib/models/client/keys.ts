@@ -58,6 +58,11 @@ function deriveEncryptionKey(secret: string, length: number): Buffer {
 	return crypto.hash(digest, secret, 'buffer').subarray(0, length);
 }
 
+// AES key wrap (`A128KW`, `A256GCMKW`) and content encryption (`A128GCM`, `A128CBC-HS256`); group 1
+// is the AES key size, group 2 the CBC-HS HMAC size, which sets the derived key's length instead.
+const KEY_WRAP = /^A(\d{3})(?:GCM)?KW$/;
+const CONTENT_ENCRYPTION = /^A(\d{3})(?:GCM|CBC-HS(\d{3}))$/;
+
 function deriveSymmetricKeys(client: Client): KeyStore {
 	const store = new KeyStore();
 	const algs = new Set<string>();
@@ -119,14 +124,16 @@ function deriveSymmetricKeys(client: Client): KeyStore {
 		for (const alg of algs) {
 			if (!(
 				alg.startsWith('HS') ||
-				/^A(\d{3})(?:GCM)?KW$/.test(alg) ||
-				/^A(\d{3})(?:GCM|CBC-HS(\d{3}))$/.test(alg)
+				KEY_WRAP.test(alg) ||
+				CONTENT_ENCRYPTION.test(alg)
 			)) {
 				algs.delete(alg);
 			}
 		}
 
 		for (const alg of algs) {
+			const keyWrap = KEY_WRAP.exec(alg);
+			const contentEncryption = CONTENT_ENCRYPTION.exec(alg);
 			if (alg.startsWith('HS')) {
 				store.add({
 					alg,
@@ -134,16 +141,17 @@ function deriveSymmetricKeys(client: Client): KeyStore {
 					kty: 'oct',
 					k: base64url.encode(client.clientSecret)
 				});
-			} else if (/^A(\d{3})(?:GCM)?KW$/.test(alg)) {
-				const len = parseInt(RegExp.$1, 10) / 8;
+			} else if (keyWrap) {
+				const len = parseInt(keyWrap[1], 10) / 8;
 				store.add({
 					alg,
 					use: 'enc',
 					kty: 'oct',
 					k: deriveEncryptionKey(client.clientSecret, len).toString('base64url')
 				});
-			} else if (/^A(\d{3})(?:GCM|CBC-HS(\d{3}))$/.test(alg)) {
-				const len = parseInt(RegExp.$2 || RegExp.$1, 10) / 8;
+			} else if (contentEncryption) {
+				const len =
+					parseInt(contentEncryption.at(2) ?? contentEncryption[1], 10) / 8;
 				store.add({
 					alg,
 					use: 'enc',

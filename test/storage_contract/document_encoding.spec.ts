@@ -239,7 +239,7 @@ describe('a document written to PostgreSQL', () => {
 	 */
 	it('excludes only files with a recorded reason for being excluded', () => {
 		const unexplained = [...NOT_A_WRITE_SITE.entries()]
-			.filter(([, reason]) => !reason?.trim())
+			.filter(([, reason]) => !reason.trim())
 			.map(([file]) => file);
 
 		expect(unexplained).toEqual([]);

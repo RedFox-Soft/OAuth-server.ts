@@ -6,7 +6,7 @@ aliases: [provider, event_bus]
 tags: [architecture, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-07-31
-updated: 2026-09-23
+updated: 2026-10-09
 graph:
   node_id: subsystem:event-bus
   node_type: subsystem
@@ -18,7 +18,7 @@ graph:
 The server's lifecycle event emitter, and — deliberately — nothing else:
 
 ```ts
-export const eventBus = new EventEmitter();
+export const eventBus = new EventEmitter<ServerEvents>();
 ```
 
 Actions emit, deployments subscribe. That is the entire contract, so a bare `EventEmitter` is the
@@ -63,6 +63,16 @@ way."
 
 ## Known signals
 
+**Since 2026-10-09 the shapes below are a type, `ServerEvents`** (exported with `ServerEventName` and
+`ServerListener` from `lib/index.ts`). Its imports are `import type` only, which the compiler erases, so
+the module is still a leaf. A listener for an event the server does not emit, or one expecting arguments
+it does not pass, no longer compiles. A test types its spy the same way —
+`mock<ServerListener<'access_token.saved'>>()` — which is what let `tsc` find tests reading a spy's
+arguments wrongly; an endpoint's `.error` event carries whatever its handler threw, Elysia's own errors
+included, so a test asserts `providerError(...)` (`test/shape.ts`) before reading `error_detail`. Two
+dynamic emitters stay untyped by construction: `BaseModel.emit` and the shared `onError`, which build
+the name at runtime.
+
 Each name has exactly one argument shape wherever it is emitted, and fires once per occurrence. A
 request-scoped event carries the request context (`OIDCContext`) first; where the same event can also
 happen with no protocol request behind it — the admin console ending a session — that position is
@@ -72,7 +82,7 @@ happen with no protocol request behind it — the admin console ending a session
 
 | Event | Arguments |
 |---|---|
-| `assign.client` | `(oidc, client)` |
+| `assign.client` | `(oidc, client?)` — `end_session` assigns a client that may no longer exist |
 | `authorization.accepted` | `(oidc)` |
 | `authorization.success` | `(oidc, response?)` — no body from the device-flow path |
 | `interaction.started` | `(oidc, prompt)` |
@@ -83,7 +93,7 @@ happen with no protocol request behind it — the admin console ending a session
 | `device_authorization.success` | `(oidc, response)` |
 | `pushed_authorization_request.success` | `(oidc, client)` |
 | `registration_{create,update,delete}.success` | `(oidc, client)` |
-| `code_verification.error` | `(oidc, error)` |
+| `code_verification.error` | `(oidc, error)` — `error` is whatever was caught, so `unknown` |
 | `backchannel.success` | `(oidc?, client, accountId, sid)` |
 | `backchannel.error` | `(oidc?, error, client, accountId, sid)` |
 

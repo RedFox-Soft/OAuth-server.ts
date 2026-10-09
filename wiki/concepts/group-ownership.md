@@ -135,8 +135,11 @@ can create a project and a consent-free client, and a project with no bucket sig
 bucket, which every tenant shares — so honouring the flag there gave a tenant every default-bucket user's
 claims with `prompt=none` and no page. A client in no project keeps the flag as stored, since only the
 operator can have set it (registration and client documents cannot); the console's own client passes
-because the admin project and the admin bucket are both the System group's. The spec is
-`test/consent_waiver/`.
+because the admin project and the admin bucket are both the System group's. `consentWaived` is the only
+reader of the flag that makes a grant `trusted` (via `loadExistingGrant`, `lib/addon/account.ts`): until
+2026-10-09 the `Grant` constructor also derived `trusted` from `consent.require` when handed a client,
+skipping the bucket check — unreachable only because no caller passed one. It now defaults to `false`. The
+spec is `test/consent_waiver/`.
 
 **A project and its bucket must share a group.** Enforced on `PUT /admin/api/projects/:id/bucket`, and
 it is a coherence rule about the data rather than a statement about authority — so a super

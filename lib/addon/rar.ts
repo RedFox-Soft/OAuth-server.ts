@@ -7,6 +7,8 @@
  * shaping.
  */
 
+import { isRecord } from '../helpers/_/object.ts';
+
 // Structural, and only as wide as these four functions actually read. Authorization details are
 // arbitrary client JSON, so they stay `unknown` and are narrowed where they are inspected.
 interface RarResourceServer {
@@ -30,14 +32,15 @@ interface RarContext {
 function filterToResourceServer(
 	rar: unknown,
 	resourceServer: RarResourceServer | undefined
-) {
+): Record<string, unknown>[] {
 	if (!Array.isArray(rar)) {
 		return [];
 	}
 
 	const identifier = resourceServer?.identifier();
-	return rar.filter((detail) => {
-		const locations = (detail as { locations?: unknown })?.locations;
+	// Each detail is a JSON object (RFC 9396 §2); the stored schema admits nothing else.
+	return rar.filter(isRecord).filter((detail) => {
+		const { locations } = detail;
 		if (!Array.isArray(locations)) {
 			return true;
 		}
@@ -45,13 +48,13 @@ function filterToResourceServer(
 	});
 }
 
-export function rarForAuthorizationCode(oidc: RarContext) {
+export async function rarForAuthorizationCode(oidc: RarContext) {
 	// The requested details intersected with what the resource owner granted. Grant#getRarFiltered
 	// owns the trusted-grant case, so an override of this function cannot lose it.
 	return oidc.entities.Grant?.getRarFiltered(oidc.params.authorization_details);
 }
 
-export function rarForCodeResponse(
+export async function rarForCodeResponse(
 	oidc: RarContext,
 	resourceServer: RarResourceServer
 ) {
@@ -61,7 +64,7 @@ export function rarForCodeResponse(
 	);
 }
 
-export function rarForRefreshTokenResponse(
+export async function rarForRefreshTokenResponse(
 	oidc: RarContext,
 	resourceServer: RarResourceServer
 ) {
@@ -71,7 +74,7 @@ export function rarForRefreshTokenResponse(
 	);
 }
 
-export function rarForIntrospectionResponse(
+export async function rarForIntrospectionResponse(
 	_oidc: RarContext,
 	// Any introspectable token; a client-credentials token carries no details at all.
 	token: { payload: Record<string, unknown> & { rar?: unknown } }

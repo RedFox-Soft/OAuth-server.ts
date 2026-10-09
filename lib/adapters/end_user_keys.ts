@@ -1,3 +1,4 @@
+import { entriesOf } from '../helpers/_/object.js';
 import type {
 	BucketGroup,
 	EndUserCreateFields,
@@ -89,10 +90,10 @@ export function withCreateFields(
 	fields: EndUserCreateFields = {}
 ): User {
 	const full: User = { ...user };
-	for (const [field, value] of Object.entries(fields)) {
+	for (const [field, value] of entriesOf(fields)) {
 		if (value !== undefined) Object.assign(full, { [field]: value });
 	}
-	for (const [field, value] of Object.entries(derivedKeysOf(full))) {
+	for (const [field, value] of entriesOf(derivedKeysOf(full))) {
 		if (value !== undefined) Object.assign(full, { [field]: value });
 	}
 	return full;

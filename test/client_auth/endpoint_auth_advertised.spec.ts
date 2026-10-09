@@ -44,7 +44,7 @@ async function assertion(
  * A method the document advertises that is missing here fails the test rather than being skipped:
  * the claim is "every advertised method works", and an unexercised method would pass it vacuously.
  */
-const credentials: Record<string, () => Promise<Credential>> = {
+const credentials: Partial<Record<string, () => Promise<Credential>>> = {
 	none: async () => ({ body: { client_id: 'client-none' }, headers: {} }),
 	client_secret_basic: async () => ({
 		body: {},

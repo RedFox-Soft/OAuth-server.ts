@@ -205,7 +205,7 @@ export const handler = async function authorizationCodeHandler(
 		code.payload.rar
 	) {
 		const rar = await rarForCodeResponse(oidc, at.resourceServer);
-		if (rar?.length) {
+		if (rar.length) {
 			at.payload.rar = rar;
 		}
 	}

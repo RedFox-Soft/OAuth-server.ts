@@ -51,7 +51,7 @@ async function buildResume({
 	const cookieID = nanoid();
 	const interaction = new Interaction(uid, {
 		deviceCode: deviceCode.jti,
-		session: { accountId },
+		session: accountId ? { accountId } : undefined,
 		params,
 		result,
 		cookieID
@@ -204,7 +204,7 @@ describe('device interaction resume /ui/:uid/device_resume', () => {
 				});
 
 				const { error, data } = await get(cookie);
-				const body = data ?? error?.value;
+				const body = data ?? error.value;
 				expect(body).toContain('id="op.deviceInputForm"');
 				expect(body).toContain(
 					'<p class="red">The Sign-in request was interrupted</p>'

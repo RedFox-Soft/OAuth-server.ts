@@ -1,6 +1,7 @@
 import * as crypto from 'node:crypto';
 
 import { describe, it, beforeAll, afterEach, expect, mock } from 'bun:test';
+import { textOf } from '../shape.ts';
 import { importJWK } from 'jose';
 
 import * as JWT from '../../lib/helpers/jwt.ts';
@@ -10,7 +11,7 @@ import bootstrap, {
 	getHeader,
 	type Setup
 } from '../test_helper.js';
-import { eventBus } from 'lib/event_bus.js';
+import { eventBus, type ServerListener } from 'lib/event_bus.js';
 import { Client, clientKeys } from 'lib/models/client.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { ISSUER } from 'lib/configs/env.js';
@@ -201,8 +202,8 @@ describe('request parameter features', () => {
 		route: string,
 		verb: string,
 		authorizationRequest: typeof authorization | typeof authorizationDevice,
-		errorEvt: string,
-		successEvt: string
+		errorEvt: 'authorization.error' | 'device_authorization.error',
+		successEvt: 'authorization.success' | 'device_authorization.success'
 	][] = [
 		[
 			'auth',
@@ -230,14 +231,16 @@ describe('request parameter features', () => {
 		([route, verb, authorizationRequest, errorEvt, successEvt]) => {
 			describe(`${route} ${verb} passing request parameters as JWTs`, () => {
 				it('does not use anything from the OAuth 2.0 parameters', async function () {
-					const spy = mock();
-					eventBus.once('authorization.success', spy);
-
+					// The parameters the server kept: the request's own, or for the device flow the ones its
+					// device code stored, read from the real event rather than re-emitted as a fake one.
+					const kept: Record<string, unknown>[] = [];
 					if (route === '/device/auth') {
 						eventBus.once('device_authorization.success', (oidc) => {
-							eventBus.emit('authorization.success', {
-								params: oidc.entities.DeviceCode.payload.params
-							});
+							kept.push(oidc.entities.DeviceCode?.payload.params ?? {});
+						});
+					} else {
+						eventBus.once('authorization.success', (oidc) => {
+							kept.push(oidc.params);
 						});
 					}
 
@@ -251,12 +254,12 @@ describe('request parameter features', () => {
 						verb
 					});
 
-					expect(spy).toHaveBeenCalledTimes(1);
-					expect(spy.mock.calls[0][0].params.ui_locales).toBeUndefined();
+					expect(kept).toHaveLength(1);
+					expect(kept[0]?.ui_locales).toBeUndefined();
 				});
 
 				it('can contain max_age parameter as a number and it (and other params too) will be forced as string', async function () {
-					const spy = mock();
+					const spy = mock<ServerListener<typeof successEvt>>();
 					eventBus.once(successEvt, spy);
 
 					await authorizationRequest('client', {
@@ -270,9 +273,7 @@ describe('request parameter features', () => {
 						verb
 					});
 
-					expect(spy.mock.calls[0][0]).toMatchObject({
-						params: { max_age: expect.any(Number) }
-					});
+					expect(spy.mock.calls[0][0].params.max_age).toBeNumber();
 				});
 
 				it('can contain params as array and have them handled as dupes', async function () {
@@ -485,7 +486,7 @@ describe('request parameter features', () => {
 
 						expect(response.headers.get('location')).toBeNull();
 						// A 4xx body is Eden's error value; this one is the auto-submitting page.
-						const page = String(error?.value);
+						const page = textOf(error?.value);
 						expect(page).toContain('action="https://client.example.com/cb"');
 						expect(page).toContain('name="error" value="invalid_request"');
 					});

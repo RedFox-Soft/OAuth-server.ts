@@ -16,7 +16,7 @@ import bootstrap, {
 } from '../test_helper.js';
 import { elysia } from 'lib/index.js';
 import { ISSUER } from 'lib/configs/env.js';
-import { eventBus } from 'lib/event_bus.js';
+import { eventBus, type ServerListener } from 'lib/event_bus.js';
 import { sessionCookieName } from 'lib/consts/param_list.js';
 import { DEFAULT_REQUEST_BUCKET } from 'lib/configs/issuer.js';
 import { Grant } from 'lib/models/grant.js';
@@ -188,7 +188,7 @@ describe('a flow started at a named bucket address', () => {
 	});
 
 	it('refuses a client of the default bucket at the bucket device endpoint, storing nothing', async () => {
-		const stored = mock();
+		const stored = mock<ServerListener<'device_code.saved'>>();
 		eventBus.on('device_code.saved', stored);
 
 		const response = await post(
@@ -206,7 +206,8 @@ describe('a flow started at a named bucket address', () => {
 	});
 
 	it('refuses a client of the default bucket at the bucket backchannel endpoint, storing nothing', async () => {
-		const stored = mock();
+		const stored =
+			mock<ServerListener<'backchannel_authentication_request.saved'>>();
 		eventBus.on('backchannel_authentication_request.saved', stored);
 
 		const response = await post(

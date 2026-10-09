@@ -125,7 +125,7 @@ async function enter(
 		bucket,
 		connection,
 		base,
-		leniency: { strict: ApplicationConfig['scim.strict'] === true }
+		leniency: { strict: ApplicationConfig['scim.strict'] }
 	};
 }
 
@@ -187,7 +187,8 @@ export const scimApp = new Elysia({ name: 'scim' })
 		}
 		if (text.trim() === '') return null;
 		try {
-			return JSON.parse(text);
+			const parsed: unknown = JSON.parse(text);
+			return parsed;
 		} catch {
 			throw new ScimError(
 				400,

@@ -3,6 +3,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import bootstrap, { clearSeededBuckets, seedBucket } from '../test_helper.js';
 import { elysia } from 'lib/index.js';
 import { ISSUER } from 'lib/configs/env.js';
+import { Type } from '@sinclair/typebox';
+import { shaped } from '../shape.ts';
 
 const SLUG = 'acme';
 
@@ -14,8 +16,11 @@ async function get(path: string) {
 	return elysia.handle(new Request(`http://localhost${path}`));
 }
 
+// A metadata document: members the cases read by name, each checked where it is read.
+const Metadata = Type.Record(Type.String(), Type.Unknown());
+
 async function doc(path: string) {
-	return (await get(path)).json();
+	return shaped(Metadata, await (await get(path)).json());
 }
 
 /**
@@ -53,7 +58,9 @@ describe('a named bucket publishes its own metadata', () => {
 			const res = await get(path);
 
 			expect(res.status).toBe(200);
-			expect((await res.json()).issuer).toBe(`${ISSUER}/${SLUG}`);
+			expect(shaped(Metadata, await res.json()).issuer).toBe(
+				`${ISSUER}/${SLUG}`
+			);
 		});
 	}
 

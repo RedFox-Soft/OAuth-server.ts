@@ -943,7 +943,40 @@ export const ApplicationConfig = {
 	 *   fault, not the only one, and there is no question an operator could answer to choose a value.
 	 */
 };
-Object.assign(ApplicationConfig, await configStore.get());
+
+/*
+ * The type each flag, number and string setting is declared with, taken before any stored override
+ * replaces its default. The settings API checks a value's type before storing it, but nothing checked
+ * what came back at boot, so a value that reached the store another way — a hand edit, an older
+ * release — was trusted as typed: a stored "false" is truthy, and a trust flag such as
+ * `mTLS.trustProxyCertificateHeader` would read as on.
+ */
+const DECLARED_KINDS = new Map(
+	Object.entries(ApplicationConfig).flatMap(([key, value]) => {
+		const kind = typeof value;
+		return kind === 'boolean' || kind === 'number' || kind === 'string'
+			? [[key, kind] as const]
+			: [];
+	})
+);
+
+/* Refuses to boot on a stored override whose type is not its setting's; unknown keys are left alone. */
+export function assertStoredSettingTypes(
+	stored: Record<string, unknown>
+): void {
+	for (const [key, value] of Object.entries(stored)) {
+		const kind = DECLARED_KINDS.get(key);
+		if (kind !== undefined && typeof value !== kind) {
+			throw new TypeError(
+				`stored setting ${key} must be a ${kind}, found ${value === null ? 'null' : typeof value}`
+			);
+		}
+	}
+}
+
+const storedSettings = (await configStore.get()) ?? {};
+assertStoredSettingTypes(storedSettings);
+Object.assign(ApplicationConfig, storedSettings);
 
 /*
  * Resolved here, between loading the persisted settings and validating them, and the position is the

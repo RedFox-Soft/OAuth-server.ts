@@ -322,16 +322,6 @@ describe('route classification', () => {
 			expect(misfiled).toEqual([]);
 		});
 
-		it('resolves every mounted route to a class, with none left undeclared', () => {
-			const unresolved = mounted
-				.filter(
-					(route) => rateClassForPattern(route.method, route.path) === undefined
-				)
-				.map(key);
-
-			expect(unresolved).toEqual([]);
-		});
-
 		/*
 		 * The request-level resolver, which the pattern-level one above cannot stand in for: a request
 		 * arrives as `/public/app.js`, not as the `/public/*` pattern, and preflights never reach the

@@ -81,7 +81,7 @@ type Found =
 	| { kind: 'document'; step: VouchingStep; document: unknown }
 	| { kind: 'refused'; reason: VouchingReason };
 
-async function fetchDocument(url: string): Promise<unknown | undefined> {
+async function fetchDocument(url: string): Promise<unknown> {
 	const response = await guardedFetch(url, {
 		headers: { accept: 'application/json' },
 		timeoutMs: TIMEOUT_MS,

@@ -6,42 +6,16 @@ import {
 	resetAdminMemoryStores
 } from 'lib/adapters/index.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { elysia } from 'lib/index.js';
-import {
-	ADMIN_MCP_CLIENT_ID,
-	MCP_RESOURCE,
-	MCP_ROUTE
-} from 'lib/mcp/consts.ts';
+import { ADMIN_MCP_CLIENT_ID, MCP_RESOURCE } from 'lib/mcp/consts.ts';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import bootstrap from '../test_helper.js';
 import { createAdministrator } from '../administrators.ts';
 import { pathBucketWith } from '../global_token_revocation/helpers.js';
 import { logoutProvider, uniqueOrigin } from './helpers.ts';
+import { rpc } from '../mcp/rpc.ts';
 
 let rpcId = 0;
-
-async function rpc(body: unknown, token: string): Promise<unknown> {
-	const res = await elysia.handle(
-		new Request(`http://e.ly${MCP_ROUTE}`, {
-			method: 'POST',
-			headers: {
-				'content-type': 'application/json',
-				accept: 'application/json, text/event-stream',
-				authorization: `Bearer ${token}`
-			},
-			body: JSON.stringify(body)
-		})
-	);
-	const text = await res.text();
-	const line = (res.headers.get('content-type') ?? '').includes(
-		'text/event-stream'
-	)
-		? text.split('\n').find((l) => l.startsWith('data:'))
-		: undefined;
-	if (line) return JSON.parse(line.slice('data:'.length).trim());
-	return text ? JSON.parse(text) : undefined;
-}
 
 /* An agent acting for a super administrator, its session initialised as an MCP client initialises one. */
 async function agentSession() {
@@ -111,7 +85,7 @@ describe('an agent connecting a provider’s back-channel logout', () => {
 		);
 
 		const stored = await getBucketStore().find(bucket._id);
-		expect(stored?.federation?.[0]?.acceptsBackChannelLogout).toBe(true);
+		expect(stored?.federation[0]?.acceptsBackChannelLogout).toBe(true);
 		const { entries } = await adminAuditStore.list({ actor: user._id });
 		expect(
 			entries.filter((entry) => entry.action === 'federation.provider.update')

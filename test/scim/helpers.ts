@@ -9,6 +9,10 @@ import {
 	type CreateConnectionInput
 } from 'lib/provisioning/service.js';
 import { SCIM_PATCH_OP, SCIM_USER_SCHEMA } from 'lib/consts/scim.js';
+import { Type } from '@sinclair/typebox';
+import { shaped } from '../shape.ts';
+
+const JsonObject = Type.Record(Type.String(), Type.Unknown());
 
 /*
  * Shared scaffolding for the SCIM suites: a bucket with a federation provider, a connection bound to it
@@ -102,7 +106,7 @@ export async function connect(
 		fresh,
 		{
 			displayName: 'Directory',
-			providerId: input.providerId ?? fresh.federation?.[0]?.id ?? 'corp',
+			providerId: input.providerId ?? fresh.federation.at(0)?.id ?? 'corp',
 			...input
 		},
 		noAudit
@@ -156,13 +160,17 @@ export async function scim(
 		new Request(`http://e.ly${path}`, { method, headers, body })
 	);
 	const text = await response.text();
-	let json: Record<string, unknown>;
+	let parsed: unknown;
 	try {
-		json = text ? JSON.parse(text) : {};
+		parsed = text ? JSON.parse(text) : {};
 	} catch {
-		json = { raw: text };
+		parsed = { raw: text };
 	}
-	return { status: response.status, json, headers: response.headers };
+	return {
+		status: response.status,
+		json: shaped(JsonObject, parsed),
+		headers: response.headers
+	};
 }
 
 /* A SCIM User a directory would send. */

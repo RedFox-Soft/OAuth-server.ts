@@ -186,7 +186,7 @@ describe('JSON Web Token (JWT) RFC7519 implementation', () => {
 					(valid) => {
 						expect(valid).not.toBeTruthy();
 					},
-					(err) => {
+					(err: unknown) => {
 						expect(err).toBeTruthy();
 						expect(err).toBeInstanceOf(Error);
 						expect(err).toHaveProperty('message', 'jwt not active yet');
@@ -217,7 +217,7 @@ describe('JSON Web Token (JWT) RFC7519 implementation', () => {
 					(valid) => {
 						expect(valid).not.toBeTruthy();
 					},
-					(err) => {
+					(err: unknown) => {
 						expect(err).toBeTruthy();
 						expect(err).toBeInstanceOf(Error);
 						expect(err).toHaveProperty(
@@ -241,7 +241,7 @@ describe('JSON Web Token (JWT) RFC7519 implementation', () => {
 					(valid) => {
 						expect(valid).not.toBeTruthy();
 					},
-					(err) => {
+					(err: unknown) => {
 						expect(err).toBeTruthy();
 						expect(err).toBeInstanceOf(Error);
 						expect(err).toHaveProperty('message', 'jwt issued in the future');
@@ -272,7 +272,7 @@ describe('JSON Web Token (JWT) RFC7519 implementation', () => {
 					(valid) => {
 						expect(valid).not.toBeTruthy();
 					},
-					(err) => {
+					(err: unknown) => {
 						expect(err).toBeTruthy();
 						expect(err).toBeInstanceOf(Error);
 						expect(err).toHaveProperty(
@@ -296,7 +296,7 @@ describe('JSON Web Token (JWT) RFC7519 implementation', () => {
 					(valid) => {
 						expect(valid).not.toBeTruthy();
 					},
-					(err) => {
+					(err: unknown) => {
 						expect(err).toBeTruthy();
 						expect(err).toBeInstanceOf(Error);
 						expect(err).toHaveProperty('message', 'jwt expired');
@@ -341,7 +341,7 @@ describe('JSON Web Token (JWT) RFC7519 implementation', () => {
 					(valid) => {
 						expect(valid).not.toBeTruthy();
 					},
-					(err) => {
+					(err: unknown) => {
 						expect(err).toBeTruthy();
 						expect(err).toBeInstanceOf(Error);
 						expect(err).toHaveProperty(
@@ -390,7 +390,7 @@ describe('JSON Web Token (JWT) RFC7519 implementation', () => {
 				.then((valid) => {
 					expect(valid).not.toBeTruthy();
 				})
-				.catch((err) => {
+				.catch((err: unknown) => {
 					expect(err).toBeTruthy();
 					expect(err).toBeInstanceOf(Error);
 					expect(err).toHaveProperty('message', 'jwt audience missing pappa');
@@ -411,7 +411,7 @@ describe('JSON Web Token (JWT) RFC7519 implementation', () => {
 				.then((valid) => {
 					expect(valid).not.toBeTruthy();
 				})
-				.catch((err) => {
+				.catch((err: unknown) => {
 					expect(err).toBeTruthy();
 					expect(err).toBeInstanceOf(Error);
 					expect(err).toHaveProperty('message', 'jwt audience missing pappa');
@@ -444,10 +444,9 @@ describe('JSON Web Token (JWT) RFC7519 implementation', () => {
 				.then((valid) => {
 					expect(valid).not.toBeTruthy();
 				})
-				.catch((err) => {
-					expect(err).toBeTruthy();
+				.catch((err: unknown) => {
 					expect(err).toBeInstanceOf(Error);
-					expect(err).toHaveProperty('message');
+					if (!(err instanceof Error)) throw err;
 					expect(err.message).toMatch(/jwt issuer invalid/);
 				});
 		});

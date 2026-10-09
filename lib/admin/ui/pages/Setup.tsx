@@ -57,7 +57,7 @@ export function Setup() {
 						<Alert
 							type="error"
 							showIcon
-							message={error}
+							title={error}
 						/>
 					</Form.Item>
 				)}

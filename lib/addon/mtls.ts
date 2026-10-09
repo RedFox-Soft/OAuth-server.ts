@@ -24,7 +24,7 @@ export function getCertificate(oidc: OIDCContext) {
 	if (!standard && !legacy) {
 		return undefined;
 	}
-	if (ApplicationConfig['mTLS.trustProxyCertificateHeader'] !== true) {
+	if (!ApplicationConfig['mTLS.trustProxyCertificateHeader']) {
 		mustChange(
 			'features.mTLS.getCertificate',
 			'read a forwarded client certificate: switch on mTLS.trustProxyCertificateHeader once the TLS-terminating proxy sets Client-Cert and strips any incoming copy (certificate headers are ignored until then)'

@@ -37,7 +37,9 @@ function readCookie(value: string) {
 type AuthParams = Static<typeof AuthorizationParameters>;
 
 // A spec's `clients` export: registration metadata, a few members still under their stored names.
-type SeedClient = ClientSchemaType & { token_endpoint_auth_method?: string };
+export type SeedClient = ClientSchemaType & {
+	token_endpoint_auth_method?: string;
+};
 
 // The stored interaction, checked against the model's own schema.
 function storedInteraction(uid: string) {
@@ -62,7 +64,7 @@ export class AuthorizationRequest {
 	grant_type: string = 'authorization_code';
 
 	constructor(parameters: Partial<AuthParams> = {}) {
-		const [defaultClient] = AuthorizationRequest.clients;
+		const defaultClient = AuthorizationRequest.clients.at(0);
 		if (!defaultClient) {
 			throw new Error('No clients have been registered');
 		}
@@ -166,10 +168,10 @@ export class AuthorizationRequest {
 
 	validateInteractionRedirect(response: Response) {
 		const location = getLocation(response);
-		const { hostname, search, query } = parse(location);
-		expect(hostname).toBeNull();
-		expect(search).toBeNull();
-		expect(query).toBeNull();
+		// Relative and query-free: resolved against a placeholder, any host of its own would replace it.
+		const url = new URL(location, 'http://relative.invalid');
+		expect(url.host).toBe('relative.invalid');
+		expect(url.search).toBe('');
 		const cookies = response.headers.getSetCookie();
 		expect(Array.isArray(cookies)).toBeTrue();
 
@@ -207,7 +209,7 @@ export class AuthorizationRequest {
 			'the interaction prompt'
 		);
 		expect(name).toBe(eName);
-		expect(reasons).toEqual(expect.arrayContaining(eReasons));
+		expect(reasons).toContainValues(eReasons);
 	}
 
 	validatePresence(response: Response, properties: string[], all = true) {
@@ -220,7 +222,7 @@ export class AuthorizationRequest {
 		if (all) {
 			expect(Object.keys(query)).toEqual(properties);
 		} else {
-			expect(Object.keys(query)).toEqual(expect.arrayContaining(properties));
+			expect(Object.keys(query)).toContainValues(properties);
 		}
 	}
 

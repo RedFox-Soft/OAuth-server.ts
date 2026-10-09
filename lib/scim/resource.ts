@@ -375,7 +375,7 @@ export function desiredUserOf(canonical: ScimObject): DesiredUser {
 		profile.enterprise = enterprise;
 	}
 	if (!Value.Check(EndUserProfile, profile)) {
-		const first = [...Value.Errors(EndUserProfile, profile)][0];
+		const first = Value.Errors(EndUserProfile, profile).First();
 		const where = first?.path
 			? first.path.replace(/^\//, '').replaceAll('/', '.')
 			: 'a value';

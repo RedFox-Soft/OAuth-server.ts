@@ -11,7 +11,7 @@ import {
 import { request as requestReset } from 'lib/password_reset/challenge.ts';
 import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { extractResetUrl, lastEmail } from '../mail_capture.ts';
-import { present } from 'test/shape.js';
+import { present, textOf } from 'test/shape.js';
 import { END_USER_PASSWORD_TOO_SHORT } from 'lib/consts/password_policy.ts';
 
 /*
@@ -91,7 +91,7 @@ describe('the password an end user chooses', () => {
 		});
 		// Refused as a form to correct, as a mismatch is — a 400, not the 500 of a fault.
 		expect(res.response.status).toBe(400);
-		expect(String(res.error?.value)).toContain(END_USER_PASSWORD_TOO_SHORT);
+		expect(textOf(res.error?.value)).toContain(END_USER_PASSWORD_TOO_SHORT);
 
 		const after = await getUserStore(bucketId).find(user._id);
 		expect(

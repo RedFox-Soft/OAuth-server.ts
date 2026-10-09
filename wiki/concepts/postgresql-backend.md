@@ -4,7 +4,7 @@ title: 'The PostgreSQL backend: two expiry reversals, a silent encoding defect, 
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-09-10
-updated: 2026-09-28
+updated: 2026-10-09
 ---
 
 # The PostgreSQL backend
@@ -83,6 +83,13 @@ first symptom was a login that could not find a user plainly present in the tabl
 write sites pass objects. The lesson is stated in the file: **a tolerant decoder in front of an
 encoding bug is indistinguishable from correct behaviour right up until something queries inside the
 document.**
+
+**A row is `unknown` until it is checked** (since 2026-10-09). Bun types a query's rows `any` unless
+given a type argument, `` sql<User[]>`…` ``, which nothing verifies. `sql()` returns the `Sql` type of
+`lib/adapters/postgres/db.ts`, whose rows default to `unknown[]` (and `Tx` for a `begin()` callback's
+handle), so a document reaches the code only through `docOf` / `payloadOf` and the area's schema. A
+type argument is kept for projections whose shape the query itself fixes — `count(*)::int AS total`,
+`RETURNING id`.
 
 Two smaller instances of the same shape:
 

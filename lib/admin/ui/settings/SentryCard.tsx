@@ -100,8 +100,8 @@ export function SentryCard() {
 						<Tag color="green">applies immediately</Tag>
 					)}
 					{configured ? (
-						<Tag color={view?.enabled ? 'green' : 'default'}>
-							{view?.enabled ? 'reporting' : 'stored, off'}
+						<Tag color={view.enabled ? 'green' : 'default'}>
+							{view.enabled ? 'reporting' : 'stored, off'}
 						</Tag>
 					) : (
 						<Tag color="orange">no credential</Tag>
@@ -116,8 +116,8 @@ export function SentryCard() {
 						style={{ marginBottom: 8 }}
 					>
 						A credential is stored and cannot be shown again. Events are filed
-						under environment <strong>{view?.environment || 'unknown'}</strong>
-						{view?.release ? (
+						under environment <strong>{view.environment || 'unknown'}</strong>
+						{view.release ? (
 							<>
 								{' '}
 								and release <strong>{view.release}</strong>

@@ -194,7 +194,7 @@ describe('signing out at one bucket while signed in to two', () => {
 
 		const notified: string[] = [];
 		const listener = (_ctx: unknown, client: { clientId?: string }) =>
-			notified.push(client?.clientId ?? 'unknown');
+			notified.push(client.clientId ?? 'unknown');
 		eventBus.on('backchannel.success', listener);
 		try {
 			await signOutAt(`/${SLUG}`, `${held}; ${acmeCookie}`);

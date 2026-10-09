@@ -19,7 +19,7 @@ import bootstrap, {
 	type Setup,
 	formAgent
 } from '../test_helper.js';
-import { eventBus } from 'lib/event_bus.js';
+import { eventBus, type ServerListener } from 'lib/event_bus.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
 import { AccessToken } from 'lib/models/access_token.js';
@@ -154,7 +154,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 		});
 
 		it('binds the access token to the certificate', async function () {
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.success'>>();
 			eventBus.once('grant.success', spy);
 
 			const { status } = await agent.token.post(
@@ -174,12 +174,17 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 			const {
 				entities: { AccessToken: accessToken, RefreshToken: refreshToken }
 			} = spy.mock.calls[0][0];
-			expect(accessToken.payload).toHaveProperty('x5t#S256', expectedS256);
-			expect(refreshToken.payload).not.toHaveProperty('x5t#S256');
+			expect(present(accessToken, 'the access token').payload).toHaveProperty(
+				'x5t#S256',
+				expectedS256
+			);
+			expect(
+				present(refreshToken, 'the refresh token').payload
+			).not.toHaveProperty('x5t#S256');
 		});
 
 		it('verifies the request made with mutual-TLS', async function () {
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.error'>>();
 			eventBus.once('grant.error', spy);
 
 			const { error } = await agent.token.post(
@@ -205,7 +210,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 		});
 
 		it('binds the refresh token to the certificate for public clients', async function () {
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.success'>>();
 			eventBus.once('grant.success', spy);
 
 			// changes the code to client-none
@@ -232,8 +237,14 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 			const {
 				entities: { AccessToken: accessToken, RefreshToken: refreshToken }
 			} = spy.mock.calls[0][0];
-			expect(accessToken.payload).toHaveProperty('x5t#S256', expectedS256);
-			expect(refreshToken.payload).toHaveProperty('x5t#S256', expectedS256);
+			expect(present(accessToken, 'the access token').payload).toHaveProperty(
+				'x5t#S256',
+				expectedS256
+			);
+			expect(present(refreshToken, 'the refresh token').payload).toHaveProperty(
+				'x5t#S256',
+				expectedS256
+			);
 		});
 	});
 
@@ -256,7 +267,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 		});
 
 		it('binds the access token to the certificate', async function () {
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.success'>>();
 			eventBus.once('grant.success', spy);
 
 			const { status } = await agent.token.post(
@@ -276,12 +287,17 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 			const {
 				entities: { AccessToken: accessToken, RefreshToken: refreshToken }
 			} = spy.mock.calls[0][0];
-			expect(accessToken.payload).toHaveProperty('x5t#S256', expectedS256);
-			expect(refreshToken.payload).not.toHaveProperty('x5t#S256');
+			expect(present(accessToken, 'the access token').payload).toHaveProperty(
+				'x5t#S256',
+				expectedS256
+			);
+			expect(
+				present(refreshToken, 'the refresh token').payload
+			).not.toHaveProperty('x5t#S256');
 		});
 
 		it('verifies the request made with mutual-TLS', async function () {
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.error'>>();
 			eventBus.once('grant.error', spy);
 
 			const { error } = await agent.token.post(
@@ -307,7 +323,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 		});
 
 		it('binds the refresh token to the certificate for public clients', async function () {
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.success'>>();
 			eventBus.once('grant.success', spy);
 
 			// changes the code to client-none
@@ -344,8 +360,14 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 			const {
 				entities: { AccessToken: accessToken, RefreshToken: refreshToken }
 			} = spy.mock.calls[0][0];
-			expect(accessToken.payload).toHaveProperty('x5t#S256', expectedS256);
-			expect(refreshToken.payload).toHaveProperty('x5t#S256', expectedS256);
+			expect(present(accessToken, 'the access token').payload).toHaveProperty(
+				'x5t#S256',
+				expectedS256
+			);
+			expect(present(refreshToken, 'the refresh token').payload).toHaveProperty(
+				'x5t#S256',
+				expectedS256
+			);
 		});
 	});
 
@@ -375,7 +397,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 		describe('authorization_code', () => {
 			it('binds the access token to the certificate', async function () {
-				const spy = mock();
+				const spy = mock<ServerListener<'grant.success'>>();
 				eventBus.once('grant.success', spy);
 				const { status } = await auth.getToken(code, {
 					headers: {
@@ -387,12 +409,17 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 				const {
 					entities: { AccessToken: accessToken, RefreshToken: refreshToken }
 				} = spy.mock.calls[0][0];
-				expect(accessToken.payload).toHaveProperty('x5t#S256', expectedS256);
-				expect(refreshToken.payload).not.toHaveProperty('x5t#S256');
+				expect(present(accessToken, 'the access token').payload).toHaveProperty(
+					'x5t#S256',
+					expectedS256
+				);
+				expect(
+					present(refreshToken, 'the refresh token').payload
+				).not.toHaveProperty('x5t#S256');
 			});
 
 			it('verifies the request made with mutual-TLS', async function () {
-				const spy = mock();
+				const spy = mock<ServerListener<'grant.error'>>();
 				eventBus.once('grant.error', spy);
 
 				const { error } = await auth.getToken(code);
@@ -424,7 +451,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 			});
 
 			it('binds the access token to the certificate', async function () {
-				const spy = mock();
+				const spy = mock<ServerListener<'grant.success'>>();
 				eventBus.once('grant.success', spy);
 
 				const { status } = await agent.token.post(
@@ -445,12 +472,17 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 				const {
 					entities: { AccessToken: accessToken, RefreshToken: refreshToken }
 				} = spy.mock.calls[0][0];
-				expect(accessToken.payload).toHaveProperty('x5t#S256', expectedS256);
-				expect(refreshToken.payload['x5t#S256']).toBeUndefined();
+				expect(present(accessToken, 'the access token').payload).toHaveProperty(
+					'x5t#S256',
+					expectedS256
+				);
+				expect(
+					present(refreshToken, 'the refresh token').payload['x5t#S256']
+				).toBeUndefined();
 			});
 
 			it('verifies the request made with mutual-TLS', async function () {
-				const spy = mock();
+				const spy = mock<ServerListener<'grant.error'>>();
 				eventBus.once('grant.error', spy);
 
 				const { error } = await agent.token.post(
@@ -508,7 +540,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 		describe('authorization_code', () => {
 			it('binds the access token to the certificate', async function () {
-				const spy = mock();
+				const spy = mock<ServerListener<'grant.success'>>();
 				eventBus.once('grant.success', spy);
 
 				const { status } = await auth.getToken(code, {
@@ -521,12 +553,17 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 				const {
 					entities: { AccessToken: accessToken, RefreshToken: refreshToken }
 				} = spy.mock.calls[0][0];
-				expect(accessToken.payload).toHaveProperty('x5t#S256', expectedS256);
-				expect(refreshToken.payload).toHaveProperty('x5t#S256', expectedS256);
+				expect(present(accessToken, 'the access token').payload).toHaveProperty(
+					'x5t#S256',
+					expectedS256
+				);
+				expect(
+					present(refreshToken, 'the refresh token').payload
+				).toHaveProperty('x5t#S256', expectedS256);
 			});
 
 			it('verifies the request made with mutual-TLS', async function () {
-				const spy = mock();
+				const spy = mock<ServerListener<'grant.error'>>();
 				eventBus.once('grant.error', spy);
 
 				const { error } = await auth.getToken(code);
@@ -558,7 +595,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 			});
 
 			it('binds the access token to the certificate', async function () {
-				const spy = mock();
+				const spy = mock<ServerListener<'grant.success'>>();
 				eventBus.once('grant.success', spy);
 
 				const { status } = await agent.token.post(
@@ -579,12 +616,17 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 				const {
 					entities: { AccessToken: accessToken, RefreshToken: refreshToken }
 				} = spy.mock.calls[0][0];
-				expect(accessToken.payload).toHaveProperty('x5t#S256', expectedS256);
-				expect(refreshToken.payload).toHaveProperty('x5t#S256', expectedS256);
+				expect(present(accessToken, 'the access token').payload).toHaveProperty(
+					'x5t#S256',
+					expectedS256
+				);
+				expect(
+					present(refreshToken, 'the refresh token').payload
+				).toHaveProperty('x5t#S256', expectedS256);
 			});
 
 			it('verifies the request made with mutual-TLS', async function () {
-				const spy = mock();
+				const spy = mock<ServerListener<'grant.error'>>();
 				eventBus.once('grant.error', spy);
 
 				const { error } = await agent.token.post({
@@ -607,7 +649,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 			});
 
 			it('verifies the request made with mutual-TLS using the same cert', async function () {
-				const spy = mock();
+				const spy = mock<ServerListener<'grant.error'>>();
 				eventBus.once('grant.error', spy);
 
 				const { error } = await agent.token.post(
@@ -642,7 +684,7 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 
 	describe('client_credentials', () => {
 		it('binds the access token to the certificate', async function () {
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.success'>>();
 			eventBus.once('grant.success', spy);
 
 			const { status } = await agent.token.post(
@@ -662,14 +704,13 @@ describe('features.mTLS.certificateBoundAccessTokens', () => {
 			const {
 				entities: { ClientCredentials }
 			} = spy.mock.calls[0][0];
-			expect(ClientCredentials.payload).toHaveProperty(
-				'x5t#S256',
-				expectedS256
-			);
+			expect(
+				present(ClientCredentials, 'the client credentials').payload
+			).toHaveProperty('x5t#S256', expectedS256);
 		});
 
 		it('verifies the request was made with mutual-TLS', async function () {
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.error'>>();
 			eventBus.once('grant.error', spy);
 
 			const { error } = await agent.token.post(

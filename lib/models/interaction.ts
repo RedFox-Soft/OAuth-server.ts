@@ -3,6 +3,8 @@ import epochTime from '../helpers/epoch_time.js';
 import { BaseModel, BaseModelPayload } from './base_model.js';
 import type { InteractionResult } from '../helpers/oidc_context.ts';
 import { StoredParams } from './stored_params.ts';
+import type { Grant } from './grant.ts';
+import type { Session } from './session.ts';
 
 /*
  * The outcome the interaction screens record. Like the stored parameters, it is copied verbatim on save
@@ -108,51 +110,45 @@ export const InteractionPayload = t.Object({
 });
 export type InteractionPayloadType = Static<typeof InteractionPayload>;
 
+/*
+ * What a new interaction is made from: its payload, where `session` and `grant` may still be the live
+ * models, which the constructor reduces to what the record stores. The models are imported as types
+ * only, which are erased, so this adds no edge to the model graph (wiki: model-graph-import-order).
+ */
+type InteractionInit = Record<string, unknown> & {
+	session?: Session | InteractionPayloadType['session'];
+	grant?: Grant;
+};
+
+// The part of a session an interaction keeps; a session nobody has signed in to keeps none.
+function storedSession(session: Session): InteractionPayloadType['session'] {
+	const { accountId, uid, jti, acr, amr } = session.payload;
+	if (!accountId) return undefined;
+	return {
+		accountId,
+		...(uid ? { uid } : undefined),
+		...(jti ? { cookie: jti } : undefined),
+		...(acr ? { acr } : undefined),
+		...(amr ? { amr } : undefined)
+	};
+}
+
 export class Interaction extends BaseModel<InteractionPayloadType> {
 	static schema = InteractionPayload;
 
 	// Read back from storage, the stored payload alone (that is how tryFind builds one); new, an id and a payload.
 	constructor(payload: InteractionPayloadType);
-	constructor(jti: string, payload: Record<string, unknown>);
-	constructor(
-		jti: string | InteractionPayloadType,
-		payload?: Record<string, unknown>
-	) {
+	constructor(jti: string, payload: InteractionInit);
+	constructor(jti: string | InteractionPayloadType, payload?: InteractionInit) {
 		if (typeof jti === 'string' && payload) {
-			if (payload.session instanceof BaseModel) {
-				const { session } = payload;
-				Object.assign(
-					payload,
-					session.payload.accountId
-						? {
-								session: {
-									accountId: session.payload.accountId,
-									...(session.payload.uid
-										? { uid: session.payload.uid }
-										: undefined),
-									...(session.payload.jti
-										? { cookie: session.payload.jti }
-										: undefined),
-									...(session.payload.acr
-										? { acr: session.payload.acr }
-										: undefined),
-									...(session.payload.amr
-										? { amr: session.payload.amr }
-										: undefined)
-								}
-							}
-						: { session: undefined }
-				);
-			}
-
-			if (payload.grant instanceof BaseModel) {
-				const { grant } = payload;
-				if (grant.id) {
-					Object.assign(payload, { grantId: grant.id });
-				}
-			}
-
-			super({ jti, ...payload });
+			const { session, grant, ...rest } = payload;
+			super({
+				jti,
+				...rest,
+				session:
+					session instanceof BaseModel ? storedSession(session) : session,
+				...(grant?.id ? { grantId: grant.id } : undefined)
+			});
 		} else if (typeof jti !== 'string') {
 			super(jti);
 		} else {

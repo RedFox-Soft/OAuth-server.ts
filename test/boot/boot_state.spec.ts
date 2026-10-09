@@ -2,6 +2,8 @@ import { describe, it, expect, afterAll } from 'bun:test';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { Type } from '@sinclair/typebox';
+import { shaped } from '../shape.ts';
 
 /*
  * What a freshly booted server has, before anything reloads or reconfigures it.
@@ -87,8 +89,22 @@ async function boot() {
 	]);
 
 	expect({ exitCode, stderr }).toEqual({ exitCode: 0, stderr: '' });
-	return JSON.parse(stdout);
+	return shaped(BootReport, JSON.parse(stdout));
 }
+
+// What BOOT_SCRIPT writes; a count or byte length the child could not produce is null.
+const BootReport = Type.Object({
+	published: Type.Number(),
+	held: Type.Number(),
+	canSign: Type.Boolean(),
+	nonceSecretIsBuffer: Type.Boolean(),
+	nonceSecretBytes: Type.Union([Type.Number(), Type.Null()]),
+	pairwiseSaltUsable: Type.Boolean(),
+	pairwiseSaltBytes: Type.Union([Type.Number(), Type.Null()]),
+	scopes: Type.Array(Type.String()),
+	claimsSupported: Type.Array(Type.String()),
+	openidClaims: Type.Array(Type.String())
+});
 
 // One boot, shared by the cases below: starting a process is the expensive part, and every
 // assertion is about the same booted state.

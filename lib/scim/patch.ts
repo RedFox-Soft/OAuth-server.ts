@@ -11,6 +11,7 @@ import {
 	type ScimAttribute
 } from '../consts/scim.js';
 import { ScimError } from './errors.js';
+import { isList } from '../helpers/_/object.js';
 import { tokenize } from './filter.js';
 import {
 	assertNoForbiddenKeys,
@@ -107,9 +108,9 @@ function parseValueFilter(text: string): Equality[] {
 	const out: Equality[] = [];
 	let i = 0;
 	for (;;) {
-		const attr = tokens[i++];
-		const op = tokens[i++];
-		const value = tokens[i++];
+		const attr = tokens.at(i++);
+		const op = tokens.at(i++);
+		const value = tokens.at(i++);
 		if (
 			attr?.kind !== 'word' ||
 			op?.kind !== 'word' ||
@@ -133,7 +134,7 @@ function parseValueFilter(text: string): Equality[] {
 			);
 		}
 		if (i >= tokens.length) return out;
-		const and = tokens[i++];
+		const and = tokens.at(i++);
 		if (and?.kind !== 'word' || and.text.toLowerCase() !== 'and') {
 			throw invalidPath('value filter terms may only be joined by and');
 		}
@@ -351,7 +352,7 @@ function applyToAttribute(
 				};
 			}
 			const replacement = canonicalValue(attribute, [value], leniency);
-			return Array.isArray(replacement) ? replacement[0] : replacement;
+			return isList(replacement) ? replacement[0] : replacement;
 		});
 		return;
 	}
@@ -398,7 +399,7 @@ function applyToAttribute(
 			);
 		}
 		const named = new Set(
-			(Array.isArray(value) ? value : [value])
+			(isList(value) ? value : [value])
 				.map((v) => (isObject(v) ? v.value : v))
 				.filter((v): v is string => typeof v === 'string')
 		);
@@ -416,7 +417,7 @@ function applyToAttribute(
 	}
 	const incoming = canonicalValue(attribute, value, leniency);
 	if (attribute.multiValued) {
-		const values = Array.isArray(incoming) ? incoming : [incoming];
+		const values = isList(incoming) ? incoming : [incoming];
 		if (op === 'replace') {
 			container[key] = values;
 			return;

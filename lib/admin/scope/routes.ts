@@ -105,7 +105,7 @@ export const scopeRoutes = new Elysia({ name: 'admin-scope' })
 				throw new AdminError(403, 'no access to this group');
 			}
 
-			const sessionId = cookie[ADMIN_SESSION_COOKIE]?.value as
+			const sessionId = cookie[ADMIN_SESSION_COOKIE].value as
 				string | undefined;
 			if (!sessionId) {
 				/*

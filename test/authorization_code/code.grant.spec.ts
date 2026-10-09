@@ -9,8 +9,9 @@ import {
 	mock,
 	setSystemTime
 } from 'bun:test';
+import { providerError } from 'test/shape.ts';
 
-import { eventBus } from 'lib/event_bus.js';
+import { eventBus, type ServerListener } from 'lib/event_bus.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { Client } from 'lib/models/client.js';
 import epochTime from '../../lib/helpers/epoch_time.ts';
@@ -78,22 +79,20 @@ describe('grant_type=authorization_code', () => {
 		});
 
 		it('the token response carries access token, token type, expiry and scope', async function () {
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.success'>>();
 			eventBus.once('grant.success', spy);
 
 			const { data, response } = await auth.getToken(code);
 			expect(response.status).toBe(200);
 			expect(spy).toHaveBeenCalledTimes(1);
 			if (!data) throw new Error('expected a token response');
-			expect(Object.keys(data)).toEqual(
-				expect.arrayContaining([
-					'access_token',
-					'id_token',
-					'expires_in',
-					'token_type',
-					'scope'
-				])
-			);
+			expect(data).toContainKeys([
+				'access_token',
+				'id_token',
+				'expires_in',
+				'token_type',
+				'scope'
+			]);
 			expect(data).not.toHaveProperty('refresh_token');
 		});
 
@@ -114,7 +113,7 @@ describe('grant_type=authorization_code', () => {
 			const code = redirectParameter(response, 'code');
 
 			setSystemTime(Date.now() + 10 * 1000);
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.error'>>();
 			eventBus.on('grant.error', spy);
 
 			const { error } = await auth.getToken(code);
@@ -131,8 +130,8 @@ describe('grant_type=authorization_code', () => {
 		});
 
 		it('a spent code is refused as invalid_grant', async function () {
-			const grantErrorSpy = mock();
-			const grantRevokeSpy = mock();
+			const grantErrorSpy = mock<ServerListener<'grant.error'>>();
+			const grantRevokeSpy = mock<ServerListener<'grant.revoked'>>();
 			eventBus.on('grant.error', grantErrorSpy);
 			eventBus.on('grant.revoked', grantRevokeSpy);
 
@@ -161,7 +160,7 @@ describe('grant_type=authorization_code', () => {
 		});
 
 		it('a code issued to another client is refused', async function () {
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.error'>>();
 			eventBus.on('grant.error', spy);
 			auth.clientId = 'client2';
 
@@ -187,7 +186,7 @@ describe('grant_type=authorization_code', () => {
 		});
 
 		it('a redirect_uri differing from the one the code was issued for is refused', async function () {
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.error'>>();
 			eventBus.on('grant.error', spy);
 
 			auth.params.redirect_uri = 'https://client.example.com/cb?thensome';
@@ -221,7 +220,7 @@ describe('grant_type=authorization_code', () => {
 			// the DB-backed findAccount now resolves nothing for this subject.
 			await getUserStore('redfox').destroy(setup.getAccountId());
 
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.error'>>();
 			eventBus.on('grant.error', spy);
 
 			const { error } = await auth.getToken(code);
@@ -229,7 +228,7 @@ describe('grant_type=authorization_code', () => {
 			expect(error.status).toBe(400);
 			expect(spy).toBeCalledTimes(1);
 			const err = spy.mock.calls[0][0];
-			expect(err.error_detail).toBe(
+			expect(providerError(err).error_detail).toBe(
 				'authorization code invalid (referenced account not found)'
 			);
 			expect(error.value).toHaveProperty('error', 'invalid_grant');
@@ -260,7 +259,7 @@ describe('grant_type=authorization_code', () => {
 		});
 
 		it('a client with several registered redirect URIs must send one', async function () {
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.error'>>();
 			eventBus.on('grant.error', spy);
 
 			auth.params.redirect_uri = undefined;
@@ -318,7 +317,7 @@ describe('grant_type=authorization_code', () => {
 		});
 
 		it('returns the access token, token type, expiry and scope the client expects', async function () {
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.success'>>();
 			eventBus.on('grant.success', spy);
 
 			const { data, response } = await auth.getToken(code);
@@ -326,15 +325,13 @@ describe('grant_type=authorization_code', () => {
 			expect(response.status).toBe(200);
 			expect(spy).toBeCalledTimes(1);
 			if (!data) throw new Error('expected a token response');
-			expect(Object.keys(data)).toEqual(
-				expect.arrayContaining([
-					'access_token',
-					'id_token',
-					'expires_in',
-					'token_type',
-					'scope'
-				])
-			);
+			expect(data).toContainKeys([
+				'access_token',
+				'id_token',
+				'expires_in',
+				'token_type',
+				'scope'
+			]);
 			expect(data).not.toHaveProperty('refresh_token');
 		});
 
@@ -355,7 +352,7 @@ describe('grant_type=authorization_code', () => {
 			const code = redirectParameter(response, 'code');
 
 			setSystemTime(Date.now() + 10 * 1000);
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.error'>>();
 			eventBus.on('grant.error', spy);
 
 			const { error } = await auth.getToken(code);
@@ -372,8 +369,8 @@ describe('grant_type=authorization_code', () => {
 		});
 
 		it('a spent code is refused as invalid_grant', async function () {
-			const grantErrorSpy = mock();
-			const grantRevokeSpy = mock();
+			const grantErrorSpy = mock<ServerListener<'grant.error'>>();
+			const grantRevokeSpy = mock<ServerListener<'grant.revoked'>>();
 			eventBus.on('grant.error', grantErrorSpy);
 			eventBus.on('grant.revoked', grantRevokeSpy);
 
@@ -400,7 +397,7 @@ describe('grant_type=authorization_code', () => {
 		});
 
 		it('a code issued to another client is refused', async function () {
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.error'>>();
 			eventBus.on('grant.error', spy);
 
 			auth.clientId = 'client';
@@ -426,7 +423,7 @@ describe('grant_type=authorization_code', () => {
 		});
 
 		it('a provided redirect_uri must still match even when it could have been omitted', async function () {
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.error'>>();
 			eventBus.on('grant.error', spy);
 
 			auth.params.redirect_uri = 'https://client.example.com/cb?thensome';
@@ -447,7 +444,7 @@ describe('grant_type=authorization_code', () => {
 			// the DB-backed findAccount now resolves nothing for this subject.
 			await getUserStore('redfox').destroy(setup.getAccountId());
 
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.error'>>();
 			eventBus.on('grant.error', spy);
 
 			const { error } = await auth.getToken(code);
@@ -556,7 +553,7 @@ describe('grant_type=authorization_code', () => {
 		});
 
 		it('an unknown code is refused as invalid_grant', async function () {
-			const spy = mock();
+			const spy = mock<ServerListener<'grant.error'>>();
 			eventBus.on('grant.error', spy);
 
 			const auth = new AuthorizationRequest({
@@ -588,7 +585,7 @@ describe('grant_type=authorization_code', () => {
 
 	it('an internal fault at the token endpoint answers server_error rather than leaking', async function () {
 		spyOn(Client, 'find').mockRejectedValue(new Error());
-		const spy = mock();
+		const spy = mock<ServerListener<'server_error'>>();
 		eventBus.on('server_error', spy);
 
 		const auth = new AuthorizationRequest({

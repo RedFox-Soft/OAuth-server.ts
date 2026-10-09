@@ -39,6 +39,12 @@ export const expiredInteractionCookie = (uid: string) => ({
 });
 
 // The first prompt of the policy whose checks this request fails, or null when none does.
+// What `interaction.started` carries: the failing prompt, without the check that failed it.
+export type StartedPrompt = Omit<
+	NonNullable<Awaited<ReturnType<typeof pendingPrompt>>>,
+	'firstError'
+>;
+
 async function pendingPrompt(oidc: OIDCContext<PipelineParams>) {
 	for (const poly of interactionPolicy()) {
 		if (poly.name === 'consent' && (await consentWaived(oidc))) {
@@ -105,7 +111,7 @@ export default async function interactions(oidc: OIDCContext<PipelineParams>) {
 	 * both consent checks already read for this purpose. Scoped to the ACR reasons: every other
 	 * prompt can legitimately be satisfied by a further interaction.
 	 */
-	if (oidc.result?.login && prompt.reasons?.some(isAcrReason)) {
+	if (oidc.result?.login && prompt.reasons.some(isAcrReason)) {
 		throw new errors.UnmetAuthenticationRequirements(
 			failedCheck.error_description
 		);
@@ -131,7 +137,7 @@ export default async function interactions(oidc: OIDCContext<PipelineParams>) {
 		// hand-off and a flow needing two interactions loses it entirely.
 		parJti:
 			oidc.entities.PushedAuthorizationRequest?.jti ||
-			oidc.entities.Interaction?.payload?.parJti
+			oidc.entities.Interaction?.payload.parJti
 	});
 
 	await interactionSession.save(ttl.Interaction);

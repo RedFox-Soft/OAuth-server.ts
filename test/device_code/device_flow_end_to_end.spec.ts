@@ -26,7 +26,8 @@ class Browser {
 			new Request(`http://e.ly${path}`, {
 				redirect: 'manual',
 				...init,
-				headers: { ...(init.headers ?? {}), cookie: this.cookie }
+				// Built rather than spread: a Headers instance spreads as an empty object.
+				headers: withCookie(init.headers, this.cookie)
 			})
 		);
 		for (const set of response.headers.getSetCookie()) {
@@ -254,3 +255,9 @@ describe('a device sign-in from a browser with no session', () => {
 		});
 	});
 });
+
+function withCookie(init: HeadersInit | undefined, cookie: string): Headers {
+	const headers = new Headers(init);
+	headers.set('cookie', cookie);
+	return headers;
+}

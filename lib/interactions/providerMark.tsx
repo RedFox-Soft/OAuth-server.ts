@@ -127,7 +127,7 @@ function githubMark(): ReactElement {
 	);
 }
 
-const MARKS: Record<string, () => ReactElement> = {
+const MARKS: Partial<Record<string, () => ReactElement>> = {
 	google: googleMark,
 	microsoft: microsoftMark,
 	apple: appleMark,

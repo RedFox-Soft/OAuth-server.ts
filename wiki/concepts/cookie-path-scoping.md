@@ -4,7 +4,7 @@ title: "A cookie's Path is part of its identity"
 tags: [contract, gotcha, architecture]
 sources: [oauth-server-codebase]
 created: 2026-08-27
-updated: 2026-09-16
+updated: 2026-10-08
 graph:
   node_type: concept
   relationships:
@@ -132,9 +132,12 @@ established the client may be used at this address at all. `signInBucket` is del
 into `bucket`, which is what `issuerFor` stamps into a token — a bucket with no address of its own
 would silently change issuer.
 
-The bare `_session` is now a legacy name. It is never read, and `clearLegacySessionCookie` expires it
-on the first request that presents it — cleared rather than ignored, or the browser sends it forever
-and a later change reintroducing the name finds a stale value waiting.
+The bare `_session` is no longer a legacy name: since `536d9b7` it is the session cookie of a bucket
+addressed by a hostname of its own ([[bucket-is-an-issuer]]). A `clearLegacySessionCookie` used to
+expire it on every request that presented it; on such a bucket's origin that cleared the live cookie,
+and an anonymous session not re-issued in the same response was lost. It was removed on 2026-10-08. On
+the issuer's origin the pre-2026-09-16 cookie is simply never read, and no host-addressed bucket shares
+that origin, so a stale one cannot reach the bucket that now owns the name.
 
 ## Why the existing test could not see it
 

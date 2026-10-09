@@ -10,7 +10,7 @@ import {
 
 import bootstrap, { agent, getHeader, type Setup } from '../test_helper.js';
 import { ISSUER } from 'lib/configs/env.js';
-import { eventBus } from 'lib/event_bus.js';
+import { eventBus, type ServerListener } from 'lib/event_bus.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
@@ -407,7 +407,7 @@ describe('introspection features', () => {
 		});
 
 		it('a failed client authentication at introspection emits the error event', async function () {
-			const spy = mock();
+			const spy = mock<ServerListener<'introspection.error'>>();
 			eventBus.once('introspection.error', spy);
 
 			const { status } = await agent.token.introspect.post(

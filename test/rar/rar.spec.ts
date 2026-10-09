@@ -9,6 +9,8 @@ import {
 	expect,
 	mock
 } from 'bun:test';
+import { Type } from '@sinclair/typebox';
+import { present, shaped } from 'test/shape.ts';
 
 import * as JWT from '../../lib/helpers/jwt.ts';
 import bootstrap, {
@@ -22,12 +24,17 @@ import bootstrap, {
 } from '../test_helper.js';
 import { elysia } from '../../lib/index.ts';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
-import { eventBus } from 'lib/event_bus.js';
+import { eventBus, type ServerListener } from 'lib/event_bus.js';
 import { addons } from 'lib/addon/registry.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { Grant } from 'lib/models/grant.js';
 import { PAYMENT_TYPE, OPEN_TYPE } from './rar.config.ts';
+
+const ErrorBody = Type.Object({
+	error: Type.String(),
+	error_description: Type.String()
+});
 
 /*
  * A real cookie jar, not a string concatenation. Resuming an authorization request calls
@@ -116,7 +123,7 @@ describe('features.richAuthorizationRequests', () => {
 	 * next request to the login prompt instead.
 	 */
 	async function approve(uid: string, jar: Jar) {
-		const codeSpy = mock();
+		const codeSpy = mock<ServerListener<'authorization_code.saved'>>();
 		eventBus.once('authorization_code.saved', codeSpy);
 		const { response } = await agent
 			.ui({ uid: uid })
@@ -252,7 +259,9 @@ describe('features.richAuthorizationRequests', () => {
 			const session = await toConsent(auth, cookie);
 			const approved = await approve(session.uid, session.jar);
 
-			const grant = await Grant.find(approved.code.payload.grantId);
+			const grant = await Grant.find(
+				present(approved.code.payload.grantId, 'the grant id')
+			);
 			expect(grant.payload.rar).toEqual([payment()]);
 
 			const repeat = new AuthorizationRequest({
@@ -346,7 +355,10 @@ describe('features.richAuthorizationRequests', () => {
 			const session = await toConsent(auth, cookie);
 			const { code } = await approve(session.uid, session.jar);
 
-			const { status, data } = await exchange(auth, code.jti);
+			const { status, data } = await exchange(
+				auth,
+				present(code.jti, 'the code id')
+			);
 			if (data === null) throw new Error('expected a success response');
 
 			expect(status).toBe(200);
@@ -368,7 +380,7 @@ describe('features.richAuthorizationRequests', () => {
 
 			const { status, data } = await exchange(
 				auth,
-				code.jti,
+				present(code.jti, 'the code id'),
 				'urn:rar:default'
 			);
 			if (data === null) throw new Error('expected a success response');
@@ -391,12 +403,19 @@ describe('features.richAuthorizationRequests', () => {
 			const session = await toConsent(auth, cookie);
 			const { code } = await approve(session.uid, session.jar);
 
-			const { status, data } = await exchange(auth, code.jti, 'urn:rar:jwt');
+			const { status, data } = await exchange(
+				auth,
+				present(code.jti, 'the code id'),
+				'urn:rar:jwt'
+			);
 			if (data === null) throw new Error('expected a success response');
 			expect(status).toBe(200);
 
-			const claims = JSON.parse(
-				Buffer.from(data.access_token.split('.')[1], 'base64url').toString()
+			const claims = shaped(
+				Type.Object({ authorization_details: Type.Array(Type.Unknown()) }),
+				JSON.parse(
+					Buffer.from(data.access_token.split('.')[1], 'base64url').toString()
+				)
 			);
 			expect(claims.authorization_details).toEqual([payment()]);
 		});
@@ -414,7 +433,7 @@ describe('features.richAuthorizationRequests', () => {
 			});
 			const session = await toConsent(auth, cookie);
 			const { code } = await approve(session.uid, session.jar);
-			const { data } = await exchange(auth, code.jti);
+			const { data } = await exchange(auth, present(code.jti, 'the code id'));
 			if (data === null) throw new Error('expected a success response');
 
 			const introspected = await agent.token.introspect.post({
@@ -482,7 +501,7 @@ describe('features.richAuthorizationRequests', () => {
 			const { code } = await approve(session.uid, session.jar);
 			expect(code.payload.rar).toEqual(shaped);
 
-			const { data } = await exchange(auth, code.jti);
+			const { data } = await exchange(auth, present(code.jti, 'the code id'));
 			if (data === null) throw new Error('expected a success response');
 			expect(data.authorization_details).toEqual(shaped);
 		});
@@ -502,11 +521,17 @@ describe('features.richAuthorizationRequests', () => {
 
 			// Granted, and carried on the code...
 			expect(code.payload.rar).toEqual([payment()]);
-			const grant = await Grant.find(code.payload.grantId);
+			const grant = await Grant.find(
+				present(code.payload.grantId, 'the grant id')
+			);
 			expect(grant.payload.rar).toEqual([payment()]);
 
 			// ...but the token request asks for no resource, so no token carries them.
-			const { status, data } = await exchange(auth, code.jti, null);
+			const { status, data } = await exchange(
+				auth,
+				present(code.jti, 'the code id'),
+				null
+			);
 			expect(status).toBe(200);
 			expect(data).not.toHaveProperty('authorization_details');
 		});
@@ -718,7 +743,7 @@ describe('features.richAuthorizationRequests', () => {
 			});
 			const session = await toConsent(auth, cookie);
 			const { code } = await approve(session.uid, session.jar);
-			const { data } = await exchange(auth, code.jti);
+			const { data } = await exchange(auth, present(code.jti, 'the code id'));
 			if (data === null) throw new Error('expected a success response');
 			expect(data.refresh_token).toBeTruthy();
 
@@ -746,7 +771,11 @@ describe('features.richAuthorizationRequests', () => {
 			});
 			const session = await toConsent(auth, cookie);
 			const { code } = await approve(session.uid, session.jar);
-			const { data } = await exchange(auth, code.jti, 'urn:rar:default');
+			const { data } = await exchange(
+				auth,
+				present(code.jti, 'the code id'),
+				'urn:rar:default'
+			);
 			if (data === null) throw new Error('expected a success response');
 
 			const first = await agent.token.post({
@@ -838,7 +867,9 @@ describe('features.richAuthorizationRequests', () => {
 			expect(data).not.toContain('Initiate a payment');
 
 			const { code } = await approve(session.uid, session.jar);
-			const grant = await Grant.find(code.payload.grantId);
+			const grant = await Grant.find(
+				present(code.payload.grantId, 'the grant id')
+			);
 			expect(grant.payload.rar).toHaveLength(2);
 		});
 
@@ -872,7 +903,7 @@ describe('features.richAuthorizationRequests', () => {
 				scope: 'openid',
 				resource: ['urn:rar:default']
 			});
-			const codeSpy = mock();
+			const codeSpy = mock<ServerListener<'authorization_code.saved'>>();
 			eventBus.once('authorization_code.saved', codeSpy);
 			const response = await auth.authorize({
 				headers: { cookie: header(cookie) }
@@ -881,7 +912,10 @@ describe('features.richAuthorizationRequests', () => {
 			const code = codeSpy.mock.calls[0][0];
 			expect(code.payload).not.toHaveProperty('rar');
 
-			const { status, data } = await exchange(auth, code.jti);
+			const { status, data } = await exchange(
+				auth,
+				present(code.jti, 'the code id')
+			);
 			if (data === null) throw new Error('expected a success response');
 			expect(status).toBe(200);
 			expect(data).not.toHaveProperty('authorization_details');
@@ -899,7 +933,7 @@ describe('features.richAuthorizationRequests', () => {
 				resource: ['urn:rar:default'],
 				authorization_details: []
 			});
-			const codeSpy = mock();
+			const codeSpy = mock<ServerListener<'authorization_code.saved'>>();
 			eventBus.once('authorization_code.saved', codeSpy);
 			await auth.authorize({ headers: { cookie: header(cookie) } });
 			const code = codeSpy.mock.calls[0][0];
@@ -941,12 +975,11 @@ describe('features.richAuthorizationRequests', () => {
 				});
 				if (!error) throw new Error('expected error response');
 				expect(status).toBe(400);
-				expect(error.value).toMatchObject({
-					error: 'invalid_request',
-					error_description: expect.stringContaining(
-						'authorization_details is unsupported'
-					)
-				});
+				const body = shaped(ErrorBody, error.value);
+				expect(body.error).toBe('invalid_request');
+				expect(body.error_description).toContain(
+					'authorization_details is unsupported'
+				);
 			} finally {
 				await restore();
 				ApplicationConfig['deviceFlow.enabled'] = false;

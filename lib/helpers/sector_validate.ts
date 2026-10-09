@@ -43,7 +43,7 @@ export default async function sectorValidate(client: Client) {
 		);
 	}
 
-	let body;
+	let body: unknown;
 	try {
 		body = JSON.parse(text);
 	} catch (err) {

@@ -21,7 +21,7 @@ import bootstrap, {
 import * as JWT from '../../lib/helpers/jwt.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { elysia } from 'lib/index.js';
-import { eventBus } from 'lib/event_bus.js';
+import { eventBus, type ServerListener } from 'lib/event_bus.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
 import { present } from 'test/shape.js';
@@ -235,7 +235,7 @@ describe('logout endpoint', () => {
 					post_logout_redirect_uri: 'https://client.example.com/logout/cb'
 				};
 
-				const spy = mock();
+				const spy = mock<ServerListener<'end_session.error'>>();
 				eventBus.once('end_session.error', spy);
 				const { status } = await agent.logout.get({
 					query,
@@ -264,7 +264,7 @@ describe('logout endpoint', () => {
 					post_logout_redirect_uri: 'https://client.example.com/logout/cb'
 				};
 
-				const spy = mock();
+				const spy = mock<ServerListener<'end_session.error'>>();
 				eventBus.once('end_session.error', spy);
 
 				const { status } = await agent.logout.get({
@@ -310,7 +310,7 @@ describe('logout endpoint', () => {
 						post_logout_redirect_uri: 'https://client.example.com/logout/cb'
 					};
 
-					const spy = mock();
+					const spy = mock<ServerListener<'end_session.error'>>();
 					eventBus.once('end_session.error', spy);
 
 					const { status } = await agent.logout.get({
@@ -396,7 +396,7 @@ describe('logout endpoint', () => {
 		});
 
 		it('a post-logout target the client did not register is refused', async function () {
-			const spy = mock();
+			const spy = mock<ServerListener<'end_session.error'>>();
 			eventBus.once('end_session.error', spy);
 			const query = {
 				id_token_hint: idToken,
@@ -423,7 +423,7 @@ describe('logout endpoint', () => {
 		});
 
 		it('rejects invalid JWTs', async function () {
-			const spy = mock();
+			const spy = mock<ServerListener<'end_session.error'>>();
 			eventBus.once('end_session.error', spy);
 			const query = {
 				id_token_hint: 'not.a.jwt'
@@ -448,8 +448,27 @@ describe('logout endpoint', () => {
 			);
 		});
 
+		it('refuses a hint whose claims set is not a JSON object as a bad request, not a server fault', async () => {
+			const spy = mock<ServerListener<'end_session.error'>>();
+			eventBus.once('end_session.error', spy);
+			const segment = (json: string) => Buffer.from(json).toString('base64url');
+
+			const { status } = await agent.logout.get({
+				query: {
+					id_token_hint: `${segment('{"alg":"none"}')}.${segment('null')}.sig`
+				}
+			});
+			expect(status).toBe(400);
+			expect(spy).toHaveBeenCalledWith(
+				expect.objectContaining({
+					error: 'invalid_request',
+					error_description: 'could not decode id_token_hint'
+				})
+			);
+		});
+
 		it('rejects JWTs with unrecognized client', async function () {
-			const spy = mock();
+			const spy = mock<ServerListener<'end_session.error'>>();
 			eventBus.once('end_session.error', spy);
 			const query = {
 				id_token_hint: await JWT.sign(
@@ -482,7 +501,7 @@ describe('logout endpoint', () => {
 		});
 
 		it('rejects JWTs with bad signatures', async function () {
-			const spy = mock();
+			const spy = mock<ServerListener<'end_session.error'>>();
 			eventBus.once('end_session.error', spy);
 			const query = {
 				id_token_hint: await JWT.sign(
@@ -532,7 +551,7 @@ describe('logout endpoint', () => {
 			});
 
 			it('a logout confirmation carrying the wrong CSRF secret is refused', async function () {
-				const spy = mock();
+				const spy = mock<ServerListener<'end_session_confirm.error'>>();
 				eventBus.once('end_session_confirm.error', spy);
 				setup.getSession().state = { secret: '123' };
 
@@ -652,7 +671,7 @@ describe('logout endpoint', () => {
 					postLogoutRedirectUri: 'https://rp.example.com/logout/cb',
 					clientId: 'client'
 				};
-				const revoked = mock();
+				const revoked = mock<ServerListener<'grant.revoked'>>();
 				eventBus.on('grant.revoked', revoked);
 
 				const res = await agent.logout.confirm.post(

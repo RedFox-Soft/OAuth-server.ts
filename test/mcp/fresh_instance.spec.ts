@@ -19,6 +19,8 @@ import {
 import { clearPermissions } from './permissions.ts';
 import { DEFAULT_REQUEST_BUCKET } from 'lib/configs/issuer.ts';
 import { createAdministrator } from '../administrators.ts';
+import { Type } from '@sinclair/typebox';
+import { shaped } from '../shape.ts';
 
 /*
  * The refusal an operator cannot see.
@@ -164,8 +166,9 @@ describe('connecting an agent to a freshly provisioned instance', () => {
 		);
 
 		const jwt = await token.issue('idtoken');
-		const claims = JSON.parse(
-			Buffer.from(jwt.split('.')[1], 'base64url').toString()
+		const claims = shaped(
+			Type.Object({ iss: Type.String() }),
+			JSON.parse(Buffer.from(jwt.split('.')[1], 'base64url').toString())
 		);
 
 		expect(claims.iss).toBe(ISSUER);

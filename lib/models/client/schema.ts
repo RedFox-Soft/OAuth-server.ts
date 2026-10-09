@@ -262,8 +262,12 @@ export default function getSchema() {
 				if (
 					lengthOf(this.metadata.responseTypes) &&
 					Array.isArray(this.metadata.redirectUris) &&
-					new Set(this.metadata.redirectUris.map((uri) => new URL(uri).host))
-						.size > 1
+					new Set(
+						this.metadata.redirectUris
+							// A non-string entry is the type check's to refuse, not this one's to throw on.
+							.filter((uri): uri is string => typeof uri === 'string')
+							.map((uri) => new URL(uri).host)
+					).size > 1
 				) {
 					checked.push('sector_identifier_uri');
 				}

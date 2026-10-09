@@ -79,7 +79,6 @@ async function runSweeps(sweeps: readonly AreaSweep[]): Promise<CascadeResult> {
 	const outcomes = await Promise.allSettled(sweeps.map((sweep) => sweep.run()));
 	for (const [index, outcome] of outcomes.entries()) {
 		const sweep = sweeps[index];
-		if (!sweep) continue;
 		if (outcome.status === 'fulfilled') {
 			destroyed[sweep.area] = outcome.value;
 		} else {
@@ -92,7 +91,9 @@ async function runSweeps(sweeps: readonly AreaSweep[]): Promise<CascadeResult> {
 
 function merge(...results: readonly CascadeResult[]): CascadeResult {
 	return {
-		destroyed: Object.assign({}, ...results.map((r) => r.destroyed)),
+		destroyed: Object.fromEntries(
+			results.flatMap((r) => Object.entries(r.destroyed))
+		),
 		failedAreas: results.flatMap((r) => [...r.failedAreas])
 	};
 }

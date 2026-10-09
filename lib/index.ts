@@ -8,6 +8,12 @@ import { backchannelResult } from './actions/authorization/backchannel_result.ts
 
 export default eventBus;
 export { backchannelResult, errors, eventBus, interactionPolicy };
+// What a deployment's subscriber codes against: every event name and the arguments it carries.
+export type {
+	ServerEvents,
+	ServerEventName,
+	ServerListener
+} from './event_bus.ts';
 
 import { Elysia } from 'elysia';
 import { staticPlugin } from '@elysiajs/static';

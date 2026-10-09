@@ -1,7 +1,7 @@
 import { beforeAll, describe, it, expect, mock } from 'bun:test';
 
 import bootstrap, { agent } from '../test_helper.js';
-import { eventBus } from 'lib/event_bus.js';
+import { eventBus, type ServerListener } from 'lib/event_bus.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 
 /**
@@ -13,7 +13,7 @@ describe('grant_type=client_credentials', () => {
 	});
 
 	it('provides a Bearer client credentials token', async function () {
-		const spy = mock();
+		const spy = mock<ServerListener<'grant.success'>>();
 		eventBus.once('grant.success', spy);
 
 		const { status, data } = await agent.token.post(
@@ -33,7 +33,10 @@ describe('grant_type=client_credentials', () => {
 	});
 
 	it('ignores unsupported scopes', async function () {
-		const spy = mock();
+		const spy =
+			mock<
+				ServerListener<'client_credentials.issued' | 'client_credentials.saved'>
+			>();
 		eventBus.once('client_credentials.saved', spy);
 		eventBus.once('client_credentials.issued', spy);
 

@@ -1422,9 +1422,9 @@ export const ui = new Elysia()
 		// The view builder reads no configuration, so the type → label map is resolved here and
 		// handed in.
 		const rarLabels = Object.fromEntries(
-			Object.entries(
-				ApplicationConfig['richAuthorizationRequests.types'] ?? {}
-			).map(([type, descriptor]) => [type, descriptor.label ?? type])
+			Object.entries(ApplicationConfig['richAuthorizationRequests.types']).map(
+				([type, descriptor]) => [type, descriptor.label]
+			)
 		);
 		return consentServer(
 			buildConsentView({

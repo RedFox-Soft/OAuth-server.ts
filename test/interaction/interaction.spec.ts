@@ -5,10 +5,16 @@ import {
 	beforeEach,
 	expect,
 	spyOn,
-	mock
+	mock,
+	beforeAll
 } from 'bun:test';
 import nanoid from '../../lib/helpers/nanoid.ts';
-import bootstrap, { agent, getHeader, noPrompts } from '../test_helper.js';
+import bootstrap, {
+	type Setup,
+	agent,
+	getHeader,
+	noPrompts
+} from '../test_helper.js';
 import { SESSION_COOKIE_PREFIX } from '../test_helper.js';
 import epochTime from '../../lib/helpers/epoch_time.ts';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
@@ -43,8 +49,11 @@ expire.setDate(expire.getDate() + 1);
  * @proves A user signs in and consents through the interaction pages and is returned to the
  * client, and no interaction completes on a session that ended or changed hands.
  */
-describe('interaction UI', async () => {
-	const setup = await bootstrap(import.meta.url);
+describe('interaction UI', () => {
+	let setup: Setup;
+	beforeAll(async () => {
+		setup = await bootstrap(import.meta.url);
+	});
 	afterEach(function () {
 		mock.restore();
 	});
@@ -483,8 +492,11 @@ describe('interaction UI', async () => {
 	});
 });
 
-describe('resume after consent', async () => {
-	const setup = await bootstrap(import.meta.url);
+describe('resume after consent', () => {
+	let setup: Setup;
+	beforeAll(async () => {
+		setup = await bootstrap(import.meta.url);
+	});
 	afterEach(function () {
 		mock.restore();
 	});

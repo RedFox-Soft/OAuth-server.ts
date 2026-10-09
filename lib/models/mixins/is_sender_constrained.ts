@@ -25,7 +25,7 @@ export default function constrained<TPayload extends ConstrainedPayload>(
 					);
 				}
 				this.payload[x5t] = certificateThumbprint(input);
-			} else if (prop === 'jkt') {
+			} else {
 				if (this.payload[x5t]) {
 					throw new InvalidRequest(
 						'multiple proof-of-posession mechanisms are not allowed'

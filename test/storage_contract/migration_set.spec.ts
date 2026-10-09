@@ -18,8 +18,8 @@ function ids(set: readonly Migration[]): string[] {
 }
 
 /**
- * @proves Every declared migration has a unique sortable id, accounts for both backends, and
- * says how it is safe to apply twice and whether it can be reversed.
+ * @proves Every declared migration has a unique sortable id and says how it is safe to apply
+ * twice and whether it can be reversed. That it covers both backends is the type's to enforce.
  */
 describe('the declared migration set', () => {
 	it('uses each id exactly once', () => {
@@ -34,15 +34,6 @@ describe('the declared migration set', () => {
 		// gets broken.
 		const sorted = [...ids(MIGRATIONS)].sort();
 		expect(ids(MIGRATIONS)).toEqual(sorted);
-	});
-
-	it('accounts for both backends in every entry', () => {
-		const incomplete = MIGRATIONS.filter(
-			(migration) =>
-				migration.mongodb === undefined || migration.postgres === undefined
-		).map((migration) => migration.id);
-
-		expect(incomplete).toEqual([]);
 	});
 
 	it('gives every no-op a reason that is not empty', () => {

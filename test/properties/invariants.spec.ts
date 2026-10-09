@@ -166,7 +166,7 @@ describe('the derived content security policy', () => {
 	 */
 	it('does not read a longer tag name as a closing tag', () => {
 		const letters = fc.string({
-			unit: fc.constantFrom(...'abcdefghijklmnopqrstuvwxyz'),
+			unit: fc.constantFrom(...'abcdefghijklmnopqrstuvwxyz'.split('')),
 			minLength: 1,
 			maxLength: 8
 		});

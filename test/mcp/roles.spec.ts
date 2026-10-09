@@ -11,17 +11,14 @@ import {
 	ADMIN_SESSION_COOKIE,
 	UNASSIGNED_GROUP_ID
 } from 'lib/admin/consts.ts';
-import {
-	ADMIN_MCP_CLIENT_ID,
-	MCP_RESOURCE,
-	MCP_ROUTE
-} from 'lib/mcp/consts.ts';
+import { ADMIN_MCP_CLIENT_ID, MCP_RESOURCE } from 'lib/mcp/consts.ts';
 import { mcpCatalogue, pathArgName } from 'lib/mcp/catalogue.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
 import { shaped } from 'test/shape.js';
 import { Type } from '@sinclair/typebox';
 import { createAdministrator, type AdminKind } from '../administrators.ts';
+import { call, rpc } from './rpc.ts';
 
 /*
  * SC-006: no agent-initiated operation succeeds with permissions the same account would not have in the
@@ -34,43 +31,6 @@ import { createAdministrator, type AdminKind } from '../administrators.ts';
  */
 
 let rpcId = 0;
-
-async function rpc(body: unknown, token: string) {
-	const res = await elysia.handle(
-		new Request(`http://e.ly${MCP_ROUTE}`, {
-			method: 'POST',
-			headers: {
-				'content-type': 'application/json',
-				accept: 'application/json, text/event-stream',
-				authorization: `Bearer ${token}`
-			},
-			body: JSON.stringify(body)
-		})
-	);
-	const text = await res.text();
-	const isEvent = (res.headers.get('content-type') ?? '').includes(
-		'text/event-stream'
-	);
-	const line = isEvent
-		? text.split('\n').find((l) => l.startsWith('data:'))
-		: undefined;
-	return isEvent
-		? line
-			? JSON.parse(line.slice('data:'.length).trim())
-			: undefined
-		: text
-			? JSON.parse(text)
-			: undefined;
-}
-
-function call(name: string, args: Record<string, unknown>) {
-	return {
-		jsonrpc: '2.0',
-		id: ++rpcId,
-		method: 'tools/call',
-		params: { name, arguments: args }
-	};
-}
 
 /* One administrator, reachable both ways: an MCP token and a console cookie. */
 async function principal(kind: AdminKind) {
@@ -121,7 +81,7 @@ async function viaAgent(
 ) {
 	const response = await rpc(call(tool, args), token);
 	if (response.result?.isError !== true) return 'ok';
-	const reason = response.result?.structuredContent?.reason;
+	const reason = response.result.structuredContent?.reason;
 	// A call refused by the tool's own input schema never reaches a handler, so it carries no reason.
 	return typeof reason === 'string' ? reason : 'refused without a reason';
 }

@@ -549,7 +549,7 @@ describe('content security policy: every rendered page', () => {
 			() => logoutSuccess(),
 			() => deviceSuccessPage({ client: {} })
 		]) {
-			const html = await (await render()).clone().text();
+			const html = await render().clone().text();
 			expect(html).not.toContain('/public/antd.css');
 			// getErrorHtmlResponse embeds cssinjs's extractStyle() output directly, which already
 			// carries its own `data-rc-order` attributes on the tag; the other three wrap it in a bare

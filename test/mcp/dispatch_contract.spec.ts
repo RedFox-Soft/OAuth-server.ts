@@ -219,7 +219,7 @@ describe('in-process re-dispatch into the admin routes', () => {
 		// The finding: the bare composition answers Elysia's own default for a validation error,
 		// NOT the admin plane's 422 shape. So `lib/mcp/dispatch.ts` must carry this arm.
 		expect(bare.status).toBe(422);
-		const bareBody = await bare.json();
+		const bareBody: unknown = await bare.json();
 		expect(bareBody).not.toMatchObject({ error: 'invalid_request' });
 	});
 

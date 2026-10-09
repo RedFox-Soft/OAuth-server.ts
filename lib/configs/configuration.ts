@@ -1,4 +1,4 @@
-import { isPlainObject, merge } from '../helpers/_/object.js';
+import { isList, isPlainObject, merge } from '../helpers/_/object.js';
 import * as formatters from '../helpers/formatters.ts';
 import {
 	CIBA_DELIVERY_MODES,
@@ -111,13 +111,16 @@ function toAcrValues(value: unknown): AcrValues {
 }
 
 function toSet(name: string, value: unknown): Set<string> {
-	if (value instanceof Set) {
-		return new Set(value);
-	}
-	if (!Array.isArray(value)) {
+	const members: unknown = value instanceof Set ? [...value] : value;
+	if (!isList(members)) {
 		throw new TypeError(`${name} must be an Array or Set`);
 	}
-	return new Set(value);
+	if (
+		!members.every((member): member is string => typeof member === 'string')
+	) {
+		throw new TypeError(`${name} must hold only strings`);
+	}
+	return new Set(members);
 }
 
 /*
@@ -161,10 +164,11 @@ function collectScopes(scopes: Set<string>, claims: ClaimsConfig) {
 
 function unpackArrayClaims(claims: ClaimsConfig) {
 	Object.entries(claims).forEach(([key, value]) => {
-		if (Array.isArray(value)) {
+		if (isList(value)) {
 			claims[key] = value.reduce<Record<string, null>>((accumulator, claim) => {
 				const scope = accumulator;
-				scope[claim] = null;
+				// checkClaims has already refused a list holding anything but strings.
+				if (typeof claim === 'string') scope[claim] = null;
 				return scope;
 			}, {});
 		}
@@ -215,101 +219,106 @@ const RAR_COMMON_FIELDS = [...RAR_LIST_FIELDS, 'identifier'];
  * semantics data cannot express.
  */
 function checkRichAuthorizationRequests(config: ConfigurationInput) {
-	if (config['richAuthorizationRequests.enabled']) {
-		const types = config['richAuthorizationRequests.types'];
-		if (!isPlainObject(types)) {
+	/*
+	 * The shape is checked whether or not the feature is on: the consent screen reads every type's
+	 * label on each render, so a malformed map stored while RAR was off broke consent for everyone.
+	 */
+	const types = config['richAuthorizationRequests.types'];
+	if (!isPlainObject(types)) {
+		throw new TypeError(
+			'features.richAuthorizationRequests.types must be an object'
+		);
+	}
+
+	// With no types every authorization_details value is rejected before any hook runs, so the
+	// combination is never what an operator meant.
+	if (
+		config['richAuthorizationRequests.enabled'] &&
+		!Object.keys(types).length
+	) {
+		throw new TypeError(
+			'features.richAuthorizationRequests.types must declare at least one type when richAuthorizationRequests is enabled'
+		);
+	}
+
+	for (const [k, v] of Object.entries(types)) {
+		if (!isPlainObject(v)) {
 			throw new TypeError(
-				'features.richAuthorizationRequests.types must be an object'
+				'features.richAuthorizationRequests.types attribute values must be objects'
 			);
 		}
 
-		// With no types every authorization_details value is rejected before any hook runs, so the
-		// combination is never what an operator meant.
-		if (!Object.keys(types).length) {
+		if (typeof v.label !== 'string' || !v.label.length) {
 			throw new TypeError(
-				'features.richAuthorizationRequests.types must declare at least one type when richAuthorizationRequests is enabled'
+				`features.richAuthorizationRequests.types['${k}'].label must be a non-empty string`
 			);
 		}
 
-		for (const [k, v] of Object.entries(types)) {
-			if (!isPlainObject(v)) {
+		if (v.fields !== undefined) {
+			if (!isPlainObject(v.fields)) {
 				throw new TypeError(
-					'features.richAuthorizationRequests.types attribute values must be objects'
+					`features.richAuthorizationRequests.types['${k}'].fields must be an object`
 				);
 			}
 
-			if (typeof v.label !== 'string' || !v.label.length) {
-				throw new TypeError(
-					`features.richAuthorizationRequests.types['${k}'].label must be a non-empty string`
-				);
-			}
-
-			if (v.fields !== undefined) {
-				if (!isPlainObject(v.fields)) {
+			for (const [field, constraint] of Object.entries(v.fields)) {
+				if (!RAR_COMMON_FIELDS.includes(field)) {
 					throw new TypeError(
-						`features.richAuthorizationRequests.types['${k}'].fields must be an object`
+						`features.richAuthorizationRequests.types['${k}'].fields must only constrain ${RAR_COMMON_FIELDS.join(', ')}`
 					);
 				}
-
-				for (const [field, constraint] of Object.entries(v.fields)) {
-					if (!RAR_COMMON_FIELDS.includes(field)) {
+				if (!isPlainObject(constraint)) {
+					throw new TypeError(
+						`features.richAuthorizationRequests.types['${k}'].fields['${field}'] must be an object`
+					);
+				}
+				if (
+					constraint.required !== undefined &&
+					typeof constraint.required !== 'boolean'
+				) {
+					throw new TypeError(
+						`features.richAuthorizationRequests.types['${k}'].fields['${field}'].required must be a boolean`
+					);
+				}
+				if (constraint.allowed !== undefined) {
+					if (!RAR_LIST_FIELDS.includes(field)) {
 						throw new TypeError(
-							`features.richAuthorizationRequests.types['${k}'].fields must only constrain ${RAR_COMMON_FIELDS.join(', ')}`
-						);
-					}
-					if (!isPlainObject(constraint)) {
-						throw new TypeError(
-							`features.richAuthorizationRequests.types['${k}'].fields['${field}'] must be an object`
+							`features.richAuthorizationRequests.types['${k}'].fields['${field}'] must not declare allowed values`
 						);
 					}
 					if (
-						constraint.required !== undefined &&
-						typeof constraint.required !== 'boolean'
+						!Array.isArray(constraint.allowed) ||
+						!constraint.allowed.length ||
+						constraint.allowed.some(
+							(value) => typeof value !== 'string' || !value.length
+						)
 					) {
 						throw new TypeError(
-							`features.richAuthorizationRequests.types['${k}'].fields['${field}'].required must be a boolean`
+							`features.richAuthorizationRequests.types['${k}'].fields['${field}'].allowed must be a non-empty array of non-empty strings`
 						);
-					}
-					if (constraint.allowed !== undefined) {
-						if (!RAR_LIST_FIELDS.includes(field)) {
-							throw new TypeError(
-								`features.richAuthorizationRequests.types['${k}'].fields['${field}'] must not declare allowed values`
-							);
-						}
-						if (
-							!Array.isArray(constraint.allowed) ||
-							!constraint.allowed.length ||
-							constraint.allowed.some(
-								(value) => typeof value !== 'string' || !value.length
-							)
-						) {
-							throw new TypeError(
-								`features.richAuthorizationRequests.types['${k}'].fields['${field}'].allowed must be a non-empty array of non-empty strings`
-							);
-						}
 					}
 				}
 			}
+		}
 
-			if (
-				v.allowUnknownFields !== undefined &&
-				typeof v.allowUnknownFields !== 'boolean'
-			) {
-				throw new TypeError(
-					`features.richAuthorizationRequests.types['${k}'].allowUnknownFields must be a boolean`
-				);
-			}
+		if (
+			v.allowUnknownFields !== undefined &&
+			typeof v.allowUnknownFields !== 'boolean'
+		) {
+			throw new TypeError(
+				`features.richAuthorizationRequests.types['${k}'].allowUnknownFields must be a boolean`
+			);
+		}
 
-			const { validate } = v;
-			if (
-				validate !== undefined &&
-				(typeof validate !== 'function' ||
-					!['Function', 'AsyncFunction'].includes(validate.constructor.name))
-			) {
-				throw new TypeError(
-					`features.richAuthorizationRequests.types['${k}'].validate must be a function`
-				);
-			}
+		const { validate } = v;
+		if (
+			validate !== undefined &&
+			(typeof validate !== 'function' ||
+				!['Function', 'AsyncFunction'].includes(validate.constructor.name))
+		) {
+			throw new TypeError(
+				`features.richAuthorizationRequests.types['${k}'].validate must be a function`
+			);
 		}
 	}
 }
@@ -610,12 +619,8 @@ function checkSentry(config: ConfigurationInput) {
 
 function checkDeviceFlow(config: ConfigurationInput) {
 	if (config['deviceFlow.enabled']) {
-		if (config['deviceFlow.charset'] !== undefined) {
-			if (!['base-20', 'digits'].includes(config['deviceFlow.charset'])) {
-				throw new TypeError(
-					'only supported charsets are "base-20" and "digits"'
-				);
-			}
+		if (!['base-20', 'digits'].includes(config['deviceFlow.charset'])) {
+			throw new TypeError('only supported charsets are "base-20" and "digits"');
 		}
 		if (!/^[-* ]*$/.test(config['deviceFlow.mask'])) {
 			throw new TypeError(

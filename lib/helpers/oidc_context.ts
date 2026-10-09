@@ -222,7 +222,7 @@ export class OIDCContext<T extends Record<string, unknown> = RequestParams> {
 		this.entities[key] = value;
 
 		if (key === 'Client') {
-			eventBus.emit('assign.client', this, value);
+			eventBus.emit('assign.client', this, this.entities.Client);
 		}
 	}
 
@@ -274,7 +274,7 @@ export class OIDCContext<T extends Record<string, unknown> = RequestParams> {
 			return `${this.issuer}${routeNames.code_verification}`;
 		}
 
-		if (name === 'client' && opt) {
+		if (opt) {
 			return `${this.issuer}${routeNames.registration}/${encodeURIComponent(opt.clientId)}`;
 		}
 

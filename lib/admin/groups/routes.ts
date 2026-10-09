@@ -124,7 +124,7 @@ function assertOwnerRemains(members: GroupMember[]): void {
  */
 function assertPersonalOwnerKept(group: Group, members: GroupMember[]): void {
 	if (group.kind !== 'personal') return;
-	const owner = group.members[0];
+	const owner = group.members.at(0);
 	if (!owner) return;
 	const still = members.find((m) => m.userId === owner.userId);
 	if (!still || still.role !== 'owner') {

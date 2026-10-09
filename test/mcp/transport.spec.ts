@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, mock } from 'bun:test';
 
 import bootstrap from '../test_helper.js';
-import { eventBus } from 'lib/event_bus.js';
+import { eventBus, type ServerListener } from 'lib/event_bus.js';
 import { elysia } from 'lib/index.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
@@ -16,6 +16,9 @@ import {
 } from 'lib/mcp/consts.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { createAdministrator, type AdminKind } from '../administrators.ts';
+import { Type } from '@sinclair/typebox';
+import { present, shaped } from '../shape.ts';
+import { postMcp } from './rpc.ts';
 
 /*
  * End-to-end proof that the surface actually serves: a real MCP client protocol exchange over the real
@@ -27,12 +30,30 @@ import { createAdministrator, type AdminKind } from '../administrators.ts';
 
 let rpcId = 0;
 
+/* One JSON-RPC request; `payload` is the checked message, absent when the answer carried none. */
 async function mcp(
 	method: string,
 	params: Record<string, unknown> | undefined,
 	token?: string
 ) {
-	const res = await elysia.handle(
+	const { status, message } = await postMcp(
+		{
+			jsonrpc: '2.0',
+			id: ++rpcId,
+			method,
+			...(params ? { params } : {})
+		},
+		token
+	);
+	return { status, payload: message };
+}
+
+/*
+ * A tools/list POST read as plain HTTP, for what is not a JSON-RPC message: the challenge header an
+ * agent acts on, and the status of a surface that is switched off.
+ */
+async function rawToolsList(token?: string) {
+	return elysia.handle(
 		new Request(`http://e.ly${MCP_ROUTE}`, {
 			method: 'POST',
 			headers: {
@@ -43,28 +64,11 @@ async function mcp(
 			body: JSON.stringify({
 				jsonrpc: '2.0',
 				id: ++rpcId,
-				method,
-				...(params ? { params } : {})
+				method: 'tools/list',
+				params: {}
 			})
 		})
 	);
-	const text = await res.text();
-	/*
-	 * Streamable HTTP answers a single request either as JSON or as one SSE event, depending on what the
-	 * client accepted — and the SSE form arrives as `event: message\ndata: {...}`. The test cares about
-	 * the JSON-RPC payload either way, so unwrap the event when that is what came back.
-	 */
-	const isEventStream = (res.headers.get('content-type') ?? '').includes(
-		'text/event-stream'
-	);
-	let payload;
-	if (isEventStream) {
-		const line = text.split('\n').find((l) => l.startsWith('data:'));
-		payload = line ? JSON.parse(line.slice('data:'.length).trim()) : undefined;
-	} else {
-		payload = text ? JSON.parse(text) : undefined;
-	}
-	return { status: res.status, headers: res.headers, payload };
 }
 
 /* An access token of exactly the shape the token endpoint mints for `resource=<issuer>/mcp`. */
@@ -106,23 +110,30 @@ describe('MCP transport', () => {
 			new Request(`http://e.ly${MCP_METADATA_ROUTE}`)
 		);
 		expect(res.status).toBe(200);
-		const doc = await res.json();
+		const doc = shaped(
+			Type.Object({
+				resource: Type.String(),
+				authorization_servers: Type.Array(Type.String())
+			}),
+			await res.json()
+		);
 		expect(doc.resource).toBe(MCP_RESOURCE);
-		expect(doc.authorization_servers).toBeArray();
 		expect(doc.authorization_servers.length).toBeGreaterThan(0);
 	});
 
 	it('refuses an unauthenticated call with a 401 naming where to get a token', async () => {
-		const { status, headers, payload } = await mcp('tools/list', {});
+		const { status, payload } = await mcp('tools/list', {});
 		expect(status).toBe(401);
-		const challenge = headers.get('www-authenticate') ?? '';
+		const challenge =
+			(await rawToolsList()).headers.get('www-authenticate') ?? '';
 		expect(challenge).toContain('Bearer');
 		expect(challenge).toContain('resource_metadata=');
 		// Nothing about instance state, and no hint which check failed.
 		expect(JSON.stringify(payload)).not.toContain('audience');
 		// The body an MCP client can actually read, not a framework validation report.
-		expect(payload.jsonrpc).toBe('2.0');
-		expect(payload.error?.code).toBe(-32001);
+		const message = present(payload, 'a JSON-RPC message');
+		expect(message.jsonrpc).toBe('2.0');
+		expect(message.error?.code).toBe(-32001);
 	});
 
 	/*
@@ -133,8 +144,8 @@ describe('MCP transport', () => {
 	 * `/mcp` entry, so an emit on the way past would file every credential-less call as a fault.
 	 */
 	it('reports a credential-less call on the MCP channel and not as a server_error', async () => {
-		const refused = mock();
-		const faults = mock();
+		const refused = mock<ServerListener<'mcp.auth.error'>>();
+		const faults = mock<ServerListener<'server_error'>>();
 		eventBus.on('mcp.auth.error', refused);
 		eventBus.on('server_error', faults);
 
@@ -195,9 +206,9 @@ describe('MCP transport', () => {
 			token
 		);
 		expect(status).toBe(200);
-		expect(payload.result?.serverInfo?.name).toBe('oauth-server-admin');
+		expect(payload?.result?.serverInfo?.name).toBe('oauth-server-admin');
 		// The withheld operations are announced up front rather than discovered by guessing.
-		expect(payload.result?.instructions).toContain('admin console');
+		expect(payload?.result?.instructions).toContain('admin console');
 	});
 
 	it('lists the read tools and withholds the container deletions', async () => {
@@ -214,9 +225,7 @@ describe('MCP transport', () => {
 		const { status, payload } = await mcp('tools/list', {}, token);
 		expect(status).toBe(200);
 
-		const names: string[] = (payload.result?.tools ?? []).map(
-			(t: { name: string }) => t.name
-		);
+		const names = (payload?.result?.tools ?? []).map((t) => t.name);
 		expect(names).toContain('project_list');
 		expect(names).toContain('whoami');
 		expect(names).toContain('audit_list');
@@ -243,13 +252,20 @@ describe('MCP transport', () => {
 			token
 		);
 		expect(status).toBe(200);
-		expect(payload.result?.isError).not.toBe(true);
+		expect(payload?.result?.isError).not.toBe(true);
 
-		const structured = payload.result?.structuredContent?.result;
-		expect(structured?.userId).toBe(user._id);
-		expect(structured?.superAdmin).toBe(true);
+		const structured = shaped(
+			Type.Object({
+				userId: Type.String(),
+				superAdmin: Type.Boolean(),
+				viaClientId: Type.String()
+			}),
+			payload?.result?.structuredContent?.result
+		);
+		expect(structured.userId).toBe(user._id);
+		expect(structured.superAdmin).toBe(true);
 		// The agent is recorded as the acting client, distinct from the administrator.
-		expect(structured?.viaClientId).toBe(ADMIN_MCP_CLIENT_ID);
+		expect(structured.viaClientId).toBe(ADMIN_MCP_CLIENT_ID);
 	});
 
 	it('scopes a read to what the administrator may see', async () => {
@@ -273,7 +289,11 @@ describe('MCP transport', () => {
 			{ name: 'project_list', arguments: {} },
 			token
 		);
-		const projects = payload.result?.structuredContent?.result ?? [];
+		// Required, not defaulted: a refused or empty-handed call must not pass as an empty list.
+		const projects = present(
+			payload?.result?.structuredContent?.result,
+			'the project list'
+		);
 		// A project administrator manages none of them, so the list is empty even though projects exist.
 		expect(projects).toEqual([]);
 	});
@@ -294,15 +314,16 @@ describe('MCP transport', () => {
 			{ name: 'admin_list', arguments: {} },
 			token
 		);
-		expect(payload.result?.isError).toBe(true);
-		expect(payload.result?.structuredContent?.reason).toBe('forbidden');
+		expect(payload?.result?.isError).toBe(true);
+		expect(payload?.result?.structuredContent?.reason).toBe('forbidden');
 	});
 
 	it('is absent entirely when the capability is switched off', async () => {
 		const { token } = await tokenFor('super');
 		ApplicationConfig['mcp.enabled'] = false;
 
-		const { status } = await mcp('tools/list', {}, token);
+		// Not a JSON-RPC answer at all: the route is not there.
+		const { status } = await rawToolsList(token);
 		expect(status).toBe(404);
 
 		const meta = await elysia.handle(

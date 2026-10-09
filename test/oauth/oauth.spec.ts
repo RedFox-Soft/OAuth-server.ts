@@ -16,8 +16,9 @@ import bootstrap, {
 	formAgent,
 	redirectParameter
 } from '../test_helper.js';
+import { present } from '../shape.ts';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
-import { eventBus } from 'lib/event_bus.js';
+import { eventBus, type ServerListener } from 'lib/event_bus.js';
 import { configuration } from 'lib/configs/application.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { TestAdapter } from 'test/models.js';
@@ -139,7 +140,7 @@ describe('requests without the openid scope', () => {
 				it('gets a code from the authorization endpoint', async function () {
 					const auth = new AuthorizationRequest({ scope });
 
-					const spy = mock();
+					const spy = mock<ServerListener<'authorization_code.saved'>>();
 					eventBus.on('authorization_code.saved', spy);
 
 					const { response } = await getAuth(auth, cookie);
@@ -166,7 +167,10 @@ describe('requests without the openid scope', () => {
 					});
 
 					it('gets an access token', async function () {
-						const spy = mock();
+						const spy =
+							mock<
+								ServerListener<'access_token.issued' | 'access_token.saved'>
+							>();
 						eventBus.on('access_token.saved', spy);
 						eventBus.on('access_token.issued', spy);
 
@@ -183,13 +187,20 @@ describe('requests without the openid scope', () => {
 						const adapter = TestAdapter.for('AuthorizationCode');
 						const jti = setup.getTokenJti(code);
 
-						const refreshScope = `${scope || ''} offline_access`.trim();
+						const refreshScope = `${scope} offline_access`;
 
 						adapter.syncUpdate(jti, {
 							scope: refreshScope
 						});
 
-						const spy = mock();
+						const spy =
+							mock<
+								ServerListener<
+									| 'access_token.issued'
+									| 'access_token.saved'
+									| 'refresh_token.saved'
+								>
+							>();
 						eventBus.on('access_token.saved', spy);
 						eventBus.on('access_token.issued', spy);
 						eventBus.on('refresh_token.saved', spy);
@@ -213,7 +224,7 @@ describe('requests without the openid scope', () => {
 				});
 
 				describe('refresh token exchange', () => {
-					const refreshScope = `${scope || ''} offline_access`.trim();
+					const refreshScope = `${scope} offline_access`;
 					let rt: string;
 
 					beforeAll(async function () {
@@ -241,7 +252,14 @@ describe('requests without the openid scope', () => {
 					});
 
 					it('gets an access token and a refresh token', async function () {
-						const spy = mock();
+						const spy =
+							mock<
+								ServerListener<
+									| 'access_token.issued'
+									| 'access_token.saved'
+									| 'refresh_token.saved'
+								>
+							>();
 						eventBus.on('access_token.saved', spy);
 						eventBus.on('access_token.issued', spy);
 						eventBus.on('refresh_token.saved', spy);
@@ -276,7 +294,7 @@ describe('requests without the openid scope', () => {
 						scope
 					});
 
-					const spy = mock();
+					const spy = mock<ServerListener<'authorization.success'>>();
 					eventBus.on('authorization.success', spy);
 
 					const { response } = await getAuth(auth, cookie);
@@ -297,7 +315,7 @@ describe('requests without the openid scope', () => {
 			});
 
 			it('accepts the device authorization request', async function () {
-				const spy = mock();
+				const spy = mock<ServerListener<'device_code.saved'>>();
 				eventBus.on('device_code.saved', spy);
 
 				const { status } = await formAgent.device.auth.post({
@@ -307,16 +325,10 @@ describe('requests without the openid scope', () => {
 
 				expect(status).toBe(200);
 				expect(spy).toHaveBeenCalledTimes(1);
-				if (scope) {
-					expect(spy.mock.calls[0][0].payload.params).toHaveProperty(
-						'scope',
-						scope
-					);
-				} else {
-					expect(spy.mock.calls[0][0].payload.params).not.toHaveProperty(
-						'scope'
-					);
-				}
+				expect(spy.mock.calls[0][0].payload.params).toHaveProperty(
+					'scope',
+					scope
+				);
 			});
 
 			describe('urn:ietf:params:oauth:grant-type:device_code', () => {
@@ -324,7 +336,7 @@ describe('requests without the openid scope', () => {
 				let code: string;
 				beforeEach(async function () {
 					eventBus.on('device_code.saved', (token) => {
-						jti = token.jti;
+						jti = present(token.jti, 'the device code id');
 					});
 
 					const { data, status } = await formAgent.device.auth.post({
@@ -354,7 +366,10 @@ describe('requests without the openid scope', () => {
 				// Fix: change device_code.ts lines ~152/154/155 to set
 				// `at.payload.scope` / `at.payload.claims` (mirror authorization_code.ts).
 				it('gets an access token', async function () {
-					const spy = mock();
+					const spy =
+						mock<
+							ServerListener<'access_token.issued' | 'access_token.saved'>
+						>();
 					eventBus.on('access_token.saved', spy);
 					eventBus.on('access_token.issued', spy);
 
@@ -376,8 +391,15 @@ describe('requests without the openid scope', () => {
 				// built with `scope: code.scope` where `code.scope` is undefined (no
 				// getter), so the emitted refresh_token payload scope is wrong too.
 				it('gets an access and a refresh_token', async function () {
-					const refreshScope = `${scope || ''} offline_access`.trim();
-					const spy = mock();
+					const refreshScope = `${scope} offline_access`;
+					const spy =
+						mock<
+							ServerListener<
+								| 'access_token.issued'
+								| 'access_token.saved'
+								| 'refresh_token.saved'
+							>
+						>();
 					eventBus.on('access_token.saved', spy);
 					eventBus.on('access_token.issued', spy);
 					eventBus.on('refresh_token.saved', spy);

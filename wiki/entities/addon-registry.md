@@ -6,7 +6,7 @@ aliases: [addons, override registry, resolve, lib/addon]
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-09-01
-updated: 2026-09-24
+updated: 2026-10-08
 graph:
   node_id: subsystem:addon-registry
   node_type: subsystem
@@ -53,10 +53,19 @@ call time against its addon-module default.
 
 Since 2026-09-24 each signature is wrapped in `Overridable<...>`: an override may answer synchronously
 where the default is async, because every caller awaits. An accessor whose default is async is itself
-`async`, so its callers always receive a promise whatever the override returns. The extension seams
+`async`, so its callers always receive a promise whatever the override returns. The rule only runs one
+way — a sync default admits no async override — so since 2026-10-09 the awaited seams whose default
+happened to be sync (`rotateRefreshToken` and the four `rarFor*` transforms) are `async` too. The seams
+whose callers do not await (`idFactory`, `deviceInfo`, `interactionPolicy`, the mTLS certificate
+readers) stay sync, and an override of one must answer synchronously. The extension seams
 whose default only warns and throws (CIBA's `processLoginHint`, `validateBindingMessage`, …) declare
 their contract's return type explicitly, and `getResourceServerInfo` answers a `ResourceServerInfo`
 (`lib/helpers/resource_server.ts`); a signature inferred from a stub had said `Promise<void>`.
+A declared type does not reach deployment code the server never type-checked, so since 2026-10-08 the
+`ResourceServer` constructor checks that answer once — `scope` a string, `accessTokenFormat` `jwt` or
+`opaque` (a node-oidc-provider override may still say `paseto`) — and the token models trust it; they
+used to re-check the format at each mint. The defaults themselves keep strict parameters: the server
+always passes a context and a client, so a test calls them with real ones rather than `undefined`.
 
 That layering is deliberate and load-bearing. Because `registry.ts` and `types.ts` import no runtime
 code, the registry can be imported anywhere — including the test preload — without loading the addon

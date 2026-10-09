@@ -8,7 +8,7 @@ import {
 } from 'lib/admin/consts.ts';
 import nanoid from 'lib/helpers/nanoid.js';
 import { Type } from '@sinclair/typebox';
-import { shaped } from 'test/shape.js';
+import { present, shaped } from 'test/shape.js';
 import bootstrap from '../test_helper.js';
 import { assertNoPendingInterceptors } from '../fetch_mock.js';
 import { sessionFor } from '../admin_session.ts';
@@ -137,11 +137,14 @@ describe('connecting a provider’s back-channel logout', () => {
 			cookie
 		);
 
-		const [provider] = shaped(
-			Type.Array(Type.Record(Type.String(), Type.Unknown())),
-			res.json
+		const provider = present(
+			shaped(
+				Type.Array(Type.Record(Type.String(), Type.Unknown())),
+				res.body
+			).at(0),
+			'the provider'
 		);
-		expect(provider?.acceptsBackChannelLogout).not.toBe(true);
+		expect(provider.acceptsBackChannelLogout).not.toBe(true);
 		expect(provider).not.toHaveProperty('backChannelLogoutEndpoint');
 	});
 

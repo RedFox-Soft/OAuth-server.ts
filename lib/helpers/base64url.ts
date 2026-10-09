@@ -3,7 +3,7 @@ export function encode(input: string, encoding: BufferEncoding = 'utf8') {
 }
 
 export function encodeBuffer(buf: Buffer<ArrayBuffer>): string {
-	return Buffer.prototype.base64urlSlice.call(buf);
+	return buf.toString('base64url');
 }
 
 export function decode(input: string) {

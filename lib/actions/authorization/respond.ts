@@ -27,7 +27,7 @@ export default async function respond(
 	 * pushed request after an interaction. It failing open is what let a request_uri survive its own
 	 * flow and mint a second code (RFC 9126 §7.3).
 	 */
-	const carriedParJti = oidc.entities.Interaction?.payload?.parJti;
+	const carriedParJti = oidc.entities.Interaction?.payload.parJti;
 	if (!pushedAuthorizationRequest && carriedParJti) {
 		pushedAuthorizationRequest = await PushedAuthorizationRequest.tryFind(
 			carriedParJti,

@@ -1,7 +1,7 @@
 import { describe, it, beforeAll, afterEach, expect, mock } from 'bun:test';
 
 import bootstrap, { agent } from '../test_helper.js';
-import { eventBus } from 'lib/event_bus.js';
+import { eventBus, type ServerListener } from 'lib/event_bus.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 
 const discoveryEndpoint = agent['.well-known']['openid-configuration'];
@@ -49,7 +49,7 @@ describe('/.well-known/openid-configuration', () => {
 		afterEach(() => mock.restore());
 
 		it('handles exceptions with json 500 and emits server_error', async () => {
-			const spy = mock();
+			const spy = mock<ServerListener<'server_error'>>();
 			eventBus.once('server_error', spy);
 
 			// Force the discovery handler to throw while it applies discovery overrides.

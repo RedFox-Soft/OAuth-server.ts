@@ -90,7 +90,7 @@ export async function pairwiseIdentifier(accountId: string, client: Client) {
 
 // Decides if and how a refresh token is rotated after use. Returns a Boolean;
 // the default rotates public-client and near-expiry tokens (capped at ~1 year).
-export function rotateRefreshToken(oidc: OIDCContext) {
+export async function rotateRefreshToken(oidc: OIDCContext) {
 	const refreshToken = oidc.require('RefreshToken');
 	const client = oidc.require('Client');
 

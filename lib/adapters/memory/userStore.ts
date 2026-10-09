@@ -1,3 +1,4 @@
+import { entriesOf } from '../../helpers/_/object.js';
 import {
 	clampPage,
 	derivedKeysOf,
@@ -64,7 +65,7 @@ export class UserStore implements UserStoreInstance {
 			lockedLocally: user.lockedLocally
 		};
 		Object.assign(full, derivedKeysOf(full));
-		for (const [field, value] of Object.entries(full)) {
+		for (const [field, value] of entriesOf(full)) {
 			if (value === undefined) Reflect.deleteProperty(full, field);
 		}
 		this.users.set(full._id, full);
@@ -202,7 +203,7 @@ export class UserStore implements UserStoreInstance {
 		// Converged with the MongoDB store, which translates the same shape into `$unset`: a key present
 		// with an undefined value means remove the field, not store an undefined one. Leaving the key
 		// behind here would make the two adapters disagree about what a cleared enrolment looks like.
-		for (const [field, value] of Object.entries(effective)) {
+		for (const [field, value] of entriesOf(effective)) {
 			if (value === undefined) {
 				Reflect.deleteProperty(user, field);
 			}

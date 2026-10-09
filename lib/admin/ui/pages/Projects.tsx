@@ -38,7 +38,7 @@ function OriginsEditor({
 	onClose: () => void;
 	onSaved: () => void;
 }) {
-	const [origins, setOrigins] = useState<string[]>(project.corsOrigins ?? []);
+	const [origins, setOrigins] = useState<string[]>(project.corsOrigins);
 	const [draft, setDraft] = useState('');
 	const [saving, setSaving] = useState(false);
 
@@ -150,7 +150,7 @@ function BucketEditor({
 			const res = await fetch('/admin/api/buckets');
 			if (res.ok) setBuckets((await res.json()) as UserBucket[]);
 		}
-		load();
+		void load();
 	}, []);
 
 	async function save() {

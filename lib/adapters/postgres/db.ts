@@ -1,4 +1,4 @@
-import { SQL } from 'bun';
+import { SQL, type TransactionSQL } from 'bun';
 
 /*
  * The PostgreSQL connection handle.
@@ -18,7 +18,24 @@ import { SQL } from 'bun';
  * simply refuses to start. `ping()` below is what the startup phase calls to close that gap.
  */
 
-let handle: SQL | undefined;
+/*
+ * Bun's handle with one change to its type: a query's rows default to `unknown[]`, not `any`. Bun
+ * documents a type argument, `` sql<User[]>`…` ``, which nothing checks, so a misspelled column reads as
+ * `undefined`; with `unknown` a row is checked before it is read. A document goes through docOf /
+ * payloadOf and the area's schema (documents.ts); a projection whose shape the query itself fixes —
+ * `RETURNING id`, `count(*)::int AS n` — names it with that type argument.
+ */
+interface RowsUnknown {
+	<T = unknown[]>(
+		strings: TemplateStringsArray,
+		...values: unknown[]
+	): SQL.Query<T>;
+}
+export type Sql = RowsUnknown & SQL;
+/* The same for the handle `begin()` passes its callback; annotate the parameter with it. */
+export type Tx = RowsUnknown & TransactionSQL;
+
+let handle: Sql | undefined;
 
 /* Bounded so a stalled database produces a rejection rather than a hung request. Deliberately not
  * configurable: these are floors for correctness, not tuning knobs, and a deployment that needs
@@ -27,7 +44,7 @@ const CONNECTION_TIMEOUT_SECONDS = 10;
 const IDLE_TIMEOUT_SECONDS = 30;
 const MAX_CONNECTIONS = 20;
 
-export function sql(): SQL {
+export function sql(): Sql {
 	if (!handle) {
 		const url = process.env.POSTGRES_URL;
 		if (!url) {

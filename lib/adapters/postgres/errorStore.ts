@@ -1,7 +1,6 @@
-import type { SQL } from 'bun';
 import { Type, type Static } from '@sinclair/typebox';
 
-import { sql } from './db.js';
+import { sql, type Sql } from './db.js';
 import { docOf } from './json.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
 import { documentOf } from '../documents.js';
@@ -35,7 +34,7 @@ const SummarizedGroup = Type.Omit(ErrorGroup, ['samples']);
  * names that client; in jsonb that is containment of a one-key object against the array, which says
  * the same thing and needs the GIN-free `@>` on the samples array.
  */
-function sampleContains(handle: SQL, shape: Record<string, unknown>) {
+function sampleContains(handle: Sql, shape: Record<string, unknown>) {
 	return handle`doc->'samples' @> ${[shape]}`;
 }
 
@@ -51,7 +50,7 @@ function sampleContains(handle: SQL, shape: Record<string, unknown>) {
  * index is over `(doc->>'lastSeenAt')`, and ISO-8601 in UTC sorts lexicographically the way it sorts
  * chronologically. A cast would be correct and would quietly stop using the index.
  */
-function conditionsFor(handle: SQL, query: ErrorStoreQuery) {
+function conditionsFor(handle: Sql, query: ErrorStoreQuery) {
 	let where = handle`expires_at > now()`;
 	const and = (fragment: typeof where) => {
 		where = handle`${where} AND ${fragment}`;

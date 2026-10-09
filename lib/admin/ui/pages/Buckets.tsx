@@ -152,7 +152,7 @@ export function Buckets({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 				bucketId={openBucketId}
 				onBack={() => {
 					setOpenBucketId(null);
-					load();
+					void load();
 				}}
 			/>
 		);
@@ -346,7 +346,7 @@ export function Buckets({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 							]}
 						/>
 					</Form.Item>
-					<Form.Item
+					<Form.Item<CreateBucketValues>
 						noStyle
 						shouldUpdate={(before, after) =>
 							before.addressForm !== after.addressForm
@@ -373,23 +373,30 @@ export function Buckets({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 								</Form.Item>
 							) : (
 								<Form.Item
-									name="slug"
 									label="Address"
+									required
 									tooltip="Where this bucket is served, and the issuer in the tokens it mints. Changing it later breaks every client integrated with this bucket."
-									rules={[
-										{ required: true },
-										{
-											pattern: /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/,
-											message:
-												'lowercase letters, digits and hyphens; not starting or ending with a hyphen'
-										},
-										{ max: 63 }
-									]}
 								>
-									<Input
-										placeholder="acme"
-										addonBefore="/"
-									/>
+									{/* The inner item binds the field; the outer one labels it and shows its errors. */}
+									<Space.Compact block>
+										<Space.Addon>/</Space.Addon>
+										<Form.Item
+											name="slug"
+											noStyle
+											messageVariables={{ label: 'Address' }}
+											rules={[
+												{ required: true },
+												{
+													pattern: /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/,
+													message:
+														'lowercase letters, digits and hyphens; not starting or ending with a hyphen'
+												},
+												{ max: 63 }
+											]}
+										>
+											<Input placeholder="acme" />
+										</Form.Item>
+									</Space.Compact>
 								</Form.Item>
 							)
 						}

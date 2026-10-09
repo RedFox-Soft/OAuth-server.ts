@@ -86,7 +86,7 @@ export async function drainForShutdown(timeoutMs = 2000): Promise<void> {
 	await Promise.race([
 		drainOnce(),
 		new Promise<void>((resolve) => {
-			setTimeout(resolve, timeoutMs).unref?.();
+			setTimeout(resolve, timeoutMs).unref();
 		})
 	]);
 }

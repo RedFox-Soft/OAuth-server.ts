@@ -57,7 +57,7 @@ function duplicateKey(): Error & { code: number } {
 	return Object.assign(new Error('E11000 duplicate key'), { code: 11000 });
 }
 
-mock.module('lib/adapters/mongodb/db.js', () => ({
+await mock.module('lib/adapters/mongodb/db.js', () => ({
 	db: {
 		/* Creating a bucket provisions its user area; that the area exists is all this file needs. */
 		listCollections: () => ({ hasNext: async () => true }),

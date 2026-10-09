@@ -74,7 +74,7 @@ export async function withLease<T>(
 			 * has. Either way, dying here would leave the effect half-applied. */
 		});
 	}, RENEW_EVERY_MS);
-	renew.unref?.();
+	renew.unref();
 
 	try {
 		return await inner();

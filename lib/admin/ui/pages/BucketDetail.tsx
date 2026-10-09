@@ -730,7 +730,7 @@ export function BucketDetail({
 					>
 						<Select
 							mode="multiple"
-							optionFilterProp="label"
+							showSearch={{ optionFilterProp: 'label' }}
 							options={bucketGroups
 								.filter((g) => !g.provisionedBy)
 								.map((g) => ({ label: g.displayName, value: g.id }))}

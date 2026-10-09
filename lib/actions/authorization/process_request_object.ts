@@ -53,6 +53,12 @@ const OBJECT_MEMBERS = new Set([
 	'request_uri'
 ]);
 
+/*
+ * K appears once in the signature but is what types the body: it ties the read and the write to one
+ * member. With a plain `keyof PipelineParams` key the write would have to suit every member at once,
+ * which only undefined does, and the checker refuses the assignment.
+ */
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters -- see above
 function copyParam<K extends keyof PipelineParams>(
 	target: PipelineParams,
 	source: PipelineParams,

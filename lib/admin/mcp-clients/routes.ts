@@ -54,7 +54,7 @@ function validateValue(kind: 'identifier' | 'host', value: string): string {
 	 * would have to encode the whole of IDN and would refuse something legitimate before it refused
 	 * anything dangerous.
 	 */
-	if (/[/:@\s]/.test(value) || value.includes('.') === false) {
+	if (/[/:@\s]/.test(value) || !value.includes('.')) {
 		throw new AdminError(
 			400,
 			'a host entry must be a bare hostname, with no scheme, port or path'

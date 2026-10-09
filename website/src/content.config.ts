@@ -74,7 +74,7 @@ export const collections = {
 			competitor: z.string(),
 			description: z.string(),
 			lastChecked: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-			sources: z.array(z.string().url()),
+			sources: z.array(z.url()),
 			/* One sentence a reader can act on before reading a single row. */
 			bottomLine: z.string(),
 			chooseThem: z.array(z.string()).min(1),
@@ -122,7 +122,7 @@ export const collections = {
 										return;
 
 									ctx.addIssue({
-										code: z.ZodIssueCode.custom,
+										code: 'custom',
 										path: ['us', 'text'],
 										message:
 											`the "${row.dimension}" row names ${named.join(', ')} but not ` +

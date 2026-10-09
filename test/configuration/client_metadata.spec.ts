@@ -2676,17 +2676,15 @@ describe('Client metadata validation', () => {
 		};
 		const withKeys = { jwks: { keys: [sigKey] } };
 
-		const refusalNaming = (name: string) =>
-			expect.objectContaining({
-				error_description: expect.stringContaining(name)
-			});
-
 		for (const [name, rules] of Object.entries(ATTRIBUTES)) {
 			if (rules.array) {
 				it(`refuses ${name} when it is not a list`, async () => {
 					await expect(
 						register({ ...withKeys, [name]: 'not-a-list' }, everything)
-					).rejects.toEqual(refusalNaming(name));
+					).rejects.toHaveProperty(
+						'error_description',
+						expect.stringContaining(name)
+					);
 				});
 			}
 
@@ -2697,7 +2695,10 @@ describe('Client metadata validation', () => {
 						: 'not-a-permitted-value';
 					await expect(
 						register({ ...withKeys, [name]: value }, everything)
-					).rejects.toEqual(refusalNaming(name));
+					).rejects.toHaveProperty(
+						'error_description',
+						expect.stringContaining(name)
+					);
 				});
 			}
 
@@ -2706,7 +2707,10 @@ describe('Client metadata validation', () => {
 				it(`refuses ${name} when its companion ${companion} is missing`, async () => {
 					await expect(
 						register({ ...withKeys, [name]: 'RSA-OAEP' }, everything)
-					).rejects.toEqual(refusalNaming(companion));
+					).rejects.toHaveProperty(
+						'error_description',
+						expect.stringContaining(companion)
+					);
 				});
 			}
 		}

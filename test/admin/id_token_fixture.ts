@@ -5,7 +5,9 @@ import { ISSUER } from 'lib/configs/env.ts';
 import { ADMIN_CLIENT_ID } from 'lib/admin/consts.ts';
 
 import generatedKeys from '../keys.ts';
+import { shaped } from '../shape.ts';
 import { rootKeys } from 'lib/keys/issuer_keys.js';
+import { Type } from '@sinclair/typebox';
 
 /*
  * Admin ID token fixtures.
@@ -37,7 +39,7 @@ export function kidOf(key: Record<string, unknown>): string | undefined {
 }
 
 export function liveSigningKey(alg = 'RS256'): Record<string, unknown> {
-	const [key] = keystore.selectForSign({ alg });
+	const key = keystore.selectForSign({ alg }).at(0);
 	if (!key) throw new Error(`live keystore holds no ${alg} signing key`);
 	return key;
 }
@@ -111,7 +113,10 @@ export async function mintWithForeignKey(
  */
 export function tamperPayload(token: string, claims: Claims): string {
 	const [header, payload, signature] = token.split('.');
-	const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString());
+	const decoded = shaped(
+		Type.Record(Type.String(), Type.Unknown()),
+		JSON.parse(Buffer.from(payload, 'base64url').toString())
+	);
 	const forged = Buffer.from(
 		JSON.stringify({ ...decoded, ...claims })
 	).toString('base64url');

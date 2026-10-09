@@ -27,6 +27,7 @@ import {
 import { displayNameKeyOf, membershipIdOf } from '../adapters/end_user_keys.js';
 import { declarationId, ROOT_NAMESPACE } from '../resources/declaration_id.js';
 import { ROOT_KEY_OWNER } from './key_owner.js';
+import { isList, member } from '../helpers/_/object.js';
 
 /*
  * One backend's half of a migration.
@@ -169,16 +170,19 @@ const namespacedProtectedResources: Migration = {
 			for (const row of legacy) {
 				const identifier = String(row.id);
 				const doc = row.doc as Doc;
-				const [project] = await sql`
+				const project = (
+					await sql`
 					SELECT doc FROM ${sql(STORE_AREAS.projects)} WHERE id = ${String(doc.projectId)}
-				`;
+				`
+				).at(0);
 				const bucketId = (project?.doc as Doc | undefined)?.bucketId;
-				const [bucket] =
+				const bucket = (
 					typeof bucketId === 'string'
 						? await sql`
 								SELECT doc FROM ${sql(STORE_AREAS.userBuckets)} WHERE id = ${bucketId}
 							`
-						: [];
+						: []
+				).at(0);
 				const namespace = namespaceFor(bucket?.doc as Doc | undefined);
 				const _id = declarationId(namespace, identifier);
 				await sql`
@@ -316,7 +320,7 @@ const rootKeysLifecycle: Migration = {
 			// A database provisioned after this migration was declared has no legacy table at all.
 			const [exists] =
 				await sql`SELECT to_regclass(${LEGACY_ROOT_KEYS_AREA}) AS t`;
-			if (!exists?.t) return;
+			if (!exists.t) return;
 			const legacyArea = sql(LEGACY_ROOT_KEYS_AREA);
 			const legacy = await sql`SELECT id, doc FROM ${legacyArea}`;
 			if (legacy.length === 0) return;
@@ -524,8 +528,9 @@ const rolesToGroups: Migration = {
 			totals.projectAdmins = decided.projectAdmins;
 			for (const userId of decided.superAdmins) {
 				const group = await adminGroups.findOne({ _id: SUPER_ADMINS_GROUP_ID });
-				const members = Array.isArray(group?.members) ? group.members : [];
-				if (!members.some((m: Doc) => m.userId === userId)) {
+				const stored = group?.members;
+				const members = isList(stored) ? stored : [];
+				if (!members.some((m) => member(m, 'userId') === userId)) {
 					await adminGroups.updateOne(
 						{ _id: SUPER_ADMINS_GROUP_ID },
 						{
@@ -588,9 +593,10 @@ const rolesToGroups: Migration = {
 								},
 								{ upsert: true }
 							);
-							groupId = String(
-								(await groups.findOne({ displayNameKey }))?._id ?? groupId
-							);
+							// The upsert may have lost to another writer; take the stored id, which every writer
+							// stores as a string.
+							const stored = (await groups.findOne({ displayNameKey }))?._id;
+							groupId = typeof stored === 'string' ? stored : groupId;
 							totals.groups += 1;
 						}
 						for (const userId of planned.memberIds) {
@@ -661,11 +667,12 @@ const rolesToGroups: Migration = {
 				);
 				totals.projectAdmins = decided.projectAdmins;
 				for (const userId of decided.superAdmins) {
-					const [group] =
-						await sql`SELECT doc FROM ${adminGroups} WHERE id = ${SUPER_ADMINS_GROUP_ID}`;
+					const group = (
+						await sql`SELECT doc FROM ${adminGroups} WHERE id = ${SUPER_ADMINS_GROUP_ID}`
+					).at(0);
 					const stored = (group?.doc as Doc | undefined)?.members;
-					const members = Array.isArray(stored) ? stored : [];
-					if (!members.some((m: Doc) => m.userId === userId)) {
+					const members = isList(stored) ? stored : [];
+					if (!members.some((m) => member(m, 'userId') === userId)) {
 						await sql`
 							UPDATE ${adminGroups}
 							SET doc = doc || ${{ members: [...members, { userId, role: 'member' }], updatedAt: now }}

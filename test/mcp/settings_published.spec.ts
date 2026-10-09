@@ -1,18 +1,14 @@
 import { describe, it, expect, beforeAll } from 'bun:test';
 
 import bootstrap from '../test_helper.js';
-import { elysia } from 'lib/index.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import {
-	ADMIN_MCP_CLIENT_ID,
-	MCP_RESOURCE,
-	MCP_ROUTE
-} from 'lib/mcp/consts.ts';
+import { ADMIN_MCP_CLIENT_ID, MCP_RESOURCE } from 'lib/mcp/consts.ts';
 import { shaped } from 'test/shape.js';
 import { Type, type Static } from '@sinclair/typebox';
 import { createAdministrator } from '../administrators.ts';
+import { rpc } from './rpc.ts';
 
 /*
  * The schema an agent reads is the one `tools/list` returns, and that is two layers below where the
@@ -23,34 +19,6 @@ import { createAdministrator } from '../administrators.ts';
  */
 
 let rpcId = 0;
-
-async function rpc(body: unknown, token: string) {
-	const res = await elysia.handle(
-		new Request(`http://e.ly${MCP_ROUTE}`, {
-			method: 'POST',
-			headers: {
-				'content-type': 'application/json',
-				accept: 'application/json, text/event-stream',
-				authorization: `Bearer ${token}`
-			},
-			body: JSON.stringify(body)
-		})
-	);
-	const text = await res.text();
-	const isEvent = (res.headers.get('content-type') ?? '').includes(
-		'text/event-stream'
-	);
-	const line = isEvent
-		? text.split('\n').find((l) => l.startsWith('data:'))
-		: undefined;
-	return isEvent
-		? line
-			? JSON.parse(line.slice('data:'.length).trim())
-			: undefined
-		: text
-			? JSON.parse(text)
-			: undefined;
-}
 
 async function session() {
 	const user = await createAdministrator('super', `pub-${Math.random()}@x.io`);
@@ -119,7 +87,8 @@ describe('the settings tool as an agent receives it', () => {
 	});
 
 	it('states the type of a switch, a list and a choice', () => {
-		const properties = schema.properties ?? {};
+		const properties: Partial<NonNullable<typeof schema.properties>> =
+			schema.properties ?? {};
 
 		expect(properties['par.enabled']?.type).toBe('boolean');
 		expect(properties['scopes']?.type).toBe('array');

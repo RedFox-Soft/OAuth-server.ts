@@ -11,17 +11,14 @@ import {
 	getBucketStore
 } from 'lib/adapters/index.ts';
 import { ADMIN_SESSION_COOKIE, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
-import {
-	ADMIN_MCP_CLIENT_ID,
-	MCP_RESOURCE,
-	MCP_ROUTE
-} from 'lib/mcp/consts.ts';
+import { ADMIN_MCP_CLIENT_ID, MCP_RESOURCE } from 'lib/mcp/consts.ts';
 import { mcpCatalogue, pathArgName } from 'lib/mcp/catalogue.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
 import { shaped } from 'test/shape.js';
 import { Type } from '@sinclair/typebox';
 import { createAdministrator } from '../administrators.ts';
+import { rpc } from './rpc.ts';
 
 /*
  * SC-002 / FR-025: an operator reading the agent's answer and the console side by side sees the same
@@ -34,34 +31,6 @@ import { createAdministrator } from '../administrators.ts';
  */
 
 let rpcId = 0;
-
-async function rpc(body: unknown, token: string) {
-	const res = await elysia.handle(
-		new Request(`http://e.ly${MCP_ROUTE}`, {
-			method: 'POST',
-			headers: {
-				'content-type': 'application/json',
-				accept: 'application/json, text/event-stream',
-				authorization: `Bearer ${token}`
-			},
-			body: JSON.stringify(body)
-		})
-	);
-	const text = await res.text();
-	const isEvent = (res.headers.get('content-type') ?? '').includes(
-		'text/event-stream'
-	);
-	const line = isEvent
-		? text.split('\n').find((l) => l.startsWith('data:'))
-		: undefined;
-	return isEvent
-		? line
-			? JSON.parse(line.slice('data:'.length).trim())
-			: undefined
-		: text
-			? JSON.parse(text)
-			: undefined;
-}
 
 async function principal() {
 	const user = await createAdministrator('super', `par-${Math.random()}@x.io`);
@@ -168,7 +137,7 @@ describe('agent answers match the console, field for field', () => {
 			'hash'
 		);
 
-		const ARGS: Record<string, Record<string, string>> = {
+		const ARGS: Partial<Record<string, Partial<Record<string, string>>>> = {
 			project_get: { id: project._id },
 			client_list: { id: project._id },
 			client_get: { id: project._id, clientId },
@@ -182,25 +151,23 @@ describe('agent answers match the console, field for field', () => {
 
 		for (const tool of mcpCatalogue.filter((t) => t.consequence === 'read')) {
 			const args = ARGS[tool.tool] ?? {};
-			if (
-				tool.pathParams.some((p) => args[pathArgName(tool, p)] === undefined)
-			) {
-				continue;
-			}
 
-			// The same operation, over the console.
-			let path = tool.path;
+			// The same operation, over the console; skipped when this test holds no value for a parameter.
+			let path: string | undefined = tool.path;
 			for (const param of tool.pathParams) {
-				path = path.replace(
-					`:${param}`,
-					encodeURIComponent(args[pathArgName(tool, param)])
-				);
+				const value = args[pathArgName(tool, param)];
+				if (value === undefined) {
+					path = undefined;
+					break;
+				}
+				path = path.replace(`:${param}`, encodeURIComponent(value));
 			}
+			if (path === undefined) continue;
 			const httpRes = await elysia.handle(
 				new Request(`http://e.ly${path}`, { headers: { cookie } })
 			);
 			expect(httpRes.status, `${tool.tool} failed over the console`).toBe(200);
-			const viaConsole = await httpRes.json();
+			const viaConsole: unknown = await httpRes.json();
 
 			const agentResponse = await rpc(
 				{

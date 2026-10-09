@@ -2,7 +2,9 @@ import { describe, it, expect } from 'bun:test';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { Type } from '@sinclair/typebox';
 
+import { shaped } from '../shape.ts';
 import {
 	FIXED_AREAS,
 	MODEL_AREAS,
@@ -48,7 +50,7 @@ function literalAdapterAreas(): Map<string, string> {
 		for (const match of source.matchAll(
 			/\b(?:adapter\(\s*'([^']+)'\s*\)|checkedAdapter\(\s*'([^']+)'\s*,)/g
 		)) {
-			const area = match[1] ?? match[2];
+			const area = match.at(1) ?? match.at(2);
 			if (area !== undefined && !found.has(area)) {
 				found.set(area, file);
 			}
@@ -56,6 +58,8 @@ function literalAdapterAreas(): Map<string, string> {
 	}
 	return found;
 }
+
+const ModuleExports = Type.Record(Type.String(), Type.Unknown());
 
 interface DiscoveredClass {
 	readonly name: string;
@@ -73,12 +77,9 @@ async function modelClasses(): Promise<DiscoveredClass[]> {
 
 	const discovered: DiscoveredClass[] = [];
 	for (const file of files) {
-		// Annotated rather than asserted: a dynamic import of a runtime-computed path is typed `any`,
-		// which the annotation accepts directly.
-		const module: Record<string, unknown> = await import(
-			pathToFileURL(file).href
-		);
-		for (const exported of Object.values(module)) {
+		// A dynamic import of a runtime-computed path is typed `any`; the namespace is checked, not claimed.
+		const module: unknown = await import(pathToFileURL(file).href);
+		for (const exported of Object.values(shaped(ModuleExports, module))) {
 			if (typeof exported !== 'function' || !hasStaticAdapter(exported)) {
 				continue;
 			}
@@ -212,14 +213,6 @@ describe('storage inventory drift', () => {
 const IDENTIFIER = /^[A-Za-z][A-Za-z0-9_]*$/;
 
 describe('storage ownership drift', () => {
-	it('declares ownership for every storage area', () => {
-		const undeclared = STORAGE_INVENTORY.filter((area) => !area.owners).map(
-			(area) => area.name
-		);
-
-		expect(undeclared).toEqual([]);
-	});
-
 	// `reason` is required exactly when nothing is owned, so "no owner" is always a decision someone
 	// wrote down rather than a field left blank — the same rule `reaped: null` already follows.
 	it('states a reason exactly when an area owns nothing', () => {

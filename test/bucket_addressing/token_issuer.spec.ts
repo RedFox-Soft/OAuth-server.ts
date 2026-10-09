@@ -175,11 +175,14 @@ describe('a token minted by a named bucket', () => {
 		);
 		expect(body.access_token).toBeTruthy();
 
-		const claims = JSON.parse(
-			Buffer.from(
-				present(body.id_token, 'an ID token').split('.')[1],
-				'base64url'
-			).toString()
+		const claims = shaped(
+			Type.Object({ iss: Type.String() }),
+			JSON.parse(
+				Buffer.from(
+					present(body.id_token, 'an ID token').split('.')[1],
+					'base64url'
+				).toString()
+			)
 		);
 		expect(claims.iss).toBe(`${ISSUER}/${SLUG}`);
 

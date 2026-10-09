@@ -7,7 +7,11 @@ import { ISSUER } from 'lib/configs/env.js';
 import { ensureAdminSeed } from 'lib/admin/seed.js';
 import { DEFAULT_BUCKET_ID } from 'lib/admin/consts.js';
 import { bucketAddressFor } from 'lib/admin/ui/bucketAddress.js';
-import { present } from 'test/shape.js';
+import { present, shaped } from 'test/shape.js';
+import { Type } from '@sinclair/typebox';
+
+// The one member read; a document without it (an error body) still reaches the toEqual and says so.
+const Metadata = Type.Object({ issuer: Type.Optional(Type.String()) });
 
 async function discoveryAt(prefix: string) {
 	return elysia.handle(
@@ -93,7 +97,7 @@ describe('the address the console reports for a bucket', () => {
 			}).toEqual({ bucket: bucket._id, status: 200 });
 			expect({
 				bucket: bucket._id,
-				issuer: (await response.json()).issuer
+				issuer: shaped(Metadata, await response.json()).issuer
 			}).toEqual({ bucket: bucket._id, issuer });
 		}
 	});

@@ -256,7 +256,7 @@ export const backchannelAuth = new Elysia()
 				assignClaims(oidc);
 				await cibaLoadAccount(oidc);
 
-				return backchannelRequestResponse(oidc);
+				return await backchannelRequestResponse(oidc);
 			} catch (err) {
 				// Remaps request-object errors thrown by downstream steps to invalid_request,
 				// preserving the description (former backchannel_request_remap_errors).

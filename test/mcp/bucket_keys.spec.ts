@@ -1,43 +1,25 @@
 import { beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 
 import bootstrap from '../test_helper.js';
-import { elysia } from 'lib/index.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { getBucketKeysStore, getBucketStore } from 'lib/adapters/index.ts';
 import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
-import {
-	ADMIN_MCP_CLIENT_ID,
-	MCP_RESOURCE,
-	MCP_ROUTE
-} from 'lib/mcp/consts.ts';
+import { ADMIN_MCP_CLIENT_ID, MCP_RESOURCE } from 'lib/mcp/consts.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { keysFor } from 'lib/keys/issuer_keys.ts';
 import { createAdministrator } from '../administrators.ts';
+import { postMcp } from './rpc.ts';
+import { present, shaped } from '../shape.ts';
+import { Type } from '@sinclair/typebox';
 
 let rpcId = 0;
 
+// The body as sent too: the assertions below look for key material in the raw text, not only the message.
 async function rpc(body: unknown, token: string) {
-	const res = await elysia.handle(
-		new Request(`http://e.ly${MCP_ROUTE}`, {
-			method: 'POST',
-			headers: {
-				'content-type': 'application/json',
-				accept: 'application/json, text/event-stream',
-				authorization: `Bearer ${token}`
-			},
-			body: JSON.stringify(body)
-		})
-	);
-	const text = await res.text();
-	const line = text.split('\n').find((l) => l.startsWith('data:'));
-	return {
-		raw: text,
-		payload: line
-			? JSON.parse(line.slice('data:'.length).trim())
-			: JSON.parse(text)
-	};
+	const { raw, message } = await postMcp(body, token);
+	return { raw, payload: present(message, 'a JSON-RPC message') };
 }
 
 function call(name: string, args: Record<string, unknown>) {
@@ -113,7 +95,12 @@ describe('an agent managing a bucket key set', () => {
 		);
 
 		expect(payload.result?.isError).not.toBe(true);
-		expect(payload.result?.structuredContent?.result?.keys).toHaveLength(1);
+		expect(
+			shaped(
+				Type.Object({ keys: Type.Array(Type.Unknown()) }),
+				payload.result?.structuredContent?.result
+			).keys
+		).toHaveLength(1);
 	});
 
 	it('generates a published key for a bucket', async () => {
@@ -126,7 +113,12 @@ describe('an agent managing a bucket key set', () => {
 		);
 
 		expect(payload.result?.isError).not.toBe(true);
-		expect(payload.result?.structuredContent?.result?.state).toBe('published');
+		expect(
+			shaped(
+				Type.Object({ state: Type.String() }),
+				payload.result?.structuredContent?.result
+			).state
+		).toBe('published');
 	});
 
 	it('holds a retirement for confirmation and retires nothing', async () => {
@@ -136,8 +128,9 @@ describe('an agent managing a bucket key set', () => {
 			call('bucket_key_generate', { id: bucket._id, alg: 'ES256' }),
 			token
 		);
-		const kid = String(
-			generated.payload.result?.structuredContent?.result?.kid
+		const { kid } = shaped(
+			Type.Object({ kid: Type.String() }),
+			generated.payload.result?.structuredContent?.result
 		);
 
 		const { payload } = await rpc(

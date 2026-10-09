@@ -1,14 +1,15 @@
 import * as crypto from 'node:crypto';
 
 import { SignJWT } from 'jose';
-import { describe, it, expect, mock } from 'bun:test';
+import { describe, it, expect, mock, beforeAll } from 'bun:test';
+import { providerError } from 'test/shape.ts';
 
-import bootstrap, { agent } from '../test_helper.js';
+import bootstrap, { type Setup, agent } from '../test_helper.js';
 import epochTime from '../../lib/helpers/epoch_time.js';
 
 import { keypair } from './fapi2.config.js';
 import { ISSUER } from 'lib/configs/env.js';
-import { eventBus } from 'lib/event_bus.js';
+import { eventBus, type ServerListener } from 'lib/event_bus.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import nanoid from 'lib/helpers/nanoid.js';
 
@@ -16,12 +17,15 @@ import nanoid from 'lib/helpers/nanoid.js';
  * @proves A FAPI 2 deployment narrows what it accepts: a client assertion audienced at the
  * issuer identifier and nowhere else, and a request object bounded by exp and nbf.
  */
-describe('FAPI 2.0 Final behaviours', async () => {
-	const setup = await bootstrap(import.meta.url, { config: 'fapi2' });
+describe('FAPI 2.0 Final behaviours', () => {
+	let setup: Setup;
+	beforeAll(async () => {
+		setup = await bootstrap(import.meta.url, { config: 'fapi2' });
+	});
 
 	describe('FAPI 2.0 Final Mode Authorization Request', () => {
 		it('requires pkjwt audience to be the issuer identifier', async function () {
-			const spy = mock();
+			const spy = mock<ServerListener<'pushed_authorization_request.error'>>();
 			eventBus.on('pushed_authorization_request.error', spy);
 
 			const res = await agent.par.post({
@@ -50,13 +54,13 @@ describe('FAPI 2.0 Final behaviours', async () => {
 				error_description: 'client authentication failed'
 			});
 
-			expect(spy.mock.calls[0][0].error_detail).toBe(
+			expect(providerError(spy.mock.calls[0][0]).error_detail).toBe(
 				'audience (aud) must equal the issuer identifier url'
 			);
 		});
 
 		it('refuses a client assertion whose audience is a list', async function () {
-			const spy = mock();
+			const spy = mock<ServerListener<'pushed_authorization_request.error'>>();
 			eventBus.on('pushed_authorization_request.error', spy);
 
 			const res = await agent.par.post({
@@ -85,13 +89,13 @@ describe('FAPI 2.0 Final behaviours', async () => {
 				error_description: 'client authentication failed'
 			});
 
-			expect(spy.mock.calls[0][0].error_detail).toBe(
+			expect(providerError(spy.mock.calls[0][0]).error_detail).toBe(
 				'audience (aud) must equal the issuer identifier url'
 			);
 		});
 
 		it('refuses a client assertion audienced at the endpoint receiving it', async function () {
-			const spy = mock();
+			const spy = mock<ServerListener<'pushed_authorization_request.error'>>();
 			eventBus.on('pushed_authorization_request.error', spy);
 
 			const res = await agent.par.post({
@@ -120,7 +124,7 @@ describe('FAPI 2.0 Final behaviours', async () => {
 				error_description: 'client authentication failed'
 			});
 
-			expect(spy.mock.calls[0][0].error_detail).toBe(
+			expect(providerError(spy.mock.calls[0][0]).error_detail).toBe(
 				'audience (aud) must equal the issuer identifier url'
 			);
 		});

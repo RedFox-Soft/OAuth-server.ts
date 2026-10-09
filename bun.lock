@@ -43,6 +43,9 @@
       },
     },
   },
+  "patchedDependencies": {
+    "bun-types@1.4.2": "patches/bun-types@1.4.2.patch",
+  },
   "packages": {
     "@ant-design/colors": ["@ant-design/colors@8.0.1", "", { "dependencies": { "@ant-design/fast-color": "^3.0.0" } }, "sha512-foPVl0+SWIslGUtD/xBr1p9U4AKzPhNYEseXYRRo5QSzGACYZrQbe11AYJbYfAWnWSpGBx6JjBmSeugUsD9vqQ=="],
 

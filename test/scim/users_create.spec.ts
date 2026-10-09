@@ -1,7 +1,9 @@
 import { describe, it, beforeAll, expect } from 'bun:test';
+import { Type } from '@sinclair/typebox';
 
 import { getUserStore } from 'lib/adapters/index.js';
 import bootstrap from '../test_helper.js';
+import { shaped } from '../shape.ts';
 import {
 	connect,
 	scim,
@@ -9,6 +11,12 @@ import {
 	scimUser,
 	type Connected
 } from './helpers.ts';
+
+const Meta = Type.Object({
+	resourceType: Type.String(),
+	created: Type.String(),
+	lastModified: Type.String()
+});
 
 /**
  * @proves An identity system creates a bucket's users over SCIM: the server issues the id, refuses a
@@ -35,11 +43,7 @@ describe('creating a user over SCIM', () => {
 		expect(created.status).toBe(201);
 		const id = created.json.id as string;
 		expect(id).not.toBe('oid-alice');
-		expect(created.json.meta).toMatchObject({
-			resourceType: 'User',
-			created: expect.any(String),
-			lastModified: expect.any(String)
-		});
+		expect(shaped(Meta, created.json.meta).resourceType).toBe('User');
 		const location = created.headers.get('location') ?? '';
 		expect(location).toBe(`http://e.ly${c.base}/Users/${id}`);
 

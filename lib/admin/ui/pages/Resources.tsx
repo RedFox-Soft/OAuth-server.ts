@@ -5,6 +5,7 @@ import {
 	Modal,
 	Form,
 	Input,
+	InputNumber,
 	Select,
 	Space,
 	Typography,
@@ -13,7 +14,8 @@ import {
 	Tag,
 	Checkbox,
 	Tooltip,
-	message
+	message,
+	type FormInstance
 } from 'antd';
 import { PlusOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import type { Project } from '../../../adapters/types.js';
@@ -54,12 +56,21 @@ interface ResourceView {
 	trailingSlashSignificant: boolean;
 }
 
+// Form.useWatch is typed as the field's value, but it answers undefined until the field registers.
+function useWatched<K extends keyof FormValues>(
+	form: FormInstance<FormValues>,
+	name: K
+): FormValues[K] | undefined {
+	return Form.useWatch(name, form);
+}
+
 interface FormValues {
 	identifier: string;
 	name: string;
 	scopes: string;
 	tokenFormat: 'jwt' | 'opaque';
-	accessTokenTTL: number;
+	// InputNumber answers null once the operator clears it.
+	accessTokenTTL: number | null;
 	trailingSlashSignificant: boolean;
 }
 
@@ -198,9 +209,9 @@ export function Resources({
 	const [saving, setSaving] = useState(false);
 	const [form] = Form.useForm<FormValues>();
 
-	const scopesValue = Form.useWatch('scopes', form) ?? '';
-	const ttlValue = Form.useWatch('accessTokenTTL', form) ?? 900;
-	const formatValue = Form.useWatch('tokenFormat', form) ?? 'jwt';
+	const scopesValue = useWatched(form, 'scopes') ?? '';
+	const ttlValue = useWatched(form, 'accessTokenTTL') ?? 900;
+	const formatValue = useWatched(form, 'tokenFormat') ?? 'jwt';
 
 	// Every state write follows an await, so the mount effect calls this without setting
 	// `loading` first; `load` is the reload, which does.
@@ -264,14 +275,14 @@ export function Resources({
 							name: values.name,
 							scopes,
 							tokenFormat: values.tokenFormat,
-							accessTokenTTL: values.accessTokenTTL,
+							accessTokenTTL: values.accessTokenTTL ?? undefined,
 							trailingSlashSignificant: values.trailingSlashSignificant
 						}
 					: {
 							name: values.name,
 							scopes,
 							tokenFormat: values.tokenFormat,
-							accessTokenTTL: values.accessTokenTTL
+							accessTokenTTL: values.accessTokenTTL ?? undefined
 						};
 
 			const url =
@@ -335,7 +346,7 @@ export function Resources({
 				type="info"
 				showIcon
 				style={{ marginBottom: 16 }}
-				message="A declared resource is half of the setup"
+				title="A declared resource is half of the setup"
 				description="Declaring the resource is what makes this server mint tokens for it. For an agent host to obtain one it also needs a client identity: either clientIdMetadataDocument.enabled, so a client_id that is an HTTPS URL is accepted, or registration.enabled for an older host that registers itself. Both are instance settings and both are off by default."
 			/>
 
@@ -360,7 +371,7 @@ export function Resources({
 						dataIndex: 'identifier',
 						render: (identifier: string, row: ResourceView) => (
 							<Space
-								direction="vertical"
+								orientation="vertical"
 								size={0}
 							>
 								<Typography.Text strong>{row.name}</Typography.Text>
@@ -402,7 +413,7 @@ export function Resources({
 						dataIndex: 'accessTokenTTL',
 						render: (ttl: number, row: ResourceView) => (
 							<Space
-								direction="vertical"
+								orientation="vertical"
 								size={0}
 							>
 								<span>{describeWindow(ttl)}</span>
@@ -486,7 +497,7 @@ export function Resources({
 							type="info"
 							showIcon
 							style={{ marginBottom: 16 }}
-							message="The identifier cannot be changed"
+							title="The identifier cannot be changed"
 							description="It is the audience of every token already issued for this resource. Replacing it means removing this declaration and making a new one."
 						/>
 					)}
@@ -510,7 +521,7 @@ export function Resources({
 							type="warning"
 							showIcon
 							style={{ marginBottom: 16 }}
-							message="About this scope list"
+							title="About this scope list"
 							description={scopeAdvice(scopesValue)}
 						/>
 					)}
@@ -524,18 +535,19 @@ export function Resources({
 						name="accessTokenTTL"
 						label="Access token lifetime (seconds)"
 					>
-						<Input
-							type="number"
+						<InputNumber
 							min={30}
 							max={86400}
+							precision={0}
+							style={{ width: '100%' }}
 						/>
 					</Form.Item>
 					<Alert
 						type="info"
 						showIcon
-						message={
+						title={
 							formatValue === 'jwt'
-								? `Revocation takes up to ${describeWindow(Number(ttlValue) || 900)}`
+								? `Revocation takes up to ${describeWindow(ttlValue)}`
 								: 'Revocation is immediate'
 						}
 						description={

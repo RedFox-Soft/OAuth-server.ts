@@ -48,7 +48,7 @@ describe('administering provisioning connections', () => {
 			clientId: `scim-${String(created.json.id)}`
 		});
 		const after = await reload(bucket);
-		expect(after.federation?.[0]?.provisioning).toBe('existing_only');
+		expect(after.federation[0]?.provisioning).toBe('existing_only');
 	});
 
 	it('defaults a Microsoft provider’s rule to oid against externalId', async () => {
@@ -116,7 +116,7 @@ describe('administering provisioning connections', () => {
 
 		expect(switched.status).toBe(409);
 		expect(deleted.status).toBe(409);
-		expect((await reload(c.bucket)).federation?.[0]).toMatchObject({
+		expect((await reload(c.bucket)).federation[0]).toMatchObject({
 			id: 'corp',
 			provisioning: 'existing_only'
 		});

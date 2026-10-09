@@ -147,7 +147,7 @@ export async function tokenAuth(
 	headers: Record<string, string | undefined>,
 	oidc: OIDCContext<authParamsType>
 ) {
-	const auth = findClientId(params, headers?.authorization);
+	const auth = findClientId(params, headers.authorization);
 
 	const client = await Client.find(auth.clientId, {
 		error: new InvalidClientAuth('client not found')

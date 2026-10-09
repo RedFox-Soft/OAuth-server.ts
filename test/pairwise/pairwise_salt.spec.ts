@@ -71,7 +71,7 @@ describe('pairwise identifiers', () => {
 		const code = redirectParameter(response, 'code');
 
 		const { data } = await auth.getToken(code);
-		if (!data?.id_token || !data?.access_token) {
+		if (!data?.id_token || !data.access_token) {
 			throw new Error(`no tokens for ${clientId}: ${JSON.stringify(data)}`);
 		}
 

@@ -83,9 +83,9 @@ async function getResourceServerConfig(
 				 * an algorithm a resource server was configured to expect is never substituted.
 				 */
 				const { signing } = await keysFor(bucket);
-				let [jwk] = signing.selectForSign({ alg, use: 'sig', kid });
+				let jwk = signing.selectForSign({ alg, use: 'sig', kid }).at(0);
 				if (!jwk && !token.resourceServer?.jwt?.sign) {
-					[jwk] = [...signing];
+					jwk = [...signing].at(0);
 					if (typeof jwk?.alg === 'string') alg = jwk.alg;
 				}
 				if (!jwk) {

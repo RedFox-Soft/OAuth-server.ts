@@ -8,7 +8,7 @@ import {
 	expect
 } from 'bun:test';
 import bootstrap, { agent } from '../test_helper.js';
-import { eventBus } from 'lib/event_bus.js';
+import { eventBus, type ServerListener } from 'lib/event_bus.js';
 import { Client } from 'lib/models/client.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
 import { AccessToken } from 'lib/models/access_token.js';
@@ -403,7 +403,7 @@ describe('revocation features', () => {
 		});
 
 		it('does not revoke tokens of other clients', async function () {
-			const spy = mock();
+			const spy = mock<ServerListener<'revocation.error'>>();
 			eventBus.once('revocation.error', spy);
 			const at = new AccessToken({
 				accountId: 'accountId',
@@ -469,9 +469,7 @@ describe('revocation features', () => {
 				expect(status).toBe(200);
 
 				const entities = spy.mock.calls.map((call) => call[0]);
-				expect(['Client', 'AccessToken']).toEqual(
-					expect.arrayContaining(entities)
-				);
+				expect(['Client', 'AccessToken']).toContainValues(entities);
 			});
 
 			it('the revocation event carries the refresh token and its client', async function () {
@@ -496,9 +494,7 @@ describe('revocation features', () => {
 				expect(status).toBe(200);
 
 				const entities = spy.mock.calls.map((call) => call[0]);
-				expect(['Client', 'RefreshToken']).toEqual(
-					expect.arrayContaining(entities)
-				);
+				expect(['Client', 'RefreshToken']).toContainValues(entities);
 			});
 
 			it('the revocation event carries the client credentials token and its client', async function () {
@@ -519,9 +515,7 @@ describe('revocation features', () => {
 				expect(status).toBe(200);
 
 				const entities = spy.mock.calls.map((call) => call[0]);
-				expect(['Client', 'ClientCredentials']).toEqual(
-					expect.arrayContaining(entities)
-				);
+				expect(['Client', 'ClientCredentials']).toContainValues(entities);
 			});
 		});
 	});

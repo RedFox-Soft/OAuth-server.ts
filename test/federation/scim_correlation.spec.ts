@@ -250,7 +250,7 @@ describe('signing in at a provider bound to a provisioning connection', () => {
 			population.set(`oid-${i}`, user._id);
 		}
 		const before = (await store.list()).length;
-		const provider = bucket.federation?.[0];
+		const provider = bucket.federation.at(0);
 		if (!provider) throw new Error('expected the bound provider');
 
 		await fc.assert(

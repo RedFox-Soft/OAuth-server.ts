@@ -3,7 +3,7 @@ import { Elysia } from 'elysia';
 import { treaty } from '@elysiajs/eden';
 
 import bootstrap from '../test_helper.ts';
-import { elysia } from 'lib/index.ts';
+import { present } from '../shape.ts';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { resourceRoutes } from 'lib/admin/resources/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
@@ -15,15 +15,12 @@ import {
 import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { AccessToken } from 'lib/models/access_token.ts';
 import { Client } from 'lib/models/client.ts';
-import {
-	ADMIN_MCP_CLIENT_ID,
-	MCP_RESOURCE,
-	MCP_ROUTE
-} from 'lib/mcp/consts.ts';
+import { ADMIN_MCP_CLIENT_ID, MCP_RESOURCE } from 'lib/mcp/consts.ts';
 import { ApplicationConfig } from 'lib/configs/application.ts';
 import { ROOT_NAMESPACE } from 'lib/resources/namespace.ts';
 import { sessionFor } from '../admin_session.ts';
 import { createAdministrator, type AdminKind } from '../administrators.ts';
+import { rpc } from '../mcp/rpc.ts';
 
 /*
  * A project with no bucket of its own is served at the root issuer, whose namespace every such tenant
@@ -77,24 +74,6 @@ async function declaredAtRoot(projectId: string) {
 }
 
 let rpcId = 0;
-async function rpc(payload: unknown, token: string) {
-	const res = await elysia.handle(
-		new Request(`http://e.ly${MCP_ROUTE}`, {
-			method: 'POST',
-			headers: {
-				'content-type': 'application/json',
-				accept: 'application/json, text/event-stream',
-				authorization: `Bearer ${token}`
-			},
-			body: JSON.stringify(payload)
-		})
-	);
-	const text = await res.text();
-	const line = text.split('\n').find((l) => l.startsWith('data:'));
-	return line
-		? JSON.parse(line.slice('data:'.length).trim())
-		: JSON.parse(text);
-}
 
 async function agentFor(userId: string) {
 	const at = new AccessToken({
@@ -148,7 +127,9 @@ describe('a project without an addressable bucket', () => {
 			.resources.post(body, { headers: { cookie } });
 
 		expect(res.status).toBe(403);
-		const message = String((res.error?.value as { message?: string })?.message);
+		const message = String(
+			(present(res.error, 'a refusal').value as { message?: string }).message
+		);
 		expect(message).toContain('super administrator');
 		expect(message).toContain('bucket');
 		expect(await getProtectedResourceStore().list()).toEqual([]);

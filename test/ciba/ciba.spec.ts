@@ -15,14 +15,36 @@ import { AccessDenied } from '../../lib/helpers/errors.ts';
 import bootstrap, { agent, seedAccount, formAgent } from '../test_helper.js';
 
 import { emitter } from './ciba.config.js';
-import { eventBus } from 'lib/event_bus.js';
+import { eventBus, type ServerListener } from 'lib/event_bus.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { BackchannelAuthenticationRequest } from 'lib/models/backchannel_authentication_request.js';
 import { Grant } from 'lib/models/grant.js';
 import { backchannelResult } from 'lib/actions/authorization/backchannel_result.js';
+import { Type } from '@sinclair/typebox';
+import { shaped } from '../shape.ts';
 
 function post(body: Parameters<typeof formAgent.backchannel.post>[0]) {
 	return formAgent.backchannel.post(body);
+}
+
+// The arguments ciba.config.ts re-emits from an addon call; the emitter itself is untyped.
+async function emitted(name: string): Promise<unknown[]> {
+	return once(emitter, name);
+}
+
+// triggerAuthenticationDevice(oidc, request, account, client), checked rather than claimed.
+async function deviceTriggered() {
+	const [, request, account, client] = await emitted(
+		'triggerAuthenticationDevice'
+	);
+	if (!(request instanceof BackchannelAuthenticationRequest)) {
+		throw new Error('expected a BackchannelAuthenticationRequest');
+	}
+	return {
+		request,
+		account: shaped(Type.Object({ accountId: Type.String() }), account),
+		client: shaped(Type.Object({ clientId: Type.String() }), client)
+	};
 }
 
 /**
@@ -270,7 +292,7 @@ describe('features.ciba', () => {
 						user_code: 'a-user-code',
 						client_id: 'client'
 					}),
-					once(emitter, 'verifyUserCode')
+					emitted('verifyUserCode')
 				]);
 
 				expect(res.status).toBe(200);
@@ -278,13 +300,13 @@ describe('features.ciba', () => {
 			});
 
 			it('a minimal request identified by login_hint is accepted and returns an auth_req_id', async () => {
-				const [res, [, request, account, client]] = await Promise.all([
+				const [res, { request, account, client }] = await Promise.all([
 					post({
 						scope: 'openid',
 						login_hint: 'accountId',
 						client_id: 'client'
 					}),
-					once(emitter, 'triggerAuthenticationDevice'),
+					deviceTriggered(),
 					once(emitter, 'processLoginHint'),
 					once(emitter, 'validateBindingMessage'),
 					once(emitter, 'validateRequestContext'),
@@ -329,13 +351,13 @@ describe('features.ciba', () => {
 			});
 
 			it('accepts a minimal request identified by login_hint_token and returns an auth_req_id', async () => {
-				const [res, [, request, account, client]] = await Promise.all([
+				const [res, { request, account, client }] = await Promise.all([
 					post({
 						scope: 'openid',
 						login_hint_token: 'accountId',
 						client_id: 'client'
 					}),
-					once(emitter, 'triggerAuthenticationDevice'),
+					deviceTriggered(),
 					once(emitter, 'processLoginHintToken'),
 					once(emitter, 'validateBindingMessage'),
 					once(emitter, 'validateRequestContext'),
@@ -367,13 +389,13 @@ describe('features.ciba', () => {
 			});
 
 			it('accepts a minimal request identified by id_token_hint and returns an auth_req_id', async () => {
-				const [, [, request]] = await Promise.all([
+				const [, { request }] = await Promise.all([
 					post({
 						scope: 'openid',
 						login_hint_token: 'accountId',
 						client_id: 'client'
 					}),
-					once(emitter, 'triggerAuthenticationDevice')
+					deviceTriggered()
 				]);
 				const grant = new Grant({
 					accountId: 'accountId',
@@ -391,17 +413,18 @@ describe('features.ciba', () => {
 				const id_token = tokenData?.id_token;
 				if (!id_token) throw new Error('expected an ID Token');
 
-				const [res2, [, request2, account, client]] = await Promise.all([
-					post({
-						scope: 'openid',
-						id_token_hint: id_token,
-						client_id: 'client'
-					}),
-					once(emitter, 'triggerAuthenticationDevice'),
-					once(emitter, 'validateBindingMessage'),
-					once(emitter, 'validateRequestContext'),
-					once(emitter, 'verifyUserCode')
-				]);
+				const [res2, { request: request2, account, client }] =
+					await Promise.all([
+						post({
+							scope: 'openid',
+							id_token_hint: id_token,
+							client_id: 'client'
+						}),
+						deviceTriggered(),
+						once(emitter, 'validateBindingMessage'),
+						once(emitter, 'validateRequestContext'),
+						once(emitter, 'verifyUserCode')
+					]);
 
 				expect(res2.status).toBe(200);
 				if (!res2.data) throw new Error('expected response data');
@@ -424,7 +447,8 @@ describe('features.ciba', () => {
 
 			describe('client validation', () => {
 				it('only responds to clients with urn:openid:params:grant-type:ciba enabled', async () => {
-					const spy = mock();
+					const spy =
+						mock<ServerListener<'backchannel_authentication.error'>>();
 					eventBus.once('backchannel_authentication.error', spy);
 
 					const { error } = await post({
@@ -442,7 +466,8 @@ describe('features.ciba', () => {
 				});
 
 				it('rejects invalid clients', async () => {
-					const spy = mock();
+					const spy =
+						mock<ServerListener<'backchannel_authentication.error'>>();
 					eventBus.once('backchannel_authentication.error', spy);
 
 					const { error } = await post({
@@ -460,7 +485,7 @@ describe('features.ciba', () => {
 			});
 
 			it('rejects other than application/x-www-form-urlencoded', async () => {
-				const spy = mock();
+				const spy = mock<ServerListener<'backchannel_authentication.error'>>();
 				eventBus.once('backchannel_authentication.error', spy);
 
 				const { error } = await agent.backchannel.post({
@@ -480,7 +505,8 @@ describe('features.ciba', () => {
 			describe('param validation', () => {
 				['request', 'request_uri', 'registration'].forEach((param) => {
 					it(`refuses ${param}, which this endpoint does not support`, async () => {
-						const spy = mock();
+						const spy =
+							mock<ServerListener<'backchannel_authentication.error'>>();
 						eventBus.once('backchannel_authentication.error', spy);
 
 						const { error } = await post({
@@ -499,7 +525,8 @@ describe('features.ciba', () => {
 				});
 
 				it('a request naming a user who cannot be resolved is refused', async () => {
-					const spy = mock();
+					const spy =
+						mock<ServerListener<'backchannel_authentication.error'>>();
 					eventBus.once('backchannel_authentication.error', spy);
 
 					const { error } = await post({
@@ -518,7 +545,8 @@ describe('features.ciba', () => {
 				});
 
 				it('refuses a request whose user cannot be resolved, without saying whether they exist', async () => {
-					const spy = mock();
+					const spy =
+						mock<ServerListener<'backchannel_authentication.error'>>();
 					eventBus.once('backchannel_authentication.error', spy);
 
 					const { error } = await post({
@@ -537,7 +565,8 @@ describe('features.ciba', () => {
 				});
 
 				it('a request with no scope is refused as invalid_request', async () => {
-					const spy = mock();
+					const spy =
+						mock<ServerListener<'backchannel_authentication.error'>>();
 					eventBus.once('backchannel_authentication.error', spy);
 
 					const { error } = await post({
@@ -554,7 +583,8 @@ describe('features.ciba', () => {
 				});
 
 				it('refuses a ping request with no client_notification_token', async () => {
-					const spy = mock();
+					const spy =
+						mock<ServerListener<'backchannel_authentication.error'>>();
 					eventBus.once('backchannel_authentication.error', spy);
 
 					const { error } = await post({
@@ -573,7 +603,8 @@ describe('features.ciba', () => {
 				});
 
 				it('refuses a request whose scope omits openid', async () => {
-					const spy = mock();
+					const spy =
+						mock<ServerListener<'backchannel_authentication.error'>>();
 					eventBus.once('backchannel_authentication.error', spy);
 
 					const { error } = await post({
@@ -591,7 +622,8 @@ describe('features.ciba', () => {
 				});
 
 				it('an out-of-range requested expiry is refused', async () => {
-					const spy = mock();
+					const spy =
+						mock<ServerListener<'backchannel_authentication.error'>>();
 					eventBus.once('backchannel_authentication.error', spy);
 
 					const { error } = await post({
@@ -610,7 +642,8 @@ describe('features.ciba', () => {
 				});
 
 				it('a request naming no user at all is refused', async () => {
-					const spy = mock();
+					const spy =
+						mock<ServerListener<'backchannel_authentication.error'>>();
 					eventBus.once('backchannel_authentication.error', spy);
 
 					const { error } = await post({
@@ -629,7 +662,8 @@ describe('features.ciba', () => {
 				});
 
 				it('a request naming two different users is refused', async () => {
-					const spy = mock();
+					const spy =
+						mock<ServerListener<'backchannel_authentication.error'>>();
 					eventBus.once('backchannel_authentication.error', spy);
 
 					const { error } = await post({
@@ -679,7 +713,8 @@ describe('features.ciba', () => {
 			describe('param validation', () => {
 				['request_uri', 'registration'].forEach((param) => {
 					it(`refuses ${param}, which this endpoint does not support`, async () => {
-						const spy = mock();
+						const spy =
+							mock<ServerListener<'backchannel_authentication.error'>>();
 						eventBus.once('backchannel_authentication.error', spy);
 
 						const { error } = await post({
@@ -698,7 +733,8 @@ describe('features.ciba', () => {
 				});
 
 				it('where request objects are required, a plain form request is refused', async () => {
-					const spy = mock();
+					const spy =
+						mock<ServerListener<'backchannel_authentication.error'>>();
 					eventBus.once('backchannel_authentication.error', spy);
 
 					const { error } = await post({
@@ -747,7 +783,8 @@ describe('features.ciba', () => {
 				});
 
 				it('a request object with no exp is refused', async () => {
-					const spy = mock();
+					const spy =
+						mock<ServerListener<'backchannel_authentication.error'>>();
 					eventBus.once('backchannel_authentication.error', spy);
 
 					const { privateKey } = await generateKeyPair('ES256');
@@ -778,7 +815,8 @@ describe('features.ciba', () => {
 				});
 
 				it('refuses a request object with no nbf', async () => {
-					const spy = mock();
+					const spy =
+						mock<ServerListener<'backchannel_authentication.error'>>();
 					eventBus.once('backchannel_authentication.error', spy);
 
 					const { privateKey } = await generateKeyPair('ES256');
@@ -809,7 +847,8 @@ describe('features.ciba', () => {
 				});
 
 				it('refuses a request object with no jti', async () => {
-					const spy = mock();
+					const spy =
+						mock<ServerListener<'backchannel_authentication.error'>>();
 					eventBus.once('backchannel_authentication.error', spy);
 
 					const { privateKey } = await generateKeyPair('ES256');
@@ -840,7 +879,8 @@ describe('features.ciba', () => {
 				});
 
 				it('refuses a request object with no iat', async () => {
-					const spy = mock();
+					const spy =
+						mock<ServerListener<'backchannel_authentication.error'>>();
 					eventBus.once('backchannel_authentication.error', spy);
 
 					const { privateKey } = await generateKeyPair('ES256');
@@ -871,7 +911,8 @@ describe('features.ciba', () => {
 				});
 
 				it('an encrypted request object is refused rather than silently ignored', async () => {
-					const spy = mock();
+					const spy =
+						mock<ServerListener<'backchannel_authentication.error'>>();
 					eventBus.once('backchannel_authentication.error', spy);
 
 					const { error } = await post({

@@ -100,11 +100,18 @@ export class BaseToken<
 		}
 	}
 
+	/*
+	 * Each pair reads wider than it writes, on purpose. A token read back from storage has neither bound,
+	 * a Grant is never handed a client, and an access token with no resource has no resource server — so
+	 * a read may answer undefined. A write only binds: the setter derives clientId or the audience from
+	 * the value, and unbinding has no meaning, so undefined is not something to assign.
+	 */
 	set client(client: Client) {
 		this.payload.clientId = client.clientId;
 		this.#client = client;
 	}
 
+	// eslint-disable-next-line @typescript-eslint/related-getter-setter-pairs -- see above
 	get client(): Client | undefined {
 		return this.#client;
 	}
@@ -114,6 +121,7 @@ export class BaseToken<
 		this.#resourceServer = resourceServer;
 	}
 
+	// eslint-disable-next-line @typescript-eslint/related-getter-setter-pairs -- see above
 	get resourceServer(): ResourceServer | undefined {
 		return this.#resourceServer;
 	}
@@ -188,7 +196,7 @@ export class BaseToken<
 			ignoreExpiration
 		});
 		if (
-			this.isSessionBound === false ||
+			!this.isSessionBound ||
 			!token?.payload.expiresWithSession ||
 			ignoreSessionBinding
 		) {
@@ -253,9 +261,6 @@ export class BaseToken<
 		if (format === 'opaque') {
 			return super.generateTokenId();
 		}
-		if (format !== 'jwt') {
-			throw new Error('invalid format resolved');
-		}
 		return jwt.generateTokenId.call(this);
 	}
 
@@ -264,9 +269,6 @@ export class BaseToken<
 		const result = await super.getValueAndPayload();
 		if (format === 'opaque') {
 			return result;
-		}
-		if (format !== 'jwt') {
-			throw new Error('invalid format resolved');
 		}
 		// Opaque always produces the payload; the JWT is built from it.
 		if (!result.payload) {

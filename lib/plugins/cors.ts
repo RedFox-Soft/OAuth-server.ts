@@ -49,7 +49,7 @@ import {
  * save must see it.
  */
 function corsEnabled(): boolean {
-	return ApplicationConfig['cors.enabled'] === true;
+	return ApplicationConfig['cors.enabled'];
 }
 
 type HeaderBag = Record<string, string | number | undefined>;
@@ -111,7 +111,7 @@ function basicAuthClientId(request: Request): string | undefined {
 	}
 
 	const [scheme, value] = header.split(' ');
-	if (scheme?.toLowerCase() !== 'basic' || !value) {
+	if (scheme.toLowerCase() !== 'basic' || !value) {
 		return undefined;
 	}
 
@@ -161,7 +161,7 @@ export const accessTokenClientId: ClientIdExtractor = async ({ request }) => {
 	}
 
 	const [scheme, value] = header.split(' ');
-	if (!value || !['bearer', 'dpop'].includes(scheme?.toLowerCase() ?? '')) {
+	if (!value || !['bearer', 'dpop'].includes(scheme.toLowerCase())) {
 		return undefined;
 	}
 

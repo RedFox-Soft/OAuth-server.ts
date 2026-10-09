@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'bun:test';
+import { describe, it, expect, spyOn } from 'bun:test';
 
 import { withDeadline } from 'lib/helpers/deadline.js';
 
@@ -48,12 +48,22 @@ describe('withDeadline', () => {
 		).rejects.toThrow('connection refused');
 	});
 
+	/*
+	 * Watched at the timer calls themselves: Bun's getActiveResourcesInfo() does not list timers, so a
+	 * before/after count of it compared nothing and passed whether or not the timer was cleared.
+	 */
 	it('leaves no timer behind when the work wins', async () => {
-		const before = process.getActiveResourcesInfo?.().length ?? 0;
+		const armed = spyOn(globalThis, 'setTimeout');
+		const cleared = spyOn(globalThis, 'clearTimeout');
+		try {
+			await withDeadline(Promise.resolve(1), 30_000, 'storage');
 
-		await withDeadline(Promise.resolve(1), 30_000, 'storage');
-
-		const after = process.getActiveResourcesInfo?.().length ?? 0;
-		expect(after).toBeLessThanOrEqual(before);
+			const call = armed.mock.calls.findIndex(([, ms]) => ms === 30_000);
+			expect(call).toBeGreaterThanOrEqual(0);
+			expect(cleared).toHaveBeenCalledWith(armed.mock.results[call]?.value);
+		} finally {
+			armed.mockRestore();
+			cleared.mockRestore();
+		}
 	});
 });

@@ -97,14 +97,14 @@ export function ConfirmDestruction({
 			destroyOnHidden
 		>
 			<Space
-				direction="vertical"
+				orientation="vertical"
 				size="middle"
 				style={{ width: '100%' }}
 			>
 				<Alert
 					type="warning"
 					showIcon
-					message="This cannot be undone"
+					title="This cannot be undone"
 					description={
 						<ul style={{ margin: 0, paddingInlineStart: 20 }}>
 							{consequences.map((line) => (
@@ -116,7 +116,7 @@ export function ConfirmDestruction({
 
 				{cascade ? (
 					<Space
-						direction="vertical"
+						orientation="vertical"
 						size={4}
 						style={{ width: '100%' }}
 					>
@@ -145,7 +145,7 @@ export function ConfirmDestruction({
 				) : null}
 
 				<Space
-					direction="vertical"
+					orientation="vertical"
 					size={4}
 					style={{ width: '100%' }}
 				>

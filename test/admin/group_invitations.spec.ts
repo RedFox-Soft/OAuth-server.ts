@@ -52,7 +52,7 @@ async function invite(cookie: string, groupId: string, email: string) {
 }
 
 function tokenFor(email: string): string {
-	const [mail] = emailsTo(email);
+	const mail = emailsTo(email).at(0);
 	const token = mail && extractInvitationToken(mail);
 	if (!token) throw new Error(`no invitation mailed to ${email}`);
 	return token;

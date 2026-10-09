@@ -66,11 +66,6 @@ describe('TypeBox admin schemas bridge into MCP tool schemas', () => {
 
 		const bridged = bridgeSchema(CreateBucketBody);
 		const std = bridged['~standard'];
-		if (!std) {
-			throw new Error(
-				'the bridged schema exposes no Standard Schema validator'
-			);
-		}
 
 		const ok = std.validate({
 			name: 'B',

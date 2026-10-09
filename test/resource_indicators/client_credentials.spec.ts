@@ -1,7 +1,7 @@
 import { describe, beforeAll, it, mock, afterEach, expect } from 'bun:test';
 
 import bootstrap, { agent } from '../test_helper.js';
-import { eventBus } from 'lib/event_bus.js';
+import { eventBus, type ServerListener } from 'lib/event_bus.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 
 /**
@@ -19,7 +19,7 @@ describe('grant_type=client_credentials w/ resourceIndicators', () => {
 	});
 
 	it('provides a Bearer client credentials opaque token', async function () {
-		const spy = mock();
+		const spy = mock<ServerListener<'client_credentials.saved'>>();
 		eventBus.once('client_credentials.saved', spy);
 
 		const res = await agent.token.post(
@@ -34,12 +34,10 @@ describe('grant_type=client_credentials w/ resourceIndicators', () => {
 		);
 		expect(res.status).toBe(200);
 		expect(spy).toHaveBeenCalledTimes(1);
-		expect(spy.mock.calls[0][0].payload).toEqual(
-			expect.objectContaining({
-				scope: 'api:read',
-				aud: 'urn:wl:opaque'
-			})
-		);
+		expect(spy.mock.calls[0][0].payload).toMatchObject({
+			scope: 'api:read',
+			aud: 'urn:wl:opaque'
+		});
 		expect(res.data).toContainAllKeys([
 			'access_token',
 			'expires_in',
@@ -51,7 +49,7 @@ describe('grant_type=client_credentials w/ resourceIndicators', () => {
 	});
 
 	it('provides a Bearer client credentials jwt token', async function () {
-		const spy = mock();
+		const spy = mock<ServerListener<'client_credentials.issued'>>();
 		eventBus.once('client_credentials.issued', spy);
 
 		const res = await agent.token.post(
@@ -66,12 +64,10 @@ describe('grant_type=client_credentials w/ resourceIndicators', () => {
 		);
 		expect(res.status).toBe(200);
 		expect(spy).toHaveBeenCalledTimes(1);
-		expect(spy.mock.calls[0][0].payload).toEqual(
-			expect.objectContaining({
-				scope: 'api:read',
-				aud: 'urn:wl:jwt'
-			})
-		);
+		expect(spy.mock.calls[0][0].payload).toMatchObject({
+			scope: 'api:read',
+			aud: 'urn:wl:jwt'
+		});
 		expect(res.data).toContainAllKeys([
 			'access_token',
 			'expires_in',
@@ -117,7 +113,7 @@ describe('grant_type=client_credentials w/ resourceIndicators', () => {
 		);
 		if (!error) throw new Error('expected error response');
 		expect(error.status).toBe(400);
-		expect(error?.value).toEqual({
+		expect(error.value).toEqual({
 			error: 'invalid_target',
 			error_description: 'resource indicator is missing, or unknown'
 		});
@@ -137,7 +133,7 @@ describe('grant_type=client_credentials w/ resourceIndicators', () => {
 		if (!error) throw new Error('expected error response');
 		expect(error.status).toBe(400);
 		// RFC 8707 §2: more than this server issues one token for is invalid_target.
-		expect(error?.value).toEqual({
+		expect(error.value).toEqual({
 			error: 'invalid_target',
 			error_description:
 				'only a single resource indicator value is supported for this grant type'
@@ -157,14 +153,17 @@ describe('grant_type=client_credentials w/ resourceIndicators', () => {
 		);
 		if (!error) throw new Error('expected error response');
 		expect(error.status).toBe(400);
-		expect(error?.value).toEqual({
+		expect(error.value).toEqual({
 			error: 'invalid_target',
 			error_description: 'resource indicator must be an absolute URI'
 		});
 	});
 
 	it("an accepted resource becomes the token's audience", async function () {
-		const spy = mock();
+		const spy =
+			mock<
+				ServerListener<'client_credentials.issued' | 'client_credentials.saved'>
+			>();
 		eventBus.once('client_credentials.saved', spy);
 		eventBus.once('client_credentials.issued', spy);
 
@@ -180,7 +179,7 @@ describe('grant_type=client_credentials w/ resourceIndicators', () => {
 		);
 		if (!error) throw new Error('expected error response');
 		expect(error.status).toBe(400);
-		expect(error?.value).toEqual({
+		expect(error.value).toEqual({
 			error: 'invalid_target',
 			error_description: 'resource indicator is missing, or unknown'
 		});
@@ -203,7 +202,10 @@ describe('grant_type=client_credentials w/ resourceIndicators', () => {
 	});
 
 	it('also ignores resource unrecognized scopes', async function () {
-		const spy = mock();
+		const spy =
+			mock<
+				ServerListener<'client_credentials.issued' | 'client_credentials.saved'>
+			>();
 		eventBus.once('client_credentials.saved', spy);
 		eventBus.once('client_credentials.issued', spy);
 
@@ -225,7 +227,10 @@ describe('grant_type=client_credentials w/ resourceIndicators', () => {
 	});
 
 	it('applies the default resource', async function () {
-		const spy = mock();
+		const spy =
+			mock<
+				ServerListener<'client_credentials.issued' | 'client_credentials.saved'>
+			>();
 		eventBus.once('client_credentials.saved', spy);
 		eventBus.once('client_credentials.issued', spy);
 
