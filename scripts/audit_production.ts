@@ -74,6 +74,8 @@ const work = await mkdtemp(join(tmpdir(), 'audit-production-'));
 try {
 	await cp(join(root, 'package.json'), join(work, 'package.json'));
 	await cp(join(root, 'bun.lock'), join(work, 'bun.lock'));
+	// package.json's patchedDependencies name files here, and the install refuses to start without them.
+	await cp(join(root, 'patches'), join(work, 'patches'), { recursive: true });
 
 	const install = await run(
 		['bun', 'install', '--production', '--frozen-lockfile', '--ignore-scripts'],

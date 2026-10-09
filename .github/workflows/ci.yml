@@ -32,6 +32,15 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # The lint is type-aware and covers website/, whose types come from its own node_modules and from
+      # what `astro sync` generates; without them every Astro and Playwright value is an error type.
+      # Only the docs export is needed for that, not the screenshot capture `bun run generate` also runs.
+      - name: Prepare the site's types for the lint
+        run: |
+          (cd website && bun install --frozen-lockfile)
+          bun scripts/docs_export.ts website/generated/docs-export.json
+          (cd website && bunx astro sync)
+
       # Without --fix: CI reports what is wrong rather than repairing a tree it then throws away. It
       # ran nowhere before this step, and 250 errors accumulated unseen.
       - name: Lint
