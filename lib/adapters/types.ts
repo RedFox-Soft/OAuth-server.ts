@@ -1890,10 +1890,23 @@ export const ActivityTombstone = t.Object({
 	bucketId: t.String(),
 	bucketName: t.String(),
 	bucketSlug: t.Optional(t.String()),
+	/*
+	 * The group that owned the bucket when it was deleted, and what it was called then (specs/077), so the
+	 * usage overview can still name the customer once that group is gone too. Optional because spec 076's
+	 * tombstones have neither; such a bucket reads as an unknown customer, never a guessed one.
+	 */
+	ownerGroupId: t.Optional(t.String()),
+	ownerLabel: t.Optional(t.String()),
 	createdAt: t.Date(),
 	deletedAt: t.Date()
 });
 export type ActivityTombstone = Static<typeof ActivityTombstone>;
+
+/* Who owned a bucket at its deletion: the group, and its label as the console showed it then. */
+export interface ActivityOwner {
+	groupId: string;
+	label: string;
+}
 
 /* The instant this instance began counting; a period before it is absent rather than zero (FR-015). */
 export const ActivitySentinel = t.Object({
@@ -1954,7 +1967,11 @@ export interface ActivityStoreInstance {
 	 * deletion must not begin without it (FR-011). Then freezes the open month and day; a failure there is
 	 * logged and swallowed, because the marks remain and the closer freezes those periods later.
 	 */
-	retire(bucket: ActivityBucketSnapshot, at: Date): Promise<void>;
+	retire(
+		bucket: ActivityBucketSnapshot,
+		owner: ActivityOwner,
+		at: Date
+	): Promise<void>;
 	tombstone(bucketId: string): Promise<ActivityTombstone | null>;
 	tombstones(): Promise<ActivityTombstone[]>;
 	/* Insert-if-absent with `at`, then the stored instant. */

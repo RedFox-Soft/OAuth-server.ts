@@ -89,4 +89,19 @@ export async function verifyActivity(
 		'a mark past its expiry is reclaimed',
 		await reclaimed(`${bucketId}|${expiredMonth}|expired`)
 	);
+
+	/*
+	 * The owner a deleted bucket's tombstone keeps (specs/077) is written insert-if-absent with the rest of
+	 * it: a second deletion request, even one naming another owner, must not rewrite whose bucket it was.
+	 */
+	const retired = `${bucketId}-retired`;
+	const snapshot = { _id: retired, name: 'verify', createdAt: at };
+	await store.retire(snapshot, { groupId: 'owner-1', label: 'First' }, at);
+	await store.retire(snapshot, { groupId: 'owner-2', label: 'Second' }, at);
+	const tombstone = await store.tombstone(retired);
+	check(
+		'a tombstone keeps the owner it was first written with',
+		tombstone?.ownerGroupId === 'owner-1' && tombstone.ownerLabel === 'First',
+		JSON.stringify(tombstone)
+	);
 }

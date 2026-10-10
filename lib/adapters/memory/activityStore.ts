@@ -6,10 +6,12 @@ import {
 	markId,
 	periodsOf,
 	tallyOf,
-	tombstoneId
+	tombstoneId,
+	tombstoneOf
 } from '../activity_records.js';
 import type {
 	ActivityBucketSnapshot,
+	ActivityOwner,
 	ActivityFigure,
 	ActivityMarkInput,
 	ActivityMarkRecord,
@@ -151,18 +153,14 @@ export class ActivityStore implements ActivityStoreInstance {
 			.map((figure) => structuredClone(figure));
 	}
 
-	async retire(bucket: ActivityBucketSnapshot, at: Date): Promise<void> {
-		const id = tombstoneId(bucket._id);
-		if (!this.tombstonesById.has(id)) {
-			this.tombstonesById.set(id, {
-				_id: id,
-				type: 'tombstone',
-				bucketId: bucket._id,
-				bucketName: bucket.name,
-				...(bucket.slug === undefined ? {} : { bucketSlug: bucket.slug }),
-				createdAt: bucket.createdAt,
-				deletedAt: at
-			});
+	async retire(
+		bucket: ActivityBucketSnapshot,
+		owner: ActivityOwner,
+		at: Date
+	): Promise<void> {
+		const tombstone = tombstoneOf(bucket, owner, at);
+		if (!this.tombstonesById.has(tombstone._id)) {
+			this.tombstonesById.set(tombstone._id, tombstone);
 		}
 		await freezeOpenPeriods(this, bucket, at);
 	}

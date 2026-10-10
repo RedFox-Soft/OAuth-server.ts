@@ -8,7 +8,8 @@ import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { getActivityStore } from 'lib/adapters/index.ts';
 import { ADMIN_MCP_CLIENT_ID, MCP_RESOURCE } from 'lib/mcp/consts.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
-import type { User } from 'lib/adapters/types.ts';
+import type { Group, User } from 'lib/adapters/types.ts';
+import type { OverviewAnswer } from 'lib/activity/overview.ts';
 import { createAdministrator } from '../administrators.ts';
 import {
 	bucketWithProjects,
@@ -22,6 +23,7 @@ let rpcId = 0;
 let owner: User;
 let foreigner: User;
 let bucketId: string;
+let customer: Group;
 
 async function agentToken(user: User): Promise<string> {
 	const at = new AccessToken({
@@ -78,8 +80,8 @@ describe('active users read by an agent', () => {
 			'plain',
 			`mcp-activity-foreign-${Math.random()}@x.io`
 		);
-		bucketId = (await bucketWithProjects((await regularGroup([owner]))._id, 0))
-			.bucket._id;
+		customer = await regularGroup([owner]);
+		bucketId = (await bucketWithProjects(customer._id, 0)).bucket._id;
 		await getActivityStore().mark({
 			bucketId,
 			accountId: 'mcp-activity-account',
@@ -114,5 +116,27 @@ describe('active users read by an agent', () => {
 		expect((await viaConsole(foreigner)).status).toBe(403);
 		expect(answer.result?.isError).toBe(true);
 		expect(answer.result?.structuredContent?.reason).toBe('forbidden');
+	});
+
+	it("gives an agent of a super administrator each bucket's customer and the customers' sums", async () => {
+		const token = await agentToken(await createAdministrator('super'));
+
+		const answer = await rpc(call('activity_overview', {}), token);
+
+		expect(answer.result?.isError).not.toBe(true);
+		const overview = answer.result?.structuredContent?.result as OverviewAnswer;
+		const row = overview.buckets.find((b) => b.bucketId === bucketId);
+		expect(row?.customer).toMatchObject({
+			groupId: customer._id,
+			label: customer.name
+		});
+		const summed = overview.customers.find(
+			(c) => c.customer.groupId === customer._id
+		);
+		expect(summed).toMatchObject({
+			bucketIds: [bucketId],
+			contacts: [owner.email],
+			current: { total: 1 }
+		});
 	});
 });

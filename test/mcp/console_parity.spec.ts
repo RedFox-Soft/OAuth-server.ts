@@ -58,8 +58,11 @@ async function principal() {
 	return { user, token, cookie: `${ADMIN_SESSION_COOKIE}=${session._id}` };
 }
 
-/* Fields that legitimately differ between two calls, so comparing them would only produce flakes. */
-const VOLATILE = new Set(['updatedAt', 'createdAt']);
+/*
+ * Fields that legitimately differ between two calls, so comparing them would only produce flakes. `asOf` is
+ * the instant the usage overview was read at (specs/077), which two calls never share.
+ */
+const VOLATILE = new Set(['updatedAt', 'createdAt', 'asOf']);
 
 /*
  * The one field that SHOULD differ, and the only one: `whoami` names the acting agent, and there is no

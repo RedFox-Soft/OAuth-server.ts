@@ -105,21 +105,33 @@ function tallyOfFigure(figure: ActivityTally): ActivityTally {
 	};
 }
 
+export interface PeriodForBuckets {
+	figures: Map<string, PeriodFigure | null>;
+	/* Buckets whose figure could not be read; their entry in `figures` is null. */
+	unavailable: Set<string>;
+}
+
 /*
  * One period across many buckets, for the instance overview: one count or one figure listing for the period
  * rather than a read per bucket. A bucket whose ended period is unfrozen and has marks falls back to the
  * single-bucket read, which freezes it — rare, since the closer runs hourly.
+ *
+ * That fallback is the one read that can fail for one bucket alone, and it then marks only that bucket
+ * unavailable (specs/077): a total that says it excludes a bucket is honest, a page that fails because of
+ * one bucket is not useful. A failed listing for the whole period still throws — no figures at all, rather
+ * than a partial set presented as complete.
  */
 export async function readPeriodForBuckets(
 	buckets: readonly ActivityBucketSnapshot[],
 	period: string,
 	at: Date = now()
-): Promise<Map<string, PeriodFigure | null>> {
+): Promise<PeriodForBuckets> {
 	const store = getActivityStore();
 	const since = (await store.countingSince(at)).getTime();
 	const existed = (bucket: ActivityBucketSnapshot) =>
 		endOf(period).getTime() > Math.max(bucket.createdAt.getTime(), since);
 	const answers = new Map<string, PeriodFigure | null>();
+	const unavailable = new Set<string>();
 
 	/* Final wherever stored, for the reason readPeriods gives: a deleted bucket's open period is frozen. */
 	const figures = new Map(
@@ -146,7 +158,7 @@ export async function readPeriodForBuckets(
 							}
 			);
 		}
-		return answers;
+		return { figures: answers, unavailable };
 	}
 
 	const withMarks = new Set(await store.bucketsWithMarks(period, at));
@@ -165,9 +177,19 @@ export async function readPeriodForBuckets(
 		} else if (!withMarks.has(bucket._id)) {
 			answers.set(bucket._id, { period, final: true, ...emptyTally() });
 		} else {
-			const [read] = await readPeriods(bucket, [period], at);
-			answers.set(bucket._id, read ?? null);
+			try {
+				const [read] = await readPeriods(bucket, [period], at);
+				answers.set(bucket._id, read ?? null);
+			} catch (error) {
+				console.error("activity: could not read a bucket's period", {
+					bucketId: bucket._id,
+					period,
+					error
+				});
+				answers.set(bucket._id, null);
+				unavailable.add(bucket._id);
+			}
 		}
 	}
-	return answers;
+	return { figures: answers, unavailable };
 }

@@ -10,13 +10,15 @@ import {
 	freezeOpenPeriods,
 	markId,
 	periodsOf,
-	tombstoneId
+	tombstoneId,
+	tombstoneOf
 } from '../activity_records.js';
 import {
 	ActivityFigure,
 	ActivitySentinel,
 	ActivityTombstone,
 	type ActivityBucketSnapshot,
+	type ActivityOwner,
 	type ActivityMarkInput,
 	type ActivityMarkRecord,
 	type ActivityStoreInstance,
@@ -214,16 +216,12 @@ export class ActivityStore implements ActivityStoreInstance {
 		);
 	}
 
-	async retire(bucket: ActivityBucketSnapshot, at: Date): Promise<void> {
-		const tombstone: ActivityTombstone = {
-			_id: tombstoneId(bucket._id),
-			type: 'tombstone',
-			bucketId: bucket._id,
-			bucketName: bucket.name,
-			...(bucket.slug === undefined ? {} : { bucketSlug: bucket.slug }),
-			createdAt: bucket.createdAt,
-			deletedAt: at
-		};
+	async retire(
+		bucket: ActivityBucketSnapshot,
+		owner: ActivityOwner,
+		at: Date
+	): Promise<void> {
+		const tombstone = tombstoneOf(bucket, owner, at);
 		await this.insertIfAbsent(tombstone._id, tombstone);
 		await freezeOpenPeriods(this, bucket, at);
 	}

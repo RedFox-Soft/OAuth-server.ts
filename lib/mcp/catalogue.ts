@@ -361,7 +361,7 @@ const catalogue = [
 		querySchema: BucketActivityQuery,
 		pathParams: ['id'],
 		summary:
-			"Read a user bucket's monthly active users: this month so far, each day of the month and the previous 12 months, in total and by kind of activity (local sign-in, upstream sign-in, renewal) and directory-provisioned accounts. Counts only, never who."
+			"Read a user bucket's monthly active users: this month so far, each day of the month and the previous 12 months, in total and by kind of activity (local sign-in, upstream sign-in, renewal) and directory-provisioned accounts. A super administrator may also read the reserved buckets and deleted buckets, by id. Counts only, never who."
 	},
 	{
 		tool: 'activity_overview',
@@ -374,7 +374,7 @@ const catalogue = [
 		querySchema: ActivityOverviewQuery,
 		pathParams: [],
 		summary:
-			'List every user bucket on the instance with its monthly active users for a month and the month before, including the default and administrators buckets and deleted buckets. Super administrators only.'
+			"List every user bucket on the instance with its monthly active users, including the default and administrators buckets and deleted buckets, each with its customer (the group that owns it, or owned it when it was deleted) and its last 13 months and the month's days. Also answers each customer's summed figures and contacts (its owners' emails), the instance's totals, and the buckets whose figure rose or fell sharply between the last two closed months. A customer's figure is a sum of its buckets', not a count of distinct people. Counts only, never which end users. Super administrators only."
 	},
 	{
 		tool: 'bucket_user_list',

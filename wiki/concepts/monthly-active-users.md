@@ -87,19 +87,52 @@ A month's marks expire thirteen months after it ends, a day's forty days after (
 figures are permanent. Both areas are **store areas with no owner** (`lib/consts/storage_inventory.ts:777-795`):
 an area naming an account owner is swept by `cascadeForAccount` on every end-user and bucket deletion, and a
 month a deleted person was active in must still count them. The bucket delete route does not sweep them
-either. Instead it calls `retire` before destroying anything (`lib/admin/buckets/routes.ts:716`): the
+either. Instead it calls `retire` before destroying anything (`lib/admin/buckets/routes.ts:724`): the
 tombstone first — if it cannot be written the deletion does not begin, because without it no loader could
 ever list the history again — then a best-effort freeze of the open month and day, which the closer would
 otherwise do later under the tombstone's name.
 
 ## Reading it
 
-`GET /admin/api/buckets/:id/activity` (`lib/admin/activity/routes.ts:109`) uses the owning-group check
+`GET /admin/api/buckets/:id/activity` (`lib/admin/activity/routes.ts:155`) uses the owning-group check
 (`loadBucketForEdit`), not the broader one a bucket's page uses: a group that only owns a project signing
-into the bucket administers its users, not its plan. `GET /admin/api/activity` (`:137`) is the super
-administrator's overview, listing the reserved buckets the bucket list leaves out and deleted ones from their
-tombstones. Neither is audited; both are MCP tools (`lib/mcp/catalogue.ts:354`, `:367`). Nothing lists who was
-counted. That list was specified and deferred to the billing feature: it would be the one audited read, and
+into the bucket administers its users, not its plan. A super administrator may read **any** bucket's figures
+there — the reserved buckets and deleted ones, from their tombstones (`bucketToRead`, `:115`, since spec 077) —
+because every one of them is already in their overview; the group that owned a deleted bucket gets the
+missing-bucket answer, as from every other route.
+
+`GET /admin/api/activity` (`:188`) is the super administrator's overview, and since spec 077 the whole Usage
+dashboard in one answer: every bucket (reserved and deleted included) with its **customer** — the owning
+group, labelled by the shared `groupLabel` (`lib/admin/groups/label.ts`) — its thirteen months and the days
+of the month and of the month before, plus each customer's sums and contacts (its owners' emails, not its
+plain members'), the instance's totals, and the buckets that changed sharply. The answer's types and every
+sum over it live once in `lib/activity/overview.ts`, a type-only-import module the console bundles too: the
+route computes the totals over every bucket (the agent's answer), and the console recomputes them over the
+rows its search and filters leave, with the same functions, so a total on screen describes the rows on screen.
+Rules the code holds and a reader can get wrong:
+
+- **A customer's figure is a sum, not a distinct count** (`sumFigures`, `lib/activity/overview.ts:135`). Each
+  bucket is its own population, so a person in two buckets is two accounts.
+- **The kinds are never stacked into the total.** `tallyOf` counts a person once in `total` and once in *each*
+  kind they used, so local + upstream + renewal ≥ total; the charts draw them beside the total.
+- **A change is only computed between two final figures** (`changeBetween`): a month in progress against a
+  finished one reads as a fall that has not happened. "Sharp" (`sharpChanges`, `:268`) compares the last two
+  closed months and needs both ≥ 20 people and ≥ 30 % of the earlier figure (`:121`).
+- **The customer is read live, not copied** (`resolveCustomers`, `lib/admin/activity/customers.ts:55`), so a
+  rename shows at once. A deleted bucket's tombstone keeps `ownerGroupId` and `ownerLabel`
+  (`lib/adapters/types.ts:1898`, written by `tombstoneOf`, `lib/adapters/activity_records.ts:38`) for the day
+  its group is deleted too; a tombstone written before 077 has neither and reads as an unknown customer.
+  A moved bucket's past months show under its current owner — which owner a past month is charged to is
+  billing's question.
+- **One bucket that cannot be read does not fail the page.** The per-bucket fallback in `readPeriodForBuckets`
+  marks that bucket `unavailable` (`lib/activity/read.ts:190`) and the sums say they exclude it; a failed
+  listing for a whole period still fails the answer.
+- **The CSV export is built in the browser and is formula-safe** (`lib/admin/ui/activity/csv.ts:31`): customer
+  names are chosen by customers, and a cell beginning with `=`, `+`, `-`, `@`, tab or CR is prefixed with `'`.
+
+The overview names administrators (contacts, personal groups' labels), never an end user who was counted:
+spec 076's "no email address" test was re-anchored to the counted accounts for that reason. Neither read is
+audited; both are MCP tools (`lib/mcp/catalogue.ts:354`, `:367`). Nothing lists who was counted. That list was specified and deferred to the billing feature: it would be the one audited read, and
 an audited GET has no precedent — `AuditedMethod` excludes GET, and three guards and the site's "Mutations"
 section assume a GET writes nothing — so it should be a POST when it comes. Eden revives any string that
 parses as a date, so a test reading a day's period (`2031-03-15`) through it gets a `Date`; read those

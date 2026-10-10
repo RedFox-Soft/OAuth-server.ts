@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Select, Typography } from 'antd';
-import { groupLabel } from '../groupLabel.js';
+import { groupLabel } from '../../groups/label.js';
 
 export interface ScopeOption {
 	id: string;

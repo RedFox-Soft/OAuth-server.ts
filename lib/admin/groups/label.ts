@@ -9,8 +9,10 @@ import { SYSTEM_GROUP_NAME } from '../consts.js';
  * group is named from a constant, so a database seeded before the name changed does not show the older
  * one until the next db:setup.
  *
- * Shared by the Groups table and the scope switcher: two sites labelling the same rows differently is
- * how a super administrator ended up with a list of identical "Personal" entries.
+ * Shared by the Groups table, the scope switcher and the usage overview (specs/077), which labels every
+ * bucket's customer on the server so the console and an agent read the same words: two sites labelling
+ * the same rows differently is how a super administrator ended up with a list of identical "Personal"
+ * entries. The server always labels as a third party (`own` absent), never as the group's own member.
  */
 export function groupLabel(group: {
 	name: string;

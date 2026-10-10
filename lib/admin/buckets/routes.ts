@@ -5,6 +5,7 @@ import {
 	getBucketStore,
 	getBucketGroupStore,
 	getContainerOwnershipStore,
+	getGroupStore,
 	getProjectStore,
 	getProvisioningConnectionStore,
 	getUserStore
@@ -58,6 +59,7 @@ import {
 import { ApplicationConfig } from '../../configs/application.js';
 import { ISSUER } from '../../configs/env.js';
 import { now } from '../../activity/clock.js';
+import { groupLabel } from '../groups/label.js';
 import {
 	forgetBucketAddresses,
 	isCanonicalHost
@@ -711,14 +713,24 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			 *
 			 * Neither activity area is swept below, deliberately: they hold evidence of how many people used
 			 * the bucket, and deleting the bucket must not erase it.
+			 *
+			 * The owner goes on the tombstone too (specs/077): the usage overview names a deleted bucket's
+			 * customer from it once the group itself may be gone. A group cannot be deleted while it owns a
+			 * bucket, so it is found here; if it somehow is not, its id stands in for its name rather than the
+			 * deletion being refused over a label.
 			 */
 			try {
+				const owner = await getGroupStore().find(bucket.ownerGroupId);
 				await getActivityStore().retire(
 					{
 						_id: bucket._id,
 						name: bucket.name,
 						...(bucket.slug === undefined ? {} : { slug: bucket.slug }),
 						createdAt: bucket.createdAt
+					},
+					{
+						groupId: bucket.ownerGroupId,
+						label: owner ? groupLabel(owner) : bucket.ownerGroupId
 					},
 					now()
 				);

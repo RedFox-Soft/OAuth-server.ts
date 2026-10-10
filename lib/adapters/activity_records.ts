@@ -3,8 +3,10 @@ import type {
 	ActivityBucketSnapshot,
 	ActivityKind,
 	ActivityMarkRecord,
+	ActivityOwner,
 	ActivityStoreInstance,
-	ActivityTally
+	ActivityTally,
+	ActivityTombstone
 } from './types.js';
 
 /*
@@ -27,6 +29,28 @@ export function figureId(bucketId: string, period: string): string {
 
 export function tombstoneId(bucketId: string): string {
 	return `bucket|${bucketId}`;
+}
+
+/*
+ * The record a deleted bucket leaves. One shape for the three stores, each of which writes it
+ * insert-if-absent, so a repeated deletion request — or one naming a different owner — changes nothing.
+ */
+export function tombstoneOf(
+	bucket: ActivityBucketSnapshot,
+	owner: ActivityOwner,
+	at: Date
+): ActivityTombstone {
+	return {
+		_id: tombstoneId(bucket._id),
+		type: 'tombstone',
+		bucketId: bucket._id,
+		bucketName: bucket.name,
+		...(bucket.slug === undefined ? {} : { bucketSlug: bucket.slug }),
+		ownerGroupId: owner.groupId,
+		ownerLabel: owner.label,
+		createdAt: bucket.createdAt,
+		deletedAt: at
+	};
 }
 
 export const SENTINEL_ID = 'countingSince';

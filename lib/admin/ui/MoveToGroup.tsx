@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Alert, Modal, Select, Space, Typography, message } from 'antd';
 import type { ScopeOption } from './pages/ScopeSwitcher.js';
-import { groupLabel } from './groupLabel.js';
+import { groupLabel } from '../groups/label.js';
 import { moveDestinations } from './ownership/model.js';
 
 interface GroupRef {

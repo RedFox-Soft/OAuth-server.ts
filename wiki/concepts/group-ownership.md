@@ -44,9 +44,12 @@ resolved (`lib/adapters/types.ts`):
   from existing personal groups, one audit entry per group. The Groups table still does not list
   personal groups.
   Its stored `name` is its owner's email, and the console never shows that name to the owner —
-  `groupLabel` (`lib/admin/ui/groupLabel.ts`) renders "Personal" for your own and
+  `groupLabel` (`lib/admin/groups/label.ts`) renders "Personal" for your own and
   "Personal — owner@email" for anyone else's. Two display sites labelling this differently is how a
-  super administrator ended up reading a list of identical "Personal" rows.
+  super administrator ended up reading a list of identical "Personal" rows. It moved out of
+  `lib/admin/ui/` in spec 077 because the server labels with it too: the usage overview names every
+  bucket's customer for the console and the agent alike, always in the third-party form
+  ([[monthly-active-users]]).
 - `regular` — a company or a team.
 - `system` — two reserved groups. The `unassigned` holding group (`UNASSIGNED_GROUP_ID` in
   `lib/admin/consts.ts`), displayed as **System** (`SYSTEM_GROUP_NAME`, which `groupLabel` prefers over the

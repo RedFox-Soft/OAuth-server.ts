@@ -5,7 +5,7 @@ import { treaty } from '@elysiajs/eden';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { activityRoutes } from 'lib/admin/activity/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { getActivityStore } from 'lib/adapters/index.ts';
+import { getActivityStore, getBucketStore } from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import type { User } from 'lib/adapters/types.ts';
 import { createAdministrator } from '../administrators.ts';
@@ -142,6 +142,54 @@ describe('reading active users', () => {
 		expect(foreign.text).toEqual(missing.text);
 	});
 
+	describe('once the bucket is deleted', () => {
+		let deletedId: string;
+
+		beforeAll(async () => {
+			const group = await regularGroup([owner]);
+			const { bucket } = await bucketWithProjects(group._id, 0);
+			deletedId = bucket._id;
+			await getActivityStore().mark({
+				bucketId: deletedId,
+				accountId: 'activity-account-c',
+				kind: 'local',
+				provisioned: false,
+				at: new Date('2031-02-12T09:00:00Z')
+			});
+			/* What the delete route does to a bucket's history: keep it under a tombstone, then destroy. */
+			await getActivityStore().retire(
+				{ _id: deletedId, name: bucket.name, createdAt: bucket.createdAt },
+				{ groupId: group._id, label: group.name },
+				new Date('2031-03-01T10:00:00Z')
+			);
+			await getBucketStore().destroy(deletedId);
+		});
+
+		it("gives a super administrator the deleted bucket's history by its id", async () => {
+			restoreClock = atDay(NOW);
+
+			const res = await bucketActivity(deletedId, await cookieFor(superAdmin));
+
+			expect(res.status).toBe(200);
+			expect(res.body.months[1]).toMatchObject({
+				period: '2031-02',
+				final: true,
+				total: 1
+			});
+		});
+
+		it('refuses its history to an administrator of the group that owned it, as for a bucket that does not exist', async () => {
+			restoreClock = atDay(NOW);
+			const cookie = await cookieFor(owner);
+
+			const gone = await bucketActivity(deletedId, cookie);
+			const missing = await bucketActivity('no-such-bucket', cookie);
+
+			expect(gone.status).toBe(missing.status);
+			expect(gone.text).toEqual(missing.text);
+		});
+	});
+
 	it('lists every bucket in the overview, the default and administrators buckets included', async () => {
 		restoreClock = atDay(NOW);
 
@@ -179,10 +227,14 @@ describe('reading active users', () => {
 			headers: { cookie: await cookieFor(superAdmin) }
 		});
 
+		/*
+		 * The people counted are end users, and none of them is named. The owning group's administrators are
+		 * — as the customer's contacts and in a personal group's label (specs/077) — which is why the
+		 * owner's email is no longer asserted absent: that is the customer, not someone who was counted.
+		 */
 		const serialised = JSON.stringify([own.body, all.data]);
 		expect(serialised).not.toContain('activity-account-a');
 		expect(serialised).not.toContain('activity-account-b');
-		expect(serialised).not.toContain(owner.email);
 	});
 
 	it('refuses a malformed month with 422', async () => {

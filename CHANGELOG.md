@@ -11,6 +11,12 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- The super administrator's **Usage** page is a dashboard: every bucket's monthly active users beside the
+  customer that owns it (the group, or the group that owned it when it was deleted), a "by customer" view
+  with owners as contacts, instance totals, 13-month and day-by-day charts, the buckets that changed sharply
+  between two closed months, search and filters every total follows, and a formula-safe CSV export.
+  `GET /admin/api/activity` (MCP `activity_overview`) answers all of it; a super administrator can read a
+  reserved or deleted bucket's history by id; a deleted bucket's tombstone now records its owner. Spec 077.
 - site: foxauth.dev in Russian (`/ru/`) and Simplified Chinese (`/zh-cn/`) — the marketing pages, the docs
   landing page and Get started, and the whole blog — shown only to a reader whose browser puts that language
   first, with a switch to English and back; everyone else sees the English site unchanged. A blog post is

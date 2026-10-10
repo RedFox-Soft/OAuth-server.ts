@@ -12,7 +12,7 @@ import {
 	message
 } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
-import { groupLabel } from '../groupLabel.js';
+import { groupLabel } from '../../groups/label.js';
 
 interface GroupMember {
 	userId: string;
