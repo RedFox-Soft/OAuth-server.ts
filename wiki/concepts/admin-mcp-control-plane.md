@@ -4,7 +4,7 @@ title: 'The administrative MCP control plane'
 tags: [architecture, contract, gotcha, config]
 sources: [oauth-server-codebase]
 created: 2026-08-24
-updated: 2026-09-14
+updated: 2026-10-10
 graph:
   node_type: concept
 ---
@@ -204,12 +204,21 @@ guessed and silently missing from the announcement that exists so an agent need 
 withholding has since arrived — `group_delete` — and cost only a table row, which is the arrangement
 working as intended.
 
-The other eleven destructive operations take two calls: describe, then confirm. The confirmation binds
+The other high-consequence operations — 28 tools since spec 075 added `bucket_owner_change` and
+`project_owner_change`, the first tools whose body names a group (`groupId`) — take two calls: describe,
+then confirm. The confirmation binds
 five ways — tool, target, arguments hash, administrator, agent — and each is a real case. Arguments,
 because a target-only binding would miss a password reset confirmed for one value and submitted with
 another. Administrator separately from agent, because one operator's confirmation must not be spendable
 by another working through the same agent. The record is deleted *before* the bindings are compared, so
 a token presented for the wrong operation is consumed rather than left to probe with.
+
+**A route's own preview reaches the agent** (since spec 075). Some routes refuse without `confirm: true`
+and answer 409 with what the second call would do: an address change's clients, a move's projects. The
+gate's consequence report reads no entity state, so it cannot supply that list. `toOutcome` used to reduce
+every 409 to `conflict: the operation was refused`, so no agent ever saw a preview. It now carries a
+`confirmationRequired` body whole as `preview` (`lib/mcp/result.ts:79`). Because `confirm` is one of the
+bound arguments, the preview and the change are confirmed separately.
 
 Neither identity may fall back to a placeholder, and both once did. `principalId` defaulted to `''` when
 `whoami` failed and `viaClientId` to `''` when `authInfo` carried no client — either turns that binding

@@ -9,6 +9,10 @@ import { verifyEndUserIdentity } from './verify_end_user_identity.js';
 import { verifyProvisioningConnections } from './verify_provisioning_connections.js';
 import { verifyBucketGroups } from './verify_bucket_groups.js';
 import {
+	verifyContainerOwnership,
+	verifyPersonalGroupRepair
+} from './verify_container_ownership.js';
+import {
 	FIXED_AREAS,
 	STORE_AREAS,
 	areaForBucket
@@ -68,6 +72,9 @@ const {
 	AdminAuditStore,
 	BucketGroupStore,
 	BucketKeysStore,
+	ContainerOwnershipStore,
+	GroupStore,
+	ProjectStore,
 	ProtectedResourceStore,
 	ProvisioningConnectionStore,
 	SingletonSecretStore,
@@ -768,6 +775,51 @@ await verifyProvisioningConnections(new ProvisioningConnectionStore(), check);
 	for (const line of await verifyBucketGroups(groupStore, check)) {
 		console.log(`       ${line}`);
 	}
+}
+
+/* Moving containers between groups, and making personal groups personal again (specs/075). */
+{
+	const moveBuckets = new UserBucketStore();
+	const moveProjects = new ProjectStore();
+	const moveAudit = new AdminAuditStore();
+	await verifyContainerOwnership(
+		{
+			buckets: moveBuckets,
+			projects: moveProjects,
+			ownership: new ContainerOwnershipStore(),
+			audit: moveAudit
+		},
+		check
+	);
+	const repair = MIGRATIONS.find((m) =>
+		m.id.endsWith('personal-groups-single-member')
+	);
+	await verifyPersonalGroupRepair(
+		{ groups: new GroupStore(), audit: moveAudit },
+		async (groupId) => {
+			const now = new Date();
+			await handle`
+				INSERT INTO ${handle(STORE_AREAS.groups)} (id, doc, expires_at)
+				VALUES (${groupId}, ${{
+					_id: groupId,
+					name: 'owner@x.io',
+					kind: 'personal',
+					members: [
+						{ userId: 'owner', role: 'owner' },
+						{ userId: 'colleague', role: 'owner' },
+						{ userId: 'viewer', role: 'member' }
+					],
+					createdAt: now,
+					updatedAt: now
+				}}, NULL)
+			`;
+		},
+		async () =>
+			repair && !('noop' in repair.postgres)
+				? repair.postgres.apply(handle)
+				: undefined,
+		check
+	);
 }
 
 const audit = new AdminAuditStore();

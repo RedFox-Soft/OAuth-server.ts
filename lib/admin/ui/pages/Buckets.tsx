@@ -16,6 +16,7 @@ import type { UserBucket, Project } from '../../../adapters/types.js';
 import { BucketDetail } from './BucketDetail.js';
 import { bucketAddressFor } from '../bucketAddress.js';
 import { ConfirmDestruction } from '../ConfirmDestruction.js';
+import { MoveToGroup } from '../MoveToGroup.js';
 import { isUndeletableBucket } from '../../consts.js';
 
 interface CreateBucketValues {
@@ -26,7 +27,13 @@ interface CreateBucketValues {
 	host?: string;
 }
 
-export function Buckets({ isSuperAdmin }: { isSuperAdmin: boolean }) {
+export function Buckets({
+	isSuperAdmin,
+	ownedGroupIds
+}: {
+	isSuperAdmin: boolean;
+	ownedGroupIds: readonly string[];
+}) {
 	const [buckets, setBuckets] = useState<UserBucket[]>([]);
 	const [projects, setProjects] = useState<Project[]>([]);
 	const [loading, setLoading] = useState(true);
@@ -37,6 +44,7 @@ export function Buckets({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 	const [deleting, setDeleting] = useState<UserBucket | null>(null);
 	const [heldUsers, setHeldUsers] = useState(0);
 	const [destroying, setDestroying] = useState(false);
+	const [moving, setMoving] = useState<UserBucket | null>(null);
 
 	// Every state write follows an await, so the mount effect calls this without setting
 	// `loading` first; `load` is the reload, which does.
@@ -226,6 +234,20 @@ export function Buckets({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 								 * a refusal — and a delete button beside the default bucket reads as an
 								 * offer no matter what happens when it is pressed.
 								 */}
+								{/*
+								 * Offered only where it can succeed: to an owner of the bucket's group, and
+								 * never for the two buckets the server is built on, which belong to no tenant.
+								 */}
+								{!isUndeletableBucket(row._id) &&
+									(isSuperAdmin ||
+										ownedGroupIds.includes(row.ownerGroupId)) && (
+										<Button
+											size="small"
+											onClick={() => setMoving(row)}
+										>
+											Move
+										</Button>
+									)}
 								{isUndeletableBucket(row._id) ? (
 									<Tooltip title="Part of the server itself — the instance needs somewhere to sign people in.">
 										<Button
@@ -249,6 +271,19 @@ export function Buckets({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 					}
 				]}
 			/>
+			{moving && (
+				<MoveToGroup
+					kind="bucket"
+					id={moving._id}
+					name={moving.name}
+					sourceGroupId={moving.ownerGroupId}
+					onClose={() => setMoving(null)}
+					onMoved={() => {
+						setMoving(null);
+						void load();
+					}}
+				/>
+			)}
 			{deleting && (
 				<ConfirmDestruction
 					open

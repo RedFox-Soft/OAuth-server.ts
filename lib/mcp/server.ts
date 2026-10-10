@@ -387,9 +387,17 @@ export function buildMcpServer(ctx: McpRequestContext): McpServer {
 				const outcome = toOutcome(await dispatchTool(tool, args, credential));
 
 				if (!outcome.ok) {
+					const text = `${outcome.reason}: ${outcome.message}`;
 					return {
 						content: [
-							{ type: 'text', text: `${outcome.reason}: ${outcome.message}` }
+							{
+								type: 'text',
+								text:
+									outcome.preview === undefined
+										? text
+										: `${text}
+${JSON.stringify(outcome.preview, null, 2)}`
+							}
 						],
 						structuredContent: { ...outcome },
 						isError: true

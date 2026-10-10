@@ -32,6 +32,11 @@ export interface AuditDetail {
 	 */
 	ownerGroupId?: string;
 	/*
+	 * An ownership move: the group the target left, where `ownerGroupId` is the group it joined. Both
+	 * groups read the entry, which is the reason the field exists (specs/075).
+	 */
+	formerOwnerGroupId?: string;
+	/*
 	 * An address change (`bucket.address.change`): the address the bucket answered at and the one it
 	 * answers at now, a slug or a hostname, or null for none. Addresses are public, unlike field values.
 	 */
@@ -190,6 +195,9 @@ async function write(input: {
 			...(input.detail.ownerGroupId === undefined
 				? {}
 				: { ownerGroupId: input.detail.ownerGroupId }),
+			...(input.detail.formerOwnerGroupId === undefined
+				? {}
+				: { formerOwnerGroupId: input.detail.formerOwnerGroupId }),
 			// Sorted so two requests setting the same fields in a different order read identically.
 			...(input.detail.attributes === undefined
 				? {}

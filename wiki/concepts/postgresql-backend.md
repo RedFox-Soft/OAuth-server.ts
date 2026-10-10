@@ -4,7 +4,7 @@ title: 'The PostgreSQL backend: two expiry reversals, a silent encoding defect, 
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-09-10
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # The PostgreSQL backend
@@ -178,8 +178,11 @@ startup gate closes that deliberately created divergence.
   `bun run db:migrate` (`--plan` to gate a deploy) — so an upgrade's data changes happen when an
   operator chose them, not as a side effect of a restart that might be a crash loop. `ahead` is
   reported before `behind`, because an older binary writing a newer database is silent damage.
-- **The set ships empty** (`MIGRATIONS`, `lib/consts/migrations.ts:71`), which is why the runner takes
-  it as an argument: a fixture set covers the machinery.
+- **The runner takes the set as an argument** (`MIGRATIONS`, `lib/consts/migrations.ts`), so a fixture
+  set covers the machinery. The set shipped empty; it held four migrations by spec 075 — the newest,
+  `2026-10-09-personal-groups-single-member`, also writes audit entries, as raw documents with
+  deterministic ids, because this import-free module cannot reach the audit writer
+  ([[container-ownership-transfer]]).
 - The one-off `managedBy → ownerGroupId` conversion was **retired**, not carried in. See
   [[group-ownership]]; a deployment old enough to need it upgrades through an earlier release first.
 

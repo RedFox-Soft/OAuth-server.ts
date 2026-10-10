@@ -8,6 +8,7 @@ import {
 	Select,
 	Space,
 	Tag,
+	Tooltip,
 	Typography,
 	message
 } from 'antd';
@@ -18,6 +19,7 @@ import { Resources } from './Resources.js';
 import { BucketDetail } from './BucketDetail.js';
 import { assignableBuckets } from '../projects/model.js';
 import { ConfirmDestruction } from '../ConfirmDestruction.js';
+import { MoveToGroup } from '../MoveToGroup.js';
 
 interface CreateProjectValues {
 	name: string;
@@ -208,7 +210,13 @@ function BucketEditor({
 	);
 }
 
-export function Projects() {
+export function Projects({
+	isSuperAdmin,
+	ownedGroupIds
+}: {
+	isSuperAdmin: boolean;
+	ownedGroupIds: readonly string[];
+}) {
 	const [projects, setProjects] = useState<Project[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [open, setOpen] = useState(false);
@@ -222,6 +230,7 @@ export function Projects() {
 	const [deleting, setDeleting] = useState<Project | null>(null);
 	const [heldClients, setHeldClients] = useState<string[]>([]);
 	const [destroying, setDestroying] = useState(false);
+	const [moving, setMoving] = useState<Project | null>(null);
 
 	// Every state write follows an await, so the mount effect calls this without setting
 	// `loading` first; `load` is the reload, which does.
@@ -415,6 +424,25 @@ export function Projects() {
 								>
 									Bucket
 								</Button>
+								{(isSuperAdmin || ownedGroupIds.includes(row.ownerGroupId)) &&
+									(row.bucketId ? (
+										/* A project and its bucket share a group, so the bucket is what moves. */
+										<Tooltip title="Moves with its bucket — move the bucket instead.">
+											<Button
+												size="small"
+												disabled
+											>
+												Move
+											</Button>
+										</Tooltip>
+									) : (
+										<Button
+											size="small"
+											onClick={() => setMoving(row)}
+										>
+											Move
+										</Button>
+									))}
 								<Button
 									size="small"
 									danger
@@ -427,6 +455,19 @@ export function Projects() {
 					}
 				]}
 			/>
+			{moving && (
+				<MoveToGroup
+					kind="project"
+					id={moving._id}
+					name={moving.name}
+					sourceGroupId={moving.ownerGroupId}
+					onClose={() => setMoving(null)}
+					onMoved={() => {
+						setMoving(null);
+						void load();
+					}}
+				/>
+			)}
 			{deleting && (
 				<ConfirmDestruction
 					open

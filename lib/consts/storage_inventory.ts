@@ -714,7 +714,12 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 			 * groups' entries, newest first. Compound rather than a bare `ownerGroupId` because the
 			 * restriction and the ordering are never applied apart.
 			 */
-			{ key: { ownerGroupId: 1, timestamp: 1 } }
+			{ key: { ownerGroupId: 1, timestamp: 1 } },
+			/*
+			 * The same read's second arm: a move is listed for the group it left as well as the one it
+			 * joined, and each branch of that disjunction needs an index of its own to be served by one.
+			 */
+			{ key: { formerOwnerGroupId: 1, timestamp: 1 } }
 		]
 	),
 	/*

@@ -2,6 +2,10 @@ import { STORE_AREAS } from '../lib/consts/storage_inventory.js';
 import { verifyEndUserIdentity } from './verify_end_user_identity.js';
 import { verifyProvisioningConnections } from './verify_provisioning_connections.js';
 import { verifyBucketGroups } from './verify_bucket_groups.js';
+import {
+	verifyContainerOwnership,
+	verifyPersonalGroupRepair
+} from './verify_container_ownership.js';
 
 /*
  * Storage fidelity for the MongoDB backend, against a real MongoDB — the properties of per-issuer
@@ -33,8 +37,12 @@ delete process.env.POSTGRES_URL;
 
 /* After the guard, for the reason verify_postgres.ts gives: importing the adapters connects. */
 const {
+	AdminAuditStore,
 	BucketGroupStore,
 	BucketKeysStore,
+	ContainerOwnershipStore,
+	GroupStore,
+	ProjectStore,
 	ProtectedResourceStore,
 	ProvisioningConnectionStore,
 	UserBucketStore,
@@ -339,6 +347,47 @@ check(
 for (const line of roleReport) console.log(`       ${line}`);
 for (const line of await verifyBucketGroups(bucketGroupStore, check)) {
 	console.log(`       ${line}`);
+}
+
+/* Moving containers between groups, and making personal groups personal again (specs/075). */
+{
+	const moveBuckets = new UserBucketStore();
+	const moveProjects = new ProjectStore();
+	const moveAudit = new AdminAuditStore();
+	await verifyContainerOwnership(
+		{
+			buckets: moveBuckets,
+			projects: moveProjects,
+			ownership: new ContainerOwnershipStore(),
+			audit: moveAudit
+		},
+		check
+	);
+	const repair = MIGRATIONS.find((m) =>
+		m.id.endsWith('personal-groups-single-member')
+	);
+	await verifyPersonalGroupRepair(
+		{ groups: new GroupStore(), audit: moveAudit },
+		async (groupId) => {
+			await db.collection<Raw>(STORE_AREAS.groups).insertOne({
+				_id: groupId,
+				name: 'owner@x.io',
+				kind: 'personal',
+				members: [
+					{ userId: 'owner', role: 'owner' },
+					{ userId: 'colleague', role: 'owner' },
+					{ userId: 'viewer', role: 'member' }
+				],
+				createdAt: new Date(),
+				updatedAt: new Date()
+			});
+		},
+		async () =>
+			repair && !('noop' in repair.mongodb)
+				? repair.mongodb.apply(db)
+				: undefined,
+		check
+	);
 }
 
 /* A bucket created here, so its user area carries the indexes declared today. */

@@ -7,7 +7,8 @@ import {
 import {
 	CreateProjectBody,
 	UpdateProjectBody,
-	SetBucketBody
+	SetBucketBody,
+	MoveProjectOwnerBody
 } from '../admin/projects/schema.js';
 import { CreateClientBody, UpdateClientBody } from '../admin/clients/schema.js';
 import {
@@ -22,6 +23,7 @@ import {
 import {
 	ChangeBucketAddressBody,
 	CreateBucketBody,
+	MoveBucketOwnerBody,
 	UpdateBucketBody
 } from '../admin/buckets/schema.js';
 import {
@@ -673,6 +675,20 @@ const catalogue = [
 		summary:
 			'Remove the user bucket assigned to this project, returning its clients to the default bucket. Reversed by assigning one again.'
 	},
+	{
+		tool: 'project_owner_change',
+		method: 'PUT',
+		path: '/admin/api/projects/:id/owner',
+		action: 'project.owner.change',
+		/* `high` for the reason `bucket_owner_change` is: the group it leaves loses it with no step of its own. */
+		consequence: 'high',
+		superAdminOnly: false,
+		bodySchema: MoveProjectOwnerBody,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			'Move a project that uses no bucket of its own to another administrator group (`groupId`), with its clients unchanged. Requires owning the group it is in now and belonging to the destination. A project that uses a bucket moves with the bucket: use bucket_owner_change. Called without `confirm`, it changes nothing and describes the move.'
+	},
 
 	/* ---------------------------------------- writes: protected resources (3) */
 	{
@@ -893,7 +909,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'Add an existing administrator to a group as an owner or a plain member. This grants them everything the group owns, in one call. Owner-only.'
+			'Add an existing administrator to a group as an owner or a plain member. This grants them everything the group owns, in one call. Owner-only. Refused for a personal group, which cannot be shared.'
 	},
 	{
 		tool: 'group_member_update',
@@ -932,7 +948,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'Invite somebody into a group by email, as an owner or a plain member. Creates an administrator account for them when they accept, if the address has none. Owner-only.'
+			'Invite somebody into a group by email, as an owner or a plain member. Creates an administrator account for them when they accept, if the address has none. Owner-only. Refused for a personal group, which cannot be shared.'
 	},
 	{
 		tool: 'group_invitation_revoke',
@@ -978,6 +994,25 @@ const catalogue = [
 		pathParams: ['id'],
 		summary:
 			"Move a bucket to a different address: a path segment (`slug`) or a hostname of its own (`host`), never both. Called without `confirm`, it changes nothing and answers with the clients that will stop validating tokens. Called with `confirm: true`, it performs the move: the bucket's issuer identifier becomes the new address, the previous address stops answering, and everyone signed in signs in again. Only an administrator of the instance may do this, and a bucket served at the root cannot be moved at all."
+	},
+	{
+		tool: 'bucket_owner_change',
+		method: 'PUT',
+		path: '/admin/api/buckets/:id/owner',
+		action: 'bucket.owner.change',
+		/*
+		 * `high`: it changes who administers a population of people. The group the bucket leaves loses it
+		 * with no step of its own, and nothing restores it but another move by an owner of the group it
+		 * joined. The route's own `confirm` stays as well, because the gate's consequence report reads no
+		 * entity state and so cannot name the projects that move with the bucket.
+		 */
+		consequence: 'high',
+		superAdminOnly: false,
+		bodySchema: MoveBucketOwnerBody,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			"Move a user bucket, and every project that uses it, to another administrator group (`groupId`). Requires owning the group it is in now and belonging to the destination; another administrator's personal group is never a destination. End users, clients and the sign-in address are unaffected. Called without `confirm`, it changes nothing and answers with the projects that would move; with `confirm: true` it moves them."
 	},
 	{
 		tool: 'bucket_update',

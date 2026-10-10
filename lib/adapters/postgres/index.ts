@@ -41,3 +41,4 @@ export {
 } from './provision.js';
 
 export { close, ping, sql } from './db.js';
+export { ContainerOwnershipStore } from './containerOwnershipStore.js';

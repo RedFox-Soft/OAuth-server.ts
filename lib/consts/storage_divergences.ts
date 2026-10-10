@@ -82,6 +82,25 @@ export const STORAGE_DIVERGENCES: readonly StorageDivergence[] = [
 			'group shows part of the change until the identity system retries.'
 	},
 	{
+		id: 'container-move-atomicity',
+		subject:
+			'whether moving a bucket and its projects to another administrator group is one write on a standalone `mongod`',
+		mongodb:
+			'a transaction on a replica set or sharded cluster; on a standalone `mongod`, ordered conditional ' +
+			'writes: the bucket first, then the projects that use it',
+		postgres: 'one transaction, with the bucket row locked first',
+		reason:
+			'A standalone `mongod` is a supported topology and has no multi-document transaction. Every ' +
+			'refusal an administrator can provoke is decided before the first write, and the bucket write is ' +
+			'conditional on the group it is leaving, so two moves of one bucket cannot both proceed. Only a ' +
+			'database failure between the writes can leave part of a move applied, and repeating the same ' +
+			'move completes it, because the bucket write also admits a bucket already in the destination.',
+		observable:
+			'only on a standalone `mongod`, after a database failure mid-move, which answers 500: the bucket ' +
+			'is in the destination group and some of its projects are still in the source group until the ' +
+			'move is repeated. Consent is not waived for those projects meanwhile, since that needs both in one group.'
+	},
+	{
 		id: 'unprovisioned-area-on-first-write',
 		subject:
 			'what a write to an area the database was never provisioned with does',

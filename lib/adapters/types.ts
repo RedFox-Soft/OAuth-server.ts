@@ -595,6 +595,16 @@ export const AdminAuditEntry = t.Object({
 	 */
 	ownerGroupId: t.Optional(t.Union([t.String(), t.Null()])),
 	/*
+	 * The group that owned the target before this action — set only when the action moved it to
+	 * another group (specs/075), where `ownerGroupId` is the group it moved to.
+	 *
+	 * A move takes a container from one tenant and gives it to another, and both have a claim to the
+	 * record: the group it left needs to see where it went, the group it joined where it came from. A
+	 * second field rather than a second entry, because one action writes one entry, and audit-first
+	 * could not write two atomically. The group-scoped read selects on either field.
+	 */
+	formerOwnerGroupId: t.Optional(t.Union([t.String(), t.Null()])),
+	/*
 	 * Names of the fields the request set — never their values, so no secret can reach the trail
 	 * through this field. Optional because entries written before it existed do not carry it, and the
 	 * trail is immutable: there is no backfill, only a read-side default.
@@ -613,6 +623,11 @@ export const AdminAuditEntry = t.Object({
 	 * Optional for the reason `attributes` is: the trail is append-only, so there is no backfill, only
 	 * a read-side default. Absent on a deletion that destroyed only the container itself, because `{}`
 	 * and absent would otherwise say the same thing in two ways.
+	 *
+	 * Two actions carry something other than a deletion's count here (specs/075), for the same reason a
+	 * deletion does — one entry, however much went with it: a move between groups counts the projects
+	 * that moved with the bucket, and the upgrade that made personal groups personal counts the members
+	 * it removed. What happened to them is the action's, so a reader takes the verb from `action`.
 	 */
 	cascade: t.Optional(t.Union([t.Record(t.String(), t.Number()), t.Null()])),
 	/*
@@ -973,9 +988,8 @@ export type GroupMember = Static<typeof GroupMember>;
  * `kind` distinguishes three cases that differ only in their invariants, never in how access is
  * resolved — every access decision anywhere is "does the caller belong to the group that owns this".
  *   - `personal` is created with an account and presented by the console as "Personal". Undeletable,
- *     and its administrator is a permanent owner. It may still gain members, at which point it is an
- *     ordinary shared group — which is what makes sharing personal work an addition rather than a
- *     transfer.
+ *     and its administrator is its one member (specs/075): nobody joins it. Work meant for several people
+ *     lives in a regular group, and a bucket or project moves there from a personal one.
  *   - `regular` is a company or a team.
  *   - `system` is the reserved `unassigned` holding group, which has no members and is exempt from the
  *     at-least-one-owner rule.
@@ -1706,6 +1720,61 @@ export interface UserBucketStoreInstance {
 
 export interface UserBucketStoreConstructor {
 	new (): UserBucketStoreInstance;
+}
+
+/*
+ * Moving a container from one administrator group to another (specs/075). The one writer of a bucket's
+ * or a project's `ownerGroupId` after creation.
+ *
+ * Its own store, rather than two `update` calls in the route, because a bucket and the projects using it
+ * must never be observed in different groups — consent waiver and end-user administration both compare
+ * the two owners — and only an adapter can make several writes one change. The adapter contract offers
+ * business logic no transaction (see `BucketGroupChange`), so the transaction lives here.
+ *
+ * Each method re-checks its precondition inside the write and changes nothing when it no longer holds,
+ * answering `conflict`. That is what makes two concurrent moves of one bucket safe: the second finds the
+ * bucket no longer in a group it may move from.
+ */
+export type ContainerMoveResult =
+	{ status: 'moved'; projectIds: string[] } | { status: 'conflict' };
+
+export interface ContainerOwnershipStoreInstance {
+	/*
+	 * Sets `ownerGroupId = to` on the bucket and on every project whose `bucketId` is the bucket, provided
+	 * the bucket and each such project is currently in `from` or already in `to`; otherwise changes nothing.
+	 *
+	 * "Already in `to`" is admitted so that a move a standalone `mongod` left part-done (bucket written,
+	 * projects not) completes when repeated — the declared `container-move-atomicity` divergence. The
+	 * projects are found inside the write rather than passed in, so one bound a moment before still moves.
+	 *
+	 * `projectIds` lists the projects this call moved, not those it found already in `to`.
+	 */
+	moveBucket(
+		bucketId: string,
+		from: string,
+		to: string
+	): Promise<ContainerMoveResult>;
+	/*
+	 * Sets `ownerGroupId = to` on a project that is in `from` and uses no bucket; otherwise changes
+	 * nothing. A project with a bucket moves with it, never alone.
+	 */
+	moveProject(
+		projectId: string,
+		from: string,
+		to: string
+	): Promise<ContainerMoveResult>;
+}
+
+export interface ContainerOwnershipStoreConstructor {
+	/*
+	 * Handed the store instances it moves records of. Only the memory backend uses them — its records live
+	 * inside those instances — while the database backends address the areas directly, inside one
+	 * transaction the instances' own methods could not join.
+	 */
+	new (stores: {
+		buckets: UserBucketStoreInstance;
+		projects: ProjectStoreInstance;
+	}): ContainerOwnershipStoreInstance;
 }
 
 export const AdminSession = t.Object({

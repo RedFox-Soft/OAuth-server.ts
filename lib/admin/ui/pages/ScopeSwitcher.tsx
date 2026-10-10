@@ -8,7 +8,7 @@ export interface ScopeOption {
 	kind: 'personal' | 'regular' | 'system';
 	role: 'owner' | 'member' | null;
 	// Whether a personal group is the caller's own. Answered by the server, which is the only side that
-	// can: a shared personal group may have promoted a second owner, so `role` does not settle it.
+	// sees a group's members.
 	own: boolean;
 }
 

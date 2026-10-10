@@ -28,6 +28,7 @@ import { displayNameKeyOf, membershipIdOf } from '../adapters/end_user_keys.js';
 import { declarationId, ROOT_NAMESPACE } from '../resources/declaration_id.js';
 import { ROOT_KEY_OWNER } from './key_owner.js';
 import { isList, member } from '../helpers/_/object.js';
+import { auditTargetTypeFor, MIGRATION_ACTOR } from './admin_audit_routes.js';
 
 /*
  * One backend's half of a migration.
@@ -753,8 +754,149 @@ const rolesToGroups: Migration = {
 	}
 };
 
+const PERSONAL_GROUPS_SINGLE_MEMBER =
+	'2026-10-09-personal-groups-single-member';
+
+/*
+ * Personal groups become personal again (specs/075). Until then a personal group could gain members, and
+ * from then on nobody joins one; this repairs what the old rule left behind.
+ *
+ * The owner is the first member — the invariant every reader of a personal group already relies on — and
+ * keeps the group and everything it owns. Everyone else is removed. A sole member left demoted by the old
+ * rule is made owner again, since a personal group's one member is its owner.
+ */
+export interface PersonalGroupRepair {
+	readonly groupId: string;
+	readonly keep: { userId: string; role: 'owner' };
+	readonly removed: number;
+}
+
+export function planPersonalGroupRepair(
+	groups: readonly { _id: string; kind: unknown; members: unknown }[]
+): PersonalGroupRepair[] {
+	const plan: PersonalGroupRepair[] = [];
+	for (const group of groups) {
+		if (group.kind !== 'personal' || !isList(group.members)) continue;
+		const [first, ...rest] = group.members;
+		const userId = member(first, 'userId');
+		if (typeof userId !== 'string') continue;
+		if (rest.length === 0 && member(first, 'role') === 'owner') continue;
+		plan.push({
+			groupId: group._id,
+			keep: { userId, role: 'owner' },
+			removed: rest.length
+		});
+	}
+	return plan;
+}
+
+/* Counts only: who lost access is not something the report, or the trail, records. */
+export function personalGroupRepairReport(
+	plan: readonly PersonalGroupRepair[]
+): string[] {
+	return [
+		`personal groups repaired: ${String(plan.length)}`,
+		`memberships removed: ${String(plan.reduce((sum, p) => sum + p.removed, 0))}`
+	];
+}
+
+/*
+ * The trail entry for one repaired group, as `recordAdminAudit` would have written it for the removal route —
+ * which this module cannot call, being import-free. Keyed by a deterministic id so a second run inserts
+ * nothing. Counts, not people: the trail records field names and counts, never values.
+ */
+function personalGroupRepairEntry(
+	repair: PersonalGroupRepair,
+	timestamp: Date
+): Doc {
+	return {
+		_id: `${PERSONAL_GROUPS_SINGLE_MEMBER}:${repair.groupId}`,
+		actorId: MIGRATION_ACTOR,
+		actorEmail: MIGRATION_ACTOR,
+		action: 'group.member.remove',
+		targetType: auditTargetTypeFor('group.member.remove'),
+		targetId: repair.groupId,
+		ownerGroupId: repair.groupId,
+		attributes: ['members'],
+		cascade: { members: repair.removed },
+		timestamp
+	};
+}
+
+const personalGroupsSingleMember: Migration = {
+	id: PERSONAL_GROUPS_SINGLE_MEMBER,
+	description:
+		'Personal groups keep only their owner: every other member is removed, one audit entry per group',
+	reversible: false,
+	rerunnable:
+		'Only personal groups that still have more than one member, or a sole member who is not owner, are read; each one’s audit entry is inserted under a deterministic id before the group is written, so a second application inserts nothing and writes the same one-member list.',
+	mongodb: {
+		async apply(handle) {
+			// The runner passes the selected backend's handle; for MongoDB that is the driver's `Db`.
+			const db = handle as MongoHandle;
+			const now = new Date();
+			const groups = db.collection(STORE_AREAS.groups);
+			const audit = db.collection(STORE_AREAS.adminAudit);
+			const plan = planPersonalGroupRepair(
+				(await groups.find({ kind: 'personal' }).toArray()).map((g) => ({
+					_id: String(g._id),
+					kind: g.kind,
+					members: g.members
+				}))
+			);
+			for (const repair of plan) {
+				const { _id, ...entry } = personalGroupRepairEntry(repair, now);
+				await audit.updateOne(
+					{ _id },
+					{ $setOnInsert: entry },
+					{ upsert: true }
+				);
+				await groups.updateOne(
+					{ _id: repair.groupId, kind: 'personal' },
+					{ $set: { members: [repair.keep], updatedAt: now } },
+					{}
+				);
+			}
+			return personalGroupRepairReport(plan);
+		}
+	},
+	postgres: {
+		async apply(handle) {
+			// The runner passes the selected backend's handle; for PostgreSQL that is Bun's SQL client.
+			const sql = handle as PostgresHandle;
+			const now = new Date();
+			const groups = sql(STORE_AREAS.groups);
+			const audit = sql(STORE_AREAS.adminAudit);
+			const rows =
+				await sql`SELECT id, doc FROM ${groups} WHERE doc->>'kind' = 'personal'`;
+			const plan = planPersonalGroupRepair(
+				rows.map((row) => ({
+					_id: String(row.id),
+					kind: (row.doc as Doc).kind,
+					members: (row.doc as Doc).members
+				}))
+			);
+			for (const repair of plan) {
+				const entry = personalGroupRepairEntry(repair, now);
+				await sql`
+					INSERT INTO ${audit} (id, doc, expires_at)
+					VALUES (${entry._id}, ${entry}, NULL)
+					ON CONFLICT (id) DO NOTHING
+				`;
+				await sql`
+					UPDATE ${groups}
+					SET doc = doc || ${{ members: [repair.keep], updatedAt: now }}
+					WHERE id = ${repair.groupId} AND doc->>'kind' = 'personal'
+				`;
+			}
+			return personalGroupRepairReport(plan);
+		}
+	}
+};
+
 export const MIGRATIONS: readonly Migration[] = [
 	namespacedProtectedResources,
 	rootKeysLifecycle,
-	rolesToGroups
+	rolesToGroups,
+	personalGroupsSingleMember
 ];

@@ -69,8 +69,10 @@ function conditionsFor(handle: Sql, query: AdminAuditQuery) {
 	 */
 	if (query.ownerGroupIds !== undefined) {
 		// `handle.array`: Bun binds a bare JS array as text PostgreSQL cannot read as an array.
+		const ids = query.ownerGroupIds;
+		// Either arm: a move belongs to the group it left as well as the one it joined.
 		and(
-			handle`doc->>'ownerGroupId' = ANY(${handle.array(query.ownerGroupIds, 'text')})`
+			handle`(doc->>'ownerGroupId' = ANY(${handle.array(ids, 'text')}) OR doc->>'formerOwnerGroupId' = ANY(${handle.array(ids, 'text')}))`
 		);
 	}
 

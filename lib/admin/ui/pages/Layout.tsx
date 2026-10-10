@@ -40,6 +40,14 @@ type PageKey =
 
 export function Layout({ me }: { me: AdminContext | null }) {
 	const isSuperAdmin = me?.superAdmin === true;
+	/*
+	 * The groups whose containers this administrator may move out (specs/075): an owner's. A super
+	 * administrator may move anything, which the pages read from `isSuperAdmin` rather than from a list
+	 * of every group.
+	 */
+	const ownedGroupIds = (me?.memberships ?? [])
+		.filter((m) => m.role === 'owner')
+		.map((m) => m.groupId);
 	const [selected, setSelected] = useState<PageKey>('projects');
 
 	/*
@@ -81,13 +89,39 @@ export function Layout({ me }: { me: AdminContext | null }) {
 	function renderPage() {
 		switch (selected) {
 			case 'buckets':
-				return <Buckets isSuperAdmin={isSuperAdmin} />;
+				return (
+					<Buckets
+						isSuperAdmin={isSuperAdmin}
+						ownedGroupIds={ownedGroupIds}
+					/>
+				);
 			case 'admins':
-				return isSuperAdmin ? <Admins /> : <Projects />;
+				return isSuperAdmin ? (
+					<Admins />
+				) : (
+					<Projects
+						isSuperAdmin={false}
+						ownedGroupIds={ownedGroupIds}
+					/>
+				);
 			case 'settings':
-				return isSuperAdmin ? <Settings /> : <Projects />;
+				return isSuperAdmin ? (
+					<Settings />
+				) : (
+					<Projects
+						isSuperAdmin={false}
+						ownedGroupIds={ownedGroupIds}
+					/>
+				);
 			case 'keys':
-				return isSuperAdmin ? <Keys /> : <Projects />;
+				return isSuperAdmin ? (
+					<Keys />
+				) : (
+					<Projects
+						isSuperAdmin={false}
+						ownedGroupIds={ownedGroupIds}
+					/>
+				);
 			case 'groups':
 				return (
 					<Groups
@@ -100,11 +134,30 @@ export function Layout({ me }: { me: AdminContext | null }) {
 			case 'audit':
 				return <Audit />;
 			case 'mcp-clients':
-				return isSuperAdmin ? <McpClients /> : <Projects />;
+				return isSuperAdmin ? (
+					<McpClients />
+				) : (
+					<Projects
+						isSuperAdmin={false}
+						ownedGroupIds={ownedGroupIds}
+					/>
+				);
 			case 'errors':
-				return isSuperAdmin ? <Errors /> : <Projects />;
+				return isSuperAdmin ? (
+					<Errors />
+				) : (
+					<Projects
+						isSuperAdmin={false}
+						ownedGroupIds={ownedGroupIds}
+					/>
+				);
 			default:
-				return <Projects />;
+				return (
+					<Projects
+						isSuperAdmin={isSuperAdmin}
+						ownedGroupIds={ownedGroupIds}
+					/>
+				);
 		}
 	}
 

@@ -3,6 +3,7 @@ import {
 	getBucketKeysStore,
 	getBucketStore,
 	getBucketGroupStore,
+	getContainerOwnershipStore,
 	getProjectStore,
 	getProvisioningConnectionStore,
 	getUserStore
@@ -12,6 +13,7 @@ import {
 	assertAuth,
 	assertActiveGroup,
 	assertBucketAccess,
+	assertGroupOwner,
 	AdminError,
 	adminErrorBody,
 	resolveAdmin
@@ -43,6 +45,7 @@ import {
 import {
 	ChangeBucketAddressBody,
 	CreateBucketBody,
+	MoveBucketOwnerBody,
 	UpdateBucketBody,
 	DeleteBucketQuery
 } from './schema.js';
@@ -57,6 +60,11 @@ import {
 	forgetBucketAddresses,
 	isCanonicalHost
 } from '../auth/bucketAddress.js';
+import {
+	describeGroup,
+	loadDestination,
+	sourceGroupOf
+} from '../ownership/destination.js';
 
 /*
  * What the slug's pattern cannot check: that this address is free to take.
@@ -537,6 +545,90 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			return { ...preview, moved: true, bucket: presentBucket(moved) };
 		},
 		{ body: ChangeBucketAddressBody }
+	)
+	/*
+	 * Moving a bucket, with every project using it, to another administrator group (specs/075).
+	 *
+	 * The bucket and its projects move as one, because two things compare their owners: consent is waived
+	 * only where a client's project and the bucket it signs into share a group, and a project's group may
+	 * administer the end users of the bucket it uses. Splitting them would change both without anyone
+	 * deciding to.
+	 *
+	 * Taking a bucket away removes every other member's access to it, so the caller must own the group it
+	 * leaves. Belonging to the destination is enough: any member may already create a bucket there.
+	 */
+	.put(
+		'/admin/api/buckets/:id/owner',
+		async ({ admin, params, body, set }) => {
+			const ctx = assertAuth(admin);
+			/*
+			 * Before the bucket is loaded, as for an address change and a deletion. The administrators' bucket
+			 * belongs to no tenant, and the default bucket is where every tenant's bucket-less project signs
+			 * in: handing it to one group would hand that group everybody else's end users.
+			 */
+			if (isUndeletableBucket(params.id)) {
+				throw new AdminError(
+					403,
+					'this bucket is part of the server itself and cannot be moved'
+				);
+			}
+			const bucket = await loadBucketForEdit(ctx, params.id);
+			const destination = await loadDestination(ctx, body.groupId);
+			const bound = (await getProjectStore().list()).filter(
+				(project) => project.bucketId === bucket._id
+			);
+			const from = sourceGroupOf(
+				[bucket.ownerGroupId, ...bound.map((project) => project.ownerGroupId)],
+				destination._id
+			);
+			assertGroupOwner(ctx, from);
+
+			const moving = bound.filter((project) => project.ownerGroupId === from);
+			if (body.confirm !== true) {
+				set.status = 409;
+				return {
+					confirmationRequired: true as const,
+					from: await describeGroup(from),
+					to: await describeGroup(destination._id),
+					bucket: { id: bucket._id, name: bucket.name },
+					projects: moving.map((project) => ({
+						id: project._id,
+						name: project.name
+					})),
+					consequence:
+						'the bucket and these projects will be administered by the members of the destination group, and no longer by members of the source group only; end users, clients and sign-in addresses are not affected'
+				};
+			}
+
+			await recordAdminAudit(ctx, 'bucket.owner.change', bucket._id, {
+				ownerGroupId: destination._id,
+				formerOwnerGroupId: from,
+				attributes: ['ownerGroupId'],
+				cascade: { projects: moving.length }
+			});
+			const result = await getContainerOwnershipStore().moveBucket(
+				bucket._id,
+				from,
+				destination._id
+			);
+			if (result.status === 'conflict') {
+				throw new AdminError(
+					409,
+					'the bucket changed while it was being moved; reload and try again'
+				);
+			}
+			const names = new Map(
+				bound.map((project) => [project._id, project.name])
+			);
+			return {
+				bucket: { id: bucket._id, ownerGroupId: destination._id },
+				projects: result.projectIds.map((id) => ({
+					id,
+					name: names.get(id) ?? id
+				}))
+			};
+		},
+		{ body: MoveBucketOwnerBody }
 	)
 	.delete(
 		'/admin/api/buckets/:id',

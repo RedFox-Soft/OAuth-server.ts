@@ -208,56 +208,11 @@ describe('groups API', () => {
 	});
 
 	/*
-	 * FR-005. A personal group is an ordinary group in every respect except that it cannot be deleted
-	 * and cannot lose its own administrator — which is what makes "share the thing I made on my own"
-	 * an addition rather than a transfer between two kinds of owner.
+	 * A personal group is one administrator's own (specs/075): nobody joins it, which
+	 * personal_group_sharing.spec.ts proves, and it is never deleted.
 	 */
-	describe('a personal group is shareable', () => {
-		it('a personal group can gain a second member, who then reaches what it owns', async () => {
-			const a = await admin();
-			const colleague = await admin();
-			const personal = await personalGroupId(a.userId);
-
-			const added = await client.admin.api
-				.groups({ id: personal })
-				.members.post(
-					{ userId: colleague.userId, role: 'member' },
-					{ headers: { cookie: a.cookie } }
-				);
-			expect(added.status).toBe(200);
-
-			const read = await client.admin.api
-				.groups({ id: personal })
-				.get({ headers: { cookie: colleague.cookie } });
-			expect(read.status).toBe(200);
-		});
-
-		it('never loses its own administrator, even once somebody else owns it too', async () => {
-			const a = await admin();
-			const colleague = await admin();
-			const personal = await personalGroupId(a.userId);
-			await client.admin.api
-				.groups({ id: personal })
-				.members.post(
-					{ userId: colleague.userId, role: 'owner' },
-					{ headers: { cookie: a.cookie } }
-				);
-
-			// A second owner exists, so the last-owner rule would not catch either of these.
-			const removed = await client.admin.api
-				.groups({ id: personal })
-				.members({ userId: a.userId })
-				.delete(undefined, { headers: { cookie: colleague.cookie } });
-			expect(removed.status).toBe(409);
-
-			const demoted = await client.admin.api
-				.groups({ id: personal })
-				.members({ userId: a.userId })
-				.patch({ role: 'member' }, { headers: { cookie: colleague.cookie } });
-			expect(demoted.status).toBe(409);
-		});
-
-		it('a personal group is never deletable, even once it has other members', async () => {
+	describe('a personal group', () => {
+		it('is never deletable', async () => {
 			const a = await admin();
 			const res = await client.admin.api
 				.groups({ id: await personalGroupId(a.userId) })

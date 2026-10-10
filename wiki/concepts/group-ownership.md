@@ -4,7 +4,7 @@ title: 'Group ownership of projects and buckets'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-29
-updated: 2026-09-29
+updated: 2026-10-10
 graph:
   node_type: concept
   relationships:
@@ -33,11 +33,16 @@ console offered the buttons anyway, producing a permission error for an action t
 `Group.kind` distinguishes three cases that differ only in their invariants, never in how access is
 resolved (`lib/adapters/types.ts`):
 
-- `personal` — created with an administrator's account. Undeletable, its administrator a permanent
-  owner. It *may* gain further members, at which point it is an ordinary shared group. That is what
-  makes sharing personal work an addition rather than a transfer, and it is why there is no second
-  owner kind for "a user owns this". Sharing one is an API operation: the Groups table does not list
-  personal groups, and the members editor is reached only for the groups it lists.
+- `personal` — created with an administrator's account. Undeletable, and its administrator is its
+  **one member** (since spec 075). Until then it could gain members and become an ordinary shared
+  group, meant to make sharing personal work an addition rather than a transfer. That ambiguity is
+  what let a colleague's default scope land in someone else's personal group (see The active scope
+  below). Now adding a member and inviting someone are both refused (`assertShareable`,
+  `lib/admin/groups/routes.ts:83`), and so is accepting an invitation issued earlier
+  (`lib/admin/groups/accept.ts:75`). Sharing *is* a transfer now: the bucket or project moves into a
+  regular group ([[container-ownership-transfer]]). The upgrade removed every member but the first
+  from existing personal groups, one audit entry per group. The Groups table still does not list
+  personal groups.
   Its stored `name` is its owner's email, and the console never shows that name to the owner —
   `groupLabel` (`lib/admin/ui/groupLabel.ts`) renders "Personal" for your own and
   "Personal — owner@email" for anyone else's. Two display sites labelling this differently is how a
@@ -77,15 +82,19 @@ their *next* call rather than at their next sign-in.
 
 ## The active scope
 
-**"Their personal group" means the one they own, not one they belong to** (corrected 2026-09-29).
+**"Their personal group" means the one they own, not one they belong to** (corrected 2026-09-29;
+since spec 075 nobody can belong to another's personal group, so the two readings no longer differ, but
+the owner predicate stays — it is the correct one).
 `findPersonalFor` matched any personal group the administrator was a member of, and so did
 `resolveActiveGroup`'s fallback; once someone added a colleague to their own personal group, both could
 answer with that group — stores return in insertion order, so the older account's won. It was the
 colleague's default scope at every sign-in, and whatever they then created landed in the other
-person's group. The owner is the first member, the invariant `assertPersonalOwnerKept` already holds
-(every membership write appends, maps or filters, so `members[0]` never moves), and all three backends
-and the fallback now match on it (`lib/admin/auth/rbac.ts:303`). `own` in `GET /admin/api/scope` always
-did. `test/admin/personal_group_ownership.spec.ts` is the attack.
+person's group. The owner is the first member (every membership write appends, maps or filters, so
+`members[0]` never moves), and all three backends and the fallback now match on it
+(`lib/admin/auth/rbac.ts:303`). `own` in `GET /admin/api/scope` always did. Since spec 075 the attack
+cannot be set up at all — nobody joins another's personal group — so `assertPersonalOwnerKept` and
+`test/admin/personal_group_ownership.spec.ts` were removed with it; `test/admin/personal_group_sharing.spec.ts`
+proves the door is shut.
 
 `AdminSession.activeGroupId` is the group the console is pointed at: what is listed, and where a new
 container is created. Server-held rather than caller-asserted, because it sits on an authorization
@@ -144,7 +153,9 @@ spec is `test/consent_waiver/`.
 **A project and its bucket must share a group.** Enforced on `PUT /admin/api/projects/:id/bucket`, and
 it is a coherence rule about the data rather than a statement about authority — so a super
 administrator is refused too. Joining them across groups would leave a project's end-users administered
-by a group with no access to the project.
+by a group with no access to the project. The same rule is why a bucket moves to another group *with*
+every project using it, and why the bind route re-checks after its write: a move can commit in between
+([[container-ownership-transfer]]).
 
 **Listing has to agree with access.** `assertBucketUserAccess` admits a bucket backing a project the
 caller's group owns, so `GET /admin/api/buckets` has to admit it as well. It did not before this
@@ -184,6 +195,8 @@ console asks somebody to confirm the grouping.
 
 ## Related
 
+- [[container-ownership-transfer]] — moving a bucket with its projects, or a bucket-less project, to
+  another group; how sharing personal work is done since personal groups stopped being shareable.
 - [[admin-provisioning]] — the scripts that seed the `unassigned` group and the reserved containers
 - [[admin-audit-trail]] — the trail this feature made group-scoped, and the load-bearing route table
   every new group route had to be added to.

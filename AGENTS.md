@@ -166,7 +166,9 @@ Each rule is the part that is easy to break. Read the named page before changing
   instance-wide things stay super-admin-only. There are no roles: the instance privilege is membership of
   Super administrators (`lib/admin/super_admins.ts`), and end users are grouped only by bucket groups, whose
   members are records — change them through `lib/bucket_groups/service.ts`, never a member list read and
-  written back. → `group-ownership.md`, `bucket-groups.md`
+  written back. A personal group has exactly one member; a container changes group only through the two
+  move routes, a bucket always with its projects. → `group-ownership.md`, `bucket-groups.md`,
+  `container-ownership-transfer.md`
 - **Audit** — a mutating admin route records audit-first, after authorization, inside the handler.
   → `admin-audit-trail.md`
 - **End users** — change an end user only through `lib/end_users/service.ts`, never the user store

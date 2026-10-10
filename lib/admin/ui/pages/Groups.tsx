@@ -356,9 +356,9 @@ export function Groups({
 					group={editing}
 					admins={admins}
 					/*
-					 * Kept keyed on kind rather than assuming a regular group, even though this table no
-					 * longer lists personal ones: a personal group is still shareable through the API, and
-					 * what refuses membership edits is being the reserved holding group, nothing else.
+					 * Keyed on kind, though this table lists no personal group: the reserved holding group
+					 * refuses membership edits, and a personal group refuses any new member (specs/075) —
+					 * both answered by the server whatever this control offers.
 					 */
 					canEdit={isOwner(editing) && editing.kind !== 'system'}
 					onClose={() => setEditing(null)}

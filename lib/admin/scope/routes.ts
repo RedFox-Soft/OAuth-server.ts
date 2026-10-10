@@ -67,9 +67,9 @@ export const scopeRoutes = new Elysia({ name: 'admin-scope' })
 				role: ctx.memberships.find((m) => m.groupId === g._id)?.role ?? null,
 				/*
 				 * Whether a personal group is the caller's own, which decides whether the console labels it
-				 * "Personal" or names its owner. Resolved here rather than in the client because the client
-				 * cannot: `role` does not answer it — a shared personal group may promote a second owner —
-				 * and `members` is not part of this response.
+				 * "Personal" or names its owner. Resolved here rather than in the client because `members` is
+				 * not part of this response. Nobody can join another's personal group (specs/075), so the one a
+				 * caller is offered is theirs; the flag still says so rather than leaving the console to infer it.
 				 */
 				own: g.kind === 'personal' && g.members[0]?.userId === ctx.userId
 			}))

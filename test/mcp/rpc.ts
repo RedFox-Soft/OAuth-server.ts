@@ -18,7 +18,8 @@ const StructuredContent = Type.Object({
 	target: Type.Optional(Type.String()),
 	reason: Type.Optional(Type.String()),
 	message: Type.Optional(Type.String()),
-	failure: Type.Optional(Type.Unknown())
+	failure: Type.Optional(Type.Unknown()),
+	preview: Type.Optional(Type.Unknown())
 });
 
 const McpResult = Type.Object({

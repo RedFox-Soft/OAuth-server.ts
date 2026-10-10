@@ -16,12 +16,23 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   first, with a switch to English and back; everyone else sees the English site unchanged. A blog post is
   published in every language or none, a stale translation says so on the page, and the build checks each
   page's language, its Chinese title lengths and that every section keeps its English id. Spec 074.
+- Moving a user bucket, with every project that uses it, or a project with no bucket, to another
+  administrator group — `PUT /admin/api/buckets/:id/owner`, `PUT /admin/api/projects/:id/owner`, a **Move**
+  action in the console and the `high` MCP tools `bucket_owner_change` / `project_owner_change`. It needs an
+  owner of the group left and a member of the group joined; a call without `confirm` previews what moves;
+  end users, clients and sign-in addresses are untouched, and the audit entry is read by both groups. Spec 075.
 - `eventBus` is typed: `ServerEvents`, `ServerEventName` and `ServerListener` are exported from the
   package entry, so a subscriber to an event the server does not emit, or one expecting arguments it does
   not pass, fails to compile instead of never running.
 
 ### Changed
 
+- **A personal group has exactly one member.** Adding a member, inviting someone and accepting an earlier
+  invitation into a personal group are refused; shared work goes into a regular group and is moved there.
+  **Upgrade:** migration `2026-10-09-personal-groups-single-member` removes every member but the owner from
+  each personal group, one audit entry per group, and cannot be undone — list the shared personal groups
+  (`group_list`, `kind: personal`, more than one member) before running `db:migrate`, then re-run
+  `db:setup` for the new audit index. Spec 075.
 - `richAuthorizationRequests.types` is shape-checked even while RAR is off, because the consent screen reads
   its labels on every render; an instance whose stored map is malformed now refuses to start until it is
   fixed. A `getResourceServerInfo` override must answer a `scope` string and an `accessTokenFormat` of `jwt`
@@ -36,6 +47,9 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- An agent calling a two-step admin tool without `confirm` — `bucket_address_change`, and now the move tools —
+  receives the route's preview (the clients that will stop validating tokens, the projects that will move) as
+  `preview`; it was answered only `conflict: the operation was refused`.
 - A bucket addressed by its own hostname no longer has its session cookie expired on every request. Its
   cookie is the bare `_session`, which the server still cleared as a pre-bucket legacy name, so an
   anonymous session not re-issued in the same response was dropped.

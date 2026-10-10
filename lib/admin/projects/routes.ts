@@ -2,12 +2,14 @@ import { Elysia } from 'elysia';
 import {
 	getProjectStore,
 	getBucketStore,
+	getContainerOwnershipStore,
 	getProtectedResourceStore
 } from '../../adapters/index.js';
 import {
 	assertAuth,
 	assertActiveGroup,
 	assertBucketAccess,
+	assertGroupOwner,
 	AdminError,
 	adminErrorBody,
 	resolveAdmin
@@ -16,7 +18,8 @@ import {
 	CreateProjectBody,
 	UpdateProjectBody,
 	SetBucketBody,
-	DeleteProjectQuery
+	DeleteProjectQuery,
+	MoveProjectOwnerBody
 } from './schema.js';
 import { deleteClientRecord } from '../clients/service.js';
 import { cascadeForClient } from '../../helpers/cascade.js';
@@ -25,6 +28,11 @@ import {
 	normalizeOrigins
 } from '../../helpers/cors_origin.js';
 import { ADMIN_BUCKET_ID } from '../consts.js';
+import {
+	describeGroup,
+	loadDestination,
+	sourceGroupOf
+} from '../ownership/destination.js';
 import { loadProject } from './access.js';
 import { recordAdminAudit } from '../audit/record.js';
 import { Client } from '../../models/client.js';
@@ -338,7 +346,32 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 				ownerGroupId: project.ownerGroupId
 			});
 			await applyMove(project._id, move);
-			return getProjectStore().update(params.id, { bucketId: body.bucketId });
+			const bound = await getProjectStore().update(params.id, {
+				bucketId: body.bucketId
+			});
+			/*
+			 * Checked again after the write, because a move of the bucket to another group can commit between
+			 * the check above and the write: it carries the projects using the bucket at that moment, and this
+			 * one was not yet among them. Whichever of the two writes comes second sees the other, so reading
+			 * the bucket now is enough to keep a project from ending up in a different group from its bucket.
+			 */
+			const settled = await getBucketStore().find(bucket._id);
+			if (settled?.ownerGroupId !== project.ownerGroupId) {
+				await getProjectStore().update(params.id, {
+					bucketId: project.bucketId
+				});
+				// Back where they were: no plan check, since this restores a namespace they held a moment ago.
+				await applyMove(project._id, {
+					from: move.to,
+					to: move.from,
+					count: move.count
+				});
+				throw new AdminError(
+					409,
+					'project and bucket must belong to the same group'
+				);
+			}
+			return bound;
 		},
 		{ body: SetBucketBody }
 	)
@@ -371,4 +404,66 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 		});
 		await applyMove(project._id, move);
 		return getProjectStore().update(params.id, { bucketId: null });
-	});
+	})
+	/*
+	 * Moving a project with no bucket to another administrator group (specs/075). A project that uses a
+	 * bucket moves with it, through the bucket's route: a project and the bucket it signs into must share a
+	 * group, so neither moves alone.
+	 *
+	 * The same rules as the bucket's move, from the same module: an owner of the group it leaves, a member
+	 * of the one it joins, and never another administrator's personal group.
+	 */
+	.put(
+		'/admin/api/projects/:id/owner',
+		async ({ admin, params, body, set }) => {
+			const ctx = assertAuth(admin);
+			const project = await loadProject(ctx, params.id);
+			/*
+			 * Refused for everyone: `loadProject` admits a super administrator to the console's own project,
+			 * which belongs to no tenant and must stay in the System group with the bucket it signs into.
+			 */
+			if (project.type === 'admin') {
+				throw new AdminError(403, 'no access to this project');
+			}
+			if (project.bucketId !== null) {
+				throw new AdminError(
+					409,
+					'a project using a bucket moves with its bucket'
+				);
+			}
+			const destination = await loadDestination(ctx, body.groupId);
+			const from = sourceGroupOf([project.ownerGroupId], destination._id);
+			assertGroupOwner(ctx, from);
+
+			if (body.confirm !== true) {
+				set.status = 409;
+				return {
+					confirmationRequired: true as const,
+					from: await describeGroup(from),
+					to: await describeGroup(destination._id),
+					project: { id: project._id, name: project.name },
+					consequence:
+						'the project and its clients will be administered by the members of the destination group, and no longer by members of the source group only; its clients keep working unchanged'
+				};
+			}
+
+			await recordAdminAudit(ctx, 'project.owner.change', project._id, {
+				ownerGroupId: destination._id,
+				formerOwnerGroupId: from,
+				attributes: ['ownerGroupId']
+			});
+			const result = await getContainerOwnershipStore().moveProject(
+				project._id,
+				from,
+				destination._id
+			);
+			if (result.status === 'conflict') {
+				throw new AdminError(
+					409,
+					'the project changed while it was being moved; reload and try again'
+				);
+			}
+			return { project: { id: project._id, ownerGroupId: destination._id } };
+		},
+		{ body: MoveProjectOwnerBody }
+	);

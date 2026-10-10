@@ -79,13 +79,15 @@ export function matchesAuditQuery(
 	 *
 	 * An entry with no group is instance-wide (settings, keys, administrator accounts) and belongs to
 	 * no tenant, so it never satisfies a group restriction.
+	 *
+	 * A move belongs to two tenants — the group the container left and the one it joined — so either
+	 * field admits the entry.
 	 */
 	if (query.ownerGroupIds !== undefined) {
-		if (
-			entry.ownerGroupId === undefined ||
-			entry.ownerGroupId === null ||
-			!query.ownerGroupIds.includes(entry.ownerGroupId)
-		) {
+		const groups = query.ownerGroupIds;
+		const belongs = (id: string | null | undefined) =>
+			id !== undefined && id !== null && groups.includes(id);
+		if (!belongs(entry.ownerGroupId) && !belongs(entry.formerOwnerGroupId)) {
 			return false;
 		}
 	}

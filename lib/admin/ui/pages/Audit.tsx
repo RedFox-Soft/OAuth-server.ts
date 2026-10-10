@@ -256,16 +256,21 @@ export function Audit() {
 				)
 		},
 		/*
-		 * What a deletion took with it. A separate column from "Fields set" rather than more tags in
-		 * it, because the two answer different questions: one says what the request changed, this says
-		 * what stopped existing. An operator scanning for the latter should not have to read the
-		 * former to find it.
+		 * What else the action carried with it: what a deletion destroyed, the projects that moved with a
+		 * bucket, the members an upgrade removed. A separate column from "Fields set" rather than more
+		 * tags in it, because the two answer different questions: one says what the request changed, this
+		 * says what else it reached. The verb comes from the action, so a move is never read as a deletion.
 		 */
 		{
-			title: 'Also destroyed',
+			title: 'Also affected',
 			dataIndex: 'cascade',
-			render: (cascade: Record<string, number> | null) => {
+			render: (cascade: Record<string, number> | null, row: AuditEntry) => {
 				const kinds = Object.entries(cascade ?? {});
+				const verb = row.action.endsWith('.owner.change')
+					? 'moved'
+					: row.action === 'group.member.remove'
+						? 'removed'
+						: 'destroyed';
 				return kinds.length === 0 ? (
 					<Typography.Text type="secondary">—</Typography.Text>
 				) : (
@@ -276,9 +281,9 @@ export function Audit() {
 						{kinds.map(([kind, count]) => (
 							<Tag
 								key={kind}
-								color="red"
+								color={verb === 'destroyed' ? 'red' : 'blue'}
 							>
-								{count} {kind}
+								{count} {kind} {verb}
 							</Tag>
 						))}
 					</Space>

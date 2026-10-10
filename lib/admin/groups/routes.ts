@@ -62,16 +62,30 @@ async function loadGroup(admin: AdminContext, id: string): Promise<Group> {
 /*
  * The one group that is not a tenant: the reserved holding group, which has no members and exists only
  * to own containers no administrator managed.
- *
- * A personal group is deliberately NOT refused here. It may gain members and then behaves as any other
- * group — that is what makes sharing personal work an addition rather than a transfer, and it is the
- * whole reason ownership has a single mechanism. What protects a personal group is narrower and lives
- * elsewhere: `assertPersonalOwnerKept` keeps its own administrator an owner of it, and
- * `assertDeletable` refuses destroying it.
  */
 function assertMutableMembership(group: Group): void {
 	if (group.kind === 'system') {
 		throw new AdminError(403, 'the System group is not a tenant');
+	}
+}
+
+/*
+ * A personal group is one administrator's own workspace and nobody else's (specs/075), so nobody joins it
+ * — by addition or by invitation, whoever asks.
+ *
+ * It was shareable until then, and sharing it is what made "their personal group" ambiguous: an
+ * administrator added to a colleague's personal group had two, and the console could pick the wrong one as
+ * their default scope. Work meant for several people belongs in a regular group, and the move routes carry
+ * a bucket and its projects there from a personal one.
+ *
+ * Checked after the owner check, so a non-owner still gets the refusal that says nothing about the group.
+ */
+function assertShareable(group: Group): void {
+	if (group.kind === 'personal') {
+		throw new AdminError(
+			403,
+			'a personal group cannot be shared; create a regular group and move the work there'
+		);
 	}
 }
 
@@ -108,30 +122,6 @@ async function ownedContainerCount(groupId: string): Promise<{
 function assertOwnerRemains(members: GroupMember[]): void {
 	if (!members.some((m) => m.role === 'owner')) {
 		throw new AdminError(409, 'a group must keep at least one owner');
-	}
-}
-
-/*
- * A personal group keeps its own administrator as an owner, whoever else joins it.
- *
- * Distinct from `assertOwnerRemains`, which only protects the *last* owner: once a personal group has
- * been shared and a second owner promoted, that check would happily let the administrator whose group
- * it is be removed from it — leaving them with no personal scope, and `contextFor`'s fallback with
- * nowhere to fall back to.
- *
- * Identified by the first member the group was created with, which is invariant: `ensurePersonalGroup`
- * creates it with exactly one owner and nothing reorders the list.
- */
-function assertPersonalOwnerKept(group: Group, members: GroupMember[]): void {
-	if (group.kind !== 'personal') return;
-	const owner = group.members.at(0);
-	if (!owner) return;
-	const still = members.find((m) => m.userId === owner.userId);
-	if (!still || still.role !== 'owner') {
-		throw new AdminError(
-			409,
-			'a personal group keeps its own administrator as an owner'
-		);
 	}
 }
 
@@ -238,6 +228,7 @@ export const groupRoutes = new Elysia({ name: 'admin-groups' })
 			const group = await loadGroup(ctx, params.id);
 			assertGroupOwner(ctx, params.id);
 			assertMutableMembership(group);
+			assertShareable(group);
 
 			// Only an existing administrator can be added. Bringing somebody in who has no account is an
 			// invitation, which is a different operation with a different audit action.
@@ -275,7 +266,6 @@ export const groupRoutes = new Elysia({ name: 'admin-groups' })
 			// Applies to demoting yourself as much as anyone else: the invariant is about the group, not
 			// about who is asking.
 			assertOwnerRemains(members);
-			assertPersonalOwnerKept(group, members);
 			await recordAdminAudit(ctx, 'group.member.update', params.id, {
 				attributes: [body.role],
 				ownerGroupId: params.id
@@ -296,7 +286,6 @@ export const groupRoutes = new Elysia({ name: 'admin-groups' })
 			}
 			const members = group.members.filter((m) => m.userId !== params.userId);
 			assertOwnerRemains(members);
-			assertPersonalOwnerKept(group, members);
 			/*
 			 * The removed member loses access to everything the group owns on their next request: nothing
 			 * here touches their session, because `contextFor` re-reads memberships per request rather than
@@ -323,6 +312,7 @@ export const groupRoutes = new Elysia({ name: 'admin-groups' })
 			const group = await loadGroup(ctx, params.id);
 			assertGroupOwner(ctx, params.id);
 			assertMutableMembership(group);
+			assertShareable(group);
 
 			const email = body.email.trim().toLowerCase();
 			const existing = await getUserStore(ADMIN_BUCKET_ID).findByEmail(email);

@@ -174,6 +174,8 @@ describe('MCP tool catalogue', () => {
 			/* Every member loses what relying parties grant for the group. */
 			'bucket_group_delete',
 			'bucket_key_retire',
+			/* The group it leaves loses a population of people, with no step of its own. */
+			'bucket_owner_change',
 			/* Makes a local user read-only to every administrator, for good. */
 			'bucket_user_assign_connection',
 			'bucket_user_delete',
@@ -189,6 +191,7 @@ describe('MCP tool catalogue', () => {
 			'jwks_promote',
 			'jwks_retire',
 			/* Ends a customer's provisioning and revokes its tokens at once. */
+			'project_owner_change',
 			'provisioning_connection_delete',
 			/* Re-admits the mass deprovisioning a connection's guard held. */
 			'provisioning_connection_release',

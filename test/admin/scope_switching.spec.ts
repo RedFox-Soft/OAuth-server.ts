@@ -280,31 +280,29 @@ describe('active scope', () => {
 	});
 
 	/*
-	 * Which personal group is the caller's own — what decides whether the console names its owner.
-	 *
-	 * Both ids are read before the share, deliberately: `findPersonalFor` matches any personal group the
-	 * account is a member of, so once the member has been added to somebody else's it can answer with
-	 * either. That ambiguity is the reason `own` is computed from `members[0]` rather than membership.
+	 * Which group is the caller's own personal group — what makes the console call it "Personal" rather
+	 * than naming an owner. Since nobody can join another's personal group (specs/075), the one a caller
+	 * sees is theirs; `own` must still say so, and must stay false for a group of any other kind.
 	 */
-	it("marks only the caller's own personal group as theirs", async () => {
+	it("marks the caller's own personal group as theirs, and no other group", async () => {
 		const owner = await admin();
-		const member = await admin();
-		const theirs = await personalGroupId(owner.userId);
-		const mine = await personalGroupId(member.userId);
-		await client.admin.api
-			.groups({ id: theirs })
-			.members.post(
-				{ userId: member.userId, role: 'member' },
-				{ headers: { cookie: owner.cookie } }
-			);
+		const mine = await personalGroupId(owner.userId);
+		const team = answered(
+			(
+				await client.admin.api.groups.post(
+					{ name: 'Team' },
+					{ headers: { cookie: owner.cookie } }
+				)
+			).data
+		);
 
 		const scope = answered(
-			(await client.admin.api.scope.get({ headers: { cookie: member.cookie } }))
+			(await client.admin.api.scope.get({ headers: { cookie: owner.cookie } }))
 				.data
 		);
 
-		expect(scope.available.find((g) => g.id === theirs)?.own).toBe(false);
 		expect(scope.available.find((g) => g.id === mine)?.own).toBe(true);
+		expect(scope.available.find((g) => g.id === team._id)?.own).toBe(false);
 	});
 
 	/*

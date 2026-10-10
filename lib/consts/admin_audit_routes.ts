@@ -284,6 +284,23 @@ const routes = [
 		path: '/admin/api/buckets/:id/address',
 		targetType: 'UserBucket'
 	},
+	/*
+	 * Moving a bucket, with the projects using it, to another administrator group (specs/075). The entry
+	 * carries both groups — `ownerGroupId` the one it joined, `formerOwnerGroupId` the one it left — so
+	 * each reads it.
+	 */
+	{
+		action: 'project.owner.change',
+		method: 'PUT',
+		path: '/admin/api/projects/:id/owner',
+		targetType: 'Project'
+	},
+	{
+		action: 'bucket.owner.change',
+		method: 'PUT',
+		path: '/admin/api/buckets/:id/owner',
+		targetType: 'UserBucket'
+	},
 	{
 		action: 'bucket.delete',
 		method: 'DELETE',
@@ -597,6 +614,13 @@ export const excludedAdminRoutes: readonly {
  * nanoid, and neither ever contains ':'.
  */
 export const BOOTSTRAP_ACTOR = 'system:bootstrap';
+
+/*
+ * Actor recorded for a change a schema migration made (`bun run db:migrate`), which has no session either.
+ * The bootstrap's convention — a ':' and no '@' — so it is told apart from an administrator without a
+ * lookup.
+ */
+export const MIGRATION_ACTOR = 'system:migration';
 
 /*
  * Prefix of the actor recorded for a change a SCIM provisioning connection made: `connection:<id>`. The

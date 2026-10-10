@@ -25,6 +25,12 @@ export interface ToolFailure {
 	readonly message: string;
 	readonly blockers?: readonly DeletionBlocker[];
 	readonly failedAreas?: readonly string[];
+	/*
+	 * What a two-step admin route would do, when it was called without its `confirm` and changed nothing:
+	 * an address change's affected clients, a move's projects. Passed through whole, because it is the
+	 * content of the answer — reduced to "conflict" it told an agent only that it had been refused.
+	 */
+	readonly preview?: unknown;
 }
 
 export interface ToolSuccess {
@@ -54,6 +60,7 @@ const BY_STATUS: Record<number, Reason> = {
 interface AdminErrorBody {
 	error?: string;
 	message?: string;
+	confirmationRequired?: boolean;
 	blockers?: readonly DeletionBlocker[];
 	failedAreas?: readonly string[];
 }
@@ -64,6 +71,21 @@ export function toOutcome(result: DispatchResult): ToolOutcome {
 	}
 
 	const body = (result.body ?? {}) as AdminErrorBody;
+
+	/*
+	 * Not a refusal of the request but the route's first step: it changed nothing and says what the
+	 * second would do. Kept a failure, since nothing was applied, but carrying the preview whole.
+	 */
+	if (result.status === 409 && body.confirmationRequired === true) {
+		return {
+			ok: false,
+			reason: 'conflict',
+			message:
+				'confirmation required: nothing changed; call again with `confirm: true` to apply what the preview describes',
+			preview: result.body
+		};
+	}
+
 	const message = body.message ?? 'the operation was refused';
 
 	if (result.status === 500 && body.failedAreas?.length) {

@@ -17,6 +17,15 @@ export const UpdateProjectBody = t.Object({
 	corsOrigins: t.Optional(t.Array(t.String()))
 });
 
+/*
+ * Moving a project with no bucket to another administrator group (specs/075). A project that uses a
+ * bucket moves with it, through the bucket's own route. `confirm` is the second call, after the preview.
+ */
+export const MoveProjectOwnerBody = t.Object({
+	groupId: t.String({ minLength: 1 }),
+	confirm: t.Optional(t.Boolean())
+});
+
 export const SetBucketBody = t.Object({
 	bucketId: t.String()
 });

@@ -44,9 +44,21 @@ function toFilter(query: AdminAuditQuery): Filter<AdminAuditEntry> {
 	 *
 	 * `$in` over an empty array matches nothing, which is the intended reading — see the note in
 	 * matchesAuditQuery, which both adapters have to agree with.
+	 *
+	 * Two arms because a move belongs to the group it left as well as the one it joined. Combined with
+	 * the actor's `$or` under `$and`, since a filter document holds only one `$or`.
 	 */
 	if (query.ownerGroupIds !== undefined) {
-		filter.ownerGroupId = { $in: query.ownerGroupIds };
+		const groupArms: Filter<AdminAuditEntry>[] = [
+			{ ownerGroupId: { $in: query.ownerGroupIds } },
+			{ formerOwnerGroupId: { $in: query.ownerGroupIds } }
+		];
+		if (filter.$or === undefined) {
+			filter.$or = groupArms;
+		} else {
+			filter.$and = [{ $or: filter.$or }, { $or: groupArms }];
+			delete filter.$or;
+		}
 	}
 	if (query.viaSurface !== undefined) {
 		/*

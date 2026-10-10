@@ -7,6 +7,7 @@ import {
 	ProtectedResourceStore as MemoryProtectedResourceStore,
 	ProvisioningConnectionStore as MemoryProvisioningConnectionStore,
 	BucketGroupStore as MemoryBucketGroupStore,
+	ContainerOwnershipStore as MemoryContainerOwnershipStore,
 	BucketKeysStore as MemoryBucketKeysStore,
 	McpClientPermissionStore as MemoryMcpClientPermissionStore,
 	UserBucketStore as MemoryUserBucketStore,
@@ -43,6 +44,8 @@ import type {
 	ProvisioningConnectionStoreInstance,
 	BucketGroupStoreConstructor,
 	BucketGroupStoreInstance,
+	ContainerOwnershipStoreConstructor,
+	ContainerOwnershipStoreInstance,
 	BucketKeysStoreConstructor,
 	BucketKeysStoreInstance,
 	ProtectedResourceStoreInstance,
@@ -78,6 +81,8 @@ let ProvisioningConnectionStoreClass: ProvisioningConnectionStoreConstructor =
 	MemoryProvisioningConnectionStore;
 let BucketGroupStoreClass: BucketGroupStoreConstructor = MemoryBucketGroupStore;
 let BucketKeysStoreClass: BucketKeysStoreConstructor = MemoryBucketKeysStore;
+let ContainerOwnershipStoreClass: ContainerOwnershipStoreConstructor =
+	MemoryContainerOwnershipStore;
 let McpClientPermissionStoreClass: McpClientPermissionStoreConstructor =
 	MemoryMcpClientPermissionStore;
 let BucketStoreClass: UserBucketStoreConstructor = MemoryUserBucketStore;
@@ -115,6 +120,7 @@ if (backend === 'postgres') {
 	ProtectedResourceStoreClass = postgres.ProtectedResourceStore;
 	ProvisioningConnectionStoreClass = postgres.ProvisioningConnectionStore;
 	BucketGroupStoreClass = postgres.BucketGroupStore;
+	ContainerOwnershipStoreClass = postgres.ContainerOwnershipStore;
 	BucketKeysStoreClass = postgres.BucketKeysStore;
 	McpClientPermissionStoreClass = postgres.McpClientPermissionStore;
 	BucketStoreClass = postgres.UserBucketStore;
@@ -147,6 +153,7 @@ if (backend === 'mongodb') {
 	ProtectedResourceStoreClass = mongodb.ProtectedResourceStore;
 	ProvisioningConnectionStoreClass = mongodb.ProvisioningConnectionStore;
 	BucketGroupStoreClass = mongodb.BucketGroupStore;
+	ContainerOwnershipStoreClass = mongodb.ContainerOwnershipStore;
 	BucketKeysStoreClass = mongodb.BucketKeysStore;
 	McpClientPermissionStoreClass = mongodb.McpClientPermissionStore;
 	BucketStoreClass = mongodb.UserBucketStore;
@@ -395,6 +402,20 @@ export function getBucketKeysStore(): BucketKeysStoreInstance {
 	return bucketKeysStoreSingleton;
 }
 
+/*
+ * The one writer of a container's group after creation (specs/075). Built over the bucket and project
+ * stores so the memory backend can move the records those instances hold.
+ */
+let containerOwnershipStoreSingleton: ContainerOwnershipStoreInstance | null =
+	null;
+export function getContainerOwnershipStore(): ContainerOwnershipStoreInstance {
+	containerOwnershipStoreSingleton ??= new ContainerOwnershipStoreClass({
+		buckets: getBucketStore(),
+		projects: getProjectStore()
+	});
+	return containerOwnershipStoreSingleton;
+}
+
 let bucketStoreSingleton: UserBucketStoreInstance | null = null;
 export function getBucketStore(): UserBucketStoreInstance {
 	if (!bucketStoreSingleton) {
@@ -447,4 +468,6 @@ export function resetAdminMemoryStores(): void {
 	groupStoreSingleton = null;
 	groupInvitationStoreSingleton = null;
 	provisioningConnectionStoreSingleton = null;
+	// Built over the two stores above, so it must not outlive them.
+	containerOwnershipStoreSingleton = null;
 }

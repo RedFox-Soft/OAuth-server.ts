@@ -5,12 +5,18 @@ import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { auditRoutes } from 'lib/admin/audit/routes.ts';
 import { groupRoutes } from 'lib/admin/groups/routes.ts';
 import { projectRoutes } from 'lib/admin/projects/routes.ts';
+import { bucketRoutes } from 'lib/admin/buckets/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { sessionFor } from '../admin_session.ts';
 import { answered } from './answered.ts';
 import { present } from 'test/shape.js';
 import { createAdministrator, type AdminKind } from '../administrators.ts';
+import {
+	bucketWithProjects,
+	cookieFor,
+	regularGroup
+} from './ownership_fixtures.ts';
 
 /*
  * The tenant boundary of the audit trail.
@@ -204,5 +210,68 @@ describe('group-scoped audit read', () => {
 			).data
 		);
 		expect(page.total).toBe(1);
+	});
+});
+
+const moveApp = new Elysia()
+	.use(resolveAdmin)
+	.use(auditRoutes)
+	.use(bucketRoutes);
+const moveClient = treaty(moveApp);
+
+/**
+ * @proves A container moved between groups is in the trail of the group it left and of the group it
+ * joined, and of no other.
+ */
+describe('audit read of a move between groups', () => {
+	beforeEach(async () => {
+		await ensureAdminSeed();
+	});
+
+	async function moved() {
+		const owner = await createAdministrator('plain', `${slug('o')}@x.io`);
+		const leaver = await createAdministrator('plain', `${slug('l')}@x.io`);
+		const joiner = await createAdministrator('plain', `${slug('j')}@x.io`);
+		const outsider = await createAdministrator('plain', `${slug('x')}@x.io`);
+		const source = await regularGroup([owner], [leaver]);
+		const destination = await regularGroup([owner], [joiner]);
+		const { bucket } = await bucketWithProjects(source._id, 1);
+		await moveClient.admin.api
+			.buckets({ id: bucket._id })
+			.owner.put(
+				{ groupId: destination._id, confirm: true },
+				{ headers: { cookie: await cookieFor(owner) } }
+			);
+		return { bucket, leaver, joiner, outsider };
+	}
+
+	async function movesSeenBy(
+		reader: Parameters<typeof cookieFor>[0],
+		bucketId: string
+	) {
+		const page = answered(
+			(
+				await moveClient.admin.api.audit.get({
+					query: { targetId: bucketId, action: 'bucket.owner.change' },
+					headers: { cookie: await cookieFor(reader) }
+				})
+			).data
+		);
+		return page.total;
+	}
+
+	it('lists the move for a member of the group the bucket left', async () => {
+		const { bucket, leaver } = await moved();
+		expect(await movesSeenBy(leaver, bucket._id)).toBe(1);
+	});
+
+	it('lists the move for a member of the group the bucket joined', async () => {
+		const { bucket, joiner } = await moved();
+		expect(await movesSeenBy(joiner, bucket._id)).toBe(1);
+	});
+
+	it('does not list the move for an administrator of neither group', async () => {
+		const { bucket, outsider } = await moved();
+		expect(await movesSeenBy(outsider, bucket._id)).toBe(0);
 	});
 });

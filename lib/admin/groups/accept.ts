@@ -68,6 +68,11 @@ export const invitationAcceptRoutes = new Elysia({ name: 'admin-invitations' })
 
 			const group = await getGroupStore().find(invitation.groupId);
 			if (!group) throw invalid();
+			/*
+			 * An invitation into a personal group may predate the rule that nobody joins one (specs/075); it
+			 * must not complete now. The same refusal as every other unusable invitation, for its reason.
+			 */
+			if (group.kind === 'personal') throw invalid();
 
 			/*
 			 * The inviting owner must still be one. An invitation issued by somebody who has since been

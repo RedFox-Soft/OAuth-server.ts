@@ -4,7 +4,7 @@ title: 'The admin audit trail'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-03
-updated: 2026-09-23
+updated: 2026-10-10
 graph:
   node_type: concept
   relationships:
@@ -185,6 +185,13 @@ the caller's own memberships and applied where entries are *selected*, never par
 string: it is the tenant boundary of this surface, so a caller-supplied group id would be a request to
 read somebody else's trail. `ownerGroupId` is written at the time of the action and never re-derived
 from `targetId`, so an entry outlives the container it describes.
+
+**A move belongs to two groups** (since spec 075). Moving a bucket or a project to another group writes
+one entry. Its `ownerGroupId` is the group the container joined, and `formerOwnerGroupId` is the group
+it left. The group-scoped read selects on either field in all three backends, and each field has its own
+index ([[container-ownership-transfer]]). A second field rather than a second entry, because one action
+writes one entry. The migration that made personal groups personal writes its removals under the
+sentinel actor `system:migration` (`MIGRATION_ACTOR`), the bootstrap's convention: a `:` and no `@`.
 
 The read is newest-first, offset-paged, and filterable by actor (id
 **or** email), action, target type, target id, scope and an inclusive time window. Ordering is

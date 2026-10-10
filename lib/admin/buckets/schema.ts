@@ -59,6 +59,19 @@ export const ChangeBucketAddressBody = t.Object({
 	confirm: t.Optional(t.Boolean())
 });
 
+/*
+ * Moving a bucket, with every project using it, to another administrator group (specs/075). The one
+ * body in which a group is named: every other body leaves it out (lib/admin/groups/schema.ts), and this
+ * route proves the caller's standing in both groups before honouring it.
+ *
+ * `confirm` is the second call, as for an address change: the preview names every project that moves
+ * with the bucket, and the move refuses until the caller has seen it.
+ */
+export const MoveBucketOwnerBody = t.Object({
+	groupId: t.String({ minLength: 1 }),
+	confirm: t.Optional(t.Boolean())
+});
+
 export const UpdateBucketBody = t.Object({
 	name: t.Optional(t.String({ minLength: 1 })),
 	/*

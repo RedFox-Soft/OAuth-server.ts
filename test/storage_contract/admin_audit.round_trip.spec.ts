@@ -207,6 +207,36 @@ describe('AdminAuditStore (memory)', () => {
 		});
 	});
 
+	describe('a move between groups', () => {
+		beforeEach(async () => {
+			await store.record({
+				...base,
+				action: 'bucket.owner.change',
+				targetType: 'UserBucket',
+				targetId: 'b1',
+				ownerGroupId: 'joined',
+				formerOwnerGroupId: 'left'
+			});
+		});
+
+		it('is listed for the group the container left', async () => {
+			expect((await store.list({ ownerGroupIds: ['left'] })).total).toBe(1);
+		});
+
+		it('is listed for the group the container joined', async () => {
+			expect((await store.list({ ownerGroupIds: ['joined'] })).total).toBe(1);
+		});
+
+		it('is not listed for a third group', async () => {
+			expect((await store.list({ ownerGroupIds: ['other'] })).total).toBe(0);
+		});
+
+		it('reads back the group it left', async () => {
+			const { entries } = await store.list({ targetId: 'b1' });
+			expect(entries[0]?.formerOwnerGroupId).toBe('left');
+		});
+	});
+
 	describe('list time window', () => {
 		beforeEach(async () => {
 			setSystemTime(new Date('2026-01-15T12:00:00Z'));
