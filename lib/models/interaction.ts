@@ -90,6 +90,19 @@ export const InteractionPayload = t.Object({
 		})
 	),
 	/*
+	 * A sign-in that proved the password of an account whose address is unverified, in a bucket that
+	 * verifies by link. It is what lets this interaction ask for the link again without naming it: the
+	 * link's token is its own reference, so it can never be put on the page, and a resend keyed by
+	 * anything the browser sends would let anyone mail anyone. Living on the interaction bounds it by the
+	 * interaction's TTL and its cookie.
+	 */
+	pendingVerification: t.Optional(
+		t.Object({
+			accountId: t.String(),
+			bucketId: t.String()
+		})
+	),
+	/*
 	 * An upstream identity whose address matched an account holding only a password. Linked when this
 	 * interaction's sign-in completes as that account, and dropped when it completes as any other — the
 	 * assertion proved control of the address, not of whoever set the password. Declared inline rather

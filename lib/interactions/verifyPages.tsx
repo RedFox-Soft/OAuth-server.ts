@@ -17,7 +17,7 @@ export function verifySuccessPage(): Response {
 export function verifyFailurePage(message: string): Response {
 	return page(
 		'Verification failed',
-		`<h2 style="color:#1f1f1f;">Verification failed</h2><p style="color:#595959;">${esc(message)}</p><p style="color:#8c8c8c; font-size:13px;">Please return to the application and register again to receive a new verification email.</p>`,
+		`<h2 style="color:#1f1f1f;">Verification failed</h2><p style="color:#595959;">${esc(message)}</p><p style="color:#8c8c8c; font-size:13px;">Please return to the application and sign in again to receive a new verification message.</p>`,
 		400
 	);
 }

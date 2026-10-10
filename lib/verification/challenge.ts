@@ -22,6 +22,7 @@ import {
 	type RateBounds
 } from '../helpers/rate_window.js';
 import { sendVerificationEmail } from '../mail/send.js';
+import { MailNotConfiguredError } from '../mail/mailer.js';
 import {
 	LINK_TTL_SECONDS,
 	CODE_TTL_SECONDS,
@@ -229,6 +230,73 @@ export async function resend(ref: string): Promise<ResendOutcome> {
 
 	const { id, method } = await issueAndSend(user, bucket, { bumpRate: true });
 	return { ok: true, sent: true, method, newRef: id };
+}
+
+export type OnDemandOutcome =
+	| { outcome: 'sent' | 'outstanding'; method: VerificationMethod; id: string }
+	| { outcome: 'rate_limited' | 'delivery_failed' | 'mail_not_configured' };
+
+/*
+ * A verification message for an account that asked for one without a challenge reference in hand: a
+ * password sign-in refused for an unverified address, or an administrator pressing "verify my address".
+ *
+ * Without this the sign-in only said "check your inbox", which was true for a fresh registrant and false
+ * for every account that existed before its bucket required verification — nothing had ever been sent to
+ * them, and the administrators' bucket could not require verification at all while that stayed true.
+ *
+ * `reuseOutstanding` is the sign-in's choice. A registrant who signs in before following their link must
+ * not have it replaced under them, since issuing supersedes the outstanding challenge; so a live one is
+ * answered as outstanding and nothing is sent. The console's button asks for a fresh message, because the
+ * person pressing it is saying the last one did not reach them.
+ *
+ * Within the existing cooldown and daily cap either way, so neither door is a way to flood a mailbox.
+ */
+export async function sendOnDemand(
+	user: Pick<User, '_id' | 'email'>,
+	bucket: Pick<UserBucket, '_id' | 'name' | 'verificationMethod'>,
+	opts: { reuseOutstanding: boolean }
+): Promise<OnDemandOutcome> {
+	const key = resendKey(bucket._id, user.email);
+	const prior = await resends().find(key);
+
+	if (opts.reuseOutstanding && prior?.challengeId) {
+		const live = await challenges().find(prior.challengeId);
+		if (
+			live &&
+			live.exp > epochTime() &&
+			live.method === bucket.verificationMethod
+		) {
+			return {
+				outcome: 'outstanding',
+				method: live.method,
+				id: prior.challengeId
+			};
+		}
+	}
+
+	if (rateRefusal(prior, epochTime(), RESEND_BOUNDS)) {
+		return { outcome: 'rate_limited' };
+	}
+
+	try {
+		const { id, method } = await issueAndSend(user, bucket, {
+			bumpRate: true
+		});
+		return { outcome: 'sent', method, id };
+	} catch (err) {
+		/*
+		 * The challenge was stored before delivery failed. Left in place, the next sign-in would find it
+		 * live and answer "check your inbox" for a message that never left.
+		 */
+		const issued = await resends().find(key);
+		if (issued?.challengeId) await challenges().destroy(issued.challengeId);
+		return {
+			outcome:
+				err instanceof MailNotConfiguredError
+					? 'mail_not_configured'
+					: 'delivery_failed'
+		};
+	}
 }
 
 export { hashCode, newCode };

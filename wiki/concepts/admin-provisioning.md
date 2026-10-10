@@ -33,7 +33,9 @@ no-ops in production while the suite stays green, because the suite runs the cop
 does. Change a seeded value in `admin_seed.ts`, never in a seeder.
 
 One seeded value worth knowing: the reserved admin bucket is `registrationOpen: false`
-(`lib/consts/admin_seed.ts:60`), while the default bucket is open. See [[end-user-onboarding]].
+(`lib/consts/admin_seed.ts:68`), while the default bucket is open. See [[end-user-onboarding]]. Since spec
+078 a super administrator may open it on the bucket's settings ([[admin-bucket-settings]]); the seed is
+create-if-absent, so a re-run never closes it again.
 
 The first administrator account is **not** seeded; it is created by first-run setup — see
 [[first-run-setup-had-two-surfaces]].

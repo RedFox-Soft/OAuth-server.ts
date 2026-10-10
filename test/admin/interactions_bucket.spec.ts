@@ -7,7 +7,8 @@ import {
 	getUserStore,
 	resetAdminMemoryStores
 } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID } from 'lib/admin/consts.ts';
+import { ADMIN_BUCKET_ID, ADMIN_CLIENT_ID } from 'lib/admin/consts.ts';
+import { elysia } from 'lib/index.ts';
 
 // These specs prove the additive client -> bucket routing added to
 // `POST ui/:uid/login`: the `admin-panel` client authenticates against the
@@ -91,17 +92,12 @@ describe('interaction login bucket routing', () => {
 	});
 
 	/*
-	 * The reserved admin bucket is never email-verification-gated, and this is a lockout guard rather
-	 * than a preference. Both paths that create an administrator write `verified: false` — the admins
-	 * route and the first-run bootstrap — and no verification mail is ever sent for this bucket, because
-	 * `issueAndSend` is only reached from the self-service registration route, which this bucket
-	 * refuses. So the flag being true here means every administrator is refused at the door with no way
-	 * to clear it short of editing the database.
-	 *
-	 * Unreachable through the admin API today, which is exactly why it is pinned at the point of
-	 * enforcement instead: the flag only has to become settable once for a console to be bricked.
+	 * The administrators' bucket is gated by the same rule as every bucket. Its lockout guard sits at the
+	 * setting — the requirement cannot be turned on without mail delivery and without the acting
+	 * administrator's own address proven — not at the door, so an administrator created before the
+	 * requirement is checked at their next sign-in like anyone else.
 	 */
-	it('never gates the admin bucket on email verification', async () => {
+	it('refuses an unverified administrator while administrators must verify their address, including one created before the requirement', async () => {
 		const unverified = await getUserStore(ADMIN_BUCKET_ID).create(
 			'unverified-admin@x.io',
 			await Bun.password.hash(PASSWORD)
@@ -113,7 +109,7 @@ describe('interaction login bucket routing', () => {
 		});
 		try {
 			expect(await submitLogin('admin-panel', 'unverified-admin@x.io')).toBe(
-				303
+				400
 			);
 		} finally {
 			await getBucketStore().update(ADMIN_BUCKET_ID, {
@@ -122,7 +118,7 @@ describe('interaction login bucket routing', () => {
 		}
 	});
 
-	// The same flag still gates an ordinary bucket, so the exemption is the admin bucket's alone.
+	// The same flag gates an ordinary bucket.
 	it('still gates an ordinary bucket on email verification', async () => {
 		const user = await getUserStore().create(
 			'unverified-regular@x.io',
@@ -142,5 +138,29 @@ describe('interaction login bucket routing', () => {
 				emailVerificationRequired: false
 			});
 		}
+	});
+});
+
+/**
+ * @proves The console's sign-in page offers no door the administrators' bucket keeps shut, so an operator
+ * is never sent to a refusal the page could have known about.
+ */
+describe("the console's sign-in page", () => {
+	beforeAll(async () => {
+		await bootstrap(import.meta.url, { config: 'admin' });
+		resetAdminMemoryStores();
+		await ensureAdminSeed();
+	});
+
+	it('offers neither a registration nor a password-reset link while administrator registration is closed', async () => {
+		const { uid, cookie } = await startLogin(ADMIN_CLIENT_ID);
+		const res = await elysia.handle(
+			new Request(`http://e.ly/ui/${uid}/login`, { headers: { cookie } })
+		);
+		const html = await res.text();
+
+		expect(html).toContain('name="password"');
+		expect(html).not.toContain(`/ui/${uid}/registration`);
+		expect(html).not.toContain(`/ui/${uid}/forgot-password`);
 	});
 });

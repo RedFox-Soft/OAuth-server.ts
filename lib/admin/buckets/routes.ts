@@ -23,7 +23,7 @@ import {
 import type { UserBucket } from '../../adapters/types.js';
 import { isUniqueValueTaken } from '../../adapters/conflicts.js';
 import { presentAll } from '../federation/service.js';
-import { ADMIN_BUCKET_ID, isUndeletableBucket } from '../consts.js';
+import { ADMIN_BUCKET_ID, isUndeletableBucket, reservedOf } from '../consts.js';
 import { cascadeForAccount } from '../../helpers/cascade.js';
 import { emailScopedId } from '../../helpers/email_scoped_id.js';
 import { recordAdminAudit } from '../audit/record.js';
@@ -39,7 +39,11 @@ import {
 	planMove,
 	type MovePlan
 } from '../resources/move.js';
-import { loadBucketForUsers, loadBucketForEdit } from './access.js';
+import { loadBucketForSettings, loadBucketForEdit } from './access.js';
+import {
+	adminBucketAdvisory,
+	assertAdminBucketChange
+} from './admin_bucket.js';
 import {
 	assertSomeWayToSignIn,
 	prospectiveBucket
@@ -232,9 +236,19 @@ async function clientsLosingTheirIssuer(bucketId: string): Promise<string[]> {
  * Found by the MCP surface's secrecy sweep (test/mcp/secrecy.spec.ts), which is why that sweep iterates
  * every published read rather than the ones somebody thought to check.
  */
-function presentBucket<T extends Pick<UserBucket, 'federation'>>(bucket: T): T {
-	if (!bucket.federation.length) return bucket;
-	return { ...bucket, federation: presentAll(bucket) };
+function presentBucket<T extends Pick<UserBucket, '_id' | 'federation'>>(
+	bucket: T
+): T & { reserved?: 'administrators' } {
+	/*
+	 * The console's own bucket says so on the response, so the console and an agent learn it from what
+	 * they were sent rather than by knowing the id.
+	 */
+	const marked =
+		reservedOf(bucket._id) === 'administrators'
+			? { ...bucket, reserved: 'administrators' as const }
+			: bucket;
+	if (!marked.federation.length) return marked;
+	return { ...marked, federation: presentAll(bucket) };
 }
 
 /*
@@ -332,7 +346,13 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			).filter((b): b is NonNullable<typeof b> => b !== null);
 			all = [...owned, ...extra];
 		}
-		return all.filter((b) => b._id !== ADMIN_BUCKET_ID).map(presentBucket);
+		/*
+		 * A super administrator configures the administrators' bucket like any other, so it is listed for
+		 * them. For anyone else it stays out of the list, as it is out of reach.
+		 */
+		return all
+			.filter((b) => ctx.superAdmin || b._id !== ADMIN_BUCKET_ID)
+			.map(presentBucket);
 	})
 	.post(
 		'/admin/api/buckets',
@@ -400,20 +420,23 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 	.get('/admin/api/buckets/:id', async ({ admin, params }) => {
 		const ctx = assertAuth(admin);
 		return withAddressGuidance(
-			presentBucket(await loadBucketForUsers(ctx, params.id))
+			presentBucket(await loadBucketForSettings(ctx, params.id, 'read'))
 		);
 	})
 	.patch(
 		'/admin/api/buckets/:id',
 		async ({ admin, params, body }) => {
 			const ctx = assertAuth(admin);
-			const bucket = await loadBucketForEdit(ctx, params.id);
+			const bucket = await loadBucketForSettings(ctx, params.id, 'edit');
 			/*
 			 * Checked before the audit entry and the write: an entry describing a change a 409 refused would
 			 * state that an operator closed a bucket's password door when they did not. The provider routes
 			 * enforce the same rule from the other direction, through the same function.
 			 */
 			assertSomeWayToSignIn(prospectiveBucket(bucket, body));
+			if (params.id === ADMIN_BUCKET_ID) {
+				await assertAdminBucketChange(ctx, body);
+			}
 			/*
 			 * Recorded whatever the request changed. This used to fire only for a registration or
 			 * verification field, so renaming a bucket or reassigning its managers left no trace at all
@@ -425,7 +448,12 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			});
 			const updated = await getBucketStore().update(params.id, body);
 			if (!updated) throw new AdminError(404, 'bucket not found');
-			return withInertTotpAdvisory(presentBucket(updated));
+			const presented = withInertTotpAdvisory(presentBucket(updated));
+			const advisory =
+				params.id === ADMIN_BUCKET_ID
+					? adminBucketAdvisory(updated)
+					: undefined;
+			return { ...presented, ...(advisory ? { advisory } : {}) };
 		},
 		{ body: UpdateBucketBody }
 	)

@@ -311,7 +311,7 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 			if (bucket._id === ADMIN_BUCKET_ID) {
 				throw new AdminError(
 					403,
-					'the admin bucket is managed via /admin/api/admins'
+					"this operation is not available for the administrators' bucket"
 				);
 			}
 			assertBucketAccess(ctx, bucket);

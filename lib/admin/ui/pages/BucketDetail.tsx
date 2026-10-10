@@ -12,6 +12,7 @@ import {
 	Typography,
 	Tooltip,
 	Popconfirm,
+	Alert,
 	message
 } from 'antd';
 import { ArrowLeftOutlined, PlusOutlined } from '@ant-design/icons';
@@ -34,6 +35,13 @@ type EndUser = Omit<User, 'password' | 'totp'> & {
 	totpEnrolledAt: string | null;
 	groups?: { id: string; displayName: string; provisionedBy?: string }[];
 };
+
+/*
+ * The bucket as the API presents it. The administrators' own bucket carries `reserved`, and the page
+ * changes shape on it: its accounts are administrators, managed on their own page, and only its settings
+ * and activity belong here.
+ */
+type BucketView = UserBucket & { reserved?: 'administrators' };
 
 interface CreateValues {
 	email: string;
@@ -99,7 +107,10 @@ export function BucketDetail({
 	onBack: () => void;
 }) {
 	const base = `/admin/api/buckets/${encodeURIComponent(bucketId)}`;
-	const [bucket, setBucket] = useState<UserBucket | null>(null);
+	const [bucket, setBucket] = useState<BucketView | null>(null);
+	// Only read on the administrators' bucket, where requiring verification needs your own address proven.
+	const [selfVerified, setSelfVerified] = useState(true);
+	const [sendingVerification, setSendingVerification] = useState(false);
 	const [rows, setRows] = useState<EndUser[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [createOpen, setCreateOpen] = useState(false);
@@ -136,8 +147,21 @@ export function BucketDetail({
 	// `loading` first; `load` is the reload, which does.
 	const fetchBucket = useCallback(async () => {
 		try {
-			const [b, u] = await Promise.all([fetch(base), fetch(`${base}/users`)]);
-			if (b.ok) setBucket((await b.json()) as UserBucket);
+			const b = await fetch(base);
+			if (!b.ok) return;
+			const loaded = (await b.json()) as BucketView;
+			setBucket(loaded);
+			// The administrators' bucket answers no user list here — its accounts have their own page.
+			if (loaded.reserved === 'administrators') {
+				const me = await fetch('/admin/api/me');
+				if (me.ok) {
+					setSelfVerified(
+						((await me.json()) as { verified?: boolean }).verified === true
+					);
+				}
+				return;
+			}
+			const u = await fetch(`${base}/users`);
 			if (u.ok) setRows((await u.json()) as EndUser[]);
 		} finally {
 			setLoading(false);
@@ -343,8 +367,55 @@ export function BucketDetail({
 			message.error(detail?.message ?? 'failed to update bucket');
 			return;
 		}
+		/*
+		 * A write can succeed and still have something to say — an inert second factor, or the console
+		 * open to anyone without proof of address. Shown, not swallowed: the same sentence an agent reads.
+		 */
+		const saved = (await res.json().catch(() => null)) as {
+			advisory?: string;
+		} | null;
+		if (saved?.advisory) message.warning(saved.advisory, 8);
 		setBucketEditOpen(false);
 		await load();
+	}
+
+	const reserved = bucket?.reserved === 'administrators';
+
+	async function onVerifySelf() {
+		setSendingVerification(true);
+		try {
+			const res = await fetch('/admin/api/me/verification', { method: 'POST' });
+			const body = (await res.json().catch(() => null)) as {
+				alreadyVerified?: boolean;
+				method?: 'link' | 'code';
+				codeUrl?: string;
+				reason?: string;
+			} | null;
+			if (body?.alreadyVerified) {
+				setSelfVerified(true);
+				return;
+			}
+			if (!res.ok) {
+				message.error(
+					body?.reason === 'rate_limited'
+						? 'A message was sent recently. Check your inbox, or try again in a minute.'
+						: body?.reason === 'mail_not_configured'
+							? 'Mail delivery is not configured, so no message can be sent.'
+							: 'The message could not be sent. Try again later.'
+				);
+				return;
+			}
+			if (body?.codeUrl) {
+				window.open(body.codeUrl, '_blank', 'noopener');
+				message.info('Enter the code from your email on the page that opened.');
+			} else {
+				message.success(
+					'Check your inbox and follow the link, then reload this page.'
+				);
+			}
+		} finally {
+			setSendingVerification(false);
+		}
 	}
 
 	return (
@@ -366,7 +437,7 @@ export function BucketDetail({
 					level={4}
 					style={{ margin: 0 }}
 				>
-					{bucket?.name ?? bucketId} — users
+					{bucket?.name ?? bucketId} — {reserved ? 'settings' : 'users'}
 				</Typography.Title>
 				<Space>
 					<Button
@@ -385,232 +456,271 @@ export function BucketDetail({
 					>
 						Edit bucket
 					</Button>
-					<Button
-						type="primary"
-						icon={<PlusOutlined />}
-						onClick={() => setCreateOpen(true)}
-					>
-						New user
-					</Button>
+					{!reserved && (
+						<Button
+							type="primary"
+							icon={<PlusOutlined />}
+							onClick={() => setCreateOpen(true)}
+						>
+							New user
+						</Button>
+					)}
 				</Space>
 			</Space>
-			<Table<EndUser>
-				rowKey="_id"
-				loading={loading}
-				dataSource={rows}
-				columns={[
-					{ title: 'Email', dataIndex: 'email' },
-					{
-						title: 'Groups',
-						dataIndex: 'groups',
-						render: (groups: EndUser['groups']) =>
-							(groups ?? []).map((g) => (
-								<Tag
-									key={g.id}
-									color={g.provisionedBy ? 'purple' : undefined}
-								>
-									{g.displayName}
-								</Tag>
-							))
-					},
-					{
-						title: 'Active',
-						dataIndex: 'active',
-						render: (a: boolean) =>
-							a ? <Tag color="green">active</Tag> : <Tag>inactive</Tag>
-					},
-					{
-						title: 'Verified',
-						dataIndex: 'verified',
-						render: (v: boolean) => (v ? 'yes' : 'no')
-					},
-					{
-						// Whether there is an authenticator, and since when. Never the secret behind it —
-						// the server does not send it, to any role.
-						title: 'Authenticator',
-						dataIndex: 'totpEnrolled',
-						render: (enrolled: boolean, row: EndUser) =>
-							enrolled ? (
-								<Tooltip
-									title={
-										row.totpEnrolledAt
-											? `Enrolled ${new Date(row.totpEnrolledAt).toLocaleString()}`
-											: 'Enrolled'
-									}
-								>
-									<Tag color="green">enrolled</Tag>
-								</Tooltip>
-							) : (
-								<Tag>none</Tag>
-							)
-					},
-					{
-						/*
-						 * Who owns the record. A connection's display name where it is known; its id
-						 * otherwise, because a stale list must not make a managed user look local.
-						 */
-						title: 'Managed by',
-						dataIndex: 'provisionedBy',
-						render: (provisionedBy: string | undefined) =>
-							provisionedBy ? (
-								<Tag color="purple">
-									{connections.find((c) => c.id === provisionedBy)
-										?.displayName ?? provisionedBy}
-								</Tag>
-							) : (
-								<Typography.Text type="secondary">local</Typography.Text>
-							)
-					},
-					{
-						title: 'Actions',
-						render: (_: unknown, row: EndUser) => {
+			{reserved && (
+				<Alert
+					type="info"
+					showIcon
+					style={{ marginBottom: 16 }}
+					title="This is the console's own bucket"
+					description="Its accounts are the administrators of this instance and are managed on the Admins page. Here you set how they sign in: whether people may register, whether they must verify their address, and whether an authenticator app is required. Turning email verification on needs mail delivery configured and your own address verified."
+				/>
+			)}
+			{reserved && !selfVerified && (
+				<Alert
+					type="warning"
+					showIcon
+					style={{ marginBottom: 16 }}
+					title="Your own address is not verified"
+					description="Requiring administrators to verify their email is refused until you have verified yours, so the requirement can never lock you out."
+					action={
+						<Button
+							size="small"
+							loading={sendingVerification}
+							onClick={() => void onVerifySelf()}
+						>
+							Verify my address
+						</Button>
+					}
+				/>
+			)}
+			{!reserved && (
+				<Table<EndUser>
+					rowKey="_id"
+					loading={loading}
+					dataSource={rows}
+					columns={[
+						{ title: 'Email', dataIndex: 'email' },
+						{
+							title: 'Groups',
+							dataIndex: 'groups',
+							render: (groups: EndUser['groups']) =>
+								(groups ?? []).map((g) => (
+									<Tag
+										key={g.id}
+										color={g.provisionedBy ? 'purple' : undefined}
+									>
+										{g.displayName}
+									</Tag>
+								))
+						},
+						{
+							title: 'Active',
+							dataIndex: 'active',
+							render: (a: boolean) =>
+								a ? <Tag color="green">active</Tag> : <Tag>inactive</Tag>
+						},
+						{
+							title: 'Verified',
+							dataIndex: 'verified',
+							render: (v: boolean) => (v ? 'yes' : 'no')
+						},
+						{
+							// Whether there is an authenticator, and since when. Never the secret behind it —
+							// the server does not send it, to any role.
+							title: 'Authenticator',
+							dataIndex: 'totpEnrolled',
+							render: (enrolled: boolean, row: EndUser) =>
+								enrolled ? (
+									<Tooltip
+										title={
+											row.totpEnrolledAt
+												? `Enrolled ${new Date(row.totpEnrolledAt).toLocaleString()}`
+												: 'Enrolled'
+										}
+									>
+										<Tag color="green">enrolled</Tag>
+									</Tooltip>
+								) : (
+									<Tag>none</Tag>
+								)
+						},
+						{
 							/*
-							 * The directory owns a provisioned record, and the server refuses these three for
-							 * one. Disabled rather than hidden, so the operator learns where the change belongs
-							 * instead of wondering why the buttons vanished.
+							 * Who owns the record. A connection's display name where it is known; its id
+							 * otherwise, because a stale list must not make a managed user look local.
 							 */
-							const managedNotice = row.provisionedBy
-								? `Managed by ${
-										connections.find((c) => c.id === row.provisionedBy)
-											?.displayName ?? row.provisionedBy
-									} — change this user in the directory`
-								: undefined;
-							return (
-								<Space>
-									<Tooltip title={managedNotice}>
-										<Button
-											size="small"
-											disabled={managedNotice !== undefined}
-											onClick={() => {
-												setEditUserId(row._id);
-												editForm.setFieldsValue({
-													groupIds: (row.groups ?? [])
-														.filter((g) => !g.provisionedBy)
-														.map((g) => g.id),
-													active: row.active,
-													claimsText: row.claims
-														? JSON.stringify(row.claims, null, 2)
-														: ''
-												});
-												setEditOpen(true);
-											}}
-										>
-											Edit
-										</Button>
-									</Tooltip>
-									<Tooltip title={managedNotice}>
-										<Button
-											size="small"
-											disabled={managedNotice !== undefined}
-											onClick={() => setPwUser(row)}
-										>
-											Reset password
-										</Button>
-									</Tooltip>
-									<Button
-										size="small"
-										onClick={() => setIdentitiesUser(row)}
-									>
-										Identities
-									</Button>
-									{!row.provisionedBy && connections.length > 0 && (
-										<Button
-											size="small"
-											onClick={() => {
-												assignForm.resetFields();
-												setAssignUser(row);
-											}}
-										>
-											Assign to connection
-										</Button>
-									)}
-									{/* Offered only where there is something to clear, and stating the two
-								    consequences an operator cannot see from here: the old codes stop working,
-								    and the person is signed out everywhere. */}
-									{/* Allowed on a provisioned user too: it ends access and edits nothing the connection owns. */}
-									<Popconfirm
-										title="Sign this user out everywhere?"
-										description="Every session and token ends at once and relying parties are told. The account stays active: they can sign in again, and will be asked to consent again."
-										okText="Sign out everywhere"
-										onConfirm={() => onSignOut(row._id)}
-									>
-										<Button size="small">Sign out everywhere</Button>
-									</Popconfirm>
-									{row.totpEnrolled && (
-										<Popconfirm
-											title="Clear this authenticator?"
-											description="Their current authenticator stops working immediately and they are signed out everywhere. They set up a new one at their next sign-in."
-											okText="Clear and sign out"
-											onConfirm={() => onClearTotp(row._id)}
-										>
-											<Button size="small">Clear authenticator</Button>
-										</Popconfirm>
-									)}
-									{/* The consequence, stated: deleting an account also ends the sessions and tokens
-								    it is currently using, which is the half an operator cannot see from here. */}
-									{managedNotice ? (
+							title: 'Managed by',
+							dataIndex: 'provisionedBy',
+							render: (provisionedBy: string | undefined) =>
+								provisionedBy ? (
+									<Tag color="purple">
+										{connections.find((c) => c.id === provisionedBy)
+											?.displayName ?? provisionedBy}
+									</Tag>
+								) : (
+									<Typography.Text type="secondary">local</Typography.Text>
+								)
+						},
+						{
+							title: 'Actions',
+							render: (_: unknown, row: EndUser) => {
+								/*
+								 * The directory owns a provisioned record, and the server refuses these three for
+								 * one. Disabled rather than hidden, so the operator learns where the change belongs
+								 * instead of wondering why the buttons vanished.
+								 */
+								const managedNotice = row.provisionedBy
+									? `Managed by ${
+											connections.find((c) => c.id === row.provisionedBy)
+												?.displayName ?? row.provisionedBy
+										} — change this user in the directory`
+									: undefined;
+								return (
+									<Space>
 										<Tooltip title={managedNotice}>
 											<Button
 												size="small"
-												danger
-												disabled
+												disabled={managedNotice !== undefined}
+												onClick={() => {
+													setEditUserId(row._id);
+													editForm.setFieldsValue({
+														groupIds: (row.groups ?? [])
+															.filter((g) => !g.provisionedBy)
+															.map((g) => g.id),
+														active: row.active,
+														claimsText: row.claims
+															? JSON.stringify(row.claims, null, 2)
+															: ''
+													});
+													setEditOpen(true);
+												}}
 											>
-												Delete
+												Edit
 											</Button>
 										</Tooltip>
-									) : (
-										<Popconfirm
-											title="Delete this user?"
-											description="Their sign-in sessions, consents and every issued token are destroyed immediately — they are signed out everywhere."
-											okText="Delete and sign out"
-											onConfirm={() => onDelete(row._id)}
-										>
+										<Tooltip title={managedNotice}>
 											<Button
 												size="small"
-												danger
+												disabled={managedNotice !== undefined}
+												onClick={() => setPwUser(row)}
 											>
-												Delete
+												Reset password
 											</Button>
+										</Tooltip>
+										<Button
+											size="small"
+											onClick={() => setIdentitiesUser(row)}
+										>
+											Identities
+										</Button>
+										{!row.provisionedBy && connections.length > 0 && (
+											<Button
+												size="small"
+												onClick={() => {
+													assignForm.resetFields();
+													setAssignUser(row);
+												}}
+											>
+												Assign to connection
+											</Button>
+										)}
+										{/* Offered only where there is something to clear, and stating the two
+								    consequences an operator cannot see from here: the old codes stop working,
+								    and the person is signed out everywhere. */}
+										{/* Allowed on a provisioned user too: it ends access and edits nothing the connection owns. */}
+										<Popconfirm
+											title="Sign this user out everywhere?"
+											description="Every session and token ends at once and relying parties are told. The account stays active: they can sign in again, and will be asked to consent again."
+											okText="Sign out everywhere"
+											onConfirm={() => onSignOut(row._id)}
+										>
+											<Button size="small">Sign out everywhere</Button>
 										</Popconfirm>
-									)}
-								</Space>
-							);
+										{row.totpEnrolled && (
+											<Popconfirm
+												title="Clear this authenticator?"
+												description="Their current authenticator stops working immediately and they are signed out everywhere. They set up a new one at their next sign-in."
+												okText="Clear and sign out"
+												onConfirm={() => onClearTotp(row._id)}
+											>
+												<Button size="small">Clear authenticator</Button>
+											</Popconfirm>
+										)}
+										{/* The consequence, stated: deleting an account also ends the sessions and tokens
+								    it is currently using, which is the half an operator cannot see from here. */}
+										{managedNotice ? (
+											<Tooltip title={managedNotice}>
+												<Button
+													size="small"
+													danger
+													disabled
+												>
+													Delete
+												</Button>
+											</Tooltip>
+										) : (
+											<Popconfirm
+												title="Delete this user?"
+												description="Their sign-in sessions, consents and every issued token are destroyed immediately — they are signed out everywhere."
+												okText="Delete and sign out"
+												onConfirm={() => onDelete(row._id)}
+											>
+												<Button
+													size="small"
+													danger
+												>
+													Delete
+												</Button>
+											</Popconfirm>
+										)}
+									</Space>
+								);
+							}
 						}
-					}
-				]}
-			/>
+					]}
+				/>
+			)}
 
-			<BucketGroupsPanel
-				bucketId={bucketId}
-				users={rows}
-				connections={connections}
-				refreshKey={groupsKey}
-				onGroups={setBucketGroups}
-				onChanged={() => void load()}
-			/>
+			{/*
+			 * Mounted only once the bucket is known: each panel fetches on mount, and before the bucket
+			 * loads `reserved` reads false, so the console's own bucket would fire requests it refuses.
+			 */}
+			{bucket && !reserved && (
+				<>
+					<BucketGroupsPanel
+						bucketId={bucketId}
+						users={rows}
+						connections={connections}
+						refreshKey={groupsKey}
+						onGroups={setBucketGroups}
+						onChanged={() => void load()}
+					/>
 
-			<FederationPanel
-				key={federationKey}
-				bucketId={bucketId}
-				// The bucket's own settings depend on this list, so a change here refreshes what the
-				// password-sign-in switch is validated against.
-				onChanged={() => {
-					void load();
-					setProvisioningKey((k) => k + 1);
-				}}
-			/>
+					<FederationPanel
+						key={federationKey}
+						bucketId={bucketId}
+						// The bucket's own settings depend on this list, so a change here refreshes what the
+						// password-sign-in switch is validated against.
+						onChanged={() => {
+							void load();
+							setProvisioningKey((k) => k + 1);
+						}}
+					/>
 
-			<ProvisioningPanel
-				bucketId={bucketId}
-				refreshKey={provisioningKey}
-				onConnections={setConnections}
-				onChanged={(event) => {
-					void load();
-					if (event === 'created') setFederationKey((k) => k + 1);
-				}}
-			/>
+					<ProvisioningPanel
+						bucketId={bucketId}
+						refreshKey={provisioningKey}
+						onConnections={setConnections}
+						onChanged={(event) => {
+							void load();
+							if (event === 'created') setFederationKey((k) => k + 1);
+						}}
+					/>
 
-			<BucketKeysPanel bucketId={bucketId} />
+					<BucketKeysPanel bucketId={bucketId} />
+				</>
+			)}
 
 			<BucketActivityPanel bucketId={bucketId} />
 
@@ -792,14 +902,20 @@ export function BucketDetail({
 					>
 						<Input />
 					</Form.Item>
-					<Form.Item
-						name="passwordLogin"
-						label="Accept email and password sign-in"
-						valuePropName="checked"
-						tooltip="Turn off for a bucket whose users must come from an identity provider. Refused unless this bucket has an enabled provider."
-					>
-						<Switch />
-					</Form.Item>
+					{/*
+					 * Not offered on the console's own bucket: it holds no provider, so turning password sign-in
+					 * off is always refused there, and a switch that can only fail is not a control.
+					 */}
+					{!reserved && (
+						<Form.Item
+							name="passwordLogin"
+							label="Accept email and password sign-in"
+							valuePropName="checked"
+							tooltip="Turn off for a bucket whose users must come from an identity provider. Refused unless this bucket has an enabled provider."
+						>
+							<Switch />
+						</Form.Item>
+					)}
 					{/*
 					 * Disabled rather than hidden when password sign-in is off: the setting still exists and
 					 * still means something, and hiding it would leave an operator wondering where it went.
@@ -817,22 +933,22 @@ export function BucketDetail({
 						name="registrationOpen"
 						label="Self-service registration open"
 						valuePropName="checked"
-						tooltip="Allow visitors to register accounts in this bucket"
+						tooltip={
+							reserved
+								? 'Anyone who can reach the console sign-in page may register an administrator account. Each gets a personal group and nothing else.'
+								: 'Allow visitors to register accounts in this bucket'
+						}
 					>
 						<Switch />
 					</Form.Item>
-					<Form.Item
-						name="emailVerificationRequired"
-						label="Require email verification"
-						valuePropName="checked"
-						tooltip="New accounts must confirm their email before they can sign in"
-					>
-						<Switch />
-					</Form.Item>
+					{/*
+					 * The method before the requirement: a message is sent in whichever method is saved, so it is
+					 * chosen first — on the console's own bucket, before verifying your own address.
+					 */}
 					<Form.Item
 						name="verificationMethod"
 						label="Verification method"
-						tooltip="How new registrants confirm their email"
+						tooltip="How an account confirms its email"
 					>
 						<Select
 							options={[
@@ -840,6 +956,14 @@ export function BucketDetail({
 								{ label: '6-digit code', value: 'code' }
 							]}
 						/>
+					</Form.Item>
+					<Form.Item
+						name="emailVerificationRequired"
+						label="Require email verification"
+						valuePropName="checked"
+						tooltip="Accounts must confirm their email before they can sign in. An unverified account that signs in is sent a new message."
+					>
+						<Switch />
 					</Form.Item>
 				</Form>
 			</Modal>

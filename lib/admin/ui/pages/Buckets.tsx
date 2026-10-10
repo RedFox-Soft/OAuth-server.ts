@@ -188,7 +188,21 @@ export function Buckets({
 						'No user buckets in this scope yet. A bucket holds the end-user accounts a project authenticates.'
 				}}
 				columns={[
-					{ title: 'Name', dataIndex: 'name' },
+					{
+						title: 'Name',
+						dataIndex: 'name',
+						render: (name: string, row: UserBucket & { reserved?: string }) =>
+							row.reserved === 'administrators' ? (
+								<Space>
+									{name}
+									<Tooltip title="The console's own bucket: its accounts are this instance's administrators.">
+										<Tag color="gold">Console</Tag>
+									</Tooltip>
+								</Space>
+							) : (
+								name
+							)
+					},
 					{
 						title: 'Address',
 						dataIndex: 'slug',
@@ -220,13 +234,14 @@ export function Buckets({
 					},
 					{
 						title: '',
-						render: (_: unknown, row: UserBucket) => (
+						render: (_: unknown, row: UserBucket & { reserved?: string }) => (
 							<Space>
 								<Button
 									size="small"
 									onClick={() => setOpenBucketId(row._id)}
 								>
-									Users
+									{/* Its accounts are on the Admins page; what opens here is its sign-in policy. */}
+									{row.reserved === 'administrators' ? 'Settings' : 'Users'}
 								</Button>
 								{/*
 								 * No action at all for the two buckets the server is built on, rather

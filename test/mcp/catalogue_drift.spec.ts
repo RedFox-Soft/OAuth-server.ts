@@ -156,6 +156,7 @@ describe('MCP tool catalogue', () => {
 			'POST /admin/api/setup',
 			'POST /admin/api/invitations/accept',
 			'POST /admin/api/logout',
+			'POST /admin/api/me/verification',
 			'PUT /admin/api/scope'
 		]);
 	});

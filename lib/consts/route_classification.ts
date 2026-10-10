@@ -510,6 +510,7 @@ const bareRateRoutes: readonly RateRoute[] = [
 	// Every end-user door that verifies a secret or sends mail. Each already carries a per-identity
 	// throttle; this is the origin-level layer in front of it, and neither replaces the other.
 	{ method: 'POST', path: '/ui/:uid/login', rate: 'strict' },
+	{ method: 'POST', path: '/ui/:uid/verification/resend', rate: 'strict' },
 	{ method: 'POST', path: '/ui/:uid/registration', rate: 'strict' },
 	{ method: 'POST', path: '/ui/:uid/forgot-password', rate: 'strict' },
 	{ method: 'POST', path: '/ui/:uid/totp', rate: 'strict' },

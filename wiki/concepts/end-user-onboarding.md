@@ -12,7 +12,8 @@ updated: 2026-09-23
 Whether a person may register, and whether they must prove their address first, is decided **per
 user bucket**, not per server. Each bucket carries `registrationOpen`, `emailVerificationRequired` and
 `verificationMethod` (`'link' | 'code'`). The default is open with verification off; the reserved admin
-bucket is seeded closed ([[admin-provisioning]]).
+bucket is seeded closed ([[admin-provisioning]]), and since spec 078 a super administrator may open it
+and require verification there like anywhere else ([[admin-bucket-settings]]).
 
 ## The door
 
@@ -20,12 +21,29 @@ The registration screen resolves its bucket from the interaction's client throug
 `resolveBucketForRequest` — on the **GET as well as the POST** (`lib/interactions/index.ts:1023`),
 because a form that can only be refused on submission is a dead end dressed as an invitation. A closed
 bucket refuses; a bucket that requires verification creates the user unverified and issues a challenge.
-The login POST then refuses an unverified user in such a bucket.
+The login POST then refuses an unverified user in such a bucket — and, since spec 078, sends what they
+need rather than only saying "check your inbox": an account that existed before its bucket required
+verification had never been sent anything. A live challenge is reused, so a registrant who signs in
+before following their link keeps it (`sendOnDemand`, `lib/verification/challenge.ts`).
 
-**The admin bucket never gates on verification**, whatever its flag says (`verificationGates`,
-`lib/interactions/index.ts:318`). That is a lockout guard: both paths that create an administrator write
-`verified: false`, and no verification mail is ever sent for that bucket, so the flag being true would
-refuse every administrator with no way back short of editing the database.
+For a lost letter whose link is still valid, the page then offers **"Send the link again"**
+(`POST /ui/:uid/verification/resend`, `lib/interactions/index.ts:1309`). It cannot reuse the public
+`/verify-email/resend`: that takes the challenge's reference, and for a link the reference *is* the token,
+so putting it on the page would let anyone who knows the password verify without the mailbox. Instead the
+sign-in records the proven account on the interaction (`pendingVerification`,
+`lib/models/interaction.ts:99`), and the button posts nothing — it can mail only the account whose
+password this interaction just proved, within the resend cooldown and daily cap. It answers with a
+redirect to the login path and a notice (`verify_resent`, `verify_recent`, `verify_unsent`), never by
+rendering the page itself: the client bundle reads the page from the path, so a login document served at
+`…/verification/resend` never hydrates.
+
+The sign-in page links to registration only when the bucket accepts it, and to password reset only when
+the bucket allows it, read from the same bucket the doors resolve (`lib/interactions/loginOptions.ts`).
+
+*Corrected in spec 078:* the admin bucket used to be exempt from the verification check
+(`verificationGates`), as a lockout guard — its administrators were all unverified and nothing could
+send them a message. The exemption is gone; the guard moved to the setting, which refuses to turn on
+without mail delivery or while the acting administrator is unverified ([[admin-bucket-settings]]).
 
 ## The challenge
 

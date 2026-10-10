@@ -388,6 +388,19 @@ describe('interaction UI — registration refusals (US2)', () => {
 		expect(login.text).toContain(`/ui/${uid}/forgot-password`);
 	});
 
+	it('leaves exactly one account, and the same answer to both, when two registrations for one address race', async () => {
+		const email = 'racing@x.io';
+		const [first, second] = await Promise.all([
+			register('ui-open-app', email),
+			register('ui-open-app', email)
+		]);
+
+		expect(first.response.status).toBe(303);
+		expect(second.response.status).toBe(303);
+		const all = await getUserStore(openBucketId).list();
+		expect(all.filter((u) => u.email === email)).toHaveLength(1);
+	});
+
 	it('stays non-committal about an address that already exists', async () => {
 		const email = 'existing@x.io';
 		const first = await register('ui-open-app', email);
@@ -413,5 +426,48 @@ describe('interaction UI — registration refusals (US2)', () => {
 		expect(second.status).toBe(303);
 		expect(second.headers.get('location')).toBe(`/ui/${uid}/login`);
 		expect(await second.text()).toBe('');
+	});
+});
+
+function hydrationProps(html: string): Record<string, unknown> {
+	const match = /window\.PROPS=(\{.*?\})<\/script>/.exec(html);
+	if (!match?.[1]) throw new Error('expected hydration props on the page');
+	return JSON.parse(match[1]) as Record<string, unknown>;
+}
+
+/**
+ * @proves A sign-in page offers a registration or password-reset link only where its bucket keeps that
+ * door open, so nobody is sent to a refusal the page could have known about.
+ */
+describe('interaction UI — sign-in links follow their doors', () => {
+	beforeAll(async () => {
+		await bootstrap(import.meta.url, { config: 'pages' });
+		resetAdminMemoryStores();
+		closedBucketId = await seedBucket('UI Closed Bucket', 'ui-closed-app', {
+			registrationOpen: false
+		});
+	});
+
+	it('offers no registration link when its bucket has closed registration', async () => {
+		const { uid, cookie } = await startInteraction('ui-closed-app');
+		const login = await getPage(`/ui/${uid}/login`, cookie);
+
+		expect(login.text).toContain('name="password"');
+		expect(login.text).not.toContain(`/ui/${uid}/registration`);
+		expect(hydrationProps(login.text).registrationOpen).toBe(false);
+	});
+
+	it('offers a registration link once its bucket opens registration, with no restart', async () => {
+		await getBucketStore().update(closedBucketId, { registrationOpen: true });
+		try {
+			const { uid, cookie } = await startInteraction('ui-closed-app');
+			const login = await getPage(`/ui/${uid}/login`, cookie);
+
+			expect(login.text).toContain(`/ui/${uid}/registration`);
+		} finally {
+			await getBucketStore().update(closedBucketId, {
+				registrationOpen: false
+			});
+		}
 	});
 });

@@ -157,7 +157,7 @@ describe('a bucket must keep some way to sign in', () => {
 		expect(answered(res.data).passwordLogin).toBe(true);
 	});
 
-	it('refuses password sign-in changes on the reserved admin bucket', async () => {
+	it("refuses turning password sign-in off on the administrators' bucket, which would leave the console with no way in", async () => {
 		const cookie = await superCookie();
 
 		const res = await client.admin.api
@@ -165,11 +165,13 @@ describe('a bucket must keep some way to sign in', () => {
 			.patch({ passwordLogin: false }, { headers: { cookie } });
 
 		/*
-		 * 403 from the reserved-bucket guard, not 409 from the lockout rule — the console is a relying party
-		 * on this server's own issuer, and a second identity source for operators is a separate decision.
-		 * Inherited from loadBucketForEdit rather than written here, and pinned because `resolveBucketForClient`
-		 * maps the console client straight to this bucket.
+		 * 409 from the lockout rule itself: a super administrator may change this bucket's settings, and this
+		 * one is refused for what it would do, not for which bucket it is. The bucket holds no provider, and
+		 * federation stays closed to it, so password sign-in is the console's only door.
 		 */
-		expect(res.status).toBe(403);
+		expect(res.status).toBe(409);
+		expect((await getBucketStore().find(ADMIN_BUCKET_ID))?.passwordLogin).toBe(
+			true
+		);
 	});
 });

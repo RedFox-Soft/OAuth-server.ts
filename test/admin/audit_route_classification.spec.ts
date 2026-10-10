@@ -6,6 +6,7 @@ import {
 	excludedAdminRoutes,
 	auditRouteFor,
 	isExcludedAdminRoute,
+	nonRouteAuditActions,
 	AUDIT_ACTION_PATTERN
 } from '../../lib/consts/admin_audit_routes.ts';
 
@@ -57,18 +58,19 @@ describe('admin audit route classification', () => {
 		expect(stale).toEqual([]);
 	});
 
-	it('audits every mutating admin route except the two deliberate exclusions', () => {
+	it('audits every mutating admin route except the deliberate exclusions', () => {
 		// Pinned exactly rather than merely checked for staleness: an operation quietly moved into the
 		// exclusion list is indistinguishable from one that was never audited.
 		expect(excludedAdminRoutes.map(key)).toEqual([
 			'POST /admin/api/logout',
-			'PUT /admin/api/scope'
+			'PUT /admin/api/scope',
+			'POST /admin/api/me/verification'
 		]);
 
 		/*
 		 * Counted exactly, and the numbers grow with the table: 23 + the four federation rows (three provider
 		 * operations and one identity severance) + the error-store purge + clearing an end-user's
-		 * authenticator + the admin bucket's own sign-in policy + the six group rows (three on the group
+		 * authenticator + the six group rows (three on the group
 		 * itself, three on its membership) + the three invitation
 		 * rows (issue, revoke, accept) + the three protected-resource rows (declare, amend, remove) + the
 		 * three administrative-client-permission rows (permit, amend, withdraw) + clearing a project's
@@ -79,12 +81,12 @@ describe('admin audit route classification', () => {
 		 * upward silently would let an audited route be swapped for an unaudited one without either
 		 * total changing.
 		 *
-		 * `mounted` stays exactly two ahead, and always the same two: the deliberate exclusions named
-		 * above, `POST /admin/api/logout` and `PUT /admin/api/scope`, both of which change the caller's own
-		 * session and no managed entity. It filters to MUTATING methods, so the settings *read* that
-		 * shipped alongside the PATCH does not appear in either total.
+		 * `mounted` stays exactly three ahead, and always the same three: the deliberate exclusions named
+		 * above, `POST /admin/api/logout`, `PUT /admin/api/scope` and `POST /admin/api/me/verification`,
+		 * each of which touches only the caller's own standing and no managed entity. It filters to MUTATING methods, so no read appears in either
+		 * total.
 		 */
-		expect(auditedAdminRoutes).toHaveLength(72);
+		expect(auditedAdminRoutes).toHaveLength(71);
 		expect(mounted).toHaveLength(74);
 	});
 
@@ -94,8 +96,10 @@ describe('admin audit route classification', () => {
 		expect(declared.length).toBe(new Set(declared).size);
 	});
 
-	it('gives every route a unique action name following the convention', () => {
-		const actions = auditedAdminRoutes.map((route) => route.action);
+	it('gives every audited action a unique name following the convention', () => {
+		const actions = [...auditedAdminRoutes, ...nonRouteAuditActions].map(
+			(entry) => entry.action
+		);
 
 		expect(actions.length).toBe(new Set(actions).size);
 		expect(actions.filter((a) => !AUDIT_ACTION_PATTERN.test(a))).toEqual([]);

@@ -9,7 +9,8 @@ import {
 	buildUILoginPath,
 	buildUIRegistrationPath,
 	buildUIForgotPasswordPath,
-	buildUIFederationStartPath
+	buildUIFederationStartPath,
+	buildUIPath
 } from './buildUIPath.js';
 import { versionedAsset } from '../html/versionedAsset.js';
 import { knownProvider } from '../consts/known_providers.js';
@@ -20,6 +21,9 @@ export function LoginPage({
 	errorMessage,
 	notice,
 	passwordLogin = true,
+	registrationOpen = true,
+	passwordReset = true,
+	verificationResend = false,
 	providers = []
 }: {
 	uid: string;
@@ -27,6 +31,9 @@ export function LoginPage({
 	notice?: string;
 	/* Defaulted so the component renders the password page for any caller that says nothing. */
 	passwordLogin?: boolean;
+	registrationOpen?: boolean;
+	passwordReset?: boolean;
+	verificationResend?: boolean;
 	providers?: { id: string; displayName: string; brand?: string }[];
 }) {
 	return (
@@ -116,7 +123,8 @@ export function LoginPage({
 					 * Everything a password needs, and nothing when the bucket has none. The fields, the
 					 * "remember me", the submit, the reset link and the registration link all go together:
 					 * each one leads somewhere that answers 403 on a federated-only bucket, so leaving any of
-					 * them would be an invitation to a dead end.
+					 * them would be an invitation to a dead end. The two links also follow their own doors:
+					 * a bucket can keep a password and still refuse registration or self-service reset.
 					 */}
 					{passwordLogin && (
 						<>
@@ -157,7 +165,9 @@ export function LoginPage({
 									>
 										<Checkbox name="remember">Remember me</Checkbox>
 									</Form.Item>
-									<a href={buildUIForgotPasswordPath(uid)}>Forgot password</a>
+									{passwordReset && (
+										<a href={buildUIForgotPasswordPath(uid)}>Forgot password</a>
+									)}
 								</Flex>
 							</Form.Item>
 
@@ -169,11 +179,33 @@ export function LoginPage({
 								>
 									Log in
 								</Button>
-								or <a href={buildUIRegistrationPath(uid)}>Register now!</a>
+								{registrationOpen && (
+									<>
+										or <a href={buildUIRegistrationPath(uid)}>Register now!</a>
+									</>
+								)}
 							</Form.Item>
 						</>
 					)}
 				</Form>
+				{/*
+				 * A form of its own, outside the sign-in <Form>: it posts nothing, because the account it
+				 * concerns is the one this sign-in already proved the password of, held on the server.
+				 */}
+				{verificationResend && (
+					<form
+						method="post"
+						action={buildUIPath(uid, 'verification/resend')}
+						style={{ textAlign: 'center', marginTop: -8, marginBottom: 16 }}
+					>
+						<Button
+							type="link"
+							htmlType="submit"
+						>
+							Send the link again
+						</Button>
+					</form>
+				)}
 				{/*
 				 * Plain anchors, not buttons with handlers: leg one of the flow is a navigation, so this adds
 				 * no script and no inline handler and the page's derived content security policy is unchanged.

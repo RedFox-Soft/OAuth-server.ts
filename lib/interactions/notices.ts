@@ -30,11 +30,26 @@ export const NOTICE_FEDERATION_ABORTED = 'federation_aborted';
  */
 export const NOTICE_FEDERATION_LINK = 'federation_link';
 
+/*
+ * The answers to "send the link again" (`POST /ui/:uid/verification/resend`). That route redirects here
+ * rather than rendering the page itself, for the federation callback's reason above: the client bundle
+ * reads the page from the path, and a login document served at …/verification/resend never hydrates.
+ */
+export const NOTICE_VERIFY_RESENT = 'verify_resent';
+export const NOTICE_VERIFY_RECENT = 'verify_recent';
+export const NOTICE_VERIFY_UNSENT = 'verify_unsent';
+
 const NOTICES: Record<string, string> = {
 	[NOTICE_VERIFY]:
 		'Check your inbox — we have emailed you a link to verify your address. You will be able to sign in once you have opened it.',
 	[NOTICE_FEDERATION_ABORTED]:
 		'Sign-in with your identity provider was not completed. You can try again, or sign in with your password.',
+	[NOTICE_VERIFY_RESENT]:
+		'We sent you a new verification link. Follow it, then sign in.',
+	[NOTICE_VERIFY_RECENT]:
+		'A verification message was sent recently. Check your inbox, or try again in a minute.',
+	[NOTICE_VERIFY_UNSENT]:
+		'We could not send the verification message. Try again later.',
 	[NOTICE_FEDERATION_LINK]:
 		'An account with this email address already exists here. Sign in with its password once to link it to your identity provider.'
 };

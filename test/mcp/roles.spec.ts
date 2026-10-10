@@ -5,7 +5,11 @@ import { elysia } from 'lib/index.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { getProjectStore, getBucketStore } from 'lib/adapters/index.ts';
+import {
+	adminAuditStore,
+	getProjectStore,
+	getBucketStore
+} from 'lib/adapters/index.ts';
 import {
 	ADMIN_BUCKET_ID,
 	ADMIN_SESSION_COOKIE,
@@ -190,22 +194,88 @@ describe('agent permissions match the console, per role', () => {
 		expect(renamed.result?.structuredContent?.reason).toBe('forbidden');
 	});
 
-	it('refuses the reserved administrator bucket through the bucket tools', async () => {
+	it("gives a super administrator's agent the administrators' bucket settings, exactly as the console does", async () => {
 		const { token, cookie } = await principal('super');
 
-		// Even to a super-administrator: administrators are managed through their own tools, and the
-		// reserved bucket is not a place end-user operations may reach.
+		expect(await viaAgent('bucket_get', { id: ADMIN_BUCKET_ID }, token)).toBe(
+			'ok'
+		);
+		expect(
+			await viaConsole(`/admin/api/buckets/${ADMIN_BUCKET_ID}`, cookie)
+		).toBe(200);
+		const listed = await rpc(call('bucket_list', {}), token);
+		expect(JSON.stringify(listed)).toContain(`"${ADMIN_BUCKET_ID}"`);
+	});
+
+	it("lets a super administrator's agent change an administrators'-bucket setting, recorded against the agent and its principal", async () => {
+		const { token, user } = await principal('super');
+		try {
+			expect(
+				await viaAgent(
+					'bucket_update',
+					{ id: ADMIN_BUCKET_ID, totpRequired: true },
+					token
+				)
+			).toBe('ok');
+
+			const { entries } = await adminAuditStore.list({
+				targetType: 'UserBucket',
+				targetId: ADMIN_BUCKET_ID,
+				actor: user._id
+			});
+			const entry = entries.find((e) => e.action === 'bucket.update');
+			expect(entry?.viaClientId).toBe(ADMIN_MCP_CLIENT_ID);
+		} finally {
+			await getBucketStore().update(ADMIN_BUCKET_ID, { totpRequired: false });
+		}
+	});
+
+	it("refuses an agent the guarded administrators'-bucket setting the console refuses, for the same reason", async () => {
+		const { token, cookie } = await principal('super');
+
+		const agentAnswer = await rpc(
+			call('bucket_update', {
+				id: ADMIN_BUCKET_ID,
+				emailVerificationRequired: true
+			}),
+			token
+		);
+		const consoleAnswer = await elysia.handle(
+			new Request(`http://e.ly/admin/api/buckets/${ADMIN_BUCKET_ID}`, {
+				method: 'PATCH',
+				headers: { cookie, 'content-type': 'application/json' },
+				body: JSON.stringify({ emailVerificationRequired: true })
+			})
+		);
+		const consoleBody = (await consoleAnswer.json()) as { message: string };
+
+		expect(consoleAnswer.status).toBe(409);
+		expect(agentAnswer.result?.isError).toBe(true);
+		expect(JSON.stringify(agentAnswer.result)).toContain(consoleBody.message);
+		expect(
+			(await getBucketStore().find(ADMIN_BUCKET_ID))?.emailVerificationRequired
+		).toBe(false);
+	});
+
+	it("refuses the administrators' bucket to the end-user tools, even for a super administrator", async () => {
+		const { token } = await principal('super');
+
+		// Administrators are managed through their own tools; the reserved bucket is not a place end-user
+		// operations may reach.
+		expect(
+			await viaAgent('bucket_user_list', { id: ADMIN_BUCKET_ID }, token)
+		).toBe('forbidden');
+	});
+
+	it("hides the administrators' bucket from an agent acting for an administrator who is not a super administrator", async () => {
+		const { token, cookie } = await principal('plain');
+
 		expect(await viaAgent('bucket_get', { id: ADMIN_BUCKET_ID }, token)).toBe(
 			'forbidden'
 		);
 		expect(
-			await viaAgent('bucket_user_list', { id: ADMIN_BUCKET_ID }, token)
-		).toBe('forbidden');
-		expect(
 			await viaConsole(`/admin/api/buckets/${ADMIN_BUCKET_ID}`, cookie)
 		).toBe(403);
-
-		// It is not listed either, so an agent cannot discover it and try.
 		const listed = await rpc(call('bucket_list', {}), token);
 		expect(JSON.stringify(listed)).not.toContain(`"${ADMIN_BUCKET_ID}"`);
 	});

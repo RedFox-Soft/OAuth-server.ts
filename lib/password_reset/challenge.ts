@@ -10,7 +10,6 @@ import {
 	PasswordResetThrottlePayload
 } from './types.js';
 import type { User, UserBucket } from '../adapters/types.js';
-import { ADMIN_BUCKET_ID } from '../admin/consts.js';
 import { ISSUER } from '../configs/env.js';
 import { endSessionsForAccount } from '../helpers/cascade.js';
 import { canSignIn } from '../end_users/can_sign_in.js';
@@ -23,6 +22,7 @@ import {
 	type RateBounds
 } from '../helpers/rate_window.js';
 import { sendPasswordResetEmail } from '../mail/send.js';
+import { selfServiceResetAllowed } from './eligibility.js';
 import { ReplayDetection } from '../models/replay_detection.js';
 import {
 	RESET_TTL_SECONDS,
@@ -151,29 +151,17 @@ export async function request(
 	bucketId: string
 ): Promise<RequestOutcome> {
 	/*
-	 * The reserved admin bucket is not self-service. An end-user reset records no actor by design, and an
-	 * operator's credentials must not be changeable through a path with nothing to attribute — the
-	 * constitution puts every administrative change in the audit trail, so console passwords stay inside the
-	 * admin plane's audited route. `resolveBucketForClient` maps the reserved console client straight here,
-	 * so without this the console's own sign-in page would have offered exactly that path.
+	 * The door refuses first and the sign-in page no longer links to it; this holds for any path that did
+	 * not pass either. `resolveBucketForClient` maps the reserved console client straight to the admin
+	 * bucket, so without it the console's own sign-in page would offer an unaudited credential change.
 	 */
-	if (bucketId === ADMIN_BUCKET_ID) {
+	const bucket = await getBucketStore().find(bucketId);
+	if (!bucket || !selfServiceResetAllowed(bucketId, bucket)) {
 		return { ok: true, sent: false };
 	}
 
 	const user = await getUserStore(bucketId).findByEmail(email);
 	if (!user || !canSignIn(user)) {
-		return { ok: true, sent: false };
-	}
-
-	const bucket = await getBucketStore().find(bucketId);
-	/*
-	 * A bucket with no password door has no password to reset, and a reset is exactly how a password
-	 * would reach an account whose users are meant to sign in only through their identity provider —
-	 * around its factors and its offboarding. The door refuses first; this holds for any path that
-	 * did not pass it.
-	 */
-	if (!bucket || !bucket.passwordLogin) {
 		return { ok: true, sent: false };
 	}
 
@@ -230,7 +218,7 @@ export async function load(token: string): Promise<LoadOutcome> {
 
 	const bucket = await getBucketStore().find(challenge.bucketId);
 	// Also a link issued before the bucket closed its password door: it must not set a password now.
-	if (!bucket || !bucket.passwordLogin) {
+	if (!selfServiceResetAllowed(challenge.bucketId, bucket)) {
 		return { ok: false };
 	}
 

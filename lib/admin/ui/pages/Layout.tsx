@@ -101,7 +101,7 @@ export function Layout({ me }: { me: AdminContext | null }) {
 				);
 			case 'admins':
 				return isSuperAdmin ? (
-					<Admins />
+					<Admins onOpenSignInPolicy={() => setSelected('buckets')} />
 				) : (
 					<Projects
 						isSuperAdmin={false}

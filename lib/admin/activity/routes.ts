@@ -15,7 +15,7 @@ import {
 	resolveAdmin
 } from '../auth/rbac.js';
 import { loadBucketForEdit } from '../buckets/access.js';
-import { ADMIN_BUCKET_ID, DEFAULT_BUCKET_ID } from '../consts.js';
+import { reservedOf } from '../consts.js';
 import { now } from '../../activity/clock.js';
 import {
 	MONTH_PATTERN,
@@ -129,12 +129,6 @@ async function bucketToRead(
 
 function present(figure: PeriodFigure | null): figure is PeriodFigure {
 	return figure !== null;
-}
-
-function reservedOf(bucketId: string): 'default' | 'administrators' | null {
-	if (bucketId === DEFAULT_BUCKET_ID) return 'default';
-	if (bucketId === ADMIN_BUCKET_ID) return 'administrators';
-	return null;
 }
 
 export const activityRoutes = new Elysia({ name: 'admin-activity' })

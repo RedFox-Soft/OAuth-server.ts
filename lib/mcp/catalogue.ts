@@ -15,11 +15,7 @@ import {
 	CreateResourceBody,
 	UpdateResourceBody
 } from '../admin/resources/schema.js';
-import {
-	AdminSettingsBody,
-	CreateAdminBody,
-	UpdateAdminBody
-} from '../admin/users/schema.js';
+import { CreateAdminBody, UpdateAdminBody } from '../admin/users/schema.js';
 import {
 	ChangeBucketAddressBody,
 	CreateBucketBody,
@@ -141,7 +137,7 @@ export function pathArgName(tool: McpTool, param: string): string {
 }
 
 const catalogue = [
-	/* ---------------------------------------------------------------- reads (18) */
+	/* ---------------------------------------------------------------- reads (17) */
 	{
 		tool: 'whoami',
 		method: 'GET',
@@ -260,19 +256,6 @@ const catalogue = [
 			'The administrator accounts of this instance, each marked when it is a super administrator.'
 	},
 	{
-		tool: 'admin_settings_read',
-		method: 'GET',
-		path: '/admin/api/admins/settings',
-		action: null,
-		consequence: 'read',
-		superAdminOnly: true,
-		bodySchema: null,
-		querySchema: null,
-		pathParams: [],
-		summary:
-			"The sign-in policy of the administrator bucket itself. `totpRequired` says whether signing in to the console also needs a one-time code from an authenticator app. The bucket's other settings are deliberately not exposed."
-	},
-	{
 		tool: 'group_list',
 		method: 'GET',
 		path: '/admin/api/groups',
@@ -335,7 +318,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: [],
 		summary:
-			'The user buckets: every one for a super-administrator, otherwise those the caller manages. The reserved administrator bucket is never listed.'
+			'The user buckets: every one for a super-administrator, otherwise those the caller manages. For a super-administrator the list includes the administrators\' own bucket, marked `reserved: "administrators"`; nobody else sees it.'
 	},
 	{
 		tool: 'bucket_get',
@@ -348,7 +331,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'One user bucket: its name, owning group, and registration and verification settings. Its groups of end users are read with bucket_group_list.'
+			'One user bucket: its name, owning group, and registration and verification settings. Its groups of end users are read with bucket_group_list. A super-administrator may read the administrators\' own bucket here (`reserved: "administrators"`); its accounts are read with admin_list, not through the bucket.'
 	},
 	{
 		tool: 'bucket_activity_get',
@@ -815,25 +798,7 @@ const catalogue = [
 			'Permanently delete an OAuth client and revoke what was issued to it. Irreversible.'
 	},
 
-	/* -------------------------------------------- writes: administrators (4) */
-	{
-		tool: 'admin_settings_update',
-		method: 'PATCH',
-		path: '/admin/api/admins/settings',
-		action: 'admin.settings.update',
-		/*
-		 * Ordinary. Turning the second factor on locks nobody out — an administrator without an
-		 * authenticator is taken through enrolment at their next sign-in — and turning it off is not
-		 * destructive either, since enrolments are retained.
-		 */
-		consequence: 'ordinary',
-		superAdminOnly: true,
-		bodySchema: AdminSettingsBody,
-		querySchema: null,
-		pathParams: [],
-		summary:
-			"Require a one-time authenticator code for signing in to the administration console, on top of the password. Applies to every administrator; anyone without an authenticator sets one up at their next sign-in, so nobody is locked out. This also covers an agent obtaining a token interactively through the console's own client, so expect to supply a code."
-	},
+	/* -------------------------------------------- writes: administrators (3) */
 	{
 		tool: 'admin_create',
 		method: 'POST',
@@ -857,7 +822,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'Activate or deactivate an administrator. Never grants or withdraws super-administrator status — that is admin_super_grant and admin_super_withdraw.'
+			"Activate or deactivate an administrator, or correct their email address. A changed address must be verified again before the administrator can sign in while the administrators' bucket requires verification, and a super-administrator cannot change their own address while it does. Never grants or withdraws super-administrator status — that is admin_super_grant and admin_super_withdraw."
 	},
 	{
 		tool: 'admin_deactivate',
@@ -1055,7 +1020,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			"Change a bucket's name, or its registration, verification and second-factor settings. Editing the bucket entity needs manager access to the bucket itself, not merely to a project it backs. `totpRequired` governs password sign-in only — it is accepted but inert while `passwordLogin` is off, and it never gates a federated sign-in, so it is not a way to secure a bucket that signs in through an upstream provider."
+			"Change a bucket's name, or its registration, verification and second-factor settings. Editing the bucket entity needs manager access to the bucket itself, not merely to a project it backs. `totpRequired` governs password sign-in only — it is accepted but inert while `passwordLogin` is off, and it never gates a federated sign-in, so it is not a way to secure a bucket that signs in through an upstream provider. A super-administrator configures the administrators' own bucket here too: opening its registration lets anyone register a console account (the answer carries an advisory while verification is off); requiring verification is refused until mail delivery is configured and until the acting administrator has verified their own address; and turning password sign-in off is refused, since it is the console's only way in. Each refusal names its remedy."
 	},
 
 	/* ----------------------------------------------- writes: end-users (7) */
@@ -1635,6 +1600,13 @@ export const excludedConsoleOperations: readonly ExcludedConsoleOperation[] = [
 		absence: 'inapplicable',
 		reason:
 			'Ends a browser session, which an agent connection does not have. Session lifecycle, not a change to a managed entity.'
+	},
+	{
+		method: 'POST',
+		path: '/admin/api/me/verification',
+		absence: 'inapplicable',
+		reason:
+			'Mails the signed-in administrator a message that proves their own address. Only the person holding the mailbox can complete it, so an agent has nothing to do with the result. The administrator presses it in the console.'
 	},
 	{
 		method: 'PUT',

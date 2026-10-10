@@ -11,6 +11,16 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- The administrators' bucket is configured on the ordinary bucket settings by a super administrator:
+  open sign-up for other administrators (each gets a personal group and nothing else), require them to
+  verify their email (refused until mail delivery is configured and your own address is verified — the
+  console's "Verify my address" sends the message), and the second factor. A super administrator can
+  correct another administrator's address. In every bucket, signing in with the right password to an
+  unverified account now sends the link or code instead of only saying "check your inbox" (with "Send the link again" for a lost letter), and sign-in
+  pages link to registration and password reset only where the bucket allows them.
+  **Breaking for agents:** `GET`/`PATCH /admin/api/admins/settings` and the MCP tools
+  `admin_settings_read`/`admin_settings_update` are removed; use `bucket_get`/`bucket_update` on the
+  administrators' bucket. Spec 078.
 - The super administrator's **Usage** page is a dashboard: every bucket's monthly active users beside the
   customer that owns it (the group, or the group that owned it when it was deleted), a "by customer" view
   with owners as contacts, instance totals, 13-month and day-by-day charts, the buckets that changed sharply
@@ -60,6 +70,8 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- Two registrations for the same address arriving together could answer one of them with a server error;
+  both now get the same non-committal answer, in every bucket. Spec 078.
 - An agent calling a two-step admin tool without `confirm` — `bucket_address_change`, and now the move tools —
   receives the route's preview (the clients that will stop validating tokens, the projects that will move) as
   `preview`; it was answered only `conflict: the operation was refused`.

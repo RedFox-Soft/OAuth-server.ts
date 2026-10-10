@@ -72,7 +72,7 @@ read a refused request as a completed one.
 ## The table is load-bearing
 
 `lib/consts/admin_audit_routes.ts` enumerates all 27 audited routes with their action name and target
-type, plus the two deliberate exclusions. Both write to the caller's own session and to nothing else,
+type, plus the deliberate exclusions. Each touches only the caller's own standing and nothing else,
 which is the shared reason — the trail is a record of changes to managed entities, so an entry for
 something that changed none of them is a row an investigator has to read past:
 
@@ -82,6 +82,14 @@ something that changed none of them is a row an investigator has to read past:
   reaches every container without switching, so there is no access event to record. The question an
   entry would have answered — which scope a change was made from — is already answered by
   `ownerGroupId` on that change's own entry. See [[group-ownership]].
+- `POST /admin/api/me/verification` (spec 078) — mails the caller a message proving their own address.
+  Nothing changes until the mailbox holder completes it at the public verification endpoint, where there
+  is no administrator to attribute. See [[admin-bucket-settings]].
+
+The table also declares **non-route** audit actions (spec 078): `admin.register`, written with the
+bootstrap actor when a person registers an administrator account at the public registration page. It
+has no admin route, so it is declared beside the table rather than in it, and the drift guard keeps
+comparing the table with mounted routes only.
 
 It is not documentation:
 

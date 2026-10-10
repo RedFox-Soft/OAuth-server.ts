@@ -37,6 +37,13 @@ export async function loginServer(
 		 * failure mode a required parameter would have introduced across every existing call site.
 		 */
 		passwordLogin?: boolean;
+		registrationOpen?: boolean;
+		passwordReset?: boolean;
+		/*
+		 * Offers "send the link again" — only on a page the server rendered after proving the password of
+		 * an unverified account, never from anything in the request.
+		 */
+		verificationResend?: boolean;
 		providers?: { id: string; displayName: string }[];
 		/*
 		 * The pending authorization request's redirect_uri, which reaches this page's
@@ -52,6 +59,9 @@ export async function loginServer(
 	// submission must never be accompanied by the notice the page was reached with.
 	const notice = errorMessage ? undefined : options.notice;
 	const passwordLogin = options.passwordLogin !== false;
+	const registrationOpen = options.registrationOpen !== false;
+	const passwordReset = options.passwordReset !== false;
+	const verificationResend = options.verificationResend === true;
 	const providers = options.providers ?? [];
 
 	let html = await htmlTeamplate.text();
@@ -68,7 +78,16 @@ export async function loginServer(
 		 */
 		.replace(
 			'<!--app-props-->',
-			propsScript({ uid, errorMessage, notice, passwordLogin, providers })
+			propsScript({
+				uid,
+				errorMessage,
+				notice,
+				passwordLogin,
+				registrationOpen,
+				passwordReset,
+				verificationResend,
+				providers
+			})
 		)
 		.replace(
 			'<!--app-html-->',
@@ -80,6 +99,9 @@ export async function loginServer(
 							errorMessage={errorMessage}
 							notice={notice}
 							passwordLogin={passwordLogin}
+							registrationOpen={registrationOpen}
+							passwordReset={passwordReset}
+							verificationResend={verificationResend}
 							providers={providers}
 						/>
 					</ZeroRuntime>

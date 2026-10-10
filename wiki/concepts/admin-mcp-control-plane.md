@@ -196,7 +196,8 @@ The table distinguishes two kinds of absence, and the distinction is what makes 
 `withheld` entries are operations an agent could perform and an operator has decided it may not;
 `inapplicable` ones have no meaning for an agent at all — there is no browser session to end, nobody to
 authorize first-run setup, and no agent principal to accept a group invitation as, since acceptance is
-a person following a link in their own mail. Only the `withheld` ones reach the instructions, and they reach them by
+a person following a link in their own mail. "Verify my address" (spec 078) is inapplicable for the same
+reason: only the mailbox holder can complete it. Only the `withheld` ones reach the instructions, and they reach them by
 being filtered out of the table rather than named a second time. Naming them literally is the bug this
 replaced: the list read `['project_delete', 'bucket_delete']` directly beneath a comment claiming it
 could not disagree with the table, so a third withholding would have been refused correctly when

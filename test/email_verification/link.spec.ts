@@ -11,10 +11,12 @@ import {
 	sentEmails,
 	resetSentEmails,
 	lastEmail,
+	emailsTo,
 	extractVerifyUrl
 } from '../mail_capture.ts';
 import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { present } from 'test/shape.js';
+import { elysia } from 'lib/index.ts';
 
 const CLIENT_ID = 'verify-link-app';
 const PASSWORD = 'correct horse battery';
@@ -126,6 +128,50 @@ describe('email verification — link method', () => {
 		expect(await login(start2.uid, start2.cookie, email)).toBe(303);
 	});
 
+	it('sends a verification link, and says so, when an account that never received one signs in with the right password', async () => {
+		// Created before its bucket required verification: no message was ever sent to it.
+		const email = 'link-never-mailed@x.io';
+		await getUserStore(bucketId).create(
+			email,
+			await Bun.password.hash(PASSWORD)
+		);
+
+		const { uid, cookie } = await startInteraction();
+		const { response, error } = await agent
+			.ui({ uid })
+			.login.post(
+				{ username: email, password: PASSWORD },
+				{ headers: { cookie } }
+			);
+
+		expect(response.status).toBe(400);
+		expect(JSON.stringify(error?.value)).toContain(
+			'We sent a verification link'
+		);
+		expect(emailsTo(email)).toHaveLength(1);
+		expect(extractVerifyUrl(present(lastEmail(), 'lastEmail()'))).toBeDefined();
+	});
+
+	it('sends nothing, and keeps the link already sent working, when a registrant signs in before following it', async () => {
+		const email = 'link-signs-in-early@x.io';
+		await register(email);
+		const url = present(
+			extractVerifyUrl(present(lastEmail(), 'lastEmail()')),
+			'extractVerifyUrl(lastEmail())'
+		);
+
+		const start = await startInteraction();
+		expect(await login(start.uid, start.cookie, email)).toBe(400);
+		expect(emailsTo(email)).toHaveLength(1);
+
+		const token = present(
+			new URL(url).searchParams.get('token'),
+			"new URL(url).searchParams.get('token')"
+		);
+		const res = await agent['verify-email'].get({ query: { token } });
+		expect(res.response.status).toBe(200);
+	});
+
 	it('rejects an unknown or already-used token', async () => {
 		const unknown = await agent['verify-email'].get({
 			query: { token: 'not-a-real-token' }
@@ -148,6 +194,93 @@ describe('email verification — link method', () => {
 		// second use of the same token is refused (single-use)
 		const second = await agent['verify-email'].get({ query: { token } });
 		expect(second.response.status).toBe(400);
+	});
+
+	describe('sending the link again from the sign-in page', () => {
+		async function resend(uid: string, cookie: string) {
+			const res = await elysia.handle(
+				new Request(`http://e.ly/ui/${uid}/verification/resend`, {
+					method: 'POST',
+					headers: { cookie }
+				})
+			);
+			return {
+				status: res.status,
+				location: res.headers.get('location') ?? ''
+			};
+		}
+
+		async function signInEarly(email: string) {
+			await register(email);
+			const start = await startInteraction();
+			const { error } = await agent
+				.ui({ uid: start.uid })
+				.login.post(
+					{ username: email, password: PASSWORD },
+					{ headers: { cookie: start.cookie } }
+				);
+			return { ...start, page: JSON.stringify(error?.value) };
+		}
+
+		it('offers to send the link again when sign-in is refused for an unverified address', async () => {
+			const { uid, page } = await signInEarly('link-offered-again@x.io');
+
+			expect(page).toContain(`/ui/${uid}/verification/resend`);
+		});
+
+		it('sends a fresh link that verifies the address when the person who proved the password asks for it', async () => {
+			const email = 'link-sent-again@x.io';
+			const { uid, cookie } = await signInEarly(email);
+
+			const res = await resend(uid, cookie);
+
+			expect(res.status).toBe(303);
+			expect(res.location).toBe(`/ui/${uid}/login?notice=verify_resent`);
+			const mails = emailsTo(email);
+			expect(mails).toHaveLength(2);
+			const url = present(
+				extractVerifyUrl(present(mails[1], 'second message')),
+				'link'
+			);
+			const token = present(new URL(url).searchParams.get('token'), 'token');
+			const opened = await agent['verify-email'].get({ query: { token } });
+			expect(opened.response.status).toBe(200);
+		});
+
+		it('lands on the sign-in page saying a new link was sent, still offering to send it again', async () => {
+			const { uid, cookie } = await signInEarly('link-lands-back@x.io');
+			const { location } = await resend(uid, cookie);
+
+			const page = await elysia.handle(
+				new Request(`http://e.ly${location}`, { headers: { cookie } })
+			);
+			const html = await page.text();
+
+			expect(page.status).toBe(200);
+			expect(html).toContain('We sent you a new verification link');
+			expect(html).toContain(`/ui/${uid}/verification/resend`);
+		});
+
+		it('sends nothing, and says a message went recently, when asked again within the cooldown', async () => {
+			const email = 'link-sent-twice@x.io';
+			const { uid, cookie } = await signInEarly(email);
+			await resend(uid, cookie);
+
+			const again = await resend(uid, cookie);
+
+			expect(again.location).toBe(`/ui/${uid}/login?notice=verify_recent`);
+			expect(emailsTo(email)).toHaveLength(2);
+		});
+
+		it('sends nothing for a sign-in that has not proved a password', async () => {
+			const { uid, cookie } = await startInteraction();
+			const before = sentEmails.length;
+
+			const res = await resend(uid, cookie);
+
+			expect(res.location).toBe(`/ui/${uid}/login`);
+			expect(sentEmails.length).toBe(before);
+		});
 	});
 });
 

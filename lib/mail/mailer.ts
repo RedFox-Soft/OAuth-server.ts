@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import { getSmtpSettingsStore } from '../adapters/index.js';
+import type { SmtpSettings } from '../adapters/types.js';
 
 export interface OutgoingEmail {
 	to: string;
@@ -25,14 +26,28 @@ export function resetSentEmails(): void {
 
 const isTest = process.env.NODE_ENV === 'test';
 
+async function configuredSmtp(): Promise<SmtpSettings | null> {
+	const smtp = await getSmtpSettingsStore().get();
+	return smtp && smtp.host && smtp.fromEmail ? smtp : null;
+}
+
+/*
+ * Whether a message could be sent at all, by the same test `deliver` applies, so a setting that refuses to
+ * turn on without mail and the send that would fail without it cannot disagree. Reads the store even under
+ * NODE_ENV=test — the test capture below says nothing about whether an operator configured anything.
+ */
+export async function mailDeliveryConfigured(): Promise<boolean> {
+	return (await configuredSmtp()) !== null;
+}
+
 export async function deliver(email: OutgoingEmail): Promise<void> {
 	if (isTest) {
 		sentEmails.push(email);
 		return;
 	}
 
-	const smtp = await getSmtpSettingsStore().get();
-	if (!smtp || !smtp.host || !smtp.fromEmail) {
+	const smtp = await configuredSmtp();
+	if (!smtp) {
 		throw new MailNotConfiguredError();
 	}
 

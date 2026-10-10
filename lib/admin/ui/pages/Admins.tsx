@@ -1,23 +1,21 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
 	Table,
+	Alert,
 	Button,
-	Card,
 	Modal,
 	Form,
 	Input,
 	Popconfirm,
-	Space,
 	Switch,
 	Tag,
-	Typography,
 	message
 } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import type { User } from '../../../adapters/types.js';
 
 /* What the list answers: the account without its password, and whether it holds the instance privilege. */
-type AdminUser = Pick<User, '_id' | 'email' | 'active'> & {
+type AdminUser = Pick<User, '_id' | 'email' | 'active' | 'verified'> & {
 	superAdmin: boolean;
 };
 
@@ -26,28 +24,26 @@ interface CreateAdminValues {
 	password: string;
 }
 
-export function Admins() {
+export function Admins({
+	onOpenSignInPolicy
+}: {
+	onOpenSignInPolicy?: () => void;
+} = {}) {
 	const [admins, setAdmins] = useState<AdminUser[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [open, setOpen] = useState(false);
 	const [creating, setCreating] = useState(false);
-	const [totpRequired, setTotpRequired] = useState(false);
-	const [savingTotp, setSavingTotp] = useState(false);
 	const [form] = Form.useForm<CreateAdminValues>();
+	const [editingEmail, setEditingEmail] = useState<AdminUser | null>(null);
+	const [savingEmail, setSavingEmail] = useState(false);
+	const [emailForm] = Form.useForm<{ email: string }>();
 
 	// Every state write follows an await, so the mount effect calls this without setting
 	// `loading` first; `load` is the reload, which does.
 	const fetchAdmins = useCallback(async () => {
 		try {
-			const [list, settings] = await Promise.all([
-				fetch('/admin/api/admins'),
-				fetch('/admin/api/admins/settings')
-			]);
+			const list = await fetch('/admin/api/admins');
 			if (list.ok) setAdmins((await list.json()) as AdminUser[]);
-			if (settings.ok) {
-				const body = (await settings.json()) as { totpRequired: boolean };
-				setTotpRequired(body.totpRequired);
-			}
 		} finally {
 			setLoading(false);
 		}
@@ -55,32 +51,6 @@ export function Admins() {
 	function load() {
 		setLoading(true);
 		return fetchAdmins();
-	}
-
-	async function onToggleTotp(next: boolean) {
-		setSavingTotp(true);
-		try {
-			const res = await fetch('/admin/api/admins/settings', {
-				method: 'PATCH',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ totpRequired: next })
-			});
-			if (!res.ok) {
-				const body = (await res.json().catch(() => null)) as {
-					message?: string;
-				} | null;
-				message.error(body?.message || 'failed to save the sign-in policy');
-				return;
-			}
-			setTotpRequired(next);
-			message.success(
-				next
-					? 'Administrators will be asked for an authenticator code from their next sign-in'
-					: 'Administrators will sign in with a password alone'
-			);
-		} finally {
-			setSavingTotp(false);
-		}
 	}
 
 	useEffect(() => {
@@ -104,6 +74,35 @@ export function Admins() {
 			return;
 		}
 		await load();
+	}
+
+	/*
+	 * Corrects an administrator's address. The server leaves the account unverified at the new one and
+	 * refuses changing your own while administrators must verify theirs; either refusal is shown as is.
+	 */
+	async function onChangeEmail(target: AdminUser, email: string) {
+		setSavingEmail(true);
+		try {
+			const res = await fetch(
+				`/admin/api/admins/${encodeURIComponent(target._id)}`,
+				{
+					method: 'PATCH',
+					headers: { 'content-type': 'application/json' },
+					body: JSON.stringify({ email })
+				}
+			);
+			if (!res.ok) {
+				const body = (await res.json().catch(() => null)) as {
+					message?: string;
+				} | null;
+				message.error(body?.message || 'failed to change the address');
+				return;
+			}
+			setEditingEmail(null);
+			await load();
+		} finally {
+			setSavingEmail(false);
+		}
 	}
 
 	async function onCreate(values: CreateAdminValues) {
@@ -132,46 +131,27 @@ export function Admins() {
 	return (
 		<>
 			{/*
-			 * The reserved admin bucket's own sign-in policy. It lives here rather than on a bucket
-			 * page because the admin bucket is deliberately absent from the bucket list — every other
-			 * route refuses it, pointing at this namespace instead.
+			 * How administrators sign in — registration, email verification, an authenticator — is the
+			 * console's own bucket's settings, edited where every bucket's are. Pointed at from here because
+			 * this is where an operator looks for anything about administrators.
 			 */}
-			<Card
-				size="small"
+			<Alert
+				type="info"
+				showIcon
 				style={{ marginBottom: 16 }}
-			>
-				<Space
-					align="start"
-					style={{ justifyContent: 'space-between', width: '100%' }}
-				>
-					<Space
-						orientation="vertical"
-						size={2}
-					>
-						<Typography.Text strong>
-							Require an authenticator app
-						</Typography.Text>
-						{/*
-						 * Both consequences an operator cannot see from here: nobody is locked out, and
-						 * the console's own client is how an agent gets a token too.
-						 */}
-						<Typography.Text
-							type="secondary"
-							style={{ fontSize: 12 }}
+				title="Sign-in policy for administrators"
+				description="Whether people may register an administrator account, whether administrators must verify their email, and whether an authenticator app is required are set on the Administrators bucket."
+				action={
+					onOpenSignInPolicy && (
+						<Button
+							size="small"
+							onClick={onOpenSignInPolicy}
 						>
-							Signing in to this console needs a 6-digit code as well as a
-							password. Administrators without an authenticator set one up at
-							their next sign-in, so nobody is locked out — including agents
-							signing in through the console&rsquo;s own client.
-						</Typography.Text>
-					</Space>
-					<Switch
-						checked={totpRequired}
-						loading={savingTotp}
-						onChange={onToggleTotp}
-					/>
-				</Space>
-			</Card>
+							Open buckets
+						</Button>
+					)
+				}
+			/>
 			<div style={{ marginBottom: 16, textAlign: 'right' }}>
 				<Button
 					type="primary"
@@ -187,6 +167,16 @@ export function Admins() {
 				dataSource={admins}
 				columns={[
 					{ title: 'Email', dataIndex: 'email' },
+					{
+						title: 'Email verified',
+						dataIndex: 'verified',
+						render: (verified: boolean) =>
+							verified ? (
+								<Tag color="green">verified</Tag>
+							) : (
+								<Tag>unverified</Tag>
+							)
+					},
 					{
 						title: 'Super administrator',
 						dataIndex: 'superAdmin',
@@ -214,9 +204,48 @@ export function Admins() {
 						dataIndex: 'active',
 						render: (active: boolean) =>
 							active ? <Tag color="green">active</Tag> : <Tag>inactive</Tag>
+					},
+					{
+						title: '',
+						render: (_: unknown, row: AdminUser) => (
+							<Button
+								size="small"
+								onClick={() => {
+									emailForm.setFieldsValue({ email: row.email });
+									setEditingEmail(row);
+								}}
+							>
+								Change email
+							</Button>
+						)
 					}
 				]}
 			/>
+			<Modal
+				title="Change email"
+				open={editingEmail !== null}
+				onCancel={() => setEditingEmail(null)}
+				onOk={() => emailForm.submit()}
+				confirmLoading={savingEmail}
+				destroyOnHidden
+			>
+				<Form<{ email: string }>
+					form={emailForm}
+					layout="vertical"
+					onFinish={({ email }) => {
+						if (editingEmail) void onChangeEmail(editingEmail, email);
+					}}
+				>
+					<Form.Item
+						name="email"
+						label="Email"
+						rules={[{ required: true, type: 'email' }]}
+						extra="The administrator must verify the new address before signing in, if administrators are required to verify theirs."
+					>
+						<Input autoComplete="off" />
+					</Form.Item>
+				</Form>
+			</Modal>
 			<Modal
 				title="New admin"
 				open={open}

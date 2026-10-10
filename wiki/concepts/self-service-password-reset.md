@@ -80,6 +80,11 @@ changing console credentials from the console's own sign-in page. `request()` re
 same non-committal page as any other unresolvable address; operator password changes stay in the audited
 admin-plane route. The next end-user feature mounted under `/ui` will have to make the same call.
 
+Since spec 078 the rule is one predicate, `selfServiceResetAllowed` (`lib/password_reset/eligibility.ts`),
+read by the request, the link and the sign-in page — which no longer shows "Forgot password" where the
+bucket refuses it, so the console's sign-in page stopped linking to this refusal
+([[admin-bucket-settings]]).
+
 A bucket with `passwordLogin: false` is refused the same way, at both ends (added 2026-09-29): `request()`
 issues nothing for it and `load()` refuses a link that names it, so a link issued before the bucket closed
 its password door cannot set one afterwards. The door in front refuses first; this is what holds for any

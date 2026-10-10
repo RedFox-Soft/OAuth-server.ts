@@ -140,16 +140,6 @@ const routes = [
 	},
 
 	{
-		/*
-		 * The reserved admin bucket's own policy. `targetType` is the bucket rather than an
-		 * administrator: the change is to the bucket record, and it applies to every operator in it.
-		 */
-		action: 'admin.settings.update',
-		method: 'PATCH',
-		path: '/admin/api/admins/settings',
-		targetType: 'UserBucket'
-	},
-	{
 		action: 'admin.create',
 		method: 'POST',
 		path: '/admin/api/admins',
@@ -579,17 +569,37 @@ const routes = [
 
 export const auditedAdminRoutes: readonly AuditedAdminRoute[] = routes;
 
-export type AuditAction = (typeof routes)[number]['action'];
-export type AuditTargetType = (typeof routes)[number]['targetType'];
+/*
+ * Audited actions that no admin route performs. Registering an administrator account happens at the
+ * public registration page, not under /admin/api, yet it creates an account that can sign in to the
+ * console — exactly the kind of change the trail exists for. Declared here rather than bolted onto the
+ * route table so the drift guard, which compares the table against mounted admin routes, keeps meaning
+ * what it says.
+ */
+const nonRouteActions = [
+	{ action: 'admin.register', targetType: 'AdminUser' }
+] as const satisfies readonly { action: string; targetType: string }[];
+
+export const nonRouteAuditActions: readonly {
+	readonly action: string;
+	readonly targetType: string;
+}[] = nonRouteActions;
+
+export type AuditAction =
+	| (typeof routes)[number]['action']
+	| (typeof nonRouteActions)[number]['action'];
+export type AuditTargetType =
+	| (typeof routes)[number]['targetType']
+	| (typeof nonRouteActions)[number]['targetType'];
 
 /*
  * Mutating admin routes that deliberately write no audit entry. Enumerated rather than defaulted, so
  * excluding one is a reviewable edit and the drift guard can pin the set exactly.
  *
- * Both write to the caller's own session and to nothing else, which is the shared reason: the trail is
+ * Each touches only the caller's own standing and nothing else, which is the shared reason: the trail is
  * a record of changes to managed entities, and an entry for something that changed none of them is a
- * row an investigator has to read past. Neither exclusion is surfaced to a caller, so the reason lives
- * here rather than as a field.
+ * row an investigator has to read past. No exclusion is surfaced to a caller, so the reason lives here
+ * rather than as a field.
  *
  * `POST /admin/api/logout` ends the caller's own session: session lifecycle, not a change to a managed
  * entity. Authentication-event logging would be its own feature.
@@ -599,13 +609,18 @@ export type AuditTargetType = (typeof routes)[number]['targetType'];
  * every container without switching — so there is no access event to record. The question an entry
  * would have answered, which scope a change was made from, is already answered by `ownerGroupId` on
  * that change's own entry, recorded at the time and never re-derived.
+ *
+ * `POST /admin/api/me/verification` mails the caller a verification message for their own address. It
+ * changes nothing; the account becomes verified at the public verification endpoint, where whoever holds
+ * the mailbox completes it, so there is no administrative change here to attribute.
  */
 export const excludedAdminRoutes: readonly {
 	readonly method: AuditedMethod;
 	readonly path: string;
 }[] = [
 	{ method: 'POST', path: '/admin/api/logout' },
-	{ method: 'PUT', path: '/admin/api/scope' }
+	{ method: 'PUT', path: '/admin/api/scope' },
+	{ method: 'POST', path: '/admin/api/me/verification' }
 ];
 
 /*
@@ -645,19 +660,22 @@ export const SENTRY_TARGET_ID = 'sentry';
  */
 export const AUDIT_ACTION_PATTERN = /^[a-z]+(?:\.[a-z]+)+$/;
 
-const routeByAction = new Map<string, AuditedAdminRoute>(
-	routes.map((route) => [route.action, route])
+const targetTypeByAction = new Map<string, string>(
+	[...routes, ...nonRouteActions].map((entry) => [
+		entry.action,
+		entry.targetType
+	])
 );
 
 // The only source of an entry's targetType. Callers pass the action; they cannot pass a target type.
 export function auditTargetTypeFor(action: AuditAction): string {
-	const route = routeByAction.get(action);
-	if (!route) {
-		// Unreachable while AuditAction is derived from this table; kept so a future non-literal
+	const targetType = targetTypeByAction.get(action);
+	if (!targetType) {
+		// Unreachable while AuditAction is derived from these tables; kept so a future non-literal
 		// caller fails loudly instead of writing an entry with an empty target type.
 		throw new Error(`no audited admin route declares the action: ${action}`);
 	}
-	return route.targetType;
+	return targetType;
 }
 
 export function auditRouteFor(

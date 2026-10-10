@@ -6,6 +6,7 @@ import {
 } from '../consts/known_providers.js';
 import { resolveBucketForRequest } from '../admin/auth/resolveBucket.js';
 import type { RequestBucket } from '../configs/issuer.js';
+import { selfServiceResetAllowed } from '../password_reset/eligibility.js';
 
 /*
  * What the login page needs to know about a bucket in order to render itself: whether it accepts a password
@@ -30,6 +31,13 @@ export interface LoginOptions {
 	 */
 	totpRequired: boolean;
 	/*
+	 * Whether the page may link to registration and to password reset. Read here, from the bucket the doors
+	 * themselves resolve, so the page can never offer a door its own bucket keeps shut — the console's
+	 * sign-in page linked to both for as long as the admin bucket refused both.
+	 */
+	registrationOpen: boolean;
+	passwordReset: boolean;
+	/*
 	 * Only what the page renders: an id to build the link from, a label to show, and — when the upstream is
 	 * one this server recognises — which mark and wording its own branding requires. Never the credentials.
 	 *
@@ -52,6 +60,9 @@ export async function loginOptionsForBucket(
 		// bucket predating the field must get, and what makes an unreadable bucket fail open on this
 		// rather than locking everyone out of a bucket nobody configured.
 		totpRequired: bucket?.totpRequired === true,
+		// A bucket that cannot be read counts as open, exactly as the registration door treats it.
+		registrationOpen: bucket?.registrationOpen !== false,
+		passwordReset: selfServiceResetAllowed(bucketId, bucket),
 		/*
 		 * Recognition keys on the stored issuer, never on how the provider came to be configured — nothing
 		 * records that, deliberately. So a Google provider somebody typed in by hand long before the

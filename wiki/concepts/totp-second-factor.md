@@ -155,29 +155,15 @@ sign-in still asks for a code.
 ## The administrator bucket needs its own door
 
 The console signs in through this same flow — `resolveBucketForRequest` maps the reserved console
-client straight to the admin bucket — so enforcement works there for free. Reaching the *setting* does
-not: `assertNotReserved` (`lib/admin/buckets/access.ts`) refuses the admin bucket on both
-`loadBucketForEdit` and `loadBucketForUsers`, and its 403 names `/admin/api/admins` as where that
-bucket is managed. Until `GET`/`PATCH /admin/api/admins/settings` existed, that promise had nothing
-behind it and administrators could not be put behind a second factor at all.
+client straight to the admin bucket — so enforcement works there for free. Reaching the *setting* did
+not: `assertNotReserved` (`lib/admin/buckets/access.ts`) refused the admin bucket on every generic
+bucket route, so a one-field `GET`/`PATCH /admin/api/admins/settings` carrying `totpRequired` alone was
+added, every other field excluded as a possible console brick.
 
-**That endpoint carries `totpRequired` and nothing else, and the exclusions are the design.** The
-bucket has nine settings; one of them is a console brick:
-
-`emailVerificationRequired` must never be true for this bucket. Both paths that create an
-administrator write `verified: false` — `POST /admin/api/admins` and the first-run bootstrap
-(`lib/admin/auth/setup.ts`) — and no verification mail is ever sent here, because `issueAndSend` is
-reached only from the self-service registration route, which this bucket refuses. Setting it would
-refuse every administrator at the door with no way to clear it short of editing the database. It is
-now pinned at the point of enforcement (`verificationGates` in `lib/interactions/index.ts`) rather
-than left to the schema, because the flag only has to become settable once.
-
-The rest fail on their own merits. `passwordLogin: false` is a permanent lockout — this bucket accepts
-no providers, and `assertSomeWayToSignIn` looks for an *enabled provider*, so it would not catch it.
-`registrationOpen: true` would let anyone who can reach `/admin/login` create a row in the reserved
-bucket through the ordinary registration page. `managedBy` is meaningless where access is by group membership, `federation` is
-refused by its own routes and is a separate decision, and `name` is cosmetic — though no longer
-invisible, since it is the issuer label an authenticator app displays.
+*Superseded in spec 078:* that endpoint and its two MCP tools are gone. A super administrator sets
+`totpRequired` — and registration and email verification — on the ordinary bucket settings, through a
+narrow loader that admits this bucket, with a guard on each setting that could shut the console
+([[admin-bucket-settings]]). The value always lived on the bucket record, so nothing migrated.
 
 Turning it on locks nobody out: an administrator without an authenticator meets enrolment at their
 next sign-in, the same path that brings any existing account under the requirement. It does also

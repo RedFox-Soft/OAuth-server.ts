@@ -212,8 +212,8 @@ describe('buckets API', () => {
 		expect(res.status).toBe(403);
 	});
 
-	it('rejects managing the reserved admin bucket', async () => {
-		const cookie = await superCookie();
+	it("keeps the administrators' bucket out of reach of an administrator who is not a super administrator", async () => {
+		const { cookie } = await sessionCookieFor('plain');
 		const got = await client.admin.api
 			.buckets({ id: ADMIN_BUCKET_ID })
 			.get({ headers: { cookie } });

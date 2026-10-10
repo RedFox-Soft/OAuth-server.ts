@@ -59,6 +59,19 @@ export function isUndeletableBucket(bucketId: string): boolean {
 }
 
 /*
+ * Which reserved bucket an id names, if any. Read by the activity figures and by the bucket routes, which
+ * mark the administrators' bucket on the response so the console and an agent learn "this is the console's
+ * own bucket" from what they were sent rather than by knowing its id.
+ */
+export function reservedOf(
+	bucketId: string
+): 'default' | 'administrators' | null {
+	if (bucketId === DEFAULT_BUCKET_ID) return 'default';
+	if (bucketId === ADMIN_BUCKET_ID) return 'administrators';
+	return null;
+}
+
+/*
  * The group that owns containers no administrator owns. Reachable only by super administrators, and
  * exempt from the at-least-one-owner rule for the same reason the reserved admin project and bucket
  * are exempt from the group model: it is a holding area, not a tenant.

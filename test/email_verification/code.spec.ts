@@ -93,6 +93,28 @@ describe('email verification — code method', () => {
 		expect(sentEmails.length).toBe(1);
 	});
 
+	it('takes an account that never received a code to the code page with a fresh one when it signs in with the right password', async () => {
+		const email = 'code-never-mailed@x.io';
+		await getUserStore(bucketId).create(
+			email,
+			await Bun.password.hash(PASSWORD)
+		);
+
+		const { uid, cookie } = await startInteraction();
+		const { response } = await agent
+			.ui({ uid })
+			.login.post(
+				{ username: email, password: PASSWORD },
+				{ headers: { cookie } }
+			);
+
+		expect(response.status).toBe(303);
+		expect(getHeader(response, 'location')).toStartWith(
+			'/verify-email/code?ref='
+		);
+		expect(extractCode(present(lastEmail(), 'lastEmail()'))).toMatch(/^\d{6}$/);
+	});
+
 	it('rejects a wrong code then accepts the correct one', async () => {
 		const email = 'code-verify@x.io';
 		const { ref, code } = await registerForCode(email);

@@ -25,7 +25,8 @@ import {
 } from 'lib/federation/pages.js';
 import {
 	loginOptionsForBucket,
-	loginOptionsForClient
+	loginOptionsForClient,
+	type LoginOptions
 } from './loginOptions.js';
 import {
 	clearFailures,
@@ -93,13 +94,19 @@ import { Session } from 'lib/models/session.js';
 import { DeviceCode } from 'lib/models/device_code.js';
 import { Interaction } from 'lib/models/interaction.js';
 import { getUserStore, getBucketStore } from 'lib/adapters/index.js';
-import { issueAndSend } from 'lib/verification/challenge.js';
+import {
+	DuplicateEndUserError,
+	type User,
+	type UserBucket
+} from 'lib/adapters/types.js';
+import { issueAndSend, sendOnDemand } from 'lib/verification/challenge.js';
 import { request as requestPasswordReset } from 'lib/password_reset/challenge.js';
 import { resetRequestPage, resetRequestAcceptedPage } from './resetPages.js';
 import { Grant } from 'lib/models/grant.js';
 import { Client, redirectUriAllowed } from 'lib/models/client.js';
 import { resolveBucketForRequest } from 'lib/admin/auth/resolveBucket.js';
 import { ADMIN_BUCKET_ID } from 'lib/admin/consts.js';
+import { registeredAdministrator } from 'lib/admin/administrators.js';
 import {
 	buildConsentView,
 	documentIdentityFor,
@@ -108,6 +115,9 @@ import {
 import {
 	NOTICE_FEDERATION_LINK,
 	NOTICE_VERIFY,
+	NOTICE_VERIFY_RECENT,
+	NOTICE_VERIFY_RESENT,
+	NOTICE_VERIFY_UNSENT,
 	resolveNotice
 } from './notices.js';
 import {
@@ -516,31 +526,53 @@ async function passwordDoorClosed(
 }
 
 /*
- * Whether this bucket refuses an unverified account at the door.
+ * A correct password for an account that has not proven its address. It is told what happened and sent
+ * what it needs, rather than pointed at an inbox: an account that existed before its bucket required
+ * verification was never sent anything, and "check your inbox" was a dead end for it.
  *
- * The reserved admin bucket never does, and that is a lockout guard rather than a preference. Both
- * paths that create an administrator write `verified: false` — `POST /admin/api/admins` and the
- * first-run bootstrap — and no verification mail is ever sent for this bucket, because `issueAndSend`
- * is reached only from the self-service registration route, which this bucket refuses. So the flag
- * being true here would refuse every administrator with nothing they could do about it, and no way
- * back short of editing the database.
- *
- * The same shape lib/password_reset/challenge.ts uses to keep the reserved bucket out of the
- * self-service reset, and for a related reason: an end-user flow that assumes a mailbox does not
- * apply to a bucket whose accounts are provisioned by other operators.
- *
- * Written as a predicate rather than inline because the federation callback asks the same question a
- * few hundred lines below. It does not use this yet — the admin bucket accepts no providers, so that
- * path is unreachable for it — but the seed calls a second operator identity source "a separate
- * decision", and on the day that decision is made this is the thing that should already be there.
+ * Reachable only after the password was proven, so naming the address and saying a message went to it
+ * reveals nothing an attacker did not already have.
  */
-function verificationGates(
-	bucket: { emailVerificationRequired?: boolean } | null,
-	bucketId: string
-): boolean {
-	return (
-		bucket?.emailVerificationRequired === true && bucketId !== ADMIN_BUCKET_ID
-	);
+async function unverifiedAtSignIn(
+	uid: string,
+	interaction: Interaction,
+	user: Pick<User, '_id' | 'email'>,
+	bucket: UserBucket,
+	loginOptions: LoginOptions
+): Promise<Response> {
+	const sent = await sendOnDemand(user, bucket, { reuseOutstanding: true });
+	if (
+		(sent.outcome === 'sent' || sent.outcome === 'outstanding') &&
+		sent.method === 'code'
+	) {
+		return Response.redirect(
+			`/verify-email/code?ref=${encodeURIComponent(sent.id)}`,
+			303
+		);
+	}
+	/*
+	 * Remembered so the page can offer "send the link again" — for the person whose letter went astray
+	 * while the link it carried is still valid, who otherwise could only wait for it to expire.
+	 */
+	interaction.payload.pendingVerification = {
+		accountId: user._id,
+		bucketId: bucket._id
+	};
+	await interaction.persist();
+	const errorMessage =
+		sent.outcome === 'sent'
+			? `We sent a verification link to ${user.email}. Follow it, then sign in.`
+			: sent.outcome === 'outstanding'
+				? `Please verify your email before signing in. Follow the link we sent to ${user.email}.`
+				: sent.outcome === 'rate_limited'
+					? 'A verification message was sent recently. Check your inbox.'
+					: 'We could not send the verification message. Try again later.';
+	return loginServer(uid, {
+		errorMessage,
+		verificationResend: true,
+		handOffTo: redirectUriOf(interaction),
+		...loginOptions
+	});
 }
 
 /* The client that began an interaction — the only trustworthy route to a bucket. */
@@ -713,6 +745,9 @@ export const ui = new Elysia()
 			const clientId = clientIdOf(interaction);
 			return loginServer(uid, {
 				notice: resolveNotice(query.notice),
+				// Only once this sign-in has proved the password of an unverified account (see the resend route).
+				verificationResend:
+					interaction.payload.pendingVerification !== undefined,
 				handOffTo: redirectUriOf(interaction),
 				...(await loginOptionsForClient(
 					clientId,
@@ -818,13 +853,19 @@ export const ui = new Elysia()
 				return refuse();
 			}
 			const loginBucket = await getBucketStore().find(bucketId);
-			if (verificationGates(loginBucket, bucketId) && !user.verified) {
-				return loginServer(uid, {
-					errorMessage:
-						'Please verify your email before signing in. Check your inbox for the verification message.',
-					handOffTo: redirectUriOf(interaction),
-					...loginOptions
-				});
+			/*
+			 * The administrators' bucket is gated like any other. Its lockout guard sits at the setting —
+			 * the requirement cannot be turned on without mail delivery, or by an administrator whose own
+			 * address is unproven — so the door has no exception to make.
+			 */
+			if (loginBucket?.emailVerificationRequired === true && !user.verified) {
+				return unverifiedAtSignIn(
+					uid,
+					interaction,
+					user,
+					loginBucket,
+					loginOptions
+				);
 			}
 			/*
 			 * Last, after every refusal above. The order is the point: an inactive or unverified account
@@ -1258,6 +1299,38 @@ export const ui = new Elysia()
 			query: t.Object({ ref: t.String() })
 		}
 	)
+	/*
+	 * "Send the link again", for a sign-in that already proved the password of an unverified account.
+	 * It takes nothing from the request: the account is the one this interaction recorded, so the button
+	 * can mail only the person who just typed that account's password, and only within the resend
+	 * cooldown and daily cap. Always a fresh link — asking says the last one did not arrive.
+	 */
+	.post(
+		'ui/:uid/verification/resend',
+		async ({ params: { uid }, interaction }) => {
+			const pending = interaction.payload.pendingVerification;
+			const bucket = pending
+				? await getBucketStore().find(pending.bucketId)
+				: null;
+			const user =
+				pending && bucket
+					? await getUserStore(pending.bucketId).find(pending.accountId)
+					: null;
+			if (!bucket || !user || user.verified || !canSignIn(user)) {
+				return Response.redirect(buildUILoginPath(uid), 303);
+			}
+			const sent = await sendOnDemand(user, bucket, {
+				reuseOutstanding: false
+			});
+			const notice =
+				sent.outcome === 'sent' || sent.outcome === 'outstanding'
+					? NOTICE_VERIFY_RESENT
+					: sent.outcome === 'rate_limited'
+						? NOTICE_VERIFY_RECENT
+						: NOTICE_VERIFY_UNSENT;
+			return Response.redirect(buildUILoginPath(uid, notice), 303);
+		}
+	)
 	.get('ui/:uid/forgot-password', async ({ params: { uid }, interaction }) => {
 		const closed = await passwordDoorClosed(interaction, uid);
 		// There is no password to reset, so offering the form would be a dead end dressed as help.
@@ -1366,11 +1439,27 @@ export const ui = new Elysia()
 				return Response.redirect(`/ui/${uid}/login`, 303);
 			}
 
-			const user = await store.create(
-				body.email,
-				await Bun.password.hash(body.password),
-				!verificationRequired
-			);
+			let user;
+			try {
+				user = await store.create(
+					body.email,
+					await Bun.password.hash(body.password),
+					!verificationRequired
+				);
+			} catch (err) {
+				/*
+				 * Two registrations for one address can both pass the check above; the store's uniqueness
+				 * refuses the second. It gets the same answer the check gives, so a race says no more about
+				 * which addresses exist than a lone request does.
+				 */
+				if (err instanceof DuplicateEndUserError) {
+					return Response.redirect(`/ui/${uid}/login`, 303);
+				}
+				throw err;
+			}
+			if (bucketId === ADMIN_BUCKET_ID) {
+				await registeredAdministrator(user);
+			}
 
 			if (verificationRequired && bucket) {
 				try {

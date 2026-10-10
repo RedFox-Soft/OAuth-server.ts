@@ -195,6 +195,7 @@ describe('route classification', () => {
 			'GET /device',
 			'POST /device',
 			'POST /ui/:uid/login',
+			'POST /ui/:uid/verification/resend',
 			'POST /ui/:uid/registration',
 			'POST /ui/:uid/forgot-password',
 			'POST /ui/:uid/totp',
