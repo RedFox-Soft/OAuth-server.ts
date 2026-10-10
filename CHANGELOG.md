@@ -18,6 +18,11 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   who enrolled an authenticator before this fix should re-enrol. Updating an administrator with
   `active: false` now refuses deactivating yourself, as the deactivation route does, and `admin_update` is a
   high-consequence agent tool, so it no longer bypasses the confirmation `admin_deactivate` requires.
+- **An identity provider can no longer be repointed under the accounts linked to it.** A link records the
+  provider and the upstream subject, not the issuer, so changing a provider's issuer (or a Microsoft
+  provider's tenant), or deleting a provider and creating another with the same id, let the new upstream's
+  users with a matching subject sign in to existing accounts. Changing the issuer or tenant is now refused
+  while anyone is linked — add a new provider instead — and deleting a provider removes its links.
 
 ## [0.10.0] - 2026-10-10
 

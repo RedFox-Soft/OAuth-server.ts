@@ -409,6 +409,12 @@ export interface UserStoreInstance {
 		providerId: string,
 		sub: string
 	): Promise<User | null>;
+	/*
+	 * The accounts linked to one provider of this bucket, at most `limit` of them when given. A link names
+	 * the provider by id and the upstream subject, never the issuer, so whatever changes the upstream a
+	 * provider id stands for has to know who is linked to it first.
+	 */
+	findLinkedTo(providerId: string, limit?: number): Promise<User[]>;
 	list(): Promise<User[]>;
 	/*
 	 * A page of the users matching `filter`, ordered by `_id` so pages do not shift between requests, with

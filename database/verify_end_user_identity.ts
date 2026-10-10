@@ -89,4 +89,36 @@ export async function verifyEndUserIdentity(
 		totalResults === 1 && users[0]?._id === first._id,
 		`${totalResults}`
 	);
+
+	/*
+	 * Who is linked to a provider: what a provider's issuer change and deletion consult. The element match
+	 * on the embedded `federated` array is what the in-memory store can only imitate with a scan.
+	 */
+	const providerId = `verify-provider-${stamp}`;
+	const linkedA = await create('linked-a');
+	const linkedB = await create('linked-b');
+	const elsewhereLinked = await create('linked-elsewhere');
+	for (const user of [linkedA, linkedB]) {
+		await store.update(user._id, {
+			federated: [{ providerId, sub: user._id, linkedAt: new Date() }]
+		});
+	}
+	await store.update(elsewhereLinked._id, {
+		federated: [
+			{ providerId: `${providerId}-other`, sub: 'x', linkedAt: new Date() }
+		]
+	});
+	const linked = await store.findLinkedTo(providerId);
+	check(
+		'the accounts linked to a provider are found, and only those',
+		linked.length === 2 &&
+			linked.every((u) => u._id === linkedA._id || u._id === linkedB._id),
+		linked.map((u) => u._id).join(',')
+	);
+	const one = await store.findLinkedTo(providerId, 1);
+	check(
+		'a limit bounds the accounts found linked to a provider',
+		one.length === 1,
+		`${one.length}`
+	);
 }

@@ -122,6 +122,25 @@ export class UserStore implements UserStoreInstance {
 		return this.userOf(rows[0]);
 	}
 
+	async findLinkedTo(providerId: string, limit?: number): Promise<User[]> {
+		const handle = sql();
+		const match = [{ providerId }];
+		const rows =
+			limit === undefined
+				? await handle`
+					SELECT doc FROM ${handle(this.area)}
+					WHERE doc->'federated' @> ${match}
+				`
+				: await handle`
+					SELECT doc FROM ${handle(this.area)}
+					WHERE doc->'federated' @> ${match}
+					LIMIT ${limit}
+				`;
+		return rows
+			.map((row) => this.userOf(row))
+			.filter((u): u is User => u !== null);
+	}
+
 	async create(
 		email: string,
 		password: string,

@@ -202,3 +202,5 @@ Operations:
 ## [2026-10-10] update | [[end-user-onboarding]] (spec 078): "Send the link again" on the sign-in page — a resend bound to the interaction that proved the password (`pendingVerification`), because the public resend takes a reference that for a link *is* the token; it redirects to the login path with a notice since a login document at another path never hydrates. [[admin-bucket-settings]] points to it.
 
 ## [2026-10-11] update | [[totp-second-factor]]: the administrator routes stripped only the password by hand and so returned every enrolled administrator's `totp.secret` (list, create, update; and `admin_list`/`admin_update` to the agent); they now use `presentUser`, and the secrecy sweep seeds an enrolled administrator.
+
+## [2026-10-11] update | [[upstream-federation]]: new section "A link names the provider, never the issuer" — issuer/tenant changes refused while anyone is linked, provider deletion removes its links, new store read `findLinkedTo` (verified against real MongoDB and PostgreSQL).

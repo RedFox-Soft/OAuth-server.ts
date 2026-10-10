@@ -1,6 +1,7 @@
 import {
 	getBucketStore,
-	getProvisioningConnectionStore
+	getProvisioningConnectionStore,
+	getUserStore
 } from '../../adapters/index.js';
 import { AdminError } from '../auth/rbac.js';
 import {
@@ -380,6 +381,9 @@ export async function updateProvider(
 	 */
 	const entry = knownProviderByIssuer(next.issuer);
 
+	if (next.issuer !== current.issuer || next.tenant !== current.tenant) {
+		await assertNobodyLinked(bucket, providerId);
+	}
 	if (next.issuer !== current.issuer) {
 		assertIssuer(next.issuer);
 		await assertIssuerResolves(next.issuer);
@@ -440,5 +444,37 @@ export async function deleteProvider(
 		passwordLogin: bucket.passwordLogin,
 		federation
 	});
+	/*
+	 * The links go with the provider, and before it. A link names the provider only by id, so links left
+	 * behind would attach to whatever provider is next created under that id — an upstream whose subjects
+	 * mean other people — and its users would sign in to accounts that are not theirs.
+	 */
+	const users = getUserStore(bucket._id);
+	for (const user of await users.findLinkedTo(providerId)) {
+		await users.update(user._id, {
+			federated: (user.federated ?? []).filter(
+				(link) => link.providerId !== providerId
+			)
+		});
+	}
 	await getBucketStore().update(bucket._id, { federation });
+}
+
+/*
+ * The issuer (and, for Microsoft, the tenant) decides whose subjects a provider's links name: the same
+ * `sub` from another issuer is another person. A link records the provider id and the subject, never the
+ * issuer, so pointing a provider people are linked to at a different upstream would hand their accounts
+ * to that upstream's users with the same subjects. Moving to another upstream is a new provider.
+ */
+async function assertNobodyLinked(
+	bucket: UserBucket,
+	providerId: string
+): Promise<void> {
+	const linked = await getUserStore(bucket._id).findLinkedTo(providerId, 1);
+	if (linked.length > 0) {
+		throw new AdminError(
+			409,
+			`people are linked to provider ${providerId}, so its issuer cannot change: add a new provider for the new issuer instead`
+		);
+	}
 }

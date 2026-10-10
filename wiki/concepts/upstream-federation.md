@@ -200,6 +200,22 @@ assumed they are disjoint. It is now a union comparison. See [[feature-flag-gati
 A deployment that switches federation off must still be able to **delete** a provider it stopped trusting.
 Gating configuration behind the capability it configures would make that provider unremovable.
 
+### A link names the provider, never the issuer
+
+A link is `(providerId, sub)` on the user row (`lib/adapters/types.ts`). The same `sub` from another issuer is
+another person, so whatever changes the upstream a provider id stands for must first know who is linked to
+it (`findLinkedTo`, all three adapters). Since 0.10.x (after `95444eb`):
+
+- changing a provider's `issuer` — or `tenant`, which moves a Microsoft provider to another directory — is
+  refused with 409 while anyone is linked to it (`assertNobodyLinked`, `lib/admin/federation/service.ts`);
+  moving to another upstream is a new provider;
+- deleting a provider removes its links first, so a provider later created under the same id starts with
+  nobody linked.
+
+Before this, both paths left the links in place, and the next upstream's users with a colliding `sub` signed
+in to other people's accounts. Severity was bounded — only a bucket administrator can repoint a provider, and
+one can already set any user's password — but the failure was silent.
+
 ### A slugless bucket's callback address is real, registerable, and temporary
 
 Found while connecting the first recognised provider, and it is the reason the guidance read

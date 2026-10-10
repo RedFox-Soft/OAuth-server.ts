@@ -537,3 +537,97 @@ describe("an account's upstream identities", () => {
 		expect(res.status).toBe(403);
 	});
 });
+
+/**
+ * @proves A provider's links follow the upstream they were made with: nobody signs in to an account
+ * through an identity provider other than the one that account was linked to.
+ */
+describe("a provider's linked accounts", () => {
+	beforeEach(async () => {
+		resetAdminMemoryStores();
+		await ensureAdminSeed();
+	});
+
+	afterEach(() => {
+		mock.restore();
+	});
+
+	async function providerWithLink(origin: string) {
+		const { cookie } = await cookieFor('super');
+		const idp = await idpStub(origin);
+		idp.expectDiscovery();
+		const bucket = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
+			name: 'b'
+		});
+		await client.admin.api
+			.buckets({ id: bucket._id })
+			.federation.post(body(idp.origin), { headers: { cookie } });
+		const store = getUserStore(bucket._id);
+		const user = await store.create('linked@acme.test', 'hash', true);
+		await store.update(user._id, {
+			federated: [
+				{ providerId: 'acme-sso', sub: 'subject-1', linkedAt: new Date() }
+			]
+		});
+		return { cookie, bucket, user };
+	}
+
+	it('refuses changing the issuer of a provider people are linked to', async () => {
+		const { cookie, bucket } = await providerWithLink(
+			'https://idp-linked-a.test'
+		);
+
+		const res = await client.admin.api
+			.buckets({ id: bucket._id })
+			.federation({ providerId: 'acme-sso' })
+			.patch({ issuer: 'https://idp-linked-b.test' }, { headers: { cookie } });
+
+		expect(res.status).toBe(409);
+		const stored = (await getBucketStore().find(bucket._id))?.federation[0];
+		expect(stored?.issuer).toBe('https://idp-linked-a.test');
+	});
+
+	it('changes the issuer of a provider nobody is linked to', async () => {
+		const { cookie } = await cookieFor('super');
+		const first = await idpStub('https://idp-unlinked-a.test');
+		first.expectDiscovery();
+		const bucket = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
+			name: 'b'
+		});
+		await client.admin.api
+			.buckets({ id: bucket._id })
+			.federation.post(body(first.origin), { headers: { cookie } });
+		const second = await idpStub('https://idp-unlinked-b.test');
+		second.expectDiscovery();
+
+		const res = await client.admin.api
+			.buckets({ id: bucket._id })
+			.federation({ providerId: 'acme-sso' })
+			.patch({ issuer: second.origin }, { headers: { cookie } });
+
+		expect(res.status).toBe(200);
+		expect(
+			(await getBucketStore().find(bucket._id))?.federation[0]?.issuer
+		).toBe(second.origin);
+	});
+
+	it('removes the links people held when the provider is deleted, so one re-created under the same id finds nobody', async () => {
+		const { cookie, bucket, user } = await providerWithLink(
+			'https://idp-linked-delete.test'
+		);
+
+		const res = await client.admin.api
+			.buckets({ id: bucket._id })
+			.federation({ providerId: 'acme-sso' })
+			.delete(undefined, { headers: { cookie } });
+
+		expect(res.status).toBe(200);
+		const store = getUserStore(bucket._id);
+		expect((await store.find(user._id))?.federated ?? []).toEqual([]);
+		expect(
+			await store.findByFederatedIdentity('acme-sso', 'subject-1')
+		).toBeNull();
+	});
+});
