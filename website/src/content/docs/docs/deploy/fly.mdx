@@ -82,8 +82,8 @@ The release command needs the connection string, `DATABASE_NAME` on MongoDB, and
 `db:migrate` follows in the same command because the server refuses to start against a database that
 is behind the migrations its release declares. Left out, a release carrying its first migration
 deploys an image that cannot boot; run from here, the same release is gated on the migration
-succeeding. Most releases declare none and the step reports `current` and exits, but 0.7.0 and 0.8.0
-each carried migrations that cannot be undone, so read the release notes before a deploy and take a
+succeeding. Most releases declare none and the step reports `current` and exits, but 0.7.0, 0.8.0 and
+0.10.0 each carried migrations that cannot be undone, so read the release notes before a deploy and take a
 backup when they name one. The `sh -c` wrapper is what makes `&&` a shell operator instead of two more arguments to `bun`.
 
 ## The health checks

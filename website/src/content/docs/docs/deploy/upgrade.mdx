@@ -246,6 +246,28 @@ server that refused to start. The shipped `docker-compose.yml` and `docker-compo
 A Compose deployment that has refused to start since it moved to 0.7.0 or 0.8.0 is this: take the
 backup those releases asked for, then run `db:migrate` once.
 
+### Then 0.10.0
+
+0.10.0 carries one schema migration, and it cannot be undone. A personal group used to be able to gain
+members; from this release it has exactly one, its owner. The migration
+`2026-10-09-personal-groups-single-member` removes everyone else from each personal group and writes one
+audit entry per group. Before you upgrade, list the personal groups with more than one member
+(`group_list` with `kind: personal`). Move what they hold into a regular group, or note who loses access.
+
+Then take a backup and run `db:setup` (or `db:setup:pg`). It adds the `activityMarks` and
+`activityFigures` areas that count active users, and a new index on the audit trail. `db:migrate --plan`
+names the migration, and `db:migrate` runs it.
+
+What else an operator or an integration sees after 0.10.0:
+
+- **The administrators' settings are bucket settings now.** `GET` and `PATCH /admin/api/admins/settings`
+  and the MCP tools `admin_settings_read` and `admin_settings_update` are removed. Read and change the
+  administrators' bucket with `bucket_get` and `bucket_update`, as any other bucket.
+- **A setting stored with the wrong type stops startup.** The settings API never writes one, so this
+  only concerns a value edited into the database by hand, such as a flag stored as the string `"false"`.
+  The error names the key. A malformed `richAuthorizationRequests.types` stops startup too, even while
+  RAR is off, because the consent screen reads it.
+
 ## After the restart
 
 ```bash

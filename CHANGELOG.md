@@ -9,6 +9,22 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-10
+
+An instance can now be run as a service for other people. Every bucket counts its monthly and daily active users,
+a super administrator's **Usage** page shows each bucket beside the customer that owns it, and a bucket moves to
+another administrator group together with its projects. The administrators' bucket is configured like any other,
+with open sign-up, email verification and the second factor, and a personal group has exactly one member again.
+A DPoP proof dated ahead of the server's clock can no longer be replayed, and foxauth.dev is now also in Russian
+and Simplified Chinese.
+
+**Upgrading asks three things of an operator.** Take a backup. Run `db:setup` (or `db:setup:pg`) for the new
+`activityMarks` and `activityFigures` areas and the audit trail's new index. Then run `db:migrate`: migration
+`2026-10-09-personal-groups-single-member` removes every member but the owner from each personal group and cannot
+be undone, so list the shared ones (`group_list`, `kind: personal`) first. An agent that used `admin_settings_read`
+or `admin_settings_update` now uses `bucket_get`/`bucket_update` on the administrators' bucket, and a setting
+edited into the database by hand with the wrong type now stops startup until it is fixed.
+
 ### Added
 
 - The administrators' bucket is configured on the ordinary bucket settings by a super administrator:
@@ -1613,7 +1629,8 @@ found`. The refusal text existed and never ran: the call that delivered it sat i
 - The DPoP nonce secret is self-provisioned at startup, making the requireNonce-without-secret 500
   state unrepresentable (spec 014)
 
-[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.6.0...v0.7.0
