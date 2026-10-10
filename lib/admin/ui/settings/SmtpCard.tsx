@@ -1,14 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import {
-	Button,
-	Card,
-	Form,
-	Input,
-	InputNumber,
-	Switch,
-	Tag,
-	message
-} from 'antd';
+import { Button, Card, Form, Input, InputNumber, Switch, Tag } from 'antd';
+import { request } from '../frame/request.js';
+import { useFeedback } from '../frame/feedback.js';
+import { LoadFailed } from '../frame/states.js';
 
 interface SmtpView {
 	host: string;
@@ -33,16 +27,27 @@ export function SmtpCard() {
 	const [form] = Form.useForm<SmtpView>();
 	const [loading, setLoading] = useState(true);
 	const [saving, setSaving] = useState(false);
+	const [failed, setFailed] = useState<string | null>(null);
+	const feedback = useFeedback();
 
 	// Every state write follows an await: `loading` starts true, so the mount has nothing to set first.
 	const load = useCallback(async () => {
 		try {
-			const res = await fetch('/admin/api/settings/smtp');
-			if (res.ok) form.setFieldsValue((await res.json()) as SmtpView);
+			const result = await request<SmtpView>('GET', '/admin/api/settings/smtp');
+			if (!result.ok) {
+				setFailed(result.error.message);
+				return;
+			}
+			setFailed(null);
+			form.setFieldsValue(result.data);
 		} finally {
 			setLoading(false);
 		}
 	}, [form]);
+	function reload() {
+		setLoading(true);
+		void load();
+	}
 	useEffect(() => {
 		void load();
 	}, [load]);
@@ -50,19 +55,17 @@ export function SmtpCard() {
 	async function save(values: SmtpView) {
 		setSaving(true);
 		try {
-			const res = await fetch('/admin/api/settings/smtp', {
-				method: 'PUT',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify(values)
-			});
-			const body = (await res.json().catch(() => null)) as
-				(SmtpView & { message?: string }) | null;
-			if (!res.ok) {
-				message.error(body?.message || 'failed to save SMTP settings');
+			const result = await request<SmtpView>(
+				'PUT',
+				'/admin/api/settings/smtp',
+				values
+			);
+			if (!result.ok) {
+				feedback.failed(result, form);
 				return;
 			}
-			if (body) form.setFieldsValue(body);
-			message.success('SMTP settings saved');
+			form.setFieldsValue(result.data);
+			feedback.done('SMTP settings saved.');
 		} finally {
 			setSaving(false);
 		}
@@ -80,6 +83,7 @@ export function SmtpCard() {
 					<Button
 						type="primary"
 						loading={saving}
+						disabled={failed !== null}
 						onClick={() => form.submit()}
 					>
 						Save
@@ -87,9 +91,21 @@ export function SmtpCard() {
 				</span>
 			}
 		>
+			{failed !== null && (
+				<LoadFailed
+					reason={failed}
+					onRetry={reload}
+				/>
+			)}
+			{/*
+			 * Hidden rather than unmounted on a failed load: the form instance stays connected, and saving
+			 * blank fields over a configuration that could not be read is not offered.
+			 */}
 			<Form<SmtpView>
 				form={form}
 				layout="vertical"
+				scrollToFirstError
+				hidden={failed !== null}
 				onFinish={save}
 			>
 				<Form.Item

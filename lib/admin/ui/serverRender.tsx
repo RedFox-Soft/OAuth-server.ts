@@ -1,11 +1,9 @@
 import { renderToString } from 'react-dom/server';
 import { StrictMode } from 'react';
 import type { AdminContext } from '../auth/rbac.js';
-import { Layout } from './pages/Layout.js';
-import { Setup } from './pages/Setup.js';
+import { ConsoleRoot } from './frame/ConsoleRoot.js';
 import { htmlResponse } from '../../html/csp.js';
 import { versionedAsset } from '../../html/versionedAsset.js';
-import { ZeroRuntime } from '../../html/zeroRuntime.js';
 
 const template = Bun.file('./lib/admin/ui/htmlTemplate.html');
 
@@ -13,9 +11,11 @@ const template = Bun.file('./lib/admin/ui/htmlTemplate.html');
 export interface AdminShellProps {
 	needsSetup: boolean;
 	me: AdminContext | null;
+	/* The address asked for, path and query: the router's first render, on both sides. */
+	path?: string;
 }
 
-export async function renderAdminShell(props: AdminShellProps) {
+export async function renderAdminShell(props: AdminShellProps, status = 200) {
 	let html = await template.text();
 	html = html
 		.replace('/public/admin.js', versionedAsset('admin.js'))
@@ -33,11 +33,9 @@ export async function renderAdminShell(props: AdminShellProps) {
 			'<!--app-html-->',
 			renderToString(
 				<StrictMode>
-					<ZeroRuntime>
-						{props.needsSetup ? <Setup /> : <Layout me={props.me} />}
-					</ZeroRuntime>
+					<ConsoleRoot {...props} />
 				</StrictMode>
 			)
 		);
-	return htmlResponse(html);
+	return htmlResponse(html, { status });
 }

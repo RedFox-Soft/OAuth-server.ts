@@ -35,8 +35,9 @@ export default defineConfig(
 			/*
 			 * An async handler on a JSX attribute — onClick, onFinish, onConfirm — is the React idiom, and a
 			 * click has nobody to await it. The hazard is a rejection no handler caught; the admin client
-			 * reports every such rejection to the administrator (lib/admin/ui/adminClient.tsx), so the rule
-			 * keeps every other void-return check and drops this one.
+			 * reports every such rejection to the administrator through the console's feedback bridge
+			 * (lib/admin/ui/adminClient.tsx, lib/admin/ui/frame/feedback.tsx), so the rule keeps every other
+			 * void-return check and drops this one.
 			 */
 			'@typescript-eslint/no-misused-promises': [
 				'error',
@@ -100,5 +101,38 @@ export default defineConfig(
 	{
 		extends: [reactHooks.configs.flat.recommended],
 		files: ['**/*.tsx']
+	},
+	/*
+	 * The console reports outcomes through antd's App context (lib/admin/ui/frame/feedback.tsx and
+	 * confirm.tsx), never the static functions: those render outside the console's theme, and under the
+	 * zeroRuntime build they generate the runtime CSS the strict style policy exists to keep out
+	 * (specs/079 research R9).
+	 */
+	{
+		files: ['lib/admin/ui/**/*.{ts,tsx}'],
+		rules: {
+			'no-restricted-imports': [
+				'error',
+				{
+					paths: [
+						{
+							name: 'antd',
+							importNames: ['message', 'notification'],
+							message:
+								'Use useFeedback() from lib/admin/ui/frame/feedback.tsx (App.useApp underneath).'
+						}
+					]
+				}
+			],
+			'no-restricted-syntax': [
+				'error',
+				{
+					selector:
+						"CallExpression[callee.object.name='Modal'][callee.property.name=/^(confirm|info|success|error|warning)$/]",
+					message:
+						'Use useConfirm() from lib/admin/ui/frame/confirm.tsx, or App.useApp().modal.'
+				}
+			]
+		}
 	}
 );

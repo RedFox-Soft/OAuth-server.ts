@@ -23,6 +23,22 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   provider's tenant), or deleting a provider and creating another with the same id, let the new upstream's
   users with a matching subject sign in to existing accounts. Changing the issuer or tenant is now refused
   while anyone is linked — add a new provider instead — and deleting a provider removes its links.
+- **A rejected admin request is no longer echoed back.** The admin plane's validation answer (422) carried the
+  whole submitted body, a typed password included; it now names the first problem and the field, nothing more.
+
+### Changed
+
+- **Every console screen has an address** (spec 079). Links, Back, reload and switching group keep your place,
+  and signing in returns to the page you asked for. Bucket and project responses state what the caller may do
+  (`can`), so the console hides what the server would refuse and disables, with the reason, what the current
+  state blocks — the console now offers group members the bucket creation the server always allowed them. Confirmations follow one scale, from none to a typed word or the
+  server's preview; outcomes, refusals and faults are reported the same way everywhere; each row has one way in
+  and its actions in one menu.
+
+### Fixed
+
+- **Invitation links work.** The link in an invitation email opened a missing page; it now opens a page to
+  accept, and a new invitee who first submits without a password no longer spends the invitation.
 
 ## [0.10.0] - 2026-10-10
 

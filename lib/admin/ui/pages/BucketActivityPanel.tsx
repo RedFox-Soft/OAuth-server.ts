@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Card, Col, Row, Statistic, Table, Tag, Typography } from 'antd';
-import { readJson } from '../json.js';
+import { request } from '../frame/request.js';
+import { EmptyState, LoadFailed } from '../frame/states.js';
 import {
 	figureRow,
 	type BucketActivityView,
 	type FigureRow
 } from '../activity/model.js';
+import { Link, useRoute } from '../frame/router.js';
 
 /*
  * A bucket's monthly and daily active users (specs/076): the people it issued tokens to, counted once per
@@ -28,9 +30,36 @@ const COLUMNS = [
 ];
 
 export function BucketActivityPanel({ bucketId }: { bucketId: string }) {
-	const [month, setMonth] = useState<string | undefined>(undefined);
+	/*
+	 * The month is part of the address (`?month=`), so a month an operator is looking at can be linked to
+	 * and survives a reload. Picking another replaces the address rather than adding to the history: Back
+	 * leaves the tab instead of stepping through every month looked at.
+	 */
+	const { location, query } = useRoute();
+	const month = query.get('month') ?? undefined;
+	const monthHref = (period: string) =>
+		`${location.pathname}?month=${encodeURIComponent(period)}`;
+	const columns = [
+		{
+			...COLUMNS[0],
+			render: (period: string) => (
+				<Link
+					href={monthHref(period)}
+					replace
+				>
+					{period}
+				</Link>
+			)
+		},
+		...COLUMNS.slice(1)
+	];
 	const [view, setView] = useState<BucketActivityView | null>(null);
+	/*
+	 * Two different answers kept apart: a 403 is the rule (only the owning group sees usage), anything else
+	 * is a read that failed and can be tried again.
+	 */
 	const [refusal, setRefusal] = useState<string | null>(null);
+	const [failure, setFailure] = useState<string | null>(null);
 
 	const [loading, setLoading] = useState(true);
 
@@ -39,14 +68,17 @@ export function BucketActivityPanel({ bucketId }: { bucketId: string }) {
 		async (id: string, asked: string | undefined) => {
 			try {
 				const query = asked ? `?month=${encodeURIComponent(asked)}` : '';
-				const res = await fetch(
+				const result = await request<BucketActivityView>(
+					'GET',
 					`/admin/api/buckets/${encodeURIComponent(id)}/activity${query}`
 				);
-				const body = await readJson<BucketActivityView & { message?: string }>(
-					res
+				setView(result.ok ? result.data : null);
+				setRefusal(
+					!result.ok && result.status === 403 ? result.error.message : null
 				);
-				setView(res.ok ? body : null);
-				setRefusal(res.ok ? null : (body.message ?? 'unavailable'));
+				setFailure(
+					!result.ok && result.status !== 403 ? result.error.message : null
+				);
 			} finally {
 				setLoading(false);
 			}
@@ -58,18 +90,28 @@ export function BucketActivityPanel({ bucketId }: { bucketId: string }) {
 		void fetchView(bucketId, month);
 	}, [fetchView, bucketId, month]);
 
-	if (refusal !== null) {
+	if (refusal !== null || failure !== null) {
 		return (
 			<Card
 				title="Active users"
 				style={{ marginTop: 24 }}
 			>
-				<Alert
-					type="info"
-					showIcon
-					title="Usage is shown to the group that owns this bucket"
-					description={refusal}
-				/>
+				{refusal !== null ? (
+					<Alert
+						type="info"
+						showIcon
+						title="Usage is shown to the group that owns this bucket"
+						description={refusal}
+					/>
+				) : (
+					<LoadFailed
+						reason={failure ?? undefined}
+						onRetry={() => {
+							setLoading(true);
+							void fetchView(bucketId, month);
+						}}
+					/>
+				)}
 			</Card>
 		);
 	}
@@ -119,12 +161,13 @@ export function BucketActivityPanel({ bucketId }: { bucketId: string }) {
 				pagination={false}
 				rowKey="key"
 				loading={loading}
-				columns={COLUMNS}
+				columns={columns}
 				dataSource={(view?.months ?? []).map(figureRow)}
-				onRow={(row) => ({
-					onClick: () => setMonth(row.period),
-					style: { cursor: 'pointer' }
-				})}
+				locale={{
+					emptyText: (
+						<EmptyState purpose="Nobody has been issued a token from this bucket yet." />
+					)
+				}}
 			/>
 			<Typography.Title
 				level={5}
@@ -136,8 +179,14 @@ export function BucketActivityPanel({ bucketId }: { bucketId: string }) {
 				size="small"
 				pagination={false}
 				rowKey="key"
+				loading={loading}
 				columns={COLUMNS}
 				dataSource={(view?.days ?? []).map(figureRow)}
+				locale={{
+					emptyText: (
+						<EmptyState purpose="Nobody was issued a token from this bucket on any day of this month." />
+					)
+				}}
 			/>
 		</Card>
 	);

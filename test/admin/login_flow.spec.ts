@@ -180,6 +180,60 @@ describe('admin OIDC login (BFF)', () => {
 		expect(meData.email).toBe('root@x.io');
 	});
 
+	/* Signs in from `/admin/login?next=<next>` and returns where the callback sends the browser. */
+	async function returnAddressAfterSignIn(next: string): Promise<string> {
+		const login = await agent.admin.login.get({ query: { next } });
+		const oauthCookie = cookiePair(
+			login.response.headers.getSetCookie(),
+			'admin_oauth'
+		);
+		const params = new URL(getHeader(login.response, 'location')).searchParams;
+		const idToken = await mintAdminIdToken({
+			sub: superAdminId,
+			nonce: params.get('nonce') ?? undefined
+		});
+		fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
+			fetchAnswering(async () =>
+				Response.json({ access_token: 'x', id_token: idToken })
+			)
+		);
+		const cb = await agent.admin.callback.get({
+			query: {
+				code: 'valid-code',
+				state: present(params.get('state'), 'a state parameter')
+			},
+			headers: { cookie: oauthCookie }
+		});
+		fetchSpy.mockRestore();
+		fetchSpy = undefined;
+		expect(cb.status).toBe(302);
+		return getHeader(cb.response, 'location');
+	}
+
+	it('signing in returns to the address the person asked for', async () => {
+		expect(
+			await returnAddressAfterSignIn('/admin/buckets/b-1/keys?tab=retired')
+		).toBe('/admin/buckets/b-1/keys?tab=retired');
+	});
+
+	/*
+	 * The return address rides through the provider and back in a cookie, so it is a value anyone can
+	 * write. An open redirect on the sign-in path would lend this server's name to a phishing page.
+	 */
+	it('a return address outside the console, protocol-relative, or into the console API lands on the console home', async () => {
+		for (const next of [
+			'https://evil.example/admin',
+			'//evil.example/admin',
+			'/admin//evil.example',
+			'/admin/../evil',
+			'/admin/%2e%2e/evil',
+			'/admin/api/me',
+			'/admin/callback'
+		]) {
+			expect(await returnAddressAfterSignIn(next)).toBe('/admin');
+		}
+	});
+
 	it('logout destroys the session', async () => {
 		const login = await agent.admin.login.get();
 		const oauthCookie = cookiePair(

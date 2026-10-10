@@ -9,17 +9,22 @@ import {
 	Select,
 	Space,
 	Typography,
-	Popconfirm,
 	Alert,
 	Tag,
 	Checkbox,
 	Tooltip,
-	message,
 	type FormInstance
 } from 'antd';
-import { PlusOutlined, ArrowLeftOutlined } from '@ant-design/icons';
-import type { Project } from '../../../adapters/types.js';
+import { PlusOutlined } from '@ant-design/icons';
 import { OMNIBUS_SCOPES } from '../../../resources/scopes.js';
+import { request } from '../frame/request.js';
+import { useFeedback } from '../frame/feedback.js';
+import { useConfirm } from '../frame/confirm.js';
+import { projectCan } from '../frame/can.js';
+import { AreaToolbar } from '../frame/AreaToolbar.js';
+import { RowActions } from '../frame/RowActions.js';
+import { EmptyState, LoadFailed } from '../frame/states.js';
+import type { ProjectView } from './ProjectWorkspace.js';
 
 /*
  * A project's protected resources: the audiences this server will mint tokens for on the project's
@@ -156,14 +161,14 @@ function VouchingCell({ url }: { url: string }) {
 	const [vouching, setVouching] = useState<Vouching | null>(null);
 	const [checking, setChecking] = useState(true);
 	// Every state write follows an await, so the effect below sets nothing synchronously.
-	const fetchVouching = useCallback(async () => {
-		try {
-			const res = await fetch(url);
-			setVouching(res.ok ? ((await res.json()) as Vouching) : null);
-		} finally {
-			setChecking(false);
-		}
-	}, [url]);
+	const fetchVouching = useCallback(
+		() =>
+			request<Vouching>('GET', url).then((result) => {
+				setVouching(result.ok ? result.data : null);
+				setChecking(false);
+			}),
+		[url]
+	);
 	useEffect(() => {
 		void fetchVouching();
 	}, [fetchVouching]);
@@ -193,21 +198,19 @@ function VouchingCell({ url }: { url: string }) {
 	);
 }
 
-export function Resources({
-	project,
-	onBack
-}: {
-	project: Project;
-	onBack: () => void;
-}) {
+export function Resources({ project }: { project: ProjectView }) {
 	const base = `/admin/api/projects/${project._id}/resources`;
+	const writable = projectCan(project).declareResources;
 	const [rows, setRows] = useState<ResourceView[]>([]);
 	const [loading, setLoading] = useState(true);
+	const [loadFailed, setLoadFailed] = useState<string | null>(null);
 	const [open, setOpen] = useState(false);
 	const [mode, setMode] = useState<'create' | 'edit'>('create');
 	const [editing, setEditing] = useState<string | null>(null);
 	const [saving, setSaving] = useState(false);
 	const [form] = Form.useForm<FormValues>();
+	const feedback = useFeedback();
+	const confirm = useConfirm();
 
 	const scopesValue = useWatched(form, 'scopes') ?? '';
 	const ttlValue = useWatched(form, 'accessTokenTTL') ?? 900;
@@ -215,22 +218,26 @@ export function Resources({
 
 	// Every state write follows an await, so the mount effect calls this without setting
 	// `loading` first; `load` is the reload, which does.
-	const fetchResources = useCallback(async () => {
-		try {
-			const res = await fetch(base);
-			if (res.ok) setRows((await res.json()) as ResourceView[]);
-		} finally {
-			setLoading(false);
-		}
-	}, [base]);
+	const fetchResources = useCallback(
+		() =>
+			request<ResourceView[]>('GET', base).then((result) => {
+				if (result.ok) {
+					setRows(result.data);
+					setLoadFailed(null);
+				} else {
+					setLoadFailed(result.error.message);
+				}
+				setLoading(false);
+			}),
+		[base]
+	);
 	function load() {
 		setLoading(true);
 		return fetchResources();
 	}
 	/*
 	 * Reloads when the project changes and never on `load` identity — the list belongs to the project,
-	 * not to the closure. No exhaustive-deps disable comment: that rule is not configured in this
-	 * repository, so the comment would only be an inert lint error (as it is in `Clients.tsx`).
+	 * not to the closure.
 	 */
 	useEffect(() => {
 		void fetchResources();
@@ -258,81 +265,83 @@ export function Resources({
 		setOpen(true);
 	}
 
-	async function submit() {
-		const values = await form.validateFields();
+	async function submit(values: FormValues) {
+		const scopes = splitScopes(values.scopes);
+		/*
+		 * The identifier is absent from the edit payload deliberately, and the server refuses it if
+		 * sent: it is the audience of every token already minted for this resource, so replacing it is
+		 * a delete and a fresh declaration rather than a rename.
+		 */
+		const body =
+			mode === 'create'
+				? {
+						identifier: values.identifier,
+						name: values.name,
+						scopes,
+						tokenFormat: values.tokenFormat,
+						accessTokenTTL: values.accessTokenTTL ?? undefined,
+						trailingSlashSignificant: values.trailingSlashSignificant
+					}
+				: {
+						name: values.name,
+						scopes,
+						tokenFormat: values.tokenFormat,
+						accessTokenTTL: values.accessTokenTTL ?? undefined
+					};
+
+		const url =
+			mode === 'create'
+				? base
+				: `${base}/${encodeURIComponent(editing as string)}`;
 		setSaving(true);
-		try {
-			const scopes = splitScopes(values.scopes);
-			/*
-			 * The identifier is absent from the edit payload deliberately, and the server refuses it if
-			 * sent: it is the audience of every token already minted for this resource, so replacing it is
-			 * a delete and a fresh declaration rather than a rename.
-			 */
-			const body =
-				mode === 'create'
-					? {
-							identifier: values.identifier,
-							name: values.name,
-							scopes,
-							tokenFormat: values.tokenFormat,
-							accessTokenTTL: values.accessTokenTTL ?? undefined,
-							trailingSlashSignificant: values.trailingSlashSignificant
-						}
-					: {
-							name: values.name,
-							scopes,
-							tokenFormat: values.tokenFormat,
-							accessTokenTTL: values.accessTokenTTL ?? undefined
-						};
-
-			const url =
-				mode === 'create'
-					? base
-					: `${base}/${encodeURIComponent(editing as string)}`;
-			const res = await fetch(url, {
-				method: mode === 'create' ? 'POST' : 'PATCH',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify(body)
-			});
-
-			if (!res.ok) {
-				const detail = (await res.json().catch(() => null)) as {
-					message?: string;
-				} | null;
-				message.error(detail?.message ?? 'could not save the resource');
-				return;
-			}
-			setOpen(false);
-			await load();
-		} finally {
-			setSaving(false);
-		}
-	}
-
-	async function remove(identifier: string) {
-		const res = await fetch(`${base}/${encodeURIComponent(identifier)}`, {
-			method: 'DELETE'
-		});
-		if (!res.ok) {
-			message.error('could not remove the resource');
+		const result = await request(
+			mode === 'create' ? 'POST' : 'PATCH',
+			url,
+			body
+		);
+		setSaving(false);
+		if (!result.ok) {
+			feedback.failed(result, form);
 			return;
 		}
+		feedback.done(mode === 'create' ? 'Resource declared.' : 'Resource saved.');
+		setOpen(false);
 		await load();
 	}
 
+	async function remove(row: ResourceView) {
+		const agreed = await confirm('resource.remove', {
+			target: row.name,
+			consequences: [
+				'Token issuance for this audience stops on the next request.',
+				'A live integration loses access as its current tokens expire.'
+			]
+		});
+		if (!agreed) return;
+		const result = await request(
+			'DELETE',
+			`${base}/${encodeURIComponent(row.identifier)}`
+		);
+		if (!result.ok) {
+			feedback.failed(result);
+			return;
+		}
+		feedback.done('Resource removed.');
+		await load();
+	}
+
+	const newResource = (
+		<Button
+			type="primary"
+			icon={<PlusOutlined />}
+			onClick={openCreateModal}
+		>
+			New resource
+		</Button>
+	);
+
 	return (
 		<>
-			<Space style={{ marginBottom: 16 }}>
-				<Button
-					icon={<ArrowLeftOutlined />}
-					onClick={onBack}
-				>
-					Back
-				</Button>
-				<Typography.Text strong>{project.name}</Typography.Text>
-				<Typography.Text type="secondary">protected resources</Typography.Text>
-			</Space>
-
 			{/*
 			 * What a declared resource still needs before an agent host can reach it, stated once here
 			 * rather than left to be discovered by a client that fails to connect.
@@ -350,115 +359,142 @@ export function Resources({
 				description="Declaring the resource is what makes this server mint tokens for it. For an agent host to obtain one it also needs a client identity: either clientIdMetadataDocument.enabled, so a client_id that is an HTTPS URL is accepted, or registration.enabled for an older host that registers itself. Both are instance settings and both are off by default."
 			/>
 
-			<div style={{ marginBottom: 16, textAlign: 'right' }}>
-				<Button
-					type="primary"
-					icon={<PlusOutlined />}
-					onClick={openCreateModal}
-				>
-					Declare a resource
-				</Button>
-			</div>
+			{writable ? (
+				<AreaToolbar create={newResource} />
+			) : (
+				<Alert
+					type="info"
+					showIcon
+					style={{ marginBottom: 16 }}
+					title="This project is read-only to you"
+					description="It has no addressable bucket of its own, so its resources live in the instance's root namespace, where only a super administrator can declare or change them."
+				/>
+			)}
 
-			<Table
-				rowKey="identifier"
-				loading={loading}
-				dataSource={rows}
-				pagination={false}
-				columns={[
-					{
-						title: 'Resource',
-						dataIndex: 'identifier',
-						render: (identifier: string, row: ResourceView) => (
-							<Space
-								orientation="vertical"
-								size={0}
-							>
-								<Typography.Text strong>{row.name}</Typography.Text>
-								<Typography.Text code>{identifier}</Typography.Text>
-							</Space>
-						)
-					},
-					{
-						title: 'Metadata',
-						key: 'vouching',
-						render: (_: unknown, row: ResourceView) => (
-							<VouchingCell
-								url={`${base}/${encodeURIComponent(row.identifier)}/vouching`}
+			{loadFailed !== null ? (
+				<LoadFailed
+					reason={loadFailed}
+					onRetry={() => void load()}
+				/>
+			) : (
+				<Table<ResourceView>
+					rowKey="identifier"
+					loading={loading}
+					dataSource={rows}
+					pagination={false}
+					locale={{
+						emptyText: (
+							<EmptyState
+								purpose="No resources declared for this project yet. Declare one to have this server mint tokens for its audience."
+								create={writable ? newResource : undefined}
 							/>
 						)
-					},
-					{
-						title: 'Scopes',
-						dataIndex: 'scopes',
-						render: (scopes: string[]) => (
-							<Space
-								size={[0, 4]}
-								wrap
-							>
-								{scopes.map((scope) => (
-									<Tag key={scope}>{scope}</Tag>
-								))}
-							</Space>
-						)
-					},
-					{
-						title: 'Token',
-						dataIndex: 'tokenFormat',
-						render: (format: 'jwt' | 'opaque') =>
-							format === 'jwt' ? 'Self-contained' : 'Opaque'
-					},
-					{
-						title: 'Lifetime',
-						dataIndex: 'accessTokenTTL',
-						render: (ttl: number, row: ResourceView) => (
-							<Space
-								orientation="vertical"
-								size={0}
-							>
-								<span>{describeWindow(ttl)}</span>
-								<Typography.Text type="secondary">
-									{row.tokenFormat === 'jwt'
-										? `revocation takes up to ${describeWindow(ttl)}`
-										: 'revocation is immediate'}
-								</Typography.Text>
-							</Space>
-						)
-					},
-					{
-						title: '',
-						render: (_: unknown, row: ResourceView) => (
-							<Space>
-								<Button
-									size="small"
-									onClick={() => openEditModal(row)}
+					}}
+					columns={[
+						{
+							title: 'Resource',
+							dataIndex: 'identifier',
+							render: (identifier: string, row: ResourceView) => (
+								<Space
+									orientation="vertical"
+									size={0}
 								>
-									Edit
-								</Button>
-								<Popconfirm
-									title="Remove this resource?"
-									description="Token issuance for this audience stops on the next request. A live integration loses access as its current tokens expire."
-									okText="Remove"
-									onConfirm={() => remove(row.identifier)}
+									{writable ? (
+										<Typography.Link
+											strong
+											onClick={() => openEditModal(row)}
+										>
+											{row.name}
+										</Typography.Link>
+									) : (
+										<Typography.Text strong>{row.name}</Typography.Text>
+									)}
+									<Typography.Text code>{identifier}</Typography.Text>
+								</Space>
+							)
+						},
+						{
+							title: 'Metadata',
+							key: 'vouching',
+							render: (_: unknown, row: ResourceView) => (
+								<VouchingCell
+									url={`${base}/${encodeURIComponent(row.identifier)}/vouching`}
+								/>
+							)
+						},
+						{
+							title: 'Scopes',
+							dataIndex: 'scopes',
+							render: (scopes: string[]) => (
+								<Space
+									size={[0, 4]}
+									wrap
 								>
-									<Button
-										size="small"
-										danger
-									>
-										Remove
-									</Button>
-								</Popconfirm>
-							</Space>
-						)
-					}
-				]}
-			/>
+									{scopes.map((scope) => (
+										<Tag key={scope}>{scope}</Tag>
+									))}
+								</Space>
+							)
+						},
+						{
+							title: 'Token',
+							dataIndex: 'tokenFormat',
+							render: (format: 'jwt' | 'opaque') =>
+								format === 'jwt' ? 'Self-contained' : 'Opaque'
+						},
+						{
+							title: 'Lifetime',
+							dataIndex: 'accessTokenTTL',
+							render: (ttl: number, row: ResourceView) => (
+								<Space
+									orientation="vertical"
+									size={0}
+								>
+									<span>{describeWindow(ttl)}</span>
+									<Typography.Text type="secondary">
+										{row.tokenFormat === 'jwt'
+											? `revocation takes up to ${describeWindow(ttl)}`
+											: 'revocation is immediate'}
+									</Typography.Text>
+								</Space>
+							)
+						},
+						...(writable
+							? [
+									{
+										title: '',
+										key: 'actions',
+										render: (_: unknown, row: ResourceView) => (
+											<RowActions
+												name={row.name}
+												items={[
+													{
+														key: 'edit',
+														label: 'Edit…',
+														group: 'edit',
+														onClick: () => openEditModal(row)
+													},
+													{
+														key: 'remove',
+														label: 'Remove',
+														group: 'danger',
+														onClick: () => void remove(row)
+													}
+												]}
+											/>
+										)
+									}
+								]
+							: [])
+					]}
+				/>
+			)}
 
 			<Modal
 				open={open}
-				title={mode === 'create' ? 'Declare a resource' : 'Edit resource'}
+				title={mode === 'create' ? 'New resource' : 'Edit resource'}
 				onCancel={() => setOpen(false)}
-				onOk={submit}
+				onOk={() => form.submit()}
 				confirmLoading={saving}
 				okText="Save"
 				destroyOnHidden
@@ -467,6 +503,8 @@ export function Resources({
 					form={form}
 					layout="vertical"
 					initialValues={DEFAULT_VALUES}
+					scrollToFirstError
+					onFinish={(values) => void submit(values)}
 				>
 					<Form.Item
 						name="identifier"

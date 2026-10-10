@@ -26,6 +26,7 @@ import { issuingBucket } from '../auth/bucketAddress.js';
 import { ISSUER } from '../../configs/env.js';
 import { isUniqueValueTaken } from '../../adapters/conflicts.js';
 import { ROOT_DECLARATION_REFUSAL } from './refusals.js';
+import { mayDeclareIn } from '../auth/can.js';
 
 /*
  * Declared protected resources: the audiences this server will mint tokens for, owned by a project.
@@ -58,7 +59,8 @@ function canonicalIdentifier(
 			400,
 			result.reason === 'fragment'
 				? 'a resource identifier must not carry a fragment'
-				: 'a resource identifier must be an absolute URI'
+				: 'a resource identifier must be an absolute URI',
+			{ field: 'identifier' }
 		);
 	}
 	if (
@@ -67,7 +69,8 @@ function canonicalIdentifier(
 	) {
 		throw new AdminError(
 			409,
-			'that identifier names an audience this server serves itself'
+			'that identifier names an audience this server serves itself',
+			{ field: 'identifier' }
 		);
 	}
 	return result.identifier;
@@ -99,7 +102,8 @@ function namesOwnScimEndpoint(identifier: string): boolean {
  * made would have the same reach by another route.
  */
 function assertMayWrite(ctx: AdminContext, namespace: string): void {
-	if (namespace === ROOT_NAMESPACE && !ctx.superAdmin) {
+	// The project's stated `declareResources` right, read from the same predicate.
+	if (!mayDeclareIn(ctx, namespace)) {
 		throw new AdminError(403, ROOT_DECLARATION_REFUSAL);
 	}
 }
@@ -107,7 +111,13 @@ function assertMayWrite(ctx: AdminContext, namespace: string): void {
 function acceptedScopes(scopes: string[]): string[] {
 	const result = validateScopes(scopes);
 	if (!result.ok) {
-		throw new AdminError(400, scopeFailureMessage(result.reason, result.value));
+		throw new AdminError(
+			400,
+			scopeFailureMessage(result.reason, result.value),
+			{
+				field: 'scopes'
+			}
+		);
 	}
 	return result.scopes;
 }
@@ -173,7 +183,9 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 			 * than by this read.
 			 */
 			if (await getProtectedResourceStore().find(namespace, identifier)) {
-				throw new AdminError(409, 'that identifier is already declared');
+				throw new AdminError(409, 'that identifier is already declared', {
+					field: 'identifier'
+				});
 			}
 
 			await recordAdminAudit(ctx, 'resource.create', identifier, {
@@ -202,7 +214,9 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 				 * it to "already declared" would hide it behind an answer that is not true.
 				 */
 				if (isUniqueValueTaken(error)) {
-					throw new AdminError(409, 'that identifier is already declared');
+					throw new AdminError(409, 'that identifier is already declared', {
+						field: 'identifier'
+					});
 				}
 				throw error;
 			}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
 	Alert,
 	Button,
@@ -6,18 +6,22 @@ import {
 	Col,
 	Descriptions,
 	Drawer,
-	Empty,
 	Input,
 	Row,
 	Select,
 	Space,
-	Modal,
 	Statistic,
 	Table,
 	Tag,
 	Typography
 } from 'antd';
 import { ORIGIN_NOT_CAPTURED } from '../../../consts/error_origin.js';
+import { PageHeader } from '../frame/PageHeader.js';
+import { PreviewConfirm, type PreviewStep } from '../frame/PreviewConfirm.js';
+import { request } from '../frame/request.js';
+import { useFeedback } from '../frame/feedback.js';
+import { Link, useNavigate, useRoute } from '../frame/router.js';
+import { EmptyState, LoadFailed, NoMatch } from '../frame/states.js';
 
 interface ErrorSample {
 	reference: string;
@@ -111,53 +115,141 @@ const SURFACE_COLOUR: Record<string, string> = {
 	interaction: 'cyan'
 };
 
+const FAULTS_HREF = '/admin/faults';
+
+/*
+ * The address a fault opens at. Any retained sample's reference finds its group, and a reference is what
+ * an integrator quotes, so the address is the same one a support conversation lands on. A group retained
+ * with no samples has no reference and so no address of its own.
+ */
+function referenceOf(group: ErrorGroup): string | null {
+	return group.samples[group.samples.length - 1]?.reference ?? null;
+}
+
+function activeFilters(active: Filters): string {
+	return Object.values(active)
+		.filter((value) => value !== '')
+		.join(', ');
+}
+
+interface PurgePreview {
+	groups: number;
+	occurrences: number;
+}
+
 export function Errors() {
 	const [page, setPage] = useState<ErrorPage | null>(null);
 	const [loading, setLoading] = useState(true);
-	const [selected, setSelected] = useState<ErrorGroup | null>(null);
+	const [loadFailed, setLoadFailed] = useState<string | null>(null);
+	/* The fault last opened, keyed by the reference it was opened at; null for one with no reference. */
+	const [opened, setOpened] = useState<{
+		reference: string | null;
+		group: ErrorGroup;
+	} | null>(null);
 	const [current, setCurrent] = useState(1);
 	const [pageSize, setPageSize] = useState(50);
 	const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
+	// What the list on screen was loaded with, which is not what the filter inputs hold until Apply.
+	const [applied, setApplied] = useState<Filters>(EMPTY_FILTERS);
 	const [summary, setSummary] = useState<Summary | null>(null);
 	const [reference, setReference] = useState('');
 	const [lookupError, setLookupError] = useState<string | null>(null);
-	const [purgePreview, setPurgePreview] = useState<{
-		groups: number;
-		occurrences: number;
-	} | null>(null);
-	const [purging, setPurging] = useState(false);
+	const [purgeOpen, setPurgeOpen] = useState(false);
+	const [purgePreview, setPurgePreview] = useState<PurgePreview | null>(null);
+	const feedback = useFeedback();
+	const navigate = useNavigate();
+	const { resolved } = useRoute();
+	const addressed =
+		resolved.kind === 'page' ? (resolved.route.params.reference ?? null) : null;
+
+	const selected =
+		addressed !== null
+			? opened?.reference === addressed
+				? opened.group
+				: null
+			: opened?.reference === null
+				? opened.group
+				: null;
+
+	/*
+	 * The drawer follows the address: a fault opened from the list, from the lookup box or from a link
+	 * someone pasted is the same page. A row already on screen is not read again.
+	 */
+	useEffect(() => {
+		if (addressed === null || opened?.reference === addressed) return;
+		let live = true;
+		void request<{ group: ErrorGroup }>(
+			'GET',
+			`/admin/api/errors/reference/${encodeURIComponent(addressed)}`
+		).then((result) => {
+			if (!live) return;
+			if (result.ok) {
+				setLookupError(null);
+				setOpened({ reference: addressed, group: result.data.group });
+				return;
+			}
+			// Said plainly rather than shown as an empty table: "no such record" is an answer, not a blank.
+			setLookupError(
+				result.status === 404
+					? 'No fault carries that reference. It may be mistyped, from another deployment, or already aged out.'
+					: result.error.message
+			);
+			void navigate(FAULTS_HREF, { replace: true });
+		});
+		return () => {
+			live = false;
+		};
+	}, [addressed, opened, navigate]);
+
+	function close() {
+		if (addressed !== null) void navigate(FAULTS_HREF, { replace: true });
+		else setOpened(null);
+	}
+
+	function filterParams(): URLSearchParams {
+		const params = new URLSearchParams();
+		for (const [name, value] of Object.entries(filters)) {
+			if (value !== '') params.set(name, value);
+		}
+		return params;
+	}
 
 	/*
 	 * Two steps, and the first one is the point: an operator is shown what the current filters would
 	 * destroy before anything is destroyed. The preview and the purge send the same filters to endpoints
 	 * that share one query schema, so what is shown is what goes.
 	 */
-	async function previewPurge() {
-		const params = new URLSearchParams();
-		for (const [name, value] of Object.entries(filters)) {
-			if (value !== '') params.set(name, value);
-		}
-		const res = await fetch(`/admin/api/errors/purge-preview?${params}`);
-		if (res.ok) {
-			setPurgePreview(
-				(await res.json()) as { groups: number; occurrences: number }
+	async function purgeStep(
+		commit: boolean
+	): Promise<PreviewStep<PurgePreview>> {
+		if (!commit) {
+			const result = await request<PurgePreview>(
+				'GET',
+				`/admin/api/errors/purge-preview?${filterParams().toString()}`
 			);
+			return result.ok
+				? { kind: 'preview', preview: result.data }
+				: { kind: 'failed', result };
 		}
+		const result = await request<{ removed: number }>(
+			'DELETE',
+			`/admin/api/errors?${filterParams().toString()}`
+		);
+		if (!result.ok) return { kind: 'failed', result };
+		const removed = result.data.removed;
+		return {
+			kind: 'done',
+			text: `${String(removed)} recorded fault${removed === 1 ? '' : 's'} purged.`
+		};
 	}
 
-	async function confirmPurge() {
-		setPurging(true);
-		try {
-			const params = new URLSearchParams();
-			for (const [name, value] of Object.entries(filters)) {
-				if (value !== '') params.set(name, value);
-			}
-			await fetch(`/admin/api/errors?${params}`, { method: 'DELETE' });
-			setPurgePreview(null);
-			void load(filters, 1, pageSize);
-			setCurrent(1);
-		} finally {
-			setPurging(false);
+	async function openPurge() {
+		const first = await purgeStep(false);
+		if (first.kind === 'preview') {
+			setPurgePreview(first.preview);
+			setPurgeOpen(true);
+		} else if (first.kind === 'failed') {
+			feedback.failed(first.result);
 		}
 	}
 
@@ -168,70 +260,66 @@ export function Errors() {
 	const canPurge = Object.values(filters).some((value) => value !== '');
 
 	/*
-	 * The support path: an integrator quotes a reference, and this lands on the one fault. Opens the same
-	 * drawer the table does, so there is one way to read a fault however it was found.
+	 * The support path: an integrator quotes a reference, and this lands on the one fault — at its own
+	 * address, so there is one way to read a fault however it was found.
 	 */
-	async function lookup() {
+	function lookup() {
 		setLookupError(null);
 		const trimmed = reference.trim();
 		if (trimmed === '') return;
-
-		const res = await fetch(
-			`/admin/api/errors/reference/${encodeURIComponent(trimmed)}`
-		);
-		if (res.ok) {
-			const body = (await res.json()) as { group: ErrorGroup };
-			setSelected(body.group);
-			return;
-		}
-		// Said plainly rather than shown as an empty table: "no such record" is an answer, not a blank.
-		setLookupError(
-			res.status === 404
-				? 'No fault carries that reference. It may be mistyped, from another deployment, or already aged out.'
-				: 'That lookup could not be completed.'
-		);
+		void navigate(`${FAULTS_HREF}/${encodeURIComponent(trimmed)}`);
 	}
 
 	/*
 	 * Filters are passed in rather than read from state, so a request always uses the values the caller
 	 * meant — resetting and reloading in one action would otherwise send the state it just replaced.
 	 */
-	async function load(active: Filters, atPage: number, size: number) {
-		setLoading(true);
-		try {
-			const res = await fetch(
+	const load = useCallback((active: Filters, atPage: number, size: number) => {
+		/*
+		 * The summary takes a window only, so it follows just the two date filters. Narrowing it by
+		 * route would make the "worst endpoint" ranking answer about one endpoint, which is not a
+		 * ranking.
+		 */
+		const window = new URLSearchParams();
+		if (active.from !== '') window.set('from', active.from);
+		if (active.to !== '') window.set('to', active.to);
+		return Promise.all([
+			request<ErrorPage>(
+				'GET',
 				`/admin/api/errors?${buildQuery(active, atPage, size)}`
-			);
-			if (res.ok) setPage((await res.json()) as ErrorPage);
-
-			/*
-			 * The summary takes a window only, so it follows just the two date filters. Narrowing it by
-			 * route would make the "worst endpoint" ranking answer about one endpoint, which is not a
-			 * ranking.
-			 */
-			const window = new URLSearchParams();
-			if (active.from !== '') window.set('from', active.from);
-			if (active.to !== '') window.set('to', active.to);
-			const sum = await fetch(`/admin/api/errors/summary?${window.toString()}`);
-			if (sum.ok) setSummary((await sum.json()) as Summary);
-		} finally {
+			),
+			request<Summary>('GET', `/admin/api/errors/summary?${window.toString()}`)
+		]).then(([result, sum]) => {
+			if (result.ok) {
+				setPage(result.data);
+				setApplied(active);
+				setLoadFailed(null);
+			} else {
+				setLoadFailed(result.error.message);
+			}
+			if (sum.ok) setSummary(sum.data);
 			setLoading(false);
-		}
+		});
+	}, []);
+
+	function reload(active: Filters, atPage: number, size: number) {
+		setLoading(true);
+		void load(active, atPage, size);
 	}
 
 	useEffect(() => {
 		void load(EMPTY_FILTERS, 1, 50);
-	}, []);
+	}, [load]);
 
 	function apply() {
 		setCurrent(1);
-		void load(filters, 1, pageSize);
+		reload(filters, 1, pageSize);
 	}
 
 	function reset() {
 		setFilters(EMPTY_FILTERS);
 		setCurrent(1);
-		void load(EMPTY_FILTERS, 1, pageSize);
+		reload(EMPTY_FILTERS, 1, pageSize);
 	}
 
 	const set = (name: keyof Filters) => (value: string) =>
@@ -272,18 +360,34 @@ export function Errors() {
 		{
 			title: 'Fault',
 			dataIndex: 'message',
-			render: (message: string, row: ErrorGroup) => (
-				<Space
-					orientation="vertical"
-					size={0}
-				>
-					<Typography.Text>{message}</Typography.Text>
-					<Typography.Text type="secondary">
-						{row.origin.file}
-						{row.origin.line === null ? '' : `:${row.origin.line}`}
-					</Typography.Text>
-				</Space>
-			)
+			render: (message: string, row: ErrorGroup) => {
+				const ref = referenceOf(row);
+				return (
+					<Space
+						orientation="vertical"
+						size={0}
+					>
+						{ref !== null ? (
+							<Link
+								href={`${FAULTS_HREF}/${encodeURIComponent(ref)}`}
+								onClick={() => setOpened({ reference: ref, group: row })}
+							>
+								{message}
+							</Link>
+						) : (
+							<Typography.Link
+								onClick={() => setOpened({ reference: null, group: row })}
+							>
+								{message}
+							</Typography.Link>
+						)}
+						<Typography.Text type="secondary">
+							{row.origin.file}
+							{row.origin.line === null ? '' : `:${row.origin.line}`}
+						</Typography.Text>
+					</Space>
+				);
+			}
 		},
 		{
 			title: 'Status',
@@ -301,325 +405,346 @@ export function Errors() {
 	];
 
 	return (
-		<Card>
-			<Space
-				orientation="vertical"
-				style={{ width: '100%' }}
-				size="middle"
-			>
-				<Typography.Title level={3}>Server faults</Typography.Title>
-				<Typography.Paragraph type="secondary">
-					Unexpected internal faults, one row per distinct fault. Routine client
-					rejections are not recorded, so everything here is a defect.
-				</Typography.Paragraph>
+		<>
+			<PageHeader
+				title="Server faults"
+				description="Unexpected internal faults, one row per distinct fault. Routine client rejections are not recorded, so everything here is a defect."
+			/>
+			<Card>
+				<Space
+					orientation="vertical"
+					style={{ width: '100%' }}
+					size="middle"
+				>
+					{/*
+					 * Stated rather than hidden. A non-zero drop count means this list is missing faults that
+					 * really happened, and an operator reading an incomplete list as complete would draw the
+					 * opposite conclusion from the evidence.
+					 */}
+					{page && !page.recording ? (
+						<Alert
+							type="info"
+							showIcon
+							title="Fault recording is switched off"
+							description="Nothing is being recorded, so an empty list here does not mean the server has had no faults. Switch it on under Settings → Error Store."
+						/>
+					) : null}
 
-				{/*
-				 * Stated rather than hidden. A non-zero drop count means this list is missing faults that
-				 * really happened, and an operator reading an incomplete list as complete would draw the
-				 * opposite conclusion from the evidence.
-				 */}
-				{page && !page.recording ? (
-					<Alert
-						type="info"
-						showIcon
-						title="Fault recording is switched off"
-						description="Nothing is being recorded, so an empty list here does not mean the server has had no faults. Switch it on under Settings → Error Store."
-					/>
-				) : null}
+					{summary ? (
+						<Row gutter={16}>
+							<Col span={6}>
+								<Card size="small">
+									<Statistic
+										title="Occurrences"
+										value={summary.total}
+									/>
+								</Card>
+							</Col>
+							<Col span={9}>
+								<Card
+									size="small"
+									title="Worst endpoints"
+								>
+									{/* Ranked by occurrences, so one loud fault outranks a quiet long tail. */}
+									{summary.byRoute.slice(0, 5).map((bucket) => (
+										<div key={bucket.key}>
+											<Typography.Text code>{bucket.key}</Typography.Text>{' '}
+											<Typography.Text strong>{bucket.count}</Typography.Text>
+										</div>
+									))}
+									{summary.byRoute.length === 0 ? (
+										<Typography.Text type="secondary">—</Typography.Text>
+									) : null}
+								</Card>
+							</Col>
+							<Col span={9}>
+								<Card
+									size="small"
+									title="By error code"
+								>
+									{summary.byErrorCode.slice(0, 5).map((bucket) => (
+										<div key={bucket.key}>
+											<Typography.Text code>{bucket.key}</Typography.Text>{' '}
+											<Typography.Text strong>{bucket.count}</Typography.Text>
+										</div>
+									))}
+									{summary.byErrorCode.length === 0 ? (
+										<Typography.Text type="secondary">—</Typography.Text>
+									) : null}
+								</Card>
+							</Col>
+						</Row>
+					) : null}
 
-				{summary ? (
-					<Row gutter={16}>
-						<Col span={6}>
-							<Card size="small">
-								<Statistic
-									title="Occurrences"
-									value={summary.total}
-								/>
-							</Card>
-						</Col>
-						<Col span={9}>
-							<Card
-								size="small"
-								title="Worst endpoints"
-							>
-								{/* Ranked by occurrences, so one loud fault outranks a quiet long tail. */}
-								{summary.byRoute.slice(0, 5).map((bucket) => (
-									<div key={bucket.key}>
-										<Typography.Text code>{bucket.key}</Typography.Text>{' '}
-										<Typography.Text strong>{bucket.count}</Typography.Text>
-									</div>
-								))}
-								{summary.byRoute.length === 0 ? (
-									<Typography.Text type="secondary">—</Typography.Text>
-								) : null}
-							</Card>
-						</Col>
-						<Col span={9}>
-							<Card
-								size="small"
-								title="By error code"
-							>
-								{summary.byErrorCode.slice(0, 5).map((bucket) => (
-									<div key={bucket.key}>
-										<Typography.Text code>{bucket.key}</Typography.Text>{' '}
-										<Typography.Text strong>{bucket.count}</Typography.Text>
-									</div>
-								))}
-								{summary.byErrorCode.length === 0 ? (
-									<Typography.Text type="secondary">—</Typography.Text>
-								) : null}
-							</Card>
-						</Col>
-					</Row>
-				) : null}
-
-				<Space wrap>
-					<Input.Search
-						placeholder="reference from a report (err_…)"
-						style={{ width: 320 }}
-						enterButton="Look up"
-						value={reference}
-						onChange={(e) => setReference(e.target.value)}
-						onSearch={lookup}
-					/>
-				</Space>
-
-				{lookupError ? (
-					<Alert
-						type="warning"
-						showIcon
-						title={lookupError}
-						closable
-					/>
-				) : null}
-
-				<Space wrap>
-					<Input
-						placeholder="endpoint"
-						style={{ width: 200 }}
-						value={filters.route}
-						onChange={(e) => set('route')(e.target.value)}
-					/>
-					<Input
-						placeholder="error code"
-						style={{ width: 150 }}
-						value={filters.errorCode}
-						onChange={(e) => set('errorCode')(e.target.value)}
-					/>
-					<Select
-						placeholder="surface"
-						style={{ width: 140 }}
-						allowClear
-						value={filters.surface === '' ? undefined : filters.surface}
-						options={['oauth', 'admin', 'mcp', 'interaction', 'scim'].map(
-							(s) => ({
-								label: s,
-								value: s
-							})
-						)}
-						onChange={(v: string | undefined) => set('surface')(v ?? '')}
-					/>
-					<Input
-						placeholder="status"
-						style={{ width: 110 }}
-						value={filters.status}
-						onChange={(e) => set('status')(e.target.value)}
-					/>
-					<Input
-						placeholder="client id"
-						style={{ width: 180 }}
-						value={filters.clientId}
-						onChange={(e) => set('clientId')(e.target.value)}
-					/>
-					<Input
-						placeholder="actor id or email"
-						style={{ width: 200 }}
-						value={filters.actor}
-						onChange={(e) => set('actor')(e.target.value)}
-					/>
-					<Input
-						placeholder="from (ISO)"
-						style={{ width: 190 }}
-						value={filters.from}
-						onChange={(e) => set('from')(e.target.value)}
-					/>
-					<Input
-						placeholder="to (ISO)"
-						style={{ width: 190 }}
-						value={filters.to}
-						onChange={(e) => set('to')(e.target.value)}
-					/>
-					<Button
-						type="primary"
-						onClick={apply}
-					>
-						Apply
-					</Button>
-					<Button onClick={reset}>Reset</Button>
-					<Button
-						danger
-						disabled={!canPurge}
-						onClick={previewPurge}
-					>
-						Purge matching…
-					</Button>
-				</Space>
-
-				{!canPurge ? (
-					<Typography.Text type="secondary">
-						Purging requires at least one filter — there is deliberately no way
-						to delete every record in one action.
-					</Typography.Text>
-				) : null}
-
-				{page && page.dropped > 0 ? (
-					<Alert
-						type="warning"
-						showIcon
-						title={`${page.dropped} fault(s) could not be recorded`}
-						description="Recording fell behind, so this list is incomplete. Raise the pending write queue depth in Settings, or investigate why the store is slow."
-					/>
-				) : null}
-
-				<Table<ErrorGroup>
-					rowKey="_id"
-					loading={loading}
-					columns={columns}
-					dataSource={page?.groups ?? []}
-					locale={{
-						emptyText: <Empty description="No faults recorded" />
-					}}
-					onRow={(row) => ({ onClick: () => setSelected(row) })}
-					pagination={{
-						current,
-						pageSize,
-						total: page?.total ?? 0,
-						showSizeChanger: true,
-						onChange: (nextPage, nextSize) => {
-							setCurrent(nextPage);
-							setPageSize(nextSize);
-							void load(filters, nextPage, nextSize);
-						}
-					}}
-				/>
-			</Space>
-
-			<Modal
-				open={purgePreview !== null}
-				title="Purge these recorded faults?"
-				okText={
-					purgePreview ? `Purge ${purgePreview.groups} fault(s)` : 'Purge'
-				}
-				okButtonProps={{ danger: true, loading: purging }}
-				onOk={confirmPurge}
-				onCancel={() => setPurgePreview(null)}
-			>
-				{purgePreview ? (
-					<Space orientation="vertical">
-						<Typography.Text>
-							{purgePreview.groups} distinct fault(s), covering{' '}
-							{purgePreview.occurrences} occurrence(s), match the current
-							filters.
-						</Typography.Text>
-						{/* Said plainly: this is the only account of what went wrong, and it does not come back. */}
-						<Typography.Text type="danger">
-							This cannot be undone. A purge is recorded in the audit trail.
-						</Typography.Text>
+					<Space wrap>
+						<Input.Search
+							placeholder="reference from a report (err_…)"
+							style={{ width: 320 }}
+							enterButton="Look up"
+							value={reference}
+							onChange={(e) => setReference(e.target.value)}
+							onSearch={lookup}
+						/>
 					</Space>
-				) : null}
-			</Modal>
 
-			<Drawer
-				size={640}
-				open={selected !== null}
-				onClose={() => setSelected(null)}
-				title={selected ? `${selected.method} ${selected.route}` : ''}
-			>
-				{selected ? (
-					<Space
-						orientation="vertical"
-						size="middle"
-						style={{ width: '100%' }}
-					>
-						<Descriptions
-							column={1}
-							size="small"
-							bordered
+					{lookupError ? (
+						<Alert
+							type="warning"
+							showIcon
+							title={lookupError}
+							closable
+						/>
+					) : null}
+
+					<Space wrap>
+						<Input
+							placeholder="endpoint"
+							style={{ width: 200 }}
+							value={filters.route}
+							onChange={(e) => set('route')(e.target.value)}
+						/>
+						<Input
+							placeholder="error code"
+							style={{ width: 150 }}
+							value={filters.errorCode}
+							onChange={(e) => set('errorCode')(e.target.value)}
+						/>
+						<Select
+							placeholder="surface"
+							style={{ width: 140 }}
+							allowClear
+							value={filters.surface === '' ? undefined : filters.surface}
+							options={['oauth', 'admin', 'mcp', 'interaction', 'scim'].map(
+								(s) => ({
+									label: s,
+									value: s
+								})
+							)}
+							onChange={(v: string | undefined) => set('surface')(v ?? '')}
+						/>
+						<Input
+							placeholder="status"
+							style={{ width: 110 }}
+							value={filters.status}
+							onChange={(e) => set('status')(e.target.value)}
+						/>
+						<Input
+							placeholder="client id"
+							style={{ width: 180 }}
+							value={filters.clientId}
+							onChange={(e) => set('clientId')(e.target.value)}
+						/>
+						<Input
+							placeholder="actor id or email"
+							style={{ width: 200 }}
+							value={filters.actor}
+							onChange={(e) => set('actor')(e.target.value)}
+						/>
+						<Input
+							placeholder="from (ISO)"
+							style={{ width: 190 }}
+							value={filters.from}
+							onChange={(e) => set('from')(e.target.value)}
+						/>
+						<Input
+							placeholder="to (ISO)"
+							style={{ width: 190 }}
+							value={filters.to}
+							onChange={(e) => set('to')(e.target.value)}
+						/>
+						<Button
+							type="primary"
+							onClick={apply}
 						>
-							<Descriptions.Item label="Fault">
-								{selected.message}
-							</Descriptions.Item>
-							<Descriptions.Item label="Origin">
-								{selected.origin.frame} — {selected.origin.file}
-								{selected.origin.line === null
-									? ''
-									: `:${selected.origin.line}`}
-							</Descriptions.Item>
-							<Descriptions.Item label="Occurrences">
-								{selected.occurrences}
-							</Descriptions.Item>
-							<Descriptions.Item label="First seen">
-								{new Date(selected.firstSeenAt).toLocaleString()}
-							</Descriptions.Item>
-							<Descriptions.Item label="Last seen">
-								{new Date(selected.lastSeenAt).toLocaleString()}
-							</Descriptions.Item>
-						</Descriptions>
+							Apply
+						</Button>
+						<Button onClick={reset}>Reset</Button>
+						<Button
+							danger
+							disabled={!canPurge}
+							onClick={() => void openPurge()}
+						>
+							Purge matching…
+						</Button>
+					</Space>
 
+					{!canPurge ? (
 						<Typography.Text type="secondary">
-							{/*
-							 * Says what the sample list is, because a count of 900 beside 10 samples otherwise
-							 * reads as data loss rather than as a deliberate bound.
-							 */}
-							Retained occurrences ({selected.samples.length} of{' '}
-							{selected.occurrences}) — the earliest, plus the most recent.
+							Purging requires at least one filter — there is deliberately no
+							way to delete every record in one action.
 						</Typography.Text>
+					) : null}
 
-						{selected.samples.map((sample) => (
+					{page && page.dropped > 0 ? (
+						<Alert
+							type="warning"
+							showIcon
+							title={`${page.dropped} fault(s) could not be recorded`}
+							description="Recording fell behind, so this list is incomplete. Raise the pending write queue depth in Settings, or investigate why the store is slow."
+						/>
+					) : null}
+
+					{loadFailed !== null ? (
+						<LoadFailed
+							reason={loadFailed}
+							onRetry={() => reload(applied, current, pageSize)}
+						/>
+					) : (
+						<Table<ErrorGroup>
+							rowKey="_id"
+							loading={loading}
+							columns={columns}
+							dataSource={page?.groups ?? []}
+							locale={{
+								emptyText:
+									activeFilters(applied) !== '' ? (
+										<NoMatch
+											query={activeFilters(applied)}
+											onClear={reset}
+										/>
+									) : (
+										<EmptyState purpose="No faults recorded." />
+									)
+							}}
+							pagination={{
+								current,
+								pageSize,
+								total: page?.total ?? 0,
+								showSizeChanger: true,
+								onChange: (nextPage, nextSize) => {
+									setCurrent(nextPage);
+									setPageSize(nextSize);
+									reload(filters, nextPage, nextSize);
+								}
+							}}
+						/>
+					)}
+				</Space>
+
+				<PreviewConfirm<PurgePreview>
+					open={purgeOpen}
+					danger
+					title="Purge these recorded faults?"
+					commitText={
+						purgePreview
+							? `Purge ${String(purgePreview.groups)} fault(s)`
+							: 'Purge'
+					}
+					preview={purgePreview}
+					onPreview={setPurgePreview}
+					step={purgeStep}
+					onClose={() => setPurgeOpen(false)}
+					onDone={() => {
+						setPurgeOpen(false);
+						setCurrent(1);
+						reload(filters, 1, pageSize);
+					}}
+					renderPreview={(shown) => (
+						<Space orientation="vertical">
+							<Typography.Text>
+								{shown.groups} distinct fault(s), covering {shown.occurrences}{' '}
+								occurrence(s), match the current filters.
+							</Typography.Text>
+							{/* Said plainly: this is the only account of what went wrong, and it does not come back. */}
+							<Typography.Text type="danger">
+								This cannot be undone. A purge is recorded in the audit trail.
+							</Typography.Text>
+						</Space>
+					)}
+				/>
+
+				<Drawer
+					size={640}
+					open={selected !== null}
+					onClose={close}
+					title={selected ? `${selected.method} ${selected.route}` : ''}
+				>
+					{selected ? (
+						<Space
+							orientation="vertical"
+							size="middle"
+							style={{ width: '100%' }}
+						>
 							<Descriptions
-								key={sample.reference}
 								column={1}
 								size="small"
 								bordered
 							>
-								<Descriptions.Item label="Reference">
-									<Typography.Text
-										copyable
-										code
-									>
-										{sample.reference}
-									</Typography.Text>
-								</Descriptions.Item>
-								<Descriptions.Item label="At">
-									{new Date(sample.at).toLocaleString()}
-								</Descriptions.Item>
-								<Descriptions.Item label="Client">
-									{sample.clientId ?? '—'}
-								</Descriptions.Item>
-								<Descriptions.Item label="Actor">
-									{sample.actor?.email ?? '—'}
+								<Descriptions.Item label="Fault">
+									{selected.message}
 								</Descriptions.Item>
 								<Descriptions.Item label="Origin">
-									{sample.origin === ORIGIN_NOT_CAPTURED
-										? 'not captured'
-										: (sample.origin ?? '—')}
+									{selected.origin.frame} — {selected.origin.file}
+									{selected.origin.line === null
+										? ''
+										: `:${selected.origin.line}`}
 								</Descriptions.Item>
-								<Descriptions.Item label="User agent">
-									{sample.userAgent ?? '—'}
+								<Descriptions.Item label="Occurrences">
+									{selected.occurrences}
 								</Descriptions.Item>
-								<Descriptions.Item label="Fields submitted">
-									{/* Names only — no value a request carried is ever stored. */}
-									{sample.submittedFields.length
-										? sample.submittedFields.map((field) => (
-												<Tag key={field}>{field}</Tag>
-											))
-										: '—'}
+								<Descriptions.Item label="First seen">
+									{new Date(selected.firstSeenAt).toLocaleString()}
+								</Descriptions.Item>
+								<Descriptions.Item label="Last seen">
+									{new Date(selected.lastSeenAt).toLocaleString()}
 								</Descriptions.Item>
 							</Descriptions>
-						))}
-					</Space>
-				) : null}
-			</Drawer>
-		</Card>
+
+							<Typography.Text type="secondary">
+								{/*
+								 * Says what the sample list is, because a count of 900 beside 10 samples otherwise
+								 * reads as data loss rather than as a deliberate bound.
+								 */}
+								Retained occurrences ({selected.samples.length} of{' '}
+								{selected.occurrences}) — the earliest, plus the most recent.
+							</Typography.Text>
+
+							{selected.samples.map((sample) => (
+								<Descriptions
+									key={sample.reference}
+									column={1}
+									size="small"
+									bordered
+								>
+									<Descriptions.Item label="Reference">
+										<Typography.Text
+											copyable
+											code
+										>
+											{sample.reference}
+										</Typography.Text>
+									</Descriptions.Item>
+									<Descriptions.Item label="At">
+										{new Date(sample.at).toLocaleString()}
+									</Descriptions.Item>
+									<Descriptions.Item label="Client">
+										{sample.clientId ?? '—'}
+									</Descriptions.Item>
+									<Descriptions.Item label="Actor">
+										{sample.actor?.email ?? '—'}
+									</Descriptions.Item>
+									<Descriptions.Item label="Origin">
+										{sample.origin === ORIGIN_NOT_CAPTURED
+											? 'not captured'
+											: (sample.origin ?? '—')}
+									</Descriptions.Item>
+									<Descriptions.Item label="User agent">
+										{sample.userAgent ?? '—'}
+									</Descriptions.Item>
+									<Descriptions.Item label="Fields submitted">
+										{/* Names only — no value a request carried is ever stored. */}
+										{sample.submittedFields.length
+											? sample.submittedFields.map((field) => (
+													<Tag key={field}>{field}</Tag>
+												))
+											: '—'}
+									</Descriptions.Item>
+								</Descriptions>
+							))}
+						</Space>
+					) : null}
+				</Drawer>
+			</Card>
+		</>
 	);
 }

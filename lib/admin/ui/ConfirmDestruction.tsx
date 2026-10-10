@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { Modal, Alert, Checkbox, Input, Space, Typography } from 'antd';
 
 /*
- * The word an administrator types before a container is destroyed.
+ * The word an administrator types before something is destroyed: `delete` for a container, `retire`
+ * for a signing key, `release` for a held deprovisioning (actions.ts, class C3).
  *
- * A fixed word rather than the container's own name: the name is on the screen to be copied, so
- * asking for it tests reading rather than attention, which is the thing this control exists to buy.
+ * A fixed word rather than the thing's own name: the name is on the screen to be copied, so asking for
+ * it tests reading rather than attention, which is the thing this control exists to buy.
  */
 export const CONFIRM_WORD = 'delete';
 
@@ -15,8 +16,8 @@ export const CONFIRM_WORD = 'delete';
  * a paste is not a different intention; case-insensitive because DELETE and delete are one word and
  * refusing one of them teaches an operator nothing.
  */
-function typedTheWord(value: string): boolean {
-	return value.trim().toLowerCase() === CONFIRM_WORD;
+function typedTheWord(value: string, word: string): boolean {
+	return value.trim().toLowerCase() === word;
 }
 
 export interface CascadeOffer {
@@ -48,6 +49,8 @@ export function ConfirmDestruction({
 	consequences,
 	cascade,
 	busy,
+	word = CONFIRM_WORD,
+	okText,
 	onCancel,
 	onConfirm
 }: {
@@ -58,6 +61,8 @@ export function ConfirmDestruction({
 	/* Absent when the container is empty, so an empty container never offers to destroy nothing. */
 	cascade?: CascadeOffer;
 	busy?: boolean;
+	word?: string;
+	okText?: string;
 	onCancel: () => void;
 	onConfirm: (withCascade: boolean) => void;
 }) {
@@ -80,10 +85,10 @@ export function ConfirmDestruction({
 		<Modal
 			title={title}
 			open={open}
-			okText={`Delete permanently`}
+			okText={okText ?? 'Delete permanently'}
 			okButtonProps={{
 				danger: true,
-				disabled: blocked || !typedTheWord(typed)
+				disabled: blocked || !typedTheWord(typed, word)
 			}}
 			confirmLoading={busy}
 			onCancel={() => {
@@ -150,8 +155,7 @@ export function ConfirmDestruction({
 					style={{ width: '100%' }}
 				>
 					<Typography.Text>
-						Type <Typography.Text strong>{CONFIRM_WORD}</Typography.Text> to
-						confirm
+						Type <Typography.Text strong>{word}</Typography.Text> to confirm
 					</Typography.Text>
 					{/*
 					 * No placeholder holding the word and no default value: a field already containing

@@ -12,15 +12,17 @@ import {
 	Tag,
 	Tooltip,
 	Badge,
-	Typography,
-	Popconfirm,
-	message
+	Typography
 } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 /* The login page's own marks, not a second copy: one table, corrected in one place. */
 import { providerMark } from '../../../interactions/providerMark.js';
 import type { FederationProvider } from '../../../federation/types.js';
-import { readJson } from '../json.ts';
+import { request } from '../frame/request.js';
+import { useFeedback } from '../frame/feedback.js';
+import { useConfirm } from '../frame/confirm.js';
+import { RowActions } from '../frame/RowActions.js';
+import { EmptyState, LoadFailed } from '../frame/states.js';
 
 /*
  * A bucket's upstream identity providers.
@@ -40,7 +42,6 @@ interface ProviderValues {
 	provisioning?: 'jit' | 'existing_only';
 	allowedEmailDomains?: string[];
 	emailClaim?: string;
-	enabled?: boolean;
 	acceptsGlobalTokenRevocation?: boolean;
 	acceptsBackChannelLogout?: boolean;
 }
@@ -113,16 +114,22 @@ function suppliedByChoice(guidance: Guidance, name: string): boolean {
 
 export function FederationPanel({
 	bucketId,
-	onChanged
+	onChanged,
+	canEdit = true
 }: {
 	bucketId: string;
 	/* The bucket's own settings depend on this list — a lockout refusal is easier to understand if the
 	 * providers shown are current — so the parent is told when it changes. */
 	onChanged?: () => void;
+	/* False when the caller may read this bucket but not change it; the server would refuse every write. */
+	canEdit?: boolean;
 }) {
 	const base = `/admin/api/buckets/${encodeURIComponent(bucketId)}/federation`;
+	const feedback = useFeedback();
+	const confirm = useConfirm();
 	const [rows, setRows] = useState<PresentedProvider[]>([]);
 	const [loading, setLoading] = useState(true);
+	const [loadFailure, setLoadFailure] = useState<string | null>(null);
 	const [open, setOpen] = useState(false);
 	const [editing, setEditing] = useState<PresentedProvider | null>(null);
 	const [saving, setSaving] = useState(false);
@@ -136,18 +143,22 @@ export function FederationPanel({
 	const fetchProviders = useCallback(async () => {
 		try {
 			const [providers, catalogue] = await Promise.all([
-				fetch(base),
-				fetch(`${base}/catalogue`)
+				request<PresentedProvider[]>('GET', base),
+				request<{ providers?: Guidance[] }>('GET', `${base}/catalogue`)
 			]);
-			setRows(
-				providers.ok ? await readJson<PresentedProvider[]>(providers) : []
-			);
-			setGuidance(
-				catalogue.ok
-					? ((await readJson<{ providers?: Guidance[] }>(catalogue))
-							.providers ?? [])
-					: []
-			);
+			/*
+			 * Either half failing is a failed load: without the catalogue the connect marks and the
+			 * callback address vanish, and an operator would read that as "nothing to connect".
+			 */
+			if (!providers.ok) {
+				setLoadFailure(providers.error.message);
+			} else if (!catalogue.ok) {
+				setLoadFailure(catalogue.error.message);
+			} else {
+				setLoadFailure(null);
+				setRows(providers.data);
+				setGuidance(catalogue.data.providers ?? []);
+			}
 		} finally {
 			setLoading(false);
 		}
@@ -165,9 +176,13 @@ export function FederationPanel({
 	async function copyCallback(uri: string) {
 		try {
 			await navigator.clipboard.writeText(uri);
-			message.success('callback address copied');
+			feedback.done('Callback address copied.');
 		} catch {
-			message.error('could not copy — select the address and copy it by hand');
+			feedback.refused({
+				error: 'clipboard',
+				message:
+					'The address could not be copied. Select it and copy it by hand.'
+			});
 		}
 	}
 
@@ -189,12 +204,16 @@ export function FederationPanel({
 					answered[choice.name] = picked;
 				}
 			}
-			const ok = await send(base, 'POST', {
+			const result = await request('POST', base, {
 				catalogueId: connecting.catalogueId,
 				...values,
 				...answered
 			});
-			if (!ok) return;
+			if (!result.ok) {
+				feedback.failed(result, connectForm);
+				return;
+			}
+			feedback.done(`Identity provider ${connecting.displayName} connected.`);
 			setConnecting(null);
 			connectForm.resetFields();
 			await load();
@@ -208,41 +227,24 @@ export function FederationPanel({
 		void fetchProviders();
 	}, [fetchProviders]);
 
-	/* One reporter for every mutation, so the server's reason is what an operator reads. */
-	async function send(
-		path: string,
-		method: string,
-		body?: unknown
-	): Promise<boolean> {
-		const res = await fetch(path, {
-			method,
-			...(body
-				? {
-						headers: { 'content-type': 'application/json' },
-						body: JSON.stringify(body)
-					}
-				: {})
-		});
-		if (res.ok) return true;
-		const detail = (await res.json().catch(() => null)) as {
-			message?: string;
-		} | null;
-		message.error(detail?.message ?? `request failed (${res.status})`);
-		return false;
-	}
-
 	async function submit(values: ProviderValues) {
 		setSaving(true);
 		try {
-			const ok = editing
-				? await send(
-						`${base}/${encodeURIComponent(editing.id)}`,
+			const result = editing
+				? await request(
 						'PATCH',
+						`${base}/${encodeURIComponent(editing.id)}`,
 						// `id` is not editable: it appears in URLs the login page has already rendered.
 						{ ...values, id: undefined }
 					)
-				: await send(base, 'POST', values);
-			if (!ok) return;
+				: await request('POST', base, values);
+			if (!result.ok) {
+				feedback.failed(result, form);
+				return;
+			}
+			feedback.done(
+				`Identity provider ${values.displayName} ${editing ? 'updated' : 'created'}.`
+			);
 			setOpen(false);
 			setEditing(null);
 			form.resetFields();
@@ -251,6 +253,69 @@ export function FederationPanel({
 		} finally {
 			setSaving(false);
 		}
+	}
+
+	async function setEnabled(row: PresentedProvider, enabled: boolean) {
+		const proceed = enabled
+			? await confirm('provider.enable', { target: row.displayName })
+			: await confirm('provider.disable', {
+					target: row.displayName,
+					consequences: [
+						`Nobody can sign in to this bucket with ${row.displayName} until it is enabled again.`,
+						'Accounts and their links to it are kept.'
+					]
+				});
+		if (!proceed) return;
+		const result = await request(
+			'PATCH',
+			`${base}/${encodeURIComponent(row.id)}`,
+			{ enabled }
+		);
+		if (!result.ok) {
+			feedback.failed(result);
+			return;
+		}
+		feedback.done(
+			`Identity provider ${row.displayName} ${enabled ? 'enabled' : 'disabled'}.`
+		);
+		await load();
+		onChanged?.();
+	}
+
+	async function remove(row: PresentedProvider) {
+		if (
+			!(await confirm('provider.delete', {
+				target: row.displayName,
+				consequences: [
+					`Every account's link to ${row.displayName} is removed with it, so its users can no longer sign in through it.`,
+					'People who signed in only through it keep their accounts, but need another way to sign in.',
+					'Connecting it again later does not restore the links.'
+				]
+			}))
+		) {
+			return;
+		}
+		const result = await request(
+			'DELETE',
+			`${base}/${encodeURIComponent(row.id)}`
+		);
+		if (!result.ok) {
+			feedback.failed(result);
+			return;
+		}
+		feedback.done(`Identity provider ${row.displayName} deleted.`);
+		await load();
+		onChanged?.();
+	}
+
+	function openEdit(row: PresentedProvider) {
+		setEditing(row);
+		// The masked secret is deliberately not prefilled: an empty field means "keep the stored one",
+		// which is what an operator editing a name wants. `enabled` is left out because it is changed
+		// only by the row's Enable and Disable, never as a side effect of saving the form.
+		const { enabled, ...editable } = row;
+		form.setFieldsValue({ ...editable, clientSecret: undefined });
+		setOpen(true);
 	}
 
 	return (
@@ -282,7 +347,7 @@ export function FederationPanel({
 				 * `aria-label` and not only the tooltip: a tooltip is visual, so an icon-only control
 				 * without one has no accessible name at all.
 				 */}
-				{guidance.map((entry) => (
+				{(canEdit ? guidance : []).map((entry) => (
 					<Tooltip
 						key={entry.catalogueId}
 						title={
@@ -330,16 +395,18 @@ export function FederationPanel({
 						</Badge>
 					</Tooltip>
 				))}
-				<Button
-					icon={<PlusOutlined />}
-					onClick={() => {
-						setEditing(null);
-						form.resetFields();
-						setOpen(true);
-					}}
-				>
-					Add another provider
-				</Button>
+				{canEdit && (
+					<Button
+						icon={<PlusOutlined />}
+						onClick={() => {
+							setEditing(null);
+							form.resetFields();
+							setOpen(true);
+						}}
+					>
+						New provider
+					</Button>
+				)}
 			</Space>
 
 			<Typography.Paragraph type="secondary">
@@ -347,101 +414,115 @@ export function FederationPanel({
 				client secret is stored but never shown again.
 			</Typography.Paragraph>
 
-			<Table<FederationProvider>
-				rowKey="id"
-				loading={loading}
-				dataSource={rows}
-				pagination={false}
-				columns={[
-					{ title: 'Id', dataIndex: 'id' },
-					{ title: 'Name', dataIndex: 'displayName' },
-					{ title: 'Issuer', dataIndex: 'issuer' },
-					{
-						title: 'Status',
-						dataIndex: 'enabled',
-						render: (enabled: boolean) => (
-							<Tag color={enabled ? 'green' : 'default'}>
-								{enabled ? 'enabled' : 'disabled'}
-							</Tag>
-						)
-					},
-					{
-						title: 'Email',
-						render: (_, row) => (
-							<Space size={4}>
-								{row.emailTrusted && <Tag color="blue">trusted</Tag>}
-								{row.acceptsGlobalTokenRevocation && (
-									<Tag color="purple">Universal Logout</Tag>
-								)}
-								{row.acceptsBackChannelLogout && (
-									<Tag color="purple">Back-channel logout</Tag>
-								)}
-								<Tag>
-									{row.provisioning === 'jit' ? 'auto-create' : 'existing only'}
+			{!canEdit && (
+				<Alert
+					style={{ marginBottom: 12 }}
+					type="info"
+					showIcon
+					title="Only members of the group that owns this bucket can change this."
+				/>
+			)}
+
+			{loadFailure !== null ? (
+				<LoadFailed
+					reason={loadFailure}
+					onRetry={() => void load()}
+				/>
+			) : (
+				<Table<PresentedProvider>
+					rowKey="id"
+					loading={loading}
+					dataSource={rows}
+					pagination={false}
+					locale={{
+						emptyText: <EmptyState purpose="No identity providers yet." />
+					}}
+					columns={[
+						{ title: 'Id', dataIndex: 'id' },
+						{
+							title: 'Name',
+							dataIndex: 'displayName',
+							render: (name: string, row) =>
+								canEdit ? (
+									<Typography.Link onClick={() => openEdit(row)}>
+										{name}
+									</Typography.Link>
+								) : (
+									name
+								)
+						},
+						{ title: 'Issuer', dataIndex: 'issuer' },
+						{
+							title: 'Status',
+							dataIndex: 'enabled',
+							render: (enabled: boolean) => (
+								<Tag color={enabled ? 'green' : 'default'}>
+									{enabled ? 'Enabled' : 'Disabled'}
 								</Tag>
-							</Space>
-						)
-					},
-					{
-						title: '',
-						render: (_, row) => (
-							<Space>
-								<Button
-									size="small"
-									onClick={() => {
-										setEditing(row);
-										// The masked secret is deliberately not prefilled: an empty field means
-										// "keep the stored one", which is what an operator editing a name wants.
-										form.setFieldsValue({ ...row, clientSecret: undefined });
-										setOpen(true);
-									}}
-								>
-									Edit
-								</Button>
-								<Button
-									size="small"
-									onClick={async () => {
-										if (
-											await send(
-												`${base}/${encodeURIComponent(row.id)}`,
-												'PATCH',
-												{ enabled: !row.enabled }
-											)
-										) {
-											await load();
-											onChanged?.();
-										}
-									}}
-								>
-									{row.enabled ? 'Disable' : 'Enable'}
-								</Button>
-								<Popconfirm
-									title="Remove this provider?"
-									description="Accounts already linked to it keep their other ways to sign in."
-									onConfirm={async () => {
-										if (
-											await send(
-												`${base}/${encodeURIComponent(row.id)}`,
-												'DELETE'
-											)
-										) {
-											await load();
-											onChanged?.();
-										}
-									}}
-								>
-									<Button
-										size="small"
-										danger
-									>
-										Remove
-									</Button>
-								</Popconfirm>
-							</Space>
-						)
-					}
-				]}
-			/>
+							)
+						},
+						{
+							title: 'Email',
+							render: (_, row) => (
+								<Space size={4}>
+									{row.emailTrusted && <Tag color="blue">Trusted</Tag>}
+									{row.acceptsGlobalTokenRevocation && (
+										<Tag color="purple">Universal Logout</Tag>
+									)}
+									{row.acceptsBackChannelLogout && (
+										<Tag color="purple">Back-channel logout</Tag>
+									)}
+									<Tag>
+										{row.provisioning === 'jit'
+											? 'Auto-create'
+											: 'Existing only'}
+									</Tag>
+								</Space>
+							)
+						},
+						...(canEdit
+							? [
+									{
+										title: '',
+										key: 'actions',
+										render: (_: unknown, row: PresentedProvider) => (
+											<RowActions
+												name={row.displayName}
+												items={[
+													{
+														key: 'edit',
+														label: 'Edit…',
+														group: 'edit',
+														onClick: () => openEdit(row)
+													},
+													row.enabled
+														? {
+																key: 'disable',
+																label: 'Disable…',
+																group: 'state',
+																onClick: () => void setEnabled(row, false)
+															}
+														: {
+																key: 'enable',
+																label: 'Enable',
+																group: 'state',
+																onClick: () => void setEnabled(row, true)
+															},
+													{
+														key: 'delete',
+														label: 'Delete…',
+														group: 'danger',
+														onClick: () => void remove(row)
+													}
+												]}
+											/>
+										)
+									}
+								]
+							: [])
+					]}
+				/>
+			)}
 
 			{/*
 			 * Restated beside the providers it governs, and worded so it claims nothing it cannot prove.
@@ -552,6 +633,7 @@ export function FederationPanel({
 								form={connectForm}
 								layout="vertical"
 								onFinish={connect}
+								scrollToFirstError
 							>
 								{/*
 								 * A question the provider forces before its values mean anything — only one
@@ -645,7 +727,7 @@ export function FederationPanel({
 			<Modal
 				open={open}
 				title={
-					editing ? `Edit ${editing.displayName}` : 'Add identity provider'
+					editing ? `Edit ${editing.displayName}` : 'New identity provider'
 				}
 				okText="Save"
 				confirmLoading={saving}
@@ -659,11 +741,11 @@ export function FederationPanel({
 					form={form}
 					layout="vertical"
 					onFinish={submit}
+					scrollToFirstError
 					initialValues={{
 						scopes: ['openid', 'email', 'profile'],
 						provisioning: 'jit',
 						emailClaim: 'email',
-						enabled: true,
 						acceptsGlobalTokenRevocation: false,
 						acceptsBackChannelLogout: false
 					}}
@@ -803,15 +885,6 @@ export function FederationPanel({
 							]}
 						/>
 					</Form.Item>
-					{editing && (
-						<Form.Item
-							name="enabled"
-							label="Enabled"
-							valuePropName="checked"
-						>
-							<Switch />
-						</Form.Item>
-					)}
 				</Form>
 			</Modal>
 		</div>

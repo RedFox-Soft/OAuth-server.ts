@@ -2,12 +2,12 @@ import { Elysia } from 'elysia';
 import { getProjectStore } from '../../adapters/index.js';
 import {
 	assertAuth,
-	assertProjectAccess,
 	AdminError,
 	adminErrorBody,
 	resolveAdmin,
 	type AdminContext
 } from '../auth/rbac.js';
+import { managesProject } from '../auth/can.js';
 import { ADMIN_CLIENT_ID } from '../consts.js';
 import { CreateClientBody, UpdateClientBody } from './schema.js';
 import {
@@ -26,9 +26,14 @@ import nanoid from '../../helpers/nanoid.js';
 async function loadManageableProject(admin: AdminContext, id: string) {
 	const project = await getProjectStore().find(id);
 	if (!project) throw new AdminError(404, 'project not found');
-	if (project.type === 'admin')
-		throw new AdminError(403, 'cannot manage admin project clients');
-	assertProjectAccess(admin, project);
+	// The project's stated `manageClients` right, so the console is never shown a control this refuses.
+	if (!managesProject(admin, project))
+		throw new AdminError(
+			403,
+			project.type === 'admin'
+				? 'cannot manage admin project clients'
+				: 'no access to this project'
+		);
 	return project;
 }
 

@@ -1,12 +1,8 @@
 import { getBucketStore } from '../../adapters/index.js';
 import type { UserBucket } from '../../adapters/types.js';
 import { ADMIN_BUCKET_ID } from '../consts.js';
-import {
-	AdminError,
-	assertBucketAccess,
-	assertBucketUserAccess,
-	type AdminContext
-} from '../auth/rbac.js';
+import { AdminError, projectReach, type AdminContext } from '../auth/rbac.js';
+import { bucketCan, holdsBucket, NO_PROJECT_REACH } from '../auth/can.js';
 
 /*
  * What a missing bucket answers.
@@ -18,6 +14,26 @@ import {
  */
 function notFoundStatus(admin: AdminContext): number {
 	return admin.superAdmin ? 404 : 403;
+}
+
+/*
+ * Whether the caller holds `right` on this bucket — decided by the predicates the bucket's stated rights
+ * come from (`can.ts`), so a loader refuses exactly when the console was told the right is false.
+ *
+ * The project reach is read only when it could change the answer: reading and managing users are widened
+ * by a project only for a caller who does not hold the bucket, and editing never is.
+ */
+async function holds(
+	admin: AdminContext,
+	bucket: UserBucket,
+	right: 'read' | 'manageUsers' | 'editSettings' | 'edit'
+): Promise<boolean> {
+	const widenedByProjects = right === 'read' || right === 'manageUsers';
+	const access =
+		widenedByProjects && !holdsBucket(admin, bucket)
+			? await projectReach(admin)
+			: NO_PROJECT_REACH;
+	return bucketCan(admin, bucket, access)[right];
 }
 
 /*
@@ -45,7 +61,9 @@ export async function loadBucketForUsers(
 	const bucket = await getBucketStore().find(id);
 	if (!bucket)
 		throw new AdminError(notFoundStatus(admin), 'no access to this bucket');
-	await assertBucketUserAccess(admin, bucket);
+	if (!(await holds(admin, bucket, 'manageUsers'))) {
+		throw new AdminError(403, 'no access to this bucket');
+	}
 	return bucket;
 }
 
@@ -68,8 +86,11 @@ export async function loadBucketForSettings(
 	const bucket = await getBucketStore().find(id);
 	if (!bucket)
 		throw new AdminError(notFoundStatus(admin), 'no access to this bucket');
-	if (mode === 'read') await assertBucketUserAccess(admin, bucket);
-	else assertBucketAccess(admin, bucket);
+	if (
+		!(await holds(admin, bucket, mode === 'read' ? 'read' : 'editSettings'))
+	) {
+		throw new AdminError(403, 'no access to this bucket');
+	}
 	return bucket;
 }
 
@@ -82,6 +103,8 @@ export async function loadBucketForEdit(
 	const bucket = await getBucketStore().find(id);
 	if (!bucket)
 		throw new AdminError(notFoundStatus(admin), 'no access to this bucket');
-	assertBucketAccess(admin, bucket);
+	if (!(await holds(admin, bucket, 'edit'))) {
+		throw new AdminError(403, 'no access to this bucket');
+	}
 	return bucket;
 }

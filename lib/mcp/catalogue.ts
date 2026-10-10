@@ -149,7 +149,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: [],
 		summary:
-			'The administrator this agent is acting as: their id, email, whether they are a super administrator, and the groups they belong to.'
+			'The administrator this agent is acting as: their id, email, whether they are a super administrator, and the groups they belong to. `can` states what they may create — `createBucket`, `createHost` (a bucket with a hostname of its own), `createProject`, `createGroup` — and `instance`, whether the instance-wide operations are theirs.'
 	},
 	{
 		tool: 'project_list',
@@ -162,7 +162,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: [],
 		summary:
-			'Every project a super-administrator can see, or just the projects the caller manages.'
+			"Every project a super-administrator can see, or just the projects the caller manages. Each row carries `can`, the caller's rights on it, and `blockers.hasBucket`, as project_get does."
 	},
 	{
 		tool: 'project_get',
@@ -175,7 +175,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'One project: name, slug, managers, assigned user bucket, client ids, and CORS origins.'
+			'One project: name, slug, managers, assigned user bucket, client ids, and CORS origins. `can` states which operations the server will accept from the caller on it: `edit` (project_update), `delete`, `manageClients` (client_*), `declareResources` (resource_declare, resource_update, resource_delete), `assignBucket` (project_bucket_assign, project_bucket_clear) and `move` (project_owner_change); a false flag is a refusal, so do not try it. A right is not a promise about state: `blockers.hasBucket` means the project moves only with its bucket. Deleting a project stays console-only for agents even where `can.delete` is true.'
 	},
 	{
 		tool: 'resource_list',
@@ -318,7 +318,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: [],
 		summary:
-			'The user buckets: every one for a super-administrator, otherwise those the caller manages. For a super-administrator the list includes the administrators\' own bucket, marked `reserved: "administrators"`; nobody else sees it.'
+			'The user buckets: every one for a super-administrator, otherwise those the caller manages. For a super-administrator the list includes the administrators\' own bucket, marked `reserved: "administrators"`; nobody else sees it. Each row carries `can` and `blockers`, as bucket_get does.'
 	},
 	{
 		tool: 'bucket_get',
@@ -331,7 +331,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'One user bucket: its name, owning group, and registration and verification settings. Its groups of end users are read with bucket_group_list. A super-administrator may read the administrators\' own bucket here (`reserved: "administrators"`); its accounts are read with admin_list, not through the bucket.'
+			'One user bucket: its name, owning group, and registration and verification settings. Its groups of end users are read with bucket_group_list. A super-administrator may read the administrators\' own bucket here (`reserved: "administrators"`); its accounts are read with admin_list, not through the bucket. `can` states which operations the server will accept from the caller on it: `manageUsers` (bucket_user_*, the identity tools, bucket_group_member_add/remove, and reading providers, provisioning and user groups), `edit` (federation_provider_create/update/delete, provisioning_connection_create/update/delete/release, provisioning_credential_*, bucket_group_create/update/delete/assign_connection, bucket_user_assign_connection, bucket_key_*), `editSettings` (bucket_update), `readActivity` (bucket_activity_get), `changeAddress` (bucket_address_change), `move` (bucket_owner_change) and `delete`; a false flag is a refusal, so do not try it. `blockers` is state that refuses a right the caller holds: `usedByProjects` names the projects still using it, and `addressable` is false for a bucket that signs with the instance keys. Deleting a bucket stays console-only for agents even where `can.delete` is true.'
 	},
 	{
 		tool: 'bucket_activity_get',
@@ -643,7 +643,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: [],
 		summary:
-			'Create a project: the container an instance groups OAuth clients into, with its own managers and CORS origins. A project has no user bucket until one is assigned.'
+			'Create a project: the container an instance groups OAuth clients into, with its own managers and CORS origins. A project has no user bucket until one is assigned. whoami states the right as `can.createProject`.'
 	},
 	{
 		tool: 'project_update',
@@ -656,7 +656,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			"Change a project's name, managers, or CORS origins. An invalid origin refuses the whole list rather than applying part of it."
+			"Change a project's name, managers, or CORS origins. An invalid origin refuses the whole list rather than applying part of it. project_get states the right as `can.edit`."
 	},
 	{
 		tool: 'project_bucket_assign',
@@ -669,7 +669,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'Assign the user bucket whose accounts this project’s clients authenticate against. The bucket must belong to the same group as the project, so not every bucket bucket_list returns can be assigned to every project. The default bucket is never assignable — it belongs to no group — and does not need to be: a project with no bucket already signs its users in from it, so project_bucket_clear is how that is chosen.'
+			'Assign the user bucket whose accounts this project’s clients authenticate against. The bucket must belong to the same group as the project, so not every bucket bucket_list returns can be assigned to every project. The default bucket is never assignable — it belongs to no group — and does not need to be: a project with no bucket already signs its users in from it, so project_bucket_clear is how that is chosen. project_get states the right as `can.assignBucket`.'
 	},
 	{
 		tool: 'project_bucket_clear',
@@ -686,7 +686,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'Remove the user bucket assigned to this project, returning its clients to the default bucket. Reversed by assigning one again.'
+			'Remove the user bucket assigned to this project, returning its clients to the default bucket. Reversed by assigning one again. project_get states the right as `can.assignBucket`; with resources declared, only a super-administrator may clear it, because they move into the shared root namespace.'
 	},
 	{
 		tool: 'project_owner_change',
@@ -700,7 +700,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'Move a project that uses no bucket of its own to another administrator group (`groupId`), with its clients unchanged. Requires owning the group it is in now and belonging to the destination. A project that uses a bucket moves with the bucket: use bucket_owner_change. Called without `confirm`, it changes nothing and describes the move.'
+			'Move a project that uses no bucket of its own to another administrator group (`groupId`), with its clients unchanged. Requires owning the group it is in now and belonging to the destination. A project that uses a bucket moves with the bucket: use bucket_owner_change. Called without `confirm`, it changes nothing and describes the move. project_get states the right as `can.move`, and `blockers.hasBucket` when the bucket is in the way.'
 	},
 
 	/* ---------------------------------------- writes: protected resources (3) */
@@ -975,7 +975,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: [],
 		summary:
-			'Create a user bucket. A bucket cannot be created unreachable: at creation it has no providers, so password login cannot be switched off. `totpRequired` makes a password sign-in also require a one-time code from an authenticator app; it governs password sign-in only and never gates a federated one.'
+			'Create a user bucket. A bucket cannot be created unreachable: at creation it has no providers, so password login cannot be switched off. `totpRequired` makes a password sign-in also require a one-time code from an authenticator app; it governs password sign-in only and never gates a federated one. A `host` needs `can.createHost` from whoami; a `slug` needs `can.createBucket`.'
 	},
 	{
 		tool: 'bucket_address_change',
@@ -994,7 +994,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			"Move a bucket to a different address: a path segment (`slug`) or a hostname of its own (`host`), never both. Called without `confirm`, it changes nothing and answers with the clients that will stop validating tokens. Called with `confirm: true`, it performs the move: the bucket's issuer identifier becomes the new address, the previous address stops answering, and everyone signed in signs in again. Only an administrator of the instance may do this, and a bucket served at the root cannot be moved at all."
+			"Move a bucket to a different address: a path segment (`slug`) or a hostname of its own (`host`), never both. Called without `confirm`, it changes nothing and answers with the clients that will stop validating tokens. Called with `confirm: true`, it performs the move: the bucket's issuer identifier becomes the new address, the previous address stops answering, and everyone signed in signs in again. Only an administrator of the instance may do this, and a bucket served at the root cannot be moved at all — bucket_get states it as `can.changeAddress`."
 	},
 	{
 		tool: 'bucket_owner_change',
@@ -1013,7 +1013,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			"Move a user bucket, and every project that uses it, to another administrator group (`groupId`). Requires owning the group it is in now and belonging to the destination; another administrator's personal group is never a destination. End users, clients and the sign-in address are unaffected. Called without `confirm`, it changes nothing and answers with the projects that would move; with `confirm: true` it moves them."
+			"Move a user bucket, and every project that uses it, to another administrator group (`groupId`). Requires owning the group it is in now and belonging to the destination; another administrator's personal group is never a destination. End users, clients and the sign-in address are unaffected. Called without `confirm`, it changes nothing and answers with the projects that would move; with `confirm: true` it moves them. bucket_get states the right as `can.move`."
 	},
 	{
 		tool: 'bucket_update',
@@ -1026,7 +1026,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			"Change a bucket's name, or its registration, verification and second-factor settings. Editing the bucket entity needs manager access to the bucket itself, not merely to a project it backs. `totpRequired` governs password sign-in only — it is accepted but inert while `passwordLogin` is off, and it never gates a federated sign-in, so it is not a way to secure a bucket that signs in through an upstream provider. A super-administrator configures the administrators' own bucket here too: opening its registration lets anyone register a console account (the answer carries an advisory while verification is off); requiring verification is refused until mail delivery is configured and until the acting administrator has verified their own address; and turning password sign-in off is refused, since it is the console's only way in. Each refusal names its remedy."
+			"Change a bucket's name, or its registration, verification and second-factor settings. Editing the bucket entity needs manager access to the bucket itself, not merely to a project it backs — bucket_get states it as `can.editSettings`. `totpRequired` governs password sign-in only — it is accepted but inert while `passwordLogin` is off, and it never gates a federated sign-in, so it is not a way to secure a bucket that signs in through an upstream provider. A super-administrator configures the administrators' own bucket here too: opening its registration lets anyone register a console account (the answer carries an advisory while verification is off); requiring verification is refused until mail delivery is configured and until the acting administrator has verified their own address; and turning password sign-in off is refused, since it is the console's only way in. Each refusal names its remedy."
 	},
 
 	/* ----------------------------------------------- writes: end-users (7) */

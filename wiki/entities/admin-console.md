@@ -69,15 +69,11 @@ miss are the ones the admin plane took the trouble to explain. See [[error-store
 
 ## One bootstrap surface
 
-`GET /admin` is the whole first-run path:
-
-```ts
-if (!(await hasSuperAdmin())) {
-    return renderAdminShell({ needsSetup: true, me: null });
-}
-if (!admin) return redirect('/admin/login', 302);
-return renderAdminShell({ needsSetup: false, me: admin });
-```
+`GET /admin` and `GET /admin/*` share one handler, `consolePage` (`lib/admin/index.ts`), which is also the
+whole first-run path. Before a super administrator exists it renders the setup screen at `/admin` and
+sends every other console address there. After that it renders the console at the requested address,
+sends a signed-out request to `/admin/login?next=<address>`, and answers 404 for an address the route
+table does not know. Since spec 079 every screen has an address; see [[admin-console-frame]].
 
 There was once a second `/admin/setup` twin; it pointed at an unserved bundle and rendered a blank
 page nothing linked to. [[first-run-setup-had-two-surfaces]] records why one surface is the fix.
@@ -85,7 +81,8 @@ page nothing linked to. [[first-run-setup-had-two-surfaces]] records why one sur
 ## The shell
 
 `ui/serverRender.tsx` reads an HTML template off disk, substitutes versioned asset addresses through
-[[html-rendering]]'s `versionedAsset`, renders React inside `ZeroRuntime`, and returns the document
+[[html-rendering]]'s `versionedAsset`, renders `ConsoleRoot` (`ZeroRuntime`, antd `App`, the router at
+the requested path), and returns the document
 through `htmlResponse` so the console's policy is derived like every other page's. The props are
 injected as an inline script and hashed by that derivation — *"the authorization is derived from the
 script that is actually served rather than restated beside it"* — with every `<` in the JSON

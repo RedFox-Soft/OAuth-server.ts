@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Button, Drawer, Modal, Table, Tag, Typography } from 'antd';
+import { App, Button, Drawer, Table, Tag, Typography } from 'antd';
 import { ExclamationCircleOutlined } from '@ant-design/icons';
 import { restartingChanges, riskyChanges, type Change } from './model.js';
 import { jsonText } from '../../../helpers/_/json_text.ts';
+import { useConfirm } from '../frame/confirm.js';
 
 const show = (v: unknown): string => {
 	if (v === undefined) return '—';
@@ -105,7 +106,11 @@ export function SaveBar({
 	onDiscard: () => void;
 }) {
 	const [reviewing, setReviewing] = useState(false);
+	const { modal } = App.useApp();
+	const confirm = useConfirm();
 	if (changes.length === 0) return null;
+
+	const count = `${String(changes.length)} unsaved ${changes.length === 1 ? 'change' : 'changes'}`;
 
 	const risky = riskyChanges(changes);
 	const restarting = restartingChanges(changes);
@@ -120,12 +125,13 @@ export function SaveBar({
 			onSave();
 			return;
 		}
-		Modal.confirm({
+		modal.confirm({
 			title: 'Confirm a change with a security consequence',
 			icon: <ExclamationCircleOutlined />,
 			width: 560,
 			okText: 'Save anyway',
 			okButtonProps: { danger: true },
+			focusable: { autoFocusButton: 'cancel' },
 			content: (
 				<div>
 					<Typography.Paragraph>
@@ -149,6 +155,10 @@ export function SaveBar({
 		});
 	}
 
+	async function discard() {
+		if (await confirm('settings.discard', { target: count })) onDiscard();
+	}
+
 	return (
 		<>
 			<div
@@ -167,9 +177,7 @@ export function SaveBar({
 					zIndex: 5
 				}}
 			>
-				<Typography.Text strong>
-					{changes.length} unsaved {changes.length === 1 ? 'change' : 'changes'}
-				</Typography.Text>
+				<Typography.Text strong>{count}</Typography.Text>
 				<Typography.Text type="secondary">
 					{restarting.length === 0
 						? '· takes effect as soon as you save'
@@ -181,7 +189,7 @@ export function SaveBar({
 				<span style={{ flex: 1 }} />
 				<Button onClick={() => setReviewing(true)}>Review</Button>
 				<Button
-					onClick={onDiscard}
+					onClick={() => void discard()}
 					disabled={saving}
 				>
 					Discard

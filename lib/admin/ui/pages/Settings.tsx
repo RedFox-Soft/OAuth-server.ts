@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Badge, Card, Input, Menu, Typography, message } from 'antd';
+import { Alert, Badge, Card, Input, Menu, Typography } from 'antd';
 import { SearchOutlined } from '@ant-design/icons';
 import {
 	cascadeOff,
@@ -18,6 +18,11 @@ import { GroupCard } from '../settings/GroupCard.js';
 import { SaveBar } from '../settings/SaveBar.js';
 import { SmtpCard } from '../settings/SmtpCard.js';
 import { SentryCard } from '../settings/SentryCard.js';
+import { useLeaveGuard } from '../frame/router.js';
+import { PageHeader } from '../frame/PageHeader.js';
+import { request } from '../frame/request.js';
+import { useFeedback } from '../frame/feedback.js';
+import { LoadFailed, NoMatch } from '../frame/states.js';
 
 /*
  * The server settings console.
@@ -49,7 +54,9 @@ export function Settings() {
 	const [pendingRestartKeys, setPendingRestartKeys] = useState<string[]>([]);
 	const [notInForceKeys, setNotInForceKeys] = useState<string[]>([]);
 	const [loading, setLoading] = useState(true);
+	const [failed, setFailed] = useState<string | null>(null);
 	const [saving, setSaving] = useState(false);
+	const feedback = useFeedback();
 	const [pane, setPane] = useState<SettingDomain | null>(null);
 	const [query, setQuery] = useState('');
 
@@ -66,8 +73,16 @@ export function Settings() {
 	// Every state write follows an await: `loading` starts true, so the mount has nothing to set first.
 	const load = useCallback(async () => {
 		try {
-			const res = await fetch('/admin/api/settings');
-			if (res.ok) apply((await res.json()) as SettingsResponse);
+			const result = await request<SettingsResponse>(
+				'GET',
+				'/admin/api/settings'
+			);
+			if (!result.ok) {
+				setFailed(result.error.message);
+				return;
+			}
+			setFailed(null);
+			apply(result.data);
 		} finally {
 			setLoading(false);
 		}
@@ -88,16 +103,10 @@ export function Settings() {
 	);
 
 	/*
-	 * Leaving with edits in hand used to lose them without a word — the shell swaps the page on a
-	 * click and nothing asked. This catches the browser-level exits; the in-app ones are caught by
-	 * the same dirty count being visible in the bar at the foot of the page.
+	 * Leaving with edits in hand used to lose them without a word. The browser's own exits and every
+	 * in-console navigation — the menu, a breadcrumb, Back, a group switch — now ask first.
 	 */
-	useEffect(() => {
-		if (dirty.length === 0) return;
-		const warn = (e: BeforeUnloadEvent) => e.preventDefault();
-		window.addEventListener('beforeunload', warn);
-		return () => window.removeEventListener('beforeunload', warn);
-	}, [dirty.length]);
+	useLeaveGuard(dirty.length > 0, dirty.length);
 
 	function setValue(key: string, value: unknown) {
 		setValues((prev) => ({ ...prev, [key]: value }));
@@ -118,19 +127,21 @@ export function Settings() {
 		try {
 			const body: Values = {};
 			for (const key of dirty) body[key] = values[key];
-			const res = await fetch('/admin/api/settings', {
-				method: 'PUT',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify(body)
-			});
-			const parsed = (await res.json().catch(() => null)) as
-				(SettingsResponse & { message?: string }) | null;
-			if (!res.ok) {
-				message.error(parsed?.message || 'failed to save settings');
+			const result = await request<SettingsResponse>(
+				'PUT',
+				'/admin/api/settings',
+				body
+			);
+			if (!result.ok) {
+				feedback.failed(result);
 				return;
 			}
-			if (parsed) apply(parsed);
-			message.success('settings saved');
+			apply(result.data);
+			feedback.done(
+				dirty.length === 1
+					? 'Setting saved.'
+					: `${String(dirty.length)} settings saved.`
+			);
 		} finally {
 			setSaving(false);
 		}
@@ -161,31 +172,19 @@ export function Settings() {
 
 	return (
 		<>
-			<div
-				style={{
-					display: 'flex',
-					justifyContent: 'space-between',
-					alignItems: 'center',
-					gap: 16,
-					flexWrap: 'wrap',
-					marginBottom: 16
-				}}
-			>
-				<Typography.Title
-					level={4}
-					style={{ margin: 0 }}
-				>
-					Server settings
-				</Typography.Title>
-				<Input
-					allowClear
-					prefix={<SearchOutlined />}
-					placeholder="Search all settings"
-					style={{ maxWidth: 320 }}
-					value={query}
-					onChange={(e) => setQuery(e.target.value)}
-				/>
-			</div>
+			<PageHeader
+				title="Server settings"
+				actions={
+					<Input
+						allowClear
+						prefix={<SearchOutlined />}
+						placeholder="Search all settings"
+						style={{ width: 320, maxWidth: '100%' }}
+						value={query}
+						onChange={(e) => setQuery(e.target.value)}
+					/>
+				}
+			/>
 
 			{pendingRestartKeys.length > 0 && (
 				<Alert
@@ -207,79 +206,92 @@ export function Settings() {
 				/>
 			)}
 
-			<div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-				<Card
-					size="small"
-					style={{ flex: '0 0 210px', position: 'sticky', top: 0 }}
-					styles={{ body: { padding: 0 } }}
-					loading={loading}
-				>
-					<Menu
-						mode="inline"
-						style={{ borderInlineEnd: 'none' }}
-						selectedKeys={searching ? [] : pane ? [pane] : []}
-						onClick={({ key }) => {
-							setQuery('');
-							setPane(key as SettingDomain);
-						}}
-						items={domains.map((d) => ({
-							key: d.id,
-							label: dirtyPanes.has(d.id) ? (
-								<Badge
-									dot
-									offset={[6, 0]}
-								>
-									{d.label}
-								</Badge>
-							) : (
-								d.label
-							)
-						}))}
-					/>
-				</Card>
-
-				<div style={{ flex: 1, minWidth: 0 }}>
-					{searching ? (
-						<Typography.Paragraph type="secondary">
-							{cards.length === 0
-								? `Nothing matches “${query}”.`
-								: `Showing settings matching “${query}” from every section.`}
-						</Typography.Paragraph>
-					) : (
-						<Typography.Paragraph type="secondary">
-							{domains.find((d) => d.id === pane)?.blurb}
-						</Typography.Paragraph>
-					)}
-
-					{cards.map(({ id, view }) => (
-						<GroupCard
-							key={`${id}:${view.group}`}
-							view={view}
-							values={values}
-							dirty={dirtySet}
-							onChange={setValue}
-							onTogglePrimaryOff={togglePrimaryOff}
+			{failed !== null ? (
+				<LoadFailed
+					reason={failed}
+					onRetry={() => {
+						setLoading(true);
+						void load();
+					}}
+				/>
+			) : (
+				<div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+					<Card
+						size="small"
+						style={{ flex: '0 0 210px', position: 'sticky', top: 0 }}
+						styles={{ body: { padding: 0 } }}
+						loading={loading}
+					>
+						<Menu
+							mode="inline"
+							style={{ borderInlineEnd: 'none' }}
+							selectedKeys={searching ? [] : pane ? [pane] : []}
+							onClick={({ key }) => {
+								setQuery('');
+								setPane(key as SettingDomain);
+							}}
+							items={domains.map((d) => ({
+								key: d.id,
+								label: dirtyPanes.has(d.id) ? (
+									<Badge
+										dot
+										offset={[6, 0]}
+									>
+										{d.label}
+									</Badge>
+								) : (
+									d.label
+								)
+							}))}
 						/>
-					))}
+					</Card>
 
-					{/*
-					 * The two runtime surfaces, each on the pane it belongs to and each saved by its own
-					 * button, because each is its own endpoint that applies immediately. The Sentry
-					 * credential sits beside the Error Store card rather than nested inside it: it is the
-					 * prerequisite for the reporting toggle there, so it has to be reachable without first
-					 * opening anything.
-					 */}
-					{!searching && pane === 'diagnostics' && <SentryCard />}
-					{!searching && pane === 'integrations' && <SmtpCard />}
+					<div style={{ flex: 1, minWidth: 0 }}>
+						{searching && cards.length === 0 ? (
+							<NoMatch
+								query={query}
+								onClear={() => setQuery('')}
+							/>
+						) : searching ? (
+							<Typography.Paragraph type="secondary">
+								{`Showing settings matching “${query}” from every section.`}
+							</Typography.Paragraph>
+						) : (
+							<Typography.Paragraph type="secondary">
+								{domains.find((d) => d.id === pane)?.blurb}
+							</Typography.Paragraph>
+						)}
 
-					<SaveBar
-						changes={changes}
-						saving={saving}
-						onSave={save}
-						onDiscard={() => setValues(baseline)}
-					/>
+						{cards.map(({ id, view }) => (
+							<GroupCard
+								key={`${id}:${view.group}`}
+								view={view}
+								values={values}
+								dirty={dirtySet}
+								onChange={setValue}
+								onTogglePrimaryOff={togglePrimaryOff}
+							/>
+						))}
+
+						{/*
+						 * The two runtime surfaces, each on the pane it belongs to and each saved by its own
+						 * button, because each is its own endpoint that applies immediately. The Sentry
+						 * credential sits beside the Error Store card rather than nested inside it: it is the
+						 * prerequisite for the reporting toggle there, so it has to be reachable without first
+						 * opening anything.
+						 */}
+						{!searching && pane === 'diagnostics' && <SentryCard />}
+						{!searching && pane === 'integrations' && <SmtpCard />}
+
+						<SaveBar
+							changes={changes}
+							saving={saving}
+							onSave={save}
+							onDiscard={() => setValues(baseline)}
+						/>
+					</div>
 				</div>
-			</div>
+			)}
 		</>
 	);
 }

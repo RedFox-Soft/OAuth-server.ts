@@ -42,14 +42,15 @@ async function assertAddressChangeable(
 ): Promise<void> {
 	const holder = await store().findByEmail(email);
 	if (holder && holder._id !== targetId) {
-		throw new AdminError(409, 'email already exists');
+		throw new AdminError(409, 'email already exists', { field: 'email' });
 	}
 	if (actingId !== targetId) return;
 	const bucket = await getBucketStore().find(ADMIN_BUCKET_ID);
 	if (bucket?.emailVerificationRequired) {
 		throw new AdminError(
 			409,
-			'you cannot change your own address while administrators must verify theirs: ask another super administrator, or turn verification off first'
+			'you cannot change your own address while administrators must verify theirs: ask another super administrator, or turn verification off first',
+			{ field: 'email' }
 		);
 	}
 }
@@ -93,7 +94,7 @@ export const adminUserRoutes = new Elysia({ name: 'admin-users' })
 			const ctx = assertAuth(admin);
 			assertSuperAdmin(ctx);
 			if (await store().findByEmail(body.email)) {
-				throw new AdminError(409, 'email already exists');
+				throw new AdminError(409, 'email already exists', { field: 'email' });
 			}
 			const hash = await Bun.password.hash(body.password);
 			// Allocated here so the entry names the account that is about to exist. After the uniqueness
@@ -138,7 +139,9 @@ export const adminUserRoutes = new Elysia({ name: 'admin-users' })
 				);
 			} catch (err) {
 				if (err instanceof DuplicateEndUserError) {
-					throw new AdminError(409, 'email already exists');
+					throw new AdminError(409, 'email already exists', {
+						field: 'email'
+					});
 				}
 				throw err;
 			}

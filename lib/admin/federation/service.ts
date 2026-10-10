@@ -237,7 +237,8 @@ function required(
 		422,
 		fromCatalogue
 			? `${field} is required`
-			: `${field} is required unless catalogueId names a recognised provider`
+			: `${field} is required unless catalogueId names a recognised provider`,
+		{ field }
 	);
 }
 

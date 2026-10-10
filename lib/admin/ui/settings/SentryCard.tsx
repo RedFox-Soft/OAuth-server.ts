@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Card, Form, Input, Tag, Typography, message } from 'antd';
+import { Button, Card, Form, Input, Tag, Typography } from 'antd';
+import { request } from '../frame/request.js';
+import { useFeedback } from '../frame/feedback.js';
+import { useConfirm } from '../frame/confirm.js';
+import { LoadFailed } from '../frame/states.js';
 
 interface SentryView {
 	enabled: boolean;
@@ -40,16 +44,31 @@ export function SentryCard() {
 	const [loading, setLoading] = useState(true);
 	const [saving, setSaving] = useState(false);
 	const [view, setView] = useState<SentryView | null>(null);
+	const [failed, setFailed] = useState<string | null>(null);
+	const feedback = useFeedback();
+	const confirm = useConfirm();
 
 	// Every state write follows an await: `loading` starts true, so the mount has nothing to set first.
 	const load = useCallback(async () => {
 		try {
-			const res = await fetch('/admin/api/settings/sentry');
-			if (res.ok) setView((await res.json()) as SentryView);
+			const result = await request<SentryView>(
+				'GET',
+				'/admin/api/settings/sentry'
+			);
+			if (!result.ok) {
+				setFailed(result.error.message);
+				return;
+			}
+			setFailed(null);
+			setView(result.data);
 		} finally {
 			setLoading(false);
 		}
 	}, []);
+	function reload() {
+		setLoading(true);
+		void load();
+	}
 	useEffect(() => {
 		void load();
 	}, [load]);
@@ -63,25 +82,36 @@ export function SentryCard() {
 		if (!view) return;
 		setSaving(true);
 		try {
-			const res = await fetch('/admin/api/settings/sentry', {
-				method: 'PUT',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ enabled: next.enabled, dsn: next.dsn })
-			});
-			const body = (await res.json().catch(() => null)) as
-				(SentryView & { message?: string }) | null;
-			if (!res.ok) {
-				message.error(body?.message || 'failed to save the Sentry credential');
+			const result = await request<SentryView>(
+				'PUT',
+				'/admin/api/settings/sentry',
+				{ enabled: next.enabled, dsn: next.dsn }
+			);
+			if (!result.ok) {
+				feedback.failed(result, form);
 				return;
 			}
-			if (body) setView(body);
+			setView(result.data);
 			form.resetFields();
-			message.success(
-				next.dsn ? 'Sentry credential saved' : 'Sentry reporting disabled'
+			feedback.done(
+				next.dsn
+					? 'Sentry credential saved.'
+					: 'Sentry reporting disabled and its credential removed.'
 			);
 		} finally {
 			setSaving(false);
 		}
+	}
+
+	async function disable() {
+		const yes = await confirm('sentry.disable', {
+			target: 'Sentry',
+			consequences: [
+				'Server faults are no longer reported to Sentry.',
+				'The stored credential is removed and has to be pasted again to resume reporting.'
+			]
+		});
+		if (yes) await submit({ dsn: '', enabled: false });
 	}
 
 	const configured = view?.configured === true;
@@ -109,7 +139,12 @@ export function SentryCard() {
 				</span>
 			}
 		>
-			{configured ? (
+			{failed !== null ? (
+				<LoadFailed
+					reason={failed}
+					onRetry={reload}
+				/>
+			) : configured ? (
 				<>
 					<Typography.Paragraph
 						type="secondary"
@@ -130,7 +165,7 @@ export function SentryCard() {
 					<Button
 						danger
 						loading={saving}
-						onClick={() => submit({ dsn: '', enabled: false })}
+						onClick={() => void disable()}
 					>
 						Disable and remove credential
 					</Button>
@@ -147,6 +182,7 @@ export function SentryCard() {
 					<Form<{ dsn: string }>
 						form={form}
 						layout="vertical"
+						scrollToFirstError
 						onFinish={(v) =>
 							submit({ dsn: v.dsn, enabled: view?.enabled ?? false })
 						}

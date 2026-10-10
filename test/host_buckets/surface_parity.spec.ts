@@ -59,6 +59,12 @@ describe('which surfaces answer at a bucket host (US1)', () => {
 			const response = await at(path, TENANT_HOST);
 			if (response.status !== 404) served.push(`${path} → ${response.status}`);
 		}
+		/* The console's pages sit behind one wildcard route the loop skips, so one of its addresses is
+		 * asked for explicitly. */
+		for (const path of ['/admin/projects', '/admin/accept-invitation']) {
+			const response = await at(path, TENANT_HOST);
+			if (response.status !== 404) served.push(`${path} → ${response.status}`);
+		}
 
 		expect(served).toEqual([]);
 	});

@@ -9,12 +9,16 @@ import {
 	Space,
 	Switch,
 	Typography,
-	Popconfirm,
 	Alert,
-	Tag,
-	message
+	Tag
 } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
+import { PageHeader } from '../frame/PageHeader.js';
+import { request } from '../frame/request.js';
+import { useFeedback } from '../frame/feedback.js';
+import { useConfirm } from '../frame/confirm.js';
+import { RowActions } from '../frame/RowActions.js';
+import { EmptyState, LoadFailed } from '../frame/states.js';
 
 /*
  * Which client identities may administer this instance.
@@ -58,8 +62,11 @@ const DEFAULT_VALUES: FormValues = {
 
 export function McpClients() {
 	const base = '/admin/api/mcp/clients';
+	const feedback = useFeedback();
+	const confirm = useConfirm();
 	const [rows, setRows] = useState<PermissionView[]>([]);
 	const [loading, setLoading] = useState(true);
+	const [failed, setFailed] = useState<string | null>(null);
 	const [open, setOpen] = useState(false);
 	const [saving, setSaving] = useState(false);
 	/* The route's own words, shown only once it has refused for want of them. */
@@ -87,13 +94,13 @@ export function McpClients() {
 	 * look at the instance that did apply it.
 	 */
 	const loadCapabilities = useCallback(async () => {
-		const res = await fetch('/admin/api/settings');
-		if (!res.ok) return;
-		const body = (await res.json()) as {
+		const result = await request<{
 			values: Record<string, unknown>;
 			pendingRestartKeys: string[];
 			notInForceKeys: string[];
-		};
+		}>('GET', '/admin/api/settings');
+		if (!result.ok) return;
+		const body = result.data;
 
 		const stateOf = (key: string, off: string) => {
 			if (body.values[key] !== true) return off;
@@ -124,8 +131,13 @@ export function McpClients() {
 	// `loading` first; `load` is the reload, which does.
 	const fetchPermissions = useCallback(async () => {
 		try {
-			const res = await fetch(base);
-			if (res.ok) setRows((await res.json()) as PermissionView[]);
+			const result = await request<PermissionView[]>('GET', base);
+			if (!result.ok) {
+				setFailed(result.error.message);
+				return;
+			}
+			setFailed(null);
+			setRows(result.data);
 			await loadCapabilities();
 		} finally {
 			setLoading(false);
@@ -147,45 +159,36 @@ export function McpClients() {
 	}
 
 	async function submit(acknowledge: boolean) {
-		const values = await form.validateFields();
+		// An invalid form already shows its own errors; a rejection here would only reach the console log.
+		const values = await form.validateFields().catch(() => null);
+		if (!values) return;
 		setSaving(true);
 		try {
-			const res = await fetch(base, {
-				method: 'POST',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({
-					kind: values.kind,
-					value: values.value,
-					requireKeyProof: values.requireKeyProof,
-					...(acknowledge ? { acknowledgeLoopbackRisk: true } : {})
-				})
+			const result = await request<PermissionView>('POST', base, {
+				kind: values.kind,
+				value: values.value,
+				requireKeyProof: values.requireKeyProof,
+				...(acknowledge ? { acknowledgeLoopbackRisk: true } : {})
 			});
 
-			if (res.status === 409) {
-				const detail = (await res.json().catch(() => null)) as {
-					message?: string;
-					acknowledgementRequired?: boolean;
-				} | null;
+			if (!result.ok) {
 				/*
 				 * A 409 is two different answers: the risk needs acknowledging, or the identity is already
 				 * permitted. The flag tells them apart — matching on the message text would break the
 				 * moment the wording improved.
+				 *
+				 * The acknowledgement is this act's C2 confirmation (`agentAccess.permit`), asked inside the
+				 * form rather than in a dialog over it: the route's own words, and a danger OK button.
 				 */
-				if (detail?.acknowledgementRequired) {
-					setAcknowledgement(detail.message ?? null);
+				if (result.status === 409 && result.error.acknowledgementRequired) {
+					setAcknowledgement(result.error.message);
 					return;
 				}
-				message.error(detail?.message ?? 'already permitted');
-				return;
-			}
-			if (!res.ok) {
-				const detail = (await res.json().catch(() => null)) as {
-					message?: string;
-				} | null;
-				message.error(detail?.message ?? 'could not permit that identity');
+				feedback.failed(result, form);
 				return;
 			}
 
+			feedback.done(`Agent identity ${values.value} permitted.`);
 			setOpen(false);
 			await load();
 		} finally {
@@ -194,31 +197,70 @@ export function McpClients() {
 	}
 
 	async function setKeyProof(entry: PermissionView, requireKeyProof: boolean) {
-		const res = await fetch(`${base}/${encodeURIComponent(entry._id)}`, {
-			method: 'PATCH',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ requireKeyProof })
+		const yes = await confirm('agentAccess.keyProof', {
+			target: entry._id,
+			consequences: requireKeyProof
+				? [
+						'An agent using this identity must authenticate with a key published in its client document; one that cannot is refused on its next call.'
+					]
+				: [
+						'This identity is accepted without proof of a published key, so a client that redirects to a local address can be impersonated.'
+					]
 		});
-		if (!res.ok) {
-			message.error('could not change that requirement');
+		if (!yes) return;
+		const result = await request(
+			'PATCH',
+			`${base}/${encodeURIComponent(entry._id)}`,
+			{ requireKeyProof }
+		);
+		if (!result.ok) {
+			feedback.failed(result);
 			return;
 		}
+		feedback.done(
+			requireKeyProof
+				? `Key proof now required for ${entry._id}.`
+				: `Key proof no longer required for ${entry._id}.`
+		);
 		await load();
 	}
 
-	async function withdraw(entryId: string) {
-		const res = await fetch(`${base}/${encodeURIComponent(entryId)}`, {
-			method: 'DELETE'
+	async function withdraw(entry: PermissionView) {
+		const yes = await confirm('agentAccess.withdraw', {
+			target: entry._id,
+			consequences: [
+				'Any agent using this identity is refused on its next call — it does not wait for a token to expire.'
+			]
 		});
-		if (!res.ok) {
-			message.error('could not withdraw that permission');
+		if (!yes) return;
+		const result = await request(
+			'DELETE',
+			`${base}/${encodeURIComponent(entry._id)}`
+		);
+		if (!result.ok) {
+			feedback.failed(result);
 			return;
 		}
+		feedback.done(`Agent identity ${entry._id} withdrawn.`);
 		await load();
 	}
+
+	const permit = (
+		<Button
+			type="primary"
+			icon={<PlusOutlined />}
+			onClick={openModal}
+		>
+			Permit an identity
+		</Button>
+	);
 
 	return (
 		<>
+			<PageHeader
+				title="Agent access"
+				actions={permit}
+			/>
 			{surfaceOff ? (
 				<Alert
 					type="error"
@@ -252,74 +294,84 @@ export function McpClients() {
 				description="An agent connecting with one of these identities acts with the permissions of the administrator who signed in through it. The reserved admin-mcp client works without an entry here. A client that registered itself dynamically can never administer the instance, whatever this list says."
 			/>
 
-			<div style={{ marginBottom: 16, textAlign: 'right' }}>
-				<Button
-					type="primary"
-					icon={<PlusOutlined />}
-					onClick={openModal}
-				>
-					Permit an identity
-				</Button>
-			</div>
-
-			<Table
-				rowKey="_id"
-				loading={loading}
-				dataSource={rows}
-				pagination={false}
-				locale={{
-					emptyText:
-						'Nothing is permitted. No agent can administer this instance except through the reserved admin-mcp client.'
-				}}
-				columns={[
-					{
-						title: 'Identity',
-						dataIndex: '_id',
-						render: (value: string, row: PermissionView) => (
-							<Space
-								orientation="vertical"
-								size={0}
-							>
-								<Typography.Text code>{value}</Typography.Text>
-								<Space size={4}>
-									<Tag>{row.kind === 'host' ? 'whole host' : 'one client'}</Tag>
-									{row.loopbackAcknowledged ? (
-										<Tag color="orange">loopback risk accepted</Tag>
-									) : null}
-								</Space>
-							</Space>
-						)
-					},
-					{
-						title: 'Key proof required',
-						dataIndex: 'requireKeyProof',
-						render: (requireKeyProof: boolean, row: PermissionView) => (
-							<Switch
-								checked={requireKeyProof}
-								onChange={(next) => setKeyProof(row, next)}
+			{failed !== null ? (
+				<LoadFailed
+					reason={failed}
+					onRetry={() => void load()}
+				/>
+			) : (
+				<Table
+					rowKey="_id"
+					loading={loading}
+					dataSource={rows}
+					pagination={false}
+					locale={{
+						emptyText: (
+							<EmptyState
+								purpose="Nothing is permitted. No agent can administer this instance except through the reserved admin-mcp client."
+								create={permit}
 							/>
 						)
-					},
-					{
-						title: '',
-						render: (_: unknown, row: PermissionView) => (
-							<Popconfirm
-								title="Withdraw this permission?"
-								description="Any agent using this identity is refused on its next call — it does not wait for a token to expire."
-								okText="Withdraw"
-								onConfirm={() => withdraw(row._id)}
-							>
-								<Button
-									size="small"
-									danger
+					}}
+					columns={[
+						{
+							title: 'Identity',
+							dataIndex: '_id',
+							render: (value: string, row: PermissionView) => (
+								<Space
+									orientation="vertical"
+									size={0}
 								>
-									Withdraw
-								</Button>
-							</Popconfirm>
-						)
-					}
-				]}
-			/>
+									<Typography.Text code>{value}</Typography.Text>
+									<Space size={4}>
+										<Tag>
+											{row.kind === 'host' ? 'whole host' : 'one client'}
+										</Tag>
+										{row.loopbackAcknowledged ? (
+											<Tag color="orange">loopback risk accepted</Tag>
+										) : null}
+									</Space>
+								</Space>
+							)
+						},
+						{
+							title: 'Key proof',
+							dataIndex: 'requireKeyProof',
+							render: (requireKeyProof: boolean) =>
+								requireKeyProof ? (
+									<Tag color="blue">Required</Tag>
+								) : (
+									<Tag>Not required</Tag>
+								)
+						},
+						{
+							title: '',
+							key: 'actions',
+							render: (_: unknown, row: PermissionView) => (
+								<RowActions
+									name={row._id}
+									items={[
+										{
+											key: 'keyProof',
+											label: row.requireKeyProof
+												? 'Stop requiring key proof…'
+												: 'Require key proof…',
+											group: 'state',
+											onClick: () => void setKeyProof(row, !row.requireKeyProof)
+										},
+										{
+											key: 'withdraw',
+											label: 'Withdraw…',
+											group: 'danger',
+											onClick: () => void withdraw(row)
+										}
+									]}
+								/>
+							)
+						}
+					]}
+				/>
+			)}
 
 			<Modal
 				open={open}
@@ -334,6 +386,7 @@ export function McpClients() {
 				<Form
 					form={form}
 					layout="vertical"
+					scrollToFirstError
 					initialValues={DEFAULT_VALUES}
 				>
 					<Form.Item

@@ -59,12 +59,18 @@ export const smtpSettingsRoutes = new Elysia({ name: 'admin-settings-smtp' })
 			const ctx = assertAuth(admin);
 			assertSuperAdmin(ctx);
 
-			if (!body.host.trim()) throw new AdminError(422, 'host is required');
+			if (!body.host.trim()) {
+				throw new AdminError(422, 'host is required', { field: 'host' });
+			}
 			if (!EMAIL_RE.test(body.fromEmail)) {
-				throw new AdminError(422, 'fromEmail must be a valid email address');
+				throw new AdminError(422, 'fromEmail must be a valid email address', {
+					field: 'fromEmail'
+				});
 			}
 			if (!Number.isInteger(body.port) || body.port < 1 || body.port > 65535) {
-				throw new AdminError(422, 'port must be between 1 and 65535');
+				throw new AdminError(422, 'port must be between 1 and 65535', {
+					field: 'port'
+				});
 			}
 
 			const store = getSmtpSettingsStore();

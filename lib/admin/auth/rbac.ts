@@ -15,6 +15,7 @@ import {
 	UNASSIGNED_GROUP_ID
 } from '../consts.js';
 import { isSuperAdminsGroup } from '../super_admins.js';
+import { holdsBucket, reachesProject, type ProjectReach } from './can.js';
 
 export interface AdminContext {
 	userId: string;
@@ -85,6 +86,11 @@ export class AdminError extends Error {
 	 * would break the moment the wording improved.
 	 */
 	acknowledgementRequired?: boolean;
+	/*
+	 * The form field the refusal is about, named as the request body names it, so the console can put the
+	 * message on that field rather than above the form. Set only where one field is the whole reason.
+	 */
+	field?: string;
 	constructor(
 		status: number,
 		message: string,
@@ -92,6 +98,7 @@ export class AdminError extends Error {
 			blockers?: readonly DeletionBlocker[];
 			failedAreas?: readonly string[];
 			acknowledgementRequired?: boolean;
+			field?: string;
 		}
 	) {
 		super(message);
@@ -99,6 +106,7 @@ export class AdminError extends Error {
 		this.blockers = extra?.blockers;
 		this.failedAreas = extra?.failedAreas;
 		this.acknowledgementRequired = extra?.acknowledgementRequired;
+		this.field = extra?.field;
 	}
 }
 
@@ -112,10 +120,12 @@ export function adminErrorBody(error: AdminError): {
 	blockers?: readonly DeletionBlocker[];
 	failedAreas?: readonly string[];
 	acknowledgementRequired?: boolean;
+	field?: string;
 } {
 	return {
 		error: 'admin_error',
 		message: error.message,
+		...(error.field === undefined ? {} : { field: error.field }),
 		...(error.blockers ? { blockers: error.blockers } : {}),
 		...(error.failedAreas ? { failedAreas: error.failedAreas } : {}),
 		...(error.acknowledgementRequired ? { acknowledgementRequired: true } : {})
@@ -182,17 +192,15 @@ export function assertActiveGroup(admin: AdminContext): string {
 	);
 }
 
+/*
+ * The refusals below decide through `can.ts`, the same predicates the rights stated to the console come
+ * from, so a right the console is shown and the check a route makes cannot drift apart.
+ */
 export function assertProjectAccess(
 	admin: AdminContext,
 	project: Project
 ): void {
-	if (admin.superAdmin) return;
-	// Checked before ownership: the reserved admin project is outside the group model entirely, so a
-	// membership can never be the thing that grants access to it.
-	if (project.type === 'admin') {
-		throw new AdminError(403, 'no access to this project');
-	}
-	if (!admin.memberships.some((m) => m.groupId === project.ownerGroupId)) {
+	if (!reachesProject(admin, project)) {
 		throw new AdminError(403, 'no access to this project');
 	}
 }
@@ -201,32 +209,45 @@ export function assertBucketAccess(
 	admin: AdminContext,
 	bucket: UserBucket
 ): void {
-	if (admin.superAdmin) return;
-	if (!admin.memberships.some((m) => m.groupId === bucket.ownerGroupId)) {
+	if (!holdsBucket(admin, bucket)) {
 		throw new AdminError(403, 'no access to this bucket');
 	}
 }
 
 /*
- * Broader than assertBucketAccess: also grants access when the caller's group owns a project whose
- * bucketId is this bucket, so an administrator can manage the end-users of a bucket backing their
- * project without their group owning the bucket itself. Used for reading a bucket's detail and
- * managing its end-users — NOT for editing the bucket entity.
- *
- * The distinction survives the move to groups unchanged; only what "the caller's" means has changed.
+ * The buckets backing a project one of the caller's groups owns — every group, not only the active one,
+ * because access follows membership and the scope only decides what is listed. A super administrator's is
+ * never consulted, so it is not read.
  */
-export async function assertBucketUserAccess(
-	admin: AdminContext,
-	bucket: UserBucket
-): Promise<void> {
-	if (admin.superAdmin) return;
-	if (admin.memberships.some((m) => m.groupId === bucket.ownerGroupId)) return;
+export async function projectReach(admin: AdminContext): Promise<ProjectReach> {
+	if (admin.superAdmin) return new Map();
+	return reachOf(await projectsOfCallerGroups(admin));
+}
+
+/* Every project owned by a group the caller belongs to. */
+export async function projectsOfCallerGroups(
+	admin: AdminContext
+): Promise<Project[]> {
 	const store = getProjectStore();
+	const all: Project[] = [];
 	for (const membership of admin.memberships) {
-		const projects = await store.listByGroup(membership.groupId);
-		if (projects.some((p) => p.bucketId === bucket._id)) return;
+		all.push(...(await store.listByGroup(membership.groupId)));
 	}
-	throw new AdminError(403, 'no access to this bucket');
+	return all;
+}
+
+/* The reach those projects give, for a caller who already read them for something else. */
+export function reachOf(
+	projects: readonly Pick<Project, 'bucketId' | 'ownerGroupId'>[]
+): ProjectReach {
+	const reach = new Map<string, Set<string>>();
+	for (const project of projects) {
+		if (!project.bucketId) continue;
+		const groups = reach.get(project.bucketId) ?? new Set<string>();
+		groups.add(project.ownerGroupId);
+		reach.set(project.bucketId, groups);
+	}
+	return reach;
 }
 
 /*

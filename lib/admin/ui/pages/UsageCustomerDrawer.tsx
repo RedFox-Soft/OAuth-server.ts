@@ -5,6 +5,8 @@ import {
 	type CustomerSummary,
 	type OverviewRow
 } from '../activity/model.js';
+import { Link } from '../frame/router.js';
+import { bucketHref } from '../frame/routes.js';
 
 /*
  * One customer of the usage dashboard (specs/077): who it is, whom to talk to, and its buckets. A customer
@@ -96,8 +98,12 @@ export function UsageCustomerDrawer({
 								key: 'name',
 								render: (_: unknown, row: OverviewRow) => (
 									<>
-										{row.name}{' '}
-										{row.deleted ? <Tag color="red">deleted</Tag> : null}
+										{row.deleted === null ? (
+											<Link href={bucketHref(row.bucketId)}>{row.name}</Link>
+										) : (
+											row.name
+										)}{' '}
+										{row.deleted ? <Tag color="red">Deleted</Tag> : null}
 									</>
 								)
 							},

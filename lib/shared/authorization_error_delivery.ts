@@ -1,6 +1,5 @@
-import { mapValueError, ValidationError } from 'elysia';
-import { TransformDecodeCheckError } from '@sinclair/typebox/value';
 import { OIDCProviderError } from '../helpers/errors.ts';
+import { getFirstError } from './first_validation_error.js';
 import { isPlainObject } from 'lib/helpers/_/object.js';
 import { responseModes } from 'lib/response_modes/index.js';
 import { send } from 'lib/response_modes/describe.js';
@@ -25,30 +24,8 @@ import type { ErrorSurface } from 'lib/adapters/types.js';
  * the handler is loaded by the root app before the interaction routes are mounted.
  */
 
-/*
- * The first schema violation behind a VALIDATION code, if there is one. Elysia reports two kinds under
- * that code: its own ValidationError, and TypeBox's TransformDecodeCheckError when a member fails to
- * decode (a query value that is not the JSON its schema expects), which carries the violation inside.
- */
-export function getFirstError(
-	error: unknown
-): { path: string; schemaError: unknown; summary?: string } | undefined {
-	if (error instanceof ValidationError) {
-		const first = mapValueError(error.valueError);
-		return (
-			first && {
-				path: first.path,
-				schemaError: first.schema.error,
-				summary: first.summary
-			}
-		);
-	}
-	if (error instanceof TransformDecodeCheckError) {
-		const { path, schema, message } = error.error;
-		return { path, schemaError: schema.error, summary: message };
-	}
-	return undefined;
-}
+/* Held in a leaf so the admin plane can read it without this module's imports; re-exported for its callers here. */
+export { getFirstError };
 
 export function getObjFromError(
 	code: string | number,

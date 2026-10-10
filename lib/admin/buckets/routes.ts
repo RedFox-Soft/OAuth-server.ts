@@ -14,13 +14,25 @@ import { destroyConnectionsOf } from '../../provisioning/service.js';
 import {
 	assertAuth,
 	assertActiveGroup,
-	assertBucketAccess,
 	assertGroupOwner,
 	AdminError,
 	adminErrorBody,
-	resolveAdmin
+	projectReach,
+	projectsOfCallerGroups,
+	reachOf,
+	resolveAdmin,
+	type AdminContext
 } from '../auth/rbac.js';
-import type { UserBucket } from '../../adapters/types.js';
+import {
+	bucketCan,
+	mayChangeBucketAddress,
+	meCan,
+	NO_PROJECT_REACH,
+	reachesProject,
+	type BucketCan,
+	type ProjectReach
+} from '../auth/can.js';
+import type { Project, UserBucket } from '../../adapters/types.js';
 import { isUniqueValueTaken } from '../../adapters/conflicts.js';
 import { presentAll } from '../federation/service.js';
 import { ADMIN_BUCKET_ID, isUndeletableBucket, reservedOf } from '../consts.js';
@@ -66,6 +78,7 @@ import { now } from '../../activity/clock.js';
 import { groupLabel } from '../groups/label.js';
 import {
 	forgetBucketAddresses,
+	isAddressable,
 	isCanonicalHost
 } from '../auth/bucketAddress.js';
 import {
@@ -91,11 +104,14 @@ async function assertSlugAvailable(slug: string) {
 	if (isReservedBucketName(slug)) {
 		throw new AdminError(
 			409,
-			`'${slug}' is reserved for this server's own addresses and cannot be a bucket slug`
+			`'${slug}' is reserved for this server's own addresses and cannot be a bucket slug`,
+			{ field: 'slug' }
 		);
 	}
 	if (await getBucketStore().findBySlug(slug)) {
-		throw new AdminError(409, `slug '${slug}' is already taken`);
+		throw new AdminError(409, `slug '${slug}' is already taken`, {
+			field: 'slug'
+		});
 	}
 }
 
@@ -142,7 +158,8 @@ async function assertHostAvailable(value: string): Promise<string> {
 	if (!judged.ok) {
 		throw new AdminError(
 			400,
-			`'${value}' is not usable as an address: ${judged.reason}`
+			`'${value}' is not usable as an address: ${judged.reason}`,
+			{ field: 'host' }
 		);
 	}
 	const host = judged.host;
@@ -150,7 +167,8 @@ async function assertHostAvailable(value: string): Promise<string> {
 	if (isCanonicalHost(host)) {
 		throw new AdminError(
 			409,
-			`'${host}' is this deployment's own address and cannot be a bucket's`
+			`'${host}' is this deployment's own address and cannot be a bucket's`,
+			{ field: 'host' }
 		);
 	}
 	/*
@@ -166,14 +184,16 @@ async function assertHostAvailable(value: string): Promise<string> {
 	) {
 		throw new AdminError(
 			409,
-			`'${host}' is reserved for this deployment and cannot be a bucket's address`
+			`'${host}' is reserved for this deployment and cannot be a bucket's address`,
+			{ field: 'host' }
 		);
 	}
 	const holder = await getBucketStore().findByHost(host);
 	if (holder) {
 		throw new AdminError(
 			409,
-			`hostname '${host}' is already taken by the bucket '${holder.name}'`
+			`hostname '${host}' is already taken by the bucket '${holder.name}'`,
+			{ field: 'host' }
 		);
 	}
 	return host;
@@ -196,7 +216,9 @@ async function refusingATakenHostname<T>(write: () => Promise<T>): Promise<T> {
 		return await write();
 	} catch (error) {
 		if (isUniqueValueTaken(error)) {
-			throw new AdminError(409, `hostname '${error.value}' is already taken`);
+			throw new AdminError(409, `hostname '${error.value}' is already taken`, {
+				field: 'host'
+			});
 		}
 		throw error;
 	}
@@ -249,6 +271,66 @@ function presentBucket<T extends Pick<UserBucket, '_id' | 'federation'>>(
 			: bucket;
 	if (!marked.federation.length) return marked;
 	return { ...marked, federation: presentAll(bucket) };
+}
+
+/*
+ * What a bucket's rights are decided from, gathered once per request so a list states every row's rights
+ * from the same reads: the caller's reach through their projects, and the projects they can see by bucket.
+ */
+interface RightsFacts {
+	readonly access: ProjectReach;
+	readonly visibleProjects: ReadonlyMap<string, readonly Project[]>;
+}
+
+async function rightsFacts(ctx: AdminContext): Promise<RightsFacts> {
+	const projects = ctx.superAdmin
+		? await getProjectStore().list()
+		: await projectsOfCallerGroups(ctx);
+	const visibleProjects = new Map<string, Project[]>();
+	for (const project of projects) {
+		if (!project.bucketId || !reachesProject(ctx, project)) continue;
+		visibleProjects.set(project.bucketId, [
+			...(visibleProjects.get(project.bucketId) ?? []),
+			project
+		]);
+	}
+	return {
+		access: ctx.superAdmin ? NO_PROJECT_REACH : reachOf(projects),
+		visibleProjects
+	};
+}
+
+/*
+ * The caller's rights on a bucket, and the state that would refuse a right they hold — so the console hides
+ * what it may not do and disables, with the reason, what it may do but not yet.
+ *
+ * Only the projects the caller can reach are named. A bucket whose projects sit in another group is
+ * reachable only through data older than the rule that a project and its bucket share a group, and naming
+ * them would tell one tenant what another calls its work; the deletion's own 409 still refuses it.
+ */
+function withRights<
+	T extends Pick<UserBucket, '_id' | 'ownerGroupId' | 'slug' | 'host'>
+>(
+	ctx: AdminContext,
+	bucket: T,
+	facts: RightsFacts
+): T & {
+	can: BucketCan;
+	blockers: {
+		usedByProjects: { id: string; name: string }[];
+		addressable: boolean;
+	};
+} {
+	return {
+		...bucket,
+		can: bucketCan(ctx, bucket, facts.access),
+		blockers: {
+			usedByProjects: (facts.visibleProjects.get(bucket._id) ?? []).map(
+				(project) => ({ id: project._id, name: project.name })
+			),
+			addressable: isAddressable(bucket)
+		}
+	};
 }
 
 /*
@@ -327,7 +409,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 		const store = getBucketStore();
 		/*
 		 * Listing has to agree with access, or the console shows an administrator fewer buckets than it
-		 * will let them open. `assertBucketUserAccess` admits a bucket backing a project the caller's
+		 * will let them open. The `read` right admits a bucket backing a project the caller's
 		 * group owns, so the list has to admit it too — it did not before this feature, and a bucket you
 		 * could administer but never see was the result.
 		 */
@@ -350,9 +432,10 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 		 * A super administrator configures the administrators' bucket like any other, so it is listed for
 		 * them. For anyone else it stays out of the list, as it is out of reach.
 		 */
+		const facts = await rightsFacts(ctx);
 		return all
 			.filter((b) => ctx.superAdmin || b._id !== ADMIN_BUCKET_ID)
-			.map(presentBucket);
+			.map((b) => withRights(ctx, presentBucket(b), facts));
 	})
 	.post(
 		'/admin/api/buckets',
@@ -360,6 +443,21 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			const ctx = assertAuth(admin);
 			// No role gate: the authority is membership of the group the bucket will belong to.
 			const ownerGroupId = assertActiveGroup(ctx);
+			/*
+			 * Naming a hostname is an instance-level act, never a group-level one. A project administrator
+			 * may create buckets in their own group; letting them name one would put a name in the
+			 * operator's own domain under their control — an escalation out of the group boundary, and out
+			 * of whatever else that domain is used for.
+			 *
+			 * Decided before the hostname is judged, so a caller without the right is refused for that and
+			 * not told whether the name they tried is free.
+			 */
+			if (body.host !== undefined && !meCan(ctx).createHost) {
+				throw new AdminError(
+					403,
+					'only an administrator of this instance may give a bucket a hostname of its own'
+				);
+			}
 			/*
 			 * A new bucket cannot be created unreachable. Providers are added through their own routes, so at
 			 * creation there are none — which makes `passwordLogin: false` here always a lockout.
@@ -373,18 +471,6 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			 * a bucket a 409 refused to create would record an address that never existed.
 			 */
 			const address = await resolveAddress(body);
-			/*
-			 * Naming a hostname is an instance-level act, never a group-level one. A project administrator
-			 * may create buckets in their own group; letting them name one would put a name in the
-			 * operator's own domain under their control — an escalation out of the group boundary, and out
-			 * of whatever else that domain is used for.
-			 */
-			if (address.host !== undefined && !ctx.superAdmin) {
-				throw new AdminError(
-					403,
-					'only an administrator of this instance may give a bucket a hostname of its own'
-				);
-			}
 			// The id is allocated here, not by the store, so the audit entry can name the bucket that is
 			// about to exist — audit-first has nothing to point at otherwise.
 			const bucketId = nanoid();
@@ -419,8 +505,9 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 	)
 	.get('/admin/api/buckets/:id', async ({ admin, params }) => {
 		const ctx = assertAuth(admin);
+		const bucket = await loadBucketForSettings(ctx, params.id, 'read');
 		return withAddressGuidance(
-			presentBucket(await loadBucketForSettings(ctx, params.id, 'read'))
+			withRights(ctx, presentBucket(bucket), await rightsFacts(ctx))
 		);
 	})
 	.patch(
@@ -476,24 +563,18 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			 * Instance-level, whichever form is being moved to. A group administrator who could rename a
 			 * bucket's address could break every client integrated with it, and one who could name a
 			 * hostname would reach into the operator's domain.
-			 */
-			if (!ctx.superAdmin) {
-				throw new AdminError(
-					403,
-					'only an administrator of this instance may change a bucket address'
-				);
-			}
-
-			/*
-			 * Before the bucket is loaded, so the answer cannot depend on who is asking — the order the
+			 *
+			 * Before the bucket is loaded, so the answer cannot depend on whether it exists — the order the
 			 * delete route below settled on for the same reason. The console authenticates against the
 			 * instance's own issuer, so moving the administrators bucket would lock every operator out of
 			 * the surface that could move it back.
 			 */
-			if (isUndeletableBucket(params.id)) {
+			if (!mayChangeBucketAddress(ctx, params.id)) {
 				throw new AdminError(
 					403,
-					'this bucket is served at the root and its address cannot be changed'
+					ctx.superAdmin
+						? 'this bucket is served at the root and its address cannot be changed'
+						: 'only an administrator of this instance may change a bucket address'
 				);
 			}
 
@@ -605,6 +686,13 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 				);
 			}
 			const bucket = await loadBucketForEdit(ctx, params.id);
+			/*
+			 * The right before anything about the destination or the projects using the bucket, so a member
+			 * who may not move it is told that rather than which group it would have left.
+			 */
+			if (!bucketCan(ctx, bucket, await projectReach(ctx)).move) {
+				throw new AdminError(403, 'group owner required');
+			}
 			const destination = await loadDestination(ctx, body.groupId);
 			const bound = (await getProjectStore().list()).filter(
 				(project) => project.bucketId === bucket._id
@@ -680,7 +768,9 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			}
 			const bucket = await getBucketStore().find(params.id);
 			if (!bucket) throw new AdminError(404, 'bucket not found');
-			assertBucketAccess(ctx, bucket);
+			if (!bucketCan(ctx, bucket, NO_PROJECT_REACH).delete) {
+				throw new AdminError(403, 'no access to this bucket');
+			}
 			/*
 			 * Before the election is even considered, and unclearable by it. What this protects is
 			 * outside the bucket: a project left pointing at a bucket that no longer exists is a broken

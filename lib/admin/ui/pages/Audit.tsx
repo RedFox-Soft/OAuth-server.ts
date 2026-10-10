@@ -10,6 +10,9 @@ import {
 	Tag,
 	Typography
 } from 'antd';
+import { PageHeader } from '../frame/PageHeader.js';
+import { request } from '../frame/request.js';
+import { EmptyState, LoadFailed, NoMatch } from '../frame/states.js';
 
 interface AuditEntry {
 	_id: string;
@@ -102,6 +105,22 @@ function toBound(day: string, edge: 'start' | 'end'): string {
 	return new Date(`${day}${suffix}`).toISOString();
 }
 
+/* The applied filters in a few words, for the "nothing matches" answer. */
+function describeFilters(filters: Filters): string {
+	const parts: string[] = [];
+	for (const { name, placeholder } of TEXT_FILTERS) {
+		const value = filters[name].trim();
+		if (value) parts.push(`${placeholder}: ${value}`);
+	}
+	if (filters.viaSurface) {
+		const surface = SURFACE_OPTIONS.find((o) => o.value === filters.viaSurface);
+		parts.push(`Surface: ${surface?.label ?? filters.viaSurface}`);
+	}
+	if (filters.from) parts.push(`from ${filters.from}`);
+	if (filters.to) parts.push(`to ${filters.to}`);
+	return parts.join(', ');
+}
+
 function buildQuery(filters: Filters, page: number, pageSize: number): string {
 	const params = new URLSearchParams();
 	for (const { name } of TEXT_FILTERS) {
@@ -119,7 +138,14 @@ function buildQuery(filters: Filters, page: number, pageSize: number): string {
 export function Audit() {
 	const [page, setPage] = useState<AuditPage | null>(null);
 	const [loading, setLoading] = useState(true);
+	/*
+	 * A failed load used to leave the previous page, or an empty table, on screen without a word — which
+	 * reads as "nothing happened" on the one page whose job is to say what did.
+	 */
+	const [failed, setFailed] = useState<string | null>(null);
 	const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
+	/* What the page on screen was filtered by, as opposed to what is typed into the boxes now. */
+	const [applied, setApplied] = useState<Filters>(EMPTY_FILTERS);
 	const [current, setCurrent] = useState(1);
 	const [pageSize, setPageSize] = useState(50);
 
@@ -132,10 +158,22 @@ export function Audit() {
 	const fetchPage = useCallback(
 		async (active: Filters, atPage: number, size: number) => {
 			try {
-				const res = await fetch(
+				const result = await request<AuditPage>(
+					'GET',
 					`/admin/api/audit?${buildQuery(active, atPage, size)}`
 				);
-				if (res.ok) setPage((await res.json()) as AuditPage);
+				setApplied(active);
+				if (!result.ok) {
+					const reference = result.error.error_reference;
+					setFailed(
+						reference
+							? `${result.error.message} (reference ${reference})`
+							: result.error.message
+					);
+					return;
+				}
+				setFailed(null);
+				setPage(result.data);
 			} finally {
 				setLoading(false);
 			}
@@ -161,6 +199,8 @@ export function Audit() {
 		setCurrent(1);
 		void load(EMPTY_FILTERS, 1, pageSize);
 	}
+
+	const filtered = describeFilters(applied) !== '';
 
 	const columns = [
 		{
@@ -298,7 +338,7 @@ export function Audit() {
 			style={{ width: '100%' }}
 			size="middle"
 		>
-			<Typography.Title level={3}>Audit trail</Typography.Title>
+			<PageHeader title="Audit trail" />
 
 			{/*
 			 * Entries are written before the change they describe, so no change is applied without a
@@ -366,25 +406,43 @@ export function Audit() {
 				</Space>
 			</Card>
 
-			<Table<AuditEntry>
-				rowKey="_id"
-				loading={loading}
-				dataSource={page?.entries ?? []}
-				columns={columns}
-				pagination={{
-					current,
-					pageSize,
-					total: page?.total ?? 0,
-					showSizeChanger: true,
-					pageSizeOptions: ['20', '50', '100', '200'],
-					showTotal: (total) => `${total} entries`,
-					onChange: (nextPage, nextSize) => {
-						setCurrent(nextPage);
-						setPageSize(nextSize);
-						void load(filters, nextPage, nextSize);
-					}
-				}}
-			/>
+			{failed !== null ? (
+				<LoadFailed
+					reason={failed}
+					onRetry={() => void load(applied, current, pageSize)}
+				/>
+			) : (
+				<Table<AuditEntry>
+					rowKey="_id"
+					loading={loading}
+					dataSource={page?.entries ?? []}
+					columns={columns}
+					locale={{
+						emptyText: filtered ? (
+							<NoMatch
+								query={describeFilters(applied)}
+								onClear={reset}
+								clearLabel="Clear filters"
+							/>
+						) : (
+							<EmptyState purpose="No administrative change has been recorded yet." />
+						)
+					}}
+					pagination={{
+						current,
+						pageSize,
+						total: page?.total ?? 0,
+						showSizeChanger: true,
+						pageSizeOptions: ['20', '50', '100', '200'],
+						showTotal: (total) => `${total} entries`,
+						onChange: (nextPage, nextSize) => {
+							setCurrent(nextPage);
+							setPageSize(nextSize);
+							void load(applied, nextPage, nextSize);
+						}
+					}}
+				/>
+			)}
 		</Space>
 	);
 }

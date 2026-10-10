@@ -102,7 +102,7 @@ async function api<T>(
 }
 
 /*
- * The console's sign-in leg. `GET /admin` redirects to `/admin/login`, which starts an authorization
+ * The console's sign-in leg. `GET /admin/projects` redirects to `/admin/login`, which starts an authorization
  * code flow against this server's own issuer and lands on the interaction's login page — so the form
  * filled in here is `lib/interactions/loginPage.tsx`, not an admin-specific screen. Its inputs carry
  * placeholders rather than labels, which is why these are placeholder locators.
@@ -112,20 +112,24 @@ async function signIn(
 	email: string,
 	password: string
 ): Promise<void> {
-	await page.goto(`${ORIGIN}/admin`);
+	await page.goto(`${ORIGIN}/admin/projects`);
 	await page.getByPlaceholder('Username').fill(email);
 	await page.getByPlaceholder('Password').fill(password);
 	await page.getByRole('button', { name: 'Log in' }).click();
-	await page.waitForURL(`${ORIGIN}/admin`);
+	// Sign-in returns to the address it was started from (`next`).
+	await page.waitForURL(`${ORIGIN}/admin/projects`);
 }
 
 interface Created {
 	_id: string;
 }
 
-async function seed(
-	ctx: BrowserContext
-): Promise<{ projectName: string; bucketName: string; bucketSlug: string }> {
+async function seed(ctx: BrowserContext): Promise<{
+	projectId: string;
+	projectName: string;
+	bucketId: string;
+	bucketSlug: string;
+}> {
 	const group = await api<Created>(ctx, 'POST', '/admin/api/groups', {
 		name: 'Acme Corp'
 	});
@@ -230,8 +234,9 @@ async function seed(
 		'deviceFlow.enabled': true
 	});
 	return {
+		projectId: project._id,
 		projectName: 'Acme Web',
-		bucketName: 'Acme customers',
+		bucketId: bucket._id,
 		bucketSlug: BUCKET_SLUG
 	};
 }
@@ -295,13 +300,11 @@ async function shoot(page: Page, name: string): Promise<void> {
 }
 
 /*
- * The console is a single-page shell: `lib/admin/ui/pages/Layout.tsx` keeps the current page in React
- * state and the sidebar switches it, so there is no per-page URL to navigate to and every capture
- * below a menu click. Same for the drill-downs — a project's clients and a bucket's users are
- * rendered by Projects.tsx swapping its own subtree, not by a route.
+ * Every console screen has an address (lib/admin/ui/frame/routes.ts), so each capture opens its page
+ * directly rather than clicking its way there, and a renamed button cannot break the walk.
  */
-async function openMenu(page: Page, label: string): Promise<void> {
-	await page.getByRole('menuitem', { name: label }).click();
+async function open(page: Page, path: string): Promise<void> {
+	await page.goto(`${ORIGIN}${path}`);
 }
 
 mkdirSync(OUT, { recursive: true });
@@ -332,31 +335,23 @@ try {
 
 	// Reloaded rather than continued: the scope switch happened on the session after this page was
 	// rendered, and the console re-reads its lists on load.
-	await page.goto(`${ORIGIN}/admin`);
+	await open(page, '/admin/projects');
 	await shoot(page, 'admin-projects');
 
-	await page
-		.getByRole('row', { name: new RegExp(names.projectName) })
-		.getByRole('button', { name: 'Clients' })
-		.click();
+	await open(page, `/admin/projects/${names.projectId}/clients`);
 	await shoot(page, 'admin-project-clients');
-	await page.getByRole('button', { name: 'Projects' }).click();
 
-	await openMenu(page, 'Buckets');
-	await page
-		.getByRole('row', { name: new RegExp(names.bucketName) })
-		.getByRole('button', { name: 'Users' })
-		.click();
+	await open(page, `/admin/buckets/${names.bucketId}/users`);
 	await shoot(page, 'admin-bucket-users');
 
-	// "Grants & flows" is the first settings domain, so it is the pane the page opens on — no click.
-	await openMenu(page, 'Settings');
+	// "Grants & flows" is the first settings domain, so it is the pane the page opens on.
+	await open(page, '/admin/settings');
 	await shoot(page, 'admin-settings-grants');
 
-	await openMenu(page, 'Audit');
+	await open(page, '/admin/audit');
 	await shoot(page, 'admin-audit-trail');
 
-	await openMenu(page, 'Keys');
+	await open(page, '/admin/keys');
 	await shoot(page, 'admin-signing-keys');
 
 	// End-user screens in a fresh context: no admin cookies, a real authorization request.

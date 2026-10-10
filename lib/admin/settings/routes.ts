@@ -34,14 +34,16 @@ const sameValue = (a: unknown, b: unknown): boolean =>
 // type/option/invariant violation.
 function validateValue(descriptor: SettingDescriptor, value: unknown): void {
 	const { key, type, options } = descriptor;
+	/* Every refusal here is about one setting, and the console marks it on that setting's control. */
+	const field = { field: key };
 	switch (type) {
 		case 'boolean':
 			if (typeof value !== 'boolean')
-				throw new AdminError(422, `${key} must be a boolean`);
+				throw new AdminError(422, `${key} must be a boolean`, field);
 			return;
 		case 'string':
 			if (typeof value !== 'string')
-				throw new AdminError(422, `${key} must be a string`);
+				throw new AdminError(422, `${key} must be a string`, field);
 			return;
 		case 'number':
 			/*
@@ -50,31 +52,33 @@ function validateValue(descriptor: SettingDescriptor, value: unknown): void {
 			 * here is the drift this module's own comment warns about.
 			 */
 			if (typeof value !== 'number' || !Number.isFinite(value))
-				throw new AdminError(422, `${key} must be a number`);
+				throw new AdminError(422, `${key} must be a number`, field);
 			return;
 		case 'enum':
 			if (typeof value !== 'string' || !options?.includes(value))
 				throw new AdminError(
 					422,
-					`${key} must be one of: ${(options ?? []).join(', ')}`
+					`${key} must be one of: ${(options ?? []).join(', ')}`,
+					field
 				);
 			return;
 		case 'string-array':
 			if (!Array.isArray(value) || !value.every((v) => typeof v === 'string'))
-				throw new AdminError(422, `${key} must be an array of strings`);
+				throw new AdminError(422, `${key} must be an array of strings`, field);
 			if (options && !value.every((v) => options.includes(v)))
 				throw new AdminError(
 					422,
-					`${key} values must be among: ${options.join(', ')}`
+					`${key} values must be among: ${options.join(', ')}`,
+					field
 				);
 			if (key === 'scopes' && !value.includes('openid'))
-				throw new AdminError(422, 'scopes must include "openid"');
+				throw new AdminError(422, 'scopes must include "openid"', field);
 			return;
 		case 'json':
 			// Shape only. The semantic rules live in validateConfiguration, which validateEffectiveConfig
 			// calls below — restating them here is the drift this module's own comment warns about.
 			if (typeof value !== 'object' || value === null || Array.isArray(value))
-				throw new AdminError(422, `${key} must be a JSON object`);
+				throw new AdminError(422, `${key} must be a JSON object`, field);
 			return;
 		default: {
 			/*
@@ -208,7 +212,9 @@ export const settingsRoutes = new Elysia({ name: 'admin-settings' })
 			// somewhere else in the same submission.
 			for (const [key, value] of Object.entries(changes)) {
 				const descriptor = CATALOG_BY_KEY.get(key);
-				if (!descriptor) throw new AdminError(422, `unknown setting: ${key}`);
+				if (!descriptor) {
+					throw new AdminError(422, `unknown setting: ${key}`, { field: key });
+				}
 				validateValue(descriptor, value);
 			}
 			// Nothing to apply, so there is nothing to record: an entry here would claim a change that

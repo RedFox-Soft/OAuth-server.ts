@@ -4,7 +4,7 @@ title: 'Group ownership of projects and buckets'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-29
-updated: 2026-10-10
+updated: 2026-10-11
 graph:
   node_type: concept
   relationships:
@@ -160,8 +160,9 @@ by a group with no access to the project. The same rule is why a bucket moves to
 every project using it, and why the bind route re-checks after its write: a move can commit in between
 ([[container-ownership-transfer]]).
 
-**Listing has to agree with access.** `assertBucketUserAccess` admits a bucket backing a project the
-caller's group owns, so `GET /admin/api/buckets` has to admit it as well. It did not before this
+**Listing has to agree with access.** A bucket's `read` right (`bucketCan`, `lib/admin/auth/can.ts`,
+which replaced `assertBucketUserAccess` in spec 079) admits a bucket backing a project the caller's group
+owns, so `GET /admin/api/buckets` has to admit it as well. It did not before this
 feature, and a bucket you could administer but never see was the result.
 
 **The audit trail's group is written, never derived.** `AdminAuditEntry.ownerGroupId` is a separate

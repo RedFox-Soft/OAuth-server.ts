@@ -6,6 +6,15 @@ import { sessionFor } from '../admin_session.ts';
 import { shaped } from 'test/shape.js';
 import { Type } from '@sinclair/typebox';
 import { createAdministrator, type AdminKind } from '../administrators.ts';
+import { elysia } from 'lib/index.ts';
+
+async function page(path: string, cookie: string): Promise<string> {
+	const res = await elysia.handle(
+		new Request(`http://e.ly${path}`, { headers: { cookie } })
+	);
+	expect(res.status).toBe(200);
+	return res.text();
+}
 
 async function cookieFor(kind: AdminKind): Promise<string> {
 	const user = await createAdministrator(
@@ -63,17 +72,11 @@ describe('admin UI shell', () => {
 		const forbidden = await agent.admin.api.audit.get({ query: {} });
 		expect(forbidden.status).toBe(401);
 
-		const superAdmin = await agent.admin.get({
-			headers: { cookie: await cookieFor('super') }
-		});
-		const superShell = shaped(Type.String(), superAdmin.data);
+		const superShell = await page('/admin/projects', await cookieFor('super'));
 		expect(superShell).toContain('Settings');
 		expect(superShell).toContain('Keys');
 
-		const projectAdmin = await agent.admin.get({
-			headers: { cookie: await cookieFor('plain') }
-		});
-		const shell = shaped(Type.String(), projectAdmin.data);
+		const shell = await page('/admin/projects', await cookieFor('plain'));
 		expect(shell).not.toContain('Settings');
 		expect(shell).not.toContain('Faults');
 		// ...but the tenant's own surfaces are offered, including the two this feature unblocked.

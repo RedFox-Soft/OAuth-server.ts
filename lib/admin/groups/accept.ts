@@ -46,6 +46,20 @@ export const invitationAcceptRoutes = new Elysia({ name: 'admin-invitations' })
 			if (!invitation || invitation.acceptedAt) throw invalid();
 
 			/*
+			 * Whether a password is needed is settled before the claim below. Claiming first meant a new
+			 * invitee who submitted without one spent the invitation on the refusal, and every retry was then
+			 * refused as not valid.
+			 */
+			const users = getUserStore(ADMIN_BUCKET_ID);
+			const existing = await users.findByEmail(invitation.email);
+			if (!existing && !body.password) {
+				throw new AdminError(
+					400,
+					'a password is required to create your administrator account'
+				);
+			}
+
+			/*
 			 * Claimed in one insert-if-absent before anything is written. Checking `acceptedAt` and marking it
 			 * last let two acceptances arriving together both go through, one of them writing the group's
 			 * membership from a copy read before the other's change. The claim lives as long as the
@@ -84,24 +98,15 @@ export const invitationAcceptRoutes = new Elysia({ name: 'admin-invitations' })
 			);
 			if (!inviterStillOwner) throw invalid();
 
-			const users = getUserStore(ADMIN_BUCKET_ID);
-			const existing = await users.findByEmail(invitation.email);
-
 			let userId: string;
 			if (existing) {
 				// Already an administrator: they join the group and nothing else about the account changes.
 				// Asking them for a password here would be a credential change nobody requested.
 				userId = existing._id;
 			} else {
-				if (!body.password) {
-					throw new AdminError(
-						400,
-						'a password is required to create your administrator account'
-					);
-				}
 				const created = await users.create(
 					invitation.email,
-					await Bun.password.hash(body.password),
+					await Bun.password.hash(body.password ?? ''),
 					// An invitation grants membership of the inviting group and nothing else — never the
 					// instance privilege, which only a super administrator grants, by its own operation.
 					true

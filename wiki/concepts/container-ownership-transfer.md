@@ -4,7 +4,7 @@ title: 'Moving a container to another group'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # Moving a container to another group
@@ -23,8 +23,8 @@ The operation exists because a personal group stopped being shareable in the sam
 Two things compare a project's owner with the owner of the bucket it signs into:
 
 - consent is waived only where they match (`consentWaived`, `lib/shared/consent_waiver.ts:32-47`);
-- a project's group may administer the end users of its bucket (`assertBucketUserAccess`,
-  `lib/admin/auth/rbac.ts:218-230`).
+- a project's group may administer the end users of its bucket (the bucket's `manageUsers` right,
+  `bucketCan` in `lib/admin/auth/can.ts` since spec 079).
 
 Moving one without the other would change both, and nobody would have decided that. This is the same reason
 `PUT /admin/api/projects/:id/bucket` refuses to bind a project to another group's bucket.
@@ -41,8 +41,15 @@ Moving one without the other would change both, and nobody would have decided th
 `loadDestination` (`lib/admin/ownership/destination.ts:27`) refuses in an order that reveals nothing.
 Membership is checked before anything about the group's kind is said, so a caller outside the destination
 gets the same answer as for an unknown id. The project route refuses `type === 'admin'` explicitly
-(`projects/routes.ts:425`), because `loadProject` admits a super administrator to the console's project.
-The bucket route checks `isUndeletableBucket` before loading (`buckets/routes.ts:569`).
+(through `mayMoveProject`, `lib/admin/auth/can.ts`), because `loadProject` admits a super administrator to
+the console's project. The bucket route checks `isUndeletableBucket` before loading.
+
+Since spec 079 both routes decide the caller's right — the `move` flag the console and agents are shown —
+before the destination and the source rule below: for a project, owning its group; for a bucket, owning its
+group or a group whose project uses it (`bucketCan`). A member without it gets 403, where before it could
+get a 409 that described how the container was attached. `assertGroupOwner(from)` still runs after the
+source rule, so a body-dependent case (moving a mixed-group bucket into the group of its stray project)
+can still answer 403 to a caller the flag admitted.
 
 ## The source rule, and why a repeated move completes
 

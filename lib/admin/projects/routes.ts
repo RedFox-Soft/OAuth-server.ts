@@ -12,8 +12,16 @@ import {
 	assertGroupOwner,
 	AdminError,
 	adminErrorBody,
-	resolveAdmin
+	resolveAdmin,
+	type AdminContext
 } from '../auth/rbac.js';
+import {
+	managesProject,
+	mayMoveProject,
+	projectCan,
+	type ProjectCan
+} from '../auth/can.js';
+import type { Project } from '../../adapters/types.js';
 import {
 	CreateProjectBody,
 	UpdateProjectBody,
@@ -61,7 +69,7 @@ function validateCorsOrigins(origins: string[] | undefined) {
 		return normalizeOrigins(origins);
 	} catch (err) {
 		if (err instanceof InvalidOriginError) {
-			throw new AdminError(400, err.message);
+			throw new AdminError(400, err.message, { field: 'corsOrigins' });
 		}
 		throw err;
 	}
@@ -78,6 +86,31 @@ function normalizeConsentedClients(
 ): string[] | null {
 	if (value === undefined) return null;
 	return Array.isArray(value) ? value : [value];
+}
+
+/*
+ * The caller's rights on each project, and the state that would refuse one they hold. The namespace a
+ * project declares into is read from its bucket, so the buckets are read once per distinct id rather than
+ * once per row.
+ */
+async function withRights<T extends Project>(
+	ctx: AdminContext,
+	projects: readonly T[]
+): Promise<(T & { can: ProjectCan; blockers: { hasBucket: boolean } })[]> {
+	const namespaces = new Map<string, string>();
+	for (const id of new Set(projects.map((project) => project.bucketId))) {
+		if (id) namespaces.set(id, await namespaceOfProject({ bucketId: id }));
+	}
+	return projects.map((project) => ({
+		...project,
+		can: projectCan(ctx, {
+			...project,
+			namespace:
+				(project.bucketId && namespaces.get(project.bucketId)) || ROOT_NAMESPACE
+		}),
+		/* As the move route reads it: a project using a bucket moves only with it. */
+		blockers: { hasBucket: project.bucketId !== null }
+	}));
 }
 
 /* Set equality, because the order the console listed them in is not part of what was consented to. */
@@ -111,7 +144,7 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 			: (await store.listByGroup(ctx.activeGroupId)).filter(
 					(p) => p.type === 'regular'
 				);
-		return all;
+		return withRights(ctx, all);
 	})
 	.post(
 		'/admin/api/projects',
@@ -125,7 +158,7 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 			const ownerGroupId = assertActiveGroup(ctx);
 			const store = getProjectStore();
 			if (await store.findBySlug(body.slug)) {
-				throw new AdminError(409, 'slug already exists');
+				throw new AdminError(409, 'slug already exists', { field: 'slug' });
 			}
 			// Allocated here so the audit entry can name the project that is about to exist.
 			const projectId = nanoid();
@@ -149,14 +182,17 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 	)
 	.get('/admin/api/projects/:id', async ({ admin, params }) => {
 		const ctx = assertAuth(admin);
-		return loadProject(ctx, params.id);
+		const [presented] = await withRights(ctx, [
+			await loadProject(ctx, params.id)
+		]);
+		return presented;
 	})
 	.patch(
 		'/admin/api/projects/:id',
 		async ({ admin, params, body }) => {
 			const ctx = assertAuth(admin);
 			const project = await loadProject(ctx, params.id);
-			if (project.type === 'admin')
+			if (!managesProject(ctx, project))
 				throw new AdminError(403, 'cannot modify admin project');
 			const corsOrigins = validateCorsOrigins(body.corsOrigins);
 			// After origin validation: an entry for a request that was about to be refused as malformed
@@ -177,7 +213,7 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 		async ({ admin, params, query }) => {
 			const ctx = assertAuth(admin);
 			const project = await loadProject(ctx, params.id);
-			if (project.type === 'admin')
+			if (!managesProject(ctx, project))
 				throw new AdminError(403, 'cannot delete admin project');
 			/*
 			 * Ownership, not role: a group deletes what it owns. What protects the contents is the
@@ -419,11 +455,18 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 			const ctx = assertAuth(admin);
 			const project = await loadProject(ctx, params.id);
 			/*
-			 * Refused for everyone: `loadProject` admits a super administrator to the console's own project,
-			 * which belongs to no tenant and must stay in the System group with the bucket it signs into.
+			 * Refused for everyone on the console's own project: `loadProject` admits a super administrator
+			 * to it, but it belongs to no tenant and must stay in the System group with the bucket it signs
+			 * into. On any other, an owner's act — and decided before the state below, so a member who may
+			 * not move a project is told that rather than how it is attached.
 			 */
-			if (project.type === 'admin') {
-				throw new AdminError(403, 'no access to this project');
+			if (!mayMoveProject(ctx, project)) {
+				throw new AdminError(
+					403,
+					project.type === 'admin'
+						? 'no access to this project'
+						: 'group owner required'
+				);
 			}
 			if (project.bucketId !== null) {
 				throw new AdminError(

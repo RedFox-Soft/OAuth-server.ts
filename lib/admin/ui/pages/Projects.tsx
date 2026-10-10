@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
+	Alert,
 	Table,
 	Button,
 	Modal,
@@ -8,18 +9,27 @@ import {
 	Select,
 	Space,
 	Tag,
-	Tooltip,
-	Typography,
-	message
+	Typography
 } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
-import type { Project, UserBucket } from '../../../adapters/types.js';
-import { Clients } from './Clients.js';
-import { Resources } from './Resources.js';
-import { BucketDetail } from './BucketDetail.js';
+import type { UserBucket } from '../../../adapters/types.js';
+import { Link, useNavigate } from '../frame/router.js';
+import { bucketHref, projectHref } from '../frame/routes.js';
+import { DEFAULT_BUCKET_ID } from '../../consts.js';
 import { assignableBuckets } from '../projects/model.js';
 import { ConfirmDestruction } from '../ConfirmDestruction.js';
 import { MoveToGroup } from '../MoveToGroup.js';
+import { PageHeader } from '../frame/PageHeader.js';
+import { request } from '../frame/request.js';
+import { useFeedback } from '../frame/feedback.js';
+import { useConfirm } from '../frame/confirm.js';
+import { ACTIONS } from '../frame/actions.js';
+import { projectCan } from '../frame/can.js';
+import { meCan, useMe } from '../frame/me.js';
+import { Allowed } from '../frame/rights.js';
+import { RowActions, type RowAction } from '../frame/RowActions.js';
+import { EmptyState, LoadFailed } from '../frame/states.js';
+import type { ProjectView } from './ProjectWorkspace.js';
 
 interface CreateProjectValues {
 	name: string;
@@ -30,19 +40,27 @@ interface CreateProjectValues {
  * The origins editor. Validation is deliberately left to the server: it owns the one rule shared with
  * the request path, and its rejection names both the offending value and the canonical form it should
  * have been — a message worth showing verbatim rather than pre-empting with a weaker client-side regex.
+ * It stays on screen until the next edit, because it is the operator's guide to what to fix.
  */
 function OriginsEditor({
 	project,
 	onClose,
 	onSaved
 }: {
-	project: Project;
+	project: ProjectView;
 	onClose: () => void;
 	onSaved: () => void;
 }) {
 	const [origins, setOrigins] = useState<string[]>(project.corsOrigins);
 	const [draft, setDraft] = useState('');
 	const [saving, setSaving] = useState(false);
+	const [refusal, setRefusal] = useState<string | null>(null);
+	const feedback = useFeedback();
+
+	function edit(next: string[]) {
+		setRefusal(null);
+		setOrigins(next);
+	}
 
 	function add() {
 		const value = draft.trim();
@@ -50,30 +68,26 @@ function OriginsEditor({
 			setDraft('');
 			return;
 		}
-		setOrigins([...origins, value]);
+		edit([...origins, value]);
 		setDraft('');
 	}
 
 	async function save() {
 		setSaving(true);
-		try {
-			const res = await fetch(`/admin/api/projects/${project._id}`, {
-				method: 'PATCH',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ corsOrigins: origins })
-			});
-			if (!res.ok) {
-				const body = (await res.json().catch(() => null)) as {
-					message?: string;
-				} | null;
-				message.error(body?.message || 'failed to save origins');
-				return;
-			}
-			onSaved();
-			onClose();
-		} finally {
-			setSaving(false);
+		const result = await request(
+			'PATCH',
+			`/admin/api/projects/${project._id}`,
+			{ corsOrigins: origins }
+		);
+		setSaving(false);
+		if (!result.ok) {
+			if (result.status >= 500) feedback.failed(result);
+			else setRefusal(result.error.message);
+			return;
 		}
+		feedback.done('Browser origins saved.');
+		onSaved();
+		onClose();
 	}
 
 	return (
@@ -81,11 +95,19 @@ function OriginsEditor({
 			title={`Browser origins — ${project.name}`}
 			open
 			onCancel={onClose}
-			onOk={save}
+			onOk={() => void save()}
 			confirmLoading={saving}
 			okText="Save"
 			destroyOnHidden
 		>
+			{refusal !== null && (
+				<Alert
+					type="error"
+					showIcon
+					style={{ marginBottom: 12 }}
+					title={refusal}
+				/>
+			)}
 			<Typography.Paragraph type="secondary">
 				Web origins allowed to call this project&apos;s clients from a browser.
 				Exact match, no wildcards — e.g. <code>https://app.example.com</code>.
@@ -102,7 +124,7 @@ function OriginsEditor({
 					<Tag
 						key={origin}
 						closable
-						onClose={() => setOrigins(origins.filter((o) => o !== origin))}
+						onClose={() => edit(origins.filter((o) => o !== origin))}
 					>
 						{origin}
 					</Tag>
@@ -130,118 +152,130 @@ function OriginsEditor({
  * through to — so choosing the default and choosing nothing are the same act, and "Not set" is how
  * this screen offers it.
  *
+ * It only chooses: the change itself is confirmed (C2) and sent by the list once this dialog has
+ * closed, so the confirmation never opens on top of it.
+ *
  * What the endpoint returns is deliberately not what is offered: see `assignableBuckets`.
  */
 function BucketEditor({
 	project,
 	onClose,
-	onSaved
+	onChoose
 }: {
-	project: Project;
+	project: ProjectView;
 	onClose: () => void;
-	onSaved: () => void;
+	onChoose: (bucketId: string | null, bucketName: string) => void;
 }) {
-	const [buckets, setBuckets] = useState<UserBucket[]>([]);
+	const [buckets, setBuckets] = useState<UserBucket[] | null>(null);
+	const [loadError, setLoadError] = useState<string | null>(null);
 	const [selected, setSelected] = useState<string | null>(
 		project.bucketId ?? null
 	);
-	const [saving, setSaving] = useState(false);
 
 	useEffect(() => {
-		async function load() {
-			const res = await fetch('/admin/api/buckets');
-			if (res.ok) setBuckets((await res.json()) as UserBucket[]);
-		}
-		void load();
+		void (async () => {
+			const result = await request<UserBucket[]>('GET', '/admin/api/buckets');
+			if (result.ok) setBuckets(result.data);
+			else setLoadError(result.error.message);
+		})();
 	}, []);
 
-	async function save() {
-		setSaving(true);
-		try {
-			const base = `/admin/api/projects/${project._id}/bucket`;
-			const res = selected
-				? await fetch(base, {
-						method: 'PUT',
-						headers: { 'content-type': 'application/json' },
-						body: JSON.stringify({ bucketId: selected })
-					})
-				: await fetch(base, { method: 'DELETE' });
-			if (!res.ok) {
-				const body = (await res.json().catch(() => null)) as {
-					message?: string;
-				} | null;
-				message.error(body?.message || 'failed to save the bucket');
-				return;
-			}
-			onSaved();
+	function choose() {
+		if (selected === (project.bucketId ?? null)) {
 			onClose();
-		} finally {
-			setSaving(false);
+			return;
 		}
+		const name =
+			selected === null
+				? 'the default bucket'
+				: (buckets?.find((b) => b._id === selected)?.name ?? selected);
+		onChoose(selected, name);
 	}
 
 	return (
 		<Modal
-			title={`Bucket — ${project.name}`}
+			title={`Change bucket — ${project.name}`}
 			open
 			onCancel={onClose}
-			onOk={save}
-			confirmLoading={saving}
-			okText="Save"
+			onOk={choose}
+			okText="Change bucket"
+			okButtonProps={{ disabled: buckets === null }}
 			destroyOnHidden
 		>
 			<Typography.Paragraph type="secondary">
 				Which population of end-users this project&apos;s clients sign in. Leave
 				it unset to use the default bucket.
 			</Typography.Paragraph>
-			<Select<string | null>
-				style={{ width: '100%' }}
-				value={selected}
-				onChange={setSelected}
-				options={[
-					{ value: null, label: 'Not set — use the default bucket' },
-					...assignableBuckets(buckets, project).map((bucket) => ({
-						value: bucket._id,
-						label: bucket.name
-					}))
-				]}
-			/>
+			{loadError !== null ? (
+				<Alert
+					type="error"
+					showIcon
+					title={loadError}
+				/>
+			) : (
+				<Select<string | null>
+					style={{ width: '100%' }}
+					loading={buckets === null}
+					value={selected}
+					onChange={setSelected}
+					options={[
+						{ value: null, label: 'Not set — use the default bucket' },
+						...assignableBuckets(buckets ?? [], project).map((bucket) => ({
+							value: bucket._id,
+							label: bucket.name
+						}))
+					]}
+				/>
+			)}
 		</Modal>
 	);
 }
 
-export function Projects({
-	isSuperAdmin,
-	ownedGroupIds
-}: {
-	isSuperAdmin: boolean;
-	ownedGroupIds: readonly string[];
-}) {
-	const [projects, setProjects] = useState<Project[]>([]);
+export function Projects() {
+	const [projects, setProjects] = useState<ProjectView[]>([]);
+	// The buckets this administrator can see, by id: a project's bucket is shown by name and opens it.
+	const [bucketNames, setBucketNames] = useState<Map<string, string>>(
+		new Map()
+	);
 	const [loading, setLoading] = useState(true);
+	const [loadFailed, setLoadFailed] = useState<string | null>(null);
 	const [open, setOpen] = useState(false);
 	const [creating, setCreating] = useState(false);
 	const [form] = Form.useForm<CreateProjectValues>();
-	const [openProject, setOpenProject] = useState<Project | null>(null);
-	const [openBucketId, setOpenBucketId] = useState<string | null>(null);
-	const [originsFor, setOriginsFor] = useState<Project | null>(null);
-	const [bucketFor, setBucketFor] = useState<Project | null>(null);
-	const [resourcesFor, setResourcesFor] = useState<Project | null>(null);
-	const [deleting, setDeleting] = useState<Project | null>(null);
+	const navigate = useNavigate();
+	const feedback = useFeedback();
+	const confirm = useConfirm();
+	const { me } = useMe();
+	const [originsFor, setOriginsFor] = useState<ProjectView | null>(null);
+	const [bucketFor, setBucketFor] = useState<ProjectView | null>(null);
+	const [deleting, setDeleting] = useState<ProjectView | null>(null);
 	const [heldClients, setHeldClients] = useState<string[]>([]);
 	const [destroying, setDestroying] = useState(false);
-	const [moving, setMoving] = useState<Project | null>(null);
+	const [moving, setMoving] = useState<ProjectView | null>(null);
 
 	// Every state write follows an await, so the mount effect calls this without setting
 	// `loading` first; `load` is the reload, which does.
-	const fetchProjects = useCallback(async () => {
-		try {
-			const res = await fetch('/admin/api/projects');
-			if (res.ok) setProjects((await res.json()) as Project[]);
-		} finally {
-			setLoading(false);
-		}
-	}, []);
+	const fetchProjects = useCallback(
+		() =>
+			Promise.all([
+				request<ProjectView[]>('GET', '/admin/api/projects'),
+				request<UserBucket[]>('GET', '/admin/api/buckets')
+			]).then(([result, bucketsResult]) => {
+				if (result.ok) {
+					setProjects(result.data);
+					setLoadFailed(null);
+				} else {
+					setLoadFailed(result.error.message);
+				}
+				if (bucketsResult.ok) {
+					setBucketNames(
+						new Map(bucketsResult.data.map((b) => [b._id, b.name]))
+					);
+				}
+				setLoading(false);
+			}),
+		[]
+	);
 	function load() {
 		setLoading(true);
 		return fetchProjects();
@@ -253,52 +287,79 @@ export function Projects({
 	 * are about to destroy. The server drops the same ids for the same reason, so what is displayed
 	 * here and what is destroyed there are the same set.
 	 */
-	async function openDelete(project: Project) {
-		const res = await fetch(
+	async function openDelete(project: ProjectView) {
+		const result = await request<{ clientId: string }[]>(
+			'GET',
 			`/admin/api/projects/${encodeURIComponent(project._id)}/clients`
 		);
-		const clients = res.ok
-			? ((await res.json()) as { clientId: string }[])
-			: [];
-		setHeldClients(clients.map((c) => c.clientId));
+		if (!result.ok) {
+			feedback.failed(result);
+			return;
+		}
+		setHeldClients(result.data.map((c) => c.clientId));
 		setDeleting(project);
 	}
 
-	async function onDelete(project: Project, withCascade: boolean) {
+	async function onDelete(project: ProjectView, withCascade: boolean) {
 		setDestroying(true);
-		try {
-			const params = new URLSearchParams();
-			if (withCascade) {
-				params.set('cascade', 'clients');
-				// The set the administrator just reviewed, so a client that arrived while they were
-				// reading is refused rather than destroyed on the strength of their consent.
-				for (const clientId of heldClients) params.append('client', clientId);
-			}
-			const qs = params.toString();
-			const res = await fetch(
-				`/admin/api/projects/${encodeURIComponent(project._id)}${qs ? `?${qs}` : ''}`,
-				{ method: 'DELETE' }
-			);
-			if (!res.ok) {
-				// The server's own refusal names what is in the way and how many; "request failed" does not.
-				const body = (await res.json().catch(() => null)) as {
-					message?: string;
-				} | null;
-				message.error(body?.message || `request failed (${res.status})`);
-				return;
-			}
-			const body = (await res.json()) as {
-				clientsDestroyed?: number;
-				resourcesRemoved?: number;
-			};
-			message.success(
-				`Project deleted — ${body.clientsDestroyed ?? 0} clients, ${body.resourcesRemoved ?? 0} resource declarations`
-			);
-			setDeleting(null);
-			await load();
-		} finally {
-			setDestroying(false);
+		const params = new URLSearchParams();
+		if (withCascade) {
+			params.set('cascade', 'clients');
+			// The set the administrator just reviewed, so a client that arrived while they were
+			// reading is refused rather than destroyed on the strength of their consent.
+			for (const clientId of heldClients) params.append('client', clientId);
 		}
+		const qs = params.toString();
+		const result = await request<{
+			clientsDestroyed?: number;
+			resourcesRemoved?: number;
+		}>(
+			'DELETE',
+			`/admin/api/projects/${encodeURIComponent(project._id)}${qs ? `?${qs}` : ''}`
+		);
+		setDestroying(false);
+		if (!result.ok) {
+			// The server's own refusal names what is in the way and how many.
+			feedback.failed(result);
+			return;
+		}
+		const clients = result.data.clientsDestroyed ?? 0;
+		const resources = result.data.resourcesRemoved ?? 0;
+		feedback.done(
+			`Project deleted, with ${String(clients)} client${clients === 1 ? '' : 's'} and ${String(resources)} resource declaration${resources === 1 ? '' : 's'}.`
+		);
+		setDeleting(null);
+		await load();
+	}
+
+	async function changeBucket(
+		project: ProjectView,
+		bucketId: string | null,
+		bucketName: string
+	) {
+		setBucketFor(null);
+		const from = project.bucketId
+			? (bucketNames.get(project.bucketId) ?? project.bucketId)
+			: 'the default bucket';
+		const agreed = await confirm('project.bucket.change', {
+			target: project.name,
+			consequences: [
+				`Its clients sign people in from ${bucketName} instead of ${from}.`,
+				'Where the two buckets are different issuers, its tokens carry the new issuer, and an integration that checks it must be updated.',
+				'No account moves: people sign in with an account of the new bucket.'
+			]
+		});
+		if (!agreed) return;
+		const base = `/admin/api/projects/${project._id}/bucket`;
+		const result = bucketId
+			? await request('PUT', base, { bucketId })
+			: await request('DELETE', base);
+		if (!result.ok) {
+			feedback.failed(result);
+			return;
+		}
+		feedback.done('Project bucket changed.');
+		await load();
 	}
 
 	useEffect(() => {
@@ -307,154 +368,135 @@ export function Projects({
 
 	async function onCreate(values: CreateProjectValues) {
 		setCreating(true);
-		try {
-			const res = await fetch('/admin/api/projects', {
-				method: 'POST',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify(values)
-			});
-			if (!res.ok) {
-				const body = (await res.json().catch(() => null)) as {
-					message?: string;
-				} | null;
-				message.error(body?.message || 'failed to create project');
-				return;
-			}
-			setOpen(false);
-			form.resetFields();
-			await load();
-		} finally {
-			setCreating(false);
+		const result = await request('POST', '/admin/api/projects', values);
+		setCreating(false);
+		if (!result.ok) {
+			feedback.failed(result, form);
+			return;
 		}
+		feedback.done('Project created.');
+		setOpen(false);
+		form.resetFields();
+		await load();
 	}
 
-	if (openBucketId) {
-		return (
-			<BucketDetail
-				bucketId={openBucketId}
-				onBack={() => setOpenBucketId(null)}
-			/>
-		);
+	function actionsFor(row: ProjectView): RowAction[] {
+		const can = projectCan(row);
+		const items: RowAction[] = [];
+		if (can.edit) {
+			items.push({
+				key: 'origins',
+				label: 'Edit origins…',
+				group: 'edit',
+				onClick: () => setOriginsFor(row)
+			});
+		}
+		if (can.assignBucket) {
+			items.push({
+				key: 'bucket',
+				label: 'Change bucket…',
+				group: 'edit',
+				onClick: () => setBucketFor(row)
+			});
+		}
+		if (can.move) {
+			items.push({
+				key: 'move',
+				label: 'Move to group…',
+				group: 'handover',
+				onClick: () => setMoving(row),
+				// A project and its bucket share a group, so the bucket is what moves.
+				blocked:
+					(row.blockers?.hasBucket ?? Boolean(row.bucketId))
+						? 'Moves with its bucket — move the bucket instead'
+						: null
+			});
+		}
+		if (can.delete) {
+			items.push({
+				key: 'delete',
+				label: 'Delete…',
+				group: 'danger',
+				onClick: () => void openDelete(row)
+			});
+		}
+		return items;
 	}
 
-	if (openProject) {
-		return (
-			<Clients
-				project={openProject}
-				onBack={() => setOpenProject(null)}
-			/>
-		);
-	}
-
-	if (resourcesFor) {
-		return (
-			<Resources
-				project={resourcesFor}
-				onBack={() => setResourcesFor(null)}
-			/>
-		);
-	}
+	const mayCreate = meCan(me).createProject;
+	const newProject = (
+		<Button
+			type="primary"
+			icon={<PlusOutlined />}
+			onClick={() => setOpen(true)}
+		>
+			New project
+		</Button>
+	);
 
 	return (
 		<>
-			<div style={{ marginBottom: 16, textAlign: 'right' }}>
-				<Button
-					type="primary"
-					icon={<PlusOutlined />}
-					onClick={() => setOpen(true)}
-				>
-					New project
-				</Button>
-			</div>
-			<Table<Project>
-				rowKey="_id"
-				loading={loading}
-				dataSource={projects}
-				locale={{
-					emptyText:
-						'No projects in this scope yet. Create one to register OAuth clients against — use the scope switcher above to work in a different group.'
-				}}
-				columns={[
-					{ title: 'Name', dataIndex: 'name' },
-					{ title: 'Slug', dataIndex: 'slug' },
-					{
-						title: 'Bucket',
-						dataIndex: 'bucketId',
-						render: (bucketId: string | null) => bucketId ?? 'default'
-					},
-
-					{
-						title: 'Browser origins',
-						dataIndex: 'corsOrigins',
-						render: (corsOrigins: string[] | undefined) =>
-							corsOrigins?.length ? corsOrigins.length : '—'
-					},
-					{
-						title: '',
-						render: (_: unknown, row: Project) => (
-							<Space>
-								<Button
-									size="small"
-									onClick={() => setOpenProject(row)}
-								>
-									Clients
-								</Button>
-								<Button
-									size="small"
-									disabled={!row.bucketId}
-									onClick={() => row.bucketId && setOpenBucketId(row.bucketId)}
-								>
-									Users
-								</Button>
-								<Button
-									size="small"
-									onClick={() => setResourcesFor(row)}
-								>
-									Resources
-								</Button>
-								<Button
-									size="small"
-									onClick={() => setOriginsFor(row)}
-								>
-									Origins
-								</Button>
-								<Button
-									size="small"
-									onClick={() => setBucketFor(row)}
-								>
-									Bucket
-								</Button>
-								{(isSuperAdmin || ownedGroupIds.includes(row.ownerGroupId)) &&
-									(row.bucketId ? (
-										/* A project and its bucket share a group, so the bucket is what moves. */
-										<Tooltip title="Moves with its bucket — move the bucket instead.">
-											<Button
-												size="small"
-												disabled
-											>
-												Move
-											</Button>
-										</Tooltip>
-									) : (
-										<Button
-											size="small"
-											onClick={() => setMoving(row)}
-										>
-											Move
-										</Button>
-									))}
-								<Button
-									size="small"
-									danger
-									onClick={() => openDelete(row)}
-								>
-									Delete
-								</Button>
-							</Space>
-						)
-					}
-				]}
+			<PageHeader
+				title="Projects"
+				actions={<Allowed when={mayCreate}>{newProject}</Allowed>}
 			/>
+			{loadFailed !== null ? (
+				<LoadFailed
+					reason={loadFailed}
+					onRetry={() => void load()}
+				/>
+			) : (
+				<Table<ProjectView>
+					rowKey="_id"
+					loading={loading}
+					dataSource={projects}
+					locale={{
+						emptyText: (
+							<EmptyState
+								purpose="No projects in this scope yet. Create one to register OAuth clients against — use the scope switcher above to work in a different group."
+								create={mayCreate ? newProject : undefined}
+							/>
+						)
+					}}
+					columns={[
+						{
+							title: 'Name',
+							dataIndex: 'name',
+							render: (name: string, row: ProjectView) => (
+								<Link href={projectHref(row._id)}>{name}</Link>
+							)
+						},
+						{ title: 'Slug', dataIndex: 'slug' },
+						{
+							title: 'Bucket',
+							dataIndex: 'bucketId',
+							render: (bucketId: string | null) => {
+								const id = bucketId ?? DEFAULT_BUCKET_ID;
+								const name = bucketNames.get(id);
+								// A bucket in a group this administrator is not in is named by id, not linked.
+								if (name === undefined) return bucketId ?? 'Default';
+								return <Link href={bucketHref(id)}>{name}</Link>;
+							}
+						},
+						{
+							title: 'Browser origins',
+							dataIndex: 'corsOrigins',
+							render: (corsOrigins: string[] | undefined) =>
+								corsOrigins?.length ? corsOrigins.length : '—'
+						},
+						{
+							title: '',
+							key: 'actions',
+							render: (_: unknown, row: ProjectView) => (
+								<RowActions
+									name={row.name}
+									items={actionsFor(row)}
+								/>
+							)
+						}
+					]}
+				/>
+			)}
 			{moving && (
 				<MoveToGroup
 					kind="project"
@@ -472,6 +514,7 @@ export function Projects({
 				<ConfirmDestruction
 					open
 					title={`Delete ${deleting.name}?`}
+					word={ACTIONS['project.delete'].word}
 					consequences={[
 						'The project is gone permanently. There is nothing left to inspect or restore.',
 						'Every protected resource it declared stops being served.',
@@ -481,7 +524,7 @@ export function Projects({
 						 * who assumes that would delete a project to get rid of a population.
 						 */
 						deleting.bucketId
-							? `Its user bucket (${deleting.bucketId}) is untouched — buckets are shared and outlive projects.`
+							? `Its user bucket (${bucketNames.get(deleting.bucketId) ?? deleting.bucketId}) is untouched — buckets are shared and outlive projects.`
 							: 'No user bucket is affected.'
 					]}
 					cascade={
@@ -489,28 +532,33 @@ export function Projects({
 							? {
 									noun: 'clients',
 									count: heldClients.length,
-									onInspect: () => setOpenProject(deleting),
+									onInspect: () => {
+										setDeleting(null);
+										void navigate(projectHref(deleting._id, 'clients'));
+									},
 									inspectLabel: `Look at them first (${heldClients.join(', ')})`
 								}
 							: undefined
 					}
 					busy={destroying}
 					onCancel={() => setDeleting(null)}
-					onConfirm={(withCascade) => onDelete(deleting, withCascade)}
+					onConfirm={(withCascade) => void onDelete(deleting, withCascade)}
 				/>
 			)}
 			{originsFor && (
 				<OriginsEditor
 					project={originsFor}
 					onClose={() => setOriginsFor(null)}
-					onSaved={load}
+					onSaved={() => void load()}
 				/>
 			)}
 			{bucketFor && (
 				<BucketEditor
 					project={bucketFor}
 					onClose={() => setBucketFor(null)}
-					onSaved={load}
+					onChoose={(bucketId, bucketName) =>
+						void changeBucket(bucketFor, bucketId, bucketName)
+					}
 				/>
 			)}
 			<Modal
@@ -524,7 +572,8 @@ export function Projects({
 				<Form<CreateProjectValues>
 					form={form}
 					layout="vertical"
-					onFinish={onCreate}
+					scrollToFirstError
+					onFinish={(values) => void onCreate(values)}
 				>
 					<Form.Item
 						name="name"

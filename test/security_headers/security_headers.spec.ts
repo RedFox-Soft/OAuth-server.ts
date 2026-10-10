@@ -401,7 +401,7 @@ describe('security headers: the administrative control plane', () => {
 		// Authenticated deliberately: GET /admin only renders the shell for a signed-in admin (or
 		// before the first admin exists) and otherwise redirects, which made an anonymous request
 		// order-dependent — it rendered or redirected depending on what an earlier case had seeded.
-		const res = await send('/admin', {
+		const res = await send('/admin/projects', {
 			method: 'GET',
 			headers: { accept: 'text/html', cookie: await superAdminCookie() }
 		});

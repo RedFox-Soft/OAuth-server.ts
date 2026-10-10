@@ -4,7 +4,7 @@ title: 'Admin plane error shape'
 tags: [contract, gotcha, architecture]
 sources: [oauth-server-codebase]
 created: 2026-08-04
-updated: 2026-08-04
+updated: 2026-10-11
 graph:
   node_type: concept
 ---
@@ -17,8 +17,8 @@ The administrative control plane answers errors in its own shape, not the OAuth 
 { "error": "admin_error", "message": "project not found" }
 ```
 
-plus `blockers` on a deletion conflict and `failedAreas` on a partial cascade failure
-(`lib/admin/auth/rbac.ts`, `adminErrorBody`). The console renders `message` and
+plus `blockers` on a deletion conflict, `failedAreas` on a partial cascade failure and `field` on a
+refusal about one form field (`lib/admin/auth/rbac.ts`, `adminErrorBody`). The console renders `message` and
 [[deletion-and-revocation]]'s dialogs read `blockers`, so the shape is a consumed contract rather than a
 presentation detail — and the same contract MCP-initiated administration answers on.
 
@@ -70,6 +70,19 @@ the standalone mount, so it held while production answered otherwise. `lib/admin
 now re-raises any `OIDCProviderError` from `registerClient` as `AdminError(422)`, and the dead mapping is
 gone. `test/admin/client_keys.spec.ts` asserts it through the composed server. Any other admin route that
 calls into protocol code can fall into this again.
+
+## A refusal names its field, and a 422 never echoes the request
+
+Added with spec 079. `AdminError` takes an optional `field` and `adminErrorBody` returns it, so the console
+can put a message on the form field it is about: a taken slug or hostname, an existing email, an issuer, a
+setting's key, a filter parameter, a resource identifier. Set only where one field is the whole reason.
+
+The admin `422` (`validationRefusal`, `lib/admin/routes.ts`) used to return Elysia's validation error
+message, which serialises the whole submission under `found` — passwords included, for create-admin,
+setup and create-user. It now answers `{ error: 'invalid_request', message, field }` built from the first
+violation (`getFirstError`, moved to the leaf `lib/shared/first_validation_error.ts`). The message uses
+TypeBox's wording, which names the rule and never the value; Elysia's `summary` is not used, because for a
+value of the wrong type it ends with `but found: <value>`. Pinned by `test/admin/admin_error_shape.spec.ts`.
 
 ## Related
 

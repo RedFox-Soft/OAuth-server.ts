@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { Layout as AntLayout, Menu, Typography } from 'antd';
+import { Layout as AntLayout, Button, Menu, Typography } from 'antd';
 import type { MenuProps } from 'antd';
 import {
 	ProjectOutlined,
@@ -14,7 +13,12 @@ import {
 	RobotOutlined,
 	LogoutOutlined
 } from '@ant-design/icons';
-import type { AdminContext } from '../../auth/rbac.js';
+import { useNavigate, useRoute } from '../frame/router.js';
+import { meCan, useMe } from '../frame/me.js';
+import { sectionHref, type PageKey, type Section } from '../frame/routes.js';
+import { InstanceOnly, NotFound } from '../frame/states.js';
+import { BucketDetail, type BucketTab } from './BucketDetail.js';
+import { ProjectWorkspace } from './ProjectWorkspace.js';
 import { Groups } from './Groups.js';
 import { ScopeSwitcher } from './ScopeSwitcher.js';
 import { Projects } from './Projects.js';
@@ -29,52 +33,71 @@ import { Usage } from './Usage.js';
 
 const { Sider, Header, Content } = AntLayout;
 
-type PageKey =
-	| 'projects'
-	| 'buckets'
-	| 'groups'
-	| 'admins'
-	| 'settings'
-	| 'keys'
-	| 'mcp-clients'
-	| 'audit'
-	| 'errors'
-	| 'usage';
+const BUCKET_TABS: Partial<Record<PageKey, BucketTab>> = {
+	'bucket.users': 'users',
+	'bucket.userGroups': 'userGroups',
+	'bucket.providers': 'providers',
+	'bucket.provisioning': 'provisioning',
+	'bucket.keys': 'keys',
+	'bucket.activity': 'activity'
+};
 
-export function Layout({ me }: { me: AdminContext | null }) {
+/*
+ * The console's frame: the sidebar, the header, and whichever page the address names. The page is chosen
+ * by the route table (frame/routes.ts), never by state held here, so a link, a reload and the browser's
+ * Back all land on the same screen.
+ */
+export function Layout() {
+	const { me } = useMe();
+	const can = meCan(me);
+	const { resolved } = useRoute();
+	const navigate = useNavigate();
 	const isSuperAdmin = me?.superAdmin === true;
-	/*
-	 * The groups whose containers this administrator may move out (specs/075): an owner's. A super
-	 * administrator may move anything, which the pages read from `isSuperAdmin` rather than from a list
-	 * of every group.
-	 */
-	const ownedGroupIds = (me?.memberships ?? [])
-		.filter((m) => m.role === 'owner')
-		.map((m) => m.groupId);
-	const [selected, setSelected] = useState<PageKey>('projects');
 
 	/*
-	 * Offered ⇔ permitted, in both directions. The create actions below are no longer role-gated, and
-	 * Audit has moved out of the super-admin block because it is scope-filtered rather than refused: a
-	 * group reads its own history. What remains super-admin-only is the instance itself.
+	 * Grouped so an operator can tell their own work from the organisation around it and from the
+	 * instance itself, which only a super administrator sees. Offered ⇔ permitted: Audit is open to every
+	 * administrator because it is filtered to their groups rather than refused.
 	 */
 	const items: MenuProps['items'] = [
-		{ key: 'projects', icon: <ProjectOutlined />, label: 'Projects' },
-		{ key: 'buckets', icon: <DatabaseOutlined />, label: 'Buckets' },
-		{ key: 'groups', icon: <ApartmentOutlined />, label: 'Groups' },
-		{ key: 'audit', icon: <FileSearchOutlined />, label: 'Audit' },
-		...(isSuperAdmin
+		{
+			type: 'group',
+			label: 'Build',
+			children: [
+				{ key: 'projects', icon: <ProjectOutlined />, label: 'Projects' },
+				{ key: 'buckets', icon: <DatabaseOutlined />, label: 'Buckets' }
+			]
+		},
+		{
+			type: 'group',
+			label: 'Organisation',
+			children: [
+				{ key: 'groups', icon: <ApartmentOutlined />, label: 'Groups' },
+				{ key: 'audit', icon: <FileSearchOutlined />, label: 'Audit' }
+			]
+		},
+		...(can.instance
 			? [
-					{ key: 'admins', icon: <TeamOutlined />, label: 'Admins' },
-					{ key: 'settings', icon: <SettingOutlined />, label: 'Settings' },
-					{ key: 'keys', icon: <KeyOutlined />, label: 'Keys' },
 					{
-						key: 'mcp-clients',
-						icon: <RobotOutlined />,
-						label: 'Agent access'
-					},
-					{ key: 'errors', icon: <BugOutlined />, label: 'Faults' },
-					{ key: 'usage', icon: <LineChartOutlined />, label: 'Usage' }
+						type: 'group' as const,
+						label: 'Instance',
+						children: [
+							{
+								key: 'administrators',
+								icon: <TeamOutlined />,
+								label: 'Administrators'
+							},
+							{ key: 'usage', icon: <LineChartOutlined />, label: 'Usage' },
+							{ key: 'settings', icon: <SettingOutlined />, label: 'Settings' },
+							{ key: 'keys', icon: <KeyOutlined />, label: 'Keys' },
+							{
+								key: 'agent-access',
+								icon: <RobotOutlined />,
+								label: 'Agent access'
+							},
+							{ key: 'faults', icon: <BugOutlined />, label: 'Faults' }
+						]
+					}
 				]
 			: [])
 	];
@@ -91,41 +114,32 @@ export function Layout({ me }: { me: AdminContext | null }) {
 	}
 
 	function renderPage() {
-		switch (selected) {
-			case 'buckets':
+		if (resolved.kind === 'redirect') return null;
+		if (resolved.kind === 'none') return <NotFound />;
+		const { route } = resolved;
+		if (route.instance && !can.instance) return <InstanceOnly />;
+		const bucketTab = BUCKET_TABS[route.key];
+		if (bucketTab) {
+			return (
+				<BucketDetail
+					key={route.params.bucket}
+					bucketId={route.params.bucket ?? ''}
+					tab={bucketTab}
+				/>
+			);
+		}
+		switch (route.key) {
+			case 'project.clients':
+			case 'project.resources':
 				return (
-					<Buckets
-						isSuperAdmin={isSuperAdmin}
-						ownedGroupIds={ownedGroupIds}
+					<ProjectWorkspace
+						key={route.params.project}
+						projectId={route.params.project ?? ''}
+						area={route.key === 'project.clients' ? 'clients' : 'resources'}
 					/>
 				);
-			case 'admins':
-				return isSuperAdmin ? (
-					<Admins onOpenSignInPolicy={() => setSelected('buckets')} />
-				) : (
-					<Projects
-						isSuperAdmin={false}
-						ownedGroupIds={ownedGroupIds}
-					/>
-				);
-			case 'settings':
-				return isSuperAdmin ? (
-					<Settings />
-				) : (
-					<Projects
-						isSuperAdmin={false}
-						ownedGroupIds={ownedGroupIds}
-					/>
-				);
-			case 'keys':
-				return isSuperAdmin ? (
-					<Keys />
-				) : (
-					<Projects
-						isSuperAdmin={false}
-						ownedGroupIds={ownedGroupIds}
-					/>
-				);
+			case 'buckets':
+				return <Buckets />;
 			case 'groups':
 				return (
 					<Groups
@@ -133,59 +147,47 @@ export function Layout({ me }: { me: AdminContext | null }) {
 						currentUserId={me?.userId ?? null}
 					/>
 				);
-			// Scope-filtered rather than refused: every administrator reads the trail of the groups they
-			// belong to, so this no longer falls back to Projects for a non-super-admin.
 			case 'audit':
 				return <Audit />;
-			case 'mcp-clients':
-				return isSuperAdmin ? (
-					<McpClients />
-				) : (
-					<Projects
-						isSuperAdmin={false}
-						ownedGroupIds={ownedGroupIds}
-					/>
-				);
-			case 'errors':
-				return isSuperAdmin ? (
-					<Errors />
-				) : (
-					<Projects
-						isSuperAdmin={false}
-						ownedGroupIds={ownedGroupIds}
-					/>
+			case 'administrators':
+				return (
+					<Admins onOpenSignInPolicy={() => void navigate('/admin/buckets')} />
 				);
 			case 'usage':
-				return isSuperAdmin ? (
-					<Usage />
-				) : (
-					<Projects
-						isSuperAdmin={false}
-						ownedGroupIds={ownedGroupIds}
-					/>
-				);
+				return <Usage />;
+			case 'settings':
+				return <Settings />;
+			case 'keys':
+				return <Keys />;
+			case 'agentAccess':
+				return <McpClients />;
+			case 'faults':
+				return <Errors />;
 			default:
-				return (
-					<Projects
-						isSuperAdmin={isSuperAdmin}
-						ownedGroupIds={ownedGroupIds}
-					/>
-				);
+				return <Projects />;
 		}
 	}
 
+	const selected =
+		resolved.kind === 'page' && resolved.route.section
+			? [resolved.route.section]
+			: [];
+
 	return (
 		<AntLayout style={{ minHeight: '100vh' }}>
-			<Sider>
+			<Sider
+				breakpoint="lg"
+				collapsedWidth={0}
+			>
 				<div style={{ color: '#fff', padding: 16, fontWeight: 600 }}>
 					OAuth Admin
 				</div>
 				<Menu
 					theme="dark"
 					mode="inline"
-					selectedKeys={[selected]}
+					selectedKeys={selected}
 					items={items}
-					onClick={({ key }) => setSelected(key as PageKey)}
+					onClick={({ key }) => void navigate(sectionHref(key as Section))}
 				/>
 			</Sider>
 			<AntLayout>
@@ -200,11 +202,22 @@ export function Layout({ me }: { me: AdminContext | null }) {
 				>
 					<ScopeSwitcher />
 					{me && <Typography.Text>{me.email}</Typography.Text>}
-					<a onClick={logout}>
-						<LogoutOutlined /> Log out
-					</a>
+					<Button
+						type="link"
+						icon={<LogoutOutlined />}
+						onClick={() => void logout()}
+					>
+						Log out
+					</Button>
 				</Header>
-				<Content style={{ margin: 24 }}>{renderPage()}</Content>
+				{/* Keyed by the active group, so switching group remounts every list rather than leaving
+				    half the console on the previous one. */}
+				<Content
+					key={me?.activeGroupId ?? 'none'}
+					style={{ margin: 24 }}
+				>
+					{renderPage()}
+				</Content>
 			</AntLayout>
 		</AntLayout>
 	);

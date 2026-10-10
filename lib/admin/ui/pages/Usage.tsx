@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { MouseEvent } from 'react';
 import {
 	Alert,
 	Button,
@@ -8,7 +7,6 @@ import {
 	Col,
 	Collapse,
 	Drawer,
-	Empty,
 	Input,
 	Popover,
 	Row,
@@ -22,7 +20,6 @@ import {
 	Typography
 } from 'antd';
 import { DownloadOutlined, QuestionCircleOutlined } from '@ant-design/icons';
-import { readJson } from '../json.js';
 import {
 	changeText,
 	figureText,
@@ -55,13 +52,19 @@ import {
 	Sparkline
 } from '../activity/charts.js';
 import {
+	DEFAULT_PREFERENCES,
 	loadPreferences,
 	savePreferences,
 	type UsagePreferences
 } from '../activity/preferences.js';
+import { useHydrated } from '../frame/hydrated.js';
 import { BucketActivityPanel } from './BucketActivityPanel.js';
-import { BucketDetail } from './BucketDetail.js';
+import { Link } from '../frame/router.js';
+import { bucketHref } from '../frame/routes.js';
 import { UsageCustomerDrawer } from './UsageCustomerDrawer.js';
+import { PageHeader } from '../frame/PageHeader.js';
+import { request, type RequestResult } from '../frame/request.js';
+import { EmptyState, LoadFailed, NoMatch } from '../frame/states.js';
 
 /*
  * The super administrator's usage dashboard (specs/077): every bucket's monthly active users beside the
@@ -110,58 +113,59 @@ function changeValue(row: OverviewRow): number | null {
 	return current && previous ? current.total - previous.total : null;
 }
 
-/* `null` when the request itself failed — no answer, as opposed to a refusal, which is an answer. */
-async function readOverview(asked: string): Promise<{
-	ok: boolean;
-	body: OverviewAnswer & { message?: string };
-} | null> {
-	try {
-		const query = asked ? `?month=${encodeURIComponent(asked)}` : '';
-		const res = await fetch(`/admin/api/activity${query}`);
-		return {
-			ok: res.ok,
-			body: await readJson<OverviewAnswer & { message?: string }>(res)
-		};
-	} catch {
-		return null;
-	}
+function readOverview(asked: string): Promise<RequestResult<OverviewAnswer>> {
+	const query = asked ? `?month=${encodeURIComponent(asked)}` : '';
+	return request<OverviewAnswer>('GET', `/admin/api/activity${query}`);
 }
+
+const RESERVED_TAG: Record<NonNullable<OverviewRow['reserved']>, string> = {
+	default: 'Default',
+	administrators: 'Administrators'
+};
 
 function nowrap(text: string) {
 	return <span style={{ whiteSpace: 'nowrap' }}>{text}</span>;
-}
-
-function stop(event: MouseEvent) {
-	event.stopPropagation();
 }
 
 export function Usage() {
 	const [month, setMonth] = useState('');
 	const [answer, setAnswer] = useState<OverviewAnswer | null>(null);
 	const [refusal, setRefusal] = useState<string | null>(null);
-	const [failed, setFailed] = useState(false);
+	const [failed, setFailed] = useState<string | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [search, setSearch] = useState('');
-	const [preferences, setPreferences] =
-		useState<UsagePreferences>(loadPreferences);
-	const [openBucketId, setOpenBucketId] = useState<string | null>(null);
+	/*
+	 * The defaults first, the stored choice from the next render: the server renders this page with no
+	 * storage to read, and a first client frame that differed from its HTML would not hydrate. An
+	 * explicit choice made on the page wins over both.
+	 */
+	const hydrated = useHydrated();
+	const stored = useMemo(
+		() => (hydrated ? loadPreferences() : DEFAULT_PREFERENCES),
+		[hydrated]
+	);
+	const [chosen, setPreferences] = useState<UsagePreferences | null>(null);
+	const preferences = chosen ?? stored;
 	const [historyOf, setHistoryOf] = useState<OverviewRow | null>(null);
 	const [customerOf, setCustomerOf] = useState<string | null>(null);
 
 	// Every state write follows an await, so the effect below sets nothing synchronously.
-	const fetchAnswer = useCallback(async (asked: string) => {
-		try {
-			const read = await readOverview(asked);
-			/* No stale figures after a failed read: the page shows the failure and a retry, nothing else. */
-			setFailed(read === null);
-			setAnswer(read?.ok ? read.body : null);
-			setRefusal(
-				read === null || read.ok ? null : (read.body.message ?? 'unavailable')
-			);
-		} finally {
-			setLoading(false);
-		}
-	}, []);
+	const fetchAnswer = useCallback(
+		(asked: string) =>
+			readOverview(asked).then((read) => {
+				/*
+				 * No stale figures after a failed read: the page shows the failure and a retry, nothing
+				 * else. A refusal is an answer and says why; no answer at all is a failure to retry.
+				 */
+				const unanswered =
+					!read.ok && (read.status === 0 || read.status >= 500);
+				setFailed(!read.ok && unanswered ? read.error.message : null);
+				setAnswer(read.ok ? read.data : null);
+				setRefusal(read.ok || unanswered ? null : read.error.message);
+				setLoading(false);
+			}),
+		[]
+	);
 
 	useEffect(() => {
 		void fetchAnswer(month);
@@ -212,15 +216,6 @@ export function Usage() {
 		);
 	}, [answer, rows]);
 
-	if (openBucketId) {
-		return (
-			<BucketDetail
-				bucketId={openBucketId}
-				onBack={() => setOpenBucketId(null)}
-			/>
-		);
-	}
-
 	const thisMonth = monthOf(new Date());
 	const monthOptions = monthsBack(thisMonth, MONTHS_OFFERED).map((m) => ({
 		value: m === thisMonth ? '' : m,
@@ -233,10 +228,7 @@ export function Usage() {
 				type="link"
 				size="small"
 				style={{ padding: 0 }}
-				onClick={(event) => {
-					stop(event);
-					setCustomerOf(customerKey(customer));
-				}}
+				onClick={() => setCustomerOf(customerKey(customer))}
 			>
 				{customer.label}
 			</Button>
@@ -260,23 +252,13 @@ export function Usage() {
 			render: (_: unknown, row: OverviewRow) => (
 				<Space size={4}>
 					{row.deleted === null ? (
-						<Button
-							type="link"
-							size="small"
-							style={{ padding: 0 }}
-							onClick={(event) => {
-								stop(event);
-								setOpenBucketId(row.bucketId);
-							}}
-						>
-							{row.name}
-						</Button>
+						<Link href={bucketHref(row.bucketId)}>{row.name}</Link>
 					) : (
 						<span>{row.name}</span>
 					)}
-					{row.reserved ? <Tag>{row.reserved}</Tag> : null}
-					{row.deleted ? <Tag color="red">deleted</Tag> : null}
-					{row.unavailable ? <Tag color="orange">unavailable</Tag> : null}
+					{row.reserved ? <Tag>{RESERVED_TAG[row.reserved]}</Tag> : null}
+					{row.deleted ? <Tag color="red">Deleted</Tag> : null}
+					{row.unavailable ? <Tag color="orange">Unavailable</Tag> : null}
 				</Space>
 			)
 		},
@@ -344,6 +326,22 @@ export function Usage() {
 					lastFinal={row.months[0]?.final ?? true}
 				/>
 			)
+		},
+		{
+			title: '',
+			key: 'activity',
+			/*
+			 * The bucket's month by month at its own address. A deleted bucket has no address any more,
+			 * but its history outlives it, so it opens here instead.
+			 */
+			render: (_: unknown, row: OverviewRow) =>
+				row.deleted === null ? (
+					<Link href={bucketHref(row.bucketId, 'activity')}>Activity</Link>
+				) : (
+					<Typography.Link onClick={() => setHistoryOf(row)}>
+						Activity
+					</Typography.Link>
+				)
 		}
 	];
 
@@ -412,6 +410,21 @@ export function Usage() {
 	const excluded = instance?.months[0]?.unavailable ?? 0;
 	const change = instance?.change ?? null;
 
+	/* A search that finds nothing is not an empty instance, and a filter that hides everything is neither. */
+	const emptyRows =
+		search.trim() !== '' ? (
+			<NoMatch
+				query={search.trim()}
+				onClear={() => setSearch('')}
+			/>
+		) : (
+			<EmptyState
+				purpose={
+					filtered ? 'No bucket matches these filters.' : 'No buckets yet.'
+				}
+			/>
+		);
+
 	const changeRow = (item: SharpChange) => (
 		<li key={item.bucketId}>
 			<Typography.Text strong>{item.name}</Typography.Text> ·{' '}
@@ -433,6 +446,7 @@ export function Usage() {
 			style={{ width: '100%' }}
 			size="middle"
 		>
+			<PageHeader title="Usage" />
 			<Card>
 				<Space
 					orientation="vertical"
@@ -443,12 +457,6 @@ export function Usage() {
 						wrap
 						style={{ width: '100%', justifyContent: 'space-between' }}
 					>
-						<Typography.Title
-							level={3}
-							style={{ margin: 0 }}
-						>
-							Usage
-						</Typography.Title>
 						<Space wrap>
 							<Select
 								style={{ minWidth: 180 }}
@@ -493,26 +501,18 @@ export function Usage() {
 							title={refusal}
 						/>
 					) : null}
-					{failed ? (
-						<Alert
-							type="error"
-							showIcon
-							title="The figures could not be read."
-							action={
-								<Button
-									size="small"
-									onClick={() => {
-										setLoading(true);
-										void fetchAnswer(month);
-									}}
-								>
-									Retry
-								</Button>
-							}
-						/>
-					) : null}
 				</Space>
 			</Card>
+
+			{failed !== null ? (
+				<LoadFailed
+					reason={failed}
+					onRetry={() => {
+						setLoading(true);
+						void fetchAnswer(month);
+					}}
+				/>
+			) : null}
 
 			{answer && instance ? (
 				<>
@@ -761,9 +761,7 @@ export function Usage() {
 									scroll={{ x: 'max-content' }}
 									columns={bucketColumns}
 									dataSource={rows}
-									locale={{
-										emptyText: <Empty description="No bucket matches" />
-									}}
+									locale={{ emptyText: emptyRows }}
 									onChange={(_pagination, _filters, sorter) => {
 										const one = Array.isArray(sorter) ? sorter[0] : sorter;
 										update({
@@ -773,10 +771,6 @@ export function Usage() {
 													: null
 										});
 									}}
-									onRow={(row) => ({
-										onClick: () => setHistoryOf(row),
-										style: { cursor: 'pointer' }
-									})}
 								/>
 							) : (
 								<Table
@@ -787,6 +781,7 @@ export function Usage() {
 									scroll={{ x: 'max-content' }}
 									columns={customerColumns}
 									dataSource={customers}
+									locale={{ emptyText: emptyRows }}
 									expandable={{
 										expandedRowRender: (summary) => (
 											<Table
@@ -799,10 +794,6 @@ export function Usage() {
 												dataSource={rows.filter((row) =>
 													summary.bucketIds.includes(row.bucketId)
 												)}
-												onRow={(row) => ({
-													onClick: () => setHistoryOf(row),
-													style: { cursor: 'pointer' }
-												})}
 											/>
 										)
 									}}

@@ -1,8 +1,15 @@
 import { Elysia } from 'elysia';
 import { captureFault } from '../error_store/capture.js';
-import { AdminError, adminErrorBody, resolveAdmin } from './auth/rbac.js';
+import {
+	AdminError,
+	adminErrorBody,
+	resolveAdmin,
+	type AdminContext
+} from './auth/rbac.js';
+import { safeNext } from './auth/next.js';
 import { hasSuperAdmin } from './auth/setup.js';
 import { adminApiRoutes } from './routes.js';
+import { resolveAddress } from './ui/frame/routes.js';
 import { renderAdminShell } from './ui/serverRender.js';
 
 /*
@@ -43,10 +50,52 @@ export const adminApp = new Elysia({ name: 'admin' })
 	})
 	.use(adminApiRoutes)
 	.use(resolveAdmin)
-	.get('/admin', async ({ admin, redirect }) => {
-		if (!(await hasSuperAdmin())) {
-			return renderAdminShell({ needsSetup: true, me: null });
-		}
-		if (!admin) return redirect('/admin/login', 302);
-		return renderAdminShell({ needsSetup: false, me: admin });
-	});
+	.get('/admin', consolePage)
+	.get('/admin/*', consolePage);
+
+/*
+ * Every console address is served the console, rendered at that address, so a link, a bookmark and a
+ * reload open the page they name (specs/079). The route table in ui/frame/routes.ts is the one list of
+ * addresses: this handler and the console's own router both read it, so the server cannot answer 200
+ * for a page the console then has nothing to draw for.
+ */
+async function consolePage({
+	admin,
+	request,
+	redirect,
+	set
+}: {
+	admin: AdminContext | null;
+	request: Request;
+	redirect: (url: string, status: 302) => Response;
+	set: { status?: number | string };
+}) {
+	const url = new URL(request.url);
+	const path = `${url.pathname}${url.search}`;
+	// The API never falls through to a page: a mistyped API path is a JSON 404 a client can read.
+	if (url.pathname.startsWith('/admin/api/')) {
+		set.status = 404;
+		return { error: 'not_found', message: 'no such admin API route' };
+	}
+	if (!(await hasSuperAdmin())) {
+		if (url.pathname !== '/admin') return redirect('/admin', 302);
+		return renderAdminShell({ needsSetup: true, me: null, path: '/admin' });
+	}
+	const resolved = resolveAddress(url.pathname);
+	// The one public page: the invitee following the link from their mail has no session yet.
+	if (resolved.kind === 'page' && resolved.route.public) {
+		return renderAdminShell({ needsSetup: false, me: null, path });
+	}
+	if (!admin) {
+		return redirect(
+			`/admin/login?next=${encodeURIComponent(safeNext(path))}`,
+			302
+		);
+	}
+	if (resolved.kind === 'redirect')
+		return redirect(resolved.to + url.search, 302);
+	return renderAdminShell(
+		{ needsSetup: false, me: admin, path },
+		resolved.kind === 'none' ? 404 : 200
+	);
+}

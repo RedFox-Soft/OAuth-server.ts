@@ -1,6 +1,7 @@
 import { Elysia } from 'elysia';
 
 import { AdminError, adminErrorBody, resolveAdmin } from './auth/rbac.js';
+import { getFirstError } from '../shared/first_validation_error.js';
 import { adminSetup } from './auth/setup.js';
 import { adminLogin } from './auth/login.js';
 import { meRoutes } from './me.js';
@@ -25,6 +26,38 @@ import { bucketKeyRoutes } from './bucket_keys/routes.js';
 import { auditRoutes } from './audit/routes.js';
 import { errorRoutes } from './errors/routes.js';
 import { activityRoutes } from './activity/routes.js';
+
+/*
+ * A request body, query or path the schema refused, said in words and named by field.
+ *
+ * Built from the first violation rather than Elysia's own validation error, whose message serialises the
+ * whole submission under `found` — passwords included, for create-admin, setup and create-user — and sent
+ * it back in every environment. TypeBox's wording names the rule and never the value; Elysia's summary is
+ * not used, because for a value of the wrong type it ends with the value.
+ */
+function validationRefusal(error: unknown): {
+	error: 'invalid_request';
+	message: string;
+	field?: string;
+} {
+	const first = getFirstError(error);
+	if (!first) {
+		return {
+			error: 'invalid_request',
+			message: 'the request does not have the shape this operation accepts'
+		};
+	}
+	const field = first.path.replace(/^\//, '');
+	const rule =
+		typeof first.schemaError === 'string' && first.schemaError
+			? first.schemaError
+			: first.message;
+	return {
+		error: 'invalid_request',
+		message: field ? `${field}: ${rule}` : rule,
+		...(field ? { field } : {})
+	};
+}
 
 /*
  * Every route of the administrative control plane except the console's own HTML shell.
@@ -56,7 +89,7 @@ export const adminApiRoutes = new Elysia({ name: 'admin-api' })
 		 */
 		if (code === 'VALIDATION') {
 			set.status = 422;
-			return { error: 'invalid_request', message: error.message };
+			return validationRefusal(error);
 		}
 	})
 	.use(adminSetup)

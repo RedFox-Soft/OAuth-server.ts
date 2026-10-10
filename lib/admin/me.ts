@@ -8,6 +8,7 @@ import {
 	AdminError,
 	adminErrorBody
 } from './auth/rbac.js';
+import { meCan } from './auth/can.js';
 import { ADMIN_BUCKET_ID } from './consts.js';
 
 /*
@@ -35,7 +36,8 @@ export const meRoutes = new Elysia({ name: 'admin-me' })
 	.get('/admin/api/me', async ({ admin }) => {
 		const ctx = assertAuth(admin);
 		const account = await getUserStore(ADMIN_BUCKET_ID).find(ctx.userId);
-		return { ...ctx, verified: account?.verified === true };
+		/* `can`: what the caller may create, and whether the instance-wide surfaces are theirs. */
+		return { ...ctx, verified: account?.verified === true, can: meCan(ctx) };
 	})
 	/*
 	 * Mails the caller a verification message for their own address, in the administrators' bucket's

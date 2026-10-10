@@ -19,6 +19,7 @@ import {
 	ADMIN_BUCKET_ID,
 	ADMIN_SESSION_COOKIE
 } from '../consts.js';
+import { safeNext } from './next.js';
 
 const REDIRECT_URI = `${ISSUER}/admin/callback`;
 
@@ -27,7 +28,7 @@ function base64url(buf: Buffer) {
 }
 
 export const adminLogin = new Elysia({ name: 'admin-login' })
-	.get('/admin/login', ({ cookie, redirect }) => {
+	.get('/admin/login', ({ cookie, query, redirect }) => {
 		const verifier = base64url(crypto.randomBytes(32));
 		const challenge = base64url(
 			crypto.createHash('sha256').update(verifier).digest()
@@ -38,7 +39,14 @@ export const adminLogin = new Elysia({ name: 'admin-login' })
 		// captured from another sign-in cannot be replayed into this one.
 		const nonce = base64url(crypto.randomBytes(32));
 		cookie.admin_oauth.set({
-			value: JSON.stringify({ verifier, state, nonce }),
+			// Where to return after sign-in, validated here and again on the way out: the cookie is the
+			// browser's to keep, so its contents are not trusted just because this route wrote them.
+			value: JSON.stringify({
+				verifier,
+				state,
+				nonce,
+				next: safeNext(query.next)
+			}),
 			httpOnly: true,
 			sameSite: 'lax',
 			secure: true,
@@ -73,6 +81,7 @@ export const adminLogin = new Elysia({ name: 'admin-login' })
 							verifier: string;
 							state: string;
 							nonce: string;
+							next?: string;
 						});
 			cookie.admin_oauth.remove();
 			if (!saved || saved.state !== query.state) {
@@ -136,7 +145,7 @@ export const adminLogin = new Elysia({ name: 'admin-login' })
 				value: session._id,
 				...sessionCookieAttributes()
 			});
-			return redirect('/admin', 302);
+			return redirect(safeNext(saved.next), 302);
 		},
 		{
 			// The provider appends `iss` (RFC 9207 authorization-response issuer

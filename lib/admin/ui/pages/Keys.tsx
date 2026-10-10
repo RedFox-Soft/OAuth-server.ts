@@ -1,5 +1,5 @@
-import { Typography } from 'antd';
 import { KeyLifecyclePanel } from './KeyLifecyclePanel.js';
+import { PageHeader } from '../frame/PageHeader.js';
 
 /*
  * The instance (root) signing keys: what the default bucket, the administrators and every bucket without
@@ -9,12 +9,7 @@ import { KeyLifecyclePanel } from './KeyLifecyclePanel.js';
 export function Keys() {
 	return (
 		<>
-			<Typography.Title
-				level={4}
-				style={{ margin: 0 }}
-			>
-				Signing keys
-			</Typography.Title>
+			<PageHeader title="Signing keys" />
 			<KeyLifecyclePanel
 				base="/admin/api/jwks"
 				title="Instance keys"

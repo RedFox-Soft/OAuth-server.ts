@@ -42,14 +42,18 @@ export function assertIssuer(issuer: string): void {
 	try {
 		parsed = new URL(issuer);
 	} catch {
-		throw new AdminError(422, `issuer must be an absolute URL: ${issuer}`);
+		throw new AdminError(422, `issuer must be an absolute URL: ${issuer}`, {
+			field: 'issuer'
+		});
 	}
 	/*
 	 * https only. An identity assertion's whole value is that it came from the party it names, and a plain
 	 * http discovery document can be rewritten in flight by anyone on the path.
 	 */
 	if (parsed.protocol !== 'https:') {
-		throw new AdminError(422, `issuer must use https: ${issuer}`);
+		throw new AdminError(422, `issuer must use https: ${issuer}`, {
+			field: 'issuer'
+		});
 	}
 }
 
@@ -93,7 +97,9 @@ export function assertScopes(
 ): void {
 	if (protocol === 'oidc') {
 		if (!scopes.includes('openid')) {
-			throw new AdminError(422, "scopes must include 'openid'");
+			throw new AdminError(422, "scopes must include 'openid'", {
+				field: 'scopes'
+			});
 		}
 		return;
 	}
@@ -105,7 +111,8 @@ export function assertScopes(
 	if (scopes.length === 0) {
 		throw new AdminError(
 			422,
-			'scopes must name what the provider should be asked for'
+			'scopes must name what the provider should be asked for',
+			{ field: 'scopes' }
 		);
 	}
 }
@@ -227,7 +234,8 @@ export function assertEmailDomains(domains: string[]): void {
 			 */
 			throw new AdminError(
 				422,
-				`allowed email domains must be bare lowercase domains: ${domain}`
+				`allowed email domains must be bare lowercase domains: ${domain}`,
+				{ field: 'allowedEmailDomains' }
 			);
 		}
 	}

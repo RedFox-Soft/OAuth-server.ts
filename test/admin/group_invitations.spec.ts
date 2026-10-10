@@ -98,6 +98,30 @@ describe('group invitations', () => {
 		expect(await personalGroupId(present(account, 'account')._id)).toBeString();
 	});
 
+	/*
+	 * The accept page cannot know whether the invitee already has an account, so a new one can submit
+	 * without a password. That refusal used to spend the invitation, and the retry with a password was
+	 * then refused as not valid.
+	 */
+	it('still accepts a new invitee who first submitted without a password', async () => {
+		const owner = await admin();
+		const group = await groupOwnedBy(owner.cookie);
+		const invitee = `new-${unique()}@x.io`;
+		await invite(owner.cookie, group._id, invitee);
+		const token = tokenFor(invitee);
+
+		const withoutPassword = await client.admin.api.invitations.accept.post({
+			token
+		});
+		expect(withoutPassword.status).toBe(400);
+
+		const withPassword = await client.admin.api.invitations.accept.post({
+			token,
+			password: 'a-long-enough-password'
+		});
+		expect(withPassword.status).toBe(200);
+	});
+
 	it('adds an existing administrator without creating a second account', async () => {
 		const owner = await admin();
 		const existing = await admin();

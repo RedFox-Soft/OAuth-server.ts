@@ -37,9 +37,11 @@ function assertNoUnknownParams(
 		(name) => !allowed.has(name)
 	);
 	if (unknown.length > 0) {
+		/* One unknown parameter is a field the console can mark; several are a refusal of the whole query. */
 		throw new AdminError(
 			422,
-			`unknown query parameter: ${unknown.sort().join(', ')}`
+			`unknown query parameter: ${unknown.sort().join(', ')}`,
+			unknown.length === 1 ? { field: unknown[0] } : undefined
 		);
 	}
 }
@@ -50,7 +52,9 @@ function parseBound(value: string | undefined, name: string): Date | undefined {
 	}
 	const parsed = new Date(value);
 	if (Number.isNaN(parsed.getTime())) {
-		throw new AdminError(422, `${name} is not a valid date-time`);
+		throw new AdminError(422, `${name} is not a valid date-time`, {
+			field: name
+		});
 	}
 	return parsed;
 }
@@ -64,7 +68,7 @@ function parseInteger(
 	}
 	const parsed = Number(value);
 	if (!Number.isInteger(parsed)) {
-		throw new AdminError(422, `${name} must be an integer`);
+		throw new AdminError(422, `${name} must be an integer`, { field: name });
 	}
 	return parsed;
 }
@@ -83,7 +87,9 @@ export function toStoreQuery(
 	const from = parseBound(query.from, 'from');
 	const to = parseBound(query.to, 'to');
 	if (from && to && from > to) {
-		throw new AdminError(422, 'from must not be later than to');
+		throw new AdminError(422, 'from must not be later than to', {
+			field: 'from'
+		});
 	}
 
 	return {

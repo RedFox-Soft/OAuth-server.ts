@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Alert, Modal, Select, Space, Typography, message } from 'antd';
+import { Alert, Select, Space, Typography } from 'antd';
 import type { ScopeOption } from './pages/ScopeSwitcher.js';
 import { groupLabel } from '../groups/label.js';
 import { moveDestinations } from './ownership/model.js';
+import { PreviewConfirm, type PreviewStep } from './frame/PreviewConfirm.js';
+import { request } from './frame/request.js';
 
 interface GroupRef {
 	id: string;
@@ -19,7 +21,7 @@ interface Preview {
 
 /*
  * Moving a bucket, with the projects using it, or a project with no bucket, to another administrator
- * group (specs/075).
+ * group (specs/075). Class C4 (`bucket.move`, `project.move`).
  *
  * Two steps, because the server's preview is the only place the full list of what moves exists: the
  * first request names the destination and is answered with what would move; the second repeats it with
@@ -42,16 +44,18 @@ export function MoveToGroup({
 	onMoved: () => void;
 }) {
 	const [scope, setScope] = useState<ScopeOption[] | null>(null);
+	const [scopeError, setScopeError] = useState<string | null>(null);
 	const [groupId, setGroupId] = useState<string | null>(null);
 	const [preview, setPreview] = useState<Preview | null>(null);
-	const [busy, setBusy] = useState(false);
 
 	useEffect(() => {
 		void (async () => {
-			const res = await fetch('/admin/api/scope');
-			if (!res.ok) return;
-			const view = (await res.json()) as { available: ScopeOption[] };
-			setScope(view.available);
+			const result = await request<{ available: ScopeOption[] }>(
+				'GET',
+				'/admin/api/scope'
+			);
+			if (result.ok) setScope(result.data.available);
+			else setScopeError(result.error.message);
 		})();
 	}, []);
 	const options = scope && moveDestinations(scope, sourceGroupId);
@@ -69,56 +73,80 @@ export function MoveToGroup({
 		return groupLabel({ kind: group.kind, name: group.name, own: false });
 	}
 
-	async function send(confirm: boolean) {
-		if (!groupId) return;
-		setBusy(true);
-		try {
-			const res = await fetch(
-				`/admin/api/${kind === 'bucket' ? 'buckets' : 'projects'}/${encodeURIComponent(id)}/owner`,
-				{
-					method: 'PUT',
-					headers: { 'content-type': 'application/json' },
-					body: JSON.stringify(confirm ? { groupId, confirm } : { groupId })
-				}
-			);
-			const body = (await res.json().catch(() => null)) as
-				(Preview & { confirmationRequired?: boolean; message?: string }) | null;
-			if (res.status === 409 && body?.confirmationRequired) {
-				setPreview(body);
-				return;
+	async function step(commit: boolean): Promise<PreviewStep<Preview>> {
+		const result = await request(
+			'PUT',
+			`/admin/api/${kind === 'bucket' ? 'buckets' : 'projects'}/${encodeURIComponent(id)}/owner`,
+			commit ? { groupId, confirm: true } : { groupId }
+		);
+		if (!result.ok) {
+			// The preview arrives as a refusal: the server will not move anything it has not shown.
+			if (result.status === 409 && result.error.confirmationRequired) {
+				return {
+					kind: 'preview',
+					preview: result.error as unknown as Preview
+				};
 			}
-			if (!res.ok) {
-				void message.error(body?.message ?? 'The move was refused.');
-				return;
-			}
-			void message.success(`${name} moved.`);
-			onMoved();
-		} finally {
-			setBusy(false);
+			return { kind: 'failed', result };
 		}
+		const noun = kind === 'bucket' ? 'Bucket' : 'Project';
+		return {
+			kind: 'done',
+			text: preview
+				? `${noun} ${name} moved to ${labelOf(preview.to)}.`
+				: `${noun} ${name} moved.`
+		};
 	}
 
 	return (
-		<Modal
+		<PreviewConfirm<Preview>
 			open
 			title={`Move ${name} to another group`}
-			okText={preview ? 'Move' : 'Next'}
-			okButtonProps={{ disabled: !groupId }}
-			confirmLoading={busy}
-			onOk={() => void send(preview !== null)}
-			onCancel={onClose}
-			destroyOnHidden
+			commitText="Move"
+			ready={groupId !== null}
+			preview={preview}
+			onPreview={setPreview}
+			step={step}
+			onClose={onClose}
+			onDone={onMoved}
+			renderPreview={(shown) => (
+				<Space
+					orientation="vertical"
+					style={{ width: '100%', marginTop: 8 }}
+				>
+					<Typography.Text>
+						From <strong>{labelOf(shown.from)}</strong> to{' '}
+						<strong>{labelOf(shown.to)}</strong>
+					</Typography.Text>
+					{kind === 'bucket' && (
+						<Typography.Text>
+							{shown.projects && shown.projects.length > 0
+								? `Moves with it: ${shown.projects.map((p) => p.name).join(', ')}.`
+								: 'No project uses this bucket.'}
+						</Typography.Text>
+					)}
+					<Alert
+						type="info"
+						showIcon
+						title={shown.consequence}
+					/>
+				</Space>
+			)}
 		>
-			<Space
-				orientation="vertical"
-				style={{ width: '100%' }}
-			>
+			{scopeError !== null ? (
+				<Alert
+					type="error"
+					showIcon
+					title={scopeError}
+				/>
+			) : (
 				<Select
 					placeholder="Destination group"
 					loading={options === null}
 					value={groupId ?? undefined}
 					onChange={(value: string) => {
 						setGroupId(value);
+						// A preview computed for another destination is not one to agree to.
 						setPreview(null);
 					}}
 					style={{ width: '100%' }}
@@ -128,27 +156,7 @@ export function MoveToGroup({
 					}))}
 					notFoundContent="You belong to no other group this can move to."
 				/>
-				{preview && (
-					<>
-						<Typography.Text>
-							From <strong>{labelOf(preview.from)}</strong> to{' '}
-							<strong>{labelOf(preview.to)}</strong>
-						</Typography.Text>
-						{kind === 'bucket' && (
-							<Typography.Text>
-								{preview.projects && preview.projects.length > 0
-									? `Moves with it: ${preview.projects.map((p) => p.name).join(', ')}.`
-									: 'No project uses this bucket.'}
-							</Typography.Text>
-						)}
-						<Alert
-							type="info"
-							showIcon
-							title={preview.consequence}
-						/>
-					</>
-				)}
-			</Space>
-		</Modal>
+			)}
+		</PreviewConfirm>
 	);
 }

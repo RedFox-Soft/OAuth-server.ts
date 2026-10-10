@@ -1,10 +1,8 @@
 import { hydrateRoot } from 'react-dom/client';
 import { StrictMode } from 'react';
-import { message } from 'antd';
 import type { AdminShellProps } from './serverRender.tsx';
-import { Layout } from './pages/Layout.tsx';
-import { Setup } from './pages/Setup.tsx';
-import { ZeroRuntime } from '../../html/zeroRuntime.js';
+import { ConsoleRoot } from './frame/ConsoleRoot.tsx';
+import { reportOutsideReact } from './frame/feedback.tsx';
 
 /*
  * `unknown` here as in loginClient.tsx: both augment the one global `Window`, and two different types
@@ -26,13 +24,12 @@ declare global {
  * logs the reason; the administrator is told only that the action did not complete.
  */
 window.addEventListener('unhandledrejection', () => {
-	void message.error(
+	reportOutsideReact(
 		'That action did not complete. Check the connection to the server and try again.'
 	);
 });
 
 const props = (window.PROPS ?? {}) as Partial<AdminShellProps>;
-const me = props.me ?? null;
 
 // The template renders this; if it is missing, the document is not the one this bundle is for, and
 // saying so beats failing somewhere inside React.
@@ -44,8 +41,10 @@ if (!root) {
 hydrateRoot(
 	root,
 	<StrictMode>
-		<ZeroRuntime>
-			{props.needsSetup ? <Setup /> : <Layout me={me} />}
-		</ZeroRuntime>
+		<ConsoleRoot
+			needsSetup={props.needsSetup ?? false}
+			me={props.me ?? null}
+			path={props.path ?? window.location.pathname + window.location.search}
+		/>
 	</StrictMode>
 );

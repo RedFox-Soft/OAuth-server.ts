@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
+	Alert,
 	Table,
 	Button,
 	Modal,
@@ -8,14 +9,19 @@ import {
 	Select,
 	Space,
 	Typography,
-	Popconfirm,
 	Switch,
 	Tag,
-	Collapse,
-	message
+	Collapse
 } from 'antd';
-import { PlusOutlined, ArrowLeftOutlined } from '@ant-design/icons';
-import type { Project } from '../../../adapters/types.js';
+import { PlusOutlined } from '@ant-design/icons';
+import { request } from '../frame/request.js';
+import { useFeedback } from '../frame/feedback.js';
+import { useConfirm } from '../frame/confirm.js';
+import { projectCan } from '../frame/can.js';
+import { AreaToolbar } from '../frame/AreaToolbar.js';
+import { RowActions, type RowAction } from '../frame/RowActions.js';
+import { EmptyState, LoadFailed } from '../frame/states.js';
+import type { ProjectView } from './ProjectWorkspace.js';
 
 const GRANT_OPTIONS = [
 	{ label: 'authorization_code', value: 'authorization_code' },
@@ -121,33 +127,36 @@ const DEFAULT_VALUES: FormValues = {
 	requireConsent: true
 };
 
-export function Clients({
-	project,
-	onBack
-}: {
-	project: Project;
-	onBack: () => void;
-}) {
+export function Clients({ project }: { project: ProjectView }) {
 	const base = `/admin/api/projects/${project._id}/clients`;
+	const writable = projectCan(project).manageClients;
 	const [rows, setRows] = useState<ClientRow[]>([]);
 	const [loading, setLoading] = useState(true);
+	const [loadFailed, setLoadFailed] = useState<string | null>(null);
 	const [open, setOpen] = useState(false);
 	const [mode, setMode] = useState<'create' | 'edit'>('create');
 	const [editingClientId, setEditingClientId] = useState<string | null>(null);
 	const [saving, setSaving] = useState(false);
 	const [secret, setSecret] = useState<string | null>(null);
 	const [form] = Form.useForm<FormValues>();
+	const feedback = useFeedback();
+	const confirm = useConfirm();
 
 	// Every state write follows an await, so the mount effect calls this without setting
 	// `loading` first; `load` is the reload, which does.
-	const fetchClients = useCallback(async () => {
-		try {
-			const res = await fetch(base);
-			if (res.ok) setRows((await res.json()) as ClientRow[]);
-		} finally {
-			setLoading(false);
-		}
-	}, [base]);
+	const fetchClients = useCallback(
+		() =>
+			request<ClientRow[]>('GET', base).then((result) => {
+				if (result.ok) {
+					setRows(result.data);
+					setLoadFailed(null);
+				} else {
+					setLoadFailed(result.error.message);
+				}
+				setLoading(false);
+			}),
+		[base]
+	);
 	function load() {
 		setLoading(true);
 		return fetchClients();
@@ -240,38 +249,33 @@ export function Clients({
 	}
 
 	async function onCreate(values: FormValues) {
-		const res = await fetch(base, {
-			method: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify(buildBody(values))
-		});
-		const body = (await res.json().catch(() => null)) as {
-			message?: string;
-			secret?: string;
-		} | null;
-		if (!res.ok) {
-			message.error(body?.message || 'failed to create client');
+		const result = await request<{ secret?: string }>(
+			'POST',
+			base,
+			buildBody(values)
+		);
+		if (!result.ok) {
+			feedback.failed(result, form);
 			return;
 		}
+		feedback.done('Client created.');
 		setOpen(false);
 		form.resetFields();
-		if (body?.secret) setSecret(body.secret);
+		if (result.data.secret) setSecret(result.data.secret);
 		await load();
 	}
 
 	async function onUpdate(clientId: string, values: FormValues) {
-		const res = await fetch(`${base}/${encodeURIComponent(clientId)}`, {
-			method: 'PATCH',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify(buildBody(values, true))
-		});
-		const body = (await res.json().catch(() => null)) as {
-			message?: string;
-		} | null;
-		if (!res.ok) {
-			message.error(body?.message || 'failed to update client');
+		const result = await request(
+			'PATCH',
+			`${base}/${encodeURIComponent(clientId)}`,
+			buildBody(values, true)
+		);
+		if (!result.ok) {
+			feedback.failed(result, form);
 			return;
 		}
+		feedback.done('Client saved.');
 		setOpen(false);
 		form.resetFields();
 		await load();
@@ -290,128 +294,171 @@ export function Clients({
 		}
 	}
 
-	async function onDelete(clientId: string) {
-		const res = await fetch(`${base}/${encodeURIComponent(clientId)}`, {
-			method: 'DELETE'
+	/*
+	 * States the consequence rather than asking for confirmation of an unstated one: deleting a client
+	 * destroys every credential it ever issued, and the invisible half of that is what an operator
+	 * cannot otherwise see.
+	 */
+	async function onDelete(row: ClientView) {
+		const agreed = await confirm('client.delete', {
+			target: row.clientName || row.clientId,
+			consequences: [
+				'Its access, refresh and machine-to-machine tokens stop working immediately.',
+				'Its pending codes and consent records are destroyed.',
+				'Its own registration credential is destroyed.'
+			]
 		});
-		if (!res.ok) {
-			message.error('failed to delete client');
+		if (!agreed) return;
+		const result = await request(
+			'DELETE',
+			`${base}/${encodeURIComponent(row.clientId)}`
+		);
+		if (!result.ok) {
+			feedback.failed(result);
 			return;
 		}
+		feedback.done('Client deleted.');
 		await load();
 	}
 
-	async function onRotate(clientId: string) {
-		const res = await fetch(`${base}/${encodeURIComponent(clientId)}/secret`, {
-			method: 'POST'
+	async function onRotate(row: ClientView) {
+		const agreed = await confirm('client.secret.rotate', {
+			target: row.clientName || row.clientId,
+			consequences: [
+				'The current secret stops working immediately.',
+				'The application fails to authenticate until it is given the new secret.'
+			]
 		});
-		const body = (await res.json().catch(() => null)) as {
-			secret?: string;
-		} | null;
-		if (!res.ok || !body?.secret) {
-			message.error('failed to rotate secret');
+		if (!agreed) return;
+		const result = await request<{ secret?: string }>(
+			'POST',
+			`${base}/${encodeURIComponent(row.clientId)}/secret`
+		);
+		if (!result.ok) {
+			feedback.failed(result);
 			return;
 		}
-		setSecret(body.secret);
+		feedback.done('Client secret rotated.');
+		if (result.data.secret) setSecret(result.data.secret);
 	}
+
+	function actionsFor(row: ClientRow): RowAction[] {
+		const items: RowAction[] = [
+			{
+				key: 'edit',
+				label: 'Edit…',
+				group: 'edit',
+				onClick: () => openEditModal(row)
+			}
+		];
+		if (row.tokenEndpointAuthMethod !== 'none') {
+			items.push({
+				key: 'rotate',
+				label: 'Rotate secret',
+				group: 'state',
+				onClick: () => void onRotate(row)
+			});
+		}
+		items.push({
+			key: 'delete',
+			label: 'Delete',
+			group: 'danger',
+			onClick: () => void onDelete(row)
+		});
+		return items;
+	}
+
+	const newClient = (
+		<Button
+			type="primary"
+			icon={<PlusOutlined />}
+			onClick={openCreateModal}
+		>
+			New client
+		</Button>
+	);
 
 	return (
 		<>
-			<Space
-				style={{
-					marginBottom: 16,
-					justifyContent: 'space-between',
-					width: '100%'
-				}}
-			>
-				<Button
-					icon={<ArrowLeftOutlined />}
-					onClick={onBack}
-				>
-					Projects
-				</Button>
-				<Typography.Title
-					level={4}
-					style={{ margin: 0 }}
-				>
-					{project.name} — clients
-				</Typography.Title>
-				<Button
-					type="primary"
-					icon={<PlusOutlined />}
-					onClick={openCreateModal}
-				>
-					New client
-				</Button>
-			</Space>
-			<Table<ClientView>
-				rowKey="clientId"
-				loading={loading}
-				dataSource={rows}
-				columns={[
-					{
-						title: 'Name',
-						dataIndex: 'clientName',
-						/*
-						 * A client the server created on its own request is marked here rather than left to be
-						 * inferred from the shape of its id. It cannot be inferred: a deployment's `idFactory`
-						 * may issue any id, including a URL, so "looks generated" is not a distinction. What an
-						 * operator needs to know is who vouched for the client — them, or nobody.
-						 */
-						render: (clientName: string | undefined, row: ClientView) => (
-							<Space size={4}>
-								<span>{clientName || '—'}</span>
-								{row.registeredDynamically ? <Tag>self-registered</Tag> : null}
-							</Space>
+			{writable ? (
+				<AreaToolbar create={newClient} />
+			) : (
+				<Alert
+					type="info"
+					showIcon
+					style={{ marginBottom: 16 }}
+					title="This project is read-only to you"
+					description="It is a reserved project: its clients are part of how this server runs, so they can be looked at here but not changed."
+				/>
+			)}
+			{loadFailed !== null ? (
+				<LoadFailed
+					reason={loadFailed}
+					onRetry={() => void load()}
+				/>
+			) : (
+				<Table<ClientRow>
+					rowKey="clientId"
+					loading={loading}
+					dataSource={rows}
+					locale={{
+						emptyText: (
+							<EmptyState
+								purpose="No clients in this project yet. A client is an application that signs people in or calls an API through this server."
+								create={writable ? newClient : undefined}
+							/>
 						)
-					},
-					{ title: 'Client ID', dataIndex: 'clientId' },
-					{ title: 'Type', dataIndex: 'applicationType' },
-					{ title: 'Auth', dataIndex: 'tokenEndpointAuthMethod' },
-					{
-						title: 'Grants',
-						dataIndex: 'grantTypes',
-						render: (g: string[]) => g.join(', ')
-					},
-					{
-						title: 'Actions',
-						render: (_: unknown, row: ClientView) => (
-							<Space>
-								<Button
-									size="small"
-									onClick={() => openEditModal(row)}
-								>
-									Edit
-								</Button>
-								{row.tokenEndpointAuthMethod !== 'none' && (
-									<Button
-										size="small"
-										onClick={() => onRotate(row.clientId)}
-									>
-										Rotate secret
-									</Button>
-								)}
-								{/* States the consequence rather than asking for confirmation of an unstated one:
-								    deleting a client destroys every credential it ever issued, and the invisible
-								    half of that is what an operator cannot otherwise see. */}
-								<Popconfirm
-									title="Delete this client?"
-									description="Its access, refresh and machine-to-machine tokens, pending codes, consent records and its own registration credential are all destroyed immediately."
-									okText="Delete and revoke"
-									onConfirm={() => onDelete(row.clientId)}
-								>
-									<Button
-										size="small"
-										danger
-									>
-										Delete
-									</Button>
-								</Popconfirm>
-							</Space>
-						)
-					}
-				]}
-			/>
+					}}
+					columns={[
+						{
+							title: 'Name',
+							dataIndex: 'clientName',
+							/*
+							 * A client the server created on its own request is marked here rather than left to be
+							 * inferred from the shape of its id. It cannot be inferred: a deployment's `idFactory`
+							 * may issue any id, including a URL, so "looks generated" is not a distinction. What an
+							 * operator needs to know is who vouched for the client — them, or nobody.
+							 */
+							render: (clientName: string | undefined, row: ClientRow) => (
+								<Space size={4}>
+									{writable ? (
+										<Typography.Link onClick={() => openEditModal(row)}>
+											{clientName || row.clientId}
+										</Typography.Link>
+									) : (
+										<span>{clientName || '—'}</span>
+									)}
+									{row.registeredDynamically ? (
+										<Tag>Self-registered</Tag>
+									) : null}
+								</Space>
+							)
+						},
+						{ title: 'Client ID', dataIndex: 'clientId' },
+						{ title: 'Type', dataIndex: 'applicationType' },
+						{ title: 'Auth', dataIndex: 'tokenEndpointAuthMethod' },
+						{
+							title: 'Grants',
+							dataIndex: 'grantTypes',
+							render: (g: string[]) => g.join(', ')
+						},
+						...(writable
+							? [
+									{
+										title: '',
+										key: 'actions',
+										render: (_: unknown, row: ClientRow) => (
+											<RowActions
+												name={row.clientName || row.clientId}
+												items={actionsFor(row)}
+											/>
+										)
+									}
+								]
+							: [])
+					]}
+				/>
+			)}
 			<Modal
 				title={mode === 'create' ? 'New client' : 'Edit client'}
 				open={open}
@@ -423,7 +470,8 @@ export function Clients({
 				<Form<FormValues>
 					form={form}
 					layout="vertical"
-					onFinish={onSubmit}
+					scrollToFirstError
+					onFinish={(values) => void onSubmit(values)}
 					initialValues={DEFAULT_VALUES}
 				>
 					<Form.Item

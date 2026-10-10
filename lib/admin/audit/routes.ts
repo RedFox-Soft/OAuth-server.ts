@@ -27,9 +27,11 @@ function assertNoUnknownParams(url: string): void {
 		(name) => !ALLOWED_AUDIT_PARAMS.has(name)
 	);
 	if (unknown.length > 0) {
+		/* One unknown parameter is a field the console can mark; several are a refusal of the whole query. */
 		throw new AdminError(
 			422,
-			`unknown query parameter: ${unknown.sort().join(', ')}`
+			`unknown query parameter: ${unknown.sort().join(', ')}`,
+			unknown.length === 1 ? { field: unknown[0] } : undefined
 		);
 	}
 }
@@ -40,7 +42,9 @@ function parseBound(value: string | undefined, name: string): Date | undefined {
 	}
 	const parsed = new Date(value);
 	if (Number.isNaN(parsed.getTime())) {
-		throw new AdminError(422, `${name} is not a valid date-time`);
+		throw new AdminError(422, `${name} is not a valid date-time`, {
+			field: name
+		});
 	}
 	return parsed;
 }
@@ -103,7 +107,8 @@ export const auditRoutes = new Elysia({ name: 'admin-audit' })
 			if (from && to && from > to) {
 				throw new AdminError(
 					422,
-					'the time window is backwards: from is later than to'
+					'the time window is backwards: from is later than to',
+					{ field: 'from' }
 				);
 			}
 

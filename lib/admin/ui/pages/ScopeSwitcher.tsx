@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Select, Typography } from 'antd';
 import { groupLabel } from '../../groups/label.js';
+import { useFeedback } from '../frame/feedback.js';
+import { useMe } from '../frame/me.js';
+import { request } from '../frame/request.js';
+import { useNavigate, useRoute } from '../frame/router.js';
+import { sectionHref } from '../frame/routes.js';
 
 export interface ScopeOption {
 	id: string;
@@ -20,14 +25,19 @@ interface ScopeView {
 /*
  * Which group the console is pointed at.
  *
- * A full page reload on change, rather than a context that re-fetches every list. The active scope is
- * held on the session, so every list in the console is already scoped by the server on its next
- * request — reloading gets all of them consistently, and avoids a half-switched console where the
- * projects table has caught up and the buckets table has not.
+ * The active scope is held on the session, so every list is scoped by the server on its next request.
+ * After a switch the operator's identity is re-read and the page subtree remounts (Layout keys it by the
+ * active group), so every list re-fetches at once — the consistency the old full reload bought, without
+ * losing the address. The operator stays in the same section; an entity page (one bucket, one project)
+ * gives way to its list, because the entity may belong to the group just left.
  */
 export function ScopeSwitcher() {
 	const [scope, setScope] = useState<ScopeView | null>(null);
 	const [switching, setSwitching] = useState(false);
+	const { reload } = useMe();
+	const navigate = useNavigate();
+	const { resolved } = useRoute();
+	const feedback = useFeedback();
 
 	useEffect(() => {
 		void (async () => {
@@ -37,17 +47,21 @@ export function ScopeSwitcher() {
 	}, []);
 
 	async function onChange(groupId: string) {
-		setSwitching(true);
-		try {
-			const res = await fetch('/admin/api/scope', {
-				method: 'PUT',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ groupId })
-			});
-			if (res.ok) window.location.reload();
-		} finally {
-			setSwitching(false);
+		const section =
+			resolved.kind === 'page' ? resolved.route.section : undefined;
+		// Through the leave guard first: unsaved edits are asked about before anything changes.
+		if (section && !(await navigate(sectionHref(section), { replace: true }))) {
+			return;
 		}
+		setSwitching(true);
+		const result = await request('PUT', '/admin/api/scope', { groupId });
+		setSwitching(false);
+		if (!result.ok) {
+			feedback.failed(result);
+			return;
+		}
+		setScope((prev) => (prev ? { ...prev, activeGroupId: groupId } : prev));
+		await reload();
 	}
 
 	// Nothing to switch between: one scope, which the server has already picked. A super administrator

@@ -6,7 +6,14 @@ import { KeyLifecyclePanel } from './KeyLifecyclePanel.js';
  * A bucket's own signing keys, for a bucket with an address of its own. A bucket served at the root has no
  * keys of its own — the server answers 409 — and is sent to the instance key page instead.
  */
-export function BucketKeysPanel({ bucketId }: { bucketId: string }) {
+export function BucketKeysPanel({
+	bucketId,
+	canEdit = true
+}: {
+	bucketId: string;
+	/* False when the caller may read this bucket but not change it; the server would refuse every write. */
+	canEdit?: boolean;
+}) {
 	const [rootServed, setRootServed] = useState(false);
 	const onUnavailable = useCallback((status: number) => {
 		setRootServed(status === 409);
@@ -33,6 +40,7 @@ export function BucketKeysPanel({ bucketId }: { bucketId: string }) {
 			base={`/admin/api/buckets/${bucketId}/keys`}
 			title="Signing keys"
 			onUnavailable={onUnavailable}
+			canEdit={canEdit}
 		/>
 	);
 }
