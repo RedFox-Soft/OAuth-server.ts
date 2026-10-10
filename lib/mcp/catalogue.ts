@@ -816,7 +816,13 @@ const catalogue = [
 		method: 'PATCH',
 		path: '/admin/api/admins/:id',
 		action: 'admin.update',
-		consequence: 'ordinary',
+		/*
+		 * High, as admin_deactivate is: `active: false` here is the same act through another door, and
+		 * leaving this ordinary let an agent deactivate an administrator without the confirmation the
+		 * deactivation tool demands. Reactivating restores access, and a changed address makes the account
+		 * unverified — neither is a step an agent should take in one call either.
+		 */
+		consequence: 'high',
 		superAdminOnly: true,
 		bodySchema: UpdateAdminBody,
 		querySchema: null,

@@ -87,6 +87,12 @@ administrator came to be handed every bucket's federation secrets. It substitute
 `test/mcp/secrecy.spec.ts` sweeps every published read for this, which is why that sweep iterates rather
 than checking the ones somebody thought of.
 
+*Corrected after 0.10.0:* the administrator routes (`lib/admin/users/routes.ts`) stripped only the password
+by hand, so the list, the create answer and the update answer carried every enrolled administrator's
+`totp.secret` — to every super administrator and, through `admin_list` and `admin_update`, to the agent.
+The sweep missed it because it never enrolled an administrator. Those routes now go through `presentUser`
+too, and the sweep seeds an administrator with an authenticator.
+
 ## Two guards that only exist in the failure path
 
 **The replay guard.** `verifyForAccount` writes the accepted step to `user.totp.lastStep`, and a code at

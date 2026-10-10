@@ -9,6 +9,16 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+### Security
+
+- **Administrators' authenticator secrets no longer leave the server.** The administrator list and the
+  answers to creating and updating an administrator carried each enrolled administrator's TOTP secret, so any
+  super administrator, or an agent acting for one (`admin_list`, `admin_update`), could generate another
+  administrator's second-factor codes. They now go through the same presenter as end users. Administrators
+  who enrolled an authenticator before this fix should re-enrol. Updating an administrator with
+  `active: false` now refuses deactivating yourself, as the deactivation route does, and `admin_update` is a
+  high-consequence agent tool, so it no longer bypasses the confirmation `admin_deactivate` requires.
+
 ## [0.10.0] - 2026-10-10
 
 An instance can now be run as a service for other people. Every bucket counts its monthly and daily active users,

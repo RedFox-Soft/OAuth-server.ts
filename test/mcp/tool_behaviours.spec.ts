@@ -192,13 +192,14 @@ describe('individual tool behaviours', () => {
 		await ensureAdminSeed();
 		const { token, user } = await session();
 
-		const deactivated = await rpc(
-			call('admin_update', { id: user._id, active: false }),
-			token
-		);
+		// Confirmed, so the refusal is the route's and not the confirmation gate's.
+		const deactivated = await perform(token, 'admin_update', {
+			id: user._id,
+			active: false
+		});
 		expect(deactivated.result?.isError).toBe(true);
 		expect(deactivated.result?.structuredContent?.message).toContain(
-			'super administrator'
+			'yourself'
 		);
 
 		const withdrawn = await perform(token, 'admin_super_withdraw', {

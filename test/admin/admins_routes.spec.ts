@@ -119,6 +119,54 @@ describe('admin-accounts API', () => {
 		expect(await isSuperAdmin(target.userId)).toBe(true);
 	});
 
+	describe('an administrator who has enrolled an authenticator', () => {
+		const SECRET = 'ADMINTOTPSECRETMARKERKRSXG5CT';
+
+		async function enrolledTarget() {
+			const target = await cookieFor('plain');
+			await getUserStore(ADMIN_BUCKET_ID).update(target.userId, {
+				totp: { secret: SECRET, enrolledAt: new Date(), lastStep: 0 }
+			});
+			return target;
+		}
+
+		it('is listed without the authenticator secret', async () => {
+			const { cookie } = await cookieFor('super');
+			await enrolledTarget();
+
+			const res = await client.admin.api.admins.get({ headers: { cookie } });
+
+			expect(res.status).toBe(200);
+			expect(JSON.stringify(res.data)).not.toContain(SECRET);
+		});
+
+		it('is answered without the authenticator secret after an update', async () => {
+			const { cookie } = await cookieFor('super');
+			const target = await enrolledTarget();
+
+			const res = await client.admin.api
+				.admins({ id: target.userId })
+				.patch({ active: true }, { headers: { cookie } });
+
+			expect(res.status).toBe(200);
+			expect(JSON.stringify(res.data)).not.toContain(SECRET);
+		});
+	});
+
+	it('refuses a super administrator deactivating themselves through an account update', async () => {
+		const self = await cookieFor('super');
+		await cookieFor('super');
+
+		const res = await client.admin.api
+			.admins({ id: self.userId })
+			.patch({ active: false }, { headers: { cookie: self.cookie } });
+
+		expect(res.status).toBe(409);
+		expect(
+			(await getUserStore(ADMIN_BUCKET_ID).find(self.userId))?.active
+		).toBe(true);
+	});
+
 	describe("changing an administrator's address", () => {
 		afterEach(async () => {
 			await getBucketStore().update(ADMIN_BUCKET_ID, {

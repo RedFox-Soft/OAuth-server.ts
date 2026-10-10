@@ -169,6 +169,7 @@ describe('MCP tool catalogue', () => {
 			'admin_deactivate',
 			'admin_super_grant',
 			'admin_super_withdraw',
+			'admin_update',
 			'bucket_address_change',
 			/* Makes a group read-only to every administrator and hands it to an external directory. */
 			'bucket_group_assign_connection',

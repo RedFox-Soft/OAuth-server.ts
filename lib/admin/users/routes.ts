@@ -14,6 +14,7 @@ import {
 } from '../auth/rbac.js';
 import { ADMIN_BUCKET_ID } from '../consts.js';
 import { CreateAdminBody, UpdateAdminBody } from './schema.js';
+import { presentUser } from '../users-end/routes.js';
 import { recordAdminAudit } from '../audit/record.js';
 import nanoid from '../../helpers/nanoid.js';
 import { ensurePersonalGroup } from '../groups/personal.js';
@@ -81,8 +82,8 @@ export const adminUserRoutes = new Elysia({ name: 'admin-users' })
 		const ctx = assertAuth(admin);
 		assertSuperAdmin(ctx);
 		const supers = new Set(await superAdminIds());
-		return (await store().list()).map(({ password: _password, ...u }) => ({
-			...u,
+		return (await store().list()).map((u) => ({
+			...presentUser(u),
 			superAdmin: supers.has(u._id)
 		}));
 	})
@@ -104,8 +105,7 @@ export const adminUserRoutes = new Elysia({ name: 'admin-users' })
 			// scope their console opens in, and without it they would sign in pointed at nothing.
 			await ensurePersonalGroup(user._id, user.email);
 			set.status = 201;
-			const { password: _password, ...safe } = user;
-			return { ...safe, superAdmin: false };
+			return { ...presentUser(user), superAdmin: false };
 		},
 		{ body: CreateAdminBody }
 	)
@@ -114,7 +114,13 @@ export const adminUserRoutes = new Elysia({ name: 'admin-users' })
 		async ({ admin, params, body }) => {
 			const ctx = assertAuth(admin);
 			assertSuperAdmin(ctx);
-			if (body.active === false) await assertNotLastSuperAdmin(params.id);
+			if (body.active === false) {
+				// The same two refusals as the deactivation route: the update is another door to the same act.
+				if (params.id === ctx.userId) {
+					throw new AdminError(409, 'cannot deactivate yourself');
+				}
+				await assertNotLastSuperAdmin(params.id);
+			}
 			if (body.email !== undefined) {
 				await assertAddressChangeable(ctx.userId, params.id, body.email);
 			}
@@ -147,8 +153,10 @@ export const adminUserRoutes = new Elysia({ name: 'admin-users' })
 					await getGroupStore().update(personal._id, { name: updated.email });
 				}
 			}
-			const { password: _password, ...safe } = updated;
-			return { ...safe, superAdmin: await isSuperAdmin(updated._id) };
+			return {
+				...presentUser(updated),
+				superAdmin: await isSuperAdmin(updated._id)
+			};
 		},
 		{ body: UpdateAdminBody }
 	)

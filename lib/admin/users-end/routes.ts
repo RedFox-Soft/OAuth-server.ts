@@ -46,13 +46,16 @@ async function asAdmin<T>(operation: Promise<T>): Promise<T> {
 }
 
 /*
- * The one shape an end-user record takes on its way out of this server.
+ * The one shape an account record takes on its way out of this server — an end user's, and an
+ * administrator's too, since both are rows of a bucket's user store and an administrator can enrol an
+ * authenticator like anyone else. The administrator routes once stripped only the password by hand and
+ * so handed every administrator's authenticator secret to every super administrator and to the agent.
  *
  * Two fields never leave, and for different reasons. `password` is a hash nobody needs. `totp` is the
  * shared secret behind an authenticator, and unlike a password it cannot be hashed — TOTP verification
  * is symmetric, so the server has to hold something recoverable. That makes "it never appears in a
  * read" the whole of its protection, and the protection has to live in one function rather than at
- * each of the four call sites: a presenter somebody forgets on one route is exactly how every
+ * each call site: a presenter somebody forgets on one route is exactly how every
  * administrator came to be handed every bucket's federation secrets (lib/admin/buckets/routes.ts).
  *
  * What an operator legitimately needs — whether there is an authenticator, and since when — is derived

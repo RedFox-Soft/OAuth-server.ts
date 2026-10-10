@@ -11,8 +11,12 @@ import bootstrap from '../test_helper.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { getProjectStore, adminAuditStore } from 'lib/adapters/index.ts';
-import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import {
+	getProjectStore,
+	getUserStore,
+	adminAuditStore
+} from 'lib/adapters/index.ts';
+import { ADMIN_BUCKET_ID, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { ADMIN_MCP_CLIENT_ID, MCP_RESOURCE } from 'lib/mcp/consts.ts';
 import { mcpCatalogue } from 'lib/mcp/catalogue.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
@@ -41,7 +45,13 @@ import { call, rpc } from './rpc.ts';
 const SECRETS = {
 	smtpPassword: 'SECRET-smtp-pw-2f9a',
 	providerSecret: 'SECRET-provider-cs-7b31',
-	endUserPassword: 'SECRET-enduser-pw-c04d'
+	endUserPassword: 'SECRET-enduser-pw-c04d',
+	/*
+	 * An administrator's authenticator secret. TOTP is symmetric, so it is stored recoverable and is
+	 * the one secret an account record carries; an administrator enrolled is what makes a projection
+	 * that forgets it visible here.
+	 */
+	adminTotpSecret: 'SECRETADMINTOTPMARKERJBSWY3DP'
 };
 
 const NEWLINE = String.fromCharCode(10);
@@ -130,6 +140,18 @@ async function seedSecretHolders(token: string) {
 		Type.Object({ _id: Type.String() }),
 		bucket.result?.structuredContent?.result
 	);
+
+	const enrolled = await createAdministrator(
+		'plain',
+		`totp-holder-${Math.random()}@x.io`
+	);
+	await getUserStore(ADMIN_BUCKET_ID).update(enrolled._id, {
+		totp: {
+			secret: SECRETS.adminTotpSecret,
+			enrolledAt: new Date(),
+			lastStep: 0
+		}
+	});
 
 	await rpc(
 		call('bucket_user_create', {
