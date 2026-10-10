@@ -165,6 +165,13 @@ export const STORE_AREAS = {
 	/* Recorded internal server faults, grouped by fingerprint. */
 	errorStore: 'errorStore',
 	/*
+	 * Who was active in which bucket in which UTC month and day (specs/076): one record per person per
+	 * period, so a person is counted once however often they are active. Expires on its own.
+	 */
+	activityMarks: 'activityMarks',
+	/* The frozen figure of every ended period, deleted buckets' tombstones and the counting-since sentinel. */
+	activityFigures: 'activityFigures',
+	/*
 	 * The database's own account of which schema migrations it has had. One record per applied
 	 * migration, and the only thing that makes "is this deployment current?" answerable without
 	 * inspecting the data a migration would have changed.
@@ -757,6 +764,34 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 			{ key: { 'samples.clientId': 1, lastSeenAt: 1 } },
 			{ key: { 'samples.reference': 1 } }
 		]
+	),
+	/*
+	 * Unowned, and that is what keeps the history: an area naming an account owner is swept by
+	 * `cascadeForAccount` on every end-user deletion and every bucket deletion, and a month in which a
+	 * deleted person was active must still count them (FR-009). The bucket delete route does not sweep it
+	 * either, deliberately (FR-011).
+	 *
+	 * Reaped on `expiresAt`: thirteen months after a month ends, forty days after a day ends (FR-021).
+	 */
+	storeArea(
+		STORE_AREAS.activityMarks,
+		EXPIRES_AT,
+		unowned(
+			'evidence of how many people used a bucket; deleting a person must not change a month they counted in'
+		),
+		[{ key: { bucketId: 1, period: 1 } }, { key: { period: 1, bucketId: 1 } }]
+	),
+	/*
+	 * Permanent: a frozen figure is what a future invoice is computed from, and it outlives both the marks
+	 * it was counted from and the bucket itself. Never swept by the bucket delete route, for that reason.
+	 */
+	storeArea(
+		STORE_AREAS.activityFigures,
+		null,
+		unowned(
+			'the usage history of a bucket, kept after the bucket and its people are gone'
+		),
+		[{ key: { type: 1, bucketId: 1, period: 1 } }]
 	),
 	storeArea(
 		STORE_AREAS.serviceConfig,

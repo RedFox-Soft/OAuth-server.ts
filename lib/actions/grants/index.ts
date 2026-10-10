@@ -3,6 +3,7 @@ import type { TokenParams } from 'lib/actions/token.js';
 import { t } from 'elysia';
 import { UnsupportedGrantType } from 'lib/helpers/errors.js';
 import { eventBus } from 'lib/event_bus.js';
+import { noteActivity } from 'lib/activity/note.js';
 import { TokenResponse } from 'lib/shared/response_schemas.js';
 
 // Body every grant handler resolves to (RFC 6749 §5.1), varying by grant_type — see TokenResponse.
@@ -93,6 +94,12 @@ export async function executeGrant(
 		throw new UnsupportedGrantType();
 	}
 	const res: TokenResponseBody = await grant(oidc, dPoP);
+	/*
+	 * The one place activity is recorded: every token issued on a person's behalf is minted by a grant that
+	 * resolves here. Synchronous and never failing — see lib/activity/note.ts for why it is a call, not a
+	 * listener on the event below.
+	 */
+	noteActivity(oidc);
 	eventBus.emit('grant.success', oidc);
 	return res;
 }

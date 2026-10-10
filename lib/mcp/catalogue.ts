@@ -58,6 +58,10 @@ import {
 } from '../admin/groups/schema.js';
 import { ErrorQuery, ErrorSummaryQuery } from '../admin/errors/schema.js';
 import {
+	ActivityOverviewQuery,
+	BucketActivityQuery
+} from '../admin/activity/schema.js';
+import {
 	AssignConnectionBody,
 	CreateConnectionBody,
 	IssueCredentialBody,
@@ -345,6 +349,32 @@ const catalogue = [
 		pathParams: ['id'],
 		summary:
 			'One user bucket: its name, owning group, and registration and verification settings. Its groups of end users are read with bucket_group_list.'
+	},
+	{
+		tool: 'bucket_activity_get',
+		method: 'GET',
+		path: '/admin/api/buckets/:id/activity',
+		action: null,
+		consequence: 'read',
+		superAdminOnly: false,
+		bodySchema: null,
+		querySchema: BucketActivityQuery,
+		pathParams: ['id'],
+		summary:
+			"Read a user bucket's monthly active users: this month so far, each day of the month and the previous 12 months, in total and by kind of activity (local sign-in, upstream sign-in, renewal) and directory-provisioned accounts. Counts only, never who."
+	},
+	{
+		tool: 'activity_overview',
+		method: 'GET',
+		path: '/admin/api/activity',
+		action: null,
+		consequence: 'read',
+		superAdminOnly: true,
+		bodySchema: null,
+		querySchema: ActivityOverviewQuery,
+		pathParams: [],
+		summary:
+			'List every user bucket on the instance with its monthly active users for a month and the month before, including the default and administrators buckets and deleted buckets. Super administrators only.'
 	},
 	{
 		tool: 'bucket_user_list',

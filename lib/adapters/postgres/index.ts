@@ -42,3 +42,4 @@ export {
 
 export { close, ping, sql } from './db.js';
 export { ContainerOwnershipStore } from './containerOwnershipStore.js';
+export { ActivityStore } from './activityStore.js';

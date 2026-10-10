@@ -69,6 +69,14 @@ export async function findAccount<
 
 	return {
 		accountId: sub,
+		/*
+		 * The bucket this account was read from, and whether a directory provisioned it. Carried for the
+		 * activity recorder (lib/activity/note.ts): the bucket is resolved here, once, and read there rather
+		 * than re-derived — two derivations of "which population is this" are how a token's root-served
+		 * `bucketId` would put the console's administrators into the default bucket's figure.
+		 */
+		bucketId,
+		provisioned: user.provisionedBy !== undefined,
 		// @param use {string} - "id_token" or "userinfo"; the provider masks the
 		//   returned claims by granted scope automatically. Any extra claims stored
 		//   on the record (profile, distributed/aggregated) are merged in.

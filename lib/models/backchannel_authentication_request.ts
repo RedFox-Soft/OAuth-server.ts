@@ -5,7 +5,7 @@ import {
 	SessionBoundPayload
 } from './base_token.js';
 import consumable, { ConsumedPayload } from './mixins/consumable.ts';
-import { authPayloadModel } from './mixins/stores_auth.js';
+import { authPayloadModel, signInPayload } from './mixins/stores_auth.js';
 import { StoredParams } from './stored_params.ts';
 import { ttl } from '../configs/liveTime.js';
 
@@ -13,6 +13,7 @@ export const BackchannelAuthenticationRequestPayload = t.Object({
 	...BaseTokenPayload.properties,
 	...SessionBoundPayload.properties,
 	...authPayloadModel.properties,
+	...signInPayload.properties,
 	consumed: ConsumedPayload,
 	error: t.Optional(t.String()),
 	errorDescription: t.Optional(t.String()),

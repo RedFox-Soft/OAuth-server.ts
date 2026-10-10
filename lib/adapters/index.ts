@@ -8,6 +8,7 @@ import {
 	ProvisioningConnectionStore as MemoryProvisioningConnectionStore,
 	BucketGroupStore as MemoryBucketGroupStore,
 	ContainerOwnershipStore as MemoryContainerOwnershipStore,
+	ActivityStore as MemoryActivityStore,
 	BucketKeysStore as MemoryBucketKeysStore,
 	McpClientPermissionStore as MemoryMcpClientPermissionStore,
 	UserBucketStore as MemoryUserBucketStore,
@@ -22,6 +23,8 @@ import {
 	configStore as memoryConfig
 } from './memory/index.js';
 import type {
+	ActivityStoreConstructor,
+	ActivityStoreInstance,
 	AdapterConfigStore,
 	AdminAuditStoreConstructor,
 	AdminAuditStoreInstance,
@@ -85,6 +88,7 @@ let ContainerOwnershipStoreClass: ContainerOwnershipStoreConstructor =
 	MemoryContainerOwnershipStore;
 let McpClientPermissionStoreClass: McpClientPermissionStoreConstructor =
 	MemoryMcpClientPermissionStore;
+let ActivityStoreClass: ActivityStoreConstructor = MemoryActivityStore;
 let BucketStoreClass: UserBucketStoreConstructor = MemoryUserBucketStore;
 let AdminSessionStoreClass: AdminSessionStoreConstructor =
 	MemoryAdminSessionStore;
@@ -121,6 +125,7 @@ if (backend === 'postgres') {
 	ProvisioningConnectionStoreClass = postgres.ProvisioningConnectionStore;
 	BucketGroupStoreClass = postgres.BucketGroupStore;
 	ContainerOwnershipStoreClass = postgres.ContainerOwnershipStore;
+	ActivityStoreClass = postgres.ActivityStore;
 	BucketKeysStoreClass = postgres.BucketKeysStore;
 	McpClientPermissionStoreClass = postgres.McpClientPermissionStore;
 	BucketStoreClass = postgres.UserBucketStore;
@@ -154,6 +159,7 @@ if (backend === 'mongodb') {
 	ProvisioningConnectionStoreClass = mongodb.ProvisioningConnectionStore;
 	BucketGroupStoreClass = mongodb.BucketGroupStore;
 	ContainerOwnershipStoreClass = mongodb.ContainerOwnershipStore;
+	ActivityStoreClass = mongodb.ActivityStore;
 	BucketKeysStoreClass = mongodb.BucketKeysStore;
 	McpClientPermissionStoreClass = mongodb.McpClientPermissionStore;
 	BucketStoreClass = mongodb.UserBucketStore;
@@ -414,6 +420,21 @@ export function getContainerOwnershipStore(): ContainerOwnershipStoreInstance {
 		projects: getProjectStore()
 	});
 	return containerOwnershipStoreSingleton;
+}
+
+/*
+ * Monthly and daily active users per bucket (specs/076). Written fire-and-forget from every successful user
+ * grant, read by the activity admin routes and the closer.
+ */
+let activityStoreSingleton: ActivityStoreInstance | null = null;
+export function getActivityStore(): ActivityStoreInstance {
+	activityStoreSingleton ??= new ActivityStoreClass();
+	return activityStoreSingleton;
+}
+
+/* Test-only: a fresh in-memory activity store, so a spec that counts from zero is not given another's marks. */
+export function resetActivityStore(): void {
+	activityStoreSingleton = null;
 }
 
 let bucketStoreSingleton: UserBucketStoreInstance | null = null;

@@ -5,13 +5,14 @@ import {
 	SessionBoundPayload
 } from './base_token.js';
 import consumable, { ConsumedPayload } from './mixins/consumable.js';
-import { authPayloadModel } from './mixins/stores_auth.js';
+import { authPayloadModel, signInPayload } from './mixins/stores_auth.js';
 import { ttl } from '../configs/liveTime.js';
 
 export const AuthorizationCodePayload = t.Object({
 	...BaseTokenPayload.properties,
 	...SessionBoundPayload.properties,
 	...authPayloadModel.properties,
+	...signInPayload.properties,
 	codeChallenge: t.Optional(t.String()),
 	codeChallengeMethod: t.Optional(t.Literal('S256')),
 	redirectUri: t.Optional(t.String({ format: 'uri' })),

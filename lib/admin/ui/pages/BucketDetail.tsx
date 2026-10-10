@@ -18,6 +18,7 @@ import { ArrowLeftOutlined, PlusOutlined } from '@ant-design/icons';
 import type { UserBucket, User } from '../../../adapters/types.js';
 import { FederationPanel } from './FederationPanel.js';
 import { BucketKeysPanel } from './BucketKeysPanel.js';
+import { BucketActivityPanel } from './BucketActivityPanel.js';
 import { UserIdentities } from './UserIdentities.js';
 import { ProvisioningPanel, type ConnectionView } from './ProvisioningPanel.js';
 import { BucketGroupsPanel, type GroupView } from './BucketGroupsPanel.js';
@@ -610,6 +611,8 @@ export function BucketDetail({
 			/>
 
 			<BucketKeysPanel bucketId={bucketId} />
+
+			<BucketActivityPanel bucketId={bucketId} />
 
 			<UserIdentities
 				bucketId={bucketId}

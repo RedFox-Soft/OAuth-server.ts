@@ -2,6 +2,7 @@ import { STORE_AREAS } from '../lib/consts/storage_inventory.js';
 import { verifyEndUserIdentity } from './verify_end_user_identity.js';
 import { verifyProvisioningConnections } from './verify_provisioning_connections.js';
 import { verifyBucketGroups } from './verify_bucket_groups.js';
+import { verifyActivity } from './verify_activity.js';
 import {
 	verifyContainerOwnership,
 	verifyPersonalGroupRepair
@@ -37,6 +38,7 @@ delete process.env.POSTGRES_URL;
 
 /* After the guard, for the reason verify_postgres.ts gives: importing the adapters connects. */
 const {
+	ActivityStore,
 	AdminAuditStore,
 	BucketGroupStore,
 	BucketKeysStore,
@@ -348,6 +350,19 @@ for (const line of roleReport) console.log(`       ${line}`);
 for (const line of await verifyBucketGroups(bucketGroupStore, check)) {
 	console.log(`       ${line}`);
 }
+
+/*
+ * Monthly and daily active users per bucket (specs/076). MongoDB's TTL monitor runs on its own schedule and
+ * cannot be asked to, so reclamation here is the TTL index on `expiresAt` being in place.
+ */
+await verifyActivity(
+	new ActivityStore(),
+	async () =>
+		(await db.collection(STORE_AREAS.activityMarks).indexes()).some(
+			(index) => index.key.expiresAt === 1 && index.expireAfterSeconds === 0
+		),
+	check
+);
 
 /* Moving containers between groups, and making personal groups personal again (specs/075). */
 {

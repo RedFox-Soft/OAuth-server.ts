@@ -5,6 +5,7 @@ import { deviceSuccessPage } from '../../html/device.js';
 import { expiresWithSession } from '../../addon/index.js';
 import { eventBus } from '../../event_bus.js';
 import { includeSid } from 'lib/models/client.js';
+import { signInOf } from '../../activity/kinds.js';
 
 export default async function deviceVerificationResponse(
 	oidc: OIDCContext<PipelineParams>
@@ -28,7 +29,9 @@ export default async function deviceVerificationResponse(
 		scope: [...scopeSet].join(' '),
 		sessionUid: oidc.session.payload.uid,
 		// One resource is recorded as itself, several as the list, none not at all.
-		resource: resources.length > 1 ? resources : resources[0]
+		resource: resources.length > 1 ? resources : resources[0],
+		/* Whether this approval signed the person in, for the activity it counts as (specs/076). */
+		signIn: signInOf(oidc)
 	});
 
 	if (Object.keys(code.payload.claims ?? {}).length === 0) {

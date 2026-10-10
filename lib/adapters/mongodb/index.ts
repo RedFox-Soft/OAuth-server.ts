@@ -19,3 +19,4 @@ export { SingletonSecretStore } from './singletonSecretStore.js';
 export { SchemaMigrationStore } from './schemaMigrationStore.js';
 export { MigrationLeaseStore } from './migrationLeaseStore.js';
 export { ContainerOwnershipStore } from './containerOwnershipStore.js';
+export { ActivityStore } from './activityStore.js';

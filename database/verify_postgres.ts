@@ -8,6 +8,7 @@ import { member } from '../lib/helpers/_/object.js';
 import { verifyEndUserIdentity } from './verify_end_user_identity.js';
 import { verifyProvisioningConnections } from './verify_provisioning_connections.js';
 import { verifyBucketGroups } from './verify_bucket_groups.js';
+import { verifyActivity } from './verify_activity.js';
 import {
 	verifyContainerOwnership,
 	verifyPersonalGroupRepair
@@ -69,6 +70,7 @@ if (!THROWAWAY.test(database)) {
  * both connection strings set — before this script had a chance to reject the database name.
  */
 const {
+	ActivityStore,
 	AdminAuditStore,
 	BucketGroupStore,
 	BucketKeysStore,
@@ -776,6 +778,19 @@ await verifyProvisioningConnections(new ProvisioningConnectionStore(), check);
 		console.log(`       ${line}`);
 	}
 }
+
+/* Monthly and daily active users per bucket (specs/076). */
+await verifyActivity(
+	new ActivityStore(),
+	async (markId) => {
+		await sweepOnce();
+		const rows = await handle`
+			SELECT id FROM ${handle(STORE_AREAS.activityMarks)} WHERE id = ${markId}
+		`;
+		return rows.length === 0;
+	},
+	check
+);
 
 /* Moving containers between groups, and making personal groups personal again (specs/075). */
 {

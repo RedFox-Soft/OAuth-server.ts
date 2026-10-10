@@ -1819,3 +1819,148 @@ export interface AdminSessionStoreInstance {
 export interface AdminSessionStoreConstructor {
 	new (): AdminSessionStoreInstance;
 }
+
+/*
+ * Monthly and daily active users per bucket (specs/076). How a counted activity happened: a sign-in at this
+ * server, a sign-in through an upstream identity provider, or tokens issued without a fresh sign-in.
+ */
+export const ACTIVITY_KINDS = ['local', 'federated', 'renewal'] as const;
+export const ActivityKind = t.Union([
+	t.Literal('local'),
+	t.Literal('federated'),
+	t.Literal('renewal')
+]);
+export type ActivityKind = Static<typeof ActivityKind>;
+
+const ActivityGranularity = t.Union([t.Literal('month'), t.Literal('day')]);
+
+/*
+ * One person active in one bucket in one period. The `_id` is `${bucketId}|${period}|${accountId}`, so a
+ * second activity in the period finds the record the first wrote and only adds its kind to `kinds`.
+ *
+ * Holds the account id and nothing else about the person: no name, no email, no address, no application
+ * (FR-021). `provisioned` is the value at the first activity in the period and is never rewritten.
+ */
+export const ActivityMarkRecord = t.Object({
+	_id: t.String(),
+	bucketId: t.String(),
+	period: t.String(),
+	granularity: ActivityGranularity,
+	accountId: t.String(),
+	kinds: t.Array(ActivityKind),
+	provisioned: t.Boolean(),
+	expiresAt: t.Date()
+});
+export type ActivityMarkRecord = Static<typeof ActivityMarkRecord>;
+
+const ActivityByKind = t.Object({
+	local: t.Number(),
+	federated: t.Number(),
+	renewal: t.Number()
+});
+
+/* What a period counted. Each kind counts the distinct accounts with that kind, so they may sum past `total`. */
+export const ActivityTally = t.Object({
+	total: t.Number(),
+	byKind: ActivityByKind,
+	provisioned: t.Number()
+});
+export type ActivityTally = Static<typeof ActivityTally>;
+
+/* An ended period's figure. Written once, insert-if-absent, and never updated or deleted. */
+export const ActivityFigure = t.Object({
+	_id: t.String(),
+	type: t.Literal('figure'),
+	bucketId: t.String(),
+	period: t.String(),
+	granularity: ActivityGranularity,
+	total: t.Number(),
+	byKind: ActivityByKind,
+	provisioned: t.Number(),
+	bucketName: t.String(),
+	bucketSlug: t.Optional(t.String()),
+	frozenAt: t.Date()
+});
+export type ActivityFigure = Static<typeof ActivityFigure>;
+
+/* A deleted bucket, kept so its history stays listable once no loader can find the bucket itself. */
+export const ActivityTombstone = t.Object({
+	_id: t.String(),
+	type: t.Literal('tombstone'),
+	bucketId: t.String(),
+	bucketName: t.String(),
+	bucketSlug: t.Optional(t.String()),
+	createdAt: t.Date(),
+	deletedAt: t.Date()
+});
+export type ActivityTombstone = Static<typeof ActivityTombstone>;
+
+/* The instant this instance began counting; a period before it is absent rather than zero (FR-015). */
+export const ActivitySentinel = t.Object({
+	_id: t.Literal('countingSince'),
+	type: t.Literal('sentinel'),
+	at: t.Date()
+});
+export type ActivitySentinel = Static<typeof ActivitySentinel>;
+
+export interface ActivityMarkInput {
+	bucketId: string;
+	accountId: string;
+	kind: ActivityKind;
+	provisioned: boolean;
+	at: Date;
+}
+
+export interface ActivityBucketSnapshot {
+	_id: string;
+	name: string;
+	slug?: string;
+	createdAt: Date;
+}
+
+export interface ActivityStoreInstance {
+	/*
+	 * The month's mark and the day's mark for one activity: two single-record upserts that set every field on
+	 * insert and add `kind` to the set. Idempotent, so a repeated or concurrent call changes nothing more.
+	 */
+	mark(input: ActivityMarkInput): Promise<void>;
+	/* An open period, counted from its marks; marks past their expiry are not counted. */
+	count(bucketId: string, period: string, at: Date): Promise<ActivityTally>;
+	/* Every bucket with marks in the period, counted. */
+	countPeriod(period: string, at: Date): Promise<Map<string, ActivityTally>>;
+	/* The buckets with at least one unexpired mark in the period: the closer's work list for it. */
+	bucketsWithMarks(period: string, at: Date): Promise<string[]>;
+	/*
+	 * Counts the period and stores the result insert-if-absent, returning whichever figure is stored. The
+	 * first writer wins, which is why a closed figure never changes (FR-007).
+	 */
+	freeze(
+		bucketId: string,
+		period: string,
+		bucket: Pick<ActivityBucketSnapshot, 'name' | 'slug'>,
+		at: Date
+	): Promise<ActivityFigure>;
+	figure(bucketId: string, period: string): Promise<ActivityFigure | null>;
+	/* One bucket's figures of a granularity with `from <= period <= to`. */
+	figures(
+		bucketId: string,
+		granularity: 'month' | 'day',
+		from: string,
+		to: string
+	): Promise<ActivityFigure[]>;
+	figuresForPeriod(period: string): Promise<ActivityFigure[]>;
+	/*
+	 * A bucket is being deleted. Writes its tombstone first, insert-if-absent, and throws if it cannot: the
+	 * deletion must not begin without it (FR-011). Then freezes the open month and day; a failure there is
+	 * logged and swallowed, because the marks remain and the closer freezes those periods later.
+	 */
+	retire(bucket: ActivityBucketSnapshot, at: Date): Promise<void>;
+	tombstone(bucketId: string): Promise<ActivityTombstone | null>;
+	tombstones(): Promise<ActivityTombstone[]>;
+	/* Insert-if-absent with `at`, then the stored instant. */
+	countingSince(at: Date): Promise<Date>;
+}
+
+export interface ActivityStoreConstructor {
+	new (): ActivityStoreInstance;
+}

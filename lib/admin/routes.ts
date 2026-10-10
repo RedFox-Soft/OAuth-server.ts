@@ -24,6 +24,7 @@ import { jwksRoutes } from './jwks/routes.js';
 import { bucketKeyRoutes } from './bucket_keys/routes.js';
 import { auditRoutes } from './audit/routes.js';
 import { errorRoutes } from './errors/routes.js';
+import { activityRoutes } from './activity/routes.js';
 
 /*
  * Every route of the administrative control plane except the console's own HTML shell.
@@ -81,4 +82,5 @@ export const adminApiRoutes = new Elysia({ name: 'admin-api' })
 	.use(jwksRoutes)
 	.use(bucketKeyRoutes)
 	.use(auditRoutes)
-	.use(errorRoutes);
+	.use(errorRoutes)
+	.use(activityRoutes);

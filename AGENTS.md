@@ -180,9 +180,12 @@ Each rule is the part that is easy to break. Read the named page before changing
   them; a bound provider's unlinked sign-in correlates by the connection's rule and never reaches the email
   steps; SCIM routes render their own errors and are rate-limited per connection, not per origin; every
   request-format tolerance sits behind `scim.strict`. → `scim-provisioning.md`
-- **Error store** — only defects (5xx) are recorded, from four capture sites; recording never blocks a
+- **Error store** — only defects (5xx) are recorded, from seven capture sites; recording never blocks a
   request; the read surface is not flag-gated. → `error-store-capture-sites.md`,
   `error-store-is-not-flag-gated.md`
+- **Monthly active users** — recorded only in `executeGrant`, by `noteActivity`, never awaited; the bucket
+  is the one `findAccount` resolved, never the token's `bucketId`; marks and figures are unowned and never
+  swept, and a frozen figure is never rewritten. → `monthly-active-users.md`
 - **Sentry** — reporting is off the request path: `lib/sentry/` mounts nothing into Elysia, and
   `@sentry/elysia` is deliberately not a dependency. → `sentry-plugin-not-used.md`
 - **Interaction screens** — a page is either the antd shell (inside an interaction) or plain and

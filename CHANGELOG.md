@@ -21,6 +21,13 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   action in the console and the `high` MCP tools `bucket_owner_change` / `project_owner_change`. It needs an
   owner of the group left and a member of the group joined; a call without `confirm` previews what moves;
   end users, clients and sign-in addresses are untouched, and the audit entry is read by both groups. Spec 075.
+- Monthly and daily active users per bucket, the default and administrators buckets included: every
+  person a bucket issued tokens to, counted once per UTC month and day and broken down into local sign-in,
+  upstream sign-in, renewal and directory-provisioned. A closed period is frozen and never changes, and the
+  history survives deleting people and the bucket itself. Read on the bucket's page and on a super-admin
+  **Usage** page, through `GET /admin/api/buckets/:id/activity` and `GET /admin/api/activity`, and by the MCP
+  tools `bucket_activity_get` / `activity_overview`. Re-run `bun run db:setup` / `db:setup:pg` for the new
+  `activityMarks` and `activityFigures` areas. Spec 076.
 - `eventBus` is typed: `ServerEvents`, `ServerEventName` and `ServerListener` are exported from the
   package entry, so a subscriber to an event the server does not emit, or one expecting arguments it does
   not pass, fails to compile instead of never running.

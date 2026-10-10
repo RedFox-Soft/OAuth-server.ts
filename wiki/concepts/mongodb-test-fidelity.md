@@ -4,7 +4,7 @@ title: 'Testing the MongoDB adapter: two tiers, and why the default suite stays 
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-26
-updated: 2026-09-28
+updated: 2026-10-10
 ---
 
 # Testing the MongoDB adapter: two tiers, and why the default suite stays hermetic
@@ -129,6 +129,18 @@ it — a record the TTL monitor still reaps on the old schedule.
 The rule the fidelity suite enforces is the one `lib/consts/storage_inventory.ts` already applies to
 `reaped: null` and `owners.reason`: a difference is either converged or written down with a reason.
 A divergence nobody decided about is the defect; a divergence someone declared is a contract.
+
+## The Stable API refuses commands outside Version 1
+
+The MongoDB client connects with `serverApi: { version: '1', strict: true }` (`lib/adapters/mongodb/db.ts:9-15`),
+so the server **refuses** any command that is not in Stable API Version 1 — `distinct` is the one that bit:
+`Provided apiStrict:true, but the command distinct is not in API Version 1`. No in-memory test can see this,
+and a fidelity check only sees it if it calls the method. Spec 076 shipped `bucketsWithMarks` as
+`collection.distinct(...)`; every hermetic test and the first fidelity run passed, and the first super
+administrator to open the Usage page got a 500 — as would the hourly closer, on every pass. It is a `$group`
+now (`lib/adapters/mongodb/activityStore.ts`), and `database/verify_activity.ts` calls it. Use `aggregate`
+for distinct values and counts (`countDocuments` is itself an aggregation and is fine); a new MongoDB
+store method needs a line in a `verify_*` script, not only a hermetic test.
 
 ## Why this matters
 

@@ -4,7 +4,7 @@ title: "Account resolution (findAccount)"
 tags: [contract, architecture, oidc]
 sources: [oauth-server-codebase]
 created: 2026-07-31
-updated: 2026-10-06
+updated: 2026-10-10
 graph:
   node_type: concept
   relationships:
@@ -74,6 +74,15 @@ caller that could omit it would resolve against every tenant's declarations agai
 The fallback is required because `oidc.client` may not be populated on the token and userinfo flows.
 The token side of that expression is also a concrete instance of
 [[token-payload-access-contract]] — `_token.payload.clientId`, never `_token.clientId`.
+
+## The account carries the bucket it was read from
+
+Since 2026-10-10 (spec 076) the returned account also carries `bucketId` — the bucket resolved above — and
+`provisioned`, whether a directory created it (`lib/addon/account.ts:78-79`). The activity recorder reads
+them instead of deriving the population again ([[monthly-active-users]]): a second derivation is how a
+console session reused at the root, whose token records the default bucket, would have counted an
+administrator in the default bucket's figure. An overriding resolver must return both; the `Account` type is
+derived from this function's return, so the compiler says so.
 
 ## Active status is enforced at every resolution, not just at login
 

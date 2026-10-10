@@ -82,7 +82,12 @@ const REAPED_ON_EXPIRES_AT = [
 	 * last seen. Reaping on first-seen would delete the longest-running faults first, which is exactly
 	 * backwards for the one area whose purpose is to show what keeps breaking.
 	 */
-	'errorStore'
+	'errorStore',
+	/*
+	 * Who was active in which period. Expiry is the control rather than housekeeping: a mark that never
+	 * expired would be a permanent record of who used which bucket on which day (FR-021).
+	 */
+	'activityMarks'
 ];
 
 const PERMANENT = [
@@ -133,6 +138,11 @@ const PERMANENT = [
 	 * would only notice by an agent working again that should not.
 	 */
 	'mcpClientPermissions',
+	/*
+	 * A bucket's frozen usage figures. An expiry here would erase the history a future invoice is computed
+	 * from, and a closed month whose figure vanished could not be counted again: its marks are gone too.
+	 */
+	'activityFigures',
 	'serviceConfig',
 	USER_AREA_PREFIX
 ];

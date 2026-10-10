@@ -6,6 +6,7 @@ import { AuthorizationCode } from 'lib/models/authorization_code.js';
 import { expiresWithSession, rarForAuthorizationCode } from '../addon/index.js';
 import { includeSid } from '../models/client/checks.ts';
 import { isRecord } from './_/object.ts';
+import { signInOf } from '../activity/kinds.js';
 
 async function codeHandler(oidc: OIDCContext<PipelineParams>) {
 	const grant = oidc.require('Grant');
@@ -35,7 +36,9 @@ async function codeHandler(oidc: OIDCContext<PipelineParams>) {
 		resource: resources.length > 1 ? resources : resources[0],
 		scope: [...scopeSet].join(' '),
 		sessionUid: oidc.session.payload.uid,
-		dpopJkt: oidc.params.dpop_jkt
+		dpopJkt: oidc.params.dpop_jkt,
+		/* Whether this authorization signed the person in, for the activity it counts as (specs/076). */
+		signIn: signInOf(oidc)
 	});
 
 	/*

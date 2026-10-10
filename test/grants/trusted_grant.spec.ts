@@ -20,6 +20,8 @@ async function requestFor(clientId: string, accountId: string) {
 	// loadExistingGrant reads only the id; the claims are the shape an account resolves to.
 	oidc.entity('Account', {
 		accountId,
+		bucketId: DEFAULT_REQUEST_BUCKET._id,
+		provisioned: false,
 		claims: async () => ({
 			sub: accountId,
 			email: `${accountId}@example.com`,

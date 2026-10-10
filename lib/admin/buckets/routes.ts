@@ -1,5 +1,6 @@
 import { Elysia } from 'elysia';
 import {
+	getActivityStore,
 	getBucketKeysStore,
 	getBucketStore,
 	getBucketGroupStore,
@@ -56,6 +57,7 @@ import {
 } from '../../consts/request_host.js';
 import { ApplicationConfig } from '../../configs/application.js';
 import { ISSUER } from '../../configs/env.js';
+import { now } from '../../activity/clock.js';
 import {
 	forgetBucketAddresses,
 	isCanonicalHost
@@ -700,6 +702,37 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			 * already-computed id in `cascadeForAccount`'s signature is what makes that ordering
 			 * impossible to get wrong here.
 			 */
+			/*
+			 * The bucket's usage history is kept (specs/076, FR-011): its tombstone first, before anything is
+			 * destroyed, because without it a deleted bucket's figures could never be listed again — no loader
+			 * finds the bucket once it is gone. If it cannot be written the deletion does not begin, which is
+			 * the one moment refusing is clean; a repeated request finds the tombstone and proceeds. The open
+			 * month and day are frozen in the same call, best effort — the closer catches up.
+			 *
+			 * Neither activity area is swept below, deliberately: they hold evidence of how many people used
+			 * the bucket, and deleting the bucket must not erase it.
+			 */
+			try {
+				await getActivityStore().retire(
+					{
+						_id: bucket._id,
+						name: bucket.name,
+						...(bucket.slug === undefined ? {} : { slug: bucket.slug }),
+						createdAt: bucket.createdAt
+					},
+					now()
+				);
+			} catch (error) {
+				console.error("activity: could not keep a deleted bucket's history", {
+					bucketId: params.id,
+					error
+				});
+				throw new AdminError(
+					500,
+					"the bucket's usage history could not be kept; nothing was deleted"
+				);
+			}
+
 			const failedAreas: string[] = [];
 			for (const account of accounts) {
 				const scopedId = account.email

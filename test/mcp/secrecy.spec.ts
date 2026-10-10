@@ -351,6 +351,7 @@ describe('MCP surface leaks no secrets', () => {
 			client_list: { id: seeded.project._id },
 			client_get: { id: seeded.project._id, clientId: seeded.clientId },
 			bucket_get: { id: seeded.bucketId },
+			bucket_activity_get: { id: seeded.bucketId },
 			bucket_user_list: { id: seeded.bucketId },
 			federation_provider_list: { id: seeded.bucketId }
 		};

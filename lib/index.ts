@@ -61,6 +61,7 @@ import { federationRoutes } from './federation/routes.js';
 import { initSentry } from './sentry/client.js';
 import { reportStartupFailure } from './sentry/startup.js';
 import { rootKeys } from './keys/issuer_keys.js';
+import { startCloser } from './activity/closer.js';
 
 /*
  * Armed before the app is built, and deliberately not as a plugin.
@@ -275,6 +276,17 @@ await assertMigrationsCurrent();
  * algorithm lists that read its mirror.
  */
 await rootKeys();
+
+/*
+ * Freezes ended months' and days' active-user figures every hour (lib/activity/closer.ts). Started here, where
+ * importing the application is what boots it, rather than beside the PostgreSQL sweeper in
+ * lib/adapters/index.ts: the closer reads the bucket store, and starting it from inside the adapter module
+ * would make that module import a consumer of itself. Not under test, where a case closes periods itself on
+ * a clock it controls.
+ */
+if (process.env.NODE_ENV !== 'test') {
+	startCloser();
+}
 
 try {
 	elysia.listen(3000);

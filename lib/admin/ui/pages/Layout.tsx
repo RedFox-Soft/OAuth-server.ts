@@ -10,6 +10,7 @@ import {
 	KeyOutlined,
 	FileSearchOutlined,
 	BugOutlined,
+	LineChartOutlined,
 	RobotOutlined,
 	LogoutOutlined
 } from '@ant-design/icons';
@@ -24,6 +25,7 @@ import { Keys } from './Keys.js';
 import { McpClients } from './McpClients.js';
 import { Audit } from './Audit.js';
 import { Errors } from './Errors.js';
+import { Usage } from './Usage.js';
 
 const { Sider, Header, Content } = AntLayout;
 
@@ -36,7 +38,8 @@ type PageKey =
 	| 'keys'
 	| 'mcp-clients'
 	| 'audit'
-	| 'errors';
+	| 'errors'
+	| 'usage';
 
 export function Layout({ me }: { me: AdminContext | null }) {
 	const isSuperAdmin = me?.superAdmin === true;
@@ -70,7 +73,8 @@ export function Layout({ me }: { me: AdminContext | null }) {
 						icon: <RobotOutlined />,
 						label: 'Agent access'
 					},
-					{ key: 'errors', icon: <BugOutlined />, label: 'Faults' }
+					{ key: 'errors', icon: <BugOutlined />, label: 'Faults' },
+					{ key: 'usage', icon: <LineChartOutlined />, label: 'Usage' }
 				]
 			: [])
 	];
@@ -145,6 +149,15 @@ export function Layout({ me }: { me: AdminContext | null }) {
 			case 'errors':
 				return isSuperAdmin ? (
 					<Errors />
+				) : (
+					<Projects
+						isSuperAdmin={false}
+						ownedGroupIds={ownedGroupIds}
+					/>
+				);
+			case 'usage':
+				return isSuperAdmin ? (
+					<Usage />
 				) : (
 					<Projects
 						isSuperAdmin={false}

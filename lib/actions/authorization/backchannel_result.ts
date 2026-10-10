@@ -127,7 +127,13 @@ export async function backchannelResult(
 				authTime,
 				sessionUid,
 				expiresWithSession,
-				sid
+				sid,
+				/*
+				 * The deployment calling this is the one that authenticated the person on their own device, so a
+				 * completed back-channel request is a sign-in rather than a renewal (specs/076). It says nothing
+				 * of an upstream provider, so the sign-in is this server's.
+				 */
+				signIn: 'local'
 			});
 			break;
 		case result instanceof OIDCProviderError:
