@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Select, Typography } from 'antd';
+import { Select, Tooltip, Typography } from 'antd';
+import { InfoCircleOutlined } from '@ant-design/icons';
 import { groupLabel } from '../../groups/label.js';
 import { useFeedback } from '../frame/feedback.js';
 import { useMe } from '../frame/me.js';
@@ -15,6 +16,21 @@ export interface ScopeOption {
 	// Whether a personal group is the caller's own. Answered by the server, which is the only side that
 	// sees a group's members.
 	own: boolean;
+}
+
+/* The control's element id, so a creation dialog's "Change" can hand focus to it (specs/085). */
+export const SCOPE_SWITCHER_ID = 'scope-switcher';
+
+export function focusScopeSwitcher(): void {
+	document.getElementById(SCOPE_SWITCHER_ID)?.focus();
+}
+
+/*
+ * A group as the switcher and the Groups list name it. An operator's own personal group says that nobody
+ * else is in it, so it is not mistaken for a place to share things (specs/085).
+ */
+export function scopeOptionLabel(g: ScopeOption): string {
+	return g.kind === 'personal' && g.own ? 'Personal · Only you' : groupLabel(g);
 }
 
 interface ScopeView {
@@ -34,7 +50,8 @@ interface ScopeView {
 export function ScopeSwitcher() {
 	const [scope, setScope] = useState<ScopeView | null>(null);
 	const [switching, setSwitching] = useState(false);
-	const { reload } = useMe();
+	const { me, reload } = useMe();
+	const superAdmin = me?.superAdmin === true;
 	const navigate = useNavigate();
 	const { resolved } = useRoute();
 	const feedback = useFeedback();
@@ -64,21 +81,52 @@ export function ScopeSwitcher() {
 		await reload();
 	}
 
-	// Nothing to switch between: one scope, which the server has already picked. A super administrator
-	// is never in this case — the system group is always among the choices.
-	if (!scope || scope.available.length < 2) return null;
+	if (!scope) return null;
+	const active = scope.available.find((g) => g.id === scope.activeGroupId);
+	/*
+	 * Named by what it does (specs/085). A super administrator's lists show the whole instance whatever is
+	 * chosen, so for them the control only decides where new projects and buckets land; for everyone else it
+	 * is the group they are working in.
+	 */
+	const label = superAdmin ? (
+		<Typography.Text type="secondary">
+			Create in{' '}
+			<Tooltip title="Lists show the whole instance. This decides which group new projects and buckets are created in.">
+				<InfoCircleOutlined aria-label="What Create in means" />
+			</Tooltip>
+		</Typography.Text>
+	) : (
+		<Typography.Text type="secondary">Group</Typography.Text>
+	);
+
+	// One group: nothing to switch between, so its name is plain text.
+	if (scope.available.length < 2) {
+		return active ? (
+			<>
+				{label}
+				<Typography.Text
+					id={SCOPE_SWITCHER_ID}
+					tabIndex={-1}
+				>
+					{scopeOptionLabel(active)}
+				</Typography.Text>
+			</>
+		) : null;
+	}
 
 	return (
 		<>
-			<Typography.Text type="secondary">Scope</Typography.Text>
+			{label}
 			<Select
+				id={SCOPE_SWITCHER_ID}
+				aria-label={superAdmin ? 'Create in' : 'Group'}
 				value={scope.activeGroupId}
 				loading={switching}
 				onChange={onChange}
 				style={{ minWidth: 200 }}
 				options={scope.available.map((g) => ({
 					value: g.id,
-					label: groupLabel(g)
+					label: scopeOptionLabel(g)
 				}))}
 			/>
 		</>

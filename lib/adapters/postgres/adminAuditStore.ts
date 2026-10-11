@@ -14,6 +14,7 @@ import {
 } from '../../helpers/admin_audit_query.js';
 import nanoid from '../../helpers/nanoid.js';
 import { member } from '../../helpers/_/object.js';
+import { CONNECTION_ACTOR_PREFIX } from '../../consts/admin_audit_routes.js';
 
 /*
  * Timestamps are compared as text, and that is deliberate rather than lazy.
@@ -27,6 +28,17 @@ import { member } from '../../helpers/_/object.js';
  */
 function isoBound(value: Date): string {
 	return value.toISOString();
+}
+
+/*
+ * Bound as a parameter rather than written into the statement, so no quoting rule of the driver or of
+ * `standard_conforming_strings` can turn the one backslash into two.
+ */
+const LIKE_ESCAPE = '\\';
+
+/* One pass, so the escapes added for `%` and `_` are not themselves escaped again. */
+function likeEscaped(text: string): string {
+	return text.replace(/[\\%_]/g, (c) => `${LIKE_ESCAPE}${c}`);
 }
 
 /*
@@ -57,6 +69,29 @@ function conditionsFor(handle: Sql, query: AdminAuditQuery) {
 	}
 	if (query.targetScope !== undefined) {
 		and(handle`doc->>'targetScope' = ${query.targetScope}`);
+	}
+	/*
+	 * A literal prefix: LIKE's own metacharacters are escaped, with the escape character named, so an
+	 * action filter of `bucket.key_` cannot match `bucket.keyX` here while matching nothing elsewhere.
+	 */
+	if (query.actionPrefix !== undefined) {
+		and(
+			handle`doc->>'action' LIKE ${`${likeEscaped(query.actionPrefix)}%`} ESCAPE ${LIKE_ESCAPE}`
+		);
+	}
+	/* Four arms — the bucket as the target, a target within it, a project joining it or leaving it. */
+	if (query.bucket !== undefined) {
+		const b = query.bucket;
+		and(
+			handle`((doc->>'targetType' = 'UserBucket' AND doc->>'targetId' = ${b}) OR doc->>'targetScope' = ${b} OR doc->>'bucketId' = ${b} OR doc->>'formerBucketId' = ${b})`
+		);
+	}
+	/* What a directory did under its own credential, and what administrators did to its connection. */
+	if (query.connection !== undefined) {
+		const c = query.connection;
+		and(
+			handle`(doc->>'actorId' = ${`${CONNECTION_ACTOR_PREFIX}${c}`} OR (doc->>'targetType' = 'ProvisioningConnection' AND doc->>'targetId' = ${c}))`
+		);
 	}
 
 	/*

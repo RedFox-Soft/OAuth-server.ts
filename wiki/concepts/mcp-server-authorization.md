@@ -58,6 +58,13 @@ their own may declare the same URL, and a request at one never reaches — or le
 it gets the `invalid_target` an undeclared identifier gets. `test/resources/namespace_resolution.spec.ts`
 is the case.
 
+**Reading a bucket's namespace (spec 085).** Two projects of one bucket share its namespace, so one project's
+declaration can block another's. `GET /admin/api/buckets/:id/resources` (MCP `bucket_resource_list`) lists the
+namespace's declarations with the project that made each. It is built from the bucket's projects and needs no
+store read by namespace. For a bucket served at the root it lists only that bucket's own projects, because the
+rest of `@root` belongs to other tenants. The console shows it on the bucket's Overview, and a project's
+Resources tab names the namespace its declarations live in.
+
 Canonicalization is one function used by *both* sides — declaration and request — which is what makes
 them unable to disagree. `resourceIdentifierMatches` takes the same options as
 `canonicalizeResourceIdentifier`, and that parameter is not decoration: without it the declaration's

@@ -19,6 +19,7 @@ import { sectionHref, type PageKey, type Section } from '../frame/routes.js';
 import { InstanceOnly, NotFound } from '../frame/states.js';
 import { BucketDetail, type BucketTab } from './BucketDetail.js';
 import { ProjectWorkspace } from './ProjectWorkspace.js';
+import { AdminGroupPage } from './groups/AdminGroupPage.js';
 import { UserPage, type UserTab } from './users/UserPage.js';
 import { ProviderPage } from './providers/ProviderPage.js';
 import {
@@ -41,6 +42,12 @@ import { Audit } from './Audit.js';
 import { Errors } from './Errors.js';
 import { Usage } from './Usage.js';
 import { ADMIN_BUCKET_ID } from '../../consts.js';
+
+const PROJECT_AREAS = {
+	'project.clients': 'clients',
+	'project.resources': 'resources',
+	'project.settings': 'settings'
+} as const;
 
 const { Sider, Header, Content } = AntLayout;
 
@@ -90,7 +97,6 @@ export function Layout() {
 	const can = meCan(me);
 	const { resolved } = useRoute();
 	const navigate = useNavigate();
-	const isSuperAdmin = me?.superAdmin === true;
 
 	/*
 	 * Grouped so an operator can tell their own work from the organisation around it and from the
@@ -221,22 +227,25 @@ export function Layout() {
 		switch (route.key) {
 			case 'project.clients':
 			case 'project.resources':
+			case 'project.settings':
 				return (
 					<ProjectWorkspace
 						key={route.params.project}
 						projectId={route.params.project ?? ''}
-						area={route.key === 'project.clients' ? 'clients' : 'resources'}
+						area={PROJECT_AREAS[route.key]}
+					/>
+				);
+			case 'group':
+				return (
+					<AdminGroupPage
+						key={route.params.group}
+						groupId={route.params.group ?? ''}
 					/>
 				);
 			case 'buckets':
 				return <Buckets />;
 			case 'groups':
-				return (
-					<Groups
-						isSuperAdmin={isSuperAdmin}
-						currentUserId={me?.userId ?? null}
-					/>
-				);
+				return <Groups currentUserId={me?.userId ?? null} />;
 			case 'audit':
 				return <Audit />;
 			case 'usage':

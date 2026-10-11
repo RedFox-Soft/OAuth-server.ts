@@ -29,6 +29,28 @@ Two things compare a project's owner with the owner of the bucket it signs into:
 Moving one without the other would change both, and nobody would have decided that. This is the same reason
 `PUT /admin/api/projects/:id/bucket` refuses to bind a project to another group's bucket.
 
+## Changing a project's bucket is previewed (spec 085)
+
+Pointing a project at another bucket, or back to Default (`DELETE …/bucket`), gives every application of the
+project a new issuer. Everyone signed in through them must sign in again, because the account lookup follows
+the project's current bucket while their refresh tokens name the old one. Both routes are preview-then-confirm
+(`lib/admin/projects/routes.ts`):
+
+- The rights and state refusals above come first.
+- Without `confirm`, the route answers 409 naming the applications, `from`/`to` (bucket, name and issuer), the
+  declarations that move (`previewMove`, `lib/admin/resources/move.ts`), `conflicts`, `rootRefused`, and
+  `expect: {applications, resources}`. Nothing is audited.
+- A confirm with other counts gets the fresh preview. A blocked change is still refused at confirm by
+  `planMove`.
+
+Tokens are deliberately left alone (owner decision, 2026-10-11): refresh tokens and grants are not revoked.
+They fail against the new bucket and would work again if the project moved back, and issued access tokens
+verify until they expire. The preview says so instead.
+
+The audit entry records the destination as `bucketId` and the previous bucket as `formerBucketId`, so the
+change appears in both buckets' trails ([[admin-audit-trail]]). In the console the change lives on the
+project's Settings tab, in the Bucket card. The bucket's Overview only starts it ("Use in a project…").
+
 ## Who may move what
 
 - **Leaving a group** needs an owner of it: taking a container away removes every other member's access.

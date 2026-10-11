@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
 	Alert,
 	Button,
@@ -12,24 +12,13 @@ import {
 } from 'antd';
 import { PageHeader } from '../frame/PageHeader.js';
 import { request } from '../frame/request.js';
-import { useRoute } from '../frame/router.js';
+import { useNavigate, useRoute } from '../frame/router.js';
 import { EmptyState, LoadFailed, NoMatch } from '../frame/states.js';
-
-interface AuditEntry {
-	_id: string;
-	actorId: string;
-	actorEmail: string;
-	action: string;
-	targetType: string;
-	targetId: string;
-	targetScope: string | null;
-	attributes: string[];
-	cascade: Record<string, number> | null;
-	/* Absent or null on an entry made in the console: the field was added after the trail began. */
-	viaSurface?: 'mcp' | 'scim' | 'upstream' | null;
-	viaClientId?: string | null;
-	timestamp: string;
-}
+import {
+	actorLabel,
+	CONNECTION_ACTOR_PREFIX,
+	type AuditEntry
+} from '../frame/auditEntry.js';
 
 type Surface = 'console' | 'mcp' | 'scim' | 'upstream';
 
@@ -40,26 +29,6 @@ const SURFACE_OPTIONS: { label: string; value: Surface }[] = [
 	{ label: 'Upstream provider', value: 'upstream' }
 ];
 
-/*
- * The sentinel a provisioning connection is recorded under (lib/admin/audit/record.ts). Shown as what it is,
- * because the raw value in the email column reads as a malformed address rather than as a directory.
- */
-const CONNECTION_ACTOR_PREFIX = 'connection:';
-
-/* An upstream identity provider's global token revocation: `upstream:<bucketId>:<providerId>` (specs/072). */
-const UPSTREAM_ACTOR_PREFIX = 'upstream:';
-
-function actorLabel(row: AuditEntry, email: string): string {
-	if (row.actorId.startsWith(CONNECTION_ACTOR_PREFIX)) {
-		return `SCIM connection ${row.actorId.slice(CONNECTION_ACTOR_PREFIX.length)}`;
-	}
-	if (row.actorId.startsWith(UPSTREAM_ACTOR_PREFIX)) {
-		const provider = row.actorId.split(':').at(-1);
-		return `Identity provider ${provider ?? ''}`.trim();
-	}
-	return email;
-}
-
 interface AuditPage {
 	entries: AuditEntry[];
 	total: number;
@@ -67,56 +36,62 @@ interface AuditPage {
 	pageSize: number;
 }
 
-interface Filters {
-	actor: string;
-	action: string;
-	targetType: string;
-	targetId: string;
-	targetScope: string;
-	from: string;
-	to: string;
-	viaSurface: Surface | '';
-}
+/*
+ * Every filter the trail takes, as the address carries it (specs/085): a filtered view is a link, a reload
+ * keeps it, and Back returns to the filter before. `from`/`to` are days (YYYY-MM-DD) here and widened to
+ * instants only for the request.
+ */
+const FILTER_KEYS = [
+	'bucket',
+	'connection',
+	'actor',
+	'action',
+	'actionPrefix',
+	'targetType',
+	'targetId',
+	'targetScope',
+	'viaSurface',
+	'viaClientId',
+	'from',
+	'to'
+] as const;
+type FilterKey = (typeof FILTER_KEYS)[number];
+type Filters = Record<FilterKey, string>;
 
-const EMPTY_FILTERS: Filters = {
-	actor: '',
-	action: '',
-	targetType: '',
-	targetId: '',
-	targetScope: '',
-	from: '',
-	to: '',
-	viaSurface: ''
+const EMPTY_FILTERS = Object.fromEntries(
+	FILTER_KEYS.map((k) => [k, ''])
+) as Filters;
+
+const CHIP_LABEL: Record<FilterKey, string> = {
+	bucket: 'Bucket',
+	connection: 'Connection',
+	actor: 'Actor',
+	action: 'Action',
+	actionPrefix: 'Action starts with',
+	targetType: 'Target type',
+	targetId: 'Target',
+	targetScope: 'In bucket',
+	viaSurface: 'Surface',
+	viaClientId: 'Agent',
+	from: 'From',
+	to: 'To'
 };
 
-/*
- * The filters a link opened the page with (specs/081: a bucket's Overview links to its own entries). Read
- * once, when the page mounts; after that the boxes are the operator's.
- */
 function filtersFrom(query: URLSearchParams): Filters {
 	const filters = { ...EMPTY_FILTERS };
-	for (const key of [
-		'actor',
-		'action',
-		'targetType',
-		'targetId',
-		'targetScope',
-		'from',
-		'to'
-	] as const) {
-		const value = query.get(key);
-		if (value) filters[key] = value;
-	}
+	for (const key of FILTER_KEYS) filters[key] = query.get(key) ?? '';
 	return filters;
 }
 
-const TEXT_FILTERS = [
-	{ name: 'actor' as const, placeholder: 'Actor (email or id)', width: 220 },
-	{ name: 'action' as const, placeholder: 'Action', width: 180 },
-	{ name: 'targetType' as const, placeholder: 'Target type', width: 160 },
-	{ name: 'targetId' as const, placeholder: 'Target id', width: 200 },
-	{ name: 'targetScope' as const, placeholder: 'Bucket (scope)', width: 180 }
-];
+function auditHref(filters: Filters): string {
+	const params = new URLSearchParams();
+	for (const key of FILTER_KEYS) {
+		const value = filters[key].trim();
+		if (value) params.set(key, value);
+	}
+	const qs = params.toString();
+	return qs ? `/admin/audit?${qs}` : '/admin/audit';
+}
 
 /*
  * `from`/`to` arrive as YYYY-MM-DD from a native date input and are widened to whole days, so a window
@@ -127,35 +102,57 @@ function toBound(day: string, edge: 'start' | 'end'): string {
 	return new Date(`${day}${suffix}`).toISOString();
 }
 
-/* The applied filters in a few words, for the "nothing matches" answer. */
-function describeFilters(filters: Filters): string {
-	const parts: string[] = [];
-	for (const { name, placeholder } of TEXT_FILTERS) {
-		const value = filters[name].trim();
-		if (value) parts.push(`${placeholder}: ${value}`);
-	}
-	if (filters.viaSurface) {
-		const surface = SURFACE_OPTIONS.find((o) => o.value === filters.viaSurface);
-		parts.push(`Surface: ${surface?.label ?? filters.viaSurface}`);
-	}
-	if (filters.from) parts.push(`from ${filters.from}`);
-	if (filters.to) parts.push(`to ${filters.to}`);
-	return parts.join(', ');
-}
-
 function buildQuery(filters: Filters, page: number, pageSize: number): string {
 	const params = new URLSearchParams();
-	for (const { name } of TEXT_FILTERS) {
-		const value = filters[name].trim();
-		if (value) params.set(name, value);
+	for (const key of FILTER_KEYS) {
+		const value = filters[key].trim();
+		if (!value) continue;
+		if (key === 'from') params.set(key, toBound(value, 'start'));
+		else if (key === 'to') params.set(key, toBound(value, 'end'));
+		else params.set(key, value);
 	}
-	if (filters.from) params.set('from', toBound(filters.from, 'start'));
-	if (filters.to) params.set('to', toBound(filters.to, 'end'));
-	if (filters.viaSurface) params.set('viaSurface', filters.viaSurface);
 	params.set('page', String(page));
 	params.set('pageSize', String(pageSize));
 	return params.toString();
 }
+
+/* The boxes: what the operator is typing, applied as a whole by Apply. */
+interface Draft {
+	actor: string;
+	action: string;
+	targetType: string;
+	targetId: string;
+	bucket: string;
+	viaSurface: Surface | '';
+	from: string;
+	to: string;
+}
+
+function draftOf(filters: Filters): Draft {
+	return {
+		actor: filters.actor,
+		// One box for both: a value ending in "." is a prefix ("enduser." is every action on a person).
+		action: filters.actionPrefix || filters.action,
+		targetType: filters.targetType,
+		targetId: filters.targetId,
+		bucket: filters.bucket,
+		viaSurface: filters.viaSurface as Surface | '',
+		from: filters.from,
+		to: filters.to
+	};
+}
+
+const TEXT_FILTERS = [
+	{ name: 'actor' as const, placeholder: 'Actor (email or id)', width: 220 },
+	{
+		name: 'action' as const,
+		placeholder: 'Action, or prefix ending in .',
+		width: 220
+	},
+	{ name: 'targetType' as const, placeholder: 'Target type', width: 160 },
+	{ name: 'targetId' as const, placeholder: 'Target id', width: 200 },
+	{ name: 'bucket' as const, placeholder: 'Bucket id', width: 160 }
+];
 
 export function Audit() {
 	const [page, setPage] = useState<AuditPage | null>(null);
@@ -166,19 +163,19 @@ export function Audit() {
 	 */
 	const [failed, setFailed] = useState<string | null>(null);
 	const { query } = useRoute();
-	const [initial] = useState<Filters>(() => filtersFrom(query));
-	const [filters, setFilters] = useState<Filters>(initial);
-	/* What the page on screen was filtered by, as opposed to what is typed into the boxes now. */
-	const [applied, setApplied] = useState<Filters>(initial);
+	const navigate = useNavigate();
+	const search = query.toString();
+	// The filters on screen are the address's; the boxes are a draft until Apply.
+	const applied = useMemo(
+		() => filtersFrom(new URLSearchParams(search)),
+		[search]
+	);
 	const [current, setCurrent] = useState(1);
 	const [pageSize, setPageSize] = useState(50);
+	// Readable names for the bucket and connection chips, keyed "bucket:<id>" / "connection:<id>".
+	const [names, setNames] = useState<Map<string, string>>(new Map());
 
-	/*
-	 * Filters are passed in rather than read from state, so a request always uses the values the caller
-	 * meant — resetting and reloading in one action would otherwise send the state it just replaced.
-	 */
-	// Every state write follows an await, so the mount effect calls this without setting
-	// `loading` first; `load` is the reload, which does.
+	// Every state write follows an await, so the effect below may call it.
 	const fetchPage = useCallback(
 		async (active: Filters, atPage: number, size: number) => {
 			try {
@@ -186,7 +183,6 @@ export function Audit() {
 					'GET',
 					`/admin/api/audit?${buildQuery(active, atPage, size)}`
 				);
-				setApplied(active);
 				if (!result.ok) {
 					const reference = result.error.error_reference;
 					setFailed(
@@ -198,33 +194,59 @@ export function Audit() {
 				}
 				setFailed(null);
 				setPage(result.data);
+				// A directory's name comes with its entries; a bucket's from its own read, when readable.
+				const found = new Map<string, string>();
+				for (const entry of result.data.entries) {
+					if (
+						entry.actorName &&
+						entry.actorId.startsWith(CONNECTION_ACTOR_PREFIX)
+					) {
+						found.set(
+							`connection:${entry.actorId.slice(CONNECTION_ACTOR_PREFIX.length)}`,
+							entry.actorName
+						);
+					}
+				}
+				for (const key of ['bucket', 'targetScope'] as const) {
+					if (!active[key]) continue;
+					const bucket = await request<{ name: string }>(
+						'GET',
+						`/admin/api/buckets/${encodeURIComponent(active[key])}`
+					);
+					if (bucket.ok) found.set(`${key}:${active[key]}`, bucket.data.name);
+				}
+				setNames(found);
 			} finally {
 				setLoading(false);
 			}
 		},
 		[]
 	);
-	function load(active: Filters, atPage: number, size: number) {
-		setLoading(true);
-		return fetchPage(active, atPage, size);
-	}
 
+	// The address changed — a link followed, a chip removed, Back pressed — so the list starts again.
 	useEffect(() => {
-		void fetchPage(initial, 1, 50);
-	}, [fetchPage, initial]);
+		void fetchPage(applied, 1, pageSize);
+		// Only a change of filters reloads here; paging asks for its own page below.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [applied, fetchPage]);
 
-	function apply() {
+	/*
+	 * A filter change is pushed, not replaced, although the console replaces for filters elsewhere: here a
+	 * filter is the question being asked, and Back must give the previous question back (specs/085).
+	 */
+	function go(next: Filters) {
 		setCurrent(1);
-		void load(filters, 1, pageSize);
+		setLoading(true);
+		void navigate(auditHref(next));
 	}
 
 	function reset() {
-		setFilters(EMPTY_FILTERS);
-		setCurrent(1);
-		void load(EMPTY_FILTERS, 1, pageSize);
+		go(EMPTY_FILTERS);
 	}
 
-	const filtered = describeFilters(applied) !== '';
+	const chips = FILTER_KEYS.filter((k) => applied[k].trim() !== '');
+	const chipText = (key: FilterKey) =>
+		`${CHIP_LABEL[key]}: ${names.get(`${key}:${applied[key]}`) ?? applied[key]}`;
 
 	const columns = [
 		{
@@ -235,12 +257,12 @@ export function Audit() {
 		{
 			title: 'Actor',
 			dataIndex: 'actorEmail',
-			render: (email: string, row: AuditEntry) => (
+			render: (_: string, row: AuditEntry) => (
 				<Space
 					orientation="vertical"
 					size={0}
 				>
-					<Typography.Text>{actorLabel(row, email)}</Typography.Text>
+					<Typography.Text>{actorLabel(row)}</Typography.Text>
 					<Typography.Text
 						type="secondary"
 						copyable
@@ -291,6 +313,14 @@ export function Audit() {
 					>
 						{targetId}
 					</Typography.Text>
+					{row.kid ? (
+						<Typography.Text
+							type="secondary"
+							style={{ fontSize: 12 }}
+						>
+							key {row.kid}
+						</Typography.Text>
+					) : null}
 					{row.targetScope ? (
 						<Typography.Text
 							type="secondary"
@@ -305,8 +335,8 @@ export function Audit() {
 		{
 			title: 'Fields set',
 			dataIndex: 'attributes',
-			render: (attributes: string[]) =>
-				attributes.length === 0 ? (
+			render: (attributes: string[] | undefined) =>
+				!attributes || attributes.length === 0 ? (
 					<Typography.Text type="secondary">—</Typography.Text>
 				) : (
 					<Space
@@ -376,64 +406,22 @@ export function Audit() {
 				description="Each entry is written immediately before its change, so a change is never applied without a record. An entry is not proof that the change took effect — a later conflict or failure can follow one. Entries are never modified or removed."
 			/>
 
-			<Card size="small">
-				<Space wrap>
-					{TEXT_FILTERS.map(({ name, placeholder, width }) => (
-						<Input
-							key={name}
-							placeholder={placeholder}
-							value={filters[name]}
-							style={{ width }}
-							onChange={(e) =>
-								setFilters({ ...filters, [name]: e.target.value })
-							}
-						/>
-					))}
-					{/*
-					 * `max`/`min` cross-bound the two fields, so a backwards window cannot be submitted from
-					 * here at all and the server's 422 stays a backstop rather than a routine error.
-					 */}
-					<Select<Surface>
-						placeholder="Surface"
-						aria-label="Surface"
-						allowClear
-						style={{ width: 140 }}
-						options={SURFACE_OPTIONS}
-						value={filters.viaSurface || undefined}
-						onChange={(value: Surface | undefined) =>
-							setFilters({ ...filters, viaSurface: value ?? '' })
-						}
-					/>
-					<Input
-						type="date"
-						aria-label="From date"
-						value={filters.from}
-						max={filters.to || undefined}
-						style={{ width: 160 }}
-						onChange={(e) => setFilters({ ...filters, from: e.target.value })}
-					/>
-					<Input
-						type="date"
-						aria-label="To date"
-						value={filters.to}
-						min={filters.from || undefined}
-						style={{ width: 160 }}
-						onChange={(e) => setFilters({ ...filters, to: e.target.value })}
-					/>
-					<Button
-						type="primary"
-						onClick={apply}
-					>
-						Apply
-					</Button>
-					<Button onClick={reset}>Reset</Button>
-				</Space>
-			</Card>
+			<FilterBar
+				key={search}
+				applied={applied}
+				chips={chips}
+				chipText={chipText}
+				onApply={go}
+				onReset={reset}
+			/>
 
 			{failed !== null ? (
 				<LoadFailed
 					reason={failed}
-					onRetry={() => void load(applied, current, pageSize)}
+					onRetry={() => {
+						setLoading(true);
+						void fetchPage(applied, current, pageSize);
+					}}
 				/>
 			) : (
 				<Table<AuditEntry>
@@ -442,15 +430,16 @@ export function Audit() {
 					dataSource={page?.entries ?? []}
 					columns={columns}
 					locale={{
-						emptyText: filtered ? (
-							<NoMatch
-								query={describeFilters(applied)}
-								onClear={reset}
-								clearLabel="Clear filters"
-							/>
-						) : (
-							<EmptyState purpose="No administrative change has been recorded yet." />
-						)
+						emptyText:
+							chips.length > 0 ? (
+								<NoMatch
+									query={chips.map(chipText).join(', ')}
+									onClear={reset}
+									clearLabel="Clear filters"
+								/>
+							) : (
+								<EmptyState purpose="No administrative change has been recorded yet." />
+							)
 					}}
 					pagination={{
 						current,
@@ -462,11 +451,130 @@ export function Audit() {
 						onChange: (nextPage, nextSize) => {
 							setCurrent(nextPage);
 							setPageSize(nextSize);
-							void load(applied, nextPage, nextSize);
+							setLoading(true);
+							void fetchPage(applied, nextPage, nextSize);
 						}
 					}}
 				/>
 			)}
 		</Space>
+	);
+}
+
+/*
+ * The boxes and the applied filters' chips. Keyed by the address in the page, so following a link or pressing
+ * Back shows the boxes the address describes rather than what was last typed.
+ */
+function FilterBar({
+	applied,
+	chips,
+	chipText,
+	onApply,
+	onReset
+}: {
+	applied: Filters;
+	chips: FilterKey[];
+	chipText: (key: FilterKey) => string;
+	onApply: (next: Filters) => void;
+	onReset: () => void;
+}) {
+	const [draft, setDraft] = useState<Draft>(() => draftOf(applied));
+	const reset = onReset;
+
+	function apply() {
+		const action = draft.action.trim();
+		onApply({
+			...applied,
+			actor: draft.actor,
+			action: action.endsWith('.') ? '' : action,
+			actionPrefix: action.endsWith('.') ? action : '',
+			targetType: draft.targetType,
+			targetId: draft.targetId,
+			bucket: draft.bucket,
+			viaSurface: draft.viaSurface,
+			from: draft.from,
+			to: draft.to
+		});
+	}
+
+	return (
+		<Card size="small">
+			<Space
+				orientation="vertical"
+				style={{ width: '100%' }}
+			>
+				<Space wrap>
+					{TEXT_FILTERS.map(({ name, placeholder, width }) => (
+						<Input
+							key={name}
+							placeholder={placeholder}
+							aria-label={placeholder}
+							value={draft[name]}
+							style={{ width }}
+							onChange={(e) => setDraft({ ...draft, [name]: e.target.value })}
+							onPressEnter={apply}
+						/>
+					))}
+					<Select<Surface>
+						placeholder="Surface"
+						aria-label="Surface"
+						allowClear
+						style={{ width: 140 }}
+						options={SURFACE_OPTIONS}
+						value={draft.viaSurface || undefined}
+						onChange={(value: Surface | undefined) =>
+							setDraft({ ...draft, viaSurface: value ?? '' })
+						}
+					/>
+					{/*
+					 * `max`/`min` cross-bound the two fields, so a backwards window cannot be submitted from
+					 * here at all and the server's 422 stays a backstop rather than a routine error.
+					 */}
+					<Input
+						type="date"
+						aria-label="From date"
+						value={draft.from}
+						max={draft.to || undefined}
+						style={{ width: 160 }}
+						onChange={(e) => setDraft({ ...draft, from: e.target.value })}
+					/>
+					<Input
+						type="date"
+						aria-label="To date"
+						value={draft.to}
+						min={draft.from || undefined}
+						style={{ width: 160 }}
+						onChange={(e) => setDraft({ ...draft, to: e.target.value })}
+					/>
+					<Button
+						type="primary"
+						onClick={apply}
+					>
+						Apply
+					</Button>
+					<Button onClick={reset}>Reset</Button>
+				</Space>
+				{chips.length > 0 && (
+					<Space
+						wrap
+						size={4}
+					>
+						{chips.map((key) => (
+							<Tag
+								key={key}
+								closable
+								aria-label={chipText(key)}
+								onClose={(e) => {
+									e.preventDefault();
+									onApply({ ...applied, [key]: '' });
+								}}
+							>
+								{chipText(key)}
+							</Tag>
+						))}
+					</Space>
+				)}
+			</Space>
+		</Card>
 	);
 }

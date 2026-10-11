@@ -17,6 +17,13 @@ export const AuditQuery = t.Object({
 	/* Which surface the action arrived on: absent means the console. */
 	viaSurface: t.Optional(t.String()),
 	viaClientId: t.Optional(t.String()),
+	/*
+	 * Everything that happened to or in one bucket, what one provisioning connection did or had done to it,
+	 * and actions starting with a text (specs/085). Each narrows like the filters above.
+	 */
+	bucket: t.Optional(t.String()),
+	connection: t.Optional(t.String()),
+	actionPrefix: t.Optional(t.String()),
 	from: t.Optional(t.String()),
 	to: t.Optional(t.String()),
 	page: t.Optional(t.String()),

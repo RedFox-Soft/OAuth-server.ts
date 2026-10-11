@@ -820,6 +820,45 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			mailDeliveryConfigured: mail
 		};
 	})
+	/*
+	 * The resource namespace a bucket's projects declare into (specs/085), read from the projects using it —
+	 * which is where a declaration's namespace comes from — rather than from a store query by namespace.
+	 *
+	 * An addressable bucket is a namespace of its own, so every declaration in it is listed. A bucket served
+	 * at the root shares the root namespace with every other root-served bucket and every project with no
+	 * bucket, so only its own projects' declarations are listed: listing the whole root would show one
+	 * tenant what another declares.
+	 */
+	.get('/admin/api/buckets/:id/resources', async ({ admin, params }) => {
+		const ctx = assertAuth(admin);
+		const bucket = await loadBucketForSettings(ctx, params.id, 'read');
+		const namespace = namespaceOf(bucket);
+		const projects = (await getProjectStore().list()).filter(
+			(project) => project.bucketId === bucket._id
+		);
+		const resources = (
+			await Promise.all(
+				projects.map(async (project) =>
+					(await getProtectedResourceStore().listByProject(project._id))
+						.filter((resource) => resource.namespace === namespace)
+						.map((resource) => ({
+							identifier: resource.identifier,
+							name: resource.name,
+							projectId: project._id,
+							projectName: project.name
+						}))
+				)
+			)
+		)
+			.flat()
+			.sort((a, b) =>
+				a.identifier < b.identifier ? -1 : a.identifier > b.identifier ? 1 : 0
+			);
+		return {
+			namespace: namespace === ROOT_NAMESPACE ? 'root' : 'bucket',
+			resources
+		};
+	})
 	.patch(
 		'/admin/api/buckets/:id',
 		async ({ admin, params, body, status }) => {

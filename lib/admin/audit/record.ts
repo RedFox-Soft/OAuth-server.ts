@@ -37,6 +37,14 @@ export interface AuditDetail {
 	 */
 	formerOwnerGroupId?: string;
 	/*
+	 * A project's bucket change (specs/085): the bucket it now uses and the one it used before, so the entry
+	 * is in the trail of both buckets.
+	 */
+	bucketId?: string;
+	formerBucketId?: string;
+	/* The signing key a key action acted on. Public, as it is in every token header the key signs. */
+	kid?: string;
+	/*
 	 * An address change (`bucket.address.change`): the address the bucket answered at and the one it
 	 * answers at now, a slug or a hostname, or null for none. Addresses are public, unlike field values.
 	 */
@@ -198,6 +206,13 @@ async function write(input: {
 			...(input.detail.formerOwnerGroupId === undefined
 				? {}
 				: { formerOwnerGroupId: input.detail.formerOwnerGroupId }),
+			...(input.detail.bucketId === undefined
+				? {}
+				: { bucketId: input.detail.bucketId }),
+			...(input.detail.formerBucketId === undefined
+				? {}
+				: { formerBucketId: input.detail.formerBucketId }),
+			...(input.detail.kid === undefined ? {} : { kid: input.detail.kid }),
 			// Sorted so two requests setting the same fields in a different order read identically.
 			...(input.detail.attributes === undefined
 				? {}

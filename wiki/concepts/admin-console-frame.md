@@ -48,6 +48,14 @@ stores it (`login.ts:48`) and again when the callback redirects to it (`login.ts
 with the current section's list. The page subtree is keyed by `activeGroupId`, so every list remounts.
 An entity page gives way to its list, because the entity may belong to the group just left.
 
+**The switcher is named by what it does** (spec 085, `pages/ScopeSwitcher.tsx`):
+- A member of several groups sees "Group". A super administrator sees "Create in" with an explanation: their
+  lists show the whole instance whatever is chosen, so the control only decides where new things land.
+- With one group it is plain text.
+- The operator's own personal group reads "Personal · Only you".
+- Every New project and New bucket dialog begins with `frame/CreateDestination.tsx`: "Will be created in **X**
+  · Change". Change closes the dialog and focuses the switcher rather than opening a chooser over it.
+
 ## The server states the rights
 
 Bucket and project responses carry `can` and `blockers`, and `GET /admin/api/me` carries `can`. The
@@ -81,7 +89,7 @@ hidden control.
 | C1 | Small, reversible | A plain question (`useConfirm`) |
 | C2 | Ends access, revokes, replaces, or is irreversible for one object | A danger question with Cancel focused and the consequences listed |
 | C3 | Destroys an unbounded set, or a key | `ConfirmDestruction` with a typed word: `delete`, `retire` or `release` (plus, since spec 084, an optional `acknowledgement` checkbox the release uses) |
-| C4 | Only the server knows the full list | `PreviewConfirm`: preview first, then commit (a move, the faults purge) |
+| C4 | Only the server knows the full list | `PreviewConfirm`: preview first, then commit (a move, the faults purge, since spec 085 a project's bucket change) |
 
 The table is the product decision; the components are mechanics. `useConfirm` refuses C3 and C4 ids, and
 answers no while another confirmation is open, so a double click cannot stack two dialogs.

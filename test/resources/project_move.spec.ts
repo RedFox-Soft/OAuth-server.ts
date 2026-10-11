@@ -101,11 +101,16 @@ describe('a project with declarations changing bucket', () => {
 		await declare(from._id, moving._id);
 		await declare(to._id, resident._id);
 
+		/* Confirmed as previewed: the preview says it is blocked, and the confirmed change is refused. */
 		const res = await send(
 			'PUT',
 			`/admin/api/projects/${moving._id}/bucket`,
 			cookie,
-			{ bucketId: to._id }
+			{
+				bucketId: to._id,
+				confirm: true,
+				expect: { applications: 0, resources: 1 }
+			}
 		);
 
 		expect(res.status).toBe(409);
@@ -130,7 +135,8 @@ describe('a project with declarations changing bucket', () => {
 		const res = await send(
 			'DELETE',
 			`/admin/api/projects/${project._id}/bucket`,
-			cookie
+			cookie,
+			{ confirm: true, expect: { applications: 0, resources: 1 } }
 		);
 
 		expect(res.status).toBe(403);
@@ -153,7 +159,11 @@ describe('a project with declarations changing bucket', () => {
 			'PUT',
 			`/admin/api/projects/${project._id}/bucket`,
 			cookie,
-			{ bucketId: to._id }
+			{
+				bucketId: to._id,
+				confirm: true,
+				expect: { applications: 0, resources: 1 }
+			}
 		);
 
 		expect(res.status).toBe(200);

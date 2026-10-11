@@ -778,7 +778,13 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 			 * The same read's second arm: a move is listed for the group it left as well as the one it
 			 * joined, and each branch of that disjunction needs an index of its own to be served by one.
 			 */
-			{ key: { formerOwnerGroupId: 1, timestamp: 1 } }
+			{ key: { formerOwnerGroupId: 1, timestamp: 1 } },
+			/*
+			 * The bucket filter's two arms that no other index serves (specs/085): a project joining a
+			 * bucket and leaving one. Its other two arms ride the target and `targetScope` indexes above.
+			 */
+			{ key: { bucketId: 1, timestamp: 1 } },
+			{ key: { formerBucketId: 1, timestamp: 1 } }
 		]
 	),
 	/*

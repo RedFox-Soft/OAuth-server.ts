@@ -8,11 +8,19 @@ import { projectHref } from '../frame/routes.js';
 import type { ProjectBlockers, ProjectCan } from '../frame/can.js';
 import { Clients } from './Clients.js';
 import { Resources } from './Resources.js';
+import { ProjectSettings } from './projects/ProjectSettings.js';
 
 /* A project as the admin API answers it: the record, the caller's stated rights over it, and its blockers. */
 export type ProjectView = Project & {
 	can?: Partial<ProjectCan>;
 	blockers?: Partial<ProjectBlockers>;
+	// The bucket it signs people into and how many applications it has, stated by the row (specs/085).
+	bucket?: {
+		id: string;
+		name: string;
+		addressForm: 'root' | 'path' | 'host' | 'unaddressed';
+	} | null;
+	clientCount?: number;
 };
 
 /*
@@ -25,7 +33,7 @@ export function ProjectWorkspace({
 	area
 }: {
 	projectId: string;
-	area: 'clients' | 'resources';
+	area: 'clients' | 'resources' | 'settings';
 }) {
 	// Keyed by project in Layout, so another project's address mounts afresh rather than showing this one.
 	const [project, setProject] = useState<ProjectView | null>(null);
@@ -85,14 +93,22 @@ export function ProjectWorkspace({
 						key: 'resources',
 						label: 'Resources',
 						href: projectHref(project._id, 'resources')
+					},
+					{
+						key: 'settings',
+						label: 'Settings',
+						href: projectHref(project._id, 'settings')
 					}
 				]}
 				activeTab={area}
 			/>
-			{area === 'clients' ? (
-				<Clients project={project} />
-			) : (
-				<Resources project={project} />
+			{area === 'clients' && <Clients project={project} />}
+			{area === 'resources' && <Resources project={project} />}
+			{area === 'settings' && (
+				<ProjectSettings
+					project={project}
+					onChanged={() => setAttempt((n) => n + 1)}
+				/>
 			)}
 		</>
 	);

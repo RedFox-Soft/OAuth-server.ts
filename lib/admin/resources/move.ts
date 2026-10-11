@@ -1,4 +1,5 @@
 import { getProtectedResourceStore } from '../../adapters/index.js';
+import type { ProtectedResource } from '../../adapters/types.js';
 import { ROOT_NAMESPACE } from '../../resources/namespace.js';
 import { AdminError, type AdminContext } from '../auth/rbac.js';
 import { ROOT_DECLARATION_REFUSAL } from './refusals.js';
@@ -26,6 +27,43 @@ export class DeclarationsConflict extends AdminError {
 			'the bucket this project would move to already declares a resource this project declares'
 		);
 	}
+}
+
+/*
+ * What `planMove` would decide, stated instead of thrown, for a preview shown before anyone consents
+ * (specs/085): the declarations that would move, the identifiers already taken where they would go, and
+ * whether the destination is the shared root this caller may not write. `planMove` stays the check at
+ * confirm time, because what was true when the preview was read may not be true now.
+ */
+export interface MovePreview {
+	readonly moving: readonly ProtectedResource[];
+	readonly conflicts: readonly string[];
+	readonly rootRefused: boolean;
+}
+
+export async function previewMove(
+	ctx: AdminContext,
+	projectId: string,
+	from: string,
+	to: string
+): Promise<MovePreview> {
+	if (from === to) return { moving: [], conflicts: [], rootRefused: false };
+
+	const store = getProtectedResourceStore();
+	const moving = (await store.listByProject(projectId)).filter(
+		(r) => r.namespace === from
+	);
+	const conflicts: string[] = [];
+	for (const resource of moving) {
+		if (await store.find(to, resource.identifier)) {
+			conflicts.push(resource.identifier);
+		}
+	}
+	return {
+		moving,
+		conflicts,
+		rootRefused: moving.length > 0 && to === ROOT_NAMESPACE && !ctx.superAdmin
+	};
 }
 
 /* Checked before the audit write, so a refused move leaves no entry describing a change nobody made. */

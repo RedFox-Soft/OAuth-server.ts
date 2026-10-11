@@ -1,4 +1,4 @@
-import { Elysia } from 'elysia';
+import { Elysia, t } from 'elysia';
 import {
 	getProjectStore,
 	getBucketStore,
@@ -21,15 +21,16 @@ import {
 	projectCan,
 	type ProjectCan
 } from '../auth/can.js';
-import type { Project } from '../../adapters/types.js';
+import type { Project, UserBucket } from '../../adapters/types.js';
 import {
 	CreateProjectBody,
 	UpdateProjectBody,
 	SetBucketBody,
+	ClearBucketBody,
 	DeleteProjectQuery,
 	MoveProjectOwnerBody
 } from './schema.js';
-import { deleteClientRecord } from '../clients/service.js';
+import { deleteClientRecord, getClientView } from '../clients/service.js';
 import { cascadeForClient } from '../../helpers/cascade.js';
 import {
 	InvalidOriginError,
@@ -45,16 +46,18 @@ import { loadProject } from './access.js';
 import { recordAdminAudit } from '../audit/record.js';
 import { Client } from '../../models/client.js';
 import nanoid from '../../helpers/nanoid.js';
-import {
-	namespaceOf,
-	namespaceOfProject,
-	ROOT_NAMESPACE
-} from '../../resources/namespace.js';
+import { namespaceOf, ROOT_NAMESPACE } from '../../resources/namespace.js';
 import {
 	applyMove,
 	DeclarationsConflict,
-	planMove
+	planMove,
+	previewMove
 } from '../resources/move.js';
+import {
+	addressOf,
+	DEFAULT_REQUEST_BUCKET,
+	issuerFor
+} from '../../configs/issuer.js';
 
 /*
  * Normalizes a submitted origin list, or refuses the whole request. All-or-nothing on purpose: half a
@@ -88,6 +91,32 @@ function normalizeConsentedClients(
 	return Array.isArray(value) ? value : [value];
 }
 
+/* As stored: a project document written before `clientIds` existed has none. */
+function clientIdsOf(project: {
+	clientIds?: readonly string[];
+}): readonly string[] {
+	return project.clientIds ?? [];
+}
+
+type AddressForm = ReturnType<typeof addressOf>['kind'];
+
+/*
+ * The project's bucket as a row names it (specs/085), so a list says which bucket each project signs in
+ * through without the caller reading the buckets — which a super administrator in another scope, or an
+ * agent, would otherwise have to join by id. Null for the default bucket, and for a bucket record that is
+ * gone, which the namespace reads the same way: served at the root.
+ */
+function bucketOfRow(
+	bucket: UserBucket | undefined
+): { id: string; name: string; addressForm: AddressForm } | null {
+	if (!bucket) return null;
+	return {
+		id: bucket._id,
+		name: bucket.name,
+		addressForm: addressOf(bucket).kind
+	};
+}
+
 /*
  * The caller's rights on each project, and the state that would refuse one they hold. The namespace a
  * project declares into is read from its bucket, so the buckets are read once per distinct id rather than
@@ -96,21 +125,168 @@ function normalizeConsentedClients(
 async function withRights<T extends Project>(
 	ctx: AdminContext,
 	projects: readonly T[]
-): Promise<(T & { can: ProjectCan; blockers: { hasBucket: boolean } })[]> {
-	const namespaces = new Map<string, string>();
+): Promise<
+	(T & {
+		can: ProjectCan;
+		blockers: { hasBucket: boolean };
+		bucket: ReturnType<typeof bucketOfRow>;
+		clientCount: number;
+	})[]
+> {
+	const buckets = new Map<string, UserBucket>();
 	for (const id of new Set(projects.map((project) => project.bucketId))) {
-		if (id) namespaces.set(id, await namespaceOfProject({ bucketId: id }));
+		const bucket = id ? await getBucketStore().find(id) : null;
+		if (id && bucket) buckets.set(id, bucket);
 	}
-	return projects.map((project) => ({
-		...project,
-		can: projectCan(ctx, {
+	return projects.map((project) => {
+		const bucket = project.bucketId ? buckets.get(project.bucketId) : undefined;
+		return {
 			...project,
-			namespace:
-				(project.bucketId && namespaces.get(project.bucketId)) || ROOT_NAMESPACE
-		}),
-		/* As the move route reads it: a project using a bucket moves only with it. */
-		blockers: { hasBucket: project.bucketId !== null }
+			can: projectCan(ctx, {
+				...project,
+				namespace: bucket ? namespaceOf(bucket) : ROOT_NAMESPACE
+			}),
+			/* As the move route reads it: a project using a bucket moves only with it. */
+			blockers: { hasBucket: project.bucketId !== null },
+			bucket: bucketOfRow(bucket),
+			clientCount: clientIdsOf(project).length
+		};
+	});
+}
+
+interface BucketSide {
+	bucketId: string | null;
+	name: string;
+	issuer: string | null;
+}
+
+/*
+ * One end of a bucket change, as the preview names it. A project with no bucket signs in at the default
+ * bucket, so "none" is named as that and given the root issuer; a bucket with no address of its own has no
+ * issuer a client could be configured with, so null rather than the id-derived fallback.
+ */
+function sideOf(
+	bucketId: string | null,
+	bucket: UserBucket | null
+): BucketSide {
+	if (bucketId === null) {
+		return {
+			bucketId: null,
+			name: 'Default bucket',
+			issuer: issuerFor(DEFAULT_REQUEST_BUCKET)
+		};
+	}
+	if (!bucket) return { bucketId, name: bucketId, issuer: null };
+	return {
+		bucketId,
+		name: bucket.name,
+		issuer: addressOf(bucket).kind === 'unaddressed' ? null : issuerFor(bucket)
+	};
+}
+
+interface BucketChangeCounts {
+	applications: number;
+	resources: number;
+}
+
+interface BucketChangePreview {
+	from: BucketSide;
+	to: BucketSide;
+	applications: { clientId: string; name: string | null }[];
+	resources: { identifier: string; name: string }[];
+	conflicts: string[];
+	rootRefused: boolean;
+	blocked: boolean;
+	consequence: string;
+	expect: BucketChangeCounts;
+}
+
+/*
+ * Everything a change of a project's bucket reaches, named before the change (specs/085), as an address
+ * change names what it reaches (`lib/admin/buckets/routes.ts`): each application by name, because the
+ * people signed in through it are who the operator has to warn; each declaration that moves namespace; and
+ * what would block it — identifiers already taken where they would go, or the shared root this caller may
+ * not write.
+ *
+ * Token behaviour is described, not changed: a token already issued names the issuer that issued it and
+ * keeps verifying until it expires.
+ */
+async function bucketChangePreview(
+	ctx: AdminContext,
+	project: Project,
+	from: { bucketId: string | null; bucket: UserBucket | null },
+	to: { bucketId: string | null; bucket: UserBucket | null }
+): Promise<BucketChangePreview> {
+	const applications: BucketChangePreview['applications'] = [];
+	for (const clientId of clientIdsOf(project)) {
+		const view = await getClientView(clientId);
+		applications.push({ clientId, name: view?.clientName ?? null });
+	}
+	/* By name, the unnamed last, then by id, so two reads of the same project list it the same way. */
+	applications.sort(
+		(a, b) =>
+			Number(a.name === null) - Number(b.name === null) ||
+			(a.name ?? '').localeCompare(b.name ?? '') ||
+			a.clientId.localeCompare(b.clientId)
+	);
+	const moves = await previewMove(
+		ctx,
+		project._id,
+		from.bucket ? namespaceOf(from.bucket) : ROOT_NAMESPACE,
+		to.bucket ? namespaceOf(to.bucket) : ROOT_NAMESPACE
+	);
+	const resources = moves.moving.map((resource) => ({
+		identifier: resource.identifier,
+		name: resource.name
 	}));
+	return {
+		from: sideOf(from.bucketId, from.bucket),
+		to: sideOf(to.bucketId, to.bucket),
+		applications,
+		resources,
+		conflicts: [...moves.conflicts],
+		rootRefused: moves.rootRefused,
+		blocked: moves.conflicts.length > 0 || moves.rootRefused,
+		consequence:
+			"the issuer of every application listed changes: people signed in through them must sign in again in the new bucket, and their accounts do not move with the project; tokens already issued keep working until they expire; the declared resources listed move to the new bucket's namespace",
+		expect: {
+			applications: applications.length,
+			resources: resources.length
+		}
+	};
+}
+
+/*
+ * The answer to an unconfirmed change, or to a confirmation of counts that are no longer true: the preview,
+ * and nothing written — no audit entry, because nothing was applied. Null when the change may proceed.
+ *
+ * The consent is to the counts shown. An application or a declaration that arrived while the preview was
+ * open is not covered by it, so the change is refused with the fresh preview.
+ */
+function unconfirmed(
+	body: { confirm?: true; expect?: BucketChangeCounts } | null | undefined,
+	preview: BucketChangePreview
+) {
+	if (body?.confirm !== true) {
+		return { confirmationRequired: true as const, ...preview };
+	}
+	const expect = body.expect;
+	if (
+		expect === undefined ||
+		expect.applications !== preview.expect.applications ||
+		expect.resources !== preview.expect.resources
+	) {
+		return {
+			error: 'admin_error' as const,
+			message:
+				expect === undefined
+					? 'confirm with the counts of the preview you reviewed (expect)'
+					: 'what this bucket change reaches changed since you reviewed it',
+			...preview,
+			confirmationRequired: true as const
+		};
+	}
+	return null;
 }
 
 /* Set equality, because the order the console listed them in is not part of what was consented to. */
@@ -330,7 +506,7 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 	)
 	.put(
 		'/admin/api/projects/:id/bucket',
-		async ({ admin, params, body }) => {
+		async ({ admin, params, body, set }) => {
 			const ctx = assertAuth(admin);
 			const project = await loadProject(ctx, params.id);
 			const bucket = await getBucketStore().find(body.bucketId);
@@ -369,17 +545,44 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 					'project and bucket must belong to the same group'
 				);
 			}
+			/*
+			 * After every refusal above, so a caller without access learns nothing from a preview, and a preview
+			 * is never offered for a change that would be refused anyway; before the audit entry, so nothing is
+			 * recorded for a change that was only described.
+			 */
+			const former =
+				project.bucketId === null
+					? null
+					: await getBucketStore().find(project.bucketId);
+			const preview = await bucketChangePreview(
+				ctx,
+				project,
+				{ bucketId: project.bucketId, bucket: former },
+				{ bucketId: bucket._id, bucket }
+			);
+			const pending = unconfirmed(body, preview);
+			if (pending) {
+				set.status = 409;
+				return pending;
+			}
+			/* The confirm-time check: a change the preview showed as blocked is refused here, as it always was. */
 			const move = await planMove(
 				ctx,
 				project._id,
-				await namespaceOfProject(project),
+				former ? namespaceOf(former) : ROOT_NAMESPACE,
 				namespaceOf(bucket)
 			);
-			// The project is the entity being changed; which bucket it was pointed at is a submitted
-			// field, so it is recorded as a field name rather than a value.
+			/*
+			 * Both buckets name the entry, so it is in the history of the one the project joined and of the one
+			 * it left; `attributes` stays the field name the change set.
+			 */
 			await recordAdminAudit(ctx, 'project.bucket.assign', params.id, {
-				attributes: Object.keys(body),
-				ownerGroupId: project.ownerGroupId
+				attributes: ['bucketId'],
+				ownerGroupId: project.ownerGroupId,
+				bucketId: bucket._id,
+				...(project.bucketId === null
+					? {}
+					: { formerBucketId: project.bucketId })
 			});
 			await applyMove(project._id, move);
 			const bound = await getProjectStore().update(params.id, {
@@ -412,35 +615,59 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 		{ body: SetBucketBody }
 	)
 	/*
-	 * Its own route rather than a null the PUT accepts, because the audit trail records field *names*
-	 * and never values: one action would have written `project.bucket.assign` for a removal, and the
-	 * trail could not tell an operator which of the two had happened.
+	 * Its own route rather than a null the PUT accepts, because the action is what tells a reader of the
+	 * trail which change happened: one action would have written `project.bucket.assign` for a removal,
+	 * and the trail could not tell an operator which of the two had happened.
 	 *
 	 * Assigning was one-way until this existed — the body took a bucket id and had no value meaning
 	 * "none" — so a project pointed at the wrong bucket stayed pointed at it. Clearing returns it to the
 	 * default bucket, which is what `resolveBucketForRequest` falls through to on an empty `bucketId`.
 	 */
-	.delete('/admin/api/projects/:id/bucket', async ({ admin, params }) => {
-		const ctx = assertAuth(admin);
-		const project = await loadProject(ctx, params.id);
-		/*
-		 * Project access only, deliberately. The entity changed is the project, and dropping a pointer
-		 * needs no authority over what it pointed at — a caller who has lost access to the bucket is
-		 * precisely somebody who needs to clear it. Its declarations are another matter: clearing moves
-		 * them into the shared root namespace, which only a super administrator writes.
-		 */
-		const move = await planMove(
-			ctx,
-			project._id,
-			await namespaceOfProject(project),
-			ROOT_NAMESPACE
-		);
-		await recordAdminAudit(ctx, 'project.bucket.clear', params.id, {
-			ownerGroupId: project.ownerGroupId
-		});
-		await applyMove(project._id, move);
-		return getProjectStore().update(params.id, { bucketId: null });
-	})
+	.delete(
+		'/admin/api/projects/:id/bucket',
+		async ({ admin, params, body, set }) => {
+			const ctx = assertAuth(admin);
+			const project = await loadProject(ctx, params.id);
+			/*
+			 * Project access only, deliberately. The entity changed is the project, and dropping a pointer
+			 * needs no authority over what it pointed at — a caller who has lost access to the bucket is
+			 * precisely somebody who needs to clear it. Its declarations are another matter: clearing moves
+			 * them into the shared root namespace, which only a super administrator writes — the preview says
+			 * so as `rootRefused`, and the confirmed change is refused for it.
+			 */
+			const former =
+				project.bucketId === null
+					? null
+					: await getBucketStore().find(project.bucketId);
+			const preview = await bucketChangePreview(
+				ctx,
+				project,
+				{ bucketId: project.bucketId, bucket: former },
+				{ bucketId: null, bucket: null }
+			);
+			const pending = unconfirmed(body, preview);
+			if (pending) {
+				set.status = 409;
+				return pending;
+			}
+			const move = await planMove(
+				ctx,
+				project._id,
+				former ? namespaceOf(former) : ROOT_NAMESPACE,
+				ROOT_NAMESPACE
+			);
+			/* In the history of the bucket the project left. */
+			await recordAdminAudit(ctx, 'project.bucket.clear', params.id, {
+				ownerGroupId: project.ownerGroupId,
+				...(project.bucketId === null
+					? {}
+					: { formerBucketId: project.bucketId })
+			});
+			await applyMove(project._id, move);
+			return getProjectStore().update(params.id, { bucketId: null });
+		},
+		{ body: t.Optional(ClearBucketBody) }
+	)
 	/*
 	 * Moving a project with no bucket to another administrator group (specs/075). A project that uses a
 	 * bucket moves with it, through the bucket's route: a project and the bucket it signs into must share a

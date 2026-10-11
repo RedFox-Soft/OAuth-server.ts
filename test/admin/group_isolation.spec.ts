@@ -187,7 +187,14 @@ describe('group isolation', () => {
 
 		const assigned = await client.admin.api
 			.projects({ id: project._id })
-			.bucket.put({ bucketId: bucket._id }, { headers: { cookie: a.cookie } });
+			.bucket.put(
+				{
+					bucketId: bucket._id,
+					confirm: true,
+					expect: { applications: 0, resources: 0 }
+				},
+				{ headers: { cookie: a.cookie } }
+			);
 		expect(assigned.status).toBe(200);
 	});
 

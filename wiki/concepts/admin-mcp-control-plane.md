@@ -205,8 +205,8 @@ guessed and silently missing from the announcement that exists so an agent need 
 withholding has since arrived — `group_delete` — and cost only a table row, which is the arrangement
 working as intended.
 
-The other high-consequence operations — 32 tools since spec 083 added `admin_sign_out` and
-`admin_totp_clear` (spec 082 had added `bucket_user_email_change`; spec 075 `bucket_owner_change` and
+The other high-consequence operations — 34 tools since spec 085 made `project_bucket_assign` and
+`project_bucket_clear` high (spec 083 had added `admin_sign_out` and `admin_totp_clear`; spec 082 had added `bucket_user_email_change`; spec 075 `bucket_owner_change` and
 `project_owner_change`, the first tools whose body names a group, `groupId`) — take two calls: describe,
 then confirm. The confirmation binds
 five ways — tool, target, arguments hash, administrator, agent — and each is a real case. Arguments,
@@ -235,6 +235,11 @@ then goes through the token gate. A confirmed call refused for foreign members p
 `blockers`, under the generic rule. Two read tools came with it: `federation_provider_get` (one provider, with
 its callback, logout signals, bound connection and linked count) and `provisioning_hold_get` (the removals a
 held connection refused).
+
+Since spec 085, setting or clearing a project's bucket answers with a route preview too: the project's
+applications by name, the issuer before and after, and the declarations that move or collide, with `expect` =
+`{applications, resources}` ([[container-ownership-transfer]]). Both tools are high, so like the hand-over the
+agent sees the preview and then passes the token gate. The read tool `bucket_resource_list` came with it.
 
 Neither identity may fall back to a placeholder, and both once did. `principalId` defaulted to `''` when
 `whoami` failed and `viaClientId` to `''` when `authInfo` carried no client — either turns that binding

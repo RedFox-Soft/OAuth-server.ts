@@ -198,6 +198,21 @@ function VouchingCell({ url }: { url: string }) {
 	);
 }
 
+/*
+ * Where the project's declarations live (specs/085). An identifier is unique within a namespace, which every
+ * project using the same addressable bucket shares, so a refusal to declare one is explained by naming it.
+ */
+function namespaceLine(project: ProjectView): string {
+	const bucket = project.bucket ?? null;
+	if (
+		bucket &&
+		(bucket.addressForm === 'path' || bucket.addressForm === 'host')
+	) {
+		return `Declared in ${bucket.name}'s namespace: an identifier must be unique across every project using that bucket. Its Overview lists them all.`;
+	}
+	return "Declared in the instance's shared root namespace, which every project without an addressable bucket shares.";
+}
+
 export function Resources({ project }: { project: ProjectView }) {
 	const base = `/admin/api/projects/${project._id}/resources`;
 	const writable = projectCan(project).declareResources;
@@ -310,11 +325,24 @@ export function Resources({ project }: { project: ProjectView }) {
 	}
 
 	async function remove(row: ResourceView) {
+		/*
+		 * Any application of the project may hold tokens for the resource, so the question names them
+		 * (specs/085). A failed read leaves the question without names rather than blocking it.
+		 */
+		const clients = await request<{ clientId: string; clientName?: string }[]>(
+			'GET',
+			`/admin/api/projects/${encodeURIComponent(project._id)}/clients`
+		);
+		const apps = clients.ok
+			? clients.data.map((c) => c.clientName || c.clientId)
+			: [];
 		const agreed = await confirm('resource.remove', {
 			target: row.name,
 			consequences: [
 				'Token issuance for this audience stops on the next request.',
-				'A live integration loses access as its current tokens expire.'
+				apps.length > 0
+					? `These applications can no longer get tokens for it: ${apps.join(', ')}. Their current tokens work until they expire.`
+					: 'A live integration loses access as its current tokens expire.'
 			]
 		});
 		if (!agreed) return;
@@ -358,6 +386,10 @@ export function Resources({ project }: { project: ProjectView }) {
 				title="A declared resource is half of the setup"
 				description="Declaring the resource is what makes this server mint tokens for it. For an agent host to obtain one it also needs a client identity: either clientIdMetadataDocument.enabled, so a client_id that is an HTTPS URL is accepted, or registration.enabled for an older host that registers itself. Both are instance settings and both are off by default."
 			/>
+
+			<Typography.Paragraph type="secondary">
+				{namespaceLine(project)}
+			</Typography.Paragraph>
 
 			{writable ? (
 				<AreaToolbar create={newResource} />

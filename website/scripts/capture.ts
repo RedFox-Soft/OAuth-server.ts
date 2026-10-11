@@ -165,8 +165,23 @@ async function seed(ctx: BrowserContext): Promise<{
 	await api(ctx, 'POST', `/admin/api/buckets/${bucket._id}/groups`, {
 		displayName: 'Support'
 	});
+	/*
+	 * A bucket change is previewed first (specs/085): the first request is answered 409 with what the change
+	 * reaches and the counts to send back, and only the confirmed repeat applies it.
+	 */
+	const preview = await ctx.request.fetch(
+		`${ORIGIN}/admin/api/projects/${project._id}/bucket`,
+		{
+			method: 'PUT',
+			headers: { 'content-type': 'application/json' },
+			data: JSON.stringify({ bucketId: bucket._id })
+		}
+	);
+	const { expect } = (await preview.json()) as { expect: unknown };
 	await api(ctx, 'PUT', `/admin/api/projects/${project._id}/bucket`, {
-		bucketId: bucket._id
+		bucketId: bucket._id,
+		confirm: true,
+		expect
 	});
 	/*
 	 * Both clients are created through the API rather than the console's dialog, which is also what

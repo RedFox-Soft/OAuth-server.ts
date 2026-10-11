@@ -100,16 +100,92 @@ function assertDeletable(group: Group): void {
 	}
 }
 
-/* How many containers a group still owns. Drives the refusal to delete one that is not empty. */
-async function ownedContainerCount(groupId: string): Promise<{
-	projects: number;
-	buckets: number;
+/*
+ * What a group owns, by name. Drives the refusal to delete one that is not empty, and is what the group's
+ * page lists (specs/085) — the same read, so the page never shows a group as empty that the delete refuses.
+ */
+async function ownedContainers(groupId: string): Promise<{
+	projects: { id: string; name: string }[];
+	buckets: { id: string; name: string }[];
 }> {
 	const [projects, buckets] = await Promise.all([
 		getProjectStore().listByGroup(groupId),
 		getBucketStore().listByGroup(groupId)
 	]);
-	return { projects: projects.length, buckets: buckets.length };
+	const named = (items: readonly { _id: string; name: string }[]) =>
+		items
+			.map((item) => ({ id: item._id, name: item.name }))
+			.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+	return { projects: named(projects), buckets: named(buckets) };
+}
+
+/*
+ * The caller's rights on a group, stated by the server so the console offers exactly what these routes
+ * accept (specs/085). Each mirrors a refusal below: changing membership and inviting are an owner's (or a
+ * super administrator's), refused on the System group, which is not a tenant, and on a personal group, which
+ * nobody joins and whose one member must stay its owner; renaming is refused only on the System group;
+ * deleting is refused on both.
+ * `addExisting` is stated for a super administrator only, because choosing an existing administrator means
+ * reading every administrator of the instance, which only they may. The route itself also accepts an owner
+ * who already knows the id, so this flag withholds a control, never a right.
+ *
+ * A right is not a promise about state: a group that still owns projects or buckets refuses deletion, and
+ * `owns` is that state.
+ */
+function groupCan(
+	ctx: AdminContext,
+	group: Group
+): {
+	manageMembers: boolean;
+	invite: boolean;
+	addExisting: boolean;
+	rename: boolean;
+	delete: boolean;
+} {
+	const owner =
+		ctx.superAdmin ||
+		ctx.memberships.some((m) => m.groupId === group._id && m.role === 'owner');
+	const shared = group.kind === 'regular';
+	return {
+		manageMembers: owner && shared,
+		invite: owner && shared,
+		addExisting: ctx.superAdmin && shared,
+		rename: owner && group.kind !== 'system',
+		delete: owner && shared
+	};
+}
+
+/*
+ * Each member with the address they sign in with and whether their account is active, owners first. Read
+ * from the administrators' store for whoever may read the group — its members and super administrators —
+ * because who you share a tenant with is something a member needs to know by name, not by id.
+ */
+async function membersOf(group: Group): Promise<
+	{
+		userId: string;
+		role: GroupMember['role'];
+		email: string | null;
+		active: boolean;
+	}[]
+> {
+	const users = getUserStore(ADMIN_BUCKET_ID);
+	const members = await Promise.all(
+		group.members.map(async (member) => {
+			const user = await users.find(member.userId);
+			return {
+				userId: member.userId,
+				role: member.role,
+				email: user?.email ?? null,
+				active: user?.active ?? false
+			};
+		})
+	);
+	return members.sort(
+		(a, b) =>
+			Number(a.role !== 'owner') - Number(b.role !== 'owner') ||
+			(a.email ?? '\uffff').localeCompare(b.email ?? '\uffff') ||
+			a.userId.localeCompare(b.userId)
+	);
 }
 
 /*
@@ -143,7 +219,21 @@ export const groupRoutes = new Elysia({ name: 'admin-groups' })
 		const groups = ctx.superAdmin
 			? await getGroupStore().list()
 			: await getGroupStore().listByMember(ctx.userId);
-		return groups.filter((g) => !isSuperAdminsGroup(g._id));
+		/* What each row owns, counted, so the list says which groups hold work before one is opened. */
+		return Promise.all(
+			groups
+				.filter((g) => !isSuperAdminsGroup(g._id))
+				.map(async (group) => {
+					const owns = await ownedContainers(group._id);
+					return {
+						...group,
+						owns: {
+							projects: owns.projects.length,
+							buckets: owns.buckets.length
+						}
+					};
+				})
+		);
 	})
 	.post(
 		'/admin/api/groups',
@@ -170,7 +260,12 @@ export const groupRoutes = new Elysia({ name: 'admin-groups' })
 	.get('/admin/api/groups/:id', async ({ admin, params }) => {
 		const ctx = assertAuth(admin);
 		// A plain member may read the membership list; only an owner may change it.
-		return loadGroup(ctx, params.id);
+		const group = await loadGroup(ctx, params.id);
+		const [members, owns] = await Promise.all([
+			membersOf(group),
+			ownedContainers(group._id)
+		]);
+		return { ...group, members, owns, can: groupCan(ctx, group) };
 	})
 	.patch(
 		'/admin/api/groups/:id',
@@ -202,15 +297,15 @@ export const groupRoutes = new Elysia({ name: 'admin-groups' })
 		 * container pointing at it — reachable by nobody, listed by nothing — so the refusal names what is
 		 * in the way and the operator empties it deliberately.
 		 */
-		const held = await ownedContainerCount(params.id);
-		if (held.projects > 0 || held.buckets > 0) {
+		const held = await ownedContainers(params.id);
+		if (held.projects.length > 0 || held.buckets.length > 0) {
 			throw new AdminError(409, 'group still owns projects or buckets', {
 				blockers: [
-					...(held.projects > 0
-						? [{ kind: 'client' as const, count: held.projects }]
+					...(held.projects.length > 0
+						? [{ kind: 'project' as const, count: held.projects.length }]
 						: []),
-					...(held.buckets > 0
-						? [{ kind: 'enduser' as const, count: held.buckets }]
+					...(held.buckets.length > 0
+						? [{ kind: 'bucket' as const, count: held.buckets.length }]
 						: [])
 				]
 			});

@@ -202,7 +202,24 @@ writes one entry. The migration that made personal groups personal writes its re
 sentinel actor `system:migration` (`MIGRATION_ACTOR`), the bootstrap's convention: a `:` and no `@`.
 
 The read is newest-first, offset-paged, and filterable by actor (id
-**or** email), action, target type, target id, scope and an inclusive time window. Ordering is
+**or** email), action, target type, target id, scope and an inclusive time window. Since spec 085 there are
+three more filters, all ANDed with the rest and with the group boundary, so they only narrow:
+- `bucket=b` matches entries whose target is the bucket (settings, address, owner, keys, providers), whose
+  `targetScope` is it (end users, user groups, provisioning, resources), or whose new `bucketId` or
+  `formerBucketId` is it (a project attached or detached).
+- `connection=c` matches the directory's own entries (`actor connection:c`) and entries targeting the
+  connection.
+- `actionPrefix` matches actions by prefix, escaped on every backend.
+
+Also since spec 085:
+- Key entries carry `kid`.
+- `provisioning.connection.create` targets the new connection rather than its provider.
+- Reads add `actorName` for directory and upstream actors (resolved per page, never stored).
+- The console's Audit page keeps every filter in its address, pushes a change so Back restores the previous
+  question, and shows applied filters as removable chips.
+
+`bucket.address.change` passes `from`/`to`, but `write()` does not store them and the entry schema has no
+such fields. This is a known gap, not fixed in 085. Ordering is
 `(timestamp desc, _id desc)`: `_id` is unique, so the order is total, which is what stops a page
 boundary from dropping or repeating an entry when two actions land in the same millisecond. A backwards
 window is refused with 422 rather than answered with an empty page — an empty page is

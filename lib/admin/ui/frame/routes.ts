@@ -24,6 +24,7 @@ export type PageKey =
 	| 'projects'
 	| 'project.clients'
 	| 'project.resources'
+	| 'project.settings'
 	| 'buckets'
 	| 'bucket.overview'
 	| 'bucket.users'
@@ -44,6 +45,7 @@ export type PageKey =
 	| 'bucket.activity'
 	| 'bucket.settings'
 	| 'groups'
+	| 'group'
 	| 'audit'
 	| 'administrators'
 	| 'administrators.signIn'
@@ -84,6 +86,13 @@ export const ROUTES: readonly RouteSpec[] = [
 		pattern: ['projects', ':project', 'resources'],
 		section: 'projects',
 		area: 'Resources'
+	},
+	/* Where the project's bucket, group and name are changed (specs/085), so none lives only in a list menu. */
+	{
+		key: 'project.settings',
+		pattern: ['projects', ':project', 'settings'],
+		section: 'projects',
+		area: 'Settings'
 	},
 	{ key: 'buckets', pattern: ['buckets'], section: 'buckets' },
 	/* A bucket's bare address is its Overview (specs/081): a link that names the bucket lands there. */
@@ -210,6 +219,8 @@ export const ROUTES: readonly RouteSpec[] = [
 		area: 'Settings'
 	},
 	{ key: 'groups', pattern: ['groups'], section: 'groups' },
+	/* One administrator group (specs/085): its members, invitations and what it owns. */
+	{ key: 'group', pattern: ['groups', ':group'], section: 'groups' },
 	{ key: 'audit', pattern: ['audit'], section: 'audit' },
 	{
 		key: 'administrators',
@@ -461,4 +472,23 @@ export function userGroupHref(bucketId: string, groupId: string): string {
 
 export function projectHref(projectId: string, area = 'clients'): string {
 	return `/admin/projects/${encodeURIComponent(projectId)}/${area}`;
+}
+
+/*
+ * A project's Settings, optionally at one card. `bucket` preselects a bucket in the Bucket card's change
+ * dialog, so it implies that card.
+ */
+export function projectSettingsHref(
+	projectId: string,
+	options: { bucket?: string; card?: 'bucket' | 'ownership' | 'danger' } = {}
+): string {
+	const query = options.bucket
+		? `?bucket=${encodeURIComponent(options.bucket)}`
+		: '';
+	const card = options.card ?? (options.bucket ? 'bucket' : undefined);
+	return `${projectHref(projectId, 'settings')}${query}${card ? `#${card}` : ''}`;
+}
+
+export function groupHref(groupId: string): string {
+	return `/admin/groups/${encodeURIComponent(groupId)}`;
 }

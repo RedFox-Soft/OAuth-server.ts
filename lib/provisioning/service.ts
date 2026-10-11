@@ -102,7 +102,8 @@ export interface CreateConnectionInput {
 export async function createConnection(
 	bucket: UserBucket,
 	input: CreateConnectionInput,
-	record: RecordChange
+	/* Given the id the connection is about to have, so the entry can name it — audit-first has nothing else. */
+	record: (connectionId: string) => Promise<unknown>
 ): Promise<ProvisioningConnection> {
 	if (bucket._id === ADMIN_BUCKET_ID) {
 		throw new ProvisioningError(
@@ -126,11 +127,12 @@ export async function createConnection(
 	}
 	assertCorrelation(input.correlation);
 
-	await record();
+	const connectionId = nanoid();
+	await record(connectionId);
 	let connection: ProvisioningConnection;
 	try {
 		connection = await store().create({
-			_id: nanoid(),
+			_id: connectionId,
 			bucketId: bucket._id,
 			displayName: input.displayName,
 			enabled: true,

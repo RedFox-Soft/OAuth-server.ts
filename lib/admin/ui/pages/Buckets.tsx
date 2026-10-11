@@ -18,6 +18,7 @@ import { bucketHref } from '../frame/routes.js';
 import { bucketAddressFor } from '../bucketAddress.js';
 import { MoveToGroup } from '../MoveToGroup.js';
 import { isUndeletableBucket, reservedOf } from '../../consts.js';
+import { CreateDestination } from '../frame/CreateDestination.js';
 import { PageHeader } from '../frame/PageHeader.js';
 import { request } from '../frame/request.js';
 import { useFeedback } from '../frame/feedback.js';
@@ -376,6 +377,7 @@ export function Buckets() {
 				confirmLoading={creating}
 				destroyOnHidden
 			>
+				<CreateDestination onChange={() => setOpen(false)} />
 				<Form<CreateBucketValues>
 					form={form}
 					layout="vertical"

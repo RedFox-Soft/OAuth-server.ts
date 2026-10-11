@@ -16,6 +16,8 @@ import { request } from '../frame/request.js';
 import type { BucketCan } from '../frame/can.js';
 import { UNASSIGNED_GROUP_ID, reservedOf } from '../../consts.js';
 import type { BucketSummary, BucketView } from './bucketView.js';
+import { RecentChanges } from '../frame/RecentChanges.js';
+import { ProtectedResources, UseInProject } from './BucketProjects.js';
 
 /*
  * A bucket's landing page (specs/081): what needs attention, how to connect an application to it, how people
@@ -294,26 +296,31 @@ export function BucketOverview({
 								{
 									key: 'projects',
 									label: 'Used by',
-									children:
-										projects.length === 0 ? (
-											<Typography.Text type="secondary">
-												No project
-											</Typography.Text>
-										) : (
-											<Flex
-												wrap
-												gap={8}
-											>
-												{projects.map((p) => (
+									children: (
+										<Flex
+											wrap
+											gap={8}
+											align="center"
+										>
+											{projects.length === 0 ? (
+												<Typography.Text type="secondary">
+													No project
+												</Typography.Text>
+											) : (
+												projects.map((p) => (
 													<Link
 														key={p.id}
 														href={projectHref(p.id)}
 													>
 														{`${p.name} (${plural(p.clientCount, 'application', 'applications')})`}
 													</Link>
-												))}
-											</Flex>
-										)
+												))
+											)}
+											{can.edit && special === null && (
+												<UseInProject bucket={bucket} />
+											)}
+										</Flex>
+									)
 								},
 								{
 									key: 'created',
@@ -408,21 +415,14 @@ export function BucketOverview({
 				</Row>
 			)}
 
-			{can.edit && (
-				<Typography.Text>
-					Recent changes:{' '}
-					<Link
-						href={`/admin/audit?targetId=${encodeURIComponent(bucket._id)}`}
-					>
-						audit entries for this bucket
-					</Link>
-					{' · '}
-					<Link
-						href={`/admin/audit?targetScope=${encodeURIComponent(bucket._id)}`}
-					>
-						for its users and groups
-					</Link>
-				</Typography.Text>
+			<ProtectedResources bucket={bucket} />
+
+			{(can.edit || superAdmin) && (
+				<RecentChanges
+					title="Recent changes"
+					params={{ bucket: bucket._id }}
+					empty="No changes recorded for this bucket yet."
+				/>
 			)}
 		</Flex>
 	);

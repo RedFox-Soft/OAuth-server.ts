@@ -75,6 +75,19 @@ another, so `assertGroupOwner` refuses by membership kind while `assertSuperAdmi
 Super administrators — two independent dimensions, and conflating them is the mistake a `group_owner`
 privilege would have been. (Accounts carry no roles at all since spec 071; [[bucket-groups]].)
 
+**The group page (spec 085).** `/admin/groups/:id` (`lib/admin/ui/pages/groups/AdminGroupPage.tsx`) is run by
+the group's owners, not only by super administrators.
+- `GET /admin/api/groups/:id` gives every member their colleagues' emails and `active` flags. Before, the
+  console took names from the super-administrator-only administrator list, so an owner saw raw ids.
+- The read also gives `owns` (projects and buckets) and `can`: `manageMembers`, `invite` and `delete` for
+  owners of a regular group; `addExisting` for super administrators; `rename` everywhere but System.
+- List rows carry `owns` counts.
+- Any owner invites by email; the form states what the invitee will reach.
+- Removing a member states "they lose access to N projects and M buckets". Leaving has its own text.
+- The last owner's role change and removal are shown unavailable before the server's 409.
+- A refused deletion's blockers are `{kind: 'project' | 'bucket'}`; until 085 they were mislabelled `client`
+  and `enduser`.
+
 ## The hot path
 
 `contextFor` resolves `getGroupStore().listByMember(user._id)` on **every** admin request, for both

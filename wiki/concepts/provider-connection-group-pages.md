@@ -75,7 +75,9 @@ Build them there rather than by hand: the console bucket's providers live under 
 - **Overview** shows:
   - the counts, linked to the Users list (`?managedBy=`) and the User groups list (`?keptBy=`);
   - one Credentials row per slot;
-  - two History links to Audit (`actor=connection:<id>`, `targetId=<id>`);
+  - a History card (since spec 085, replacing two links) with All (`connection=<id>`), By the directory
+    (`actor=connection:<id>`) and By administrators (the connection as target), five entries each
+    ([[admin-audit-trail]]);
   - the hold panel (`HoldPanel.tsx`).
 - **Settings** holds name, matching, email trust and the safeguard under one save bar. Turning the safeguard
   off is a danger question.

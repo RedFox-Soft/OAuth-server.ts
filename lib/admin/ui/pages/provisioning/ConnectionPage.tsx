@@ -9,6 +9,7 @@ import {
 	Input,
 	InputNumber,
 	Radio,
+	Segmented,
 	Select,
 	Skeleton,
 	Switch,
@@ -51,6 +52,7 @@ import {
 	type Threshold
 } from './connectionShared.js';
 import { HoldPanel } from './HoldPanel.js';
+import { RecentChanges } from '../../frame/RecentChanges.js';
 import { deleteBlock, useConnectionActions } from './useConnectionActions.js';
 
 export type ConnectionTab = 'overview' | 'setup' | 'settings';
@@ -303,23 +305,7 @@ export function ConnectionPage({
 							onChanged={reload}
 						/>
 					</div>
-					<Card title="History">
-						<Flex
-							vertical
-							gap={4}
-						>
-							<Link
-								href={`/admin/audit?actor=${encodeURIComponent(`connection:${connection.id}`)}`}
-							>
-								Changes made by this directory →
-							</Link>
-							<Link
-								href={`/admin/audit?targetId=${encodeURIComponent(connection.id)}`}
-							>
-								Changes to this connection →
-							</Link>
-						</Flex>
-					</Card>
+					{can.edit && <ConnectionHistory connectionId={connection.id} />}
 					{can.edit && (
 						<Card
 							title="Danger zone"
@@ -1094,5 +1080,47 @@ function ConnectionSettings({
 				}}
 			/>
 		</Flex>
+	);
+}
+
+type HistoryView = 'all' | 'directory' | 'administrators';
+
+/*
+ * What happened to and through this connection (specs/085): everything, what the directory itself did, and
+ * what administrators changed about the connection. Shown to editors only — a partial history that looks
+ * complete answers the incident question wrongly.
+ */
+function ConnectionHistory({ connectionId }: { connectionId: string }) {
+	const [view, setView] = useState<HistoryView>('all');
+	const params: Record<HistoryView, Record<string, string>> = {
+		all: { connection: connectionId },
+		directory: { actor: `connection:${connectionId}` },
+		administrators: {
+			targetType: 'ProvisioningConnection',
+			targetId: connectionId
+		}
+	};
+	return (
+		<RecentChanges
+			title="History"
+			params={params[view]}
+			empty={
+				view === 'directory'
+					? 'The directory has changed nothing yet.'
+					: 'No changes recorded for this connection yet.'
+			}
+			extra={
+				<Segmented<HistoryView>
+					size="small"
+					value={view}
+					onChange={setView}
+					options={[
+						{ value: 'all', label: 'All' },
+						{ value: 'directory', label: 'By the directory' },
+						{ value: 'administrators', label: 'By administrators' }
+					]}
+				/>
+			}
+		/>
 	);
 }

@@ -26,7 +26,8 @@ function rootOwner(ctx: AdminContext): lifecycle.KeyOwner {
 	return {
 		id: ROOT_KEY_OWNER,
 		audit: async (verb, kid) => {
-			await recordAdminAudit(ctx, `jwks.${verb}`, kid);
+			/* `kid` as well as the target, so a reader finds the key in the same field on both key surfaces. */
+			await recordAdminAudit(ctx, `jwks.${verb}`, kid, { kid });
 		},
 		/*
 		 * Reloaded, not only dropped: the reload is what refreshes the mirror client registration reads the

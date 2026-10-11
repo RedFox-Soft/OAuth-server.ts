@@ -67,9 +67,11 @@ export interface AdminContext {
  * `ids` is present for clients and absent for end-users, which is a privacy decision rather than an
  * omission — a project's clients are objects the operator administers, while a bucket may hold thousands
  * of accounts whose identities are not the caller's business.
+ *
+ * `project` and `bucket` are what keep a group from being deleted: the containers it still owns, counted.
  */
 export interface DeletionBlocker {
-	readonly kind: 'client' | 'enduser';
+	readonly kind: 'client' | 'enduser' | 'project' | 'bucket';
 	readonly count: number;
 	readonly ids?: readonly string[];
 }

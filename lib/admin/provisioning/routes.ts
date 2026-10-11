@@ -118,15 +118,16 @@ export const provisioningRoutes = new Elysia({ name: 'admin-provisioning' })
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForEdit(ctx, params.id);
 			const created = await asAdmin(
-				createConnection(bucket, body, async () => {
+				createConnection(bucket, body, async (connectionId) => {
 					/*
-					 * The connection's id is allocated by the store, so the entry names the provider it binds;
-					 * the bucket travels as the scope. `attributes` are field names, never values.
+					 * The connection the entry creates, as every later entry about it is targeted (specs/085); entries
+					 * written before named the provider it binds. The bucket travels as the scope. `attributes` are
+					 * field names, never values.
 					 */
 					await recordAdminAudit(
 						ctx,
 						'provisioning.connection.create',
-						body.providerId,
+						connectionId,
 						{ attributes: Object.keys(body), ...scope(bucket) }
 					);
 				})

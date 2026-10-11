@@ -41,6 +41,18 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Changed
 
+- **Changing a project's bucket shows who breaks first; groups have a page; audit answers "what happened
+  here"** (spec 085). Setting or clearing a project's bucket now answers 409 with a preview — its applications by
+  name, the issuer before and after, that people signed in through them sign in again, and every declared resource
+  that moves or collides — and applies only with `confirm: true` and the same `expect`; API clients that did it in
+  one request must now confirm, and `project_bucket_assign`/`project_bucket_clear` are high-consequence. Token
+  behaviour is unchanged. A project has a Settings tab, project rows carry their bucket and application count, and
+  a bucket's declared resources are read with `bucket_resource_list`. An administrator group has a page where any
+  owner invites colleagues and every removal states what the member loses; group reads give members their
+  colleagues' emails and what the group owns, and a refused group deletion names projects and buckets as such.
+  The audit trail filters by `bucket`, `connection` and `actionPrefix`, records the key id of key operations and
+  the created connection as its target, and names directories; the bucket Overview and connection page show
+  recent changes.
 - **Identity providers, provisioning connections and user groups each have a page** (spec 084). Connecting a
   provider or a directory is a side-panel wizard that cannot finish without choosing who a first sign-in may
   create, or what happens when the directory removes many people at once; a provider page asks before a save that

@@ -199,8 +199,14 @@ describe('MCP tool catalogue', () => {
 			'jwks_generate',
 			'jwks_promote',
 			'jwks_retire',
-			/* Ends a customer's provisioning and revokes its tokens at once. */
+			/*
+			 * The issuer of every application in the project changes, so everyone signed in through them signs
+			 * in again, in a bucket where their accounts are not (specs/085).
+			 */
+			'project_bucket_assign',
+			'project_bucket_clear',
 			'project_owner_change',
+			/* Ends a customer's provisioning and revokes its tokens at once. */
 			'provisioning_connection_delete',
 			/* Re-admits the mass deprovisioning a connection's guard held. */
 			'provisioning_connection_release',

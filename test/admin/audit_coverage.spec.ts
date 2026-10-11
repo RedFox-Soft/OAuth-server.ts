@@ -233,17 +233,24 @@ describe('admin audit coverage: projects', () => {
 		const project = await makeProject();
 		const bucket = await makeBucket();
 
-		const res = await client.admin.api
-			.projects({ id: project._id })
-			.bucket.put({ bucketId: bucket._id }, { headers: { cookie } });
+		const res = await client.admin.api.projects({ id: project._id }).bucket.put(
+			{
+				bucketId: bucket._id,
+				confirm: true,
+				expect: { applications: 0, resources: 0 }
+			},
+			{ headers: { cookie } }
+		);
 		expect(res.status).toBe(200);
 
-		expectEntry(await soleEntry(project._id), {
+		const entry = await soleEntry(project._id);
+		expectEntry(entry, {
 			action: 'project.bucket.assign',
 			targetType: 'Project',
 			actorId: userId,
 			attributes: ['bucketId']
 		});
+		expect(entry.bucketId).toBe(bucket._id);
 	});
 });
 

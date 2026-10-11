@@ -197,7 +197,7 @@ describe('the owning group administrator', () => {
 		expect(states[String(body.kid)]).toBe('signing');
 	});
 
-	it('records every key action in the audit trail', async () => {
+	it('records every key action in the audit trail, naming the key it acted on', async () => {
 		const { cookie, groupId, userId } = await administrator('plain');
 		const bucket = await ownedBucket(groupId);
 		const { body } = await generate(bucket._id, cookie, 'RS256');
@@ -209,10 +209,14 @@ describe('the owning group administrator', () => {
 		await retire(bucket._id, cookie, demoted.kid);
 
 		const { entries } = await adminAuditStore.list({ actor: userId });
-		expect(entries.map((entry) => entry.action).sort()).toEqual([
-			'bucket.key.generate',
-			'bucket.key.promote',
-			'bucket.key.retire'
+		expect(
+			entries
+				.map((entry) => [entry.action, entry.kid])
+				.sort((x, y) => String(x[0]).localeCompare(String(y[0])))
+		).toEqual([
+			['bucket.key.generate', String(body.kid)],
+			['bucket.key.promote', String(body.kid)],
+			['bucket.key.retire', demoted.kid]
 		]);
 		expect(new Set(entries.map((entry) => entry.targetId))).toEqual(
 			new Set([bucket._id])

@@ -26,8 +26,30 @@ export const MoveProjectOwnerBody = t.Object({
 	confirm: t.Optional(t.Boolean())
 });
 
+/*
+ * Changing a project's bucket changes the issuer of every application in it, so it is two calls (specs/085):
+ * without `confirm` the route answers with a preview and changes nothing; `confirm` with the preview's
+ * `expect` applies it. The counts are what the consent was given to — an application or a declaration that
+ * arrived since was not on the screen, so a mismatch answers with the fresh preview instead.
+ *
+ * Whole numbers by `multipleOf`, as the bucket address change spells them: `t.Integer` coerces through a
+ * string branch.
+ */
+const BucketChangeExpect = t.Object({
+	applications: t.Number({ minimum: 0, multipleOf: 1 }),
+	resources: t.Number({ minimum: 0, multipleOf: 1 })
+});
+
 export const SetBucketBody = t.Object({
-	bucketId: t.String()
+	bucketId: t.String(),
+	confirm: t.Optional(t.Literal(true)),
+	expect: t.Optional(BucketChangeExpect)
+});
+
+/* Clearing is the same change towards the default bucket. The body is optional; without one it previews. */
+export const ClearBucketBody = t.Object({
+	confirm: t.Optional(t.Literal(true)),
+	expect: t.Optional(BucketChangeExpect)
 });
 
 /*

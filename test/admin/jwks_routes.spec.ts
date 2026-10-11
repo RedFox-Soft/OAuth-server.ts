@@ -277,7 +277,11 @@ describe('the root key set, administered', () => {
 
 			await promote(cookie, kid);
 
-			expect(await actions(kid)).toContain('jwks.promote');
+			const { entries } = await adminAuditStore.list({
+				targetId: kid,
+				action: 'jwks.promote'
+			});
+			expect(entries.map((entry) => entry.kid)).toEqual([kid]);
 		});
 
 		it('answers 404 for a key the instance does not hold', async () => {
@@ -312,6 +316,19 @@ describe('the root key set, administered', () => {
 			expect(res.status).toBe(409);
 			expect(res.body.reason).toBe('signing_key');
 			expect(await stateOf(cookie, bootRsa.kid)).toBe('signing');
+		});
+
+		it('records the retirement in the audit trail, naming the key', async () => {
+			const { cookie } = await sessionCookieFor('super');
+			const { kid } = shaped(KeyView, (await generate(cookie, 'ES256')).body);
+
+			await retire(cookie, kid);
+
+			const { entries } = await adminAuditStore.list({
+				targetId: kid,
+				action: 'jwks.retire'
+			});
+			expect(entries.map((entry) => entry.kid)).toEqual([kid]);
 		});
 
 		it('is refused for a key already retired', async () => {

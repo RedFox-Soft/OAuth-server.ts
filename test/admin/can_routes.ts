@@ -56,6 +56,7 @@ export const statedRightRoutes: readonly StatedRightRoute[] = [
 
 	{ on: 'bucket', flag: 'read', method: 'GET', path: BUCKET },
 	{ on: 'bucket', flag: 'read', method: 'GET', path: `${BUCKET}/summary` },
+	{ on: 'bucket', flag: 'read', method: 'GET', path: `${BUCKET}/resources` },
 	{
 		on: 'bucket',
 		flag: 'editSettings',

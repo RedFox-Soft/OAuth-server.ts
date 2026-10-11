@@ -1,4 +1,5 @@
 import type { AdminAuditEntry, AdminAuditQuery } from '../adapters/types.js';
+import { CONNECTION_ACTOR_PREFIX } from '../consts/admin_audit_routes.js';
 
 export const AUDIT_PAGE_DEFAULT_LIMIT = 50;
 export const AUDIT_PAGE_MAX_LIMIT = 200;
@@ -8,8 +9,8 @@ export const AUDIT_PAGE_MAX_LIMIT = 200;
  * adapters must behave identically (FR-017) and a duplicated clamp is exactly where the two would
  * drift apart — the way `revokeByGrantId` and email lowercasing already have.
  *
- * Imports only types, so the MongoDB store can use it without dragging anything into the test-time
- * import graph.
+ * Imports only types and the import-free audit table, so the MongoDB store can use it without dragging
+ * anything into the test-time import graph.
  */
 export function normalizeAuditPaging(query: AdminAuditQuery = {}): {
 	limit: number;
@@ -58,6 +59,38 @@ export function matchesAuditQuery(
 	}
 	if (query.action !== undefined && entry.action !== query.action) {
 		return false;
+	}
+	// A literal prefix, not a pattern: the stores escape it, so every backend reads `.` and `%` as text.
+	if (
+		query.actionPrefix !== undefined &&
+		!entry.action.startsWith(query.actionPrefix)
+	) {
+		return false;
+	}
+	/*
+	 * Four arms, because what happened "in a bucket" is recorded four ways: the bucket as the target, a target
+	 * resolving within it, and a project joining it or leaving it.
+	 */
+	if (query.bucket !== undefined) {
+		const b = query.bucket;
+		if (
+			!(entry.targetType === 'UserBucket' && entry.targetId === b) &&
+			entry.targetScope !== b &&
+			entry.bucketId !== b &&
+			entry.formerBucketId !== b
+		) {
+			return false;
+		}
+	}
+	/* What a directory did under its own credential, and what administrators did to its connection. */
+	if (query.connection !== undefined) {
+		const c = query.connection;
+		if (
+			entry.actorId !== `${CONNECTION_ACTOR_PREFIX}${c}` &&
+			!(entry.targetType === 'ProvisioningConnection' && entry.targetId === c)
+		) {
+			return false;
+		}
 	}
 	if (query.targetType !== undefined && entry.targetType !== query.targetType) {
 		return false;

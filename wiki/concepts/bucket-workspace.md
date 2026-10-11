@@ -33,6 +33,15 @@ and create only; each group, provider and connection has a page of its own
   (`issuer`, `discoveryUrl` on `GET /admin/api/buckets/:id`) because the browser bundle may not know the
   server's own address (`lib/configs/issuer.ts`). Unaddressed buckets get `null`, not an issuer that 404s.
 - **Sign-in at a glance**, read-only, with one link to change it, and the numbers.
+- Since spec 085:
+  - **Used by** lists the projects read-only. **Use in a project…** picks a project of the same group and opens
+    that project's Bucket card with this bucket chosen. The project owns the field, so the change and its
+    preview happen there ([[container-ownership-transfer]]).
+  - **Protected resources** lists every resource declared in the bucket's namespace, with the project that
+    declared it (`GET /admin/api/buckets/:id/resources`, [[mcp-server-authorization]]).
+  - **Recent changes** shows the bucket's five latest audit entries (`bucket=<id>`, [[admin-audit-trail]]). It
+    is shown only to editors and super administrators: a users-only caller would see a partial history that
+    looks complete.
 
 The counts come from `GET /admin/api/buckets/:id/summary` (`lib/admin/buckets/routes.ts:777`), which uses one
 new adapter read, `UserStoreInstance.tally()` (`lib/adapters/types.ts:477`): total, unverified, without an
@@ -76,7 +85,8 @@ nothing new. `blockers.dependents` and `blockers.accounts` carry the facts so th
 - The list's `held` flag comes from one read, `ProvisioningConnectionStore.bucketsHolding()`
   (`lib/adapters/types.ts:1360`); the MongoDB version uses an aggregation because `distinct` is refused under the
   strict Stable API.
-- The Audit page reads its filters from its address, so the Overview can link to a bucket's entries.
+- The Audit page reads its filters from its address, so the Overview can link to a bucket's entries. Since spec
+  085 it also writes them back and shows each as a removable chip ([[admin-audit-trail]]).
 
 ## Related
 

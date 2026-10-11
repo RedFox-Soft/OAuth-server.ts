@@ -14,19 +14,40 @@ import {
 	withAuditDefaults
 } from '../../helpers/admin_audit_query.js';
 import nanoid from '../../helpers/nanoid.js';
+import { CONNECTION_ACTOR_PREFIX } from '../../consts/admin_audit_routes.js';
+
+/* A user's text, matched literally: every character a regular expression gives meaning to is escaped. */
+function literalPrefix(text: string): RegExp {
+	return new RegExp(`^${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`);
+}
 
 /*
- * Translates a query into a filter document. Every clause is an exact match except the time window,
- * and the actor is a two-arm `$or` because one filter has to reach both actorId and actorEmail — both
- * are indexed for it (see the adminAudit entry in the storage inventory).
+ * Translates a query into a filter document. Every clause is an exact match except the time window and the
+ * action prefix, and several are disjunctions: the actor reaches both actorId and actorEmail, the group
+ * boundary both owner fields, a bucket four fields and a connection two — each arm indexed (see the
+ * adminAudit entry in the storage inventory). A filter document holds one `$or`, so every disjunction goes
+ * under `$and` as one clause of its own.
  */
 function toFilter(query: AdminAuditQuery): Filter<AdminAuditEntry> {
 	const filter: Filter<AdminAuditEntry> = {};
+	const disjunctions: Filter<AdminAuditEntry>[][] = [];
 	if (query.actor !== undefined) {
-		filter.$or = [{ actorId: query.actor }, { actorEmail: query.actor }];
+		disjunctions.push([{ actorId: query.actor }, { actorEmail: query.actor }]);
 	}
 	if (query.action !== undefined) {
 		filter.action = query.action;
+	}
+	/*
+	 * Anchored, so the index on `action` serves it as a range scan. Combined with an exact `action` under
+	 * `$and` rather than overwriting it: both filters narrow, neither replaces the other.
+	 */
+	if (query.actionPrefix !== undefined) {
+		const prefix = { action: { $regex: literalPrefix(query.actionPrefix) } };
+		if (filter.action === undefined) {
+			filter.action = prefix.action;
+		} else {
+			disjunctions.push([prefix]);
+		}
 	}
 	if (query.targetType !== undefined) {
 		filter.targetType = query.targetType;
@@ -37,6 +58,20 @@ function toFilter(query: AdminAuditQuery): Filter<AdminAuditEntry> {
 	if (query.targetScope !== undefined) {
 		filter.targetScope = query.targetScope;
 	}
+	if (query.bucket !== undefined) {
+		disjunctions.push([
+			{ targetType: 'UserBucket', targetId: query.bucket },
+			{ targetScope: query.bucket },
+			{ bucketId: query.bucket },
+			{ formerBucketId: query.bucket }
+		]);
+	}
+	if (query.connection !== undefined) {
+		disjunctions.push([
+			{ actorId: `${CONNECTION_ACTOR_PREFIX}${query.connection}` },
+			{ targetType: 'ProvisioningConnection', targetId: query.connection }
+		]);
+	}
 	/*
 	 * Applied here, where the entries are selected, rather than by filtering a wider result afterwards.
 	 * This is the tenant boundary of the audit read: a restriction imposed after the fact is one a bug
@@ -45,20 +80,18 @@ function toFilter(query: AdminAuditQuery): Filter<AdminAuditEntry> {
 	 * `$in` over an empty array matches nothing, which is the intended reading — see the note in
 	 * matchesAuditQuery, which both adapters have to agree with.
 	 *
-	 * Two arms because a move belongs to the group it left as well as the one it joined. Combined with
-	 * the actor's `$or` under `$and`, since a filter document holds only one `$or`.
+	 * Two arms because a move belongs to the group it left as well as the one it joined.
 	 */
 	if (query.ownerGroupIds !== undefined) {
-		const groupArms: Filter<AdminAuditEntry>[] = [
+		disjunctions.push([
 			{ ownerGroupId: { $in: query.ownerGroupIds } },
 			{ formerOwnerGroupId: { $in: query.ownerGroupIds } }
-		];
-		if (filter.$or === undefined) {
-			filter.$or = groupArms;
-		} else {
-			filter.$and = [{ $or: filter.$or }, { $or: groupArms }];
-			delete filter.$or;
-		}
+		]);
+	}
+	if (disjunctions.length > 0) {
+		filter.$and = disjunctions.map((arms) =>
+			arms.length === 1 ? arms[0] : { $or: arms }
+		);
 	}
 	if (query.viaSurface !== undefined) {
 		/*

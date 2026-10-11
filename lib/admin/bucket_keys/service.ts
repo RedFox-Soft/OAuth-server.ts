@@ -40,9 +40,11 @@ export async function loadKeyedBucket(
 function ownerOf(ctx: AdminContext, bucket: UserBucket): lifecycle.KeyOwner {
 	return {
 		id: bucket._id,
-		audit: async (verb) => {
+		audit: async (verb, kid) => {
+			/* The target is the bucket, as for every bucket setting; the key it acted on rides beside it. */
 			await recordAdminAudit(ctx, `bucket.key.${verb}`, bucket._id, {
-				ownerGroupId: bucket.ownerGroupId
+				ownerGroupId: bucket.ownerGroupId,
+				kid
 			});
 		},
 		invalidate: () => invalidateBucketKeys(bucket._id)

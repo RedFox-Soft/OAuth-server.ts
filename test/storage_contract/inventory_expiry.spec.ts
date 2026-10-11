@@ -241,7 +241,9 @@ describe('storage inventory: expiry', () => {
 			{ key: { targetType: 1, targetId: 1, timestamp: 1 } },
 			{ key: { targetScope: 1, timestamp: 1 } },
 			{ key: { ownerGroupId: 1, timestamp: 1 } },
-			{ key: { formerOwnerGroupId: 1, timestamp: 1 } }
+			{ key: { formerOwnerGroupId: 1, timestamp: 1 } },
+			{ key: { bucketId: 1, timestamp: 1 } },
+			{ key: { formerBucketId: 1, timestamp: 1 } }
 		]);
 		expect(
 			specs.some((spec) => spec.expireAfterSeconds !== undefined)

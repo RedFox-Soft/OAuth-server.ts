@@ -33,11 +33,13 @@ export interface ActionSpec {
 export const ACTIONS = {
 	'project.create': { class: 'C0' },
 	'project.origins.save': { class: 'C0' },
-	'project.bucket.change': {
-		class: 'C2',
-		title: (t) => `Change the user bucket of ${t}?`,
-		okText: 'Change bucket'
-	},
+	/*
+	 * Every application of the project gets a new issuer and everyone signed in through them signs in again;
+	 * only the server knows the full list (specs/085), so both are previewed, for agents too.
+	 */
+	'project.bucket.change': { class: 'C4' },
+	'project.bucket.clear': { class: 'C4' },
+	'project.rename': { class: 'C0' },
 	'project.move': { class: 'C4' },
 	'project.delete': { class: 'C3', word: 'delete' },
 
@@ -56,8 +58,9 @@ export const ACTIONS = {
 
 	'resource.declare': { class: 'C0' },
 	'resource.edit': { class: 'C0' },
+	// Any application of the project may hold tokens for it, so the question names them (specs/085).
 	'resource.remove': {
-		class: 'C1',
+		class: 'C2',
 		title: (t) => `Remove ${t} from this project?`,
 		okText: 'Remove'
 	},
@@ -232,10 +235,16 @@ export const ACTIONS = {
 		title: (t) => `Delete group ${t}?`,
 		okText: 'Delete group'
 	},
+	'group.rename': { class: 'C0' },
 	'group.member.add': { class: 'C0' },
-	'group.member.promote': { class: 'C0' },
-	'group.member.demote': {
+	// An owner may invite, remove and delete: widening who controls the group is asked as danger (specs/085).
+	'group.member.promote': {
 		class: 'C2',
+		title: (t) => `Make ${t} an owner?`,
+		okText: 'Make owner'
+	},
+	'group.member.demote': {
+		class: 'C1',
 		title: (t) => `Make ${t} a member instead of an owner?`,
 		okText: 'Make member'
 	},
@@ -243,6 +252,18 @@ export const ACTIONS = {
 		class: 'C2',
 		title: (t) => `Remove ${t} from this group?`,
 		okText: 'Remove'
+	},
+	'group.member.leave': {
+		class: 'C2',
+		title: (t) => `Leave ${t}?`,
+		okText: 'Leave group'
+	},
+	// The form states what the invitee will reach; its danger submit is the consent.
+	'group.invite': { class: 'C2', okText: 'Send invitation', inline: true },
+	'group.invitation.revoke': {
+		class: 'C1',
+		title: (t) => `Revoke the invitation to ${t}?`,
+		okText: 'Revoke'
 	},
 
 	'admin.create': { class: 'C0' },

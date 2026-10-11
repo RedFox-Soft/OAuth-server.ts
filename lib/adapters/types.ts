@@ -682,6 +682,23 @@ export const AdminAuditEntry = t.Object({
 	 */
 	formerOwnerGroupId: t.Optional(t.Union([t.String(), t.Null()])),
 	/*
+	 * The bucket a project now uses, set only by `project.bucket.assign`, and the bucket it used before, set
+	 * by an assignment that replaced one and by `project.bucket.clear` (specs/085).
+	 *
+	 * A project's bucket change belongs to the history of both buckets — the one it joined and the one it
+	 * left — and neither is where the project resolves, which is what `targetScope` means. Two fields rather
+	 * than an array because each needs an ordinary index to serve the bucket filter on every backend.
+	 *
+	 * Optional for the reason `attributes` is: no backfill, only absence on older entries.
+	 */
+	bucketId: t.Optional(t.Union([t.String(), t.Null()])),
+	formerBucketId: t.Optional(t.Union([t.String(), t.Null()])),
+	/*
+	 * The signing key a key action acted on (`bucket.key.*`, `jwks.*`). A key id is public — it is in every
+	 * token header the key signs — so it is a value the trail may carry, unlike a field's value.
+	 */
+	kid: t.Optional(t.Union([t.String(), t.Null()])),
+	/*
 	 * Names of the fields the request set — never their values, so no secret can reach the trail
 	 * through this field. Optional because entries written before it existed do not carry it, and the
 	 * trail is immutable: there is no backfill, only a read-side default.
@@ -763,6 +780,16 @@ export interface AdminAuditQuery {
 	 */
 	viaSurface?: string;
 	viaClientId?: string;
+	/*
+	 * Everything that happened to or in one bucket (specs/085): the bucket itself as the target, anything
+	 * resolving within it (`targetScope`), and a project joining or leaving it (`bucketId`,
+	 * `formerBucketId`). A narrowing like every other filter — the group boundary above still applies.
+	 */
+	bucket?: string;
+	/* What one provisioning connection did (its `connection:<id>` actor) and what was done to it. */
+	connection?: string;
+	/* Actions starting with this text, matched literally: `bucket.key.` is every key action of a bucket. */
+	actionPrefix?: string;
 	/* Inclusive bounds on `timestamp`; either is valid alone. */
 	from?: Date;
 	to?: Date;

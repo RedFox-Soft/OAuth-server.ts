@@ -9,6 +9,7 @@ import {
 	CreateProjectBody,
 	UpdateProjectBody,
 	SetBucketBody,
+	ClearBucketBody,
 	MoveProjectOwnerBody
 } from '../admin/projects/schema.js';
 import { CreateClientBody, UpdateClientBody } from '../admin/clients/schema.js';
@@ -203,7 +204,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: [],
 		summary:
-			"Every project a super-administrator can see, or just the projects the caller manages. Each row carries `can`, the caller's rights on it, and `blockers.hasBucket`, as project_get does."
+			"Every project a super-administrator can see, or just the projects the caller manages. Each row carries `can`, the caller's rights on it, `blockers.hasBucket`, `bucket` and `clientCount`, as project_get does."
 	},
 	{
 		tool: 'project_get',
@@ -216,7 +217,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'One project: name, slug, managers, assigned user bucket, client ids, and CORS origins. `can` states which operations the server will accept from the caller on it: `edit` (project_update), `delete`, `manageClients` (client_*), `declareResources` (resource_declare, resource_update, resource_delete), `assignBucket` (project_bucket_assign, project_bucket_clear) and `move` (project_owner_change); a false flag is a refusal, so do not try it. A right is not a promise about state: `blockers.hasBucket` means the project moves only with its bucket. Deleting a project stays console-only for agents even where `can.delete` is true.'
+			'One project: name, slug, managers, assigned user bucket, client ids, and CORS origins. `can` states which operations the server will accept from the caller on it: `edit` (project_update), `delete`, `manageClients` (client_*), `declareResources` (resource_declare, resource_update, resource_delete), `assignBucket` (project_bucket_assign, project_bucket_clear) and `move` (project_owner_change); a false flag is a refusal, so do not try it. A right is not a promise about state: `blockers.hasBucket` means the project moves only with its bucket. `bucket` names the bucket its applications sign in through — `id`, `name` and `addressForm` (root, path, host or unaddressed) — or is null for the default bucket; `clientCount` is how many applications it holds. Deleting a project stays console-only for agents even where `can.delete` is true.'
 	},
 	{
 		tool: 'resource_list',
@@ -320,7 +321,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: [],
 		summary:
-			'The groups this administrator belongs to. A group owns projects and user buckets, and belonging to it is what grants access to them.'
+			'The groups this administrator belongs to (every group, for a super administrator). A group owns projects and user buckets, and belonging to it is what grants access to them; each row counts what it owns as `owns.projects` and `owns.buckets`.'
 	},
 	{
 		tool: 'group_get',
@@ -333,7 +334,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'One group: its name, kind, and the administrators in it with their membership kind. A plain member may read this; only an owner may change it.'
+			"One group: its name, kind, and the administrators in it — each with `role`, `email` and `active` (false for a deactivated account), owners first. `owns` names the projects and buckets it owns, which are what keep it from being deleted. `can` states what the server will accept from the caller on it: `manageMembers` (group_member_update, group_member_remove), `invite` (group_invite, group_invitation_revoke), `addExisting` (group_member_add — stated only for a super administrator, the one caller who can list administrators to choose from, though an owner who knows an administrator's id is accepted too), `rename` (group_update) and `delete`; a personal group can be renamed and nothing else, and the System group nothing. Readable by its members and super administrators."
 	},
 	{
 		tool: 'group_invitation_list',
@@ -399,6 +400,19 @@ const catalogue = [
 		pathParams: ['id'],
 		summary:
 			"Count what a user bucket holds, computed when asked: its accounts (`users`), how many are unverified, without an authenticator and without any linked upstream identity; its user groups; its provisioning connections and how many are holding a deprovisioning (`held`); its identity providers (`providers.enabled`, and `providers.creating` — enabled ones that create accounts on first sign-in); and whether mail delivery is configured. `withoutEnabledLink` counts accounts with no link to an enabled identity provider (who could not sign in were passwords turned off) and `passwordWithoutAuthenticator` accounts with no authenticator whose password is not known to be absent (who an authenticator requirement would ask to enrol); on the default bucket `projects` counts the projects signing in there, those naming no bucket included. `activeThisMonth` is present only to a caller with `can.readActivity`, and absent rather than zero before counting began. Counts only, never who. Readable by anyone who may read the bucket (bucket_get's `can.read`)."
+	},
+	{
+		tool: 'bucket_resource_list',
+		method: 'GET',
+		path: '/admin/api/buckets/:id/resources',
+		action: null,
+		consequence: 'read',
+		superAdminOnly: false,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			"The protected resources declared in a user bucket's namespace, sorted by identifier, each with `name` and the project (`projectId`, `projectName`) that declares it. `namespace` is `bucket` for a bucket with an address of its own — an identifier is unique across all its projects — or `root` for one served at the root, which shares the root namespace with every other root-served bucket and every project with no bucket; then only this bucket's own projects' declarations are listed. Readable by anyone who may read the bucket (bucket_get's `can.read`)."
 	},
 	{
 		tool: 'bucket_activity_get',
@@ -669,7 +683,7 @@ const catalogue = [
 		querySchema: AuditQuery,
 		pathParams: [],
 		summary:
-			'The administrative audit trail for the groups this administrator belongs to, newest first, filterable by actor, action, target, surface and time window. A super administrator sees the whole instance, including actions that belong to no group. Filter `viaSurface=mcp` for actions taken through an agent, `viaSurface=scim` for changes a provisioning connection made and `viaSurface=upstream` for sign-outs an upstream identity provider requested. An entry means an authorized actor reached the point of applying a change, not that the change took effect.'
+			'The administrative audit trail for the groups this administrator belongs to, newest first, filterable by actor, action, target, surface and time window. A super administrator sees the whole instance, including actions that belong to no group. Filter `viaSurface=mcp` for actions taken through an agent, `viaSurface=scim` for changes a provisioning connection made and `viaSurface=upstream` for sign-outs an upstream identity provider requested. `bucket=<id>` returns everything that happened to or in one bucket: its own settings, address, keys and providers, the users, user groups, provisioning and resources within it, and projects joining or leaving it (those entries carry `bucketId` and `formerBucketId`). `connection=<id>` returns what one provisioning connection did and what administrators did to it. `actionPrefix` matches actions starting with the text, such as `bucket.key.`. Filters only narrow what the caller may already read. Key actions carry the `kid` they acted on. An entry whose actor is a provisioning connection (`connection:<id>`) or an upstream identity provider (`upstream:<bucket>:<provider>`) carries `actorName`, its name now, or null when it no longer exists. An entry means an authorized actor reached the point of applying a change, not that the change took effect.'
 	},
 	{
 		tool: 'error_list',
@@ -770,13 +784,19 @@ const catalogue = [
 		method: 'PUT',
 		path: '/admin/api/projects/:id/bucket',
 		action: 'project.bucket.assign',
-		consequence: 'ordinary',
+		/*
+		 * `high` since specs/085: changing a project's bucket changes the issuer of every application in it, so
+		 * everyone signed in through them signs in again, in a bucket where their accounts are not. The route's
+		 * own preview stays as well, because the gate's report reads no entity state and so cannot name the
+		 * applications; the gate binds `expect` through the argument hash.
+		 */
+		consequence: 'high',
 		superAdminOnly: false,
 		bodySchema: SetBucketBody,
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'Assign the user bucket whose accounts this project’s clients authenticate against. The bucket must belong to the same group as the project, so not every bucket bucket_list returns can be assigned to every project. The default bucket is never assignable — it belongs to no group — and does not need to be: a project with no bucket already signs its users in from it, so project_bucket_clear is how that is chosen. project_get states the right as `can.assignBucket`.'
+			'Assign the user bucket whose accounts this project’s clients authenticate against. The bucket must belong to the same group as the project, so not every bucket bucket_list returns can be assigned to every project. The default bucket is never assignable — it belongs to no group — and does not need to be: a project with no bucket already signs its users in from it, so project_bucket_clear is how that is chosen. Called without `confirm`, it changes nothing and answers with a preview: `from` and `to` (each `bucketId`, `name`, `issuer`), `applications` (every client of the project, by name), `resources` (the declarations that move namespace), `conflicts` (identifiers already declared where they would go), `rootRefused`, `blocked`, `consequence` and `expect`, the counts. Called with `confirm: true` and that `expect`, it applies the change: the issuer of every listed application changes, people signed in through them sign in again in the new bucket and their accounts do not move, and tokens already issued keep working until they expire. If what it reaches changed since the preview, it is refused with 409 and the fresh preview; a `blocked` preview is refused when confirmed. project_get states the right as `can.assignBucket`.'
 	},
 	{
 		tool: 'project_bucket_clear',
@@ -784,16 +804,16 @@ const catalogue = [
 		path: '/admin/api/projects/:id/bucket',
 		action: 'project.bucket.clear',
 		/*
-		 * Ordinary, like the assignment it undoes. It changes which accounts a project's clients
-		 * authenticate, which is disruptive, but it destroys nothing and is reversed by assigning again.
+		 * `high`, like the assignment it undoes (specs/085): it destroys nothing and is reversed by assigning
+		 * again, but it changes the issuer of every application in the project just the same.
 		 */
-		consequence: 'ordinary',
+		consequence: 'high',
 		superAdminOnly: false,
-		bodySchema: null,
+		bodySchema: ClearBucketBody,
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'Remove the user bucket assigned to this project, returning its clients to the default bucket. Reversed by assigning one again. project_get states the right as `can.assignBucket`; with resources declared, only a super-administrator may clear it, because they move into the shared root namespace.'
+			'Remove the user bucket assigned to this project, returning its clients to the default bucket. Reversed by assigning one again. Called without `confirm`, it changes nothing and answers with the same preview as project_bucket_assign, `to` being the default bucket; call again with `confirm: true` and the preview’s `expect` to apply it, and a changed count answers with the fresh preview. project_get states the right as `can.assignBucket`; with resources declared, only a super-administrator may clear it, because they move into the shared root namespace — the preview says so as `rootRefused`.'
 	},
 	{
 		tool: 'project_owner_change',

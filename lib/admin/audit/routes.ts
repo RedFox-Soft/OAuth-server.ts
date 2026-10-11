@@ -1,6 +1,14 @@
 import { Elysia } from 'elysia';
-import { adminAuditStore } from '../../adapters/index.js';
-import type { AdminAuditQuery } from '../../adapters/types.js';
+import {
+	adminAuditStore,
+	getBucketStore,
+	getProvisioningConnectionStore
+} from '../../adapters/index.js';
+import type { AdminAuditEntry, AdminAuditQuery } from '../../adapters/types.js';
+import {
+	CONNECTION_ACTOR_PREFIX,
+	UPSTREAM_ACTOR_PREFIX
+} from '../../consts/admin_audit_routes.js';
 import {
 	assertAuth,
 	AdminError,
@@ -36,6 +44,40 @@ function assertNoUnknownParams(url: string): void {
 	}
 }
 
+/*
+ * What a non-person actor is called now, read when the page is read and never stored (specs/085): a
+ * directory's connection by its display name, an upstream provider by its own. The trail keeps the id,
+ * which outlives the name; null says the thing the id named is gone, which an investigator needs to know.
+ *
+ * One read per distinct actor on the page, not per entry: a directory's sync writes runs of entries under
+ * one actor. Only actors on entries the caller was already allowed to read are resolved, and each names a
+ * connection or provider of a bucket those entries belong to, so the names widen nothing.
+ */
+async function actorNames(
+	entries: readonly AdminAuditEntry[]
+): Promise<Map<string, string | null>> {
+	const names = new Map<string, string | null>();
+	for (const actorId of new Set(entries.map((entry) => entry.actorId))) {
+		if (actorId.startsWith(CONNECTION_ACTOR_PREFIX)) {
+			const connection = await getProvisioningConnectionStore().find(
+				actorId.slice(CONNECTION_ACTOR_PREFIX.length)
+			);
+			names.set(actorId, connection?.displayName ?? null);
+		} else if (actorId.startsWith(UPSTREAM_ACTOR_PREFIX)) {
+			/* A bucket id never holds a ':', so the first one after the prefix ends it; the provider id is the rest. */
+			const rest = actorId.slice(UPSTREAM_ACTOR_PREFIX.length);
+			const split = rest.indexOf(':');
+			const bucket =
+				split > 0 ? await getBucketStore().find(rest.slice(0, split)) : null;
+			const provider = bucket?.federation.find(
+				(p) => p.id === rest.slice(split + 1)
+			);
+			names.set(actorId, provider?.displayName ?? null);
+		}
+	}
+	return names;
+}
+
 function parseBound(value: string | undefined, name: string): Date | undefined {
 	if (value === undefined || value === '') {
 		return undefined;
@@ -61,7 +103,8 @@ function parsePositiveInt(value: string | undefined, fallback: number): number {
 }
 
 /*
- * The audit trail's read surface. Super-admin only, newest first, paged.
+ * The audit trail's read surface: the caller's groups, or the instance for a super administrator; newest
+ * first, paged, and each non-person actor named as it is called now.
  *
  * Deliberately read-only: no POST/PUT/PATCH/DELETE is served on this path or below it, because the
  * trail is append-only by construction and an alteration surface would defeat the property it exists
@@ -134,6 +177,13 @@ export const auditRoutes = new Elysia({ name: 'admin-audit' })
 				...(query.viaClientId === undefined
 					? {}
 					: { viaClientId: query.viaClientId }),
+				...(query.bucket === undefined ? {} : { bucket: query.bucket }),
+				...(query.connection === undefined
+					? {}
+					: { connection: query.connection }),
+				...(query.actionPrefix === undefined
+					? {}
+					: { actionPrefix: query.actionPrefix }),
 				...(from === undefined ? {} : { from }),
 				...(to === undefined ? {} : { to }),
 				...(ownerGroupIds === undefined ? {} : { ownerGroupIds }),
@@ -142,9 +192,19 @@ export const auditRoutes = new Elysia({ name: 'admin-audit' })
 			};
 
 			const { entries, total } = await adminAuditStore.list(filters);
+			const names = await actorNames(entries);
 			// `page`/`pageSize` are echoed as applied, not as submitted, so a clamped request does not
 			// leave the caller paging against a size the server never used.
-			return { entries, total, page, pageSize };
+			return {
+				entries: entries.map((entry) =>
+					names.has(entry.actorId)
+						? { ...entry, actorName: names.get(entry.actorId) ?? null }
+						: entry
+				),
+				total,
+				page,
+				pageSize
+			};
 		},
 		{ query: AuditQuery }
 	);

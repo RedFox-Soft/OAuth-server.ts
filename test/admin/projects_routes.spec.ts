@@ -200,7 +200,10 @@ describe('projects API', () => {
 
 		const res = await client.admin.api
 			.projects({ id: proj._id })
-			.bucket.delete(undefined, { headers: { cookie: su.cookie } });
+			.bucket.delete(
+				{ confirm: true, expect: { applications: 0, resources: 0 } },
+				{ headers: { cookie: su.cookie } }
+			);
 
 		expect(res.status).toBe(200);
 		expect((await getProjectStore().find(proj._id))?.bucketId).toBeNull();

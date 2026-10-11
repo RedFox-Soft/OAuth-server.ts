@@ -20,7 +20,7 @@ import { meCan, useMe } from '../frame/me.js';
 import { PreviewConfirm, type PreviewStep } from '../frame/PreviewConfirm.js';
 import { request } from '../frame/request.js';
 import { Link, useLeaveGuard, useNavigate } from '../frame/router.js';
-import { projectHref } from '../frame/routes.js';
+import { projectSettingsHref } from '../frame/routes.js';
 import { DeleteBucketDialog } from './DeleteBucketDialog.js';
 import type { AddressPreview, BucketView } from './bucketView.js';
 
@@ -521,7 +521,11 @@ export function BucketSettings({
 											{usedBy.map((p, i) => (
 												<span key={p.id}>
 													{i > 0 ? ', ' : ''}
-													<Link href={projectHref(p.id)}>{p.name}</Link>
+													<Link
+														href={projectSettingsHref(p.id, { card: 'bucket' })}
+													>
+														{p.name}
+													</Link>
 												</span>
 											))}{' '}
 											— assign them another bucket first.
