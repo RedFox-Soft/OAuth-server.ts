@@ -168,8 +168,12 @@ describe('MCP tool catalogue', () => {
 		const high = mcpCatalogue.filter((t) => t.consequence === 'high');
 		expect(high.map((t) => t.tool).sort()).toEqual([
 			'admin_deactivate',
+			/* Ends a colleague's console sessions and every token issued to them, agents' included. */
+			'admin_sign_out',
 			'admin_super_grant',
 			'admin_super_withdraw',
+			/* Removes a second factor from an account that administers the instance. */
+			'admin_totp_clear',
 			'admin_update',
 			'bucket_address_change',
 			/* Makes a group read-only to every administrator and hands it to an external directory. */

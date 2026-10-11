@@ -1,6 +1,5 @@
 import { getUserStore } from '../../adapters/index.js';
 import type { UserBucket } from '../../adapters/types.js';
-import { mailDeliveryConfigured } from '../../mail/mailer.js';
 import { AdminError, type AdminContext } from '../auth/rbac.js';
 import { ADMIN_BUCKET_ID } from '../consts.js';
 import {
@@ -20,9 +19,10 @@ import {
  * cannot go off while every remaining door leads nowhere. An agent has no console session and never qualifies.
  *
  * Requiring verification is the one that needed a guard of its own. It refuses every unverified
- * administrator at the door, so it may be turned on only when the message can actually be sent, and only by
- * someone the requirement cannot lock out: the person changing it must already have proven their own
- * address, so the requirement can never refuse the one administrator who set it.
+ * administrator at the door, so it may be turned on only when the message can actually be sent — the route
+ * refuses that on every bucket (specs/083) — and only by someone the requirement cannot lock out: the person
+ * changing it must already have proven their own address, so the requirement can never refuse the one
+ * administrator who set it.
  */
 export async function assertAdminBucketChange(
 	ctx: AdminContext,
@@ -33,12 +33,6 @@ export async function assertAdminBucketChange(
 		await assertMayTurnPasswordsOff(ctx, bucket);
 	}
 	if (patch.emailVerificationRequired !== true) return;
-	if (!(await mailDeliveryConfigured())) {
-		throw new AdminError(
-			409,
-			'administrators could not receive the verification message: configure mail delivery first'
-		);
-	}
 	const acting = await getUserStore(ADMIN_BUCKET_ID).find(ctx.userId);
 	if (!acting?.verified) {
 		throw new AdminError(

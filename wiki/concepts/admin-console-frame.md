@@ -27,8 +27,8 @@ One pure route table, `ROUTES` (`lib/admin/ui/frame/routes.ts:57`), is read by b
   `/admin/login?next=<address>`, and serves the one public page, `/admin/accept-invitation`, without a
   session. A mistyped `/admin/api/*` path stays a JSON 404 and is never rendered as a page. `REDIRECTS`
   (`routes.ts:156`) send `/admin` to `/admin/projects`, and a project's bare address to its first tab. A bucket's bare address
-is a page of its own since spec 081, its Overview ([[bucket-workspace]]); only the administrators' bucket
-still redirects.
+is a page of its own since spec 081, its Overview ([[bucket-workspace]]). Since spec 083 every address of the
+administrators' bucket redirects to the matching tab of `/admin/administrators` ([[bucket-sign-in-policy]]).
 - **The client.** The path goes into `window.PROPS.path` and becomes the server snapshot of an in-house
   history router (`frame/router.tsx:74`). It is `useSyncExternalStore` over `pushState`/`popstate`, so the
   first client render matches the HTML.

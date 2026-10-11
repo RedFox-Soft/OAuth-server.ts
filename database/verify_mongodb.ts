@@ -5,6 +5,7 @@ import {
 	verifyEndUserSearch
 } from './verify_end_user_identity.js';
 import { verifyProvisioningConnections } from './verify_provisioning_connections.js';
+import { verifyAdminSessionsByUser } from './verify_admin_sessions.js';
 import { verifyBucketGroups } from './verify_bucket_groups.js';
 import { verifyActivity } from './verify_activity.js';
 import {
@@ -44,6 +45,7 @@ delete process.env.POSTGRES_URL;
 const {
 	ActivityStore,
 	AdminAuditStore,
+	AdminSessionStore,
 	BucketGroupStore,
 	BucketKeysStore,
 	ContainerOwnershipStore,
@@ -422,6 +424,17 @@ await verifyAddressChangeForgetsArrivals(
 	check
 );
 await verifyProvisioningConnections(new ProvisioningConnectionStore(), check);
+
+/* Provisioned by db:setup from the inventory: the index ending an administrator's sessions reads by (specs/083). */
+const sessionIndexes = await db.collection(STORE_AREAS.adminSession).indexes();
+check(
+	'console sessions are indexed by the administrator they belong to',
+	sessionIndexes.some(
+		(index) => JSON.stringify(index.key) === JSON.stringify({ userId: 1 })
+	),
+	sessionIndexes.map((index) => JSON.stringify(index.key)).join(', ')
+);
+await verifyAdminSessionsByUser(new AdminSessionStore(), check);
 
 console.log(
 	`\n${failures === 0 ? 'all fidelity checks passed' : `${failures} check(s) FAILED`}`

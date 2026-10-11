@@ -15,6 +15,7 @@ import type { FederationProvider } from 'lib/federation/types.ts';
 import { sessionFor } from '../admin_session.ts';
 import { answered } from './answered.ts';
 import { createAdministrator } from '../administrators.ts';
+import { consenting } from './sign_in_consent.ts';
 
 /*
  * A bucket nobody can sign into must not be reachable through the management API.
@@ -105,9 +106,11 @@ describe('a bucket must keep some way to sign in', () => {
 			federation: [provider()]
 		});
 
-		const res = await client.admin.api
-			.buckets({ id: bucket._id })
-			.patch({ passwordLogin: false }, { headers: { cookie } });
+		const res = await consenting((consent) =>
+			client.admin.api
+				.buckets({ id: bucket._id })
+				.patch({ passwordLogin: false, ...consent }, { headers: { cookie } })
+		);
 
 		expect(res.status).toBe(200);
 		expect((await getBucketStore().find(bucket._id))?.passwordLogin).toBe(

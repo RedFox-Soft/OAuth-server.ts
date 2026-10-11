@@ -173,11 +173,56 @@ export async function verifyEndUserIdentity(
 			delta.withoutLinkedIdentity === 2,
 		JSON.stringify(delta)
 	);
+	/*
+	 * The two counts a sign-in change is previewed with (specs/083), against the datastore: a link counts only
+	 * when its provider is among the enabled ones — matched inside the embedded array — and a password is
+	 * assumed unless the account says it has none.
+	 */
+	const enabled = { enabledProviderIds: [providerId] };
+	const beforeSignIn = await store.tally(enabled);
+	const atProvider = await create('tally-at-provider');
+	await store.update(atProvider._id, {
+		totp: { secret: 'JBSWY3DPEHPK3PXP', enrolledAt: new Date(), lastStep: 0 },
+		federated: [{ providerId, sub: `at-${stamp}`, linkedAt: new Date() }]
+	});
+	const atOther = await create('tally-at-other');
+	await store.update(atOther._id, {
+		federated: [
+			{
+				providerId: `${providerId}-off`,
+				sub: `off-${stamp}`,
+				linkedAt: new Date()
+			}
+		]
+	});
+	const passwordless = await create('tally-passwordless');
+	await store.update(passwordless._id, { passwordSet: false });
+	const afterSignIn = await store.tally(enabled);
+	const signInDelta = {
+		withoutEnabledLink:
+			afterSignIn.withoutEnabledLink - beforeSignIn.withoutEnabledLink,
+		passwordWithoutAuthenticator:
+			afterSignIn.passwordWithoutAuthenticator -
+			beforeSignIn.passwordWithoutAuthenticator
+	};
+	check(
+		'a link counts only to an enabled provider, and an account without a password is never asked for an authenticator',
+		signInDelta.withoutEnabledLink === 2 &&
+			signInDelta.passwordWithoutAuthenticator === 1,
+		JSON.stringify(signInDelta)
+	);
+	const noneEnabled = await store.tally({ enabledProviderIds: [] });
+	check(
+		'with no enabled provider nobody has an enabled link',
+		noneEnabled.withoutEnabledLink === noneEnabled.total,
+		`${noneEnabled.withoutEnabledLink} of ${noneEnabled.total}`
+	);
+
 	const listed = await store.list();
 	check(
 		'the tally total is the number of accounts the bucket holds',
-		after.total === listed.length,
-		`${after.total} vs ${listed.length}`
+		afterSignIn.total === listed.length,
+		`${afterSignIn.total} vs ${listed.length}`
 	);
 }
 

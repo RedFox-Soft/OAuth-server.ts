@@ -703,7 +703,13 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 		EXPIRES_AT,
 		unowned(
 			'operator sessions, out of scope: admin deletion deactivates, and revoking their sessions is a separate concern'
-		)
+		),
+		/*
+		 * Every session of one administrator, ended at once when a super administrator signs a colleague out
+		 * or resets their authenticator (specs/083). Indexed so that is a lookup, not a scan of every console
+		 * session on the instance.
+		 */
+		[{ key: { userId: 1 } }]
 	),
 	/*
 	 * Append-only and permanent: the constitution requires an immutable admin audit trail, so no expiry

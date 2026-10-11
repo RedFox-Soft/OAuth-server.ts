@@ -20,6 +20,7 @@ import {
 	type EndUserPatch,
 	type EndUserQueryResult,
 	type EndUserTally,
+	type EndUserTallyOptions,
 	type User,
 	type UserStoreInstance
 } from '../types.js';
@@ -167,18 +168,27 @@ export class UserStore implements UserStoreInstance {
 		return linked;
 	}
 
-	async tally(): Promise<EndUserTally> {
+	async tally(options?: EndUserTallyOptions): Promise<EndUserTally> {
+		const enabled = new Set(options?.enabledProviderIds ?? []);
 		const counted: EndUserTally = {
 			total: 0,
 			unverified: 0,
 			withoutAuthenticator: 0,
-			withoutLinkedIdentity: 0
+			withoutLinkedIdentity: 0,
+			withoutEnabledLink: 0,
+			passwordWithoutAuthenticator: 0
 		};
 		for (const user of this.users.values()) {
 			counted.total += 1;
 			if (!user.verified) counted.unverified += 1;
 			if (!user.totp) counted.withoutAuthenticator += 1;
 			if (!user.federated?.length) counted.withoutLinkedIdentity += 1;
+			if (!user.federated?.some((link) => enabled.has(link.providerId))) {
+				counted.withoutEnabledLink += 1;
+			}
+			if (!user.totp && user.passwordSet !== false) {
+				counted.passwordWithoutAuthenticator += 1;
+			}
 		}
 		return counted;
 	}

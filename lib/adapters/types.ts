@@ -415,6 +415,22 @@ export interface EndUserTally {
 	unverified: number;
 	withoutAuthenticator: number;
 	withoutLinkedIdentity: number;
+	/*
+	 * Accounts with no link to any provider in `enabledProviderIds` — who could not get in were passwords
+	 * turned off (specs/083). Equal to `total` when no enabled provider is named.
+	 */
+	withoutEnabledLink: number;
+	/*
+	 * Accounts that would be asked to enrol an authenticator were one required: none enrolled, and a
+	 * password not known to be absent. An account written before `passwordSet` existed counts — the
+	 * conservative reading of an unknown.
+	 */
+	passwordWithoutAuthenticator: number;
+}
+
+export interface EndUserTallyOptions {
+	/* The ids of the bucket's enabled identity providers; absent or empty, nobody has an enabled link. */
+	enabledProviderIds?: readonly string[];
 }
 
 export interface UserStoreInstance {
@@ -458,7 +474,7 @@ export interface UserStoreInstance {
 	 * without an authenticator when it holds no TOTP enrolment, and without a linked identity when
 	 * `federated` is absent or empty — the two are the same state on every backend, never a divergence.
 	 */
-	tally(): Promise<EndUserTally>;
+	tally(options?: EndUserTallyOptions): Promise<EndUserTally>;
 	list(): Promise<User[]>;
 	/*
 	 * A page of the users matching `filter`, in a total order (`_id` unless `email` is asked for) so pages do
@@ -1886,6 +1902,12 @@ export interface AdminSessionStoreInstance {
 	/* Records a scope switch. Separate from `touch` so switching does not silently extend a session. */
 	setActiveGroup(id: string, groupId: string): Promise<void>;
 	destroy(id: string): Promise<void>;
+	/*
+	 * Ends every console session of one administrator, answering how many there were (specs/083): what a
+	 * super administrator does for a colleague whose device was lost, and part of resetting their
+	 * authenticator. Read by `userId`, which the inventory indexes for this.
+	 */
+	destroyByUser(userId: string): Promise<number>;
 }
 
 export interface AdminSessionStoreConstructor {

@@ -105,4 +105,12 @@ export class AdminSessionStore implements AdminSessionStoreInstance {
 		const handle = sql();
 		await handle`DELETE FROM ${handle(this.area)} WHERE id = ${id}`;
 	}
+
+	async destroyByUser(userId: string): Promise<number> {
+		const handle = sql();
+		const rows = await handle<{ id: string }[]>`
+			DELETE FROM ${handle(this.area)} WHERE doc->>'userId' = ${userId} RETURNING id
+		`;
+		return rows.length;
+	}
 }

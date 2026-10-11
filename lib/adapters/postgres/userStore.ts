@@ -26,6 +26,7 @@ import {
 	type EndUserPatch,
 	type EndUserQueryResult,
 	type EndUserTally,
+	type EndUserTallyOptions,
 	type UserStoreInstance
 } from '../types.js';
 
@@ -213,8 +214,16 @@ export class UserStore implements UserStoreInstance {
 	 * anything else — absent or a JSON null — is no authenticator; `federated` counts as unlinked unless it
 	 * is a non-empty array — absent, null and empty alike.
 	 */
-	async tally(): Promise<EndUserTally> {
+	async tally(options?: EndUserTallyOptions): Promise<EndUserTally> {
 		const handle = sql();
+		/*
+		 * `= ANY` over an empty array matches nothing, so with no enabled provider every account is without
+		 * an enabled link — the reading wanted. A `federated` that is not an array holds no link at all.
+		 */
+		const enabled = handle.array(
+			[...(options?.enabledProviderIds ?? [])],
+			'text'
+		);
 		const rows = await handle<EndUserTally[]>`
 			SELECT
 				count(*)::int AS "total",
@@ -225,7 +234,21 @@ export class UserStore implements UserStoreInstance {
 				count(*) FILTER (
 					WHERE jsonb_typeof(doc->'federated') IS DISTINCT FROM 'array'
 						OR doc->'federated' = '[]'::jsonb
-				)::int AS "withoutLinkedIdentity"
+				)::int AS "withoutLinkedIdentity",
+				count(*) FILTER (
+					WHERE NOT EXISTS (
+						SELECT 1
+						FROM jsonb_array_elements(
+							CASE WHEN jsonb_typeof(doc->'federated') = 'array'
+								THEN doc->'federated' ELSE '[]'::jsonb END
+						) AS link
+						WHERE link->>'providerId' = ANY(${enabled})
+					)
+				)::int AS "withoutEnabledLink",
+				count(*) FILTER (
+					WHERE jsonb_typeof(doc->'totp') IS DISTINCT FROM 'object'
+						AND doc->'passwordSet' IS DISTINCT FROM 'false'::jsonb
+				)::int AS "passwordWithoutAuthenticator"
 			FROM ${handle(this.area)}
 		`;
 		const counted = rows.at(0);
@@ -233,7 +256,9 @@ export class UserStore implements UserStoreInstance {
 			total: counted?.total ?? 0,
 			unverified: counted?.unverified ?? 0,
 			withoutAuthenticator: counted?.withoutAuthenticator ?? 0,
-			withoutLinkedIdentity: counted?.withoutLinkedIdentity ?? 0
+			withoutLinkedIdentity: counted?.withoutLinkedIdentity ?? 0,
+			withoutEnabledLink: counted?.withoutEnabledLink ?? 0,
+			passwordWithoutAuthenticator: counted?.passwordWithoutAuthenticator ?? 0
 		};
 	}
 

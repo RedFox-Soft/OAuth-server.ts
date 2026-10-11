@@ -23,6 +23,7 @@ import {
 	type EndUserPatch,
 	type EndUserQueryResult,
 	type EndUserTally,
+	type EndUserTallyOptions,
 	type UserStoreInstance
 } from '../types.js';
 
@@ -171,16 +172,40 @@ export class UserStore implements UserStoreInstance {
 	 * An enrolment is an object, so anything else — absent or null — is no authenticator; and `federated.0`
 	 * not existing matches an absent, null or empty array alike. The PostgreSQL store counts the same states.
 	 */
-	async tally(): Promise<EndUserTally> {
+	async tally(options?: EndUserTallyOptions): Promise<EndUserTally> {
 		const collection = db.collection<User>(this.collectionName);
-		const [total, unverified, withoutAuthenticator, withoutLinkedIdentity] =
-			await Promise.all([
-				collection.countDocuments({}),
-				collection.countDocuments({ verified: false }),
-				collection.countDocuments({ totp: { $not: { $type: 'object' } } }),
-				collection.countDocuments({ 'federated.0': { $exists: false } })
-			]);
-		return { total, unverified, withoutAuthenticator, withoutLinkedIdentity };
+		const unenrolled = { totp: { $not: { $type: 'object' as const } } };
+		const [
+			total,
+			unverified,
+			withoutAuthenticator,
+			withoutLinkedIdentity,
+			withoutEnabledLink,
+			passwordWithoutAuthenticator
+		] = await Promise.all([
+			collection.countDocuments({}),
+			collection.countDocuments({ verified: false }),
+			collection.countDocuments(unenrolled),
+			collection.countDocuments({ 'federated.0': { $exists: false } }),
+			/*
+			 * `$nin` matches a document whose `federated` holds no such provider — absent, null and an empty
+			 * array included — and with no ids at all it matches every document, which is the reading wanted.
+			 */
+			collection.countDocuments({
+				'federated.providerId': {
+					$nin: [...(options?.enabledProviderIds ?? [])]
+				}
+			}),
+			collection.countDocuments({ ...unenrolled, passwordSet: { $ne: false } })
+		]);
+		return {
+			total,
+			unverified,
+			withoutAuthenticator,
+			withoutLinkedIdentity,
+			withoutEnabledLink,
+			passwordWithoutAuthenticator
+		};
 	}
 
 	async create(

@@ -24,7 +24,10 @@ import { Groups } from './Groups.js';
 import { ScopeSwitcher } from './ScopeSwitcher.js';
 import { Projects } from './Projects.js';
 import { Buckets } from './Buckets.js';
-import { Admins } from './Admins.js';
+import {
+	AdministratorsHome,
+	type AdministratorsTab
+} from './administrators/AdministratorsHome.js';
 import { Settings } from './Settings.js';
 import { Keys } from './Keys.js';
 import { McpClients } from './McpClients.js';
@@ -38,11 +41,21 @@ const BUCKET_TABS: Partial<Record<PageKey, BucketTab>> = {
 	'bucket.overview': 'overview',
 	'bucket.users': 'users',
 	'bucket.userGroups': 'userGroups',
+	'bucket.signIn': 'signIn',
 	'bucket.providers': 'providers',
 	'bucket.provisioning': 'provisioning',
 	'bucket.keys': 'keys',
 	'bucket.activity': 'activity',
 	'bucket.settings': 'settings'
+};
+
+/* The console's own bucket, at home with its accounts (specs/083). */
+const ADMINISTRATORS_TABS: Partial<Record<PageKey, AdministratorsTab>> = {
+	administrators: 'accounts',
+	'administrators.signIn': 'signIn',
+	'administrators.providers': 'providers',
+	'administrators.activity': 'activity',
+	'administrators.settings': 'settings'
 };
 
 /* One person in a bucket (specs/082): its own page, beside the bucket's areas rather than inside them. */
@@ -129,6 +142,10 @@ export function Layout() {
 		if (resolved.kind === 'none') return <NotFound />;
 		const { route } = resolved;
 		if (route.instance && !can.instance) return <InstanceOnly />;
+		const administratorsTab = ADMINISTRATORS_TABS[route.key];
+		if (administratorsTab) {
+			return <AdministratorsHome tab={administratorsTab} />;
+		}
 		const userTab = USER_TABS[route.key];
 		if (userTab) {
 			return (
@@ -171,10 +188,6 @@ export function Layout() {
 				);
 			case 'audit':
 				return <Audit />;
-			case 'administrators':
-				return (
-					<Admins onOpenSignInPolicy={() => void navigate('/admin/buckets')} />
-				);
 			case 'usage':
 				return <Usage />;
 			case 'settings':

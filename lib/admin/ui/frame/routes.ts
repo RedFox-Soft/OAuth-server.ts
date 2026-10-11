@@ -32,6 +32,7 @@ export type PageKey =
 	| 'bucket.user.groups'
 	| 'bucket.user.activity'
 	| 'bucket.userGroups'
+	| 'bucket.signIn'
 	| 'bucket.providers'
 	| 'bucket.provisioning'
 	| 'bucket.keys'
@@ -40,6 +41,10 @@ export type PageKey =
 	| 'groups'
 	| 'audit'
 	| 'administrators'
+	| 'administrators.signIn'
+	| 'administrators.providers'
+	| 'administrators.activity'
+	| 'administrators.settings'
 	| 'usage'
 	| 'settings'
 	| 'keys'
@@ -119,6 +124,13 @@ export const ROUTES: readonly RouteSpec[] = [
 		section: 'buckets',
 		area: 'User groups'
 	},
+	/* How people get in (specs/083): its own address, between who is in the bucket and who vouches for them. */
+	{
+		key: 'bucket.signIn',
+		pattern: ['buckets', ':bucket', 'sign-in'],
+		section: 'buckets',
+		area: 'Sign-in'
+	},
 	{
 		key: 'bucket.providers',
 		pattern: ['buckets', ':bucket', 'identity-providers'],
@@ -156,6 +168,35 @@ export const ROUTES: readonly RouteSpec[] = [
 		pattern: ['administrators'],
 		section: 'administrators',
 		instance: true
+	},
+	/* The console's own bucket, at home with its accounts (specs/083). */
+	{
+		key: 'administrators.signIn',
+		pattern: ['administrators', 'sign-in'],
+		section: 'administrators',
+		instance: true,
+		area: 'Sign-in'
+	},
+	{
+		key: 'administrators.providers',
+		pattern: ['administrators', 'identity-providers'],
+		section: 'administrators',
+		instance: true,
+		area: 'Identity providers'
+	},
+	{
+		key: 'administrators.activity',
+		pattern: ['administrators', 'activity'],
+		section: 'administrators',
+		instance: true,
+		area: 'Activity'
+	},
+	{
+		key: 'administrators.settings',
+		pattern: ['administrators', 'settings'],
+		section: 'administrators',
+		instance: true,
+		area: 'Settings'
 	},
 	{ key: 'usage', pattern: ['usage'], section: 'usage', instance: true },
 	{
@@ -207,15 +248,28 @@ const REDIRECTS: readonly {
 		pattern: ['projects', ':project'],
 		to: (p) => `/admin/projects/${encodeURIComponent(p.project ?? '')}/clients`
 	},
-	{
-		/*
-		 * The administrators' bucket keeps its own pages until it moves home (console redesign phase 4): its bare
-		 * address opens its identity providers (specs/080). Its id is written out rather than imported, so this
-		 * module keeps importing nothing but types.
-		 */
-		pattern: ['buckets', 'admin'],
-		to: () => '/admin/buckets/admin/identity-providers'
-	}
+	/*
+	 * The administrators' bucket lives on the Administrators page (specs/083): every address it had as a bucket
+	 * leads to the matching tab there, so an old link still lands somewhere that means the same. Its id is
+	 * written out rather than imported, so this module keeps importing nothing but types.
+	 */
+	{ pattern: ['buckets', 'admin'], to: () => '/admin/administrators/sign-in' },
+	...(
+		[
+			['sign-in', 'sign-in'],
+			['identity-providers', 'identity-providers'],
+			['activity', 'activity'],
+			['settings', 'settings'],
+			['users', ''],
+			// Areas it never had as a bucket land on its accounts rather than on a refusal.
+			['user-groups', ''],
+			['provisioning', ''],
+			['keys', '']
+		] as const
+	).map(([from, to]) => ({
+		pattern: ['buckets', 'admin', from],
+		to: () => `/admin/administrators${to ? `/${to}` : ''}`
+	}))
 ];
 
 export interface Route {

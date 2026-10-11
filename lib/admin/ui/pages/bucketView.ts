@@ -39,6 +39,12 @@ export interface BucketSummary {
 	unverified: number;
 	withoutAuthenticator: number;
 	withoutLinkedIdentity: number;
+	/* No link to an enabled identity provider: who passwords off would leave without a way in (specs/083). */
+	withoutEnabledLink: number;
+	/* Signs in with a password and holds no authenticator: who an authenticator requirement would ask. */
+	passwordWithoutAuthenticator: number;
+	/* The default bucket only: projects whose sign-in lands there. */
+	projects?: number;
 	userGroups: number;
 	connections: number;
 	held: number;

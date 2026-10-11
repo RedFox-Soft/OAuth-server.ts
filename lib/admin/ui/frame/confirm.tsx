@@ -53,7 +53,7 @@ export function useConfirm(): (
 						) : undefined,
 					okText: spec.okText ?? 'Confirm',
 					okButtonProps: danger ? { danger: true } : undefined,
-					cancelText: 'Cancel',
+					cancelText: spec.cancelText ?? 'Cancel',
 					focusable: { autoFocusButton: danger ? 'cancel' : 'ok' },
 					onOk: () => {
 						resolve(true);

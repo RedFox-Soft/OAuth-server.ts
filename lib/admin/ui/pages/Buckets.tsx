@@ -38,6 +38,8 @@ interface CreateBucketValues {
 	addressForm?: 'path' | 'host';
 	slug?: string;
 	host?: string;
+	/* Who can create accounts (specs/083): closed unless the creator opens it. */
+	registrationOpen?: boolean;
 }
 
 /* A list row as the API presents it: the record, the caller's rights on it, and what blocks them. */
@@ -204,7 +206,10 @@ export function Buckets() {
 					loading={loading}
 					dataSource={buckets}
 					locale={{
-						emptyText: (
+						// Before the first answer nothing is known, and "none yet" would be a claim.
+						emptyText: loading ? (
+							' '
+						) : (
 							<EmptyState
 								purpose="A bucket holds the people who sign in to your apps. Until you create one, your projects sign people in from the shared Default bucket."
 								create={createButton}
@@ -219,7 +224,16 @@ export function Buckets() {
 								const reserved = reservedOf(row._id);
 								return (
 									<Space>
-										<Link href={bucketHref(row._id)}>{name}</Link>
+										{/* The console's own bucket lives on the Administrators page (specs/083). */}
+										<Link
+											href={
+												reserved === 'administrators'
+													? '/admin/administrators'
+													: bucketHref(row._id)
+											}
+										>
+											{name}
+										</Link>
 										{row.held && <Tag color="red">Deprovisioning held</Tag>}
 										{reserved === 'administrators' && (
 											<Tooltip title="The console's own bucket: its accounts are this instance's administrators.">
@@ -463,6 +477,26 @@ export function Buckets() {
 								</Form.Item>
 							)
 						}
+					</Form.Item>
+					<Form.Item<CreateBucketValues>
+						name="registrationOpen"
+						label="Who can create accounts?"
+						initialValue={false}
+						extra="You can change this later on the bucket's Sign-in tab."
+					>
+						<Radio.Group
+							options={[
+								{
+									label:
+										'Only administrators, identity providers and directories',
+									value: false
+								},
+								{
+									label: 'Anyone who can reach the sign-in page',
+									value: true
+								}
+							]}
+						/>
 					</Form.Item>
 				</Form>
 			</Modal>

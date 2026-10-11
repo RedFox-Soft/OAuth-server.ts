@@ -41,6 +41,16 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Changed
 
+- **Tightening a bucket's sign-in is previewed with counts before it applies** (spec 083). Turning passwords
+  off, requiring verification or an authenticator, or opening sign-up on the default or administrators' bucket
+  now answers 409 with what it does to whom (`consequences`, `expect`) and applies only when repeated with
+  `confirm: true` and the same counts; agents get the preview through `bucket_update`. The bucket summary adds
+  `withoutEnabledLink`, `passwordWithoutAuthenticator` and, on the default bucket, `projects`. Requiring
+  verification is refused on every bucket until mail delivery is configured, and new buckets are created closed
+  to sign-up unless asked otherwise. A super administrator can sign a colleague out everywhere and reset their
+  authenticator (`admin_sign_out`, `admin_totp_clear`, both high-consequence). In the console, sign-in is a bucket
+  tab with one save bar, refusals shown beforehand and the server's counts in the question; the administrators'
+  bucket became the Administrators page (Accounts, Sign-in, Identity providers, Activity, Settings).
 - **A bucket's users are searched and paged by the server** (spec 082). **Breaking:** the users list
   (`GET /admin/api/buckets/:id/users`, `bucket_user_list`) now answers `{ users, totalResults }` in email order, a
   page at a time, with `q` (the start of an email or username in any case, or an exact id) and status,

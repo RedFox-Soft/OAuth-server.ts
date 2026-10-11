@@ -205,9 +205,9 @@ guessed and silently missing from the announcement that exists so an agent need 
 withholding has since arrived — `group_delete` — and cost only a table row, which is the arrangement
 working as intended.
 
-The other high-consequence operations — 30 tools since spec 082 added `bucket_user_email_change` (spec 075
-had added `bucket_owner_change` and `project_owner_change`, the first tools whose body names a group,
-`groupId`) — take two calls: describe,
+The other high-consequence operations — 32 tools since spec 083 added `admin_sign_out` and
+`admin_totp_clear` (spec 082 had added `bucket_user_email_change`; spec 075 `bucket_owner_change` and
+`project_owner_change`, the first tools whose body names a group, `groupId`) — take two calls: describe,
 then confirm. The confirmation binds
 five ways — tool, target, arguments hash, administrator, agent — and each is a real case. Arguments,
 because a target-only binding would miss a password reset confirmed for one value and submitted with
@@ -221,6 +221,13 @@ gate's consequence report reads no entity state, so it cannot supply that list. 
 every 409 to `conflict: the operation was refused`, so no agent ever saw a preview. It now carries a
 `confirmationRequired` body whole as `preview` (`lib/mcp/result.ts:79`). Because `confirm` is one of the
 bound arguments, the preview and the change are confirmed separately.
+
+Since spec 083 an `ordinary` tool answers this way too: `bucket_update` previews a change that tightens a
+bucket's sign-in (passwords off, verification or an authenticator required, sign-up opened on a bucket served
+at the root) with counted `consequences` and an `expect`, and applies it only when repeated with
+`confirm: true` and that `expect`. It stays ordinary because the route's own confirmation is the whole
+protection; the token gate would add a third call and nothing else ([[bucket-sign-in-policy]]). The
+conflict message names `expect` for that reason.
 
 Neither identity may fall back to a placeholder, and both once did. `principalId` defaulted to `''` when
 `whoami` failed and `viaClientId` to `''` when `authInfo` carried no client — either turns that binding

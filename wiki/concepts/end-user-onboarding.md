@@ -11,9 +11,14 @@ updated: 2026-10-11
 
 Whether a person may register, and whether they must prove their address first, is decided **per
 user bucket**, not per server. Each bucket carries `registrationOpen`, `emailVerificationRequired` and
-`verificationMethod` (`'link' | 'code'`). The default is open with verification off; the reserved admin
-bucket is seeded closed ([[admin-provisioning]]), and since spec 078 a super administrator may open it
-and require verification there like anywhere else ([[admin-bucket-settings]]).
+`verificationMethod` (`'link' | 'code'`). A bucket created through the admin API is **closed** with
+verification off unless its creator opens it (spec 083: `registrationOpen: body.registrationOpen ?? false`,
+`lib/admin/buckets/routes.ts:721`); before 083 it was open. Only the route defaults it: a stored bucket
+without the field still reads as open. The reserved admin bucket is seeded closed
+([[admin-provisioning]]), and since spec 078 a super administrator may open it and require verification
+there like anywhere else ([[admin-bucket-settings]]). Since spec 083, tightening any of these is previewed
+with its counts and confirmed, and opening sign-up is previewed on the default and admin buckets
+([[bucket-sign-in-policy]]).
 
 ## The door
 
@@ -51,6 +56,12 @@ page; neither sends anything by itself ([[end-user-lifecycle]]).
 (`verificationGates`), as a lockout guard — its administrators were all unverified and nothing could
 send them a message. The exemption is gone; the guard moved to the setting, which refuses to turn on
 without mail delivery or while the acting administrator is unverified ([[admin-bucket-settings]]).
+
+*Corrected in spec 083:* the mail-delivery refusal holds on **every** bucket, not only the admin bucket
+("people could not receive the verification message: configure mail delivery first",
+`lib/admin/buckets/routes.ts:838-849`). An ordinary bucket used to accept the requirement without mail, after
+which every unverified person was sent to a message that could not be sent. Turning it off is always
+allowed ([[bucket-sign-in-policy]]).
 
 ## The challenge
 

@@ -22,6 +22,7 @@ import { elysia } from 'lib/index.ts';
 import type { User } from 'lib/adapters/types.ts';
 import { provider } from '../federation/harness.ts';
 import { createAdministrator, type AdminKind } from '../administrators.ts';
+import { consenting } from './sign_in_consent.ts';
 
 const CORP = 'corp-sso';
 
@@ -67,10 +68,14 @@ async function send(
 	return { status: res.status, body: (await res.json()) as unknown };
 }
 
+/* As the console sends it: the change, then consent to the preview of whom it leaves without a way in. */
 const passwordsOff = (cookie: string) =>
-	send('PATCH', `/admin/api/buckets/${ADMIN_BUCKET_ID}`, cookie, {
-		passwordLogin: false
-	});
+	consenting((consent) =>
+		send('PATCH', `/admin/api/buckets/${ADMIN_BUCKET_ID}`, cookie, {
+			passwordLogin: false,
+			...consent
+		})
+	);
 
 async function consoleBucket() {
 	return getBucketStore().find(ADMIN_BUCKET_ID);

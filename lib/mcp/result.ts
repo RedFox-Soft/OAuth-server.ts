@@ -81,7 +81,7 @@ export function toOutcome(result: DispatchResult): ToolOutcome {
 			ok: false,
 			reason: 'conflict',
 			message:
-				'confirmation required: nothing changed; call again with `confirm: true` to apply what the preview describes',
+				"confirmation required: nothing changed; call again with `confirm: true` — and the preview's `expect`, when it carries one — to apply what the preview describes",
 			preview: result.body
 		};
 	}

@@ -398,7 +398,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			"Count what a user bucket holds, computed when asked: its accounts (`users`), how many are unverified, without an authenticator and without any linked upstream identity; its user groups; its provisioning connections and how many are holding a deprovisioning (`held`); its identity providers (`providers.enabled`, and `providers.creating` — enabled ones that create accounts on first sign-in); and whether mail delivery is configured. `activeThisMonth` is present only to a caller with `can.readActivity`, and absent rather than zero before counting began. Counts only, never who. Readable by anyone who may read the bucket (bucket_get's `can.read`)."
+			"Count what a user bucket holds, computed when asked: its accounts (`users`), how many are unverified, without an authenticator and without any linked upstream identity; its user groups; its provisioning connections and how many are holding a deprovisioning (`held`); its identity providers (`providers.enabled`, and `providers.creating` — enabled ones that create accounts on first sign-in); and whether mail delivery is configured. `withoutEnabledLink` counts accounts with no link to an enabled identity provider (who could not sign in were passwords turned off) and `passwordWithoutAuthenticator` accounts with no authenticator whose password is not known to be absent (who an authenticator requirement would ask to enrol); on the default bucket `projects` counts the projects signing in there, those naming no bucket included. `activeThisMonth` is present only to a caller with `can.readActivity`, and absent rather than zero before counting began. Counts only, never who. Readable by anyone who may read the bucket (bucket_get's `can.read`)."
 	},
 	{
 		tool: 'bucket_activity_get',
@@ -952,6 +952,40 @@ const catalogue = [
 		summary:
 			'Withdraw super-administrator status from an administrator. Refused for the last active super administrator.'
 	},
+	{
+		tool: 'admin_sign_out',
+		method: 'POST',
+		path: '/admin/api/admins/:id/sign-out',
+		action: 'admin.signout',
+		/*
+		 * High: it ends a colleague's console sessions, and every token issued to them at the console's
+		 * issuer — an agent acting for them included, possibly the one calling.
+		 */
+		consequence: 'high',
+		superAdminOnly: true,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			"Sign an administrator out everywhere, for a lost or stolen device: every console session they hold ends, and every grant and token issued to them at the console's issuer is revoked, agents' tokens included. The account is untouched and they can sign in again at once. Answers `sessions`, the number of console sessions ended. Refused on your own account (use Log out in the console)."
+	},
+	{
+		tool: 'admin_totp_clear',
+		method: 'DELETE',
+		path: '/admin/api/admins/:id/totp',
+		action: 'admin.totp.clear',
+		/*
+		 * High, where bucket_user_totp_clear is ordinary: it removes a second factor from an account that
+		 * administers the instance, and signs it out.
+		 */
+		consequence: 'high',
+		superAdminOnly: true,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			"Reset an administrator's authenticator, for a lost device: the enrolment is cleared along with any failed attempts, and they are signed out everywhere as admin_sign_out does; they set a new one up at their next sign-in. Answers `sessions`. Refused on your own account, and when the administrator has no authenticator."
+	},
 
 	/* ------------------------------------------------- writes: buckets (2) */
 	{
@@ -1112,7 +1146,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			"Change a bucket's name, or its registration, verification and second-factor settings. Editing the bucket entity needs manager access to the bucket itself, not merely to a project it backs — bucket_get states it as `can.editSettings`. `totpRequired` governs password sign-in only — it is accepted but inert while `passwordLogin` is off, and it never gates a federated sign-in, so it is not a way to secure a bucket that signs in through an upstream provider. A super-administrator configures the administrators' own bucket here too: opening its registration lets anyone register a console account (the answer carries an advisory while verification is off); requiring verification is refused until mail delivery is configured and until the acting administrator has verified their own address; and turning password sign-in off is refused, since it is the console's only way in. Each refusal names its remedy."
+			"Change a bucket's name, or its registration, verification and second-factor settings. Editing the bucket entity needs manager access to the bucket itself, not merely to a project it backs — bucket_get states it as `can.editSettings`. `totpRequired` governs password sign-in only — it is accepted but inert while `passwordLogin` is off, and it never gates a federated sign-in, so it is not a way to secure a bucket that signs in through an upstream provider. Requiring verification is refused on every bucket until mail delivery is configured. A change that tightens who can get in — `passwordLogin` off, `emailVerificationRequired` or `totpRequired` (while passwords are on) turned on, or `registrationOpen` turned on for the default or the administrators' bucket — changes nothing when called alone: it answers with a preview, `consequences` (one sentence per change, counted), `expect` (the counts) and `changes`; call again with the same settings, `confirm: true` and that `expect` to apply it. If the counts changed since, it is refused with 409 and the fresh preview. Other changes apply at once. A super-administrator configures the administrators' own bucket here too: opening its registration lets anyone register a console account (the answer carries an advisory while verification is off); requiring verification is also refused until the acting administrator has verified their own address; turning password sign-in off is refused unless the caller's console session signed in through one of its identity providers and a super administrator stays reachable — so an agent, having no console session, is always refused it. Each refusal names its remedy."
 	},
 
 	/* ----------------------------------------------- writes: end-users (10) */

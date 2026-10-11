@@ -11,9 +11,10 @@ updated: 2026-10-11
 
 Phase 2 of the console redesign (spec 081). A bucket opens on an **Overview** and keeps its own properties
 on a **Settings** tab, with the two acts that break things at its foot. The tabs, in order: Overview, Users,
-User groups, Identity providers, Provisioning, Signing keys, Activity, Settings — each its own address, the
+User groups, Sign-in, Identity providers, Provisioning, Signing keys, Activity, Settings — each its own address, the
 bare `/admin/buckets/:id` being the Overview (`lib/admin/ui/frame/routes.ts`). The administrators' bucket
-keeps its own pages until it moves home in phase 4. The Users tab and each person's page are
+lives on the Administrators page since spec 083, and sign-in policy is the Sign-in tab, not a dialog
+([[bucket-sign-in-policy]]). The Users tab and each person's page are
 [[bucket-users-workspace]] (spec 082).
 
 ## The Overview reads, it never edits
@@ -30,10 +31,12 @@ keeps its own pages until it moves home in phase 4. The Users tab and each perso
   server's own address (`lib/configs/issuer.ts`). Unaddressed buckets get `null`, not an issuer that 404s.
 - **Sign-in at a glance**, read-only, with one link to change it, and the numbers.
 
-The counts come from `GET /admin/api/buckets/:id/summary` (`lib/admin/buckets/routes.ts:770`), which uses one
-new adapter read, `UserStoreInstance.tally()` (`lib/adapters/types.ts:431`): total, unverified, without an
+The counts come from `GET /admin/api/buckets/:id/summary` (`lib/admin/buckets/routes.ts:777`), which uses one
+new adapter read, `UserStoreInstance.tally()` (`lib/adapters/types.ts:477`): total, unverified, without an
 authenticator, without any linked identity — counted the same way on every backend (absent and empty
-`federated` both count as unlinked) and verified on real MongoDB and PostgreSQL. Users active this month
+`federated` both count as unlinked) and verified on real MongoDB and PostgreSQL. Spec 083 added two counts
+the sign-in preview confirms against — without a link to an *enabled* provider, and password users without an
+authenticator — and, on the default bucket, the projects signing in there ([[bucket-sign-in-policy]]). Users active this month
 appear only to a caller who may read the bucket's activity, and are absent, not zero, before counting began.
 
 ## Rights that depend on the bucket's state

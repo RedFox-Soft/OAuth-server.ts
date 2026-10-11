@@ -42,7 +42,7 @@ function plural(n: number, one: string, many: string): string {
 	return `${String(n)} ${n === 1 ? one : many}`;
 }
 
-function GeneralCard({
+export function GeneralCard({
 	bucket,
 	canEdit,
 	onChanged

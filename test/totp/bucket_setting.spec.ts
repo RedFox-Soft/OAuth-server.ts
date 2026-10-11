@@ -12,6 +12,7 @@ import {
 import { ADMIN_SESSION_COOKIE, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
 import { answered } from '../admin/answered.ts';
+import { consenting } from '../admin/sign_in_consent.ts';
 import { createAdministrator, type AdminKind } from '../administrators.ts';
 
 const app = new Elysia().use(resolveAdmin).use(bucketRoutes);
@@ -102,9 +103,11 @@ describe('bucket sign-in method setting', () => {
 			).data
 		);
 
-		const patched = await client.admin.api
-			.buckets({ id: first._id })
-			.patch({ totpRequired: true }, { headers: { cookie } });
+		const patched = await consenting((consent) =>
+			client.admin.api
+				.buckets({ id: first._id })
+				.patch({ totpRequired: true, ...consent }, { headers: { cookie } })
+		);
 		expect(patched.status).toBe(200);
 		expect(answered(patched.data).totpRequired).toBe(true);
 
@@ -196,9 +199,11 @@ describe('bucket sign-in method setting', () => {
 			).data
 		);
 
-		const patched = await client.admin.api
-			.buckets({ id: bucket._id })
-			.patch({ totpRequired: true }, { headers: { cookie } });
+		const patched = await consenting((consent) =>
+			client.admin.api
+				.buckets({ id: bucket._id })
+				.patch({ totpRequired: true, ...consent }, { headers: { cookie } })
+		);
 		const body = answered(patched.data);
 		expect('advisory' in body ? body.advisory : undefined).toBeUndefined();
 	});
@@ -260,9 +265,14 @@ describe('bucket sign-in method setting', () => {
 			).data
 		);
 
-		await client.admin.api
-			.buckets({ id: bucket._id })
-			.patch({ totpRequired: true }, { headers: { cookie: admin.cookie } });
+		await consenting((consent) =>
+			client.admin.api
+				.buckets({ id: bucket._id })
+				.patch(
+					{ totpRequired: true, ...consent },
+					{ headers: { cookie: admin.cookie } }
+				)
+		);
 
 		const { entries } = await adminAuditStore.list({
 			targetType: 'UserBucket',

@@ -73,4 +73,8 @@ export class AdminSessionStore implements AdminSessionStoreInstance {
 	async destroy(id: string): Promise<void> {
 		await this.collection.deleteOne({ _id: id });
 	}
+
+	async destroyByUser(userId: string): Promise<number> {
+		return (await this.collection.deleteMany({ userId })).deletedCount;
+	}
 }

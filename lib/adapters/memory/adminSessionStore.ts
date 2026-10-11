@@ -60,4 +60,14 @@ export class AdminSessionStore implements AdminSessionStoreInstance {
 	async destroy(id: string): Promise<void> {
 		this.sessions.delete(id);
 	}
+
+	async destroyByUser(userId: string): Promise<number> {
+		let ended = 0;
+		for (const [id, session] of this.sessions) {
+			if (session.userId !== userId) continue;
+			this.sessions.delete(id);
+			ended += 1;
+		}
+		return ended;
+	}
 }

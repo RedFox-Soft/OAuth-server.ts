@@ -178,6 +178,22 @@ const routes = [
 		path: '/admin/api/admins/:id/super-admin',
 		targetType: 'AdminUser'
 	},
+	/*
+	 * Recovering a colleague (specs/083): ending their console sessions, and resetting their authenticator,
+	 * which ends them too. Each its own action, so the trail says which was done to whom.
+	 */
+	{
+		action: 'admin.signout',
+		method: 'POST',
+		path: '/admin/api/admins/:id/sign-out',
+		targetType: 'AdminUser'
+	},
+	{
+		action: 'admin.totp.clear',
+		method: 'DELETE',
+		path: '/admin/api/admins/:id/totp',
+		targetType: 'AdminUser'
+	},
 
 	/*
 	 * Groups: the owner of every project and bucket, and therefore the thing that decides who may reach

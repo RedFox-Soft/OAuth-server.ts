@@ -4,7 +4,7 @@ title: "The administrators' bucket: ordinary settings, a guard per setting"
 tags: [architecture, contract]
 sources: [oauth-server-codebase]
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # The administrators' bucket: ordinary settings, a guard per setting
@@ -28,7 +28,8 @@ groups and more. Several of them have no second check of their own. Moving the r
 loaders would have opened all of those routes to super administrators with nothing behind them.
 
 Instead, a third loader, `loadBucketForSettings` (`access.ts:60`), admits the bucket. Only
-`GET /admin/api/buckets/:id` and `PATCH /admin/api/buckets/:id` use it.
+`GET /admin/api/buckets/:id`, its `/summary` and `PATCH /admin/api/buckets/:id` use it (and, through
+`loadBucketForProviders`, the provider routes).
 - It refuses the administrators' bucket to anyone who is not a super administrator, explicitly. It does
   not rely on the bucket's owner, the System group, having no members. That invariant is real but is not
   enforced anywhere near here.
@@ -44,14 +45,16 @@ super-administrator-only rule as `loadBucketForSettings`; see [[console-federati
 
 ## The guards
 
-`assertAdminBucketChange` (`lib/admin/buckets/admin_bucket.ts:20`) runs after access is checked and
-before the audit entry, so a refused change records nothing.
+`assertAdminBucketChange` (`lib/admin/buckets/admin_bucket.ts:27`) runs after access is checked and
+before the preview and the audit entry, so a refused change records nothing. Since spec 083 a change that
+tightens sign-in here is also previewed and must be confirmed with its counts, as on every bucket; the order
+and the preview are on [[bucket-sign-in-policy]].
 
 | Setting | Guard |
 |---|---|
-| `passwordLogin: false` | Since spec 080: refused unless the acting session signed in through an enabled provider of this bucket where the actor is linked (an agent never qualifies), and unless some active super administrator stays reachable through a provider ([[console-federation]]). `assertSomeWayToSignIn` still applies on top. |
-| `emailVerificationRequired: true` | Refused while mail delivery is not configured (`mailDeliveryConfigured`, `lib/mail/mailer.ts:39`, the same test `deliver()` applies). Also refused while the **acting** administrator's own address is unverified, so the requirement can never refuse the person who set it. |
-| `registrationOpen`, `verificationMethod`, `totpRequired`, `name` | No guard. Opening registration while verification is off answers with an advisory (`adminBucketAdvisory`, `admin_bucket.ts:45`), and an agent reads the same sentence the console shows. |
+| `passwordLogin: false` | Since spec 080: refused unless the acting session signed in through an enabled provider of this bucket where the actor is linked (an agent never qualifies), and unless some active super administrator stays reachable through a provider ([[console-federation]]). `assertSomeWayToSignIn` still applies on top. Since spec 083, once allowed it is previewed, naming the administrators without a linked identity. |
+| `emailVerificationRequired: true` | Refused while mail delivery is not configured (`mailDeliveryConfigured`, `lib/mail/mailer.ts:39`, the same test `deliver()` applies). Since spec 083 that refusal is the route's and holds on every bucket, worded "people could not receive the verification message: configure mail delivery first" ([[bucket-sign-in-policy]]). This bucket adds its own: refused while the **acting** administrator's own address is unverified, so the requirement can never refuse the person who set it. |
+| `registrationOpen`, `verificationMethod`, `totpRequired`, `name` | No guard. Opening registration while verification is off answers with an advisory (`adminBucketAdvisory`, `admin_bucket.ts:50`), and an agent reads the same sentence the console shows. Since spec 083 opening registration and requiring an authenticator are previewed and confirmed first. |
 
 A super administrator cannot change **their own** address while verification is required
 (`assertAddressChangeable`, `lib/admin/users/routes.ts:37`). The new address would be unproven, a typo

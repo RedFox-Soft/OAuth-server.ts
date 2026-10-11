@@ -11,6 +11,7 @@ import {
 	verifyEndUserSearch
 } from './verify_end_user_identity.js';
 import { verifyProvisioningConnections } from './verify_provisioning_connections.js';
+import { verifyAdminSessionsByUser } from './verify_admin_sessions.js';
 import { verifyBucketGroups } from './verify_bucket_groups.js';
 import { verifyActivity } from './verify_activity.js';
 import {
@@ -20,7 +21,8 @@ import {
 import {
 	FIXED_AREAS,
 	STORE_AREAS,
-	areaForBucket
+	areaForBucket,
+	areaNamed
 } from '../lib/consts/storage_inventory.js';
 
 /*
@@ -76,6 +78,7 @@ if (!THROWAWAY.test(database)) {
 const {
 	ActivityStore,
 	AdminAuditStore,
+	AdminSessionStore,
 	BucketGroupStore,
 	BucketKeysStore,
 	ContainerOwnershipStore,
@@ -701,6 +704,26 @@ await verifyEndUserIdentity(runtimeUsers, check);
 await verifyEndUserSearch(runtimeUsers, check);
 await verifyAddressChangeForgetsArrivals(buckets, runtime._id, check);
 await verifyProvisioningConnections(new ProvisioningConnectionStore(), check);
+
+/* The index ending an administrator's sessions reads by (specs/083), as provisioned from the inventory. */
+const sessionArea = areaNamed(STORE_AREAS.adminSession);
+const sessionIndexes = new Set(
+	(
+		await handle<{ indexname: string }[]>`
+			SELECT indexname FROM pg_indexes WHERE tablename = ${sessionArea.name}
+		`
+	).map((row) => row.indexname)
+);
+const byUser = indexStatements(sessionArea).filter((planned) =>
+	planned.statement.includes("'userId'")
+);
+check(
+	'console sessions are indexed by the administrator they belong to',
+	byUser.length === 1 &&
+		byUser.every((planned) => sessionIndexes.has(planned.name)),
+	[...sessionIndexes].join(', ')
+);
+await verifyAdminSessionsByUser(new AdminSessionStore(), check);
 
 /*
  * Roles to groups (specs/071), against legacy records as a release before it wrote them. The bucket is made

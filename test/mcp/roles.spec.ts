@@ -23,6 +23,7 @@ import { shaped } from 'test/shape.js';
 import { Type } from '@sinclair/typebox';
 import { createAdministrator, type AdminKind } from '../administrators.ts';
 import { call, rpc } from './rpc.ts';
+import { SignInPreview } from '../admin/sign_in_consent.ts';
 
 /*
  * SC-006: no agent-initiated operation succeeds with permissions the same account would not have in the
@@ -210,10 +211,28 @@ describe('agent permissions match the console, per role', () => {
 	it("lets a super administrator's agent change an administrators'-bucket setting, recorded against the agent and its principal", async () => {
 		const { token, user } = await principal('super');
 		try {
+			const previewed = await rpc(
+				call('bucket_update', { id: ADMIN_BUCKET_ID, totpRequired: true }),
+				token
+			);
+			const preview = shaped(
+				SignInPreview,
+				previewed.result?.structuredContent?.preview
+			);
+			// The agent is shown what the console is shown, and nothing changed yet.
+			expect(preview.changes).toEqual(['authenticatorOn']);
+			expect((await getBucketStore().find(ADMIN_BUCKET_ID))?.totpRequired).toBe(
+				false
+			);
 			expect(
 				await viaAgent(
 					'bucket_update',
-					{ id: ADMIN_BUCKET_ID, totpRequired: true },
+					{
+						id: ADMIN_BUCKET_ID,
+						totpRequired: true,
+						confirm: true,
+						expect: preview.expect
+					},
 					token
 				)
 			).toBe('ok');

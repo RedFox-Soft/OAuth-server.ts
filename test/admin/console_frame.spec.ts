@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from 'bun:test';
 import bootstrap from '../test_helper.ts';
 import { elysia } from 'lib/index.ts';
 import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
-import { ROUTES } from 'lib/admin/ui/frame/routes.ts';
+import { ROUTES, resolveAddress } from 'lib/admin/ui/frame/routes.ts';
 import { ACTIONS } from 'lib/admin/ui/frame/actions.ts';
 import { sessionFor } from '../admin_session.ts';
 import { createAdministrator } from '../administrators.ts';
@@ -74,6 +74,27 @@ describe('console frame', () => {
 				'Only an instance administrator can open this page'
 			);
 		}
+	});
+
+	/*
+	 * The console's own bucket moved to the Administrators page (specs/083). A bookmark or a link pasted in a
+	 * ticket still names it as a bucket, and must land on the tab that means the same thing.
+	 */
+	it("an address of the console's bucket leads to the matching Administrators tab", () => {
+		const lands = (path: string) => {
+			const resolved = resolveAddress(path);
+			return resolved.kind === 'redirect' ? resolved.to : resolved.kind;
+		};
+		expect(lands('/admin/buckets/admin')).toBe('/admin/administrators/sign-in');
+		expect(lands('/admin/buckets/admin/identity-providers')).toBe(
+			'/admin/administrators/identity-providers'
+		);
+		expect(lands('/admin/buckets/admin/activity')).toBe(
+			'/admin/administrators/activity'
+		);
+		expect(lands('/admin/buckets/admin/users')).toBe('/admin/administrators');
+		// Any other bucket keeps its own addresses.
+		expect(lands('/admin/buckets/acme/sign-in')).toBe('page');
 	});
 
 	/*

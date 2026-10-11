@@ -60,6 +60,7 @@ import {
 	adminBucketAdvisory,
 	assertAdminBucketChange
 } from './admin_bucket.js';
+import { sameExpect, signInCounts, signInPreview } from './sign_in_preview.js';
 import {
 	assertSomeWayToSignIn,
 	prospectiveBucket
@@ -711,7 +712,13 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 					...address,
 					ownerGroupId,
 					passwordLogin: body.passwordLogin,
-					registrationOpen: body.registrationOpen,
+					/*
+					 * Closed unless asked for (specs/083): a bucket's people arrive through its administrators, its
+					 * identity providers and its directories, and a door anyone can walk through is a decision to
+					 * state at creation, not a default to notice later. Only the route defaults it — a stored bucket
+					 * without the field keeps reading as it always has.
+					 */
+					registrationOpen: body.registrationOpen ?? false,
 					emailVerificationRequired: body.emailVerificationRequired,
 					verificationMethod: body.verificationMethod,
 					totpRequired: body.totpRequired
@@ -771,8 +778,8 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 		const ctx = assertAuth(admin);
 		const bucket = await loadBucketForSettings(ctx, params.id, 'read');
 		const readsActivity = bucketCan(ctx, bucket, NO_PROJECT_REACH).readActivity;
-		const [tally, groups, connections, mail, figure] = await Promise.all([
-			getUserStore(bucket._id).tally(),
+		const [counts, groups, connections, mail, figure] = await Promise.all([
+			signInCounts(bucket),
 			getBucketGroupStore().query(
 				{ bucketId: bucket._id },
 				{ startIndex: 1, count: 0 }
@@ -783,10 +790,19 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 		]);
 		const enabled = bucket.federation.filter((provider) => provider.enabled);
 		return {
-			users: tally.total,
-			unverified: tally.unverified,
-			withoutAuthenticator: tally.withoutAuthenticator,
-			withoutLinkedIdentity: tally.withoutLinkedIdentity,
+			users: counts.total,
+			unverified: counts.unverified,
+			withoutAuthenticator: counts.withoutAuthenticator,
+			withoutLinkedIdentity: counts.withoutLinkedIdentity,
+			/*
+			 * What the sign-in tab shows under each switch (specs/083), counted as the change's preview counts
+			 * them: who has no link to an enabled provider, and who signs in with a password but holds no
+			 * authenticator.
+			 */
+			withoutEnabledLink: counts.withoutEnabledLink,
+			passwordWithoutAuthenticator: counts.passwordWithoutAuthenticator,
+			/* The default bucket only: the projects whose sign-in lands there, those naming no bucket included. */
+			...(counts.projects === undefined ? {} : { projects: counts.projects }),
 			userGroups: groups.totalResults,
 			connections: connections.length,
 			held: connections.filter((c) => c.hold !== undefined).length,
@@ -806,17 +822,61 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 	})
 	.patch(
 		'/admin/api/buckets/:id',
-		async ({ admin, params, body }) => {
+		async ({ admin, params, body, status }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForSettings(ctx, params.id, 'edit');
+			const { confirm, expect, ...changes } = body;
 			/*
 			 * Checked before the audit entry and the write: an entry describing a change a 409 refused would
 			 * state that an operator closed a bucket's password door when they did not. The provider routes
 			 * enforce the same rule from the other direction, through the same function.
 			 */
-			assertSomeWayToSignIn(prospectiveBucket(bucket, body));
+			assertSomeWayToSignIn(prospectiveBucket(bucket, changes));
+			/*
+			 * Requiring verification sends a message to everyone unverified at their next sign-in, and refuses
+			 * them until they follow it. Without mail nobody can, so on any bucket the requirement would be a
+			 * lock-out of every unverified person — refused before it is previewed, recorded or written.
+			 */
+			if (
+				changes.emailVerificationRequired === true &&
+				!bucket.emailVerificationRequired &&
+				!(await mailDeliveryConfigured())
+			) {
+				throw new AdminError(
+					409,
+					'people could not receive the verification message: configure mail delivery first'
+				);
+			}
 			if (params.id === ADMIN_BUCKET_ID) {
-				await assertAdminBucketChange(ctx, bucket, body);
+				await assertAdminBucketChange(ctx, bucket, changes);
+			}
+			/*
+			 * After every refusal, so a preview is never offered for a change that would be refused anyway; and
+			 * before the audit entry, so nothing is recorded for a change that was only described.
+			 */
+			const preview = await signInPreview(bucket, changes);
+			if (preview) {
+				if (confirm !== true) {
+					return status(409, {
+						confirmationRequired: true as const,
+						...preview
+					});
+				}
+				/*
+				 * The consent is to the counts shown. Somebody who registered, or lost a link, while the preview
+				 * was open is not covered by it, so the change is refused with the fresh one.
+				 */
+				if (!sameExpect(expect, preview.expect)) {
+					return status(409, {
+						error: 'admin_error' as const,
+						message:
+							expect === undefined
+								? 'confirm with the counts of the preview you reviewed (expect)'
+								: 'what this change affects changed since you reviewed it',
+						...preview,
+						confirmationRequired: true as const
+					});
+				}
 			}
 			/*
 			 * Recorded whatever the request changed. This used to fire only for a registration or
@@ -824,10 +884,10 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			 * — while still being an exercised privilege over who can administer a bucket's users.
 			 */
 			await recordAdminAudit(ctx, 'bucket.update', params.id, {
-				attributes: Object.keys(body),
+				attributes: Object.keys(changes),
 				ownerGroupId: bucket.ownerGroupId
 			});
-			const updated = await getBucketStore().update(params.id, body);
+			const updated = await getBucketStore().update(params.id, changes);
 			if (!updated) throw new AdminError(404, 'bucket not found');
 			const presented = withInertTotpAdvisory(presentBucket(updated));
 			const advisory =

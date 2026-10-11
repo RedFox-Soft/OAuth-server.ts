@@ -60,7 +60,7 @@ export const CreateBucketBody = t.Object({
  * residue the operator already accepted for the rest.
  */
 /* Whole numbers by `multipleOf`, as the resource body spells it: `t.Integer` coerces through a string branch. */
-const AddressChangeCount = t.Number({ minimum: 0, multipleOf: 1 });
+const PreviewCount = t.Number({ minimum: 0, multipleOf: 1 });
 
 export const ChangeBucketAddressBody = t.Object({
 	slug: t.Optional(BucketSlug),
@@ -68,10 +68,10 @@ export const ChangeBucketAddressBody = t.Object({
 	confirm: t.Optional(t.Boolean()),
 	expect: t.Optional(
 		t.Object({
-			applications: AddressChangeCount,
-			connections: AddressChangeCount,
-			providers: AddressChangeCount,
-			resources: AddressChangeCount
+			applications: PreviewCount,
+			connections: PreviewCount,
+			providers: PreviewCount,
+			resources: PreviewCount
 		})
 	)
 });
@@ -119,7 +119,22 @@ export const UpdateBucketBody = t.Object({
 	 * provider owns its own factor policy. Accepted while `passwordLogin` is off, where it is inert;
 	 * the route says so rather than refusing.
 	 */
-	totpRequired: t.Optional(t.Boolean())
+	totpRequired: t.Optional(t.Boolean()),
+	/*
+	 * Consent to the preview (specs/083). A change that tightens who can get in — passwords off, verification
+	 * or an authenticator required, sign-up opened on a bucket served at the root — answers 409 with what it
+	 * would do to whom, counted, and is applied only when repeated with `confirm` and those counts as
+	 * `expect`, so a consent given before people arrived does not cover them. Every other change ignores both.
+	 */
+	confirm: t.Optional(t.Boolean()),
+	expect: t.Optional(
+		t.Object({
+			withoutEnabledLink: t.Optional(PreviewCount),
+			unverified: t.Optional(PreviewCount),
+			passwordWithoutAuthenticator: t.Optional(PreviewCount),
+			projects: t.Optional(PreviewCount)
+		})
+	)
 });
 
 /*

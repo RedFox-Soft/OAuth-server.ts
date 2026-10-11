@@ -26,6 +26,8 @@ export interface ActionSpec {
 	readonly word?: string;
 	/* Asked inside the act's own form rather than by useConfirm, because the question needs the form's answer. */
 	readonly inline?: boolean;
+	/* The word on Cancel, when "Cancel" would not say what declining keeps. */
+	readonly cancelText?: string;
 }
 
 export const ACTIONS = {
@@ -66,10 +68,15 @@ export const ACTIONS = {
 	'bucket.rename': { class: 'C0' },
 	// The server's preview names every application, connection, provider and resource the change affects.
 	'bucket.address.change': { class: 'C4' },
-	'bucket.passwordSignIn.off': {
+	/*
+	 * A sign-in change that can shut people out (specs/083): the server states what it would do, with counts,
+	 * and the question lists its lines. Declining keeps the draft, so Cancel says so.
+	 */
+	'bucket.signIn.confirm': {
 		class: 'C2',
-		title: () => 'Turn off password sign-in to the console?',
-		okText: 'Turn off password sign-in'
+		title: (t) => `Save sign-in changes for ${t}?`,
+		okText: 'Save changes',
+		cancelText: 'Keep editing'
 	},
 	'bucket.delete': { class: 'C3', word: 'delete' },
 
@@ -235,6 +242,28 @@ export const ACTIONS = {
 		class: 'C2',
 		title: (t) => `Withdraw super administration from ${t}?`,
 		okText: 'Withdraw'
+	},
+	// Ends their access to the console at once; their account, groups and history are kept.
+	'admin.deactivate': {
+		class: 'C2',
+		title: (t) => `Deactivate ${t}?`,
+		okText: 'Deactivate'
+	},
+	// Gives back everything their groups grant, so it is asked like the act it undoes.
+	'admin.activate': {
+		class: 'C2',
+		title: (t) => `Activate ${t}?`,
+		okText: 'Activate'
+	},
+	'admin.signOut': {
+		class: 'C1',
+		title: (t) => `Sign ${t} out everywhere?`,
+		okText: 'Sign out'
+	},
+	'admin.totp.reset': {
+		class: 'C2',
+		title: (t) => `Reset the authenticator of ${t}?`,
+		okText: 'Reset authenticator'
 	},
 	'admin.email.change': {
 		class: 'C2',

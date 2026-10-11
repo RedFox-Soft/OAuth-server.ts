@@ -19,6 +19,7 @@ import {
 import { sessionFor } from '../admin_session.ts';
 import { createAdministrator, type AdminKind } from '../administrators.ts';
 import { answered } from './answered.ts';
+import { consenting } from './sign_in_consent.ts';
 
 /*
  * `normalize: false` because that is how lib/index.ts constructs the real app, and one assertion here
@@ -85,9 +86,14 @@ describe("the administrators' bucket on the bucket settings", () => {
 	});
 
 	it('turns the second factor on and reads it back', async () => {
-		const patched = await client.admin.api
-			.buckets({ id: ADMIN_BUCKET_ID })
-			.patch({ totpRequired: true }, { headers: { cookie: admin.cookie } });
+		const patched = await consenting((consent) =>
+			client.admin.api
+				.buckets({ id: ADMIN_BUCKET_ID })
+				.patch(
+					{ totpRequired: true, ...consent },
+					{ headers: { cookie: admin.cookie } }
+				)
+		);
 		expect(patched.status).toBe(200);
 		expect(answered(patched.data).totpRequired).toBe(true);
 
@@ -98,9 +104,14 @@ describe("the administrators' bucket on the bucket settings", () => {
 	});
 
 	it('turns the second factor back off', async () => {
-		await client.admin.api
-			.buckets({ id: ADMIN_BUCKET_ID })
-			.patch({ totpRequired: true }, { headers: { cookie: admin.cookie } });
+		await consenting((consent) =>
+			client.admin.api
+				.buckets({ id: ADMIN_BUCKET_ID })
+				.patch(
+					{ totpRequired: true, ...consent },
+					{ headers: { cookie: admin.cookie } }
+				)
+		);
 		const off = await client.admin.api
 			.buckets({ id: ADMIN_BUCKET_ID })
 			.patch({ totpRequired: false }, { headers: { cookie: admin.cookie } });
@@ -133,9 +144,14 @@ describe("the administrators' bucket on the bucket settings", () => {
 			).entries.map((e) => e._id)
 		);
 
-		await client.admin.api
-			.buckets({ id: ADMIN_BUCKET_ID })
-			.patch({ totpRequired: true }, { headers: { cookie: admin.cookie } });
+		await consenting((consent) =>
+			client.admin.api
+				.buckets({ id: ADMIN_BUCKET_ID })
+				.patch(
+					{ totpRequired: true, ...consent },
+					{ headers: { cookie: admin.cookie } }
+				)
+		);
 
 		const { entries } = await adminAuditStore.list({
 			targetType: 'UserBucket',
@@ -145,14 +161,19 @@ describe("the administrators' bucket on the bucket settings", () => {
 			(e) => e.action === 'bucket.update' && !before.has(e._id)
 		);
 		expect(entry?.actorId).toBe(admin.userId);
-		expect(entry?.attributes).toContain('totpRequired');
+		expect(entry?.attributes).toEqual(['totpRequired']);
 		expect(entry?.ownerGroupId).toBe(UNASSIGNED_GROUP_ID);
 	});
 
 	it('opens administrator registration and warns that, without verification, any address can be claimed', async () => {
-		const res = await client.admin.api
-			.buckets({ id: ADMIN_BUCKET_ID })
-			.patch({ registrationOpen: true }, { headers: { cookie: admin.cookie } });
+		const res = await consenting((consent) =>
+			client.admin.api
+				.buckets({ id: ADMIN_BUCKET_ID })
+				.patch(
+					{ registrationOpen: true, ...consent },
+					{ headers: { cookie: admin.cookie } }
+				)
+		);
 		expect(res.status).toBe(200);
 		expect(answered(res.data).registrationOpen).toBe(true);
 		expect(answered(res.data).advisory).toContain('any address can be claimed');
@@ -240,12 +261,16 @@ describe("the administrators' bucket on the bucket settings", () => {
 			await getSmtpSettingsStore().set(MAIL);
 			await verifyActing();
 
-			const res = await client.admin.api
-				.buckets({ id: ADMIN_BUCKET_ID })
-				.patch(
-					{ emailVerificationRequired: true, verificationMethod: 'code' },
+			const res = await consenting((consent) =>
+				client.admin.api.buckets({ id: ADMIN_BUCKET_ID }).patch(
+					{
+						emailVerificationRequired: true,
+						verificationMethod: 'code',
+						...consent
+					},
 					{ headers: { cookie: admin.cookie } }
-				);
+				)
+			);
 
 			expect(res.status).toBe(200);
 			expect(answered(res.data).emailVerificationRequired).toBe(true);

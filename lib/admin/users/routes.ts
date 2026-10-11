@@ -1,5 +1,6 @@
 import { Elysia } from 'elysia';
 import {
+	adminSessionStore,
 	getBucketStore,
 	getGroupStore,
 	getUserStore
@@ -20,6 +21,8 @@ import {
 	reachableThroughProvider
 } from '../federation/reachability.js';
 import { canSignIn } from '../../end_users/can_sign_in.js';
+import { revokeAccountAccess } from '../../end_users/revoke_access.js';
+import { clearAttempts } from '../../totp/verify.js';
 import { CreateAdminBody, UpdateAdminBody } from './schema.js';
 import { presentUser } from '../users-end/routes.js';
 import { recordAdminAudit } from '../audit/record.js';
@@ -103,6 +106,40 @@ async function assertAddressKeepsConsoleReachable(
 		},
 		'Changing this address'
 	);
+}
+
+/*
+ * Ends a colleague's access to the console without touching their account (specs/083): every console
+ * session they hold, and every grant and token at the console's issuer — so an agent acting for them loses
+ * its token too. They can sign in again at once, as themselves. Answers how many console sessions ended.
+ */
+async function signOutAdministrator(userId: string): Promise<number> {
+	const sessions = await adminSessionStore.destroyByUser(userId);
+	const revoked = await revokeAccountAccess(userId);
+	if (revoked.failedAreas.length > 0) {
+		throw new AdminError(
+			500,
+			`the administrator was signed out of the console, but their access survives in: ${revoked.failedAreas.join(', ')}`,
+			{ failedAreas: revoked.failedAreas }
+		);
+	}
+	return sessions;
+}
+
+/*
+ * The colleague to recover, refused on oneself: your own sessions end with Log out, and your own
+ * authenticator is reset by another super administrator — a route that let you do either here would sign
+ * you out of the request that asked.
+ */
+async function recoveryTarget(
+	actingId: string,
+	targetId: string,
+	refusal: string
+) {
+	if (targetId === actingId) throw new AdminError(409, refusal);
+	const target = await store().find(targetId);
+	if (!target) throw new AdminError(404, 'admin not found');
+	return target;
 }
 
 export const adminUserRoutes = new Elysia({ name: 'admin-users' })
@@ -257,6 +294,43 @@ export const adminUserRoutes = new Elysia({ name: 'admin-users' })
 			await withdrawSuperAdmin(target._id);
 		}
 		return { _id: target._id, email: target.email, superAdmin: false };
+	})
+	/*
+	 * Sign an administrator out everywhere: for a lost or stolen device. The account stays as it is.
+	 */
+	.post('/admin/api/admins/:id/sign-out', async ({ admin, params }) => {
+		const ctx = assertAuth(admin);
+		assertSuperAdmin(ctx);
+		const target = await recoveryTarget(
+			ctx.userId,
+			params.id,
+			'you cannot sign yourself out from here — use Log out'
+		);
+		await recordAdminAudit(ctx, 'admin.signout', target._id);
+		return { sessions: await signOutAdministrator(target._id) };
+	})
+	/*
+	 * Reset an administrator's authenticator: for a lost device. They enrol afresh at their next sign-in,
+	 * and are signed out now, because a session obtained with a factor the account no longer holds must not
+	 * outlive it. Refused when there is nothing to reset, so an operator is told they had the wrong person.
+	 */
+	.delete('/admin/api/admins/:id/totp', async ({ admin, params }) => {
+		const ctx = assertAuth(admin);
+		assertSuperAdmin(ctx);
+		const target = await recoveryTarget(
+			ctx.userId,
+			params.id,
+			'you cannot reset your own authenticator — ask another super administrator'
+		);
+		if (!target.totp) {
+			throw new AdminError(409, 'no authenticator to reset');
+		}
+		await recordAdminAudit(ctx, 'admin.totp.clear', target._id);
+		const updated = await store().update(target._id, { totp: undefined });
+		if (!updated) throw new AdminError(404, 'admin not found');
+		// So a re-enrolment does not begin inside a lockout the lost device earned.
+		await clearAttempts(ADMIN_BUCKET_ID, target._id);
+		return { sessions: await signOutAdministrator(target._id) };
 	})
 	.delete('/admin/api/admins/:id', async ({ admin, params }) => {
 		const ctx = assertAuth(admin);

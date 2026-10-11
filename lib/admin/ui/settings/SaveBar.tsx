@@ -194,7 +194,12 @@ export function SaveBar({
 				>
 					Discard
 				</Button>
+				{/*
+				 * Keyed by the state: once a save has finished, antd leaves its collapsed loading icon in the
+				 * button, and a screen reader goes on announcing "loading Save" until the bar remounts.
+				 */}
 				<Button
+					key={saving ? 'saving' : 'idle'}
 					type="primary"
 					loading={saving}
 					onClick={attempt}
