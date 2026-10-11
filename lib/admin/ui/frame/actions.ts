@@ -63,6 +63,9 @@ export const ACTIONS = {
 	'bucket.create': { class: 'C0' },
 	'bucket.edit': { class: 'C0' },
 	'bucket.move': { class: 'C4' },
+	'bucket.rename': { class: 'C0' },
+	// The server's preview names every application, connection, provider and resource the change affects.
+	'bucket.address.change': { class: 'C4' },
 	'bucket.passwordSignIn.off': {
 		class: 'C2',
 		title: () => 'Turn off password sign-in to the console?',

@@ -14,7 +14,10 @@ import { Client } from 'lib/models/client.js';
 import { sessionFor } from '../admin_session.ts';
 import { answered } from '../admin/answered.ts';
 import { createAdministrator } from '../administrators.ts';
-import { present } from '../shape.ts';
+import { present, shaped } from '../shape.ts';
+import { elysia } from 'lib/index.ts';
+import { Type } from '@sinclair/typebox';
+import { regularGroup } from '../admin/ownership_fixtures.ts';
 
 // A container may take its contents with it, on an election the administrator makes separately from
 // confirming the deletion.
@@ -28,7 +31,8 @@ import { present } from '../shape.ts';
 /**
  * @proves A container deleted with its contents destroys each of them as completely as deleting
  * that one thing would, never reaches a bucket it merely pointed at, and leaves exactly one entry
- * in the trail whatever it destroyed.
+ * in the trail whatever it destroyed — an entry the group that owned a bucket can read. A bucket
+ * holding accounts is deleted only by an owner of its group or a super administrator.
  */
 describe('deletion cascade: containers', () => {
 	beforeAll(async () => {
@@ -303,5 +307,100 @@ describe('deletion cascade: containers', () => {
 			'the project.delete entry'
 		);
 		expect(entry.cascade ?? null).toBeNull();
+	});
+
+	describe('by a member of the group that owns the bucket', () => {
+		async function asMember(
+			user: Awaited<ReturnType<typeof createAdministrator>>
+		) {
+			const session = await sessionFor(user);
+			return `${ADMIN_SESSION_COOKIE}=${session._id}`;
+		}
+
+		async function call(method: string, path: string, cookie: string) {
+			const response = await elysia.handle(
+				new Request(`http://e.ly${path}`, { method, headers: { cookie } })
+			);
+			return {
+				status: response.status,
+				body: shaped(
+					Type.Record(Type.String(), Type.Unknown()),
+					await response.json()
+				)
+			};
+		}
+
+		it('shows the deletion in the trail of the group that owned the bucket', async () => {
+			const owner = await createAdministrator('plain');
+			const team = await regularGroup([owner]);
+			const held = await getBucketStore().create({
+				name: `b-${Math.random()}`,
+				ownerGroupId: team._id
+			});
+			await getUserStore(held._id).create('leaving@example.com', 'hash');
+			const cookie = await asMember(owner);
+
+			const deleted = await call(
+				'DELETE',
+				`/admin/api/buckets/${held._id}?cascade=endusers&expect=1`,
+				cookie
+			);
+			const trail = await call(
+				'GET',
+				`/admin/api/audit?targetId=${encodeURIComponent(held._id)}`,
+				cookie
+			);
+
+			expect(deleted.status).toBe(200);
+			expect(
+				shaped(
+					Type.Array(Type.Object({ action: Type.String() })),
+					trail.body.entries
+				).map((e) => e.action)
+			).toContain('bucket.delete');
+		});
+
+		it('refuses a member who is not an owner a bucket holding accounts, and says why', async () => {
+			const owner = await createAdministrator('plain');
+			const member = await createAdministrator('plain');
+			const team = await regularGroup([owner], [member]);
+			const held = await getBucketStore().create({
+				name: `b-${Math.random()}`,
+				ownerGroupId: team._id
+			});
+			await getUserStore(held._id).create('staying@example.com', 'hash');
+			await getUserStore(held._id).create('also@example.com', 'hash');
+
+			const refused = await call(
+				'DELETE',
+				`/admin/api/buckets/${held._id}?cascade=endusers&expect=2`,
+				await asMember(member)
+			);
+
+			expect(refused.status).toBe(403);
+			expect(refused.body.message).toBe(
+				'This bucket holds 2 accounts: only an owner of its group can delete it.'
+			);
+			expect((await getUserStore(held._id).list()).length).toBe(2);
+		});
+
+		it('lets a member who is not an owner delete a bucket holding no accounts', async () => {
+			const owner = await createAdministrator('plain');
+			const member = await createAdministrator('plain');
+			const team = await regularGroup([owner], [member]);
+			const empty = await getBucketStore().create({
+				name: `b-${Math.random()}`,
+				ownerGroupId: team._id
+			});
+
+			const deleted = await call(
+				'DELETE',
+				`/admin/api/buckets/${empty._id}`,
+				await asMember(member)
+			);
+
+			expect(deleted.status).toBe(200);
+			expect(await getBucketStore().find(empty._id)).toBeNull();
+		});
 	});
 });

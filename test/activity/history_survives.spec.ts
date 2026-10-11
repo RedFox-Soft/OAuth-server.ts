@@ -20,8 +20,19 @@ import {
 	cookieFor,
 	regularGroup
 } from '../admin/ownership_fixtures.ts';
-import { present } from 'test/shape.ts';
+import { present, shaped } from 'test/shape.ts';
+import { Type } from '@sinclair/typebox';
 import { settled, startCounting } from './fixtures.ts';
+
+/* What an address change's preview counted, which its confirmation carries back. */
+const AddressChangeCounts = Type.Object({
+	expect: Type.Object({
+		applications: Type.Number(),
+		connections: Type.Number(),
+		providers: Type.Number(),
+		resources: Type.Number()
+	})
+});
 
 const app = new Elysia()
 	.use(resolveAdmin)
@@ -169,12 +180,19 @@ describe('active users after the bucket and its people change', () => {
 	});
 
 	it("leaves the bucket's history unchanged after its address changes", async () => {
-		const res = await client.admin.api
+		const cookie = await cookieFor(superAdmin);
+		const slug = `history-${String(Date.now())}`;
+		const preview = await client.admin.api
 			.buckets({ id: bucketId })
-			.address.post(
-				{ slug: `history-${String(Date.now())}`, confirm: true },
-				{ headers: { cookie: await cookieFor(superAdmin) } }
-			);
+			.address.post({ slug }, { headers: { cookie } });
+		const res = await client.admin.api.buckets({ id: bucketId }).address.post(
+			{
+				slug,
+				confirm: true,
+				expect: shaped(AddressChangeCounts, preview.error?.value).expect
+			},
+			{ headers: { cookie } }
+		);
 
 		expect(res.status).toBe(200);
 		expect(await monthTotal(bucketId, owner)).toEqual({

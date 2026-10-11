@@ -23,6 +23,7 @@ import {
 	type EndUserPage,
 	type EndUserPatch,
 	type EndUserQueryResult,
+	type EndUserTally,
 	type UserStoreInstance
 } from '../types.js';
 
@@ -139,6 +140,35 @@ export class UserStore implements UserStoreInstance {
 		return rows
 			.map((row) => this.userOf(row))
 			.filter((u): u is User => u !== null);
+	}
+
+	/*
+	 * One scan, one filter per state, matching the MongoDB store's tests: an enrolment is an object, so
+	 * anything else — absent or a JSON null — is no authenticator; `federated` counts as unlinked unless it
+	 * is a non-empty array — absent, null and empty alike.
+	 */
+	async tally(): Promise<EndUserTally> {
+		const handle = sql();
+		const rows = await handle<EndUserTally[]>`
+			SELECT
+				count(*)::int AS "total",
+				count(*) FILTER (WHERE doc->'verified' = 'false'::jsonb)::int AS "unverified",
+				count(*) FILTER (
+					WHERE jsonb_typeof(doc->'totp') IS DISTINCT FROM 'object'
+				)::int AS "withoutAuthenticator",
+				count(*) FILTER (
+					WHERE jsonb_typeof(doc->'federated') IS DISTINCT FROM 'array'
+						OR doc->'federated' = '[]'::jsonb
+				)::int AS "withoutLinkedIdentity"
+			FROM ${handle(this.area)}
+		`;
+		const counted = rows.at(0);
+		return {
+			total: counted?.total ?? 0,
+			unverified: counted?.unverified ?? 0,
+			withoutAuthenticator: counted?.withoutAuthenticator ?? 0,
+			withoutLinkedIdentity: counted?.withoutLinkedIdentity ?? 0
+		};
 	}
 
 	async create(

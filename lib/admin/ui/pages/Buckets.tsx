@@ -8,14 +8,14 @@ import {
 	Radio,
 	Space,
 	Tag,
-	Tooltip
+	Tooltip,
+	Typography
 } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import type { UserBucket } from '../../../adapters/types.js';
-import { Link, useNavigate } from '../frame/router.js';
+import { Link } from '../frame/router.js';
 import { bucketHref } from '../frame/routes.js';
 import { bucketAddressFor } from '../bucketAddress.js';
-import { ConfirmDestruction } from '../ConfirmDestruction.js';
 import { MoveToGroup } from '../MoveToGroup.js';
 import { isUndeletableBucket, reservedOf } from '../../consts.js';
 import { PageHeader } from '../frame/PageHeader.js';
@@ -29,6 +29,8 @@ import {
 } from '../frame/can.js';
 import { meCan, useMe } from '../frame/me.js';
 import { EmptyState, LoadFailed } from '../frame/states.js';
+import { projectHref } from '../frame/routes.js';
+import { DeleteBucketDialog } from './DeleteBucketDialog.js';
 
 interface CreateBucketValues {
 	name: string;
@@ -42,7 +44,19 @@ interface CreateBucketValues {
 type BucketRow = UserBucket & {
 	can?: Partial<BucketCan>;
 	blockers?: BucketBlockers;
+	/* specs/081: whether a host has been reached, whether a connection holds, the issuer to copy. */
+	hostReached?: boolean;
+	held?: boolean;
+	issuer?: string | null;
 };
+
+/* The two buckets the server is built on, listed last so the buckets an operator works with come first. */
+function pinnedLast(rows: BucketRow[]): BucketRow[] {
+	return [
+		...rows.filter((r) => !reservedOf(r._id)),
+		...rows.filter((r) => reservedOf(r._id))
+	];
+}
 
 /*
  * Who may create, move and delete is what the server states (`me.can`, each row's `can`), never
@@ -55,14 +69,14 @@ export function Buckets() {
 	const [open, setOpen] = useState(false);
 	const [creating, setCreating] = useState(false);
 	const [form] = Form.useForm<CreateBucketValues>();
-	const navigate = useNavigate();
 	const feedback = useFeedback();
 	const { me } = useMe();
 	const mine = meCan(me);
 	const [deleting, setDeleting] = useState<BucketRow | null>(null);
-	const [heldUsers, setHeldUsers] = useState(0);
-	const [destroying, setDestroying] = useState(false);
 	const [moving, setMoving] = useState<BucketRow | null>(null);
+	// Owning groups by name, for a super administrator's Owner column.
+	const [groupNames, setGroupNames] = useState<Map<string, string>>(new Map());
+	const superAdmin = me?.superAdmin === true;
 
 	// Every state write follows an await, so the mount effect calls this without setting
 	// `loading` first; `load` is the reload, which does.
@@ -70,7 +84,7 @@ export function Buckets() {
 		try {
 			const result = await request<BucketRow[]>('GET', '/admin/api/buckets');
 			if (result.ok) {
-				setBuckets(result.data);
+				setBuckets(pinnedLast(result.data));
 				setLoadError(null);
 			} else {
 				setLoadError(result.error.message);
@@ -86,6 +100,17 @@ export function Buckets() {
 	useEffect(() => {
 		void fetchBuckets();
 	}, [fetchBuckets]);
+	useEffect(() => {
+		if (!superAdmin) return;
+		void request<{ _id: string; name: string }[]>(
+			'GET',
+			'/admin/api/groups'
+		).then((result) => {
+			if (result.ok) {
+				setGroupNames(new Map(result.data.map((g) => [g._id, g.name])));
+			}
+		});
+	}, [superAdmin]);
 
 	async function onCreate(values: CreateBucketValues) {
 		setCreating(true);
@@ -111,57 +136,6 @@ export function Buckets() {
 			await load();
 		} finally {
 			setCreating(false);
-		}
-	}
-
-	/*
-	 * The account count is fetched when the dialog opens rather than listed in the table: it is a read
-	 * per bucket, and a table of twenty buckets does not need twenty of them to answer a question
-	 * nobody has asked yet. A failed read does not open the dialog: a count it never learned would read
-	 * as "empty".
-	 */
-	async function openDelete(bucket: BucketRow) {
-		const result = await request<unknown[]>(
-			'GET',
-			`/admin/api/buckets/${encodeURIComponent(bucket._id)}/users`
-		);
-		if (!result.ok) {
-			feedback.failed(result);
-			return;
-		}
-		setHeldUsers(result.data.length);
-		setDeleting(bucket);
-	}
-
-	async function onDelete(bucket: BucketRow, withCascade: boolean) {
-		setDestroying(true);
-		try {
-			const params = new URLSearchParams();
-			if (withCascade) {
-				params.set('cascade', 'endusers');
-				// The number the administrator just reviewed. An account that arrived while they were
-				// reading makes this stale, and the server refuses rather than destroying it.
-				params.set('expect', String(heldUsers));
-			}
-			const qs = params.toString();
-			const result = await request<{ endUsersDestroyed?: number }>(
-				'DELETE',
-				`/admin/api/buckets/${encodeURIComponent(bucket._id)}${qs ? `?${qs}` : ''}`
-			);
-			if (!result.ok) {
-				feedback.failed(result);
-				return;
-			}
-			const destroyed = result.data.endUsersDestroyed ?? 0;
-			feedback.done(
-				destroyed > 0
-					? `Bucket ${bucket.name} deleted with its ${String(destroyed)} end-user accounts.`
-					: `Bucket ${bucket.name} deleted.`
-			);
-			setDeleting(null);
-			await load();
-		} finally {
-			setDestroying(false);
 		}
 	}
 
@@ -193,7 +167,7 @@ export function Buckets() {
 				key: 'delete',
 				label: 'Delete…',
 				group: 'danger',
-				onClick: () => void openDelete(row),
+				onClick: () => setDeleting(row),
 				blocked:
 					usedBy.length > 0
 						? `Used by ${usedBy.map((p) => p.name).join(', ')} — assign them another bucket first`
@@ -232,7 +206,7 @@ export function Buckets() {
 					locale={{
 						emptyText: (
 							<EmptyState
-								purpose="No user buckets in this scope yet. A bucket holds the end-user accounts a project authenticates."
+								purpose="A bucket holds the people who sign in to your apps. Until you create one, your projects sign people in from the shared Default bucket."
 								create={createButton}
 							/>
 						)
@@ -246,6 +220,7 @@ export function Buckets() {
 								return (
 									<Space>
 										<Link href={bucketHref(row._id)}>{name}</Link>
+										{row.held && <Tag color="red">Deprovisioning held</Tag>}
 										{reserved === 'administrators' && (
 											<Tooltip title="The console's own bucket: its accounts are this instance's administrators.">
 												<Tag color="gold">Administrators</Tag>
@@ -269,9 +244,19 @@ export function Buckets() {
 									return <code>{address.path}</code>;
 								if (address.kind === 'host') {
 									return (
-										<Tooltip title="Served at a host of its own. Its tokens carry that origin as their issuer, and its sign-in cookie is isolated by the browser rather than by name.">
-											<code>{`https://${address.host}`}</code>
-										</Tooltip>
+										<Space
+											orientation="vertical"
+											size={0}
+										>
+											<Tooltip title="Served at a host of its own. Its tokens carry that origin as their issuer, and its sign-in cookie is isolated by the browser rather than by name.">
+												<code>{`https://${address.host}`}</code>
+											</Tooltip>
+											{row.hostReached === false && (
+												<Typography.Text type="warning">
+													Not reached yet
+												</Typography.Text>
+											)}
+										</Space>
 									);
 								}
 								if (address.kind === 'none') return <Tag>not addressable</Tag>;
@@ -283,10 +268,51 @@ export function Buckets() {
 							}
 						},
 						{
-							title: 'Projects',
+							title: 'Issuer',
+							key: 'issuer',
 							render: (_: unknown, row: BucketRow) =>
-								row.blockers?.usedByProjects.length ?? 0
+								row.issuer ? (
+									<Typography.Text
+										copyable={{ text: row.issuer }}
+										type="secondary"
+									>
+										Copy
+									</Typography.Text>
+								) : null
 						},
+						{
+							title: 'Used by',
+							key: 'usedBy',
+							render: (_: unknown, row: BucketRow) => {
+								const used = row.blockers?.usedByProjects ?? [];
+								if (used.length === 0) return '—';
+								return (
+									<Space
+										wrap
+										size={4}
+									>
+										{used.map((p, i) => (
+											<span key={p.id}>
+												{i > 0 ? ', ' : ''}
+												<Link href={projectHref(p.id)}>{p.name}</Link>
+											</span>
+										))}
+									</Space>
+								);
+							}
+						},
+						...(superAdmin
+							? [
+									{
+										title: 'Owner',
+										key: 'owner',
+										render: (_: unknown, row: BucketRow) =>
+											reservedOf(row._id)
+												? '—'
+												: (groupNames.get(row.ownerGroupId) ?? row.ownerGroupId)
+									}
+								]
+							: []),
 						{
 							title: '',
 							render: (_: unknown, row: BucketRow) => (
@@ -313,30 +339,18 @@ export function Buckets() {
 				/>
 			)}
 			{deleting && (
-				<ConfirmDestruction
-					open
-					title={`Delete ${deleting.name}?`}
-					okText="Delete bucket"
-					consequences={[
-						'The bucket is gone permanently. There is nothing left to inspect or restore.',
-						`Its sign-in address stops answering, and every token it minted stops being issued from it.`
-					]}
-					cascade={
-						heldUsers > 0
-							? {
-									noun: 'end-user accounts',
-									count: heldUsers,
-									onInspect: () => {
-										setDeleting(null);
-										void navigate(bucketHref(deleting._id));
-									},
-									inspectLabel: 'Look at the accounts first'
-								}
-							: undefined
-					}
-					busy={destroying}
-					onCancel={() => setDeleting(null)}
-					onConfirm={(withCascade) => void onDelete(deleting, withCascade)}
+				<DeleteBucketDialog
+					bucket={deleting}
+					onClose={() => setDeleting(null)}
+					onDeleted={(accounts) => {
+						feedback.done(
+							accounts > 0
+								? `Bucket ${deleting.name} deleted, with ${String(accounts)} accounts.`
+								: `Bucket ${deleting.name} deleted.`
+						);
+						setDeleting(null);
+						void load();
+					}}
 				/>
 			)}
 			<Modal

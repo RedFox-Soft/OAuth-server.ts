@@ -341,6 +341,9 @@ try {
 	await open(page, `/admin/projects/${names.projectId}/clients`);
 	await shoot(page, 'admin-project-clients');
 
+	await open(page, `/admin/buckets/${names.bucketId}`);
+	await shoot(page, 'admin-bucket-overview');
+
 	await open(page, `/admin/buckets/${names.bucketId}/users`);
 	await shoot(page, 'admin-bucket-users');
 

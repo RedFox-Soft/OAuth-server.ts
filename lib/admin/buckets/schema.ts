@@ -49,14 +49,31 @@ export const CreateBucketBody = t.Object({
 /*
  * Moving a bucket to a new address. Its own body, because it is its own operation.
  *
- * `confirm` is the second call. The preview that precedes it names every client that will stop
- * validating tokens, and an operator who has not seen that list has not been told what the change
- * costs — so the change refuses until they say they have.
+ * `confirm` is the second call. The preview that precedes it names every application, provisioning
+ * connection, identity provider and declared resource the change reaches, and an operator who has not
+ * seen that list has not been told what the change costs — so the change refuses until they say they have.
+ *
+ * `expect` is what they saw, counted, and the confirming call must carry it (specs/081 FR-013): a project
+ * or a provider added while the preview was open would otherwise be broken by a consent given before it
+ * existed. Counts rather than names for the reason the deletion's `expect` gives — a count is what survives
+ * a large set — and each list is short enough that a changed member set without a changed count is a
+ * residue the operator already accepted for the rest.
  */
+/* Whole numbers by `multipleOf`, as the resource body spells it: `t.Integer` coerces through a string branch. */
+const AddressChangeCount = t.Number({ minimum: 0, multipleOf: 1 });
+
 export const ChangeBucketAddressBody = t.Object({
 	slug: t.Optional(BucketSlug),
 	host: t.Optional(t.String({ minLength: 1, maxLength: 253 })),
-	confirm: t.Optional(t.Boolean())
+	confirm: t.Optional(t.Boolean()),
+	expect: t.Optional(
+		t.Object({
+			applications: AddressChangeCount,
+			connections: AddressChangeCount,
+			providers: AddressChangeCount,
+			resources: AddressChangeCount
+		})
+	)
 });
 
 /*

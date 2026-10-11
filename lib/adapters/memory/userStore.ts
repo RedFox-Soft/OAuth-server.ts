@@ -17,6 +17,7 @@ import {
 	type EndUserPage,
 	type EndUserPatch,
 	type EndUserQueryResult,
+	type EndUserTally,
 	type User,
 	type UserStoreInstance
 } from '../types.js';
@@ -154,6 +155,22 @@ export class UserStore implements UserStoreInstance {
 			}
 		}
 		return linked;
+	}
+
+	async tally(): Promise<EndUserTally> {
+		const counted: EndUserTally = {
+			total: 0,
+			unverified: 0,
+			withoutAuthenticator: 0,
+			withoutLinkedIdentity: 0
+		};
+		for (const user of this.users.values()) {
+			counted.total += 1;
+			if (!user.verified) counted.unverified += 1;
+			if (!user.totp) counted.withoutAuthenticator += 1;
+			if (!user.federated?.length) counted.withoutLinkedIdentity += 1;
+		}
+		return counted;
 	}
 
 	async create(

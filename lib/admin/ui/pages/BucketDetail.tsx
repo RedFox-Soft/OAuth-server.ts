@@ -23,7 +23,12 @@ import { useFeedback } from '../frame/feedback.js';
 import { useConfirm } from '../frame/confirm.js';
 import { RowActions, type RowAction } from '../frame/RowActions.js';
 import { bucketCan, type BucketCan } from '../frame/can.js';
-import type { UserBucket, User } from '../../../adapters/types.js';
+import type { User } from '../../../adapters/types.js';
+import { reservedOf } from '../../consts.js';
+import { useMe } from '../frame/me.js';
+import { BucketOverview } from './BucketOverview.js';
+import { BucketSettings } from './BucketSettings.js';
+import type { BucketSummary, BucketView } from './bucketView.js';
 import { FederationPanel } from './FederationPanel.js';
 import { BucketKeysPanel } from './BucketKeysPanel.js';
 import { BucketActivityPanel } from './BucketActivityPanel.js';
@@ -42,16 +47,6 @@ type EndUser = Omit<User, 'password' | 'totp' | 'lockedLocally'> & {
 	totpEnrolledAt: string | null;
 	groups?: { id: string; displayName: string; provisionedBy?: string }[];
 	lockedLocally?: { at: string; by: string; reason: string };
-};
-
-/*
- * The bucket as the API presents it. The administrators' own bucket carries `reserved`, and the page
- * changes shape on it: its accounts are administrators, managed on their own page, and only its settings
- * and activity belong here.
- */
-type BucketView = UserBucket & {
-	reserved?: 'administrators';
-	can?: Partial<BucketCan>;
 };
 
 interface CreateValues {
@@ -74,7 +69,7 @@ interface EditValues {
 }
 
 interface BucketSettingsValues {
-	name: string;
+	name?: string;
 	passwordLogin?: boolean;
 	registrationOpen?: boolean;
 	emailVerificationRequired?: boolean;
@@ -134,11 +129,22 @@ function ReadOnlyNotice() {
 	);
 }
 
-/* The bucket's areas, each an address of its own (specs/079); only the one shown loads. */
+/*
+ * The bucket's areas, each an address of its own (specs/079); only the one shown loads. The Overview is the
+ * bucket's bare address and Settings comes last, with the acts that break things at its foot (specs/081).
+ */
 export type BucketTab =
-	'users' | 'userGroups' | 'providers' | 'provisioning' | 'keys' | 'activity';
+	| 'overview'
+	| 'users'
+	| 'userGroups'
+	| 'providers'
+	| 'provisioning'
+	| 'keys'
+	| 'activity'
+	| 'settings';
 
-const TABS: { key: BucketTab; segment: string; label: string }[] = [
+const TABS: { key: BucketTab; segment?: string; label: string }[] = [
+	{ key: 'overview', label: 'Overview' },
 	{ key: 'users', segment: 'users', label: 'Users' },
 	{ key: 'userGroups', segment: 'user-groups', label: 'User groups' },
 	{
@@ -148,7 +154,8 @@ const TABS: { key: BucketTab; segment: string; label: string }[] = [
 	},
 	{ key: 'provisioning', segment: 'provisioning', label: 'Provisioning' },
 	{ key: 'keys', segment: 'keys', label: 'Signing keys' },
-	{ key: 'activity', segment: 'activity', label: 'Activity' }
+	{ key: 'activity', segment: 'activity', label: 'Activity' },
+	{ key: 'settings', segment: 'settings', label: 'Settings' }
 ];
 
 /*
@@ -169,6 +176,7 @@ function tabAllowed(
 		if (key === 'activity') return can.readActivity;
 		return false;
 	}
+	if (key === 'overview' || key === 'settings') return can.read;
 	if (key === 'keys') return can.edit;
 	if (key === 'activity') return can.readActivity;
 	return true;
@@ -237,6 +245,12 @@ export function BucketDetail({
 	const [settingsRefusal, setSettingsRefusal] = useState<string | null>(null);
 	const [readiness, setReadiness] = useState<SignInReadiness | null>(null);
 	const [settingsAdvisory, setSettingsAdvisory] = useState<string | null>(null);
+	// The counts the Overview, the header's held tag and the delete dialog read (specs/081).
+	const [summary, setSummary] = useState<BucketSummary | null>(null);
+	const [summaryFailed, setSummaryFailed] = useState(false);
+	// Group names for the header and Settings; a group the caller is not in is named generically.
+	const [groupNames, setGroupNames] = useState<Map<string, string>>(new Map());
+	const { me } = useMe();
 	const [saving, setSaving] = useState(false);
 	const [createForm] = Form.useForm<CreateValues>();
 	const [editForm] = Form.useForm<EditValues>();
@@ -257,6 +271,22 @@ export function BucketDetail({
 			}
 			setLoadStatus(null);
 			setBucket(b.data);
+			if (b.data.reserved !== 'administrators') {
+				const [s, scope] = await Promise.all([
+					request<BucketSummary>('GET', `${base}/summary`),
+					request<{ available: { id: string; name: string }[] }>(
+						'GET',
+						'/admin/api/scope'
+					)
+				]);
+				setSummary(s.ok ? s.data : null);
+				setSummaryFailed(!s.ok);
+				if (scope.ok) {
+					setGroupNames(
+						new Map(scope.data.available.map((g) => [g.id, g.name]))
+					);
+				}
+			}
 			// The administrators' bucket answers no user list here — its accounts have their own page.
 			if (b.data.reserved === 'administrators') {
 				const me = await request<{ verified?: boolean }>(
@@ -596,7 +626,8 @@ export function BucketDetail({
 		}
 		bucketForm.setFieldsValue({
 			passwordLogin: bucket?.passwordLogin !== false,
-			name: bucket?.name ?? '',
+			// Renamed on Settings → General for every bucket that has a Settings tab (specs/081).
+			...(bucket?.reserved === 'administrators' ? { name: bucket.name } : {}),
 			registrationOpen: bucket?.registrationOpen ?? true,
 			emailVerificationRequired: bucket?.emailVerificationRequired ?? false,
 			verificationMethod: bucket?.verificationMethod ?? 'link',
@@ -664,7 +695,7 @@ export function BucketDetail({
 				}
 				return;
 			}
-			feedback.done(`Bucket ${values.name} updated.`);
+			feedback.done(`Bucket ${bucket?.name ?? ''} updated.`);
 			/*
 			 * A write can succeed and still have something to say — an inert second factor, or the console
 			 * open to anyone without proof of address. Shown, not swallowed: the same sentence an agent reads,
@@ -814,8 +845,9 @@ export function BucketDetail({
 		);
 	}
 
-	// The console's bucket has no Users area; its bare address lands on its providers.
-	const shownTab = reserved && tab === 'users' ? 'providers' : tab;
+	// The console's bucket has no Users area or Overview yet; those addresses land on its providers.
+	const shownTab =
+		reserved && (tab === 'users' || tab === 'overview') ? 'providers' : tab;
 	const tabs = TABS.filter(
 		(t) =>
 			(!reserved || CONSOLE_TABS.includes(t.key)) &&
@@ -825,6 +857,10 @@ export function BucketDetail({
 		label: t.label,
 		href: bucketHref(bucketId, t.segment)
 	}));
+	const special = bucket ? reservedOf(bucket._id) : null;
+	const groupName = bucket
+		? (groupNames.get(bucket.ownerGroupId) ?? 'a group you are not in')
+		: '';
 	/*
 	 * An area the caller may not open is said to be so at its own address, rather than quietly showing
 	 * Users there: the address keeps meaning what it says, and a link someone shared explains itself.
@@ -851,15 +887,39 @@ export function BucketDetail({
 				]}
 				title={bucket?.name ?? '…'}
 				tags={
-					reserved ? (
-						<Tag color="gold">Administrators</Tag>
-					) : bucket?._id === 'redfox' ? (
-						<Tag>Default</Tag>
+					<>
+						{special === 'administrators' && (
+							<Tag color="gold">Administrators</Tag>
+						)}
+						{special === 'default' && <Tag>Default</Tag>}
+						{summary && summary.held > 0 && (
+							<Tag color="red">Deprovisioning held</Tag>
+						)}
+					</>
+				}
+				meta={
+					bucket && !reserved ? (
+						<>
+							Owned by {groupName}
+							{bucket.issuer ? (
+								<>
+									{' · '}
+									<Typography.Text copyable>{bucket.issuer}</Typography.Text>
+								</>
+							) : null}
+						</>
 					) : undefined
+				}
+				description={
+					special === 'default'
+						? "Projects without a bucket of their own sign people in here. Served at the server's root. It cannot be moved, re-addressed or deleted."
+						: undefined
 				}
 				actions={
 					bucket && can.editSettings ? (
-						<Button onClick={openSettings}>Edit…</Button>
+						<Button onClick={openSettings}>
+							{reserved ? 'Edit…' : 'Edit sign-in…'}
+						</Button>
 					) : undefined
 				}
 				tabs={tabs}
@@ -897,6 +957,25 @@ export function BucketDetail({
 					what={`bucket's ${shownTabLabel.toLowerCase()}`}
 					backHref={reserved ? '/admin/buckets' : bucketHref(bucketId)}
 					backLabel={reserved ? 'Back to Buckets' : 'Go to Users'}
+				/>
+			)}
+			{bucket && !tabRefused && shownTab === 'overview' && (
+				<BucketOverview
+					bucket={bucket}
+					summary={summary}
+					summaryFailed={summaryFailed}
+					can={can}
+					superAdmin={me?.superAdmin === true}
+					groupName={groupName}
+					onOpenSignIn={openSettings}
+				/>
+			)}
+			{bucket && !tabRefused && shownTab === 'settings' && (
+				<BucketSettings
+					bucket={bucket}
+					can={can}
+					groupName={groupName}
+					onChanged={() => void load()}
 				/>
 			)}
 			{bucket && !tabRefused && !reserved && (
@@ -1295,7 +1374,7 @@ export function BucketDetail({
 			</Modal>
 
 			<Modal
-				title="Edit bucket"
+				title={reserved ? 'Edit bucket' : 'Sign-in'}
 				open={bucketEditOpen}
 				onCancel={() => setBucketEditOpen(false)}
 				onOk={() => bucketForm.submit()}
@@ -1327,13 +1406,15 @@ export function BucketDetail({
 					onValuesChange={() => setSettingsRefusal(null)}
 					scrollToFirstError
 				>
-					<Form.Item
-						name="name"
-						label="Name"
-						rules={[{ required: true }]}
-					>
-						<Input />
-					</Form.Item>
+					{reserved && (
+						<Form.Item
+							name="name"
+							label="Name"
+							rules={[{ required: true }]}
+						>
+							<Input />
+						</Form.Item>
+					)}
 					{/*
 					 * On the console's own bucket the switch is disabled, with the reason beside it, until this
 					 * session has come in through a linked provider: the server would refuse anything else.

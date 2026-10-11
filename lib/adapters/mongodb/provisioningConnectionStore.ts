@@ -90,6 +90,21 @@ export class ProvisioningConnectionStore implements ProvisioningConnectionStoreI
 			.filter((c): c is ProvisioningConnection => c !== null);
 	}
 
+	/*
+	 * The hold test `holdIfFree` and `releaseHold` use: an object, not merely a present key. Grouped rather
+	 * than `distinct`, which the strict Stable API the client declares does not include — found against a real
+	 * server.
+	 */
+	async bucketsHolding(): Promise<string[]> {
+		const rows = await this.collection
+			.aggregate<{ _id: string }>([
+				{ $match: { hold: { $type: 'object' } } },
+				{ $group: { _id: '$bucketId' } }
+			])
+			.toArray();
+		return rows.map((row) => row._id);
+	}
+
 	async findByProvider(
 		bucketId: string,
 		providerId: string

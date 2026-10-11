@@ -1,4 +1,5 @@
 import type { Project, UserBucket } from '../../adapters/types.js';
+import { addressOf } from '../../configs/issuer.js';
 import { ROOT_NAMESPACE } from '../../resources/declaration_id.js';
 import { ADMIN_BUCKET_ID, isUndeletableBucket } from '../consts.js';
 import type { AdminContext } from './rbac.js';
@@ -8,12 +9,17 @@ import type { AdminContext } from './rbac.js';
  *
  * The routes decide through these functions, and the presenters attach their answers to what the routes
  * return, so the console learns what the server will accept from the server's own predicates instead of a
- * copy of the rules kept in the browser. Each flag answers one question — would the route accept this
- * request from this caller — and nothing about the entity's current state: a bucket still used by projects
- * is deletable by right and refused by state, and the console shows those two differently.
+ * copy of the rules kept in the browser. Each flag answers one question — would the route accept this caller
+ * for this entity as it is now. Most answers depend on the caller alone; two depend on the bucket's state
+ * for one kind of caller (specs/081): a group owner may change the address of a bucket nothing depends on,
+ * and a plain member may delete a bucket holding no accounts. A state refusal that applies to every caller
+ * — a bucket still used by projects cannot be deleted by anyone — stays out of the flags: the bucket is
+ * deletable by right and refused by state, and the console shows those two differently.
  *
- * Pure on purpose. Nothing here reads a store, so a list can state rights for every row from facts it
- * gathered once; and nothing reads `viaClientId`, so an agent is told exactly what the console is told.
+ * Pure on purpose. Nothing here reads a store: the state a flag depends on arrives as `BucketFacts`, which
+ * the caller reads only where `bucketFactsWanted` says it can change the answer, so a list states rights for
+ * every row from facts gathered for it; and nothing reads `viaClientId`, so an agent is told exactly what the
+ * console is told.
  */
 
 export interface BucketCan {
@@ -98,22 +104,109 @@ function reachesBucketUsers(
 	return holdsBucket(ctx, bucket) || access.has(bucket._id);
 }
 
+/* What depends on a bucket, counted across the instance rather than among what the caller can see. */
+export interface BucketDependents {
+	readonly projects: number;
+	readonly providers: number;
+	readonly connections: number;
+}
+
 /*
- * Changing an address changes a bucket's issuer identifier and breaks every client integrated with it, and
- * a hostname reaches into the operator's domain: instance-level. The two buckets served at the root keep
- * theirs, or the console would lock every operator out of the surface that could move it back.
+ * The bucket's state the two state-dependent flags are decided from. Each is present only when it was read,
+ * and read only when it can change the answer for this caller (`bucketFactsWanted`); one wanted but absent
+ * answers as refusing, so a route that forgot to read it fails closed.
  */
-export function mayChangeBucketAddress(
+export interface BucketFacts {
+	readonly dependents?: BucketDependents;
+	readonly accounts?: number;
+}
+
+export const NO_BUCKET_FACTS: BucketFacts = {};
+
+type AddressedBucket = Pick<
+	UserBucket,
+	'_id' | 'ownerGroupId' | 'slug' | 'host'
+>;
+
+/*
+ * A path, or none of its own yet: the forms whose change a group owner may make. A hostname reaches into the
+ * operator's domain, and the root belongs to the two buckets the instance is built on.
+ */
+function ownerMayReaddress(bucket: AddressedBucket): boolean {
+	const kind = addressOf(bucket).kind;
+	return kind === 'path' || kind === 'unaddressed';
+}
+
+/*
+ * Which facts can change this caller's answer. A super administrator's never can, so their reads — a whole
+ * list included — cost nothing new; the dependency counts matter only to a group owner whose bucket has a
+ * form they may change, and the account count only to a member who is not an owner.
+ */
+export function bucketFactsWanted(
 	ctx: AdminContext,
-	bucketId: string
+	bucket: AddressedBucket
+): { dependents: boolean; accounts: boolean } {
+	if (ctx.superAdmin || isUndeletableBucket(bucket._id)) {
+		return { dependents: false, accounts: false };
+	}
+	const owner = ownsGroup(ctx, bucket.ownerGroupId);
+	return {
+		dependents: owner && ownerMayReaddress(bucket),
+		accounts: !owner && belongsTo(ctx, bucket.ownerGroupId)
+	};
+}
+
+/*
+ * Changing an address changes a bucket's issuer identifier and breaks every client integrated with it, so it
+ * stays a super administrator's once anything is integrated: a project (and so its applications), an
+ * identity provider registered with the old callback, or a provisioning connection pointed at the old base
+ * URL. Before then nothing breaks, and an owner who mistyped a path corrects it themselves. A hostname target
+ * is a super administrator's whatever the bucket's state, which the route checks, because this answers per
+ * bucket and not per target. The two buckets served at the root keep theirs, or the console would lock every
+ * operator out of the surface that could move it back.
+ */
+function mayChangeBucketAddress(
+	ctx: AdminContext,
+	bucket: AddressedBucket,
+	facts: BucketFacts
 ): boolean {
-	return ctx.superAdmin && !isUndeletableBucket(bucketId);
+	if (isUndeletableBucket(bucket._id)) return false;
+	if (ctx.superAdmin) return true;
+	const dependents = facts.dependents;
+	return (
+		ownsGroup(ctx, bucket.ownerGroupId) &&
+		ownerMayReaddress(bucket) &&
+		dependents !== undefined &&
+		dependents.projects === 0 &&
+		dependents.providers === 0 &&
+		dependents.connections === 0
+	);
+}
+
+/*
+ * Deleting a bucket that holds accounts deletes people, so it is an owner's act, as moving it is; an empty
+ * bucket is still deletable by any member of its group.
+ */
+function mayDeleteBucket(
+	ctx: AdminContext,
+	bucket: AddressedBucket,
+	facts: BucketFacts
+): boolean {
+	if (isUndeletableBucket(bucket._id) || !holdsBucket(ctx, bucket)) {
+		return false;
+	}
+	return (
+		ctx.superAdmin ||
+		ownsGroup(ctx, bucket.ownerGroupId) ||
+		facts.accounts === 0
+	);
 }
 
 export function bucketCan(
 	ctx: AdminContext,
-	bucket: Pick<UserBucket, '_id' | 'ownerGroupId'>,
-	access: ProjectReach
+	bucket: AddressedBucket,
+	access: ProjectReach,
+	facts: BucketFacts = NO_BUCKET_FACTS
 ): BucketCan {
 	/*
 	 * The administrators' bucket: its accounts are administrators, managed on their own routes, so everything
@@ -137,13 +230,13 @@ export function bucketCan(
 		edit,
 		/* A super administrator reads any bucket's figures, the reserved ones included. */
 		readActivity: ctx.superAdmin || edit,
-		changeAddress: mayChangeBucketAddress(ctx, bucket._id),
+		changeAddress: mayChangeBucketAddress(ctx, bucket, facts),
 		/*
 		 * Taking a bucket away removes every other member's access to it, so it is an owner's act — of its
 		 * group, or of a group whose project moves with it, which is how a move left half-done is finished.
 		 */
 		move: !fixed && holds && (ctx.superAdmin || ownsWhatMoves),
-		delete: !fixed && holds
+		delete: mayDeleteBucket(ctx, bucket, facts)
 	};
 }
 

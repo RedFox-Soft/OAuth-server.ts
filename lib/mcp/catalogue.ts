@@ -370,7 +370,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: [],
 		summary:
-			'The user buckets: every one for a super-administrator, otherwise those the caller manages. For a super-administrator the list includes the administrators\' own bucket, marked `reserved: "administrators"`; nobody else sees it. Each row carries `can` and `blockers`, as bucket_get does.'
+			'The user buckets: every one for a super-administrator, otherwise those the caller manages. For a super-administrator the list includes the administrators\' own bucket, marked `reserved: "administrators"`; nobody else sees it. Each row carries `can` and `blockers`, as bucket_get does, and `addressForm` (root, path, host or unaddressed), `issuer` (null when unaddressed), `hostReached` (a request has arrived at its hostname; false for a bucket without one) and `held` (a provisioning connection of the bucket is holding a deprovisioning).'
 	},
 	{
 		tool: 'bucket_get',
@@ -383,7 +383,20 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'One user bucket: its name, owning group, and registration and verification settings. Its groups of end users are read with bucket_group_list. A super-administrator may read the administrators\' own bucket here (`reserved: "administrators"`); its accounts are read with admin_list, not through the bucket. `can` states which operations the server will accept from the caller on it: `manageUsers` (bucket_user_*, the identity tools, bucket_group_member_add/remove, and reading providers, provisioning and user groups), `edit` (federation_provider_create/update/delete, provisioning_connection_create/update/delete/release, provisioning_credential_*, bucket_group_create/update/delete/assign_connection, bucket_user_assign_connection, bucket_key_*), `editSettings` (bucket_update), `readActivity` (bucket_activity_get), `changeAddress` (bucket_address_change), `move` (bucket_owner_change) and `delete`; a false flag is a refusal, so do not try it. `blockers` is state that refuses a right the caller holds: `usedByProjects` names the projects still using it, and `addressable` is false for a bucket that signs with the instance keys. Deleting a bucket stays console-only for agents even where `can.delete` is true.'
+			"One user bucket: its name, owning group, and registration and verification settings. Its groups of end users are read with bucket_group_list. A super-administrator may read the administrators' own bucket here (`reserved: \"administrators\"`); its accounts are read with admin_list, not through the bucket. `can` states which operations the server will accept from the caller on it: `manageUsers` (bucket_user_*, the identity tools, bucket_group_member_add/remove, and reading providers, provisioning and user groups), `edit` (federation_provider_create/update/delete, provisioning_connection_create/update/delete/release, provisioning_credential_*, bucket_group_create/update/delete/assign_connection, bucket_user_assign_connection, bucket_key_*), `editSettings` (bucket_update), `readActivity` (bucket_activity_get), `changeAddress` (bucket_address_change), `move` (bucket_owner_change) and `delete`; a false flag is a refusal, so do not try it. `changeAddress` and `delete` also depend on the bucket's state for some callers: an owner of its group may change a path address only while no project, identity provider or provisioning connection depends on it, and a member who is not an owner may delete it only while it holds no accounts. `blockers` is the state behind them: `usedByProjects` names the projects still using it, `addressable` is false for a bucket that signs with the instance keys, `dependents` counts the projects, providers and connections depending on it and `accounts` the accounts it holds — each null when it could not change the caller's answer and so was not read. `addressForm` is root, path, host or unaddressed; `issuer` and `discoveryUrl` are what a client is configured with (null when unaddressed); `projects` lists the projects using it the caller can see, each with its `clientCount`. Its counts are read with bucket_summary_get. Deleting a bucket stays console-only for agents even where `can.delete` is true."
+	},
+	{
+		tool: 'bucket_summary_get',
+		method: 'GET',
+		path: '/admin/api/buckets/:id/summary',
+		action: null,
+		consequence: 'read',
+		superAdminOnly: false,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			"Count what a user bucket holds, computed when asked: its accounts (`users`), how many are unverified, without an authenticator and without any linked upstream identity; its user groups; its provisioning connections and how many are holding a deprovisioning (`held`); its identity providers (`providers.enabled`, and `providers.creating` — enabled ones that create accounts on first sign-in); and whether mail delivery is configured. `activeThisMonth` is present only to a caller with `can.readActivity`, and absent rather than zero before counting began. Counts only, never who. Readable by anyone who may read the bucket (bucket_get's `can.read`)."
 	},
 	{
 		tool: 'bucket_activity_get',
@@ -1041,12 +1054,17 @@ const catalogue = [
 		 * is a route of its own rather than a field on `bucket_update`.
 		 */
 		consequence: 'high',
-		superAdminOnly: true,
+		/*
+		 * Not instance-only since specs/081: an owner of the bucket's group may change a path address while
+		 * nothing depends on it. Still `high` whoever calls it; the gate binds `expect` through the argument
+		 * hash, so a confirmation cannot be spent on a different preview.
+		 */
+		superAdminOnly: false,
 		bodySchema: ChangeBucketAddressBody,
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			"Move a bucket to a different address: a path segment (`slug`) or a hostname of its own (`host`), never both. Called without `confirm`, it changes nothing and answers with the clients that will stop validating tokens. Called with `confirm: true`, it performs the move: the bucket's issuer identifier becomes the new address, the previous address stops answering, and everyone signed in signs in again. Only an administrator of the instance may do this, and a bucket served at the root cannot be moved at all — bucket_get states it as `can.changeAddress`."
+			"Move a bucket to a different address: a path segment (`slug`) or a hostname of its own (`host`), never both. Called without `confirm`, it changes nothing and answers with a preview naming what the change reaches — `applications` (each with its project), `connections`, `providers` (each with the `newCallback` its upstream registration needs) and `resources` — the issuers `from` and `to`, and `expect`, their counts. Called with `confirm: true` and that `expect`, it performs the move: the bucket's issuer identifier becomes the new address, the previous address stops answering, and everyone signed in signs in again. If what it reaches changed since the preview, it is refused with 409 and the fresh preview. A super administrator may change any bucket's address; an owner of its group may change a path address while no project, identity provider or provisioning connection depends on it; only a super administrator may give it a hostname; a bucket served at the root cannot be moved at all — bucket_get states it as `can.changeAddress`, with `blockers.dependents` as the reason."
 	},
 	{
 		tool: 'bucket_owner_change',

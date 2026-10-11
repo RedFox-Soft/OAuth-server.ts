@@ -106,7 +106,12 @@ the air everywhere except the exact URL in `ISSUER`.
 **Changing an address changes the issuer**, so it is not a field on the bucket PATCH. It is its own
 route, `POST /admin/api/buckets/:id/address` (`lib/admin/buckets/routes.ts:404`), which answers with a
 preview until called with `confirm: true`, and is audited as its own action, `bucket.address.change`
-(`lib/consts/admin_audit_routes.ts:264`).
+(`lib/consts/admin_audit_routes.ts:264`). Since spec 081 the preview names what breaks — each application
+with its project, each provisioning connection, each identity provider with its new callback address, each
+declared resource — and the confirming call must repeat the preview's counts (`expect`), or it is refused
+with a fresh preview. A group owner may change a **path** while nothing depends on the bucket (no project,
+provider or connection); a host stays super-administrator-only. The change clears the bucket's recorded host
+arrivals, so a new host does not read as reached from the old one's traffic. See [[bucket-workspace]].
 
 **A slug is a name, not an address**, and three places need to know the difference: `issuerFor`, which
 stamps `iss` into every token; `isAddressable`, which decides whether an address resolves — and which now

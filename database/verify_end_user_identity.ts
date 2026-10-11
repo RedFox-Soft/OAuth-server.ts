@@ -1,4 +1,7 @@
-import type { UserStoreInstance } from '../lib/adapters/types.js';
+import type {
+	UserBucketStoreInstance,
+	UserStoreInstance
+} from '../lib/adapters/types.js';
 
 /*
  * By name rather than by class: a value import of the adapter types would load what the callers deliberately
@@ -120,5 +123,95 @@ export async function verifyEndUserIdentity(
 		'a limit bounds the accounts found linked to a provider',
 		one.length === 1,
 		`${one.length}`
+	);
+
+	/*
+	 * A bucket's tally, counted by the datastore: the predicates reach inside each document, so a field
+	 * stored in the wrong shape would count nothing here and everything in memory. A link list emptied and
+	 * one removed must both count as unlinked, and an authenticator cleared as none.
+	 */
+	const before = await store.tally();
+	const complete = await store.create(
+		`tally-complete-${stamp}@example.com`,
+		'hash',
+		true
+	);
+	await store.update(complete._id, {
+		totp: { secret: 'JBSWY3DPEHPK3PXP', enrolledAt: new Date(), lastStep: 0 },
+		federated: [{ providerId, sub: `tally-${stamp}`, linkedAt: new Date() }]
+	});
+	const emptied = await create('tally-emptied');
+	await store.update(emptied._id, {
+		federated: [{ providerId, sub: `emptied-${stamp}`, linkedAt: new Date() }]
+	});
+	await store.update(emptied._id, { federated: [] });
+	const cleared = await store.create(
+		`tally-cleared-${stamp}@example.com`,
+		'hash',
+		true
+	);
+	await store.update(cleared._id, {
+		totp: { secret: 'JBSWY3DPEHPK3PXP', enrolledAt: new Date(), lastStep: 0 },
+		federated: [{ providerId, sub: `cleared-${stamp}`, linkedAt: new Date() }]
+	});
+	await store.update(cleared._id, { totp: undefined, federated: undefined });
+	const after = await store.tally();
+	const delta = {
+		total: after.total - before.total,
+		unverified: after.unverified - before.unverified,
+		withoutAuthenticator:
+			after.withoutAuthenticator - before.withoutAuthenticator,
+		withoutLinkedIdentity:
+			after.withoutLinkedIdentity - before.withoutLinkedIdentity
+	};
+	check(
+		"a bucket's tally counts unverified, unenrolled and unlinked accounts, an emptied or removed link list alike",
+		delta.total === 3 &&
+			delta.unverified === 1 &&
+			delta.withoutAuthenticator === 2 &&
+			delta.withoutLinkedIdentity === 2,
+		JSON.stringify(delta)
+	);
+	const listed = await store.list();
+	check(
+		'the tally total is the number of accounts the bucket holds',
+		after.total === listed.length,
+		`${after.total} vs ${listed.length}`
+	);
+}
+
+/*
+ * An address change forgets the arrivals recorded at the old address, in the same write: kept, they would
+ * report a new hostname as reached before any request had arrived at it. Shared here because both fidelity
+ * scripts already run the end-user checks against a bucket they created.
+ */
+export async function verifyAddressChangeForgetsArrivals(
+	buckets: UserBucketStoreInstance,
+	bucketId: string,
+	check: (name: string, ok: boolean, detail?: string) => void
+): Promise<void> {
+	const stamp = Date.now();
+	await buckets.setAddress(bucketId, { host: `old-${stamp}.example.test` });
+	await buckets.update(bucketId, {
+		hostFirstSeenAt: new Date(),
+		hostLastSeenAt: new Date()
+	});
+	const moved = await buckets.setAddress(bucketId, {
+		host: `new-${stamp}.example.test`
+	});
+	check(
+		'a new hostname carries no arrivals from the old one',
+		moved?.host === `new-${stamp}.example.test` &&
+			moved.hostFirstSeenAt === undefined &&
+			moved.hostLastSeenAt === undefined,
+		JSON.stringify(moved)
+	);
+	const reread = await buckets.find(bucketId);
+	check(
+		'the forgotten arrivals stay forgotten on a fresh read',
+		reread?.hostFirstSeenAt === undefined &&
+			reread?.hostLastSeenAt === undefined &&
+			reread?.slug === undefined,
+		JSON.stringify(reread)
 	);
 }

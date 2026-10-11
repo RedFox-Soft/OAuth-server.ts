@@ -41,6 +41,12 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Changed
 
+- **A bucket opens on an Overview and keeps its settings in one place** (spec 081). The Overview lists what needs
+  attention (a held deprovisioning, an unreached host, verification without mail…), the issuer and discovery
+  addresses to copy, sign-in at a glance and the counts; Settings holds the name, the address with its DNS record,
+  the owning group, and a Danger zone. Changing an address previews every application, connection, provider and
+  resource it affects and is refused if that set changed before confirming. A group owner may change an unused
+  bucket's path; only an owner (or a super administrator) may delete a bucket that still holds accounts.
 - **Every console screen has an address** (spec 079). Links, Back, reload and switching group keep your place,
   and signing in returns to the page you asked for. Bucket and project responses state what the caller may do
   (`can`), so the console hides what the server would refuse and disables, with the reason, what the current
@@ -50,6 +56,8 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- **A bucket moved to a new host no longer reads as reached** from the old host's traffic, and owners now see
+  their group's bucket deletions and address changes in their audit trail.
 - **Invitation links work.** The link in an invitation email opened a missing page; it now opens a page to
   accept, and a new invitee who first submits without a password no longer spends the invitation.
 

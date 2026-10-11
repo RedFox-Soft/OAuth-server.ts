@@ -17,7 +17,9 @@ import { createClient } from 'lib/admin/clients/service.ts';
 import {
 	getBucketStore,
 	getProjectStore,
-	getProtectedResourceStore
+	getProtectedResourceStore,
+	getProvisioningConnectionStore,
+	getUserStore
 } from 'lib/adapters/index.ts';
 import type { User } from 'lib/adapters/types.ts';
 import {
@@ -32,6 +34,7 @@ import { ADMIN_MCP_CLIENT_ID, MCP_RESOURCE } from 'lib/mcp/consts.ts';
 import { ROOT_NAMESPACE } from 'lib/resources/namespace.ts';
 import nanoid from 'lib/helpers/nanoid.ts';
 import { shaped } from 'test/shape.ts';
+import { provider as scimProvider } from '../scim/helpers.ts';
 import { createAdministrator } from '../administrators.ts';
 import { rpc, call as toolCall } from '../mcp/rpc.ts';
 import { cookieFor, regularGroup } from './ownership_fixtures.ts';
@@ -106,7 +109,16 @@ const BucketRead = Type.Object({
 	can: BucketCan,
 	blockers: Type.Object({
 		usedByProjects: Type.Array(Named),
-		addressable: Type.Boolean()
+		addressable: Type.Boolean(),
+		dependents: Type.Union([
+			Type.Object({
+				projects: Type.Number(),
+				providers: Type.Number(),
+				connections: Type.Number()
+			}),
+			Type.Null()
+		]),
+		accounts: Type.Union([Type.Number(), Type.Null()])
 	})
 });
 const ProjectRead = Type.Object({
@@ -131,7 +143,9 @@ const BUCKETS = [
 	'regular',
 	'administrators',
 	'default',
-	'not addressable'
+	'not addressable',
+	'unused',
+	'holding accounts'
 ] as const;
 type BucketKind = (typeof BUCKETS)[number];
 
@@ -150,6 +164,7 @@ interface World {
 	readonly placeholders: Readonly<Record<string, string>>;
 	readonly throughProjectName: string;
 	readonly bucketedName: string;
+	readonly owningGroupId: string;
 }
 
 const RESOURCE = `https://can-routes-${nanoid()
@@ -185,8 +200,11 @@ async function project(
  * A regular bucket and one with no address, both owned by a group with an owner and a plain member; a second
  * group whose only tie to every bucket is a project pointing at it — the reserved two included; an outsider;
  * a super administrator; and a destination group the members belong to, so a move is decided by its rights
- * and not by where it was asked to go. Built fresh per route, because some routes the right admits do change
- * what the next caller finds.
+ * and not by where it was asked to go. Two more buckets of the owning group carry the state two rights depend
+ * on (specs/081): one nothing uses and that holds no accounts, and one no project uses that holds an account.
+ * Built fresh per route, because some routes the right admits do change what the next caller finds — the
+ * unused bucket is deleted by the first caller whose right admits it, and every later caller is then refused
+ * it as a bucket that does not exist, which a caller who is not a super administrator cannot tell apart.
  */
 async function world(): Promise<World> {
 	await ensureAdminSeed();
@@ -222,6 +240,17 @@ async function world(): Promise<World> {
 		name: `legacy ${id}`,
 		ownerGroupId: owning._id
 	});
+	const unused = await getBucketStore().create({
+		name: `unused ${id}`,
+		slug: `cu-${id}`,
+		ownerGroupId: owning._id
+	});
+	const holding = await getBucketStore().create({
+		name: `holding ${id}`,
+		slug: `ch-${id}`,
+		ownerGroupId: owning._id
+	});
+	await getUserStore(holding._id).create(`held-${id}@x.io`, 'hash', true);
 
 	const bucketed = await project(owning._id, regular._id, [await heldClient()]);
 	const alone = await project(owning._id, null, [await heldClient()]);
@@ -241,7 +270,9 @@ async function world(): Promise<World> {
 			regular: regular._id,
 			administrators: ADMIN_BUCKET_ID,
 			default: DEFAULT_BUCKET_ID,
-			'not addressable': unaddressable._id
+			'not addressable': unaddressable._id,
+			unused: unused._id,
+			'holding accounts': holding._id
 		},
 		projects: {
 			'without a bucket': alone._id,
@@ -255,7 +286,8 @@ async function world(): Promise<World> {
 			':resource': RESOURCE
 		},
 		throughProjectName: throughProject.name,
-		bucketedName: bucketed.name
+		bucketedName: bucketed.name,
+		owningGroupId: owning._id
 	};
 }
 
@@ -519,6 +551,114 @@ describe('stated rights on buckets and projects', () => {
 				regular.blockers.addressable,
 				legacy.blockers.addressable
 			]).toEqual([true, false]);
+		});
+
+		it('states the right to change an unused bucket’s address to an owner of its group and not to a plain member', async () => {
+			const owner = await bucketAs('group owner', 'unused');
+			const member = await bucketAs('group member', 'unused');
+
+			expect([owner.can.changeAddress, member.can.changeAddress]).toEqual([
+				true,
+				false
+			]);
+			expect(owner.blockers.dependents).toEqual({
+				projects: 0,
+				providers: 0,
+				connections: 0
+			});
+		});
+
+		it('states the right to change the address of a bucket a project uses to a super administrator only, and tells an owner what depends on it', async () => {
+			const owner = await bucketAs('group owner', 'regular');
+			const superAdmin = await bucketAs('super administrator', 'regular');
+
+			expect([owner.can.changeAddress, superAdmin.can.changeAddress]).toEqual([
+				false,
+				true
+			]);
+			/* Counted across the instance: the project another group points at it counts too. */
+			expect(owner.blockers.dependents).toEqual({
+				projects: 2,
+				providers: 0,
+				connections: 0
+			});
+		});
+
+		it('states no right to an owner to change the address of a bucket an identity provider depends on', async () => {
+			const bucket = await getBucketStore().create({
+				name: `with provider ${nanoid()}`,
+				slug: `cp-${nanoid()
+					.toLowerCase()
+					.replace(/[^a-z0-9]/g, '')}`,
+				ownerGroupId: w.owningGroupId,
+				federation: [scimProvider('corp', { enabled: false })]
+			});
+
+			const read = shaped(
+				BucketRead,
+				(
+					await request(
+						'GET',
+						`/admin/api/buckets/${bucket._id}`,
+						w.cookies['group owner']
+					)
+				).body
+			);
+
+			expect(read.can.changeAddress).toBe(false);
+			expect(read.blockers.dependents?.providers).toBe(1);
+		});
+
+		it('states no right to an owner to change the address of a bucket a provisioning connection depends on', async () => {
+			const bucket = await getBucketStore().create({
+				name: `with connection ${nanoid()}`,
+				slug: `cc-${nanoid()
+					.toLowerCase()
+					.replace(/[^a-z0-9]/g, '')}`,
+				ownerGroupId: w.owningGroupId
+			});
+			await getProvisioningConnectionStore().create({
+				_id: nanoid(),
+				bucketId: bucket._id,
+				displayName: 'Directory',
+				enabled: true,
+				providerId: 'gone',
+				correlation: { claim: 'oid', attribute: 'externalId' },
+				emailTrust: 'untrusted',
+				oauthCredential: null
+			});
+
+			const read = shaped(
+				BucketRead,
+				(
+					await request(
+						'GET',
+						`/admin/api/buckets/${bucket._id}`,
+						w.cookies['group owner']
+					)
+				).body
+			);
+
+			expect(read.can.changeAddress).toBe(false);
+			expect(read.blockers.dependents?.connections).toBe(1);
+		});
+
+		it('states the right to delete a bucket holding accounts to an owner of its group and not to a plain member, and tells the member how many it holds', async () => {
+			const owner = await bucketAs('group owner', 'holding accounts');
+			const member = await bucketAs('group member', 'holding accounts');
+
+			expect([owner.can.delete, member.can.delete]).toEqual([true, false]);
+			expect([owner.blockers.accounts, member.blockers.accounts]).toEqual([
+				null,
+				1
+			]);
+		});
+
+		it('states the right to delete a bucket holding no accounts to a plain member of its group', async () => {
+			const member = await bucketAs('group member', 'unused');
+
+			expect(member.can.delete).toBe(true);
+			expect(member.blockers.accounts).toBe(0);
 		});
 
 		it('reports a project that uses a bucket as one that moves only with it', async () => {

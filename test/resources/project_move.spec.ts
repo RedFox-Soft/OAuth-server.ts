@@ -175,7 +175,12 @@ describe('a project with declarations changing bucket', () => {
 			'POST',
 			`/admin/api/buckets/${legacy._id}/address`,
 			cookie,
-			{ slug: unique('legacy'), confirm: true }
+			{
+				slug: unique('legacy'),
+				confirm: true,
+				/* The preview this confirms: one project with no applications, and its one declaration. */
+				expect: { applications: 0, connections: 0, providers: 0, resources: 1 }
+			}
 		);
 
 		expect(res.status).toBe(200);

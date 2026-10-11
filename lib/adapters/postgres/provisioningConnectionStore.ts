@@ -61,6 +61,16 @@ export class ProvisioningConnectionStore implements ProvisioningConnectionStoreI
 		return this.connectionsOf(rows);
 	}
 
+	/* The hold test `holdIfFree` and `releaseHold` use: an object, not merely a present key. */
+	async bucketsHolding(): Promise<string[]> {
+		const handle = sql();
+		const rows = await handle<{ bucket: string }[]>`
+			SELECT DISTINCT doc->>'bucketId' AS bucket FROM ${handle(this.area)}
+			WHERE jsonb_typeof(doc->'hold') = 'object'
+		`;
+		return rows.map((row) => row.bucket);
+	}
+
 	async findByProvider(
 		bucketId: string,
 		providerId: string

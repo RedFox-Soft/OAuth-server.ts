@@ -92,6 +92,34 @@ export async function verifyProvisioningConnections(
 		typeof read?.createdAt
 	);
 
+	/*
+	 * Which buckets hold a deprovisioning: what the bucket list marks from one read. A connection released
+	 * again keeps its bucket off the list, which is the `hold` test the stores share rather than a present key.
+	 */
+	const heldElsewhere = `verify-held-bucket-${stamp}`;
+	const releasedBucket = `verify-released-bucket-${stamp}`;
+	await store.create({ ...base('held-a', 'held-a'), bucketId: heldElsewhere });
+	await store.create({ ...base('held-b', 'held-b'), bucketId: heldElsewhere });
+	await store.create({
+		...base('released', 'released'),
+		bucketId: releasedBucket
+	});
+	const hold = { since: new Date(), count: 3 };
+	await store.holdIfFree(`held-a-${stamp}`, hold);
+	await store.holdIfFree(`held-b-${stamp}`, hold);
+	await store.holdIfFree(`released-${stamp}`, hold);
+	await store.releaseHold(`released-${stamp}`);
+	const holding = await store.bucketsHolding();
+	check(
+		'a bucket whose connections hold is named once, and one whose hold was released is not',
+		holding.filter((id) => id === heldElsewhere).length === 1 &&
+			!holding.includes(releasedBucket) &&
+			!holding.includes(bucketId),
+		holding.join(', ')
+	);
+	await store.destroyByBucket(heldElsewhere);
+	await store.destroyByBucket(releasedBucket);
+
 	const removed = await store.destroyByBucket(bucketId);
 	check(
 		'deleting the bucket’s connections names each one removed',

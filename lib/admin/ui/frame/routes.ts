@@ -25,12 +25,14 @@ export type PageKey =
 	| 'project.clients'
 	| 'project.resources'
 	| 'buckets'
+	| 'bucket.overview'
 	| 'bucket.users'
 	| 'bucket.userGroups'
 	| 'bucket.providers'
 	| 'bucket.provisioning'
 	| 'bucket.keys'
 	| 'bucket.activity'
+	| 'bucket.settings'
 	| 'groups'
 	| 'audit'
 	| 'administrators'
@@ -69,6 +71,13 @@ export const ROUTES: readonly RouteSpec[] = [
 		area: 'Resources'
 	},
 	{ key: 'buckets', pattern: ['buckets'], section: 'buckets' },
+	/* A bucket's bare address is its Overview (specs/081): a link that names the bucket lands there. */
+	{
+		key: 'bucket.overview',
+		pattern: ['buckets', ':bucket'],
+		section: 'buckets',
+		area: 'Overview'
+	},
 	{
 		key: 'bucket.users',
 		pattern: ['buckets', ':bucket', 'users'],
@@ -104,6 +113,12 @@ export const ROUTES: readonly RouteSpec[] = [
 		pattern: ['buckets', ':bucket', 'activity'],
 		section: 'buckets',
 		area: 'Activity'
+	},
+	{
+		key: 'bucket.settings',
+		pattern: ['buckets', ':bucket', 'settings'],
+		section: 'buckets',
+		area: 'Settings'
 	},
 	{ key: 'groups', pattern: ['groups'], section: 'groups' },
 	{ key: 'audit', pattern: ['audit'], section: 'audit' },
@@ -149,9 +164,10 @@ export const ROUTES: readonly RouteSpec[] = [
 ];
 
 /*
- * Addresses that stand for another one. The bare entity opens its first area — a bucket's users until it
- * has an overview of its own — and the bare console opens Projects. Kept apart from the table above so a
- * redirect never has a page that could drift from the page it names.
+ * Addresses that stand for another one. A bare project opens its first area and the bare console opens
+ * Projects; a bucket's bare address is a page of its own, its Overview. Kept apart from the table above so a
+ * redirect never has a page that could drift from the page it names. Checked before the table, so the
+ * literal administrators' bucket below wins over the Overview pattern.
  */
 const REDIRECTS: readonly {
 	readonly pattern: readonly string[];
@@ -163,16 +179,13 @@ const REDIRECTS: readonly {
 		to: (p) => `/admin/projects/${encodeURIComponent(p.project ?? '')}/clients`
 	},
 	{
-		pattern: ['buckets', ':bucket'],
 		/*
-		 * The administrators' bucket has no Users area — its accounts are on the Administrators page — so its
-		 * bare address opens its identity providers (specs/080). Its id is written out rather than imported,
-		 * so this module keeps importing nothing but types.
+		 * The administrators' bucket keeps its own pages until it moves home (console redesign phase 4): its bare
+		 * address opens its identity providers (specs/080). Its id is written out rather than imported, so this
+		 * module keeps importing nothing but types.
 		 */
-		to: (p) =>
-			p.bucket === 'admin'
-				? '/admin/buckets/admin/identity-providers'
-				: `/admin/buckets/${encodeURIComponent(p.bucket ?? '')}/users`
+		pattern: ['buckets', 'admin'],
+		to: () => '/admin/buckets/admin/identity-providers'
 	}
 ];
 
@@ -261,8 +274,10 @@ export function sectionHref(section: Section): string {
 	return `/admin/${section}`;
 }
 
-export function bucketHref(bucketId: string, area = 'users'): string {
-	return `/admin/buckets/${encodeURIComponent(bucketId)}/${area}`;
+/* A bucket's address; without an area, its Overview. */
+export function bucketHref(bucketId: string, area?: string): string {
+	const base = `/admin/buckets/${encodeURIComponent(bucketId)}`;
+	return area ? `${base}/${area}` : base;
 }
 
 export function projectHref(projectId: string, area = 'clients'): string {

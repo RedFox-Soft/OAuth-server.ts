@@ -1,28 +1,86 @@
 import { describe, it, expect, beforeEach, spyOn } from 'bun:test';
 import { Elysia } from 'elysia';
-import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
-import { bucketRoutes } from 'lib/admin/buckets/routes.ts';
+import { adminApiRoutes } from 'lib/admin/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { getBucketStore, getProjectStore } from 'lib/adapters/index.ts';
+import {
+	getBucketStore,
+	getProjectStore,
+	getProtectedResourceStore,
+	getProvisioningConnectionStore
+} from 'lib/adapters/index.ts';
+import type { User } from 'lib/adapters/types.ts';
 import {
 	ADMIN_SESSION_COOKIE,
 	DEFAULT_BUCKET_ID,
 	UNASSIGNED_GROUP_ID
 } from 'lib/admin/consts.ts';
 import { forgetBucketAddresses } from 'lib/admin/auth/bucketAddress.ts';
+import { createClient } from 'lib/admin/clients/service.ts';
 import { issuerFor } from 'lib/configs/issuer.ts';
-import { sessionFor } from '../admin_session.ts';
+import nanoid from 'lib/helpers/nanoid.ts';
+import { personalGroupId, sessionFor } from '../admin_session.ts';
 import { Type } from '@sinclair/typebox';
 import { present, shaped } from 'test/shape.ts';
 import { createAdministrator, type AdminKind } from '../administrators.ts';
+import { regularGroup } from '../admin/ownership_fixtures.ts';
+import { provider } from '../scim/helpers.ts';
 
-const app = new Elysia().use(resolveAdmin).use(bucketRoutes);
+const app = new Elysia().use(adminApiRoutes);
 
-async function cookieFor(kind: AdminKind) {
-	const user = await createAdministrator(kind, `${kind}-${Math.random()}@x.io`);
+async function sessionCookie(user: User) {
 	const session = await sessionFor(user);
 	return `${ADMIN_SESSION_COOKIE}=${session._id}`;
 }
+
+async function cookieFor(kind: AdminKind) {
+	return sessionCookie(
+		await createAdministrator(kind, `${kind}-${Math.random()}@x.io`)
+	);
+}
+
+/* What a preview that reaches nothing counts: the expectation a commit on an unused bucket carries. */
+const NOTHING = { applications: 0, connections: 0, providers: 0, resources: 0 };
+
+const Preview = Type.Object({
+	from: Type.String(),
+	to: Type.String(),
+	applications: Type.Array(
+		Type.Object({
+			clientId: Type.String(),
+			name: Type.Union([Type.String(), Type.Null()]),
+			projectId: Type.String(),
+			projectName: Type.String()
+		})
+	),
+	connections: Type.Array(
+		Type.Object({ id: Type.String(), displayName: Type.String() })
+	),
+	providers: Type.Array(
+		Type.Object({
+			id: Type.String(),
+			displayName: Type.String(),
+			newCallback: Type.String()
+		})
+	),
+	resources: Type.Array(
+		Type.Object({
+			identifier: Type.String(),
+			projectId: Type.String(),
+			projectName: Type.String()
+		})
+	),
+	namespaceMove: Type.Boolean(),
+	expect: Type.Object({
+		applications: Type.Number(),
+		connections: Type.Number(),
+		providers: Type.Number(),
+		resources: Type.Number()
+	})
+});
+
+const AuditPage = Type.Object({
+	entries: Type.Array(Type.Object({ action: Type.String() }))
+});
 
 async function changeAddress(
 	cookie: string,
@@ -65,9 +123,11 @@ async function seedBucketWithClients(slug: string, clientIds: string[]) {
 }
 
 /**
- * @proves Moving a bucket is an operation of its own: it shows what it will break before it breaks it,
- * completes only on a separate confirmation, leaves the previous address answering nothing, and is
- * refused outright for a bucket served at the root.
+ * @proves Moving a bucket is an operation of its own: it names what it will break before it breaks it,
+ * completes only on a separate confirmation of what was previewed, leaves the previous address answering
+ * nothing, and is refused outright for a bucket served at the root. An owner of the bucket's group may
+ * correct its path while nothing depends on it; a hostname, or a bucket something depends on, stays a
+ * super administrator's.
  */
 describe('moving a bucket to a different address (US3)', () => {
 	let superCookie: string;
@@ -80,22 +140,109 @@ describe('moving a bucket to a different address (US3)', () => {
 		counter += 1;
 	});
 
-	it('names every client that will need reconfiguring, before an address changes', async () => {
-		const id = await seedBucketWithClients(`preview-${counter}`, [
-			'billing-api',
-			'admin-console-app'
-		]);
-
-		const { body } = await changeAddress(superCookie, id, {
-			host: `preview-${counter}.e.ly`
+	it('names each application with its project, connection, provider with its new callback, and resource, before an address changes', async () => {
+		const slug = `preview-${counter}`;
+		const { view } = await createClient({
+			clientId: `billing-${nanoid()}`,
+			clientName: 'Billing',
+			grantTypes: ['authorization_code'],
+			redirectUris: ['https://billing.example.com/cb'],
+			tokenEndpointAuthMethod: 'none'
+		});
+		const id = await seedBucketWithClients(slug, [view.clientId]);
+		await getBucketStore().update(id, { federation: [provider('corp')] });
+		const connection = await getProvisioningConnectionStore().create({
+			_id: nanoid(),
+			bucketId: id,
+			displayName: 'Directory',
+			enabled: true,
+			providerId: 'corp',
+			correlation: { claim: 'oid', attribute: 'externalId' },
+			emailTrust: 'untrusted',
+			oauthCredential: null
+		});
+		const project = present(
+			await getProjectStore().findBySlug(`proj-${slug}`),
+			'project'
+		);
+		const identifier = `https://api-${String(counter)}-${nanoid()
+			.toLowerCase()
+			.replace(/[^a-z0-9]/g, '')}.example.com/mcp`;
+		await getProtectedResourceStore().create({
+			namespace: id,
+			identifier,
+			projectId: project._id,
+			name: 'API',
+			scopes: ['read']
 		});
 
-		/* Named rather than counted: "2 clients" tells an operator nothing they can act on, and a list of
-		 * ids is what they take to whoever owns each one. */
-		expect(body.clientsNeedingReconfiguration).toEqual([
-			'admin-console-app',
-			'billing-api'
+		const { status, body } = await changeAddress(superCookie, id, {
+			host: `preview-${counter}.e.ly`
+		});
+		const preview = shaped(Preview, body);
+
+		/* Named rather than counted: "4 things" tells an operator nothing they can act on, and each of these
+		 * is what they take to whoever owns it. */
+		expect(status).toBe(409);
+		expect(preview.applications).toEqual([
+			{
+				clientId: view.clientId,
+				name: 'Billing',
+				projectId: project._id,
+				projectName: project.name
+			}
 		]);
+		expect(preview.connections).toEqual([
+			{ id: connection._id, displayName: 'Directory' }
+		]);
+		expect(preview.providers).toEqual([
+			{
+				id: 'corp',
+				displayName: 'corp',
+				newCallback: `http://preview-${counter}.e.ly/federation/callback`
+			}
+		]);
+		expect(preview.resources).toEqual([
+			{ identifier, projectId: project._id, projectName: project.name }
+		]);
+		expect([preview.from, preview.to]).toEqual([
+			`http://e.ly/${slug}`,
+			`http://preview-${counter}.e.ly`
+		]);
+	});
+
+	it('refuses a commit whose expectation no longer matches, with the fresh preview', async () => {
+		const id = await seedBucketWithClients(`stale-${counter}`, []);
+		const { body } = await changeAddress(superCookie, id, {
+			slug: `stale-moved-${counter}`
+		});
+		const seen = shaped(Preview, body).expect;
+		/* A provider configured while the preview was open: the consent given did not cover it. */
+		await getBucketStore().update(id, { federation: [provider('late')] });
+
+		const { status, body: refused } = await changeAddress(superCookie, id, {
+			slug: `stale-moved-${counter}`,
+			confirm: true,
+			expect: seen
+		});
+
+		expect(status).toBe(409);
+		expect(shaped(Preview, refused).providers.map((p) => p.id)).toEqual([
+			'late'
+		]);
+		expect((await getBucketStore().find(id))?.slug).toBe(`stale-${counter}`);
+	});
+
+	it('refuses a commit that does not carry the counts of the preview it confirms', async () => {
+		const id = await seedBucketWithClients(`blind-${counter}`, []);
+
+		const { status } = await changeAddress(superCookie, id, {
+			slug: `blind-moved-${counter}`,
+			confirm: true
+		});
+
+		expect(status).toBe(409);
+		expect((await getBucketStore().find(id))?.slug).toBe(`blind-${counter}`);
 	});
 
 	it('refuses to complete an address change without a separate confirmation', async () => {
@@ -132,7 +279,8 @@ describe('moving a bucket to a different address (US3)', () => {
 		try {
 			const { status } = await changeAddress(superCookie, id, {
 				host: held,
-				confirm: true
+				confirm: true,
+				expect: NOTHING
 			});
 
 			expect(status).toBe(409);
@@ -147,7 +295,8 @@ describe('moving a bucket to a different address (US3)', () => {
 
 		const { status } = await changeAddress(superCookie, id, {
 			host,
-			confirm: true
+			confirm: true,
+			expect: NOTHING
 		});
 		expect(status).toBe(200);
 
@@ -162,7 +311,8 @@ describe('moving a bucket to a different address (US3)', () => {
 
 		await changeAddress(superCookie, id, {
 			host: `vacated-${counter}.e.ly`,
-			confirm: true
+			confirm: true,
+			expect: NOTHING
 		});
 		forgetBucketAddresses();
 
@@ -176,7 +326,8 @@ describe('moving a bucket to a different address (US3)', () => {
 
 		await changeAddress(superCookie, id, {
 			host: `single-${counter}.e.ly`,
-			confirm: true
+			confirm: true,
+			expect: NOTHING
 		});
 
 		const after = await getBucketStore().find(id);
@@ -199,15 +350,126 @@ describe('moving a bucket to a different address (US3)', () => {
 		expect(status).toBe(403);
 	});
 
-	it('refuses an address change from an administrator who administers only a group', async () => {
-		const id = await seedBucketWithClients(`escalate-${counter}`, []);
-		const projectAdmin = await cookieFor('plain');
+	describe('by an owner of the bucket’s group', () => {
+		let ownerCookie: string;
+		let groupId: string;
 
-		const { status } = await changeAddress(projectAdmin, id, {
-			host: `escalate-${counter}.e.ly`,
-			confirm: true
+		beforeEach(async () => {
+			const owner = await createAdministrator('plain');
+			ownerCookie = await sessionCookie(owner);
+			groupId = await personalGroupId(owner._id);
 		});
 
+		async function ownBucket(slug: string) {
+			return getBucketStore().create({
+				ownerGroupId: groupId,
+				name: `Own ${slug}`,
+				slug
+			});
+		}
+
+		it('corrects a mistyped path on a bucket nothing uses, and the change is in the group’s trail', async () => {
+			const bucket = await ownBucket(`mistpyed-${counter}`);
+
+			const preview = await changeAddress(ownerCookie, bucket._id, {
+				slug: `mistyped-${counter}`
+			});
+			const committed = await changeAddress(ownerCookie, bucket._id, {
+				slug: `mistyped-${counter}`,
+				confirm: true,
+				expect: shaped(Preview, preview.body).expect
+			});
+			const trail = await app.handle(
+				new Request(
+					`http://e.ly/admin/api/audit?targetId=${encodeURIComponent(bucket._id)}`,
+					{ headers: { cookie: ownerCookie } }
+				)
+			);
+
+			expect(committed.status).toBe(200);
+			expect((await getBucketStore().find(bucket._id))?.slug).toBe(
+				`mistyped-${counter}`
+			);
+			expect(
+				shaped(AuditPage, await trail.json()).entries.map((e) => e.action)
+			).toContain('bucket.address.change');
+		});
+
+		it('refuses an owner a hostname for a bucket nothing uses', async () => {
+			const bucket = await ownBucket(`unhosted-${counter}`);
+
+			const { status } = await changeAddress(ownerCookie, bucket._id, {
+				host: `unhosted-${counter}.e.ly`,
+				confirm: true,
+				expect: NOTHING
+			});
+
+			expect(status).toBe(403);
+			expect((await getBucketStore().find(bucket._id))?.host).toBeUndefined();
+		});
+
+		it('refuses an owner once a project uses the bucket, and says what depends on it', async () => {
+			const bucket = await ownBucket(`used-${counter}`);
+			await getProjectStore().create({
+				ownerGroupId: groupId,
+				name: `Uses ${counter}`,
+				slug: `uses-${counter}`,
+				bucketId: bucket._id
+			});
+
+			const { status, body } = await changeAddress(ownerCookie, bucket._id, {
+				slug: `used-moved-${counter}`,
+				confirm: true,
+				expect: NOTHING
+			});
+
+			expect(status).toBe(403);
+			expect(body.message).toBe(
+				"Used by 1 project, 0 identity providers and 0 provisioning connections: only an instance administrator can change this bucket's address now."
+			);
+			expect((await getBucketStore().find(bucket._id))?.slug).toBe(
+				`used-${counter}`
+			);
+		});
+	});
+
+	it('refuses a plain member of the group a bucket nothing uses belongs to', async () => {
+		const owner = await createAdministrator('plain');
+		const member = await createAdministrator('plain');
+		const team = await regularGroup([owner], [member]);
+		const bucket = await getBucketStore().create({
+			ownerGroupId: team._id,
+			name: `Team ${counter}`,
+			slug: `team-${counter}`
+		});
+
+		const { status } = await changeAddress(
+			await sessionCookie(member),
+			bucket._id,
+			{ slug: `team-moved-${counter}`, confirm: true, expect: NOTHING }
+		);
+
 		expect(status).toBe(403);
+		expect((await getBucketStore().find(bucket._id))?.slug).toBe(
+			`team-${counter}`
+		);
+	});
+
+	it('refuses a caller who is not a super administrator alike for a missing bucket and a forbidden one', async () => {
+		const outsider = await cookieFor('plain');
+		const forbidden = await seedBucketWithClients(`forbidden-${counter}`, []);
+
+		const missing = await changeAddress(outsider, `missing-${counter}`, {
+			slug: `missing-moved-${counter}`
+		});
+		const refused = await changeAddress(outsider, forbidden, {
+			slug: `forbidden-moved-${counter}`
+		});
+
+		expect(refused.status).toBe(403);
+		expect([missing.status, missing.body.message]).toEqual([
+			refused.status,
+			refused.body.message
+		]);
 	});
 });

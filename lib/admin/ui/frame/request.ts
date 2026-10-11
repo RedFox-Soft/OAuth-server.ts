@@ -72,14 +72,19 @@ export async function request<T = unknown>(
 		// The shape is the route's: the console reads what the admin API answers, typed at the call.
 		return { ok: true, status: res.status, data: parsed as T };
 	}
-	return {
-		ok: false,
-		status: res.status,
-		error: isErrorBody(parsed)
-			? parsed
-			: {
+	const fallback = `The server refused the request (${String(res.status)}).`;
+	/*
+	 * A body without a `message` is still the server's answer — a 409 preview (an address change's, a move's)
+	 * carries its whole content in other fields — so it is kept, with a generic sentence added for display.
+	 */
+	const error: AdminErrorBody = isErrorBody(parsed)
+		? parsed
+		: typeof parsed === 'object' && parsed !== null
+			? {
 					error: 'unknown',
-					message: `The server refused the request (${String(res.status)}).`
+					...(parsed as Record<string, unknown>),
+					message: fallback
 				}
-	};
+			: { error: 'unknown', message: fallback };
+	return { ok: false, status: res.status, error };
 }

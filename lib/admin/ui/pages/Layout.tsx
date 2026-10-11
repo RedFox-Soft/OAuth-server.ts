@@ -34,12 +34,14 @@ import { Usage } from './Usage.js';
 const { Sider, Header, Content } = AntLayout;
 
 const BUCKET_TABS: Partial<Record<PageKey, BucketTab>> = {
+	'bucket.overview': 'overview',
 	'bucket.users': 'users',
 	'bucket.userGroups': 'userGroups',
 	'bucket.providers': 'providers',
 	'bucket.provisioning': 'provisioning',
 	'bucket.keys': 'keys',
-	'bucket.activity': 'activity'
+	'bucket.activity': 'activity',
+	'bucket.settings': 'settings'
 };
 
 /*

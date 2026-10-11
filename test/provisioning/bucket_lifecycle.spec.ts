@@ -30,7 +30,7 @@ describe('a bucket with provisioning connections', () => {
 		);
 
 		expect(preview.status).toBe(409);
-		expect(preview.json.provisioningConnectionsNeedingReconfiguration).toEqual([
+		expect(preview.json.connections).toEqual([
 			{ id: c.connection._id, displayName: 'Directory' }
 		]);
 	});

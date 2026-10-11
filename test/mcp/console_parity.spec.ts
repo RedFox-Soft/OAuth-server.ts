@@ -146,6 +146,7 @@ describe('agent answers match the console, field for field', () => {
 			client_get: { id: project._id, clientId },
 			bucket_get: { id: bucket._id },
 			bucket_activity_get: { id: bucket._id },
+			bucket_summary_get: { id: bucket._id },
 			bucket_user_list: { id: bucket._id },
 			federation_provider_list: { id: bucket._id },
 			federation_identity_list: { id: bucket._id, uid: endUser._id }

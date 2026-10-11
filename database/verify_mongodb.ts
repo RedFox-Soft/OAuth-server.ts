@@ -1,5 +1,8 @@
 import { STORE_AREAS } from '../lib/consts/storage_inventory.js';
-import { verifyEndUserIdentity } from './verify_end_user_identity.js';
+import {
+	verifyAddressChangeForgetsArrivals,
+	verifyEndUserIdentity
+} from './verify_end_user_identity.js';
 import { verifyProvisioningConnections } from './verify_provisioning_connections.js';
 import { verifyBucketGroups } from './verify_bucket_groups.js';
 import { verifyActivity } from './verify_activity.js';
@@ -411,6 +414,11 @@ const identityBucket = await new UserBucketStore().create({
 	ownerGroupId: 'unassigned'
 });
 await verifyEndUserIdentity(new UserStore(identityBucket._id), check);
+await verifyAddressChangeForgetsArrivals(
+	new UserBucketStore(),
+	identityBucket._id,
+	check
+);
 await verifyProvisioningConnections(new ProvisioningConnectionStore(), check);
 
 console.log(

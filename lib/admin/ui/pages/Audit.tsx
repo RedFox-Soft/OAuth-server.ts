@@ -12,6 +12,7 @@ import {
 } from 'antd';
 import { PageHeader } from '../frame/PageHeader.js';
 import { request } from '../frame/request.js';
+import { useRoute } from '../frame/router.js';
 import { EmptyState, LoadFailed, NoMatch } from '../frame/states.js';
 
 interface AuditEntry {
@@ -88,6 +89,27 @@ const EMPTY_FILTERS: Filters = {
 	viaSurface: ''
 };
 
+/*
+ * The filters a link opened the page with (specs/081: a bucket's Overview links to its own entries). Read
+ * once, when the page mounts; after that the boxes are the operator's.
+ */
+function filtersFrom(query: URLSearchParams): Filters {
+	const filters = { ...EMPTY_FILTERS };
+	for (const key of [
+		'actor',
+		'action',
+		'targetType',
+		'targetId',
+		'targetScope',
+		'from',
+		'to'
+	] as const) {
+		const value = query.get(key);
+		if (value) filters[key] = value;
+	}
+	return filters;
+}
+
 const TEXT_FILTERS = [
 	{ name: 'actor' as const, placeholder: 'Actor (email or id)', width: 220 },
 	{ name: 'action' as const, placeholder: 'Action', width: 180 },
@@ -143,9 +165,11 @@ export function Audit() {
 	 * reads as "nothing happened" on the one page whose job is to say what did.
 	 */
 	const [failed, setFailed] = useState<string | null>(null);
-	const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
+	const { query } = useRoute();
+	const [initial] = useState<Filters>(() => filtersFrom(query));
+	const [filters, setFilters] = useState<Filters>(initial);
 	/* What the page on screen was filtered by, as opposed to what is typed into the boxes now. */
-	const [applied, setApplied] = useState<Filters>(EMPTY_FILTERS);
+	const [applied, setApplied] = useState<Filters>(initial);
 	const [current, setCurrent] = useState(1);
 	const [pageSize, setPageSize] = useState(50);
 
@@ -186,8 +210,8 @@ export function Audit() {
 	}
 
 	useEffect(() => {
-		void fetchPage(EMPTY_FILTERS, 1, 50);
-	}, [fetchPage]);
+		void fetchPage(initial, 1, 50);
+	}, [fetchPage, initial]);
 
 	function apply() {
 		setCurrent(1);

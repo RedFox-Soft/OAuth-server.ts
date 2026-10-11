@@ -121,6 +121,9 @@ export class UserBucketStore implements UserBucketStoreInstance {
 		/* One form written, the other removed in the same step: a bucket holds one address, never both. */
 		delete b.slug;
 		delete b.host;
+		/* Arrivals at the old address say nothing about the new one. */
+		delete b.hostFirstSeenAt;
+		delete b.hostLastSeenAt;
 		Object.assign(b, address, { updatedAt: new Date() });
 		return this.withDefaults(b);
 	}

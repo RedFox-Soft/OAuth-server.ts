@@ -131,13 +131,19 @@ export class UserBucketStore implements UserBucketStoreInstance {
 		/*
 		 * Merge one form, then drop the other: a bucket holds one address, never both. `-` removes the
 		 * key outright rather than setting it null, which matters because a null would occupy the partial
-		 * unique index rather than being excluded from it.
+		 * unique index rather than being excluded from it. Arrivals at the old address say nothing about
+		 * the new one, so they are dropped in the same write.
 		 */
-		const dropped = address.host === undefined ? 'host' : 'slug';
+		const dropped = [
+			address.host === undefined ? 'host' : 'slug',
+			'hostFirstSeenAt',
+			'hostLastSeenAt'
+		];
 		const merged = { ...address, updatedAt: new Date() };
 		try {
 			const rows = await handle`
-				UPDATE ${handle(this.area)} SET doc = (doc || ${merged}) - ${dropped}
+				UPDATE ${handle(this.area)}
+				SET doc = (doc || ${merged}) - ${handle.array(dropped, 'text')}
 				WHERE id = ${id}
 				RETURNING doc
 			`;

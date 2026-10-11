@@ -66,6 +66,14 @@ export class ProvisioningConnectionStore implements ProvisioningConnectionStoreI
 			.map((c) => structuredClone(c));
 	}
 
+	async bucketsHolding(): Promise<string[]> {
+		const held = new Set<string>();
+		for (const connection of this.connections.values()) {
+			if (connection.hold) held.add(connection.bucketId);
+		}
+		return [...held];
+	}
+
 	async findByProvider(
 		bucketId: string,
 		providerId: string

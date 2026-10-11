@@ -101,7 +101,9 @@ describe('an addressable bucket without keys of its own', () => {
 			cookie,
 			{
 				slug: `legacy${Math.random().toString(36).slice(2, 8)}`,
-				confirm: true
+				confirm: true,
+				/* Nothing uses it: the preview this confirms reaches nothing. */
+				expect: { applications: 0, connections: 0, providers: 0, resources: 0 }
 			}
 		);
 
@@ -122,7 +124,8 @@ describe('an addressable bucket without keys of its own', () => {
 
 		await send('POST', `/admin/api/buckets/${bucket._id}/address`, cookie, {
 			slug: `moved${Math.random().toString(36).slice(2, 8)}`,
-			confirm: true
+			confirm: true,
+			expect: { applications: 0, connections: 0, providers: 0, resources: 0 }
 		});
 
 		expect(await kidsOf(bucket._id)).toEqual(before);

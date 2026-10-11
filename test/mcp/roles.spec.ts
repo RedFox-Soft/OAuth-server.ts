@@ -301,6 +301,66 @@ describe('agent permissions match the console, per role', () => {
 		}
 	});
 
+	it("lets an agent correct the path of an unused bucket its administrator's group owns, as the console does", async () => {
+		const { token, user } = await principal('plain');
+		const suffix = Math.floor(Math.random() * 1e6);
+		const bucket = await getBucketStore().create({
+			name: 'Mistyped',
+			slug: `mistpyed-${suffix}`,
+			ownerGroupId: await personalGroupId(user._id)
+		});
+		const args = {
+			id: bucket._id,
+			slug: `mistyped-${suffix}`,
+			confirm: true,
+			expect: { applications: 0, connections: 0, providers: 0, resources: 0 }
+		};
+
+		const described = await rpc(call('bucket_address_change', args), token);
+		const performed = await rpc(
+			call('bucket_address_change', {
+				...args,
+				confirmationToken:
+					described.result?.structuredContent?.confirmationToken
+			}),
+			token
+		);
+
+		expect(performed.result?.isError).not.toBe(true);
+		expect((await getBucketStore().find(bucket._id))?.slug).toBe(
+			`mistyped-${suffix}`
+		);
+	});
+
+	it('refuses an agent a hostname for a bucket its administrator owns, as the console does', async () => {
+		const { token, user } = await principal('plain');
+		const suffix = Math.floor(Math.random() * 1e6);
+		const bucket = await getBucketStore().create({
+			name: 'Unhosted',
+			slug: `unhosted-${suffix}`,
+			ownerGroupId: await personalGroupId(user._id)
+		});
+		const args = {
+			id: bucket._id,
+			host: `unhosted-${suffix}.e.ly`,
+			confirm: true,
+			expect: { applications: 0, connections: 0, providers: 0, resources: 0 }
+		};
+
+		const described = await rpc(call('bucket_address_change', args), token);
+		const performed = await rpc(
+			call('bucket_address_change', {
+				...args,
+				confirmationToken:
+					described.result?.structuredContent?.confirmationToken
+			}),
+			token
+		);
+
+		expect(performed.result?.structuredContent?.reason).toBe('forbidden');
+		expect((await getBucketStore().find(bucket._id))?.host).toBeUndefined();
+	});
+
 	it('lets a non-super administrator create a project and a bucket into their own scope', async () => {
 		const { token } = await principal('plain');
 		const suffix = Math.floor(Math.random() * 1e6);

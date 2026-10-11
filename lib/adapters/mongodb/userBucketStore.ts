@@ -122,9 +122,18 @@ export class UserBucketStore implements UserBucketStoreInstance {
 	): Promise<UserBucket | null> {
 		/* One form set, the other unset in the same update: a bucket holds one address, never both. An
 		 * absent hostname must be *removed* rather than written null, or it would occupy the unique
-		 * sparse index and collide with every other bucket that has none. */
-		const unset: { host: '' } | { slug: '' } =
-			address.host === undefined ? { host: '' } : { slug: '' };
+		 * sparse index and collide with every other bucket that has none. Arrivals at the old address say
+		 * nothing about the new one, so they go in the same update. */
+		const unset: {
+			host?: '';
+			slug?: '';
+			hostFirstSeenAt: '';
+			hostLastSeenAt: '';
+		} = {
+			...(address.host === undefined ? { host: '' } : { slug: '' }),
+			hostFirstSeenAt: '',
+			hostLastSeenAt: ''
+		};
 		try {
 			return withDefaults(
 				await this.collection.findOneAndUpdate(

@@ -5,7 +5,10 @@ import { join } from 'node:path';
 
 import { STORAGE_DIVERGENCES } from '../lib/consts/storage_divergences.js';
 import { member } from '../lib/helpers/_/object.js';
-import { verifyEndUserIdentity } from './verify_end_user_identity.js';
+import {
+	verifyAddressChangeForgetsArrivals,
+	verifyEndUserIdentity
+} from './verify_end_user_identity.js';
 import { verifyProvisioningConnections } from './verify_provisioning_connections.js';
 import { verifyBucketGroups } from './verify_bucket_groups.js';
 import { verifyActivity } from './verify_activity.js';
@@ -671,6 +674,7 @@ check(
 );
 
 await verifyEndUserIdentity(runtimeUsers, check);
+await verifyAddressChangeForgetsArrivals(buckets, runtime._id, check);
 await verifyProvisioningConnections(new ProvisioningConnectionStore(), check);
 
 /*

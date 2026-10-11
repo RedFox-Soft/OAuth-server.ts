@@ -20,6 +20,7 @@ import {
 	type EndUserPage,
 	type EndUserPatch,
 	type EndUserQueryResult,
+	type EndUserTally,
 	type UserStoreInstance
 } from '../types.js';
 
@@ -106,6 +107,22 @@ export class UserStore implements UserStoreInstance {
 		return docs
 			.map((doc) => this.userOf(doc))
 			.filter((u): u is User => u !== null);
+	}
+
+	/*
+	 * An enrolment is an object, so anything else — absent or null — is no authenticator; and `federated.0`
+	 * not existing matches an absent, null or empty array alike. The PostgreSQL store counts the same states.
+	 */
+	async tally(): Promise<EndUserTally> {
+		const collection = db.collection<User>(this.collectionName);
+		const [total, unverified, withoutAuthenticator, withoutLinkedIdentity] =
+			await Promise.all([
+				collection.countDocuments({}),
+				collection.countDocuments({ verified: false }),
+				collection.countDocuments({ totp: { $not: { $type: 'object' } } }),
+				collection.countDocuments({ 'federated.0': { $exists: false } })
+			]);
+		return { total, unverified, withoutAuthenticator, withoutLinkedIdentity };
 	}
 
 	async create(

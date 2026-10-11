@@ -380,6 +380,13 @@ export interface SecretStoreConstructor {
 	new (documentName: string): SecretStoreInstance;
 }
 
+export interface EndUserTally {
+	total: number;
+	unverified: number;
+	withoutAuthenticator: number;
+	withoutLinkedIdentity: number;
+}
+
 export interface UserStoreInstance {
 	find(id: string): Promise<User | null>;
 	findByEmail(email: string): Promise<User | null>;
@@ -415,6 +422,13 @@ export interface UserStoreInstance {
 	 * provider id stands for has to know who is linked to it first.
 	 */
 	findLinkedTo(providerId: string, limit?: number): Promise<User[]>;
+	/*
+	 * How many accounts the bucket holds, and how many of them are in each state a bucket's overview asks
+	 * about, counted by the datastore rather than by reading every account (specs/081). An account is
+	 * without an authenticator when it holds no TOTP enrolment, and without a linked identity when
+	 * `federated` is absent or empty — the two are the same state on every backend, never a divergence.
+	 */
+	tally(): Promise<EndUserTally>;
 	list(): Promise<User[]>;
 	/*
 	 * A page of the users matching `filter`, ordered by `_id` so pages do not shift between requests, with
@@ -1339,6 +1353,11 @@ export interface ProvisioningConnectionStoreInstance {
 	): Promise<ProvisioningConnection>;
 	find(id: string): Promise<ProvisioningConnection | null>;
 	listByBucket(bucketId: string): Promise<ProvisioningConnection[]>;
+	/*
+	 * The buckets with at least one held connection, each once: what lets the bucket list mark every held
+	 * bucket with one read rather than one per row.
+	 */
+	bucketsHolding(): Promise<string[]>;
 	findByProvider(
 		bucketId: string,
 		providerId: string
@@ -1690,6 +1709,10 @@ export interface UserBucketStoreInstance {
 	 *
 	 * Rejects rather than overwrites when the name is taken: the uniqueness guarantee is the store's,
 	 * because a read-then-write in a handler cannot promise it.
+	 *
+	 * Clears `hostFirstSeenAt` and `hostLastSeenAt` in the same write: they record requests that reached
+	 * the old address, and kept across the change they would report a new hostname as reached before any
+	 * request had arrived at it (specs/081).
 	 */
 	setAddress(
 		id: string,
