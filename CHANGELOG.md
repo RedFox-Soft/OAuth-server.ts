@@ -51,7 +51,8 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   owner invites colleagues and every removal states what the member loses; group reads give members their
   colleagues' emails and what the group owns, and a refused group deletion names projects and buckets as such.
   The audit trail filters by `bucket`, `connection` and `actionPrefix`, records the key id of key operations and
-  the created connection as its target, and names directories; the bucket Overview and connection page show
+  the created connection as its target, and the address before and after an address change (passed but
+  never stored until now), and names directories; the bucket Overview and connection page show
   recent changes.
 - **Identity providers, provisioning connections and user groups each have a page** (spec 084). Connecting a
   provider or a directory is a side-panel wizard that cannot finish without choosing who a first sign-in may

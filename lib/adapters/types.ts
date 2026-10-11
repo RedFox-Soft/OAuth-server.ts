@@ -699,6 +699,13 @@ export const AdminAuditEntry = t.Object({
 	 */
 	kid: t.Optional(t.Union([t.String(), t.Null()])),
 	/*
+	 * An address change (`bucket.address.change`): the slug or hostname the bucket answered at, and the one it
+	 * answers at now, null for none. Addresses are public, unlike field values. Entries written before these
+	 * fields existed lack them: the route passed them, but nothing stored them.
+	 */
+	from: t.Optional(t.Union([t.String(), t.Null()])),
+	to: t.Optional(t.Union([t.String(), t.Null()])),
+	/*
 	 * Names of the fields the request set — never their values, so no secret can reach the trail
 	 * through this field. Optional because entries written before it existed do not carry it, and the
 	 * trail is immutable: there is no backfill, only a read-side default.

@@ -218,8 +218,9 @@ Also since spec 085:
 - The console's Audit page keeps every filter in its address, pushes a change so Back restores the previous
   question, and shows applied filters as removable chips.
 
-`bucket.address.change` passes `from`/`to`, but `write()` does not store them and the entry schema has no
-such fields. This is a known gap, not fixed in 085. Ordering is
+`bucket.address.change` entries record the address before and after (`from`/`to`, a slug or hostname, null
+for none). The route always passed them, but until 085 `write()` dropped them and the entry schema had no such
+fields, so earlier address changes in the trail do not say where the bucket was. Ordering is
 `(timestamp desc, _id desc)`: `_id` is unique, so the order is total, which is what stops a page
 boundary from dropping or repeating an entry when two actions land in the same millisecond. A backwards
 window is refused with 422 rather than answered with an empty page — an empty page is

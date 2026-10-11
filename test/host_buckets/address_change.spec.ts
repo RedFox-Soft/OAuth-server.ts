@@ -79,7 +79,13 @@ const Preview = Type.Object({
 });
 
 const AuditPage = Type.Object({
-	entries: Type.Array(Type.Object({ action: Type.String() }))
+	entries: Type.Array(
+		Type.Object({
+			action: Type.String(),
+			from: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+			to: Type.Optional(Type.Union([Type.String(), Type.Null()]))
+		})
+	)
 });
 
 async function changeAddress(
@@ -368,7 +374,7 @@ describe('moving a bucket to a different address (US3)', () => {
 			});
 		}
 
-		it('corrects a mistyped path on a bucket nothing uses, and the change is in the group’s trail', async () => {
+		it('corrects a mistyped path on a bucket nothing uses, and the trail says from which address to which', async () => {
 			const bucket = await ownBucket(`mistpyed-${counter}`);
 
 			const preview = await changeAddress(ownerCookie, bucket._id, {
@@ -390,9 +396,13 @@ describe('moving a bucket to a different address (US3)', () => {
 			expect((await getBucketStore().find(bucket._id))?.slug).toBe(
 				`mistyped-${counter}`
 			);
-			expect(
-				shaped(AuditPage, await trail.json()).entries.map((e) => e.action)
-			).toContain('bucket.address.change');
+			const entry = shaped(AuditPage, await trail.json()).entries.find(
+				(e) => e.action === 'bucket.address.change'
+			);
+			expect(entry).toMatchObject({
+				from: `mistpyed-${counter}`,
+				to: `mistyped-${counter}`
+			});
 		});
 
 		it('refuses an owner a hostname for a bucket nothing uses', async () => {

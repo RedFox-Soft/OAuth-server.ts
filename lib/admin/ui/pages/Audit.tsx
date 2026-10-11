@@ -313,6 +313,14 @@ export function Audit() {
 					>
 						{targetId}
 					</Typography.Text>
+					{row.from !== undefined || row.to !== undefined ? (
+						<Typography.Text
+							type="secondary"
+							style={{ fontSize: 12 }}
+						>
+							{row.from ?? 'no address'} → {row.to ?? 'no address'}
+						</Typography.Text>
+					) : null}
 					{row.kid ? (
 						<Typography.Text
 							type="secondary"

@@ -13,6 +13,9 @@ export interface AuditEntry {
 	cascade: Record<string, number> | null;
 	/* The key an operation acted on (specs/085); absent on entries written before it was recorded. */
 	kid?: string | null;
+	/* An address change's address before and after: a slug or hostname, null for none. */
+	from?: string | null;
+	to?: string | null;
 	/* Absent or null on an entry made in the console: the field was added after the trail began. */
 	viaSurface?: 'mcp' | 'scim' | 'upstream' | null;
 	viaClientId?: string | null;

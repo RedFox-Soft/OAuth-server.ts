@@ -213,6 +213,8 @@ async function write(input: {
 				? {}
 				: { formerBucketId: input.detail.formerBucketId }),
 			...(input.detail.kid === undefined ? {} : { kid: input.detail.kid }),
+			...(input.detail.from === undefined ? {} : { from: input.detail.from }),
+			...(input.detail.to === undefined ? {} : { to: input.detail.to }),
 			// Sorted so two requests setting the same fields in a different order read identically.
 			...(input.detail.attributes === undefined
 				? {}
