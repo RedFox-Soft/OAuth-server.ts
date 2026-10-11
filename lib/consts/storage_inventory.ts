@@ -152,6 +152,11 @@ export const STORE_AREAS = {
 	 */
 	provisioningConnections: 'provisioningConnections',
 	/*
+	 * The removals a held provisioning connection was refused: one record per person per hold generation, so
+	 * a release can show whom it lets the directory remove (specs/084 R2).
+	 */
+	provisioningRefusals: 'provisioningRefusals',
+	/*
 	 * A bucket's groups of end users — what its roles became. Distinct from `groups`, which hold administrators
 	 * and own projects and buckets; the two are never the same record.
 	 */
@@ -570,6 +575,30 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 			{ key: { bucketId: 1 } },
 			{ key: { providerKey: 1 }, unique: true },
 			{ key: { staticTokenDigest: 1 }, unique: true, sparse: true }
+		]
+	),
+	/*
+	 * Never reaped by age: a refusal that expired on its own would let a release remove somebody the
+	 * administrator was never shown. A record leaves when its hold does — release, connection delete and bucket
+	 * delete each destroy the connection's records — and a hold generation is bounded by the people the
+	 * directory manages, so the area cannot grow past them.
+	 *
+	 * Unowned, though each record names an end user: owner fields drive the cascades that sweep model areas,
+	 * and an end user is not a principal of the inventory. A person deleted while held is skipped when the
+	 * hold is read, and their record goes with the hold.
+	 *
+	 * `{connectionId, epoch, lastAt}` serves the one read: a generation's refusals, most recent first.
+	 * `bucketId` serves the bucket-delete cascade.
+	 */
+	storeArea(
+		STORE_AREAS.provisioningRefusals,
+		null,
+		unowned(
+			'a refused removal recorded against a held connection; cleared with the hold by release, connection delete and bucket delete'
+		),
+		[
+			{ key: { connectionId: 1, epoch: 1, lastAt: 1 } },
+			{ key: { bucketId: 1 } }
 		]
 	),
 	/*

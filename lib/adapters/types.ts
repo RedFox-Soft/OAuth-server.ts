@@ -469,6 +469,12 @@ export interface UserStoreInstance {
 	 */
 	findLinkedTo(providerId: string, limit?: number): Promise<User[]>;
 	/*
+	 * How many accounts of this bucket are linked to one provider, counted by the datastore over the
+	 * `federated.providerId` index rather than by reading them: what a provider's page states before an
+	 * administrator disables or deletes it (specs/084 R1).
+	 */
+	countLinkedTo(providerId: string): Promise<number>;
+	/*
 	 * How many accounts the bucket holds, and how many of them are in each state a bucket's overview asks
 	 * about, counted by the datastore rather than by reading every account (specs/081). An account is
 	 * without an authenticator when it holds no TOTP enrolment, and without a linked identity when
@@ -1440,6 +1446,71 @@ export interface ProvisioningConnectionStoreInstance {
 
 export interface ProvisioningConnectionStoreConstructor {
 	new (): ProvisioningConnectionStoreInstance;
+}
+
+export const RefusedOperation = t.Union([
+	t.Literal('deactivate'),
+	t.Literal('delete')
+]);
+export type RefusedOperation = Static<typeof RefusedOperation>;
+
+/*
+ * One person a held connection was refused the removal of, in one generation of its hold (specs/084 R2). The
+ * `_id` is `${connectionId}:${epoch}:${userId}`, so a directory retrying the same removal bumps `attempts`
+ * on one record rather than adding another. `operation` is the most recent refused one.
+ *
+ * The epoch is the connection's `tallyEpoch` when refused: a release moves it on, so a refusal racing the
+ * release lands in a generation no read asks for, and the next hold starts empty.
+ */
+export const ProvisioningRefusal = t.Object({
+	_id: t.String(),
+	connectionId: t.String(),
+	bucketId: t.String(),
+	epoch: t.Integer({ minimum: 0 }),
+	userId: t.String(),
+	operation: RefusedOperation,
+	firstAt: t.Date(),
+	lastAt: t.Date(),
+	attempts: t.Integer({ minimum: 1 })
+});
+export type ProvisioningRefusal = Static<typeof ProvisioningRefusal>;
+
+export interface ProvisioningRefusalInput {
+	connectionId: string;
+	bucketId: string;
+	epoch: number;
+	userId: string;
+	operation: RefusedOperation;
+	at: Date;
+}
+
+export interface ProvisioningRefusalPage {
+	/* Most recent attempt first. */
+	refusals: ProvisioningRefusal[];
+	/* Every record of the generation, however many `refusals` holds. */
+	total: number;
+}
+
+export interface ProvisioningRefusalStoreInstance {
+	/*
+	 * Records one refused removal, in one atomic write: inserted with `attempts: 1` the first time, and on
+	 * every later refusal of the same person in the same generation `attempts` is incremented and `lastAt`
+	 * and `operation` replaced. Concurrent refusals never lose an attempt.
+	 */
+	note(input: ProvisioningRefusalInput): Promise<void>;
+	/* One generation's refusals, most recent first, at most `limit`; a `limit` of 0 reads the total alone. */
+	list(
+		connectionId: string,
+		epoch: number,
+		limit: number
+	): Promise<ProvisioningRefusalPage>;
+	/* Answers how many records went, every generation of the connection included. */
+	destroyByConnection(connectionId: string): Promise<number>;
+	destroyByBucket(bucketId: string): Promise<number>;
+}
+
+export interface ProvisioningRefusalStoreConstructor {
+	new (): ProvisioningRefusalStoreInstance;
 }
 
 /*

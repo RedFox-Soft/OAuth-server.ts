@@ -229,6 +229,13 @@ at the root) with counted `consequences` and an `expect`, and applies it only wh
 protection; the token gate would add a third call and nothing else ([[bucket-sign-in-policy]]). The
 conflict message names `expect` for that reason.
 
+Since spec 084, `bucket_group_assign_connection` answers with a route preview as well: which members the
+directory does not manage. It is high-consequence, so the agent sees the preview on the unconfirmed call and
+then goes through the token gate. A confirmed call refused for foreign members passes on only the message and
+`blockers`, under the generic rule. Two read tools came with it: `federation_provider_get` (one provider, with
+its callback, logout signals, bound connection and linked count) and `provisioning_hold_get` (the removals a
+held connection refused).
+
 Neither identity may fall back to a placeholder, and both once did. `principalId` defaulted to `''` when
 `whoami` failed and `viaClientId` to `''` when `authInfo` carried no client — either turns that binding
 into a wildcard, so two callers whose id could not be read would match each other's confirmations. A

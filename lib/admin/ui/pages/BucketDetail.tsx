@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Tag, Typography, Alert, Skeleton } from 'antd';
+import { Badge, Tag, Typography, Alert, Skeleton } from 'antd';
 import { PageHeader } from '../frame/PageHeader.js';
 import { LoadFailed, NoAccess } from '../frame/states.js';
 import { bucketHref } from '../frame/routes.js';
@@ -167,9 +167,25 @@ export function BucketDetail({
 	}
 
 	const shownTab = tab;
+	const held = summary !== null && summary.held > 0;
 	const tabs = TABS.filter((t) => tabAllowed(t.key, can)).map((t) => ({
 		key: t.key,
-		label: t.label,
+		/*
+		 * A held directory is marked on the tab that holds it (specs/084 US6), so it is seen from every area of
+		 * the bucket, not only from the Overview.
+		 */
+		label:
+			t.key === 'provisioning' && held ? (
+				<Badge
+					dot
+					offset={[6, 0]}
+					aria-label="Provisioning, a connection is held"
+				>
+					{t.label}
+				</Badge>
+			) : (
+				t.label
+			),
 		href: bucketHref(bucketId, t.segment)
 	}));
 	const special = bucket ? reservedOf(bucket._id) : null;
@@ -289,7 +305,7 @@ export function BucketDetail({
 			{bucket && !tabRefused && shownTab === 'providers' && (
 				<FederationPanel
 					key={federationKey}
-					bucketId={bucketId}
+					bucket={bucket}
 					canEdit={can.edit}
 					onChanged={() => {
 						void load();
@@ -299,13 +315,13 @@ export function BucketDetail({
 			)}
 			{bucket && shownTab === 'provisioning' && (
 				<ProvisioningPanel
-					bucketId={bucketId}
+					bucket={bucket}
 					canEdit={can.edit}
 					refreshKey={provisioningKey}
 					onConnections={setConnections}
-					onChanged={(event) => {
+					onChanged={() => {
 						void load();
-						if (event === 'created') setFederationKey((k) => k + 1);
+						setFederationKey((k) => k + 1);
 					}}
 				/>
 			)}

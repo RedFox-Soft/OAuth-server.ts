@@ -302,18 +302,25 @@ export async function deleteGroup(
 	await store().destroy(group._id);
 }
 
+/* How many of the hand-over's blockers are named; the count says how many there are in all. */
+export const HAND_OVER_BLOCKERS_NAMED = 20;
+
 /*
- * Hands an administrator-kept group to one of the bucket's connections — the explicit step that lets a
- * bucket whose groups already have the directory's names start provisioning them. Never automatic, and
- * refused while any member is someone the connection does not manage: the connection would otherwise be
- * handed authority over local users through the back door.
+ * What handing a group to a connection would mean: how many of its members the connection already manages,
+ * how many it does not, and the first of those by name — the people an administrator has to deal with before
+ * the hand-over can happen (specs/084 R5). A member whose account is gone counts as foreign, with no email.
  */
-export async function assignGroupToConnection(
+export interface HandOverWalk {
+	managed: number;
+	foreign: number;
+	blockers: { id: string; email: string | null }[];
+}
+
+export async function walkHandOver(
 	bucket: UserBucket,
 	group: BucketGroup,
-	connection: ProvisioningConnection,
-	record: RecordGroupChange
-): Promise<BucketGroup> {
+	connection: ProvisioningConnection
+): Promise<HandOverWalk> {
 	assertGroupsAllowed(bucket);
 	if (group.provisionedBy !== undefined) {
 		throw new BucketGroupError(
@@ -325,19 +332,49 @@ export async function assignGroupToConnection(
 		throw new BucketGroupError(422, 'connection belongs to another bucket');
 	}
 	const users = getUserStore(bucket._id);
-	let foreign = 0;
+	const walk: HandOverWalk = { managed: 0, foreign: 0, blockers: [] };
 	for (let startIndex = 1; ; startIndex += MAX_END_USER_PAGE) {
 		const ids = await store().memberIds(group._id, {
 			startIndex,
 			count: MAX_END_USER_PAGE
 		});
 		if (ids.length === 0) break;
-		const found = await users.findMany(ids);
-		foreign +=
-			ids.length -
-			found.filter((u) => u.provisionedBy === connection._id).length;
+		const found = new Map(
+			(await users.findMany(ids)).map((user) => [user._id, user])
+		);
+		for (const id of ids) {
+			const user = found.get(id);
+			if (user?.provisionedBy === connection._id) {
+				walk.managed += 1;
+				continue;
+			}
+			walk.foreign += 1;
+			if (walk.blockers.length < HAND_OVER_BLOCKERS_NAMED) {
+				walk.blockers.push({ id, email: user?.email || null });
+			}
+		}
 		if (ids.length < MAX_END_USER_PAGE) break;
 	}
+	return walk;
+}
+
+/*
+ * Hands an administrator-kept group to one of the bucket's connections — the explicit step that lets a
+ * bucket whose groups already have the directory's names start provisioning them. Never automatic, and
+ * refused while any member is someone the connection does not manage: the connection would otherwise be
+ * handed authority over local users through the back door.
+ *
+ * `walk` is the one the caller previewed and the administrator consented to, so the decision and the
+ * consent rest on the same reading of the members.
+ */
+export async function assignGroupToConnection(
+	bucket: UserBucket,
+	group: BucketGroup,
+	connection: ProvisioningConnection,
+	walk: HandOverWalk,
+	record: RecordGroupChange
+): Promise<BucketGroup> {
+	const { foreign } = walk;
 	if (foreign > 0) {
 		throw new BucketGroupError(
 			409,

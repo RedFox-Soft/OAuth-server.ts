@@ -89,6 +89,9 @@ describe('console frame', () => {
 		expect(lands('/admin/buckets/admin/identity-providers')).toBe(
 			'/admin/administrators/identity-providers'
 		);
+		expect(lands('/admin/buckets/admin/identity-providers/okta')).toBe(
+			'/admin/administrators/identity-providers/okta'
+		);
 		expect(lands('/admin/buckets/admin/activity')).toBe(
 			'/admin/administrators/activity'
 		);
@@ -104,7 +107,7 @@ describe('console frame', () => {
 	 */
 	it('every C1 and C2 action in the confirmation table is asked by some console screen', async () => {
 		const asked = new Set<string>();
-		for (const file of new Bun.Glob('lib/admin/ui/**/*.tsx').scanSync()) {
+		for (const file of new Bun.Glob('lib/admin/ui/**/*.{ts,tsx}').scanSync()) {
 			const source = await Bun.file(file).text();
 			// Asked through useConfirm, or worded from the table by an inline Popconfirm inside a dialog.
 			for (const match of source.matchAll(

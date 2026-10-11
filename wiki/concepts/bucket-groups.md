@@ -71,8 +71,12 @@ IPSIE §4.2); a connection sees and changes only its own groups and may add only
 (`assertActorMayChange`, `lib/bucket_groups/service.ts:84`). An administrator-kept group may hold provisioned
 users — the membership belongs to the group, and the connection never sees it. A directory's create of a name an
 administrator-kept group holds answers 409 `uniqueness`; an administrator may **hand the group over**
-(`assignGroupToConnection`, `:310`), refused while any member is someone the connection does not manage, never
-automatically. A connection that owns any group cannot be deleted.
+(`assignGroupToConnection`, `:370`), refused while any member is someone the connection does not manage, never
+automatically. Since spec 084 the hand-over is preview-then-confirm, like the bucket sign-in PATCH
+([[bucket-sign-in-policy]]). `walkHandOver` (`:319`) counts the members the connection manages and those it does
+not, naming the first 20 of the latter. A request without `confirm: true` and the same `expect` answers 409 with
+that preview, and nothing is audited for a 409. With foreign members the confirmed request is refused with the
+same preview. The console asks it as C4 with the group's name typed ([[provider-connection-group-pages]]). A connection that owns any group cannot be deleted.
 
 ## The groups claim
 

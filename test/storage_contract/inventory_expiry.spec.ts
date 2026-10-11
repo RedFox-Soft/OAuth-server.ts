@@ -111,6 +111,11 @@ const PERMANENT = [
 	 */
 	'provisioningConnections',
 	/*
+	 * A refused removal lives as long as the hold that refused it. An expiry here would let a release
+	 * re-admit the removal of somebody the administrator releasing it was never shown.
+	 */
+	'provisioningRefusals',
+	/*
 	 * A bucket group and its memberships live until an administrator or the owning directory removes them.
 	 * An expiry here would silently change what every relying party lets those people do.
 	 */

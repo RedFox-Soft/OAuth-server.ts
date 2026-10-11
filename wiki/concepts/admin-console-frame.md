@@ -80,11 +80,19 @@ hidden control.
 | C0 | Creating, editing, enabling | Nothing |
 | C1 | Small, reversible | A plain question (`useConfirm`) |
 | C2 | Ends access, revokes, replaces, or is irreversible for one object | A danger question with Cancel focused and the consequences listed |
-| C3 | Destroys an unbounded set, or a key | `ConfirmDestruction` with a typed word: `delete`, `retire` or `release` |
+| C3 | Destroys an unbounded set, or a key | `ConfirmDestruction` with a typed word: `delete`, `retire` or `release` (plus, since spec 084, an optional `acknowledgement` checkbox the release uses) |
 | C4 | Only the server knows the full list | `PreviewConfirm`: preview first, then commit (a move, the faults purge) |
 
 The table is the product decision; the components are mechanics. `useConfirm` refuses C3 and C4 ids, and
 answers no while another confirmation is open, so a double click cannot stack two dialogs.
+`test/admin/console_frame.spec.ts` keeps the table and the screens in step: every C1 and C2 id must be asked
+somewhere under `lib/admin/ui/`. Since spec 084 that includes `.ts` files, because the provider and connection
+action hooks are plain TypeScript.
+
+A value the server returns only once (a client secret, a provisioning secret or token) is shown through
+`frame/SecretReveal.tsx`. It is masked until asked for, offers one Copy, and holds its surface until the
+operator ticks that it is stored. It always sits inside the surface that produced it, never in a window
+stacked on another ([[provider-connection-group-pages]]).
 
 ## One feedback model
 

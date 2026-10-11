@@ -18,12 +18,12 @@ import {
 	deleteConnection,
 	issueCredential,
 	loadConnection,
-	managedUserCount,
-	presentConnection,
 	ProvisioningError,
+	readHold,
 	releaseConnection,
 	revokeCredential,
-	updateConnection
+	updateConnection,
+	viewConnection
 } from '../../provisioning/service.js';
 import {
 	getBucketStore,
@@ -69,12 +69,7 @@ function scope(bucket: UserBucket) {
 }
 
 async function view(bucket: UserBucket, connectionId: string) {
-	const connection = await loadConnection(bucket, connectionId);
-	return presentConnection(
-		bucket,
-		connection,
-		await managedUserCount(bucket._id, connection._id)
-	);
+	return viewConnection(bucket, await loadConnection(bucket, connectionId));
 }
 
 export const provisioningRoutes = new Elysia({ name: 'admin-provisioning' })
@@ -93,15 +88,7 @@ export const provisioningRoutes = new Elysia({ name: 'admin-provisioning' })
 			const connections = await getProvisioningConnectionStore().listByBucket(
 				bucket._id
 			);
-			return Promise.all(
-				connections.map(async (c) =>
-					presentConnection(
-						bucket,
-						c,
-						await managedUserCount(bucket._id, c._id)
-					)
-				)
-			);
+			return Promise.all(connections.map((c) => viewConnection(bucket, c)));
 		}
 	)
 	.get(
@@ -110,6 +97,19 @@ export const provisioningRoutes = new Elysia({ name: 'admin-provisioning' })
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForUsers(ctx, params.id);
 			return asAdmin(view(bucket, params.connectionId));
+		}
+	)
+	/*
+	 * Whom a held connection has been refused the removal of, in this hold — what an administrator reads
+	 * before releasing it, because the release lets the directory's retries of exactly these go through
+	 * (specs/084 R2). `{held: false}` for a connection that is not held.
+	 */
+	.get(
+		'/admin/api/buckets/:id/provisioning-connections/:connectionId/hold',
+		async ({ admin, params }) => {
+			const ctx = assertAuth(admin);
+			const bucket = await loadBucketForUsers(ctx, params.id);
+			return asAdmin(readHold(bucket, params.connectionId));
 		}
 	)
 	.post(
@@ -194,12 +194,16 @@ export const provisioningRoutes = new Elysia({ name: 'admin-provisioning' })
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForEdit(ctx, params.id);
 			await asAdmin(
-				releaseConnection(bucket, params.connectionId, () =>
+				releaseConnection(bucket, params.connectionId, (refusedRemovals) =>
 					recordAdminAudit(
 						ctx,
 						'provisioning.connection.release',
 						params.connectionId,
-						scope(bucket)
+						{
+							...scope(bucket),
+							/* How many people's removals the release re-admits; absent when it re-admits none. */
+							...(refusedRemovals > 0 ? { cascade: { refusedRemovals } } : {})
+						}
 					)
 				)
 			);

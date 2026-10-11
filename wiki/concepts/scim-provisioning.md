@@ -207,6 +207,27 @@ the threshold of a held connection is refused 409.
   any count, which is why none of those is used. A 5xx would also be captured as a defect.
 - **An IPSIE departure, isolated by the threshold itself**: a held leaver keeps access until the release.
   Opt-in per connection, documented in `CONFORMANCE.md`.
+- **Every refused removal is recorded** (spec 084), so a release is decided knowing whom it removes. Store
+  area `provisioningRefusals`, one record per person per tally generation
+  (`${connectionId}:${epoch}:${userId}`): operation, first and last attempt, and an attempt count. The count is
+  bumped by one upsert on all three backends (`noteRefusal`, `deprovision_guard.ts:145`).
+  - **It never changes the answer.** It is written before the 429 on both the already-held and the just-tripped
+    paths. A failed write is swallowed into `provisioning.held.refused`, which now carries `userId`,
+    `operation` and `failed`.
+  - **Reading it.** `GET …/provisioning-connections/:id/hold` (`readHold`, `lib/provisioning/service.ts:496`;
+    MCP `provisioning_hold_get`) lists at most 1,000, newest first, with the total. A person deleted since is
+    skipped but still counted.
+  - **Release clears it.** `releaseConnection` counts it first; the release's audit entry carries
+    `cascade: { refusedRemovals: N }`. It then destroys the records as a best effort, after the hold clears. A
+    straggler written by a request that raced the release lands in a generation no read returns, because the
+    release moved `tallyEpoch` on. Deleting the connection or the bucket destroys them too.
+  - **The area has no owner.** The drift guard allows owners only on model areas, so a person's records are
+    not swept when the person is deleted; they leave with the hold.
+  - `database/verify_084_refusals.ts` proves the upsert and the reads on real MongoDB and PostgreSQL
+    (2026-10-11).
+- **The alert links to the connection** (spec 084): `${ISSUER}/admin/buckets/<bucket>/provisioning/<connection>`
+  (`deprovision_guard.ts:209`), the page whose hold panel lists the refused removals
+  ([[provider-connection-group-pages]]). Before that it linked to the console's front page.
 
 ## Gotchas found while building it
 

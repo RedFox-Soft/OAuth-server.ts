@@ -168,6 +168,13 @@ export class UserStore implements UserStoreInstance {
 			.filter((u): u is User => u !== null);
 	}
 
+	/* A document matches once however many of its links name the provider, so this counts accounts, not links. */
+	async countLinkedTo(providerId: string): Promise<number> {
+		return db
+			.collection<User>(this.collectionName)
+			.countDocuments({ 'federated.providerId': providerId });
+	}
+
 	/*
 	 * An enrolment is an object, so anything else — absent or null — is no authenticator; and `federated.0`
 	 * not existing matches an absent, null or empty array alike. The PostgreSQL store counts the same states.

@@ -19,6 +19,7 @@ import {
 	deleteProvider,
 	presentAll,
 	present,
+	presentDetail,
 	updateProvider
 } from './service.js';
 
@@ -63,6 +64,19 @@ export const federationAdminRoutes = new Elysia({ name: 'admin-federation' })
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForProviders(ctx, params.id, 'read');
 			return { providers: guidanceForBucket(bucket) };
+		}
+	)
+	/*
+	 * One provider, with what its page explains (specs/084 R1): its callback, the logout signals it can send and
+	 * whether this instance accepts them, the provisioning connection bound to it and how many people are
+	 * linked to it. Read with the list's right; the secrets are masked as in the list.
+	 */
+	.get(
+		'/admin/api/buckets/:id/federation/:providerId',
+		async ({ admin, params }) => {
+			const ctx = assertAuth(admin);
+			const bucket = await loadBucketForProviders(ctx, params.id, 'read');
+			return presentDetail(bucket, params.providerId);
 		}
 	)
 	.post(

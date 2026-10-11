@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import {
 	Alert,
 	Button,
@@ -11,7 +11,8 @@ import {
 	Typography
 } from 'antd';
 import { Link, useNavigate } from '../frame/router.js';
-import { bucketHref, projectHref } from '../frame/routes.js';
+import { bucketHref, connectionHref, projectHref } from '../frame/routes.js';
+import { request } from '../frame/request.js';
 import type { BucketCan } from '../frame/can.js';
 import { UNASSIGNED_GROUP_ID, reservedOf } from '../../consts.js';
 import type { BucketSummary, BucketView } from './bucketView.js';
@@ -59,6 +60,25 @@ export function BucketOverview({
 }) {
 	const navigate = useNavigate();
 	const special = reservedOf(bucket._id);
+	/*
+	 * The held connection itself, so the item opens the page that can end the hold (specs/084 US6). Read only
+	 * when the summary says one is held; the list it comes from is short.
+	 */
+	const [heldId, setHeldId] = useState<string | null>(null);
+	const anyHeld = summary !== null && summary.held > 0;
+	useEffect(() => {
+		if (!anyHeld) return;
+		let live = true;
+		void request<{ id: string; hold?: unknown }[]>(
+			'GET',
+			`/admin/api/buckets/${encodeURIComponent(bucket._id)}/provisioning-connections`
+		).then((r) => {
+			if (live && r.ok) setHeldId(r.data.find((c) => c.hold)?.id ?? null);
+		});
+		return () => {
+			live = false;
+		};
+	}, [anyHeld, bucket._id]);
 	const settingsHref = bucketHref(bucket._id, 'settings');
 	const projects = bucket.projects ?? [];
 
@@ -72,9 +92,15 @@ export function BucketOverview({
 			action: (
 				<Button
 					size="small"
-					onClick={() => void navigate(bucketHref(bucket._id, 'provisioning'))}
+					onClick={() =>
+						void navigate(
+							heldId
+								? connectionHref(bucket._id, heldId)
+								: bucketHref(bucket._id, 'provisioning')
+						)
+					}
 				>
-					Open Provisioning
+					{heldId ? 'Review the hold' : 'Open Provisioning'}
 				</Button>
 			)
 		});

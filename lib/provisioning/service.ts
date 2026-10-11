@@ -3,6 +3,7 @@ import { nanoid } from 'nanoid';
 import {
 	getBucketStore,
 	getProvisioningConnectionStore,
+	getProvisioningRefusalStore,
 	getUserStore
 } from '../adapters/index.js';
 import type {
@@ -11,6 +12,7 @@ import type {
 	KeyCredential,
 	ProvisioningConnection,
 	ProvisioningConnectionPatch,
+	RefusedOperation,
 	UserBucket
 } from '../adapters/types.js';
 import { isUniqueValueTaken } from '../adapters/conflicts.js';
@@ -49,6 +51,7 @@ export class ProvisioningError extends Error {
 }
 
 const store = () => getProvisioningConnectionStore();
+const refusals = () => getProvisioningRefusalStore();
 
 export async function loadConnection(
 	bucket: UserBucket,
@@ -256,6 +259,8 @@ export async function deleteConnection(
 		);
 	}
 	await record();
+	/* Before the connection, so a failure here leaves it in place for a retry rather than records nothing reads. */
+	await refusals().destroyByConnection(connection._id);
 	await store().destroy(connection._id);
 	return cascadeForClient(connectionClientId(connection._id));
 }
@@ -434,24 +439,107 @@ export async function revokeCredential(
 export async function releaseConnection(
 	bucket: UserBucket,
 	connectionId: string,
-	record: RecordChange
+	record: (refusedRemovals: number) => Promise<unknown>
 ): Promise<ProvisioningConnection> {
 	const connection = await loadConnection(bucket, connectionId);
 	if (!connection.hold) {
 		throw new ProvisioningError(409, 'the connection is not held');
 	}
-	await record();
+	/* Counted before the audit entry, which is written first and states how many refused removals it re-admits. */
+	const { total } = await refusals().list(
+		connection._id,
+		connection.tallyEpoch ?? 0,
+		0
+	);
+	await record(total);
 	const released = await store().releaseHold(connection._id);
 	if (!released) {
 		throw new ProvisioningError(409, 'the connection is not held');
 	}
+	/*
+	 * After the hold is cleared, and as a best effort: the release has happened and must be answered as one.
+	 * A record this leaves behind belongs to a generation the release has already moved past, so no read
+	 * returns it, and the connection's or bucket's deletion removes it.
+	 */
+	await refusals()
+		.destroyByConnection(connection._id)
+		.catch(() => 0);
 	return released;
 }
 
-/* Revokes every token a bucket's connections obtained; called by the bucket-delete route after the users go. */
+/*
+ * The removals a held connection has been refused in its current hold, most recent first, with the people
+ * they name. At most `HOLD_READ_LIMIT` rows; a person deleted since is skipped, and `total` still counts them.
+ */
+export const HOLD_READ_LIMIT = 1000;
+
+export interface RefusedRemovalView {
+	userId: string;
+	email: string | null;
+	userName: string | null;
+	operation: RefusedOperation;
+	firstAt: string;
+	lastAt: string;
+	attempts: number;
+}
+
+export type HoldView =
+	| { held: false }
+	| {
+			held: true;
+			since: string;
+			count: number;
+			refused: RefusedRemovalView[];
+			total: number;
+	  };
+
+export async function readHold(
+	bucket: UserBucket,
+	connectionId: string
+): Promise<HoldView> {
+	const connection = await loadConnection(bucket, connectionId);
+	if (!connection.hold) return { held: false };
+	const { refusals: found, total } = await refusals().list(
+		connection._id,
+		connection.tallyEpoch ?? 0,
+		HOLD_READ_LIMIT
+	);
+	const people = new Map(
+		(await getUserStore(bucket._id).findMany(found.map((r) => r.userId))).map(
+			(user) => [user._id, user]
+		)
+	);
+	const refused: RefusedRemovalView[] = [];
+	for (const refusal of found) {
+		const person = people.get(refusal.userId);
+		if (!person) continue;
+		refused.push({
+			userId: refusal.userId,
+			email: person.email || null,
+			userName: person.userName ?? null,
+			operation: refusal.operation,
+			firstAt: refusal.firstAt.toISOString(),
+			lastAt: refusal.lastAt.toISOString(),
+			attempts: refusal.attempts
+		});
+	}
+	return {
+		held: true,
+		since: connection.hold.since.toISOString(),
+		count: connection.hold.count,
+		refused,
+		total
+	};
+}
+
+/*
+ * Revokes every token a bucket's connections obtained, and forgets every removal they were refused; called by
+ * the bucket-delete route after the users go.
+ */
 export async function destroyConnectionsOf(
 	bucketId: string
 ): Promise<CascadeResult[]> {
+	await refusals().destroyByBucket(bucketId);
 	const ids = await store().destroyByBucket(bucketId);
 	return Promise.all(ids.map((id) => cascadeForClient(connectionClientId(id))));
 }
@@ -490,15 +578,52 @@ export interface ConnectionView {
 	/* Present while held: when it began, and the threshold count that was reached. */
 	hold?: { since: string; count: number };
 	managedUsers: number;
+	/* The groups it keeps: the same count that refuses its deletion. */
+	managedGroups: number;
+	/*
+	 * The credentials this instance would issue it now. A key always; a secret and a static token only while
+	 * their switches are on, so a console never offers what the issue route would refuse.
+	 */
+	availableCredentialKinds: CredentialKind[];
 	lastUsedAt: string | null;
 	createdAt: string;
 	warnings: ConnectionWarning[];
 }
 
+export type CredentialKind = IssueCredentialInput['kind'];
+
+export function availableCredentialKinds(): CredentialKind[] {
+	return [
+		'key',
+		...(ApplicationConfig['scim.secretCredentials'] ? ['secret' as const] : []),
+		...(ApplicationConfig['scim.staticTokens'] ? ['static_token' as const] : [])
+	];
+}
+
+export interface ConnectionCounts {
+	managedUsers: number;
+	managedGroups: number;
+}
+
+/* Every read of a connection presents it through this, so the list and the single read never differ. */
+export async function viewConnection(
+	bucket: UserBucket,
+	connection: ProvisioningConnection
+): Promise<ConnectionView> {
+	const [managedUsers, managedGroups] = await Promise.all([
+		managedUserCount(bucket._id, connection._id),
+		ownedGroupCount(bucket._id, connection._id)
+	]);
+	return presentConnection(bucket, connection, {
+		managedUsers,
+		managedGroups
+	});
+}
+
 export function presentConnection(
 	bucket: UserBucket,
 	connection: ProvisioningConnection,
-	managedUsers: number
+	{ managedUsers, managedGroups }: ConnectionCounts
 ): ConnectionView {
 	const warnings: ConnectionWarning[] = [];
 	if (!ApplicationConfig['scim.enabled']) warnings.push('scim_disabled');
@@ -560,6 +685,8 @@ export function presentConnection(
 				}
 			: {}),
 		managedUsers,
+		managedGroups,
+		availableCredentialKinds: availableCredentialKinds(),
 		lastUsedAt: connection.lastUsedAt?.toISOString() ?? null,
 		createdAt: connection.createdAt.toISOString(),
 		warnings

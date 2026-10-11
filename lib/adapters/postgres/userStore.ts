@@ -209,6 +209,17 @@ export class UserStore implements UserStoreInstance {
 			.filter((u): u is User => u !== null);
 	}
 
+	/* The containment test `findLinkedTo` uses, so the two can never disagree about who is linked. */
+	async countLinkedTo(providerId: string): Promise<number> {
+		const handle = sql();
+		const match = [{ providerId }];
+		const rows = await handle<{ count: number }[]>`
+			SELECT count(*)::int AS count FROM ${handle(this.area)}
+			WHERE doc->'federated' @> ${match}
+		`;
+		return rows[0]?.count ?? 0;
+	}
+
 	/*
 	 * One scan, one filter per state, matching the MongoDB store's tests: an enrolment is an object, so
 	 * anything else — absent or a JSON null — is no authenticator; `federated` counts as unlinked unless it

@@ -32,9 +32,14 @@ export type PageKey =
 	| 'bucket.user.groups'
 	| 'bucket.user.activity'
 	| 'bucket.userGroups'
+	| 'bucket.userGroup'
 	| 'bucket.signIn'
 	| 'bucket.providers'
+	| 'bucket.provider'
 	| 'bucket.provisioning'
+	| 'bucket.connection'
+	| 'bucket.connection.setup'
+	| 'bucket.connection.settings'
 	| 'bucket.keys'
 	| 'bucket.activity'
 	| 'bucket.settings'
@@ -43,6 +48,7 @@ export type PageKey =
 	| 'administrators'
 	| 'administrators.signIn'
 	| 'administrators.providers'
+	| 'administrators.provider'
 	| 'administrators.activity'
 	| 'administrators.settings'
 	| 'usage'
@@ -124,6 +130,13 @@ export const ROUTES: readonly RouteSpec[] = [
 		section: 'buckets',
 		area: 'User groups'
 	},
+	/* One group of people (specs/084): its members, its name, and who keeps it. */
+	{
+		key: 'bucket.userGroup',
+		pattern: ['buckets', ':bucket', 'user-groups', ':group'],
+		section: 'buckets',
+		area: 'User groups'
+	},
 	/* How people get in (specs/083): its own address, between who is in the bucket and who vouches for them. */
 	{
 		key: 'bucket.signIn',
@@ -137,9 +150,44 @@ export const ROUTES: readonly RouteSpec[] = [
 		section: 'buckets',
 		area: 'Identity providers'
 	},
+	/* One identity provider (specs/084): everything about it after it is connected. */
+	{
+		key: 'bucket.provider',
+		pattern: ['buckets', ':bucket', 'identity-providers', ':provider'],
+		section: 'buckets',
+		area: 'Identity providers'
+	},
 	{
 		key: 'bucket.provisioning',
 		pattern: ['buckets', ':bucket', 'provisioning'],
+		section: 'buckets',
+		area: 'Provisioning'
+	},
+	/*
+	 * One provisioning connection (specs/084); the bare address is its Overview, the one the hold email links
+	 * to, so it must stay stable.
+	 */
+	{
+		key: 'bucket.connection',
+		pattern: ['buckets', ':bucket', 'provisioning', ':connection'],
+		section: 'buckets',
+		area: 'Provisioning'
+	},
+	{
+		key: 'bucket.connection.setup',
+		pattern: [
+			'buckets',
+			':bucket',
+			'provisioning',
+			':connection',
+			'directory-setup'
+		],
+		section: 'buckets',
+		area: 'Provisioning'
+	},
+	{
+		key: 'bucket.connection.settings',
+		pattern: ['buckets', ':bucket', 'provisioning', ':connection', 'settings'],
 		section: 'buckets',
 		area: 'Provisioning'
 	},
@@ -180,6 +228,13 @@ export const ROUTES: readonly RouteSpec[] = [
 	{
 		key: 'administrators.providers',
 		pattern: ['administrators', 'identity-providers'],
+		section: 'administrators',
+		instance: true,
+		area: 'Identity providers'
+	},
+	{
+		key: 'administrators.provider',
+		pattern: ['administrators', 'identity-providers', ':provider'],
 		section: 'administrators',
 		instance: true,
 		area: 'Identity providers'
@@ -269,7 +324,12 @@ const REDIRECTS: readonly {
 	).map(([from, to]) => ({
 		pattern: ['buckets', 'admin', from],
 		to: () => `/admin/administrators${to ? `/${to}` : ''}`
-	}))
+	})),
+	{
+		pattern: ['buckets', 'admin', 'identity-providers', ':provider'],
+		to: (p) =>
+			`/admin/administrators/identity-providers/${encodeURIComponent(p.provider ?? '')}`
+	}
 ];
 
 export interface Route {
@@ -371,6 +431,32 @@ export function userHref(
 ): string {
 	const base = `${bucketHref(bucketId, 'users')}/${encodeURIComponent(userId)}`;
 	return area ? `${base}/${area}` : base;
+}
+
+/*
+ * An identity provider's page. The console's own bucket keeps its providers under Administrators, so the
+ * address depends on the bucket and every caller asks here rather than spelling it.
+ */
+export function providerHref(bucketId: string, providerId: string): string {
+	const base =
+		bucketId === 'admin'
+			? '/admin/administrators/identity-providers'
+			: bucketHref(bucketId, 'identity-providers');
+	return `${base}/${encodeURIComponent(providerId)}`;
+}
+
+/* A provisioning connection; without an area, its Overview. */
+export function connectionHref(
+	bucketId: string,
+	connectionId: string,
+	area?: 'directory-setup' | 'settings'
+): string {
+	const base = `${bucketHref(bucketId, 'provisioning')}/${encodeURIComponent(connectionId)}`;
+	return area ? `${base}/${area}` : base;
+}
+
+export function userGroupHref(bucketId: string, groupId: string): string {
+	return `${bucketHref(bucketId, 'user-groups')}/${encodeURIComponent(groupId)}`;
 }
 
 export function projectHref(projectId: string, area = 'clients'): string {

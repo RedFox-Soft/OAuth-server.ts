@@ -150,7 +150,16 @@ export type ServerEvents = ModelEvents &
 		'provisioning.held': [
 			{ bucketId: string; connectionId: string; count: number }
 		];
-		'provisioning.held.refused': [{ bucketId: string; connectionId: string }];
+		'provisioning.held.refused': [
+			{
+				bucketId: string;
+				connectionId: string;
+				userId: string;
+				operation: 'deactivate' | 'delete';
+				/* Present when the refusal could not be recorded; the 429 was answered regardless. */
+				failed?: true;
+			}
+		];
 		'provisioning.hold.alert_failed': [
 			{ bucketId: string; connectionId: string; reason: string }
 		];

@@ -20,6 +20,12 @@ import { InstanceOnly, NotFound } from '../frame/states.js';
 import { BucketDetail, type BucketTab } from './BucketDetail.js';
 import { ProjectWorkspace } from './ProjectWorkspace.js';
 import { UserPage, type UserTab } from './users/UserPage.js';
+import { ProviderPage } from './providers/ProviderPage.js';
+import {
+	ConnectionPage,
+	type ConnectionTab
+} from './provisioning/ConnectionPage.js';
+import { UserGroupPage } from './groups/UserGroupPage.js';
 import { Groups } from './Groups.js';
 import { ScopeSwitcher } from './ScopeSwitcher.js';
 import { Projects } from './Projects.js';
@@ -34,6 +40,7 @@ import { McpClients } from './McpClients.js';
 import { Audit } from './Audit.js';
 import { Errors } from './Errors.js';
 import { Usage } from './Usage.js';
+import { ADMIN_BUCKET_ID } from '../../consts.js';
 
 const { Sider, Header, Content } = AntLayout;
 
@@ -64,6 +71,13 @@ const USER_TABS: Partial<Record<PageKey, UserTab>> = {
 	'bucket.user.signIn': 'signIn',
 	'bucket.user.groups': 'groups',
 	'bucket.user.activity': 'activity'
+};
+
+/* One provisioning connection (specs/084); the bare address is its Overview, which the hold email links to. */
+const CONNECTION_TABS: Partial<Record<PageKey, ConnectionTab>> = {
+	'bucket.connection': 'overview',
+	'bucket.connection.setup': 'setup',
+	'bucket.connection.settings': 'settings'
 };
 
 /*
@@ -154,6 +168,43 @@ export function Layout() {
 					bucketId={route.params.bucket ?? ''}
 					userId={route.params.user ?? ''}
 					tab={userTab}
+				/>
+			);
+		}
+		const connectionTab = CONNECTION_TABS[route.key];
+		if (connectionTab) {
+			return (
+				<ConnectionPage
+					key={`${route.params.bucket ?? ''}/${route.params.connection ?? ''}`}
+					bucketId={route.params.bucket ?? ''}
+					connectionId={route.params.connection ?? ''}
+					tab={connectionTab}
+				/>
+			);
+		}
+		if (
+			route.key === 'bucket.provider' ||
+			route.key === 'administrators.provider'
+		) {
+			// The console's own bucket keeps its providers under Administrators (specs/083).
+			const bucketId =
+				route.key === 'administrators.provider'
+					? ADMIN_BUCKET_ID
+					: (route.params.bucket ?? '');
+			return (
+				<ProviderPage
+					key={`${bucketId}/${route.params.provider ?? ''}`}
+					bucketId={bucketId}
+					providerId={route.params.provider ?? ''}
+				/>
+			);
+		}
+		if (route.key === 'bucket.userGroup') {
+			return (
+				<UserGroupPage
+					key={`${route.params.bucket ?? ''}/${route.params.group ?? ''}`}
+					bucketId={route.params.bucket ?? ''}
+					groupId={route.params.group ?? ''}
 				/>
 			);
 		}

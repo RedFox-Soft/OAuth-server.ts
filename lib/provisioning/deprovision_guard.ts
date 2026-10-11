@@ -2,12 +2,14 @@ import {
 	checkedAdapter,
 	getGroupStore,
 	getProvisioningConnectionStore,
+	getProvisioningRefusalStore,
 	getUserStore
 } from '../adapters/index.js';
 import type {
 	DeprovisioningHold,
 	DeprovisioningThreshold,
 	ProvisioningConnection,
+	RefusedOperation,
 	UserBucket
 } from '../adapters/types.js';
 import { recordConnectionAudit } from '../admin/audit/record.js';
@@ -45,6 +47,12 @@ const HELD_DETAIL =
 	'Deprovisioning from this connection is held by its mass-deprovisioning guard until an administrator releases it.';
 
 const slots = () => checkedAdapter('DeprovisionSlot', DeprovisionSlotPayload);
+
+/* The removal being asked for: whom, and whether as a deactivation or a deletion. */
+export interface Removal {
+	userId: string;
+	operation: RefusedOperation;
+}
 
 /*
  * Answers the next sequence number of this generation of the tally. `increment` needs a record, so the counter
@@ -110,14 +118,48 @@ async function claimSlot(
  * isolates the departure (Constitution Principle I) — absent by default, so an unguarded connection conforms,
  * and set deliberately per connection by an administrator who chooses the brake over immediacy.
  */
-function heldRefusal(bucket: UserBucket, connection: ProvisioningConnection) {
+async function heldRefusal(
+	bucket: UserBucket,
+	connection: ProvisioningConnection,
+	removal: Removal
+): Promise<ScimError> {
+	const failed = !(await noteRefusal(bucket, connection, removal));
 	eventBus.emit('provisioning.held.refused', {
 		bucketId: bucket._id,
-		connectionId: connection._id
+		connectionId: connection._id,
+		userId: removal.userId,
+		operation: removal.operation,
+		...(failed ? { failed: true as const } : {})
 	});
 	return new ScimError(429, undefined, HELD_DETAIL, {
 		'Retry-After': RETRY_AFTER_SECONDS
 	});
+}
+
+/*
+ * Records whom the hold refused, so the administrator who releases it can see whom the release lets the
+ * directory remove (specs/084 R2). Awaited, so the record is there when the directory's next retry or the
+ * console reads it, but never allowed to change the answer: a store that fails here costs the record, and the
+ * event says so, never the 429 the directory relies on to retry. Answers whether the record was written.
+ */
+async function noteRefusal(
+	bucket: UserBucket,
+	connection: ProvisioningConnection,
+	removal: Removal
+): Promise<boolean> {
+	try {
+		await getProvisioningRefusalStore().note({
+			connectionId: connection._id,
+			bucketId: bucket._id,
+			epoch: connection.tallyEpoch ?? 0,
+			userId: removal.userId,
+			operation: removal.operation,
+			at: new Date()
+		});
+		return true;
+	} catch {
+		return false;
+	}
 }
 
 /*
@@ -163,7 +205,8 @@ async function alertAdministrators(
 					bucketName: bucket.name,
 					since: hold.since,
 					count: hold.count,
-					consoleUrl: `${ISSUER}/admin`
+					/* The connection's page: a signed-out administrator lands there after sign-in (specs/084 R3). */
+					consoleUrl: `${ISSUER}/admin/buckets/${encodeURIComponent(bucket._id)}/provisioning/${encodeURIComponent(connection._id)}`
 				}).catch(failed)
 			)
 		);
@@ -223,12 +266,13 @@ async function hold(
  */
 export async function admitDeprovisioning(
 	bucket: UserBucket,
-	connection: ProvisioningConnection
+	connection: ProvisioningConnection,
+	removal: Removal
 ): Promise<void> {
-	if (connection.hold) throw heldRefusal(bucket, connection);
+	if (connection.hold) throw await heldRefusal(bucket, connection, removal);
 	const threshold = connection.threshold;
 	if (!threshold) return;
 	if (await claimSlot(connection, threshold)) return;
 	await hold(bucket, connection, threshold);
-	throw heldRefusal(bucket, connection);
+	throw await heldRefusal(bucket, connection, removal);
 }

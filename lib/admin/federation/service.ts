@@ -24,6 +24,9 @@ import {
 } from '../../consts/known_providers.js';
 import type { UserBucket } from '../../adapters/types.js';
 import type { FederationProvider } from '../../federation/types.js';
+import { callbackUri } from '../../federation/flow.js';
+import { defaultCorrelationFor } from '../../provisioning/correlation.js';
+import { stabilityOf } from './guidance.js';
 import { ApplicationConfig } from '../../configs/application.js';
 import { issuerFor } from '../../configs/issuer.js';
 import { routeNames } from '../../consts/param_list.js';
@@ -109,6 +112,58 @@ export function presentAll(
 	return bucket.federation.map((provider) =>
 		present(provider, _id === undefined ? undefined : { ...bucket, _id })
 	);
+}
+
+export type ProviderWarning =
+	'callback_provisional' | 'signals_capability_off' | 'bound_provider_disabled';
+
+/*
+ * One provider with everything its page explains, read from the server rather than worked out in a browser
+ * (specs/084 R1): where the upstream must send people back, which logout signals it can send and whether this
+ * instance would accept them, which directory it belongs to, and how many people a change to it reaches.
+ */
+export async function presentDetail(bucket: UserBucket, providerId: string) {
+	const provider = find(bucket, providerId);
+	const entry = knownProviderByIssuer(provider.issuer);
+	const signs = (entry?.protocol.kind ?? 'oidc') === 'oidc';
+	const capabilities = {
+		globalTokenRevocation: ApplicationConfig['globalTokenRevocation.enabled'],
+		backChannelLogout: ApplicationConfig['federation.enabled']
+	};
+	const [bound, linkedUsers] = await Promise.all([
+		getProvisioningConnectionStore().findByProvider(bucket._id, provider.id),
+		getUserStore(bucket._id).countLinkedTo(provider.id)
+	]);
+	const callbackStability = stabilityOf(bucket);
+
+	const warnings: ProviderWarning[] = [];
+	if (callbackStability === 'provisional')
+		warnings.push('callback_provisional');
+	if (
+		(provider.acceptsGlobalTokenRevocation === true &&
+			!capabilities.globalTokenRevocation) ||
+		(provider.acceptsBackChannelLogout === true &&
+			!capabilities.backChannelLogout)
+	) {
+		warnings.push('signals_capability_off');
+	}
+	if (bound && !provider.enabled) warnings.push('bound_provider_disabled');
+
+	return {
+		...present(provider, bucket),
+		callbackUri: callbackUri(bucket),
+		callbackStability,
+		recognised: entry?.catalogueId ?? null,
+		/* What the provider can send at all: one that publishes no signing keys can authenticate neither. */
+		logoutSignals: { globalTokenRevocation: signs, backChannelLogout: signs },
+		capabilities,
+		boundConnection: bound
+			? { id: bound._id, displayName: bound.displayName }
+			: null,
+		linkedUsers,
+		recommendedCorrelation: defaultCorrelationFor(provider),
+		warnings
+	};
 }
 
 function providersOf(bucket: Pick<UserBucket, 'federation'>) {

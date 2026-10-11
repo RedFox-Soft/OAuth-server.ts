@@ -27,8 +27,26 @@ export const AddBucketGroupMembersBody = t.Object(
 	{ additionalProperties: false }
 );
 
+/*
+ * A hand-over is previewed, then confirmed (specs/084 R5): without `confirm` the route answers a 409 preview,
+ * and a confirmation carries the `expect` that preview stated, so the consent is to the counts reviewed.
+ */
 export const AssignBucketGroupConnectionBody = t.Object(
-	{ connectionId: t.String({ minLength: 1 }) },
+	{
+		connectionId: t.String({ minLength: 1 }),
+		confirm: t.Optional(t.Boolean()),
+		expect: t.Optional(
+			t.Object(
+				/* Whole numbers by `multipleOf`: `t.Integer` coerces through a string branch an agent would be shown. */
+				{
+					connectionId: t.String(),
+					managed: t.Number({ minimum: 0, multipleOf: 1 }),
+					foreign: t.Number({ minimum: 0, multipleOf: 1 })
+				},
+				{ additionalProperties: false }
+			)
+		)
+	},
 	{ additionalProperties: false }
 );
 

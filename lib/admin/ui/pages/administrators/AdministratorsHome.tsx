@@ -103,7 +103,7 @@ export function AdministratorsHome({ tab }: { tab: AdministratorsTab }) {
 			case 'providers':
 				return (
 					<FederationPanel
-						bucketId={ADMIN_BUCKET_ID}
+						bucket={bucket}
 						consoleBucket
 						canEdit={can.editSettings}
 						onChanged={reload}

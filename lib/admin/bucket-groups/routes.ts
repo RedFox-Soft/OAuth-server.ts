@@ -12,6 +12,7 @@ import { getBucketGroupStore, getUserStore } from '../../adapters/index.js';
 import {
 	MAX_END_USER_PAGE,
 	type BucketGroup,
+	type ProvisioningConnection,
 	type UserBucket
 } from '../../adapters/types.js';
 import {
@@ -21,7 +22,9 @@ import {
 	createGroup,
 	deleteGroup,
 	loadGroup,
-	type BucketGroupActor
+	walkHandOver,
+	type BucketGroupActor,
+	type HandOverWalk
 } from '../../bucket_groups/service.js';
 import {
 	loadConnection,
@@ -240,17 +243,51 @@ export const bucketGroupRoutes = new Elysia({ name: 'admin-bucket-groups' })
 			return present(updated);
 		}
 	)
+	/*
+	 * Previewed, then confirmed (specs/084 R5), as a sign-in change is (specs/083): the first call answers a 409
+	 * stating what the hand-over means and whom it would leave behind, and only a call with `confirm: true` and
+	 * the preview's `expect` applies it. Every 409 here is answered before the audit entry, so nothing is
+	 * recorded for a hand-over that was only described or refused.
+	 */
 	.post(
 		'/admin/api/buckets/:id/groups/:gid/connection',
-		async ({ admin, params, body }) => {
+		async ({ admin, params, body, status }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForEdit(ctx, params.id);
 			const group = await asAdmin(loadGroup(bucket, ADMIN, params.gid));
 			const connection = await asAdmin(
 				loadConnection(bucket, body.connectionId)
 			);
+			const walk = await asAdmin(walkHandOver(bucket, group, connection));
+			const preview = handOverPreview(group, connection, walk);
+			if (body.confirm !== true) {
+				return status(409, {
+					confirmationRequired: true as const,
+					...preview
+				});
+			}
+			/* Nothing to confirm: the people named have to leave the group, or come under the connection, first. */
+			if (walk.foreign > 0) {
+				return status(409, {
+					error: 'admin_error' as const,
+					message: `${walk.foreign} member${walk.foreign === 1 ? ' is' : 's are'} not managed by this connection`,
+					...preview
+				});
+			}
+			/* The consent is to the counts shown; a member who joined or left since is not covered by it. */
+			if (!sameHandOver(body.expect, preview.expect)) {
+				return status(409, {
+					error: 'admin_error' as const,
+					message:
+						body.expect === undefined
+							? 'confirm with the counts of the preview you reviewed (expect)'
+							: 'what this hand-over affects changed since you reviewed it',
+					...preview,
+					confirmationRequired: true as const
+				});
+			}
 			const updated = await asAdmin(
-				assignGroupToConnection(bucket, group, connection, () =>
+				assignGroupToConnection(bucket, group, connection, walk, () =>
 					recordAdminAudit(ctx, 'bucketgroup.connection.assign', group._id, {
 						attributes: ['provisionedBy'],
 						...scope(bucket)
@@ -261,3 +298,54 @@ export const bucketGroupRoutes = new Elysia({ name: 'admin-bucket-groups' })
 		},
 		{ body: AssignBucketGroupConnectionBody }
 	);
+
+interface HandOverExpect {
+	connectionId: string;
+	managed: number;
+	foreign: number;
+}
+
+function handOverPreview(
+	group: BucketGroup,
+	connection: ProvisioningConnection,
+	walk: HandOverWalk
+): {
+	consequences: string[];
+	expect: HandOverExpect;
+	blockers: HandOverWalk['blockers'];
+} {
+	const people = (n: number) => `${n} member${n === 1 ? '' : 's'}`;
+	const consequences = [
+		`From now on only the directory behind "${connection.displayName}" can change "${group.displayName}": administrators can no longer rename it, delete it or change who is in it, and this cannot be undone here.`,
+		`Relying parties keep seeing the group as "${group.displayName}" in the groups claim until the directory renames it.`,
+		walk.managed > 0
+			? `${people(walk.managed)} the connection already manages ${walk.managed === 1 ? 'stays' : 'stay'} in the group.`
+			: 'The group has no member the connection manages.'
+	];
+	if (walk.foreign > 0) {
+		consequences.push(
+			`${people(walk.foreign)} ${walk.foreign === 1 ? 'is' : 'are'} not managed by this connection, so the group cannot be handed over until ${walk.foreign === 1 ? 'that person leaves' : 'they leave'} the group or ${walk.foreign === 1 ? 'is' : 'are'} handed to the connection.`
+		);
+	}
+	return {
+		consequences,
+		expect: {
+			connectionId: connection._id,
+			managed: walk.managed,
+			foreign: walk.foreign
+		},
+		blockers: walk.blockers
+	};
+}
+
+function sameHandOver(
+	given: HandOverExpect | undefined,
+	fresh: HandOverExpect
+): boolean {
+	return (
+		given !== undefined &&
+		given.connectionId === fresh.connectionId &&
+		given.managed === fresh.managed &&
+		given.foreign === fresh.foreign
+	);
+}

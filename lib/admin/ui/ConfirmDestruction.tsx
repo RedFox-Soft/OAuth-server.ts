@@ -51,6 +51,7 @@ export function ConfirmDestruction({
 	busy,
 	word = CONFIRM_WORD,
 	okText,
+	acknowledgement,
 	onCancel,
 	onConfirm
 }: {
@@ -63,15 +64,22 @@ export function ConfirmDestruction({
 	busy?: boolean;
 	word?: string;
 	okText?: string;
+	/*
+	 * A statement the administrator must tick before the word counts — for an act whose harm depends on
+	 * something they had to look at first, such as whom a released hold removes (specs/084).
+	 */
+	acknowledgement?: string;
 	onCancel: () => void;
 	onConfirm: (withCascade: boolean) => void;
 }) {
 	const [typed, setTyped] = useState('');
 	const [withCascade, setWithCascade] = useState(false);
+	const [acknowledged, setAcknowledged] = useState(false);
 
 	function reset() {
 		setTyped('');
 		setWithCascade(false);
+		setAcknowledged(false);
 	}
 
 	/*
@@ -79,7 +87,9 @@ export function ConfirmDestruction({
 	 * request would be refused by the server anyway, and a button that submits a known refusal is a
 	 * button that teaches the operator to ignore what the screen says.
 	 */
-	const blocked = cascade !== undefined && !withCascade;
+	const blocked =
+		(cascade !== undefined && !withCascade) ||
+		(acknowledgement !== undefined && !acknowledged);
 
 	return (
 		<Modal
@@ -148,6 +158,15 @@ export function ConfirmDestruction({
 						) : null}
 					</Space>
 				) : null}
+
+				{acknowledgement !== undefined && (
+					<Checkbox
+						checked={acknowledged}
+						onChange={(e) => setAcknowledged(e.target.checked)}
+					>
+						{acknowledgement}
+					</Checkbox>
+				)}
 
 				<Space
 					orientation="vertical"

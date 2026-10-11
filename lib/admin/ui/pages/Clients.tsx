@@ -21,6 +21,7 @@ import { projectCan } from '../frame/can.js';
 import { AreaToolbar } from '../frame/AreaToolbar.js';
 import { RowActions, type RowAction } from '../frame/RowActions.js';
 import { EmptyState, LoadFailed } from '../frame/states.js';
+import { SecretReveal } from '../frame/SecretReveal.js';
 import type { ProjectView } from './ProjectWorkspace.js';
 
 const GRANT_OPTIONS = [
@@ -138,6 +139,7 @@ export function Clients({ project }: { project: ProjectView }) {
 	const [editingClientId, setEditingClientId] = useState<string | null>(null);
 	const [saving, setSaving] = useState(false);
 	const [secret, setSecret] = useState<string | null>(null);
+	const [secretStored, setSecretStored] = useState(false);
 	const [form] = Form.useForm<FormValues>();
 	const feedback = useFeedback();
 	const confirm = useConfirm();
@@ -638,22 +640,33 @@ export function Clients({ project }: { project: ProjectView }) {
 					/>
 				</Form>
 			</Modal>
+			{/*
+			 * The value exists only in the answer that created it, so the dialog cannot be dismissed until the
+			 * operator says it is stored (specs/084): no Cancel, no close button, no click-away.
+			 */}
 			<Modal
 				title="Client secret"
 				open={secret !== null}
-				onOk={() => setSecret(null)}
-				onCancel={() => setSecret(null)}
+				closable={false}
+				mask={{ closable: false }}
+				keyboard={false}
+				okText="Done"
+				okButtonProps={{ disabled: !secretStored }}
+				onOk={() => {
+					setSecret(null);
+					setSecretStored(false);
+				}}
 				cancelButtonProps={{ style: { display: 'none' } }}
 			>
-				<Typography.Paragraph type="warning">
-					Copy this secret now — it will not be shown again.
-				</Typography.Paragraph>
-				<Typography.Paragraph
-					copyable
-					code
-				>
-					{secret}
-				</Typography.Paragraph>
+				{secret !== null && (
+					<SecretReveal
+						secret={secret}
+						noun="client secret"
+						acknowledged={secretStored}
+						onAcknowledged={setSecretStored}
+						acknowledgement="I've put it into the application's configuration"
+					/>
+				)}
 			</Modal>
 		</>
 	);

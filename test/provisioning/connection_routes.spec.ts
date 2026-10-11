@@ -1,8 +1,12 @@
-import { describe, it, beforeAll, expect } from 'bun:test';
+import { describe, it, beforeAll, afterEach, expect } from 'bun:test';
+import { Type } from '@sinclair/typebox';
 
 import { getUserStore } from 'lib/adapters/index.js';
 import { ADMIN_BUCKET_ID } from 'lib/admin/consts.ts';
+import { ApplicationConfig } from 'lib/configs/application.js';
+import { SCIM_GROUP_SCHEMA } from 'lib/consts/scim.js';
 import bootstrap from '../test_helper.js';
+import { shaped } from '../shape.ts';
 import { adminCookie } from '../end_user_lifecycle/fixtures.ts';
 import {
 	connect,
@@ -19,7 +23,8 @@ import { admin } from './helpers.ts';
  * @proves An administrator sets up a provisioning connection on a bucket and controls it: the connection
  * tells them what to give the directory, binds its provider, can be disabled, cannot be created where it
  * must not be, and cannot be deleted from under its users (spec 070, User Story 2, scenarios 1, 5–7, 9;
- * FR-003, FR-005, FR-006, FR-007).
+ * FR-003, FR-005, FR-006, FR-007); its read states the users and groups it manages and the credential kinds
+ * the instance would issue it (spec 084 R4).
  */
 describe('administering provisioning connections', () => {
 	let cookie: string;
@@ -137,5 +142,64 @@ describe('administering provisioning connections', () => {
 
 		expect(res.status).toBe(409);
 		expect(res.json.blockers).toEqual([{ kind: 'enduser', count: 1 }]);
+	});
+
+	describe('reading a connection before deciding what to do with it', () => {
+		afterEach(() => {
+			ApplicationConfig['scim.secretCredentials'] = true;
+			ApplicationConfig['scim.staticTokens'] = true;
+		});
+
+		it('states how many users and groups it manages, in the list and the single read alike', async () => {
+			const c = await connect(await scimBucket());
+			await scim('POST', `${c.base}/Users`, {
+				token: c.token,
+				body: scimUser('ava@contoso.com')
+			});
+			await scim('POST', `${c.base}/Groups`, {
+				token: c.token,
+				body: { schemas: [SCIM_GROUP_SCHEMA], displayName: 'Payroll' }
+			});
+			const base = `/admin/api/buckets/${c.bucket._id}/provisioning-connections`;
+
+			const one = await admin('GET', `${base}/${c.connection._id}`, cookie);
+			const list = shaped(
+				Type.Array(Type.Record(Type.String(), Type.Unknown())),
+				(await admin('GET', base, cookie)).body
+			);
+
+			expect(one.json).toMatchObject({ managedUsers: 1, managedGroups: 1 });
+			expect(list[0]).toMatchObject({ managedUsers: 1, managedGroups: 1 });
+		});
+
+		it('offers every credential kind while the instance issues them all', async () => {
+			const c = await connect(await scimBucket());
+
+			const res = await admin(
+				'GET',
+				`/admin/api/buckets/${c.bucket._id}/provisioning-connections/${c.connection._id}`,
+				cookie
+			);
+
+			expect(res.json.availableCredentialKinds).toEqual([
+				'key',
+				'secret',
+				'static_token'
+			]);
+		});
+
+		it('offers only a key once secrets and static tokens are switched off', async () => {
+			const c = await connect(await scimBucket());
+			ApplicationConfig['scim.secretCredentials'] = false;
+			ApplicationConfig['scim.staticTokens'] = false;
+
+			const res = await admin(
+				'GET',
+				`/admin/api/buckets/${c.bucket._id}/provisioning-connections/${c.connection._id}`,
+				cookie
+			);
+
+			expect(res.json.availableCredentialKinds).toEqual(['key']);
+		});
 	});
 });

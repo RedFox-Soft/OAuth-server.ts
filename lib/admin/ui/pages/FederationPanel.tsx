@@ -1,169 +1,74 @@
 import { useCallback, useEffect, useState } from 'react';
-import {
-	Alert,
-	Table,
-	Button,
-	Modal,
-	Form,
-	Input,
-	Select,
-	Switch,
-	Space,
-	Tag,
-	Tooltip,
-	Badge,
-	Typography
-} from 'antd';
+import { Alert, Table, Button, Flex, Space, Tag, Typography } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
-/* The login page's own marks, not a second copy: one table, corrected in one place. */
-import { providerMark } from '../../../interactions/providerMark.js';
-import type { FederationProvider } from '../../../federation/types.js';
 import { request } from '../frame/request.js';
-import { useFeedback } from '../frame/feedback.js';
-import { useConfirm } from '../frame/confirm.js';
 import { RowActions } from '../frame/RowActions.js';
-import { EmptyState, LoadFailed } from '../frame/states.js';
+import { LoadFailed } from '../frame/states.js';
+import { Link, useNavigate } from '../frame/router.js';
+import { providerHref } from '../frame/routes.js';
+import type { BucketView } from './bucketView.js';
+import {
+	federationApi,
+	type Guidance,
+	type PresentedProvider
+} from './providers/providerTypes.js';
+import { ProviderTiles, ProviderWizard } from './providers/ProviderWizard.js';
+import {
+	providerBlocks,
+	useProviderActions
+} from './providers/useProviderActions.js';
 
 /*
- * A bucket's upstream identity providers.
- *
- * Its own component rather than more state in BucketDetail, which is already the per-bucket user surface and
- * long enough. The two share only the bucket id.
+ * A bucket's upstream identity providers: the list, and the way to connect another (specs/084). Everything
+ * done to one provider after it is connected happens on its own page; this tab only lists, opens, turns off
+ * and deletes.
  */
-
-interface ProviderValues {
-	id: string;
-	displayName: string;
-	issuer: string;
-	clientId: string;
-	clientSecret?: string;
-	scopes?: string[];
-	emailTrusted?: boolean;
-	provisioning?: 'jit' | 'existing_only';
-	allowedEmailDomains?: string[];
-	emailClaim?: string;
-	acceptsGlobalTokenRevocation?: boolean;
-	acceptsBackChannelLogout?: boolean;
-}
-
-/* A provider as the API presents it: the address to paste into its logout settings rides along when it applies. */
-type PresentedProvider = FederationProvider & {
-	globalTokenRevocationEndpoint?: string;
-	backChannelLogoutEndpoint?: string;
-};
-
-/*
- * What the server says it takes to connect a recognised provider to this bucket.
- *
- * This replaced a browser-side map of form prefills. The prefills were honest about having no runtime
- * effect, but they were a second copy of facts the server now holds — and a copy only the console could
- * read, so an agent got none of it. Everything below is fetched, including the one value nobody can guess.
- */
-interface Guidance {
-	catalogueId: string;
-	displayName: string;
-	consoleUrl: string;
-	steps: string[];
-	credentialLabels: { clientId: string; clientSecret: string };
-	/* Every value this provider asks for, in its own wording. Two for some, four for others. */
-	requiredValues: {
-		name: string;
-		label: string;
-		secret: boolean;
-		hint: string;
-	}[];
-	/* A question that must be answered before those values mean anything. Only one provider asks one. */
-	choices: {
-		name: string;
-		question: string;
-		options: { value: string | null; label: string; consequence: string }[];
-	}[];
-	clientIdHint: string;
-	callbackUri: string;
-	callbackStability: 'stable' | 'provisional';
-	javascriptOrigins: string[];
-	alreadyConnected: boolean;
-	existingProviderId?: string;
-}
-
-/*
- * Whatever the provider asked for, plus the answers to its questions.
- *
- * Open rather than a fixed shape, because the fields are driven by the guidance: naming them here would
- * put the list in a second place and leave a provider added later silently unable to be connected.
- */
-type ConnectValues = Record<string, unknown> & {
-	allowedEmailDomains?: string[];
-};
-
-/*
- * The option value standing for "I will type it myself". A sentinel is needed because the choice and the
- * value it decides are the same field: picking the broad answer *is* the value, while picking the narrow
- * one only says that a value is coming.
- */
-const SUPPLY_IT = '__supply__';
-
-/*
- * Whether a value is already settled by the answer to a question, and so must not also be asked for.
- * Without this the one provider that asks a question would show its organisation field twice — once as
- * the question, once as a value.
- */
-function suppliedByChoice(guidance: Guidance, name: string): boolean {
-	return guidance.choices.some((choice) => choice.name === name);
-}
-
 export function FederationPanel({
-	bucketId,
+	bucket,
 	onChanged,
 	canEdit = true,
 	consoleBucket = false
 }: {
-	bucketId: string;
+	bucket: BucketView;
 	/*
-	 * The console's own bucket (specs/080): its providers decide who can sign in to the console, so new ones
-	 * start out admitting existing accounts only and the panel says what linking and creation take there.
+	 * The console's own bucket (specs/080): its providers decide who can sign in to the console, so the tab
+	 * says what linking and creation take there.
 	 */
 	consoleBucket?: boolean;
-	/* The bucket's own settings depend on this list — a lockout refusal is easier to understand if the
-	 * providers shown are current — so the parent is told when it changes. */
+	/* The bucket's own settings depend on this list, so the parent is told when it changes. */
 	onChanged?: () => void;
 	/* False when the caller may read this bucket but not change it; the server would refuse every write. */
 	canEdit?: boolean;
 }) {
-	const base = `/admin/api/buckets/${encodeURIComponent(bucketId)}/federation`;
-	const feedback = useFeedback();
-	const confirm = useConfirm();
-	/*
-	 * On the console's own bucket these acts can shut administrators out. The server refuses the one that
-	 * would leave no super administrator a way in while passwords are off; the question says what remains.
-	 */
-	const consoleConsequences = consoleBucket
-		? [
-				'Administrators who sign in only through it will need their password, or another provider, to reach the console.'
-			]
-		: [];
+	const bucketId = bucket._id;
+	const navigate = useNavigate();
+	const actions = useProviderActions(bucketId, consoleBucket);
 	const [rows, setRows] = useState<PresentedProvider[]>([]);
+	const [guidance, setGuidance] = useState<Guidance[]>([]);
+	const [bound, setBound] = useState<Map<string, string>>(new Map());
 	const [loading, setLoading] = useState(true);
 	const [loadFailure, setLoadFailure] = useState<string | null>(null);
-	const [open, setOpen] = useState(false);
-	const [editing, setEditing] = useState<PresentedProvider | null>(null);
-	const [saving, setSaving] = useState(false);
-	const [form] = Form.useForm<ProviderValues>();
-	const [guidance, setGuidance] = useState<Guidance[]>([]);
-	const [connecting, setConnecting] = useState<Guidance | null>(null);
-	const [connectForm] = Form.useForm<ConnectValues>();
+	// The wizard, and the provider a tile chose to open it at (undefined: open at the first step).
+	const [wizard, setWizard] = useState<{ start?: string } | null>(null);
 
-	// Every state write follows an await, so the mount effect calls this without setting
-	// `loading` first; `load` is the reload, which does.
+	// Every state write follows an await, so the mount effect calls this without setting `loading` first.
 	const fetchProviders = useCallback(async () => {
 		try {
-			const [providers, catalogue] = await Promise.all([
-				request<PresentedProvider[]>('GET', base),
-				request<{ providers?: Guidance[] }>('GET', `${base}/catalogue`)
+			const [providers, catalogue, connections] = await Promise.all([
+				request<PresentedProvider[]>('GET', federationApi(bucketId)),
+				request<{ providers?: Guidance[] }>(
+					'GET',
+					`${federationApi(bucketId)}/catalogue`
+				),
+				request<{ providerId: string; displayName: string }[]>(
+					'GET',
+					`/admin/api/buckets/${encodeURIComponent(bucketId)}/provisioning-connections`
+				)
 			]);
 			/*
-			 * Either half failing is a failed load: without the catalogue the connect marks and the
-			 * callback address vanish, and an operator would read that as "nothing to connect".
+			 * Either of the first two failing is a failed load: without the catalogue the connect tiles and the
+			 * callback address vanish, and an operator would read that as "nothing to connect". The connections
+			 * only explain why Delete is unavailable, so a caller who cannot read them still gets the list.
 			 */
 			if (!providers.ok) {
 				setLoadFailure(providers.error.message);
@@ -173,170 +78,34 @@ export function FederationPanel({
 				setLoadFailure(null);
 				setRows(providers.data);
 				setGuidance(catalogue.data.providers ?? []);
+				setBound(
+					new Map(
+						(connections.ok ? connections.data : []).map((c) => [
+							c.providerId,
+							c.displayName
+						])
+					)
+				);
 			}
 		} finally {
 			setLoading(false);
 		}
-	}, [base]);
-	function load() {
-		setLoading(true);
-		return fetchProviders();
-	}
-
-	/*
-	 * The address is the thing an administrator must carry to somebody else's console unchanged, so it is
-	 * offered as one action. The failure path still leaves it selectable on the page — a clipboard that
-	 * refuses is a browser setting, not a reason to be unable to finish.
-	 */
-	async function copyCallback(uri: string) {
-		try {
-			await navigator.clipboard.writeText(uri);
-			feedback.done('Callback address copied.');
-		} catch {
-			feedback.refused({
-				error: 'clipboard',
-				message:
-					'The address could not be copied. Select it and copy it by hand.'
-			});
-		}
-	}
-
-	async function connect(values: ConnectValues) {
-		if (!connecting) return;
-		setSaving(true);
-		try {
-			/*
-			 * An answer of "I will type it myself" leaves the field to the value the administrator typed
-			 * beside it; any other answer *is* the value. Resolved here rather than in the form so the
-			 * question and the field it decides stay one thing on the wire, which is what the server
-			 * validates.
-			 */
-			const answered: Record<string, unknown> = {};
-			for (const choice of connecting.choices) {
-				const picked = values[`choice:${choice.name}`];
-				delete values[`choice:${choice.name}`];
-				if (picked !== SUPPLY_IT && picked !== undefined) {
-					answered[choice.name] = picked;
-				}
-			}
-			const result = await request('POST', base, {
-				catalogueId: connecting.catalogueId,
-				...values,
-				...answered
-			});
-			if (!result.ok) {
-				feedback.failed(result, connectForm);
-				return;
-			}
-			feedback.done(`Identity provider ${connecting.displayName} connected.`);
-			setConnecting(null);
-			connectForm.resetFields();
-			await load();
-			onChanged?.();
-		} finally {
-			setSaving(false);
-		}
-	}
-
+	}, [bucketId]);
 	useEffect(() => {
 		void fetchProviders();
 	}, [fetchProviders]);
 
-	async function submit(values: ProviderValues) {
-		setSaving(true);
-		try {
-			const result = editing
-				? await request(
-						'PATCH',
-						`${base}/${encodeURIComponent(editing.id)}`,
-						// `id` is not editable: it appears in URLs the login page has already rendered.
-						{ ...values, id: undefined }
-					)
-				: await request('POST', base, values);
-			if (!result.ok) {
-				feedback.failed(result, form);
-				return;
-			}
-			feedback.done(
-				`Identity provider ${values.displayName} ${editing ? 'updated' : 'created'}.`
-			);
-			setOpen(false);
-			setEditing(null);
-			form.resetFields();
-			await load();
-			onChanged?.();
-		} finally {
-			setSaving(false);
-		}
-	}
-
-	async function setEnabled(row: PresentedProvider, enabled: boolean) {
-		const proceed = enabled
-			? await confirm('provider.enable', { target: row.displayName })
-			: await confirm('provider.disable', {
-					target: row.displayName,
-					consequences: [
-						`Nobody can sign in to this bucket with ${row.displayName} until it is enabled again.`,
-						'Accounts and their links to it are kept.',
-						...consoleConsequences
-					]
-				});
-		if (!proceed) return;
-		const result = await request(
-			'PATCH',
-			`${base}/${encodeURIComponent(row.id)}`,
-			{ enabled }
-		);
-		if (!result.ok) {
-			feedback.failed(result);
-			return;
-		}
-		feedback.done(
-			`Identity provider ${row.displayName} ${enabled ? 'enabled' : 'disabled'}.`
-		);
-		await load();
+	function after(done: boolean) {
+		if (!done) return;
+		setLoading(true);
+		void fetchProviders();
 		onChanged?.();
 	}
 
-	async function remove(row: PresentedProvider) {
-		if (
-			!(await confirm('provider.delete', {
-				target: row.displayName,
-				consequences: [
-					`Every account's link to ${row.displayName} is removed with it, so its users can no longer sign in through it.`,
-					'People who signed in only through it keep their accounts, but need another way to sign in.',
-					'Connecting it again later does not restore the links.',
-					...consoleConsequences
-				]
-			}))
-		) {
-			return;
-		}
-		const result = await request(
-			'DELETE',
-			`${base}/${encodeURIComponent(row.id)}`
-		);
-		if (!result.ok) {
-			feedback.failed(result);
-			return;
-		}
-		feedback.done(`Identity provider ${row.displayName} deleted.`);
-		await load();
-		onChanged?.();
-	}
-
-	function openEdit(row: PresentedProvider) {
-		setEditing(row);
-		// The masked secret is deliberately not prefilled: an empty field means "keep the stored one",
-		// which is what an operator editing a name wants. `enabled` is left out because it is changed
-		// only by the row's Enable and Disable, never as a side effect of saving the form.
-		const { enabled, ...editable } = row;
-		form.setFieldsValue({ ...editable, clientSecret: undefined });
-		setOpen(true);
-	}
+	const empty = !loading && loadFailure === null && rows.length === 0;
 
 	return (
-		<div style={{ marginTop: 32 }}>
+		<div style={{ marginTop: 8 }}>
 			<Space
 				style={{ marginBottom: 12 }}
 				align="center"
@@ -347,88 +116,18 @@ export function FederationPanel({
 				>
 					Identity providers
 				</Typography.Title>
-				{/*
-				 * A recognised provider is connected by name; anything else is configured field by field.
-				 * Two routes to the same stored record, and the guided one is offered first because it is
-				 * the one that can tell an administrator the callback address to register.
-				 *
-				 * One mark per provider rather than a labelled button each. Four "Connect X" buttons beside
-				 * a heading was a wall of text that grew with the catalogue, and the mark is the thing an
-				 * administrator actually scans for — they arrive knowing which provider they want.
-				 *
-				 * The marks are imported from the login page's own table rather than copied: the same four
-				 * SVGs, so a corrected mark corrects both surfaces. Nothing about a provider's *sign-in*
-				 * branding rules applies here — those govern the button an end user presses, and this is an
-				 * administrative action on a page no end user sees.
-				 *
-				 * `aria-label` and not only the tooltip: a tooltip is visual, so an icon-only control
-				 * without one has no accessible name at all.
-				 */}
-				{(canEdit ? guidance : []).map((entry) => (
-					<Tooltip
-						key={entry.catalogueId}
-						title={
-							entry.alreadyConnected
-								? `${entry.displayName} is connected — edit it in the table below`
-								: `Connect ${entry.displayName}`
-						}
-					>
-						{/*
-						 * `color` and not `status`: `status` turns a Badge into a standalone status dot meant
-						 * to sit beside its own `text`, which is a different component shape. On a badge
-						 * wrapping something, the dot's colour comes from `color`.
-						 */}
-						<Badge
-							dot={entry.alreadyConnected}
-							color="green"
-							offset={[-4, 4]}
-						>
-							<Button
-								/*
-								 * Never `primary`, and that is what removes the white chip a previous version
-								 * had. These marks are their own fixed colours — two of them are black — so on
-								 * a filled blue button they needed a white plate behind them, which read as a
-								 * sticker stuck to a button. On the default surface they need nothing.
-								 *
-								 * It is also the right emphasis regardless: four equal alternatives are not
-								 * four primary actions, and four filled buttons that never changed made the
-								 * panel look like four things left to do.
-								 *
-								 * Safe because the console's content area is light — the only dark theme here
-								 * is the `Menu` in the sider. A dark content theme would need each provider's
-								 * white mark variant instead, which is why their guidelines publish one.
-								 */
-								aria-label={
-									entry.alreadyConnected
-										? `${entry.displayName} is already connected`
-										: `Connect ${entry.displayName}`
-								}
-								icon={providerMark(entry.catalogueId)}
-								onClick={() => {
-									connectForm.resetFields();
-									setConnecting(entry);
-								}}
-							/>
-						</Badge>
-					</Tooltip>
-				))}
-				{canEdit && (
+				{canEdit && !empty && (
 					<Button
 						icon={<PlusOutlined />}
-						onClick={() => {
-							setEditing(null);
-							form.resetFields();
-							setOpen(true);
-						}}
+						onClick={() => setWizard({})}
 					>
-						New provider
+						New identity provider
 					</Button>
 				)}
 			</Space>
 
 			<Typography.Paragraph type="secondary">
-				Users of this bucket can sign in through these providers. A provider's
-				client secret is stored but never shown again.
+				People of this bucket can sign in through these providers.
 			</Typography.Paragraph>
 
 			{consoleBucket && (
@@ -441,44 +140,42 @@ export function FederationPanel({
 				/>
 			)}
 
-			{!canEdit && (
-				<Alert
-					style={{ marginBottom: 12 }}
-					type="info"
-					showIcon
-					title="Only members of the group that owns this bucket can change this."
-				/>
-			)}
-
 			{loadFailure !== null ? (
 				<LoadFailed
 					reason={loadFailure}
-					onRetry={() => void load()}
+					onRetry={() => after(true)}
 				/>
+			) : empty ? (
+				<Flex
+					vertical
+					gap={12}
+				>
+					<Typography.Text>
+						No identity providers yet.
+						{canEdit && ' Connect one:'}
+					</Typography.Text>
+					{canEdit && (
+						<ProviderTiles
+							guidance={guidance}
+							onChoose={(id) => setWizard({ start: id })}
+						/>
+					)}
+				</Flex>
 			) : (
 				<Table<PresentedProvider>
 					rowKey="id"
 					loading={loading}
 					dataSource={rows}
 					pagination={false}
-					locale={{
-						emptyText: <EmptyState purpose="No identity providers yet." />
-					}}
 					columns={[
-						{ title: 'Id', dataIndex: 'id' },
 						{
 							title: 'Name',
 							dataIndex: 'displayName',
-							render: (name: string, row) =>
-								canEdit ? (
-									<Typography.Link onClick={() => openEdit(row)}>
-										{name}
-									</Typography.Link>
-								) : (
-									name
-								)
+							render: (name: string, row) => (
+								<Link href={providerHref(bucketId, row.id)}>{name}</Link>
+							)
 						},
-						{ title: 'Issuer', dataIndex: 'issuer' },
+						{ title: 'Id', dataIndex: 'id' },
 						{
 							title: 'Status',
 							dataIndex: 'enabled',
@@ -489,436 +186,91 @@ export function FederationPanel({
 							)
 						},
 						{
-							title: 'Email',
-							render: (_, row) => (
-								<Space size={4}>
-									{row.emailTrusted && <Tag color="blue">Trusted</Tag>}
-									{row.acceptsGlobalTokenRevocation && (
-										<Tag color="purple">Universal Logout</Tag>
-									)}
-									{row.acceptsBackChannelLogout && (
-										<Tag color="purple">Back-channel logout</Tag>
-									)}
-									<Tag>
-										{row.provisioning === 'jit'
-											? 'Auto-create'
-											: 'Existing only'}
-									</Tag>
-								</Space>
-							)
+							title: 'First-time users',
+							render: (_, row) =>
+								row.provisioning === 'jit'
+									? 'Creates accounts'
+									: 'Existing only'
 						},
-						...(canEdit
-							? [
-									{
-										title: '',
-										key: 'actions',
-										render: (_: unknown, row: PresentedProvider) => (
-											<RowActions
-												name={row.displayName}
-												items={[
-													{
-														key: 'edit',
-														label: 'Edit…',
-														group: 'edit',
-														onClick: () => openEdit(row)
-													},
-													row.enabled
-														? {
-																key: 'disable',
-																label: 'Disable…',
-																group: 'state',
-																onClick: () => void setEnabled(row, false)
-															}
-														: {
-																key: 'enable',
-																label: 'Enable',
-																group: 'state',
-																onClick: () => void setEnabled(row, true)
-															},
-													{
-														key: 'delete',
-														label: 'Delete…',
-														group: 'danger',
-														onClick: () => void remove(row)
-													}
-												]}
-											/>
-										)
-									}
-								]
-							: [])
+						{
+							title: 'Email domains',
+							render: (_, row) =>
+								row.allowedEmailDomains.length > 0
+									? row.allowedEmailDomains.join(', ')
+									: 'Any'
+						},
+						{
+							title: '',
+							key: 'actions',
+							render: (_: unknown, row: PresentedProvider) => {
+								const connection = bound.get(row.id);
+								const blocks = providerBlocks(
+									bucket,
+									row,
+									connection ? { displayName: connection } : null
+								);
+								return (
+									<RowActions
+										name={row.displayName}
+										items={[
+											{
+												key: 'open',
+												label: 'Open',
+												group: 'edit',
+												onClick: () =>
+													void navigate(providerHref(bucketId, row.id))
+											},
+											...(canEdit
+												? [
+														row.enabled
+															? {
+																	key: 'disable',
+																	label: 'Disable…',
+																	group: 'state' as const,
+																	blocked: blocks.disable,
+																	onClick: () =>
+																		void actions
+																			.setEnabled(row, false)
+																			.then(after)
+																}
+															: {
+																	key: 'enable',
+																	label: 'Enable',
+																	group: 'state' as const,
+																	onClick: () =>
+																		void actions
+																			.setEnabled(row, true)
+																			.then(after)
+																},
+														{
+															key: 'delete',
+															label: 'Delete…',
+															group: 'danger' as const,
+															blocked: blocks.remove,
+															onClick: () =>
+																void actions.remove(row).then(after)
+														}
+													]
+												: [])
+										]}
+									/>
+								);
+							}
+						}
 					]}
 				/>
 			)}
 
-			{/*
-			 * Restated beside the providers it governs, and worded so it claims nothing it cannot prove.
-			 * Whether the upstream actually holds this address is the one thing that cannot be checked
-			 * without a person completing a sign-in — so the console says where to look rather than
-			 * implying the connection has been verified.
-			 */}
-			{rows.length > 0 && guidance[0] && (
-				<div style={{ marginTop: 16 }}>
-					<Typography.Paragraph type="secondary">
-						Every provider on this bucket returns users to{' '}
-						<Typography.Text
-							code
-							copyable={{ text: guidance[0].callbackUri }}
-						>
-							{guidance[0].callbackUri}
-						</Typography.Text>
-						. If a sign-in fails on the provider's own page, that address not
-						being registered there is by far the most likely cause.
-					</Typography.Paragraph>
-					{guidance[0].callbackStability === 'provisional' && (
-						<Alert
-							type="warning"
-							showIcon
-							title="This address will change"
-							description="This bucket has no address of its own yet, so the address above is built from its internal id. Giving the bucket a slug changes it, and whatever you registered with the provider stops matching. Set the slug first."
-						/>
-					)}
-				</div>
+			{wizard && (
+				<ProviderWizard
+					bucketId={bucketId}
+					guidance={guidance}
+					registrationOpen={bucket.registrationOpen}
+					consoleBucket={consoleBucket}
+					start={wizard.start}
+					onClose={() => setWizard(null)}
+				/>
 			)}
-
-			{connecting && (
-				<Modal
-					open
-					width={640}
-					title={`Connect ${connecting.displayName}`}
-					okText={connecting.alreadyConnected ? 'Close' : 'Connect'}
-					okButtonProps={{
-						style: connecting.alreadyConnected ? { display: 'none' } : undefined
-					}}
-					confirmLoading={saving}
-					onCancel={() => setConnecting(null)}
-					onOk={() => connectForm.submit()}
-				>
-					{connecting.alreadyConnected ? (
-						<Alert
-							type="info"
-							showIcon
-							title={`${connecting.displayName} is already connected to this bucket`}
-							description={`Edit the provider '${connecting.existingProviderId ?? connecting.displayName}' in the table below to change its credentials or settings. A bucket holds one connection per provider.`}
-						/>
-					) : (
-						<>
-							<Typography.Paragraph>
-								Do this at{' '}
-								<Typography.Link
-									href={connecting.consoleUrl}
-									target="_blank"
-									rel="noreferrer"
-								>
-									{connecting.displayName}
-								</Typography.Link>
-								, then come back with the {connecting.requiredValues.length}{' '}
-								values it gives you.
-							</Typography.Paragraph>
-							<ol style={{ paddingLeft: 20, marginBottom: 16 }}>
-								{connecting.steps.map((step) => (
-									<li
-										key={step}
-										style={{ marginBottom: 6 }}
-									>
-										{step}
-									</li>
-								))}
-							</ol>
-
-							<Typography.Paragraph style={{ marginBottom: 4 }}>
-								<strong>The redirect URI to register</strong>
-							</Typography.Paragraph>
-							<Space
-								align="center"
-								style={{ marginBottom: 4 }}
-							>
-								<Typography.Text code>{connecting.callbackUri}</Typography.Text>
-								<Button
-									size="small"
-									onClick={() => void copyCallback(connecting.callbackUri)}
-								>
-									Copy
-								</Button>
-							</Space>
-							<Typography.Paragraph type="secondary">
-								Paste it exactly. Providers match this address character for
-								character, and a mismatch is refused on their page rather than
-								here.
-							</Typography.Paragraph>
-							{connecting.callbackStability === 'provisional' && (
-								<Alert
-									style={{ marginBottom: 16 }}
-									type="warning"
-									showIcon
-									title="Give this bucket a slug first"
-									description="This bucket has no address of its own, so the address above is built from its internal id and will change the moment you assign a slug — silently invalidating what you registered."
-								/>
-							)}
-
-							<Form
-								form={connectForm}
-								layout="vertical"
-								onFinish={connect}
-								scrollToFirstError
-							>
-								{/*
-								 * A question the provider forces before its values mean anything — only one
-								 * provider asks one, and the answer decides whether the button admits one
-								 * company's staff or everybody in the world with an account there. Rendered
-								 * from the guidance rather than written here, and **no option is preselected**:
-								 * a default would be this console choosing who may sign in.
-								 */}
-								{connecting.choices.map((choice) => (
-									<Form.Item
-										key={choice.name}
-										name={`choice:${choice.name}`}
-										label={choice.question}
-										rules={[{ required: true }]}
-									>
-										<Select
-											options={choice.options.map((option) => ({
-												value: option.value ?? SUPPLY_IT,
-												label: option.label,
-												title: option.consequence
-											}))}
-											optionRender={(option) => (
-												<div>
-													<div>{option.label}</div>
-													<Typography.Text
-														type="secondary"
-														style={{ fontSize: 12, whiteSpace: 'normal' }}
-													>
-														{option.data.title}
-													</Typography.Text>
-												</div>
-											)}
-										/>
-									</Form.Item>
-								))}
-
-								{/*
-								 * Every value this provider asks for, in its own wording, driven by the
-								 * guidance — two for some, four for others. Written as a loop rather than as
-								 * fields per provider so that a provider added later needs no console change,
-								 * which is the same reason the catalogue is data.
-								 *
-								 * `autoComplete` is off on all of them: these are an upstream's credentials,
-								 * never the administrator's own, and without it the browser reads an
-								 * identifier beside a secret as a sign-in form and fills both from its
-								 * password store.
-								 */}
-								{connecting.requiredValues
-									.filter((value) => !suppliedByChoice(connecting, value.name))
-									.map((value) => (
-										<Form.Item
-											key={value.name}
-											name={value.name}
-											label={value.label}
-											tooltip={value.hint}
-											rules={[{ required: true }]}
-										>
-											{value.secret ? (
-												/* A key is pasted from a file and is many lines long; a secret is one. */
-												value.name === 'signingKey' ? (
-													<Input.TextArea
-														rows={4}
-														autoComplete="off"
-														placeholder="-----BEGIN PRIVATE KEY-----"
-													/>
-												) : (
-													<Input.Password autoComplete="new-password" />
-												)
-											) : (
-												<Input autoComplete="off" />
-											)}
-										</Form.Item>
-									))}
-								<Form.Item
-									name="allowedEmailDomains"
-									label="Restrict to these email domains"
-									tooltip="Optional. Bare lower-case domains. Empty means anyone with an account at this provider can sign in."
-								>
-									<Select
-										mode="tags"
-										tokenSeparators={[' ', ',']}
-										placeholder="acme.com"
-									/>
-								</Form.Item>
-							</Form>
-						</>
-					)}
-				</Modal>
-			)}
-
-			<Modal
-				open={open}
-				title={
-					editing ? `Edit ${editing.displayName}` : 'New identity provider'
-				}
-				okText="Save"
-				confirmLoading={saving}
-				onCancel={() => {
-					setOpen(false);
-					setEditing(null);
-				}}
-				onOk={() => form.submit()}
-			>
-				<Form
-					form={form}
-					layout="vertical"
-					onFinish={submit}
-					scrollToFirstError
-					initialValues={{
-						scopes: ['openid', 'email', 'profile'],
-						provisioning: consoleBucket ? 'existing_only' : 'jit',
-						emailClaim: 'email',
-						acceptsGlobalTokenRevocation: false,
-						acceptsBackChannelLogout: false
-					}}
-				>
-					{!editing && (
-						<Form.Item
-							name="id"
-							label="Id"
-							tooltip="Appears in the sign-in URL. Lower-case letters, digits and hyphens."
-							rules={[{ required: true }]}
-						>
-							<Input placeholder="acme-sso" />
-						</Form.Item>
-					)}
-					<Form.Item
-						name="displayName"
-						label="Button label"
-						rules={[{ required: true }]}
-					>
-						<Input placeholder="Acme SSO" />
-					</Form.Item>
-					<Form.Item
-						name="issuer"
-						label="Issuer"
-						tooltip="Checked when you save: its discovery document must be reachable and name this issuer."
-						rules={[{ required: true }]}
-					>
-						<Input placeholder="https://idp.acme.com" />
-					</Form.Item>
-					<Form.Item
-						name="clientId"
-						label="Client id"
-						rules={[{ required: !editing }]}
-					>
-						<Input autoComplete="off" />
-					</Form.Item>
-					<Form.Item
-						name="clientSecret"
-						label="Client secret"
-						tooltip={
-							editing ? 'Leave blank to keep the stored secret.' : undefined
-						}
-						rules={[{ required: !editing }]}
-					>
-						{/* Editing means an empty field keeps the stored secret, so an autofilled value here
-						    would silently overwrite a working credential with the wrong one. */}
-						<Input.Password
-							autoComplete="new-password"
-							placeholder={editing ? 'unchanged' : undefined}
-						/>
-					</Form.Item>
-					<Form.Item
-						name="scopes"
-						label="Scopes"
-					>
-						<Select
-							mode="tags"
-							tokenSeparators={[' ', ',']}
-						/>
-					</Form.Item>
-					<Form.Item
-						name="emailClaim"
-						label="Email claim"
-						tooltip="Which claim carries the address. Some corporate providers use upn."
-					>
-						<Input />
-					</Form.Item>
-					<Form.Item
-						name="allowedEmailDomains"
-						label="Allowed email domains"
-						tooltip="Bare lower-case domains. Empty means any domain is accepted."
-					>
-						<Select
-							mode="tags"
-							tokenSeparators={[' ', ',']}
-							placeholder="acme.com"
-						/>
-					</Form.Item>
-					<Form.Item
-						name="emailTrusted"
-						label="Trust this provider's verified addresses"
-						tooltip="Only enable for a provider that genuinely verifies addresses. It allows linking to an existing account with the same address."
-						valuePropName="checked"
-					>
-						<Switch />
-					</Form.Item>
-					<Form.Item
-						name="acceptsGlobalTokenRevocation"
-						label="Accept global token revocation (Okta Universal Logout)"
-						tooltip="Lets this provider end everything one of its users holds here — sessions and tokens — with a request signed by its own keys. The account is not deactivated. Also needs Global Token Revocation switched on in Settings."
-						valuePropName="checked"
-					>
-						<Switch />
-					</Form.Item>
-					{editing?.globalTokenRevocationEndpoint && (
-						<Form.Item label="Logout endpoint to give the provider">
-							<Typography.Text
-								copyable
-								code
-							>
-								{editing.globalTokenRevocationEndpoint}
-							</Typography.Text>
-						</Form.Item>
-					)}
-					<Form.Item
-						name="acceptsBackChannelLogout"
-						label="Accept back-channel logout (Keycloak, Auth0, Ping)"
-						tooltip="When a person signs out at this provider, or an administrator there ends their session, the sessions here that sign-in reached end too. Offline access they granted is kept, and the account is not deactivated."
-						valuePropName="checked"
-					>
-						<Switch />
-					</Form.Item>
-					{editing?.backChannelLogoutEndpoint && (
-						<Form.Item
-							label="Back-channel logout URL to register at the provider"
-							extra="Register this address at the provider as this application's back-channel logout URL. When a person signs out there, or an administrator ends their session, they are signed out of every application here that their sign-in through this provider reached. Offline access they granted is kept. Turn on the provider's “session required” option (Keycloak: Backchannel logout session required) so only the session they signed out of ends; without it, every session they opened through this provider ends. Keycloak must be 24.0.0 or later (22.0.8 and 23.0.4 also work): earlier releases send logout tokens without an expiry, which are refused."
-						>
-							<Typography.Text
-								copyable
-								code
-							>
-								{editing.backChannelLogoutEndpoint}
-							</Typography.Text>
-						</Form.Item>
-					)}
-					<Form.Item
-						name="provisioning"
-						label="First-time users"
-						extra={
-							consoleBucket
-								? 'Creating accounts also needs sign-up open on this bucket.'
-								: undefined
-						}
-					>
-						<Select
-							options={[
-								{ label: 'Create an account automatically', value: 'jit' },
-								{
-									label: 'Only allow accounts that already exist',
-									value: 'existing_only'
-								}
-							]}
-						/>
-					</Form.Item>
-				</Form>
-			</Modal>
 		</div>
 	);
 }

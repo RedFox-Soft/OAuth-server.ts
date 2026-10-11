@@ -49,13 +49,17 @@ describe('handing an administrator-kept group to a provisioning connection', () 
 		).json.id as string;
 	}
 
-	function assign(c: Connected, gid: string) {
-		return admin(
-			'POST',
-			`/admin/api/buckets/${c.bucket._id}/groups/${gid}/connection`,
-			cookie,
-			{ connectionId: c.connection._id }
-		);
+	/* As the console hands a group over: previewed, then confirmed with the counts the preview showed. */
+	async function assign(c: Connected, gid: string) {
+		const path = `/admin/api/buckets/${c.bucket._id}/groups/${gid}/connection`;
+		const body = { connectionId: c.connection._id };
+		const preview = await admin('POST', path, cookie, body);
+		expect(preview.status).toBe(409);
+		return admin('POST', path, cookie, {
+			...body,
+			confirm: true,
+			expect: preview.json.expect
+		});
 	}
 
 	it('refuses the directory’s create of a name an administrator-kept group holds', async () => {

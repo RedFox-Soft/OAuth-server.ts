@@ -143,11 +143,8 @@ export const ACTIONS = {
 
 	'userGroup.create': { class: 'C0' },
 	'userGroup.rename': { class: 'C0' },
-	'userGroup.connection.assign': {
-		class: 'C2',
-		title: (t) => `Hand user group ${t} over to the provisioning connection?`,
-		okText: 'Hand over'
-	},
+	// The server's preview names the members the directory does not manage (specs/084).
+	'userGroup.connection.assign': { class: 'C4' },
 	'userGroup.delete': {
 		class: 'C2',
 		title: (t) => `Delete user group ${t}?`,
@@ -168,6 +165,16 @@ export const ACTIONS = {
 		class: 'C2',
 		title: (t) => `Disable sign-in with ${t}?`,
 		okText: 'Disable'
+	},
+	/*
+	 * A provider change that lets more people in (specs/084): creating accounts, dropping a domain limit,
+	 * linking by email, accepting a logout signal. Declining keeps the draft.
+	 */
+	'provider.trust.widen': {
+		class: 'C2',
+		title: (t) => `Save changes to ${t}?`,
+		okText: 'Save changes',
+		cancelText: 'Keep editing'
 	},
 	'provider.delete': {
 		class: 'C2',
@@ -191,6 +198,12 @@ export const ACTIONS = {
 		class: 'C2',
 		title: (t) => `Issue a new credential for ${t}?`,
 		okText: 'Issue credential'
+	},
+	// One slot per kind: the old credential stops working the moment the new one exists.
+	'connection.credential.replace': {
+		class: 'C2',
+		title: (t) => `Replace the credential of ${t}?`,
+		okText: 'Replace credential'
 	},
 	'connection.credential.revoke': {
 		class: 'C1',

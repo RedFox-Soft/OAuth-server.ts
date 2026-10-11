@@ -19,7 +19,7 @@ export interface Crumb {
 
 export interface HeaderTab {
 	key: string;
-	label: string;
+	label: ReactNode;
 	href: string;
 }
 

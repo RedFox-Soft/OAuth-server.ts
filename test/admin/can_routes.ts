@@ -195,6 +195,12 @@ export const statedRightRoutes: readonly StatedRightRoute[] = [
 		method: 'GET',
 		path: `${BUCKET}/federation/catalogue`
 	},
+	{
+		on: 'bucket',
+		flag: 'read',
+		method: 'GET',
+		path: `${BUCKET}/federation/:providerId`
+	},
 	/* An issuer over plain http is refused after the right, so no provider is configured. */
 	{
 		on: 'bucket',
@@ -228,6 +234,12 @@ export const statedRightRoutes: readonly StatedRightRoute[] = [
 		flag: 'manageUsers',
 		method: 'GET',
 		path: `${BUCKET}/provisioning-connections/:connectionId`
+	},
+	{
+		on: 'bucket',
+		flag: 'manageUsers',
+		method: 'GET',
+		path: `${BUCKET}/provisioning-connections/:connectionId/hold`
 	},
 	{
 		on: 'bucket',

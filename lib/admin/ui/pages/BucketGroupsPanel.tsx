@@ -8,124 +8,79 @@ import {
 	Select,
 	Space,
 	Tag,
-	Typography,
-	Popconfirm
+	Typography
 } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import type { ConnectionView } from './ProvisioningPanel.js';
 import { request } from '../frame/request.js';
 import { useFeedback } from '../frame/feedback.js';
-import { useConfirm } from '../frame/confirm.js';
-import { ACTIONS } from '../frame/actions.js';
 import { RowActions, type RowAction } from '../frame/RowActions.js';
 import { EmptyState, LoadFailed } from '../frame/states.js';
 import type { BucketCan } from '../frame/can.js';
-import { UserSearchSelect } from './users/UserSearchSelect.js';
+import { Link, useNavigate, useRoute } from '../frame/router.js';
+import { bucketHref, userGroupHref } from '../frame/routes.js';
+import {
+	RenameGroupModal,
+	groupsApi,
+	useDeleteGroup,
+	type GroupView
+} from './groups/groupShared.js';
 
-/* What `GET …/groups` answers for each group. */
-export interface GroupView {
-	id: string;
-	displayName: string;
-	externalId?: string;
-	provisionedBy?: string;
-	memberCount: number;
-}
-
-interface MemberView {
-	id: string;
-	email: string | null;
-	userName?: string;
-}
-
-const PAGE = 100;
-
-const REMOVE_MEMBER = ACTIONS['userGroup.member.remove'];
+export type { GroupView };
 
 /*
- * A bucket's groups of end users. Their names are what relying parties receive in the `groups` claim, so a
- * rename is stated as such. A group a SCIM directory manages is shown read-only, with its connection: the
- * server refuses an administrator's change to one, and the controls say where the change belongs instead.
+ * A bucket's groups of end users (specs/084): the list, and creating one. Each group has a page of its own
+ * for its members and the acts that change who it grants; this tab lists, opens, renames and deletes.
  *
- * Creating, renaming, deleting and handing a group over are the bucket's owners' (`can.edit`); changing who
- * is in a group is user management (`can.manageUsers`), open also to those who reach the bucket through a
- * project.
+ * Creating, renaming and deleting are the bucket's owners' (`can.edit`); changing who is in a group is user
+ * management and happens on the group's page.
  */
 export function BucketGroupsPanel({
 	bucketId,
 	can,
 	connections,
-	refreshKey,
-	onChanged,
-	onGroups
+	onChanged
 }: {
 	bucketId: string;
 	can: Pick<BucketCan, 'edit' | 'manageUsers'>;
 	connections: ConnectionView[];
-	refreshKey?: number;
 	onChanged: () => void;
-	/* The current list, for the user editor's group picker. */
-	onGroups?: (groups: GroupView[]) => void;
 }) {
-	const base = `/admin/api/buckets/${encodeURIComponent(bucketId)}/groups`;
 	const feedback = useFeedback();
-	const confirm = useConfirm();
+	const navigate = useNavigate();
+	const deleteGroup = useDeleteGroup(bucketId);
+	const { query } = useRoute();
+	// Who keeps a group, from the address so a connection's page can link to the groups it keeps.
+	const keptBy = query.get('keptBy') ?? undefined;
 	const [groups, setGroups] = useState<GroupView[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [loadError, setLoadError] = useState<string | null>(null);
 	const [createOpen, setCreateOpen] = useState(false);
 	const [renaming, setRenaming] = useState<GroupView | null>(null);
-	const [membersOf, setMembersOf] = useState<GroupView | null>(null);
-	const [assigning, setAssigning] = useState<GroupView | null>(null);
-	const [members, setMembers] = useState<MemberView[]>([]);
-	const [membersLoading, setMembersLoading] = useState(false);
-	const [memberTotal, setMemberTotal] = useState(0);
-	const [memberPage, setMemberPage] = useState(1);
-	const [adding, setAdding] = useState<string[]>([]);
 	const [nameForm] = Form.useForm<{ displayName: string }>();
-	const [assignForm] = Form.useForm<{ connectionId: string }>();
 
 	const connectionName = (id: string) =>
 		connections.find((c) => c.id === id)?.displayName ?? id;
 
 	const fetchGroups = useCallback(async () => {
 		try {
-			const result = await request<{ groups: GroupView[] }>('GET', base);
+			const result = await request<{ groups: GroupView[] }>(
+				'GET',
+				groupsApi(bucketId)
+			);
 			if (result.ok) {
 				setGroups(result.data.groups);
 				setLoadError(null);
-				onGroups?.(result.data.groups);
 			} else {
 				setLoadError(result.error.message);
 			}
 		} finally {
 			setLoading(false);
 		}
-	}, [base, onGroups]);
+	}, [bucketId]);
 	useEffect(() => {
 		void fetchGroups();
-	}, [fetchGroups, refreshKey]);
-
-	const fetchMembers = useCallback(
-		async (group: GroupView, page: number) => {
-			setMembersLoading(true);
-			const result = await request<{
-				totalResults: number;
-				members: MemberView[];
-			}>(
-				'GET',
-				`${base}/${encodeURIComponent(group.id)}/members?startIndex=${(page - 1) * PAGE + 1}&count=${PAGE}`
-			);
-			setMembersLoading(false);
-			if (!result.ok) {
-				feedback.failed(result);
-				return;
-			}
-			setMembers(result.data.members);
-			setMemberTotal(result.data.totalResults);
-			setMemberPage(page);
-		},
-		[base, feedback]
-	);
+	}, [fetchGroups]);
 
 	async function changed() {
 		await fetchGroups();
@@ -133,7 +88,9 @@ export function BucketGroupsPanel({
 	}
 
 	async function onCreate({ displayName }: { displayName: string }) {
-		const result = await request('POST', base, { displayName });
+		const result = await request<GroupView>('POST', groupsApi(bucketId), {
+			displayName
+		});
 		if (!result.ok) {
 			feedback.failed(result, nameForm);
 			return;
@@ -141,174 +98,55 @@ export function BucketGroupsPanel({
 		feedback.done(`User group ${displayName} created.`);
 		setCreateOpen(false);
 		nameForm.resetFields();
-		await changed();
+		void navigate(userGroupHref(bucketId, result.data.id));
 	}
 
-	async function onRename({ displayName }: { displayName: string }) {
-		if (!renaming) return;
-		const result = await request(
-			'PATCH',
-			`${base}/${encodeURIComponent(renaming.id)}`,
-			{ displayName }
+	function setKeptBy(value: string | undefined) {
+		const params = new URLSearchParams(query);
+		if (value) params.set('keptBy', value);
+		else params.delete('keptBy');
+		const qs = params.toString();
+		void navigate(
+			`${bucketHref(bucketId, 'user-groups')}${qs ? `?${qs}` : ''}`,
+			{
+				replace: true
+			}
 		);
-		if (!result.ok) {
-			feedback.failed(result, nameForm);
-			return;
-		}
-		feedback.done(
-			`User group ${renaming.displayName} renamed to ${displayName}.`
-		);
-		setRenaming(null);
-		nameForm.resetFields();
-		await changed();
-	}
-
-	async function onDelete(group: GroupView) {
-		const count = group.memberCount;
-		if (
-			!(await confirm('userGroup.delete', {
-				target: group.displayName,
-				consequences: [
-					`Its ${String(count)} member${count === 1 ? '' : 's'} lose whatever relying parties grant for it.`,
-					'The users themselves are kept.'
-				]
-			}))
-		) {
-			return;
-		}
-		const result = await request(
-			'DELETE',
-			`${base}/${encodeURIComponent(group.id)}`
-		);
-		if (!result.ok) {
-			feedback.failed(result);
-			return;
-		}
-		feedback.done(`User group ${group.displayName} deleted.`);
-		await changed();
-	}
-
-	async function onAddMembers() {
-		if (!membersOf || adding.length === 0) return;
-		const result = await request(
-			'POST',
-			`${base}/${encodeURIComponent(membersOf.id)}/members`,
-			{ userIds: adding }
-		);
-		if (!result.ok) {
-			feedback.failed(result);
-			return;
-		}
-		feedback.done(
-			adding.length === 1
-				? `User added to ${membersOf.displayName}.`
-				: `${String(adding.length)} users added to ${membersOf.displayName}.`
-		);
-		setAdding([]);
-		await fetchMembers(membersOf, memberPage);
-		await changed();
-	}
-
-	async function onRemoveMember(member: MemberView) {
-		if (!membersOf) return;
-		const result = await request(
-			'DELETE',
-			`${base}/${encodeURIComponent(membersOf.id)}/members/${encodeURIComponent(member.id)}`
-		);
-		if (!result.ok) {
-			feedback.failed(result);
-			return;
-		}
-		feedback.done(
-			`${member.email ?? member.userName ?? 'User'} removed from ${membersOf.displayName}.`
-		);
-		await fetchMembers(membersOf, memberPage);
-		await changed();
-	}
-
-	/*
-	 * The connection is chosen in the dialog, which closes before the question is asked: a confirmation
-	 * stacked on a dialog is a second modal the operator has to read through the first.
-	 */
-	async function onAssign({ connectionId }: { connectionId: string }) {
-		const group = assigning;
-		if (!group) return;
-		setAssigning(null);
-		const connection = connectionName(connectionId);
-		if (
-			!(await confirm('userGroup.connection.assign', {
-				target: group.displayName,
-				consequences: [
-					`${connection} takes the group over: from then on only the directory can rename it or change its members.`,
-					'Every member must already be a user the directory manages.',
-					'It cannot be handed back from the console.'
-				]
-			}))
-		) {
-			return;
-		}
-		const result = await request(
-			'POST',
-			`${base}/${encodeURIComponent(group.id)}/connection`,
-			{ connectionId }
-		);
-		if (!result.ok) {
-			feedback.failed(result);
-			return;
-		}
-		feedback.done(
-			`User group ${group.displayName} handed over to ${connection}.`
-		);
-		assignForm.resetFields();
-		await changed();
-	}
-
-	const managedNotice = (group: GroupView) =>
-		group.provisionedBy
-			? `Managed by ${connectionName(group.provisionedBy)} — change this group in the directory`
-			: null;
-
-	function openMembers(group: GroupView) {
-		setAdding([]);
-		setMembers([]);
-		setMembersOf(group);
-		void fetchMembers(group, 1);
 	}
 
 	function rowActions(group: GroupView): RowAction[] {
-		if (!can.edit) return [];
-		const notice = managedNotice(group);
-		const items: RowAction[] = [
+		const notice = group.provisionedBy
+			? `Kept by ${connectionName(group.provisionedBy)} — change this group in the directory`
+			: null;
+		return [
 			{
-				key: 'rename',
-				label: 'Rename…',
+				key: 'open',
+				label: 'Open',
 				group: 'edit',
-				blocked: notice,
-				onClick: () => {
-					nameForm.setFieldsValue({ displayName: group.displayName });
-					setRenaming(group);
-				}
-			}
+				onClick: () => void navigate(userGroupHref(bucketId, group.id))
+			},
+			...(can.edit
+				? [
+						{
+							key: 'rename',
+							label: 'Rename…',
+							group: 'edit' as const,
+							blocked: notice,
+							onClick: () => setRenaming(group)
+						},
+						{
+							key: 'delete',
+							label: 'Delete…',
+							group: 'danger' as const,
+							blocked: notice,
+							onClick: () =>
+								void deleteGroup(group).then((done) => {
+									if (done) void changed();
+								})
+						}
+					]
+				: [])
 		];
-		if (!group.provisionedBy && connections.length > 0) {
-			items.push({
-				key: 'assign',
-				label: 'Hand over to connection…',
-				group: 'handover',
-				onClick: () => {
-					assignForm.resetFields();
-					setAssigning(group);
-				}
-			});
-		}
-		items.push({
-			key: 'delete',
-			label: 'Delete',
-			group: 'danger',
-			blocked: notice,
-			onClick: () => void onDelete(group)
-		});
-		return items;
 	}
 
 	const createButton = can.edit ? (
@@ -323,14 +161,19 @@ export function BucketGroupsPanel({
 		</Button>
 	) : null;
 
-	const membersEditable =
-		membersOf !== null && !membersOf.provisionedBy && can.manageUsers;
+	const shown = groups.filter((g) =>
+		keptBy === undefined
+			? true
+			: keptBy === 'console'
+				? !g.provisionedBy
+				: g.provisionedBy === keptBy
+	);
 
 	return (
 		<>
 			<Space
 				style={{
-					marginTop: 24,
+					marginTop: 8,
 					marginBottom: 12,
 					justifyContent: 'space-between',
 					width: '100%'
@@ -342,7 +185,26 @@ export function BucketGroupsPanel({
 				>
 					User groups
 				</Typography.Title>
-				{createButton}
+				<Space>
+					{connections.length > 0 && (
+						<Select
+							aria-label="Kept by"
+							allowClear
+							placeholder="Kept by"
+							style={{ width: 220 }}
+							value={keptBy}
+							onChange={(v: string | undefined) => setKeptBy(v)}
+							options={[
+								{ label: 'Administrators', value: 'console' },
+								...connections.map((c) => ({
+									label: c.displayName,
+									value: c.id
+								}))
+							]}
+						/>
+					)}
+					{createButton}
+				</Space>
 			</Space>
 			{loadError !== null ? (
 				<LoadFailed
@@ -356,13 +218,19 @@ export function BucketGroupsPanel({
 				<Table<GroupView>
 					rowKey="id"
 					loading={loading}
-					dataSource={groups}
+					dataSource={shown}
 					pagination={false}
 					locale={{
-						emptyText: (
+						emptyText: loading ? (
+							' '
+						) : (
 							<EmptyState
-								purpose="No user groups in this bucket yet. A group's name reaches relying parties in the groups claim of each member's tokens."
-								create={createButton}
+								purpose={
+									keptBy
+										? 'No group is kept by this.'
+										: "No user groups in this bucket yet. A group's name reaches applications in the groups claim of each member's tokens."
+								}
+								create={keptBy ? undefined : createButton}
 							/>
 						)
 					}}
@@ -371,20 +239,18 @@ export function BucketGroupsPanel({
 							title: 'Name',
 							dataIndex: 'displayName',
 							render: (displayName: string, group: GroupView) => (
-								<Typography.Link onClick={() => openMembers(group)}>
+								<Link href={userGroupHref(bucketId, group.id)}>
 									{displayName}
-								</Typography.Link>
+								</Link>
 							)
 						},
 						{ title: 'Members', dataIndex: 'memberCount' },
 						{
-							title: 'Managed by',
+							title: 'Kept by',
 							dataIndex: 'provisionedBy',
 							render: (provisionedBy: string | undefined) =>
 								provisionedBy ? (
-									<Tag color="purple">
-										Managed by {connectionName(provisionedBy)}
-									</Tag>
+									<Tag color="purple">{connectionName(provisionedBy)}</Tag>
 								) : (
 									<Typography.Text type="secondary">
 										administrators
@@ -405,142 +271,34 @@ export function BucketGroupsPanel({
 			)}
 
 			<Modal
-				title={renaming ? 'Rename user group' : 'New user group'}
-				open={createOpen || renaming !== null}
-				onCancel={() => {
-					setCreateOpen(false);
-					setRenaming(null);
-				}}
+				title="New user group"
+				open={createOpen}
+				onCancel={() => setCreateOpen(false)}
 				onOk={() => nameForm.submit()}
-				okText={renaming ? 'Rename' : 'Create user group'}
+				okText="Create user group"
 				destroyOnHidden
 			>
 				<Form<{ displayName: string }>
 					form={nameForm}
 					layout="vertical"
-					onFinish={renaming ? onRename : onCreate}
-					scrollToFirstError
+					onFinish={(v) => void onCreate(v)}
 				>
 					<Form.Item
 						name="displayName"
 						label="Name"
-						tooltip="Unique in this bucket in any letter case. Relying parties receive it in the groups claim, so renaming changes what they see in each member's next token."
-						rules={[{ required: true, whitespace: true, max: 256 }]}
+						extra="Applications receive this name in the groups claim of each member's tokens."
+						rules={[{ required: true, whitespace: true }]}
 					>
-						<Input />
+						<Input autoComplete="off" />
 					</Form.Item>
 				</Form>
 			</Modal>
-
-			<Modal
-				title={membersOf ? `Members of ${membersOf.displayName}` : 'Members'}
-				open={membersOf !== null}
-				onCancel={() => setMembersOf(null)}
-				footer={null}
-				width={720}
-				destroyOnHidden
-			>
-				{membersEditable && (
-					<Space.Compact style={{ width: '100%', marginBottom: 12 }}>
-						<UserSearchSelect
-							bucketId={bucketId}
-							placeholder="Add users — type the start of an email"
-							value={adding}
-							onChange={setAdding}
-						/>
-						<Button
-							type="primary"
-							disabled={adding.length === 0}
-							onClick={() => void onAddMembers()}
-						>
-							Add
-						</Button>
-					</Space.Compact>
-				)}
-				<Table<MemberView>
-					rowKey="id"
-					loading={membersLoading}
-					dataSource={members}
-					locale={{
-						emptyText: (
-							<EmptyState purpose="Nobody is in this user group yet." />
-						)
-					}}
-					pagination={{
-						current: memberPage,
-						pageSize: PAGE,
-						total: memberTotal,
-						onChange: (page) => membersOf && void fetchMembers(membersOf, page)
-					}}
-					columns={[
-						{ title: 'Email', dataIndex: 'email' },
-						{ title: 'Username', dataIndex: 'userName' },
-						{
-							title: '',
-							render: (_: unknown, member: MemberView) => {
-								if (!membersEditable) return null;
-								const name = member.email ?? member.userName ?? member.id;
-								/*
-								 * Asked in place rather than in a dialog of its own: this table is already
-								 * inside one, and a second modal over it is the stacking the console avoids.
-								 */
-								return (
-									<RowActions
-										name={name}
-										inline={
-											<Popconfirm
-												title={REMOVE_MEMBER.title(name)}
-												okText={REMOVE_MEMBER.okText}
-												onConfirm={() => onRemoveMember(member)}
-											>
-												<Button size="small">Remove</Button>
-											</Popconfirm>
-										}
-										items={[]}
-									/>
-								);
-							}
-						}
-					]}
-				/>
-			</Modal>
-
-			<Modal
-				title={
-					assigning
-						? `Hand ${assigning.displayName} over to a connection`
-						: 'Hand over to a connection'
-				}
-				open={assigning !== null}
-				onCancel={() => setAssigning(null)}
-				onOk={() => assignForm.submit()}
-				okText="Continue"
-				destroyOnHidden
-			>
-				<Typography.Paragraph>
-					The directory takes this group over: from then on only it can rename
-					the group or change its members. Every member must already be a user
-					the directory manages.
-				</Typography.Paragraph>
-				<Form<{ connectionId: string }>
-					form={assignForm}
-					layout="vertical"
-					onFinish={onAssign}
-				>
-					<Form.Item
-						name="connectionId"
-						label="Connection"
-						rules={[{ required: true }]}
-					>
-						<Select
-							options={connections.map((c) => ({
-								label: c.displayName,
-								value: c.id
-							}))}
-						/>
-					</Form.Item>
-				</Form>
-			</Modal>
+			<RenameGroupModal
+				bucketId={bucketId}
+				group={renaming}
+				onClose={() => setRenaming(null)}
+				onRenamed={() => void changed()}
+			/>
 		</>
 	);
 }

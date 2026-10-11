@@ -71,7 +71,7 @@ type GuidanceBucket = Pick<UserBucket, '_id' | 'slug' | 'federation'>;
  * page, with nothing on this server to connect it to the slug that caused it. The only moment the warning
  * is useful is the moment the address is copied.
  */
-function stabilityOf(bucket: GuidanceBucket): CallbackStability {
+export function stabilityOf(bucket: GuidanceBucket): CallbackStability {
 	if (isServedAtTheRoot(bucket._id)) return 'stable';
 	return bucket.slug ? 'stable' : 'provisional';
 }

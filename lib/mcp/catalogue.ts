@@ -466,6 +466,19 @@ const catalogue = [
 			'The upstream identity providers configured on a bucket. Never returns a provider client secret.'
 	},
 	{
+		tool: 'federation_provider_get',
+		method: 'GET',
+		path: '/admin/api/buckets/:id/federation/:providerId',
+		action: null,
+		consequence: 'read',
+		superAdminOnly: false,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id', 'providerId'],
+		summary:
+			"One upstream identity provider of a bucket, with what it takes to run it: `callbackUri` (the redirect URI to register at the provider) and `callbackStability` (`provisional` while the bucket's address may still change), `recognised` (the catalogue entry it matches, or null), `logoutSignals` (whether the provider can send Global Token Revocation and back-channel logout at all — never for GitHub), `capabilities` (whether this instance accepts each), `boundConnection` (the SCIM provisioning connection bound to it, or null), `linkedUsers` (how many of the bucket's users are linked to it — the people a disable or delete affects), `recommendedCorrelation` (the claim and SCIM attribute a provisioning connection should match on) and `warnings`. Never returns its client secret."
+	},
+	{
 		tool: 'bucket_group_list',
 		method: 'GET',
 		path: '/admin/api/buckets/:id/groups',
@@ -528,7 +541,20 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'connectionId'],
 		summary:
-			'One SCIM provisioning connection: everything a directory administrator needs to configure it, and which credentials it holds. Never returns a secret or a static token.'
+			'One SCIM provisioning connection: everything a directory administrator needs to configure it, which credentials it holds, which kinds of credential this instance would issue it now (`availableCredentialKinds`), and how many users and groups it manages. Never returns a secret or a static token.'
+	},
+	{
+		tool: 'provisioning_hold_get',
+		method: 'GET',
+		path: '/admin/api/buckets/:id/provisioning-connections/:connectionId/hold',
+		action: null,
+		consequence: 'read',
+		superAdminOnly: false,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id', 'connectionId'],
+		summary:
+			"Whom a SCIM provisioning connection held by its mass-deprovisioning guard has been refused the deactivation or deletion of: `{held: false}`, or `{held: true, since, count, refused, total}` where each refused row names the user (`userId`, `email`, `userName`), the last refused `operation`, `firstAt`, `lastAt` and `attempts`, most recent first, at most 1,000 rows. Releasing the hold (provisioning_connection_release) lets the directory's retries of exactly these go through — read this first."
 	},
 	{
 		/*
@@ -1545,7 +1571,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'gid'],
 		summary:
-			'Hand a group administrators keep to a SCIM provisioning connection, so the directory adopts it instead of failing to create one of the same name. Refused while any member is someone the connection does not manage. Afterwards only the directory can change it.'
+			'Hand a group administrators keep to a SCIM provisioning connection, so the directory adopts it instead of failing to create one of the same name. Called with only `connectionId`, it changes nothing and answers a conflict carrying the preview: `consequences`, `expect` (`connectionId`, `managed` and `foreign` member counts) and `blockers` (up to 20 members the connection does not manage, by `id` and `email`). Apply it by calling again with `confirm: true` and that `expect`; a stale `expect` is answered with the fresh preview. Refused while any member is someone the connection does not manage. Afterwards only the directory can change it.'
 	},
 
 	/* ---------------------------------------------------- writes: keys (5) */

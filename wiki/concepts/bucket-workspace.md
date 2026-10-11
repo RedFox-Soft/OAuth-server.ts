@@ -15,13 +15,16 @@ User groups, Sign-in, Identity providers, Provisioning, Signing keys, Activity, 
 bare `/admin/buckets/:id` being the Overview (`lib/admin/ui/frame/routes.ts`). The administrators' bucket
 lives on the Administrators page since spec 083, and sign-in policy is the Sign-in tab, not a dialog
 ([[bucket-sign-in-policy]]). The Users tab and each person's page are
-[[bucket-users-workspace]] (spec 082).
+[[bucket-users-workspace]] (spec 082). Since spec 084, User groups, Identity providers and Provisioning list
+and create only; each group, provider and connection has a page of its own
+([[provider-connection-group-pages]]).
 
 ## The Overview reads, it never edits
 
 `lib/admin/ui/pages/BucketOverview.tsx` shows what the bucket read and the summary already say:
 
-- **Needs attention**, most urgent first: a provisioning connection holding a mass deprovisioning; a host no
+- **Needs attention**, most urgent first: a provisioning connection holding a mass deprovisioning (its button
+  opens the held connection's page since spec 084); a host no
   request has reached; email verification required while the server cannot send mail; an authenticator
   required while password sign-in is off; a bucket owned by the System group (super administrators only); a
   bucket no project uses; a bucket with no address of its own. Each item links to where it is fixed. With

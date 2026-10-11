@@ -168,6 +168,16 @@ export class UserStore implements UserStoreInstance {
 		return linked;
 	}
 
+	async countLinkedTo(providerId: string): Promise<number> {
+		let count = 0;
+		for (const user of this.users.values()) {
+			if (user.federated?.some((link) => link.providerId === providerId)) {
+				count += 1;
+			}
+		}
+		return count;
+	}
+
 	async tally(options?: EndUserTallyOptions): Promise<EndUserTally> {
 		const enabled = new Set(options?.enabledProviderIds ?? []);
 		const counted: EndUserTally = {

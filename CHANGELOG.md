@@ -41,6 +41,15 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Changed
 
+- **Identity providers, provisioning connections and user groups each have a page** (spec 084). Connecting a
+  provider or a directory is a side-panel wizard that cannot finish without choosing who a first sign-in may
+  create, or what happens when the directory removes many people at once; a provider page asks before a save that
+  lets more people in, and secrets are shown once, in place, with an acknowledgement. While a connection is held,
+  each removal it refuses is recorded per person, read with `provisioning_hold_get` and cleared by the release
+  (whose audit entry keeps the count); the hold email links to the connection's page. New: one provider's read
+  (`federation_provider_get`: callback, logout signals, bound connection, linked people), and the connection read
+  adds `managedGroups` and `availableCredentialKinds`. Handing a group to a directory now answers 409 with a
+  preview naming the members it does not manage and applies only with `confirm: true` and the same counts.
 - **Tightening a bucket's sign-in is previewed with counts before it applies** (spec 083). Turning passwords
   off, requiring verification or an authenticator, or opening sign-up on the default or administrators' bucket
   now answers 409 with what it does to whom (`consequences`, `expect`) and applies only when repeated with

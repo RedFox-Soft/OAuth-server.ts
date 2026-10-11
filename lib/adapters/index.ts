@@ -6,6 +6,7 @@ import {
 	ProjectStore as MemoryProjectStore,
 	ProtectedResourceStore as MemoryProtectedResourceStore,
 	ProvisioningConnectionStore as MemoryProvisioningConnectionStore,
+	ProvisioningRefusalStore as MemoryProvisioningRefusalStore,
 	BucketGroupStore as MemoryBucketGroupStore,
 	ContainerOwnershipStore as MemoryContainerOwnershipStore,
 	ActivityStore as MemoryActivityStore,
@@ -45,6 +46,8 @@ import type {
 	ProtectedResourceStoreConstructor,
 	ProvisioningConnectionStoreConstructor,
 	ProvisioningConnectionStoreInstance,
+	ProvisioningRefusalStoreConstructor,
+	ProvisioningRefusalStoreInstance,
 	BucketGroupStoreConstructor,
 	BucketGroupStoreInstance,
 	ContainerOwnershipStoreConstructor,
@@ -82,6 +85,8 @@ let ProtectedResourceStoreClass: ProtectedResourceStoreConstructor =
 	MemoryProtectedResourceStore;
 let ProvisioningConnectionStoreClass: ProvisioningConnectionStoreConstructor =
 	MemoryProvisioningConnectionStore;
+let ProvisioningRefusalStoreClass: ProvisioningRefusalStoreConstructor =
+	MemoryProvisioningRefusalStore;
 let BucketGroupStoreClass: BucketGroupStoreConstructor = MemoryBucketGroupStore;
 let BucketKeysStoreClass: BucketKeysStoreConstructor = MemoryBucketKeysStore;
 let ContainerOwnershipStoreClass: ContainerOwnershipStoreConstructor =
@@ -123,6 +128,7 @@ if (backend === 'postgres') {
 	ProjectStoreClass = postgres.ProjectStore;
 	ProtectedResourceStoreClass = postgres.ProtectedResourceStore;
 	ProvisioningConnectionStoreClass = postgres.ProvisioningConnectionStore;
+	ProvisioningRefusalStoreClass = postgres.ProvisioningRefusalStore;
 	BucketGroupStoreClass = postgres.BucketGroupStore;
 	ContainerOwnershipStoreClass = postgres.ContainerOwnershipStore;
 	ActivityStoreClass = postgres.ActivityStore;
@@ -157,6 +163,7 @@ if (backend === 'mongodb') {
 	ProjectStoreClass = mongodb.ProjectStore;
 	ProtectedResourceStoreClass = mongodb.ProtectedResourceStore;
 	ProvisioningConnectionStoreClass = mongodb.ProvisioningConnectionStore;
+	ProvisioningRefusalStoreClass = mongodb.ProvisioningRefusalStore;
 	BucketGroupStoreClass = mongodb.BucketGroupStore;
 	ContainerOwnershipStoreClass = mongodb.ContainerOwnershipStore;
 	ActivityStoreClass = mongodb.ActivityStore;
@@ -386,6 +393,17 @@ export function getProvisioningConnectionStore(): ProvisioningConnectionStoreIns
 			new ProvisioningConnectionStoreClass();
 	}
 	return provisioningConnectionStoreSingleton;
+}
+
+/*
+ * The removals a held connection was refused (specs/084 R2). Written by a held SCIM request, read by the
+ * console's hold panel, cleared by release.
+ */
+let provisioningRefusalStoreSingleton: ProvisioningRefusalStoreInstance | null =
+	null;
+export function getProvisioningRefusalStore(): ProvisioningRefusalStoreInstance {
+	provisioningRefusalStoreSingleton ??= new ProvisioningRefusalStoreClass();
+	return provisioningRefusalStoreSingleton;
 }
 
 let bucketGroupStoreSingleton: BucketGroupStoreInstance | null = null;

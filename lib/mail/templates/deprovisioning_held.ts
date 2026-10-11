@@ -2,9 +2,10 @@
 // administrators about something it did rather than something they asked for, in the same plain,
 // inline-styled, table-free shape as the other templates, because it has to render in a mail client.
 //
-// Names the connection, the bucket, when and after how many deprovisionings, and where to go. Nothing about
-// the people the directory tried to deprovision: a mail is forwarded and kept, and who was about to lose
-// access is for the console, behind the administrator's sign-in.
+// Names the connection, the bucket, when and after how many deprovisionings, and where to go: the held
+// connection's own page, which lists whom the hold has refused. Nothing about those people here: a mail is
+// forwarded and kept, and who was about to lose access is for the console, behind the administrator's
+// sign-in.
 
 interface DeprovisioningHeldParams {
 	connectionName: string;
@@ -42,15 +43,15 @@ export function deprovisioningHeldEmail(params: DeprovisioningHeldParams): {
 		`<h2 style="font-size: 20px;">Provisioning connection held</h2>`,
 		`<p>The provisioning connection <strong>${safeConnection}</strong> of the user bucket <strong>${safeBucket}</strong> reached its limit of ${count} deprovisioning${plural} and was held at ${escapeHtml(when)}.</p>`,
 		`<p>${escapeHtml(consequence)}</p>`,
-		`<p>Check the directory for a mistaken rule before releasing the hold.</p>`,
+		`<p>Check the directory for a mistaken rule, and see whom the hold has refused, before releasing it.</p>`,
 		`<p style="text-align: center; margin: 28px 0;">`,
-		`<a href="${safeUrl}" style="background: #1677ff; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 6px; display: inline-block;">Open the admin console</a>`,
+		`<a href="${safeUrl}" style="background: #1677ff; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 6px; display: inline-block;">Review the held connection</a>`,
 		`</p>`,
 		`<p style="font-size: 12px; color: #8c8c8c;">Or paste this link into your browser:<br/>${safeUrl}</p>`,
 		`</div>`
 	].join('');
 
-	const text = `${what}\n\n${consequence}\n\nCheck the directory for a mistaken rule before releasing the hold:\n${consoleUrl}`;
+	const text = `${what}\n\n${consequence}\n\nCheck the directory for a mistaken rule, and see whom the hold has refused, before releasing it:\n${consoleUrl}`;
 
 	return {
 		subject: `Provisioning connection "${connectionName}" held`,

@@ -35,8 +35,11 @@ if (!THROWAWAY.test(database)) {
 }
 
 /* After the guard, for the reason verify_postgres.ts gives: importing the adapters connects. */
-const { getBucketStore, getProvisioningConnectionStore } =
-	await import('../lib/adapters/index.js');
+const {
+	getBucketStore,
+	getProvisioningConnectionStore,
+	getProvisioningRefusalStore
+} = await import('../lib/adapters/index.js');
 const { admitDeprovisioning } =
 	await import('../lib/provisioning/deprovision_guard.js');
 const { ScimError } = await import('../lib/scim/errors.js');
@@ -110,7 +113,12 @@ const bucket = await getBucketStore().create({
 	ownerGroupId: `verify-group-${stamp}`
 });
 const claims = await Promise.allSettled(
-	Array.from({ length: 100 }, () => admitDeprovisioning(bucket, guarded))
+	Array.from({ length: 100 }, (_, i) =>
+		admitDeprovisioning(bucket, guarded, {
+			userId: `verify-user-${i}`,
+			operation: 'delete'
+		})
+	)
 );
 const admitted = claims.filter((c) => c.status === 'fulfilled').length;
 const held = claims.filter(
@@ -133,7 +141,14 @@ check(
 	'the connection is left held',
 	(await store.find(guarded._id))?.hold !== undefined
 );
+const recorded = await getProvisioningRefusalStore().list(guarded._id, 0, 0);
+check(
+	'every refused deprovisioning is recorded against the person it named (specs/084)',
+	recorded.total === 90,
+	`${recorded.total} recorded`
+);
 
+await getProvisioningRefusalStore().destroyByBucket(bucketId);
 await store.destroyByBucket(bucketId);
 await getBucketStore().destroy(bucketId);
 

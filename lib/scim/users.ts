@@ -302,7 +302,10 @@ async function applyDesired(
 		 */
 		async () => {
 			if (input.active === false) {
-				await admitDeprovisioning(context.bucket, context.connection);
+				await admitDeprovisioning(context.bucket, context.connection, {
+					userId: user._id,
+					operation: 'deactivate'
+				});
 			}
 			await recordConnectionAudit(
 				context.connection._id,
@@ -352,7 +355,10 @@ export async function deleteUser(
 		user._id,
 		/* Counted here for the reason the update's `record` counts: after every refusal, before any write. */
 		async () => {
-			await admitDeprovisioning(context.bucket, context.connection);
+			await admitDeprovisioning(context.bucket, context.connection, {
+				userId: user._id,
+				operation: 'delete'
+			});
 			await recordConnectionAudit(
 				context.connection._id,
 				'enduser.delete',
