@@ -164,7 +164,15 @@ const REDIRECTS: readonly {
 	},
 	{
 		pattern: ['buckets', ':bucket'],
-		to: (p) => `/admin/buckets/${encodeURIComponent(p.bucket ?? '')}/users`
+		/*
+		 * The administrators' bucket has no Users area — its accounts are on the Administrators page — so its
+		 * bare address opens its identity providers (specs/080). Its id is written out rather than imported,
+		 * so this module keeps importing nothing but types.
+		 */
+		to: (p) =>
+			p.bucket === 'admin'
+				? '/admin/buckets/admin/identity-providers'
+				: `/admin/buckets/${encodeURIComponent(p.bucket ?? '')}/users`
 	}
 ];
 

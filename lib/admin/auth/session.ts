@@ -18,6 +18,8 @@ import type { AdminSession } from '../../adapters/types.js';
 export async function createAdminSession(data: {
 	userId: string;
 	bucketId: string;
+	/* The provider the sign-in came through, or null for a password sign-in. */
+	signedInWith?: string | null;
 	tokens: AdminSession['tokens'];
 }) {
 	const personal = await getGroupStore().findPersonalFor(data.userId);

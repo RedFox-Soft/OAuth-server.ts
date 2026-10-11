@@ -151,11 +151,45 @@ const TABS: { key: BucketTab; segment: string; label: string }[] = [
 	{ key: 'activity', segment: 'activity', label: 'Activity' }
 ];
 
+/*
+ * The console's own bucket shows two areas (specs/080): its identity providers, which a super administrator
+ * configures as on any bucket, and its activity. Its accounts are on the Administrators page, and its groups,
+ * provisioning and keys stay closed to it.
+ */
+const CONSOLE_TABS: readonly BucketTab[] = ['providers', 'activity'];
+
 /* Whether the caller may open an area at all; the others are open to anyone who can read the bucket. */
-function tabAllowed(key: BucketTab, can: BucketCan): boolean {
+function tabAllowed(
+	key: BucketTab,
+	can: BucketCan,
+	reserved: boolean
+): boolean {
+	if (reserved) {
+		if (key === 'providers') return can.read;
+		if (key === 'activity') return can.readActivity;
+		return false;
+	}
 	if (key === 'keys') return can.edit;
 	if (key === 'activity') return can.readActivity;
 	return true;
+}
+
+/* What turning password sign-in to the console off would do (GET /admin/api/admins/sign-in-readiness). */
+interface SignInReadiness {
+	passwordLogin: boolean;
+	signedInWith: string | null;
+	callerLinkedAt: string[];
+	reachableSuperAdministrators: number;
+	unlinkedAdministrators: { id: string; email: string }[];
+}
+
+/* Whether this session could turn password sign-in off: it came in through a provider the caller is linked at. */
+function mayTurnPasswordsOff(readiness: SignInReadiness | null): boolean {
+	return (
+		readiness !== null &&
+		readiness.signedInWith !== null &&
+		readiness.callerLinkedAt.includes(readiness.signedInWith)
+	);
 }
 
 export function BucketDetail({
@@ -201,6 +235,7 @@ export function BucketDetail({
 	 * A toast that fades in eight seconds is gone before either has been read.
 	 */
 	const [settingsRefusal, setSettingsRefusal] = useState<string | null>(null);
+	const [readiness, setReadiness] = useState<SignInReadiness | null>(null);
 	const [settingsAdvisory, setSettingsAdvisory] = useState<string | null>(null);
 	const [saving, setSaving] = useState(false);
 	const [createForm] = Form.useForm<CreateValues>();
@@ -550,6 +585,15 @@ export function BucketDetail({
 	function openSettings() {
 		setSettingsRefusal(null);
 		setSettingsAdvisory(null);
+		setReadiness(null);
+		if (bucket?.reserved === 'administrators') {
+			void request<SignInReadiness>(
+				'GET',
+				'/admin/api/admins/sign-in-readiness'
+			).then((answer) => {
+				if (answer.ok) setReadiness(answer.data);
+			});
+		}
 		bucketForm.setFieldsValue({
 			passwordLogin: bucket?.passwordLogin !== false,
 			name: bucket?.name ?? '',
@@ -561,7 +605,39 @@ export function BucketDetail({
 		setBucketEditOpen(true);
 	}
 
+	/*
+	 * Turning password sign-in to the console off is the one change here that can shut people out, so it is
+	 * asked about with who it shuts out (C2). The server refuses it unless this session came in through a
+	 * linked provider; asking first only spares the operator a refusal they could have read.
+	 *
+	 * The settings dialog steps aside while the question is asked, so no dialog opens on top of another, and
+	 * comes back with what was typed either way: to be saved, or to be changed.
+	 */
+	async function confirmPasswordsOff(values: BucketSettingsValues) {
+		const turningOff =
+			bucket?.reserved === 'administrators' &&
+			bucket.passwordLogin &&
+			values.passwordLogin === false;
+		if (!turningOff) return true;
+		const unlinked = readiness?.unlinkedAdministrators ?? [];
+		setBucketEditOpen(false);
+		const agreed = await confirm('bucket.passwordSignIn.off', {
+			target: 'the console',
+			consequences: [
+				`${String(readiness?.reachableSuperAdministrators ?? 0)} super administrator(s) can still sign in through an identity provider.`,
+				unlinked.length === 0
+					? 'Every administrator has a linked identity.'
+					: `These administrators have no linked identity and will not be able to sign in: ${unlinked.map((a) => a.email).join(', ')}.`,
+				'No new identity can be linked while password sign-in is off.'
+			]
+		});
+		setBucketEditOpen(true);
+		bucketForm.setFieldsValue(values);
+		return agreed;
+	}
+
 	async function onSaveBucket(values: BucketSettingsValues) {
+		if (!(await confirmPasswordsOff(values))) return;
 		setSaving(true);
 		try {
 			setSettingsAdvisory(null);
@@ -738,20 +814,23 @@ export function BucketDetail({
 		);
 	}
 
-	const shownTab = reserved ? 'activity' : tab;
-	const tabs = reserved
-		? []
-		: TABS.filter((t) => tabAllowed(t.key, can)).map((t) => ({
-				key: t.key,
-				label: t.label,
-				href: bucketHref(bucketId, t.segment)
-			}));
+	// The console's bucket has no Users area; its bare address lands on its providers.
+	const shownTab = reserved && tab === 'users' ? 'providers' : tab;
+	const tabs = TABS.filter(
+		(t) =>
+			(!reserved || CONSOLE_TABS.includes(t.key)) &&
+			tabAllowed(t.key, can, reserved)
+	).map((t) => ({
+		key: t.key,
+		label: t.label,
+		href: bucketHref(bucketId, t.segment)
+	}));
 	/*
 	 * An area the caller may not open is said to be so at its own address, rather than quietly showing
 	 * Users there: the address keeps meaning what it says, and a link someone shared explains itself.
 	 */
 	const shownTabLabel = TABS.find((t) => t.key === shownTab)?.label ?? '';
-	const tabRefused = bucket !== null && !tabAllowed(shownTab, can);
+	const tabRefused = bucket !== null && !tabAllowed(shownTab, can, reserved);
 
 	const newUserButton = (
 		<Button
@@ -792,7 +871,7 @@ export function BucketDetail({
 					showIcon
 					style={{ marginBottom: 16 }}
 					title="This is the console's own bucket"
-					description="Its accounts are the administrators of this instance and are managed on the Administrators page. Here you set how they sign in: whether people may register, whether they must verify their address, and whether an authenticator app is required. Turning email verification on needs mail delivery configured and your own address verified."
+					description="Its accounts are the administrators of this instance and are managed on the Administrators page. Here you set how they sign in: with a password, through your organisation's identity provider, or both; whether people may register; whether they must verify their address; and whether an authenticator app is required for password sign-in. Whoever an identity provider here vouches for can be linked to an administrator account, so only super administrators configure them."
 				/>
 			)}
 			{reserved && !selfVerified && can.editSettings && (
@@ -973,11 +1052,12 @@ export function BucketDetail({
 					onChanged={() => void load()}
 				/>
 			)}
-			{bucket && !reserved && shownTab === 'providers' && (
+			{bucket && !tabRefused && shownTab === 'providers' && (
 				<FederationPanel
 					key={federationKey}
 					bucketId={bucketId}
-					canEdit={can.edit}
+					consoleBucket={reserved}
+					canEdit={reserved ? can.editSettings : can.edit}
 					onChanged={() => {
 						void load();
 						setProvisioningKey((k) => k + 1);
@@ -1255,19 +1335,34 @@ export function BucketDetail({
 						<Input />
 					</Form.Item>
 					{/*
-					 * Not offered on the console's own bucket: it holds no provider, so turning password sign-in
-					 * off is always refused there, and a switch that can only fail is not a control.
+					 * On the console's own bucket the switch is disabled, with the reason beside it, until this
+					 * session has come in through a linked provider: the server would refuse anything else.
 					 */}
-					{!reserved && (
-						<Form.Item
-							name="passwordLogin"
-							label="Accept email and password sign-in"
-							valuePropName="checked"
-							tooltip="Turn off for a bucket whose users must come from an identity provider. Refused unless this bucket has an enabled provider."
-						>
-							<Switch />
-						</Form.Item>
-					)}
+					<Form.Item
+						name="passwordLogin"
+						label="Accept email and password sign-in"
+						valuePropName="checked"
+						tooltip={
+							reserved
+								? "Turn off so administrators sign in only through this bucket's identity providers. Allowed only from a session that signed in through one of them, and never while it would leave no super administrator a way in."
+								: 'Turn off for a bucket whose users must come from an identity provider. Refused unless this bucket has an enabled provider.'
+						}
+						extra={
+							reserved &&
+							bucket.passwordLogin &&
+							!mayTurnPasswordsOff(readiness)
+								? "To turn it off, sign in through one of this bucket's identity providers first."
+								: undefined
+						}
+					>
+						<Switch
+							disabled={
+								reserved &&
+								bucket.passwordLogin &&
+								!mayTurnPasswordsOff(readiness)
+							}
+						/>
+					</Form.Item>
 					{/*
 					 * Disabled rather than hidden when password sign-in is off: the setting still exists and
 					 * still means something, and hiding it would leave an operator wondering where it went.
@@ -1277,7 +1372,7 @@ export function BucketDetail({
 						name="totpRequired"
 						label="Require an authenticator app"
 						valuePropName="checked"
-						tooltip="Password sign-ins to this bucket must also carry a 6-digit code. Anyone without an authenticator sets one up at their next sign-in. Federated sign-in is not affected — the identity provider owns that policy."
+						tooltip="Password sign-ins to this bucket must also carry a 6-digit code. Anyone without an authenticator sets one up at their next sign-in. Applies to password sign-in only: provider sign-ins use the provider's own second factor."
 					>
 						<Switch disabled={bucket?.passwordLogin === false} />
 					</Form.Item>

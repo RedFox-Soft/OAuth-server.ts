@@ -13,6 +13,13 @@ import {
 	resolveAdmin
 } from '../auth/rbac.js';
 import { ADMIN_BUCKET_ID } from '../consts.js';
+import {
+	assertConsoleStaysReachable,
+	loadReachabilityState,
+	reachableSuperAdministrators,
+	reachableThroughProvider
+} from '../federation/reachability.js';
+import { canSignIn } from '../../end_users/can_sign_in.js';
 import { CreateAdminBody, UpdateAdminBody } from './schema.js';
 import { presentUser } from '../users-end/routes.js';
 import { recordAdminAudit } from '../audit/record.js';
@@ -69,6 +76,33 @@ async function assertNotLastSuperAdmin(targetId: string): Promise<void> {
 			'cannot remove the last active super administrator'
 		);
 	}
+	const state = await loadReachabilityState();
+	assertConsoleStaysReachable(
+		{
+			...state,
+			superAdministrators: state.superAdministrators.filter(
+				(user) => user._id !== targetId
+			)
+		},
+		'Removing this super administrator'
+	);
+}
+
+/* A new address can fall outside every provider's admitted domains as surely as a removal can. */
+async function assertAddressKeepsConsoleReachable(
+	targetId: string,
+	email: string
+): Promise<void> {
+	const state = await loadReachabilityState();
+	assertConsoleStaysReachable(
+		{
+			...state,
+			superAdministrators: state.superAdministrators.map((user) =>
+				user._id === targetId ? { ...user, email } : user
+			)
+		},
+		'Changing this address'
+	);
 }
 
 export const adminUserRoutes = new Elysia({ name: 'admin-users' })
@@ -87,6 +121,32 @@ export const adminUserRoutes = new Elysia({ name: 'admin-users' })
 			...presentUser(u),
 			superAdmin: supers.has(u._id)
 		}));
+	})
+	/*
+	 * What turning password sign-in off would do to the console (specs/080): how this session signed in,
+	 * where the caller is linked, how many super administrators could still get in, and who could not.
+	 * Read before the change so the console can say it, not after.
+	 */
+	.get('/admin/api/admins/sign-in-readiness', async ({ admin }) => {
+		const ctx = assertAuth(admin);
+		assertSuperAdmin(ctx);
+		const state = await loadReachabilityState();
+		const accounts = await store().list();
+		const caller = accounts.find((u) => u._id === ctx.userId);
+		return {
+			passwordLogin: state.passwordLogin,
+			signedInWith: ctx.signedInWith,
+			callerLinkedAt: (caller?.federated ?? [])
+				.map((link) => link.providerId)
+				.filter((id) => state.providers.some((p) => p.id === id && p.enabled)),
+			reachableSuperAdministrators: reachableSuperAdministrators(state).length,
+			unlinkedAdministrators: accounts
+				.filter(
+					(user) =>
+						canSignIn(user) && !reachableThroughProvider(user, state.providers)
+				)
+				.map((user) => ({ id: user._id, email: user.email }))
+		};
 	})
 	.post(
 		'/admin/api/admins',
@@ -124,6 +184,7 @@ export const adminUserRoutes = new Elysia({ name: 'admin-users' })
 			}
 			if (body.email !== undefined) {
 				await assertAddressChangeable(ctx.userId, params.id, body.email);
+				await assertAddressKeepsConsoleReachable(params.id, body.email);
 			}
 			// After every guard: an entry for a request a guard refused would record a change that never
 			// happened.

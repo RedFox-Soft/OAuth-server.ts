@@ -18,6 +18,7 @@ export class AdminSessionStore implements AdminSessionStoreInstance {
 		userId: string;
 		bucketId: string;
 		activeGroupId: string;
+		signedInWith?: string | null;
 		tokens: AdminSession['tokens'];
 		ttlSeconds: number;
 		absoluteTtlSeconds: number;
@@ -28,6 +29,7 @@ export class AdminSessionStore implements AdminSessionStoreInstance {
 			userId: data.userId,
 			bucketId: data.bucketId,
 			activeGroupId: data.activeGroupId,
+			signedInWith: data.signedInWith ?? null,
 			tokens: data.tokens,
 			createdAt: now,
 			expiresAt: new Date(now.getTime() + data.ttlSeconds * 1000),

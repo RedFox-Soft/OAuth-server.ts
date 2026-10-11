@@ -4,6 +4,8 @@ import {
 } from '@modelcontextprotocol/server';
 
 import {
+	isHighCall,
+	mayBeHigh,
 	mcpCatalogue,
 	pathArgName,
 	withheldConsoleOperations,
@@ -78,7 +80,7 @@ export function inputSchemaFor(tool: McpTool): Record<string, unknown> {
 	 * High-consequence tools take the confirmation as an ordinary optional argument. Declared here rather
 	 * than assumed, so an agent reading the schema can see how to confirm without being told separately.
 	 */
-	if (tool.consequence === 'high') {
+	if (mayBeHigh(tool)) {
 		properties[CONFIRMATION_ARG] = {
 			type: 'string',
 			description:
@@ -123,6 +125,10 @@ function describe(tool: McpTool): string {
 	if (tool.consequence === 'high') {
 		parts.push(
 			'High-consequence: called without a confirmationToken it changes nothing and returns a description of what it would do, plus a token to confirm that exact operation.'
+		);
+	} else if (tool.highWhen) {
+		parts.push(
+			'High-consequence for some targets (named above): there, called without a confirmationToken it changes nothing and returns a description of what it would do, plus a token to confirm that exact operation.'
 		);
 	}
 	return parts.join(' ');
@@ -283,7 +289,7 @@ export function buildMcpServer(ctx: McpRequestContext): McpServer {
 
 				const presented = args[CONFIRMATION_ARG];
 
-				if (tool.consequence === 'high') {
+				if (isHighCall(tool, args)) {
 					/*
 					 * `principalId` is the administrator and `viaClientId` is the agent. Both are required,
 					 * and neither may fall back to a placeholder: conflating them would let one operator's

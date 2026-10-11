@@ -37,9 +37,10 @@ Instead, a third loader, `loadBucketForSettings` (`access.ts:60`), admits the bu
 - Every response marks it `reserved: 'administrators'` (`routes.ts:248`), so the console and an agent
   learn what it is from what they were sent.
 
-Deleting it, moving it, re-addressing it, keys, federation and provisioning stay refused. Each of those
-already had its own reason, and the refusal message now says the operation is not available for this
-bucket.
+Deleting it, moving it, re-addressing it, keys and provisioning stay refused. Each of those already had
+its own reason, and the refusal message now says the operation is not available for this bucket. Its
+identity providers are admitted since spec 080 through `loadBucketForProviders`, which has the same
+super-administrator-only rule as `loadBucketForSettings`; see [[console-federation]].
 
 ## The guards
 
@@ -48,7 +49,7 @@ before the audit entry, so a refused change records nothing.
 
 | Setting | Guard |
 |---|---|
-| `passwordLogin: false` | Refused by the existing `assertSomeWayToSignIn`, as for any bucket with no enabled provider. This bucket has none, and federation stays closed to it, so this is always refused today. |
+| `passwordLogin: false` | Since spec 080: refused unless the acting session signed in through an enabled provider of this bucket where the actor is linked (an agent never qualifies), and unless some active super administrator stays reachable through a provider ([[console-federation]]). `assertSomeWayToSignIn` still applies on top. |
 | `emailVerificationRequired: true` | Refused while mail delivery is not configured (`mailDeliveryConfigured`, `lib/mail/mailer.ts:39`, the same test `deliver()` applies). Also refused while the **acting** administrator's own address is unverified, so the requirement can never refuse the person who set it. |
 | `registrationOpen`, `verificationMethod`, `totpRequired`, `name` | No guard. Opening registration while verification is off answers with an advisory (`adminBucketAdvisory`, `admin_bucket.ts:45`), and an agent reads the same sentence the console shows. |
 
@@ -96,17 +97,12 @@ two flags come from the same bucket read the page already makes, using the same 
 use (`lib/interactions/loginOptions.ts:64-65`). Reset eligibility is one predicate shared by the page,
 the request and the link (`selfServiceResetAllowed`, `lib/password_reset/eligibility.ts:19`).
 
-## Not here: federation into the console
+## Federation into the console
 
-Letting administrators sign in through an upstream identity provider is a separate feature (079). It
-carries its own security decisions:
-- whoever controls the upstream provider controls console access;
-- an account created at a first federated sign-in needs a personal group and must obey the sign-up
-  policy;
-- password sign-in may be turned off only by someone who can still get in through a provider.
-
-Until then federation stays refused for this bucket, which is also why `passwordLogin: false` is always
-refused.
+Letting administrators sign in through an upstream identity provider was kept out of this feature and
+shipped as spec 080 (this page called it "079" before; 079 became the console frame). Its decisions —
+super administrators only, creation obeying the closed sign-up, a password proof on every link, and
+password sign-in off only for someone who can get back in — are on [[console-federation]].
 
 ## Related
 

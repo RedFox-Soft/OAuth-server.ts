@@ -575,9 +575,14 @@ export const auditedAdminRoutes: readonly AuditedAdminRoute[] = routes;
  * console — exactly the kind of change the trail exists for. Declared here rather than bolted onto the
  * route table so the drift guard, which compares the table against mounted admin routes, keeps meaning
  * what it says.
+ *
+ * Turning password sign-in to the console back on from the server is the other (specs/080): the way back in
+ * when every identity provider of the administrators' bucket fails while passwords are off, run by an operator
+ * with server access, with no administrator signed in to attribute it to.
  */
 const nonRouteActions = [
-	{ action: 'admin.register', targetType: 'AdminUser' }
+	{ action: 'admin.register', targetType: 'AdminUser' },
+	{ action: 'admin.passwordsignin.restore', targetType: 'UserBucket' }
 ] as const satisfies readonly { action: string; targetType: string }[];
 
 export const nonRouteAuditActions: readonly {

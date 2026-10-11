@@ -23,8 +23,21 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   provider's tenant), or deleting a provider and creating another with the same id, let the new upstream's
   users with a matching subject sign in to existing accounts. Changing the issuer or tenant is now refused
   while anyone is linked — add a new provider instead — and deleting a provider removes its links.
+- **Linking an upstream identity to an administrator always asks for their password.** In the console's own
+  bucket a provider trusted for an address could otherwise sign its holder in as that administrator, a super
+  administrator included, once password sign-in was off or the account already held another identity. A locally
+  locked administrator is now also refused at the console's own callback.
 - **A rejected admin request is no longer echoed back.** The admin plane's validation answer (422) carried the
   whole submitted body, a typed password included; it now names the first problem and the field, nothing more.
+
+### Added
+
+- **Administrators can sign in through your organisation's identity provider** (spec 080). Super administrators
+  connect providers to the Administrators bucket; a first sign-in links an existing administrator after a password
+  proof, or creates one — with a personal group, never the super administrator privilege — only while the console
+  takes sign-ups. Password sign-in can be turned off only from a session that came in through a linked provider,
+  and nothing can then leave every super administrator without a way in; `bun run admin:password-sign-in` turns it
+  back on from the server. Agents may change the console's providers only by confirming each change.
 
 ### Changed
 

@@ -48,9 +48,8 @@ export const SUPER_ADMINS_GROUP_SEED = {
 } as const;
 
 /*
- * The reserved administrator bucket. Password login stays on and no providers are accepted: the
- * console is a relying party on this server's own issuer, and a second identity source for operators
- * is a separate decision. Both the bucket PATCH and the provider routes refuse it.
+ * The reserved administrator bucket. Seeded with password sign-in on and no providers; a super
+ * administrator may add providers and, once one of them works for them, turn passwords off (specs/080).
  */
 export const ADMIN_BUCKET_SEED = {
 	_id: ADMIN_BUCKET_ID,

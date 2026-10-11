@@ -115,9 +115,15 @@ function suppliedByChoice(guidance: Guidance, name: string): boolean {
 export function FederationPanel({
 	bucketId,
 	onChanged,
-	canEdit = true
+	canEdit = true,
+	consoleBucket = false
 }: {
 	bucketId: string;
+	/*
+	 * The console's own bucket (specs/080): its providers decide who can sign in to the console, so new ones
+	 * start out admitting existing accounts only and the panel says what linking and creation take there.
+	 */
+	consoleBucket?: boolean;
 	/* The bucket's own settings depend on this list — a lockout refusal is easier to understand if the
 	 * providers shown are current — so the parent is told when it changes. */
 	onChanged?: () => void;
@@ -127,6 +133,15 @@ export function FederationPanel({
 	const base = `/admin/api/buckets/${encodeURIComponent(bucketId)}/federation`;
 	const feedback = useFeedback();
 	const confirm = useConfirm();
+	/*
+	 * On the console's own bucket these acts can shut administrators out. The server refuses the one that
+	 * would leave no super administrator a way in while passwords are off; the question says what remains.
+	 */
+	const consoleConsequences = consoleBucket
+		? [
+				'Administrators who sign in only through it will need their password, or another provider, to reach the console.'
+			]
+		: [];
 	const [rows, setRows] = useState<PresentedProvider[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [loadFailure, setLoadFailure] = useState<string | null>(null);
@@ -262,7 +277,8 @@ export function FederationPanel({
 					target: row.displayName,
 					consequences: [
 						`Nobody can sign in to this bucket with ${row.displayName} until it is enabled again.`,
-						'Accounts and their links to it are kept.'
+						'Accounts and their links to it are kept.',
+						...consoleConsequences
 					]
 				});
 		if (!proceed) return;
@@ -289,7 +305,8 @@ export function FederationPanel({
 				consequences: [
 					`Every account's link to ${row.displayName} is removed with it, so its users can no longer sign in through it.`,
 					'People who signed in only through it keep their accounts, but need another way to sign in.',
-					'Connecting it again later does not restore the links.'
+					'Connecting it again later does not restore the links.',
+					...consoleConsequences
 				]
 			}))
 		) {
@@ -413,6 +430,16 @@ export function FederationPanel({
 				Users of this bucket can sign in through these providers. A provider's
 				client secret is stored but never shown again.
 			</Typography.Paragraph>
+
+			{consoleBucket && (
+				<Alert
+					style={{ marginBottom: 12 }}
+					type="warning"
+					showIcon
+					title="These providers sign administrators in to the console"
+					description="An administrator links their identity once, by also entering their password. A provider creates new administrator accounts only when it is set to and sign-up is open on this bucket; each new account gets a personal group and never the super administrator privilege."
+				/>
+			)}
 
 			{!canEdit && (
 				<Alert
@@ -744,7 +771,7 @@ export function FederationPanel({
 					scrollToFirstError
 					initialValues={{
 						scopes: ['openid', 'email', 'profile'],
-						provisioning: 'jit',
+						provisioning: consoleBucket ? 'existing_only' : 'jit',
 						emailClaim: 'email',
 						acceptsGlobalTokenRevocation: false,
 						acceptsBackChannelLogout: false
@@ -874,6 +901,11 @@ export function FederationPanel({
 					<Form.Item
 						name="provisioning"
 						label="First-time users"
+						extra={
+							consoleBucket
+								? 'Creating accounts also needs sign-up open on this bucket.'
+								: undefined
+						}
 					>
 						<Select
 							options={[

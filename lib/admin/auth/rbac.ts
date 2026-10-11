@@ -52,6 +52,12 @@ export interface AdminContext {
 	 * written before agents existed.
 	 */
 	viaClientId?: string;
+	/*
+	 * The administrators' bucket provider this console session signed in through, or null — a password
+	 * sign-in, or a request with no console session at all (an agent). Read only by the guard on turning
+	 * password sign-in off (specs/080), never by a right: `can` stays independent of the channel.
+	 */
+	signedInWith: string | null;
 }
 
 /*
@@ -263,7 +269,8 @@ async function contextFor(
 	userId: string,
 	bucketId: string,
 	viaClientId?: string,
-	sessionGroupId?: string
+	sessionGroupId?: string,
+	signedInWith: string | null = null
 ): Promise<AdminContext | null> {
 	const user = await getUserStore(bucketId).find(userId);
 	if (!user || !user.active) return null;
@@ -287,7 +294,8 @@ async function contextFor(
 			groups,
 			sessionGroupId
 		),
-		...(viaClientId ? { viaClientId } : {})
+		...(viaClientId ? { viaClientId } : {}),
+		signedInWith
 	};
 }
 
@@ -350,7 +358,8 @@ export const resolveAdmin = new Elysia({ name: 'admin-resolve' }).derive(
 				session.userId,
 				session.bucketId,
 				undefined,
-				session.activeGroupId
+				session.activeGroupId,
+				session.signedInWith ?? null
 			);
 			if (!admin) return { admin: null };
 			await adminSessionStore.touch(sessionId, ADMIN_SESSION_TTL_SECONDS);

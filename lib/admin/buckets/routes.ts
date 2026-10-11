@@ -522,7 +522,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			 */
 			assertSomeWayToSignIn(prospectiveBucket(bucket, body));
 			if (params.id === ADMIN_BUCKET_ID) {
-				await assertAdminBucketChange(ctx, body);
+				await assertAdminBucketChange(ctx, bucket, body);
 			}
 			/*
 			 * Recorded whatever the request changed. This used to fire only for a registration or

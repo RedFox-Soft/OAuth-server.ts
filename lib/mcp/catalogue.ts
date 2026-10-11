@@ -1,4 +1,5 @@
 import type { TSchema } from 'elysia';
+import { ADMIN_BUCKET_ID } from '../admin/consts.js';
 
 import {
 	type AuditAction,
@@ -128,8 +129,46 @@ export interface McpTool {
 	 * collide, so the next such route fails the suite instead of shipping broken.
 	 */
 	readonly pathArgs?: Readonly<Record<string, string>>;
+	/*
+	 * High-consequence for one target only: the call is gated as `high` when the named path parameter (by its
+	 * declared name, `id`, not its argument alias) equals the value. The provider writes use it for the
+	 * administrators' bucket (specs/080): there they decide who can sign in to the console, while on an
+	 * ordinary bucket one confirmation more would buy nothing. Data rather than a predicate, so the catalogue
+	 * still exports as JSON for the documentation. The token already binds the target, so a confirmation for
+	 * one bucket cannot be spent on another.
+	 */
+	readonly highWhen?: { readonly pathParam: string; readonly equals: string };
 	readonly summary: string;
 }
+
+/* The call's path values, keyed by the route's declared parameter names. */
+export function pathValues(
+	tool: McpTool,
+	args: Record<string, unknown>
+): Record<string, string> {
+	return Object.fromEntries(
+		tool.pathParams.map((name) => [name, String(args[pathArgName(tool, name)])])
+	);
+}
+
+/* Whether this call is gated: always for a `high` tool, and for its targets for one with `highWhen`. */
+export function isHighCall(
+	tool: McpTool,
+	args: Record<string, unknown>
+): boolean {
+	return (
+		tool.consequence === 'high' ||
+		(tool.highWhen !== undefined &&
+			pathValues(tool, args)[tool.highWhen.pathParam] === tool.highWhen.equals)
+	);
+}
+
+/* Whether some call of this tool can be gated, so its schema must offer the confirmation. */
+export function mayBeHigh(tool: McpTool): boolean {
+	return tool.consequence === 'high' || tool.highWhen !== undefined;
+}
+
+const onConsoleBucket = { pathParam: 'id', equals: ADMIN_BUCKET_ID } as const;
 
 /* The argument name a path parameter is addressed by, after any alias. */
 export function pathArgName(tool: McpTool, param: string): string {
@@ -254,6 +293,19 @@ const catalogue = [
 		pathParams: [],
 		summary:
 			'The administrator accounts of this instance, each marked when it is a super administrator.'
+	},
+	{
+		tool: 'admin_sign_in_readiness_get',
+		method: 'GET',
+		path: '/admin/api/admins/sign-in-readiness',
+		action: null,
+		consequence: 'read',
+		superAdminOnly: true,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: [],
+		summary:
+			'What turning password sign-in to the console off would do: whether it is on, how many super administrators could still sign in through an identity provider of the Administrators bucket, and which administrators could not. Turning it off is refused to an agent: only a console session that signed in through such a provider may.'
 	},
 	{
 		tool: 'group_list',
@@ -1158,8 +1210,9 @@ const catalogue = [
 		pathParams: ['id'],
 		// The body carries the provider's own `id`, so the bucket needs a different argument name.
 		pathArgs: { id: 'bucketId' },
+		highWhen: onConsoleBucket,
 		summary:
-			'Configure an upstream identity provider on a bucket. Available whether or not federation is switched on, so a provider can be prepared first.'
+			'Configure an upstream identity provider on a bucket. Available whether or not federation is switched on, so a provider can be prepared first. On the Administrators bucket (`admin`) this decides who can sign in to the console: only a super administrator may, and each such change must be confirmed.'
 	},
 	{
 		tool: 'federation_provider_update',
@@ -1171,8 +1224,9 @@ const catalogue = [
 		bodySchema: UpdateProviderBody,
 		querySchema: null,
 		pathParams: ['id', 'providerId'],
+		highWhen: onConsoleBucket,
 		summary:
-			"Change an upstream provider's configuration, or enable/disable it."
+			"Change an upstream provider's configuration, or enable/disable it. On the Administrators bucket (`admin`) this decides who can sign in to the console: only a super administrator may, and each such change must be confirmed."
 	},
 	{
 		tool: 'federation_provider_delete',

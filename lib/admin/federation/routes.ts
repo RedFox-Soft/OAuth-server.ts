@@ -7,7 +7,10 @@ import {
 	adminErrorBody,
 	resolveAdmin
 } from '../auth/rbac.js';
-import { loadBucketForEdit, loadBucketForUsers } from '../buckets/access.js';
+import {
+	loadBucketForProviders,
+	loadBucketForUsers
+} from '../buckets/access.js';
 import { recordAdminAudit } from '../audit/record.js';
 import { CreateProviderBody, UpdateProviderBody } from './schema.js';
 import { guidanceForBucket } from './guidance.js';
@@ -22,9 +25,10 @@ import {
 /*
  * Managing a bucket's upstream providers, and severing an account's link to one.
  *
- * Access and the reserved-admin-bucket refusal are **inherited**, not re-implemented: `loadBucketForEdit`
- * and `loadBucketForUsers` already refuse `ADMIN_BUCKET_ID` with 403 and already apply bucket-manager
- * scoping. Writing an explicit check in each of six handlers would be six chances to forget one.
+ * Access is **inherited** from the loaders, not re-implemented in each handler. The providers use
+ * `loadBucketForProviders`, which admits the administrators' bucket for a super administrator only
+ * (specs/080); the identities use `loadBucketForUsers`, which keeps refusing it — an administrator's links
+ * are not managed from the bucket page.
  *
  * Every mutation is audit-first — after authorization, before the write — with `attributes` naming the
  * fields the request set and never their values, so a `clientSecret` change records the name and nothing
@@ -44,7 +48,7 @@ export const federationAdminRoutes = new Elysia({ name: 'admin-federation' })
 	})
 	.get('/admin/api/buckets/:id/federation', async ({ admin, params }) => {
 		const ctx = assertAuth(admin);
-		const bucket = await loadBucketForUsers(ctx, params.id);
+		const bucket = await loadBucketForProviders(ctx, params.id, 'read');
 		return presentAll(bucket);
 	})
 	/*
@@ -57,7 +61,7 @@ export const federationAdminRoutes = new Elysia({ name: 'admin-federation' })
 		'/admin/api/buckets/:id/federation/catalogue',
 		async ({ admin, params }) => {
 			const ctx = assertAuth(admin);
-			const bucket = await loadBucketForUsers(ctx, params.id);
+			const bucket = await loadBucketForProviders(ctx, params.id, 'read');
 			return { providers: guidanceForBucket(bucket) };
 		}
 	)
@@ -65,7 +69,7 @@ export const federationAdminRoutes = new Elysia({ name: 'admin-federation' })
 		'/admin/api/buckets/:id/federation',
 		async ({ admin, params, body, set }) => {
 			const ctx = assertAuth(admin);
-			const bucket = await loadBucketForEdit(ctx, params.id);
+			const bucket = await loadBucketForProviders(ctx, params.id, 'edit');
 			/*
 			 * Recorded before the write, and after the validation that can refuse it: an entry for a request a
 			 * 422 rejected would describe a provider that was never configured. The read surface already says
@@ -74,7 +78,7 @@ export const federationAdminRoutes = new Elysia({ name: 'admin-federation' })
 			await recordAdminAudit(ctx, 'federation.provider.create', params.id, {
 				attributes: Object.keys(body)
 			});
-			const created = await createProvider(bucket, body);
+			const created = await createProvider(bucket, ctx, body);
 			set.status = 201;
 			return present(created, bucket);
 		},
@@ -84,12 +88,12 @@ export const federationAdminRoutes = new Elysia({ name: 'admin-federation' })
 		'/admin/api/buckets/:id/federation/:providerId',
 		async ({ admin, params, body }) => {
 			const ctx = assertAuth(admin);
-			const bucket = await loadBucketForEdit(ctx, params.id);
+			const bucket = await loadBucketForProviders(ctx, params.id, 'edit');
 			await recordAdminAudit(ctx, 'federation.provider.update', params.id, {
 				attributes: Object.keys(body)
 			});
 			return present(
-				await updateProvider(bucket, params.providerId, body),
+				await updateProvider(bucket, ctx, params.providerId, body),
 				bucket
 			);
 		},
@@ -99,9 +103,9 @@ export const federationAdminRoutes = new Elysia({ name: 'admin-federation' })
 		'/admin/api/buckets/:id/federation/:providerId',
 		async ({ admin, params }) => {
 			const ctx = assertAuth(admin);
-			const bucket = await loadBucketForEdit(ctx, params.id);
+			const bucket = await loadBucketForProviders(ctx, params.id, 'edit');
 			await recordAdminAudit(ctx, 'federation.provider.delete', params.id);
-			await deleteProvider(bucket, params.providerId);
+			await deleteProvider(bucket, ctx, params.providerId);
 			return { ok: true };
 		}
 	)

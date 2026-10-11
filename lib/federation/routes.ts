@@ -1,4 +1,6 @@
 import { issuingBucket } from '../admin/auth/bucketAddress.js';
+import { registeredAdministrator } from '../admin/administrators.js';
+import { ADMIN_BUCKET_ID } from '../admin/consts.js';
 import { Elysia, t } from 'elysia';
 
 import { getBucketStore } from '../adapters/index.js';
@@ -15,6 +17,7 @@ import {
 	federationInactivePage,
 	federationLinkRefusedPage,
 	federationNoEmailPage,
+	federationNoConsoleAccountPage,
 	federationProvisioningClosedPage,
 	federationRejectedPage,
 	federationUpstreamPage
@@ -212,10 +215,21 @@ async function completeReturn(params: ReturnParams) {
 				case 'provisioning_closed':
 				case 'not_provisioned':
 				case 'link_conflict':
-					return federationProvisioningClosedPage();
+					return bucket._id === ADMIN_BUCKET_ID
+						? federationNoConsoleAccountPage()
+						: federationProvisioningClosedPage();
 				case 'inactive':
 					return federationInactivePage();
 			}
+		}
+
+		/*
+		 * An administrator created at a first sign-in gets what one created by sign-up gets: a personal group
+		 * to land in, and a sign-up entry in the audit trail (specs/080). Never the instance privilege — only
+		 * its own grant routes change that membership.
+		 */
+		if (resolution.provisioned && bucket._id === ADMIN_BUCKET_ID) {
+			await registeredAdministrator(resolution.account);
 		}
 
 		/*

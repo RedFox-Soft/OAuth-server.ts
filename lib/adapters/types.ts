@@ -1795,6 +1795,13 @@ export const AdminSession = t.Object({
 	 * rather than erroring, so a removed member keeps a usable console.
 	 */
 	activeGroupId: t.String(),
+	/*
+	 * The administrators' bucket provider this session signed in through, or null for a password
+	 * sign-in (specs/080). Turning password sign-in off is allowed only from a session that came in
+	 * through a provider, so whoever does it has just proved they can get back in. Absent on sessions
+	 * created before it was recorded, which read as null.
+	 */
+	signedInWith: t.Optional(t.Union([t.String(), t.Null()])),
 	tokens: t.Object({
 		accessToken: t.Optional(t.String()),
 		idToken: t.Optional(t.String()),
@@ -1811,6 +1818,7 @@ export interface AdminSessionStoreInstance {
 		userId: string;
 		bucketId: string;
 		activeGroupId: string;
+		signedInWith?: string | null;
 		tokens: AdminSession['tokens'];
 		ttlSeconds: number;
 		absoluteTtlSeconds: number;

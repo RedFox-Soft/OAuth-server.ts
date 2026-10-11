@@ -14,7 +14,8 @@ const superAdmin: AdminContext = {
 	bucketId: 'admin',
 	// Super administrators owns nothing, so it is not among the memberships; their reach is instance-wide.
 	memberships: [],
-	activeGroupId: ''
+	activeGroupId: '',
+	signedInWith: null
 };
 const projectAdmin: AdminContext = {
 	userId: 'u2',
@@ -22,7 +23,8 @@ const projectAdmin: AdminContext = {
 	superAdmin: false,
 	bucketId: 'admin',
 	memberships: [{ groupId: 'g1', role: 'owner' as const }],
-	activeGroupId: 'g1'
+	activeGroupId: 'g1',
+	signedInWith: null
 };
 const project = (over: Partial<Project>): Project => ({
 	_id: 'p1',

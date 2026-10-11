@@ -2,6 +2,7 @@ import { describe, it, expect } from 'bun:test';
 import { Elysia } from 'elysia';
 
 import {
+	mayBeHigh,
 	mcpCatalogue,
 	excludedConsoleOperations,
 	withheldConsoleOperations,
@@ -210,6 +211,23 @@ describe('MCP tool catalogue', () => {
 			'settings_update',
 			'smtp_settings_update'
 		]);
+	});
+
+	/*
+	 * The other half of the gate: tools that are high only for some targets (`highWhen`). Named for the same
+	 * reason, and each must offer the confirmation argument, or an agent could never complete the call the
+	 * gate asks it to repeat.
+	 */
+	it('names every tool that is high-consequence for some targets, and each offers the confirmation', () => {
+		const sometimes = mcpCatalogue.filter((t) => t.highWhen !== undefined);
+		expect(sometimes.map((t) => t.tool).sort()).toEqual([
+			/* On the Administrators bucket these decide who can sign in to the console (specs/080). */
+			'federation_provider_create',
+			'federation_provider_update'
+		]);
+		for (const tool of sometimes) {
+			expect(mayBeHigh(tool)).toBe(true);
+		}
 	});
 
 	it('gives every write an audit action matching the audit table', () => {

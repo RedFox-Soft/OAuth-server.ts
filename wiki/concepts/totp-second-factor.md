@@ -153,7 +153,9 @@ that does not require one signs in with a password and reports the single-factor
 party that *requires* multi-factor is refused for that person.
 
 Federated sign-in is never gated. The upstream provider owns its own factor policy, mirroring the
-existing split where `passwordLogin` governs password doors and federation is enabled per provider.
+existing split where `passwordLogin` governs password doors and federation is enabled per provider. The
+console's own bucket follows the same rule since it accepts providers (spec 080, owner decision): its
+"require an authenticator" setting says it applies to password sign-in only.
 
 A password reset neither clears nor bypasses an enrolment: a reset proves an address, and the next
 sign-in still asks for a code.

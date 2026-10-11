@@ -37,10 +37,11 @@ async function holds(
 }
 
 /*
- * Every bucket operation except reading and changing its settings stays closed to the administrators'
+ * Every bucket operation except its settings and its identity providers stays closed to the administrators'
  * bucket: its accounts are administrators (managed on their own routes, with personal groups and the
- * instance privilege attached), and federation, provisioning and bucket groups would each reach console
- * access through a door nobody designed for it. Kept inside the two shared loaders deliberately — they
+ * instance privilege attached), and provisioning, bucket groups and the users' identities would each reach
+ * console access through a door nobody designed for it. The providers have their own loader below, with the
+ * guards that door needs (specs/080). Kept inside the two shared loaders deliberately — they
  * guard some forty routes, and opening them would admit all of those at once with nothing behind them.
  */
 function assertNotReserved(id: string): void {
@@ -92,6 +93,20 @@ export async function loadBucketForSettings(
 		throw new AdminError(403, 'no access to this bucket');
 	}
 	return bucket;
+}
+
+/*
+ * Load a bucket for its identity providers (specs/080). The administrators' bucket is admitted for a super
+ * administrator only — whoever configures its providers decides who can sign in to the console — exactly as
+ * its settings are. On every other bucket `read` and `editSettings` answer as `manageUsers` and `edit` do, so
+ * ordinary buckets' providers keep the rights they had.
+ */
+export function loadBucketForProviders(
+	admin: AdminContext,
+	id: string,
+	mode: 'read' | 'edit'
+): Promise<UserBucket> {
+	return loadBucketForSettings(admin, id, mode);
 }
 
 // Load a bucket for mutating the bucket entity itself (strict access).

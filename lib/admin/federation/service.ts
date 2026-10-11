@@ -4,6 +4,11 @@ import {
 	getUserStore
 } from '../../adapters/index.js';
 import { AdminError } from '../auth/rbac.js';
+import { ADMIN_BUCKET_ID } from '../consts.js';
+import {
+	assertConsoleStaysReachable,
+	loadReachabilityState
+} from './reachability.js';
 import {
 	DiscoveryError,
 	discover,
@@ -242,8 +247,51 @@ function required(
 	);
 }
 
+/* Who is changing a provider: enough to decide whether they may touch the console's own bucket. */
+export interface ProviderActor {
+	superAdmin: boolean;
+}
+
+/*
+ * The administrators' bucket's providers decide who can sign in to the console, so only a super
+ * administrator configures them. The routes' loader already refuses everyone else; this is the second
+ * lock, so a future caller that forgets the loader does not open the console (specs/080), as provisioning
+ * and bucket groups keep their own.
+ */
+function assertMayConfigure(bucket: UserBucket, actor: ProviderActor): void {
+	if (bucket._id === ADMIN_BUCKET_ID && !actor.superAdmin) {
+		throw new AdminError(
+			403,
+			"only a super administrator may configure the administrators' bucket's providers"
+		);
+	}
+}
+
+/*
+ * With password sign-in to the console off, a provider change that would leave no super administrator a
+ * way in is refused (lib/admin/federation/reachability.ts). Ordinary buckets have their own, weaker rule:
+ * `assertSomeWayToSignIn` only asks that some door is open.
+ */
+async function assertConsoleKeepsADoor(
+	bucket: UserBucket,
+	federation: FederationProvider[],
+	what: string
+): Promise<void> {
+	if (bucket._id !== ADMIN_BUCKET_ID) return;
+	const state = await loadReachabilityState();
+	assertConsoleStaysReachable(
+		{
+			...state,
+			passwordLogin: bucket.passwordLogin,
+			providers: federation
+		},
+		what
+	);
+}
+
 export async function createProvider(
 	bucket: UserBucket,
+	actor: ProviderActor,
 	body: {
 		catalogueId?: string;
 		id?: string;
@@ -265,6 +313,7 @@ export async function createProvider(
 		acceptsBackChannelLogout?: boolean;
 	}
 ): Promise<FederationProvider> {
+	assertMayConfigure(bucket, actor);
 	const existing = providersOf(bucket);
 	/*
 	 * The entry fills only what the caller left out — every `??` below reads the body first — so narrowing
@@ -326,7 +375,14 @@ export async function createProvider(
 		// that is a judgement about a named provider somebody made deliberately — it never raises the
 		// second, so the guided route cannot leave a bucket more open than the manual one would.
 		emailTrusted: body.emailTrusted ?? entry?.emailTrusted ?? false,
-		provisioning: body.provisioning ?? 'jit',
+		/*
+		 * The console's own bucket defaults to existing accounts only: a provider that creates administrators
+		 * is a decision, and a provider that creates them silently would admit anyone its directory vouches
+		 * for the moment sign-up is opened (specs/080).
+		 */
+		provisioning:
+			body.provisioning ??
+			(bucket._id === ADMIN_BUCKET_ID ? 'existing_only' : 'jit'),
 		allowedEmailDomains: body.allowedEmailDomains ?? [],
 		emailClaim: body.emailClaim ?? entry?.emailClaim ?? 'email',
 		/* Opted into deliberately: it lets a third party end any of this provider's users' sessions here. */
@@ -352,9 +408,11 @@ export async function createProvider(
 
 export async function updateProvider(
 	bucket: UserBucket,
+	actor: ProviderActor,
 	providerId: string,
 	body: Partial<Omit<FederationProvider, 'id'>>
 ): Promise<FederationProvider> {
+	assertMayConfigure(bucket, actor);
 	const current = find(bucket, providerId);
 	if (body.provisioning === 'jit') {
 		await assertNotBound(
@@ -406,6 +464,11 @@ export async function updateProvider(
 		passwordLogin: bucket.passwordLogin,
 		federation
 	});
+	await assertConsoleKeepsADoor(
+		bucket,
+		federation,
+		`Changing identity provider ${providerId}`
+	);
 
 	await getBucketStore().update(bucket._id, { federation });
 	return next;
@@ -436,8 +499,10 @@ async function assertNotBound(
 
 export async function deleteProvider(
 	bucket: UserBucket,
+	actor: ProviderActor,
 	providerId: string
 ): Promise<void> {
+	assertMayConfigure(bucket, actor);
 	find(bucket, providerId);
 	await assertNotBound(bucket, providerId, 'deleted');
 	const federation = providersOf(bucket).filter((p) => p.id !== providerId);
@@ -445,6 +510,11 @@ export async function deleteProvider(
 		passwordLogin: bucket.passwordLogin,
 		federation
 	});
+	await assertConsoleKeepsADoor(
+		bucket,
+		federation,
+		`Deleting identity provider ${providerId}`
+	);
 	/*
 	 * The links go with the provider, and before it. A link names the provider only by id, so links left
 	 * behind would attach to whatever provider is next created under that id — an upstream whose subjects

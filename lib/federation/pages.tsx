@@ -102,6 +102,15 @@ export function federationProvisioningClosedPage(): Response {
 	);
 }
 
+/* The console's own bucket: nobody here creates the account for you, an administrator invites you. */
+export function federationNoConsoleAccountPage(): Response {
+	return terminal(
+		'You have no console account',
+		'Signing in through this provider does not create a console account. Ask an administrator to invite you.',
+		403
+	);
+}
+
 export function federationInactivePage(): Response {
 	return terminal(
 		'This account is not active',

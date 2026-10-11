@@ -63,6 +63,11 @@ export const ACTIONS = {
 	'bucket.create': { class: 'C0' },
 	'bucket.edit': { class: 'C0' },
 	'bucket.move': { class: 'C4' },
+	'bucket.passwordSignIn.off': {
+		class: 'C2',
+		title: () => 'Turn off password sign-in to the console?',
+		okText: 'Turn off password sign-in'
+	},
 	'bucket.delete': { class: 'C3', word: 'delete' },
 
 	'user.create': { class: 'C0' },

@@ -391,19 +391,113 @@ describe('provider management', () => {
 		expect(providersB[0]?.clientId).toBe('client-b');
 	});
 
-	it('refuses provider writes to the reserved admin bucket', async () => {
+	/*
+	 * The administrators' bucket takes providers like any other (specs/080), and only from a super
+	 * administrator: whoever configures them decides who can reach the console.
+	 */
+	it('a super administrator connects, edits, disables and deletes a provider on the Administrators bucket', async () => {
 		const { cookie } = await cookieFor('super');
-		const idp = await idpStub('https://idp-admin-reserved.test');
+		const idp = await idpStub('https://idp-admin-console.test');
+		idp.expectDiscovery();
+		const provider = client.admin.api.buckets({
+			id: ADMIN_BUCKET_ID
+		}).federation;
+
+		const created = await provider.post(
+			body(idp.origin, { id: 'console-sso' }),
+			{ headers: { cookie } }
+		);
+		expect(created.status).toBe(201);
+		const edited = await provider({ providerId: 'console-sso' }).patch(
+			{ displayName: 'Corp SSO' },
+			{ headers: { cookie } }
+		);
+		expect(edited.status).toBe(200);
+		const disabled = await provider({ providerId: 'console-sso' }).patch(
+			{ enabled: false },
+			{ headers: { cookie } }
+		);
+		expect(disabled.status).toBe(200);
+		const deleted = await provider({ providerId: 'console-sso' }).delete(
+			undefined,
+			{ headers: { cookie } }
+		);
+		expect(deleted.status).toBe(200);
+
+		for (const action of [
+			'federation.provider.create',
+			'federation.provider.update',
+			'federation.provider.delete'
+		]) {
+			const { entries } = await adminAuditStore.list({
+				action,
+				targetId: ADMIN_BUCKET_ID
+			});
+			expect({ action, recorded: entries.length > 0 }).toEqual({
+				action,
+				recorded: true
+			});
+		}
+	});
+
+	it('an administrator who is not a super administrator is refused every provider route on the Administrators bucket', async () => {
+		const { cookie } = await cookieFor('plain');
+		const idp = await idpStub('https://idp-admin-console-plain.test');
+		const bucket = client.admin.api.buckets({ id: ADMIN_BUCKET_ID });
+
+		const answers = [
+			(await bucket.federation.get({ headers: { cookie } })).status,
+			(await bucket.federation.catalogue.get({ headers: { cookie } })).status,
+			(
+				await bucket.federation.post(body(idp.origin), {
+					headers: { cookie }
+				})
+			).status,
+			(
+				await bucket
+					.federation({ providerId: 'acme-sso' })
+					.patch({ enabled: false }, { headers: { cookie } })
+			).status,
+			(
+				await bucket
+					.federation({ providerId: 'acme-sso' })
+					.delete(undefined, { headers: { cookie } })
+			).status
+		];
+		expect(answers.every((status) => status === 403 || status === 404)).toBe(
+			true
+		);
+		expect(
+			(await getBucketStore().find(ADMIN_BUCKET_ID))?.federation ?? []
+		).toEqual([]);
+	});
+
+	it('a provider created on the Administrators bucket admits existing accounts only until told otherwise', async () => {
+		const { cookie } = await cookieFor('super');
+		const idp = await idpStub('https://idp-admin-console-default.test');
+		idp.expectDiscovery();
+		const provider = client.admin.api.buckets({
+			id: ADMIN_BUCKET_ID
+		}).federation;
+
+		const created = await provider.post(
+			body(idp.origin, { id: 'console-default' }),
+			{ headers: { cookie } }
+		);
+		expect(answered(created.data).provisioning).toBe('existing_only');
+		await provider({ providerId: 'console-default' }).delete(undefined, {
+			headers: { cookie }
+		});
+	});
+
+	it("the Administrators bucket's users' identities stay out of reach of the bucket routes", async () => {
+		const { cookie, user } = await cookieFor('super');
 
 		const res = await client.admin.api
 			.buckets({ id: ADMIN_BUCKET_ID })
-			.federation.post(body(idp.origin), { headers: { cookie } });
+			.users({ uid: user._id })
+			.identities.get({ headers: { cookie } });
 
-		/*
-		 * Inherited from `loadBucketForEdit`, not written in this handler. Pinned because
-		 * `resolveBucketForClient` maps the reserved console client straight to this bucket, so every /ui
-		 * surface is operator-reachable unless something says otherwise.
-		 */
 		expect(res.status).toBe(403);
 	});
 

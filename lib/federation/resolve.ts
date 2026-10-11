@@ -12,6 +12,8 @@ import { unusablePassword } from '../helpers/unusable_password.js';
 import { canSignIn } from '../end_users/can_sign_in.js';
 import { COPIED_CLAIMS } from './consts.js';
 import type { FederationProvider, PendingLinkIdentity } from './types.js';
+import { domainAllowed } from './domains.js';
+import { ADMIN_BUCKET_ID } from '../admin/consts.js';
 
 /*
  * Turn a verified assertion into a signed-in account, or into a refusal.
@@ -69,19 +71,6 @@ function emailFrom(
 	if (typeof value !== 'string') return undefined;
 	const trimmed = value.trim();
 	return trimmed.length > 0 ? trimmed : undefined;
-}
-
-/*
- * Case-insensitive on the domain part, against entries stored as bare lowercase domains. No subdomain
- * wildcarding: `acme.com` does not admit `eu.acme.com`, and — the case that matters — a suffix comparison
- * would have admitted `acme.com.evil.test`.
- */
-function domainAllowed(email: string, provider: FederationProvider): boolean {
-	if (provider.allowedEmailDomains.length === 0) return true;
-	const at = email.lastIndexOf('@');
-	if (at === -1) return false;
-	const domain = email.slice(at + 1).toLowerCase();
-	return provider.allowedEmailDomains.includes(domain);
 }
 
 /*
@@ -245,8 +234,15 @@ export async function resolveFederatedAccount(input: {
 		 *
 		 * A bucket with no password door is the exception: there is no sign-in to prove the account with,
 		 * and nobody can have registered one there with a password.
+		 *
+		 * The console's own bucket has no exceptions (specs/080): every new link to an administrator needs
+		 * the password proof, whichever provider and whatever the account already holds. There the account
+		 * behind the address may be a super administrator, and without the proof any provider trusted for
+		 * the address — a second one, or any one once passwords are off — would sign its holder in as them.
+		 * With passwords off no new link can be made at all, which the console says before they go off.
 		 */
-		if (bucket.passwordLogin && !existing.federated?.length) {
+		const inConsole = bucket._id === ADMIN_BUCKET_ID;
+		if (inConsole || (bucket.passwordLogin && !existing.federated?.length)) {
 			return {
 				ok: false,
 				reason: 'password_required',
@@ -261,7 +257,14 @@ export async function resolveFederatedAccount(input: {
 			: { ok: false, reason: 'link_not_permitted' };
 	}
 
-	// 5. No account: the provider's own knob decides, not the bucket's password-registration setting.
+	/*
+	 * 5. No account: the provider's own knob decides, not the bucket's password-registration setting — except
+	 * for the console's own bucket, where a closed sign-up closes every way to become an administrator
+	 * (specs/080, research question 9.4).
+	 */
+	if (bucket._id === ADMIN_BUCKET_ID && !bucket.registrationOpen) {
+		return { ok: false, reason: 'provisioning_closed' };
+	}
 	if (provider.provisioning === 'existing_only') {
 		return { ok: false, reason: 'provisioning_closed' };
 	}

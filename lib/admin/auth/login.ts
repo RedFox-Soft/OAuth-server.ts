@@ -20,11 +20,28 @@ import {
 	ADMIN_SESSION_COOKIE
 } from '../consts.js';
 import { safeNext } from './next.js';
+import { canSignIn } from '../../end_users/can_sign_in.js';
 
 const REDIRECT_URI = `${ISSUER}/admin/callback`;
 
 function base64url(buf: Buffer) {
 	return buf.toString('base64url');
+}
+
+/*
+ * Which of the administrators' bucket's providers this sign-in came through, read off the provider session
+ * the authorization just used (specs/080). That session records the upstream of its latest real sign-in and
+ * clears it on a password sign-in (lib/models/session.ts), which is the codebase's one reading of "came in
+ * through a provider" (lib/activity/kinds.ts). A console session re-established silently from it inherits
+ * that answer, which is still a sign-in through that provider in this browser.
+ */
+async function providerSignedInWith(
+	cookie: Record<string, { value: unknown }>
+) {
+	const id = cookie[sessionCookieName(ADMIN_REQUEST_BUCKET)].value;
+	if (typeof id !== 'string' || !id) return null;
+	const session = await Session.tryFind(id);
+	return session?.payload.upstream?.providerId ?? null;
 }
 
 export const adminLogin = new Elysia({ name: 'admin-login' })
@@ -128,13 +145,15 @@ export const adminLogin = new Elysia({ name: 'admin-login' })
 			}
 
 			const user = await getUserStore(ADMIN_BUCKET_ID).find(sub);
-			if (!user || !user.active) {
+			// The same predicate as every sign-in door, so a locally locked administrator is refused here too.
+			if (!user || !canSignIn(user)) {
 				set.status = 403;
 				return { error: 'not_admin', message: 'no admin account' };
 			}
 			const session = await createAdminSession({
 				userId: user._id,
 				bucketId: ADMIN_BUCKET_ID,
+				signedInWith: await providerSignedInWith(cookie),
 				tokens: {
 					accessToken: tokens.access_token,
 					idToken: tokens.id_token,

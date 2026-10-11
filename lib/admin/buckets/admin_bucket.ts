@@ -3,14 +3,21 @@ import type { UserBucket } from '../../adapters/types.js';
 import { mailDeliveryConfigured } from '../../mail/mailer.js';
 import { AdminError, type AdminContext } from '../auth/rbac.js';
 import { ADMIN_BUCKET_ID } from '../consts.js';
+import {
+	assertConsoleStaysReachable,
+	loadReachabilityState
+} from '../federation/reachability.js';
 
 /*
  * The administrators' bucket is configured through the same settings as every bucket; what differs is that
  * a careless setting here shuts the console, and with it the only surface that could undo the setting. Each
  * such setting carries its own guard instead of the blanket refusal this bucket used to get.
  *
- * Turning password sign-in off needs nothing here: `assertSomeWayToSignIn` already refuses it, because this
- * bucket holds no provider and federation stays closed to it.
+ * Turning password sign-in off is allowed only to someone who has just come in through one of this bucket's
+ * providers (specs/080): the console session records the provider it signed in through, and the account must
+ * be linked there. Whoever turns the door off has proven, in that very session, that another one works. And
+ * the result must leave some super administrator a way in (lib/admin/federation/reachability.ts), so passwords
+ * cannot go off while every remaining door leads nowhere. An agent has no console session and never qualifies.
  *
  * Requiring verification is the one that needed a guard of its own. It refuses every unverified
  * administrator at the door, so it may be turned on only when the message can actually be sent, and only by
@@ -19,8 +26,12 @@ import { ADMIN_BUCKET_ID } from '../consts.js';
  */
 export async function assertAdminBucketChange(
 	ctx: AdminContext,
-	patch: { emailVerificationRequired?: boolean }
+	bucket: UserBucket,
+	patch: { emailVerificationRequired?: boolean; passwordLogin?: boolean }
 ): Promise<void> {
+	if (patch.passwordLogin === false && bucket.passwordLogin) {
+		await assertMayTurnPasswordsOff(ctx, bucket);
+	}
 	if (patch.emailVerificationRequired !== true) return;
 	if (!(await mailDeliveryConfigured())) {
 		throw new AdminError(
@@ -49,4 +60,28 @@ export function adminBucketAdvisory(
 		return undefined;
 	}
 	return 'anyone can register an administrator account, and without email verification any address can be claimed';
+}
+
+async function assertMayTurnPasswordsOff(
+	ctx: AdminContext,
+	bucket: UserBucket
+): Promise<void> {
+	const provider = bucket.federation.find(
+		(p) => p.id === ctx.signedInWith && p.enabled
+	);
+	const acting = await getUserStore(ADMIN_BUCKET_ID).find(ctx.userId);
+	const linked = (acting?.federated ?? []).some(
+		(link) => link.providerId === provider?.id
+	);
+	if (!provider || !linked) {
+		throw new AdminError(
+			409,
+			"Sign in through one of this bucket's identity providers first, then turn password sign-in off."
+		);
+	}
+	const state = await loadReachabilityState();
+	assertConsoleStaysReachable(
+		{ ...state, passwordLogin: false },
+		'Turning password sign-in off'
+	);
 }

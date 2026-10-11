@@ -91,8 +91,11 @@ find it. See [[upstream-back-channel-logout]].
    for this address?" for addresses the provider is not allowed to speak for.
 4. **collision** → link only if `emailTrusted && email_verified === true`. Both halves required. And
    immediately only if the account already holds an upstream identity (or the bucket has no password
-   door); an account holding only a password links once its own sign-in completes.
-5. **provisioning** → `jit` creates; `existing_only` refuses.
+   door); an account holding only a password links once its own sign-in completes. In the administrators'
+   bucket every new link waits for the password sign-in, with no exceptions (spec 080, [[console-federation]]).
+5. **provisioning** → `jit` creates; `existing_only` refuses. In the administrators' bucket a closed
+   sign-up (`registrationOpen: false`) refuses first, and a created account gets a personal group and an
+   `admin.register` audit entry; providers there default to `existing_only` (spec 080).
 6. **active**, 7. **verification**, 8. sign in through the same `resume()` a password sign-in uses.
 
 Step 4 is the takeover boundary. `=== true` exactly — a provider that stringifies its booleans does not

@@ -158,36 +158,41 @@ export const statedRightRoutes: readonly StatedRightRoute[] = [
 		body: { connectionId: 'absent' }
 	},
 
+	/*
+	 * A bucket's providers follow its settings rights (specs/080): on an ordinary bucket `read` and
+	 * `editSettings` answer as `manageUsers` and `edit` do, and on the administrators' bucket they admit a
+	 * super administrator alone, because the console's providers decide who can reach the console.
+	 */
 	{
 		on: 'bucket',
-		flag: 'manageUsers',
+		flag: 'read',
 		method: 'GET',
 		path: `${BUCKET}/federation`
 	},
 	{
 		on: 'bucket',
-		flag: 'manageUsers',
+		flag: 'read',
 		method: 'GET',
 		path: `${BUCKET}/federation/catalogue`
 	},
 	/* An issuer over plain http is refused after the right, so no provider is configured. */
 	{
 		on: 'bucket',
-		flag: 'edit',
+		flag: 'editSettings',
 		method: 'POST',
 		path: `${BUCKET}/federation`,
 		body: { clientId: 'probe', issuer: 'http://idp.example.com' }
 	},
 	{
 		on: 'bucket',
-		flag: 'edit',
+		flag: 'editSettings',
 		method: 'PATCH',
 		path: `${BUCKET}/federation/:providerId`,
 		body: {}
 	},
 	{
 		on: 'bucket',
-		flag: 'edit',
+		flag: 'editSettings',
 		method: 'DELETE',
 		path: `${BUCKET}/federation/:providerId`
 	},

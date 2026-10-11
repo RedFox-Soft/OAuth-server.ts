@@ -15,7 +15,10 @@ The administrative control plane authenticates operators by running an OpenID Co
 authorization-code flow **against the very server it administers**. `GET /admin/login` redirects to this
 server's own `/auth`; `GET /admin/callback` exchanges the code over loopback HTTP at `${ISSUER}/token`
 and reads the resulting identity token to learn which operator arrived
-(`lib/admin/auth/login.ts`). Since spec 079 the callback returns to the console address the sign-in
+(`lib/admin/auth/login.ts`). Since spec 080 the callback refuses an account that fails `canSignIn`
+(inactive or locally locked, as at every door) and records on the console session which of the
+administrators' bucket's providers the sign-in came through (`signedInWith`, read from the provider
+session's `upstream`); see [[console-federation]]. Since spec 079 the callback returns to the console address the sign-in
 started from (`next`). The address is validated by `safeNext` both when it is stored and when it is used,
 because it rides in the `admin_oauth` cookie; see [[admin-console-frame]].
 
