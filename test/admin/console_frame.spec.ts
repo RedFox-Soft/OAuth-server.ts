@@ -24,7 +24,7 @@ async function shell(path: string, cookie: string): Promise<string> {
 
 /* The menu entry the rendered console marks as where the operator is. */
 function highlighted(html: string): string | undefined {
-	return /ant-menu-item-selected[^>]*data-menu-id="rc-menu-uuid-[^"]*?-id-([a-z-]+)"/.exec(
+	return /ant-menu-item-selected[^>]*data-menu-id="console-menu-([a-z-]+)"/.exec(
 		html
 	)?.[1];
 }

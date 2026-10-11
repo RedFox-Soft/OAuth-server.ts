@@ -182,7 +182,9 @@ export function Layout() {
 				<div style={{ color: '#fff', padding: 16, fontWeight: 600 }}>
 					OAuth Admin
 				</div>
+				{/* A fixed id: the generated one differs between the server render and the hydrate under test. */}
 				<Menu
+					id="console-menu"
 					theme="dark"
 					mode="inline"
 					selectedKeys={selected}

@@ -72,14 +72,28 @@ export const meRoutes = new Elysia({ name: 'admin-me' })
 							}
 						: {})
 				};
+			// `message` beside the reason code, so a refusal reads like every other admin refusal.
 			case 'rate_limited':
 				set.status = 429;
-				return { sent: false, reason: sent.outcome };
+				return {
+					sent: false,
+					reason: sent.outcome,
+					message:
+						'A message was sent recently. Check your inbox, or try again in a minute.'
+				};
 			case 'mail_not_configured':
 				set.status = 409;
-				return { sent: false, reason: sent.outcome };
+				return {
+					sent: false,
+					reason: sent.outcome,
+					message: 'Mail delivery is not configured, so no message can be sent.'
+				};
 			case 'delivery_failed':
 				set.status = 502;
-				return { sent: false, reason: sent.outcome };
+				return {
+					sent: false,
+					reason: sent.outcome,
+					message: 'The message could not be sent. Try again later.'
+				};
 		}
 	});

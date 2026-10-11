@@ -84,8 +84,12 @@ export const ACTIONS = {
 	},
 	// The lock dialog asks for the reason, which is kept on the record; typing it is the confirmation.
 	'user.lock': { class: 'C1', okText: 'Lock', inline: true },
-	// Re-admits an account someone judged compromised; the dialog shows when and why it was locked.
-	'user.unlock': { class: 'C2', okText: 'Unlock', inline: true },
+	// Re-admits an account someone judged compromised; the question states when and why it was locked.
+	'user.unlock': {
+		class: 'C2',
+		title: (t) => `Unlock ${t}?`,
+		okText: 'Unlock'
+	},
 	'user.signOut': {
 		class: 'C1',
 		title: (t) => `Sign ${t} out everywhere?`,

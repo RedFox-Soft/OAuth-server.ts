@@ -184,7 +184,6 @@ export function BucketDetail({
 	const [identitiesUser, setIdentitiesUser] = useState<EndUser | null>(null);
 	const [assignUser, setAssignUser] = useState<EndUser | null>(null);
 	const [lockUser, setLockUser] = useState<EndUser | null>(null);
-	const [unlockUser, setUnlockUser] = useState<EndUser | null>(null);
 	const [connections, setConnections] = useState<ConnectionView[]>([]);
 	/*
 	 * The two panels below each fetch their own list, and each changes what the other shows: a connection
@@ -524,25 +523,28 @@ export function BucketDetail({
 		}
 	}
 
-	async function onUnlock() {
-		const user = unlockUser;
-		if (!user) return;
-		setSaving(true);
-		try {
-			const result = await request(
-				'POST',
-				`${base}/users/${encodeURIComponent(user._id)}/unlock`
-			);
-			if (!result.ok) {
-				feedback.failed(result);
-				return;
-			}
-			feedback.done(`User ${user.email} unlocked.`);
-			setUnlockUser(null);
-			await load();
-		} finally {
-			setSaving(false);
+	async function onUnlock(user: EndUser) {
+		const lock = user.lockedLocally;
+		const agreed = await confirm('user.unlock', {
+			target: user.email,
+			consequences: [
+				...(lock
+					? [`Locked ${new Date(lock.at).toLocaleString()}: ${lock.reason}`]
+					: []),
+				'They can sign in again at once. Unlock only once whatever the lock was for has been dealt with.'
+			]
+		});
+		if (!agreed) return;
+		const result = await request(
+			'POST',
+			`${base}/users/${encodeURIComponent(user._id)}/unlock`
+		);
+		if (!result.ok) {
+			feedback.failed(result);
+			return;
 		}
+		feedback.done(`User ${user.email} unlocked.`);
+		await load();
 	}
 
 	function openSettings() {
@@ -610,16 +612,7 @@ export function BucketDetail({
 				codeUrl?: string;
 			}>('POST', '/admin/api/me/verification');
 			if (!result.ok) {
-				// This route answers a reason code rather than a message; the status says which one.
-				feedback.refused({
-					error: 'verification_not_sent',
-					message:
-						result.status === 429
-							? 'A message was sent recently. Check your inbox, or try again in a minute.'
-							: result.status === 409
-								? 'Mail delivery is not configured, so no message can be sent.'
-								: 'The message could not be sent. Try again later.'
-				});
+				feedback.refused(result);
 				return;
 			}
 			if (result.data.alreadyVerified) {
@@ -696,7 +689,7 @@ export function BucketDetail({
 						key: 'unlock',
 						label: 'Unlock…',
 						group: 'state',
-						onClick: () => setUnlockUser(row)
+						onClick: () => void onUnlock(row)
 					}
 				: {
 						key: 'lock',
@@ -1219,28 +1212,6 @@ export function BucketDetail({
 						<Input.TextArea rows={3} />
 					</Form.Item>
 				</Form>
-			</Modal>
-
-			<Modal
-				title={unlockUser ? `Unlock ${unlockUser.email}?` : 'Unlock user?'}
-				open={unlockUser !== null}
-				onCancel={() => setUnlockUser(null)}
-				onOk={() => void onUnlock()}
-				okText="Unlock"
-				okButtonProps={{ danger: true }}
-				confirmLoading={saving}
-				destroyOnHidden
-			>
-				{unlockUser?.lockedLocally && (
-					<Typography.Paragraph>
-						Locked {new Date(unlockUser.lockedLocally.at).toLocaleString()}:{' '}
-						{unlockUser.lockedLocally.reason}
-					</Typography.Paragraph>
-				)}
-				<Typography.Paragraph type="secondary">
-					They can sign in again at once. Unlock only once whatever the lock was
-					for has been dealt with.
-				</Typography.Paragraph>
 			</Modal>
 
 			<Modal
