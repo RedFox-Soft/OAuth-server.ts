@@ -75,6 +75,20 @@ export const ACTIONS = {
 
 	'user.create': { class: 'C0' },
 	'user.edit': { class: 'C0' },
+	'user.claims.edit': { class: 'C0' },
+	'user.activate': { class: 'C0' },
+	'user.deactivate': {
+		class: 'C2',
+		title: (t) => `Deactivate ${t}?`,
+		okText: 'Deactivate'
+	},
+	// The old address stops signing them in, and a message sent to it no longer proves the new one.
+	'user.email.change': {
+		class: 'C2',
+		title: (t) => `Change the email of ${t}?`,
+		okText: 'Change email'
+	},
+	'user.verification.resend': { class: 'C0' },
 	'user.password.set': {
 		class: 'C2',
 		title: (t) => `Set a new password for ${t}?`,
@@ -82,6 +96,12 @@ export const ACTIONS = {
 	},
 	'user.identity.remove': {
 		class: 'C1',
+		title: (t) => `Remove the linked identity ${t}?`,
+		okText: 'Remove'
+	},
+	// The same act when the link is the only way they can sign in: afterwards nobody can, until someone helps.
+	'user.identity.removeOnly': {
+		class: 'C2',
 		title: (t) => `Remove the linked identity ${t}?`,
 		okText: 'Remove'
 	},

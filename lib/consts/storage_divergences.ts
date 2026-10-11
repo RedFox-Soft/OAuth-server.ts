@@ -148,7 +148,7 @@ export const STORAGE_DIVERGENCES: readonly StorageDivergence[] = [
 			'the stored value on both backends rather than on a `lower()` expression, which keeps the ' +
 			'normalisation in one place instead of in two datastores’ index definitions.',
 		observable:
-			'nothing. The in-memory store keeps the address as supplied, which is a separate and ' +
-			'previously recorded difference, not this one.'
+			'nothing. The in-memory store lower-cases on write as well — create, update and the test seed — ' +
+			'so the three stores hold the same address, and a prefix search on it agrees across them.'
 	}
 ];

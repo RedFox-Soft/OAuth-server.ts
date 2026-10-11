@@ -97,9 +97,28 @@ export const statedRightRoutes: readonly StatedRightRoute[] = [
 	{
 		on: 'bucket',
 		flag: 'manageUsers',
+		method: 'GET',
+		path: `${BUCKET}/users/:uid`
+	},
+	{
+		on: 'bucket',
+		flag: 'manageUsers',
 		method: 'PATCH',
 		path: `${BUCKET}/users/:uid`,
 		body: {}
+	},
+	{
+		on: 'bucket',
+		flag: 'manageUsers',
+		method: 'POST',
+		path: `${BUCKET}/users/:uid/email`,
+		body: { email: 'moved@x.io' }
+	},
+	{
+		on: 'bucket',
+		flag: 'manageUsers',
+		method: 'POST',
+		path: `${BUCKET}/users/:uid/verification`
 	},
 	{
 		on: 'bucket',

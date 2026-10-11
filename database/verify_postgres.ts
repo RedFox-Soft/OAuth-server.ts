@@ -7,7 +7,8 @@ import { STORAGE_DIVERGENCES } from '../lib/consts/storage_divergences.js';
 import { member } from '../lib/helpers/_/object.js';
 import {
 	verifyAddressChangeForgetsArrivals,
-	verifyEndUserIdentity
+	verifyEndUserIdentity,
+	verifyEndUserSearch
 } from './verify_end_user_identity.js';
 import { verifyProvisioningConnections } from './verify_provisioning_connections.js';
 import { verifyBucketGroups } from './verify_bucket_groups.js';
@@ -86,6 +87,7 @@ const {
 	UserBucketStore,
 	UserStore,
 	close,
+	indexStatements,
 	sql,
 	sweepOnce,
 	tableExists
@@ -576,6 +578,28 @@ check(
 	runtimeArea.name
 );
 
+/*
+ * The users search's prefix indexes (specs/082), built with text_pattern_ops so LIKE 'ada%' can use them
+ * whatever the database collation. Named rather than inferred: an index the planner never chooses is a
+ * sequential scan that only shows under load.
+ */
+const runtimeIndexes = new Set(
+	(
+		await handle<{ indexname: string }[]>`
+			SELECT indexname FROM pg_indexes WHERE tablename = ${runtimeArea.name}
+		`
+	).map((row) => row.indexname)
+);
+const prefixIndexes = indexStatements(runtimeArea).filter((planned) =>
+	planned.statement.includes('text_pattern_ops')
+);
+check(
+	'a bucket created at runtime carries the search prefix indexes',
+	prefixIndexes.length === 2 &&
+		prefixIndexes.every((planned) => runtimeIndexes.has(planned.name)),
+	[...runtimeIndexes].join(', ')
+);
+
 const runtimeUsers = new UserStore(runtime._id);
 const shared = `runtime-${Date.now()}@example.com`;
 const racing = await Promise.allSettled([
@@ -674,6 +698,7 @@ check(
 );
 
 await verifyEndUserIdentity(runtimeUsers, check);
+await verifyEndUserSearch(runtimeUsers, check);
 await verifyAddressChangeForgetsArrivals(buckets, runtime._id, check);
 await verifyProvisioningConnections(new ProvisioningConnectionStore(), check);
 

@@ -27,6 +27,10 @@ export type PageKey =
 	| 'buckets'
 	| 'bucket.overview'
 	| 'bucket.users'
+	| 'bucket.user'
+	| 'bucket.user.signIn'
+	| 'bucket.user.groups'
+	| 'bucket.user.activity'
 	| 'bucket.userGroups'
 	| 'bucket.providers'
 	| 'bucket.provisioning'
@@ -83,6 +87,31 @@ export const ROUTES: readonly RouteSpec[] = [
 		pattern: ['buckets', ':bucket', 'users'],
 		section: 'buckets',
 		area: 'Users'
+	},
+	/* One person in a bucket (specs/082); the bare address is their Profile. */
+	{
+		key: 'bucket.user',
+		pattern: ['buckets', ':bucket', 'users', ':user'],
+		section: 'buckets',
+		area: 'Profile'
+	},
+	{
+		key: 'bucket.user.signIn',
+		pattern: ['buckets', ':bucket', 'users', ':user', 'sign-in-methods'],
+		section: 'buckets',
+		area: 'Sign-in methods'
+	},
+	{
+		key: 'bucket.user.groups',
+		pattern: ['buckets', ':bucket', 'users', ':user', 'groups'],
+		section: 'buckets',
+		area: 'Groups'
+	},
+	{
+		key: 'bucket.user.activity',
+		pattern: ['buckets', ':bucket', 'users', ':user', 'activity'],
+		section: 'buckets',
+		area: 'Activity'
 	},
 	{
 		key: 'bucket.userGroups',
@@ -277,6 +306,16 @@ export function sectionHref(section: Section): string {
 /* A bucket's address; without an area, its Overview. */
 export function bucketHref(bucketId: string, area?: string): string {
 	const base = `/admin/buckets/${encodeURIComponent(bucketId)}`;
+	return area ? `${base}/${area}` : base;
+}
+
+/* One person in a bucket; without an area, their Profile. */
+export function userHref(
+	bucketId: string,
+	userId: string,
+	area?: string
+): string {
+	const base = `${bucketHref(bucketId, 'users')}/${encodeURIComponent(userId)}`;
 	return area ? `${base}/${area}` : base;
 }
 

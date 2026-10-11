@@ -4,7 +4,7 @@ title: 'Testing the MongoDB adapter: two tiers, and why the default suite stays 
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-26
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # Testing the MongoDB adapter: two tiers, and why the default suite stays hermetic
@@ -120,9 +120,10 @@ accessor with an async one both can satisfy.
 
 ## Divergences are declared, not erased
 
-Two are already known. `lib/adapters/mongodb/userStore.ts:31,67` lower-cases an email on insert and
-on lookup; `lib/adapters/memory/userStore.ts:88` stores it as supplied and compares case-insensitively
-at `:44`. And `lib/adapters/mongodb/mongoAdapter.ts:25-29` `$set`s `expiresAt` only when an expiry is
+Two were known. The first is gone: the MongoDB store lower-cases an email on insert and on lookup, and the
+in-memory store, which once stored it as supplied, now lower-cases on create, update and its test `seed()`
+too (corrected 2026-10-11, spec 082 — a prefix search on the stored address needs all three to agree; the
+register's `email-case-normalisation` entry records the convergence). The second stands: `lib/adapters/mongodb/mongoAdapter.ts:25-29` `$set`s `expiresAt` only when an expiry is
 given, so an upsert that drops a lifetime leaves a stale `expiresAt` in place rather than `$unset`ing
 it — a record the TTL monitor still reaps on the old schedule.
 

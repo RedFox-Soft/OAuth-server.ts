@@ -187,6 +187,63 @@ export function storedFilterOf(filter: EndUserFilter): StoredEndUserFilter {
 	return stored;
 }
 
+/*
+ * What one search text is compared with, per arm: the start of the stored email (lower-cased on write, so
+ * lower-cased here), the start of the username key (derived by `userNameKeyOf`, so derived here the same
+ * way), or the id exactly as typed — ids are case-sensitive, so lower-casing that arm would miss them.
+ * One definition for the three stores, so "Ada" finds the same people on each.
+ */
+export interface EndUserSearch {
+	emailPrefix: string;
+	userNameKeyPrefix: string;
+	id: string;
+}
+
+export function searchOf(search: string): EndUserSearch {
+	return {
+		emailPrefix: search.toLowerCase(),
+		userNameKeyPrefix: userNameKeyOf(search),
+		id: search
+	};
+}
+
+/* Whether a record satisfies the console's filters — the in-memory store's reading of them. */
+export function matchesConsoleFilter(
+	user: User,
+	filter: EndUserFilter
+): boolean {
+	if (filter.search !== undefined) {
+		const search = searchOf(filter.search);
+		const found =
+			user.email.startsWith(search.emailPrefix) ||
+			(user.userNameKey?.startsWith(search.userNameKeyPrefix) ?? false) ||
+			user._id === search.id;
+		if (!found) return false;
+	}
+	const isObject = (value: unknown) =>
+		typeof value === 'object' && value !== null;
+	if (filter.active !== undefined && user.active !== filter.active)
+		return false;
+	if (filter.verified !== undefined && user.verified !== filter.verified)
+		return false;
+	if (
+		filter.locked !== undefined &&
+		isObject(user.lockedLocally) !== filter.locked
+	)
+		return false;
+	if (
+		filter.totpEnrolled !== undefined &&
+		isObject(user.totp) !== filter.totpEnrolled
+	)
+		return false;
+	if (
+		filter.local !== undefined &&
+		(typeof user.provisionedBy !== 'string') !== filter.local
+	)
+		return false;
+	return true;
+}
+
 /* Whether a record satisfies every member of a stored filter — the in-memory store's whole query engine. */
 export function matchesStored(
 	user: User,

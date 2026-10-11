@@ -13,7 +13,8 @@ Phase 2 of the console redesign (spec 081). A bucket opens on an **Overview** an
 on a **Settings** tab, with the two acts that break things at its foot. The tabs, in order: Overview, Users,
 User groups, Identity providers, Provisioning, Signing keys, Activity, Settings — each its own address, the
 bare `/admin/buckets/:id` being the Overview (`lib/admin/ui/frame/routes.ts`). The administrators' bucket
-keeps its own pages until it moves home in phase 4.
+keeps its own pages until it moves home in phase 4. The Users tab and each person's page are
+[[bucket-users-workspace]] (spec 082).
 
 ## The Overview reads, it never edits
 

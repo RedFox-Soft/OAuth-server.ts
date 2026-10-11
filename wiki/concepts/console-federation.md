@@ -74,7 +74,7 @@ switch: how this session signed in, how many super administrators could still ge
 ## Agents
 
 An agent may configure the console's providers, as the console does, but each write there is
-high-consequence: `McpTool.highWhen` (`lib/mcp/catalogue.ts:1212,1226`) gates `federation_provider_create`
+high-consequence: `McpTool.highWhen` (`lib/mcp/catalogue.ts:1279,1293`) gates `federation_provider_create`
 and `federation_provider_update` on the administrators' bucket only, through the ordinary two-call
 confirmation. The token binds the target, so a confirmation for this bucket changes nothing on another.
 Ordinary buckets take one call. Turning password sign-in off is refused to an agent by rule 1.

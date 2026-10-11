@@ -261,13 +261,16 @@ describe('storage inventory: per-bucket user areas', () => {
 		 * index added by accident fails here. The second entry resolves an account from the upstream
 		 * identity it holds and is deliberately non-unique — see the comment on the declaration for why
 		 * uniqueness lives in code instead. The last two hold a provisioned username and external
-		 * identifier unique, sparse because most users carry neither.
+		 * identifier unique, sparse because most users carry neither. The two prefix indexes serve the console's
+		 * search on a datastore whose ordinary index cannot answer "starts with" (specs/082).
 		 */
 		expect(indexesFor(area)).toEqual([
 			{ key: { email: 1 }, unique: true },
 			{ key: { 'federated.providerId': 1, 'federated.sub': 1 } },
 			{ key: { userNameKey: 1 }, unique: true, sparse: true },
-			{ key: { externalIdKey: 1 }, unique: true, sparse: true }
+			{ key: { externalIdKey: 1 }, unique: true, sparse: true },
+			{ key: { email: 1 }, prefix: true },
+			{ key: { userNameKey: 1 }, sparse: true, prefix: true }
 		]);
 	});
 

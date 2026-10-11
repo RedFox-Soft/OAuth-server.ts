@@ -41,6 +41,16 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Changed
 
+- **A bucket's users are searched and paged by the server** (spec 082). **Breaking:** the users list
+  (`GET /admin/api/buckets/:id/users`, `bucket_user_list`) now answers `{ users, totalResults }` in email order, a
+  page at a time, with `q` (the start of an email or username in any case, or an exact id) and status,
+  managed-by, verified and authenticator filters. New: reading one person (`bucket_user_get`, with who locked
+  them), changing their address (`bucket_user_email_change`, high-consequence) and mailing them a fresh
+  verification message (`bucket_user_verification_send`); setting a password can sign the person out everywhere,
+  a person can be created without one, and an administrator's create now follows the bucket's verification
+  policy. In the console each person has a page (Profile, Sign-in methods, Groups, Activity), and no save spans
+  more than one request. Fixed on the way: a verification link or code sent to an old address no longer verifies
+  the new one.
 - **A bucket opens on an Overview and keeps its settings in one place** (spec 081). The Overview lists what needs
   attention (a held deprovisioning, an unreached host, verification without mail…), the issuer and discovery
   addresses to copy, sign-in at a glance and the counts; Settings holds the name, the address with its DNS record,

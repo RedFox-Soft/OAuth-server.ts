@@ -133,7 +133,15 @@ export const User = t.Object({
 	 */
 	lockedLocally: t.Optional(
 		t.Object({ at: t.Date(), by: t.String(), reason: t.String() })
-	)
+	),
+	/*
+	 * Whether a password anyone chose opens this account: `true` once one is set at creation or later,
+	 * `false` for an account created without one (an administrator's password-less create, or a federated
+	 * sign-in's just-in-time account). Stored rather than derived because the unusable password such an
+	 * account holds cannot be told from a real hash afterwards (lib/helpers/unusable_password.ts). Absent on
+	 * accounts written before it existed, which a reader treats as "not known" rather than as either answer.
+	 */
+	passwordSet: t.Optional(t.Boolean())
 });
 export type User = Static<typeof User>;
 
@@ -167,7 +175,27 @@ export interface EndUserFilter {
 	email?: string;
 	provisionedBy?: string;
 	externalId?: string;
+	/*
+	 * The console's search box: the start of the email, the start of the username, or the exact id — any
+	 * one of the three. Matched against the stored lower-case keys, so it is case-insensitive without a
+	 * collation, and taken literally: no character in it is a wildcard on any backend.
+	 */
+	search?: string;
+	active?: boolean;
+	/* An administrator's local lock is present (true) or absent (false). */
+	locked?: boolean;
+	verified?: boolean;
+	/* Holds an authenticator enrolment — the same test the tally's `withoutAuthenticator` counts. */
+	totpEnrolled?: boolean;
+	/* No provisioning connection manages the user (true), or one does (false). */
+	local?: boolean;
 }
+
+/*
+ * The order a page is read in. `id` is the stable default SCIM pages by; `email` is what a person scanning
+ * a list reads by. Both are total, because `email` is unique within a bucket.
+ */
+export type EndUserOrder = 'id' | 'email';
 
 /* `startIndex` is 1-based, as SCIM's is; `count` is clamped to MAX_END_USER_PAGE. */
 export interface EndUserPage {
@@ -197,6 +225,7 @@ export type EndUserCreateFields = Partial<
 		| 'claims'
 		/* A directory may create a user already deactivated (RFC 7643 `active: false`). */
 		| 'active'
+		| 'passwordSet'
 	>
 >;
 
@@ -217,6 +246,7 @@ export type EndUserPatch = Partial<
 		| 'provisionedBy'
 		| 'profile'
 		| 'lockedLocally'
+		| 'passwordSet'
 	>
 >;
 
@@ -431,10 +461,15 @@ export interface UserStoreInstance {
 	tally(): Promise<EndUserTally>;
 	list(): Promise<User[]>;
 	/*
-	 * A page of the users matching `filter`, ordered by `_id` so pages do not shift between requests, with
-	 * the total match count. `externalId` without `provisionedBy` is a programming error and throws.
+	 * A page of the users matching `filter`, in a total order (`_id` unless `email` is asked for) so pages do
+	 * not shift between requests, with the total match count. `externalId` without `provisionedBy` is a
+	 * programming error and throws.
 	 */
-	query(filter: EndUserFilter, page: EndUserPage): Promise<EndUserQueryResult>;
+	query(
+		filter: EndUserFilter,
+		page: EndUserPage,
+		order?: EndUserOrder
+	): Promise<EndUserQueryResult>;
 	/* Up to MAX_END_USER_PAGE users by id, in no particular order; unknown ids are simply absent. */
 	findMany(ids: string[]): Promise<User[]>;
 	/*

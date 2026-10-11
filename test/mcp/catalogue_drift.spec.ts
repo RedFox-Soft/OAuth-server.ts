@@ -182,6 +182,8 @@ describe('MCP tool catalogue', () => {
 			/* Makes a local user read-only to every administrator, for good. */
 			'bucket_user_assign_connection',
 			'bucket_user_delete',
+			/* Hands the account's recovery to whoever holds the new mailbox. */
+			'bucket_user_email_change',
 			'bucket_user_password_reset',
 			/* Re-admits an account an administrator locked as compromised. */
 			'bucket_user_unlock',

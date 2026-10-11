@@ -85,7 +85,7 @@ expiresIn?)` (`lib/adapters/types.ts:88`): one atomic write that answers the new
 `returnDocument: 'after'` in MongoDB and `UPDATE … RETURNING` in PostgreSQL.
 
 Every counter now counts the attempt **before** verifying it and admits it only if its own number is
-within the cap (`lib/verification/challenge.ts:183`, `lib/totp/verify.ts`, `recordAttempt` in
+within the cap (`lib/verification/challenge.ts:211`, `lib/totp/verify.ts`, `recordAttempt` in
 `lib/login_throttle/throttle.ts`). A right answer is counted too, harmlessly, because success destroys or
 clears the record. Opening a window is `create`; the TOTP window's record dies with the window, so an
 expired one is simply free, while the login throttle's outlives it for the escalation and rolls with a

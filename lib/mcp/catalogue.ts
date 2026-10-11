@@ -24,10 +24,12 @@ import {
 	UpdateBucketBody
 } from '../admin/buckets/schema.js';
 import {
+	ChangeEndUserEmailBody,
 	CreateEndUserBody,
 	UpdateEndUserBody,
 	ResetPasswordBody,
-	LockEndUserBody
+	LockEndUserBody,
+	UserListQuery
 } from '../admin/users-end/schema.js';
 import {
 	CreateProviderBody,
@@ -432,9 +434,23 @@ const catalogue = [
 		consequence: 'read',
 		superAdminOnly: false,
 		bodySchema: null,
-		querySchema: null,
+		querySchema: UserListQuery,
 		pathParams: ['id'],
-		summary: 'The end-user accounts held in one bucket.'
+		summary:
+			"A page of the end-user accounts held in one bucket, ordered by email, as `{ users, totalResults }`. `q` finds people whose email or username starts with it, in any letter case, or whose id is exactly it. Narrow with `status` (active, deactivated, locked), `managedBy` (`console` for people administrators manage, or a provisioning connection's id), `verified` and `authenticator` (yes or no). Page with `startIndex` (1-based) and `count` (1–200, default 50). Each user carries their groups; `passwordSet` says whether a password anyone chose opens the account, when known. Read one person in full with bucket_user_get."
+	},
+	{
+		tool: 'bucket_user_get',
+		method: 'GET',
+		path: '/admin/api/buckets/:id/users/:uid',
+		action: null,
+		consequence: 'read',
+		superAdminOnly: false,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id', 'uid'],
+		summary:
+			"One end-user of a bucket, as a row of bucket_user_list, and — when they are locked — who locked them: `lockedLocally.byEmail` is that administrator's email, or null when their account no longer exists."
 	},
 	{
 		tool: 'federation_provider_list',
@@ -1099,7 +1115,7 @@ const catalogue = [
 			"Change a bucket's name, or its registration, verification and second-factor settings. Editing the bucket entity needs manager access to the bucket itself, not merely to a project it backs — bucket_get states it as `can.editSettings`. `totpRequired` governs password sign-in only — it is accepted but inert while `passwordLogin` is off, and it never gates a federated sign-in, so it is not a way to secure a bucket that signs in through an upstream provider. A super-administrator configures the administrators' own bucket here too: opening its registration lets anyone register a console account (the answer carries an advisory while verification is off); requiring verification is refused until mail delivery is configured and until the acting administrator has verified their own address; and turning password sign-in off is refused, since it is the console's only way in. Each refusal names its remedy."
 	},
 
-	/* ----------------------------------------------- writes: end-users (7) */
+	/* ----------------------------------------------- writes: end-users (10) */
 	{
 		tool: 'bucket_user_create',
 		method: 'POST',
@@ -1110,7 +1126,39 @@ const catalogue = [
 		bodySchema: CreateEndUserBody,
 		querySchema: null,
 		pathParams: ['id'],
-		summary: 'Create an end-user account in a bucket.'
+		summary:
+			'Create an end-user account in a bucket. Without `password` no password opens it: the person signs in through an identity provider or sets one through password reset. Its address starts verified only when the bucket does not require verification.'
+	},
+	{
+		tool: 'bucket_user_email_change',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/users/:uid/email',
+		action: 'enduser.email.change',
+		/*
+		 * High: the address is where password reset and verification mail go, so changing it hands the
+		 * account's recovery to whoever holds the new mailbox.
+		 */
+		consequence: 'high',
+		superAdminOnly: false,
+		bodySchema: ChangeEndUserEmailBody,
+		querySchema: null,
+		pathParams: ['id', 'uid'],
+		summary:
+			"Change an end-user's login address. The new address is unverified, and a verification message sent to the old one no longer verifies anything; nothing is mailed by the change — send one with bucket_user_verification_send. Refused for a user a provisioning connection manages, and for an address another account in the bucket holds."
+	},
+	{
+		tool: 'bucket_user_verification_send',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/users/:uid/verification',
+		action: 'enduser.verification.send',
+		/* Ordinary: it mails the account's own address, within the cooldown and daily cap every door shares. */
+		consequence: 'ordinary',
+		superAdminOnly: false,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id', 'uid'],
+		summary:
+			"Mail an end-user a fresh verification message in the bucket's current method. The answer never carries the link or code. Refused when the address is already verified, when mail delivery is not configured, and when a message was sent too recently."
 	},
 	{
 		tool: 'bucket_user_update',
@@ -1199,7 +1247,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'uid'],
 		summary:
-			"Replace an end-user's password. The previous one is unrecoverable and the account holder is not asked."
+			"Replace an end-user's password. The previous one is unrecoverable and the account holder is not asked. With `signOut: true` every session and token they hold ends too, and relying parties registered for back-channel logout are told; without it they stay signed in."
 	},
 	{
 		tool: 'bucket_user_delete',

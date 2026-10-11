@@ -271,6 +271,7 @@ export async function consume(
 
 	await getUserStore(challenge.bucketId).update(challenge.accountId, {
 		password: await Bun.password.hash(password),
+		passwordSet: true,
 		verified: true
 	});
 

@@ -3,6 +3,7 @@ import {
 	clampPage,
 	derivedKeysOf,
 	FIELD_OF_KEY,
+	matchesConsoleFilter,
 	matchesStored,
 	storedFilterOf,
 	storedPatchOf,
@@ -14,6 +15,7 @@ import {
 	MAX_END_USER_PAGE,
 	type EndUserCreateFields,
 	type EndUserFilter,
+	type EndUserOrder,
 	type EndUserPage,
 	type EndUserPatch,
 	type EndUserQueryResult,
@@ -44,7 +46,8 @@ export class UserStore implements UserStoreInstance {
 		const now = new Date();
 		const full: User = {
 			_id: user._id,
-			email: user.email ?? `${user._id}@example.com`,
+			/* Lower-cased as create() and every other store write it, so a seeded account is found as a created one is. */
+			email: (user.email ?? `${user._id}@example.com`).toLowerCase(),
 			verified: user.verified ?? true,
 			password: user.password ?? 'seeded',
 			active: user.active ?? true,
@@ -63,7 +66,8 @@ export class UserStore implements UserStoreInstance {
 			externalId: user.externalId,
 			provisionedBy: user.provisionedBy,
 			profile: user.profile,
-			lockedLocally: user.lockedLocally
+			lockedLocally: user.lockedLocally,
+			passwordSet: user.passwordSet
 		};
 		Object.assign(full, derivedKeysOf(full));
 		for (const [field, value] of entriesOf(full)) {
@@ -95,13 +99,19 @@ export class UserStore implements UserStoreInstance {
 
 	async query(
 		filter: EndUserFilter,
-		page: EndUserPage
+		page: EndUserPage,
+		order: EndUserOrder = 'id'
 	): Promise<EndUserQueryResult> {
 		const stored = storedFilterOf(filter);
 		const { offset, limit } = clampPage(page, MAX_END_USER_PAGE);
+		/* Code-unit order, which is the byte order the other two stores sort in for these ASCII-heavy keys. */
+		const key = (user: User) => (order === 'email' ? user.email : user._id);
 		const matches = [...this.users.values()]
-			.filter((user) => matchesStored(user, stored))
-			.sort((a, b) => (a._id < b._id ? -1 : a._id > b._id ? 1 : 0));
+			.filter(
+				(user) =>
+					matchesStored(user, stored) && matchesConsoleFilter(user, filter)
+			)
+			.sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0));
 		return {
 			users: matches.slice(offset, offset + limit),
 			totalResults: matches.length

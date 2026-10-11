@@ -197,9 +197,13 @@ describe('a bucket group kept by an administrator', () => {
 		const res = await admin('GET', `/admin/api/buckets/${b}/users`, cookie);
 
 		const listed = shaped(
-			Type.Array(Type.Object({ _id: Type.String(), groups: Type.Unknown() })),
+			Type.Object({
+				users: Type.Array(
+					Type.Object({ _id: Type.String(), groups: Type.Unknown() })
+				)
+			}),
 			res.body
-		).find((u) => u._id === uid);
+		).users.find((u) => u._id === uid);
 		expect(listed?.groups).toEqual([{ id: gid, displayName: 'Readers' }]);
 	});
 

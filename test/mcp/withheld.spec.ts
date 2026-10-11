@@ -228,9 +228,9 @@ describe('withheld container deletions', () => {
 
 		const users = await rpc(call('bucket_user_list', { id: bucketId }), token);
 		const held = shaped(
-			Type.Array(Type.Unknown()),
+			Type.Object({ users: Type.Array(Type.Unknown()) }),
 			users.result?.structuredContent?.result
-		);
+		).users;
 		expect(held.length).toBe(1);
 	});
 

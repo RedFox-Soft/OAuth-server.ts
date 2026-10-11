@@ -274,7 +274,10 @@ export async function resolveFederatedAccount(input: {
 		await unusablePassword(),
 		// Verified by the same test that governs linking, so a provisioned account is never more trusted
 		// than the assertion that created it.
-		trustedVerified(claims, provider)
+		trustedVerified(claims, provider),
+		undefined,
+		// Said rather than left absent, so an administrator is told no password opens this account.
+		{ passwordSet: false }
 	);
 	const profile = copiedClaims(claims);
 	const completed = await store.update(created._id, {

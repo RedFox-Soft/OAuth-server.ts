@@ -1,5 +1,5 @@
 import {
-	indexesFor,
+	documentIndexesFor,
 	type IndexSpec,
 	type StorageArea
 } from '../lib/consts/storage_inventory.js';
@@ -126,7 +126,7 @@ export function missingIndexes(
 	area: StorageArea,
 	existing: readonly ExistingIndex[]
 ): IndexSpec[] {
-	return indexesFor(area).filter(
+	return documentIndexesFor(area).filter(
 		(declared) => !existing.some((index) => satisfies(declared, index))
 	);
 }
@@ -149,7 +149,7 @@ export function staleExpiryIndexes(
 	area: StorageArea,
 	existing: readonly ExistingIndex[]
 ): string[] {
-	const declared = indexesFor(area);
+	const declared = documentIndexesFor(area);
 
 	return existing
 		.filter(

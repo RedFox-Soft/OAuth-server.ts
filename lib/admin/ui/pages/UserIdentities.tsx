@@ -1,74 +1,80 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Modal, List, Button, Typography, Popconfirm } from 'antd';
+import { Button, Table, Typography } from 'antd';
 import type { FederatedIdentity } from '../../../federation/types.js';
 import { request } from '../frame/request.js';
 import { useFeedback } from '../frame/feedback.js';
-import { ACTIONS } from '../frame/actions.js';
+import { useConfirm } from '../frame/confirm.js';
 import { EmptyState, LoadFailed } from '../frame/states.js';
 
-const REMOVE_IDENTITY = ACTIONS['user.identity.remove'];
-
 /*
- * One account's upstream identities, and the means to sever one.
+ * One account's upstream identities, and the means to sever one — on the person's Sign-in methods tab
+ * (specs/082), where it used to be a dialog off the users table.
  *
- * A modal on the bucket's user table rather than a page of its own: there is no user-detail page in this
- * console, and `BucketDetail` is the per-bucket user surface.
- *
- * `canRemove` is the bucket's `manageUsers`: without it the links are shown and nothing is offered.
+ * Removing a link does not delete the account. When it is the only way the person can sign in — no
+ * password they know of, or password sign-in off for the bucket — the question says so and is asked as a
+ * danger question: after it, nobody can sign in as them until an administrator gives them a way back.
  */
-export function UserIdentities({
+export function UserIdentityLinks({
 	bucketId,
 	user,
-	canRemove = true,
-	onClose
+	canRemove,
+	passwordUsable,
+	onChanged
 }: {
 	bucketId: string;
-	user: { _id: string; email: string } | null;
-	canRemove?: boolean;
-	onClose: () => void;
+	user: { _id: string; email: string };
+	canRemove: boolean;
+	/* Whether a password could still sign them in: set, or unknown, and accepted by the bucket. */
+	passwordUsable: boolean;
+	onChanged?: () => void;
 }) {
 	const feedback = useFeedback();
-	const [links, setLinks] = useState<FederatedIdentity[]>([]);
-	/*
-	 * Whose links `links` holds. The modal stays mounted while the account it shows changes, so this is
-	 * what says the list is still loading on opening — without it, the previous account's links showed
-	 * under the new account's name until the fetch returned.
-	 */
-	const [linksOf, setLinksOf] = useState<string | null>(null);
+	const confirm = useConfirm();
+	const [links, setLinks] = useState<FederatedIdentity[] | null>(null);
 	const [loadError, setLoadError] = useState<string | null>(null);
-	const [reloading, setReloading] = useState(false);
+	const [loading, setLoading] = useState(true);
 
-	const userId = user?._id;
-	const base = userId
-		? `/admin/api/buckets/${encodeURIComponent(bucketId)}/users/${encodeURIComponent(userId)}/identities`
-		: '';
+	const base = `/admin/api/buckets/${encodeURIComponent(bucketId)}/users/${encodeURIComponent(user._id)}/identities`;
 
 	const fetchLinks = useCallback(async () => {
-		if (!userId) return;
 		try {
 			const result = await request<FederatedIdentity[]>('GET', base);
 			if (result.ok) {
 				setLinks(result.data);
 				setLoadError(null);
 			} else {
-				setLinks([]);
 				setLoadError(result.error.message);
 			}
-			setLinksOf(userId);
 		} finally {
-			setReloading(false);
+			setLoading(false);
 		}
-	}, [base, userId]);
+	}, [base]);
 	function load() {
-		setReloading(true);
+		setLoading(true);
 		return fetchLinks();
 	}
-
 	useEffect(() => {
 		void fetchLinks();
 	}, [fetchLinks]);
 
 	async function onRemove(link: FederatedIdentity) {
+		const last = (links?.length ?? 0) <= 1 && !passwordUsable;
+		const consequences = [
+			'The account is kept. Their next sign-in through this provider is treated as a first one and checked against its current settings.'
+		];
+		const agreed = last
+			? await confirm('user.identity.removeOnly', {
+					target: link.providerId,
+					consequences: [
+						`It is the only way ${user.email} can sign in: nobody can, until an administrator sets a password or the provider links them again.`,
+						...consequences
+					]
+				})
+			: await confirm('user.identity.remove', {
+					target: link.providerId,
+					consequences
+				});
+		if (!agreed) return;
 		const result = await request(
 			'DELETE',
 			`${base}/${encodeURIComponent(link.providerId)}`
@@ -79,71 +85,59 @@ export function UserIdentities({
 		}
 		feedback.done(`Linked identity ${link.providerId} removed.`);
 		await load();
+		onChanged?.();
 	}
 
-	const current = userId !== undefined && linksOf === userId;
-	const loading = reloading || (userId !== undefined && !current);
+	if (loadError !== null) {
+		return (
+			<LoadFailed
+				reason={loadError}
+				onRetry={() => void load()}
+			/>
+		);
+	}
 
 	return (
-		<Modal
-			open={Boolean(user)}
-			title={user ? `Linked identities — ${user.email}` : ''}
-			footer={null}
-			onCancel={onClose}
-		>
-			<Typography.Paragraph type="secondary">
-				Removing a link does not delete the account. The next sign-in through
-				that provider is treated as a first-time sign-in and re-checked against
-				the provider's current settings.
-			</Typography.Paragraph>
-			{current && loadError !== null ? (
-				<LoadFailed
-					reason={loadError}
-					onRetry={() => void load()}
-				/>
-			) : (
-				<List<FederatedIdentity>
-					loading={loading}
-					dataSource={current ? links : []}
-					locale={{
-						emptyText: (
-							<EmptyState purpose="This account has no linked identities." />
-						)
-					}}
-					rowKey={(link) => `${link.providerId}:${link.sub}`}
-					renderItem={(link) => (
-						<List.Item
-							actions={
-								canRemove
-									? [
-											/*
-											 * Asked in place: this list is already inside a dialog, and a second
-											 * modal over it is the stacking the console avoids.
-											 */
-											<Popconfirm
-												key="remove"
-												title={REMOVE_IDENTITY.title(link.providerId)}
-												okText={REMOVE_IDENTITY.okText}
-												onConfirm={() => onRemove(link)}
-											>
-												<Button size="small">Remove</Button>
-											</Popconfirm>
-										]
-									: []
-							}
-						>
-							<List.Item.Meta
-								title={link.providerId}
-								description={
-									// The subject is the provider's own identifier for this person; an operator
-									// diagnosing a duplicate account needs to see it.
-									`subject ${link.sub} — linked ${new Date(link.linkedAt).toLocaleString()}`
-								}
-							/>
-						</List.Item>
-					)}
-				/>
-			)}
-		</Modal>
+		<Table<FederatedIdentity>
+			size="small"
+			loading={loading}
+			dataSource={links ?? []}
+			pagination={false}
+			rowKey={(link) => `${link.providerId}:${link.sub}`}
+			locale={{
+				emptyText: (
+					<EmptyState purpose="No linked identities. One is added when they sign in through an identity provider of this bucket." />
+				)
+			}}
+			columns={[
+				{ title: 'Provider', dataIndex: 'providerId' },
+				{
+					// The provider's own identifier for this person; an operator diagnosing a duplicate needs it.
+					title: 'Subject',
+					dataIndex: 'sub',
+					render: (sub: string) => (
+						<Typography.Text copyable>{sub}</Typography.Text>
+					)
+				},
+				{
+					title: 'Linked',
+					dataIndex: 'linkedAt',
+					render: (at: string) => new Date(at).toLocaleString()
+				},
+				{
+					title: '',
+					key: 'remove',
+					render: (_: unknown, link: FederatedIdentity) =>
+						canRemove ? (
+							<Button
+								size="small"
+								onClick={() => void onRemove(link)}
+							>
+								Remove
+							</Button>
+						) : null
+				}
+			]}
+		/>
 	);
 }

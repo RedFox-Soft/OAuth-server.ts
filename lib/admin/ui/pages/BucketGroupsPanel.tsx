@@ -20,6 +20,7 @@ import { ACTIONS } from '../frame/actions.js';
 import { RowActions, type RowAction } from '../frame/RowActions.js';
 import { EmptyState, LoadFailed } from '../frame/states.js';
 import type { BucketCan } from '../frame/can.js';
+import { UserSearchSelect } from './users/UserSearchSelect.js';
 
 /* What `GET …/groups` answers for each group. */
 export interface GroupView {
@@ -34,12 +35,6 @@ interface MemberView {
 	id: string;
 	email: string | null;
 	userName?: string;
-}
-
-/* The bucket's users the member picker offers. */
-export interface PickableUser {
-	_id: string;
-	email: string;
 }
 
 const PAGE = 100;
@@ -58,7 +53,6 @@ const REMOVE_MEMBER = ACTIONS['userGroup.member.remove'];
 export function BucketGroupsPanel({
 	bucketId,
 	can,
-	users,
 	connections,
 	refreshKey,
 	onChanged,
@@ -66,9 +60,8 @@ export function BucketGroupsPanel({
 }: {
 	bucketId: string;
 	can: Pick<BucketCan, 'edit' | 'manageUsers'>;
-	users: PickableUser[];
 	connections: ConnectionView[];
-	refreshKey: number;
+	refreshKey?: number;
 	onChanged: () => void;
 	/* The current list, for the user editor's group picker. */
 	onGroups?: (groups: GroupView[]) => void;
@@ -449,14 +442,11 @@ export function BucketGroupsPanel({
 			>
 				{membersEditable && (
 					<Space.Compact style={{ width: '100%', marginBottom: 12 }}>
-						<Select
-							mode="multiple"
-							style={{ width: '100%' }}
-							placeholder="Add users"
+						<UserSearchSelect
+							bucketId={bucketId}
+							placeholder="Add users — type the start of an email"
 							value={adding}
 							onChange={setAdding}
-							showSearch={{ optionFilterProp: 'label' }}
-							options={users.map((u) => ({ label: u.email, value: u._id }))}
 						/>
 						<Button
 							type="primary"

@@ -1444,7 +1444,9 @@ export const ui = new Elysia()
 				user = await store.create(
 					body.email,
 					await Bun.password.hash(body.password),
-					!verificationRequired
+					!verificationRequired,
+					undefined,
+					{ passwordSet: true }
 				);
 			} catch (err) {
 				/*

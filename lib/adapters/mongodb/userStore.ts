@@ -7,6 +7,7 @@ import { documentOf } from '../documents.js';
 import {
 	clampPage,
 	FIELD_OF_KEY,
+	searchOf,
 	storedFilterOf,
 	storedPatchOf,
 	withCreateFields
@@ -17,6 +18,7 @@ import {
 	User,
 	type EndUserCreateFields,
 	type EndUserFilter,
+	type EndUserOrder,
 	type EndUserPage,
 	type EndUserPatch,
 	type EndUserQueryResult,
@@ -46,6 +48,62 @@ function duplicateFrom(error: unknown): DuplicateEndUserError | null {
 			return new DuplicateEndUserError(FIELD_OF_KEY[key]);
 	}
 	return null;
+}
+
+/*
+ * A text matched literally inside a regular expression. Every character the expression language gives a
+ * meaning is preceded by a backslash, so a search for `a.b` cannot find `axb` and `.*` finds nothing it does
+ * not spell. Built from a character list rather than a regex literal of escapes, which is the one place a
+ * mistake here would be invisible.
+ */
+const BACKSLASH = String.fromCharCode(92);
+
+function literalPattern(text: string): string {
+	/* The escape character itself first, so the backslashes added below are not escaped again. */
+	let escaped = text.split(BACKSLASH).join(BACKSLASH + BACKSLASH);
+	for (const special of '.*+?^$()[]{}|') {
+		escaped = escaped.split(special).join(BACKSLASH + special);
+	}
+	return escaped;
+}
+
+/*
+ * The console's filters as MongoDB clauses, ANDed. The search is an anchored, case-sensitive prefix on the
+ * stored lower-case keys, which is what lets the `email` and `userNameKey` indexes bound the scan; the state
+ * tests are the tally's own (an enrolment or a lock is an object, anything else is none).
+ */
+function consoleClauses(filter: EndUserFilter): Record<string, unknown>[] {
+	const clauses: Record<string, unknown>[] = [];
+	const objectWhen = (wanted: boolean) =>
+		wanted ? { $type: 'object' } : { $not: { $type: 'object' } };
+	if (filter.search !== undefined) {
+		const search = searchOf(filter.search);
+		clauses.push({
+			$or: [
+				{ email: { $regex: `^${literalPattern(search.emailPrefix)}` } },
+				{
+					userNameKey: {
+						$regex: `^${literalPattern(search.userNameKeyPrefix)}`
+					}
+				},
+				{ _id: search.id }
+			]
+		});
+	}
+	if (filter.active !== undefined) clauses.push({ active: filter.active });
+	if (filter.verified !== undefined)
+		clauses.push({ verified: filter.verified });
+	if (filter.locked !== undefined)
+		clauses.push({ lockedLocally: objectWhen(filter.locked) });
+	if (filter.totpEnrolled !== undefined)
+		clauses.push({ totp: objectWhen(filter.totpEnrolled) });
+	if (filter.local !== undefined)
+		clauses.push({
+			provisionedBy: filter.local
+				? { $not: { $type: 'string' } }
+				: { $type: 'string' }
+		});
+	return clauses;
 }
 
 export class UserStore implements UserStoreInstance {
@@ -172,10 +230,18 @@ export class UserStore implements UserStoreInstance {
 
 	async query(
 		filter: EndUserFilter,
-		page: EndUserPage
+		page: EndUserPage,
+		order: EndUserOrder = 'id'
 	): Promise<EndUserQueryResult> {
-		/* Member names come from storedFilterOf, never from the caller, so this object holds no operator. */
-		const stored = storedFilterOf(filter);
+		/*
+		 * Member names come from storedFilterOf and consoleClauses, never from the caller, so this object holds
+		 * no operator a caller chose; a caller's text reaches it only as a value or as an escaped pattern.
+		 */
+		const clauses = consoleClauses(filter);
+		const stored =
+			clauses.length === 0
+				? storedFilterOf(filter)
+				: { $and: [storedFilterOf(filter), ...clauses] };
 		const { offset, limit } = clampPage(page, MAX_END_USER_PAGE);
 		const collection = db.collection<User>(this.collectionName);
 		const [found, totalResults] = await Promise.all([
@@ -183,7 +249,7 @@ export class UserStore implements UserStoreInstance {
 				? Promise.resolve([])
 				: collection
 						.find(stored)
-						.sort({ _id: 1 })
+						.sort(order === 'email' ? { email: 1 } : { _id: 1 })
 						.skip(offset)
 						.limit(limit)
 						.toArray(),

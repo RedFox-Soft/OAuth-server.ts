@@ -108,7 +108,15 @@ export function translateIndex(
 		};
 	}
 
-	const columns = keys.map((key) => jsonPath(column, key));
+	const expressions = keys.map((key) => jsonPath(column, key));
+	/*
+	 * A prefix index names its operator class on every column. The partial predicate below is over the bare
+	 * expressions, which is why the two are kept apart.
+	 */
+	const columns =
+		spec.prefix === true
+			? expressions.map((expression) => `${expression} text_pattern_ops`)
+			: expressions;
 	const unique = spec.unique === true;
 
 	if (spec.expireAfterSeconds !== undefined) {
@@ -134,7 +142,7 @@ export function translateIndex(
 			method: 'btree',
 			columns,
 			unique,
-			where: columns
+			where: expressions
 				.map((expression) => `${expression} IS NOT NULL`)
 				.join(' AND ')
 		};

@@ -8,6 +8,7 @@ import {
 } from '../adapters/types.js';
 import { cascadeForAccount, type CascadeResult } from '../helpers/cascade.js';
 import { emailScopedId } from '../helpers/email_scoped_id.js';
+import { RESERVED_CLAIMS } from '../consts/reserved_claims.js';
 import { unusablePassword } from '../helpers/unusable_password.js';
 import { notifyRelyingParties, revokeAccountAccess } from './revoke_access.js';
 
@@ -29,40 +30,16 @@ export type RecordChange = () => Promise<unknown>;
 
 export class EndUserError extends Error {
 	readonly status: 404 | 409 | 422;
+	/* The input field the refusal is about, when one field is the whole reason — so a form can mark it. */
+	readonly field?: string;
 
-	constructor(status: 404 | 409 | 422, message: string) {
+	constructor(status: 404 | 409 | 422, message: string, field?: string) {
 		super(message);
 		this.name = 'EndUserError';
 		this.status = status;
+		if (field !== undefined) this.field = field;
 	}
 }
-
-/*
- * Names an account's stored claims may not carry. `findAccount` spreads the stored claims last, so the
- * first three would stand in for the account's identity — `sub` also feeds the pairwise derivation —
- * and the rest for what the server itself asserts about a token or a sign-in.
- */
-export const RESERVED_CLAIMS: readonly string[] = [
-	'sub',
-	'email',
-	'email_verified',
-	'iss',
-	'aud',
-	'exp',
-	'iat',
-	'nbf',
-	'jti',
-	'nonce',
-	'azp',
-	'acr',
-	'amr',
-	'auth_time',
-	'sid',
-	'at_hash',
-	'c_hash',
-	/* Always the user's actual bucket groups (lib/addon/account.ts); a stored value would forge authorization. */
-	'groups'
-];
 
 function assertClaimsAssignable(claims: Record<string, unknown> | undefined) {
 	if (!claims) return;
@@ -96,7 +73,7 @@ function assertExternalIdScoped(
 /* The store's uniqueness refusal, in the words the admin API has always used for the email case. */
 function duplicateAsError(error: unknown): never {
 	if (error instanceof DuplicateEndUserError) {
-		throw new EndUserError(409, `${error.field} already exists`);
+		throw new EndUserError(409, `${error.field} already exists`, error.field);
 	}
 	throw error;
 }
@@ -156,7 +133,7 @@ export async function createEndUser(
 
 	const store = getUserStore(bucket._id);
 	if (await store.findByEmail(input.email)) {
-		throw new EndUserError(409, 'email already exists');
+		throw new EndUserError(409, 'email already exists', 'email');
 	}
 	const hash =
 		input.password === undefined
@@ -177,7 +154,8 @@ export async function createEndUser(
 			externalId: input.externalId,
 			profile: input.profile,
 			provisionedBy,
-			active: input.active
+			active: input.active,
+			passwordSet: input.password !== undefined
 		})
 		.catch(duplicateAsError);
 }
@@ -216,6 +194,16 @@ export async function updateEndUser(
 	const user = await existing(bucket._id, id);
 	assertActorMayChange(actor, user);
 	assertExternalIdScoped(input.externalId, user.provisionedBy);
+	/*
+	 * Refused before the record, so a taken address writes no entry: the store's unique index still decides a
+	 * race, but the ordinary case of an address somebody already holds is a refusal, not an audited change.
+	 */
+	if (input.email !== undefined) {
+		const holder = await getUserStore(bucket._id).findByEmail(input.email);
+		if (holder && holder._id !== id) {
+			throw new EndUserError(409, 'email already exists', 'email');
+		}
+	}
 
 	const patch: EndUserPatch = { ...input };
 	if (actor.kind !== 'connection') delete patch.verified;
@@ -248,17 +236,29 @@ export async function updateEndUser(
 	return { user: updated };
 }
 
+/*
+ * Sets a password an administrator chose. With `signOut`, every session, grant and token the account holds
+ * ends in the same request, after the write — what "I think someone else has this password" needs, and the
+ * same sweep "sign out everywhere" runs, so the two cannot differ. Without it, existing sign-ins are kept.
+ */
 export async function resetEndUserPassword(
 	bucket: UserBucket,
 	actor: EndUserActor,
 	id: string,
 	password: string,
-	record: RecordChange
-): Promise<void> {
+	record: RecordChange,
+	options: { signOut?: boolean } = {}
+): Promise<{ revoked?: CascadeResult }> {
 	assertActorMayChange(actor, await existing(bucket._id, id));
 	const hash = await Bun.password.hash(password);
 	await record();
-	await getUserStore(bucket._id).update(id, { password: hash });
+	await getUserStore(bucket._id).update(id, {
+		password: hash,
+		passwordSet: true
+	});
+	return options.signOut === true
+		? { revoked: await revokeAccountAccess(id) }
+		: {};
 }
 
 /*

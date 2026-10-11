@@ -58,7 +58,14 @@ export function indexName(
 	spec: IndexSpec,
 	column: string
 ): string {
-	const suffix = spec.multikey ? 'gin' : spec.unique === true ? 'key' : 'idx';
+	/* `pfx` for a prefix index, so it never shares a name with an ordinary index declared on the same key. */
+	const suffix = spec.multikey
+		? 'gin'
+		: spec.unique === true
+			? 'key'
+			: spec.prefix === true
+				? 'pfx'
+				: 'idx';
 	const fields = (spec.multikey ? [spec.multikey] : Object.keys(spec.key))
 		.map((key) => nameFragment(column, key))
 		.join('_');

@@ -44,6 +44,16 @@ export interface IndexSpec {
 	 * That asymmetry is why this is a declaration and not an implementation detail of one backend.
 	 */
 	readonly multikey?: string;
+	/*
+	 * An index that serves "starts with" on a text key, for a datastore whose ordinary index cannot.
+	 *
+	 * PostgreSQL's default b-tree compares in the database collation, so it cannot bound `LIKE 'ada%'`
+	 * unless the collation is C; built with `text_pattern_ops` it can (lib/adapters/postgres/jsonPath.ts).
+	 * MongoDB needs nothing: an anchored, case-sensitive regular expression is bounded by the ordinary index
+	 * on the same key, which every key declared this way already has — so MongoDB neither creates this one
+	 * nor expects it (`documentIndexesFor`), and a second index on an identical key would be refused there.
+	 */
+	readonly prefix?: true;
 }
 
 /*
@@ -274,7 +284,14 @@ const perBucketArea: StorageArea = {
 		 * records, avoided rather than modelled.
 		 */
 		{ key: { userNameKey: 1 }, unique: true, sparse: true },
-		{ key: { externalIdKey: 1 }, unique: true, sparse: true }
+		{ key: { externalIdKey: 1 }, unique: true, sparse: true },
+		/*
+		 * The console's search: the start of an email or a username, in any letter case, served by an index on
+		 * every backend (specs/082 R1). Case-insensitive for free, as the unique indexes above are, because both
+		 * keys are stored lower-case; the search lower-cases its text the same way.
+		 */
+		{ key: { email: 1 }, prefix: true },
+		{ key: { userNameKey: 1 }, sparse: true, prefix: true }
 	]
 };
 
@@ -848,6 +865,14 @@ export function indexesFor(area: StorageArea): IndexSpec[] {
 			? []
 			: [{ ...singleKeyIndex(area.reaped), expireAfterSeconds: 0 }])
 	];
+}
+
+/*
+ * The indexes a document store builds: every declared one except those that only teach another datastore a
+ * prefix search the document store's ordinary index already answers (`IndexSpec.prefix`).
+ */
+export function documentIndexesFor(area: StorageArea): IndexSpec[] {
+	return indexesFor(area).filter((spec) => spec.prefix !== true);
 }
 
 /* Built through a typed local rather than an object literal with a computed key, which widens `1` to

@@ -301,7 +301,7 @@ const routes = [
 	/*
 	 * These end-user rows also record `targetScope` (the bucket): their users live in per-bucket storage, so
 	 * a bare user id cannot be resolved to an account — not even to an email — without knowing which bucket
-	 * to look in. `federation.identity.delete` below is the fifth row of this kind.
+	 * to look in. `federation.identity.delete` below is another row of this kind.
 	 */
 	{
 		action: 'enduser.create',
@@ -319,6 +319,20 @@ const routes = [
 		action: 'enduser.password.reset',
 		method: 'POST',
 		path: '/admin/api/buckets/:id/users/:uid/password',
+		targetType: 'EndUser'
+	},
+	/* A new login address. `attributes` names the field, never the addresses (specs/082). */
+	{
+		action: 'enduser.email.change',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/users/:uid/email',
+		targetType: 'EndUser'
+	},
+	/* A verification message an administrator asked to be mailed; its link or code never reaches the trail. */
+	{
+		action: 'enduser.verification.send',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/users/:uid/verification',
 		targetType: 'EndUser'
 	},
 	{

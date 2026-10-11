@@ -70,7 +70,7 @@ In every bucket that requires verification, a correct password for an unverified
 what it needs (`unverifiedAtSignIn`, `index.ts:533`). It is no longer just told to "check your inbox",
 which was a dead end for any account that existed before its bucket required verification.
 
-`sendOnDemand` (`lib/verification/challenge.ts:254`) works within the existing cooldown and daily cap.
+`sendOnDemand` (`lib/verification/challenge.ts:295`) works within the existing cooldown and daily cap.
 - At sign-in it **reuses** a live challenge rather than issuing a new one. Issuing supersedes the
   outstanding challenge, and a registrant who signs in before following their link must not have it
   replaced under them.

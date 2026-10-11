@@ -69,7 +69,7 @@ describe('end-user API', () => {
 		const list = await client.admin.api
 			.buckets({ id: bucket._id })
 			.users.get({ headers: { cookie } });
-		const users = answered(list.data);
+		const { users } = answered(list.data);
 		expect(users.some((u) => u._id === uid)).toBe(true);
 		expect(users.every((u) => !('password' in u))).toBe(true);
 

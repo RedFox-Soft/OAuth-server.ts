@@ -4,7 +4,7 @@ title: 'The PostgreSQL backend: two expiry reversals, a silent encoding defect, 
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-09-10
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # The PostgreSQL backend
@@ -208,6 +208,26 @@ seam they share (`lib/helpers/deadline.ts`, five seconds), and `/ready` shares o
 instead of starting one per caller: without that, every probe arriving during a slow answer opens
 another query against a database already failing to keep up, and the readiness endpoint joins the
 outage it is supposed to report.
+
+## A prefix search needs its own index here (spec 082)
+
+The console's users search matches the *start* of the stored lower-case `email` or `userNameKey`. MongoDB
+answers an anchored, case-sensitive regular expression from the ordinary index on the same key. PostgreSQL's
+default b-tree compares in the database collation and cannot bound `LIKE 'ada%'` unless that collation is C,
+so the inventory gained `IndexSpec.prefix` (`lib/consts/storage_inventory.ts:56`): `translateIndex` builds such
+an index with `text_pattern_ops` (`lib/adapters/postgres/jsonPath.ts:118`), named `…_pfx`, and the per-bucket area
+declares one on `email` and a sparse one on `userNameKey` (`storage_inventory.ts:293-294`). MongoDB neither builds
+nor expects them — `documentIndexesFor` (`:874`) filters them out of its provisioning and reconciliation —
+because a second index on an identical key is refused there. Not a divergence entry: nothing a caller can
+observe differs.
+
+The pattern is a bound parameter with `%`, `_` and `\` escaped by a backslash, LIKE's default escape character,
+so no ESCAPE clause is needed and none of the three is ever a wildcard (`likePrefix`,
+`lib/adapters/postgres/userStore.ts:75`); MongoDB's regex escapes its own specials the same way. Pages ordered
+by email sort `COLLATE "C"` (`userStore.ts:308`), the byte order MongoDB's default comparison uses, so a page is
+the same page on both. Measured on PostgreSQL 17: with a prepared statement the planner turns the parameter
+into an index range (`~>=~ … ~<~`) on the `_pfx` index, in a BitmapOr with the primary key for the exact-id
+arm. `database/verify_end_user_identity.ts` (`verifyEndUserSearch`) asks both backends the same questions.
 
 ## The divergence register is a gate
 

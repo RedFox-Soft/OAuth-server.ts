@@ -16,6 +16,7 @@ import { attemptKey } from 'lib/totp/verify.ts';
 import epochTime from 'lib/helpers/epoch_time.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
 import { present } from 'test/shape.js';
+import { answered } from '../admin/answered.ts';
 import { createAdministrator, type AdminKind } from '../administrators.ts';
 
 const app = new Elysia().use(resolveAdmin).use(endUserRoutes);
@@ -69,10 +70,7 @@ describe('clearing a lost authenticator (US5)', () => {
 			.users.get({ headers: { cookie: admin.cookie } });
 
 		expect(res.status).toBe(200);
-		// The route's answer is typed as the list or the admin error envelope; only the list has accounts.
-		const listed = Array.isArray(res.data)
-			? res.data.find((u) => u._id === user._id)
-			: undefined;
+		const listed = answered(res.data).users.find((u) => u._id === user._id);
 		expect(listed?.totpEnrolled).toBe(true);
 		expect(listed?.totpEnrolledAt).toBeTruthy();
 	});
@@ -85,9 +83,7 @@ describe('clearing a lost authenticator (US5)', () => {
 		const res = await client.admin.api
 			.buckets({ id: bucketId })
 			.users.get({ headers: { cookie: admin.cookie } });
-		const listed = Array.isArray(res.data)
-			? res.data.find((u) => u._id === user._id)
-			: undefined;
+		const listed = answered(res.data).users.find((u) => u._id === user._id);
 		expect(listed?.totpEnrolled).toBe(false);
 		expect(listed?.totpEnrolledAt).toBeNull();
 	});

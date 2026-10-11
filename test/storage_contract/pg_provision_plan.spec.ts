@@ -136,6 +136,26 @@ describe('indexStatements', () => {
 				'ON "user_redfox" ((doc->>\'email\'))'
 		);
 	});
+
+	/*
+	 * A default b-tree compares in the database collation and cannot bound `LIKE 'ada%'`; one built with
+	 * text_pattern_ops can. Without it the users search still answers, from a sequential scan nobody sees
+	 * until a bucket is large.
+	 */
+	it('builds the per-bucket email prefix index with the pattern operator class', () => {
+		expect(statementsFor(areaForBucket('redfox'))).toContain(
+			'CREATE INDEX IF NOT EXISTS "user_redfox_email_pfx" ' +
+				'ON "user_redfox" ((doc->>\'email\') text_pattern_ops)'
+		);
+	});
+
+	it('keeps the username prefix index partial over the rows that hold a username', () => {
+		expect(statementsFor(areaForBucket('redfox'))).toContain(
+			'CREATE INDEX IF NOT EXISTS "user_redfox_userNameKey_pfx" ' +
+				'ON "user_redfox" ((doc->>\'userNameKey\') text_pattern_ops) ' +
+				"WHERE (doc->>'userNameKey') IS NOT NULL"
+		);
+	});
 });
 
 describe('generated index names', () => {

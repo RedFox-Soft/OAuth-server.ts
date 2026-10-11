@@ -19,6 +19,7 @@ import { sectionHref, type PageKey, type Section } from '../frame/routes.js';
 import { InstanceOnly, NotFound } from '../frame/states.js';
 import { BucketDetail, type BucketTab } from './BucketDetail.js';
 import { ProjectWorkspace } from './ProjectWorkspace.js';
+import { UserPage, type UserTab } from './users/UserPage.js';
 import { Groups } from './Groups.js';
 import { ScopeSwitcher } from './ScopeSwitcher.js';
 import { Projects } from './Projects.js';
@@ -42,6 +43,14 @@ const BUCKET_TABS: Partial<Record<PageKey, BucketTab>> = {
 	'bucket.keys': 'keys',
 	'bucket.activity': 'activity',
 	'bucket.settings': 'settings'
+};
+
+/* One person in a bucket (specs/082): its own page, beside the bucket's areas rather than inside them. */
+const USER_TABS: Partial<Record<PageKey, UserTab>> = {
+	'bucket.user': 'profile',
+	'bucket.user.signIn': 'signIn',
+	'bucket.user.groups': 'groups',
+	'bucket.user.activity': 'activity'
 };
 
 /*
@@ -120,6 +129,17 @@ export function Layout() {
 		if (resolved.kind === 'none') return <NotFound />;
 		const { route } = resolved;
 		if (route.instance && !can.instance) return <InstanceOnly />;
+		const userTab = USER_TABS[route.key];
+		if (userTab) {
+			return (
+				<UserPage
+					key={`${route.params.bucket ?? ''}/${route.params.user ?? ''}`}
+					bucketId={route.params.bucket ?? ''}
+					userId={route.params.user ?? ''}
+					tab={userTab}
+				/>
+			);
+		}
 		const bucketTab = BUCKET_TABS[route.key];
 		if (bucketTab) {
 			return (

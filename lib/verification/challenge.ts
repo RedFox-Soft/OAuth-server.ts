@@ -135,11 +135,37 @@ export async function issueAndSend(
 
 export type VerifyOutcome = { ok: true } | { ok: false; reason: 'invalid' };
 
+/*
+ * Whether the account still holds the address the challenge was sent to. A message proves control of the
+ * mailbox it reached, and nothing else: once the account's address changes — by an administrator, a
+ * provisioning connection or the console — a link or code mailed to the old one must not verify the new one,
+ * which nobody has proven. Compared on the stored, lower-cased form both sides were written in.
+ */
+async function addressStillHeld(challenge: {
+	bucketId: string;
+	accountId: string;
+	email: string;
+}): Promise<boolean> {
+	const account = await getUserStore(challenge.bucketId).find(
+		challenge.accountId
+	);
+	return (
+		account !== null &&
+		account.email.toLowerCase() === challenge.email.toLowerCase()
+	);
+}
+
 // Consume a link token: mark the bound account verified and delete the challenge so it
-// cannot be reused. Unknown/expired/already-used tokens fail as 'invalid'.
+// cannot be reused. Unknown/expired/already-used tokens fail as 'invalid', and so does a
+// token for an address the account no longer holds — the same answer, so the refusal says
+// nothing about whether the address changed.
 export async function verifyLink(token: string): Promise<VerifyOutcome> {
 	const challenge = await challenges().find(token);
-	if (!challenge || challenge.method !== 'link') {
+	if (
+		!challenge ||
+		challenge.method !== 'link' ||
+		!(await addressStillHeld(challenge))
+	) {
 		return { ok: false, reason: 'invalid' };
 	}
 	await getUserStore(challenge.bucketId).update(challenge.accountId, {
@@ -168,7 +194,8 @@ export async function verifyCode(
 	if (
 		!challenge ||
 		challenge.method !== 'code' ||
-		challenge.exp <= epochTime()
+		challenge.exp <= epochTime() ||
+		!(await addressStillHeld(challenge))
 	) {
 		return { ok: false, reason: 'invalid' };
 	}
@@ -230,6 +257,20 @@ export async function resend(ref: string): Promise<ResendOutcome> {
 
 	const { id, method } = await issueAndSend(user, bucket, { bumpRate: true });
 	return { ok: true, sent: true, method, newRef: id };
+}
+
+/*
+ * Whether a send for this account would be refused by the cooldown or the daily cap right now. For a caller
+ * that must decide before it records anything — an administrator's resend is audited first, and an entry for a
+ * message the limit was always going to refuse would record a send that never had a chance to happen. The send
+ * itself still checks, so a race between the two answers the same refusal.
+ */
+export async function sendRateRefused(
+	user: Pick<User, 'email'>,
+	bucket: Pick<UserBucket, '_id'>
+): Promise<boolean> {
+	const prior = await resends().find(resendKey(bucket._id, user.email));
+	return rateRefusal(prior, epochTime(), RESEND_BOUNDS) !== null;
 }
 
 export type OnDemandOutcome =

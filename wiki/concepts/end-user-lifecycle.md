@@ -4,7 +4,7 @@ title: 'End-user lifecycle: ending access, the local lock, provisioned users'
 tags: [architecture, contract, gotcha, oidc]
 sources: [oauth-server-codebase]
 created: 2026-10-06
-updated: 2026-10-08
+updated: 2026-10-11
 graph:
   node_type: concept
   relationships:
@@ -79,7 +79,7 @@ user allowed" drift, and the drifted one is the door a locked user walks through
 connection for a provisioned one. A local deactivation of a provisioned user would be undone by that
 connection's next sync (`active: true`), so it cannot be the emergency control. `lockedLocally` is a
 separate field that only the admin routes (and MCP through them) set or clear
-(`lib/end_users/service.ts:301`, `:317`); nothing a connection sends reaches it.
+(`lib/end_users/service.ts:306`, `:381`); nothing a connection sends reaches it.
 
 This is a **deliberate departure from IPSIE AL2**, which forbids local changes to identity-service-managed
 users. It touches sign-in only, never the profile, and exists because an incident response must not wait
@@ -105,7 +105,7 @@ audience depends on.)
 `userName` is unique per bucket **case-insensitively**; `externalId` is unique **per connection**
 (RFC 7643 §3.1 scopes it to the provisioning domain). Both are stored exactly as sent, and beside them
 the store keeps a derived key (`lib/adapters/end_user_keys.ts`) that the unique indexes hold
-(`lib/consts/storage_inventory.ts:255-256`):
+(`lib/consts/storage_inventory.ts:286-287`):
 
 - `userNameKey` — NFC-normalised lowercase. A collation would behave differently on MongoDB and PostgreSQL
   and need a divergence entry; a stored key is plain equality on both.
@@ -118,6 +118,41 @@ the store keeps a derived key (`lib/adapters/end_user_keys.ts`) that the unique 
 The keys never leave the server (`presentUser` strips them) and are never accepted from a caller; the store
 recomputes them on every write that touches an identity field. `database/verify_end_user_identity.ts`
 proves the indexes against real MongoDB and PostgreSQL, including the race for one external identifier.
+
+## An address change, and what a verification message proves (spec 082)
+
+An administrator changes a local person's login address through its own route,
+`POST /admin/api/buckets/:id/users/:uid/email` (`lib/admin/users-end/routes.ts:353`), rather than through the
+PATCH beside it: it is `high` for agents (`bucket_user_email_change`), because the address is where password
+reset and verification mail go. The service refuses an address another account in the bucket holds **before**
+the audit write, with `field: 'email'` (`lib/end_users/service.ts:198`) — the store's unique index still decides
+a race, but the ordinary taken address is a refusal, not an audited change, and SCIM's address changes get the
+same pre-check. A changed address is unverified whoever typed it, as it already was for SCIM. The entry names
+the field (`attributes: ['email']`), never the addresses: they are personal data and the trail outlives the
+account.
+
+**Security fix found on the way.** `verifyLink` and `verifyCode` marked the account verified without comparing
+the challenge's address with the account's current one, so a link mailed to an *old* address verified the
+*new* one — for an administrator's, a connection's and now the console's changes alike. Both now refuse unless
+the account still holds the address the challenge was sent to (`addressStillHeld`,
+`lib/verification/challenge.ts:144`), and the refusal is the same `invalid` an unknown or spent token gets, so
+it says nothing about whether the address changed. Proved by `test/email_verification/address_change.spec.ts`.
+
+An administrator's **resend** (`POST …/users/:uid/verification`, `routes.ts:376`) mails a fresh message through
+`sendOnDemand` with `reuseOutstanding: false` and answers 204 with no body — never the link or the code, since
+proving the address is the mailbox holder's act. Every refusal that can be known first (already verified, mail
+not configured, the cooldown via `sendRateRefused`, `challenge.ts:268`) is decided before the audit entry, so the
+trail records sends that were attempted.
+
+**`passwordSet`.** The unusable password a password-less account holds (`lib/helpers/unusable_password.ts`) cannot
+be told from a real hash afterwards, so whether a password anyone chose opens an account is a stored marker
+(`lib/adapters/types.ts:144`): `true` on a create with a password, on every administrator's set
+(`service.ts:257`), on registration (`lib/interactions/index.ts:1449`) and on a completed reset
+(`lib/password_reset/challenge.ts:274`); `false` on a password-less create — an administrator's or SCIM's
+(`service.ts:158`) and a federated sign-in's just-in-time account (`lib/federation/resolve.ts:280`). Accounts
+written before it carry none, and a reader says nothing rather than guess. Setting a password can also sign the
+person out everywhere in the same request (`signOut`, `service.ts:244`), through the same `revokeAccountAccess`
+the "sign out everywhere" route runs.
 
 ## Profile → claims is this server's own table
 
@@ -140,3 +175,6 @@ the stored object replaces the default whole (the same trap [[amr-reporting]] re
 - [[scim-provisioning]] — part 2 (spec 070): connections now exist, write through this service as the
   `connection` actor, and `createEndUser` writes the identity fields in one insert (it used a follow-up
   update, which left a half-made account behind whenever that update collided).
+
+How the console presents these acts — the paged list, the person's page, one request per save — is
+[[bucket-users-workspace]].

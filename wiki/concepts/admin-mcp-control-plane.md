@@ -4,7 +4,7 @@ title: 'The administrative MCP control plane'
 tags: [architecture, contract, gotcha, config]
 sources: [oauth-server-codebase]
 created: 2026-08-24
-updated: 2026-10-10
+updated: 2026-10-11
 graph:
   node_type: concept
 ---
@@ -205,8 +205,9 @@ guessed and silently missing from the announcement that exists so an agent need 
 withholding has since arrived — `group_delete` — and cost only a table row, which is the arrangement
 working as intended.
 
-The other high-consequence operations — 28 tools since spec 075 added `bucket_owner_change` and
-`project_owner_change`, the first tools whose body names a group (`groupId`) — take two calls: describe,
+The other high-consequence operations — 30 tools since spec 082 added `bucket_user_email_change` (spec 075
+had added `bucket_owner_change` and `project_owner_change`, the first tools whose body names a group,
+`groupId`) — take two calls: describe,
 then confirm. The confirmation binds
 five ways — tool, target, arguments hash, administrator, agent — and each is a real case. Arguments,
 because a target-only binding would miss a password reset confirmed for one value and submitted with

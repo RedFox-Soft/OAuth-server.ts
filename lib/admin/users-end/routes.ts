@@ -1,6 +1,11 @@
 import { Elysia } from 'elysia';
 import { getBucketGroupStore, getUserStore } from '../../adapters/index.js';
-import { MAX_END_USER_PAGE, type User } from '../../adapters/types.js';
+import {
+	MAX_END_USER_PAGE,
+	type EndUserFilter,
+	type User
+} from '../../adapters/types.js';
+import { ADMIN_BUCKET_ID } from '../consts.js';
 import {
 	assertAuth,
 	AdminError,
@@ -9,11 +14,16 @@ import {
 } from '../auth/rbac.js';
 import { loadBucketForUsers } from '../buckets/access.js';
 import {
+	ALLOWED_USER_LIST_PARAMS,
+	ChangeEndUserEmailBody,
 	CreateEndUserBody,
 	LockEndUserBody,
 	UpdateEndUserBody,
-	ResetPasswordBody
+	ResetPasswordBody,
+	UserListQuery
 } from './schema.js';
+import { mailDeliveryConfigured } from '../../mail/mailer.js';
+import { sendOnDemand, sendRateRefused } from '../../verification/challenge.js';
 import { recordAdminAudit } from '../audit/record.js';
 import { endSessionsForAccount } from '../../helpers/cascade.js';
 import { clearAttempts } from '../../totp/verify.js';
@@ -39,7 +49,11 @@ async function asAdmin<T>(operation: Promise<T>): Promise<T> {
 		return await operation;
 	} catch (error) {
 		if (error instanceof EndUserError) {
-			throw new AdminError(error.status, error.message);
+			throw new AdminError(
+				error.status,
+				error.message,
+				error.field === undefined ? undefined : { field: error.field }
+			);
 		}
 		throw error;
 	}
@@ -125,6 +139,61 @@ async function withGroups(bucketId: string, users: User[]) {
 	}));
 }
 
+/*
+ * Checked against the raw URL, because Elysia only lifts declared keys out of the query string: a mistyped
+ * filter would be dropped and answered with everyone — a wrong list wearing a 200.
+ */
+function assertNoUnknownParams(url: string): void {
+	const unknown = [...new URL(url).searchParams.keys()].filter(
+		(name) => !ALLOWED_USER_LIST_PARAMS.has(name)
+	);
+	if (unknown.length > 0) {
+		throw new AdminError(
+			422,
+			`unknown query parameter: ${[...new Set(unknown)].sort().join(', ')}`,
+			unknown.length === 1 ? { field: unknown[0] } : undefined
+		);
+	}
+}
+
+const DEFAULT_LIST_COUNT = 50;
+
+/*
+ * The list's query as the store's filter. `active` is the people who can sign in as far as status goes —
+ * active and not locked — so the three statuses read as a person would sort them, with a deactivated and
+ * locked account under both of the other two.
+ */
+function listFilterOf(query: typeof UserListQuery.static): EndUserFilter {
+	const filter: EndUserFilter = {};
+	const q = query.q?.trim();
+	if (q) filter.search = q;
+	if (query.status === 'active') {
+		filter.active = true;
+		filter.locked = false;
+	} else if (query.status === 'deactivated') {
+		filter.active = false;
+	} else if (query.status === 'locked') {
+		filter.locked = true;
+	}
+	if (query.managedBy === 'console') filter.local = true;
+	else if (query.managedBy !== undefined)
+		filter.provisionedBy = query.managedBy;
+	if (query.verified !== undefined) filter.verified = query.verified === 'yes';
+	if (query.authenticator !== undefined)
+		filter.totpEnrolled = query.authenticator === 'yes';
+	return filter;
+}
+
+/* One person with their groups, as a row of the list is. */
+async function presentOne(bucketId: string, user: User) {
+	const [row] = await withGroups(bucketId, [user]);
+	return row;
+}
+
+const NOT_CONFIGURED =
+	'Mail delivery is not configured, so no message can be sent.';
+const RATE_LIMITED = 'A message was sent recently. Try again in a minute.';
+
 export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 	.use(resolveAdmin)
 	.onError(({ error, set }) => {
@@ -133,11 +202,51 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 			return adminErrorBody(error);
 		}
 	})
-	.get('/admin/api/buckets/:id/users', async ({ admin, params }) => {
+	/*
+	 * A page of the bucket's people, ordered by email, with how many match. Searched by the start of an email or
+	 * a username in any letter case, or by an exact id, and narrowed by status, who manages them, verification
+	 * and authenticator — every filter answered by the datastore, so a bucket of any size reads in one page.
+	 */
+	.get(
+		'/admin/api/buckets/:id/users',
+		async ({ admin, params, query, request }) => {
+			const ctx = assertAuth(admin);
+			await loadBucketForUsers(ctx, params.id);
+			assertNoUnknownParams(request.url);
+			const { users, totalResults } = await getUserStore(params.id).query(
+				listFilterOf(query),
+				{
+					startIndex: Number(query.startIndex ?? 1),
+					count: Number(query.count ?? DEFAULT_LIST_COUNT)
+				},
+				'email'
+			);
+			return { users: await withGroups(params.id, users), totalResults };
+		},
+		{ query: UserListQuery }
+	)
+	/*
+	 * One person: the list's row, and — when they are locked — the email of the administrator who locked
+	 * them, read now from the administrators' store, so an account since deleted reads as `null` rather than
+	 * as an id nobody can place.
+	 */
+	.get('/admin/api/buckets/:id/users/:uid', async ({ admin, params }) => {
 		const ctx = assertAuth(admin);
 		await loadBucketForUsers(ctx, params.id);
-		const users = await getUserStore(params.id).list();
-		return withGroups(params.id, users);
+		const user = await getUserStore(params.id).find(params.uid);
+		if (!user) throw new AdminError(404, 'user not found');
+		const row = await presentOne(params.id, user);
+		if (!user.lockedLocally) return row;
+		const locker = await getUserStore(ADMIN_BUCKET_ID).find(
+			user.lockedLocally.by
+		);
+		return {
+			...row,
+			lockedLocally: {
+				...user.lockedLocally,
+				byEmail: locker?.email ?? null
+			}
+		};
 	})
 	.post(
 		'/admin/api/buckets/:id/users',
@@ -155,7 +264,9 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 						id: userId,
 						email: body.email,
 						password: body.password,
-						verified: true,
+						// The bucket's policy, as registration applies it: an address nobody has proven is not
+						// verified because an administrator typed it.
+						verified: !bucket.emailVerificationRequired,
 						claims: body.claims
 					},
 					() =>
@@ -204,18 +315,101 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 		async ({ admin, params, body }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForUsers(ctx, params.id);
-			await asAdmin(
-				resetEndUserPassword(bucket, ADMIN, params.uid, body.password, () =>
-					// The reset is the recorded fact. No attribute names either: naming the field would say
-					// nothing the action does not, and the value must never be near the trail.
-					recordAdminAudit(ctx, 'enduser.password.reset', params.uid, {
-						targetScope: params.id
-					})
+			const signOut = body.signOut === true;
+			const { revoked } = await asAdmin(
+				resetEndUserPassword(
+					bucket,
+					ADMIN,
+					params.uid,
+					body.password,
+					() =>
+						// The reset is the recorded fact; the password is never named, and its value never near
+						// the trail. `signOut` is, because ending every sign-in is a second act the entry must show.
+						recordAdminAudit(ctx, 'enduser.password.reset', params.uid, {
+							targetScope: params.id,
+							...(signOut ? { attributes: ['signOut'] } : {})
+						}),
+					{ signOut }
 				)
 			);
+			if (revoked && revoked.failedAreas.length > 0) {
+				throw new AdminError(
+					500,
+					`the password was set, but their access survives in: ${revoked.failedAreas.join(', ')}`,
+					{ failedAreas: revoked.failedAreas }
+				);
+			}
 			return { ok: true };
 		},
 		{ body: ResetPasswordBody }
+	)
+	/*
+	 * A new login address for a person administrators manage. Refused for a directory's person (the directory
+	 * owns the address) and for an address another account in the bucket holds — both before the entry is
+	 * written. The new address is unverified, and a message sent to the old one no longer verifies anything.
+	 * The entry names the field, never the addresses: they are personal data, and the trail outlives the account.
+	 */
+	.post(
+		'/admin/api/buckets/:id/users/:uid/email',
+		async ({ admin, params, body }) => {
+			const ctx = assertAuth(admin);
+			const bucket = await loadBucketForUsers(ctx, params.id);
+			const { user } = await asAdmin(
+				updateEndUser(bucket, ADMIN, params.uid, { email: body.email }, () =>
+					recordAdminAudit(ctx, 'enduser.email.change', params.uid, {
+						targetScope: params.id,
+						attributes: ['email']
+					})
+				)
+			);
+			return presentOne(params.id, user);
+		},
+		{ body: ChangeEndUserEmailBody }
+	)
+	/*
+	 * Mails the person a fresh verification message in the bucket's current method, within the cooldown and
+	 * daily cap every other door shares. The answer never carries the link or the code: proving the address is
+	 * the mailbox holder's act, not the administrator's. Every refusal that can be known first is decided
+	 * before the entry, so the trail records sends that were attempted.
+	 */
+	.post(
+		'/admin/api/buckets/:id/users/:uid/verification',
+		async ({ admin, params, set }) => {
+			const ctx = assertAuth(admin);
+			const bucket = await loadBucketForUsers(ctx, params.id);
+			const user = await getUserStore(params.id).find(params.uid);
+			if (!user) throw new AdminError(404, 'user not found');
+			if (user.verified) {
+				throw new AdminError(409, 'The address is already verified.');
+			}
+			if (!(await mailDeliveryConfigured())) {
+				throw new AdminError(409, NOT_CONFIGURED);
+			}
+			if (await sendRateRefused(user, bucket)) {
+				throw new AdminError(429, RATE_LIMITED);
+			}
+			await recordAdminAudit(ctx, 'enduser.verification.send', params.uid, {
+				targetScope: params.id
+			});
+			const sent = await sendOnDemand(user, bucket, {
+				reuseOutstanding: false
+			});
+			switch (sent.outcome) {
+				case 'sent':
+				case 'outstanding':
+					set.status = 204;
+					return;
+				case 'rate_limited':
+					throw new AdminError(429, RATE_LIMITED);
+				case 'mail_not_configured':
+					throw new AdminError(409, NOT_CONFIGURED);
+				case 'delivery_failed':
+					throw new AdminError(
+						502,
+						'The message could not be sent. Try again later.'
+					);
+			}
+		}
 	)
 	/*
 	 * The emergency block: ends the user's access at once and holds until an administrator lifts it, whatever

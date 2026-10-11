@@ -1,4 +1,5 @@
 import type {
+	EndUserFilter,
 	UserBucketStoreInstance,
 	UserStoreInstance
 } from '../lib/adapters/types.js';
@@ -177,6 +178,161 @@ export async function verifyEndUserIdentity(
 		'the tally total is the number of accounts the bucket holds',
 		after.total === listed.length,
 		`${after.total} vs ${listed.length}`
+	);
+}
+
+/*
+ * The console's users search and filters, against a real datastore (specs/082): a prefix on the stored
+ * lower-case email or username key — an anchored regular expression on MongoDB, LIKE over a
+ * text_pattern_ops index on PostgreSQL — where the in-memory store only compares strings. The characters
+ * each language gives a meaning (`%` and `_` to LIKE, `.` to a regular expression) must be taken literally,
+ * and a page must come back in the same email order with the same total on both backends.
+ *
+ * Every account here shares one stamped prefix, and every query carries it, so the answers are about these
+ * accounts alone whatever else the area holds.
+ */
+export async function verifyEndUserSearch(
+	store: UserStoreInstance,
+	check: (name: string, ok: boolean, detail?: string) => void
+): Promise<void> {
+	const prefix = `s${Date.now()}-`;
+	const page = { startIndex: 1, count: 50 };
+	const made: Record<string, string> = {};
+	for (const local of [
+		'alice',
+		'100%off',
+		'100xoff',
+		'a_b',
+		'axb',
+		'c.d',
+		'cxd',
+		'deactivated',
+		'locked',
+		'unverified',
+		'enrolled',
+		'directory'
+	]) {
+		const user = await store.create(
+			`${prefix}${local}@example.com`,
+			'hash',
+			local !== 'unverified'
+		);
+		made[local] = user._id;
+	}
+	await store.update(made.deactivated, { active: false });
+	await store.update(made.locked, {
+		lockedLocally: { at: new Date(), by: 'verify', reason: 'verify' }
+	});
+	await store.update(made.enrolled, {
+		totp: { secret: 'JBSWY3DPEHPK3PXP', enrolledAt: new Date(), lastStep: 0 }
+	});
+	await store.update(made.directory, {
+		provisionedBy: `conn-${prefix}`,
+		userName: `${prefix}Grace.Hopper`
+	});
+
+	const found = async (filter: EndUserFilter) =>
+		(await store.query(filter, page)).users
+			.map((u) => u.email.slice(prefix.length).split('@')[0])
+			.sort();
+	const expectFound = async (
+		name: string,
+		filter: EndUserFilter,
+		wanted: string[]
+	) => {
+		const got = await found(filter);
+		check(name, JSON.stringify(got) === JSON.stringify(wanted), got.join(','));
+	};
+
+	await expectFound(
+		'a search finds the start of an email in another letter case',
+		{ search: `${prefix.toUpperCase()}ALI` },
+		['alice']
+	);
+	await expectFound(
+		'a percent sign in a search is a literal, not a wildcard',
+		{ search: `${prefix}100%` },
+		['100%off']
+	);
+	await expectFound(
+		'an underscore in a search is a literal, not a wildcard',
+		{ search: `${prefix}a_` },
+		['a_b']
+	);
+	await expectFound(
+		'a dot in a search is a literal, not a wildcard',
+		{ search: `${prefix}c.` },
+		['c.d']
+	);
+	await expectFound(
+		'a search finds the start of a username in another letter case',
+		{ search: `${prefix}grace.h`.toUpperCase() },
+		['directory']
+	);
+	await expectFound(
+		'a search finds an account by its exact id',
+		{ search: made.alice },
+		['alice']
+	);
+	await expectFound(
+		'the deactivated filter finds deactivated accounts',
+		{ search: prefix, active: false },
+		['deactivated']
+	);
+	await expectFound(
+		'the locked filter finds locked accounts',
+		{ search: prefix, locked: true },
+		['locked']
+	);
+	await expectFound(
+		'the unverified filter finds unverified accounts',
+		{ search: prefix, verified: false },
+		['unverified']
+	);
+	await expectFound(
+		'the authenticator filter finds enrolled accounts',
+		{ search: prefix, totpEnrolled: true },
+		['enrolled']
+	);
+	await expectFound(
+		'the directory filter finds a connection’s accounts',
+		{ search: prefix, local: false },
+		['directory']
+	);
+	const local = await found({ search: prefix, local: true });
+	check(
+		'the local filter leaves a connection’s accounts out',
+		local.length === 11 && !local.includes('directory'),
+		local.join(',')
+	);
+
+	const first = await store.query(
+		{ search: prefix },
+		{ startIndex: 1, count: 3 },
+		'email'
+	);
+	const second = await store.query(
+		{ search: prefix },
+		{ startIndex: 4, count: 3 },
+		'email'
+	);
+	const all = await store.query({ search: prefix }, page, 'email');
+	const emails = all.users.map((u) => u.email);
+	const byteOrder = [...emails].sort((a, b) =>
+		Buffer.compare(Buffer.from(a), Buffer.from(b))
+	);
+	check(
+		'a page in email order is in byte order, with the total of every match',
+		JSON.stringify(emails) === JSON.stringify(byteOrder) &&
+			all.totalResults === 12 &&
+			first.totalResults === 12,
+		`${all.totalResults}: ${emails.join(',')}`
+	);
+	check(
+		'consecutive pages continue the same email order',
+		JSON.stringify([...first.users, ...second.users].map((u) => u.email)) ===
+			JSON.stringify(emails.slice(0, 6)),
+		[...first.users, ...second.users].map((u) => u.email).join(',')
 	);
 }
 

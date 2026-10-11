@@ -4,7 +4,7 @@ title: 'Self-service password reset'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-04
-updated: 2026-09-29
+updated: 2026-10-11
 graph:
   node_type: concept
   relationships:
@@ -120,7 +120,8 @@ datastore time; constant-time behaviour would mean doing that work either way.
 Receiving the secret proves control of the address on file — precisely what the verification challenge
 proves. Without this an unverified account in a verification-required bucket is a permanent dead end: sign-in
 is gated on `verified`, and re-registering is deliberately non-committal about an existing address, so
-nothing resends anything. The same `update()` writes the password hash and `verified: true`.
+nothing resends anything. The same `update()` writes the password hash, `passwordSet: true` (spec 082) and
+`verified: true`.
 
 ## Sessions, and nothing more
 

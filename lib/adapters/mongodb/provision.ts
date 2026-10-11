@@ -1,7 +1,7 @@
 import type { Db } from 'mongodb';
 import {
 	areaForBucket,
-	indexesFor,
+	documentIndexesFor,
 	type IndexSpec
 } from '../../consts/storage_inventory.js';
 import { member } from '../../helpers/_/object.js';
@@ -140,5 +140,5 @@ export async function provisionUserArea(
 ): Promise<AppliedIndexes> {
 	const area = areaForBucket(bucketId);
 	await ensureCollection(target, area.name);
-	return applyIndexes(target, area.name, indexesFor(area));
+	return applyIndexes(target, area.name, documentIndexesFor(area));
 }

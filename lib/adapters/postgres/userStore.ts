@@ -9,6 +9,7 @@ import { documentOf } from '../documents.js';
 import {
 	clampPage,
 	FIELD_OF_KEY,
+	searchOf,
 	storedFilterOf,
 	storedPatchOf,
 	withCreateFields,
@@ -20,6 +21,7 @@ import {
 	User,
 	type EndUserCreateFields,
 	type EndUserFilter,
+	type EndUserOrder,
 	type EndUserPage,
 	type EndUserPatch,
 	type EndUserQueryResult,
@@ -60,6 +62,70 @@ function conditionsFor(handle: Sql, filter: StoredEndUserFilter) {
 		}
 	}
 	return where;
+}
+
+/*
+ * A text as a LIKE prefix that matches only itself: `%`, `_` and the escape character are each preceded by
+ * a backslash, which is LIKE's escape character unless an ESCAPE clause names another — none here does, so
+ * the pattern stays a plain parameter the planner can turn into an index range. Built from a character
+ * rather than written as an escape sequence, so no layer of quoting can change what it says.
+ */
+const BACKSLASH = String.fromCharCode(92);
+
+function likePrefix(text: string): string {
+	/* The escape character itself first, so the backslashes added below are not escaped again. */
+	let escaped = text.split(BACKSLASH).join(BACKSLASH + BACKSLASH);
+	for (const wildcard of '%_') {
+		escaped = escaped.split(wildcard).join(BACKSLASH + wildcard);
+	}
+	return `${escaped}%`;
+}
+
+/*
+ * The console's filters, ANDed onto `where`. The search's two prefix arms are served by the per-bucket area's
+ * `text_pattern_ops` indexes (`prefix: true` in lib/consts/storage_inventory.ts), which a default-collation
+ * b-tree cannot do for LIKE. The state tests are the tally's own, so a filter and a count agree.
+ */
+function consoleConditionsFor(
+	handle: Sql,
+	where: ReturnType<typeof conditionsFor>,
+	filter: EndUserFilter
+) {
+	let all = where;
+	if (filter.search !== undefined) {
+		const search = searchOf(filter.search);
+		all = handle`${all} AND (
+			doc->>'email' LIKE ${likePrefix(search.emailPrefix)}
+			OR doc->>'userNameKey' LIKE ${likePrefix(search.userNameKeyPrefix)}
+			OR id = ${search.id}
+		)`;
+	}
+	if (filter.active !== undefined) {
+		all = filter.active
+			? handle`${all} AND doc->'active' = 'true'::jsonb`
+			: handle`${all} AND doc->'active' = 'false'::jsonb`;
+	}
+	if (filter.verified !== undefined) {
+		all = filter.verified
+			? handle`${all} AND doc->'verified' = 'true'::jsonb`
+			: handle`${all} AND doc->'verified' = 'false'::jsonb`;
+	}
+	if (filter.locked !== undefined) {
+		all = filter.locked
+			? handle`${all} AND jsonb_typeof(doc->'lockedLocally') = 'object'`
+			: handle`${all} AND jsonb_typeof(doc->'lockedLocally') IS DISTINCT FROM 'object'`;
+	}
+	if (filter.totpEnrolled !== undefined) {
+		all = filter.totpEnrolled
+			? handle`${all} AND jsonb_typeof(doc->'totp') = 'object'`
+			: handle`${all} AND jsonb_typeof(doc->'totp') IS DISTINCT FROM 'object'`;
+	}
+	if (filter.local !== undefined) {
+		all = filter.local
+			? handle`${all} AND jsonb_typeof(doc->'provisionedBy') IS DISTINCT FROM 'string'`
+			: handle`${all} AND jsonb_typeof(doc->'provisionedBy') = 'string'`;
+	}
+	return all;
 }
 
 export class UserStore implements UserStoreInstance {
@@ -226,18 +292,26 @@ export class UserStore implements UserStoreInstance {
 
 	async query(
 		filter: EndUserFilter,
-		page: EndUserPage
+		page: EndUserPage,
+		order: EndUserOrder = 'id'
 	): Promise<EndUserQueryResult> {
 		const stored = storedFilterOf(filter);
 		const { offset, limit } = clampPage(page, MAX_END_USER_PAGE);
 		const handle = sql();
-		const where = conditionsFor(handle, stored);
+		const where = consoleConditionsFor(
+			handle,
+			conditionsFor(handle, stored),
+			filter
+		);
+		/* Byte order, as MongoDB's default comparison sorts, so a page is the same page on either backend. */
+		const orderBy =
+			order === 'email' ? handle`doc->>'email' COLLATE "C"` : handle`id`;
 		const [rows, counted] = await Promise.all([
 			limit === 0
 				? Promise.resolve([])
 				: handle`
 					SELECT doc FROM ${handle(this.area)} WHERE ${where}
-					ORDER BY id LIMIT ${limit} OFFSET ${offset}
+					ORDER BY ${orderBy} LIMIT ${limit} OFFSET ${offset}
 				`,
 			handle<
 				{ total: number }[]

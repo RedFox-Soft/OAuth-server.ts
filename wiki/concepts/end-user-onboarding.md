@@ -4,7 +4,7 @@ title: "End-user onboarding: bucket-scoped registration and email verification"
 tags: [architecture, config, oidc]
 sources: [oauth-server-codebase]
 created: 2026-09-23
-updated: 2026-09-23
+updated: 2026-10-11
 ---
 
 # End-user onboarding
@@ -40,6 +40,13 @@ rendering the page itself: the client bundle reads the page from the path, so a 
 The sign-in page links to registration only when the bucket accepts it, and to password reset only when
 the bucket allows it, read from the same bucket the doors resolve (`lib/interactions/loginOptions.ts`).
 
+**An administrator's create follows the same policy** (spec 082): a person created in the console or by an
+agent starts verified only when the bucket does not require verification
+(`lib/admin/users-end/routes.ts:269`). The route used to write `verified: true` whatever the bucket said, so an
+address nobody had proven counted as proven because an administrator typed it. It may now create a person
+with no password at all, and an administrator may mail anyone unverified a fresh message from the person's
+page; neither sends anything by itself ([[end-user-lifecycle]]).
+
 *Corrected in spec 078:* the admin bucket used to be exempt from the verification check
 (`verificationGates`), as a lockout guard — its administrators were all unverified and nothing could
 send them a message. The exemption is gone; the guard moved to the setting, which refuses to turn on
@@ -53,8 +60,10 @@ for the challenge logic, the rate limiter and the tests:
 
 - a link token is single-use and valid for about a day;
 - a code is six digits, **hashed at rest**, valid for fifteen minutes, and capped at five attempts —
-  after which even a correct code is refused until a new one is issued (`lib/verification/challenge.ts:161`);
-- a resend has a cooldown and a rolling daily cap.
+  after which even a correct code is refused until a new one is issued (`lib/verification/challenge.ts:202`);
+- a resend has a cooldown and a rolling daily cap;
+- a link or code verifies only an account that still holds the address it was sent to — after an address
+  change it is refused like an unknown token (spec 082, [[end-user-lifecycle]]).
 
 The public verification endpoints — `GET /verify-email`, `GET|POST /verify-email/code`,
 `POST /verify-email/resend` — are a standalone, cookie-less group in `lib/routes/verification.ts`. They
