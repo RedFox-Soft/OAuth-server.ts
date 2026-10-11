@@ -54,6 +54,7 @@ export type PageKey =
 	| 'administrators.activity'
 	| 'administrators.settings'
 	| 'usage'
+	| 'usage.bucket'
 	| 'settings'
 	| 'keys'
 	| 'agentAccess'
@@ -265,6 +266,13 @@ export const ROUTES: readonly RouteSpec[] = [
 		area: 'Settings'
 	},
 	{ key: 'usage', pattern: ['usage'], section: 'usage', instance: true },
+	/* A deleted bucket's history (specs/086): a tombstone belongs to Usage, not to Buckets. */
+	{
+		key: 'usage.bucket',
+		pattern: ['usage', 'buckets', ':bucket'],
+		section: 'usage',
+		instance: true
+	},
 	{
 		key: 'settings',
 		pattern: ['settings'],
@@ -491,4 +499,9 @@ export function projectSettingsHref(
 
 export function groupHref(groupId: string): string {
 	return `/admin/groups/${encodeURIComponent(groupId)}`;
+}
+
+export function usageBucketHref(bucketId: string, month?: string): string {
+	const base = `/admin/usage/buckets/${encodeURIComponent(bucketId)}`;
+	return month ? `${base}?month=${encodeURIComponent(month)}` : base;
 }

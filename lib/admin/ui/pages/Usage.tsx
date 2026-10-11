@@ -6,7 +6,6 @@ import {
 	Checkbox,
 	Col,
 	Collapse,
-	Drawer,
 	Input,
 	Popover,
 	Row,
@@ -58,9 +57,8 @@ import {
 	type UsagePreferences
 } from '../activity/preferences.js';
 import { useHydrated } from '../frame/hydrated.js';
-import { BucketActivityPanel } from './BucketActivityPanel.js';
 import { Link } from '../frame/router.js';
-import { bucketHref } from '../frame/routes.js';
+import { bucketHref, usageBucketHref } from '../frame/routes.js';
 import { UsageCustomerDrawer } from './UsageCustomerDrawer.js';
 import { PageHeader } from '../frame/PageHeader.js';
 import { request, type RequestResult } from '../frame/request.js';
@@ -146,7 +144,6 @@ export function Usage() {
 	);
 	const [chosen, setPreferences] = useState<UsagePreferences | null>(null);
 	const preferences = chosen ?? stored;
-	const [historyOf, setHistoryOf] = useState<OverviewRow | null>(null);
 	const [customerOf, setCustomerOf] = useState<string | null>(null);
 
 	// Every state write follows an await, so the effect below sets nothing synchronously.
@@ -257,7 +254,11 @@ export function Usage() {
 						<span>{row.name}</span>
 					)}
 					{row.reserved ? <Tag>{RESERVED_TAG[row.reserved]}</Tag> : null}
-					{row.deleted ? <Tag color="red">Deleted</Tag> : null}
+					{row.deleted ? (
+						<Tag color="red">
+							Deleted {new Date(row.deleted).toLocaleDateString()}
+						</Tag>
+					) : null}
 					{row.unavailable ? <Tag color="orange">Unavailable</Tag> : null}
 				</Space>
 			)
@@ -331,17 +332,21 @@ export function Usage() {
 			title: '',
 			key: 'activity',
 			/*
-			 * The bucket's month by month at its own address. A deleted bucket has no address any more,
-			 * but its history outlives it, so it opens here instead.
+			 * The bucket's month by month at its own address, at the month shown here (specs/086). A deleted bucket
+			 * has no address any more, but its history outlives it on a page of its own under Usage.
 			 */
-			render: (_: unknown, row: OverviewRow) =>
-				row.deleted === null ? (
-					<Link href={bucketHref(row.bucketId, 'activity')}>Activity</Link>
-				) : (
-					<Typography.Link onClick={() => setHistoryOf(row)}>
+			render: (_: unknown, row: OverviewRow) => {
+				const month = answer?.month;
+				return row.deleted === null ? (
+					<Link
+						href={`${bucketHref(row.bucketId, 'activity')}${month ? `?month=${month}` : ''}`}
+					>
 						Activity
-					</Typography.Link>
-				)
+					</Link>
+				) : (
+					<Link href={usageBucketHref(row.bucketId, month)}>Activity</Link>
+				);
+			}
 		}
 	];
 
@@ -804,17 +809,6 @@ export function Usage() {
 				</>
 			) : null}
 
-			<Drawer
-				open={historyOf !== null}
-				onClose={() => setHistoryOf(null)}
-				size="large"
-				destroyOnHidden
-				title={historyOf?.name ?? ''}
-			>
-				{historyOf ? (
-					<BucketActivityPanel bucketId={historyOf.bucketId} />
-				) : null}
-			</Drawer>
 			<UsageCustomerDrawer
 				summary={
 					customerOf === null

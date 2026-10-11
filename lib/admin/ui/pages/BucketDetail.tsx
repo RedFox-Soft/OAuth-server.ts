@@ -15,6 +15,7 @@ import type { BucketSummary, BucketView } from './bucketView.js';
 import { FederationPanel } from './FederationPanel.js';
 import { BucketKeysPanel } from './BucketKeysPanel.js';
 import { BucketActivityPanel } from './BucketActivityPanel.js';
+import { BucketNotFound } from './UsageBucketHistory.js';
 import { ProvisioningPanel, type ConnectionView } from './ProvisioningPanel.js';
 import { BucketGroupsPanel } from './BucketGroupsPanel.js';
 import { BucketUsersPanel } from './BucketUsersPanel.js';
@@ -153,10 +154,9 @@ export function BucketDetail({
 
 	if (loadStatus !== null) {
 		return loadStatus === 403 || loadStatus === 404 ? (
-			<NoAccess
-				what="bucket"
-				backHref="/admin/buckets"
-				backLabel="Back to Buckets"
+			<BucketNotFound
+				bucketId={bucketId}
+				superAdmin={me?.superAdmin === true}
 			/>
 		) : (
 			<LoadFailed
@@ -327,12 +327,16 @@ export function BucketDetail({
 			)}
 			{bucket && !tabRefused && shownTab === 'keys' && (
 				<BucketKeysPanel
-					bucketId={bucketId}
+					bucket={bucket}
 					canEdit={can.edit}
+					superAdmin={me?.superAdmin === true}
 				/>
 			)}
 			{bucket && !tabRefused && shownTab === 'activity' && (
-				<BucketActivityPanel bucketId={bucketId} />
+				<BucketActivityPanel
+					bucketId={bucketId}
+					usageLink={me?.superAdmin === true}
+				/>
 			)}
 		</>
 	);

@@ -5,6 +5,7 @@ import { generateJWKS } from '../helpers/jwks.js';
 import type { SupportedAlg } from './jwks/schema.js';
 import {
 	KEY_PUBLICATION_SECONDS,
+	RETIRED_KEY_LIFETIME_SECONDS,
 	retiredKeyRemovableAt
 } from '../keys/issuer_keys.js';
 
@@ -51,6 +52,8 @@ export interface KeyView {
 	stateChangedAt: Date;
 	promotableAt?: Date;
 	removableAt?: Date;
+	/* When a published key stopped signing (specs/086); absent if it never signed. */
+	signedUntil?: Date;
 }
 
 function promotableAt(key: BucketKey): Date {
@@ -70,6 +73,15 @@ function viewOf(key: BucketKey): KeyView {
 		createdAt: key.createdAt,
 		stateChangedAt: key.stateChangedAt,
 		...(key.state === 'published' ? { promotableAt: promotableAt(key) } : {}),
+		/*
+		 * Derived rather than stored: a published key's state time moves only when a promotion demotes it, since
+		 * generating sets both times to one instant and the publication window keeps a promotion from landing on
+		 * it. A retired key has lost the time — retiring overwrites it — so it states none.
+		 */
+		...(key.state === 'published' &&
+		key.stateChangedAt.getTime() > key.createdAt.getTime()
+			? { signedUntil: key.stateChangedAt }
+			: {}),
 		...(key.state === 'retired'
 			? { removableAt: retiredKeyRemovableAt(key) }
 			: {})
@@ -95,7 +107,12 @@ export async function listKeys(owner: KeyOwner) {
 	const keys = (await getBucketKeysStore().listByBucket(owner.id))
 		.filter((key) => visible(key, now))
 		.map(viewOf);
-	return { keys, publicationSeconds: KEY_PUBLICATION_SECONDS };
+	// The retired-key lifetime lets the console say when a key it is about to retire stops verifying.
+	return {
+		keys,
+		publicationSeconds: KEY_PUBLICATION_SECONDS,
+		retiredKeyLifetimeSeconds: RETIRED_KEY_LIFETIME_SECONDS
+	};
 }
 
 export async function generateKey(owner: KeyOwner, alg: SupportedAlg) {

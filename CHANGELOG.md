@@ -41,6 +41,14 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Changed
 
+- **Signing keys read by algorithm; Activity reads like Usage; a deleted bucket's history has a page** (spec
+  086). A bucket's and the instance's keys show one card per algorithm, each key's state in words (can sign at,
+  signed until, verifies until) with Promote inline and Retire behind the typed word; the key read adds
+  `signedUntil` and the list `retiredKeyLifetimeSeconds`. A bucket served at the root explains that it signs with
+  the instance keys and lists their published ids, and the instance Keys page names every bucket depending on
+  them. The bucket Activity tab uses Usage's charts, month chooser and CSV; Usage links into buckets instead of a
+  drawer; `bucket_activity_get` adds `name`, `deletedAt` and `lastOwner`, and a super administrator gets a
+  deleted bucket's history at `/admin/usage/buckets/:id`.
 - **Changing a project's bucket shows who breaks first; groups have a page; audit answers "what happened
   here"** (spec 085). Setting or clearing a project's bucket now answers 409 with a preview — its applications by
   name, the issuer before and after, that people signed in through them sign in again, and every declared resource

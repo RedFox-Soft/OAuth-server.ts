@@ -48,6 +48,9 @@ interface DayOrMonth {
 	total: number;
 }
 interface BucketActivityBody {
+	name: string;
+	deletedAt: string | null;
+	lastOwner: { groupId: string; label: string } | null;
 	month: DayOrMonth | null;
 	days: DayOrMonth[];
 	months: DayOrMonth[];
@@ -114,6 +117,8 @@ describe('reading active users', () => {
 
 		expect(res.status).toBe(200);
 		const { body } = res;
+		expect(body).toMatchObject({ deletedAt: null, lastOwner: null });
+		expect(typeof body.name).toBe('string');
 		expect(body.month).toMatchObject({
 			period: '2031-03',
 			final: false,
@@ -144,11 +149,15 @@ describe('reading active users', () => {
 
 	describe('once the bucket is deleted', () => {
 		let deletedId: string;
+		let deletedName: string;
+		let formerGroup: { _id: string; name: string };
 
 		beforeAll(async () => {
 			const group = await regularGroup([owner]);
 			const { bucket } = await bucketWithProjects(group._id, 0);
 			deletedId = bucket._id;
+			deletedName = bucket.name;
+			formerGroup = group;
 			await getActivityStore().mark({
 				bucketId: deletedId,
 				accountId: 'activity-account-c',
@@ -165,12 +174,17 @@ describe('reading active users', () => {
 			await getBucketStore().destroy(deletedId);
 		});
 
-		it("gives a super administrator the deleted bucket's history by its id", async () => {
+		it("gives a super administrator the deleted bucket's history by its id, saying what it was and when it went", async () => {
 			restoreClock = atDay(NOW);
 
 			const res = await bucketActivity(deletedId, await cookieFor(superAdmin));
 
 			expect(res.status).toBe(200);
+			expect(res.body).toMatchObject({
+				name: deletedName,
+				deletedAt: '2031-03-01T10:00:00.000Z',
+				lastOwner: { groupId: formerGroup._id, label: formerGroup.name }
+			});
 			expect(res.body.months[1]).toMatchObject({
 				period: '2031-02',
 				final: true,

@@ -111,6 +111,29 @@ describe('the owning group administrator', () => {
 		expect(await publishedKids(bucket.slug ?? '')).toContain(initial.kid);
 	});
 
+	it('says until when a replaced key signed, and nothing for a key that never signed', async () => {
+		const { cookie, groupId } = await administrator('plain');
+		const bucket = await ownedBucket(groupId);
+		const [initial] = await listed(bucket._id, cookie);
+		const { body } = await generate(bucket._id, cookie, 'RS256');
+		const { body: unused } = await generate(bucket._id, cookie, 'RS256');
+		later(KEY_PUBLICATION_SECONDS + 1);
+		const promotedAt = Date.now();
+
+		await promote(bucket._id, cookie, String(body.kid));
+
+		const { body: read } = await call(
+			'GET',
+			`/admin/api/buckets/${bucket._id}/keys`,
+			cookie
+		);
+		const keys = read.keys as Array<{ kid: string; signedUntil?: string }>;
+		const until = (kid: string) =>
+			keys.find((key) => key.kid === kid)?.signedUntil;
+		expect(until(initial.kid)).toBe(new Date(promotedAt).toISOString());
+		expect(until(String(unused.kid))).toBeUndefined();
+	});
+
 	it('is refused retiring the key the bucket signs with', async () => {
 		const { cookie, groupId } = await administrator('plain');
 		const bucket = await ownedBucket(groupId);

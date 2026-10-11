@@ -99,7 +99,18 @@ otherwise do later under the tombstone's name.
 into the bucket administers its users, not its plan. A super administrator may read **any** bucket's figures
 there — the reserved buckets and deleted ones, from their tombstones (`bucketToRead`, `:115`, since spec 077) —
 because every one of them is already in their overview; the group that owned a deleted bucket gets the
-missing-bucket answer, as from every other route.
+missing-bucket answer, as from every other route. Since spec 086 the answer names the bucket (`name`) and, for
+a deleted one, `deletedAt` and `lastOwner`, both from the tombstone.
+
+**In the console (spec 086).**
+- The bucket's Activity tab is built from the Usage dashboard's own parts: charts, the change rule and the CSV
+  cell rules. The month lives in the address and is replaced on change, never pushed. Chart or Table is a
+  per-browser preference.
+- Usage links each bucket to its Overview and its Activity tab at the dashboard's month. The bucket drawer is
+  gone.
+- A deleted bucket's history has a page, `/admin/usage/buckets/:id`, for super administrators.
+- Opening a deleted bucket's own address tells a super administrator when it was deleted and links to that
+  history. Nobody else makes that read, so the bucket stays indistinguishable from one that never existed.
 
 `GET /admin/api/activity` (`:188`) is the super administrator's overview, and since spec 077 the whole Usage
 dashboard in one answer: every bucket (reserved and deleted included) with its **customer** — the owning

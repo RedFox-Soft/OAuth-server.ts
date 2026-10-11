@@ -112,18 +112,32 @@ function snapshotOfTombstone(
  * overview; this only lets them look closer. Everyone else keeps the owning-group check, so a deleted
  * bucket stays unfindable to the group that owned it, as every other route answers it.
  */
+/* The bucket read, and — for a deleted one, which only a super administrator can reach — what its tombstone kept. */
+interface BucketToRead {
+	snapshot: ActivityBucketSnapshot;
+	tombstone: ActivityTombstone | null;
+}
+
 async function bucketToRead(
 	ctx: AdminContext,
 	id: string
-): Promise<ActivityBucketSnapshot> {
-	if (!ctx.superAdmin) return snapshotOf(await loadBucketForEdit(ctx, id));
+): Promise<BucketToRead> {
+	if (!ctx.superAdmin) {
+		return {
+			snapshot: snapshotOf(await loadBucketForEdit(ctx, id)),
+			tombstone: null
+		};
+	}
 	const live = await getBucketStore().find(id);
-	if (live) return snapshotOf(live);
+	if (live) return { snapshot: snapshotOf(live), tombstone: null };
 	const tombstone = await getActivityStore().tombstone(id);
-	if (tombstone) return snapshotOfTombstone(tombstone);
+	if (tombstone) return { snapshot: snapshotOfTombstone(tombstone), tombstone };
 	/* A reserved bucket on an instance never provisioned: read as having always existed, as `bucketRefOf` does. */
 	if (reservedOf(id) !== null)
-		return { _id: id, name: id, createdAt: new Date(0) };
+		return {
+			snapshot: { _id: id, name: id, createdAt: new Date(0) },
+			tombstone: null
+		};
 	throw new AdminError(404, 'bucket not found');
 }
 
@@ -150,7 +164,10 @@ export const activityRoutes = new Elysia({ name: 'admin-activity' })
 		async ({ admin, params, query, request }) => {
 			const ctx = assertAuth(admin);
 			assertNoUnknownParams(request.url, ALLOWED_BUCKET_ACTIVITY_PARAMS);
-			const bucket = await bucketToRead(ctx, params.id);
+			const { snapshot: bucket, tombstone } = await bucketToRead(
+				ctx,
+				params.id
+			);
 			const at = now();
 			const month = monthAsked(query.month, at);
 
@@ -161,6 +178,17 @@ export const activityRoutes = new Elysia({ name: 'admin-activity' })
 			]);
 			return {
 				bucketId: bucket._id,
+				/*
+				 * Named, and dated when deleted (specs/086), so a deleted bucket's history page can say what it was
+				 * and when it went without a second read that no longer exists for it.
+				 */
+				name: bucket.name,
+				deletedAt: tombstone ? tombstone.deletedAt.toISOString() : null,
+				lastOwner:
+					tombstone?.ownerGroupId !== undefined &&
+					tombstone.ownerLabel !== undefined
+						? { groupId: tombstone.ownerGroupId, label: tombstone.ownerLabel }
+						: null,
 				countingSince: since.toISOString(),
 				month: months[0] ?? null,
 				days: days.filter(present),

@@ -1,4 +1,4 @@
-import { Descriptions, Drawer, Table, Tag, Typography } from 'antd';
+import { Descriptions, Drawer, Space, Table, Tag, Typography } from 'antd';
 import {
 	changeText,
 	figureText,
@@ -6,7 +6,7 @@ import {
 	type OverviewRow
 } from '../activity/model.js';
 import { Link } from '../frame/router.js';
-import { bucketHref } from '../frame/routes.js';
+import { bucketHref, groupHref, usageBucketHref } from '../frame/routes.js';
 
 /*
  * One customer of the usage dashboard (specs/077): who it is, whom to talk to, and its buckets. A customer
@@ -53,14 +53,35 @@ export function UsageCustomerDrawer({
 						column={1}
 						size="small"
 						items={[
-							{ key: 'kind', label: 'Group', children: kindText },
+							{
+								key: 'kind',
+								label: 'Group',
+								// A live group opens its page (specs/086); a deleted or unrecorded one is only named.
+								children:
+									customer.exists && customer.groupId !== null ? (
+										<Link href={groupHref(customer.groupId)}>{kindText}</Link>
+									) : (
+										kindText
+									)
+							},
 							{
 								key: 'contacts',
 								label: 'Contacts (owners)',
 								children:
-									summary.contacts.length > 0
-										? summary.contacts.join(', ')
-										: '—'
+									summary.contacts.length > 0 ? (
+										<Space wrap>
+											{summary.contacts.map((email) => (
+												<Typography.Text
+													key={email}
+													copyable
+												>
+													{email}
+												</Typography.Text>
+											))}
+										</Space>
+									) : (
+										'—'
+									)
 							},
 							{
 								key: 'members',
@@ -101,7 +122,9 @@ export function UsageCustomerDrawer({
 										{row.deleted === null ? (
 											<Link href={bucketHref(row.bucketId)}>{row.name}</Link>
 										) : (
-											row.name
+											<Link href={usageBucketHref(row.bucketId, month)}>
+												{row.name}
+											</Link>
 										)}{' '}
 										{row.deleted ? <Tag color="red">Deleted</Tag> : null}
 									</>

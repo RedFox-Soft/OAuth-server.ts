@@ -41,6 +41,7 @@ import { McpClients } from './McpClients.js';
 import { Audit } from './Audit.js';
 import { Errors } from './Errors.js';
 import { Usage } from './Usage.js';
+import { UsageBucketHistory } from './UsageBucketHistory.js';
 import { ADMIN_BUCKET_ID } from '../../consts.js';
 
 const PROJECT_AREAS = {
@@ -250,6 +251,13 @@ export function Layout() {
 				return <Audit />;
 			case 'usage':
 				return <Usage />;
+			case 'usage.bucket':
+				return (
+					<UsageBucketHistory
+						key={route.params.bucket}
+						bucketId={route.params.bucket ?? ''}
+					/>
+				);
 			case 'settings':
 				return <Settings />;
 			case 'keys':

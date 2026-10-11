@@ -73,3 +73,49 @@ export function usageCsv(
 	}
 	return `\uFEFF${lines.join('\r\n')}\r\n`;
 }
+
+/*
+ * One bucket's months as a spreadsheet file (specs/086), from its Activity tab. The same cell rules as the
+ * dashboard's export: an absent figure is an empty cell and a cell that would run as a formula is made inert.
+ */
+export function bucketActivityCsv(
+	bucket: { id: string; name: string },
+	months: readonly {
+		period: string;
+		final: boolean;
+		total: number;
+		byKind: { local: number; federated: number; renewal: number };
+		provisioned: number;
+	}[]
+): string {
+	const header = [
+		'month',
+		'bucket_id',
+		'bucket',
+		'active_users',
+		'final',
+		'local',
+		'upstream',
+		'renewal',
+		'provisioned'
+	];
+	const lines = [header.map(cell).join(',')];
+	for (const m of months) {
+		lines.push(
+			[
+				m.period,
+				bucket.id,
+				bucket.name,
+				m.total,
+				m.final,
+				m.byKind.local,
+				m.byKind.federated,
+				m.byKind.renewal,
+				m.provisioned
+			]
+				.map(cell)
+				.join(',')
+		);
+	}
+	return `\uFEFF${lines.join('\r\n')}\r\n`;
+}

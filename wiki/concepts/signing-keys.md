@@ -64,8 +64,8 @@ cross-instance messaging and the TTL is how far another instance can lag:
   makes the key the signer **of its algorithm** and returns that algorithm's previous signer to
   published — the new signer is written first, so there is no moment without one.
 - **retire** (`:184`) requires `{ confirm: <kid> }` — checked before anything else, refused 422
-  `confirmation_mismatch` — because nothing it signed verifies once its window closes. The console makes
-  the operator type the kid; the MCP tools `jwks_retire` and `bucket_key_retire` are `high` as well.
+  `confirmation_mismatch` — because nothing it signed verifies once its window closes. The console asks for
+  the typed word `retire` and sends the row's kid itself (since spec 086); the MCP tools `jwks_retire` and `bucket_key_retire` are `high` as well.
   Retiring a signing key is refused (409), so an algorithm never loses its signer.
 - A retired key stays published for a day (`RETIRED_KEY_LIFETIME_SECONDS`, `:43`, the longest a signed
   artefact lives) and is then **hidden, not deleted**: absent from `/jwks`, the view and every
@@ -107,8 +107,21 @@ ID model, where skipping that check is a known class of vulnerability.
   first like every endpoint, so a tenant hostname serves its tenant's keys; an address naming no bucket
   is 404, never the root's keys. Discovery advertises `jwks_uri` under the issuer and, for a bucket, the
   signing algorithms of its own keys.
-- A bucket served at the root has no keys of its own: its key routes answer 409 and the console sends the
-  operator to the instance Keys page.
+- A bucket served at the root has no keys of its own: its key routes answer 409.
+
+**The console since spec 086** (`lib/admin/ui/pages/keys/`):
+- `KeyCards` shows one card per algorithm, so it is visible that promoting replaces only that algorithm's
+  signer. Each key states its life in words: Signing; Published with "can sign at" or "signed until"; Retired
+  with "verifies until". Promote is the row's one inline action and names the key it replaces. Retire sits in
+  the row's menu and is blocked on the signer. The same component serves the instance Keys page, which names
+  every bucket served at the root issuer, so retiring a root key says who it reaches.
+- `signedUntil` is derived in `viewOf` (`lib/admin/key_lifecycle.ts`). A published key's state time moves only
+  when a promotion demotes it, so a time later than `createdAt` is when it stopped signing. A retired key
+  states none, because retiring overwrote that time.
+- The key list also returns `retiredKeyLifetimeSeconds`, so the retire question can give the exact time the key
+  stops verifying.
+- A root-served bucket's tab is chosen from the bucket read's `addressForm`, never after a 409. It explains the
+  instance keys and lists the published kids from the public `/jwks` that any relying party reads.
 
 What is not observable in the default test run: request-object decryption with a bucket's own
 encryption key. The algorithm list is derived from the root keys the suite preloads, which hold no

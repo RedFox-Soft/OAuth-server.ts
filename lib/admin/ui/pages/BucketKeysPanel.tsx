@@ -1,45 +1,37 @@
-import { useCallback, useState } from 'react';
-import { Alert, Card } from 'antd';
-import { KeyLifecyclePanel } from './KeyLifecyclePanel.js';
+import type { BucketView } from './bucketView.js';
+import { KeyCards } from './keys/KeyCards.js';
+import { RootKeysCard } from './keys/RootKeysCard.js';
 
 /*
- * A bucket's own signing keys, for a bucket with an address of its own. A bucket served at the root has no
- * keys of its own — the server answers 409 — and is sent to the instance key page instead.
+ * A bucket's Signing keys tab. Which variant it is comes from the bucket read (specs/086): a bucket with a
+ * path or a hostname has keys of its own; one served at the root signs with the instance keys and is told so,
+ * without first asking for keys the server would refuse with a 409.
  */
 export function BucketKeysPanel({
-	bucketId,
-	canEdit = true
+	bucket,
+	canEdit,
+	superAdmin
 }: {
-	bucketId: string;
+	bucket: BucketView;
 	/* False when the caller may read this bucket but not change it; the server would refuse every write. */
-	canEdit?: boolean;
+	canEdit: boolean;
+	superAdmin: boolean;
 }) {
-	const [rootServed, setRootServed] = useState(false);
-	const onUnavailable = useCallback((status: number) => {
-		setRootServed(status === 409);
-	}, []);
-
-	if (rootServed) {
+	if (bucket.addressForm === 'root' || bucket.addressForm === 'unaddressed') {
 		return (
-			<Card
-				title="Signing keys"
-				style={{ marginTop: 24 }}
-			>
-				<Alert
-					type="info"
-					showIcon
-					title="This bucket signs with the instance keys"
-					description="It has no address of its own, so it shares the root issuer and its key set. Those keys are managed on the Keys page."
-				/>
-			</Card>
+			<RootKeysCard
+				bucketId={bucket._id}
+				bucketName={bucket.name}
+				superAdmin={superAdmin}
+			/>
 		);
 	}
-
+	const id = encodeURIComponent(bucket._id);
 	return (
-		<KeyLifecyclePanel
-			base={`/admin/api/buckets/${bucketId}/keys`}
-			title="Signing keys"
-			onUnavailable={onUnavailable}
+		<KeyCards
+			base={`/admin/api/buckets/${id}/keys`}
+			keySetUrl={bucket.issuer ? `${bucket.issuer}/jwks` : null}
+			historyHref={`/admin/audit?bucket=${id}&actionPrefix=bucket.key.`}
 			canEdit={canEdit}
 		/>
 	);

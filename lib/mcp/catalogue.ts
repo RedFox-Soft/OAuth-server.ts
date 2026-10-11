@@ -425,7 +425,7 @@ const catalogue = [
 		querySchema: BucketActivityQuery,
 		pathParams: ['id'],
 		summary:
-			"Read a user bucket's monthly active users: this month so far, each day of the month and the previous 12 months, in total and by kind of activity (local sign-in, upstream sign-in, renewal) and directory-provisioned accounts. A super administrator may also read the reserved buckets and deleted buckets, by id. Counts only, never who."
+			"Read a user bucket's monthly active users: this month so far, each day of the month and the previous 12 months, in total and by kind of activity (local sign-in, upstream sign-in, renewal) and directory-provisioned accounts. A super administrator may also read the reserved buckets and deleted buckets, by id. The answer names the bucket (`name`) and, for a deleted one, `deletedAt` and the group that last owned it (`lastOwner`, null when not recorded). Counts only, never who."
 	},
 	{
 		tool: 'activity_overview',
@@ -652,7 +652,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: [],
 		summary:
-			'The instance (root) signing keys, each with its state — published (verifies, may be promoted once promotableAt has passed), signing (one per algorithm), or retired (still verifies until removableAt, then hidden). Nothing here needs a restart. No key material is returned; the public keys are at the root /jwks.'
+			'The instance (root) signing keys, each with its state — published (verifies, may be promoted once promotableAt has passed; signedUntil when it signed before a promotion replaced it), signing (one per algorithm), or retired (still verifies until removableAt, then hidden). Nothing here needs a restart. No key material is returned; the public keys are at the root /jwks.'
 	},
 	{
 		tool: 'bucket_key_list',
@@ -665,7 +665,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			"The signing keys of a bucket that has an address of its own, each with its state — published (verifies, may be promoted once promotableAt has passed), signing, or retired (still verifies until removableAt). No key material is returned; the public keys are at the bucket's jwks_uri. A bucket served at the root signs with the instance keys (jwks_list)."
+			"The signing keys of a bucket that has an address of its own, each with its state — published (verifies, may be promoted once promotableAt has passed; signedUntil when it signed before a promotion replaced it), signing (one per algorithm), or retired (still verifies until removableAt). No key material is returned; the public keys are at the bucket's jwks_uri. A bucket served at the root signs with the instance keys (jwks_list)."
 	},
 	{
 		tool: 'audit_list',

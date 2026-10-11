@@ -115,7 +115,10 @@ export function AdministratorsHome({ tab }: { tab: AdministratorsTab }) {
 						vertical
 						gap={12}
 					>
-						<BucketActivityPanel bucketId={ADMIN_BUCKET_ID} />
+						<BucketActivityPanel
+							bucketId={ADMIN_BUCKET_ID}
+							usageLink
+						/>
 						{/* Changes to an administrator's account are recorded against the account, not a bucket. */}
 						<Link href="/admin/audit?targetType=AdminUser">
 							Changes to administrators are in Audit →
