@@ -9,6 +9,27 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-12
+
+The admin console is rebuilt around addresses, pages and previews. Every screen has a link; buckets, identity
+providers, provisioning connections, groups and people each have a page; and a change that can lock people out or
+break applications says whom it affects, counted, before it applies. Deleting a bucket can be undone for 30 days,
+a signing key rotates in one step and can be revoked at once, administrators can sign in through their
+organisation's identity provider, and end users can be invited, signed out of one application or changed a hundred
+at a time. Usage is open to every administrator, over their own groups' buckets. Security fixes close a leak of
+administrators' authenticator secrets, a verification bypass through an email change, and the repointing of an
+identity provider under the accounts linked to it.
+
+**Upgrading asks four things of an operator.** Take a backup. Run `db:setup` (or `db:setup:pg`) for the new
+`provisioningRefusals` area and the new indexes. Then run `db:migrate`: migration
+`2026-10-12-static-token-expiry` gives every SCIM static token that has no expiry one, a year from its issue and
+never sooner than 90 days from the upgrade, and cannot be undone. Administrators who enrolled an authenticator
+before this release should enrol again. An integration meets these changes: the users list answers
+`{ users, totalResults }` a page at a time; setting or clearing a project's bucket, tightening a bucket's sign-in
+and handing a group to a directory answer 409 with a preview and apply only when repeated with `confirm: true` and
+the same `expect`; deleting a bucket schedules its destruction instead of destroying it; new buckets are closed to
+sign-up unless asked otherwise; and a user's profile now wins over a stored claim of the same name.
+
 ### Security
 
 - **A password-reset link no longer survives an email change** (spec 089). Before, a link sent to a person's old
@@ -1792,7 +1813,8 @@ found`. The refusal text existed and never ran: the call that delivered it sat i
 - The DPoP nonce secret is self-provisioned at startup, making the requireNonce-without-secret 500
   state unrepresentable (spec 014)
 
-[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.7.0...v0.8.0

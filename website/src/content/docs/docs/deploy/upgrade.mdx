@@ -268,6 +268,39 @@ What else an operator or an integration sees after 0.10.0:
   The error names the key. A malformed `richAuthorizationRequests.types` stops startup too, even while
   RAR is off, because the consent screen reads it.
 
+### Then 0.11.0
+
+0.11.0 carries one schema migration, and it cannot be undone. A SCIM static token used to live until it
+was replaced or revoked; from this release it expires (RFC 7644 §7.4). The migration
+`2026-10-12-static-token-expiry` gives every static token that has none an expiry a year after its issue,
+and never sooner than 90 days after the upgrade, so no directory stops syncing that day. Note the dates
+it sets and plan the replacements: a directory that still holds an expired token is refused.
+
+Then take a backup and run `db:setup` (or `db:setup:pg`). It adds the `provisioningRefusals` area, which
+records the removals a held connection refused, and new indexes: prefix search over users' emails and
+usernames, the audit trail's bucket filters, and a connection's previous static token. `db:migrate --plan`
+names the migration, and `db:migrate` runs it.
+
+What else an operator or an integration sees after 0.11.0:
+
+- **Administrators should enrol their authenticator again.** Before this release the administrator list
+  and the answers to creating and updating an administrator carried every enrolled administrator's TOTP
+  secret, readable by any super administrator or an agent acting for one.
+- **The users list is paged by the server.** `GET /admin/api/buckets/:id/users` and `bucket_user_list`
+  answer `{ users, totalResults }` in email order, a page at a time, instead of an array of everyone.
+- **More changes ask to be confirmed.** Setting or clearing a project's bucket, tightening a bucket's
+  sign-in (passwords off, verification or an authenticator required, sign-up opened on a reserved bucket)
+  and handing a group to a directory answer 409 with what they do. They apply only when the request is
+  repeated with `confirm: true` and the same `expect`. A script that did any of these in one request must
+  now send the second.
+- **Deleting a bucket schedules it.** `DELETE /admin/api/buckets/:id` switches the bucket off and destroys
+  it 30 days later; `POST /admin/api/buckets/:id/purge` destroys a scheduled bucket at once, and
+  `bucket_restore` brings it back. Its address stays taken until it is destroyed.
+- **New buckets are closed to sign-up** unless the request asks for it, and requiring a verified address
+  is refused on every bucket until mail delivery is configured.
+- **A user's profile wins over a stored claim of the same name.** An application that read a `given_name`
+  from a user's claims document while the profile held another now receives the profile's.
+
 ## After the restart
 
 ```bash
