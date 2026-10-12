@@ -29,6 +29,17 @@ export async function oidcIdentity(
 	let metadata;
 	try {
 		metadata = await discover(provider.issuer);
+	} catch (err) {
+		if (err instanceof DiscoveryError) {
+			throw new IdentityError('upstream', err.reason);
+		}
+		throw err;
+	}
+
+	/* Before the code is spent: a response from another issuer is not exchanged at all. */
+	assertResponseIssuer(request.iss, metadata);
+
+	try {
 		idToken = await exchangeCode(
 			provider,
 			metadata,
@@ -37,7 +48,7 @@ export async function oidcIdentity(
 			codeVerifier
 		);
 	} catch (err) {
-		if (err instanceof DiscoveryError || err instanceof ExchangeError) {
+		if (err instanceof ExchangeError) {
 			throw new IdentityError('upstream', err.reason);
 		}
 		throw err;
@@ -76,6 +87,31 @@ export async function oidcIdentity(
 		subject: assertion.subject,
 		claims: withFallbackAddress(provider, assertion.claims)
 	};
+}
+
+/*
+ * RFC 9207 §2.4: the `iss` an authorization response carries must be the issuer of the provider this round
+ * trip was started with, or the response is refused — and a provider that declares it always sends one must
+ * have sent one. Both are `rejected`, the class of an assertion that fails verification.
+ *
+ * Not compared where the discovered issuer is a template (Microsoft's multi-organisation endpoints publish
+ * `{tenantid}` literally): no response can equal a placeholder, and the ID token's issuer check, which knows
+ * the template's shape, stands as it did.
+ */
+function assertResponseIssuer(
+	iss: string | undefined,
+	metadata: { issuer: string; issParameterSupported?: boolean }
+): void {
+	if (metadata.issuer.includes('{')) return;
+	if (iss === undefined) {
+		if (metadata.issParameterSupported === true) {
+			throw new IdentityError('rejected', 'issuer_missing');
+		}
+		return;
+	}
+	if (iss !== metadata.issuer) {
+		throw new IdentityError('rejected', 'issuer_mismatch');
+	}
 }
 
 /*

@@ -223,6 +223,25 @@ export const statedRightRoutes: readonly StatedRightRoute[] = [
 		method: 'DELETE',
 		path: `${BUCKET}/federation/:providerId`
 	},
+	{
+		on: 'bucket',
+		flag: 'editSettings',
+		method: 'POST',
+		path: `${BUCKET}/federation/:providerId/move`,
+		body: { direction: 'up' }
+	},
+	{
+		on: 'bucket',
+		flag: 'editSettings',
+		method: 'POST',
+		path: `${BUCKET}/federation/:providerId/try`
+	},
+	{
+		on: 'bucket',
+		flag: 'read',
+		method: 'GET',
+		path: `${BUCKET}/federation/:providerId/try/:tryRef`
+	},
 
 	{
 		on: 'bucket',
@@ -241,6 +260,12 @@ export const statedRightRoutes: readonly StatedRightRoute[] = [
 		flag: 'manageUsers',
 		method: 'GET',
 		path: `${BUCKET}/provisioning-connections/:connectionId/hold`
+	},
+	{
+		on: 'bucket',
+		flag: 'manageUsers',
+		method: 'GET',
+		path: `${BUCKET}/provisioning-connections/directories`
 	},
 	{
 		on: 'bucket',
@@ -280,6 +305,12 @@ export const statedRightRoutes: readonly StatedRightRoute[] = [
 		flag: 'edit',
 		method: 'DELETE',
 		path: `${BUCKET}/provisioning-connections/:connectionId/credentials/:kind`
+	},
+	{
+		on: 'bucket',
+		flag: 'edit',
+		method: 'DELETE',
+		path: `${BUCKET}/provisioning-connections/:connectionId/credentials/:kind/previous`
 	},
 
 	{

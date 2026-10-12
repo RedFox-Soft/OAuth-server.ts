@@ -34,14 +34,19 @@ import { SaveBar } from '../../settings/SaveBar.js';
 import type { Change } from '../../settings/model.js';
 import type { BucketView } from '../bucketView.js';
 import {
+	ADVISORY_WARNINGS,
 	CREDENTIAL_KINDS,
 	Copyable,
+	DIRECTORY_CHOICES,
 	MAX_WINDOW_SECONDS,
 	MIN_WINDOW_SECONDS,
 	WARNING_LABELS,
 	WINDOW_UNITS,
 	connectionsApi,
 	describeWindow,
+	directoriesApi,
+	type DirectoryGuidance,
+	type DirectoryId,
 	parseJwks,
 	people,
 	setupDetails,
@@ -148,6 +153,9 @@ export function ConnectionPage({
 		);
 	}
 
+	const refusing =
+		connection?.warnings.filter((w) => !ADVISORY_WARNINGS.has(w)) ?? [];
+
 	const disable = () =>
 		connection &&
 		void actions.setEnabled(connection, false).then((done) => done && reload());
@@ -221,14 +229,41 @@ export function ConnectionPage({
 					vertical
 					gap={16}
 				>
-					{connection.warnings.length > 0 && (
+					{connection.warnings
+						.filter((w) => ADVISORY_WARNINGS.has(w))
+						.map((w) => (
+							<Alert
+								key={w}
+								type="info"
+								showIcon
+								title={WARNING_LABELS[w]}
+								description={
+									w === 'static_token_expiring' && connection.staticToken
+										? `It stops working ${when(connection.staticToken.expiresAt)}. Replace it now: the current one keeps working until the directory uses the new one.`
+										: 'Paste the new value into the directory before the previous one ends.'
+								}
+								action={
+									<Button
+										size="small"
+										onClick={() =>
+											credentialsRef.current?.scrollIntoView({
+												behavior: 'smooth'
+											})
+										}
+									>
+										Go to credentials
+									</Button>
+								}
+							/>
+						))}
+					{refusing.length > 0 && (
 						<Alert
 							type="warning"
 							showIcon
 							title="The directory's requests will be refused until this is fixed"
 							description={
 								<ul style={{ margin: 0, paddingInlineStart: 20 }}>
-									{connection.warnings.map((w) => (
+									{refusing.map((w) => (
 										<li key={w}>
 											{WARNING_LABELS[w]}
 											{w === 'provider_disabled' && (
@@ -344,12 +379,16 @@ export function ConnectionPage({
 				</Flex>
 			)}
 			{connection && tab === 'setup' && (
-				<DirectorySetup connection={connection} />
+				<DirectorySetup
+					bucketId={bucketId}
+					connection={connection}
+				/>
 			)}
 			{connection && tab === 'settings' && (
 				<ConnectionSettings
 					key={JSON.stringify([
 						connection.displayName,
+						connection.directory,
 						connection.correlation,
 						connection.emailTrust,
 						connection.threshold ?? null,
@@ -365,11 +404,36 @@ export function ConnectionPage({
 	);
 }
 
-function DirectorySetup({ connection }: { connection: ConnectionView }) {
+/* The chosen directory's entry in the server's guidance, or undefined while it loads or if it cannot be read. */
+function useDirectoryGuidance(
+	bucketId: string,
+	directory: DirectoryId
+): DirectoryGuidance | undefined {
+	const [all, setAll] = useState<DirectoryGuidance[]>([]);
+	useEffect(() => {
+		void request<{ directories: DirectoryGuidance[] }>(
+			'GET',
+			directoriesApi(bucketId)
+		).then((r) => {
+			if (r.ok) setAll(r.data.directories);
+		});
+	}, [bucketId]);
+	return all.find((d) => d.id === directory);
+}
+
+function DirectorySetup({
+	bucketId,
+	connection
+}: {
+	bucketId: string;
+	connection: ConnectionView;
+}) {
 	const feedback = useFeedback();
+	const guidance = useDirectoryGuidance(bucketId, connection.directory);
+	const labels = guidance?.labels;
 	async function copySetup() {
 		try {
-			await navigator.clipboard.writeText(setupDetails(connection));
+			await navigator.clipboard.writeText(setupDetails(connection, guidance));
 			feedback.done('Setup details copied, without the secret.');
 		} catch {
 			feedback.refused({
@@ -384,22 +448,31 @@ function DirectorySetup({ connection }: { connection: ConnectionView }) {
 			vertical
 			gap={16}
 		>
-			<Card title="Values for the directory">
+			<Card
+				title="Values for the directory"
+				extra={
+					guidance && (
+						<Typography.Text type="secondary">
+							Labelled as {guidance.displayName} labels them
+						</Typography.Text>
+					)
+				}
+			>
 				<Descriptions
 					column={1}
 					size="small"
 					bordered
 					items={[
 						{
-							label: 'SCIM base URL',
+							label: labels?.scimBaseUrl ?? 'SCIM base URL',
 							children: <Copyable value={connection.scimBaseUrl} />
 						},
 						{
-							label: 'Token endpoint',
+							label: labels?.tokenEndpoint ?? 'Token endpoint',
 							children: <Copyable value={connection.tokenEndpoint} />
 						},
 						{
-							label: 'Client id',
+							label: labels?.clientId ?? 'Client id',
 							children: <Copyable value={connection.clientId} />
 						},
 						{ label: 'Scope', children: <Copyable value={connection.scope} /> },
@@ -416,28 +489,109 @@ function DirectorySetup({ connection }: { connection: ConnectionView }) {
 					Copy setup details (without the secret)
 				</Button>
 			</Card>
-			<Card title="In the directory">
-				<Typography.Paragraph>
-					<strong>Microsoft Entra ID</strong>: in the enterprise application's
-					Provisioning, set the mode to Automatic, choose{' '}
-					<strong>OAuth2 client credentials</strong>, and paste the base URL,
-					token endpoint, client id and a client secret issued here.
-				</Typography.Paragraph>
-				<Typography.Paragraph style={{ margin: 0 }}>
-					<strong>Okta</strong>: in the app's Provisioning, enable API
-					integration with <strong>HTTP Header</strong> authentication, paste
-					the base URL, and a static token issued here as the bearer token.
-				</Typography.Paragraph>
-			</Card>
+			{guidance && (
+				<Card title={`In ${guidance.displayName}`}>
+					<Flex
+						vertical
+						gap={12}
+					>
+						<ol style={{ margin: 0, paddingInlineStart: 20 }}>
+							{guidance.steps.map((step) => (
+								<li key={step}>{step}</li>
+							))}
+						</ol>
+						{guidance.pitfalls.map((pitfall) => (
+							<Alert
+								key={pitfall}
+								type="info"
+								showIcon
+								title={pitfall}
+							/>
+						))}
+						<Typography.Text type="secondary">
+							Recommended credential:{' '}
+							{CREDENTIAL_KINDS.find(
+								(k) => k.kind === guidance.recommendedCredential
+							)?.label ?? guidance.recommendedCredential}
+							{guidance.fallbackCredential &&
+								` (or ${CREDENTIAL_KINDS.find((k) => k.kind === guidance.fallbackCredential)?.label.toLowerCase() ?? guidance.fallbackCredential} if it offers no OAuth option)`}
+							. Change the directory on the Settings tab.
+						</Typography.Text>
+					</Flex>
+				</Card>
+			)}
 		</Flex>
 	);
 }
 
 /*
- * One row per slot: the OAuth credential (a key or a secret) and the static token. Each slot holds one value,
- * so a replacement cuts the old one off the moment the new one exists — said before it happens, because the
- * directory still holding the old one stops working then.
+ * One row per slot: the OAuth credential (a key or a secret) and the static token. Replacing a secret or a
+ * static token keeps the old value working until the directory has moved to the new one (specs/088), so a
+ * scheduled rotation is not an outage; "stop now" is for a value that leaked. A key, or a change of kind, still
+ * replaces at once — said before it happens, because the directory still holding the old one stops working then.
  */
+type ValueSlot = 'secret' | 'static_token';
+
+interface ValueDraft {
+	slot: ValueSlot;
+	keep: boolean;
+	lifetimeDays: 90 | 365;
+}
+
+type Previous = NonNullable<
+	NonNullable<ConnectionView['staticToken']>['previous']
+>;
+
+function PreviousRow({
+	noun,
+	previous,
+	canEdit,
+	onRetire
+}: {
+	noun: string;
+	previous: Previous;
+	canEdit: boolean;
+	onRetire: () => void;
+}) {
+	return (
+		<Flex
+			vertical
+			gap={8}
+			style={{
+				paddingInlineStart: 16,
+				borderInlineStart: '2px solid var(--ant-color-border)'
+			}}
+		>
+			<Flex
+				justify="space-between"
+				align="center"
+				gap={12}
+				wrap
+			>
+				<div>
+					<Typography.Text>Previous {noun}</Typography.Text>
+					<br />
+					<Typography.Text type="secondary">
+						Still works · issued {when(previous.issuedAt)} · last used{' '}
+						{previous.lastUsedAt
+							? when(previous.lastUsedAt)
+							: 'not since the replacement'}{' '}
+						· ends at the latest {when(previous.endsAt)}
+					</Typography.Text>
+				</div>
+				{canEdit && <Button onClick={onRetire}>Retire previous now</Button>}
+			</Flex>
+			{previous.stillUsedByDirectory && (
+				<Alert
+					type="warning"
+					showIcon
+					title={`The directory still uses the previous ${noun}. Update it before ${when(previous.endsAt)}.`}
+				/>
+			)}
+		</Flex>
+	);
+}
+
 function CredentialsCard({
 	bucketId,
 	connection,
@@ -457,6 +611,7 @@ function CredentialsCard({
 	} | null>(null);
 	const [stored, setStored] = useState(false);
 	const [keyOpen, setKeyOpen] = useState(false);
+	const [draft, setDraft] = useState<ValueDraft | null>(null);
 	const [busy, setBusy] = useState(false);
 	const [keyForm] = Form.useForm<{
 		source: 'jwks' | 'jwksUri';
@@ -467,42 +622,23 @@ function CredentialsCard({
 	const keySource = Form.useWatch('source', keyForm);
 	const available: CredentialKind[] = connection.availableCredentialKinds;
 	const base = connectionsApi(bucketId, connection.id);
+	const oauth = connection.oauthCredential;
+	const staticToken = connection.staticToken;
 
-	async function issue(
-		kind: CredentialKind,
-		extra: Record<string, unknown> = {}
-	) {
-		const slotTaken =
-			kind === 'static_token'
-				? connection.staticToken !== null
-				: connection.oauthCredential !== null;
-		const proceed = slotTaken
-			? await confirm('connection.credential.replace', {
-					target: connection.displayName,
-					consequences: [
-						'The current credential stops working now, and every token it obtained is revoked.',
-						"The directory's synchronisation fails until it has the new one; Entra may quarantine the job."
-					]
-				})
-			: await confirm('connection.credential.issue', {
-					target: connection.displayName,
-					consequences: [
-						'Whoever holds it can create, change and remove the people of this bucket.'
-					]
-				});
-		if (!proceed) return;
+	async function post(kind: CredentialKind, body: Record<string, unknown>) {
 		setBusy(true);
 		try {
 			const result = await request<{ secret?: string; token?: string }>(
 				'POST',
 				`${base}/credentials`,
-				{ kind, ...extra }
+				{ kind, ...body }
 			);
 			if (!result.ok) {
 				feedback.failed(result);
 				return;
 			}
 			setStored(false);
+			setDraft(null);
 			if (result.data.secret)
 				setRevealed({ noun: 'client secret', value: result.data.secret });
 			else if (result.data.token)
@@ -518,14 +654,121 @@ function CredentialsCard({
 		}
 	}
 
+	/* A key, or a secret replacing a key: there is nothing the old credential could overlap with. */
+	async function issueAtOnce(
+		kind: CredentialKind,
+		extra: Record<string, unknown> = {}
+	) {
+		const slotTaken =
+			kind === 'static_token' ? staticToken !== null : oauth !== null;
+		const proceed = slotTaken
+			? await confirm('connection.credential.replace', {
+					target: connection.displayName,
+					consequences: [
+						'The current credential stops working now, and every token it obtained is revoked.',
+						'Update the directory first: its synchronisation fails until it has the new one, and Microsoft Entra ID may quarantine the job.'
+					]
+				})
+			: await confirm('connection.credential.issue', {
+					target: connection.displayName,
+					consequences: [
+						'Whoever holds it can create, change and remove the people of this bucket.'
+					]
+				});
+		if (proceed) await post(kind, extra);
+	}
+
+	/* Whether this replacement can keep the old value working: the same kind replacing itself. */
+	const overlaps = (slot: ValueSlot) =>
+		slot === 'static_token'
+			? staticToken !== null
+			: oauth !== null && oauth.kind === 'secret';
+
+	async function submitValue(d: ValueDraft) {
+		const replacing =
+			d.slot === 'static_token' ? staticToken !== null : oauth !== null;
+		const keep = overlaps(d.slot) && d.keep;
+		const noun = d.slot === 'static_token' ? 'static token' : 'client secret';
+		const lifetime =
+			d.slot === 'static_token'
+				? [
+						`The new token expires ${d.lifetimeDays === 365 ? 'in one year' : 'in 90 days'}.`
+					]
+				: [];
+		let proceed: boolean;
+		if (!replacing) {
+			proceed = await confirm('connection.credential.issue', {
+				target: connection.displayName,
+				consequences: [
+					'Whoever holds it can create, change and remove the people of this bucket.',
+					...lifetime
+				]
+			});
+		} else if (keep) {
+			proceed = await confirm('connection.credential.replace', {
+				target: connection.displayName,
+				consequences: [
+					`The current ${noun} keeps working until the directory has used the new one and stopped using the old one for an hour — and no longer than 24 hours.`,
+					'Paste the new value into the directory within that time; synchronisation does not stop.',
+					...lifetime
+				]
+			});
+		} else {
+			proceed = await confirm('connection.credential.replace', {
+				target: connection.displayName,
+				consequences: [
+					`The current ${noun} stops working now${d.slot === 'secret' ? ', and every token it obtained is revoked' : ''}.`,
+					"The directory's synchronisation fails until it has the new one; Microsoft Entra ID may quarantine the job.",
+					...lifetime
+				]
+			});
+		}
+		if (!proceed) return;
+		await post(d.slot, {
+			...(replacing && overlaps(d.slot) ? { overlap: keep } : {}),
+			...(d.slot === 'static_token' ? { lifetimeDays: d.lifetimeDays } : {})
+		});
+	}
+
+	async function retire(slot: 'oauth' | 'static_token') {
+		const noun = slot === 'oauth' ? 'client secret' : 'static token';
+		if (
+			!(await confirm('connection.credential.retire', {
+				target: connection.displayName,
+				consequences: [
+					slot === 'oauth'
+						? 'Requests with it, and every token it obtained, fail at once. The current secret is unaffected.'
+						: 'Requests with it fail at once. The current token is unaffected.'
+				]
+			}))
+		) {
+			return;
+		}
+		const result = await request(
+			'DELETE',
+			`${base}/credentials/${slot}/previous`
+		);
+		if (!result.ok) {
+			feedback.failed(result);
+			return;
+		}
+		feedback.done(`Previous ${noun} of ${connection.displayName} retired.`);
+		onChanged();
+	}
+
 	async function revoke(slot: 'oauth' | 'static_token') {
+		const previous =
+			slot === 'oauth'
+				? oauth?.kind === 'secret' && oauth.previous !== undefined
+				: staticToken?.previous !== undefined;
 		if (
 			!(await confirm('connection.credential.revoke', {
 				target: connection.displayName,
 				consequences: [
 					slot === 'oauth'
 						? 'Every token it obtained is revoked and the directory can no longer authenticate with it.'
-						: 'The directory can no longer authenticate with it.'
+						: 'The directory can no longer authenticate with it.',
+					...(previous ? ['The previous value, still working, ends too.'] : [])
 				]
 			}))
 		) {
@@ -552,7 +795,7 @@ function CredentialsCard({
 			return;
 		}
 		const signingAlg = values.signingAlg?.trim();
-		await issue('key', {
+		await issueAtOnce('key', {
 			...(values.source === 'jwksUri'
 				? { jwksUri: values.jwksUri?.trim() }
 				: { jwks: parseJwks(values.jwksText) }),
@@ -560,13 +803,17 @@ function CredentialsCard({
 		});
 	}
 
-	const oauth = connection.oauthCredential;
 	const unavailable = (kind: CredentialKind) =>
 		!available.includes(kind)
 			? 'Switched off on this instance (Settings → SCIM).'
 			: null;
 	const label = (kind: CredentialKind) =>
 		CREDENTIAL_KINDS.find((k) => k.kind === kind)?.label ?? kind;
+	const use = (firstUsedAt: string | null) =>
+		firstUsedAt ? `in use since ${when(firstUsedAt)}` : 'not used yet';
+	const open = (slot: ValueSlot) =>
+		setDraft({ slot, keep: true, lifetimeDays: 365 });
+	const idle = canEdit && !revealed && !draft && !keyOpen;
 
 	return (
 		<Card title="Credentials">
@@ -609,11 +856,11 @@ function CredentialsCard({
 							{oauth === null
 								? 'None'
 								: oauth.kind === 'secret'
-									? `Client secret, issued ${when(oauth.issuedAt)}`
+									? `Client secret, issued ${when(oauth.issuedAt)} · ${use(oauth.firstUsedAt)}`
 									: `Public key${oauth.jwksUri ? ` at ${oauth.jwksUri}` : oauth.keyCount !== undefined ? ` (${oauth.keyCount} in the set)` : ''}, issued ${when(oauth.issuedAt)}`}
 						</Typography.Text>
 					</div>
-					{canEdit && !revealed && (
+					{idle && (
 						<Flex
 							gap={8}
 							wrap
@@ -621,14 +868,18 @@ function CredentialsCard({
 							<Button
 								disabled={busy || unavailable('secret') !== null}
 								title={unavailable('secret') ?? undefined}
-								onClick={() => void issue('secret')}
+								onClick={() =>
+									oauth?.kind === 'key'
+										? void issueAtOnce('secret')
+										: open('secret')
+								}
 							>
 								{oauth
 									? `Replace with a ${label('secret').toLowerCase()}…`
-									: 'Issue client secret'}
+									: 'Issue client secret…'}
 							</Button>
 							<Button
-								disabled={keyOpen || unavailable('key') !== null}
+								disabled={unavailable('key') !== null}
 								onClick={() => {
 									keyForm.resetFields();
 									setKeyOpen(true);
@@ -647,6 +898,25 @@ function CredentialsCard({
 						</Flex>
 					)}
 				</Flex>
+				{oauth?.kind === 'secret' && oauth.previous && (
+					<PreviousRow
+						noun="client secret"
+						previous={oauth.previous}
+						canEdit={canEdit}
+						onRetire={() => void retire('oauth')}
+					/>
+				)}
+				{canEdit && draft?.slot === 'secret' && (
+					<ValueForm
+						draft={draft}
+						overlaps={overlaps('secret')}
+						replacing={oauth !== null}
+						busy={busy}
+						onChange={setDraft}
+						onSubmit={() => void submitValue(draft)}
+						onCancel={() => setDraft(null)}
+					/>
+				)}
 				{canEdit && keyOpen && (
 					<Card
 						size="small"
@@ -728,12 +998,12 @@ function CredentialsCard({
 						<Typography.Text strong>Static token</Typography.Text>
 						<br />
 						<Typography.Text type="secondary">
-							{connection.staticToken === null
+							{staticToken === null
 								? 'None'
-								: `Issued ${when(connection.staticToken.issuedAt)}`}
+								: `Issued ${when(staticToken.issuedAt)} · expires ${when(staticToken.expiresAt)} · ${use(staticToken.firstUsedAt)}`}
 						</Typography.Text>
 					</div>
-					{canEdit && !revealed && (
+					{idle && (
 						<Flex
 							gap={8}
 							wrap
@@ -741,13 +1011,11 @@ function CredentialsCard({
 							<Button
 								disabled={busy || unavailable('static_token') !== null}
 								title={unavailable('static_token') ?? undefined}
-								onClick={() => void issue('static_token')}
+								onClick={() => open('static_token')}
 							>
-								{connection.staticToken
-									? 'Replace static token…'
-									: 'Issue static token'}
+								{staticToken ? 'Replace static token…' : 'Issue static token…'}
 							</Button>
-							{connection.staticToken && (
+							{staticToken && (
 								<Button
 									danger
 									onClick={() => void revoke('static_token')}
@@ -758,6 +1026,120 @@ function CredentialsCard({
 						</Flex>
 					)}
 				</Flex>
+				{staticToken?.previous && (
+					<PreviousRow
+						noun="static token"
+						previous={staticToken.previous}
+						canEdit={canEdit}
+						onRetire={() => void retire('static_token')}
+					/>
+				)}
+				{canEdit && draft?.slot === 'static_token' && (
+					<ValueForm
+						draft={draft}
+						overlaps={overlaps('static_token')}
+						replacing={staticToken !== null}
+						busy={busy}
+						onChange={setDraft}
+						onSubmit={() => void submitValue(draft)}
+						onCancel={() => setDraft(null)}
+					/>
+				)}
+			</Flex>
+		</Card>
+	);
+}
+
+/* The choices a new secret or static token needs before the question: overlap, and a token's lifetime. */
+function ValueForm({
+	draft,
+	overlaps,
+	replacing,
+	busy,
+	onChange,
+	onSubmit,
+	onCancel
+}: {
+	draft: ValueDraft;
+	overlaps: boolean;
+	replacing: boolean;
+	busy: boolean;
+	onChange: (d: ValueDraft) => void;
+	onSubmit: () => void;
+	onCancel: () => void;
+}) {
+	const noun = draft.slot === 'static_token' ? 'static token' : 'client secret';
+	return (
+		<Card
+			size="small"
+			title={`${replacing ? 'Replace' : 'Issue'} the ${noun}`}
+		>
+			<Flex
+				vertical
+				gap={12}
+			>
+				{overlaps && (
+					<Radio.Group
+						aria-label="What happens to the current value"
+						value={draft.keep}
+						onChange={(e) =>
+							onChange({ ...draft, keep: e.target.value as boolean })
+						}
+					>
+						<Flex
+							vertical
+							gap={8}
+						>
+							<Radio value={true}>
+								<Typography.Text strong>
+									Keep the current one working until the directory uses the new
+									one
+								</Typography.Text>
+								<br />
+								<Typography.Text type="secondary">
+									It ends an hour after the directory last uses it, and no later
+									than 24 hours from now.
+								</Typography.Text>
+							</Radio>
+							<Radio value={false}>
+								<Typography.Text strong>
+									Stop the current one now
+								</Typography.Text>
+								<br />
+								<Typography.Text type="secondary">
+									Use this if it leaked. Synchronisation fails until the
+									directory has the new one.
+								</Typography.Text>
+							</Radio>
+						</Flex>
+					</Radio.Group>
+				)}
+				{draft.slot === 'static_token' && (
+					<div>
+						<Typography.Text strong>Lifetime</Typography.Text>
+						<br />
+						<Select<90 | 365>
+							aria-label="Lifetime"
+							value={draft.lifetimeDays}
+							onChange={(v) => onChange({ ...draft, lifetimeDays: v })}
+							style={{ width: 160 }}
+							options={[
+								{ label: '1 year', value: 365 },
+								{ label: '90 days', value: 90 }
+							]}
+						/>
+					</div>
+				)}
+				<Flex gap={8}>
+					<Button
+						type="primary"
+						loading={busy}
+						onClick={onSubmit}
+					>
+						{replacing ? 'Replace…' : 'Issue…'}
+					</Button>
+					<Button onClick={onCancel}>Cancel</Button>
+				</Flex>
 			</Flex>
 		</Card>
 	);
@@ -765,6 +1147,7 @@ function CredentialsCard({
 
 interface SettingsDraft {
 	displayName: string;
+	directory: DirectoryId;
 	claim: string;
 	attribute: 'externalId' | 'userName';
 	emailTrust: 'trusted' | 'untrusted';
@@ -776,6 +1159,7 @@ interface SettingsDraft {
 
 const SETTING_LABELS: Record<keyof SettingsDraft, string> = {
 	displayName: 'Name',
+	directory: 'Directory',
 	claim: 'Matching claim',
 	attribute: 'Matching attribute',
 	emailTrust: 'Email addresses',
@@ -803,6 +1187,7 @@ function ConnectionSettings({
 		: { amount: 1, unit: 3600 };
 	const baseline: SettingsDraft = {
 		displayName: connection.displayName,
+		directory: connection.directory,
 		claim: connection.correlation.claim,
 		attribute: connection.correlation.attribute,
 		emailTrust: connection.emailTrust,
@@ -853,6 +1238,7 @@ function ConnectionSettings({
 		}
 		const body: Record<string, unknown> = {};
 		if (dirty.includes('displayName')) body.displayName = draft.displayName;
+		if (dirty.includes('directory')) body.directory = draft.directory;
 		if (dirty.includes('emailTrust')) body.emailTrust = draft.emailTrust;
 		if (dirty.includes('claim') || dirty.includes('attribute')) {
 			body.correlation = {
@@ -903,6 +1289,12 @@ function ConnectionSettings({
 					items={[
 						{ label: 'Name', children: connection.displayName },
 						{
+							label: 'Directory',
+							children:
+								DIRECTORY_CHOICES.find((d) => d.value === connection.directory)
+									?.label ?? connection.directory
+						},
+						{
 							label: 'Matching',
 							children: `${connection.correlation.claim} ↔ ${connection.correlation.attribute}`
 						},
@@ -952,6 +1344,21 @@ function ConnectionSettings({
 							value={draft.displayName}
 							onChange={(e) => set('displayName', e.target.value)}
 						/>
+					</div>
+					<div>
+						<Typography.Text strong>Directory</Typography.Text>
+						<br />
+						<Select<DirectoryId>
+							aria-label="Directory"
+							value={draft.directory}
+							onChange={(v) => set('directory', v)}
+							options={DIRECTORY_CHOICES}
+							style={{ width: 240 }}
+						/>
+						<br />
+						<Typography.Text type="secondary">
+							Only changes the field names and advice shown on Directory setup.
+						</Typography.Text>
 					</div>
 					<div>
 						<Typography.Text strong>

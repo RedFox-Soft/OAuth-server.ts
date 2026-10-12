@@ -90,22 +90,33 @@ the client-credentials grant. Entra may send the secret by Basic authentication 
 both are accepted. The token it gets carries the `scim` scope and nothing else, and works only at this
 bucket's SCIM URL.
 
+In Entra's **How credentials are sent**, choose Header or Body, not Both: a token request that
+authenticates twice is refused (RFC 6749 §2.3). Leave the scopes empty or enter `scim`.
+
 A client secret is a deviation from the IPSIE profile this server targets, which requires a signed JWT
-assertion. It exists because Entra can only send a secret, and it can be switched off with
-[`scim.secretCredentials`](/docs/reference/settings/#scim.secretCredentials). A client that can sign uses
-**Issue key credential** instead, with a key set pasted in or fetched from a URL. Issuing either kind
-replaces the connection's previous credential and ends every token it obtained.
+assertion. It exists because Entra's and Okta's OAuth modes send a secret, and it can be switched off
+with [`scim.secretCredentials`](/docs/reference/settings/#scim.secretCredentials). A client that can sign
+uses **Issue key credential** instead, with a key set pasted in or fetched from a URL.
 
-## Okta: a static token in header mode
+To rotate a secret, choose **Replace secret** and keep the current one working. The previous secret
+keeps working until the directory has used the new one and stopped using the old one for an hour, and
+never longer than 24 hours, so synchronisation does not stop while you paste the new value. **Retire
+previous now** ends it early, together with every token it obtained. If a secret leaked, replace it
+with **Stop the current one now** instead: it stops at once. Issuing a key credential, or switching
+between a secret and a key, replaces the previous credential at once.
 
-Okta cannot use the client-credentials grant for SCIM, so it gets a static token. Under
-**Authorization**, choose **Issue static token**. The token begins with `scimst_`, is shown once, and is
-stored only as a digest. In Okta's SCIM settings, choose header authentication and paste the token
-as it is. Okta sends it without a `Bearer` prefix, and the prefix is what lets this server recognise it.
+## Okta: a client secret, or a static token in header mode
 
-To rotate, issue a new static token. The old one stops working at that moment, and the connection has
-one static token at a time, so paste the new one into Okta straight away and use its credential test.
-Requests that arrive in between are refused as unauthenticated, so rotate when the directory is quiet.
+Okta's SCIM settings offer **OAuth2** with the Client Credentials grant type; use it where your Okta
+organisation offers it, with a client secret issued here, exactly as for Entra. Where it does not,
+Okta gets a static token. Under **Authorization**, choose **Issue static token** and its lifetime, 90
+days or one year. The token begins with `scimst_`, is shown once, and is stored only as a digest. In
+Okta's SCIM settings, choose **HTTP Header** authentication and paste the token as it is. Okta sends it
+without a `Bearer` prefix, and the prefix is what lets this server recognise it.
+
+A static token expires (RFC 7644 §7.4); the connection page and the bucket's overview warn 14 days
+before. To rotate, choose **Replace static token**: as with a secret, the previous token keeps working
+until Okta has moved to the new one, at most 24 hours, so there is no gap to schedule around.
 **Revoke the static token** removes it without issuing another. Static tokens are another deviation
 from the profile, switched by [`scim.staticTokens`](/docs/reference/settings/#scim.staticTokens).
 

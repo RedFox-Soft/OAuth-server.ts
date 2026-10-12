@@ -2,6 +2,7 @@ import { getProvisioningConnectionStore } from '../adapters/index.js';
 import type { ProvisioningConnection } from '../adapters/types.js';
 import { CONNECTION_CLIENT_PREFIX } from '../consts/scim.js';
 import { ApplicationConfig } from '../configs/application.js';
+import { isPreviousLive } from './overlap.js';
 
 /*
  * The OAuth client a connection's key or secret credential authenticates as at the token endpoint.
@@ -62,6 +63,14 @@ export function connectionClientMetadata(
 		 */
 		metadata.token_endpoint_auth_method = 'client_secret_basic';
 		metadata.clientSecretDigest = credential.digest;
+		/*
+		 * The replaced secret keeps working only while the overlap rule says so (specs/088 R1). Emitted or
+		 * dropped on each resolution: the validation memo is keyed by these properties, so the change takes
+		 * effect on the next request with nothing to invalidate.
+		 */
+		if (connection.previousSecret && isPreviousLive(connection, 'secret')) {
+			metadata.previousClientSecretDigest = connection.previousSecret.digest;
+		}
 	}
 	return metadata;
 }

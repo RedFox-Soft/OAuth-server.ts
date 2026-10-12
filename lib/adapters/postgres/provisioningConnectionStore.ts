@@ -8,7 +8,9 @@ import { UniqueValueTaken } from '../conflicts.js';
 import { providerKeyOf } from '../connection_keys.js';
 import {
 	ProvisioningConnection,
+	type CredentialSlot,
 	type DeprovisioningHold,
+	type HeldConnection,
 	type NewProvisioningConnection,
 	type ProvisioningConnectionPatch,
 	type ProvisioningConnectionStoreInstance
@@ -92,6 +94,103 @@ export class ProvisioningConnectionStore implements ProvisioningConnectionStoreI
 			WHERE doc->>'staticTokenDigest' = ${digest}
 		`;
 		return this.connectionOf(rows[0]);
+	}
+
+	/* The expression the inventory's index on `previousStaticToken.digest` is built over, so the planner uses it. */
+	async findByPreviousStaticTokenDigest(
+		digest: string
+	): Promise<ProvisioningConnection | null> {
+		const handle = sql();
+		const rows = await handle`
+			SELECT doc FROM ${handle(this.area)}
+			WHERE (doc->'previousStaticToken'->>'digest') = ${digest}
+		`;
+		return this.connectionOf(rows[0]);
+	}
+
+	/* The same hold test as `bucketsHolding`, so the count and the bucket marks cannot disagree. */
+	async listHeld(): Promise<HeldConnection[]> {
+		const handle = sql();
+		const rows = await handle`
+			SELECT doc FROM ${handle(this.area)}
+			WHERE jsonb_typeof(doc->'hold') = 'object'
+		`;
+		return this.connectionsOf(rows).flatMap((connection) =>
+			connection.hold
+				? [
+						{
+							_id: connection._id,
+							bucketId: connection.bucketId,
+							displayName: connection.displayName,
+							hold: connection.hold,
+							...(connection.tallyEpoch !== undefined
+								? { tallyEpoch: connection.tallyEpoch }
+								: {})
+						}
+					]
+				: []
+		);
+	}
+
+	/*
+	 * One conditional statement each, written with `jsonb_set` so nothing else in the document is rewritten:
+	 * a request's bookkeeping must not race an administrator's replacement of the credential.
+	 */
+	async noteCredentialUse(
+		id: string,
+		slot: CredentialSlot,
+		which: 'current' | 'previous',
+		at: Date
+	): Promise<void> {
+		const handle = sql();
+		/*
+		 * Through `to_jsonb(text)`: a string parameter cast straight to jsonb is sent JSON-encoded by the driver,
+		 * so a pre-stringified value would land as a string holding quotes — found against a real server.
+		 */
+		const stamp = at.toISOString();
+		if (which === 'previous') {
+			const field =
+				slot === 'secret' ? 'previousSecret' : 'previousStaticToken';
+			await handle`
+				UPDATE ${handle(this.area)}
+				SET doc = jsonb_set(doc, ${`{${field},lastUsedAt}`}::text[], to_jsonb(${stamp}::text))
+				WHERE id = ${id} AND jsonb_typeof(doc->${field}::text) = 'object'
+			`;
+			return;
+		}
+		if (slot === 'secret') {
+			await handle`
+				UPDATE ${handle(this.area)}
+				SET doc = jsonb_set(doc, '{oauthCredential,firstUsedAt}', to_jsonb(${stamp}::text))
+				WHERE id = ${id}
+					AND doc->'oauthCredential'->>'kind' = 'secret'
+					AND jsonb_typeof(doc->'oauthCredential'->'firstUsedAt') IS DISTINCT FROM 'string'
+			`;
+			return;
+		}
+		await handle`
+			UPDATE ${handle(this.area)}
+			SET doc = jsonb_set(doc, '{staticTokenFirstUsedAt}', to_jsonb(${stamp}::text))
+			WHERE id = ${id}
+				AND jsonb_typeof(doc->'staticTokenDigest') = 'string'
+				AND jsonb_typeof(doc->'staticTokenFirstUsedAt') IS DISTINCT FROM 'string'
+		`;
+	}
+
+	async retirePrevious(
+		id: string,
+		slot: CredentialSlot,
+		digest: string
+	): Promise<boolean> {
+		const field = slot === 'secret' ? 'previousSecret' : 'previousStaticToken';
+		const handle = sql();
+		const rows = await handle`
+			UPDATE ${handle(this.area)}
+			SET doc = (doc - ${field}::text) || ${{ updatedAt: new Date() }}
+			WHERE id = ${id} AND doc->${field}::text->>'digest' = ${digest}
+			RETURNING id
+		`;
+		return rows.length === 1;
 	}
 
 	/*

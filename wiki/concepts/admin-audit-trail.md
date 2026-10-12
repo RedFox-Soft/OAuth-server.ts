@@ -4,7 +4,7 @@ title: 'The admin audit trail'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-03
-updated: 2026-10-10
+updated: 2026-10-12
 graph:
   node_type: concept
   relationships:
@@ -26,7 +26,8 @@ graph:
 
 Every state-changing action in the administrative control plane writes exactly one append-only record
 naming who did it, what they did, which entity it affected and when. The constitution requires this of
-*every* admin action, human- or MCP-initiated, and 27 mounted routes are subject to it. The trail is
+*every* admin action, human- or MCP-initiated, and every mounted mutating route is subject to it (82 since
+spec 088; 27 when this page was written). The trail is
 permanent: the storage area declares no expiry, the store interface exposes no update or delete, and no
 product surface offers either (`lib/adapters/types.ts`, `lib/consts/storage_inventory.ts`).
 
@@ -71,7 +72,7 @@ read a refused request as a completed one.
 
 ## The table is load-bearing
 
-`lib/consts/admin_audit_routes.ts` enumerates all 27 audited routes with their action name and target
+`lib/consts/admin_audit_routes.ts` enumerates every audited route with its action name and target
 type, plus the deliberate exclusions. Each touches only the caller's own standing and nothing else,
 which is the shared reason — the trail is a record of changes to managed entities, so an entry for
 something that changed none of them is a row an investigator has to read past:
@@ -214,6 +215,18 @@ three more filters, all ANDed with the rest and with the group boundary, so they
 Since spec 087 an entry may carry `keys`, the kids a key act touched by role (`promoted`, `demoted`,
 `generated`, `revoked`, `signing`), because a rotation or a revocation acts on up to three keys in one entry.
 Key ids are public, as `kid` is.
+
+Spec 088 added three actions and changed one entry:
+
+- `provisioning.credential.retire` — an administrator ends a SCIM connection's overlapping previous secret or
+  static token now. A previous value that ends by itself is not an act and writes nothing
+  ([[scim-credential-overlap]]).
+- `provisioning.credential.issue` now records in `to` the replaced value's latest end when it overlaps, or `null`
+  when it stopped at once.
+- `federation.provider.move` — one place up or down in a bucket's sign-in order; `from` and `to` are the order
+  before and after, ids joined by `, `.
+- `federation.provider.try` — the start of an administrator's try of a provider. It changes no managed entity, but it
+  sends a browser to an upstream with the bucket's client credentials, and that is worth a record. Its result is not ([[federation-try-signin]]).
 
 Also since spec 085:
 - Key entries carry `kid`.

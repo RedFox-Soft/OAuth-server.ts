@@ -25,6 +25,7 @@ import {
 import type { UserBucket } from '../../adapters/types.js';
 import type { FederationProvider } from '../../federation/types.js';
 import { callbackUri } from '../../federation/flow.js';
+import { orderProviders } from '../../federation/order.js';
 import { defaultCorrelationFor } from '../../provisioning/correlation.js';
 import { stabilityOf } from './guidance.js';
 import { ApplicationConfig } from '../../configs/application.js';
@@ -103,13 +104,16 @@ export function present(
 	};
 }
 
-/* A caller holding only the providers gets no endpoint address, since there is no issuer to build it from. */
+/*
+ * A caller holding only the providers gets no endpoint address, since there is no issuer to build it from.
+ * In sign-in order (specs/088 R10), so the console's table lists them as the sign-in page shows them.
+ */
 export function presentAll(
 	bucket: Pick<UserBucket, 'federation'> &
-		Partial<Pick<UserBucket, '_id' | 'slug' | 'host'>>
+		Partial<Pick<UserBucket, '_id' | 'slug' | 'host' | 'signInOrder'>>
 ) {
 	const { _id } = bucket;
-	return bucket.federation.map((provider) =>
+	return orderProviders(bucket.federation, bucket.signInOrder).map((provider) =>
 		present(provider, _id === undefined ? undefined : { ...bucket, _id })
 	);
 }
@@ -128,7 +132,9 @@ export async function presentDetail(bucket: UserBucket, providerId: string) {
 	const signs = (entry?.protocol.kind ?? 'oidc') === 'oidc';
 	const capabilities = {
 		globalTokenRevocation: ApplicationConfig['globalTokenRevocation.enabled'],
-		backChannelLogout: ApplicationConfig['federation.enabled']
+		backChannelLogout: ApplicationConfig['federation.enabled'],
+		/* A try runs the real exchange and ladder, so it needs federation on, as a sign-in does (specs/088). */
+		trySignIn: ApplicationConfig['federation.enabled']
 	};
 	const [bound, linkedUsers] = await Promise.all([
 		getProvisioningConnectionStore().findByProvider(bucket._id, provider.id),
@@ -168,6 +174,14 @@ export async function presentDetail(bucket: UserBucket, providerId: string) {
 
 function providersOf(bucket: Pick<UserBucket, 'federation'>) {
 	return bucket.federation;
+}
+
+/* Whether or not it is enabled: what a try needs, since trying a provider before switching it on is the point. */
+export function findProvider(
+	bucket: Pick<UserBucket, 'federation'>,
+	providerId: string
+): FederationProvider {
+	return find(bucket, providerId);
 }
 
 function find(
@@ -583,7 +597,61 @@ export async function deleteProvider(
 			)
 		});
 	}
-	await getBucketStore().update(bucket._id, { federation });
+	/*
+	 * Its place in the sign-in order goes with it: a provider created later under the same id is a new
+	 * provider, and appears after the ordered ones rather than inheriting the deleted one's position.
+	 */
+	await getBucketStore().update(bucket._id, {
+		federation,
+		...(bucket.signInOrder?.includes(providerId)
+			? { signInOrder: bucket.signInOrder.filter((id) => id !== providerId) }
+			: {})
+	});
+}
+
+/*
+ * The order before and after one move (specs/088 R10): the displayed order, with the provider swapped with
+ * its neighbour. Refused (409) at an end, so a move in the trail always moved something.
+ */
+export function plannedMove(
+	bucket: UserBucket,
+	actor: ProviderActor,
+	providerId: string,
+	direction: 'up' | 'down'
+): { from: string[]; to: string[] } {
+	assertMayConfigure(bucket, actor);
+	find(bucket, providerId);
+	const from = orderProviders(bucket.federation, bucket.signInOrder).map(
+		(p) => p.id
+	);
+	const index = from.indexOf(providerId);
+	const target = direction === 'up' ? index - 1 : index + 1;
+	if (target < 0 || target >= from.length) {
+		throw new AdminError(
+			409,
+			`provider ${providerId} is already ${direction === 'up' ? 'first' : 'last'}`
+		);
+	}
+	const to = [...from];
+	to[index] = from[target];
+	to[target] = providerId;
+	return { from, to };
+}
+
+/*
+ * Writes the new order and nothing else: the providers themselves are not rewritten, so a move cannot
+ * revert an edit another administrator made a moment earlier. The full id list is stored, so every
+ * provider's place is fixed from then on rather than only the moved one's.
+ */
+export async function moveProvider(
+	bucket: UserBucket,
+	to: string[]
+): Promise<UserBucket> {
+	const updated = await getBucketStore().update(bucket._id, {
+		signInOrder: to
+	});
+	if (!updated) throw new AdminError(404, 'no access to this bucket');
+	return updated;
 }
 
 /*

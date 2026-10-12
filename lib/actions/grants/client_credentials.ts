@@ -14,6 +14,9 @@ import { namespaceOf } from '../../resources/namespace.js';
 import { ClientCredentials } from 'lib/models/client_credentials.js';
 import type { DPoPProof } from 'lib/helpers/validate_dpop.js';
 import { SCIM_SCOPE } from '../../consts/scim.js';
+import { getProvisioningConnectionStore } from '../../adapters/index.js';
+import { credentialRefOf } from '../../provisioning/overlap.js';
+import { noteCredentialUse } from '../../provisioning/credential_use.js';
 
 export async function clientCredentials(
 	oidc: OIDCContext<TokenParams>,
@@ -117,8 +120,32 @@ export async function clientCredentials(
 		throw new InvalidGrant('DPoP proof JWT not provided');
 	}
 
+	/*
+	 * A connection's token carries which of its secrets obtained it (specs/088 R2), so an administrator who
+	 * ends one of two overlapping secrets stops that secret's tokens and none of the other's.
+	 */
+	const match = client.provisioningConnectionId
+		? oidc.clientSecretMatch
+		: undefined;
+	const matchedDigest =
+		match === 'current'
+			? client.clientSecretDigest
+			: match === 'previous'
+				? client.previousClientSecretDigest
+				: undefined;
+	if (matchedDigest) {
+		token.payload.credentialRef = credentialRefOf(matchedDigest);
+	}
+
 	oidc.entity('ClientCredentials', token);
 	const value = await token.save();
+
+	if (match && client.provisioningConnectionId) {
+		const connection = await getProvisioningConnectionStore().find(
+			client.provisioningConnectionId
+		);
+		if (connection) await noteCredentialUse(connection, 'secret', match);
+	}
 
 	return {
 		access_token: value,

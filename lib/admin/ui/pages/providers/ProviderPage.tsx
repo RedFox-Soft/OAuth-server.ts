@@ -32,6 +32,7 @@ import { ADMIN_BUCKET_ID } from '../../../consts.js';
 import type { BucketView } from '../bucketView.js';
 import { federationApi, type ProviderDetail } from './providerTypes.js';
 import { providerBlocks, useProviderActions } from './useProviderActions.js';
+import { useTrySignIn } from './TrySignIn.js';
 
 /*
  * One identity provider, at an address of its own (specs/084 US2): everything an operator does to it after it
@@ -207,6 +208,7 @@ export function ProviderPage({
 	const reload = () => void fetchAll();
 
 	const can = bucketCan(bucket);
+	const trySignIn = useTrySignIn(bucketId, provider, can.edit);
 	const listHref = consoleBucket
 		? '/admin/administrators/identity-providers'
 		: bucketHref(bucketId, 'identity-providers');
@@ -246,40 +248,43 @@ export function ProviderPage({
 
 	const headerActions =
 		provider && can.edit ? (
-			<Dropdown
-				trigger={['click']}
-				menu={{
-					items: [
-						provider.enabled
-							? {
-									key: 'disable',
-									label: blocks.disable ? (
-										<Tooltip title={blocks.disable}>Disable…</Tooltip>
-									) : (
-										'Disable…'
-									),
-									danger: true,
-									disabled: blocks.disable !== null,
-									onClick: () =>
-										void actions
-											.setEnabled(provider, false)
-											.then((done) => done && reload())
-								}
-							: {
-									key: 'enable',
-									label: 'Enable',
-									onClick: () =>
-										void actions
-											.setEnabled(provider, true)
-											.then((done) => done && reload())
-								}
-					]
-				}}
-			>
-				<Button>
-					More <DownOutlined />
-				</Button>
-			</Dropdown>
+			<Flex gap={8}>
+				{trySignIn.button}
+				<Dropdown
+					trigger={['click']}
+					menu={{
+						items: [
+							provider.enabled
+								? {
+										key: 'disable',
+										label: blocks.disable ? (
+											<Tooltip title={blocks.disable}>Disable…</Tooltip>
+										) : (
+											'Disable…'
+										),
+										danger: true,
+										disabled: blocks.disable !== null,
+										onClick: () =>
+											void actions
+												.setEnabled(provider, false)
+												.then((done) => done && reload())
+									}
+								: {
+										key: 'enable',
+										label: 'Enable',
+										onClick: () =>
+											void actions
+												.setEnabled(provider, true)
+												.then((done) => done && reload())
+									}
+						]
+					}}
+				>
+					<Button>
+						More <DownOutlined />
+					</Button>
+				</Dropdown>
+			</Flex>
 		) : undefined;
 
 	return (
@@ -329,6 +334,7 @@ export function ProviderPage({
 				actions={headerActions}
 			/>
 			{loading && !provider && <Skeleton active />}
+			{trySignIn.panel}
 			{bucket && provider && (
 				<ProviderEditor
 					key={JSON.stringify(provider)}

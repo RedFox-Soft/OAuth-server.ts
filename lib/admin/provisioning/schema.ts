@@ -47,13 +47,24 @@ const Threshold = t.Union(
 	}
 );
 
+/*
+ * Which directory's words the console uses for a connection (specs/088 R9): Microsoft Entra ID, Okta, or a
+ * generic one. Presentation only — no runtime decision reads it. The list is the catalogue's
+ * (lib/consts/known_directories.ts), restated here as literals because a schema must be literal.
+ */
+const Directory = t.Union(
+	[t.Literal('entra'), t.Literal('okta'), t.Literal('generic')],
+	{ error: 'directory must be entra, okta or generic' }
+);
+
 export const CreateConnectionBody = t.Object(
 	{
 		displayName: t.String({ minLength: 1, maxLength: 100 }),
 		providerId: t.String({ minLength: 1, maxLength: 32 }),
 		correlation: t.Optional(Correlation),
 		emailTrust: t.Optional(EmailTrust),
-		threshold: t.Optional(Threshold)
+		threshold: t.Optional(Threshold),
+		directory: t.Optional(Directory)
 	},
 	{ additionalProperties: false }
 );
@@ -65,7 +76,8 @@ export const UpdateConnectionBody = t.Object(
 		enabled: t.Optional(t.Boolean()),
 		correlation: t.Optional(Correlation),
 		emailTrust: t.Optional(EmailTrust),
-		threshold: t.Optional(Threshold)
+		threshold: t.Optional(Threshold),
+		directory: t.Optional(Directory)
 	},
 	{ additionalProperties: false }
 );
@@ -91,7 +103,19 @@ export const IssueCredentialBody = t.Object(
 			})
 		),
 		jwksUri: t.Optional(t.String({ maxLength: 2048 })),
-		signingAlg: t.Optional(t.String({ maxLength: 16 }))
+		signingAlg: t.Optional(t.String({ maxLength: 16 })),
+		/*
+		 * Replacing a secret with a secret, or a static token with a static token: whether the current value
+		 * keeps working until the directory uses the new one (true, the default) or stops now (false — for a
+		 * leaked value). Without effect for a key or a change of kind, which always replace at once.
+		 */
+		overlap: t.Optional(t.Boolean()),
+		/* A static token's lifetime in days (RFC 7644 §7.4); default 365. Refused with any other kind. */
+		lifetimeDays: t.Optional(
+			t.Union([t.Literal(90), t.Literal(365)], {
+				error: 'lifetimeDays must be 90 or 365'
+			})
+		)
 	},
 	{ additionalProperties: false }
 );

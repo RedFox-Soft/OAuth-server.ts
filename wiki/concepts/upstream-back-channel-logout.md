@@ -4,7 +4,7 @@ title: 'Upstream back-channel logout: a provider''s sign-out ends the sessions i
 tags: [architecture, contract, gotcha, oauth]
 sources: [oauth-server-codebase]
 created: 2026-10-07
-updated: 2026-10-07
+updated: 2026-10-12
 graph:
   node_type: concept
   relationships:
@@ -48,7 +48,7 @@ Which sessions end (`lib/upstream_signals/back_channel_logout.ts:111`):
 Before this, nothing recorded which provider or upstream session a sign-in came through, so there was nothing to
 match a logout against. Now:
 
-- The callback reads `sid` from the **verified** ID-token claims (`lib/federation/routes.ts:173`) and carries
+- The callback reads `sid` from the **verified** ID-token claims (`lib/federation/routes.ts:197` as of spec 088) and carries
   `{ providerId, sid }` through the stage-2 handoff into `result.login.upstream`; a pending link carries it too and
   `settlePendingLink` attaches it when the link lands on the account signing in (`lib/federation/pending_link.ts:59`).
 - `resume()` passes it to `Session.loginAccount`, which **replaces or clears** `session.payload.upstream` at every

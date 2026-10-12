@@ -4,7 +4,7 @@ title: "Federation into the console: who can become an administrator, and never 
 tags: [architecture, security, admin, federation]
 sources: [oauth-server-codebase]
 created: 2026-10-11
-updated: 2026-10-11
+updated: 2026-10-12
 ---
 
 # Federation into the console
@@ -31,15 +31,15 @@ A provider created here defaults to `existing_only`.
 
 ## Becoming an administrator through a provider
 
-- **Linking always needs the password proof** (`lib/federation/resolve.ts:244`). Ordinary buckets link
+- **Linking always needs the password proof** (`lib/federation/resolve.ts:264` since spec 088's split of the ladder). Ordinary buckets link
   without it once the account holds an identity, or when the bucket has no password door. Here the account
   behind the address may be a super administrator, so any provider trusted for the address — a second one, or
   any one once passwords are off — would otherwise sign its holder in as them. With passwords off, no new
   identity can be linked at all; the password-off question names who that leaves out.
-- **A closed sign-up closes creation** (`resolve.ts:265`), before the provider's own setting. Ordinary buckets
+- **A closed sign-up closes creation** (`resolve.ts:277`), before the provider's own setting. Ordinary buckets
   keep "the provider's own knob decides" (research question 9.4 of the console redesign).
 - **A created administrator** gets a personal group and an `admin.register` audit entry
-  (`lib/federation/routes.ts:232`, `registeredAdministrator`), and never the instance privilege: only its own
+  (`lib/federation/routes.ts:246`, `registeredAdministrator`), and never the instance privilege: only its own
   grant routes change that membership. The refusal page says "You have no console account".
 - **The second factor** stays the provider's (owner decision): the bucket's authenticator requirement applies
   to password sign-in only, as in every bucket ([[totp-second-factor]]).
@@ -74,9 +74,9 @@ switch: how this session signed in, how many super administrators could still ge
 ## Agents
 
 An agent may configure the console's providers, as the console does, but each write there is
-high-consequence: `McpTool.highWhen` (`lib/mcp/catalogue.ts:1279,1293`) gates `federation_provider_create`
-and `federation_provider_update` on the administrators' bucket only, through the ordinary two-call
-confirmation. The token binds the target, so a confirmation for this bucket changes nothing on another.
+high-consequence: `McpTool.highWhen` (`lib/mcp/catalogue.ts:1395,1409,1436`) gates `federation_provider_create`,
+`federation_provider_update` and, since spec 088, `federation_provider_move` (the sign-in button order) on the
+administrators' bucket only, through the ordinary two-call confirmation. The token binds the target, so a confirmation for this bucket changes nothing on another.
 Ordinary buckets take one call. Turning password sign-in off is refused to an agent by rule 1.
 
 ## Related

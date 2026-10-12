@@ -69,7 +69,9 @@ export const BASE_METADATA_KEYS = [
 	 * to be a connection's client or present a digest in place of a secret.
 	 */
 	'provisioningConnectionId',
-	'clientSecretDigest'
+	'clientSecretDigest',
+	/* The connection's overlapping previous secret, emitted only while it is live (specs/088 R1). */
+	'previousClientSecretDigest'
 ];
 
 const CANONICAL_ONLY = new Set(BASE_METADATA_KEYS);

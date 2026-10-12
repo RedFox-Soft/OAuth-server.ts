@@ -786,18 +786,20 @@ export const ApplicationConfig = {
 	 *
 	 * A deviation flag (Constitution Principle I). IPSIE AL SCIM §4.1 requires JWT client
 	 * authentication (RFC 7523 §2.2) for the token a SCIM client presents; a client secret is not that.
-	 * On by default because Microsoft Entra ID can authenticate to a token endpoint only with a client
-	 * secret (until workload identity federation, part 4 of the series). Off: secret credentials can
-	 * neither be issued nor used, and Entra cannot obtain a token.
+	 * On by default because Microsoft Entra ID's OAuth2 Client Credentials Grant and Okta's OAuth 2
+	 * client-credentials mode both send a client secret; Entra's workload identity federation, which signs,
+	 * is not supported yet. Off: secret credentials can neither be issued nor used, and those directories
+	 * cannot obtain a token.
 	 */
 	'scim.secretCredentials': true,
 	/*
 	 * scim.staticTokens
 	 *
 	 * A deviation flag (Constitution Principle I). IPSIE §4.1 requires an OAuth access token from the
-	 * client-credentials grant; a long-lived bearer token is not one. On by default because Okta cannot
-	 * use client credentials for SCIM at all — its options are a header token or the authorization
-	 * code grant. Off: static tokens can neither be issued nor used, and Okta cannot connect.
+	 * client-credentials grant; a bearer token presented directly is not one. On by default for an Okta
+	 * organisation without the OAuth 2 option for SCIM (its HTTP Header mode) and Entra's long-lived bearer
+	 * mode. Every static token expires (RFC 7644 §7.4, specs/088). Off: static tokens can neither be issued
+	 * nor used, and directories using one cannot connect.
 	 */
 	'scim.staticTokens': true,
 	/*

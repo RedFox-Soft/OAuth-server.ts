@@ -36,8 +36,8 @@ async function issueSecret(c: Connected, cookie: string): Promise<string> {
 
 /**
  * @proves A provisioning connection's credentials obtain a token good for its own bucket's SCIM endpoint,
- * are shown exactly once, and stop working — with every token they obtained — the moment they are rotated,
- * revoked or switched off (spec 070, User Story 2, scenarios 2–4, 10; FR-009, FR-010, FR-013).
+ * are shown exactly once, and stop working — with every token they obtained — the moment they are rotated to
+ * stop now, revoked or switched off (spec 070, User Story 2, scenarios 2–4, 10; FR-009, FR-010, FR-013).
  */
 describe('provisioning connection credentials', () => {
 	let cookie: string;
@@ -137,7 +137,7 @@ describe('provisioning connection credentials', () => {
 		}
 	});
 
-	it('stops the old secret, the old static token and every token they obtained once each is re-issued', async () => {
+	it('stops the old secret, the old static token and every token they obtained once each is re-issued to stop now', async () => {
 		const c = await connect(await scimBucket());
 		const clientId = `scim-${c.connection._id}`;
 		const oldSecret = await issueSecret(c, cookie);
@@ -149,16 +149,20 @@ describe('provisioning connection credentials', () => {
 			)
 		).json.access_token as string;
 
-		await issueSecret(c, cookie);
+		const reissuedSecret = await admin(
+			'POST',
+			`${connectionPath(c)}/credentials`,
+			cookie,
+			{ kind: 'secret', overlap: false }
+		);
 		const reissuedToken = await admin(
 			'POST',
 			`${connectionPath(c)}/credentials`,
 			cookie,
-			{
-				kind: 'static_token'
-			}
+			{ kind: 'static_token', overlap: false }
 		);
 
+		expect(reissuedSecret.status).toBe(201);
 		expect(reissuedToken.status).toBe(201);
 		expect(
 			(

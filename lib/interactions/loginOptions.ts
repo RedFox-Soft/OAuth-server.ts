@@ -1,9 +1,7 @@
 import { getBucketStore } from '../adapters/index.js';
 import { enabledProviders } from '../federation/providers.js';
-import {
-	KNOWN_PROVIDERS,
-	knownProviderByIssuer
-} from '../consts/known_providers.js';
+import { orderProviders } from '../federation/order.js';
+import { knownProviderByIssuer } from '../consts/known_providers.js';
 import { resolveBucketForRequest } from '../admin/auth/resolveBucket.js';
 import type { RequestBucket } from '../configs/issuer.js';
 import { selfServiceResetAllowed } from '../password_reset/eligibility.js';
@@ -68,7 +66,10 @@ export async function loginOptionsForBucket(
 		 * records that, deliberately. So a Google provider somebody typed in by hand long before the
 		 * catalogue existed renders with its mark on the next page load, and no migration is owed.
 		 */
-		providers: orderedForDisplay(enabledProviders(bucket)).map((provider) => {
+		providers: orderProviders(
+			enabledProviders(bucket),
+			bucket?.signInOrder
+		).map((provider) => {
 			const known = knownProviderByIssuer(provider.issuer);
 			return {
 				id: provider.id,
@@ -77,28 +78,6 @@ export async function loginOptionsForBucket(
 			};
 		})
 	};
-}
-
-/*
- * The order the buttons appear in, which must not be the order somebody happened to connect them in.
- *
- * Stored order is the array's order, so it is stable across reloads — but it is *connection* order, which
- * means adding a provider silently rearranges a page end users already know, and two buckets configured
- * the same way in a different sequence look different. Recognised providers therefore take the catalogue's
- * order and arbitrary ones follow, alphabetically so that they too are independent of when they arrived.
- */
-function orderedForDisplay<T extends { id: string; issuer: string }>(
-	providers: T[]
-): T[] {
-	const rank = (provider: T): number => {
-		const known = knownProviderByIssuer(provider.issuer);
-		if (!known) return KNOWN_PROVIDERS.length;
-		return KNOWN_PROVIDERS.indexOf(known);
-	};
-	// Copied before sorting: the array belongs to the bucket document this was read from.
-	return [...providers].sort(
-		(a, b) => rank(a) - rank(b) || a.id.localeCompare(b.id)
-	);
 }
 
 /* The same answer, reached from the client that started the interaction — which is the only trustworthy

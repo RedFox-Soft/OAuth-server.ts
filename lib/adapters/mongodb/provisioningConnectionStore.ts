@@ -7,7 +7,9 @@ import { UniqueValueTaken } from '../conflicts.js';
 import { providerKeyOf } from '../connection_keys.js';
 import {
 	ProvisioningConnection,
+	type CredentialSlot,
 	type DeprovisioningHold,
+	type HeldConnection,
 	type NewProvisioningConnection,
 	type ProvisioningConnectionPatch,
 	type ProvisioningConnectionStoreInstance
@@ -122,6 +124,90 @@ export class ProvisioningConnectionStore implements ProvisioningConnectionStoreI
 		return connectionOf(
 			await this.collection.findOne({ staticTokenDigest: digest })
 		);
+	}
+
+	async findByPreviousStaticTokenDigest(
+		digest: string
+	): Promise<ProvisioningConnection | null> {
+		return connectionOf(
+			await this.collection.findOne({ 'previousStaticToken.digest': digest })
+		);
+	}
+
+	/* The same hold test as `bucketsHolding`, so the count and the bucket marks cannot disagree. */
+	async listHeld(): Promise<HeldConnection[]> {
+		const rows = await this.collection
+			.find({ hold: { $type: 'object' } })
+			.toArray();
+		return rows.flatMap((row) => {
+			const connection = connectionOf(row);
+			return connection?.hold
+				? [
+						{
+							_id: connection._id,
+							bucketId: connection.bucketId,
+							displayName: connection.displayName,
+							hold: connection.hold,
+							...(connection.tallyEpoch !== undefined
+								? { tallyEpoch: connection.tallyEpoch }
+								: {})
+						}
+					]
+				: [];
+		});
+	}
+
+	/*
+	 * One conditional update each, so a request's bookkeeping never rewrites the credential an administrator
+	 * replaced a moment earlier: the filter names the value the use was made with.
+	 */
+	async noteCredentialUse(
+		id: string,
+		slot: CredentialSlot,
+		which: 'current' | 'previous',
+		at: Date
+	): Promise<void> {
+		if (which === 'previous') {
+			const field =
+				slot === 'secret' ? 'previousSecret' : 'previousStaticToken';
+			await this.collection.updateOne(
+				{ _id: id, [field]: { $type: 'object' } },
+				{ $set: { [`${field}.lastUsedAt`]: at } }
+			);
+			return;
+		}
+		if (slot === 'secret') {
+			await this.collection.updateOne(
+				{
+					_id: id,
+					'oauthCredential.kind': 'secret',
+					'oauthCredential.firstUsedAt': { $not: { $type: 'date' } }
+				},
+				{ $set: { 'oauthCredential.firstUsedAt': at } }
+			);
+			return;
+		}
+		await this.collection.updateOne(
+			{
+				_id: id,
+				staticTokenDigest: { $type: 'string' },
+				staticTokenFirstUsedAt: { $not: { $type: 'date' } }
+			},
+			{ $set: { staticTokenFirstUsedAt: at } }
+		);
+	}
+
+	async retirePrevious(
+		id: string,
+		slot: CredentialSlot,
+		digest: string
+	): Promise<boolean> {
+		const field = slot === 'secret' ? 'previousSecret' : 'previousStaticToken';
+		const result = await this.collection.updateOne(
+			{ _id: id, [`${field}.digest`]: digest },
+			{ $unset: { [field]: '' }, $set: { updatedAt: new Date() } }
+		);
+		return result.modifiedCount === 1;
 	}
 
 	/*

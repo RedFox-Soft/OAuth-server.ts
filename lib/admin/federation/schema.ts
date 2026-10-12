@@ -51,6 +51,16 @@ export const CreateProviderBody = t.Object({
 	acceptsBackChannelLogout: t.Optional(t.Boolean())
 });
 
+/* One place up or down in the bucket's sign-in order (specs/088 R10). */
+export const MoveProviderBody = t.Object(
+	{
+		direction: t.Union([t.Literal('up'), t.Literal('down')], {
+			error: 'direction must be up or down'
+		})
+	},
+	{ additionalProperties: false }
+);
+
 /*
  * `id` is absent: a provider's identifier is in its path and appears in URLs the login page has already
  * rendered, so renaming one is deleting it and creating another.

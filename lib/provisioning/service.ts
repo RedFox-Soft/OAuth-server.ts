@@ -8,8 +8,11 @@ import {
 } from '../adapters/index.js';
 import type {
 	ConnectionCorrelation,
+	CredentialSlot,
 	DeprovisioningThreshold,
 	KeyCredential,
+	KnownDirectoryId,
+	PreviousCredential,
 	ProvisioningConnection,
 	ProvisioningConnectionPatch,
 	RefusedOperation,
@@ -19,7 +22,19 @@ import { isUniqueValueTaken } from '../adapters/conflicts.js';
 import { ADMIN_BUCKET_ID } from '../admin/consts.js';
 import { ownedGroupCount } from '../bucket_groups/service.js';
 import { ApplicationConfig } from '../configs/application.js';
-import { cascadeForClient, type CascadeResult } from '../helpers/cascade.js';
+import { knownProviderByIssuer } from '../consts/known_providers.js';
+import {
+	cascadeForClient,
+	sweepClientTokensWhere,
+	type CascadeResult
+} from '../helpers/cascade.js';
+import {
+	credentialRefOf,
+	isPreviousLive,
+	latestEndOf,
+	previousOf,
+	previousState
+} from './overlap.js';
 import { OIDCProviderError } from '../helpers/errors.js';
 import { validateClient } from '../models/client/validate.js';
 import { scimBaseUrl, scimMetadataUrl, tokenEndpointFor } from './addresses.js';
@@ -92,6 +107,8 @@ export interface CreateConnectionInput {
 	emailTrust?: 'trusted' | 'untrusted';
 	/* The mass-deprovisioning guard; absent or `null` leaves it off, the default (specs/072 FR-017). */
 	threshold?: DeprovisioningThreshold | null;
+	/* Which directory's words the console uses for it; absent means inferred from the provider. */
+	directory?: KnownDirectoryId;
 }
 
 /*
@@ -140,7 +157,8 @@ export async function createConnection(
 			correlation: input.correlation ?? defaultCorrelationFor(provider),
 			emailTrust: input.emailTrust ?? 'untrusted',
 			oauthCredential: null,
-			...(input.threshold ? { threshold: { ...input.threshold } } : {})
+			...(input.threshold ? { threshold: { ...input.threshold } } : {}),
+			...(input.directory ? { directory: input.directory } : {})
 		});
 	} catch (error) {
 		if (isUniqueValueTaken(error)) {
@@ -171,6 +189,7 @@ export interface UpdateConnectionInput {
 	emailTrust?: 'trusted' | 'untrusted';
 	/* A threshold sets or changes the guard; `null` removes it; absent leaves it as it is. */
 	threshold?: DeprovisioningThreshold | null;
+	directory?: KnownDirectoryId;
 }
 
 function sameThreshold(
@@ -204,6 +223,7 @@ export async function updateConnection(
 	if (input.enabled !== undefined) patch.enabled = input.enabled;
 	if (input.correlation !== undefined) patch.correlation = input.correlation;
 	if (input.emailTrust !== undefined) patch.emailTrust = input.emailTrust;
+	if (input.directory !== undefined) patch.directory = input.directory;
 	if (
 		input.threshold !== undefined &&
 		!sameThreshold(connection.threshold, input.threshold)
@@ -273,13 +293,27 @@ export interface IssueCredentialInput {
 	jwks?: { keys: Record<string, unknown>[] };
 	jwksUri?: string;
 	signingAlg?: string;
+	/*
+	 * Whether the value being replaced keeps working until the directory has moved (specs/088), default
+	 * true. Meaningful only for a secret replacing a secret and a static token replacing a static token; a
+	 * key, or a change of kind, always replaces at once.
+	 */
+	overlap?: boolean;
+	/* A static token's lifetime (RFC 7644 §7.4), default 365 days. Refused with any other kind. */
+	lifetimeDays?: StaticTokenLifetime;
 }
+
+export type StaticTokenLifetime = 90 | 365;
+export const DEFAULT_STATIC_TOKEN_LIFETIME_DAYS: StaticTokenLifetime = 365;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 export interface IssuedCredential {
 	connection: ProvisioningConnection;
 	/* Present only in the response to the issue, and nowhere else, ever. */
 	secret?: string;
 	token?: string;
+	/* The latest the replaced value keeps working, or null when it stopped at once. */
+	previousEndsAt: Date | null;
 }
 
 /*
@@ -325,11 +359,18 @@ function assertKeyCredentialValid(
 	}
 }
 
+/*
+ * Issuing a credential, or replacing one (specs/088). A secret replacing a secret, and a static token
+ * replacing a static token, keep the replaced value working as the slot's one previous value unless the
+ * administrator stops it now; any older previous value ends first, by this act, with its tokens. A key, or a
+ * change of kind, replaces at once as it always did. `record` is given the replaced value's latest end, or
+ * null when it stops at once, so the audit entry says which.
+ */
 export async function issueCredential(
 	bucket: UserBucket,
 	connectionId: string,
 	input: IssueCredentialInput,
-	record: RecordChange
+	record: (previousEndsAt: Date | null) => Promise<unknown>
 ): Promise<IssuedCredential> {
 	const connection = await loadConnection(bucket, connectionId);
 	const issuedAt = new Date();
@@ -344,6 +385,12 @@ export async function issueCredential(
 			'jwks, jwksUri and signingAlg belong to a key credential only'
 		);
 	}
+	if (input.kind !== 'static_token' && input.lifetimeDays !== undefined) {
+		throw new ProvisioningError(
+			422,
+			'lifetimeDays belongs to a static token only'
+		);
+	}
 
 	if (input.kind === 'key') {
 		const credential: KeyCredential = {
@@ -356,9 +403,9 @@ export async function issueCredential(
 				: {})
 		};
 		assertKeyCredentialValid(connection, credential);
-		await record();
+		await record(null);
 		const updated = await replaceOauthCredential(connection, credential);
-		return { connection: updated };
+		return { connection: updated, previousEndsAt: null };
 	}
 
 	if (input.kind === 'secret') {
@@ -369,13 +416,36 @@ export async function issueCredential(
 			);
 		}
 		const secret = newConnectionSecret();
-		await record();
-		const updated = await replaceOauthCredential(connection, {
-			kind: 'secret',
+		const credential = {
+			kind: 'secret' as const,
 			digest: digestOf(secret),
 			issuedAt
+		};
+		const current = connection.oauthCredential;
+		if (input.overlap === false || current?.kind !== 'secret') {
+			await record(null);
+			const updated = await replaceOauthCredential(connection, credential);
+			return { connection: updated, secret, previousEndsAt: null };
+		}
+
+		const previous: PreviousCredential = {
+			digest: current.digest,
+			issuedAt: current.issuedAt,
+			replacedAt: issuedAt
+		};
+		const previousEndsAt = latestEndOf(previous);
+		await record(previousEndsAt);
+		const updated = await store().update(connection._id, {
+			oauthCredential: credential,
+			previousSecret: previous
 		});
-		return { connection: updated, secret };
+		if (!updated)
+			throw new ProvisioningError(404, 'provisioning connection not found');
+		/* After the write, so the older value can no longer mint while its tokens are swept. */
+		if (connection.previousSecret) {
+			await sweepTokensOfPrevious(connection._id, connection.previousSecret);
+		}
+		return { connection: updated, secret, previousEndsAt };
 	}
 
 	if (!ApplicationConfig['scim.staticTokens']) {
@@ -385,32 +455,71 @@ export async function issueCredential(
 		);
 	}
 	const token = newStaticToken();
-	await record();
+	const expiresAt = new Date(
+		issuedAt.getTime() +
+			(input.lifetimeDays ?? DEFAULT_STATIC_TOKEN_LIFETIME_DAYS) * DAY_MS
+	);
+	const replaced = connection.staticTokenDigest;
+	const previous: PreviousCredential | undefined =
+		input.overlap !== false && replaced !== undefined
+			? {
+					digest: replaced,
+					issuedAt: connection.staticTokenIssuedAt ?? issuedAt,
+					replacedAt: issuedAt,
+					...(connection.staticTokenExpiresAt
+						? { expiresAt: connection.staticTokenExpiresAt }
+						: {})
+				}
+			: undefined;
+	const previousEndsAt = previous ? latestEndOf(previous) : null;
+	await record(previousEndsAt);
+	/* A static token obtains no tokens of its own, so ending one sweeps nothing. */
 	const updated = await store().update(connection._id, {
 		staticTokenDigest: digestOf(token),
-		staticTokenIssuedAt: issuedAt
+		staticTokenIssuedAt: issuedAt,
+		staticTokenExpiresAt: expiresAt,
+		staticTokenFirstUsedAt: undefined,
+		previousStaticToken: previous
 	});
 	if (!updated)
 		throw new ProvisioningError(404, 'provisioning connection not found');
-	return { connection: updated, token };
+	return { connection: updated, token, previousEndsAt };
 }
 
 /*
  * Written, then every token the previous credential obtained is swept: they are `ClientCredentials` rows
  * owned by the client `scim-<id>`, which the client cascade reaches whether or not a client record exists.
- * In this order so nothing new can be minted with the old credential between the sweep and the write.
+ * In this order so nothing new can be minted with the old credential between the sweep and the write. Any
+ * overlapping previous secret goes in the same write, and its tokens with the rest.
  */
 async function replaceOauthCredential(
 	connection: ProvisioningConnection,
 	credential: ProvisioningConnection['oauthCredential']
 ): Promise<ProvisioningConnection> {
 	const updated = await store().update(connection._id, {
-		oauthCredential: credential
+		oauthCredential: credential,
+		previousSecret: undefined
 	});
 	if (!updated)
 		throw new ProvisioningError(404, 'provisioning connection not found');
 	await cascadeForClient(connectionClientId(connection._id));
 	return updated;
+}
+
+/*
+ * The tokens a previous secret obtained, and only those (specs/088 R2): marked with its reference, or
+ * unmarked — a token minted before tokens were marked can only have come from the value that is now the
+ * previous one. The current secret's tokens all carry its reference, so they survive.
+ */
+async function sweepTokensOfPrevious(
+	connectionId: string,
+	previous: PreviousCredential
+): Promise<void> {
+	const ref = credentialRefOf(previous.digest);
+	await sweepClientTokensWhere(connectionClientId(connectionId), (stored) => {
+		const marked = stored.credentialRef;
+		return marked === undefined || marked === ref;
+	});
 }
 
 export async function revokeCredential(
@@ -426,11 +535,47 @@ export async function revokeCredential(
 	}
 	const updated = await store().update(connection._id, {
 		staticTokenDigest: undefined,
-		staticTokenIssuedAt: undefined
+		staticTokenIssuedAt: undefined,
+		staticTokenExpiresAt: undefined,
+		staticTokenFirstUsedAt: undefined,
+		previousStaticToken: undefined
 	});
 	if (!updated)
 		throw new ProvisioningError(404, 'provisioning connection not found');
 	return updated;
+}
+
+/*
+ * Ends a slot's overlapping previous value at once — an administrator's act, so it is audited first and the
+ * tokens the previous secret obtained stop with it; the current value and its tokens are untouched. Refused
+ * (404) when there is no live previous value: one that ended by itself has nothing left to end. The store
+ * removes it only while it is still the same value, so two administrators retiring together act once.
+ */
+export async function retirePreviousCredential(
+	bucket: UserBucket,
+	connectionId: string,
+	kind: 'oauth' | 'static_token',
+	record: RecordChange
+): Promise<ProvisioningConnection> {
+	const connection = await loadConnection(bucket, connectionId);
+	const slot: CredentialSlot = kind === 'oauth' ? 'secret' : 'static_token';
+	const previous = previousOf(connection, slot);
+	if (!previous || !isPreviousLive(connection, slot)) {
+		throw new ProvisioningError(
+			404,
+			'this credential has no previous value that still works'
+		);
+	}
+	await record();
+	const removed = await store().retirePrevious(
+		connection._id,
+		slot,
+		previous.digest
+	);
+	if (removed && slot === 'secret') {
+		await sweepTokensOfPrevious(connection._id, previous);
+	}
+	return loadConnection(bucket, connectionId);
 }
 
 /*
@@ -551,7 +696,42 @@ export type ConnectionWarning =
 	| 'bucket_unaddressed'
 	| 'provider_disabled'
 	| 'client_credentials_disabled'
-	| 'credential_kind_disabled';
+	| 'credential_kind_disabled'
+	/* The static token expires within STATIC_TOKEN_WARNING_DAYS, or has expired (specs/088 US2). */
+	| 'static_token_expiring'
+	| 'static_token_expired'
+	/* The directory used a previous value after it first used the new one, and the previous still works. */
+	| 'previous_credential_in_use';
+
+/* How far ahead of a static token's expiry the connection and the bucket overview say so. */
+export const STATIC_TOKEN_WARNING_DAYS = 14;
+
+/*
+ * A previous value as a reader may see it: when it was issued and replaced, when it ends at the latest, its
+ * last use, and whether the directory still uses it. Never its digest. Present only while it still works.
+ */
+export interface PreviousCredentialView {
+	issuedAt: string;
+	replacedAt: string;
+	endsAt: string;
+	lastUsedAt: string | null;
+	stillUsedByDirectory: boolean;
+}
+
+export type SecretCredentialView = {
+	kind: 'secret';
+	issuedAt: string;
+	firstUsedAt: string | null;
+	previous?: PreviousCredentialView;
+};
+
+export interface StaticTokenView {
+	issuedAt: string;
+	/* Null only for a token issued before tokens had a lifetime, until the upgrade's migration gives it one. */
+	expiresAt: string | null;
+	firstUsedAt: string | null;
+	previous?: PreviousCredentialView;
+}
 
 /*
  * What an administrator sees: everything they need to configure the directory, and nothing that would
@@ -572,9 +752,11 @@ export interface ConnectionView {
 	scope: 'scim';
 	oauthCredential:
 		| { kind: 'key'; issuedAt: string; jwksUri?: string; keyCount?: number }
-		| { kind: 'secret'; issuedAt: string }
+		| SecretCredentialView
 		| null;
-	staticToken: { issuedAt: string } | null;
+	staticToken: StaticTokenView | null;
+	/* Which directory's words the console uses for it: as stored, or inferred from its provider. */
+	directory: KnownDirectoryId;
 	/* The mass-deprovisioning guard, absent when off. The tally's generation is bookkeeping and never shown. */
 	threshold?: DeprovisioningThreshold;
 	/* Present while held: when it began, and the threshold count that was reached. */
@@ -605,6 +787,43 @@ export function availableCredentialKinds(): CredentialKind[] {
 export interface ConnectionCounts {
 	managedUsers: number;
 	managedGroups: number;
+}
+
+/* The previous value of a slot as a reader sees it, or undefined unless it still works. */
+function previousView(
+	connection: ProvisioningConnection,
+	slot: CredentialSlot,
+	now: Date
+): PreviousCredentialView | undefined {
+	const previous = previousOf(connection, slot);
+	const state = previousState(connection, slot, now);
+	if (!previous || !state?.live) return undefined;
+	return {
+		issuedAt: previous.issuedAt.toISOString(),
+		replacedAt: previous.replacedAt.toISOString(),
+		endsAt: state.endsAt.toISOString(),
+		lastUsedAt: previous.lastUsedAt?.toISOString() ?? null,
+		stillUsedByDirectory: state.stillUsedByDirectory
+	};
+}
+
+/*
+ * The directory a connection's guidance speaks for: the one an administrator chose, or — for a connection
+ * created before the choice existed — Microsoft Entra ID when its provider is Microsoft, and a generic
+ * directory otherwise (specs/088 R9). Presentation only; nothing at runtime branches on it.
+ */
+export function directoryOf(
+	bucket: Pick<UserBucket, 'federation'>,
+	connection: Pick<ProvisioningConnection, 'directory' | 'providerId'>
+): KnownDirectoryId {
+	if (connection.directory) return connection.directory;
+	const provider = bucket.federation.find(
+		(p) => p.id === connection.providerId
+	);
+	return provider &&
+		knownProviderByIssuer(provider.issuer)?.catalogueId === 'microsoft'
+		? 'entra'
+		: 'generic';
 }
 
 /* Every read of a connection presents it through this, so the list and the single read never differ. */
@@ -648,6 +867,26 @@ export function presentConnection(
 	) {
 		warnings.push('credential_kind_disabled');
 	}
+	const now = new Date();
+	const expiry = connection.staticTokenDigest
+		? connection.staticTokenExpiresAt
+		: undefined;
+	if (expiry && expiry.getTime() <= now.getTime()) {
+		warnings.push('static_token_expired');
+	} else if (
+		expiry &&
+		expiry.getTime() - now.getTime() <= STATIC_TOKEN_WARNING_DAYS * DAY_MS
+	) {
+		warnings.push('static_token_expiring');
+	}
+	const previousSecret = previousView(connection, 'secret', now);
+	const previousStaticToken = previousView(connection, 'static_token', now);
+	if (
+		previousSecret?.stillUsedByDirectory ||
+		previousStaticToken?.stillUsedByDirectory
+	) {
+		warnings.push('previous_credential_in_use');
+	}
 
 	return {
 		id: connection._id,
@@ -665,7 +904,12 @@ export function presentConnection(
 		oauthCredential: !credential
 			? null
 			: credential.kind === 'secret'
-				? { kind: 'secret', issuedAt: credential.issuedAt.toISOString() }
+				? {
+						kind: 'secret',
+						issuedAt: credential.issuedAt.toISOString(),
+						firstUsedAt: credential.firstUsedAt?.toISOString() ?? null,
+						...(previousSecret ? { previous: previousSecret } : {})
+					}
 				: {
 						kind: 'key',
 						issuedAt: credential.issuedAt.toISOString(),
@@ -675,8 +919,14 @@ export function presentConnection(
 							: {})
 					},
 		staticToken: connection.staticTokenIssuedAt
-			? { issuedAt: connection.staticTokenIssuedAt.toISOString() }
+			? {
+					issuedAt: connection.staticTokenIssuedAt.toISOString(),
+					expiresAt: connection.staticTokenExpiresAt?.toISOString() ?? null,
+					firstUsedAt: connection.staticTokenFirstUsedAt?.toISOString() ?? null,
+					...(previousStaticToken ? { previous: previousStaticToken } : {})
+				}
 			: null,
+		directory: directoryOf(bucket, connection),
 		...(connection.threshold ? { threshold: { ...connection.threshold } } : {}),
 		...(connection.hold
 			? {

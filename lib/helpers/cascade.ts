@@ -138,6 +138,36 @@ export async function sweepAccountOwned(
 	return runSweeps(ownerSweeps('account', accountId));
 }
 
+/*
+ * The client-credentials tokens of one client that `keep` does not keep — what ending one of a provisioning
+ * connection's two overlapping secrets owes (specs/088 R2): the tokens that secret obtained stop at once,
+ * and the other secret's tokens are left alone. Read, judged and destroyed one by one, because the marker
+ * that tells them apart is not an owner field and no store enumerates by it. Area and owner field come from
+ * the inventory, as every sweep here does.
+ */
+export async function sweepClientTokensWhere(
+	clientId: string,
+	sweep: (stored: Readonly<Record<string, unknown>>) => boolean
+): Promise<number> {
+	const area = areaNamed('ClientCredentials');
+	const field = area.owners.client;
+	if (field === null) {
+		/* Unreachable while the inventory declares ClientCredentials client-owned; a loud stop beats a silent no-op. */
+		throw new Error(
+			'the ClientCredentials area declares no client owner to read by'
+		);
+	}
+	const store = adapter(area.name);
+	let destroyed = 0;
+	for (const stored of await store.findByOwner(field, clientId)) {
+		const id = stored.jti;
+		if (typeof id !== 'string' || !sweep(stored)) continue;
+		await store.destroy(id);
+		destroyed += 1;
+	}
+	return destroyed;
+}
+
 /* Every record naming this client as its owner, across every area that declares a client owner. */
 export async function cascadeForClient(
 	clientId: string

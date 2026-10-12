@@ -3,6 +3,8 @@ import type {
 	ConnectionView,
 	ConnectionWarning
 } from '../../../../provisioning/service.js';
+import type { DirectoryGuidance } from '../../../provisioning/directories.js';
+import type { KnownDirectoryKey } from '../../../../consts/known_directories.js';
 
 export type { ConnectionView, ConnectionWarning };
 
@@ -15,12 +17,39 @@ export const WARNING_LABELS: Record<ConnectionWarning, string> = {
 	bucket_unaddressed: 'Bucket has no address yet',
 	provider_disabled: 'Sign-in provider is disabled',
 	client_credentials_disabled: 'Client-credentials grant is off',
-	credential_kind_disabled: 'This credential kind is switched off'
+	credential_kind_disabled: 'This credential kind is switched off',
+	static_token_expired: 'The static token has expired',
+	static_token_expiring: 'The static token expires within 14 days',
+	previous_credential_in_use:
+		'The directory still uses the previous credential, which ends soon'
 };
+
+/* Worth acting on, but nothing is refused yet — shown apart from the warnings that stop the directory. */
+export const ADVISORY_WARNINGS: ReadonlySet<ConnectionWarning> =
+	new Set<ConnectionWarning>([
+		'static_token_expiring',
+		'previous_credential_in_use'
+	]);
+
+/*
+ * One directory's own words and advice, read from the server (specs/088) so the console and an agent say the
+ * same thing — the lesson of the console's old PRESETS map, which only a browser could read.
+ */
+export type { DirectoryGuidance };
+export type DirectoryId = KnownDirectoryKey;
+
+export const DIRECTORY_CHOICES: { value: DirectoryId; label: string }[] = [
+	{ value: 'entra', label: 'Microsoft Entra ID' },
+	{ value: 'okta', label: 'Okta' },
+	{ value: 'generic', label: 'Another directory' }
+];
 
 export type CredentialKind = 'key' | 'secret' | 'static_token';
 
-/* Which directory each credential suits, said where the kind is chosen. */
+/*
+ * What each credential is, said where the kind is chosen. Which one a directory should use is the directory
+ * guidance's to say (DirectoryGuidance.recommendedCredential), not this table's.
+ */
 export const CREDENTIAL_KINDS: {
 	kind: CredentialKind;
 	label: string;
@@ -29,12 +58,14 @@ export const CREDENTIAL_KINDS: {
 	{
 		kind: 'secret',
 		label: 'Client secret',
-		suits: 'For Microsoft Entra ID: choose "OAuth2 client credentials" there.'
+		suits:
+			'OAuth2 client credentials: the directory exchanges it for short-lived tokens.'
 	},
 	{
 		kind: 'static_token',
 		label: 'Static token',
-		suits: 'For Okta: sent in the Authorization header as a bearer token.'
+		suits:
+			'A bearer token the directory sends on every request. It expires; choose 90 days or a year.'
 	},
 	{
 		kind: 'key',
@@ -122,13 +153,23 @@ export function Copyable({ value }: { value: string | null }) {
  * What a directory administrator needs, as text to paste into a ticket or a chat — and never the secret,
  * which is shown once and copied on its own.
  */
-export function setupDetails(c: ConnectionView): string {
+export function setupDetails(
+	c: ConnectionView,
+	guidance?: DirectoryGuidance
+): string {
+	const labels = guidance?.labels;
 	return [
-		`SCIM base URL: ${c.scimBaseUrl ?? '(the bucket has no address yet)'}`,
-		`Token endpoint: ${c.tokenEndpoint}`,
-		`Client id: ${c.clientId}`,
-		`Scope: ${c.scope}`
+		...(guidance ? [`Directory: ${guidance.displayName}`] : []),
+		`${labels?.scimBaseUrl ?? 'SCIM base URL'}: ${c.scimBaseUrl ?? '(the bucket has no address yet)'}`,
+		`${labels?.tokenEndpoint ?? 'Token endpoint'}: ${c.tokenEndpoint}`,
+		`${labels?.clientId ?? 'Client id'}: ${c.clientId}`,
+		`Scope: ${c.scope}`,
+		...(guidance?.pitfalls ?? []).map((p) => `Note: ${p}`)
 	].join('\n');
+}
+
+export function directoriesApi(bucketId: string): string {
+	return `${connectionsApi(bucketId)}/directories`;
 }
 
 const people = (n: number, noun = 'user') =>

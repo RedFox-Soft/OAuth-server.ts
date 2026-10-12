@@ -27,6 +27,11 @@ export interface ProviderMetadata {
 	signingAlgValues: string[];
 	codeChallengeMethods: string[];
 	tokenAuthMethods: string[];
+	/*
+	 * Whether the provider declares it always puts `iss` in its authorization responses (RFC 9207 §3,
+	 * `authorization_response_iss_parameter_supported`). Read as `=== true`; absent means it does not say.
+	 */
+	issParameterSupported?: boolean;
 }
 
 /* Distinguishes "the other side is broken" from "your submitted value is wrong" for the caller. */
@@ -99,7 +104,12 @@ function parse(
 			'id_token_signing_alg_values_supported'
 		),
 		codeChallengeMethods: stringsAt(source, 'code_challenge_methods_supported'),
-		tokenAuthMethods: stringsAt(source, 'token_endpoint_auth_methods_supported')
+		tokenAuthMethods: stringsAt(
+			source,
+			'token_endpoint_auth_methods_supported'
+		),
+		issParameterSupported:
+			source.authorization_response_iss_parameter_supported === true
 	};
 
 	/*

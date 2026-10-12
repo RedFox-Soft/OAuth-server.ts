@@ -11,6 +11,12 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Security
 
+- **The federation callback refuses a response from another issuer** (spec 088). An upstream's RFC 9207 `iss`
+  parameter is now compared with the issuer the sign-in started with, and required when the provider's metadata
+  says it sends one — the mix-up defence RFC 9700 §2.1 asks of a client that talks to several providers.
+- **Static SCIM tokens expire** (spec 088, RFC 7644 §7.4). A token is issued for 90 days or a year (`lifetimeDays`);
+  the upgrade's migration `2026-10-12-static-token-expiry` gives existing tokens a year from issue but never less
+  than 90 days from the upgrade, so none stops working that day. Run `bun run db:migrate` before starting.
 - **Administrators' authenticator secrets no longer leave the server.** The administrator list and the
   answers to creating and updating an administrator carried each enrolled administrator's TOTP secret, so any
   super administrator, or an agent acting for one (`admin_list`, `admin_update`), could generate another
@@ -41,6 +47,15 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Changed
 
+- **Replacing a SCIM secret or static token is no longer an outage; a provider can be tried before anyone relies on
+  it** (spec 088). The previous value keeps working until the directory has used the new one and stopped using the
+  old one for an hour, at most 24 hours; `overlap: false` stops it at once, and retiring it early
+  (`provisioning_credential_retire`) ends the tokens it obtained and only those. Keys and a change of kind still
+  replace at once. **Try sign-in** on a provider's page signs in at the provider through the bucket's real callback
+  and shows what it answered and what a real sign-in would do — link, create, refuse and why — writing nothing; it
+  works on a disabled provider and is console-only. Held provisioning connections show as a badge on Buckets
+  (`provisioning_hold_list`); the provisioning wizard speaks Entra's and Okta's own field names from a server-side
+  guide (`provisioning_directory_list`); sign-in buttons can be moved up and down (`federation_provider_move`).
 - **A key rotates in one step, a compromised key is revoked at once, and new things are created in the group you
   choose** (spec 087). Rotate (`bucket_key_rotate`, `jwks_rotate`) makes the algorithm's oldest ready key sign and
   publishes the next one, or only publishes the next one when none may sign yet. Revoke (`bucket_key_revoke`,

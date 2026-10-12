@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Alert, Table, Button, Flex, Space, Tag, Typography } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { request } from '../frame/request.js';
+import { useFeedback } from '../frame/feedback.js';
 import { RowActions } from '../frame/RowActions.js';
 import { LoadFailed } from '../frame/states.js';
 import { Link, useNavigate } from '../frame/router.js';
@@ -43,6 +44,7 @@ export function FederationPanel({
 	const bucketId = bucket._id;
 	const navigate = useNavigate();
 	const actions = useProviderActions(bucketId, consoleBucket);
+	const feedback = useFeedback();
 	const [rows, setRows] = useState<PresentedProvider[]>([]);
 	const [guidance, setGuidance] = useState<Guidance[]>([]);
 	const [bound, setBound] = useState<Map<string, string>>(new Map());
@@ -100,6 +102,21 @@ export function FederationPanel({
 		setLoading(true);
 		void fetchProviders();
 		onChanged?.();
+	}
+
+	/* One place up or down on the sign-in page (specs/088); only the order changes, so nothing is asked. */
+	async function move(row: PresentedProvider, direction: 'up' | 'down') {
+		const result = await request(
+			'POST',
+			`${federationApi(bucketId, row.id)}/move`,
+			{ direction }
+		);
+		if (!result.ok) {
+			feedback.failed(result);
+			return;
+		}
+		feedback.done(`${row.displayName} moved ${direction} on the sign-in page.`);
+		after(true);
 	}
 
 	const empty = !loading && loadFailure === null && rows.length === 0;
@@ -202,7 +219,7 @@ export function FederationPanel({
 						{
 							title: '',
 							key: 'actions',
-							render: (_: unknown, row: PresentedProvider) => {
+							render: (_: unknown, row: PresentedProvider, index: number) => {
 								const connection = bound.get(row.id);
 								const blocks = providerBlocks(
 									bucket,
@@ -242,6 +259,26 @@ export function FederationPanel({
 																			.setEnabled(row, true)
 																			.then(after)
 																},
+														...(index > 0
+															? [
+																	{
+																		key: 'up',
+																		label: 'Move up',
+																		group: 'state' as const,
+																		onClick: () => void move(row, 'up')
+																	}
+																]
+															: []),
+														...(index < rows.length - 1
+															? [
+																	{
+																		key: 'down',
+																		label: 'Move down',
+																		group: 'state' as const,
+																		onClick: () => void move(row, 'down')
+																	}
+																]
+															: []),
 														{
 															key: 'delete',
 															label: 'Delete…',
@@ -259,6 +296,14 @@ export function FederationPanel({
 						}
 					]}
 				/>
+			)}
+			{!empty && loadFailure === null && (
+				<Typography.Paragraph
+					type="secondary"
+					style={{ marginTop: 8 }}
+				>
+					Buttons appear on the sign-in page in this order.
+				</Typography.Paragraph>
 			)}
 
 			{wizard && (

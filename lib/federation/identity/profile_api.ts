@@ -30,6 +30,13 @@ export async function profileApiIdentity(
 		reader: keyof typeof READERS;
 	}
 ): Promise<UpstreamIdentity> {
+	/*
+	 * RFC 9207 for a provider that publishes no metadata: nothing declares that it sends `iss`, so only a
+	 * present one is compared — with the issuer this provider was configured with.
+	 */
+	if (request.iss !== undefined && request.iss !== request.provider.issuer) {
+		throw new IdentityError('rejected', 'issuer_mismatch');
+	}
 	const token = await exchangeForApiToken(request, protocol.tokenEndpoint);
 	return READERS[protocol.reader](token);
 }

@@ -9,6 +9,8 @@ import { ClientCredentials } from '../models/client_credentials.js';
 import { scimBaseUrl, scimMetadataUrl } from '../provisioning/addresses.js';
 import { connectionIdOfClient } from '../provisioning/client.js';
 import { digestOf, isStaticToken } from '../provisioning/credentials.js';
+import { noteCredentialUse } from '../provisioning/credential_use.js';
+import { isPreviousLive } from '../provisioning/overlap.js';
 import { ScimError } from './errors.js';
 
 /*
@@ -82,6 +84,39 @@ async function usable(
 	return connection;
 }
 
+/*
+ * The connection a static token belongs to: the current token first, then an overlapping previous one
+ * (specs/088), each a point read by digest so the two are told apart. An expired token, and a previous one
+ * the overlap rule has ended, are refused as unknown — what they are to a caller now. The use is recorded
+ * for the overlap rule: the current token's first use once, the previous token's last use at most once a
+ * minute.
+ */
+async function staticTokenHolder(
+	bucket: RequestBucket,
+	digest: string
+): Promise<ProvisioningConnection> {
+	const store = getProvisioningConnectionStore();
+	const now = new Date();
+	const current = await store.findByStaticTokenDigest(digest);
+	if (current) {
+		const connection = await usable(bucket, current);
+		const expiry = connection.staticTokenExpiresAt;
+		if (expiry && expiry.getTime() <= now.getTime()) {
+			throw unauthorized(bucket, 'unknown_token');
+		}
+		await noteCredentialUse(connection, 'static_token', 'current', now);
+		return connection;
+	}
+	const previous = await store.findByPreviousStaticTokenDigest(digest);
+	if (!previous) throw unauthorized(bucket, 'unknown_connection');
+	const connection = await usable(bucket, previous);
+	if (!isPreviousLive(connection, 'static_token', now)) {
+		throw unauthorized(bucket, 'unknown_token');
+	}
+	await noteCredentialUse(connection, 'static_token', 'previous', now);
+	return connection;
+}
+
 export async function resolveScimPrincipal(
 	authorization: string | undefined,
 	bucket: RequestBucket
@@ -97,10 +132,7 @@ export async function resolveScimPrincipal(
 		if (!ApplicationConfig['scim.staticTokens']) {
 			throw unauthorized(bucket, 'credential_kind_disabled');
 		}
-		connection = await usable(
-			bucket,
-			await store.findByStaticTokenDigest(digestOf(credential))
-		);
+		connection = await staticTokenHolder(bucket, digestOf(credential));
 	} else {
 		const token = await ClientCredentials.tryFind(credential);
 		if (!token) throw unauthorized(bucket, 'unknown_token');

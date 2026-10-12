@@ -28,7 +28,11 @@ const ProviderDetail = Type.Object({
 	]),
 	recognised: Type.Union([Type.String(), Type.Null()]),
 	logoutSignals: Signals,
-	capabilities: Signals,
+	capabilities: Type.Object({
+		globalTokenRevocation: Type.Boolean(),
+		backChannelLogout: Type.Boolean(),
+		trySignIn: Type.Boolean()
+	}),
 	boundConnection: Type.Union([
 		Type.Object({ id: Type.String(), displayName: Type.String() }),
 		Type.Null()
@@ -199,7 +203,8 @@ describe('reading one identity provider of a bucket', () => {
 		});
 		expect(read.capabilities).toEqual({
 			globalTokenRevocation: false,
-			backChannelLogout: true
+			backChannelLogout: true,
+			trySignIn: true
 		});
 	});
 

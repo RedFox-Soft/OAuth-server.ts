@@ -38,21 +38,39 @@ function isHmac(this: Readonly<Record<string, unknown>>, prop: string) {
 	return /^HS/.test(String(this[prop]));
 }
 
+/* Which of a client's secrets a presented value is, or null for neither. */
+export type ClientSecretMatch = 'current' | 'previous' | null;
+
 // Constant-time compare with the preserved 1000ms floor.
 export function compareClientSecret(
-	client: Pick<Client, 'clientSecret' | 'clientSecretDigest'>,
+	client: Pick<
+		Client,
+		'clientSecret' | 'clientSecretDigest' | 'previousClientSecretDigest'
+	>,
 	actual: string
-): boolean {
+): ClientSecretMatch {
 	/*
 	 * A provisioning connection's client stores only the SHA-256 of its secret (specs/070 R3), so the
 	 * presented value is hashed and the digests compared. Ordinary clients still hold the plaintext,
 	 * because client_secret_jwt and the symmetric keys derive from it.
+	 *
+	 * Both digests are compared, always, with no short cut on the first: whether a client has a previous
+	 * secret, and which of the two a value matched, must not show in how long the refusal takes.
 	 */
 	if (client.clientSecretDigest !== undefined) {
 		const presented = crypto.createHash('sha256').update(actual).digest('hex');
-		return constantEquals(client.clientSecretDigest, presented, 1000);
+		const current = constantEquals(client.clientSecretDigest, presented, 1000);
+		const previous = constantEquals(
+			client.previousClientSecretDigest ?? '',
+			presented,
+			1000
+		);
+		if (current) return 'current';
+		return previous && client.previousClientSecretDigest !== undefined
+			? 'previous'
+			: null;
 	}
-	return constantEquals(client.clientSecret, actual, 1000);
+	return constantEquals(client.clientSecret, actual, 1000) ? 'current' : null;
 }
 
 // Throw InvalidClient if clientSecretExpiresAt has passed (clockTolerance + optional errorOverride).

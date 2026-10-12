@@ -4,7 +4,7 @@ title: 'The administrative MCP control plane'
 tags: [architecture, contract, gotcha, config]
 sources: [oauth-server-codebase]
 created: 2026-08-24
-updated: 2026-10-11
+updated: 2026-10-12
 graph:
   node_type: concept
 ---
@@ -197,7 +197,9 @@ The table distinguishes two kinds of absence, and the distinction is what makes 
 `inapplicable` ones have no meaning for an agent at all — there is no browser session to end, nobody to
 authorize first-run setup, and no agent principal to accept a group invitation as, since acceptance is
 a person following a link in their own mail. "Verify my address" (spec 078) is inapplicable for the same
-reason: only the mailbox holder can complete it. Only the `withheld` ones reach the instructions, and they reach them by
+reason: only the mailbox holder can complete it. So is "Try sign-in" (spec 088), start and result both: it is a
+person signing in at an upstream provider in a browser, and its result is bound to the console session that
+started it ([[federation-try-signin]]). Only the `withheld` ones reach the instructions, and they reach them by
 being filtered out of the table rather than named a second time. Naming them literally is the bug this
 replaced: the list read `['project_delete', 'bucket_delete']` directly beneath a comment claiming it
 could not disagree with the table, so a third withholding would have been refused correctly when
@@ -206,7 +208,7 @@ withholding has since arrived — `group_delete` — and cost only a table row, 
 working as intended.
 
 The other high-consequence operations — 37 tools since spec 087 added `bucket_key_revoke`, `jwks_rotate` and
-`jwks_revoke` (spec 085 made `project_bucket_assign` and `project_bucket_clear` high; spec 083 had added `admin_sign_out` and `admin_totp_clear`; spec 082 had added `bucket_user_email_change`; spec 075 `bucket_owner_change` and
+`jwks_revoke`, still 37 after spec 088, whose new writes are ordinary (spec 085 made `project_bucket_assign` and `project_bucket_clear` high; spec 083 had added `admin_sign_out` and `admin_totp_clear`; spec 082 had added `bucket_user_email_change`; spec 075 `bucket_owner_change` and
 `project_owner_change`, the first tools whose body names a group, `groupId`) — take two calls: describe,
 then confirm. The confirmation binds
 five ways — tool, target, arguments hash, administrator, agent — and each is a real case. Arguments,
@@ -240,6 +242,21 @@ Since spec 085, setting or clearing a project's bucket answers with a route prev
 applications by name, the issuer before and after, and the declarations that move or collide, with `expect` =
 `{applications, resources}` ([[container-ownership-transfer]]). Both tools are high, so like the hand-over the
 agent sees the preview and then passes the token gate. The read tool `bucket_resource_list` came with it.
+
+Spec 088 added four tools and two exclusions:
+
+- `provisioning_credential_retire` ends a SCIM connection's overlapping previous secret or static token now. It
+  is **ordinary**, like revoke, because it only removes access ([[scim-credential-overlap]]).
+  `provisioning_credential_issue` stays high and gained `overlap` and `lifetimeDays`; its summary no longer says
+  the previous credential is revoked at once.
+- `federation_provider_move` moves a provider one place in its bucket's sign-in order. It is ordinary, and high
+  on the administrators' bucket through `highWhen: onConsoleBucket` like its two siblings
+  (`lib/mcp/catalogue.ts:1436`; [[console-federation]]).
+- Two reads: `provisioning_hold_list` (held connections across the buckets the caller sees) and
+  `provisioning_directory_list` (Entra's, Okta's and a generic directory's field names, recommended credential
+  and pitfalls). The second is published for the reason `federation_catalogue_list` is: an agent cannot derive
+  those facts, and without them it would configure a directory wrongly ([[scim-provisioning]]).
+- Try sign-in's start and result are excluded as `inapplicable` (above).
 
 Neither identity may fall back to a placeholder, and both once did. `principalId` defaulted to `''` when
 `whoami` failed and `viaClientId` to `''` when `authInfo` carried no client — either turns that binding

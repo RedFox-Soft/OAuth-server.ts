@@ -119,6 +119,29 @@ export function federationInactivePage(): Response {
 	);
 }
 
+/*
+ * Where a try of a provider ends (specs/088 R6): a plain page in the tab the provider sent back, never a
+ * redirect into the console. The console's Strict session cookie would not survive the hop from the
+ * provider's site, and a host-addressed bucket's callback is another origin anyway — the console tab that
+ * started the try is already waiting for the result.
+ */
+export function tryFinishedPage(): Response {
+	return terminal(
+		'Try finished',
+		'The result is in the console tab you started it from. You can close this tab and return to the console.',
+		200
+	);
+}
+
+/* The try record ran out (ten minutes) before the provider answered; nobody is left to read a result. */
+export function tryExpiredPage(): Response {
+	return terminal(
+		'This try is no longer valid',
+		'The try took too long to complete. Start it again from the console.',
+		400
+	);
+}
+
 /* `passwordLogin: false` — the password-only doors of a federated-only bucket. */
 export function passwordLoginClosedPage(uid?: string): Response {
 	return terminal(

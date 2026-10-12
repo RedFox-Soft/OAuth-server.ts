@@ -12,6 +12,7 @@ import {
 	Radio,
 	Select,
 	Steps,
+	Tag,
 	Typography
 } from 'antd';
 import { CheckCircleOutlined, LoadingOutlined } from '@ant-design/icons';
@@ -28,14 +29,18 @@ import {
 import {
 	CREDENTIAL_KINDS,
 	Copyable,
+	DIRECTORY_CHOICES,
 	MAX_WINDOW_SECONDS,
 	MIN_WINDOW_SECONDS,
 	WINDOW_UNITS,
 	connectionsApi,
+	directoriesApi,
 	parseJwks,
 	setupDetails,
 	type ConnectionView,
-	type CredentialKind
+	type CredentialKind,
+	type DirectoryGuidance,
+	type DirectoryId
 } from './connectionShared.js';
 
 /*
@@ -56,6 +61,7 @@ const POLL_MS = 10_000;
 const POLL_LIMIT = 60; // ten minutes
 
 interface Values {
+	directory?: DirectoryId;
 	displayName?: string;
 	providerId?: string;
 	matching?: 'recommended' | 'custom';
@@ -71,10 +77,11 @@ interface Values {
 	jwksText?: string;
 	jwksUri?: string;
 	signingAlg?: string;
+	lifetimeDays?: 90 | 365;
 }
 
 const STEP_FIELDS: (keyof Values)[][] = [
-	['displayName', 'providerId'],
+	['directory', 'displayName', 'providerId'],
 	['matching', 'claim', 'attribute', 'emailTrust'],
 	['safeguard', 'count', 'windowAmount', 'windowUnit']
 ];
@@ -110,13 +117,27 @@ export function ConnectionWizard({
 	const [keyIssued, setKeyIssued] = useState(false);
 	const [firstRequest, setFirstRequest] = useState<string | null>(null);
 	const [gaveUp, setGaveUp] = useState(false);
+	const [directories, setDirectories] = useState<DirectoryGuidance[]>([]);
 
 	const providerId = Form.useWatch('providerId', form);
 	const matching = Form.useWatch('matching', form);
 	const safeguard = Form.useWatch('safeguard', form);
 	const kind = Form.useWatch('kind', form);
 	const keySource = Form.useWatch('keySource', form);
+	// Read on later steps too, after step one's field has unmounted, so the watch keeps its value.
+	const directory = Form.useWatch('directory', { form, preserve: true });
 	const provider = providers.find((p) => p.id === providerId) ?? null;
+	const guidance = directories.find((d) => d.id === directory);
+
+	// The directory's own words and advice are the server's (specs/088), read once for this bucket.
+	useEffect(() => {
+		void request<{ directories: DirectoryGuidance[] }>(
+			'GET',
+			directoriesApi(bucketId)
+		).then((r) => {
+			if (r.ok) setDirectories(r.data.directories);
+		});
+	}, [bucketId]);
 
 	// The recommended matching rule is the server's, read for the chosen provider.
 	useEffect(() => {
@@ -126,12 +147,18 @@ export function ConnectionWizard({
 			'GET',
 			federationApi(bucketId, providerId)
 		).then((r) => {
-			if (live) setRecommended(r.ok ? r.data.recommendedCorrelation : null);
+			if (!live) return;
+			setRecommended(r.ok ? r.data.recommendedCorrelation : null);
+			if (r.ok && !form.isFieldTouched('directory')) {
+				form.setFieldsValue({
+					directory: r.data.recognised === 'microsoft' ? 'entra' : 'generic'
+				});
+			}
 		});
 		return () => {
 			live = false;
 		};
-	}, [bucketId, providerId]);
+	}, [bucketId, providerId, form]);
 
 	// Watch for the directory's first request while the last step is open: every ten seconds, for ten minutes.
 	useEffect(() => {
@@ -182,6 +209,7 @@ export function ConnectionWizard({
 				{
 					displayName: v.displayName,
 					providerId: v.providerId,
+					directory: v.directory,
 					emailTrust: v.emailTrust,
 					...(v.matching === 'custom' && v.claim && v.attribute
 						? { correlation: { claim: v.claim.trim(), attribute: v.attribute } }
@@ -215,10 +243,17 @@ export function ConnectionWizard({
 			feedback.done(
 				`Provisioning connection ${result.data.displayName} created; ${result.data.providerId} now signs in existing accounts only.`
 			);
-			const first = CREDENTIAL_KINDS.find((k) =>
-				result.data.availableCredentialKinds.includes(k.kind)
-			);
-			form.setFieldsValue({ kind: first?.kind, keySource: 'jwks' });
+			const offered = result.data.availableCredentialKinds;
+			const preferred = [
+				guidance?.recommendedCredential,
+				guidance?.fallbackCredential,
+				...CREDENTIAL_KINDS.map((k) => k.kind)
+			].find((k) => k !== undefined && offered.includes(k));
+			form.setFieldsValue({
+				kind: preferred,
+				keySource: 'jwks',
+				lifetimeDays: 365
+			});
 			setStep(3);
 		} finally {
 			setBusy(false);
@@ -227,7 +262,14 @@ export function ConnectionWizard({
 
 	async function issue() {
 		if (!created || !kind) return;
-		let body: Record<string, unknown> = { kind };
+		let body: Record<string, unknown> =
+			kind === 'static_token'
+				? {
+						kind,
+						lifetimeDays:
+							(form.getFieldsValue(true) as Values).lifetimeDays ?? 365
+					}
+				: { kind };
 		if (kind === 'key') {
 			try {
 				await form.validateFields(['jwksText', 'jwksUri']);
@@ -303,7 +345,7 @@ export function ConnectionWizard({
 	async function copySetup() {
 		if (!created) return;
 		try {
-			await navigator.clipboard.writeText(setupDetails(created));
+			await navigator.clipboard.writeText(setupDetails(created, guidance));
 			feedback.done('Setup details copied, without the secret.');
 		} catch {
 			feedback.refused({
@@ -337,11 +379,25 @@ export function ConnectionWizard({
 			content: (
 				<>
 					<Form.Item
+						name="directory"
+						label="Which directory provisions this bucket?"
+						extra="Decides the field names and advice shown from here on; nothing else."
+						initialValue="generic"
+						rules={[{ required: true }]}
+					>
+						<Radio.Group
+							optionType="button"
+							options={DIRECTORY_CHOICES}
+						/>
+					</Form.Item>
+					<Form.Item
 						name="displayName"
 						label="Name"
 						rules={[{ required: true, max: 100 }]}
 					>
-						<Input placeholder="Okta SCIM for Acme" />
+						<Input
+							placeholder={`${guidance && guidance.id !== 'generic' ? guidance.displayName : 'Directory'} provisioning for Acme`}
+						/>
 					</Form.Item>
 					<Form.Item
 						name="providerId"
@@ -591,6 +647,16 @@ export function ConnectionWizard({
 												disabled={!available.includes(k.kind)}
 											>
 												{k.label}{' '}
+												{guidance?.recommendedCredential === k.kind && (
+													<Tag color="blue">
+														Recommended for {guidance.displayName}
+													</Tag>
+												)}
+												{guidance?.fallbackCredential === k.kind && (
+													<Tag>
+														If {guidance.displayName} offers no OAuth option
+													</Tag>
+												)}
 												<Typography.Text type="secondary">
 													{available.includes(k.kind)
 														? k.suits
@@ -601,6 +667,21 @@ export function ConnectionWizard({
 									</Flex>
 								</Radio.Group>
 							</Form.Item>
+							{kind === 'static_token' && (
+								<Form.Item
+									name="lifetimeDays"
+									label="Lifetime"
+									extra="After it the token is refused. Replacing it before then causes no outage."
+								>
+									<Select<90 | 365>
+										style={{ width: 160 }}
+										options={[
+											{ label: '1 year', value: 365 },
+											{ label: '90 days', value: 90 }
+										]}
+									/>
+								</Form.Item>
+							)}
 							{kind === 'key' && (
 								<>
 									<Form.Item
@@ -670,7 +751,11 @@ export function ConnectionWizard({
 					gap={16}
 				>
 					<Typography.Paragraph>
-						Give the directory these values.
+						Give {guidance?.displayName ?? 'the directory'} these values
+						{guidance && guidance.id !== 'generic'
+							? ', under the names it uses'
+							: ''}
+						.
 					</Typography.Paragraph>
 					<Descriptions
 						column={1}
@@ -678,20 +763,28 @@ export function ConnectionWizard({
 						bordered
 						items={[
 							{
-								label: 'SCIM base URL',
+								label: guidance?.labels.scimBaseUrl ?? 'SCIM base URL',
 								children: <Copyable value={created.scimBaseUrl} />
 							},
 							{
-								label: 'Token endpoint',
+								label: guidance?.labels.tokenEndpoint ?? 'Token endpoint',
 								children: <Copyable value={created.tokenEndpoint} />
 							},
 							{
-								label: 'Client id',
+								label: guidance?.labels.clientId ?? 'Client id',
 								children: <Copyable value={created.clientId} />
 							},
 							{ label: 'Scope', children: <Copyable value={created.scope} /> }
 						]}
 					/>
+					{guidance?.pitfalls.map((pitfall) => (
+						<Alert
+							key={pitfall}
+							type="info"
+							showIcon
+							title={pitfall}
+						/>
+					))}
 					<div>
 						<Button onClick={() => void copySetup()}>
 							Copy setup details (without the secret)

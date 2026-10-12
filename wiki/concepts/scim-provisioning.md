@@ -4,7 +4,7 @@ title: 'SCIM provisioning: connections, /Users, and the sign-in they feed'
 tags: [architecture, contract, gotcha, oauth, config]
 sources: [oauth-server-codebase]
 created: 2026-10-06
-updated: 2026-10-06
+updated: 2026-10-12
 graph:
   node_type: concept
   relationships:
@@ -50,21 +50,36 @@ That one decision buys the whole token endpoint for free — `private_key_jwt` w
 constant-time comparison, the client-credentials grant — and keeps the connection the single source of its
 credential: rotation is one write, and there is no hidden stored client to keep in step or orphan.
 
+**Replacing a secret or a static token is no longer an outage** (since spec 088). Until then the new value
+killed the old one in the same write, and Entra quarantines a provisioning job on an invalid credential. Now the
+replaced value keeps working until the directory has used the new one and has not used the old one for an hour,
+and at most 24 hours. A key credential, or a change of kind, still replaces at once. The rule, the
+`credentialRef` on tokens that lets an administrator stop only the old value's tokens, and the static token's
+new lifetime are in [[scim-credential-overlap]].
+
 - **The secret is a digest.** The synthesized client carries `clientSecretDigest` and no `clientSecret`;
-  comparison hashes what is presented (`lib/models/client/secret.ts:51`). Ordinary clients still store the
+  comparison hashes what is presented (`lib/models/client/secret.ts:45`; since spec 088 against the overlapping
+  previous digest too). Ordinary clients still store the
   plaintext, because `client_secret_jwt` and the symmetric keys derive from it — a standing gap against the
   constitution's "client secrets MUST be stored hashed" that this change did not widen.
 - **Basic and post alike** for a connection's secret (`lib/shared/token_auth.ts:169`): Entra lets its
   administrator choose either, and a wrong guess surfaces as `invalid_client` on the customer's "Test
-  connection".
+  connection". Not both at once: a request carrying the secret in the header and the body is refused as
+  `invalid_request` (`lib/shared/token_auth.ts:83`, RFC 6749 §2.3), so Entra's "How credentials are sent" must be
+  Header or Body, never Both — one of the pitfalls the directory guidance below carries (since spec 088).
 - **No `scope` in the client metadata.** Client metadata may name only scopes the server advertises, and
   `scim` belongs to a bucket's SCIM resource, not to the server. That such a client gets `scim` and nothing
   else is enforced at the grant (`lib/actions/grants/client_credentials.ts:41`): absent scope means `scim`, any
   other scope is `invalid_scope`.
-- **A static token** (Okta cannot use client credentials for SCIM) is `scimst_` + 256 random bits, stored as
+- **A static token** is `scimst_` + 256 random bits, stored as
   a SHA-256 digest and found by a point read. The prefix makes it distinguishable from an access token without
   a lookup, lets Okta's header mode send it with no `Bearer` (`lib/scim/principal.ts:63`), and lets a secret
-  scanner recognise one.
+  scanner recognise one. It used to be justified as what Okta needs because "Okta cannot use client credentials
+  for SCIM"; the standards review of spec 088 found that out of date. Okta's help pages now document an OAuth 2
+  Client Credentials mode for SCIM (not yet in its developer guide, and not yet verified here against a live Okta
+  organisation), so the guidance recommends the client secret for Okta and keeps the static token as the
+  fallback for an organisation without that mode. Since spec 088 every static token also expires (90 days or a
+  year, RFC 7644 §7.4) — see [[scim-credential-overlap]].
 
 ### The token endpoint does not check a client's bucket
 
@@ -118,7 +133,7 @@ parser to linear time.
 ## Sign-in: the correlation rule ends the ladder
 
 At a provider bound to a connection, an unlinked sign-in never reaches the email steps
-(`lib/federation/resolve.ts:208`, `:142`): the connection's rule names a claim of the ID token and a SCIM
+(`lib/federation/resolve.ts:213`, `decideCorrelated` at `:154` since spec 088 split the ladder): the connection's rule names a claim of the ID token and a SCIM
 attribute (Entra: `oid` ↔ `externalId`, because Entra's `sub` is pairwise; others default to
 `preferred_username` ↔ `userName`), and exactly one provisioned user must match. No match is
 `not_provisioned`; a match already linked to another subject is `link_conflict` and an event, not a re-link.
@@ -136,13 +151,20 @@ that are behaviours; the two that are absences — no `/Bulk`, and the administr
 switched and are documented in `CONFORMANCE.md`. Each carries an operator-facing explanation in the settings
 catalog (`lib/admin/settings/catalog.ts`).
 
-- **`scim.secretCredentials`** (on, `lib/configs/application.ts:778`). IPSIE AL SCIM §4.1 and §10 require
-  JWT client authentication (RFC 7523 §2.2); a client secret is not that. **On because Entra ID can only send
-  a secret** until workload identity federation (part 4). Off: secret clients stop resolving, so their token
-  requests are `invalid_client`, and their tokens are refused at the SCIM principal; nothing is deleted.
-- **`scim.staticTokens`** (on, `:787`). §4.1 wants a short-lived OAuth token. **On because Okta cannot use
-  client credentials for SCIM** at all. Off: static tokens are refused; nothing is deleted.
-- **`scim.strict`** (off, `:800`), inverted — off means tolerant. The interop profile (§6.5.1.1) requires
+- **`scim.secretCredentials`** (on, `lib/configs/application.ts:794`). IPSIE AL SCIM §4.1 and §10 require
+  JWT client authentication (RFC 7523 §2.2); a client secret is not that. **On because Entra's OAuth2 Client
+  Credentials Grant and Okta's OAuth 2 client-credentials mode both send a secret.** Corrected in spec 088: the
+  reason used to read "Entra ID can only send a secret"; Entra also has a Workload Identity Federation mode,
+  which signs, and which this server does not support yet (a later part of the series). Off: secret clients stop
+  resolving, so their token requests are `invalid_client`, and their tokens are refused at the SCIM principal;
+  nothing is deleted.
+- **`scim.staticTokens`** (on, `:804`). §4.1 wants a short-lived OAuth token. **On for directories with no OAuth
+  option**: an Okta organisation without the client-credentials mode (its HTTP Header mode), and Entra's
+  long-lived bearer mode. Corrected in spec 088: the reason used to read "Okta cannot use client credentials for
+  SCIM at all". Since that spec a static token is also no longer only an IPSIE departure that lives forever: it
+  expires, as RFC 7644 §7.4 requires ([[scim-credential-overlap]]). Off: static tokens are refused; nothing is
+  deleted.
+- **`scim.strict`** (off, `:817`), inverted — off means tolerant. The interop profile (§6.5.1.1) requires
   refusing a path-less PATCH and unknown attributes, and IPSIE §6.1.2 forbids `password`. **Off because both
   v1 clients would fail strict**: Okta deactivates with a path-less PATCH and sends `password` on every create;
   Entra sends path-less multi-attribute replaces, `"False"`, capitalised operations, `addresses` in its
@@ -154,7 +176,7 @@ catalog (`lib/admin/settings/catalog.ts`).
   against the profiles, or connecting Entra and Okta. RFC 7644 itself permits a path-less `add`/`replace`;
   only the profile forbids it.
 
-`scim.enabled` (off, `:768`) is a capability switch, not a deviation: the surface lets a third party's system
+`scim.enabled` (off, `:783`) is a capability switch, not a deviation: the surface lets a third party's system
 write to end-user accounts. Connections can be prepared while it is off.
 
 ### §4.1 contradicts itself
@@ -228,6 +250,39 @@ the threshold of a held connection is refused 409.
 - **The alert links to the connection** (spec 084): `${ISSUER}/admin/buckets/<bucket>/provisioning/<connection>`
   (`deprovision_guard.ts:209`), the page whose hold panel lists the refused removals
   ([[provider-connection-group-pages]]). Before that it linked to the console's front page.
+- **A hold is visible from every page** (spec 088). `GET /admin/api/provisioning-holds`
+  (`lib/admin/provisioning/holds.ts:50`; MCP `provisioning_hold_list`) lists the held connections in the buckets
+  the caller's bucket list shows, read by the same `visibleBuckets` (`lib/admin/buckets/visible.ts:15`) the list
+  uses, so the count never includes a hold the list cannot lead to. Its store read, `listHeld` (all three
+  adapters), also replaced `bucketsHolding` in the bucket list. The console reads it on every change of page and
+  shows the number as a badge on Buckets (`useHeldConnections`, `lib/admin/ui/pages/Layout.tsx:103`); a bucket
+  row says On hold and links to its oldest held connection (`heldConnectionId`). The count is not added to
+  `/admin/api/me`: MCP's `whoami` shares that read, and the console seeds it once and never refetches it.
+- Entra's quarantine on 401 is also why a replaced credential now keeps working for a while
+  ([[scim-credential-overlap]]).
+
+## Directory guidance lives on the server
+
+Since spec 088. `lib/consts/known_directories.ts` holds, for Microsoft Entra ID, Okta and "another directory",
+the facts an administrator needs at the directory's own screen:
+
+- **its field names**, so a value is copied without translating it — Entra: Tenant URL, Token Endpoint, Client
+  Identifier, Client Secret; Okta: SCIM connector base URL, Token URL, Client ID, Client Secret, and Authorization
+  for its header mode;
+- **the recommended credential and a fallback** — Entra: a client secret; Okta: a client secret, with the static
+  token as the fallback; another directory: a key, with a secret as the fallback;
+- the recommended correlation rule, the setup steps and the known pitfalls (Entra: send the secret in the header
+  or the body, never both; leave Scope blank or `scim`).
+
+It is data, not behaviour, like `known_providers.ts`. A connection's optional `directory` only chooses which
+entry the console and an agent read, and nothing at runtime branches on it. When it is absent it is inferred: a
+Microsoft provider means Entra, anything else the generic entry (`directoryOf`,
+`lib/provisioning/service.ts:815`). The guidance is read through `GET …/provisioning-connections/directories`
+(`lib/admin/provisioning/routes.ts:101`), with the bucket's SCIM base URL and token endpoint filled in, and by
+MCP `provisioning_directory_list`. It lives on the server rather than in the console because facts only the
+console holds are facts an agent never gets — the lesson of the providers' old `PRESETS` map
+([[upstream-federation]]). The correlation constants moved to the import-free `lib/consts/correlation_rules.ts`
+so the guidance and `lib/provisioning/correlation.ts` share them.
 
 ## Gotchas found while building it
 
@@ -244,6 +299,7 @@ the threshold of a held connection is refused 409.
 
 ## Related
 
+- [[scim-credential-overlap]] — replacing a secret or static token without an outage, and the static token's lifetime.
 - [[end-user-lifecycle]] — the record, `provisionedBy`, and the access-ending operation a SCIM deactivation runs.
 - [[upstream-federation]] — the ladder the correlation step now ends early for a bound provider.
 - [[mcp-server-authorization]] — the other built-in resource arm, and the declared-resource path SCIM sits before.

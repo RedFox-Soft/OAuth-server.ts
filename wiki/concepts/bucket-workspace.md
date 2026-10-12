@@ -4,7 +4,7 @@ title: "The bucket workspace: an Overview that says what needs attention, a Sett
 tags: [architecture, admin, console, contract]
 sources: [oauth-server-codebase]
 created: 2026-10-11
-updated: 2026-10-11
+updated: 2026-10-12
 ---
 
 # The bucket workspace
@@ -24,7 +24,8 @@ and create only; each group, provider and connection has a page of its own
 `lib/admin/ui/pages/BucketOverview.tsx` shows what the bucket read and the summary already say:
 
 - **Needs attention**, most urgent first: a provisioning connection holding a mass deprovisioning (its button
-  opens the held connection's page since spec 084); a host no
+  opens the held connection's page since spec 084); a static token within 14 days of its expiry, or expired
+  (since spec 088, [[scim-credential-overlap]]); a host no
   request has reached; email verification required while the server cannot send mail; an authenticator
   required while password sign-in is off; a bucket owned by the System group (super administrators only); a
   bucket no project uses; a bucket with no address of its own. Each item links to where it is fixed. With
@@ -82,9 +83,12 @@ nothing new. `blockers.dependents` and `blockers.accounts` carry the facts so th
 
 - `setAddress` cleared nothing, so a bucket moved from one host to another read as "reached" from the old
   host's traffic; it now clears both arrival fields in all three adapters.
-- The list's `held` flag comes from one read, `ProvisioningConnectionStore.bucketsHolding()`
-  (`lib/adapters/types.ts:1360`); the MongoDB version uses an aggregation because `distinct` is refused under the
-  strict Stable API.
+- The list's `held` flag came from one read, `ProvisioningConnectionStore.bucketsHolding()`; the MongoDB version
+  uses an aggregation because `distinct` is refused under the strict Stable API. Since spec 088 the list reads
+  `listHeld()` (`lib/adapters/types.ts:1559`) instead, the same hold test returning the connections, so a row also
+  carries `heldConnectionId` and its On hold mark links to the connection. The list's bucket set is
+  `visibleBuckets` (`lib/admin/buckets/visible.ts:15`), shared with the console-wide held-connections badge
+  ([[scim-provisioning]]).
 - The Audit page reads its filters from its address, so the Overview can link to a bucket's entries. Since spec
   085 it also writes them back and shows each as a removable chip ([[admin-audit-trail]]).
 

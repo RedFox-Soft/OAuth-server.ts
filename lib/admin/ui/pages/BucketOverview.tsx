@@ -63,24 +63,37 @@ export function BucketOverview({
 	const navigate = useNavigate();
 	const special = reservedOf(bucket._id);
 	/*
-	 * The held connection itself, so the item opens the page that can end the hold (specs/084 US6). Read only
-	 * when the summary says one is held; the list it comes from is short.
+	 * The connections, for two items: the held one, so the item opens the page that can end the hold (specs/084
+	 * US6), and a static token about to expire (specs/088). The list is short; a caller who may not read it gets
+	 * neither item, and the summary still says a hold exists.
 	 */
-	const [heldId, setHeldId] = useState<string | null>(null);
-	const anyHeld = summary !== null && summary.held > 0;
+	const [connections, setConnections] = useState<
+		{
+			id: string;
+			displayName: string;
+			hold?: unknown;
+			warnings: string[];
+			staticToken: { expiresAt: string } | null;
+		}[]
+	>([]);
 	useEffect(() => {
-		if (!anyHeld) return;
 		let live = true;
-		void request<{ id: string; hold?: unknown }[]>(
+		void request<typeof connections>(
 			'GET',
 			`/admin/api/buckets/${encodeURIComponent(bucket._id)}/provisioning-connections`
 		).then((r) => {
-			if (live && r.ok) setHeldId(r.data.find((c) => c.hold)?.id ?? null);
+			if (live && r.ok) setConnections(r.data);
 		});
 		return () => {
 			live = false;
 		};
-	}, [anyHeld, bucket._id]);
+	}, [bucket._id]);
+	const heldId = connections.find((c) => c.hold)?.id ?? null;
+	const expiring = connections.filter(
+		(c) =>
+			c.warnings.includes('static_token_expiring') ||
+			c.warnings.includes('static_token_expired')
+	);
 	const settingsHref = bucketHref(bucket._id, 'settings');
 	const projects = bucket.projects ?? [];
 
@@ -103,6 +116,24 @@ export function BucketOverview({
 					}
 				>
 					{heldId ? 'Review the hold' : 'Open Provisioning'}
+				</Button>
+			)
+		});
+	}
+	for (const c of expiring) {
+		const expired = c.warnings.includes('static_token_expired');
+		attention.push({
+			key: `token-${c.id}`,
+			type: expired ? 'error' : 'warning',
+			title: expired
+				? `The static token of ${c.displayName} has expired: the directory's requests are refused.`
+				: `The static token of ${c.displayName} expires ${c.staticToken ? new Date(c.staticToken.expiresAt).toLocaleDateString() : 'soon'}. Replace it: the current one keeps working until the directory uses the new one.`,
+			action: (
+				<Button
+					size="small"
+					onClick={() => void navigate(connectionHref(bucket._id, c.id))}
+				>
+					Open connection
 				</Button>
 			)
 		});

@@ -164,6 +164,9 @@ export const ACTIONS = {
 	'provider.create': { class: 'C0' },
 	'provider.edit': { class: 'C0' },
 	'provider.enable': { class: 'C0' },
+	// A try writes nothing but its own short-lived result; a move changes only the order of buttons.
+	'provider.try': { class: 'C0' },
+	'provider.move': { class: 'C0' },
 	'provider.disable': {
 		class: 'C2',
 		title: (t) => `Disable sign-in with ${t}?`,
@@ -202,7 +205,10 @@ export const ACTIONS = {
 		title: (t) => `Issue a new credential for ${t}?`,
 		okText: 'Issue credential'
 	},
-	// One slot per kind: the old credential stops working the moment the new one exists.
+	/*
+	 * A secret or a static token keeps the old value working until the directory has moved (specs/088); a key or
+	 * a change of kind, or "stop now", cuts it off at once. C2 either way: the question says which.
+	 */
 	'connection.credential.replace': {
 		class: 'C2',
 		title: (t) => `Replace the credential of ${t}?`,
@@ -212,6 +218,12 @@ export const ACTIONS = {
 		class: 'C1',
 		title: (t) => `Revoke the credential of ${t}?`,
 		okText: 'Revoke'
+	},
+	// Protective, like revoke: it only ends a value the directory should no longer hold.
+	'connection.credential.retire': {
+		class: 'C1',
+		title: (t) => `Retire the previous credential of ${t}?`,
+		okText: 'Retire previous'
 	},
 	'connection.guard.save': { class: 'C0' },
 	'connection.guard.off': {

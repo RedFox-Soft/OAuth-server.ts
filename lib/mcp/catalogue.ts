@@ -34,6 +34,7 @@ import {
 } from '../admin/users-end/schema.js';
 import {
 	CreateProviderBody,
+	MoveProviderBody,
 	UpdateProviderBody
 } from '../admin/federation/schema.js';
 import { PublishedSettingsBody } from '../admin/settings/schema.js';
@@ -574,6 +575,36 @@ const catalogue = [
 		pathParams: ['id', 'connectionId'],
 		summary:
 			"Whom a SCIM provisioning connection held by its mass-deprovisioning guard has been refused the deactivation or deletion of: `{held: false}`, or `{held: true, since, count, refused, total}` where each refused row names the user (`userId`, `email`, `userName`), the last refused `operation`, `firstAt`, `lastAt` and `attempts`, most recent first, at most 1,000 rows. Releasing the hold (provisioning_connection_release) lets the directory's retries of exactly these go through — read this first."
+	},
+	{
+		tool: 'provisioning_hold_list',
+		method: 'GET',
+		path: '/admin/api/provisioning-holds',
+		action: null,
+		consequence: 'read',
+		superAdminOnly: false,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: [],
+		summary:
+			'Every SCIM provisioning connection held by its mass-deprovisioning guard, across the buckets bucket_list shows the caller: `{count, connections}`, each with `bucketId`, `bucketName`, `connectionId`, `displayName`, `since` (when the hold began) and `refused` (how many removals it has refused so far), oldest hold first. While a connection is held, the people the directory removes keep their access; read provisioning_hold_get before releasing one.'
+	},
+	{
+		/*
+		 * Published for the reason federation_catalogue_list is: the field names and pitfalls of Entra and Okta
+		 * are facts an agent cannot derive, and without them it would configure a directory wrongly.
+		 */
+		tool: 'provisioning_directory_list',
+		method: 'GET',
+		path: '/admin/api/buckets/:id/provisioning-connections/directories',
+		action: null,
+		consequence: 'read',
+		superAdminOnly: false,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			"How to connect each known directory to a bucket over SCIM, in the directory's own words: `directories`, one each for `entra` (Microsoft Entra ID), `okta` and `generic`, with `displayName`, `recommendedCredential` and `fallbackCredential` (the kind to pass to provisioning_credential_issue), `recommendedCorrelation`, `labels` (the directory's names for the SCIM base URL, token endpoint, client id, client secret and static token), the ordered `steps`, known `pitfalls`, and `values` — this bucket's SCIM base URL and token endpoint, null when it has no SCIM address. Set a connection's `directory` to the matching id. Returns no credential."
 	},
 	{
 		/*
@@ -1348,7 +1379,7 @@ const catalogue = [
 			'Permanently delete an end-user account and everything issued to it; relying parties registered for back-channel logout are told the user signed out. Irreversible.'
 	},
 
-	/* ---------------------------------------------- writes: federation (4) */
+	/* ---------------------------------------------- writes: federation (5) */
 	{
 		tool: 'federation_provider_create',
 		method: 'POST',
@@ -1393,6 +1424,20 @@ const catalogue = [
 			'Remove an upstream identity provider from a bucket. Deliberately available even with federation switched off, so a deployment can delete a provider it no longer trusts. Users who signed in only through it lose that route in.'
 	},
 	{
+		tool: 'federation_provider_move',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/federation/:providerId/move',
+		action: 'federation.provider.move',
+		consequence: 'ordinary',
+		superAdminOnly: false,
+		bodySchema: MoveProviderBody,
+		querySchema: null,
+		pathParams: ['id', 'providerId'],
+		highWhen: onConsoleBucket,
+		summary:
+			"Move an upstream provider one place `up` or `down` in the order its bucket's sign-in page shows the buttons — the order federation_provider_list returns. Changes nothing but the order; refused (409) when the provider is already first or last. Answers `{providers}` in the new order. On the Administrators bucket (`admin`) only a super administrator may, and each move must be confirmed."
+	},
+	{
 		tool: 'federation_identity_delete',
 		method: 'DELETE',
 		path: '/admin/api/buckets/:id/users/:uid/identities/:providerId',
@@ -1406,7 +1451,7 @@ const catalogue = [
 			"Sever one end-user's link to one upstream provider. The account survives; only the link is removed."
 	},
 
-	/* ---------------------------------------- writes: SCIM provisioning (7) */
+	/* ---------------------------------------- writes: SCIM provisioning (8) */
 	{
 		tool: 'provisioning_connection_create',
 		method: 'POST',
@@ -1419,7 +1464,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'Create a SCIM provisioning connection on a bucket, bound to one of its federation providers. That provider stops creating accounts on first sign-in: from now on the directory creates them. Holds no credential until one is issued.'
+			'Create a SCIM provisioning connection on a bucket, bound to one of its federation providers. That provider stops creating accounts on first sign-in: from now on the directory creates them. Holds no credential until one is issued. `directory` (entra, okta or generic) chooses whose words the console uses for it; absent, it is inferred from the provider.'
 	},
 	{
 		tool: 'provisioning_connection_update',
@@ -1432,7 +1477,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'connectionId'],
 		summary:
-			'Rename, enable or disable a SCIM provisioning connection, change its correlation rule or email trust, or set its mass-deprovisioning guard: threshold {count 1–100000, windowSeconds 300–604800} holds the connection after that many deactivations or deletions within the window; null removes it (refused while held). Disabling refuses every SCIM request through it and leaves its users as they are; no edit releases a hold.'
+			'Rename, enable or disable a SCIM provisioning connection, change its correlation rule or email trust, or set its mass-deprovisioning guard: threshold {count 1–100000, windowSeconds 300–604800} holds the connection after that many deactivations or deletions within the window; null removes it (refused while held). Disabling refuses every SCIM request through it and leaves its users as they are; no edit releases a hold. `directory` (entra, okta or generic) changes only whose words the console uses for it.'
 	},
 	{
 		tool: 'provisioning_connection_release',
@@ -1480,7 +1525,21 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'connectionId'],
 		summary:
-			'Issue a credential for a SCIM provisioning connection: public keys (signed client assertion), a client secret (Microsoft Entra ID), or a static token (Okta). A secret or token is returned exactly once. Replaces the previous credential of that kind and revokes its tokens.'
+			'Issue or replace a credential for a SCIM provisioning connection: public keys (signed client assertion), a client secret (Microsoft Entra ID, Okta), or a static token (Okta without OAuth; `lifetimeDays` 90 or 365, default 365). A secret or token is returned exactly once. Replacing a secret with a secret, or a static token with a static token, keeps the current value working until the directory has used the new one and not the old one for an hour, and at most 24 hours (`previousEndsAt` in the answer); pass `overlap: false` to stop it and the tokens it obtained at once — for a leaked value. Keys and a change of kind always replace at once and revoke the old tokens. See provisioning_directory_list for which kind each directory needs.'
+	},
+	{
+		tool: 'provisioning_credential_retire',
+		method: 'DELETE',
+		path: '/admin/api/buckets/:id/provisioning-connections/:connectionId/credentials/:kind/previous',
+		action: 'provisioning.credential.retire',
+		/* Ordinary: it only removes access, like revoke. */
+		consequence: 'ordinary',
+		superAdminOnly: false,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id', 'connectionId', 'kind'],
+		summary:
+			'End a SCIM provisioning connection\'s overlapping previous client secret ("oauth") or static token ("static_token") now, with every token the previous secret obtained; the current value and its tokens keep working. Refused (404) when there is no previous value that still works. Check that the directory uses the new value first — provisioning_connection_get says `stillUsedByDirectory` while it does not.'
 	},
 	{
 		tool: 'provisioning_credential_revoke',
@@ -1880,6 +1939,25 @@ export const excludedConsoleOperations: readonly ExcludedConsoleOperation[] = [
 		reason:
 			'Points a browser console at one of the groups it may administer, and an agent connection has no session to hold that choice. Name the group in each call instead.'
 	},
+	/*
+	 * Trying a sign-in through a provider (specs/088). Not a decision withheld from agents: the try is a
+	 * person signing in at the upstream in a browser, and its result is bound to the console session that
+	 * started it, which an agent connection does not have.
+	 */
+	{
+		method: 'POST',
+		path: '/admin/api/buckets/:id/federation/:providerId/try',
+		absence: 'inapplicable',
+		reason:
+			'Trying a sign-in through an identity provider needs a person signing in at that provider in a browser, and its result is shown only to the console session that started it. Do it from the provider page in the admin console.'
+	},
+	{
+		method: 'GET',
+		path: '/admin/api/buckets/:id/federation/:providerId/try/:tryRef',
+		absence: 'inapplicable',
+		reason:
+			'The result of a sign-in try is readable only by the console session that started it, which an agent connection does not have. Read it on the provider page in the admin console.'
+	},
 	{
 		method: 'DELETE',
 		path: '/admin/api/projects/:id',
@@ -1947,7 +2025,8 @@ export function excludedOperationFor(
 		setup_bootstrap: '/admin/api/setup',
 		logout: '/admin/api/logout',
 		scope_switch: '/admin/api/scope',
-		error_purge: '/admin/api/errors'
+		error_purge: '/admin/api/errors',
+		federation_provider_try: '/admin/api/buckets/:id/federation/:providerId/try'
 	};
 	const path = guesses[name];
 	return path

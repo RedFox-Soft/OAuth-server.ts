@@ -56,6 +56,7 @@ import {
 	type MovePlan
 } from '../resources/move.js';
 import { loadBucketForSettings, loadBucketForEdit } from './access.js';
+import { visibleBuckets } from './visible.js';
 import {
 	adminBucketAdvisory,
 	assertAdminBucketChange
@@ -617,42 +618,24 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 	})
 	.get('/admin/api/buckets', async ({ admin }) => {
 		const ctx = assertAuth(admin);
-		const store = getBucketStore();
-		/*
-		 * Listing has to agree with access, or the console shows an administrator fewer buckets than it
-		 * will let them open. The `read` right admits a bucket backing a project the caller's
-		 * group owns, so the list has to admit it too — it did not before this feature, and a bucket you
-		 * could administer but never see was the result.
-		 */
-		let all;
-		if (ctx.superAdmin) {
-			all = await store.list();
-		} else {
-			const owned = await store.listByGroup(ctx.activeGroupId);
-			const projects = await getProjectStore().listByGroup(ctx.activeGroupId);
-			const backing = projects
-				.map((p) => p.bucketId)
-				.filter((id): id is string => id !== null);
-			const missing = backing.filter((id) => !owned.some((b) => b._id === id));
-			const extra = (
-				await Promise.all(missing.map((id) => store.find(id)))
-			).filter((b): b is NonNullable<typeof b> => b !== null);
-			all = [...owned, ...extra];
-		}
-		/*
-		 * A super administrator configures the administrators' bucket like any other, so it is listed for
-		 * them. For anyone else it stays out of the list, as it is out of reach.
-		 */
-		const listed = all.filter(
-			(b) => ctx.superAdmin || b._id !== ADMIN_BUCKET_ID
-		);
+		/* The same set the held-connections count is taken over (lib/admin/buckets/visible.ts). */
+		const listed = await visibleBuckets(ctx);
 		const [facts, holding, states] = await Promise.all([
 			rightsFacts(ctx),
-			getProvisioningConnectionStore().bucketsHolding(),
+			getProvisioningConnectionStore().listHeld(),
 			Promise.all(listed.map((b) => bucketFacts(ctx, b)))
 		]);
-		const held = new Set(holding);
+		/* One held connection per bucket is enough to link to; the oldest hold, so the link is stable. */
+		const heldIn = new Map<string, string>();
+		for (const connection of [...holding].sort(
+			(a, b) => a.hold.since.getTime() - b.hold.since.getTime()
+		)) {
+			if (!heldIn.has(connection.bucketId)) {
+				heldIn.set(connection.bucketId, connection._id);
+			}
+		}
 		return listed.map((b, i) => {
+			const heldConnectionId = heldIn.get(b._id);
 			const { addressForm, issuer } = addressing(b);
 			return {
 				...withRights(ctx, presentBucket(b), facts, states[i] ?? {}),
@@ -663,7 +646,9 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 				 * reached is the row an operator has still to finish setting up.
 				 */
 				hostReached: b.host !== undefined && b.hostLastSeenAt !== undefined,
-				held: held.has(b._id)
+				held: heldConnectionId !== undefined,
+				/* The held connection an "On hold" mark links to (specs/088 US5). */
+				...(heldConnectionId ? { heldConnectionId } : {})
 			};
 		});
 	})

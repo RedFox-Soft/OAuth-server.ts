@@ -21,6 +21,7 @@ import {
 	ProvisioningError,
 	readHold,
 	releaseConnection,
+	retirePreviousCredential,
 	revokeCredential,
 	updateConnection,
 	viewConnection
@@ -30,6 +31,7 @@ import {
 	getProvisioningConnectionStore
 } from '../../adapters/index.js';
 import type { UserBucket } from '../../adapters/types.js';
+import { directoryGuidance } from './directories.js';
 import {
 	AssignConnectionBody,
 	CreateConnectionBody,
@@ -89,6 +91,18 @@ export const provisioningRoutes = new Elysia({ name: 'admin-provisioning' })
 				bucket._id
 			);
 			return Promise.all(connections.map((c) => viewConnection(bucket, c)));
+		}
+	)
+	/*
+	 * What it takes to connect each known directory to this bucket, in that directory's own words (specs/088
+	 * R9): the same facts the console's wizard shows, so an agent configuring Entra or Okta reads them too.
+	 */
+	.get(
+		'/admin/api/buckets/:id/provisioning-connections/directories',
+		async ({ admin, params }) => {
+			const ctx = assertAuth(admin);
+			const bucket = await loadBucketForUsers(ctx, params.id);
+			return { directories: directoryGuidance(bucket) };
 		}
 	)
 	.get(
@@ -221,12 +235,17 @@ export const provisioningRoutes = new Elysia({ name: 'admin-provisioning' })
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForEdit(ctx, params.id);
 			const issued = await asAdmin(
-				issueCredential(bucket, params.connectionId, body, () =>
+				issueCredential(bucket, params.connectionId, body, (previousEndsAt) =>
 					recordAdminAudit(
 						ctx,
 						'provisioning.credential.issue',
 						params.connectionId,
-						{ attributes: [body.kind], ...scope(bucket) }
+						{
+							attributes: [body.kind],
+							/* Whether the replaced value overlaps, and until when at the latest (specs/088 FR-006). */
+							to: previousEndsAt?.toISOString() ?? null,
+							...scope(bucket)
+						}
 					)
 				)
 			);
@@ -234,10 +253,40 @@ export const provisioningRoutes = new Elysia({ name: 'admin-provisioning' })
 			return {
 				connection: await asAdmin(view(bucket, params.connectionId)),
 				...(issued.secret ? { secret: issued.secret } : {}),
-				...(issued.token ? { token: issued.token } : {})
+				...(issued.token ? { token: issued.token } : {}),
+				previousEndsAt: issued.previousEndsAt?.toISOString() ?? null
 			};
 		},
 		{ body: IssueCredentialBody }
+	)
+	/*
+	 * Ends a slot's overlapping previous value at once, with the tokens it obtained; the current value is
+	 * untouched (specs/088). 404 when there is no previous value that still works.
+	 */
+	.delete(
+		'/admin/api/buckets/:id/provisioning-connections/:connectionId/credentials/:kind/previous',
+		async ({ admin, params }) => {
+			const ctx = assertAuth(admin);
+			const bucket = await loadBucketForEdit(ctx, params.id);
+			await asAdmin(
+				retirePreviousCredential(bucket, params.connectionId, params.kind, () =>
+					recordAdminAudit(
+						ctx,
+						'provisioning.credential.retire',
+						params.connectionId,
+						{ attributes: [params.kind], ...scope(bucket) }
+					)
+				)
+			);
+			return asAdmin(view(bucket, params.connectionId));
+		},
+		{
+			params: t.Object({
+				id: t.String(),
+				connectionId: t.String(),
+				kind: CredentialKindParam
+			})
+		}
 	)
 	.delete(
 		'/admin/api/buckets/:id/provisioning-connections/:connectionId/credentials/:kind',

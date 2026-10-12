@@ -189,6 +189,18 @@ export const ClientSchema = t.Object({
 	clientSecretDigest: t.Optional(t.String({ pattern: '^[0-9a-f]{64}$' })),
 
 	/*
+	 * previousClientSecretDigest
+	 *
+	 * description: The SHA-256 (hex) of a provisioning connection's previous client secret, present only
+	 * while that secret still overlaps the current one (specs/088): a replacement keeps the old value
+	 * working until the directory has moved to the new one. Synthesized like the digest above, never stored
+	 * on a client and never accepted from wire input.
+	 */
+	previousClientSecretDigest: t.Optional(
+		t.String({ pattern: '^[0-9a-f]{64}$' })
+	),
+
+	/*
 	 * The remaining members describe the full shape of a *validated* client
 	 * object: the schema engine (lib/models/client/schema.ts) projects the
 	 * recognised snake_case metadata onto these camelCased properties. They are

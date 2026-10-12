@@ -789,24 +789,25 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 		domain: 'integrations',
 		group: 'SCIM provisioning',
 		label: 'Allow client-secret credentials for SCIM',
-		summary: 'Needed by Microsoft Entra ID; a deviation from IPSIE §4.1',
+		summary: 'Used by Entra and Okta OAuth modes; a deviation from IPSIE §4.1',
 		type: 'boolean',
 		dependsOn: 'scim.enabled',
 		risk: 'security',
 		description:
-			'Lets a provisioning connection hold a client secret and obtain its SCIM token with it. Microsoft Entra ID can only authenticate this way, so turning this off stops every Entra connection from obtaining a token. The OpenID IPSIE SCIM profile (§4.1) requires a signed JWT client assertion instead, which the key credential provides — turn this off if you certify against IPSIE and no connection uses a secret. Turning it off does not delete secrets; turning it back on restores them.'
+			'Lets a provisioning connection hold a client secret and obtain its SCIM token with it. Microsoft Entra ID’s OAuth2 Client Credentials Grant and Okta’s OAuth 2 client-credentials mode both authenticate this way, so turning this off stops those connections from obtaining a token. A replaced secret keeps working until the directory has moved to the new one, at most 24 hours. The OpenID IPSIE SCIM profile (§4.1) requires a signed JWT client assertion instead, which the key credential provides — turn this off if you certify against IPSIE and no connection uses a secret. Turning it off does not delete secrets; turning it back on restores them.'
 	},
 	{
 		key: 'scim.staticTokens',
 		domain: 'integrations',
 		group: 'SCIM provisioning',
 		label: 'Allow static tokens for SCIM',
-		summary: 'Needed by Okta; a deviation from IPSIE §4.1',
+		summary:
+			'For directories without an OAuth option; a deviation from IPSIE §4.1',
 		type: 'boolean',
 		dependsOn: 'scim.enabled',
 		risk: 'security',
 		description:
-			'Lets a provisioning connection hold a long-lived bearer token that the directory presents directly. Okta cannot use the client-credentials grant for SCIM, so turning this off disconnects every Okta connection. The OpenID IPSIE SCIM profile (§4.1) requires a short-lived OAuth access token instead — turn this off if you certify against IPSIE and no connection uses a static token. A static token is stored only as a hash and can be rotated at any time; turning this setting off does not delete it.'
+			'Lets a provisioning connection hold a bearer token that the directory presents directly — for an Okta organisation without the OAuth 2 option for SCIM (its HTTP Header mode), or Entra’s long-lived bearer mode. Turning this off disconnects every connection that uses one. Each token expires after 90 days or a year, chosen when it is issued (RFC 7644 §7.4), and a replaced token keeps working until the directory has moved to the new one. The OpenID IPSIE SCIM profile (§4.1) requires a short-lived OAuth access token instead — turn this off if you certify against IPSIE and no connection uses a static token. A static token is stored only as a hash; turning this setting off does not delete it.'
 	},
 	{
 		key: 'scim.strict',

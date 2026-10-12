@@ -1,6 +1,8 @@
 import { entriesOf } from '../../helpers/_/object.js';
 import type {
+	CredentialSlot,
 	DeprovisioningHold,
+	HeldConnection,
 	NewProvisioningConnection,
 	ProvisioningConnection,
 	ProvisioningConnectionPatch,
@@ -51,7 +53,7 @@ export class ProvisioningConnectionStore implements ProvisioningConnectionStoreI
 		};
 		const taken = this.takenBy(connection);
 		if (taken) throw taken;
-		this.connections.set(connection._id, connection);
+		this.connections.set(connection._id, structuredClone(connection));
 		return structuredClone(connection);
 	}
 
@@ -96,6 +98,75 @@ export class ProvisioningConnectionStore implements ProvisioningConnectionStoreI
 		return null;
 	}
 
+	async findByPreviousStaticTokenDigest(
+		digest: string
+	): Promise<ProvisioningConnection | null> {
+		for (const connection of this.connections.values()) {
+			if (connection.previousStaticToken?.digest === digest) {
+				return structuredClone(connection);
+			}
+		}
+		return null;
+	}
+
+	async listHeld(): Promise<HeldConnection[]> {
+		return [...this.connections.values()].flatMap((connection) =>
+			connection.hold
+				? [
+						{
+							_id: connection._id,
+							bucketId: connection.bucketId,
+							displayName: connection.displayName,
+							hold: structuredClone(connection.hold),
+							...(connection.tallyEpoch !== undefined
+								? { tallyEpoch: connection.tallyEpoch }
+								: {})
+						}
+					]
+				: []
+		);
+	}
+
+	/* Nothing awaits between the read and the write, so racing callers are serialised as the databases do. */
+	async noteCredentialUse(
+		id: string,
+		slot: CredentialSlot,
+		which: 'current' | 'previous',
+		at: Date
+	): Promise<void> {
+		const current = this.connections.get(id);
+		if (!current) return;
+		if (which === 'previous') {
+			const previous =
+				slot === 'secret'
+					? current.previousSecret
+					: current.previousStaticToken;
+			if (previous) previous.lastUsedAt = at;
+			return;
+		}
+		if (slot === 'secret') {
+			const credential = current.oauthCredential;
+			if (credential?.kind === 'secret' && !credential.firstUsedAt) {
+				credential.firstUsedAt = at;
+			}
+		} else if (current.staticTokenDigest && !current.staticTokenFirstUsedAt) {
+			current.staticTokenFirstUsedAt = at;
+		}
+	}
+
+	async retirePrevious(
+		id: string,
+		slot: CredentialSlot,
+		digest: string
+	): Promise<boolean> {
+		const current = this.connections.get(id);
+		const field = slot === 'secret' ? 'previousSecret' : 'previousStaticToken';
+		if (current?.[field]?.digest !== digest) return false;
+		Reflect.deleteProperty(current, field);
+		current.updatedAt = new Date();
+		return true;
+	}
+
 	async update(
 		id: string,
 		patch: ProvisioningConnectionPatch
@@ -113,7 +184,8 @@ export class ProvisioningConnectionStore implements ProvisioningConnectionStoreI
 		}
 		const taken = this.takenBy(next, id);
 		if (taken) throw taken;
-		this.connections.set(id, next);
+		/* Cloned in: the use writes below mutate nested values, which must not reach the caller's patch. */
+		this.connections.set(id, structuredClone(next));
 		return structuredClone(next);
 	}
 

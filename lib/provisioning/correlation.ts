@@ -1,4 +1,8 @@
 import { knownProviderByIssuer } from '../consts/known_providers.js';
+import {
+	DEFAULT_CORRELATION,
+	MICROSOFT_CORRELATION
+} from '../consts/correlation_rules.js';
 import type { ConnectionCorrelation } from '../adapters/types.js';
 import type { FederationProvider } from '../federation/types.js';
 
@@ -21,7 +25,7 @@ export function defaultCorrelationFor(
 	provider: Pick<FederationProvider, 'issuer'>
 ): ConnectionCorrelation {
 	if (knownProviderByIssuer(provider.issuer)?.catalogueId === 'microsoft') {
-		return { claim: 'oid', attribute: 'externalId' };
+		return { ...MICROSOFT_CORRELATION };
 	}
-	return { claim: 'preferred_username', attribute: 'userName' };
+	return { ...DEFAULT_CORRELATION };
 }

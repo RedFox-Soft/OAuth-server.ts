@@ -894,9 +894,141 @@ const personalGroupsSingleMember: Migration = {
 	}
 };
 
+/*
+ * Static SCIM tokens get a lifetime (specs/088 US2; RFC 7644 §7.4: "Bearer tokens MUST have a limited
+ * lifetime"). Every token issued from now on carries an expiry; this gives one to each token issued before,
+ * without refusing any of them on the day of the upgrade: one year after it was issued, but never sooner
+ * than 90 days after the upgrade. A token whose issue time is unknown is treated as old, so it gets the 90
+ * days. A data change rather than a read-time default, because a default computed on read would expire every
+ * token older than a year at once.
+ */
+const STATIC_TOKEN_EXPIRY = '2026-10-12-static-token-expiry';
+const DAY_MS = 24 * 60 * 60 * 1000;
+export const STATIC_TOKEN_BACKFILL_LIFETIME_DAYS = 365;
+export const STATIC_TOKEN_BACKFILL_FLOOR_DAYS = 90;
+
+export interface StaticTokenExpiryPlan {
+	readonly connectionId: string;
+	readonly expiresAt: Date;
+}
+
+/* A stored time as either backend hands it back: a Date from MongoDB, an ISO string from a jsonb document. */
+function timeOf(value: unknown): Date | undefined {
+	if (value instanceof Date) return value;
+	if (typeof value === 'string') {
+		const parsed = new Date(value);
+		return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+	}
+	return undefined;
+}
+
+export function planStaticTokenExpiry(
+	connections: readonly {
+		_id: string;
+		staticTokenDigest: unknown;
+		staticTokenIssuedAt: unknown;
+		staticTokenExpiresAt: unknown;
+	}[],
+	now: Date
+): StaticTokenExpiryPlan[] {
+	const floor = now.getTime() + STATIC_TOKEN_BACKFILL_FLOOR_DAYS * DAY_MS;
+	const plan: StaticTokenExpiryPlan[] = [];
+	for (const connection of connections) {
+		if (typeof connection.staticTokenDigest !== 'string') continue;
+		if (timeOf(connection.staticTokenExpiresAt)) continue;
+		const issuedAt = timeOf(connection.staticTokenIssuedAt);
+		const yearAfterIssue = issuedAt
+			? issuedAt.getTime() + STATIC_TOKEN_BACKFILL_LIFETIME_DAYS * DAY_MS
+			: Number.NEGATIVE_INFINITY;
+		plan.push({
+			connectionId: connection._id,
+			expiresAt: new Date(Math.max(yearAfterIssue, floor))
+		});
+	}
+	return plan;
+}
+
+function staticTokenExpiryReport(
+	plan: readonly StaticTokenExpiryPlan[]
+): string[] {
+	return [`static tokens given an expiry: ${String(plan.length)}`];
+}
+
+const staticTokenExpiry: Migration = {
+	id: STATIC_TOKEN_EXPIRY,
+	description:
+		'Give every SCIM static token issued without an expiry one: a year after its issue, and never sooner than 90 days from now',
+	reversible: false,
+	rerunnable:
+		'Only connections holding a static token with no expiry are read, and each write is conditional on the expiry still being absent, so a second application finds nothing to plan and writes nothing.',
+	mongodb: {
+		async apply(handle) {
+			// The runner passes the selected backend's handle; for MongoDB that is the driver's `Db`.
+			const db = handle as MongoHandle;
+			const connections = db.collection(STORE_AREAS.provisioningConnections);
+			const lacking = { staticTokenExpiresAt: { $not: { $type: 'date' } } };
+			const plan = planStaticTokenExpiry(
+				(
+					await connections
+						.find({ staticTokenDigest: { $type: 'string' }, ...lacking })
+						.toArray()
+				).map((c) => ({
+					_id: String(c._id),
+					staticTokenDigest: c.staticTokenDigest,
+					staticTokenIssuedAt: c.staticTokenIssuedAt,
+					staticTokenExpiresAt: c.staticTokenExpiresAt
+				})),
+				new Date()
+			);
+			for (const entry of plan) {
+				await connections.updateOne(
+					{ _id: entry.connectionId, ...lacking },
+					{ $set: { staticTokenExpiresAt: entry.expiresAt } },
+					{}
+				);
+			}
+			return staticTokenExpiryReport(plan);
+		}
+	},
+	postgres: {
+		async apply(handle) {
+			// The runner passes the selected backend's handle; for PostgreSQL that is Bun's SQL client.
+			const sql = handle as PostgresHandle;
+			const area = sql(STORE_AREAS.provisioningConnections);
+			const rows = await sql`
+				SELECT id, doc FROM ${area}
+				WHERE jsonb_typeof(doc->'staticTokenDigest') = 'string'
+					AND jsonb_typeof(doc->'staticTokenExpiresAt') IS DISTINCT FROM 'string'
+			`;
+			const plan = planStaticTokenExpiry(
+				rows.map((row) => {
+					const doc = row.doc as Doc;
+					return {
+						_id: String(row.id),
+						staticTokenDigest: doc.staticTokenDigest,
+						staticTokenIssuedAt: doc.staticTokenIssuedAt,
+						staticTokenExpiresAt: doc.staticTokenExpiresAt
+					};
+				}),
+				new Date()
+			);
+			for (const entry of plan) {
+				await sql`
+					UPDATE ${area}
+					SET doc = doc || ${{ staticTokenExpiresAt: entry.expiresAt }}
+					WHERE id = ${entry.connectionId}
+						AND jsonb_typeof(doc->'staticTokenExpiresAt') IS DISTINCT FROM 'string'
+				`;
+			}
+			return staticTokenExpiryReport(plan);
+		}
+	}
+};
+
 export const MIGRATIONS: readonly Migration[] = [
 	namespacedProtectedResources,
 	rootKeysLifecycle,
 	rolesToGroups,
-	personalGroupsSingleMember
+	personalGroupsSingleMember,
+	staticTokenExpiry
 ];

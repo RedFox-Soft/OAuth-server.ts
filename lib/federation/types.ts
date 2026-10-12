@@ -137,14 +137,126 @@ export const PendingLinkIdentity = t.Object({
 });
 export type PendingLinkIdentity = Static<typeof PendingLinkIdentity>;
 
+/*
+ * Why the decision ladder refused a sign-in (lib/federation/resolve.ts). A schema rather than a bare union so
+ * a try's stored result is checked against the same list the ladder answers from.
+ *
+ * - `no_email`: the assertion carries no address, so nothing can be linked or provisioned.
+ * - `domain_not_allowed`: the address is outside a non-empty allow-list.
+ * - `link_not_permitted`: an account holds this address, but this provider may not claim it.
+ * - `provisioning_closed`: no account, and this provider does not provision.
+ * - `inactive`: whichever branch produced it, the account is frozen.
+ * - `not_provisioned`: the provider is bound to a SCIM provisioning connection, and no user that connection
+ *   provisioned answers to this sign-in's correlation claim. Accounts there are created by the directory,
+ *   never by a first sign-in, and never found by email.
+ * - `link_conflict`: the correlated user is already linked to a different subject at this provider. Not
+ *   re-linked: two upstream identities claiming one provisioned person is an incident, not a sign-in.
+ */
+export const RefusalReason = t.Union([
+	t.Literal('no_email'),
+	t.Literal('domain_not_allowed'),
+	t.Literal('link_not_permitted'),
+	t.Literal('provisioning_closed'),
+	t.Literal('inactive'),
+	t.Literal('not_provisioned'),
+	t.Literal('link_conflict')
+]);
+export type RefusalReason = Static<typeof RefusalReason>;
+
+/*
+ * What a try of a provider found (specs/088 US3): what the provider answered, and what a real sign-in would
+ * do now — or what went wrong. Read back only by the console session that started the try, for ten minutes.
+ * `claims` leaves out `nonce`, `at_hash` and `c_hash`, which describe the exchange rather than the person.
+ */
+export const TryResult = t.Object({
+	providerEnabled: t.Boolean(),
+	answer: t.Optional(
+		t.Object({
+			subject: t.String(),
+			email: t.Optional(t.String()),
+			emailVerified: t.Optional(t.Boolean()),
+			claims: t.Record(t.String(), t.Unknown())
+		})
+	),
+	outcome: t.Optional(
+		t.Object({
+			kind: t.Union([
+				t.Literal('signin'),
+				t.Literal('link'),
+				t.Literal('password_required'),
+				t.Literal('provision'),
+				t.Literal('correlate'),
+				t.Literal('refuse'),
+				t.Literal('conflict')
+			]),
+			reason: t.Optional(RefusalReason),
+			account: t.Optional(
+				t.Object({ id: t.String(), email: t.Optional(t.String()) })
+			),
+			/* A new account's address would be recorded as verified. */
+			verified: t.Optional(t.Boolean()),
+			/* The provisioning connection whose correlation rule decided, for `correlate` and `conflict`. */
+			connection: t.Optional(
+				t.Object({ id: t.String(), displayName: t.String() })
+			)
+		})
+	),
+	error: t.Optional(
+		t.Object({
+			stage: t.Union([
+				t.Literal('upstream'),
+				t.Literal('rejected'),
+				t.Literal('declined')
+			]),
+			reason: t.String(),
+			description: t.Optional(t.String())
+		})
+	),
+	/* The bucket has no address yet, so the callback the try used changes when it gets one. */
+	callbackProvisional: t.Boolean()
+});
+export type TryResult = Static<typeof TryResult>;
+
+/* The answer to starting a try: the address to open in a new tab, and the reference its result is read by. */
+export interface TryStarted {
+	tryRef: string;
+	authorizationUrl: string;
+	/* When the try's record, and so its result, is gone. */
+	expiresAt: string;
+}
+
+/* What the console polls for while a try is out at the provider. */
+export type TryStatus =
+	{ status: 'waiting' } | { status: 'done'; result: TryResult };
+
 export const FederationStatePayload = t.Object({
-	stage: t.Union([t.Literal('pending'), t.Literal('complete')]),
+	/*
+	 * `try` is the record a try of a provider writes its result into (specs/088): named by the digest of the
+	 * `tryRef` the console polls with, bound to the console session that started it.
+	 */
+	stage: t.Union([
+		t.Literal('pending'),
+		t.Literal('complete'),
+		t.Literal('try')
+	]),
 	/*
 	 * Which interaction this round trip belongs to. The `complete` route refuses a record whose value
 	 * disagrees with the `uid` in its own path, which is what stops a handoff being spent on someone
-	 * else's interaction.
+	 * else's interaction. Absent only on a try, which belongs to no interaction — and a handoff without it
+	 * is refused by that same comparison.
 	 */
-	interactionUid: t.String(),
+	interactionUid: t.Optional(t.String()),
+	/*
+	 * Stage 1 only: present when the round trip is a try. Read only from this stored record, never from the
+	 * returning request, so a sign-in cannot be turned into a try or a try into a sign-in (specs/088 FR-015).
+	 */
+	purpose: t.Optional(t.Literal('try')),
+	/* Stage 1 of a try: the id of the try record the callback writes the result into. */
+	tryId: t.Optional(t.String()),
+	/* The try record only: SHA-256 of the console session cookie that started it — RFC 9700 §2.1.1's binding. */
+	sessionDigest: t.Optional(t.String()),
+	/* The try record only, once the provider has answered. */
+	result: t.Optional(TryResult),
 	/* Resolved from the client that started the interaction, never from a request. Stage 1 only. */
 	bucketId: t.Optional(t.String()),
 	/* Stage 1 only. The provider is re-resolved fresh at the callback, so this identifies, not configures. */

@@ -1369,9 +1369,39 @@ export type KeyCredential = Static<typeof KeyCredential>;
 export const SecretCredential = t.Object({
 	kind: t.Literal('secret'),
 	digest: t.String(),
-	issuedAt: t.Date()
+	issuedAt: t.Date(),
+	/*
+	 * The first token obtained with this secret (specs/088 R3), written once. First rather than last use,
+	 * because a directory uses the new value continuously: a rule keyed on its last use would never end the
+	 * previous one.
+	 */
+	firstUsedAt: t.Optional(t.Date())
 });
 export type SecretCredential = Static<typeof SecretCredential>;
+
+/*
+ * The value a client secret or a static token held before it was replaced, kept working for a while so a
+ * replacement is not an outage (specs/088). At most one per slot. Its end is decided by
+ * lib/provisioning/overlap.ts and nowhere else; `lastUsedAt` is what that rule reads, written at most once
+ * a minute.
+ */
+export const PreviousCredential = t.Object({
+	digest: t.String({ pattern: '^[0-9a-f]{64}$' }),
+	issuedAt: t.Date(),
+	replacedAt: t.Date(),
+	/* A static token's own expiry, carried over from when it was current. */
+	expiresAt: t.Optional(t.Date()),
+	lastUsedAt: t.Optional(t.Date())
+});
+export type PreviousCredential = Static<typeof PreviousCredential>;
+
+/* Which directory a connection's console guidance speaks for. Presentation only: no runtime decision reads it. */
+export const KnownDirectoryId = t.Union([
+	t.Literal('entra'),
+	t.Literal('okta'),
+	t.Literal('generic')
+]);
+export type KnownDirectoryId = Static<typeof KnownDirectoryId>;
 
 /*
  * The most deprovisionings a connection may make within a rolling window before it is held (specs/072
@@ -1412,6 +1442,14 @@ export const ProvisioningConnection = t.Object({
 	oauthCredential: t.Union([KeyCredential, SecretCredential, t.Null()]),
 	staticTokenDigest: t.Optional(t.String()),
 	staticTokenIssuedAt: t.Optional(t.Date()),
+	/* After it the static token is refused (RFC 7644 §7.4). Set on every issue, backfilled by a migration. */
+	staticTokenExpiresAt: t.Optional(t.Date()),
+	/* The first SCIM request accepted with the current static token, written once and cleared on issue. */
+	staticTokenFirstUsedAt: t.Optional(t.Date()),
+	/* The overlapping previous client secret and static token (specs/088), each absent when there is none. */
+	previousSecret: t.Optional(PreviousCredential),
+	previousStaticToken: t.Optional(PreviousCredential),
+	directory: t.Optional(KnownDirectoryId),
 	lastUsedAt: t.Optional(t.Date()),
 	threshold: t.Optional(DeprovisioningThreshold),
 	/*
@@ -1440,10 +1478,28 @@ export type ProvisioningConnectionPatch = Partial<
 		| 'oauthCredential'
 		| 'staticTokenDigest'
 		| 'staticTokenIssuedAt'
+		| 'staticTokenExpiresAt'
+		| 'staticTokenFirstUsedAt'
+		| 'previousSecret'
+		| 'previousStaticToken'
+		| 'directory'
 		| 'threshold'
 		| 'tallyEpoch'
 	>
 >;
+
+/* A connection's two credential slots as the overlap rule names them. */
+export type CredentialSlot = 'secret' | 'static_token';
+
+/* One held connection, as the cross-bucket holds read lists it. */
+export interface HeldConnection {
+	_id: string;
+	bucketId: string;
+	displayName: string;
+	hold: DeprovisioningHold;
+	/* The tally generation the hold's refused removals are recorded under (absent = 0). */
+	tallyEpoch?: number;
+}
 
 export type NewProvisioningConnection = Omit<
 	ProvisioningConnection,
@@ -1469,12 +1525,38 @@ export interface ProvisioningConnectionStoreInstance {
 	findByStaticTokenDigest(
 		digest: string
 	): Promise<ProvisioningConnection | null>;
+	/* The connection whose overlapping previous static token has this digest, live or not: the caller judges. */
+	findByPreviousStaticTokenDigest(
+		digest: string
+	): Promise<ProvisioningConnection | null>;
 	update(
 		id: string,
 		patch: ProvisioningConnectionPatch
 	): Promise<ProvisioningConnection | null>;
 	/* Writes `lastUsedAt` only, so a request's bookkeeping never races an administrator's edit. */
 	touch(id: string, at: Date): Promise<void>;
+	/*
+	 * A credential's use, written alone for the reason `touch` is. `current` sets the slot's first use only
+	 * where none is recorded (one write per value); `previous` sets the previous value's last use, and the
+	 * caller throttles it to once a minute. Writes nothing when the slot holds no such value.
+	 */
+	noteCredentialUse(
+		id: string,
+		slot: CredentialSlot,
+		which: 'current' | 'previous',
+		at: Date
+	): Promise<void>;
+	/*
+	 * Removes the slot's previous value only while its digest is still `digest`, in one conditional write,
+	 * and answers whether this call removed it — so two administrators ending it together act once.
+	 */
+	retirePrevious(
+		id: string,
+		slot: CredentialSlot,
+		digest: string
+	): Promise<boolean>;
+	/* Every held connection on the instance, with the fields a cross-bucket count and link need. */
+	listHeld(): Promise<HeldConnection[]>;
 	/*
 	 * Sets `hold` only where none is present, in one conditional write, and answers whether *this* call set
 	 * it. Of many requests tripping the threshold together exactly one is told `true`, and only that one
@@ -1799,6 +1881,13 @@ export const UserBucket = t.Object({
 	passwordLogin: t.Boolean(),
 	/* This bucket's upstream providers, credentials included. Managed only through their own routes. */
 	federation: t.Array(FederationProvider),
+	/*
+	 * Provider ids in the order their buttons appear (specs/088 R10), read through `orderProviders`. Beside
+	 * `federation` rather than an order of that array, so a move never rewrites the providers — every provider
+	 * write is a whole-array read-modify-write, and a move that rewrote it could revert a concurrent edit.
+	 * Absent means the catalogue order, so nothing reshuffles on upgrade; an id no longer present is ignored.
+	 */
+	signInOrder: t.Optional(t.Array(t.String())),
 	// Whether self-service registration is accepted for this bucket. The reserved
 	// admin bucket seeds this false; every other bucket defaults true.
 	//
@@ -1905,6 +1994,7 @@ export interface UserBucketStoreInstance {
 				| 'totpRequired'
 				| 'hostFirstSeenAt'
 				| 'hostLastSeenAt'
+				| 'signInOrder'
 			>
 		>
 	): Promise<UserBucket | null>;

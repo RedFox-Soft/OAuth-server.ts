@@ -41,4 +41,10 @@ export interface IdentityRequest {
 	/* Bound to this attempt. Compared against the assertion where there is one to compare it against. */
 	nonce: string;
 	codeVerifier?: string;
+	/*
+	 * The authorization response's `iss` (RFC 9207), as the callback received it. Several providers share a
+	 * bucket's one callback address, so a response must say it came from the provider the round trip was
+	 * started with — the mix-up defence RFC 9700 §2.1 requires of a client talking to more than one.
+	 */
+	iss?: string;
 }

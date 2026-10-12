@@ -4,7 +4,7 @@ title: 'Signing in through somebody else’s identity provider'
 tags: [architecture, contract, gotcha, oidc]
 sources: [oauth-server-codebase]
 created: 2026-08-05
-updated: 2026-09-28
+updated: 2026-10-12
 graph:
   node_type: concept
   relationships:
@@ -76,6 +76,12 @@ identifier from the verified ID token — and the session the sign-in makes keep
 `sid` (`session.payload.upstream`, replaced or cleared at every sign-in), so that provider's back-channel logout can
 find it. See [[upstream-back-channel-logout]].
 
+Since spec 088 the area holds a third kind of record, `stage: 'try'`, keyed by the digest of a `tryRef`: the
+result of an administrator's try of a provider, bound to the console session that started it. A stage-one record
+of a try carries `purpose: 'try'` and no `interactionUid`, which is therefore optional now; the callback learns
+that a round trip is a try only from that stored field (`lib/federation/routes.ts:111`). See
+[[federation-try-signin]].
+
 ## The decision ladder, and why the order is the contract
 
 `lib/federation/resolve.ts`, in this order:
@@ -98,6 +104,13 @@ find it. See [[upstream-back-channel-logout]].
    `admin.register` audit entry; providers there default to `existing_only` (spec 080).
 6. **active**, 7. **verification**, 8. sign in through the same `resume()` a password sign-in uses.
 
+**Since spec 088 the ladder is two functions.** `decideFederatedAccount` (`lib/federation/resolve.ts:191`) runs
+the steps above in the same order and only reads; it returns a `Decision`. `applyDecision` (`:297`) makes every
+write — the link, the created account, the `federation.link.conflict` event — and the checks that can only follow
+a write. `resolveFederatedAccount` (`:370`) is the two in sequence, so a sign-in behaves as before. The split
+exists so an administrator's try of a provider runs the very same rules and stops before writing anything; a copy
+of the ladder for the try would drift. See [[federation-try-signin]].
+
 Step 4 is the takeover boundary. `=== true` exactly — a provider that stringifies its booleans does not
 clear it. Failing it, the refusal says "sign in with your password": no second account for one address, no
 silent takeover.
@@ -107,7 +120,7 @@ address, not who set the matching account's password — and in a bucket that do
 `verified` is written `true` at registration, so anybody could register a victim's address first. Their
 first federated sign-in then attached to that account and the registrant kept signing in with the
 password. The step now answers `password_required` for an account with no `federated` entry
-(`lib/federation/resolve.ts:178`): leg two hands back as usual but carrying the identity instead of a
+(`lib/federation/resolve.ts:266` since spec 088's split): leg two hands back as usual but carrying the identity instead of a
 sign-in, leg three writes it to `interaction.payload.pendingLink` and redirects to the login page with the
 `federation_link` notice, and `settlePendingLink` (`lib/federation/pending_link.ts:17`) links it at every
 door that completes a sign-in — after the second factor where there is one — only if the sign-in is of
@@ -156,6 +169,28 @@ organisation and so differs per deployment. Extending the lookup rather than add
 field was the deliberate choice: the absence of that field is what makes provenance-based branching
 impossible, and adding the three later entries needed no migration for the same reason Google did not.
 
+## The order of the buttons
+
+A bucket's sign-in page and the console's providers table list providers in one order, computed by one
+function, `orderProviders` (`lib/federation/order.ts:16`), called by `loginOptions.ts` and the admin
+`presentAll`. Until spec 088 the order was fixed: recognised providers in the catalogue's order, then the rest
+alphabetically by id — never connection order, which would rearrange a page end users know whenever a provider
+is added.
+
+Since spec 088 a bucket may hold `signInOrder`, a list of provider ids. Listed providers come first, in that
+order; the rest follow by the old rule. `POST …/federation/:providerId/move` with `up` or `down`
+(`lib/admin/federation/routes.ts:154`; MCP `federation_provider_move`) swaps a provider with its neighbour in the
+displayed order and writes the full id list. It is refused 409 at either end, and audited as
+`federation.provider.move` with the order before and after. Deleting a provider prunes its id, so a provider
+created later under that id starts after the ordered ones.
+
+The order is a **separate field** rather than the order of the `federation` array, for two reasons:
+
+- every provider write is a read-modify-write of the whole array, so a move that rewrote the array could revert
+  another administrator's provider edit made a moment earlier;
+- a bucket nobody has reordered keeps exactly its old order with no migration, because absent means the old
+  rule.
+
 ## Gotchas
 
 ### The callback ignores return parameters it does not know
@@ -164,6 +199,9 @@ RFC 6749 §4.1.2 says a client MUST. The app runs `normalize: false`, so a close
 Keycloak's `session_state` and no Keycloak sign-in could complete until 2026-10-07 (`lib/federation/routes.ts`,
 `additionalProperties: true`); found by the live check of [[upstream-back-channel-logout]]. No test had a provider
 adding a parameter of its own; `test/federation/signin.spec.ts` now has one.
+
+`iss` was admitted the same way and, until spec 088, never read; it is now compared — see "The callback checks
+which issuer answered" below.
 
 ### A guarded route's schema is composed, not overridden
 
@@ -283,6 +321,27 @@ Verification failures answer one uninformative page; the reason goes to the even
 this route is unauthenticated, so an attacker-triggerable log write is a vector of its own. The reasoning is
 [[admin-console-signin]]'s, and it applies here with more force: anyone who can follow a redirect reaches it.
 
+## The callback checks which issuer answered
+
+Since spec 088. Several providers share a bucket's one callback address, so a response must prove it came from
+the provider the round trip was started with. RFC 9700 §2.1 requires that mix-up defence of a client talking to
+more than one authorization server, and RFC 9207's `iss` response parameter is it (§2.4: the client "MUST reject"
+a mismatch). The callback passes the response's `iss` to the identity layer (`lib/federation/routes.ts`, the
+`identityFor` call):
+
+- an OIDC provider refuses, right after discovery and **before the code is spent**, a present `iss` that differs
+  from the discovered issuer (`issuer_mismatch`), and a missing one when the provider's metadata declares
+  `authorization_response_iss_parameter_supported: true` (`issuer_missing`) (`assertResponseIssuer`,
+  `lib/federation/identity/oidc.ts:101`; the flag is `issParameterSupported`, `lib/federation/discovery.ts:34`);
+- a discovered issuer that is a template — Microsoft's multi-organisation endpoints publish `{tenantid}` — is not
+  compared, because no response can equal a placeholder; the ID token's issuer check, which knows the template's
+  shape, stands as before;
+- a profile-API provider such as GitHub publishes no metadata, so only a present `iss` is compared, with the
+  issuer the provider was configured with (`lib/federation/identity/profile_api.ts:37`).
+
+Both refusals are `rejected`, the class of an assertion that fails verification: a sign-in gets the usual
+rejected page, and a try reports the reason. `test/federation/response_issuer.spec.ts` holds the cases.
+
 ## The masked secret leaked for a year through the bucket routes
 
 `lib/admin/federation/service.ts` states the rule and means it: a provider's `clientSecret` is
@@ -320,5 +379,6 @@ subject exists.
   provisioned account acquires a usable password.
 - [[admin-console-signin]] — the same relying-party discipline pointed at this server's own issuer.
 - [[admin-mcp-control-plane]] — the agent surface whose secrecy sweep found the bucket-route leak above.
+- [[federation-try-signin]] — an administrator's try of a provider: the ladder's reads-only half, bound to the console session.
 
 Verified against [[oauth-server-codebase]].

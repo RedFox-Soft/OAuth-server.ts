@@ -16,7 +16,12 @@ export type ProviderDetail = PresentedProvider & {
 	callbackStability: 'stable' | 'provisional';
 	recognised: string | null;
 	logoutSignals: { globalTokenRevocation: boolean; backChannelLogout: boolean };
-	capabilities: { globalTokenRevocation: boolean; backChannelLogout: boolean };
+	capabilities: {
+		globalTokenRevocation: boolean;
+		backChannelLogout: boolean;
+		/* Try sign-in needs the callback route, which exists only while federation is on (specs/088). */
+		trySignIn: boolean;
+	};
 	boundConnection: { id: string; displayName: string } | null;
 	linkedUsers: number;
 	recommendedCorrelation: {

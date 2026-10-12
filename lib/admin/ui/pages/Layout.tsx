@@ -1,4 +1,5 @@
-import { Layout as AntLayout, Button, Menu, Typography } from 'antd';
+import { useEffect, useState } from 'react';
+import { Layout as AntLayout, Badge, Button, Menu, Typography } from 'antd';
 import type { MenuProps } from 'antd';
 import {
 	ProjectOutlined,
@@ -14,6 +15,7 @@ import {
 	LogoutOutlined
 } from '@ant-design/icons';
 import { useNavigate, useRoute } from '../frame/router.js';
+import { request } from '../frame/request.js';
 import { meCan, useMe } from '../frame/me.js';
 import { sectionHref, type PageKey, type Section } from '../frame/routes.js';
 import { InstanceOnly, NotFound } from '../frame/states.js';
@@ -93,11 +95,34 @@ const CONNECTION_TABS: Partial<Record<PageKey, ConnectionTab>> = {
  * by the route table (frame/routes.ts), never by state held here, so a link, a reload and the browser's
  * Back all land on the same screen.
  */
+/*
+ * How many provisioning connections the administrator can see are held (specs/088): a hold means removals are
+ * not happening, so it is shown from every page rather than only from its bucket. Read again on every move
+ * between pages, which is when the administrator would look at the menu anyway.
+ */
+function useHeldConnections(pathname: string): number {
+	const [count, setCount] = useState(0);
+	useEffect(() => {
+		let live = true;
+		void request<{ count: number }>(
+			'GET',
+			'/admin/api/provisioning-holds'
+		).then((r) => {
+			if (live && r.ok) setCount(r.data.count);
+		});
+		return () => {
+			live = false;
+		};
+	}, [pathname]);
+	return count;
+}
+
 export function Layout() {
 	const { me } = useMe();
 	const can = meCan(me);
-	const { resolved } = useRoute();
+	const { resolved, location } = useRoute();
 	const navigate = useNavigate();
+	const held = useHeldConnections(location.pathname);
 
 	/*
 	 * Grouped so an operator can tell their own work from the organisation around it and from the
@@ -110,7 +135,24 @@ export function Layout() {
 			label: 'Build',
 			children: [
 				{ key: 'projects', icon: <ProjectOutlined />, label: 'Projects' },
-				{ key: 'buckets', icon: <DatabaseOutlined />, label: 'Buckets' }
+				{
+					key: 'buckets',
+					icon: <DatabaseOutlined />,
+					label:
+						held > 0 ? (
+							<span
+								title={`${held} provisioning connection${held === 1 ? ' is' : 's are'} on hold`}
+							>
+								Buckets{' '}
+								<Badge
+									count={held}
+									size="small"
+								/>
+							</span>
+						) : (
+							'Buckets'
+						)
+				}
 			]
 		},
 		{

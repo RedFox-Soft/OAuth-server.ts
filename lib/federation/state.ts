@@ -1,9 +1,14 @@
 import crypto from 'crypto';
 
 import { checkedAdapter } from '../adapters/index.js';
+import constantEquals from '../helpers/constant_equals.js';
 import epochTime from '../helpers/epoch_time.js';
 import { HANDOFF_TTL_SECONDS, STATE_TTL_SECONDS } from './consts.js';
-import { FederationStatePayload, type PendingLinkIdentity } from './types.js';
+import {
+	FederationStatePayload,
+	type PendingLinkIdentity,
+	type TryResult
+} from './types.js';
 
 /*
  * The two-stage round-trip record. This module owns both the secrets and their storage, deliberately:
@@ -75,6 +80,101 @@ export async function openPending(
 	);
 
 	return { state, nonce, codeVerifier };
+}
+
+/*
+ * Open a try of a provider (specs/088 R6): a round trip like a sign-in's, marked as a try in the stored
+ * record — the only place the callback learns it from — and a try record the callback writes its result
+ * into, found by the digest of `tryRef` and bound to the digest of the console session that started it.
+ * Both live as long as a sign-in's round trip. The values returned are not stored, as for `openPending`.
+ */
+export async function openTry(start: {
+	bucketId: string;
+	providerId: string;
+	sessionDigest: string;
+	withPkce: boolean;
+}): Promise<PendingSecrets & { tryRef: string; expiresAt: Date }> {
+	const tryRef = secret();
+	const tryId = idFor(tryRef);
+	const state = secret();
+	const nonce = secret();
+	const codeVerifier = start.withPkce ? secret() : undefined;
+	const exp = epochTime() + STATE_TTL_SECONDS;
+
+	await records().upsert(
+		tryId,
+		{
+			stage: 'try',
+			bucketId: start.bucketId,
+			providerId: start.providerId,
+			sessionDigest: start.sessionDigest,
+			exp
+		},
+		STATE_TTL_SECONDS
+	);
+	await records().upsert(
+		idFor(state),
+		{
+			stage: 'pending',
+			purpose: 'try',
+			tryId,
+			bucketId: start.bucketId,
+			providerId: start.providerId,
+			nonce,
+			...(codeVerifier ? { codeVerifier } : {}),
+			exp
+		},
+		STATE_TTL_SECONDS
+	);
+
+	return {
+		tryRef,
+		state,
+		nonce,
+		codeVerifier,
+		expiresAt: new Date(exp * 1000)
+	};
+}
+
+/*
+ * Write a try's result into its record, keeping the record's own expiry. Answers false when the record has
+ * gone — expired, or never there — in which case nobody is left to read the result.
+ */
+export async function finishTry(
+	tryId: string,
+	result: TryResult
+): Promise<boolean> {
+	const record = await records().find(tryId);
+	const left = record ? record.exp - epochTime() : 0;
+	if (!record || record.stage !== 'try' || left <= 0) return false;
+	await records().upsert(tryId, { ...record, result }, left);
+	return true;
+}
+
+/*
+ * A try's record, for the console session that started it and nobody else: a record of another session —
+ * even the same administrator's — answers exactly as one that does not exist, as does an expired one.
+ */
+export async function readTry(
+	tryRef: string,
+	sessionDigest: string
+): Promise<FederationStatePayload | null> {
+	const record = await records().find(idFor(tryRef));
+	if (!record || record.stage !== 'try' || record.exp <= epochTime()) {
+		return null;
+	}
+	if (
+		!record.sessionDigest ||
+		!constantEquals(record.sessionDigest, sessionDigest)
+	) {
+		return null;
+	}
+	return record;
+}
+
+/* The digest a try is bound to: of the console session cookie's value, never the value itself. */
+export function sessionDigestOf(sessionCookie: string): string {
+	return idFor(sessionCookie);
 }
 
 /*

@@ -4,7 +4,7 @@ title: "Providers, provisioning connections and user groups: a page each, and th
 tags: [architecture, admin, federation, scim, ux]
 sources: [oauth-server-codebase]
 created: 2026-10-11
-updated: 2026-10-11
+updated: 2026-10-12
 ---
 
 # Providers, connections and groups pages
@@ -13,7 +13,8 @@ Spec 084, phase 5 of the console redesign. A bucket's identity providers, SCIM p
 user groups used to be edited in modals stacked on drawers. Each now has a page with its own address, and
 creating a provider or a connection is a side-panel wizard. The tabs (`FederationPanel.tsx`,
 `ProvisioningPanel.tsx`, `BucketGroupsPanel.tsx` under `lib/admin/ui/pages/`) only list, open, create, turn on
-or off and delete.
+or off and delete. Since spec 088 the providers table is in sign-in page order and says so, and each row's menu
+has Move up and Move down, C0 because only the order changes ([[upstream-federation]]).
 
 | Page | Address | Component |
 |---|---|---|
@@ -37,6 +38,11 @@ Build them there rather than by hand: the console bucket's providers live under 
   - Applying at once is what the directory, and IPSIE, expect.
 
   Only the operator can weigh the two.
+
+  Since spec 088 its first step asks which directory this is — Microsoft Entra ID, Okta or another — preset from
+  the provider. That choice brings the directory's own field names, recommended credential and pitfalls, read
+  from the server's directory guidance, to the later steps, the Directory setup tab and Copy setup details
+  ([[scim-provisioning]]).
 - **Recommended matching.** The rule the wizard calls "recommended" is the server's `defaultCorrelationFor`,
   read through the provider read. It is not a second copy in the browser.
 
@@ -62,19 +68,24 @@ Build them there rather than by hand: the console bucket's providers live under 
   provider. In that case Disable and Delete are shown unavailable with the reason before anyone presses them.
   The console bucket's stricter guard stays the server's.
 - **The read behind the page.** It is one provider read, `GET …/federation/:providerId`
-  (`lib/admin/federation/routes.ts:75`, `presentDetail` at `service.ts:125`; MCP `federation_provider_get`). It
+  (`lib/admin/federation/routes.ts:98`, `presentDetail` at `service.ts:129`; MCP `federation_provider_get`). It
   returns:
   - the callback and its stability;
   - which logout signals the provider can send at all (none for a `profile_api` provider such as GitHub);
   - whether the instance accepts them;
   - the bound connection and the linked-people count (`UserStore.countLinkedTo`);
-  - warnings.
+  - warnings;
+  - since spec 088, `capabilities.trySignIn`, which is `federation.enabled`.
+- **Try sign-in** (spec 088, `pages/providers/TrySignIn.tsx`, C0) sends a new tab through the provider with the
+  bucket's real callback and shows what the provider answered and what a real sign-in would do, with nothing
+  written. It works on a disabled provider. See [[federation-try-signin]].
 
 ## The connection page and the hold
 
 - **Overview** shows:
   - the counts, linked to the Users list (`?managedBy=`) and the User groups list (`?keptBy=`);
-  - one Credentials row per slot;
+  - one Credentials row per slot — since spec 088 two while a replaced secret or static token still works,
+    with Retire previous now (C1) and a static token's expiry ([[scim-credential-overlap]]);
   - a History card (since spec 085, replacing two links) with All (`connection=<id>`), By the directory
     (`actor=connection:<id>`) and By administrators (the connection as target), five entries each
     ([[admin-audit-trail]]);
@@ -88,7 +99,8 @@ Build them there rather than by hand: the console bucket's providers live under 
     `acknowledgement` prop is new and holds the button until it is ticked.
 - **Where a hold shows**: the bucket list row, the Overview's attention item (which opens the held connection
   itself), a dot on the Provisioning tab, the connection's header, and the hold email, which now links to the
-  connection page.
+  connection page. Since spec 088 also a red count on Buckets in the side menu, on every page, and the bucket
+  list's On hold mark links to the held connection ([[scim-provisioning]]).
 
 ## Secrets are shown once, in place
 

@@ -158,7 +158,9 @@ describe('MCP tool catalogue', () => {
 			'POST /admin/api/invitations/accept',
 			'POST /admin/api/logout',
 			'POST /admin/api/me/verification',
-			'PUT /admin/api/scope'
+			'PUT /admin/api/scope',
+			'POST /admin/api/buckets/:id/federation/:providerId/try',
+			'GET /admin/api/buckets/:id/federation/:providerId/try/:tryRef'
 		]);
 	});
 
@@ -239,6 +241,7 @@ describe('MCP tool catalogue', () => {
 		expect(sometimes.map((t) => t.tool).sort()).toEqual([
 			/* On the Administrators bucket these decide who can sign in to the console (specs/080). */
 			'federation_provider_create',
+			'federation_provider_move',
 			'federation_provider_update'
 		]);
 		for (const tool of sometimes) {

@@ -574,7 +574,13 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 		[
 			{ key: { bucketId: 1 } },
 			{ key: { providerKey: 1 }, unique: true },
-			{ key: { staticTokenDigest: 1 }, unique: true, sparse: true }
+			{ key: { staticTokenDigest: 1 }, unique: true, sparse: true },
+			/*
+			 * The overlapping previous static token (specs/088 R4), looked up after the current one misses.
+			 * Not unique: 256-bit values do not collide, and a unique index would need its own duplicate-key
+			 * mapping in both stores for a collision that cannot happen.
+			 */
+			{ key: { 'previousStaticToken.digest': 1 }, sparse: true }
 		]
 	),
 	/*

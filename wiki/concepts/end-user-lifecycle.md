@@ -4,7 +4,7 @@ title: 'End-user lifecycle: ending access, the local lock, provisioned users'
 tags: [architecture, contract, gotcha, oidc]
 sources: [oauth-server-codebase]
 created: 2026-10-06
-updated: 2026-10-11
+updated: 2026-10-12
 graph:
   node_type: concept
   relationships:
@@ -149,7 +149,7 @@ be told from a real hash afterwards, so whether a password anyone chose opens an
 (`lib/adapters/types.ts:144`): `true` on a create with a password, on every administrator's set
 (`service.ts:257`), on registration (`lib/interactions/index.ts:1449`) and on a completed reset
 (`lib/password_reset/challenge.ts:274`); `false` on a password-less create — an administrator's or SCIM's
-(`service.ts:158`) and a federated sign-in's just-in-time account (`lib/federation/resolve.ts:280`). Accounts
+(`service.ts:158`) and a federated sign-in's just-in-time account (`lib/federation/resolve.ts:339`, in `applyDecision` since spec 088). Accounts
 written before it carry none, and a reader says nothing rather than guess. Setting a password can also sign the
 person out everywhere in the same request (`signOut`, `service.ts:244`), through the same `revokeAccountAccess`
 the "sign out everywhere" route runs.

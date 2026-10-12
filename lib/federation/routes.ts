@@ -25,6 +25,7 @@ import {
 import { findEnabledProvider } from './providers.js';
 import { resolveFederatedAccount } from './resolve.js';
 import { consumePending, openHandoff } from './state.js';
+import { completeTry } from './try.js';
 
 /*
  * The return leg from an upstream provider.
@@ -101,7 +102,18 @@ async function completeReturn(params: ReturnParams) {
 			// apart would tell the holder of one dead value something about another.
 			return federationExpiredPage();
 		}
+
+		/*
+		 * A try of a provider (specs/088) — decided by what was stored when the round trip began, never by
+		 * anything in this request, so a sign-in cannot be turned into a try or a try into a sign-in. Before
+		 * any interaction is touched: a try has none, and writes nothing a sign-in writes.
+		 */
+		if (pending.purpose === 'try') {
+			return completeTry(pending, params);
+		}
+
 		const uid = pending.interactionUid;
+		if (!uid) return federationExpiredPage();
 
 		/*
 		 * The user declined, or the provider refused. This is the one federation failure that returns to a
@@ -142,7 +154,9 @@ async function completeReturn(params: ReturnParams) {
 				 * upstream matches `redirect_uri` by exact string across the two legs. */
 				bucket: await issuingBucket(pending.bucketId),
 				nonce: pending.nonce,
-				codeVerifier: pending.codeVerifier
+				codeVerifier: pending.codeVerifier,
+				/* RFC 9207: which issuer says it answered, compared by the identity layer. */
+				iss: params.iss
 			});
 		} catch (err) {
 			if (err instanceof IdentityError) {

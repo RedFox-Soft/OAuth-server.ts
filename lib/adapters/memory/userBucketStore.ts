@@ -153,6 +153,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 				| 'totpRequired'
 				| 'hostFirstSeenAt'
 				| 'hostLastSeenAt'
+				| 'signInOrder'
 			>
 		>
 	): Promise<UserBucket | null> {

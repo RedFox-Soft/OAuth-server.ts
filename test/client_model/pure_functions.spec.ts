@@ -164,8 +164,8 @@ describe('client pure functions', () => {
 	describe('secret', () => {
 		it('answers equal only for the identical client secret', () => {
 			const client = { clientSecret: 'super-secret-value' };
-			expect(compareClientSecret(client, 'super-secret-value')).toBe(true);
-			expect(compareClientSecret(client, 'wrong')).toBe(false);
+			expect(compareClientSecret(client, 'super-secret-value')).toBe('current');
+			expect(compareClientSecret(client, 'wrong')).toBe(null);
 		});
 
 		it('a client with no secret expiry keeps authenticating indefinitely', () => {

@@ -14,7 +14,7 @@ import {
 import { PlusOutlined } from '@ant-design/icons';
 import type { UserBucket } from '../../../adapters/types.js';
 import { Link, useNavigate } from '../frame/router.js';
-import { bucketHref } from '../frame/routes.js';
+import { bucketHref, connectionHref } from '../frame/routes.js';
 import { bucketAddressFor } from '../bucketAddress.js';
 import { MoveToGroup } from '../MoveToGroup.js';
 import { isUndeletableBucket, reservedOf } from '../../consts.js';
@@ -52,6 +52,8 @@ type BucketRow = UserBucket & {
 	/* specs/081: whether a host has been reached, whether a connection holds, the issuer to copy. */
 	hostReached?: boolean;
 	held?: boolean;
+	/* specs/088: the held connection, so the mark opens the page that can end the hold. */
+	heldConnectionId?: string;
 	issuer?: string | null;
 };
 
@@ -239,7 +241,19 @@ export function Buckets() {
 										>
 											{name}
 										</Link>
-										{row.held && <Tag color="red">Deprovisioning held</Tag>}
+										{row.held && (
+											<Tooltip title="A provisioning connection is holding a mass deprovisioning: the people it tried to remove keep their access until someone releases it.">
+												{row.heldConnectionId ? (
+													<Link
+														href={connectionHref(row._id, row.heldConnectionId)}
+													>
+														<Tag color="red">On hold</Tag>
+													</Link>
+												) : (
+													<Tag color="red">On hold</Tag>
+												)}
+											</Tooltip>
+										)}
 										{reserved === 'administrators' && (
 											<Tooltip title="The console's own bucket: its accounts are this instance's administrators.">
 												<Tag color="gold">Administrators</Tag>

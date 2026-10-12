@@ -182,6 +182,13 @@ export class OIDCContext<T extends Record<string, unknown> = RequestParams> {
 	/* The parameters a signed request object vouched for, which later checks may take on trust. */
 	trusted: string[] | undefined;
 
+	/*
+	 * Which of the client's secrets authenticated this request, when one did (specs/088). Held here rather
+	 * than on the client, which is frozen data: the client-credentials grant marks its token with it and
+	 * records the use.
+	 */
+	clientSecretMatch: 'current' | 'previous' | undefined;
+
 	redirectUriCheckPerformed = false;
 
 	constructor({

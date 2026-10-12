@@ -484,6 +484,16 @@ const routes = [
 		path: '/admin/api/buckets/:id/provisioning-connections/:connectionId/credentials/:kind',
 		targetType: 'ProvisioningConnection'
 	},
+	/*
+	 * Ending an overlapping previous secret or static token at once (specs/088). An end by itself is not an
+	 * act and is not recorded; this one is, before it takes effect.
+	 */
+	{
+		action: 'provisioning.credential.retire',
+		method: 'DELETE',
+		path: '/admin/api/buckets/:id/provisioning-connections/:connectionId/credentials/:kind/previous',
+		targetType: 'ProvisioningConnection'
+	},
 
 	/*
 	 * Upstream federation providers. `targetType` is the bucket, because a provider has no identity outside
@@ -509,6 +519,23 @@ const routes = [
 		action: 'federation.provider.delete',
 		method: 'DELETE',
 		path: '/admin/api/buckets/:id/federation/:providerId',
+		targetType: 'UserBucket'
+	},
+	/*
+	 * Starting a try of a provider (specs/088): it changes nothing, but it sends somebody's browser to an
+	 * upstream with this bucket's credentials, so the start is recorded. Its result is not.
+	 */
+	{
+		action: 'federation.provider.try',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/federation/:providerId/try',
+		targetType: 'UserBucket'
+	},
+	/* One place up or down in the sign-in order; the entry's `from`/`to` are the order before and after. */
+	{
+		action: 'federation.provider.move',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/federation/:providerId/move',
 		targetType: 'UserBucket'
 	},
 	/*
