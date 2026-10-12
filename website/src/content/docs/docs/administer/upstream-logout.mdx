@@ -19,8 +19,9 @@ applies depends entirely on which provider you use:
 | Microsoft Entra ID    | Nothing a third-party application can receive                               | —                                                     |
 | Google                | RISC events, for consumer accounts only                                     | —                                                     |
 
-Both are opted into one provider at a time, on the provider's own settings in the bucket's **Identity
-providers**. Neither is accepted from a provider that has not been opted in, whatever it signs.
+Both are opted into one provider at a time, under **Logout signals** on the provider's page in the
+bucket's **Identity providers**. Neither is accepted from a provider that has not been opted in, whatever
+it signs.
 
 ## Global token revocation: Okta Universal Logout
 
@@ -37,8 +38,8 @@ providers**. Neither is accepted from a provider that has not been opted in, wha
 </Aside>
 
 Turn on [`globalTokenRevocation.enabled`](/docs/reference/settings/#globalTokenRevocation.enabled), then,
-on the Okta provider, **Accept global token revocation (Okta Universal Logout)**. The provider's details
-show the **Logout endpoint to give the provider**: the bucket's issuer followed by
+on the Okta provider, **Accept global token revocation (Okta Universal Logout)**. The provider's page
+then shows the **Endpoint to give the provider**: the bucket's issuer followed by
 `/global-token-revocation`. While the switch is on, each bucket's discovery document advertises it as
 `global_token_revocation_endpoint`.
 
@@ -74,7 +75,7 @@ provider configured with a custom authorization server's issuer may not match.
 OpenID Connect Back-Channel Logout 1.0 is a final specification, so this needs no switch of its own: it
 is served whenever [`federation.enabled`](/docs/reference/settings/#federation.enabled) is on. Opt the
 provider in with **Accept back-channel logout (Keycloak, Auth0, Ping)**, and register the **Back-channel
-logout URL to register at the provider** in the provider's client settings. It is the bucket's issuer
+logout address to register** in the provider's client settings. It is the bucket's issuer
 followed by `/federation/backchannel-logout`. An agent sets the same option through
 `federation_provider_update`.
 

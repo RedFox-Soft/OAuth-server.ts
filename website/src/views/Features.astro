@@ -111,6 +111,7 @@ const groups = [
 	group('administration', t.groups.administration, [
 		{ ...administration.console },
 		{ ...administration.audit },
+		{ ...administration.usage },
 		{
 			title: administration.mcp.title,
 			body: administration.mcp.body(mcpToolCount),
@@ -128,8 +129,11 @@ const groups = [
 		{ ...administration.databaseClients },
 		{ ...administration.groupOwnership },
 		{ ...administration.bucketAddress },
+		{ ...administration.bucketDeletion },
 		{ ...administration.selfService },
+		{ ...administration.endUsers },
 		{ ...administration.federation, flag: 'federation.enabled' },
+		{ ...administration.scim, flag: 'scim.enabled', spec: rfc('7644') },
 		{ ...administration.signingKeys }
 	]),
 	group('extensibility', t.groups.extensibility, [

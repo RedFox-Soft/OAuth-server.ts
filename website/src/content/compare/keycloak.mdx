@@ -74,7 +74,7 @@ groups:
         us:
           {
             status: no,
-            text: 'OAuth 2.1, OpenID Connect, and sign-in through Google, Microsoft, Apple, GitHub or any other OIDC provider. No SAML, no LDAP.'
+            text: 'OAuth 2.1, OpenID Connect, and sign-in through Google, Microsoft, Apple, GitHub or any other OIDC provider; SCIM 2.0 provisioning from a directory, behind scim.enabled. No SAML, no LDAP.'
           }
         them:
           {
@@ -87,7 +87,7 @@ groups:
         us:
           {
             status: yes,
-            text: "User buckets, each its own issuer with its own signing keys. A bucket takes a path beneath the server's URL or a hostname of its own."
+            text: "User buckets, each its own issuer with its own signing keys. A bucket takes a path beneath the server's URL or a hostname of its own, counts its own monthly active users, moves between administrator groups with its projects, and can be restored for 30 days after it is deleted."
           }
         them:
           {
@@ -218,7 +218,7 @@ groups:
         us:
           {
             status: yes,
-            text: 'Projects, clients, administrators, user buckets, end-users, upstream providers, settings, SMTP, signing keys.'
+            text: 'Projects, clients, administrators and their groups, user buckets, end-users, upstream providers, SCIM connections, usage, settings, SMTP, signing keys. Administrators can sign in through your own identity provider, and a change that could lock people out is previewed with counts before it applies.'
           }
         them:
           {

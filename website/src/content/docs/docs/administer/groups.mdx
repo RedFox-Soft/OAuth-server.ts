@@ -1,6 +1,6 @@
 ---
 title: Groups and the groups claim
-description: Bucket groups gather a bucket's end users, and relying parties read their names in the groups claim. Where the claim appears, and what changes above 200 groups.
+description: Administrator groups own projects and buckets, which can move between them. Bucket groups gather end users, read in the groups claim.
 sidebar:
   order: 4
 ---
@@ -23,12 +23,45 @@ They are separate entities so that nothing a directory writes over SCIM, and not
 reach the set that grants privilege here. A SCIM directory writes bucket groups; it cannot touch an
 administrator group.
 
+## Administrator groups
+
+Every administrator has a **personal group**, created with their account. It has exactly one member,
+its administrator: adding a member to it, or inviting someone into it, is refused. Shared work goes into
+a regular group, created on the **Groups** page or with `group_create`.
+
+Each administrator group has a page. A member sees the other members with their email addresses, and what the
+group owns. An owner invites colleagues with **Invite administrator…**: an email with a single-use link,
+valid for 7 days, that also creates the account of someone who has none yet. Pending invitations are
+listed on the same page and can be revoked. Removing a member says first what they lose. Agents use
+`group_get`, `group_invite`, `group_invitation_list`, `group_invitation_revoke` and the
+`group_member_*` tools.
+
+A project or a bucket is created in a group you choose: the console's creation dialogs ask for it, and
+the API takes an optional `groupId`, which defaults to your active group. A project can also be given a
+`bucketId` of that group at creation.
+
+### Moving a project or a bucket to another group
+
+Work started in a personal group, or in the wrong team, moves with **Move to group…** on a bucket, or
+**Move to another group…** on a project's **Settings** tab:
+
+- **A bucket moves with every project that uses it**, because a project and its bucket stay in the same
+  group. Use `PUT /admin/api/buckets/:id/owner`, or `bucket_owner_change` for an agent.
+- **A project with no bucket of its own moves alone.** Use `PUT /admin/api/projects/:id/owner`, or
+  `project_owner_change`.
+
+A move needs an owner of the group it leaves and a member of the group it joins. Without `confirm`, the
+call only previews what would move. End users, applications and sign-in addresses are untouched, and the
+audit entry is visible to both groups. A container cannot move into another administrator's personal
+group or into Super administrators, and the default bucket, the administrators' bucket and the
+console's own project never move. Both agent tools are high-consequence and ask for confirmation.
+
 ## Who keeps a bucket group
 
 A bucket group is kept either by administrators or by exactly one
 [SCIM connection](/docs/administer/scim/):
 
-- An **administrator-kept** group is created in the bucket's **Groups** panel or with
+- An **administrator-kept** group is created on the bucket's **User groups** tab or with
   `bucket_group_create`, and its members are edited there. It may hold provisioned users too; the
   membership belongs to the group, and the directory never sees it.
 - A **connection-owned** group is created by the directory through `/Groups`. Administrators can read it
@@ -37,7 +70,7 @@ A bucket group is kept either by administrators or by exactly one
 Names are unique within a bucket regardless of letter case. If a directory tries to create a group whose
 name an administrator-kept group already holds, it is refused. An administrator can then hand the
 existing group over to the connection, once every member is someone that connection manages. The
-handover is never automatic.
+handover is never automatic: it is previewed first, and applies only when confirmed.
 
 ## The `groups` scope and claim
 

@@ -33,24 +33,31 @@ bucket and is bound to one of that bucket's upstream identity providers.
 
 <Steps>
 
-1. Open the bucket in the console, go to **Provisioning (SCIM)** and choose **New provisioning
-   connection**.
+1. Open the bucket in the console, go to its **Provisioning** tab and choose **New provisioning
+   connection**. A side panel walks you through the rest.
 
-2. Pick the **Identity provider** the directory's users will sign in with. One provider binds to at
-   most one connection.
+2. **Directory.** Say which directory provisions the bucket: Entra ID, Okta or another SCIM client.
+   From then on the panel uses that directory's own names for each field and shows its advice. An agent
+   reads the same guide with `provisioning_directory_list`. Then pick the **Sign-in provider** the
+   directory's users will sign in with. One provider binds to at most one connection.
 
-3. Check the **correlation rule**: the ID token claim and the SCIM attribute that must hold the same
-   value for a sign-in to land on a provisioned account. For Microsoft it starts as `oid` ↔
-   `externalId`, because Entra's `sub` differs per application while its object id is stable and is what
-   Entra sends to SCIM as `externalId`. For everything else it starts as `preferred_username` ↔
-   `userName`, which is what Okta sends.
+3. **Matching & trust.** Check the **correlation rule**: the ID token claim and the SCIM attribute that
+   must hold the same value for a sign-in to land on a provisioned account. For Microsoft the
+   recommended rule is `oid` ↔ `externalId`, because Entra's `sub` differs per application while its
+   object id is stable and is what Entra sends to SCIM as `externalId`. For everything else it is
+   `preferred_username` ↔ `userName`, which is what Okta sends. Then choose what to do with **Email
+   addresses from the directory**. Unverified, the default, stores them unverified. Verified marks them
+   verified, which you should choose only when the directory verifies addresses itself.
 
-4. Choose what to do with **Email addresses from the directory**. **Untrusted**, the default, stores
-   them unverified. **Trusted** marks them verified, which you should choose only when the directory
-   verifies addresses itself.
+4. **Safeguard.** Choose what happens when the directory removes many people at once: hold the
+   connection above a limit, or apply every removal immediately. There is no default, and the panel
+   cannot finish until you choose. See [The mass-deprovisioning guard](#the-mass-deprovisioning-guard).
 
-5. Save. The connection shows the **SCIM base URL**, the **Token endpoint** and the **Client id** you
-   will give the directory.
+5. **Credential.** Choose how the directory authenticates, described below for each directory.
+
+6. **Connect.** The panel shows the **SCIM base URL**, the **Token endpoint**, the **Client id** and the
+   scope to give the directory, under the names the directory uses, and says when the directory makes
+   its first request.
 
 </Steps>
 
@@ -84,7 +91,8 @@ the SCIM base URL. The client is `scim-<connectionId>`, shown on the connection 
 derived from the connection on every request and stored nowhere, so there is no second record to keep in
 step.
 
-Under **Authorization**, choose **Issue secret**. The secret is shown once. In Entra's provisioning
+On the connection's page, under **Credentials**, choose **Issue client secret…**. The secret is shown
+once. In Entra's provisioning
 settings, give it the SCIM base URL as the tenant URL, and the token endpoint, client id and secret for
 the client-credentials grant. Entra may send the secret by Basic authentication or in the form body;
 both are accepted. The token it gets carries the `scim` scope and nothing else, and works only at this
@@ -96,28 +104,34 @@ authenticates twice is refused (RFC 6749 §2.3). Leave the scopes empty or enter
 A client secret is a deviation from the IPSIE profile this server targets, which requires a signed JWT
 assertion. It exists because Entra's and Okta's OAuth modes send a secret, and it can be switched off
 with [`scim.secretCredentials`](/docs/reference/settings/#scim.secretCredentials). A client that can sign
-uses **Issue key credential** instead, with a key set pasted in or fetched from a URL.
+uses **Issue public key…** instead, with a key set pasted in or fetched from a URL.
 
-To rotate a secret, choose **Replace secret** and keep the current one working. The previous secret
+To rotate a secret, choose **Replace with a client secret…** and **Keep the current one working until
+the directory uses the new one**. The previous secret
 keeps working until the directory has used the new one and stopped using the old one for an hour, and
 never longer than 24 hours, so synchronisation does not stop while you paste the new value. **Retire
 previous now** ends it early, together with every token it obtained. If a secret leaked, replace it
-with **Stop the current one now** instead: it stops at once. Issuing a key credential, or switching
-between a secret and a key, replaces the previous credential at once.
+with **Stop the current one now** instead: it stops at once. Issuing a public key, or switching between
+a secret and a key, replaces the previous credential at once. An agent issues and replaces credentials
+with `provisioning_credential_issue` (`overlap: false` stops the previous value at once), retires the
+previous one early with `provisioning_credential_retire`, and removes one with
+`provisioning_credential_revoke`.
 
 ## Okta: a client secret, or a static token in header mode
 
 Okta's SCIM settings offer **OAuth2** with the Client Credentials grant type; use it where your Okta
 organisation offers it, with a client secret issued here, exactly as for Entra. Where it does not,
-Okta gets a static token. Under **Authorization**, choose **Issue static token** and its lifetime, 90
-days or one year. The token begins with `scimst_`, is shown once, and is stored only as a digest. In
+Okta gets a static token. Under **Credentials**, choose **Issue static token…** and its lifetime, 90
+days or one year (`lifetimeDays` over the API). The token begins with `scimst_`, is shown once, and is stored only as a digest. In
 Okta's SCIM settings, choose **HTTP Header** authentication and paste the token as it is. Okta sends it
 without a `Bearer` prefix, and the prefix is what lets this server recognise it.
 
 A static token expires (RFC 7644 §7.4); the connection page and the bucket's overview warn 14 days
-before. To rotate, choose **Replace static token**: as with a secret, the previous token keeps working
+before. To rotate, choose **Replace static token…**: as with a secret, the previous token keeps working
 until Okta has moved to the new one, at most 24 hours, so there is no gap to schedule around.
-**Revoke the static token** removes it without issuing another. Static tokens are another deviation
+**Revoke…** on the static token removes it without issuing another. Tokens issued before 0.11.0 were
+given an expiry by the upgrade: a year from their issue, and never sooner than 90 days from the
+upgrade. Static tokens are another deviation
 from the profile, switched by [`scim.staticTokens`](/docs/reference/settings/#scim.staticTokens).
 
 ## Users and groups
@@ -159,14 +173,20 @@ A deactivation and a deletion of an existing user each count.
 
 The first deprovisioning beyond the threshold **holds** the connection. While it is held, every
 deactivation and deletion is refused with `429` and `Retry-After: 300` and changes nothing, while
-creates, updates and group changes keep flowing. The bucket's administrators get one email. Both
-directories retry a `429` by themselves, so nothing is lost: the refused requests land once the hold is
-released.
+creates, updates and group changes keep flowing. The bucket's administrators get one email, which links
+to the connection's page. Both directories retry a `429` by themselves, so nothing is lost: the refused
+requests land once the hold is released.
 
-Only an explicit release ends a hold: **Release the hold?** in the console, or
+Each refusal is recorded per person: who, which operation, when first and last, and how many attempts.
+The connection's page lists them, and an agent reads them with `provisioning_hold_get`. A held
+connection also shows as **On hold** on the **Buckets** list, and `provisioning_hold_list` lists every
+held connection the caller can see.
+
+Only an explicit release ends a hold: **Release hold…** on the connection's page, or
 `provisioning_connection_release` for an agent, which is a high-consequence tool that asks for
-confirmation. No edit ends one, and removing the threshold of a held connection is refused. Look at what
-the directory was trying to do before releasing; the refused deprovisionings arrive as soon as you do.
+confirmation. No edit ends one, and removing the threshold of a held connection is refused. Look at
+whom the directory was trying to remove before releasing; the refused deprovisionings arrive as soon as
+you do. The release clears the per-person records, and its audit entry keeps their count.
 
 The guard is off until you set a threshold, and setting one departs from the IPSIE profile, which wants
 deprovisioning to end access promptly: a leaver caught by a hold keeps access until the release. That

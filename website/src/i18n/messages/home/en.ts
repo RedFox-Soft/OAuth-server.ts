@@ -22,7 +22,7 @@ export default {
 			),
 		getStarted: 'Get started',
 		github: 'View on GitHub',
-		specifications: '22 specifications',
+		specifications: '25 specifications',
 		quickstartCaption: 'Two commands and a browser tab',
 		givesHeading: 'What those two commands give you',
 		gives: [
@@ -44,7 +44,7 @@ export default {
 	console: {
 		eyebrow: 'The console',
 		heading: 'Everything an operator needs, without a second product.',
-		lead: "Projects, clients, user buckets, end-users, upstream providers, settings, SMTP, signing keys and an append-only audit trail, all in one console that you sign into through the server's own OpenID Connect flow. The same API is what an AI agent uses over MCP.",
+		lead: "Projects, clients, user buckets, end-users, upstream providers, SCIM connections, settings, SMTP, signing keys, monthly active users and an append-only audit trail, all in one console that you sign into through the server's own OpenID Connect flow, or through your organisation's identity provider. A change that could lock people out says whom it affects before it applies. The same API is what an AI agent uses over MCP.",
 		screenshotAlt:
 			'The FoxAuth admin console listing the OAuth clients of a project.',
 		screenshotCaption:
@@ -109,7 +109,7 @@ export default {
 	},
 	standards: {
 		eyebrow: 'Standards',
-		heading: 'Twenty-two specifications, implemented.',
+		heading: 'Twenty-five specifications, implemented.',
 		lead: 'Every entry below is code in the repository, with tests. Each links to the spec it implements; the Reference names the flag that governs it.',
 		reference: 'Endpoint reference'
 	},

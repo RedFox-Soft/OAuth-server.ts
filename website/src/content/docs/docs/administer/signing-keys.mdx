@@ -1,6 +1,6 @@
 ---
 title: Rotate signing keys
-description: Generate a key, wait while every instance publishes it, promote it, then retire the old one. Rotation without a restart for the instance and every bucket.
+description: Rotate a signing key in one step, retire the old one, or revoke a compromised key at once — with no restart, for the instance and every bucket.
 sidebar:
   order: 6
 ---
@@ -9,8 +9,8 @@ import { Steps, Aside } from '@astrojs/starlight/components';
 
 Every token this server signs carries the `kid` of the key that signed it, and every relying party
 verifies it against a published key set. Rotating a key means changing which key signs without leaving
-any instance, or any relying party, holding a token it cannot verify. It is three steps, each with a
-reason, and none of them needs a restart.
+any instance, or any relying party, holding a token it cannot verify. **Rotate** does it in one step,
+the steps it is made of can be taken one at a time, and none of them needs a restart.
 
 ## Whose keys
 
@@ -22,10 +22,14 @@ Each issuer has its own keys, and so its own rotation:
 - **A bucket's keys**, for a bucket with a path or a hostname of its own. It signs with them alone and
   publishes them under its own issuer, `https://auth.example.com/acme/jwks` or its hostname's `/jwks`, so a
   token from one bucket never verifies against another bucket's keys. The group that owns the bucket
-  manages them from the bucket's page, or with the `bucket_key_*` tools.
+  manages them on the bucket's **Signing keys** tab, or with the `bucket_key_*` tools.
 
-A bucket without an address has no keys of its own; its key operations are refused and the console
-sends you to the instance's **Keys** page.
+A bucket without an address has no keys of its own, and its key operations are refused. Its
+**Signing keys** tab says that it signs with the instance keys and lists their published ids. To rotate
+its keys on their own, give it an address of its own.
+
+The instance's **Keys** page and a bucket's **Signing keys** tab show one card per algorithm. Each
+key's state is stated in words: when it can sign, until when it signed, until when it verifies.
 
 ## A key's life: published, signing, retired, hidden
 
@@ -39,15 +43,25 @@ sends you to the instance's **Keys** page.
    and the key that signed that algorithm before goes back to published, so it keeps verifying the tokens
    it already signed. The new signer is written first, so there is no moment with no signer.
 
-3. **Retire** the old key once you no longer need it to sign. Retiring asks you to type its `kid`, and
-   over the API the body must name it: `{ "confirm": "<kid>" }`. The key that currently signs cannot be
-   retired. Promote its replacement first.
+3. **Retire** the old key once you no longer need it to sign. In the console you type the word
+   `retire`; over the API the body must name the key: `{ "confirm": "<kid>" }`. The key that currently
+   signs cannot be retired. Promote its replacement first.
 
 </Steps>
 
 A retired key stays published for one day, the longest anything it signed can live, and is then
 **hidden**: gone from the key set, from the console's list and from every verification. It is never
 deleted. The record is kept, and every operation on it answers `404`.
+
+## Rotate: promote and publish in one step
+
+**Rotate**, on an algorithm's card, does the first two steps at once. The oldest published key of that
+algorithm that may sign now becomes its signer. The key that signed before goes back to published, so
+it keeps verifying what it signed. A new key is generated and published, ready for the next rotation.
+
+When no key of the algorithm may sign yet, Rotate only publishes the next key and changes nothing about
+who signs. The answer says from when the algorithm can rotate (`rotatableAt`). Rotate never promotes a
+key inside its publication window, so pressing it twice, a minute apart, puts a new key in charge.
 
 <Aside
 	type="note"
@@ -60,16 +74,41 @@ deleted. The record is kept, and every operation on it answers `404`.
 	Promote is refused with `too_soon` until then.
 </Aside>
 
-Each step is recorded in the audit trail before it takes effect. For an agent, every instance key tool
-is high-consequence and asks for confirmation, and so is retiring a bucket key; generating and
-promoting a bucket key are ordinary.
+## Revoke a compromised key
+
+Retiring leaves a key verifying for a day. For a key that may have leaked, that is a day in which
+forged tokens verify. **Revoke now…** in a key's menu ends it at once instead. In the console you type
+the word `revoke`; over the API the body names the key, as for retiring.
+
+- The key leaves the key set and every verification: on the instance that revoked it at once, and on
+  every other instance within the 30 seconds its cache lives. Every token it signed stops verifying, so
+  people signed in with such tokens may have to sign in again.
+- Its state becomes **revoked**. It is never published again and cannot be brought back. The record is
+  kept, so its `kid` is never reused.
+- Revoking the key that signs puts another in its place in the same act: the oldest published key of the
+  algorithm that may sign, or else a newly generated key that signs at once. That new key skips the
+  publication window, so a relying party holding a cached key set may reject new tokens until it
+  refreshes it. That is the price of ending a compromised key now rather than in a minute.
+
+## In the audit trail, and for an agent
+
+Each step is recorded in the audit trail before it takes effect. A rotation or a revocation is one entry,
+and it names every key the act touched (`keys`): the key promoted, the one demoted, the one generated,
+the one revoked.
+
+For an agent, every instance key tool is high-consequence and asks for confirmation:
+`jwks_generate`, `jwks_promote`, `jwks_rotate`, `jwks_retire` and `jwks_revoke`. For a bucket, retiring
+and revoking are high-consequence (`bucket_key_retire`, `bucket_key_revoke`); generating, promoting and
+rotating are ordinary (`bucket_key_generate`, `bucket_key_promote`, `bucket_key_rotate`), because none of
+them stops a key from verifying.
 
 ## One signer per algorithm
 
 An issuer has one signing key per algorithm, not one in total. Ordinary clients get `RS256`, and a FAPI
 2.0 client registered for `PS256` or `ES256` needs a signer in that algorithm too, so an issuer can sign
-with several keys at once, each for its own clients. Promoting a key replaces only its own algorithm's
-signer, so no step can leave a client's algorithm without one.
+with several keys at once, each for its own clients. Promoting or rotating a key replaces only its own
+algorithm's signer, and revoking a signer puts another in its place, so no step can leave a client's
+algorithm without one.
 
 A new algorithm needs no restart. Generate an `ES256` key, promote it, and discovery advertises `ES256`
 from then on, so clients can register for it straight away.
@@ -90,10 +129,14 @@ new key well ahead of promoting it, at least as long ahead as that cache lives.
 
 ## A rotation, start to finish
 
-1. Generate a key in the same algorithm as the one you are replacing.
-2. Wait at least a minute, longer if a relying party caches the key set for longer, then promote it.
-3. Retire the old key, typing its `kid`. It keeps verifying for the day a retired key stays
+1. Press **Rotate** on the algorithm's card. If no next key was published yet, this publishes one and
+   signs nothing with it.
+2. Wait at least a minute, longer if a relying party caches the key set for longer, then press
+   **Rotate** again. The next key signs, and a new next key is published.
+3. Retire the old key, typing `retire`. It keeps verifying for the day a retired key stays
    published, which outlasts every token it signed, so there is nothing to wait for first.
+
+The same rotation by hand is Generate, then Promote once the key may sign, then Retire.
 
 The upgrade to 0.8.0 moved the instance's keys into this lifecycle; [Upgrading](/docs/deploy/upgrade/)
 says how it chose which key signs.

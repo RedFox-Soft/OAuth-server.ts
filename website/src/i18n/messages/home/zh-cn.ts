@@ -2,7 +2,7 @@ import { rich } from '../../types.ts';
 import type english from './en.ts';
 import type { HomeFacts } from './en.ts';
 
-export const source = '7b4eb534d1f9';
+export const source = 'b842fadd8554';
 
 export default {
 	title: 'FoxAuth — 面向智能体时代的授权服务器',
@@ -20,7 +20,7 @@ export default {
 			),
 		getStarted: '快速开始',
 		github: '在 GitHub 上查看',
-		specifications: '22 项规范',
+		specifications: '25 项规范',
 		quickstartCaption: '两条命令，一个浏览器标签页',
 		givesHeading: '这两条命令为你准备好了什么',
 		gives: [
@@ -42,7 +42,7 @@ export default {
 	console: {
 		eyebrow: '控制台',
 		heading: '运维所需的一切，无需第二个产品。',
-		lead: '项目、客户端、用户桶、最终用户、上游身份提供商、设置、SMTP、签名密钥，以及只追加的审计日志，全部集中在一个控制台里；登录控制台走的是服务器自身的 OpenID Connect 流程。AI 智能体通过 MCP 使用的也是同一套 API。',
+		lead: '项目、客户端、用户桶、最终用户、上游身份提供商、SCIM 连接、设置、SMTP、签名密钥、月活跃用户，以及只追加的审计日志，全部集中在一个控制台里；登录控制台走的是服务器自身的 OpenID Connect 流程，也可以通过你所在组织的身份提供商登录。可能让人无法登录的更改，会在生效前先告诉你影响到谁。AI 智能体通过 MCP 使用的也是同一套 API。',
 		screenshotAlt: 'FoxAuth 管理控制台，列出某个项目的 OAuth 客户端。',
 		screenshotCaption:
 			'内置控制台中某个项目的客户端。这里的每一次更改都会生成一条审计记录。'
@@ -104,7 +104,7 @@ export default {
 	},
 	standards: {
 		eyebrow: '标准',
-		heading: '22 项规范，均已实现。',
+		heading: '25 项规范，均已实现。',
 		lead: '下面每一项都是仓库里的代码，并且有测试。每一项都链接到它所实现的规范；参考文档写明了控制它的功能开关。',
 		reference: '端点参考'
 	},
