@@ -1,4 +1,12 @@
-import { describe, it, beforeAll, afterEach, expect, mock } from 'bun:test';
+import {
+	describe,
+	it,
+	beforeAll,
+	afterAll,
+	afterEach,
+	expect,
+	mock
+} from 'bun:test';
 import { strict as assert } from 'node:assert';
 
 import bootstrap, {
@@ -83,13 +91,16 @@ describe('features.resourceIndicators', () => {
 		mock.restore();
 		resetGrantFlags();
 	});
-	beforeAll(async () => {
-		cookie = await setup.login({
+	/* The session every case but the ID Token ones signs in with, and which those put back when done. */
+	const signIn = () =>
+		setup.login({
 			resources: {
 				'urn:wl:default': 'api:read api:write',
 				'urn:wl:explicit': 'api:read api:write'
 			}
 		});
+	beforeAll(async () => {
+		cookie = await signIn();
 	});
 
 	// RFC 8707 §2: a resource that is "invalid, missing, unknown, or malformed" is invalid_target.
@@ -945,6 +956,10 @@ describe('features.resourceIndicators', () => {
 
 		afterEach(() => {
 			setSeedClaims(undefined);
+		});
+		/* These sign in again with a narrower grant; the cases that run after them expect the shared one. */
+		afterAll(async () => {
+			cookie = await signIn();
 		});
 
 		it('carries the granted claims when the access token is bound to a resource server', async () => {

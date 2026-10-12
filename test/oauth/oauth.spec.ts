@@ -88,17 +88,19 @@ describe('requests without the openid scope', () => {
 			});
 		});
 
-		Object.entries({
+		Object.entries<() => unknown>({
 			// A value the deployment admits: a client registering any other is refused before this gate.
-			default_acr_values: [[...configuration.acrValues][0]],
-			default_max_age: 300,
-			require_auth_time: true
+			// Read when the case runs: this object is built while the file is collected, before this spec's
+			// bootstrap, when the settings in force are whichever spec ran last.
+			default_acr_values: () => [[...configuration.acrValues][0]],
+			default_max_age: () => 300,
+			require_auth_time: () => true
 		}).forEach(([clientProperty, value]) => {
 			it(`each client-required parameter is enforced`, async function () {
 				const auth = new AuthorizationRequest({ client_id: 'client' });
 
 				const restore = await changeClient('client', {
-					[clientProperty]: value
+					[clientProperty]: value()
 				});
 
 				let response;

@@ -193,7 +193,11 @@ describe('end-user API', () => {
 
 		const { entries } = await adminAuditStore.list({ targetId: user._id });
 		expect(entries.length).toBeGreaterThan(0);
-		expect(JSON.stringify(entries)).not.toContain('7946');
+		/*
+		 * The value as typed, spaces and all: four bare digits can turn up by chance in an entry's random ids
+		 * and timestamps, and once did.
+		 */
+		expect(JSON.stringify(entries)).not.toContain('20 7946 0000');
 	});
 
 	it('rejects a duplicate email with 409', async () => {

@@ -20,7 +20,8 @@ import { Type } from '@sinclair/typebox';
  * a client belonging to no project reach a declared resource at all.
  */
 
-const AUDIENCE = 'https://mcp.acme.example/mcp';
+/* Its own identifier: declarations outlive a spec file, and two files declaring one identifier collide. */
+const AUDIENCE = 'https://mcp.machine.example/mcp';
 const OAuthError = Type.Object({ error: Type.String() });
 
 function tokenAs(clientId: string, secret: string) {

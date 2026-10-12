@@ -17,7 +17,8 @@ import { ROOT_NAMESPACE } from 'lib/resources/namespace.ts';
 /* Every case below signs in at the bare address, where rule 3 chooses among root-served buckets. */
 const AT_ROOT = DEFAULT_REQUEST_BUCKET;
 
-const AUDIENCE = 'https://mcp.acme.example/mcp';
+/* Its own identifier: declarations outlive a spec file, and two files declaring one identifier collide. */
+const AUDIENCE = 'https://mcp.resolve.example/mcp';
 
 async function declaredResourceIn(bucketId: string) {
 	const project = await getProjectStore().create({
@@ -95,8 +96,8 @@ describe('resolveBucketForRequest', () => {
 
 		for (const named of [
 			`${AUDIENCE}/`,
-			'HTTPS://mcp.acme.example/mcp',
-			'https://MCP.ACME.EXAMPLE/mcp'
+			'HTTPS://mcp.resolve.example/mcp',
+			'https://MCP.RESOLVE.EXAMPLE/mcp'
 		]) {
 			expect(
 				await resolveBucketForRequest('unaffiliated', named, AT_ROOT)

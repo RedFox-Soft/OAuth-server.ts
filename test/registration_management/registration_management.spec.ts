@@ -1,6 +1,15 @@
-import { describe, it, beforeAll, afterEach, expect, mock } from 'bun:test';
+import {
+	describe,
+	it,
+	beforeAll,
+	afterAll,
+	afterEach,
+	expect,
+	mock
+} from 'bun:test';
 
-import bootstrap, { agent, getHeader } from '../test_helper.js';
+import bootstrap, { agent, getHeader, seedClient } from '../test_helper.js';
+import nanoid from 'lib/helpers/nanoid.ts';
 import { eventBus, type ServerListener } from 'lib/event_bus.js';
 import { Client, toStored } from 'lib/models/client.js';
 import { ISSUER } from 'lib/configs/env.js';
@@ -299,12 +308,18 @@ describe('OAuth 2.0 Dynamic Client Registration Management Protocol', () => {
 		});
 
 		describe('rotateRegistrationAccessToken', () => {
-			// Enabled through ApplicationConfig for this block; the sibling "after rotation"
-			// describe flips it back so the flag does not leak within the shared bootstrap.
+			/*
+			 * On for this block only, and put back by the block itself: cases run in any order, so a sibling
+			 * that switched it off again could run first and leave it on for every case after this block.
+			 */
+			const ROTATE = 'registrationManagement.rotateRegistrationAccessToken';
+			let before: (typeof ApplicationConfig)[typeof ROTATE];
 			beforeAll(() => {
-				ApplicationConfig[
-					'registrationManagement.rotateRegistrationAccessToken'
-				] = true;
+				before = ApplicationConfig[ROTATE];
+				ApplicationConfig[ROTATE] = true;
+			});
+			afterAll(() => {
+				ApplicationConfig[ROTATE] = before;
 			});
 
 			it('destroys the old RegistrationAccessToken', async () => {
@@ -346,13 +361,7 @@ describe('OAuth 2.0 Dynamic Client Registration Management Protocol', () => {
 			});
 		});
 
-		describe('after rotation (flag restored)', () => {
-			beforeAll(() => {
-				ApplicationConfig[
-					'registrationManagement.rotateRegistrationAccessToken'
-				] = false;
-			});
-
+		describe('with rotation off', () => {
 			it('does not rotate when disabled', async () => {
 				const client = await register();
 				const res = await agent
@@ -414,11 +423,17 @@ describe('OAuth 2.0 Dynamic Client Registration Management Protocol', () => {
 
 		it('can delete any stored client given a valid registration access token', async () => {
 			// All clients are manageable now (no `noManage` class); a valid RAT is
-			// the only gate.
-			const rat = new RegistrationAccessToken({ clientId: 'client' });
+			// the only gate. A stored client of its own, so the one the update case reads is not deleted.
+			const clientId = `stored-${nanoid()}`;
+			seedClient({
+				clientId,
+				clientSecret: 'secret',
+				redirectUris: ['https://client.example.com/cb']
+			});
+			const rat = new RegistrationAccessToken({ clientId });
 			const token = await rat.save();
 			const res = await agent
-				.reg({ clientId: 'client' })
+				.reg({ clientId })
 				.delete(undefined, { headers: bearer(token) });
 			expect(res.status).toBe(204);
 		});

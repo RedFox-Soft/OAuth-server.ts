@@ -36,10 +36,12 @@ describe('naming a bucket', () => {
 	});
 
 	it('accepts a slug that is free and well formed', async () => {
-		const res = await create(await superCookie(), 'acme');
+		/* Unique: the bucket outlives this file, and test/bucket_addressing seeds its own at `acme`. */
+		const slug = `acme-${Math.random().toString(36).slice(2, 8)}`;
+		const res = await create(await superCookie(), slug);
 
 		expect(res.status).toBe(201);
-		expect(answered(res.data).slug).toBe('acme');
+		expect(answered(res.data).slug).toBe(slug);
 	});
 
 	/*

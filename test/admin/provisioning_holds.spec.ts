@@ -92,12 +92,14 @@ describe('held provisioning connections across buckets', () => {
 	});
 
 	it('counts a held connection in a bucket the administrator can see', async () => {
-		const { bucket, connection } = await bucketOf(owner, true);
-		await bucketOf(owner, false);
+		/* An administrator of their own: the count is exact, and another case holds a bucket of `owner`'s. */
+		const counted = await createAdministrator();
+		const { bucket, connection } = await bucketOf(counted, true);
+		await bucketOf(counted, false);
 
 		const holds = shaped(
 			Holds,
-			await get('/admin/api/provisioning-holds', await cookieFor(owner))
+			await get('/admin/api/provisioning-holds', await cookieFor(counted))
 		);
 
 		expect(holds.count).toBe(1);

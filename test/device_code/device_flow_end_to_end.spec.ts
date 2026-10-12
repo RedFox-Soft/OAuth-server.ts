@@ -211,8 +211,15 @@ describe('a device sign-in from a browser with no session', () => {
 		await browser.post(`/ui/${uidOf(consentAt)}/consent`, { action: 'allow' });
 		const answer = await poll(device_code);
 		await flushForTest();
-		const groups = (await errorStore.list({ route: '/ui/:uid/consent' }))
-			.groups;
+		/*
+		 * By this fault's message as well as its route: the error store is shared by every spec file, and
+		 * another can record its own fault on the consent route before this one runs.
+		 */
+		const groups = (
+			await errorStore.list({ route: '/ui/:uid/consent' })
+		).groups.filter(
+			(group) => group.message === 'fault while completing a device sign-in'
+		);
 
 		expect(answer.error).toBe('server_error');
 		expect(groups).toHaveLength(1);

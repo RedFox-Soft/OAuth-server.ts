@@ -2,6 +2,7 @@ import {
 	describe,
 	it,
 	beforeAll,
+	beforeEach,
 	afterEach,
 	spyOn,
 	mock,
@@ -17,6 +18,7 @@ import bootstrap, { seedClient } from '../test_helper.js';
 import { OIDCProviderError } from 'lib/helpers/errors.js';
 import { IdToken } from 'lib/models/id_token.js';
 import { Client, clientKeys } from 'lib/models/client.js';
+import nanoid from 'lib/helpers/nanoid.ts';
 
 const keys = [
 	{
@@ -26,6 +28,12 @@ const keys = [
 		crv: 'P-256'
 	}
 ];
+const anotherKey = {
+	kty: 'EC',
+	x: 'pPrd-y2inidf7iiYmB_ymaTWZrBresjbgmnjLzIOiBY',
+	y: 'Wkxz6RSvg9xEvDLppPJ0Bi7psTF974mXSlpuf_x120c',
+	crv: 'P-256'
+};
 
 // The client's jwks_uri answering with `body` — anything a remote server might serve, keys or not.
 function setResponse(
@@ -43,17 +51,25 @@ function setResponse(
 	);
 }
 
-// NOTE: these tests are to be run sequentially, picking one random won't pass
 /**
  * @proves A client published key set is fetched once per cache window, refreshed when a
  * verification fails, and refused when it carries private keys or is not a key set at all.
  */
 describe('client keystore refresh', () => {
+	/*
+	 * A client of its own for every case. The key set is cached per client, so cases sharing one read
+	 * whatever the case before them left in it — and passed only in the order they were written.
+	 */
+	let clientId: string;
+
 	beforeAll(async function () {
 		await bootstrap(import.meta.url, { config: 'client_keystore' });
+	});
 
+	beforeEach(() => {
+		clientId = `client-${nanoid()}`;
 		seedClient({
-			clientId: 'client',
+			clientId,
 			clientSecret: 'secret',
 			redirectUris: ['https://client.example.com/cb'],
 			jwks_uri: 'https://client.example.com/jwks',
@@ -70,7 +86,7 @@ describe('client keystore refresh', () => {
 	it('gets the jwks from the uri (and does only one request concurrently)', async function () {
 		const fetched = setResponse();
 
-		const client = await Client.find('client');
+		const client = await Client.find(clientId);
 		await Promise.all([
 			clientKeys(client).asymmetric.refresh(),
 			clientKeys(client).asymmetric.refresh()
@@ -95,7 +111,7 @@ describe('client keystore refresh', () => {
 			]
 		});
 
-		const client = await Client.find('client');
+		const client = await Client.find(clientId);
 		spyOn(clientKeys(client).asymmetric, 'fresh').mockReturnValue(false);
 		return Promise.all([
 			assert.rejects(clientKeys(client).asymmetric.refresh(), (err) => {
@@ -120,14 +136,10 @@ describe('client keystore refresh', () => {
 	});
 
 	it('adds new keys', async function () {
-		const client = await Client.find('client');
-		keys.push({
-			kty: 'EC',
-			x: 'pPrd-y2inidf7iiYmB_ymaTWZrBresjbgmnjLzIOiBY',
-			y: 'Wkxz6RSvg9xEvDLppPJ0Bi7psTF974mXSlpuf_x120c',
-			crv: 'P-256'
-		});
+		const client = await Client.find(clientId);
 		setResponse();
+		await clientKeys(client).asymmetric.refresh();
+		setResponse({ keys: [...keys, anotherKey] });
 
 		spyOn(clientKeys(client).asymmetric, 'fresh').mockReturnValue(false);
 		await clientKeys(client).asymmetric.refresh();
@@ -137,9 +149,11 @@ describe('client keystore refresh', () => {
 	});
 
 	it('removes not found keys', async function () {
+		const client = await Client.find(clientId);
+		setResponse();
+		await clientKeys(client).asymmetric.refresh();
 		setResponse({ keys: [] });
 
-		const client = await Client.find('client');
 		spyOn(clientKeys(client).asymmetric, 'fresh').mockReturnValue(false);
 		await clientKeys(client).asymmetric.refresh();
 
@@ -151,7 +165,7 @@ describe('client keystore refresh', () => {
 	it('only accepts 200s', async function () {
 		setResponse({ keys: [] }, 201);
 
-		const client = await Client.find('client');
+		const client = await Client.find(clientId);
 		spyOn(clientKeys(client).asymmetric, 'fresh').mockReturnValue(false);
 		return assert.rejects(clientKeys(client).asymmetric.refresh(), (err) => {
 			if (!(err instanceof OIDCProviderError)) throw err;
@@ -167,7 +181,7 @@ describe('client keystore refresh', () => {
 	it('only accepts parseable json', async function () {
 		setResponse('not json');
 
-		const client = await Client.find('client');
+		const client = await Client.find(clientId);
 		spyOn(clientKeys(client).asymmetric, 'fresh').mockReturnValue(false);
 		return assert.rejects(clientKeys(client).asymmetric.refresh(), (err) => {
 			if (!(err instanceof OIDCProviderError)) throw err;
@@ -183,7 +197,7 @@ describe('client keystore refresh', () => {
 	it('only accepts keys as array', async function () {
 		setResponse({ keys: {} });
 
-		const client = await Client.find('client');
+		const client = await Client.find(clientId);
 		spyOn(clientKeys(client).asymmetric, 'fresh').mockReturnValue(false);
 		return assert.rejects(clientKeys(client).asymmetric.refresh(), (err) => {
 			if (!(err instanceof OIDCProviderError)) throw err;
@@ -198,7 +212,7 @@ describe('client keystore refresh', () => {
 
 	describe('caching', () => {
 		it('uses expires caching header to determine stale states', async function () {
-			const client = await Client.find('client');
+			const client = await Client.find(clientId);
 			const until = moment().add(2, 'hours').toDate();
 
 			setResponse(undefined, undefined, {
@@ -219,7 +233,7 @@ describe('client keystore refresh', () => {
 		});
 
 		it('ignores the cache-control one when expires is provided', async function () {
-			const client = await Client.find('client');
+			const client = await Client.find(clientId);
 			const until = moment().add(2, 'hours').toDate();
 
 			setResponse(undefined, undefined, {
@@ -241,7 +255,7 @@ describe('client keystore refresh', () => {
 		});
 
 		it('uses the max-age if Cache-Control is missing', async function () {
-			const client = await Client.find('client');
+			const client = await Client.find(clientId);
 
 			setResponse(undefined, undefined, {
 				'Cache-Control': 'private, max-age=3600'
@@ -264,7 +278,7 @@ describe('client keystore refresh', () => {
 		});
 
 		it('falls back to 1 minute throttle if no caching header is found', async function () {
-			const client = await Client.find('client');
+			const client = await Client.find(clientId);
 
 			setResponse();
 
@@ -289,7 +303,7 @@ describe('client keystore refresh', () => {
 		it('when a stale keystore is passed to JWT verification it gets refreshed when verification fails', async function () {
 			setResponse();
 
-			const client = await Client.find('client');
+			const client = await Client.find(clientId);
 			clientKeys(client).asymmetric.freshUntil = epochTime() - 1;
 			return assert.rejects(
 				JWT.verify(
@@ -302,7 +316,7 @@ describe('client keystore refresh', () => {
 		it('refreshes stale keystores before id_token encryption', async function () {
 			setResponse();
 
-			const client = await Client.find('client');
+			const client = await Client.find(clientId);
 			clientKeys(client).asymmetric.freshUntil = epochTime() - 1;
 			expect(clientKeys(client).asymmetric.stale()).toBe(true);
 

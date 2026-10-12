@@ -12,6 +12,7 @@ import epochTime from '../lib/helpers/epoch_time.js';
 import { elysia } from '../lib/index.ts';
 import {
 	adapter,
+	configStore,
 	getBucketStore,
 	getProjectStore,
 	getUserStore
@@ -514,6 +515,13 @@ async function bootstrap(
 	);
 
 	TestAdapter.clear();
+	/*
+	 * No stored settings either. A spec that saves one through the settings API leaves it in the store, and
+	 * the next spec's own configuration then differs from it — so that spec's settings answers report the
+	 * leftover as "not in force", by file order alone. Reset here rather than trusted to every spec's
+	 * afterAll: sixteen specs save settings, and the next one to be written would have to remember too.
+	 */
+	await configStore.set({});
 	// Each spec file starts with no extra seeded claims; claim-conformance specs
 	// opt in via setSeedClaims() after this bootstrap call.
 	seedClaims = undefined;

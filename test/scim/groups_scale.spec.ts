@@ -48,7 +48,10 @@ describe('a 10,000-member group over SCIM', () => {
 			token: c.token
 		});
 
-		expect((res.json.members as unknown[]).length).toBe(SIZE);
+		/* Against the store, not SIZE: the PATCH case adds one member to this same group, in any order. */
+		const stored = await getBucketGroupStore().memberIds(gid);
+		expect(stored.length).toBeGreaterThanOrEqual(SIZE);
+		expect((res.json.members as unknown[]).length).toBe(stored.length);
 	});
 
 	it('lists the group without its members when members are excluded', async () => {
@@ -64,6 +67,7 @@ describe('a 10,000-member group over SCIM', () => {
 	});
 
 	it('adds a member by PATCH and leaves the other members as they were', async () => {
+		const before = (await getBucketGroupStore().memberIds(gid)).length;
 		const added = (
 			await scim('POST', `${c.base}/Users`, {
 				token: c.token,
@@ -78,7 +82,7 @@ describe('a 10,000-member group over SCIM', () => {
 
 		expect(res.status).toBe(204);
 		const after = await getBucketGroupStore().memberIds(gid);
-		expect(after.length).toBe(SIZE + 1);
+		expect(after.length).toBe(before + 1);
 		expect(after).toContain(added);
 		expect(after).toContain('seed000000');
 	});

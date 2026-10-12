@@ -465,16 +465,21 @@ describe('registration features', () => {
 		});
 
 		it('invalidates registration_access_token if used on the wrong client', async () => {
+			/* A registration of its own: the token this case destroys is not the one the others read with. */
+			const { data } = await reg();
+			if (!data?.registration_access_token) {
+				throw new Error('expected a registration access token');
+			}
 			const spy = mock<ServerListener<'registration_access_token.destroyed'>>();
 			eventBus.once('registration_access_token.destroyed', spy);
 
 			const res = await agent
 				.reg({ clientId: 'foobar' })
-				.get({ headers: bearer(token) });
+				.get({ headers: bearer(data.registration_access_token) });
 			expect(getHeader(res.response, 'cache-control')).toBe('no-store');
 			expectFail(res, 401, 'invalid_token', 'invalid token provided');
 			expect(spy).toHaveBeenCalledTimes(1);
-			expect(spy.mock.calls[0][0].payload.clientId).toBe(clientId);
+			expect(spy.mock.calls[0][0].payload.clientId).toBe(data.client_id);
 		});
 
 		it('can read any stored client given a valid registration access token', async () => {

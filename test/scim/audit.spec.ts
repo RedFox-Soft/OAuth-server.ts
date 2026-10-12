@@ -104,6 +104,11 @@ describe('the audit trail of SCIM changes', () => {
 	});
 
 	it('shows only connection entries when filtered to the SCIM surface', async () => {
+		/* A change through SCIM of its own, so the filter has something to show whatever ran before. */
+		await scim('POST', `${c.base}/Users`, {
+			token: c.token,
+			body: scimUser(`filtered-${Math.random()}@contoso.com`)
+		});
 		await admin(
 			'PATCH',
 			`/admin/api/buckets/${c.bucket._id}/provisioning-connections/${c.connection._id}`,

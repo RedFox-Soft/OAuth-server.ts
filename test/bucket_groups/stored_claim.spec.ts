@@ -1,4 +1,12 @@
-import { describe, it, beforeAll, afterEach, expect, spyOn } from 'bun:test';
+import {
+	describe,
+	it,
+	beforeAll,
+	afterEach,
+	expect,
+	mock,
+	spyOn
+} from 'bun:test';
 import { nanoid } from 'nanoid';
 
 import { DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
@@ -28,6 +36,8 @@ describe('a stored groups claim', () => {
 
 	afterEach(() => {
 		setSeedClaims(undefined);
+		/* The prompt spy sits on OIDCContext's prototype, which outlives this file (see groups_claim). */
+		mock.restore();
 	});
 
 	it('is refused when an administrator sets one on an account', async () => {

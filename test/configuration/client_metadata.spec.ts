@@ -18,6 +18,7 @@ import keys, { stripPrivateJWKFields } from '../keys.js';
 import { ATTRIBUTES, BASE_ATTRIBUTES } from 'lib/consts/client_attributes.js';
 import { TestAdapter } from '../models.js';
 import getConfig from '../default.config.js';
+import { applicationDefaultSettings } from '../config_baseline.js';
 import {
 	registerClient,
 	responseModeAllowed,
@@ -46,8 +47,11 @@ const baseConfig = () => ({
 
 // ApplicationConfig is the single source for every server setting: feature flags as flat dotted
 // keys, plus these collection options. A test's `configuration` is routed there and reset each
-// call, then re-validated with reloadConfiguration().
-const applicationDefaults = { ...ApplicationConfig };
+// call, then re-validated with reloadConfiguration(). The reset is to the shipped defaults as the
+// test run found them (test/config_baseline.ts), not a copy of ApplicationConfig taken when this file
+// loads: that copy held whatever the spec before it had switched on, so a default asserted here
+// depended on file order.
+const applicationDefaults = structuredClone(applicationDefaultSettings);
 const COLLECTION_OPTIONS = new Set([
 	'acrValues',
 	'scopes',

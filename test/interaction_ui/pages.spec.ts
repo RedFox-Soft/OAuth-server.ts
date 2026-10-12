@@ -116,27 +116,31 @@ async function register(clientId: string, email: string, password = PASSWORD) {
 	return { uid, cookie, response };
 }
 
+/*
+ * At file level: every describe below uses these buckets, and cases run in any order, so none may rely on
+ * another describe having set them up — or re-bootstrap and wipe them from under the rest.
+ */
+beforeAll(async () => {
+	await bootstrap(import.meta.url, { config: 'pages' });
+	resetAdminMemoryStores();
+	verifyBucketId = await seedBucket('UI Verify Bucket', 'ui-verify-app', {
+		emailVerificationRequired: true,
+		verificationMethod: 'link'
+	});
+	closedBucketId = await seedBucket('UI Closed Bucket', 'ui-closed-app', {
+		registrationOpen: false
+	});
+	openBucketId = await seedBucket('UI Open Bucket', 'ui-open-app', {
+		emailVerificationRequired: false
+	});
+});
+
 /**
  * @proves The registration and login pages tell the user what happened, survive hydration,
  * refuse a closed bucket with a rendered page, and stay non-committal about which addresses
  * exist.
  */
 describe('interaction UI — the post-registration notice (US1)', () => {
-	beforeAll(async () => {
-		await bootstrap(import.meta.url, { config: 'pages' });
-		resetAdminMemoryStores();
-		verifyBucketId = await seedBucket('UI Verify Bucket', 'ui-verify-app', {
-			emailVerificationRequired: true,
-			verificationMethod: 'link'
-		});
-		closedBucketId = await seedBucket('UI Closed Bucket', 'ui-closed-app', {
-			registrationOpen: false
-		});
-		openBucketId = await seedBucket('UI Open Bucket', 'ui-open-app', {
-			emailVerificationRequired: false
-		});
-	});
-
 	beforeEach(() => {
 		resetSentEmails();
 	});
@@ -440,14 +444,6 @@ function hydrationProps(html: string): Record<string, unknown> {
  * door open, so nobody is sent to a refusal the page could have known about.
  */
 describe('interaction UI — sign-in links follow their doors', () => {
-	beforeAll(async () => {
-		await bootstrap(import.meta.url, { config: 'pages' });
-		resetAdminMemoryStores();
-		closedBucketId = await seedBucket('UI Closed Bucket', 'ui-closed-app', {
-			registrationOpen: false
-		});
-	});
-
 	it('offers no registration link when its bucket has closed registration', async () => {
 		const { uid, cookie } = await startInteraction('ui-closed-app');
 		const login = await getPage(`/ui/${uid}/login`, cookie);

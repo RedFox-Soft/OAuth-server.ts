@@ -5,7 +5,8 @@ import {
 	beforeEach,
 	afterEach,
 	expect,
-	spyOn
+	spyOn,
+	mock
 } from 'bun:test';
 import { nanoid } from 'nanoid';
 
@@ -75,6 +76,11 @@ describe('the groups claim', () => {
 
 	afterEach(() => {
 		ApplicationConfig['conformIdTokenClaims'] = true;
+		/*
+		 * The spy sits on OIDCContext's prototype, which outlives this file: left in place, every later
+		 * spec's prompt=none passes whatever its checks say (it emptied claims.spec's "are not met").
+		 */
+		mock.restore();
 	});
 
 	async function inGroups(...names: string[]): Promise<string[]> {

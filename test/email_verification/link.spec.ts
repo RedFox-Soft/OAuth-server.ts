@@ -59,34 +59,38 @@ async function login(uid: string, cookie: string, email: string) {
 	return response.status;
 }
 
+/*
+ * At file level, not in the first describe: both describes below run against this bootstrap, and cases
+ * run in any order, so the second one cannot rely on the first having started.
+ */
+beforeAll(async () => {
+	await bootstrap(import.meta.url, { config: 'link' });
+	resetAdminMemoryStores();
+	// A dedicated bucket (link method, verification required) reached by CLIENT_ID
+	// through a project, so these specs never touch the shared 'redfox' bucket.
+	const bucket = await getBucketStore().create({
+		ownerGroupId: UNASSIGNED_GROUP_ID,
+		name: 'Verify Link Bucket',
+		emailVerificationRequired: true,
+		verificationMethod: 'link'
+	});
+	bucketId = bucket._id;
+	const project = await getProjectStore().create({
+		ownerGroupId: UNASSIGNED_GROUP_ID,
+		name: 'Verify Link',
+		slug: `verify-link-${Math.random()}`
+	});
+	await getProjectStore().update(project._id, {
+		bucketId,
+		clientIds: [CLIENT_ID]
+	});
+});
+
 /**
  * @proves A registrant proves their address by opening a single-use link in any browser, and a
  * closed bucket creates no account and sends no mail.
  */
 describe('email verification — link method', () => {
-	beforeAll(async () => {
-		await bootstrap(import.meta.url, { config: 'link' });
-		resetAdminMemoryStores();
-		// A dedicated bucket (link method, verification required) reached by CLIENT_ID
-		// through a project, so these specs never touch the shared 'redfox' bucket.
-		const bucket = await getBucketStore().create({
-			ownerGroupId: UNASSIGNED_GROUP_ID,
-			name: 'Verify Link Bucket',
-			emailVerificationRequired: true,
-			verificationMethod: 'link'
-		});
-		bucketId = bucket._id;
-		const project = await getProjectStore().create({
-			ownerGroupId: UNASSIGNED_GROUP_ID,
-			name: 'Verify Link',
-			slug: `verify-link-${Math.random()}`
-		});
-		await getProjectStore().update(project._id, {
-			bucketId,
-			clientIds: [CLIENT_ID]
-		});
-	});
-
 	beforeEach(() => {
 		resetSentEmails();
 	});

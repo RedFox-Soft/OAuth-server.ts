@@ -32,14 +32,13 @@ async function cookieFor(kind: AdminKind): Promise<string> {
 describe('admin UI shell', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'admin' });
-		// Cross-suite isolation: other admin specs (login_flow, interactions_bucket)
-		// seed a super administrator into the shared in-memory admin bucket earlier in the
-		// same `bun test` process. Drop the cached store singletons so this spec
-		// sees a genuinely empty admin bucket before asserting on first-run setup.
-		resetAdminMemoryStores();
 	});
 
 	it('serves the setup screen when no super administrator exists', async () => {
+		// Other admin specs, and the case below in either order, seed a super administrator into the shared
+		// in-memory admin bucket. Drop the cached store singletons here, in the case itself, so it sees a
+		// genuinely empty admin bucket whatever ran before it.
+		resetAdminMemoryStores();
 		const res = await agent.admin.get();
 		const html = shaped(Type.String(), res.data);
 		expect(res.response.headers.get('content-type')).toContain('text/html');
@@ -58,8 +57,8 @@ describe('admin UI shell', () => {
 	 * bundle is deliberately absent under test (versionedAsset falls back for exactly that reason),
 	 * so asserting on public/admin.js only ever passed on a locally built artifact.
 	 *
-	 * The sessions are minted here rather than in beforeAll because the first test above must see an
-	 * admin bucket with no super administrator in it.
+	 * The sessions are minted here rather than in beforeAll because the setup case above empties the admin
+	 * bucket, and may run before or after this one.
 	 *
 	 * This covers the nav gate only; the API's own scoping for a non-super-admin is pinned in
 	 * audit_group_scope.spec.ts, which is where it actually matters.

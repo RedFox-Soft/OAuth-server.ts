@@ -115,7 +115,12 @@ describe('connecting a recognised provider', () => {
 
 	it('returns the callback address to register for this bucket', async () => {
 		const cookie = await cookieFor();
-		const bucket = await seedBucket({ slug: 'acme' });
+		/*
+		 * A slug of its own: the store outlives this file, and a bucket left at `acme` answered the address
+		 * test/bucket_addressing seeds its own `acme` bucket at, whenever this file ran first.
+		 */
+		const slug = `catalogue-${Math.random().toString(36).slice(2, 10)}`;
+		const bucket = await seedBucket({ slug });
 
 		const res = await client.admin.api
 			.buckets({ id: bucket._id })
@@ -123,7 +128,7 @@ describe('connecting a recognised provider', () => {
 
 		expect(res.status).toBe(200);
 		const google = guidanceFor(answered(res.data));
-		expect(google?.callbackUri).toBe('http://e.ly/acme/federation/callback');
+		expect(google?.callbackUri).toBe(`http://e.ly/${slug}/federation/callback`);
 		expect(google?.consoleUrl).toStartWith('https://console.cloud.google.com');
 		expect(google?.steps.length).toBeGreaterThan(0);
 		// Google's form asks for these; this flow is server-side and needs none, so the guidance says so.
