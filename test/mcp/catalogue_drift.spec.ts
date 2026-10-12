@@ -181,6 +181,8 @@ describe('MCP tool catalogue', () => {
 			/* Every member loses what relying parties grant for the group. */
 			'bucket_group_delete',
 			'bucket_key_retire',
+			/* Every token the key signed stops verifying at once (specs/087). */
+			'bucket_key_revoke',
 			/* The group it leaves loses a population of people, with no step of its own. */
 			'bucket_owner_change',
 			/* Makes a local user read-only to every administrator, for good. */
@@ -199,6 +201,8 @@ describe('MCP tool catalogue', () => {
 			'jwks_generate',
 			'jwks_promote',
 			'jwks_retire',
+			'jwks_revoke',
+			'jwks_rotate',
 			/*
 			 * The issuer of every application in the project changes, so everyone signed in through them signs
 			 * in again, in a bucket where their accounts are not (specs/085).

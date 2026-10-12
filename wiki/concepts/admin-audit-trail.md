@@ -211,6 +211,10 @@ three more filters, all ANDed with the rest and with the group boundary, so they
   connection.
 - `actionPrefix` matches actions by prefix, escaped on every backend.
 
+Since spec 087 an entry may carry `keys`, the kids a key act touched by role (`promoted`, `demoted`,
+`generated`, `revoked`, `signing`), because a rotation or a revocation acts on up to three keys in one entry.
+Key ids are public, as `kid` is.
+
 Also since spec 085:
 - Key entries carry `kid`.
 - `provisioning.connection.create` targets the new connection rather than its provider.

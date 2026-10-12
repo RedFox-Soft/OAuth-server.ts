@@ -4,7 +4,11 @@ import bootstrap from '../test_helper.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { getBucketKeysStore, getBucketStore } from 'lib/adapters/index.ts';
+import {
+	adminAuditStore,
+	getBucketKeysStore,
+	getBucketStore
+} from 'lib/adapters/index.ts';
 import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { ADMIN_MCP_CLIENT_ID, MCP_RESOURCE } from 'lib/mcp/consts.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
@@ -142,6 +146,52 @@ describe('an agent managing a bucket key set', () => {
 		expect((await getBucketKeysStore().find(bucket._id, kid))?.state).toBe(
 			'published'
 		);
+	});
+
+	it('rotates an algorithm, publishing the next key, and the trail records it once naming the key', async () => {
+		const token = await agent();
+		const bucket = await keyedBucket();
+
+		const { payload } = await rpc(
+			call('bucket_key_rotate', { id: bucket._id, alg: 'RS256' }),
+			token
+		);
+
+		expect(payload.result?.isError).not.toBe(true);
+		const { generated } = shaped(
+			Type.Object({ generated: Type.String() }),
+			payload.result?.structuredContent?.result
+		);
+		expect(
+			(await getBucketKeysStore().find(bucket._id, generated))?.state
+		).toBe('published');
+		const { entries } = await adminAuditStore.list({
+			targetId: bucket._id,
+			action: 'bucket.key.rotate'
+		});
+		expect(entries.map((entry) => [entry.keys, entry.viaSurface])).toEqual([
+			[{ generated }, 'mcp']
+		]);
+	});
+
+	it('holds a revocation for confirmation and revokes nothing', async () => {
+		const token = await agent();
+		const bucket = await keyedBucket();
+		const [signer] = await getBucketKeysStore().listByBucket(bucket._id);
+
+		const { payload } = await rpc(
+			call('bucket_key_revoke', {
+				id: bucket._id,
+				kid: signer.kid,
+				confirm: signer.kid
+			}),
+			token
+		);
+
+		expect(payload.result?.structuredContent?.confirmationToken).toBeDefined();
+		expect(
+			(await getBucketKeysStore().find(bucket._id, signer.kid))?.state
+		).toBe('signing');
 	});
 
 	it('returns no key material from any key tool', async () => {

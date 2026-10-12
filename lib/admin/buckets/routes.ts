@@ -671,8 +671,14 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 		'/admin/api/buckets',
 		async ({ admin, body, set }) => {
 			const ctx = assertAuth(admin);
-			// No role gate: the authority is membership of the group the bucket will belong to.
-			const ownerGroupId = assertActiveGroup(ctx);
+			/*
+			 * No role gate: the authority is membership of the group the bucket will belong to — the active
+			 * group, or one the caller names (specs/087), held to the rules a move into it is held to.
+			 */
+			const ownerGroupId =
+				body.groupId === undefined
+					? assertActiveGroup(ctx)
+					: (await loadDestination(ctx, body.groupId))._id;
 			/*
 			 * Naming a hostname is an instance-level act, never a group-level one. A project administrator
 			 * may create buckets in their own group; letting them name one would put a name in the

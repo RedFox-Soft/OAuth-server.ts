@@ -67,6 +67,20 @@ cross-instance messaging and the TTL is how far another instance can lag:
   `confirmation_mismatch` — because nothing it signed verifies once its window closes. The console asks for
   the typed word `retire` and sends the row's kid itself (since spec 086); the MCP tools `jwks_retire` and `bucket_key_retire` are `high` as well.
   Retiring a signing key is refused (409), so an algorithm never loses its signer.
+- **rotate** (since spec 087) is promote and generate in one audited act: the algorithm's oldest *ready*
+  published key signs, the previous signer returns to published, and a new key is published as the next one.
+  With no ready key it only generates and answers `rotatableAt`, the earliest time any waiting key of the
+  algorithm may sign. One audit entry names the keys involved in `keys`: `{promoted, demoted, generated}`.
+- **revoke** (since spec 087) is for a compromised key. It sets the terminal state `revoked`, which
+  `stillPublished` treats as gone, so the key leaves `/jwks` and every verification at once. Other instances
+  follow within `KEY_CACHE_SECONDS`.
+  - Like retire, it requires `{ confirm: <kid> }`.
+  - Revoking the signer puts another key in its place in the same act: the oldest ready key, or else a newly
+    generated key created directly as `signing`, skipping the publication window. Relying parties holding a cached
+    key set may briefly reject new tokens, which the console says beforehand. When the algorithm cannot be
+    generated it answers 409 `no_replacement`.
+  - A revoked key is never ready, promotable or retirable.
+  - MCP `bucket_key_revoke` and `jwks_revoke` are high-consequence; `bucket_key_rotate` is ordinary, like promote.
 - A retired key stays published for a day (`RETIRED_KEY_LIFETIME_SECONDS`, `:43`, the longest a signed
   artefact lives) and is then **hidden, not deleted**: absent from `/jwks`, the view and every
   verification, its record kept, 404 to every operation.
@@ -109,7 +123,8 @@ ID model, where skipping that check is a known class of vulnerability.
   signing algorithms of its own keys.
 - A bucket served at the root has no keys of its own: its key routes answer 409.
 
-**The console since spec 086** (`lib/admin/ui/pages/keys/`):
+**The console since spec 086** (`lib/admin/ui/pages/keys/`). Since spec 087 each card also has **Rotate**,
+marks the next key ("Next · ready"), and offers **Revoke now…** behind the typed word `revoke`:
 - `KeyCards` shows one card per algorithm, so it is visible that promoting replaces only that algorithm's
   signer. Each key states its life in words: Signing; Published with "can sign at" or "signed until"; Retired
   with "verifies until". Promote is the row's one inline action and names the key it replaces. Retire sits in

@@ -7,8 +7,15 @@ import {
 	resolveAdmin
 } from '../auth/rbac.js';
 import { KeyActionRefused } from '../key_lifecycle.js';
-import { RetireKeyBody } from './schema.js';
-import { generateKey, listKeys, promoteKey, retireKey } from './service.js';
+import { RetireKeyBody, RevokeKeyBody } from './schema.js';
+import {
+	generateKey,
+	listKeys,
+	promoteKey,
+	retireKey,
+	revokeKey,
+	rotateKey
+} from './service.js';
 
 // Super-admin management of the root issuer's keys. Every action flows through this management API
 // with the same auth/validation as other admin operations (no privileged bypass), and every mutation is
@@ -52,4 +59,23 @@ export const jwksRoutes = new Elysia({ name: 'admin-jwks' })
 			return retireKey(ctx, params.kid, body?.confirm);
 		},
 		{ body: t.Optional(RetireKeyBody) }
+	)
+	.post(
+		'/admin/api/jwks/rotate',
+		async ({ admin, body }) => {
+			const ctx = assertAuth(admin);
+			assertSuperAdmin(ctx);
+			return rotateKey(ctx, (body as { alg?: unknown }).alg);
+		},
+		// Loose for the reason the generate route's body is: the service refuses a bad `alg` in the admin shape.
+		{ body: t.Record(t.String(), t.Unknown()) }
+	)
+	.post(
+		'/admin/api/jwks/:kid/revoke',
+		async ({ admin, params, body }) => {
+			const ctx = assertAuth(admin);
+			assertSuperAdmin(ctx);
+			return revokeKey(ctx, params.kid, body?.confirm);
+		},
+		{ body: t.Optional(RevokeKeyBody) }
 	);

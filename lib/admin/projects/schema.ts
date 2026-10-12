@@ -9,7 +9,13 @@ import { t } from 'elysia';
 export const CreateProjectBody = t.Object({
 	name: t.String({ minLength: 1 }),
 	slug: t.String({ pattern: '^[a-z0-9-]+$' }),
-	corsOrigins: t.Optional(t.Array(t.String()))
+	corsOrigins: t.Optional(t.Array(t.String())),
+	/*
+	 * Where the project is created, and the bucket it signs people into (specs/087). Without `groupId` it
+	 * lands in the caller's active group, as it always has; without `bucketId` it uses the default bucket.
+	 */
+	groupId: t.Optional(t.String({ minLength: 1 })),
+	bucketId: t.Optional(t.String({ minLength: 1 }))
 });
 
 export const UpdateProjectBody = t.Object({

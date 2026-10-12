@@ -26,9 +26,10 @@ import { ROOT_KEY_OWNER } from '../consts/key_owner.js';
  *
  * A bucket's set is cached per instance for `KEY_CACHE_SECONDS` and dropped at once on this instance's
  * own writes. There is no cross-instance messaging in this server for anything, so a TTL is what bounds
- * how long another instance can lag; the rotation rules in lib/admin/bucket_keys/ are written against
+ * how long another instance can lag; the rotation rules in lib/admin/key_lifecycle.ts are written against
  * it — a key is published for longer than the TTL before it may sign — so the lag never lets one
- * instance sign with a key another does not yet serve.
+ * instance sign with a key another does not yet serve. It is also how long a revoked key can still
+ * verify on another instance.
  */
 export const KEY_CACHE_SECONDS = 30;
 
@@ -70,7 +71,9 @@ export function retiredKeyRemovableAt(key: BucketKey): Date {
 	);
 }
 
+/* A revoked key has no window: it may be compromised, so nothing it signed may verify again. */
 function stillPublished(key: BucketKey, now: number): boolean {
+	if (key.state === 'revoked') return false;
 	return key.state !== 'retired' || now < retiredKeyRemovableAt(key).getTime();
 }
 

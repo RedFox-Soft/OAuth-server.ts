@@ -17,7 +17,7 @@ import {
 	projectHref,
 	projectSettingsHref
 } from '../frame/routes.js';
-import { CreateDestination } from '../frame/CreateDestination.js';
+import { BucketField, GroupField } from '../frame/CreateDestination.js';
 import { PageHeader } from '../frame/PageHeader.js';
 import { request } from '../frame/request.js';
 import { useFeedback } from '../frame/feedback.js';
@@ -31,6 +31,9 @@ import type { ProjectView } from './ProjectWorkspace.js';
 interface CreateProjectValues {
 	name: string;
 	slug: string;
+	/* Chosen in the dialog (specs/087); the header's current group by default. */
+	groupId?: string;
+	bucketId?: string;
 }
 
 /*
@@ -178,16 +181,21 @@ export function Projects() {
 
 	async function onCreate(values: CreateProjectValues) {
 		setCreating(true);
-		const result = await request('POST', '/admin/api/projects', values);
+		const result = await request<{ _id: string }>(
+			'POST',
+			'/admin/api/projects',
+			values
+		);
 		setCreating(false);
 		if (!result.ok) {
 			feedback.failed(result, form);
 			return;
 		}
-		feedback.done('Project created.');
+		feedback.done(`Project ${values.name} created.`);
 		setOpen(false);
 		form.resetFields();
-		await load();
+		// Opened at once: it may belong to a group other than the header's, where the list would not show it.
+		void navigate(projectHref(result.data._id));
 	}
 
 	/*
@@ -333,13 +341,13 @@ export function Projects() {
 				confirmLoading={creating}
 				destroyOnHidden
 			>
-				<CreateDestination onChange={() => setOpen(false)} />
 				<Form<CreateProjectValues>
 					form={form}
 					layout="vertical"
 					scrollToFirstError
 					onFinish={(values) => void onCreate(values)}
 				>
+					<GroupField />
 					<Form.Item
 						name="name"
 						label="Name"
@@ -354,6 +362,7 @@ export function Projects() {
 					>
 						<Input placeholder="lowercase, digits, hyphens" />
 					</Form.Item>
+					<BucketField />
 				</Form>
 			</Modal>
 		</>

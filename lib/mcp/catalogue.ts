@@ -39,7 +39,12 @@ import {
 import { PublishedSettingsBody } from '../admin/settings/schema.js';
 import { UpdateSmtpBody } from '../admin/settings/smtp/schema.js';
 import { UpdateSentryBody } from '../admin/settings/sentry/schema.js';
-import { GenerateKeyBody, RetireKeyBody } from '../admin/jwks/schema.js';
+import {
+	GenerateKeyBody,
+	RetireKeyBody,
+	RevokeKeyBody,
+	RotateKeyBody
+} from '../admin/jwks/schema.js';
 import { GenerateBucketKeyBody } from '../admin/bucket_keys/schema.js';
 import { AuditQuery } from '../admin/audit/schema.js';
 import {
@@ -764,7 +769,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: [],
 		summary:
-			'Create a project: the container an instance groups OAuth clients into, with its own managers and CORS origins. A project has no user bucket until one is assigned. whoami states the right as `can.createProject`.'
+			"Create a project: the container an instance groups OAuth clients into, with its own managers and CORS origins. `groupId` names the administrator group it belongs to — one this administrator is a member of (a super administrator: any group but another administrator's personal group); without it, the administrator's active group. `bucketId` names the user bucket it signs people into, which must belong to that same group (409 otherwise) and cannot be the administrators' bucket; leave it out to use the default bucket, which is refused by name. whoami states the right as `can.createProject`."
 	},
 	{
 		tool: 'project_update',
@@ -1136,7 +1141,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: [],
 		summary:
-			'Create a user bucket. A bucket cannot be created unreachable: at creation it has no providers, so password login cannot be switched off. `totpRequired` makes a password sign-in also require a one-time code from an authenticator app; it governs password sign-in only and never gates a federated one. A `host` needs `can.createHost` from whoami; a `slug` needs `can.createBucket`.'
+			"Create a user bucket. A bucket cannot be created unreachable: at creation it has no providers, so password login cannot be switched off. `totpRequired` makes a password sign-in also require a one-time code from an authenticator app; it governs password sign-in only and never gates a federated one. A `host` needs `can.createHost` from whoami; a `slug` needs `can.createBucket`. `groupId` names the administrator group it belongs to — one this administrator is a member of (a super administrator: any group but another administrator's personal group); without it, the administrator's active group."
 	},
 	{
 		tool: 'bucket_address_change',
@@ -1594,7 +1599,7 @@ const catalogue = [
 			'Hand a group administrators keep to a SCIM provisioning connection, so the directory adopts it instead of failing to create one of the same name. Called with only `connectionId`, it changes nothing and answers a conflict carrying the preview: `consequences`, `expect` (`connectionId`, `managed` and `foreign` member counts) and `blockers` (up to 20 members the connection does not manage, by `id` and `email`). Apply it by calling again with `confirm: true` and that `expect`; a stale `expect` is answered with the fresh preview. Refused while any member is someone the connection does not manage. Afterwards only the directory can change it.'
 	},
 
-	/* ---------------------------------------------------- writes: keys (5) */
+	/* --------------------------------------------------- writes: keys (10) */
 	{
 		tool: 'jwks_generate',
 		method: 'POST',
@@ -1635,6 +1640,32 @@ const catalogue = [
 			'Retire a key of the instance key set. The body must name the key again — { "confirm": "<kid>" } — or nothing happens. The key stops signing at once, keeps verifying until removableAt so tokens already issued stay valid, and is then hidden for good. Refused for a key that signs: promote its replacement first.'
 	},
 	{
+		tool: 'jwks_rotate',
+		method: 'POST',
+		path: '/admin/api/jwks/rotate',
+		action: 'jwks.rotate',
+		consequence: 'high',
+		superAdminOnly: true,
+		bodySchema: RotateKeyBody,
+		querySchema: null,
+		pathParams: [],
+		summary:
+			'Rotate one algorithm of the instance key set in one step. When a published key of that algorithm is past its promotableAt, the oldest such key starts signing (`promoted`), the previous signer returns to published and keeps verifying what it signed (`demoted`), and a new key is generated and published as the next one (`generated`). When no key is ready, only the next key is generated, nothing changes who signs, and `rotatableAt` says from when the algorithm can rotate. Never promotes a key inside its publication window. Every bucket served at the root signs with these keys, the administrators included, which is why it is gated.'
+	},
+	{
+		tool: 'jwks_revoke',
+		method: 'POST',
+		path: '/admin/api/jwks/:kid/revoke',
+		action: 'jwks.revoke',
+		consequence: 'high',
+		superAdminOnly: true,
+		bodySchema: RevokeKeyBody,
+		querySchema: null,
+		pathParams: ['kid'],
+		summary:
+			'Revoke a key of the instance key set that may be compromised. The body must name the key again — { "confirm": "<kid>" } — or nothing happens. Unlike retiring, there is no day of grace: the key leaves the key set at once and every token it signed stops verifying on this instance now and on every other within the key cache bound, for every bucket served at the root, the console\'s own sign-in included, so people may have to sign in again. When the key is the one signing, the same act puts another key in its place: the oldest published key of its algorithm past its promotableAt, or else a newly generated key that signs at once (`replacementGenerated: true`), in which case relying parties holding a cached key set may reject new tokens until they refresh it. Answers `replacement` with the key now signing. Refused for a key already revoked (409); a hidden or unknown key is 404.'
+	},
+	{
 		tool: 'bucket_key_generate',
 		method: 'POST',
 		path: '/admin/api/buckets/:id/keys',
@@ -1672,6 +1703,34 @@ const catalogue = [
 		pathParams: ['id', 'kid'],
 		summary:
 			'Retire a key the bucket no longer signs with. The body must name the key again — { "confirm": "<kid>" } — or nothing happens. It stays published until every token it could have signed has expired, then is hidden and tokens signed with it stop verifying. Refused for the signing key. High-consequence: describe it and confirm before running.'
+	},
+	{
+		tool: 'bucket_key_rotate',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/keys/rotate',
+		action: 'bucket.key.rotate',
+		/* Ordinary, as promote is: it promotes only a key past its publication window, and the old signer keeps verifying. */
+		consequence: 'ordinary',
+		superAdminOnly: false,
+		bodySchema: RotateKeyBody,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			"Rotate one algorithm of a bucket's keys in one step. When a published key of that algorithm is past its promotableAt, the oldest such key starts signing (`promoted`), the previous signer returns to published and keeps verifying what it signed (`demoted`), and a new key is generated and published as the next one (`generated`). When no key is ready, only the next key is generated, nothing changes who signs, and `rotatableAt` says from when the algorithm can rotate. Never promotes a key inside its publication window. Refused for a bucket served at the root (its keys are the instance's) and for an unsupported algorithm."
+	},
+	{
+		tool: 'bucket_key_revoke',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/keys/:kid/revoke',
+		action: 'bucket.key.revoke',
+		/* Every token the key signed stops verifying at once, and people may have to sign in again. */
+		consequence: 'high',
+		superAdminOnly: false,
+		bodySchema: RevokeKeyBody,
+		querySchema: null,
+		pathParams: ['id', 'kid'],
+		summary:
+			'Revoke a key of a bucket that may be compromised. The body must name the key again — { "confirm": "<kid>" } — or nothing happens. Unlike retiring, there is no day of grace: the key leaves the key set at once and every token it signed stops verifying on this instance now and on every other within the key cache bound, so people may have to sign in again. When the key is the one signing, the same act puts another key in its place: the oldest published key of its algorithm past its promotableAt, or else a newly generated key that signs at once (`replacementGenerated: true`), in which case relying parties holding a cached key set may reject new tokens until they refresh it. Answers `replacement` with the key now signing. Refused for a key already revoked (409); a hidden or unknown key is 404. High-consequence: describe it and confirm before running.'
 	},
 
 	/* ------------------------------------------------ writes: settings (3) */

@@ -41,6 +41,14 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Changed
 
+- **A key rotates in one step, a compromised key is revoked at once, and new things are created in the group you
+  choose** (spec 087). Rotate (`bucket_key_rotate`, `jwks_rotate`) makes the algorithm's oldest ready key sign and
+  publishes the next one, or only publishes the next one when none may sign yet. Revoke (`bucket_key_revoke`,
+  `jwks_revoke`, high-consequence) hides a key immediately — a new `revoked` state, never published again — so
+  nothing it signed verifies; revoking the signer puts a ready key, or a new key without the publication window, in
+  its place in the same act. Audit entries name every key an act touched (`keys`). Creating a project or bucket takes
+  an optional `groupId`, and a project an optional `bucketId` of that group; the console's creation dialogs choose
+  both.
 - **Signing keys read by algorithm; Activity reads like Usage; a deleted bucket's history has a page** (spec
   086). A bucket's and the instance's keys show one card per algorithm, each key's state in words (can sign at,
   signed until, verifies until) with Promote inline and Retire behind the typed word; the key read adds

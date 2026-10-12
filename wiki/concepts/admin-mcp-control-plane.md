@@ -205,8 +205,8 @@ guessed and silently missing from the announcement that exists so an agent need 
 withholding has since arrived — `group_delete` — and cost only a table row, which is the arrangement
 working as intended.
 
-The other high-consequence operations — 34 tools since spec 085 made `project_bucket_assign` and
-`project_bucket_clear` high (spec 083 had added `admin_sign_out` and `admin_totp_clear`; spec 082 had added `bucket_user_email_change`; spec 075 `bucket_owner_change` and
+The other high-consequence operations — 37 tools since spec 087 added `bucket_key_revoke`, `jwks_rotate` and
+`jwks_revoke` (spec 085 made `project_bucket_assign` and `project_bucket_clear` high; spec 083 had added `admin_sign_out` and `admin_totp_clear`; spec 082 had added `bucket_user_email_change`; spec 075 `bucket_owner_change` and
 `project_owner_change`, the first tools whose body names a group, `groupId`) — take two calls: describe,
 then confirm. The confirmation binds
 five ways — tool, target, arguments hash, administrator, agent — and each is a real case. Arguments,

@@ -504,7 +504,7 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 
 	/*
 	 * Never reaped by age: a key leaves when its state says so — retired, and past the lifetime of every
-	 * token it could have signed — which a TTL on the record could not know. Owned by a bucket, which is
+	 * token it could have signed, or revoked — which a TTL on the record could not know. Owned by a bucket, which is
 	 * not a principal, so the bucket-delete route cascades it explicitly. Indexed on `bucketId` because
 	 * every read is one bucket's set.
 	 */

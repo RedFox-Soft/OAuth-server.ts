@@ -57,3 +57,27 @@ export const GenerateKeyBody = t.Object({
 export const RetireKeyBody = t.Object({
 	confirm: t.Optional(t.String())
 });
+
+/*
+ * A rotation's body (specs/087): the algorithm to rotate — the bucket route validates against it, and the
+ * MCP catalogue describes both rotate tools with it. The instance route validates in its service instead,
+ * as its generate route does, so a bad `alg` answers there in the admin_error shape.
+ */
+export const RotateKeyBody = t.Object(
+	{
+		alg: t.Union(
+			SUPPORTED_ALGS.map((alg) => t.Literal(alg)) as unknown as [
+				ReturnType<typeof t.Literal>
+			]
+		)
+	},
+	{ additionalProperties: false }
+);
+
+/*
+ * A revocation's body: the key it revokes, named again, as a retirement's is and for the stronger reason —
+ * a revoked key stops verifying at once and never comes back. Loose for the reason `RetireKeyBody` is.
+ */
+export const RevokeKeyBody = t.Object({
+	confirm: t.Optional(t.String())
+});

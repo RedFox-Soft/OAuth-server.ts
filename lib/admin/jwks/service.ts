@@ -16,7 +16,8 @@ export { SUPPORTED_ALGS };
 /*
  * The root issuer's keys — the ones the default bucket, the administrators and every bucket without an
  * address of its own sign with — managed through the lifecycle every issuer's keys follow
- * (`../key_lifecycle.ts`): generate publishes, promote signs, retire ends. No step needs a restart:
+ * (`../key_lifecycle.ts`): generate publishes, promote signs, retire ends, rotate promotes and generates in
+ * one act, revoke ends at once. No step needs a restart:
  * every instance reloads the set from the store within the cache bound, which the publication window is
  * written against.
  *
@@ -25,9 +26,12 @@ export { SUPPORTED_ALGS };
 function rootOwner(ctx: AdminContext): lifecycle.KeyOwner {
 	return {
 		id: ROOT_KEY_OWNER,
-		audit: async (verb, kid) => {
+		audit: async (verb, kid, keys) => {
 			/* `kid` as well as the target, so a reader finds the key in the same field on both key surfaces. */
-			await recordAdminAudit(ctx, `jwks.${verb}`, kid, { kid });
+			await recordAdminAudit(ctx, `jwks.${verb}`, kid, {
+				kid,
+				...(keys ? { keys } : {})
+			});
 		},
 		/*
 		 * Reloaded, not only dropped: the reload is what refreshes the mirror client registration reads the
@@ -47,7 +51,7 @@ export async function listKeys(ctx: AdminContext) {
 	};
 }
 
-export async function generateKey(ctx: AdminContext, alg: unknown) {
+function supportedAlg(alg: unknown): SupportedAlg {
 	if (
 		typeof alg !== 'string' ||
 		!SUPPORTED_ALGS.includes(alg as SupportedAlg)
@@ -57,7 +61,23 @@ export async function generateKey(ctx: AdminContext, alg: unknown) {
 			`unsupported algorithm; expected one of: ${SUPPORTED_ALGS.join(', ')}`
 		);
 	}
-	return lifecycle.generateKey(rootOwner(ctx), alg as SupportedAlg);
+	return alg as SupportedAlg;
+}
+
+export async function generateKey(ctx: AdminContext, alg: unknown) {
+	return lifecycle.generateKey(rootOwner(ctx), supportedAlg(alg));
+}
+
+export async function rotateKey(ctx: AdminContext, alg: unknown) {
+	return lifecycle.rotateKey(rootOwner(ctx), supportedAlg(alg));
+}
+
+export async function revokeKey(
+	ctx: AdminContext,
+	kid: string,
+	confirm: unknown
+) {
+	return lifecycle.revokeKey(rootOwner(ctx), kid, confirm);
 }
 
 export async function promoteKey(ctx: AdminContext, kid: string) {

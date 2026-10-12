@@ -533,6 +533,19 @@ const routes = [
 		path: '/admin/api/buckets/:id/keys/:kid',
 		targetType: 'UserBucket'
 	},
+	/* One entry per act however many keys it touched; the entry's `keys` names each by its role (specs/087). */
+	{
+		action: 'bucket.key.rotate',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/keys/rotate',
+		targetType: 'UserBucket'
+	},
+	{
+		action: 'bucket.key.revoke',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/keys/:kid/revoke',
+		targetType: 'UserBucket'
+	},
 	/*
 	 * Severing one account's upstream identity. An end-user target, so it carries `targetScope` — the fifth
 	 * row to do so, for the same reason as the other four: these users live in per-bucket storage, and a bare
@@ -561,6 +574,18 @@ const routes = [
 		action: 'jwks.retire',
 		method: 'DELETE',
 		path: '/admin/api/jwks/:kid',
+		targetType: 'jwks'
+	},
+	{
+		action: 'jwks.rotate',
+		method: 'POST',
+		path: '/admin/api/jwks/rotate',
+		targetType: 'jwks'
+	},
+	{
+		action: 'jwks.revoke',
+		method: 'POST',
+		path: '/admin/api/jwks/:kid/revoke',
 		targetType: 'jwks'
 	},
 

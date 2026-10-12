@@ -56,6 +56,13 @@ export const clients = [
 		grantTypes: ['client_credentials'],
 		responseTypes: [],
 		redirectUris: []
+	},
+	{
+		clientId: 'revoke-path-machine',
+		clientSecret: 'revoke-path-machine-secret',
+		grantTypes: ['client_credentials'],
+		responseTypes: [],
+		redirectUris: []
 	}
 ];
 

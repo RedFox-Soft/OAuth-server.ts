@@ -191,7 +191,8 @@ describe('admin audit coverage: projects', () => {
 		expectEntry(await soleEntry(created._id), {
 			action: 'project.create',
 			targetType: 'Project',
-			actorId: userId
+			actorId: userId,
+			attributes: ['name', 'slug']
 		});
 	});
 

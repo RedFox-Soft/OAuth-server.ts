@@ -35,7 +35,7 @@ interface KeyView {
 	kid: string;
 	alg: string;
 	use: 'sig' | 'enc';
-	state: 'published' | 'signing' | 'retired' | (string & {});
+	state: 'published' | 'signing' | 'retired' | 'revoked' | (string & {});
 	createdAt: string;
 	promotableAt?: string;
 	removableAt?: string;
@@ -101,6 +101,7 @@ export function KeyCards({
 	const [failure, setFailure] = useState<string | null>(null);
 	const [generating, setGenerating] = useState(false);
 	const [retiring, setRetiring] = useState<KeyView | null>(null);
+	const [revoking, setRevoking] = useState<KeyView | null>(null);
 	const [busy, setBusy] = useState(false);
 	// Ticks while a key waits for its publication window, so Promote becomes available on time.
 	const [now, setNow] = useState(() => Date.now());
@@ -146,6 +147,97 @@ export function KeyCards({
 			k.promotableAt !== undefined &&
 			new Date(k.promotableAt).getTime() <= now
 	);
+
+	/* The key Rotate would promote: the oldest of the algorithm's published keys that may sign. */
+	const readyOf = (alg: string) =>
+		ready
+			.filter((k) => k.alg === alg)
+			.sort(
+				(a, b) =>
+					new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+			)
+			.at(0);
+	/*
+	 * The key that is next in an algorithm (specs/087): the ready one Rotate would promote, else the newest
+	 * waiting key that has never signed — the one the window is running for.
+	 */
+	const nextOf = (alg: string) =>
+		readyOf(alg) ??
+		keys
+			.filter(
+				(k) =>
+					k.alg === alg &&
+					k.state === 'published' &&
+					k.use === 'sig' &&
+					!k.signedUntil
+			)
+			.sort(
+				(a, b) =>
+					new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+			)
+			.at(0);
+
+	async function rotate(alg: string) {
+		const next = readyOf(alg);
+		const previous = signerOf(alg);
+		const yes = await confirm('key.rotate', {
+			target: alg,
+			consequences: next
+				? [
+						`${short(next.kid)} signs ${alg} tokens from now on.`,
+						previous
+							? `${short(previous.kid)} stops signing and keeps verifying what it signed.`
+							: `It becomes the only key signing ${alg} tokens.`,
+						'A new key is published as the next one, ready for the rotation after this.'
+					]
+				: [
+						`No ${alg} key may sign yet, so this only publishes the next key.`,
+						'You can rotate once it has been published long enough for every server to serve it.'
+					]
+		});
+		if (!yes) return;
+		setBusy(true);
+		const result = await request<{
+			promoted?: string;
+			generated: string;
+			rotatableAt?: string;
+		}>('POST', `${base}/rotate`, { alg });
+		if (!result.ok) {
+			feedback.failed(result);
+			await load();
+			return;
+		}
+		const { promoted, generated, rotatableAt } = result.data;
+		feedback.done(
+			promoted
+				? `${short(promoted)} now signs ${alg} tokens; ${short(generated)} is published as the next key.`
+				: `${short(generated)} is published as the next ${alg} key.${rotatableAt ? ` You can rotate from ${new Date(rotatableAt).toLocaleTimeString()}.` : ''}`
+		);
+		await load();
+	}
+
+	async function revoke(key: KeyView) {
+		setBusy(true);
+		const result = await request<{
+			replacement?: string;
+			replacementGenerated?: boolean;
+		}>('POST', `${base}/${encodeURIComponent(key.kid)}/revoke`, {
+			confirm: key.kid
+		});
+		if (!result.ok) {
+			feedback.failed(result);
+			await load();
+			return;
+		}
+		setRevoking(null);
+		const { replacement } = result.data;
+		feedback.done(
+			replacement
+				? `${short(key.kid)} revoked. ${short(replacement)} now signs ${key.alg} tokens.`
+				: `${short(key.kid)} revoked.`
+		);
+		await load();
+	}
 
 	async function promote(key: KeyView) {
 		const previous = signerOf(key.alg);
@@ -234,13 +326,21 @@ export function KeyCards({
 		return (
 			<Space size={6}>
 				<Tag color={color}>{label}</Tag>
+				{nextOf(key.alg)?.kid === key.kid && (
+					<Tag color="purple">{readyOf(key.alg) ? 'Next · ready' : 'Next'}</Tag>
+				)}
 				{detail && <Typography.Text type="secondary">{detail}</Typography.Text>}
 			</Space>
 		);
 	}
 
 	function actionsCell(key: KeyView) {
-		if (!canEdit || (key.state !== 'published' && key.state !== 'signing')) {
+		if (
+			!canEdit ||
+			(key.state !== 'published' &&
+				key.state !== 'signing' &&
+				key.state !== 'retired')
+		) {
 			return null;
 		}
 		const early =
@@ -261,15 +361,25 @@ export function KeyCards({
 					) : undefined
 				}
 				items={[
+					...(key.state === 'retired'
+						? []
+						: [
+								{
+									key: 'retire',
+									label: 'Retire…',
+									group: 'danger' as const,
+									blocked:
+										key.state === 'signing'
+											? `Promote another ${key.alg} key first`
+											: null,
+									onClick: () => setRetiring(key)
+								}
+							]),
 					{
-						key: 'retire',
-						label: 'Retire…',
+						key: 'revoke',
+						label: 'Revoke now…',
 						group: 'danger',
-						blocked:
-							key.state === 'signing'
-								? `Promote another ${key.alg} key first`
-								: null,
-						onClick: () => setRetiring(key)
+						onClick: () => setRevoking(key)
 					}
 				]}
 			/>
@@ -328,17 +438,18 @@ export function KeyCards({
 								current={-1}
 								items={[
 									{
-										title: 'Generate',
-										description: 'Published at once; signs nothing yet.'
+										title: 'Next key',
+										description:
+											'Rotate publishes one if there is none; it signs nothing yet.'
 									},
 									{
 										title: 'Wait',
 										description: `At least ${String(Math.round((read?.publicationSeconds ?? 60) / 60) || 1)} minute, longer if your relying parties cache keys.`
 									},
 									{
-										title: 'Promote',
+										title: 'Rotate',
 										description:
-											'It signs from now on; the previous signer keeps verifying.'
+											'The next key signs; the previous signer keeps verifying; a new next key is published.'
 									},
 									{
 										title: 'Retire',
@@ -373,6 +484,17 @@ export function KeyCards({
 							key={alg}
 							title={alg}
 							size="small"
+							extra={
+								canEdit && read !== null ? (
+									<Button
+										size="small"
+										disabled={busy}
+										onClick={() => void rotate(alg)}
+									>
+										Rotate
+									</Button>
+								) : null
+							}
 						>
 							{read !== null && !signerOf(alg) && (
 								<Alert
@@ -479,6 +601,42 @@ export function KeyCards({
 				onCancel={() => setRetiring(null)}
 				onConfirm={() => {
 					if (retiring) void retire(retiring);
+				}}
+			/>
+			{/*
+			 * Revoking is for a compromised key: it leaves the key set at once, so a token it signed — forged or
+			 * not — stops verifying. The signer is replaced in the same act by the server, by a ready key or, when
+			 * there is none, by a new key that signs without the publication window.
+			 */}
+			<ConfirmDestruction
+				open={revoking !== null}
+				title={revoking ? `Revoke ${short(revoking.kid)} now?` : ''}
+				consequences={
+					revoking
+						? [
+								'It leaves the key set at once, and every token it signed stops verifying. People signed in with such tokens may have to sign in again.',
+								...(revoking.state === 'signing'
+									? [
+											readyOf(revoking.alg)
+												? `${short(readyOf(revoking.alg)?.kid ?? '')} signs ${revoking.alg} tokens from now on.`
+												: `No other ${revoking.alg} key may sign yet, so a new key is generated and signs at once. Relying parties holding a cached copy of your key set may reject new tokens until they refresh it.`
+										]
+									: []),
+								'Unlike retiring, there is no day of grace, and a revoked key never comes back.',
+								...(dependents && dependents.length > 0
+									? [
+											'Every bucket listed above uses this key set, including the administrators’ sign-in.'
+										]
+									: [])
+							]
+						: []
+				}
+				word="revoke"
+				okText="Revoke key"
+				busy={busy}
+				onCancel={() => setRevoking(null)}
+				onConfirm={() => {
+					if (revoking) void revoke(revoking);
 				}}
 			/>
 		</Flex>

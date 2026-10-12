@@ -11,9 +11,16 @@ import {
 	KeyActionRefused,
 	listKeys,
 	promoteKey,
-	retireKey
+	retireKey,
+	revokeKey,
+	rotateKey
 } from './service.js';
-import { RetireKeyBody, type SupportedAlg } from '../jwks/schema.js';
+import {
+	RetireKeyBody,
+	RevokeKeyBody,
+	RotateKeyBody,
+	type SupportedAlg
+} from '../jwks/schema.js';
 
 /*
  * An addressable bucket's own signing keys. Authorization is the bucket's — its owning group, or a
@@ -62,4 +69,21 @@ export const bucketKeyRoutes = new Elysia({ name: 'admin-bucket-keys' })
 			return retireKey(ctx, params.id, params.kid, body?.confirm);
 		},
 		{ body: t.Optional(RetireKeyBody) }
+	)
+	.post(
+		'/admin/api/buckets/:id/keys/rotate',
+		async ({ admin, params, body }) => {
+			const ctx = assertAuth(admin);
+			// The schema's union is built from SUPPORTED_ALGS, so the literal is one of them.
+			return rotateKey(ctx, params.id, body.alg as SupportedAlg);
+		},
+		{ body: RotateKeyBody }
+	)
+	.post(
+		'/admin/api/buckets/:id/keys/:kid/revoke',
+		async ({ admin, params, body }) => {
+			const ctx = assertAuth(admin);
+			return revokeKey(ctx, params.id, params.kid, body?.confirm);
+		},
+		{ body: t.Optional(RevokeKeyBody) }
 	);

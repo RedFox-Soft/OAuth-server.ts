@@ -524,7 +524,8 @@ export interface UserStoreConstructor {
  *
  * `state` is what makes rotation safe across instances that each cache the set for a short while: a
  * key is `published` before it may sign, so every instance serves it before any signs with it, and a
- * `retired` key stays published until every token it could have signed has expired.
+ * `retired` key stays published until every token it could have signed has expired. A `revoked` key is
+ * served by nobody from the moment each instance's cache next reloads.
  *
  * The private members are stored with the key and never leave the server: every surface projects a key
  * through `toPublicJwk`.
@@ -539,7 +540,13 @@ export const BucketKey = t.Object({
 	state: t.Union([
 		t.Literal('published'),
 		t.Literal('signing'),
-		t.Literal('retired')
+		t.Literal('retired'),
+		/*
+		 * Revoked (specs/087): taken out of service at once because it may be compromised. Never published
+		 * again — unlike a retired key, no window keeps what it signed verifying — and kept rather than
+		 * deleted, so the audit trail's references resolve and a kid is never reused.
+		 */
+		t.Literal('revoked')
 	]),
 	createdAt: t.Date(),
 	stateChangedAt: t.Date()
@@ -698,6 +705,12 @@ export const AdminAuditEntry = t.Object({
 	 * token header the key signs — so it is a value the trail may carry, unlike a field's value.
 	 */
 	kid: t.Optional(t.Union([t.String(), t.Null()])),
+	/*
+	 * Every key a rotation or revocation acted on, by role (specs/087): `promoted`, `demoted`, `generated`,
+	 * `revoked`, `signing`. One act touches up to three keys and writes one entry, so `kid` alone cannot
+	 * name them all; `kid` stays the primary one. Key ids are public, so the map may carry them.
+	 */
+	keys: t.Optional(t.Union([t.Record(t.String(), t.String()), t.Null()])),
 	/*
 	 * An address change (`bucket.address.change`): the slug or hostname the bucket answered at, and the one it
 	 * answers at now, null for none. Addresses are public, unlike field values. Entries written before these

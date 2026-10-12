@@ -1,4 +1,12 @@
-import { describe, it, expect, beforeEach, afterEach, spyOn } from 'bun:test';
+import {
+	describe,
+	it,
+	expect,
+	beforeEach,
+	afterEach,
+	afterAll,
+	spyOn
+} from 'bun:test';
 import { Elysia } from 'elysia';
 import { Type } from '@sinclair/typebox';
 
@@ -97,6 +105,12 @@ const retire = (cookie: string, kid: string, confirm: string | null = kid) =>
 		cookie,
 		confirm === null ? undefined : { confirm }
 	);
+const rotate = (cookie: string, alg: string) =>
+	call('POST', '/admin/api/jwks/rotate', cookie, { alg });
+const revoke = (cookie: string, kid: string, confirm: string = kid) =>
+	call('POST', `/admin/api/jwks/${encodeURIComponent(kid)}/revoke`, cookie, {
+		confirm
+	});
 
 /* Moves the clock forward by `seconds`, from the time it is called. */
 function later(seconds: number) {
@@ -132,6 +146,8 @@ async function resetRootKeys() {
  */
 describe('the root key set, administered', () => {
 	beforeEach(resetRootKeys);
+	// A revocation here replaces the signer the specs after this one would otherwise find.
+	afterAll(resetRootKeys);
 	afterEach(() => {
 		(Date.now as unknown as { mockRestore?: () => void }).mockRestore?.();
 	});
@@ -360,6 +376,116 @@ describe('the root key set, administered', () => {
 			await retire(cookie, kid);
 
 			expect(await actions(kid)).toContain('jwks.retire');
+		});
+	});
+
+	describe('rotating', () => {
+		it('is refused to a project administrator', async () => {
+			const { cookie } = await sessionCookieFor('plain');
+
+			expect((await rotate(cookie, 'RS256')).status).toBe(403);
+		});
+
+		it('refuses an algorithm it cannot generate a key in', async () => {
+			const { cookie } = await sessionCookieFor('super');
+
+			expect((await rotate(cookie, 'HS256')).status).toBe(422);
+		});
+
+		it('makes the ready key sign, returns the old signer to published and publishes the next key', async () => {
+			const { cookie } = await sessionCookieFor('super');
+			const kid = await publishedKey(cookie, 'RS256');
+
+			const res = await rotate(cookie, 'RS256');
+
+			expect(res.status).toBe(200);
+			expect([res.body.promoted, res.body.demoted]).toEqual([kid, bootRsa.kid]);
+			const root = await rootKeys();
+			expect([...root.signing].map((key) => String(key.kid))).toContain(kid);
+			const published = root.publicJWKS.keys.map((key) => key.kid);
+			expect(published).toContain(bootRsa.kid);
+			expect(published).toContain(String(res.body.generated));
+		});
+
+		it('records the rotation once, naming every key it acted on', async () => {
+			const { cookie } = await sessionCookieFor('super');
+			const kid = await publishedKey(cookie, 'RS256');
+
+			const res = await rotate(cookie, 'RS256');
+
+			const { entries } = await adminAuditStore.list({
+				targetId: kid,
+				action: 'jwks.rotate'
+			});
+			expect(entries.map((entry) => entry.keys)).toEqual([
+				{
+					promoted: kid,
+					demoted: bootRsa.kid,
+					generated: String(res.body.generated)
+				}
+			]);
+		});
+	});
+
+	describe('revoking', () => {
+		it('is refused to a project administrator', async () => {
+			const { cookie } = await sessionCookieFor('plain');
+
+			expect((await revoke(cookie, bootRsa.kid)).status).toBe(403);
+		});
+
+		it('is refused unless the confirmation names the key, and nothing changes or is recorded', async () => {
+			const { cookie } = await sessionCookieFor('super');
+			const { kid } = shaped(KeyView, (await generate(cookie, 'ES256')).body);
+
+			const res = await revoke(cookie, kid, 'not-this-key');
+
+			expect(res.status).toBe(422);
+			expect(res.body.reason).toBe('confirmation_mismatch');
+			expect(await stateOf(cookie, kid)).toBe('published');
+			expect(await actions(kid)).not.toContain('jwks.revoke');
+		});
+
+		it('takes a published key out of the instance key set and the key list at once', async () => {
+			const { cookie } = await sessionCookieFor('super');
+			const { kid } = shaped(KeyView, (await generate(cookie, 'ES256')).body);
+
+			const res = await revoke(cookie, kid);
+
+			expect(res.status).toBe(200);
+			expect(await stateOf(cookie, kid)).toBeUndefined();
+			expect(
+				(await rootKeys()).publicJWKS.keys.map((key) => key.kid)
+			).not.toContain(kid);
+		});
+
+		it('makes a newly generated key sign at once when the signer is revoked and no key is ready', async () => {
+			const { cookie } = await sessionCookieFor('super');
+
+			const res = await revoke(cookie, bootRsa.kid);
+
+			expect(res.status).toBe(200);
+			expect(res.body.replacementGenerated).toBe(true);
+			const root = await rootKeys();
+			const signing = [...root.signing].map((key) => String(key.kid));
+			expect(signing).toContain(String(res.body.replacement));
+			expect(signing).not.toContain(bootRsa.kid);
+		});
+
+		it('records the revocation once, naming the revoked key and the one now signing', async () => {
+			const { cookie, userId } = await sessionCookieFor('super');
+			const kid = await publishedKey(cookie, 'RS256');
+
+			await revoke(cookie, bootRsa.kid);
+
+			// By actor: the boot key is revoked afresh in every case that revokes it.
+			const { entries } = await adminAuditStore.list({
+				actor: userId,
+				action: 'jwks.revoke'
+			});
+			expect(entries.map((entry) => entry.keys)).toEqual([
+				{ revoked: bootRsa.kid, signing: kid }
+			]);
 		});
 	});
 

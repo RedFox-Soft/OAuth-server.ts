@@ -18,12 +18,7 @@ export interface ScopeOption {
 	own: boolean;
 }
 
-/* The control's element id, so a creation dialog's "Change" can hand focus to it (specs/085). */
-export const SCOPE_SWITCHER_ID = 'scope-switcher';
-
-export function focusScopeSwitcher(): void {
-	document.getElementById(SCOPE_SWITCHER_ID)?.focus();
-}
+const SCOPE_SWITCHER_ID = 'scope-switcher';
 
 /*
  * A group as the switcher and the Groups list name it. An operator's own personal group says that nobody

@@ -140,9 +140,12 @@ See [[admin-audit-trail]].
 An agent has no session, so there is nothing for it to switch. `PUT /admin/api/scope` is therefore not
 published as a tool at all — it is named in `excludedConsoleOperations` as `inapplicable`, the same
 category as logout and first-run setup, so an agent is not offered an operation it has no principal
-for. The create tools instead take an explicit `groupId` validated against the acting administrator's
-memberships — the one place the agent surface's request shape differs from the console's, and it
-differs in the safe direction.
+for. Since spec 087 project and bucket creation take an optional `groupId` and check it with the moves'
+`loadDestination`: the caller must be a member, and Super administrators and another administrator's personal
+group are never a destination. Without it, the active group decides, as before. A project may also take a
+`bucketId` of that same group, but not the default bucket: leaving the field out already means that bucket. The
+console's creation dialogs choose both, so the header switcher is a default rather than the only way to say
+where something goes.
 
 ## Gotchas
 

@@ -36,7 +36,7 @@ import {
 	InvalidOriginError,
 	normalizeOrigins
 } from '../../helpers/cors_origin.js';
-import { ADMIN_BUCKET_ID } from '../consts.js';
+import { ADMIN_BUCKET_ID, DEFAULT_BUCKET_ID } from '../consts.js';
 import {
 	describeGroup,
 	loadDestination,
@@ -76,6 +76,49 @@ function validateCorsOrigins(origins: string[] | undefined) {
 		}
 		throw err;
 	}
+}
+
+/*
+ * The bucket a new project is created with (specs/087), refused by the rules an assignment is: it exists,
+ * it is not the administrators' bucket, the caller reaches it, and it is in the group the project is
+ * created in. No preview, unlike an assignment: a new project has no applications or declarations whose
+ * issuer could change.
+ *
+ * The default bucket is refused by name rather than admitted: leaving `bucketId` out is how a project uses
+ * it, and it belongs to the System group, so admitting it would succeed only for a super administrator
+ * creating there — two spellings of one state, one of them reachable by almost nobody.
+ */
+async function bucketForNewProject(
+	ctx: AdminContext,
+	bucketId: string,
+	ownerGroupId: string
+): Promise<UserBucket> {
+	if (bucketId === DEFAULT_BUCKET_ID) {
+		throw new AdminError(422, 'leave bucketId out to use the default bucket', {
+			field: 'bucketId'
+		});
+	}
+	const bucket = await getBucketStore().find(bucketId);
+	/* Answered as a bucket the caller cannot reach, unless they reach every bucket: no existence oracle. */
+	if (!bucket) {
+		throw ctx.superAdmin
+			? new AdminError(404, 'bucket not found')
+			: new AdminError(403, 'no access to this bucket');
+	}
+	if (bucket._id === ADMIN_BUCKET_ID) {
+		throw new AdminError(
+			403,
+			"this operation is not available for the administrators' bucket"
+		);
+	}
+	assertBucketAccess(ctx, bucket);
+	if (bucket.ownerGroupId !== ownerGroupId) {
+		throw new AdminError(
+			409,
+			'project and bucket must belong to the same group'
+		);
+	}
+	return bucket;
 }
 
 /*
@@ -328,18 +371,33 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 			const ctx = assertAuth(admin);
 			/*
 			 * No role gate. Creating a project is what a project administrator signs in to do, and the
-			 * authority that matters is membership of the group it will belong to — checked below, on the
-			 * scope the caller is actually in.
+			 * authority that matters is membership of the group it will belong to: the active group, or a
+			 * group the caller names (specs/087), held to the rules a move into it is held to — so naming a
+			 * group admits nothing a move would refuse.
 			 */
-			const ownerGroupId = assertActiveGroup(ctx);
+			const ownerGroupId =
+				body.groupId === undefined
+					? assertActiveGroup(ctx)
+					: (await loadDestination(ctx, body.groupId))._id;
+			const bucket =
+				body.bucketId === undefined
+					? null
+					: await bucketForNewProject(ctx, body.bucketId, ownerGroupId);
 			const store = getProjectStore();
 			if (await store.findBySlug(body.slug)) {
 				throw new AdminError(409, 'slug already exists', { field: 'slug' });
 			}
+			const corsOrigins = validateCorsOrigins(body.corsOrigins) ?? [];
 			// Allocated here so the audit entry can name the project that is about to exist.
 			const projectId = nanoid();
+			/*
+			 * With a bucket, the entry carries it as an assignment's does, so the creation is in that bucket's
+			 * trail too.
+			 */
 			await recordAdminAudit(ctx, 'project.create', projectId, {
-				ownerGroupId
+				attributes: Object.keys(body),
+				ownerGroupId,
+				...(bucket ? { bucketId: bucket._id } : {})
 			});
 			// Every accepted key must be forwarded explicitly: the store takes more than this handler
 			// passes, so a schema addition alone would accept a value and silently discard it.
@@ -349,8 +407,24 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 				slug: body.slug,
 				type: 'regular',
 				ownerGroupId,
-				corsOrigins: validateCorsOrigins(body.corsOrigins) ?? []
+				corsOrigins,
+				...(bucket ? { bucketId: bucket._id } : {})
 			});
+			/*
+			 * Checked again after the write, as an assignment is: a move of the bucket to another group can
+			 * commit in between, carrying the projects that used it then — not this one. A project with no
+			 * clients yet is simply not kept, so nothing is left in a group other than its bucket's.
+			 */
+			if (bucket) {
+				const settled = await getBucketStore().find(bucket._id);
+				if (settled?.ownerGroupId !== ownerGroupId) {
+					await store.destroy(projectId);
+					throw new AdminError(
+						409,
+						'project and bucket must belong to the same group'
+					);
+				}
+			}
 			set.status = 201;
 			return project;
 		},

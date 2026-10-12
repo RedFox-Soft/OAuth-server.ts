@@ -45,6 +45,11 @@ export interface AuditDetail {
 	/* The signing key a key action acted on. Public, as it is in every token header the key signs. */
 	kid?: string;
 	/*
+	 * Every key a rotation or revocation acted on, by role — `promoted`, `demoted`, `generated`, `revoked`,
+	 * `signing` (specs/087). One act, one entry, however many keys it touched.
+	 */
+	keys?: Record<string, string>;
+	/*
 	 * An address change (`bucket.address.change`): the address the bucket answered at and the one it
 	 * answers at now, a slug or a hostname, or null for none. Addresses are public, unlike field values.
 	 */
@@ -213,6 +218,7 @@ async function write(input: {
 				? {}
 				: { formerBucketId: input.detail.formerBucketId }),
 			...(input.detail.kid === undefined ? {} : { kid: input.detail.kid }),
+			...(input.detail.keys === undefined ? {} : { keys: input.detail.keys }),
 			...(input.detail.from === undefined ? {} : { from: input.detail.from }),
 			...(input.detail.to === undefined ? {} : { to: input.detail.to }),
 			// Sorted so two requests setting the same fields in a different order read identically.

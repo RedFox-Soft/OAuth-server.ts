@@ -79,7 +79,7 @@ describe('admin audit route classification', () => {
 		 * rename, delete, member add, member remove, hand to a connection) + the two super-administrator rows
 		 * (grant, withdraw) + moving a bucket or a project to another group + an end-user's address change and
 		 * verification resend (specs/082) + signing an administrator out and resetting their authenticator
-		 * (specs/083). A count that drifted
+		 * (specs/083) + rotating and revoking a key, for a bucket and for the root (specs/087). A count that drifted
 		 * upward silently would let an audited route be swapped for an unaudited one without either
 		 * total changing.
 		 *
@@ -88,8 +88,8 @@ describe('admin audit route classification', () => {
 		 * each of which touches only the caller's own standing and no managed entity. It filters to MUTATING methods, so no read appears in either
 		 * total.
 		 */
-		expect(auditedAdminRoutes).toHaveLength(75);
-		expect(mounted).toHaveLength(78);
+		expect(auditedAdminRoutes).toHaveLength(79);
+		expect(mounted).toHaveLength(82);
 	});
 
 	it('declares each route pattern only once', () => {

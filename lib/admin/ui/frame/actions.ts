@@ -228,6 +228,14 @@ export const ACTIONS = {
 		okText: 'Make signing key'
 	},
 	'key.retire': { class: 'C3', word: 'retire' },
+	// Promote and generate in one act (specs/087): the ready next key signs and the one after it is published.
+	'key.rotate': {
+		class: 'C1',
+		title: (t) => `Rotate ${t}?`,
+		okText: 'Rotate'
+	},
+	// A compromised key: hidden at once, so nothing it signed verifies any longer (specs/087).
+	'key.revoke': { class: 'C3', word: 'revoke' },
 
 	'group.create': { class: 'C0' },
 	'group.delete': {

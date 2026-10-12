@@ -10,8 +10,8 @@ import * as lifecycle from '../key_lifecycle.js';
 export { KeyActionRefused, type KeyView } from '../key_lifecycle.js';
 
 /*
- * Rotating an addressable bucket's own keys: generate, promote, retire — the lifecycle in
- * `../key_lifecycle.ts`, which the instance keys follow too.
+ * Rotating an addressable bucket's own keys: generate, promote, retire, rotate, revoke — the lifecycle
+ * in `../key_lifecycle.ts`, which the instance keys follow too.
  *
  * Held by the bucket's owning group as well as by super administrators, because the keys are the
  * tenant's issuer and a mistake here breaks that tenant alone. The instance key set, which every
@@ -40,11 +40,12 @@ export async function loadKeyedBucket(
 function ownerOf(ctx: AdminContext, bucket: UserBucket): lifecycle.KeyOwner {
 	return {
 		id: bucket._id,
-		audit: async (verb, kid) => {
+		audit: async (verb, kid, keys) => {
 			/* The target is the bucket, as for every bucket setting; the key it acted on rides beside it. */
 			await recordAdminAudit(ctx, `bucket.key.${verb}`, bucket._id, {
 				ownerGroupId: bucket.ownerGroupId,
-				kid
+				kid,
+				...(keys ? { keys } : {})
 			});
 		},
 		invalidate: () => invalidateBucketKeys(bucket._id)
@@ -85,4 +86,23 @@ export async function retireKey(
 ) {
 	const bucket = await loadKeyedBucket(ctx, bucketId);
 	return lifecycle.retireKey(ownerOf(ctx, bucket), kid, confirm);
+}
+
+export async function rotateKey(
+	ctx: AdminContext,
+	bucketId: string,
+	alg: SupportedAlg
+) {
+	const bucket = await loadKeyedBucket(ctx, bucketId);
+	return lifecycle.rotateKey(ownerOf(ctx, bucket), alg);
+}
+
+export async function revokeKey(
+	ctx: AdminContext,
+	bucketId: string,
+	kid: string,
+	confirm: unknown
+) {
+	const bucket = await loadKeyedBucket(ctx, bucketId);
+	return lifecycle.revokeKey(ownerOf(ctx, bucket), kid, confirm);
 }

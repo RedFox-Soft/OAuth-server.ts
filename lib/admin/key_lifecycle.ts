@@ -2,7 +2,7 @@ import { getBucketKeysStore } from '../adapters/index.js';
 import type { BucketKey } from '../adapters/types.js';
 import { AdminError } from './auth/rbac.js';
 import { generateJWKS } from '../helpers/jwks.js';
-import type { SupportedAlg } from './jwks/schema.js';
+import { SUPPORTED_ALGS, type SupportedAlg } from './jwks/schema.js';
 import {
 	KEY_PUBLICATION_SECONDS,
 	RETIRED_KEY_LIFETIME_SECONDS,
@@ -13,20 +13,31 @@ import {
  * The lifecycle every issuer's signing keys follow — the root's and each addressable bucket's: a key is
  * generated published, promoted to sign once every instance has had time to serve it, and retired to
  * keep verifying what it signed until nothing it signed can still be in circulation, after which it is
- * hidden. One implementation, because a divergence between the root's rules and a bucket's would be a
- * defect in whichever was not reviewed.
+ * hidden. Rotation is promote-the-ready-key and generate-the-next in one act; revocation hides a key at
+ * once, for a key that may be compromised (specs/087). One implementation, because a divergence between
+ * the root's rules and a bucket's would be a defect in whichever was not reviewed.
  *
- * Every instance caches an issuer's set for a short while, and that is what the three steps are written
+ * Every instance caches an issuer's set for a short while, and that is what the steps are written
  * against: a key is published for longer than that cache before it may sign, so no instance signs with
- * a key another does not yet serve (Constitution VI: rotation never invalidates a valid token).
+ * a key another does not yet serve (Constitution VI: rotation never invalidates a valid token). Revoking
+ * a signer with no ready replacement is the one step that does not wait — see `revokeKey`.
  */
+
+export type KeyVerb = 'generate' | 'promote' | 'retire' | 'rotate' | 'revoke';
 
 /* Whose keys these are, and the two things that differ between the root and a bucket. */
 export interface KeyOwner {
 	/* The owner id the records are stored under: a bucket id, or the reserved root owner. */
 	readonly id: string;
-	/* Written before the change it records; `verb` is generate, promote or retire. */
-	audit(verb: 'generate' | 'promote' | 'retire', kid: string): Promise<void>;
+	/*
+	 * Written before the change it records. `kid` is the key the act is about; `keys` names every key a
+	 * rotation or revocation touched, by role, so one entry records the whole act.
+	 */
+	audit(
+		verb: KeyVerb,
+		kid: string,
+		keys?: Record<string, string>
+	): Promise<void>;
 	/* Drops this instance's cached set for the owner, so its own write is served at once. */
 	invalidate(): void | Promise<void>;
 }
@@ -88,8 +99,12 @@ function viewOf(key: BucketKey): KeyView {
 	};
 }
 
-// Hidden is final: a retired key past its window is served by nobody and may not come back.
+/*
+ * Hidden is final: a retired key past its window, and a revoked key from the moment it was revoked, is
+ * served by nobody and may not come back.
+ */
 function visible(key: BucketKey, now: number): boolean {
+	if (key.state === 'revoked') return false;
 	return key.state !== 'retired' || now < retiredKeyRemovableAt(key).getTime();
 }
 
@@ -99,6 +114,81 @@ async function keyOf(owner: KeyOwner, kid: string): Promise<BucketKey> {
 		throw new AdminError(404, 'no such key');
 	}
 	return key;
+}
+
+/* May sign now: published, a signing key of the algorithm, and served by every instance for long enough. */
+function ready(key: BucketKey, alg: string, now: number): boolean {
+	return (
+		key.state === 'published' &&
+		key.use === 'sig' &&
+		key.alg === alg &&
+		promotableAt(key).getTime() <= now
+	);
+}
+
+/*
+ * The oldest ready key, because it is the one every relying party has had longest to fetch. Ties on the
+ * creation time are broken by kid, so two instances rotating at once promote the same key.
+ */
+function oldestReady(
+	keys: readonly BucketKey[],
+	alg: string,
+	now: number,
+	except?: string
+): BucketKey | undefined {
+	return keys
+		.filter((key) => key.kid !== except && ready(key, alg, now))
+		.sort(
+			(a, b) =>
+				a.createdAt.getTime() - b.createdAt.getTime() ||
+				a.kid.localeCompare(b.kid)
+		)
+		.at(0);
+}
+
+function signerOf(
+	keys: readonly BucketKey[],
+	alg: string,
+	except: string
+): BucketKey | undefined {
+	return keys.find(
+		(other) =>
+			other.state === 'signing' &&
+			other.use === 'sig' &&
+			other.alg === alg &&
+			other.kid !== except
+	);
+}
+
+async function freshJwk(alg: SupportedAlg) {
+	const {
+		keys: [jwk]
+	} = await generateJWKS(alg);
+	return jwk;
+}
+
+function recordOf(
+	owner: KeyOwner,
+	jwk: Awaited<ReturnType<typeof freshJwk>>,
+	alg: SupportedAlg,
+	state: BucketKey['state'],
+	at: Date
+): BucketKey {
+	return {
+		_id: `${owner.id} ${jwk.kid}`,
+		bucketId: owner.id,
+		kid: jwk.kid,
+		jwk,
+		alg,
+		use: 'sig',
+		state,
+		createdAt: at,
+		stateChangedAt: at
+	};
+}
+
+function isSupportedAlg(alg: string): alg is SupportedAlg {
+	return (SUPPORTED_ALGS as readonly string[]).includes(alg);
 }
 
 /* Built from the stored records rather than a cached set, so it always shows what every instance converges on. */
@@ -116,23 +206,10 @@ export async function listKeys(owner: KeyOwner) {
 }
 
 export async function generateKey(owner: KeyOwner, alg: SupportedAlg) {
-	const {
-		keys: [jwk]
-	} = await generateJWKS(alg);
+	const jwk = await freshJwk(alg);
 
 	await owner.audit('generate', jwk.kid);
-	const now = new Date(Date.now());
-	const key: BucketKey = {
-		_id: `${owner.id} ${jwk.kid}`,
-		bucketId: owner.id,
-		kid: jwk.kid,
-		jwk,
-		alg,
-		use: 'sig',
-		state: 'published',
-		createdAt: now,
-		stateChangedAt: now
-	};
+	const key = recordOf(owner, jwk, alg, 'published', new Date(Date.now()));
 	await getBucketKeysStore().createIfAbsent(key);
 	await owner.invalidate();
 	return viewOf(key);
@@ -145,8 +222,9 @@ export async function generateKey(owner: KeyOwner, alg: SupportedAlg) {
  * Per algorithm, not per key type, because every client registers the algorithm it is signed for (OIDC
  * Registration §2) and discovery promises every algorithm it lists — RS256 for one client and PS256 for a
  * FAPI client are both RSA keys, both needed at once. It also means no step can take an algorithm away: a
- * promotion replaces a signer in its own algorithm, and a signer cannot be retired, so an issuer never
- * loses the last key in an algorithm its clients rely on (Constitution VI).
+ * promotion replaces a signer in its own algorithm, a signer cannot be retired, and revoking one puts
+ * another in its place, so an issuer never loses the last key in an algorithm its clients rely on
+ * (Constitution VI).
  */
 export async function promoteKey(owner: KeyOwner, kid: string) {
 	const key = await keyOf(owner, kid);
@@ -166,13 +244,10 @@ export async function promoteKey(owner: KeyOwner, kid: string) {
 	}
 
 	const store = getBucketKeysStore();
-	const all = await store.listByBucket(owner.id);
-	const displaced = all.find(
-		(other) =>
-			other.state === 'signing' &&
-			other.use === 'sig' &&
-			other.alg === key.alg &&
-			other.kid !== key.kid
+	const displaced = signerOf(
+		await store.listByBucket(owner.id),
+		key.alg,
+		key.kid
 	);
 
 	await owner.audit('promote', key.kid);
@@ -190,6 +265,71 @@ export async function promoteKey(owner: KeyOwner, kid: string) {
 		kid: key.kid,
 		state: 'signing' as const,
 		...(displaced ? { demoted: displaced.kid } : {})
+	};
+}
+
+/*
+ * Rotation in one act (specs/087): the oldest published key of the algorithm that may sign now does, the
+ * algorithm's signer returns to published where it keeps verifying what it signed, and a new key is
+ * generated published — so the next rotation always has a key every relying party has already fetched.
+ * With no key ready, only the next key is generated, and the answer says from when the algorithm can
+ * rotate. Nothing is ever promoted inside its publication window, which is what made the manual procedure
+ * easy to get wrong.
+ *
+ * Two rotations at once promote the same key (the choice is deterministic, the write idempotent) and
+ * each generates a next key; two next keys is harmless, and the new signer is written before the old one
+ * is demoted, so there is never a moment without one.
+ */
+export async function rotateKey(owner: KeyOwner, alg: SupportedAlg) {
+	const store = getBucketKeysStore();
+	const all = await store.listByBucket(owner.id);
+	const now = Date.now();
+	const next = oldestReady(all, alg, now);
+	const displaced = next ? signerOf(all, alg, next.kid) : undefined;
+	// Generated before the audit entry, so the entry can name it; stored after, as generation is.
+	const jwk = await freshJwk(alg);
+
+	await owner.audit('rotate', next?.kid ?? jwk.kid, {
+		...(next ? { promoted: next.kid } : {}),
+		...(displaced ? { demoted: displaced.kid } : {}),
+		generated: jwk.kid
+	});
+	const at = new Date(Date.now());
+	if (next) {
+		await store.setState(owner.id, next.kid, 'signing', at);
+		if (displaced) {
+			await store.setState(owner.id, displaced.kid, 'published', at);
+		}
+	}
+	const generated = recordOf(owner, jwk, alg, 'published', at);
+	await store.createIfAbsent(generated);
+	await owner.invalidate();
+
+	/*
+	 * When nothing was promoted, the earliest any key of the algorithm may sign — a key generated earlier
+	 * and still inside its window comes before the one just made.
+	 */
+	const rotatableAt = next
+		? undefined
+		: new Date(
+				Math.min(
+					promotableAt(generated).getTime(),
+					...all
+						.filter(
+							(key) =>
+								key.state === 'published' &&
+								key.use === 'sig' &&
+								key.alg === alg
+						)
+						.map((key) => promotableAt(key).getTime())
+				)
+			);
+	return {
+		alg,
+		...(next ? { promoted: next.kid } : {}),
+		...(displaced ? { demoted: displaced.kid } : {}),
+		generated: jwk.kid,
+		...(rotatableAt ? { rotatableAt } : {})
 	};
 }
 
@@ -237,5 +377,85 @@ export async function retireKey(
 		kid: key.kid,
 		state: 'retired' as const,
 		removableAt: retiredKeyRemovableAt(retired)
+	};
+}
+
+/*
+ * Revocation is the answer to a key that may be compromised (specs/087): retiring leaves a key verifying
+ * for a day, which for a leaked key is a day in which forged tokens verify. A revoked key leaves the key
+ * set and every verification at once — on this instance now, on every other within the key cache bound —
+ * and its record is kept, so the trail's references resolve and its kid is never reused. Named by the
+ * caller, as a retirement is, because it cannot be undone.
+ *
+ * Revoking the signer puts another key in its place in the same act, so no algorithm that had a signer is
+ * left without one: the oldest ready key of the algorithm, or else a newly generated key that signs at
+ * once. That one skips the publication window — a relying party holding a cached key set may reject new
+ * tokens until it refreshes — which is the price of ending a compromised key now rather than in a minute.
+ */
+export async function revokeKey(
+	owner: KeyOwner,
+	kid: string,
+	confirm: unknown
+) {
+	if (confirm !== kid) {
+		throw new KeyActionRefused(
+			422,
+			'confirm revocation by naming the key: send { "confirm": "<kid>" }',
+			{ reason: 'confirmation_mismatch' }
+		);
+	}
+	const store = getBucketKeysStore();
+	const key = await store.find(owner.id, kid);
+	if (key?.state === 'revoked') {
+		throw new KeyActionRefused(409, 'the key is already revoked', {
+			reason: 'already_revoked'
+		});
+	}
+	if (!key || !visible(key, Date.now())) {
+		throw new AdminError(404, 'no such key');
+	}
+
+	const signs = key.state === 'signing' && key.use === 'sig';
+	const standby = signs
+		? oldestReady(await store.listByBucket(owner.id), key.alg, Date.now(), kid)
+		: undefined;
+	let fresh:
+		| { jwk: Awaited<ReturnType<typeof freshJwk>>; alg: SupportedAlg }
+		| undefined;
+	if (signs && !standby) {
+		if (!isSupportedAlg(key.alg)) {
+			throw new KeyActionRefused(
+				409,
+				'no key can be generated in this algorithm to replace it; promote another key in its algorithm first',
+				{ reason: 'no_replacement' }
+			);
+		}
+		// Generated before the audit entry, so the entry can name it; stored after.
+		fresh = { jwk: await freshJwk(key.alg), alg: key.alg };
+	}
+	const replacement = standby?.kid ?? fresh?.jwk.kid;
+
+	await owner.audit('revoke', kid, {
+		revoked: kid,
+		...(replacement ? { signing: replacement } : {}),
+		...(fresh ? { generated: fresh.jwk.kid } : {})
+	});
+	const at = new Date(Date.now());
+	/* The replacement first, as a promotion writes its signer first: the algorithm is never without one. */
+	if (standby) {
+		await store.setState(owner.id, standby.kid, 'signing', at);
+	} else if (fresh) {
+		await store.createIfAbsent(
+			recordOf(owner, fresh.jwk, fresh.alg, 'signing', at)
+		);
+	}
+	const revoked = await store.setState(owner.id, kid, 'revoked', at);
+	await owner.invalidate();
+	if (!revoked) throw new AdminError(404, 'no such key');
+	return {
+		kid,
+		state: 'revoked' as const,
+		...(replacement ? { replacement } : {}),
+		replacementGenerated: fresh !== undefined
 	};
 }

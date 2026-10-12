@@ -13,12 +13,12 @@ import {
 } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import type { UserBucket } from '../../../adapters/types.js';
-import { Link } from '../frame/router.js';
+import { Link, useNavigate } from '../frame/router.js';
 import { bucketHref } from '../frame/routes.js';
 import { bucketAddressFor } from '../bucketAddress.js';
 import { MoveToGroup } from '../MoveToGroup.js';
 import { isUndeletableBucket, reservedOf } from '../../consts.js';
-import { CreateDestination } from '../frame/CreateDestination.js';
+import { GroupField } from '../frame/CreateDestination.js';
 import { PageHeader } from '../frame/PageHeader.js';
 import { request } from '../frame/request.js';
 import { useFeedback } from '../frame/feedback.js';
@@ -41,6 +41,8 @@ interface CreateBucketValues {
 	host?: string;
 	/* Who can create accounts (specs/083): closed unless the creator opens it. */
 	registrationOpen?: boolean;
+	/* Chosen in the dialog (specs/087); the header's current group by default. */
+	groupId?: string;
 }
 
 /* A list row as the API presents it: the record, the caller's rights on it, and what blocks them. */
@@ -73,6 +75,7 @@ export function Buckets() {
 	const [creating, setCreating] = useState(false);
 	const [form] = Form.useForm<CreateBucketValues>();
 	const feedback = useFeedback();
+	const navigate = useNavigate();
 	const { me } = useMe();
 	const mine = meCan(me);
 	const [deleting, setDeleting] = useState<BucketRow | null>(null);
@@ -124,7 +127,7 @@ export function Buckets() {
 			 * 400 they did not cause.
 			 */
 			const { addressForm, slug, host, ...rest } = values;
-			const result = await request(
+			const result = await request<{ _id: string }>(
 				'POST',
 				'/admin/api/buckets',
 				addressForm === 'host' ? { ...rest, host } : { ...rest, slug }
@@ -136,7 +139,8 @@ export function Buckets() {
 			feedback.done(`Bucket ${values.name} created.`);
 			setOpen(false);
 			form.resetFields();
-			await load();
+			// Opened at once: it may belong to a group other than the header's, where the list would not show it.
+			void navigate(bucketHref(result.data._id));
 		} finally {
 			setCreating(false);
 		}
@@ -377,13 +381,13 @@ export function Buckets() {
 				confirmLoading={creating}
 				destroyOnHidden
 			>
-				<CreateDestination onChange={() => setOpen(false)} />
 				<Form<CreateBucketValues>
 					form={form}
 					layout="vertical"
 					onFinish={onCreate}
 					scrollToFirstError
 				>
+					<GroupField />
 					<Form.Item
 						name="name"
 						label="Name"

@@ -43,7 +43,9 @@ export const CreateBucketBody = t.Object({
 	registrationOpen: t.Optional(t.Boolean()),
 	emailVerificationRequired: t.Optional(t.Boolean()),
 	verificationMethod: t.Optional(VerificationMethod),
-	totpRequired: t.Optional(t.Boolean())
+	totpRequired: t.Optional(t.Boolean()),
+	/* The group the bucket is created in (specs/087); without it, the caller's active group. */
+	groupId: t.Optional(t.String({ minLength: 1 }))
 });
 
 /*

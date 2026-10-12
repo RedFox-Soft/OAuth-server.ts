@@ -357,6 +357,20 @@ export const statedRightRoutes: readonly StatedRightRoute[] = [
 		path: `${BUCKET}/keys/:kid/promote`
 	},
 	{ on: 'bucket', flag: 'edit', method: 'DELETE', path: `${BUCKET}/keys/:kid` },
+	{
+		on: 'bucket',
+		flag: 'edit',
+		method: 'POST',
+		path: `${BUCKET}/keys/rotate`,
+		body: { alg: 'ES256' }
+	},
+	{
+		on: 'bucket',
+		flag: 'edit',
+		method: 'POST',
+		path: `${BUCKET}/keys/:kid/revoke`,
+		body: { confirm: 'absent-key' }
+	},
 
 	{ on: 'project', flag: 'read', method: 'GET', path: PROJECT },
 	{ on: 'project', flag: 'edit', method: 'PATCH', path: PROJECT, body: {} },
