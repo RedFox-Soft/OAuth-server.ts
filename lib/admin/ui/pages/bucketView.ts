@@ -59,6 +59,8 @@ export interface BucketSummary {
 	providers: { enabled: number; creating: number };
 	activeThisMonth?: number;
 	mailDeliveryConfigured: boolean;
+	/* The instance's `federation.enabled`: the preview's one input the console cannot read elsewhere (specs/091). */
+	federationEnabled: boolean;
 }
 
 /* The address change's preview (data-model §6). */

@@ -265,13 +265,13 @@ export const ROUTES: readonly RouteSpec[] = [
 		instance: true,
 		area: 'Settings'
 	},
-	{ key: 'usage', pattern: ['usage'], section: 'usage', instance: true },
+	/* Every administrator's since specs/091, over the buckets their groups own; the server does the narrowing. */
+	{ key: 'usage', pattern: ['usage'], section: 'usage' },
 	/* A deleted bucket's history (specs/086): a tombstone belongs to Usage, not to Buckets. */
 	{
 		key: 'usage.bucket',
 		pattern: ['usage', 'buckets', ':bucket'],
-		section: 'usage',
-		instance: true
+		section: 'usage'
 	},
 	{
 		key: 'settings',

@@ -65,8 +65,10 @@ import { request, type RequestResult } from '../frame/request.js';
 import { EmptyState, LoadFailed, NoMatch } from '../frame/states.js';
 
 /*
- * The super administrator's usage dashboard (specs/077): every bucket's monthly active users beside the
- * customer that owns it, the instance at a glance, and what changed sharply.
+ * The usage dashboard (specs/077): every bucket's monthly active users beside the customer that owns it, the
+ * instance at a glance, and what changed sharply. Since specs/091 every administrator opens it: the server
+ * answers anyone but a super administrator over the buckets their own groups own — the groups being the
+ * customers, the totals theirs — so the page needs only to say so, never to filter.
  *
  * The server answers every bucket at once; the search and the filters run here, and every total, chart and
  * the sharp-changes list is recomputed over exactly the rows they leave, with the server's own functions —
@@ -125,7 +127,7 @@ function nowrap(text: string) {
 	return <span style={{ whiteSpace: 'nowrap' }}>{text}</span>;
 }
 
-export function Usage() {
+export function Usage({ superAdmin }: { superAdmin: boolean }) {
 	const [month, setMonth] = useState('');
 	const [answer, setAnswer] = useState<OverviewAnswer | null>(null);
 	const [refusal, setRefusal] = useState<string | null>(null);
@@ -415,6 +417,11 @@ export function Usage() {
 	const excluded = instance?.months[0]?.unavailable ?? 0;
 	const change = instance?.change ?? null;
 
+	/* Groups that own nothing have nothing to chart: one sentence says so instead of a page of zeros. */
+	const ownsNothing =
+		!superAdmin && answer !== null && answer.buckets.length === 0;
+	const anyReserved = answer?.buckets.some((row) => row.reserved) ?? false;
+
 	/* A search that finds nothing is not an empty instance, and a filter that hides everything is neither. */
 	const emptyRows =
 		search.trim() !== '' ? (
@@ -482,8 +489,9 @@ export function Usage() {
 						</Space>
 					</Space>
 					<Typography.Text type="secondary">
-						Monthly active users of every bucket, with the customer that owns
-						it.{' '}
+						{superAdmin
+							? 'Monthly active users of every bucket, with the customer that owns it.'
+							: 'Monthly active users of the buckets your groups own.'}{' '}
 						<Popover
 							title="What counts"
 							content={WHAT_COUNTS}
@@ -519,7 +527,11 @@ export function Usage() {
 				/>
 			) : null}
 
-			{answer && instance ? (
+			{ownsNothing ? (
+				<EmptyState purpose="Your groups don't own any buckets yet." />
+			) : null}
+
+			{answer && instance && !ownsNothing ? (
 				<>
 					<Card
 						title={`${answer.month} at a glance`}
@@ -580,7 +592,7 @@ export function Usage() {
 								md={4}
 							>
 								<Statistic
-									title="Active customers"
+									title={superAdmin ? 'Active customers' : 'Active groups'}
 									value={instance.activeCustomers}
 								/>
 							</Col>
@@ -740,14 +752,16 @@ export function Usage() {
 								>
 									Hide inactive
 								</Checkbox>
-								<Checkbox
-									checked={preferences.hideReserved}
-									onChange={(event) =>
-										update({ hideReserved: event.target.checked })
-									}
-								>
-									Hide reserved
-								</Checkbox>
+								{anyReserved ? (
+									<Checkbox
+										checked={preferences.hideReserved}
+										onChange={(event) =>
+											update({ hideReserved: event.target.checked })
+										}
+									>
+										Hide reserved
+									</Checkbox>
+								) : null}
 								<Checkbox
 									checked={preferences.hideDeleted}
 									onChange={(event) =>

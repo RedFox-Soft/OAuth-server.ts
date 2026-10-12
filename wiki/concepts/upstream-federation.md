@@ -172,8 +172,8 @@ impossible, and adding the three later entries needed no migration for the same 
 ## The order of the buttons
 
 A bucket's sign-in page and the console's providers table list providers in one order, computed by one
-function, `orderProviders` (`lib/federation/order.ts:16`), called by `loginOptions.ts` and the admin
-`presentAll`. Until spec 088 the order was fixed: recognised providers in the catalogue's order, then the rest
+function, `orderProviders` (`lib/federation/order.ts:16`), called by `signInOptions.ts` (the page's rule, split out
+of `loginOptions.ts` in spec 091 so the console's preview runs it too) and the admin `presentAll`. Until spec 088 the order was fixed: recognised providers in the catalogue's order, then the rest
 alphabetically by id — never connection order, which would rearrange a page end users know whenever a provider
 is added.
 

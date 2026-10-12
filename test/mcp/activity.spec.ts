@@ -118,6 +118,24 @@ describe('active users read by an agent', () => {
 		expect(answer.result?.structuredContent?.reason).toBe('forbidden');
 	});
 
+	it("gives an agent of any administrator the overview of their own groups' buckets, as the console does", async () => {
+		const token = await agentToken(owner);
+
+		const answer = await rpc(call('activity_overview', {}), token);
+		const viaRoute = await elysia.handle(
+			new Request('http://e.ly/admin/api/activity', {
+				headers: { cookie: await cookieFor(owner) }
+			})
+		);
+
+		expect(answer.result?.isError).not.toBe(true);
+		const overview = answer.result?.structuredContent?.result as OverviewAnswer;
+		const console_ = (await viaRoute.json()) as OverviewAnswer;
+		expect(overview.buckets.map((b) => b.bucketId)).toEqual([bucketId]);
+		expect(overview.buckets).toEqual(console_.buckets);
+		expect(overview.customers).toEqual(console_.customers);
+	});
+
 	it("gives an agent of a super administrator each bucket's customer and the customers' sums", async () => {
 		const token = await agentToken(await createAdministrator('super'));
 

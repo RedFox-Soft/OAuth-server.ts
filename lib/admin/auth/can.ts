@@ -92,6 +92,22 @@ export function holdsBucket(
 }
 
 /*
+ * The same question about a bucket that no longer exists, answered from the group its deletion record names
+ * (specs/091): that group's members may still read its usage, since its active users counted in their months.
+ * A record that names no group — written before groups were recorded — is a super administrator's alone.
+ */
+export function heldDeletedBucket(
+	ctx: AdminContext,
+	tombstone: { ownerGroupId?: string }
+): boolean {
+	return (
+		ctx.superAdmin ||
+		(tombstone.ownerGroupId !== undefined &&
+			belongsTo(ctx, tombstone.ownerGroupId))
+	);
+}
+
+/*
  * Broader than holding the bucket: a group that owns a project signing into it administers its end users,
  * though not the bucket — reading its detail and managing its users, never editing the bucket entity. Says
  * nothing about the administrators' bucket, which `bucketCan` refuses first, by its own rule.

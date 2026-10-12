@@ -9,12 +9,12 @@ import type {
 import {
 	type AdminContext,
 	assertAuth,
-	assertSuperAdmin,
 	AdminError,
 	adminErrorBody,
 	resolveAdmin
 } from '../auth/rbac.js';
 import { loadBucketForEdit } from '../buckets/access.js';
+import { heldDeletedBucket, holdsBucket } from '../auth/can.js';
 import { reservedOf } from '../consts.js';
 import { now } from '../../activity/clock.js';
 import {
@@ -109,8 +109,10 @@ function snapshotOfTombstone(
 /*
  * The bucket whose figures are asked for. A super administrator may read any bucket's — the reserved ones
  * and deleted ones by their tombstones (specs/077) — because every one of those figures is already in their
- * overview; this only lets them look closer. Everyone else keeps the owning-group check, so a deleted
- * bucket stays unfindable to the group that owned it, as every other route answers it.
+ * overview; this only lets them look closer. Everyone else keeps the owning-group check, and since specs/091
+ * the same check reaches a deleted bucket through the group its tombstone names: its active users counted in
+ * that group's months, and the group's overview lists it. Anyone else falls through to the live loader, so a
+ * deleted bucket is refused to them in exactly the words an id that never existed is.
  */
 /* The bucket read, and — for a deleted one, which only a super administrator can reach — what its tombstone kept. */
 interface BucketToRead {
@@ -123,6 +125,16 @@ async function bucketToRead(
 	id: string
 ): Promise<BucketToRead> {
 	if (!ctx.superAdmin) {
+		if (!(await getBucketStore().find(id))) {
+			const tombstone = await getActivityStore().tombstone(id);
+			if (
+				tombstone &&
+				reservedOf(id) === null &&
+				heldDeletedBucket(ctx, tombstone)
+			) {
+				return { snapshot: snapshotOfTombstone(tombstone), tombstone };
+			}
+		}
 		return {
 			snapshot: snapshotOf(await loadBucketForEdit(ctx, id)),
 			tombstone: null
@@ -201,6 +213,11 @@ export const activityRoutes = new Elysia({ name: 'admin-activity' })
 	 * Every bucket on the instance, for a super administrator: the reserved ones, which the bucket list leaves
 	 * out, and deleted ones, which no loader can find any more and which are listed from their tombstones.
 	 *
+	 * Since specs/091 every administrator reads it, over the buckets their groups hold and the deleted ones
+	 * their groups held last — the buckets whose Activity tab each of them can already open. The set is
+	 * narrowed before anything is read, so every figure, customer, contact, total and sharp change in the
+	 * answer is computed from those buckets alone; no other tenant's number is ever summed into it.
+	 *
 	 * Since specs/077 it is the whole dashboard in one answer — each bucket's customer and thirteen months,
 	 * the days of the month and of the month before, the customers' sums, the instance's totals and the
 	 * buckets that changed sharply — all read at one instant. The console filters in the browser and
@@ -210,7 +227,6 @@ export const activityRoutes = new Elysia({ name: 'admin-activity' })
 		'/admin/api/activity',
 		async ({ admin, query, request }): Promise<OverviewAnswer> => {
 			const ctx = assertAuth(admin);
-			assertSuperAdmin(ctx);
 			assertNoUnknownParams(request.url, ALLOWED_ACTIVITY_OVERVIEW_PARAMS);
 			const at = now();
 			const month = monthAsked(query.month, at);
@@ -219,10 +235,19 @@ export const activityRoutes = new Elysia({ name: 'admin-activity' })
 			const days = daysOf(month, at);
 			const previousDays = daysOf(previous, at);
 
-			const liveBuckets = await getBucketStore().list();
-			const liveIds = new Set(liveBuckets.map((bucket) => bucket._id));
+			/* The instance's own buckets belong to no administrator's group: a super administrator's alone. */
+			const visible = (bucketId: string) =>
+				ctx.superAdmin || reservedOf(bucketId) === null;
+			const everyLive = await getBucketStore().list();
+			const liveIds = new Set(everyLive.map((bucket) => bucket._id));
+			const liveBuckets = everyLive.filter(
+				(bucket) => visible(bucket._id) && holdsBucket(ctx, bucket)
+			);
 			const deleted = (await getActivityStore().tombstones()).filter(
-				(tombstone) => !liveIds.has(tombstone.bucketId)
+				(tombstone) =>
+					!liveIds.has(tombstone.bucketId) &&
+					visible(tombstone.bucketId) &&
+					heldDeletedBucket(ctx, tombstone)
 			);
 			const everyBucket = [
 				...liveBuckets.map((bucket) => ({

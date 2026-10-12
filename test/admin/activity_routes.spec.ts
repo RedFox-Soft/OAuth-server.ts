@@ -191,17 +191,6 @@ describe('reading active users', () => {
 				total: 1
 			});
 		});
-
-		it('refuses its history to an administrator of the group that owned it, as for a bucket that does not exist', async () => {
-			restoreClock = atDay(NOW);
-			const cookie = await cookieFor(owner);
-
-			const gone = await bucketActivity(deletedId, cookie);
-			const missing = await bucketActivity('no-such-bucket', cookie);
-
-			expect(gone.status).toBe(missing.status);
-			expect(gone.text).toEqual(missing.text);
-		});
 	});
 
 	it('lists every bucket in the overview, the default and administrators buckets included', async () => {
@@ -223,14 +212,6 @@ describe('reading active users', () => {
 				previous: { total: 2, final: true }
 			}
 		);
-	});
-
-	it('refuses the overview to an administrator who is not a super administrator', async () => {
-		const res = await client.admin.api.activity.get({
-			headers: { cookie: await cookieFor(owner) }
-		});
-
-		expect(res.status).toBe(403);
 	});
 
 	it('answers counts and no account identifier, email address or name', async () => {

@@ -126,8 +126,8 @@ export function Layout() {
 
 	/*
 	 * Grouped so an operator can tell their own work from the organisation around it and from the
-	 * instance itself, which only a super administrator sees. Offered ⇔ permitted: Audit is open to every
-	 * administrator because it is filtered to their groups rather than refused.
+	 * instance itself, which only a super administrator sees. Offered ⇔ permitted: Audit and Usage are open to
+	 * every administrator because each is filtered to their groups rather than refused.
 	 */
 	const items: MenuProps['items'] = [
 		{
@@ -160,7 +160,9 @@ export function Layout() {
 			label: 'Organisation',
 			children: [
 				{ key: 'groups', icon: <ApartmentOutlined />, label: 'Groups' },
-				{ key: 'audit', icon: <FileSearchOutlined />, label: 'Audit' }
+				{ key: 'audit', icon: <FileSearchOutlined />, label: 'Audit' },
+				/* Every administrator's since specs/091: over the buckets their groups own. */
+				{ key: 'usage', icon: <LineChartOutlined />, label: 'Usage' }
 			]
 		},
 		...(can.instance
@@ -174,7 +176,6 @@ export function Layout() {
 								icon: <TeamOutlined />,
 								label: 'Administrators'
 							},
-							{ key: 'usage', icon: <LineChartOutlined />, label: 'Usage' },
 							{ key: 'settings', icon: <SettingOutlined />, label: 'Settings' },
 							{ key: 'keys', icon: <KeyOutlined />, label: 'Keys' },
 							{
@@ -292,7 +293,7 @@ export function Layout() {
 			case 'audit':
 				return <Audit />;
 			case 'usage':
-				return <Usage />;
+				return <Usage superAdmin={can.instance} />;
 			case 'usage.bucket':
 				return (
 					<UsageBucketHistory

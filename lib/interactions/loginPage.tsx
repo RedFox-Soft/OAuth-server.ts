@@ -25,7 +25,8 @@ export function LoginPage({
 	passwordReset = true,
 	verificationResend = false,
 	providers = [],
-	logoSrc = DEFAULT_LOGO
+	logoSrc = DEFAULT_LOGO,
+	embedded = false
 }: {
 	uid: string;
 	errorMessage?: string;
@@ -42,13 +43,18 @@ export function LoginPage({
 	 * so the browser computed a different address and every hydration logged a mismatch.
 	 */
 	logoSrc?: string;
+	/*
+	 * Drawn inside the console's Sign-in tab as its preview (specs/091) rather than as a whole page: the same
+	 * component, so the preview shows whatever this page shows, but sized to its content instead of the window.
+	 */
+	embedded?: boolean;
 }) {
 	return (
 		<Flex
 			justify="center"
 			style={{
 				display: 'flex',
-				height: '100vh',
+				...(embedded ? { padding: '32px 16px' } : { height: '100vh' }),
 				alignItems: 'center',
 				backgroundColor: '#f0f2f5'
 			}}

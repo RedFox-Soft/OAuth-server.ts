@@ -4,7 +4,7 @@ title: "Bucket sign-in policy: refusals first, then a counted preview to confirm
 tags: [architecture, contract]
 sources: [oauth-server-codebase]
 created: 2026-10-11
-updated: 2026-10-11
+updated: 2026-10-12
 ---
 
 # Bucket sign-in policy
@@ -166,6 +166,17 @@ bucket, and the administrators' bucket through its `consoleBucket` mode.
   asks again with the fresh lines. The console asks no question of its own: `bucket.passwordSignIn.off` is gone.
 - **What people will see.** Every switch carries one sentence about the experience of the people signing in,
   in both of its states.
+- **And the page itself (spec 091).** Beside the switches (below them on a narrow window) the card "What people
+  see" draws the bucket's sign-in page with the draft, before anything is saved
+  (`lib/admin/ui/pages/signin/SignInPreview.tsx`). It is the real `LoginPage` component (`embedded`, inside a
+  `<div inert>`, so nothing in it can be focused, clicked or submitted), fed by `signInOptionsOf`
+  (`lib/interactions/signInOptions.ts`) — the rule the server renders the page with, split out of
+  `loginOptions.ts` so a browser can run it; a preview with its own idea of which buttons to draw would be a
+  second opinion the operator trusted. Its inputs are the draft, the `GET …/federation` list (already in sign-in
+  order, so its ids are passed as the order; leaving the order out would fall back to catalogue rank) and the
+  summary's `federationEnabled`. Only the first screen is drawn: the authenticator requirement and verification
+  act after it. `test/federation/signin_preview.spec.ts` compares the preview's options, read through the admin
+  API, with the real page's `window.PROPS` across configurations.
 
 ## The Administrators page
 

@@ -406,7 +406,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			"Count what a user bucket holds, computed when asked: its accounts (`users`), how many are unverified, without an authenticator and without any linked upstream identity; its user groups; its provisioning connections and how many are holding a deprovisioning (`held`); its identity providers (`providers.enabled`, and `providers.creating` — enabled ones that create accounts on first sign-in); and whether mail delivery is configured. `withoutEnabledLink` counts accounts with no link to an enabled identity provider (who could not sign in were passwords turned off) and `passwordWithoutAuthenticator` accounts with no authenticator whose password is not known to be absent (who an authenticator requirement would ask to enrol); on the default bucket `projects` counts the projects signing in there, those naming no bucket included. `activeThisMonth` is present only to a caller with `can.readActivity`, and absent rather than zero before counting began. Counts only, never who. Readable by anyone who may read the bucket (bucket_get's `can.read`)."
+			"Count what a user bucket holds, computed when asked: its accounts (`users`), how many are unverified, without an authenticator and without any linked upstream identity; its user groups; its provisioning connections and how many are holding a deprovisioning (`held`); its identity providers (`providers.enabled`, and `providers.creating` — enabled ones that create accounts on first sign-in); whether mail delivery is configured; and whether federation is switched on for the instance (`federationEnabled` — when false no bucket's sign-in page shows a provider button). `withoutEnabledLink` counts accounts with no link to an enabled identity provider (who could not sign in were passwords turned off) and `passwordWithoutAuthenticator` accounts with no authenticator whose password is not known to be absent (who an authenticator requirement would ask to enrol); on the default bucket `projects` counts the projects signing in there, those naming no bucket included. `activeThisMonth` is present only to a caller with `can.readActivity`, and absent rather than zero before counting began. Counts only, never who. Readable by anyone who may read the bucket (bucket_get's `can.read`)."
 	},
 	{
 		tool: 'bucket_resource_list',
@@ -432,7 +432,7 @@ const catalogue = [
 		querySchema: BucketActivityQuery,
 		pathParams: ['id'],
 		summary:
-			"Read a user bucket's monthly active users: this month so far, each day of the month and the previous 12 months, in total and by kind of activity (local sign-in, upstream sign-in, renewal) and directory-provisioned accounts. A super administrator may also read the reserved buckets and deleted buckets, by id. The answer names the bucket (`name`) and, for a deleted one, `deletedAt` and the group that last owned it (`lastOwner`, null when not recorded). Counts only, never who."
+			"Read a user bucket's monthly active users: this month so far, each day of the month and the previous 12 months, in total and by kind of activity (local sign-in, upstream sign-in, renewal) and directory-provisioned accounts. A super administrator may also read the reserved buckets, by id; a deleted bucket can be read by id by a super administrator and by members of the group that owned it last, and is refused to anyone else exactly as an unknown id is. The answer names the bucket (`name`) and, for a deleted one, `deletedAt` and the group that last owned it (`lastOwner`, null when not recorded). Counts only, never who."
 	},
 	{
 		tool: 'activity_overview',
@@ -440,12 +440,12 @@ const catalogue = [
 		path: '/admin/api/activity',
 		action: null,
 		consequence: 'read',
-		superAdminOnly: true,
+		superAdminOnly: false,
 		bodySchema: null,
 		querySchema: ActivityOverviewQuery,
 		pathParams: [],
 		summary:
-			"List every user bucket on the instance with its monthly active users, including the default and administrators buckets and deleted buckets, each with its customer (the group that owns it, or owned it when it was deleted) and its last 13 months and the month's days. Also answers each customer's summed figures and contacts (its owners' emails), the instance's totals, and the buckets whose figure rose or fell sharply between the last two closed months. A customer's figure is a sum of its buckets', not a count of distinct people. Counts only, never which end users. Super administrators only."
+			"List every user bucket on the instance with its monthly active users, including the default and administrators buckets and deleted buckets, each with its customer (the group that owns it, or owned it when it was deleted) and its last 13 months and the month's days. Also answers each customer's summed figures and contacts (its owners' emails), the instance's totals, and the buckets whose figure rose or fell sharply between the last two closed months. A customer's figure is a sum of its buckets', not a count of distinct people. Counts only, never which end users. A super administrator reads the whole instance; any other administrator reads only the buckets owned by groups they belong to and the deleted buckets those groups owned last, with those groups as the customers and every total computed over those buckets alone — the reserved buckets are never included for them."
 	},
 	{
 		tool: 'bucket_user_list',

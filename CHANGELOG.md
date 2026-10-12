@@ -42,6 +42,10 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- **The Sign-in tab shows the sign-in page people will see** (spec 091). A card beside the switches draws the
+  bucket's real sign-in page and changes as the switches change, before saving: the password form, the
+  "Forgot password" and "Register now!" links and the provider buttons in their order. It is decided by the same
+  rule the server renders the page with, so the two cannot disagree.
 - **Supporting end users without inventing their passwords** (spec 089).
   - An administrator can invite a person by email: a single-use link, valid 7 days, sets their own password and
     confirms their address.
@@ -62,6 +66,11 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Changed
 
+- **Usage is open to every administrator** (spec 091). It lists the buckets owned by the groups they belong to,
+  with those groups as the customers and every total computed over those buckets alone; the reserved buckets stay
+  a super administrator's. A deleted bucket's row and history stay readable by the group that owned it last, since
+  its active users counted in that group's months; everyone else is refused as for an id that never existed. The
+  `activity_overview` MCP tool follows.
 - **A user's profile now wins over a stored claim of the same name** (spec 089). Before, a `given_name` in the
   claims document beat the profile's. Now the profile supplies the claims it sets, and stored claims supply the
   rest, so for a directory's people the directory's value is what applications receive.

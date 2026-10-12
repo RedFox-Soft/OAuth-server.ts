@@ -916,7 +916,13 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			 * count: a zero would read as "nobody signed in".
 			 */
 			...(figure ? { activeThisMonth: figure.total } : {}),
-			mailDeliveryConfigured: mail
+			mailDeliveryConfigured: mail,
+			/*
+			 * Whether any provider button can appear on any sign-in page of this instance. The Sign-in tab's preview
+			 * (specs/091) draws the page with the same rule the server renders it with, and this is the one input
+			 * of that rule a browser cannot otherwise know.
+			 */
+			federationEnabled: ApplicationConfig['federation.enabled']
 		};
 	})
 	/*

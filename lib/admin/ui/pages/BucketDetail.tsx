@@ -160,10 +160,7 @@ export function BucketDetail({
 
 	if (loadStatus !== null) {
 		return loadStatus === 403 || loadStatus === 404 ? (
-			<BucketNotFound
-				bucketId={bucketId}
-				superAdmin={me?.superAdmin === true}
-			/>
+			<BucketNotFound bucketId={bucketId} />
 		) : (
 			<LoadFailed
 				reason={loadMessage ?? undefined}

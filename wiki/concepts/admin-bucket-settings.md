@@ -4,7 +4,7 @@ title: "The administrators' bucket: ordinary settings, a guard per setting"
 tags: [architecture, contract]
 sources: [oauth-server-codebase]
 created: 2026-10-10
-updated: 2026-10-11
+updated: 2026-10-12
 ---
 
 # The administrators' bucket: ordinary settings, a guard per setting
@@ -97,7 +97,8 @@ non-committal answer, in every bucket (`index.ts:1407`).
 
 The page links to registration and to password reset only when its bucket keeps those doors open. The
 two flags come from the same bucket read the page already makes, using the same resolution the doors
-use (`lib/interactions/loginOptions.ts:64-65`). Reset eligibility is one predicate shared by the page,
+use (`signInOptionsOf`, `lib/interactions/signInOptions.ts:76-77`, since spec 091; the console's sign-in preview
+runs the same function). Reset eligibility is one predicate shared by the page,
 the request and the link (`selfServiceResetAllowed`, `lib/password_reset/eligibility.ts:19`).
 
 ## Federation into the console

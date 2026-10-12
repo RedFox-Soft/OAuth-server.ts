@@ -3,8 +3,10 @@ import {
 	Alert,
 	Button,
 	Card,
+	Col,
 	Descriptions,
 	Flex,
+	Row,
 	Segmented,
 	Switch,
 	Typography
@@ -20,6 +22,7 @@ import type { BucketCan } from '../../frame/can.js';
 import { SaveBar } from '../../settings/SaveBar.js';
 import type { Change } from '../../settings/model.js';
 import type { BucketSummary, BucketView } from '../bucketView.js';
+import { SignInPreview } from './SignInPreview.js';
 
 /* The five settings that decide how people get into a bucket. */
 interface Policy {
@@ -328,9 +331,39 @@ export function SignInTab({
 		</Typography.Text>
 	) : null;
 
+	/*
+	 * The page people meet, beside the switches that decide it (specs/091): the draft for an editor, the stored
+	 * settings for anyone who can only read them. Below the switches on a narrow window.
+	 */
+	const preview = (
+		<SignInPreview
+			bucketId={bucket._id}
+			draft={editable ? draft : baseline}
+			providers={providers}
+			federationOn={summary ? summary.federationEnabled : null}
+			loading={contextLoading || (summary === null && !summaryFailed)}
+		/>
+	);
+	const besidePreview = (content: ReactNode) => (
+		<Row gutter={[16, 16]}>
+			<Col
+				xs={24}
+				xl={14}
+			>
+				{content}
+			</Col>
+			<Col
+				xs={24}
+				xl={10}
+			>
+				{preview}
+			</Col>
+		</Row>
+	);
+
 	if (!editable) {
 		const yes = (v: boolean) => (v ? 'On' : 'Off');
-		return (
+		return besidePreview(
 			<Flex
 				vertical
 				gap={16}
@@ -382,7 +415,7 @@ export function SignInTab({
 		);
 	}
 
-	return (
+	return besidePreview(
 		<Flex
 			vertical
 			gap={16}

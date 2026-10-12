@@ -4,7 +4,7 @@ title: 'Monthly active users per bucket'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-12
 ---
 
 # Monthly active users per bucket
@@ -95,13 +95,18 @@ otherwise do later under the tombstone's name.
 
 ## Reading it
 
-`GET /admin/api/buckets/:id/activity` (`lib/admin/activity/routes.ts:155`) uses the owning-group check
+`GET /admin/api/buckets/:id/activity` (`lib/admin/activity/routes.ts:176`) uses the owning-group check
 (`loadBucketForEdit`), not the broader one a bucket's page uses: a group that only owns a project signing
 into the bucket administers its users, not its plan. A super administrator may read **any** bucket's figures
-there — the reserved buckets and deleted ones, from their tombstones (`bucketToRead`, `:115`, since spec 077) —
-because every one of them is already in their overview; the group that owned a deleted bucket gets the
-missing-bucket answer, as from every other route. Since spec 086 the answer names the bucket (`name`) and, for
-a deleted one, `deletedAt` and `lastOwner`, both from the tombstone.
+there — the reserved buckets and deleted ones, from their tombstones (`bucketToRead`, `:123`, since spec 077) —
+because every one of them is already in their overview. **Since spec 091 the group a deleted bucket's tombstone
+names (`ownerGroupId`) may read it too** (`heldDeletedBucket`, `lib/admin/auth/can.ts`): its active users
+counted in that group's months, and without it the group's sum for the month of the deletion would disagree
+with the super administrator's. Anyone else falls through to `loadBucketForEdit`, so the refusal is the one an
+id that never existed gets, byte for byte; a tombstone written before 077 names no group and stays a super
+administrator's alone. Membership is read per request: someone who leaves the group loses the history. Since
+spec 086 the answer names the bucket (`name`) and, for a deleted one, `deletedAt` and `lastOwner`, both from
+the tombstone.
 
 **In the console (spec 086).**
 - The bucket's Activity tab is built from the Usage dashboard's own parts: charts, the change rule and the CSV
@@ -109,11 +114,12 @@ a deleted one, `deletedAt` and `lastOwner`, both from the tombstone.
   per-browser preference.
 - Usage links each bucket to its Overview and its Activity tab at the dashboard's month. The bucket drawer is
   gone.
-- A deleted bucket's history has a page, `/admin/usage/buckets/:id`, for super administrators.
-- Opening a deleted bucket's own address tells a super administrator when it was deleted and links to that
-  history. Nobody else makes that read, so the bucket stays indistinguishable from one that never existed.
+- A deleted bucket's history has a page, `/admin/usage/buckets/:id`, for whoever may read it (above).
+- Opening a deleted bucket's own address tells them when it was deleted and links to that history. Since spec
+  091 every caller makes that read; the server's refusal leaves everyone else the ordinary no-access page, so
+  the bucket stays indistinguishable from one that never existed.
 
-`GET /admin/api/activity` (`:188`) is the super administrator's overview, and since spec 077 the whole Usage
+`GET /admin/api/activity` (`:227`) is the Usage overview, and since spec 077 the whole Usage
 dashboard in one answer: every bucket (reserved and deleted included) with its **customer** — the owning
 group, labelled by the shared `groupLabel` (`lib/admin/groups/label.ts`) — its thirteen months and the days
 of the month and of the month before, plus each customer's sums and contacts (its owners' emails, not its
@@ -121,6 +127,15 @@ plain members'), the instance's totals, and the buckets that changed sharply. Th
 sum over it live once in `lib/activity/overview.ts`, a type-only-import module the console bundles too: the
 route computes the totals over every bucket (the agent's answer), and the console recomputes them over the
 rows its search and filters leave, with the same functions, so a total on screen describes the rows on screen.
+
+**Every administrator reads it since spec 091**, under Organisation in the menu. For anyone but a super
+administrator the route narrows the buckets **before** reading anything: the live ones `holdsBucket` admits
+(member of the owning group, any role — the predicate behind each bucket's Activity tab) and the tombstones
+`heldDeletedBucket` admits, the reserved buckets never. Customers, contacts, the "instance" totals and the sharp
+changes are then computed over those rows by the same functions, so no other tenant's figure is ever summed
+into the answer; for such a caller `instance` means "my buckets". A super administrator's answer is unchanged.
+The MCP tool `activity_overview` follows (no longer `superAdminOnly`).
+
 Rules the code holds and a reader can get wrong:
 
 - **A customer's figure is a sum, not a distinct count** (`sumFigures`, `lib/activity/overview.ts:135`). Each

@@ -83,21 +83,15 @@ export function UsageBucketHistory({ bucketId }: { bucketId: string }) {
 }
 
 /*
- * A bucket address that answers no-access. For a super administrator, who may read a deleted bucket's figures,
- * it may be a bucket that was deleted: then it says when, and leads to its history (specs/086). Anyone else gets
- * the ordinary answer without that read, so whether a bucket ever existed is not revealed to them.
+ * A bucket address that answers no-access. It may be a bucket that was deleted: then it says when, and leads to
+ * its history (specs/086). Asked for whoever is looking (specs/091): the server answers a deleted bucket to a
+ * super administrator and to the group that owned it last, and refuses everyone else exactly as an unknown id —
+ * so a refusal leaves the ordinary answer, and tells nobody that a bucket ever existed.
  */
-export function BucketNotFound({
-	bucketId,
-	superAdmin
-}: {
-	bucketId: string;
-	superAdmin: boolean;
-}) {
+export function BucketNotFound({ bucketId }: { bucketId: string }) {
 	const [deletedAt, setDeletedAt] = useState<string | null>(null);
 
 	useEffect(() => {
-		if (!superAdmin) return;
 		void (async () => {
 			const result = await request<BucketActivityRead>(
 				'GET',
@@ -106,7 +100,7 @@ export function BucketNotFound({
 			if (result.ok && result.data.deletedAt)
 				setDeletedAt(result.data.deletedAt);
 		})();
-	}, [bucketId, superAdmin]);
+	}, [bucketId]);
 
 	if (deletedAt === null) {
 		return (
