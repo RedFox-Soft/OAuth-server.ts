@@ -66,11 +66,17 @@ describe('the address the console reports for a bucket', () => {
 	/*
 	 * The guard the case above cannot be: an example proves one bucket, and the defect is the bucket
 	 * somebody did not think to check. Enumerated from the store rather than from a list in this file,
-	 * so a bucket state added later is covered the day it exists.
+	 * so a form of address added later is covered the day a bucket has it.
+	 *
+	 * One bucket per form of address, not every bucket. The defect was a form reported wrongly — the root
+	 * shown as a slug — and every bucket of a form is reported and routed by the same branch. The store is
+	 * shared by every spec file, and a bucket's first discovery generates its signing keys, so walking all of
+	 * them grew with the whole suite and passed the 5 s bound on CI.
 	 */
-	it('is served, for every bucket the console can list', async () => {
+	it('is served, for every form of address the console can list', async () => {
 		const buckets = await getBucketStore().list();
 		expect(buckets.length).toBeGreaterThan(2);
+		const formsSeen = new Set<string>();
 
 		for (const bucket of buckets) {
 			const address = bucketAddressFor(bucket);
@@ -81,6 +87,8 @@ describe('the address the console reports for a bucket', () => {
 			 * store is shared across spec files, so one another spec left scheduled reaches this loop.
 			 */
 			if (bucket.deletion) continue;
+			if (formsSeen.has(address.kind)) continue;
+			formsSeen.add(address.kind);
 
 			// A host-addressed bucket answers at its own origin, its issuer taking ISSUER's scheme.
 			const { origin, issuer } =
@@ -106,5 +114,7 @@ describe('the address the console reports for a bucket', () => {
 				issuer: shaped(Metadata, await response.json()).issuer
 			}).toEqual({ bucket: bucket._id, issuer });
 		}
+		/* The seeded buckets guarantee these two, so the walk cannot pass by checking nothing. */
+		expect(formsSeen.has('root') && formsSeen.has('prefix')).toBe(true);
 	});
 });

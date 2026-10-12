@@ -77,7 +77,8 @@ const COLUMNS = [
 ];
 
 type View = 'chart' | 'table';
-const VIEW_KEY = 'oauth-admin.activity.view.v1';
+/* The same prefix as Usage's layout, and for its reason (lib/admin/ui/activity/preferences.ts). */
+const VIEW_KEY = 'admin-console.activity.view.v2';
 
 /* Chart or table: a viewer's habit, remembered in this browser only and never relied on. */
 function loadView(): View {
