@@ -184,6 +184,9 @@ sign-up unless asked otherwise; and a user's profile now wins over a stored clai
 
 ### Fixed
 
+- **A directory can no longer give an account an empty sign-in address.** A SCIM user whose `emails` listed a blank
+  entry before a real one passed the "at least one email" check and was then given the blank entry as its login; the
+  login is now chosen among the entries that hold an address.
 - **`db:setup:pg` no longer breaks a reserved bucket's address while repairing it.** On a PostgreSQL database
   provisioned before buckets had addresses, the repair stored the console's and the default bucket's slug with
   its quotes (`"\"admin\""`), so neither could be found by its address. The value is now written as text, and the

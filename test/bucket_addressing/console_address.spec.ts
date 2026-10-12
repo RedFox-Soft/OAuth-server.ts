@@ -75,6 +75,12 @@ describe('the address the console reports for a bucket', () => {
 		for (const bucket of buckets) {
 			const address = bucketAddressFor(bucket);
 			if (address.kind === 'none') continue;
+			/*
+			 * A bucket scheduled for deletion keeps its address but answers nobody there until it is restored
+			 * (specs/090) — the console lists it marked as such, and test/deletion proves the refusal. The
+			 * store is shared across spec files, so one another spec left scheduled reaches this loop.
+			 */
+			if (bucket.deletion) continue;
 
 			// A host-addressed bucket answers at its own origin, its issuer taking ISSUER's scheme.
 			const { origin, issuer } =

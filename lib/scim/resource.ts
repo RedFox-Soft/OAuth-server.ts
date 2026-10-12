@@ -320,14 +320,22 @@ const PROFILE_SCALARS = [
 	'timezone'
 ] as const;
 
-/* The sign-in address: the primary email, else the work one, else the first (spec, Edge Cases). */
+/*
+ * The sign-in address: the primary email, else the work one, else the first (spec, Edge Cases) — chosen among
+ * the entries that hold an address at all. A blank entry passes the profile's schema, and picking it would give
+ * the account an empty login while the check below had been satisfied by another entry.
+ */
 function loginEmailOf(
 	emails: { value: string; type?: string; primary?: boolean }[]
 ): string {
+	const usable = emails.filter((e) => e.value.trim() !== '');
 	const chosen =
-		emails.find((e) => e.primary === true) ??
-		emails.find((e) => e.type?.toLowerCase() === 'work') ??
-		emails[0];
+		usable.find((e) => e.primary === true) ??
+		usable.find((e) => e.type?.toLowerCase() === 'work') ??
+		usable.at(0);
+	if (!chosen) {
+		throw new ScimError(400, 'invalidValue', 'at least one email is required');
+	}
 	return chosen.value;
 }
 

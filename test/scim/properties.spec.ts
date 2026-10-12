@@ -146,6 +146,32 @@ describe('SCIM input over generated cases', () => {
 		);
 	});
 
+	/*
+	 * The counterexample the property above found on CI, kept as a fixed case: a blank entry listed first beside
+	 * a real one satisfied "at least one email" and was then chosen as the login, leaving an empty address.
+	 */
+	it('never makes a blank email entry the login', () => {
+		const patched = applyPatch(
+			{
+				userName: 'gen@contoso.com',
+				active: true,
+				emails: [{ value: 'gen@contoso.com', type: 'work', primary: true }]
+			},
+			{
+				Operations: [
+					{
+						op: 'replace',
+						path: 'emails',
+						value: [{ value: '' }, { value: 'second@contoso.com' }]
+					}
+				]
+			},
+			{ strict: false }
+		);
+
+		expect(desiredUserOf(patched).email).toBe('second@contoso.com');
+	});
+
 	it('for every generated population and page size, pages through each of the connection’s users exactly once', async () => {
 		await fc.assert(
 			fc.asyncProperty(
