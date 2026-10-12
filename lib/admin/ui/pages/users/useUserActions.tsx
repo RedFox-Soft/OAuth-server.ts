@@ -116,6 +116,38 @@ export function useUserActions(bucketId: string) {
 				if (!(await send('POST', user, '/verification'))) return false;
 				feedback.done(`Verification message sent to ${user.email}.`);
 				return true;
+			},
+
+			// specs/089: the person chooses their own password from a link that also proves the address.
+			async invite(user: EndUser) {
+				const agreed = await confirm('user.invite', {
+					target: user.email,
+					consequences: [
+						'They get a message with a link to choose their own password. The link works for 7 days, and opening it confirms their address.',
+						'Any earlier invitation or password-reset link for them stops working.',
+						...(user.passwordSet
+							? [
+									'They already have a password: it stops working once they choose a new one.'
+								]
+							: [])
+					]
+				});
+				if (!agreed || !(await send('POST', user, '/invitation'))) return false;
+				feedback.done('Invitation sent. The link works for 7 days.');
+				return true;
+			},
+
+			async markVerified(user: EndUser) {
+				const agreed = await confirm('user.verified.mark', {
+					target: user.email,
+					consequences: [
+						'Only do this once you have confirmed they control this address some other way.',
+						'A verification message already sent to them stops working.'
+					]
+				});
+				if (!agreed || !(await send('POST', user, '/verified'))) return false;
+				feedback.done(`${user.email} marked as verified.`);
+				return true;
 			}
 		};
 	}, [bucketId, feedback, confirm]);

@@ -11,6 +11,10 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Security
 
+- **A password-reset link no longer survives an email change** (spec 089). Before, a link sent to a person's old
+  address still worked after an administrator or a directory changed it. Opened from the old mailbox, it set the
+  password and marked the _new_ address verified. The link now dies with the address it was sent to.
+
 - **The federation callback refuses a response from another issuer** (spec 088). An upstream's RFC 9207 `iss`
   parameter is now compared with the issuer the sign-in started with, and required when the provider's metadata
   says it sends one — the mix-up defence RFC 9700 §2.1 asks of a client that talks to several providers.
@@ -38,6 +42,17 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- **Supporting end users without inventing their passwords** (spec 089).
+  - An administrator can invite a person by email: a single-use link, valid 7 days, sets their own password and
+    confirms their address.
+  - An administrator can mark an address verified by hand.
+  - A person's page lists the applications they are signed in to, and one of them can be signed out without the
+    others.
+  - Local users get the directory's profile fields (name, locale, time zone, phone), delivered as standard claims.
+  - Up to 100 selected users can be deactivated, activated, signed out or deleted at once, each with their own
+    audit entry.
+  - A group's members can be searched.
+
 - **Administrators can sign in through your organisation's identity provider** (spec 080). Super administrators
   connect providers to the Administrators bucket; a first sign-in links an existing administrator after a password
   proof, or creates one — with a personal group, never the super administrator privilege — only while the console
@@ -46,6 +61,10 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   back on from the server. Agents may change the console's providers only by confirming each change.
 
 ### Changed
+
+- **A user's profile now wins over a stored claim of the same name** (spec 089). Before, a `given_name` in the
+  claims document beat the profile's. Now the profile supplies the claims it sets, and stored claims supply the
+  rest, so for a directory's people the directory's value is what applications receive.
 
 - **Deleting a bucket can be undone for 30 days** (spec 090). Delete now switches the bucket off at once and
   destroys it 30 days later. In between, nothing in it answers, and nothing in it is destroyed. Restore brings it

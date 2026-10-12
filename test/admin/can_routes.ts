@@ -159,6 +159,59 @@ export const statedRightRoutes: readonly StatedRightRoute[] = [
 	{
 		on: 'bucket',
 		flag: 'manageUsers',
+		method: 'POST',
+		path: `${BUCKET}/users/:uid/invitation`
+	},
+	{
+		on: 'bucket',
+		flag: 'manageUsers',
+		method: 'POST',
+		path: `${BUCKET}/users/:uid/verified`
+	},
+	{
+		on: 'bucket',
+		flag: 'manageUsers',
+		method: 'GET',
+		path: `${BUCKET}/users/:uid/sessions`
+	},
+	{
+		on: 'bucket',
+		flag: 'manageUsers',
+		method: 'POST',
+		path: `${BUCKET}/users/:uid/sessions/:clientId/sign-out`
+	},
+	/* Nobody named is held by the bucket, so where the right holds each person is skipped and nothing changes. */
+	{
+		on: 'bucket',
+		flag: 'manageUsers',
+		method: 'POST',
+		path: `${BUCKET}/users/bulk/deactivate`,
+		body: { userIds: ['absent-user'] }
+	},
+	{
+		on: 'bucket',
+		flag: 'manageUsers',
+		method: 'POST',
+		path: `${BUCKET}/users/bulk/activate`,
+		body: { userIds: ['absent-user'] }
+	},
+	{
+		on: 'bucket',
+		flag: 'manageUsers',
+		method: 'POST',
+		path: `${BUCKET}/users/bulk/sign-out`,
+		body: { userIds: ['absent-user'] }
+	},
+	{
+		on: 'bucket',
+		flag: 'manageUsers',
+		method: 'POST',
+		path: `${BUCKET}/users/bulk/delete`,
+		body: { userIds: ['absent-user'] }
+	},
+	{
+		on: 'bucket',
+		flag: 'manageUsers',
 		method: 'DELETE',
 		path: `${BUCKET}/users/:uid`
 	},

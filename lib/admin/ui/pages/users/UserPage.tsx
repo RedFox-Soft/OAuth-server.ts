@@ -162,6 +162,16 @@ export function UserPage({
 						trigger={['click']}
 						menu={{
 							items: [
+								// A password chosen by the person, never by an administrator (specs/089).
+								...(bucket?.passwordLogin !== false
+									? [
+											{
+												key: 'invite',
+												label: 'Send invitation…',
+												onClick: () => void actions.invite(user).then(after)
+											}
+										]
+									: []),
 								user.active
 									? {
 											key: 'deactivate',

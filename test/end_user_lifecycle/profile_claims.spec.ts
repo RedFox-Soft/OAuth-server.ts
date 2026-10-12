@@ -60,7 +60,11 @@ describe('a user with a provisioned profile', () => {
 		expect(claims).not.toHaveProperty('family_name');
 	});
 
-	it('carries an administrator-set claim over the derived one of the same name', async () => {
+	/*
+	 * Since specs/089 the profile wins for the claims it sets: the directory owns that value, and a stored claim
+	 * of the same name no longer overrides it.
+	 */
+	it('carries the profile’s claim over a stored claim of the same name', async () => {
 		const user = await signIn(setup, 'openid profile');
 		await getUserStore(DEFAULT_BUCKET_ID).update(user.accountId, {
 			...profileOf(`ada.${nanoid()}`),
@@ -69,6 +73,18 @@ describe('a user with a provisioned profile', () => {
 
 		const claims = await userinfo(user.accessToken);
 
-		expect(claims).toHaveProperty('given_name', 'Augusta');
+		expect(claims).toHaveProperty('given_name', 'Ada');
+	});
+
+	it('still carries a stored claim the profile leaves unset', async () => {
+		const user = await signIn(setup, 'openid profile');
+		await getUserStore(DEFAULT_BUCKET_ID).update(user.accountId, {
+			...profileOf(`ada.${nanoid()}`),
+			claims: { nickname: 'Countess' }
+		});
+
+		const claims = await userinfo(user.accessToken);
+
+		expect(claims).toHaveProperty('nickname', 'Countess');
 	});
 });

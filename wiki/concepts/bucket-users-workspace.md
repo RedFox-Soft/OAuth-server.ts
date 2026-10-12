@@ -46,16 +46,20 @@ page until phase 4.
 - **Header** (`headerActions`, `UserPage.tsx:141`): Sign out everywhere (C1), Lock… (the reason is the
   confirmation) / Unlock… (C2, the question repeats who locked them, when and why), and under More,
   Deactivate (C2) / Activate (C0). Deactivate is absent for a provisioned person: `active` is the
-  directory's.
+  directory's. Since spec 089 More also holds Send invitation… (C1), when the bucket takes passwords.
 - **Profile**: whether they can sign in and every reason they cannot (`signInState`,
   `UserProfileTab.tsx:34`), including "locked by <email>" from the single read's
-  `lockedLocally.byEmail`; the email with Change email… (C2) and Resend verification; claims, edited in a
-  drawer and saved in one PATCH; a Danger zone with Hand over… (`can.edit`) and Delete user….
+  `lockedLocally.byEmail`; the email with Change email… (C2), Resend verification and, since spec 089, Mark
+  verified… (C1, local people only); since spec 089 a Profile card (`users/ProfileCard.tsx`) — editable for
+  local people, read-only for a directory's — whose fields each name the claim and scope they reach tokens as;
+  claims, edited in a drawer and saved in one PATCH, warned when the profile overrides one of them; a Danger
+  zone with Hand over… (`can.edit`) and Delete user….
 - **Sign-in methods**: the password is said to be set or not only when the record carries `passwordSet`;
   an older account says nothing either way, because an unusable password cannot be recognised afterwards.
   Removing the last identity link of someone with no usable password is asked as
   `user.identity.removeOnly` (C2) rather than `user.identity.remove` (C1): afterwards nobody can sign in as
-  them.
+  them. Since spec 089 a Sessions card (`users/SessionsCard.tsx`) lists the applications they are signed in
+  to, with Sign out of this app (C1) per row ([[end-user-support]]).
 - **Groups**: one request per membership, through the group's own routes. The old edit dialog diffed groups,
   status and claims and sent several requests, so a failure halfway left the person half changed; there is
   no longer a save that spans more than one request.

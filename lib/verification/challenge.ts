@@ -344,4 +344,18 @@ export async function sendOnDemand(
 	}
 }
 
+/*
+ * Ends whatever verification is outstanding for the account: its challenge, so a link or code already in the
+ * mailbox no longer verifies anything, and the resend record that points at it. For an administrator who has
+ * just marked the address verified by hand (specs/089) — a message still in flight would otherwise stay a live
+ * secret for an act that is already done.
+ */
+export async function discardPending(
+	bucketId: string,
+	user: Pick<User, '_id' | 'email'>
+): Promise<void> {
+	await challenges().destroyByOwner('accountId', user._id);
+	await resends().destroy(resendKey(bucketId, user.email));
+}
+
 export { hashCode, newCode };

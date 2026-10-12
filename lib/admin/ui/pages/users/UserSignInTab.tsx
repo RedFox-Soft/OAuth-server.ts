@@ -6,6 +6,7 @@ import type { BucketView } from '../bucketView.js';
 import { UserIdentityLinks } from '../UserIdentities.js';
 import { usersApi, type EndUser } from './endUser.js';
 import { useUserActions } from './useUserActions.js';
+import { SessionsCard } from './SessionsCard.js';
 
 /* What can be said about their password. Older accounts carry no marker, and then nothing is claimed. */
 function passwordText(user: EndUser): string | null {
@@ -121,6 +122,13 @@ export function UserSignInTab({
 					onChanged={onChanged}
 				/>
 			</Card>
+
+			<SessionsCard
+				bucketId={bucketId}
+				user={user}
+				canManage={can.manageUsers}
+				refreshKey={user}
+			/>
 
 			<SetPasswordModal
 				account={pwOpen ? user : null}

@@ -99,6 +99,8 @@ export class AdminError extends Error {
 	 * message on that field rather than above the form. Set only where one field is the whole reason.
 	 */
 	field?: string;
+	/* Seconds until a refused send may be asked for again, on a 429 from a mail throttle. */
+	retryAfter?: number;
 	constructor(
 		status: number,
 		message: string,
@@ -107,6 +109,7 @@ export class AdminError extends Error {
 			failedAreas?: readonly string[];
 			acknowledgementRequired?: boolean;
 			field?: string;
+			retryAfter?: number;
 		}
 	) {
 		super(message);
@@ -115,6 +118,7 @@ export class AdminError extends Error {
 		this.failedAreas = extra?.failedAreas;
 		this.acknowledgementRequired = extra?.acknowledgementRequired;
 		this.field = extra?.field;
+		this.retryAfter = extra?.retryAfter;
 	}
 }
 
@@ -129,11 +133,13 @@ export function adminErrorBody(error: AdminError): {
 	failedAreas?: readonly string[];
 	acknowledgementRequired?: boolean;
 	field?: string;
+	retryAfter?: number;
 } {
 	return {
 		error: 'admin_error',
 		message: error.message,
 		...(error.field === undefined ? {} : { field: error.field }),
+		...(error.retryAfter === undefined ? {} : { retryAfter: error.retryAfter }),
 		...(error.blockers ? { blockers: error.blockers } : {}),
 		...(error.failedAreas ? { failedAreas: error.failedAreas } : {}),
 		...(error.acknowledgementRequired ? { acknowledgementRequired: true } : {})

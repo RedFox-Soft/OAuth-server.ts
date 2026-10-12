@@ -105,12 +105,28 @@ export class UserStore implements UserStoreInstance {
 	): Promise<EndUserQueryResult> {
 		const stored = storedFilterOf(filter);
 		const { offset, limit } = clampPage(page, MAX_END_USER_PAGE);
+		/*
+		 * A member of one bucket group (specs/089). Read through the store registry at call time: the registry
+		 * imports this module, so a static import back would be a cycle.
+		 */
+		const members =
+			filter.memberOf === undefined
+				? null
+				: new Set(
+						await (
+							await import('../index.js')
+						)
+							.getBucketGroupStore()
+							.memberIds(filter.memberOf)
+					);
 		/* Code-unit order, which is the byte order the other two stores sort in for these ASCII-heavy keys. */
 		const key = (user: User) => (order === 'email' ? user.email : user._id);
 		const matches = [...this.users.values()]
 			.filter(
 				(user) =>
-					matchesStored(user, stored) && matchesConsoleFilter(user, filter)
+					matchesStored(user, stored) &&
+					matchesConsoleFilter(user, filter) &&
+					(members === null || members.has(user._id))
 			)
 			.sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0));
 		return {

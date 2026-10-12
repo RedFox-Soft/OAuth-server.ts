@@ -77,6 +77,18 @@ leaves the account as it was. It is also exactly what an upstream provider asks 
 [global token revocation](/docs/administer/upstream-logout/), and the audit trail records both under
 the same action.
 
+## One application, or many people
+
+- **One application.** A person's Sign-in methods tab lists the applications they are signed in to: when they
+  signed in, and when each app last got a token. **Sign out of this app** ends that application's access only. Its
+  tokens stop working, offline access included, and the person's other applications are untouched. The list shows
+  no network address or device, because the server keeps none.
+- **Many people.** Select up to 100 people in a bucket's Users list, then Deactivate, Activate, Sign out
+  everywhere or Delete them. Each person is handled exactly as if acted on alone, with their own entry in the audit
+  trail. People an act does not apply to — a directory's people for Deactivate, Activate and Delete, or anyone
+  already in that state — are skipped and counted, not failed. Agents have the same acts (`bucket_user_bulk_*`);
+  bulk deactivation and deletion are confirmed in two calls.
+
 ## Deleting a whole bucket
 
 Deleting a bucket ends everyone's access at once, but it does not destroy anything for 30 days:

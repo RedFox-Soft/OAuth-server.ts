@@ -241,6 +241,24 @@ export function locationParameter(location: string, name: string): string {
 // Preload a user into the in-memory store so the DB-backed findAccount resolves
 // `accountId`. Use in specs whose flow loads an account without going through
 // login() (e.g. CIBA login_hint, device_resume). Defaults: active + verified.
+/*
+ * A spec's seeded claims as the account a real sign-in would read. `email` and `email_verified` are the
+ * account's own fields, never stored claims (lib/consts/reserved_claims.ts), and the server derives them from
+ * the account over anything stored (lib/addon/account.ts) — so a seeded address is written where the server
+ * reads it, as an administrator's or a directory's would be.
+ */
+function seedFieldsOf(
+	claims: Record<string, unknown> | undefined
+): Partial<Omit<User, '_id'>> {
+	if (!claims) return {};
+	const { email, email_verified: verified, ...rest } = claims;
+	return {
+		claims: rest,
+		...(typeof email === 'string' ? { email } : {}),
+		...(typeof verified === 'boolean' ? { verified } : {})
+	};
+}
+
 export function seedAccount(
 	accountId: string,
 	overrides: Partial<Omit<User, '_id'>> = {},
@@ -604,7 +622,7 @@ async function bootstrap(
 		// (the resolver reads getUserStore(bucket).find(sub)). Conformance clients
 		// resolve to the default 'redfox' bucket via resolveBucketForClient. Any
 		// spec-scoped extra claims (setSeedClaims) ride along on the record.
-		seedAccount(accountId, seedClaims ? { claims: seedClaims } : {}, bucketId);
+		seedAccount(accountId, seedFieldsOf(seedClaims), bucketId);
 		await session.save();
 		return sessionCookie;
 	}

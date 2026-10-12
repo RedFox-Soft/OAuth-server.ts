@@ -154,6 +154,40 @@ export const ACTIONS = {
 		title: (t) => `Delete user ${t}?`,
 		okText: 'Delete user'
 	},
+	// The person chooses their own password from the link; nobody loses anything until they do (specs/089).
+	'user.invite': {
+		class: 'C1',
+		title: (t) => `Send ${t} an invitation?`,
+		okText: 'Send invitation'
+	},
+	'user.verified.mark': {
+		class: 'C1',
+		title: (t) => `Mark the email of ${t} as verified?`,
+		okText: 'Mark verified'
+	},
+	// Narrower than signing out everywhere, which is C1 too: the other applications are untouched.
+	'user.application.signout': {
+		class: 'C1',
+		title: (t) => `Sign out of ${t}?`,
+		okText: 'Sign out of this app'
+	},
+	// Acting on many people at once asks louder than the single act it repeats, except where it gives access back.
+	'users.bulk.deactivate': {
+		class: 'C2',
+		title: (t) => `Deactivate ${t}?`,
+		okText: 'Deactivate'
+	},
+	'users.bulk.activate': {
+		class: 'C1',
+		title: (t) => `Activate ${t}?`,
+		okText: 'Activate'
+	},
+	'users.bulk.signout': {
+		class: 'C2',
+		title: (t) => `Sign ${t} out everywhere?`,
+		okText: 'Sign out'
+	},
+	'users.bulk.delete': { class: 'C3', word: 'delete' },
 
 	'userGroup.create': { class: 'C0' },
 	'userGroup.rename': { class: 'C0' },

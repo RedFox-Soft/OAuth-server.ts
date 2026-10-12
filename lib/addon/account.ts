@@ -95,18 +95,25 @@ export async function findAccount<
 			_rejected?: readonly string[]
 		) {
 			/*
-			 * A provisioned profile yields standard claims (lib/consts/profile_claims.ts); the stored claims an
-			 * administrator set come last and win, as they always have — except `groups`, which is always the
-			 * user's actual membership: a stored value would let whoever can edit an account's claims forge what
-			 * every relying party authorizes on.
+			 * The stored claims come first, then the standard claims the profile yields
+			 * (lib/consts/profile_claims.ts) over them, then the identity the server derives. The profile wins
+			 * only for the claims it actually sets, so a stored claim it leaves empty still reaches the client.
+			 *
+			 * Until specs/089 the stored claims came last and won. That changed when a local person's profile
+			 * became editable: a profile and a claims document disagreeing must have one documented answer, and
+			 * the profile is the field an administrator edits by name. For a directory's person it means the
+			 * directory's `given_name` now beats one stored by hand — the directory is that value's owner.
+			 *
+			 * `groups` is never taken from the stored claims: it is the user's actual membership, and a stored
+			 * value would let whoever can edit an account's claims forge what every relying party authorizes on.
 			 */
 			const { groups: _stored, ...stored } = user.claims ?? {};
 			const claims: Record<string, unknown> = {
+				...stored,
+				...profileClaims(user),
 				sub,
 				email: user.email,
-				email_verified: user.verified,
-				...profileClaims(user),
-				...stored
+				email_verified: user.verified
 			};
 			const groups = await groupsClaimFor(bucketId, sub, {
 				reference: use === 'id_token',

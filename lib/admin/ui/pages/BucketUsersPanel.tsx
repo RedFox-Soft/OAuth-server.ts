@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
+	App,
 	Button,
 	Flex,
 	Form,
 	Input,
 	Modal,
+	Radio,
 	Select,
 	Space,
 	Table,
@@ -33,6 +35,7 @@ import {
 	type EndUserPage
 } from './users/endUser.js';
 import { useUserActions } from './users/useUserActions.js';
+import { BULK_LIMIT, BulkUsersBar } from './users/BulkUsersBar.js';
 
 const PAGE_SIZE = 50;
 
@@ -47,6 +50,8 @@ type FilterKey = (typeof FILTER_KEYS)[number];
 
 interface CreateValues {
 	email: string;
+	/* How the person gets a password: typed here, or chosen by them from an invitation (specs/089). */
+	access: 'password' | 'invite';
 	password?: string;
 	claimsText?: string;
 }
@@ -60,12 +65,18 @@ interface CreateValues {
  */
 export function BucketUsersPanel({
 	bucketId,
-	can
+	can,
+	mailConfigured,
+	passwordLogin
 }: {
 	bucketId: string;
 	can: BucketCan;
+	/* Whether an invitation could be sent and used; unknown (undefined) offers it and lets the server decide. */
+	mailConfigured?: boolean;
+	passwordLogin?: boolean;
 }) {
 	const feedback = useFeedback();
+	const { notification } = App.useApp();
 	const navigate = useNavigate();
 	const actions = useUserActions(bucketId);
 	const { query } = useRoute();
@@ -86,6 +97,18 @@ export function BucketUsersPanel({
 	const [pwUser, setPwUser] = useState<EndUser | null>(null);
 	const [lockUser, setLockUser] = useState<EndUser | null>(null);
 	const [createForm] = Form.useForm<CreateValues>();
+	const access = Form.useWatch('access', { form: createForm, preserve: true });
+	/*
+	 * Kept by id across pages and searches, so a selection built from several filtered views survives; the
+	 * rows themselves are kept too, because the bar forecasts skips from what it was shown.
+	 */
+	const [selected, setSelected] = useState<Map<string, EndUser>>(new Map());
+	const inviteBlocked =
+		mailConfigured === false
+			? 'Set up mail delivery first (Settings → Mail).'
+			: passwordLogin === false
+				? "This bucket doesn't sign people in with a password."
+				: null;
 
 	/* Writes the list's state into the address; the address is what the list reads. */
 	const go = useCallback(
@@ -163,24 +186,39 @@ export function BucketUsersPanel({
 	const connectionName = (id: string) =>
 		connections.find((c) => c.id === id)?.displayName ?? id;
 
-	async function onCreate({ claimsText, password, email }: CreateValues) {
+	async function onCreate({
+		claimsText,
+		password,
+		email,
+		access: how
+	}: CreateValues) {
 		const claims = parseClaims(claimsText);
+		const invite = how === 'invite';
 		setSaving(true);
 		try {
-			const result = await request<{ _id?: string }>(
-				'POST',
-				usersApi(bucketId),
-				{
-					email,
-					...(password ? { password } : {}),
-					...(Object.keys(claims).length ? { claims } : {})
-				}
-			);
+			const result = await request<{
+				_id?: string;
+				invitation?: 'sent' | 'failed';
+			}>('POST', usersApi(bucketId), {
+				email,
+				...(invite ? { invite: true } : password ? { password } : {}),
+				...(Object.keys(claims).length ? { claims } : {})
+			});
 			if (!result.ok) {
 				feedback.failed(result, createForm);
 				return;
 			}
-			feedback.done(`User ${email} created.`);
+			if (result.data.invitation === 'failed') {
+				notification.warning({
+					title: `User ${email} created, but the invitation could not be sent`,
+					description: "Send it again from the user's page.",
+					duration: 0
+				});
+			} else {
+				feedback.done(
+					invite ? `Invitation sent to ${email}.` : `User ${email} created.`
+				);
+			}
 			setCreateOpen(false);
 			createForm.resetFields();
 			// Their page is where the next thing is done: groups, a password, a verification message.
@@ -351,9 +389,54 @@ export function BucketUsersPanel({
 				}
 				create={newUserButton}
 			/>
+			{can.manageUsers && selected.size > 0 && (
+				<BulkUsersBar
+					bucketId={bucketId}
+					selected={[...selected.values()]}
+					onClear={() => setSelected(new Map())}
+					onDone={() => {
+						setSelected(new Map());
+						void reload();
+					}}
+				/>
+			)}
 			<Table<EndUser>
 				rowKey="_id"
 				loading={loading}
+				rowSelection={
+					can.manageUsers
+						? {
+								selectedRowKeys: [...selected.keys()],
+								preserveSelectedRowKeys: true,
+								// The bulk routes take at most this many; the list stops offering more rather than the server refusing.
+								getCheckboxProps: (row) => ({
+									disabled:
+										selected.size >= BULK_LIMIT && !selected.has(row._id),
+									title:
+										selected.size >= BULK_LIMIT && !selected.has(row._id)
+											? `Up to ${String(BULK_LIMIT)} people at a time`
+											: undefined
+								}),
+								onChange: (_keys, rows) => {
+									setSelected((current) => {
+										const next = new Map<string, EndUser>();
+										const shown = new Set(
+											(data?.users ?? []).map((u) => u._id)
+										);
+										// Keep what was picked on other pages; replace this page's picks with the table's.
+										for (const [id, user] of current) {
+											if (!shown.has(id)) next.set(id, user);
+										}
+										for (const row of rows) {
+											if (next.size >= BULK_LIMIT) break;
+											next.set(row._id, row);
+										}
+										return next;
+									});
+								}
+							}
+						: undefined
+				}
 				dataSource={data?.users ?? []}
 				pagination={{
 					current: page,
@@ -524,6 +607,7 @@ export function BucketUsersPanel({
 				<Form<CreateValues>
 					form={createForm}
 					layout="vertical"
+					initialValues={{ access: 'password' }}
 					onFinish={(values) => void onCreate(values)}
 					scrollToFirstError
 				>
@@ -537,16 +621,39 @@ export function BucketUsersPanel({
 						<Input autoComplete="off" />
 					</Form.Item>
 					<Form.Item
-						name="password"
-						label="Initial password"
-						rules={[{ min: 8 }]}
-						extra="Optional. Without one, they sign in through an identity provider, or you set a password later."
+						name="access"
+						label="Password"
 					>
-						<Input.Password
-							autoComplete="new-password"
-							placeholder="at least 8 characters"
-						/>
+						<Radio.Group>
+							<Radio value="password">Set a password</Radio>
+							<Tooltip title={inviteBlocked ?? undefined}>
+								<Radio
+									value="invite"
+									disabled={inviteBlocked !== null}
+								>
+									Invite by email
+								</Radio>
+							</Tooltip>
+						</Radio.Group>
 					</Form.Item>
+					{access === 'invite' ? (
+						<Typography.Paragraph type="secondary">
+							They get a message with a link to choose their own password. The
+							link works for 7 days, and opening it confirms their address.
+						</Typography.Paragraph>
+					) : (
+						<Form.Item
+							name="password"
+							label="Initial password"
+							rules={[{ min: 8 }]}
+							extra="Optional. Without one, they sign in through an identity provider, or you set a password later."
+						>
+							<Input.Password
+								autoComplete="new-password"
+								placeholder="at least 8 characters"
+							/>
+						</Form.Item>
+					)}
 					<ClaimsField />
 				</Form>
 			</Modal>

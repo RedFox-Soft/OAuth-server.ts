@@ -397,6 +397,58 @@ const routes = [
 		path: '/admin/api/buckets/:id/users/:uid/totp',
 		targetType: 'EndUser'
 	},
+	/*
+	 * A link for the person to choose their own password (specs/089). Its link never reaches the trail, and its
+	 * acceptance is the person's act, recorded nowhere, as a password reset's is.
+	 */
+	{
+		action: 'enduser.invitation.send',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/users/:uid/invitation',
+		targetType: 'EndUser'
+	},
+	/* An administrator's statement that the person controls their address. */
+	{
+		action: 'enduser.verified.mark',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/users/:uid/verified',
+		targetType: 'EndUser'
+	},
+	/* Signing the person out of one application, named in the entry's `clientId`. */
+	{
+		action: 'enduser.application.signout',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/users/:uid/sessions/:clientId/sign-out',
+		targetType: 'EndUser'
+	},
+	/*
+	 * The bulk acts (specs/089). One entry per person, never one for the request: each person's history has to
+	 * be findable by their own id, and a request's entry would name nobody.
+	 */
+	{
+		action: 'enduser.bulk.deactivate',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/users/bulk/deactivate',
+		targetType: 'EndUser'
+	},
+	{
+		action: 'enduser.bulk.activate',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/users/bulk/activate',
+		targetType: 'EndUser'
+	},
+	{
+		action: 'enduser.bulk.signout',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/users/bulk/sign-out',
+		targetType: 'EndUser'
+	},
+	{
+		action: 'enduser.bulk.delete',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/users/bulk/delete',
+		targetType: 'EndUser'
+	},
 	{
 		action: 'enduser.delete',
 		method: 'DELETE',

@@ -115,6 +115,16 @@ one difference large enough to read reliably. The accepted path still writes the
 record where the unresolvable one only reads, so the two remain distinguishable by a few milliseconds of
 datastore time; constant-time behaviour would mean doing that work either way.
 
+## Since spec 089: invitations, and two fixes
+
+The same challenge carries invitations (`purpose: 'invite'`, 7 days; [[end-user-support]]), and the reuse exposed
+two defects, both fixed:
+- **The address is checked.** `load()` refuses a challenge whose address is no longer the account's
+  (`lib/password_reset/challenge.ts:288`). Before, a link sent to an old address survived an email change, and
+  opening it verified the new one.
+- **The pointer outlives the link.** The throttle record holding the pointer to the live challenge lives
+  `max(window, challenge lifetime)` (`challenge.ts:136`), so a resend after a day still supersedes.
+
 ## Consuming a reset marks the address verified
 
 Receiving the secret proves control of the address on file — precisely what the verification challenge

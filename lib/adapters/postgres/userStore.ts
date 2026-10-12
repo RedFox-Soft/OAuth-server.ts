@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import { sql, type Sql } from './db.js';
 import { docOf } from './json.js';
 import { isUniqueViolation } from './sqlState.js';
-import { userAreaFor } from '../../consts/storage_inventory.js';
+import { STORE_AREAS, userAreaFor } from '../../consts/storage_inventory.js';
 import { documentOf } from '../documents.js';
 import {
 	clampPage,
@@ -90,9 +90,22 @@ function likePrefix(text: string): string {
 function consoleConditionsFor(
 	handle: Sql,
 	where: ReturnType<typeof conditionsFor>,
-	filter: EndUserFilter
+	filter: EndUserFilter,
+	area: string
 ) {
 	let all = where;
+	/*
+	 * A member of one bucket group (specs/089): a membership record naming this user, served by the membership
+	 * area's `(groupId, userId)` index. The user's own `id` is qualified by its table, because the membership
+	 * area has an `id` column of its own.
+	 */
+	if (filter.memberOf !== undefined) {
+		all = handle`${all} AND EXISTS (
+			SELECT 1 FROM ${handle(STORE_AREAS.bucketGroupMembers)} AS m
+			WHERE m.doc->>'groupId' = ${filter.memberOf}
+			AND m.doc->>'userId' = ${handle(area)}.id
+		)`;
+	}
 	if (filter.search !== undefined) {
 		const search = searchOf(filter.search);
 		all = handle`${all} AND (
@@ -337,7 +350,8 @@ export class UserStore implements UserStoreInstance {
 		const where = consoleConditionsFor(
 			handle,
 			conditionsFor(handle, stored),
-			filter
+			filter,
+			this.area
 		);
 		/* Byte order, as MongoDB's default comparison sorts, so a page is the same page on either backend. */
 		const orderBy =

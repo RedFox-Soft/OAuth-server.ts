@@ -6,11 +6,28 @@ import {
 	type User,
 	type UserBucket
 } from '../adapters/types.js';
+import { ApplicationConfig } from '../configs/application.js';
 import { cascadeForAccount, type CascadeResult } from '../helpers/cascade.js';
 import { emailScopedId } from '../helpers/email_scoped_id.js';
+import epochTime from '../helpers/epoch_time.js';
 import { RESERVED_CLAIMS } from '../consts/reserved_claims.js';
 import { unusablePassword } from '../helpers/unusable_password.js';
-import { notifyRelyingParties, revokeAccountAccess } from './revoke_access.js';
+import { mailDeliveryConfigured } from '../mail/mailer.js';
+import {
+	invite,
+	inviteRetryAfter,
+	type InviteOutcome
+} from '../password_reset/challenge.js';
+import { backchannelLogoutFor } from '../shared/destroy_session.js';
+import { discardPending } from '../verification/challenge.js';
+import { canSignIn } from './can_sign_in.js';
+import { changedProfileFields, validateProfile } from './profile_validation.js';
+import {
+	endGrants,
+	notifyRelyingParties,
+	revokeAccountAccess
+} from './revoke_access.js';
+import { grantsIn, sessionsIn } from './sessions.js';
 
 /*
  * Every change to an end user, whichever surface it arrives through — the admin API (and MCP, which
@@ -27,6 +44,11 @@ export type EndUserActor =
 
 /* Called once, after every check has passed and before anything is written. */
 export type RecordChange = () => Promise<unknown>;
+
+/* What an update changed that its entry names: the profile fields an edit replaced, as `profile.<field>`. */
+export interface UpdateRecordDetail {
+	profileFields: string[];
+}
 
 export class EndUserError extends Error {
 	readonly status: 404 | 409 | 422;
@@ -188,12 +210,20 @@ export async function updateEndUser(
 	actor: EndUserActor,
 	id: string,
 	input: UpdateEndUserInput,
-	record: RecordChange
+	record: (detail: UpdateRecordDetail) => Promise<unknown>
 ): Promise<UpdatedEndUser> {
 	assertClaimsAssignable(input.claims);
 	const user = await existing(bucket._id, id);
 	assertActorMayChange(actor, user);
 	assertExternalIdScoped(input.externalId, user.provisionedBy);
+	/*
+	 * An administrator writes a local person's profile through here (specs/089), and its values reach
+	 * applications as standard claims, so they are held to what those claims allow. A connection's are not.
+	 */
+	if (actor.kind === 'admin' && input.profile !== undefined) {
+		const refused = validateProfile(input.profile);
+		if (refused) throw new EndUserError(422, refused.message, refused.field);
+	}
 	/*
 	 * Refused before the record, so a taken address writes no entry: the store's unique index still decides a
 	 * race, but the ordinary case of an address somebody already holds is a refusal, not an audited change.
@@ -219,7 +249,12 @@ export async function updateEndUser(
 		patch.verified = false;
 	}
 
-	await record();
+	await record({
+		profileFields:
+			input.profile === undefined
+				? []
+				: changedProfileFields(user.profile, input.profile)
+	});
 	const updated = await getUserStore(bucket._id)
 		.update(id, patch)
 		.catch(duplicateAsError);
@@ -382,4 +417,121 @@ export async function unlockEndUser(
 	});
 	if (!unlocked) throw new EndUserError(404, 'user not found');
 	return unlocked;
+}
+
+/*
+ * Why an invitation cannot be sent in this bucket at all, whoever it is for: a bucket without a password door
+ * has nothing to set, and without mail there is no message. Asked before an account is created to invite, so
+ * a refusal leaves nothing behind.
+ */
+export async function assertInvitationsPossible(
+	bucket: UserBucket
+): Promise<void> {
+	if (!bucket.passwordLogin) {
+		throw new EndUserError(
+			409,
+			'this bucket does not sign people in with a password'
+		);
+	}
+	if (!(await mailDeliveryConfigured())) {
+		throw new EndUserError(409, 'mail delivery is not configured');
+	}
+}
+
+/*
+ * Mails a person a link to set their own password (specs/089), so no administrator invents one and hands it
+ * over. Refused for a directory's person — the directory owns their credentials and address — and for one who
+ * cannot sign in, before the entry; a send the throttle would refuse is answered as such, also before it.
+ */
+export async function inviteEndUser(
+	bucket: UserBucket,
+	actor: EndUserActor,
+	id: string,
+	record: RecordChange
+): Promise<InviteOutcome> {
+	const user = await existing(bucket._id, id);
+	assertActorMayChange(actor, user);
+	await assertInvitationsPossible(bucket);
+	if (!canSignIn(user)) {
+		throw new EndUserError(409, 'this person cannot sign in');
+	}
+	const retryAfter = await inviteRetryAfter(user, bucket);
+	if (retryAfter !== null) return { outcome: 'rate_limited', retryAfter };
+	await record();
+	return invite(user, bucket);
+}
+
+/*
+ * An administrator's statement that the person controls their address, made after confirming it some other
+ * way (specs/089). A named act rather than a field of the update: the update never lets an administrator
+ * assert verification. Refused for a directory's person, whose address trust is the connection's setting, and
+ * a no-op refusal when nothing would change, so the trail records only marks that moved something. A pending
+ * verification message stops working with it.
+ */
+export async function markEndUserVerified(
+	bucket: UserBucket,
+	actor: EndUserActor,
+	id: string,
+	record: RecordChange
+): Promise<User> {
+	const user = await existing(bucket._id, id);
+	assertActorMayChange(actor, user);
+	if (user.verified) throw new EndUserError(409, 'already verified');
+	await record();
+	const marked = await getUserStore(bucket._id).update(id, { verified: true });
+	if (!marked) throw new EndUserError(404, 'user not found');
+	await discardPending(bucket._id, user);
+	return marked;
+}
+
+/*
+ * Signs a person out of one application and leaves the others alone (specs/089): what the end-session
+ * endpoint's partial sign-out does for one session, done for every session of theirs in this bucket, and
+ * further — the application's grants go with every token under them, offline ones included, because "sign
+ * out of this app" that left a refresh token working would sign out nothing.
+ *
+ * Allowed on a directory's person, as signing out everywhere is: it ends access and edits nothing the
+ * directory owns.
+ */
+export async function endApplicationAccess(
+	bucket: UserBucket,
+	id: string,
+	clientId: string,
+	record: RecordChange
+): Promise<void> {
+	await existing(bucket._id, id);
+	const sessions = (await sessionsIn(bucket._id, id)).filter((session) =>
+		Object.hasOwn(session.payload.authorizations ?? {}, clientId)
+	);
+	const grants = (await grantsIn(bucket._id, id)).filter(
+		(grant) => grant.payload.clientId === clientId
+	);
+	if (sessions.length === 0 && grants.length === 0) {
+		throw new EndUserError(
+			404,
+			'the person is not signed in to this application'
+		);
+	}
+	await record();
+
+	const grantIds = new Set(grants.map((grant) => grant.id));
+	for (const session of sessions) {
+		/* Told while the session still names the sign-in: the logout token carries its `sid`. */
+		if (ApplicationConfig['backchannelLogout.enabled']) {
+			await backchannelLogoutFor(session, [clientId]);
+		}
+		const authorizations = session.payload.authorizations ?? {};
+		/* Present: only sessions holding this client's entry were kept above. */
+		const { grantId } = authorizations[clientId];
+		if (grantId !== undefined) grantIds.add(grantId);
+		delete authorizations[clientId];
+		/*
+		 * Saved with what was left of its life. A save renews the full lifetime by default, so the person's
+		 * other sign-ins would outlast what they signed in for because an administrator ended one of them.
+		 */
+		const remaining = (session.payload.exp ?? 0) - epochTime();
+		if (remaining > 0) await session.save(remaining);
+	}
+
+	await endGrants(grantIds);
 }

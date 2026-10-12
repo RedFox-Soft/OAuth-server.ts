@@ -23,7 +23,9 @@ export const passwordResetRoutes = new Elysia({ name: 'password-reset' })
 		'/reset-password',
 		async ({ query }) => {
 			const loaded = await load(query.token);
-			return loaded.ok ? resetFormPage(query.token) : resetFailurePage();
+			return loaded.ok
+				? resetFormPage(query.token, loaded)
+				: resetFailurePage();
 		},
 		{ query: t.Object({ token: t.String() }) }
 	)
@@ -33,14 +35,19 @@ export const passwordResetRoutes = new Elysia({ name: 'password-reset' })
 			/*
 			 * Checked here rather than in the engine, which is what keeps "a mismatch does not consume the
 			 * secret" a property of the code rather than a rule someone has to remember: `consume` is never
-			 * reached with a mismatched pair.
+			 * reached with a mismatched pair. Loaded first only so the re-rendered form keeps its own words.
 			 */
-			if (body.password !== body.confirmPassword) {
-				return resetFormPage(body.token, 'Those passwords do not match.');
-			}
-			// Before `consume`, for the same reason the check above is: a refused form spends nothing.
-			if (body.password.length < END_USER_PASSWORD_MIN_LENGTH) {
-				return resetFormPage(body.token, END_USER_PASSWORD_TOO_SHORT);
+			const refused =
+				body.password !== body.confirmPassword
+					? 'Those passwords do not match.'
+					: body.password.length < END_USER_PASSWORD_MIN_LENGTH
+						? END_USER_PASSWORD_TOO_SHORT
+						: null;
+			if (refused !== null) {
+				const loaded = await load(body.token);
+				return loaded.ok
+					? resetFormPage(body.token, loaded, refused)
+					: resetFailurePage();
 			}
 
 			const result = await consume(body.token, body.password);
@@ -48,7 +55,7 @@ export const passwordResetRoutes = new Elysia({ name: 'password-reset' })
 				return resetFailurePage();
 			}
 
-			return resetSuccessPage();
+			return resetSuccessPage(result.purpose);
 		},
 		{
 			body: t.Object({

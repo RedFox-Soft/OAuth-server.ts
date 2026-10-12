@@ -26,8 +26,10 @@ graph:
 
 Every state-changing action in the administrative control plane writes exactly one append-only record
 naming who did it, what they did, which entity it affected and when. The constitution requires this of
-*every* admin action, human- or MCP-initiated, and every mounted mutating route is subject to it (84 since
-spec 090 added `bucket.restore` and `bucket.purge`; 27 when this page was written). The trail is
+*every* admin action, human- or MCP-initiated, and every mounted mutating route is subject to it (91 since
+spec 089 added the invitation, mark-verified, per-application sign-out and four bulk routes — a bulk route writes
+one `enduser.bulk.<act>` entry per person — and an entry may carry `clientId`; 84 after spec 090; 27 when this page
+was written). The trail is
 permanent: the storage area declares no expiry, the store interface exposes no update or delete, and no
 product surface offers either (`lib/adapters/types.ts`, `lib/consts/storage_inventory.ts`).
 

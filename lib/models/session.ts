@@ -134,7 +134,12 @@ export class Session extends BaseModel<SessionPayloadType> {
 		return session;
 	}
 
-	async save() {
+	/*
+	 * `lifetime` is for a change made to a session its holder is not using at that moment — an administrator
+	 * ending one application's part of it (specs/089) — which must not extend how long the sign-in lives. A
+	 * request's own save renews the full lifetime, as it always has.
+	 */
+	async save(lifetime: number = ttl.Session) {
 		if (this.#isDestroyed) {
 			return this.id;
 		}
@@ -144,7 +149,7 @@ export class Session extends BaseModel<SessionPayloadType> {
 			this.#oldId = undefined;
 		}
 
-		const result = await super.save(ttl.Session);
+		const result = await super.save(lifetime);
 		this.touched = false;
 		return result;
 	}

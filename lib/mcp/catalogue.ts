@@ -25,6 +25,7 @@ import {
 	UpdateBucketBody
 } from '../admin/buckets/schema.js';
 import {
+	BulkUsersBody,
 	ChangeEndUserEmailBody,
 	CreateEndUserBody,
 	UpdateEndUserBody,
@@ -473,6 +474,19 @@ const catalogue = [
 			"One end-user of a bucket, as a row of bucket_user_list, and — when they are locked — who locked them: `lockedLocally.byEmail` is that administrator's email, or null when their account no longer exists."
 	},
 	{
+		tool: 'bucket_user_session_list',
+		method: 'GET',
+		path: '/admin/api/buckets/:id/users/:uid/sessions',
+		action: null,
+		consequence: 'read',
+		superAdminOnly: false,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id', 'uid'],
+		summary:
+			'The applications an end-user is signed in to in this bucket, as `{ applications }`: per application its `clientId` and `clientName`, `signedInAt`, `lastTokenAt` (when this server last issued it a token for the person — not when the application used one) and `offline` (it holds offline access no live session carries). A row with `clientId: null` is a sign-in that has reached no application yet. No network address, browser or device is stored, so none is returned. Sign the person out of one application with bucket_user_application_sign_out.'
+	},
+	{
 		tool: 'federation_provider_list',
 		method: 'GET',
 		path: '/admin/api/buckets/:id/federation',
@@ -535,7 +549,7 @@ const catalogue = [
 		querySchema: BucketGroupMemberPageQuery,
 		pathParams: ['id', 'gid'],
 		summary:
-			"A page of a bucket group's members (id, email, userName), up to 1,000 at a time, with the total."
+			"A page of a bucket group's members (id, email, userName), up to 1,000 at a time, with the total. `q` narrows it to members whose email or username starts with it, in any letter case, or whose id is exactly it; the total is then the matching members'."
 	},
 	{
 		tool: 'provisioning_connection_list',
@@ -1260,7 +1274,52 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'Create an end-user account in a bucket. Without `password` no password opens it: the person signs in through an identity provider or sets one through password reset. Its address starts verified only when the bucket does not require verification.'
+			'Create an end-user account in a bucket. Without `password` no password opens it: the person signs in through an identity provider or sets one through password reset. With `invite: true` (never together with `password`) the person is mailed a link to choose their own password, valid for 7 days; refused before the account is created when the bucket does not sign people in with a password or mail delivery is not configured, and the answer carries `invitation: sent` or `failed` — a failed send leaves the account, and bucket_user_invite sends again. Its address starts verified only when the bucket does not require verification; setting the password through the link verifies it.'
+	},
+	{
+		tool: 'bucket_user_invite',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/users/:uid/invitation',
+		action: 'enduser.invitation.send',
+		/*
+		 * Ordinary: it mails the account's own address, within the cooldown and daily cap a reset shares, and
+		 * nothing changes until the mailbox holder chooses a password.
+		 */
+		consequence: 'ordinary',
+		superAdminOnly: false,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id', 'uid'],
+		summary:
+			'Mail an end-user a link to choose their own password, valid for 7 days and once; choosing it also verifies their address. Any earlier reset or invitation link of theirs stops working, and a password they already have keeps working until they choose a new one. The answer never carries the link. Refused for a user a provisioning connection manages, when the bucket does not sign people in with a password, when mail delivery is not configured, for a user who cannot sign in (deactivated or locked), and when a message was sent too recently (429 with `retryAfter` seconds).'
+	},
+	{
+		tool: 'bucket_user_mark_verified',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/users/:uid/verified',
+		action: 'enduser.verified.mark',
+		/* Ordinary: it records what the administrator confirmed, and an address change makes it unverified again. */
+		consequence: 'ordinary',
+		superAdminOnly: false,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id', 'uid'],
+		summary:
+			"Mark an end-user's address verified, once it has been confirmed some other way; a verification message still in their inbox stops working. Refused for a user a provisioning connection manages — their address trust is the connection's setting — and, with nothing recorded, for one already verified."
+	},
+	{
+		tool: 'bucket_user_application_sign_out',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/users/:uid/sessions/:clientId/sign-out',
+		action: 'enduser.application.signout',
+		/* Ordinary, as signing out everywhere is: the protective act, narrowed to one application. */
+		consequence: 'ordinary',
+		superAdminOnly: false,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id', 'uid', 'clientId'],
+		summary:
+			"Sign an end-user out of one application: that application is told through back-channel logout, its grants end with every token under them — offline refresh tokens included — and it must ask for consent again. The person's other applications and their sign-in stay as they were. Works on users a provisioning connection manages. 404 when the person is not signed in to that application; read where they are with bucket_user_session_list."
 	},
 	{
 		tool: 'bucket_user_email_change',
@@ -1304,7 +1363,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'uid'],
 		summary:
-			"Change an end-user's active state or claims. Their groups are changed with bucket_group_member_add and bucket_group_member_remove. Claims replace the account's whole set; sub, email, email_verified and the protocol claims are refused, and a claim is released to a client only once the `claims` setting names it under a scope. Deactivating ends the user's access at once — every session and token, with a logout notice to each relying party registered for one — but keeps the account; reactivating restores sign-in only, never the old tokens or consents."
+			"Change an end-user's active state, claims or profile. `profile` replaces the whole profile of a user administrators manage (refused for one a provisioning connection manages) and reaches tokens as standard claims under the scope the `claims` setting maps them to: `name.givenName` → given_name, `name.familyName` → family_name, `name.middleName` → middle_name, `name.formatted` (else `displayName`) → name, `nickName` → nickname, `locale` → locale (a BCP 47 tag), `timezone` → zoneinfo (a time-zone name such as Europe/Berlin) and the primary of `phoneNumbers` → phone_number (international form, +14155550100); an invalid value is refused with 422 naming `profile.<field>`. Where the profile sets a claim the stored claims also hold, the profile's wins. Their groups are changed with bucket_group_member_add and bucket_group_member_remove. Claims replace the account's whole set; sub, email, email_verified and the protocol claims are refused, and a claim is released to a client only once the `claims` setting names it under a scope. Deactivating ends the user's access at once — every session and token, with a logout notice to each relying party registered for one — but keeps the account; reactivating restores sign-in only, never the old tokens or consents."
 	},
 	{
 		tool: 'bucket_user_totp_clear',
@@ -1394,6 +1453,61 @@ const catalogue = [
 		pathParams: ['id', 'uid'],
 		summary:
 			'Permanently delete an end-user account and everything issued to it; relying parties registered for back-channel logout are told the user signed out. Irreversible.'
+	},
+	{
+		tool: 'bucket_user_bulk_deactivate',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/users/bulk/deactivate',
+		action: 'enduser.bulk.deactivate',
+		/* High where the single deactivation is ordinary: one call ends access for up to a hundred people. */
+		consequence: 'high',
+		superAdminOnly: false,
+		bodySchema: BulkUsersBody,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			'Deactivate up to 100 end-users of a bucket, named by id, each exactly as bucket_user_update with `active: false` would: their sessions and tokens end and relying parties are told. Answers `{ results }`, one per id in the order given: `changed`, `skipped` with a `reason` (`provisioned`, `already_inactive`, `not_found`) or `failed` with a `reason`. Each person gets their own audit entry. Repeating the call is harmless.'
+	},
+	{
+		tool: 'bucket_user_bulk_activate',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/users/bulk/activate',
+		action: 'enduser.bulk.activate',
+		/* Ordinary, as the single reactivation is; it never lifts a lock. */
+		consequence: 'ordinary',
+		superAdminOnly: false,
+		bodySchema: BulkUsersBody,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			'Reactivate up to 100 end-users of a bucket, named by id. A locked user stays locked — unlocking is bucket_user_unlock, one person at a time. Answers `{ results }`, one per id: `changed`, `skipped` with a `reason` (`provisioned`, `already_active`, `not_found`) or `failed`. Each person gets their own audit entry.'
+	},
+	{
+		tool: 'bucket_user_bulk_sign_out',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/users/bulk/sign-out',
+		action: 'enduser.bulk.signout',
+		/* Ordinary, as the single sign-out is: the accounts stay active and may sign in again at once. */
+		consequence: 'ordinary',
+		superAdminOnly: false,
+		bodySchema: BulkUsersBody,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			'Sign up to 100 end-users of a bucket out everywhere, named by id, each as bucket_user_sign_out would; users a provisioning connection manages included. Answers `{ results }`, one per id: `changed`, `skipped` (`not_found`) or `failed`. Each person gets their own audit entry.'
+	},
+	{
+		tool: 'bucket_user_bulk_delete',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/users/bulk/delete',
+		action: 'enduser.bulk.delete',
+		consequence: 'high',
+		superAdminOnly: false,
+		bodySchema: BulkUsersBody,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			'Permanently delete up to 100 end-users of a bucket, named by id, each as bucket_user_delete would, with everything issued to them. Irreversible. Answers `{ results }`, one per id: `changed`, `skipped` with a `reason` (`provisioned`, `not_found`) or `failed` with a `reason` and, when records survived the sweep, `failedAreas`. Each person gets their own audit entry.'
 	},
 
 	/* ---------------------------------------------- writes: federation (5) */

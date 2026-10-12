@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import { entriesOf } from '../../helpers/_/object.js';
 import { db } from './db.js';
 import { ABSENT_UNDEFINED } from './write_options.js';
-import { userAreaFor } from '../../consts/storage_inventory.js';
+import { STORE_AREAS, userAreaFor } from '../../consts/storage_inventory.js';
 import { documentOf } from '../documents.js';
 import {
 	clampPage,
@@ -270,6 +270,17 @@ export class UserStore implements UserStoreInstance {
 		 * no operator a caller chose; a caller's text reaches it only as a value or as an escaped pattern.
 		 */
 		const clauses = consoleClauses(filter);
+		/*
+		 * A member of one bucket group (specs/089): the group's membership ids, then those users. One `$in`
+		 * holds a group of tens of thousands, and the membership area's `groupId` index serves the read.
+		 */
+		if (filter.memberOf !== undefined) {
+			const memberships = await db
+				.collection<{ userId: string }>(STORE_AREAS.bucketGroupMembers)
+				.find({ groupId: filter.memberOf }, { projection: { userId: 1 } })
+				.toArray();
+			clauses.push({ _id: { $in: memberships.map((m) => m.userId) } });
+		}
 		const stored =
 			clauses.length === 0
 				? storedFilterOf(filter)

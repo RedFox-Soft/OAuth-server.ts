@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import {
+	Alert,
 	Button,
 	Card,
 	Descriptions,
@@ -23,6 +24,7 @@ import type { BucketView } from '../bucketView.js';
 import type { ConnectionView } from '../ProvisioningPanel.js';
 import { nameOf, usersApi, type EndUser } from './endUser.js';
 import { useUserActions } from './useUserActions.js';
+import { ProfileCard, profileSetClaims } from './ProfileCard.js';
 
 interface AssignValues {
 	connectionId: string;
@@ -158,6 +160,11 @@ export function UserProfileTab({
 	}
 
 	const claims = Object.entries(user.claims ?? {});
+	// A claim the profile sets wins over the same claim here (specs/089 FR-018), so say which ones.
+	const fromProfile = profileSetClaims(user);
+	const overridden = claims
+		.map(([key]) => key)
+		.filter((key) => fromProfile.has(key));
 	const mayAssign = can.edit && local && connections.length > 0;
 	const mayDelete = manage && local;
 
@@ -196,13 +203,26 @@ export function UserProfileTab({
 									) : (
 										<Tag color="orange">Unverified</Tag>
 									)}
-									{manage && !user.verified && (
+									{/* A directory decides whether its addresses are trusted (specs/089): both acts are local only. */}
+									{manage && local && !user.verified && (
 										<Button
 											size="small"
 											loading={resending}
 											onClick={() => void onResend()}
 										>
 											Resend verification
+										</Button>
+									)}
+									{manage && local && !user.verified && (
+										<Button
+											size="small"
+											onClick={() =>
+												void actions.markVerified(user).then((done) => {
+													if (done) onChanged();
+												})
+											}
+										>
+											Mark verified…
 										</Button>
 									)}
 									{manage && local && (
@@ -259,6 +279,16 @@ export function UserProfileTab({
 				/>
 			</Card>
 
+			<ProfileCard
+				bucketId={bucketId}
+				user={user}
+				editable={manage && local}
+				managedBy={
+					user.provisionedBy ? connectionName(user.provisionedBy) : null
+				}
+				onChanged={onChanged}
+			/>
+
 			<Card
 				title="Claims"
 				extra={
@@ -267,6 +297,14 @@ export function UserProfileTab({
 					) : undefined
 				}
 			>
+				{overridden.length > 0 && (
+					<Alert
+						type="info"
+						showIcon
+						style={{ marginBottom: 12 }}
+						title={`The profile's ${overridden.join(', ')} ${overridden.length === 1 ? 'is' : 'are'} used instead of the value here.`}
+					/>
+				)}
 				{claims.length === 0 ? (
 					<Typography.Text type="secondary">
 						No claims of their own. A client receives only the account's email

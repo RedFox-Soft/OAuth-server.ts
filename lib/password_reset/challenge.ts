@@ -7,7 +7,8 @@ import {
 } from '../adapters/index.js';
 import {
 	PasswordResetChallengePayload,
-	PasswordResetThrottlePayload
+	PasswordResetThrottlePayload,
+	type SetPasswordPurpose
 } from './types.js';
 import type { User, UserBucket } from '../adapters/types.js';
 import { ISSUER } from '../configs/env.js';
@@ -22,10 +23,15 @@ import {
 	rateRefusal,
 	type RateBounds
 } from '../helpers/rate_window.js';
-import { sendPasswordResetEmail } from '../mail/send.js';
+import { MailNotConfiguredError } from '../mail/mailer.js';
+import {
+	sendPasswordResetEmail,
+	sendUserInvitationEmail
+} from '../mail/send.js';
 import { selfServiceResetAllowed } from './eligibility.js';
 import { ReplayDetection } from '../models/replay_detection.js';
 import {
+	INVITE_TTL_SECONDS,
 	RESET_TTL_SECONDS,
 	REQUEST_COOLDOWN_SECONDS,
 	REQUEST_DAILY_CAP,
@@ -76,13 +82,24 @@ export function resetUrlFor(token: string): string {
 export type RequestOutcome =
 	{ ok: true; sent: boolean } | { ok: false; reason: 'cooldown' | 'daily' };
 
+/* What one issue is for, how long its secret lives, and how its message goes out. */
+interface IssuePlan {
+	purpose: SetPasswordPurpose;
+	ttl: number;
+	send: (to: string, bucketName: string, url: string) => Promise<void>;
+}
+
 /*
  * Issue a fresh secret for the account and deliver it. The plaintext token exists only as a local and
  * inside the outgoing message: it is never returned, never logged, and never written.
+ *
+ * A reset and an invitation share this, and the one outstanding secret per person: whichever was issued last
+ * is the only one that works, so an invitation supersedes a reset link and the reverse.
  */
 async function issueAndSend(
 	user: Pick<User, '_id' | 'email'>,
-	bucket: Pick<UserBucket, '_id' | 'name'>
+	bucket: Pick<UserBucket, '_id' | 'name'>,
+	plan: IssuePlan
 ): Promise<void> {
 	const token = newToken();
 	const id = challengeId(token);
@@ -105,11 +122,18 @@ async function issueAndSend(
 			accountId: user._id,
 			bucketId: bucket._id,
 			email: user.email.toLowerCase(),
-			exp: now + RESET_TTL_SECONDS
+			exp: now + plan.ttl,
+			purpose: plan.purpose
 		},
-		RESET_TTL_SECONDS
+		plan.ttl
 	);
 
+	/*
+	 * The pointer that supersedes a link must live as long as that link. Bounded by the rate window alone, a
+	 * seven-day invitation resent after a day found no pointer, and the first link stayed alive beside the
+	 * second. `windowStart` still measures the cap, so a longer-lived record limits nothing more.
+	 */
+	const recordTtl = Math.max(REQUEST_WINDOW_SECONDS, plan.ttl);
 	// Every issue counts against the window: unlike verification, whose initial registration send is free,
 	// there is no "initial" reset.
 	await throttles().upsert(
@@ -117,26 +141,35 @@ async function issueAndSend(
 		{
 			...nextRateFields(prior, now, REQUEST_BOUNDS, true),
 			challengeId: id,
-			exp: now + REQUEST_WINDOW_SECONDS
+			exp: now + recordTtl
 		},
-		REQUEST_WINDOW_SECONDS
+		recordTtl
 	);
 
-	/*
-	 * Sent off the request path. A send happens only for an address that has an account, and an SMTP
-	 * round-trip is hundreds of milliseconds, so awaiting it made the response time answer the question
-	 * the uniform page refuses to. A failure is logged for the operator and is invisible to the
-	 * requester, as it was when awaited; the secret stays valid, so a retry after the cooldown costs
-	 * nothing.
-	 */
-	const appName = bucket.name || 'the application';
-	void sendPasswordResetEmail({
-		email: user.email,
-		appName,
-		resetUrl: resetUrlFor(token)
-	}).catch((err: unknown) => {
-		console.error('password reset email could not be delivered:', err);
-	});
+	await plan.send(
+		user.email,
+		bucket.name || 'the application',
+		resetUrlFor(token)
+	);
+}
+
+/*
+ * The self-service reset's delivery: sent off the request path. A send happens only for an address that has
+ * an account, and an SMTP round-trip is hundreds of milliseconds, so awaiting it made the response time answer
+ * the question the uniform page refuses to. A failure is logged for the operator and is invisible to the
+ * requester, as it was when awaited; the secret stays valid, so a retry after the cooldown costs nothing.
+ */
+function sendResetInBackground(
+	to: string,
+	appName: string,
+	resetUrl: string
+): Promise<void> {
+	void sendPasswordResetEmail({ email: to, appName, resetUrl }).catch(
+		(err: unknown) => {
+			console.error('password reset email could not be delivered:', err);
+		}
+	);
+	return Promise.resolve();
 }
 
 /*
@@ -180,7 +213,11 @@ export async function request(
 	}
 
 	try {
-		await issueAndSend(user, bucket);
+		await issueAndSend(user, bucket, {
+			purpose: 'reset',
+			ttl: RESET_TTL_SECONDS,
+			send: sendResetInBackground
+		});
 	} catch (err) {
 		/*
 		 * Issuing only happens for an address that *does* have an account here, so surfacing a failure to
@@ -195,7 +232,14 @@ export async function request(
 }
 
 export type LoadOutcome =
-	| { ok: true; id: string; challenge: PasswordResetChallengePayload }
+	| {
+			ok: true;
+			id: string;
+			challenge: PasswordResetChallengePayload;
+			purpose: SetPasswordPurpose;
+			/* For the page's words: an invitation names the place the person is invited to. */
+			bucketName: string;
+	  }
 	| { ok: false };
 
 /*
@@ -235,12 +279,31 @@ export async function load(token: string): Promise<LoadOutcome> {
 	if (!user || !canSignIn(user)) {
 		return { ok: false };
 	}
+	/*
+	 * A secret proves control of the mailbox it reached, and nothing else. Once the account's address changes,
+	 * a link mailed to the old one must not set a password — nor mark the new address verified, which consuming
+	 * does. The same rule, and the same indistinguishable refusal, as verification's `addressStillHeld`
+	 * (lib/verification/challenge.ts).
+	 */
+	if (user.email.toLowerCase() !== challenge.email) {
+		return { ok: false };
+	}
 
-	return { ok: true, id, challenge };
+	return {
+		ok: true,
+		id,
+		challenge,
+		purpose: challenge.purpose ?? 'reset',
+		bucketName: bucket?.name || 'the application'
+	};
 }
 
 export type ConsumeOutcome =
-	| { ok: true; failedAreas: readonly string[] }
+	| {
+			ok: true;
+			failedAreas: readonly string[];
+			purpose: SetPasswordPurpose;
+	  }
 	| { ok: false; reason: 'invalid' };
 
 /*
@@ -310,5 +373,81 @@ export async function consume(
 		);
 	}
 
-	return { ok: true, failedAreas: swept.failedAreas };
+	return {
+		ok: true,
+		failedAreas: swept.failedAreas,
+		purpose: loaded.purpose
+	};
+}
+
+export type InviteOutcome =
+	| { outcome: 'sent' }
+	| { outcome: 'rate_limited'; retryAfter: number }
+	| { outcome: 'mail_not_configured' | 'delivery_failed' };
+
+/*
+ * Seconds until a message to this person may be sent again, or null when one may be sent now. The same
+ * counters a reset request spends, so alternating the two is no way round either bound. For a caller that must
+ * decide before it records anything: an administrator's invitation is audited first.
+ */
+export async function inviteRetryAfter(
+	user: Pick<User, 'email'>,
+	bucket: Pick<UserBucket, '_id'>
+): Promise<number | null> {
+	const prior = await throttles().find(throttleKey(bucket._id, user.email));
+	const now = epochTime();
+	const refusal = rateRefusal(prior, now, REQUEST_BOUNDS);
+	if (!refusal || !prior) return null;
+	const until =
+		refusal === 'cooldown'
+			? prior.lastSentAt + REQUEST_BOUNDS.cooldownSeconds
+			: prior.windowStart + REQUEST_BOUNDS.windowSeconds;
+	return Math.max(1, until - now);
+}
+
+/*
+ * An administrator's invitation for a person to set their own password (specs/089): the reset's secret, with a
+ * week's life and its own message. Awaited, unlike a self-service reset: the administrator chose the address
+ * and must learn that the message did not go, and a secret whose message never left is destroyed, so the
+ * person's page does not suggest a link is out there.
+ *
+ * The route refuses a provisioned person, a bucket without passwords and a person who cannot sign in before it
+ * records anything; this asserts the same, so no other caller can mail a link that would set a password a
+ * directory owns or that no door would accept.
+ */
+export async function invite(
+	user: User,
+	bucket: UserBucket
+): Promise<InviteOutcome> {
+	if (
+		user.provisionedBy !== undefined ||
+		!canSignIn(user) ||
+		!selfServiceResetAllowed(bucket._id, bucket)
+	) {
+		throw new Error('this person cannot be invited to set a password');
+	}
+
+	const retryAfter = await inviteRetryAfter(user, bucket);
+	if (retryAfter !== null) {
+		return { outcome: 'rate_limited', retryAfter };
+	}
+
+	try {
+		await issueAndSend(user, bucket, {
+			purpose: 'invite',
+			ttl: INVITE_TTL_SECONDS,
+			send: (to, bucketName, url) =>
+				sendUserInvitationEmail(to, { bucketName, url })
+		});
+		return { outcome: 'sent' };
+	} catch (err) {
+		const issued = await throttles().find(throttleKey(bucket._id, user.email));
+		if (issued?.challengeId) await challenges().destroy(issued.challengeId);
+		return {
+			outcome:
+				err instanceof MailNotConfiguredError
+					? 'mail_not_configured'
+					: 'delivery_failed'
+		};
+	}
 }

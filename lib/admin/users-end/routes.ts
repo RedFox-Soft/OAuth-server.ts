@@ -15,6 +15,7 @@ import {
 import { loadBucketForUsers } from '../buckets/access.js';
 import {
 	ALLOWED_USER_LIST_PARAMS,
+	BulkUsersBody,
 	ChangeEndUserEmailBody,
 	CreateEndUserBody,
 	LockEndUserBody,
@@ -29,9 +30,13 @@ import { endSessionsForAccount } from '../../helpers/cascade.js';
 import { clearAttempts } from '../../totp/verify.js';
 import nanoid from '../../helpers/nanoid.js';
 import {
+	assertInvitationsPossible,
 	createEndUser,
+	endApplicationAccess,
 	EndUserError,
+	inviteEndUser,
 	lockEndUser,
+	markEndUserVerified,
 	removeEndUser,
 	resetEndUserPassword,
 	revokeEndUserAccess,
@@ -39,6 +44,10 @@ import {
 	updateEndUser,
 	type EndUserActor
 } from '../../end_users/service.js';
+import { applyBulk, type BulkAct } from '../../end_users/bulk.js';
+import { applicationSessions } from '../../end_users/sessions.js';
+import type { InviteOutcome } from '../../password_reset/challenge.js';
+import type { AuditAction } from '../../consts/admin_audit_routes.js';
 
 /* Every change made here is an administrator's. */
 const ADMIN: EndUserActor = { kind: 'admin' };
@@ -184,6 +193,22 @@ function listFilterOf(query: typeof UserListQuery.static): EndUserFilter {
 	return filter;
 }
 
+async function bulk(
+	admin: Parameters<typeof assertAuth>[0],
+	bucketId: string,
+	userIds: readonly string[],
+	act: BulkAct
+) {
+	const ctx = assertAuth(admin);
+	const bucket = await loadBucketForUsers(ctx, bucketId);
+	const action = BULK_ACTIONS[act];
+	return {
+		results: await applyBulk(bucket, act, userIds, (id) =>
+			recordAdminAudit(ctx, action, id, { targetScope: bucketId })
+		)
+	};
+}
+
 /* One person with their groups, as a row of the list is. */
 async function presentOne(bucketId: string, user: User) {
 	const [row] = await withGroups(bucketId, [user]);
@@ -193,6 +218,33 @@ async function presentOne(bucketId: string, user: User) {
 const NOT_CONFIGURED =
 	'Mail delivery is not configured, so no message can be sent.';
 const RATE_LIMITED = 'A message was sent recently. Try again in a minute.';
+
+/* An invitation's outcome as the route answers it; `sent` is the only one that is not a refusal. */
+function invitationRefusal(outcome: InviteOutcome): AdminError | null {
+	switch (outcome.outcome) {
+		case 'sent':
+			return null;
+		case 'rate_limited':
+			return new AdminError(429, RATE_LIMITED, {
+				retryAfter: outcome.retryAfter
+			});
+		case 'mail_not_configured':
+			return new AdminError(409, NOT_CONFIGURED);
+		case 'delivery_failed':
+			return new AdminError(
+				502,
+				'The invitation could not be sent. Try again later.'
+			);
+	}
+}
+
+/* The action each bulk act's per-person entries record. */
+const BULK_ACTIONS: Readonly<Record<BulkAct, AuditAction>> = {
+	deactivate: 'enduser.bulk.deactivate',
+	activate: 'enduser.bulk.activate',
+	'sign-out': 'enduser.bulk.signout',
+	delete: 'enduser.bulk.delete'
+};
 
 export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 	.use(resolveAdmin)
@@ -253,6 +305,16 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 		async ({ admin, params, body, set }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForUsers(ctx, params.id);
+			const inviting = body.invite === true;
+			if (inviting && body.password !== undefined) {
+				throw new AdminError(
+					422,
+					'choose either a password or an invitation, not both',
+					{ field: 'invite' }
+				);
+			}
+			/* Before the account exists, so a bucket that cannot invite leaves no password-less account behind. */
+			if (inviting) await asAdmin(assertInvitationsPossible(bucket));
 			// Allocated here so the entry names the account that is about to exist. The bucket travels as
 			// the scope: these users live in per-bucket storage, so an id alone resolves to nobody.
 			const userId = nanoid();
@@ -276,7 +338,20 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 				)
 			);
 			set.status = 201;
-			return presentUser(user);
+			if (!inviting) return presentUser(user);
+			/*
+			 * The account exists whatever happens to the message, so a failed send is reported beside it rather
+			 * than as the request's failure: the person's page offers to send it again.
+			 */
+			const sent = await inviteEndUser(bucket, ADMIN, userId, () =>
+				recordAdminAudit(ctx, 'enduser.invitation.send', userId, {
+					targetScope: params.id
+				})
+			).catch(() => null);
+			return {
+				...presentUser(user),
+				invitation: sent?.outcome === 'sent' ? 'sent' : 'failed'
+			};
 		},
 		{ body: CreateEndUserBody }
 	)
@@ -286,11 +361,15 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForUsers(ctx, params.id);
 			const { user, revoked } = await asAdmin(
-				updateEndUser(bucket, ADMIN, params.uid, body, () =>
-					// Names only: the values are personal data, and the trail is kept longer than the account.
+				updateEndUser(bucket, ADMIN, params.uid, body, ({ profileFields }) =>
+					// Names only: the values are personal data, and the trail is kept longer than the account. A
+					// profile is named by the fields it changed, so a full replace does not read as "everything".
 					recordAdminAudit(ctx, 'enduser.update', params.uid, {
 						targetScope: params.id,
-						attributes: Object.keys(body)
+						attributes: [
+							...Object.keys(body).filter((key) => key !== 'profile'),
+							...profileFields
+						]
 					})
 				)
 			);
@@ -379,6 +458,13 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 			const bucket = await loadBucketForUsers(ctx, params.id);
 			const user = await getUserStore(params.id).find(params.uid);
 			if (!user) throw new AdminError(404, 'user not found');
+			/* A directory owns its people's address trust; whether they are verified is its connection's say. */
+			if (user.provisionedBy !== undefined) {
+				throw new AdminError(
+					409,
+					`user is managed by connection ${user.provisionedBy}`
+				);
+			}
 			if (user.verified) {
 				throw new AdminError(409, 'The address is already verified.');
 			}
@@ -409,6 +495,86 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 						'The message could not be sent. Try again later.'
 					);
 			}
+		}
+	)
+	/*
+	 * Mails the person a link to choose their own password, valid for seven days; any earlier reset or
+	 * invitation link of theirs stops working. Every refusal that can be known first — a directory's person, a
+	 * bucket without passwords, mail not configured, a person who cannot sign in, the throttle — comes before
+	 * the entry. Answers 204 and never the link: choosing the password is the person's act.
+	 */
+	.post(
+		'/admin/api/buckets/:id/users/:uid/invitation',
+		async ({ admin, params, set }) => {
+			const ctx = assertAuth(admin);
+			const bucket = await loadBucketForUsers(ctx, params.id);
+			const outcome = await asAdmin(
+				inviteEndUser(bucket, ADMIN, params.uid, () =>
+					recordAdminAudit(ctx, 'enduser.invitation.send', params.uid, {
+						targetScope: params.id
+					})
+				)
+			);
+			const refusal = invitationRefusal(outcome);
+			if (refusal) throw refusal;
+			set.status = 204;
+		}
+	)
+	/*
+	 * An administrator's statement that the person controls their address, confirmed some other way. A
+	 * pending verification message stops working with it; a directory's person and an already verified one are
+	 * refused before the entry.
+	 */
+	.post(
+		'/admin/api/buckets/:id/users/:uid/verified',
+		async ({ admin, params }) => {
+			const ctx = assertAuth(admin);
+			const bucket = await loadBucketForUsers(ctx, params.id);
+			const user = await asAdmin(
+				markEndUserVerified(bucket, ADMIN, params.uid, () =>
+					recordAdminAudit(ctx, 'enduser.verified.mark', params.uid, {
+						targetScope: params.id
+					})
+				)
+			);
+			return presentOne(params.id, user);
+		}
+	)
+	/*
+	 * The applications the person is signed in to here, one row each, with when they signed in and when the
+	 * application last received a token. Names and times only — no address, browser or device is stored.
+	 */
+	.get(
+		'/admin/api/buckets/:id/users/:uid/sessions',
+		async ({ admin, params }) => {
+			const ctx = assertAuth(admin);
+			const bucket = await loadBucketForUsers(ctx, params.id);
+			const user = await getUserStore(params.id).find(params.uid);
+			if (!user) throw new AdminError(404, 'user not found');
+			return { applications: await applicationSessions(bucket, params.uid) };
+		}
+	)
+	/*
+	 * Signs the person out of one application and no other: that application is told through back-channel
+	 * logout, its part of each session goes, and its grants go with every token under them, offline ones
+	 * included. The person stays signed in everywhere else.
+	 */
+	.post(
+		'/admin/api/buckets/:id/users/:uid/sessions/:clientId/sign-out',
+		async ({ admin, params, set }) => {
+			const ctx = assertAuth(admin);
+			const bucket = await loadBucketForUsers(ctx, params.id);
+			/* Decoded by Elysia: a client id may be a URL, which the caller encodes as one path segment. */
+			const { clientId } = params;
+			await asAdmin(
+				endApplicationAccess(bucket, params.uid, clientId, () =>
+					recordAdminAudit(ctx, 'enduser.application.signout', params.uid, {
+						targetScope: params.id,
+						clientId
+					})
+				)
+			);
+			set.status = 204;
 		}
 	)
 	/*
@@ -526,6 +692,35 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 			}
 			return { ok: true };
 		}
+	)
+	/*
+	 * One act for up to a hundred people, named by id (specs/089). Each person is handled by the single act's
+	 * service function, with its own entry under `enduser.bulk.<act>`; people the act does not apply to are
+	 * skipped with the reason, and one person's failure is reported as theirs. Always 200: the answer says what
+	 * happened to each, so repeating a request is harmless.
+	 */
+	.post(
+		'/admin/api/buckets/:id/users/bulk/deactivate',
+		({ admin, params, body }) =>
+			bulk(admin, params.id, body.userIds, 'deactivate'),
+		{ body: BulkUsersBody }
+	)
+	.post(
+		'/admin/api/buckets/:id/users/bulk/activate',
+		({ admin, params, body }) =>
+			bulk(admin, params.id, body.userIds, 'activate'),
+		{ body: BulkUsersBody }
+	)
+	.post(
+		'/admin/api/buckets/:id/users/bulk/sign-out',
+		({ admin, params, body }) =>
+			bulk(admin, params.id, body.userIds, 'sign-out'),
+		{ body: BulkUsersBody }
+	)
+	.post(
+		'/admin/api/buckets/:id/users/bulk/delete',
+		({ admin, params, body }) => bulk(admin, params.id, body.userIds, 'delete'),
+		{ body: BulkUsersBody }
 	)
 	.delete('/admin/api/buckets/:id/users/:uid', async ({ admin, params }) => {
 		const ctx = assertAuth(admin);

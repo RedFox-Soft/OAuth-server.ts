@@ -18,6 +18,7 @@ export const clients = [
 	{
 		clientId: 'client',
 		clientSecret: 'secret',
+		client_name: 'Checkout',
 		responseTypes: ['code'],
 		grantTypes: ['authorization_code', 'refresh_token'],
 		redirectUris: ['https://client.example.com/cb'],

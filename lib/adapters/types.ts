@@ -189,6 +189,8 @@ export interface EndUserFilter {
 	totpEnrolled?: boolean;
 	/* No provisioning connection manages the user (true), or one does (false). */
 	local?: boolean;
+	/* A member of this bucket group (specs/089): the search box over one group's members. */
+	memberOf?: string;
 }
 
 /*
@@ -711,6 +713,11 @@ export const AdminAuditEntry = t.Object({
 	 * name them all; `kid` stays the primary one. Key ids are public, so the map may carry them.
 	 */
 	keys: t.Optional(t.Union([t.Record(t.String(), t.String()), t.Null()])),
+	/*
+	 * The application an end user was signed out of (`enduser.application.signout`, specs/089). A client id is
+	 * public — every authorization request carries it — so the entry may name it.
+	 */
+	clientId: t.Optional(t.Union([t.String(), t.Null()])),
 	/*
 	 * An address change (`bucket.address.change`): the slug or hostname the bucket answered at, and the one it
 	 * answers at now, null for none. Addresses are public, unlike field values. Entries written before these

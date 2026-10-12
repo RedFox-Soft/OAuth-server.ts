@@ -49,6 +49,8 @@ export interface AuditDetail {
 	 * `signing` (specs/087). One act, one entry, however many keys it touched.
 	 */
 	keys?: Record<string, string>;
+	/* The application an end user was signed out of (specs/089). Public, as a client id always is. */
+	clientId?: string;
 	/*
 	 * An address change (`bucket.address.change`): the address the bucket answered at and the one it
 	 * answers at now, a slug or a hostname, or null for none. Addresses are public, unlike field values.
@@ -242,6 +244,9 @@ async function write(input: {
 				: { formerBucketId: input.detail.formerBucketId }),
 			...(input.detail.kid === undefined ? {} : { kid: input.detail.kid }),
 			...(input.detail.keys === undefined ? {} : { keys: input.detail.keys }),
+			...(input.detail.clientId === undefined
+				? {}
+				: { clientId: input.detail.clientId }),
 			...(input.detail.from === undefined ? {} : { from: input.detail.from }),
 			...(input.detail.to === undefined ? {} : { to: input.detail.to }),
 			...(input.detail.scheduledAt === undefined

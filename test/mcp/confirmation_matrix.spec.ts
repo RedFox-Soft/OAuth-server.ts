@@ -60,6 +60,8 @@ const BODIES: Record<string, Record<string, unknown>> = {
 		password: 'a new password that is long enough'
 	},
 	bucket_user_email_change: { email: 'moved@example.com' },
+	bucket_user_bulk_deactivate: { userIds: ['absent-user'] },
+	bucket_user_bulk_delete: { userIds: ['absent-user'] },
 	jwks_generate: { alg: 'RS256' },
 	jwks_rotate: { alg: 'RS256' },
 	bucket_user_assign_connection: { connectionId: 'any', userName: 'someone' },
@@ -108,7 +110,7 @@ describe('every high-consequence tool is gated', () => {
 		 * membership is named in catalogue_drift rather than counted here.
 		 */
 		expect(HIGH.length).toBeGreaterThan(0);
-		expect(HIGH.length).toBe(38);
+		expect(HIGH.length).toBe(40);
 	});
 
 	it.each(HIGH.map((t) => [t.tool, t] as const))(

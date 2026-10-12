@@ -307,6 +307,8 @@ export function BucketDetail({
 				<BucketUsersPanel
 					bucketId={bucketId}
 					can={can}
+					mailConfigured={summary?.mailDeliveryConfigured}
+					passwordLogin={bucket.passwordLogin}
 				/>
 			)}
 

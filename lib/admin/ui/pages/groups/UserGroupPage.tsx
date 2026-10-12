@@ -84,6 +84,9 @@ export function UserGroupPage({
 	const [memberTotal, setMemberTotal] = useState(0);
 	const [memberPage, setMemberPage] = useState(1);
 	const [membersLoading, setMembersLoading] = useState(true);
+	// What is typed, and what was last asked of the server once typing paused (specs/089 US6).
+	const [memberSearch, setMemberSearch] = useState('');
+	const [memberQ, setMemberQ] = useState('');
 	const [adding, setAdding] = useState<string[]>([]);
 	const [addBusy, setAddBusy] = useState(false);
 	const [renaming, setRenaming] = useState(false);
@@ -130,13 +133,15 @@ export function UserGroupPage({
 	const fetchMembers = useCallback(
 		async (page: number) => {
 			try {
+				const params = new URLSearchParams({
+					startIndex: String((page - 1) * PAGE + 1),
+					count: String(PAGE)
+				});
+				if (memberQ) params.set('q', memberQ);
 				const result = await request<{
 					totalResults: number;
 					members: MemberView[];
-				}>(
-					'GET',
-					`${api}/members?startIndex=${(page - 1) * PAGE + 1}&count=${PAGE}`
-				);
+				}>('GET', `${api}/members?${params.toString()}`);
 				if (!result.ok) {
 					feedback.failed(result);
 					return;
@@ -148,13 +153,22 @@ export function UserGroupPage({
 				setMembersLoading(false);
 			}
 		},
-		[api, feedback]
+		[api, feedback, memberQ]
 	);
 
 	useEffect(() => {
 		void fetchGroup();
+	}, [fetchGroup]);
+	// A new search starts at its first page.
+	useEffect(() => {
 		void fetchMembers(1);
-	}, [fetchGroup, fetchMembers]);
+	}, [fetchMembers]);
+	useEffect(() => {
+		const next = memberSearch.trim();
+		if (next === memberQ) return;
+		const timer = setTimeout(() => setMemberQ(next), 300);
+		return () => clearTimeout(timer);
+	}, [memberSearch, memberQ]);
 
 	const can = bucketCan(bucket);
 	const listHref = bucketHref(bucketId, 'user-groups');
@@ -338,6 +352,14 @@ export function UserGroupPage({
 								</Button>
 							</Flex>
 						)}
+						<Input.Search
+							allowClear
+							placeholder="Search by email or username"
+							aria-label="Search members"
+							value={memberSearch}
+							onChange={(e) => setMemberSearch(e.target.value)}
+							style={{ maxWidth: 360, marginBottom: 12 }}
+						/>
 						<Table<MemberView>
 							rowKey="id"
 							size="small"

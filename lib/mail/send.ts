@@ -3,6 +3,7 @@ import { deliver } from './mailer.js';
 import { deprovisioningHeldEmail } from './templates/deprovisioning_held.js';
 import { groupInvitationEmail } from './templates/group_invitation.js';
 import { passwordResetEmail } from './templates/password_reset.js';
+import { userInvitationEmail } from './templates/user_invitation.js';
 import {
 	verificationLinkEmail,
 	verificationCodeEmail
@@ -47,6 +48,18 @@ export async function sendPasswordResetEmail(
 ): Promise<void> {
 	const { email, appName, resetUrl } = params;
 	await deliver({ to: email, ...passwordResetEmail({ appName, resetUrl }) });
+}
+
+/*
+ * Delivers an administrator's invitation for a person to set their own password (specs/089). Throws on
+ * delivery failure and, unlike the reset beside it, the caller does not swallow it: an administrator chose the
+ * address and needs to know the message did not go, and there is nothing to enumerate.
+ */
+export async function sendUserInvitationEmail(
+	to: string,
+	params: { bucketName: string; url: string }
+): Promise<void> {
+	await deliver({ to, ...userInvitationEmail(params) });
 }
 
 /*

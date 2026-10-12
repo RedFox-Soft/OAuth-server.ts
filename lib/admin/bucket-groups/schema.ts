@@ -50,11 +50,16 @@ export const AssignBucketGroupConnectionBody = t.Object(
 	{ additionalProperties: false }
 );
 
-/* A page of a group's members: `count` up to 1,000, default 100. Strings, as every query value arrives. */
+/*
+ * A page of a group's members: `count` up to 1,000, default 100. Strings, as every query value arrives. `q`
+ * narrows it to members whose email or username starts with it, in any letter case, or whose id is exactly it
+ * — the users list's own search (specs/089).
+ */
 export const BucketGroupMemberPageQuery = t.Object(
 	{
 		startIndex: t.Optional(t.String()),
-		count: t.Optional(t.String())
+		count: t.Optional(t.String()),
+		q: t.Optional(t.String({ minLength: 1, maxLength: 254 }))
 	},
 	{ additionalProperties: false }
 );

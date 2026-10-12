@@ -4,6 +4,7 @@ import { areaNamed } from '../consts/storage_inventory.js';
 import { sweepAccountOwned, type CascadeResult } from '../helpers/cascade.js';
 import { Session } from '../models/session.js';
 import { backchannelLogoutFor } from '../shared/destroy_session.js';
+import revoke from '../helpers/revoke.js';
 
 /*
  * Tells every relying party holding a session with this account that the session is over (OpenID Connect
@@ -36,6 +37,18 @@ export async function notifyRelyingParties(accountId: string): Promise<void> {
 			);
 		})
 	);
+}
+
+/*
+ * Ends grants outright: every token under each — whether or not it outlives a sign-out, since `persistsLogout`
+ * keeps offline access through a person's own logout and this is the act that ends it — and then the grant
+ * records, because a kept grant would be reused by the application's next request, consent included.
+ */
+export async function endGrants(grantIds: Iterable<string>): Promise<void> {
+	for (const grantId of grantIds) {
+		await revoke(grantId);
+		await adapter('Grant').destroy(grantId);
+	}
 }
 
 /*

@@ -26,12 +26,20 @@ export const PasswordResetChallengePayload = t.Object({
 	 * monitor deletes lazily, so an expired record can still be found for a minute or more, which for a
 	 * takeover-capable secret is a minute of extra credential validity.
 	 */
-	exp: t.Number()
+	exp: t.Number(),
+	/*
+	 * What the secret was issued for: a person's own reset, or an administrator's invitation to set a first
+	 * password (specs/089). The two differ in lifetime and in the words the page uses, never in what the
+	 * secret can do. Absent on records written before invitations existed, which were all resets.
+	 */
+	purpose: t.Optional(t.Union([t.Literal('reset'), t.Literal('invite')]))
 });
 
 export type PasswordResetChallengePayload = Static<
 	typeof PasswordResetChallengePayload
 >;
+
+export type SetPasswordPurpose = 'reset' | 'invite';
 
 /*
  * Per-address request counters. Keyed by `${bucketId}:${email}` so the daily cap survives challenge

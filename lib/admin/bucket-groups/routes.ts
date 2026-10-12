@@ -128,11 +128,32 @@ export const bucketGroupRoutes = new Elysia({ name: 'admin-bucket-groups' })
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForUsers(ctx, params.id);
 			const group = await asAdmin(loadGroup(bucket, ADMIN, params.gid));
-			const store = getBucketGroupStore();
-			const ids = await store.memberIds(group._id, {
+			const page = {
 				startIndex: Math.max(1, positiveInt(query.startIndex, 1)),
 				count: Math.min(MAX_END_USER_PAGE, positiveInt(query.count, 100))
-			});
+			};
+			/*
+			 * A search reads the user store, which matches by its own keys, narrowed to the group's members —
+			 * so the total is the matching members', exact, and a page never holds a matching non-member.
+			 */
+			const q = query.q?.trim();
+			if (q) {
+				const { users, totalResults } = await getUserStore(bucket._id).query(
+					{ search: q, memberOf: group._id },
+					page,
+					'email'
+				);
+				return {
+					totalResults,
+					members: users.map((user) => ({
+						id: user._id,
+						email: user.email,
+						...(user.userName === undefined ? {} : { userName: user.userName })
+					}))
+				};
+			}
+			const store = getBucketGroupStore();
+			const ids = await store.memberIds(group._id, page);
 			const users = new Map(
 				(await getUserStore(bucket._id).findMany(ids)).map((u) => [u._id, u])
 			);

@@ -9,6 +9,13 @@
  */
 export const RESET_TTL_SECONDS = 60 * 60; // ~1h
 
+/*
+ * An administrator's invitation to set a first password (specs/089). A week, as a group invitation lives
+ * (lib/admin/groups/invite.ts), because the person did not ask for it and may not read the message today; the
+ * secret is the same one-use, address-bound secret a reset is, and any newer one replaces it.
+ */
+export const INVITE_TTL_SECONDS = 7 * 24 * 60 * 60;
+
 // Minimum gap between two reset requests for the same address in the same bucket.
 export const REQUEST_COOLDOWN_SECONDS = 60;
 

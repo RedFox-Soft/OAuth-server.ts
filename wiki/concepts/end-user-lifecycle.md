@@ -158,8 +158,9 @@ the "sign out everywhere" route runs.
 
 No specification maps SCIM attributes to OIDC claims. The table lives in `lib/consts/profile_claims.ts`
 (`userName` → `preferred_username`, given/family/middle name, `nickName`, `locale`, `timezone` →
-`zoneinfo`, primary phone → `phone_number`) and is merged in `findAccount` *before* the stored `claims`,
-so an administrator's claim still wins (`account.ts:84`).
+`zoneinfo`, primary phone → `phone_number`). Until spec 089 it was merged in `findAccount` *before* the stored
+`claims`, so an administrator's claim won. Since spec 089 the stored claims go first and the claims the profile sets
+win (`lib/addon/account.ts:113`), and a local user's profile is editable too ([[end-user-support]]).
 
 **Gotcha found while planning:** the default claims setting mapped no `profile` or `phone` scope, so no
 profile claim — including ones an administrator stored — reached a token on a default instance. The default

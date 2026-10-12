@@ -193,6 +193,10 @@ describe('MCP tool catalogue', () => {
 			'bucket_restore',
 			/* Makes a local user read-only to every administrator, for good. */
 			'bucket_user_assign_connection',
+			/* One call ends access for up to a hundred people (specs/089). */
+			'bucket_user_bulk_deactivate',
+			/* One call deletes up to a hundred people, irreversibly (specs/089). */
+			'bucket_user_bulk_delete',
 			'bucket_user_delete',
 			/* Hands the account's recovery to whoever holds the new mailbox. */
 			'bucket_user_email_change',
