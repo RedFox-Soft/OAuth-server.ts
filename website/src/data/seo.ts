@@ -113,7 +113,8 @@ export function stripLocale(route: string): string {
 /*
  * The documentation sections that are translated. Every other /<locale>/docs/ page is a Starlight
  * fallback — the English body under translated navigation — which a reader can use but a search
- * engine must not index as if it were Russian or Chinese.
+ * engine must not index as if it were Russian or Chinese. It names the English page as its
+ * canonical rather than saying `noindex` (src/route-middleware.ts says why).
  */
 export const TRANSLATED_DOCS: readonly string[] = ['/docs/get-started/'];
 export const TRANSLATED_DOCS_EXACT: readonly string[] = ['/docs/'];

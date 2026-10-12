@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import {
 	coverageFor,
+	isDocsFallback,
 	isIndexable,
 	localeOf,
 	normaliseRoute,
@@ -135,7 +136,10 @@ export function verify(input: VerifyInput): VerifyOutput {
 
 	// --- canonical, language, heading outline ------------------------------------------------
 	for (const page of pages) {
-		const expected = new URL(page.route, origin).href;
+		const expected = new URL(
+			isDocsFallback(page.route) ? stripLocale(page.route) : page.route,
+			origin
+		).href;
 		if (page.canonical !== expected) {
 			fail(
 				'canonical-mismatch',

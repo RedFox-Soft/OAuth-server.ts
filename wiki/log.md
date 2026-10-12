@@ -228,3 +228,5 @@ Operations:
 ## [2026-10-11] ingest | spec 086 (keys by algorithm, Activity like Usage, deleted-bucket history): corrected [[signing-keys]] (`KeyCards`, derived `signedUntil`, `retiredKeyLifetimeSeconds`, root-served card chosen from `addressForm`, instance dependents) and [[monthly-active-users]] (activity read names the bucket, `deletedAt`, `lastOwner`; Activity tab from Usage parts; Usage links; `/admin/usage/buckets/:id`; the super administrator's deleted-bucket answer).
 
 ## [2026-10-12] ingest | spec 087 (rotate, revoke, create in a group): corrected [[signing-keys]] (rotate; revoke and the `revoked` state; signer replacement without the window; console Rotate/Next/Revoke now), [[group-ownership]] (`groupId`/`bucketId` at creation via `loadDestination`), [[admin-mcp-control-plane]] (37 high tools), [[admin-audit-trail]] (`keys`).
+
+## [2026-10-12] fix | site fallbacks: corrected [[site-translations]] — a Starlight fallback page now names the English page as canonical instead of `noindex` + self-canonical, after Search Console reported the thirty fallbacks as excluded by noindex.

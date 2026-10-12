@@ -411,7 +411,10 @@ export async function collectPages(
 			description: decodeEntities(draft.description).trim(),
 			canonical: draft.canonical.trim(),
 			lang: draft.lang.trim(),
-			indexable: !/noindex/i.test(draft.robots),
+			// A page that names another as canonical is that page's duplicate, not a result of its own.
+			indexable:
+				!/noindex/i.test(draft.robots) &&
+				draft.canonical.trim() === new URL(route, origin).href,
 			ogImage: draft.og.image ?? '',
 			ogTitle: decodeEntities(draft.og.title ?? ''),
 			ogDescription: decodeEntities(draft.og.description ?? ''),

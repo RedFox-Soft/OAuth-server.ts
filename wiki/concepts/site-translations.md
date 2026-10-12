@@ -4,7 +4,7 @@ title: 'Site translations: who sees Russian and Chinese, and how the build keeps
 tags: [architecture, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-10-08
-updated: 2026-10-08
+updated: 2026-10-12
 ---
 
 # Site translations: who sees Russian and Chinese, and how the build keeps them honest
@@ -41,10 +41,20 @@ says and English pages are exactly the pre-translation site. Things that are eas
 
 A Russian reader in the docs who follows a link to Deploy, Administer or Security gets Starlight's **fallback
 page**: the English body under Russian navigation. Starlight indexes fallbacks and declares every language as an
-alternate on every docs page, translated or not; `website/src/route-middleware.ts:32` makes a fallback `noindex`
-with no alternates, and prunes every other page's alternates to the languages it exists in, so the generated
-Reference pages declare none. `isDocsFallback` (`website/src/data/seo.ts:121`) is the one definition the sitemap
-filter and the verifier share.
+alternate on every docs page, translated or not; `website/src/route-middleware.ts:53` gives a fallback no
+alternates and **names the English page as its canonical** (also `og:url`, the TechArticle and the `.md`
+alternate, `website/src/components/StarlightHead.astro:20`), and prunes every other page's alternates to the
+languages it exists in, so the generated Reference pages declare none. `isDocsFallback`
+(`website/src/data/seo.ts:122`) is the one definition the sitemap filter and the verifier share; the verifier
+expects a fallback's canonical to be the English URL, and a page whose canonical is elsewhere is not indexable
+(`website/scripts/seo/collect.ts:415`).
+
+Until 2026-10-12 a fallback said `noindex` with a self-canonical instead. Every translated page links into the
+fallbacks (sidebar and body), so Google crawled all thirty, and Search Console reported them as excluded by
+`noindex` — read by the owner as "the translations are blocked". A canonical is the signal Google documents for a
+duplicate; mixing `noindex` with it is the conflict to avoid, and with `noindex` the inbound links counted for
+nothing. Expect Search Console to list them as "Alternate page with proper canonical tag", which is the healthy
+state.
 
 English-only pages outside the docs (changelog, comparison articles, Reference) keep one English address; an
 eligible reader sees an "only in English" notice **in the header**, never in `<main>`, so it never becomes part of
