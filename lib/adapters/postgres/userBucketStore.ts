@@ -293,6 +293,21 @@ export class UserBucketStore implements UserBucketStoreInstance {
 		return this.bucketOf(rows[0]);
 	}
 
+	async releasePurge(id: string, until: Date): Promise<void> {
+		const handle = sql();
+		/* Lapsed rather than removed, so `recordedAt` beside it survives and a retry never records twice. */
+		await handle`
+			UPDATE ${handle(this.area)}
+			SET doc = jsonb_set(
+				doc,
+				'{deletion,purge,claimedUntil}',
+				to_jsonb(${new Date(0).toISOString()}::text)
+			)
+			WHERE id = ${id}
+				AND (doc #>> '{deletion,purge,claimedUntil}')::timestamptz = ${until.toISOString()}::timestamptz
+		`;
+	}
+
 	async markPurgeRecorded(id: string, at: Date): Promise<void> {
 		const handle = sql();
 		await handle`

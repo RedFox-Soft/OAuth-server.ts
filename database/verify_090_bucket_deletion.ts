@@ -3,7 +3,8 @@
  * destruction each decide their race in one statement — a second schedule is refused and keeps the first date,
  * a restore is refused while a destruction holds a live claim and allowed once it lapses, two claims at one
  * moment give one winner, a claim for a due destruction is refused before the date, a re-claim keeps the record
- * of the audit entry, and a restore removes the field outright — and the dates read back as dates.
+ * of the audit entry, a released claim lets the next one in at once while a claim the releaser no longer holds is
+ * left alone, and a restore removes the field outright — and the dates read back as dates.
  *
  *   MONGODB_URI=… DATABASE_NAME=oauth_scratch          bun database/verify_090_bucket_deletion.ts
  *   POSTGRES_URL=postgres://…/oauth_scratch            bun database/verify_090_bucket_deletion.ts
@@ -168,6 +169,30 @@ try {
 		reclaimed?.deletion?.purge?.recordedAt?.getTime() === at(32).getTime() &&
 			reclaimed.deletion.purge.claimedUntil.getTime() === at(62).getTime()
 	);
+
+	const released = await bucket('released');
+	await store.scheduleDeletion(released, schedule(at(0), at(30)));
+	await store.claimPurge(released, at(31), at(46), { due: true });
+	await store.markPurgeRecorded(released, at(32));
+	await store.releasePurge(released, at(46));
+	const afterRelease = await store.claimPurge(released, at(33), at(48), {
+		due: true
+	});
+	check(
+		'a released claim lets the next one in at once, keeping the record of the audit entry',
+		afterRelease?.deletion?.purge?.recordedAt?.getTime() === at(32).getTime()
+	);
+
+	const foreign = await bucket('foreign');
+	await store.scheduleDeletion(foreign, schedule(at(0), at(30)));
+	await store.claimPurge(foreign, at(31), at(46), { due: true });
+	await store.claimPurge(foreign, at(47), at(62), { due: true });
+	await store.releasePurge(foreign, at(46));
+	check(
+		'releasing a claim the caller no longer holds leaves the live one',
+		(await store.claimPurge(foreign, at(48), at(63), { due: true })) === null
+	);
+
 	check(
 		'a scheduled bucket is still found by its address',
 		(await store.findBySlug(`v090-recorded-${stamp}`))?._id === recorded

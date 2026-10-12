@@ -219,10 +219,19 @@ export class UserBucketStore implements UserBucketStoreInstance {
 		deletion.purge = { ...deletion.purge, recordedAt: at };
 	}
 
+	async releasePurge(id: string, until: Date): Promise<void> {
+		const deletion = this.buckets.get(id)?.deletion;
+		if (deletion?.purge?.claimedUntil.getTime() !== until.getTime()) return;
+		deletion.purge = { ...deletion.purge, claimedUntil: LAPSED };
+	}
+
 	async destroy(id: string): Promise<void> {
 		this.buckets.delete(id);
 	}
 }
+
+/* A released claim: in the past, so the next claim is taken at once; `recordedAt` beside it is kept. */
+const LAPSED = new Date(0);
 
 function claimLive(deletion: BucketDeletion, now: Date): boolean {
 	const until = deletion.purge?.claimedUntil;

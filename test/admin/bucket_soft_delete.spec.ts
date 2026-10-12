@@ -4,7 +4,8 @@ import {
 	beforeEach,
 	describe,
 	expect,
-	it
+	it,
+	spyOn
 } from 'bun:test';
 import { Elysia } from 'elysia';
 import { Type } from '@sinclair/typebox';
@@ -414,6 +415,33 @@ describe('deleting a bucket', () => {
 			expect(
 				recorded.map((e) => [e.actorId, e.ownerGroupId, e.cascade])
 			).toEqual([[w.owner._id, w.groupId, { endusers: 1 }]]);
+		});
+
+		it('can be retried at once after it failed part-way, still recording one destruction', async () => {
+			const bucket = await bucketOf(w.groupId, 1);
+			await scheduleAs(w.ownerCookie, bucket, '?cascade=endusers&expect=1');
+			const log = spyOn(console, 'error').mockImplementation(() => undefined);
+			const failing = spyOn(
+				getBucketGroupStore(),
+				'destroyByBucket'
+			).mockRejectedValueOnce(new Error('the datastore went away'));
+			const path = `/admin/api/buckets/${bucket._id}/purge?cascade=endusers&expect=0`;
+
+			// Read raw: this app has no shared error handler, so the fault is not a JSON body.
+			const first = await app.handle(
+				new Request(
+					`http://e.ly/admin/api/buckets/${bucket._id}/purge?cascade=endusers&expect=1`,
+					{ method: 'POST', headers: { cookie: w.ownerCookie } }
+				)
+			);
+			failing.mockRestore();
+			const retry = await request('POST', path, w.ownerCookie);
+			log.mockRestore();
+
+			expect(first.status).toBe(500);
+			expect(retry.status).toBe(200);
+			expect(await getBucketStore().find(bucket._id)).toBeNull();
+			expect(await entries(bucket._id, 'bucket.purge')).toHaveLength(1);
 		});
 
 		it('refuses a bucket that is not scheduled', async () => {

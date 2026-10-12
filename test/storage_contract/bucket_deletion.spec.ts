@@ -87,6 +87,29 @@ describe('a bucket’s scheduled destruction, as stored', () => {
 		expect(again?.deletion?.purge?.recordedAt).toEqual(at(32));
 	});
 
+	it('lets the next claim in at once when its holder releases it, keeping the audit record', async () => {
+		const { store, id } = await scheduled();
+		await store.claimPurge(id, at(31), at(46), { due: true });
+		await store.markPurgeRecorded(id, at(32));
+		await store.releasePurge(id, at(46));
+
+		const again = await store.claimPurge(id, at(33), at(48), { due: true });
+
+		expect(again?.deletion?.purge?.recordedAt).toEqual(at(32));
+	});
+
+	it('leaves a claim alone that its releaser no longer holds', async () => {
+		const { store, id } = await scheduled();
+		await store.claimPurge(id, at(31), at(46), { due: true });
+		await store.claimPurge(id, at(47), at(62), { due: true });
+
+		await store.releasePurge(id, at(46));
+
+		expect(
+			await store.claimPurge(id, at(48), at(63), { due: true })
+		).toBeNull();
+	});
+
 	it('leaves no deletion on a restored bucket', async () => {
 		const { store, id } = await scheduled();
 

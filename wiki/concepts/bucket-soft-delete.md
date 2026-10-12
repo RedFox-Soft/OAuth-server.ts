@@ -99,13 +99,13 @@ without a change of its own. The server keeps state out of its `can` flags, as `
 `destroyBucket` (`lib/admin/buckets/destroy.ts:48`) is the old DELETE body, moved. Delete now and the pass both
 call it.
 
-1. **Claim.** `claimPurge` (`:55`) is a compare-and-set that takes a 15-minute claim. Only the holder proceeds, so
+1. **Claim.** `claimPurge` (`:56`) is a compare-and-set that takes a 15-minute claim. Only the holder proceeds, so
    two instances, or a pass racing an administrator, cannot both destroy.
-2. **Audit once.** `bucket.purge` is written only while `deletion.purge.recordedAt` is unset (`:77`), then marked.
+2. **Audit once.** `bucket.purge` is written only while `deletion.purge.recordedAt` is unset (`:103`), then marked.
    A retried destruction is not recorded twice.
 3. **Usage tombstone.** It is written before anything is destroyed. If it fails, nothing is deleted.
 4. **Contents.** Accounts with their cascade, keys, provisioning connections, groups and the user area.
-5. **The bucket record LAST** (`:169`). The old route destroyed the record before keys, connections and groups. A
+5. **The bucket record LAST** (`:195`). The old route destroyed the record before keys, connections and groups. A
    failure in between then orphaned them, with nothing left to find them by. Now a failure leaves a
    still-scheduled, still-silent bucket, and the next pass finishes it once the claim lapses.
 
@@ -114,8 +114,15 @@ The pass (`purgeDueBuckets` / `startBucketPurger`, `lib/admin/buckets/purge_pass
 `RETENTION_ACTOR = 'system:retention'` (`lib/consts/admin_audit_routes.ts:749`) through `recordSystemAudit`. The
 entry carries `ownerGroupId`, so the owning group reads it like its own deletion.
 
-**Rough edge:** if the tombstone write fails during Delete now, the claim stays for 15 minutes. A repeated Delete now
-in that window answers "already being deleted", and the pass finishes the job later.
+**A destruction that throws gives its claim back** (`releasePurge`, `:71`). Only while the claim is still the one
+it took, and keeping `recordedAt`, so the administrator's next Delete now starts at once instead of being told for
+15 minutes that the bucket is already being deleted. Only a process that dies mid-way leaves the claim to lapse.
+The first version kept the claim, and a failed Delete now could not be retried for a quarter of an hour.
+
+**A failed destruction can leave a `bucket.purge` entry for a bucket that still exists.** The audit entry is written
+before the usage tombstone, by the trail's contract. If the tombstone cannot be kept, nothing is destroyed but the
+entry stands, and a later restore reads as `bucket.purge` followed by `bucket.restore`. The reverse order is worse:
+a tombstone written before an audit write that then fails lists a live, restorable bucket as deleted in Usage.
 
 ## Agents
 

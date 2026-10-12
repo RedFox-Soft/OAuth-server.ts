@@ -259,6 +259,14 @@ export class UserBucketStore implements UserBucketStoreInstance {
 		);
 	}
 
+	async releasePurge(id: string, until: Date): Promise<void> {
+		/* Lapsed rather than removed, so `recordedAt` beside it survives and a retry never records twice. */
+		await this.collection.updateOne(
+			{ _id: id, 'deletion.purge.claimedUntil': until },
+			{ $set: { 'deletion.purge.claimedUntil': new Date(0) } }
+		);
+	}
+
 	async destroy(id: string): Promise<void> {
 		await this.collection.deleteOne({ _id: id });
 	}

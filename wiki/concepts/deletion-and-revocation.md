@@ -164,7 +164,7 @@ principal gone, answers `500` with `failedAreas`, and a repeated `DELETE` answer
 accepted cost of closing the door first, and the residue is bounded by each area's TTL *because* the one
 unbounded area goes first.
 
-A bucket is the exception since spec 090. Its record goes **last** (`lib/admin/buckets/destroy.ts:169`), after
+A bucket is the exception since spec 090. Its record goes **last** (`lib/admin/buckets/destroy.ts:195`), after
 its keys, connections, groups and user area. A destruction that fails part-way then leaves a scheduled, silent
 bucket for the next pass to finish. Destroyed first, as the old route did, it took with it the only handle on
 what was left ([[bucket-soft-delete]]).

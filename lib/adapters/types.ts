@@ -2049,6 +2049,8 @@ export interface UserBucketStoreInstance {
 	 * - `claimPurge` — only while scheduled with no live claim, and, when `due`, once `purgeAt <= now`; keeps
 	 *   `recordedAt`, so a retried destruction does not record itself twice.
 	 * - `markPurgeRecorded` — only once a claim exists.
+	 * - `releasePurge` — only while the claim is still the one this caller took (`claimedUntil === until`);
+	 *   lapses it, so a destruction that failed is retried at once rather than after the claim runs out.
 	 */
 	scheduleDeletion(
 		id: string,
@@ -2062,6 +2064,7 @@ export interface UserBucketStoreInstance {
 		options: { due: boolean }
 	): Promise<UserBucket | null>;
 	markPurgeRecorded(id: string, at: Date): Promise<void>;
+	releasePurge(id: string, until: Date): Promise<void>;
 	destroy(id: string): Promise<void>;
 }
 

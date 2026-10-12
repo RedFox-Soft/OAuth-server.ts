@@ -6,7 +6,7 @@ import {
 	getGroupStore,
 	getUserStore
 } from '../../adapters/index.js';
-import type { UserBucket } from '../../adapters/types.js';
+import type { BucketDeletion, UserBucket } from '../../adapters/types.js';
 import { now } from '../../activity/clock.js';
 import { BUCKET_PURGE_CLAIM_MS } from '../../consts/bucket_deletion.js';
 import { RETENTION_ACTOR } from '../../consts/admin_audit_routes.js';
@@ -52,13 +52,39 @@ export async function destroyBucket(
 ): Promise<DestroyOutcome> {
 	const id = bucket._id;
 	const at = opts.at ?? now();
-	const claimed = await getBucketStore().claimPurge(
-		id,
-		at,
-		new Date(at.getTime() + BUCKET_PURGE_CLAIM_MS),
-		{ due: opts.due }
-	);
+	const until = new Date(at.getTime() + BUCKET_PURGE_CLAIM_MS);
+	const claimed = await getBucketStore().claimPurge(id, at, until, {
+		due: opts.due
+	});
 	if (!claimed?.deletion) return { claimed: false };
+
+	/*
+	 * A destruction that throws gives its claim back, so the administrator's next Delete now — or the next
+	 * pass — starts at once instead of being told for fifteen minutes that the bucket is already being deleted.
+	 * The claim exists to keep two destructions from running together; once this one has stopped, it protects
+	 * nothing. Only a process that dies mid-way leaves it to lapse, which is what the lapse is for.
+	 */
+	try {
+		return await destroyClaimed(claimed, claimed.deletion, actor);
+	} catch (error) {
+		await getBucketStore()
+			.releasePurge(id, until)
+			.catch((release: unknown) => {
+				console.error('bucket purge: could not release the claim; it lapses', {
+					bucketId: id,
+					error: release
+				});
+			});
+		throw error;
+	}
+}
+
+async function destroyClaimed(
+	claimed: UserBucket,
+	deletion: BucketDeletion,
+	actor: DestroyingActor
+): Promise<DestroyOutcome> {
+	const id = claimed._id;
 
 	const store = getUserStore(id);
 	/*
@@ -74,14 +100,14 @@ export async function destroyBucket(
 	 * before the destruction, by the trail's own contract; and once, however often a failed destruction is
 	 * retried — the entry is marked written on the claim, which a later claim keeps.
 	 */
-	if (!claimed.deletion.purge?.recordedAt) {
+	if (!deletion.purge?.recordedAt) {
 		const detail: AuditDetail = {
 			...(accounts.length > 0
 				? { cascade: { endusers: accounts.length } }
 				: {}),
 			/* So the group that owned it reads the destruction in its own trail. */
 			ownerGroupId: claimed.ownerGroupId,
-			scheduledAt: claimed.deletion.scheduledAt
+			scheduledAt: deletion.scheduledAt
 		};
 		if (actor.kind === 'admin') {
 			await recordAdminAudit(actor.ctx, 'bucket.purge', id, detail);
