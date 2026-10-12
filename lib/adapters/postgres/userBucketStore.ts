@@ -203,13 +203,19 @@ export class UserBucketStore implements UserBucketStoreInstance {
 		const handle = sql();
 		/*
 		 * `jsonb_set` merges server-side rather than reading, mutating and writing the document back: a
-		 * round trip is where a document gets re-serialised, and a pre-stringified value stores a jsonb
-		 * *string* whose every predicate then silently matches nothing.
+		 * round trip is where a document gets re-serialised.
+		 *
+		 * The value goes in as text and becomes jsonb in the database (`to_jsonb`). Bun's client JSON-encodes
+		 * a string bound to a `::jsonb` cast, so the earlier `${JSON.stringify(slug)}::jsonb` stored the slug
+		 * with its quotes — `"\"default\""` — and `findBySlug` could no longer find the bucket. A record that
+		 * write already damaged holds exactly `JSON.stringify(slug)`, so it is repaired too: that value is
+		 * never a slug anyone chose (a slug cannot contain a quote), so this still never renames a bucket.
 		 */
 		await handle`
 			UPDATE ${handle(this.area)}
-			SET doc = jsonb_set(doc, '{slug}', ${JSON.stringify(slug)}::jsonb)
-			WHERE id = ${id} AND doc->>'slug' IS NULL
+			SET doc = jsonb_set(doc, '{slug}', to_jsonb(${slug}::text))
+			WHERE id = ${id}
+				AND (doc->>'slug' IS NULL OR doc->>'slug' = ${JSON.stringify(slug)})
 		`;
 	}
 

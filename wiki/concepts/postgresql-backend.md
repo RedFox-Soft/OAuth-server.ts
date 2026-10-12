@@ -84,6 +84,16 @@ write sites pass objects. The lesson is stated in the file: **a tolerant decoder
 encoding bug is indistinguishable from correct behaviour right up until something queries inside the
 document.**
 
+**The same defect survived inside one field** (found 2026-10-12, while verifying spec 088). The decoder's
+guard sees only a whole document stored as a string; a single *value* written as
+`jsonb_set(doc, '{slug}', ${JSON.stringify(slug)}::jsonb)` is JSON-encoded again by the client and lands
+as `"\"default\""` — still inside a valid object, so nothing threw. That was `repairReservedSlug`, the
+`db:setup:pg` repair that gives a reserved bucket its address on a database provisioned before addresses
+existed: it would have left `findBySlug` unable to find the console's own bucket. A value is now put in
+as text and made jsonb by the database (`to_jsonb(${value}::text)`, `lib/adapters/postgres/userBucketStore.ts`),
+the repair also heals the damaged value the old write left, and `database/verify_postgres.ts` checks both
+on a real database — the hermetic suite runs on the in-memory adapter and cannot see it.
+
 **A row is `unknown` until it is checked** (since 2026-10-09). Bun types a query's rows `any` unless
 given a type argument, `` sql<User[]>`…` ``, which nothing verifies. `sql()` returns the `Sql` type of
 `lib/adapters/postgres/db.ts`, whose rows default to `unknown[]` (and `Tx` for a `begin()` callback's

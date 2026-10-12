@@ -233,6 +233,36 @@ const byName = await handle`
 `;
 check('a predicate inside the document matches', byName.length === 1);
 
+/*
+ * The same defect inside one field. `repairReservedSlug` wrote `${JSON.stringify(slug)}::jsonb`, which Bun
+ * JSON-encodes again, so a reserved bucket provisioned before addresses existed got its slug with the quotes
+ * in it and `findBySlug` lost it. Checked on a copy of a seeded bucket with its address removed: repaired
+ * from nothing, and repaired from the damaged value the old write left.
+ */
+const repairId = `fidelity-slug-${Date.now()}`;
+await handle`
+	INSERT INTO ${handle(STORE_AREAS.userBuckets)} (id, doc)
+	SELECT ${repairId}, (doc - 'slug' - 'host') || ${{ _id: repairId }}
+	FROM ${handle(STORE_AREAS.userBuckets)} ORDER BY id LIMIT 1
+`;
+const bucketStore = new UserBucketStore();
+await bucketStore.repairReservedSlug(repairId, repairId);
+check(
+	'a repaired slug is stored as the slug, and found by it',
+	(await bucketStore.findBySlug(repairId))?._id === repairId
+);
+await handle`
+	UPDATE ${handle(STORE_AREAS.userBuckets)}
+	SET doc = jsonb_set(doc, '{slug}', to_jsonb(${JSON.stringify(repairId)}::text))
+	WHERE id = ${repairId}
+`;
+await bucketStore.repairReservedSlug(repairId, repairId);
+check(
+	'a slug the old repair double-encoded is repaired on the next run',
+	(await bucketStore.findBySlug(repairId))?._id === repairId
+);
+await bucketStore.destroy(repairId);
+
 /* ---- 3. dates survive the round trip as dates ----------------------------------------------- */
 
 const users = new UserStore('redfox');

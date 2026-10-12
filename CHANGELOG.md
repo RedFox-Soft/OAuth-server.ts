@@ -129,6 +129,10 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- **`db:setup:pg` no longer breaks a reserved bucket's address while repairing it.** On a PostgreSQL database
+  provisioned before buckets had addresses, the repair stored the console's and the default bucket's slug with
+  its quotes (`"\"admin\""`), so neither could be found by its address. The value is now written as text, and the
+  next `db:setup:pg` heals a slug the old repair damaged.
 - **A bucket moved to a new host no longer reads as reached** from the old host's traffic, and owners now see
   their group's bucket deletions and address changes in their audit trail.
 - **Invitation links work.** The link in an invitation email opened a missing page; it now opens a page to
