@@ -1,7 +1,7 @@
 import { rich } from '../../types.ts';
 import type english from './en.ts';
 
-export const source = '1425ed4a7105';
+export const source = '915265f710ba';
 
 export default {
 	skipToContent: 'Перейти к содержанию',
@@ -40,8 +40,16 @@ export default {
 		contactUs: 'Написать нам',
 		about:
 			'FoxAuth построен на OAuth-server.ts — сервере OAuth 2.1 / OpenID Connect с доступным исходным кодом (source-available).',
-		siteVersion: (version: string, unreleased: boolean): string =>
-			`Версия сайта ${version}${unreleased ? ' (не выпущена)' : ''}`
+		siteVersion: (
+			lastTag: string | null,
+			commit: string,
+			unreleased: boolean
+		): string =>
+			!unreleased && lastTag
+				? `Версия сайта ${lastTag}`
+				: lastTag
+					? `Версия сайта ${lastTag} + невыпущенные изменения (${commit})`
+					: `Версия сайта: не выпущена (${commit})`
 	},
 	compareLinks: {
 		before: 'Уже используете другое решение? Мы ведём датированные сравнения с',

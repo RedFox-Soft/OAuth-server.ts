@@ -1,7 +1,7 @@
 import { rich } from '../../types.ts';
 import type english from './en.ts';
 
-export const source = '1425ed4a7105';
+export const source = '915265f710ba';
 
 export default {
 	skipToContent: '跳到正文',
@@ -40,8 +40,16 @@ export default {
 		contactUs: '联系我们',
 		about:
 			'FoxAuth 构建于 OAuth-server.ts 之上，这是一个源码可用的 OAuth 2.1 / OpenID Connect 服务器。',
-		siteVersion: (version: string, unreleased: boolean): string =>
-			`网站版本 ${version}${unreleased ? '（未发布）' : ''}`
+		siteVersion: (
+			lastTag: string | null,
+			commit: string,
+			unreleased: boolean
+		): string =>
+			!unreleased && lastTag
+				? `网站版本 ${lastTag}`
+				: lastTag
+					? `网站版本 ${lastTag} + 未发布的更改（${commit}）`
+					: `网站版本：未发布（${commit}）`
 	},
 	compareLinks: {
 		before: '已经在用别的方案？我们维护着与',

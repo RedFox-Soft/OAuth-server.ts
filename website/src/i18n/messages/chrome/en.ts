@@ -38,8 +38,16 @@ export default {
 		contactUs: 'Contact us',
 		about:
 			'FoxAuth is built on OAuth-server.ts, a source-available OAuth 2.1 / OpenID Connect server.',
-		siteVersion: (version: string, unreleased: boolean): string =>
-			`Site version ${version}${unreleased ? ' (unreleased)' : ''}`
+		siteVersion: (
+			lastTag: string | null,
+			commit: string,
+			unreleased: boolean
+		): string =>
+			!unreleased && lastTag
+				? `Site version ${lastTag}`
+				: lastTag
+					? `Site version ${lastTag} + unreleased changes (${commit})`
+					: `Site version: unreleased (${commit})`
 	},
 	/* The sentence around the comparison links (CompareLinks.astro); the names are joined between. */
 	compareLinks: {

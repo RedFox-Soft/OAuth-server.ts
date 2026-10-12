@@ -105,7 +105,7 @@ const columns = await Promise.all(
 			/>
 			<div class="text-sm text-gray-600 dark:text-gray-400">
 				<p>{t.about}</p>
-				<p class="mt-1">{t.siteVersion(v.version, v.unreleased)}</p>
+				<p class="mt-1">{t.siteVersion(v.lastTag, v.commit, v.unreleased)}</p>
 			</div>
 		</div>
 	</div>
