@@ -4,7 +4,7 @@ import {
 } from '@ant-design/icons';
 import { Button, Card, Flex, Form, Input, QRCode, Typography } from 'antd';
 import { buildUIPath } from './buildUIPath.js';
-import { versionedAsset } from '../html/versionedAsset.js';
+import { DEFAULT_LOGO } from './logo.js';
 
 /*
  * The second factor's one page, in two modes.
@@ -28,6 +28,8 @@ export interface TotpPageProps {
 	otpauthUri?: string;
 	/* Enrol mode only. The same secret as text, grouped in fours. */
 	secretText?: string;
+	/* The logo's versioned address, from the server: see LoginPage. */
+	logoSrc?: string;
 }
 
 function ErrorBanner({ message }: { message: string }) {
@@ -58,7 +60,8 @@ export function TotpPage({
 	mode,
 	errorMessage,
 	otpauthUri,
-	secretText
+	secretText,
+	logoSrc = DEFAULT_LOGO
 }: TotpPageProps) {
 	const enrolling = mode === 'enroll';
 	const action = buildUIPath(uid, enrolling ? 'totp/enroll' : 'totp');
@@ -83,7 +86,7 @@ export function TotpPage({
 			>
 				<div style={{ textAlign: 'center', marginBottom: 24 }}>
 					<img
-						src={versionedAsset('logo.svg')}
+						src={logoSrc}
 						alt="Logo"
 						style={{ width: 120 }}
 					/>

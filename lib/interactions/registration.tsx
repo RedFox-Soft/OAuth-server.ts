@@ -5,16 +5,19 @@ import {
 } from '@ant-design/icons';
 import { Button, Card, Flex, Form, Input } from 'antd';
 import { buildUILoginPath, buildUIRegistrationPath } from './buildUIPath.js';
-import { versionedAsset } from '../html/versionedAsset.js';
+import { DEFAULT_LOGO } from './logo.js';
 
 export function RegistrationPage({
 	uid,
 	errorMessage,
-	email
+	email,
+	logoSrc = DEFAULT_LOGO
 }: {
 	uid: string;
 	errorMessage?: string;
 	email?: string;
+	/* The logo's versioned address, from the server: see LoginPage. */
+	logoSrc?: string;
 }) {
 	return (
 		<Flex
@@ -36,7 +39,7 @@ export function RegistrationPage({
 			>
 				<div style={{ textAlign: 'center', marginBottom: 24 }}>
 					<img
-						src={versionedAsset('logo.svg')}
+						src={logoSrc}
 						alt="Logo"
 						style={{ width: 120 }}
 					/>

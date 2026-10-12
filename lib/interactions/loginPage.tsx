@@ -12,7 +12,7 @@ import {
 	buildUIFederationStartPath,
 	buildUIPath
 } from './buildUIPath.js';
-import { versionedAsset } from '../html/versionedAsset.js';
+import { DEFAULT_LOGO } from './logo.js';
 import { knownProvider } from '../consts/known_providers.js';
 import { providerMark } from './providerMark.js';
 
@@ -24,7 +24,8 @@ export function LoginPage({
 	registrationOpen = true,
 	passwordReset = true,
 	verificationResend = false,
-	providers = []
+	providers = [],
+	logoSrc = DEFAULT_LOGO
 }: {
 	uid: string;
 	errorMessage?: string;
@@ -35,6 +36,12 @@ export function LoginPage({
 	passwordReset?: boolean;
 	verificationResend?: boolean;
 	providers?: { id: string; displayName: string; brand?: string }[];
+	/*
+	 * The logo's versioned address, worked out by the server and handed over in the props. Computing it here
+	 * cannot work: the version is the file's build time, read from disk, which a browser has no way to read —
+	 * so the browser computed a different address and every hydration logged a mismatch.
+	 */
+	logoSrc?: string;
 }) {
 	return (
 		<Flex
@@ -56,7 +63,7 @@ export function LoginPage({
 			>
 				<div style={{ textAlign: 'center', marginBottom: 24 }}>
 					<img
-						src={versionedAsset('logo.svg')}
+						src={logoSrc}
 						alt="Logo"
 						style={{ width: 120 }}
 					/>

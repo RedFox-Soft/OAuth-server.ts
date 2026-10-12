@@ -70,6 +70,15 @@ the page's introduction until spec 021. Harmless while that page had nothing to 
 it survived: the defect was invisible until someone rendered a message into it. If you add a message to a
 hydrated page, the props are half the change.
 
+**A value only the server can compute is a prop too.** The login, registration and TOTP components called
+`versionedAsset('logo.svg')` themselves. On the server that reads the file's build time from disk
+(`lib/html/versionedAsset.ts`) and yields `/public/logo.svg?v=…`. In the browser there is no disk, so it yields
+`/public/logo.svg`, and every hydration of those pages logged a mismatch. React keeps the server's attribute,
+so nothing looked wrong, and the browser bundle carried a `node:fs` import it could never use. Since the spec
+090 follow-up, the render functions in `lib/interactions/serverRender.tsx` compute `logoSrc` once and pass it
+to both the markup and `window.PROPS`; the components only receive it. The same rule holds for anything a
+component reads from the environment — the clock, the disk, the process.
+
 Never put a submitted password, a token, or any request text in a props object: `propsScript` escapes `<`
 so a value cannot break out of the script tag, but that is containment, not permission — the object is
 serialised into the document.

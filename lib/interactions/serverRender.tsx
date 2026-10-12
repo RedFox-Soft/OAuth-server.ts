@@ -64,6 +64,8 @@ export async function loginServer(
 	const verificationResend = options.verificationResend === true;
 	const providers = options.providers ?? [];
 
+	// Here and nowhere else: the version is the file's build time, which only the server can read (see LoginPage).
+	const logoSrc = versionedAsset('logo.svg');
 	let html = await htmlTeamplate.text();
 	html = html
 		.replace('/public/loginClient.js', versionedAsset('loginClient.js'))
@@ -86,7 +88,8 @@ export async function loginServer(
 				registrationOpen,
 				passwordReset,
 				verificationResend,
-				providers
+				providers,
+				logoSrc
 			})
 		)
 		.replace(
@@ -103,6 +106,7 @@ export async function loginServer(
 							passwordReset={passwordReset}
 							verificationResend={verificationResend}
 							providers={providers}
+							logoSrc={logoSrc}
 						/>
 					</ZeroRuntime>
 				</StrictMode>
@@ -121,6 +125,8 @@ export async function registrationServer(
 ) {
 	const { errorMessage, email } = options;
 
+	// Here and nowhere else: the version is the file's build time, which only the server can read (see LoginPage).
+	const logoSrc = versionedAsset('logo.svg');
 	let html = await htmlTeamplate.text();
 	html = html
 		.replace('/public/loginClient.js', versionedAsset('loginClient.js'))
@@ -130,7 +136,10 @@ export async function registrationServer(
 		// The props are what the hydrated tree is built from: without them React replaces the
 		// server-rendered page with one that never heard about the error, silently and in the browser
 		// only.
-		.replace('<!--app-props-->', propsScript({ uid, errorMessage, email }))
+		.replace(
+			'<!--app-props-->',
+			propsScript({ uid, errorMessage, email, logoSrc })
+		)
 		.replace(
 			'<!--app-html-->',
 			renderToString(
@@ -140,6 +149,7 @@ export async function registrationServer(
 							uid={uid}
 							errorMessage={errorMessage}
 							email={email}
+							logoSrc={logoSrc}
 						/>
 					</ZeroRuntime>
 				</StrictMode>
@@ -164,6 +174,8 @@ export async function totpServer(
 ) {
 	const { mode, errorMessage, otpauthUri, secretText } = options;
 
+	// Here and nowhere else: the version is the file's build time, which only the server can read (see LoginPage).
+	const logoSrc = versionedAsset('logo.svg');
 	let html = await htmlTeamplate.text();
 	html = html
 		.replace('/public/loginClient.js', versionedAsset('loginClient.js'))
@@ -180,7 +192,14 @@ export async function totpServer(
 		 */
 		.replace(
 			'<!--app-props-->',
-			propsScript({ uid, mode, errorMessage, otpauthUri, secretText })
+			propsScript({
+				uid,
+				mode,
+				errorMessage,
+				otpauthUri,
+				secretText,
+				logoSrc
+			})
 		)
 		.replace(
 			'<!--app-html-->',
@@ -193,6 +212,7 @@ export async function totpServer(
 							errorMessage={errorMessage}
 							otpauthUri={otpauthUri}
 							secretText={secretText}
+							logoSrc={logoSrc}
 						/>
 					</ZeroRuntime>
 				</StrictMode>
