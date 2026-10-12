@@ -1,6 +1,11 @@
 import { getBucketStore } from '../../adapters/index.js';
 import { recordHostArrival } from './hostArrivals.js';
-import { DEFAULT_BUCKET_ID, isServedAtTheRoot } from '../consts.js';
+import {
+	DEFAULT_BUCKET_ID,
+	isServedAtTheRoot,
+	isUndeletableBucket
+} from '../consts.js';
+import { isScheduledForDeletion } from '../../consts/bucket_deletion.js';
 import type { UserBucket } from '../../adapters/types.js';
 import { UnknownBucket } from '../../helpers/errors.js';
 import {
@@ -35,9 +40,35 @@ import { canonicalHostOf, normaliseHost } from '../../consts/request_host.js';
  * datastore round trip per request to answer a question whose answer almost never changes. Positive
  * entries only — a miss stays a miss, so a bucket created a moment ago is not locked out by a cached
  * negative.
+ *
+ * Every entry lives for one minute (specs/090 FR-007a). `forgetBucketAddresses` clears this instance's
+ * caches, but nothing tells another instance that a bucket was scheduled for deletion, restored, moved or
+ * destroyed — without a lifetime it would keep answering for it until it restarted. A minute bounds that,
+ * at the cost of one read per address per minute.
  */
-const bySlug = new Map<string, UserBucket>();
-const byId = new Map<string, RequestBucket>();
+const CACHE_LIFETIME_MS = 60 * 1000;
+
+interface Cached<T> {
+	value: T;
+	at: number;
+}
+
+function cached<T>(map: Map<string, Cached<T>>, key: string): T | undefined {
+	const entry = map.get(key);
+	if (!entry) return undefined;
+	if (Date.now() - entry.at > CACHE_LIFETIME_MS) {
+		map.delete(key);
+		return undefined;
+	}
+	return entry.value;
+}
+
+function remember<T>(map: Map<string, Cached<T>>, key: string, value: T) {
+	map.set(key, { value, at: Date.now() });
+}
+
+const bySlug = new Map<string, Cached<UserBucket>>();
+const byId = new Map<string, Cached<RequestBucket>>();
 /*
  * The same cache for the other address form, with one difference worth stating: a hostname is NOT
  * immutable the way a slug is. The address-change operation writes it, so this map must be cleared
@@ -45,7 +76,17 @@ const byId = new Map<string, RequestBucket>();
  * its old address out of cache after a move, which is precisely the second issuer identifier the move
  * exists to avoid.
  */
-const byHost = new Map<string, UserBucket>();
+const byHost = new Map<string, Cached<UserBucket>>();
+/* Whether a bucket is scheduled for deletion, by id — what `findAccount` asks on every token it serves. */
+const scheduledById = new Map<string, Cached<boolean>>();
+
+/*
+ * Who asks for a scheduled bucket. Nothing but the upstream signals that only end access (specs/090
+ * FR-008): every other door answers a scheduled bucket's address as one where no bucket exists.
+ */
+interface AddressOptions {
+	includeScheduled?: boolean;
+}
 
 /*
  * The host this deployment itself answers at, derived once from the canonical URL.
@@ -90,6 +131,22 @@ export function forgetBucketAddresses(): void {
 	bySlug.clear();
 	byId.clear();
 	byHost.clear();
+	scheduledById.clear();
+}
+
+/*
+ * Whether a bucket is switched off, from a fresh read cached for the minute the address caches are
+ * (specs/090 R4). The two buckets the instance is built on can never be scheduled, so they are answered
+ * without a read — they are what nearly every token belongs to.
+ */
+export async function bucketIsScheduled(id: string): Promise<boolean> {
+	if (isUndeletableBucket(id)) return false;
+	const known = cached(scheduledById, id);
+	if (known !== undefined) return known;
+	const bucket = await getBucketStore().find(id);
+	const scheduled = bucket !== null && isScheduledForDeletion(bucket);
+	remember(scheduledById, id, scheduled);
+	return scheduled;
 }
 
 /*
@@ -133,18 +190,29 @@ export function isWithinDeploymentDomain(host: string): boolean {
  * `bucketAtAddress` records about an unknown slug: falling back would serve one population's endpoints
  * at another population's address, and would make a typo in a hostname look like it worked.
  */
-export async function bucketAtHost(host: string): Promise<UserBucket | null> {
-	const cached = byHost.get(host);
-	if (cached) {
-		recordHostArrival(cached._id, host);
-		return cached;
+export async function bucketAtHost(
+	host: string,
+	options: AddressOptions = {}
+): Promise<UserBucket | null> {
+	const known = cached(byHost, host);
+	/* Tested on the hit too: the memory store hands out its own record, which a schedule changes in place. */
+	if (known && !isScheduledForDeletion(known)) {
+		recordHostArrival(known._id, host);
+		return known;
 	}
 
 	const bucket = await getBucketStore().findByHost(host);
 	if (!bucket) return null;
 	if (!isAddressable(bucket)) return null;
+	/*
+	 * A scheduled bucket answers as no bucket at all (specs/090 R3), and is never cached, so a restore is
+	 * seen on the next request. Nor is its arrival recorded: nothing answered.
+	 */
+	if (isScheduledForDeletion(bucket)) {
+		return options.includeScheduled ? bucket : null;
+	}
 
-	byHost.set(host, bucket);
+	remember(byHost, host, bucket);
 	/*
 	 * Recorded on the cached path too, not only on a miss. The cache is what makes resolution cheap, so
 	 * recording only on a miss would report the first request after a restart and nothing else — an
@@ -165,21 +233,26 @@ export async function bucketAtHost(host: string): Promise<UserBucket | null> {
  * population's address, and would make a typo in a URL look like it worked.
  */
 export async function bucketAtAddress(
-	slug: string | undefined
+	slug: string | undefined,
+	options: AddressOptions = {}
 ): Promise<UserBucket | null> {
 	if (slug === undefined) {
 		return getBucketStore().find(DEFAULT_BUCKET_ID);
 	}
 
-	const cached = bySlug.get(slug);
-	if (cached) return cached;
+	const known = cached(bySlug, slug);
+	if (known && !isScheduledForDeletion(known)) return known;
 
 	const bucket = await getBucketStore().findBySlug(slug);
 	if (!bucket) return null;
 
 	if (!isAddressable(bucket)) return null;
+	/* As at a hostname: absent, and never cached. The slug stays the bucket's, so no other can take it. */
+	if (isScheduledForDeletion(bucket)) {
+		return options.includeScheduled ? bucket : null;
+	}
 
-	bySlug.set(slug, bucket);
+	remember(bySlug, slug, bucket);
 	return bucket;
 }
 
@@ -198,7 +271,8 @@ export async function bucketAtAddress(
  */
 export async function requestBucketFor(
 	slug: string | undefined,
-	requestHost: string | null | undefined
+	requestHost: string | null | undefined,
+	options: AddressOptions = {}
 ): Promise<RequestBucket> {
 	const host = normaliseHost(requestHost ?? undefined);
 
@@ -209,7 +283,7 @@ export async function requestBucketFor(
 	 * second issuer identifier, which is the one thing an issuer identifier may not have.
 	 */
 	if (host !== null && !isCanonicalHost(host)) {
-		const addressed = await bucketAtHost(host);
+		const addressed = await bucketAtHost(host, options);
 		if (addressed) {
 			/* One bucket, one address: a leading segment here names no bucket, and honouring it would
 			 * give that bucket a second address and therefore a second issuer identifier. */
@@ -228,7 +302,7 @@ export async function requestBucketFor(
 
 	if (slug === undefined) return DEFAULT_REQUEST_BUCKET;
 
-	const bucket = await bucketAtAddress(slug);
+	const bucket = await bucketAtAddress(slug, options);
 	if (!bucket) throw new UnknownBucket();
 	return { _id: bucket._id, slug: bucket.slug };
 }
@@ -251,8 +325,8 @@ export async function issuingBucket(
 		return DEFAULT_REQUEST_BUCKET;
 	}
 
-	const cached = byId.get(bucketId);
-	if (cached) return cached;
+	const known = cached(byId, bucketId);
+	if (known) return known;
 
 	const bucket = await getBucketStore().find(bucketId);
 	/*
@@ -271,6 +345,6 @@ export async function issuingBucket(
 		? { _id: bucket._id, slug: bucket.slug, host: bucket.host }
 		: { _id: bucketId, slug: undefined };
 
-	byId.set(bucketId, resolved);
+	remember(byId, bucketId, resolved);
 	return resolved;
 }

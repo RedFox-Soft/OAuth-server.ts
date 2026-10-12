@@ -32,6 +32,8 @@ import { meCan, useMe } from '../frame/me.js';
 import { EmptyState, LoadFailed } from '../frame/states.js';
 import { projectHref } from '../frame/routes.js';
 import { DeleteBucketDialog } from './DeleteBucketDialog.js';
+import { useScheduledActions } from './ScheduledBanner.js';
+import type { BucketDeletionView } from './bucketView.js';
 
 interface CreateBucketValues {
 	name: string;
@@ -46,8 +48,10 @@ interface CreateBucketValues {
 }
 
 /* A list row as the API presents it: the record, the caller's rights on it, and what blocks them. */
-type BucketRow = UserBucket & {
+type BucketRow = Omit<UserBucket, 'deletion'> & {
 	can?: Partial<BucketCan>;
+	/* specs/090: present while the bucket is scheduled for deletion. */
+	deletion?: BucketDeletionView;
 	blockers?: BucketBlockers;
 	/* specs/081: whether a host has been reached, whether a connection holds, the issuer to copy. */
 	hostReached?: boolean;
@@ -77,6 +81,10 @@ export function Buckets() {
 	const [creating, setCreating] = useState(false);
 	const [form] = Form.useForm<CreateBucketValues>();
 	const feedback = useFeedback();
+	const scheduled = useScheduledActions({
+		onRestored: () => void load(),
+		onDeleted: () => void load()
+	});
 	const navigate = useNavigate();
 	const { me } = useMe();
 	const mine = meCan(me);
@@ -165,6 +173,23 @@ export function Buckets() {
 				onClick: () => setMoving(row)
 			});
 		}
+		if (can.delete && row.deletion) {
+			items.push(
+				{
+					key: 'restore',
+					label: 'Restore',
+					group: 'handover',
+					onClick: () => void scheduled.restore(row)
+				},
+				{
+					key: 'purge',
+					label: 'Delete now…',
+					group: 'danger',
+					onClick: () => scheduled.deleteNow(row)
+				}
+			);
+			return items;
+		}
 		if (can.delete) {
 			/*
 			 * Named, not counted: "one project" leaves the administrator hunting through a list for which
@@ -241,6 +266,12 @@ export function Buckets() {
 										>
 											{name}
 										</Link>
+										{row.deletion && (
+											<Tag color="warning">
+												Deletes on{' '}
+												{new Date(row.deletion.purgeAt).toLocaleDateString()}
+											</Tag>
+										)}
 										{row.held && (
 											<Tooltip title="A provisioning connection is holding a mass deprovisioning: the people it tried to remove keep their access until someone releases it.">
 												{row.heldConnectionId ? (
@@ -375,17 +406,18 @@ export function Buckets() {
 				<DeleteBucketDialog
 					bucket={deleting}
 					onClose={() => setDeleting(null)}
-					onDeleted={(accounts) => {
+					onDeleted={({ purgeAt }) => {
 						feedback.done(
-							accounts > 0
-								? `Bucket ${deleting.name} deleted, with ${String(accounts)} accounts.`
-								: `Bucket ${deleting.name} deleted.`
+							purgeAt
+								? `${deleting.name} scheduled for deletion on ${new Date(purgeAt).toLocaleDateString()}.`
+								: `${deleting.name} scheduled for deletion.`
 						);
 						setDeleting(null);
 						void load();
 					}}
 				/>
 			)}
+			{scheduled.dialog}
 			<Modal
 				title="New bucket"
 				open={open}

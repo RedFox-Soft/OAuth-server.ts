@@ -95,6 +95,15 @@ describe('deletion cascade: containers', () => {
 			.delete(undefined, { headers: { cookie }, ...(query ? { query } : {}) });
 	}
 
+	/* A deletion and then Delete now: the destruction itself, since a deletion only schedules it (specs/090). */
+	async function destroyBucketNow(id: string, query: Record<string, unknown>) {
+		await deleteBucket(id, query);
+		const cookie = await superAdminCookie();
+		return agent.admin.api
+			.buckets({ id })
+			.purge.post(undefined, { headers: { cookie }, query });
+	}
+
 	async function entriesFor(targetId: string, action: string) {
 		const trail = await adminAuditStore.list({ targetId });
 		return trail.entries.filter((e) => e.action === action);
@@ -179,7 +188,7 @@ describe('deletion cascade: containers', () => {
 		await getUserStore(held._id).create('one@example.com', 'hash');
 		await getUserStore(held._id).create('two@example.com', 'hash');
 
-		const res = await deleteBucket(held._id, {
+		const res = await destroyBucketNow(held._id, {
 			cascade: 'endusers',
 			expect: 2
 		});
@@ -213,7 +222,8 @@ describe('deletion cascade: containers', () => {
 		);
 
 		expect(
-			(await deleteBucket(held._id, { cascade: 'endusers', expect: 1 })).status
+			(await destroyBucketNow(held._id, { cascade: 'endusers', expect: 1 }))
+				.status
 		).toBe(200);
 
 		expect(await adapter('VerificationResend').find(scopedId)).toBe(undefined);
@@ -384,7 +394,7 @@ describe('deletion cascade: containers', () => {
 			expect((await getUserStore(held._id).list()).length).toBe(2);
 		});
 
-		it('lets a member who is not an owner delete a bucket holding no accounts', async () => {
+		it('lets a member who is not an owner schedule the deletion of a bucket holding no accounts', async () => {
 			const owner = await createAdministrator('plain');
 			const member = await createAdministrator('plain');
 			const team = await regularGroup([owner], [member]);
@@ -400,7 +410,7 @@ describe('deletion cascade: containers', () => {
 			);
 
 			expect(deleted.status).toBe(200);
-			expect(await getBucketStore().find(empty._id)).toBeNull();
+			expect((await getBucketStore().find(empty._id))?.deletion).toBeDefined();
 		});
 	});
 });

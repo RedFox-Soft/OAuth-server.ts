@@ -94,7 +94,13 @@ async function revoke(
 	server: unknown,
 	subject: SubjectIdentifier
 ): Promise<void> {
-	const addressed = await requestBucketFor(slug, hostOfRequest(request));
+	/*
+	 * Heard for a bucket scheduled for deletion too (specs/090 FR-008), for the reason back-channel logout
+	 * gives: it only ends access, and a restore must not revive what the upstream revoked.
+	 */
+	const addressed = await requestBucketFor(slug, hostOfRequest(request), {
+		includeScheduled: true
+	});
 	const audience = `${issuerFor(addressed)}${routeNames.global_token_revocation}`;
 	/* A bucket with no stored record holds no providers, so nobody can be authenticated for it. */
 	const bucket = await getBucketStore().find(addressed._id);

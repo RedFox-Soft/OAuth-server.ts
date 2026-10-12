@@ -35,7 +35,7 @@ describe('a bucket with provisioning connections', () => {
 		]);
 	});
 
-	it('revokes its connections’ tokens when it is deleted', async () => {
+	it('revokes its connections’ tokens when it is destroyed', async () => {
 		const c = await connect(await scimBucket());
 		const path = `/admin/api/buckets/${c.bucket._id}/provisioning-connections/${c.connection._id}`;
 		const issued = await admin('POST', `${path}/credentials`, cookie, {
@@ -48,13 +48,15 @@ describe('a bucket with provisioning connections', () => {
 		);
 		expect(granted.status).toBe(200);
 
-		const deleted = await admin(
-			'DELETE',
-			`/admin/api/buckets/${c.bucket._id}`,
+		/* A deletion schedules the destruction (specs/090); Delete now carries it out. */
+		await admin('DELETE', `/admin/api/buckets/${c.bucket._id}`, cookie);
+		const destroyed = await admin(
+			'POST',
+			`/admin/api/buckets/${c.bucket._id}/purge`,
 			cookie
 		);
 
-		expect(deleted.status).toBe(200);
+		expect(destroyed.status).toBe(200);
 		expect(
 			await ClientCredentials.tryFind(granted.json.access_token as string)
 		).toBeUndefined();

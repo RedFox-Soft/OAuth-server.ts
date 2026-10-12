@@ -6,8 +6,10 @@ import type { BucketBlockers, BucketCan } from '../frame/can.js';
  * for the console — the address form, the issuer and discovery addresses (the browser bundle never learns the
  * server's own address), the projects using it, and for a host, whether requests have arrived.
  */
-export interface BucketView extends UserBucket {
+export interface BucketView extends Omit<UserBucket, 'deletion'> {
 	reserved?: 'administrators';
+	/* Present while the bucket is scheduled for deletion (specs/090); dates arrive as ISO strings. */
+	deletion?: BucketDeletionView;
 	can?: Partial<BucketCan>;
 	blockers?: Partial<
 		BucketBlockers & {
@@ -31,6 +33,12 @@ export interface BucketView extends UserBucket {
 		dnsRecord: { name: string; type: string; value: string };
 		stillToDo?: string;
 	};
+}
+
+export interface BucketDeletionView {
+	scheduledAt: string;
+	purgeAt: string;
+	scheduledBy?: { userId: string; email?: string };
 }
 
 /* GET /admin/api/buckets/:id/summary (data-model §3). */

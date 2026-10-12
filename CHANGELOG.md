@@ -47,6 +47,12 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Changed
 
+- **Deleting a bucket can be undone for 30 days** (spec 090). Delete now switches the bucket off at once and
+  destroys it 30 days later. In between, nothing in it answers, and nothing in it is destroyed. Restore brings it
+  back with every session and refresh token still valid. Delete now (`POST /admin/api/buckets/:id/purge`) destroys a
+  scheduled bucket at once. An hourly pass destroys the rest, recorded in the audit trail as the server. Agents may
+  restore (`bucket_restore`) but neither schedule nor destroy.
+
 - **Replacing a SCIM secret or static token is no longer an outage; a provider can be tried before anyone relies on
   it** (spec 088). The previous value keeps working until the directory has used the new one and stopped using the
   old one for an hour, at most 24 hours; `overlap: false` stops it at once, and retiring it early

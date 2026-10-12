@@ -52,7 +52,11 @@ export const instancePlaneOnly = new Elysia({
 	 * its canonical one — `localhost`, the platform's own, whatever a health check uses — and an
 	 * operator reaching the console at one of those is doing something ordinary.
 	 */
-	if (!(await bucketAtHost(host))) return;
+	/*
+	 * A scheduled bucket's host still counts (specs/090): it is still that tenant's name, and answering the
+	 * console there for thirty days would be the second origin this refusal exists to prevent.
+	 */
+	if (!(await bucketAtHost(host, { includeScheduled: true }))) return;
 
 	set.status = 404;
 	return { error: 'not_found' };

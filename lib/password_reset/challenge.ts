@@ -11,6 +11,7 @@ import {
 } from './types.js';
 import type { User, UserBucket } from '../adapters/types.js';
 import { ISSUER } from '../configs/env.js';
+import { isScheduledForDeletion } from '../consts/bucket_deletion.js';
 import { endSessionsForAccount } from '../helpers/cascade.js';
 import { canSignIn } from '../end_users/can_sign_in.js';
 import { emailScopedId } from '../helpers/email_scoped_id.js';
@@ -156,7 +157,11 @@ export async function request(
 	 * bucket, so without it the console's own sign-in page would offer an unaudited credential change.
 	 */
 	const bucket = await getBucketStore().find(bucketId);
-	if (!bucket || !selfServiceResetAllowed(bucketId, bucket)) {
+	if (
+		!bucket ||
+		isScheduledForDeletion(bucket) ||
+		!selfServiceResetAllowed(bucketId, bucket)
+	) {
 		return { ok: true, sent: false };
 	}
 
@@ -219,6 +224,10 @@ export async function load(token: string): Promise<LoadOutcome> {
 	const bucket = await getBucketStore().find(challenge.bucketId);
 	// Also a link issued before the bucket closed its password door: it must not set a password now.
 	if (!selfServiceResetAllowed(challenge.bucketId, bucket)) {
+		return { ok: false };
+	}
+	/* Nor one issued before the bucket was scheduled for deletion (specs/090): nobody signs in there. */
+	if (bucket && isScheduledForDeletion(bucket)) {
 		return { ok: false };
 	}
 

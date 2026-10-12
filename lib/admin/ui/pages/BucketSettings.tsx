@@ -22,6 +22,7 @@ import { request } from '../frame/request.js';
 import { Link, useLeaveGuard, useNavigate } from '../frame/router.js';
 import { projectSettingsHref } from '../frame/routes.js';
 import { DeleteBucketDialog } from './DeleteBucketDialog.js';
+import { useScheduledActions } from './ScheduledBanner.js';
 import type { AddressPreview, BucketView } from './bucketView.js';
 
 /*
@@ -413,6 +414,10 @@ export function BucketSettings({
 	const [moving, setMoving] = useState(false);
 	const [changingAddress, setChangingAddress] = useState(false);
 	const [deleting, setDeleting] = useState(false);
+	const scheduled = useScheduledActions({
+		onRestored: onChanged,
+		onDeleted: () => void navigate('/admin/buckets', { replace: true })
+	});
 	const fixed = isUndeletableBucket(bucket._id);
 	const usedBy = bucket.blockers?.usedByProjects ?? [];
 	const dependents = bucket.blockers?.dependents;
@@ -425,7 +430,7 @@ export function BucketSettings({
 	 * who could never change it, is not shown the act at all.
 	 */
 	const addressReason =
-		!can.changeAddress && ownsGroup && dependents
+		!can.changeAddress && !bucket.deletion && ownsGroup && dependents
 			? `Used by ${plural(dependents.projects, 'project', 'projects')}, ${plural(dependents.providers, 'identity provider', 'identity providers')} and ${plural(dependents.connections, 'provisioning connection', 'provisioning connections')}: only an instance administrator can change this bucket's address now.`
 			: null;
 
@@ -505,7 +510,38 @@ export function BucketSettings({
 								</Button>
 							</Flex>
 						)}
-						{can.delete && (
+						{can.delete && bucket.deletion && (
+							<Flex
+								justify="space-between"
+								align="center"
+								wrap
+								gap={12}
+							>
+								<div>
+									<Typography.Text strong>
+										Scheduled for deletion
+									</Typography.Text>
+									<br />
+									<Typography.Text type="secondary">
+										Deleted permanently on{' '}
+										{new Date(bucket.deletion.purgeAt).toLocaleDateString()}{' '}
+										unless it is restored.
+									</Typography.Text>
+								</div>
+								<Space>
+									<Button onClick={() => void scheduled.restore(bucket)}>
+										Restore
+									</Button>
+									<Button
+										danger
+										onClick={() => scheduled.deleteNow(bucket)}
+									>
+										Delete now…
+									</Button>
+								</Space>
+							</Flex>
+						)}
+						{can.delete && !bucket.deletion && (
 							<Flex
 								justify="space-between"
 								align="center"
@@ -532,8 +568,9 @@ export function BucketSettings({
 										</Typography.Text>
 									) : (
 										<Typography.Text type="secondary">
-											The bucket and, with your separate consent, its accounts
-											are destroyed.
+											It stops answering at once and is destroyed after 30 days,
+											with its accounts if you consent. Until then it can be
+											restored.
 										</Typography.Text>
 									)}
 								</div>
@@ -574,16 +611,18 @@ export function BucketSettings({
 				<DeleteBucketDialog
 					bucket={bucket}
 					onClose={() => setDeleting(false)}
-					onDeleted={(accounts) => {
+					onDeleted={({ purgeAt }) => {
+						setDeleting(false);
 						feedback.done(
-							accounts > 0
-								? `Bucket ${bucket.name} deleted, with ${plural(accounts, 'account', 'accounts')}.`
-								: `Bucket ${bucket.name} deleted.`
+							purgeAt
+								? `Scheduled for deletion on ${new Date(purgeAt).toLocaleDateString()}.`
+								: `Bucket ${bucket.name} scheduled for deletion.`
 						);
-						void navigate('/admin/buckets', { replace: true });
+						onChanged();
 					}}
 				/>
 			)}
+			{scheduled.dialog}
 		</Flex>
 	);
 }

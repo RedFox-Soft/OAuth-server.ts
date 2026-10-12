@@ -31,7 +31,11 @@ export const CONNECTION_ACTOR_PREFIX = 'connection:';
 /* An upstream identity provider's global token revocation: `upstream:<bucketId>:<providerId>` (specs/072). */
 const UPSTREAM_ACTOR_PREFIX = 'upstream:';
 
+/* The server itself, destroying a bucket whose 30 days of scheduled deletion ran out (specs/090). */
+const RETENTION_ACTOR = 'system:retention';
+
 export function actorLabel(row: AuditEntry): string {
+	if (row.actorId === RETENTION_ACTOR) return 'The server (30 days elapsed)';
 	if (row.actorId.startsWith(CONNECTION_ACTOR_PREFIX)) {
 		return row.actorName
 			? `Directory ${row.actorName}`

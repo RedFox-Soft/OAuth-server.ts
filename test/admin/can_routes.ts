@@ -65,6 +65,9 @@ export const statedRightRoutes: readonly StatedRightRoute[] = [
 		body: {}
 	},
 	{ on: 'bucket', flag: 'delete', method: 'DELETE', path: BUCKET },
+	/* The right to restore and to destroy now is the right to delete (specs/090); no bucket here is scheduled. */
+	{ on: 'bucket', flag: 'delete', method: 'POST', path: `${BUCKET}/restore` },
+	{ on: 'bucket', flag: 'delete', method: 'POST', path: `${BUCKET}/purge` },
 	{
 		on: 'bucket',
 		flag: 'changeAddress',

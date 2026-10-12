@@ -75,6 +75,18 @@ async function overviewRow(id: string) {
 	return body.buckets.find((row) => row.bucketId === id);
 }
 
+/* The bucket deleted and then destroyed at once — a deletion only schedules it (specs/090). */
+async function destroyedNow() {
+	const headers = { cookie: await cookieFor(owner) };
+	const query = { cascade: 'endusers' as const, expect: 1 };
+	await client.admin.api
+		.buckets({ id: bucketId })
+		.delete(undefined, { headers, query });
+	return client.admin.api
+		.buckets({ id: bucketId })
+		.purge.post(undefined, { headers, query });
+}
+
 /**
  * @proves A bucket's usage history is evidence and ordinary administration does not change it: deleting,
  * locking or signing out a person, renaming the bucket, changing its address or moving it to another group
@@ -239,12 +251,7 @@ describe('active users after the bucket and its people change', () => {
 	});
 
 	it("keeps a deleted bucket's history readable in the overview, marked deleted, the deletion month included", async () => {
-		const res = await client.admin.api
-			.buckets({ id: bucketId })
-			.delete(undefined, {
-				headers: { cookie: await cookieFor(owner) },
-				query: { cascade: 'endusers', expect: 1 }
-			});
+		const res = await destroyedNow();
 
 		expect(res.status).toBe(200);
 		const row = await overviewRow(bucketId);
@@ -263,12 +270,7 @@ describe('active users after the bucket and its people change', () => {
 		const log = spyOn(console, 'error').mockImplementation(() => undefined);
 
 		try {
-			const res = await client.admin.api
-				.buckets({ id: bucketId })
-				.delete(undefined, {
-					headers: { cookie: await cookieFor(owner) },
-					query: { cascade: 'endusers', expect: 1 }
-				});
+			const res = await destroyedNow();
 
 			expect(res.status).toBe(500);
 			expect(await getBucketStore().find(bucketId)).not.toBeNull();

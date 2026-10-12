@@ -55,6 +55,9 @@ export interface AuditDetail {
 	 */
 	from?: string | null;
 	to?: string | null;
+	/* A bucket's scheduled destruction (specs/090): when it was scheduled, and when it is due. */
+	scheduledAt?: Date;
+	purgeAt?: Date;
 }
 
 /*
@@ -129,6 +132,26 @@ export function recordBootstrapAudit(
 	return write({
 		actorId: BOOTSTRAP_ACTOR,
 		actorEmail: BOOTSTRAP_ACTOR,
+		action,
+		targetId,
+		detail
+	});
+}
+
+/*
+ * A change the server made on its own, with no session and no request behind it — a bucket destroyed because
+ * its scheduled deletion came due (specs/090). `actorId` is one of the `system:` sentinels, written to both
+ * actor fields as the bootstrap's is. Audit-first as everywhere: the caller records before it changes anything.
+ */
+export function recordSystemAudit(
+	actorId: string,
+	action: AuditAction,
+	targetId: string,
+	detail: AuditDetail = {}
+): Promise<AdminAuditEntry> {
+	return write({
+		actorId,
+		actorEmail: actorId,
 		action,
 		targetId,
 		detail
@@ -221,6 +244,12 @@ async function write(input: {
 			...(input.detail.keys === undefined ? {} : { keys: input.detail.keys }),
 			...(input.detail.from === undefined ? {} : { from: input.detail.from }),
 			...(input.detail.to === undefined ? {} : { to: input.detail.to }),
+			...(input.detail.scheduledAt === undefined
+				? {}
+				: { scheduledAt: input.detail.scheduledAt }),
+			...(input.detail.purgeAt === undefined
+				? {}
+				: { purgeAt: input.detail.purgeAt }),
 			// Sorted so two requests setting the same fields in a different order read identically.
 			...(input.detail.attributes === undefined
 				? {}

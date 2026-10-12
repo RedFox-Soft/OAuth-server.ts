@@ -3,7 +3,11 @@ import { ABSENT_UNDEFINED } from './write_options.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
 import { provisionUserArea } from './provision.js';
 import { documentOf } from '../documents.js';
-import { UserBucket, type UserBucketStoreInstance } from '../types.js';
+import {
+	UserBucket,
+	type BucketDeletion,
+	type UserBucketStoreInstance
+} from '../types.js';
 import type { FederationProvider } from '../../federation/types.js';
 import { UniqueValueTaken } from '../conflicts.js';
 import nanoid from '../../helpers/nanoid.js';
@@ -193,6 +197,65 @@ export class UserBucketStore implements UserBucketStoreInstance {
 		await this.collection.updateOne(
 			{ _id: id, slug: { $exists: false } },
 			{ $set: { slug, updatedAt: new Date() } }
+		);
+	}
+
+	/*
+	 * Each transition's condition is in the filter of one `findOneAndUpdate`, so the datastore decides the
+	 * race: of two callers, one matches and the other finds nothing.
+	 */
+	async scheduleDeletion(
+		id: string,
+		deletion: Omit<BucketDeletion, 'purge'>
+	): Promise<UserBucket | null> {
+		return withDefaults(
+			await this.collection.findOneAndUpdate(
+				{ _id: id, deletion: { $exists: false } },
+				{ $set: { deletion, updatedAt: new Date() } },
+				{ returnDocument: 'after', ...ABSENT_UNDEFINED }
+			)
+		);
+	}
+
+	async cancelDeletion(id: string, now: Date): Promise<UserBucket | null> {
+		return withDefaults(
+			await this.collection.findOneAndUpdate(
+				{
+					_id: id,
+					deletion: { $exists: true },
+					'deletion.purge.claimedUntil': { $not: { $gte: now } }
+				},
+				{ $unset: { deletion: '' }, $set: { updatedAt: new Date() } },
+				{ returnDocument: 'after' }
+			)
+		);
+	}
+
+	async claimPurge(
+		id: string,
+		now: Date,
+		until: Date,
+		options: { due: boolean }
+	): Promise<UserBucket | null> {
+		return withDefaults(
+			await this.collection.findOneAndUpdate(
+				{
+					_id: id,
+					deletion: { $exists: true },
+					'deletion.purge.claimedUntil': { $not: { $gte: now } },
+					...(options.due ? { 'deletion.purgeAt': { $lte: now } } : {})
+				},
+				/* The dotted path keeps `recordedAt` beside it, so a retry never records twice. */
+				{ $set: { 'deletion.purge.claimedUntil': until } },
+				{ returnDocument: 'after' }
+			)
+		);
+	}
+
+	async markPurgeRecorded(id: string, at: Date): Promise<void> {
+		await this.collection.updateOne(
+			{ _id: id, 'deletion.purge': { $exists: true } },
+			{ $set: { 'deletion.purge.recordedAt': at } }
 		);
 	}
 

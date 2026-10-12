@@ -231,11 +231,13 @@ describe('a bucket group kept by an administrator', () => {
 		expect(await memberIds(cookie, b, gid)).toEqual([]);
 	});
 
-	it('is deleted with its bucket', async () => {
+	it('is destroyed with its bucket', async () => {
 		const b = await bucket();
 		const gid = await group(cookie, b, 'Readers');
 
-		const res = await admin('DELETE', `/admin/api/buckets/${b}`, cookie);
+		/* A deletion schedules the destruction (specs/090); Delete now carries it out. */
+		await admin('DELETE', `/admin/api/buckets/${b}`, cookie);
+		const res = await admin('POST', `/admin/api/buckets/${b}/purge`, cookie);
 
 		expect(res.status).toBe(200);
 		expect(await getBucketGroupStore().find(gid)).toBeNull();

@@ -4,7 +4,11 @@ import {
 	END_USER_PASSWORD_MIN_LENGTH,
 	END_USER_PASSWORD_TOO_SHORT
 } from 'lib/consts/password_policy.js';
-import { bucketAtHost, isCanonicalHost } from 'lib/admin/auth/bucketAddress.js';
+import {
+	bucketAtHost,
+	bucketIsScheduled,
+	isCanonicalHost
+} from 'lib/admin/auth/bucketAddress.js';
 // Aliased: this module already imports a `NotFoundError` from helpers/re_render_errors.js, which is the
 // device-flow re-render error and a different thing entirely. Elysia's is the one that produces the same
 // answer the server gives for a path it does not serve, which is what an unknown provider must look like.
@@ -714,6 +718,23 @@ export const ui = new Elysia()
 					);
 				}
 			}
+		}
+
+		/*
+		 * A bucket scheduled for deletion has no sign-in (specs/090 R5): neither the one this interaction began
+		 * at nor the one it signs into may continue a flow begun before the schedule. Answered as an
+		 * interaction that does not exist, which is what its address answers too.
+		 */
+		const signsInto = await resolveBucketForRequest(
+			clientIdOf(interaction),
+			resourceOf(interaction),
+			await addressedBucketOf(interaction)
+		);
+		if (
+			(startedAt && (await bucketIsScheduled(startedAt))) ||
+			(await bucketIsScheduled(signsInto))
+		) {
+			throw new SessionNotFound('interaction session not found');
 		}
 
 		if (interaction.payload.session?.uid) {

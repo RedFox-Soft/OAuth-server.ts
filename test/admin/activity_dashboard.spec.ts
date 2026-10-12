@@ -69,14 +69,20 @@ async function bucketOf(groupId: string): Promise<string> {
 	return (await bucketWithProjects(groupId, 0)).bucket._id;
 }
 
+/* Deleted and then destroyed at once: a deletion only schedules the destruction (specs/090). */
 async function deleteBucket(bucketId: string, as: User) {
-	const response = await app.handle(
-		new Request(`http://e.ly/admin/api/buckets/${bucketId}`, {
-			method: 'DELETE',
-			headers: { cookie: await cookieFor(as) }
-		})
-	);
-	expect(response.status).toBeLessThan(300);
+	for (const [method, path] of [
+		['DELETE', `/admin/api/buckets/${bucketId}`],
+		['POST', `/admin/api/buckets/${bucketId}/purge`]
+	] as const) {
+		const response = await app.handle(
+			new Request(`http://e.ly${path}`, {
+				method,
+				headers: { cookie: await cookieFor(as) }
+			})
+		);
+		expect(response.status).toBeLessThan(300);
+	}
 }
 
 function rowOf(answer: OverviewAnswer, bucketId: string) {

@@ -175,13 +175,17 @@ describe('deletion guards: containers', () => {
 		expect(res.status).toBe(409);
 	});
 
-	it('deletes an emptied bucket and drops its user area (scenario 8)', async () => {
+	it('destroys an emptied bucket and drops its user area (scenario 8)', async () => {
 		const held = await bucket();
 		const store = getUserStore(held._id);
 		const user = await store.create('leaving@example.com', 'hash');
 		await store.destroy(user._id);
 
-		const res = await deleteBucket(held._id);
+		/* A deletion schedules (specs/090); Delete now is the destruction. */
+		await deleteBucket(held._id);
+		const res = await agent.admin.api
+			.buckets({ id: held._id })
+			.purge.post(undefined, { headers: { cookie: await superAdminCookie() } });
 
 		expect(res.status).toBe(200);
 		expect(await getBucketStore().find(held._id)).toBeNull();

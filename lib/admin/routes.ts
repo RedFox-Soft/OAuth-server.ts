@@ -14,6 +14,7 @@ import { resourceRoutes } from './resources/routes.js';
 import { mcpClientRoutes } from './mcp-clients/routes.js';
 import { adminUserRoutes } from './users/routes.js';
 import { bucketRoutes } from './buckets/routes.js';
+import { scheduledBucketGuard } from './buckets/scheduled_guard.js';
 import { federationAdminRoutes } from './federation/routes.js';
 import { endUserRoutes } from './users-end/routes.js';
 import { provisioningRoutes } from './provisioning/routes.js';
@@ -96,6 +97,8 @@ export const adminApiRoutes = new Elysia({ name: 'admin-api' })
 	.use(adminSetup)
 	.use(adminLogin)
 	.use(resolveAdmin)
+	/* Before every route group that writes into a bucket, which is what its hook reaches. */
+	.use(scheduledBucketGuard)
 	.use(meRoutes)
 	.use(groupRoutes)
 	.use(invitationAcceptRoutes)

@@ -73,7 +73,9 @@ export function BucketField() {
 		(b) =>
 			b.ownerGroupId === groupId &&
 			b._id !== ADMIN_BUCKET_ID &&
-			b._id !== DEFAULT_BUCKET_ID
+			b._id !== DEFAULT_BUCKET_ID &&
+			// Scheduled for deletion (specs/090): the server refuses a new project there.
+			!b.deletion
 	);
 
 	useEffect(() => {

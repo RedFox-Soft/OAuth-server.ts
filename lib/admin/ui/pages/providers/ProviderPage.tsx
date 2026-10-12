@@ -30,6 +30,7 @@ import { SaveBar } from '../../settings/SaveBar.js';
 import type { Change } from '../../settings/model.js';
 import { ADMIN_BUCKET_ID } from '../../../consts.js';
 import type { BucketView } from '../bucketView.js';
+import { ScheduledBanner } from '../ScheduledBanner.js';
 import { federationApi, type ProviderDetail } from './providerTypes.js';
 import { providerBlocks, useProviderActions } from './useProviderActions.js';
 import { useTrySignIn } from './TrySignIn.js';
@@ -334,6 +335,13 @@ export function ProviderPage({
 				actions={headerActions}
 			/>
 			{loading && !provider && <Skeleton active />}
+			{bucket?.deletion && (
+				<ScheduledBanner
+					bucket={{ ...bucket, deletion: bucket.deletion }}
+					canDelete={can.delete}
+					onRestored={() => void fetchAll()}
+				/>
+			)}
 			{trySignIn.panel}
 			{bucket && provider && (
 				<ProviderEditor

@@ -131,7 +131,13 @@ async function receive(
 	server: unknown,
 	body: unknown
 ): Promise<Response> {
-	const addressed = await requestBucketFor(slug, hostOfRequest(request));
+	/*
+	 * A bucket scheduled for deletion still hears this (specs/090 FR-008): ending a session is what the
+	 * upstream asked, and a restore must not bring back a session it ended while the bucket was off.
+	 */
+	const addressed = await requestBucketFor(slug, hostOfRequest(request), {
+		includeScheduled: true
+	});
 	let providerId: string | undefined;
 	try {
 		const token = logoutTokenOf(request, body);

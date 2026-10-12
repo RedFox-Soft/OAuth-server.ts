@@ -379,7 +379,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: [],
 		summary:
-			'The user buckets: every one for a super-administrator, otherwise those the caller manages. For a super-administrator the list includes the administrators\' own bucket, marked `reserved: "administrators"`; nobody else sees it. Each row carries `can` and `blockers`, as bucket_get does, and `addressForm` (root, path, host or unaddressed), `issuer` (null when unaddressed), `hostReached` (a request has arrived at its hostname; false for a bucket without one) and `held` (a provisioning connection of the bucket is holding a deprovisioning).'
+			'The user buckets: every one for a super-administrator, otherwise those the caller manages. For a super-administrator the list includes the administrators\' own bucket, marked `reserved: "administrators"`; nobody else sees it. Each row carries `can` and `blockers`, as bucket_get does, and `addressForm` (root, path, host or unaddressed), `issuer` (null when unaddressed), `hostReached` (a request has arrived at its hostname; false for a bucket without one) and `held` (a provisioning connection of the bucket is holding a deprovisioning). A bucket scheduled for deletion is still listed, with `deletion` as bucket_get describes it.'
 	},
 	{
 		tool: 'bucket_get',
@@ -392,7 +392,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			"One user bucket: its name, owning group, and registration and verification settings. Its groups of end users are read with bucket_group_list. A super-administrator may read the administrators' own bucket here (`reserved: \"administrators\"`); its accounts are read with admin_list, not through the bucket. `can` states which operations the server will accept from the caller on it: `manageUsers` (bucket_user_*, the identity tools, bucket_group_member_add/remove, and reading providers, provisioning and user groups), `edit` (federation_provider_create/update/delete, provisioning_connection_create/update/delete/release, provisioning_credential_*, bucket_group_create/update/delete/assign_connection, bucket_user_assign_connection, bucket_key_*), `editSettings` (bucket_update), `readActivity` (bucket_activity_get), `changeAddress` (bucket_address_change), `move` (bucket_owner_change) and `delete`; a false flag is a refusal, so do not try it. `changeAddress` and `delete` also depend on the bucket's state for some callers: an owner of its group may change a path address only while no project, identity provider or provisioning connection depends on it, and a member who is not an owner may delete it only while it holds no accounts. `blockers` is the state behind them: `usedByProjects` names the projects still using it, `addressable` is false for a bucket that signs with the instance keys, `dependents` counts the projects, providers and connections depending on it and `accounts` the accounts it holds — each null when it could not change the caller's answer and so was not read. `addressForm` is root, path, host or unaddressed; `issuer` and `discoveryUrl` are what a client is configured with (null when unaddressed); `projects` lists the projects using it the caller can see, each with its `clientCount`. Its counts are read with bucket_summary_get. Deleting a bucket stays console-only for agents even where `can.delete` is true."
+			"One user bucket: its name, owning group, and registration and verification settings. Its groups of end users are read with bucket_group_list. A super-administrator may read the administrators' own bucket here (`reserved: \"administrators\"`); its accounts are read with admin_list, not through the bucket. `can` states which operations the server will accept from the caller on it: `manageUsers` (bucket_user_*, the identity tools, bucket_group_member_add/remove, and reading providers, provisioning and user groups), `edit` (federation_provider_create/update/delete, provisioning_connection_create/update/delete/release, provisioning_credential_*, bucket_group_create/update/delete/assign_connection, bucket_user_assign_connection, bucket_key_*), `editSettings` (bucket_update), `readActivity` (bucket_activity_get), `changeAddress` (bucket_address_change), `move` (bucket_owner_change) and `delete`; a false flag is a refusal, so do not try it. `changeAddress` and `delete` also depend on the bucket's state for some callers: an owner of its group may change a path address only while no project, identity provider or provisioning connection depends on it, and a member who is not an owner may delete it only while it holds no accounts. `blockers` is the state behind them: `usedByProjects` names the projects still using it, `addressable` is false for a bucket that signs with the instance keys, `dependents` counts the projects, providers and connections depending on it and `accounts` the accounts it holds — each null when it could not change the caller's answer and so was not read. `addressForm` is root, path, host or unaddressed; `issuer` and `discoveryUrl` are what a client is configured with (null when unaddressed); `projects` lists the projects using it the caller can see, each with its `clientCount`. Its counts are read with bucket_summary_get. A bucket scheduled for deletion carries `deletion` — `scheduledAt`, `purgeAt` (the date it will be destroyed) and `scheduledBy` — and answers nobody at its address until then: every change to it or to anything it holds is refused with 409 until bucket_restore brings it back, while reading keeps working. Deleting a bucket stays console-only for agents even where `can.delete` is true."
 	},
 	{
 		tool: 'bucket_summary_get',
@@ -1218,6 +1218,23 @@ const catalogue = [
 			"Move a user bucket, and every project that uses it, to another administrator group (`groupId`). Requires owning the group it is in now and belonging to the destination; another administrator's personal group is never a destination. End users, clients and the sign-in address are unaffected. Called without `confirm`, it changes nothing and answers with the projects that would move; with `confirm: true` it moves them. bucket_get states the right as `can.move`."
 	},
 	{
+		tool: 'bucket_restore',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/restore',
+		action: 'bucket.restore',
+		/*
+		 * `high`: it gives a whole population its sign-in back, and every session and token it still holds
+		 * becomes valid again — access an administrator switched off on purpose returns in one call otherwise.
+		 */
+		consequence: 'high',
+		superAdminOnly: false,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			"Bring back a user bucket that is scheduled for deletion (bucket_get carries `deletion` with `purgeAt`, the date it will be destroyed): it answers at its address again, exactly as before it was deleted, and every session and token it issued that has not expired is valid again. A provisioning directory that tried to reach it while it was off may need a manual resync. Requires the right to delete it, decided over the accounts it holds now — bucket_get's `can.delete`. Refused with 409 when the bucket is not scheduled, or while its destruction is already under way. Deleting a bucket, and destroying a scheduled one at once, stay in the admin console."
+	},
+	{
 		tool: 'bucket_update',
 		method: 'PATCH',
 		path: '/admin/api/buckets/:id',
@@ -1965,12 +1982,24 @@ export const excludedConsoleOperations: readonly ExcludedConsoleOperation[] = [
 		reason:
 			'Deleting a project can destroy every OAuth client it holds, with nothing left afterwards to inspect or restore. In the console an administrator is shown those clients by name, consents to their destruction as a separate act, and types a confirmation word; none of that is a gesture an agent can be asked to make on somebody else behalf. Withheld by operator decision — delete it in the admin console instead.'
 	},
+	/*
+	 * Since specs/090 a deletion schedules rather than destroys, and is still withheld: thirty days later it
+	 * becomes the same destruction, with nobody there to stop it, so consenting to it is consenting to that.
+	 * A restore is published (bucket_restore); it only gives access back.
+	 */
 	{
 		method: 'DELETE',
 		path: '/admin/api/buckets/:id',
 		absence: 'withheld',
 		reason:
-			'Deleting a user bucket can destroy every end-user account in it — people, not configuration — with nothing left afterwards to inspect or restore. In the console an administrator is shown how many, consents to their destruction as a separate act, and types a confirmation word. Withheld by operator decision — delete it in the admin console instead.'
+			'Deleting a user bucket switches off every end-user account in it at once — people, not configuration — and ends, unattended, thirty days later in their destruction, with nothing left afterwards to inspect or restore. In the console an administrator is shown how many, consents to their destruction as a separate act, and types a confirmation word. Withheld by operator decision — delete it in the admin console instead. A bucket already scheduled for deletion can be brought back with bucket_restore.'
+	},
+	{
+		method: 'POST',
+		path: '/admin/api/buckets/:id/purge',
+		absence: 'withheld',
+		reason:
+			'Destroying a user bucket scheduled for deletion, before its date, destroys every end-user account in it — people, not configuration — with nothing left afterwards to inspect or restore. In the console an administrator is shown how many, consents to their destruction as a separate act, and types a confirmation word. Withheld by operator decision — use Delete now in the admin console instead.'
 	},
 	{
 		method: 'DELETE',
@@ -2022,6 +2051,7 @@ export function excludedOperationFor(
 		group_delete: '/admin/api/groups/:id',
 		project_delete: '/admin/api/projects/:id',
 		bucket_delete: '/admin/api/buckets/:id',
+		bucket_purge: '/admin/api/buckets/:id/purge',
 		setup_bootstrap: '/admin/api/setup',
 		logout: '/admin/api/logout',
 		scope_switch: '/admin/api/scope',

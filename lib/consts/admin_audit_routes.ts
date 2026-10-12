@@ -307,10 +307,28 @@ const routes = [
 		path: '/admin/api/buckets/:id/owner',
 		targetType: 'UserBucket'
 	},
+	/*
+	 * Since specs/090 a deletion schedules the bucket's destruction thirty days out rather than destroying
+	 * it; the action keeps its name, so the trail reads one deletion whichever version wrote it. The
+	 * destruction itself is `bucket.purge` — by an administrator's Delete now, or by the server when the
+	 * thirty days are up — and a cancelled schedule is `bucket.restore`.
+	 */
 	{
 		action: 'bucket.delete',
 		method: 'DELETE',
 		path: '/admin/api/buckets/:id',
+		targetType: 'UserBucket'
+	},
+	{
+		action: 'bucket.restore',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/restore',
+		targetType: 'UserBucket'
+	},
+	{
+		action: 'bucket.purge',
+		method: 'POST',
+		path: '/admin/api/buckets/:id/purge',
 		targetType: 'UserBucket'
 	},
 
@@ -723,6 +741,12 @@ export const BOOTSTRAP_ACTOR = 'system:bootstrap';
  * lookup.
  */
 export const MIGRATION_ACTOR = 'system:migration';
+
+/*
+ * Actor recorded when the server destroys a bucket whose thirty days of scheduled deletion ran out
+ * (specs/090) — nobody asked at that moment, so nobody is named. The bootstrap's convention.
+ */
+export const RETENTION_ACTOR = 'system:retention';
 
 /*
  * Prefix of the actor recorded for a change a SCIM provisioning connection made: `connection:<id>`. The

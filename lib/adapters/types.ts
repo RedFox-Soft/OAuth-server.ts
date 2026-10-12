@@ -719,6 +719,12 @@ export const AdminAuditEntry = t.Object({
 	from: t.Optional(t.Union([t.String(), t.Null()])),
 	to: t.Optional(t.Union([t.String(), t.Null()])),
 	/*
+	 * A bucket's scheduled destruction (specs/090): when it was scheduled — on a restore or a destruction, the
+	 * schedule that ended — and the date it was due to be destroyed, on the deletion that set it.
+	 */
+	scheduledAt: t.Optional(t.Union([t.Date(), t.Null()])),
+	purgeAt: t.Optional(t.Union([t.Date(), t.Null()])),
+	/*
 	 * Names of the fields the request set — never their values, so no secret can reach the trail
 	 * through this field. Optional because entries written before it existed do not carry it, and the
 	 * trail is immutable: there is no backfill, only a read-side default.
@@ -1814,6 +1820,28 @@ export const VerificationMethod = t.Union([
 ]);
 export type VerificationMethod = Static<typeof VerificationMethod>;
 
+/*
+ * A bucket's scheduled destruction (specs/090): when it was deleted, by whom, and when it will be
+ * destroyed. `purge` is internal — present only once a destruction has begun — and is never shown.
+ */
+export const BucketDeletion = t.Object({
+	scheduledAt: t.Date(),
+	purgeAt: t.Date(),
+	scheduledBy: t.Object({
+		userId: t.String(),
+		email: t.Optional(t.String())
+	}),
+	purge: t.Optional(
+		t.Object({
+			/* A destruction in progress; another may start only after this. */
+			claimedUntil: t.Date(),
+			/* The `bucket.purge` audit entry was written, so a retried destruction never writes a second. */
+			recordedAt: t.Optional(t.Date())
+		})
+	)
+});
+export type BucketDeletion = Static<typeof BucketDeletion>;
+
 export const UserBucket = t.Object({
 	_id: t.String(),
 	name: t.String(),
@@ -1919,6 +1947,14 @@ export const UserBucket = t.Object({
 	 * refusing: an operator recording intent ahead of opening the door is doing something reasonable.
 	 */
 	totpRequired: t.Boolean(),
+	/*
+	 * Absent ⇔ active. Present, the bucket is switched off and will be destroyed at `purgeAt` (specs/090).
+	 *
+	 * Embedded for the reason `hostFirstSeenAt` gives: it dies with the bucket, so no cascade arm and no
+	 * storage area needs to know it exists. Written only by the conditional store methods below, never by
+	 * `update`, because every transition of it is a race a compare-and-set has to decide.
+	 */
+	deletion: t.Optional(BucketDeletion),
 	createdAt: t.Date(),
 	updatedAt: t.Date()
 });
@@ -2003,6 +2039,29 @@ export interface UserBucketStoreInstance {
 	 * cannot, because an address is not an ordinary edit.
 	 */
 	repairReservedSlug(id: string, slug: string): Promise<void>;
+	/*
+	 * The four transitions of a bucket's scheduled destruction (specs/090), each a compare-and-set in one
+	 * statement, so two administrators, a restore racing a purge, or two server instances running the pass
+	 * cannot both win. Each answers null (or does nothing) when its condition does not hold.
+	 *
+	 * - `scheduleDeletion` — only while not scheduled.
+	 * - `cancelDeletion` — only while scheduled and no destruction holds a live claim (`claimedUntil >= now`).
+	 * - `claimPurge` — only while scheduled with no live claim, and, when `due`, once `purgeAt <= now`; keeps
+	 *   `recordedAt`, so a retried destruction does not record itself twice.
+	 * - `markPurgeRecorded` — only once a claim exists.
+	 */
+	scheduleDeletion(
+		id: string,
+		deletion: Omit<BucketDeletion, 'purge'>
+	): Promise<UserBucket | null>;
+	cancelDeletion(id: string, now: Date): Promise<UserBucket | null>;
+	claimPurge(
+		id: string,
+		now: Date,
+		until: Date,
+		options: { due: boolean }
+	): Promise<UserBucket | null>;
+	markPurgeRecorded(id: string, at: Date): Promise<void>;
 	destroy(id: string): Promise<void>;
 }
 

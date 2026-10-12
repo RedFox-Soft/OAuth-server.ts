@@ -14,6 +14,7 @@ import type {
 	VerificationMethod
 } from '../adapters/types.js';
 import { ISSUER } from '../configs/env.js';
+import { isScheduledForDeletion } from '../consts/bucket_deletion.js';
 import { emailScopedId } from '../helpers/email_scoped_id.js';
 import epochTime from '../helpers/epoch_time.js';
 import {
@@ -146,6 +147,9 @@ async function addressStillHeld(challenge: {
 	accountId: string;
 	email: string;
 }): Promise<boolean> {
+	/* A bucket scheduled for deletion verifies nobody (specs/090): its link is as dead as its address. */
+	const bucket = await getBucketStore().find(challenge.bucketId);
+	if (bucket && isScheduledForDeletion(bucket)) return false;
 	const account = await getUserStore(challenge.bucketId).find(
 		challenge.accountId
 	);
@@ -251,7 +255,7 @@ export async function resend(ref: string): Promise<ResendOutcome> {
 
 	const bucket = await getBucketStore().find(bucketId);
 	const user = await getUserStore(bucketId).find(accountId);
-	if (!bucket || !user || user.verified) {
+	if (!bucket || isScheduledForDeletion(bucket) || !user || user.verified) {
 		return { ok: true, sent: false };
 	}
 

@@ -4,6 +4,7 @@ import { ADMIN_BUCKET_ID } from '../admin/consts.js';
 import { Elysia, t } from 'elysia';
 
 import { getBucketStore } from '../adapters/index.js';
+import { isScheduledForDeletion } from '../consts/bucket_deletion.js';
 import { eventBus } from '../event_bus.js';
 import { NOTICE_FEDERATION_ABORTED } from '../interactions/notices.js';
 import {
@@ -139,7 +140,9 @@ async function completeReturn(params: ReturnParams) {
 		 * re-keyed while the user was away must refuse rather than complete against settings that no longer
 		 * exist. This is also what makes the deployment switch effective mid-flight.
 		 */
-		const bucket = await getBucketStore().find(pending.bucketId);
+		const found = await getBucketStore().find(pending.bucketId);
+		/* A bucket scheduled for deletion while the user was away has no sign-in to complete (specs/090). */
+		const bucket = found && !isScheduledForDeletion(found) ? found : null;
 		const provider = findEnabledProvider(bucket, pending.providerId);
 		if (!bucket || !provider) {
 			return federationInactivePage();

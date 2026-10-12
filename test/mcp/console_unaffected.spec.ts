@@ -113,6 +113,12 @@ describe.each([
 			cookie
 		});
 		expect(res.status).toBe(200);
+		/* A deletion schedules the destruction (specs/090); Delete now carries it out. */
+		const destroyed = await admin(`/admin/api/buckets/${bucket._id}/purge`, {
+			method: 'POST',
+			cookie
+		});
+		expect(destroyed.status).toBe(200);
 		expect(await getBucketStore().find(bucket._id)).toBeNull();
 	});
 

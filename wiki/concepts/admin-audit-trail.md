@@ -26,8 +26,8 @@ graph:
 
 Every state-changing action in the administrative control plane writes exactly one append-only record
 naming who did it, what they did, which entity it affected and when. The constitution requires this of
-*every* admin action, human- or MCP-initiated, and every mounted mutating route is subject to it (82 since
-spec 088; 27 when this page was written). The trail is
+*every* admin action, human- or MCP-initiated, and every mounted mutating route is subject to it (84 since
+spec 090 added `bucket.restore` and `bucket.purge`; 27 when this page was written). The trail is
 permanent: the storage area declares no expiry, the store interface exposes no update or delete, and no
 product surface offers either (`lib/adapters/types.ts`, `lib/consts/storage_inventory.ts`).
 
@@ -200,7 +200,11 @@ one entry. Its `ownerGroupId` is the group the container joined, and `formerOwne
 it left. The group-scoped read selects on either field in all three backends, and each field has its own
 index ([[container-ownership-transfer]]). A second field rather than a second entry, because one action
 writes one entry. The migration that made personal groups personal writes its removals under the
-sentinel actor `system:migration` (`MIGRATION_ACTOR`), the bootstrap's convention: a `:` and no `@`.
+sentinel actor `system:migration` (`MIGRATION_ACTOR`), the bootstrap's convention: a `:` and no `@`. Since spec
+090 the hourly pass that destroys a bucket whose 30 days ran out writes `bucket.purge` as `system:retention`
+(`RETENTION_ACTOR`, `lib/consts/admin_audit_routes.ts:749`) through `recordSystemAudit`, with `ownerGroupId` so
+the owning group reads it ([[bucket-soft-delete]]). Since then `bucket.delete` records the scheduling, with
+`purgeAt`, and the destruction is the separate `bucket.purge`.
 
 The read is newest-first, offset-paged, and filterable by actor (id
 **or** email), action, target type, target id, scope and an inclusive time window. Since spec 085 there are

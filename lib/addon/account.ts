@@ -1,6 +1,7 @@
 import { Grant } from '../models/grant.js';
 import { getUserStore } from '../adapters/index.js';
 import { resolveBucketForRequest } from '../admin/auth/resolveBucket.js';
+import { bucketIsScheduled } from '../admin/auth/bucketAddress.js';
 import { DEFAULT_REQUEST_BUCKET, issuerFor } from '../configs/issuer.js';
 import type { OIDCContext } from '../helpers/oidc_context.ts';
 import { consentWaived } from '../shared/consent_waiver.js';
@@ -55,6 +56,13 @@ export async function findAccount<
 		resource,
 		oidc?.bucket ?? DEFAULT_REQUEST_BUCKET
 	);
+	/*
+	 * A bucket scheduled for deletion loads nobody (specs/090 R4): its own address already answers 404, and
+	 * this is what refuses its tokens everywhere else — a refresh at the root, userinfo, a device or CIBA
+	 * grant — since no grant compares a token's bucket with the address it is presented at. The same
+	 * contract `canSignIn` relies on below, so an override of this function takes this check over with it.
+	 */
+	if (await bucketIsScheduled(bucketId)) return undefined;
 	const user = await getUserStore(bucketId).find(sub);
 
 	// A missing or deactivated user resolves to nothing so the calling flow

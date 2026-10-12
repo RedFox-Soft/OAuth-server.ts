@@ -1,4 +1,8 @@
-import type { UserBucket, UserBucketStoreInstance } from '../types.js';
+import type {
+	BucketDeletion,
+	UserBucket,
+	UserBucketStoreInstance
+} from '../types.js';
 import type { FederationProvider } from '../../federation/types.js';
 import { UniqueValueTaken } from '../conflicts.js';
 import nanoid from '../../helpers/nanoid.js';
@@ -169,7 +173,58 @@ export class UserBucketStore implements UserBucketStoreInstance {
 		Object.assign(b, { slug, updatedAt: new Date() });
 	}
 
+	/*
+	 * Each transition below checks and writes with no `await` between, which is what makes it the
+	 * compare-and-set the two production backends get from one conditional statement — the reasoning
+	 * `hostHolder` gives above.
+	 */
+	async scheduleDeletion(
+		id: string,
+		deletion: Omit<BucketDeletion, 'purge'>
+	): Promise<UserBucket | null> {
+		const b = this.buckets.get(id);
+		if (!b || b.deletion) return null;
+		Object.assign(b, { deletion: { ...deletion }, updatedAt: new Date() });
+		return this.withDefaults(b);
+	}
+
+	async cancelDeletion(id: string, now: Date): Promise<UserBucket | null> {
+		const b = this.buckets.get(id);
+		if (!b?.deletion || claimLive(b.deletion, now)) return null;
+		delete b.deletion;
+		b.updatedAt = new Date();
+		return this.withDefaults(b);
+	}
+
+	async claimPurge(
+		id: string,
+		now: Date,
+		until: Date,
+		options: { due: boolean }
+	): Promise<UserBucket | null> {
+		const b = this.buckets.get(id);
+		const deletion = b?.deletion;
+		if (!b || !deletion || claimLive(deletion, now)) return null;
+		if (options.due && deletion.purgeAt.getTime() > now.getTime()) return null;
+		b.deletion = {
+			...deletion,
+			purge: { ...deletion.purge, claimedUntil: until }
+		};
+		return this.withDefaults(b);
+	}
+
+	async markPurgeRecorded(id: string, at: Date): Promise<void> {
+		const deletion = this.buckets.get(id)?.deletion;
+		if (!deletion?.purge) return;
+		deletion.purge = { ...deletion.purge, recordedAt: at };
+	}
+
 	async destroy(id: string): Promise<void> {
 		this.buckets.delete(id);
 	}
+}
+
+function claimLive(deletion: BucketDeletion, now: Date): boolean {
+	const until = deletion.purge?.claimedUntil;
+	return until !== undefined && until.getTime() >= now.getTime();
 }

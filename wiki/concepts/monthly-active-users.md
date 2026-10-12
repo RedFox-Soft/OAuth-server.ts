@@ -87,7 +87,8 @@ A month's marks expire thirteen months after it ends, a day's forty days after (
 figures are permanent. Both areas are **store areas with no owner** (`lib/consts/storage_inventory.ts:777-795`):
 an area naming an account owner is swept by `cascadeForAccount` on every end-user and bucket deletion, and a
 month a deleted person was active in must still count them. The bucket delete route does not sweep them
-either. Instead it calls `retire` before destroying anything (`lib/admin/buckets/routes.ts:724`): the
+either. Instead it calls `retire` before destroying anything (since spec 090 in `destroyBucket`,
+`lib/admin/buckets/destroy.ts`, run by Delete now and by the 30-day pass — [[bucket-soft-delete]]): the
 tombstone first — if it cannot be written the deletion does not begin, because without it no loader could
 ever list the history again — then a best-effort freeze of the open month and day, which the closer would
 otherwise do later under the tombstone's name.

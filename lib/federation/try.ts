@@ -4,6 +4,7 @@ import {
 } from '../adapters/index.js';
 import type { UserBucket } from '../adapters/types.js';
 import { issuingBucket } from '../admin/auth/bucketAddress.js';
+import { isScheduledForDeletion } from '../consts/bucket_deletion.js';
 import { stabilityOf } from '../admin/federation/guidance.js';
 import { canSignIn } from '../end_users/can_sign_in.js';
 import { IdentityError, identityFor } from './identity/index.js';
@@ -51,7 +52,9 @@ export async function completeTry(
 	const { tryId, bucketId, providerId, nonce } = pending;
 	if (!tryId || !bucketId || !providerId || !nonce) return tryExpiredPage();
 
-	const bucket = await getBucketStore().find(bucketId);
+	const found = await getBucketStore().find(bucketId);
+	/* A bucket scheduled for deletion since the try began is answered as gone (specs/090), as its callback is. */
+	const bucket = found && !isScheduledForDeletion(found) ? found : null;
 	const provider = bucket?.federation.find((p) => p.id === providerId);
 	const base = {
 		providerEnabled: provider?.enabled === true,

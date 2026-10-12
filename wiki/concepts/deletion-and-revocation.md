@@ -18,7 +18,7 @@ Three different operations are easy to confuse, and the code has always distingu
 | **Protocol revocation** (RFC 7009, end-session) | every token under one grant | the `Grant` record — the consent itself |
 | **Principal deletion** (client, end-user) | the principal, then every record naming it as owner, including its grants | nothing of that principal |
 | **Ending an end user's access** (deactivate, lock; spec 069) | every account-owned record — sessions, grants, tokens, codes — after a back-channel logout per session | the account, and its email-addressed throttles |
-| **Container deletion** (project, bucket) | nothing, unless the caller elected to take the contents — then every principal inside, each by the principal cascade above | the bucket a project merely pointed at, always |
+| **Container deletion** (project, bucket) | nothing, unless the caller elected to take the contents — then every principal inside, each by the principal cascade above. Since spec 090 a bucket's deletion only schedules this for 30 days later ([[bucket-soft-delete]]) | the bucket a project merely pointed at, always |
 
 "Revoke" reads as "remove everything" and the code disagrees. A grant is the record that a user
 authorized a client; revoking a token is not withdrawing that authorization, so only a principal cascade
@@ -163,6 +163,11 @@ Order is audit → destroy the principal → cascade. A sweep that fails partway
 principal gone, answers `500` with `failedAreas`, and a repeated `DELETE` answers `404`. That is the
 accepted cost of closing the door first, and the residue is bounded by each area's TTL *because* the one
 unbounded area goes first.
+
+A bucket is the exception since spec 090. Its record goes **last** (`lib/admin/buckets/destroy.ts:169`), after
+its keys, connections, groups and user area. A destruction that fails part-way then leaves a scheduled, silent
+bucket for the next pass to finish. Destroyed first, as the old route did, it took with it the only handle on
+what was left ([[bucket-soft-delete]]).
 
 ## Federated links need no cascade arm
 

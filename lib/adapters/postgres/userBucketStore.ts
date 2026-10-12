@@ -3,7 +3,11 @@ import { docOf } from './json.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
 import { provisionUserArea } from './provision.js';
 import { documentOf } from '../documents.js';
-import { UserBucket, type UserBucketStoreInstance } from '../types.js';
+import {
+	UserBucket,
+	type BucketDeletion,
+	type UserBucketStoreInstance
+} from '../types.js';
 import type { FederationProvider } from '../../federation/types.js';
 import { UniqueValueTaken } from '../conflicts.js';
 import { isUniqueViolation } from './sqlState.js';
@@ -216,6 +220,89 @@ export class UserBucketStore implements UserBucketStoreInstance {
 			SET doc = jsonb_set(doc, '{slug}', to_jsonb(${slug}::text))
 			WHERE id = ${id}
 				AND (doc->>'slug' IS NULL OR doc->>'slug' = ${JSON.stringify(slug)})
+		`;
+	}
+
+	/*
+	 * Each transition is one `UPDATE … WHERE <condition> RETURNING`, so the database decides the race.
+	 *
+	 * Values go in as objects (`doc || ${…}`) or as text made jsonb in the database (`to_jsonb`), never as
+	 * `JSON.stringify(...)` — the trap `repairReservedSlug` above records. Dates are compared as
+	 * `timestamptz`: a document stores them as the ISO text `JSON.stringify` writes, and the bound side is
+	 * the same text cast the same way, so neither depends on the driver's encoding of a Date.
+	 */
+	async scheduleDeletion(
+		id: string,
+		deletion: Omit<BucketDeletion, 'purge'>
+	): Promise<UserBucket | null> {
+		const handle = sql();
+		const merged = { deletion, updatedAt: new Date() };
+		const rows = await handle`
+			UPDATE ${handle(this.area)} SET doc = doc || ${merged}
+			WHERE id = ${id} AND doc->'deletion' IS NULL
+			RETURNING doc
+		`;
+		return this.bucketOf(rows[0]);
+	}
+
+	async cancelDeletion(id: string, now: Date): Promise<UserBucket | null> {
+		const handle = sql();
+		const merged = { updatedAt: new Date() };
+		const rows = await handle`
+			UPDATE ${handle(this.area)} SET doc = (doc - 'deletion') || ${merged}
+			WHERE id = ${id}
+				AND doc->'deletion' IS NOT NULL
+				AND NOT COALESCE(
+					(doc #>> '{deletion,purge,claimedUntil}')::timestamptz >= ${now.toISOString()}::timestamptz,
+					false
+				)
+			RETURNING doc
+		`;
+		return this.bucketOf(rows[0]);
+	}
+
+	async claimPurge(
+		id: string,
+		now: Date,
+		until: Date,
+		options: { due: boolean }
+	): Promise<UserBucket | null> {
+		const handle = sql();
+		const at = now.toISOString();
+		const claim = { claimedUntil: until };
+		/* Merged into what is there, so `recordedAt` survives the claim and a retry never records twice. */
+		const rows = await handle`
+			UPDATE ${handle(this.area)}
+			SET doc = jsonb_set(
+				doc,
+				'{deletion,purge}',
+				COALESCE(doc #> '{deletion,purge}', '{}'::jsonb) || ${claim}
+			)
+			WHERE id = ${id}
+				AND doc->'deletion' IS NOT NULL
+				AND NOT COALESCE(
+					(doc #>> '{deletion,purge,claimedUntil}')::timestamptz >= ${at}::timestamptz,
+					false
+				)
+				AND (
+					${!options.due}
+					OR (doc #>> '{deletion,purgeAt}')::timestamptz <= ${at}::timestamptz
+				)
+			RETURNING doc
+		`;
+		return this.bucketOf(rows[0]);
+	}
+
+	async markPurgeRecorded(id: string, at: Date): Promise<void> {
+		const handle = sql();
+		await handle`
+			UPDATE ${handle(this.area)}
+			SET doc = jsonb_set(
+				doc,
+				'{deletion,purge,recordedAt}',
+				to_jsonb(${at.toISOString()}::text)
+			)
+			WHERE id = ${id} AND doc #> '{deletion,purge}' IS NOT NULL
 		`;
 	}
 

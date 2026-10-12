@@ -77,7 +77,9 @@ nothing new. `blockers.dependents` and `blockers.accounts` carry the facts so th
   owner sees their own change in their trail.
 - **Delete bucket…** reads the account count when the dialog opens (`DeleteBucketDialog.tsx`, shared with the
   list menu); a count that moved before confirming is refused by the server and the dialog starts over with the
-  new number. The delete entry also carries the owning group now.
+  new number. The delete entry also carries the owning group now. Since spec 090 it schedules the bucket's
+  destruction 30 days out instead of destroying it. A scheduled bucket's Danger zone, banner and list menu offer
+  Restore and Delete now, and every area turns read-only ([[bucket-soft-delete]]).
 
 ## Fixed along the way
 

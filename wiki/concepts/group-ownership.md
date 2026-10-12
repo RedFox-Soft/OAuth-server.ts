@@ -68,7 +68,8 @@ belongs to no working group by virtue of the privilege (Super administrators is 
 `GroupMember.role` is `owner` or `member`. An owner decides who is in the group and whether it may be
 deleted; a member is equal to an owner over everything the group owns and has no say over membership.
 Two exceptions since spec 081 ([[bucket-workspace]]): deleting a bucket that still holds accounts is an
-owner's act, and a group owner (not a member) may change an unused bucket's path.
+owner's act, and a group owner (not a member) may change an unused bucket's path. Since spec 090 the same
+right decides restoring such a bucket and deleting it now ([[bucket-soft-delete]]).
 
 This cannot live on the account. The same administrator is an owner of one group and a plain member of
 another, so `assertGroupOwner` refuses by membership kind while `assertSuperAdmin` refuses by membership of

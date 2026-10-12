@@ -81,7 +81,18 @@ export const ACTIONS = {
 		okText: 'Save changes',
 		cancelText: 'Keep editing'
 	},
+	/*
+	 * Deleting schedules the bucket's destruction 30 days out and switches it off at once (specs/090). Still a
+	 * typed word: left alone, it ends in the same destruction, and it shuts every person in the bucket out now.
+	 */
 	'bucket.delete': { class: 'C3', word: 'delete' },
+	// Gives access back to everyone it took it from, and nothing is lost by it: a plain question, not a danger one.
+	'bucket.restore': {
+		class: 'C1',
+		title: (t) => `Restore ${t}?`,
+		okText: 'Restore'
+	},
+	'bucket.purge': { class: 'C3', word: 'delete' },
 
 	'user.create': { class: 'C0' },
 	'user.edit': { class: 'C0' },

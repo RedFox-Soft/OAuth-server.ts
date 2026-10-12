@@ -77,6 +77,25 @@ leaves the account as it was. It is also exactly what an upstream provider asks 
 [global token revocation](/docs/administer/upstream-logout/), and the audit trail records both under
 the same action.
 
+## Deleting a whole bucket
+
+Deleting a bucket ends everyone's access at once, but it does not destroy anything for 30 days:
+
+- The bucket stops answering. Its sign-in page, token endpoint, userinfo, discovery document, key set and SCIM
+  endpoint all answer as if no bucket were there. A refresh token it issued is refused at every other address of
+  this server too.
+- Nothing in it is deleted. Its accounts, sessions, tokens, keys, groups and directory connections stay as they
+  were, and its address stays reserved, so no other bucket can take it.
+- **Restore** brings it back exactly as it was. People who were signed in stay signed in, and apps keep
+  refreshing their tokens. A directory that only sends changes may need a manual resync for what it sent meanwhile.
+- After 30 days the server destroys it, with everything in it. **Delete now** does that at once, on a bucket
+  already scheduled, with the same typed confirmation.
+
+Signals from an upstream identity provider that only end access, such as back-channel logout and global token
+revocation, are still accepted while the bucket is off. A restore therefore cannot bring back a session the
+provider ended. An agent can restore a bucket (`bucket_restore`, confirmed in two calls), but cannot schedule or
+destroy one; those stay in the console.
+
 ## The token none of them can reach
 
 A JWT access token that a resource server validates on its own, against the published keys, never

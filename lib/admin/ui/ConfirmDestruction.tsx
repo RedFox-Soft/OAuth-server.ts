@@ -52,6 +52,7 @@ export function ConfirmDestruction({
 	word = CONFIRM_WORD,
 	okText,
 	acknowledgement,
+	warning,
 	onCancel,
 	onConfirm
 }: {
@@ -69,6 +70,8 @@ export function ConfirmDestruction({
 	 * something they had to look at first, such as whom a released hold removes (specs/084).
 	 */
 	acknowledgement?: string;
+	/* The heading over the consequences, for an act that is not final at once (a bucket's 30 days, specs/090). */
+	warning?: string;
 	onCancel: () => void;
 	onConfirm: (withCascade: boolean) => void;
 }) {
@@ -119,7 +122,7 @@ export function ConfirmDestruction({
 				<Alert
 					type="warning"
 					showIcon
-					title="This cannot be undone"
+					title={warning ?? 'This cannot be undone'}
 					description={
 						<ul style={{ margin: 0, paddingInlineStart: 20 }}>
 							{consequences.map((line) => (

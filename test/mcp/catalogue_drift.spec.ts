@@ -146,6 +146,8 @@ describe('MCP tool catalogue', () => {
 			'DELETE /admin/api/mcp/clients/:entryId',
 			'DELETE /admin/api/projects/:id',
 			'DELETE /admin/api/buckets/:id',
+			/* Delete now: the destruction a scheduled deletion ends in, at once (specs/090). */
+			'POST /admin/api/buckets/:id/purge',
 			'DELETE /admin/api/groups/:id',
 			'DELETE /admin/api/errors'
 		]);
@@ -187,6 +189,8 @@ describe('MCP tool catalogue', () => {
 			'bucket_key_revoke',
 			/* The group it leaves loses a population of people, with no step of its own. */
 			'bucket_owner_change',
+			/* Gives a switched-off population its sign-in, sessions and tokens back (specs/090). */
+			'bucket_restore',
 			/* Makes a local user read-only to every administrator, for good. */
 			'bucket_user_assign_connection',
 			'bucket_user_delete',

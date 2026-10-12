@@ -108,7 +108,7 @@ describe('every high-consequence tool is gated', () => {
 		 * membership is named in catalogue_drift rather than counted here.
 		 */
 		expect(HIGH.length).toBeGreaterThan(0);
-		expect(HIGH.length).toBe(37);
+		expect(HIGH.length).toBe(38);
 	});
 
 	it.each(HIGH.map((t) => [t.tool, t] as const))(

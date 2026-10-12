@@ -33,6 +33,7 @@ import { SecretReveal } from '../../frame/SecretReveal.js';
 import { SaveBar } from '../../settings/SaveBar.js';
 import type { Change } from '../../settings/model.js';
 import type { BucketView } from '../bucketView.js';
+import { ScheduledBanner } from '../ScheduledBanner.js';
 import {
 	ADVISORY_WARNINGS,
 	CREDENTIAL_KINDS,
@@ -216,7 +217,14 @@ export function ConnectionPage({
 				activeTab={tab}
 			/>
 			{loading && !connection && <Skeleton active />}
-			{bucket && !can.edit && (
+			{bucket?.deletion && (
+				<ScheduledBanner
+					bucket={{ ...bucket, deletion: bucket.deletion }}
+					canDelete={can.delete}
+					onRestored={() => void fetchAll()}
+				/>
+			)}
+			{bucket && !can.edit && !bucket.deletion && (
 				<Alert
 					type="info"
 					showIcon

@@ -1,17 +1,13 @@
 import { Elysia } from 'elysia';
 import {
-	getActivityStore,
-	getBucketKeysStore,
 	getBucketStore,
 	getBucketGroupStore,
 	getContainerOwnershipStore,
-	getGroupStore,
 	getProjectStore,
 	getProtectedResourceStore,
 	getProvisioningConnectionStore,
 	getUserStore
 } from '../../adapters/index.js';
-import { destroyConnectionsOf } from '../../provisioning/service.js';
 import {
 	assertAuth,
 	assertActiveGroup,
@@ -40,14 +36,12 @@ import type { Project, UserBucket } from '../../adapters/types.js';
 import { isUniqueValueTaken } from '../../adapters/conflicts.js';
 import { presentAll } from '../federation/service.js';
 import { ADMIN_BUCKET_ID, isUndeletableBucket, reservedOf } from '../consts.js';
-import { cascadeForAccount } from '../../helpers/cascade.js';
-import { emailScopedId } from '../../helpers/email_scoped_id.js';
 import { recordAdminAudit } from '../audit/record.js';
 import nanoid from '../../helpers/nanoid.js';
-import {
-	ensureBucketKey,
-	invalidateBucketKeys
-} from '../../keys/issuer_keys.js';
+import { ensureBucketKey } from '../../keys/issuer_keys.js';
+import { purgeAtOf } from '../../consts/bucket_deletion.js';
+import { destroyBucket } from './destroy.js';
+import { scheduledForDeletion } from './scheduled_guard.js';
 import { namespaceOf, ROOT_NAMESPACE } from '../../resources/namespace.js';
 import {
 	applyMove,
@@ -87,7 +81,6 @@ import { addressOf, issuerFor } from '../../configs/issuer.js';
 import { callbackUri } from '../../federation/flow.js';
 import { mailDeliveryConfigured } from '../../mail/mailer.js';
 import { getClientView } from '../clients/service.js';
-import { groupLabel } from '../groups/label.js';
 import {
 	forgetBucketAddresses,
 	isAddressable,
@@ -461,9 +454,9 @@ function countOf(n: number, noun: string): string {
  * Found by the MCP surface's secrecy sweep (test/mcp/secrecy.spec.ts), which is why that sweep iterates
  * every published read rather than the ones somebody thought to check.
  */
-function presentBucket<T extends Pick<UserBucket, '_id' | 'federation'>>(
-	bucket: T
-): T & { reserved?: 'administrators' } {
+function presentBucket<
+	T extends Pick<UserBucket, '_id' | 'federation' | 'deletion'>
+>(bucket: T): T & { reserved?: 'administrators' } {
 	/*
 	 * The console's own bucket says so on the response, so the console and an agent learn it from what
 	 * they were sent rather than by knowing the id.
@@ -472,8 +465,21 @@ function presentBucket<T extends Pick<UserBucket, '_id' | 'federation'>>(
 		reservedOf(bucket._id) === 'administrators'
 			? { ...bucket, reserved: 'administrators' as const }
 			: bucket;
-	if (!marked.federation.length) return marked;
-	return { ...marked, federation: presentAll(bucket) };
+	const shown = withoutPurgeClaim(marked);
+	if (!shown.federation.length) return shown;
+	return { ...shown, federation: presentAll(bucket) };
+}
+
+/*
+ * A scheduled bucket says when it stops and when it goes (specs/090 FR-031); how far a destruction has got is
+ * the destruction's own bookkeeping, and nobody reading the bucket acts on it.
+ */
+function withoutPurgeClaim<T extends Pick<UserBucket, 'deletion'>>(
+	bucket: T
+): T {
+	if (!bucket.deletion?.purge) return bucket;
+	const { purge: _purge, ...deletion } = bucket.deletion;
+	return { ...bucket, deletion };
 }
 
 /*
@@ -605,6 +611,133 @@ function withInertTotpAdvisory<
 	};
 }
 
+/* One bucket as `GET /admin/api/buckets/:id` answers it, and as a restore answers with what it brought back. */
+async function bucketDetail(ctx: AdminContext, bucket: UserBucket) {
+	const [facts, state] = await Promise.all([
+		rightsFacts(ctx),
+		bucketFacts(ctx, bucket)
+	]);
+	/*
+	 * The projects named are those the caller can reach, for the reason `withRights` gives; each with how
+	 * many applications it holds, which is what a change to this bucket's sign-in reaches through it.
+	 */
+	const projects = (facts.visibleProjects.get(bucket._id) ?? []).map(
+		(project) => ({
+			id: project._id,
+			name: project.name,
+			clientCount: clientIdsOf(project).length
+		})
+	);
+	return {
+		...withAddressGuidance(
+			withRights(ctx, presentBucket(bucket), facts, state)
+		),
+		/*
+		 * Sent by the server because the console cannot derive it: ISSUER is kept out of the browser
+		 * bundle (lib/configs/issuer.ts).
+		 */
+		...addressing(bucket),
+		projects
+	};
+}
+
+/*
+ * The checks a deletion has always applied, in their order and with their messages (specs/090 FR-002),
+ * shared by scheduling a deletion and by Delete now, which applies them again over the bucket as it is then
+ * (FR-021). `scheduled` is the state the operation needs the bucket in, judged after the right — so a caller
+ * without the right is refused for that, as the stated rights say, and not told the bucket's state.
+ */
+async function deletionChecked(
+	ctx: AdminContext,
+	id: string,
+	query: { cascade?: 'endusers'; expect?: number },
+	scheduled: boolean
+): Promise<{ bucket: UserBucket; accounts: number }> {
+	/*
+	 * First, before the bucket is even loaded, so the answer cannot depend on whether it happens to be
+	 * empty or on who is asking. This route does not go through `loadBucketForEdit`, which is where
+	 * `assertNotReserved` lives, so until 051 it reached no reserved-bucket guard at all and an empty
+	 * administrators' or default bucket was deletable by a super administrator.
+	 */
+	if (isUndeletableBucket(id)) {
+		throw new AdminError(
+			403,
+			'this bucket is part of the server itself and cannot be deleted'
+		);
+	}
+	/*
+	 * Loaded as its settings are, so a caller who is not a super administrator cannot tell a missing
+	 * bucket from one they may not read.
+	 */
+	const bucket = await loadBucketForSettings(ctx, id, 'read');
+	const store = getUserStore(id);
+	/*
+	 * Counted before the right is decided, because the right depends on it (specs/081): deleting a
+	 * bucket that holds accounts deletes people, which is an owner's act, while an empty bucket stays
+	 * deletable by any member of its group. Counted by the datastore, not by reading every account.
+	 */
+	const held = (await store.tally()).total;
+	if (!bucketCan(ctx, bucket, NO_PROJECT_REACH, { accounts: held }).delete) {
+		throw new AdminError(
+			403,
+			held > 0 && holdsBucket(ctx, bucket)
+				? `This bucket holds ${countOf(held, 'account')}: only an owner of its group can delete it.`
+				: 'no access to this bucket'
+		);
+	}
+	if (scheduled && !bucket.deletion) {
+		throw new AdminError(409, 'This bucket is not scheduled for deletion.');
+	}
+	/* Only by a race: the scheduled-bucket guard refuses a reader before the handler runs. */
+	if (!scheduled && bucket.deletion) {
+		throw scheduledForDeletion(bucket.deletion.purgeAt);
+	}
+	/*
+	 * Before the election is even considered, and unclearable by it. What this protects is
+	 * outside the bucket: a project left pointing at a bucket that no longer exists is a broken
+	 * tenant, which is not something the bucket's own contents can consent away.
+	 */
+	if ((await getProjectStore().countByBucket(id)) > 0) {
+		throw new AdminError(409, 'bucket is assigned to one or more projects');
+	}
+	/*
+	 * `list()` does not filter, which is what makes a deactivated account count — deactivation is
+	 * a sign-in decision, not absence, and the account is still there to be destroyed. Only the
+	 * count is reported and only a count is accepted back: a bucket can hold thousands of
+	 * accounts, their identifiers are not the caller's business, and an administrator is not
+	 * asked to decide about people by name.
+	 */
+	const accounts = (await store.list()).length;
+	/* An account that arrived since the count still counts: the right is decided over what is destroyed. */
+	if (!bucketCan(ctx, bucket, NO_PROJECT_REACH, { accounts }).delete) {
+		throw new AdminError(
+			403,
+			`This bucket holds ${countOf(accounts, 'account')}: only an owner of its group can delete it.`
+		);
+	}
+	if (accounts > 0) {
+		if (query.cascade === undefined) {
+			throw new AdminError(409, 'bucket still holds end-users', {
+				blockers: [{ kind: 'enduser', count: accounts }]
+			});
+		}
+		if (query.expect !== accounts) {
+			throw new AdminError(
+				409,
+				'the bucket end-users changed since you reviewed them',
+				{ blockers: [{ kind: 'enduser', count: accounts }] }
+			);
+		}
+	}
+	return { bucket, accounts };
+}
+
+/* Whether a destruction holds the bucket now — a restore or a second Delete now would race it. */
+function destructionUnderway(bucket: UserBucket, at: Date): boolean {
+	const until = bucket.deletion?.purge?.claimedUntil;
+	return until !== undefined && until.getTime() >= at.getTime();
+}
+
 export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 	.use(resolveAdmin)
 	.onError(({ error, set }) => {
@@ -733,32 +866,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 	.get('/admin/api/buckets/:id', async ({ admin, params }) => {
 		const ctx = assertAuth(admin);
 		const bucket = await loadBucketForSettings(ctx, params.id, 'read');
-		const [facts, state] = await Promise.all([
-			rightsFacts(ctx),
-			bucketFacts(ctx, bucket)
-		]);
-		/*
-		 * The projects named are those the caller can reach, for the reason `withRights` gives; each with how
-		 * many applications it holds, which is what a change to this bucket's sign-in reaches through it.
-		 */
-		const projects = (facts.visibleProjects.get(bucket._id) ?? []).map(
-			(project) => ({
-				id: project._id,
-				name: project.name,
-				clientCount: clientIdsOf(project).length
-			})
-		);
-		return {
-			...withAddressGuidance(
-				withRights(ctx, presentBucket(bucket), facts, state)
-			),
-			/*
-			 * Sent by the server because the console cannot derive it: ISSUER is kept out of the browser
-			 * bundle (lib/configs/issuer.ts).
-			 */
-			...addressing(bucket),
-			projects
-		};
+		return bucketDetail(ctx, bucket);
 	})
 	/*
 	 * What a bucket's overview counts (specs/081 FR-018): computed per request and never stored. Governed by
@@ -1145,189 +1253,135 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 		},
 		{ body: MoveBucketOwnerBody }
 	)
+	/*
+	 * Deleting a bucket schedules its destruction thirty days out (specs/090), and changes nothing inside it:
+	 * every door answers as though the bucket did not exist, every session and token stays stored, and a
+	 * restore puts it back exactly as it was. The destruction itself is the purge route's, or the hourly
+	 * pass's when the date comes (lib/admin/buckets/destroy.ts).
+	 *
+	 * Every check a deletion applied when it destroyed at once still applies here, in the same order and with
+	 * the same messages, because the destruction this schedules runs later with nobody there to ask.
+	 */
 	.delete(
 		'/admin/api/buckets/:id',
 		async ({ admin, params, query }) => {
 			const ctx = assertAuth(admin);
-			/*
-			 * First, before the bucket is even loaded, so the answer cannot depend on whether it happens
-			 * to be empty or on who is asking. This route does not go through `loadBucketForEdit`, which
-			 * is where `assertNotReserved` lives, so until 051 it reached no reserved-bucket guard at all
-			 * and an empty administrators' or default bucket was deletable by a super administrator.
-			 */
-			if (isUndeletableBucket(params.id)) {
-				throw new AdminError(
-					403,
-					'this bucket is part of the server itself and cannot be deleted'
-				);
-			}
-			/*
-			 * Loaded as its settings are, so a caller who is not a super administrator cannot tell a missing
-			 * bucket from one they may not read.
-			 */
-			const bucket = await loadBucketForSettings(ctx, params.id, 'read');
-			const store = getUserStore(params.id);
-			/*
-			 * Counted before the right is decided, because the right depends on it (specs/081): deleting a
-			 * bucket that holds accounts deletes people, which is an owner's act, while an empty bucket stays
-			 * deletable by any member of its group. Counted by the datastore, not by reading every account.
-			 */
-			const held = (await store.tally()).total;
-			if (
-				!bucketCan(ctx, bucket, NO_PROJECT_REACH, { accounts: held }).delete
-			) {
-				throw new AdminError(
-					403,
-					held > 0 && holdsBucket(ctx, bucket)
-						? `This bucket holds ${countOf(held, 'account')}: only an owner of its group can delete it.`
-						: 'no access to this bucket'
-				);
-			}
-			/*
-			 * Before the election is even considered, and unclearable by it. What this protects is
-			 * outside the bucket: a project left pointing at a bucket that no longer exists is a broken
-			 * tenant, which is not something the bucket's own contents can consent away.
-			 */
-			if ((await getProjectStore().countByBucket(params.id)) > 0) {
-				throw new AdminError(409, 'bucket is assigned to one or more projects');
-			}
-			/*
-			 * `list()` does not filter, which is what makes a deactivated account count — deactivation is
-			 * a sign-in decision, not absence, and the account is still there to be destroyed. Only the
-			 * count is reported and only a count is accepted back: a bucket can hold thousands of
-			 * accounts, their identifiers are not the caller's business, and an administrator is not
-			 * asked to decide about people by name.
-			 */
-			const accounts = await store.list();
-			/* An account that arrived since the count still counts: the right is decided over what is destroyed. */
-			if (
-				!bucketCan(ctx, bucket, NO_PROJECT_REACH, {
-					accounts: accounts.length
-				}).delete
-			) {
-				throw new AdminError(
-					403,
-					`This bucket holds ${countOf(accounts.length, 'account')}: only an owner of its group can delete it.`
-				);
-			}
-			if (accounts.length > 0) {
-				if (query.cascade === undefined) {
-					throw new AdminError(409, 'bucket still holds end-users', {
-						blockers: [{ kind: 'enduser', count: accounts.length }]
-					});
-				}
-				if (query.expect !== accounts.length) {
-					throw new AdminError(
-						409,
-						'the bucket end-users changed since you reviewed them',
-						{ blockers: [{ kind: 'enduser', count: accounts.length }] }
-					);
-				}
-			}
+			const { bucket, accounts } = await deletionChecked(
+				ctx,
+				params.id,
+				query,
+				false
+			);
+			const scheduledAt = now();
+			const purgeAt = purgeAtOf(scheduledAt);
 
 			/*
-			 * One entry carrying a count, never one per account: a bucket-sized deletion writing a row
-			 * per person would bury everything else an operator needs to investigate, and would say
-			 * nothing the bucket's identity does not already say — a cascade is all-or-nothing over what
-			 * it held. After the guards and before the destruction, by the trail's own contract.
+			 * One entry carrying a count, never one per account, for the reason the destruction gives; with the
+			 * date the bucket will be destroyed, so the trail says what this deletion set in motion. After the
+			 * guards and before the change, by the trail's own contract.
 			 */
 			await recordAdminAudit(ctx, 'bucket.delete', params.id, {
-				...(accounts.length > 0
-					? { cascade: { endusers: accounts.length } }
-					: {}),
+				...(accounts > 0 ? { cascade: { endusers: accounts } } : {}),
 				/* So the group that owned it reads the deletion in its own trail. */
-				ownerGroupId: bucket.ownerGroupId
+				ownerGroupId: bucket.ownerGroupId,
+				purgeAt
 			});
-
-			/*
-			 * The email is read before the row goes, per account, because the email-scoped areas are
-			 * addressed by `${bucketId}:${email}` and nothing else records it. Destroy first and those
-			 * records are unreachable — skipped in silence, with no error anywhere to notice. The
-			 * already-computed id in `cascadeForAccount`'s signature is what makes that ordering
-			 * impossible to get wrong here.
-			 */
-			/*
-			 * The bucket's usage history is kept (specs/076, FR-011): its tombstone first, before anything is
-			 * destroyed, because without it a deleted bucket's figures could never be listed again — no loader
-			 * finds the bucket once it is gone. If it cannot be written the deletion does not begin, which is
-			 * the one moment refusing is clean; a repeated request finds the tombstone and proceeds. The open
-			 * month and day are frozen in the same call, best effort — the closer catches up.
-			 *
-			 * Neither activity area is swept below, deliberately: they hold evidence of how many people used
-			 * the bucket, and deleting the bucket must not erase it.
-			 *
-			 * The owner goes on the tombstone too (specs/077): the usage overview names a deleted bucket's
-			 * customer from it once the group itself may be gone. A group cannot be deleted while it owns a
-			 * bucket, so it is found here; if it somehow is not, its id stands in for its name rather than the
-			 * deletion being refused over a label.
-			 */
-			try {
-				const owner = await getGroupStore().find(bucket.ownerGroupId);
-				await getActivityStore().retire(
-					{
-						_id: bucket._id,
-						name: bucket.name,
-						...(bucket.slug === undefined ? {} : { slug: bucket.slug }),
-						createdAt: bucket.createdAt
-					},
-					{
-						groupId: bucket.ownerGroupId,
-						label: owner ? groupLabel(owner) : bucket.ownerGroupId
-					},
-					now()
-				);
-			} catch (error) {
-				console.error("activity: could not keep a deleted bucket's history", {
-					bucketId: params.id,
-					error
-				});
-				throw new AdminError(
-					500,
-					"the bucket's usage history could not be kept; nothing was deleted"
-				);
+			const scheduled = await getBucketStore().scheduleDeletion(params.id, {
+				scheduledAt,
+				purgeAt,
+				scheduledBy: { userId: ctx.userId, email: ctx.email }
+			});
+			if (!scheduled?.deletion) {
+				const current = await getBucketStore().find(params.id);
+				throw current?.deletion
+					? scheduledForDeletion(current.deletion.purgeAt)
+					: new AdminError(404, 'bucket not found');
 			}
-
-			const failedAreas: string[] = [];
-			for (const account of accounts) {
-				const scopedId = account.email
-					? emailScopedId(params.id, account.email)
-					: null;
-				await store.destroy(account._id);
-				const swept = await cascadeForAccount(account._id, scopedId);
-				failedAreas.push(...swept.failedAreas);
-			}
-
-			await getBucketStore().destroy(params.id);
-			/*
-			 * Its keys go with it. They sign for an issuer that no longer exists, and leaving the private
-			 * halves behind would keep key material nobody can manage any more.
-			 */
-			await getBucketKeysStore().destroyByBucket(params.id);
-			invalidateBucketKeys(params.id);
-			/*
-			 * Its SCIM provisioning connections go too, and every token they obtained with them: a token
-			 * outliving its bucket would fail at the SCIM principal anyway, but a customer's directory should
-			 * see its credential refused at the token endpoint, not answered with a token for nothing.
-			 */
-			for (const swept of await destroyConnectionsOf(params.id)) {
-				failedAreas.push(...swept.failedAreas);
-			}
-			/* Its groups and every membership in them; nothing outside the bucket refers to either. */
-			await getBucketGroupStore().destroyByBucket(params.id);
-			/* The address is gone; a cached entry would keep answering for a bucket that no longer exists. */
+			/* Every door at its address closes now on this instance; the address caches' minute bounds the rest. */
 			forgetBucketAddresses();
-			/* The half that was missing: without this a deleted bucket left its `user_<bucket>` area behind
-			 * for good, indexes and all. Safe here and only here, because the loop above emptied it. */
-			await store.destroyArea();
-
-			if (failedAreas.length > 0) {
+			return {
+				scheduled: {
+					scheduledAt: scheduled.deletion.scheduledAt,
+					purgeAt: scheduled.deletion.purgeAt
+				}
+			};
+		},
+		{ query: DeleteBucketQuery }
+	)
+	/*
+	 * Restoring a scheduled bucket (specs/090 US2): it answers again as it did, with every session and token
+	 * still unexpired valid again. The right to restore is the right to delete, over the accounts it holds
+	 * now (FR-014). A directory that tried to provision while it was off may need a resync; nothing here can
+	 * replay what it was refused.
+	 */
+	.post('/admin/api/buckets/:id/restore', async ({ admin, params }) => {
+		const ctx = assertAuth(admin);
+		const bucket = await loadBucketForSettings(ctx, params.id, 'read');
+		const held = (await getUserStore(params.id).tally()).total;
+		if (!bucketCan(ctx, bucket, NO_PROJECT_REACH, { accounts: held }).delete) {
+			throw new AdminError(
+				403,
+				held > 0 && holdsBucket(ctx, bucket)
+					? `This bucket holds ${countOf(held, 'account')}: only an owner of its group can restore it.`
+					: 'no access to this bucket'
+			);
+		}
+		/* Before the audit entry, so a restore that changes nothing is not recorded (FR-015). */
+		if (!bucket.deletion) {
+			throw new AdminError(409, 'This bucket is not scheduled for deletion.');
+		}
+		if (destructionUnderway(bucket, now())) {
+			throw new AdminError(409, 'This bucket is already being deleted.');
+		}
+		await recordAdminAudit(ctx, 'bucket.restore', params.id, {
+			ownerGroupId: bucket.ownerGroupId,
+			/* The schedule this restore cancelled. */
+			scheduledAt: bucket.deletion.scheduledAt
+		});
+		/* The store decides the race with a destruction that began since the read above. */
+		const restored = await getBucketStore().cancelDeletion(params.id, now());
+		if (!restored) {
+			throw new AdminError(409, 'This bucket is already being deleted.');
+		}
+		forgetBucketAddresses();
+		return bucketDetail(ctx, restored);
+	})
+	/*
+	 * Delete now (specs/090 US4): destroys a scheduled bucket at once rather than at its date, by the procedure
+	 * the hourly pass runs. The deletion's checks are applied again, over what the bucket holds now — the
+	 * consent to destroy people is to the count reviewed, and the right depends on it.
+	 */
+	.post(
+		'/admin/api/buckets/:id/purge',
+		async ({ admin, params, query }) => {
+			const ctx = assertAuth(admin);
+			const { bucket } = await deletionChecked(ctx, params.id, query, true);
+			if (destructionUnderway(bucket, now())) {
+				throw new AdminError(409, 'This bucket is already being deleted.');
+			}
+			const outcome = await destroyBucket(
+				bucket,
+				{ kind: 'admin', ctx },
+				{ due: false }
+			);
+			if (!outcome.claimed) {
+				const current = await getBucketStore().find(params.id);
+				if (!current) throw new AdminError(404, 'bucket not found');
 				throw new AdminError(
-					500,
-					`bucket deleted, but records of its end-users survive in: ${[...new Set(failedAreas)].join(', ')}`,
-					{ failedAreas: [...new Set(failedAreas)] }
+					409,
+					current.deletion
+						? 'This bucket is already being deleted.'
+						: 'This bucket is not scheduled for deletion.'
 				);
 			}
-			return { ok: true, endUsersDestroyed: accounts.length };
+			if (outcome.failedAreas.length > 0) {
+				throw new AdminError(
+					500,
+					`bucket deleted, but records of its end-users survive in: ${outcome.failedAreas.join(', ')}`,
+					{ failedAreas: outcome.failedAreas }
+				);
+			}
+			return { ok: true, endUsersDestroyed: outcome.endUsersDestroyed };
 		},
 		{ query: DeleteBucketQuery }
 	);

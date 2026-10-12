@@ -19,6 +19,7 @@ import { BucketNotFound } from './UsageBucketHistory.js';
 import { ProvisioningPanel, type ConnectionView } from './ProvisioningPanel.js';
 import { BucketGroupsPanel } from './BucketGroupsPanel.js';
 import { BucketUsersPanel } from './BucketUsersPanel.js';
+import { ScheduledBanner } from './ScheduledBanner.js';
 import { SignInTab, signInKey } from './signin/SignInTab.js';
 
 /*
@@ -151,6 +152,11 @@ export function BucketDetail({
 	}, [fetchBucket]);
 
 	const can = bucketCan(bucket);
+	/*
+	 * Which areas open is the server's answer alone. A scheduled bucket is read-only (`can` above), but its keys
+	 * stay readable by whoever could manage them — hiding the tab would hide what is about to be destroyed.
+	 */
+	const granted = bucketCan(bucket ? { can: bucket.can } : null);
 
 	if (loadStatus !== null) {
 		return loadStatus === 403 || loadStatus === 404 ? (
@@ -168,7 +174,7 @@ export function BucketDetail({
 
 	const shownTab = tab;
 	const held = summary !== null && summary.held > 0;
-	const tabs = TABS.filter((t) => tabAllowed(t.key, can)).map((t) => ({
+	const tabs = TABS.filter((t) => tabAllowed(t.key, granted)).map((t) => ({
 		key: t.key,
 		/*
 		 * A held directory is marked on the tab that holds it (specs/084 US6), so it is seen from every area of
@@ -197,7 +203,7 @@ export function BucketDetail({
 	 * Users there: the address keeps meaning what it says, and a link someone shared explains itself.
 	 */
 	const shownTabLabel = TABS.find((t) => t.key === shownTab)?.label ?? '';
-	const tabRefused = bucket !== null && !tabAllowed(shownTab, can);
+	const tabRefused = bucket !== null && !tabAllowed(shownTab, granted);
 	const openSignIn = () => void navigate(bucketHref(bucketId, 'sign-in'));
 
 	return (
@@ -211,6 +217,12 @@ export function BucketDetail({
 				tags={
 					<>
 						{special === 'default' && <Tag>Default</Tag>}
+						{bucket?.deletion && (
+							<Tag color="warning">
+								Deletes on{' '}
+								{new Date(bucket.deletion.purgeAt).toLocaleDateString()}
+							</Tag>
+						)}
 						{summary && summary.held > 0 && (
 							<Tag color="red">Deprovisioning held</Tag>
 						)}
@@ -238,6 +250,13 @@ export function BucketDetail({
 				activeTab={shownTab}
 			/>
 			{loading && !bucket && <Skeleton active />}
+			{bucket?.deletion && (
+				<ScheduledBanner
+					bucket={{ ...bucket, deletion: bucket.deletion }}
+					canDelete={granted.delete}
+					onRestored={() => void load()}
+				/>
+			)}
 			{tabRefused && (
 				<NoAccess
 					what={`bucket's ${shownTabLabel.toLowerCase()}`}
@@ -274,7 +293,8 @@ export function BucketDetail({
 					onSaved={() => void load()}
 				/>
 			)}
-			{bucket && !tabRefused && (
+			{/* A scheduled bucket's banner already says why nothing can be changed. */}
+			{bucket && !tabRefused && !bucket.deletion && (
 				<>
 					{shownTab === 'users' && !can.manageUsers && <ReadOnlyNotice />}
 					{(shownTab === 'userGroups' ||

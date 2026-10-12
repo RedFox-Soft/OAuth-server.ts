@@ -37,6 +37,7 @@ import {
 	normalizeOrigins
 } from '../../helpers/cors_origin.js';
 import { ADMIN_BUCKET_ID, DEFAULT_BUCKET_ID } from '../consts.js';
+import { isScheduledForDeletion } from '../../consts/bucket_deletion.js';
 import {
 	describeGroup,
 	loadDestination,
@@ -79,6 +80,17 @@ function validateCorsOrigins(origins: string[] | undefined) {
 }
 
 /*
+ * A bucket scheduled for deletion takes no new project (specs/090 FR-011): it answers nobody, and a project
+ * pointing at it would also block its deletion from completing. After the access check, so only a caller who
+ * may reach the bucket learns it is scheduled.
+ */
+function assertNotScheduled(bucket: UserBucket): void {
+	if (isScheduledForDeletion(bucket)) {
+		throw new AdminError(409, 'That bucket is scheduled for deletion.');
+	}
+}
+
+/*
  * The bucket a new project is created with (specs/087), refused by the rules an assignment is: it exists,
  * it is not the administrators' bucket, the caller reaches it, and it is in the group the project is
  * created in. No preview, unlike an assignment: a new project has no applications or declarations whose
@@ -112,6 +124,7 @@ async function bucketForNewProject(
 		);
 	}
 	assertBucketAccess(ctx, bucket);
+	assertNotScheduled(bucket);
 	if (bucket.ownerGroupId !== ownerGroupId) {
 		throw new AdminError(
 			409,
@@ -601,6 +614,7 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 				);
 			}
 			assertBucketAccess(ctx, bucket);
+			assertNotScheduled(bucket);
 			/*
 			 * A project and the bucket backing it must belong to the same group. Both access checks above
 			 * can pass for an administrator who belongs to two groups — one owning the project, the other

@@ -17,7 +17,8 @@ export function assignableBuckets(
 	buckets: readonly UserBucket[],
 	project: Pick<Project, 'ownerGroupId'>
 ): UserBucket[] {
+	// A bucket scheduled for deletion refuses new projects (specs/090), so it is not offered either.
 	return buckets.filter(
-		(bucket) => bucket.ownerGroupId === project.ownerGroupId
+		(bucket) => bucket.ownerGroupId === project.ownerGroupId && !bucket.deletion
 	);
 }

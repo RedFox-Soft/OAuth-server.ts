@@ -11,6 +11,7 @@ import {
 	resolveAdmin
 } from '../auth/rbac.js';
 import { visibleBuckets } from '../buckets/visible.js';
+import { isScheduledForDeletion } from '../../consts/bucket_deletion.js';
 
 /*
  * Every connection held by its mass-deprovisioning guard in the buckets this administrator's bucket list
@@ -55,7 +56,16 @@ export const provisioningHoldRoutes = new Elysia({
 				visibleBuckets(ctx),
 				getProvisioningConnectionStore().listHeld()
 			]);
-			const names = new Map(buckets.map((b) => [b._id, b.name]));
+			/*
+			 * A scheduled bucket's holds are left out (specs/090 FR-012): its directory reaches nobody while
+			 * it is off, and every change to the connection is refused until it is restored, so a hold there
+			 * is nothing an administrator can act on.
+			 */
+			const names = new Map(
+				buckets
+					.filter((b) => !isScheduledForDeletion(b))
+					.map((b) => [b._id, b.name])
+			);
 			const visible = held
 				.filter((c) => names.has(c.bucketId))
 				.sort((a, b) => a.hold.since.getTime() - b.hold.since.getTime());

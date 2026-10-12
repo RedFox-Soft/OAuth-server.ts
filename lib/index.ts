@@ -62,6 +62,7 @@ import { initSentry } from './sentry/client.js';
 import { reportStartupFailure } from './sentry/startup.js';
 import { rootKeys } from './keys/issuer_keys.js';
 import { startCloser } from './activity/closer.js';
+import { startBucketPurger } from './admin/buckets/purge_pass.js';
 
 /*
  * Armed before the app is built, and deliberately not as a plugin.
@@ -286,6 +287,11 @@ await rootKeys();
  */
 if (process.env.NODE_ENV !== 'test') {
 	startCloser();
+	/*
+	 * Destroys buckets whose thirty days of scheduled deletion ran out (specs/090), hourly, for the same
+	 * reasons and under the same guard as the closer: a case runs a pass itself, on a clock it controls.
+	 */
+	startBucketPurger();
 }
 
 try {
