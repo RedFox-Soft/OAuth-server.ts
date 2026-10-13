@@ -80,7 +80,7 @@ to both the markup and `window.PROPS`; the components only receive it. The same 
 component reads from the environment — the clock, the disk, the process.
 
 The consent page follows the rule whole since spec 092. Its props are one view built on the server
-(`consentViewFor`, `lib/interactions/index.ts:571`): `logoSrc`, the account's label and id, the client's
+(`consentViewFor`, `lib/interactions/index.ts:658`): `logoSrc`, the account's label and id, the client's
 provenance tier, and pre-formatted dates such as "keeps access until". The view carries data and the
 component words it from one catalog, so hydration reads the same values. `loginClient.tsx` starts from
 `emptyConsentView` and spreads the server's props over it. See [[consent-screen-decisions]].

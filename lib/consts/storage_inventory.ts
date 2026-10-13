@@ -104,6 +104,7 @@ export const MODEL_AREAS = [
 	'BackchannelAuthenticationRequest',
 	'Client',
 	'ClientCredentials',
+	'ClientLogo',
 	'DeprovisionSlot',
 	'DeviceCode',
 	'FederationState',
@@ -344,6 +345,14 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 	 * field is what reaches it.
 	 */
 	modelArea('ClientCredentials', EXPIRES_AT, byClient),
+	/*
+	 * The logo an administrator gave a client, one record per client keyed by its id (specs/094). Beside
+	 * the client record rather than in it: that record is read, serialized and hashed on every resolution
+	 * — every authorization, token and introspection call — and up to 87 KB of image would ride along on
+	 * each for a picture only the consent page shows. Never reaped; client-owned so deleting the client
+	 * sweeps it.
+	 */
+	modelArea('ClientLogo', null, byClient),
 	modelArea('DeviceCode', EXPIRES_AT, byAccountAndClient, [
 		grantId,
 		{ key: { 'payload.userCode': 1 }, unique: true }

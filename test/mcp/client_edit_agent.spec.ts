@@ -4,6 +4,8 @@ import bootstrap, { seedClient } from '../test_helper.js';
 import { mock } from '../fetch_mock.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
+import { readLogo } from 'lib/models/client/logo.js';
+import { PNG } from '../consent_branding/consent_branding.config.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
 	adapter,
@@ -156,6 +158,50 @@ describe('an agent editing a client', () => {
 		expect(entries).toHaveLength(1);
 		expect(entries[0]?.attributes).toEqual(['partialConsent']);
 		expect(entries[0]?.viaClientId).toBe(ADMIN_MCP_CLIENT_ID);
+	});
+
+	it('gives a client a logo, recorded as the agent and by name, and lists it without the image', async () => {
+		const token = await agentToken();
+		const record = {
+			clientId: 'agent-edit-logo',
+			applicationType: 'web',
+			redirectUris: ['https://rp.example.com/cb'],
+			responseTypes: ['code'],
+			grantTypes: ['authorization_code'],
+			token_endpoint_auth_method: 'none'
+		};
+		seedClient(record);
+		const project = await getProjectStore().create({
+			name: 'Agent logo',
+			slug: `agent-logo-${Math.floor(Math.random() * 1e6)}`,
+			ownerGroupId: UNASSIGNED_GROUP_ID
+		});
+		await getProjectStore().update(project._id, {
+			clientIds: [record.clientId]
+		});
+
+		const response = await rpc(
+			call('client_update', {
+				id: project._id,
+				clientId: record.clientId,
+				logo: PNG
+			}),
+			token
+		);
+		const listed = await rpc(call('client_list', { id: project._id }), token);
+
+		expect(response.result?.isError).not.toBe(true);
+		expect(await readLogo(record.clientId)).toBe(PNG);
+		const { entries } = await adminAuditStore.list({
+			targetId: record.clientId,
+			action: 'client.update'
+		});
+		expect(entries).toHaveLength(1);
+		expect(entries[0]?.attributes).toEqual(['logo']);
+		expect(entries[0]?.viaClientId).toBe(ADMIN_MCP_CLIENT_ID);
+		const text = JSON.stringify(listed.result);
+		expect(text).toContain('hasLogo');
+		expect(text).not.toContain('data:image');
 	});
 
 	it('is refused a redirect URI the sector identifier document of a pairwise client does not list', async () => {

@@ -933,7 +933,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'Register an OAuth client in a project. A confidential client’s generated secret is returned exactly once, here, and is never readable again. partialConsent lets the person untick individual permissions on the consent page — turn it on only for an application that copes with receiving fewer permissions than it asked for.'
+			'Register an OAuth client in a project. A confidential client’s generated secret is returned exactly once, here, and is never readable again. partialConsent lets the person untick individual permissions on the consent page — turn it on only for an application that copes with receiving fewer permissions than it asked for. logo takes a data:image/png, image/jpeg or image/webp base64 URL of at most 64 KiB (null removes it), and policyUri and tosUri take https addresses; the consent page shows them only to this organization’s own users, the links only when they are on a redirect URI’s host.'
 	},
 	{
 		tool: 'client_update',
@@ -946,7 +946,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'clientId'],
 		summary:
-			"Change a client's registered metadata — redirect URIs, grant types, and the rest. partialConsent lets the person untick individual permissions on the consent page — turn it on only for an application that copes with receiving fewer permissions than it asked for."
+			"Change a client's registered metadata — redirect URIs, grant types, and the rest. partialConsent lets the person untick individual permissions on the consent page — turn it on only for an application that copes with receiving fewer permissions than it asked for. logo takes a data:image/png, image/jpeg or image/webp base64 URL of at most 64 KiB (null removes it), and policyUri and tosUri take https addresses; the consent page shows them only to this organization’s own users, the links only when they are on a redirect URI’s host."
 	},
 	{
 		tool: 'client_secret_rotate',

@@ -145,7 +145,7 @@ The group-scoped read matches either field in all three backends:
 - MongoDB: `adminAuditStore.ts:54`;
 - PostgreSQL: `adminAuditStore.ts:75`.
 
-Each field has its own index (`storage_inventory.ts:722`).
+Each field has its own index (`storage_inventory.ts:731`).
 
 A second field is used rather than a second entry, because one action writes one entry and audit-first
 could not write two atomically. Entries written before a move keep the group that owned the container at

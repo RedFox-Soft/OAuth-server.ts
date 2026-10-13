@@ -37,7 +37,7 @@ reach it **by construction**, not by a guard a later change could miss. The cons
 ## Members are records, not a list on the group
 
 Memberships live in their own area, one record per (group, user), id `groupId:userId`
-(`lib/consts/storage_inventory.ts:554`). The first design put a member array on the group; it was dropped after
+(`lib/consts/storage_inventory.ts:563`). The first design put a member array on the group; it was dropped after
 checking vendor behaviour: neither Okta nor Entra caps a group's size, "all employees" groups of 100,000+ are
 real, and Entra fills a group with PATCH batches of ~40–200 members. Rewriting a member array on each batch is
 quadratic write volume (the whole jsonb document on PostgreSQL, the whole field and its oplog entry on MongoDB)

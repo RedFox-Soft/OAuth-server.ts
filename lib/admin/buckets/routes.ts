@@ -80,7 +80,7 @@ import { readPeriod } from '../../activity/read.js';
 import { addressOf, issuerFor } from '../../configs/issuer.js';
 import { callbackUri } from '../../federation/flow.js';
 import { mailDeliveryConfigured } from '../../mail/mailer.js';
-import { getClientView } from '../clients/service.js';
+import { listClientView } from '../clients/service.js';
 import {
 	forgetBucketAddresses,
 	isAddressable,
@@ -298,7 +298,7 @@ async function addressChangePreview(
 	const applications: AddressChangePreview['applications'] = [];
 	for (const project of projects) {
 		for (const clientId of [...clientIdsOf(project)].sort()) {
-			const view = await getClientView(clientId);
+			const view = await listClientView(clientId);
 			applications.push({
 				clientId,
 				name: view?.clientName ?? null,

@@ -30,7 +30,7 @@ import {
 	DeleteProjectQuery,
 	MoveProjectOwnerBody
 } from './schema.js';
-import { deleteClientRecord, getClientView } from '../clients/service.js';
+import { deleteClientRecord, listClientView } from '../clients/service.js';
 import { cascadeForClient } from '../../helpers/cascade.js';
 import {
 	InvalidOriginError,
@@ -275,7 +275,7 @@ async function bucketChangePreview(
 ): Promise<BucketChangePreview> {
 	const applications: BucketChangePreview['applications'] = [];
 	for (const clientId of clientIdsOf(project)) {
-		const view = await getClientView(clientId);
+		const view = await listClientView(clientId);
 		applications.push({ clientId, name: view?.clientName ?? null });
 	}
 	/* By name, the unnamed last, then by id, so two reads of the same project list it the same way. */

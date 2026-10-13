@@ -11,7 +11,8 @@ import {
 	Typography,
 	Switch,
 	Tag,
-	Collapse
+	Collapse,
+	Upload
 } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { request } from '../frame/request.js';
@@ -23,6 +24,10 @@ import { RowActions, type RowAction } from '../frame/RowActions.js';
 import { EmptyState, LoadFailed } from '../frame/states.js';
 import { SecretReveal } from '../frame/SecretReveal.js';
 import type { ProjectView } from './ProjectWorkspace.js';
+import {
+	LOGO_MAX_BYTES,
+	LOGO_SIZE_MESSAGE
+} from '../../../consts/client_logo.js';
 
 const GRANT_OPTIONS = [
 	{ label: 'authorization_code', value: 'authorization_code' },
@@ -106,6 +111,9 @@ interface ClientView {
 	backchannelClientNotificationEndpoint?: string;
 	authorizationDetailsTypes?: string[];
 	registeredDynamically?: boolean;
+	hasLogo?: boolean;
+	policyUri?: string;
+	tosUri?: string;
 }
 type ClientRow = ClientView & KeyAttributes;
 interface FormValues extends Omit<KeyAttributes, 'jwks'> {
@@ -121,6 +129,78 @@ interface FormValues extends Omit<KeyAttributes, 'jwks'> {
 	backchannelTokenDeliveryMode?: 'poll' | 'ping';
 	backchannelClientNotificationEndpoint?: string;
 	authorizationDetailsTypes?: string[];
+	logo?: string | null;
+	policyUri?: string;
+	tosUri?: string;
+}
+
+/*
+ * The client's logo as the consent page will show it, read into a `data:` URL in the browser: the admin
+ * API takes the image in the body, so no upload route exists. The size is checked here only to say so
+ * sooner; what the bytes are is the server's decision.
+ */
+function LogoField({
+	value,
+	onChange
+}: {
+	value?: string | null;
+	onChange?: (value: string | null) => void;
+}) {
+	const [tooLarge, setTooLarge] = useState(false);
+	return (
+		<Space
+			orientation="vertical"
+			size={4}
+		>
+			<Space align="center">
+				{value ? (
+					<img
+						src={value}
+						alt="Current logo"
+						width={40}
+						height={40}
+						style={{
+							display: 'block',
+							objectFit: 'contain',
+							padding: 3,
+							boxSizing: 'border-box',
+							background: '#f6f7f9',
+							border: '1px solid #e6e8eb',
+							borderRadius: 8
+						}}
+					/>
+				) : (
+					<Typography.Text type="secondary">No logo</Typography.Text>
+				)}
+				<Upload
+					accept="image/png,image/jpeg,image/webp"
+					showUploadList={false}
+					beforeUpload={(file) => {
+						if (file.size > LOGO_MAX_BYTES) {
+							setTooLarge(true);
+							return false;
+						}
+						const reader = new FileReader();
+						reader.onload = () => {
+							if (typeof reader.result !== 'string') return;
+							setTooLarge(false);
+							onChange?.(reader.result);
+						};
+						reader.readAsDataURL(file);
+						return false;
+					}}
+				>
+					<Button>{value ? 'Replace' : 'Upload'}</Button>
+				</Upload>
+				{value ? (
+					<Button onClick={() => onChange?.(null)}>Remove</Button>
+				) : null}
+			</Space>
+			{tooLarge ? (
+				<Typography.Text type="danger">{LOGO_SIZE_MESSAGE}</Typography.Text>
+			) : null}
+		</Space>
+	);
 }
 
 const DEFAULT_VALUES: FormValues = {
@@ -142,6 +222,8 @@ export function Clients({ project }: { project: ProjectView }) {
 	const [saving, setSaving] = useState(false);
 	const [secret, setSecret] = useState<string | null>(null);
 	const [secretStored, setSecretStored] = useState(false);
+	// The logo the client had when the form opened: an edit sends `logo` only when it changed.
+	const [storedLogo, setStoredLogo] = useState<string | null>(null);
 	const [form] = Form.useForm<FormValues>();
 	const feedback = useFeedback();
 	const confirm = useConfirm();
@@ -172,6 +254,7 @@ export function Clients({ project }: { project: ProjectView }) {
 	function openCreateModal() {
 		setMode('create');
 		setEditingClientId(null);
+		setStoredLogo(null);
 		form.resetFields();
 		setOpen(true);
 	}
@@ -192,6 +275,9 @@ export function Clients({ project }: { project: ProjectView }) {
 			backchannelTokenDeliveryMode: row.backchannelTokenDeliveryMode,
 			backchannelClientNotificationEndpoint:
 				row.backchannelClientNotificationEndpoint,
+			policyUri: row.policyUri ?? '',
+			tosUri: row.tosUri ?? '',
+			logo: null,
 			jwksText: row.jwks ? JSON.stringify(row.jwks, null, 2) : '',
 			subjectType: row.subjectType,
 			...Object.fromEntries(
@@ -201,7 +287,19 @@ export function Clients({ project }: { project: ProjectView }) {
 				KEY_SWITCHES.map(([name]) => [name, row[name] ?? false])
 			)
 		});
+		setStoredLogo(null);
 		setOpen(true);
+		// The list carries whether there is a logo, never the image, so the image is read on its own.
+		if (row.hasLogo) {
+			void request<{ logo?: string }>(
+				'GET',
+				`${base}/${encodeURIComponent(row.clientId)}`
+			).then((result) => {
+				if (!result.ok || !result.data.logo) return;
+				setStoredLogo(result.data.logo);
+				form.setFieldValue('logo', result.data.logo);
+			});
+		}
 	}
 
 	/*
@@ -223,9 +321,21 @@ export function Clients({ project }: { project: ProjectView }) {
 		return body;
 	}
 
+	function presentation(values: FormValues, editing: boolean) {
+		const body: Record<string, unknown> = {};
+		for (const name of ['policyUri', 'tosUri'] as const) {
+			const value = values[name]?.trim();
+			if (value || editing) body[name] = value || null;
+		}
+		const logo = values.logo ?? null;
+		if (editing ? logo !== storedLogo : logo) body.logo = logo;
+		return body;
+	}
+
 	function buildBody(values: FormValues, editing = false) {
 		return {
 			...keyAttributes(values, editing),
+			...presentation(values, editing),
 			clientName: values.clientName,
 			applicationType: values.applicationType,
 			grantTypes: values.grantTypes,
@@ -554,6 +664,27 @@ export function Clients({ project }: { project: ProjectView }) {
 								</Form.Item>
 							) : null
 						}
+					</Form.Item>
+					<Form.Item
+						name="logo"
+						label="Logo on the consent page"
+						extra="Shown only to people who sign in through this organization’s own user bucket. PNG, JPEG or WebP, up to 64 KiB; square, at least 128 px."
+					>
+						<LogoField />
+					</Form.Item>
+					<Form.Item
+						name="policyUri"
+						label="Privacy policy URL"
+						extra="Linked on the consent page only when it is on the same host as a redirect URI."
+					>
+						<Input placeholder="https://app.example.com/privacy" />
+					</Form.Item>
+					<Form.Item
+						name="tosUri"
+						label="Terms of service URL"
+						extra="Linked on the consent page only when it is on the same host as a redirect URI."
+					>
+						<Input placeholder="https://app.example.com/terms" />
 					</Form.Item>
 					{/*
 					 * Free-form tags rather than a picker over the configured types: the server validates

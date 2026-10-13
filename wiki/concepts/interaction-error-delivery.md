@@ -26,7 +26,7 @@ answered `400`.
 
 - the shared handler, for `/auth`, addressing the error from the request it received
   (`lib/shared/authorization_error_handler.ts:360`, `:506`);
-- `resume()` (`lib/interactions/index.ts:173`), addressing it from the stored request, through
+- `resume()` (`lib/interactions/index.ts:174`), addressing it from the stored request, through
   `deliverToClient` (`:135`).
 
 The module imports neither the interaction pages nor the shared handler — both import it, and the
@@ -36,7 +36,7 @@ handler is loaded by the root app before the interaction routes are mounted. `ge
 ## The boundary is the restored request, not a list of errors
 
 Inside `resume()`, everything after `getResume()` restores the stored request runs in one `try`
-(`lib/interactions/index.ts:214`), and its `catch` delivers (`:261`). Nothing before that line is
+(`lib/interactions/index.ts:215`), and its `catch` delivers (`:261`). Nothing before that line is
 delivered.
 
 That boundary is what makes the untrusted-interaction rule structural. Every way an interaction can fail
@@ -57,7 +57,7 @@ site; the failure mode when it does not is the original defect, silently).
 
 The stored request passed redirect-URI validation when it began; delivery goes to the registration as
 it stands now. `deliverToClient` re-reads the client and tests `redirectUriAllowed` before an error
-(`lib/interactions/index.ts:135`); the success path tests it after `checkClient` (`:238`). A client
+(`lib/interactions/index.ts:136`); the success path tests it after `checkClient` (`:238`). A client
 deleted, or a redirect URI withdrawn, while the end user was signing in gets this server's own
 `invalid_client` / `invalid_redirect_uri` page and no redirect.
 
@@ -71,14 +71,14 @@ so an error under `response_mode=jwt` could not be delivered at all.
 ## Consent refusal is an interaction result
 
 Declining (the `cancel` action, labelled *Don't allow* since spec 092) records `result.error = 'access_denied'` and calls `resume()`, as *Allow* records
-`result.consent` and does (`lib/interactions/index.ts:1784-1799`). The throw it replaced left the interaction
+`result.consent` and does (`lib/interactions/index.ts:1792-1807`). The throw it replaced left the interaction
 standing: after a cancel, the same uid could still be resumed — or consent submitted again — into a code.
 As a result it is consumed like any other (`lib/actions/authorization/resume.ts:107` destroys it) and
 delivered by the same rule.
 
 Since spec 092 both branches wait on one check. The form carries back the account it was shown for, and a
 submission naming another account, or none, is refused as "session principal changed" before either
-branch runs (`lib/interactions/index.ts:1779-1782`). Nothing is granted and no denial is delivered, so the
+branch runs (`lib/interactions/index.ts:1787-1790`). Nothing is granted and no denial is delivered, so the
 client hears nothing about a decision the person on screen never made. See [[consent-screen-decisions]].
 
 ## A delivered fault is still recorded
@@ -106,7 +106,7 @@ path. Delivery itself did not change ([[consent-screen-decisions]]).
 
 - The device flow has no redirect, so its errors are never delivered this way. Since spec 067 the same
   boundary governs it from the other side: `resume()` hands a device interaction to
-  `completeDeviceInteraction` (`lib/interactions/index.ts:188`, `:294`), which records every error
+  `completeDeviceInteraction` (`lib/interactions/index.ts:189`, `:294`), which records every error
   raised after the stored request is restored (`:326`) on the device code, with its own code, for the
   device's next poll (RFC 8628 §3.5). Before that, no completing page reached the device completion at
   all — a person who had to sign in or consent was shown `invalid_redirect_uri` — and a browser with no

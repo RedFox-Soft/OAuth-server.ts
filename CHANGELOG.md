@@ -11,6 +11,12 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- **The organization's own applications show their logo and policy links on the consent page** (spec 094).
+  An administrator uploads a client's logo (`logo`: a PNG, JPEG or WebP `data:` URL of at most 64 KiB, checked
+  by its bytes; console, admin API and MCP) and sets `policyUri`/`tosUri` (https only). The page shows them only
+  for this organization's own app (never a self-registered one or another group's) — the logo never on a device or
+  loopback page, the links only on one of the app's redirect hosts. A client's own `logo_uri` is never fetched
+  or shown. Logos live in a new `ClientLogo` area: re-run `db:setup` / `db:setup:pg`.
 - **People can choose what an application gets** (spec 093). For a client an administrator marks with
   `partialConsent` (console, admin API and MCP; never settable by dynamic registration or a metadata document),
   the consent page gives every permission beyond signing in its own unticked checkbox, and the application's

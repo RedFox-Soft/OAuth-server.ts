@@ -27,7 +27,7 @@ is the upstream back-channel logout receiver (`lib/upstream_signals/back_channel
 Logout 1.0 §2.8 requires `400` for a logout that failed, so a fault there is answered `400 logout_failed` and
 recorded where it is answered, filed at 500 under the `oauth` surface — the redirect rule below, applied to a
 status the specification fixes — see [[upstream-back-channel-logout]]. The sixth, since 2026-10-01 and `5990bfe`,
-is the device-flow completion catch in `lib/interactions/index.ts:404`: a fault while completing a device
+is the device-flow completion catch in `lib/interactions/index.ts:405`: a fault while completing a device
 sign-in is filed there under the `interaction` surface, and the device's later poll reports the stored outcome
 as a 400 without filing it twice — this page listed five until 2026-10-10 and missed it. The seventh, since
 2026-10-10 and spec 076, is the activity recorder (`lib/activity/note.ts:60`), and it is the only one whose

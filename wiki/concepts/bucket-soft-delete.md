@@ -44,7 +44,7 @@ two unrelated ways.
   token would still be redeemed at the root `/token`. The default `findAccount` answers nothing when the bucket it
   resolved is scheduled (`lib/addon/account.ts:65`), which closes every grant and userinfo anywhere. Four doors
   that read a bucket from a stored id check for themselves:
-  - interactions, for both the bucket the interaction began at and the sign-in bucket (`lib/interactions/index.ts:734`);
+  - interactions, for both the bucket the interaction began at and the sign-in bucket (`lib/interactions/index.ts:738`);
   - the federation callback (`lib/federation/routes.ts:145`);
   - the verification links (`lib/verification/challenge.ts:152,258`);
   - the password-reset links (`lib/password_reset/challenge.ts:162`).

@@ -125,7 +125,7 @@ Two super-administrator routes in `lib/admin/users/routes.ts`, both refused on t
 
 - `POST /admin/api/admins/:id/sign-out` (`routes.ts:301`): every console session of that administrator ends
   (`AdminSessionStore.destroyByUser`, served by a `{ userId: 1 }` index declared on the admin-session area in
-  `lib/consts/storage_inventory.ts:702`). So does every grant and token at the console's issuer
+  `lib/consts/storage_inventory.ts:711`). So does every grant and token at the console's issuer
   (`revokeAccountAccess`), agents' tokens included. The account is left as it was. Answers `{ sessions }`,
   the number of console sessions ended. Refused on oneself with "you cannot sign yourself out from here —
   use Log out".

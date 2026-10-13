@@ -9,6 +9,18 @@ import {
 import { adapter } from '../../adapters/index.js';
 import { AdminError } from '../auth/rbac.js';
 import { OIDCProviderError } from '../../helpers/errors.js';
+import { isHttpsUri } from '../../helpers/valid_url.js';
+import {
+	LOGO_FORMAT_MESSAGE,
+	LOGO_SIZE_MESSAGE
+} from '../../consts/client_logo.js';
+import {
+	clearLogo,
+	hasLogo,
+	parseLogo,
+	readLogo,
+	writeLogo
+} from '../../models/client/logo.js';
 
 export interface AdminClientView {
 	clientId: string;
@@ -39,14 +51,24 @@ export interface AdminClientView {
 	backchannelLogoutSessionRequired?: boolean;
 	subjectType?: string;
 	sectorIdentifierUri?: string;
+	/* Shown on the consent page for this organization's own users only (specs/094). */
+	policyUri?: string;
+	tosUri?: string;
+	logo?: string;
 }
 
+/* A client in a list: whether it has a logo, never the image — a project may hold many. */
+export type AdminClientListItem = Omit<AdminClientView, 'logo'> & {
+	hasLogo: boolean;
+};
+
 /*
- * The key and request-protection attributes, each as the admin surface names it, the key the stored
- * record holds it under (a base attribute canonically, recognised metadata under its wire name), and
- * the property a validated client exposes it as. One table so the three cannot drift apart: a field
- * the route accepts but this builder does not forward is silently discarded, which is the defect the
- * allow-list below already had once.
+ * The attributes an edit sets or removes one by one — the key and request-protection attributes, and the
+ * links the consent page shows — each as the admin surface names it, the key the stored record holds it
+ * under (a base attribute canonically, recognised metadata under its wire name), and the property a
+ * validated client exposes it as. One table so the three cannot drift apart: a field the route accepts
+ * but this builder does not forward is silently discarded, which is the defect the allow-list below
+ * already had once.
  */
 const KEY_AND_REQUEST_ATTRIBUTES = {
 	jwks: { stored: 'jwks', property: 'jwks' },
@@ -91,7 +113,9 @@ const KEY_AND_REQUEST_ATTRIBUTES = {
 	sectorIdentifierUri: {
 		stored: 'sector_identifier_uri',
 		property: 'sectorIdentifierUri'
-	}
+	},
+	policyUri: { stored: 'policy_uri', property: 'policyUri' },
+	tosUri: { stored: 'tos_uri', property: 'tosUri' }
 } as const;
 
 type KeyAndRequestAttribute = keyof typeof KEY_AND_REQUEST_ATTRIBUTES;
@@ -132,9 +156,47 @@ export interface CreateClientInput extends KeyAndRequestInput {
 	backchannelTokenDeliveryMode?: string;
 	backchannelClientNotificationEndpoint?: string;
 	authorizationDetailsTypes?: readonly string[];
+	/* A `data:` URL; null on an update removes the logo. Never part of the client record. */
+	logo?: string | null;
 }
 
 export type UpdateClientInput = Partial<CreateClientInput>;
+
+/*
+ * Checked before anything is written, so a refused logo or link leaves the client exactly as it was. The
+ * client's own validation accepts an http policy or terms link (dynamic registration may register one);
+ * an administrator is held to https, the only kind the consent page ever shows.
+ */
+function checkedPresentation(
+	input: UpdateClientInput
+): string | null | undefined {
+	for (const field of ['policyUri', 'tosUri'] as const) {
+		const value = input[field];
+		if (typeof value === 'string' && !isHttpsUri(value)) {
+			throw new AdminError(422, `${field} must be an https URL`);
+		}
+	}
+	if (input.logo === undefined || input.logo === null) return input.logo;
+	const parsed = parseLogo(input.logo);
+	if (!parsed.ok) {
+		throw new AdminError(
+			422,
+			parsed.reason === 'too-large' ? LOGO_SIZE_MESSAGE : LOGO_FORMAT_MESSAGE
+		);
+	}
+	return parsed.image;
+}
+
+// Written only once the client record is stored, so a client refused by validation gains no logo.
+async function storeLogo(clientId: string, logo: string | null | undefined) {
+	if (logo === null) await clearLogo(clientId);
+	else if (logo !== undefined) await writeLogo(clientId, logo);
+}
+
+async function withLogo(view: AdminClientView): Promise<AdminClientView> {
+	const logo = await readLogo(view.clientId);
+	return logo ? { ...view, logo } : view;
+}
 
 function generateSecret(): string {
 	return crypto.randomBytes(48).toString('base64url');
@@ -241,6 +303,7 @@ export async function createClient(
 	input: CreateClientInput
 ): Promise<{ view: AdminClientView; secret?: string }> {
 	const clientId = input.clientId ?? nanoid();
+	const logo = checkedPresentation(input);
 	const metadata = toMetadata(input, clientId);
 	let secret: string | undefined;
 	if (needsSecret(metadata)) {
@@ -249,14 +312,24 @@ export async function createClient(
 		metadata.client_secret_expires_at = 0;
 	}
 	const client = await validateAndStore(metadata);
-	return { view: toView(client), secret };
+	await storeLogo(clientId, logo);
+	return { view: await withLogo(toView(client)), secret };
 }
 
 export async function getClientView(
 	clientId: string
 ): Promise<AdminClientView | null> {
 	const client = await Client.tryFind(clientId);
-	return client ? toView(client) : null;
+	return client ? withLogo(toView(client)) : null;
+}
+
+export async function listClientView(
+	clientId: string
+): Promise<AdminClientListItem | null> {
+	const client = await Client.tryFind(clientId);
+	return client
+		? { ...toView(client), hasLogo: await hasLogo(clientId) }
+		: null;
 }
 
 export async function updateClient(
@@ -265,6 +338,7 @@ export async function updateClient(
 ): Promise<AdminClientView> {
 	const existing = await Client.tryFind(clientId);
 	if (!existing) throw new AdminError(404, 'client not found');
+	const logo = checkedPresentation(patch);
 	const merged: CreateClientInput = {
 		clientName: patch.clientName ?? existing.clientName,
 		applicationType: patch.applicationType ?? existing.applicationType,
@@ -316,7 +390,8 @@ export async function updateClient(
 		delete metadata.client_secret_expires_at;
 	}
 	const client = await validateAndStore(metadata);
-	return toView(client);
+	await storeLogo(clientId, logo);
+	return withLogo(toView(client));
 }
 
 export async function rotateSecret(clientId: string): Promise<string> {

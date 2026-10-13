@@ -24,7 +24,7 @@ support tickets. What ties a sign-in to the browser that began it is a second va
 beside the uid and sent only in the `_interaction` cookie (`lib/actions/authorization/interactions.ts:114`,
 `:140`). The `ui` guard's cookie schema proves only that *some* `_interaction` cookie arrived; the
 comparison against `interaction.payload.cookieID` in the shared `resolve`
-(`lib/interactions/index.ts:393-408`) is the whole of the binding. It is constant-time and answers
+(`lib/interactions/index.ts:394-409`) is the whole of the binding. It is constant-time and answers
 exactly as an unknown uid does, so it is no oracle for which uids are live.
 
 ## It was missing from `53341c6` until 2026-09-28
@@ -37,14 +37,14 @@ sixteen months any browser holding a uid could continue that sign-in with a cook
 What that allowed, measured with a forged cookie:
 
 - **After the end user's correct password in a bucket requiring a second factor**, the interaction
-  carries only `secondFactor.accountId` (`lib/interactions/index.ts:588`) and, on a first sign-in, no
+  carries only `secondFactor.accountId` (`lib/interactions/index.ts:589`) and, on a first sign-in, no
   session to compare. The enrolment page showed the account's new authenticator secret to the other
   browser, which confirmed it, left with a session for the account, and left **its own** authenticator
   enrolled as the account's second factor.
 - On the password screen, the other browser signed in as itself and destroyed the end user's pending
   sign-in.
 - After sign-in, `resume`'s session comparison (`lib/actions/authorization/resume.ts:25`) refused the
-  foreign browser — but the consent POST had already saved the grant (`lib/interactions/index.ts:1150`).
+  foreign browser — but the consent POST had already saved the grant (`lib/interactions/index.ts:1158`).
 
 Presence plus the per-uid cookie path did stop the opposite direction — pushing a victim's browser into
 the *attacker's* interaction — because no browser holds a cookie for someone else's `/ui/${uid}`. That

@@ -56,7 +56,7 @@ match a logout against. Now:
   answering to the provider. The session stores the provider and a **SHA-256 of the `sid`**, never the value: it is
   the provider's session handle and nothing here needs it back.
 - Sessions are reachable only by id, uid and owner, so `resume()` also writes an account-owned
-  **`UpstreamSession`** record (`lib/consts/storage_inventory.ts:453`): `sha256("<bucket>:<provider>:<sid>")` →
+  **`UpstreamSession`** record (`lib/consts/storage_inventory.ts:491`): `sha256("<bucket>:<provider>:<sid>")` →
   account, expiring one session lifetime after the sign-in (`lib/upstream_signals/upstream_session.ts:55`). A token
   naming only `sid` resolves through it to an account whose sessions are then read and filtered. No new adapter
   method was needed — `find`, `upsert`, `findByOwner` exist on all three backends; re-run `db:setup`/`db:setup:pg`.

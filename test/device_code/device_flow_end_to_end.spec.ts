@@ -12,6 +12,7 @@ import {
 } from 'lib/adapters/index.ts';
 import { addons } from 'lib/addon/registry.js';
 import { DeviceCode } from 'lib/models/device_code.js';
+import { writeLogo } from 'lib/models/client/logo.js';
 import { flushForTest, resetQueue } from 'lib/error_store/queue.ts';
 import { ROOT_NAMESPACE } from 'lib/resources/namespace.js';
 import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.js';
@@ -173,6 +174,22 @@ describe('a device sign-in from a browser with no session', () => {
 		expect(text).toContain(CONSENT_TEXTS.warning.deviceSent);
 		expect(text).toContain(CONSENT_TEXTS.device.next);
 		expect(text).not.toMatch(/hasn't checked this app/);
+	});
+
+	// A familiar logo is the persuasion a phished code needs, so a device page never shows one.
+	it('shows no app logo on the consent page for a device, even for an app of this organization with one', async () => {
+		await writeLogo(
+			'tv',
+			'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+		);
+		const { browser, consentAt } = await atConsent();
+
+		const html = await (
+			await browser.request(`/ui/${uidOf(consentAt)}/consent`)
+		).text();
+
+		expect(html).toContain(CONSENT_TEXTS.headline.device);
+		expect(html).not.toContain('data:image/png');
 	});
 
 	it('tells the device access_denied when the person declines', async () => {

@@ -1,4 +1,5 @@
 import { t } from 'elysia';
+import { LOGO_MAX_LENGTH } from '../../consts/client_logo.js';
 
 /*
  * Written as literal tuples, not `list.map((v) => t.Literal(v))`: a union built from a mapped array
@@ -26,6 +27,24 @@ const AuthMethod = t.Union([
 	t.Literal('client_secret_jwt'),
 	t.Literal('private_key_jwt')
 ]);
+
+/*
+ * How the client appears on the consent page (specs/094). The logo is a `data:` URL whose bytes the service
+ * checks — PNG, JPEG or WebP, at most 64 KiB — and the links must be https; both are shown only for this
+ * organization's own app. On an edit, null removes one.
+ */
+const presented = {
+	logo: t.Optional(t.String({ maxLength: LOGO_MAX_LENGTH })),
+	policyUri: t.Optional(t.String()),
+	tosUri: t.Optional(t.String())
+};
+const presentedEditable = {
+	logo: t.Optional(
+		t.Union([t.String({ maxLength: LOGO_MAX_LENGTH }), t.Null()])
+	),
+	policyUri: t.Optional(t.Union([t.String(), t.Null()])),
+	tosUri: t.Optional(t.Union([t.String(), t.Null()]))
+};
 
 const JwkSet = t.Object({ keys: t.Array(t.Record(t.String(), t.Unknown())) });
 
@@ -101,7 +120,8 @@ export const CreateClientBody = t.Object({
 	// must opt in explicitly. Validation is delegated to validateClient, which recognizes the metadata
 	// only when the feature is enabled and checks each value against the configured types.
 	authorizationDetailsTypes: t.Optional(t.Array(t.String())),
-	...creatable
+	...creatable,
+	...presented
 });
 
 export const UpdateClientBody = t.Object({
@@ -127,5 +147,6 @@ export const UpdateClientBody = t.Object({
 	),
 	backchannelClientNotificationEndpoint: t.Optional(t.String()),
 	authorizationDetailsTypes: t.Optional(t.Array(t.String())),
-	...editable
+	...editable,
+	...presentedEditable
 });

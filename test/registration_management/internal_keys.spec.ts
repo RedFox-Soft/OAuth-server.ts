@@ -5,6 +5,9 @@ import { adapter } from 'lib/adapters/index.ts';
 import { Client } from 'lib/models/client.js';
 import { present } from 'test/shape.js';
 
+const LOGO =
+	'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+
 /*
  * A registration body is wire metadata, and only wire metadata. The client model keeps its base
  * attributes under canonical names (`clientId`, `clientSecret`, `consent.require`, …), and a body that
@@ -123,5 +126,20 @@ describe('a registration body naming internal client attributes', () => {
 
 		const client = await Client.find(own.clientId);
 		expect(client['consent.partial']).toBe(false);
+	});
+
+	it('gives the app no logo on the consent page for a registration or an update that supplies one', async () => {
+		const own = await register({ logo: LOGO, 'consent.logo': LOGO });
+		await agent.reg({ clientId: own.clientId }).put(
+			{
+				client_id: own.clientId,
+				redirect_uris: ['https://client.example.com/cb'],
+				logo: LOGO,
+				'consent.logo': LOGO
+			},
+			{ headers: { ...json, ...bearer(own.token) } }
+		);
+
+		expect(await adapter('ClientLogo').find(own.clientId)).toBeUndefined();
 	});
 });

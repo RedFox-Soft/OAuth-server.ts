@@ -43,7 +43,7 @@ simplification in the feature and it was not visible from the spec.
 carry `scopeDescriptions`: per scope, a `description` in the administrator's words and an optional `kind`,
 `see` or `act` (`lib/adapters/types.ts:1286-1290`, `:1309`). Absent, the kind is `act`. The consent page
 heads each resource with its declared name and its host, and lists a described scope under "see" or "act"
-(`lib/interactions/consentView.ts:406-422`). An undescribed scope is shown only by its technical name,
+(`lib/interactions/consentView.ts:436-442`). An undescribed scope is shown only by its technical name,
 under "not described". A description may only name one of the resource's scopes; changing `scopes` without
 sending descriptions prunes the removed scopes' entries (`lib/admin/resources/routes.ts:150`, `:327-336`).
 Nothing is taken from the resource's own metadata or an MCP server's tool list. See
@@ -232,7 +232,7 @@ kinds of 409 apart by a flag, never by matching the message text.
 
 Since spec 092 the consent page states the stake as well. When the request's `resource` is the
 administrative MCP, the page shows one red block: the app will be able to do anything you can do in the
-console. It is recognised by the requested resource, not by scope (`lib/interactions/index.ts:687-694`),
+console. It is recognised by the requested resource, not by scope (`lib/interactions/index.ts:795-802`),
 because the plane's only scope is `openid` and a repeat consent would otherwise show nothing. The page
 shows one warning at most, and this one outranks the rest, the loopback warning included
 ([[consent-screen-decisions]]).

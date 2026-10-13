@@ -131,6 +131,14 @@ export const CONSENT_TEXTS = {
 		loopback: 'Next, a program on this computer receives the answer.'
 	},
 
+	/* The application's own pages, linked below the buttons for an app of this organization (specs/094). */
+	links: {
+		label: (name: string) => `About ${name}`,
+		policyAfter: '’s privacy policy',
+		termsAfter: '’s terms of service',
+		external: ' (opens an external site in a new tab)'
+	},
+
 	buttons: {
 		deny: 'Don’t allow',
 		allow: 'Allow',

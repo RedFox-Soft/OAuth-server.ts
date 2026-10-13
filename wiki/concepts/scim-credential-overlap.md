@@ -76,7 +76,7 @@ an administrator's replacement.
   `oidc.clientSecretMatch` (`lib/shared/token_auth.ts:193`), because the resolved client is frozen data.
 - **Static token.** The SCIM principal makes two point reads: the current digest, then
   `findByPreviousStaticTokenDigest` (`staticTokenHolder`, `lib/scim/principal.ts:94`), so it knows which one
-  matched. The previous digest has a sparse index (`lib/consts/storage_inventory.ts:583`). The index is **not
+  matched. The previous digest has a sparse index (`lib/consts/storage_inventory.ts:592`). The index is **not
   unique**: 256-bit values do not collide, and a unique index would need its own duplicate-key mapping in both
   stores. An expired token, and a previous one the rule has ended, are refused as `unknown_token`, the same
   answer as an unknown token.

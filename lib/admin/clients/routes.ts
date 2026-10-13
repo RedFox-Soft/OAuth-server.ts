@@ -13,6 +13,7 @@ import { CreateClientBody, UpdateClientBody } from './schema.js';
 import {
 	createClient,
 	getClientView,
+	listClientView,
 	updateClient,
 	rotateSecret,
 	deleteClientRecord
@@ -58,7 +59,7 @@ export const clientRoutes = new Elysia({ name: 'admin-clients' })
 		const project = await loadManageableProject(ctx, params.id);
 		const views = [];
 		for (const clientId of project.clientIds) {
-			const view = await getClientView(clientId);
+			const view = await listClientView(clientId);
 			if (view) views.push(view);
 		}
 		return views;

@@ -229,7 +229,7 @@ answers an anchored, case-sensitive regular expression from the ordinary index o
 default b-tree compares in the database collation and cannot bound `LIKE 'ada%'` unless that collation is C,
 so the inventory gained `IndexSpec.prefix` (`lib/consts/storage_inventory.ts:56`): `translateIndex` builds such
 an index with `text_pattern_ops` (`lib/adapters/postgres/jsonPath.ts:118`), named `…_pfx`, and the per-bucket area
-declares one on `email` and a sparse one on `userNameKey` (`storage_inventory.ts:293-294`). MongoDB neither builds
+declares one on `email` and a sparse one on `userNameKey` (`storage_inventory.ts:294-295`). MongoDB neither builds
 nor expects them — `documentIndexesFor` (`:874`) filters them out of its provisioning and reconciliation —
 because a second index on an identical key is refused there. Not a divergence entry: nothing a caller can
 observe differs.

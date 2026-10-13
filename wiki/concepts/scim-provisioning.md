@@ -27,7 +27,7 @@ mass-deprovisioning guard below and [[global-token-revocation]].
 
 ## A connection is its own record, bound to one provider
 
-`provisioningConnections` (`lib/consts/storage_inventory.ts:141`, `:512`) holds one document per connection:
+`provisioningConnections` (`lib/consts/storage_inventory.ts:142`, `:512`) holds one document per connection:
 its bucket, one of that bucket's federation providers, a correlation rule, an email trust policy and its
 credentials. Its `_id` is what an end user's `provisionedBy` holds. It is **not** embedded in the bucket
 document like `federation[]`, for the reason [[upstream-federation]] records: a nested secret leaked for a

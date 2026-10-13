@@ -506,6 +506,84 @@ function WarningBlock({
 	}
 }
 
+/*
+ * The app's own pages, which the server decided are on the app's own site. A new tab told nothing about
+ * this page: no referrer, and no handle back to it. Darker than antd's link blue, which is under 4.5:1 on
+ * white at this size.
+ */
+function AppLinks({
+	name,
+	links
+}: {
+	name: string;
+	links: NonNullable<ConsentView['links']>;
+}) {
+	const entries = [
+		links.policy ? { href: links.policy, after: T.links.policyAfter } : null,
+		links.terms ? { href: links.terms, after: T.links.termsAfter } : null
+	].filter((entry) => entry !== null);
+	return (
+		<nav aria-label={T.links.label(name)}>
+			<Flex
+				wrap
+				justify="center"
+				gap="0 12px"
+				style={{ fontSize: 13 }}
+			>
+				{entries.map(({ href, after }) => (
+					<a
+						key={href + after}
+						href={href}
+						target="_blank"
+						rel="noopener noreferrer"
+						style={{
+							display: 'inline-block',
+							lineHeight: '24px',
+							textAlign: 'center',
+							color: '#0958d9'
+						}}
+					>
+						<bdi>{name}</bdi>
+						{after}
+						<span aria-hidden="true">&nbsp;↗</span>
+						<span style={hiddenText}>{T.links.external}</span>
+					</a>
+				))}
+			</Flex>
+		</nav>
+	);
+}
+
+/*
+ * The app's own logo, on a plain tile so a picture with no background of its own still reads as a tile and
+ * not as part of the page. Named by the app's name: the image is who is asking, not decoration.
+ */
+function ClientLogo({ src, name }: { src: string; name: string }) {
+	return (
+		<span
+			style={{
+				flex: 'none',
+				display: 'block',
+				width: 40,
+				height: 40,
+				padding: 3,
+				boxSizing: 'border-box',
+				background: '#f6f7f9',
+				border: '1px solid #e6e8eb',
+				borderRadius: 8
+			}}
+		>
+			<img
+				src={src}
+				alt={name}
+				width={32}
+				height={32}
+				style={{ display: 'block', objectFit: 'contain' }}
+			/>
+		</span>
+	);
+}
+
 function Headline({ view, service }: { view: ConsentView; service: string }) {
 	const { mode, client } = view;
 	const own = client.tier === 'this-organization';
@@ -733,10 +811,26 @@ export const ConsentPage: React.FC<ConsentView> = (view) => {
 						<Text strong>{service}</Text>
 					</Flex>
 
-					<Headline
-						view={view}
-						service={service}
-					/>
+					{view.client.logo ? (
+						<Flex
+							gap={12}
+							align="flex-start"
+						>
+							<ClientLogo
+								src={view.client.logo}
+								name={view.client.name}
+							/>
+							<Headline
+								view={view}
+								service={service}
+							/>
+						</Flex>
+					) : (
+						<Headline
+							view={view}
+							service={service}
+						/>
+					)}
 
 					{mode === 'device' && device ? (
 						<Flex
@@ -903,6 +997,13 @@ export const ConsentPage: React.FC<ConsentView> = (view) => {
 						<Text style={{ color: MUTED, textAlign: 'center' }}>
 							{T.next.loopback}
 						</Text>
+					) : null}
+
+					{view.links ? (
+						<AppLinks
+							name={view.client.name}
+							links={view.links}
+						/>
 					) : null}
 				</Flex>
 			</Card>

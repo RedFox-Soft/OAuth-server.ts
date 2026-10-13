@@ -67,7 +67,7 @@ follows it (`routes.ts:145`).
 ## The door has no exception any more
 
 The sign-in check used to skip this bucket (`verificationGates`). It now gates on
-`emailVerificationRequired` like any bucket (`lib/interactions/index.ts:845`), because the lockout guard
+`emailVerificationRequired` like any bucket (`lib/interactions/index.ts:853`), because the lockout guard
 moved from the door to the setting.
 
 In every bucket that requires verification, a correct password for an unverified account is now sent

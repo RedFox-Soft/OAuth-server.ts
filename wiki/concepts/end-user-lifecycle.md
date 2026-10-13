@@ -69,7 +69,7 @@ why re-deactivating an inactive user is allowed rather than a no-op.
 ## One predicate decides whether a user may sign in
 
 `canSignIn` (`lib/end_users/can_sign_in.ts:11`) — `active && !lockedLocally` — is used by account
-resolution (`lib/addon/account.ts:61`), the password door (`lib/interactions/index.ts:817`), the federated
+resolution (`lib/addon/account.ts:61`), the password door (`lib/interactions/index.ts:821`), the federated
 door (`:1202`), federation linking and provisioning, and both password-reset steps. Two copies of "is this
 user allowed" drift, and the drifted one is the door a locked user walks through.
 
@@ -105,7 +105,7 @@ audience depends on.)
 `userName` is unique per bucket **case-insensitively**; `externalId` is unique **per connection**
 (RFC 7643 §3.1 scopes it to the provisioning domain). Both are stored exactly as sent, and beside them
 the store keeps a derived key (`lib/adapters/end_user_keys.ts`) that the unique indexes hold
-(`lib/consts/storage_inventory.ts:286-287`):
+(`lib/consts/storage_inventory.ts:287-288`):
 
 - `userNameKey` — NFC-normalised lowercase. A collation would behave differently on MongoDB and PostgreSQL
   and need a divergence entry; a stored key is plain equality on both.
@@ -147,7 +147,7 @@ trail records sends that were attempted.
 **`passwordSet`.** The unusable password a password-less account holds (`lib/helpers/unusable_password.ts`) cannot
 be told from a real hash afterwards, so whether a password anyone chose opens an account is a stored marker
 (`lib/adapters/types.ts:144`): `true` on a create with a password, on every administrator's set
-(`service.ts:257`), on registration (`lib/interactions/index.ts:1449`) and on a completed reset
+(`service.ts:257`), on registration (`lib/interactions/index.ts:1457`) and on a completed reset
 (`lib/password_reset/challenge.ts:274`); `false` on a password-less create — an administrator's or SCIM's
 (`service.ts:158`) and a federated sign-in's just-in-time account (`lib/federation/resolve.ts:339`, in `applyDecision` since spec 088). Accounts
 written before it carry none, and a reader says nothing rather than guess. Setting a password can also sign the

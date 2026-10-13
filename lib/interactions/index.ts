@@ -126,6 +126,7 @@ import {
 } from './consentChoices.js';
 import { adapter } from 'lib/adapters/index.js';
 import { clientProvenance, grantTypeAllowed } from 'lib/models/client.js';
+import { readLogo } from 'lib/models/client/logo.js';
 import { profileClaims } from 'lib/consts/profile_claims.js';
 import { issuerFor } from 'lib/configs/issuer.js';
 import { ttl } from 'lib/configs/liveTime.js';
@@ -682,6 +683,9 @@ async function consentViewFor(
 	const tier = client
 		? await clientProvenance(client, bucket)
 		: 'self-registered';
+	// Read only where it could be shown: no other app's logo ever reaches the page (specs/094).
+	const logo =
+		tier === 'this-organization' ? await readLogo(clientId) : undefined;
 	/*
 	 * A client nobody registered here and that did not come through dynamic registration was resolved from
 	 * its metadata document, so its client_id is a URL whose host the document proved control of.
@@ -816,7 +820,11 @@ async function consentViewFor(
 			...(client?.redirectUris.length &&
 			client.redirectUris.every(isLoopbackRedirect)
 				? { loopbackOnly: true }
-				: {})
+				: {}),
+			...(logo ? { logo } : {}),
+			...(client?.policyUri ? { policyUri: client.policyUri } : {}),
+			...(client?.tosUri ? { tosUri: client.tosUri } : {}),
+			redirectUris: client?.redirectUris ?? []
 		},
 		redirectUri: redirectUriOf(interaction),
 		account: {

@@ -84,7 +84,7 @@ countingSince)` is absent, never zero.
 ## Retention, and why history is unowned
 
 A month's marks expire thirteen months after it ends, a day's forty days after (`lib/activity/periods.ts:22-23`);
-figures are permanent. Both areas are **store areas with no owner** (`lib/consts/storage_inventory.ts:777-795`):
+figures are permanent. Both areas are **store areas with no owner** (`lib/consts/storage_inventory.ts:786-804`):
 an area naming an account owner is swept by `cascadeForAccount` on every end-user and bucket deletion, and a
 month a deleted person was active in must still count them. The bucket delete route does not sweep them
 either. Instead it calls `retire` before destroying anything (since spec 090 in `destroyBucket`,

@@ -94,7 +94,8 @@ export interface ConsentView {
 	logoSrc: string;
 	/* The header: the bucket's display name, else its address. Only ever server data. */
 	service: { displayName?: string; host: string };
-	client: { name: string; tier: ProvenanceTier };
+	/* `logo` only for this organization's own app, on a page that does not warn about the receiver. */
+	client: { name: string; tier: ProvenanceTier; logo?: string };
 	redirect: {
 		kind: RedirectKind;
 		host?: string;
@@ -128,6 +129,8 @@ export interface ConsentView {
 	offline?: { key: string; refusedBefore?: true };
 	/* The after-approval summary lists only what is certain; the rest depends on the checkboxes. */
 	afterApprovalDependsOnChoice?: true;
+	/* The app's privacy policy and terms, each only when it is on one of the app's own redirect hosts. */
+	links?: { policy?: string; terms?: string };
 }
 
 /*
@@ -196,6 +199,11 @@ export interface ConsentInput {
 		 * proved a place the answer can go, and its loopback use is stated without alarm.
 		 */
 		loopbackOnly?: boolean;
+		/* The operator's logo, read only for this organization's own app (specs/094). */
+		logo?: string;
+		policyUri?: string;
+		tosUri?: string;
+		redirectUris?: readonly string[];
 	};
 	redirectUri?: string;
 	account: { id: string; email?: string; name?: string; login?: string };
@@ -633,7 +641,21 @@ export function buildConsentView(input: ConsentInput): ConsentView {
 		mode,
 		logoSrc: input.logoSrc,
 		service: input.service,
-		client: { name, tier: input.client.tier },
+		client: {
+			name,
+			tier: input.client.tier,
+			/*
+			 * Only an app this organization stands behind, and never on a page that warns the receiver may not be
+			 * who it seems: a familiar logo is exactly what makes a phished device code or a local program look
+			 * like the real thing (specs/094).
+			 */
+			...(input.client.logo &&
+			input.client.tier === 'this-organization' &&
+			warning?.kind !== 'loopback' &&
+			warning?.kind !== 'device'
+				? { logo: input.client.logo }
+				: {})
+		},
 		redirect: { ...redirect, ...(documentHost ? { documentHost } : {}) },
 		account: { id: input.account.id, label: accountLabel(input.account) },
 		canSwitchAccount: input.canSwitchAccount,
@@ -669,8 +691,46 @@ export function buildConsentView(input: ConsentInput): ConsentView {
 						? { afterApprovalDependsOnChoice: true as const }
 						: {})
 				}
-			: {})
+			: {}),
+		...linksOf(input.client)
 	};
+}
+
+/*
+ * The app's privacy policy and terms, each only when it is https on the host of one of the app's own
+ * redirect URIs, and only for an app this organization stands behind: a link from the consent page is a
+ * promise the page makes about where it leads (specs/094). Hosts compare in the URL parser's ASCII form,
+ * so a look-alike Unicode host is never the same host.
+ */
+function linksOf(client: ConsentInput['client']): {
+	links?: ConsentView['links'];
+} {
+	if (client.tier !== 'this-organization') return {};
+	const hosts = new Set(
+		(client.redirectUris ?? []).flatMap((uri) => {
+			const parsed = URL.parse(uri);
+			return parsed &&
+				(parsed.protocol === 'https:' || parsed.protocol === 'http:')
+				? [parsed.hostname]
+				: [];
+		})
+	);
+	const onHost = (link: string | undefined) => {
+		const parsed = link ? URL.parse(link) : null;
+		return parsed?.protocol === 'https:' && hosts.has(parsed.hostname)
+			? link
+			: undefined;
+	};
+	const policy = onHost(client.policyUri);
+	const terms = onHost(client.tosUri);
+	return policy || terms
+		? {
+				links: {
+					...(policy ? { policy } : {}),
+					...(terms ? { terms } : {})
+				}
+			}
+		: {};
 }
 
 /* Whether the grant records the person refusing anything this row stands for. */

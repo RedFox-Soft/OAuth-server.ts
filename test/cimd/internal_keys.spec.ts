@@ -12,7 +12,11 @@ import { tryFindClient } from 'lib/models/client/validate.ts';
 import { clearDocumentCache } from 'lib/client_metadata_document/cache.ts';
 import { resolver } from 'lib/client_metadata_document/fetch.ts';
 import { present } from 'test/shape.js';
+import { adapter } from 'lib/adapters/index.ts';
 import { serveDocument, mock } from './document_host.js';
+
+const LOGO =
+	'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
 
 /*
  * A client description document is written by whoever hosts it, so everything in it is the
@@ -76,5 +80,14 @@ describe('a client document naming internal client attributes', () => {
 		});
 
 		expect(client['consent.partial']).toBe(false);
+	});
+
+	it('gives the app no logo on the consent page when its document supplies one', async () => {
+		const { client } = await resolveServed({
+			logo: LOGO,
+			'consent.logo': LOGO
+		});
+
+		expect(await adapter('ClientLogo').find(client.clientId)).toBeUndefined();
 	});
 });

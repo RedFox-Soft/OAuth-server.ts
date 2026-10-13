@@ -146,7 +146,7 @@ the raw textarea it replaced, which at least never claimed to know.
 Writing that test found an asymmetry rather than confirming a symmetry. The server's rule is
 `label.length`, so a label of only spaces satisfies it and the consent screen then showed a blank
 where the name of the thing being authorized should be. (Since spec 092 the consent page shows the type
-identifier for a label that is blank once trimmed, `lib/interactions/consentView.ts:323`; the validator
+identifier for a label that is blank once trimmed, `lib/interactions/consentView.ts:319`; the validator
 still accepts it.) The editor stays stricter, and the difference
 is enumerated in a test of its own so a later reader does not "fix" it in either direction by
 accident. Whether the validator should refuse a blank-looking label is a question about server
