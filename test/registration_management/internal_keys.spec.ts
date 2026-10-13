@@ -97,4 +97,31 @@ describe('a registration body naming internal client attributes', () => {
 		const client = await Client.find(own.clientId);
 		expect(client['consent.require']).not.toBe(false);
 	});
+
+	it('gives the person no checkboxes for a registration that asks for them', async () => {
+		const { clientId } = await register({
+			'consent.partial': true,
+			partial_consent: true
+		});
+
+		const client = await Client.find(clientId);
+		expect(client['consent.partial']).toBe(false);
+	});
+
+	it('gives the person no checkboxes for an update that asks for them', async () => {
+		const own = await register();
+
+		await agent.reg({ clientId: own.clientId }).put(
+			{
+				client_id: own.clientId,
+				redirect_uris: ['https://client.example.com/cb'],
+				'consent.partial': true,
+				partial_consent: true
+			},
+			{ headers: { ...json, ...bearer(own.token) } }
+		);
+
+		const client = await Client.find(own.clientId);
+		expect(client['consent.partial']).toBe(false);
+	});
 });

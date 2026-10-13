@@ -55,6 +55,12 @@ export const BASE_METADATA_KEYS = [
 	'requestObject.backChannelSigningAlg',
 	'consent.require',
 	/*
+	 * Whether the person may untick individual permissions on the consent page. An operator's judgement that
+	 * the application copes with fewer permissions than it asked for — not something an application may
+	 * claim about itself (specs/093).
+	 */
+	'consent.partial',
+	/*
 	 * Whether the server created this client on its own request. A base key rather than recognised
 	 * metadata: it is not something a client may send — `lib/actions/registration.ts` sets it after the
 	 * wire translation — and it must survive the round trip through storage, which only keeps what is

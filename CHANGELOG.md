@@ -9,6 +9,14 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+### Added
+
+- **People can choose what an application gets** (spec 093). For a client an administrator marks with
+  `partialConsent` (console, admin API and MCP; never settable by dynamic registration or a metadata document),
+  the consent page gives every permission beyond signing in its own unticked checkbox, and the application's
+  tokens, ID token and userinfo carry only what was ticked. A refused permission is offered again when the
+  application sends `prompt=consent`; before, a refusal recorded on a grant could never be granted again.
+
 ### Changed
 
 - **The consent page says who is asking, which account is agreeing and what the app will do** (spec 092). It is

@@ -87,6 +87,8 @@ export const CreateClientBody = t.Object({
 	tokenEndpointAuthMethod: AuthMethod,
 	scope: t.Optional(t.String()),
 	requireConsent: t.Optional(t.Boolean()),
+	// Lets the person untick individual permissions; only for an application that copes with fewer (specs/093).
+	partialConsent: t.Optional(t.Boolean()),
 	backchannelTokenDeliveryMode: t.Optional(
 		// 'push' is deliberately absent: nothing implements it (the backchannel result handler knows
 		// 'ping', the CIBA request check knows 'poll') and checkCibaDeliveryModes refuses any mode
@@ -115,6 +117,8 @@ export const UpdateClientBody = t.Object({
 	tokenEndpointAuthMethod: t.Optional(AuthMethod),
 	scope: t.Optional(t.String()),
 	requireConsent: t.Optional(t.Boolean()),
+	// Lets the person untick individual permissions; only for an application that copes with fewer (specs/093).
+	partialConsent: t.Optional(t.Boolean()),
 	backchannelTokenDeliveryMode: t.Optional(
 		// 'push' is deliberately absent: nothing implements it (the backchannel result handler knows
 		// 'ping', the CIBA request check knows 'poll') and checkCibaDeliveryModes refuses any mode

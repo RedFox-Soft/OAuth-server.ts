@@ -59,7 +59,8 @@ export const ALWAYS_PRESENT = [
 	'dpopBoundAccessTokens',
 	'authorization.requirePushedAuthorizationRequests',
 	'requestObject.require',
-	'consent.require'
+	'consent.require',
+	'consent.partial'
 ] as const;
 
 export type AlwaysPresent = (typeof ALWAYS_PRESENT)[number];

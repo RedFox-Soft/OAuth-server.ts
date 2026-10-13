@@ -101,6 +101,7 @@ interface ClientView {
 	redirectUris: string[];
 	scope?: string;
 	requireConsent: boolean;
+	partialConsent?: boolean;
 	backchannelTokenDeliveryMode?: 'poll' | 'ping';
 	backchannelClientNotificationEndpoint?: string;
 	authorizationDetailsTypes?: string[];
@@ -116,6 +117,7 @@ interface FormValues extends Omit<KeyAttributes, 'jwks'> {
 	redirectUris?: string;
 	scope?: string;
 	requireConsent: boolean;
+	partialConsent?: boolean;
 	backchannelTokenDeliveryMode?: 'poll' | 'ping';
 	backchannelClientNotificationEndpoint?: string;
 	authorizationDetailsTypes?: string[];
@@ -185,6 +187,7 @@ export function Clients({ project }: { project: ProjectView }) {
 			redirectUris: row.redirectUris.join('\n'),
 			scope: row.scope,
 			requireConsent: row.requireConsent,
+			partialConsent: row.partialConsent ?? false,
 			authorizationDetailsTypes: row.authorizationDetailsTypes,
 			backchannelTokenDeliveryMode: row.backchannelTokenDeliveryMode,
 			backchannelClientNotificationEndpoint:
@@ -233,6 +236,7 @@ export function Clients({ project }: { project: ProjectView }) {
 				.filter(Boolean),
 			scope: values.scope,
 			requireConsent: values.requireConsent,
+			partialConsent: Boolean(values.partialConsent),
 			...(values.authorizationDetailsTypes?.length
 				? { authorizationDetailsTypes: values.authorizationDetailsTypes }
 				: {}),
@@ -530,6 +534,26 @@ export function Clients({ project }: { project: ProjectView }) {
 						valuePropName="checked"
 					>
 						<Switch />
+					</Form.Item>
+					{/* With consent skipped there is no page to choose on, so the switch would mean nothing. */}
+					<Form.Item<FormValues>
+						shouldUpdate={(prev, cur) =>
+							prev.requireConsent !== cur.requireConsent
+						}
+						noStyle
+					>
+						{() =>
+							form.getFieldValue('requireConsent') ? (
+								<Form.Item
+									name="partialConsent"
+									label="Lets people choose permissions"
+									valuePropName="checked"
+									extra="People can untick individual permissions on the consent page. Turn on only if this application works with fewer permissions than it asks for."
+								>
+									<Switch />
+								</Form.Item>
+							) : null
+						}
 					</Form.Item>
 					{/*
 					 * Free-form tags rather than a picker over the configured types: the server validates

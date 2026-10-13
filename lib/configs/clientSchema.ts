@@ -140,6 +140,15 @@ export const ClientSchema = t.Object({
 	'consent.require': t.Boolean(),
 
 	/*
+	 * consent.partial
+	 *
+	 * description: Lets the end user untick individual permissions on the consent page. Set by an
+	 * administrator for an application known to cope with receiving fewer permissions than it asked for;
+	 * an application that does not would break on a partial grant, which is why it is off by default.
+	 */
+	'consent.partial': t.Boolean(),
+
+	/*
 	 * registeredDynamically
 	 *
 	 * description: Whether this client was created on its own request through dynamic client

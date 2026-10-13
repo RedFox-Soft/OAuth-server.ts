@@ -5,7 +5,11 @@ import { mock } from '../fetch_mock.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { adapter, getProjectStore } from 'lib/adapters/index.ts';
+import {
+	adapter,
+	adminAuditStore,
+	getProjectStore
+} from 'lib/adapters/index.ts';
 import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { ADMIN_MCP_CLIENT_ID, MCP_RESOURCE } from 'lib/mcp/consts.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
@@ -112,6 +116,46 @@ describe('an agent editing a client', () => {
 			if (name === 'client_name') continue;
 			expect({ [name]: after[name] }).toEqual({ [name]: value });
 		}
+	});
+
+	it('lets people choose permissions once an agent turns it on, recorded as the agent', async () => {
+		const token = await agentToken();
+		const record = {
+			clientId: 'agent-edit-partial',
+			applicationType: 'web',
+			redirectUris: ['https://rp.example.com/cb'],
+			responseTypes: ['code'],
+			grantTypes: ['authorization_code'],
+			token_endpoint_auth_method: 'none'
+		};
+		seedClient(record);
+		const project = await getProjectStore().create({
+			name: 'Agent partial',
+			slug: `agent-partial-${Math.floor(Math.random() * 1e6)}`,
+			ownerGroupId: UNASSIGNED_GROUP_ID
+		});
+		await getProjectStore().update(project._id, {
+			clientIds: [record.clientId]
+		});
+
+		const response = await rpc(
+			call('client_update', {
+				id: project._id,
+				clientId: record.clientId,
+				partialConsent: true
+			}),
+			token
+		);
+
+		expect(response.result?.isError).not.toBe(true);
+		expect((await Client.find(record.clientId))['consent.partial']).toBe(true);
+		const { entries } = await adminAuditStore.list({
+			targetId: record.clientId,
+			action: 'client.update'
+		});
+		expect(entries).toHaveLength(1);
+		expect(entries[0]?.attributes).toEqual(['partialConsent']);
+		expect(entries[0]?.viaClientId).toBe(ADMIN_MCP_CLIENT_ID);
 	});
 
 	it('is refused a redirect URI the sector identifier document of a pairwise client does not list', async () => {

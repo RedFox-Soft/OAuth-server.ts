@@ -1,5 +1,7 @@
 import { Prompt, type CheckPartial } from '../prompt.js';
 import { canonicalKey, canonicalKeySet } from '../../rar_canonical.js';
+import type { OIDCContext } from '../../oidc_context.js';
+import type { PipelineParams } from '../../../consts/param_list.js';
 
 /*
  * What a check found missing, kept for its `details` to report. Beside the request context rather than
@@ -9,6 +11,17 @@ const missingOIDCScope = new WeakMap<object, unknown>();
 const missingOIDCClaims = new WeakMap<object, unknown>();
 const missingResourceScopes = new WeakMap<object, unknown>();
 const missingRar = new WeakMap<object, unknown>();
+
+/*
+ * Whether what the person refused counts as answered. It does — so they are not asked again on every
+ * sign-in — except while a prompt=consent is pending: that is how an application asks again, and a
+ * refusal that could never be offered again would lock the person and the application out for good
+ * (specs/093). Pending is true on the request's first pass and false on the resume once the person has
+ * answered, so offering a refusal again cannot ask twice.
+ */
+function refusalsCountAsAnswered(oidc: OIDCContext<PipelineParams>): boolean {
+	return !oidc.promptPending('consent');
+}
 
 class ConsentPromt extends Prompt {
 	name = 'consent';
@@ -44,8 +57,13 @@ class ConsentPromt extends Prompt {
 				 * any consent check runs — so this is defence rather than a live branch. It stays because
 				 * the failure it prevents is indistinguishable, from outside, from the server being broken.
 				 */
+				const grant = oidc.entities.Grant;
 				const encounteredScopes = new Set(
-					(oidc.entities.Grant?.getOIDCScopeEncountered() ?? '').split(' ')
+					(
+						(refusalsCountAsAnswered(oidc)
+							? grant?.getOIDCScopeEncountered()
+							: grant?.getOIDCScope()) ?? ''
+					).split(' ')
 				);
 
 				let missing: string[] | undefined;
@@ -69,8 +87,11 @@ class ConsentPromt extends Prompt {
 			reason: 'op_claims_missing',
 			description: 'requested claims not granted',
 			check: (oidc) => {
+				const grant = oidc.entities.Grant;
 				const encounteredClaims = new Set(
-					oidc.entities.Grant?.getOIDCClaimsEncountered() ?? []
+					(refusalsCountAsAnswered(oidc)
+						? grant?.getOIDCClaimsEncountered()
+						: grant?.getOIDCClaims()) ?? []
 				);
 
 				let missing: string[] | undefined;
@@ -102,9 +123,12 @@ class ConsentPromt extends Prompt {
 				for (const [indicator, resourceServer] of Object.entries(
 					oidc.resourceServers
 				)) {
+					const grant = oidc.entities.Grant;
 					const encounteredScopes = new Set(
 						(
-							oidc.entities.Grant?.getResourceScopeEncountered(indicator) ?? ''
+							(refusalsCountAsAnswered(oidc)
+								? grant?.getResourceScopeEncountered(indicator)
+								: grant?.getResourceScope(indicator)) ?? ''
 						).split(' ')
 					);
 					const requestedScopes = oidc.requestParamScopes;

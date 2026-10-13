@@ -49,6 +49,36 @@ describe('admin client service', () => {
 		expect(view.requireConsent).toBe(false);
 	});
 
+	it('lets people choose permissions once an administrator turns it on', async () => {
+		const { view } = await createClient({
+			clientName: 'Assistant',
+			grantTypes: ['authorization_code'],
+			redirectUris: ['https://partial-on.example.com/cb'],
+			tokenEndpointAuthMethod: 'none'
+		});
+		expect(view.partialConsent).toBe(false);
+
+		const updated = await updateClient(view.clientId, { partialConsent: true });
+
+		expect(updated.partialConsent).toBe(true);
+	});
+
+	it('keeps partial consent through an edit that does not name it', async () => {
+		const { view } = await createClient({
+			clientName: 'Assistant',
+			grantTypes: ['authorization_code'],
+			redirectUris: ['https://partial-kept.example.com/cb'],
+			tokenEndpointAuthMethod: 'none',
+			partialConsent: true
+		});
+
+		const updated = await updateClient(view.clientId, {
+			clientName: 'Assistant 2'
+		});
+
+		expect(updated.partialConsent).toBe(true);
+	});
+
 	it('creates a confidential client and returns the secret once', async () => {
 		const { view, secret } = await createClient({
 			clientName: 'Server',

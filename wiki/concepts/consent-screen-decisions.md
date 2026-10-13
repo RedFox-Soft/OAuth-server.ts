@@ -134,7 +134,52 @@ The GET reads the hinted grant with `Grant.tryFind` (`index.ts:611`), never `fin
 consent's grantId names nothing stored ([[first-consent-grant-id]]). What it already holds becomes one
 line, "You already allowed: …". The groups list only the prompt's missing items. A summary of everything
 the app will then have appears only when the new items escalate: an act, an undescribed item, or offline
-access (`consentView.ts:563-568`). There is still no per-item selection. Allow grants everything shown.
+access (`consentView.ts:563-568`). For an application without partial consent there is no per-item
+selection: Allow grants everything shown. The next section is the exception.
+
+## Choosing what to allow (spec 093, 2026-10-13)
+
+An administrator can mark a client as coping with partial access: the canonical-only base key
+`consent.partial` (`lib/models/client/wire.ts:62`), admin `partialConsent`, off by default. Dynamic
+registration and metadata documents cannot set it — the same rule that keeps `consent.require` an
+operator's decision. For such a client the page gives every item beyond signing in its own checkbox,
+**unticked**. What signing in needs — `openid`, `profile`, `email` and their claims — is fixed and shown
+in a block of its own (`lib/interactions/consentChoices.ts:57`). Authorization details stay all or
+nothing, and the page says so. A claim's `essential` is a hint, never a lock.
+
+- **One function decides the offer, twice.** `consentChoices` (`consentChoices.ts:105`) runs for the GET
+  and again for the POST (`choicesFor`, `lib/interactions/index.ts:607`). It reads only the prompt's
+  details and two facts — the flag and whether this is a device approval — never the person's claims, so
+  the page and the handler cannot disagree. Each row posts a content key (`oidc:phone`, `scope:billing`,
+  `resource:<indicator> <scope>`). A value the page did not draw, or a selection where there was no
+  choice, is refused with nothing written (`index.ts:1902`).
+- **The posted list only narrows.** The grant is built from the details as before, then every unticked
+  row is refused through the grant's `reject*` (`index.ts:520`). The details never hold an earlier
+  allowance, so a partial allow cannot withdraw one. An Allow that leaves nothing at all is answered as
+  the refusal it amounts to, without recording refusals (`allowsNothing`, `index.ts:622`).
+- **Checkboxes appear only with two or more choices** (`consentChoices.ts:172`), and never in the device
+  flow: it has no `prompt` parameter, so a refusal there could never be offered again.
+- **A choosable category is shown even when empty** (`consentView.ts:402`). A checkbox decides a
+  permission. Hidden, an empty phone number would be granted unseen the day the person adds one, or
+  refused without being asked.
+- **Summaries promise only what is certain.** With choices, "after you allow" lists what was allowed
+  before plus the fixed items, and adds "and anything you select above" (`consentView.ts:617`); the
+  long-lived-access date sits on its own row.
+- **One form spans the rows and the buttons**, and **one `Checkbox.Group name="allow"` spans every row**,
+  both laid out with `display: contents`, so the ticked keys post with the buttons without script. In antd
+  a checkbox's `value` means something only inside a group: a lone `<Checkbox value>` warns "`value` is
+  not a valid prop, do you mean `checked`?" (`antd/es/checkbox/Checkbox.js:60`, the check is
+  `'checked' in props || !!checkboxGroup || !('value' in props)`), and it is the group that names each box
+  through its context. The group's `role` is `none`: the rows already sit under the page's own headings.
+
+**A refusal is not forever.** The grant subtracts what it refused from everything it issues, and the
+consent checks count a refusal as answered — so the person is not asked on every sign-in. But until 093
+they did so even under `prompt=consent`, and allowing never cleared a refusal: the first "no" was
+permanent. Now a refusal counts as answered only while `prompt=consent` is not pending
+(`refusalsCountAsAnswered`, `lib/helpers/interaction_policy/prompts/consent.ts:22`). Pending is true on
+the request's first pass and false on the resume once the person answered, so offering it again cannot
+loop. Allowing takes the refusal back (`withdrawRefusal`, `lib/models/grant.ts:165`). An item offered
+again says "You didn't allow this last time". This holds for every client, flag or not.
 
 ## The decision belongs to the account it was shown for
 

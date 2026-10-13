@@ -54,6 +54,7 @@ import {
 	errorForCode,
 	InvalidClient,
 	InvalidRedirectUri,
+	InvalidRequest,
 	SessionNotFound
 } from 'lib/helpers/errors.js';
 import {
@@ -118,6 +119,11 @@ import {
 	type GrantedSoFar,
 	type PromptDetails
 } from './consentView.js';
+import {
+	consentChoices,
+	type ConsentChoices,
+	type SelectableItem
+} from './consentChoices.js';
 import { adapter } from 'lib/adapters/index.js';
 import { clientProvenance, grantTypeAllowed } from 'lib/models/client.js';
 import { profileClaims } from 'lib/consts/profile_claims.js';
@@ -455,7 +461,10 @@ async function completeDeviceInteraction(
 	}
 }
 
-async function createGrant(interaction: Interaction) {
+async function createGrant(
+	interaction: Interaction,
+	refuse: SelectableItem[] = []
+) {
 	const grantId = interaction.payload.grantId;
 	const details: PromptDetails = interaction.payload.prompt?.details ?? {};
 
@@ -502,6 +511,19 @@ async function createGrant(interaction: Interaction) {
 			// Each member was validated as an object when the request was checked (check_rar.ts).
 			if (isPlainObject(detail)) grant.addRar(detail);
 		}
+	}
+	/*
+	 * What the person left unticked (specs/093). Added above and refused here, so exactly the ticked rows
+	 * remain granted; `details` holds only what was not granted before, so refusing from it never withdraws
+	 * an earlier allowance.
+	 */
+	for (const item of refuse) {
+		if (item.resource) {
+			grant.rejectResourceScope(item.resource, item.scopes);
+			continue;
+		}
+		if (item.scopes.length) grant.rejectOIDCScope(item.scopes);
+		if (item.claims.length) grant.rejectOIDCClaims(item.claims);
 	}
 
 	await grant.save();
@@ -564,6 +586,70 @@ function asList(value: string | string[] | undefined): string[] {
 }
 
 /*
+ * Declining finishes the interaction rather than throwing out of it. A throw here was rendered to the
+ * browser and left the interaction standing, so the client never heard and the same uid could still be
+ * resumed into a code; as a result it is consumed and delivered like any other.
+ */
+function decline(
+	interaction: Interaction,
+	cookie: OIDCCookies,
+	context: { route: string; request: Request }
+) {
+	interaction.payload.result = {
+		...(interaction.payload.result ?? {}),
+		error: 'access_denied',
+		error_description: 'End-User denied consent'
+	};
+	return resume(interaction, cookie, context);
+}
+
+/* What the person may leave out on this interaction's page — the same answer the page was drawn from. */
+async function choicesFor(interaction: Interaction): Promise<ConsentChoices> {
+	const clientId = clientIdOf(interaction);
+	const client = clientId ? await Client.tryFind(clientId) : undefined;
+	return consentChoices({
+		details: interaction.payload.prompt?.details ?? {},
+		partial: client?.['consent.partial'] === true,
+		device: !!interaction.payload.deviceCode
+	});
+}
+
+/*
+ * An "Allow" that would leave the application with nothing: nothing for signing in was asked, nothing was
+ * ticked, no authorization details ride along, and nothing allowed before covers this request. Answered as
+ * the refusal it amounts to, without recording refusals the person expressed only by ticking nothing.
+ */
+async function allowsNothing(
+	interaction: Interaction,
+	choices: ConsentChoices,
+	ticked: string[]
+): Promise<boolean> {
+	if (
+		ticked.length ||
+		choices.rar.length ||
+		choices.fixed.scopes.length ||
+		choices.fixed.claims.length ||
+		Object.keys(choices.fixed.resourceScopes).length
+	) {
+		return false;
+	}
+	const existing = interaction.payload.grantId
+		? await Grant.tryFind(interaction.payload.grantId)
+		: undefined;
+	if (!existing) return true;
+	const params = (interaction.payload.params ?? {}) as Record<string, unknown>;
+	const scopes = (typeof params.scope === 'string' ? params.scope : '')
+		.split(' ')
+		.filter(Boolean);
+	return (
+		!existing.getOIDCScopeFiltered(scopes) &&
+		asList(params.resource as string | string[] | undefined).every(
+			(resource) => !existing.getResourceScopeFiltered(resource, scopes)
+		)
+	);
+}
+
+/*
  * Everything the consent page shows, gathered from the interaction, the client, the bucket being signed
  * into, the person and their existing grant. The decisions about what to say are buildConsentView's; this
  * only reads.
@@ -622,6 +708,24 @@ async function consentViewFor(
 					])
 				),
 				rar: existing.payload.rar ?? []
+			}
+		: undefined;
+	const refused: GrantedSoFar | undefined = existing?.payload.rejected
+		? {
+				oidcScopes: existing.getRejectedOIDCScope().split(' ').filter(Boolean),
+				oidcClaims: existing.getRejectedOIDCClaims(),
+				resourceScopes: Object.fromEntries(
+					Object.keys(existing.payload.rejected.resources ?? {}).map(
+						(indicator) => [
+							indicator,
+							existing
+								.getRejectedResourceScope(indicator)
+								.split(' ')
+								.filter(Boolean)
+						]
+					)
+				),
+				rar: []
 			}
 		: undefined;
 
@@ -730,7 +834,9 @@ async function consentViewFor(
 		...(adminResource ? { adminResource } : {}),
 		...(refreshIssued ? { keepsAccessUntil: lifetimeDate(grantExpiry) } : {}),
 		canSwitchAccount: !accountNamedByRequest(params),
-		...(device ? { device } : {})
+		...(device ? { device } : {}),
+		...(client?.['consent.partial'] ? { partial: true } : {}),
+		...(refused ? { refused } : {})
 	});
 }
 
@@ -1782,25 +1888,46 @@ export const ui = new Elysia()
 			}
 
 			if (body.action === 'allow') {
-				await createGrant(interaction);
+				const choices = await choicesFor(interaction);
+				const ticked = asList(body.allow);
+				/*
+				 * The offer is worked out again here rather than read from the submission: a value the page did
+				 * not draw is not from this page, and the only safe answer to it is to change nothing.
+				 */
+				const offered = new Set(choices.selectable.map((item) => item.key));
+				if (
+					ticked.length &&
+					(!choices.active || ticked.some((key) => !offered.has(key)))
+				) {
+					throw new InvalidRequest('consent selection not offered');
+				}
+				if (
+					choices.active &&
+					(await allowsNothing(interaction, choices, ticked))
+				) {
+					return decline(interaction, cookie, { route, request });
+				}
+				await createGrant(
+					interaction,
+					choices.active
+						? choices.selectable.filter((item) => !ticked.includes(item.key))
+						: []
+				);
 				return resume(interaction, cookie, { route, request });
 			}
 
-			/*
-			 * Declining finishes the interaction rather than throwing out of it. A throw here was rendered to
-			 * the browser and left the interaction standing, so the client never heard and the same uid could
-			 * still be resumed into a code; as a result it is consumed and delivered like any other.
-			 */
-			interaction.payload.result = {
-				...(interaction.payload.result ?? {}),
-				error: 'access_denied',
-				error_description: 'End-User denied consent'
-			};
-			return resume(interaction, cookie, { route, request });
+			return decline(interaction, cookie, { route, request });
 		},
 		{
 			body: t.Object({
 				action: t.Union([t.Literal('allow'), t.Literal('cancel')]),
+				// The ticked rows: one value per checkbox, so a single tick arrives as a string (specs/093).
+				allow: t.Optional(
+					t.Union([
+						t.String({ maxLength: 2048 }),
+						t.Array(t.String({ maxLength: 2048 }), { maxItems: 64 })
+					])
+				),
 				/*
 				 * Optional in the schema so a submission without it reaches the refusal above — the same
 				 * answer as a mismatch — rather than a validation error that says which field was missing.

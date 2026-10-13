@@ -933,7 +933,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'Register an OAuth client in a project. A confidential client’s generated secret is returned exactly once, here, and is never readable again.'
+			'Register an OAuth client in a project. A confidential client’s generated secret is returned exactly once, here, and is never readable again. partialConsent lets the person untick individual permissions on the consent page — turn it on only for an application that copes with receiving fewer permissions than it asked for.'
 	},
 	{
 		tool: 'client_update',
@@ -946,7 +946,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'clientId'],
 		summary:
-			"Change a client's registered metadata — redirect URIs, grant types, and the rest."
+			"Change a client's registered metadata — redirect URIs, grant types, and the rest. partialConsent lets the person untick individual permissions on the consent page — turn it on only for an application that copes with receiving fewer permissions than it asked for."
 	},
 	{
 		tool: 'client_secret_rotate',

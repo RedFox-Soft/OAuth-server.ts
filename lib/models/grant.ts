@@ -157,6 +157,42 @@ function addResourceScope(
 	}
 }
 
+/*
+ * Allowing something the person refused before takes the refusal back. A grant subtracts what it refused
+ * from what it holds, so without this an item allowed on a page that offered it again would still be
+ * withheld from every token (specs/093).
+ */
+function withdrawRefusal(
+	rejected: Consent | undefined,
+	scope: string[],
+	claims: string[],
+	resource?: string
+) {
+	if (!rejected) return;
+	const without = (value: string | undefined, remove: string[]) =>
+		(value ?? '')
+			.split(' ')
+			.filter((v) => v && !remove.includes(v))
+			.join(' ');
+	if (resource !== undefined) {
+		if (rejected.resources?.[resource]) {
+			rejected.resources[resource] = without(
+				rejected.resources[resource],
+				scope
+			);
+		}
+		return;
+	}
+	if (rejected.openid?.scope && scope.length) {
+		rejected.openid.scope = without(rejected.openid.scope, scope);
+	}
+	if (rejected.openid?.claims && claims.length) {
+		rejected.openid.claims = rejected.openid.claims.filter(
+			(claim) => !claims.includes(claim)
+		);
+	}
+}
+
 function oidcClaims(context: Consent): string[] {
 	if (context.openid?.claims) {
 		if (context.rejected) {
@@ -253,6 +289,7 @@ export class Grant extends BaseToken<GrantPayloadType> {
 	}
 
 	addOIDCScope(scope: ScopeInput) {
+		withdrawRefusal(this.payload.rejected, scopeString(scope).split(' '), []);
 		addScope(this.payload, scope);
 	}
 
@@ -286,6 +323,12 @@ export class Grant extends BaseToken<GrantPayloadType> {
 	}
 
 	addResourceScope(resource: string, scope: ScopeInput) {
+		withdrawRefusal(
+			this.payload.rejected,
+			scopeString(scope).split(' '),
+			[],
+			resource
+		);
 		addResourceScope(this.payload, resource, scope);
 	}
 
@@ -322,6 +365,7 @@ export class Grant extends BaseToken<GrantPayloadType> {
 	}
 
 	addOIDCClaims(claims: Set<string> | string[]) {
+		withdrawRefusal(this.payload.rejected, [], [...claims]);
 		addClaims(this.payload, claims);
 	}
 

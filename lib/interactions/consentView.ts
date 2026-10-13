@@ -7,6 +7,18 @@ import {
 	RESERVED_NAME_WORDS,
 	sanitiseClientName
 } from './clientName.js';
+import {
+	categoryKey,
+	claimCategory,
+	consentChoices,
+	NAME_CLAIMS,
+	OFFLINE_KEY,
+	PROFILE_DETAIL_CLAIMS,
+	PROTOCOL_CLAIMS,
+	resourceKey,
+	SELECTABLE_STANDARD,
+	type SelectableItem
+} from './consentChoices.js';
 
 /*
  * What the consent page shows, worked out on the server from the interaction and handed to the page whole.
@@ -44,6 +56,10 @@ export interface ConsentItem {
 	codes: string[];
 	/* In a one-line summary, the resource an undescribed item belongs to — otherwise "api:read" twice reads as a mistake. */
 	resource?: string;
+	/* A row the person may untick: the value its checkbox posts. */
+	choice?: { key: string };
+	/* Offered again after the person refused it — said, so the question does not look new. */
+	refusedBefore?: true;
 }
 
 export interface ResourceBlock {
@@ -103,6 +119,15 @@ export interface ConsentView {
 	afterApproval: ConsentItem[];
 	nothingRequested?: 'first' | 'repeat';
 	device?: { userCode: string; requestedAgo: string };
+	/*
+	 * Present when the person may untick permissions (specs/093): what signing in needs regardless, and
+	 * whether authorization details ride along with the rest.
+	 */
+	choices?: { fixed: ConsentItem[]; rarTogether: boolean };
+	/* Long-lived access as a row of its own, when it can be refused. */
+	offline?: { key: string; refusedBefore?: true };
+	/* The after-approval summary lists only what is certain; the rest depends on the checkboxes. */
+	afterApprovalDependsOnChoice?: true;
 }
 
 /*
@@ -188,6 +213,10 @@ export interface ConsentInput {
 	keepsAccessUntil?: string;
 	canSwitchAccount: boolean;
 	device?: { userCode: string; requestedAgo: string };
+	/* The client's operator-set `consent.partial`. */
+	partial?: boolean;
+	/* What the grant records as refused, to mark a row offered again. */
+	refused?: GrantedSoFar;
 }
 
 /*
@@ -211,24 +240,6 @@ export function redirectKind(uri: string | undefined): {
 	return { kind: 'private-use', scheme: parsed.protocol.replace(/:$/, '') };
 }
 
-const NAME_CLAIMS = [
-	'name',
-	'given_name',
-	'family_name',
-	'middle_name',
-	'nickname',
-	'preferred_username'
-];
-const PROFILE_DETAIL_CLAIMS = [
-	'profile',
-	'website',
-	'gender',
-	'birthdate',
-	'zoneinfo',
-	'locale',
-	'updated_at'
-];
-
 function hasValue(claims: Record<string, unknown>, claim: string): boolean {
 	const value = claims[claim];
 	return value !== undefined && value !== null && value !== '';
@@ -246,29 +257,6 @@ function profileCategories(claims: Record<string, unknown>): DataCategory[] {
 	if (details) out.push('profileDetails');
 	return out;
 }
-
-/* The category an individually requested claim belongs to, or undefined for one nobody worded. */
-function claimCategory(claim: string): DataCategory | undefined {
-	if (NAME_CLAIMS.includes(claim)) return 'profileName';
-	if (claim === 'picture') return 'profilePhoto';
-	if (PROFILE_DETAIL_CLAIMS.includes(claim)) return 'profileDetails';
-	if (claim === 'email' || claim === 'email_verified') return 'email';
-	if (claim === 'address') return 'address';
-	if (claim === 'phone_number' || claim === 'phone_number_verified')
-		return 'phone';
-	if (claim === 'groups') return 'groups';
-	return undefined;
-}
-
-// Claims every sign-in carries; asking for one by name adds nothing a person would read.
-const PROTOCOL_CLAIMS = new Set([
-	'sub',
-	'acr',
-	'amr',
-	'sid',
-	'auth_time',
-	'iss'
-]);
 
 function scopeCategories(
 	scope: string,
@@ -331,18 +319,31 @@ function hostOfIndicator(indicator: string): string {
 	return URL.parse(indicator)?.hostname || indicator;
 }
 
+/*
+ * How a sorted item learns whether it is a row the person may untick, and whether they refused it before.
+ * Absent when the page is not marking anything (the "already allowed" line, for one).
+ */
+type Mark = (key: string) => Pick<ConsentItem, 'choice' | 'refusedBefore'>;
+
+const unmarked: Mark = () => ({});
+
 /* Adds category items once each, keeping the order in which they were first asked for. */
 function pushCategories(
 	group: ConsentGroup,
 	categories: DataCategory[],
-	code: string
+	code: string,
+	mark: Mark
 ) {
 	for (const category of categories) {
 		const existing = group.items.find((i) => i.category === category);
 		if (existing) {
 			if (!existing.codes.includes(code)) existing.codes.push(code);
 		} else {
-			group.items.push({ category, codes: [code] });
+			group.items.push({
+				category,
+				codes: [code],
+				...mark(categoryKey(category))
+			});
 		}
 	}
 }
@@ -380,7 +381,12 @@ interface Asked {
  * access, understating what an app can do is the failure that matters. Anything nobody described is shown
  * by its technical name rather than guessed at — honest, and the signal that it was not described.
  */
-function sortAsked(input: ConsentInput, asked: Asked) {
+function sortAsked(
+	input: ConsentInput,
+	asked: Asked,
+	mark: Mark = unmarked,
+	choosing = false
+) {
 	const see = emptyGroup();
 	const act = emptyGroup();
 	const other = emptyGroup();
@@ -388,19 +394,32 @@ function sortAsked(input: ConsentInput, asked: Asked) {
 	for (const scope of asked.oidcScopes) {
 		if (scope === 'openid' || scope === 'offline_access') continue;
 		if (isStandardOidcScope(scope)) {
-			pushCategories(see, scopeCategories(scope, input.userClaims), scope);
+			const categories = scopeCategories(scope, input.userClaims);
+			/*
+			 * A row the person may untick is a permission, not a list of what they have today: hidden while
+			 * empty, it would be granted unseen the day they add a value — or refused without being asked.
+			 */
+			const offered = SELECTABLE_STANDARD[scope];
+			pushCategories(
+				see,
+				choosing && offered && !categories.length ? [offered] : categories,
+				scope,
+				mark
+			);
 			continue;
 		}
 		const description = input.scopeDescriptions[scope]?.trim();
-		if (description) act.items.push({ text: description, codes: [scope] });
-		else other.items.push({ codes: [scope] });
+		const row = mark(`scope:${scope}`);
+		if (description)
+			act.items.push({ text: description, codes: [scope], ...row });
+		else other.items.push({ codes: [scope], ...row });
 	}
 
 	for (const claim of asked.oidcClaims) {
 		if (PROTOCOL_CLAIMS.has(claim)) continue;
 		const category = claimCategory(claim);
-		if (category) pushCategories(see, [category], claim);
-		else other.items.push({ codes: [claim] });
+		if (category) pushCategories(see, [category], claim, mark);
+		else other.items.push({ codes: [claim], ...mark(`claim:${claim}`) });
 	}
 
 	for (const [indicator, scopes] of Object.entries(asked.resourceScopes)) {
@@ -410,14 +429,19 @@ function sortAsked(input: ConsentInput, asked: Asked) {
 		for (const scope of scopes) {
 			const described = facts?.scopeDescriptions?.[scope];
 			const text = described?.description.trim();
+			const row = mark(resourceKey(indicator, scope));
 			if (text) {
 				const target = described?.kind === 'see' ? see : act;
 				resourceBlock(target, indicator, facts).items.push({
 					text,
-					codes: [scope]
+					codes: [scope],
+					...row
 				});
 			} else {
-				resourceBlock(other, indicator, facts).items.push({ codes: [scope] });
+				resourceBlock(other, indicator, facts).items.push({
+					codes: [scope],
+					...row
+				});
 			}
 		}
 	}
@@ -486,7 +510,33 @@ export function buildConsentView(input: ConsentInput): ConsentView {
 		resourceScopes: details.missingResourceScopes ?? {},
 		rar: details.rar ?? []
 	};
-	const groups = sortAsked(input, asked);
+	const choices = consentChoices({
+		details,
+		partial: input.partial ?? false,
+		device: !!input.device
+	});
+	const choosing = choices.active;
+	const refusedKeys = new Set(
+		choices.selectable
+			.filter((item) => wasRefused(item, input.refused))
+			.map((item) => item.key)
+	);
+	const selectableKeys = new Set(choices.selectable.map((item) => item.key));
+	const mark: Mark = (key) => ({
+		...(choosing && selectableKeys.has(key) ? { choice: { key } } : {}),
+		...(refusedKeys.has(key) ? { refusedBefore: true as const } : {})
+	});
+	const groups = sortAsked(input, asked, mark, choosing);
+	/*
+	 * What signing in needs is not a row to untick: it leaves the "see" group for a block of its own, so
+	 * the person can tell what they are choosing from what comes with signing in at all.
+	 */
+	const fixed = choosing
+		? groups.see.items.filter((item) => item.category && !item.choice)
+		: [];
+	if (choosing) {
+		groups.see.items = groups.see.items.filter((item) => !fixed.includes(item));
+	}
 
 	const offline = input.keepsAccessUntil !== undefined;
 	const customScopeAsked = asked.oidcScopes.some(
@@ -496,6 +546,7 @@ export function buildConsentView(input: ConsentInput): ConsentView {
 		(s) => s.length > 0
 	);
 	const compact =
+		!choosing &&
 		!input.adminResource &&
 		!offline &&
 		!customScopeAsked &&
@@ -562,9 +613,13 @@ export function buildConsentView(input: ConsentInput): ConsentView {
 	];
 	const escalates = acts || offline;
 	// Long-lived access is no list item of its own, yet on its own it is an escalation worth summing up.
+	// With checkboxes, only what comes regardless is certain; the summary must not promise an unticked row.
+	const certain = choosing
+		? [...fixed, ...flatten({ items: [], resources: [], rar: groups.act.rar })]
+		: newItems;
 	const afterApproval =
 		previouslyAllowed.length && escalates
-			? unique([...previouslyAllowed, ...newItems])
+			? unique([...previouslyAllowed, ...certain])
 			: [];
 
 	const askedAnything =
@@ -596,6 +651,40 @@ export function buildConsentView(input: ConsentInput): ConsentView {
 		...(!askedAnything && !input.adminResource && !input.device
 			? { nothingRequested: granted ? 'repeat' : 'first' }
 			: {}),
-		...(input.device ? { device: input.device } : {})
+		...(input.device ? { device: input.device } : {}),
+		...(choosing
+			? {
+					choices: { fixed, rarTogether: asked.rar.length > 0 },
+					...(selectableKeys.has(OFFLINE_KEY)
+						? {
+								offline: {
+									key: OFFLINE_KEY,
+									...(refusedKeys.has(OFFLINE_KEY)
+										? { refusedBefore: true as const }
+										: {})
+								}
+							}
+						: {}),
+					...(afterApproval.length
+						? { afterApprovalDependsOnChoice: true as const }
+						: {})
+				}
+			: {})
 	};
+}
+
+/* Whether the grant records the person refusing anything this row stands for. */
+function wasRefused(
+	item: SelectableItem,
+	refused: GrantedSoFar | undefined
+): boolean {
+	if (!refused) return false;
+	if (item.resource) {
+		const scopes = refused.resourceScopes[item.resource] ?? [];
+		return item.scopes.some((s) => scopes.includes(s));
+	}
+	return (
+		item.scopes.some((s) => refused.oidcScopes.includes(s)) ||
+		item.claims.some((c) => refused.oidcClaims.includes(c))
+	);
 }

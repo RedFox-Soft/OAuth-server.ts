@@ -43,6 +43,8 @@ export interface ConsentPage {
 	view: ConsentView;
 	/* The page's response, for its headers. */
 	response: Response;
+	/* The request that led here, to redeem its code with the verifier it was started with. */
+	auth: AuthorizationRequest;
 }
 
 /* Starts an authorization request with a signed-in session and opens the consent page it leads to. */
@@ -69,7 +71,8 @@ export async function openConsent(
 		html,
 		text: visible(html),
 		view: propsOf(html),
-		response
+		response,
+		auth
 	};
 }
 
@@ -77,11 +80,14 @@ export async function openConsent(
 export async function decide(
 	page: Pick<ConsentPage, 'uid' | 'cookie'>,
 	action: 'allow' | 'cancel',
-	accountId?: string
+	accountId?: string,
+	/* The ticked rows, one `allow` field each — what the page's checkboxes post. */
+	allow: string[] = []
 ): Promise<Response> {
-	const fields: Record<string, string> = { action };
+	const fields = new URLSearchParams({ action });
 	const account = accountId ?? (await shownAccount(page.uid));
-	if (account !== '') fields.accountId = account;
+	if (account !== '') fields.set('accountId', account);
+	for (const key of allow) fields.append('allow', key);
 	return elysia.handle(
 		new Request(`${ISSUER}/ui/${page.uid}/consent`, {
 			method: 'POST',
@@ -89,7 +95,7 @@ export async function decide(
 				cookie: page.cookie,
 				'content-type': 'application/x-www-form-urlencoded'
 			},
-			body: new URLSearchParams(fields).toString()
+			body: fields.toString()
 		})
 	);
 }

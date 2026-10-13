@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button, Card, Flex, Typography } from 'antd';
+import { Button, Card, Checkbox, Flex, Typography } from 'antd';
 import {
 	ClockCircleOutlined,
 	CloudServerOutlined,
@@ -108,20 +108,139 @@ function TechnicalNames({ items }: { items: ConsentItem[] }) {
 	);
 }
 
+function RefusedBefore({ item }: { item: Pick<ConsentItem, 'refusedBefore'> }) {
+	return item.refusedBefore ? (
+		<div style={{ fontSize: 12.5, color: MUTED }}>
+			{T.choices.refusedBefore}
+		</div>
+	) : null;
+}
+
+/*
+ * A permission the person may leave out. The whole row is the checkbox's label, so a tap anywhere on it
+ * toggles the box, and the text is the box's accessible name. A plain form field: it posts without script.
+ */
+function ChoiceRow({
+	choiceKey,
+	refusedBefore,
+	icon,
+	children
+}: {
+	choiceKey: string;
+	refusedBefore?: true;
+	icon?: React.ReactNode;
+	children: React.ReactNode;
+}) {
+	return (
+		<li style={{ listStyle: 'none' }}>
+			<Checkbox
+				value={choiceKey}
+				style={{ display: 'flex', alignItems: 'center', minHeight: 44 }}
+			>
+				<span style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
+					{icon ? (
+						<span style={{ width: 16, color: MUTED, flex: 'none' }}>
+							{icon}
+						</span>
+					) : null}
+					<span>
+						{children}
+						<RefusedBefore item={{ refusedBefore }} />
+					</span>
+				</span>
+			</Checkbox>
+		</li>
+	);
+}
+
+/*
+ * The one group every row belongs to. In antd a checkbox's `value` means something only inside a
+ * `Checkbox.Group` — alone it warns that `value` is not a prop and asks for `checked` — and the group is what
+ * names each box `allow`, so the ticked keys post with the form, script or not. It lays out as if it were not
+ * there and announces nothing: the rows sit under the page's own headings, which already say what they are.
+ */
+function ChoiceGroup({
+	active,
+	children
+}: {
+	active: boolean;
+	children: React.ReactNode;
+}) {
+	return active ? (
+		<Checkbox.Group
+			name="allow"
+			role="none"
+			style={{ display: 'contents' }}
+		>
+			{children}
+		</Checkbox.Group>
+	) : (
+		<>{children}</>
+	);
+}
+
+function itemKey(item: ConsentItem): string {
+	return `${item.category ?? item.text ?? ''}:${item.codes.join(' ')}`;
+}
+
 function ItemList({ items }: { items: ConsentItem[] }) {
 	return (
 		<ul style={{ margin: 0, paddingLeft: 0, listStyle: 'none' }}>
-			{items.map((item) => (
-				<li
-					key={`${item.category ?? item.text ?? ''}:${item.codes.join(' ')}`}
-					style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}
-				>
-					<span style={{ width: 16, color: MUTED, flex: 'none' }}>
-						{item.category ? CATEGORY_ICON[item.category] : '•'}
-					</span>
-					<span>{itemText(item)}</span>
-				</li>
-			))}
+			{items.map((item) =>
+				item.choice ? (
+					<ChoiceRow
+						key={itemKey(item)}
+						choiceKey={item.choice.key}
+						refusedBefore={item.refusedBefore}
+						icon={item.category ? CATEGORY_ICON[item.category] : undefined}
+					>
+						{itemText(item)}
+					</ChoiceRow>
+				) : (
+					<li
+						key={itemKey(item)}
+						style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}
+					>
+						<span style={{ width: 16, color: MUTED, flex: 'none' }}>
+							{item.category ? CATEGORY_ICON[item.category] : '•'}
+						</span>
+						<span>
+							{itemText(item)}
+							<RefusedBefore item={item} />
+						</span>
+					</li>
+				)
+			)}
+		</ul>
+	);
+}
+
+/* Undescribed codes: chips when there is nothing to say about any one of them, one row each otherwise. */
+function UndescribedCodes({ items }: { items: ConsentItem[] }) {
+	if (!items.some((i) => i.choice || i.refusedBefore)) {
+		return <Codes codes={items.flatMap((i) => i.codes)} />;
+	}
+	return (
+		<ul style={{ margin: 0, paddingLeft: 0 }}>
+			{items.map((item) =>
+				item.choice ? (
+					<ChoiceRow
+						key={itemKey(item)}
+						choiceKey={item.choice.key}
+						refusedBefore={item.refusedBefore}
+					>
+						<Codes codes={item.codes} />
+					</ChoiceRow>
+				) : (
+					<li
+						key={itemKey(item)}
+						style={{ listStyle: 'none' }}
+					>
+						<Codes codes={item.codes} />
+						<RefusedBefore item={item} />
+					</li>
+				)
+			)}
 		</ul>
 	);
 }
@@ -153,7 +272,7 @@ function GroupBody({
 						<Text style={{ color: MUTED }}>
 							{T.resource.undescribedAdministrator(service)}
 						</Text>
-						<Codes codes={group.items.flatMap((i) => i.codes)} />
+						<UndescribedCodes items={group.items} />
 					</>
 				)
 			) : null}
@@ -191,11 +310,18 @@ function GroupBody({
 					<div style={{ paddingLeft: 24, marginTop: 6 }}>
 						{described ? (
 							<>
-								<ul style={{ margin: 0, paddingLeft: 16 }}>
-									{resource.items.map((item) => (
-										<li key={item.codes.join(' ')}>{itemText(item)}</li>
-									))}
-								</ul>
+								{resource.items.some((i) => i.choice) ? (
+									<ItemList items={resource.items} />
+								) : (
+									<ul style={{ margin: 0, paddingLeft: 16 }}>
+										{resource.items.map((item) => (
+											<li key={item.codes.join(' ')}>
+												{itemText(item)}
+												<RefusedBefore item={item} />
+											</li>
+										))}
+									</ul>
+								)}
 								<TechnicalNames items={resource.items} />
 							</>
 						) : (
@@ -206,7 +332,7 @@ function GroupBody({
 								<Text style={{ color: MUTED }}>
 									{T.resource.undescribedOwner(resource.name ?? resource.host)}
 								</Text>
-								<Codes codes={resource.items.flatMap((i) => i.codes)} />
+								<UndescribedCodes items={resource.items} />
 							</Flex>
 						)}
 					</div>
@@ -524,10 +650,24 @@ function Body({ view, service }: { view: ConsentView; service: string }) {
 					{T.repeat.alsoAsks}
 				</Text>
 			) : null}
+			{view.choices?.fixed.length ? (
+				<section>
+					<Title
+						level={2}
+						style={{ fontSize: 15, margin: '0 0 6px' }}
+					>
+						{T.choices.fixedHeading}
+					</Title>
+					<ItemList items={view.choices.fixed} />
+				</section>
+			) : null}
 			<Groups
 				groups={view.groups}
 				service={service}
 			/>
+			{view.choices?.rarTogether ? (
+				<Text style={{ color: MUTED }}>{T.choices.rarTogether}</Text>
+			) : null}
 			{/* Long-lived sign-in alone lists no data, and a page saying nothing about what it shares reads as hiding it. */}
 			{!previouslyAllowed.length &&
 			isEmpty(view.groups.see) &&
@@ -646,77 +786,113 @@ export const ConsentPage: React.FC<ConsentView> = (view) => {
 						service={service}
 					/>
 
-					<Body
-						view={view}
-						service={service}
-					/>
+					{/*
+					 * One form from the permissions to the buttons, laid out as if it were not there: the checkboxes
+					 * live in the groups above the buttons and must post with them, without relying on script.
+					 */}
+					<form
+						method="post"
+						style={{ display: 'contents' }}
+					>
+						<ChoiceGroup active={!!view.choices}>
+							<Body
+								view={view}
+								service={service}
+							/>
 
-					{keepsAccessUntil ? (
-						<div
-							style={{
-								display: 'flex',
-								gap: 8,
-								alignItems: 'baseline',
-								paddingTop: 12,
-								borderTop: '1px solid #f0f0f0'
-							}}
-						>
-							<span style={{ color: MUTED, flex: 'none' }}>
-								<ClockCircleOutlined aria-hidden="true" />
-							</span>
-							<span>{T.lifetime(keepsAccessUntil)}</span>
-						</div>
-					) : null}
+							{view.offline ? (
+								<ul
+									style={{
+										margin: 0,
+										padding: '12px 0 0',
+										borderTop: '1px solid #f0f0f0'
+									}}
+								>
+									<ChoiceRow
+										choiceKey={view.offline.key}
+										refusedBefore={view.offline.refusedBefore}
+										icon={<ClockCircleOutlined aria-hidden="true" />}
+									>
+										{T.choices.offline}
+										{keepsAccessUntil ? (
+											<div style={{ fontSize: 12.5, color: MUTED }}>
+												{T.choices.offlineUntil(keepsAccessUntil)}
+											</div>
+										) : null}
+									</ChoiceRow>
+								</ul>
+							) : keepsAccessUntil ? (
+								<div
+									style={{
+										display: 'flex',
+										gap: 8,
+										alignItems: 'baseline',
+										paddingTop: 12,
+										borderTop: '1px solid #f0f0f0'
+									}}
+								>
+									<span style={{ color: MUTED, flex: 'none' }}>
+										<ClockCircleOutlined aria-hidden="true" />
+									</span>
+									<span>{T.lifetime(keepsAccessUntil)}</span>
+								</div>
+							) : null}
+						</ChoiceGroup>
 
-					{afterApproval.length ? (
-						<div
-							style={{
-								background: '#f6f7f9',
-								borderRadius: 8,
-								padding: '10px 12px'
-							}}
-						>
-							<b>{T.repeat.afterApproval}</b>{' '}
-							{joinList(afterApproval.map(itemText))}.
-						</div>
-					) : null}
-
-					<form method="post">
-						<input
-							type="hidden"
-							name="accountId"
-							value={account.id}
-						/>
-						{/*
-						 * Allow comes first in the document and is drawn on the right: on a wide screen the two
-						 * sit side by side in the usual order, and on a narrow one they wrap with Allow on top.
-						 * The same size either way, and neither label carries the app's name.
-						 */}
-						<Flex
-							wrap
-							gap={8}
-							style={{ flexDirection: 'row-reverse' }}
-						>
-							<Button
-								type="primary"
-								htmlType="submit"
-								name="action"
-								value="allow"
-								size="large"
-								style={{ flex: '1 1 160px', minHeight: 44 }}
+						{afterApproval.length ? (
+							<div
+								style={{
+									background: '#f6f7f9',
+									borderRadius: 8,
+									padding: '10px 12px'
+								}}
 							>
-								{nothingAtAll ? T.buttons.continue : T.buttons.allow}
-							</Button>
-							<Button
-								htmlType="submit"
-								name="action"
-								value="cancel"
-								size="large"
-								style={{ flex: '1 1 160px', minHeight: 44 }}
+								<b>{T.repeat.afterApproval}</b>{' '}
+								{joinList(afterApproval.map(itemText))}
+								{view.afterApprovalDependsOnChoice
+									? `, ${T.choices.afterApprovalRest}`
+									: ''}
+								.
+							</div>
+						) : null}
+
+						<div>
+							<input
+								type="hidden"
+								name="accountId"
+								value={account.id}
+							/>
+							{/*
+							 * Allow comes first in the document and is drawn on the right: on a wide screen the two
+							 * sit side by side in the usual order, and on a narrow one they wrap with Allow on top.
+							 * The same size either way, and neither label carries the app's name.
+							 */}
+							<Flex
+								wrap
+								gap={8}
+								style={{ flexDirection: 'row-reverse' }}
 							>
-								{nothingAtAll ? T.buttons.cancel : T.buttons.deny}
-							</Button>
-						</Flex>
+								<Button
+									type="primary"
+									htmlType="submit"
+									name="action"
+									value="allow"
+									size="large"
+									style={{ flex: '1 1 160px', minHeight: 44 }}
+								>
+									{nothingAtAll ? T.buttons.continue : T.buttons.allow}
+								</Button>
+								<Button
+									htmlType="submit"
+									name="action"
+									value="cancel"
+									size="large"
+									style={{ flex: '1 1 160px', minHeight: 44 }}
+								>
+									{nothingAtAll ? T.buttons.cancel : T.buttons.deny}
+								</Button>
+							</Flex>
+						</div>
 					</form>
 
 					{mode === 'device' ? (

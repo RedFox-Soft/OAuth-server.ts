@@ -89,6 +89,15 @@ export const CONSENT_TEXTS = {
 		afterApproval: 'After you allow, the app will be able to:'
 	},
 
+	choices: {
+		fixedHeading: 'Needed to sign you in:',
+		refusedBefore: 'You didn’t allow this last time',
+		offline: 'Keep access when you’re not using it',
+		offlineUntil: (date: string) => `Until ${date}`,
+		rarTogether: 'These are allowed together with the rest, or not at all.',
+		afterApprovalRest: 'and anything you select above'
+	},
+
 	nothingRequested: {
 		before: '“',
 		after: '” isn’t asking for any of your data.'

@@ -19,5 +19,6 @@ export const ClientDefaults: Omit<ClientData, 'clientId'> = {
 	tokenEndpointAuthMethod: 'client_secret_basic',
 	'authorization.requirePushedAuthorizationRequests': false,
 	'requestObject.require': false,
-	'consent.require': true
+	'consent.require': true,
+	'consent.partial': false
 };

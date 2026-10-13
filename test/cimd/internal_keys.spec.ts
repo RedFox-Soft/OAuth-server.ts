@@ -68,4 +68,13 @@ describe('a client document naming internal client attributes', () => {
 
 		expect(client['consent.require']).not.toBe(false);
 	});
+
+	it('gives the person no checkboxes when it asks for them', async () => {
+		const { client } = await resolveServed({
+			'consent.partial': true,
+			partial_consent: true
+		});
+
+		expect(client['consent.partial']).toBe(false);
+	});
 });
