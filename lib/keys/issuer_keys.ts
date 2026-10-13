@@ -65,6 +65,11 @@ export function invalidateRootKeys(): void {
 	cache.delete(ROOT_KEY_OWNER);
 }
 
+/* Test-only: every issuer's keys, forgotten with the bucket-keys store they were read from. */
+export function forgetIssuerKeys(): void {
+	cache.clear();
+}
+
 export function retiredKeyRemovableAt(key: BucketKey): Date {
 	return new Date(
 		key.stateChangedAt.getTime() + RETIRED_KEY_LIFETIME_SECONDS * 1000

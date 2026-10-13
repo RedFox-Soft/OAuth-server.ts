@@ -202,7 +202,7 @@ and a stored model record through `TestAdapter.for(name).syncFindAs(<the model's
 A mocked `fetch` is `fetchAnswering(...)` over a real `Response`. `@ts-expect-error` is for input that is
 off-schema on purpose, with the reason on the directive.
 
-**Two properties hold for every spec**, so no spec has to remember them and no file order can change them:
+**Three properties hold for every spec**, so no spec has to remember them and no file order can change them:
 
 - **A case is bounded at 5 s** — Bun's default. It cannot be raised for the whole suite from one place:
   `setDefaultTimeout` applies only to the file that calls it (a call in `test/preload.ts` once bounded the
@@ -213,6 +213,12 @@ off-schema on purpose, with the reason on the directive.
 - **No test reaches the real network.** `test/fetch_mock.ts` intercepts every outbound `fetch`, and a
   request to an origin nobody registered with `mock(origin)` is **refused by name** rather than sent. If
   you see `test fetch to an unregistered origin: …`, register that origin and intercept the path.
+- **A spec file starts from a clean process.** Between two files `test/preload.ts` restores every spy,
+  the system clock and `process.env`, and `bootstrap()` empties every store and the caches derived from
+  them. Nothing one file leaves reaches the next, so a fixed id or slug is safe across files. Cases
+  _within_ a file still share everything the file set up: a case that changes shared state restores it,
+  and `bun test --randomize --seed=N` (both orders shuffled) is how to show a file does not depend on
+  case order. → `wiki/concepts/spec-file-isolation.md`
 
 ## Reviewing a pull request
 

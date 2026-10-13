@@ -140,8 +140,8 @@ const CLIENT_BODY = {
 
 /*
  * First-run setup runs before anything else in this file and against a deliberately emptied admin
- * bucket: the route closes itself as soon as one super administrator exists, and earlier specs in this process
- * have seeded several.
+ * bucket: the route closes itself as soon as one super administrator exists, and the other cases in this file,
+ * which may run first, seed several.
  */
 /**
  * @proves Every state-changing administrative operation writes an entry naming the actor, the
@@ -704,8 +704,8 @@ describe('admin audit coverage: keys and settings', () => {
 	 */
 	it('records a settings update, naming the settings document and the submitted keys', async () => {
 		const { cookie, userId } = await superCookie();
-		// Only what really changes is recorded, so the overrides an earlier spec in this process left
-		// behind would otherwise decide which keys this entry names — and spec order differs by OS.
+		// Only what really changes is recorded, so the overrides an earlier case in this file left
+		// behind would otherwise decide which keys this entry names.
 		await configStore.set({});
 		const before = (await adminAuditStore.list({ action: 'settings.update' }))
 			.total;

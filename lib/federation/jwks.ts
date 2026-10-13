@@ -99,3 +99,9 @@ async function fetchThroughBoundary(
 		{ status: response.status, headers: response.headers }
 	);
 }
+
+/* Test-only: one spec's stubbed provider keys are not another's for the same jwks_uri. */
+export function forgetKeySets(): void {
+	sets.clear();
+	presentedSets.clear();
+}

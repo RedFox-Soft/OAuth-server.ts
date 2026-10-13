@@ -15,9 +15,8 @@ const client = treaty(app);
  * @proves First-run setup creates the first super administrator and then closes permanently.
  */
 describe('first-run setup', () => {
-	// This spec asserts a clean admin bucket (no super administrator yet); reset the
-	// process-wide store singletons so users seeded by earlier specs in the same
-	// `bun test` run don't leak in.
+	// Each case asserts a clean admin bucket (no super administrator yet), and the
+	// case before it has created one.
 	beforeEach(async () => {
 		resetAdminMemoryStores();
 		await ensureAdminSeed();

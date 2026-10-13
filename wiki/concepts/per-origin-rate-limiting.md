@@ -4,7 +4,7 @@ title: "Per-origin rate limiting"
 tags: [architecture, config, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-28
-updated: 2026-09-01
+updated: 2026-10-13
 graph:
   node_type: concept
   relationships:
@@ -129,10 +129,11 @@ to cross the allowance first — 1039 failures, on the first full run after moun
 in `test/preload.ts`'s global `afterEach`, not in `bootstrap()`: the specs that trip it are the ones
 calling `bootstrap` in `beforeAll`, where a per-file reset comes too late.
 
-The counters are not the only store shaped this way. The same preload seeds the root signing keys (the
-`'#root'` records of `bucketKeys`, formerly `jwksStore`) once, at process start, and that one is
-*never* reset — so a spec that retires or promotes a root key changes what every later file sees, and
-restores the seeded set itself (`seedJwks`, `writeRootKeys`) rather than assume it starts clean. The hazard is the module state, not the hook: a
+The counters are not the only store shaped this way. Every store and every cache built from one is
+module state too. Since 2026-10-13 `bootstrap()` replaces them all for each spec file, the root
+signing keys included (`seedJwks` writes them again into the fresh `bucketKeys` store), and
+`test/preload.ts` restores spies, the clock and the environment between files — see
+[[spec-file-isolation]]. The hazard is the module state, not the hook: a
 top-level `beforeEach` does fire for `describe`-nested tests (checked against bun 1.4.0, in both
 declaration orders), so per-file placement is not what rescues these.
 

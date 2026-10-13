@@ -1,4 +1,5 @@
-import { afterEach, beforeEach } from 'bun:test';
+import { plugin } from 'bun';
+import { afterEach, beforeEach, mock, setSystemTime } from 'bun:test';
 
 import { writeRootKeys } from './root_keys.js';
 import { resetToBaseline } from './addon_baseline.js';
@@ -35,6 +36,41 @@ beforeEach(installFetchInterception);
  */
 beforeEach(() => {
 	resolver.lookup = async () => ['93.184.216.34'];
+});
+
+/*
+ * Between two spec files, the process-wide state Bun does not restore on its own goes back to how the run
+ * found it: every spy (`spyOn` patches the real object, and Bun leaves the patch in place for every later
+ * file), the system clock (`setSystemTime` likewise), and the environment.
+ *
+ * Restored rather than detected and reported, because at this moment nothing can legitimately want any of
+ * it: the last file's afterAll hooks have run and the next file has not been loaded. Bun offers no hook
+ * there, but it resolves the next spec file there, so a resolver that only watches and resolves nothing
+ * marks the boundary exactly. Stores and caches are bootstrap()'s to empty (test/test_helper.ts).
+ */
+const environment = { ...process.env };
+let currentSpec: string | undefined;
+
+function restoreProcessState(): void {
+	mock.restore();
+	setSystemTime();
+	for (const name of Object.keys(process.env)) {
+		if (!(name in environment)) delete process.env[name];
+	}
+	Object.assign(process.env, environment);
+}
+
+plugin({
+	name: 'spec-file-boundary',
+	setup(build) {
+		build.onResolve({ filter: /\.spec\.tsx?$/ }, ({ path }) => {
+			// Resolved more than once per file, and only a different file is a boundary.
+			if (path === currentSpec) return undefined;
+			if (currentSpec !== undefined) restoreProcessState();
+			currentSpec = path;
+			return undefined;
+		});
+	}
 });
 
 // Seed the root keys before any provider import so the first load resolves to known keys. Runs as a Bun

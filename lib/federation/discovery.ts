@@ -177,6 +177,11 @@ export function forgetDiscovery(issuer: string): void {
 	cache.delete(issuer);
 }
 
+/* Test-only: one spec's stubbed provider document is not another's answer for the same issuer. */
+export function forgetAllDiscovery(): void {
+	cache.clear();
+}
+
 export async function discover(issuer: string): Promise<ProviderMetadata> {
 	const cached = cache.get(issuer);
 	if (cached && cached.expiresAtMs > Date.now()) {

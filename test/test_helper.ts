@@ -15,9 +15,28 @@ import {
 	configStore,
 	getBucketStore,
 	getProjectStore,
-	getUserStore
+	getUserStore,
+	resetStoresForTests
 } from '../lib/adapters/index.ts';
-import { invalidateRootKeys, rootKeys } from '../lib/keys/issuer_keys.ts';
+import {
+	forgetIssuerKeys,
+	invalidateRootKeys,
+	rootKeys
+} from '../lib/keys/issuer_keys.ts';
+import { resetActivityCacheForTests } from '../lib/activity/note.ts';
+import { forgetHostArrivals } from '../lib/admin/auth/hostArrivals.ts';
+import {
+	resetUnauthenticatedCharge,
+	setUnauthenticatedChargeClock
+} from '../lib/helpers/unauthenticated_charge.ts';
+import {
+	resetScimRateLimiter,
+	setScimRateLimitClock
+} from '../lib/scim/rate_limit.ts';
+import { setRateLimitClock } from '../lib/plugins/rateLimit.ts';
+import { clearDocumentCache } from '../lib/client_metadata_document/cache.ts';
+import { forgetAllDiscovery } from '../lib/federation/discovery.ts';
+import { forgetKeySets } from '../lib/federation/jwks.ts';
 import { writeRootKeys } from './root_keys.js';
 import { verifyJWKs } from '../lib/configs/verifyJWKs.ts';
 import { UserStore as MemoryUserStore } from '../lib/adapters/memory/userStore.ts';
@@ -348,11 +367,8 @@ export async function changeClient(
  * proves nothing. All three records are therefore one call, and the clientId is returned because it
  * is the only handle a request has.
  *
- * Cleanup is the caller's, via `clearSeededBuckets()`. It has to be, because the bucket, project and
- * user stores are module-level singletons holding their own Maps — `TestAdapter.clear()` empties the
- * adapter's map and not theirs, so anything seeded here outlives the spec file that seeded it. A
- * blanket reset in bootstrap() would be the tidier fix and is deliberately not done: at least one
- * existing spec passes only because of that leakage, and repairing it is not this fixture's job.
+ * The next spec file never sees what this seeds: bootstrap() empties every store. Within one file it
+ * stays until `clearSeededBuckets()`, which a file whose later cases must not find it calls.
  */
 const seededBuckets: Array<{ bucketId: string; projectId: string }> = [];
 
@@ -377,10 +393,9 @@ export async function seedBucket({
 }): Promise<{ bucketId: string; clientId: string; accountId: string }> {
 	/*
 	 * A bucket appearing is one of the two events the address cache says must forget it, and here it is
-	 * load-bearing rather than tidy: those caches are module state, so they outlive a spec *file*. Two
-	 * files seeding `acme` with and without a slug left the second one reading the first one's address,
-	 * which is a failure that depends on the order Bun happens to walk the directory in — green on one
-	 * machine and red on the next.
+	 * load-bearing rather than tidy: those caches are module state, so within one file an address looked up
+	 * before this seed — and remembered as nobody's, or as an earlier seed's — would still be answered from
+	 * the cache. bootstrap() forgets them between files.
 	 */
 	forgetBucketAddresses();
 	await getBucketStore().create({
@@ -420,8 +435,7 @@ export async function seedBucket({
 	return { bucketId, clientId, accountId };
 }
 
-/* Removes exactly what seedBucket created, and nothing else — see the note above on why the stores
- * cannot simply be emptied. Call from `afterAll`. */
+/* Removes exactly what seedBucket created, and nothing else — for the cases later in the same file. */
 export async function clearSeededBuckets(): Promise<void> {
 	for (const { bucketId, projectId } of seededBuckets.splice(0)) {
 		await getProjectStore().destroy(projectId);
@@ -429,6 +443,31 @@ export async function clearSeededBuckets(): Promise<void> {
 	}
 	/* The other of the two events — see the note in `seedBucket`. */
 	forgetBucketAddresses();
+}
+
+/*
+ * Everything the process keeps between spec files, forgotten: every store (buckets, projects, groups,
+ * users, the audit trail, recorded faults, activity) and every cache derived from a store or from a
+ * stubbed upstream. Each spec file starts from what its own *.config.ts and setup put there, so a case
+ * cannot pass or fail by which file ran before it — an order Windows and CI do not share.
+ *
+ * Spies, the system clock and process.env are not here: they are restored at the file boundary itself,
+ * by test/preload.ts, so a spec that never calls bootstrap() is covered too.
+ */
+function forgetProcessState(): void {
+	resetStoresForTests();
+	forgetIssuerKeys();
+	forgetBucketAddresses();
+	forgetHostArrivals();
+	resetActivityCacheForTests();
+	resetUnauthenticatedCharge();
+	setUnauthenticatedChargeClock(null);
+	resetScimRateLimiter();
+	setScimRateLimitClock(null);
+	setRateLimitClock(null);
+	clearDocumentCache();
+	forgetAllDiscovery();
+	forgetKeySets();
 }
 
 // Extra OIDC claims that login()'s seeded user carries for the current spec.
@@ -515,6 +554,7 @@ async function bootstrap(
 	);
 
 	TestAdapter.clear();
+	forgetProcessState();
 	/*
 	 * No stored settings either. A spec that saves one through the settings API leaves it in the store, and
 	 * the next spec's own configuration then differs from it — so that spec's settings answers report the

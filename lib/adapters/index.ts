@@ -184,11 +184,15 @@ if (process.env.NODE_ENV === 'test') {
 	Adapter = (await import('../../test/models.js')).TestAdapter;
 }
 
-export const adminSessionStore: AdminSessionStoreInstance =
+/*
+ * `let` only so resetStoresForTests() below can hand every spec file empty ones; nothing else assigns
+ * them, and an importer sees the replacement through the live binding.
+ */
+export let adminSessionStore: AdminSessionStoreInstance =
 	new AdminSessionStoreClass();
-export const adminAuditStore: AdminAuditStoreInstance =
+export let adminAuditStore: AdminAuditStoreInstance =
 	new AdminAuditStoreClass();
-export const mcpConfirmationStore: McpConfirmationStoreInstance =
+export let mcpConfirmationStore: McpConfirmationStoreInstance =
 	new McpConfirmationStoreClass();
 /*
  * Which client identities may reach the administrative MCP plane. Eager like the stores above rather
@@ -196,9 +200,9 @@ export const mcpConfirmationStore: McpConfirmationStoreInstance =
  * live read is what makes a withdrawal take effect on the agent's next call instead of when its token
  * expires.
  */
-export const mcpClientPermissionStore: McpClientPermissionStoreInstance =
+export let mcpClientPermissionStore: McpClientPermissionStoreInstance =
 	new McpClientPermissionStoreClass();
-export const errorStore: ErrorStoreInstance = new ErrorStoreClass();
+export let errorStore: ErrorStoreInstance = new ErrorStoreClass();
 /* Eagerly constructed like the stores above, because both secrets are resolved at module scope —
  * configs/application.ts for the nonce secret, configs/pairwiseSalt.ts for the salt — before any
  * request, and a lazy getter would only defer that by one call.
@@ -509,4 +513,31 @@ export function resetAdminMemoryStores(): void {
 	provisioningConnectionStoreSingleton = null;
 	// Built over the two stores above, so it must not outlive them.
 	containerOwnershipStoreSingleton = null;
+}
+
+/*
+ * Test-only: every store this module builds, empty again — what test/test_helper.ts bootstrap() gives
+ * each spec file, so a record one file left behind (a bucket's slug, a declared audience, an audit
+ * entry, a recorded fault) is never what the next file finds. Order-dependent cases came from exactly
+ * that leftover, and which file ran first differs between Windows and CI.
+ *
+ * The three serviceConfig secrets and `configStore` are left alone: the secrets are read once at module
+ * scope and a fresh one would orphan what was derived from them, and bootstrap() empties `configStore`
+ * itself.
+ */
+export function resetStoresForTests(): void {
+	resetAdminMemoryStores();
+	protectedResourceStoreSingleton = null;
+	provisioningRefusalStoreSingleton = null;
+	bucketGroupStoreSingleton = null;
+	bucketKeysStoreSingleton = null;
+	activityStoreSingleton = null;
+	schemaMigrationStoreSingleton = null;
+	migrationLeaseStoreSingleton = null;
+	smtpSettingsStoreSingleton = null;
+	adminSessionStore = new AdminSessionStoreClass();
+	adminAuditStore = new AdminAuditStoreClass();
+	mcpConfirmationStore = new McpConfirmationStoreClass();
+	mcpClientPermissionStore = new McpClientPermissionStoreClass();
+	errorStore = new ErrorStoreClass();
 }

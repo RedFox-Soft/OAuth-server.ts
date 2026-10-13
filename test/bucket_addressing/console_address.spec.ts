@@ -67,13 +67,8 @@ describe('the address the console reports for a bucket', () => {
 	 * The guard the case above cannot be: an example proves one bucket, and the defect is the bucket
 	 * somebody did not think to check. Enumerated from the store rather than from a list in this file,
 	 * so a form of address added later is covered the day a bucket has it.
-	 *
-	 * One bucket per form of address, not every bucket. The defect was a form reported wrongly — the root
-	 * shown as a slug — and every bucket of a form is reported and routed by the same branch. The store is
-	 * shared by every spec file, and a bucket's first discovery generates its signing keys, so walking all of
-	 * them grew with the whole suite and passed the 5 s bound on CI.
 	 */
-	it('is served, for every form of address the console can list', async () => {
+	it('is served, for every bucket the console can list', async () => {
 		const buckets = await getBucketStore().list();
 		expect(buckets.length).toBeGreaterThan(2);
 		const formsSeen = new Set<string>();
@@ -81,13 +76,6 @@ describe('the address the console reports for a bucket', () => {
 		for (const bucket of buckets) {
 			const address = bucketAddressFor(bucket);
 			if (address.kind === 'none') continue;
-			/*
-			 * A bucket scheduled for deletion keeps its address but answers nobody there until it is restored
-			 * (specs/090) — the console lists it marked as such, and test/deletion proves the refusal. The
-			 * store is shared across spec files, so one another spec left scheduled reaches this loop.
-			 */
-			if (bucket.deletion) continue;
-			if (formsSeen.has(address.kind)) continue;
 			formsSeen.add(address.kind);
 
 			// A host-addressed bucket answers at its own origin, its issuer taking ISSUER's scheme.
