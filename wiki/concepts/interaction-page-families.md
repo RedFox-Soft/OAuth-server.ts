@@ -32,8 +32,12 @@ on it survives, and where its document is built.
 
 The plain family is **not** a lesser page. Its hand-written inline styles deliberately reproduce the antd
 pages — `#f0f2f5` backdrop, white card, `padding:32px`, `border-radius:12px`,
-`box-shadow:0 2px 8px rgba(0,0,0,0.1)`, `width:400px` — so a page reached from an inbox, with no bundle
-loaded, does not look like a different product.
+`box-shadow:0 2px 8px rgba(0,0,0,0.1)`, a 400 px card — so a page reached from an inbox, with no bundle
+loaded, does not look like a different product. Since spec 095 the card is fluid up to 400 px inside a 16 px
+gutter (`width:100%; max-width:400px`): the fixed `width:400px` scrolled every plain page sideways on a 320 px
+phone. A `wide` variant (640 px, top-aligned, left-aligned) serves the end user's connected-apps page — the
+first plain page outside any interaction or email, chosen for the family because every step there must work
+without JavaScript ([[connected-apps-page]]).
 
 Both families build their `Response` through `htmlResponse`. That is enforced, not merely conventional:
 see [[html-response-security-policy]].
@@ -80,7 +84,7 @@ to both the markup and `window.PROPS`; the components only receive it. The same 
 component reads from the environment — the clock, the disk, the process.
 
 The consent page follows the rule whole since spec 092. Its props are one view built on the server
-(`consentViewFor`, `lib/interactions/index.ts:658`): `logoSrc`, the account's label and id, the client's
+(`consentViewFor`, `lib/interactions/index.ts:661`): `logoSrc`, the account's label and id, the client's
 provenance tier, and pre-formatted dates such as "keeps access until". The view carries data and the
 component words it from one catalog, so hydration reads the same values. `loginClient.tsx` starts from
 `emptyConsentView` and spreads the server's props over it. See [[consent-screen-decisions]].

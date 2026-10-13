@@ -41,6 +41,13 @@ export const SessionPayload = t.Object({
 		})
 	),
 	transient: t.Optional(t.Boolean()),
+	/*
+	 * The anti-forgery value the connected-applications page puts in its removal form and checks on the post
+	 * (specs/095 R6). A field of its own rather than `state`, which sign-out and the device flow overwrite
+	 * wholesale — sharing it would cancel a pending sign-out confirmation, or let one cancel this. Declared for
+	 * the reason `bucketId` is: an undeclared key does not persist.
+	 */
+	accountPageXsrf: t.Optional(t.String()),
 	// `state` carries the CSRF secret plus interaction context (logout/device confirmation).
 	// It is an object across end_session, interaction resume, and the device flow; the schema
 	// must accept that object so a reloaded session does not silently drop it.

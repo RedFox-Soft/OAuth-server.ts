@@ -19,6 +19,7 @@ import { registerClient } from './register.ts';
 import { BASE_METADATA_KEYS } from './wire.ts';
 import { rootKeys } from '../../keys/issuer_keys.js';
 import { connectionClientRecord } from '../../provisioning/client.js';
+import { accountPageClientRecord } from '../../account_page/client.js';
 
 // Validate raw metadata → plain, frozen client object (defaults applied,
 // recognised metadata camelCased) or throw InvalidClientMetadata. Key material
@@ -117,10 +118,13 @@ export async function tryFindClient(id: string): Promise<Client | undefined> {
 	 * Client area (lib/provisioning/client.ts). Consulted only after the adapter read, for the reason the
 	 * metadata-document branch below gives: a stored record always wins, so no stored client can be
 	 * shadowed by a connection — and a stored id is server-generated, so none can claim the `scim-` prefix
-	 * on purpose either.
+	 * on purpose either. A bucket's connected-applications page client is synthesized the same way, after
+	 * both (lib/account_page/client.ts).
 	 */
 	const properties =
-		(await adapter('Client').find(id)) ?? (await connectionClientRecord(id));
+		(await adapter('Client').find(id)) ??
+		(await connectionClientRecord(id)) ??
+		(await accountPageClientRecord(id));
 	if (!properties) {
 		/*
 		 * A `client_id` that is an https URL naming a document describing the client, resolved by

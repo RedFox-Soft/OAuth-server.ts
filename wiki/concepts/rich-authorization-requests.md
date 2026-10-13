@@ -33,7 +33,7 @@ of this page — a conformance claim is only meaningful next to its exceptions.
 
 `richAuthorizationRequests.types` maps an opaque type identifier to a serializable descriptor: a required
 `label` (what the consent screen shows as the detail's heading, under "The app will be able to act for
-you" since spec 092 — `lib/interactions/consentView.ts:298-320`), optional per-field constraints over the five §2 common fields,
+you" since spec 092 — `lib/interactions/consentView.ts:302-320`), optional per-field constraints over the five §2 common fields,
 and `allowUnknownFields` (default `false`, because §5 requires refusing unknown fields). A `validate`
 function may still be registered in an in-process bootstrap as an escape hatch, and a rejection from it
 surfaces as `invalid_authorization_details` rather than a server fault.
@@ -97,7 +97,7 @@ the same detail; two differing in case are different details. `lib/helpers/rar_c
 implementation.
 
 Since spec 092 the page also says what the grant already holds. The consent GET reads the existing grant
-(`lib/interactions/index.ts:702`) and names its details, by label, in one line: "You already allowed: …".
+(`lib/interactions/index.ts:705`) and names its details, by label, in one line: "You already allowed: …".
 Only the not-yet-granted details are listed as new, each with its common fields. When the new items
 escalate, a summary of everything the app will then have follows. See [[consent-screen-decisions]].
 

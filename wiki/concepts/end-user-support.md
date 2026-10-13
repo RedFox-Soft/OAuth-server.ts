@@ -62,9 +62,13 @@ set `verified`. The resend route gained the same provisioned refusal.
 
 ## Sessions are read from grants
 
-`applicationSessions` (`lib/end_users/sessions.ts:81`) groups the person's **grants** by client, because an
+`applicationSessions` (`lib/end_users/sessions.ts:112`) groups the person's **grants** by client, because an
 offline grant outlives its session.
-- **Signed in** is the holding session's `loginTs`, else the grant's creation.
+- **Signed in** is the holding session's `loginTs`, else the grant's creation. A grant's times are milliseconds;
+  until spec 095 they were read as seconds, which dated access no session held some fifty thousand years ahead.
+- The bucket's connected-apps page client is never a row: signing in to one's own account page leaves a grant,
+  as every authorization does, and it is not an application (`grantsByClient`, `lib/end_users/sessions.ts:101`).
+  The person's own page reads the same grants ([[connected-apps-page]]).
 - **Last token issued** is the newest stored refresh or access token of the grant. JWT access tokens are never
   stored, so the console names it honestly and says a token an app checks by itself is invisible here.
 
@@ -76,7 +80,7 @@ No IP or user agent: none is stored.
 3. the grants destroyed (`endGrants`, `lib/end_users/revoke_access.ts:47`). A kept grant is reused by the next
    authorization.
 
-**The session's lifetime is not extended.** `Session.save(lifetime)` (`lib/models/session.ts:142`) takes the
+**The session's lifetime is not extended.** `Session.save(lifetime)` (`lib/models/session.ts:149`) takes the
 remaining seconds for a change its holder is not making. Saving with the default would have handed every one of the
 person's sessions a fresh full lifetime as a side effect of signing them out of one app.
 

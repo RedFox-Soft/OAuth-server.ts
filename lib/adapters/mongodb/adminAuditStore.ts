@@ -106,7 +106,8 @@ function toFilter(query: AdminAuditQuery): Filter<AdminAuditEntry> {
 				? null
 				: query.viaSurface === 'mcp' ||
 					  query.viaSurface === 'scim' ||
-					  query.viaSurface === 'upstream'
+					  query.viaSurface === 'upstream' ||
+					  query.viaSurface === 'self-service'
 					? query.viaSurface
 					: { $in: [] };
 	}

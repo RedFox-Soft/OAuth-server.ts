@@ -25,7 +25,7 @@ nothing (it was assigned and never read) and is gone.
 
 ## Two kinds of group, on purpose
 
-A bucket group (`BucketGroup`, `lib/adapters/types.ts:1312`) is a named set of one bucket's end users, kept by
+A bucket group (`BucketGroup`, `lib/adapters/types.ts:1316`) is a named set of one bucket's end users, kept by
 administrators or owned by exactly one provisioning connection (`provisionedBy`, the same field and meaning as
 on `User`). An administrator group owns projects and buckets and has owner/member standing and invitations.
 
@@ -45,7 +45,7 @@ and caps at ~370,000 members under MongoDB's 16 MB document limit. With records,
 is: on a standalone `mongod`, a 50-member change into a group growing to 10,000 measured ~10 ms throughout.
 
 **Never read a group's members, edit the list in memory and write it back.** Every change is one
-`BucketGroupStore.change(groupId, { attributes, add, remove })` (`lib/adapters/types.ts:1370`), made by the one
+`BucketGroupStore.change(groupId, { attributes, add, remove })` (`lib/adapters/types.ts:1374`), made by the one
 service function `applyGroupChange` (`lib/bucket_groups/service.ts:219`) for every surface — admin rename,
 member routes, SCIM PUT and PATCH.
 

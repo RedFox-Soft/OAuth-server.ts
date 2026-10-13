@@ -20,13 +20,14 @@ import {
 	type AuditEntry
 } from '../frame/auditEntry.js';
 
-type Surface = 'console' | 'mcp' | 'scim' | 'upstream';
+type Surface = 'console' | 'mcp' | 'scim' | 'upstream' | 'self-service';
 
 const SURFACE_OPTIONS: { label: string; value: Surface }[] = [
 	{ label: 'Console', value: 'console' },
 	{ label: 'MCP', value: 'mcp' },
 	{ label: 'SCIM', value: 'scim' },
-	{ label: 'Upstream provider', value: 'upstream' }
+	{ label: 'Upstream provider', value: 'upstream' },
+	{ label: 'End user (self-service)', value: 'self-service' }
 ];
 
 interface AuditPage {
@@ -288,6 +289,8 @@ export function Audit() {
 					<Tag color="purple">SCIM</Tag>
 				) : surface === 'upstream' ? (
 					<Tag color="volcano">Upstream</Tag>
+				) : surface === 'self-service' ? (
+					<Tag color="cyan">End user</Tag>
 				) : (
 					<Tag>Console</Tag>
 				)

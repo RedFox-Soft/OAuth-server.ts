@@ -139,6 +139,16 @@ export const CONSENT_TEXTS = {
 		external: ' (opens an external site in a new tab)'
 	},
 
+	/*
+	 * Where the access can be taken back (specs/095). Held back until that page existed: a promise of a place
+	 * that is not there is worse than saying nothing.
+	 */
+	revokeHint: {
+		before: 'You can remove this access at any time on your ',
+		link: 'connected apps page',
+		after: '.'
+	},
+
 	buttons: {
 		deny: 'Don’t allow',
 		allow: 'Allow',

@@ -4,6 +4,7 @@ import {
 	auditTargetTypeFor,
 	BOOTSTRAP_ACTOR,
 	CONNECTION_ACTOR_PREFIX,
+	ENDUSER_ACTOR_PREFIX,
 	UPSTREAM_ACTOR_PREFIX,
 	type AuditAction
 } from '../../consts/admin_audit_routes.js';
@@ -211,6 +212,30 @@ export function recordUpstreamAudit(
 	});
 }
 
+/*
+ * An end user removing an application's access to their own account, from their connected-applications page
+ * (specs/095). The person is the actor — not an administrator, so the sentinel convention again: a ':' and no
+ * '@', in both actor fields, `viaSurface: 'self-service'`. The console resolves the person's address for
+ * display (routes.ts), as it resolves a directory's name. Recorded under the action an administrator's "sign
+ * out of this application" uses, because the effect is the same.
+ */
+export function recordEndUserAudit(
+	bucketId: string,
+	accountId: string,
+	action: AuditAction,
+	detail: AuditDetail = {}
+): Promise<AdminAuditEntry> {
+	const actor = `${ENDUSER_ACTOR_PREFIX}${bucketId}:${accountId}`;
+	return write({
+		actorId: actor,
+		actorEmail: actor,
+		action,
+		targetId: accountId,
+		detail,
+		viaSurface: 'self-service'
+	});
+}
+
 async function write(input: {
 	actorId: string;
 	actorEmail: string;
@@ -218,7 +243,7 @@ async function write(input: {
 	targetId: string;
 	detail: AuditDetail;
 	viaClientId?: string;
-	viaSurface?: 'scim' | 'upstream';
+	viaSurface?: 'scim' | 'upstream' | 'self-service';
 }): Promise<AdminAuditEntry> {
 	try {
 		return await adminAuditStore.record({

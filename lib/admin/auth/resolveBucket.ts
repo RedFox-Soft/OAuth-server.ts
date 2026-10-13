@@ -8,6 +8,7 @@ import { findDeclaredResource } from '../../resources/registry.js';
 import { namespaceOf } from '../../resources/namespace.js';
 import type { RequestBucket } from '../../configs/issuer.js';
 import { MCP_RESOURCE } from '../../mcp/consts.js';
+import { bucketIdOfAccountPageClient } from '../../account_page/client.js';
 
 /*
  * Which user bucket a request signs a user into, in order:
@@ -48,6 +49,15 @@ export async function resolveBucketForRequest(
 	addressed: RequestBucket
 ): Promise<string> {
 	if (clientId === ADMIN_CLIENT_ID) return ADMIN_BUCKET_ID;
+
+	/*
+	 * A bucket's connected-applications page client belongs to the bucket its id names (specs/095), and is
+	 * then refused at every other address by the same check every client is. The id is not a request
+	 * parameter in the sense D6 worried about: the client only exists for an end-user bucket that exists, so
+	 * naming the administrators' bucket here resolves no client and the request ends as `invalid_client`.
+	 */
+	const pageBucket = clientId && bucketIdOfAccountPageClient(clientId);
+	if (pageBucket) return pageBucket;
 
 	if (clientId) {
 		const project = await getProjectStore().findByClientId(clientId);

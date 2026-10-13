@@ -139,6 +139,10 @@ and an anonymous session not re-issued in the same response was lost. It was rem
 the issuer's origin the pre-2026-09-16 cookie is simply never read, and no host-addressed bucket shares
 that origin, so a stale one cannot reach the bucket that now owns the name.
 
+The connected-apps page's pending sign-in cookie, `_account_apps` (spec 095), follows the rule from birth: it
+lives on the page's own path (`/account/apps` or `/<slug>/account/apps`), and the set and the clear derive that
+path from one function (`pagePath`, `lib/account_page/session.ts:137`) — see [[connected-apps-page]].
+
 ## Why the existing test could not see it
 
 `test/admin/login_flow.spec.ts` asserted that `/admin/api/me` answered 401 after logout — but it

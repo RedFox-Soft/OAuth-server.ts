@@ -19,7 +19,7 @@ graph:
 # A cross-site sign-out post is bounced once, because Lax withholds the cookie
 
 OpenID Connect RP-Initiated Logout 1.0 §2 requires the end-session endpoint to accept POST as well as
-GET. `POST /logout` exists since spec 064 (`lib/actions/end_session.ts:233`), and it is **not** the GET
+GET. `POST /logout` exists since spec 064 (`lib/actions/end_session.ts:234`), and it is **not** the GET
 handler mounted for a second method. It cannot be, and the reason is the cookie.
 
 ## Why the obvious implementation signs people out wrongly
@@ -43,10 +43,10 @@ drives sign-out by GET never sees any of it, which is how the missing method wen
 
 A POST carrying **no session cookie for the addressed bucket** and no `_resubmitted` marker is
 answered with the `form_post` self-submitting page (`lib/html/formPost.tsx`), re-posting the same
-fields plus `_resubmitted=1` to the same address (`lib/actions/end_session.ts:263`). That second post is
+fields plus `_resubmitted=1` to the same address (`lib/actions/end_session.ts:264`). That second post is
 initiated by a page on this server's own origin, so it is same-site and the browser sends the `Lax`
 cookie with it; from there it is handled exactly as the GET is (`endSession`,
-`lib/actions/end_session.ts:81`). Nothing about the session is read or written on the first leg.
+`lib/actions/end_session.ts:82`). Nothing about the session is read or written on the first leg.
 
 A resubmission that still carries no cookie has genuinely no sign-in and proceeds as a sign-out with
 no session — the outcome a GET without a session already had.

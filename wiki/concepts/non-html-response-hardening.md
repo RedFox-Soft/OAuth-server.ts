@@ -36,7 +36,7 @@ page carries a fifth:
 | `Content-Security-Policy` | `default-src 'none'; frame-ancestors 'none'` *(non-page only)* | spec 026 |
 
 One `onRequest` hook writes all five: `securityHeaders` in `lib/plugins/securityHeaders.ts`, registered
-once in `lib/index.ts:92`.
+once in `lib/index.ts:93`.
 
 This is the companion to [[html-response-security-policy]], which owns the *page* policy. Between
 them the rule is complete: a page gets the policy derived from its own document, everything else gets
@@ -47,7 +47,7 @@ a policy that authorizes nothing.
 **There is no page-detection branch, and adding one would be a regression.**
 
 The plugin writes `default-src 'none'` on *every* request, including ones that go on to render a
-sign-in page. Pages are not blank because `htmlResponse` (`lib/html/csp.ts:272`) builds its own
+sign-in page. Pages are not blank because `htmlResponse` (`lib/html/csp.ts:286`) builds its own
 `Response` carrying its own derived policy, and **a header already present on a returned `Response`
 wins over Elysia's `set.headers` merge** — it is not duplicated, not comma-joined, and the merged
 value is dropped. So every page overrides the default *by construction*.
@@ -68,7 +68,7 @@ output, named and unnamed sub-apps, feature-gate refusals, the empty preflight 2
 ## Gotcha: the mount-order caveat does not apply here
 
 `lib/plugins/cors.ts:33` documents that "a hook only affects routes declared after it", and
-`staticPlugin` is mounted at `lib/index.ts:88`, *before* this plugin. Static assets are covered
+`staticPlugin` is mounted at `lib/index.ts:89`, *before* this plugin. Static assets are covered
 anyway. That caveat is scoped to **per-route** lifecycle hooks (`onTransform`, `onBeforeHandle`),
 which is the class CORS must use; `onRequest` runs before routing and sees every request regardless of
 declaration order. Measured in both mount orders. The same fact explains why `nocache` — also an

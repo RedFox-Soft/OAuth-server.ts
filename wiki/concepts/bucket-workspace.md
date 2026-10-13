@@ -87,7 +87,7 @@ nothing new. `blockers.dependents` and `blockers.accounts` carry the facts so th
   host's traffic; it now clears both arrival fields in all three adapters.
 - The list's `held` flag came from one read, `ProvisioningConnectionStore.bucketsHolding()`; the MongoDB version
   uses an aggregation because `distinct` is refused under the strict Stable API. Since spec 088 the list reads
-  `listHeld()` (`lib/adapters/types.ts:1559`) instead, the same hold test returning the connections, so a row also
+  `listHeld()` (`lib/adapters/types.ts:1563`) instead, the same hold test returning the connections, so a row also
   carries `heldConnectionId` and its On hold mark links to the connection. The list's bucket set is
   `visibleBuckets` (`lib/admin/buckets/visible.ts:15`), shared with the console-wide held-connections badge
   ([[scim-provisioning]]).

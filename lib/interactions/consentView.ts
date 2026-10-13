@@ -131,6 +131,8 @@ export interface ConsentView {
 	afterApprovalDependsOnChoice?: true;
 	/* The app's privacy policy and terms, each only when it is on one of the app's own redirect hosts. */
 	links?: { policy?: string; terms?: string };
+	/* The person's connected-applications page, where this access can be removed later (specs/095). */
+	revokeHint?: { href: string };
 }
 
 /*
@@ -225,6 +227,8 @@ export interface ConsentInput {
 	partial?: boolean;
 	/* What the grant records as refused, to mark a row offered again. */
 	refused?: GrantedSoFar;
+	/* The sign-in bucket's connected-applications page, absent where there is none (specs/095). */
+	revokeHref?: string;
 }
 
 /*
@@ -381,6 +385,28 @@ interface Asked {
 	rar: unknown[];
 }
 
+/* What sorting needs to know besides the permissions themselves. */
+export type SortingContext = Pick<
+	ConsentInput,
+	| 'userClaims'
+	| 'scopeDescriptions'
+	| 'resources'
+	| 'rarLabels'
+	| 'adminResource'
+>;
+
+/*
+ * What a grant holds, sorted and worded exactly as the consent page sorts what is asked — so the person's
+ * connected-applications page (specs/095) describes an application's access in the words they agreed to.
+ * A grant's own getters have already subtracted what the person declined.
+ */
+export function describeGranted(
+	context: SortingContext,
+	granted: GrantedSoFar
+): { see: ConsentGroup; act: ConsentGroup; other: ConsentGroup } {
+	return sortAsked(context, granted);
+}
+
 /*
  * Sorts what is asked into "see", "act for you" and "not described".
  *
@@ -390,7 +416,7 @@ interface Asked {
  * by its technical name rather than guessed at — honest, and the signal that it was not described.
  */
 function sortAsked(
-	input: ConsentInput,
+	input: SortingContext,
 	asked: Asked,
 	mark: Mark = unmarked,
 	choosing = false
@@ -692,7 +718,8 @@ export function buildConsentView(input: ConsentInput): ConsentView {
 						: {})
 				}
 			: {}),
-		...linksOf(input.client)
+		...linksOf(input.client),
+		...(input.revokeHref ? { revokeHint: { href: input.revokeHref } } : {})
 	};
 }
 

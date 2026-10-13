@@ -77,7 +77,12 @@ export const BASE_METADATA_KEYS = [
 	'provisioningConnectionId',
 	'clientSecretDigest',
 	/* The connection's overlapping previous secret, emitted only while it is live (specs/088 R1). */
-	'previousClientSecretDigest'
+	'previousClientSecretDigest',
+	/*
+	 * A bucket's connected-applications page client, synthesized and never stored (lib/account_page/client.ts).
+	 * A base key so no registration or document can claim to be one.
+	 */
+	'accountPageBucketId'
 ];
 
 const CANONICAL_ONLY = new Set(BASE_METADATA_KEYS);

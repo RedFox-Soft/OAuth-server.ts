@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll } from 'bun:test';
 
 import bootstrap, { type Setup } from '../test_helper.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
+import { ISSUER } from 'lib/configs/env.js';
 import { CONSENT_TEXTS as T } from 'lib/interactions/consentTexts.js';
 import { openConsent, type ConsentPage } from '../consent_page/flow.ts';
 import { tenantProject } from './seed.ts';
@@ -21,8 +22,13 @@ function links(page: ConsentPage) {
 }
 
 /* The links that lead away to a site the server does not control. */
+/* Links leaving this server: the page's own link to the connected-apps page (specs/095) is not one. */
 function external(page: ConsentPage) {
-	return links(page).filter((link) => /^https?:/.test(link.href));
+	return links(page).filter(
+		(link) =>
+			/^https?:/.test(link.href) &&
+			new URL(link.href).origin !== new URL(ISSUER).origin
+	);
 }
 
 /**

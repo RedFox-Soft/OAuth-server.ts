@@ -26,7 +26,7 @@ Three things compare a project's owner with the owner of the bucket it signs int
 - a project's group may administer the end users of its bucket (the bucket's `manageUsers` right,
   `bucketCan` in `lib/admin/auth/can.ts` since spec 079);
 - since spec 092, the consent page calls a client "this organization's" only where they match, and
-  "operator-registered" otherwise (`clientProvenance`, `lib/models/client/provenance.ts:66-78`). The waiver
+  "operator-registered" otherwise (`clientProvenance`, `lib/models/client/provenance.ts:68-78`). The waiver
   and the page share the comparison, `projectGroupOwnsBucket` (`provenance.ts:38-45`). See
   [[consent-screen-decisions]].
 
@@ -95,7 +95,7 @@ Dropping the destination first is what makes two awkward states repairable witho
 
 ## One change, per backend
 
-The write goes through `ContainerOwnershipStore` (`lib/adapters/types.ts:1736`). Business logic gets no
+The write goes through `ContainerOwnershipStore` (`lib/adapters/types.ts:1740`). Business logic gets no
 transaction from the adapter contract. Each method re-checks its precondition inside the write — every
 owner involved is `from` or already `to` — and changes nothing otherwise.
 
@@ -137,7 +137,7 @@ reached the change, not that the change held ([[admin-audit-trail]]).
 A move writes one entry:
 
 - `ownerGroupId` is the group the container joined;
-- `formerOwnerGroupId` is the group it left (`types.ts:606`, `lib/admin/audit/record.ts:198`).
+- `formerOwnerGroupId` is the group it left (`types.ts:606`, `lib/admin/audit/record.ts:199`).
 
 The group-scoped read matches either field in all three backends:
 

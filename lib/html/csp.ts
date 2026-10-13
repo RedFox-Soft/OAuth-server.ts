@@ -47,6 +47,20 @@ function resolveOrigin(raw: string, self: string | undefined): string {
 }
 
 /*
+ * A form posting back to this server, as the path on the origin that served the page.
+ *
+ * `'self'` above means ISSUER's origin, because this module knows no request — but a bucket with a hostname of
+ * its own serves its pages from that host, so its issuer-built form target read as a foreign origin. The page
+ * then counted as a hand-off and lost `frame-ancestors`: the sign-out confirmation and the device-code pages of
+ * every host-addressed bucket could be framed. An origin-relative path is `'self'` wherever the page is served,
+ * to this policy and to the browser alike.
+ */
+export function ownFormAction(url: string): string {
+	const { pathname, search } = new URL(url);
+	return `${pathname}${search}`;
+}
+
+/*
  * Inline <script> blocks that carry a body rather than a src. Their hashes go into `script-src`; the
  * blanket 'unsafe-inline' is never used, which is the whole point of hashing them.
  *

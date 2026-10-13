@@ -103,7 +103,7 @@ mean deriving an identifier nobody asked for purely to fail early.
 
 ## Gotcha: the logout notification derives its `sub` a layer away
 
-`lib/actions/end_session.ts:163` passes `session.payload.accountId` — the raw account id — into
+`lib/actions/end_session.ts:164` passes `session.payload.accountId` — the raw account id — into
 `client.backchannelLogout(...)`, and `lib/models/client/backchannel.ts:46` builds the notification as
 `new IdToken(client, { sub })`. Grepping `lib/models/id_token.ts` for `pairwise` finds nothing.
 

@@ -67,7 +67,7 @@ binds :3000 without `EADDRINUSE` and the two share incoming connections. A serve
 run — a browser rig, `bun start` — was answered at random by the test process, whose stores hold none of
 its clients, sessions or interactions: a sign-in got a 500 or "interaction session not found" with no
 fault recorded in the server that was meant to answer. The listen now sits behind the same
-`NODE_ENV !== 'test'` guard as the hourly closer and purger (`lib/index.ts:304`).
+`NODE_ENV !== 'test'` guard as the hourly closer and purger (`lib/index.ts:312`).
 
 ## Why reset, not detect
 

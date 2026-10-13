@@ -26,6 +26,8 @@ export async function redirectUrisVouchedFor(client: Client): Promise<boolean> {
 	if (client.registeredDynamically) {
 		return false;
 	}
+	/* Derived by this server from the bucket's own address: nobody but the server put it there. */
+	if (client.accountPageBucketId) return true;
 	return Boolean(await adapter('Client').find(client.clientId));
 }
 

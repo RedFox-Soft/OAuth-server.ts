@@ -4,6 +4,8 @@ import { type Client, type ClientRecord } from './types.ts';
 import { validateClient } from './validate.ts';
 import { toStored } from './projection.ts';
 import { rootKeys } from '../../keys/issuer_keys.js';
+import { InvalidClientMetadata } from '../../helpers/errors.ts';
+import { isAccountPageClient } from '../../account_page/client.js';
 
 /*
  * The one way a client is written, whichever surface writes it — dynamic registration, registration
@@ -28,6 +30,14 @@ export async function registerClient(
 	 */
 	await rootKeys();
 	const client = validateClient(record);
+
+	/*
+	 * The prefix of a bucket's connected-applications page client (specs/095). No generated id can carry it,
+	 * but a deployment may supply its own id factory, and a stored record would shadow the page's client.
+	 */
+	if (store && isAccountPageClient(client.clientId)) {
+		throw new InvalidClientMetadata('client_id is reserved');
+	}
 
 	if (client.sectorIdentifierUri !== undefined) {
 		await sectorValidate(client);

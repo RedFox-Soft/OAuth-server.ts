@@ -23,7 +23,7 @@ with its counts and confirmed, and opening sign-up is previewed on the default a
 ## The door
 
 The registration screen resolves its bucket from the interaction's client through
-`resolveBucketForRequest` — on the **GET as well as the POST** (`lib/interactions/index.ts:1031`),
+`resolveBucketForRequest` — on the **GET as well as the POST** (`lib/interactions/index.ts:1040`),
 because a form that can only be refused on submission is a dead end dressed as an invitation. A closed
 bucket refuses; a bucket that requires verification creates the user unverified and issues a challenge.
 The login POST then refuses an unverified user in such a bucket — and, since spec 078, sends what they
@@ -32,7 +32,7 @@ verification had never been sent anything. A live challenge is reused, so a regi
 before following their link keeps it (`sendOnDemand`, `lib/verification/challenge.ts`).
 
 For a lost letter whose link is still valid, the page then offers **"Send the link again"**
-(`POST /ui/:uid/verification/resend`, `lib/interactions/index.ts:1317`). It cannot reuse the public
+(`POST /ui/:uid/verification/resend`, `lib/interactions/index.ts:1326`). It cannot reuse the public
 `/verify-email/resend`: that takes the challenge's reference, and for a link the reference *is* the token,
 so putting it on the page would let anyone who knows the password verify without the mailbox. Instead the
 sign-in records the proven account on the interaction (`pendingVerification`,
@@ -47,7 +47,7 @@ the bucket allows it, read from the same bucket the doors resolve (`lib/interact
 
 **An administrator's create follows the same policy** (spec 082): a person created in the console or by an
 agent starts verified only when the bucket does not require verification
-(`lib/admin/users-end/routes.ts:269`). The route used to write `verified: true` whatever the bucket said, so an
+(`lib/admin/users-end/routes.ts:279`). The route used to write `verified: true` whatever the bucket said, so an
 address nobody had proven counted as proven because an administrator typed it. It may now create a person
 with no password at all, and an administrator may mail anyone unverified a fresh message from the person's
 page; neither sends anything by itself ([[end-user-lifecycle]]).

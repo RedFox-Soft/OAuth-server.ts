@@ -100,9 +100,9 @@ provisioned user who never signed in through the provider has no link, so only `
 The audit table admits only actions backed by a mounted `/admin/api` route
 (`test/admin/audit_route_classification.spec.ts`), so the upstream request needed a real action rather than a
 second audit mechanism. It got one that administrators lacked anyway: **"sign out everywhere"**
-(`POST /admin/api/buckets/:id/users/:uid/sign-out`, `lib/admin/users-end/routes.ts:466`; MCP
+(`POST /admin/api/buckets/:id/users/:uid/sign-out`, `lib/admin/users-end/routes.ts:476`; MCP
 `bucket_user_sign_out`, ordinary), backed by `revokeEndUserAccess` (`lib/end_users/service.ts:318`). The upstream
-request records the same `enduser.signout` through `recordUpstreamAudit` (`lib/admin/audit/record.ts:153`):
+request records the same `enduser.signout` through `recordUpstreamAudit` (`lib/admin/audit/record.ts:154`):
 actor `upstream:<bucketId>:<providerId>`, **`viaSurface: 'upstream'`**, target the user, never the identifier the
 provider named them by.
 

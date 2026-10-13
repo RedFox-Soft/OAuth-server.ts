@@ -35,9 +35,9 @@ it said "Consent Required", printed the account id, and listed scope tokens. Sin
 asking, what the app will be able to do, and for how long, in plain words. This page records the
 decisions behind that wording. Each one is easy to undo by accident.
 
-The work is split three ways. `consentViewFor` (`lib/interactions/index.ts:658`) only reads: the
+The work is split three ways. `consentViewFor` (`lib/interactions/index.ts:661`) only reads: the
 interaction, the client, the bucket, the person and their grant. `buildConsentView`
-(`lib/interactions/consentView.ts:503`) decides what to say, and reads no configuration. `ConsentPage`
+(`lib/interactions/consentView.ts:529`) decides what to say, and reads no configuration. `ConsentPage`
 (`lib/interactions/consentPage.tsx:760`) turns the result into words from one catalog. The view carries
 **data, never sentences** (`consentView.ts:22-31`). The server render and the browser's hydration then
 read the same values and the same words. A value computed only in the component would vanish on
@@ -45,7 +45,7 @@ hydration ([[interaction-page-families]]).
 
 ## Who stands behind the app: three tiers
 
-`clientProvenance` (`lib/models/client/provenance.ts:66-78`) puts every client in one of three tiers:
+`clientProvenance` (`lib/models/client/provenance.ts:68-78`) puts every client in one of three tiers:
 
 - **self-registered** — nobody here created it: dynamic registration, or a metadata document.
 - **this-organization** — the group that owns the client's project also owns the bucket being signed
@@ -68,7 +68,7 @@ tiers share it. It answers `undefined` for a client in no project, and each call
 means. The waiver's own behaviour did not change. See [[group-ownership]].
 
 The bucket compared is the **sign-in bucket** — the one `resolveBucketForRequest` chose, which the
-interaction resolve now returns as `signsInto` (`lib/interactions/index.ts:1078-1100`). Its users are the
+interaction resolve now returns as `signsInto` (`lib/interactions/index.ts:1087-1100`). Its users are the
 ones consenting. The addressed bucket would name the root service for a project bucket reached at the root
 address.
 
@@ -148,7 +148,7 @@ in a block of its own (`lib/interactions/consentChoices.ts:57`). Authorization d
 nothing, and the page says so. A claim's `essential` is a hint, never a lock.
 
 - **One function decides the offer, twice.** `consentChoices` (`consentChoices.ts:105`) runs for the GET
-  and again for the POST (`choicesFor`, `lib/interactions/index.ts:608`). It reads only the prompt's
+  and again for the POST (`choicesFor`, `lib/interactions/index.ts:611`). It reads only the prompt's
   details and two facts — the flag and whether this is a device approval — never the person's claims, so
   the page and the handler cannot disagree. Each row posts a content key (`oidc:phone`, `scope:billing`,
   `resource:<indicator> <scope>`). A value the page did not draw, or a selection where there was no
@@ -210,7 +210,7 @@ said about itself.
   `this-organization` alone. The own-device-redirect warning and the device-flow warning also hide it: a
   familiar logo is exactly what makes a phished device code or a local program look like the real thing,
   so the device page never shows one. The administrator-rights warning is about the request, not who is
-  asking, and leaves the logo. The read itself happens only for that tier (`lib/interactions/index.ts:688`).
+  asking, and leaves the logo. The read itself happens only for that tier (`lib/interactions/index.ts:691`).
 - **Embedded, so the policy stays.** The image is in the page as `data:` (`ClientLogo`,
   `consentPage.tsx:561`), which `img-src 'self' data:` already allowed. It appears twice — in the markup
   and in `window.PROPS` — which the 64 KiB cap keeps small. Its `alt` is the sanitized client name; it
@@ -260,7 +260,7 @@ warning, never access, which is why a subset is enough.
 
 The header shows the sign-in bucket's `displayName`, else the host of that bucket's issuer
 (`index.ts:668-672`). It never shows the bucket's internal `name`, which may say "prod-eu-users"
-(`UserBucket.displayName`, `lib/adapters/types.ts:1876-1881`). Nothing client-supplied appears there —
+(`UserBucket.displayName`, `lib/adapters/types.ts:1880-1881`). Nothing client-supplied appears there —
 the own app's logo (spec 094) sits beside the headline, below it.
 
 Hosts are the WHATWG parser's ASCII form (`redirectKind`, `consentView.ts:230-249`). An
@@ -301,7 +301,9 @@ name, its redirect URIs, and — for this organization's own app only — its po
 - No per-item selection unless an operator turned it on for the client (spec 093, above).
 - No logo for any app the organization does not stand behind, and no monogram or placeholder for one
   without a logo.
-- No "revoke access in …" line: it waits for a page where a person can do that.
+- Since spec 095 the "remove this access later" line is here, below the buttons, linking the sign-in bucket's
+  connected-apps page in the same tab, absent in the administrators' bucket (`revokeHint`,
+  `lib/interactions/index.ts:855`). It waited for that page to exist: see [[connected-apps-page]].
 - CIBA never renders this page.
 - No translation yet; the catalog is the seam.
 

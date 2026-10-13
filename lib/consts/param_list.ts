@@ -190,6 +190,9 @@ export type PipelineParamsWith<K extends keyof PipelineParams> =
 	};
 
 export const routeNames = {
+	/* The end-user connected-applications page and the return address of the sign-in it starts (specs/095). */
+	account_apps: '/account/apps',
+	account_apps_callback: '/account/apps/callback',
 	authorization: '/auth',
 	backchannel_authentication: '/backchannel',
 	code_verification: '/device',

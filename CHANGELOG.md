@@ -11,6 +11,16 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- **People see and remove the access they gave applications** (spec 095). Every end-user bucket has
+  `/account/apps` at its own address. It lists each application holding access: what it can do, in the consent
+  page's words; when access was given; when it last got a token; and whether it keeps access after sign-out.
+  One confirmed removal ends that application's grants, tokens and sign-in, the same as the administrator's
+  "sign out of this app", and is audited as `self-service`. The page reads the bucket's own sign-in and signs a
+  signed-out person in through a built-in client that can get no code or token. Removal needs a sign-in no older
+  than 15 minutes and a same-origin form. The consent page now links to this page.
+  - Fixed along the way: grants now record their bucket; the console's per-application dates are no longer
+    decades ahead; plain pages no longer scroll sideways at 320 px.
+
 - **The organization's own applications show their logo and policy links on the consent page** (spec 094).
   An administrator uploads a client's logo (`logo`: a PNG, JPEG or WebP `data:` URL of at most 64 KiB, checked
   by its bytes; console, admin API and MCP) and sets `policyUri`/`tosUri` (https only). The page shows them only
@@ -56,7 +66,18 @@ and handing a group to a directory answer 409 with a preview and apply only when
 the same `expect`; deleting a bucket schedules its destruction instead of destroying it; new buckets are closed to
 sign-up unless asked otherwise; and a user's profile now wins over a stored claim of the same name.
 
+### Fixed
+
+- **A group's administrators can read what was done to their bucket's people.** The audit entries for end-user
+  changes made in the console or through MCP carried no owning group, so only a super administrator could read
+  them, on the Audit page or on a person's Activity tab. New entries carry the bucket's group. Entries already
+  written stay as they are.
+
 ### Security
+
+- **A host-addressed bucket's sign-out confirmation and device-code pages can no longer be framed.** Their forms
+  posted to an absolute address the page policy took for another site, so the pages lost `frame-ancestors`. The
+  forms now post to an origin-relative path.
 
 - **A password-reset link no longer survives an email change** (spec 089). Before, a link sent to a person's old
   address still worked after an administrator or a directory changed it. Opened from the old mailbox, it set the

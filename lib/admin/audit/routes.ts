@@ -2,11 +2,13 @@ import { Elysia } from 'elysia';
 import {
 	adminAuditStore,
 	getBucketStore,
-	getProvisioningConnectionStore
+	getProvisioningConnectionStore,
+	getUserStore
 } from '../../adapters/index.js';
 import type { AdminAuditEntry, AdminAuditQuery } from '../../adapters/types.js';
 import {
 	CONNECTION_ACTOR_PREFIX,
+	ENDUSER_ACTOR_PREFIX,
 	UPSTREAM_ACTOR_PREFIX
 } from '../../consts/admin_audit_routes.js';
 import {
@@ -73,6 +75,15 @@ async function actorNames(
 				(p) => p.id === rest.slice(split + 1)
 			);
 			names.set(actorId, provider?.displayName ?? null);
+		} else if (actorId.startsWith(ENDUSER_ACTOR_PREFIX)) {
+			/* The person's own address, as an administrator who may read this entry may read the person. */
+			const rest = actorId.slice(ENDUSER_ACTOR_PREFIX.length);
+			const split = rest.indexOf(':');
+			const user =
+				split > 0
+					? await getUserStore(rest.slice(0, split)).find(rest.slice(split + 1))
+					: null;
+			names.set(actorId, user?.email ?? null);
 		}
 	}
 	return names;

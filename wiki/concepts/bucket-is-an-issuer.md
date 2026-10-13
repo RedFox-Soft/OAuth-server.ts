@@ -171,6 +171,9 @@ host-addressed bucket was spared only because a root-relative path resolves agai
 `logout()` (`lib/html/logout.tsx`) now takes the confirmation address, built from the addressed
 issuer. `test/end_session/per_bucket.spec.ts` had claimed to follow the form the browser is shown
 while building the prefixed URL itself; it now reads the form's `action`, and so does the host case.
+Since 2026-10-13 that address is the confirmation's origin-relative path (`/acme/logout/confirm`): built
+absolute from a host bucket's issuer, it read as a foreign form target and left the page framable
+([[html-response-security-policy]]).
 
 The path stays `/` for every bucket and deliberately does not carry the partition. It would, if every
 bucket were prefixed — but the default bucket is served at the root, so its cookie must live at

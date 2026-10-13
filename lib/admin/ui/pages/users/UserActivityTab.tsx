@@ -9,7 +9,7 @@ interface AuditEntry {
 	actorEmail: string;
 	action: string;
 	attributes: string[];
-	viaSurface?: 'mcp' | 'scim' | 'upstream' | null;
+	viaSurface?: 'mcp' | 'scim' | 'upstream' | 'self-service' | null;
 	timestamp: string;
 }
 
@@ -117,7 +117,10 @@ export function UserActivityTab({
 						key: 'by',
 						render: (_: unknown, row: AuditEntry) => (
 							<>
-								{row.actorEmail}
+								{/* The person on their connected-apps page: the sentinel is not an address (specs/095). */}
+								{row.viaSurface === 'self-service'
+									? 'The person themselves'
+									: row.actorEmail}
 								{row.viaSurface === 'mcp' && <Tag>agent</Tag>}
 								{row.viaSurface === 'scim' && <Tag>directory</Tag>}
 							</>

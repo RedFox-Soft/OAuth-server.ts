@@ -133,6 +133,7 @@ import { ttl } from 'lib/configs/liveTime.js';
 import epochTime from 'lib/helpers/epoch_time.js';
 import { denormalize } from 'lib/helpers/user_codes.js';
 import { versionedAsset } from 'lib/html/versionedAsset.js';
+import { accountPageUrl } from 'lib/account_page/client.js';
 import { findDeclaredResource } from 'lib/resources/registry.js';
 import { namespaceOf } from 'lib/resources/namespace.js';
 import { isMcpResource } from 'lib/mcp/resource_server.js';
@@ -464,6 +465,7 @@ async function completeDeviceInteraction(
 
 async function createGrant(
 	interaction: Interaction,
+	signsInto: string,
 	refuse: SelectableItem[] = []
 ) {
 	const grantId = interaction.payload.grantId;
@@ -488,7 +490,8 @@ async function createGrant(
 		// establish a new grant for this account/client
 		new Grant({
 			accountId: interaction.payload.session?.accountId,
-			clientId: clientIdOf(interaction)
+			clientId: clientIdOf(interaction),
+			bucketId: signsInto
 		});
 
 	if (details.missingOIDCScope) {
@@ -844,7 +847,13 @@ async function consentViewFor(
 		canSwitchAccount: !accountNamedByRequest(params),
 		...(device ? { device } : {}),
 		...(client?.['consent.partial'] ? { partial: true } : {}),
-		...(refused ? { refused } : {})
+		...(refused ? { refused } : {}),
+		/* The administrators' bucket has no connected-applications page (specs/095), so nothing to point at. */
+		...(signsInto === ADMIN_BUCKET_ID
+			? {}
+			: {
+					revokeHref: accountPageUrl(bucket ?? (await issuingBucket(signsInto)))
+				})
 	});
 }
 
@@ -1882,7 +1891,7 @@ export const ui = new Elysia()
 	)
 	.post(
 		'ui/:uid/consent',
-		async ({ body, interaction, cookie, route, request }) => {
+		async ({ body, interaction, signsInto, cookie, route, request }) => {
 			/*
 			 * The decision belongs to the account it was shown for. The page carries that account back, and a
 			 * submission naming any other — the browser's session changed in another tab, or the field was
@@ -1917,6 +1926,7 @@ export const ui = new Elysia()
 				}
 				await createGrant(
 					interaction,
+					signsInto,
 					choices.active
 						? choices.selectable.filter((item) => !ticked.includes(item.key))
 						: []

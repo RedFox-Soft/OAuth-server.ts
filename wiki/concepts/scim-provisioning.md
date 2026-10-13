@@ -45,7 +45,7 @@ configuration — and the console offers disable instead.
 
 The key and secret credentials authenticate at the **bucket's own token endpoint** as the OAuth client
 `scim-<connectionId>`, which is **synthesized from the connection on every resolution and stored nowhere**
-(`lib/provisioning/client.ts:31`, consulted after the adapter read at `lib/models/client/validate.ts:123`).
+(`lib/provisioning/client.ts:31`, consulted after the adapter read at `lib/models/client/validate.ts:124`).
 That one decision buys the whole token endpoint for free — `private_key_jwt` with `jti` replay protection,
 constant-time comparison, the client-credentials grant — and keeps the connection the single source of its
 credential: rotation is one write, and there is no hidden stored client to keep in step or orphan.
@@ -93,7 +93,7 @@ be revoked when a credential is rotated or a connection deleted.
 
 ## The SCIM surface
 
-`lib/scim/` is a protocol plugin, mounted bare and beneath `/:bucket` (`lib/index.ts:213`), so a bucket's
+`lib/scim/` is a protocol plugin, mounted bare and beneath `/:bucket` (`lib/index.ts:214`), so a bucket's
 base URL is `<its issuer>/scim/v2` in every addressing form. It is mounted with **statements of its own after
 the app chain**, not as links in it: adding it to the chain tipped TypeScript past its instantiation depth
 (TS2589), and typing the plugin `AnyElysia` instead erased the whole app's type and broke every Eden client
@@ -188,7 +188,7 @@ both. The JWT bullet wins: §10 repeats it, and §4.1 carries an editor's note t
 
 ## Audit by a connection
 
-`recordConnectionAudit` (`lib/admin/audit/record.ts:128`) writes `connection:<id>` as the actor — the
+`recordConnectionAudit` (`lib/admin/audit/record.ts:129`) writes `connection:<id>` as the actor — the
 bootstrap's sentinel convention — with `viaSurface: 'scim'` and the bucket's `ownerGroupId`, so the bucket's
 own administrators see it ([[admin-audit-trail]]). SCIM computes the attribute names that change before the
 write, so a request asserting what is already stored writes nothing and audits nothing.

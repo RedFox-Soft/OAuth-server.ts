@@ -812,6 +812,13 @@ export const CONNECTION_ACTOR_PREFIX = 'connection:';
  */
 export const UPSTREAM_ACTOR_PREFIX = 'upstream:';
 
+/*
+ * Prefix of the actor recorded when an end user removed an application's access from their own
+ * connected-applications page: `enduser:<bucketId>:<accountId>` (specs/095). The bucket is named because an
+ * account id is unique only within its bucket.
+ */
+export const ENDUSER_ACTOR_PREFIX = 'enduser:';
+
 /* Target ids of the singleton configuration documents, which have no entity id of their own. */
 export const SETTINGS_TARGET_ID = 'settings';
 export const SMTP_TARGET_ID = 'smtp';

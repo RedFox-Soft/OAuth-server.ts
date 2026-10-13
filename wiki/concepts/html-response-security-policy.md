@@ -20,7 +20,7 @@ graph:
 
 Every HTML response this server produces carries a
 `Content-Security-Policy`, and **there is exactly one place that may build such a response**:
-`htmlResponse` in `lib/html/csp.ts:76`.
+`htmlResponse` in `lib/html/csp.ts:90`.
 
 ## The contract
 
@@ -53,6 +53,12 @@ page still renders.
 **Same-origin comparison is load-bearing.** The device pages build an `ISSUER`-absolute form action,
 so "absolute means foreign" would name this server as a foreign target *and* drop `frame-ancestors`
 from a page with a real form on it. The comparison is against `new URL(ISSUER).origin`.
+
+**That origin is not every page's own** (fixed 2026-10-13). A bucket with a hostname of its own serves its pages
+from that host, so its issuer-built sign-out and device-code form targets compared as foreign. Those pages then
+counted as hand-offs and lost `frame-ancestors`, so they could be framed. They now post to an origin-relative
+path (`ownFormAction`, `lib/html/csp.ts:58`), which is `'self'` to this policy and to the browser wherever
+the page is served. Pinned by `test/csp/host_bucket_framing.spec.ts`.
 
 ## What "derived" does and does not buy you
 
@@ -117,7 +123,7 @@ because nothing keeps them in agreement; there is one decision.
 offered instead of an error redirect to an untrusted client also has a form posting off-origin — and is
 the opposite case: its one control leaves for that client, so framed it is a clickjacking target, and a
 hidden-frame silent request is precisely what it exists to stop answering. `htmlResponse` therefore takes
-`denyFraming: true` (`lib/html/csp.ts:294`), which forces both headers whatever the forms say. It can only
+`denyFraming: true` (`lib/html/csp.ts:308`), which forces both headers whatever the forms say. It can only
 strengthen a page, so the `form_post` exception above is untouched. See [[untrusted-redirect-confirmation]].
 
 **Do not move `X-Frame-Options` to the blanket plugin.** It is not a stylistic split. The plugin writes

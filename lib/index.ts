@@ -53,6 +53,7 @@ import { adminApp } from './admin/index.js';
 import { mcpApp } from './mcp/index.js';
 import { scimApp, scimMetadataApp } from './scim/index.js';
 import { federationBackChannelLogout } from './upstream_signals/back_channel_logout.js';
+import { accountPageRoutes } from './account_page/routes.js';
 import { globalTokenRevocation } from './upstream_signals/global_token_revocation.js';
 import { verificationRoutes } from './routes/verification.js';
 import { passwordResetRoutes } from './routes/password_reset.js';
@@ -244,6 +245,13 @@ elysia.use(federationBackChannelLogout);
 elysia.group('/:bucket', (bucketScoped) =>
 	bucketScoped.use(federationBackChannelLogout)
 );
+
+/*
+ * The end-user connected-applications page (specs/095), bare and beneath a bucket's segment, the same way and
+ * for the same reason.
+ */
+elysia.use(accountPageRoutes);
+elysia.group('/:bucket', (bucketScoped) => bucketScoped.use(accountPageRoutes));
 
 /*
  * Binding the port, and the one startup failure this module can report.

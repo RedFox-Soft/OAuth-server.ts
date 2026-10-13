@@ -158,6 +158,7 @@ export async function loadExistingGrant(oidc: OIDCContext) {
 		return existing;
 	}
 	const accountId = oidc.entities.Account?.accountId;
+	const bucketId = oidc.entities.Account?.bucketId;
 	// Honoured only in a bucket the client's own group owns — see lib/shared/consent_waiver.ts.
 	if (accountId && (await consentWaived(oidc))) {
 		// Mark the auto-created grant `trusted` (this is a consent-not-required
@@ -165,7 +166,7 @@ export async function loadExistingGrant(oidc: OIDCContext) {
 		// return the full requested scope set. Without it the grant has no scopes,
 		// so `interactions()` denies the request with access_denied ("no scope was
 		// granted"). `trusted` is persisted, so reloaded grants stay trusted too.
-		const grant = new Grant({ accountId, clientId, trusted: true });
+		const grant = new Grant({ accountId, clientId, bucketId, trusted: true });
 		await grant.save();
 		return grant;
 	}

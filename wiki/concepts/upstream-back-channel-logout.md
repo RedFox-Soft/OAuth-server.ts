@@ -52,7 +52,7 @@ match a logout against. Now:
   `{ providerId, sid }` through the stage-2 handoff into `result.login.upstream`; a pending link carries it too and
   `settlePendingLink` attaches it when the link lands on the account signing in (`lib/federation/pending_link.ts:59`).
 - `resume()` passes it to `Session.loginAccount`, which **replaces or clears** `session.payload.upstream` at every
-  sign-in, as it does `transient` (`lib/models/session.ts:273`) — a session re-authenticated by password stops
+  sign-in, as it does `transient` (`lib/models/session.ts:280`) — a session re-authenticated by password stops
   answering to the provider. The session stores the provider and a **SHA-256 of the `sid`**, never the value: it is
   the provider's session handle and nothing here needs it back.
 - Sessions are reachable only by id, uid and owner, so `resume()` also writes an account-owned
@@ -88,7 +88,7 @@ it relays a person's own sign-out, which is not audited either, and arrives on e
 
 ## Gating and administration
 
-The route is gated by `federation.enabled` (`lib/consts/route_classification.ts:235`), not a flag of its own:
+The route is gated by `federation.enabled` (`lib/consts/route_classification.ts:237`), not a flag of its own:
 Back-Channel Logout 1.0 is final, so there is no deviation to isolate, and with federation off nothing signed in
 through a provider. The opt-in is the provider option `acceptsBackChannelLogout` (`lib/federation/types.ts`), off
 on every provider stored before it, settable only for an OIDC provider; the console shows the address to register

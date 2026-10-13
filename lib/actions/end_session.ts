@@ -38,6 +38,7 @@ import {
 } from '../shared/destroy_session.ts';
 import { logoutSuccess } from '../html/logoutSuccess.tsx';
 import { logout } from '../html/logout.tsx';
+import { ownFormAction } from '../html/csp.ts';
 import { eventBus } from '../event_bus.js';
 import {
 	PageError,
@@ -201,7 +202,7 @@ async function endSession(
 	if (oidc.session.payload.accountId) {
 		return logout(
 			secret,
-			`${oidc.issuer}${routeNames.end_session_confirm}`,
+			ownFormAction(`${oidc.issuer}${routeNames.end_session_confirm}`),
 			oidc.params.post_logout_redirect_uri
 		);
 	}

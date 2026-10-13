@@ -173,7 +173,7 @@ skipping the bucket check — unreachable only because no caller passed one. It 
 spec is `test/consent_waiver/`.
 
 Since spec 092 the comparison itself is one function, `projectGroupOwnsBucket`
-(`lib/models/client/provenance.ts:38-45`). The waiver calls it (`lib/shared/consent_waiver.ts:44`), and so
+(`lib/models/client/provenance.ts:40-45`). The waiver calls it (`lib/shared/consent_waiver.ts:44`), and so
 does `clientProvenance`, which words the consent page: a client whose project's group owns the sign-in
 bucket is "this organization's", one of another group's project is "operator-registered". The two callers
 read a client in no project differently, on purpose. The waiver keeps the stored flag, which a

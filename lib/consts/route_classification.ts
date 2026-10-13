@@ -84,7 +84,9 @@ export const bucketScopedPaths: readonly string[] = [
 	routeNames.federation_backchannel_logout,
 	routeNames.code_verification,
 	routeNames.global_token_revocation,
-	SCIM_BASE_PATH
+	SCIM_BASE_PATH,
+	routeNames.account_apps,
+	routeNames.account_apps_callback
 ];
 
 /* RFC 8414 §3 places the well-known segment before the issuer's path, so these two cannot be produced
@@ -296,7 +298,15 @@ const bareAlwaysAvailableRoutes: readonly AlwaysAvailableRoute[] = [
 	{ method: 'GET', path: routeNames.jwks },
 	{ method: 'GET', path: routeNames.authorization },
 	{ method: 'POST', path: routeNames.authorization },
-	{ method: 'POST', path: routeNames.token }
+	{ method: 'POST', path: routeNames.token },
+	/*
+	 * The end-user connected-applications page (specs/095). Unconditional for the reason the sign-in screens
+	 * are: a person must always be able to see, and take back, the access they gave — a capability toggle
+	 * that could hide it would make every consent on this server one that cannot be withdrawn.
+	 */
+	{ method: 'GET', path: routeNames.account_apps },
+	{ method: 'POST', path: routeNames.account_apps },
+	{ method: 'GET', path: routeNames.account_apps_callback }
 ];
 
 /*

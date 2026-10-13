@@ -70,7 +70,7 @@ uses containment (`@>`) rather than the `?` operator.
 
 `activityFigures` holds the figure of each ended period, written **insert-if-absent** — the first writer
 wins, nothing rewrites it. Three things freeze, all idempotent: an hourly closer
-(`lib/activity/closer.ts:25`, started from `lib/index.ts:288` — not beside the PostgreSQL sweeper, because it
+(`lib/activity/closer.ts:25`, started from `lib/index.ts:296` — not beside the PostgreSQL sweeper, because it
 reads the bucket store and starting it inside the adapter module is the cycle [[model-graph-import-order]]
 describes); the first read of an ended, unfrozen period (`readPeriods`, `lib/activity/read.ts:55`); and
 bucket deletion. A period is closable five minutes after it ends (`CLOSE_GRACE_MS`,
@@ -147,7 +147,7 @@ Rules the code holds and a reader can get wrong:
   closed months and needs both ≥ 20 people and ≥ 30 % of the earlier figure (`:121`).
 - **The customer is read live, not copied** (`resolveCustomers`, `lib/admin/activity/customers.ts:55`), so a
   rename shows at once. A deleted bucket's tombstone keeps `ownerGroupId` and `ownerLabel`
-  (`lib/adapters/types.ts:1898`, written by `tombstoneOf`, `lib/adapters/activity_records.ts:38`) for the day
+  (`lib/adapters/types.ts:1902`, written by `tombstoneOf`, `lib/adapters/activity_records.ts:38`) for the day
   its group is deleted too; a tombstone written before 077 has neither and reads as an unknown customer.
   A moved bucket's past months show under its current owner — which owner a past month is charged to is
   billing's question.

@@ -20,9 +20,15 @@ export default async function loadGrant(oidc: OIDCContext<PipelineParams>) {
 			oidc.session.ensureClientContainer(oidc.client.clientId);
 			oidc.session.grantIdFor(oidc.client.clientId, grant.id);
 		} else {
+			/*
+			 * With the bucket the account was read from: an account id is unique only inside its bucket — an
+			 * administrator may choose one — so a grant that does not say which bucket it was given in is one
+			 * the person's connected-apps page of another bucket would also list (specs/095 R12).
+			 */
 			grant = new Grant({
 				accountId: account.accountId,
-				clientId: oidc.client.clientId
+				clientId: oidc.client.clientId,
+				bucketId: account.bucketId
 			});
 		}
 		oidc.entity('Grant', grant);

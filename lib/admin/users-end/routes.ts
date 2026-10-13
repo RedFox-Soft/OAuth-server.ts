@@ -3,7 +3,8 @@ import { getBucketGroupStore, getUserStore } from '../../adapters/index.js';
 import {
 	MAX_END_USER_PAGE,
 	type EndUserFilter,
-	type User
+	type User,
+	type UserBucket
 } from '../../adapters/types.js';
 import { ADMIN_BUCKET_ID } from '../consts.js';
 import {
@@ -193,6 +194,15 @@ function listFilterOf(query: typeof UserListQuery.static): EndUserFilter {
 	return filter;
 }
 
+/*
+ * Where an entry about one of a bucket's people belongs: within the bucket, and to the group that owns it. The
+ * group is what a group administrator's audit read selects on, so an entry without it was written for nobody
+ * but a super administrator — the bucket's own administrators acted and could not read that they had.
+ */
+function scope(bucket: UserBucket) {
+	return { targetScope: bucket._id, ownerGroupId: bucket.ownerGroupId };
+}
+
 async function bulk(
 	admin: Parameters<typeof assertAuth>[0],
 	bucketId: string,
@@ -204,7 +214,7 @@ async function bulk(
 	const action = BULK_ACTIONS[act];
 	return {
 		results: await applyBulk(bucket, act, userIds, (id) =>
-			recordAdminAudit(ctx, action, id, { targetScope: bucketId })
+			recordAdminAudit(ctx, action, id, scope(bucket))
 		)
 	};
 }
@@ -333,7 +343,7 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 					},
 					() =>
 						recordAdminAudit(ctx, 'enduser.create', userId, {
-							targetScope: params.id
+							...scope(bucket)
 						})
 				)
 			);
@@ -345,7 +355,7 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 			 */
 			const sent = await inviteEndUser(bucket, ADMIN, userId, () =>
 				recordAdminAudit(ctx, 'enduser.invitation.send', userId, {
-					targetScope: params.id
+					...scope(bucket)
 				})
 			).catch(() => null);
 			return {
@@ -365,7 +375,7 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 					// Names only: the values are personal data, and the trail is kept longer than the account. A
 					// profile is named by the fields it changed, so a full replace does not read as "everything".
 					recordAdminAudit(ctx, 'enduser.update', params.uid, {
-						targetScope: params.id,
+						...scope(bucket),
 						attributes: [
 							...Object.keys(body).filter((key) => key !== 'profile'),
 							...profileFields
@@ -405,7 +415,7 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 						// The reset is the recorded fact; the password is never named, and its value never near
 						// the trail. `signOut` is, because ending every sign-in is a second act the entry must show.
 						recordAdminAudit(ctx, 'enduser.password.reset', params.uid, {
-							targetScope: params.id,
+							...scope(bucket),
 							...(signOut ? { attributes: ['signOut'] } : {})
 						}),
 					{ signOut }
@@ -436,7 +446,7 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 			const { user } = await asAdmin(
 				updateEndUser(bucket, ADMIN, params.uid, { email: body.email }, () =>
 					recordAdminAudit(ctx, 'enduser.email.change', params.uid, {
-						targetScope: params.id,
+						...scope(bucket),
 						attributes: ['email']
 					})
 				)
@@ -475,7 +485,7 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 				throw new AdminError(429, RATE_LIMITED);
 			}
 			await recordAdminAudit(ctx, 'enduser.verification.send', params.uid, {
-				targetScope: params.id
+				...scope(bucket)
 			});
 			const sent = await sendOnDemand(user, bucket, {
 				reuseOutstanding: false
@@ -511,7 +521,7 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 			const outcome = await asAdmin(
 				inviteEndUser(bucket, ADMIN, params.uid, () =>
 					recordAdminAudit(ctx, 'enduser.invitation.send', params.uid, {
-						targetScope: params.id
+						...scope(bucket)
 					})
 				)
 			);
@@ -533,7 +543,7 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 			const user = await asAdmin(
 				markEndUserVerified(bucket, ADMIN, params.uid, () =>
 					recordAdminAudit(ctx, 'enduser.verified.mark', params.uid, {
-						targetScope: params.id
+						...scope(bucket)
 					})
 				)
 			);
@@ -569,7 +579,7 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 			await asAdmin(
 				endApplicationAccess(bucket, params.uid, clientId, () =>
 					recordAdminAudit(ctx, 'enduser.application.signout', params.uid, {
-						targetScope: params.id,
+						...scope(bucket),
 						clientId
 					})
 				)
@@ -593,7 +603,7 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 					{ by: ctx.userId, reason: body.reason },
 					() =>
 						recordAdminAudit(ctx, 'enduser.lock', params.uid, {
-							targetScope: params.id
+							...scope(bucket)
 						})
 				)
 			);
@@ -616,7 +626,7 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 			const user = await asAdmin(
 				unlockEndUser(bucket, params.uid, () =>
 					recordAdminAudit(ctx, 'enduser.unlock', params.uid, {
-						targetScope: params.id
+						...scope(bucket)
 					})
 				)
 			);
@@ -636,7 +646,7 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 			const { user, revoked } = await asAdmin(
 				revokeEndUserAccess(bucket, params.uid, () =>
 					recordAdminAudit(ctx, 'enduser.signout', params.uid, {
-						targetScope: params.id
+						...scope(bucket)
 					})
 				)
 			);
@@ -666,12 +676,12 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 		'/admin/api/buckets/:id/users/:uid/totp',
 		async ({ admin, params }) => {
 			const ctx = assertAuth(admin);
-			await loadBucketForUsers(ctx, params.id);
+			const bucket = await loadBucketForUsers(ctx, params.id);
 
 			// Audit-first, as the password reset beside it is: a mutation is not reported successful
 			// unless its entry was recorded. No attribute names and no values — the act is the whole fact.
 			await recordAdminAudit(ctx, 'enduser.totp.clear', params.uid, {
-				targetScope: params.id
+				...scope(bucket)
 			});
 
 			const updated = await getUserStore(params.id).update(params.uid, {
@@ -728,7 +738,7 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 		const cascade = await asAdmin(
 			removeEndUser(bucket, ADMIN, params.uid, () =>
 				recordAdminAudit(ctx, 'enduser.delete', params.uid, {
-					targetScope: params.id
+					...scope(bucket)
 				})
 			)
 		);

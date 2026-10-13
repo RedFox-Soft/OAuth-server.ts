@@ -69,7 +69,7 @@ why re-deactivating an inactive user is allowed rather than a no-op.
 ## One predicate decides whether a user may sign in
 
 `canSignIn` (`lib/end_users/can_sign_in.ts:11`) — `active && !lockedLocally` — is used by account
-resolution (`lib/addon/account.ts:61`), the password door (`lib/interactions/index.ts:821`), the federated
+resolution (`lib/addon/account.ts:61`), the password door (`lib/interactions/index.ts:824`), the federated
 door (`:1202`), federation linking and provisioning, and both password-reset steps. Two copies of "is this
 user allowed" drift, and the drifted one is the door a locked user walks through.
 
@@ -122,7 +122,7 @@ proves the indexes against real MongoDB and PostgreSQL, including the race for o
 ## An address change, and what a verification message proves (spec 082)
 
 An administrator changes a local person's login address through its own route,
-`POST /admin/api/buckets/:id/users/:uid/email` (`lib/admin/users-end/routes.ts:353`), rather than through the
+`POST /admin/api/buckets/:id/users/:uid/email` (`lib/admin/users-end/routes.ts:363`), rather than through the
 PATCH beside it: it is `high` for agents (`bucket_user_email_change`), because the address is where password
 reset and verification mail go. The service refuses an address another account in the bucket holds **before**
 the audit write, with `field: 'email'` (`lib/end_users/service.ts:198`) — the store's unique index still decides
@@ -147,7 +147,7 @@ trail records sends that were attempted.
 **`passwordSet`.** The unusable password a password-less account holds (`lib/helpers/unusable_password.ts`) cannot
 be told from a real hash afterwards, so whether a password anyone chose opens an account is a stored marker
 (`lib/adapters/types.ts:144`): `true` on a create with a password, on every administrator's set
-(`service.ts:257`), on registration (`lib/interactions/index.ts:1457`) and on a completed reset
+(`service.ts:257`), on registration (`lib/interactions/index.ts:1466`) and on a completed reset
 (`lib/password_reset/challenge.ts:274`); `false` on a password-less create — an administrator's or SCIM's
 (`service.ts:158`) and a federated sign-in's just-in-time account (`lib/federation/resolve.ts:339`, in `applyDecision` since spec 088). Accounts
 written before it carry none, and a reader says nothing rather than guess. Setting a password can also sign the

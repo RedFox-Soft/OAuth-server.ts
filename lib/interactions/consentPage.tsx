@@ -1005,6 +1005,27 @@ export const ConsentPage: React.FC<ConsentView> = (view) => {
 							links={view.links}
 						/>
 					) : null}
+
+					{/* This server's own page, so the same tab: nothing here leads to the app's site (specs/095). */}
+					{view.revokeHint ? (
+						<Text
+							style={{
+								color: MUTED,
+								textAlign: 'center',
+								fontSize: 13,
+								lineHeight: '24px'
+							}}
+						>
+							{T.revokeHint.before}
+							<a
+								href={view.revokeHint.href}
+								style={{ color: '#0958d9', display: 'inline-block' }}
+							>
+								{T.revokeHint.link}
+							</a>
+							{T.revokeHint.after}
+						</Text>
+					) : null}
 				</Flex>
 			</Card>
 		</Flex>

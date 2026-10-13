@@ -50,7 +50,7 @@ Two things generalise:
    noticed because nothing linked to it. This is now structurally prevented for pages —
    see [[html-response-security-policy]], where a single constructor is the only way to build one.
 2. **Deleting a route under `/admin` needs no `route_classification.ts` edit.** That table's
-   `alwaysAvailablePrefixes` covers `/admin` wholesale (`lib/consts/route_classification.ts:112-117`),
+   `alwaysAvailablePrefixes` covers `/admin` wholesale (`lib/consts/route_classification.ts:114-117`),
    so the two-way drift guard stays green. A route under a *listed* path would have needed the edit.
 
 ## Related

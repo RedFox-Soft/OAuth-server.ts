@@ -44,7 +44,7 @@ two unrelated ways.
   token would still be redeemed at the root `/token`. The default `findAccount` answers nothing when the bucket it
   resolved is scheduled (`lib/addon/account.ts:65`), which closes every grant and userinfo anywhere. Four doors
   that read a bucket from a stored id check for themselves:
-  - interactions, for both the bucket the interaction began at and the sign-in bucket (`lib/interactions/index.ts:738`);
+  - interactions, for both the bucket the interaction began at and the sign-in bucket (`lib/interactions/index.ts:741`);
   - the federation callback (`lib/federation/routes.ts:145`);
   - the verification links (`lib/verification/challenge.ts:152,258`);
   - the password-reset links (`lib/password_reset/challenge.ts:162`).
@@ -110,7 +110,7 @@ call it.
    still-scheduled, still-silent bucket, and the next pass finishes it once the claim lapses.
 
 The pass (`purgeDueBuckets` / `startBucketPurger`, `lib/admin/buckets/purge_pass.ts:17,54`) follows the
-`startCloser` pattern, started in `lib/index.ts:294` outside tests. It records as
+`startCloser` pattern, started in `lib/index.ts:302` outside tests. It records as
 `RETENTION_ACTOR = 'system:retention'` (`lib/consts/admin_audit_routes.ts:749`) through `recordSystemAudit`. The
 entry carries `ownerGroupId`, so the owning group reads it like its own deletion.
 

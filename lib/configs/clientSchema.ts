@@ -210,6 +210,15 @@ export const ClientSchema = t.Object({
 	),
 
 	/*
+	 * accountPageBucketId
+	 *
+	 * description: The end-user bucket whose connected-applications page this client signs people in to, when
+	 * it is that page's built-in client. Synthesized from the bucket on every resolution and never stored
+	 * (lib/account_page/client.ts); it can bring the person back to the page and obtain nothing.
+	 */
+	accountPageBucketId: t.Optional(t.String()),
+
+	/*
 	 * The remaining members describe the full shape of a *validated* client
 	 * object: the schema engine (lib/models/client/schema.ts) projects the
 	 * recognised snake_case metadata onto these camelCased properties. They are

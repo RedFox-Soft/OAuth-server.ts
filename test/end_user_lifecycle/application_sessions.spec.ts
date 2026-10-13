@@ -13,6 +13,7 @@ import { Type } from '@sinclair/typebox';
 import { adapter, adminAuditStore } from 'lib/adapters/index.ts';
 import { DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
+import { Grant } from 'lib/models/grant.js';
 import bootstrap, {
 	agent,
 	redirectParameter,
@@ -176,6 +177,37 @@ describe('a person’s sessions, one application at a time', () => {
 		const { applications } = await applicationsOf(cookie, person.accountId);
 
 		expect(applications.map((row) => row.offline)).toEqual([true, true]);
+	});
+
+	it('dates access no sign-in holds by when it was given, not decades ahead', async () => {
+		const person = await signedInToBoth(setup);
+		await adapter('Session').destroy(person.sessionId);
+
+		const { applications } = await applicationsOf(cookie, person.accountId);
+
+		const now = Date.now();
+		for (const row of applications) {
+			const signedInAt = Date.parse(present(row.signedInAt, 'signedInAt'));
+			expect(signedInAt).toBeLessThanOrEqual(now);
+			expect(signedInAt).toBeGreaterThan(now - 60 * 60 * 1000);
+		}
+	});
+
+	it('lists no row for the person’s own connected-apps page sign-in', async () => {
+		const person = await signedInToBoth(setup);
+		/* What a sign-in through the page leaves behind, as every authorization does (specs/095). */
+		await new Grant({
+			accountId: person.accountId,
+			clientId: `account.${DEFAULT_BUCKET_ID}`,
+			bucketId: DEFAULT_BUCKET_ID,
+			trusted: true
+		}).save();
+
+		const { applications } = await applicationsOf(cookie, person.accountId);
+
+		expect(applications.map((row) => row.clientId)).not.toContain(
+			`account.${DEFAULT_BUCKET_ID}`
+		);
 	});
 
 	it('ends that application’s refresh token, offline access included', async () => {

@@ -24,7 +24,7 @@ makes the protocol extensible — a client may send what a later profile defines
 must still work — and it is a `MUST` in four separate specifications, not a courtesy.
 
 `lib/consts/param_list.ts` declares these parameters as TypeBox objects, and the app is constructed
-with `normalize: false` (`lib/index.ts:63`), so an undeclared key raises `invalid_request` with
+with `normalize: false` (`lib/index.ts:64`), so an undeclared key raises `invalid_request` with
 `Property '<name>' should not be provided`. That was the behaviour until 2026-09-11.
 
 ## Where it is required, and by what

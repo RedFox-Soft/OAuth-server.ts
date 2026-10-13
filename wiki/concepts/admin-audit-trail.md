@@ -11,13 +11,13 @@ graph:
     - predicate: depends_on
       object: concept:admin-console-signin
       source: oauth-server-codebase
-      evidence: "lib/admin/audit/record.ts:67 names the actor from the resolved admin context and nowhere else: 'actorId: ctx.userId, actorEmail: ctx.email'."
+      evidence: "lib/admin/audit/record.ts:68 names the actor from the resolved admin context and nowhere else: 'actorId: ctx.userId, actorEmail: ctx.email'."
       confidence: high
       status: current
     - predicate: constrained_by
       object: concept:group-ownership
       source: oauth-server-codebase
-      evidence: "lib/admin/audit/routes.ts:94 scopes the read by owning group, a super administrator excepted: 'const ownerGroupIds = ctx.superAdmin ? ...', spread into the query at line 135."
+      evidence: "lib/admin/audit/routes.ts:105 scopes the read by owning group, a super administrator excepted: 'const ownerGroupIds = ctx.superAdmin ? ...', spread into the query at line 135."
       confidence: high
       status: current
 ---
@@ -43,6 +43,12 @@ Since 2026-10-07 (spec 072) there is a third non-person actor: a bucket's upstre
 user's access through global token revocation, recorded as `upstream:<bucketId>:<providerId>` with
 `viaSurface: 'upstream'` (`recordUpstreamAudit`). It needed a route-backed action, because the table admits no
 other; it records the action of the new administrator operation "sign out everywhere", `enduser.signout`.
+
+Since spec 095 the fourth: an end user removing an application's access from their own connected-apps page,
+recorded as `enduser:<bucketId>:<accountId>` with `viaSurface: 'self-service'` under the administrator's
+`enduser.application.signout`, with the bucket's `ownerGroupId` (`recordEndUserAudit`,
+`lib/admin/audit/record.ts:222`). The read resolves the person's address as `actorName`. See
+[[connected-apps-page]].
 **A new surface literal touches five places** — the entry schema union (validated *on read* by MongoDB and
 PostgreSQL, so a miss breaks the audit list in production while `bun test` stays green), the Mongo surface
 filter, `write()`'s input type, the console audit page and the MCP `audit_list` summary. See
@@ -196,6 +202,13 @@ the caller's own memberships and applied where entries are *selected*, never par
 string: it is the tenant boundary of this surface, so a caller-supplied group id would be a request to
 read somebody else's trail. `ownerGroupId` is written at the time of the action and never re-derived
 from `targetId`, so an entry outlives the container it describes.
+
+**An entry about a bucket's people carries the bucket's group** (fixed 2026-10-13). The `enduser.*` entries the
+console and MCP write were scoped only by `targetScope`, so the group-scoped read never selected them: a group's
+administrators acted on their bucket's people and could not read that they had, in the Audit page or on a
+person's Activity tab. They now carry the bucket's `ownerGroupId` (`scope`,
+`lib/admin/users-end/routes.ts:202`), as the provisioning and bucket-group entries already did. Entries
+written before stay as written, readable by a super administrator only, because the trail is never rewritten.
 
 **A move belongs to two groups** (since spec 075). Moving a bucket or a project to another group writes
 one entry. Its `ownerGroupId` is the group the container joined, and `formerOwnerGroupId` is the group

@@ -32,7 +32,7 @@ A grantId that resolves to nothing is the same state as no grantId: there is no 
 extend.
 
 Since spec 092 the consent **GET** reads the hinted grant too, for the same reason with `tryFind`
-(`lib/interactions/index.ts:702`). It needs what the grant already holds for the "You already allowed"
+(`lib/interactions/index.ts:705`). It needs what the grant already holds for the "You already allowed"
 line, and its `exp` for the "keeps access until" date. A first consent finds nothing, and the date is then
 now plus `ttl.Grant` (`index.ts:666-668`). See [[consent-screen-decisions]].
 

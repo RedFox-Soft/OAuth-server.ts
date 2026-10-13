@@ -11,7 +11,7 @@ graph:
     - predicate: constrained_by
       object: concept:admin-mcp-control-plane
       source: oauth-server-codebase
-      evidence: "lib/consts/route_classification.ts:139 states the omission as a decision, not an oversight: 'The error store read surface is deliberately NOT here, though errorStore.enabled exists and it would be mechanically possible'. lib/mcp/catalogue.ts:1017 withholds the purge instead."
+      evidence: "lib/consts/route_classification.ts:141 states the omission as a decision, not an oversight: 'The error store read surface is deliberately NOT here, though errorStore.enabled exists and it would be mechanically possible'. lib/mcp/catalogue.ts:1017 withholds the purge instead."
       confidence: high
       status: current
 ---

@@ -17,7 +17,7 @@ export interface AuditEntry {
 	from?: string | null;
 	to?: string | null;
 	/* Absent or null on an entry made in the console: the field was added after the trail began. */
-	viaSurface?: 'mcp' | 'scim' | 'upstream' | null;
+	viaSurface?: 'mcp' | 'scim' | 'upstream' | 'self-service' | null;
 	viaClientId?: string | null;
 	timestamp: string;
 }
@@ -30,6 +30,9 @@ export const CONNECTION_ACTOR_PREFIX = 'connection:';
 
 /* An upstream identity provider's global token revocation: `upstream:<bucketId>:<providerId>` (specs/072). */
 const UPSTREAM_ACTOR_PREFIX = 'upstream:';
+
+/* An end user acting on their own access from their connected-applications page (specs/095). */
+const ENDUSER_ACTOR_PREFIX = 'enduser:';
 
 /* The server itself, destroying a bucket whose 30 days of scheduled deletion ran out (specs/090). */
 const RETENTION_ACTOR = 'system:retention';
@@ -44,6 +47,11 @@ export function actorLabel(row: AuditEntry): string {
 	if (row.actorId.startsWith(UPSTREAM_ACTOR_PREFIX)) {
 		const provider = row.actorName ?? row.actorId.split(':').at(-1) ?? '';
 		return `Identity provider ${provider}`.trim();
+	}
+	if (row.actorId.startsWith(ENDUSER_ACTOR_PREFIX)) {
+		return row.actorName
+			? `${row.actorName} (the person themselves)`
+			: 'The person themselves';
 	}
 	return row.actorEmail;
 }

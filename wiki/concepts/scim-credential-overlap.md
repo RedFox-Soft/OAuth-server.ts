@@ -129,7 +129,7 @@ A static token obtains no tokens, so ending one sweeps nothing.
   (`lib/admin/provisioning/routes.ts:267`; `retirePreviousCredential`, `service.ts:554`) ends a live previous
   value now. It is 404 when there is none: one that ended by itself has nothing left to end. It audits
   `provisioning.credential.retire` first. The store removes the value only while its digest is unchanged
-  (`retirePrevious`, `lib/adapters/types.ts:1553`), so two administrators retiring together act once. MCP
+  (`retirePrevious`, `lib/adapters/types.ts:1557`), so two administrators retiring together act once. MCP
   `provisioning_credential_retire` is **ordinary**, like revoke: it only removes access.
 - An end by itself is not an act. It is shown, not recorded ([[admin-audit-trail]]).
 - The connection view has `previous` only while it is live: issued, replaced, latest end, last use and

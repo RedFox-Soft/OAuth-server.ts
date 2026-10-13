@@ -775,6 +775,9 @@ export const AdminAuditEntry = t.Object({
 	 *
 	 * `upstream` is the other: a bucket's upstream identity provider asking for a user's access to end
 	 * (specs/072), recorded as the sentinel `upstream:<bucketId>:<providerId>`.
+	 *
+	 * `self-service` is an end user acting on their own access from their connected-applications page
+	 * (specs/095), recorded as the sentinel `enduser:<bucketId>:<accountId>`.
 	 */
 	viaClientId: t.Optional(t.Union([t.String(), t.Null()])),
 	viaSurface: t.Optional(
@@ -782,6 +785,7 @@ export const AdminAuditEntry = t.Object({
 			t.Literal('mcp'),
 			t.Literal('scim'),
 			t.Literal('upstream'),
+			t.Literal('self-service'),
 			t.Null()
 		])
 	),

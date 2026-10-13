@@ -13,12 +13,22 @@ import { esc } from '../html/escape.js';
 
 // A page reporting a refusal passes its own status: a rendered error that answers 200 tells a non-browser
 // client the opposite of what it says to a reader.
+//
+// The card is fluid up to its width, inside a 16 px gutter: a fixed width wider than a 320 px phone scrolled
+// every plain page sideways (WCAG 1.4.10). `wide` is for a page that lists things — the connected-applications
+// page (specs/095) — which reads from the top and left rather than as one centred message.
 export function page(
 	title: string,
 	bodyHtml: string,
 	status = 200,
-	{ denyFraming }: { denyFraming?: boolean } = {}
+	{ denyFraming, wide }: { denyFraming?: boolean; wide?: boolean } = {}
 ): Response {
-	const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>${esc(title)}</title></head><body style="font-family: Arial, Helvetica, sans-serif; background:#f0f2f5; margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;"><div style="background:#fff; padding:32px; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.1); width:400px; text-align:center;">${bodyHtml}</div></body></html>`;
+	const layout = wide
+		? 'align-items:flex-start; justify-content:center; padding:32px 16px;'
+		: 'align-items:center; justify-content:center; padding:16px;';
+	const card = wide
+		? 'max-width:640px; text-align:left;'
+		: 'max-width:400px; text-align:center;';
+	const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>${esc(title)}</title></head><body style="font-family: Arial, Helvetica, sans-serif; background:#f0f2f5; margin:0; min-height:100vh; box-sizing:border-box; display:flex; ${layout}"><div style="background:#fff; padding:32px; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.1); width:100%; box-sizing:border-box; ${card}">${bodyHtml}</div></body></html>`;
 	return htmlResponse(html, { status, denyFraming });
 }

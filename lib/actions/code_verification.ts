@@ -7,6 +7,7 @@ import sessionHandler from '../shared/session.ts';
 import { InvalidClient, InvalidRequest } from '../helpers/errors.ts';
 import { formPost } from '../html/formPost.js';
 import { deviceInputPage, deviceConfirmPage } from '../html/device.js';
+import { ownFormAction } from '../html/csp.js';
 import { normalize, denormalize } from '../helpers/user_codes.ts';
 import {
 	ReRenderError,
@@ -41,7 +42,7 @@ function renderInputError(oidc: OIDCContext<PipelineParams>, err: unknown) {
 	const secret =
 		oidc.entities.Session?.payload.state?.secret ??
 		crypto.randomBytes(24).toString('hex');
-	const action = oidc.urlFor('code_verification');
+	const action = ownFormAction(oidc.urlFor('code_verification'));
 
 	if (!(err instanceof ReRenderError)) {
 		eventBus.emit('code_verification.error', oidc, err);
@@ -88,7 +89,11 @@ export const codeVerification = new Elysia()
 				});
 			}
 
-			return deviceInputPage({ action, secret, charset });
+			return deviceInputPage({
+				action: ownFormAction(action),
+				secret,
+				charset
+			});
 		},
 		{
 			query: t.Object({
@@ -163,7 +168,7 @@ export const codeVerification = new Elysia()
 					oidc.entity('Client', client);
 
 					const mask = ApplicationConfig['deviceFlow.mask'];
-					const action = oidc.urlFor('code_verification');
+					const action = ownFormAction(oidc.urlFor('code_verification'));
 					return deviceConfirmPage({
 						action,
 						secret,
