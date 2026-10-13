@@ -21,6 +21,7 @@ import {
 	registrationServer,
 	consentServer
 } from 'lib/interactions/serverRender.tsx';
+import { emptyConsentView } from 'lib/interactions/consentView.ts';
 import {
 	verifySuccessPage,
 	verifyFailurePage,
@@ -234,9 +235,8 @@ describe('content security policy: every rendered page', () => {
 			'consent',
 			() =>
 				consentServer({
-					uid: 'uid-1',
-					clientName: 'Client</script>',
-					permissions: []
+					...emptyConsentView('uid-1'),
+					client: { name: 'Client</script>', tier: 'self-registered' }
 				})
 		],
 		[
@@ -523,9 +523,8 @@ describe('content security policy: every rendered page', () => {
 			() => loginServer('uid-1'),
 			() =>
 				consentServer({
-					uid: 'uid-1',
-					clientName: 'Client',
-					permissions: []
+					...emptyConsentView('uid-1'),
+					client: { name: 'Client', tier: 'self-registered' }
 				}),
 			() => registrationServer('uid-1'),
 			() => renderAdminShell({ needsSetup: true, me: null })

@@ -2,6 +2,7 @@ import { hydrateRoot } from 'react-dom/client';
 import { StrictMode } from 'react';
 import { LoginPage } from './loginPage.tsx';
 import { ConsentPage } from './consentPage.tsx';
+import { emptyConsentView } from './consentView.ts';
 import { RegistrationPage } from './registration.tsx';
 import { TotpPage } from './totpPage.tsx';
 import { ZeroRuntime } from '../html/zeroRuntime.js';
@@ -49,10 +50,7 @@ hydrateRoot(
 					case 'consent':
 						return (
 							<ConsentPage
-								uid={calculateUid()}
-								clientName={''}
-								account={undefined}
-								permissions={[]}
+								{...emptyConsentView(calculateUid())}
 								{...props}
 							/>
 						);

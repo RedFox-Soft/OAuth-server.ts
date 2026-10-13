@@ -1,8 +1,10 @@
+import { shownAccount } from '../consent_form.js';
 import { describe, it, expect, beforeAll, beforeEach } from 'bun:test';
 import bootstrap, { agent, type Setup } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { Grant } from 'lib/models/grant.js';
-import { buildConsentView } from 'lib/interactions/consentView.js';
+import { CONSENT_TEXTS } from 'lib/interactions/consentTexts.js';
+import { visible } from '../page_text.js';
 import { PAYMENT_TYPE, RESOURCE } from './consent.config.ts';
 import { present } from 'test/shape.js';
 
@@ -43,24 +45,6 @@ const header = (jar: Jar) =>
 	Object.entries(jar)
 		.map(([k, v]) => `${k}=${v}`)
 		.join('; ');
-
-/*
- * What a reader sees, with the markup taken out. The page renders a token inside a <code> element, so
- * "printed twice" is invisible to a substring search over the raw HTML — `email (<code>email</code>)`
- * contains neither "email (email)" nor anything else worth asserting on.
- */
-function visible(html: string): string {
-	return (
-		html
-			// Scripts go first, contents and all: the hydration props repeat every label and token, so a
-			// count over the whole document measures the props rather than the page.
-			.replace(/<script[\s\S]*?<\/script>/g, ' ')
-			.replace(/<style[\s\S]*?<\/style>/g, ' ')
-			.replace(/<[^>]*>/g, ' ')
-			.replace(/\s+/g, ' ')
-			.trim()
-	);
-}
 
 /*
  * Eden types this route's `data` from the handler's `Response` return value; at runtime the client hands
@@ -134,52 +118,43 @@ describe('consent page — every permission, stated once (US3)', () => {
 		return { session, html, text: visible(html) };
 	}
 
-	it('labels every kind of permission it is asking for', async () => {
-		const { text } = await renderFourKinds();
-
-		expect(text).toContain('Your identity information');
-		expect(text).toContain('Specific details about you');
-		expect(text).toContain(`Access to ${RESOURCE}`);
-		expect(text).toContain('Initiate a payment');
-		expect(text).not.toContain('No additional permissions are requested');
-	});
-
-	it('renders a requested claim, once', async () => {
-		const { text } = await renderFourKinds();
-
-		expect(text).toContain('email');
-		expect(text).not.toContain('email (email)');
-	});
-
-	it('renders a resource’s scopes under that resource, once', async () => {
-		const { text } = await renderFourKinds();
-
-		expect(text).toContain('api:read');
-		expect(text).not.toContain('api:read (api:read)');
-		// The indicator is named once — in the heading, not also as a bare line above it.
-		expect(text.split(RESOURCE).length - 1).toBe(1);
-	});
-
-	it('renders a scope with no friendly label once, and one with a label alongside its token', async () => {
-		const { text } = await renderFourKinds();
-
-		expect(text).toContain('billing');
-		expect(text).not.toContain('billing (billing)');
-		// A token still earns its place when the label is prose the token does not carry.
-		expect(text).toContain('Your basic profile information ( profile )');
-	});
-
-	it('keeps the four kinds in a fixed order', async () => {
+	it('sorts what it asks into what the app will see, do, and what nobody described', async () => {
 		const { text } = await renderFourKinds();
 
 		const positions = [
-			text.indexOf('Your identity information'),
-			text.indexOf('Specific details about you'),
-			text.indexOf(`Access to ${RESOURCE}`),
-			text.indexOf('Initiate a payment')
+			text.indexOf(CONSENT_TEXTS.groups.see),
+			text.indexOf(CONSENT_TEXTS.groups.act),
+			text.indexOf(CONSENT_TEXTS.groups.other)
 		];
 		expect(positions.every((p) => p >= 0)).toBeTrue();
 		expect(positions).toEqual([...positions].sort((a, b) => a - b));
+	});
+
+	it('words a requested claim as the data it is, never as its claim name alone', async () => {
+		const { text } = await renderFourKinds();
+
+		expect(text).toContain(CONSENT_TEXTS.categories.email);
+	});
+
+	it('shows a resource scope nobody described by its technical name, under the resource', async () => {
+		const { text } = await renderFourKinds();
+
+		expect(text).toContain(CONSENT_TEXTS.resource.undescribedOwner(RESOURCE));
+		expect(text).toContain('api:read');
+	});
+
+	it('shows a custom scope nobody described by its technical name, saying the administrator did not describe it', async () => {
+		const { text } = await renderFourKinds();
+
+		expect(text).toContain('billing');
+		expect(text).toMatch(/administrator hasn.t described these/);
+	});
+
+	it('names a rich authorization detail by its operator label, with its fields', async () => {
+		const { text } = await renderFourKinds();
+
+		expect(text).toContain('Initiate a payment');
+		expect(text).toContain(`${CONSENT_TEXTS.rarFields.actions}: initiate`);
 	});
 
 	it('grants exactly what the page listed', async () => {
@@ -188,7 +163,7 @@ describe('consent page — every permission, stated once (US3)', () => {
 		const { response } = await agent
 			.ui({ uid: session.uid })
 			.consent.post(
-				{ action: 'allow' },
+				{ action: 'allow', accountId: await shownAccount(session.uid) },
 				{ headers: { cookie: header(session.jar) } }
 			);
 		expect(response.status).toBe(303);
@@ -216,7 +191,7 @@ describe('consent page — every permission, stated once (US3)', () => {
 		expect(grant.payload.rar).toEqual([payment]);
 	});
 
-	it('still says so when nothing is outstanding', async () => {
+	it('says nothing new is asked when a forced consent finds everything already allowed', async () => {
 		const auth = new AuthorizationRequest({
 			client_id: 'consent-app',
 			scope: 'openid',
@@ -228,66 +203,6 @@ describe('consent page — every permission, stated once (US3)', () => {
 			headers: { cookie: header(session.jar) }
 		});
 
-		expect(visible(bodyOf(data))).toContain(
-			'No additional permissions are requested'
-		);
-	});
-});
-
-// The view builder is pure and reads no configuration, so its labels need no HTTP at all.
-describe('buildConsentView labels (US3)', () => {
-	const base = { uid: 'u', clientName: 'C' };
-
-	it('labels an OIDC scope group', () => {
-		const view = buildConsentView({
-			...base,
-			details: { missingOIDCScope: ['openid'] }
-		});
-		expect(present(view.permissions[0], 'view.permissions[0]').label).toBe(
-			'Your identity information'
-		);
-	});
-
-	it('labels a claims group', () => {
-		const view = buildConsentView({
-			...base,
-			details: { missingOIDCClaims: ['email'] }
-		});
-		expect(present(view.permissions[0], 'view.permissions[0]').label).toBe(
-			'Specific details about you'
-		);
-	});
-
-	it('names the resource in a resource-scope group label', () => {
-		const view = buildConsentView({
-			...base,
-			details: { missingResourceScopes: { 'urn:x': ['api:read'] } }
-		});
-		expect(present(view.permissions[0], 'view.permissions[0]').label).toBe(
-			'Access to urn:x'
-		);
-		// The indicator stays on the group as data, for keys and for tests.
-		expect(
-			present(view.permissions[0], 'view.permissions[0]').resourceIndicator
-		).toBe('urn:x');
-	});
-
-	it('keeps the operator label for a rich detail, and falls back to the raw type', () => {
-		const labelled = buildConsentView({
-			...base,
-			details: { rar: [{ type: 'urn:t', actions: ['a'] }] },
-			rarLabels: { 'urn:t': 'Do a thing' }
-		});
-		expect(
-			present(labelled.permissions[0], 'labelled.permissions[0]').label
-		).toBe('Do a thing');
-
-		const unlabelled = buildConsentView({
-			...base,
-			details: { rar: [{ type: 'urn:t', actions: ['a'] }] }
-		});
-		expect(
-			present(unlabelled.permissions[0], 'unlabelled.permissions[0]').label
-		).toBe('urn:t');
+		expect(visible(bodyOf(data))).toContain(CONSENT_TEXTS.repeat.nothingNew);
 	});
 });

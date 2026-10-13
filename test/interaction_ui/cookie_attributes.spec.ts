@@ -1,3 +1,4 @@
+import { shownAccount } from '../consent_form.js';
 import { describe, it, expect, beforeAll } from 'bun:test';
 import bootstrap, {
 	findSessionSetCookie,
@@ -151,7 +152,10 @@ describe('end-user cookie attributes', () => {
 
 		const { response: allowed } = await agent
 			.ui({ uid: consentUid })
-			.consent.post({ action: 'allow' }, { headers: { cookie } });
+			.consent.post(
+				{ action: 'allow', accountId: await shownAccount(consentUid) },
+				{ headers: { cookie } }
+			);
 		expect(allowed.status).toBe(303);
 
 		const header = setCookieFor(allowed, '_interaction');

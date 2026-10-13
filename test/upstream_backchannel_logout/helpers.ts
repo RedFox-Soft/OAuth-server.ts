@@ -1,3 +1,4 @@
+import { shownAccount } from '../consent_form.js';
 import { spyOn } from 'bun:test';
 import { Type } from '@sinclair/typebox';
 
@@ -266,7 +267,10 @@ async function consented(
 				'content-type': 'application/x-www-form-urlencoded',
 				cookie: cookies.filter(Boolean).join('; ')
 			},
-			body: new URLSearchParams({ action: 'allow' }).toString()
+			body: new URLSearchParams({
+				action: 'allow',
+				accountId: await shownAccount(consentUid)
+			}).toString()
 		})
 	);
 	return {

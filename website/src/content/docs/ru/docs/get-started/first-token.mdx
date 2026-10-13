@@ -1,7 +1,7 @@
 ---
 title: Получение первого токена
 description: 'Authorization Code с PKCE вручную через curl: от challenge до декодированного ID-токена и вызова UserInfo.'
-source: f8dc5adfcb86
+source: fd7f1a489fe5
 sidebar:
   order: 5
 ---
@@ -150,8 +150,8 @@ authorized at this address», — потому что клиент можно и
 
 <ScreenshotFigure
 	name="consent"
-	alt="Экран согласия с названием клиента и списком запрашиваемых им scope."
-	caption="Экран согласия перечисляет то, что было запрошено. `offline_access` появляется, только если запрос также содержит `prompt=consent`."
+	alt="Экран согласия: название приложения, аккаунт, который даёт согласие, и что приложение сможет делать."
+	caption="Экран согласия говорит, что приложение сможет делать. Если в запросе есть `offline_access` и `prompt=consent`, экран также говорит, до какой даты у приложения останется доступ."
 />
 
 ## Включено по умолчанию или за флагом {#on-by-default-or-behind-a-flag}

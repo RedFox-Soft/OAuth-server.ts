@@ -37,6 +37,8 @@ import type { BucketDeletionView } from './bucketView.js';
 
 interface CreateBucketValues {
 	name: string;
+	/* What the bucket's people see on the page where they allow an app access; empty means its address. */
+	displayName?: string;
 	/* Which form the operator chose. Never sent — the body carries `slug` or `host`, never both. */
 	addressForm?: 'path' | 'host';
 	slug?: string;
@@ -136,11 +138,13 @@ export function Buckets() {
 			 * preferring one, so sending the field the operator did not fill would turn their choice into a
 			 * 400 they did not cause.
 			 */
-			const { addressForm, slug, host, ...rest } = values;
+			const { addressForm, slug, host, displayName, ...rest } = values;
+			const shown = displayName?.trim();
+			const named = shown ? { ...rest, displayName: shown } : rest;
 			const result = await request<{ _id: string }>(
 				'POST',
 				'/admin/api/buckets',
-				addressForm === 'host' ? { ...rest, host } : { ...rest, slug }
+				addressForm === 'host' ? { ...named, host } : { ...named, slug }
 			);
 			if (!result.ok) {
 				feedback.failed(result, form);
@@ -440,6 +444,16 @@ export function Buckets() {
 						rules={[{ required: true }]}
 					>
 						<Input />
+					</Form.Item>
+					<Form.Item
+						name="displayName"
+						label="Name shown to users"
+						extra="What people see at the top of the page where they allow an app access — for example “Acme ID”. Leave it empty to show the bucket’s address instead. The name above is only for this console."
+					>
+						<Input
+							maxLength={60}
+							placeholder="the bucket’s address"
+						/>
 					</Form.Item>
 					{/*
 					 * The address, and not a second name: everything beneath it — this bucket's endpoints,

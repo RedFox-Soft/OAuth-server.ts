@@ -27,6 +27,7 @@ import {
 // second copy of the rule drifts from the one that actually decides.
 import { dsnFromString } from '@sentry/core';
 import { withGroupsScope } from '../consts/groups_claim.js';
+import { isStandardOidcScope } from '../consts/oidc_scopes.js';
 
 /*
  * The server settings that cannot be read straight off ApplicationConfig: collections turned into
@@ -160,6 +161,43 @@ function collectScopes(scopes: Set<string>, claims: ClaimsConfig) {
 			scopes.add(scope);
 		}
 	});
+}
+
+/*
+ * Checked against the scope set the claims pass just built, so a description can only name a scope this
+ * instance defines — and removing a scope while it is still described is refused rather than left as a
+ * sentence about nothing. The standard scopes are refused too: the consent page describes them itself, and
+ * a second description would contradict the first on the same page.
+ */
+function checkConsentScopeDescriptions(
+	config: ConfigurationInput,
+	scopes: ReadonlySet<string>
+) {
+	const descriptions = config['consent.scopeDescriptions'];
+	if (!isPlainObject(descriptions)) {
+		throw new TypeError('consent.scopeDescriptions must be an object');
+	}
+	for (const [scope, description] of Object.entries(descriptions)) {
+		if (isStandardOidcScope(scope)) {
+			throw new TypeError(
+				`consent.scopeDescriptions['${scope}'] describes a standard scope, which the consent page already describes`
+			);
+		}
+		if (!scopes.has(scope)) {
+			throw new TypeError(
+				`consent.scopeDescriptions['${scope}'] describes a scope this instance does not define`
+			);
+		}
+		if (
+			typeof description !== 'string' ||
+			!description.trim() ||
+			description.length > 200
+		) {
+			throw new TypeError(
+				`consent.scopeDescriptions['${scope}'] must be 1 to 200 characters of text`
+			);
+		}
+	}
 }
 
 function unpackArrayClaims(claims: ClaimsConfig) {
@@ -683,6 +721,7 @@ export function validateConfiguration(
 
 	// Order is significant: each claims pass below builds on the one before it.
 	collectScopes(scopes, claims);
+	checkConsentScopeDescriptions(config, scopes);
 	unpackArrayClaims(claims);
 	ensureOpenIdSub(claims);
 	const claimsSupported = collectClaims(scopes, claims);

@@ -1,3 +1,4 @@
+import { shownAccount } from '../consent_form.js';
 import {
 	describe,
 	it,
@@ -199,7 +200,10 @@ describe('an authorization error for a client nobody here vouched for', () => {
 
 			const { response, error } = await agent
 				.ui({ uid })
-				.consent.post({ action: 'cancel' }, { headers: { cookie } });
+				.consent.post(
+					{ action: 'cancel', accountId: await shownAccount(uid) },
+					{ headers: { cookie } }
+				);
 			const page = textOf(error?.value);
 
 			expect(response.status).toBeGreaterThanOrEqual(400);

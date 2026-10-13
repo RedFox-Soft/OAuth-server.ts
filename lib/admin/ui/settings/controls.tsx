@@ -3,6 +3,7 @@ import { Input, InputNumber, Select, Switch, Typography } from 'antd';
 import type { Descriptor, Values } from './model.js';
 import { MaskField } from './MaskField.js';
 import { RarTypesField } from './RarTypesField.js';
+import { ScopeDescriptionsField } from './ScopeDescriptionsField.js';
 
 interface BespokeProps {
 	values: Values;
@@ -33,6 +34,15 @@ const BESPOKE: Partial<Record<string, (props: BespokeProps) => ReactNode>> = {
 			enabled={values['richAuthorizationRequests.enabled'] === true}
 			disabled={disabled}
 			onChange={(types) => onChange('richAuthorizationRequests.types', types)}
+		/>
+	),
+	'consent.scopeDescriptions': ({ values, disabled, onChange }) => (
+		<ScopeDescriptionsField
+			values={values}
+			disabled={disabled}
+			onChange={(descriptions) =>
+				onChange('consent.scopeDescriptions', descriptions)
+			}
 		/>
 	)
 };

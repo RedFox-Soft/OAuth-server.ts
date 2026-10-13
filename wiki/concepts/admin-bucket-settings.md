@@ -4,7 +4,7 @@ title: "The administrators' bucket: ordinary settings, a guard per setting"
 tags: [architecture, contract]
 sources: [oauth-server-codebase]
 created: 2026-10-10
-updated: 2026-10-12
+updated: 2026-10-13
 ---
 
 # The administrators' bucket: ordinary settings, a guard per setting
@@ -54,6 +54,7 @@ and the preview are on [[bucket-sign-in-policy]].
 |---|---|
 | `passwordLogin: false` | Since spec 080: refused unless the acting session signed in through an enabled provider of this bucket where the actor is linked (an agent never qualifies), and unless some active super administrator stays reachable through a provider ([[console-federation]]). `assertSomeWayToSignIn` still applies on top. Since spec 083, once allowed it is previewed, naming the administrators without a linked identity. |
 | `emailVerificationRequired: true` | Refused while mail delivery is not configured (`mailDeliveryConfigured`, `lib/mail/mailer.ts:39`, the same test `deliver()` applies). Since spec 083 that refusal is the route's and holds on every bucket, worded "people could not receive the verification message: configure mail delivery first" ([[bucket-sign-in-policy]]). This bucket adds its own: refused while the **acting** administrator's own address is unverified, so the requirement can never refuse the person who set it. |
+| `displayName` (since spec 092) | No guard beyond its shape: 1–60 characters, trimmed, blank refused with 400 (`acceptedDisplayName`, `lib/admin/buckets/routes.ts:112`); `null` removes it. It is the name end users see at the top of the consent page, never the console's label for the bucket ([[consent-screen-decisions]]). The field's comment and the MCP tool text also name the sign-in page, which does not read it yet (2026-10-13). |
 | `registrationOpen`, `verificationMethod`, `totpRequired`, `name` | No guard. Opening registration while verification is off answers with an advisory (`adminBucketAdvisory`, `admin_bucket.ts:50`), and an agent reads the same sentence the console shows. Since spec 083 opening registration and requiring an authenticator are previewed and confirmed first. |
 
 A super administrator cannot change **their own** address while verification is required

@@ -37,7 +37,8 @@ const ALTERNATIVES: Record<string, unknown> = {
 		openid: ['sub'],
 		profile: ['name']
 	},
-	clientAuthMethods: ['client_secret_basic', 'none']
+	clientAuthMethods: ['client_secret_basic', 'none'],
+	'consent.scopeDescriptions': { billing: 'see your invoices' }
 };
 
 /*
@@ -55,7 +56,11 @@ const COMPANIONS: Record<string, Record<string, unknown>> = {
 	},
 	'registrationManagement.enabled': { 'registration.enabled': true },
 	'jwtIntrospection.enabled': { 'introspection.enabled': true },
-	'jwtUserinfo.enabled': { 'userinfo.enabled': true }
+	'jwtUserinfo.enabled': { 'userinfo.enabled': true },
+	/* A description must name a scope the instance defines, so the scope travels with it. */
+	'consent.scopeDescriptions': {
+		scopes: ['openid', 'offline_access', 'billing']
+	}
 };
 
 /*

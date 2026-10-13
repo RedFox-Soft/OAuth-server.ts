@@ -1,7 +1,7 @@
 ---
 title: 获取第一个令牌
 description: 用 curl 手动走一遍授权码 + PKCE 流程：从 challenge 到解码 ID 令牌，再到调用 UserInfo。
-source: f8dc5adfcb86
+source: fd7f1a489fe5
 sidebar:
   order: 5
 ---
@@ -116,8 +116,8 @@ import ScreenshotFigure from '../../../../../components/ScreenshotFigure.astro';
 
 <ScreenshotFigure
 	name="consent"
-	alt="授权同意页面，显示客户端名称并列出它所请求的 scope。"
-	caption="授权同意页面列出所请求的内容。只有当请求同时带有 `prompt=consent` 时，`offline_access` 才会出现。"
+	alt="授权同意页面，显示应用名称、正在授权的账户，以及应用将能做什么。"
+	caption="授权同意页面说明应用将能做什么。如果请求同时带有 `offline_access` 和 `prompt=consent`，页面还会说明应用的访问权限保留到哪一天。"
 />
 
 ## 默认开启，还是由开关控制 {#on-by-default-or-behind-a-flag}

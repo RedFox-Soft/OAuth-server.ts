@@ -1041,6 +1041,17 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 			'Which end-user claims this server can release, and under which scope, e.g. {"openid":["sub"],"profile":["name","given_name","family_name"],"email":["email","email_verified"],"acr":null,"sid":null,"auth_time":null,"iss":null}. A member whose value is a list of claim names defines a scope: that scope is advertised in discovery and a client granted it receives those claims. A member whose value is null is a claim of its own, released when requested by name. `openid` is required and always carries `sub`. `amr` — the authentication methods a sign-in used — is always supported and needs no entry here: every ID token from a sign-in carries it, and listing or omitting it changes nothing. A claim an end user holds but no entry names is never released, which is why the claims you set on an account in a bucket reach a client only once a scope here names them. A new instance maps `profile` and `phone` to their OpenID Connect Core §5.4 claims, which is what a provisioned profile is released under; an instance that saved this setting before keeps exactly what it saved.'
 	},
 	{
+		key: 'consent.scopeDescriptions',
+		domain: 'endpoints',
+		group: 'Discovery',
+		label: 'Descriptions of custom scopes',
+		summary:
+			'What each of your own scopes lets an app do, as the consent page says it',
+		type: 'json',
+		description:
+			'What each scope this instance defines lets an application do, in the words the consent page shows the person deciding, e.g. {"billing":"see your invoices and payment history"}. Write it to follow "The app will be able to": a verb, then what it acts on. Keys must be scopes defined under Supported scopes or Claims, and never a standard OpenID Connect scope (openid, profile, email, address, phone, offline_access, groups) — the page describes those itself. A requested scope with no description is still shown, by its technical name, under "Other permissions — not described", which is honest but tells the person nothing. To remove a scope that has a description, remove the description in the same save. Scopes of a protected resource you declared are described on that resource, not here.'
+	},
+	{
 		key: 'acrValues',
 		domain: 'endpoints',
 		group: 'Discovery',

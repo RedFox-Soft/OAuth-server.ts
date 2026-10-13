@@ -3,6 +3,7 @@ import { routeNames, type PipelineParams } from 'lib/consts/param_list.js';
 import type { Interaction } from 'lib/models/interaction.js';
 import nanoid from '../../helpers/nanoid.js';
 import { ISSUER } from 'lib/configs/env.js';
+import { issuerFor } from 'lib/configs/issuer.js';
 import { logout } from 'lib/html/logout.js';
 import { SessionNotFound } from '../../helpers/errors.js';
 import { resolveBucketForRequest } from '../../admin/auth/resolveBucket.js';
@@ -71,16 +72,36 @@ export default async function resumeAction(
 		}
 
 		const secret = nanoid();
+		/*
+		 * Back to the address the interaction began at. A bucket with a hostname serves its interaction there
+		 * and nowhere else — its cookie lives on that host and the interaction refuses any other — so sending
+		 * the browser to the root issuer after the sign-out ended the switch on a page the browser would not
+		 * even submit to. Every other bucket's screens live at the root, as before.
+		 */
+		const resumeAt = oidc.bucket.host
+			? new URL(issuerFor(oidc.bucket)).origin
+			: ISSUER;
 		// On the payload: only payload keys are stored, and the sign-out confirmation reads it from there.
 		session.payload.state = {
 			secret,
 			clientId: storedParams.client_id,
-			postLogoutRedirectUri: `${ISSUER}/ui/${interaction.uid}/resume`
+			postLogoutRedirectUri: `${resumeAt}/ui/${interaction.uid}/resume`
 		};
 
-		// The bare address, as before: this screen is reached at /ui/, which no bucket prefixes, and
-		// which session cookie its confirmation must read is a question of its own.
-		return logout(secret, routeNames.end_session_confirm);
+		/*
+		 * The bare address, as before: this screen is reached at /ui/, which no bucket prefixes, and which
+		 * session cookie its confirmation must read is a question of its own.
+		 *
+		 * The pending request's redirect URI goes to the page's policy because confirming starts a redirect
+		 * chain — confirmation, then /ui/:uid/resume, then the client — and `form-action` governs every hop
+		 * of it. With 'self' alone the browser stopped at the last one whenever the new account needed no
+		 * consent, leaving the person on this page after switching accounts (wiki: form-action-redirect-chain).
+		 */
+		return logout(
+			secret,
+			routeNames.end_session_confirm,
+			storedParams.redirect_uri
+		);
 	}
 
 	await interaction.destroy();

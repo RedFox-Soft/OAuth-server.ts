@@ -11,7 +11,13 @@ import {
 import { loadProject } from '../projects/access.js';
 import { recordAdminAudit } from '../audit/record.js';
 import { canonicalizeResourceIdentifier } from '../../resources/canonical.js';
-import { validateScopes, scopeFailureMessage } from '../../resources/scopes.js';
+import {
+	validateScopes,
+	scopeFailureMessage,
+	validateScopeDescriptions,
+	scopeDescriptionFailureMessage,
+	type ScopeDescriptionInput
+} from '../../resources/scopes.js';
 import { isMcpResource } from '../../mcp/resource_server.js';
 import { SCIM_BASE_PATH } from '../../consts/scim.js';
 import { CreateResourceBody, UpdateResourceBody } from './schema.js';
@@ -122,6 +128,38 @@ function acceptedScopes(scopes: string[]): string[] {
 	return result.scopes;
 }
 
+function acceptedScopeDescriptions(
+	descriptions: Readonly<Record<string, ScopeDescriptionInput>>,
+	scopes: readonly string[]
+) {
+	const result = validateScopeDescriptions(descriptions, scopes);
+	if (!result.ok) {
+		throw new AdminError(
+			400,
+			scopeDescriptionFailureMessage(result.reason, result.value),
+			{ field: 'scopeDescriptions' }
+		);
+	}
+	return result.descriptions;
+}
+
+/*
+ * The descriptions that survive a change to the scope list: those of scopes still recognised. Undefined
+ * when nothing was dropped, so an edit that removed no described scope does not rewrite the map.
+ */
+function prunedDescriptions(
+	existing: Readonly<Record<string, ScopeDescriptionInput>> | undefined,
+	scopes: readonly string[]
+) {
+	if (!existing) return undefined;
+	const kept = Object.fromEntries(
+		Object.entries(existing).filter(([scope]) => scopes.includes(scope))
+	);
+	return Object.keys(kept).length === Object.keys(existing).length
+		? undefined
+		: kept;
+}
+
 /*
  * Loads a declared resource by the spelling in the path, and refuses one that belongs to a different
  * project than the path names.
@@ -173,6 +211,10 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 				body.trailingSlashSignificant
 			);
 			const scopes = acceptedScopes(body.scopes);
+			const scopeDescriptions =
+				body.scopeDescriptions === undefined
+					? undefined
+					: acceptedScopeDescriptions(body.scopeDescriptions, scopes);
 			const namespace = await namespaceOfProject(project);
 			assertMayWrite(ctx, namespace);
 
@@ -200,6 +242,7 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 					projectId: params.id,
 					name: body.name,
 					scopes,
+					...(scopeDescriptions ? { scopeDescriptions } : {}),
 					tokenFormat: body.tokenFormat,
 					accessTokenTTL: body.accessTokenTTL,
 					trailingSlashSignificant: body.trailingSlashSignificant
@@ -271,26 +314,39 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 			const project = await loadProject(ctx, params.id);
 			const namespace = await namespaceOfProject(project);
 			assertMayWrite(ctx, namespace);
-			const { identifier } = await loadResource(
+			const existing = await loadResource(
 				params.id,
 				namespace,
 				params.resourceId
 			);
+			const { identifier } = existing;
 
 			const scopes =
 				body.scopes === undefined ? undefined : acceptedScopes(body.scopes);
+			const effectiveScopes = scopes ?? existing.scopes;
+			const scopeDescriptions =
+				body.scopeDescriptions !== undefined
+					? acceptedScopeDescriptions(body.scopeDescriptions, effectiveScopes)
+					: scopes === undefined
+						? undefined
+						: prunedDescriptions(existing.scopeDescriptions, effectiveScopes);
+			const attributes = Object.keys(body);
+			if (scopeDescriptions && !attributes.includes('scopeDescriptions')) {
+				attributes.push('scopeDescriptions');
+			}
 
 			// After validation: an entry for a request about to be refused as malformed would describe a
 			// change nobody attempted.
 			await recordAdminAudit(ctx, 'resource.update', identifier, {
-				attributes: Object.keys(body),
+				attributes,
 				ownerGroupId: project.ownerGroupId,
 				targetScope: namespace
 			});
 
 			return getProtectedResourceStore().update(namespace, identifier, {
 				...body,
-				...(scopes === undefined ? {} : { scopes })
+				...(scopes === undefined ? {} : { scopes }),
+				...(scopeDescriptions === undefined ? {} : { scopeDescriptions })
 			});
 		},
 		{ body: UpdateResourceBody }

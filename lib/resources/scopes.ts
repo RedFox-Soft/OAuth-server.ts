@@ -88,3 +88,62 @@ export function scopeFailureMessage(
 			return `scope listed twice: ${JSON.stringify(value)}`;
 	}
 }
+
+/*
+ * What each scope lets an app do, in the declaring administrator's words, as the consent page will say it.
+ * The same single source as the scope rules above, for the same reason: the route enforces it and the
+ * console shows it.
+ */
+export const SCOPE_DESCRIPTION_MAX_LENGTH = 200;
+
+export interface ScopeDescriptionInput {
+	readonly description: string;
+	readonly kind?: 'see' | 'act';
+}
+
+type AcceptedDescription = { description: string; kind?: 'see' | 'act' };
+
+export type ScopeDescriptionsValidation =
+	| {
+			readonly ok: true;
+			readonly descriptions: Record<string, AcceptedDescription>;
+	  }
+	| {
+			readonly ok: false;
+			readonly reason: 'undeclared' | 'blank';
+			readonly value: string;
+	  };
+
+/*
+ * A description may only name a scope the resource recognises — one for any other would be a sentence on
+ * the consent page about nothing it can grant. Returned trimmed and with no absent member left behind as
+ * `undefined`, because a stored map is a nested value no backend restores a null inside.
+ */
+export function validateScopeDescriptions(
+	descriptions: Readonly<Record<string, ScopeDescriptionInput>>,
+	scopes: readonly string[]
+): ScopeDescriptionsValidation {
+	const recognised = new Set(scopes);
+	const accepted: Record<string, AcceptedDescription> = {};
+	for (const [scope, entry] of Object.entries(descriptions)) {
+		if (!recognised.has(scope)) {
+			return { ok: false, reason: 'undeclared', value: scope };
+		}
+		const description = entry.description.trim();
+		if (!description) return { ok: false, reason: 'blank', value: scope };
+		accepted[scope] = {
+			description,
+			...(entry.kind ? { kind: entry.kind } : {})
+		};
+	}
+	return { ok: true, descriptions: accepted };
+}
+
+export function scopeDescriptionFailureMessage(
+	reason: 'undeclared' | 'blank',
+	value: string
+): string {
+	return reason === 'undeclared'
+		? `${JSON.stringify(value)} is described but is not one of the resource's scopes`
+		: `the description of ${JSON.stringify(value)} cannot be blank`;
+}

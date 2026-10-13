@@ -1,3 +1,5 @@
+import { CONSENT_TEXTS } from 'lib/interactions/consentTexts.js';
+import { shownAccount } from '../consent_form.js';
 import {
 	describe,
 	it,
@@ -147,7 +149,9 @@ describe('interaction UI', () => {
 			});
 			expect(status).toBe(200);
 			expect(data).toContain('method="post"');
-			expect(data).toContain('Consent Required');
+			// The decision travels with the account it was shown for, or the server refuses it.
+			expect(data).toContain('name="accountId"');
+			expect(data).toContain(CONSENT_TEXTS.buttons.allow);
 		});
 
 		it('a consent page for a session that has ended is refused', async function () {
@@ -208,7 +212,8 @@ describe('interaction UI', () => {
 			const before = grantCount();
 			const { response: declined } = await agent.ui({ uid: uid }).consent.post(
 				{
-					action: 'cancel'
+					action: 'cancel',
+					accountId: await shownAccount(uid)
 				},
 				{
 					headers: {
@@ -344,7 +349,8 @@ describe('interaction UI', () => {
 		it('accepts the consent and resumes the authorization request', async function () {
 			const { response } = await agent.ui({ uid: uid }).consent.post(
 				{
-					action: 'allow'
+					action: 'allow',
+					accountId: await shownAccount(uid)
 				},
 				{
 					headers: {
@@ -378,7 +384,10 @@ describe('interaction UI', () => {
 
 			const { response } = await agent
 				.ui({ uid: uid })
-				.consent.post({ action: 'allow' }, { headers: { cookie } });
+				.consent.post(
+					{ action: 'allow', accountId: await shownAccount(uid) },
+					{ headers: { cookie } }
+				);
 
 			expect(response.status).toBe(303);
 			expect(grantCount()).toBe(before + 1);
@@ -390,7 +399,8 @@ describe('interaction UI', () => {
 
 			const { error } = await agent.ui({ uid: uid }).consent.post(
 				{
-					action: 'allow'
+					action: 'allow',
+					accountId: await shownAccount(uid)
 				},
 				{
 					headers: {
@@ -413,7 +423,8 @@ describe('interaction UI', () => {
 
 			const { error } = await agent.ui({ uid: uid }).consent.post(
 				{
-					action: 'allow'
+					action: 'allow',
+					accountId: await shownAccount(uid)
 				},
 				{
 					headers: {
@@ -465,14 +476,16 @@ describe('interaction UI', () => {
 			});
 			expect(status).toBe(200);
 			expect(data).toContain('Test Client App');
-			expect(data).toContain('profile');
-			expect(data).toContain('email');
+			// The seeded person has an address and no name, so the page promises the one and not the other.
+			expect(data).toContain(CONSENT_TEXTS.categories.email);
+			expect(data).not.toContain(CONSENT_TEXTS.categories.profileName);
 		});
 
 		it('allow issues a grant for the requested scopes and resumes to the client', async function () {
 			const { response } = await agent.ui({ uid: uid }).consent.post(
 				{
-					action: 'allow'
+					action: 'allow',
+					accountId: await shownAccount(uid)
 				},
 				{
 					headers: {

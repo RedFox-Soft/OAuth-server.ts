@@ -1,3 +1,6 @@
+import { shownAccount } from '../consent_form.js';
+import { visible } from '../page_text.js';
+import { CONSENT_TEXTS } from 'lib/interactions/consentTexts.js';
 import * as crypto from 'node:crypto';
 
 import {
@@ -127,7 +130,10 @@ describe('features.richAuthorizationRequests', () => {
 		eventBus.once('authorization_code.saved', codeSpy);
 		const { response } = await agent
 			.ui({ uid: uid })
-			.consent.post({ action: 'allow' }, { headers: { cookie: header(jar) } });
+			.consent.post(
+				{ action: 'allow', accountId: await shownAccount(uid) },
+				{ headers: { cookie: header(jar) } }
+			);
 		expect(response.status).toBe(303);
 		const location = response.headers.get('location');
 		expect(location).toContain('https://client.example.com/cb');
@@ -243,12 +249,15 @@ describe('features.richAuthorizationRequests', () => {
 				});
 
 			expect(status).toBe(200);
-			expect(data).toContain('Initiate a payment');
-			expect(data).toContain('Actions: initiate');
-			expect(data).toContain('Locations: urn:rar:default');
-			expect(data).toContain('Identifier: acct-1');
-			// The page used to say this while asking the End-User to authorize a payment.
-			expect(data).not.toContain('No additional permissions are requested');
+			const text = visible(String(data));
+			expect(text).toContain('Initiate a payment');
+			expect(text).toContain('Actions: initiate');
+			expect(text).toContain('Locations: urn:rar:default');
+			expect(text).toContain('Identifier: acct-1');
+			// A payment is something the app does for the person, never something it merely sees.
+			expect(text.indexOf(CONSENT_TEXTS.groups.act)).toBeLessThan(
+				text.indexOf('Initiate a payment')
+			);
 		});
 
 		it('records the requested detail on the grant, and finds it granted next time', async () => {
@@ -279,7 +288,7 @@ describe('features.richAuthorizationRequests', () => {
 
 		it('renders rich details beside scopes on one page', async () => {
 			const auth = new AuthorizationRequest({
-				scope: 'openid profile',
+				scope: 'openid email',
 				authorization_details: details(payment())
 			});
 			const session = await toConsent(auth, cookie);
@@ -288,8 +297,9 @@ describe('features.richAuthorizationRequests', () => {
 				headers: { cookie: header(session.jar) }
 			});
 
-			expect(data).toContain('Initiate a payment');
-			expect(data).toContain('profile');
+			const text = visible(String(data));
+			expect(text).toContain('Initiate a payment');
+			expect(text).toContain(CONSENT_TEXTS.categories.email);
 		});
 
 		/*
@@ -332,7 +342,9 @@ describe('features.richAuthorizationRequests', () => {
 			});
 
 			expect(data).not.toContain('<script>alert(1)</script>');
-			expect(data).toContain('Identifier:');
+			expect(visible(String(data))).toContain(
+				'Identifier: <script>alert(1)</script>'
+			);
 		});
 	});
 
@@ -862,9 +874,17 @@ describe('features.richAuthorizationRequests', () => {
 			const { data } = await agent.ui({ uid: session.uid }).consent.get({
 				headers: { cookie: header(session.jar) }
 			});
-			// Only the not-yet-granted detail is shown; the End-User is not asked to re-approve.
-			expect(data).toContain('Open-ended access');
-			expect(data).not.toContain('Initiate a payment');
+			// Only the not-yet-granted detail is asked for; the granted one is named as already allowed.
+			const text = visible(String(data));
+			const asked = text.slice(
+				text.indexOf(CONSENT_TEXTS.repeat.alsoAsks),
+				text.indexOf(CONSENT_TEXTS.repeat.afterApproval)
+			);
+			expect(text).toContain(
+				`${CONSENT_TEXTS.repeat.alreadyAllowed} Initiate a payment`
+			);
+			expect(asked).toContain('Open-ended access');
+			expect(asked).not.toContain('Initiate a payment');
 
 			const { code } = await approve(session.uid, session.jar);
 			const grant = await Grant.find(

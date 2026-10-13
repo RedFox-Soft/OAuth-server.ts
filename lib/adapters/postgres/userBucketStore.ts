@@ -43,6 +43,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 	async create(data: {
 		_id?: string;
 		name: string;
+		displayName?: string;
 		slug?: string;
 		host?: string;
 		ownerGroupId: string;
@@ -57,6 +58,9 @@ export class UserBucketStore implements UserBucketStoreInstance {
 		const bucket: UserBucket = {
 			_id: data._id ?? nanoid(),
 			name: data.name,
+			...(data.displayName !== undefined
+				? { displayName: data.displayName }
+				: {}),
 			slug: data.slug,
 			/* Written only when present: a stored null would occupy the partial unique index, so the
 			 * second bucket created without a hostname would collide with the first. */
@@ -180,6 +184,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 			Pick<
 				UserBucket,
 				| 'name'
+				| 'displayName'
 				| 'ownerGroupId'
 				| 'passwordLogin'
 				| 'federation'
@@ -193,10 +198,23 @@ export class UserBucketStore implements UserBucketStoreInstance {
 			>
 		>
 	): Promise<UserBucket | null> {
+		/*
+		 * A key present with an undefined value removes the field, and `doc || patch` cannot say that: the
+		 * key vanishes from the JSON and the stored value stays. Removals are subtracted before the merge,
+		 * as in the user store.
+		 */
+		const set: Record<string, unknown> = { updatedAt: new Date() };
+		const remove: string[] = [];
+		for (const [field, value] of Object.entries(
+			patch as Record<string, unknown>
+		)) {
+			if (value === undefined) remove.push(field);
+			else set[field] = value;
+		}
 		const handle = sql();
-		const merged = { ...patch, updatedAt: new Date() };
 		const rows = await handle`
-			UPDATE ${handle(this.area)} SET doc = doc || ${merged}
+			UPDATE ${handle(this.area)}
+			SET doc = (doc - ${handle.array(remove, 'text')}) || ${set}
 			WHERE id = ${id}
 			RETURNING doc
 		`;

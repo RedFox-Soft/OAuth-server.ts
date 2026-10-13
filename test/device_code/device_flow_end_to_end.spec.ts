@@ -1,3 +1,6 @@
+import { shownAccount } from '../consent_form.js';
+import { visible } from '../page_text.js';
+import { CONSENT_TEXTS } from 'lib/interactions/consentTexts.js';
 import { describe, it, expect, beforeAll, afterEach } from 'bun:test';
 import bootstrap from '../test_helper.js';
 import { elysia } from 'lib/index.ts';
@@ -121,7 +124,12 @@ async function atConsent(fields: Record<string, string> = {}) {
 		await enterCode(browser, user_code),
 		await newUser()
 	);
-	return { browser, device_code, consentAt: signedIn.headers.get('location') };
+	return {
+		browser,
+		device_code,
+		user_code,
+		consentAt: signedIn.headers.get('location')
+	};
 }
 
 /**
@@ -142,17 +150,38 @@ describe('a device sign-in from a browser with no session', () => {
 		const { browser, device_code, consentAt } = await atConsent();
 
 		const approved = await browser.post(`/ui/${uidOf(consentAt)}/consent`, {
-			action: 'allow'
+			action: 'allow',
+			accountId: await shownAccount(uidOf(consentAt))
 		});
 
 		expect(approved.status).toBe(200);
 		expect(await poll(device_code)).toHaveProperty('access_token');
 	});
 
+	/*
+	 * Device-code phishing hands a person a code someone else started. The page repeats the code and says
+	 * what to do if it was sent to them, and offers none of the reassurance a web sign-in gets.
+	 */
+	it('repeats the code and says to refuse it when someone sent it, on the consent page for a device', async () => {
+		const { browser, user_code, consentAt } = await atConsent();
+
+		const page = await browser.request(`/ui/${uidOf(consentAt)}/consent`);
+		const text = visible(await page.text());
+
+		expect(text).toContain(CONSENT_TEXTS.headline.device);
+		expect(text).toContain(user_code);
+		expect(text).toContain(CONSENT_TEXTS.warning.deviceSent);
+		expect(text).toContain(CONSENT_TEXTS.device.next);
+		expect(text).not.toMatch(/hasn't checked this app/);
+	});
+
 	it('tells the device access_denied when the person declines', async () => {
 		const { browser, device_code, consentAt } = await atConsent();
 
-		await browser.post(`/ui/${uidOf(consentAt)}/consent`, { action: 'cancel' });
+		await browser.post(`/ui/${uidOf(consentAt)}/consent`, {
+			action: 'cancel',
+			accountId: await shownAccount(uidOf(consentAt))
+		});
 
 		expect((await poll(device_code)).error).toBe('access_denied');
 	});
@@ -195,7 +224,10 @@ describe('a device sign-in from a browser with no session', () => {
 		});
 		await getProtectedResourceStore().destroy(ROOT_NAMESPACE, AUDIENCE);
 
-		await browser.post(`/ui/${uidOf(consentAt)}/consent`, { action: 'allow' });
+		await browser.post(`/ui/${uidOf(consentAt)}/consent`, {
+			action: 'allow',
+			accountId: await shownAccount(uidOf(consentAt))
+		});
 
 		expect((await poll(device_code)).error).toBe('invalid_target');
 	});
@@ -208,7 +240,10 @@ describe('a device sign-in from a browser with no session', () => {
 			}
 		});
 
-		await browser.post(`/ui/${uidOf(consentAt)}/consent`, { action: 'allow' });
+		await browser.post(`/ui/${uidOf(consentAt)}/consent`, {
+			action: 'allow',
+			accountId: await shownAccount(uidOf(consentAt))
+		});
 		const answer = await poll(device_code);
 		await flushForTest();
 		/*
@@ -254,7 +289,10 @@ describe('a device sign-in from a browser with no session', () => {
 		});
 		await code.save();
 
-		await browser.post(`/ui/${uidOf(consentAt)}/consent`, { action: 'allow' });
+		await browser.post(`/ui/${uidOf(consentAt)}/consent`, {
+			action: 'allow',
+			accountId: await shownAccount(uidOf(consentAt))
+		});
 
 		expect(await poll(device_code)).toMatchObject({
 			error: 'access_denied',

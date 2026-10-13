@@ -4,7 +4,7 @@ title: 'Moving a container to another group'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-10-10
-updated: 2026-10-11
+updated: 2026-10-13
 ---
 
 # Moving a container to another group
@@ -20,13 +20,17 @@ The operation exists because a personal group stopped being shareable in the sam
 
 ## Why the bucket and its projects move together
 
-Two things compare a project's owner with the owner of the bucket it signs into:
+Three things compare a project's owner with the owner of the bucket it signs into:
 
-- consent is waived only where they match (`consentWaived`, `lib/shared/consent_waiver.ts:32-47`);
+- consent is waived only where they match (`consentWaived`, `lib/shared/consent_waiver.ts:33-45`);
 - a project's group may administer the end users of its bucket (the bucket's `manageUsers` right,
-  `bucketCan` in `lib/admin/auth/can.ts` since spec 079).
+  `bucketCan` in `lib/admin/auth/can.ts` since spec 079);
+- since spec 092, the consent page calls a client "this organization's" only where they match, and
+  "operator-registered" otherwise (`clientProvenance`, `lib/models/client/provenance.ts:66-78`). The waiver
+  and the page share the comparison, `projectGroupOwnsBucket` (`provenance.ts:38-45`). See
+  [[consent-screen-decisions]].
 
-Moving one without the other would change both, and nobody would have decided that. This is the same reason
+Moving one without the other would change all three, and nobody would have decided that. This is the same reason
 `PUT /admin/api/projects/:id/bucket` refuses to bind a project to another group's bucket.
 
 ## Changing a project's bucket is previewed (spec 085)
@@ -106,7 +110,9 @@ owner involved is `from` or already `to` — and changes nothing otherwise.
 racing moves only one finds the bucket still in a group it may leave. The real-database check for this
 lives in `database/verify_container_ownership.ts`. The remaining half-done window is the declared
 `container-move-atomicity` divergence (`lib/consts/storage_divergences.ts:85`). While it lasts, consent is
-*not* waived for the bucket's clients, which is the safe direction.
+*not* waived for the bucket's clients, which is the safe direction. For the same reason the consent page
+speaks of them as another group's apps (operator-registered) until the projects follow, which is the
+cautious reading too.
 
 The store finds the bound projects inside the write instead of taking a list. A project bound a moment
 earlier therefore still moves.

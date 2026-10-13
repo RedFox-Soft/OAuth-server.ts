@@ -4,7 +4,7 @@ title: "Rich Authorization Requests and its conformance boundary"
 tags: [oauth, config, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-07-31
-updated: 2026-10-08
+updated: 2026-10-13
 graph:
   node_type: concept
   relationships:
@@ -32,7 +32,8 @@ of this page — a conformance claim is only meaningful next to its exceptions.
 ## Types are data, and at least one is required
 
 `richAuthorizationRequests.types` maps an opaque type identifier to a serializable descriptor: a required
-`label` (what the consent screen shows), optional per-field constraints over the five §2 common fields,
+`label` (what the consent screen shows as the detail's heading, under "The app will be able to act for
+you" since spec 092 — `lib/interactions/consentView.ts:302-324`), optional per-field constraints over the five §2 common fields,
 and `allowUnknownFields` (default `false`, because §5 requires refusing unknown fields). A `validate`
 function may still be registered in an in-process bootstrap as an escape hatch, and a rejection from it
 surfaces as `invalid_authorization_details` rather than a server fault.
@@ -40,7 +41,8 @@ surfaces as `invalid_authorization_details` rather than a server fault.
 Enabling the feature with an **empty** map fails validation, at boot and through the admin settings API,
 because every request would otherwise be refused. The map's **shape** is validated whether or not the
 feature is on (since 2026-10-08): the consent screen reads every type's label on each render, so a
-malformed map stored while RAR was off used to reach it unchecked. `identifier` is single-valued, so a descriptor may mark
+malformed map stored while RAR was off used to reach it unchecked. Since spec 092 a label that is blank
+once trimmed shows the type identifier instead (`consentView.ts:323`). `identifier` is single-valued, so a descriptor may mark
 it required but cannot fix a permitted value set for it.
 
 Per-client opt-in is mandatory: `authorization_details_types` defaults to `[]`, so a client that does not
@@ -93,6 +95,11 @@ identity**: object members are sorted before comparison, but string values are n
 forbids trimming, case folding, and Unicode normalization. Two details differing only in member order are
 the same detail; two differing in case are different details. `lib/helpers/rar_canonical.ts` is the one
 implementation.
+
+Since spec 092 the page also says what the grant already holds. The consent GET reads the existing grant
+(`lib/interactions/index.ts:611`) and names its details, by label, in one line: "You already allowed: …".
+Only the not-yet-granted details are listed as new, each with its common fields. When the new items
+escalate, a summary of everything the app will then have follows. See [[consent-screen-decisions]].
 
 There is no per-detail selection: approval grants everything shown.
 

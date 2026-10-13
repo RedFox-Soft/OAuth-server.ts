@@ -113,9 +113,23 @@ import { ADMIN_BUCKET_ID } from 'lib/admin/consts.js';
 import { registeredAdministrator } from 'lib/admin/administrators.js';
 import {
 	buildConsentView,
-	documentIdentityFor,
+	type ConsentView,
+	type DeclaredResourceFacts,
+	type GrantedSoFar,
 	type PromptDetails
 } from './consentView.js';
+import { adapter } from 'lib/adapters/index.js';
+import { clientProvenance, grantTypeAllowed } from 'lib/models/client.js';
+import { profileClaims } from 'lib/consts/profile_claims.js';
+import { issuerFor } from 'lib/configs/issuer.js';
+import { ttl } from 'lib/configs/liveTime.js';
+import epochTime from 'lib/helpers/epoch_time.js';
+import { denormalize } from 'lib/helpers/user_codes.js';
+import { versionedAsset } from 'lib/html/versionedAsset.js';
+import { findDeclaredResource } from 'lib/resources/registry.js';
+import { namespaceOf } from 'lib/resources/namespace.js';
+import { isMcpResource } from 'lib/mcp/resource_server.js';
+import { isLoopbackRedirect } from 'lib/client_metadata_document/identifier.js';
 import {
 	NOTICE_FEDERATION_LINK,
 	NOTICE_VERIFY,
@@ -498,6 +512,228 @@ async function createGrant(interaction: Interaction) {
 	};
 }
 
+const LIFETIME_DATE = (sameYear: boolean) =>
+	new Intl.DateTimeFormat('en-GB', {
+		day: 'numeric',
+		month: 'long',
+		...(sameYear ? {} : { year: 'numeric' }),
+		timeZone: 'UTC'
+	});
+
+/*
+ * The date until which an app keeps access it was given with `offline_access`: the grant's expiry, which
+ * every refresh is bounded by and which re-consenting never extends. Formatted here, once, so the server
+ * render and the browser show the same string whatever the browser's locale or clock.
+ */
+function lifetimeDate(exp: number): string {
+	const date = new Date(exp * 1000);
+	const sameYear = date.getUTCFullYear() === new Date().getUTCFullYear();
+	return LIFETIME_DATE(sameYear).format(date);
+}
+
+function requestedAgo(iat: number | undefined): string {
+	const minutes = iat === undefined ? 0 : Math.floor((epochTime() - iat) / 60);
+	if (minutes < 1) return 'just now';
+	return minutes === 1 ? '1 minute ago' : `${minutes} minutes ago`;
+}
+
+/*
+ * Whether the request named the account it wants, in a way the sign-in enforces: then switching accounts
+ * on the consent page can only lead back to a sign-in demanding the first one.
+ */
+function accountNamedByRequest(params: Record<string, unknown>): boolean {
+	if (params.id_token_hint) return true;
+	const raw = params.claims;
+	let claims: unknown = raw;
+	if (typeof raw === 'string') {
+		try {
+			claims = JSON.parse(raw);
+		} catch {
+			return false;
+		}
+	}
+	const idToken = isPlainObject(claims)
+		? (claims as { id_token?: unknown }).id_token
+		: undefined;
+	return isPlainObject(idToken) && idToken.sub !== undefined;
+}
+
+function asList(value: string | string[] | undefined): string[] {
+	if (value === undefined) return [];
+	return Array.isArray(value) ? value : [value];
+}
+
+/*
+ * Everything the consent page shows, gathered from the interaction, the client, the bucket being signed
+ * into, the person and their existing grant. The decisions about what to say are buildConsentView's; this
+ * only reads.
+ */
+async function consentViewFor(
+	uid: string,
+	interaction: Interaction,
+	signsInto: string
+): Promise<ConsentView> {
+	const clientId = clientIdOf(interaction) ?? '';
+	const client = clientId ? await Client.tryFind(clientId) : undefined;
+	const params = (interaction.payload.params ?? {}) as Record<string, unknown>;
+	const details: PromptDetails = interaction.payload.prompt?.details ?? {};
+
+	const bucket = await getBucketStore().find(signsInto);
+	const service = {
+		...(bucket?.displayName ? { displayName: bucket.displayName } : {}),
+		host: new URL(issuerFor(bucket ?? (await issuingBucket(signsInto)))).host
+	};
+
+	const accountId = interaction.payload.session?.accountId ?? '';
+	const user = accountId ? await getUserStore(signsInto).find(accountId) : null;
+	const profile = user ? profileClaims(user) : {};
+	// `groups` is never read from stored claims (lib/addon/account.ts says why); membership decides it.
+	const { groups: _groups, ...storedClaims } = user?.claims ?? {};
+	const userClaims: Record<string, unknown> = user
+		? { ...storedClaims, ...profile, email: user.email }
+		: {};
+
+	const tier = client
+		? await clientProvenance(client, bucket)
+		: 'self-registered';
+	/*
+	 * A client nobody registered here and that did not come through dynamic registration was resolved from
+	 * its metadata document, so its client_id is a URL whose host the document proved control of.
+	 */
+	const documentHost =
+		client &&
+		tier === 'self-registered' &&
+		!client.registeredDynamically &&
+		!(await adapter('Client').find(clientId))
+			? URL.parse(clientId)?.hostname
+			: undefined;
+
+	const existing = interaction.payload.grantId
+		? await Grant.tryFind(interaction.payload.grantId)
+		: undefined;
+	const granted: GrantedSoFar | undefined = existing
+		? {
+				oidcScopes: existing.getOIDCScope().split(' ').filter(Boolean),
+				oidcClaims: existing.getOIDCClaims(),
+				resourceScopes: Object.fromEntries(
+					Object.keys(existing.payload.resources ?? {}).map((indicator) => [
+						indicator,
+						existing.getResourceScope(indicator).split(' ').filter(Boolean)
+					])
+				),
+				rar: existing.payload.rar ?? []
+			}
+		: undefined;
+
+	const addressed = await addressedBucketOf(interaction);
+	const indicators = new Set([
+		...Object.keys(details.missingResourceScopes ?? {}),
+		...Object.keys(granted?.resourceScopes ?? {})
+	]);
+	const resources: Record<string, DeclaredResourceFacts> = {};
+	for (const indicator of indicators) {
+		const declared = await findDeclaredResource(
+			indicator,
+			namespaceOf(addressed)
+		);
+		if (declared) {
+			resources[indicator] = {
+				name: declared.name,
+				...(declared.scopeDescriptions
+					? { scopeDescriptions: declared.scopeDescriptions }
+					: {})
+			};
+		}
+	}
+
+	/*
+	 * Long-lived access is mentioned only when a refresh token will really be issued. `offline_access`
+	 * survives on the stored request only where the request may have it (check_scope.ts), and the token
+	 * endpoint issues one only to a client allowed refresh tokens while the instance supports the scope —
+	 * the default refresh-token rule (lib/addon/tokens.ts). A deployment that overrides that rule is not
+	 * second-guessed here.
+	 */
+	const requestedScopes = new Set(
+		(typeof params.scope === 'string' ? params.scope : '')
+			.split(' ')
+			.filter(Boolean)
+	);
+	const refreshIssued =
+		requestedScopes.has('offline_access') &&
+		configuration.scopes.has('offline_access') &&
+		!!client &&
+		grantTypeAllowed(client, 'refresh_token');
+	const grantExpiry =
+		existing?.payload.exp ??
+		epochTime() + ttl.Grant(new Grant({ accountId, clientId }), undefined);
+
+	let device: ConsentView['device'];
+	if (interaction.payload.deviceCode) {
+		const code = await DeviceCode.tryFind(interaction.payload.deviceCode, {
+			ignoreExpiration: true,
+			ignoreSessionBinding: true
+		});
+		if (code?.payload.userCode) {
+			device = {
+				userCode: denormalize(
+					code.payload.userCode,
+					ApplicationConfig['deviceFlow.mask']
+				),
+				requestedAgo: requestedAgo(code.payload.iat)
+			};
+		}
+	}
+
+	/*
+	 * Recognised by the resource the token will be minted for, not by what the prompt found missing: the
+	 * administrative MCP's only scope is `openid`, so once that is granted it vanishes from the details,
+	 * and a second agent asking for the same power would be shown nothing at all.
+	 */
+	const adminResource = asList(
+		params.resource as string | string[] | undefined
+	).find(isMcpResource);
+
+	// The view builder reads no configuration, so the type → label map is resolved here and handed in.
+	const rarLabels = Object.fromEntries(
+		Object.entries(ApplicationConfig['richAuthorizationRequests.types']).map(
+			([type, descriptor]) => [type, descriptor.label]
+		)
+	);
+
+	return buildConsentView({
+		uid,
+		logoSrc: versionedAsset('logo.svg'),
+		service,
+		client: {
+			id: clientId,
+			...(client?.clientName ? { name: client.clientName } : {}),
+			tier,
+			...(documentHost ? { documentHost } : {}),
+			...(client?.redirectUris.length &&
+			client.redirectUris.every(isLoopbackRedirect)
+				? { loopbackOnly: true }
+				: {})
+		},
+		redirectUri: redirectUriOf(interaction),
+		account: {
+			id: accountId,
+			...(user?.email ? { email: user.email } : {}),
+			...(profile.name ? { name: profile.name } : {}),
+			...(user?.userName ? { login: user.userName } : {})
+		},
+		userClaims,
+		details,
+		...(granted ? { granted } : {}),
+		resources,
+		scopeDescriptions: ApplicationConfig['consent.scopeDescriptions'],
+		rarLabels,
+		...(adminResource ? { adminResource } : {}),
+		...(refreshIssued ? { keepsAccessUntil: lifetimeDate(grantExpiry) } : {}),
+		canSwitchAccount: !accountNamedByRequest(params),
+		...(device ? { device } : {})
+	});
+}
+
 /*
  * The password-only doors of a federated-only bucket.
  *
@@ -747,7 +983,7 @@ export const ui = new Elysia()
 			}
 		}
 
-		return { interaction };
+		return { interaction, signsInto };
 	})
 	/*
 	 * `notice` is typed as an optional string rather than a literal union on purpose: a value the server
@@ -1525,38 +1761,26 @@ export const ui = new Elysia()
 			})
 		}
 	)
-	.get('ui/:uid/consent', async ({ params: { uid }, interaction }) => {
-		const clientId = clientIdOf(interaction);
-		const client = clientId ? await Client.tryFind(clientId) : undefined;
-		const clientName = client?.clientName || clientId || uid;
-		const details = interaction.payload.prompt?.details ?? {};
-		const account = interaction.payload.session?.accountId;
-		// The view builder reads no configuration, so the type → label map is resolved here and
-		// handed in.
-		const rarLabels = Object.fromEntries(
-			Object.entries(ApplicationConfig['richAuthorizationRequests.types']).map(
-				([type, descriptor]) => [type, descriptor.label]
-			)
-		);
-		return consentServer(
-			buildConsentView({
-				uid,
-				clientName,
-				account,
-				details,
-				rarLabels,
-				identity: documentIdentityFor({
-					clientId,
-					redirectUri: redirectUriOf(interaction),
-					redirectUris: client?.redirectUris
-				})
-			}),
-			{ handOffTo: redirectUriOf(interaction) }
-		);
-	})
+	.get('ui/:uid/consent', async ({ params: { uid }, interaction, signsInto }) =>
+		consentServer(await consentViewFor(uid, interaction, signsInto), {
+			handOffTo: redirectUriOf(interaction)
+		})
+	)
 	.post(
 		'ui/:uid/consent',
 		async ({ body, interaction, cookie, route, request }) => {
+			/*
+			 * The decision belongs to the account it was shown for. The page carries that account back, and a
+			 * submission naming any other — the browser's session changed in another tab, or the field was
+			 * dropped — is refused before anything is written: granting would hand the app the wrong
+			 * person's data, and declining would end a flow the person on screen never saw. Checked ahead of
+			 * both branches because `createGrant` saves at once.
+			 */
+			const shownFor = interaction.payload.session?.accountId ?? '';
+			if (!shownFor || !constantEquals(body.accountId ?? '', shownFor)) {
+				throw new SessionNotFound('session principal changed');
+			}
+
 			if (body.action === 'allow') {
 				await createGrant(interaction);
 				return resume(interaction, cookie, { route, request });
@@ -1576,7 +1800,12 @@ export const ui = new Elysia()
 		},
 		{
 			body: t.Object({
-				action: t.Union([t.Literal('allow'), t.Literal('cancel')])
+				action: t.Union([t.Literal('allow'), t.Literal('cancel')]),
+				/*
+				 * Optional in the schema so a submission without it reaches the refusal above — the same
+				 * answer as a mismatch — rather than a validation error that says which field was missing.
+				 */
+				accountId: t.Optional(t.String())
 			})
 		}
 	)

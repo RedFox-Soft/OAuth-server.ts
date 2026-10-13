@@ -35,8 +35,16 @@ const BucketSlug = t.String({
  */
 const BucketHost = t.String({ minLength: 1, maxLength: 253 });
 
+/*
+ * The name the bucket's end users know the service by, shown at the top of the page where they allow an app access
+ * ("Acme ID"). Distinct from `name`, the operator's label in a list. Blank text is refused in the route,
+ * for the reason `BucketHost` gives: the answer should name the rule it broke.
+ */
+const BucketDisplayName = t.String({ minLength: 1, maxLength: 60 });
+
 export const CreateBucketBody = t.Object({
 	name: t.String({ minLength: 1 }),
+	displayName: t.Optional(BucketDisplayName),
 	slug: t.Optional(BucketSlug),
 	host: t.Optional(BucketHost),
 	passwordLogin: t.Optional(t.Boolean()),
@@ -93,6 +101,8 @@ export const MoveBucketOwnerBody = t.Object({
 
 export const UpdateBucketBody = t.Object({
 	name: t.Optional(t.String({ minLength: 1 })),
+	/* `null` removes it, and the pages go back to showing the bucket's address. */
+	displayName: t.Optional(t.Union([BucketDisplayName, t.Null()])),
 	/*
 	 * `slug` is deliberately absent, so a bucket's address is fixed once chosen.
 	 *

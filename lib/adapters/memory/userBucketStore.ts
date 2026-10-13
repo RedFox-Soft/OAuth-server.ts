@@ -29,6 +29,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 	async create(data: {
 		_id?: string;
 		name: string;
+		displayName?: string;
 		slug?: string;
 		host?: string;
 		ownerGroupId: string;
@@ -47,6 +48,9 @@ export class UserBucketStore implements UserBucketStoreInstance {
 		const bucket: UserBucket = {
 			_id: data._id ?? nanoid(),
 			name: data.name,
+			...(data.displayName !== undefined
+				? { displayName: data.displayName }
+				: {}),
 			slug: data.slug,
 			...(data.host !== undefined ? { host: data.host } : {}),
 			ownerGroupId: data.ownerGroupId,
@@ -74,7 +78,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 	 * door on every existing bucket.
 	 */
 	private withDefaults(bucket: UserBucket): UserBucket {
-		// As held, not as typed: update() writes a patch's explicit undefined as it comes.
+		// As held, not as typed: a document stored before these fields existed has none of them.
 		const held: Partial<
 			Pick<UserBucket, 'passwordLogin' | 'federation' | 'totpRequired'>
 		> = bucket;
@@ -148,6 +152,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 			Pick<
 				UserBucket,
 				| 'name'
+				| 'displayName'
 				| 'ownerGroupId'
 				| 'passwordLogin'
 				| 'federation'
@@ -163,7 +168,17 @@ export class UserBucketStore implements UserBucketStoreInstance {
 	): Promise<UserBucket | null> {
 		const b = this.buckets.get(id);
 		if (!b) return null;
-		Object.assign(b, patch, { updatedAt: new Date() });
+		/*
+		 * A key present with an undefined value removes the field, as the other two backends do — leaving
+		 * it as an own property holding undefined would read back differently from them.
+		 */
+		for (const [field, value] of Object.entries(
+			patch as Record<string, unknown>
+		)) {
+			if (value === undefined) Reflect.deleteProperty(b, field);
+			else Reflect.set(b, field, value);
+		}
+		b.updatedAt = new Date();
 		return b;
 	}
 

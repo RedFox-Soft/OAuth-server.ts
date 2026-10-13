@@ -1,3 +1,4 @@
+import { shownAccount } from '../consent_form.js';
 import {
 	describe,
 	it,
@@ -90,7 +91,10 @@ describe('a fault delivered to the client', () => {
 
 		const { response } = await agent
 			.ui({ uid })
-			.consent.post({ action: 'allow' }, { headers: { cookie } });
+			.consent.post(
+				{ action: 'allow', accountId: await shownAccount(uid) },
+				{ headers: { cookie } }
+			);
 
 		expect(response.status).toBe(303);
 		auth.validateClientLocation(response);

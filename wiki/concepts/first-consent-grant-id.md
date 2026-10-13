@@ -4,7 +4,7 @@ title: "First consent and the unstored grantId"
 tags: [contract, gotcha, architecture]
 sources: [oauth-server-codebase]
 created: 2026-08-25
-updated: 2026-08-25
+updated: 2026-10-13
 graph:
   node_type: concept
   relationships:
@@ -30,6 +30,11 @@ interaction names a grant that is not in storage.
 `createGrant` therefore resolves it with `Grant.tryFind`, and falls back to establishing a new grant.
 A grantId that resolves to nothing is the same state as no grantId: there is no prior consent to
 extend.
+
+Since spec 092 the consent **GET** reads the hinted grant too, for the same reason with `tryFind`
+(`lib/interactions/index.ts:611`). It needs what the grant already holds for the "You already allowed"
+line, and its `exp` for the "keeps access until" date. A first consent finds nothing, and the date is then
+now plus `ttl.Grant` (`index.ts:666-668`). See [[consent-screen-decisions]].
 
 ## Why it read as an authentication failure
 

@@ -1,3 +1,4 @@
+import { shownAccount } from '../consent_form.js';
 import { describe, it, expect, beforeAll } from 'bun:test';
 import bootstrap, {
 	agent,
@@ -46,7 +47,12 @@ async function atConsent(extra: RequestParameters = {}) {
 }
 
 async function decide(uid: string, cookie: string, action: 'allow' | 'cancel') {
-	return agent.ui({ uid }).consent.post({ action }, { headers: { cookie } });
+	return agent
+		.ui({ uid })
+		.consent.post(
+			{ action, accountId: await shownAccount(uid) },
+			{ headers: { cookie } }
+		);
 }
 
 /**

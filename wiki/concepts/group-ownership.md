@@ -4,7 +4,7 @@ title: 'Group ownership of projects and buckets'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-29
-updated: 2026-10-11
+updated: 2026-10-13
 graph:
   node_type: concept
   relationships:
@@ -171,6 +171,14 @@ reader of the flag that makes a grant `trusted` (via `loadExistingGrant`, `lib/a
 2026-10-09 the `Grant` constructor also derived `trusted` from `consent.require` when handed a client,
 skipping the bucket check — unreachable only because no caller passed one. It now defaults to `false`. The
 spec is `test/consent_waiver/`.
+
+Since spec 092 the comparison itself is one function, `projectGroupOwnsBucket`
+(`lib/models/client/provenance.ts:38-45`). The waiver calls it (`lib/shared/consent_waiver.ts:44`), and so
+does `clientProvenance`, which words the consent page: a client whose project's group owns the sign-in
+bucket is "this organization's", one of another group's project is "operator-registered". The two callers
+read a client in no project differently, on purpose. The waiver keeps the stored flag, which a
+self-registered client cannot carry. The page tests self-registration first, so by the time it asks, "no
+project" can only mean the operator's own. `consentWaived` is still the only reader of `consent.require`. See [[consent-screen-decisions]].
 
 **A project and its bucket must share a group.** Enforced on `PUT /admin/api/projects/:id/bucket`, and
 it is a coherence rule about the data rather than a statement about authority — so a super

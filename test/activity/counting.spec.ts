@@ -1,3 +1,4 @@
+import { shownAccount } from '../consent_form.js';
 import { describe, it, expect, beforeAll, jest } from 'bun:test';
 
 import bootstrap, { agent, getHeader } from '../test_helper.ts';
@@ -300,7 +301,10 @@ describe('active users counted per bucket', () => {
 				password: PASSWORD
 			});
 			const consentUid = uidOf(signedIn.headers.get('location'));
-			await browser.post(`/ui/${consentUid}/consent`, { action: 'allow' });
+			await browser.post(`/ui/${consentUid}/consent`, {
+				action: 'allow',
+				accountId: await shownAccount(consentUid)
+			});
 			const polled = await agent.token.post({
 				client_id: 'act-tv',
 				grant_type: 'urn:ietf:params:oauth:grant-type:device_code',

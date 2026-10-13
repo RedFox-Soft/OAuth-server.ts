@@ -4,7 +4,7 @@ title: "The two interaction page families"
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-04
-updated: 2026-09-23
+updated: 2026-10-13
 graph:
   node_type: concept
   relationships:
@@ -78,6 +78,12 @@ so nothing looked wrong, and the browser bundle carried a `node:fs` import it co
 090 follow-up, the render functions in `lib/interactions/serverRender.tsx` compute `logoSrc` once and pass it
 to both the markup and `window.PROPS`; the components only receive it. The same rule holds for anything a
 component reads from the environment — the clock, the disk, the process.
+
+The consent page follows the rule whole since spec 092. Its props are one view built on the server
+(`consentViewFor`, `lib/interactions/index.ts:571`): `logoSrc`, the account's label and id, the client's
+provenance tier, and pre-formatted dates such as "keeps access until". The view carries data and the
+component words it from one catalog, so hydration reads the same values. `loginClient.tsx` starts from
+`emptyConsentView` and spreads the server's props over it. See [[consent-screen-decisions]].
 
 Never put a submitted password, a token, or any request text in a props object: `propsScript` escapes `<`
 so a value cannot break out of the script tag, but that is containment, not permission — the object is
@@ -160,7 +166,9 @@ controls.
 - [[self-service-password-reset]] — the plain family's other user, and the feature that made the login
   page's "Forgot password" link real (which is why backlog § 17's request to delete it was refused).
 - [[rich-authorization-requests]] — supplied the consent page's rich-detail group; § 021 gave every group
-  a heading and stopped printing a token whose label is the token.
+  a heading and stopped printing a token whose label is the token. Since spec 092 no token is printed
+  beside its label at all: technical names sit in a `<details>` disclosure, and only undescribed items show
+  their code in the list ([[consent-screen-decisions]]).
 - [[feature-flag-gating]] — the other place a deployment's configuration decides what an end user is
   allowed to reach.
 - [[upstream-federation]] — added the login page's provider controls (plain anchors, so the policy is

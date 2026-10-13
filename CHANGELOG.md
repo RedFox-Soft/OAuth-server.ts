@@ -9,6 +9,18 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+### Changed
+
+- **The consent page says who is asking, which account is agreeing and what the app will do** (spec 092). It is
+  headed by the bucket's new `displayName` (or its address), names the account by email instead of its internal
+  id, and words requested data and declared-resource scopes in plain sentences grouped as "see", "act for you"
+  and "not described". Apps that registered themselves are never headed as the organization's own, every app's
+  redirect host is shown (the MCP requirement), at most one warning appears, a request for the administrative
+  MCP shows an administrator-rights block, long-lived access states its end date, and "Switch account" is
+  offered. Operators describe scopes with `scopeDescriptions` on a declared resource and the new
+  `consent.scopeDescriptions` setting. The consent form now carries the account it was shown for and is refused
+  for any other.
+
 ## [0.11.0] - 2026-10-12
 
 The admin console is rebuilt around addresses, pages and previews. Every screen has a link; buckets, identity

@@ -4,7 +4,7 @@ title: 'The settings console is read from one descriptor'
 tags: [architecture, config, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-09-03
-updated: 2026-09-13
+updated: 2026-10-13
 graph:
   node_type: concept
   relationships:
@@ -126,8 +126,14 @@ pulling that into the browser bundle to borrow an interface is a poor deal. Two 
 assignments in `test/admin/ui_settings_model.spec.ts` fail typecheck if the mirror drifts — which is
 the failure the old per-component copy invited.
 
-Bespoke controls are a **registry keyed by setting** (`lib/admin/ui/settings/controls.tsx:103`)
+Bespoke controls are a **registry keyed by setting** (`lib/admin/ui/settings/controls.tsx:22`)
 rather than a branch inside `Control`, which exists to know nothing about individual settings.
+Since spec 092 it has a third entry, `consent.scopeDescriptions`
+(`lib/admin/ui/settings/ScopeDescriptionsField.tsx`). The setting's type is `json`, but the keys the
+server accepts are exactly the scopes defined under Supported scopes and Claims, minus the standard
+ones. So the control lists one row per such scope, and keeps a description of a scope no longer defined
+on screen with a way to remove it, since saving with one left in is refused
+(`checkConsentScopeDescriptions`, `lib/configs/configuration.ts:172`). See [[consent-screen-decisions]].
 
 ## A structured editor restates server rules, so it is pinned to them
 
@@ -138,8 +144,10 @@ it safe is the direction of the test: **a draft the editor calls clean must be o
 the raw textarea it replaced, which at least never claimed to know.
 
 Writing that test found an asymmetry rather than confirming a symmetry. The server's rule is
-`label.length`, so a label of only spaces satisfies it and the consent screen then shows a blank
-where the name of the thing being authorized should be. The editor stays stricter, and the difference
+`label.length`, so a label of only spaces satisfies it and the consent screen then showed a blank
+where the name of the thing being authorized should be. (Since spec 092 the consent page shows the type
+identifier for a label that is blank once trimmed, `lib/interactions/consentView.ts:323`; the validator
+still accepts it.) The editor stays stricter, and the difference
 is enumerated in a test of its own so a later reader does not "fix" it in either direction by
 accident. Whether the validator should refuse a blank-looking label is a question about server
 behaviour, deliberately left open.

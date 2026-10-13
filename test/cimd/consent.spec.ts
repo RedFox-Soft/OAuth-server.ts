@@ -1,122 +1,150 @@
-import { describe, it, expect } from 'bun:test';
-
 import {
-	buildConsentView,
-	documentIdentityFor
-} from 'lib/interactions/consentView.ts';
+	describe,
+	it,
+	expect,
+	beforeAll,
+	beforeEach,
+	afterEach
+} from 'bun:test';
+
+import bootstrap, { type Setup } from '../test_helper.js';
+import { clearDocumentCache } from 'lib/client_metadata_document/cache.ts';
+import { resolver } from 'lib/client_metadata_document/fetch.ts';
+import { CONSENT_TEXTS as T } from 'lib/interactions/consentTexts.js';
+import { serveDocument, mock } from './document_host.js';
+import { openConsent } from '../consent_page/flow.ts';
 
 /*
  * What the End-User is shown about a client that identified itself with a document it hosts.
  *
  * The name on the screen is whatever that document claims, so on its own it proves nothing — which is
- * why the draft's §6.4 and the MCP security considerations both require the hostnames beside it: the
+ * why the draft's §8.5 and the MCP security considerations both require the hostnames beside it: the
  * domain is the part that was actually proved. The loopback warning is a stated SHOULD, because such a
  * document cannot establish which local process will receive the authorization code.
  */
 
-const IDENTIFIER = 'https://app.example.com/oauth/client-metadata.json';
+const publicAddress = '93.184.216.34';
 
 /**
  * @proves A user asked to authorize a document-identified client is shown who it actually is,
  * including when its redirect leaves the identifier host or offers only loopback.
  */
-describe('identity facts for a document-identified client', () => {
-	it('names the identifier host and the redirect host', () => {
-		const identity = documentIdentityFor({
-			clientId: IDENTIFIER,
-			redirectUri: 'https://app.example.com/callback',
-			redirectUris: ['https://app.example.com/callback']
-		});
+describe('the consent page for a document-identified client', () => {
+	let setup: Setup;
+	let cookie: string;
 
-		expect(identity.clientIdHostname).toBe('app.example.com');
-		expect(identity.redirectHostname).toBe('app.example.com');
-		expect(identity.loopbackOnly).toBeUndefined();
+	beforeAll(async () => {
+		setup = await bootstrap(import.meta.url, { config: 'cimd' });
+		cookie = await setup.login({ scope: 'openid' });
 	});
 
-	it('notices that the redirect leaves the identifier host', () => {
-		const identity = documentIdentityFor({
-			clientId: IDENTIFIER,
-			redirectUri: 'https://cdn.elsewhere.example/cb',
-			redirectUris: ['https://cdn.elsewhere.example/cb']
-		});
-
-		expect(identity.clientIdHostname).toBe('app.example.com');
-		expect(identity.redirectHostname).toBe('cdn.elsewhere.example');
+	beforeEach(() => {
+		clearDocumentCache();
+		resolver.lookup = async () => [publicAddress];
 	});
 
-	it('warns when every offered redirect target is loopback', () => {
-		for (const uris of [
-			['http://127.0.0.1:33418/callback'],
-			['http://localhost:7777/cb', 'http://127.0.0.1:7777/cb']
-		]) {
-			const identity = documentIdentityFor({
-				clientId: IDENTIFIER,
-				redirectUri: uris[0],
-				redirectUris: uris
-			});
-			expect(identity.loopbackOnly).toBe(true);
-		}
+	afterEach(() => {
+		mock.restore();
+		resolver.lookup = resolver.realLookup;
+	});
+
+	it('shows where the answer goes and that the server has not checked the app', async () => {
+		const { identifier } = serveDocument();
+
+		const page = await openConsent(
+			{
+				client_id: identifier,
+				scope: 'openid',
+				redirect_uri: 'https://app.example.com/callback'
+			},
+			cookie
+		);
+
+		expect(page.view.client.tier).toBe('self-registered');
+		expect(page.text).toContain(`${T.host.label} app.example.com`);
+		expect(page.text).toContain(T.host.notChecked(page.view.service.host));
+		// The document's host is the redirect's host, so it is not shown a second time.
+		expect(page.view.redirect.documentHost).toBeUndefined();
+	});
+
+	it('shows both hosts and warns when the redirect leaves the identifier host', async () => {
+		const { identifier } = serveDocument({
+			overrides: { redirect_uris: ['https://cdn.elsewhere.example/cb'] }
+		});
+
+		const page = await openConsent(
+			{
+				client_id: identifier,
+				scope: 'openid',
+				redirect_uri: 'https://cdn.elsewhere.example/cb'
+			},
+			cookie
+		);
+
+		expect(page.view.redirect).toMatchObject({
+			host: 'cdn.elsewhere.example',
+			documentHost: 'app.example.com'
+		});
+		expect(page.text).toContain(`${T.host.documentLabel} app.example.com`);
+		expect(page.text).toContain(T.warning.hostMismatch);
+	});
+
+	it('warns when every offered redirect target is loopback', async () => {
+		const { identifier } = serveDocument({
+			overrides: { redirect_uris: ['http://127.0.0.1:33418/callback'] }
+		});
+
+		const page = await openConsent(
+			{
+				client_id: identifier,
+				scope: 'openid',
+				redirect_uri: 'http://127.0.0.1:33418/callback'
+			},
+			cookie
+		);
+
+		expect(page.view.warning).toEqual({ kind: 'loopback' });
 	});
 
 	/*
 	 * A document offering a real HTTPS target as well is not in the same position: the domain it proved
 	 * is somewhere the code can actually be sent, so the warning would be noise.
 	 */
-	it('does not warn when a non-loopback target is also offered', () => {
-		const identity = documentIdentityFor({
-			clientId: IDENTIFIER,
-			redirectUri: 'http://127.0.0.1:1/cb',
-			redirectUris: ['http://127.0.0.1:1/cb', 'https://app.example.com/cb']
+	it('does not warn about loopback when a web target is also offered', async () => {
+		const { identifier } = serveDocument({
+			overrides: {
+				redirect_uris: [
+					'http://127.0.0.1:1/cb',
+					'https://app.example.com/callback'
+				]
+			}
 		});
 
-		expect(identity.loopbackOnly).toBeUndefined();
+		const page = await openConsent(
+			{
+				client_id: identifier,
+				scope: 'openid',
+				redirect_uri: 'http://127.0.0.1:1/cb'
+			},
+			cookie
+		);
+
+		expect(page.view.warning?.kind).not.toBe('loopback');
+		expect(page.text).toContain(T.next.loopback);
 	});
 
 	/*
-	 * An ordinary registered client gets none of this. An operator vouched for it, so there is no
-	 * domain for the End-User to weigh and a hostname line would be noise on every consent screen the
-	 * server has ever shown.
+	 * An ordinary registered client gets none of this: the operator who made it is the instance's own, so
+	 * there is no unchecked app to warn about — only the address it sends the answer to.
 	 */
-	it('says nothing about an ordinary registered client', () => {
-		for (const clientId of ['admin-panel', 'client', undefined]) {
-			expect(
-				documentIdentityFor({
-					clientId,
-					redirectUri: 'https://app.example.com/cb',
-					redirectUris: ['https://app.example.com/cb']
-				})
-			).toEqual({});
-		}
-	});
-});
+	it('says nothing of an unchecked app for an ordinary registered client', async () => {
+		const page = await openConsent(
+			{ client_id: 'client', scope: 'openid email', prompt: 'consent' },
+			cookie
+		);
 
-describe('the consent view carries the identity facts through', () => {
-	it('merges them onto the view the page renders', () => {
-		const view = buildConsentView({
-			uid: 'u1',
-			clientName: 'Example MCP Client',
-			details: { missingOIDCScope: ['openid'] },
-			identity: documentIdentityFor({
-				clientId: IDENTIFIER,
-				redirectUri: 'http://127.0.0.1:33418/callback',
-				redirectUris: ['http://127.0.0.1:33418/callback']
-			})
-		});
-
-		expect(view.clientIdHostname).toBe('app.example.com');
-		expect(view.loopbackOnly).toBe(true);
-		expect(view.permissions).toHaveLength(1);
-	});
-
-	it('leaves the view unchanged when there are no identity facts', () => {
-		const view = buildConsentView({
-			uid: 'u1',
-			clientName: 'Registered App',
-			details: {}
-		});
-
-		expect(view.clientIdHostname).toBeUndefined();
-		expect(view.redirectHostname).toBeUndefined();
-		expect(view.loopbackOnly).toBeUndefined();
+		expect(page.view.client.tier).toBe('this-organization');
+		expect(page.text).not.toContain(T.host.notChecked(page.view.service.host));
+		expect(page.text).toContain('client.example.com');
 	});
 });

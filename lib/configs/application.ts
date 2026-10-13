@@ -675,6 +675,18 @@ export const ApplicationConfig = {
 	scopes: ['openid', 'offline_access'],
 
 	/*
+	 * consent.scopeDescriptions
+	 *
+	 * description: What each of this instance's own scopes lets an application do, as the consent page
+	 *   says it to the person deciding — `{ billing: 'see your invoices and payment history' }`. Keys are
+	 *   scopes this instance defines (in `scopes`, or claim-defined in `claims`) and never the standard
+	 *   OpenID Connect ones, whose wording the page already has. A requested scope with no description is
+	 *   shown by its technical name under "Other permissions — not described". A resource's own scopes are
+	 *   described on the resource declaration, not here.
+	 */
+	'consent.scopeDescriptions': setting<Record<string, string>>({}),
+
+	/*
 	 * claims
 	 *
 	 * description: Claims map used to derive `claims_supported` and claim-defined scopes for discovery.

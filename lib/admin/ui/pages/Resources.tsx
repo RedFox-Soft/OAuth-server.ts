@@ -16,7 +16,10 @@ import {
 	type FormInstance
 } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
-import { OMNIBUS_SCOPES } from '../../../resources/scopes.js';
+import {
+	OMNIBUS_SCOPES,
+	SCOPE_DESCRIPTION_MAX_LENGTH
+} from '../../../resources/scopes.js';
 import { request } from '../frame/request.js';
 import { useFeedback } from '../frame/feedback.js';
 import { useConfirm } from '../frame/confirm.js';
@@ -52,10 +55,13 @@ const TOKEN_FORMAT_OPTIONS = [
 	{ label: 'Opaque (checked back with this server)', value: 'opaque' }
 ];
 
+type ScopeKind = 'see' | 'act';
+
 interface ResourceView {
 	identifier: string;
 	name: string;
 	scopes: string[];
+	scopeDescriptions?: Record<string, { description: string; kind?: ScopeKind }>;
 	tokenFormat: 'jwt' | 'opaque';
 	accessTokenTTL: number;
 	trailingSlashSignificant: boolean;
@@ -73,6 +79,8 @@ interface FormValues {
 	identifier: string;
 	name: string;
 	scopes: string;
+	/* Per scope, what it lets an app do and whether it only sees; keyed by the scope as typed above. */
+	descriptions?: Record<string, { description?: string; kind?: ScopeKind }>;
 	tokenFormat: 'jwt' | 'opaque';
 	// InputNumber answers null once the operator clears it.
 	accessTokenTTL: number | null;
@@ -93,6 +101,30 @@ function splitScopes(raw: string): string[] {
 		.split(/[\s,]+/)
 		.map((scope) => scope.trim())
 		.filter((scope) => scope.length > 0);
+}
+
+/*
+ * What the consent page will say about each scope. A row left empty sends nothing for that scope, and the
+ * page then shows it by its technical name under "not described" — honest, but no help to the person
+ * deciding.
+ */
+const KIND_OPTIONS: { label: string; value: ScopeKind }[] = [
+	{ label: 'Acts for the person', value: 'act' },
+	{ label: 'Only lets it see', value: 'see' }
+];
+
+function describedScopes(
+	scopes: string[],
+	descriptions: FormValues['descriptions']
+): Record<string, { description: string; kind?: ScopeKind }> {
+	const out: Record<string, { description: string; kind?: ScopeKind }> = {};
+	for (const scope of scopes) {
+		const entry = descriptions?.[scope];
+		const description = entry?.description?.trim();
+		if (!description) continue;
+		out[scope] = { description, ...(entry?.kind ? { kind: entry.kind } : {}) };
+	}
+	return out;
 }
 
 function describeWindow(seconds: number): string {
@@ -273,6 +305,7 @@ export function Resources({ project }: { project: ProjectView }) {
 			identifier: row.identifier,
 			name: row.name,
 			scopes: row.scopes.join(' '),
+			descriptions: row.scopeDescriptions ?? {},
 			tokenFormat: row.tokenFormat,
 			accessTokenTTL: row.accessTokenTTL,
 			trailingSlashSignificant: row.trailingSlashSignificant
@@ -282,6 +315,7 @@ export function Resources({ project }: { project: ProjectView }) {
 
 	async function submit(values: FormValues) {
 		const scopes = splitScopes(values.scopes);
+		const scopeDescriptions = describedScopes(scopes, values.descriptions);
 		/*
 		 * The identifier is absent from the edit payload deliberately, and the server refuses it if
 		 * sent: it is the audience of every token already minted for this resource, so replacing it is
@@ -293,6 +327,9 @@ export function Resources({ project }: { project: ProjectView }) {
 						identifier: values.identifier,
 						name: values.name,
 						scopes,
+						...(Object.keys(scopeDescriptions).length
+							? { scopeDescriptions }
+							: {}),
 						tokenFormat: values.tokenFormat,
 						accessTokenTTL: values.accessTokenTTL ?? undefined,
 						trailingSlashSignificant: values.trailingSlashSignificant
@@ -300,6 +337,8 @@ export function Resources({ project }: { project: ProjectView }) {
 				: {
 						name: values.name,
 						scopes,
+						// The whole map, so a description emptied here is removed rather than kept.
+						scopeDescriptions,
 						tokenFormat: values.tokenFormat,
 						accessTokenTTL: values.accessTokenTTL ?? undefined
 					};
@@ -586,6 +625,48 @@ export function Resources({ project }: { project: ProjectView }) {
 					>
 						<Input placeholder="mcp:tools-basic mcp:files-read" />
 					</Form.Item>
+					{splitScopes(scopesValue).length > 0 && (
+						<Form.Item
+							label="What each scope lets an app do"
+							extra="Shown on the consent page after “The app will be able to”: a verb, then what it acts on — “run the service’s tools as you”. A scope left empty is shown only by its name, as not described."
+						>
+							<Space
+								orientation="vertical"
+								style={{ width: '100%' }}
+							>
+								{splitScopes(scopesValue).map((scope) => (
+									<Space.Compact
+										key={scope}
+										style={{ width: '100%' }}
+									>
+										<Space.Addon>
+											<Typography.Text code>{scope}</Typography.Text>
+										</Space.Addon>
+										<Form.Item
+											name={['descriptions', scope, 'description']}
+											noStyle
+										>
+											<Input
+												maxLength={SCOPE_DESCRIPTION_MAX_LENGTH}
+												placeholder="not described"
+											/>
+										</Form.Item>
+										<Form.Item
+											name={['descriptions', scope, 'kind']}
+											noStyle
+										>
+											<Select
+												options={KIND_OPTIONS}
+												placeholder="Acts for the person"
+												style={{ width: 190 }}
+												allowClear
+											/>
+										</Form.Item>
+									</Space.Compact>
+								))}
+							</Space>
+						</Form.Item>
+					)}
 					{scopeAdvice(scopesValue) && (
 						<Alert
 							type="warning"

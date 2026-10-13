@@ -38,7 +38,12 @@ export {
 
 export { sectorIdentifier } from './client/sector.ts';
 
-export { redirectUrisVouchedFor } from './client/provenance.ts';
+export {
+	redirectUrisVouchedFor,
+	clientProvenance,
+	projectGroupOwnsBucket,
+	type ProvenanceTier
+} from './client/provenance.ts';
 
 export { clientKeys, type ClientKeys } from './client/keys.ts';
 

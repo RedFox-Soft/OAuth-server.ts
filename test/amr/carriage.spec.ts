@@ -1,3 +1,4 @@
+import { shownAccount } from '../consent_form.js';
 import { describe, it, expect, beforeAll } from 'bun:test';
 import bootstrap, { agent } from '../test_helper.ts';
 import { AuthorizationRequest } from '../AuthorizationRequest.ts';
@@ -97,7 +98,10 @@ describe('the authentication methods on every way a token is issued', () => {
 		const signedIn = await browser.post(`/ui/${uid}/totp`, { code: codeFor() });
 		// Consent is its own interaction, under a uid of its own.
 		const consentUid = uidOf(signedIn.headers.get('location'));
-		await browser.post(`/ui/${consentUid}/consent`, { action: 'allow' });
+		await browser.post(`/ui/${consentUid}/consent`, {
+			action: 'allow',
+			accountId: await shownAccount(consentUid)
+		});
 
 		expect(amrOf(await devicePoll(device_code))).toEqual(['mfa', 'otp', 'pwd']);
 	});

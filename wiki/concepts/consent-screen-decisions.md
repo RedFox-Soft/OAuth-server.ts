@@ -1,0 +1,222 @@
+---
+type: concept
+title: 'The consent page: what it says, and why'
+tags: [architecture, contract, gotcha]
+sources: [oauth-server-codebase]
+created: 2026-10-13
+updated: 2026-10-13
+graph:
+  node_type: concept
+  relationships:
+    - predicate: depends_on
+      object: concept:untrusted-redirect-confirmation
+      source: oauth-server-codebase
+      evidence: "clientProvenance: if (!(await redirectUrisVouchedFor(client)) && !(await connectionClientRecord(client.clientId))) return 'self-registered';"
+      confidence: high
+      status: current
+    - predicate: complements
+      object: concept:group-ownership
+      source: oauth-server-codebase
+      evidence: "projectGroupOwnsBucket — the one test of \"these users are the tenant's own\" … the consent waiver honours an operator's stored flag there, and `clientProvenance` counts such a client as the instance's own."
+      confidence: high
+      status: current
+    - predicate: depends_on
+      object: concept:form-action-redirect-chain
+      source: oauth-server-codebase
+      evidence: "The pending request's redirect URI goes to the page's policy because confirming starts a redirect chain — confirmation, then /ui/:uid/resume, then the client"
+      confidence: high
+      status: current
+---
+
+# The consent page: what it says, and why
+
+The consent page is where a person decides whether an application gets into their account. Until spec 092
+it said "Consent Required", printed the account id, and listed scope tokens. Since 092 it says who is
+asking, what the app will be able to do, and for how long, in plain words. This page records the
+decisions behind that wording. Each one is easy to undo by accident.
+
+The work is split three ways. `consentViewFor` (`lib/interactions/index.ts:571`) only reads: the
+interaction, the client, the bucket, the person and their grant. `buildConsentView`
+(`lib/interactions/consentView.ts:471`) decides what to say, and reads no configuration. `ConsentPage`
+(`lib/interactions/consentPage.tsx:542`) turns the result into words from one catalog. The view carries
+**data, never sentences** (`consentView.ts:11-20`). The server render and the browser's hydration then
+read the same values and the same words. A value computed only in the component would vanish on
+hydration ([[interaction-page-families]]).
+
+## Who stands behind the app: three tiers
+
+`clientProvenance` (`lib/models/client/provenance.ts:66-78`) puts every client in one of three tiers:
+
+- **self-registered** — nobody here created it: dynamic registration, or a metadata document.
+- **this-organization** — the group that owns the client's project also owns the bucket being signed
+  into, or the client is in no project at all (the instance operator's own).
+- **operator-registered** — an administrator of this server created it, but for another group. In a
+  shared bucket that is another tenant's app.
+
+**Self-registered is tested first, and the order is the point.** A dynamically registered or document
+client is in no project. The consent waiver reads "no project" as "the operator's own"
+(`lib/shared/consent_waiver.ts:33-45`). That reading is safe for the waiver only because such a client
+cannot switch consent off. For wording it would be wrong: every DCR and CIMD client would be headed as the
+organization's own app. The self-registered test reuses `redirectUrisVouchedFor` (`provenance.ts:25`), so
+"who vouched for this client" has one definition for both this page and
+[[untrusted-redirect-confirmation]]. A provisioning connection's client is synthesized, not stored, so it
+is explicitly kept out of self-registered (`provenance.ts:70-73`). It never reaches consent, but the
+function stays right for every client it can be handed.
+
+The ownership comparison itself is `projectGroupOwnsBucket` (`provenance.ts:38-45`). The waiver and the
+tiers share it. It answers `undefined` for a client in no project, and each caller decides what that
+means. The waiver's own behaviour did not change. See [[group-ownership]].
+
+The bucket compared is the **sign-in bucket** — the one `resolveBucketForRequest` chose, which the
+interaction resolve now returns as `signsInto` (`lib/interactions/index.ts:964-986`). Its users are the
+ones consenting. The addressed bucket would name the root service for a project bucket reached at the root
+address.
+
+## No positive trust signals
+
+The page never shows a shield, a check mark, "verified" or "added by your administrator". The tier only
+chooses the wording and the warnings. Only a this-organization client may be headed "Sign in to {name}" or
+"{name} wants access to your {service} account". Every other tier gets "The app “{name}” wants access to
+your account" (`consentPage.tsx:383-407`). Every other tier also gets the quiet line "{service} hasn't
+checked this app", except on a device approval (`consentPage.tsx:462-464`,
+`lib/interactions/consentTexts.ts:31`). A trust badge on a page whose name and logo
+a registrant chooses would be the first thing an impostor copies.
+
+## At most one warning
+
+`buildConsentView` picks one warning at most, and the gravest wins (`consentView.ts:530-539`):
+
+1. **admin** — the request asks for this server's own administrative MCP. Red, with a key icon.
+2. **loopback** — **all** registered redirect URIs are loopback (`index.ts:712-715`). Such a client
+   cannot prove which local program receives the answer. A client that also registered a web address
+   has proved a place the answer can go, so its loopback use is stated without alarm.
+3. **device** — a device-flow approval: "Is this code shown on your device?"
+4. **unverified** — amber, and only for a client that is not this organization's own. It shows only when
+   the app acts (anything in the "act" or "not described" groups), asks for offline access, has a name
+   confusable with the service, or is a document client whose document host differs from its redirect
+   host (`consentView.ts:512-528`).
+
+A warning on every page is a warning nobody reads. That is why a self-registered client asking only to
+sign someone in gets the quiet line and no amber block.
+
+## What is asked for: see, act, not described
+
+Standard OpenID scopes become fixed phrases about data the person can picture. They are "see". Profile,
+email, address and phone are named only when the person actually has a value
+(`consentView.ts:237-291`). `openid` and `offline_access` are never items. A resource scope is "see"
+only when its administrator declared `kind: 'see'`. **Described without a kind, it is "act"**
+(`consentView.ts:406-422`). Understating what an app can do is the failure that matters on this page.
+Anything nobody described is shown by its technical name under "Other permissions — not described". It is
+not guessed at. Technical names of described items sit in a `<details>` disclosure
+(`consentPage.tsx:96-108`), so they work before any script loads.
+
+Sign-in mode (one sentence of shared data) is used only when nothing but standard personal data is asked.
+No resource, no custom scope, no rich authorization detail, no offline access, no administrative MCP
+(`consentView.ts:498-510`).
+
+**The administrative MCP is recognised by the requested resource, not by scope**
+(`index.ts:687-694`). Its only scope is `openid`. Once that is granted it drops out of the prompt's
+details, and a second agent asking for the same power would be shown nothing.
+
+## "Keeps access until"
+
+The lifetime line appears only when a refresh token will really be issued (`index.ts:649-668`). That
+means `offline_access` survived on the stored request, the instance supports the scope, and the client is
+allowed the `refresh_token` grant. This is the default refresh-token rule. A deployment that overrides
+`issueRefreshToken` is not second-guessed. The date is the grant's `exp`, because every refresh is bounded
+by it and re-consenting never extends it. For a first consent it is now plus `ttl.Grant`. It is formatted
+once on the server, in UTC (`lifetimeDate`, `index.ts:528`), so the browser's locale and clock cannot
+change it during hydration.
+
+## Asking again shows only what is new
+
+The GET reads the hinted grant with `Grant.tryFind` (`index.ts:611`), never `find` — a first
+consent's grantId names nothing stored ([[first-consent-grant-id]]). What it already holds becomes one
+line, "You already allowed: …". The groups list only the prompt's missing items. A summary of everything
+the app will then have appears only when the new items escalate: an act, an undescribed item, or offline
+access (`consentView.ts:563-568`). There is still no per-item selection. Allow grants everything shown.
+
+## The decision belongs to the account it was shown for
+
+The account is named by email, else name, else login. It is never shown as an id
+(`consentView.ts:467-469`). The form carries the account id back as a hidden field. The POST refuses a
+submission naming any other account, or none, **before** either branch (`index.ts:1769-1782`). The
+refusal is the resolve's "session principal changed". `createGrant` saves at once, so a later check would
+come after the grant was written. Declining for the wrong account would also end a flow the person on
+screen never saw. The field is optional in the schema (`index.ts:1801-1809`) so a missing field gets the
+same answer as a mismatch, not a 422 naming the field.
+
+"Switch account" links to the interaction's login page. It is hidden when the request names its account
+in a way sign-in enforces: an `id_token_hint`, or `claims.id_token.sub` (`accountNamedByRequest`,
+`index.ts:544`). `login_hint` is not enforced, so it does not hide the link. Switching to another account
+of the same bucket goes through the sign-out confirmation. That page now gets the pending `redirect_uri`
+as its hand-off, or the browser stops before the client ([[form-action-redirect-chain]]).
+
+## A self-chosen name is shown with care
+
+A client's name is whatever its registrant typed. `sanitiseClientName`
+(`lib/interactions/clientName.ts:50-66`) removes control, format, line- and paragraph-separator
+characters, which covers bidi overrides and zero-width characters. It trims leading and trailing symbols
+and emoji ("✅ Acme"), keeping a closing bracket the name opened. It shortens the name to 40 graphemes.
+The page renders it inside `<bdi>`, so it cannot reorder the sentence around it.
+
+Confusability is a containment test on skeletons (`clientName.ts:68-109`). The skeleton is compatibility
+decomposition, lower case, a look-alike map, then only `[a-z0-9]`. The map (`lib/consts/confusables.ts`)
+is a vendored subset of Unicode's UTS #39 `confusables.txt`, version and date recorded in its header. No
+npm dependency was added for one warning. The references are the service's display name, its host, and
+four reserved words (`consentView.ts:513-520`). **A reference whose skeleton is shorter than four
+characters is ignored.** A service called "ID" is contained in half the names there are. A miss costs a
+warning, never access, which is why a subset is enough.
+
+## The header is the server's, never the client's
+
+The header shows the sign-in bucket's `displayName`, else the host of that bucket's issuer
+(`index.ts:581-585`). It never shows the bucket's internal `name`, which may say "prod-eu-users"
+(`UserBucket.displayName`, `lib/adapters/types.ts:1876-1881`). Nothing client-supplied appears there.
+
+Hosts are the WHATWG parser's ASCII form (`redirectKind`, `consentView.ts:193-212`). An
+internationalised name is never converted back to Unicode, because that is what lets a look-alike pass as
+the original.
+
+## One catalog of words
+
+Every string the page shows is in `lib/interactions/consentTexts.ts` (`:1-11`), including the page title
+(`lib/interactions/serverRender.tsx:242`). It absorbed the old scope-label, group-heading and RAR field
+tables. A translation is a change to that file alone, and a test asserts the sentence the page shows
+instead of retyping it. The page is still English only ([[site-translations]]).
+
+## What operators supply
+
+- **Resource scope descriptions.** A declared resource takes `scopeDescriptions`: per scope a
+  `description` (1–200) and an optional `kind` (`lib/admin/resources/schema.ts:17-30`). A key that is not
+  one of the resource's scopes is a 400 naming `scopeDescriptions` (`routes.ts:131`). A PATCH that changes
+  `scopes` without sending descriptions prunes the removed scopes' entries and names `scopeDescriptions`
+  in the audit attributes (`routes.ts:150`, `:327-336`). Accepted values are trimmed and carry no
+  `undefined` member (`lib/resources/scopes.ts:116-141`). See [[mcp-server-authorization]].
+- **Custom OpenID scope descriptions.** The setting `consent.scopeDescriptions`
+  (`lib/configs/application.ts:677-687`) is checked right after `collectScopes`
+  (`checkConsentScopeDescriptions`, `lib/configs/configuration.ts:172`, called at `:724`). A key must be a
+  defined scope and never a standard one (`lib/consts/oidc_scopes.ts`). Removing a described scope
+  without its description is refused. See [[settings-console-descriptor]].
+- **Bucket display name.** `displayName` (1–60, trimmed, blank refused) on create and update; `null` on
+  update clears it (`lib/admin/buckets/schema.ts:43`, `:105`; `routes.ts:112`). See
+  [[admin-bucket-settings]] and [[stored-document-schemas]] for how the field is removed.
+
+Nothing on the page is taken from protected-resource metadata, MCP tool metadata or the client beyond its
+name and redirect URIs.
+
+## Not here
+
+- No per-item selection; Allow grants everything shown.
+- No client logo, and no image other than the server's own logo.
+- CIBA never renders this page.
+- No translation yet; the catalog is the seam.
+
+## Related
+
+- [[untrusted-redirect-confirmation]] — the same provenance, read on the error path
+- [[group-ownership]] — the ownership comparison the tiers and the waiver share
+- [[rich-authorization-requests]] — rich details on this page, under "act"
+- [[form-action-redirect-chain]] — why the account-switch sign-out needed a hand-off
+- [[first-consent-grant-id]] — why the grant is read with `tryFind`
+- [[interaction-page-families]] — the hydration contract this page's data-only view honours

@@ -5,6 +5,7 @@ import { ConsentPage } from './consentPage.js';
 import { RegistrationPage } from './registration.js';
 import { TotpPage } from './totpPage.js';
 import type { ConsentView } from './consentView.js';
+import { CONSENT_TEXTS } from './consentTexts.js';
 import { htmlResponse } from '../html/csp.js';
 import { versionedAsset } from '../html/versionedAsset.js';
 import { ZeroRuntime } from '../html/zeroRuntime.js';
@@ -238,7 +239,7 @@ export async function consentServer(
 	html = html
 		.replace('/public/loginClient.js', versionedAsset('loginClient.js'))
 		.replace('/public/favicon.ico', versionedAsset('favicon.ico'))
-		.replace('<!--app-title-->', 'Consent Page')
+		.replace('<!--app-title-->', CONSENT_TEXTS.pageTitle)
 		.replace('<!--app-styles-->', styleLinks())
 		.replace('<!--app-props-->', propsScript(view))
 		.replace(

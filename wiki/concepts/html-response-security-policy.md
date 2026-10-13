@@ -4,7 +4,7 @@ title: "Rendered pages and their content security policy"
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-04
-updated: 2026-10-01
+updated: 2026-10-13
 graph:
   node_type: concept
   relationships:
@@ -97,7 +97,8 @@ them.
 `style-src-attr` keeps `'unsafe-inline'` on most pages, and that is not laziness: 62 `style={{…}}`
 props across `lib/interactions/{loginPage,consentPage,registration}.tsx` and ten pages under
 `lib/admin/ui/pages/` each render one, and `lib/interactions/plainPage.tsx` builds its markup from
-them by hand. An attribute decorates the one element it is attached to; a `<style>` block restyles the
+them by hand. (That count is from before spec 092. The rebuilt consent page alone now carries 44, up
+from 5, and the console has grown past ten pages; the argument is unchanged.) An attribute decorates the one element it is attached to; a `<style>` block restyles the
 whole document and can exfiltrate input values by attribute selector. The block form is the one
 `style-src-elem` closes.
 
@@ -145,7 +146,9 @@ into the document through its own `cssUtils`. That package is independent of ant
 `zeroRuntime` does not stop it, and the compiled `antd.css` does not contain it.
 
 This is why `style-src-elem` cannot simply hash every `<style>` block. The injected one does not exist
-when the document is built, so it has no hash, and all four hydrated pages import icons. The
+when the document is built, so it has no hash, and all four hydrated pages import icons (the consent
+page since spec 092, each icon with `aria-hidden="true"` so antd's English icon name is not read
+aloud — `lib/interactions/consentPage.tsx:27-40`). The
 derivation therefore keys off whether the document references an *external* script — a linked bundle
 is the case whose post-serve behaviour the document cannot describe — not off whether anything runs
 after the document is served at all. Two pages run inline code after serving (the `form_post`

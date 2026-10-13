@@ -8,7 +8,8 @@ import { declarationId } from '../../resources/declaration_id.js';
 import {
 	ProtectedResource,
 	type ProtectedResourcePatch,
-	type ProtectedResourceStoreInstance
+	type ProtectedResourceStoreInstance,
+	type ScopeDescription
 } from '../types.js';
 
 /*
@@ -29,6 +30,7 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 		projectId: string;
 		name: string;
 		scopes: string[];
+		scopeDescriptions?: Record<string, ScopeDescription>;
 		tokenFormat?: 'jwt' | 'opaque';
 		accessTokenTTL?: number;
 		trailingSlashSignificant?: boolean;
@@ -41,6 +43,9 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 			projectId: data.projectId,
 			name: data.name,
 			scopes: [...data.scopes],
+			...(data.scopeDescriptions
+				? { scopeDescriptions: structuredClone(data.scopeDescriptions) }
+				: {}),
 			tokenFormat: data.tokenFormat ?? 'jwt',
 			accessTokenTTL: data.accessTokenTTL ?? 900,
 			trailingSlashSignificant: data.trailingSlashSignificant ?? false,

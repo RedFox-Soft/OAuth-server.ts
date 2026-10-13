@@ -4,7 +4,7 @@ title: 'Interaction error delivery'
 tags: [architecture, contract, oauth]
 sources: [oauth-server-codebase]
 created: 2026-10-01
-updated: 2026-10-01
+updated: 2026-10-13
 ---
 
 # Interaction error delivery
@@ -70,28 +70,37 @@ so an error under `response_mode=jwt` could not be delivered at all.
 
 ## Consent refusal is an interaction result
 
-*Cancel* records `result.error = 'access_denied'` and calls `resume()`, as *Allow* records
-`result.consent` and does (`lib/interactions/index.ts:1291`). The throw it replaced left the interaction
+Declining (the `cancel` action, labelled *Don't allow* since spec 092) records `result.error = 'access_denied'` and calls `resume()`, as *Allow* records
+`result.consent` and does (`lib/interactions/index.ts:1784-1799`). The throw it replaced left the interaction
 standing: after a cancel, the same uid could still be resumed — or consent submitted again — into a code.
-As a result it is consumed like any other (`lib/actions/authorization/resume.ts:82` destroys it) and
+As a result it is consumed like any other (`lib/actions/authorization/resume.ts:107` destroys it) and
 delivered by the same rule.
+
+Since spec 092 both branches wait on one check. The form carries back the account it was shown for, and a
+submission naming another account, or none, is refused as "session principal changed" before either
+branch runs (`lib/interactions/index.ts:1779-1782`). Nothing is granted and no denial is delivered, so the
+client hears nothing about a decision the person on screen never made. See [[consent-screen-decisions]].
 
 ## A delivered fault is still recorded
 
 A fault answered by redirect never reached the handler's `captureFault`, so a fault at `/auth` was
 announced on `server_error` and never stored. The module records it after the response-mode handler has
-returned (`lib/shared/authorization_error_delivery.ts:174`) — a delivery that fails goes back to the
+returned (`lib/shared/authorization_error_delivery.ts:179`) — a delivery that fails goes back to the
 handler, which records it there, so it is one record either way — filed at status 500, and the reference
 is not put in the redirect. See [[error-store-capture-sites]].
 
 ## An untrusted client is offered the error, not sent it
 
 Since spec 066 the module decides one more thing before delivering: whether an operator vouched for the
-client's redirect URIs (`redirectUrisVouchedFor`, `lib/models/client/provenance.ts:23`). For a
+client's redirect URIs (`redirectUrisVouchedFor`, `lib/models/client/provenance.ts:25`). For a
 self-registered or document-described client the answer is offered on a confirmation page instead of
-redirected (`lib/shared/authorization_error_delivery.ts:175`) — RFC 9700 §4.11.2. The response modes
+redirected (`lib/shared/authorization_error_delivery.ts:163`) — RFC 9700 §4.11.2. The response modes
 describe the answer rather than only send it (`lib/response_modes/describe.ts`), so the page's link or
 form carries exactly what the redirect would have. See [[untrusted-redirect-confirmation]].
+
+This module is no longer the only reader of that answer. Since spec 092 the consent page reads it too,
+through `clientProvenance` (`provenance.ts:66-78`), to decide how it speaks of the app on the success
+path. Delivery itself did not change ([[consent-screen-decisions]]).
 
 ## Not covered
 

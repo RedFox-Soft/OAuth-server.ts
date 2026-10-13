@@ -43,6 +43,11 @@ function plural(n: number, one: string, many: string): string {
 	return `${String(n)} ${n === 1 ? one : many}`;
 }
 
+interface GeneralValues {
+	name: string;
+	displayName: string;
+}
+
 export function GeneralCard({
 	bucket,
 	canEdit,
@@ -53,26 +58,35 @@ export function GeneralCard({
 	onChanged: () => void;
 }) {
 	const feedback = useFeedback();
-	const [form] = Form.useForm<{ name: string }>();
+	const [form] = Form.useForm<GeneralValues>();
 	// Undefined until the form mounts, whatever the field's type says.
 	const name = Form.useWatch('name', form) as string | undefined;
+	const displayName = Form.useWatch('displayName', form) as string | undefined;
 	const [saving, setSaving] = useState(false);
-	const dirty = name !== undefined && name !== bucket.name;
+	const initial: GeneralValues = {
+		name: bucket.name,
+		displayName: bucket.displayName ?? ''
+	};
+	const dirty =
+		(name !== undefined && name !== initial.name) ||
+		(displayName !== undefined && displayName !== initial.displayName);
 	useLeaveGuard(dirty, dirty ? 1 : 0);
 
-	async function save(values: { name: string }) {
+	async function save(values: GeneralValues) {
 		setSaving(true);
+		const shown = values.displayName.trim();
 		const result = await request(
 			'PATCH',
 			`/admin/api/buckets/${encodeURIComponent(bucket._id)}`,
-			{ name: values.name }
+			// Emptied means removed: the pages then show the bucket's address.
+			{ name: values.name, displayName: shown ? shown : null }
 		);
 		setSaving(false);
 		if (!result.ok) {
 			feedback.failed(result, form);
 			return;
 		}
-		feedback.done(`Bucket renamed to “${values.name}”.`);
+		feedback.done('Bucket saved.');
 		onChanged();
 	}
 
@@ -81,7 +95,7 @@ export function GeneralCard({
 			<Form
 				form={form}
 				layout="vertical"
-				initialValues={{ name: bucket.name }}
+				initialValues={initial}
 				onFinish={(values) => void save(values)}
 				disabled={!canEdit}
 				scrollToFirstError
@@ -93,6 +107,17 @@ export function GeneralCard({
 					rules={[{ required: true, whitespace: true }]}
 				>
 					<Input style={{ maxWidth: 420 }} />
+				</Form.Item>
+				<Form.Item
+					name="displayName"
+					label="Name shown to users"
+					extra="What people see at the top of the page where they allow an app access — for example “Acme ID”. Leave it empty to show the bucket’s address instead. The name above is only for this console."
+				>
+					<Input
+						style={{ maxWidth: 420 }}
+						maxLength={60}
+						placeholder="the bucket’s address"
+					/>
 				</Form.Item>
 				{canEdit && (
 					<Space>
@@ -106,7 +131,7 @@ export function GeneralCard({
 						</Button>
 						<Button
 							disabled={!dirty}
-							onClick={() => form.setFieldsValue({ name: bucket.name })}
+							onClick={() => form.setFieldsValue(initial)}
 						>
 							Reset
 						</Button>

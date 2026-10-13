@@ -52,6 +52,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 	async create(data: {
 		_id?: string;
 		name: string;
+		displayName?: string;
 		slug?: string;
 		host?: string;
 		ownerGroupId: string;
@@ -66,6 +67,9 @@ export class UserBucketStore implements UserBucketStoreInstance {
 		const bucket: UserBucket = {
 			_id: data._id ?? nanoid(),
 			name: data.name,
+			...(data.displayName !== undefined
+				? { displayName: data.displayName }
+				: {}),
 			slug: data.slug,
 			/*
 			 * Written only when present, never as an explicit undefined. A stored null would occupy the
@@ -170,6 +174,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 			Pick<
 				UserBucket,
 				| 'name'
+				| 'displayName'
 				| 'ownerGroupId'
 				| 'passwordLogin'
 				| 'federation'
@@ -183,10 +188,26 @@ export class UserBucketStore implements UserBucketStoreInstance {
 			>
 		>
 	): Promise<UserBucket | null> {
+		/*
+		 * A key present with an undefined value removes the field. `$set` cannot say that — the driver drops
+		 * undefined values — so clearing a display name through it would leave the old name on every
+		 * end-user page. The patch is split, as the user store's is.
+		 */
+		const set: Record<string, unknown> = { updatedAt: new Date() };
+		const unset: Record<string, ''> = {};
+		for (const [field, value] of Object.entries(
+			patch as Record<string, unknown>
+		)) {
+			if (value === undefined) unset[field] = '';
+			else set[field] = value;
+		}
 		return withDefaults(
 			await this.collection.findOneAndUpdate(
 				{ _id: id },
-				{ $set: { ...patch, updatedAt: new Date() } },
+				// An empty $unset is rejected by MongoDB, so the operator only appears when it has work.
+				Object.keys(unset).length
+					? { $set: set, $unset: unset }
+					: { $set: set },
 				// A federation list carries providers whose optional secrets may be undefined.
 				{ returnDocument: 'after', ...ABSENT_UNDEFINED }
 			)

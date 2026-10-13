@@ -14,11 +14,27 @@ import { t } from 'elysia';
  * value. Same reasoning as `corsOrigins` in the projects schema: the check runs in the handler so the
  * answer arrives in the admin error shape with something an operator can act on.
  */
+/*
+ * What one scope lets an app do, as the consent page says it to the person deciding. `kind` says whether
+ * the app merely sees something or acts; absent, the page says "act", because understating what an app
+ * may do is the mistake that matters on that page.
+ */
+const ScopeDescriptionBody = t.Object(
+	{
+		description: t.String({ minLength: 1, maxLength: 200 }),
+		kind: t.Optional(t.Union([t.Literal('see'), t.Literal('act')]))
+	},
+	{ additionalProperties: false }
+);
+
+const ScopeDescriptions = t.Record(t.String(), ScopeDescriptionBody);
+
 export const CreateResourceBody = t.Object(
 	{
 		identifier: t.String({ minLength: 1 }),
 		name: t.String({ minLength: 1, maxLength: 100 }),
 		scopes: t.Array(t.String()),
+		scopeDescriptions: t.Optional(ScopeDescriptions),
 		tokenFormat: t.Optional(t.Union([t.Literal('jwt'), t.Literal('opaque')])),
 		accessTokenTTL: t.Optional(
 			t.Number({ minimum: 30, maximum: 86400, multipleOf: 1 })
@@ -44,6 +60,11 @@ export const UpdateResourceBody = t.Object(
 	{
 		name: t.Optional(t.String({ minLength: 1, maxLength: 100 })),
 		scopes: t.Optional(t.Array(t.String())),
+		/*
+		 * Replaces the whole map. Sent without it, a change to `scopes` drops the descriptions of scopes it
+		 * removes and keeps the rest.
+		 */
+		scopeDescriptions: t.Optional(ScopeDescriptions),
 		tokenFormat: t.Optional(t.Union([t.Literal('jwt'), t.Literal('opaque')])),
 		accessTokenTTL: t.Optional(
 			t.Number({ minimum: 30, maximum: 86400, multipleOf: 1 })

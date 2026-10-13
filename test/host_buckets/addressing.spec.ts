@@ -1,3 +1,4 @@
+import { shownAccount } from '../consent_form.js';
 import { createHash, randomBytes } from 'node:crypto';
 import { describe, it, expect, beforeAll } from 'bun:test';
 import bootstrap from '../test_helper.ts';
@@ -107,7 +108,10 @@ async function completeSignIn(host: string, clientId: string, email: string) {
 			'content-type': 'application/x-www-form-urlencoded',
 			cookie: cookiesOf(response).join('; ')
 		},
-		body: new URLSearchParams({ action: 'allow' }).toString()
+		body: new URLSearchParams({
+			action: 'allow',
+			accountId: await shownAccount(consentUid)
+		}).toString()
 	});
 	const session = cookiesOf(allowed).find((cookie) =>
 		cookie.startsWith('_session')

@@ -1,4 +1,5 @@
-import { getBucketStore, getProjectStore } from '../adapters/index.js';
+import { getBucketStore } from '../adapters/index.js';
+import { projectGroupOwnsBucket } from '../models/client/provenance.js';
 import { resolveBucketForRequest } from '../admin/auth/resolveBucket.js';
 import type { OIDCContext } from '../helpers/oidc_context.js';
 
@@ -33,9 +34,6 @@ async function decide(oidc: OIDCContext): Promise<boolean> {
 	const { client } = oidc;
 	if (client['consent.require']) return false;
 
-	const project = await getProjectStore().findByClientId(client.clientId);
-	if (!project) return true;
-
 	const bucket = await getBucketStore().find(
 		await resolveBucketForRequest(
 			client.clientId,
@@ -43,5 +41,5 @@ async function decide(oidc: OIDCContext): Promise<boolean> {
 			oidc.bucket
 		)
 	);
-	return bucket?.ownerGroupId === project.ownerGroupId;
+	return (await projectGroupOwnsBucket(client.clientId, bucket)) ?? true;
 }

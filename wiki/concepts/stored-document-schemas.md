@@ -4,7 +4,7 @@ title: 'Stored documents are checked against their schema on the way out'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-09-28
-updated: 2026-09-28
+updated: 2026-10-13
 graph:
   node_type: concept
   relationships:
@@ -65,9 +65,21 @@ not a third). Model records differ on purpose: a token that fails its schema is 
   and `postLogoutRedirectUri` undefined; stored as nulls, the session vanished and the confirmation
   answered "could not find logout details". The conformance suite's `rp-initiated-logout` plan found it;
   both writes now pass the option.
+  Since spec 092 the bucket update no longer hands its patch to `$set` whole. With the option on, `$set`
+  drops an undefined member, so clearing a field would leave the old value, and clearing a bucket's
+  `displayName` needs a real removal. A key present with `undefined` now means "remove the field" on all
+  three backends: MongoDB splits the patch into `$set` and `$unset`
+  (`lib/adapters/mongodb/userBucketStore.ts:191-210`), PostgreSQL subtracts the keys before the merge
+  (`lib/adapters/postgres/userBucketStore.ts:201-217`), and memory deletes them
+  (`lib/adapters/memory/userBucketStore.ts:171-180`), as the user stores already did.
 
 Nothing is sniffed from the value: a string that looks like a date stays a string unless the schema
 declares a date there.
+
+**Nothing restores a null inside a map.** The null rule reaches a member a schema declares optional, not
+a value inside a `t.Record`. So a map is written fully defined. Since spec 092 a declared resource's
+`scopeDescriptions` is trimmed and carries no absent `kind` member before the store sees it
+(`validateScopeDescriptions`, `lib/resources/scopes.ts:116-141`).
 
 ## What checks it
 

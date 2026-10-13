@@ -1278,6 +1278,17 @@ export interface ProjectStoreConstructor {
  * project names its owning group, and every access decision resolves through that — one source of
  * ownership, as everywhere else.
  */
+/*
+ * One scope's description. The description is required because a kind alone says nothing a person can
+ * read: an undescribed scope is listed as "not described" whatever its kind. `kind` absent means "act" —
+ * a scope is shown as merely letting an app see something only when its administrator said so.
+ */
+export const ScopeDescription = t.Object({
+	description: t.String({ minLength: 1, maxLength: 200 }),
+	kind: t.Optional(t.Union([t.Literal('see'), t.Literal('act')]))
+});
+export type ScopeDescription = Static<typeof ScopeDescription>;
+
 export const ProtectedResource = t.Object({
 	_id: t.String(),
 	namespace: t.String(),
@@ -1290,6 +1301,12 @@ export const ProtectedResource = t.Object({
 	 * because a space-delimited string is the wire shape, not a storage shape.
 	 */
 	scopes: t.Array(t.String()),
+	/*
+	 * What each scope lets an app do, in the declaring administrator's words, for the consent page — keyed
+	 * by scope, and only ever by one of `scopes` above. Optional because a resource is usable without it:
+	 * an undescribed scope is shown to the end user as its technical name, under "not described".
+	 */
+	scopeDescriptions: t.Optional(t.Record(t.String(), ScopeDescription)),
 	/*
 	 * How the resource verifies a token. `jwt` by default: an independent MCP server can then check a
 	 * signature against the published keys with no request back and no credentials of its own, which
@@ -1308,7 +1325,10 @@ export const ProtectedResource = t.Object({
 export type ProtectedResource = Static<typeof ProtectedResource>;
 
 export type ProtectedResourcePatch = Partial<
-	Pick<ProtectedResource, 'name' | 'scopes' | 'tokenFormat' | 'accessTokenTTL'>
+	Pick<
+		ProtectedResource,
+		'name' | 'scopes' | 'scopeDescriptions' | 'tokenFormat' | 'accessTokenTTL'
+	>
 >;
 
 export interface ProtectedResourceStoreInstance {
@@ -1319,6 +1339,7 @@ export interface ProtectedResourceStoreInstance {
 		projectId: string;
 		name: string;
 		scopes: string[];
+		scopeDescriptions?: Record<string, ScopeDescription>;
 		tokenFormat?: 'jwt' | 'opaque';
 		accessTokenTTL?: number;
 		trailingSlashSignificant?: boolean;
@@ -1853,6 +1874,12 @@ export const UserBucket = t.Object({
 	_id: t.String(),
 	name: t.String(),
 	/*
+	 * The name the bucket's end users know the service by — "Acme ID" — shown at the top of the page where they
+	 * allow an app access. Separate from `name`, which is the operator's label in a list and may say
+	 * "prod-eu-users". Optional: without it that page shows the bucket's address, never `name`.
+	 */
+	displayName: t.Optional(t.String()),
+	/*
 	 * The bucket's address: the path segment its endpoints live beneath, and the path component of its
 	 * issuer identifier. Distinct from `name`, which is the display name an operator reads in a list
 	 * ("Default users") and carries spaces and capitals — one field cannot answer to both a human
@@ -1971,6 +1998,7 @@ export interface UserBucketStoreInstance {
 	create(data: {
 		_id?: string;
 		name: string;
+		displayName?: string;
 		slug?: string;
 		ownerGroupId: string;
 		passwordLogin?: boolean;
@@ -2027,6 +2055,7 @@ export interface UserBucketStoreInstance {
 			Pick<
 				UserBucket,
 				| 'name'
+				| 'displayName'
 				| 'slug'
 				| 'ownerGroupId'
 				| 'passwordLogin'

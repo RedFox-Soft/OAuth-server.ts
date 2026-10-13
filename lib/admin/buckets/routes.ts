@@ -105,6 +105,23 @@ import {
  * differently-cased slug never reaches this function — it is refused a step earlier, which is what
  * tells the operator the rule instead of silently moving their bucket to an address they did not type.
  */
+/*
+ * A display name as stored: trimmed, and refused when nothing is left — an end user's page headed by
+ * whitespace names nothing. `null` (cleared) passes through for the update route to remove the field.
+ */
+function acceptedDisplayName(
+	value: string | null | undefined
+): string | null | undefined {
+	if (value === undefined || value === null) return value;
+	const trimmed = value.trim();
+	if (!trimmed) {
+		throw new AdminError(400, 'the name shown to users cannot be blank', {
+			field: 'displayName'
+		});
+	}
+	return trimmed;
+}
+
 async function assertSlugAvailable(slug: string) {
 	if (isReservedBucketName(slug)) {
 		throw new AdminError(
@@ -825,6 +842,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			 * a bucket a 409 refused to create would record an address that never existed.
 			 */
 			const address = await resolveAddress(body);
+			const displayName = acceptedDisplayName(body.displayName) ?? undefined;
 			// The id is allocated here, not by the store, so the audit entry can name the bucket that is
 			// about to exist — audit-first has nothing to point at otherwise.
 			const bucketId = nanoid();
@@ -833,6 +851,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 				getBucketStore().create({
 					_id: bucketId,
 					name: body.name,
+					...(displayName ? { displayName } : {}),
 					...address,
 					ownerGroupId,
 					passwordLogin: body.passwordLogin,
@@ -969,7 +988,18 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 		async ({ admin, params, body, status }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForSettings(ctx, params.id, 'edit');
-			const { confirm, expect, ...changes } = body;
+			const { confirm, expect, displayName, ...rest } = body;
+			/*
+			 * Present with no value when the request cleared it, so the store removes the field rather than
+			 * leaving the old name in place.
+			 */
+			const changes =
+				displayName === undefined
+					? rest
+					: {
+							...rest,
+							displayName: acceptedDisplayName(displayName) ?? undefined
+						};
 			/*
 			 * Checked before the audit entry and the write: an entry describing a change a 409 refused would
 			 * state that an operator closed a bucket's password door when they did not. The provider routes

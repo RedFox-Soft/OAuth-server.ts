@@ -655,3 +655,73 @@ describe('settings API', () => {
 		});
 	});
 });
+
+/**
+ * @proves A super administrator can describe the instance's own scopes for the consent page, and only
+ * those: a description of a scope the instance does not define, or of a standard one the page already
+ * words, is refused before anything is saved.
+ */
+describe('describing custom scopes for the consent page', () => {
+	beforeEach(async () => {
+		await bootstrap(import.meta.url);
+		await configStore.set({});
+	});
+
+	it('saves a description of a scope the instance defines', async () => {
+		const cookie = await sessionCookieFor('super');
+
+		const res = await client.admin.api.settings.put(
+			{
+				scopes: ['openid', 'offline_access', 'billing'],
+				'consent.scopeDescriptions': { billing: 'see your invoices' }
+			},
+			{ headers: { cookie } }
+		);
+
+		expect(res.status).toBe(200);
+		expect((await storedSettings())['consent.scopeDescriptions']).toEqual({
+			billing: 'see your invoices'
+		});
+	});
+
+	it('refuses a description of a scope the instance does not define', async () => {
+		const cookie = await sessionCookieFor('super');
+
+		const res = await client.admin.api.settings.put(
+			{ 'consent.scopeDescriptions': { billing: 'see your invoices' } },
+			{ headers: { cookie } }
+		);
+
+		expect(res.status).toBe(422);
+		expect(JSON.stringify(res.error?.value)).toContain('billing');
+	});
+
+	it('refuses a description of a standard scope', async () => {
+		const cookie = await sessionCookieFor('super');
+
+		const res = await client.admin.api.settings.put(
+			{ 'consent.scopeDescriptions': { email: 'your address' } },
+			{ headers: { cookie } }
+		);
+
+		expect(res.status).toBe(422);
+	});
+
+	it('refuses removing a described scope while its description stays', async () => {
+		const cookie = await sessionCookieFor('super');
+		await client.admin.api.settings.put(
+			{
+				scopes: ['openid', 'offline_access', 'billing'],
+				'consent.scopeDescriptions': { billing: 'see your invoices' }
+			},
+			{ headers: { cookie } }
+		);
+
+		const res = await client.admin.api.settings.put(
+			{ scopes: ['openid', 'offline_access'] },
+			{ headers: { cookie } }
+		);
+
+		expect(res.status).toBe(422);
+	});
+});

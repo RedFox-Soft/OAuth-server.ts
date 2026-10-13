@@ -4,7 +4,7 @@ title: 'Untrusted redirect confirmation'
 tags: [oauth, contract, architecture]
 sources: [oauth-server-codebase]
 created: 2026-10-01
-updated: 2026-10-01
+updated: 2026-10-13
 ---
 
 # Untrusted redirect confirmation
@@ -20,12 +20,19 @@ instead of redirected. Successful responses, and every client an operator create
 
 ## Trust is provenance
 
-`redirectUrisVouchedFor` (`lib/models/client/provenance.ts:23`) answers one question: did an operator put
+`redirectUrisVouchedFor` (`lib/models/client/provenance.ts:25`) answers one question: did an operator put
 these redirect URIs here? **No** for a client created by dynamic registration (`registeredDynamically`,
 written by the endpoint, unsettable by the registrant) and for a client resolved from a metadata document
 (stored nowhere — so "no stored record" is its definition). **Yes** for everything else, including an
 operator-created client whose id is a URL: the shape of the id is not the test, the same reason
 `tryFindClient` reads the store before trying a document.
+
+Since spec 092 the same answer is also read on the **success** path. The consent page classifies the
+client through `clientProvenance` (`provenance.ts:66-78`), whose first test is this one: a client nobody
+vouched for is self-registered, and the page says "{service} hasn't checked this app" about it. Redirects
+are still unchanged; only the page's wording and warnings follow the tier. That replaced the consent
+page's own `https:`-shaped test of the client id, which was the very test this section rules out. See
+[[consent-screen-decisions]].
 
 This is not a local interpretation. The section's history (draft-ietf-oauth-security-topics -05 → -06,
 2018) replaced an absolute ban with the trust-based SHOULD after Lodderstedt wrote that "open dynamic
@@ -39,7 +46,7 @@ authorization endpoint; Microsoft reported live campaigns abusing exactly this i
 
 ## One decision point, one answer
 
-The decision sits in `deliverAuthorizationError` (`lib/shared/authorization_error_delivery.ts:175`),
+The decision sits in `deliverAuthorizationError` (`lib/shared/authorization_error_delivery.ts:163`),
 which every authorization error has passed through since spec 065 — `/auth`, `prompt=none`, a declined
 consent, any terminal error on resume. The response modes **describe** an answer as well as send it
 (`lib/response_modes/describe.ts`; `responseModes.describe`, `lib/response_modes/index.ts:75`): navigate
@@ -63,10 +70,13 @@ plan's `oidcc-prompt-none-not-logged-in` sees the page instead of a redirect.
 ## Not here
 
 No operator "trust this document host" list (the editors' "CIMD from an untrusted domain" implies one
-could exist); no reputation checks or first-use warnings, which the standard mentions as options.
+could exist); no reputation checks or first-use warnings, which the standard mentions as options. The
+amber warning the consent page shows since spec 092 is not one of these: it fires on what the request
+asks for and on the client's name and hosts, never on a reputation ([[consent-screen-decisions]]).
 
 ## Related
 
 - [[interaction-error-delivery]] — the single delivery rule this branches inside
 - [[html-response-security-policy]] — `denyFraming`, and the one page that stays framable
 - [[interaction-page-families]] — why this is a plain page
+- [[consent-screen-decisions]] — the same provenance, read on the success path to word the consent page

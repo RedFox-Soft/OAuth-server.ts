@@ -224,3 +224,72 @@ describe('bucket verification settings API', () => {
 		expect(res.status).toBe(422);
 	});
 });
+
+/**
+ * @proves An operator can give a bucket the name its people know the service by, separate from the
+ * label they read in the console, and take it away again.
+ */
+describe('a bucket’s name shown to users', () => {
+	beforeEach(async () => {
+		await ensureAdminSeed();
+	});
+
+	async function created(cookie: string, slug: string) {
+		const res = await client.admin.api.buckets.post(
+			{ name: 'prod-eu-users', slug, displayName: 'Acme ID' },
+			{ headers: { cookie } }
+		);
+		return answered(res.data);
+	}
+
+	it('keeps the name shown to users apart from the bucket’s own name', async () => {
+		const cookie = await superCookie();
+
+		const bucket = await created(cookie, 'display-name-1');
+
+		expect(bucket.displayName).toBe('Acme ID');
+		expect(bucket.name).toBe('prod-eu-users');
+	});
+
+	it('refuses a name shown to users that is blank', async () => {
+		const cookie = await superCookie();
+		const bucket = await created(cookie, 'display-name-2');
+
+		const res = await client.admin.api
+			.buckets({ id: bucket._id })
+			.patch({ displayName: '   ' }, { headers: { cookie } });
+
+		expect(res.status).toBe(400);
+	});
+
+	it('refuses a name shown to users longer than sixty characters', async () => {
+		const cookie = await superCookie();
+		const bucket = await created(cookie, 'display-name-3');
+
+		const res = await client.admin.api
+			.buckets({ id: bucket._id })
+			.patch({ displayName: 'x'.repeat(61) }, { headers: { cookie } });
+
+		expect(res.status).toBe(422);
+	});
+
+	it('removes the name shown to users when it is cleared, and records the change', async () => {
+		const cookie = await superCookie();
+		const bucket = await created(cookie, 'display-name-4');
+
+		const res = await client.admin.api
+			.buckets({ id: bucket._id })
+			.patch({ displayName: null }, { headers: { cookie } });
+
+		expect(res.status).toBe(200);
+		expect(answered(res.data).displayName).toBeUndefined();
+		expect(
+			(await getBucketStore().find(bucket._id))?.displayName
+		).toBeUndefined();
+		const { entries } = await adminAuditStore.list({
+			targetId: bucket._id,
+			action: 'bucket.update'
+		});
+		expect(entries[0]?.attributes).toContain('displayName');
+	});
+});
