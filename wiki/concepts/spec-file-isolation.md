@@ -20,16 +20,23 @@ instead of checked for leftovers.
 
 ## Two places, split by what they can reach
 
-**At the file boundary — `test/preload.ts:54`.** Spies, the system clock and `process.env`. A spy made
+**At the file boundary — `test/preload.ts:56`.** Spies, the system clock, `process.env` and the settings. A spy made
 with `spyOn` patches the real object, and Bun keeps the patch in place for every later file.
 `setSystemTime` behaves the same way. Bun has no hook between files, but it resolves the next spec
 file at exactly that moment: after the last file's `afterAll`, before the next file's module loads. A
-runtime plugin whose `onResolve` (`test/preload.ts:66`) only watches and resolves nothing marks that
+runtime plugin whose `onResolve` (`test/preload.ts:73`) only watches and resolves nothing marks that
 point. There `mock.restore()` is safe. It is not safe inside a file — see the gotcha below. Bun
 resolves each spec path more than once, so only a *different* path counts as a boundary. The first
 file has nothing before it.
 
-**In `bootstrap()` — `test/test_helper.ts:457`.** Every store and every cache built from one.
+The settings joined the boundary on 2026-10-13. `bootstrap()` already restored `ApplicationConfig` and
+`ClientDefaults`, but a spec that never calls it — `test/configuration/constructor.spec.ts`, which
+exercises the configuration itself — ran under whatever the previous file's config export switched on,
+and failed whenever a file enabling mTLS ran just before it. The boundary now applies the baseline from
+`test/config_baseline.ts` the way `bootstrap()` does, re-validates it and runs the settings invalidators
+(`restoreSettings`, `test/preload.ts:95`).
+
+**In `bootstrap()` — `test/test_helper.ts:509`.** Every store and every cache built from one.
 `resetStoresForTests()` (`lib/adapters/index.ts:528`) replaces every store singleton: buckets,
 projects, groups, users, the audit trail, recorded faults, activity, keys and the rest. The five stores
 built at import time became `export let` (`lib/adapters/index.ts:191`) so they can be replaced. An

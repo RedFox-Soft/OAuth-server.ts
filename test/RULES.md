@@ -214,7 +214,7 @@ off-schema on purpose, with the reason on the directive.
   request to an origin nobody registered with `mock(origin)` is **refused by name** rather than sent. If
   you see `test fetch to an unregistered origin: …`, register that origin and intercept the path.
 - **A spec file starts from a clean process.** Between two files `test/preload.ts` restores every spy,
-  the system clock and `process.env`, and `bootstrap()` empties every store and the caches derived from
+  the system clock, `process.env` and the settings, and `bootstrap()` empties every store and the caches derived from
   them. Nothing one file leaves reaches the next, so a fixed id or slug is safe across files. Cases
   _within_ a file still share everything the file set up: a case that changes shared state restores it,
   and `bun test --randomize --seed=N` (both orders shuffled) is how to show a file does not depend on

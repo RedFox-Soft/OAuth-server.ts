@@ -41,7 +41,12 @@ beforeEach(() => {
 /*
  * Between two spec files, the process-wide state Bun does not restore on its own goes back to how the run
  * found it: every spy (`spyOn` patches the real object, and Bun leaves the patch in place for every later
- * file), the system clock (`setSystemTime` likewise), and the environment.
+ * file), the system clock (`setSystemTime` likewise), the environment, and the settings.
+ *
+ * The settings too, though bootstrap() also restores them: a spec that never calls bootstrap — one that
+ * exercises the configuration itself — otherwise ran under whatever the previous file's config export
+ * switched on, and `test/configuration/constructor.spec.ts` failed whenever a file enabling mTLS happened
+ * to run just before it.
  *
  * Restored rather than detected and reported, because at this moment nothing can legitimately want any of
  * it: the last file's afterAll hooks have run and the next file has not been loaded. Bun offers no hook
@@ -50,6 +55,7 @@ beforeEach(() => {
  */
 const environment = { ...process.env };
 let currentSpec: string | undefined;
+let restoreSettings: (() => void) | undefined;
 
 function restoreProcessState(): void {
 	mock.restore();
@@ -58,6 +64,7 @@ function restoreProcessState(): void {
 		if (!(name in environment)) delete process.env[name];
 	}
 	Object.assign(process.env, environment);
+	restoreSettings?.();
 }
 
 plugin({
@@ -78,7 +85,23 @@ plugin({
 await writeRootKeys(testSigningKeys);
 
 // The settings baseline every bootstrap restores, taken now — after the keys above, before any spec.
-await import('./config_baseline.js');
+const { applicationDefaultSettings, clientDefaultSettings } =
+	await import('./config_baseline.js');
+{
+	const { ApplicationConfig, reloadConfiguration, settingsApplied } =
+		await import('../lib/configs/application.js');
+	const { ClientDefaults } = await import('../lib/configs/clientBase.js');
+	// As bootstrap() applies them, and with what was derived from the last file's settings forgotten.
+	restoreSettings = () => {
+		Object.assign(
+			ApplicationConfig,
+			structuredClone(applicationDefaultSettings)
+		);
+		Object.assign(ClientDefaults, structuredClone(clientDefaultSettings));
+		reloadConfiguration();
+		settingsApplied(Object.keys(ApplicationConfig));
+	};
+}
 
 let policyControl: { reset(): void } | undefined;
 let rateLimiter: { resetRateLimiter(): void } | undefined;
