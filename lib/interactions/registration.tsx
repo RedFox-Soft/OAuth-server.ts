@@ -6,6 +6,7 @@ import {
 import { Button, Card, Flex, Form, Input } from 'antd';
 import { buildUILoginPath, buildUIRegistrationPath } from './buildUIPath.js';
 import { DEFAULT_LOGO } from './logo.js';
+import { foxVar } from '../html/theme/palette.js';
 
 export function RegistrationPage({
 	uid,
@@ -26,7 +27,7 @@ export function RegistrationPage({
 				display: 'flex',
 				height: '100vh',
 				alignItems: 'center',
-				backgroundColor: '#f0f2f5'
+				backgroundColor: foxVar('page')
 			}}
 		>
 			<Card
@@ -34,7 +35,7 @@ export function RegistrationPage({
 					width: 400,
 					padding: 24,
 					borderRadius: 12,
-					boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+					boxShadow: `0 2px 8px ${foxVar('shadow')}`
 				}}
 			>
 				<div style={{ textAlign: 'center', marginBottom: 24 }}>
@@ -61,17 +62,21 @@ export function RegistrationPage({
 								style={{
 									padding: '12px 16px',
 									borderRadius: '6px',
-									border: '1px solid #ffccc7',
-									backgroundColor: '#fff2f0',
+									border: `1px solid ${foxVar('danger-border')}`,
+									backgroundColor: foxVar('danger-bg'),
 									display: 'flex',
 									alignItems: 'center',
 									gap: '8px'
 								}}
 							>
-								<span style={{ color: '#ff4d4f', fontSize: '14px' }}>
+								<span
+									style={{ color: foxVar('danger-text'), fontSize: '14px' }}
+								>
 									<ExclamationCircleOutlined />
 								</span>
-								<span style={{ color: '#ff4d4f', fontSize: '14px' }}>
+								<span
+									style={{ color: foxVar('danger-text'), fontSize: '14px' }}
+								>
 									{errorMessage}
 								</span>
 							</div>

@@ -5,11 +5,14 @@
  *
  * The inline styles deliberately mirror the antd shell pages (same field colour, card, radius and shadow),
  * so a page reached without the interaction cookie — or without the client bundle at all — does not look
- * like a different product.
+ * like a different product. Every colour is a palette role, declared by the theme head for both colour
+ * schemes, so these pages follow the device's scheme with no script, as the antd pages do (specs/096).
  */
 
 import { htmlResponse } from '../html/csp.js';
 import { esc } from '../html/escape.js';
+import { foxVar } from '../html/theme/palette.js';
+import { themeHead } from '../html/theme/head.js';
 
 // A page reporting a refusal passes its own status: a rendered error that answers 200 tells a non-browser
 // client the opposite of what it says to a reader.
@@ -29,6 +32,6 @@ export function page(
 	const card = wide
 		? 'max-width:640px; text-align:left;'
 		: 'max-width:400px; text-align:center;';
-	const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>${esc(title)}</title></head><body style="font-family: Arial, Helvetica, sans-serif; background:#f0f2f5; margin:0; min-height:100vh; box-sizing:border-box; display:flex; ${layout}"><div style="background:#fff; padding:32px; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.1); width:100%; box-sizing:border-box; ${card}">${bodyHtml}</div></body></html>`;
+	const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>${esc(title)}</title>${themeHead()}</head><body style="font-family: Arial, Helvetica, sans-serif; background:${foxVar('page')}; margin:0; min-height:100vh; box-sizing:border-box; display:flex; ${layout}"><div style="background:${foxVar('card')}; padding:32px; border-radius:12px; box-shadow:0 2px 8px ${foxVar('shadow')}; width:100%; box-sizing:border-box; ${card}">${bodyHtml}</div></body></html>`;
 	return htmlResponse(html, { status, denyFraming });
 }

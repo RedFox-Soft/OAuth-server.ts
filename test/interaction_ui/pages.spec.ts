@@ -18,8 +18,8 @@ const PASSWORD = 'correct horse battery';
 // The wording the login page must show after a registration that needs verification, and the two markers
 // that make "notice" and "error" distinguishable in the markup rather than only in prose.
 const NOTICE_TEXT = 'Check your inbox';
-const NOTICE_MARKER = '#e6f4ff';
-const ERROR_MARKER = '#fff2f0';
+const NOTICE_MARKER = 'var(--fox-notice-bg)';
+const ERROR_MARKER = 'var(--fox-danger-bg)';
 
 let verifyBucketId: string;
 let closedBucketId: string;

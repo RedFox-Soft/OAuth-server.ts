@@ -1,5 +1,6 @@
 import { page } from './plainPage.js';
 import { esc } from '../html/escape.js';
+import { foxVar } from '../html/theme/palette.js';
 import type { AnswerDescription } from '../response_modes/describe.js';
 
 /*
@@ -37,7 +38,7 @@ export function confirmationPage({
 
 	const control =
 		answer.method === 'GET'
-			? `<a href="${esc(answer.url)}" style="display:inline-block; padding:8px 16px; background:#1677ff; color:#fff; border-radius:6px; text-decoration:none;">${esc(label)}</a>`
+			? `<a href="${esc(answer.url)}" style="display:inline-block; padding:8px 16px; background:${foxVar('primary-solid')}; color:${foxVar('on-primary')}; border-radius:6px; text-decoration:none;">${esc(label)}</a>`
 			: `<form method="post" action="${esc(answer.action)}">${Object.entries(
 					answer.fields
 				)
@@ -47,9 +48,9 @@ export function confirmationPage({
 					)
 					.join(
 						''
-					)}<button type="submit" style="padding:8px 16px; background:#1677ff; color:#fff; border:0; border-radius:6px; cursor:pointer;">${esc(label)}</button></form>`;
+					)}<button type="submit" style="padding:8px 16px; background:${foxVar('primary-solid')}; color:${foxVar('on-primary')}; border:0; border-radius:6px; cursor:pointer;">${esc(label)}</button></form>`;
 
-	const body = `<h2 style="margin-top:0;">${esc(heading)}</h2><p>The application at <strong>${esc(host)}</strong> is waiting for this answer. Continue only if you trust that site.</p><p style="color:#8c8c8c; font-size:12px;">Error: ${esc(error)}</p>${control}`;
+	const body = `<h2 style="margin-top:0;">${esc(heading)}</h2><p>The application at <strong>${esc(host)}</strong> is waiting for this answer. Continue only if you trust that site.</p><p style="color:${foxVar('text-muted')}; font-size:12px;">Error: ${esc(error)}</p>${control}`;
 
 	// The error's status, as a form-post error answer has it: the page reports a failed request, and a
 	// 200 would tell a non-browser caller the opposite of what it says to a reader.

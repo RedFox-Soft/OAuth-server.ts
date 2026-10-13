@@ -1,11 +1,5 @@
 import { hydrateRoot } from 'react-dom/client';
-import { StrictMode } from 'react';
-import { LoginPage } from './loginPage.tsx';
-import { ConsentPage } from './consentPage.tsx';
-import { emptyConsentView } from './consentView.ts';
-import { RegistrationPage } from './registration.tsx';
-import { TotpPage } from './totpPage.tsx';
-import { ZeroRuntime } from '../html/zeroRuntime.js';
+import { clientRoot } from './clientRoot.tsx';
 
 declare global {
 	interface Window {
@@ -34,56 +28,4 @@ if (!root) {
 	throw new Error('#root is missing from the document');
 }
 
-hydrateRoot(
-	root,
-	<StrictMode>
-		<ZeroRuntime>
-			{(() => {
-				switch (pageName()) {
-					case 'login':
-						return (
-							<LoginPage
-								uid={calculateUid()}
-								{...props}
-							/>
-						);
-					case 'consent':
-						return (
-							<ConsentPage
-								{...emptyConsentView(calculateUid())}
-								{...props}
-							/>
-						);
-					case 'registration':
-						// Spreading props is not parity for its own sake: a message the server rendered into
-						// this page is erased the moment React hydrates from props that never carried it, in
-						// the browser only and with nothing logged anywhere.
-						return (
-							<RegistrationPage
-								uid={calculateUid()}
-								{...props}
-							/>
-						);
-					case 'totp':
-						/*
-						 * Both `ui/:uid/totp` and `ui/:uid/totp/enroll` land here — the page name is the
-						 * fourth path segment, which is `totp` for both — so which of the two this is comes
-						 * from the props, never from the URL.
-						 *
-						 * `mode` is defaulted to the code page and the spread comes last, so the server's
-						 * value wins. Drop the spread and the enrolment page hydrates into the code page:
-						 * the QR and the secret disappear the instant React takes over, leaving a form that
-						 * asks for a code from an authenticator the person was never able to set up.
-						 */
-						return (
-							<TotpPage
-								uid={calculateUid()}
-								mode="verify"
-								{...props}
-							/>
-						);
-				}
-			})()}
-		</ZeroRuntime>
-	</StrictMode>
-);
+hydrateRoot(root, clientRoot(pageName(), calculateUid(), props));

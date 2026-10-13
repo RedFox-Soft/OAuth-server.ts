@@ -1,5 +1,5 @@
 import { renderToString } from 'react-dom/server';
-import { StrictMode } from 'react';
+import { StrictMode, type ReactElement } from 'react';
 import { LoginPage } from './loginPage.js';
 import { ConsentPage } from './consentPage.js';
 import { RegistrationPage } from './registration.js';
@@ -8,7 +8,7 @@ import type { ConsentView } from './consentView.js';
 import { CONSENT_TEXTS } from './consentTexts.js';
 import { htmlResponse } from '../html/csp.js';
 import { versionedAsset } from '../html/versionedAsset.js';
-import { ZeroRuntime } from '../html/zeroRuntime.js';
+import { renderEndUserTree } from '../html/theme/dark.js';
 
 const htmlTeamplate = Bun.file('./lib/interactions/htmlTeamplate.html');
 
@@ -25,6 +25,31 @@ function styleLinks(): string {
 		`<link rel="stylesheet" href="${versionedAsset('reset.css')}" />`,
 		`<link rel="stylesheet" href="${versionedAsset('antd.css')}" />`
 	].join('');
+}
+
+/*
+ * A hydrated page's markup and the <head> it needs (specs/096): the compiled stylesheets, then the theme, the
+ * page's own antd custom properties and their dark counterparts. The tree is the one lib/interactions/
+ * clientRoot.tsx hydrates — StrictMode outside, the end-user theme inside — so the two cannot disagree.
+ * The replacements are functions because a replacement string reads `$&` and its kin as patterns.
+ */
+function hydratedPage(
+	template: string,
+	title: string,
+	props: unknown,
+	page: ReactElement
+): string {
+	const tree = renderEndUserTree(page, {
+		zeroRuntime: true,
+		render: (element) => renderToString(<StrictMode>{element}</StrictMode>)
+	});
+	return template
+		.replace('/public/loginClient.js', versionedAsset('loginClient.js'))
+		.replace('/public/favicon.ico', versionedAsset('favicon.ico'))
+		.replace('<!--app-title-->', () => title)
+		.replace('<!--app-styles-->', () => styleLinks() + tree.head)
+		.replace('<!--app-props-->', () => propsScript(props))
+		.replace('<!--app-html-->', () => tree.html);
 }
 
 export async function loginServer(
@@ -45,7 +70,7 @@ export async function loginServer(
 		 * an unverified account, never from anything in the request.
 		 */
 		verificationResend?: boolean;
-		providers?: { id: string; displayName: string }[];
+		providers?: { id: string; displayName: string; brand?: string }[];
 		/*
 		 * The pending authorization request's redirect_uri, which reaches this page's
 		 * Content-Security-Policy. `form-action` has to name it: the page posts to itself, and the
@@ -67,52 +92,38 @@ export async function loginServer(
 
 	// Here and nowhere else: the version is the file's build time, which only the server can read (see LoginPage).
 	const logoSrc = versionedAsset('logo.svg');
-	let html = await htmlTeamplate.text();
-	html = html
-		.replace('/public/loginClient.js', versionedAsset('loginClient.js'))
-		.replace('/public/favicon.ico', versionedAsset('favicon.ico'))
-		.replace('<!--app-title-->', 'Login Page')
-		.replace('<!--app-styles-->', styleLinks())
-		/*
-		 * The props are half of this change, not a detail of it. This page hydrates, so React rebuilds the
-		 * tree from `window.PROPS` — provider buttons rendered here but absent there vanish in a browser,
-		 * silently, with nothing logged and no server-side test able to see it. That is exactly how the
-		 * registration page's missing props survived from its introduction until spec 021.
-		 */
-		.replace(
-			'<!--app-props-->',
-			propsScript({
-				uid,
-				errorMessage,
-				notice,
-				passwordLogin,
-				registrationOpen,
-				passwordReset,
-				verificationResend,
-				providers,
-				logoSrc
-			})
-		)
-		.replace(
-			'<!--app-html-->',
-			renderToString(
-				<StrictMode>
-					<ZeroRuntime>
-						<LoginPage
-							uid={uid}
-							errorMessage={errorMessage}
-							notice={notice}
-							passwordLogin={passwordLogin}
-							registrationOpen={registrationOpen}
-							passwordReset={passwordReset}
-							verificationResend={verificationResend}
-							providers={providers}
-							logoSrc={logoSrc}
-						/>
-					</ZeroRuntime>
-				</StrictMode>
-			)
-		);
+	/*
+	 * The props are half of this change, not a detail of it. This page hydrates, so React rebuilds the
+	 * tree from `window.PROPS` — provider buttons rendered here but absent there vanish in a browser,
+	 * silently, with nothing logged and no server-side test able to see it. That is exactly how the
+	 * registration page's missing props survived from its introduction until spec 021.
+	 */
+	const html = hydratedPage(
+		await htmlTeamplate.text(),
+		'Login Page',
+		{
+			uid,
+			errorMessage,
+			notice,
+			passwordLogin,
+			registrationOpen,
+			passwordReset,
+			verificationResend,
+			providers,
+			logoSrc
+		},
+		<LoginPage
+			uid={uid}
+			errorMessage={errorMessage}
+			notice={notice}
+			passwordLogin={passwordLogin}
+			registrationOpen={registrationOpen}
+			passwordReset={passwordReset}
+			verificationResend={verificationResend}
+			providers={providers}
+			logoSrc={logoSrc}
+		/>
+	);
 	// A notice is not a failure: only the error re-render answers 400.
 	return htmlResponse(html, {
 		status: errorMessage ? 400 : 200,
@@ -128,34 +139,20 @@ export async function registrationServer(
 
 	// Here and nowhere else: the version is the file's build time, which only the server can read (see LoginPage).
 	const logoSrc = versionedAsset('logo.svg');
-	let html = await htmlTeamplate.text();
-	html = html
-		.replace('/public/loginClient.js', versionedAsset('loginClient.js'))
-		.replace('/public/favicon.ico', versionedAsset('favicon.ico'))
-		.replace('<!--app-title-->', 'Registration Page')
-		.replace('<!--app-styles-->', styleLinks())
-		// The props are what the hydrated tree is built from: without them React replaces the
-		// server-rendered page with one that never heard about the error, silently and in the browser
-		// only.
-		.replace(
-			'<!--app-props-->',
-			propsScript({ uid, errorMessage, email, logoSrc })
-		)
-		.replace(
-			'<!--app-html-->',
-			renderToString(
-				<StrictMode>
-					<ZeroRuntime>
-						<RegistrationPage
-							uid={uid}
-							errorMessage={errorMessage}
-							email={email}
-							logoSrc={logoSrc}
-						/>
-					</ZeroRuntime>
-				</StrictMode>
-			)
-		);
+	// The props are what the hydrated tree is built from: without them React replaces the
+	// server-rendered page with one that never heard about the error, silently and in the browser
+	// only.
+	const html = hydratedPage(
+		await htmlTeamplate.text(),
+		'Registration Page',
+		{ uid, errorMessage, email, logoSrc },
+		<RegistrationPage
+			uid={uid}
+			errorMessage={errorMessage}
+			email={email}
+			logoSrc={logoSrc}
+		/>
+	);
 	// Neither submitted password reaches this document — not the markup, not the props (spec FR-011).
 	return htmlResponse(html, {
 		status: errorMessage ? 400 : 200,
@@ -177,48 +174,24 @@ export async function totpServer(
 
 	// Here and nowhere else: the version is the file's build time, which only the server can read (see LoginPage).
 	const logoSrc = versionedAsset('logo.svg');
-	let html = await htmlTeamplate.text();
-	html = html
-		.replace('/public/loginClient.js', versionedAsset('loginClient.js'))
-		.replace('/public/favicon.ico', versionedAsset('favicon.ico'))
-		.replace(
-			'<!--app-title-->',
-			mode === 'enroll' ? 'Set Up Authenticator' : 'Two-Step Verification'
-		)
-		.replace('<!--app-styles-->', styleLinks())
-		/*
-		 * `mode` must be here as well as in the render. It decides whether the page shows a QR at all, so
-		 * a props script that omitted it would hydrate the enrolment page into the code page — the QR and
-		 * the secret vanishing the moment React takes over, in a browser only, with nothing logged.
-		 */
-		.replace(
-			'<!--app-props-->',
-			propsScript({
-				uid,
-				mode,
-				errorMessage,
-				otpauthUri,
-				secretText,
-				logoSrc
-			})
-		)
-		.replace(
-			'<!--app-html-->',
-			renderToString(
-				<StrictMode>
-					<ZeroRuntime>
-						<TotpPage
-							uid={uid}
-							mode={mode}
-							errorMessage={errorMessage}
-							otpauthUri={otpauthUri}
-							secretText={secretText}
-							logoSrc={logoSrc}
-						/>
-					</ZeroRuntime>
-				</StrictMode>
-			)
-		);
+	/*
+	 * `mode` must be in the props as well as in the render. It decides whether the page shows a QR at all,
+	 * so a props script that omitted it would hydrate the enrolment page into the code page — the QR and
+	 * the secret vanishing the moment React takes over, in a browser only, with nothing logged.
+	 */
+	const html = hydratedPage(
+		await htmlTeamplate.text(),
+		mode === 'enroll' ? 'Set Up Authenticator' : 'Two-Step Verification',
+		{ uid, mode, errorMessage, otpauthUri, secretText, logoSrc },
+		<TotpPage
+			uid={uid}
+			mode={mode}
+			errorMessage={errorMessage}
+			otpauthUri={otpauthUri}
+			secretText={secretText}
+			logoSrc={logoSrc}
+		/>
+	);
 	/*
 	 * The submitted code never comes back with the page, in the markup or the props — the same rule the
 	 * registration page follows for a password. The enrolment secret does reach the document, which is
@@ -235,22 +208,11 @@ export async function consentServer(
 	view: ConsentView,
 	options: { handOffTo?: string } = {}
 ) {
-	let html = await htmlTeamplate.text();
-	html = html
-		.replace('/public/loginClient.js', versionedAsset('loginClient.js'))
-		.replace('/public/favicon.ico', versionedAsset('favicon.ico'))
-		.replace('<!--app-title-->', CONSENT_TEXTS.pageTitle)
-		.replace('<!--app-styles-->', styleLinks())
-		.replace('<!--app-props-->', propsScript(view))
-		.replace(
-			'<!--app-html-->',
-			renderToString(
-				<StrictMode>
-					<ZeroRuntime>
-						<ConsentPage {...view} />
-					</ZeroRuntime>
-				</StrictMode>
-			)
-		);
+	const html = hydratedPage(
+		await htmlTeamplate.text(),
+		CONSENT_TEXTS.pageTitle,
+		view,
+		<ConsentPage {...view} />
+	);
 	return htmlResponse(html, { handOffTo: options.handOffTo });
 }

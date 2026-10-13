@@ -81,9 +81,12 @@ hand-off page — silent authentication stops working, with nothing downstream a
 - `csp.ts` — policy derivation and `htmlResponse`, above.
 - `device.tsx`, `error.tsx`, `formPost.tsx`, `logout.tsx`, `logoutSuccess.tsx` — the terminal pages.
   Self-contained: they extract their styles server-side and inline them, which is cheaper for a page
-  read once. See [[interaction-page-families]] for the split between these and the hydrated shell.
-- `zeroRuntime.tsx` — one component owning antd 6's `zeroRuntime` flag so the four entry points
-  cannot drift. Server render and client hydrate must agree or hydration diverges, in the browser
+  read once — through `theme/dark.tsx`'s `renderEndUserTree` since spec 096, so they carry the dark block too.
+- `theme/` — the end-user colour scheme (spec 096): the `--fox-*` palette, the per-scheme antd token sets,
+  `EndUserTheme`, the theme head and the dark `--ant-*` block. See [[end-user-colour-scheme]]. See [[interaction-page-families]] for the split between these and the hydrated shell.
+- `zeroRuntime.tsx` — one component owning antd 6's `zeroRuntime` flag, now for the admin console only
+  (the end-user pages use `theme/provider.tsx`'s `EndUserTheme`, which sets the same flag), so its entry
+  points cannot drift. Server render and client hydrate must agree or hydration diverges, in the browser
   only, visible only as a mismatch warning. The name overpromises: it gates
   `genComponentStyleHook` but not `genCSSVarRegister`, so a measured floor of 7 tags / 17,540 B
   remains on `/admin`.

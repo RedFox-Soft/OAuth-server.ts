@@ -1,11 +1,10 @@
-import { renderToStaticMarkup } from 'react-dom/server';
-import { createCache, extractStyle, StyleProvider } from '@ant-design/cssinjs';
 import { Button, Form } from 'antd';
 import { Card, Flex } from 'antd';
 import { htmlResponse } from './csp.js';
 import { versionedAsset } from './versionedAsset.js';
+import { foxVar } from './theme/palette.js';
+import { renderEndUserTree } from './theme/dark.js';
 
-const cache = createCache();
 /*
  * The confirmation address is handed in rather than read from `routeNames`: a root-relative
  * `/logout/confirm` sends a path-addressed bucket's confirmation to the default bucket, whose session
@@ -13,22 +12,25 @@ const cache = createCache();
  */
 function renderLogoutForm(secret: string, confirmAction: string) {
 	return (
-		<StyleProvider cache={cache}>
+		<>
 			<Flex
 				justify="center"
 				style={{
 					display: 'flex',
 					height: '100vh',
+					padding: '0 16px',
+					boxSizing: 'border-box',
 					alignItems: 'center',
-					backgroundColor: '#f0f2f5'
+					backgroundColor: foxVar('page')
 				}}
 			>
 				<Card
 					style={{
-						width: 400,
+						width: '100%',
+						maxWidth: 400,
 						padding: 24,
 						borderRadius: 12,
-						boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+						boxShadow: `0 2px 8px ${foxVar('shadow')}`
 					}}
 				>
 					<div style={{ textAlign: 'center', marginBottom: 24 }}>
@@ -52,7 +54,10 @@ function renderLogoutForm(secret: string, confirmAction: string) {
 							value={secret}
 						/>
 						<Form.Item>
-							<Flex gap="small">
+							<Flex
+								gap="small"
+								wrap
+							>
 								<Button
 									block
 									htmlType="button"
@@ -76,7 +81,7 @@ function renderLogoutForm(secret: string, confirmAction: string) {
 					</Form>
 				</Card>
 			</Flex>
-		</StyleProvider>
+		</>
 	);
 }
 
@@ -92,14 +97,15 @@ export function logout(
 	postLogoutRedirectUri?: string
 ) {
 	// Rendered before extracting, and not re-wrapped — for the reasons given at `logoutSuccess`.
-	const body = renderToStaticMarkup(renderLogoutForm(secret, confirmAction));
-	const styleText = extractStyle(cache);
+	const page = renderEndUserTree(renderLogoutForm(secret, confirmAction));
 
 	const html = `<!DOCTYPE html>
 <html><head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Logging Out</title>
-  ${styleText}
-</head><body>${body}</body></html>`;
+  ${page.head}
+</head><body>${page.html}</body></html>`;
 
 	return htmlResponse(html, { handOffTo: postLogoutRedirectUri });
 }

@@ -1,28 +1,30 @@
-import { renderToStaticMarkup } from 'react-dom/server';
-import { createCache, extractStyle, StyleProvider } from '@ant-design/cssinjs';
 import { Card, Flex } from 'antd';
 import { htmlResponse } from './csp.js';
 import { versionedAsset } from './versionedAsset.js';
+import { foxVar } from './theme/palette.js';
+import { renderEndUserTree } from './theme/dark.js';
 
-const cache = createCache();
 function renderLogoutForm() {
 	return (
-		<StyleProvider cache={cache}>
+		<>
 			<Flex
 				justify="center"
 				style={{
 					display: 'flex',
 					height: '100vh',
+					padding: '0 16px',
+					boxSizing: 'border-box',
 					alignItems: 'center',
-					backgroundColor: '#f0f2f5'
+					backgroundColor: foxVar('page')
 				}}
 			>
 				<Card
 					style={{
-						width: 400,
+						width: '100%',
+						maxWidth: 400,
 						padding: 24,
 						borderRadius: 12,
-						boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+						boxShadow: `0 2px 8px ${foxVar('shadow')}`
 					}}
 				>
 					<div style={{ textAlign: 'center', marginBottom: 24 }}>
@@ -37,25 +39,25 @@ function renderLogoutForm() {
 					</div>
 				</Card>
 			</Flex>
-		</StyleProvider>
+		</>
 	);
 }
 
 /*
- * Rendered before the styles are extracted: cssinjs registers a component's styles while it renders, so
- * extracting first left the first page after a restart unstyled and every later one wearing whatever
- * earlier renders had registered. `extractStyle` returns complete `<style>` elements, which is why they
- * are not wrapped in another.
+ * renderEndUserTree renders before it extracts: cssinjs registers a component's styles while it renders, so
+ * extracting first left the first page after a restart unstyled. Its <head> part is complete `<style>`
+ * elements, which is why they are not wrapped in another.
  */
 export function logoutSuccess() {
-	const body = renderToStaticMarkup(renderLogoutForm());
-	const styleText = extractStyle(cache);
+	const page = renderEndUserTree(renderLogoutForm());
 
 	const html = `<!DOCTYPE html>
 <html><head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Logging Out</title>
-  ${styleText}
-</head><body>${body}</body></html>`;
+  ${page.head}
+</head><body>${page.html}</body></html>`;
 
 	return htmlResponse(html);
 }

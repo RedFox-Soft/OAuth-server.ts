@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react';
+import { MARK_MONO_CLASS } from '../html/theme/palette.js';
 
 /*
  * The marks a recognised provider's sign-in button carries, keyed by the catalogue id the login options
@@ -15,7 +16,8 @@ import type { ReactElement } from 'react';
 
 /*
  * Google's own mark, unmodified, in its standard four colours — the guidelines allow no monochrome variant
- * and no recolouring, and require it on a light background, which the login card is.
+ * and no recolouring. It sits on Google's light button, or on Google's own dark button (#131314) when the
+ * device prefers dark; both carry this same mark.
  */
 function googleMark(): ReactElement {
 	return (
@@ -83,14 +85,15 @@ function microsoftMark(): ReactElement {
 
 /*
  * Apple's mark, in black. Their guidelines allow black, white or an outlined variant and nothing else —
- * black on the login card's light background is the combination they specify for it. `currentColor` is
- * deliberately NOT used: it would make the mark follow a theme and stop complying the first time one
- * changed.
+ * black on the login card's light background, white on a dark one. `currentColor` is deliberately NOT used:
+ * it would make the mark follow whatever colour the text has and stop complying the first time that changed.
+ * The dark scheme turns it white through MARK_MONO_CLASS, to exactly the other colour Apple allows.
  */
 function appleMark(): ReactElement {
 	return (
 		<svg
 			xmlns="http://www.w3.org/2000/svg"
+			className={MARK_MONO_CLASS}
 			viewBox="0 0 17 20"
 			width="17"
 			height="18"
@@ -107,12 +110,13 @@ function appleMark(): ReactElement {
 
 /*
  * GitHub's Invertocat, unmodified, in black. Their usage terms allow black or white and forbid altering
- * the shape; black is the one that reads on a light card.
+ * the shape; black is the one that reads on a light card, white (through MARK_MONO_CLASS) on a dark one.
  */
 function githubMark(): ReactElement {
 	return (
 		<svg
 			xmlns="http://www.w3.org/2000/svg"
+			className={MARK_MONO_CLASS}
 			viewBox="0 0 16 16"
 			width="18"
 			height="18"

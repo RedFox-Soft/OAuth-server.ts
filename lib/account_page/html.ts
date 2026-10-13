@@ -8,23 +8,21 @@ import type {
 } from '../interactions/consentView.js';
 import { ACCOUNT_PAGE_TEXTS as T } from './texts.js';
 import type { ApplicationRow } from './view.js';
+import { foxVar } from '../html/theme/palette.js';
 
 /*
  * The connected-applications page as markup (specs/095). The plain, script-free family: every step — the list,
  * the confirmation, the removal — is a link or a form, so all of it works with scripts off (R10). Every value
  * reaching the markup goes through `esc`; the sentences come from the catalog.
  *
- * Contrast: body text #1f1f1f and secondary #595959 on white are both above 4.5:1, as are the link and
- * button colours. Every control is at least 24 px tall, and none removes the browser's focus ring.
+ * Contrast: every colour is a palette role (lib/html/theme/palette.ts), held to WCAG AA in the light and the
+ * dark scheme by its test. Every control is at least 24 px tall, and none removes the browser's focus ring.
  */
 
-const MUTED = 'color:#595959;';
-const LINK =
-	'color:#0958d9; display:inline-block; min-height:24px; line-height:24px;';
-const DANGER_LINK =
-	'color:#a8071a; display:inline-block; min-height:24px; line-height:24px;';
-const BUTTON =
-	'background:#a8071a; color:#fff; border:0; border-radius:6px; padding:0 16px; min-height:32px; font-size:14px; cursor:pointer;';
+const MUTED = `color:${foxVar('text-secondary')};`;
+const LINK = `color:${foxVar('link')}; display:inline-block; min-height:24px; line-height:24px;`;
+const DANGER_LINK = `color:${foxVar('danger-strong')}; display:inline-block; min-height:24px; line-height:24px;`;
+const BUTTON = `background:${foxVar('danger-solid')}; color:${foxVar('on-danger')}; border:0; border-radius:6px; padding:0 16px; min-height:32px; font-size:14px; cursor:pointer;`;
 
 export interface PageFrame {
 	service: string;
@@ -128,7 +126,7 @@ function permissions(row: ApplicationRow, service: string): string {
 
 function logoTile(row: ApplicationRow): string {
 	if (!row.logo) return '';
-	return `<span style="flex:none; width:40px; height:40px; background:#f6f7f9; border:1px solid #e6e8eb; border-radius:8px; display:flex; align-items:center; justify-content:center;"><img src="${esc(row.logo)}" alt="${esc(row.name)}" width="32" height="32" style="object-fit:contain; display:block;"/></span>`;
+	return `<span style="flex:none; width:40px; height:40px; background:${foxVar('logo-plate')}; border:1px solid ${foxVar('logo-plate-border')}; border-radius:8px; display:flex; align-items:center; justify-content:center;"><img src="${esc(row.logo)}" alt="${esc(row.name)}" width="32" height="32" style="object-fit:contain; display:block;"/></span>`;
 }
 
 function where(row: ApplicationRow): string {
@@ -141,7 +139,7 @@ function section(row: ApplicationRow, index: number, frame: PageFrame): string {
 	const id = `app-${index}`;
 	const whereLine = where(row);
 	const revokeHref = `${frame.path}?revoke=${encodeURIComponent(row.clientId)}`;
-	return `<section aria-labelledby="${id}" style="border-top:1px solid #e6e8eb; padding:16px 0;">
+	return `<section aria-labelledby="${id}" style="border-top:1px solid ${foxVar('box-border')}; padding:16px 0;">
 <div style="display:flex; gap:12px; align-items:flex-start;">${logoTile(row)}<div style="min-width:0; flex:1;"><h2 id="${id}" style="font-size:18px; margin:0; overflow-wrap:anywhere;">${esc(row.name)}</h2>${whereLine ? `<p style="${MUTED} margin:4px 0 0; overflow-wrap:anywhere;">${esc(whereLine)}</p>` : ''}</div></div>
 ${permissions(row, frame.service)}
 <p style="${MUTED} margin:8px 0 0;">${esc(T.given)} ${stamp(row.givenAt)}${row.lastTokenAt ? `<br/>${esc(T.lastToken)} ${stamp(row.lastTokenAt)}` : ''}</p>
@@ -157,7 +155,7 @@ export function listPage(
 ): Response {
 	const body = `${header(frame)}<h1 style="font-size:24px; margin:0 0 8px;">${esc(T.title)}</h1>
 <p style="margin:0 0 8px; overflow-wrap:anywhere;">${esc(T.signedInAs)} <strong>${esc(frame.email)}</strong> · <a href="${esc(frame.signOutHref)}" style="${LINK}">${esc(T.signOut)}</a></p>
-<div role="status">${notice ? `<p style="background:#f6ffed; border:1px solid #b7eb8f; border-radius:6px; padding:8px 12px; margin:8px 0;">${esc(notice)}</p>` : ''}</div>
+<div role="status">${notice ? `<p style="background:${foxVar('success-bg')}; border:1px solid ${foxVar('success-border')}; border-radius:6px; padding:8px 12px; margin:8px 0;">${esc(notice)}</p>` : ''}</div>
 ${rows.length ? `<p style="margin:8px 0 16px;">${esc(T.intro)}</p>${rows.map((row, i) => section(row, i, frame)).join('')}` : `<p style="margin:8px 0;">${esc(T.empty)}</p>`}`;
 	return page(T.title, body, 200, { wide: true });
 }

@@ -5,6 +5,7 @@ import {
 import { Button, Card, Flex, Form, Input, QRCode, Typography } from 'antd';
 import { buildUIPath } from './buildUIPath.js';
 import { DEFAULT_LOGO } from './logo.js';
+import { foxVar } from '../html/theme/palette.js';
 
 /*
  * The second factor's one page, in two modes.
@@ -39,17 +40,19 @@ function ErrorBanner({ message }: { message: string }) {
 				style={{
 					padding: '12px 16px',
 					borderRadius: '6px',
-					border: '1px solid #ffccc7',
-					backgroundColor: '#fff2f0',
+					border: `1px solid ${foxVar('danger-border')}`,
+					backgroundColor: foxVar('danger-bg'),
 					display: 'flex',
 					alignItems: 'center',
 					gap: '8px'
 				}}
 			>
-				<span style={{ color: '#ff4d4f', fontSize: '14px' }}>
+				<span style={{ color: foxVar('danger-text'), fontSize: '14px' }}>
 					<ExclamationCircleOutlined />
 				</span>
-				<span style={{ color: '#ff4d4f', fontSize: '14px' }}>{message}</span>
+				<span style={{ color: foxVar('danger-text'), fontSize: '14px' }}>
+					{message}
+				</span>
 			</div>
 		</Form.Item>
 	);
@@ -73,7 +76,7 @@ export function TotpPage({
 				display: 'flex',
 				height: '100vh',
 				alignItems: 'center',
-				backgroundColor: '#f0f2f5'
+				backgroundColor: foxVar('page')
 			}}
 		>
 			<Card
@@ -81,7 +84,7 @@ export function TotpPage({
 					width: 400,
 					padding: 24,
 					borderRadius: 12,
-					boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+					boxShadow: `0 2px 8px ${foxVar('shadow')}`
 				}}
 			>
 				<div style={{ textAlign: 'center', marginBottom: 24 }}>
@@ -115,11 +118,25 @@ export function TotpPage({
 						 * only drawn after hydration, so the QR would be missing for the whole first paint
 						 * and entirely absent to anything that does not run scripts.
 						 */}
-						<QRCode
-							type="svg"
-							value={otpauthUri}
-							size={180}
-						/>
+						{/*
+						 * Black on white in either scheme: a camera reads dark modules on a light field, and an
+						 * inverted code — light on a dark page — is one many authenticator apps cannot scan.
+						 */}
+						<div
+							style={{
+								background: foxVar('qr-plate'),
+								borderRadius: 8,
+								lineHeight: 0
+							}}
+						>
+							<QRCode
+								type="svg"
+								value={otpauthUri}
+								size={180}
+								color="#000000"
+								bgColor="transparent"
+							/>
+						</div>
 						{/*
 						 * The real fallback, not a nicety. A camera that will not focus, an app with no
 						 * scanner, a screen being read remotely — all of them come down to typing the secret,

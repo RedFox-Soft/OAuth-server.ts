@@ -31,9 +31,10 @@ on it survives, and where its document is built.
 | Use for | a page with a form the user works in | a page carrying a message, or one reached without the interaction cookie |
 
 The plain family is **not** a lesser page. Its hand-written inline styles deliberately reproduce the antd
-pages — `#f0f2f5` backdrop, white card, `padding:32px`, `border-radius:12px`,
-`box-shadow:0 2px 8px rgba(0,0,0,0.1)`, a 400 px card — so a page reached from an inbox, with no bundle
-loaded, does not look like a different product. Since spec 095 the card is fluid up to 400 px inside a 16 px
+pages — the `page` backdrop, the `card`, `padding:32px`, `border-radius:12px`, the `shadow`, a 400 px card —
+so a page reached from an inbox, with no bundle loaded, does not look like a different product. Since spec
+096 every colour on it, as on the antd pages, is a palette role that follows the device's colour scheme
+([[end-user-colour-scheme]]); the page carries one hashed `<style>`, the theme block, and still no script. Since spec 095 the card is fluid up to 400 px inside a 16 px
 gutter (`width:100%; max-width:400px`): the fixed `width:400px` scrolled every plain page sideways on a 320 px
 phone. A `wide` variant (640 px, top-aligned, left-aligned) serves the end user's connected-apps page — the
 first plain page outside any interaction or email, chosen for the family because every step there must work
@@ -156,6 +157,12 @@ Two fixes were tried and both are dead ends, not just untried:
   (`@ant-design/icons`' own, unrelated style-injection mechanism). It is never read anywhere near
   `genCSSVarRegister`. Adopting `layer` would also require re-linking `antd.css` under a CSS `@layer`
   for no effect on this floor.
+
+Since spec 096 the end-user antd pages (not the console) also **extract these blocks on the server** and
+inline them, so the first paint — and a page with scripts off — has antd's colours; before, every
+`var(--ant-…)` was undefined until the bundle ran. The key is pinned to `fox` there, not to shrink the floor
+(it does not) but because the dark block names the scope class in selectors written once
+([[end-user-colour-scheme]]).
 
 No theme prop in antd 6.5.1 suppresses `genCSSVarRegister`. The floor scales with the distinct
 cssVar-participating components a given page actually mounts (Typography, Input, Form, Button, Card on

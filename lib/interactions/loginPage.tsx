@@ -15,6 +15,7 @@ import {
 import { DEFAULT_LOGO } from './logo.js';
 import { knownProvider } from '../consts/known_providers.js';
 import { providerMark } from './providerMark.js';
+import { foxVar } from '../html/theme/palette.js';
 
 export function LoginPage({
 	uid,
@@ -56,7 +57,7 @@ export function LoginPage({
 				display: 'flex',
 				...(embedded ? { padding: '32px 16px' } : { height: '100vh' }),
 				alignItems: 'center',
-				backgroundColor: '#f0f2f5'
+				backgroundColor: foxVar('page')
 			}}
 		>
 			<Card
@@ -64,7 +65,7 @@ export function LoginPage({
 					width: 400,
 					padding: 24,
 					borderRadius: 12,
-					boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+					boxShadow: `0 2px 8px ${foxVar('shadow')}`
 				}}
 			>
 				<div style={{ textAlign: 'center', marginBottom: 24 }}>
@@ -94,17 +95,21 @@ export function LoginPage({
 								style={{
 									padding: '12px 16px',
 									borderRadius: '6px',
-									border: '1px solid #91caff',
-									backgroundColor: '#e6f4ff',
+									border: `1px solid ${foxVar('notice-border')}`,
+									backgroundColor: foxVar('notice-bg'),
 									display: 'flex',
 									alignItems: 'center',
 									gap: '8px'
 								}}
 							>
-								<span style={{ color: '#0958d9', fontSize: '14px' }}>
+								<span
+									style={{ color: foxVar('notice-text'), fontSize: '14px' }}
+								>
 									<InfoCircleOutlined />
 								</span>
-								<span style={{ color: '#0958d9', fontSize: '14px' }}>
+								<span
+									style={{ color: foxVar('notice-text'), fontSize: '14px' }}
+								>
 									{notice}
 								</span>
 							</div>
@@ -116,17 +121,21 @@ export function LoginPage({
 								style={{
 									padding: '12px 16px',
 									borderRadius: '6px',
-									border: '1px solid #ffccc7',
-									backgroundColor: '#fff2f0',
+									border: `1px solid ${foxVar('danger-border')}`,
+									backgroundColor: foxVar('danger-bg'),
 									display: 'flex',
 									alignItems: 'center',
 									gap: '8px'
 								}}
 							>
-								<span style={{ color: '#ff4d4f', fontSize: '14px' }}>
+								<span
+									style={{ color: foxVar('danger-text'), fontSize: '14px' }}
+								>
 									<ExclamationCircleOutlined />
 								</span>
-								<span style={{ color: '#ff4d4f', fontSize: '14px' }}>
+								<span
+									style={{ color: foxVar('danger-text'), fontSize: '14px' }}
+								>
 									{errorMessage}
 								</span>
 							</div>
@@ -232,7 +241,7 @@ export function LoginPage({
 						{passwordLogin && (
 							<div
 								style={{
-									color: '#8c8c8c',
+									color: foxVar('text-muted'),
 									fontSize: '12px',
 									textAlign: 'center'
 								}}
@@ -247,8 +256,9 @@ export function LoginPage({
 							 * A recognised provider's button follows that provider's own branding
 							 * requirements, which are a condition of using its mark rather than a design
 							 * preference. Google's light theme is #FFFFFF on a #747775 stroke with #1F1F1F
-							 * text, 12px before the mark, 10px after it and 12px after the text, and the
-							 * mark is never shown without the text.
+							 * text, and its dark theme #131314 on #8E918F with #E3E3E3 (the palette's
+							 * `provider-*` roles, chosen by the device's scheme); 12px before the mark, 10px
+							 * after it and 12px after the text, and the mark is never shown without the text.
 							 *
 							 * The wording comes from the catalogue, not from `displayName`: an administrator
 							 * may rename a provider to anything, and a branded button whose text an operator
@@ -267,19 +277,19 @@ export function LoginPage({
 													gap: '10px',
 													height: '40px',
 													padding: '0 12px',
-													backgroundColor: '#FFFFFF',
-													border: '1px solid #747775',
+													backgroundColor: foxVar('provider-bg'),
+													border: `1px solid ${foxVar('provider-border')}`,
 													borderRadius: '6px',
-													color: '#1F1F1F',
+													color: foxVar('provider-text'),
 													textDecoration: 'none'
 												}
 											: {
 													display: 'block',
 													padding: '8px 16px',
-													border: '1px solid #d9d9d9',
+													border: `1px solid ${foxVar('field-border')}`,
 													borderRadius: '6px',
 													textAlign: 'center',
-													color: '#1f1f1f',
+													color: foxVar('text'),
 													textDecoration: 'none'
 												}
 									}

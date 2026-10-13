@@ -1,5 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { htmlResponse } from './csp.js';
+import { themeHead } from './theme/head.js';
 
 function renderForm(action: string, inputs: Record<string, string>) {
 	const formInputs = Object.entries(inputs).map(([key, value]) => (
@@ -54,6 +55,7 @@ export function formPost(
 	const html = `<!DOCTYPE html>
 <html><head>
   <title>Submitting Callback</title>
+  ${themeHead()}
 </head><body>${renderToStaticMarkup(form)}<script>${script}</script></body></html>`;
 
 	return htmlResponse(html);

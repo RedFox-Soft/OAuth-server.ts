@@ -40,7 +40,9 @@ The policy is derived from the document that is being sent:
   the verification and password-reset pages, device confirmation and success;
 - every `<link rel="stylesheet">` → `'self'` or the foreign origin, in `style-src-elem`;
 - every inline `<style>` body → a `'sha256-…'` in `style-src-elem`, **but only on a page that
-  references no external script** (see the icons gotcha below);
+  references no external script** (see the icons gotcha below). Since spec 096 every end-user page
+  carries one such block, the colour-scheme theme, so a plain page's `style-src-elem` is exactly that one
+  hash rather than `'none'` ([[end-user-colour-scheme]]);
 - `style-src-attr` → `'unsafe-inline'` only where a `style="…"` attribute is actually present;
 - every `<form action>` → `'self'` when relative or at this server's origin, the foreign origin
   otherwise;
@@ -154,7 +156,7 @@ into the document through its own `cssUtils`. That package is independent of ant
 This is why `style-src-elem` cannot simply hash every `<style>` block. The injected one does not exist
 when the document is built, so it has no hash, and all four hydrated pages import icons (the consent
 page since spec 092, each icon with `aria-hidden="true"` so antd's English icon name is not read
-aloud — `lib/interactions/consentPage.tsx:27-40`). The
+aloud — `lib/interactions/consentPage.tsx:28-41`). The
 derivation therefore keys off whether the document references an *external* script — a linked bundle
 is the case whose post-serve behaviour the document cannot describe — not off whether anything runs
 after the document is served at all. Two pages run inline code after serving (the `form_post`

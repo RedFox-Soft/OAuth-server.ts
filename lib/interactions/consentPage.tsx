@@ -21,6 +21,7 @@ import type {
 import { CONSENT_TEXTS as T, joinList } from './consentTexts.js';
 import { buildUILoginPath } from './buildUIPath.js';
 import { DEFAULT_LOGO } from './logo.js';
+import { foxVar } from '../html/theme/palette.js';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -40,7 +41,7 @@ const CATEGORY_ICON: Record<DataCategory, React.ReactNode> = {
 	groups: <TeamOutlined aria-hidden="true" />
 };
 
-const MUTED = 'rgba(0, 0, 0, 0.55)';
+const MUTED = foxVar('text-muted');
 
 // Visible to a screen reader only, so a warning announces itself as one without a second visual label.
 const hiddenText: React.CSSProperties = {
@@ -82,8 +83,8 @@ function Codes({ codes }: { codes: string[] }) {
 						...codeStyle,
 						padding: '1px 6px',
 						borderRadius: 4,
-						background: '#f6f7f9',
-						border: '1px solid #e6e8eb'
+						background: foxVar('box'),
+						border: `1px solid ${foxVar('box-border')}`
 					}}
 				>
 					{code}
@@ -280,7 +281,7 @@ function GroupBody({
 				<div
 					key={resource.indicator}
 					style={{
-						border: '1px solid #e6e8eb',
+						border: `1px solid ${foxVar('box-border')}`,
 						borderRadius: 8,
 						padding: '10px 12px'
 					}}
@@ -342,7 +343,7 @@ function GroupBody({
 				<div
 					key={`${block.label}:${index}`}
 					style={{
-						border: '1px solid #e6e8eb',
+						border: `1px solid ${foxVar('box-border')}`,
 						borderRadius: 8,
 						padding: '10px 12px'
 					}}
@@ -424,8 +425,16 @@ function Warning({
 }) {
 	const palette =
 		tone === 'danger'
-			? { bg: '#fff2f0', border: '#ffccc7', icon: '#a8071a' }
-			: { bg: '#fffbe6', border: '#ffe58f', icon: '#ad6800' };
+			? {
+					bg: foxVar('danger-bg'),
+					border: foxVar('danger-border'),
+					icon: foxVar('danger-strong')
+				}
+			: {
+					bg: foxVar('warn-bg'),
+					border: foxVar('warn-border'),
+					icon: foxVar('warn-icon')
+				};
 	return (
 		<div
 			style={{
@@ -462,7 +471,9 @@ function WarningBlock({
 					tone="danger"
 					icon={<KeyOutlined aria-hidden="true" />}
 				>
-					<b style={{ color: '#a8071a' }}>{T.warning.adminTitle}</b>{' '}
+					<b style={{ color: foxVar('danger-strong') }}>
+						{T.warning.adminTitle}
+					</b>{' '}
 					{T.warning.admin(service)}
 				</Warning>
 			);
@@ -540,7 +551,7 @@ function AppLinks({
 							display: 'inline-block',
 							lineHeight: '24px',
 							textAlign: 'center',
-							color: '#0958d9'
+							color: foxVar('link')
 						}}
 					>
 						<bdi>{name}</bdi>
@@ -568,8 +579,8 @@ function ClientLogo({ src, name }: { src: string; name: string }) {
 				height: 40,
 				padding: 3,
 				boxSizing: 'border-box',
-				background: '#f6f7f9',
-				border: '1px solid #e6e8eb',
+				background: foxVar('logo-plate'),
+				border: `1px solid ${foxVar('logo-plate-border')}`,
 				borderRadius: 8
 			}}
 		>
@@ -619,8 +630,8 @@ function HostBox({ view, service }: { view: ConsentView; service: string }) {
 		alignSelf: 'flex-start',
 		maxWidth: '100%',
 		padding: '3px 8px',
-		border: '1px solid #e6e8eb',
-		background: '#f6f7f9',
+		border: `1px solid ${foxVar('box-border')}`,
+		background: foxVar('box'),
 		borderRadius: 6
 	};
 	const label = (text: string) => (
@@ -781,7 +792,7 @@ export const ConsentPage: React.FC<ConsentView> = (view) => {
 			style={{
 				minHeight: '100vh',
 				padding: 16,
-				backgroundColor: '#f0f2f5',
+				backgroundColor: foxVar('page'),
 				boxSizing: 'border-box'
 			}}
 		>
@@ -790,7 +801,7 @@ export const ConsentPage: React.FC<ConsentView> = (view) => {
 					width: '100%',
 					maxWidth: 440,
 					borderRadius: 12,
-					boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+					boxShadow: `0 2px 8px ${foxVar('shadow')}`
 				}}
 				styles={{ body: { padding: 'clamp(16px, 5vw, 28px)' } }}
 			>
@@ -801,7 +812,10 @@ export const ConsentPage: React.FC<ConsentView> = (view) => {
 					<Flex
 						align="center"
 						gap={10}
-						style={{ paddingBottom: 12, borderBottom: '1px solid #f0f0f0' }}
+						style={{
+							paddingBottom: 12,
+							borderBottom: `1px solid ${foxVar('divider')}`
+						}}
 					>
 						<img
 							src={logoSrc || DEFAULT_LOGO}
@@ -846,7 +860,7 @@ export const ConsentPage: React.FC<ConsentView> = (view) => {
 									letterSpacing: '0.12em',
 									textAlign: 'center',
 									padding: 10,
-									border: '1px dashed #b0b8c4',
+									border: `1px dashed ${foxVar('code-border')}`,
 									borderRadius: 8
 								}}
 							>
@@ -899,7 +913,7 @@ export const ConsentPage: React.FC<ConsentView> = (view) => {
 									style={{
 										margin: 0,
 										padding: '12px 0 0',
-										borderTop: '1px solid #f0f0f0'
+										borderTop: `1px solid ${foxVar('divider')}`
 									}}
 								>
 									<ChoiceRow
@@ -922,7 +936,7 @@ export const ConsentPage: React.FC<ConsentView> = (view) => {
 										gap: 8,
 										alignItems: 'baseline',
 										paddingTop: 12,
-										borderTop: '1px solid #f0f0f0'
+										borderTop: `1px solid ${foxVar('divider')}`
 									}}
 								>
 									<span style={{ color: MUTED, flex: 'none' }}>
@@ -936,7 +950,7 @@ export const ConsentPage: React.FC<ConsentView> = (view) => {
 						{afterApproval.length ? (
 							<div
 								style={{
-									background: '#f6f7f9',
+									background: foxVar('box'),
 									borderRadius: 8,
 									padding: '10px 12px'
 								}}
@@ -1019,7 +1033,7 @@ export const ConsentPage: React.FC<ConsentView> = (view) => {
 							{T.revokeHint.before}
 							<a
 								href={view.revokeHint.href}
-								style={{ color: '#0958d9', display: 'inline-block' }}
+								style={{ color: foxVar('link'), display: 'inline-block' }}
 							>
 								{T.revokeHint.link}
 							</a>

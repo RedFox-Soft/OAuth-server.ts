@@ -51,7 +51,7 @@ which every authorization error has passed through since spec 065 — `/auth`, `
 consent, any terminal error on resume. The response modes **describe** an answer as well as send it
 (`lib/response_modes/describe.ts`; `responseModes.describe`, `lib/response_modes/index.ts:75`): navigate
 to a URL, or post fields. Sent, that is a 303 or the auto-submit page; offered, it is a link or a
-button-submitted form on `confirmationPage` (`lib/interactions/confirmationPage.tsx:22`). One description,
+button-submitted form on `confirmationPage` (`lib/interactions/confirmationPage.tsx:23`). One description,
 two exits — so the confirmed answer cannot drift from the redirect's.
 
 ## The page

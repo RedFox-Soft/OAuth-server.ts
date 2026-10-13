@@ -1,6 +1,4 @@
 import type { ReactNode } from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
-import { createCache, extractStyle, StyleProvider } from '@ant-design/cssinjs';
 import { Button, Card, Flex, Typography } from 'antd';
 
 import {
@@ -10,18 +8,16 @@ import {
 import { htmlResponse } from './csp.js';
 import { esc } from './escape.js';
 import { isRecord } from '../helpers/_/object.ts';
+import { foxVar } from './theme/palette.js';
+import { renderEndUserTree } from './theme/dark.js';
 
 const { Title, Paragraph, Text } = Typography;
 
 // Renders an antd component tree to a self-contained HTML document. antd's cssinjs styles are
 // extracted inline (no external stylesheet / web font); a small `.red` rule preserves the exact
-// `<p class="red">` error markup embedded below.
+// `<p class="red">` error markup embedded below, in the palette's error colour for either scheme.
 function renderPage(title: string, node: ReactNode) {
-	const cache = createCache();
-	const body = renderToStaticMarkup(
-		<StyleProvider cache={cache}>{node}</StyleProvider>
-	);
-	const styleText = extractStyle(cache);
+	const page = renderEndUserTree(<>{node}</>);
 
 	const html = `<!DOCTYPE html>
 <html>
@@ -29,10 +25,10 @@ function renderPage(title: string, node: ReactNode) {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${esc(title)}</title>
-  ${styleText}
-  <style>.red{color:#d50000}</style>
+  ${page.head}
+  <style>.red{color:${foxVar('danger-text')}}</style>
 </head>
-<body>${body}</body>
+<body>${page.html}</body>
 </html>`;
 
 	return html;
@@ -45,16 +41,19 @@ function CenteredCard({ children }: { children: ReactNode }) {
 			style={{
 				display: 'flex',
 				height: '100vh',
+				padding: '0 16px',
+				boxSizing: 'border-box',
 				alignItems: 'center',
-				backgroundColor: '#f0f2f5'
+				backgroundColor: foxVar('page')
 			}}
 		>
 			<Card
 				style={{
-					width: 400,
+					width: '100%',
+					maxWidth: 400,
 					padding: 24,
 					borderRadius: 12,
-					boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+					boxShadow: `0 2px 8px ${foxVar('shadow')}`
 				}}
 			>
 				{children}

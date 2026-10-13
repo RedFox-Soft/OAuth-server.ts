@@ -8,13 +8,14 @@
  */
 
 import { page } from './plainPage.js';
+import { foxVar } from '../html/theme/palette.js';
 
 // Constants with nothing interpolated: the same refusal reaches the GET and the POST, and "identical
 // whichever way you got here" is then a property of the function rather than a promise at two call sites.
 export function registrationClosedPage(): Response {
 	return page(
 		'Registration closed',
-		`<h2 style="color:#1f1f1f;">Not accepting new accounts</h2><p style="color:#595959;">This application is not accepting new accounts at the moment.</p><p style="color:#8c8c8c; font-size:13px;">If you already have an account, return to the application and sign in.</p>`,
+		`<h2 style="color:${foxVar('text')};">Not accepting new accounts</h2><p style="color:${foxVar('text-secondary')};">This application is not accepting new accounts at the moment.</p><p style="color:${foxVar('text-muted')}; font-size:13px;">If you already have an account, return to the application and sign in.</p>`,
 		403
 	);
 }
@@ -26,7 +27,7 @@ export function registrationClosedPage(): Response {
 export function registrationSendFailedPage(): Response {
 	return page(
 		'Verification email not sent',
-		`<h2 style="color:#1f1f1f;">We could not send your verification email</h2><p style="color:#595959;">Your account was created, but the verification message could not be sent. Return to the application and sign in to have another one sent.</p>`,
+		`<h2 style="color:${foxVar('text')};">We could not send your verification email</h2><p style="color:${foxVar('text-secondary')};">Your account was created, but the verification message could not be sent. Return to the application and sign in to have another one sent.</p>`,
 		502
 	);
 }

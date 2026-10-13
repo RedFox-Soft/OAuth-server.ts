@@ -12,9 +12,10 @@
 
 import { page } from '../interactions/plainPage.js';
 import { esc } from '../html/escape.js';
+import { foxVar } from '../html/theme/palette.js';
 
-const heading = 'color:#1f1f1f;';
-const body = 'color:#595959;';
+const heading = `color:${foxVar('text')};`;
+const body = `color:${foxVar('text-secondary')};`;
 
 function terminal(
 	title: string,
@@ -23,7 +24,7 @@ function terminal(
 	link?: { href: string; label: string }
 ): Response {
 	const back = link
-		? `<p style="margin-top:12px;"><a href="${esc(link.href)}" style="color:#1677ff;">${esc(link.label)}</a></p>`
+		? `<p style="margin-top:12px;"><a href="${esc(link.href)}" style="color:${foxVar('link')};">${esc(link.label)}</a></p>`
 		: '';
 	return page(
 		title,

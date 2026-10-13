@@ -11,25 +11,16 @@ import { getErrorHtmlResponse } from 'lib/html/error.tsx';
 import { formPost } from 'lib/html/formPost.tsx';
 import { logout } from 'lib/html/logout.tsx';
 import { logoutSuccess } from 'lib/html/logoutSuccess.tsx';
-import {
-	deviceInputPage,
-	deviceConfirmPage,
-	deviceSuccessPage
-} from 'lib/html/device.tsx';
+import { deviceInputPage, deviceSuccessPage } from 'lib/html/device.tsx';
 import {
 	loginServer,
 	registrationServer,
 	consentServer
 } from 'lib/interactions/serverRender.tsx';
 import { emptyConsentView } from 'lib/interactions/consentView.ts';
-import {
-	verifySuccessPage,
-	verifyFailurePage,
-	codeEntryPage,
-	resendAcceptedPage,
-	verifyRateLimitedPage
-} from 'lib/interactions/verifyPages.tsx';
 import { renderAdminShell } from 'lib/admin/ui/serverRender.tsx';
+import { ADMIN_SHELL, END_USER_PAGES } from '../end_user_pages.ts';
+import { themeHead } from 'lib/html/theme/head.ts';
 
 /*
  * Every page this server renders declares what it is allowed to run.
@@ -224,60 +215,13 @@ describe('content security policy: every rendered page', () => {
 	});
 
 	const pages: Array<[string, () => Response | Promise<Response>]> = [
-		['error', () => getErrorHtmlResponse(400, 'invalid_request', 'nope')],
-		['sign-in', () => loginServer('uid-1')],
-		[
-			'sign-in with an error',
-			() => loginServer('uid-1', { errorMessage: 'wrong password' })
-		],
-		['registration', () => registrationServer('uid-1')],
-		[
-			'consent',
-			() =>
-				consentServer({
-					...emptyConsentView('uid-1'),
-					client: { name: 'Client</script>', tier: 'self-registered' }
-				})
-		],
-		[
-			'device code entry',
-			() =>
-				deviceInputPage({
-					action: `${ISSUER}/device`,
-					secret: 'xsrf',
-					charset: 'digits'
-				})
-		],
-		[
-			'device confirmation',
-			() =>
-				deviceConfirmPage({
-					action: `${ISSUER}/device`,
-					secret: 'xsrf',
-					userCode: 'ABC-DEF',
-					client: { clientId: 'client' }
-				})
-		],
-		['device success', () => deviceSuccessPage({ client: {} })],
-		['logout confirmation', () => logout('xsrf', `${ISSUER}/logout/confirm`)],
-		['logout success', () => logoutSuccess()],
-		['email verified', () => verifySuccessPage()],
-		['verification failed', () => verifyFailurePage('expired')],
-		['verification code entry', () => codeEntryPage('ref-1', 'wrong code')],
-		['verification resent', () => resendAcceptedPage()],
-		['verification rate limited', () => verifyRateLimitedPage('slow down')],
-		[
-			'auto-submit callback',
-			() =>
-				formPost({}, 'https://client.example.com/cb', {
-					code: 'abc',
-					state: 'xyz'
-				})
-		],
-		[
-			'admin console shell',
-			() => renderAdminShell({ needsSetup: true, me: null })
-		]
+		...END_USER_PAGES.map(
+			([name, , render]): [string, () => Response | Promise<Response>] => [
+				name,
+				render
+			]
+		),
+		['admin console shell', ADMIN_SHELL]
 	];
 
 	for (const [name, render] of pages) {
@@ -480,6 +424,43 @@ describe('content security policy: every rendered page', () => {
 	 * values by attribute selector. A style="…" attribute only decorates the element it is on. The
 	 * error page carries one block, from extractStyle, and it is hashable — so no blanket permission.
 	 */
+	it('hashes every terminal page’s stylesheets rather than allowing any inline style', async () => {
+		for (const [, family, render] of END_USER_PAGES) {
+			if (family !== 'terminal') continue;
+			const res = await render();
+			const html = await res.clone().text();
+			const csp = directives(res);
+
+			expect(inlineStyleBlocks(html).length).toBeGreaterThan(0);
+			expect(csp.get('style-src-elem')).not.toContain("'unsafe-inline'");
+			for (const block of inlineStyleBlocks(html)) {
+				expect(csp.get('style-src-elem')).toContain(hash(block));
+			}
+		}
+	});
+
+	/*
+	 * A plain page used to authorize no style element at all. It now carries one — the theme block that
+	 * follows the device's colour scheme (specs/096) — and authorizes exactly that one, by hash, and still no
+	 * script: nothing else inline becomes acceptable.
+	 */
+	it('authorizes on a plain page only the theme block, and no script', async () => {
+		const theme = inlineStyleBlocks(themeHead());
+		expect(theme).toHaveLength(1);
+
+		for (const [, family, render] of END_USER_PAGES) {
+			if (family !== 'plain') continue;
+			const res = await render();
+			const html = await res.clone().text();
+			const csp = directives(res);
+
+			expect(html).not.toMatch(/<script/i);
+			expect(inlineStyleBlocks(html)).toEqual(theme);
+			expect(csp.get('style-src-elem')).toBe(hash(theme[0]));
+			expect(csp.get('script-src')).toBe("'none'");
+		}
+	});
+
 	it('hashes the error page stylesheet rather than allowing any inline style', async () => {
 		const res = getErrorHtmlResponse(404, 'not_found', 'nothing here');
 		const html = await res.clone().text();

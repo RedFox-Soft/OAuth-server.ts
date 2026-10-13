@@ -11,6 +11,15 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- **Every end-user page follows the device's light or dark scheme** (spec 096). Sign-in, registration,
+  two-step verification, consent, sign-out, device code, error, password reset, email verification and the
+  connected-apps page all turn dark when the device prefers it, with no script, cookie or setting; the admin
+  console is unchanged. Application logos and the TOTP QR code stay on a light plate, and Apple's and GitHub's
+  marks turn white. Colours now meet WCAG 2.2 AA in both schemes, so the light pages change too: a darker blue,
+  red and secondary grey, and field borders that stand out from the field.
+  - Fixed along the way: the hydrated sign-in pages painted without antd's colours until their script ran
+    (and for good with scripts off); the sign-out and device pages scrolled sideways at 320 px.
+
 - **People see and remove the access they gave applications** (spec 095). Every end-user bucket has
   `/account/apps` at its own address. It lists each application holding access: what it can do, in the consent
   page's words; when access was given; when it last got a token; and whether it keeps access after sign-out.

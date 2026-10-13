@@ -38,7 +38,7 @@ decisions behind that wording. Each one is easy to undo by accident.
 The work is split three ways. `consentViewFor` (`lib/interactions/index.ts:661`) only reads: the
 interaction, the client, the bucket, the person and their grant. `buildConsentView`
 (`lib/interactions/consentView.ts:529`) decides what to say, and reads no configuration. `ConsentPage`
-(`lib/interactions/consentPage.tsx:760`) turns the result into words from one catalog. The view carries
+(`lib/interactions/consentPage.tsx:771`) turns the result into words from one catalog. The view carries
 **data, never sentences** (`consentView.ts:22-31`). The server render and the browser's hydration then
 read the same values and the same words. A value computed only in the component would vanish on
 hydration ([[interaction-page-families]]).
@@ -77,8 +77,8 @@ address.
 The page never shows a shield, a check mark, "verified" or "added by your administrator". The tier only
 chooses the wording and the warnings. Only a this-organization client may be headed "Sign in to {name}" or
 "{name} wants access to your {service} account". Every other tier gets "The app “{name}” wants access to
-your account" (`consentPage.tsx:587-612`). Every other tier also gets the quiet line "{service} hasn't
-checked this app", except on a device approval (`consentPage.tsx:668`,
+your account" (`consentPage.tsx:598-623`). Every other tier also gets the quiet line "{service} hasn't
+checked this app", except on a device approval (`consentPage.tsx:679`,
 `lib/interactions/consentTexts.ts:31`). A trust badge on a page whose name and logo
 a registrant chooses would be the first thing an impostor copies.
 
@@ -108,7 +108,7 @@ only when its administrator declared `kind: 'see'`. **Described without a kind, 
 (`consentView.ts:436-442`). Understating what an app can do is the failure that matters on this page.
 Anything nobody described is shown by its technical name under "Other permissions — not described". It is
 not guessed at. Technical names of described items sit in a `<details>` disclosure
-(`consentPage.tsx:96-108`), so they work before any script loads.
+(`consentPage.tsx:97-109`), so they work before any script loads.
 
 Sign-in mode (one sentence of shared data) is used only when nothing but standard personal data is asked.
 No resource, no custom scope, no rich authorization detail, no offline access, no administrative MCP
@@ -211,8 +211,10 @@ said about itself.
   familiar logo is exactly what makes a phished device code or a local program look like the real thing,
   so the device page never shows one. The administrator-rights warning is about the request, not who is
   asking, and leaves the logo. The read itself happens only for that tier (`lib/interactions/index.ts:691`).
+- **On a light plate in either colour scheme** (spec 096). The tile is the palette's `logo-plate`, light even
+  on a dark page, because the logo was drawn for a white one ([[end-user-colour-scheme]]).
 - **Embedded, so the policy stays.** The image is in the page as `data:` (`ClientLogo`,
-  `consentPage.tsx:561`), which `img-src 'self' data:` already allowed. It appears twice — in the markup
+  `consentPage.tsx:572`), which `img-src 'self' data:` already allowed. It appears twice — in the markup
   and in `window.PROPS` — which the 64 KiB cap keeps small. Its `alt` is the sanitized client name; it
   sits outside the `<h1>` and never in the header.
 - **Links only on the app's own site** (`linksOf`, `consentView.ts:705`). For a `this-organization` app,
@@ -221,7 +223,7 @@ said about itself.
   has no host, so it gets no links. RFC 9700 §4.2.4 says the authorization page should not link off-site;
   this is the narrow reading that still meets RFC 7591's "SHOULD display". Opened in a new tab with
   `noopener noreferrer`, marked external for a screen reader, darker than antd's link blue for contrast
-  (`AppLinks`, `consentPage.tsx:514`). Administrators may set only https ones; dynamic registration may
+  (`AppLinks`, `consentPage.tsx:525`). Administrators may set only https ones; dynamic registration may
   still store http ones, which are simply never shown.
 
 ## The decision belongs to the account it was shown for
@@ -270,7 +272,7 @@ the original.
 ## One catalog of words
 
 Every string the page shows is in `lib/interactions/consentTexts.ts` (`:1-11`), including the page title
-(`lib/interactions/serverRender.tsx:242`). It absorbed the old scope-label, group-heading and RAR field
+(`lib/interactions/serverRender.tsx:213`). It absorbed the old scope-label, group-heading and RAR field
 tables. A translation is a change to that file alone, and a test asserts the sentence the page shows
 instead of retyping it. The page is still English only ([[site-translations]]).
 

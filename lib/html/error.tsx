@@ -1,9 +1,8 @@
 import { ComponentProps } from 'react';
 import { Result } from 'antd';
-import { createCache, extractStyle, StyleProvider } from '@ant-design/cssinjs';
-import { renderToStaticMarkup } from 'react-dom/server';
 import { htmlResponse } from './csp.js';
 import { esc } from './escape.js';
+import { renderEndUserTree } from './theme/dark.js';
 
 type ResultStatus = ComponentProps<typeof Result>['status'];
 
@@ -26,7 +25,6 @@ function illustrationFor(status: number): ResultStatus {
 	return 'error';
 }
 
-const cache = createCache();
 function renderError(
 	status: number,
 	title: string,
@@ -39,29 +37,27 @@ function renderError(
 	 * it to an operator, who resolves it to the one record. It discloses nothing — the identifier is
 	 * random and carries no state.
 	 */
-	const html = renderToStaticMarkup(
-		<StyleProvider cache={cache}>
-			<Result
-				status={illustrationFor(status)}
-				title={status.toString()}
-				subTitle={
-					reference
-						? [subTitle, `(reference: ${reference})`].filter(Boolean).join(' ')
-						: subTitle
-				}
-			/>
-		</StyleProvider>
+	const page = renderEndUserTree(
+		<Result
+			status={illustrationFor(status)}
+			title={status.toString()}
+			subTitle={
+				reference
+					? [subTitle, `(reference: ${reference})`].filter(Boolean).join(' ')
+					: subTitle
+			}
+		/>
 	);
-	const styleText = extractStyle(cache);
 
 	return `<!DOCTYPE html>
 	<html>
 		<head>
 			<meta charSet="utf-8" />
+			<meta name="viewport" content="width=device-width, initial-scale=1" />
 			<title>${esc(title)}</title>
-			${styleText}
+			${page.head}
 		</head>
-		<body>${html}</body>
+		<body>${page.html}</body>
 	</html>`;
 }
 

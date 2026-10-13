@@ -92,7 +92,7 @@ callback into `/admin` would therefore land on the console's login. The cookie's
 anyway, and a host-addressed bucket's callback is another origin. So:
 
 - the callback answers a plain self-contained page, "Try finished" (`tryFinishedPage`,
-  `lib/federation/pages.tsx:128`), in the plain family of [[interaction-page-families]];
+  `lib/federation/pages.tsx:129`), in the plain family of [[interaction-page-families]];
 - the console tab that started the try polls every two seconds (`POLL_MS`,
   `lib/admin/ui/pages/providers/TrySignIn.tsx:26`);
 - no return address is taken from the request (RFC 9700 §4.11);
