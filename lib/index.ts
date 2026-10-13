@@ -294,12 +294,21 @@ if (process.env.NODE_ENV !== 'test') {
 	startBucketPurger();
 }
 
-try {
-	elysia.listen(3000);
-} catch (error) {
-	await reportStartupFailure(
-		error instanceof Error ? error.name : 'unknown',
-		'listen'
-	);
-	throw error;
+/*
+ * Not under test either: every case drives the app through `elysia.handle`, and a test run that bound the
+ * port took requests meant for a server started beside it. On Windows a second process binds :3000 with no
+ * error and the two then share incoming connections, so a browser talking to a local server while
+ * `bun test` ran was answered at random by the test process, whose stores hold none of that server's
+ * clients, sessions or interactions.
+ */
+if (process.env.NODE_ENV !== 'test') {
+	try {
+		elysia.listen(3000);
+	} catch (error) {
+		await reportStartupFailure(
+			error instanceof Error ? error.name : 'unknown',
+			'listen'
+		);
+		throw error;
+	}
 }

@@ -59,6 +59,16 @@ These resets need imports from the model graph, which the preload must not load 
 - `configStore`, because `bootstrap()` empties it itself (`test/test_helper.ts:564`).
 - `mock.module`, which `mock.restore()` does not undo.
 
+## The test process binds no port
+
+Importing `lib/index.ts` boots the server, and until 2026-10-13 that included `elysia.listen(3000)` under
+`bun test` too, though every case drives the app through `elysia.handle`. On Windows a second process
+binds :3000 without `EADDRINUSE` and the two share incoming connections. A server started beside a test
+run — a browser rig, `bun start` — was answered at random by the test process, whose stores hold none of
+its clients, sessions or interactions: a sign-in got a 500 or "interaction session not found" with no
+fault recorded in the server that was meant to answer. The listen now sits behind the same
+`NODE_ENV !== 'test'` guard as the hourly closer and purger (`lib/index.ts:304`).
+
 ## Why reset, not detect
 
 A guard that reports leftovers was considered first. It would have to know where to look. Bun keeps a
