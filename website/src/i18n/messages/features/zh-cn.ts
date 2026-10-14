@@ -1,6 +1,6 @@
 import type english from './en.ts';
 
-export const source = '894725d6d5ca';
+export const source = '03efdd8c6887';
 
 export default {
 	title: '功能',
@@ -249,7 +249,7 @@ export default {
 				},
 				loginUi: {
 					title: '内置登录与授权同意界面',
-					body: '基于 React 和 Ant Design 的页面，可以自定义主题，也可以通过交互策略整体替换。'
+					body: '基于 React 和 Ant Design 的页面，支持英文、俄文和简体中文，并随设备切换浅色或深色。授权同意页面说明是谁在请求访问，并让用户选择应用能获得什么；在已连接应用页面上可以随时收回访问权限。页面可以自定义主题，也可以通过交互策略整体替换。'
 				}
 			}
 		},

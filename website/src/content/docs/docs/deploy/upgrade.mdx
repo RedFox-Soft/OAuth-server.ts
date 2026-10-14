@@ -301,6 +301,27 @@ What else an operator or an integration sees after 0.11.0:
 - **A user's profile wins over a stored claim of the same name.** An application that read a `given_name`
   from a user's claims document while the profile held another now receives the profile's.
 
+### Then 0.12.0
+
+0.12.0 carries no schema migration. Take a backup and run `db:setup` (or `db:setup:pg`): it adds the
+`ClientLogo` area, which holds the logo an administrator uploads for an application.
+
+What else an operator or an integration sees after 0.12.0:
+
+- **The consent form is bound to the account it was shown for.** It carries a hidden `accountId`, and a post
+  for any other account is refused. A script that fills in the consent form itself must send it.
+- **The consent page is reworded and rebuilt.** It is headed by the bucket's new `displayName` (or its
+  address), names the account by email, and groups what an application asks for into what it will see, what it
+  will do and what nobody described. A test or a script that reads the page's text must be updated.
+- **A refused permission can be granted again.** A permission someone left out is offered again when the
+  application sends `prompt=consent`; before, a refusal recorded on a grant was final.
+- **End-user pages speak three languages.** They are shown in English, Russian or Simplified Chinese, from the
+  person's own choice, the application's `ui_locales`, the account's stored locale and the browser, and they
+  answer with `Content-Language` and `Vary: Accept-Language, Cookie`. Protocol answers do not change. Both
+  discovery documents publish `ui_locales_supported`.
+- **Every bucket has a connected-apps page** at `/account/apps` on its own address, where people remove the
+  access they gave. A removal is audited as `self-service`.
+
 ## After the restart
 
 ```bash

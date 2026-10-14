@@ -9,6 +9,21 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-10-14
+
+The pages people see are rebuilt for the people who see them. The consent page says who is asking, which account
+is agreeing and what the application will be able to do, in plain sentences; people can leave out what they do not
+want to give and change their mind later; the organization's own applications show their logo and policy links;
+and every bucket has a page where people see and remove the access they gave. Every end-user page follows the
+device's light or dark scheme, and every end-user page and email is shown in English, Russian or Simplified
+Chinese, chosen from the person, the application's `ui_locales` and the browser.
+
+The upgrade asks a backup and `db:setup` (or `db:setup:pg`) for the new `ClientLogo` area. There is no schema
+migration. What an integration meets: the consent form now carries the account it was shown for and is refused
+for any other, so a script that posts the consent form must send `accountId`; the consent page's wording and
+markup changed; end-user pages declare their language and answer with `Content-Language` and
+`Vary: Accept-Language, Cookie`; and both discovery documents publish `ui_locales_supported`.
+
 ### Added
 
 - **End-user pages and emails in English, Russian and Simplified Chinese** (spec 097). The language comes from
@@ -1883,7 +1898,8 @@ found`. The refusal text existed and never ran: the call that delivered it sat i
 - The DPoP nonce secret is self-provisioned at startup, making the requireNonce-without-secret 500
   state unrepresentable (spec 014)
 
-[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.8.0...v0.9.0

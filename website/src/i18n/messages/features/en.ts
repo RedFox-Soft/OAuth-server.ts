@@ -251,7 +251,7 @@ export default {
 				},
 				loginUi: {
 					title: 'Built-in login and consent UI',
-					body: 'React and Ant Design screens you can theme, or replace through the interaction policy.'
+					body: 'React and Ant Design screens in English, Russian and Simplified Chinese, light or dark with the device. The consent page says who is asking and lets people choose what an app gets, and a connected-apps page lets them take it back. Theme the screens, or replace them through the interaction policy.'
 				}
 			}
 		},
