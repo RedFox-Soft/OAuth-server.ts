@@ -23,7 +23,7 @@
       },
       "devDependencies": {
         "@astrojs/check": "^0.9.10",
-        "@fontsource/noto-sans-sc": "^5.3.0",
+        "@fontsource/noto-sans-sc": "^5.3.1",
         "@types/bun": "^1.4.2",
         "playwright": "^1.64.0",
         "typescript": "^6.0.3",
@@ -147,7 +147,7 @@
 
     "@fontsource-variable/jetbrains-mono": ["@fontsource-variable/jetbrains-mono@5.3.0", "", {}, "sha512-F32xpS2NsGYoQi2ADSkKTgpJj7ozajsGgDJ8woTnqjmIB+dxDIqImjl4pXZVEExu8UFZ2ndhmX18EBS/hdz3Lw=="],
 
-    "@fontsource/noto-sans-sc": ["@fontsource/noto-sans-sc@5.3.0", "", {}, "sha512-HeqIlGm0+ohOKxZLuHj1qW6r6avHH0OWdKERAcSDI0RQ+MXrteuLKA+M+5eOA8rYy0MFvOR5AT0fQo2rUkye0Q=="],
+    "@fontsource/noto-sans-sc": ["@fontsource/noto-sans-sc@5.3.1", "", {}, "sha512-YxZ/VWAWo9FWzH08Q6fGTzIW6vYNP2TMhUFCnfhlimbhdXnWrxJLrzX3KWt2FKnV0s8XiM5vjpGHQiyFRlTj0w=="],
 
     "@img/colour": ["@img/colour@1.1.0", "", {}, "sha512-Td76q7j57o/tLVdgS746cYARfSyxk8iEfRxewL9h4OMzYhbW4TAcppl0mT4eyqXddh6L/jwoM75mo7ixa/pCeQ=="],
 
