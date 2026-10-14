@@ -8,7 +8,10 @@ import {
 } from 'lib/adapters/index.ts';
 import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { ROOT_NAMESPACE } from 'lib/resources/namespace.js';
-import { CONSENT_TEXTS as T } from 'lib/interactions/consentTexts.js';
+import { CONSENT_TEXTS } from 'lib/i18n/texts/consent/index.ts';
+import { text as fill } from 'lib/i18n/message.tsx';
+
+const T = CONSENT_TEXTS.en;
 import { MCP } from './consent_page.config.ts';
 import { openConsent } from './flow.ts';
 
@@ -57,7 +60,7 @@ describe('the consent page when an application asks for more', () => {
 		);
 
 		expect(page.text).toContain(
-			`${T.repeat.alreadyAllowed} ${T.categories.email}.`
+			fill(T.repeat.alreadyAllowed, { items: T.categories.email })
 		);
 		const asked = page.text.slice(page.text.indexOf(T.repeat.alsoAsks));
 		expect(asked).toContain('run the service’s tools as you');
@@ -79,7 +82,7 @@ describe('the consent page when an application asks for more', () => {
 		);
 
 		expect(page.text).toContain(
-			`${T.repeat.afterApproval} ${T.categories.email} and run the service’s tools as you.`
+			`${T.repeat.afterApproval} ${fill(T.repeat.afterApprovalItems, { items: `${T.categories.email} and run the service’s tools as you` })}`
 		);
 	});
 

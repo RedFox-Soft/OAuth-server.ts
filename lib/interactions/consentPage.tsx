@@ -18,9 +18,17 @@ import type {
 	ConsentView,
 	DataCategory
 } from './consentView.js';
-import { CONSENT_TEXTS as T, joinList } from './consentTexts.js';
+import { useLanguage } from '../i18n/context.js';
+import { formatList } from '../i18n/format.js';
+import type { Language } from '../i18n/languages.js';
+import { Message, text } from '../i18n/message.js';
+import {
+	CONSENT_TEXTS,
+	type ConsentTexts
+} from '../i18n/texts/consent/index.js';
 import { buildUILoginPath } from './buildUIPath.js';
 import { DEFAULT_LOGO } from './logo.js';
+import { LanguageSwitch, type SwitcherProps } from './languageSwitch.js';
 import { foxVar } from '../html/theme/palette.js';
 
 const { Title, Paragraph, Text } = Typography;
@@ -61,11 +69,33 @@ const codeStyle: React.CSSProperties = {
 	overflowWrap: 'anywhere'
 };
 
-function itemText(item: ConsentItem): string {
+function useTexts(): ConsentTexts {
+	return CONSENT_TEXTS[useLanguage()];
+}
+
+function itemText(item: ConsentItem, T: ConsentTexts): string {
 	if (item.category) return T.categories[item.category];
 	if (item.text) return item.text;
 	const codes = item.codes.join(', ');
-	return item.resource ? T.resource.codesIn(codes, item.resource) : codes;
+	return item.resource
+		? text(T.resource.codesIn, { codes, resource: item.resource })
+		: codes;
+}
+
+/* "a, b and c" in the page's language, as one value: a list inside a sentence is one thing to read. */
+function itemList(
+	items: readonly ConsentItem[],
+	T: ConsentTexts,
+	language: Language
+): React.ReactNode {
+	return (
+		<>
+			{formatList(
+				language,
+				items.map((item) => itemText(item, T))
+			)}
+		</>
+	);
 }
 
 function Codes({ codes }: { codes: string[] }) {
@@ -95,6 +125,7 @@ function Codes({ codes }: { codes: string[] }) {
 }
 
 function TechnicalNames({ items }: { items: ConsentItem[] }) {
+	const T = useTexts();
 	const codes = items.flatMap((i) => i.codes);
 	if (!codes.length) return null;
 	return (
@@ -110,6 +141,7 @@ function TechnicalNames({ items }: { items: ConsentItem[] }) {
 }
 
 function RefusedBefore({ item }: { item: Pick<ConsentItem, 'refusedBefore'> }) {
+	const T = useTexts();
 	return item.refusedBefore ? (
 		<div style={{ fontSize: 12.5, color: MUTED }}>
 			{T.choices.refusedBefore}
@@ -185,6 +217,7 @@ function itemKey(item: ConsentItem): string {
 }
 
 function ItemList({ items }: { items: ConsentItem[] }) {
+	const T = useTexts();
 	return (
 		<ul style={{ margin: 0, paddingLeft: 0, listStyle: 'none' }}>
 			{items.map((item) =>
@@ -195,7 +228,7 @@ function ItemList({ items }: { items: ConsentItem[] }) {
 						refusedBefore={item.refusedBefore}
 						icon={item.category ? CATEGORY_ICON[item.category] : undefined}
 					>
-						{itemText(item)}
+						{itemText(item, T)}
 					</ChoiceRow>
 				) : (
 					<li
@@ -206,7 +239,7 @@ function ItemList({ items }: { items: ConsentItem[] }) {
 							{item.category ? CATEGORY_ICON[item.category] : '•'}
 						</span>
 						<span>
-							{itemText(item)}
+							{itemText(item, T)}
 							<RefusedBefore item={item} />
 						</span>
 					</li>
@@ -255,6 +288,7 @@ function GroupBody({
 	described: boolean;
 	service: string;
 }) {
+	const T = useTexts();
 	return (
 		<Flex
 			vertical
@@ -271,7 +305,10 @@ function GroupBody({
 				) : (
 					<>
 						<Text style={{ color: MUTED }}>
-							{T.resource.undescribedAdministrator(service)}
+							<Message
+								t={T.resource.undescribedAdministrator}
+								values={{ service }}
+							/>
 						</Text>
 						<UndescribedCodes items={group.items} />
 					</>
@@ -317,7 +354,7 @@ function GroupBody({
 									<ul style={{ margin: 0, paddingLeft: 16 }}>
 										{resource.items.map((item) => (
 											<li key={item.codes.join(' ')}>
-												{itemText(item)}
+												{itemText(item, T)}
 												<RefusedBefore item={item} />
 											</li>
 										))}
@@ -331,7 +368,10 @@ function GroupBody({
 								gap={6}
 							>
 								<Text style={{ color: MUTED }}>
-									{T.resource.undescribedOwner(resource.name ?? resource.host)}
+									<Message
+										t={T.resource.undescribedOwner}
+										values={{ owner: resource.name ?? resource.host }}
+									/>
 								</Text>
 								<UndescribedCodes items={resource.items} />
 							</Flex>
@@ -376,6 +416,7 @@ function Groups({
 	groups: ConsentView['groups'];
 	service: string;
 }) {
+	const T = useTexts();
 	const sections: {
 		key: string;
 		title: string;
@@ -386,7 +427,7 @@ function Groups({
 		{ key: 'act', title: T.groups.act, group: groups.act, described: true },
 		{
 			key: 'other',
-			title: T.groups.other,
+			title: T.groups.undescribed,
 			group: groups.other,
 			described: false
 		}
@@ -423,6 +464,7 @@ function Warning({
 	icon: React.ReactNode;
 	children: React.ReactNode;
 }) {
+	const T = useTexts();
 	const palette =
 		tone === 'danger'
 			? {
@@ -462,6 +504,7 @@ function WarningBlock({
 	view: ConsentView;
 	service: string;
 }) {
+	const T = useTexts();
 	const { warning, client, redirect, device } = view;
 	if (!warning) return null;
 	switch (warning.kind) {
@@ -474,7 +517,10 @@ function WarningBlock({
 					<b style={{ color: foxVar('danger-strong') }}>
 						{T.warning.adminTitle}
 					</b>{' '}
-					{T.warning.admin(service)}
+					<Message
+						t={T.warning.admin}
+						values={{ service }}
+					/>
 				</Warning>
 			);
 		case 'loopback':
@@ -483,9 +529,10 @@ function WarningBlock({
 					tone="warn"
 					icon={<LaptopOutlined aria-hidden="true" />}
 				>
-					{T.warning.loopbackBefore(service)}
-					<bdi>{client.name}</bdi>
-					{T.warning.loopbackAfter}
+					<Message
+						t={T.warning.loopback}
+						values={{ service, app: client.name }}
+					/>
 				</Warning>
 			);
 		case 'device':
@@ -495,7 +542,13 @@ function WarningBlock({
 					icon={<WarningOutlined aria-hidden="true" />}
 				>
 					{T.warning.deviceQuestion} {T.warning.deviceSent}
-					{device ? ` ${T.warning.deviceRequested(device.requestedAgo)}` : ''}
+					{device ? ' ' : ''}
+					{device ? (
+						<Message
+							t={T.warning.deviceRequested}
+							values={{ ago: <>{device.requestedAgo}</> }}
+						/>
+					) : null}
 				</Warning>
 			);
 		case 'unverified':
@@ -504,11 +557,17 @@ function WarningBlock({
 					tone="warn"
 					icon={<WarningOutlined aria-hidden="true" />}
 				>
-					{T.warning.unverifiedBefore}
-					<bdi>{client.name}</bdi>
-					{redirect.host
-						? T.warning.unverifiedAfter(redirect.host)
-						: T.warning.unverifiedAfterNoHost}
+					{redirect.host ? (
+						<Message
+							t={T.warning.unverified}
+							values={{ app: client.name, host: <>{redirect.host}</> }}
+						/>
+					) : (
+						<Message
+							t={T.warning.unverifiedNoHost}
+							values={{ app: client.name }}
+						/>
+					)}
 					{warning.reasons.includes('host-mismatch')
 						? ` ${T.warning.hostMismatch}`
 						: ''}
@@ -529,21 +588,22 @@ function AppLinks({
 	name: string;
 	links: NonNullable<ConsentView['links']>;
 }) {
+	const T = useTexts();
 	const entries = [
-		links.policy ? { href: links.policy, after: T.links.policyAfter } : null,
-		links.terms ? { href: links.terms, after: T.links.termsAfter } : null
+		links.policy ? { href: links.policy, label: T.links.policy } : null,
+		links.terms ? { href: links.terms, label: T.links.terms } : null
 	].filter((entry) => entry !== null);
 	return (
-		<nav aria-label={T.links.label(name)}>
+		<nav aria-label={text(T.links.label, { app: name })}>
 			<Flex
 				wrap
 				justify="center"
 				gap="0 12px"
 				style={{ fontSize: 13 }}
 			>
-				{entries.map(({ href, after }) => (
+				{entries.map(({ href, label }) => (
 					<a
-						key={href + after}
+						key={href + label}
 						href={href}
 						target="_blank"
 						rel="noopener noreferrer"
@@ -554,8 +614,10 @@ function AppLinks({
 							color: foxVar('link')
 						}}
 					>
-						<bdi>{name}</bdi>
-						{after}
+						<Message
+							t={label}
+							values={{ app: name }}
+						/>
 						<span aria-hidden="true">&nbsp;↗</span>
 						<span style={hiddenText}>{T.links.external}</span>
 					</a>
@@ -596,6 +658,7 @@ function ClientLogo({ src, name }: { src: string; name: string }) {
 }
 
 function Headline({ view, service }: { view: ConsentView; service: string }) {
+	const T = useTexts();
 	const { mode, client } = view;
 	const own = client.tier === 'this-organization';
 	return (
@@ -607,22 +670,28 @@ function Headline({ view, service }: { view: ConsentView; service: string }) {
 				T.headline.device
 			) : own ? (
 				mode === 'sign-in' ? (
-					T.headline.signIn(client.name)
+					<Message
+						t={T.headline.signIn}
+						values={{ app: client.name }}
+					/>
 				) : (
-					T.headline.ownAccess(client.name, service)
+					<Message
+						t={T.headline.ownAccess}
+						values={{ app: client.name, service }}
+					/>
 				)
 			) : (
-				<>
-					{T.headline.appBefore}
-					<bdi>{client.name}</bdi>
-					{T.headline.appAfter}
-				</>
+				<Message
+					t={T.headline.app}
+					values={{ app: client.name }}
+				/>
 			)}
 		</Title>
 	);
 }
 
 function HostBox({ view, service }: { view: ConsentView; service: string }) {
+	const T = useTexts();
 	const { redirect, client, mode } = view;
 	const own = client.tier === 'this-organization';
 	const box: React.CSSProperties = {
@@ -671,12 +740,18 @@ function HostBox({ view, service }: { view: ConsentView; service: string }) {
 			) : null}
 			{redirect.kind === 'private-use' && redirect.scheme ? (
 				<span style={{ ...box, fontFamily: 'inherit', fontSize: 14 }}>
-					{T.host.privateUse(redirect.scheme, service)}
+					<Message
+						t={T.host.privateUse}
+						values={{ scheme: redirect.scheme, service }}
+					/>
 				</span>
 			) : null}
 			{!own && mode !== 'device' ? (
 				<Text style={{ color: MUTED, fontSize: 13 }}>
-					{T.host.notChecked(service)}
+					<Message
+						t={T.host.notChecked}
+						values={{ service }}
+					/>
 				</Text>
 			) : null}
 		</Flex>
@@ -684,22 +759,28 @@ function HostBox({ view, service }: { view: ConsentView; service: string }) {
 }
 
 function Body({ view, service }: { view: ConsentView; service: string }) {
+	const T = useTexts();
+	const language = useLanguage();
 	const { mode, compact, signInData, previouslyAllowed, nothingRequested } =
 		view;
 
 	if (nothingRequested === 'first') {
 		return (
 			<Paragraph style={{ margin: 0 }}>
-				{T.nothingRequested.before}
-				<bdi>{view.client.name}</bdi>
-				{T.nothingRequested.after}
+				<Message
+					t={T.nothingRequested}
+					values={{ app: view.client.name }}
+				/>
 			</Paragraph>
 		);
 	}
 	if (nothingRequested === 'repeat') {
 		return (
 			<Paragraph style={{ margin: 0 }}>
-				{T.repeat.nothingNew} {joinList(previouslyAllowed.map(itemText))}.
+				<Message
+					t={T.repeat.nothingNew}
+					values={{ items: itemList(previouslyAllowed, T, language) }}
+				/>
 			</Paragraph>
 		);
 	}
@@ -713,13 +794,23 @@ function Body({ view, service }: { view: ConsentView; service: string }) {
 			>
 				{shared.length ? (
 					<>
-						<Text>{T.signIn.shares(service)}</Text>
+						<Text>
+							<Message
+								t={T.signIn.shares}
+								values={{ service }}
+							/>
+						</Text>
 						<ItemList
 							items={shared.map((category) => ({ category, codes: [] }))}
 						/>
 					</>
 				) : (
-					<Text>{T.signIn.confirmsIdentity(service)}</Text>
+					<Text>
+						<Message
+							t={T.signIn.confirmsIdentity}
+							values={{ service }}
+						/>
+					</Text>
 				)}
 				{mode === 'sign-in' ? (
 					<Text style={{ color: MUTED }}>{T.signIn.noPassword}</Text>
@@ -735,7 +826,10 @@ function Body({ view, service }: { view: ConsentView; service: string }) {
 		>
 			{previouslyAllowed.length ? (
 				<Text style={{ color: MUTED }}>
-					{T.repeat.alreadyAllowed} {joinList(previouslyAllowed.map(itemText))}.{' '}
+					<Message
+						t={T.repeat.alreadyAllowed}
+						values={{ items: itemList(previouslyAllowed, T, language) }}
+					/>{' '}
 					{T.repeat.alsoAsks}
 				</Text>
 			) : null}
@@ -762,13 +856,20 @@ function Body({ view, service }: { view: ConsentView; service: string }) {
 			isEmpty(view.groups.see) &&
 			isEmpty(view.groups.act) &&
 			isEmpty(view.groups.other) ? (
-				<Text>{T.signIn.confirmsIdentity(service)}</Text>
+				<Text>
+					<Message
+						t={T.signIn.confirmsIdentity}
+						values={{ service }}
+					/>
+				</Text>
 			) : null}
 		</Flex>
 	);
 }
 
-export const ConsentPage: React.FC<ConsentView> = (view) => {
+export const ConsentPage: React.FC<
+	ConsentView & { switcher?: SwitcherProps }
+> = (view) => {
 	const {
 		uid,
 		service: serviceInfo,
@@ -782,6 +883,8 @@ export const ConsentPage: React.FC<ConsentView> = (view) => {
 		mode,
 		device
 	} = view;
+	const T = useTexts();
+	const language = useLanguage();
 	const service = serviceInfo.displayName ?? serviceInfo.host;
 	const nothingAtAll = nothingRequested === 'first';
 
@@ -875,7 +978,10 @@ export const ConsentPage: React.FC<ConsentView> = (view) => {
 					)}
 
 					<Text style={{ color: MUTED }}>
-						{T.account.signedInAs} <Text strong>{account.label}</Text>
+						<Message
+							t={T.account.signedInAs}
+							values={{ account: <Text strong>{account.label}</Text> }}
+						/>
 						{canSwitchAccount ? (
 							<>
 								{' · '}
@@ -924,7 +1030,10 @@ export const ConsentPage: React.FC<ConsentView> = (view) => {
 										{T.choices.offline}
 										{keepsAccessUntil ? (
 											<div style={{ fontSize: 12.5, color: MUTED }}>
-												{T.choices.offlineUntil(keepsAccessUntil)}
+												<Message
+													t={T.choices.offlineUntil}
+													values={{ date: <>{keepsAccessUntil}</> }}
+												/>
 											</div>
 										) : null}
 									</ChoiceRow>
@@ -942,7 +1051,12 @@ export const ConsentPage: React.FC<ConsentView> = (view) => {
 									<span style={{ color: MUTED, flex: 'none' }}>
 										<ClockCircleOutlined aria-hidden="true" />
 									</span>
-									<span>{T.lifetime(keepsAccessUntil)}</span>
+									<span>
+										<Message
+											t={T.lifetime}
+											values={{ date: <>{keepsAccessUntil}</> }}
+										/>
+									</span>
 								</div>
 							) : null}
 						</ChoiceGroup>
@@ -956,11 +1070,14 @@ export const ConsentPage: React.FC<ConsentView> = (view) => {
 								}}
 							>
 								<b>{T.repeat.afterApproval}</b>{' '}
-								{joinList(afterApproval.map(itemText))}
-								{view.afterApprovalDependsOnChoice
-									? `, ${T.choices.afterApprovalRest}`
-									: ''}
-								.
+								<Message
+									t={
+										view.afterApprovalDependsOnChoice
+											? T.repeat.afterApprovalItemsAndChoice
+											: T.repeat.afterApprovalItems
+									}
+									values={{ items: itemList(afterApproval, T, language) }}
+								/>
 							</div>
 						) : null}
 
@@ -1030,16 +1147,22 @@ export const ConsentPage: React.FC<ConsentView> = (view) => {
 								lineHeight: '24px'
 							}}
 						>
-							{T.revokeHint.before}
-							<a
-								href={view.revokeHint.href}
-								style={{ color: foxVar('link'), display: 'inline-block' }}
-							>
-								{T.revokeHint.link}
-							</a>
-							{T.revokeHint.after}
+							<Message
+								t={T.revokeHint.sentence}
+								values={{
+									link: (
+										<a
+											href={view.revokeHint.href}
+											style={{ color: foxVar('link'), display: 'inline-block' }}
+										>
+											{T.revokeHint.link}
+										</a>
+									)
+								}}
+							/>
 						</Text>
 					) : null}
+					{view.switcher ? <LanguageSwitch {...view.switcher} /> : null}
 				</Flex>
 			</Card>
 		</Flex>

@@ -3,6 +3,7 @@ import epochTime from '../helpers/epoch_time.js';
 import { BaseModel, BaseModelPayload } from './base_model.js';
 import type { InteractionResult } from '../helpers/oidc_context.ts';
 import { StoredParams } from './stored_params.ts';
+import { AlternativeLanguageSchema, LanguageSchema } from '../i18n/schema.ts';
 import type { Grant } from './grant.ts';
 import type { Session } from './session.ts';
 
@@ -56,6 +57,14 @@ export const InteractionPayload = t.Object({
 	grantId: t.Optional(t.String()),
 	deviceCode: t.Optional(t.String()),
 	parJti: t.Optional(t.String()),
+	/*
+	 * The page language, decided once when the sign-in starts and kept for every page of it (specs/097);
+	 * `alternative` is the visitor's own non-English language, present exactly when the switcher is shown, and
+	 * `languageChosen` marks that the person used it, which is what lets sign-in save the choice to the account.
+	 */
+	language: t.Optional(LanguageSchema),
+	alternative: t.Optional(AlternativeLanguageSchema),
+	languageChosen: t.Optional(t.Literal(true)),
 	/*
 	 * The bucket whose address this interaction began at.
 	 *

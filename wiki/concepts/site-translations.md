@@ -12,9 +12,8 @@ updated: 2026-10-13
 foxauth.dev (`website/`) publishes Russian under `/ru/` and Simplified Chinese under `/zh-cn/` for the
 marketing pages, the docs landing page and "Get started", and the whole blog. English is unprefixed and is the
 site; nobody whose browser does not put Russian or Simplified Chinese **first** is ever shown another language.
-The server's own screens (sign-in, consent, the console) are not translated. Spec 074. Since spec 092 every
-string on the consent page lives in one catalog, `lib/interactions/consentTexts.ts`, so translating that page
-is a change to that file; it is still English only ([[consent-screen-decisions]]).
+Spec 074. The server's own end-user screens and emails are translated into the same three languages since
+spec 097, from catalogues under `lib/i18n/texts/` ([[end-user-languages]]); the console is not.
 
 ## The first-language rule, and why it needs a script
 

@@ -8,7 +8,10 @@ import {
 	getProjectStore
 } from 'lib/adapters/index.ts';
 import { DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
-import { CONSENT_TEXTS as T } from 'lib/interactions/consentTexts.js';
+import { CONSENT_TEXTS } from 'lib/i18n/texts/consent/index.ts';
+import { text as fill } from 'lib/i18n/message.tsx';
+
+const T = CONSENT_TEXTS.en;
 import { openConsent } from './flow.ts';
 
 /**
@@ -55,10 +58,10 @@ describe('who the consent page says is asking', () => {
 		);
 
 		expect(page.view.client.tier).toBe('self-registered');
+		expect(page.text).toContain(fill(T.headline.app, { app: 'Google' }));
 		expect(page.text).toContain(
-			`${T.headline.appBefore}Google${T.headline.appAfter}`
+			fill(T.host.notChecked, { service: page.view.service.host })
 		);
-		expect(page.text).toContain(T.host.notChecked(page.view.service.host));
 	});
 
 	it('never heads a self-registered app as a sign-in to it', async () => {
@@ -67,7 +70,7 @@ describe('who the consent page says is asking', () => {
 			cookie
 		);
 
-		expect(page.text).not.toContain(T.headline.signIn('Google'));
+		expect(page.text).not.toContain(fill(T.headline.signIn, { app: 'Google' }));
 	});
 
 	it('shows where a self-registered app sends the answer', async () => {
@@ -90,8 +93,12 @@ describe('who the consent page says is asking', () => {
 		);
 
 		expect(page.view.client.tier).toBe('operator-registered');
-		expect(page.text).not.toContain(T.headline.signIn('Partner Tool'));
-		expect(page.text).toContain(T.host.notChecked(page.view.service.host));
+		expect(page.text).not.toContain(
+			fill(T.headline.signIn, { app: 'Partner Tool' })
+		);
+		expect(page.text).toContain(
+			fill(T.host.notChecked, { service: page.view.service.host })
+		);
 	});
 
 	it('warns once when an unchecked app asks for long-lived access', async () => {
@@ -109,7 +116,10 @@ describe('who the consent page says is asking', () => {
 			reasons: ['offline']
 		});
 		expect(page.text).toContain(
-			`${T.warning.unverifiedBefore}Google${T.warning.unverifiedAfter('evil.example.net')}`
+			fill(T.warning.unverified, {
+				app: 'Google',
+				host: 'evil.example.net'
+			})
 		);
 	});
 
@@ -188,7 +198,10 @@ describe('who the consent page says is asking', () => {
 		);
 
 		expect(page.text).toContain(
-			T.host.privateUse('com.acme.mobile', page.view.service.host)
+			fill(T.host.privateUse, {
+				scheme: 'com.acme.mobile',
+				service: page.view.service.host
+			})
 		);
 	});
 });

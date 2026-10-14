@@ -2,6 +2,12 @@
 // plaintext fallback so it renders across mail clients (the antd/React interaction pages
 // are for browsers, not inboxes).
 
+import { esc } from '../../html/escape.js';
+import type { Language } from '../../i18n/languages.js';
+import { html, text } from '../../i18n/message.js';
+import { EMAIL_TEXTS } from '../../i18n/texts/email/index.js';
+import type { RenderedEmail } from '../mailer.js';
+
 interface LinkParams {
 	appName: string;
 	verifyUrl: string;
@@ -12,60 +18,64 @@ interface CodeParams {
 	code: string;
 }
 
-function escapeHtml(value: string): string {
-	return value
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;')
-		.replace(/"/g, '&quot;');
-}
-
-function shell(appName: string, bodyHtml: string): string {
+function shell(language: Language, appName: string, bodyHtml: string): string {
+	const t = EMAIL_TEXTS[language].verification;
 	return [
-		`<div style="font-family: Arial, Helvetica, sans-serif; max-width: 480px; margin: 0 auto; color: #1f1f1f;">`,
-		`<h2 style="font-size: 20px;">Verify your email</h2>`,
-		`<p>Thanks for registering with ${escapeHtml(appName)}. Please confirm this email address to activate your account.</p>`,
+		`<div lang="${language}" style="font-family: Arial, Helvetica, sans-serif; max-width: 480px; margin: 0 auto; color: #1f1f1f;">`,
+		`<h2 style="font-size: 20px;">${html(t.heading)}</h2>`,
+		`<p>${html(t.intro, { app: appName })}</p>`,
 		bodyHtml,
-		`<p style="color: #8c8c8c; font-size: 12px; margin-top: 24px;">If you did not create this account, you can safely ignore this email.</p>`,
+		`<p style="color: #8c8c8c; font-size: 12px; margin-top: 24px;">${html(t.ignore)}</p>`,
 		`</div>`
 	].join('');
 }
 
-export function verificationLinkEmail(params: LinkParams): {
-	subject: string;
-	html: string;
-	text: string;
-} {
+export function verificationLinkEmail(
+	params: LinkParams,
+	language: Language = 'en'
+): RenderedEmail {
 	const { appName, verifyUrl } = params;
-	const html = shell(
+	const texts = EMAIL_TEXTS[language];
+	const t = texts.verification.link;
+	const body = shell(
+		language,
 		appName,
 		[
 			`<p style="text-align: center; margin: 28px 0;">`,
-			`<a href="${escapeHtml(verifyUrl)}" style="background: #1677ff; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 6px; display: inline-block;">Verify email</a>`,
+			`<a href="${esc(verifyUrl)}" style="background: #1677ff; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 6px; display: inline-block;">${html(t.button)}</a>`,
 			`</p>`,
-			`<p style="font-size: 12px; color: #8c8c8c;">Or paste this link into your browser:<br/>${escapeHtml(verifyUrl)}</p>`
+			`<p style="font-size: 12px; color: #8c8c8c;">${html(texts.pasteLink)}<br/>${html('{url}', { url: verifyUrl })}</p>`
 		].join('')
 	);
-	const text = `Verify your email for ${appName}.\n\nOpen this link to confirm your address:\n${verifyUrl}\n\nIf you did not create this account, you can ignore this email.`;
-	return { subject: `Verify your email for ${appName}`, html, text };
+	return {
+		subject: text(t.subject, { app: appName }),
+		html: body,
+		text: text(t.text, { app: appName, url: verifyUrl }),
+		language
+	};
 }
 
-export function verificationCodeEmail(params: CodeParams): {
-	subject: string;
-	html: string;
-	text: string;
-} {
+export function verificationCodeEmail(
+	params: CodeParams,
+	language: Language = 'en'
+): RenderedEmail {
 	const { appName, code } = params;
-	const html = shell(
+	const t = EMAIL_TEXTS[language].verification.code;
+	const body = shell(
+		language,
 		appName,
 		[
-			`<p>Enter this verification code to confirm your address:</p>`,
+			`<p>${html(t.prompt)}</p>`,
 			`<p style="text-align: center; margin: 24px 0;">`,
-			`<span style="font-size: 32px; letter-spacing: 8px; font-weight: bold;">${escapeHtml(code)}</span>`,
+			`<span style="font-size: 32px; letter-spacing: 8px; font-weight: bold;">${html('{code}', { code })}</span>`,
 			`</p>`,
-			`<p style="font-size: 12px; color: #8c8c8c;">This code expires shortly. Do not share it with anyone.</p>`
+			`<p style="font-size: 12px; color: #8c8c8c;">${html(t.expiry)}</p>`
 		].join('')
 	);
-	const text = `Verify your email for ${appName}.\n\nYour verification code is: ${code}\n\nThis code expires shortly. If you did not create this account, you can ignore this email.`;
-	return { subject: `Your ${appName} verification code`, html, text };
+	return {
+		subject: text(t.subject, { app: appName }),
+		html: body,
+		text: text(t.text, { app: appName, code }),
+		language
+	};
 }

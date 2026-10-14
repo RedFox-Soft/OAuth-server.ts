@@ -1,6 +1,9 @@
 import { shownAccount } from '../consent_form.js';
 import { visible } from '../page_text.js';
-import { CONSENT_TEXTS } from 'lib/interactions/consentTexts.js';
+import { CONSENT_TEXTS as CONSENT_CATALOGUE } from 'lib/i18n/texts/consent/index.ts';
+import { text as fill } from 'lib/i18n/message.tsx';
+
+const CONSENT_TEXTS = CONSENT_CATALOGUE.en;
 import * as crypto from 'node:crypto';
 
 import {
@@ -881,7 +884,9 @@ describe('features.richAuthorizationRequests', () => {
 				text.indexOf(CONSENT_TEXTS.repeat.afterApproval)
 			);
 			expect(text).toContain(
-				`${CONSENT_TEXTS.repeat.alreadyAllowed} Initiate a payment`
+				fill(CONSENT_TEXTS.repeat.alreadyAllowed, {
+					items: 'Initiate a payment'
+				}).slice(0, -1)
 			);
 			expect(asked).toContain('Open-ended access');
 			expect(asked).not.toContain('Initiate a payment');

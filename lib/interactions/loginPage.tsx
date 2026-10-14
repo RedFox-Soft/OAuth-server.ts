@@ -15,7 +15,11 @@ import {
 import { DEFAULT_LOGO } from './logo.js';
 import { knownProvider } from '../consts/known_providers.js';
 import { providerMark } from './providerMark.js';
+import { LanguageSwitch, type SwitcherProps } from './languageSwitch.js';
 import { foxVar } from '../html/theme/palette.js';
+import { useLanguage } from '../i18n/context.js';
+import { Message, text } from '../i18n/message.js';
+import { SIGN_IN_TEXTS } from '../i18n/texts/signIn/index.js';
 
 export function LoginPage({
 	uid,
@@ -27,7 +31,8 @@ export function LoginPage({
 	verificationResend = false,
 	providers = [],
 	logoSrc = DEFAULT_LOGO,
-	embedded = false
+	embedded = false,
+	switcher
 }: {
 	uid: string;
 	errorMessage?: string;
@@ -49,7 +54,10 @@ export function LoginPage({
 	 * component, so the preview shows whatever this page shows, but sized to its content instead of the window.
 	 */
 	embedded?: boolean;
+	/* The language switch (specs/097), present only for a visitor with a language other than English. */
+	switcher?: SwitcherProps;
 }) {
+	const T = SIGN_IN_TEXTS[useLanguage()];
 	return (
 		<Flex
 			justify="center"
@@ -71,7 +79,7 @@ export function LoginPage({
 				<div style={{ textAlign: 'center', marginBottom: 24 }}>
 					<img
 						src={logoSrc}
-						alt="Logo"
+						alt={T.logoAlt}
 						style={{ width: 120 }}
 					/>
 				</div>
@@ -105,7 +113,7 @@ export function LoginPage({
 								<span
 									style={{ color: foxVar('notice-text'), fontSize: '14px' }}
 								>
-									<InfoCircleOutlined />
+									<InfoCircleOutlined aria-hidden="true" />
 								</span>
 								<span
 									style={{ color: foxVar('notice-text'), fontSize: '14px' }}
@@ -131,7 +139,7 @@ export function LoginPage({
 								<span
 									style={{ color: foxVar('danger-text'), fontSize: '14px' }}
 								>
-									<ExclamationCircleOutlined />
+									<ExclamationCircleOutlined aria-hidden="true" />
 								</span>
 								<span
 									style={{ color: foxVar('danger-text'), fontSize: '14px' }}
@@ -152,27 +160,23 @@ export function LoginPage({
 						<>
 							<Form.Item
 								name="username"
-								rules={[
-									{ required: true, message: 'Please input your Username!' }
-								]}
+								rules={[{ required: true, message: T.login.usernameRequired }]}
 							>
 								<Input
 									name="username"
-									prefix={<UserOutlined />}
-									placeholder="Username"
+									prefix={<UserOutlined aria-hidden="true" />}
+									placeholder={T.login.usernamePlaceholder}
 								/>
 							</Form.Item>
 							<Form.Item
 								name="password"
-								rules={[
-									{ required: true, message: 'Please input your Password!' }
-								]}
+								rules={[{ required: true, message: T.login.passwordRequired }]}
 							>
 								<Input
 									name="password"
-									prefix={<LockOutlined />}
+									prefix={<LockOutlined aria-hidden="true" />}
 									type="password"
-									placeholder="Password"
+									placeholder={T.login.passwordPlaceholder}
 								/>
 							</Form.Item>
 							<Form.Item>
@@ -185,10 +189,12 @@ export function LoginPage({
 										valuePropName="checked"
 										noStyle
 									>
-										<Checkbox name="remember">Remember me</Checkbox>
+										<Checkbox name="remember">{T.login.remember}</Checkbox>
 									</Form.Item>
 									{passwordReset && (
-										<a href={buildUIForgotPasswordPath(uid)}>Forgot password</a>
+										<a href={buildUIForgotPasswordPath(uid)}>
+											{T.login.forgotPassword}
+										</a>
 									)}
 								</Flex>
 							</Form.Item>
@@ -199,11 +205,20 @@ export function LoginPage({
 									type="primary"
 									htmlType="submit"
 								>
-									Log in
+									{T.login.submit}
 								</Button>
 								{registrationOpen && (
 									<>
-										or <a href={buildUIRegistrationPath(uid)}>Register now!</a>
+										<Message
+											t={T.login.registerPrompt}
+											values={{
+												link: (
+													<a href={buildUIRegistrationPath(uid)}>
+														{T.login.register}
+													</a>
+												)
+											}}
+										/>
 									</>
 								)}
 							</Form.Item>
@@ -224,7 +239,7 @@ export function LoginPage({
 							type="link"
 							htmlType="submit"
 						>
-							Send the link again
+							{T.login.resendLink}
 						</Button>
 					</form>
 				)}
@@ -246,7 +261,7 @@ export function LoginPage({
 									textAlign: 'center'
 								}}
 							>
-								or continue with
+								{T.login.orContinueWith}
 							</div>
 						)}
 						{providers.map((provider) => {
@@ -295,14 +310,15 @@ export function LoginPage({
 									}
 								>
 									{mark}
-									{known
-										? known.buttonText
-										: `Sign in with ${provider.displayName}`}
+									{text(T.login.signInWith, {
+										provider: known ? known.displayName : provider.displayName
+									})}
 								</a>
 							);
 						})}
 					</Flex>
 				)}
+				{switcher && <LanguageSwitch {...switcher} />}
 			</Card>
 		</Flex>
 	);

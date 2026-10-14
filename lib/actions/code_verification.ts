@@ -33,6 +33,7 @@ import type { PipelineParams } from 'lib/consts/param_list.js';
 import { DeviceCode } from 'lib/models/device_code.js';
 import { Client } from 'lib/models/client.js';
 import { eventBus } from '../event_bus.js';
+import { languageHeaders, languageOfContext } from '../i18n/request.js';
 
 // Renders (or re-renders) the user-code input page for an error. ReRenderErrors (bad/missing/
 // expired/used code, aborted interaction) are ordinary re-renders and do NOT emit an error event;
@@ -48,7 +49,13 @@ function renderInputError(oidc: OIDCContext<PipelineParams>, err: unknown) {
 		eventBus.emit('code_verification.error', oidc, err);
 	}
 
-	return deviceInputPage({ action, secret, charset, err });
+	return deviceInputPage({
+		action,
+		secret,
+		charset,
+		err,
+		language: languageOfContext(oidc).language
+	});
 }
 
 export const codeVerification = new Elysia()
@@ -70,7 +77,13 @@ export const codeVerification = new Elysia()
 				(params as { bucket?: string } | undefined)?.bucket,
 				hostOfRequest(request)
 			);
-			const oidc = new OIDCContext({ params: query, bucket, cookie });
+			const oidc = new OIDCContext({
+				params: query,
+				bucket,
+				cookie,
+				headers: languageHeaders(request)
+			});
+			const { language } = languageOfContext(oidc);
 			const setCookies = await sessionHandler(oidc);
 
 			const charset = ApplicationConfig['deviceFlow.charset'];
@@ -83,16 +96,22 @@ export const codeVerification = new Elysia()
 			await setCookies();
 
 			if (query.user_code) {
-				return formPost(oidc, action, {
-					xsrf: secret,
-					user_code: query.user_code
-				});
+				return formPost(
+					oidc,
+					action,
+					{
+						xsrf: secret,
+						user_code: query.user_code
+					},
+					language
+				);
 			}
 
 			return deviceInputPage({
 				action: ownFormAction(action),
 				secret,
-				charset
+				charset,
+				language
 			});
 		},
 		{
@@ -111,7 +130,8 @@ export const codeVerification = new Elysia()
 			const oidc = new OIDCContext<PipelineParams>({
 				params: {},
 				bucket,
-				cookie
+				cookie,
+				headers: languageHeaders(request)
 			});
 			const setCookies = await sessionHandler(oidc);
 
@@ -173,7 +193,8 @@ export const codeVerification = new Elysia()
 						action,
 						secret,
 						userCode: denormalize(normalized, mask),
-						client
+						client,
+						language: languageOfContext(oidc).language
 					});
 				}
 

@@ -1,8 +1,17 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { htmlResponse } from './csp.js';
+import { esc } from './escape.js';
 import { themeHead } from './theme/head.js';
+import type { Language } from '../i18n/languages.js';
+import { PAGES_TEXTS } from '../i18n/texts/pages/index.js';
+import { languageOfContext } from '../i18n/request.js';
 
-function renderForm(action: string, inputs: Record<string, string>) {
+function renderForm(
+	action: string,
+	inputs: Record<string, string>,
+	language: Language
+) {
+	const t = PAGES_TEXTS[language].formPost;
 	const formInputs = Object.entries(inputs).map(([key, value]) => (
 		<input
 			type="hidden"
@@ -18,13 +27,13 @@ function renderForm(action: string, inputs: Record<string, string>) {
 		>
 			{formInputs}
 			<noscript>
-				Your browser does not support JavaScript or you've disabled it.
+				{t.noscript}
 				<br />
 				<button
 					autoFocus
 					type="submit"
 				>
-					Continue
+					{t.continue}
 				</button>
 			</noscript>
 		</form>
@@ -35,12 +44,26 @@ function renderForm(action: string, inputs: Record<string, string>) {
  * `_oidc` is unused but cannot be dropped: response-mode handlers share one dispatch signature with
  * `query` and `jwt` (see lib/actions/authorization/respond.ts).
  */
+/*
+ * The parts of a request context this page reads, structurally, so this module stays clear of the model graph:
+ * the sign-in's language when there was a sign-in, else the request's own headers (specs/097).
+ */
+interface LanguageSource {
+	entities: { Interaction?: { payload: { language?: Language } } };
+	get(name: string): string | undefined;
+}
+
 export function formPost(
-	_oidc: unknown,
+	oidc: LanguageSource | undefined,
 	action: string,
-	inputs: Record<string, string>
+	inputs: Record<string, string>,
+	language?: Language
 ) {
-	const form = renderForm(action, inputs);
+	const lang =
+		language ??
+		oidc?.entities.Interaction?.payload.language ??
+		(oidc ? languageOfContext(oidc).language : 'en');
+	const form = renderForm(action, inputs, lang);
 	const script = `document.forms[0].submit();`;
 
 	/*
@@ -53,10 +76,10 @@ export function formPost(
 	 * into <head> restores the dead end.
 	 */
 	const html = `<!DOCTYPE html>
-<html><head>
-  <title>Submitting Callback</title>
+<html lang="${lang}"><head>
+  <title>${esc(PAGES_TEXTS[lang].formPost.title)}</title>
   ${themeHead()}
 </head><body>${renderToStaticMarkup(form)}<script>${script}</script></body></html>`;
 
-	return htmlResponse(html);
+	return htmlResponse(html, { language: lang });
 }

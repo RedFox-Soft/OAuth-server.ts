@@ -21,6 +21,8 @@ export function visible(html: string): string {
 			.replace(/&gt;/g, '>')
 			.replace(/&amp;/g, '&')
 			.replace(/\s+/g, ' ')
+			// A sentence's full stop after a link or a name is not a gap either: the markup ends there, the words don't.
+			.replace(/ ([.,;:!?])(?= |$)/g, '$1')
 			.trim()
 	);
 }

@@ -17,7 +17,10 @@ import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { forgetBucketAddresses } from 'lib/admin/auth/bucketAddress.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { ACCOUNT_PAGE_COOKIE } from 'lib/consts/account_page.ts';
-import { ACCOUNT_PAGE_TEXTS as T } from 'lib/account_page/texts.ts';
+import { ACCOUNT_TEXTS } from 'lib/i18n/texts/account/index.ts';
+import { text as fill } from 'lib/i18n/message.tsx';
+
+const T = ACCOUNT_TEXTS.en;
 import { AuthorizationRequest } from '../AuthorizationRequest.ts';
 import { present } from '../shape.ts';
 import {
@@ -284,7 +287,7 @@ describe('who may see and change access on the page', () => {
 		);
 		expect(back.url).toMatch(/\/account\/apps\?revoke=own-app$/);
 		expect(textOf(await back.response.text())).toContain(
-			T.confirmTitle('Timesheets')
+			fill(T.confirmTitle, { app: 'Timesheets' })
 		);
 		expect(await introspect(access.accessToken)).toMatchObject({
 			active: true

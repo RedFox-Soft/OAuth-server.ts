@@ -47,9 +47,14 @@ import {
 } from 'lib/account_page/html.ts';
 import type { ApplicationRow } from 'lib/account_page/view.ts';
 import {
+	federationExpiredPage,
+	federationInactivePage,
+	federationNoEmailPage,
 	federationRejectedPage,
+	federationUpstreamPage,
 	passwordLoginClosedPage
 } from 'lib/federation/pages.tsx';
+import type { Language } from 'lib/i18n/languages.ts';
 import { renderAdminShell } from 'lib/admin/ui/serverRender.tsx';
 
 export type PageFamily = 'hydrated' | 'terminal' | 'plain';
@@ -71,160 +76,261 @@ export const APPLICATION_ROW: ApplicationRow = {
 	keepsAccess: true
 };
 
-const FRAME = {
+const frame = (language: Language) => ({
 	service: 'Acme ID',
 	logoSrc: '/public/logo.svg',
 	path: '/account/apps',
 	signOutHref: '/session/end',
-	email: 'person@example.com'
-};
+	email: 'person@example.com',
+	language
+});
 
+/*
+ * Each page takes the language to render in, so a walk can cover every page in every language (specs/097). A
+ * renderer called without one renders English, as an existing caller always has.
+ */
 export const END_USER_PAGES: Array<
-	[string, PageFamily, () => Response | Promise<Response>]
+	[string, PageFamily, (language?: Language) => Response | Promise<Response>]
 > = [
-	['sign-in', 'hydrated', () => loginServer('uid-1')],
+	['sign-in', 'hydrated', (language) => loginServer('uid-1', { language })],
 	[
 		'sign-in with an error',
 		'hydrated',
-		() => loginServer('uid-1', { errorMessage: 'wrong password' })
+		(language) =>
+			loginServer('uid-1', { errorMessage: 'wrong password', language })
 	],
 	[
 		'sign-in with providers',
 		'hydrated',
-		() =>
+		(language) =>
 			loginServer('uid-1', {
 				providers: [
 					{ id: 'gh', displayName: 'GitHub', brand: 'github' },
 					{ id: 'gg', displayName: 'Google', brand: 'google' }
-				]
+				],
+				language
 			})
 	],
-	['registration', 'hydrated', () => registrationServer('uid-1')],
+	[
+		'registration',
+		'hydrated',
+		(language) => registrationServer('uid-1', { language })
+	],
 	[
 		'two-step code',
 		'hydrated',
-		() => totpServer('uid-1', { mode: 'verify', errorMessage: 'wrong code' })
+		(language) =>
+			totpServer('uid-1', {
+				mode: 'verify',
+				errorMessage: 'wrong code',
+				language
+			})
 	],
 	[
 		'two-step enrolment',
 		'hydrated',
-		() =>
+		(language) =>
 			totpServer('uid-1', {
 				mode: 'enroll',
 				otpauthUri: 'otpauth://totp/x?secret=ABC',
-				secretText: 'ABC'
+				secretText: 'ABC',
+				language
 			})
 	],
 	[
 		'consent',
 		'hydrated',
-		() =>
-			consentServer({
-				...emptyConsentView('uid-1'),
-				client: { name: 'Client</script>', tier: 'self-registered' }
-			})
+		(language) =>
+			consentServer(
+				{
+					...emptyConsentView('uid-1'),
+					client: { name: 'Client</script>', tier: 'self-registered' }
+				},
+				{ language }
+			)
 	],
 	[
 		'error',
 		'terminal',
-		() => getErrorHtmlResponse(400, 'invalid_request', 'nope')
+		(language) =>
+			getErrorHtmlResponse(400, 'invalid_request', 'nope', undefined, language)
 	],
 	[
 		'device code entry',
 		'terminal',
-		() =>
+		(language) =>
 			deviceInputPage({
 				action: `${ISSUER}/device`,
 				secret: 'xsrf',
-				charset: 'digits'
+				charset: 'digits',
+				language
 			})
 	],
 	[
 		'device confirmation',
 		'terminal',
-		() =>
+		(language) =>
 			deviceConfirmPage({
 				action: `${ISSUER}/device`,
 				secret: 'xsrf',
 				userCode: 'ABC-DEF',
-				client: { clientId: 'client' }
+				client: { clientId: 'client' },
+				language
 			})
 	],
-	['device success', 'terminal', () => deviceSuccessPage({ client: {} })],
+	[
+		'device success',
+		'terminal',
+		(language) => deviceSuccessPage({ client: {}, language })
+	],
 	[
 		'logout confirmation',
 		'terminal',
-		() => logout('xsrf', `${ISSUER}/logout/confirm`)
+		(language) =>
+			logout('xsrf', `${ISSUER}/logout/confirm`, undefined, language)
 	],
-	['logout success', 'terminal', () => logoutSuccess()],
+	['logout success', 'terminal', (language) => logoutSuccess(language)],
 	[
 		'auto-submit callback',
 		'terminal',
-		() =>
-			formPost({}, 'https://client.example.com/cb', {
-				code: 'abc',
-				state: 'xyz'
-			})
+		(language) =>
+			formPost(
+				undefined,
+				'https://client.example.com/cb',
+				{
+					code: 'abc',
+					state: 'xyz'
+				},
+				language
+			)
 	],
-	['email verified', 'plain', () => verifySuccessPage()],
-	['verification failed', 'plain', () => verifyFailurePage('expired')],
+	['email verified', 'plain', (language) => verifySuccessPage(language)],
+	[
+		'verification failed',
+		'plain',
+		(language) => verifyFailurePage('expired', language)
+	],
 	[
 		'verification code entry',
 		'plain',
-		() => codeEntryPage('ref-1', 'wrong code')
+		(language) => codeEntryPage('ref-1', 'wrong code', language)
 	],
-	['verification resent', 'plain', () => resendAcceptedPage()],
+	['verification resent', 'plain', (language) => resendAcceptedPage(language)],
 	[
 		'verification rate limited',
 		'plain',
-		() => verifyRateLimitedPage('slow down')
+		(language) => verifyRateLimitedPage('slow down', language)
 	],
-	['reset request', 'plain', () => resetRequestPage('uid-1', 'bad address')],
-	['reset requested', 'plain', () => resetRequestAcceptedPage()],
+	[
+		'reset request',
+		'plain',
+		(language) => resetRequestPage('uid-1', 'bad address', language)
+	],
+	[
+		'reset requested',
+		'plain',
+		(language) => resetRequestAcceptedPage(language)
+	],
 	[
 		'reset form',
 		'plain',
-		() =>
+		(language) =>
 			resetFormPage(
 				'token',
 				{ purpose: 'reset', bucketName: 'Acme' },
-				'too short'
+				'too short',
+				language
 			)
 	],
-	['reset done', 'plain', () => resetSuccessPage('reset')],
-	['reset failed', 'plain', () => resetFailurePage()],
-	['registration closed', 'plain', () => registrationClosedPage()],
-	['registration email failed', 'plain', () => registrationSendFailedPage()],
+	[
+		'invitation form',
+		'plain',
+		(language) =>
+			resetFormPage(
+				'token',
+				{ purpose: 'invite', bucketName: 'Acme' },
+				undefined,
+				language
+			)
+	],
+	['reset done', 'plain', (language) => resetSuccessPage('reset', language)],
+	[
+		'invitation done',
+		'plain',
+		(language) => resetSuccessPage('invite', language)
+	],
+	['reset failed', 'plain', (language) => resetFailurePage(language)],
+	[
+		'registration closed',
+		'plain',
+		(language) => registrationClosedPage(language)
+	],
+	[
+		'registration email failed',
+		'plain',
+		(language) => registrationSendFailedPage(language)
+	],
 	[
 		'connected applications',
 		'plain',
-		() => listPage(FRAME, [APPLICATION_ROW], 'Access removed.')
+		(language = 'en') =>
+			listPage(frame(language), [APPLICATION_ROW], 'Access removed.')
 	],
 	[
 		'connected application removal',
 		'plain',
-		() => removalConfirmationPage(FRAME, APPLICATION_ROW, 'xsrf')
+		(language = 'en') =>
+			removalConfirmationPage(frame(language), APPLICATION_ROW, 'xsrf')
 	],
 	[
 		'connected applications outcome',
 		'plain',
-		() => outcomePage('Sign-in expired', 'Try again.', '/account/apps', 400)
+		(language = 'en') => outcomePage('expired', '/account/apps', 400, language)
 	],
 	[
 		'untrusted redirect',
 		'plain',
-		() =>
+		(language) =>
 			untrustedRedirectPage({
 				answer: {
 					method: 'GET',
 					url: 'https://elsewhere.example/cb?error=access_denied'
 				},
 				error: 'access_denied',
-				redirectUri: 'https://elsewhere.example/cb'
+				redirectUri: 'https://elsewhere.example/cb',
+				language
 			})
 	],
-	['federation refused', 'plain', () => federationRejectedPage('uid-1')],
-	['password sign-in closed', 'plain', () => passwordLoginClosedPage('uid-1')]
+	[
+		'federation refused',
+		'plain',
+		(language) => federationRejectedPage('uid-1', language)
+	],
+	[
+		'federation expired',
+		'plain',
+		(language) => federationExpiredPage(language)
+	],
+	[
+		'federation upstream',
+		'plain',
+		(language) => federationUpstreamPage(language)
+	],
+	[
+		'federation no email',
+		'plain',
+		(language) => federationNoEmailPage(language)
+	],
+	[
+		'federation inactive',
+		'plain',
+		(language) => federationInactivePage(language)
+	],
+	[
+		'password sign-in closed',
+		'plain',
+		(language) => passwordLoginClosedPage('uid-1', language)
+	]
 ];
 
 export const ADMIN_SHELL = (): Promise<Response> | Response =>

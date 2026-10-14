@@ -223,7 +223,7 @@ describe('error store capture', () => {
 		const html = await response.text();
 
 		expect(response.status).toBe(500);
-		expect(html).toContain('reference: err_');
+		expect(html).toContain('reference: <bdi>err_');
 		expect(html).not.toContain('html fault');
 	});
 });

@@ -28,6 +28,8 @@ import {
 	revokeAccountAccess
 } from './revoke_access.js';
 import { grantsIn, sessionsIn } from './sessions.js';
+import { lookup, type Language } from '../i18n/languages.js';
+import { storedLocaleRanges } from '../i18n/resolve.js';
 
 /*
  * Every change to an end user, whichever surface it arrives through — the admin API (and MCP, which
@@ -534,4 +536,27 @@ export async function endApplicationAccess(
 	}
 
 	await endGrants(grantIds);
+}
+
+/*
+ * The person's own choice of language, saved when they finish a sign-in after using the language switch
+ * (specs/097), so the next email and the next sign-in come in it. The browser's language is never saved — only
+ * this explicit choice is.
+ *
+ * Not an administrative change, so no audit record: nobody's access changes, and the trail is for what
+ * administrators do. A directory-provisioned person is left alone, because the directory owns `locale` and its
+ * next sync would put its own value back. A stored `ru-RU` that already means Russian is kept as it is.
+ */
+export async function recordOwnLanguage(
+	bucketId: string,
+	accountId: string,
+	language: Language
+): Promise<void> {
+	const store = getUserStore(bucketId);
+	const user = await store.find(accountId);
+	if (!user || user.provisionedBy) return;
+	if (lookup(storedLocaleRanges(user)) === language) return;
+	await store.update(accountId, {
+		profile: { ...user.profile, locale: language }
+	});
 }

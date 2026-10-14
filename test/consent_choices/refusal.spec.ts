@@ -8,7 +8,9 @@ import {
 } from 'lib/adapters/index.ts';
 import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { ROOT_NAMESPACE } from 'lib/resources/namespace.js';
-import { CONSENT_TEXTS as T } from 'lib/interactions/consentTexts.js';
+import { CONSENT_TEXTS } from 'lib/i18n/texts/consent/index.ts';
+
+const T = CONSENT_TEXTS.en;
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { openConsent, decide, withCookies } from '../consent_page/flow.ts';
 import { MCP } from './consent_choices.config.ts';

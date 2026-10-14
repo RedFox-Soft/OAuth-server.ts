@@ -3,8 +3,13 @@ import { beforeAll, describe, expect, it } from 'bun:test';
 import bootstrap, { changeClient } from '../test_helper.js';
 import { adapter } from 'lib/adapters/index.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { ACCOUNT_PAGE_TEXTS as T } from 'lib/account_page/texts.ts';
-import { CONSENT_TEXTS } from 'lib/interactions/consentTexts.ts';
+import { ACCOUNT_TEXTS } from 'lib/i18n/texts/account/index.ts';
+import { text as fill } from 'lib/i18n/message.tsx';
+
+const T = ACCOUNT_TEXTS.en;
+import { CONSENT_TEXTS as CONSENT_CATALOGUE } from 'lib/i18n/texts/consent/index.ts';
+
+const CONSENT_TEXTS = CONSENT_CATALOGUE.en;
 import { OFFLINE_KEY } from 'lib/interactions/consentChoices.ts';
 import { writeLogo } from 'lib/models/client/logo.ts';
 import { PNG } from '../consent_branding/consent_branding.config.ts';
@@ -65,9 +70,9 @@ describe('the list of connected applications', () => {
 		const own = textOf(sectionOf(html, 'Timesheets'));
 		expect(own).toContain(T.canSee);
 		expect(own).toContain(capitalised(CONSENT_TEXTS.categories.email));
-		expect(own).toContain(T.given);
-		expect(own).toContain(T.lastToken);
-		expect(own).toContain(T.hosts(['time.acme.test'], 0));
+		expect(own).toContain(fill(T.given, { date: '' }).trim());
+		expect(own).toContain(fill(T.lastToken, { date: '' }).trim());
+		expect(own).toContain(fill(T.signsInAt, { hosts: 'time.acme.test' }));
 		expect(textOf(html)).toContain('Mail Sync');
 	});
 
@@ -89,7 +94,7 @@ describe('the list of connected applications', () => {
 		const html = await listHtml(browser);
 
 		expect(textOf(sectionOf(html, 'Intranet'))).toContain(
-			T.trusted(new URL(browser.origin).host)
+			fill(T.trusted, { service: new URL(browser.origin).host })
 		);
 	});
 
@@ -126,7 +131,7 @@ describe('the list of connected applications', () => {
 
 		const section = textOf(sectionOf(html, 'Google'));
 		expect(section).not.toContain('✅');
-		expect(section).toContain(T.hosts(['evil.example.net'], 0));
+		expect(section).toContain(fill(T.signsInAt, { hosts: 'evil.example.net' }));
 	});
 
 	it('shows the logo of the organization’s own application, named for a screen reader', async () => {

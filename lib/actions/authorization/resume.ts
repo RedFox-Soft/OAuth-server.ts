@@ -5,6 +5,7 @@ import nanoid from '../../helpers/nanoid.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { issuerFor } from 'lib/configs/issuer.js';
 import { logout } from 'lib/html/logout.js';
+import { recordOwnLanguage } from 'lib/end_users/service.js';
 import { SessionNotFound } from '../../helpers/errors.js';
 import { resolveBucketForRequest } from '../../admin/auth/resolveBucket.js';
 import {
@@ -100,7 +101,8 @@ export default async function resumeAction(
 		return logout(
 			secret,
 			routeNames.end_session_confirm,
-			storedParams.redirect_uri
+			storedParams.redirect_uri,
+			interaction.payload.language
 		);
 	}
 
@@ -132,6 +134,11 @@ export default async function resumeAction(
 		/* Written here, the one place every sign-in passes, so a federated one cannot skip it (specs/073). */
 		if (upstream) {
 			await rememberUpstreamSession(bucketId, upstream, accountId);
+		}
+		// The same place for the language the person chose with the switch, and only then (specs/097).
+		const { language, languageChosen } = interaction.payload;
+		if (languageChosen && language) {
+			await recordOwnLanguage(bucketId, accountId, language);
 		}
 	}
 

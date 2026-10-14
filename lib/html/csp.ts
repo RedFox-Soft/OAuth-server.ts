@@ -1,6 +1,7 @@
 import * as crypto from 'node:crypto';
 
 import { ISSUER } from 'lib/configs/env.js';
+import type { Language } from 'lib/i18n/languages.js';
 
 /*
  * The only place this server builds an HTML response, and the only place that knows what a content
@@ -354,6 +355,11 @@ export function htmlResponse(
 		handOffTo?: string;
 		/* Deny framing even though a form posts off-origin — see pagePolicy. Can only strengthen. */
 		denyFraming?: boolean;
+		/*
+		 * The page's language (specs/097). Stated in `Content-Language` (RFC 9110 §8.5), and `Vary` names what
+		 * chose it, so a cache that ignores `no-store` still cannot hand a Russian page to an English browser.
+		 */
+		language?: Language;
 	} = {}
 ): Response {
 	const { policy, deniesFraming } = pagePolicy(
@@ -366,6 +372,12 @@ export function htmlResponse(
 		status: init.status,
 		headers: {
 			...init.headers,
+			...(init.language
+				? {
+						'Content-Language': init.language,
+						Vary: 'Accept-Language, Cookie'
+					}
+				: {}),
 			'Content-Type': 'text/html; charset=utf-8',
 			'Content-Security-Policy': policy,
 			...(deniesFraming ? { 'X-Frame-Options': 'DENY' } : {})

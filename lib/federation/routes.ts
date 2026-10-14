@@ -27,6 +27,9 @@ import { findEnabledProvider } from './providers.js';
 import { resolveFederatedAccount } from './resolve.js';
 import { consumePending, openHandoff } from './state.js';
 import { completeTry } from './try.js';
+import type { Language } from '../i18n/languages.js';
+import { languageOfRequest } from '../i18n/request.js';
+import { Interaction } from '../models/interaction.js';
 
 /*
  * The return leg from an upstream provider.
@@ -67,9 +70,11 @@ const ReturnParams = t.Object(
 type ReturnParams = typeof ReturnParams.static;
 
 export const federationRoutes = new Elysia({ name: 'federation-callback' })
-	.get('/federation/callback', ({ query }) => completeReturn(query), {
-		query: ReturnParams
-	})
+	.get(
+		'/federation/callback',
+		({ query, request }) => completeReturn(query, request),
+		{ query: ReturnParams }
+	)
 	/*
 	 * The same path, a second method, one handler.
 	 *
@@ -82,11 +87,25 @@ export const federationRoutes = new Elysia({ name: 'federation-callback' })
 	 * the method, so a POST is cookieless on exactly the same grounds. A second path would mean a second
 	 * address for every administrator to register and a second place for these rules to drift apart.
 	 */
-	.post('/federation/callback', ({ body }) => completeReturn(body), {
-		body: ReturnParams
-	});
+	.post(
+		'/federation/callback',
+		({ body, request }) => completeReturn(body, request),
+		{ body: ReturnParams }
+	);
 
-async function completeReturn(params: ReturnParams) {
+/*
+ * The language of a page this leg shows (specs/097): the one the sign-in it belongs to decided, read from the
+ * interaction the pending state names; the request's own when there is none to read.
+ */
+async function returnLanguage(
+	uid: string | undefined,
+	request: Request
+): Promise<Language> {
+	const interaction = uid ? await Interaction.tryFind(uid) : undefined;
+	return interaction?.payload.language ?? languageOfRequest(request).language;
+}
+
+async function completeReturn(params: ReturnParams, request: Request) {
 	/*
 	 * The state is spent first, whatever happens next — including when the provider reports an error.
 	 * A round trip is one attempt, and an attempt that came back at all is over.
@@ -101,7 +120,7 @@ async function completeReturn(params: ReturnParams) {
 		) {
 			// Unknown, expired, already spent, or the wrong stage. One answer for all four: telling them
 			// apart would tell the holder of one dead value something about another.
-			return federationExpiredPage();
+			return federationExpiredPage(languageOfRequest(request).language);
 		}
 
 		/*
@@ -114,7 +133,8 @@ async function completeReturn(params: ReturnParams) {
 		}
 
 		const uid = pending.interactionUid;
-		if (!uid) return federationExpiredPage();
+		const language = await returnLanguage(uid, request);
+		if (!uid) return federationExpiredPage(language);
 
 		/*
 		 * The user declined, or the provider refused. This is the one federation failure that returns to a
@@ -132,7 +152,7 @@ async function completeReturn(params: ReturnParams) {
 		}
 
 		if (!params.code) {
-			return federationRejectedPage(uid);
+			return federationRejectedPage(uid, language);
 		}
 
 		/*
@@ -145,7 +165,7 @@ async function completeReturn(params: ReturnParams) {
 		const bucket = found && !isScheduledForDeletion(found) ? found : null;
 		const provider = findEnabledProvider(bucket, pending.providerId);
 		if (!bucket || !provider) {
-			return federationInactivePage();
+			return federationInactivePage(language);
 		}
 
 		let identity;
@@ -174,13 +194,13 @@ async function completeReturn(params: ReturnParams) {
 						providerId: provider.id,
 						reason: err.reason
 					});
-					return federationUpstreamPage();
+					return federationUpstreamPage(language);
 				}
 				eventBus.emit('federation.idtoken.error', {
 					providerId: provider.id,
 					reason: err.reason
 				});
-				return federationRejectedPage(uid);
+				return federationRejectedPage(uid, language);
 			}
 			throw err;
 		}
@@ -219,11 +239,11 @@ async function completeReturn(params: ReturnParams) {
 		if (!resolution.ok) {
 			switch (resolution.reason) {
 				case 'no_email':
-					return federationNoEmailPage();
+					return federationNoEmailPage(language);
 				case 'domain_not_allowed':
-					return federationDomainRefusedPage();
+					return federationDomainRefusedPage(language);
 				case 'link_not_permitted':
-					return federationLinkRefusedPage(uid);
+					return federationLinkRefusedPage(uid, language);
 				/*
 				 * The two refusals of a provider bound to a SCIM connection render the provisioning-closed page:
 				 * to the person signing in, both mean "your organisation has not given you access here yet",
@@ -234,9 +254,9 @@ async function completeReturn(params: ReturnParams) {
 				case 'link_conflict':
 					return bucket._id === ADMIN_BUCKET_ID
 						? federationNoConsoleAccountPage()
-						: federationProvisioningClosedPage();
+						: federationProvisioningClosedPage(language);
 				case 'inactive':
-					return federationInactivePage();
+					return federationInactivePage(language);
 			}
 		}
 

@@ -360,7 +360,7 @@ describe('content security policy: every rendered page', () => {
 
 	it('lets the auto-submit callback post to the client, and no one else post off-origin', async () => {
 		const callback = directives(
-			formPost({}, 'https://client.example.com/cb', { code: 'abc' })
+			formPost(undefined, 'https://client.example.com/cb', { code: 'abc' })
 		);
 		expect(callback.get('form-action')).toBe('https://client.example.com');
 

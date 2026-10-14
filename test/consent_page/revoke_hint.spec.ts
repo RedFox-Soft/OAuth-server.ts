@@ -7,7 +7,10 @@ import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { getBucketStore, getProjectStore } from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { forgetBucketAddresses } from 'lib/admin/auth/bucketAddress.ts';
-import { CONSENT_TEXTS as T } from 'lib/interactions/consentTexts.js';
+import { CONSENT_TEXTS } from 'lib/i18n/texts/consent/index.ts';
+import { text as fill } from 'lib/i18n/message.tsx';
+
+const T = CONSENT_TEXTS.en;
 import type { ConsentView } from 'lib/interactions/consentView.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { openConsent, withCookies } from './flow.ts';
@@ -84,7 +87,9 @@ describe('the consent page’s line about removing access later', () => {
 		);
 
 		expect(page.view.revokeHint).toEqual({ href: `${ISSUER}/account/apps` });
-		expect(page.text).toContain(`${T.revokeHint.before}${T.revokeHint.link}`);
+		expect(page.text).toContain(
+			fill(T.revokeHint.sentence, { link: T.revokeHint.link })
+		);
 		const anchor = /<a[^>]*href="http:\/\/e\.ly\/account\/apps"[^>]*>/.exec(
 			page.html
 		)?.[0];

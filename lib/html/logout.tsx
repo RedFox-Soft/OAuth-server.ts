@@ -1,16 +1,24 @@
 import { Button, Form } from 'antd';
 import { Card, Flex } from 'antd';
 import { htmlResponse } from './csp.js';
+import { esc } from './escape.js';
 import { versionedAsset } from './versionedAsset.js';
 import { foxVar } from './theme/palette.js';
 import { renderEndUserTree } from './theme/dark.js';
+import type { Language } from '../i18n/languages.js';
+import { PAGES_TEXTS } from '../i18n/texts/pages/index.js';
 
 /*
  * The confirmation address is handed in rather than read from `routeNames`: a root-relative
  * `/logout/confirm` sends a path-addressed bucket's confirmation to the default bucket, whose session
  * cookie holds none of this sign-out's state.
  */
-function renderLogoutForm(secret: string, confirmAction: string) {
+function renderLogoutForm(
+	secret: string,
+	confirmAction: string,
+	language: Language
+) {
+	const t = PAGES_TEXTS[language].logout;
 	return (
 		<>
 			<Flex
@@ -36,12 +44,12 @@ function renderLogoutForm(secret: string, confirmAction: string) {
 					<div style={{ textAlign: 'center', marginBottom: 24 }}>
 						<img
 							src={versionedAsset('logo.svg')}
-							alt="Logo"
+							alt={t.logoAlt}
 							style={{ width: 120 }}
 						/>
 					</div>
 					<div style={{ textAlign: 'center', marginBottom: 24, fontSize: 16 }}>
-						<p>Do you want to sign-out?</p>
+						<p>{t.question}</p>
 					</div>
 					<Form
 						action={confirmAction}
@@ -63,7 +71,7 @@ function renderLogoutForm(secret: string, confirmAction: string) {
 									htmlType="button"
 									className="logout logout-cancel"
 								>
-									No, stay signed in
+									{t.stay}
 								</Button>
 								<Button
 									block
@@ -74,7 +82,7 @@ function renderLogoutForm(secret: string, confirmAction: string) {
 									className="logout logout-submit"
 									autoFocus
 								>
-									Yes, sign me out
+									{t.signOut}
 								</Button>
 							</Flex>
 						</Form.Item>
@@ -94,18 +102,22 @@ function renderLogoutForm(secret: string, confirmAction: string) {
 export function logout(
 	secret: string,
 	confirmAction: string,
-	postLogoutRedirectUri?: string
+	postLogoutRedirectUri?: string,
+	language: Language = 'en'
 ) {
 	// Rendered before extracting, and not re-wrapped — for the reasons given at `logoutSuccess`.
-	const page = renderEndUserTree(renderLogoutForm(secret, confirmAction));
+	const page = renderEndUserTree(
+		renderLogoutForm(secret, confirmAction, language),
+		{ language }
+	);
 
 	const html = `<!DOCTYPE html>
-<html><head>
+<html lang="${language}"><head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Logging Out</title>
+  <title>${esc(PAGES_TEXTS[language].logout.title)}</title>
   ${page.head}
 </head><body>${page.html}</body></html>`;
 
-	return htmlResponse(html, { handOffTo: postLogoutRedirectUri });
+	return htmlResponse(html, { handOffTo: postLogoutRedirectUri, language });
 }

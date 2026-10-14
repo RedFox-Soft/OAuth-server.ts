@@ -1,5 +1,13 @@
 import { Elysia, t } from 'elysia';
-import { verifyLink, verifyCode, resend } from '../verification/challenge.js';
+import {
+	challengeLanguage,
+	verifyLink,
+	verifyCode,
+	resend
+} from '../verification/challenge.js';
+import type { Language } from '../i18n/languages.js';
+import { languageOfRequest } from '../i18n/request.js';
+import { singleRange } from '../i18n/resolve.js';
 import {
 	verifySuccessPage,
 	verifyFailurePage,
@@ -7,9 +15,16 @@ import {
 	resendAcceptedPage,
 	verifyRateLimitedPage
 } from '../interactions/verifyPages.js';
+import { PLAIN_TEXTS } from '../i18n/texts/plain/index.js';
 
-const INVALID_LINK =
-	'This verification link is invalid or has expired. Request a new verification email below.';
+/*
+ * These pages are opened from an email, often in another browser, so they speak the language the email was
+ * written in unless the reader chose one here (specs/097). Read before the challenge is spent.
+ */
+async function pageLanguage(request: Request, id: string): Promise<Language> {
+	return languageOfRequest(request, [singleRange(await challengeLanguage(id))])
+		.language;
+}
 
 // Public, standalone verification endpoints. Deliberately NOT under the `ui/:uid/*`
 // interaction-cookie guard: a verification link/code is used from an email, often in a
@@ -17,44 +32,55 @@ const INVALID_LINK =
 export const verificationRoutes = new Elysia({ name: 'verification' })
 	.get(
 		'/verify-email',
-		async ({ query }) => {
+		async ({ query, request }) => {
+			const language = await pageLanguage(request, query.token);
 			const result = await verifyLink(query.token);
-			return result.ok ? verifySuccessPage() : verifyFailurePage(INVALID_LINK);
+			return result.ok
+				? verifySuccessPage(language)
+				: verifyFailurePage(
+						PLAIN_TEXTS[language].verify.messages.invalidLink,
+						language
+					);
 		},
 		{ query: t.Object({ token: t.String() }) }
 	)
-	.get('/verify-email/code', ({ query }) => codeEntryPage(query.ref), {
-		query: t.Object({ ref: t.String() })
-	})
+	.get(
+		'/verify-email/code',
+		async ({ query, request }) =>
+			codeEntryPage(
+				query.ref,
+				undefined,
+				await pageLanguage(request, query.ref)
+			),
+		{ query: t.Object({ ref: t.String() }) }
+	)
 	.post(
 		'/verify-email/code',
-		async ({ body }) => {
+		async ({ body, request }) => {
+			const language = await pageLanguage(request, body.ref);
+			const messages = PLAIN_TEXTS[language].verify.messages;
 			const result = await verifyCode(body.ref, body.code);
-			if (result.ok) return verifySuccessPage();
+			if (result.ok) return verifySuccessPage(language);
 			if (result.reason === 'too_many') {
-				return codeEntryPage(
-					body.ref,
-					'Too many incorrect attempts. Request a new code below.'
-				);
+				return codeEntryPage(body.ref, messages.tooManyAttempts, language);
 			}
 			if (result.reason === 'invalid') {
-				return verifyFailurePage(
-					'This verification request is invalid or has expired. Request a new code below.'
-				);
+				return verifyFailurePage(messages.invalidRequest, language);
 			}
-			return codeEntryPage(body.ref, 'Incorrect code. Please try again.');
+			return codeEntryPage(body.ref, messages.incorrectCode, language);
 		},
 		{ body: t.Object({ ref: t.String(), code: t.String() }) }
 	)
 	.post(
 		'/verify-email/resend',
-		async ({ body, set }) => {
+		async ({ body, set, request }) => {
+			const language = await pageLanguage(request, body.ref);
+			const messages = PLAIN_TEXTS[language].verify.messages;
 			const result = await resend(body.ref);
 			if (!result.ok) {
 				return verifyRateLimitedPage(
-					result.reason === 'cooldown'
-						? 'Please wait a moment before requesting another verification email.'
-						: 'You have requested too many verification emails today. Please try again later.'
+					result.reason === 'cooldown' ? messages.cooldown : messages.dailyCap,
+					language
 				);
 			}
 			if (result.sent && result.method === 'code' && result.newRef) {
@@ -64,7 +90,7 @@ export const verificationRoutes = new Elysia({ name: 'verification' })
 				set.status = 303;
 				return;
 			}
-			return resendAcceptedPage();
+			return resendAcceptedPage(language);
 		},
 		{ body: t.Object({ ref: t.String() }) }
 	);

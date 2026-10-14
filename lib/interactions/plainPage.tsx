@@ -13,6 +13,7 @@ import { htmlResponse } from '../html/csp.js';
 import { esc } from '../html/escape.js';
 import { foxVar } from '../html/theme/palette.js';
 import { themeHead } from '../html/theme/head.js';
+import type { Language } from '../i18n/languages.js';
 
 // A page reporting a refusal passes its own status: a rendered error that answers 200 tells a non-browser
 // client the opposite of what it says to a reader.
@@ -24,7 +25,11 @@ export function page(
 	title: string,
 	bodyHtml: string,
 	status = 200,
-	{ denyFraming, wide }: { denyFraming?: boolean; wide?: boolean } = {}
+	{
+		denyFraming,
+		wide,
+		language = 'en'
+	}: { denyFraming?: boolean; wide?: boolean; language?: Language } = {}
 ): Response {
 	const layout = wide
 		? 'align-items:flex-start; justify-content:center; padding:32px 16px;'
@@ -32,6 +37,6 @@ export function page(
 	const card = wide
 		? 'max-width:640px; text-align:left;'
 		: 'max-width:400px; text-align:center;';
-	const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>${esc(title)}</title>${themeHead()}</head><body style="font-family: Arial, Helvetica, sans-serif; background:${foxVar('page')}; margin:0; min-height:100vh; box-sizing:border-box; display:flex; ${layout}"><div style="background:${foxVar('card')}; padding:32px; border-radius:12px; box-shadow:0 2px 8px ${foxVar('shadow')}; width:100%; box-sizing:border-box; ${card}">${bodyHtml}</div></body></html>`;
-	return htmlResponse(html, { status, denyFraming });
+	const html = `<!doctype html><html lang="${language}"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>${esc(title)}</title>${themeHead()}</head><body style="font-family: Arial, Helvetica, sans-serif; background:${foxVar('page')}; margin:0; min-height:100vh; box-sizing:border-box; display:flex; ${layout}"><div style="background:${foxVar('card')}; padding:32px; border-radius:12px; box-shadow:0 2px 8px ${foxVar('shadow')}; width:100%; box-sizing:border-box; ${card}">${bodyHtml}</div></body></html>`;
+	return htmlResponse(html, { status, denyFraming, language });
 }

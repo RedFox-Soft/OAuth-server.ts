@@ -40,6 +40,7 @@ const DEFAULT_MEMBERS = [
 	'token_endpoint',
 	'token_endpoint_auth_methods_supported',
 	'token_endpoint_auth_signing_alg_values_supported',
+	'ui_locales_supported',
 	'userinfo_endpoint'
 ] as const;
 

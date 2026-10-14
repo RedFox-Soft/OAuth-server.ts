@@ -76,7 +76,8 @@ describe('marks and logos on a dark page', () => {
 				logoSrc: '/public/logo.svg',
 				path: '/account/apps',
 				signOutHref: '/session/end',
-				email: 'person@example.com'
+				email: 'person@example.com',
+				language: 'en'
 			},
 			[{ ...APPLICATION_ROW, logo: LOGO }]
 		).text();

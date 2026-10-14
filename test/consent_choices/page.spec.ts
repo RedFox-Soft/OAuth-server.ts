@@ -8,7 +8,10 @@ import {
 } from 'lib/adapters/index.ts';
 import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { ROOT_NAMESPACE } from 'lib/resources/namespace.js';
-import { CONSENT_TEXTS as T } from 'lib/interactions/consentTexts.js';
+import { CONSENT_TEXTS } from 'lib/i18n/texts/consent/index.ts';
+import { text as fill } from 'lib/i18n/message.tsx';
+
+const T = CONSENT_TEXTS.en;
 import { openConsent, decide, withCookies } from '../consent_page/flow.ts';
 import { MCP, PAYMENT } from './consent_choices.config.ts';
 import { checkboxes } from './rows.ts';
@@ -121,8 +124,8 @@ describe('the consent page with choices', () => {
 		const until = page.view.keepsAccessUntil ?? '';
 		expect(until).not.toBe('');
 		expect(page.text).toContain(T.choices.offline);
-		expect(page.text).toContain(T.choices.offlineUntil(until));
-		expect(page.text).not.toContain(T.lifetime(until));
+		expect(page.text).toContain(fill(T.choices.offlineUntil, { date: until }));
+		expect(page.text).not.toContain(fill(T.lifetime, { date: until }));
 	});
 	it('sums up only what is certain and says the rest depends on the selection on an escalation with choices', async () => {
 		const signedIn = await setup.login({ scope: 'openid email' });
@@ -141,7 +144,9 @@ describe('the consent page with choices', () => {
 			page.text.indexOf(T.buttons.deny)
 		);
 		expect(summary).toContain(T.categories.email);
-		expect(summary).toContain(T.choices.afterApprovalRest);
+		expect(summary).toContain(
+			fill(T.repeat.afterApprovalItemsAndChoice, { items: '' })
+		);
 		expect(summary).not.toContain('create and update issues');
 		expect(summary).not.toContain('billing');
 	});
@@ -164,7 +169,9 @@ describe('the consent page with choices', () => {
 		);
 
 		const already = page.text.slice(
-			page.text.indexOf(T.repeat.alreadyAllowed),
+			page.text.indexOf(
+				fill(T.repeat.alreadyAllowed, { items: '' }).slice(0, -2)
+			),
 			page.text.indexOf(T.repeat.alsoAsks)
 		);
 		expect(already).toContain('billing');

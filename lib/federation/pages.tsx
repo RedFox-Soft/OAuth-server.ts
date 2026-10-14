@@ -13,23 +13,29 @@
 import { page } from '../interactions/plainPage.js';
 import { esc } from '../html/escape.js';
 import { foxVar } from '../html/theme/palette.js';
+import type { Language } from '../i18n/languages.js';
+import { html, text } from '../i18n/message.js';
+import { PLAIN_TEXTS } from '../i18n/texts/plain/index.js';
 
 const heading = `color:${foxVar('text')};`;
 const body = `color:${foxVar('text-secondary')};`;
 
+// Every text here is a catalogue template without slots; the console-only pages pass English literals.
 function terminal(
 	title: string,
 	message: string,
 	status: number,
-	link?: { href: string; label: string }
+	link?: { href: string; label: string },
+	language: Language = 'en'
 ): Response {
 	const back = link
-		? `<p style="margin-top:12px;"><a href="${esc(link.href)}" style="color:${foxVar('link')};">${esc(link.label)}</a></p>`
+		? `<p style="margin-top:12px;"><a href="${esc(link.href)}" style="color:${foxVar('link')};">${html(link.label)}</a></p>`
 		: '';
 	return page(
-		title,
-		`<h2 style="${heading}">${esc(title)}</h2><p style="${body}">${esc(message)}</p>${back}`,
-		status
+		text(title),
+		`<h2 style="${heading}">${html(title)}</h2><p style="${body}">${html(message)}</p>${back}`,
+		status,
+		{ language }
 	);
 }
 
@@ -40,67 +46,67 @@ function terminal(
  * reason goes to the event bus instead. These two are separate pages only because their statuses differ in
  * what they tell a non-browser client, not because they say different things to a person.
  */
-export function federationRejectedPage(uid?: string): Response {
+export function federationRejectedPage(
+	uid?: string,
+	language: Language = 'en'
+): Response {
+	const f = PLAIN_TEXTS[language].federation;
+	const t = f.rejected;
 	return terminal(
-		'Sign-in could not be completed',
-		'We could not verify the response from your identity provider. Please start again.',
+		t.title,
+		t.body,
 		400,
-		uid ? { href: `/ui/${uid}/login`, label: 'Back to sign in' } : undefined
+		uid ? { href: `/ui/${uid}/login`, label: f.backToSignIn } : undefined,
+		language
 	);
 }
 
-export function federationExpiredPage(): Response {
-	return terminal(
-		'This sign-in is no longer valid',
-		'The sign-in took too long, or this link has already been used. Please start again from the application.',
-		400
-	);
+export function federationExpiredPage(language: Language = 'en'): Response {
+	const t = PLAIN_TEXTS[language].federation.expired;
+	return terminal(t.title, t.body, 400, undefined, language);
 }
 
 /* The other side is broken, and saying so distinguishes it from "you are not allowed". */
-export function federationUpstreamPage(): Response {
-	return terminal(
-		'Your identity provider could not be reached',
-		'We could not complete the exchange with your identity provider. This is usually temporary — please try again shortly.',
-		502
-	);
+export function federationUpstreamPage(language: Language = 'en'): Response {
+	const t = PLAIN_TEXTS[language].federation.upstream;
+	return terminal(t.title, t.body, 502, undefined, language);
 }
 
-export function federationNoEmailPage(): Response {
-	return terminal(
-		'Your identity provider sent no email address',
-		'We need an email address to sign you in, and your identity provider did not supply one. Ask your administrator to release your address to this application.',
-		400
-	);
+export function federationNoEmailPage(language: Language = 'en'): Response {
+	const t = PLAIN_TEXTS[language].federation.noEmail;
+	return terminal(t.title, t.body, 400, undefined, language);
 }
 
-export function federationDomainRefusedPage(): Response {
-	return terminal(
-		'This account cannot use this application',
-		'Your email address is not in a domain this application accepts.',
-		403
-	);
+export function federationDomainRefusedPage(
+	language: Language = 'en'
+): Response {
+	const t = PLAIN_TEXTS[language].federation.domainRefused;
+	return terminal(t.title, t.body, 403, undefined, language);
 }
 
 /*
  * The one refusal with a usable next step, and the reason it exists: an untrusted or unverified assertion
  * must not silently take over an account that already holds the address.
  */
-export function federationLinkRefusedPage(uid: string): Response {
+export function federationLinkRefusedPage(
+	uid: string,
+	language: Language = 'en'
+): Response {
+	const t = PLAIN_TEXTS[language].federation.linkRefused;
 	return terminal(
-		'An account already exists for this address',
-		'An account with this email address already exists here. Sign in with your password instead.',
+		t.title,
+		t.body,
 		403,
-		{ href: `/ui/${uid}/login`, label: 'Sign in with your password' }
+		{ href: `/ui/${uid}/login`, label: t.link },
+		language
 	);
 }
 
-export function federationProvisioningClosedPage(): Response {
-	return terminal(
-		'No account here yet',
-		'This application does not create accounts automatically. Ask your administrator to create one for you first.',
-		403
-	);
+export function federationProvisioningClosedPage(
+	language: Language = 'en'
+): Response {
+	const t = PLAIN_TEXTS[language].federation.provisioningClosed;
+	return terminal(t.title, t.body, 403, undefined, language);
 }
 
 /* The console's own bucket: nobody here creates the account for you, an administrator invites you. */
@@ -112,12 +118,9 @@ export function federationNoConsoleAccountPage(): Response {
 	);
 }
 
-export function federationInactivePage(): Response {
-	return terminal(
-		'This account is not active',
-		'Your account has been deactivated. Please contact your administrator.',
-		403
-	);
+export function federationInactivePage(language: Language = 'en'): Response {
+	const t = PLAIN_TEXTS[language].federation.inactive;
+	return terminal(t.title, t.body, 403, undefined, language);
 }
 
 /*
@@ -144,11 +147,17 @@ export function tryExpiredPage(): Response {
 }
 
 /* `passwordLogin: false` — the password-only doors of a federated-only bucket. */
-export function passwordLoginClosedPage(uid?: string): Response {
+export function passwordLoginClosedPage(
+	uid?: string,
+	language: Language = 'en'
+): Response {
+	const f = PLAIN_TEXTS[language].federation;
+	const t = f.passwordLoginClosed;
 	return terminal(
-		'Password sign-in is not available',
-		'This application signs you in through your identity provider. There is no password to enter, reset, or register here.',
+		t.title,
+		t.body,
 		403,
-		uid ? { href: `/ui/${uid}/login`, label: 'Back to sign in' } : undefined
+		uid ? { href: `/ui/${uid}/login`, label: f.backToSignIn } : undefined,
+		language
 	);
 }

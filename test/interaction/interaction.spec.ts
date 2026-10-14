@@ -1,4 +1,6 @@
-import { CONSENT_TEXTS } from 'lib/interactions/consentTexts.js';
+import { CONSENT_TEXTS as CONSENT_CATALOGUE } from 'lib/i18n/texts/consent/index.ts';
+
+const CONSENT_TEXTS = CONSENT_CATALOGUE.en;
 import { shownAccount } from '../consent_form.js';
 import {
 	describe,

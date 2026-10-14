@@ -28,7 +28,10 @@ export function describeFormPost(
 	return { method: 'POST', action: redirectUri, fields: payload };
 }
 
-export function send(oidc: unknown, answer: AnswerDescription): Response {
+export function send(
+	oidc: Parameters<typeof formPost>[0],
+	answer: AnswerDescription
+): Response {
 	if (answer.method === 'GET') {
 		return Response.redirect(answer.url, 303);
 	}

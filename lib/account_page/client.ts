@@ -5,7 +5,7 @@ import { ACCOUNT_PAGE_CLIENT_PREFIX } from '../consts/account_page.js';
 import { routeNames } from '../consts/param_list.js';
 import { ISSUER } from '../configs/env.js';
 import { addressOf, issuerFor, type RequestBucket } from '../configs/issuer.js';
-import { ACCOUNT_PAGE_TEXTS } from './texts.js';
+import { ACCOUNT_TEXTS } from '../i18n/texts/account/index.js';
 
 /*
  * The client each end-user bucket's connected-applications page signs people in through (specs/095 R3).
@@ -70,7 +70,7 @@ export async function accountPageClientRecord(
 			`${accountPageBase(bucket)}${routeNames.account_apps_callback}`
 		],
 		token_endpoint_auth_method: 'none',
-		client_name: ACCOUNT_PAGE_TEXTS.clientName,
+		client_name: ACCOUNT_TEXTS.en.clientName,
 		'consent.require': false,
 		accountPageBucketId: bucket._id
 	};

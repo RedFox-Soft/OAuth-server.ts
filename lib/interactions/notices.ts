@@ -1,3 +1,6 @@
+import type { Language } from '../i18n/languages.js';
+import { SIGN_IN_TEXTS, type SignInTexts } from '../i18n/texts/signIn/index.js';
+
 /*
  * The login page's informational messages. A request selects one by identifier; it never supplies the
  * text. That direction is the whole point: a login page that renders a string taken from its own query
@@ -39,26 +42,25 @@ export const NOTICE_VERIFY_RESENT = 'verify_resent';
 export const NOTICE_VERIFY_RECENT = 'verify_recent';
 export const NOTICE_VERIFY_UNSENT = 'verify_unsent';
 
-const NOTICES: Record<string, string> = {
-	[NOTICE_VERIFY]:
-		'Check your inbox — we have emailed you a link to verify your address. You will be able to sign in once you have opened it.',
-	[NOTICE_FEDERATION_ABORTED]:
-		'Sign-in with your identity provider was not completed. You can try again, or sign in with your password.',
-	[NOTICE_VERIFY_RESENT]:
-		'We sent you a new verification link. Follow it, then sign in.',
-	[NOTICE_VERIFY_RECENT]:
-		'A verification message was sent recently. Check your inbox, or try again in a minute.',
-	[NOTICE_VERIFY_UNSENT]:
-		'We could not send the verification message. Try again later.',
-	[NOTICE_FEDERATION_LINK]:
-		'An account with this email address already exists here. Sign in with its password once to link it to your identity provider.'
+// The words live in the sign-in catalogue (lib/i18n/texts/signIn), in every language; this maps an identifier to
+// its entry.
+const NOTICES: Record<string, keyof SignInTexts['notices']> = {
+	[NOTICE_VERIFY]: 'verify',
+	[NOTICE_FEDERATION_ABORTED]: 'federationAborted',
+	[NOTICE_VERIFY_RESENT]: 'verifyResent',
+	[NOTICE_VERIFY_RECENT]: 'verifyRecent',
+	[NOTICE_VERIFY_UNSENT]: 'verifyUnsent',
+	[NOTICE_FEDERATION_LINK]: 'federationLink'
 };
 
 // No trimming, no case folding, no normalisation: an identifier is either one the server minted or it is
-// nothing at all.
-export function resolveNotice(value?: string): string | undefined {
-	if (value === undefined) {
+// nothing at all. `Object.hasOwn`, so `toString` and its kin are not identifiers either.
+export function resolveNotice(
+	value: string | undefined,
+	language: Language = 'en'
+): string | undefined {
+	if (value === undefined || !Object.hasOwn(NOTICES, value)) {
 		return undefined;
 	}
-	return NOTICES[value];
+	return SIGN_IN_TEXTS[language].notices[NOTICES[value]];
 }

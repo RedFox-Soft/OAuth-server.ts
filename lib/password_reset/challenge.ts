@@ -37,6 +37,8 @@ import {
 	REQUEST_DAILY_CAP,
 	REQUEST_WINDOW_SECONDS
 } from './consts.js';
+import type { Language } from '../i18n/languages.js';
+import { emailLanguage, type LocaleHolder } from '../i18n/resolve.js';
 
 function challenges() {
 	return checkedAdapter(
@@ -86,7 +88,14 @@ export type RequestOutcome =
 interface IssuePlan {
 	purpose: SetPasswordPurpose;
 	ttl: number;
-	send: (to: string, bucketName: string, url: string) => Promise<void>;
+	/* The language of the page the person asked from, when they did (specs/097). */
+	language?: Language;
+	send: (
+		to: string,
+		bucketName: string,
+		url: string,
+		language: Language
+	) => Promise<void>;
 }
 
 /*
@@ -97,10 +106,11 @@ interface IssuePlan {
  * is the only one that works, so an invitation supersedes a reset link and the reverse.
  */
 async function issueAndSend(
-	user: Pick<User, '_id' | 'email'>,
+	user: Pick<User, '_id' | 'email'> & LocaleHolder,
 	bucket: Pick<UserBucket, '_id' | 'name'>,
 	plan: IssuePlan
 ): Promise<void> {
+	const language = emailLanguage(user, plan.language);
 	const token = newToken();
 	const id = challengeId(token);
 	const now = epochTime();
@@ -123,7 +133,8 @@ async function issueAndSend(
 			bucketId: bucket._id,
 			email: user.email.toLowerCase(),
 			exp: now + plan.ttl,
-			purpose: plan.purpose
+			purpose: plan.purpose,
+			language
 		},
 		plan.ttl
 	);
@@ -149,7 +160,8 @@ async function issueAndSend(
 	await plan.send(
 		user.email,
 		bucket.name || 'the application',
-		resetUrlFor(token)
+		resetUrlFor(token),
+		language
 	);
 }
 
@@ -162,9 +174,10 @@ async function issueAndSend(
 function sendResetInBackground(
 	to: string,
 	appName: string,
-	resetUrl: string
+	resetUrl: string,
+	language: Language
 ): Promise<void> {
-	void sendPasswordResetEmail({ email: to, appName, resetUrl }).catch(
+	void sendPasswordResetEmail({ email: to, appName, resetUrl, language }).catch(
 		(err: unknown) => {
 			console.error('password reset email could not be delivered:', err);
 		}
@@ -182,7 +195,8 @@ function sendResetInBackground(
  */
 export async function request(
 	email: string,
-	bucketId: string
+	bucketId: string,
+	language?: Language
 ): Promise<RequestOutcome> {
 	/*
 	 * The door refuses first and the sign-in page no longer links to it; this holds for any path that did
@@ -216,6 +230,7 @@ export async function request(
 		await issueAndSend(user, bucket, {
 			purpose: 'reset',
 			ttl: RESET_TTL_SECONDS,
+			language,
 			send: sendResetInBackground
 		});
 	} catch (err) {
@@ -436,8 +451,8 @@ export async function invite(
 		await issueAndSend(user, bucket, {
 			purpose: 'invite',
 			ttl: INVITE_TTL_SECONDS,
-			send: (to, bucketName, url) =>
-				sendUserInvitationEmail(to, { bucketName, url })
+			send: (to, bucketName, url, language) =>
+				sendUserInvitationEmail(to, { bucketName, url, language })
 		});
 		return { outcome: 'sent' };
 	} catch (err) {

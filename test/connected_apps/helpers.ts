@@ -284,9 +284,10 @@ export async function auditOf(accountId: string) {
 	return (await adminAuditStore.list({ targetId: accountId })).entries;
 }
 
-/* What a reader sees, tags removed and whitespace folded. */
+/* What a reader sees, tags removed and whitespace folded. The isolation around a name sits inside a sentence. */
 export function textOf(html: string): string {
 	return html
+		.replace(/<\/?bdi>/g, '')
 		.replace(/<[^>]+>/g, ' ')
 		.replace(/&amp;/g, '&')
 		.replace(/&#39;|&#x27;/g, "'")

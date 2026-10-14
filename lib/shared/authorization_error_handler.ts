@@ -39,6 +39,7 @@ import { MissingResourceCredential, RateLimited } from 'lib/helpers/errors.js';
 import { captureFault } from 'lib/error_store/capture.js';
 import { fieldNamesOf } from 'lib/error_store/redact.js';
 import type { ErrorSurface } from 'lib/adapters/types.js';
+import { languageOfRequest } from 'lib/i18n/request.js';
 
 /*
  * Which plane a fault arose on, from the route it arrived at.
@@ -501,11 +502,13 @@ export async function errorHandler(obj: ErrorHandlerContext) {
 
 	const accept = request.headers.get('accept') || '';
 	if (accept.includes('text/html')) {
+		// The page's own words follow the reader (specs/097); the protocol code and description stay English.
 		return getErrorHtmlResponse(
 			numericStatus ?? 500,
 			errorObj.error,
 			errorObj.error_description,
-			reference
+			reference,
+			languageOfRequest(request).language
 		);
 	}
 	return body;

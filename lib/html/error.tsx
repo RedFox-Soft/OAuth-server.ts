@@ -3,6 +3,9 @@ import { Result } from 'antd';
 import { htmlResponse } from './csp.js';
 import { esc } from './escape.js';
 import { renderEndUserTree } from './theme/dark.js';
+import type { Language } from '../i18n/languages.js';
+import { Message } from '../i18n/message.js';
+import { PAGES_TEXTS } from '../i18n/texts/pages/index.js';
 
 type ResultStatus = ComponentProps<typeof Result>['status'];
 
@@ -29,32 +32,65 @@ function renderError(
 	status: number,
 	title: string,
 	subTitle: string | undefined,
-	reference?: string
+	reference: string | undefined,
+	language: Language
 ) {
 	/*
 	 * The reference is rendered as plain text beside the message, and only when the fault was recorded.
 	 * It is the whole point of showing a person an error page rather than a status code: they can quote
 	 * it to an operator, who resolves it to the one record. It discloses nothing — the identifier is
 	 * random and carries no state.
+	 *
+	 * The error code and its description are protocol text and stay English in every language, so they
+	 * say so; only the frame around them is translated.
 	 */
+	const T = PAGES_TEXTS[language].error;
+	const illustration = illustrationFor(status);
+	const heading =
+		illustration === '404'
+			? T.headings.notFound
+			: illustration === '403'
+				? T.headings.forbidden
+				: illustration === '500'
+					? T.headings.serverError
+					: T.headings.failed;
 	const page = renderEndUserTree(
 		<Result
-			status={illustrationFor(status)}
-			title={status.toString()}
+			status={illustration}
+			title={heading}
 			subTitle={
-				reference
-					? [subTitle, `(reference: ${reference})`].filter(Boolean).join(' ')
-					: subTitle
+				<>
+					{subTitle ? (
+						<>
+							{T.details}{' '}
+							<span lang="en">
+								{status} {subTitle}
+							</span>
+						</>
+					) : (
+						<span lang="en">{status}</span>
+					)}
+					{reference ? (
+						<>
+							{' '}
+							<Message
+								t={T.reference}
+								values={{ reference }}
+							/>
+						</>
+					) : null}
+				</>
 			}
-		/>
+		/>,
+		{ language }
 	);
 
 	return `<!DOCTYPE html>
-	<html>
+	<html lang="${language}">
 		<head>
 			<meta charSet="utf-8" />
 			<meta name="viewport" content="width=device-width, initial-scale=1" />
-			<title>${esc(title)}</title>
+			<title lang="en">${esc(title)}</title>
 			${page.head}
 		</head>
 		<body>${page.html}</body>
@@ -65,10 +101,11 @@ export function getErrorHtmlResponse(
 	status: number,
 	error: string,
 	message: string | undefined,
-	reference?: string
+	reference?: string,
+	language: Language = 'en'
 ) {
-	const html = renderError(status, error, message, reference);
+	const html = renderError(status, error, message, reference, language);
 	// Without an explicit status the Response defaults to 200, so an HTML-preferring caller was told
 	// "OK" for every error the server rendered as a page — including a not-found.
-	return htmlResponse(html, { status });
+	return htmlResponse(html, { status, language });
 }

@@ -44,6 +44,12 @@ import {
 	PageError,
 	RedirectOrHtmlResponse
 } from 'lib/shared/response_schemas.js';
+import {
+	languageHeaders,
+	languageOfContext,
+	languageOfRequest
+} from '../i18n/request.js';
+import { uiLocalesRanges } from '../i18n/resolve.js';
 
 const logoutParameters = t.Object({
 	id_token_hint: t.Optional(t.String()),
@@ -84,15 +90,26 @@ async function endSession(
 	{
 		cookie,
 		route,
-		bucket
-	}: { cookie: OIDCCookies; route: string; bucket: RequestBucket }
+		bucket,
+		request
+	}: {
+		cookie: OIDCCookies;
+		route: string;
+		bucket: RequestBucket;
+		request: Request;
+	}
 ) {
 	const oidc = new OIDCContext({
 		params,
 		route,
 		bucket,
-		cookie
+		cookie,
+		headers: languageHeaders(request)
 	});
+	// The person's choice, the relying party's `ui_locales`, then the browser (specs/097).
+	const { language } = languageOfContext(oidc, [
+		uiLocalesRanges(params.ui_locales)
+	]);
 	const setCookies = await sessionHandler(oidc);
 	let client;
 	if (params.id_token_hint) {
@@ -203,10 +220,11 @@ async function endSession(
 		return logout(
 			secret,
 			ownFormAction(`${oidc.issuer}${routeNames.end_session_confirm}`),
-			oidc.params.post_logout_redirect_uri
+			oidc.params.post_logout_redirect_uri,
+			language
 		);
 	}
-	return logoutSuccess();
+	return logoutSuccess(language);
 }
 
 export const logoutAction = new Elysia()
@@ -222,7 +240,8 @@ export const logoutAction = new Elysia()
 			endSession(query, {
 				cookie,
 				route,
-				bucket: await addressedBucket(params, request)
+				bucket: await addressedBucket(params, request),
+				request
 			}),
 		{ response: logoutResponses }
 	);
@@ -272,11 +291,13 @@ export const logoutPostAction = new Elysia().post(
 				{
 					...fields,
 					_resubmitted: '1'
-				}
+				},
+				languageOfRequest(request, [uiLocalesRanges(fields.ui_locales)])
+					.language
 			);
 		}
 
-		return endSession(fields, { cookie, route, bucket });
+		return endSession(fields, { cookie, route, bucket, request });
 	},
 	{
 		body: t.Object({
@@ -309,7 +330,8 @@ export const logoutConfirmAction = new Elysia()
 				params: body,
 				route,
 				bucket,
-				cookie
+				cookie,
+				headers: languageHeaders(request)
 			});
 			const setCookies = await sessionHandler(oidc);
 
@@ -372,7 +394,7 @@ export const logoutConfirmAction = new Elysia()
 				return Response.redirect(uri, 303);
 			}
 
-			return logoutSuccess();
+			return logoutSuccess(languageOfContext(oidc).language);
 		},
 		{
 			response: {

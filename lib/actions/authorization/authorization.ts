@@ -68,6 +68,7 @@ import {
 	AuthPlugin,
 	withBody
 } from 'lib/plugins/auth.js';
+import { languageHeaders } from 'lib/i18n/request.js';
 import { corsClientBased, formClientId } from 'lib/plugins/cors.js';
 import {
 	OAuthError,
@@ -265,7 +266,8 @@ export const authGet = new Elysia()
 				params: query,
 				route,
 				bucket,
-				cookie
+				cookie,
+				headers: languageHeaders(request)
 			});
 
 			return await authorizationActionHandler(oidc);
@@ -302,7 +304,8 @@ export const authPost = new Elysia()
 				params: body,
 				route,
 				bucket,
-				cookie
+				cookie,
+				headers: languageHeaders(request)
 			});
 
 			return await authorizationActionHandler(oidc);

@@ -98,7 +98,7 @@ async function errorOf(response: Response): Promise<string> {
 	const text = await response.text();
 	return present(
 		/"error":"([^"]+)"/.exec(text)?.[1] ??
-			/<title>([a-z_]+)<\/title>/.exec(text)?.[1],
+			/<title[^>]*>([a-z_]+)<\/title>/.exec(text)?.[1],
 		'an error code'
 	);
 }

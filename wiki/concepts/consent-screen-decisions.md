@@ -79,7 +79,7 @@ chooses the wording and the warnings. Only a this-organization client may be hea
 "{name} wants access to your {service} account". Every other tier gets "The app “{name}” wants access to
 your account" (`consentPage.tsx:598-623`). Every other tier also gets the quiet line "{service} hasn't
 checked this app", except on a device approval (`consentPage.tsx:679`,
-`lib/interactions/consentTexts.ts:31`). A trust badge on a page whose name and logo
+`lib/i18n/texts/consent/en.ts` `host.notChecked`). A trust badge on a page whose name and logo
 a registrant chooses would be the first thing an impostor copies.
 
 ## At most one warning
@@ -271,10 +271,11 @@ the original.
 
 ## One catalog of words
 
-Every string the page shows is in `lib/interactions/consentTexts.ts` (`:1-11`), including the page title
-(`lib/interactions/serverRender.tsx:213`). It absorbed the old scope-label, group-heading and RAR field
-tables. A translation is a change to that file alone, and a test asserts the sentence the page shows
-instead of retyping it. The page is still English only ([[site-translations]]).
+Every string the page shows is in the consent catalogue, `lib/i18n/texts/consent/{en,ru,zh-Hans}.ts`,
+including the page title. It absorbed the old scope-label, group-heading and RAR field tables. Since spec
+097 (which replaced `lib/interactions/consentTexts.ts`) each entry is a whole sentence with `{slots}`, so a
+translation can put the application's name where its language wants it, and the page is shown in English,
+Russian or Simplified Chinese ([[end-user-languages]]).
 
 ## What operators supply
 

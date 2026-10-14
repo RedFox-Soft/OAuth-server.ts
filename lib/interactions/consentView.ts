@@ -23,7 +23,7 @@ import {
 /*
  * What the consent page shows, worked out on the server from the interaction and handed to the page whole.
  *
- * Data, never sentences: the page turns this into words from one catalog (consentTexts.ts), so the server
+ * Data, never sentences: the page turns this into words from one catalog (lib/i18n/texts/consent), so the server
  * render and the browser's hydration read the same values and the same words. Everything the page shows
  * must therefore be in here — a value computed in the component alone vanishes on hydration.
  *

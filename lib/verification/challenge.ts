@@ -32,6 +32,8 @@ import {
 	RESEND_DAILY_CAP,
 	RESEND_WINDOW_SECONDS
 } from './consts.js';
+import type { Language } from '../i18n/languages.js';
+import { emailLanguage, type LocaleHolder } from '../i18n/resolve.js';
 
 function challenges() {
 	return checkedAdapter('VerificationChallenge', VerificationChallengePayload);
@@ -79,11 +81,12 @@ const RESEND_BOUNDS: RateBounds = {
 // the verification email. Throws if delivery fails. Returns the challenge id (the link
 // token, or the `ref` for the code-entry page).
 export async function issueAndSend(
-	user: Pick<User, '_id' | 'email'>,
+	user: Pick<User, '_id' | 'email'> & LocaleHolder,
 	bucket: Pick<UserBucket, '_id' | 'name' | 'verificationMethod'>,
-	opts: { bumpRate?: boolean } = {}
+	opts: { bumpRate?: boolean; language?: Language } = {}
 ): Promise<{ id: string; method: VerificationMethod }> {
 	const method = bucket.verificationMethod;
+	const language = emailLanguage(user, opts.language);
 	const key = resendKey(bucket._id, user.email);
 
 	const prior = await resends().find(key);
@@ -105,7 +108,8 @@ export async function issueAndSend(
 			method,
 			...(code ? { codeHash: hashCode(code) } : {}),
 			attempts: 0,
-			exp
+			exp,
+			language
 		},
 		ttl
 	);
@@ -128,7 +132,8 @@ export async function issueAndSend(
 		appName,
 		method,
 		verifyUrl: method === 'link' ? verifyUrlFor(id) : undefined,
-		code
+		code,
+		language
 	});
 
 	return { id, method };
@@ -259,7 +264,11 @@ export async function resend(ref: string): Promise<ResendOutcome> {
 		return { ok: true, sent: false };
 	}
 
-	const { id, method } = await issueAndSend(user, bucket, { bumpRate: true });
+	// A resend speaks the language the first message did, unless the account has its own since.
+	const { id, method } = await issueAndSend(user, bucket, {
+		bumpRate: true,
+		language: challenge.language
+	});
 	return { ok: true, sent: true, method, newRef: id };
 }
 
@@ -297,9 +306,9 @@ export type OnDemandOutcome =
  * Within the existing cooldown and daily cap either way, so neither door is a way to flood a mailbox.
  */
 export async function sendOnDemand(
-	user: Pick<User, '_id' | 'email'>,
+	user: Pick<User, '_id' | 'email'> & LocaleHolder,
 	bucket: Pick<UserBucket, '_id' | 'name' | 'verificationMethod'>,
-	opts: { reuseOutstanding: boolean }
+	opts: { reuseOutstanding: boolean; language?: Language }
 ): Promise<OnDemandOutcome> {
 	const key = resendKey(bucket._id, user.email);
 	const prior = await resends().find(key);
@@ -325,7 +334,8 @@ export async function sendOnDemand(
 
 	try {
 		const { id, method } = await issueAndSend(user, bucket, {
-			bumpRate: true
+			bumpRate: true,
+			language: opts.language
 		});
 		return { outcome: 'sent', method, id };
 	} catch (err) {
@@ -359,3 +369,13 @@ export async function discardPending(
 }
 
 export { hashCode, newCode };
+
+/*
+ * The language the message behind a link or a code was written in (specs/097), read before the challenge is
+ * spent so the page that answers it speaks the same language. Nothing for an unknown or spent reference.
+ */
+export async function challengeLanguage(
+	id: string
+): Promise<Language | undefined> {
+	return (await challenges().find(id))?.language;
+}

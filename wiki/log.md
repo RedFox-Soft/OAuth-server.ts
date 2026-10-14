@@ -262,3 +262,5 @@ Operations:
 ## [2026-10-14] update | [[sentry-elysia-10.73.0]] — `@sentry/bun` moved from `11.5.0` to `11.6.0`, still exact-pinned, with the Dependabot batch; the reading itself is unchanged.
 
 ## [2026-10-14] update | [[spec-file-isolation]] — the test-mode listen guard keys on `NODE_ENV`, so the site capture (which boots with `NODE_ENV=test`) now listens itself; it had broken the site build since 7a2f110.
+
+## [2026-10-14] ingest | [[end-user-languages]] — spec 097: end-user pages and emails in en/ru/zh-Hans; the resolution order and why it is decided once per sign-in, the switch and why it is not a menu, `_lang` unpartitioned by bucket, the catalogue rules, what stays English.

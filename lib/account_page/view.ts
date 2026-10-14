@@ -7,7 +7,8 @@ import {
 	type SortingContext
 } from '../interactions/consentView.js';
 import type { ProvenanceTier } from '../models/client/provenance.js';
-import { ACCOUNT_PAGE_TEXTS } from './texts.js';
+import type { Language } from '../i18n/languages.js';
+import { ACCOUNT_TEXTS } from '../i18n/texts/account/index.js';
 
 /*
  * What one row of the connected-applications page says (specs/095 R7), decided here from facts the route
@@ -90,7 +91,8 @@ function isEmpty(group: ConsentGroup): boolean {
 
 export function applicationRow(
 	facts: ApplicationFacts,
-	context: SortingContext
+	context: SortingContext,
+	language: Language = 'en'
 ): ApplicationRow {
 	const hosts: string[] = [];
 	let device = false;
@@ -106,7 +108,7 @@ export function applicationRow(
 	/* The consent page's fallback chain, so an application is called the same thing on both pages. */
 	const name = facts.client
 		? (sanitiseClientName(facts.client.name) ?? hosts.at(0) ?? facts.clientId)
-		: ACCOUNT_PAGE_TEXTS.deletedApp;
+		: ACCOUNT_TEXTS[language].deletedApp;
 
 	const granted = union(facts.grants);
 	const groups = describeGranted(context, granted);

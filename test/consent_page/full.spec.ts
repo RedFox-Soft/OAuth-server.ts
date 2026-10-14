@@ -10,7 +10,10 @@ import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { ROOT_NAMESPACE } from 'lib/resources/namespace.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { MCP_RESOURCE } from 'lib/mcp/consts.js';
-import { CONSENT_TEXTS as T } from 'lib/interactions/consentTexts.js';
+import { CONSENT_TEXTS } from 'lib/i18n/texts/consent/index.ts';
+import { text as fill } from 'lib/i18n/message.tsx';
+
+const T = CONSENT_TEXTS.en;
 import { MCP } from './consent_page.config.ts';
 import { openConsent, decide, withCookies } from './flow.ts';
 
@@ -85,8 +88,10 @@ describe('the consent page for access to a service', () => {
 	it('shows a scope nobody described by its technical name, in sight', async () => {
 		const page = await toService('openid tools:admin');
 
-		expect(page.text).toContain(T.groups.other);
-		expect(page.text).toContain(T.resource.undescribedOwner('Company MCP'));
+		expect(page.text).toContain(T.groups.undescribed);
+		expect(page.text).toContain(
+			fill(T.resource.undescribedOwner, { owner: 'Company MCP' })
+		);
 		expect(page.text).toContain('tools:admin');
 	});
 
@@ -116,7 +121,7 @@ describe('the consent page for access to a service', () => {
 				cookie
 			);
 
-			expect(page.text).toContain(T.groups.other);
+			expect(page.text).toContain(T.groups.undescribed);
 			expect(page.text).toContain('billing');
 		} finally {
 			ApplicationConfig['consent.scopeDescriptions'] = {
@@ -136,7 +141,9 @@ describe('the consent page for access to a service', () => {
 		);
 
 		expect(page.view.keepsAccessUntil).toBeString();
-		expect(page.text).toContain(T.lifetime(page.view.keepsAccessUntil ?? ''));
+		expect(page.text).toContain(
+			fill(T.lifetime, { date: page.view.keepsAccessUntil ?? '' })
+		);
 	});
 
 	it('says nothing of long-lived access when the request did not ask for consent and so cannot have it', async () => {

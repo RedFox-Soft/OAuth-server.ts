@@ -1,4 +1,5 @@
 import type { VerificationMethod } from '../adapters/types.js';
+import type { Language } from '../i18n/languages.js';
 import { deliver } from './mailer.js';
 import { deprovisioningHeldEmail } from './templates/deprovisioning_held.js';
 import { groupInvitationEmail } from './templates/group_invitation.js';
@@ -17,17 +18,21 @@ interface SendParams {
 	verifyUrl?: string;
 	// Present for the code method: the plaintext 6-digit code (never persisted).
 	code?: string;
+	language?: Language;
 }
 
 // Renders and delivers the standard verification email for the bucket's method. Throws
 // on delivery failure so the caller can leave the account unverified and offer a retry
 // (FR-013).
 export async function sendVerificationEmail(params: SendParams): Promise<void> {
-	const { email, appName, method, verifyUrl, code } = params;
+	const { email, appName, method, verifyUrl, code, language = 'en' } = params;
 	const message =
 		method === 'code'
-			? verificationCodeEmail({ appName, code: code ?? '' })
-			: verificationLinkEmail({ appName, verifyUrl: verifyUrl ?? '' });
+			? verificationCodeEmail({ appName, code: code ?? '' }, language)
+			: verificationLinkEmail(
+					{ appName, verifyUrl: verifyUrl ?? '' },
+					language
+				);
 	await deliver({ to: email, ...message });
 }
 
@@ -36,6 +41,7 @@ interface ResetSendParams {
 	appName: string;
 	// Fully-qualified https URL carrying the single-use reset token.
 	resetUrl: string;
+	language?: Language;
 }
 
 /*
@@ -46,8 +52,11 @@ interface ResetSendParams {
 export async function sendPasswordResetEmail(
 	params: ResetSendParams
 ): Promise<void> {
-	const { email, appName, resetUrl } = params;
-	await deliver({ to: email, ...passwordResetEmail({ appName, resetUrl }) });
+	const { email, appName, resetUrl, language = 'en' } = params;
+	await deliver({
+		to: email,
+		...passwordResetEmail({ appName, resetUrl }, language)
+	});
 }
 
 /*
@@ -57,9 +66,10 @@ export async function sendPasswordResetEmail(
  */
 export async function sendUserInvitationEmail(
 	to: string,
-	params: { bucketName: string; url: string }
+	params: { bucketName: string; url: string; language?: Language }
 ): Promise<void> {
-	await deliver({ to, ...userInvitationEmail(params) });
+	const { language = 'en', ...rest } = params;
+	await deliver({ to, ...userInvitationEmail(rest, language) });
 }
 
 /*

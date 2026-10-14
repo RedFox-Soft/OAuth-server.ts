@@ -44,7 +44,11 @@ import {
 	xsrfMatches,
 	type PagePerson
 } from './session.js';
-import { ACCOUNT_PAGE_TEXTS as T } from './texts.js';
+import type { Language } from '../i18n/languages.js';
+import { text } from '../i18n/message.js';
+import { languageOfRequest } from '../i18n/request.js';
+import { storedLocaleRanges } from '../i18n/resolve.js';
+import { ACCOUNT_TEXTS } from '../i18n/texts/account/index.js';
 import {
 	applicationRow,
 	byNewest,
@@ -74,9 +78,15 @@ function pathOf(bucket: RequestBucket): string {
 	return new URL(accountPageUrl(bucket)).pathname;
 }
 
-function frameFor(person: PagePerson): PageFrame {
+/* The person's choice, then their account's stored locale, then the browser (specs/097). */
+function personLanguage(person: PagePerson, request: Request): Language {
+	return languageOfRequest(request, [storedLocaleRanges(person.user)]).language;
+}
+
+function frameFor(person: PagePerson, language: Language): PageFrame {
 	const base = accountPageBase(person.bucket);
 	return {
+		language,
 		service: person.bucket.displayName ?? new URL(base).host,
 		logoSrc: versionedAsset('logo.svg'),
 		path: pathOf(person.bucket),
@@ -106,7 +116,8 @@ function grantFacts(grant: Grant): GrantFacts {
 /* Everything the list says about the person's applications, read here and decided in view.ts. */
 async function rowsFor(
 	person: PagePerson,
-	addressed: RequestBucket
+	addressed: RequestBucket,
+	language: Language
 ): Promise<ApplicationRow[]> {
 	const accountId = person.user._id;
 	const applications = await connectedApplications(person.bucket, accountId);
@@ -173,15 +184,15 @@ async function rowsFor(
 				: {}),
 			liveRefresh: application.liveRefresh
 		};
-		rows.push(applicationRow(facts, context));
+		rows.push(applicationRow(facts, context, language));
 	}
 	return rows.sort(byNewest);
 }
 
 /* The name an application went by, re-read rather than echoed back from the address bar. */
-async function nameOf(clientId: string): Promise<string> {
+async function nameOf(clientId: string, language: Language): Promise<string> {
 	const client = await Client.tryFind(clientId);
-	if (!client) return T.deletedApp;
+	if (!client) return ACCOUNT_TEXTS[language].deletedApp;
 	return sanitiseClientName(client.clientName) ?? clientId;
 }
 
@@ -216,8 +227,10 @@ export const accountPageRoutes = new Elysia({ name: 'account-page' })
 			const person = await usablePerson(addressed, cookie);
 			if (!person) return seeOther(signInRedirect(cookie, addressed));
 
-			const frame = frameFor(person);
-			const rows = await rowsFor(person, addressed);
+			const language = personLanguage(person, request);
+			const T = ACCOUNT_TEXTS[language];
+			const frame = frameFor(person, language);
+			const rows = await rowsFor(person, addressed, language);
 
 			if (query.revoke !== undefined) {
 				const row = rows.find((r) => r.clientId === query.revoke);
@@ -229,7 +242,7 @@ export const accountPageRoutes = new Elysia({ name: 'account-page' })
 
 			const notice =
 				query.done !== undefined
-					? T.done(await nameOf(query.done))
+					? text(T.done, { app: await nameOf(query.done, language) })
 					: query.gone !== undefined
 						? T.gone
 						: undefined;
@@ -249,12 +262,22 @@ export const accountPageRoutes = new Elysia({ name: 'account-page' })
 			if (
 				!fromThisOrigin(request, new URL(accountPageBase(addressed)).origin)
 			) {
-				return outcomePage(T.refusedTitle, T.refused, path, 403);
+				return outcomePage(
+					'refused',
+					path,
+					403,
+					languageOfRequest(request).language
+				);
 			}
 			const person = await usablePerson(addressed, cookie);
 			if (!person) return seeOther(signInRedirect(cookie, addressed));
 			if (!xsrfMatches(person.session, body.xsrf)) {
-				return outcomePage(T.refusedTitle, T.refused, path, 403);
+				return outcomePage(
+					'refused',
+					path,
+					403,
+					languageOfRequest(request).language
+				);
 			}
 
 			const accountId = person.user._id;
@@ -325,13 +348,28 @@ export const accountPageRoutes = new Elysia({ name: 'account-page' })
 				query.state.length !== pending.state.length ||
 				!constantEquals(query.state, pending.state)
 			) {
-				return outcomePage(T.expiredTitle, T.expired, path, 400);
+				return outcomePage(
+					'expired',
+					path,
+					400,
+					languageOfRequest(request).language
+				);
 			}
 			if (query.error === 'access_denied') {
-				return outcomePage(T.notSignedInTitle, T.notSignedIn, path, 200);
+				return outcomePage(
+					'notSignedIn',
+					path,
+					200,
+					languageOfRequest(request).language
+				);
 			}
 			if (query.error !== undefined) {
-				return outcomePage(T.failedTitle, T.failed, path, 400);
+				return outcomePage(
+					'failed',
+					path,
+					400,
+					languageOfRequest(request).language
+				);
 			}
 
 			const person = await usablePerson(addressed, cookie);
@@ -339,14 +377,25 @@ export const accountPageRoutes = new Elysia({ name: 'account-page' })
 			 * Signed in, yet not someone this page can show — a person who may not sign in, or a sign-in that
 			 * landed elsewhere. Said, rather than sent round again: the page would only start the same sign-in.
 			 */
-			if (!person) return outcomePage(T.failedTitle, T.failed, path, 400);
+			if (!person)
+				return outcomePage(
+					'failed',
+					path,
+					400,
+					languageOfRequest(request).language
+				);
 
 			const pagePath = pathOf(person.bucket);
 			if (pending.accountId !== undefined) {
 				/* Someone else finished the sign-in: whatever was asked for belonged to the person who asked. */
 				if (person.user._id !== pending.accountId) return seeOther(pagePath);
 				if ((person.session.payload.loginTs ?? 0) < pending.startedAt) {
-					return outcomePage(T.failedTitle, T.failed, pagePath, 400);
+					return outcomePage(
+						'failed',
+						pagePath,
+						400,
+						personLanguage(person, request)
+					);
 				}
 				if (pending.revoke !== undefined) {
 					return seeOther(

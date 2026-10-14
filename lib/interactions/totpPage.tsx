@@ -6,6 +6,9 @@ import { Button, Card, Flex, Form, Input, QRCode, Typography } from 'antd';
 import { buildUIPath } from './buildUIPath.js';
 import { DEFAULT_LOGO } from './logo.js';
 import { foxVar } from '../html/theme/palette.js';
+import { LanguageSwitch, type SwitcherProps } from './languageSwitch.js';
+import { useLanguage } from '../i18n/context.js';
+import { SIGN_IN_TEXTS } from '../i18n/texts/signIn/index.js';
 
 /*
  * The second factor's one page, in two modes.
@@ -31,6 +34,7 @@ export interface TotpPageProps {
 	secretText?: string;
 	/* The logo's versioned address, from the server: see LoginPage. */
 	logoSrc?: string;
+	switcher?: SwitcherProps;
 }
 
 function ErrorBanner({ message }: { message: string }) {
@@ -48,7 +52,7 @@ function ErrorBanner({ message }: { message: string }) {
 				}}
 			>
 				<span style={{ color: foxVar('danger-text'), fontSize: '14px' }}>
-					<ExclamationCircleOutlined />
+					<ExclamationCircleOutlined aria-hidden="true" />
 				</span>
 				<span style={{ color: foxVar('danger-text'), fontSize: '14px' }}>
 					{message}
@@ -64,8 +68,10 @@ export function TotpPage({
 	errorMessage,
 	otpauthUri,
 	secretText,
-	logoSrc = DEFAULT_LOGO
+	logoSrc = DEFAULT_LOGO,
+	switcher
 }: TotpPageProps) {
+	const T = SIGN_IN_TEXTS[useLanguage()];
 	const enrolling = mode === 'enroll';
 	const action = buildUIPath(uid, enrolling ? 'totp/enroll' : 'totp');
 
@@ -90,19 +96,15 @@ export function TotpPage({
 				<div style={{ textAlign: 'center', marginBottom: 24 }}>
 					<img
 						src={logoSrc}
-						alt="Logo"
+						alt={T.logoAlt}
 						style={{ width: 120 }}
 					/>
-					<h2>
-						{enrolling ? 'Set up your authenticator' : 'Two-step verification'}
-					</h2>
+					<h2>{enrolling ? T.totp.enrollHeading : T.totp.verifyHeading}</h2>
 					<Typography.Text
 						type="secondary"
 						style={{ fontSize: 13 }}
 					>
-						{enrolling
-							? 'Scan this with an authenticator app, then enter the code it shows.'
-							: 'Enter the current code from your authenticator app.'}
+						{enrolling ? T.totp.enrollHint : T.totp.verifyHint}
 					</Typography.Text>
 				</div>
 
@@ -146,7 +148,7 @@ export function TotpPage({
 							type="secondary"
 							style={{ fontSize: 12 }}
 						>
-							Or enter this key manually:
+							{T.totp.manualKey}
 						</Typography.Text>
 						<Typography.Text
 							code
@@ -169,11 +171,11 @@ export function TotpPage({
 					{errorMessage && <ErrorBanner message={errorMessage} />}
 					<Form.Item
 						name="code"
-						rules={[{ required: true, message: 'Please enter your code!' }]}
+						rules={[{ required: true, message: T.totp.codeRequired }]}
 					>
 						<Input
 							name="code"
-							prefix={<SafetyCertificateOutlined />}
+							prefix={<SafetyCertificateOutlined aria-hidden="true" />}
 							placeholder="000000"
 							// A phone keypad rather than a full keyboard, and the browser's own one-time-code
 							// autofill where the platform offers it.
@@ -190,10 +192,11 @@ export function TotpPage({
 							htmlType="submit"
 							block
 						>
-							{enrolling ? 'Confirm' : 'Verify'}
+							{enrolling ? T.totp.confirm : T.totp.verify}
 						</Button>
 					</Form.Item>
 				</Form>
+				{switcher && <LanguageSwitch {...switcher} />}
 			</Card>
 		</Flex>
 	);

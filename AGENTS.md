@@ -189,8 +189,10 @@ Each rule is the part that is easy to break. Read the named page before changing
 - **Sentry** — reporting is off the request path: `lib/sentry/` mounts nothing into Elysia, and
   `@sentry/elysia` is deliberately not a dependency. → `sentry-plugin-not-used.md`
 - **Interaction screens** — a page is either the antd shell (inside an interaction) or plain and
-  self-contained (opened from an email, no script); which one is not a style choice.
-  → `interaction-page-families.md`, `end-user-onboarding.md`
+  self-contained (opened from an email, no script); which one is not a style choice. Every word on them
+  lives in `lib/i18n/texts/`, in all three languages in the same change, and a value inserted into a
+  sentence is never a template. → `interaction-page-families.md`, `end-user-onboarding.md`,
+  `end-user-languages.md`
 
 Pages are under `wiki/concepts/` unless the path says otherwise.
 

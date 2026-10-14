@@ -4,6 +4,7 @@ import bootstrap, { agent } from '../test_helper.js';
 import { getErrorHtmlResponse } from 'lib/html/error.tsx';
 import getWWWAuthenticate from 'lib/shared/authorization_error_handler.js';
 import { send, UNSERVED_PATH } from '../feature_gate/helpers.ts';
+import { visible } from '../page_text.js';
 
 const browserAccept =
 	'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8';
@@ -90,11 +91,11 @@ describe('rendered error page illustration', () => {
 		}
 	});
 
-	it('keeps the displayed title equal to the response status', async () => {
+	it('shows the reader the same status the response carries', async () => {
 		for (const status of [400, 403, 404, 500]) {
 			const { status: responseStatus, html } = await render(status);
 			expect(responseStatus).toBe(status);
-			expect(html).toContain(`>${status}</div>`);
+			expect(visible(html)).toContain(`${status} a description`);
 		}
 	});
 });

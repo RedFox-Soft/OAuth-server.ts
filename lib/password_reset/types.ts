@@ -1,3 +1,4 @@
+import { LanguageSchema } from '../i18n/schema.js';
 import { Type as t, type Static } from '@sinclair/typebox';
 
 // These two payloads are TypeBox schemas rather than plain interfaces so the storage-ownership drift guard
@@ -32,7 +33,12 @@ export const PasswordResetChallengePayload = t.Object({
 	 * password (specs/089). The two differ in lifetime and in the words the page uses, never in what the
 	 * secret can do. Absent on records written before invitations existed, which were all resets.
 	 */
-	purpose: t.Optional(t.Union([t.Literal('reset'), t.Literal('invite')]))
+	purpose: t.Optional(t.Union([t.Literal('reset'), t.Literal('invite')])),
+	/*
+	 * The language the email was written in (specs/097), so the page its link opens speaks it too — also on
+	 * another device whose browser asks for something else. Absent on a record written before the field.
+	 */
+	language: t.Optional(LanguageSchema)
 });
 
 export type PasswordResetChallengePayload = Static<

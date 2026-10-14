@@ -1,13 +1,19 @@
 import nodemailer from 'nodemailer';
 import { getSmtpSettingsStore } from '../adapters/index.js';
 import type { SmtpSettings } from '../adapters/types.js';
+import type { Language } from '../i18n/languages.js';
 
 export interface OutgoingEmail {
 	to: string;
 	subject: string;
 	html: string;
 	text: string;
+	// Set by the end-user templates only; an administrator's email declares no language, as before.
+	language?: Language;
 }
+
+/* What an end-user template renders: everything but the recipient, always in a declared language. */
+export type RenderedEmail = Required<Omit<OutgoingEmail, 'to'>>;
 
 export class MailNotConfiguredError extends Error {
 	constructor() {
@@ -68,6 +74,9 @@ export async function deliver(email: OutgoingEmail): Promise<void> {
 		to: email.to,
 		subject: email.subject,
 		text: email.text,
-		html: email.html
+		html: email.html,
+		...(email.language
+			? { headers: { 'Content-Language': email.language } }
+			: {})
 	});
 }

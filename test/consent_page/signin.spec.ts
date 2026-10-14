@@ -4,7 +4,10 @@ import bootstrap, { setSeedClaims, type Setup } from '../test_helper.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { getBucketStore } from 'lib/adapters/index.ts';
 import { DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
-import { CONSENT_TEXTS as T } from 'lib/interactions/consentTexts.js';
+import { CONSENT_TEXTS } from 'lib/i18n/texts/consent/index.ts';
+import { text as fill } from 'lib/i18n/message.tsx';
+
+const T = CONSENT_TEXTS.en;
 import { openConsent } from './flow.ts';
 
 /**
@@ -44,9 +47,13 @@ describe('the consent page for a sign-in to the organization’s own app', () =>
 			cookie
 		);
 
-		expect(page.text).toContain(T.headline.signIn('Acme Billing'));
+		expect(page.text).toContain(
+			fill(T.headline.signIn, { app: 'Acme Billing' })
+		);
 		expect(page.text).toContain('billing.acme.test');
-		expect(page.text).toContain(`${T.account.signedInAs} anna@example.com`);
+		expect(page.text).toContain(
+			fill(T.account.signedInAs, { account: 'anna@example.com' })
+		);
 		expect(page.text).toContain(T.categories.profile);
 		expect(page.text).toContain(T.categories.email);
 		expect(page.text).toContain(T.signIn.noPassword);
@@ -77,7 +84,9 @@ describe('the consent page for a sign-in to the organization’s own app', () =>
 		);
 
 		expect(page.view.service.displayName).toBeUndefined();
-		expect(page.text).toContain(T.signIn.shares(page.view.service.host));
+		expect(page.text).toContain(
+			fill(T.signIn.shares, { service: page.view.service.host })
+		);
 	});
 
 	it('names the service by the bucket’s display name, never its internal name, when it has one', async () => {
@@ -92,7 +101,7 @@ describe('the consent page for a sign-in to the organization’s own app', () =>
 			cookie
 		);
 
-		expect(page.text).toContain(T.signIn.shares('Acme ID'));
+		expect(page.text).toContain(fill(T.signIn.shares, { service: 'Acme ID' }));
 		expect(page.text).not.toContain(bucket?.name ?? '\u0000');
 	});
 
@@ -110,7 +119,10 @@ describe('the consent page for a sign-in to the organization’s own app', () =>
 
 		expect(page.view.mode).toBe('full');
 		expect(page.text).toContain(
-			T.headline.ownAccess('Acme Billing', page.view.service.host)
+			fill(T.headline.ownAccess, {
+				app: 'Acme Billing',
+				service: page.view.service.host
+			})
 		);
 		expect(page.text).toContain(T.groups.see);
 	});

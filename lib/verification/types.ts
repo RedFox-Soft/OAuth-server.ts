@@ -1,3 +1,4 @@
+import { LanguageSchema } from '../i18n/schema.js';
 import { Type as t, type Static } from '@sinclair/typebox';
 
 import type { VerificationMethod } from '../adapters/types.js';
@@ -37,7 +38,12 @@ export const VerificationChallengePayload = t.Object({
 	codeHash: t.Optional(t.String()),
 	// Failed code entries so far; the code is invalidated once this reaches the cap.
 	attempts: t.Number(),
-	exp: t.Number()
+	exp: t.Number(),
+	/*
+	 * The language the email was written in (specs/097), so the page its link opens speaks it too — also on
+	 * another device whose browser asks for something else. Absent on a record written before the field.
+	 */
+	language: t.Optional(LanguageSchema)
 });
 
 export type VerificationChallengePayload = Static<

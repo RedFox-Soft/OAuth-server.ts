@@ -3,7 +3,10 @@ import { describe, it, expect, beforeAll } from 'bun:test';
 import bootstrap, { type Setup } from '../test_helper.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { ISSUER } from 'lib/configs/env.js';
-import { CONSENT_TEXTS as T } from 'lib/interactions/consentTexts.js';
+import { CONSENT_TEXTS } from 'lib/i18n/texts/consent/index.ts';
+import { text as fill } from 'lib/i18n/message.tsx';
+
+const T = CONSENT_TEXTS.en;
 import { openConsent, type ConsentPage } from '../consent_page/flow.ts';
 import { tenantProject } from './seed.ts';
 
@@ -66,16 +69,18 @@ describe('the privacy policy and terms links on the consent page', () => {
 				href: 'https://app.acme.test/privacy',
 				target: '_blank',
 				rel: 'noopener noreferrer',
-				text: `Timesheets${T.links.policyAfter}${NBSP}↗${T.links.external}`
+				text: `${fill(T.links.policy, { app: 'Timesheets' })}${NBSP}↗${T.links.external}`
 			},
 			{
 				href: 'https://app.acme.test/terms',
 				target: '_blank',
 				rel: 'noopener noreferrer',
-				text: `Timesheets${T.links.termsAfter}${NBSP}↗${T.links.external}`
+				text: `${fill(T.links.terms, { app: 'Timesheets' })}${NBSP}↗${T.links.external}`
 			}
 		]);
-		expect(page.html).toContain(`aria-label="${T.links.label('Timesheets')}"`);
+		expect(page.html).toContain(
+			`aria-label="${fill(T.links.label, { app: 'Timesheets' })}"`
+		);
 	});
 
 	it('links only the one that is on the redirect host', async () => {
@@ -98,7 +103,9 @@ describe('the privacy policy and terms links on the consent page', () => {
 
 		expect(page.view.links).toBeUndefined();
 		expect(external(page)).toEqual([]);
-		expect(page.text).not.toContain(T.links.policyAfter);
+		expect(page.text).not.toContain(
+			fill(T.links.policy, { app: 'Timesheets' })
+		);
 	});
 
 	it.each([

@@ -5,6 +5,7 @@ import { emptyConsentView } from './consentView.ts';
 import { RegistrationPage } from './registration.tsx';
 import { TotpPage } from './totpPage.tsx';
 import { EndUserTheme } from '../html/theme/provider.tsx';
+import { isLanguage } from '../i18n/languages.ts';
 
 /*
  * The tree the browser hydrates, apart from the browser: the bundle (loginClient.tsx) reads the page name and
@@ -17,9 +18,16 @@ export function clientRoot(
 	uid: string,
 	props: object
 ): ReactElement {
+	// The server put the page's language in the props (serverRender.tsx); anything else there is ignored.
+	const { language } = props as { language?: unknown };
 	return (
 		<StrictMode>
-			<EndUserTheme zeroRuntime>{pageElement(page, uid, props)}</EndUserTheme>
+			<EndUserTheme
+				zeroRuntime
+				language={isLanguage(language) ? language : 'en'}
+			>
+				{pageElement(page, uid, props)}
+			</EndUserTheme>
 		</StrictMode>
 	);
 }

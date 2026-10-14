@@ -5,7 +5,10 @@ import { ConsentPage } from './consentPage.js';
 import { RegistrationPage } from './registration.js';
 import { TotpPage } from './totpPage.js';
 import type { ConsentView } from './consentView.js';
-import { CONSENT_TEXTS } from './consentTexts.js';
+import type { SwitcherProps } from './languageSwitch.js';
+import type { Language } from '../i18n/languages.js';
+import { CONSENT_TEXTS } from '../i18n/texts/consent/index.js';
+import { SIGN_IN_TEXTS } from '../i18n/texts/signIn/index.js';
 import { htmlResponse } from '../html/csp.js';
 import { versionedAsset } from '../html/versionedAsset.js';
 import { renderEndUserTree } from '../html/theme/dark.js';
@@ -36,19 +39,26 @@ function styleLinks(): string {
 function hydratedPage(
 	template: string,
 	title: string,
-	props: unknown,
-	page: ReactElement
+	props: object,
+	page: ReactElement,
+	language: Language
 ): string {
 	const tree = renderEndUserTree(page, {
 		zeroRuntime: true,
+		language,
 		render: (element) => renderToString(<StrictMode>{element}</StrictMode>)
 	});
+	/*
+	 * The language travels in the props as well as in the markup: the browser rebuilds the tree from the props,
+	 * and a client that defaulted to English would rewrite a Russian page on load (specs/097).
+	 */
 	return template
+		.replace('__APP_LANG__', language)
 		.replace('/public/loginClient.js', versionedAsset('loginClient.js'))
 		.replace('/public/favicon.ico', versionedAsset('favicon.ico'))
 		.replace('<!--app-title-->', () => title)
 		.replace('<!--app-styles-->', () => styleLinks() + tree.head)
-		.replace('<!--app-props-->', () => propsScript(props))
+		.replace('<!--app-props-->', () => propsScript({ ...props, language }))
 		.replace('<!--app-html-->', () => tree.html);
 }
 
@@ -78,9 +88,12 @@ export async function loginServer(
 		 * the document the form was submitted from.
 		 */
 		handOffTo?: string;
+		language?: Language;
+		switcher?: SwitcherProps;
 	} = {}
 ) {
-	const { errorMessage } = options;
+	const { errorMessage, switcher } = options;
+	const language = options.language ?? 'en';
 	// Exclusivity is a property of this function rather than a promise made at each call site: a rejected
 	// submission must never be accompanied by the notice the page was reached with.
 	const notice = errorMessage ? undefined : options.notice;
@@ -100,7 +113,7 @@ export async function loginServer(
 	 */
 	const html = hydratedPage(
 		await htmlTeamplate.text(),
-		'Login Page',
+		SIGN_IN_TEXTS[language].titles.login,
 		{
 			uid,
 			errorMessage,
@@ -110,7 +123,8 @@ export async function loginServer(
 			passwordReset,
 			verificationResend,
 			providers,
-			logoSrc
+			logoSrc,
+			switcher
 		},
 		<LoginPage
 			uid={uid}
@@ -122,20 +136,30 @@ export async function loginServer(
 			verificationResend={verificationResend}
 			providers={providers}
 			logoSrc={logoSrc}
-		/>
+			switcher={switcher}
+		/>,
+		language
 	);
 	// A notice is not a failure: only the error re-render answers 400.
 	return htmlResponse(html, {
 		status: errorMessage ? 400 : 200,
-		handOffTo: options.handOffTo
+		handOffTo: options.handOffTo,
+		language
 	});
 }
 
 export async function registrationServer(
 	uid: string,
-	options: { errorMessage?: string; email?: string; handOffTo?: string } = {}
+	options: {
+		errorMessage?: string;
+		email?: string;
+		handOffTo?: string;
+		language?: Language;
+		switcher?: SwitcherProps;
+	} = {}
 ) {
-	const { errorMessage, email } = options;
+	const { errorMessage, email, switcher } = options;
+	const language = options.language ?? 'en';
 
 	// Here and nowhere else: the version is the file's build time, which only the server can read (see LoginPage).
 	const logoSrc = versionedAsset('logo.svg');
@@ -144,19 +168,22 @@ export async function registrationServer(
 	// only.
 	const html = hydratedPage(
 		await htmlTeamplate.text(),
-		'Registration Page',
-		{ uid, errorMessage, email, logoSrc },
+		SIGN_IN_TEXTS[language].titles.registration,
+		{ uid, errorMessage, email, logoSrc, switcher },
 		<RegistrationPage
 			uid={uid}
 			errorMessage={errorMessage}
 			email={email}
 			logoSrc={logoSrc}
-		/>
+			switcher={switcher}
+		/>,
+		language
 	);
 	// Neither submitted password reaches this document — not the markup, not the props (spec FR-011).
 	return htmlResponse(html, {
 		status: errorMessage ? 400 : 200,
-		handOffTo: options.handOffTo
+		handOffTo: options.handOffTo,
+		language
 	});
 }
 
@@ -168,9 +195,13 @@ export async function totpServer(
 		otpauthUri?: string;
 		secretText?: string;
 		handOffTo?: string;
+		language?: Language;
+		switcher?: SwitcherProps;
 	}
 ) {
-	const { mode, errorMessage, otpauthUri, secretText } = options;
+	const { mode, errorMessage, otpauthUri, secretText, switcher } = options;
+	const language = options.language ?? 'en';
+	const T = SIGN_IN_TEXTS[language];
 
 	// Here and nowhere else: the version is the file's build time, which only the server can read (see LoginPage).
 	const logoSrc = versionedAsset('logo.svg');
@@ -181,8 +212,8 @@ export async function totpServer(
 	 */
 	const html = hydratedPage(
 		await htmlTeamplate.text(),
-		mode === 'enroll' ? 'Set Up Authenticator' : 'Two-Step Verification',
-		{ uid, mode, errorMessage, otpauthUri, secretText, logoSrc },
+		mode === 'enroll' ? T.titles.totpEnroll : T.titles.totpVerify,
+		{ uid, mode, errorMessage, otpauthUri, secretText, logoSrc, switcher },
 		<TotpPage
 			uid={uid}
 			mode={mode}
@@ -190,7 +221,9 @@ export async function totpServer(
 			otpauthUri={otpauthUri}
 			secretText={secretText}
 			logoSrc={logoSrc}
-		/>
+			switcher={switcher}
+		/>,
+		language
 	);
 	/*
 	 * The submitted code never comes back with the page, in the markup or the props — the same rule the
@@ -200,19 +233,30 @@ export async function totpServer(
 	 */
 	return htmlResponse(html, {
 		status: errorMessage ? 400 : 200,
-		handOffTo: options.handOffTo
+		handOffTo: options.handOffTo,
+		language
 	});
 }
 
 export async function consentServer(
 	view: ConsentView,
-	options: { handOffTo?: string } = {}
+	options: {
+		handOffTo?: string;
+		language?: Language;
+		switcher?: SwitcherProps;
+	} = {}
 ) {
+	const language = options.language ?? 'en';
+	const { switcher } = options;
 	const html = hydratedPage(
 		await htmlTeamplate.text(),
-		CONSENT_TEXTS.pageTitle,
-		view,
-		<ConsentPage {...view} />
+		CONSENT_TEXTS[language].pageTitle,
+		{ ...view, switcher },
+		<ConsentPage
+			{...view}
+			switcher={switcher}
+		/>,
+		language
 	);
-	return htmlResponse(html, { handOffTo: options.handOffTo });
+	return htmlResponse(html, { handOffTo: options.handOffTo, language });
 }

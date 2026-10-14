@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { createCache, extractStyle, StyleProvider } from '@ant-design/cssinjs';
 import { EndUserTheme } from './provider.js';
 import { themeHead } from './head.js';
+import type { Language } from '../../i18n/languages.js';
 
 interface Rule {
 	selector: string;
@@ -79,13 +80,23 @@ export function renderEndUserTree(
 	page: ReactElement,
 	{
 		zeroRuntime = false,
-		render = renderToStaticMarkup
-	}: { zeroRuntime?: boolean; render?: (element: ReactElement) => string } = {}
+		render = renderToStaticMarkup,
+		language = 'en'
+	}: {
+		zeroRuntime?: boolean;
+		render?: (element: ReactElement) => string;
+		language?: Language;
+	} = {}
 ): { html: string; head: string } {
 	const cache = createCache();
 	const html = render(
 		<StyleProvider cache={cache}>
-			<EndUserTheme zeroRuntime={zeroRuntime}>{page}</EndUserTheme>
+			<EndUserTheme
+				zeroRuntime={zeroRuntime}
+				language={language}
+			>
+				{page}
+			</EndUserTheme>
 		</StyleProvider>
 	);
 	const light = extractStyle(cache, { plain: true });

@@ -1,10 +1,14 @@
 import { Card, Flex } from 'antd';
 import { htmlResponse } from './csp.js';
+import { esc } from './escape.js';
 import { versionedAsset } from './versionedAsset.js';
 import { foxVar } from './theme/palette.js';
 import { renderEndUserTree } from './theme/dark.js';
+import type { Language } from '../i18n/languages.js';
+import { PAGES_TEXTS } from '../i18n/texts/pages/index.js';
 
-function renderLogoutForm() {
+function renderLogoutForm(language: Language) {
+	const t = PAGES_TEXTS[language].logoutSuccess;
 	return (
 		<>
 			<Flex
@@ -30,12 +34,12 @@ function renderLogoutForm() {
 					<div style={{ textAlign: 'center', marginBottom: 24 }}>
 						<img
 							src={versionedAsset('logo.svg')}
-							alt="Logo"
+							alt={t.logoAlt}
 							style={{ width: 120 }}
 						/>
 					</div>
 					<div style={{ textAlign: 'center', marginBottom: 24, fontSize: 16 }}>
-						<p>You have been signed out successfully</p>
+						<p>{t.message}</p>
 					</div>
 				</Card>
 			</Flex>
@@ -48,16 +52,16 @@ function renderLogoutForm() {
  * extracting first left the first page after a restart unstyled. Its <head> part is complete `<style>`
  * elements, which is why they are not wrapped in another.
  */
-export function logoutSuccess() {
-	const page = renderEndUserTree(renderLogoutForm());
+export function logoutSuccess(language: Language = 'en') {
+	const page = renderEndUserTree(renderLogoutForm(language), { language });
 
 	const html = `<!DOCTYPE html>
-<html><head>
+<html lang="${language}"><head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Logging Out</title>
+  <title>${esc(PAGES_TEXTS[language].logoutSuccess.title)}</title>
   ${page.head}
 </head><body>${page.html}</body></html>`;
 
-	return htmlResponse(html);
+	return htmlResponse(html, { language });
 }

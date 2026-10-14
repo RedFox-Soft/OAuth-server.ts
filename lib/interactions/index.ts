@@ -1,9 +1,6 @@
 import { hostOfRequest } from 'lib/consts/request_host.js';
 import { AMR_FOR_DISTINCTION } from 'lib/consts/amr.js';
-import {
-	END_USER_PASSWORD_MIN_LENGTH,
-	END_USER_PASSWORD_TOO_SHORT
-} from 'lib/consts/password_policy.js';
+import { END_USER_PASSWORD_MIN_LENGTH } from 'lib/consts/password_policy.js';
 import {
 	bucketAtHost,
 	bucketIsScheduled,
@@ -151,13 +148,54 @@ import {
 	registrationSendFailedPage
 } from './registrationPages.js';
 import { buildUILoginPath, buildUIPath } from './buildUIPath.js';
+import type { Language } from '../i18n/languages.js';
+import { lookup } from '../i18n/languages.js';
+import { formatDate, formatMinutesAgo } from '../i18n/format.js';
+import { text } from '../i18n/message.js';
+import { uiLocalesRanges } from '../i18n/resolve.js';
+import { CONSENT_TEXTS } from '../i18n/texts/consent/index.js';
+import { passwordTooShort, SIGN_IN_TEXTS } from '../i18n/texts/signIn/index.js';
+import {
+	SWITCH_PAGES,
+	switcherFor,
+	type SwitcherProps,
+	type SwitchPage
+} from './languageSwitch.js';
+import { LANGUAGE_COOKIE, languageCookie } from '../i18n/cookie.js';
+
+/*
+ * The page language of this sign-in, decided when the interaction was created
+ * (lib/actions/authorization/interactions.ts) and read by every page and message of it, so no step changes
+ * language halfway. A record written before the field existed falls back to the application's request.
+ */
+function languageOf(interaction: Interaction): Language {
+	return (
+		interaction.payload.language ??
+		lookup(uiLocalesRanges(interaction.payload.params?.ui_locales)) ??
+		'en'
+	);
+}
 
 /*
  * The single answer to every failed code, whatever went wrong: a guess, a replay, an expired step, or a
- * throttle. Written once so no future branch can accidentally be more informative than the others —
+ * throttle. One catalogue entry, so no future branch can accidentally be more informative than the others —
  * which is the only way an attacker learns anything here.
  */
-const INVALID_CODE = 'Invalid code';
+function switcherOf(
+	interaction: Interaction,
+	page: SwitchPage
+): SwitcherProps | undefined {
+	return switcherFor(
+		interaction.id,
+		page,
+		languageOf(interaction),
+		interaction.payload.alternative
+	);
+}
+
+function invalidCode(interaction: Interaction): string {
+	return SIGN_IN_TEXTS[languageOf(interaction)].errors.invalidCode;
+}
 
 import { ApplicationConfig, configuration } from 'lib/configs/application.js';
 import { isPlainObject } from 'lib/helpers/_/object.js';
@@ -459,7 +497,12 @@ async function completeDeviceInteraction(
 		oidc.session.payload.state = { secret };
 		oidc.session.keep();
 		await setCookies();
-		return deviceInputPage({ action, secret, err: renderErr });
+		return deviceInputPage({
+			action,
+			secret,
+			err: renderErr,
+			language: languageOf(interaction)
+		});
 	}
 }
 
@@ -538,29 +581,19 @@ async function createGrant(
 	};
 }
 
-const LIFETIME_DATE = (sameYear: boolean) =>
-	new Intl.DateTimeFormat('en-GB', {
-		day: 'numeric',
-		month: 'long',
-		...(sameYear ? {} : { year: 'numeric' }),
-		timeZone: 'UTC'
-	});
-
 /*
  * The date until which an app keeps access it was given with `offline_access`: the grant's expiry, which
  * every refresh is bounded by and which re-consenting never extends. Formatted here, once, so the server
  * render and the browser show the same string whatever the browser's locale or clock.
  */
-function lifetimeDate(exp: number): string {
-	const date = new Date(exp * 1000);
-	const sameYear = date.getUTCFullYear() === new Date().getUTCFullYear();
-	return LIFETIME_DATE(sameYear).format(date);
+function lifetimeDate(exp: number, language: Language): string {
+	return formatDate(language, exp * 1000);
 }
 
-function requestedAgo(iat: number | undefined): string {
+function requestedAgo(iat: number | undefined, language: Language): string {
 	const minutes = iat === undefined ? 0 : Math.floor((epochTime() - iat) / 60);
-	if (minutes < 1) return 'just now';
-	return minutes === 1 ? '1 minute ago' : `${minutes} minutes ago`;
+	if (minutes < 1) return CONSENT_TEXTS[language].warning.justNow;
+	return formatMinutesAgo(language, minutes);
 }
 
 /*
@@ -790,7 +823,7 @@ async function consentViewFor(
 					code.payload.userCode,
 					ApplicationConfig['deviceFlow.mask']
 				),
-				requestedAgo: requestedAgo(code.payload.iat)
+				requestedAgo: requestedAgo(code.payload.iat, languageOf(interaction))
 			};
 		}
 	}
@@ -843,7 +876,9 @@ async function consentViewFor(
 		scopeDescriptions: ApplicationConfig['consent.scopeDescriptions'],
 		rarLabels,
 		...(adminResource ? { adminResource } : {}),
-		...(refreshIssued ? { keepsAccessUntil: lifetimeDate(grantExpiry) } : {}),
+		...(refreshIssued
+			? { keepsAccessUntil: lifetimeDate(grantExpiry, languageOf(interaction)) }
+			: {}),
 		canSwitchAccount: !accountNamedByRequest(params),
 		...(device ? { device } : {}),
 		...(client?.['consent.partial'] ? { partial: true } : {}),
@@ -884,7 +919,7 @@ async function passwordDoorClosed(
 	);
 	// `=== false` exactly: absent means available, which is what a bucket predating the field must get.
 	return bucket?.passwordLogin === false
-		? passwordLoginClosedPage(uid)
+		? passwordLoginClosedPage(uid, languageOf(interaction))
 		: undefined;
 }
 
@@ -903,7 +938,10 @@ async function unverifiedAtSignIn(
 	bucket: UserBucket,
 	loginOptions: LoginOptions
 ): Promise<Response> {
-	const sent = await sendOnDemand(user, bucket, { reuseOutstanding: true });
+	const sent = await sendOnDemand(user, bucket, {
+		reuseOutstanding: true,
+		language: languageOf(interaction)
+	});
 	if (
 		(sent.outcome === 'sent' || sent.outcome === 'outstanding') &&
 		sent.method === 'code'
@@ -922,18 +960,21 @@ async function unverifiedAtSignIn(
 		bucketId: bucket._id
 	};
 	await interaction.persist();
+	const T = SIGN_IN_TEXTS[languageOf(interaction)].errors;
 	const errorMessage =
 		sent.outcome === 'sent'
-			? `We sent a verification link to ${user.email}. Follow it, then sign in.`
+			? text(T.verificationSent, { email: user.email })
 			: sent.outcome === 'outstanding'
-				? `Please verify your email before signing in. Follow the link we sent to ${user.email}.`
+				? text(T.verificationOutstanding, { email: user.email })
 				: sent.outcome === 'rate_limited'
-					? 'A verification message was sent recently. Check your inbox.'
-					: 'We could not send the verification message. Try again later.';
+					? T.verificationRecent
+					: T.verificationUnsent;
 	return loginServer(uid, {
 		errorMessage,
 		verificationResend: true,
 		handOffTo: redirectUriOf(interaction),
+		language: languageOf(interaction),
+		switcher: switcherOf(interaction, 'login'),
 		...loginOptions
 	});
 }
@@ -1124,11 +1165,13 @@ export const ui = new Elysia()
 			 */
 			const clientId = clientIdOf(interaction);
 			return loginServer(uid, {
-				notice: resolveNotice(query.notice),
+				notice: resolveNotice(query.notice, languageOf(interaction)),
 				// Only once this sign-in has proved the password of an unverified account (see the resend route).
 				verificationResend:
 					interaction.payload.pendingVerification !== undefined,
 				handOffTo: redirectUriOf(interaction),
+				language: languageOf(interaction),
+				switcher: switcherOf(interaction, 'login'),
 				...(await loginOptionsForClient(
 					clientId,
 					resourceOf(interaction),
@@ -1173,8 +1216,11 @@ export const ui = new Elysia()
 			 */
 			const refuse = () =>
 				loginServer(uid, {
-					errorMessage: 'Invalid username or password',
+					errorMessage:
+						SIGN_IN_TEXTS[languageOf(interaction)].errors.invalidCredentials,
 					handOffTo: redirectUriOf(interaction),
+					language: languageOf(interaction),
+					switcher: switcherOf(interaction, 'login'),
 					...loginOptions
 				});
 
@@ -1328,7 +1374,9 @@ export const ui = new Elysia()
 		}
 		return totpServer(uid, {
 			mode: 'verify',
-			handOffTo: redirectUriOf(interaction)
+			handOffTo: redirectUriOf(interaction),
+			language: languageOf(interaction),
+			switcher: switcherOf(interaction, 'totp')
 		});
 	})
 	.post(
@@ -1347,8 +1395,10 @@ export const ui = new Elysia()
 			const refuse = () =>
 				totpServer(uid, {
 					mode: 'verify',
-					errorMessage: INVALID_CODE,
-					handOffTo: redirectUriOf(interaction)
+					errorMessage: invalidCode(interaction),
+					handOffTo: redirectUriOf(interaction),
+					language: languageOf(interaction),
+					switcher: switcherOf(interaction, 'totp')
 				});
 
 			if (pending.attempts >= MAX_ATTEMPTS_PER_INTERACTION) {
@@ -1440,7 +1490,9 @@ export const ui = new Elysia()
 			mode: 'enroll',
 			otpauthUri,
 			secretText,
-			handOffTo: redirectUriOf(interaction)
+			handOffTo: redirectUriOf(interaction),
+			language: languageOf(interaction),
+			switcher: switcherOf(interaction, 'totp/enroll')
 		});
 	})
 	.post(
@@ -1507,10 +1559,12 @@ export const ui = new Elysia()
 				);
 				return totpServer(uid, {
 					mode: 'enroll',
-					errorMessage: INVALID_CODE,
+					errorMessage: invalidCode(interaction),
 					otpauthUri,
 					secretText,
-					handOffTo: redirectUriOf(interaction)
+					handOffTo: redirectUriOf(interaction),
+					language: languageOf(interaction),
+					switcher: switcherOf(interaction, 'totp/enroll')
 				});
 			}
 
@@ -1573,7 +1627,7 @@ export const ui = new Elysia()
 						providerId: provider.id,
 						reason: err.reason
 					});
-					return federationUpstreamPage();
+					return federationUpstreamPage(languageOf(interaction));
 				}
 				throw err;
 			}
@@ -1609,7 +1663,7 @@ export const ui = new Elysia()
 		async ({ params: { uid }, query, interaction, cookie, route, request }) => {
 			const handoff = await consumeHandoff(query.ref, uid);
 			if (!handoff?.accountId) {
-				return federationExpiredPage();
+				return federationExpiredPage(languageOf(interaction));
 			}
 
 			const clientId = clientIdOf(interaction);
@@ -1621,7 +1675,7 @@ export const ui = new Elysia()
 			const user = await getUserStore(bucketId).find(handoff.accountId);
 			// Re-read rather than trusted from the record: an account frozen between hops must not sign in.
 			if (!user || !canSignIn(user)) {
-				return federationInactivePage();
+				return federationInactivePage(languageOf(interaction));
 			}
 
 			/*
@@ -1649,7 +1703,9 @@ export const ui = new Elysia()
 				 * spec 021 made real. A second verification flow would be two answers to a settled question.
 				 */
 				try {
-					const { id, method } = await issueAndSend(user, bucket);
+					const { id, method } = await issueAndSend(user, bucket, {
+						language: languageOf(interaction)
+					});
 					if (method === 'code') {
 						return Response.redirect(
 							`/verify-email/code?ref=${encodeURIComponent(id)}`,
@@ -1657,7 +1713,7 @@ export const ui = new Elysia()
 						);
 					}
 				} catch {
-					return federationUpstreamPage();
+					return federationUpstreamPage(languageOf(interaction));
 				}
 				return Response.redirect(buildUILoginPath(uid, NOTICE_VERIFY), 303);
 			}
@@ -1700,6 +1756,7 @@ export const ui = new Elysia()
 				return Response.redirect(buildUILoginPath(uid), 303);
 			}
 			const sent = await sendOnDemand(user, bucket, {
+				language: languageOf(interaction),
 				reuseOutstanding: false
 			});
 			const notice =
@@ -1714,7 +1771,15 @@ export const ui = new Elysia()
 	.get('ui/:uid/forgot-password', async ({ params: { uid }, interaction }) => {
 		const closed = await passwordDoorClosed(interaction, uid);
 		// There is no password to reset, so offering the form would be a dead end dressed as help.
-		return closed ?? resetRequestPage(uid);
+		return (
+			closed ??
+			resetRequestPage(
+				uid,
+				undefined,
+				languageOf(interaction),
+				switcherOf(interaction, 'forgot-password')
+			)
+		);
 	})
 	.post(
 		'ui/:uid/forgot-password',
@@ -1740,8 +1805,8 @@ export const ui = new Elysia()
 			 * here?": asking twice within a minute told anybody. The limits still apply, silently, and the
 			 * page says what they are.
 			 */
-			await requestPasswordReset(body.email, bucketId);
-			return resetRequestAcceptedPage();
+			await requestPasswordReset(body.email, bucketId, languageOf(interaction));
+			return resetRequestAcceptedPage(languageOf(interaction));
 		},
 		{
 			body: t.Object({
@@ -1766,9 +1831,13 @@ export const ui = new Elysia()
 			)
 		);
 		if (bucket && !bucket.registrationOpen) {
-			return registrationClosedPage();
+			return registrationClosedPage(languageOf(interaction));
 		}
-		return registrationServer(uid, { handOffTo: redirectUriOf(interaction) });
+		return registrationServer(uid, {
+			handOffTo: redirectUriOf(interaction),
+			language: languageOf(interaction),
+			switcher: switcherOf(interaction, 'registration')
+		});
 	})
 	.post(
 		'ui/:uid/registration',
@@ -1787,25 +1856,33 @@ export const ui = new Elysia()
 
 			// A closed bucket accepts no self-service sign-ups: no account, no email.
 			if (bucket && !bucket.registrationOpen) {
-				return registrationClosedPage();
+				return registrationClosedPage(languageOf(interaction));
 			}
 
 			// The user's own form comes back with their address still in it. Neither password is echoed,
 			// into the markup or the props.
 			if (body.password !== body.confirmPassword) {
 				return registrationServer(uid, {
-					errorMessage: 'Passwords do not match',
+					errorMessage:
+						SIGN_IN_TEXTS[languageOf(interaction)].errors.passwordsDiffer,
 					email: body.email,
-					handOffTo: redirectUriOf(interaction)
+					handOffTo: redirectUriOf(interaction),
+					language: languageOf(interaction),
+					switcher: switcherOf(interaction, 'registration')
 				});
 			}
 			// Before the existing-address branch, so a short password is refused the same way whether or
 			// not the address is taken — answering it differently would say which one it is.
 			if (body.password.length < END_USER_PASSWORD_MIN_LENGTH) {
 				return registrationServer(uid, {
-					errorMessage: END_USER_PASSWORD_TOO_SHORT,
+					errorMessage: passwordTooShort(
+						languageOf(interaction),
+						END_USER_PASSWORD_MIN_LENGTH
+					),
 					email: body.email,
-					handOffTo: redirectUriOf(interaction)
+					handOffTo: redirectUriOf(interaction),
+					language: languageOf(interaction),
+					switcher: switcherOf(interaction, 'registration')
 				});
 			}
 
@@ -1845,7 +1922,9 @@ export const ui = new Elysia()
 
 			if (verificationRequired && bucket) {
 				try {
-					const { id, method } = await issueAndSend(user, bucket);
+					const { id, method } = await issueAndSend(user, bucket, {
+						language: languageOf(interaction)
+					});
 					if (method === 'code') {
 						return Response.redirect(
 							`/verify-email/code?ref=${encodeURIComponent(id)}`,
@@ -1855,7 +1934,7 @@ export const ui = new Elysia()
 					return Response.redirect(buildUILoginPath(uid, NOTICE_VERIFY), 303);
 				} catch {
 					// Delivery failed: the account exists but is unverified; invite a retry.
-					return registrationSendFailedPage();
+					return registrationSendFailedPage(languageOf(interaction));
 				}
 			}
 
@@ -1886,7 +1965,9 @@ export const ui = new Elysia()
 	)
 	.get('ui/:uid/consent', async ({ params: { uid }, interaction, signsInto }) =>
 		consentServer(await consentViewFor(uid, interaction, signsInto), {
-			handOffTo: redirectUriOf(interaction)
+			handOffTo: redirectUriOf(interaction),
+			language: languageOf(interaction),
+			switcher: switcherOf(interaction, 'consent')
 		})
 	)
 	.post(
@@ -1951,6 +2032,38 @@ export const ui = new Elysia()
 				 * answer as a mismatch — rather than a validation error that says which field was missing.
 				 */
 				accountId: t.Optional(t.String())
+			})
+		}
+	)
+	/*
+	 * The language switch (specs/097). Inside the `ui` app, so the guard above already holds: the interaction
+	 * cookie, the expiry and the host-bucket origin — the same protection every other form here relies on.
+	 * Both fields are checked against closed lists: the language must be English or this visitor's own, and
+	 * the page one of the interaction's pages, so the redirect is built from the uid and nothing the request
+	 * says, and nothing submitted is ever written back.
+	 */
+	.post(
+		'ui/:uid/language',
+		async ({ body, params: { uid }, interaction, cookie }) => {
+			const { alternative } = interaction.payload;
+			const page = SWITCH_PAGES.find((p) => p === body.page);
+			const language =
+				body.lang === 'en' || (alternative && body.lang === alternative)
+					? body.lang
+					: undefined;
+			if (page && language && alternative) {
+				cookie[LANGUAGE_COOKIE].set(languageCookie(language));
+				interaction.payload.language = language;
+				interaction.payload.languageChosen = true;
+				await interaction.persist();
+			}
+			const back = page ?? interaction.payload.prompt?.name ?? 'login';
+			return Response.redirect(buildUIPath(uid, back), 303);
+		},
+		{
+			body: t.Object({
+				lang: t.Optional(t.String()),
+				page: t.Optional(t.String())
 			})
 		}
 	)

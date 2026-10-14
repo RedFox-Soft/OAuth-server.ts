@@ -3,7 +3,9 @@ import { beforeAll, describe, expect, it } from 'bun:test';
 import bootstrap from '../test_helper.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { ACCOUNT_PAGE_COOKIE } from 'lib/consts/account_page.ts';
-import { ACCOUNT_PAGE_TEXTS } from 'lib/account_page/texts.ts';
+import { ACCOUNT_TEXTS } from 'lib/i18n/texts/account/index.ts';
+
+const ACCOUNT_PAGE_TEXTS = ACCOUNT_TEXTS.en;
 import { ISSUER } from 'lib/configs/env.js';
 import { present } from '../shape.ts';
 import {

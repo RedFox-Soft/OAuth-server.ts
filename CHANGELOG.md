@@ -11,6 +11,17 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- **End-user pages and emails in English, Russian and Simplified Chinese** (spec 097). The language comes from
+  the person's own choice, the application's `ui_locales` (query, request object or PAR), the account's stored
+  locale, then the browser, and is decided once per sign-in; Traditional Chinese falls back to English rather
+  than to the wrong script, and no value of any signal causes an error. A no-script switch under the card
+  offers English and back to a visitor whose own language is not English; the choice is kept in a `_lang`
+  cookie and saved to the account at sign-in (not for directory-provisioned accounts). Emails follow the
+  account's language, else the page that asked for them, and their links open pages in the email's language.
+  Both discovery documents publish `ui_locales_supported`. Protocol answers (`error`, `error_description`, JSON)
+  are unchanged. The Chinese translation has not been reviewed by a native speaker. Also: the error page now has
+  a heading of its own, and the connected-apps page writes dates in the reader's language.
+
 - **Every end-user page follows the device's light or dark scheme** (spec 096). Sign-in, registration,
   two-step verification, consent, sign-out, device code, error, password reset, email verification and the
   connected-apps page all turn dark when the device prefers it, with no script, cookie or setting; the admin

@@ -2,6 +2,7 @@ import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import type { PipelineParams } from 'lib/consts/param_list.js';
 import combinedScope from '../../helpers/combined_scope.ts';
 import { deviceSuccessPage } from '../../html/device.js';
+import { languageOfContext } from '../../i18n/request.js';
 import { expiresWithSession } from '../../addon/index.js';
 import { eventBus } from '../../event_bus.js';
 import { includeSid } from 'lib/models/client.js';
@@ -55,5 +56,12 @@ export default async function deviceVerificationResponse(
 
 	eventBus.emit('authorization.success', oidc);
 
-	return deviceSuccessPage({ client: oidc.client });
+	// After a sign-in the interaction decided the language; a device approved by a signed-in browser has only
+	// the request to go on.
+	return deviceSuccessPage({
+		client: oidc.client,
+		language:
+			oidc.entities.Interaction?.payload.language ??
+			languageOfContext(oidc).language
+	});
 }

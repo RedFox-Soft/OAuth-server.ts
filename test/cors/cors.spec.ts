@@ -465,7 +465,8 @@ describe('CORS', () => {
 						for (const [name] of res.headers) {
 							expect(name.startsWith('access-control-')).toBe(false);
 						}
-						expect(res.headers.get('vary')).toBeNull();
+						// A page may vary by language (specs/097); none may vary by the requesting origin.
+						expect(res.headers.get('vary') ?? '').not.toMatch(/origin/i);
 					}
 				}
 			);

@@ -9,6 +9,7 @@ import { resolveNonceSecret } from './nonceSecret.js';
 import { DEFAULT_ACR_VALUES } from '../consts/acr.js';
 import type { UserCodeCharset } from '../helpers/user_codes.js';
 import { initPairwiseSalt } from './pairwiseSalt.js';
+import { SUPPORTED_LANGUAGES } from '../i18n/languages.js';
 import type { OIDCContext } from '../helpers/oidc_context.js';
 
 /* A registration policy: reads the request and may adjust the client properties being registered. */
@@ -62,7 +63,8 @@ const discoveryDefaults: DiscoveryExtensions = {
 	op_policy_uri: undefined,
 	op_tos_uri: undefined,
 	service_documentation: undefined,
-	ui_locales_supported: undefined
+	// The languages end-user pages are written in (specs/097): a fact of this build, not a setting.
+	ui_locales_supported: [...SUPPORTED_LANGUAGES]
 };
 
 export const ApplicationConfig = {

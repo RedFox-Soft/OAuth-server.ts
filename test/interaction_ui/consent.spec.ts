@@ -3,7 +3,10 @@ import { describe, it, expect, beforeAll, beforeEach } from 'bun:test';
 import bootstrap, { agent, type Setup } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { Grant } from 'lib/models/grant.js';
-import { CONSENT_TEXTS } from 'lib/interactions/consentTexts.js';
+import { CONSENT_TEXTS as CONSENT_CATALOGUE } from 'lib/i18n/texts/consent/index.ts';
+import { text as fill } from 'lib/i18n/message.tsx';
+
+const CONSENT_TEXTS = CONSENT_CATALOGUE.en;
 import { visible } from '../page_text.js';
 import { PAYMENT_TYPE, RESOURCE } from './consent.config.ts';
 import { present } from 'test/shape.js';
@@ -124,7 +127,7 @@ describe('consent page — every permission, stated once (US3)', () => {
 		const positions = [
 			text.indexOf(CONSENT_TEXTS.groups.see),
 			text.indexOf(CONSENT_TEXTS.groups.act),
-			text.indexOf(CONSENT_TEXTS.groups.other)
+			text.indexOf(CONSENT_TEXTS.groups.undescribed)
 		];
 		expect(positions.every((p) => p >= 0)).toBeTrue();
 		expect(positions).toEqual([...positions].sort((a, b) => a - b));
@@ -139,7 +142,9 @@ describe('consent page — every permission, stated once (US3)', () => {
 	it('shows a resource scope nobody described by its technical name, under the resource', async () => {
 		const { text } = await renderFourKinds();
 
-		expect(text).toContain(CONSENT_TEXTS.resource.undescribedOwner(RESOURCE));
+		expect(text).toContain(
+			fill(CONSENT_TEXTS.resource.undescribedOwner, { owner: RESOURCE })
+		);
 		expect(text).toContain('api:read');
 	});
 
@@ -203,6 +208,8 @@ describe('consent page — every permission, stated once (US3)', () => {
 			headers: { cookie: header(session.jar) }
 		});
 
-		expect(visible(bodyOf(data))).toContain(CONSENT_TEXTS.repeat.nothingNew);
+		expect(visible(bodyOf(data))).toContain(
+			fill(CONSENT_TEXTS.repeat.nothingNew, { items: '' }).split(':')[0]
+		);
 	});
 });

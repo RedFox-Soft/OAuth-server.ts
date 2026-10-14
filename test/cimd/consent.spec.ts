@@ -10,7 +10,10 @@ import {
 import bootstrap, { type Setup } from '../test_helper.js';
 import { clearDocumentCache } from 'lib/client_metadata_document/cache.ts';
 import { resolver } from 'lib/client_metadata_document/fetch.ts';
-import { CONSENT_TEXTS as T } from 'lib/interactions/consentTexts.js';
+import { CONSENT_TEXTS } from 'lib/i18n/texts/consent/index.ts';
+import { text as fill } from 'lib/i18n/message.tsx';
+
+const T = CONSENT_TEXTS.en;
 import { serveDocument, mock } from './document_host.js';
 import { openConsent } from '../consent_page/flow.ts';
 
@@ -62,7 +65,9 @@ describe('the consent page for a document-identified client', () => {
 
 		expect(page.view.client.tier).toBe('self-registered');
 		expect(page.text).toContain(`${T.host.label} app.example.com`);
-		expect(page.text).toContain(T.host.notChecked(page.view.service.host));
+		expect(page.text).toContain(
+			fill(T.host.notChecked, { service: page.view.service.host })
+		);
 		// The document's host is the redirect's host, so it is not shown a second time.
 		expect(page.view.redirect.documentHost).toBeUndefined();
 	});
@@ -144,7 +149,9 @@ describe('the consent page for a document-identified client', () => {
 		);
 
 		expect(page.view.client.tier).toBe('this-organization');
-		expect(page.text).not.toContain(T.host.notChecked(page.view.service.host));
+		expect(page.text).not.toContain(
+			fill(T.host.notChecked, { service: page.view.service.host })
+		);
 		expect(page.text).toContain('client.example.com');
 	});
 });

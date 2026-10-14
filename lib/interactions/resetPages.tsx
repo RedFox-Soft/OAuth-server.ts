@@ -8,6 +8,10 @@ import { page } from './plainPage.js';
 import { esc } from '../html/escape.js';
 import { foxVar } from '../html/theme/palette.js';
 import type { SetPasswordPurpose } from '../password_reset/types.js';
+import type { Language } from '../i18n/languages.js';
+import { html, text } from '../i18n/message.js';
+import { PLAIN_TEXTS } from '../i18n/texts/plain/index.js';
+import { languageSwitchHtml, type SwitcherProps } from './languageSwitch.js';
 
 /*
  * What the page knows about the link it was opened from (specs/089). A reset and an administrator's invitation
@@ -30,10 +34,19 @@ function errorHtml(error?: string): string {
 
 // Where a locked-out user starts. Inside the interaction (the form posts back to `ui/:uid`), because the
 // bucket an address is looked up in has to come from the client that began the authorization request.
-export function resetRequestPage(uid: string, error?: string): Response {
+export function resetRequestPage(
+	uid: string,
+	error?: string,
+	language: Language = 'en',
+	switcher?: SwitcherProps
+): Response {
+	const t = PLAIN_TEXTS[language].reset.request;
+	const switchHtml = switcher ? languageSwitchHtml(switcher, language) : '';
 	return page(
-		'Reset your password',
-		`<h2 style="color:${foxVar('text')};">Reset your password</h2><p style="color:${foxVar('text-secondary')};">Enter the email address for your account and we will send you a link to choose a new password.</p>${errorHtml(error)}<form method="post" action="/ui/${esc(uid)}/forgot-password"><input name="email" type="email" autocomplete="email" placeholder="you@example.com" required style="${input}"/><button type="submit" style="${button}">Send reset link</button></form><p style="margin-top:12px;"><a href="/ui/${esc(uid)}/login" style="color:${foxVar('link')};">Back to sign in</a></p>`
+		t.title,
+		`<h2 style="color:${foxVar('text')};">${html(t.heading)}</h2><p style="color:${foxVar('text-secondary')};">${html(t.lead)}</p>${errorHtml(error)}<form method="post" action="/ui/${esc(uid)}/forgot-password"><input name="email" type="email" autocomplete="email" placeholder="${html(t.emailPlaceholder)}" required style="${input}"/><button type="submit" style="${button}">${html(t.submit)}</button></form><p style="margin-top:12px;"><a href="/ui/${esc(uid)}/login" style="color:${foxVar('link')};">${html(t.back)}</a></p>${switchHtml}`,
+		200,
+		{ language }
 	);
 }
 
@@ -44,10 +57,13 @@ export function resetRequestPage(uid: string, error?: string): Response {
  * interpolated, so "byte-identical across outcomes" is a property of this function rather than a promise
  * made by its callers.
  */
-export function resetRequestAcceptedPage(): Response {
+export function resetRequestAcceptedPage(language: Language = 'en'): Response {
+	const t = PLAIN_TEXTS[language].reset.accepted;
 	return page(
-		'Check your email',
-		`<h2 style="color:${foxVar('text')};">Check your email</h2><p style="color:${foxVar('text-secondary')};">If that address has an account, a password reset link is on its way. The link expires in one hour.</p><p style="color:${foxVar('text-muted')}; font-size:13px;">Not seeing it? Check your spam folder first. A new link is sent at most once a minute and a few times a day, so a request made sooner than that sends nothing.</p>`
+		t.title,
+		`<h2 style="color:${foxVar('text')};">${html(t.heading)}</h2><p style="color:${foxVar('text-secondary')};">${html(t.body)}</p><p style="color:${foxVar('text-muted')}; font-size:13px;">${html(t.hint)}</p>`,
+		200,
+		{ language }
 	);
 }
 
@@ -56,34 +72,37 @@ export function resetRequestAcceptedPage(): Response {
 export function resetFormPage(
 	token: string,
 	context: SetPasswordContext,
-	error?: string
+	error?: string,
+	language: Language = 'en'
 ): Response {
+	const texts = PLAIN_TEXTS[language].reset;
 	const invited = context.purpose === 'invite';
-	const title = invited
-		? `Set your password for ${context.bucketName}`
-		: 'Choose a new password';
+	const t = invited ? texts.inviteForm : texts.form;
+	const values = { bucket: context.bucketName };
 	const lead = invited
-		? `<p style="color:${foxVar('text-secondary')};">Choose the password you will sign in with. Setting it also confirms your email address.</p>`
+		? `<p style="color:${foxVar('text-secondary')};">${html(texts.inviteForm.lead)}</p>`
 		: '';
 	return page(
-		title,
-		`<h2 style="color:${foxVar('text')};">${esc(title)}</h2>${lead}${errorHtml(error)}<form method="post" action="/reset-password"><input type="hidden" name="token" value="${esc(token)}"/><input name="password" type="password" autocomplete="new-password" placeholder="${invited ? 'Password' : 'New password'}" required style="${input}"/><input name="confirmPassword" type="password" autocomplete="new-password" placeholder="${invited ? 'Repeat password' : 'Repeat new password'}" required style="${input}"/><button type="submit" style="${button}">${invited ? 'Set password' : 'Set new password'}</button></form>`,
+		text(t.title, values),
+		`<h2 style="color:${foxVar('text')};">${html(t.title, values)}</h2>${lead}${errorHtml(error)}<form method="post" action="/reset-password"><input type="hidden" name="token" value="${esc(token)}"/><input name="password" type="password" autocomplete="new-password" placeholder="${html(t.password)}" required style="${input}"/><input name="confirmPassword" type="password" autocomplete="new-password" placeholder="${html(t.confirm)}" required style="${input}"/><button type="submit" style="${button}">${html(t.submit)}</button></form>`,
 		// A re-render after a rejected submission is a failed request, and says so — the same rule
 		// loginServer follows for its own error re-render.
-		error ? 400 : 200
+		error ? 400 : 200,
+		{ language }
 	);
 }
 
-export function resetSuccessPage(purpose: SetPasswordPurpose): Response {
-	if (purpose === 'invite') {
-		return page(
-			'Password set',
-			`<h2 style="color:${foxVar('text')};">Your password is set</h2><p style="color:${foxVar('text-secondary')};">You can sign in now. Return to the application and sign in with your email address and the password you just chose.</p>`
-		);
-	}
+export function resetSuccessPage(
+	purpose: SetPasswordPurpose,
+	language: Language = 'en'
+): Response {
+	const texts = PLAIN_TEXTS[language].reset;
+	const t = purpose === 'invite' ? texts.inviteSuccess : texts.success;
 	return page(
-		'Password updated',
-		`<h2 style="color:${foxVar('text')};">Password updated</h2><p style="color:${foxVar('text-secondary')};">Your password has been changed and you have been signed out everywhere. Return to the application to sign in.</p>`
+		t.title,
+		`<h2 style="color:${foxVar('text')};">${html(t.heading)}</h2><p style="color:${foxVar('text-secondary')};">${html(t.body)}</p>`,
+		200,
+		{ language }
 	);
 }
 
@@ -93,10 +112,12 @@ export function resetSuccessPage(purpose: SetPasswordPurpose): Response {
  * something about another. It cannot say whether the link was a reset or an invitation either: knowing that
  * takes a valid link, so it speaks for both.
  */
-export function resetFailurePage(): Response {
+export function resetFailurePage(language: Language = 'en'): Response {
+	const t = PLAIN_TEXTS[language].reset.failure;
 	return page(
-		'Link invalid',
-		`<h2 style="color:${foxVar('text')};">This link is no longer valid</h2><p style="color:${foxVar('text-secondary')};">Reset links expire after an hour and invitation links after 7 days; a newer one replaces an older one, and each works once.</p><p style="color:${foxVar('text-muted')}; font-size:13px;">Request a new reset link from the application's sign-in page, or ask whoever invited you to send another invitation.</p>`,
-		400
+		t.title,
+		`<h2 style="color:${foxVar('text')};">${html(t.heading)}</h2><p style="color:${foxVar('text-secondary')};">${html(t.body)}</p><p style="color:${foxVar('text-muted')}; font-size:13px;">${html(t.hint)}</p>`,
+		400,
+		{ language }
 	);
 }

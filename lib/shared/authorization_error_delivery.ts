@@ -9,6 +9,9 @@ import { captureFault } from 'lib/error_store/capture.js';
 import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import type { PipelineParams } from 'lib/consts/param_list.js';
 import type { ErrorSurface } from 'lib/adapters/types.js';
+import type { Language } from 'lib/i18n/languages.js';
+import { languageOfRequest } from 'lib/i18n/request.js';
+import { uiLocalesRanges } from 'lib/i18n/resolve.js';
 
 /*
  * Returning an authorization error to the client, wherever the request ended.
@@ -162,7 +165,12 @@ export async function deliverAuthorizationError(
 	 */
 	const response = (await redirectUrisVouchedFor(oidc.client))
 		? send(oidc, answer)
-		: confirmationPage({ answer, error: body.error, redirectUri });
+		: confirmationPage({
+				answer,
+				error: body.error,
+				redirectUri,
+				language: deliveryLanguage(oidc, capture.request)
+			});
 
 	/*
 	 * A fault reported to the client still has to be findable by the operator, and the shared handler's
@@ -189,4 +197,20 @@ export async function deliverAuthorizationError(
 	}
 
 	return response;
+}
+
+/*
+ * The page offering the error is in the sign-in's language when there was a sign-in (the interaction decided
+ * it), and otherwise in what this request asks for: the person's choice, the application's `ui_locales`, the
+ * browser (specs/097).
+ */
+function deliveryLanguage(
+	oidc: OIDCContext<PipelineParams>,
+	request: Request
+): Language {
+	const decided = oidc.entities.Interaction?.payload.language;
+	if (decided) return decided;
+	const uiLocales =
+		'ui_locales' in oidc.params ? oidc.params.ui_locales : undefined;
+	return languageOfRequest(request, [uiLocalesRanges(uiLocales)]).language;
 }

@@ -9,6 +9,16 @@ import { ttl } from 'lib/configs/liveTime.js';
 import { Interaction } from 'lib/models/interaction.js';
 import { eventBus } from '../../event_bus.js';
 import { consentWaived } from '../../shared/consent_waiver.js';
+import { getUserStore } from '../../adapters/index.js';
+import { languageFromCookieHeader } from '../../i18n/cookie.js';
+import {
+	acceptLanguageRanges,
+	resolveLanguage,
+	singleRange,
+	storedLocaleRanges,
+	uiLocalesRanges,
+	type ResolvedLanguage
+} from '../../i18n/resolve.js';
 
 /*
  * The two login-prompt checks that compare a requested authentication context against the one the
@@ -119,6 +129,8 @@ export default async function interactions(oidc: OIDCContext<PipelineParams>) {
 
 	const uid = nanoid();
 	const cookieID = nanoid();
+	const { language, alternative } = await interactionLanguage(oidc);
+	const languageChosen = oidc.entities.Interaction?.payload.languageChosen;
 
 	const interactionSession = new Interaction(uid, {
 		prompt,
@@ -137,7 +149,10 @@ export default async function interactions(oidc: OIDCContext<PipelineParams>) {
 		// hand-off and a flow needing two interactions loses it entirely.
 		parJti:
 			oidc.entities.PushedAuthorizationRequest?.jti ||
-			oidc.entities.Interaction?.payload.parJti
+			oidc.entities.Interaction?.payload.parJti,
+		language,
+		...(alternative ? { alternative } : {}),
+		...(languageChosen ? { languageChosen } : {})
 	});
 
 	await interactionSession.save(ttl.Interaction);
@@ -154,4 +169,33 @@ export default async function interactions(oidc: OIDCContext<PipelineParams>) {
 	eventBus.emit('interaction.started', oidc, prompt);
 	const destination = `/ui/${uid}/${prompt.name}`;
 	return destination;
+}
+
+/*
+ * The page language of a new interaction (specs/097). A follow-up interaction of the same authorization —
+ * consent after the password — takes the one that just finished, so a sign-in never changes language between
+ * two of its pages. Otherwise it is decided here, once: the person's own choice, the application's
+ * `ui_locales`, the account's stored locale when a session already names the account, then the browser.
+ */
+async function interactionLanguage(
+	oidc: OIDCContext
+): Promise<ResolvedLanguage> {
+	const previous = oidc.entities.Interaction?.payload;
+	if (previous?.language) {
+		return previous.alternative
+			? { language: previous.language, alternative: previous.alternative }
+			: { language: previous.language };
+	}
+	const accountId = oidc.session.payload.accountId;
+	const account = accountId
+		? await getUserStore(oidc.signInBucket._id).find(accountId)
+		: undefined;
+	return resolveLanguage([
+		singleRange(languageFromCookieHeader(oidc.get('cookie'))),
+		uiLocalesRanges(
+			'ui_locales' in oidc.params ? oidc.params.ui_locales : undefined
+		),
+		storedLocaleRanges(account ?? undefined),
+		acceptLanguageRanges(oidc.get('accept-language'))
+	]);
 }

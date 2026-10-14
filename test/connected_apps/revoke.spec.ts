@@ -6,7 +6,10 @@ import { ISSUER } from 'lib/configs/env.js';
 import { getBucketStore } from 'lib/adapters/index.ts';
 import { DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { ACCOUNT_PAGE_TEXTS as T } from 'lib/account_page/texts.ts';
+import { ACCOUNT_TEXTS } from 'lib/i18n/texts/account/index.ts';
+import { text as fill } from 'lib/i18n/message.tsx';
+
+const T = ACCOUNT_TEXTS.en;
 import { AuthorizationRequest } from '../AuthorizationRequest.ts';
 import { mock as mockHttp } from '../fetch_mock.js';
 import { createAdministrator } from '../administrators.ts';
@@ -70,8 +73,8 @@ describe('removing an application’s access', () => {
 
 		expect(response.status).toBe(200);
 		const text = textOf(html);
-		expect(text).toContain(T.confirmTitle('Mail Sync'));
-		expect(text).toContain(T.confirmEffect('Mail Sync'));
+		expect(text).toContain(fill(T.confirmTitle, { app: 'Mail Sync' }));
+		expect(text).toContain(fill(T.confirmEffect, { app: 'Mail Sync' }));
 		expect(text).toContain(T.confirmAsksAgain);
 		expect(html).toContain('<form method="post" action="/account/apps"');
 		expect(html).toContain('name="clientId" value="offline-app"');
@@ -115,9 +118,9 @@ describe('removing an application’s access', () => {
 
 		expect(after.status).toBe(200);
 		const text = textOf(await after.text());
-		expect(text).toContain(T.done('Mail Sync'));
+		expect(text).toContain(fill(T.done, { app: 'Mail Sync' }));
 		expect(text).toContain('Timesheets');
-		expect(text).not.toContain(T.confirmTitle('Mail Sync'));
+		expect(text).not.toContain(fill(T.confirmTitle, { app: 'Mail Sync' }));
 		expect(text.match(/Mail Sync/g)?.length).toBe(1);
 	});
 
