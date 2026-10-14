@@ -45,8 +45,8 @@ const OG_OUT = resolve(import.meta.dir, '../public/og');
 process.chdir(resolve(import.meta.dir, '../..'));
 
 /*
- * lib/index.ts listens on :3000 as a side effect of import, and on Windows a second listener binds
- * to an already-bound port silently instead of failing with EADDRINUSE. Without this check the
+ * This script binds :3000 itself, and on Windows a second listener binds to an already-bound port
+ * silently instead of failing with EADDRINUSE. Without this check the
  * capture would seed a developer's real, Mongo-backed dev server with demo data instead of the
  * in-memory instance it thinks it booted.
  */
@@ -67,8 +67,13 @@ async function assertPortFree(): Promise<void> {
 }
 await assertPortFree();
 
-// Dynamic imports so the environment above is in place before lib/ evaluates.
-await import('../../lib/index.ts'); // listens on :3000
+/*
+ * Dynamic imports so the environment above is in place before lib/ evaluates. Importing lib/index.ts
+ * boots the app but, under NODE_ENV=test, does not listen — a test run must not take a local server's
+ * requests — so the port is opened here.
+ */
+const { elysia } = await import('../../lib/index.ts');
+elysia.listen(3000);
 const { ensureAdminSeed } = await import('../../lib/admin/seed.ts');
 await ensureAdminSeed();
 

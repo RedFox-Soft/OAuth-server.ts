@@ -260,3 +260,5 @@ Operations:
 ## [2026-10-13] create | spec 096 (dark theme), uncommitted: new [[end-user-colour-scheme]]; [[interaction-page-families]] records the palette on the plain pages and the server-extracted antd custom properties (the hydrated pages no longer paint unstyled before their bundle); [[html-rendering]] the `theme/` directory and the console-only `zeroRuntime.tsx`; [[html-response-security-policy]] a plain page's `style-src-elem` is one hash, not `'none'`; [[consent-screen-decisions]] the logo plate light in both schemes.
 
 ## [2026-10-14] update | [[sentry-elysia-10.73.0]] — `@sentry/bun` moved from `11.5.0` to `11.6.0`, still exact-pinned, with the Dependabot batch; the reading itself is unchanged.
+
+## [2026-10-14] update | [[spec-file-isolation]] — the test-mode listen guard keys on `NODE_ENV`, so the site capture (which boots with `NODE_ENV=test`) now listens itself; it had broken the site build since 7a2f110.

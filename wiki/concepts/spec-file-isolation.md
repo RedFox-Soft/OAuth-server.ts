@@ -4,7 +4,7 @@ title: "Spec-file isolation"
 tags: [testing, gotcha, decision]
 sources: [oauth-server-codebase]
 created: 2026-10-13
-updated: 2026-10-13
+updated: 2026-10-14
 ---
 
 # Spec-file isolation
@@ -68,6 +68,11 @@ run — a browser rig, `bun start` — was answered at random by the test proces
 its clients, sessions or interactions: a sign-in got a 500 or "interaction session not found" with no
 fault recorded in the server that was meant to answer. The listen now sits behind the same
 `NODE_ENV !== 'test'` guard as the hourly closer and purger (`lib/index.ts:312`).
+
+The guard reads `NODE_ENV`, not "this is `bun test`", so any other process that boots the app with
+`NODE_ENV=test` gets no port either. The site's screenshot capture does exactly that to get the in-memory
+adapter, and it broke the site build until it called `elysia.listen(3000)` itself
+(`website/scripts/capture.ts:76`, 2026-10-14).
 
 ## Why reset, not detect
 
