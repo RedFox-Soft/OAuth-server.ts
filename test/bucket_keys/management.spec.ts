@@ -24,13 +24,13 @@ function later(seconds: number) {
 }
 
 async function generate(bucketId: string, cookie: string, alg: string) {
-	return call('POST', `/admin/api/buckets/${bucketId}/keys`, cookie, { alg });
+	return call('POST', `/admin/api/projects/${bucketId}/keys`, cookie, { alg });
 }
 
 async function promote(bucketId: string, cookie: string, kid: string) {
 	return call(
 		'POST',
-		`/admin/api/buckets/${bucketId}/keys/${encodeURIComponent(kid)}/promote`,
+		`/admin/api/projects/${bucketId}/keys/${encodeURIComponent(kid)}/promote`,
 		cookie
 	);
 }
@@ -44,7 +44,7 @@ async function retire(
 ) {
 	return call(
 		'DELETE',
-		`/admin/api/buckets/${bucketId}/keys/${encodeURIComponent(kid)}`,
+		`/admin/api/projects/${bucketId}/keys/${encodeURIComponent(kid)}`,
 		cookie,
 		confirm === null ? undefined : { confirm }
 	);
@@ -124,7 +124,7 @@ describe('the owning group administrator', () => {
 
 		const { body: read } = await call(
 			'GET',
-			`/admin/api/buckets/${bucket._id}/keys`,
+			`/admin/api/projects/${bucket._id}/keys`,
 			cookie
 		);
 		const keys = read.keys as Array<{ kid: string; signedUntil?: string }>;

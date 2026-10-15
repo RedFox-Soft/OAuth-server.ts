@@ -4,7 +4,7 @@ title: "A cookie's Path is part of its identity"
 tags: [contract, gotcha, architecture]
 sources: [oauth-server-codebase]
 created: 2026-08-27
-updated: 2026-10-08
+updated: 2026-10-15
 graph:
   node_type: concept
   relationships:
@@ -73,12 +73,14 @@ attributes it was created with, derived from the same constant that set it.
 
 ## The name varies too, now, and it multiplies the same rule
 
-A session cookie is `_session_<bucket>` — `_session_default`, `_session_acme` — because a bucket is a
-population of its own and a browser may hold a sign-in in more than one ([[bucket-is-an-issuer]]).
+A session cookie is `_session_<project>` — `_session_default`, `_session_acme` — because a project is a
+population of its own and a browser may hold a sign-in in more than one ([[project-is-an-issuer]]).
+(A project is stored as a bucket, and the code keeps that name: `sessionCookieName(bucket)` takes a
+`RequestBucket`. Spec 100 renamed nothing a browser holds — every cookie name and path below is as it was.)
 So the identity this page is about now has **two** variable parts on the same cookie, and the rule is
 unchanged: one derivation, used to write and to clear. `sessionCookieName(bucket)` in
 `lib/consts/param_list.ts` is that derivation, and it is the whole of it — `expiredSessionCookie()`
-supplies the attributes, the caller supplies the bucket, and neither hand-writes a name.
+supplies the attributes, the caller supplies the project, and neither hand-writes a name.
 
 It lives in `param_list.ts`, which imports nothing, because three modules need it and two of them
 cannot import each other: `lib/shared/session.ts` writes the cookie, `lib/models/session.ts` reads it,
@@ -86,29 +88,29 @@ and the first already imports the second.
 
 Two consequences worth stating, because both are ways to clear nothing while reporting success:
 
-- **The bucket comes from the request, never from the cookie.** A forged `_session_<anything>` is read
-  only where the server independently resolved that same bucket, and its value must still name a
+- **The project comes from the request, never from the cookie.** A forged `_session_<anything>` is read
+  only where the server independently resolved that same project, and its value must still name a
   session record.
-- **A bucket with no slug shares the default bucket's name.** It has no address of its own, so its
-  clients use the bare endpoints — and the sign-in screen, which knows the bucket from the *client*,
-  must agree with `/auth` and `/logout`. Falling back to the bucket's record id instead made those two
+- **A project with no slug shares the Default project's name.** It has no address of its own, so its
+  clients use the bare endpoints — and the sign-in screen, which knows the project from the *client*,
+  must agree with `/auth` and `/logout`. Falling back to the project's record id instead made those two
   disagree: the sign-in completed, wrote `_session_<id>`, and the next request looked for
   `_session_default` and found nobody.
 
-### At the root the address does not name one bucket, so the client does
+### At the root the address does not name one project, so the client does
 
-The first bullet used to read "from the address", and that was the defect. Two buckets are served at
-the root — the default one and the administrators' ([[bucket-is-an-issuer]]) — so the bare paths are
+The first bullet used to read "from the address", and that was the defect. Two projects are served at
+the root — the Default one and the administrators' ([[project-is-an-issuer]]) — so the bare paths are
 one address for two populations and the address alone cannot say which a sign-in is for. Only the
 client can, and `resolveBucketForRequest` is where that is already answered for everything else in a
 sign-in: the resumption, the login POST, `findAccount`.
 
 Naming the cookie from the address made `/auth` and the resumption disagree about the same sign-in.
 `/auth` read `_session_default`, recorded that session's `uid` on the interaction, and
-`lib/interactions/index.ts`'s `resume()` — which has always resolved its bucket from the client —
+`lib/interactions/index.ts`'s `resume()` — which has always resolved its project from the client —
 read `_session_admin`, found another session, and threw **`interaction session and authentication
 session mismatch`**. It only fired for an operator whose browser already held an authenticated
-default-bucket cookie, because an interaction records a session only when that session carries an
+Default-project cookie, because an interaction records a session only when that session carries an
 account (`lib/models/interaction.ts`), which is why a clean browser and every existing spec signed in
 perfectly. The quieter half of the same bug: a console session was never recognised at `/auth` at
 all, so the password was asked for on every authorization request.
@@ -118,26 +120,26 @@ Signing *out* has the same hole and cannot take the same fix. `/logout` is two l
 session, which it must first find by cookie name. Resolving the first leg from the client would simply
 move the disagreement to the second. So the sign-out keeps naming the cookie from the address and
 **refuses** a client that does not share that cookie, which is the actual defect: an `id_token_hint` is
-validated against the issuer, the two root-served buckets share one, and a named bucket's token was
+validated against the issuer, the two root-served projects share one, and a named project's token was
 never checked here at all — so a token minted for one population ended another's sign-in. The
-comparison is by cookie *name*, not by bucket id, because buckets that share a cookie share a sign-in
+comparison is by cookie *name*, not by project id, because projects that share a cookie share a sign-in
 and their clients have always ended each other's at the bare endpoints.
 
 The fix is one field with one writer. `OIDCContext.signInBucket` defaults to `bucket` — the address,
 which is the honest answer everywhere else — and the authorization pipeline assigns it from
-`checkBucket`'s own resolution, which is why that check now returns the bucket it compared against
+`checkBucket`'s own resolution, which is why that check now returns the project it compared against
 rather than resolving it a second time. The session is therefore read **after** `checkBucket`, not
 at the top of the handler: a session loaded earlier would be the client's before anything had
 established the client may be used at this address at all. `signInBucket` is deliberately not folded
-into `bucket`, which is what `issuerFor` stamps into a token — a bucket with no address of its own
+into `bucket`, which is what `issuerFor` stamps into a token — a project with no address of its own
 would silently change issuer.
 
-The bare `_session` is no longer a legacy name: since `536d9b7` it is the session cookie of a bucket
-addressed by a hostname of its own ([[bucket-is-an-issuer]]). A `clearLegacySessionCookie` used to
-expire it on every request that presented it; on such a bucket's origin that cleared the live cookie,
+The bare `_session` is no longer a legacy name: since `536d9b7` it is the session cookie of a project
+addressed by a hostname of its own ([[project-is-an-issuer]]). A `clearLegacySessionCookie` used to
+expire it on every request that presented it; on such a project's origin that cleared the live cookie,
 and an anonymous session not re-issued in the same response was lost. It was removed on 2026-10-08. On
-the issuer's origin the pre-2026-09-16 cookie is simply never read, and no host-addressed bucket shares
-that origin, so a stale one cannot reach the bucket that now owns the name.
+the issuer's origin the pre-2026-09-16 cookie is simply never read, and no host-addressed project shares
+that origin, so a stale one cannot reach the project that now owns the name.
 
 The connected-apps page's pending sign-in cookie, `_account_apps` (spec 095), follows the rule from birth: it
 lives on the page's own path (`/account/apps` or `/<slug>/account/apps`), and the set and the clear derive that
@@ -160,8 +162,8 @@ that gap, and the same blindness applies to any spec that threads cookies throug
   that was quietly writing `_session` with no attributes at all.
 - [[remember-me-session-retention]] — the same blindness one field over: a session-cookie lifetime no
   test could see, because the tests that named the distinction threaded cookies through by hand. The
-  answer is now per bucket: declining in one leaves another's alone, which falls out of them being
+  answer is now per project: declining in one leaves another's alone, which falls out of them being
   separate cookies.
-- [[bucket-is-an-issuer]] — why the name carries the partition and the path cannot: the default bucket
-  is served at the root, so its cookie must live at `Path=/`, where every other bucket's path sees it.
+- [[project-is-an-issuer]] — why the name carries the partition and the path cannot: the Default project
+  is served at the root, so its cookie must live at `Path=/`, where every other project's path sees it.
 - [[html-response-security-policy]] — the neighbouring per-response policy derived from one owner.

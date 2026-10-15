@@ -66,7 +66,7 @@ describe('clearing a lost authenticator (US5)', () => {
 	it('reports whether an account is enrolled, and when', async () => {
 		const user = await enrolledAccount(bucketId);
 		const res = await client.admin.api
-			.buckets({ id: bucketId })
+			.projects({ id: bucketId })
 			.users.get({ headers: { cookie: admin.cookie } });
 
 		expect(res.status).toBe(200);
@@ -81,7 +81,7 @@ describe('clearing a lost authenticator (US5)', () => {
 			'hash'
 		);
 		const res = await client.admin.api
-			.buckets({ id: bucketId })
+			.projects({ id: bucketId })
 			.users.get({ headers: { cookie: admin.cookie } });
 		const listed = answered(res.data).users.find((u) => u._id === user._id);
 		expect(listed?.totpEnrolled).toBe(false);
@@ -96,13 +96,13 @@ describe('clearing a lost authenticator (US5)', () => {
 		await enrolledAccount(bucketId);
 
 		const list = await client.admin.api
-			.buckets({ id: bucketId })
+			.projects({ id: bucketId })
 			.users.get({ headers: { cookie: admin.cookie } });
 		expect(JSON.stringify(list.data)).not.toContain(SECRET);
 		expect(JSON.stringify(list.data)).not.toContain('"totp"');
 
 		const created = await client.admin.api
-			.buckets({ id: bucketId })
+			.projects({ id: bucketId })
 			.users.post(
 				{ email: `${unique('fresh')}@x.io`, password: 'hunter22hunter' },
 				{ headers: { cookie: admin.cookie } }
@@ -115,7 +115,7 @@ describe('clearing a lost authenticator (US5)', () => {
 		const user = await enrolledAccount(bucketId);
 
 		const res = await client.admin.api
-			.buckets({ id: bucketId })
+			.projects({ id: bucketId })
 			.users({ uid: user._id })
 			.totp.delete(undefined, { headers: { cookie: admin.cookie } });
 
@@ -133,7 +133,7 @@ describe('clearing a lost authenticator (US5)', () => {
 		);
 
 		await client.admin.api
-			.buckets({ id: bucketId })
+			.projects({ id: bucketId })
 			.users({ uid: user._id })
 			.totp.delete(undefined, { headers: { cookie: admin.cookie } });
 
@@ -155,7 +155,7 @@ describe('clearing a lost authenticator (US5)', () => {
 		);
 
 		await client.admin.api
-			.buckets({ id: bucketId })
+			.projects({ id: bucketId })
 			.users({ uid: user._id })
 			.totp.delete(undefined, { headers: { cookie: admin.cookie } });
 
@@ -168,7 +168,7 @@ describe('clearing a lost authenticator (US5)', () => {
 			'hash'
 		);
 		const res = await client.admin.api
-			.buckets({ id: bucketId })
+			.projects({ id: bucketId })
 			.users({ uid: user._id })
 			.totp.delete(undefined, { headers: { cookie: admin.cookie } });
 		// An operator should not have to know the current state to reach the intended one.
@@ -177,7 +177,7 @@ describe('clearing a lost authenticator (US5)', () => {
 
 	it('answers 404 for an account that does not exist', async () => {
 		const res = await client.admin.api
-			.buckets({ id: bucketId })
+			.projects({ id: bucketId })
 			.users({ uid: 'no-such-account' })
 			.totp.delete(undefined, { headers: { cookie: admin.cookie } });
 		expect(res.status).toBe(404);
@@ -188,7 +188,7 @@ describe('clearing a lost authenticator (US5)', () => {
 		const outsider = await sessionCookieFor('plain');
 
 		const res = await client.admin.api
-			.buckets({ id: bucketId })
+			.projects({ id: bucketId })
 			.users({ uid: user._id })
 			.totp.delete(undefined, { headers: { cookie: outsider.cookie } });
 
@@ -201,7 +201,7 @@ describe('clearing a lost authenticator (US5)', () => {
 		const user = await enrolledAccount(bucketId);
 
 		const res = await client.admin.api
-			.buckets({ id: bucketId })
+			.projects({ id: bucketId })
 			.users({ uid: user._id })
 			.totp.delete();
 
@@ -214,7 +214,7 @@ describe('clearing a lost authenticator (US5)', () => {
 		const user = await enrolledAccount(bucketId);
 
 		await client.admin.api
-			.buckets({ id: bucketId })
+			.projects({ id: bucketId })
 			.users({ uid: user._id })
 			.totp.delete(undefined, { headers: { cookie: admin.cookie } });
 
@@ -248,7 +248,7 @@ describe('clearing a lost authenticator (US5)', () => {
 		);
 
 		await client.admin.api
-			.buckets({ id: bucketId })
+			.projects({ id: bucketId })
 			.users({ uid: user._id })
 			.totp.delete(undefined, { headers: { cookie: admin.cookie } });
 

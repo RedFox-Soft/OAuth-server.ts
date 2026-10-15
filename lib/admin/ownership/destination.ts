@@ -30,14 +30,14 @@ export async function loadDestination(
 ): Promise<Group> {
 	const unknown = () =>
 		admin.superAdmin
-			? new AdminError(404, 'group not found')
-			: new AdminError(403, 'no access to this group');
+			? new AdminError(404, 'team not found')
+			: new AdminError(403, 'no access to this team');
 	if (isSuperAdminsGroup(groupId)) throw unknown();
 	const group = await getGroupStore().find(groupId);
 	if (!group) throw unknown();
 	assertGroupMember(admin, groupId);
 	if (group.kind === 'personal' && group.members[0]?.userId !== admin.userId) {
-		throw new AdminError(403, 'a personal group belongs to its administrator');
+		throw new AdminError(403, 'a personal team belongs to its administrator');
 	}
 	return group;
 }
@@ -68,7 +68,7 @@ export function sourceGroupOf(
 	const sources = [...new Set(owners)].filter((id) => id !== destination);
 	const only = sources.at(0);
 	if (only === undefined) {
-		throw new AdminError(409, 'already owned by this group');
+		throw new AdminError(409, 'already owned by this team');
 	}
 	return only;
 }

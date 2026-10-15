@@ -71,7 +71,7 @@ async function send(
 /* As the console sends it: the change, then consent to the preview of whom it leaves without a way in. */
 const passwordsOff = (cookie: string) =>
 	consenting((consent) =>
-		send('PATCH', `/admin/api/buckets/${ADMIN_BUCKET_ID}`, cookie, {
+		send('PATCH', `/admin/api/projects/${ADMIN_BUCKET_ID}`, cookie, {
 			passwordLogin: false,
 			...consent
 		})
@@ -155,7 +155,7 @@ describe('keeping the console reachable', () => {
 		it('disabling the last provider a super administrator can use is refused', async () => {
 			const res = await send(
 				'PATCH',
-				`/admin/api/buckets/${ADMIN_BUCKET_ID}/federation/${CORP}`,
+				`/admin/api/projects/${ADMIN_BUCKET_ID}/federation/${CORP}`,
 				cookie,
 				{ enabled: false }
 			);
@@ -166,7 +166,7 @@ describe('keeping the console reachable', () => {
 		it('narrowing that provider so it no longer admits the super administrator is refused', async () => {
 			const res = await send(
 				'PATCH',
-				`/admin/api/buckets/${ADMIN_BUCKET_ID}/federation/${CORP}`,
+				`/admin/api/projects/${ADMIN_BUCKET_ID}/federation/${CORP}`,
 				cookie,
 				{ allowedEmailDomains: ['elsewhere.example'] }
 			);
@@ -176,7 +176,7 @@ describe('keeping the console reachable', () => {
 		it('deleting that provider is refused', async () => {
 			const res = await send(
 				'DELETE',
-				`/admin/api/buckets/${ADMIN_BUCKET_ID}/federation/${CORP}`,
+				`/admin/api/projects/${ADMIN_BUCKET_ID}/federation/${CORP}`,
 				cookie
 			);
 			expect(res.status).toBe(409);

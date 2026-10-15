@@ -182,7 +182,7 @@ describe('end-user emails in the person’s language', () => {
 			const created = await adminCall(
 				cookie,
 				'POST',
-				`/admin/api/buckets/${DEFAULT_BUCKET_ID}/users`,
+				`/admin/api/projects/${DEFAULT_BUCKET_ID}/users`,
 				{ email }
 			);
 			const id =
@@ -198,7 +198,7 @@ describe('end-user emails in the person’s language', () => {
 			await adminCall(
 				cookie,
 				'POST',
-				`/admin/api/buckets/${DEFAULT_BUCKET_ID}/users/${id}/invitation`
+				`/admin/api/projects/${DEFAULT_BUCKET_ID}/users/${id}/invitation`
 			);
 
 			expect(only(email).language).toBe(expected);

@@ -29,7 +29,7 @@ async function read(
 	cookie: string
 ): Promise<{ status: number; body: unknown }> {
 	const response = await app.handle(
-		new Request(`http://e.ly/admin/api/buckets/${bucketId}/resources`, {
+		new Request(`http://e.ly/admin/api/projects/${bucketId}/resources`, {
 			headers: { cookie }
 		})
 	);
@@ -37,12 +37,12 @@ async function read(
 }
 
 const Namespace = Type.Object({
-	namespace: Type.Union([Type.Literal('bucket'), Type.Literal('root')]),
+	namespace: Type.Union([Type.Literal('project'), Type.Literal('root')]),
 	resources: Type.Array(
 		Type.Object({
 			identifier: Type.String(),
 			name: Type.String(),
-			bucketId: Type.String()
+			projectId: Type.String()
 		})
 	)
 });
@@ -87,8 +87,8 @@ describe("a bucket's resource namespace", () => {
 
 		expect(res.status).toBe(200);
 		const listed = shaped(Namespace, res.body);
-		expect(listed.namespace).toBe('bucket');
-		expect(listed.resources.map((r) => [r.identifier, r.bucketId])).toEqual([
+		expect(listed.namespace).toBe('project');
+		expect(listed.resources.map((r) => [r.identifier, r.projectId])).toEqual([
 			[a, bucket._id],
 			[b, bucket._id]
 		]);

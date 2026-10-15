@@ -122,13 +122,13 @@ export function Admins({
 			? await confirm('admin.superAdmin.grant', {
 					target: target.email,
 					consequences: [
-						'They gain authority over every group, setting and key of this instance.'
+						'They gain authority over every team, setting and key of this instance.'
 					]
 				})
 			: await confirm('admin.superAdmin.withdraw', {
 					target: target.email,
 					consequences: [
-						'They keep their groups but lose authority over the whole instance.'
+						'They keep their teams but lose authority over the whole instance.'
 					]
 				});
 		if (!yes) return;
@@ -147,7 +147,7 @@ export function Admins({
 			target: target.email,
 			consequences: [
 				'They cannot sign in to the console, and any page they have open stops working at its next request.',
-				'Their account, groups and history are kept; Activate gives them back.'
+				'Their account, teams and history are kept; Activate gives them back.'
 			]
 		});
 		if (yes) {
@@ -159,7 +159,7 @@ export function Admins({
 		const yes = await confirm('admin.activate', {
 			target: target.email,
 			consequences: [
-				'They can sign in to the console again, with everything their groups grant.'
+				'They can sign in to the console again, with everything their teams grant.'
 			]
 		});
 		if (yes) {

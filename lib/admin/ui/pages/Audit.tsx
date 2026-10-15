@@ -43,7 +43,7 @@ interface AuditPage {
  * instants only for the request.
  */
 const FILTER_KEYS = [
-	'bucket',
+	'project',
 	'connection',
 	'actor',
 	'action',
@@ -64,14 +64,14 @@ const EMPTY_FILTERS = Object.fromEntries(
 ) as Filters;
 
 const CHIP_LABEL: Record<FilterKey, string> = {
-	bucket: 'Bucket',
+	project: 'Project',
 	connection: 'Connection',
 	actor: 'Actor',
 	action: 'Action',
 	actionPrefix: 'Action starts with',
 	targetType: 'Target type',
 	targetId: 'Target',
-	targetScope: 'In bucket',
+	targetScope: 'In project',
 	viaSurface: 'Surface',
 	viaClientId: 'Agent',
 	from: 'From',
@@ -123,7 +123,7 @@ interface Draft {
 	action: string;
 	targetType: string;
 	targetId: string;
-	bucket: string;
+	project: string;
 	viaSurface: Surface | '';
 	from: string;
 	to: string;
@@ -136,7 +136,7 @@ function draftOf(filters: Filters): Draft {
 		action: filters.actionPrefix || filters.action,
 		targetType: filters.targetType,
 		targetId: filters.targetId,
-		bucket: filters.bucket,
+		project: filters.project,
 		viaSurface: filters.viaSurface as Surface | '',
 		from: filters.from,
 		to: filters.to
@@ -152,7 +152,7 @@ const TEXT_FILTERS = [
 	},
 	{ name: 'targetType' as const, placeholder: 'Target type', width: 160 },
 	{ name: 'targetId' as const, placeholder: 'Target id', width: 200 },
-	{ name: 'bucket' as const, placeholder: 'Bucket id', width: 160 }
+	{ name: 'project' as const, placeholder: 'Project id', width: 160 }
 ];
 
 export function Audit() {
@@ -173,7 +173,7 @@ export function Audit() {
 	);
 	const [current, setCurrent] = useState(1);
 	const [pageSize, setPageSize] = useState(50);
-	// Readable names for the bucket and connection chips, keyed "bucket:<id>" / "connection:<id>".
+	// Readable names for the project and connection chips, keyed "project:<id>" / "connection:<id>".
 	const [names, setNames] = useState<Map<string, string>>(new Map());
 
 	// Every state write follows an await, so the effect below may call it.
@@ -195,7 +195,7 @@ export function Audit() {
 				}
 				setFailed(null);
 				setPage(result.data);
-				// A directory's name comes with its entries; a bucket's from its own read, when readable.
+				// A directory's name comes with its entries; a project's from its own read, when readable.
 				const found = new Map<string, string>();
 				for (const entry of result.data.entries) {
 					if (
@@ -208,13 +208,13 @@ export function Audit() {
 						);
 					}
 				}
-				for (const key of ['bucket', 'targetScope'] as const) {
+				for (const key of ['project', 'targetScope'] as const) {
 					if (!active[key]) continue;
-					const bucket = await request<{ name: string }>(
+					const project = await request<{ name: string }>(
 						'GET',
-						`/admin/api/buckets/${encodeURIComponent(active[key])}`
+						`/admin/api/projects/${encodeURIComponent(active[key])}`
 					);
-					if (bucket.ok) found.set(`${key}:${active[key]}`, bucket.data.name);
+					if (project.ok) found.set(`${key}:${active[key]}`, project.data.name);
 				}
 				setNames(found);
 			} finally {
@@ -362,7 +362,7 @@ export function Audit() {
 		},
 		/*
 		 * What else the action carried with it: what a deletion destroyed, the applications and APIs that moved with a
-		 * bucket, the members an upgrade removed. A separate column from "Fields set" rather than more
+		 * project, the members an upgrade removed. A separate column from "Fields set" rather than more
 		 * tags in it, because the two answer different questions: one says what the request changed, this
 		 * says what else it reached. The verb comes from the action, so a move is never read as a deletion.
 		 */
@@ -373,7 +373,7 @@ export function Audit() {
 				const kinds = Object.entries(cascade ?? {});
 				const verb = row.action.endsWith('.owner.change')
 					? 'moved'
-					: row.action === 'group.member.remove'
+					: row.action === 'team.member.remove'
 						? 'removed'
 						: 'destroyed';
 				return kinds.length === 0 ? (
@@ -501,7 +501,7 @@ function FilterBar({
 			actionPrefix: action.endsWith('.') ? action : '',
 			targetType: draft.targetType,
 			targetId: draft.targetId,
-			bucket: draft.bucket,
+			project: draft.project,
 			viaSurface: draft.viaSurface,
 			from: draft.from,
 			to: draft.to

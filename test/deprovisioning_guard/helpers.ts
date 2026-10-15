@@ -68,7 +68,7 @@ export async function guarded(threshold?: Threshold): Promise<Guarded> {
 }
 
 export function connectionPath(g: Guarded): string {
-	return `/admin/api/buckets/${g.bucket._id}/provisioning-connections/${g.connection._id}`;
+	return `/admin/api/projects/${g.bucket._id}/provisioning-connections/${g.connection._id}`;
 }
 
 export function setThreshold(

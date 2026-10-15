@@ -16,19 +16,19 @@ import type { PeriodFigure } from './read.js';
 export type GroupKind = 'personal' | 'regular' | 'system';
 
 /*
- * Who a bucket belongs to, as a reader is shown it. `groupId` is null only when nobody recorded the owner —
+ * Who a bucket belongs to, as a reader is shown it: its team (specs/100). `teamId` is null only when nobody recorded the owner —
  * a bucket deleted before owners were kept. `exists` says whether the group can still be opened: false for
  * that unknown owner and for a deleted bucket's group that has since been deleted too.
  */
 export interface CustomerRef {
-	groupId: string | null;
+	teamId: string | null;
 	label: string;
 	kind: GroupKind | null;
 	exists: boolean;
 }
 
 export interface OverviewRow {
-	bucketId: string;
+	projectId: string;
 	name: string;
 	slug: string | null;
 	reserved: 'default' | 'administrators' | null;
@@ -63,7 +63,7 @@ export interface CustomerSummary {
 	customer: CustomerRef;
 	contacts: string[];
 	memberCount: number;
-	bucketIds: string[];
+	projectIds: string[];
 	current: Sum | null;
 	previous: Sum | null;
 }
@@ -72,14 +72,14 @@ export interface InstanceSummary {
 	months: (Sum | null)[];
 	days: (number | null)[];
 	previousDays: (number | null)[];
-	activeBuckets: number;
+	activeProjects: number;
 	activeCustomers: number;
 	today: number | null;
 	change: Change | null;
 }
 
 export interface SharpChange {
-	bucketId: string;
+	projectId: string;
 	name: string;
 	customer: CustomerRef;
 	from: { period: string; total: number };
@@ -102,7 +102,7 @@ export interface OverviewAnswer {
 	countingSince: string;
 	months: string[];
 	daysFinal: boolean[];
-	buckets: OverviewRow[];
+	projects: OverviewRow[];
 	customers: CustomerSummary[];
 	instance: InstanceSummary;
 	changes: SharpChanges;
@@ -124,7 +124,7 @@ export const SHARP_CHANGE_MIN_SHARE = 0.3;
 const UNKNOWN_CUSTOMER_KEY = '\u0000unknown';
 
 export function customerKey(customer: CustomerRef): string {
-	return customer.groupId ?? UNKNOWN_CUSTOMER_KEY;
+	return customer.teamId ?? UNKNOWN_CUSTOMER_KEY;
 }
 
 /*
@@ -223,7 +223,7 @@ export function instanceSummary(
 		months,
 		days,
 		previousDays: sumDays(readable.map((row) => row.previousDays)),
-		activeBuckets: active.length,
+		activeProjects: active.length,
 		activeCustomers: new Set(active.map((row) => customerKey(row.customer)))
 			.size,
 		today: isCurrentMonth ? (days[days.length - 1] ?? null) : null,
@@ -248,7 +248,7 @@ export function customerSummaries(
 			customer: held[0].customer,
 			contacts: details.get(key)?.contacts ?? [],
 			memberCount: details.get(key)?.memberCount ?? 0,
-			bucketIds: held.map((row) => row.bucketId),
+			projectIds: held.map((row) => row.projectId),
 			current: sumMonth(held, 0),
 			previous: sumMonth(held, 1)
 		})
@@ -289,7 +289,7 @@ export function sharpChanges(
 				continue;
 			}
 			changes.push({
-				bucketId: row.bucketId,
+				projectId: row.projectId,
 				name: row.name,
 				customer: row.customer,
 				from: { period: from, total: earlier.total },

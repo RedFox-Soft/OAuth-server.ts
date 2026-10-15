@@ -33,7 +33,7 @@ describe('an administrator acting on a user managed by a provisioning connection
 		const user = await provisionedUser();
 
 		const res = await admin.admin.api
-			.buckets({ id: DEFAULT_BUCKET_ID })
+			.projects({ id: DEFAULT_BUCKET_ID })
 			.users({ uid: user._id })
 			.patch({ claims: {} }, { headers: { cookie } });
 
@@ -50,7 +50,7 @@ describe('an administrator acting on a user managed by a provisioning connection
 		const user = await provisionedUser();
 
 		const res = await admin.admin.api
-			.buckets({ id: DEFAULT_BUCKET_ID })
+			.projects({ id: DEFAULT_BUCKET_ID })
 			.users({ uid: user._id })
 			.delete(undefined, { headers: { cookie } });
 

@@ -68,12 +68,24 @@ describe('console addresses', () => {
 	});
 
 	it('a signed-out request for a console address is sent to sign-in carrying that address', async () => {
-		const res = await get('/admin/buckets/b-1/keys?tab=retired');
+		const res = await get('/admin/projects/b-1/keys?tab=retired');
 		expect(res.status).toBe(302);
 		const location = new URL(res.headers.get('location') ?? '', 'http://e.ly');
 		expect(location.pathname).toBe('/admin/login');
 		expect(location.searchParams.get('next')).toBe(
-			'/admin/buckets/b-1/keys?tab=retired'
+			'/admin/projects/b-1/keys?tab=retired'
+		);
+	});
+
+	/*
+	 * A held deprovisioning email names its connection's page by address, and emails sent before specs/100
+	 * still say `/admin/buckets/...`: the link in an administrator's inbox must keep opening that page.
+	 */
+	it('an address from a held-connection email sent before the rename opens the same page at its new address', async () => {
+		const res = await get('/admin/buckets/b-1/provisioning/conn-1', cookie);
+		expect(res.status).toBe(302);
+		expect(res.headers.get('location')).toBe(
+			'/admin/projects/b-1/provisioning/conn-1'
 		);
 	});
 

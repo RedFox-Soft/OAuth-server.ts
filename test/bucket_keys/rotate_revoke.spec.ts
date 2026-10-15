@@ -57,7 +57,7 @@ const KeyRead = Type.Object(
 async function generate(bucketId: string, cookie: string, alg: string) {
 	const res = await call(
 		'POST',
-		`/admin/api/buckets/${bucketId}/keys`,
+		`/admin/api/projects/${bucketId}/keys`,
 		cookie,
 		{
 			alg
@@ -67,7 +67,7 @@ async function generate(bucketId: string, cookie: string, alg: string) {
 }
 
 async function rotate(bucketId: string, cookie: string, alg: string) {
-	return call('POST', `/admin/api/buckets/${bucketId}/keys/rotate`, cookie, {
+	return call('POST', `/admin/api/projects/${bucketId}/keys/rotate`, cookie, {
 		alg
 	});
 }
@@ -81,7 +81,7 @@ async function revoke(
 ) {
 	return call(
 		'POST',
-		`/admin/api/buckets/${bucketId}/keys/${encodeURIComponent(kid)}/revoke`,
+		`/admin/api/projects/${bucketId}/keys/${encodeURIComponent(kid)}/revoke`,
 		cookie,
 		confirm === null ? undefined : { confirm }
 	);
@@ -175,7 +175,7 @@ describe('rotating and revoking a bucket key', () => {
 
 			const { body } = await call(
 				'GET',
-				`/admin/api/buckets/${bucket._id}/keys`,
+				`/admin/api/projects/${bucket._id}/keys`,
 				cookie
 			);
 			const keys = shaped(
@@ -364,7 +364,7 @@ describe('rotating and revoking a bucket key', () => {
 
 			const res = await call(
 				'POST',
-				`/admin/api/buckets/${bucket._id}/keys/${encodeURIComponent(key.kid)}/promote`,
+				`/admin/api/projects/${bucket._id}/keys/${encodeURIComponent(key.kid)}/promote`,
 				cookie
 			);
 

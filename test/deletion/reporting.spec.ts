@@ -95,7 +95,7 @@ describe('deletion reporting', () => {
 
 	async function deleteClient(clientId: string, cookie: string) {
 		return agent.admin.api
-			.buckets({ id: DEFAULT_BUCKET_ID })
+			.projects({ id: DEFAULT_BUCKET_ID })
 			.clients({ clientId })
 			.delete(undefined, { headers: { cookie } });
 	}
@@ -124,7 +124,7 @@ describe('deletion reporting', () => {
 		});
 
 		const res = await agent.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.delete(undefined, { headers: { cookie } });
 
 		expect(res.status).toBe(409);
@@ -148,7 +148,7 @@ describe('deletion reporting', () => {
 		await store.create('two@example.com', 'hash');
 
 		const res = await agent.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.delete(undefined, { headers: { cookie } });
 
 		expect(res.status).toBe(409);
@@ -209,7 +209,7 @@ describe('deletion reporting', () => {
 		await grant.save();
 
 		const res = await agent.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.users({ uid: user._id })
 			.delete(undefined, { headers: { cookie } });
 

@@ -81,8 +81,8 @@ const MONTHS_OFFERED = 25;
 const WHAT_COUNTS = (
 	<div style={{ maxWidth: 360 }}>
 		<p>
-			A monthly active user is a person a bucket issued tokens to — a sign-in, a
-			refresh, a silent re-authentication — counted once per calendar month in
+			A monthly active user is a person a project issued tokens to — a sign-in,
+			a refresh, a silent re-authentication — counted once per calendar month in
 			UTC.
 		</p>
 		<p>
@@ -90,8 +90,8 @@ const WHAT_COUNTS = (
 			active in more than one way, so the three add up to more than the total.
 		</p>
 		<p>
-			A customer is the group that owns a bucket. Its figure is the sum of its
-			buckets&apos; figures, not a count of distinct people.
+			A customer is the team that owns a project. Its figure is the sum of its
+			projects&apos; figures, not a count of distinct people.
 		</p>
 	</div>
 );
@@ -181,7 +181,7 @@ export function Usage({ superAdmin }: { superAdmin: boolean }) {
 		[search, preferences]
 	);
 	const rows = useMemo(
-		() => (answer ? visibleRows(answer.buckets, filters) : []),
+		() => (answer ? visibleRows(answer.projects, filters) : []),
 		[answer, filters]
 	);
 	const isCurrent = answer
@@ -222,7 +222,7 @@ export function Usage({ superAdmin }: { superAdmin: boolean }) {
 	}));
 
 	const customerCell = (customer: CustomerRef) =>
-		customer.exists && customer.groupId !== null ? (
+		customer.exists && customer.teamId !== null ? (
 			<Button
 				type="link"
 				size="small"
@@ -233,9 +233,9 @@ export function Usage({ superAdmin }: { superAdmin: boolean }) {
 			</Button>
 		) : (
 			<Typography.Text type="secondary">
-				{customer.groupId === null
+				{customer.teamId === null
 					? customer.label
-					: `${customer.label} (deleted group)`}
+					: `${customer.label} (deleted team)`}
 			</Typography.Text>
 		);
 
@@ -244,14 +244,14 @@ export function Usage({ superAdmin }: { superAdmin: boolean }) {
 
 	const bucketColumns = [
 		{
-			title: 'Bucket',
+			title: 'Project',
 			key: 'name',
 			sorter: (a: OverviewRow, b: OverviewRow) => a.name.localeCompare(b.name),
 			sortOrder: sortOrderOf('name'),
 			render: (_: unknown, row: OverviewRow) => (
 				<Space size={4}>
 					{row.deleted === null ? (
-						<Link href={bucketHref(row.bucketId)}>{row.name}</Link>
+						<Link href={bucketHref(row.projectId)}>{row.name}</Link>
 					) : (
 						<span>{row.name}</span>
 					)}
@@ -267,7 +267,7 @@ export function Usage({ superAdmin }: { superAdmin: boolean }) {
 		},
 		{
 			title: (
-				<Tooltip title="The group that owns the bucket now. A bucket moved to another group shows every month under its current owner.">
+				<Tooltip title="The team that owns the project now. A project moved to another team shows every month under its current owner.">
 					Customer (current owner)
 				</Tooltip>
 			),
@@ -341,12 +341,12 @@ export function Usage({ superAdmin }: { superAdmin: boolean }) {
 				const month = answer?.month;
 				return row.deleted === null ? (
 					<Link
-						href={`${bucketHref(row.bucketId, 'activity')}${month ? `?month=${month}` : ''}`}
+						href={`${bucketHref(row.projectId, 'activity')}${month ? `?month=${month}` : ''}`}
 					>
 						Activity
 					</Link>
 				) : (
-					<Link href={usageBucketHref(row.bucketId, month)}>Activity</Link>
+					<Link href={usageBucketHref(row.projectId, month)}>Activity</Link>
 				);
 			}
 		}
@@ -366,10 +366,10 @@ export function Usage({ superAdmin }: { superAdmin: boolean }) {
 				summary.contacts.length > 0 ? summary.contacts.join(', ') : '—'
 		},
 		{
-			title: 'Buckets',
-			key: 'buckets',
+			title: 'Projects',
+			key: 'projects',
 			render: (_: unknown, summary: CustomerSummary) =>
-				String(summary.bucketIds.length)
+				String(summary.projectIds.length)
 		},
 		{
 			title: answer?.month ?? 'This month',
@@ -419,8 +419,8 @@ export function Usage({ superAdmin }: { superAdmin: boolean }) {
 
 	/* Groups that own nothing have nothing to chart: one sentence says so instead of a page of zeros. */
 	const ownsNothing =
-		!superAdmin && answer !== null && answer.buckets.length === 0;
-	const anyReserved = answer?.buckets.some((row) => row.reserved) ?? false;
+		!superAdmin && answer !== null && answer.projects.length === 0;
+	const anyReserved = answer?.projects.some((row) => row.reserved) ?? false;
 
 	/* A search that finds nothing is not an empty instance, and a filter that hides everything is neither. */
 	const emptyRows =
@@ -432,13 +432,13 @@ export function Usage({ superAdmin }: { superAdmin: boolean }) {
 		) : (
 			<EmptyState
 				purpose={
-					filtered ? 'No bucket matches these filters.' : 'No buckets yet.'
+					filtered ? 'No project matches these filters.' : 'No projects yet.'
 				}
 			/>
 		);
 
 	const changeRow = (item: SharpChange) => (
-		<li key={item.bucketId}>
+		<li key={item.projectId}>
 			<Typography.Text strong>{item.name}</Typography.Text> ·{' '}
 			{item.customer.label} · {String(item.from.total)} →{' '}
 			{String(item.to.total)}{' '}
@@ -490,8 +490,8 @@ export function Usage({ superAdmin }: { superAdmin: boolean }) {
 					</Space>
 					<Typography.Text type="secondary">
 						{superAdmin
-							? 'Monthly active users of every bucket, with the customer that owns it.'
-							: 'Monthly active users of the buckets your groups own.'}{' '}
+							? 'Monthly active users of every project, with the customer that owns it.'
+							: 'Monthly active users of the projects your teams own.'}{' '}
 						<Popover
 							title="What counts"
 							content={WHAT_COUNTS}
@@ -528,7 +528,7 @@ export function Usage({ superAdmin }: { superAdmin: boolean }) {
 			) : null}
 
 			{ownsNothing ? (
-				<EmptyState purpose="Your groups don't own any buckets yet." />
+				<EmptyState purpose="Your teams don't own any projects yet." />
 			) : null}
 
 			{answer && instance && !ownsNothing ? (
@@ -539,7 +539,7 @@ export function Usage({ superAdmin }: { superAdmin: boolean }) {
 							<Space>
 								{filtered ? <Tag color="blue">filtered</Tag> : null}
 								{excluded > 0 ? (
-									<Tag color="orange">{`excludes ${String(excluded)} bucket${excluded === 1 ? '' : 's'}`}</Tag>
+									<Tag color="orange">{`excludes ${String(excluded)} project${excluded === 1 ? '' : 's'}`}</Tag>
 								) : null}
 							</Space>
 						}
@@ -583,8 +583,8 @@ export function Usage({ superAdmin }: { superAdmin: boolean }) {
 								md={4}
 							>
 								<Statistic
-									title="Active buckets"
-									value={instance.activeBuckets}
+									title="Active projects"
+									value={instance.activeProjects}
 								/>
 							</Col>
 							<Col
@@ -592,7 +592,7 @@ export function Usage({ superAdmin }: { superAdmin: boolean }) {
 								md={4}
 							>
 								<Statistic
-									title={superAdmin ? 'Active customers' : 'Active groups'}
+									title={superAdmin ? 'Active customers' : 'Active teams'}
 									value={instance.activeCustomers}
 								/>
 							</Col>
@@ -728,17 +728,17 @@ export function Usage({ superAdmin }: { superAdmin: boolean }) {
 								<Segmented
 									value={preferences.view}
 									options={[
-										{ value: 'bucket', label: 'By bucket' },
+										{ value: 'project', label: 'By project' },
 										{ value: 'customer', label: 'By customer' }
 									]}
 									onChange={(value) =>
 										update({
-											view: value === 'customer' ? 'customer' : 'bucket'
+											view: value === 'customer' ? 'customer' : 'project'
 										})
 									}
 								/>
 								<Input.Search
-									placeholder="Bucket or customer"
+									placeholder="Project or customer"
 									allowClear
 									style={{ width: 260 }}
 									value={search}
@@ -771,9 +771,9 @@ export function Usage({ superAdmin }: { superAdmin: boolean }) {
 									Hide deleted
 								</Checkbox>
 							</Space>
-							{preferences.view === 'bucket' ? (
+							{preferences.view === 'project' ? (
 								<Table
-									rowKey="bucketId"
+									rowKey="projectId"
 									loading={loading}
 									size="small"
 									pagination={{ pageSize: 50, hideOnSinglePage: true }}
@@ -804,14 +804,14 @@ export function Usage({ superAdmin }: { superAdmin: boolean }) {
 									expandable={{
 										expandedRowRender: (summary) => (
 											<Table
-												rowKey="bucketId"
+												rowKey="projectId"
 												size="small"
 												pagination={false}
 												columns={bucketColumns.filter(
 													(column) => column.key !== 'customer'
 												)}
 												dataSource={rows.filter((row) =>
-													summary.bucketIds.includes(row.bucketId)
+													summary.projectIds.includes(row.projectId)
 												)}
 											/>
 										)
@@ -833,7 +833,7 @@ export function Usage({ superAdmin }: { superAdmin: boolean }) {
 							) ??
 							null)
 				}
-				rows={answer?.buckets ?? []}
+				rows={answer?.projects ?? []}
 				month={answer?.month ?? ''}
 				previous={answer?.previous ?? ''}
 				onClose={() => setCustomerOf(null)}

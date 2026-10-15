@@ -55,7 +55,7 @@ async function monthTotal(
 ): Promise<{ status: number; total?: number }> {
 	const res = await app.handle(
 		new Request(
-			`http://e.ly/admin/api/buckets/${encodeURIComponent(id)}/activity`,
+			`http://e.ly/admin/api/projects/${encodeURIComponent(id)}/activity`,
 			{
 				headers: { cookie: await cookieFor(reader) }
 			}
@@ -71,8 +71,8 @@ async function overviewRow(id: string) {
 		headers: { cookie: await cookieFor(superAdmin) }
 	});
 	const body = present(res.data, 'an overview');
-	if (!('buckets' in body)) throw new Error('expected an overview');
-	return body.buckets.find((row) => row.bucketId === id);
+	if (!('projects' in body)) throw new Error('expected an overview');
+	return body.projects.find((row) => row.projectId === id);
 }
 
 /* The bucket deleted and then destroyed at once — a deletion only schedules it (specs/090). */
@@ -80,10 +80,10 @@ async function destroyedNow() {
 	const headers = { cookie: await cookieFor(owner) };
 	const query = { cascade: 'endusers' as const, expect: 1 };
 	await client.admin.api
-		.buckets({ id: bucketId })
+		.projects({ id: bucketId })
 		.delete(undefined, { headers, query });
 	return client.admin.api
-		.buckets({ id: bucketId })
+		.projects({ id: bucketId })
 		.purge.post(undefined, { headers, query });
 }
 
@@ -131,7 +131,7 @@ describe('active users after the bucket and its people change', () => {
 		const cookie = await cookieFor(owner);
 
 		const res = await client.admin.api
-			.buckets({ id: bucketId })
+			.projects({ id: bucketId })
 			.users({ uid: endUserId })
 			.delete(undefined, {
 				headers: { cookie }
@@ -149,7 +149,7 @@ describe('active users after the bucket and its people change', () => {
 		const cookie = await cookieFor(owner);
 
 		const res = await client.admin.api
-			.buckets({ id: bucketId })
+			.projects({ id: bucketId })
 			.users({ uid: endUserId })
 			.lock.post({ reason: 'history case' }, { headers: { cookie } });
 
@@ -164,7 +164,7 @@ describe('active users after the bucket and its people change', () => {
 		const cookie = await cookieFor(owner);
 
 		const user = client.admin.api
-			.buckets({ id: bucketId })
+			.projects({ id: bucketId })
 			.users({ uid: endUserId });
 
 		const res = await user['sign-out'].post(undefined, { headers: { cookie } });
@@ -178,7 +178,7 @@ describe('active users after the bucket and its people change', () => {
 
 	it("leaves the bucket's history unchanged after its name changes", async () => {
 		const res = await client.admin.api
-			.buckets({ id: bucketId })
+			.projects({ id: bucketId })
 			.patch(
 				{ name: 'Renamed for history' },
 				{ headers: { cookie: await cookieFor(owner) } }
@@ -195,9 +195,9 @@ describe('active users after the bucket and its people change', () => {
 		const cookie = await cookieFor(superAdmin);
 		const slug = `history-${String(Date.now())}`;
 		const preview = await client.admin.api
-			.buckets({ id: bucketId })
+			.projects({ id: bucketId })
 			.address.post({ slug }, { headers: { cookie } });
-		const res = await client.admin.api.buckets({ id: bucketId }).address.post(
+		const res = await client.admin.api.projects({ id: bucketId }).address.post(
 			{
 				slug,
 				confirm: true,
@@ -236,9 +236,9 @@ describe('active users after the bucket and its people change', () => {
 		const destination = await regularGroup([owner], [newMember]);
 
 		const moved = await client.admin.api
-			.buckets({ id: bucketId })
+			.projects({ id: bucketId })
 			.owner.put(
-				{ groupId: destination._id, confirm: true },
+				{ teamId: destination._id, confirm: true },
 				{ headers: { cookie: await cookieFor(owner) } }
 			);
 

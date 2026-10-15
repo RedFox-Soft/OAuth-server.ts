@@ -70,7 +70,7 @@ describe('admin-plane fault capture', () => {
 		try {
 			const response = await app.handle(
 				new Request(
-					`http://e.ly/admin/api/buckets/${DEFAULT_BUCKET_ID}/resources`,
+					`http://e.ly/admin/api/projects/${DEFAULT_BUCKET_ID}/resources`,
 					{
 						method: 'POST',
 						headers: {
@@ -102,7 +102,7 @@ describe('admin-plane fault capture', () => {
 			expect(body.error_reference).toMatch(/^err_[A-Za-z0-9_-]{16}$/);
 
 			const page = await errorStore.list({
-				route: '/admin/api/buckets/:id/resources'
+				route: '/admin/api/projects/:id/resources'
 			});
 			expect(page.total).toBe(1);
 			expect(page.groups[0].surface).toBe('admin');
@@ -119,7 +119,7 @@ describe('admin-plane fault capture', () => {
 	it('records nothing for a 4xx AdminError', async () => {
 		const response = await app.handle(
 			new Request(
-				`http://e.ly/admin/api/buckets/${DEFAULT_BUCKET_ID}/resources`,
+				`http://e.ly/admin/api/projects/${DEFAULT_BUCKET_ID}/resources`,
 				{
 					method: 'POST',
 					headers: { 'content-type': 'application/json' },

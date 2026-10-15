@@ -36,12 +36,12 @@ export const bucketKeyRoutes = new Elysia({ name: 'admin-bucket-keys' })
 				: adminErrorBody(error);
 		}
 	})
-	.get('/admin/api/buckets/:id/keys', async ({ admin, params }) => {
+	.get('/admin/api/projects/:id/keys', async ({ admin, params }) => {
 		const ctx = assertAuth(admin);
 		return listKeys(ctx, params.id);
 	})
 	.post(
-		'/admin/api/buckets/:id/keys',
+		'/admin/api/projects/:id/keys',
 		async ({ admin, params, body, set }) => {
 			const ctx = assertAuth(admin);
 			const created = await generateKey(
@@ -56,14 +56,14 @@ export const bucketKeyRoutes = new Elysia({ name: 'admin-bucket-keys' })
 		{ body: GenerateBucketKeyBody }
 	)
 	.post(
-		'/admin/api/buckets/:id/keys/:kid/promote',
+		'/admin/api/projects/:id/keys/:kid/promote',
 		async ({ admin, params }) => {
 			const ctx = assertAuth(admin);
 			return promoteKey(ctx, params.id, params.kid);
 		}
 	)
 	.delete(
-		'/admin/api/buckets/:id/keys/:kid',
+		'/admin/api/projects/:id/keys/:kid',
 		async ({ admin, params, body }) => {
 			const ctx = assertAuth(admin);
 			return retireKey(ctx, params.id, params.kid, body?.confirm);
@@ -71,7 +71,7 @@ export const bucketKeyRoutes = new Elysia({ name: 'admin-bucket-keys' })
 		{ body: t.Optional(RetireKeyBody) }
 	)
 	.post(
-		'/admin/api/buckets/:id/keys/rotate',
+		'/admin/api/projects/:id/keys/rotate',
 		async ({ admin, params, body }) => {
 			const ctx = assertAuth(admin);
 			// The schema's union is built from SUPPORTED_ALGS, so the literal is one of them.
@@ -80,7 +80,7 @@ export const bucketKeyRoutes = new Elysia({ name: 'admin-bucket-keys' })
 		{ body: RotateKeyBody }
 	)
 	.post(
-		'/admin/api/buckets/:id/keys/:kid/revoke',
+		'/admin/api/projects/:id/keys/:kid/revoke',
 		async ({ admin, params, body }) => {
 			const ctx = assertAuth(admin);
 			return revokeKey(ctx, params.id, params.kid, body?.confirm);

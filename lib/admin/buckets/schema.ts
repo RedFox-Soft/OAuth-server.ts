@@ -52,8 +52,8 @@ export const CreateBucketBody = t.Object({
 	emailVerificationRequired: t.Optional(t.Boolean()),
 	verificationMethod: t.Optional(VerificationMethod),
 	totpRequired: t.Optional(t.Boolean()),
-	/* The group the bucket is created in (specs/087); without it, the caller's active group. */
-	groupId: t.Optional(t.String({ minLength: 1 }))
+	/* The team the project is created in (specs/087); without it, the caller's active team. */
+	teamId: t.Optional(t.String({ minLength: 1 }))
 });
 
 /*
@@ -95,7 +95,7 @@ export const ChangeBucketAddressBody = t.Object({
  * and the move refuses until the caller has seen it.
  */
 export const MoveBucketOwnerBody = t.Object({
-	groupId: t.String({ minLength: 1 }),
+	teamId: t.String({ minLength: 1 }),
 	confirm: t.Optional(t.Boolean())
 });
 

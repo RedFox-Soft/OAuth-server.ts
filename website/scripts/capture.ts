@@ -25,10 +25,10 @@ const ADMIN = {
 };
 const USER_PASSWORD = 'AcmeDemo-2026!';
 /*
- * The demo bucket's address. A bucket is a tenant with its own issuer, so this is both where its
+ * The demo project's address. A project is a tenant with its own issuer, so this is both where its
  * endpoints are served and the path component of the `iss` its tokens carry.
  */
-const BUCKET_SLUG = 'acme-customers';
+const PROJECT_SLUG = 'acme-customers';
 const VIEWPORT = { width: 1440, height: 900 } as const;
 const ADMIN_HEIGHT = 640;
 const OUT = resolve(import.meta.dir, '../public/screenshots');
@@ -107,7 +107,7 @@ async function api<T>(
 }
 
 /*
- * The console's sign-in leg. `GET /admin/buckets` redirects to `/admin/login`, which starts an authorization
+ * The console's sign-in leg. `GET /admin/projects` redirects to `/admin/login`, which starts an authorization
  * code flow against this server's own issuer and lands on the interaction's login page — so the form
  * filled in here is `lib/interactions/loginPage.tsx`, not an admin-specific screen. Its inputs carry
  * placeholders rather than labels, which is why these are placeholder locators.
@@ -117,12 +117,12 @@ async function signIn(
 	email: string,
 	password: string
 ): Promise<void> {
-	await page.goto(`${ORIGIN}/admin/buckets`);
+	await page.goto(`${ORIGIN}/admin/projects`);
 	await page.getByPlaceholder('Username').fill(email);
 	await page.getByPlaceholder('Password').fill(password);
 	await page.getByRole('button', { name: 'Log in' }).click();
 	// Sign-in returns to the address it was started from (`next`).
-	await page.waitForURL(`${ORIGIN}/admin/buckets`);
+	await page.waitForURL(`${ORIGIN}/admin/projects`);
 }
 
 interface Created {
@@ -130,37 +130,37 @@ interface Created {
 }
 
 async function seed(ctx: BrowserContext): Promise<{
-	bucketId: string;
-	bucketSlug: string;
+	projectId: string;
+	projectSlug: string;
 	clientId: string;
 }> {
-	const group = await api<Created>(ctx, 'POST', '/admin/api/groups', {
+	const team = await api<Created>(ctx, 'POST', '/admin/api/teams', {
 		name: 'Acme Corp'
 	});
-	// The console's lists are scoped by the group held on the session, so everything created below
-	// has to be created *after* the switch or it lands in the bootstrap administrator's personal group.
-	await api(ctx, 'PUT', '/admin/api/scope', { groupId: group._id });
+	// The console's lists are scoped by the team held on the session, so everything created below
+	// has to be created *after* the switch or it lands in the bootstrap administrator's personal team.
+	await api(ctx, 'PUT', '/admin/api/scope', { teamId: team._id });
 	/*
-	 * The bucket is the only container (specs/099): it holds the people, their sign-in, the applications
+	 * The project is the only container (specs/099): it holds the people, their sign-in, the applications
 	 * and the APIs, so it comes first and everything else is created in it.
 	 *
-	 * The slug is the bucket's address, and it is required: a bucket is a tenant with its own issuer, so
+	 * The slug is the project's address, and it is required: a project is a tenant with its own issuer, so
 	 * it cannot be created without somewhere to be served. Omitting it is what broke this capture — and
-	 * with it the whole site build — from the commit that made buckets addressable.
+	 * with it the whole site build — from the commit that made projects addressable.
 	 */
-	const bucket = await api<Created>(ctx, 'POST', '/admin/api/buckets', {
+	const project = await api<Created>(ctx, 'POST', '/admin/api/projects', {
 		name: 'Acme customers',
-		slug: BUCKET_SLUG,
+		slug: PROJECT_SLUG,
 		registrationOpen: true
 	});
-	/* The bucket's groups of end users, which relying parties receive in the `groups` claim. */
+	/* The project's groups of end users, which relying parties receive in the `groups` claim. */
 	const customers = await api<{ id: string }>(
 		ctx,
 		'POST',
-		`/admin/api/buckets/${bucket._id}/groups`,
+		`/admin/api/projects/${project._id}/groups`,
 		{ displayName: 'Customers' }
 	);
-	await api(ctx, 'POST', `/admin/api/buckets/${bucket._id}/groups`, {
+	await api(ctx, 'POST', `/admin/api/projects/${project._id}/groups`, {
 		displayName: 'Support'
 	});
 	/*
@@ -172,7 +172,7 @@ async function seed(ctx: BrowserContext): Promise<{
 	const web = await api<{ clientId: string }>(
 		ctx,
 		'POST',
-		`/admin/api/buckets/${bucket._id}/clients`,
+		`/admin/api/projects/${project._id}/clients`,
 		{
 			clientName: 'acme-web',
 			applicationType: 'web',
@@ -189,21 +189,21 @@ async function seed(ctx: BrowserContext): Promise<{
 			requireConsent: true
 		}
 	);
-	await api(ctx, 'POST', `/admin/api/buckets/${bucket._id}/clients`, {
+	await api(ctx, 'POST', `/admin/api/projects/${project._id}/clients`, {
 		clientName: 'acme-backend',
 		applicationType: 'web',
 		grantTypes: ['client_credentials'],
 		tokenEndpointAuthMethod: 'client_secret_basic'
 	});
-	// Two more so the applications table reads as a real bucket rather than a two-row demo.
-	await api(ctx, 'POST', `/admin/api/buckets/${bucket._id}/clients`, {
+	// Two more so the applications table reads as a real project rather than a two-row demo.
+	await api(ctx, 'POST', `/admin/api/projects/${project._id}/clients`, {
 		clientName: 'acme-mobile',
 		applicationType: 'native',
 		grantTypes: ['authorization_code', 'refresh_token'],
 		redirectUris: ['com.acme.app:/callback', 'http://127.0.0.1/callback'],
 		tokenEndpointAuthMethod: 'none'
 	});
-	await api(ctx, 'POST', `/admin/api/buckets/${bucket._id}/clients`, {
+	await api(ctx, 'POST', `/admin/api/projects/${project._id}/clients`, {
 		clientName: 'acme-cli',
 		applicationType: 'native',
 		grantTypes: [
@@ -214,15 +214,15 @@ async function seed(ctx: BrowserContext): Promise<{
 		tokenEndpointAuthMethod: 'none'
 	});
 	/*
-	 * The bucket's APIs: protected resources it mints audience-bound tokens for — one of them an MCP
-	 * server. The bucket has an address, so they are declared in its own namespace.
+	 * The project's APIs: protected resources it mints audience-bound tokens for — one of them an MCP
+	 * server. The project has an address, so they are declared in its own namespace.
 	 */
-	await api(ctx, 'POST', `/admin/api/buckets/${bucket._id}/resources`, {
+	await api(ctx, 'POST', `/admin/api/projects/${project._id}/resources`, {
 		identifier: 'https://mcp.acme.example.com/mcp',
 		name: 'Acme support MCP server',
 		scopes: ['tickets:read', 'tickets:write']
 	});
-	await api(ctx, 'POST', `/admin/api/buckets/${bucket._id}/resources`, {
+	await api(ctx, 'POST', `/admin/api/projects/${project._id}/resources`, {
 		identifier: 'https://api.acme.example.com',
 		name: 'Acme orders API',
 		scopes: ['orders:read', 'orders:write']
@@ -235,13 +235,13 @@ async function seed(ctx: BrowserContext): Promise<{
 		const user = await api<Created>(
 			ctx,
 			'POST',
-			`/admin/api/buckets/${bucket._id}/users`,
+			`/admin/api/projects/${project._id}/users`,
 			{ email, password: USER_PASSWORD }
 		);
 		await api(
 			ctx,
 			'POST',
-			`/admin/api/buckets/${bucket._id}/groups/${customers.id}/members`,
+			`/admin/api/projects/${project._id}/groups/${customers.id}/members`,
 			{ userIds: [user._id] }
 		);
 	}
@@ -250,8 +250,8 @@ async function seed(ctx: BrowserContext): Promise<{
 		'deviceFlow.enabled': true
 	});
 	return {
-		bucketId: bucket._id,
-		bucketSlug: BUCKET_SLUG,
+		projectId: project._id,
+		projectSlug: PROJECT_SLUG,
 		clientId: web.clientId
 	};
 }
@@ -323,20 +323,20 @@ try {
 
 	// Reloaded rather than continued: the scope switch happened on the session after this page was
 	// rendered, and the console re-reads its lists on load.
-	await open(page, '/admin/buckets');
-	await shoot(page, 'admin-buckets');
+	await open(page, '/admin/projects');
+	await shoot(page, 'admin-projects');
 
-	await open(page, `/admin/buckets/${names.bucketId}`);
-	await shoot(page, 'admin-bucket-overview');
+	await open(page, `/admin/projects/${names.projectId}`);
+	await shoot(page, 'admin-project-overview');
 
-	await open(page, `/admin/buckets/${names.bucketId}/applications`);
-	await shoot(page, 'admin-bucket-applications');
+	await open(page, `/admin/projects/${names.projectId}/applications`);
+	await shoot(page, 'admin-project-applications');
 
-	await open(page, `/admin/buckets/${names.bucketId}/apis`);
-	await shoot(page, 'admin-bucket-apis');
+	await open(page, `/admin/projects/${names.projectId}/apis`);
+	await shoot(page, 'admin-project-apis');
 
-	await open(page, `/admin/buckets/${names.bucketId}/users`);
-	await shoot(page, 'admin-bucket-users');
+	await open(page, `/admin/projects/${names.projectId}/users`);
+	await shoot(page, 'admin-project-users');
 
 	// "Grants & flows" is the first settings domain, so it is the pane the page opens on.
 	await open(page, '/admin/settings');
@@ -356,12 +356,12 @@ try {
 	const userPage = await userCtx.newPage();
 	const { challenge } = pkce();
 	/*
-	 * Addressed to the bucket, not to the bare path. The demo application belongs to a bucket that
+	 * Addressed to the project, not to the bare path. The demo application belongs to a project that
 	 * has an address, and `check_bucket.ts` refuses such a client anywhere else — "client is not
 	 * authorized at this address", delivered to the redirect_uri, which the browser then cannot resolve.
 	 * That is the rule working, and this script is an integration like any other.
 	 */
-	const auth = new URL(`${ORIGIN}/${names.bucketSlug}/auth`);
+	const auth = new URL(`${ORIGIN}/${names.projectSlug}/auth`);
 	auth.search = new URLSearchParams({
 		client_id: names.clientId,
 		response_type: 'code',

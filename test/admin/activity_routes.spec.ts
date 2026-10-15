@@ -50,7 +50,7 @@ interface DayOrMonth {
 interface BucketActivityBody {
 	name: string;
 	deletedAt: string | null;
-	lastOwner: { groupId: string; label: string } | null;
+	lastOwner: { teamId: string; label: string } | null;
 	month: DayOrMonth | null;
 	days: DayOrMonth[];
 	months: DayOrMonth[];
@@ -64,7 +64,7 @@ async function bucketActivity(
 	const search = new URLSearchParams(query).toString();
 	const response = await app.handle(
 		new Request(
-			`http://e.ly/admin/api/buckets/${encodeURIComponent(id)}/activity${search ? `?${search}` : ''}`,
+			`http://e.ly/admin/api/projects/${encodeURIComponent(id)}/activity${search ? `?${search}` : ''}`,
 			{ headers: { cookie } }
 		)
 	);
@@ -183,7 +183,7 @@ describe('reading active users', () => {
 			expect(res.body).toMatchObject({
 				name: deletedName,
 				deletedAt: '2031-03-01T10:00:00.000Z',
-				lastOwner: { groupId: formerGroup._id, label: formerGroup.name }
+				lastOwner: { teamId: formerGroup._id, label: formerGroup.name }
 			});
 			expect(res.body.months[1]).toMatchObject({
 				period: '2031-02',
@@ -203,15 +203,15 @@ describe('reading active users', () => {
 		expect(res.status).toBe(200);
 		const body = answered(res.data);
 		expect(body).toMatchObject({ month: '2031-03', previous: '2031-02' });
-		const ids = body.buckets.map((row) => row.bucketId);
+		const ids = body.projects.map((row) => row.projectId);
 		expect(ids).toContain(DEFAULT_BUCKET_ID);
 		expect(ids).toContain(ADMIN_BUCKET_ID);
-		expect(body.buckets.find((row) => row.bucketId === bucketId)).toMatchObject(
-			{
-				current: { total: 1 },
-				previous: { total: 2, final: true }
-			}
-		);
+		expect(
+			body.projects.find((row) => row.projectId === bucketId)
+		).toMatchObject({
+			current: { total: 1 },
+			previous: { total: 2, final: true }
+		});
 	});
 
 	it('answers counts and no account identifier, email address or name', async () => {

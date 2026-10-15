@@ -15,7 +15,7 @@ graph:
     - predicate: relates_to
       object: concept:cookie-path-scoping
     - predicate: relates_to
-      object: concept:bucket-is-an-issuer
+      object: concept:project-is-an-issuer
     - predicate: relates_to
       object: concept:admin-audit-trail
     - predicate: relates_to
@@ -24,45 +24,46 @@ graph:
 
 # The connected-applications page
 
-Since spec 095, every end-user bucket has `/account/apps` at its own address. It lists the applications
+Since spec 095, every project has `/account/apps` at its own address. It lists the applications
 holding access to the signed-in person and lets them remove one. It is the first end-user page outside a
 sign-in interaction (`/ui/:uid/*`). Before it, only an administrator could end a person's access to one
 application ([[end-user-support]]).
 
-The routes are mounted bare and beneath `/:bucket`, like every bucket-scoped surface
-(`lib/index.ts:253`). They are classified always-available: no switch may hide the one place consent can be
+The routes are mounted bare and beneath `/:bucket` (the project's path segment), like every
+project-scoped surface (`lib/index.ts:253`). They are classified always-available: no switch may hide the one place consent can be
 withdrawn. The routes are `GET /account/apps`, `POST /account/apps` and `GET /account/apps/callback`
 (`lib/account_page/routes.ts:213`).
 
-## The person comes from the bucket's own session, not from a token
+## The person comes from the project's own session, not from a token
 
 The server is the authorization server, so it already knows who is signed in. The page reads the addressed
-bucket's session cookie and the session record (`usablePerson`, `lib/account_page/session.ts:44`). It mints
+project's session cookie and the session record (`usablePerson`, `lib/account_page/session.ts:44`). It mints
 nothing. It never calls `setCookies()`, because a save renews the whole sign-in, and looking at one's
 applications is no reason for a sign-in to last longer.
 
-At the root, the default bucket and every bucket with no address share `_session_default`, so the session's
-`bucketId` names the person's bucket. That bucket must still share this address's cookie: the same comparison
-sign-out makes (`session.ts:65`). Otherwise a bucket given an address after the sign-in would stay readable at
+At the root, the Default project and every project with no address share `_session_default`, so the session's
+`bucketId` names the person's project. That project must still share this address's cookie: the same comparison
+sign-out makes (`session.ts:65`). Otherwise a project given an address after the sign-in would stay readable at
 an address it no longer has. A person who may not sign in (`canSignIn`) gets nothing (`session.ts:76`).
 
 ## The built-in client can only bring the person back
 
-With no usable session, the page starts an ordinary sign-in in the bucket through `account.<bucketId>`. That
-client is synthesized from the bucket on every resolution and never stored, like the SCIM client
+With no usable session, the page starts an ordinary sign-in in the project through `account.<bucketId>`. That
+client is synthesized from the project on every resolution and never stored, like the SCIM client
 (`lib/account_page/client.ts:57`, resolved after the stored read and the SCIM client at
 `lib/models/client/validate.ts:127`).
 
 How it is limited:
 - **No code, no token.** It has `response_type=none` and no grant type (`client.ts:67`). The page needs
   nothing back except that the session now exists.
-- **One bucket.** `resolveBucketForRequest` maps the id to its bucket (`lib/admin/auth/resolveBucket.ts:59`),
+- **One project.** `resolveBucketForRequest` maps the id to its project (`lib/admin/auth/resolveBucket.ts:59`),
   so `checkBucket` refuses it at any other address.
-- **Not for every bucket.** It does not exist for the administrators' bucket, for a bucket scheduled for
+- **Not for every project.** It does not exist for the administrators' project, for a project scheduled for
   deletion, or for an unknown one: `invalid_client`.
 - **No look-alikes.** `.` is outside nanoid's alphabet, so no generated id can collide with it. A registration
   is refused the prefix even through a deployment's own `idFactory` (`lib/models/client/register.ts:38`).
-- **No consent page.** It belongs to no stored bucket record (no `bucketId`; until spec 099, no project) and
+- **No consent page.** It belongs to no stored project record (no `bucketId`; until spec 099, no old
+  Project entity either — a retired project) and
   has `consent.require: false`, so consent is waived.
   `redirectUrisVouchedFor` answers true for it (`lib/models/client/provenance.ts:30`). Otherwise a cancelled
   sign-in would show the RFC 9700 "untrusted redirect" page instead of coming back.
@@ -71,9 +72,9 @@ Every authorization leaves a trusted Grant and a session entry, and this one doe
 every per-application listing, the administrator's view included (`grantsByClient`,
 `lib/end_users/sessions.ts:101`).
 
-A bucket with no address of its own serves its page at the root (`accountPageBase`, `client.ts:48`),
+A project with no address of its own serves its page at the root (`accountPageBase`, `client.ts:48`),
 because `issuerFor` names it `ISSUER/<id>`, which routes nothing. A sign-in started from that root page uses
-the default bucket's client. People of such a bucket therefore reach their list with the session an
+the Default project's client. People of such a project therefore reach their list with the session an
 application gave them, not by signing in from the page.
 
 ## A GET never removes anything
@@ -107,7 +108,7 @@ the grants, every token under them and the session entries, and sends back-chann
 asks for consent again next time. A consent-waived application signs the person in again silently, and the
 confirmation says so.
 
-The form `action` is the page's origin-relative path, never `${issuer}/…`. At a host-addressed bucket an
+The form `action` is the page's origin-relative path, never `${issuer}/…`. At a host-addressed project an
 issuer URL would count as a foreign form target in `csp.ts`, and the page would lose `frame-ancestors`.
 
 ## What a row says
@@ -128,15 +129,16 @@ What a row says is decided purely in `applicationRow` (`lib/account_page/view.ts
 
 Each removal is one audit entry under the administrator's action, `enduser.application.signout`. The actor is
 the sentinel `enduser:<bucketId>:<accountId>` (`lib/consts/admin_audit_routes.ts:820`,
-`recordEndUserAudit`, `lib/admin/audit/record.ts:222`), `viaSurface: 'self-service'`. It carries the bucket's
-`ownerGroupId`, so group administrators read it. The read resolves the person's address as `actorName`.
+`recordEndUserAudit`, `lib/admin/audit/record.ts:222`), `viaSurface: 'self-service'`. It carries the project's
+`ownerGroupId` (its owning team; `ownerTeamId` when presented), so the team's administrators read it. The
+read resolves the person's address as `actorName`.
 Following the bootstrap convention (a `:` and no `@`), no reader mistakes the person for an administrator.
 
-## Grants record their bucket
+## Grants record their project
 
 Since spec 095 every new Grant carries `bucketId` (`lib/actions/authorization/load_grant.ts:31`,
 `lib/addon/account.ts:169`, `lib/interactions/index.ts:494`). An administrator may choose an account id, so two
-buckets can share one. Before, `grantsIn` counted every grant as every bucket's, and one bucket's page or
+projects can share one. Before, `grantsIn` counted every grant as every project's, and one project's page or
 console would have listed the other's access. Older grants still read as before until they expire.
 
 ## Related

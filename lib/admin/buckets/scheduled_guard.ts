@@ -4,7 +4,7 @@ import { getBucketStore } from '../../adapters/index.js';
 import { AdminError, resolveAdmin } from '../auth/rbac.js';
 import { bucketCan } from '../auth/can.js';
 
-const BUCKET = '/admin/api/buckets/:id';
+const BUCKET = '/admin/api/projects/:id';
 
 /* The two writes that exist for a scheduled bucket: taking it back, and ending it now. */
 const SCHEDULED_ONLY = new Set([`${BUCKET}/restore`, `${BUCKET}/purge`]);
@@ -25,7 +25,7 @@ export function writesIntoBucket(method: string, route: string): boolean {
 export function scheduledForDeletion(purgeAt: Date): AdminError {
 	return new AdminError(
 		409,
-		`This bucket is scheduled for deletion on ${purgeAt.toISOString().slice(0, 10)}. Restore it first.`
+		`This project is scheduled for deletion on ${purgeAt.toISOString().slice(0, 10)}. Restore it first.`
 	);
 }
 

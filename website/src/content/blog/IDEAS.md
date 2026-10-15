@@ -59,7 +59,7 @@ it. Display names rather than ids, and what a rename does; the 200 limit taken f
 distributed-claim reference (OIDC Core 5.6.2) in the ID token while UserInfo carries the whole list;
 the snapshot in resource tokens (RFC 9068); `conformIdTokenClaims` keeping it out of the ID token by
 default. Diagram: where the claim appears for 3 groups and for 300.
-Sources: `wiki/concepts/bucket-groups.md`, `lib/consts/groups_claim.ts`, `lib/bucket_groups/claim.ts`,
+Sources: `wiki/concepts/project-groups.md`, `lib/consts/groups_claim.ts`, `lib/bucket_groups/claim.ts`,
 `lib/addon/account.ts`.
 
 ### Group members are records, not an array
@@ -69,7 +69,7 @@ groups in PATCH batches of 40-200; 100,000-member groups are real; MongoDB's 16 
 370,000 members. All-or-nothing PATCH without multi-document transactions on a standalone `mongod`: every
 refusal decided before the first write. Measured: a 50-member change into a 10,000-member group stays
 around 10 ms. Diagram: write volume per batch, array against records.
-Sources: `wiki/concepts/bucket-groups.md`, `lib/bucket_groups/service.ts`,
+Sources: `wiki/concepts/project-groups.md`, `lib/bucket_groups/service.ts`,
 `lib/consts/storage_divergences.ts` (`bucket-group-change-atomicity`), CONFORMANCE.md.
 
 ### Back-channel logout should keep offline access
@@ -113,7 +113,7 @@ Sources: `wiki/concepts/single-use-under-concurrency.md`, CHANGELOG 0.7.0 (Secur
 ### The issuer is the unit of tenant isolation
 
 Claim: a shared key set makes every resource server's `iss` check a tenant boundary nobody reviews.
-Per-bucket keys against the Entra `iss`/`tid` model; squatting on a resource identifier; why the switch
+Per-project keys against the Entra `iss`/`tid` model; squatting on a resource identifier; why the switch
 had no transition window.
 Sources: `wiki/concepts/per-issuer-isolation.md`, `mcp-server-authorization.md`, CHANGELOG 0.7.0.
 

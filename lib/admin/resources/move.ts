@@ -24,7 +24,7 @@ export class DeclarationsConflict extends AdminError {
 	constructor(readonly conflicts: string[]) {
 		super(
 			409,
-			'the namespace this bucket would move to already declares a resource this bucket declares'
+			'the namespace this project would move to already declares a resource this project declares'
 		);
 	}
 }

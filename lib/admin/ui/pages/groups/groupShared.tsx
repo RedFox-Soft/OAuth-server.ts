@@ -14,7 +14,7 @@ export interface GroupView {
 }
 
 export function groupsApi(bucketId: string, groupId?: string): string {
-	const base = `/admin/api/buckets/${encodeURIComponent(bucketId)}/groups`;
+	const base = `/admin/api/projects/${encodeURIComponent(bucketId)}/groups`;
 	return groupId === undefined
 		? base
 		: `${base}/${encodeURIComponent(groupId)}`;
@@ -55,7 +55,7 @@ export function RenameGroupModal({
 				return;
 			}
 			feedback.done(
-				`User group ${group.displayName} renamed to ${displayName.trim()}.`
+				`Group ${group.displayName} renamed to ${displayName.trim()}.`
 			);
 			onRenamed();
 			onClose();
@@ -66,7 +66,7 @@ export function RenameGroupModal({
 
 	return (
 		<Modal
-			title="Rename user group"
+			title="Rename group"
 			open={group !== null}
 			okText="Rename"
 			okButtonProps={{ disabled: !changed }}
@@ -124,7 +124,7 @@ export function useDeleteGroup(bucketId: string) {
 				feedback.failed(result);
 				return false;
 			}
-			feedback.done(`User group ${group.displayName} deleted.`);
+			feedback.done(`Group ${group.displayName} deleted.`);
 			return true;
 		},
 		[bucketId, confirm, feedback]

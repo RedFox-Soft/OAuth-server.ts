@@ -142,7 +142,7 @@ describe('changing how people sign in to a bucket', () => {
 		bucket: Pick<UserBucket, '_id'>,
 		body: Readonly<Record<string, unknown>>,
 		as = cookie
-	) => request('PATCH', `/admin/api/buckets/${bucket._id}`, as, body);
+	) => request('PATCH', `/admin/api/projects/${bucket._id}`, as, body);
 
 	async function updatesRecorded(bucketId: string): Promise<number> {
 		const { entries } = await adminAuditStore.list({
@@ -275,7 +275,7 @@ describe('changing how people sign in to a bucket', () => {
 
 		const answer = await request(
 			'GET',
-			`/admin/api/buckets/${bucket._id}/summary`,
+			`/admin/api/projects/${bucket._id}/summary`,
 			cookie
 		);
 
@@ -353,7 +353,7 @@ describe('changing how people sign in to a bucket', () => {
 		async function applicationsCounted(): Promise<number> {
 			const answer = await request(
 				'GET',
-				`/admin/api/buckets/${DEFAULT_BUCKET_ID}/summary`,
+				`/admin/api/projects/${DEFAULT_BUCKET_ID}/summary`,
 				superCookie
 			);
 			return shaped(Summary, answer.body).applications;
@@ -379,7 +379,7 @@ describe('changing how people sign in to a bucket', () => {
 
 			const answer = await request(
 				'PATCH',
-				`/admin/api/buckets/${DEFAULT_BUCKET_ID}`,
+				`/admin/api/projects/${DEFAULT_BUCKET_ID}`,
 				superCookie,
 				{ registrationOpen: true }
 			);
@@ -400,7 +400,7 @@ describe('changing how people sign in to a bucket', () => {
 		try {
 			const answer = await request(
 				'PATCH',
-				`/admin/api/buckets/${ADMIN_BUCKET_ID}`,
+				`/admin/api/projects/${ADMIN_BUCKET_ID}`,
 				superCookie,
 				{ registrationOpen: true }
 			);
@@ -418,7 +418,7 @@ describe('changing how people sign in to a bucket', () => {
 	it("gives a super administrator the administrators' bucket counts", async () => {
 		const answer = await request(
 			'GET',
-			`/admin/api/buckets/${ADMIN_BUCKET_ID}/summary`,
+			`/admin/api/projects/${ADMIN_BUCKET_ID}/summary`,
 			superCookie
 		);
 

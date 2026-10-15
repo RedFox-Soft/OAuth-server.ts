@@ -49,7 +49,7 @@ export const ACTIONS = {
 	// The bucket's own applications may hold tokens for it, so the question names them (specs/085).
 	'resource.remove': {
 		class: 'C2',
-		title: (t) => `Remove ${t} from this bucket?`,
+		title: (t) => `Remove ${t} from this project?`,
 		okText: 'Remove'
 	},
 
@@ -183,13 +183,13 @@ export const ACTIONS = {
 	'userGroup.connection.assign': { class: 'C4' },
 	'userGroup.delete': {
 		class: 'C2',
-		title: (t) => `Delete user group ${t}?`,
-		okText: 'Delete user group'
+		title: (t) => `Delete group ${t}?`,
+		okText: 'Delete group'
 	},
 	'userGroup.member.add': { class: 'C0' },
 	'userGroup.member.remove': {
 		class: 'C1',
-		title: (t) => `Remove ${t} from this user group?`,
+		title: (t) => `Remove ${t} from this group?`,
 		okText: 'Remove'
 	},
 
@@ -285,8 +285,8 @@ export const ACTIONS = {
 	'group.create': { class: 'C0' },
 	'group.delete': {
 		class: 'C2',
-		title: (t) => `Delete group ${t}?`,
-		okText: 'Delete group'
+		title: (t) => `Delete team ${t}?`,
+		okText: 'Delete team'
 	},
 	'group.rename': { class: 'C0' },
 	'group.member.add': { class: 'C0' },
@@ -303,13 +303,13 @@ export const ACTIONS = {
 	},
 	'group.member.remove': {
 		class: 'C2',
-		title: (t) => `Remove ${t} from this group?`,
+		title: (t) => `Remove ${t} from this team?`,
 		okText: 'Remove'
 	},
 	'group.member.leave': {
 		class: 'C2',
 		title: (t) => `Leave ${t}?`,
-		okText: 'Leave group'
+		okText: 'Leave team'
 	},
 	// The form states what the invitee will reach; its danger submit is the consent.
 	'group.invite': { class: 'C2', okText: 'Send invitation', inline: true },

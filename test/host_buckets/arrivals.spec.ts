@@ -27,7 +27,7 @@ async function superCookie() {
 
 async function readBucket(cookie: string, id: string) {
 	const response = await app.handle(
-		new Request(`http://e.ly/admin/api/buckets/${id}`, {
+		new Request(`http://e.ly/admin/api/projects/${id}`, {
 			redirect: 'manual',
 			headers: { cookie }
 		})

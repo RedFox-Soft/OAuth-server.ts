@@ -28,15 +28,15 @@ export function UsageCustomerDrawer({
 }) {
 	const customer = summary?.customer ?? null;
 	const held = rows.filter((row) =>
-		summary ? summary.bucketIds.includes(row.bucketId) : false
+		summary ? summary.projectIds.includes(row.projectId) : false
 	);
 	const kindText =
 		customer === null
 			? ''
 			: customer.kind === null
-				? customer.groupId === null
+				? customer.teamId === null
 					? 'not recorded'
-					: 'deleted group'
+					: 'deleted team'
 				: customer.kind;
 
 	return (
@@ -55,11 +55,11 @@ export function UsageCustomerDrawer({
 						items={[
 							{
 								key: 'kind',
-								label: 'Group',
+								label: 'Team',
 								// A live group opens its page (specs/086); a deleted or unrecorded one is only named.
 								children:
-									customer.exists && customer.groupId !== null ? (
-										<Link href={groupHref(customer.groupId)}>{kindText}</Link>
+									customer.exists && customer.teamId !== null ? (
+										<Link href={groupHref(customer.teamId)}>{kindText}</Link>
 									) : (
 										kindText
 									)
@@ -104,25 +104,25 @@ export function UsageCustomerDrawer({
 						type="secondary"
 						style={{ marginTop: 16 }}
 					>
-						A customer&apos;s figure is the sum of its buckets&apos; figures.
-						Each bucket is its own population, so a person with accounts in two
-						buckets is counted in both.
+						A customer&apos;s figure is the sum of its projects&apos; figures.
+						Each project is its own population, so a person with accounts in two
+						projects is counted in both.
 					</Typography.Paragraph>
 					<Table
 						size="small"
-						rowKey="bucketId"
+						rowKey="projectId"
 						pagination={false}
 						dataSource={held}
 						columns={[
 							{
-								title: 'Bucket',
+								title: 'Project',
 								key: 'name',
 								render: (_: unknown, row: OverviewRow) => (
 									<>
 										{row.deleted === null ? (
-											<Link href={bucketHref(row.bucketId)}>{row.name}</Link>
+											<Link href={bucketHref(row.projectId)}>{row.name}</Link>
 										) : (
-											<Link href={usageBucketHref(row.bucketId, month)}>
+											<Link href={usageBucketHref(row.projectId, month)}>
 												{row.name}
 											</Link>
 										)}{' '}

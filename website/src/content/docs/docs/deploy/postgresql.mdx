@@ -27,8 +27,8 @@ the variable causing the refusal is often one you cannot see with `env`.
 <Steps>
 
 1. **Create a database and a role** that can create tables in it. `CREATE` is needed at
-   provisioning time and also while the server runs: creating a user bucket in the console
-   provisions that bucket's table and its unique-email constraint at that moment, so a bucket added
+   provisioning time and also while the server runs: creating a project in the console
+   provisions that project's table and its unique-email constraint at that moment, so a project added
    later is constrained exactly like one that came with the schema.
 
 2. **Set the connection string.** The database name is part of the URL, so `DATABASE_NAME` is not
@@ -91,10 +91,10 @@ pipeline can gate on it.
 
 <Aside
 	type="note"
-	title="Upgrading from before ownership groups"
+	title="Upgrading from before team ownership"
 >
-	A deployment old enough to predate ownership groups must upgrade through an
-	earlier release first. The one-off conversion that introduced them has been
+	A deployment old enough to predate team ownership must upgrade through an
+	earlier release first. The one-off conversion that introduced it has been
 	retired, and this release does not attempt it.
 </Aside>
 

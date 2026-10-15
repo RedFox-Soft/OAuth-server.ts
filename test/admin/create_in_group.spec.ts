@@ -49,11 +49,11 @@ async function call(
 }
 
 const Created = Type.Object(
-	{ _id: Type.String(), ownerGroupId: Type.String() },
+	{ _id: Type.String(), ownerTeamId: Type.String() },
 	{ additionalProperties: true }
 );
 const CreatedApplication = Type.Object(
-	{ clientId: Type.String(), bucketId: Type.String() },
+	{ clientId: Type.String(), projectId: Type.String() },
 	{ additionalProperties: true }
 );
 
@@ -69,14 +69,14 @@ function unique(prefix: string) {
 
 /* An application in a bucket, as its Applications page would create it. */
 const createApplication = (cookie: string, bucketId: string) =>
-	call(`/admin/api/buckets/${bucketId}/clients`, cookie, {
+	call(`/admin/api/projects/${bucketId}/clients`, cookie, {
 		clientName: unique('app'),
 		grantTypes: ['client_credentials'],
 		tokenEndpointAuthMethod: 'client_secret_basic'
 	});
 
 const createBucket = (cookie: string, body: Record<string, unknown> = {}) =>
-	call('/admin/api/buckets', cookie, {
+	call('/admin/api/projects', cookie, {
 		name: 'Created',
 		slug: unique('b'),
 		...body
@@ -126,7 +126,7 @@ describe('creating in a chosen group', () => {
 	it('creates a bucket in another group the administrator belongs to', async () => {
 		const w = await world();
 
-		const res = await createBucket(w.cookie, { groupId: w.team._id });
+		const res = await createBucket(w.cookie, { teamId: w.team._id });
 
 		expect(res.status).toBe(201);
 		const { _id } = shaped(Created, res.body);
@@ -139,7 +139,7 @@ describe('creating in a chosen group', () => {
 		const res = await createApplication(w.cookie, w.teamBucket._id);
 
 		expect(res.status).toBe(201);
-		expect(shaped(CreatedApplication, res.body).bucketId).toBe(
+		expect(shaped(CreatedApplication, res.body).projectId).toBe(
 			w.teamBucket._id
 		);
 	});
@@ -164,13 +164,13 @@ describe('creating in a chosen group', () => {
 
 		const bucket = await createBucket(w.cookie);
 
-		expect(shaped(Created, bucket.body).ownerGroupId).toBe(w.personal._id);
+		expect(shaped(Created, bucket.body).ownerTeamId).toBe(w.personal._id);
 	});
 
 	it('refuses a group the administrator is not a member of, and creates nothing', async () => {
 		const w = await world();
 
-		const bucket = await createBucket(w.cookie, { groupId: w.others._id });
+		const bucket = await createBucket(w.cookie, { teamId: w.others._id });
 
 		expect(bucket.status).toBe(403);
 		expect(await getBucketStore().listByGroup(w.others._id)).toHaveLength(1);
@@ -225,7 +225,7 @@ describe('creating in a chosen group', () => {
 		const bobsPersonal = await ensurePersonalGroup(w.bob._id, w.bob.email);
 
 		const res = await createBucket(await cookieFor(superAdmin), {
-			groupId: bobsPersonal._id
+			teamId: bobsPersonal._id
 		});
 
 		expect(res.status).toBe(403);
@@ -236,7 +236,7 @@ describe('creating in a chosen group', () => {
 		const superAdmin = await admin('super');
 
 		const res = await createBucket(await cookieFor(superAdmin), {
-			groupId: SUPER_ADMINS_GROUP_ID
+			teamId: SUPER_ADMINS_GROUP_ID
 		});
 
 		expect(res.status).toBe(404);
@@ -250,11 +250,11 @@ describe('creating in a chosen group', () => {
 		const superAdmin = await admin('super');
 
 		const res = await createBucket(await cookieFor(superAdmin), {
-			groupId: w.team._id
+			teamId: w.team._id
 		});
 
 		expect(res.status).toBe(201);
-		expect(shaped(Created, res.body).ownerGroupId).toBe(w.team._id);
+		expect(shaped(Created, res.body).ownerTeamId).toBe(w.team._id);
 	});
 
 	it('creates an application in a bucket of a group a super administrator does not belong to', async () => {
@@ -267,7 +267,7 @@ describe('creating in a chosen group', () => {
 		);
 
 		expect(res.status).toBe(201);
-		expect(shaped(CreatedApplication, res.body).bucketId).toBe(
+		expect(shaped(CreatedApplication, res.body).projectId).toBe(
 			w.teamBucket._id
 		);
 	});

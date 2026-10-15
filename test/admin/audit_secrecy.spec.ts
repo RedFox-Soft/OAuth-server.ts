@@ -80,7 +80,7 @@ describe('admin audit secrecy', () => {
 		const bucket = await makeBucket();
 		const created = answered(
 			(
-				await client.admin.api.buckets({ id: bucket._id }).clients.post(
+				await client.admin.api.projects({ id: bucket._id }).clients.post(
 					{
 						grantTypes: ['authorization_code'],
 						tokenEndpointAuthMethod: 'client_secret_basic',
@@ -92,7 +92,7 @@ describe('admin audit secrecy', () => {
 		);
 
 		const rotated = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.clients({ clientId: created.clientId })
 			.secret.post(undefined, { headers: { cookie } });
 		const { secret } = answered(rotated.data);
@@ -116,7 +116,7 @@ describe('admin audit secrecy', () => {
 		);
 
 		await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.users({ uid: target._id })
 			.password.post({ password: PASSWORD_MARKER }, { headers: { cookie } });
 
@@ -138,7 +138,7 @@ describe('admin audit secrecy', () => {
 		const bucket = await makeBucket();
 		const created = answered(
 			(
-				await client.admin.api.buckets({ id: bucket._id }).clients.post(
+				await client.admin.api.projects({ id: bucket._id }).clients.post(
 					{
 						grantTypes: ['authorization_code'],
 						tokenEndpointAuthMethod: 'client_secret_basic',
@@ -150,7 +150,7 @@ describe('admin audit secrecy', () => {
 		);
 
 		const deleted = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.clients({ clientId: created.clientId })
 			.delete(undefined, { headers: { cookie } });
 		expect(deleted.status).toBe(200);
@@ -176,7 +176,7 @@ describe('admin audit secrecy', () => {
 		const created = answered(
 			(
 				await client.admin.api
-					.buckets({ id: bucket._id })
+					.projects({ id: bucket._id })
 					.users.post(
 						{ email, password: PASSWORD_MARKER },
 						{ headers: { cookie } }
@@ -184,7 +184,7 @@ describe('admin audit secrecy', () => {
 			).data
 		);
 
-		await client.admin.api.buckets({ id: bucket._id }).delete(undefined, {
+		await client.admin.api.projects({ id: bucket._id }).delete(undefined, {
 			headers: { cookie },
 			query: { cascade: 'endusers', expect: 1 }
 		});
@@ -205,7 +205,7 @@ describe('admin audit secrecy', () => {
 		const created = answered(
 			(
 				await client.admin.api
-					.buckets({ id: bucket._id })
+					.projects({ id: bucket._id })
 					.users.post(
 						{ email: `${unique('end')}@x.io`, password: PASSWORD_MARKER },
 						{ headers: { cookie } }
@@ -262,7 +262,7 @@ describe('admin audit secrecy', () => {
 
 		const created = answered(
 			(
-				await client.admin.api.buckets({ id: bucket._id }).clients.post(
+				await client.admin.api.projects({ id: bucket._id }).clients.post(
 					{
 						clientName: CLIENT_SECRET_MARKER,
 						grantTypes: ['authorization_code'],

@@ -37,13 +37,13 @@ async function bucketWith(ids: string[]): Promise<UserBucket> {
 }
 
 function movePath(bucket: UserBucket, providerId: string): string {
-	return `/admin/api/buckets/${bucket._id}/federation/${providerId}/move`;
+	return `/admin/api/projects/${bucket._id}/federation/${providerId}/move`;
 }
 
 async function tableOrder(bucket: UserBucket, cookie: string) {
 	const reply = await admin(
 		'GET',
-		`/admin/api/buckets/${bucket._id}/federation`,
+		`/admin/api/projects/${bucket._id}/federation`,
 		cookie
 	);
 	return shaped(Providers, reply.body).map((p) => p.id);
@@ -156,7 +156,7 @@ describe('the order of a bucket’s sign-in buttons', () => {
 
 		const deleted = await admin(
 			'DELETE',
-			`/admin/api/buckets/${bucket._id}/federation/beta`,
+			`/admin/api/projects/${bucket._id}/federation/beta`,
 			cookie
 		);
 		const after = await getBucketStore().find(bucket._id);

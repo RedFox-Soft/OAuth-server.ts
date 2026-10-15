@@ -221,13 +221,13 @@ describe('an administrator created through an invitation', () => {
 		const owner = await createAdministrator('plain');
 		const session = await sessionFor(owner);
 		const cookie = `${ADMIN_SESSION_COOKIE}=${session._id}`;
-		const group = await adminCall('/admin/api/groups', cookie, {
+		const group = await adminCall('/admin/api/teams', cookie, {
 			name: `Invited ${seq}`
 		});
 		const groupId = (group.body as { _id: string })._id;
 		const invitee = unique();
 		resetSentEmails();
-		await adminCall(`/admin/api/groups/${groupId}/invitations`, cookie, {
+		await adminCall(`/admin/api/teams/${groupId}/invitations`, cookie, {
 			email: invitee,
 			role: 'member'
 		});

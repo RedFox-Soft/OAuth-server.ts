@@ -194,7 +194,7 @@ async function resolveCaller(
  * operation the caller could never perform, rather than handing out a confirmation that is certain to
  * fail (FR-017).
  *
- * It covers the role gate only. Finer-grained refusals — a bucket the caller does not manage
+ * It covers the role gate only. Finer-grained refusals — a project the caller does not manage
  * — need the entity itself and surface at the perform step, from the handler that owns the rule. That
  * is a worse message one step later, never a weaker check: nothing is performed without a confirmation
  * that the real route then authorizes for itself.
@@ -435,8 +435,8 @@ ${JSON.stringify(outcome.preview, null, 2)}`
  */
 function buildInstructions(): string {
 	/*
-	 * Both the list and the count come off the table. An earlier version named `project_delete` and
-	 * `bucket_delete` literally, directly under a comment claiming the text could not disagree with the
+	 * Both the list and the count come off the table. An earlier version named the two container
+	 * deletions literally, directly under a comment claiming the text could not disagree with the
 	 * exclusion table — it could: a third withheld operation would have been added to the table, refused
 	 * correctly when guessed, and silently left out of the announcement that exists so an agent does not
 	 * have to guess. `inapplicable` entries stay out; see `absence` on the table for why.
@@ -455,6 +455,6 @@ function buildInstructions(): string {
 		`The admin console can perform ${count} deliberately unavailable here. Do not attempt them, and if asked, say plainly that they must be done in the admin console:`,
 		withheld,
 		'',
-		'Reading what such a deletion would involve IS available — a bucket reports the applications and APIs that block it, and how many end-users it holds.'
+		'Reading what such a deletion would involve IS available — a project reports the applications and APIs that block it, and how many end-users it holds.'
 	].join('\n');
 }

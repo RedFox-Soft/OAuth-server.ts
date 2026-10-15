@@ -256,7 +256,7 @@ export function useTrySignIn(
 							description={
 								<>
 									If {provider.displayName} showed an error about the redirect
-									address, this bucket's callback is not registered there. Add
+									address, this project's callback is not registered there. Add
 									it to the application at {provider.displayName}:{' '}
 									<Typography.Text
 										code
@@ -375,7 +375,7 @@ export function useTrySignIn(
 						<Alert
 							type="warning"
 							showIcon
-							title="This bucket has no address yet, so its callback changes when it gets one. Register the new callback at the provider then."
+							title="This project has no address yet, so its callback changes when it gets one. Register the new callback at the provider then."
 						/>
 					)}
 					<Typography.Text type="secondary">

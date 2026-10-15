@@ -239,7 +239,7 @@ describe('the removals a held connection was refused', () => {
 
 		await eventually(() => sentEmails.length > 0);
 		expect(sentEmails[0]?.text).toContain(
-			`/admin/buckets/${g.bucket._id}/provisioning/${g.connection._id}`
+			`/admin/projects/${g.bucket._id}/provisioning/${g.connection._id}`
 		);
 	});
 

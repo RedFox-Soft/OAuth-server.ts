@@ -14,7 +14,7 @@ export type { ConnectionView, ConnectionWarning };
  */
 export const WARNING_LABELS: Record<ConnectionWarning, string> = {
 	scim_disabled: 'SCIM is switched off in Settings',
-	bucket_unaddressed: 'Bucket has no address yet',
+	project_unaddressed: 'Project has no address yet',
 	provider_disabled: 'Sign-in provider is disabled',
 	client_credentials_disabled: 'Client-credentials grant is off',
 	credential_kind_disabled: 'This credential kind is switched off',
@@ -78,7 +78,7 @@ export function connectionsApi(
 	bucketId: string,
 	connectionId?: string
 ): string {
-	const base = `/admin/api/buckets/${encodeURIComponent(bucketId)}/provisioning-connections`;
+	const base = `/admin/api/projects/${encodeURIComponent(bucketId)}/provisioning-connections`;
 	return connectionId === undefined
 		? base
 		: `${base}/${encodeURIComponent(connectionId)}`;
@@ -137,7 +137,7 @@ export function parseJwks(text: string | undefined): {
 export function Copyable({ value }: { value: string | null }) {
 	return value === null ? (
 		<Typography.Text type="secondary">
-			not available until the bucket has an address
+			not available until the project has an address
 		</Typography.Text>
 	) : (
 		<Typography.Text
@@ -160,7 +160,7 @@ export function setupDetails(
 	const labels = guidance?.labels;
 	return [
 		...(guidance ? [`Directory: ${guidance.displayName}`] : []),
-		`${labels?.scimBaseUrl ?? 'SCIM base URL'}: ${c.scimBaseUrl ?? '(the bucket has no address yet)'}`,
+		`${labels?.scimBaseUrl ?? 'SCIM base URL'}: ${c.scimBaseUrl ?? '(the project has no address yet)'}`,
 		`${labels?.tokenEndpoint ?? 'Token endpoint'}: ${c.tokenEndpoint}`,
 		`${labels?.clientId ?? 'Client id'}: ${c.clientId}`,
 		`Scope: ${c.scope}`,

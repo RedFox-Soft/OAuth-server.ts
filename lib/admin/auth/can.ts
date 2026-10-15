@@ -40,9 +40,9 @@ export interface BucketCan {
 }
 
 export interface MeCan {
-	createBucket: boolean;
+	createProject: boolean;
 	createHost: boolean;
-	createGroup: boolean;
+	createTeam: boolean;
 	/* The instance-wide surfaces: settings, keys, administrators, agent access, usage, faults. */
 	instance: boolean;
 }
@@ -229,10 +229,10 @@ export function meCan(ctx: AdminContext): MeCan {
 	 */
 	const creates = ctx.superAdmin || ctx.activeGroupId !== '';
 	return {
-		createBucket: creates,
+		createProject: creates,
 		/* Naming a hostname puts a name in the operator's own domain under the caller's control. */
 		createHost: ctx.superAdmin,
-		createGroup: true,
+		createTeam: true,
 		instance: ctx.superAdmin
 	};
 }

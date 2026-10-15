@@ -26,7 +26,7 @@ export function UsageBucketHistory({ bucketId }: { bucketId: string }) {
 		void (async () => {
 			const result = await request<BucketActivityRead>(
 				'GET',
-				`/admin/api/buckets/${encodeURIComponent(bucketId)}/activity`
+				`/admin/api/projects/${encodeURIComponent(bucketId)}/activity`
 			);
 			if (!result.ok) {
 				setStatus(result.status);
@@ -48,7 +48,7 @@ export function UsageBucketHistory({ bucketId }: { bucketId: string }) {
 	if (status !== null) {
 		return status === 403 || status === 404 ? (
 			<NoAccess
-				what="bucket"
+				what="project"
 				backHref="/admin/usage"
 				backLabel="Back to Usage"
 			/>
@@ -95,7 +95,7 @@ export function BucketNotFound({ bucketId }: { bucketId: string }) {
 		void (async () => {
 			const result = await request<BucketActivityRead>(
 				'GET',
-				`/admin/api/buckets/${encodeURIComponent(bucketId)}/activity`
+				`/admin/api/projects/${encodeURIComponent(bucketId)}/activity`
 			);
 			if (result.ok && result.data.deletedAt)
 				setDeletedAt(result.data.deletedAt);
@@ -105,16 +105,16 @@ export function BucketNotFound({ bucketId }: { bucketId: string }) {
 	if (deletedAt === null) {
 		return (
 			<NoAccess
-				what="bucket"
-				backHref="/admin/buckets"
-				backLabel="Back to Buckets"
+				what="project"
+				backHref="/admin/projects"
+				backLabel="Back to Projects"
 			/>
 		);
 	}
 	return (
 		<Result
 			status="404"
-			title={`This bucket was deleted on ${new Date(deletedAt).toLocaleDateString()}`}
+			title={`This project was deleted on ${new Date(deletedAt).toLocaleDateString()}`}
 			extra={
 				<Link href={usageBucketHref(bucketId)}>See its usage history</Link>
 			}

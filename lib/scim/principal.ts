@@ -48,7 +48,7 @@ function unauthorized(
 	return new ScimError(
 		401,
 		undefined,
-		'a valid credential for this bucket’s SCIM endpoint is required',
+		'a valid credential for this project’s SCIM endpoint is required',
 		{
 			'WWW-Authenticate': metadata
 				? `Bearer resource_metadata="${metadata}"`

@@ -125,7 +125,7 @@ export default {
 				},
 				totp: {
 					title: 'TOTP second factor',
-					body: 'Per-bucket time-based one-time passwords, optionally enforced for the admin console.'
+					body: 'Per-project time-based one-time passwords, optionally enforced for the admin console.'
 				},
 				pairwise: {
 					title: 'Pairwise subject identifiers',
@@ -161,15 +161,15 @@ export default {
 			items: {
 				console: {
 					title: 'Administration console',
-					body: 'User buckets with their applications and APIs, administrators and their groups, end users, upstream providers, SCIM connections, settings, SMTP and signing keys. Every screen has an address. A change that could lock people out or break applications first says whom it affects, counted, and applies only once you confirm.'
+					body: 'Projects with their applications and APIs, administrators and their teams, end users, upstream providers, SCIM connections, settings, SMTP and signing keys. Every screen has an address. A change that could lock people out or break applications first says whom it affects, counted, and applies only once you confirm.'
 				},
 				audit: {
 					title: 'Append-only audit trail',
 					body: 'Every state-changing admin action records actor, action, target and time. The entry is written before the mutation, and the store has no update or delete path.'
 				},
 				usage: {
-					title: 'Monthly active users per bucket',
-					body: 'Each bucket counts the people it issued tokens to, once per UTC month and day, split into local sign-in, upstream sign-in, renewal and directory provisioning. A closed month never changes, and the history outlives the people and the bucket. Usage shows every bucket beside the group that owns it, so an instance run for other teams or customers can say who used how much.'
+					title: 'Monthly active users per project',
+					body: 'Each project counts the people it issued tokens to, once per UTC month and day, split into local sign-in, upstream sign-in, renewal and directory provisioning. A closed month never changes, and the history outlives the people and the project. Usage shows every project beside the team that owns it, so an instance run for other teams or customers can say who used how much.'
 				},
 				mcp: {
 					title: 'Administration over MCP',
@@ -178,7 +178,7 @@ export default {
 				},
 				mcpAuthorization: {
 					title: 'Authorization for your own MCP servers',
-					body: 'Declare a third-party MCP server as a protected resource of a user bucket and this server mints tokens whose audience is exactly that resource, with no code change here and no restart. In a bucket with an address of its own the declaration needs nothing from the resource — it can be internal, on localhost or not yet deployed — and another tenant may declare the same URL without affecting yours. Tokens are self-contained by default, so the resource verifies them against its bucket’s published keys without credentials of its own.'
+					body: 'Declare a third-party MCP server as a protected resource of a project and this server mints tokens whose audience is exactly that resource, with no code change here and no restart. In a project with an address of its own the declaration needs nothing from the resource — it can be internal, on localhost or not yet deployed — and another tenant may declare the same URL without affecting yours. Tokens are self-contained by default, so the resource verifies them against its project’s published keys without credentials of its own.'
 				},
 				clientIdMetadataDocument: {
 					title: 'Client identity documents',
@@ -197,20 +197,20 @@ export default {
 					body: 'Clients live in the server’s own store, created through the console, the API, dynamic registration or the setup script. There is no static client file.'
 				},
 				groupOwnership: {
-					title: 'Group ownership',
-					body: 'User buckets are owned by a group, and so is everything in them: end users, applications and APIs. Nothing but membership grants access, and it is re-resolved on every request. A bucket moves to another group with everything it holds, in one step.'
+					title: 'Team ownership',
+					body: 'Projects are owned by a team of administrators, and so is everything in them: end users, applications and APIs. Nothing but membership of the team grants access, and it is re-resolved on every request. A project moves to another team with everything it holds, in one step.'
 				},
 				bucketAddress: {
-					title: 'A bucket addressed by a path or a host',
-					body: 'Each user bucket is its own issuer, with its own metadata and signing keys, reached at a path beneath the server or at a hostname of its own — one or the other, never both. A hostname lets the browser isolate that bucket’s sign-in cookie by origin and publishes one metadata location instead of two; it costs a DNS record and a certificate you provide. Changing an address is its own operation: it shows you which clients it will break before it breaks them.'
+					title: 'A project addressed by a path or a host',
+					body: 'Each project is its own issuer, with its own metadata and signing keys, reached at a path beneath the server or at a hostname of its own — one or the other, never both. A hostname lets the browser isolate that project’s sign-in cookie by origin and publishes one metadata location instead of two; it costs a DNS record and a certificate you provide. Changing an address is its own operation: it shows you which clients it will break before it breaks them.'
 				},
 				bucketDeletion: {
-					title: 'Deleting a bucket can be undone',
-					body: 'Delete switches a bucket off at once and destroys it 30 days later. Until then nothing in it is destroyed, and Restore brings it back with every session and refresh token still valid.'
+					title: 'Deleting a project can be undone',
+					body: 'Delete switches a project off at once and destroys it 30 days later. Until then nothing in it is destroyed, and Restore brings it back with every session and refresh token still valid.'
 				},
 				selfService: {
 					title: 'End-user self-service',
-					body: 'Email verification and password reset per bucket, each with attempt caps, cooldowns and single-use links.'
+					body: 'Email verification and password reset per project, each with attempt caps, cooldowns and single-use links.'
 				},
 				endUsers: {
 					title: 'End-user administration',
@@ -218,15 +218,15 @@ export default {
 				},
 				federation: {
 					title: 'Sign in with Google, Microsoft, Apple or GitHub',
-					body: 'Connect one by name and the console shows you what to do at the provider and the exact callback address to register; you supply only the values it issues. Any other OIDC provider can be configured by hand. Per user bucket, so each tenant uses its own application. Try sign-in shows what a real sign-in would do before anyone relies on the provider, and the callback refuses an answer from an issuer other than the one the sign-in started with. Administrators can sign in to the console through your organisation’s provider too.'
+					body: 'Connect one by name and the console shows you what to do at the provider and the exact callback address to register; you supply only the values it issues. Any other OIDC provider can be configured by hand. Per project, so each tenant uses its own application. Try sign-in shows what a real sign-in would do before anyone relies on the provider, and the callback refuses an answer from an issuer other than the one the sign-in started with. Administrators can sign in to the console through your organisation’s provider too.'
 				},
 				scim: {
 					title: 'SCIM 2.0 provisioning',
-					body: 'Microsoft Entra ID, Okta or any SCIM 2.0 directory creates, updates and removes a bucket’s users and groups. A removal of many people at once can be held for review instead of applied, and a replaced secret or static token keeps working until the directory has switched to the new one.'
+					body: 'Microsoft Entra ID, Okta or any SCIM 2.0 directory creates, updates and removes a project’s users and groups. A removal of many people at once can be held for review instead of applied, and a replaced secret or static token keeps working until the directory has switched to the new one.'
 				},
 				signingKeys: {
 					title: 'Signing key management',
-					body: 'Each bucket with an address of its own signs with keys of its own, published at its own jwks_uri, so one tenant’s token never verifies at another’s resource server. The bucket’s owning group rotates them in one step — a new key is published before it may sign, and a retired one stays published until its tokens expire — and can revoke a compromised key at once, so nothing it signed verifies any more. The instance key set stays a super administrator’s.'
+					body: 'Each project with an address of its own signs with keys of its own, published at its own jwks_uri, so one tenant’s token never verifies at another’s resource server. The project’s owning team rotates them in one step — a new key is published before it may sign, and a retired one stays published until its tokens expire — and can revoke a compromised key at once, so nothing it signed verifies any more. The instance key set stays a super administrator’s.'
 				}
 			}
 		},

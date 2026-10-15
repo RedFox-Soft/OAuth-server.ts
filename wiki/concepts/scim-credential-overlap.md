@@ -4,7 +4,7 @@ title: 'SCIM credential overlap: a replaced secret or static token works until t
 tags: [architecture, contract, gotcha, oauth]
 sources: [oauth-server-codebase]
 created: 2026-10-12
-updated: 2026-10-12
+updated: 2026-10-15
 graph:
   node_type: concept
   relationships:
@@ -148,7 +148,7 @@ RFC 7644 §7.4 says "Bearer tokens MUST have a limited lifetime", and the IPSIE 
   (`lib/scim/principal.ts:103`).
 - A previous token keeps its own expiry, and whichever end comes first applies.
 - Within 14 days of the expiry the view adds `static_token_expiring`, and after it `static_token_expired`. Both
-  appear on the connection and in the bucket Overview's Needs attention
+  appear on the connection and in the project Overview's Needs attention
   (`lib/admin/ui/pages/BucketOverview.tsx:94`), with a link to the connection.
 - **Tokens issued before spec 088** get an expiry from migration `2026-10-12-static-token-expiry`
   (`lib/consts/migrations.ts:905`). The expiry is one year after the issue, but never sooner than 90 days after

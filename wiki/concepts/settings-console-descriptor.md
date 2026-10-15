@@ -4,7 +4,7 @@ title: 'The settings console is read from one descriptor'
 tags: [architecture, config, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-09-03
-updated: 2026-10-13
+updated: 2026-10-15
 graph:
   node_type: concept
   relationships:
@@ -39,7 +39,9 @@ holds at least one setting and every setting names a declared domain".
 - `domain` files each setting onto one of six panes (`grants`, `request-security`, `endpoints`,
   `signin-abuse`, `diagnostics`, `integrations`). Before it, sixty-odd settings sat on one
   unsectioned scroll and the `group` each descriptor already carried was discarded at render for
-  fourteen of them.
+  fourteen of them. That field names the card a setting sits in on its pane — `projects.reservedHostnames`
+  sits in "Project addresses" (`lib/admin/settings/catalog.ts:515-517`) — and has nothing to do with the
+  groups of end users or the teams of administrators the console otherwise names.
 - `summary` is one line, **bounded at 100 characters and pinned by test**
   (`lib/admin/settings/catalog.ts:83`). The bound is what stops summary and `description` collapsing
   back into one wall of text — several descriptions run past a hundred words, so the prose used to be
@@ -97,7 +99,7 @@ edits take effect, a review drawer showing each pending change as old → new, a
 When a change takes effect was the most important fact on the page and was only ever reported *after*
 a save — the one moment it cannot be acted on. It is now stated before, and per setting: the save bar
 reads the class off the edits being saved, and the descriptor's `apply: 'restart'` (with its written
-`restartReason`) is what puts a setting in the other group. SMTP and Sentry keep their own buttons
+`restartReason`) is what puts a setting in the other class. SMTP and Sentry keep their own buttons
 because they are separate endpoints.
 
 **Superseded (2026-09-13):** the standing "these apply at restart" note is gone, because

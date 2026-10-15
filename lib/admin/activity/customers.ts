@@ -26,7 +26,7 @@ export interface CustomerSource {
 }
 
 export const UNKNOWN_CUSTOMER: CustomerRef = {
-	groupId: null,
+	teamId: null,
 	label: 'Unknown',
 	kind: null,
 	exists: false
@@ -34,7 +34,7 @@ export const UNKNOWN_CUSTOMER: CustomerRef = {
 
 function refOf(group: Group): CustomerRef {
 	return {
-		groupId: group._id,
+		teamId: group._id,
 		label: groupLabel(group),
 		kind: group.kind,
 		exists: true
@@ -46,7 +46,7 @@ function refOf(group: Group): CustomerRef {
  * not be stored; it is still the System group, not a vanished one.
  */
 const SYSTEM: CustomerRef = {
-	groupId: UNASSIGNED_GROUP_ID,
+	teamId: UNASSIGNED_GROUP_ID,
 	label: SYSTEM_GROUP_NAME,
 	kind: 'system',
 	exists: true
@@ -75,7 +75,7 @@ export async function resolveCustomers(
 			refs.set(source.bucketId, SYSTEM);
 		} else if (source.ownerGroupId !== undefined) {
 			refs.set(source.bucketId, {
-				groupId: source.ownerGroupId,
+				teamId: source.ownerGroupId,
 				label: source.recordedLabel ?? source.ownerGroupId,
 				kind: null,
 				exists: false

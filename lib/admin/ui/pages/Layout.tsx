@@ -90,7 +90,7 @@ const CONNECTION_TABS: Partial<Record<PageKey, ConnectionTab>> = {
  */
 /*
  * How many provisioning connections the administrator can see are held (specs/088): a hold means removals are
- * not happening, so it is shown from every page rather than only from its bucket. Read again on every move
+ * not happening, so it is shown from every page rather than only from its project. Read again on every move
  * between pages, which is when the administrator would look at the menu anyway.
  */
 function useHeldConnections(pathname: string): number {
@@ -120,7 +120,7 @@ export function Layout() {
 	/*
 	 * Grouped so an operator can tell their own work from the organisation around it and from the
 	 * instance itself, which only a super administrator sees. Offered ⇔ permitted: Audit and Usage are open to
-	 * every administrator because each is filtered to their groups rather than refused.
+	 * every administrator because each is filtered to their teams rather than refused.
 	 */
 	const items: MenuProps['items'] = [
 		{
@@ -128,21 +128,21 @@ export function Layout() {
 			label: 'Build',
 			children: [
 				{
-					key: 'buckets',
+					key: 'projects',
 					icon: <DatabaseOutlined />,
 					label:
 						held > 0 ? (
 							<span
 								title={`${held} provisioning connection${held === 1 ? ' is' : 's are'} on hold`}
 							>
-								Buckets{' '}
+								Projects{' '}
 								<Badge
 									count={held}
 									size="small"
 								/>
 							</span>
 						) : (
-							'Buckets'
+							'Projects'
 						)
 				}
 			]
@@ -151,9 +151,9 @@ export function Layout() {
 			type: 'group',
 			label: 'Organisation',
 			children: [
-				{ key: 'groups', icon: <ApartmentOutlined />, label: 'Groups' },
+				{ key: 'teams', icon: <ApartmentOutlined />, label: 'Teams' },
 				{ key: 'audit', icon: <FileSearchOutlined />, label: 'Audit' },
-				/* Every administrator's since specs/091: over the buckets their groups own. */
+				/* Every administrator's since specs/091: over the projects their teams own. */
 				{ key: 'usage', icon: <LineChartOutlined />, label: 'Usage' }
 			]
 		},
@@ -206,8 +206,8 @@ export function Layout() {
 		if (userTab) {
 			return (
 				<UserPage
-					key={`${route.params.bucket ?? ''}/${route.params.user ?? ''}`}
-					bucketId={route.params.bucket ?? ''}
+					key={`${route.params.project ?? ''}/${route.params.user ?? ''}`}
+					bucketId={route.params.project ?? ''}
 					userId={route.params.user ?? ''}
 					tab={userTab}
 				/>
@@ -217,8 +217,8 @@ export function Layout() {
 		if (connectionTab) {
 			return (
 				<ConnectionPage
-					key={`${route.params.bucket ?? ''}/${route.params.connection ?? ''}`}
-					bucketId={route.params.bucket ?? ''}
+					key={`${route.params.project ?? ''}/${route.params.connection ?? ''}`}
+					bucketId={route.params.project ?? ''}
 					connectionId={route.params.connection ?? ''}
 					tab={connectionTab}
 				/>
@@ -232,7 +232,7 @@ export function Layout() {
 			const bucketId =
 				route.key === 'administrators.provider'
 					? ADMIN_BUCKET_ID
-					: (route.params.bucket ?? '');
+					: (route.params.project ?? '');
 			return (
 				<ProviderPage
 					key={`${bucketId}/${route.params.provider ?? ''}`}
@@ -244,8 +244,8 @@ export function Layout() {
 		if (route.key === 'bucket.userGroup') {
 			return (
 				<UserGroupPage
-					key={`${route.params.bucket ?? ''}/${route.params.group ?? ''}`}
-					bucketId={route.params.bucket ?? ''}
+					key={`${route.params.project ?? ''}/${route.params.group ?? ''}`}
+					bucketId={route.params.project ?? ''}
 					groupId={route.params.group ?? ''}
 				/>
 			);
@@ -254,8 +254,8 @@ export function Layout() {
 		if (bucketTab) {
 			return (
 				<BucketDetail
-					key={route.params.bucket}
-					bucketId={route.params.bucket ?? ''}
+					key={route.params.project}
+					bucketId={route.params.project ?? ''}
 					tab={bucketTab}
 				/>
 			);
@@ -264,8 +264,8 @@ export function Layout() {
 			case 'group':
 				return (
 					<AdminGroupPage
-						key={route.params.group}
-						groupId={route.params.group ?? ''}
+						key={route.params.team}
+						groupId={route.params.team ?? ''}
 					/>
 				);
 			case 'buckets':
@@ -279,8 +279,8 @@ export function Layout() {
 			case 'usage.bucket':
 				return (
 					<UsageBucketHistory
-						key={route.params.bucket}
-						bucketId={route.params.bucket ?? ''}
+						key={route.params.project}
+						bucketId={route.params.project ?? ''}
 					/>
 				);
 			case 'settings':
@@ -340,10 +340,10 @@ export function Layout() {
 						Log out
 					</Button>
 				</Header>
-				{/* Keyed by the active group, so switching group remounts every list rather than leaving
+				{/* Keyed by the active team, so switching team remounts every list rather than leaving
 				    half the console on the previous one. */}
 				<Content
-					key={me?.activeGroupId ?? 'none'}
+					key={me?.activeTeamId ?? 'none'}
 					style={{ margin: 24 }}
 				>
 					{renderPage()}

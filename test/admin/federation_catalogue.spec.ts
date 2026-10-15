@@ -123,7 +123,7 @@ describe('connecting a recognised provider', () => {
 		const bucket = await seedBucket({ slug });
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.catalogue.get({ headers: { cookie } });
 
 		expect(res.status).toBe(200);
@@ -141,10 +141,10 @@ describe('connecting a recognised provider', () => {
 		const second = await seedBucket({ slug: 'tenant-two' });
 
 		const one = await client.admin.api
-			.buckets({ id: first._id })
+			.projects({ id: first._id })
 			.federation.catalogue.get({ headers: { cookie } });
 		const two = await client.admin.api
-			.buckets({ id: second._id })
+			.projects({ id: second._id })
 			.federation.catalogue.get({ headers: { cookie } });
 
 		expect(guidanceFor(answered(one.data))?.callbackUri).toBe(
@@ -160,7 +160,7 @@ describe('connecting a recognised provider', () => {
 		const bucket = await seedBucket();
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.catalogue.get({ headers: { cookie } });
 
 		const google = guidanceFor(answered(res.data));
@@ -174,7 +174,7 @@ describe('connecting a recognised provider', () => {
 		const bucket = await seedBucket({ slug: 'stable-co' });
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.catalogue.get({ headers: { cookie } });
 
 		expect(guidanceFor(answered(res.data))?.callbackStability).toBe('stable');
@@ -186,7 +186,7 @@ describe('connecting a recognised provider', () => {
 		const bucket = await seedBucket({ slug: 'connect-co' });
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.post(
 				{
 					catalogueId: 'google',
@@ -214,7 +214,7 @@ describe('connecting a recognised provider', () => {
 		await stubGoogle();
 		const manual = await seedBucket({ slug: 'manual-co' });
 
-		await client.admin.api.buckets({ id: guided._id }).federation.post(
+		await client.admin.api.projects({ id: guided._id }).federation.post(
 			{
 				catalogueId: 'google',
 				clientId: GOOGLE_CLIENT_ID,
@@ -222,7 +222,7 @@ describe('connecting a recognised provider', () => {
 			},
 			{ headers: { cookie } }
 		);
-		await client.admin.api.buckets({ id: manual._id }).federation.post(
+		await client.admin.api.projects({ id: manual._id }).federation.post(
 			{
 				id: 'google',
 				displayName: 'Google',
@@ -262,7 +262,7 @@ describe('connecting a recognised provider', () => {
 		const bucket = await seedBucket({ slug: 'narrow-co' });
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.post(
 				{
 					catalogueId: 'google',
@@ -289,7 +289,7 @@ describe('connecting a recognised provider', () => {
 		const bucket = await seedBucket({ slug: 'wrong-id-co' });
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.post(
 				{
 					catalogueId: 'google',
@@ -313,7 +313,7 @@ describe('connecting a recognised provider', () => {
 		const bucket = await seedBucket({ slug: 'unknown-co' });
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.post(
 				{
 					catalogueId: 'gogle',
@@ -339,12 +339,12 @@ describe('connecting a recognised provider', () => {
 		};
 
 		const first = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.post(body, { headers: { cookie } });
 		expect(first.status).toBe(201);
 
 		const second = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.post(body, { headers: { cookie } });
 
 		expect(second.status).toBe(422);
@@ -364,7 +364,7 @@ describe('connecting a recognised provider', () => {
 		await stubGoogle();
 		const bucket = await seedBucket({ slug: 'already-co' });
 
-		await client.admin.api.buckets({ id: bucket._id }).federation.post(
+		await client.admin.api.projects({ id: bucket._id }).federation.post(
 			{
 				catalogueId: 'google',
 				clientId: GOOGLE_CLIENT_ID,
@@ -374,7 +374,7 @@ describe('connecting a recognised provider', () => {
 		);
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.catalogue.get({ headers: { cookie } });
 
 		const google = guidanceFor(answered(res.data));
@@ -389,7 +389,7 @@ describe('connecting a recognised provider', () => {
 		const bucket = await seedBucket({ slug: 'unreachable-co' });
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.post(
 				{
 					catalogueId: 'google',
@@ -411,7 +411,7 @@ describe('connecting a recognised provider', () => {
 		await stubGoogle();
 		const bucket = await seedBucket({ slug: 'secrecy-co' });
 
-		await client.admin.api.buckets({ id: bucket._id }).federation.post(
+		await client.admin.api.projects({ id: bucket._id }).federation.post(
 			{
 				catalogueId: 'google',
 				clientId: GOOGLE_CLIENT_ID,
@@ -421,7 +421,7 @@ describe('connecting a recognised provider', () => {
 		);
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.catalogue.get({ headers: { cookie } });
 
 		expect(JSON.stringify(res.data)).not.toContain(

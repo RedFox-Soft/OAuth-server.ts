@@ -107,15 +107,15 @@ assertion: a signed statement that one party makes to another.
 `iss` is the Okta organisation. `sub` is our client id in that organisation. Okta documents it as
 `client_id/appInstanceId`; only a real run will show which form actually arrives. Together, these two
 fields point to one upstream provider (an outside identity provider our users sign in through)
-configured on one bucket. A bucket is this server's name for a set of end users with their own sign-in
-rules. Once a bucket has its own address, it also issues tokens in its own name, that is, it becomes
+configured on one project. A project is this server's name for a set of end users with their own sign-in
+rules. Once a project has its own address, it also issues tokens in its own name, that is, it becomes
 its own issuer.
 
 The body's `sub_id` names the person: by their subject (their id at that provider) or, in Okta's other
 format, by email. Not just anyone can be named. The provider can name only a user who signs in here
 through that provider, or a user whom the SCIM connection bound to that provider created. (SCIM is the
 protocol a company's user directory uses to create and disable accounts in other systems by itself. A
-provisioning connection is the record that links one directory to one bucket.) Everyone else gets the
+provisioning connection is the record that links one directory to one project.) Everyone else gets the
 same `404`, even people who do not exist. So nobody can use the endpoint to find out who has an
 account.
 
@@ -202,7 +202,7 @@ did so for any provider whose signature validation an operator had switched off.
 switches signature validation off in production on purpose. I suspect they switch it off once, to
 debug a provider that will not connect, and forget. So in our server the set of acceptable signing
 algorithms is a constant. It holds only asymmetric algorithms, and of those only the ones the provider
-advertises. No setting can widen it: not a provider's, not a bucket's, not the whole instance's.
+advertises. No setting can widen it: not a provider's, not a project's, not the whole instance's.
 `none` and every `HS*` are refused. `HS*` algorithms are symmetric: whoever checks the signature must
 hold the same key that made it. And nobody but the provider may hold the key that signs these tokens.
 
@@ -216,7 +216,7 @@ The `aud` (whom the assertion is meant for) must be exactly this endpoint. `exp`
 required. `jti` is the assertion's unique id, and each `jti` is accepted
 only once.
 
-To remember which `jti` values we have seen, we record each one under a namespace made of the bucket
+To remember which `jti` values we have seen, we record each one under a namespace made of the project
 and the provider. That namespace ends with a delimiter. The delimiter is there because the record's id
 is a hash of the namespace and the `jti` glued together with nothing in between. Without it, two
 different namespace and `jti` pairs could glue into the same string.
@@ -266,7 +266,7 @@ over an endpoint that fetches keys whenever anyone asks.
 ## Okta's draft is one module on a shared core, so the next format got every check for free {#build-the-core-once-and-the-draft-as-a-plugin}
 
 The core under all of this does three things and knows nothing about Okta. It authenticates an
-upstream provider of this bucket. It decides whom that provider may name. And it ends that person's
+upstream provider of this project. It decides whom that provider may name. And it ends that person's
 access. The global token revocation module adds only the details: which claim (field of the token)
 carries our client id, which audience (`aud`) it expects, which token types it accepts, a namespace
 for replay records, and which provider option switches it on.

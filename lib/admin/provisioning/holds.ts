@@ -23,8 +23,8 @@ import { isScheduledForDeletion } from '../../consts/bucket_deletion.js';
  */
 
 export interface HeldConnectionView {
-	bucketId: string;
-	bucketName: string;
+	projectId: string;
+	projectName: string;
 	connectionId: string;
 	displayName: string;
 	/* When the hold began. */
@@ -83,8 +83,8 @@ export const provisioningHoldRoutes = new Elysia({
 				)
 			);
 			const connections = visible.map((c, i) => ({
-				bucketId: c.bucketId,
-				bucketName: names.get(c.bucketId) ?? c.bucketId,
+				projectId: c.bucketId,
+				projectName: names.get(c.bucketId) ?? c.bucketId,
 				connectionId: c._id,
 				displayName: c.displayName,
 				since: c.hold.since.toISOString(),

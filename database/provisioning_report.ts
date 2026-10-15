@@ -98,8 +98,8 @@ export function reservedAddressReport(
 	);
 	if (clashing.length === 0) return null;
 	return (
-		'these buckets use an address the server now reserves for its own routes; give each a new address ' +
-		'through POST /admin/api/buckets/:id/address:\n' +
+		'these projects use an address the server now reserves for its own routes; give each a new address ' +
+		'through POST /admin/api/projects/:id/address:\n' +
 		clashing.join('\n')
 	);
 }

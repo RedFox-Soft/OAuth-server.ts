@@ -74,7 +74,7 @@ describe('a bucket must keep some way to sign in', () => {
 		});
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.patch({ passwordLogin: false }, { headers: { cookie } });
 
 		expect(res.status).toBe(409);
@@ -91,7 +91,7 @@ describe('a bucket must keep some way to sign in', () => {
 		});
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.patch({ passwordLogin: false }, { headers: { cookie } });
 
 		// A kept-but-disabled provider is not a way in.
@@ -108,7 +108,7 @@ describe('a bucket must keep some way to sign in', () => {
 
 		const res = await consenting((consent) =>
 			client.admin.api
-				.buckets({ id: bucket._id })
+				.projects({ id: bucket._id })
 				.patch({ passwordLogin: false, ...consent }, { headers: { cookie } })
 		);
 
@@ -128,7 +128,7 @@ describe('a bucket must keep some way to sign in', () => {
 		});
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.patch({ passwordLogin: true }, { headers: { cookie } });
 
 		// Opening a door is never a lockout, so nothing guards this direction.
@@ -138,7 +138,7 @@ describe('a bucket must keep some way to sign in', () => {
 	it('refuses to create a bucket that would be unreachable from birth', async () => {
 		const cookie = await superCookie();
 
-		const res = await client.admin.api.buckets.post(
+		const res = await client.admin.api.projects.post(
 			{ name: 'stillborn', slug: 'stillborn-1', passwordLogin: false },
 			{ headers: { cookie } }
 		);
@@ -151,7 +151,7 @@ describe('a bucket must keep some way to sign in', () => {
 	it('creates a bucket with password sign-in available by default', async () => {
 		const cookie = await superCookie();
 
-		const res = await client.admin.api.buckets.post(
+		const res = await client.admin.api.projects.post(
 			{ name: 'ordinary', slug: 'ordinary-2' },
 			{ headers: { cookie } }
 		);
@@ -164,7 +164,7 @@ describe('a bucket must keep some way to sign in', () => {
 		const cookie = await superCookie();
 
 		const res = await client.admin.api
-			.buckets({ id: ADMIN_BUCKET_ID })
+			.projects({ id: ADMIN_BUCKET_ID })
 			.patch({ passwordLogin: false }, { headers: { cookie } });
 
 		/*

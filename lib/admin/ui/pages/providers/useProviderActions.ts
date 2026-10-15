@@ -27,14 +27,14 @@ export function providerBlocks(
 	bound: { displayName: string } | null
 ): { disable: string | null; remove: string | null } {
 	const lastDoor = isLastDoor(bucket, provider.id)
-		? 'This is the only way to sign in to this bucket: password sign-in is off and no other provider is enabled. Turn password sign-in on, or enable another provider, first.'
+		? 'This is the only way to sign in to this project: password sign-in is off and no other provider is enabled. Turn password sign-in on, or enable another provider, first.'
 		: null;
 	return {
 		disable: lastDoor,
 		remove:
 			lastDoor ??
 			(bound
-				? `${bound.displayName} provisions this bucket through this provider. Delete that connection first.`
+				? `${bound.displayName} provisions this project through this provider. Delete that connection first.`
 				: null)
 	};
 }
@@ -99,7 +99,7 @@ export function useProviderActions(
 							: 'Accounts and their links to it are kept.',
 						...(detail?.boundConnection
 							? [
-									`${detail.boundConnection.displayName} provisions this bucket through it: the people it manages sign in with ${provider.displayName}, and can't while it is off.`
+									`${detail.boundConnection.displayName} provisions this project through it: the people it manages sign in with ${provider.displayName}, and can't while it is off.`
 								]
 							: []),
 						...consoleLines

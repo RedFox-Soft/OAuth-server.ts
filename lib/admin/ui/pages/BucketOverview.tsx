@@ -79,7 +79,7 @@ export function BucketOverview({
 		let live = true;
 		void request<typeof connections>(
 			'GET',
-			`/admin/api/buckets/${encodeURIComponent(bucket._id)}/provisioning-connections`
+			`/admin/api/projects/${encodeURIComponent(bucket._id)}/provisioning-connections`
 		).then((r) => {
 			if (live && r.ok) setConnections(r.data);
 		});
@@ -188,18 +188,18 @@ export function BucketOverview({
 			) : null
 		});
 	}
-	if (superAdmin && bucket.ownerGroupId === UNASSIGNED_GROUP_ID && !special) {
+	if (superAdmin && bucket.ownerTeamId === UNASSIGNED_GROUP_ID && !special) {
 		attention.push({
 			key: 'system',
 			type: 'info',
 			title:
-				'This bucket belongs to the System group, so no customer group manages it.',
+				'This project belongs to the System team, so no customer team manages it.',
 			action: (
 				<Button
 					size="small"
 					onClick={() => void navigate(settingsHref)}
 				>
-					Move to group…
+					Move to team…
 				</Button>
 			)
 		});
@@ -224,7 +224,7 @@ export function BucketOverview({
 			key: 'address',
 			type: 'warning',
 			title:
-				'This bucket has no address of its own, so no application can sign in to it.',
+				'This project has no address of its own, so no application can sign in to it.',
 			action: (
 				<Button
 					size="small"
@@ -260,9 +260,9 @@ export function BucketOverview({
 					href: bucketHref(bucket._id, 'users')
 				},
 				{
-					title: 'User groups',
-					value: summary.userGroups,
-					href: bucketHref(bucket._id, 'user-groups')
+					title: 'Groups',
+					value: summary.groups,
+					href: bucketHref(bucket._id, 'groups')
 				},
 				{
 					title: 'Provisioning connections',
@@ -323,7 +323,7 @@ export function BucketOverview({
 										? ADDRESS_FORM[bucket.addressForm]
 										: '—'
 								},
-								{ key: 'group', label: 'Owning group', children: groupName },
+								{ key: 'team', label: 'Owning team', children: groupName },
 								{
 									key: 'holds',
 									label: 'Holds',
@@ -411,7 +411,7 @@ export function BucketOverview({
 				<Alert
 					type="warning"
 					showIcon
-					title="The bucket's numbers could not be read. Reload to try again."
+					title="The project's numbers could not be read. Reload to try again."
 				/>
 			)}
 			{numbers.length > 0 && (
@@ -438,8 +438,8 @@ export function BucketOverview({
 			{(can.edit || superAdmin) && (
 				<RecentChanges
 					title="Recent changes"
-					params={{ bucket: bucket._id }}
-					empty="No changes recorded for this bucket yet."
+					params={{ project: bucket._id }}
+					empty="No changes recorded for this project yet."
 				/>
 			)}
 		</Flex>

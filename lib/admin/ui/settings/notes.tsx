@@ -61,7 +61,7 @@ function LoginThrottleNote({ values }: { values: Values }) {
 					style={{ fontSize: 12 }}
 				>
 					The longest lockout is what sets this rate; the first lockout only
-					decides how long an honest mistake costs. A bucket that requires a
+					decides how long an honest mistake costs. A project that requires a
 					one-time code stays at the first lockout however often it is tripped,
 					because a guessed password there does not sign anyone in.
 				</Typography.Text>

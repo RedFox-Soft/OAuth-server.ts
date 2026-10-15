@@ -38,7 +38,7 @@ async function admin(kind: AdminKind = 'plain') {
 }
 
 async function groupOwnedBy(cookie: string, name = 'Acme') {
-	const res = await client.admin.api.groups.post(
+	const res = await client.admin.api.teams.post(
 		{ name },
 		{ headers: { cookie } }
 	);
@@ -47,7 +47,7 @@ async function groupOwnedBy(cookie: string, name = 'Acme') {
 
 async function invite(cookie: string, groupId: string, email: string) {
 	return client.admin.api
-		.groups({ id: groupId })
+		.teams({ id: groupId })
 		.invitations.post({ email, role: 'member' }, { headers: { cookie } });
 }
 
@@ -206,7 +206,7 @@ describe('group invitations', () => {
 		const token = tokenFor(invitee);
 
 		await client.admin.api
-			.groups({ id: group._id })
+			.teams({ id: group._id })
 			.delete(undefined, { headers: { cookie: owner.cookie } });
 
 		const res = await client.admin.api.invitations.accept.post({
@@ -225,7 +225,7 @@ describe('group invitations', () => {
 		const second = await admin();
 		const group = await groupOwnedBy(founder.cookie);
 		await client.admin.api
-			.groups({ id: group._id })
+			.teams({ id: group._id })
 			.members.post(
 				{ userId: second.userId, role: 'owner' },
 				{ headers: { cookie: founder.cookie } }
@@ -237,7 +237,7 @@ describe('group invitations', () => {
 
 		// The founder demotes the inviter, so their outstanding invitation stops working.
 		await client.admin.api
-			.groups({ id: group._id })
+			.teams({ id: group._id })
 			.members({ userId: second.userId })
 			.patch({ role: 'member' }, { headers: { cookie: founder.cookie } });
 
@@ -254,7 +254,7 @@ describe('group invitations', () => {
 		const outsider = await admin();
 		const group = await groupOwnedBy(owner.cookie);
 		await client.admin.api
-			.groups({ id: group._id })
+			.teams({ id: group._id })
 			.members.post(
 				{ userId: member.userId, role: 'member' },
 				{ headers: { cookie: owner.cookie } }
@@ -277,7 +277,7 @@ describe('group invitations', () => {
 		const inviteId = answered(sent.data)._id;
 
 		const revoked = await client.admin.api
-			.groups({ id: group._id })
+			.teams({ id: group._id })
 			.invitations({ inviteId })
 			.delete(undefined, { headers: { cookie: owner.cookie } });
 		expect(revoked.status).toBe(200);

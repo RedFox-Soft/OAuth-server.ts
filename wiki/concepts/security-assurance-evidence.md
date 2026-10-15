@@ -4,7 +4,7 @@ title: "Security assurance: what evidence the project publishes, and what it ref
 tags: [architecture, contract]
 sources: [oauth-server-codebase]
 created: 2026-09-07
-updated: 2026-10-05
+updated: 2026-10-15
 graph:
   node_type: concept
   relationships:
@@ -35,7 +35,7 @@ page records what was published to close it and, more usefully, the decisions in
   cookie on the RP-initiated navigation every sign-in is made of — see
   [[end-user-cookie-attributes]]), cookies
   unsigned, verification link tokens unhashed, no per-code device attempt counter, the image
-  running as root, TOTP not seeded on for the admin bucket — each with its compensating control.
+  running as root, TOTP not seeded on for the administrators' project — each with its compensating control.
 - **An assurance page** at `docs/security/assurance.mdx`: what each scan covers, what it does on a
   finding, where the result is read, and a section titled "What has not been done" — no external
   audit, no paid bounty, no OpenID Foundation certification, no fuzzing or signed releases.

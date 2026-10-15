@@ -4,7 +4,7 @@ title: 'End-user support: invitations on the reset challenge, mark verified, ses
 tags: [architecture, contract, gotcha, security]
 sources: [oauth-server-codebase]
 created: 2026-10-12
-updated: 2026-10-12
+updated: 2026-10-15
 graph:
   node_type: concept
   relationships:
@@ -13,7 +13,7 @@ graph:
     - predicate: depends_on
       object: concept:self-service-password-reset
     - predicate: relates_to
-      object: concept:bucket-users-workspace
+      object: concept:project-users-workspace
     - predicate: relates_to
       object: concept:admin-audit-trail
 ---
@@ -38,7 +38,7 @@ administrator learns of a delivery failure (`lib/password_reset/challenge.ts:418
 - the account-owned cleanup on lock, deactivation and deletion;
 - the link `/reset-password?token=`, its plain page and its throttle.
 
-The page's copy follows the loaded purpose ("Set your password for <bucket>"). An invalid link has no purpose,
+The page's copy follows the loaded purpose ("Set your password for <project>"). An invalid link has no purpose,
 so one neutral failure page covers both. One outstanding set-password secret per person is the rule: an
 invitation supersedes a reset link and the reverse.
 
@@ -66,7 +66,7 @@ set `verified`. The resend route gained the same provisioned refusal.
 offline grant outlives its session.
 - **Signed in** is the holding session's `loginTs`, else the grant's creation. A grant's times are milliseconds;
   until spec 095 they were read as seconds, which dated access no session held some fifty thousand years ahead.
-- The bucket's connected-apps page client is never a row: signing in to one's own account page leaves a grant,
+- The project's connected-apps page client is never a row: signing in to one's own account page leaves a grant,
   as every authorization does, and it is not an application (`grantsByClient`, `lib/end_users/sessions.ts:101`).
   The person's own page reads the same grants ([[connected-apps-page]]).
 - **Last token issued** is the newest stored refresh or access token of the grant. JWT access tokens are never
@@ -130,5 +130,5 @@ and memory use the group's member ids. `totalResults` is exact.
 
 - [[self-service-password-reset]] — the challenge an invitation reuses.
 - [[end-user-lifecycle]] — the single acts every bulk act repeats.
-- [[bucket-users-workspace]] — the console where all of this lives.
+- [[project-users-workspace]] — the console where all of this lives.
 - [[admin-audit-trail]] — the per-person bulk entries and the new `clientId` field.

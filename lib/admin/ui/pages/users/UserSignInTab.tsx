@@ -54,7 +54,7 @@ export function UserSignInTab({
 					{said && <Typography.Text>{said}</Typography.Text>}
 					{!passwordLogin && (
 						<Typography.Text type="secondary">
-							This bucket does not accept password sign-in: a password, if set,
+							This project does not accept password sign-in: a password, if set,
 							is not used.
 						</Typography.Text>
 					)}
@@ -107,8 +107,8 @@ export function UserSignInTab({
 					</Typography.Text>
 					<Typography.Text type="secondary">
 						{bucket.totpRequired
-							? 'This bucket requires one for password sign-in; without one, they set it up at their next sign-in.'
-							: 'This bucket does not require one.'}
+							? 'This project requires one for password sign-in; without one, they set it up at their next sign-in.'
+							: 'This project does not require one.'}
 					</Typography.Text>
 				</Flex>
 			</Card>

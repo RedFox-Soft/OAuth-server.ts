@@ -33,7 +33,7 @@ const IssuedToken = Type.Object({
 });
 
 function connectionPath(c: Connected): string {
-	return `/admin/api/buckets/${c.bucket._id}/provisioning-connections/${c.connection._id}`;
+	return `/admin/api/projects/${c.bucket._id}/provisioning-connections/${c.connection._id}`;
 }
 
 async function issueToken(

@@ -96,15 +96,17 @@ describe('admin audit write failure', () => {
 			name: 'Holds nothing'
 		});
 
-		const res = await client.admin.api.buckets({ id: bucket._id }).clients.post(
-			{
-				clientName: 'Never created',
-				grantTypes: ['authorization_code'],
-				tokenEndpointAuthMethod: 'client_secret_basic',
-				redirectUris: ['https://rp.example.com/cb']
-			},
-			{ headers: { cookie } }
-		);
+		const res = await client.admin.api
+			.projects({ id: bucket._id })
+			.clients.post(
+				{
+					clientName: 'Never created',
+					grantTypes: ['authorization_code'],
+					tokenEndpointAuthMethod: 'client_secret_basic',
+					redirectUris: ['https://rp.example.com/cb']
+				},
+				{ headers: { cookie } }
+			);
 
 		expectAuditFailure(res.status, res.error?.value ?? res.data);
 		expect(
@@ -120,7 +122,7 @@ describe('admin audit write failure', () => {
 		});
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.patch({ name: 'Renamed' }, { headers: { cookie } });
 
 		expectAuditFailure(res.status, res.error?.value ?? res.data);
@@ -135,7 +137,7 @@ describe('admin audit write failure', () => {
 		});
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.delete(undefined, { headers: { cookie } });
 
 		expectAuditFailure(res.status, res.error?.value ?? res.data);

@@ -95,7 +95,7 @@ export function BucketGroupsPanel({
 			feedback.failed(result, nameForm);
 			return;
 		}
-		feedback.done(`User group ${displayName} created.`);
+		feedback.done(`Group ${displayName} created.`);
 		setCreateOpen(false);
 		nameForm.resetFields();
 		void navigate(userGroupHref(bucketId, result.data.id));
@@ -106,12 +106,9 @@ export function BucketGroupsPanel({
 		if (value) params.set('keptBy', value);
 		else params.delete('keptBy');
 		const qs = params.toString();
-		void navigate(
-			`${bucketHref(bucketId, 'user-groups')}${qs ? `?${qs}` : ''}`,
-			{
-				replace: true
-			}
-		);
+		void navigate(`${bucketHref(bucketId, 'groups')}${qs ? `?${qs}` : ''}`, {
+			replace: true
+		});
 	}
 
 	function rowActions(group: GroupView): RowAction[] {
@@ -157,7 +154,7 @@ export function BucketGroupsPanel({
 				setCreateOpen(true);
 			}}
 		>
-			New user group
+			New group
 		</Button>
 	) : null;
 
@@ -183,7 +180,7 @@ export function BucketGroupsPanel({
 					level={5}
 					style={{ margin: 0 }}
 				>
-					User groups
+					Groups
 				</Typography.Title>
 				<Space>
 					{connections.length > 0 && (
@@ -228,7 +225,7 @@ export function BucketGroupsPanel({
 								purpose={
 									keptBy
 										? 'No group is kept by this.'
-										: "No user groups in this bucket yet. A group's name reaches applications in the groups claim of each member's tokens."
+										: "No groups in this project yet. A group's name reaches applications in the groups claim of each member's tokens."
 								}
 								create={keptBy ? undefined : createButton}
 							/>
@@ -271,11 +268,11 @@ export function BucketGroupsPanel({
 			)}
 
 			<Modal
-				title="New user group"
+				title="New group"
 				open={createOpen}
 				onCancel={() => setCreateOpen(false)}
 				onOk={() => nameForm.submit()}
-				okText="Create user group"
+				okText="Create group"
 				destroyOnHidden
 			>
 				<Form<{ displayName: string }>

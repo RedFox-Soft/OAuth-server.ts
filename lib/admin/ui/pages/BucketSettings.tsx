@@ -77,7 +77,7 @@ export function GeneralCard({
 		const shown = values.displayName.trim();
 		const result = await request(
 			'PATCH',
-			`/admin/api/buckets/${encodeURIComponent(bucket._id)}`,
+			`/admin/api/projects/${encodeURIComponent(bucket._id)}`,
 			// Emptied means removed: the pages then show the bucket's address.
 			{ name: values.name, displayName: shown ? shown : null }
 		);
@@ -86,7 +86,7 @@ export function GeneralCard({
 			feedback.failed(result, form);
 			return;
 		}
-		feedback.done('Bucket saved.');
+		feedback.done('Project saved.');
 		onChanged();
 	}
 
@@ -111,12 +111,12 @@ export function GeneralCard({
 				<Form.Item
 					name="displayName"
 					label="Name shown to users"
-					extra="What people see at the top of the page where they allow an app access — for example “Acme ID”. Leave it empty to show the bucket’s address instead. The name above is only for this console."
+					extra="What people see at the top of the page where they allow an app access — for example “Acme ID”. Leave it empty to show the project’s address instead. The name above is only for this console."
 				>
 					<Input
 						style={{ maxWidth: 420 }}
 						maxLength={60}
-						placeholder="the bucket’s address"
+						placeholder="the project’s address"
 					/>
 				</Form.Item>
 				{canEdit && (
@@ -304,7 +304,7 @@ function AddressPreviewView({ preview }: { preview: AddressPreview }) {
 			)}
 			{preview.namespaceMove && (
 				<Typography.Text type="secondary">
-					The bucket's API declarations move with it.
+					The project's API declarations move with it.
 				</Typography.Text>
 			)}
 			<Alert
@@ -339,7 +339,7 @@ function ChangeAddressDialog({
 			form === 'host' ? { host: value.trim() } : { slug: value.trim() };
 		const result = await request<{ to?: string }>(
 			'POST',
-			`/admin/api/buckets/${encodeURIComponent(bucket._id)}/address`,
+			`/admin/api/projects/${encodeURIComponent(bucket._id)}/address`,
 			commit && preview
 				? { ...target, confirm: true, expect: preview.expect }
 				: target
@@ -439,14 +439,14 @@ export function BucketSettings({
 	const [deleting, setDeleting] = useState(false);
 	const scheduled = useScheduledActions({
 		onRestored: onChanged,
-		onDeleted: () => void navigate('/admin/buckets', { replace: true })
+		onDeleted: () => void navigate('/admin/projects', { replace: true })
 	});
 	const fixed = isUndeletableBucket(bucket._id);
 	const holdsApplications = bucket.applications ?? 0;
 	const holdsApis = bucket.apis ?? 0;
 	const dependents = bucket.blockers?.dependents;
 	const ownsGroup = (me?.memberships ?? []).some(
-		(m) => m.groupId === bucket.ownerGroupId && m.role === 'owner'
+		(m) => m.teamId === bucket.ownerTeamId && m.role === 'owner'
 	);
 
 	/*
@@ -455,20 +455,20 @@ export function BucketSettings({
 	 */
 	const addressReason =
 		!can.changeAddress && !bucket.deletion && ownsGroup && dependents
-			? `Used by ${plural(dependents.applications, 'application', 'applications')}, ${plural(dependents.providers, 'identity provider', 'identity providers')} and ${plural(dependents.connections, 'provisioning connection', 'provisioning connections')}: only an instance administrator can change this bucket's address now.`
+			? `Used by ${plural(dependents.applications, 'application', 'applications')}, ${plural(dependents.providers, 'identity provider', 'identity providers')} and ${plural(dependents.connections, 'provisioning connection', 'provisioning connections')}: only an instance administrator can change this project's address now.`
 			: null;
 
 	async function afterMove() {
 		setMoving(false);
 		const check = await request(
 			'GET',
-			`/admin/api/buckets/${encodeURIComponent(bucket._id)}`
+			`/admin/api/projects/${encodeURIComponent(bucket._id)}`
 		);
 		if (!check.ok && (check.status === 403 || check.status === 404)) {
 			feedback.done(
-				`${bucket.name} now belongs to a group you are not in, so it left your list.`
+				`${bucket.name} now belongs to a team you are not in, so it left your list.`
 			);
-			void navigate('/admin/buckets', { replace: true });
+			void navigate('/admin/projects', { replace: true });
 			return;
 		}
 		onChanged();
@@ -496,7 +496,7 @@ export function BucketSettings({
 						Owned by <Typography.Text strong>{groupName}</Typography.Text>
 					</Typography.Text>
 					{can.move && !fixed && (
-						<Button onClick={() => setMoving(true)}>Move to group…</Button>
+						<Button onClick={() => setMoving(true)}>Move to team…</Button>
 					)}
 				</Flex>
 			</Card>
@@ -522,7 +522,7 @@ export function BucketSettings({
 									<br />
 									<Typography.Text type="secondary">
 										{addressReason ??
-											'Applications using this bucket must be reconfigured with the new issuer.'}
+											'Applications using this project must be reconfigured with the new issuer.'}
 									</Typography.Text>
 								</div>
 								<Button
@@ -573,7 +573,7 @@ export function BucketSettings({
 								gap={12}
 							>
 								<div>
-									<Typography.Text strong>Delete bucket</Typography.Text>
+									<Typography.Text strong>Delete project</Typography.Text>
 									<br />
 									{holdsApplications + holdsApis > 0 ? (
 										<Typography.Text type="secondary">
@@ -604,7 +604,7 @@ export function BucketSettings({
 									disabled={holdsApplications + holdsApis > 0}
 									onClick={() => setDeleting(true)}
 								>
-									Delete bucket…
+									Delete project…
 								</Button>
 							</Flex>
 						)}
@@ -616,7 +616,7 @@ export function BucketSettings({
 				<MoveToGroup
 					id={bucket._id}
 					name={bucket.name}
-					sourceGroupId={bucket.ownerGroupId}
+					sourceGroupId={bucket.ownerTeamId}
 					onClose={() => setMoving(false)}
 					onMoved={() => void afterMove()}
 				/>
@@ -640,7 +640,7 @@ export function BucketSettings({
 						feedback.done(
 							purgeAt
 								? `Scheduled for deletion on ${new Date(purgeAt).toLocaleDateString()}.`
-								: `Bucket ${bucket.name} scheduled for deletion.`
+								: `Project ${bucket.name} scheduled for deletion.`
 						);
 						onChanged();
 					}}

@@ -369,15 +369,15 @@ export const ApplicationConfig = {
 	 */
 	'ciba.deliveryModes': ['poll'],
 	/*
-	 * buckets.reservedHostnames
+	 * projects.reservedHostnames
 	 *
-	 * description: Hostnames beneath this deployment's domain that no bucket may be given, beyond the
+	 * description: Hostnames beneath this deployment's domain that no project may be given, beyond the
 	 * canonical host itself — which is always refused and need not be listed. Empty by default because
 	 * the server cannot infer it: what else lives in an operator's domain is a fact about their DNS, not
 	 * about this process, and a guess here would either refuse a name they meant to use or admit one
 	 * that shadows something they run.
 	 */
-	'buckets.reservedHostnames': [] as string[],
+	'projects.reservedHostnames': [] as string[],
 
 	/*
 	 * features.requestObjects

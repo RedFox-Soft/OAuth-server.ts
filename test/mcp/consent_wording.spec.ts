@@ -109,7 +109,7 @@ describe('an agent wording the consent page', () => {
 		const { token, userId } = await agentToken();
 
 		const response = await rpc(
-			call('bucket_update', { id: DEFAULT_BUCKET_ID, displayName: 'Acme ID' }),
+			call('project_update', { id: DEFAULT_BUCKET_ID, displayName: 'Acme ID' }),
 			token
 		);
 

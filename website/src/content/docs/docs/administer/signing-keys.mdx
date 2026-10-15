@@ -1,8 +1,8 @@
 ---
 title: Rotate signing keys
-description: Rotate a signing key in one step, retire the old one, or revoke a compromised key at once — with no restart, for the instance and every bucket.
+description: Rotate a signing key in one step, retire the old one, or revoke a compromised key at once — with no restart, for the instance and every project.
 sidebar:
-  order: 6
+  order: 7
 ---
 
 import { Steps, Aside } from '@astrojs/starlight/components';
@@ -16,19 +16,19 @@ the steps it is made of can be taken one at a time, and none of them needs a res
 
 Each issuer has its own keys, and so its own rotation:
 
-- **The instance's keys** sign for everything served at the root: the default bucket, the
-  administrators' bucket and any bucket without an address of its own. They are published at `/jwks`.
+- **The instance's keys** sign for everything served at the root: the default project, the
+  administrators' project and any project without an address of its own. They are published at `/jwks`.
   Only super administrators manage them, on the console's **Keys** page or with the `jwks_*` tools.
-- **A bucket's keys**, for a bucket with a path or a hostname of its own. It signs with them alone and
+- **A project's keys**, for a project with a path or a hostname of its own. It signs with them alone and
   publishes them under its own issuer, `https://auth.example.com/acme/jwks` or its hostname's `/jwks`, so a
-  token from one bucket never verifies against another bucket's keys. The group that owns the bucket
-  manages them on the bucket's **Signing keys** tab, or with the `bucket_key_*` tools.
+  token from one project never verifies against another project's keys. The team that owns the project
+  manages them on the project's **Signing keys** tab, or with the `project_key_*` tools.
 
-A bucket without an address has no keys of its own, and its key operations are refused. Its
+A project without an address has no keys of its own, and its key operations are refused. Its
 **Signing keys** tab says that it signs with the instance keys and lists their published ids. To rotate
 its keys on their own, give it an address of its own.
 
-The instance's **Keys** page and a bucket's **Signing keys** tab show one card per algorithm. Each
+The instance's **Keys** page and a project's **Signing keys** tab show one card per algorithm. Each
 key's state is stated in words: when it can sign, until when it signed, until when it verifies.
 
 ## A key's life: published, signing, retired, hidden
@@ -97,9 +97,9 @@ and it names every key the act touched (`keys`): the key promoted, the one demot
 the one revoked.
 
 For an agent, every instance key tool is high-consequence and asks for confirmation:
-`jwks_generate`, `jwks_promote`, `jwks_rotate`, `jwks_retire` and `jwks_revoke`. For a bucket, retiring
-and revoking are high-consequence (`bucket_key_retire`, `bucket_key_revoke`); generating, promoting and
-rotating are ordinary (`bucket_key_generate`, `bucket_key_promote`, `bucket_key_rotate`), because none of
+`jwks_generate`, `jwks_promote`, `jwks_rotate`, `jwks_retire` and `jwks_revoke`. For a project, retiring
+and revoking are high-consequence (`project_key_retire`, `project_key_revoke`); generating, promoting and
+rotating are ordinary (`project_key_generate`, `project_key_promote`, `project_key_rotate`), because none of
 them stops a key from verifying.
 
 ## One signer per algorithm
@@ -119,7 +119,7 @@ The sixty-second window protects this server's own instances. It cannot protect 
 caches the key set for an hour and never looks again. A relying party that copes with rotation:
 
 - reads `jwks_uri` from the issuer's discovery document rather than having it typed into its
-  configuration, so a bucket's own key set is found without anyone remembering it exists;
+  configuration, so a project's own key set is found without anyone remembering it exists;
 - selects the verification key by the token's `kid`, never by assuming there is only one key;
 - re-reads the key set when it sees a `kid` it does not know, with a short cooldown so a stream of
   forged `kid`s cannot make it fetch on every request.

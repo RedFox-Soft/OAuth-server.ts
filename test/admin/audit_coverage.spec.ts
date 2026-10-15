@@ -171,7 +171,7 @@ describe('admin audit coverage: clients', () => {
 		const bucket = await makeBucket();
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.clients.post(CLIENT_BODY, { headers: { cookie } });
 		expect(res.status).toBe(201);
 		const created = answered(res.data);
@@ -193,13 +193,13 @@ describe('admin audit coverage: clients', () => {
 		const created = answered(
 			(
 				await client.admin.api
-					.buckets({ id: bucket._id })
+					.projects({ id: bucket._id })
 					.clients.post(CLIENT_BODY, { headers: { cookie } })
 			).data
 		);
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.clients({ clientId: created.clientId })
 			.patch({ clientName: 'Renamed' }, { headers: { cookie } });
 		expect(res.status).toBe(200);
@@ -224,13 +224,13 @@ describe('admin audit coverage: clients', () => {
 		const created = answered(
 			(
 				await client.admin.api
-					.buckets({ id: bucket._id })
+					.projects({ id: bucket._id })
 					.clients.post(CLIENT_BODY, { headers: { cookie } })
 			).data
 		);
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.clients({ clientId: created.clientId })
 			.secret.post(undefined, { headers: { cookie } });
 		expect(res.status).toBe(200);
@@ -255,13 +255,13 @@ describe('admin audit coverage: clients', () => {
 		const created = answered(
 			(
 				await client.admin.api
-					.buckets({ id: bucket._id })
+					.projects({ id: bucket._id })
 					.clients.post(CLIENT_BODY, { headers: { cookie } })
 			).data
 		);
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.clients({ clientId: created.clientId })
 			.delete(undefined, { headers: { cookie } });
 		expect(res.status).toBe(200);
@@ -391,7 +391,7 @@ describe('admin audit coverage: buckets', () => {
 	it('records a bucket creation against the id the bucket will have', async () => {
 		const { cookie, userId } = await superCookie();
 
-		const res = await client.admin.api.buckets.post(
+		const res = await client.admin.api.projects.post(
 			{ name: 'Audited bucket', slug: 'audited-bucket-1' },
 			{ headers: { cookie } }
 		);
@@ -412,7 +412,7 @@ describe('admin audit coverage: buckets', () => {
 		const bucket = await makeBucket();
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.patch({ name: 'Renamed only' }, { headers: { cookie } });
 		expect(res.status).toBe(200);
 
@@ -434,7 +434,7 @@ describe('admin audit coverage: buckets', () => {
 		const bucket = await makeBucket();
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.patch({ name: 'Renamed' }, { headers: { cookie } });
 		expect(res.status).toBe(200);
 
@@ -451,7 +451,7 @@ describe('admin audit coverage: buckets', () => {
 		const bucket = await makeBucket();
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.delete(undefined, { headers: { cookie } });
 		expect(res.status).toBe(200);
 
@@ -477,7 +477,7 @@ describe('admin audit coverage: end-users', () => {
 		const bucket = await makeBucket();
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.users.post(
 				{ email: `${unique('end')}@x.io`, password: 'password-long' },
 				{ headers: { cookie } }
@@ -502,7 +502,7 @@ describe('admin audit coverage: end-users', () => {
 		);
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.users({ uid: target._id })
 			.patch({ active: false }, { headers: { cookie } });
 		expect(res.status).toBe(200);
@@ -525,7 +525,7 @@ describe('admin audit coverage: end-users', () => {
 		);
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.users({ uid: target._id })
 			.password.post(
 				{ password: 'brand-new-password' },
@@ -552,7 +552,7 @@ describe('admin audit coverage: end-users', () => {
 		);
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.users({ uid: target._id })
 			.delete(undefined, { headers: { cookie } });
 		expect(res.status).toBe(200);

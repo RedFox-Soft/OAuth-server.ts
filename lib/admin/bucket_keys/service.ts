@@ -31,7 +31,7 @@ export async function loadKeyedBucket(
 	if (!isAddressable(bucket)) {
 		throw new AdminError(
 			409,
-			'This bucket signs with the instance keys; manage them under Keys.'
+			'This project signs with the instance keys; manage them under Keys.'
 		);
 	}
 	return bucket;

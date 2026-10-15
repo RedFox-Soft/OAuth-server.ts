@@ -45,7 +45,7 @@ const Summary = Type.Object({
 	unverified: Type.Number(),
 	withoutAuthenticator: Type.Number(),
 	withoutLinkedIdentity: Type.Number(),
-	userGroups: Type.Number(),
+	groups: Type.Number(),
 	connections: Type.Number(),
 	held: Type.Number(),
 	applications: Type.Number(),
@@ -172,7 +172,7 @@ describe("a bucket's overview", () => {
 	async function summaryAs(cookie: string) {
 		const answer = await request(
 			'GET',
-			`/admin/api/buckets/${bucket._id}/summary`,
+			`/admin/api/projects/${bucket._id}/summary`,
 			cookie
 		);
 		expect(answer.status).toBe(200);
@@ -187,7 +187,7 @@ describe("a bucket's overview", () => {
 			unverified: 1,
 			withoutAuthenticator: 2,
 			withoutLinkedIdentity: 2,
-			userGroups: 1,
+			groups: 1,
 			connections: 2,
 			held: 1,
 			applications: 2,
@@ -207,7 +207,7 @@ describe("a bucket's overview", () => {
 
 		const answer = await request(
 			'GET',
-			`/admin/api/buckets/${bucket._id}/summary`,
+			`/admin/api/projects/${bucket._id}/summary`,
 			outsider
 		);
 
@@ -217,7 +217,7 @@ describe("a bucket's overview", () => {
 	it('gives the issuer and discovery address discovery itself serves, the address form and how many applications and APIs it holds', async () => {
 		const read = shaped(
 			BucketRead,
-			(await request('GET', `/admin/api/buckets/${bucket._id}`, ownerCookie))
+			(await request('GET', `/admin/api/projects/${bucket._id}`, ownerCookie))
 				.body
 		);
 		const discovered = await elysia.handle(
@@ -241,7 +241,7 @@ describe("a bucket's overview", () => {
 
 		const read = shaped(
 			BucketRead,
-			(await request('GET', `/admin/api/buckets/${legacy._id}`, ownerCookie))
+			(await request('GET', `/admin/api/projects/${legacy._id}`, ownerCookie))
 				.body
 		);
 
@@ -256,7 +256,7 @@ describe("a bucket's overview", () => {
 		async function rowOf(id: string) {
 			const rows = shaped(
 				Type.Array(ListRow),
-				(await request('GET', '/admin/api/buckets', superCookie)).body
+				(await request('GET', '/admin/api/projects', superCookie)).body
 			);
 			const row = rows.find((r) => r._id === id);
 			expect(row).toBeDefined();
@@ -312,7 +312,7 @@ describe("a bucket's overview", () => {
 
 			const changed = await request(
 				'POST',
-				`/admin/api/buckets/${moving._id}/address`,
+				`/admin/api/projects/${moving._id}/address`,
 				superCookie,
 				{
 					host: `after-${id}.e.ly`,

@@ -94,7 +94,7 @@ describe('an agent managing a bucket key set', () => {
 		const bucket = await keyedBucket();
 
 		const { payload } = await rpc(
-			call('bucket_key_list', { id: bucket._id }),
+			call('project_key_list', { id: bucket._id }),
 			token
 		);
 
@@ -112,7 +112,7 @@ describe('an agent managing a bucket key set', () => {
 		const bucket = await keyedBucket();
 
 		const { payload } = await rpc(
-			call('bucket_key_generate', { id: bucket._id, alg: 'ES256' }),
+			call('project_key_generate', { id: bucket._id, alg: 'ES256' }),
 			token
 		);
 
@@ -129,7 +129,7 @@ describe('an agent managing a bucket key set', () => {
 		const token = await agent();
 		const bucket = await keyedBucket();
 		const generated = await rpc(
-			call('bucket_key_generate', { id: bucket._id, alg: 'ES256' }),
+			call('project_key_generate', { id: bucket._id, alg: 'ES256' }),
 			token
 		);
 		const { kid } = shaped(
@@ -138,7 +138,7 @@ describe('an agent managing a bucket key set', () => {
 		);
 
 		const { payload } = await rpc(
-			call('bucket_key_retire', { id: bucket._id, kid }),
+			call('project_key_retire', { id: bucket._id, kid }),
 			token
 		);
 
@@ -153,7 +153,7 @@ describe('an agent managing a bucket key set', () => {
 		const bucket = await keyedBucket();
 
 		const { payload } = await rpc(
-			call('bucket_key_rotate', { id: bucket._id, alg: 'RS256' }),
+			call('project_key_rotate', { id: bucket._id, alg: 'RS256' }),
 			token
 		);
 
@@ -180,7 +180,7 @@ describe('an agent managing a bucket key set', () => {
 		const [signer] = await getBucketKeysStore().listByBucket(bucket._id);
 
 		const { payload } = await rpc(
-			call('bucket_key_revoke', {
+			call('project_key_revoke', {
 				id: bucket._id,
 				kid: signer.kid,
 				confirm: signer.kid
@@ -199,11 +199,11 @@ describe('an agent managing a bucket key set', () => {
 		const bucket = await keyedBucket();
 
 		const listedKeys = await rpc(
-			call('bucket_key_list', { id: bucket._id }),
+			call('project_key_list', { id: bucket._id }),
 			token
 		);
 		const generated = await rpc(
-			call('bucket_key_generate', { id: bucket._id, alg: 'RS256' }),
+			call('project_key_generate', { id: bucket._id, alg: 'RS256' }),
 			token
 		);
 

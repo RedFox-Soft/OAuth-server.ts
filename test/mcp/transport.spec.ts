@@ -226,12 +226,12 @@ describe('MCP transport', () => {
 		expect(status).toBe(200);
 
 		const names = (payload?.result?.tools ?? []).map((t) => t.name);
-		expect(names).toContain('bucket_list');
+		expect(names).toContain('project_list');
 		expect(names).toContain('whoami');
 		expect(names).toContain('audit_list');
 
 		// FR-031: absent from the published surface, not merely refused when called.
-		expect(names).not.toContain('bucket_delete');
+		expect(names).not.toContain('project_delete');
 	});
 
 	it('answers whoami from the real admin route, as the authorizing administrator', async () => {
@@ -284,7 +284,7 @@ describe('MCP transport', () => {
 		);
 		const { payload } = await mcp(
 			'tools/call',
-			{ name: 'bucket_list', arguments: {} },
+			{ name: 'project_list', arguments: {} },
 			token
 		);
 		// Required, not defaulted: a refused or empty-handed call must not pass as an empty list.

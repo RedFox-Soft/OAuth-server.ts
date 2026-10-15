@@ -56,18 +56,18 @@ async function session() {
  * covered the moment it is classified.
  */
 const BODIES: Record<string, Record<string, unknown>> = {
-	bucket_user_password_reset: {
+	project_user_password_reset: {
 		password: 'a new password that is long enough'
 	},
-	bucket_user_email_change: { email: 'moved@example.com' },
-	bucket_user_bulk_deactivate: { userIds: ['absent-user'] },
-	bucket_user_bulk_delete: { userIds: ['absent-user'] },
+	project_user_email_change: { email: 'moved@example.com' },
+	project_user_bulk_deactivate: { userIds: ['absent-user'] },
+	project_user_bulk_delete: { userIds: ['absent-user'] },
 	jwks_generate: { alg: 'RS256' },
 	jwks_rotate: { alg: 'RS256' },
-	bucket_user_assign_connection: { connectionId: 'any', userName: 'someone' },
-	bucket_group_assign_connection: { connectionId: 'any' },
+	project_user_assign_connection: { connectionId: 'any', userName: 'someone' },
+	project_group_assign_connection: { connectionId: 'any' },
 	provisioning_credential_issue: { kind: 'static_token' },
-	bucket_owner_change: { groupId: 'any' },
+	project_owner_change: { teamId: 'any' },
 
 	settings_update: { 'dpop.requireNonce': true },
 	smtp_settings_update: {

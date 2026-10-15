@@ -2,14 +2,19 @@ import type { UserBucket } from '../../../adapters/types.js';
 import type { BucketBlockers, BucketCan } from '../frame/can.js';
 
 /*
- * The bucket as the API presents it (specs/081 data-model §1): the stored record plus what the server derives
+ * The project as the API presents it (specs/081 data-model §1): the stored record under its edge names
+ * (specs/100: the owning team is `ownerTeamId`, never the stored `ownerGroupId`) plus what the server derives
  * for the console — the address form, the issuer and discovery addresses (the browser bundle never learns the
  * server's own address), how many applications and APIs it holds, and for a host, whether requests have
  * arrived.
  */
-export interface BucketView extends Omit<UserBucket, 'deletion'> {
+export interface BucketView extends Omit<
+	UserBucket,
+	'deletion' | 'ownerGroupId'
+> {
+	ownerTeamId: string;
 	reserved?: 'administrators';
-	/* Present while the bucket is scheduled for deletion (specs/090); dates arrive as ISO strings. */
+	/* Present while the project is scheduled for deletion (specs/090); dates arrive as ISO strings. */
 	deletion?: BucketDeletionView;
 	can?: Partial<BucketCan>;
 	blockers?: Partial<
@@ -44,7 +49,7 @@ export interface BucketDeletionView {
 	scheduledBy?: { userId: string; email?: string };
 }
 
-/* GET /admin/api/buckets/:id/summary (data-model §3). */
+/* GET /admin/api/projects/:id/summary (data-model §3). */
 export interface BucketSummary {
 	users: number;
 	unverified: number;
@@ -56,7 +61,7 @@ export interface BucketSummary {
 	passwordWithoutAuthenticator: number;
 	applications?: number;
 	apis?: number;
-	userGroups: number;
+	groups: number;
 	connections: number;
 	held: number;
 	providers: { enabled: number; creating: number };

@@ -6,23 +6,23 @@ import {
 	useState,
 	type ReactNode
 } from 'react';
-import type { AdminContext } from '../../auth/rbac.js';
+import type { AdminMeView } from '../../me_view.js';
 import { request } from './request.js';
 
 /*
  * Who the operator is, for the whole console. Seeded from the server render and re-read after anything
- * that changes it — switching group above all, which used to reload the page for exactly this reason:
- * a console where half the screens knew the new group and half the old one.
+ * that changes it — switching team above all, which used to reload the page for exactly this reason:
+ * a console where half the screens knew the new team and half the old one.
  */
 
 export interface MeCan {
-	createBucket: boolean;
+	createProject: boolean;
 	createHost: boolean;
-	createGroup: boolean;
+	createTeam: boolean;
 	instance: boolean;
 }
 
-export type Me = AdminContext & { verified?: boolean; can?: MeCan };
+export type Me = AdminMeView & { verified?: boolean; can?: MeCan };
 
 interface MeValue {
 	me: Me | null;
@@ -61,9 +61,9 @@ export function meCan(me: Me | null): MeCan {
 	if (me?.can) return me.can;
 	const instance = me?.superAdmin === true;
 	return {
-		createBucket: me !== null,
+		createProject: me !== null,
 		createHost: instance,
-		createGroup: me !== null,
+		createTeam: me !== null,
 		instance
 	};
 }

@@ -76,9 +76,9 @@ const BucketCan = Type.Object({
 	delete: Type.Boolean()
 });
 const MeCan = Type.Object({
-	createBucket: Type.Boolean(),
+	createProject: Type.Boolean(),
 	createHost: Type.Boolean(),
-	createGroup: Type.Boolean(),
+	createTeam: Type.Boolean(),
 	instance: Type.Boolean()
 });
 const BucketRead = Type.Object({
@@ -99,7 +99,7 @@ const BucketRead = Type.Object({
 });
 const MeRead = Type.Object({ can: MeCan });
 const ApiList = Type.Object({
-	namespace: Type.Union([Type.Literal('bucket'), Type.Literal('root')])
+	namespace: Type.Union([Type.Literal('project'), Type.Literal('root')])
 });
 
 type Rights = Readonly<Record<string, boolean>>;
@@ -275,7 +275,7 @@ async function statedRight(
 	entityId: string
 ): Promise<boolean> {
 	if (route.on === 'me') return (await meRights(cookie))[route.flag] ?? false;
-	const base = `/admin/api/buckets/${encodeURIComponent(entityId)}`;
+	const base = `/admin/api/projects/${encodeURIComponent(entityId)}`;
 	const read = await request('GET', base, cookie);
 	const rights: Rights =
 		read.status === 403 ? NO_RIGHTS : shaped(BucketRead, read.body).can;
@@ -286,7 +286,7 @@ async function statedRight(
 		(await request('GET', `${base}/resources`, cookie)).body
 	);
 	return (
-		apis.namespace === 'bucket' ||
+		apis.namespace === 'project' ||
 		((await meRights(cookie))[route.atRoot] ?? false)
 	);
 }
@@ -392,7 +392,7 @@ describe('stated rights on buckets', () => {
 				(
 					await request(
 						'GET',
-						`/admin/api/buckets/${w.buckets[kind]}`,
+						`/admin/api/projects/${w.buckets[kind]}`,
 						w.cookies[caller]
 					)
 				).body
@@ -423,11 +423,11 @@ describe('stated rights on buckets', () => {
 			);
 
 			expect(member.can).toMatchObject({
-				createBucket: true,
+				createProject: true,
 				createHost: false
 			});
 			expect(superAdmin.can).toMatchObject({
-				createBucket: true,
+				createProject: true,
 				createHost: true,
 				instance: true
 			});
@@ -488,7 +488,7 @@ describe('stated rights on buckets', () => {
 				(
 					await request(
 						'GET',
-						`/admin/api/buckets/${bucket._id}`,
+						`/admin/api/projects/${bucket._id}`,
 						w.cookies['group owner']
 					)
 				).body
@@ -522,7 +522,7 @@ describe('stated rights on buckets', () => {
 				(
 					await request(
 						'GET',
-						`/admin/api/buckets/${bucket._id}`,
+						`/admin/api/projects/${bucket._id}`,
 						w.cookies['group owner']
 					)
 				).body
@@ -554,7 +554,7 @@ describe('stated rights on buckets', () => {
 			const caller = 'super administrator';
 			const rows = shaped(
 				Type.Array(BucketRead),
-				(await request('GET', '/admin/api/buckets', w.cookies[caller])).body
+				(await request('GET', '/admin/api/projects', w.cookies[caller])).body
 			);
 			const ours = rows.filter((row) =>
 				Object.values(w.buckets).includes(row._id)
@@ -567,7 +567,7 @@ describe('stated rights on buckets', () => {
 					(
 						await request(
 							'GET',
-							`/admin/api/buckets/${row._id}`,
+							`/admin/api/projects/${row._id}`,
 							w.cookies[caller]
 						)
 					).body
@@ -619,14 +619,14 @@ describe('stated rights on buckets', () => {
 				(
 					await request(
 						'GET',
-						`/admin/api/buckets/${id}`,
+						`/admin/api/projects/${id}`,
 						w.cookies['group owner']
 					)
 				).body
 			);
 			const agent: Static<typeof BucketRead> = shaped(
 				BucketRead,
-				await viaAgent('bucket_get', id)
+				await viaAgent('project_get', id)
 			);
 
 			expect(agent.can).toEqual(viaConsole.can);

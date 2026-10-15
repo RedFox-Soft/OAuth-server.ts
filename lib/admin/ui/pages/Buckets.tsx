@@ -44,12 +44,14 @@ interface CreateBucketValues {
 	host?: string;
 	/* Who can create accounts (specs/083): closed unless the creator opens it. */
 	registrationOpen?: boolean;
-	/* Chosen in the dialog (specs/087); the header's current group by default. */
-	groupId?: string;
+	/* Chosen in the dialog (specs/087); the header's current team by default. */
+	teamId?: string;
 }
 
 /* A list row as the API presents it: the record, the caller's rights on it, and what blocks them. */
-type BucketRow = Omit<UserBucket, 'deletion'> & {
+type BucketRow = Omit<UserBucket, 'deletion' | 'ownerGroupId'> & {
+	/* The owning team, under its edge name (specs/100). */
+	ownerTeamId: string;
 	can?: Partial<BucketCan>;
 	/* specs/090: present while the bucket is scheduled for deletion. */
 	deletion?: BucketDeletionView;
@@ -99,7 +101,7 @@ export function Buckets() {
 	// `loading` first; `load` is the reload, which does.
 	const fetchBuckets = useCallback(async () => {
 		try {
-			const result = await request<BucketRow[]>('GET', '/admin/api/buckets');
+			const result = await request<BucketRow[]>('GET', '/admin/api/projects');
 			if (result.ok) {
 				setBuckets(pinnedLast(result.data));
 				setLoadError(null);
@@ -121,7 +123,7 @@ export function Buckets() {
 		if (!superAdmin) return;
 		void request<{ _id: string; name: string }[]>(
 			'GET',
-			'/admin/api/groups'
+			'/admin/api/teams'
 		).then((result) => {
 			if (result.ok) {
 				setGroupNames(new Map(result.data.map((g) => [g._id, g.name])));
@@ -142,17 +144,17 @@ export function Buckets() {
 			const named = shown ? { ...rest, displayName: shown } : rest;
 			const result = await request<{ _id: string }>(
 				'POST',
-				'/admin/api/buckets',
+				'/admin/api/projects',
 				addressForm === 'host' ? { ...named, host } : { ...named, slug }
 			);
 			if (!result.ok) {
 				feedback.failed(result, form);
 				return;
 			}
-			feedback.done(`Bucket ${values.name} created.`);
+			feedback.done(`Project ${values.name} created.`);
 			setOpen(false);
 			form.resetFields();
-			// Opened at once: it may belong to a group other than the header's, where the list would not show it.
+			// Opened at once: it may belong to a team other than the header's, where the list would not show it.
 			void navigate(bucketHref(result.data._id));
 		} finally {
 			setCreating(false);
@@ -171,7 +173,7 @@ export function Buckets() {
 		if (can.move) {
 			items.push({
 				key: 'move',
-				label: 'Move to group…',
+				label: 'Move to team…',
 				group: 'handover',
 				onClick: () => setMoving(row)
 			});
@@ -208,20 +210,20 @@ export function Buckets() {
 		return items;
 	}
 
-	const createButton = mine.createBucket ? (
+	const createButton = mine.createProject ? (
 		<Button
 			type="primary"
 			icon={<PlusOutlined />}
 			onClick={() => setOpen(true)}
 		>
-			New bucket
+			New project
 		</Button>
 	) : null;
 
 	return (
 		<>
 			<PageHeader
-				title="Buckets"
+				title="Projects"
 				actions={createButton}
 			/>
 			{loadError !== null ? (
@@ -240,7 +242,7 @@ export function Buckets() {
 							' '
 						) : (
 							<EmptyState
-								purpose="A bucket holds the people who sign in to your apps, and the apps and APIs that sign them in. Create one, then register your first application in it."
+								purpose="A project holds the people who sign in to your apps, and the apps and APIs that sign them in. Create one, then register your first application in it."
 								create={createButton}
 							/>
 						)
@@ -283,7 +285,7 @@ export function Buckets() {
 											</Tooltip>
 										)}
 										{reserved === 'administrators' && (
-											<Tooltip title="The console's own bucket: its accounts are this instance's administrators.">
+											<Tooltip title="The console's own project: its accounts are this instance's administrators.">
 												<Tag color="gold">Administrators</Tag>
 											</Tooltip>
 										)}
@@ -349,7 +351,7 @@ export function Buckets() {
 										render: (_: unknown, row: BucketRow) =>
 											reservedOf(row._id)
 												? '—'
-												: (groupNames.get(row.ownerGroupId) ?? row.ownerGroupId)
+												: (groupNames.get(row.ownerTeamId) ?? row.ownerTeamId)
 									}
 								]
 							: []),
@@ -369,7 +371,7 @@ export function Buckets() {
 				<MoveToGroup
 					id={moving._id}
 					name={moving.name}
-					sourceGroupId={moving.ownerGroupId}
+					sourceGroupId={moving.ownerTeamId}
 					onClose={() => setMoving(null)}
 					onMoved={() => {
 						setMoving(null);
@@ -394,11 +396,11 @@ export function Buckets() {
 			)}
 			{scheduled.dialog}
 			<Modal
-				title="New bucket"
+				title="New project"
 				open={open}
 				onCancel={() => setOpen(false)}
 				onOk={() => form.submit()}
-				okText="Create bucket"
+				okText="Create project"
 				confirmLoading={creating}
 				destroyOnHidden
 			>
@@ -419,11 +421,11 @@ export function Buckets() {
 					<Form.Item
 						name="displayName"
 						label="Name shown to users"
-						extra="What people see at the top of the page where they allow an app access — for example “Acme ID”. Leave it empty to show the bucket’s address instead. The name above is only for this console."
+						extra="What people see at the top of the page where they allow an app access — for example “Acme ID”. Leave it empty to show the project’s address instead. The name above is only for this console."
 					>
 						<Input
 							maxLength={60}
-							placeholder="the bucket’s address"
+							placeholder="the project’s address"
 						/>
 					</Form.Item>
 					{/*
@@ -449,7 +451,7 @@ export function Buckets() {
 							name="addressForm"
 							label="Address form"
 							initialValue="path"
-							tooltip="A host isolates this bucket's sign-in cookie by origin and publishes one metadata location instead of two. It needs a DNS record and a TLS certificate, which you provide — this server creates neither."
+							tooltip="A host isolates this project's sign-in cookie by origin and publishes one metadata location instead of two. It needs a DNS record and a TLS certificate, which you provide — this server creates neither."
 						>
 							<Radio.Group
 								optionType="button"
@@ -471,7 +473,7 @@ export function Buckets() {
 								<Form.Item
 									name="host"
 									label="Hostname"
-									tooltip="Where this bucket is served, and the issuer in the tokens it mints. Changing it later breaks every client integrated with this bucket."
+									tooltip="Where this project is served, and the issuer in the tokens it mints. Changing it later breaks every client integrated with this project."
 									rules={[
 										{ required: true },
 										{
@@ -481,7 +483,7 @@ export function Buckets() {
 										},
 										{ max: 253 }
 									]}
-									extra="Point this name at the deployment and obtain a certificate for it. Until a request arrives, the bucket page will say so."
+									extra="Point this name at the deployment and obtain a certificate for it. Until a request arrives, the project page will say so."
 								>
 									<Input placeholder="acme.auth.example.com" />
 								</Form.Item>
@@ -489,7 +491,7 @@ export function Buckets() {
 								<Form.Item
 									label="Address"
 									required
-									tooltip="Where this bucket is served, and the issuer in the tokens it mints. Changing it later breaks every client integrated with this bucket."
+									tooltip="Where this project is served, and the issuer in the tokens it mints. Changing it later breaks every client integrated with this project."
 								>
 									{/* The inner item binds the field; the outer one labels it and shows its errors. */}
 									<Space.Compact block>
@@ -519,7 +521,7 @@ export function Buckets() {
 						name="registrationOpen"
 						label="Who can create accounts?"
 						initialValue={false}
-						extra="You can change this later on the bucket's Sign-in tab."
+						extra="You can change this later on the project's Sign-in tab."
 					>
 						<Radio.Group
 							options={[

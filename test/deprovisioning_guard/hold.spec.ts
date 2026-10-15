@@ -202,7 +202,7 @@ describe('holding and releasing a provisioning connection', () => {
 
 			const res = await admin(
 				'POST',
-				`/admin/api/buckets/${g.bucket._id}/provisioning-connections`,
+				`/admin/api/projects/${g.bucket._id}/provisioning-connections`,
 				cookie,
 				{
 					displayName: 'Second',

@@ -17,9 +17,9 @@ The server administers itself. There is no seeded password to look up in a log a
    `http://localhost:3000/admin`.
 
 2. The **Create the first super admin** screen asks for an e-mail address and a password of at
-   least twelve characters. The account goes into the reserved "Administrators" user bucket, is made a
-   member of **Super administrators** — the group whose members administer the whole instance — and
-   gets a personal group like any other administrator.
+   least twelve characters. The account goes into the reserved "Administrators" project, is made a
+   member of **Super administrators** — the team whose members administer the whole instance — and
+   gets a personal team like any other administrator.
 
 3. Submit, then sign in with those credentials.
 
@@ -32,7 +32,7 @@ password of at least twelve characters. A super administrator can also open sign
 **Sign-in** tab, so that people register themselves, or connect your organisation's identity provider
 under **Identity providers**. A new administrator is never a super administrator, however they
 arrived: a super administrator grants that separately, with **Make super administrator…** in the
-account's menu. (Membership of an ordinary group, separately,
+account's menu. (Membership of a regular team, separately,
 is offered by e-mail invitation.) If you reach a setup screen on a deployment that is supposed to have
 administrators, that is worth investigating: it means the account collection this server reads
 holds none.
@@ -46,9 +46,9 @@ after the deployment comes up, and do not leave a reachable, un-provisioned inst
 </Aside>
 
 <ScreenshotFigure
-	name="admin-buckets"
-	alt="The admin console after sign-in, listing the user buckets in the current group scope."
-	caption="What a signed-in administrator lands on: the buckets of the group the scope switcher is pointed at."
+	name="admin-projects"
+	alt="The admin console after sign-in, listing the projects of the current team."
+	caption="What a signed-in administrator lands on: the projects of the team the scope switcher is pointed at."
 />
 
 ## Administrators sign in through this server's own issuer
@@ -56,7 +56,7 @@ after the deployment comes up, and do not leave a reachable, un-provisioned inst
 Signing in to the console is an OpenID Connect authorization code flow against the very server the
 console administers, using the first-party `admin-panel` client that `db:setup` seeds. There is no
 second password store and no admin-only credential path: an administrator is an end-user in the
-reserved administrator bucket, and what the admin API lets them do follows from the groups they
+reserved administrators' project, and what the admin API lets them do follows from the teams they
 belong to.
 
 Two consequences follow, and both come up in practice:
@@ -70,7 +70,7 @@ Two consequences follow, and both come up in practice:
 
 ## Turn on the second factor
 
-The administrator bucket is a password door on the public internet, so our advice is to require an
+The administrators' project is a password door on the public internet, so our advice is to require an
 authenticator app on it before you do anything else. In the console, go to **Administrators** (super
 administrators only), open the **Sign-in** tab, switch on **Require an authenticator app for password
 sign-in** and save. The console first shows how many administrators have no authenticator yet and
@@ -82,8 +82,8 @@ signing in with the reserved `admin-mcp` client that `database/mongodb.ts` seeds
 same door. Administrators who sign in through an identity provider use that provider's second
 factor instead; the requirement applies to password sign-in only.
 
-This matters more than it might look. Failed password attempts are counted per bucket and
-e-mail address, and an address that reaches the cap is refused for a while. A bucket that requires a
+This matters more than it might look. Failed password attempts are counted per project and
+e-mail address, and an address that reaches the cap is refused for a while. A project that requires a
 one-time code stays at the first lockout window however often it is tripped, by design: a guessed
 password there does not sign anyone in. Administrators also have no self-service password reset to
 escape a lockout with. The way to make that door properly hard is the second factor, not the
@@ -95,16 +95,16 @@ throttle. The throttle's own settings are `loginThrottle.failureCap`,
 
 The console's super-admin surface covers the instance itself: server settings, signing keys, SMTP,
 administrator accounts and the fault store. Being a super administrator is membership of the reserved
-**Super administrators** group, granted and withdrawn as operations of their own (**Make super administrator…** and **Withdraw super administration…** on the **Administrators**
+**Super administrators** team, granted and withdrawn as operations of their own (**Make super administrator…** and **Withdraw super administration…** on the **Administrators**
 page, or `admin_super_grant` and `admin_super_withdraw` for an agent); the last active member
-can be neither withdrawn nor deactivated. Any other administrator creates buckets, the applications
-and APIs in them, and groups, invites people into their regular groups by e-mail, and reads the audit trail and **Usage**
-for their own groups. Ownership is by group: belonging to a container's owning group is what grants access to
-it.
+can be neither withdrawn nor deactivated. Any other administrator creates projects, the applications
+and APIs in them, and teams, invites people into their regular teams by e-mail, and reads the audit trail and **Usage**
+for their own teams. Ownership is by team: belonging to a project's owning team is what grants access to
+it. [Teams and project ownership](/docs/administer/teams/) has the details.
 
 Every state-changing action, the console's and an agent's alike, is written to an append-only
 audit trail before the mutation, naming the actor, the action and the target. The store exposes no
 update or delete.
 
-If what you found is a security problem instead of a configuration one, the project's disclosure
-policy and contact are on the [security page](/security/).
+If what you found is a security problem instead of a configuration one, our disclosure policy and
+contact are on the [security page](/security/).

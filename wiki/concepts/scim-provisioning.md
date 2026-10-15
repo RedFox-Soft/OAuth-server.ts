@@ -4,7 +4,7 @@ title: 'SCIM provisioning: connections, /Users, and the sign-in they feed'
 tags: [architecture, contract, gotcha, oauth, config]
 sources: [oauth-server-codebase]
 created: 2026-10-06
-updated: 2026-10-12
+updated: 2026-10-15
 graph:
   node_type: concept
   relationships:
@@ -19,19 +19,19 @@ graph:
 # SCIM provisioning: connections, /Users, and the sign-in they feed
 
 Spec 070 — part 2 of 4 of the SCIM series (issue #62). An enterprise directory (Microsoft Entra ID, Okta)
-provisions a bucket's end users over SCIM 2.0 through a **provisioning connection**, and those users sign in
+provisions a project's end users over SCIM 2.0 through a **provisioning connection**, and those users sign in
 through the same directory by federation. Part 1 ([[end-user-lifecycle]]) built the record and the
-access-ending operation this calls; part 3 ([[bucket-groups]], spec 071) adds `/Groups` and the `groups`
-claim, part 4 (split by the owner on 2026-10-07 into several specs) starts with spec 072: the
-mass-deprovisioning guard below and [[global-token-revocation]].
+access-ending operation this calls; part 3 ([[project-groups]], spec 071) adds `/Groups` — SCIM Groups are a
+project's groups of end users — and the `groups` claim, part 4 (split by the owner on 2026-10-07 into several
+specs) starts with spec 072: the mass-deprovisioning guard below and [[global-token-revocation]].
 
 ## A connection is its own record, bound to one provider
 
 `provisioningConnections` (`lib/consts/storage_inventory.ts:142`, `:512`) holds one document per connection:
-its bucket, one of that bucket's federation providers, a correlation rule, an email trust policy and its
-credentials. Its `_id` is what an end user's `provisionedBy` holds. It is **not** embedded in the bucket
-document like `federation[]`, for the reason [[upstream-federation]] records: a nested secret leaked for a
-year because the containing entity's reads skipped the nested entity's presenter. `providerKey`
+its project, one of that project's federation providers, a correlation rule, an email trust policy and its
+credentials. Its `_id` is what an end user's `provisionedBy` holds. It is **not** embedded in the project
+(`UserBucket`) document like `federation[]`, for the reason [[upstream-federation]] records: a nested secret
+leaked for a year because the containing entity's reads skipped the nested entity's presenter. `providerKey`
 (`bucketId:providerId`) is a unique index, so one provider binds to at most one connection without a route
 having to remember it.
 
@@ -43,7 +43,7 @@ configuration — and the console offers disable instead.
 
 ## Credentials: a client that is never stored
 
-The key and secret credentials authenticate at the **bucket's own token endpoint** as the OAuth client
+The key and secret credentials authenticate at the **project's own token endpoint** as the OAuth client
 `scim-<connectionId>`, which is **synthesized from the connection on every resolution and stored nowhere**
 (`lib/provisioning/client.ts:31`, consulted after the adapter read at `lib/models/client/validate.ts:124`).
 That one decision buys the whole token endpoint for free — `private_key_jwt` with `jti` replay protection,
@@ -68,7 +68,7 @@ new lifetime are in [[scim-credential-overlap]].
   `invalid_request` (`lib/shared/token_auth.ts:83`, RFC 6749 §2.3), so Entra's "How credentials are sent" must be
   Header or Body, never Both — one of the pitfalls the directory guidance below carries (since spec 088).
 - **No `scope` in the client metadata.** Client metadata may name only scopes the server advertises, and
-  `scim` belongs to a bucket's SCIM resource, not to the server. That such a client gets `scim` and nothing
+  `scim` belongs to a project's SCIM resource, not to the server. That such a client gets `scim` and nothing
   else is enforced at the grant (`lib/actions/grants/client_credentials.ts:41`): absent scope means `scim`, any
   other scope is `invalid_scope`.
 - **A static token** is `scimst_` + 256 random bits, stored as
@@ -81,19 +81,19 @@ new lifetime are in [[scim-credential-overlap]].
   fallback for an organisation without that mode. Since spec 088 every static token also expires (90 days or a
   year, RFC 7644 §7.4) — see [[scim-credential-overlap]].
 
-### The token endpoint does not check a client's bucket
+### The token endpoint does not check a client's project
 
 `check_bucket.ts` runs only for the authorization and device flows, and a client-credentials token takes its
-bucket from the address it was requested at. So the SCIM resource is a **built-in arm** in
+project from the address it was requested at. So the SCIM resource is a **built-in arm** in
 `getResourceServerInfo` (`lib/addon/resources.ts:88`), placed **before** the MCP arm, and
 `assertConnectionMayMint` (`lib/provisioning/token_policy.ts:44`) refuses any client that is not an enabled
-connection of the *addressed* bucket — and refuses a connection's client every other indicator, MCP's
+connection of the *addressed* project — and refuses a connection's client every other indicator, MCP's
 included. Tokens are **opaque** (`:22`): a JWT-format client-credentials token is not stored, so it could not
 be revoked when a credential is rotated or a connection deleted.
 
 ## The SCIM surface
 
-`lib/scim/` is a protocol plugin, mounted bare and beneath `/:bucket` (`lib/index.ts:214`), so a bucket's
+`lib/scim/` is a protocol plugin, mounted bare and beneath `/:bucket` (`lib/index.ts:214`), so a project's
 base URL is `<its issuer>/scim/v2` in every addressing form. It is mounted with **statements of its own after
 the app chain**, not as links in it: adding it to the chain tipped TypeScript past its instantiation depth
 (TS2589), and typing the plugin `AnyElysia` instead erased the whole app's type and broke every Eden client
@@ -116,8 +116,11 @@ in the suite. `.use` mutates, so the routes register identically.
   SCIM routes are `exempt` from it and limited per connection inside the plugin
   (`lib/scim/rate_limit.ts:81`), while a request whose credential fails is charged per origin with the strict
   bounds (`:89`) — the exemption moves the limit, it does not remove it.
-- **Its own principal** (`lib/scim/principal.ts:85`): a token's `aud` must equal the addressed bucket's SCIM
-  URL and its `bucketId` the addressed bucket, which is what keeps bucket A's token out of bucket B.
+- **Its own principal** (`lib/scim/principal.ts:85`): a token's `aud` must equal the addressed project's SCIM
+  URL and its `bucketId` the addressed project, which is what keeps project A's token out of project B.
+- **Its own words.** Since spec 100 its schema and resource-type descriptions (`lib/scim/discovery.ts`) and its
+  error details (`lib/scim/principal.ts`, `lib/scim/users.ts`) say "project" — e.g. "End users of this project",
+  "that email is already taken in this project". The resource names and the protocol are unchanged.
 
 ### Own filter parser and patch applier, not the libraries issue #62 named
 
@@ -139,7 +142,7 @@ attribute (Entra: `oid` ↔ `externalId`, because Entra's `sub` is pairwise; oth
 `not_provisioned`; a match already linked to another subject is `link_conflict` and an event, not a re-link.
 Upstream claims are **not** copied onto a provisioned user — its profile belongs to the directory.
 
-Two things this closes beyond email linking: a provisioned user holds no usable password, so in a bucket with
+Two things this closes beyond email linking: a provisioned user holds no usable password, so in a project with
 a password door the email step would have sent them to `password_required`, which they could never complete;
 and the existing-link step now uses `canSignIn`, so a locked account is refused there rather than only at the
 door after.
@@ -189,14 +192,14 @@ both. The JWT bullet wins: §10 repeats it, and §4.1 carries an editor's note t
 ## Audit by a connection
 
 `recordConnectionAudit` (`lib/admin/audit/record.ts:129`) writes `connection:<id>` as the actor — the
-bootstrap's sentinel convention — with `viaSurface: 'scim'` and the bucket's `ownerGroupId`, so the bucket's
-own administrators see it ([[admin-audit-trail]]). SCIM computes the attribute names that change before the
+bootstrap's sentinel convention — with `viaSurface: 'scim'` and the project's `ownerGroupId` (its owning
+team), so the project's own administrators see it ([[admin-audit-trail]]). SCIM computes the attribute names that change before the
 write, so a request asserting what is already stored writes nothing and audits nothing.
 
 ## The mass-deprovisioning guard
 
 Spec 072. Part 1 made deprovisioning instant and total, so a wrong scoping rule in Entra or a compromised
-directory credential could end a whole bucket's access — sessions, grants, consents — in minutes. A connection
+directory credential could end a whole project's access — sessions, grants, consents — in minutes. A connection
 may carry an optional `threshold` (`count` 1–100,000 within `windowSeconds` 300–604,800; absent by default):
 the first deprovisioning beyond it **holds** the connection, and while held every deprovisioning is refused and
 everything else keeps flowing. Only an explicit release ends a hold (`releaseConnection`,
@@ -220,7 +223,7 @@ the threshold of a held connection is refused 409.
   admitted, 2026-10-07).
 - **One alert per hold.** `holdIfFree` is a conditional write; only the caller told `true` records the hold
   (`provisioning.connection.update`, `attributes: ['hold']`, under the connection) and mails the administrators
-  of the owning group (super administrators for `unassigned`), fire-and-forget (`hold`, `deprovision_guard.ts:185`).
+  of the owning team (super administrators for `unassigned`), fire-and-forget (`hold`, `deprovision_guard.ts:185`).
   That audit entry follows the write rather than preceding it — the one departure from audit-first, because
   written before, every refused request in a burst would record a hold only one of them set.
 - **429 with `Retry-After: 300`** (`deprovision_guard.ts:42`): the only status Okta retries by itself (it turns a
@@ -242,20 +245,23 @@ the threshold of a held connection is refused 409.
   - **Release clears it.** `releaseConnection` counts it first; the release's audit entry carries
     `cascade: { refusedRemovals: N }`. It then destroys the records as a best effort, after the hold clears. A
     straggler written by a request that raced the release lands in a generation no read returns, because the
-    release moved `tallyEpoch` on. Deleting the connection or the bucket destroys them too.
+    release moved `tallyEpoch` on. Deleting the connection or the project destroys them too.
   - **The area has no owner.** The drift guard allows owners only on model areas, so a person's records are
     not swept when the person is deleted; they leave with the hold.
   - `database/verify_084_refusals.ts` proves the upsert and the reads on real MongoDB and PostgreSQL
     (2026-10-11).
-- **The alert links to the connection** (spec 084): `${ISSUER}/admin/buckets/<bucket>/provisioning/<connection>`
+- **The alert links to the connection** (spec 084): `${ISSUER}/admin/projects/<project>/provisioning/<connection>`
   (`deprovision_guard.ts:209`), the page whose hold panel lists the refused removals
-  ([[provider-connection-group-pages]]). Before that it linked to the console's front page.
+  ([[provider-connection-group-pages]]). Before that it linked to the console's front page. Until spec 100 the
+  link read `/admin/buckets/…`; emails already sent still carry it, which is why every old `/admin/buckets/…`
+  console address 302-redirects to its `/admin/projects/…` page (`REDIRECTS`, `lib/admin/ui/frame/routes.ts:390`).
 - **A hold is visible from every page** (spec 088). `GET /admin/api/provisioning-holds`
-  (`lib/admin/provisioning/holds.ts:50`; MCP `provisioning_hold_list`) lists the held connections in the buckets
-  the caller's bucket list shows, read by the same `visibleBuckets` (`lib/admin/buckets/visible.ts:15`) the list
+  (`lib/admin/provisioning/holds.ts:52`; MCP `provisioning_hold_list`) lists the held connections in the projects
+  the caller's project list shows, each as `projectId` and `projectName` (named `bucketId`/`bucketName` until
+  spec 100), read by the same `visibleBuckets` (`lib/admin/buckets/visible.ts:15`) the list
   uses, so the count never includes a hold the list cannot lead to. Its store read, `listHeld` (all three
-  adapters), also replaced `bucketsHolding` in the bucket list. The console reads it on every change of page and
-  shows the number as a badge on Buckets (`useHeldConnections`, `lib/admin/ui/pages/Layout.tsx:103`); a bucket
+  adapters), also replaced `bucketsHolding` in the project list. The console reads it on every change of page and
+  shows the number as a badge on Projects (`useHeldConnections`, `lib/admin/ui/pages/Layout.tsx:96`); a project
   row says On hold and links to its oldest held connection (`heldConnectionId`). The count is not added to
   `/admin/api/me`: MCP's `whoami` shares that read, and the console seeds it once and never refetches it.
 - Entra's quarantine on 401 is also why a replaced credential now keeps working for a while
@@ -278,8 +284,10 @@ It is data, not behaviour, like `known_providers.ts`. A connection's optional `d
 entry the console and an agent read, and nothing at runtime branches on it. When it is absent it is inferred: a
 Microsoft provider means Entra, anything else the generic entry (`directoryOf`,
 `lib/provisioning/service.ts:815`). The guidance is read through `GET …/provisioning-connections/directories`
-(`lib/admin/provisioning/routes.ts:101`), with the bucket's SCIM base URL and token endpoint filled in, and by
-MCP `provisioning_directory_list`. It lives on the server rather than in the console because facts only the
+(`lib/admin/provisioning/routes.ts:101`), with the project's SCIM base URL and token endpoint filled in, and by
+MCP `provisioning_directory_list`. A connection whose project has no address of its own, and so no SCIM base
+URL, carries the warning `project_unaddressed` (`bucket_unaddressed` until spec 100;
+`lib/provisioning/service.ts:851`). It lives on the server rather than in the console because facts only the
 console holds are facts an agent never gets — the lesson of the providers' old `PRESETS` map
 ([[upstream-federation]]). The correlation constants moved to the import-free `lib/consts/correlation_rules.ts`
 so the guidance and `lib/provisioning/correlation.ts` share them.

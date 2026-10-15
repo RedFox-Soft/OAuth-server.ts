@@ -32,7 +32,7 @@ const CreatedClient = Type.Object({ clientId: Type.String() });
 /* A bucket made by the agent itself, so nothing about it is console-only to begin with. */
 async function agentBucket(token: string, name: string) {
 	const created = await rpc(
-		call('bucket_create', {
+		call('project_create', {
 			name,
 			slug: `wh-${Math.floor(Math.random() * 1e6)}`
 		}),
@@ -109,10 +109,10 @@ describe('withheld bucket deletion', () => {
 			(t: { name: string }) => t.name
 		);
 
-		expect(names).not.toContain('bucket_delete');
+		expect(names).not.toContain('project_delete');
 		// And nothing else that reaches the same route by another name.
 		const paths = new Set(mcpCatalogue.map((t) => `${t.method} ${t.path}`));
-		expect(paths.has('DELETE /admin/api/buckets/:id')).toBe(false);
+		expect(paths.has('DELETE /admin/api/projects/:id')).toBe(false);
 	});
 
 	it('announces what is withheld and where to do it, in the server instructions', async () => {
@@ -121,14 +121,14 @@ describe('withheld bucket deletion', () => {
 
 		// So an agent can answer correctly without a tool existing to discover the absence from.
 		expect(instructions).toContain('admin console');
-		expect(instructions.toLowerCase()).toContain('bucket');
+		expect(instructions.toLowerCase()).toContain('project');
 	});
 
 	it('deletes no bucket however insistently it is asked', async () => {
 		const { token } = await superAdmin();
 		const bucketId = await agentBucket(token, 'Survivor');
 
-		for (const name of ['bucket_delete', 'bucket_delete', 'delete_bucket']) {
+		for (const name of ['project_delete', 'project_delete', 'delete_bucket']) {
 			const refused = await rpc(call(name, { id: bucketId }), token);
 			expect(refused.result?.isError ?? refused.error !== undefined).toBe(true);
 		}
@@ -151,8 +151,8 @@ describe('withheld bucket deletion', () => {
 			}),
 			token
 		);
-		const withheld = await rpc(call('bucket_delete', { id: bucketId }), token);
-		const after = await rpc(call('bucket_get', { id: bucketId }), token);
+		const withheld = await rpc(call('project_delete', { id: bucketId }), token);
+		const after = await rpc(call('project_get', { id: bucketId }), token);
 
 		expect(before.result?.isError).not.toBe(true);
 		expect(withheld.result?.isError ?? withheld.error !== undefined).toBe(true);
@@ -171,7 +171,7 @@ describe('withheld bucket deletion', () => {
 		 * bucket counts the applications that block it, and lists them by name; its end-users are
 		 * countable.
 		 */
-		const detail = await rpc(call('bucket_get', { id: bucketId }), token);
+		const detail = await rpc(call('project_get', { id: bucketId }), token);
 		const { applications } = shaped(
 			Type.Object({ applications: Type.Number() }),
 			detail.result?.structuredContent?.result
@@ -185,7 +185,7 @@ describe('withheld bucket deletion', () => {
 	it('counts a bucket’s end-users without an operator needing the deletion', async () => {
 		const { token } = await superAdmin();
 		const created = await rpc(
-			call('bucket_create', { name: 'Counted', slug: 'counted-2' }),
+			call('project_create', { name: 'Counted', slug: 'counted-2' }),
 			token
 		);
 		const { _id: bucketId } = shaped(
@@ -193,7 +193,7 @@ describe('withheld bucket deletion', () => {
 			created.result?.structuredContent?.result
 		);
 		await rpc(
-			call('bucket_user_create', {
+			call('project_user_create', {
 				id: bucketId,
 				email: `held-${Math.random()}@x.io`,
 				password: 'correct horse battery staple'
@@ -201,7 +201,7 @@ describe('withheld bucket deletion', () => {
 			token
 		);
 
-		const users = await rpc(call('bucket_user_list', { id: bucketId }), token);
+		const users = await rpc(call('project_user_list', { id: bucketId }), token);
 		const held = shaped(
 			Type.Object({ users: Type.Array(Type.Unknown()) }),
 			users.result?.structuredContent?.result
@@ -230,7 +230,7 @@ describe('withheld bucket deletion', () => {
 		expect(deleted.result?.isError).not.toBe(true);
 
 		// The bucket is now empty — and still not deletable from here.
-		const refused = await rpc(call('bucket_delete', { id: bucketId }), token);
+		const refused = await rpc(call('project_delete', { id: bucketId }), token);
 		expect(refused.result?.isError ?? refused.error !== undefined).toBe(true);
 		expect(await getBucketStore().find(bucketId)).not.toBeNull();
 	});
@@ -246,13 +246,13 @@ describe('withheld bucket deletion', () => {
 			const { token } = await superAdmin();
 
 			const refused = await rpc(
-				call('bucket_delete', { id: 'anything' }),
+				call('project_delete', { id: 'anything' }),
 				token
 			);
 
 			const expected = present(
 				excludedConsoleOperations.find(
-					(e) => e.path === '/admin/api/buckets/:id' && e.method === 'DELETE'
+					(e) => e.path === '/admin/api/projects/:id' && e.method === 'DELETE'
 				),
 				'the bucket deletion in the exclusion table'
 			);
@@ -270,7 +270,7 @@ describe('withheld bucket deletion', () => {
 
 			// An agent has no console session to point at a group, so the operation is absent rather than
 			// withheld — but an agent that guesses the name still deserves to be told which it is.
-			const refused = await rpc(call('scope_switch', { groupId: 'g' }), token);
+			const refused = await rpc(call('scope_switch', { teamId: 'g' }), token);
 
 			expect(refused.result?.isError).toBe(true);
 			expect(refused.result?.structuredContent?.message).toMatch(/console/i);

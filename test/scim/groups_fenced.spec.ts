@@ -120,7 +120,7 @@ describe('a provisioning connection’s groups are fenced in', () => {
 		const cookie = await adminCookie();
 		const kept = await admin(
 			'POST',
-			`/admin/api/buckets/${a.bucket._id}/groups`,
+			`/admin/api/projects/${a.bucket._id}/groups`,
 			cookie,
 			{ displayName: 'Executives' }
 		);

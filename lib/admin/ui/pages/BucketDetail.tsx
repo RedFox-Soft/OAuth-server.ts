@@ -34,7 +34,7 @@ function ReadOnlyNotice() {
 			type="info"
 			showIcon
 			style={{ marginBottom: 16 }}
-			title="Only members of the group that owns this bucket can change this."
+			title="Only members of the team that owns this project can change this."
 		/>
 	);
 }
@@ -61,7 +61,7 @@ const TABS: { key: BucketTab; segment?: string; label: string }[] = [
 	{ key: 'applications', segment: 'applications', label: 'Applications' },
 	{ key: 'apis', segment: 'apis', label: 'APIs' },
 	{ key: 'users', segment: 'users', label: 'Users' },
-	{ key: 'userGroups', segment: 'user-groups', label: 'User groups' },
+	{ key: 'userGroups', segment: 'groups', label: 'Groups' },
 	{ key: 'signIn', segment: 'sign-in', label: 'Sign-in' },
 	{
 		key: 'providers',
@@ -96,7 +96,7 @@ export function BucketDetail({
 	bucketId: string;
 	tab: BucketTab;
 }) {
-	const base = `/admin/api/buckets/${encodeURIComponent(bucketId)}`;
+	const base = `/admin/api/projects/${encodeURIComponent(bucketId)}`;
 	const feedback = useFeedback();
 	const navigate = useNavigate();
 	const [bucket, setBucket] = useState<BucketView | null>(null);
@@ -142,7 +142,7 @@ export function BucketDetail({
 			if (scope.ok) {
 				setGroupNames(new Map(scope.data.available.map((g) => [g.id, g.name])));
 			}
-			// The user-groups area names each group's connection; the panel that lists them is not mounted beside it.
+			// The groups area names each group's connection; the panel that lists them is not mounted beside it.
 			if (tab === 'userGroups') {
 				const c = await request<ConnectionView[]>(
 					'GET',
@@ -204,7 +204,7 @@ export function BucketDetail({
 	}));
 	const special = bucket ? reservedOf(bucket._id) : null;
 	const groupName = bucket
-		? (groupNames.get(bucket.ownerGroupId) ?? 'a group you are not in')
+		? (groupNames.get(bucket.ownerTeamId) ?? 'a team you are not in')
 		: '';
 	/*
 	 * An area the caller may not open is said to be so at its own address, rather than quietly showing
@@ -218,7 +218,7 @@ export function BucketDetail({
 		<>
 			<PageHeader
 				crumbs={[
-					{ label: 'Buckets', href: '/admin/buckets' },
+					{ label: 'Projects', href: '/admin/projects' },
 					{ label: bucket?.name ?? '…' }
 				]}
 				title={bucket?.name ?? '…'}
@@ -251,7 +251,7 @@ export function BucketDetail({
 				}
 				description={
 					special === 'default'
-						? "The instance's own bucket, served at the server's root. Only super administrators manage its applications. It cannot be moved, re-addressed or deleted."
+						? "The instance's own project, served at the server's root. Only super administrators manage its applications. It cannot be moved, re-addressed or deleted."
 						: undefined
 				}
 				tabs={tabs}
@@ -267,7 +267,7 @@ export function BucketDetail({
 			)}
 			{tabRefused && (
 				<NoAccess
-					what={`bucket's ${shownTabLabel.toLowerCase()}`}
+					what={`project's ${shownTabLabel.toLowerCase()}`}
 					backHref={bucketHref(bucketId)}
 					backLabel="Go to Overview"
 				/>

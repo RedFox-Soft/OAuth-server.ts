@@ -59,8 +59,8 @@ export function useConnectionActions(bucketId: string): {
 			const proceed = await confirm('connection.delete', {
 				target: c.displayName,
 				consequences: [
-					'The directory can no longer provision this bucket, and every token it holds is revoked.',
-					'Its identity provider stays on this bucket, still limited to existing accounts.'
+					'The directory can no longer provision this project, and every token it holds is revoked.',
+					'Its identity provider stays on this project, still limited to existing accounts.'
 				]
 			});
 			if (!proceed) return false;

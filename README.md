@@ -48,11 +48,11 @@ install versus what you switch on deliberately — the distinction is load-beari
 - **Resource Indicators** — audience-restricted tokens via `resource` ([RFC 8707](https://datatracker.ietf.org/doc/html/rfc8707))
 - **Refresh Token grant** — with rotation and reuse detection; offered while `offline_access` is among the supported `scopes`, which it is by default
 - **RP-initiated logout** — by GET or form POST, with a confirmation step
-- **JWT tokens** — access and ID tokens signed with the algorithms your key store holds; `bun run db:setup` provisions an initial RS256 key, and ES256 and EdDSA keys are supported. Keys live in the database, are generated on first run, and are published at `/jwks` — and each bucket with an address of its own publishes its own at its own `jwks_uri`
+- **JWT tokens** — access and ID tokens signed with the algorithms your key store holds; `bun run db:setup` provisions an initial RS256 key, and ES256 and EdDSA keys are supported. Keys live in the database, are generated on first run, and are published at `/jwks` — and each project with an address of its own publishes its own at its own `jwks_uri`
 - **Database-backed clients** — clients live in this server's own store and are created through the admin API, dynamic registration, or `bun run db:setup`. There is no static client configuration file
-- **Administration console** — projects, OAuth clients, administrators, user buckets, end-users and their groups, upstream identity providers, SCIM provisioning connections, settings, SMTP, signing keys and an append-only audit trail
+- **Administration console** — projects, teams, OAuth clients and APIs, administrators, end-users and their groups, upstream identity providers, SCIM provisioning connections, settings, SMTP, signing keys and an append-only audit trail
 - **End-user self-service** — email verification and password reset, each with per-identity attempt and cooldown caps
-- **TOTP second factor** — per-bucket, optionally enforced for the admin console ([RFC 6238](https://datatracker.ietf.org/doc/html/rfc6238))
+- **TOTP second factor** — per-project, optionally enforced for the admin console ([RFC 6238](https://datatracker.ietf.org/doc/html/rfc6238))
 - **Pairwise subject identifiers** — per-sector `sub` values, salted from the database
 - **Per-origin rate limiting** — tiered by route class, on by default
 - **Sign-in brute-force throttle** — persisted per-address failure counters with escalating lockouts, and no way to tell a throttled refusal from a wrong password
@@ -91,7 +91,7 @@ Implemented, and off until the flag is set. Set them in the console under **Sett
 | Token and response encryption                                                                                       | `encryption.enabled`                |
 | Sign in with Google, Microsoft, Apple or GitHub, or any other OIDC provider by hand                                 | `federation.enabled`                |
 | Administration over MCP — the same management API, served to an AI agent                                            | `mcp.enabled`                       |
-| SCIM 2.0 provisioning of a bucket's users and groups from Microsoft Entra ID, Okta or any SCIM client               | `scim.enabled`                      |
+| SCIM 2.0 provisioning of a project's users and groups from Microsoft Entra ID, Okta or any SCIM client              | `scim.enabled`                      |
 | Okta Universal Logout — global token revocation (an expired individual draft, hence opt-in)                         | `globalTokenRevocation.enabled`     |
 | Error-store recording (its read surface is always served, deliberately)                                             | `errorStore.enabled`                |
 
@@ -138,11 +138,11 @@ server ever starts against an empty key store it also generates and persists one
 
 ### Admin panel provisioning
 
-`bun run db:setup` also provisions the admin panel: the reserved admin project, its "Administrators"
-user bucket, and the first-party `admin-panel` OAuth client. The seed is idempotent — **re-run
-`bun run db:setup` after upgrading an existing install** so the admin client/project/bucket exist.
+`bun run db:setup` also provisions the admin panel: the reserved "Administrators" project and the
+first-party `admin-panel` OAuth client. The seed is idempotent — **re-run `bun run db:setup` after
+upgrading an existing install** so the admin client and project exist.
 On first visit to `/admin`, a one-time setup screen creates the first administrator and makes them a
-member of Super administrators; the setup route is closed once that group has an active member. The admin panel requires a database-backed deployment, MongoDB or PostgreSQL
+member of Super administrators; the setup route is closed once that team has an active member. The admin panel requires a database-backed deployment, MongoDB or PostgreSQL
 (the in-memory adapter does not persist seeded data across restarts).
 
 ## Configuration
@@ -217,7 +217,7 @@ stutters while loading. Lower `maxTrackedOrigins` under memory pressure. Set `ra
 
 ### Sign-in brute-force throttle
 
-Failed password attempts are counted per bucket and address. Once an address reaches the cap, the
+Failed password attempts are counted per project and address. Once an address reaches the cap, the
 sign-in door is shut for that address and refuses every further attempt — **including one carrying
 the correct password** — until the window ends. Each further exhaustion shuts it for longer, doubling
 to the ceiling: 15 → 30 → 60 minutes by default, which holds a sustained attack to roughly 120
@@ -246,9 +246,9 @@ and a **completed** password reset. The second is the escape hatch — consuming
 proves control of the address, which is exactly what an attacker guessing passwords does not have —
 so a locked-out user is never stuck waiting. Merely _requesting_ a reset clears nothing.
 
-**A bucket that requires a one-time code stays at the first window** however often it is tripped: a
+**A project that requires a one-time code stays at the first window** however often it is tripped: a
 guessed password there does not sign anyone in, so the deeper lockouts buy little. This matters most
-for the reserved administrator bucket, whose operators sign in through this same door and have no
+for the reserved Administrators project, whose operators sign in through this same door and have no
 self-service reset to escape with — their worst case is a 15-minute wait, and the way to make that
 door properly hard is to require the second factor on it (**Admins → Require an authenticator app**).
 
@@ -333,8 +333,8 @@ Absent from a default install until the flag is set.
 | `POST, GET /mcp`                                 | Administration over MCP                            | `mcp.enabled`                    |
 | `GET  /.well-known/oauth-protected-resource/mcp` | Protected resource metadata for `/mcp` (RFC 9728)  | `mcp.enabled`                    |
 | `GET, POST /federation/callback`                 | Upstream identity provider callback                | `federation.enabled`             |
-| `/scim/v2/*` (Users, Groups and discovery)       | SCIM 2.0 provisioning, at each bucket's address    | `scim.enabled`                   |
-| `POST /global-token-revocation`                  | Okta Universal Logout, at each bucket's address    | `globalTokenRevocation.enabled`  |
+| `/scim/v2/*` (Users, Groups and discovery)       | SCIM 2.0 provisioning, at each project's address   | `scim.enabled`                   |
+| `POST /global-token-revocation`                  | Okta Universal Logout, at each project's address   | `globalTokenRevocation.enabled`  |
 
 Reading your own registration follows `registration.enabled` rather than
 `registrationManagement.enabled`: the registration response hands the client that URI, so refusing the
@@ -351,7 +351,7 @@ families rather than enumerated.
 | End-user interaction screens | `/ui/:uid/…`           | Login, consent, registration, TOTP challenge and enrolment, forgot-password, flow resume. The federation legs (`/ui/:uid/federation/…`) need `federation.enabled` |
 | Email verification           | `/verify-email`        | Verify, code entry, resend                                                                                                                                        |
 | Password reset               | `/reset-password`      | Self-service reset                                                                                                                                                |
-| Administration console + API | `/admin`, `/admin/api` | Projects, clients, administrators, user buckets, end-users, federation providers, settings, SMTP, signing keys, audit trail, error store                          |
+| Administration console + API | `/admin`, `/admin/api` | Projects, teams, clients, administrators, end-users, federation providers, settings, SMTP, signing keys, audit trail, error store                                 |
 | Static assets                | `/public/…`            | Console assets                                                                                                                                                    |
 
 The interaction and self-service families are unconditional by design — a user locked out of their
@@ -360,8 +360,8 @@ account cannot be asked to wait for a capability toggle. The console is uncondit
 
 ## Administration
 
-The server administers itself. `GET /admin` is a console for projects, OAuth clients,
-administrators, user buckets, end-users, upstream identity providers, settings, signing keys and an
+The server administers itself. `GET /admin` is a console for projects, teams, OAuth clients,
+administrators, end-users, upstream identity providers, settings, signing keys and an
 append-only audit trail. Administrators sign in through an OpenID Connect flow against this server's
 own issuer, so there is no second password store.
 
@@ -384,7 +384,7 @@ An agent then acts as the administrator who signed in, with exactly that account
 change it makes runs through the same routes, the same checks and the same audit trail as the console's,
 and each audit entry names both the operator and the agent.
 
-A few things it deliberately cannot do: **delete a project, a user bucket or a group**, **purge the fault
+A few things it deliberately cannot do: **delete a project or a team**, **purge the fault
 store**, and **change which client identities may administer the instance**. The deletions destroy a
 container with nothing left afterwards to inspect, and the last is a privilege-escalation path, so they
 stay console-only.

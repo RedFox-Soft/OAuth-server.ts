@@ -260,7 +260,7 @@ export function assertSomeWayToSignIn(next: {
 
 	throw new AdminError(
 		409,
-		'that would leave this bucket with no way to sign in: enable a provider first, or turn password sign-in back on'
+		'that would leave this project with no way to sign in: enable a provider first, or turn password sign-in back on'
 	);
 }
 

@@ -9,6 +9,7 @@ import {
 	adminErrorBody
 } from './auth/rbac.js';
 import { meCan } from './auth/can.js';
+import { meView } from './me_view.js';
 import { ADMIN_BUCKET_ID } from './consts.js';
 
 /*
@@ -37,7 +38,11 @@ export const meRoutes = new Elysia({ name: 'admin-me' })
 		const ctx = assertAuth(admin);
 		const account = await getUserStore(ADMIN_BUCKET_ID).find(ctx.userId);
 		/* `can`: what the caller may create, and whether the instance-wide surfaces are theirs. */
-		return { ...ctx, verified: account?.verified === true, can: meCan(ctx) };
+		return {
+			...meView(ctx),
+			verified: account?.verified === true,
+			can: meCan(ctx)
+		};
 	})
 	/*
 	 * Mails the caller a verification message for their own address, in the administrators' bucket's
@@ -55,7 +60,8 @@ export const meRoutes = new Elysia({ name: 'admin-me' })
 		if (!account) throw new AdminError(404, 'no administrator account');
 		if (account.verified) return { alreadyVerified: true };
 		const bucket = await getBucketStore().find(ADMIN_BUCKET_ID);
-		if (!bucket) throw new AdminError(500, 'the admin bucket is missing');
+		if (!bucket)
+			throw new AdminError(500, "the administrators' project is missing");
 
 		const sent = await sendOnDemand(account, bucket, {
 			reuseOutstanding: false

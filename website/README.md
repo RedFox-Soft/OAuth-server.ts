@@ -150,7 +150,10 @@ the build rather than shipping a shorter page.
 - In Chinese, keep each paragraph on one line (a wrapped line becomes a space between two Han characters).
 - Settled Russian terms, so a new page reads like the rest: _grant type_ → «тип гранта», a stored _grant_ →
   «выданное разрешение»; _issuer_ → «издатель (issuer)» at first use, then «issuer»; _confused deputy_ stays in
-  English with a one-line explanation at first use; _user bucket_ → «бакет пользователей».
+  English with a one-line explanation at first use; _project_ → «проект», _team_ → «команда», _personal team_ →
+  «личная команда», _group_ (a set of a project's end users) → «группа» or «группа пользователей».
+- Settled Chinese terms: _project_ → 项目, _team_ → 团队, _personal team_ → 个人团队, _group_ → 用户组. Replace by
+  meaning, never by substring: 组织, 组合, 工作组 and 一组 are unrelated words.
 - After writing or updating a translation, `bun run i18n:stamp <file>` records the hash of the English file it was
   made from. When the English changes, `bun run seo` lists the translation as stale and the page shows "the English
   version is newer"; it never fails the build. Re-translate, then stamp — never stamp to silence it.

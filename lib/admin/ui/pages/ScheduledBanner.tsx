@@ -45,7 +45,7 @@ export function useScheduledActions({
 		if (!ok) return;
 		const result = await request(
 			'POST',
-			`/admin/api/buckets/${encodeURIComponent(bucket._id)}/restore`
+			`/admin/api/projects/${encodeURIComponent(bucket._id)}/restore`
 		);
 		if (!result.ok) {
 			feedback.failed(result);
@@ -64,8 +64,8 @@ export function useScheduledActions({
 				setPurging(null);
 				feedback.done(
 					accounts > 0
-						? `Bucket ${purging.name} deleted, with ${plural(accounts, 'account', 'accounts')}.`
-						: `Bucket ${purging.name} deleted.`
+						? `Project ${purging.name} deleted, with ${plural(accounts, 'account', 'accounts')}.`
+						: `Project ${purging.name} deleted.`
 				);
 				onDeleted();
 			}}
@@ -91,7 +91,7 @@ export function ScheduledBanner({
 	const navigate = useNavigate();
 	const { restore, deleteNow, dialog } = useScheduledActions({
 		onRestored,
-		onDeleted: () => void navigate('/admin/buckets', { replace: true })
+		onDeleted: () => void navigate('/admin/projects', { replace: true })
 	});
 	const stopped = new Date(bucket.deletion.scheduledAt).toLocaleDateString();
 	const purge = new Date(bucket.deletion.purgeAt).toLocaleDateString();
@@ -100,7 +100,7 @@ export function ScheduledBanner({
 			<Alert
 				type="warning"
 				showIcon
-				title={`This bucket stopped answering on ${stopped} and will be deleted on ${purge}.`}
+				title={`This project stopped answering on ${stopped} and will be deleted on ${purge}.`}
 				description="People can't sign in and apps can't get tokens. Nothing in it has been deleted yet, and nothing can be changed until it is restored."
 				action={
 					canDelete ? (

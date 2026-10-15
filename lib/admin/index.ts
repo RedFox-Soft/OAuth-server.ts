@@ -11,6 +11,7 @@ import { hasSuperAdmin } from './auth/setup.js';
 import { adminApiRoutes } from './routes.js';
 import { resolveAddress } from './ui/frame/routes.js';
 import { renderAdminShell } from './ui/serverRender.js';
+import { meView } from './me_view.js';
 
 /*
  * The console: the admin API plus the HTML shell that drives it.
@@ -95,7 +96,7 @@ async function consolePage({
 	if (resolved.kind === 'redirect')
 		return redirect(resolved.to + url.search, 302);
 	return renderAdminShell(
-		{ needsSetup: false, me: admin, path },
+		{ needsSetup: false, me: meView(admin), path },
 		resolved.kind === 'none' ? 404 : 200
 	);
 }

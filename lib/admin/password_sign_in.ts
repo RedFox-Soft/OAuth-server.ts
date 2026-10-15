@@ -16,7 +16,7 @@ export async function restorePasswordSignIn(): Promise<
 	const bucket = await getBucketStore().find(ADMIN_BUCKET_ID);
 	if (!bucket)
 		throw new Error(
-			"the administrators' bucket is missing: run db:setup first"
+			"the administrators' project is missing: run db:setup first"
 		);
 	if (bucket.passwordLogin) return 'already_on';
 	await recordBootstrapAudit('admin.passwordsignin.restore', ADMIN_BUCKET_ID);

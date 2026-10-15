@@ -137,7 +137,7 @@ async function applicationIn(
 }
 
 function scheduleAs(cookie: string, bucket: UserBucket, query = '') {
-	return request('DELETE', `/admin/api/buckets/${bucket._id}${query}`, cookie);
+	return request('DELETE', `/admin/api/projects/${bucket._id}${query}`, cookie);
 }
 
 async function entries(targetId: string, action: string) {
@@ -172,7 +172,7 @@ describe('deleting a bucket', () => {
 			const superAdmin = await cookieFor(await createAdministrator('super'));
 			const listed = shaped(
 				Listed,
-				(await request('GET', '/admin/api/buckets', superAdmin)).body
+				(await request('GET', '/admin/api/projects', superAdmin)).body
 			);
 
 			expect(res.status).toBe(200);
@@ -274,7 +274,7 @@ describe('deleting a bucket', () => {
 
 			expect(res.status).toBe(409);
 			expect(shaped(Refusal, res.body)).toMatchObject({
-				message: 'bucket still holds applications or APIs',
+				message: 'project still holds applications or APIs',
 				blockers: [{ kind: 'client', count: 1, ids: [clientId] }]
 			});
 			expect(
@@ -318,7 +318,7 @@ describe('deleting a bucket', () => {
 
 			const res = await request(
 				'DELETE',
-				`/admin/api/buckets/${id}`,
+				`/admin/api/projects/${id}`,
 				superAdmin
 			);
 
@@ -349,7 +349,7 @@ describe('deleting a bucket', () => {
 
 			const res = await request(
 				'POST',
-				`/admin/api/buckets/${bucket._id}/restore`,
+				`/admin/api/projects/${bucket._id}/restore`,
 				w.ownerCookie
 			);
 			const entry = present(
@@ -368,7 +368,7 @@ describe('deleting a bucket', () => {
 
 			const res = await request(
 				'POST',
-				`/admin/api/buckets/${bucket._id}/restore`,
+				`/admin/api/projects/${bucket._id}/restore`,
 				w.ownerCookie
 			);
 
@@ -382,7 +382,7 @@ describe('deleting a bucket', () => {
 
 			const res = await request(
 				'POST',
-				`/admin/api/buckets/${bucket._id}/restore`,
+				`/admin/api/projects/${bucket._id}/restore`,
 				w.memberCookie
 			);
 
@@ -402,14 +402,14 @@ describe('deleting a bucket', () => {
 
 			const res = await request(
 				'POST',
-				`/admin/api/buckets/${bucket._id}/restore`,
+				`/admin/api/projects/${bucket._id}/restore`,
 				w.ownerCookie
 			);
 
 			expect(res.status).toBe(409);
 			expect(
 				shaped(Type.Object({ message: Type.String() }), res.body).message
-			).toBe('This bucket is already being deleted.');
+			).toBe('This project is already being deleted.');
 		});
 
 		describe('and deleted again', () => {
@@ -428,7 +428,7 @@ describe('deleting a bucket', () => {
 				).scheduled.purgeAt;
 				await request(
 					'POST',
-					`/admin/api/buckets/${bucket._id}/restore`,
+					`/admin/api/projects/${bucket._id}/restore`,
 					w.ownerCookie
 				);
 				const later = new Date(Date.now() + 2 * DAY_MS);
@@ -452,7 +452,7 @@ describe('deleting a bucket', () => {
 
 			const res = await request(
 				'POST',
-				`/admin/api/buckets/${bucket._id}/purge?cascade=endusers&expect=1`,
+				`/admin/api/projects/${bucket._id}/purge?cascade=endusers&expect=1`,
 				w.ownerCookie
 			);
 
@@ -468,7 +468,7 @@ describe('deleting a bucket', () => {
 
 			await request(
 				'POST',
-				`/admin/api/buckets/${bucket._id}/purge?cascade=endusers&expect=1`,
+				`/admin/api/projects/${bucket._id}/purge?cascade=endusers&expect=1`,
 				w.ownerCookie
 			);
 			const recorded = await entries(bucket._id, 'bucket.purge');
@@ -486,12 +486,12 @@ describe('deleting a bucket', () => {
 				getBucketGroupStore(),
 				'destroyByBucket'
 			).mockRejectedValueOnce(new Error('the datastore went away'));
-			const path = `/admin/api/buckets/${bucket._id}/purge?cascade=endusers&expect=0`;
+			const path = `/admin/api/projects/${bucket._id}/purge?cascade=endusers&expect=0`;
 
 			// Read raw: this app has no shared error handler, so the fault is not a JSON body.
 			const first = await app.handle(
 				new Request(
-					`http://e.ly/admin/api/buckets/${bucket._id}/purge?cascade=endusers&expect=1`,
+					`http://e.ly/admin/api/projects/${bucket._id}/purge?cascade=endusers&expect=1`,
 					{ method: 'POST', headers: { cookie: w.ownerCookie } }
 				)
 			);
@@ -510,7 +510,7 @@ describe('deleting a bucket', () => {
 
 			const res = await request(
 				'POST',
-				`/admin/api/buckets/${bucket._id}/purge`,
+				`/admin/api/projects/${bucket._id}/purge`,
 				w.ownerCookie
 			);
 
@@ -524,7 +524,7 @@ describe('deleting a bucket', () => {
 
 			const res = await request(
 				'POST',
-				`/admin/api/buckets/${bucket._id}/purge?cascade=endusers&expect=1`,
+				`/admin/api/projects/${bucket._id}/purge?cascade=endusers&expect=1`,
 				w.memberCookie
 			);
 
@@ -539,7 +539,7 @@ describe('deleting a bucket', () => {
 
 			const res = await request(
 				'POST',
-				`/admin/api/buckets/${bucket._id}/purge?cascade=endusers&expect=1`,
+				`/admin/api/projects/${bucket._id}/purge?cascade=endusers&expect=1`,
 				w.ownerCookie
 			);
 
@@ -557,7 +557,7 @@ describe('deleting a bucket', () => {
 
 			const res = await request(
 				'POST',
-				`/admin/api/buckets/${bucket._id}/purge`,
+				`/admin/api/projects/${bucket._id}/purge`,
 				superAdmin
 			);
 

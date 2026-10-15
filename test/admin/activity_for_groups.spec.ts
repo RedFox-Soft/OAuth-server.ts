@@ -63,8 +63,8 @@ async function bucketOf(group: Group): Promise<string> {
 /* Deleted and then destroyed at once: a deletion only schedules the destruction (specs/090). */
 async function destroy(bucketId: string, as: User) {
 	for (const [method, path] of [
-		['DELETE', `/admin/api/buckets/${bucketId}`],
-		['POST', `/admin/api/buckets/${bucketId}/purge`]
+		['DELETE', `/admin/api/projects/${bucketId}`],
+		['POST', `/admin/api/projects/${bucketId}/purge`]
 	] as const) {
 		const response = await app.handle(
 			new Request(`http://e.ly${path}`, {
@@ -77,7 +77,7 @@ async function destroy(bucketId: string, as: User) {
 }
 
 const ids = (answer: OverviewAnswer) =>
-	answer.buckets.map((row) => row.bucketId).sort();
+	answer.projects.map((row) => row.projectId).sort();
 
 afterEach(() => {
 	restoreClock?.();
@@ -129,7 +129,7 @@ describe('the usage overview, for an administrator of some groups', () => {
 
 		expect(ids(forAlice)).toEqual([inOne, inShared].sort());
 		expect(ids(forBob)).toEqual([inShared, inOther].sort());
-		expect(forAlice.customers.map((c) => c.customer.groupId).sort()).toEqual(
+		expect(forAlice.customers.map((c) => c.customer.teamId).sort()).toEqual(
 			[one._id, shared._id].sort()
 		);
 	});
@@ -142,7 +142,7 @@ describe('the usage overview, for an administrator of some groups', () => {
 
 		expect(forAlice.instance.months[0]?.total).toBe(5);
 		expect(forBob.instance.months[0]?.total).toBe(7);
-		expect(forAlice.instance.activeBuckets).toBe(2);
+		expect(forAlice.instance.activeProjects).toBe(2);
 	});
 
 	it("discloses nothing of another group's bucket: not its id, its name, its group or its owner", async () => {
@@ -168,11 +168,11 @@ describe('the usage overview, for an administrator of some groups', () => {
 	it('shows a plain member of a group what its owner sees of that group', async () => {
 		restoreClock = atDay(NOW);
 
-		const asMember = (await overview(alice)).buckets.find(
-			(row) => row.bucketId === inShared
+		const asMember = (await overview(alice)).projects.find(
+			(row) => row.projectId === inShared
 		);
-		const asOwner = (await overview(bob)).buckets.find(
-			(row) => row.bucketId === inShared
+		const asOwner = (await overview(bob)).projects.find(
+			(row) => row.projectId === inShared
 		);
 
 		expect(asMember).toBeDefined();
@@ -184,7 +184,7 @@ describe('the usage overview, for an administrator of some groups', () => {
 
 		const answer = await overview(loner);
 
-		expect(answer.buckets).toEqual([]);
+		expect(answer.projects).toEqual([]);
 		expect(answer.customers).toEqual([]);
 	});
 });
@@ -220,41 +220,41 @@ describe('a deleted bucket, for the group that owned it last', () => {
 	it('lists it to a member of that group, marked deleted and counted in February', async () => {
 		restoreClock = atDay(NOW);
 
-		const row = (await overview(member)).buckets.find(
-			(b) => b.bucketId === deletedId
+		const row = (await overview(member)).projects.find(
+			(b) => b.projectId === deletedId
 		);
 
 		expect(row?.deleted).not.toBeNull();
 		expect(row?.previous?.total).toBe(4);
-		expect(row?.customer.groupId).toBe(team._id);
+		expect(row?.customer.teamId).toBe(team._id);
 	});
 
 	it('opens its history to a member of that group', async () => {
 		restoreClock = atDay(NOW);
 
 		const reply = await read(
-			`/admin/api/buckets/${deletedId}/activity`,
+			`/admin/api/projects/${deletedId}/activity`,
 			member
 		);
 
 		expect(reply.status).toBe(200);
 		const body = JSON.parse(reply.text) as {
 			deletedAt: string | null;
-			lastOwner: { groupId: string } | null;
+			lastOwner: { teamId: string } | null;
 		};
 		expect(body.deletedAt).not.toBeNull();
-		expect(body.lastOwner?.groupId).toBe(team._id);
+		expect(body.lastOwner?.teamId).toBe(team._id);
 	});
 
 	it('refuses it to anyone else exactly as an id that never existed', async () => {
 		restoreClock = atDay(NOW);
 
 		const deleted = await read(
-			`/admin/api/buckets/${deletedId}/activity`,
+			`/admin/api/projects/${deletedId}/activity`,
 			stranger
 		);
 		const unknown = await read(
-			`/admin/api/buckets/${nanoid().toLowerCase()}/activity`,
+			`/admin/api/projects/${nanoid().toLowerCase()}/activity`,
 			stranger
 		);
 
@@ -273,7 +273,7 @@ describe('a deleted bucket, for the group that owned it last', () => {
 		restoreClock = atDay(NOW);
 
 		const reply = await read(
-			`/admin/api/buckets/${deletedId}/activity`,
+			`/admin/api/projects/${deletedId}/activity`,
 			leaver
 		);
 
@@ -302,8 +302,11 @@ describe('a deleted bucket, for the group that owned it last', () => {
 		restoreClock = atDay(NOW);
 
 		const superAdmin = await createAdministrator('super');
-		const asMember = await read(`/admin/api/buckets/${id}/activity`, member);
-		const asSuper = await read(`/admin/api/buckets/${id}/activity`, superAdmin);
+		const asMember = await read(`/admin/api/projects/${id}/activity`, member);
+		const asSuper = await read(
+			`/admin/api/projects/${id}/activity`,
+			superAdmin
+		);
 		const memberSees = ids(await overview(member));
 		listed.mockRestore();
 		found.mockRestore();

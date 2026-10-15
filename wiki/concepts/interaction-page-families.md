@@ -4,7 +4,7 @@ title: "The two interaction page families"
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-04
-updated: 2026-10-13
+updated: 2026-10-15
 graph:
   node_type: concept
   relationships:
@@ -54,7 +54,7 @@ received, and server-rendered content vanishes. Nothing logs. No test that reads
 can see it. The page still "works".
 
 The login page joined the list of pages this matters for when federation gave it `passwordLogin` and
-`providers`: buttons rendered from the bucket but absent from the props would appear and then vanish.
+`providers`: buttons rendered from the project but absent from the props would appear and then vanish.
 
 **And a page in this family cannot be rendered at a URL outside its own route.** `loginClient.tsx` derives
 both the page name and the interaction id from `window.location.pathname`, so a login document served at
@@ -65,7 +65,7 @@ the login path carrying a notice identifier rather than rendering the login page
 **And the props can be right while the page is still wrong.** Spec 052 found a third failure of the same
 shape, one floor down: the login POST's refusal path called `loginServer` with an error message and
 nothing else, so both the markup *and* the props were rendered from the function's defaults — password
-form, no providers. Hydration was blameless; the server had already forgotten what the bucket offered. The
+form, no providers. Hydration was blameless; the server had already forgotten what the project offered. The
 lesson the two halves share is that this page's content is only as good as the options reaching the render
 call, and a resolver that exists to prevent drift prevents none of it at a call site that ignores it. See
 [[upstream-federation]].
@@ -111,7 +111,7 @@ The rule that decided spec 021's three cases:
 
 - **A form the user was working in comes back in the antd family.** The password-mismatch re-render must
   carry the address they typed inside a live form, and only the hydrated family can.
-- **A terminal message goes plain.** A closed bucket and a failed verification send have no form and no
+- **A terminal message goes plain.** A closed project and a failed verification send have no form and no
   next action inside the deployment; an antd page would add a bundle and an inline props script to a page
   with nothing to hydrate.
 
@@ -171,7 +171,7 @@ controls.
 
 ## Related
 
-- [[end-user-onboarding]] — the verification pages of the plain family, and the bucket flags behind the registration door
+- [[end-user-onboarding]] — the verification pages of the plain family, and the project flags behind the registration door
 - [[html-response-security-policy]] — the one constructor every page here goes through, and the origin of
   the rendered-error status rule.
 - [[self-service-password-reset]] — the plain family's other user, and the feature that made the login

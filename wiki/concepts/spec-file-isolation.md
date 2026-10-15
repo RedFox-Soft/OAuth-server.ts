@@ -37,12 +37,12 @@ and failed whenever a file enabling mTLS ran just before it. The boundary now ap
 (`restoreSettings`, `test/preload.ts:95`).
 
 **In `bootstrap()` — `test/test_helper.ts:509`.** Every store and every cache built from one.
-`resetStoresForTests()` (`lib/adapters/index.ts:528`) replaces every store singleton: buckets,
-groups, users, the audit trail, recorded faults, activity, keys and the rest. The five stores
+`resetStoresForTests()` (`lib/adapters/index.ts:528`) replaces every store singleton: projects,
+teams, users, the audit trail, recorded faults, activity, keys and the rest. The five stores
 built at import time became `export let` (`lib/adapters/index.ts:191`) so they can be replaced. An
 importer sees the new instance through the live binding. The derived caches are forgotten next to
 them:
-- the bucket address cache;
+- the project address cache;
 - the issuer key cache;
 - host arrivals;
 - the activity dedupe cache;

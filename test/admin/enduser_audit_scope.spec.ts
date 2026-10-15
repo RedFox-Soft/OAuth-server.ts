@@ -59,7 +59,7 @@ describe('the trail of a bucket’s people, for the group that owns it', () => {
 		const created = await call(
 			cookie,
 			'POST',
-			`/admin/api/buckets/${bucketId}/users`,
+			`/admin/api/projects/${bucketId}/users`,
 			{
 				email: `p-${Math.random()}@x.io`,
 				password: 'a long enough password'
@@ -83,7 +83,7 @@ describe('the trail of a bucket’s people, for the group that owns it', () => {
 		const res = await call(
 			cookie,
 			'POST',
-			`/admin/api/buckets/${bucketId}/users/bulk/deactivate`,
+			`/admin/api/projects/${bucketId}/users/bulk/deactivate`,
 			{
 				userIds: [person._id]
 			}

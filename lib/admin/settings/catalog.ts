@@ -380,7 +380,7 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 		type: 'boolean',
 		risk: 'security',
 		description:
-			'Serves <issuer>/global-token-revocation at each bucket. An upstream identity provider of the bucket that you opted in (on its federation provider) can then end everything one of its users holds here: every session, refresh token and access token this server can revoke, with relying parties told by back-channel logout. The account is not deactivated; the user can sign in again. Switch it on when a bucket federates to Okta and you want Okta Universal Logout (Identity Threat Protection) to reach this server. The request must be a JWT signed by the provider’s own published keys; unsigned or shared-secret requests are always refused. This implements an expired individual Internet-Draft (draft-parecki-oauth-global-token-revocation-06, expired 2026-08-28) in the shape Okta sends, so its format may change. Off: the path is not served and discovery does not advertise it.'
+			'Serves <issuer>/global-token-revocation at each project. An upstream identity provider of the project that you opted in (on its federation provider) can then end everything one of its users holds here: every session, refresh token and access token this server can revoke, with relying parties told by back-channel logout. The account is not deactivated; the user can sign in again. Switch it on when a project federates to Okta and you want Okta Universal Logout (Identity Threat Protection) to reach this server. The request must be a JWT signed by the provider’s own published keys; unsigned or shared-secret requests are always refused. This implements an expired individual Internet-Draft (draft-parecki-oauth-global-token-revocation-06, expired 2026-08-28) in the shape Okta sends, so its format may change. Off: the path is not served and discovery does not advertise it.'
 	},
 
 	{
@@ -512,15 +512,15 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 	},
 
 	{
-		key: 'buckets.reservedHostnames',
+		key: 'projects.reservedHostnames',
 		domain: 'endpoints',
-		group: 'Bucket addresses',
+		group: 'Project addresses',
 		label: 'Reserved hostnames',
-		summary: 'Names in your domain that no bucket may be given',
+		summary: 'Names in your domain that no project may be given',
 		type: 'string-array',
 		risk: 'security',
 		description:
-			'Hostnames beneath this deployment’s domain that no user bucket may be assigned. The deployment’s own canonical host is always refused and does not need listing; this is for everything else you run under the same domain — a marketing site, a status page, a staging instance — which this server has no way to discover. Empty by default, deliberately: a guess would either refuse a name you meant to use for a tenant or admit one that shadows something you already serve. Names are compared in normalised form, so case and a trailing dot do not matter.'
+			'Hostnames beneath this deployment’s domain that no project may be assigned. The deployment’s own canonical host is always refused and does not need listing; this is for everything else you run under the same domain — a marketing site, a status page, a staging instance — which this server has no way to discover. Empty by default, deliberately: a guess would either refuse a name you meant to use for a tenant or admit one that shadows something you already serve. Names are compared in normalised form, so case and a trailing dot do not matter.'
 	},
 
 	{
@@ -722,7 +722,7 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 		type: 'number',
 		unit: 'seconds',
 		description:
-			'How long the door stays shut the first time an address runs out of attempts, and the length each further lockout doubles from. This is also the shortest wait an honest user who trips the throttle will face, so it is the number to lower if legitimate lockouts are the complaint. A bucket that requires a one-time code stays at this length however often it is tripped, because a guessed password there does not sign anyone in.'
+			'How long the door stays shut the first time an address runs out of attempts, and the length each further lockout doubles from. This is also the shortest wait an honest user who trips the throttle will face, so it is the number to lower if legitimate lockouts are the complaint. A project that requires a one-time code stays at this length however often it is tripped, because a guessed password there does not sign anyone in.'
 	},
 	{
 		key: 'loginThrottle.windowCeilingSeconds',
@@ -746,10 +746,10 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 		domain: 'signin-abuse',
 		group: 'Federation',
 		label: 'Enable sign-in through an upstream identity provider',
-		summary: 'Let a bucket offer sign-in through an upstream provider',
+		summary: 'Let a project offer sign-in through an upstream provider',
 		type: 'boolean',
 		description:
-			'Lets a user bucket offer sign-in through external OpenID Providers configured on that bucket, alongside or instead of its password form. Off by default: this is the only capability that lets an outside party’s assertion produce a session here, and with it off no federation route is served and no provider button renders, whatever a bucket holds. Configuring providers stays available either way, so a provider can be prepared before switching this on and removed after switching it off.'
+			'Lets a project offer sign-in through external OpenID Providers configured on that project, alongside or instead of its password form. Off by default: this is the only capability that lets an outside party’s assertion produce a session here, and with it off no federation route is served and no provider button renders, whatever a project holds. Configuring providers stays available either way, so a provider can be prepared before switching this on and removed after switching it off.'
 	},
 
 	/*
@@ -765,7 +765,7 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 		summary: 'Let an AI agent administer this server over MCP',
 		type: 'boolean',
 		description:
-			'Serves this control plane to an AI agent over MCP at /mcp, as an OAuth 2.1 protected resource of this server. An agent acts as the administrator who authorized it and gets exactly that account’s permissions: every operation runs through the same routes, the same checks and the same audit trail as the console, and each entry records both the operator and the agent. Deleting a user bucket is withheld from agents entirely and stays console-only. Off by default — with it off, neither /mcp nor its metadata document is served.'
+			'Serves this control plane to an AI agent over MCP at /mcp, as an OAuth 2.1 protected resource of this server. An agent acts as the administrator who authorized it and gets exactly that account’s permissions: every operation runs through the same routes, the same checks and the same audit trail as the console, and each entry records both the operator and the agent. Deleting a project is withheld from agents entirely and stays console-only. Off by default — with it off, neither /mcp nor its metadata document is served.'
 	},
 
 	/*
@@ -779,10 +779,10 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 		domain: 'integrations',
 		group: 'SCIM provisioning',
 		label: 'Enable SCIM 2.0 provisioning',
-		summary: 'Let an enterprise directory manage a bucket’s users over SCIM',
+		summary: 'Let an enterprise directory manage a project’s users over SCIM',
 		type: 'boolean',
 		description:
-			'Serves SCIM 2.0 /Users at each bucket’s <issuer>/scim/v2, so an enterprise directory such as Microsoft Entra ID or Okta can create, update, deactivate and delete the bucket’s end users through a provisioning connection you set up on the bucket. A deactivation over SCIM ends the user’s sessions and tokens at once. Off by default, because it lets a third party’s system write to end-user accounts. With it off no SCIM path or metadata document is served; connections can still be prepared and are kept.'
+			'Serves SCIM 2.0 /Users at each project’s <issuer>/scim/v2, so an enterprise directory such as Microsoft Entra ID or Okta can create, update, deactivate and delete the project’s end users through a provisioning connection you set up on the project. A deactivation over SCIM ends the user’s sessions and tokens at once. Off by default, because it lets a third party’s system write to end-user accounts. With it off no SCIM path or metadata document is served; connections can still be prepared and are kept.'
 	},
 	{
 		key: 'scim.secretCredentials',
@@ -1038,7 +1038,7 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 		summary: 'Which claims each scope releases, and which stand alone',
 		type: 'json',
 		description:
-			'Which end-user claims this server can release, and under which scope, e.g. {"openid":["sub"],"profile":["name","given_name","family_name"],"email":["email","email_verified"],"acr":null,"sid":null,"auth_time":null,"iss":null}. A member whose value is a list of claim names defines a scope: that scope is advertised in discovery and a client granted it receives those claims. A member whose value is null is a claim of its own, released when requested by name. `openid` is required and always carries `sub`. `amr` — the authentication methods a sign-in used — is always supported and needs no entry here: every ID token from a sign-in carries it, and listing or omitting it changes nothing. A claim an end user holds but no entry names is never released, which is why the claims you set on an account in a bucket reach a client only once a scope here names them. A new instance maps `profile` and `phone` to their OpenID Connect Core §5.4 claims, which is what a provisioned profile is released under; an instance that saved this setting before keeps exactly what it saved.'
+			'Which end-user claims this server can release, and under which scope, e.g. {"openid":["sub"],"profile":["name","given_name","family_name"],"email":["email","email_verified"],"acr":null,"sid":null,"auth_time":null,"iss":null}. A member whose value is a list of claim names defines a scope: that scope is advertised in discovery and a client granted it receives those claims. A member whose value is null is a claim of its own, released when requested by name. `openid` is required and always carries `sub`. `amr` — the authentication methods a sign-in used — is always supported and needs no entry here: every ID token from a sign-in carries it, and listing or omitting it changes nothing. A claim an end user holds but no entry names is never released, which is why the claims you set on an account in a project reach a client only once a scope here names them. A new instance maps `profile` and `phone` to their OpenID Connect Core §5.4 claims, which is what a provisioned profile is released under; an instance that saved this setting before keeps exactly what it saved.'
 	},
 	{
 		key: 'consent.scopeDescriptions',
@@ -1060,7 +1060,7 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 			'Which acr value each authentication this server can distinguish is reported as',
 		type: 'json',
 		description:
-			'Which Authentication Context Class Reference each authentication this server can distinguish is reported as, e.g. {"password":"1","multi_factor":"2","federated":"1"}. The server owns the distinctions and you own the names: a relying party matches a requested context against the one satisfied by exact string comparison, so values your applications already expect are what belong here. `acr_values_supported` is derived from these, so what is advertised is always what a sign-in can actually produce. Every distinction needs a value, no two may share one, and "0" is reserved by the specification for an authentication carrying no confidence that the same person is there. Note that a relying party which *requires* the multi-factor context is refused for anyone who signs in with a password alone — and whether a second factor is demanded is a user bucket setting, not a property of the person, so an end user with one enrolled in a bucket that does not require it reports the password context. A federated sign-in is never gated by that setting at all.'
+			'Which Authentication Context Class Reference each authentication this server can distinguish is reported as, e.g. {"password":"1","multi_factor":"2","federated":"1"}. The server owns the distinctions and you own the names: a relying party matches a requested context against the one satisfied by exact string comparison, so values your applications already expect are what belong here. `acr_values_supported` is derived from these, so what is advertised is always what a sign-in can actually produce. Every distinction needs a value, no two may share one, and "0" is reserved by the specification for an authentication carrying no confidence that the same person is there. Note that a relying party which *requires* the multi-factor context is refused for anyone who signs in with a password alone — and whether a second factor is demanded is a project setting, not a property of the person, so an end user with one enrolled in a project that does not require it reports the password context. A federated sign-in is never gated by that setting at all.'
 	},
 	{
 		key: 'clientAuthMethods',

@@ -8,7 +8,7 @@ import {
 	resolveAdmin,
 	type AdminContext
 } from '../auth/rbac.js';
-import type { UserBucket } from '../../adapters/types.js';
+import type { ProtectedResource, UserBucket } from '../../adapters/types.js';
 import { loadBucketForEdit, loadBucketForUsers } from '../buckets/access.js';
 import { recordAdminAudit } from '../audit/record.js';
 import { canonicalizeResourceIdentifier } from '../../resources/canonical.js';
@@ -176,9 +176,19 @@ async function loadResource(bucket: UserBucket, resourceId: string) {
 	canonicalIdentifier(resourceId);
 	const resource = await findDeclaredResource(resourceId, namespaceOf(bucket));
 	if (resource?.bucketId !== bucket._id) {
-		throw new AdminError(404, 'resource not declared in this bucket');
+		throw new AdminError(404, 'resource not declared in this project');
 	}
 	return resource;
+}
+
+/* A declaration as the edge names it (specs/100): the project it belongs to, where storage says bucket. */
+function resourceView({ bucketId, ...rest }: ProtectedResource): Omit<
+	ProtectedResource,
+	'bucketId'
+> & {
+	projectId: string;
+} {
+	return { ...rest, projectId: bucketId };
 }
 
 function scopeOf(bucket: UserBucket, namespace: string) {
@@ -202,7 +212,7 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 	 * address, the root otherwise — shared with every other root-served bucket, which is why only this
 	 * bucket's declarations are listed.
 	 */
-	.get('/admin/api/buckets/:id/resources', async ({ admin, params }) => {
+	.get('/admin/api/projects/:id/resources', async ({ admin, params }) => {
 		const ctx = assertAuth(admin);
 		const bucket = await loadBucketForUsers(ctx, params.id);
 		const namespace = namespaceOf(bucket);
@@ -212,12 +222,12 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 			a.identifier < b.identifier ? -1 : a.identifier > b.identifier ? 1 : 0
 		);
 		return {
-			namespace: namespace === ROOT_NAMESPACE ? 'root' : 'bucket',
-			resources
+			namespace: namespace === ROOT_NAMESPACE ? 'root' : 'project',
+			resources: resources.map(resourceView)
 		};
 	})
 	.post(
-		'/admin/api/buckets/:id/resources',
+		'/admin/api/projects/:id/resources',
 		async ({ admin, params, body, set }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForEdit(ctx, params.id);
@@ -266,7 +276,7 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 					trailingSlashSignificant: body.trailingSlashSignificant
 				});
 				set.status = 201;
-				return resource;
+				return resourceView(resource);
 			} catch (error) {
 				/*
 				 * The primary key refused it between the read above and this write. A conflict rather than a
@@ -285,11 +295,11 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 		{ body: CreateResourceBody }
 	)
 	.get(
-		'/admin/api/buckets/:id/resources/:resourceId',
+		'/admin/api/projects/:id/resources/:resourceId',
 		async ({ admin, params }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForUsers(ctx, params.id);
-			return loadResource(bucket, params.resourceId);
+			return resourceView(await loadResource(bucket, params.resourceId));
 		}
 	)
 	/*
@@ -302,7 +312,7 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 	 * no address, which no metadata document could ever be asked to name.
 	 */
 	.get(
-		'/admin/api/buckets/:id/resources/:resourceId/vouching',
+		'/admin/api/projects/:id/resources/:resourceId/vouching',
 		async ({ admin, params }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForUsers(ctx, params.id);
@@ -318,7 +328,7 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 		}
 	)
 	.patch(
-		'/admin/api/buckets/:id/resources/:resourceId',
+		'/admin/api/projects/:id/resources/:resourceId',
 		async ({ admin, params, body }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForEdit(ctx, params.id);
@@ -348,16 +358,21 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 				attributes
 			});
 
-			return getProtectedResourceStore().update(namespace, identifier, {
-				...body,
-				...(scopes === undefined ? {} : { scopes }),
-				...(scopeDescriptions === undefined ? {} : { scopeDescriptions })
-			});
+			const updated = await getProtectedResourceStore().update(
+				namespace,
+				identifier,
+				{
+					...body,
+					...(scopes === undefined ? {} : { scopes }),
+					...(scopeDescriptions === undefined ? {} : { scopeDescriptions })
+				}
+			);
+			return updated && resourceView(updated);
 		},
 		{ body: UpdateResourceBody }
 	)
 	.delete(
-		'/admin/api/buckets/:id/resources/:resourceId',
+		'/admin/api/projects/:id/resources/:resourceId',
 		async ({ admin, params, set }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForEdit(ctx, params.id);

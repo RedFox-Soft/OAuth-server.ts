@@ -214,7 +214,7 @@ export function ProviderWizard({
 			gap={12}
 		>
 			<Typography.Paragraph>
-				Which provider should people of this bucket sign in with?
+				Which provider should people of this project sign in with?
 			</Typography.Paragraph>
 			<ProviderTiles
 				guidance={guidance}
@@ -282,7 +282,7 @@ export function ProviderWizard({
 					type="warning"
 					showIcon
 					title="This address will change"
-					description="This bucket has no address of its own, so the address above is built from its internal id. If the bucket later gets a path or a host, it changes, and the provider must then be given the new one."
+					description="This project has no address of its own, so the address above is built from its internal id. If the project later gets a path or a host, it changes, and the provider must then be given the new one."
 				/>
 			)}
 		</>
@@ -433,10 +433,10 @@ export function ProviderWizard({
 					title={`Anyone ${name} lets sign in gets an account here`}
 					description={
 						consoleBucket
-							? 'On the console, a new account also needs sign-up open on this bucket; it gets a personal group and never the super administrator privilege.'
+							? 'On the console, a new account also needs sign-up open on this project; it gets a personal team and never the super administrator privilege.'
 							: registrationOpen
 								? 'Limit it with email domains below if only one organisation should get in.'
-								: "This happens even though this bucket's Sign-up is closed. Limit it with email domains below if only one organisation should get in."
+								: "This happens even though this project's Sign-up is closed. Limit it with email domains below if only one organisation should get in."
 					}
 				/>
 			)}
@@ -465,7 +465,7 @@ export function ProviderWizard({
 
 	const steps = [
 		{ title: 'Choose', content: choose_step },
-		{ title: 'Register this bucket', content: register_step },
+		{ title: 'Register this project', content: register_step },
 		{ title: 'Paste values', content: values_step },
 		{ title: 'Who may sign in', content: trust_step }
 	];

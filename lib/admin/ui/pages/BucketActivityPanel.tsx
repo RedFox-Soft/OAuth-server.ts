@@ -37,10 +37,10 @@ import { useHydrated } from '../frame/hydrated.js';
  */
 
 export interface BucketActivityRead {
-	bucketId: string;
+	projectId: string;
 	name: string;
 	deletedAt: string | null;
-	lastOwner: { groupId: string; label: string } | null;
+	lastOwner: { teamId: string; label: string } | null;
 	countingSince: string;
 	month: PeriodFigureView | null;
 	days: PeriodFigureView[];
@@ -125,7 +125,7 @@ export function BucketActivityPanel({
 	const [chosenView, setChosenView] = useState<View | null>(null);
 	const view: View = chosenView ?? (hydrated ? loadView() : 'chart');
 
-	const base = `/admin/api/buckets/${encodeURIComponent(bucketId)}/activity`;
+	const base = `/admin/api/projects/${encodeURIComponent(bucketId)}/activity`;
 
 	// Every state write follows an await, so the effect below sets nothing synchronously.
 	const load = useCallback(
@@ -205,13 +205,13 @@ export function BucketActivityPanel({
 	function exportCsv() {
 		if (!read) return;
 		const blob = new Blob(
-			[bucketActivityCsv({ id: read.bucketId, name: read.name }, read.months)],
+			[bucketActivityCsv({ id: read.projectId, name: read.name }, read.months)],
 			{ type: 'text/csv;charset=utf-8' }
 		);
 		const url = URL.createObjectURL(blob);
 		const link = document.createElement('a');
 		link.href = url;
-		link.download = `activity-${read.bucketId}-${month}.csv`;
+		link.download = `activity-${read.projectId}-${month}.csv`;
 		link.click();
 		URL.revokeObjectURL(url);
 	}
@@ -283,7 +283,7 @@ export function BucketActivityPanel({
 					/>
 				)}
 			{neverActive && !loading ? (
-				<Empty description="Nobody has received a token from this bucket yet. People are counted when an app signs them in or renews their tokens." />
+				<Empty description="Nobody has received a token from this project yet. People are counted when an app signs them in or renews their tokens." />
 			) : (
 				<>
 					<Row gutter={[16, 16]}>
@@ -393,7 +393,7 @@ export function BucketActivityPanel({
 											row.status === undefined ? (
 												<Typography.Text
 													type="secondary"
-													title="Not counted: the bucket didn't exist yet, or counting hadn't started"
+													title="Not counted: the project didn't exist yet, or counting hadn't started"
 												>
 													—
 												</Typography.Text>
@@ -439,8 +439,8 @@ export function BucketActivityPanel({
 				</>
 			)}
 			<Typography.Text type="secondary">
-				People this bucket issued tokens to, counted once per month and once per
-				day, in UTC. One person can appear under more than one kind, so the
+				People this project issued tokens to, counted once per month and once
+				per day, in UTC. One person can appear under more than one kind, so the
 				kinds add up to more than the total.
 			</Typography.Text>
 		</Flex>

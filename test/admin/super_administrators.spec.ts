@@ -130,7 +130,7 @@ describe('Super administrators', () => {
 	});
 
 	it('cannot be read, renamed, deleted or joined through the group routes', async () => {
-		const path = `/admin/api/groups/${SUPER_ADMINS_GROUP_ID}`;
+		const path = `/admin/api/teams/${SUPER_ADMINS_GROUP_ID}`;
 
 		const statuses = [
 			(await admin('GET', path, root.cookie)).status,
@@ -148,7 +148,7 @@ describe('Super administrators', () => {
 	});
 
 	it('is neither listed among groups nor offered as a scope to work in', async () => {
-		const groups = await admin('GET', '/admin/api/groups', root.cookie);
+		const groups = await admin('GET', '/admin/api/teams', root.cookie);
 		const scope = await admin('GET', '/admin/api/scope', root.cookie);
 
 		expect(
@@ -165,7 +165,7 @@ describe('Super administrators', () => {
 
 	it('cannot be switched into', async () => {
 		const res = await admin('PUT', '/admin/api/scope', root.cookie, {
-			groupId: SUPER_ADMINS_GROUP_ID
+			teamId: SUPER_ADMINS_GROUP_ID
 		});
 
 		expect(res.status).toBe(403);

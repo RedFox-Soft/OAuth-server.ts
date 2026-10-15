@@ -67,7 +67,7 @@ describe('bucket verification settings API', () => {
 
 	it('defaults new buckets to closed sign-up and verification off', async () => {
 		const cookie = await superCookie();
-		const res = await client.admin.api.buckets.post(
+		const res = await client.admin.api.projects.post(
 			{ name: 'Defaults', slug: 'defaults-1' },
 			{ headers: { cookie } }
 		);
@@ -79,7 +79,7 @@ describe('bucket verification settings API', () => {
 
 	it('creates a bucket open to sign-up when that is asked for', async () => {
 		const cookie = await superCookie();
-		const res = await client.admin.api.buckets.post(
+		const res = await client.admin.api.projects.post(
 			{ name: 'Open', slug: 'open-sign-up-1', registrationOpen: true },
 			{ headers: { cookie } }
 		);
@@ -95,7 +95,7 @@ describe('bucket verification settings API', () => {
 		});
 
 		const res = await client.admin.api
-			.buckets({ id: stored._id })
+			.projects({ id: stored._id })
 			.get({ headers: { cookie } });
 
 		expect(answered(res.data).registrationOpen).toBe(true);
@@ -103,13 +103,13 @@ describe('bucket verification settings API', () => {
 
 	it('persists a settings patch and records an audit entry', async () => {
 		const cookie = await superCookie();
-		const created = await client.admin.api.buckets.post(
+		const created = await client.admin.api.projects.post(
 			{ name: 'Settable', slug: 'settable-2', registrationOpen: true },
 			{ headers: { cookie } }
 		);
 		const bucket = answered(created.data);
 		const patched = await consenting((consent) =>
-			client.admin.api.buckets({ id: bucket._id }).patch(
+			client.admin.api.projects({ id: bucket._id }).patch(
 				{
 					registrationOpen: false,
 					emailVerificationRequired: true,
@@ -136,14 +136,14 @@ describe('bucket verification settings API', () => {
 	// rename left no trace — while still being an exercised privilege over a bucket.
 	it('audits an update that touches no verification field', async () => {
 		const cookie = await superCookie();
-		const created = await client.admin.api.buckets.post(
+		const created = await client.admin.api.projects.post(
 			{ name: 'Rename me', slug: 'rename-me-3' },
 			{ headers: { cookie } }
 		);
 		const bucket = answered(created.data);
 
 		const patched = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.patch({ name: 'Renamed' }, { headers: { cookie } });
 		expect(patched.status).toBe(200);
 
@@ -163,7 +163,7 @@ describe('bucket verification settings API', () => {
 			const cookie = await superCookie();
 			const bucket = answered(
 				(
-					await client.admin.api.buckets.post(
+					await client.admin.api.projects.post(
 						{ name: 'Mailless', slug: 'mailless-1' },
 						{ headers: { cookie } }
 					)
@@ -171,7 +171,7 @@ describe('bucket verification settings API', () => {
 			);
 
 			const res = await client.admin.api
-				.buckets({ id: bucket._id })
+				.projects({ id: bucket._id })
 				.patch(
 					{ emailVerificationRequired: true, confirm: true, expect: {} },
 					{ headers: { cookie } }
@@ -201,7 +201,7 @@ describe('bucket verification settings API', () => {
 			});
 
 			const res = await client.admin.api
-				.buckets({ id: stored._id })
+				.projects({ id: stored._id })
 				.patch({ emailVerificationRequired: false }, { headers: { cookie } });
 
 			expect(res.status).toBe(200);
@@ -211,12 +211,12 @@ describe('bucket verification settings API', () => {
 
 	it('rejects an invalid verification method', async () => {
 		const cookie = await superCookie();
-		const created = await client.admin.api.buckets.post(
+		const created = await client.admin.api.projects.post(
 			{ name: 'BadMethod', slug: 'badmethod-4' },
 			{ headers: { cookie } }
 		);
 		const bucket = answered(created.data);
-		const res = await client.admin.api.buckets({ id: bucket._id }).patch(
+		const res = await client.admin.api.projects({ id: bucket._id }).patch(
 			// @ts-expect-error a verification method the schema does not offer
 			{ verificationMethod: 'sms' },
 			{ headers: { cookie } }
@@ -235,7 +235,7 @@ describe('a bucket’s name shown to users', () => {
 	});
 
 	async function created(cookie: string, slug: string) {
-		const res = await client.admin.api.buckets.post(
+		const res = await client.admin.api.projects.post(
 			{ name: 'prod-eu-users', slug, displayName: 'Acme ID' },
 			{ headers: { cookie } }
 		);
@@ -256,7 +256,7 @@ describe('a bucket’s name shown to users', () => {
 		const bucket = await created(cookie, 'display-name-2');
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.patch({ displayName: '   ' }, { headers: { cookie } });
 
 		expect(res.status).toBe(400);
@@ -267,7 +267,7 @@ describe('a bucket’s name shown to users', () => {
 		const bucket = await created(cookie, 'display-name-3');
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.patch({ displayName: 'x'.repeat(61) }, { headers: { cookie } });
 
 		expect(res.status).toBe(422);
@@ -278,7 +278,7 @@ describe('a bucket’s name shown to users', () => {
 		const bucket = await created(cookie, 'display-name-4');
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.patch({ displayName: null }, { headers: { cookie } });
 
 		expect(res.status).toBe(200);

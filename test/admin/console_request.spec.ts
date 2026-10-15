@@ -29,7 +29,7 @@ describe("the console's request helper", () => {
 			)
 		);
 
-		const result = await request('POST', '/admin/api/buckets/b/address', {
+		const result = await request('POST', '/admin/api/projects/b/address', {
 			slug: 'new'
 		});
 

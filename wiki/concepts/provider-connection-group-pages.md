@@ -1,36 +1,39 @@
 ---
 type: concept
-title: "Providers, provisioning connections and user groups: a page each, and the deciding question as a wizard step"
+title: "Providers, provisioning connections and groups: a page each, and the deciding question as a wizard step"
 tags: [architecture, admin, federation, scim, ux]
 sources: [oauth-server-codebase]
 created: 2026-10-11
-updated: 2026-10-12
+updated: 2026-10-15
 ---
 
 # Providers, connections and groups pages
 
-Spec 084, phase 5 of the console redesign. A bucket's identity providers, SCIM provisioning connections and
-user groups used to be edited in modals stacked on drawers. Each now has a page with its own address, and
-creating a provider or a connection is a side-panel wizard. The tabs (`FederationPanel.tsx`,
+Spec 084, phase 5 of the console redesign. A project's identity providers, SCIM provisioning connections and
+groups of end users used to be edited in modals stacked on drawers. Each now has a page with its own address,
+and creating a provider or a connection is a side-panel wizard. The tabs (`FederationPanel.tsx`,
 `ProvisioningPanel.tsx`, `BucketGroupsPanel.tsx` under `lib/admin/ui/pages/`) only list, open, create, turn on
 or off and delete. Since spec 088 the providers table is in sign-in page order and says so, and each row's menu
 has Move up and Move down, C0 because only the order changes ([[upstream-federation]]).
 
 | Page | Address | Component |
 |---|---|---|
-| Provider | `/admin/buckets/:b/identity-providers/:p` (console bucket: `/admin/administrators/identity-providers/:p`) | `pages/providers/ProviderPage.tsx` |
-| Connection | `/admin/buckets/:b/provisioning/:c` plus `/directory-setup` and `/settings` | `pages/provisioning/ConnectionPage.tsx` |
-| Group | `/admin/buckets/:b/user-groups/:g` | `pages/groups/UserGroupPage.tsx` |
+| Provider | `/admin/projects/:p/identity-providers/:id` (administrators' project: `/admin/administrators/identity-providers/:id`) | `pages/providers/ProviderPage.tsx` |
+| Connection | `/admin/projects/:p/provisioning/:c` plus `/directory-setup` and `/settings` | `pages/provisioning/ConnectionPage.tsx` |
+| Group | `/admin/projects/:p/groups/:g` | `pages/groups/UserGroupPage.tsx` |
 
-`providerHref`, `connectionHref` and `userGroupHref` (`lib/admin/ui/frame/routes.ts`) build these addresses.
-Build them there rather than by hand: the console bucket's providers live under Administrators.
+Until spec 100 these were `/admin/buckets/:b/…`, and the group page `/admin/buckets/:b/user-groups/:g`; the old
+addresses answer with a redirect (the `REDIRECTS` table, `lib/admin/ui/frame/routes.ts:390`), because hold
+emails already sent link the old connection address. `providerHref`, `connectionHref` and `userGroupHref`
+(`lib/admin/ui/frame/routes.ts:512-532`) build these addresses. Build them there rather than by hand: the
+administrators' project's providers live under Administrators.
 
 ## The deciding question cannot be skipped
 
 - **Provider wizard** (`ProviderWizard.tsx`). Its last step asks what happens at a first sign-in, and it has no
   default; Create stays disabled until it is answered.
   - The answer "create an account" ignores a closed Sign-up, and the step says so.
-  - The server's create default (`jit`, or `existing_only` on the console bucket) is unchanged for agents.
+  - The server's create default (`jit`, or `existing_only` on the administrators' project) is unchanged for agents.
     Making the field required on the API was left out of scope.
 - **Connection wizard** (`ConnectionWizard.tsx`). It creates the connection at the end of step three, and that
   step's safeguard choice has nothing preselected, by owner decision.
@@ -66,7 +69,7 @@ Build them there rather than by hand: the console bucket's providers live under 
   connection is bound.
 - **The last-door check** (`isLastDoor`, `providerTypes.ts`): password sign-in off and no other enabled
   provider. In that case Disable and Delete are shown unavailable with the reason before anyone presses them.
-  The console bucket's stricter guard stays the server's.
+  The administrators' project's stricter guard stays the server's.
 - **The read behind the page.** It is one provider read, `GET …/federation/:providerId`
   (`lib/admin/federation/routes.ts:98`, `presentDetail` at `service.ts:129`; MCP `federation_provider_get`). It
   returns:
@@ -77,13 +80,13 @@ Build them there rather than by hand: the console bucket's providers live under 
   - warnings;
   - since spec 088, `capabilities.trySignIn`, which is `federation.enabled`.
 - **Try sign-in** (spec 088, `pages/providers/TrySignIn.tsx`, C0) sends a new tab through the provider with the
-  bucket's real callback and shows what the provider answered and what a real sign-in would do, with nothing
+  project's real callback and shows what the provider answered and what a real sign-in would do, with nothing
   written. It works on a disabled provider. See [[federation-try-signin]].
 
 ## The connection page and the hold
 
 - **Overview** shows:
-  - the counts, linked to the Users list (`?managedBy=`) and the User groups list (`?keptBy=`);
+  - the counts, linked to the Users list (`?managedBy=`) and the Groups list (`?keptBy=`);
   - one Credentials row per slot — since spec 088 two while a replaced secret or static token still works,
     with Retire previous now (C1) and a static token's expiry ([[scim-credential-overlap]]);
   - a History card (since spec 085, replacing two links) with All (`connection=<id>`), By the directory
@@ -97,9 +100,9 @@ Build them there rather than by hand: the console bucket's providers live under 
   it, then release), or someone else holds its credential (revoke or disable).
   - Release is `ConfirmDestruction` with the word `release` plus an acknowledgement checkbox. The
     `acknowledgement` prop is new and holds the button until it is ticked.
-- **Where a hold shows**: the bucket list row, the Overview's attention item (which opens the held connection
+- **Where a hold shows**: the project list row, the Overview's attention item (which opens the held connection
   itself), a dot on the Provisioning tab, the connection's header, and the hold email, which now links to the
-  connection page. Since spec 088 also a red count on Buckets in the side menu, on every page, and the bucket
+  connection page. Since spec 088 also a red count on Projects in the side menu, on every page, and the project
   list's On hold mark links to the held connection ([[scim-provisioning]]).
 
 ## Secrets are shown once, in place
@@ -119,7 +122,7 @@ which an operator closes by reflex.
 - **The group page** pages its members from the server. It adds up to 1,000 people in one request, and removes
   them with the same question as a person's Groups tab (`userGroup.member.remove`).
 - **Rename warns** with the old and new names that applications see the new one at each member's next token.
-  The `groups` claim carries names ([[bucket-groups]]).
+  The `groups` claim carries names ([[project-groups]]).
 - **A directory-kept group** shows one sentence instead of controls.
 - **Hand-over is C4** (`PreviewConfirm`): the server's preview names the members the connection does not manage,
   and the group's typed name confirms.
@@ -127,7 +130,7 @@ which an operator closes by reflex.
 ## Related
 
 - [[scim-provisioning]] — the hold, the refused-removal record and release
-- [[bucket-groups]] — the hand-over preview on the server
+- [[project-groups]] — the hand-over preview on the server
 - [[admin-console-frame]] — action classes, `PreviewConfirm`, `ConfirmDestruction`
-- [[bucket-workspace]] — the tabs these pages sit under
-- [[console-federation]] — the console bucket's providers and their guards
+- [[project-workspace]] — the tabs these pages sit under
+- [[console-federation]] — the administrators' project's providers and their guards

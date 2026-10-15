@@ -77,7 +77,7 @@ describe.each([
 
 	it('still deletes an empty bucket', async () => {
 		const { cookie } = await cookieFor('super');
-		const created = await admin('/admin/api/buckets', {
+		const created = await admin('/admin/api/projects', {
 			method: 'POST',
 			cookie,
 			body: { name: 'Deletable bucket', slug: 'deletable-bucket-1' }
@@ -88,13 +88,13 @@ describe.each([
 			await created.json()
 		);
 
-		const res = await admin(`/admin/api/buckets/${bucket._id}`, {
+		const res = await admin(`/admin/api/projects/${bucket._id}`, {
 			method: 'DELETE',
 			cookie
 		});
 		expect(res.status).toBe(200);
 		/* A deletion schedules the destruction (specs/090); Delete now carries it out. */
-		const destroyed = await admin(`/admin/api/buckets/${bucket._id}/purge`, {
+		const destroyed = await admin(`/admin/api/projects/${bucket._id}/purge`, {
 			method: 'POST',
 			cookie
 		});
@@ -104,7 +104,7 @@ describe.each([
 
 	it('still refuses a bucket that holds an application, with its structured blockers', async () => {
 		const { cookie } = await cookieFor('super');
-		const made = await admin('/admin/api/buckets', {
+		const made = await admin('/admin/api/projects', {
 			method: 'POST',
 			cookie,
 			body: { name: 'Populated bucket', slug: slug() }
@@ -114,7 +114,7 @@ describe.each([
 			Type.Object({ _id: Type.String() }),
 			await made.json()
 		);
-		const created = await admin(`/admin/api/buckets/${bucket._id}/clients`, {
+		const created = await admin(`/admin/api/projects/${bucket._id}/clients`, {
 			method: 'POST',
 			cookie,
 			body: {
@@ -126,7 +126,7 @@ describe.each([
 		});
 		expect(created.status).toBe(201);
 
-		const refused = await admin(`/admin/api/buckets/${bucket._id}`, {
+		const refused = await admin(`/admin/api/projects/${bucket._id}`, {
 			method: 'DELETE',
 			cookie
 		});
@@ -163,9 +163,9 @@ describe.each([
 		expect(me.userId).toBe(user._id);
 		expect(me.email).toBe(user.email);
 		expect(me.superAdmin).toBe(true);
-		expect(me.bucketId).toBe(ADMIN_BUCKET_ID);
+		expect(me.projectId).toBe(ADMIN_BUCKET_ID);
 		expect(me.memberships).toBeArray();
-		expect(me.activeGroupId).toBeString();
+		expect(me.activeTeamId).toBeString();
 		// The agent marker must be absent for a console session, or every audit entry it writes would
 		// claim an agent was involved.
 		expect(me.viaClientId).toBeUndefined();
@@ -175,7 +175,7 @@ describe.each([
 		const { cookie, user } = await cookieFor('super');
 
 		const created = await admin(
-			`/admin/api/buckets/${DEFAULT_BUCKET_ID}/clients`,
+			`/admin/api/projects/${DEFAULT_BUCKET_ID}/clients`,
 			{
 				method: 'POST',
 				cookie,
@@ -196,14 +196,14 @@ describe.each([
 	});
 
 	it('still refuses an unauthenticated console request', async () => {
-		const res = await admin('/admin/api/buckets');
+		const res = await admin('/admin/api/projects');
 		expect(res.status).toBe(401);
 	});
 
 	it('refuses a bearer credential that is not an MCP-audience token', async () => {
 		// The second credential arm must not become a way in for an arbitrary Authorization header.
 		const res = await elysia.handle(
-			new Request('http://e.ly/admin/api/buckets', {
+			new Request('http://e.ly/admin/api/projects', {
 				headers: { authorization: 'Bearer not-a-real-token' }
 			})
 		);

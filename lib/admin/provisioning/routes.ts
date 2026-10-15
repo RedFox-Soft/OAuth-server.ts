@@ -83,7 +83,7 @@ export const provisioningRoutes = new Elysia({ name: 'admin-provisioning' })
 		}
 	})
 	.get(
-		'/admin/api/buckets/:id/provisioning-connections',
+		'/admin/api/projects/:id/provisioning-connections',
 		async ({ admin, params }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForUsers(ctx, params.id);
@@ -98,7 +98,7 @@ export const provisioningRoutes = new Elysia({ name: 'admin-provisioning' })
 	 * R9): the same facts the console's wizard shows, so an agent configuring Entra or Okta reads them too.
 	 */
 	.get(
-		'/admin/api/buckets/:id/provisioning-connections/directories',
+		'/admin/api/projects/:id/provisioning-connections/directories',
 		async ({ admin, params }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForUsers(ctx, params.id);
@@ -106,7 +106,7 @@ export const provisioningRoutes = new Elysia({ name: 'admin-provisioning' })
 		}
 	)
 	.get(
-		'/admin/api/buckets/:id/provisioning-connections/:connectionId',
+		'/admin/api/projects/:id/provisioning-connections/:connectionId',
 		async ({ admin, params }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForUsers(ctx, params.id);
@@ -119,7 +119,7 @@ export const provisioningRoutes = new Elysia({ name: 'admin-provisioning' })
 	 * (specs/084 R2). `{held: false}` for a connection that is not held.
 	 */
 	.get(
-		'/admin/api/buckets/:id/provisioning-connections/:connectionId/hold',
+		'/admin/api/projects/:id/provisioning-connections/:connectionId/hold',
 		async ({ admin, params }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForUsers(ctx, params.id);
@@ -127,7 +127,7 @@ export const provisioningRoutes = new Elysia({ name: 'admin-provisioning' })
 		}
 	)
 	.post(
-		'/admin/api/buckets/:id/provisioning-connections',
+		'/admin/api/projects/:id/provisioning-connections',
 		async ({ admin, params, body, set }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForEdit(ctx, params.id);
@@ -154,7 +154,7 @@ export const provisioningRoutes = new Elysia({ name: 'admin-provisioning' })
 		{ body: CreateConnectionBody }
 	)
 	.patch(
-		'/admin/api/buckets/:id/provisioning-connections/:connectionId',
+		'/admin/api/projects/:id/provisioning-connections/:connectionId',
 		async ({ admin, params, body }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForEdit(ctx, params.id);
@@ -173,7 +173,7 @@ export const provisioningRoutes = new Elysia({ name: 'admin-provisioning' })
 		{ body: UpdateConnectionBody }
 	)
 	.delete(
-		'/admin/api/buckets/:id/provisioning-connections/:connectionId',
+		'/admin/api/projects/:id/provisioning-connections/:connectionId',
 		async ({ admin, params }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForEdit(ctx, params.id);
@@ -204,7 +204,7 @@ export const provisioningRoutes = new Elysia({ name: 'admin-provisioning' })
 	 * the bucket's people. 409 when the connection is not held.
 	 */
 	.post(
-		'/admin/api/buckets/:id/provisioning-connections/:connectionId/release',
+		'/admin/api/projects/:id/provisioning-connections/:connectionId/release',
 		async ({ admin, params }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForEdit(ctx, params.id);
@@ -230,7 +230,7 @@ export const provisioningRoutes = new Elysia({ name: 'admin-provisioning' })
 	 * administrator to paste into the directory. The audit entry records the kind, never the value.
 	 */
 	.post(
-		'/admin/api/buckets/:id/provisioning-connections/:connectionId/credentials',
+		'/admin/api/projects/:id/provisioning-connections/:connectionId/credentials',
 		async ({ admin, params, body, set }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForEdit(ctx, params.id);
@@ -264,7 +264,7 @@ export const provisioningRoutes = new Elysia({ name: 'admin-provisioning' })
 	 * untouched (specs/088). 404 when there is no previous value that still works.
 	 */
 	.delete(
-		'/admin/api/buckets/:id/provisioning-connections/:connectionId/credentials/:kind/previous',
+		'/admin/api/projects/:id/provisioning-connections/:connectionId/credentials/:kind/previous',
 		async ({ admin, params }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForEdit(ctx, params.id);
@@ -289,7 +289,7 @@ export const provisioningRoutes = new Elysia({ name: 'admin-provisioning' })
 		}
 	)
 	.delete(
-		'/admin/api/buckets/:id/provisioning-connections/:connectionId/credentials/:kind',
+		'/admin/api/projects/:id/provisioning-connections/:connectionId/credentials/:kind',
 		async ({ admin, params }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForEdit(ctx, params.id);
@@ -318,7 +318,7 @@ export const provisioningRoutes = new Elysia({ name: 'admin-provisioning' })
 	 * two names for one slot.
 	 */
 	.post(
-		'/admin/api/buckets/:id/users/:uid/connection',
+		'/admin/api/projects/:id/users/:uid/connection',
 		async ({ admin, params, body }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForEdit(ctx, params.id);

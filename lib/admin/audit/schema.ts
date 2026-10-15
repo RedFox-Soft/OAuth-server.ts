@@ -18,10 +18,11 @@ export const AuditQuery = t.Object({
 	viaSurface: t.Optional(t.String()),
 	viaClientId: t.Optional(t.String()),
 	/*
-	 * Everything that happened to or in one bucket, what one provisioning connection did or had done to it,
-	 * and actions starting with a text (specs/085). Each narrows like the filters above.
+	 * Everything that happened to or in one project, what one provisioning connection did or had done to it,
+	 * and actions starting with a text (specs/085). Each narrows like the filters above. Action, target type
+	 * and prefix are named as the edge names them (lib/admin/vocabulary.ts); a prefix names whole segments.
 	 */
-	bucket: t.Optional(t.String()),
+	project: t.Optional(t.String()),
 	connection: t.Optional(t.String()),
 	actionPrefix: t.Optional(t.String()),
 	from: t.Optional(t.String()),

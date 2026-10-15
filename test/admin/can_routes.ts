@@ -35,14 +35,14 @@ export type StatedRightRoute =
 	  })
 	| (Governed & { readonly on: 'me'; readonly flag: keyof MeCan });
 
-const BUCKET = '/admin/api/buckets/:id';
+const BUCKET = '/admin/api/projects/:id';
 
 export const statedRightRoutes: readonly StatedRightRoute[] = [
 	{
 		on: 'me',
-		flag: 'createBucket',
+		flag: 'createProject',
 		method: 'POST',
-		path: '/admin/api/buckets',
+		path: '/admin/api/projects',
 		body: { name: 'Taken', slug: ':taken-bucket-slug' }
 	},
 	/* The same route, asked for a hostname: an instance-level act, decided before the hostname is judged. */
@@ -50,7 +50,7 @@ export const statedRightRoutes: readonly StatedRightRoute[] = [
 		on: 'me',
 		flag: 'createHost',
 		method: 'POST',
-		path: '/admin/api/buckets',
+		path: '/admin/api/projects',
 		body: { name: 'Hosted', host: 'not a hostname' }
 	},
 
@@ -85,7 +85,7 @@ export const statedRightRoutes: readonly StatedRightRoute[] = [
 		flag: 'move',
 		method: 'PUT',
 		path: `${BUCKET}/owner`,
-		body: { groupId: ':destination' }
+		body: { teamId: ':destination' }
 	},
 	{
 		on: 'bucket',
@@ -560,7 +560,7 @@ export const excludedRightRoutes: readonly {
 /* The routes the declaration has to cover: every one under a bucket, and the one that creates one. */
 export function isGovernedSurface(method: string, path: string): boolean {
 	return (
-		path.startsWith('/admin/api/buckets/:id') ||
-		(method === 'POST' && path === '/admin/api/buckets')
+		path.startsWith('/admin/api/projects/:id') ||
+		(method === 'POST' && path === '/admin/api/projects')
 	);
 }

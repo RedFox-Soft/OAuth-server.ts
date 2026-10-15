@@ -95,7 +95,7 @@ function rowsOf(
 					}
 		);
 		return {
-			bucketId: `b${String(i)}`,
+			projectId: `b${String(i)}`,
 			name: `bucket ${String(i)}`,
 			slug: null,
 			reserved: null,
@@ -103,7 +103,7 @@ function rowsOf(
 			current: months[0] ?? null,
 			previous: months[1] ?? null,
 			customer: {
-				groupId: row.group,
+				teamId: row.group,
 				label: row.group,
 				kind: 'regular',
 				exists: true
@@ -134,7 +134,7 @@ describe('totals across buckets', () => {
 				}
 				for (const customer of customers) {
 					const held = rows.filter((row) =>
-						customer.bucketIds.includes(row.bucketId)
+						customer.projectIds.includes(row.projectId)
 					);
 					const expected = held.reduce(
 						(sum, row) => sum + (row.months[0]?.total ?? 0),

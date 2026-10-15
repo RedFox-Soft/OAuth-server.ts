@@ -58,7 +58,7 @@ const Issued = Type.Object({
 });
 
 function connectionPath(c: Connected): string {
-	return `/admin/api/buckets/${c.bucket._id}/provisioning-connections/${c.connection._id}`;
+	return `/admin/api/projects/${c.bucket._id}/provisioning-connections/${c.connection._id}`;
 }
 
 const clientIdOf = (c: Connected) => `scim-${c.connection._id}`;
@@ -421,7 +421,7 @@ describe('replacing a SCIM credential without an outage', () => {
 		const one = await admin('GET', connectionPath(c), cookie);
 		const all = await admin(
 			'GET',
-			`/admin/api/buckets/${c.bucket._id}/provisioning-connections`,
+			`/admin/api/projects/${c.bucket._id}/provisioning-connections`,
 			cookie
 		);
 

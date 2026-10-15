@@ -20,7 +20,7 @@ export function Keys() {
 
 	useEffect(() => {
 		void (async () => {
-			const result = await request<BucketView[]>('GET', '/admin/api/buckets');
+			const result = await request<BucketView[]>('GET', '/admin/api/projects');
 			if (!result.ok) {
 				setDependents([]);
 				return;
@@ -34,7 +34,7 @@ export function Keys() {
 						id: b._id,
 						name:
 							b._id === DEFAULT_BUCKET_ID
-								? 'Default bucket'
+								? 'Default project'
 								: b._id === ADMIN_BUCKET_ID
 									? 'Administrators'
 									: b.name,
@@ -59,7 +59,7 @@ export function Keys() {
 					<Typography.Paragraph>
 						Signs for the root issuer:{' '}
 						{dependents.length === 0
-							? 'no bucket is served at the root.'
+							? 'no project is served at the root.'
 							: dependents.map((d, i) => (
 									<span key={d.id}>
 										{i > 0 ? ', ' : ''}

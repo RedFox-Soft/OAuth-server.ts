@@ -39,7 +39,7 @@ describe('administering provisioning connections', () => {
 
 		const created = await admin(
 			'POST',
-			`/admin/api/buckets/${bucket._id}/provisioning-connections`,
+			`/admin/api/projects/${bucket._id}/provisioning-connections`,
 			cookie,
 			{ displayName: 'Contoso', providerId: 'corp' }
 		);
@@ -66,7 +66,7 @@ describe('administering provisioning connections', () => {
 
 		const created = await admin(
 			'POST',
-			`/admin/api/buckets/${bucket._id}/provisioning-connections`,
+			`/admin/api/projects/${bucket._id}/provisioning-connections`,
 			cookie,
 			{ displayName: 'Entra', providerId: 'entra' }
 		);
@@ -87,7 +87,7 @@ describe('administering provisioning connections', () => {
 
 		const disabled = await admin(
 			'PATCH',
-			`/admin/api/buckets/${c.bucket._id}/provisioning-connections/${c.connection._id}`,
+			`/admin/api/projects/${c.bucket._id}/provisioning-connections/${c.connection._id}`,
 			cookie,
 			{ enabled: false }
 		);
@@ -102,7 +102,7 @@ describe('administering provisioning connections', () => {
 	it('refuses a connection on the administrators’ bucket', async () => {
 		const res = await admin(
 			'POST',
-			`/admin/api/buckets/${ADMIN_BUCKET_ID}/provisioning-connections`,
+			`/admin/api/projects/${ADMIN_BUCKET_ID}/provisioning-connections`,
 			cookie,
 			{ displayName: 'Nope', providerId: 'corp' }
 		);
@@ -112,7 +112,7 @@ describe('administering provisioning connections', () => {
 
 	it('refuses to delete a bound provider or switch it to just-in-time creation', async () => {
 		const c = await connect(await scimBucket([provider('corp')]));
-		const path = `/admin/api/buckets/${c.bucket._id}/federation/corp`;
+		const path = `/admin/api/projects/${c.bucket._id}/federation/corp`;
 
 		const switched = await admin('PATCH', path, cookie, {
 			provisioning: 'jit'
@@ -136,7 +136,7 @@ describe('administering provisioning connections', () => {
 
 		const res = await admin(
 			'DELETE',
-			`/admin/api/buckets/${c.bucket._id}/provisioning-connections/${c.connection._id}`,
+			`/admin/api/projects/${c.bucket._id}/provisioning-connections/${c.connection._id}`,
 			cookie
 		);
 
@@ -160,7 +160,7 @@ describe('administering provisioning connections', () => {
 				token: c.token,
 				body: { schemas: [SCIM_GROUP_SCHEMA], displayName: 'Payroll' }
 			});
-			const base = `/admin/api/buckets/${c.bucket._id}/provisioning-connections`;
+			const base = `/admin/api/projects/${c.bucket._id}/provisioning-connections`;
 
 			const one = await admin('GET', `${base}/${c.connection._id}`, cookie);
 			const list = shaped(
@@ -177,7 +177,7 @@ describe('administering provisioning connections', () => {
 
 			const res = await admin(
 				'GET',
-				`/admin/api/buckets/${c.bucket._id}/provisioning-connections/${c.connection._id}`,
+				`/admin/api/projects/${c.bucket._id}/provisioning-connections/${c.connection._id}`,
 				cookie
 			);
 
@@ -195,7 +195,7 @@ describe('administering provisioning connections', () => {
 
 			const res = await admin(
 				'GET',
-				`/admin/api/buckets/${c.bucket._id}/provisioning-connections/${c.connection._id}`,
+				`/admin/api/projects/${c.bucket._id}/provisioning-connections/${c.connection._id}`,
 				cookie
 			);
 

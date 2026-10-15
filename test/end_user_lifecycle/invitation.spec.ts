@@ -55,7 +55,7 @@ async function passwordless(bucketId: string, email = `${nanoid()}@x.io`) {
 	const { status, body } = await adminCall(
 		cookie,
 		'POST',
-		`/admin/api/buckets/${bucketId}/users`,
+		`/admin/api/projects/${bucketId}/users`,
 		{ email }
 	);
 	expect(status).toBe(201);
@@ -66,7 +66,7 @@ function invite(bucketId: string, uid: string) {
 	return adminCall(
 		cookie,
 		'POST',
-		`/admin/api/buckets/${bucketId}/users/${uid}/invitation`
+		`/admin/api/projects/${bucketId}/users/${uid}/invitation`
 	);
 }
 
@@ -247,7 +247,7 @@ describe('inviting a person to set their own password', () => {
 		await adminCall(
 			cookie,
 			'PATCH',
-			`/admin/api/buckets/${bucketId}/users/${person.id}`,
+			`/admin/api/projects/${bucketId}/users/${person.id}`,
 			{ active: false }
 		);
 
@@ -284,7 +284,7 @@ describe('creating a person with an invitation', () => {
 		const { status, body } = await adminCall(
 			cookie,
 			'POST',
-			`/admin/api/buckets/${bucketId}/users`,
+			`/admin/api/projects/${bucketId}/users`,
 			{ email, invite: true }
 		);
 
@@ -302,7 +302,7 @@ describe('creating a person with an invitation', () => {
 		const { status } = await adminCall(
 			cookie,
 			'POST',
-			`/admin/api/buckets/${bucketId}/users`,
+			`/admin/api/projects/${bucketId}/users`,
 			{ email, invite: true, password: 'a chosen password' }
 		);
 
@@ -318,7 +318,7 @@ describe('creating a person with an invitation', () => {
 			const { status } = await adminCall(
 				cookie,
 				'POST',
-				`/admin/api/buckets/${bucketId}/users`,
+				`/admin/api/projects/${bucketId}/users`,
 				{ email, invite: true }
 			);
 
@@ -408,7 +408,7 @@ describe('an invitation that cannot be sent', () => {
 		await adminCall(
 			cookie,
 			'POST',
-			`/admin/api/buckets/${bucketId}/users/${person.id}/lock`,
+			`/admin/api/projects/${bucketId}/users/${person.id}/lock`,
 			{ reason: 'suspected compromise' }
 		);
 

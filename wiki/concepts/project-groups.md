@@ -1,6 +1,6 @@
 ---
 type: concept
-title: 'Bucket groups: what roles became, the groups claim, and Super administrators'
+title: 'Project groups: what roles became, the groups claim, and Super administrators'
 tags: [architecture, contract, gotcha, oauth]
 sources: [oauth-server-codebase]
 created: 2026-10-07
@@ -13,27 +13,35 @@ graph:
     - predicate: depends_on
       object: concept:end-user-lifecycle
     - predicate: depends_on
-      object: concept:group-ownership
+      object: concept:team-ownership
 ---
 
-# Bucket groups: what roles became, the groups claim, and Super administrators
+# Project groups: what roles became, the groups claim, and Super administrators
 
 Spec 071 — part 3 of 4 of the SCIM series (issue #62). There are no roles any more. **End users** are grouped
-by **bucket groups**; **administrators** by administrator groups ([[group-ownership]]), one of which —
+by a project's **groups**; **administrators** by **teams** ([[team-ownership]]), one of which —
 **Super administrators** — is the instance privilege that `super_admin` used to be. `project_admin` granted
 nothing (it was assigned and never read) and is gone.
 
-## Two kinds of group, on purpose
+A group is stored as a bucket group (`BucketGroup`, area `bucketGroups`, service `lib/bucket_groups/`) and a
+team as an administrator group (`Group`); the code keeps those names. Spec 100 renamed the edge: the API is
+`/admin/api/projects/:id/groups…` (`lib/admin/bucket-groups/routes.ts:106`), the console page
+`/admin/projects/:p/groups[/:g]`, the MCP tools `project_group_*`, and the trail presents the stored
+`bucketgroup.*` action ids as `group.*` (and the teams' stored `group.*` as `team.*`). The `groups` claim, the
+`groups` scope and SCIM Groups always meant these end-user groups and are unchanged.
 
-A bucket group (`BucketGroup`, `lib/adapters/types.ts:1316`) is a named set of one bucket's end users, kept by
+## Two kinds of set, on purpose
+
+A group (`BucketGroup`, `lib/adapters/types.ts:1316`) is a named set of one project's end users, kept by
 administrators or owned by exactly one provisioning connection (`provisionedBy`, the same field and meaning as
-on `User`). An administrator group owns buckets (and owned projects, until spec 099 removed them) and has owner/member
-standing and invitations.
+on `User`). A team owns projects (and owned the old Project entity, a retired project, until spec 099 removed
+it) and has owner/member standing and invitations.
 
 They are not merged. They hold different people, have different shapes, and — the deciding reason — keeping the
 privilege-granting set in a different entity from the one SCIM writes means no SCIM request and no token can
-reach it **by construction**, not by a guard a later change could miss. The console and API say "bucket group"
-(`bucket_group_*` tools) where the two could be confused; administrator groups keep `group_*`.
+reach it **by construction**, not by a guard a later change could miss. Until spec 100 the console and API
+said "bucket group" (`bucket_group_*` tools) where the two could be confused and administrator groups kept
+`group_*`; since then the two words differ outright — `project_group_*` for groups, `team_*` for teams.
 
 ## Members are records, not a list on the group
 
@@ -73,8 +81,8 @@ IPSIE §4.2); a connection sees and changes only its own groups and may add only
 users — the membership belongs to the group, and the connection never sees it. A directory's create of a name an
 administrator-kept group holds answers 409 `uniqueness`; an administrator may **hand the group over**
 (`assignGroupToConnection`, `:370`), refused while any member is someone the connection does not manage, never
-automatically. Since spec 084 the hand-over is preview-then-confirm, like the bucket sign-in PATCH
-([[bucket-sign-in-policy]]). `walkHandOver` (`:319`) counts the members the connection manages and those it does
+automatically. Since spec 084 the hand-over is preview-then-confirm, like the project sign-in PATCH
+([[project-sign-in-policy]]). `walkHandOver` (`:319`) counts the members the connection manages and those it does
 not, naming the first 20 of the latter. A request without `confirm: true` and the same `expect` answers 409 with
 that preview, and nothing is audited for a 409. With foreign members the confirmed request is refused with the
 same preview. The console asks it as C4 with the group's name typed ([[provider-connection-group-pages]]). A connection that owns any group cannot be deleted.
@@ -84,7 +92,7 @@ same preview. The console asks it as C4 with the group's name typed ([[provider-
 Built in, as `amr` is (`withGroupsScope`, `lib/consts/groups_claim.ts:32`): the `groups` scope releases the
 `groups` claim whatever the claims setting holds, because a saved setting replaces the default whole and a
 default entry would never reach those deployments. The value is the **display names**, sorted — readable and
-checkable by a relying party; a rename changes it, which is acceptable because names are unique in the bucket and
+checkable by a relying party; a rename changes it, which is acceptable because names are unique in the project and
 only the owner renames. It is computed from membership after the account's stored claims are spread
 (`lib/addon/account.ts:87`), so a stored `groups` can never forge it, and the admin claims route refuses one.
 
@@ -97,24 +105,28 @@ audience-bound token cannot call userinfo.
 
 ## Super administrators
 
-`super-administrators`, kind `system` (`lib/admin/consts.ts`, seeded beside `unassigned`). The admin context's
-`superAdmin` comes from the group-membership read every admin request already made (`lib/admin/auth/rbac.ts:250`)
-— no extra query — and the group is removed from `memberships`, so it is never a working scope. It is invisible to
-the group routes (404 to everyone, `lib/admin/groups/routes.ts:50`) and the scope switcher; a system group cannot
+`super-administrators`, a team of kind `system` (`lib/admin/consts.ts`, seeded beside `unassigned`). The admin
+context's `superAdmin` comes from the team-membership read every admin request already made
+(`lib/admin/auth/rbac.ts:241`) — no extra query — and the team is removed from `memberships`, so it is never a
+working scope. It is invisible to the team routes (404 `team not found` to everyone,
+`lib/admin/groups/routes.ts:53`) and the scope switcher; a system team cannot
 be renamed. Granting and withdrawing are operations of their own — `POST`/`DELETE /admin/api/admins/:id/super-admin`,
 `high` on MCP — so creating or editing an account never grants it; the only writer is
 `lib/admin/super_admins.ts` (`grantSuperAdmin`, `:45`). The last active member can be neither withdrawn nor
 deactivated (`activeSuperAdminsWithout`, `:68`); first-run setup makes its administrator a member and stays closed
-while the group has an active member.
+while the team has an active member.
 
-Found while doing this: MCP's `project_create` (removed with projects in spec 099) and `bucket_create` were
-marked super-admin-only although their routes had no such gate — an MCP-only refusal the console never applied. They are `superAdminOnly: false` now.
+Found while doing this: MCP's `project_create` and `bucket_create` were marked super-admin-only although their
+routes had no such gate — an MCP-only refusal the console never applied. The first was the retired-project tool
+of that name (removed with the old Project entity in spec 099); the second is today's `project_create` (renamed
+in spec 100). It is `superAdminOnly: false`.
 
 ## The migration
 
-`2026-10-08-roles-to-groups` (`lib/consts/migrations.ts:481`): every role a bucket declares or a user holds
-becomes an administrator-kept group with exactly its holders — names differing only in case merge, blank ones are
-skipped, all reported — and every holder of `super_admin`, active or not, joins Super administrators. The decisions
+`2026-10-08-roles-to-groups` (`lib/consts/migrations.ts:481`): every role a project declares or a user holds
+becomes an administrator-kept group of end users with exactly its holders — names differing only in case
+merge, blank ones are skipped, all reported — and every holder of `super_admin`, active or not, joins Super
+administrators. The decisions
 are pure (`planRoleMigration`, `:383`; `planSuperAdmins`, `:443`) and tested without a datastore; applying it twice
 is checked against a real MongoDB by `database/verify_mongodb.ts`. `MigrationStep.apply` may now return report
 lines, which `database/migrate.ts` prints.
@@ -122,5 +134,5 @@ lines, which `database/migrate.ts` prints.
 ## Related
 
 - [[scim-provisioning]] — the connection, credentials and `/Users` this builds on.
-- [[group-ownership]] — administrator groups, which own containers; Super administrators is one of them.
+- [[team-ownership]] — teams, which own projects; Super administrators is one of them.
 - [[end-user-lifecycle]] — deleting a user also removes their memberships.

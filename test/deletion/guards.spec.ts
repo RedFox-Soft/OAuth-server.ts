@@ -93,14 +93,14 @@ describe('deletion guards: buckets', () => {
 	async function deleteBucket(id: string, query?: Record<string, unknown>) {
 		const cookie = await superAdminCookie();
 		return agent.admin.api
-			.buckets({ id })
+			.projects({ id })
 			.delete(undefined, { headers: { cookie }, ...(query ? { query } : {}) });
 	}
 
 	async function deleteClient(bucketId: string, clientId: string) {
 		const cookie = await superAdminCookie();
 		return agent.admin.api
-			.buckets({ id: bucketId })
+			.projects({ id: bucketId })
 			.clients({ clientId })
 			.delete(undefined, { headers: { cookie } });
 	}
@@ -182,7 +182,7 @@ describe('deletion guards: buckets', () => {
 		/* A deletion schedules (specs/090); Delete now is the destruction. */
 		await deleteBucket(held._id);
 		const res = await agent.admin.api
-			.buckets({ id: held._id })
+			.projects({ id: held._id })
 			.purge.post(undefined, { headers: { cookie: await superAdminCookie() } });
 
 		expect(res.status).toBe(200);

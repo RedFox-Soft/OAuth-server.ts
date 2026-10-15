@@ -21,8 +21,8 @@ export function NotFound({
 			title="Page not found"
 			subTitle="There is nothing at this address in the console."
 			extra={
-				<Link href={backHref ?? '/admin/buckets'}>
-					{backLabel ?? 'Go to Buckets'}
+				<Link href={backHref ?? '/admin/projects'}>
+					{backLabel ?? 'Go to Projects'}
 				</Link>
 			}
 		/>
@@ -42,7 +42,7 @@ export function NoAccess({
 		<Result
 			status="403"
 			title={`You cannot open this ${what}`}
-			subTitle={`It does not exist, or it belongs to a group you are not in.`}
+			subTitle={`It does not exist, or it belongs to a team you are not in.`}
 			extra={<Link href={backHref}>{backLabel}</Link>}
 		/>
 	);
@@ -53,7 +53,7 @@ export function InstanceOnly() {
 		<Result
 			status="403"
 			title="Only an instance administrator can open this page"
-			extra={<Link href="/admin/buckets">Go to Buckets</Link>}
+			extra={<Link href="/admin/projects">Go to Projects</Link>}
 		/>
 	);
 }

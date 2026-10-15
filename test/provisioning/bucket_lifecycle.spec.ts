@@ -24,7 +24,7 @@ describe('a bucket with provisioning connections', () => {
 
 		const preview = await admin(
 			'POST',
-			`/admin/api/buckets/${c.bucket._id}/address`,
+			`/admin/api/projects/${c.bucket._id}/address`,
 			cookie,
 			{ slug: `moved-${Math.random().toString(36).slice(2, 8)}` }
 		);
@@ -37,7 +37,7 @@ describe('a bucket with provisioning connections', () => {
 
 	it('revokes its connections’ tokens when it is destroyed', async () => {
 		const c = await connect(await scimBucket());
-		const path = `/admin/api/buckets/${c.bucket._id}/provisioning-connections/${c.connection._id}`;
+		const path = `/admin/api/projects/${c.bucket._id}/provisioning-connections/${c.connection._id}`;
 		const issued = await admin('POST', `${path}/credentials`, cookie, {
 			kind: 'secret'
 		});
@@ -49,10 +49,10 @@ describe('a bucket with provisioning connections', () => {
 		expect(granted.status).toBe(200);
 
 		/* A deletion schedules the destruction (specs/090); Delete now carries it out. */
-		await admin('DELETE', `/admin/api/buckets/${c.bucket._id}`, cookie);
+		await admin('DELETE', `/admin/api/projects/${c.bucket._id}`, cookie);
 		const destroyed = await admin(
 			'POST',
-			`/admin/api/buckets/${c.bucket._id}/purge`,
+			`/admin/api/projects/${c.bucket._id}/purge`,
 			cookie
 		);
 

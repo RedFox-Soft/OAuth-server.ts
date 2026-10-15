@@ -1,6 +1,6 @@
 import { renderToString } from 'react-dom/server';
 import { StrictMode } from 'react';
-import type { AdminContext } from '../auth/rbac.js';
+import type { AdminMeView } from '../me_view.js';
 import { ConsoleRoot } from './frame/ConsoleRoot.js';
 import { htmlResponse } from '../../html/csp.js';
 import { versionedAsset } from '../../html/versionedAsset.js';
@@ -10,7 +10,7 @@ const template = Bun.file('./lib/admin/ui/htmlTemplate.html');
 /* What the shell writes to `window.PROPS`, and so what adminClient.tsx reads back. */
 export interface AdminShellProps {
 	needsSetup: boolean;
-	me: AdminContext | null;
+	me: AdminMeView | null;
 	/* The address asked for, path and query: the router's first render, on both sides. */
 	path?: string;
 }

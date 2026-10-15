@@ -172,7 +172,7 @@ const contactParts: readonly ScimAttribute[] = [
 export const SCIM_USER_ATTRIBUTES: readonly ScimAttribute[] = [
 	simple(
 		'userName',
-		'The name the directory knows the user by. Unique in the bucket, compared case-insensitively.',
+		'The name the directory knows the user by. Unique in the project, compared case-insensitively.',
 		{ required: true, uniqueness: 'server' }
 	),
 	simple(
@@ -249,7 +249,7 @@ export const SCIM_USER_ATTRIBUTES: readonly ScimAttribute[] = [
 export const SCIM_GROUP_ATTRIBUTES: readonly ScimAttribute[] = [
 	simple(
 		'displayName',
-		'The group’s name, unique in the bucket in any letter case. Relying parties receive it in the groups claim.',
+		'The group’s name, unique in the project in any letter case. Relying parties receive it in the groups claim.',
 		{ required: true, uniqueness: 'server' }
 	),
 	simple(

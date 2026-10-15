@@ -140,7 +140,7 @@ export function SignInTab({
 	consoleBucket?: boolean;
 	onSaved: () => void;
 }) {
-	const base = `/admin/api/buckets/${encodeURIComponent(bucket._id)}`;
+	const base = `/admin/api/projects/${encodeURIComponent(bucket._id)}`;
 	const feedback = useFeedback();
 	const confirm = useConfirm();
 	const baseline = policyOf(bucket);
@@ -302,7 +302,7 @@ export function SignInTab({
 		: consoleBucket
 			? mayTurnPasswordsOff
 				? null
-				: "To turn it off, sign in through one of this bucket's identity providers first. That proves another way in works before this one closes."
+				: "To turn it off, sign in through one of this project's identity providers first. That proves another way in works before this one closes."
 			: providers !== null && enabled.length === 0
 				? 'Enable an identity provider first, otherwise nobody could sign in.'
 				: null;
@@ -374,7 +374,7 @@ export function SignInTab({
 					title={
 						consoleBucket
 							? 'Only super administrators can change how administrators sign in.'
-							: 'Only members of the group that owns this bucket can change how people sign in.'
+							: 'Only members of the team that owns this project can change how people sign in.'
 					}
 				/>
 				<Card>
@@ -553,7 +553,7 @@ export function SignInTab({
 					effect={
 						draft.registrationOpen
 							? consoleBucket
-								? 'Anyone who can reach the console sign-in page can create an administrator account. Each gets a personal group and nothing else.'
+								? 'Anyone who can reach the console sign-in page can create an administrator account. Each gets a personal team and nothing else.'
 								: 'Anyone who can reach the sign-in page can create an account.'
 							: consoleBucket
 								? 'Administrator accounts are created by super administrators, or linked through an identity provider.'

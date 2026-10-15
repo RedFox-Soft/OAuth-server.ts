@@ -23,7 +23,7 @@ describe('who may manage a bucket key', () => {
 
 		const res = await call(
 			'GET',
-			`/admin/api/buckets/${bucket._id}/keys`,
+			`/admin/api/projects/${bucket._id}/keys`,
 			outsider.cookie
 		);
 
@@ -37,7 +37,7 @@ describe('who may manage a bucket key', () => {
 
 		const res = await call(
 			'POST',
-			`/admin/api/buckets/${bucket._id}/keys`,
+			`/admin/api/projects/${bucket._id}/keys`,
 			outsider.cookie,
 			{ alg: 'ES256' }
 		);
@@ -58,7 +58,7 @@ describe('who may manage a bucket key', () => {
 
 		const res = await call(
 			'POST',
-			`/admin/api/buckets/${DEFAULT_BUCKET_ID}/keys`,
+			`/admin/api/projects/${DEFAULT_BUCKET_ID}/keys`,
 			cookie,
 			{ alg: 'ES256' }
 		);
@@ -73,7 +73,7 @@ describe('who may manage a bucket key', () => {
 
 		const res = await call(
 			'POST',
-			`/admin/api/buckets/${bucket._id}/keys`,
+			`/admin/api/projects/${bucket._id}/keys`,
 			cookie,
 			{ alg: 'ES256' }
 		);

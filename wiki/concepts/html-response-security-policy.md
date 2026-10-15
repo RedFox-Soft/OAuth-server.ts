@@ -4,7 +4,7 @@ title: "Rendered pages and their content security policy"
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-04
-updated: 2026-10-13
+updated: 2026-10-15
 graph:
   node_type: concept
   relationships:
@@ -56,7 +56,7 @@ page still renders.
 so "absolute means foreign" would name this server as a foreign target *and* drop `frame-ancestors`
 from a page with a real form on it. The comparison is against `new URL(ISSUER).origin`.
 
-**That origin is not every page's own** (fixed 2026-10-13). A bucket with a hostname of its own serves its pages
+**That origin is not every page's own** (fixed 2026-10-13). A project with a hostname of its own serves its pages
 from that host, so its issuer-built sign-out and device-code form targets compared as foreign. Those pages then
 counted as hand-offs and lost `frame-ancestors`, so they could be framed. They now post to an origin-relative
 path (`ownFormAction`, `lib/html/csp.ts:58`), which is `'self'` to this policy and to the browser wherever

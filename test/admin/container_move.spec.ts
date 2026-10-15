@@ -72,13 +72,13 @@ const BucketPreview = Type.Object({
 	confirmationRequired: Type.Literal(true),
 	from: GroupRef,
 	to: GroupRef,
-	bucket: Named,
+	project: Named,
 	applications: Type.Number(),
 	apis: Type.Number(),
 	consequence: Type.String()
 });
 const BucketMoved = Type.Object({
-	bucket: Type.Object({ id: Type.String(), ownerGroupId: Type.String() })
+	project: Type.Object({ id: Type.String(), ownerTeamId: Type.String() })
 });
 const Listed = Type.Array(Type.Object({ _id: Type.String() }));
 const Applications = Type.Array(Type.Object({ clientId: Type.String() }));
@@ -94,7 +94,7 @@ const moveBucket = (
 	cookie: string,
 	id: string,
 	body: Record<string, unknown>
-) => call('PUT', `/admin/api/buckets/${id}/owner`, cookie, body);
+) => call('PUT', `/admin/api/projects/${id}/owner`, cookie, body);
 
 async function ownerOfBucket(id: string) {
 	return (await getBucketStore().find(id))?.ownerGroupId;
@@ -154,14 +154,14 @@ describe('moving a bucket to another group', () => {
 		const w = await world();
 
 		const { status, body } = await moveBucket(w.aliceCookie, w.bucket._id, {
-			groupId: w.team._id,
+			teamId: w.team._id,
 			confirm: true
 		});
 
 		expect(status).toBe(200);
-		expect(as(BucketMoved, body).bucket).toEqual({
+		expect(as(BucketMoved, body).project).toEqual({
 			id: w.bucket._id,
-			ownerGroupId: w.team._id
+			ownerTeamId: w.team._id
 		});
 		expect(await ownerOfBucket(w.bucket._id)).toBe(w.team._id);
 	});
@@ -171,7 +171,7 @@ describe('moving a bucket to another group', () => {
 		const other = await regularGroup([w.bob], [w.alice]);
 
 		const { status } = await moveBucket(w.aliceCookie, w.bucket._id, {
-			groupId: other._id,
+			teamId: other._id,
 			confirm: true
 		});
 
@@ -182,16 +182,16 @@ describe('moving a bucket to another group', () => {
 	it('lists the moved bucket to the destination’s members', async () => {
 		const w = await world();
 		await moveBucket(w.aliceCookie, w.bucket._id, {
-			groupId: w.team._id,
+			teamId: w.team._id,
 			confirm: true
 		});
 		await call('PUT', '/admin/api/scope', w.bobCookie, {
-			groupId: w.team._id
+			teamId: w.team._id
 		});
 
 		const buckets = as(
 			Listed,
-			(await call('GET', '/admin/api/buckets', w.bobCookie)).body
+			(await call('GET', '/admin/api/projects', w.bobCookie)).body
 		);
 
 		expect(buckets.map((b) => b._id)).toContain(w.bucket._id);
@@ -200,13 +200,13 @@ describe('moving a bucket to another group', () => {
 	it('gives the destination’s members every application of the moved bucket', async () => {
 		const w = await world();
 		await moveBucket(w.aliceCookie, w.bucket._id, {
-			groupId: w.team._id,
+			teamId: w.team._id,
 			confirm: true
 		});
 
 		const { status, body } = await call(
 			'GET',
-			`/admin/api/buckets/${w.bucket._id}/clients`,
+			`/admin/api/projects/${w.bucket._id}/clients`,
 			w.bobCookie
 		);
 
@@ -221,13 +221,13 @@ describe('moving a bucket to another group', () => {
 	it('gives the destination’s members every API of the moved bucket', async () => {
 		const w = await world();
 		await moveBucket(w.aliceCookie, w.bucket._id, {
-			groupId: w.team._id,
+			teamId: w.team._id,
 			confirm: true
 		});
 
 		const { status, body } = await call(
 			'GET',
-			`/admin/api/buckets/${w.bucket._id}/resources`,
+			`/admin/api/projects/${w.bucket._id}/resources`,
 			w.bobCookie
 		);
 
@@ -239,7 +239,7 @@ describe('moving a bucket to another group', () => {
 		const w = await world();
 		const team2 = await regularGroup([w.carol]);
 		await moveBucket(w.aliceCookie, w.bucket._id, {
-			groupId: w.team._id,
+			teamId: w.team._id,
 			confirm: true
 		});
 		// Carol now shares Alice's former source group only: a team Alice moved nothing into.
@@ -252,12 +252,12 @@ describe('moving a bucket to another group', () => {
 
 		const moved = await call(
 			'GET',
-			`/admin/api/buckets/${w.bucket._id}`,
+			`/admin/api/projects/${w.bucket._id}`,
 			w.carolCookie
 		);
 		const missing = await call(
 			'GET',
-			'/admin/api/buckets/no-such-bucket',
+			'/admin/api/projects/no-such-bucket',
 			w.carolCookie
 		);
 
@@ -276,7 +276,7 @@ describe('moving a bucket to another group', () => {
 		const { bucket, clientIds } = await bucketWithClients(source._id, 1);
 		await apiIn(bucket);
 		await moveBucket(await cookieFor(owner), bucket._id, {
-			groupId: target._id,
+			teamId: target._id,
 			confirm: true
 		});
 		return {
@@ -291,12 +291,12 @@ describe('moving a bucket to another group', () => {
 
 		const moved = await call(
 			'GET',
-			`/admin/api/buckets/${bucket._id}/clients/${clientId}`,
+			`/admin/api/projects/${bucket._id}/clients/${clientId}`,
 			cookie
 		);
 		const missing = await call(
 			'GET',
-			`/admin/api/buckets/no-such-bucket/clients/${clientId}`,
+			`/admin/api/projects/no-such-bucket/clients/${clientId}`,
 			cookie
 		);
 
@@ -312,12 +312,12 @@ describe('moving a bucket to another group', () => {
 
 		const moved = await call(
 			'GET',
-			`/admin/api/buckets/${bucket._id}/resources`,
+			`/admin/api/projects/${bucket._id}/resources`,
 			cookie
 		);
 		const missing = await call(
 			'GET',
-			'/admin/api/buckets/no-such-bucket/resources',
+			'/admin/api/projects/no-such-bucket/resources',
 			cookie
 		);
 
@@ -334,7 +334,7 @@ describe('moving a bucket to another group', () => {
 		const bobs = await ensurePersonalGroup(w.bob._id, w.bob.email);
 
 		const { status } = await moveBucket(w.bobCookie, bucket._id, {
-			groupId: bobs._id,
+			teamId: bobs._id,
 			confirm: true
 		});
 
@@ -347,11 +347,11 @@ describe('moving a bucket to another group', () => {
 		const strangers = await regularGroup([w.carol]);
 
 		const foreign = await moveBucket(w.aliceCookie, w.bucket._id, {
-			groupId: strangers._id,
+			teamId: strangers._id,
 			confirm: true
 		});
 		const unknown = await moveBucket(w.aliceCookie, w.bucket._id, {
-			groupId: 'no-such-group',
+			teamId: 'no-such-group',
 			confirm: true
 		});
 
@@ -369,7 +369,7 @@ describe('moving a bucket to another group', () => {
 			await cookieFor(owner),
 			ADMIN_BUCKET_ID,
 			{
-				groupId: UNASSIGNED_GROUP_ID,
+				teamId: UNASSIGNED_GROUP_ID,
 				confirm: true
 			}
 		);
@@ -384,7 +384,7 @@ describe('moving a bucket to another group', () => {
 		const { status } = await moveBucket(
 			await cookieFor(superAdmin),
 			DEFAULT_BUCKET_ID,
-			{ groupId: team._id, confirm: true }
+			{ teamId: team._id, confirm: true }
 		);
 
 		expect(status).toBe(403);
@@ -395,7 +395,7 @@ describe('moving a bucket to another group', () => {
 		const w = await world();
 
 		const { status, body } = await moveBucket(w.aliceCookie, w.bucket._id, {
-			groupId: w.team._id
+			teamId: w.team._id
 		});
 
 		expect(status).toBe(409);
@@ -406,7 +406,7 @@ describe('moving a bucket to another group', () => {
 			name: w.personal.name
 		});
 		expect(preview.to.id).toBe(w.team._id);
-		expect(preview.bucket).toEqual({ id: w.bucket._id, name: w.bucket.name });
+		expect(preview.project).toEqual({ id: w.bucket._id, name: w.bucket.name });
 		expect(preview.applications).toBe(w.clientIds.length);
 		expect(preview.apis).toBe(1);
 		expect(await ownerOfBucket(w.bucket._id)).toBe(w.personal._id);
@@ -416,7 +416,7 @@ describe('moving a bucket to another group', () => {
 		const w = await world();
 
 		const { status } = await moveBucket(w.aliceCookie, w.bucket._id, {
-			groupId: w.personal._id,
+			teamId: w.personal._id,
 			confirm: true
 		});
 
@@ -434,7 +434,7 @@ describe('moving a bucket to another group', () => {
 				await cookieFor(superAdmin),
 				bucket._id,
 				{
-					groupId: team._id,
+					teamId: team._id,
 					confirm: true
 				}
 			);
@@ -442,14 +442,14 @@ describe('moving a bucket to another group', () => {
 			expect(status).toBe(200);
 			const listed = as(
 				Listed,
-				(await call('GET', '/admin/api/buckets', await cookieFor(member))).body
+				(await call('GET', '/admin/api/projects', await cookieFor(member))).body
 			);
 			// A plain member's console is scoped to their personal group; switching shows the team's.
 			expect(listed.map((b) => b._id)).not.toContain(bucket._id);
 			const cookie = await cookieFor(member);
-			await call('PUT', '/admin/api/scope', cookie, { groupId: team._id });
+			await call('PUT', '/admin/api/scope', cookie, { teamId: team._id });
 			expect(
-				as(Listed, (await call('GET', '/admin/api/buckets', cookie)).body).map(
+				as(Listed, (await call('GET', '/admin/api/projects', cookie)).body).map(
 					(b) => b._id
 				)
 			).toContain(bucket._id);
@@ -462,7 +462,7 @@ describe('moving a bucket to another group', () => {
 			const { status } = await moveBucket(
 				await cookieFor(superAdmin),
 				w.bucket._id,
-				{ groupId: w.team._id, confirm: true }
+				{ teamId: w.team._id, confirm: true }
 			);
 
 			expect(status).toBe(200);
@@ -477,12 +477,12 @@ describe('moving a bucket to another group', () => {
 			const { status, body } = await moveBucket(
 				await cookieFor(superAdmin),
 				w.bucket._id,
-				{ groupId: bobs._id, confirm: true }
+				{ teamId: bobs._id, confirm: true }
 			);
 
 			expect(status).toBe(403);
 			expect(as(Refusal, body).message).toBe(
-				'a personal group belongs to its administrator'
+				'a personal team belongs to its administrator'
 			);
 		});
 
@@ -492,11 +492,11 @@ describe('moving a bucket to another group', () => {
 			const w = await world();
 
 			const reserved = await moveBucket(cookie, w.bucket._id, {
-				groupId: SUPER_ADMINS_GROUP_ID,
+				teamId: SUPER_ADMINS_GROUP_ID,
 				confirm: true
 			});
 			const unknown = await moveBucket(cookie, w.bucket._id, {
-				groupId: 'no-such-group',
+				teamId: 'no-such-group',
 				confirm: true
 			});
 

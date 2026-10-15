@@ -4,7 +4,7 @@ title: 'Sign-in brute-force throttle'
 tags: [architecture, contract, gotcha, config]
 sources: [oauth-server-codebase]
 created: 2026-08-28
-updated: 2026-09-29
+updated: 2026-10-15
 graph:
   node_type: concept
   relationships:
@@ -18,7 +18,8 @@ graph:
 
 # Sign-in brute-force throttle
 
-`POST /ui/:uid/login` counts failed password attempts per `${bucketId}:${email}` and shuts that
+`POST /ui/:uid/login` counts failed password attempts per `${bucketId}:${email}` (a project is stored as a
+bucket, so its id is `bucketId`) and shuts that
 address's door for a window that grows each time it is exhausted. Five things about it cannot be
 re-derived from reading the code, and they are why this page exists.
 
@@ -73,23 +74,23 @@ away.
 `TotpAttempt` is right to do the opposite: it has no escalation to remember, so a record that dies
 with its window is exactly what makes *its* lockout non-permanent.
 
-## The ceiling reads the bucket's second factor, never the bucket's id
+## The ceiling reads the project's second factor, never the project's id
 
-`windowFor` stops doubling at a ceiling that is the *first* window when the bucket sets
-`totpRequired`, and the configured ceiling otherwise. The rule exists for the reserved admin bucket —
-its operators sign in through this same door, and `lib/password_reset/challenge.ts` refuses that
-bucket, so they have no self-service escape from a long lockout — but it is **not** written as
+`windowFor` stops doubling at a ceiling that is the *first* window when the project sets
+`totpRequired`, and the configured ceiling otherwise. The rule exists for the reserved administrators'
+project — its operators sign in through this same door, and `lib/password_reset/challenge.ts` refuses that
+project, so they have no self-service escape from a long lockout — but it is **not** written as
 `bucketId === ADMIN_BUCKET_ID`.
 
 Stating it as the policy rather than the identity buys two things. It says the actual reason (a
 guessed password is not a sign-in where a second factor is required, so deep escalation buys little
-and risks the one lockout nobody can undo), and it self-corrects: turn a bucket's second factor off
+and risks the one lockout nobody can undo), and it self-corrects: turn a project's second factor off
 and its escalation deepens automatically, with nothing to remember. It also satisfies Principle II,
 which forbids deployment-shaped branches in business logic.
 
-The coupling to know: `totpRequired` **defaults to false** and is absent from both admin-bucket seeds
-(`lib/admin/seed.ts`, `database/mongodb.ts`). Issue #26 shipped the capability opt-in, so on a
-deployment that never enabled it the console escalates like any other bucket. That is the correct
+The coupling to know: `totpRequired` **defaults to false** and is absent from both seeds of the
+administrators' project (`lib/admin/seed.ts`, `database/mongodb.ts`). Issue #26 shipped the capability opt-in, so on a
+deployment that never enabled it the console escalates like any other project. That is the correct
 fallback, and it is also the argument for changing that default.
 
 ## The escape hatch is the reset flow, and the distinction is request vs complete
@@ -100,7 +101,7 @@ code from your email to keep trying" step, is wrong four times over: the prompt 
 an address that has an account, so showing it selectively rebuilds the oracle; it is an email-bombing
 vector, so it needs its own cap and therefore only relocates the lockout; it makes the mailer a hard
 dependency of sign-in, on a server where mail is best-effort everywhere else; and it cannot serve the
-admin bucket at all.
+administrators' project at all.
 
 So `consume()` in `lib/password_reset/challenge.ts` calls `clearFailures` — a **completed** reset
 clears the counter, a *requested* one does not. Requesting proves nothing and would hand anyone who
@@ -134,7 +135,7 @@ there and is tracked separately.
   rather than by four copies of the same wording staying in step.
 - **No error is thrown.** The refusal renders a page, so unlike [[per-origin-rate-limiting]] this
   needs no handler branch, no `allow_redirect` decision, and no exclusion from the `server_error`
-  channel. It emits `login_throttled` with the bucket and nothing else.
+  channel. It emits `login_throttled` with the project's id (`bucketId`) and nothing else.
 - **Nothing fails open.** No storage error is caught: the throttle read sits one line ahead of the
   account lookup, which reaches the same datastore, so propagating reveals nothing new and lets the
   error store record a real fault.

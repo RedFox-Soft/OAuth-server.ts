@@ -4,7 +4,7 @@ title: 'Try sign-in: the real decision ladder, stopped before it writes'
 tags: [architecture, contract, gotcha, oidc]
 sources: [oauth-server-codebase]
 created: 2026-10-12
-updated: 2026-10-12
+updated: 2026-10-15
 graph:
   node_type: concept
   relationships:
@@ -19,11 +19,11 @@ graph:
 # Try sign-in
 
 Since spec 088 a provider's page in the console has **Try sign-in**. Saving a provider proves its issuer and
-its keys. It does not prove that this bucket's callback is registered at the provider, and it does not show what
+its keys. It does not prove that this project's callback is registered at the provider, and it does not show what
 the decision rules would do with a real person: link, create, or refuse for the domain. Until spec 088 the
 first person to find out was a customer at the sign-in page.
 
-A try sends a new browser tab to the provider's sign-in with the bucket's **real** callback address. Proving
+A try sends a new browser tab to the provider's sign-in with the project's **real** callback address. Proving
 that address is registered upstream is the point. The administrator signs in there with any account they
 control. The console tab then shows:
 
@@ -50,7 +50,7 @@ A copy of the ladder for the try would drift from the real one; the split cannot
 Two refusals exist only after a write, so they are not decisions: `link_not_permitted` when the link write finds
 nothing to update, and `inactive` after linking or creating. Those checks guard races, and a try reports the
 decision that preceded them. Running the real ladder against a throw-away store was rejected: the user store is
-module state per bucket, and a fake would have to mirror every read.
+module state per project, and a fake would have to mirror every read.
 
 ## Nothing is written
 
@@ -76,7 +76,7 @@ button disabled with the reason.
 
 The try record holds the SHA-256 of the console session cookie that started it (`sessionDigestOf`,
 `state.ts:176`). `readTry` (`:158`) compares it in constant time. Another session, even the same
-administrator's, another bucket or provider, an unknown try and an expired one all get the same 404
+administrator's, another project or provider, an unknown try and an expired one all get the same 404
 (`GET …/federation/:providerId/try/:tryRef`, `lib/admin/federation/routes.ts:240`). The record lives ten
 minutes. A start without a console session, such as an agent's bearer token, is refused 403 (`:182`): nobody
 could read its result.
@@ -89,7 +89,7 @@ could read its result.
 `SameSite=Strict` with `path: /admin` (`lib/admin/auth/session.ts:37`). RFC 6265bis §5.6.7.1: a Strict cookie is
 not sent on a navigation started from a cross-site document, and a redirect does not change that. A 303 from the
 callback into `/admin` would therefore land on the console's login. The cookie's path excludes the callback
-anyway, and a host-addressed bucket's callback is another origin. So:
+anyway, and a host-addressed project's callback is another origin. So:
 
 - the callback answers a plain self-contained page, "Try finished" (`tryFinishedPage`,
   `lib/federation/pages.tsx:129`), in the plain family of [[interaction-page-families]];
@@ -105,7 +105,7 @@ what to check and shows the callback with Copy.
 ## Audit and agents
 
 - Starting a try is audited, `federation.provider.try`, before anything happens. It changes no managed entity,
-  but it sends a browser to an upstream with the bucket's client credentials. The result is not recorded.
+  but it sends a browser to an upstream with the project's client credentials. The result is not recorded.
 - The start and the result are excluded from MCP as **inapplicable** (`lib/mcp/catalogue.ts:1949`): a try needs a
   person signing in at the provider in a browser, and its result belongs to the console session that started it.
   The guessed name `federation_provider_try` answers with that reason ([[admin-mcp-control-plane]]).

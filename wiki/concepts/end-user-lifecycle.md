@@ -4,7 +4,7 @@ title: 'End-user lifecycle: ending access, the local lock, provisioned users'
 tags: [architecture, contract, gotcha, oidc]
 sources: [oauth-server-codebase]
 created: 2026-10-06
-updated: 2026-10-12
+updated: 2026-10-15
 graph:
   node_type: concept
   relationships:
@@ -30,7 +30,7 @@ told. An administrator responding to a compromised account had no way to end acc
 Now deactivation, the local lock and deletion all run `revokeAccountAccess`
 (`lib/end_users/revoke_access.ts:51`) — and, since spec 072, so does **"sign out everywhere"**
 (`revokeEndUserAccess`, `lib/end_users/service.ts:318`), which ends access without writing any flag, for an
-administrator and for a bucket's upstream provider through [[global-token-revocation]] — in this order:
+administrator and for a project's upstream provider through [[global-token-revocation]] — in this order:
 
 1. The caller has already written the flag, so account resolution refuses the user from that moment.
 2. **Back-channel logout for every session** (`notifyRelyingParties`, `revoke_access.ts:17`). Sessions are
@@ -83,8 +83,8 @@ separate field that only the admin routes (and MCP through them) set or clear
 
 This is a **deliberate departure from IPSIE AL2**, which forbids local changes to identity-service-managed
 users. It touches sign-in only, never the profile, and exists because an incident response must not wait
-on an external system. `bucket_user_unlock` is `high` in the MCP catalogue — it re-admits an account an
-administrator judged compromised — while `bucket_user_lock` is `ordinary`, like deactivation.
+on an external system. `project_user_unlock` is `high` in the MCP catalogue — it re-admits an account an
+administrator judged compromised — while `project_user_lock` is `ordinary`, like deactivation.
 
 ## Provisioned users are read-only here
 
@@ -95,14 +95,14 @@ a local one, answers 404 to it. Clearing an authenticator stays allowed — it i
 profile edit.
 
 **Why `provisionedBy` and not `managedBy`.** `managedBy` is the name of a retired ownership field (the
-manager list that group ownership replaced). A new field with the old name would have read as that field
+manager list that team ownership replaced). A new field with the old name would have read as that field
 come back. (Until 2026-10-06 a guard, `test/admin/retired_migration.spec.ts`, failed on the identifier
 anywhere in code; it was removed under Principle V — it tested that removed code stayed removed, which no
 audience depends on.)
 
 ## Uniqueness rides on derived scalar keys
 
-`userName` is unique per bucket **case-insensitively**; `externalId` is unique **per connection**
+`userName` is unique per project **case-insensitively**; `externalId` is unique **per connection**
 (RFC 7643 §3.1 scopes it to the provisioning domain). Both are stored exactly as sent, and beside them
 the store keeps a derived key (`lib/adapters/end_user_keys.ts`) that the unique indexes hold
 (`lib/consts/storage_inventory.ts:287-288`):
@@ -122,9 +122,9 @@ proves the indexes against real MongoDB and PostgreSQL, including the race for o
 ## An address change, and what a verification message proves (spec 082)
 
 An administrator changes a local person's login address through its own route,
-`POST /admin/api/buckets/:id/users/:uid/email` (`lib/admin/users-end/routes.ts:363`), rather than through the
-PATCH beside it: it is `high` for agents (`bucket_user_email_change`), because the address is where password
-reset and verification mail go. The service refuses an address another account in the bucket holds **before**
+`POST /admin/api/projects/:id/users/:uid/email` (`lib/admin/users-end/routes.ts:442`), rather than through the
+PATCH beside it: it is `high` for agents (`project_user_email_change`), because the address is where password
+reset and verification mail go. The service refuses an address another account in the project holds **before**
 the audit write, with `field: 'email'` (`lib/end_users/service.ts:198`) — the store's unique index still decides
 a race, but the ordinary taken address is a refusal, not an audited change, and SCIM's address changes get the
 same pre-check. A changed address is unverified whoever typed it, as it already was for SCIM. The entry names
@@ -178,4 +178,4 @@ the stored object replaces the default whole (the same trap [[amr-reporting]] re
   update, which left a half-made account behind whenever that update collided).
 
 How the console presents these acts — the paged list, the person's page, one request per save — is
-[[bucket-users-workspace]].
+[[project-users-workspace]].

@@ -40,7 +40,7 @@ function assertNotReserved(id: string): void {
 	if (id === ADMIN_BUCKET_ID) {
 		throw new AdminError(
 			403,
-			"this operation is not available for the administrators' bucket"
+			"this operation is not available for the administrators' project"
 		);
 	}
 }
@@ -53,9 +53,9 @@ export async function loadBucketForUsers(
 	assertNotReserved(id);
 	const bucket = await getBucketStore().find(id);
 	if (!bucket)
-		throw new AdminError(notFoundStatus(admin), 'no access to this bucket');
+		throw new AdminError(notFoundStatus(admin), 'no access to this project');
 	if (!holds(admin, bucket, 'manageUsers')) {
-		throw new AdminError(403, 'no access to this bucket');
+		throw new AdminError(403, 'no access to this project');
 	}
 	return bucket;
 }
@@ -74,13 +74,13 @@ export async function loadBucketForSettings(
 	mode: 'read' | 'edit'
 ): Promise<UserBucket> {
 	if (id === ADMIN_BUCKET_ID && !admin.superAdmin) {
-		throw new AdminError(notFoundStatus(admin), 'no access to this bucket');
+		throw new AdminError(notFoundStatus(admin), 'no access to this project');
 	}
 	const bucket = await getBucketStore().find(id);
 	if (!bucket)
-		throw new AdminError(notFoundStatus(admin), 'no access to this bucket');
+		throw new AdminError(notFoundStatus(admin), 'no access to this project');
 	if (!holds(admin, bucket, mode === 'read' ? 'read' : 'editSettings')) {
-		throw new AdminError(403, 'no access to this bucket');
+		throw new AdminError(403, 'no access to this project');
 	}
 	return bucket;
 }
@@ -107,9 +107,9 @@ export async function loadBucketForEdit(
 	assertNotReserved(id);
 	const bucket = await getBucketStore().find(id);
 	if (!bucket)
-		throw new AdminError(notFoundStatus(admin), 'no access to this bucket');
+		throw new AdminError(notFoundStatus(admin), 'no access to this project');
 	if (!holds(admin, bucket, 'edit')) {
-		throw new AdminError(403, 'no access to this bucket');
+		throw new AdminError(403, 'no access to this project');
 	}
 	return bucket;
 }

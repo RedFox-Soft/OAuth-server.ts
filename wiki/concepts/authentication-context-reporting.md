@@ -4,7 +4,7 @@ title: "Reporting the authentication context a sign-in satisfied"
 tags: [oidc, contract, gotcha, config]
 sources: [oauth-server-codebase]
 created: 2026-09-13
-updated: 2026-10-01
+updated: 2026-10-15
 graph:
   node_type: concept
   relationships:
@@ -140,9 +140,9 @@ a claims-parameter finding: see [[feature-flag-gating]] for the general shape.
   Registration §2 requires. The individual claim request is now authoritative. §5.5.1.1 leaves a
   client sending both forms explicitly *unspecified*, so what is owed there is determinism, not a
   particular winner.
-- **A second factor is demanded by the bucket, not by the person.** `totpRequired` is a
-  `UserBucket` flag; `user.totp` is consulted only inside that branch, to choose the verify page over
-  the enrolment page. So an end user with an authenticator enrolled, in a bucket that does not require
+- **A second factor is demanded by the project, not by the person.** `totpRequired` is a
+  project (`UserBucket`) flag; `user.totp` is consulted only inside that branch, to choose the verify page over
+  the enrolment page. So an end user with an authenticator enrolled, in a project that does not require
   one, signs in with a password and reports the single-factor context — and a relying party requiring
   multi-factor is refused for them. The setting's own description says so, because it arrives as a
   support question whose remedy is a different setting.

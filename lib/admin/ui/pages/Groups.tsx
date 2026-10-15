@@ -15,13 +15,13 @@ interface GroupMember {
 	role: 'owner' | 'member';
 }
 
-/* A row of `GET /admin/api/groups`; `owns` counts what membership reaches (specs/085). */
+/* A row of `GET /admin/api/teams`; `owns` counts what membership reaches (specs/085). */
 interface Group {
 	_id: string;
 	name: string;
 	kind: 'personal' | 'regular' | 'system';
 	members: GroupMember[];
-	owns?: { buckets: number };
+	owns?: { projects: number };
 }
 
 function plural(n: number, one: string, many: string): string {
@@ -29,19 +29,19 @@ function plural(n: number, one: string, many: string): string {
 }
 
 /*
- * The administrator groups the operator can open. Each opens its own page (specs/085), where members,
- * invitations and deletion live; this list only finds a group and creates one.
+ * The teams the operator can open. Each opens its own page (specs/085), where members,
+ * invitations and deletion live; this list only finds a team and creates one.
  */
 export function Groups({ currentUserId }: { currentUserId: string | null }) {
 	const feedback = useFeedback();
 	const navigate = useNavigate();
 	const { query } = useRoute();
 	const { me } = useMe();
-	const mayCreate = meCan(me).createGroup;
+	const mayCreate = meCan(me).createTeam;
 	const [groups, setGroups] = useState<Group[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [failed, setFailed] = useState<string | null>(null);
-	// A personal group's page offers "New group", which lands here with the dialog open.
+	// A personal team's page offers "New team", which lands here with the dialog open.
 	const [open, setOpen] = useState(query.get('new') === '1');
 	const [form] = Form.useForm<{ name: string }>();
 
@@ -49,7 +49,7 @@ export function Groups({ currentUserId }: { currentUserId: string | null }) {
 	// `loading` first; `load` is the reload, which does.
 	const fetchGroups = useCallback(async () => {
 		try {
-			const result = await request<Group[]>('GET', '/admin/api/groups');
+			const result = await request<Group[]>('GET', '/admin/api/teams');
 			if (!result.ok) {
 				setFailed(result.error.message);
 				return;
@@ -70,12 +70,12 @@ export function Groups({ currentUserId }: { currentUserId: string | null }) {
 	}, [fetchGroups]);
 
 	async function onCreate(values: { name: string }) {
-		const result = await request<Group>('POST', '/admin/api/groups', values);
+		const result = await request<Group>('POST', '/admin/api/teams', values);
 		if (!result.ok) {
 			feedback.failed(result, form);
 			return;
 		}
-		feedback.done(`Group ${values.name} created.`);
+		feedback.done(`Team ${values.name} created.`);
 		setOpen(false);
 		form.resetFields();
 		void navigate(groupHref(result.data._id));
@@ -86,7 +86,7 @@ export function Groups({ currentUserId }: { currentUserId: string | null }) {
 	 * indistinguishable row per administrator on the instance. The operator's own is listed, said to be
 	 * theirs alone, so it is not mistaken for a place to share things.
 	 *
-	 * Filtered here rather than in `GET /admin/api/groups`, which is also the MCP `group_list` tool and the
+	 * Filtered here rather than in `GET /admin/api/teams`, which is also the MCP `team_list` tool and the
 	 * answer to "which groups does this account belong to".
 	 */
 	const visible = groups.filter(
@@ -102,14 +102,14 @@ export function Groups({ currentUserId }: { currentUserId: string | null }) {
 			icon={<PlusOutlined />}
 			onClick={() => setOpen(true)}
 		>
-			New group
+			New team
 		</Button>
 	);
 
 	return (
 		<>
 			<PageHeader
-				title="Groups"
+				title="Teams"
 				actions={mayCreate ? newGroup : undefined}
 			/>
 			{failed !== null ? (
@@ -125,7 +125,7 @@ export function Groups({ currentUserId }: { currentUserId: string | null }) {
 					locale={{
 						emptyText: (
 							<EmptyState
-								purpose="No groups yet. Create one to share user buckets with colleagues."
+								purpose="No teams yet. Create one to share projects with colleagues."
 								create={mayCreate ? newGroup : undefined}
 							/>
 						)
@@ -155,14 +155,14 @@ export function Groups({ currentUserId }: { currentUserId: string | null }) {
 							title: 'Owns',
 							key: 'owns',
 							render: (_: unknown, g: Group) =>
-								g.owns ? plural(g.owns.buckets, 'bucket', 'buckets') : '—'
+								g.owns ? plural(g.owns.projects, 'project', 'projects') : '—'
 						}
 					]}
 				/>
 			)}
 			<Modal
 				open={open}
-				title="New group"
+				title="New team"
 				onCancel={() => setOpen(false)}
 				onOk={() => form.submit()}
 			>
@@ -176,7 +176,7 @@ export function Groups({ currentUserId }: { currentUserId: string | null }) {
 						label="Name"
 						name="name"
 						rules={[{ required: true }]}
-						extra="Usually a company or team name. You become its first owner."
+						extra="Usually a company or department name. You become its first owner."
 					>
 						<Input />
 					</Form.Item>

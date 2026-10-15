@@ -111,7 +111,7 @@ describe('the audit trail of SCIM changes', () => {
 		});
 		await admin(
 			'PATCH',
-			`/admin/api/buckets/${c.bucket._id}/provisioning-connections/${c.connection._id}`,
+			`/admin/api/projects/${c.bucket._id}/provisioning-connections/${c.connection._id}`,
 			cookie,
 			{ displayName: 'Renamed by a person' }
 		);

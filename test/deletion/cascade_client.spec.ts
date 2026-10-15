@@ -85,7 +85,7 @@ describe('deletion cascade: client', () => {
 	async function deleteClient(clientId: string) {
 		const cookie = await superAdminCookie();
 		return agent.admin.api
-			.buckets({ id: DEFAULT_BUCKET_ID })
+			.projects({ id: DEFAULT_BUCKET_ID })
 			.clients({ clientId })
 			.delete(undefined, { headers: { cookie } });
 	}

@@ -143,7 +143,7 @@ describe('admin sign-in: ID token verification', () => {
 		expect(me.status).toBe(200);
 		expect(me.data).toMatchObject({
 			superAdmin: true,
-			bucketId: ADMIN_BUCKET_ID,
+			projectId: ADMIN_BUCKET_ID,
 			email: 'verify@x.io'
 		});
 	});

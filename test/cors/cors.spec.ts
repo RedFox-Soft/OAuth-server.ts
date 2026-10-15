@@ -727,7 +727,7 @@ describe('CORS', () => {
 		it.each([
 			'/auth',
 			'/ui/x/login',
-			'/admin/api/buckets',
+			'/admin/api/projects',
 			'/token/introspect'
 		])('falls through to 404 on the none-class route %s', async (path) => {
 			const res = await preflight(path, 'POST');

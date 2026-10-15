@@ -39,7 +39,7 @@ const PageProps = Type.Object({
  * the tab reads it — the bucket, its provider list and its summary — and assembled by the tab's own function.
  */
 async function previewFor(bucketId: string, cookie: string) {
-	const base = `/admin/api/buckets/${encodeURIComponent(bucketId)}`;
+	const base = `/admin/api/projects/${encodeURIComponent(bucketId)}`;
 	const [bucket, providers, summary] = await Promise.all([
 		admin('GET', base, cookie),
 		admin('GET', `${base}/federation`, cookie),

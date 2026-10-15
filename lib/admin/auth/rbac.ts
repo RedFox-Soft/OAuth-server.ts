@@ -67,11 +67,11 @@ export interface AdminContext {
  * omission — a bucket's applications are objects the operator administers, while a bucket may hold
  * thousands of accounts whose identities are not the caller's business.
  *
- * `client` and `resource` are what keep a bucket from being deleted (specs/099); `bucket` is what keeps a
+ * `client` and `resource` are what keep a bucket from being deleted (specs/099); `project` is what keeps a
  * group from being deleted: the containers it still owns, counted.
  */
 export interface DeletionBlocker {
-	readonly kind: 'client' | 'resource' | 'enduser' | 'bucket';
+	readonly kind: 'client' | 'resource' | 'enduser' | 'project';
 	readonly count: number;
 	readonly ids?: readonly string[];
 }
@@ -167,7 +167,7 @@ export function assertSuperAdmin(admin: AdminContext): void {
 export function assertGroupMember(admin: AdminContext, groupId: string): void {
 	if (admin.superAdmin) return;
 	if (!admin.memberships.some((m) => m.groupId === groupId)) {
-		throw new AdminError(403, 'no access to this group');
+		throw new AdminError(403, 'no access to this team');
 	}
 }
 
@@ -180,7 +180,7 @@ export function assertGroupOwner(admin: AdminContext, groupId: string): void {
 	if (admin.superAdmin) return;
 	const membership = admin.memberships.find((m) => m.groupId === groupId);
 	if (!membership || membership.role !== 'owner') {
-		throw new AdminError(403, 'group owner required');
+		throw new AdminError(403, 'team owner required');
 	}
 }
 
@@ -202,7 +202,7 @@ export function assertActiveGroup(admin: AdminContext): string {
 	if (admin.superAdmin) return UNASSIGNED_GROUP_ID;
 	throw new AdminError(
 		500,
-		'no active group: this administrator has no personal group'
+		'no active team: this administrator has no personal team'
 	);
 }
 
@@ -215,7 +215,7 @@ export function assertBucketAccess(
 	bucket: UserBucket
 ): void {
 	if (!holdsBucket(admin, bucket)) {
-		throw new AdminError(403, 'no access to this bucket');
+		throw new AdminError(403, 'no access to this project');
 	}
 }
 

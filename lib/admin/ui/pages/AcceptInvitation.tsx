@@ -51,12 +51,12 @@ export function AcceptInvitation() {
 					<Result
 						status="warning"
 						title="This invitation link is incomplete"
-						subTitle="Open the link from the invitation email again, or ask the group owner to send a new one."
+						subTitle="Open the link from the invitation email again, or ask the team owner to send a new one."
 					/>
 				) : accepted ? (
 					<Result
 						status="success"
-						title="You have joined the group"
+						title="You have joined the team"
 						extra={
 							<Button
 								type="primary"
@@ -71,7 +71,7 @@ export function AcceptInvitation() {
 						<Typography.Title level={3}>Accept the invitation</Typography.Title>
 						<Typography.Paragraph type="secondary">
 							If you already administer this server, leave the password empty:
-							you join the group with the account you have. Otherwise choose a
+							you join the team with the account you have. Otherwise choose a
 							password for your new administrator account.
 						</Typography.Paragraph>
 						{error && (

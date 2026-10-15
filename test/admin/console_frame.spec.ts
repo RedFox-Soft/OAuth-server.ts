@@ -78,7 +78,7 @@ describe('console frame', () => {
 
 	/*
 	 * The console's own bucket moved to the Administrators page (specs/083). A bookmark or a link pasted in a
-	 * ticket still names it as a bucket, and must land on the tab that means the same thing.
+	 * ticket still names it as a bucket or a project, and must land on the tab that means the same thing.
 	 */
 	it("an address of the console's bucket leads to the matching Administrators tab", () => {
 		const lands = (path: string) => {
@@ -96,8 +96,12 @@ describe('console frame', () => {
 			'/admin/administrators/activity'
 		);
 		expect(lands('/admin/buckets/admin/users')).toBe('/admin/administrators');
-		// Any other bucket keeps its own addresses.
-		expect(lands('/admin/buckets/acme/sign-in')).toBe('page');
+		// Named as a project, as the console's addresses do since specs/100, it lands on the same tab.
+		expect(lands('/admin/projects/admin')).toBe(
+			'/admin/administrators/sign-in'
+		);
+		// Any other project keeps its own addresses.
+		expect(lands('/admin/projects/acme/sign-in')).toBe('page');
 	});
 
 	/*

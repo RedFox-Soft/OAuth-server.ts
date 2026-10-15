@@ -38,7 +38,7 @@ async function declarer() {
 	return {
 		headers: { cookie: `${ADMIN_SESSION_COOKIE}=${session._id}` },
 		userId: user._id,
-		resources: api.admin.api.buckets({ id: bucket._id }).resources
+		resources: api.admin.api.projects({ id: bucket._id }).resources
 	};
 }
 

@@ -4,7 +4,7 @@ title: 'Upstream back-channel logout: a provider''s sign-out ends the sessions i
 tags: [architecture, contract, gotcha, oauth]
 sources: [oauth-server-codebase]
 created: 2026-10-07
-updated: 2026-10-12
+updated: 2026-10-15
 graph:
   node_type: concept
   relationships:
@@ -19,11 +19,11 @@ graph:
 # Upstream back-channel logout: a provider's sign-out ends the sessions it began here
 
 Spec 073 — item 4b of the SCIM series (issue #62). This server is the relying party of every upstream
-provider a bucket federates to, and OpenID Connect Back-Channel Logout 1.0 is how a provider tells its
+provider a project federates to, and OpenID Connect Back-Channel Logout 1.0 is how a provider tells its
 relying parties that a person signed out of one of its sessions. Keycloak, Auth0 and Ping (PingAM/PingFederate)
 send it to a third-party application; Okta, Entra and Google do not (Okta's equivalent is
-[[global-token-revocation]]; Entra pushes nothing). A bucket now receives those logout tokens at
-`<bucket issuer>/federation/backchannel-logout` and ends the sessions here that came from the upstream session
+[[global-token-revocation]]; Entra pushes nothing). A project now receives those logout tokens at
+`<project issuer>/federation/backchannel-logout` and ends the sessions here that came from the upstream session
 named — and, through them, every relying party this server signed the person in to.
 
 ## Softer than global token revocation, by decision
@@ -111,7 +111,7 @@ logout session required" on (`sid`) and off (`sub` only). The run first failed e
   Refreshing the record on every session save would double federated session writes to close a gap no known
   provider opens.
 - **A sign-in in flight** (ID token issued, session not yet written) is not ended by a logout that lands in between.
-- **One upstream application per bucket**: a provider registers one logout URL per application, so an application
-  reused across buckets is heard only by the bucket at that URL; a bucket's address change changes the URL.
+- **One upstream application per project**: a provider registers one logout URL per application, so an application
+  reused across projects is heard only by the project at that URL; a project's address change changes the URL.
 - **Keycloak older than 24.0.0** (except 22.0.8 and 23.0.4) sends logout tokens with **no `exp`**
   (keycloak/keycloak#25753) and is refused; fixed releases send `exp = iat + 120`.

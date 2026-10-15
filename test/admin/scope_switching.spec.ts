@@ -45,7 +45,7 @@ describe('active scope', () => {
 		const a = await admin();
 		const group = answered(
 			(
-				await client.admin.api.groups.post(
+				await client.admin.api.teams.post(
 					{ name: 'Acme' },
 					{ headers: { cookie: a.cookie } }
 				)
@@ -56,7 +56,7 @@ describe('active scope', () => {
 			(await client.admin.api.scope.get({ headers: { cookie: a.cookie } })).data
 		);
 
-		expect(scope.activeGroupId).toBe(await personalGroupId(a.userId));
+		expect(scope.activeTeamId).toBe(await personalGroupId(a.userId));
 		expect(scope.available.map((g) => g.id)).toContain(group._id);
 		expect(scope.available.find((g) => g.id === group._id)?.role).toBe('owner');
 	});
@@ -65,7 +65,7 @@ describe('active scope', () => {
 		const a = await admin();
 		const group = answered(
 			(
-				await client.admin.api.groups.post(
+				await client.admin.api.teams.post(
 					{ name: 'Acme' },
 					{ headers: { cookie: a.cookie } }
 				)
@@ -75,7 +75,7 @@ describe('active scope', () => {
 		// One bucket in the personal scope...
 		const personalBucket = answered(
 			(
-				await client.admin.api.buckets.post(
+				await client.admin.api.projects.post(
 					{ name: 'Personal', slug: slug('p') },
 					{ headers: { cookie: a.cookie } }
 				)
@@ -84,34 +84,34 @@ describe('active scope', () => {
 
 		// ...then switch, and the next creation lands in the group without being asked again.
 		const switched = await client.admin.api.scope.put(
-			{ groupId: group._id },
+			{ teamId: group._id },
 			{ headers: { cookie: a.cookie } }
 		);
 		expect(switched.status).toBe(200);
 
 		const groupBucket = answered(
 			(
-				await client.admin.api.buckets.post(
+				await client.admin.api.projects.post(
 					{ name: 'Company', slug: slug('c') },
 					{ headers: { cookie: a.cookie } }
 				)
 			).data
 		);
-		expect(groupBucket.ownerGroupId).toBe(group._id);
+		expect(groupBucket.ownerTeamId).toBe(group._id);
 
 		const inGroup = answered(
-			(await client.admin.api.buckets.get({ headers: { cookie: a.cookie } }))
+			(await client.admin.api.projects.get({ headers: { cookie: a.cookie } }))
 				.data
 		);
 		expect(inGroup.map((b) => b._id)).toEqual([groupBucket._id]);
 
 		// Switching back shows the other set — nothing is merged.
 		await client.admin.api.scope.put(
-			{ groupId: await personalGroupId(a.userId) },
+			{ teamId: await personalGroupId(a.userId) },
 			{ headers: { cookie: a.cookie } }
 		);
 		const inPersonal = answered(
-			(await client.admin.api.buckets.get({ headers: { cookie: a.cookie } }))
+			(await client.admin.api.projects.get({ headers: { cookie: a.cookie } }))
 				.data
 		);
 		expect(inPersonal.map((b) => b._id)).toEqual([personalBucket._id]);
@@ -121,7 +121,7 @@ describe('active scope', () => {
 		const a = await admin();
 		const group = answered(
 			(
-				await client.admin.api.groups.post(
+				await client.admin.api.teams.post(
 					{ name: 'Acme' },
 					{ headers: { cookie: a.cookie } }
 				)
@@ -129,14 +129,14 @@ describe('active scope', () => {
 		);
 
 		await client.admin.api.scope.put(
-			{ groupId: group._id },
+			{ teamId: group._id },
 			{ headers: { cookie: a.cookie } }
 		);
 
 		const later = answered(
 			(await client.admin.api.scope.get({ headers: { cookie: a.cookie } })).data
 		);
-		expect(later.activeGroupId).toBe(group._id);
+		expect(later.activeTeamId).toBe(group._id);
 	});
 
 	/*
@@ -153,7 +153,7 @@ describe('active scope', () => {
 		const a = await admin();
 		const group = answered(
 			(
-				await client.admin.api.groups.post(
+				await client.admin.api.teams.post(
 					{ name: 'Acme' },
 					{ headers: { cookie: a.cookie } }
 				)
@@ -163,7 +163,7 @@ describe('active scope', () => {
 		const before = (await adminAuditStore.list({ targetId: group._id })).total;
 
 		await client.admin.api.scope.put(
-			{ groupId: group._id },
+			{ teamId: group._id },
 			{ headers: { cookie: a.cookie } }
 		);
 
@@ -177,7 +177,7 @@ describe('active scope', () => {
 		const b = await admin();
 		const theirs = answered(
 			(
-				await client.admin.api.groups.post(
+				await client.admin.api.teams.post(
 					{ name: 'Theirs' },
 					{ headers: { cookie: b.cookie } }
 				)
@@ -185,13 +185,13 @@ describe('active scope', () => {
 		);
 
 		const denied = await client.admin.api.scope.put(
-			{ groupId: theirs._id },
+			{ teamId: theirs._id },
 			{ headers: { cookie: a.cookie } }
 		);
 		expect(denied.status).toBe(403);
 
 		const invented = await client.admin.api.scope.put(
-			{ groupId: 'no-such-group' },
+			{ teamId: 'no-such-group' },
 			{ headers: { cookie: a.cookie } }
 		);
 		// Identical to the refusal above: a switch must not reveal which group ids are real.
@@ -210,7 +210,7 @@ describe('active scope', () => {
 		const theirs = await personalGroupId(other.userId);
 		const shared = answered(
 			(
-				await client.admin.api.groups.post(
+				await client.admin.api.teams.post(
 					{ name: 'Acme' },
 					{ headers: { cookie: other.cookie } }
 				)
@@ -232,7 +232,7 @@ describe('active scope', () => {
 		expect(scope.available.map((g) => g.id)).toContain(UNASSIGNED_GROUP_ID);
 
 		const denied = await client.admin.api.scope.put(
-			{ groupId: theirs },
+			{ teamId: theirs },
 			{ headers: { cookie: root.cookie } }
 		);
 		expect(denied.status).toBe(403);
@@ -249,7 +249,7 @@ describe('active scope', () => {
 		const other = await admin();
 		const theirs = answered(
 			(
-				await client.admin.api.groups.post(
+				await client.admin.api.teams.post(
 					{ name: 'Acme' },
 					{ headers: { cookie: other.cookie } }
 				)
@@ -257,7 +257,7 @@ describe('active scope', () => {
 		);
 
 		const switched = await client.admin.api.scope.put(
-			{ groupId: theirs._id },
+			{ teamId: theirs._id },
 			{ headers: { cookie: root.cookie } }
 		);
 		expect(switched.status).toBe(200);
@@ -266,17 +266,17 @@ describe('active scope', () => {
 			(await client.admin.api.scope.get({ headers: { cookie: root.cookie } }))
 				.data
 		);
-		expect(later.activeGroupId).toBe(theirs._id);
+		expect(later.activeTeamId).toBe(theirs._id);
 
 		const bucket = answered(
 			(
-				await client.admin.api.buckets.post(
+				await client.admin.api.projects.post(
 					{ name: 'Company', slug: slug('c') },
 					{ headers: { cookie: root.cookie } }
 				)
 			).data
 		);
-		expect(bucket.ownerGroupId).toBe(theirs._id);
+		expect(bucket.ownerTeamId).toBe(theirs._id);
 	});
 
 	/*
@@ -289,7 +289,7 @@ describe('active scope', () => {
 		const mine = await personalGroupId(owner.userId);
 		const team = answered(
 			(
-				await client.admin.api.groups.post(
+				await client.admin.api.teams.post(
 					{ name: 'Team' },
 					{ headers: { cookie: owner.cookie } }
 				)
@@ -315,25 +315,25 @@ describe('active scope', () => {
 		const member = await admin();
 		const group = answered(
 			(
-				await client.admin.api.groups.post(
+				await client.admin.api.teams.post(
 					{ name: 'Acme' },
 					{ headers: { cookie: owner.cookie } }
 				)
 			).data
 		);
 		await client.admin.api
-			.groups({ id: group._id })
+			.teams({ id: group._id })
 			.members.post(
 				{ userId: member.userId, role: 'member' },
 				{ headers: { cookie: owner.cookie } }
 			);
 		await client.admin.api.scope.put(
-			{ groupId: group._id },
+			{ teamId: group._id },
 			{ headers: { cookie: member.cookie } }
 		);
 
 		await client.admin.api
-			.groups({ id: group._id })
+			.teams({ id: group._id })
 			.members({ userId: member.userId })
 			.delete(undefined, { headers: { cookie: owner.cookie } });
 
@@ -341,7 +341,7 @@ describe('active scope', () => {
 			(await client.admin.api.scope.get({ headers: { cookie: member.cookie } }))
 				.data
 		);
-		expect(scope.activeGroupId).toBe(await personalGroupId(member.userId));
+		expect(scope.activeTeamId).toBe(await personalGroupId(member.userId));
 		expect(scope.available.map((g) => g.id)).not.toContain(group._id);
 	});
 });

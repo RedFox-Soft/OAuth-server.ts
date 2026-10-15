@@ -135,10 +135,10 @@ describe('agent answers match the console, field for field', () => {
 			client_list: { id: bucket._id },
 			client_get: { id: bucket._id, clientId },
 			resource_list: { id: bucket._id },
-			bucket_get: { id: bucket._id },
-			bucket_activity_get: { id: bucket._id },
-			bucket_summary_get: { id: bucket._id },
-			bucket_user_list: { id: bucket._id },
+			project_get: { id: bucket._id },
+			project_activity_get: { id: bucket._id },
+			project_summary_get: { id: bucket._id },
+			project_user_list: { id: bucket._id },
 			federation_provider_list: { id: bucket._id },
 			federation_identity_list: { id: bucket._id, uid: endUser._id }
 		};
@@ -229,7 +229,7 @@ describe('agent answers match the console, field for field', () => {
 		});
 
 		const httpRes = await elysia.handle(
-			new Request(`http://e.ly/admin/api/buckets/${theirs._id}/clients`, {
+			new Request(`http://e.ly/admin/api/projects/${theirs._id}/clients`, {
 				headers: { cookie }
 			})
 		);

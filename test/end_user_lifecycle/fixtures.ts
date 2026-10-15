@@ -115,7 +115,7 @@ export async function introspect(token: string) {
 /* An administrator deactivating or reactivating a user of the default bucket. */
 export function setActive(cookie: string, uid: string, active: boolean) {
 	return admin.admin.api
-		.buckets({ id: DEFAULT_BUCKET_ID })
+		.projects({ id: DEFAULT_BUCKET_ID })
 		.users({ uid })
 		.patch({ active }, { headers: { cookie } });
 }

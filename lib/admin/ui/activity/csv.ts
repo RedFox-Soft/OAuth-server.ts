@@ -3,7 +3,7 @@ import type { OverviewRow } from '../../../activity/overview.js';
 /*
  * The month as a spreadsheet file (specs/077, FR-017), built from the rows the dashboard shows.
  *
- * Bucket and group names are chosen by customers — any administrator can create and name a group — and the
+ * Project and team names are chosen by customers — any administrator can create and name a team — and the
  * file is opened by the operator in a spreadsheet, which runs a cell beginning with `=`, `+`, `-` or `@` as a
  * formula (CSV injection). Such a cell is prefixed with an apostrophe so it is read as text. Tab and carriage
  * return lead the same way in some spreadsheets and are treated alike.
@@ -11,8 +11,8 @@ import type { OverviewRow } from '../../../activity/overview.js';
 
 const HEADER = [
 	'month',
-	'bucket_id',
-	'bucket',
+	'project_id',
+	'project',
 	'customer',
 	'customer_kind',
 	'deleted',
@@ -51,7 +51,7 @@ export function usageCsv(
 		lines.push(
 			[
 				month,
-				row.bucketId,
+				row.projectId,
 				row.name,
 				row.customer.label,
 				row.customer.kind,
@@ -75,7 +75,7 @@ export function usageCsv(
 }
 
 /*
- * One bucket's months as a spreadsheet file (specs/086), from its Activity tab. The same cell rules as the
+ * One project's months as a spreadsheet file (specs/086), from its Activity tab. The same cell rules as the
  * dashboard's export: an absent figure is an empty cell and a cell that would run as a formula is made inert.
  */
 export function bucketActivityCsv(
@@ -90,8 +90,8 @@ export function bucketActivityCsv(
 ): string {
 	const header = [
 		'month',
-		'bucket_id',
-		'bucket',
+		'project_id',
+		'project',
 		'active_users',
 		'final',
 		'local',

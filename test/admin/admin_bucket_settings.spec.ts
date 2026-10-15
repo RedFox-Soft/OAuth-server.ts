@@ -68,7 +68,7 @@ describe("the administrators' bucket on the bucket settings", () => {
 	afterAll(restoreSeededPolicy);
 
 	it("lists the administrators' bucket for a super administrator, marked as the console's own", async () => {
-		const res = await client.admin.api.buckets.get({
+		const res = await client.admin.api.projects.get({
 			headers: { cookie: admin.cookie }
 		});
 		expect(res.status).toBe(200);
@@ -78,7 +78,7 @@ describe("the administrators' bucket on the bucket settings", () => {
 
 	it('reads the second-factor requirement off by default', async () => {
 		const res = await client.admin.api
-			.buckets({ id: ADMIN_BUCKET_ID })
+			.projects({ id: ADMIN_BUCKET_ID })
 			.get({ headers: { cookie: admin.cookie } });
 		expect(res.status).toBe(200);
 		expect(answered(res.data).totpRequired).toBe(false);
@@ -88,7 +88,7 @@ describe("the administrators' bucket on the bucket settings", () => {
 	it('turns the second factor on and reads it back', async () => {
 		const patched = await consenting((consent) =>
 			client.admin.api
-				.buckets({ id: ADMIN_BUCKET_ID })
+				.projects({ id: ADMIN_BUCKET_ID })
 				.patch(
 					{ totpRequired: true, ...consent },
 					{ headers: { cookie: admin.cookie } }
@@ -98,7 +98,7 @@ describe("the administrators' bucket on the bucket settings", () => {
 		expect(answered(patched.data).totpRequired).toBe(true);
 
 		const read = await client.admin.api
-			.buckets({ id: ADMIN_BUCKET_ID })
+			.projects({ id: ADMIN_BUCKET_ID })
 			.get({ headers: { cookie: admin.cookie } });
 		expect(answered(read.data).totpRequired).toBe(true);
 	});
@@ -106,14 +106,14 @@ describe("the administrators' bucket on the bucket settings", () => {
 	it('turns the second factor back off', async () => {
 		await consenting((consent) =>
 			client.admin.api
-				.buckets({ id: ADMIN_BUCKET_ID })
+				.projects({ id: ADMIN_BUCKET_ID })
 				.patch(
 					{ totpRequired: true, ...consent },
 					{ headers: { cookie: admin.cookie } }
 				)
 		);
 		const off = await client.admin.api
-			.buckets({ id: ADMIN_BUCKET_ID })
+			.projects({ id: ADMIN_BUCKET_ID })
 			.patch({ totpRequired: false }, { headers: { cookie: admin.cookie } });
 		expect(off.status).toBe(200);
 		expect(answered(off.data).totpRequired).toBe(false);
@@ -121,7 +121,7 @@ describe("the administrators' bucket on the bucket settings", () => {
 
 	it('renames the bucket an authenticator app shows as the issuer', async () => {
 		const res = await client.admin.api
-			.buckets({ id: ADMIN_BUCKET_ID })
+			.projects({ id: ADMIN_BUCKET_ID })
 			.patch({ name: 'Operators' }, { headers: { cookie: admin.cookie } });
 		expect(res.status).toBe(200);
 		expect((await getBucketStore().find(ADMIN_BUCKET_ID))?.name).toBe(
@@ -146,7 +146,7 @@ describe("the administrators' bucket on the bucket settings", () => {
 
 		await consenting((consent) =>
 			client.admin.api
-				.buckets({ id: ADMIN_BUCKET_ID })
+				.projects({ id: ADMIN_BUCKET_ID })
 				.patch(
 					{ totpRequired: true, ...consent },
 					{ headers: { cookie: admin.cookie } }
@@ -168,7 +168,7 @@ describe("the administrators' bucket on the bucket settings", () => {
 	it('opens administrator registration and warns that, without verification, any address can be claimed', async () => {
 		const res = await consenting((consent) =>
 			client.admin.api
-				.buckets({ id: ADMIN_BUCKET_ID })
+				.projects({ id: ADMIN_BUCKET_ID })
 				.patch(
 					{ registrationOpen: true, ...consent },
 					{ headers: { cookie: admin.cookie } }
@@ -180,7 +180,7 @@ describe("the administrators' bucket on the bucket settings", () => {
 	});
 
 	it('refuses a setting the bucket does not have', async () => {
-		const res = await client.admin.api.buckets({ id: ADMIN_BUCKET_ID }).patch(
+		const res = await client.admin.api.projects({ id: ADMIN_BUCKET_ID }).patch(
 			{
 				totpRequired: true,
 				// @ts-expect-error a field no bucket carries; the schema refuses it
@@ -227,7 +227,7 @@ describe("the administrators' bucket on the bucket settings", () => {
 			await verifyActing();
 
 			const res = await client.admin.api
-				.buckets({ id: ADMIN_BUCKET_ID })
+				.projects({ id: ADMIN_BUCKET_ID })
 				.patch(
 					{ emailVerificationRequired: true },
 					{ headers: { cookie: admin.cookie } }
@@ -244,7 +244,7 @@ describe("the administrators' bucket on the bucket settings", () => {
 			await getSmtpSettingsStore().set(MAIL);
 
 			const res = await client.admin.api
-				.buckets({ id: ADMIN_BUCKET_ID })
+				.projects({ id: ADMIN_BUCKET_ID })
 				.patch(
 					{ emailVerificationRequired: true },
 					{ headers: { cookie: admin.cookie } }
@@ -262,7 +262,7 @@ describe("the administrators' bucket on the bucket settings", () => {
 			await verifyActing();
 
 			const res = await consenting((consent) =>
-				client.admin.api.buckets({ id: ADMIN_BUCKET_ID }).patch(
+				client.admin.api.projects({ id: ADMIN_BUCKET_ID }).patch(
 					{
 						emailVerificationRequired: true,
 						verificationMethod: 'code',
@@ -285,7 +285,7 @@ describe("the administrators' bucket on the bucket settings", () => {
 		});
 
 		it("does not list the administrators' bucket", async () => {
-			const res = await client.admin.api.buckets.get({
+			const res = await client.admin.api.projects.get({
 				headers: { cookie: weaker.cookie }
 			});
 			expect(answered(res.data).some((b) => b._id === ADMIN_BUCKET_ID)).toBe(
@@ -295,14 +295,14 @@ describe("the administrators' bucket on the bucket settings", () => {
 
 		it("refuses to read the administrators' bucket", async () => {
 			const res = await client.admin.api
-				.buckets({ id: ADMIN_BUCKET_ID })
+				.projects({ id: ADMIN_BUCKET_ID })
 				.get({ headers: { cookie: weaker.cookie } });
 			expect(res.status).toBe(403);
 		});
 
 		it("refuses to change the administrators' bucket", async () => {
 			const res = await client.admin.api
-				.buckets({ id: ADMIN_BUCKET_ID })
+				.projects({ id: ADMIN_BUCKET_ID })
 				.patch({ totpRequired: true }, { headers: { cookie: weaker.cookie } });
 			expect(res.status).toBe(403);
 			expect((await getBucketStore().find(ADMIN_BUCKET_ID))?.totpRequired).toBe(
@@ -313,10 +313,10 @@ describe("the administrators' bucket on the bucket settings", () => {
 
 	it('refuses an unauthenticated caller', async () => {
 		expect(
-			(await client.admin.api.buckets({ id: ADMIN_BUCKET_ID }).get()).status
+			(await client.admin.api.projects({ id: ADMIN_BUCKET_ID }).get()).status
 		).toBe(401);
 		const patched = await client.admin.api
-			.buckets({ id: ADMIN_BUCKET_ID })
+			.projects({ id: ADMIN_BUCKET_ID })
 			.patch({ totpRequired: true });
 		expect(patched.status).toBe(401);
 		expect((await getBucketStore().find(ADMIN_BUCKET_ID))?.totpRequired).toBe(

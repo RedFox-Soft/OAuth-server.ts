@@ -24,7 +24,7 @@ const { restorePasswordSignIn } =
 const outcome = await restorePasswordSignIn();
 console.log(
 	outcome === 'restored'
-		? 'Password sign-in is on for the Administrators bucket.'
-		: 'Password sign-in was already on for the Administrators bucket; nothing changed.'
+		? 'Password sign-in is on for the Administrators project.'
+		: 'Password sign-in was already on for the Administrators project; nothing changed.'
 );
 process.exit(0);

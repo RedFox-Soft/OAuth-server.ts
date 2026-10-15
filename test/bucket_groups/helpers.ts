@@ -29,7 +29,7 @@ export async function endUser(
 ): Promise<string> {
 	const res = await admin(
 		'POST',
-		`/admin/api/buckets/${bucketId}/users`,
+		`/admin/api/projects/${bucketId}/users`,
 		cookie,
 		{
 			email,
@@ -47,7 +47,7 @@ export async function group(
 ): Promise<string> {
 	const res = await admin(
 		'POST',
-		`/admin/api/buckets/${bucketId}/groups`,
+		`/admin/api/projects/${bucketId}/groups`,
 		cookie,
 		{
 			displayName
@@ -65,7 +65,7 @@ export function addMembers(
 ): Promise<Reply> {
 	return admin(
 		'POST',
-		`/admin/api/buckets/${bucketId}/groups/${gid}/members`,
+		`/admin/api/projects/${bucketId}/groups/${gid}/members`,
 		cookie,
 		{ userIds }
 	);
@@ -78,7 +78,7 @@ export async function memberIds(
 ): Promise<string[]> {
 	const res = await admin(
 		'GET',
-		`/admin/api/buckets/${bucketId}/groups/${gid}/members?count=1000`,
+		`/admin/api/projects/${bucketId}/groups/${gid}/members?count=1000`,
 		cookie
 	);
 	expect(res.status).toBe(200);

@@ -34,14 +34,14 @@ export function deprovisioningHeldEmail(params: DeprovisioningHeldParams): {
 	const safeBucket = escapeHtml(bucketName);
 	const safeUrl = escapeHtml(consoleUrl);
 	const plural = count === 1 ? '' : 's';
-	const what = `The provisioning connection "${connectionName}" of the user bucket "${bucketName}" reached its limit of ${count} deprovisioning${plural} and was held at ${when}.`;
+	const what = `The provisioning connection "${connectionName}" of the project "${bucketName}" reached its limit of ${count} deprovisioning${plural} and was held at ${when}.`;
 	const consequence =
-		'Until an administrator of the bucket releases it, every deactivation and deletion it sends is refused and retried later by the directory; creates and updates still go through. People the directory is removing keep their access meanwhile.';
+		'Until an administrator of the project releases it, every deactivation and deletion it sends is refused and retried later by the directory; creates and updates still go through. People the directory is removing keep their access meanwhile.';
 
 	const html = [
 		`<div style="font-family: Arial, Helvetica, sans-serif; max-width: 480px; margin: 0 auto; color: #1f1f1f;">`,
 		`<h2 style="font-size: 20px;">Provisioning connection held</h2>`,
-		`<p>The provisioning connection <strong>${safeConnection}</strong> of the user bucket <strong>${safeBucket}</strong> reached its limit of ${count} deprovisioning${plural} and was held at ${escapeHtml(when)}.</p>`,
+		`<p>The provisioning connection <strong>${safeConnection}</strong> of the project <strong>${safeBucket}</strong> reached its limit of ${count} deprovisioning${plural} and was held at ${escapeHtml(when)}.</p>`,
 		`<p>${escapeHtml(consequence)}</p>`,
 		`<p>Check the directory for a mistaken rule, and see whom the hold has refused, before releasing it.</p>`,
 		`<p style="text-align: center; margin: 28px 0;">`,

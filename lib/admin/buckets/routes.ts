@@ -120,7 +120,7 @@ async function assertSlugAvailable(slug: string) {
 	if (isReservedBucketName(slug)) {
 		throw new AdminError(
 			409,
-			`'${slug}' is reserved for this server's own addresses and cannot be a bucket slug`,
+			`'${slug}' is reserved for this server's own addresses and cannot be a project slug`,
 			{ field: 'slug' }
 		);
 	}
@@ -145,13 +145,13 @@ async function resolveAddress(body: {
 	if (body.slug !== undefined && body.host !== undefined) {
 		throw new AdminError(
 			400,
-			'a bucket is addressed by a path segment or a hostname, not both — supply one'
+			'a project is addressed by a path segment or a hostname, not both — supply one'
 		);
 	}
 	if (body.slug === undefined && body.host === undefined) {
 		throw new AdminError(
 			400,
-			'a bucket needs an address: supply a slug or a hostname'
+			'a project needs an address: supply a slug or a hostname'
 		);
 	}
 
@@ -183,7 +183,7 @@ async function assertHostAvailable(value: string): Promise<string> {
 	if (isCanonicalHost(host)) {
 		throw new AdminError(
 			409,
-			`'${host}' is this deployment's own address and cannot be a bucket's`,
+			`'${host}' is this deployment's own address and cannot be a project's`,
 			{ field: 'host' }
 		);
 	}
@@ -194,13 +194,13 @@ async function assertHostAvailable(value: string): Promise<string> {
 	 * otherwise be a reservation that does not hold.
 	 */
 	if (
-		ApplicationConfig['buckets.reservedHostnames'].some(
+		ApplicationConfig['projects.reservedHostnames'].some(
 			(reserved) => normaliseHost(reserved) === host
 		)
 	) {
 		throw new AdminError(
 			409,
-			`'${host}' is reserved for this deployment and cannot be a bucket's address`,
+			`'${host}' is reserved for this deployment and cannot be a project's address`,
 			{ field: 'host' }
 		);
 	}
@@ -208,7 +208,7 @@ async function assertHostAvailable(value: string): Promise<string> {
 	if (holder) {
 		throw new AdminError(
 			409,
-			`hostname '${host}' is already taken by the bucket '${holder.name}'`,
+			`hostname '${host}' is already taken by the project '${holder.name}'`,
 			{ field: 'host' }
 		);
 	}
@@ -417,21 +417,21 @@ function addressRefusal(
 	facts: BucketFacts
 ): string {
 	if (isUndeletableBucket(bucket._id)) {
-		return 'this bucket is served at the root and its address cannot be changed';
+		return 'this project is served at the root and its address cannot be changed';
 	}
 	const dependents = facts.dependents;
 	if (
 		dependents &&
 		dependents.applications + dependents.providers + dependents.connections > 0
 	) {
-		return `Used by ${countOf(dependents.applications, 'application')}, ${countOf(dependents.providers, 'identity provider')} and ${countOf(dependents.connections, 'provisioning connection')}: only an instance administrator can change this bucket's address now.`;
+		return `Used by ${countOf(dependents.applications, 'application')}, ${countOf(dependents.providers, 'identity provider')} and ${countOf(dependents.connections, 'provisioning connection')}: only an instance administrator can change this project's address now.`;
 	}
 	if (bucketFactsWanted(ctx, bucket).dependents || ctx.superAdmin) {
-		return 'this bucket address cannot be changed';
+		return 'this project address cannot be changed';
 	}
 	return addressOf(bucket).kind === 'host'
-		? 'only an administrator of this instance may change the address of a bucket served at its own hostname'
-		: 'only an owner of the bucket group or an administrator of this instance may change a bucket address';
+		? 'only an administrator of this instance may change the address of a project served at its own hostname'
+		: "only an owner of the project's team or an administrator of this instance may change a project address";
 }
 
 function countOf(n: number, noun: string): string {
@@ -445,16 +445,21 @@ function countOf(n: number, noun: string): string {
  * `lib/admin/federation/service.ts` states the rule these routes were breaking — the secret is
  * write-only, masked "on every read, for every role including super-admin". It held on the federation
  * routes and not here, because a bucket document *contains* its providers and these handlers returned it
- * whole. So `GET /admin/api/buckets` handed every provider secret to any authenticated administrator, and
- * `GET /admin/api/buckets/:id` handed a bucket's secrets to anyone with the broader
+ * whole. So `GET /admin/api/projects` handed every provider secret to any authenticated administrator, and
+ * `GET /admin/api/projects/:id` handed a bucket's secrets to anyone with the broader
  * `loadBucketForUsers` access, not only the bucket's editors.
  *
  * Found by the MCP surface's secrecy sweep (test/mcp/secrecy.spec.ts), which is why that sweep iterates
  * every published read rather than the ones somebody thought to check.
  */
 function presentBucket<
-	T extends Pick<UserBucket, '_id' | 'federation' | 'deletion'>
->(bucket: T): T & { reserved?: 'administrators' } {
+	T extends Pick<UserBucket, '_id' | 'federation' | 'deletion' | 'ownerGroupId'>
+>(
+	bucket: T
+): Omit<T, 'ownerGroupId'> & {
+	ownerTeamId: string;
+	reserved?: 'administrators';
+} {
 	/*
 	 * The console's own bucket says so on the response, so the console and an agent learn it from what
 	 * they were sent rather than by knowing the id.
@@ -463,9 +468,11 @@ function presentBucket<
 		reservedOf(bucket._id) === 'administrators'
 			? { ...bucket, reserved: 'administrators' as const }
 			: bucket;
-	const shown = withoutPurgeClaim(marked);
-	if (!shown.federation.length) return shown;
-	return { ...shown, federation: presentAll(bucket) };
+	/* The edge calls the owning group a team (specs/100); storage keeps `ownerGroupId`. */
+	const { ownerGroupId, ...shown } = withoutPurgeClaim(marked);
+	const project = { ...shown, ownerTeamId: ownerGroupId };
+	if (!project.federation.length) return project;
+	return { ...project, federation: presentAll(bucket) };
 }
 
 /*
@@ -573,7 +580,7 @@ function withInertTotpAdvisory<
 	};
 }
 
-/* One bucket as `GET /admin/api/buckets/:id` answers it, and as a restore answers with what it brought back. */
+/* One bucket as `GET /admin/api/projects/:id` answers it, and as a restore answers with what it brought back. */
 async function bucketDetail(ctx: AdminContext, bucket: UserBucket) {
 	const [state, applications, apis] = await Promise.all([
 		bucketFacts(ctx, bucket),
@@ -581,7 +588,7 @@ async function bucketDetail(ctx: AdminContext, bucket: UserBucket) {
 		getProtectedResourceStore().listByBucket(bucket._id)
 	]);
 	return {
-		...withAddressGuidance(withRights(ctx, presentBucket(bucket), state)),
+		...withAddressGuidance(presentBucket(withRights(ctx, bucket, state))),
 		/*
 		 * Sent by the server because the console cannot derive it: ISSUER is kept out of the browser
 		 * bundle (lib/configs/issuer.ts).
@@ -614,7 +621,7 @@ async function deletionChecked(
 	if (isUndeletableBucket(id)) {
 		throw new AdminError(
 			403,
-			'this bucket is part of the server itself and cannot be deleted'
+			'this project is part of the server itself and cannot be deleted'
 		);
 	}
 	/*
@@ -633,12 +640,12 @@ async function deletionChecked(
 		throw new AdminError(
 			403,
 			held > 0 && holdsBucket(ctx, bucket)
-				? `This bucket holds ${countOf(held, 'account')}: only an owner of its group can delete it.`
-				: 'no access to this bucket'
+				? `This project holds ${countOf(held, 'account')}: only an owner of its team can delete it.`
+				: 'no access to this project'
 		);
 	}
 	if (scheduled && !bucket.deletion) {
-		throw new AdminError(409, 'This bucket is not scheduled for deletion.');
+		throw new AdminError(409, 'This project is not scheduled for deletion.');
 	}
 	/* Only by a race: the scheduled-bucket guard refuses a reader before the handler runs. */
 	if (!scheduled && bucket.deletion) {
@@ -655,7 +662,7 @@ async function deletionChecked(
 		getProtectedResourceStore().listByBucket(id)
 	]);
 	if (applications.length > 0 || apis.length > 0) {
-		throw new AdminError(409, 'bucket still holds applications or APIs', {
+		throw new AdminError(409, 'project still holds applications or APIs', {
 			blockers: [
 				...(applications.length > 0
 					? [
@@ -684,19 +691,19 @@ async function deletionChecked(
 	if (!bucketCan(ctx, bucket, { accounts }).delete) {
 		throw new AdminError(
 			403,
-			`This bucket holds ${countOf(accounts, 'account')}: only an owner of its group can delete it.`
+			`This project holds ${countOf(accounts, 'account')}: only an owner of its team can delete it.`
 		);
 	}
 	if (accounts > 0) {
 		if (query.cascade === undefined) {
-			throw new AdminError(409, 'bucket still holds end-users', {
+			throw new AdminError(409, 'project still holds end-users', {
 				blockers: [{ kind: 'enduser', count: accounts }]
 			});
 		}
 		if (query.expect !== accounts) {
 			throw new AdminError(
 				409,
-				'the bucket end-users changed since you reviewed them',
+				'the project end-users changed since you reviewed them',
 				{ blockers: [{ kind: 'enduser', count: accounts }] }
 			);
 		}
@@ -721,7 +728,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 				: adminErrorBody(error);
 		}
 	})
-	.get('/admin/api/buckets', async ({ admin }) => {
+	.get('/admin/api/projects', async ({ admin }) => {
 		const ctx = assertAuth(admin);
 		/* The same set the held-connections count is taken over (lib/admin/buckets/visible.ts). */
 		const listed = await visibleBuckets(ctx);
@@ -742,7 +749,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			const heldConnectionId = heldIn.get(b._id);
 			const { addressForm, issuer } = addressing(b);
 			return {
-				...withRights(ctx, presentBucket(b), states[i] ?? {}),
+				...presentBucket(withRights(ctx, b, states[i] ?? {})),
 				addressForm,
 				issuer,
 				/*
@@ -757,7 +764,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 		});
 	})
 	.post(
-		'/admin/api/buckets',
+		'/admin/api/projects',
 		async ({ admin, body, set }) => {
 			const ctx = assertAuth(admin);
 			/*
@@ -765,9 +772,9 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			 * group, or one the caller names (specs/087), held to the rules a move into it is held to.
 			 */
 			const ownerGroupId =
-				body.groupId === undefined
+				body.teamId === undefined
 					? assertActiveGroup(ctx)
-					: (await loadDestination(ctx, body.groupId))._id;
+					: (await loadDestination(ctx, body.teamId))._id;
 			/*
 			 * Naming a hostname is an instance-level act, never a group-level one. A tenant administrator
 			 * may create buckets in their own group; letting them name one would put a name in the
@@ -780,7 +787,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			if (body.host !== undefined && !meCan(ctx).createHost) {
 				throw new AdminError(
 					403,
-					'only an administrator of this instance may give a bucket a hostname of its own'
+					'only an administrator of this instance may give a project a hostname of its own'
 				);
 			}
 			/*
@@ -836,7 +843,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 		},
 		{ body: CreateBucketBody }
 	)
-	.get('/admin/api/buckets/:id', async ({ admin, params }) => {
+	.get('/admin/api/projects/:id', async ({ admin, params }) => {
 		const ctx = assertAuth(admin);
 		const bucket = await loadBucketForSettings(ctx, params.id, 'read');
 		return bucketDetail(ctx, bucket);
@@ -846,7 +853,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 	 * `read`, as the bucket itself is; the active-user figure only with `readActivity`, the right that
 	 * governs the activity page it summarises.
 	 */
-	.get('/admin/api/buckets/:id/summary', async ({ admin, params }) => {
+	.get('/admin/api/projects/:id/summary', async ({ admin, params }) => {
 		const ctx = assertAuth(admin);
 		const bucket = await loadBucketForSettings(ctx, params.id, 'read');
 		const readsActivity = bucketCan(ctx, bucket).readActivity;
@@ -878,7 +885,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			passwordWithoutAuthenticator: counts.passwordWithoutAuthenticator,
 			applications: applications.length,
 			apis: apis.length,
-			userGroups: groups.totalResults,
+			groups: groups.totalResults,
 			connections: connections.length,
 			held: connections.filter((c) => c.hold !== undefined).length,
 			providers: {
@@ -902,7 +909,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 		};
 	})
 	.patch(
-		'/admin/api/buckets/:id',
+		'/admin/api/projects/:id',
 		async ({ admin, params, body, status }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForSettings(ctx, params.id, 'edit');
@@ -980,7 +987,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 				ownerGroupId: bucket.ownerGroupId
 			});
 			const updated = await getBucketStore().update(params.id, changes);
-			if (!updated) throw new AdminError(404, 'bucket not found');
+			if (!updated) throw new AdminError(404, 'project not found');
 			const presented = withInertTotpAdvisory(presentBucket(updated));
 			const advisory =
 				params.id === ADMIN_BUCKET_ID
@@ -1001,7 +1008,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 	 * covering both, and the two-call confirmation gate would never see it.
 	 */
 	.post(
-		'/admin/api/buckets/:id/address',
+		'/admin/api/projects/:id/address',
 		async ({ admin, params, body, set }) => {
 			const ctx = assertAuth(admin);
 
@@ -1029,7 +1036,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			if (body.host !== undefined && !meCan(ctx).createHost) {
 				throw new AdminError(
 					403,
-					'only an administrator of this instance may give a bucket a hostname of its own'
+					'only an administrator of this instance may give a project a hostname of its own'
 				);
 			}
 
@@ -1098,7 +1105,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			const moved = await refusingATakenHostname(() =>
 				getBucketStore().setAddress(params.id, address)
 			);
-			if (!moved) throw new AdminError(404, 'bucket not found');
+			if (!moved) throw new AdminError(404, 'project not found');
 
 			/*
 			 * The one place this operation can leave a bucket answering at its old address. The resolver
@@ -1106,7 +1113,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			 * move exists to avoid.
 			 */
 			forgetBucketAddresses();
-			return { ...preview, moved: true, bucket: presentBucket(moved) };
+			return { ...preview, moved: true, project: presentBucket(moved) };
 		},
 		{ body: ChangeBucketAddressBody }
 	)
@@ -1119,7 +1126,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 	 * leaves. Belonging to the destination is enough: any member may already create a bucket there.
 	 */
 	.put(
-		'/admin/api/buckets/:id/owner',
+		'/admin/api/projects/:id/owner',
 		async ({ admin, params, body, set }) => {
 			const ctx = assertAuth(admin);
 			/*
@@ -1130,7 +1137,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			if (isUndeletableBucket(params.id)) {
 				throw new AdminError(
 					403,
-					'this bucket is part of the server itself and cannot be moved'
+					'this project is part of the server itself and cannot be moved'
 				);
 			}
 			const bucket = await loadBucketForEdit(ctx, params.id);
@@ -1139,9 +1146,9 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			 * rather than which group it would have left.
 			 */
 			if (!bucketCan(ctx, bucket).move) {
-				throw new AdminError(403, 'group owner required');
+				throw new AdminError(403, 'team owner required');
 			}
-			const destination = await loadDestination(ctx, body.groupId);
+			const destination = await loadDestination(ctx, body.teamId);
 			const from = sourceGroupOf([bucket.ownerGroupId], destination._id);
 			assertGroupOwner(ctx, from);
 
@@ -1155,11 +1162,11 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 					confirmationRequired: true as const,
 					from: await describeGroup(from),
 					to: await describeGroup(destination._id),
-					bucket: { id: bucket._id, name: bucket.name },
+					project: { id: bucket._id, name: bucket.name },
 					applications: applications.length,
 					apis: apis.length,
 					consequence:
-						'the bucket, with its applications and APIs, will be administered by the members of the destination group, and no longer by members of the source group; end users, clients and sign-in addresses are not affected'
+						'the project, with its applications and APIs, will be administered by the members of the destination team, and no longer by members of the source team; end users, clients and sign-in addresses are not affected'
 				};
 			}
 
@@ -1177,10 +1184,10 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			if (result.status === 'conflict') {
 				throw new AdminError(
 					409,
-					'the bucket changed while it was being moved; reload and try again'
+					'the project changed while it was being moved; reload and try again'
 				);
 			}
-			return { bucket: { id: bucket._id, ownerGroupId: destination._id } };
+			return { project: { id: bucket._id, ownerTeamId: destination._id } };
 		},
 		{ body: MoveBucketOwnerBody }
 	)
@@ -1194,7 +1201,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 	 * the same messages, because the destruction this schedules runs later with nobody there to ask.
 	 */
 	.delete(
-		'/admin/api/buckets/:id',
+		'/admin/api/projects/:id',
 		async ({ admin, params, query }) => {
 			const ctx = assertAuth(admin);
 			const { bucket, accounts } = await deletionChecked(
@@ -1226,7 +1233,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 				const current = await getBucketStore().find(params.id);
 				throw current?.deletion
 					? scheduledForDeletion(current.deletion.purgeAt)
-					: new AdminError(404, 'bucket not found');
+					: new AdminError(404, 'project not found');
 			}
 			/* Every door at its address closes now on this instance; the address caches' minute bounds the rest. */
 			forgetBucketAddresses();
@@ -1245,7 +1252,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 	 * now (FR-014). A directory that tried to provision while it was off may need a resync; nothing here can
 	 * replay what it was refused.
 	 */
-	.post('/admin/api/buckets/:id/restore', async ({ admin, params }) => {
+	.post('/admin/api/projects/:id/restore', async ({ admin, params }) => {
 		const ctx = assertAuth(admin);
 		const bucket = await loadBucketForSettings(ctx, params.id, 'read');
 		const held = (await getUserStore(params.id).tally()).total;
@@ -1253,16 +1260,16 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			throw new AdminError(
 				403,
 				held > 0 && holdsBucket(ctx, bucket)
-					? `This bucket holds ${countOf(held, 'account')}: only an owner of its group can restore it.`
-					: 'no access to this bucket'
+					? `This project holds ${countOf(held, 'account')}: only an owner of its team can restore it.`
+					: 'no access to this project'
 			);
 		}
 		/* Before the audit entry, so a restore that changes nothing is not recorded (FR-015). */
 		if (!bucket.deletion) {
-			throw new AdminError(409, 'This bucket is not scheduled for deletion.');
+			throw new AdminError(409, 'This project is not scheduled for deletion.');
 		}
 		if (destructionUnderway(bucket, now())) {
-			throw new AdminError(409, 'This bucket is already being deleted.');
+			throw new AdminError(409, 'This project is already being deleted.');
 		}
 		await recordAdminAudit(ctx, 'bucket.restore', params.id, {
 			ownerGroupId: bucket.ownerGroupId,
@@ -1272,7 +1279,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 		/* The store decides the race with a destruction that began since the read above. */
 		const restored = await getBucketStore().cancelDeletion(params.id, now());
 		if (!restored) {
-			throw new AdminError(409, 'This bucket is already being deleted.');
+			throw new AdminError(409, 'This project is already being deleted.');
 		}
 		forgetBucketAddresses();
 		return bucketDetail(ctx, restored);
@@ -1283,12 +1290,12 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 	 * consent to destroy people is to the count reviewed, and the right depends on it.
 	 */
 	.post(
-		'/admin/api/buckets/:id/purge',
+		'/admin/api/projects/:id/purge',
 		async ({ admin, params, query }) => {
 			const ctx = assertAuth(admin);
 			const { bucket } = await deletionChecked(ctx, params.id, query, true);
 			if (destructionUnderway(bucket, now())) {
-				throw new AdminError(409, 'This bucket is already being deleted.');
+				throw new AdminError(409, 'This project is already being deleted.');
 			}
 			const outcome = await destroyBucket(
 				bucket,
@@ -1297,18 +1304,18 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			);
 			if (!outcome.claimed) {
 				const current = await getBucketStore().find(params.id);
-				if (!current) throw new AdminError(404, 'bucket not found');
+				if (!current) throw new AdminError(404, 'project not found');
 				throw new AdminError(
 					409,
 					current.deletion
-						? 'This bucket is already being deleted.'
-						: 'This bucket is not scheduled for deletion.'
+						? 'This project is already being deleted.'
+						: 'This project is not scheduled for deletion.'
 				);
 			}
 			if (outcome.failedAreas.length > 0) {
 				throw new AdminError(
 					500,
-					`bucket deleted, but records of its end-users survive in: ${outcome.failedAreas.join(', ')}`,
+					`project deleted, but records of its end-users survive in: ${outcome.failedAreas.join(', ')}`,
 					{ failedAreas: outcome.failedAreas }
 				);
 			}

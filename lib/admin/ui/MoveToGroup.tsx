@@ -21,7 +21,7 @@ interface Preview {
 }
 
 /*
- * Moving a bucket, with everything it holds, to another administrator group (specs/075, specs/099). Class
+ * Moving a project, with everything it holds, to another team (specs/075, specs/099). Class
  * C4 (`bucket.move`).
  *
  * Two steps, because the server's preview is the only place the full list of what moves exists: the
@@ -75,8 +75,8 @@ export function MoveToGroup({
 	async function step(commit: boolean): Promise<PreviewStep<Preview>> {
 		const result = await request(
 			'PUT',
-			`/admin/api/buckets/${encodeURIComponent(id)}/owner`,
-			commit ? { groupId, confirm: true } : { groupId }
+			`/admin/api/projects/${encodeURIComponent(id)}/owner`,
+			commit ? { teamId: groupId, confirm: true } : { teamId: groupId }
 		);
 		if (!result.ok) {
 			// The preview arrives as a refusal: the server will not move anything it has not shown.
@@ -91,15 +91,15 @@ export function MoveToGroup({
 		return {
 			kind: 'done',
 			text: preview
-				? `Bucket ${name} moved to ${labelOf(preview.to)}.`
-				: `Bucket ${name} moved.`
+				? `Project ${name} moved to ${labelOf(preview.to)}.`
+				: `Project ${name} moved.`
 		};
 	}
 
 	return (
 		<PreviewConfirm<Preview>
 			open
-			title={`Move ${name} to another group`}
+			title={`Move ${name} to another team`}
 			commitText="Move"
 			ready={groupId !== null}
 			preview={preview}
@@ -135,7 +135,7 @@ export function MoveToGroup({
 				/>
 			) : (
 				<Select
-					placeholder="Destination group"
+					placeholder="Destination team"
 					loading={options === null}
 					value={groupId ?? undefined}
 					onChange={(value: string) => {
@@ -148,7 +148,7 @@ export function MoveToGroup({
 						value: g.id,
 						label: groupLabel(g)
 					}))}
-					notFoundContent="You belong to no other group this can move to."
+					notFoundContent="You belong to no other team this can move to."
 				/>
 			)}
 		</PreviewConfirm>

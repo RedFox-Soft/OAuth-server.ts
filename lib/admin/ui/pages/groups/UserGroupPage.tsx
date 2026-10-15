@@ -103,12 +103,12 @@ export function UserGroupPage({
 			const [b, g, c] = await Promise.all([
 				request<BucketView>(
 					'GET',
-					`/admin/api/buckets/${encodeURIComponent(bucketId)}`
+					`/admin/api/projects/${encodeURIComponent(bucketId)}`
 				),
 				request<GroupView>('GET', api),
 				request<ConnectionView[]>(
 					'GET',
-					`/admin/api/buckets/${encodeURIComponent(bucketId)}/provisioning-connections`
+					`/admin/api/projects/${encodeURIComponent(bucketId)}/provisioning-connections`
 				)
 			]);
 			if (!b.ok) {
@@ -171,14 +171,14 @@ export function UserGroupPage({
 	}, [memberSearch, memberQ]);
 
 	const can = bucketCan(bucket);
-	const listHref = bucketHref(bucketId, 'user-groups');
+	const listHref = bucketHref(bucketId, 'groups');
 
 	if (loadStatus !== null) {
 		return loadStatus === 403 || loadStatus === 404 ? (
 			<NoAccess
-				what="user group"
-				backHref={bucket ? listHref : '/admin/buckets'}
-				backLabel={bucket ? 'Back to User groups' : 'Back to Buckets'}
+				what="group"
+				backHref={bucket ? listHref : '/admin/projects'}
+				backLabel={bucket ? 'Back to Groups' : 'Back to Projects'}
 			/>
 		) : (
 			<LoadFailed
@@ -255,7 +255,7 @@ export function UserGroupPage({
 		if (result.ok) {
 			return {
 				kind: 'done',
-				text: `User group ${group?.displayName ?? ''} handed over to ${
+				text: `Group ${group?.displayName ?? ''} handed over to ${
 					connections.find((c) => c.id === target)?.displayName ??
 					'the directory'
 				}.`
@@ -278,9 +278,9 @@ export function UserGroupPage({
 		<>
 			<PageHeader
 				crumbs={[
-					{ label: 'Buckets', href: '/admin/buckets' },
+					{ label: 'Projects', href: '/admin/projects' },
 					{ label: bucket?.name ?? '…', href: bucketHref(bucketId) },
-					{ label: 'User groups', href: listHref },
+					{ label: 'Groups', href: listHref },
 					{ label: group?.displayName ?? '…' }
 				]}
 				title={group?.displayName ?? '…'}
@@ -455,7 +455,7 @@ export function UserGroupPage({
 									wrap
 								>
 									<div>
-										<Typography.Text strong>Delete user group</Typography.Text>
+										<Typography.Text strong>Delete group</Typography.Text>
 										<br />
 										<Typography.Text type="secondary">
 											Its members lose whatever applications grant for it. The
@@ -470,7 +470,7 @@ export function UserGroupPage({
 											})
 										}
 									>
-										Delete user group…
+										Delete group…
 									</Button>
 								</Flex>
 							</Flex>

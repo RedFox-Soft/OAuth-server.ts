@@ -1,6 +1,6 @@
 ---
 title: Provision users from Entra ID or Okta with SCIM
-description: Connect Microsoft Entra ID, Okta or any SCIM 2.0 client to a bucket, so the directory creates, updates, deactivates and deletes its users and groups.
+description: Connect Microsoft Entra ID, Okta or any SCIM 2.0 client to a project, so the directory creates, updates, deactivates and deletes its users and groups.
 sidebar:
   order: 2
 ---
@@ -8,12 +8,12 @@ sidebar:
 import { Steps, Aside } from '@astrojs/starlight/components';
 
 With SCIM 2.0 the directory is the source of truth for who works here. Microsoft Entra ID, Okta or any
-SCIM client creates a bucket's users, keeps their profiles current, puts them in groups, and
+SCIM client creates a project's users, keeps their profiles current, puts them in groups, and
 deactivates or deletes them when they leave. The same people then sign in through the same directory,
 and the sign-in finds their account by the directory's own identifier rather than by email address.
 
 All of that rests on one record per directory, the **provisioning connection**. It belongs to one
-bucket and is bound to one of that bucket's upstream identity providers.
+project and is bound to one of that project's upstream identity providers.
 
 <Aside
 	type="note"
@@ -21,22 +21,22 @@ bucket and is bound to one of that bucket's upstream identity providers.
 >
 	Three things. The [`scim.enabled`](/docs/reference/settings/#scim.enabled)
 	setting on: it is off by default, because it lets a third party's system write
-	end-user accounts, and connections can be prepared while it is off. A bucket
+	end-user accounts, and connections can be prepared while it is off. A project
 	with an address, meaning one at a path or a hostname of its own, or the
-	default bucket at the root; the administrators' bucket cannot be provisioned.
-	And the directory configured as an [upstream identity
-	provider](/docs/administer/federation/) of that bucket, because the connection
-	is bound to it.
+	default project at the root; the administrators' project cannot be
+	provisioned. And the directory configured as an [upstream identity
+	provider](/docs/administer/federation/) of that project, because the
+	connection is bound to it.
 </Aside>
 
 ## Create the connection
 
 <Steps>
 
-1. Open the bucket in the console, go to its **Provisioning** tab and choose **New provisioning
+1. Open the project in the console, go to its **Provisioning** tab and choose **New provisioning
    connection**. A side panel walks you through the rest.
 
-2. **Directory.** Say which directory provisions the bucket: Entra ID, Okta or another SCIM client.
+2. **Directory.** Say which directory provisions the project: Entra ID, Okta or another SCIM client.
    From then on the panel uses that directory's own names for each field and shows its advice. An agent
    reads the same guide with `provisioning_directory_list`. Then pick the **Sign-in provider** the
    directory's users will sign in with. One provider binds to at most one connection.
@@ -72,7 +72,7 @@ provisioned user, because the directory owns that profile.
 
 ## The address the directory calls
 
-The SCIM base URL is the bucket's issuer followed by `/scim/v2`:
+The SCIM base URL is the project's issuer followed by `/scim/v2`:
 
 ```
 https://auth.example.com/acme/scim/v2
@@ -86,7 +86,7 @@ per address, because Entra and Okta send many customers' traffic from a few addr
 
 ## Microsoft Entra ID: client credentials
 
-Entra authenticates to the bucket's token endpoint as an OAuth client and presents the token it gets to
+Entra authenticates to the project's token endpoint as an OAuth client and presents the token it gets to
 the SCIM base URL. The client is `scim-<connectionId>`, shown on the connection as **Client id**. It is
 derived from the connection on every request and stored nowhere, so there is no second record to keep in
 step.
@@ -96,7 +96,7 @@ once. In Entra's provisioning
 settings, give it the SCIM base URL as the tenant URL, and the token endpoint, client id and secret for
 the client-credentials grant. Entra may send the secret by Basic authentication or in the form body;
 both are accepted. The token it gets carries the `scim` scope and nothing else, and works only at this
-bucket's SCIM URL.
+project's SCIM URL.
 
 In Entra's **How credentials are sent**, choose Header or Body, not Both: a token request that
 authenticates twice is refused (RFC 6749 §2.3). Leave the scopes empty or enter `scim`.
@@ -126,7 +126,7 @@ days or one year (`lifetimeDays` over the API). The token begins with `scimst_`,
 Okta's SCIM settings, choose **HTTP Header** authentication and paste the token as it is. Okta sends it
 without a `Bearer` prefix, and the prefix is what lets this server recognise it.
 
-A static token expires (RFC 7644 §7.4); the connection page and the bucket's overview warn 14 days
+A static token expires (RFC 7644 §7.4); the connection page and the project's overview warn 14 days
 before. To rotate, choose **Replace static token…**: as with a secret, the previous token keeps working
 until Okta has moved to the new one, at most 24 hours, so there is no gap to schedule around.
 **Revoke…** on the static token removes it without issuing another. Tokens issued before 0.11.0 were
@@ -136,12 +136,12 @@ from the profile, switched by [`scim.staticTokens`](/docs/reference/settings/#sc
 
 ## Users and groups
 
-`/Users` creates, reads, filters, replaces, patches and deletes the bucket's end users. `userName` is
-unique in the bucket regardless of letter case; `externalId` is unique within the connection.
+`/Users` creates, reads, filters, replaces, patches and deletes the project's end users. `userName` is
+unique in the project regardless of letter case; `externalId` is unique within the connection.
 Deactivating a user through SCIM ends their access at once, exactly as an administrator's deactivation
 does: see [End a user's access](/docs/administer/ending-access/).
 
-`/Groups` manages the bucket groups the connection owns, and their members. A group PATCH answers
+`/Groups` manages the project's groups that the connection owns, and their members. A group PATCH answers
 `204`, which is what Entra and Okta expect, and large groups are filled by PATCH batches of members
 rather than in the create. Relying parties read the result in the [`groups` claim](/docs/administer/groups/).
 
@@ -166,20 +166,20 @@ connection manages.
 
 ## The mass-deprovisioning guard
 
-A wrong scoping rule in the directory, or a stolen credential, can deactivate a whole bucket in minutes,
+A wrong scoping rule in the directory, or a stolen credential, can deactivate a whole project in minutes,
 and deactivation here ends sessions, grants and consents. Each connection can carry a threshold:
 **at most** a number of deprovisionings, from 1 to 100,000, within a window of 5 minutes to 7 days.
 A deactivation and a deletion of an existing user each count.
 
 The first deprovisioning beyond the threshold **holds** the connection. While it is held, every
 deactivation and deletion is refused with `429` and `Retry-After: 300` and changes nothing, while
-creates, updates and group changes keep flowing. The bucket's administrators get one email, which links
+creates, updates and group changes keep flowing. The project's administrators get one email, which links
 to the connection's page. Both directories retry a `429` by themselves, so nothing is lost: the refused
 requests land once the hold is released.
 
 Each refusal is recorded per person: who, which operation, when first and last, and how many attempts.
 The connection's page lists them, and an agent reads them with `provisioning_hold_get`. A held
-connection also shows as **On hold** on the **Buckets** list, and `provisioning_hold_list` lists every
+connection also shows as **On hold** on the **Projects** list, and `provisioning_hold_list` lists every
 held connection the caller can see.
 
 Only an explicit release ends a hold: **Release hold…** on the connection's page, or

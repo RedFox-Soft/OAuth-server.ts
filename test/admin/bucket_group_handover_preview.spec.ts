@@ -69,7 +69,7 @@ async function world(): Promise<World> {
 	);
 	const created = await admin(
 		'POST',
-		`/admin/api/buckets/${c.bucket._id}/groups`,
+		`/admin/api/projects/${c.bucket._id}/groups`,
 		cookie,
 		{ displayName: `Finance ${Math.random().toString(36).slice(2)}` }
 	);
@@ -95,7 +95,7 @@ async function members(w: World, n: number, local = false): Promise<User[]> {
 	}
 	const added = await admin(
 		'POST',
-		`/admin/api/buckets/${w.c.bucket._id}/groups/${w.gid}/members`,
+		`/admin/api/projects/${w.c.bucket._id}/groups/${w.gid}/members`,
 		w.cookie,
 		{ userIds: made.map((u) => u._id) }
 	);
@@ -106,7 +106,7 @@ async function members(w: World, n: number, local = false): Promise<User[]> {
 function handOver(w: World, consent: Record<string, unknown> = {}) {
 	return admin(
 		'POST',
-		`/admin/api/buckets/${w.c.bucket._id}/groups/${w.gid}/connection`,
+		`/admin/api/projects/${w.c.bucket._id}/groups/${w.gid}/connection`,
 		w.cookie,
 		{ connectionId: w.c.connection._id, ...consent }
 	);
@@ -278,12 +278,12 @@ describe('handing a user group to a provisioning connection', () => {
 			connectionId: w.c.connection._id
 		};
 		const described = await rpc(
-			call('bucket_group_assign_connection', args),
+			call('project_group_assign_connection', args),
 			token
 		);
 
 		const previewed = await rpc(
-			call('bucket_group_assign_connection', {
+			call('project_group_assign_connection', {
 				...args,
 				confirmationToken:
 					described.result?.structuredContent?.confirmationToken

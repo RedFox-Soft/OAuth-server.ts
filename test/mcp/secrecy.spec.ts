@@ -121,7 +121,7 @@ async function seedSecretHolders(token: string) {
 	const bucket = await rpc(
 		// Unique per call: this helper runs once per case, and the bucket store is a module-level
 		// singleton that no bootstrap clears — so a fixed slug collides with the previous case's.
-		call('bucket_create', {
+		call('project_create', {
 			name: 'Secret bucket',
 			slug: `secret-bucket-${Math.random().toString(36).slice(2, 10)}`
 		}),
@@ -145,7 +145,7 @@ async function seedSecretHolders(token: string) {
 	});
 
 	await rpc(
-		call('bucket_user_create', {
+		call('project_user_create', {
 			id: bucketId,
 			email: `holder-${Math.random()}@x.io`,
 			password: SECRETS.endUserPassword
@@ -164,7 +164,7 @@ async function seedSecretHolders(token: string) {
 	idp.expectDiscovery();
 	const provider = await rpc(
 		call('federation_provider_create', {
-			bucketId,
+			projectId: bucketId,
 			id: 'okta',
 			displayName: 'Okta',
 			issuer: idp.origin,
@@ -194,7 +194,7 @@ async function seedSecretHolders(token: string) {
 	apple.expectDiscovery();
 	const keyed = await rpc(
 		call('federation_provider_create', {
-			bucketId,
+			projectId: bucketId,
 			catalogueId: 'apple',
 			clientId: apple.clientId,
 			teamId: apple.teamId,
@@ -366,10 +366,10 @@ describe('MCP surface leaks no secrets', () => {
 			resource_list: { id: seeded.bucketId },
 			client_list: { id: seeded.clientBucketId },
 			client_get: { id: seeded.clientBucketId, clientId: seeded.clientId },
-			bucket_get: { id: seeded.bucketId },
-			bucket_activity_get: { id: seeded.bucketId },
-			bucket_summary_get: { id: seeded.bucketId },
-			bucket_user_list: { id: seeded.bucketId },
+			project_get: { id: seeded.bucketId },
+			project_activity_get: { id: seeded.bucketId },
+			project_summary_get: { id: seeded.bucketId },
+			project_user_list: { id: seeded.bucketId },
 			federation_provider_list: { id: seeded.bucketId }
 		};
 
@@ -440,7 +440,7 @@ describe('MCP surface leaks no secrets', () => {
 				id: seeded.clientBucketId,
 				clientId: 'no-such-client'
 			}),
-			call('bucket_get', { id: 'no-such-bucket' }),
+			call('project_get', { id: 'no-such-bucket' }),
 			call('federation_provider_update', {
 				id: seeded.bucketId,
 				providerId: 'okta',

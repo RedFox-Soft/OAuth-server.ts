@@ -29,12 +29,12 @@ export function scopeOptionLabel(g: ScopeOption): string {
 }
 
 interface ScopeView {
-	activeGroupId: string;
+	activeTeamId: string;
 	available: ScopeOption[];
 }
 
 /*
- * Which group the console is pointed at.
+ * Which team the console is pointed at.
  *
  * The active scope is held on the session, so every list is scoped by the server on its next request.
  * After a switch the operator's identity is re-read and the page subtree remounts (Layout keys it by the
@@ -66,18 +66,20 @@ export function ScopeSwitcher() {
 			return;
 		}
 		setSwitching(true);
-		const result = await request('PUT', '/admin/api/scope', { groupId });
+		const result = await request('PUT', '/admin/api/scope', {
+			teamId: groupId
+		});
 		setSwitching(false);
 		if (!result.ok) {
 			feedback.failed(result);
 			return;
 		}
-		setScope((prev) => (prev ? { ...prev, activeGroupId: groupId } : prev));
+		setScope((prev) => (prev ? { ...prev, activeTeamId: groupId } : prev));
 		await reload();
 	}
 
 	if (!scope) return null;
-	const active = scope.available.find((g) => g.id === scope.activeGroupId);
+	const active = scope.available.find((g) => g.id === scope.activeTeamId);
 	/*
 	 * Named by what it does (specs/085). A super administrator's lists show the whole instance whatever is
 	 * chosen, so for them the control only decides where new buckets land; for everyone else it
@@ -86,12 +88,12 @@ export function ScopeSwitcher() {
 	const label = superAdmin ? (
 		<Typography.Text type="secondary">
 			Create in{' '}
-			<Tooltip title="Lists show the whole instance. This decides which group new buckets are created in.">
+			<Tooltip title="Lists show the whole instance. This decides which team new projects are created in.">
 				<InfoCircleOutlined aria-label="What Create in means" />
 			</Tooltip>
 		</Typography.Text>
 	) : (
-		<Typography.Text type="secondary">Group</Typography.Text>
+		<Typography.Text type="secondary">Team</Typography.Text>
 	);
 
 	// One group: nothing to switch between, so its name is plain text.
@@ -114,8 +116,8 @@ export function ScopeSwitcher() {
 			{label}
 			<Select
 				id={SCOPE_SWITCHER_ID}
-				aria-label={superAdmin ? 'Create in' : 'Group'}
-				value={scope.activeGroupId}
+				aria-label={superAdmin ? 'Create in' : 'Team'}
+				value={scope.activeTeamId}
 				loading={switching}
 				onChange={onChange}
 				style={{ minWidth: 200 }}

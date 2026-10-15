@@ -331,7 +331,7 @@ function assertMayConfigure(bucket: UserBucket, actor: ProviderActor): void {
 	if (bucket._id === ADMIN_BUCKET_ID && !actor.superAdmin) {
 		throw new AdminError(
 			403,
-			"only a super administrator may configure the administrators' bucket's providers"
+			"only a super administrator may configure the administrators' project's providers"
 		);
 	}
 }
@@ -650,7 +650,7 @@ export async function moveProvider(
 	const updated = await getBucketStore().update(bucket._id, {
 		signInOrder: to
 	});
-	if (!updated) throw new AdminError(404, 'no access to this bucket');
+	if (!updated) throw new AdminError(404, 'no access to this project');
 	return updated;
 }
 

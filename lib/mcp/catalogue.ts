@@ -95,8 +95,8 @@ import {
  * the schema module's own comment carries the argument.
  *
  * Paths are written in Elysia's declaration form so they compare directly against `elysia.routes`.
- * Matching is exact on (method, path), never a prefix test: `POST /admin/api/buckets` and
- * `POST /admin/api/buckets/:id/users` are different operations on different entities.
+ * Matching is exact on (method, path), never a prefix test: `POST /admin/api/projects` and
+ * `POST /admin/api/projects/:id/users` are different operations on different entities.
  */
 
 export type Consequence = 'read' | 'ordinary' | 'high';
@@ -114,7 +114,7 @@ export interface McpTool {
 	 * tell an agent what it needs, and so a drift test can compare it against the handler.
 	 *
 	 * `false` covers two different things on purpose: a route open to any authenticated administrator,
-	 * and a route that is scope-filtered rather than privilege-gated (`bucket_list` returns the buckets the
+	 * and a route that is scope-filtered rather than privilege-gated (`project_list` returns the projects the
 	 * caller manages). Neither refuses a non-super administrator outright.
 	 */
 	readonly superAdminOnly: boolean;
@@ -126,7 +126,7 @@ export interface McpTool {
 	 *
 	 * A tool takes one flat argument object, so `:id` and a body property called `id` cannot both be
 	 * `id` — one silently wins and the other is dropped. That is not hypothetical: the federation
-	 * provider create route is `/admin/api/buckets/:id/federation` while its body carries the
+	 * provider create route is `/admin/api/projects/:id/federation` while its body carries the
 	 * provider's own `id`, so the provider id vanished and every call failed validation until this
 	 * existed. `test/mcp/catalogue_drift.spec.ts` now refuses any tool whose final argument names
 	 * collide, so the next such route fails the suite instead of shipping broken.
@@ -135,10 +135,10 @@ export interface McpTool {
 	/*
 	 * High-consequence for one target only: the call is gated as `high` when the named path parameter (by its
 	 * declared name, `id`, not its argument alias) equals the value. The provider writes use it for the
-	 * administrators' bucket (specs/080): there they decide who can sign in to the console, while on an
-	 * ordinary bucket one confirmation more would buy nothing. Data rather than a predicate, so the catalogue
+	 * administrators' project (specs/080): there they decide who can sign in to the console, while on an
+	 * ordinary project one confirmation more would buy nothing. Data rather than a predicate, so the catalogue
 	 * still exports as JSON for the documentation. The token already binds the target, so a confirmation for
-	 * one bucket cannot be spent on another.
+	 * one project cannot be spent on another.
 	 */
 	readonly highWhen?: { readonly pathParam: string; readonly equals: string };
 	readonly summary: string;
@@ -191,12 +191,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: [],
 		summary:
-			'The administrator this agent is acting as: their id, email, whether they are a super administrator, and the groups they belong to. `can` states what they may create — `createBucket`, `createHost` (a bucket with a hostname of its own), `createGroup` — and `instance`, whether the instance-wide operations are theirs.'
+			'The administrator this agent is acting as: their id, email, whether they are a super administrator, and the teams they belong to. `can` states what they may create — `createProject`, `createHost` (a project with a hostname of its own), `createTeam` — and `instance`, whether the instance-wide operations are theirs.'
 	},
 	{
 		tool: 'resource_list',
 		method: 'GET',
-		path: '/admin/api/buckets/:id/resources',
+		path: '/admin/api/projects/:id/resources',
 		action: null,
 		consequence: 'read',
 		superAdminOnly: false,
@@ -204,12 +204,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			"Every protected resource (API) declared in a user bucket, sorted by identifier: the audiences this server mints tokens for on that bucket's behalf, with the scopes each recognises, how its tokens are verified, and their lifetime. `namespace` is `bucket` for a bucket with an address of its own — whose identifiers are unique to it — and `root` for one served at the root, which shares its namespace with the other root-served buckets; only this bucket's declarations are listed either way."
+			"Every protected resource (API) declared in a project, sorted by identifier: the audiences this server mints tokens for on that project's behalf, with the scopes each recognises, how its tokens are verified, and their lifetime. `namespace` is `project` for a project with an address of its own — whose identifiers are unique to it — and `root` for one served at the root, which shares its namespace with the other root-served projects; only this project's declarations are listed either way."
 	},
 	{
 		tool: 'resource_get',
 		method: 'GET',
-		path: '/admin/api/buckets/:id/resources/:resourceId',
+		path: '/admin/api/projects/:id/resources/:resourceId',
 		action: null,
 		consequence: 'read',
 		superAdminOnly: false,
@@ -217,12 +217,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'resourceId'],
 		summary:
-			'One declared protected resource. The resourceId is the canonical resource identifier itself, percent-encoded into the path, and names the declaration in this bucket: another tenant may declare the same identifier in its own.'
+			'One declared protected resource. The resourceId is the canonical resource identifier itself, percent-encoded into the path, and names the declaration in this project: another tenant may declare the same identifier in its own.'
 	},
 	{
 		tool: 'resource_vouching_check',
 		method: 'GET',
-		path: '/admin/api/buckets/:id/resources/:resourceId/vouching',
+		path: '/admin/api/projects/:id/resources/:resourceId/vouching',
 		action: null,
 		consequence: 'read',
 		superAdminOnly: false,
@@ -235,7 +235,7 @@ const catalogue = [
 	{
 		tool: 'client_list',
 		method: 'GET',
-		path: '/admin/api/buckets/:id/clients',
+		path: '/admin/api/projects/:id/clients',
 		action: null,
 		consequence: 'read',
 		superAdminOnly: false,
@@ -243,12 +243,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			"The OAuth clients (applications) of a user bucket: those an administrator created and those that registered themselves at the bucket's own address (`registeredDynamically: true` — listed and readable, but changed only through their registration access token). Each carries its `corsOrigins`. Never returns a client secret."
+			"The OAuth clients (applications) of a project: those an administrator created and those that registered themselves at the project's own address (`registeredDynamically: true` — listed and readable, but changed only through their registration access token). Each carries its `corsOrigins`. Never returns a client secret."
 	},
 	{
 		tool: 'client_get',
 		method: 'GET',
-		path: '/admin/api/buckets/:id/clients/:clientId',
+		path: '/admin/api/projects/:id/clients/:clientId',
 		action: null,
 		consequence: 'read',
 		superAdminOnly: false,
@@ -282,12 +282,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: [],
 		summary:
-			'What turning password sign-in to the console off would do: whether it is on, how many super administrators could still sign in through an identity provider of the Administrators bucket, and which administrators could not. Turning it off is refused to an agent: only a console session that signed in through such a provider may.'
+			'What turning password sign-in to the console off would do: whether it is on, how many super administrators could still sign in through an identity provider of the Administrators project, and which administrators could not. Turning it off is refused to an agent: only a console session that signed in through such a provider may.'
 	},
 	{
-		tool: 'group_list',
+		tool: 'team_list',
 		method: 'GET',
-		path: '/admin/api/groups',
+		path: '/admin/api/teams',
 		action: null,
 		consequence: 'read',
 		superAdminOnly: false,
@@ -295,12 +295,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: [],
 		summary:
-			'The groups this administrator belongs to (every group, for a super administrator). A group owns user buckets — and through them their applications and APIs — and belonging to it is what grants access to them; each row counts what it owns as `owns.buckets`.'
+			'The teams this administrator belongs to (every team, for a super administrator). A team owns projects — and through them their applications and APIs — and belonging to it is what grants access to them; each row counts what it owns as `owns.projects`.'
 	},
 	{
-		tool: 'group_get',
+		tool: 'team_get',
 		method: 'GET',
-		path: '/admin/api/groups/:id',
+		path: '/admin/api/teams/:id',
 		action: null,
 		consequence: 'read',
 		superAdminOnly: false,
@@ -308,12 +308,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			"One group: its name, kind, and the administrators in it — each with `role`, `email` and `active` (false for a deactivated account), owners first. `owns` names the buckets it owns, which are what keep it from being deleted. `can` states what the server will accept from the caller on it: `manageMembers` (group_member_update, group_member_remove), `invite` (group_invite, group_invitation_revoke), `addExisting` (group_member_add — stated only for a super administrator, the one caller who can list administrators to choose from, though an owner who knows an administrator's id is accepted too), `rename` (group_update) and `delete`; a personal group can be renamed and nothing else, and the System group nothing. Readable by its members and super administrators."
+			"One team: its name, kind, and the administrators in it — each with `role`, `email` and `active` (false for a deactivated account), owners first. `owns` names the projects it owns, which are what keep it from being deleted. `can` states what the server will accept from the caller on it: `manageMembers` (team_member_update, team_member_remove), `invite` (team_invite, team_invitation_revoke), `addExisting` (team_member_add — stated only for a super administrator, the one caller who can list administrators to choose from, though an owner who knows an administrator's id is accepted too), `rename` (team_update) and `delete`; a personal team can be renamed and nothing else, and the System team nothing. Readable by its members and super administrators."
 	},
 	{
-		tool: 'group_invitation_list',
+		tool: 'team_invitation_list',
 		method: 'GET',
-		path: '/admin/api/groups/:id/invitations',
+		path: '/admin/api/teams/:id/invitations',
 		action: null,
 		consequence: 'read',
 		superAdminOnly: false,
@@ -321,7 +321,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'Pending invitations into a group. Never returns an invitation token — a token exists only in the mail it was sent in.'
+			'Pending invitations into a team. Never returns an invitation token — a token exists only in the mail it was sent in.'
 	},
 	{
 		tool: 'scope_get',
@@ -334,12 +334,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: [],
 		summary:
-			"The console's active group and the groups available to switch to. An agent has no console session: name a group per call instead of switching."
+			"The console's active team and the teams available to switch to. An agent has no console session: name a team per call instead of switching."
 	},
 	{
-		tool: 'bucket_list',
+		tool: 'project_list',
 		method: 'GET',
-		path: '/admin/api/buckets',
+		path: '/admin/api/projects',
 		action: null,
 		consequence: 'read',
 		superAdminOnly: false,
@@ -347,12 +347,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: [],
 		summary:
-			'The user buckets: every one for a super-administrator, otherwise those the caller manages. For a super-administrator the list includes the administrators\' own bucket, marked `reserved: "administrators"`; nobody else sees it. Each row carries `can` and `blockers`, as bucket_get does, and `addressForm` (root, path, host or unaddressed), `issuer` (null when unaddressed), `hostReached` (a request has arrived at its hostname; false for a bucket without one) and `held` (a provisioning connection of the bucket is holding a deprovisioning). A bucket scheduled for deletion is still listed, with `deletion` as bucket_get describes it.'
+			'The projects: every one for a super-administrator, otherwise those the caller manages. For a super-administrator the list includes the administrators\' own project, marked `reserved: "administrators"`; nobody else sees it. Each row carries `can` and `blockers`, as project_get does, and `addressForm` (root, path, host or unaddressed), `issuer` (null when unaddressed), `hostReached` (a request has arrived at its hostname; false for a project without one) and `held` (a provisioning connection of the project is holding a deprovisioning). A project scheduled for deletion is still listed, with `deletion` as project_get describes it.'
 	},
 	{
-		tool: 'bucket_get',
+		tool: 'project_get',
 		method: 'GET',
-		path: '/admin/api/buckets/:id',
+		path: '/admin/api/projects/:id',
 		action: null,
 		consequence: 'read',
 		superAdminOnly: false,
@@ -360,12 +360,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			"One user bucket: its name, owning group, and registration and verification settings. Its groups of end users are read with bucket_group_list. A super-administrator may read the administrators' own bucket here (`reserved: \"administrators\"`); its accounts are read with admin_list, not through the bucket. `can` states which operations the server will accept from the caller on it: `manageUsers` (bucket_user_*, the identity tools, bucket_group_member_add/remove, and reading providers, provisioning and user groups), `edit` (federation_provider_create/update/delete, provisioning_connection_create/update/delete/release, provisioning_credential_*, bucket_group_create/update/delete/assign_connection, bucket_user_assign_connection, bucket_key_*), `editSettings` (bucket_update), `readActivity` (bucket_activity_get), `changeAddress` (bucket_address_change), `move` (bucket_owner_change) and `delete`; a false flag is a refusal, so do not try it. `changeAddress` and `delete` also depend on the bucket's state for some callers: an owner of its group may change a path address only while no application, identity provider or provisioning connection depends on it, and a member who is not an owner may delete it only while it holds no accounts. `blockers` is the state behind them: `addressable` is false for a bucket that signs with the instance keys, `dependents` counts the applications, providers and connections depending on it and `accounts` the accounts it holds — each null when it could not change the caller's answer and so was not read. `addressForm` is root, path, host or unaddressed; `issuer` and `discoveryUrl` are what a client is configured with (null when unaddressed); `applications` and `apis` count what it holds (client_list, resource_list). `edit` also governs its applications and APIs (client_create/update/delete, client_secret_rotate, resource_declare/update/delete). Its counts are read with bucket_summary_get. A bucket scheduled for deletion carries `deletion` — `scheduledAt`, `purgeAt` (the date it will be destroyed) and `scheduledBy` — and answers nobody at its address until then: every change to it or to anything it holds is refused with 409 until bucket_restore brings it back, while reading keeps working. Deleting a bucket stays console-only for agents even where `can.delete` is true."
+			"One project: its name, owning team, and registration and verification settings. Its groups of end users are read with project_group_list. A super-administrator may read the administrators' own project here (`reserved: \"administrators\"`); its accounts are read with admin_list, not through the project. `can` states which operations the server will accept from the caller on it: `manageUsers` (project_user_*, the identity tools, project_group_member_add/remove, and reading providers, provisioning and groups), `edit` (federation_provider_create/update/delete, provisioning_connection_create/update/delete/release, provisioning_credential_*, project_group_create/update/delete/assign_connection, project_user_assign_connection, project_key_*), `editSettings` (project_update), `readActivity` (project_activity_get), `changeAddress` (project_address_change), `move` (project_owner_change) and `delete`; a false flag is a refusal, so do not try it. `changeAddress` and `delete` also depend on the project's state for some callers: an owner of its team may change a path address only while no application, identity provider or provisioning connection depends on it, and a member who is not an owner may delete it only while it holds no accounts. `blockers` is the state behind them: `addressable` is false for a project that signs with the instance keys, `dependents` counts the applications, providers and connections depending on it and `accounts` the accounts it holds — each null when it could not change the caller's answer and so was not read. `addressForm` is root, path, host or unaddressed; `issuer` and `discoveryUrl` are what a client is configured with (null when unaddressed); `applications` and `apis` count what it holds (client_list, resource_list). `edit` also governs its applications and APIs (client_create/update/delete, client_secret_rotate, resource_declare/update/delete). Its counts are read with project_summary_get. A project scheduled for deletion carries `deletion` — `scheduledAt`, `purgeAt` (the date it will be destroyed) and `scheduledBy` — and answers nobody at its address until then: every change to it or to anything it holds is refused with 409 until project_restore brings it back, while reading keeps working. Deleting a project stays console-only for agents even where `can.delete` is true."
 	},
 	{
-		tool: 'bucket_summary_get',
+		tool: 'project_summary_get',
 		method: 'GET',
-		path: '/admin/api/buckets/:id/summary',
+		path: '/admin/api/projects/:id/summary',
 		action: null,
 		consequence: 'read',
 		superAdminOnly: false,
@@ -373,12 +373,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			"Count what a user bucket holds, computed when asked: its accounts (`users`), how many are unverified, without an authenticator and without any linked upstream identity; its user groups; its provisioning connections and how many are holding a deprovisioning (`held`); its identity providers (`providers.enabled`, and `providers.creating` — enabled ones that create accounts on first sign-in); whether mail delivery is configured; and whether federation is switched on for the instance (`federationEnabled` — when false no bucket's sign-in page shows a provider button). `withoutEnabledLink` counts accounts with no link to an enabled identity provider (who could not sign in were passwords turned off) and `passwordWithoutAuthenticator` accounts with no authenticator whose password is not known to be absent (who an authenticator requirement would ask to enrol); `applications` and `apis` count the applications and declared APIs it holds; on the default bucket a sign-in change's preview also counts the applications signing in there. `activeThisMonth` is present only to a caller with `can.readActivity`, and absent rather than zero before counting began. Counts only, never who. Readable by anyone who may read the bucket (bucket_get's `can.read`)."
+			"Count what a project holds, computed when asked: its accounts (`users`), how many are unverified, without an authenticator and without any linked upstream identity; its groups of end users (`groups`); its provisioning connections and how many are holding a deprovisioning (`held`); its identity providers (`providers.enabled`, and `providers.creating` — enabled ones that create accounts on first sign-in); whether mail delivery is configured; and whether federation is switched on for the instance (`federationEnabled` — when false no project's sign-in page shows a provider button). `withoutEnabledLink` counts accounts with no link to an enabled identity provider (who could not sign in were passwords turned off) and `passwordWithoutAuthenticator` accounts with no authenticator whose password is not known to be absent (who an authenticator requirement would ask to enrol); `applications` and `apis` count the applications and declared APIs it holds; on the default project a sign-in change's preview also counts the applications signing in there. `activeThisMonth` is present only to a caller with `can.readActivity`, and absent rather than zero before counting began. Counts only, never who. Readable by anyone who may read the project (project_get's `can.read`)."
 	},
 	{
-		tool: 'bucket_activity_get',
+		tool: 'project_activity_get',
 		method: 'GET',
-		path: '/admin/api/buckets/:id/activity',
+		path: '/admin/api/projects/:id/activity',
 		action: null,
 		consequence: 'read',
 		superAdminOnly: false,
@@ -386,7 +386,7 @@ const catalogue = [
 		querySchema: BucketActivityQuery,
 		pathParams: ['id'],
 		summary:
-			"Read a user bucket's monthly active users: this month so far, each day of the month and the previous 12 months, in total and by kind of activity (local sign-in, upstream sign-in, renewal) and directory-provisioned accounts. A super administrator may also read the reserved buckets, by id; a deleted bucket can be read by id by a super administrator and by members of the group that owned it last, and is refused to anyone else exactly as an unknown id is. The answer names the bucket (`name`) and, for a deleted one, `deletedAt` and the group that last owned it (`lastOwner`, null when not recorded). Counts only, never who."
+			"Read a project's monthly active users: this month so far, each day of the month and the previous 12 months, in total and by kind of activity (local sign-in, upstream sign-in, renewal) and directory-provisioned accounts. A super administrator may also read the reserved projects, by id; a deleted project can be read by id by a super administrator and by members of the team that owned it last, and is refused to anyone else exactly as an unknown id is. The answer names the project (`name`) and, for a deleted one, `deletedAt` and the team that last owned it (`lastOwner`, null when not recorded). Counts only, never who."
 	},
 	{
 		tool: 'activity_overview',
@@ -399,12 +399,12 @@ const catalogue = [
 		querySchema: ActivityOverviewQuery,
 		pathParams: [],
 		summary:
-			"List every user bucket on the instance with its monthly active users, including the default and administrators buckets and deleted buckets, each with its customer (the group that owns it, or owned it when it was deleted) and its last 13 months and the month's days. Also answers each customer's summed figures and contacts (its owners' emails), the instance's totals, and the buckets whose figure rose or fell sharply between the last two closed months. A customer's figure is a sum of its buckets', not a count of distinct people. Counts only, never which end users. A super administrator reads the whole instance; any other administrator reads only the buckets owned by groups they belong to and the deleted buckets those groups owned last, with those groups as the customers and every total computed over those buckets alone — the reserved buckets are never included for them."
+			"List every project on the instance with its monthly active users, including the default and administrators projects and deleted projects, each with its customer (the team that owns it, or owned it when it was deleted) and its last 13 months and the month's days. Also answers each customer's summed figures and contacts (its owners' emails), the instance's totals, and the projects whose figure rose or fell sharply between the last two closed months. A customer's figure is a sum of its projects', not a count of distinct people. Counts only, never which end users. A super administrator reads the whole instance; any other administrator reads only the projects owned by teams they belong to and the deleted projects those teams owned last, with those teams as the customers and every total computed over those projects alone — the reserved projects are never included for them."
 	},
 	{
-		tool: 'bucket_user_list',
+		tool: 'project_user_list',
 		method: 'GET',
-		path: '/admin/api/buckets/:id/users',
+		path: '/admin/api/projects/:id/users',
 		action: null,
 		consequence: 'read',
 		superAdminOnly: false,
@@ -412,12 +412,12 @@ const catalogue = [
 		querySchema: UserListQuery,
 		pathParams: ['id'],
 		summary:
-			"A page of the end-user accounts held in one bucket, ordered by email, as `{ users, totalResults }`. `q` finds people whose email or username starts with it, in any letter case, or whose id is exactly it. Narrow with `status` (active, deactivated, locked), `managedBy` (`console` for people administrators manage, or a provisioning connection's id), `verified` and `authenticator` (yes or no). Page with `startIndex` (1-based) and `count` (1–200, default 50). Each user carries their groups; `passwordSet` says whether a password anyone chose opens the account, when known. Read one person in full with bucket_user_get."
+			"A page of the end-user accounts held in one project, ordered by email, as `{ users, totalResults }`. `q` finds people whose email or username starts with it, in any letter case, or whose id is exactly it. Narrow with `status` (active, deactivated, locked), `managedBy` (`console` for people administrators manage, or a provisioning connection's id), `verified` and `authenticator` (yes or no). Page with `startIndex` (1-based) and `count` (1–200, default 50). Each user carries their groups; `passwordSet` says whether a password anyone chose opens the account, when known. Read one person in full with project_user_get."
 	},
 	{
-		tool: 'bucket_user_get',
+		tool: 'project_user_get',
 		method: 'GET',
-		path: '/admin/api/buckets/:id/users/:uid',
+		path: '/admin/api/projects/:id/users/:uid',
 		action: null,
 		consequence: 'read',
 		superAdminOnly: false,
@@ -425,12 +425,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'uid'],
 		summary:
-			"One end-user of a bucket, as a row of bucket_user_list, and — when they are locked — who locked them: `lockedLocally.byEmail` is that administrator's email, or null when their account no longer exists."
+			"One end-user of a project, as a row of project_user_list, and — when they are locked — who locked them: `lockedLocally.byEmail` is that administrator's email, or null when their account no longer exists."
 	},
 	{
-		tool: 'bucket_user_session_list',
+		tool: 'project_user_session_list',
 		method: 'GET',
-		path: '/admin/api/buckets/:id/users/:uid/sessions',
+		path: '/admin/api/projects/:id/users/:uid/sessions',
 		action: null,
 		consequence: 'read',
 		superAdminOnly: false,
@@ -438,12 +438,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'uid'],
 		summary:
-			'The applications an end-user is signed in to in this bucket, as `{ applications }`: per application its `clientId` and `clientName`, `signedInAt`, `lastTokenAt` (when this server last issued it a token for the person — not when the application used one) and `offline` (it holds offline access no live session carries). A row with `clientId: null` is a sign-in that has reached no application yet. No network address, browser or device is stored, so none is returned. Sign the person out of one application with bucket_user_application_sign_out.'
+			'The applications an end-user is signed in to in this project, as `{ applications }`: per application its `clientId` and `clientName`, `signedInAt`, `lastTokenAt` (when this server last issued it a token for the person — not when the application used one) and `offline` (it holds offline access no live session carries). A row with `clientId: null` is a sign-in that has reached no application yet. No network address, browser or device is stored, so none is returned. Sign the person out of one application with project_user_application_sign_out.'
 	},
 	{
 		tool: 'federation_provider_list',
 		method: 'GET',
-		path: '/admin/api/buckets/:id/federation',
+		path: '/admin/api/projects/:id/federation',
 		action: null,
 		consequence: 'read',
 		superAdminOnly: false,
@@ -451,12 +451,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'The upstream identity providers configured on a bucket. Never returns a provider client secret.'
+			'The upstream identity providers configured on a project. Never returns a provider client secret.'
 	},
 	{
 		tool: 'federation_provider_get',
 		method: 'GET',
-		path: '/admin/api/buckets/:id/federation/:providerId',
+		path: '/admin/api/projects/:id/federation/:providerId',
 		action: null,
 		consequence: 'read',
 		superAdminOnly: false,
@@ -464,12 +464,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'providerId'],
 		summary:
-			"One upstream identity provider of a bucket, with what it takes to run it: `callbackUri` (the redirect URI to register at the provider) and `callbackStability` (`provisional` while the bucket's address may still change), `recognised` (the catalogue entry it matches, or null), `logoutSignals` (whether the provider can send Global Token Revocation and back-channel logout at all — never for GitHub), `capabilities` (whether this instance accepts each), `boundConnection` (the SCIM provisioning connection bound to it, or null), `linkedUsers` (how many of the bucket's users are linked to it — the people a disable or delete affects), `recommendedCorrelation` (the claim and SCIM attribute a provisioning connection should match on) and `warnings`. Never returns its client secret."
+			"One upstream identity provider of a project, with what it takes to run it: `callbackUri` (the redirect URI to register at the provider) and `callbackStability` (`provisional` while the project's address may still change), `recognised` (the catalogue entry it matches, or null), `logoutSignals` (whether the provider can send Global Token Revocation and back-channel logout at all — never for GitHub), `capabilities` (whether this instance accepts each), `boundConnection` (the SCIM provisioning connection bound to it, or null), `linkedUsers` (how many of the project's users are linked to it — the people a disable or delete affects), `recommendedCorrelation` (the claim and SCIM attribute a provisioning connection should match on) and `warnings`. Never returns its client secret."
 	},
 	{
-		tool: 'bucket_group_list',
+		tool: 'project_group_list',
 		method: 'GET',
-		path: '/admin/api/buckets/:id/groups',
+		path: '/admin/api/projects/:id/groups',
 		action: null,
 		consequence: 'read',
 		superAdminOnly: false,
@@ -477,12 +477,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			"A bucket's groups of end users, each with its member count and, for one a SCIM directory manages, the connection that owns it. Group names are what relying parties see in the `groups` claim."
+			"A project's groups of end users, each with its member count and, for one a SCIM directory manages, the connection that owns it. Group names are what relying parties see in the `groups` claim."
 	},
 	{
-		tool: 'bucket_group_get',
+		tool: 'project_group_get',
 		method: 'GET',
-		path: '/admin/api/buckets/:id/groups/:gid',
+		path: '/admin/api/projects/:id/groups/:gid',
 		action: null,
 		consequence: 'read',
 		superAdminOnly: false,
@@ -490,12 +490,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'gid'],
 		summary:
-			'One bucket group: its name, external id and owning connection if a directory manages it, and its member count.'
+			"One group of the project's end users: its name, external id and owning connection if a directory manages it, and its member count."
 	},
 	{
-		tool: 'bucket_group_member_list',
+		tool: 'project_group_member_list',
 		method: 'GET',
-		path: '/admin/api/buckets/:id/groups/:gid/members',
+		path: '/admin/api/projects/:id/groups/:gid/members',
 		action: null,
 		consequence: 'read',
 		superAdminOnly: false,
@@ -503,12 +503,12 @@ const catalogue = [
 		querySchema: BucketGroupMemberPageQuery,
 		pathParams: ['id', 'gid'],
 		summary:
-			"A page of a bucket group's members (id, email, userName), up to 1,000 at a time, with the total. `q` narrows it to members whose email or username starts with it, in any letter case, or whose id is exactly it; the total is then the matching members'."
+			"A page of a group's members (id, email, userName), up to 1,000 at a time, with the total. `q` narrows it to members whose email or username starts with it, in any letter case, or whose id is exactly it; the total is then the matching members'."
 	},
 	{
 		tool: 'provisioning_connection_list',
 		method: 'GET',
-		path: '/admin/api/buckets/:id/provisioning-connections',
+		path: '/admin/api/projects/:id/provisioning-connections',
 		action: null,
 		consequence: 'read',
 		superAdminOnly: false,
@@ -516,12 +516,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'The SCIM provisioning connections of a bucket, each with its SCIM base URL, token endpoint, client id, managed-user count and warnings. Never returns a secret or a static token.'
+			'The SCIM provisioning connections of a project, each with its SCIM base URL, token endpoint, client id, managed-user count and warnings. Never returns a secret or a static token.'
 	},
 	{
 		tool: 'provisioning_connection_get',
 		method: 'GET',
-		path: '/admin/api/buckets/:id/provisioning-connections/:connectionId',
+		path: '/admin/api/projects/:id/provisioning-connections/:connectionId',
 		action: null,
 		consequence: 'read',
 		superAdminOnly: false,
@@ -534,7 +534,7 @@ const catalogue = [
 	{
 		tool: 'provisioning_hold_get',
 		method: 'GET',
-		path: '/admin/api/buckets/:id/provisioning-connections/:connectionId/hold',
+		path: '/admin/api/projects/:id/provisioning-connections/:connectionId/hold',
 		action: null,
 		consequence: 'read',
 		superAdminOnly: false,
@@ -555,7 +555,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: [],
 		summary:
-			'Every SCIM provisioning connection held by its mass-deprovisioning guard, across the buckets bucket_list shows the caller: `{count, connections}`, each with `bucketId`, `bucketName`, `connectionId`, `displayName`, `since` (when the hold began) and `refused` (how many removals it has refused so far), oldest hold first. While a connection is held, the people the directory removes keep their access; read provisioning_hold_get before releasing one.'
+			'Every SCIM provisioning connection held by its mass-deprovisioning guard, across the projects project_list shows the caller: `{count, connections}`, each with `projectId`, `projectName`, `connectionId`, `displayName`, `since` (when the hold began) and `refused` (how many removals it has refused so far), oldest hold first. While a connection is held, the people the directory removes keep their access; read provisioning_hold_get before releasing one.'
 	},
 	{
 		/*
@@ -564,7 +564,7 @@ const catalogue = [
 		 */
 		tool: 'provisioning_directory_list',
 		method: 'GET',
-		path: '/admin/api/buckets/:id/provisioning-connections/directories',
+		path: '/admin/api/projects/:id/provisioning-connections/directories',
 		action: null,
 		consequence: 'read',
 		superAdminOnly: false,
@@ -572,18 +572,18 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			"How to connect each known directory to a bucket over SCIM, in the directory's own words: `directories`, one each for `entra` (Microsoft Entra ID), `okta` and `generic`, with `displayName`, `recommendedCredential` and `fallbackCredential` (the kind to pass to provisioning_credential_issue), `recommendedCorrelation`, `labels` (the directory's names for the SCIM base URL, token endpoint, client id, client secret and static token), the ordered `steps`, known `pitfalls`, and `values` — this bucket's SCIM base URL and token endpoint, null when it has no SCIM address. Set a connection's `directory` to the matching id. Returns no credential."
+			"How to connect each known directory to a project over SCIM, in the directory's own words: `directories`, one each for `entra` (Microsoft Entra ID), `okta` and `generic`, with `displayName`, `recommendedCredential` and `fallbackCredential` (the kind to pass to provisioning_credential_issue), `recommendedCorrelation`, `labels` (the directory's names for the SCIM base URL, token endpoint, client id, client secret and static token), the ordered `steps`, known `pitfalls`, and `values` — this project's SCIM base URL and token endpoint, null when it has no SCIM address. Set a connection's `directory` to the matching id. Returns no credential."
 	},
 	{
 		/*
 		 * Published rather than withheld because the callback address is the one thing an agent cannot
-		 * derive: it depends on whether the bucket is served at the root and on the slug an operator chose.
+		 * derive: it depends on whether the project is served at the root and on the slug an operator chose.
 		 * Without it an agent could still configure a provider — one that cannot work, failing later on the
 		 * upstream's page with nothing on this server to explain it.
 		 */
 		tool: 'federation_catalogue_list',
 		method: 'GET',
-		path: '/admin/api/buckets/:id/federation/catalogue',
+		path: '/admin/api/projects/:id/federation/catalogue',
 		action: null,
 		consequence: 'read',
 		superAdminOnly: false,
@@ -591,12 +591,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'What it takes to connect a recognised identity provider to a bucket: the ordered steps, where to perform them, and the exact callback address to register with the upstream. Returns no configured provider and no credential. Connect one by passing that provider catalogueId to federation_provider_create with the client id and secret it issued.'
+			'What it takes to connect a recognised identity provider to a project: the ordered steps, where to perform them, and the exact callback address to register with the upstream. Returns no configured provider and no credential. Connect one by passing that provider catalogueId to federation_provider_create with the client id and secret it issued.'
 	},
 	{
 		tool: 'federation_identity_list',
 		method: 'GET',
-		path: '/admin/api/buckets/:id/users/:uid/identities',
+		path: '/admin/api/projects/:id/users/:uid/identities',
 		action: null,
 		consequence: 'read',
 		superAdminOnly: false,
@@ -659,9 +659,9 @@ const catalogue = [
 			'The instance (root) signing keys, each with its state — published (verifies, may be promoted once promotableAt has passed; signedUntil when it signed before a promotion replaced it), signing (one per algorithm), or retired (still verifies until removableAt, then hidden). Nothing here needs a restart. No key material is returned; the public keys are at the root /jwks.'
 	},
 	{
-		tool: 'bucket_key_list',
+		tool: 'project_key_list',
 		method: 'GET',
-		path: '/admin/api/buckets/:id/keys',
+		path: '/admin/api/projects/:id/keys',
 		action: null,
 		consequence: 'read',
 		superAdminOnly: false,
@@ -669,7 +669,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			"The signing keys of a bucket that has an address of its own, each with its state — published (verifies, may be promoted once promotableAt has passed; signedUntil when it signed before a promotion replaced it), signing (one per algorithm), or retired (still verifies until removableAt). No key material is returned; the public keys are at the bucket's jwks_uri. A bucket served at the root signs with the instance keys (jwks_list)."
+			"The signing keys of a project that has an address of its own, each with its state — published (verifies, may be promoted once promotableAt has passed; signedUntil when it signed before a promotion replaced it), signing (one per algorithm), or retired (still verifies until removableAt). No key material is returned; the public keys are at the project's jwks_uri. A project served at the root signs with the instance keys (jwks_list)."
 	},
 	{
 		tool: 'audit_list',
@@ -679,7 +679,7 @@ const catalogue = [
 		consequence: 'read',
 		/*
 		 * Scope-filtered rather than role-gated, which is why this is `null` and not `super_admin`. The
-		 * route serves everyone: an administrator sees the trail of the groups they belong to, a super
+		 * route serves everyone: an administrator sees the trail of the teams they belong to, a super
 		 * administrator sees the instance. Naming a role here would be a claim the handler does not make.
 		 */
 		superAdminOnly: false,
@@ -687,7 +687,7 @@ const catalogue = [
 		querySchema: AuditQuery,
 		pathParams: [],
 		summary:
-			'The administrative audit trail for the groups this administrator belongs to, newest first, filterable by actor, action, target, surface and time window. A super administrator sees the whole instance, including actions that belong to no group. Filter `viaSurface=mcp` for actions taken through an agent, `viaSurface=scim` for changes a provisioning connection made and `viaSurface=upstream` for sign-outs an upstream identity provider requested and `viaSurface=self-service` for applications an end user removed from their own connected-apps page. `bucket=<id>` returns everything that happened to or in one bucket: its own settings, address, keys and providers, the users, user groups, provisioning resources and applications within it (those entries carry `bucketId`). `connection=<id>` returns what one provisioning connection did and what administrators did to it. `actionPrefix` matches actions starting with the text, such as `bucket.key.`. Filters only narrow what the caller may already read. Key actions carry the `kid` they acted on. An entry whose actor is a provisioning connection (`connection:<id>`), an upstream identity provider (`upstream:<bucket>:<provider>`) or an end user (`enduser:<bucket>:<account>`) carries `actorName`, its name or address now, or null when it no longer exists. An entry means an authorized actor reached the point of applying a change, not that the change took effect.'
+			'The administrative audit trail for the teams this administrator belongs to, newest first, filterable by actor, action, target, surface and time window. A super administrator sees the whole instance, including actions that belong to no team. Filter `viaSurface=mcp` for actions taken through an agent, `viaSurface=scim` for changes a provisioning connection made and `viaSurface=upstream` for sign-outs an upstream identity provider requested and `viaSurface=self-service` for applications an end user removed from their own connected-apps page. `project=<id>` returns everything that happened to or in one project: its own settings, address, keys and providers, the users, groups, provisioning resources and applications within it (those entries carry `projectId`). `connection=<id>` returns what one provisioning connection did and what administrators did to it. Actions and target types name projects, teams and groups: actions `project.*`, `team.*` and `group.*` (a group of end users), with target types `Project`, `Team` and `Group`; `retiredproject.*` and `RetiredProject` are entries about the former project entity, which no longer exists. `actionPrefix` matches actions starting with the text, such as `project.key.`, and must name whole segments: a prefix that ends partway into a first segment several actions share is refused. Filters only narrow what the caller may already read. Key actions carry the `kid` they acted on. An entry whose actor is a provisioning connection (`connection:<id>`), an upstream identity provider (`upstream:<project>:<provider>`) or an end user (`enduser:<project>:<account>`) carries `actorName`, its name or address now, or null when it no longer exists. An entry means an authorized actor reached the point of applying a change, not that the change took effect.'
 	},
 	{
 		tool: 'error_list',
@@ -759,7 +759,7 @@ const catalogue = [
 	{
 		tool: 'resource_declare',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/resources',
+		path: '/admin/api/projects/:id/resources',
 		action: 'resource.create',
 		consequence: 'ordinary',
 		superAdminOnly: false,
@@ -767,12 +767,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'Declare an MCP server (or any API) as a protected resource of this user bucket, so this server will mint tokens whose audience is exactly that resource. The scope list is the baseline a general-purpose client requests in full, not a catalogue — an omnibus scope is refused. Tokens default to a self-contained JWT the resource verifies against this server\'s published keys, with a fifteen-minute lifetime. Nothing about the resource is fetched: the identifier is unique within the bucket, so it need not be reachable or deployed yet. `scopeDescriptions` says, per scope, what it lets an app do (`description`, a phrase that follows "The app will be able to") and whether the app only sees something (`kind: "see"`) or acts (`"act"`, the default); the consent page shows these to the person deciding, and a scope without one is shown only by its technical name. A bucket without an address of its own shares the root namespace, where only a super administrator may declare, amend or remove a resource.'
+			'Declare an MCP server (or any API) as a protected resource of this project, so this server will mint tokens whose audience is exactly that resource. The scope list is the baseline a general-purpose client requests in full, not a catalogue — an omnibus scope is refused. Tokens default to a self-contained JWT the resource verifies against this server\'s published keys, with a fifteen-minute lifetime. Nothing about the resource is fetched: the identifier is unique within the project, so it need not be reachable or deployed yet. `scopeDescriptions` says, per scope, what it lets an app do (`description`, a phrase that follows "The app will be able to") and whether the app only sees something (`kind: "see"`) or acts (`"act"`, the default); the consent page shows these to the person deciding, and a scope without one is shown only by its technical name. A project without an address of its own shares the root namespace, where only a super administrator may declare, amend or remove a resource.'
 	},
 	{
 		tool: 'resource_update',
 		method: 'PATCH',
-		path: '/admin/api/buckets/:id/resources/:resourceId',
+		path: '/admin/api/projects/:id/resources/:resourceId',
 		action: 'resource.update',
 		consequence: 'ordinary',
 		superAdminOnly: false,
@@ -785,7 +785,7 @@ const catalogue = [
 	{
 		tool: 'resource_delete',
 		method: 'DELETE',
-		path: '/admin/api/buckets/:id/resources/:resourceId',
+		path: '/admin/api/projects/:id/resources/:resourceId',
 		action: 'resource.delete',
 		consequence: 'high',
 		superAdminOnly: false,
@@ -800,7 +800,7 @@ const catalogue = [
 	{
 		tool: 'client_create',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/clients',
+		path: '/admin/api/projects/:id/clients',
 		action: 'client.create',
 		consequence: 'ordinary',
 		superAdminOnly: false,
@@ -808,12 +808,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'Register an OAuth client (application) in a user bucket; it signs that bucket’s people in for its whole life, and no operation moves it to another. corsOrigins lists the web origins whose browser code may read its responses — an invalid origin refuses the whole list. Only the bucket’s own client_credentials clients may obtain machine tokens for the APIs declared in it. A confidential client’s generated secret is returned exactly once, here, and is never readable again. partialConsent lets the person untick individual permissions on the consent page — turn it on only for an application that copes with receiving fewer permissions than it asked for. logo takes a data:image/png, image/jpeg or image/webp base64 URL of at most 64 KiB (null removes it), and policyUri and tosUri take https addresses; the consent page shows them only to this organization’s own users, the links only when they are on a redirect URI’s host.'
+			'Register an OAuth client (application) in a project; it signs that project’s people in for its whole life, and no operation moves it to another. corsOrigins lists the web origins whose browser code may read its responses — an invalid origin refuses the whole list. Only the project’s own client_credentials clients may obtain machine tokens for the APIs declared in it. A confidential client’s generated secret is returned exactly once, here, and is never readable again. partialConsent lets the person untick individual permissions on the consent page — turn it on only for an application that copes with receiving fewer permissions than it asked for. logo takes a data:image/png, image/jpeg or image/webp base64 URL of at most 64 KiB (null removes it), and policyUri and tosUri take https addresses; the consent page shows them only to this organization’s own users, the links only when they are on a redirect URI’s host.'
 	},
 	{
 		tool: 'client_update',
 		method: 'PATCH',
-		path: '/admin/api/buckets/:id/clients/:clientId',
+		path: '/admin/api/projects/:id/clients/:clientId',
 		action: 'client.update',
 		consequence: 'ordinary',
 		superAdminOnly: false,
@@ -826,7 +826,7 @@ const catalogue = [
 	{
 		tool: 'client_secret_rotate',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/clients/:clientId/secret',
+		path: '/admin/api/projects/:id/clients/:clientId/secret',
 		action: 'client.secret.rotate',
 		consequence: 'high',
 		superAdminOnly: false,
@@ -839,7 +839,7 @@ const catalogue = [
 	{
 		tool: 'client_delete',
 		method: 'DELETE',
-		path: '/admin/api/buckets/:id/clients/:clientId',
+		path: '/admin/api/projects/:id/clients/:clientId',
 		action: 'client.delete',
 		consequence: 'high',
 		superAdminOnly: false,
@@ -880,7 +880,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			"Activate or deactivate an administrator, or correct their email address. A changed address must be verified again before the administrator can sign in while the administrators' bucket requires verification, and a super-administrator cannot change their own address while it does. Never grants or withdraws super-administrator status — that is admin_super_grant and admin_super_withdraw."
+			"Activate or deactivate an administrator, or correct their email address. A changed address must be verified again before the administrator can sign in while the administrators' project requires verification, and a super-administrator cannot change their own address while it does. Never grants or withdraws super-administrator status — that is admin_super_grant and admin_super_withdraw."
 	},
 	{
 		tool: 'admin_deactivate',
@@ -900,7 +900,7 @@ const catalogue = [
 		method: 'POST',
 		path: '/admin/api/admins/:id/super-admin',
 		action: 'admin.superadmin.grant',
-		/* High: instance-wide authority, over every group, setting and key. */
+		/* High: instance-wide authority, over every team, setting and key. */
 		consequence: 'high',
 		superAdminOnly: true,
 		bodySchema: null,
@@ -946,7 +946,7 @@ const catalogue = [
 		path: '/admin/api/admins/:id/totp',
 		action: 'admin.totp.clear',
 		/*
-		 * High, where bucket_user_totp_clear is ordinary: it removes a second factor from an account that
+		 * High, where project_user_totp_clear is ordinary: it removes a second factor from an account that
 		 * administers the instance, and signs it out.
 		 */
 		consequence: 'high',
@@ -958,11 +958,11 @@ const catalogue = [
 			"Reset an administrator's authenticator, for a lost device: the enrolment is cleared along with any failed attempts, and they are signed out everywhere as admin_sign_out does; they set a new one up at their next sign-in. Answers `sessions`. Refused on your own account, and when the administrator has no authenticator."
 	},
 
-	/* ------------------------------------------------- writes: buckets (2) */
+	/* ------------------------------------------------- writes: teams and projects (12) */
 	{
-		tool: 'group_create',
+		tool: 'team_create',
 		method: 'POST',
-		path: '/admin/api/groups',
+		path: '/admin/api/teams',
 		action: 'group.create',
 		consequence: 'ordinary',
 		superAdminOnly: false,
@@ -970,12 +970,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: [],
 		summary:
-			'Create a group. The administrator this agent acts for becomes its first owner — a group with no owner would be unreachable the instant it existed.'
+			'Create a team. The administrator this agent acts for becomes its first owner — a team with no owner would be unreachable the instant it existed.'
 	},
 	{
-		tool: 'group_update',
+		tool: 'team_update',
 		method: 'PATCH',
-		path: '/admin/api/groups/:id',
+		path: '/admin/api/teams/:id',
 		action: 'group.update',
 		consequence: 'ordinary',
 		superAdminOnly: false,
@@ -983,12 +983,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'Rename a group. Requires being an owner of that group, which is a membership kind rather than an instance role.'
+			'Rename a team. Requires being an owner of that team, which is a membership kind rather than an instance role.'
 	},
 	{
-		tool: 'group_member_add',
+		tool: 'team_member_add',
 		method: 'POST',
-		path: '/admin/api/groups/:id/members',
+		path: '/admin/api/teams/:id/members',
 		action: 'group.member.add',
 		consequence: 'ordinary',
 		superAdminOnly: false,
@@ -996,12 +996,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'Add an existing administrator to a group as an owner or a plain member. This grants them everything the group owns, in one call. Owner-only. Refused for a personal group, which cannot be shared.'
+			'Add an existing administrator to a team as an owner or a plain member. This grants them everything the team owns, in one call. Owner-only. Refused for a personal team, which cannot be shared.'
 	},
 	{
-		tool: 'group_member_update',
+		tool: 'team_member_update',
 		method: 'PATCH',
-		path: '/admin/api/groups/:id/members/:userId',
+		path: '/admin/api/teams/:id/members/:userId',
 		action: 'group.member.update',
 		consequence: 'ordinary',
 		superAdminOnly: false,
@@ -1012,9 +1012,9 @@ const catalogue = [
 			'Promote a member to owner or demote an owner to member. The last owner can be neither demoted nor removed. Owner-only.'
 	},
 	{
-		tool: 'group_member_remove',
+		tool: 'team_member_remove',
 		method: 'DELETE',
-		path: '/admin/api/groups/:id/members/:userId',
+		path: '/admin/api/teams/:id/members/:userId',
 		action: 'group.member.remove',
 		consequence: 'high',
 		superAdminOnly: false,
@@ -1022,12 +1022,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'userId'],
 		summary:
-			'Remove an administrator from a group. They lose access to every bucket, application and end-user the group owns, on their very next request. The last owner cannot be removed. Owner-only.'
+			'Remove an administrator from a team. They lose access to every project, application and end-user the team owns, on their very next request. The last owner cannot be removed. Owner-only.'
 	},
 	{
-		tool: 'group_invite',
+		tool: 'team_invite',
 		method: 'POST',
-		path: '/admin/api/groups/:id/invitations',
+		path: '/admin/api/teams/:id/invitations',
 		action: 'invitation.create',
 		consequence: 'ordinary',
 		superAdminOnly: false,
@@ -1035,12 +1035,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'Invite somebody into a group by email, as an owner or a plain member. Creates an administrator account for them when they accept, if the address has none. Owner-only. Refused for a personal group, which cannot be shared.'
+			'Invite somebody into a team by email, as an owner or a plain member. Creates an administrator account for them when they accept, if the address has none. Owner-only. Refused for a personal team, which cannot be shared.'
 	},
 	{
-		tool: 'group_invitation_revoke',
+		tool: 'team_invitation_revoke',
 		method: 'DELETE',
-		path: '/admin/api/groups/:id/invitations/:inviteId',
+		path: '/admin/api/teams/:id/invitations/:inviteId',
 		action: 'invitation.revoke',
 		consequence: 'ordinary',
 		superAdminOnly: false,
@@ -1050,9 +1050,9 @@ const catalogue = [
 		summary: 'Withdraw a pending invitation before it is accepted. Owner-only.'
 	},
 	{
-		tool: 'bucket_create',
+		tool: 'project_create',
 		method: 'POST',
-		path: '/admin/api/buckets',
+		path: '/admin/api/projects',
 		action: 'bucket.create',
 		consequence: 'ordinary',
 		/* Its route has no privilege gate: any administrator creates into their own scope. */
@@ -1061,22 +1061,22 @@ const catalogue = [
 		querySchema: null,
 		pathParams: [],
 		summary:
-			"Create a user bucket. `displayName` is the name its people know the service by, shown at the top of the page where they allow an app access (the consent page); without it that page shows the bucket's address. A bucket cannot be created unreachable: at creation it has no providers, so password login cannot be switched off. `totpRequired` makes a password sign-in also require a one-time code from an authenticator app; it governs password sign-in only and never gates a federated one. A `host` needs `can.createHost` from whoami; a `slug` needs `can.createBucket`. `groupId` names the administrator group it belongs to — one this administrator is a member of (a super administrator: any group but another administrator's personal group); without it, the administrator's active group."
+			"Create a project. `displayName` is the name its people know the service by, shown at the top of the page where they allow an app access (the consent page); without it that page shows the project's address. A project cannot be created unreachable: at creation it has no providers, so password login cannot be switched off. `totpRequired` makes a password sign-in also require a one-time code from an authenticator app; it governs password sign-in only and never gates a federated one. A `host` needs `can.createHost` from whoami; a `slug` needs `can.createProject`. `teamId` names the team it belongs to — one this administrator is a member of (a super administrator: any team but another administrator's personal team); without it, the administrator's active team."
 	},
 	{
-		tool: 'bucket_address_change',
+		tool: 'project_address_change',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/address',
+		path: '/admin/api/projects/:id/address',
 		action: 'bucket.address.change',
 		/*
-		 * `high`, which puts the two-call confirmation gate in front of it automatically. Moving a bucket
+		 * `high`, which puts the two-call confirmation gate in front of it automatically. Moving a project
 		 * changes its issuer identifier, so every client integrated with it stops validating tokens on the
 		 * next request — a consequence an agent must not be able to cause in one call, and the reason this
-		 * is a route of its own rather than a field on `bucket_update`.
+		 * is a route of its own rather than a field on `project_update`.
 		 */
 		consequence: 'high',
 		/*
-		 * Not instance-only since specs/081: an owner of the bucket's group may change a path address while
+		 * Not instance-only since specs/081: an owner of the project's team may change a path address while
 		 * nothing depends on it. Still `high` whoever calls it; the gate binds `expect` through the argument
 		 * hash, so a confirmation cannot be spent on a different preview.
 		 */
@@ -1085,18 +1085,18 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			"Move a bucket to a different address: a path segment (`slug`) or a hostname of its own (`host`), never both. Called without `confirm`, it changes nothing and answers with a preview naming what the change reaches — `applications`, `connections`, `providers` (each with the `newCallback` its upstream registration needs) and `resources` — the issuers `from` and `to`, and `expect`, their counts. Called with `confirm: true` and that `expect`, it performs the move: the bucket's issuer identifier becomes the new address, the previous address stops answering, and everyone signed in signs in again. If what it reaches changed since the preview, it is refused with 409 and the fresh preview. A super administrator may change any bucket's address; an owner of its group may change a path address while no application, identity provider or provisioning connection depends on it; only a super administrator may give it a hostname; a bucket served at the root cannot be moved at all — bucket_get states it as `can.changeAddress`, with `blockers.dependents` as the reason."
+			"Move a project to a different address: a path segment (`slug`) or a hostname of its own (`host`), never both. Called without `confirm`, it changes nothing and answers with a preview naming what the change reaches — `applications`, `connections`, `providers` (each with the `newCallback` its upstream registration needs) and `resources` — the issuers `from` and `to`, and `expect`, their counts. Called with `confirm: true` and that `expect`, it performs the move: the project's issuer identifier becomes the new address, the previous address stops answering, and everyone signed in signs in again. If what it reaches changed since the preview, it is refused with 409 and the fresh preview. A super administrator may change any project's address; an owner of its team may change a path address while no application, identity provider or provisioning connection depends on it; only a super administrator may give it a hostname; a project served at the root cannot be moved at all — project_get states it as `can.changeAddress`, with `blockers.dependents` as the reason."
 	},
 	{
-		tool: 'bucket_owner_change',
+		tool: 'project_owner_change',
 		method: 'PUT',
-		path: '/admin/api/buckets/:id/owner',
+		path: '/admin/api/projects/:id/owner',
 		action: 'bucket.owner.change',
 		/*
-		 * `high`: it changes who administers a population of people. The group the bucket leaves loses it
-		 * with no step of its own, and nothing restores it but another move by an owner of the group it
+		 * `high`: it changes who administers a population of people. The team the project leaves loses it
+		 * with no step of its own, and nothing restores it but another move by an owner of the team it
 		 * joined. The route's own `confirm` stays as well, because the gate's consequence report reads no
-		 * entity state and so cannot count what moves with the bucket.
+		 * entity state and so cannot count what moves with the project.
 		 */
 		consequence: 'high',
 		superAdminOnly: false,
@@ -1104,12 +1104,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			"Move a user bucket, with its applications and APIs, to another administrator group (`groupId`). Requires owning the group it is in now and belonging to the destination; another administrator's personal group is never a destination. End users, clients and the sign-in address are unaffected. Called without `confirm`, it changes nothing and answers with what would move (`applications`, `apis`); with `confirm: true` it moves it. bucket_get states the right as `can.move`."
+			"Move a project, with its applications and APIs, to another team (`teamId`). Requires owning the team it is in now and belonging to the destination; another administrator's personal team is never a destination. End users, clients and the sign-in address are unaffected. Called without `confirm`, it changes nothing and answers with what would move (`applications`, `apis`); with `confirm: true` it moves it. project_get states the right as `can.move`."
 	},
 	{
-		tool: 'bucket_restore',
+		tool: 'project_restore',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/restore',
+		path: '/admin/api/projects/:id/restore',
 		action: 'bucket.restore',
 		/*
 		 * `high`: it gives a whole population its sign-in back, and every session and token it still holds
@@ -1121,12 +1121,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			"Bring back a user bucket that is scheduled for deletion (bucket_get carries `deletion` with `purgeAt`, the date it will be destroyed): it answers at its address again, exactly as before it was deleted, and every session and token it issued that has not expired is valid again. A provisioning directory that tried to reach it while it was off may need a manual resync. Requires the right to delete it, decided over the accounts it holds now — bucket_get's `can.delete`. Refused with 409 when the bucket is not scheduled, or while its destruction is already under way. Deleting a bucket, and destroying a scheduled one at once, stay in the admin console."
+			"Bring back a project that is scheduled for deletion (project_get carries `deletion` with `purgeAt`, the date it will be destroyed): it answers at its address again, exactly as before it was deleted, and every session and token it issued that has not expired is valid again. A provisioning directory that tried to reach it while it was off may need a manual resync. Requires the right to delete it, decided over the accounts it holds now — project_get's `can.delete`. Refused with 409 when the project is not scheduled, or while its destruction is already under way. Deleting a project, and destroying a scheduled one at once, stay in the admin console."
 	},
 	{
-		tool: 'bucket_update',
+		tool: 'project_update',
 		method: 'PATCH',
-		path: '/admin/api/buckets/:id',
+		path: '/admin/api/projects/:id',
 		action: 'bucket.update',
 		consequence: 'ordinary',
 		superAdminOnly: false,
@@ -1134,14 +1134,14 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			"Change a bucket's name, the name shown to its people (`displayName`; null removes it), or its registration, verification and second-factor settings. Editing the bucket entity needs membership of the bucket's group — bucket_get states it as `can.editSettings`. `totpRequired` governs password sign-in only — it is accepted but inert while `passwordLogin` is off, and it never gates a federated sign-in, so it is not a way to secure a bucket that signs in through an upstream provider. Requiring verification is refused on every bucket until mail delivery is configured. A change that tightens who can get in — `passwordLogin` off, `emailVerificationRequired` or `totpRequired` (while passwords are on) turned on, or `registrationOpen` turned on for the default or the administrators' bucket — changes nothing when called alone: it answers with a preview, `consequences` (one sentence per change, counted), `expect` (the counts) and `changes`; call again with the same settings, `confirm: true` and that `expect` to apply it. If the counts changed since, it is refused with 409 and the fresh preview. Other changes apply at once. A super-administrator configures the administrators' own bucket here too: opening its registration lets anyone register a console account (the answer carries an advisory while verification is off); requiring verification is also refused until the acting administrator has verified their own address; turning password sign-in off is refused unless the caller's console session signed in through one of its identity providers and a super administrator stays reachable — so an agent, having no console session, is always refused it. Each refusal names its remedy."
+			"Change a project's name, the name shown to its people (`displayName`; null removes it), or its registration, verification and second-factor settings. Editing the project itself needs membership of the project's team — project_get states it as `can.editSettings`. `totpRequired` governs password sign-in only — it is accepted but inert while `passwordLogin` is off, and it never gates a federated sign-in, so it is not a way to secure a project that signs in through an upstream provider. Requiring verification is refused on every project until mail delivery is configured. A change that tightens who can get in — `passwordLogin` off, `emailVerificationRequired` or `totpRequired` (while passwords are on) turned on, or `registrationOpen` turned on for the default or the administrators' project — changes nothing when called alone: it answers with a preview, `consequences` (one sentence per change, counted), `expect` (the counts) and `changes`; call again with the same settings, `confirm: true` and that `expect` to apply it. If the counts changed since, it is refused with 409 and the fresh preview. Other changes apply at once. A super-administrator configures the administrators' own project here too: opening its registration lets anyone register a console account (the answer carries an advisory while verification is off); requiring verification is also refused until the acting administrator has verified their own address; turning password sign-in off is refused unless the caller's console session signed in through one of its identity providers and a super administrator stays reachable — so an agent, having no console session, is always refused it. Each refusal names its remedy."
 	},
 
 	/* ----------------------------------------------- writes: end-users (10) */
 	{
-		tool: 'bucket_user_create',
+		tool: 'project_user_create',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/users',
+		path: '/admin/api/projects/:id/users',
 		action: 'enduser.create',
 		consequence: 'ordinary',
 		superAdminOnly: false,
@@ -1149,12 +1149,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'Create an end-user account in a bucket. Without `password` no password opens it: the person signs in through an identity provider or sets one through password reset. With `invite: true` (never together with `password`) the person is mailed a link to choose their own password, valid for 7 days; refused before the account is created when the bucket does not sign people in with a password or mail delivery is not configured, and the answer carries `invitation: sent` or `failed` — a failed send leaves the account, and bucket_user_invite sends again. Its address starts verified only when the bucket does not require verification; setting the password through the link verifies it.'
+			'Create an end-user account in a project. Without `password` no password opens it: the person signs in through an identity provider or sets one through password reset. With `invite: true` (never together with `password`) the person is mailed a link to choose their own password, valid for 7 days; refused before the account is created when the project does not sign people in with a password or mail delivery is not configured, and the answer carries `invitation: sent` or `failed` — a failed send leaves the account, and project_user_invite sends again. Its address starts verified only when the project does not require verification; setting the password through the link verifies it.'
 	},
 	{
-		tool: 'bucket_user_invite',
+		tool: 'project_user_invite',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/users/:uid/invitation',
+		path: '/admin/api/projects/:id/users/:uid/invitation',
 		action: 'enduser.invitation.send',
 		/*
 		 * Ordinary: it mails the account's own address, within the cooldown and daily cap a reset shares, and
@@ -1166,12 +1166,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'uid'],
 		summary:
-			'Mail an end-user a link to choose their own password, valid for 7 days and once; choosing it also verifies their address. Any earlier reset or invitation link of theirs stops working, and a password they already have keeps working until they choose a new one. The answer never carries the link. Refused for a user a provisioning connection manages, when the bucket does not sign people in with a password, when mail delivery is not configured, for a user who cannot sign in (deactivated or locked), and when a message was sent too recently (429 with `retryAfter` seconds).'
+			'Mail an end-user a link to choose their own password, valid for 7 days and once; choosing it also verifies their address. Any earlier reset or invitation link of theirs stops working, and a password they already have keeps working until they choose a new one. The answer never carries the link. Refused for a user a provisioning connection manages, when the project does not sign people in with a password, when mail delivery is not configured, for a user who cannot sign in (deactivated or locked), and when a message was sent too recently (429 with `retryAfter` seconds).'
 	},
 	{
-		tool: 'bucket_user_mark_verified',
+		tool: 'project_user_mark_verified',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/users/:uid/verified',
+		path: '/admin/api/projects/:id/users/:uid/verified',
 		action: 'enduser.verified.mark',
 		/* Ordinary: it records what the administrator confirmed, and an address change makes it unverified again. */
 		consequence: 'ordinary',
@@ -1183,9 +1183,9 @@ const catalogue = [
 			"Mark an end-user's address verified, once it has been confirmed some other way; a verification message still in their inbox stops working. Refused for a user a provisioning connection manages — their address trust is the connection's setting — and, with nothing recorded, for one already verified."
 	},
 	{
-		tool: 'bucket_user_application_sign_out',
+		tool: 'project_user_application_sign_out',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/users/:uid/sessions/:clientId/sign-out',
+		path: '/admin/api/projects/:id/users/:uid/sessions/:clientId/sign-out',
 		action: 'enduser.application.signout',
 		/* Ordinary, as signing out everywhere is: the protective act, narrowed to one application. */
 		consequence: 'ordinary',
@@ -1194,12 +1194,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'uid', 'clientId'],
 		summary:
-			"Sign an end-user out of one application: that application is told through back-channel logout, its grants end with every token under them — offline refresh tokens included — and it must ask for consent again. The person's other applications and their sign-in stay as they were. Works on users a provisioning connection manages. 404 when the person is not signed in to that application; read where they are with bucket_user_session_list."
+			"Sign an end-user out of one application: that application is told through back-channel logout, its grants end with every token under them — offline refresh tokens included — and it must ask for consent again. The person's other applications and their sign-in stay as they were. Works on users a provisioning connection manages. 404 when the person is not signed in to that application; read where they are with project_user_session_list."
 	},
 	{
-		tool: 'bucket_user_email_change',
+		tool: 'project_user_email_change',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/users/:uid/email',
+		path: '/admin/api/projects/:id/users/:uid/email',
 		action: 'enduser.email.change',
 		/*
 		 * High: the address is where password reset and verification mail go, so changing it hands the
@@ -1211,12 +1211,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'uid'],
 		summary:
-			"Change an end-user's login address. The new address is unverified, and a verification message sent to the old one no longer verifies anything; nothing is mailed by the change — send one with bucket_user_verification_send. Refused for a user a provisioning connection manages, and for an address another account in the bucket holds."
+			"Change an end-user's login address. The new address is unverified, and a verification message sent to the old one no longer verifies anything; nothing is mailed by the change — send one with project_user_verification_send. Refused for a user a provisioning connection manages, and for an address another account in the project holds."
 	},
 	{
-		tool: 'bucket_user_verification_send',
+		tool: 'project_user_verification_send',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/users/:uid/verification',
+		path: '/admin/api/projects/:id/users/:uid/verification',
 		action: 'enduser.verification.send',
 		/* Ordinary: it mails the account's own address, within the cooldown and daily cap every door shares. */
 		consequence: 'ordinary',
@@ -1225,12 +1225,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'uid'],
 		summary:
-			"Mail an end-user a fresh verification message in the bucket's current method. The answer never carries the link or code. Refused when the address is already verified, when mail delivery is not configured, and when a message was sent too recently."
+			"Mail an end-user a fresh verification message in the project's current method. The answer never carries the link or code. Refused when the address is already verified, when mail delivery is not configured, and when a message was sent too recently."
 	},
 	{
-		tool: 'bucket_user_update',
+		tool: 'project_user_update',
 		method: 'PATCH',
-		path: '/admin/api/buckets/:id/users/:uid',
+		path: '/admin/api/projects/:id/users/:uid',
 		action: 'enduser.update',
 		consequence: 'ordinary',
 		superAdminOnly: false,
@@ -1238,12 +1238,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'uid'],
 		summary:
-			"Change an end-user's active state, claims or profile. `profile` replaces the whole profile of a user administrators manage (refused for one a provisioning connection manages) and reaches tokens as standard claims under the scope the `claims` setting maps them to: `name.givenName` → given_name, `name.familyName` → family_name, `name.middleName` → middle_name, `name.formatted` (else `displayName`) → name, `nickName` → nickname, `locale` → locale (a BCP 47 tag), `timezone` → zoneinfo (a time-zone name such as Europe/Berlin) and the primary of `phoneNumbers` → phone_number (international form, +14155550100); an invalid value is refused with 422 naming `profile.<field>`. Where the profile sets a claim the stored claims also hold, the profile's wins. Their groups are changed with bucket_group_member_add and bucket_group_member_remove. Claims replace the account's whole set; sub, email, email_verified and the protocol claims are refused, and a claim is released to a client only once the `claims` setting names it under a scope. Deactivating ends the user's access at once — every session and token, with a logout notice to each relying party registered for one — but keeps the account; reactivating restores sign-in only, never the old tokens or consents."
+			"Change an end-user's active state, claims or profile. `profile` replaces the whole profile of a user administrators manage (refused for one a provisioning connection manages) and reaches tokens as standard claims under the scope the `claims` setting maps them to: `name.givenName` → given_name, `name.familyName` → family_name, `name.middleName` → middle_name, `name.formatted` (else `displayName`) → name, `nickName` → nickname, `locale` → locale (a BCP 47 tag), `timezone` → zoneinfo (a time-zone name such as Europe/Berlin) and the primary of `phoneNumbers` → phone_number (international form, +14155550100); an invalid value is refused with 422 naming `profile.<field>`. Where the profile sets a claim the stored claims also hold, the profile's wins. Their groups are changed with project_group_member_add and project_group_member_remove. Claims replace the account's whole set; sub, email, email_verified and the protocol claims are refused, and a claim is released to a client only once the `claims` setting names it under a scope. Deactivating ends the user's access at once — every session and token, with a logout notice to each relying party registered for one — but keeps the account; reactivating restores sign-in only, never the old tokens or consents."
 	},
 	{
-		tool: 'bucket_user_totp_clear',
+		tool: 'project_user_totp_clear',
 		method: 'DELETE',
-		path: '/admin/api/buckets/:id/users/:uid/totp',
+		path: '/admin/api/projects/:id/users/:uid/totp',
 		action: 'enduser.totp.clear',
 		/*
 		 * Ordinary rather than gated. The confirmation gate is for what cannot be undone; this is the
@@ -1259,12 +1259,12 @@ const catalogue = [
 			"Clear an end-user's authenticator enrolment. Their existing authenticator stops working at once and their sessions end; they set a new one up at their next sign-in. Use when someone has lost the device holding their codes. Their password, grants and tokens are untouched."
 	},
 	{
-		tool: 'bucket_user_lock',
+		tool: 'project_user_lock',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/users/:uid/lock',
+		path: '/admin/api/projects/:id/users/:uid/lock',
 		action: 'enduser.lock',
 		/*
-		 * Ordinary, as deactivating through bucket_user_update is: it is the protective act, and what it costs
+		 * Ordinary, as deactivating through project_user_update is: it is the protective act, and what it costs
 		 * the user is signing in and consenting again once it is lifted.
 		 */
 		consequence: 'ordinary',
@@ -1273,12 +1273,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'uid'],
 		summary:
-			'Lock an end-user out, at once: every session and token ends and relying parties registered for back-channel logout are told. Works on users a provisioning connection manages, and the connection cannot undo it — only bucket_user_unlock can. Use when an account is suspected compromised.'
+			'Lock an end-user out, at once: every session and token ends and relying parties registered for back-channel logout are told. Works on users a provisioning connection manages, and the connection cannot undo it — only project_user_unlock can. Use when an account is suspected compromised.'
 	},
 	{
-		tool: 'bucket_user_sign_out',
+		tool: 'project_user_sign_out',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/users/:uid/sign-out',
+		path: '/admin/api/projects/:id/users/:uid/sign-out',
 		action: 'enduser.signout',
 		/* Ordinary, as the lock is: the same protective act, minus the block on signing in again. */
 		consequence: 'ordinary',
@@ -1287,12 +1287,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'uid'],
 		summary:
-			'Sign an end-user out everywhere: every session and token ends and relying parties registered for back-channel logout are told, but the account stays active and unlocked, so they can sign in again at once (and consent afresh). Works on users a provisioning connection manages. Use for a lost or stolen device; use bucket_user_lock when the person must not get back in.'
+			'Sign an end-user out everywhere: every session and token ends and relying parties registered for back-channel logout are told, but the account stays active and unlocked, so they can sign in again at once (and consent afresh). Works on users a provisioning connection manages. Use for a lost or stolen device; use project_user_lock when the person must not get back in.'
 	},
 	{
-		tool: 'bucket_user_unlock',
+		tool: 'project_user_unlock',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/users/:uid/unlock',
+		path: '/admin/api/projects/:id/users/:uid/unlock',
 		action: 'enduser.unlock',
 		/* High: it re-admits an account an administrator judged compromised. */
 		consequence: 'high',
@@ -1304,9 +1304,9 @@ const catalogue = [
 			"Lift an end-user's lock. Nothing is restored: they sign in afresh, and only if their account is also active."
 	},
 	{
-		tool: 'bucket_user_password_reset',
+		tool: 'project_user_password_reset',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/users/:uid/password',
+		path: '/admin/api/projects/:id/users/:uid/password',
 		action: 'enduser.password.reset',
 		consequence: 'high',
 		superAdminOnly: false,
@@ -1317,9 +1317,9 @@ const catalogue = [
 			"Replace an end-user's password. The previous one is unrecoverable and the account holder is not asked. With `signOut: true` every session and token they hold ends too, and relying parties registered for back-channel logout are told; without it they stay signed in."
 	},
 	{
-		tool: 'bucket_user_delete',
+		tool: 'project_user_delete',
 		method: 'DELETE',
-		path: '/admin/api/buckets/:id/users/:uid',
+		path: '/admin/api/projects/:id/users/:uid',
 		action: 'enduser.delete',
 		consequence: 'high',
 		superAdminOnly: false,
@@ -1330,9 +1330,9 @@ const catalogue = [
 			'Permanently delete an end-user account and everything issued to it; relying parties registered for back-channel logout are told the user signed out. Irreversible.'
 	},
 	{
-		tool: 'bucket_user_bulk_deactivate',
+		tool: 'project_user_bulk_deactivate',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/users/bulk/deactivate',
+		path: '/admin/api/projects/:id/users/bulk/deactivate',
 		action: 'enduser.bulk.deactivate',
 		/* High where the single deactivation is ordinary: one call ends access for up to a hundred people. */
 		consequence: 'high',
@@ -1341,12 +1341,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'Deactivate up to 100 end-users of a bucket, named by id, each exactly as bucket_user_update with `active: false` would: their sessions and tokens end and relying parties are told. Answers `{ results }`, one per id in the order given: `changed`, `skipped` with a `reason` (`provisioned`, `already_inactive`, `not_found`) or `failed` with a `reason`. Each person gets their own audit entry. Repeating the call is harmless.'
+			'Deactivate up to 100 end-users of a project, named by id, each exactly as project_user_update with `active: false` would: their sessions and tokens end and relying parties are told. Answers `{ results }`, one per id in the order given: `changed`, `skipped` with a `reason` (`provisioned`, `already_inactive`, `not_found`) or `failed` with a `reason`. Each person gets their own audit entry. Repeating the call is harmless.'
 	},
 	{
-		tool: 'bucket_user_bulk_activate',
+		tool: 'project_user_bulk_activate',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/users/bulk/activate',
+		path: '/admin/api/projects/:id/users/bulk/activate',
 		action: 'enduser.bulk.activate',
 		/* Ordinary, as the single reactivation is; it never lifts a lock. */
 		consequence: 'ordinary',
@@ -1355,12 +1355,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'Reactivate up to 100 end-users of a bucket, named by id. A locked user stays locked — unlocking is bucket_user_unlock, one person at a time. Answers `{ results }`, one per id: `changed`, `skipped` with a `reason` (`provisioned`, `already_active`, `not_found`) or `failed`. Each person gets their own audit entry.'
+			'Reactivate up to 100 end-users of a project, named by id. A locked user stays locked — unlocking is project_user_unlock, one person at a time. Answers `{ results }`, one per id: `changed`, `skipped` with a `reason` (`provisioned`, `already_active`, `not_found`) or `failed`. Each person gets their own audit entry.'
 	},
 	{
-		tool: 'bucket_user_bulk_sign_out',
+		tool: 'project_user_bulk_sign_out',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/users/bulk/sign-out',
+		path: '/admin/api/projects/:id/users/bulk/sign-out',
 		action: 'enduser.bulk.signout',
 		/* Ordinary, as the single sign-out is: the accounts stay active and may sign in again at once. */
 		consequence: 'ordinary',
@@ -1369,12 +1369,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'Sign up to 100 end-users of a bucket out everywhere, named by id, each as bucket_user_sign_out would; users a provisioning connection manages included. Answers `{ results }`, one per id: `changed`, `skipped` (`not_found`) or `failed`. Each person gets their own audit entry.'
+			'Sign up to 100 end-users of a project out everywhere, named by id, each as project_user_sign_out would; users a provisioning connection manages included. Answers `{ results }`, one per id: `changed`, `skipped` (`not_found`) or `failed`. Each person gets their own audit entry.'
 	},
 	{
-		tool: 'bucket_user_bulk_delete',
+		tool: 'project_user_bulk_delete',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/users/bulk/delete',
+		path: '/admin/api/projects/:id/users/bulk/delete',
 		action: 'enduser.bulk.delete',
 		consequence: 'high',
 		superAdminOnly: false,
@@ -1382,30 +1382,30 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'Permanently delete up to 100 end-users of a bucket, named by id, each as bucket_user_delete would, with everything issued to them. Irreversible. Answers `{ results }`, one per id: `changed`, `skipped` with a `reason` (`provisioned`, `not_found`) or `failed` with a `reason` and, when records survived the sweep, `failedAreas`. Each person gets their own audit entry.'
+			'Permanently delete up to 100 end-users of a project, named by id, each as project_user_delete would, with everything issued to them. Irreversible. Answers `{ results }`, one per id: `changed`, `skipped` with a `reason` (`provisioned`, `not_found`) or `failed` with a `reason` and, when records survived the sweep, `failedAreas`. Each person gets their own audit entry.'
 	},
 
 	/* ---------------------------------------------- writes: federation (5) */
 	{
 		tool: 'federation_provider_create',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/federation',
+		path: '/admin/api/projects/:id/federation',
 		action: 'federation.provider.create',
 		consequence: 'ordinary',
 		superAdminOnly: false,
 		bodySchema: CreateProviderBody,
 		querySchema: null,
 		pathParams: ['id'],
-		// The body carries the provider's own `id`, so the bucket needs a different argument name.
-		pathArgs: { id: 'bucketId' },
+		// The body carries the provider's own `id`, so the project needs a different argument name.
+		pathArgs: { id: 'projectId' },
 		highWhen: onConsoleBucket,
 		summary:
-			'Configure an upstream identity provider on a bucket. Available whether or not federation is switched on, so a provider can be prepared first. On the Administrators bucket (`admin`) this decides who can sign in to the console: only a super administrator may, and each such change must be confirmed.'
+			'Configure an upstream identity provider on a project. Available whether or not federation is switched on, so a provider can be prepared first. On the Administrators project (`admin`) this decides who can sign in to the console: only a super administrator may, and each such change must be confirmed.'
 	},
 	{
 		tool: 'federation_provider_update',
 		method: 'PATCH',
-		path: '/admin/api/buckets/:id/federation/:providerId',
+		path: '/admin/api/projects/:id/federation/:providerId',
 		action: 'federation.provider.update',
 		consequence: 'ordinary',
 		superAdminOnly: false,
@@ -1414,12 +1414,12 @@ const catalogue = [
 		pathParams: ['id', 'providerId'],
 		highWhen: onConsoleBucket,
 		summary:
-			"Change an upstream provider's configuration, or enable/disable it. On the Administrators bucket (`admin`) this decides who can sign in to the console: only a super administrator may, and each such change must be confirmed."
+			"Change an upstream provider's configuration, or enable/disable it. On the Administrators project (`admin`) this decides who can sign in to the console: only a super administrator may, and each such change must be confirmed."
 	},
 	{
 		tool: 'federation_provider_delete',
 		method: 'DELETE',
-		path: '/admin/api/buckets/:id/federation/:providerId',
+		path: '/admin/api/projects/:id/federation/:providerId',
 		action: 'federation.provider.delete',
 		consequence: 'high',
 		superAdminOnly: false,
@@ -1427,12 +1427,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'providerId'],
 		summary:
-			'Remove an upstream identity provider from a bucket. Deliberately available even with federation switched off, so a deployment can delete a provider it no longer trusts. Users who signed in only through it lose that route in.'
+			'Remove an upstream identity provider from a project. Deliberately available even with federation switched off, so a deployment can delete a provider it no longer trusts. Users who signed in only through it lose that route in.'
 	},
 	{
 		tool: 'federation_provider_move',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/federation/:providerId/move',
+		path: '/admin/api/projects/:id/federation/:providerId/move',
 		action: 'federation.provider.move',
 		consequence: 'ordinary',
 		superAdminOnly: false,
@@ -1441,12 +1441,12 @@ const catalogue = [
 		pathParams: ['id', 'providerId'],
 		highWhen: onConsoleBucket,
 		summary:
-			"Move an upstream provider one place `up` or `down` in the order its bucket's sign-in page shows the buttons — the order federation_provider_list returns. Changes nothing but the order; refused (409) when the provider is already first or last. Answers `{providers}` in the new order. On the Administrators bucket (`admin`) only a super administrator may, and each move must be confirmed."
+			"Move an upstream provider one place `up` or `down` in the order its project's sign-in page shows the buttons — the order federation_provider_list returns. Changes nothing but the order; refused (409) when the provider is already first or last. Answers `{providers}` in the new order. On the Administrators project (`admin`) only a super administrator may, and each move must be confirmed."
 	},
 	{
 		tool: 'federation_identity_delete',
 		method: 'DELETE',
-		path: '/admin/api/buckets/:id/users/:uid/identities/:providerId',
+		path: '/admin/api/projects/:id/users/:uid/identities/:providerId',
 		action: 'federation.identity.delete',
 		consequence: 'high',
 		superAdminOnly: false,
@@ -1461,7 +1461,7 @@ const catalogue = [
 	{
 		tool: 'provisioning_connection_create',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/provisioning-connections',
+		path: '/admin/api/projects/:id/provisioning-connections',
 		action: 'provisioning.connection.create',
 		/* Ordinary: a connection without a credential can do nothing; issuing one is the gated act. */
 		consequence: 'ordinary',
@@ -1470,12 +1470,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'Create a SCIM provisioning connection on a bucket, bound to one of its federation providers. That provider stops creating accounts on first sign-in: from now on the directory creates them. Holds no credential until one is issued. `directory` (entra, okta or generic) chooses whose words the console uses for it; absent, it is inferred from the provider.'
+			'Create a SCIM provisioning connection on a project, bound to one of its federation providers. That provider stops creating accounts on first sign-in: from now on the directory creates them. Holds no credential until one is issued. `directory` (entra, okta or generic) chooses whose words the console uses for it; absent, it is inferred from the provider.'
 	},
 	{
 		tool: 'provisioning_connection_update',
 		method: 'PATCH',
-		path: '/admin/api/buckets/:id/provisioning-connections/:connectionId',
+		path: '/admin/api/projects/:id/provisioning-connections/:connectionId',
 		action: 'provisioning.connection.update',
 		consequence: 'ordinary',
 		superAdminOnly: false,
@@ -1488,11 +1488,11 @@ const catalogue = [
 	{
 		tool: 'provisioning_connection_release',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/provisioning-connections/:connectionId/release',
+		path: '/admin/api/projects/:id/provisioning-connections/:connectionId/release',
 		action: 'provisioning.connection.release',
 		/*
 		 * High: it re-admits what the guard judged a runaway — every deactivation and deletion the directory has
-		 * been retrying goes through, and each ends a person's access. Precedent: bucket_user_unlock.
+		 * been retrying goes through, and each ends a person's access. Precedent: project_user_unlock.
 		 */
 		consequence: 'high',
 		superAdminOnly: false,
@@ -1505,7 +1505,7 @@ const catalogue = [
 	{
 		tool: 'provisioning_connection_delete',
 		method: 'DELETE',
-		path: '/admin/api/buckets/:id/provisioning-connections/:connectionId',
+		path: '/admin/api/projects/:id/provisioning-connections/:connectionId',
 		action: 'provisioning.connection.delete',
 		/* High: it ends a customer's provisioning, and its credentials stop working at once. */
 		consequence: 'high',
@@ -1519,10 +1519,10 @@ const catalogue = [
 	{
 		tool: 'provisioning_credential_issue',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/provisioning-connections/:connectionId/credentials',
+		path: '/admin/api/projects/:id/provisioning-connections/:connectionId/credentials',
 		action: 'provisioning.credential.issue',
 		/*
-		 * High: it hands out the authority to create, change and delete a bucket's people, and the secret or
+		 * High: it hands out the authority to create, change and delete a project's people, and the secret or
 		 * static token it returns is shown exactly once.
 		 */
 		consequence: 'high',
@@ -1536,7 +1536,7 @@ const catalogue = [
 	{
 		tool: 'provisioning_credential_retire',
 		method: 'DELETE',
-		path: '/admin/api/buckets/:id/provisioning-connections/:connectionId/credentials/:kind/previous',
+		path: '/admin/api/projects/:id/provisioning-connections/:connectionId/credentials/:kind/previous',
 		action: 'provisioning.credential.retire',
 		/* Ordinary: it only removes access, like revoke. */
 		consequence: 'ordinary',
@@ -1550,7 +1550,7 @@ const catalogue = [
 	{
 		tool: 'provisioning_credential_revoke',
 		method: 'DELETE',
-		path: '/admin/api/buckets/:id/provisioning-connections/:connectionId/credentials/:kind',
+		path: '/admin/api/projects/:id/provisioning-connections/:connectionId/credentials/:kind',
 		action: 'provisioning.credential.revoke',
 		/* Ordinary: it only removes access. */
 		consequence: 'ordinary',
@@ -1562,9 +1562,9 @@ const catalogue = [
 			'Revoke a SCIM provisioning connection\'s OAuth credential ("oauth") or static token ("static_token"), with every token it obtained.'
 	},
 	{
-		tool: 'bucket_user_assign_connection',
+		tool: 'project_user_assign_connection',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/users/:uid/connection',
+		path: '/admin/api/projects/:id/users/:uid/connection',
 		action: 'enduser.connection.assign',
 		/*
 		 * High: from this moment the user is read-only to every administrator and belongs to an external
@@ -1579,11 +1579,11 @@ const catalogue = [
 			'Hand a local end-user to a SCIM provisioning connection, under the userName and/or externalId the directory knows them by, so the directory adopts them instead of creating a duplicate. Afterwards only the directory can change them.'
 	},
 
-	/* ------------------------------------------------- writes: bucket groups (6) */
+	/* ------------------------------------------------- writes: groups of end users (6) */
 	{
-		tool: 'bucket_group_create',
+		tool: 'project_group_create',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/groups',
+		path: '/admin/api/projects/:id/groups',
 		action: 'bucketgroup.create',
 		consequence: 'ordinary',
 		superAdminOnly: false,
@@ -1591,12 +1591,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'Create a group of end users in a bucket. The name must be unique in the bucket in any letter case, and it is the value relying parties receive in the `groups` claim.'
+			'Create a group of end users in a project. The name must be unique in the project in any letter case, and it is the value relying parties receive in the `groups` claim.'
 	},
 	{
-		tool: 'bucket_group_update',
+		tool: 'project_group_update',
 		method: 'PATCH',
-		path: '/admin/api/buckets/:id/groups/:gid',
+		path: '/admin/api/projects/:id/groups/:gid',
 		action: 'bucketgroup.update',
 		consequence: 'ordinary',
 		superAdminOnly: false,
@@ -1604,12 +1604,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'gid'],
 		summary:
-			'Rename a bucket group. Relying parties see the new name in the next token each member receives, so an authorization rule keyed on the old name stops matching. A group a SCIM directory manages is read-only here.'
+			'Rename a group of end users. Relying parties see the new name in the next token each member receives, so an authorization rule keyed on the old name stops matching. A group a SCIM directory manages is read-only here.'
 	},
 	{
-		tool: 'bucket_group_delete',
+		tool: 'project_group_delete',
 		method: 'DELETE',
-		path: '/admin/api/buckets/:id/groups/:gid',
+		path: '/admin/api/projects/:id/groups/:gid',
 		action: 'bucketgroup.delete',
 		/* High: every member loses whatever relying parties grant for the group, and nothing restores it. */
 		consequence: 'high',
@@ -1618,12 +1618,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'gid'],
 		summary:
-			'Delete a bucket group and every membership in it. The users themselves are untouched. A group a SCIM directory manages is read-only here.'
+			'Delete a group of end users and every membership in it. The users themselves are untouched. A group a SCIM directory manages is read-only here.'
 	},
 	{
-		tool: 'bucket_group_member_add',
+		tool: 'project_group_member_add',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/groups/:gid/members',
+		path: '/admin/api/projects/:id/groups/:gid/members',
 		action: 'bucketgroup.member.add',
 		consequence: 'ordinary',
 		superAdminOnly: false,
@@ -1631,12 +1631,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'gid'],
 		summary:
-			'Add end users of the bucket to a group, up to 1,000 at a time. Users already in it are left as they are. Provisioned users may be added to a group administrators keep; a group a SCIM directory manages is read-only here.'
+			'Add end users of the project to a group, up to 1,000 at a time. Users already in it are left as they are. Provisioned users may be added to a group administrators keep; a group a SCIM directory manages is read-only here.'
 	},
 	{
-		tool: 'bucket_group_member_remove',
+		tool: 'project_group_member_remove',
 		method: 'DELETE',
-		path: '/admin/api/buckets/:id/groups/:gid/members/:uid',
+		path: '/admin/api/projects/:id/groups/:gid/members/:uid',
 		action: 'bucketgroup.member.remove',
 		consequence: 'ordinary',
 		superAdminOnly: false,
@@ -1644,12 +1644,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'gid', 'uid'],
 		summary:
-			'Remove one end user from a bucket group. Their sessions and tokens are untouched; the next token they receive no longer names the group.'
+			'Remove one end user from a group. Their sessions and tokens are untouched; the next token they receive no longer names the group.'
 	},
 	{
-		tool: 'bucket_group_assign_connection',
+		tool: 'project_group_assign_connection',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/groups/:gid/connection',
+		path: '/admin/api/projects/:id/groups/:gid/connection',
 		action: 'bucketgroup.connection.assign',
 		/*
 		 * High: from this moment the group belongs to an external directory and is read-only to every
@@ -1715,7 +1715,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: [],
 		summary:
-			'Rotate one algorithm of the instance key set in one step. When a published key of that algorithm is past its promotableAt, the oldest such key starts signing (`promoted`), the previous signer returns to published and keeps verifying what it signed (`demoted`), and a new key is generated and published as the next one (`generated`). When no key is ready, only the next key is generated, nothing changes who signs, and `rotatableAt` says from when the algorithm can rotate. Never promotes a key inside its publication window. Every bucket served at the root signs with these keys, the administrators included, which is why it is gated.'
+			'Rotate one algorithm of the instance key set in one step. When a published key of that algorithm is past its promotableAt, the oldest such key starts signing (`promoted`), the previous signer returns to published and keeps verifying what it signed (`demoted`), and a new key is generated and published as the next one (`generated`). When no key is ready, only the next key is generated, nothing changes who signs, and `rotatableAt` says from when the algorithm can rotate. Never promotes a key inside its publication window. Every project served at the root signs with these keys, the administrators included, which is why it is gated.'
 	},
 	{
 		tool: 'jwks_revoke',
@@ -1728,12 +1728,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['kid'],
 		summary:
-			'Revoke a key of the instance key set that may be compromised. The body must name the key again — { "confirm": "<kid>" } — or nothing happens. Unlike retiring, there is no day of grace: the key leaves the key set at once and every token it signed stops verifying on this instance now and on every other within the key cache bound, for every bucket served at the root, the console\'s own sign-in included, so people may have to sign in again. When the key is the one signing, the same act puts another key in its place: the oldest published key of its algorithm past its promotableAt, or else a newly generated key that signs at once (`replacementGenerated: true`), in which case relying parties holding a cached key set may reject new tokens until they refresh it. Answers `replacement` with the key now signing. Refused for a key already revoked (409); a hidden or unknown key is 404.'
+			'Revoke a key of the instance key set that may be compromised. The body must name the key again — { "confirm": "<kid>" } — or nothing happens. Unlike retiring, there is no day of grace: the key leaves the key set at once and every token it signed stops verifying on this instance now and on every other within the key cache bound, for every project served at the root, the console\'s own sign-in included, so people may have to sign in again. When the key is the one signing, the same act puts another key in its place: the oldest published key of its algorithm past its promotableAt, or else a newly generated key that signs at once (`replacementGenerated: true`), in which case relying parties holding a cached key set may reject new tokens until they refresh it. Answers `replacement` with the key now signing. Refused for a key already revoked (409); a hidden or unknown key is 404.'
 	},
 	{
-		tool: 'bucket_key_generate',
+		tool: 'project_key_generate',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/keys',
+		path: '/admin/api/projects/:id/keys',
 		action: 'bucket.key.generate',
 		consequence: 'ordinary',
 		superAdminOnly: false,
@@ -1741,12 +1741,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'Generate a signing key for a bucket with an address of its own. The key is published at once and signs only once promoted, which the server allows after the publication window so every instance serves it first.'
+			'Generate a signing key for a project with an address of its own. The key is published at once and signs only once promoted, which the server allows after the publication window so every instance serves it first.'
 	},
 	{
-		tool: 'bucket_key_promote',
+		tool: 'project_key_promote',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/keys/:kid/promote',
+		path: '/admin/api/projects/:id/keys/:kid/promote',
 		action: 'bucket.key.promote',
 		consequence: 'ordinary',
 		superAdminOnly: false,
@@ -1754,12 +1754,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'kid'],
 		summary:
-			"Make a published key the one the bucket signs with in its algorithm. The key it replaces in that algorithm keeps verifying. Refused before the key's promotableAt."
+			"Make a published key the one the project signs with in its algorithm. The key it replaces in that algorithm keeps verifying. Refused before the key's promotableAt."
 	},
 	{
-		tool: 'bucket_key_retire',
+		tool: 'project_key_retire',
 		method: 'DELETE',
-		path: '/admin/api/buckets/:id/keys/:kid',
+		path: '/admin/api/projects/:id/keys/:kid',
 		action: 'bucket.key.retire',
 		consequence: 'high',
 		superAdminOnly: false,
@@ -1767,12 +1767,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'kid'],
 		summary:
-			'Retire a key the bucket no longer signs with. The body must name the key again — { "confirm": "<kid>" } — or nothing happens. It stays published until every token it could have signed has expired, then is hidden and tokens signed with it stop verifying. Refused for the signing key. High-consequence: describe it and confirm before running.'
+			'Retire a key the project no longer signs with. The body must name the key again — { "confirm": "<kid>" } — or nothing happens. It stays published until every token it could have signed has expired, then is hidden and tokens signed with it stop verifying. Refused for the signing key. High-consequence: describe it and confirm before running.'
 	},
 	{
-		tool: 'bucket_key_rotate',
+		tool: 'project_key_rotate',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/keys/rotate',
+		path: '/admin/api/projects/:id/keys/rotate',
 		action: 'bucket.key.rotate',
 		/* Ordinary, as promote is: it promotes only a key past its publication window, and the old signer keeps verifying. */
 		consequence: 'ordinary',
@@ -1781,12 +1781,12 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			"Rotate one algorithm of a bucket's keys in one step. When a published key of that algorithm is past its promotableAt, the oldest such key starts signing (`promoted`), the previous signer returns to published and keeps verifying what it signed (`demoted`), and a new key is generated and published as the next one (`generated`). When no key is ready, only the next key is generated, nothing changes who signs, and `rotatableAt` says from when the algorithm can rotate. Never promotes a key inside its publication window. Refused for a bucket served at the root (its keys are the instance's) and for an unsupported algorithm."
+			"Rotate one algorithm of a project's keys in one step. When a published key of that algorithm is past its promotableAt, the oldest such key starts signing (`promoted`), the previous signer returns to published and keeps verifying what it signed (`demoted`), and a new key is generated and published as the next one (`generated`). When no key is ready, only the next key is generated, nothing changes who signs, and `rotatableAt` says from when the algorithm can rotate. Never promotes a key inside its publication window. Refused for a project served at the root (its keys are the instance's) and for an unsupported algorithm."
 	},
 	{
-		tool: 'bucket_key_revoke',
+		tool: 'project_key_revoke',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/keys/:kid/revoke',
+		path: '/admin/api/projects/:id/keys/:kid/revoke',
 		action: 'bucket.key.revoke',
 		/* Every token the key signed stops verifying at once, and people may have to sign in again. */
 		consequence: 'high',
@@ -1795,7 +1795,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'kid'],
 		summary:
-			'Revoke a key of a bucket that may be compromised. The body must name the key again — { "confirm": "<kid>" } — or nothing happens. Unlike retiring, there is no day of grace: the key leaves the key set at once and every token it signed stops verifying on this instance now and on every other within the key cache bound, so people may have to sign in again. When the key is the one signing, the same act puts another key in its place: the oldest published key of its algorithm past its promotableAt, or else a newly generated key that signs at once (`replacementGenerated: true`), in which case relying parties holding a cached key set may reject new tokens until they refresh it. Answers `replacement` with the key now signing. Refused for a key already revoked (409); a hidden or unknown key is 404. High-consequence: describe it and confirm before running.'
+			'Revoke a key of a project that may be compromised. The body must name the key again — { "confirm": "<kid>" } — or nothing happens. Unlike retiring, there is no day of grace: the key leaves the key set at once and every token it signed stops verifying on this instance now and on every other within the key cache bound, so people may have to sign in again. When the key is the one signing, the same act puts another key in its place: the oldest published key of its algorithm past its promotableAt, or else a newly generated key that signs at once (`replacementGenerated: true`), in which case relying parties holding a cached key set may reject new tokens until they refresh it. Answers `replacement` with the key now signing. Refused for a key already revoked (409); a hidden or unknown key is 404. High-consequence: describe it and confirm before running.'
 	},
 
 	/* ------------------------------------------------ writes: settings (3) */
@@ -1943,7 +1943,7 @@ export const excludedConsoleOperations: readonly ExcludedConsoleOperation[] = [
 		path: '/admin/api/scope',
 		absence: 'inapplicable',
 		reason:
-			'Points a browser console at one of the groups it may administer, and an agent connection has no session to hold that choice. Name the group in each call instead.'
+			'Points a browser console at one of the teams it may administer, and an agent connection has no session to hold that choice. Name the team in each call instead.'
 	},
 	/*
 	 * Trying a sign-in through a provider (specs/088). Not a decision withheld from agents: the try is a
@@ -1952,14 +1952,14 @@ export const excludedConsoleOperations: readonly ExcludedConsoleOperation[] = [
 	 */
 	{
 		method: 'POST',
-		path: '/admin/api/buckets/:id/federation/:providerId/try',
+		path: '/admin/api/projects/:id/federation/:providerId/try',
 		absence: 'inapplicable',
 		reason:
 			'Trying a sign-in through an identity provider needs a person signing in at that provider in a browser, and its result is shown only to the console session that started it. Do it from the provider page in the admin console.'
 	},
 	{
 		method: 'GET',
-		path: '/admin/api/buckets/:id/federation/:providerId/try/:tryRef',
+		path: '/admin/api/projects/:id/federation/:providerId/try/:tryRef',
 		absence: 'inapplicable',
 		reason:
 			'The result of a sign-in try is readable only by the console session that started it, which an agent connection does not have. Read it on the provider page in the admin console.'
@@ -1967,28 +1967,28 @@ export const excludedConsoleOperations: readonly ExcludedConsoleOperation[] = [
 	/*
 	 * Since specs/090 a deletion schedules rather than destroys, and is still withheld: thirty days later it
 	 * becomes the same destruction, with nobody there to stop it, so consenting to it is consenting to that.
-	 * A restore is published (bucket_restore); it only gives access back.
+	 * A restore is published (project_restore); it only gives access back.
 	 */
 	{
 		method: 'DELETE',
-		path: '/admin/api/buckets/:id',
+		path: '/admin/api/projects/:id',
 		absence: 'withheld',
 		reason:
-			'Deleting a user bucket switches off every end-user account in it at once — people, not configuration — and ends, unattended, thirty days later in their destruction, with nothing left afterwards to inspect or restore. In the console an administrator is shown how many, consents to their destruction as a separate act, and types a confirmation word. Withheld by operator decision — delete it in the admin console instead. A bucket already scheduled for deletion can be brought back with bucket_restore.'
+			'Deleting a project switches off every end-user account in it at once — people, not configuration — and ends, unattended, thirty days later in their destruction, with nothing left afterwards to inspect or restore. In the console an administrator is shown how many, consents to their destruction as a separate act, and types a confirmation word. Withheld by operator decision — delete it in the admin console instead. A project already scheduled for deletion can be brought back with project_restore.'
 	},
 	{
 		method: 'POST',
-		path: '/admin/api/buckets/:id/purge',
+		path: '/admin/api/projects/:id/purge',
 		absence: 'withheld',
 		reason:
-			'Destroying a user bucket scheduled for deletion, before its date, destroys every end-user account in it — people, not configuration — with nothing left afterwards to inspect or restore. In the console an administrator is shown how many, consents to their destruction as a separate act, and types a confirmation word. Withheld by operator decision — use Delete now in the admin console instead.'
+			'Destroying a project scheduled for deletion, before its date, destroys every end-user account in it — people, not configuration — with nothing left afterwards to inspect or restore. In the console an administrator is shown how many, consents to their destruction as a separate act, and types a confirmation word. Withheld by operator decision — use Delete now in the admin console instead.'
 	},
 	{
 		method: 'DELETE',
-		path: '/admin/api/groups/:id',
+		path: '/admin/api/teams/:id',
 		absence: 'withheld',
 		reason:
-			'Deleting a group destroys the owner of whatever it held, and with it the only thing that granted anyone access — the same class as the two container deletions above. Withheld from agents by operator decision; delete it in the admin console instead.'
+			'Deleting a team destroys the owner of whatever it held, and with it the only thing that granted anyone access — the same class as the two container deletions above. Withheld from agents by operator decision; delete it in the admin console instead.'
 	},
 	/*
 	 * Purging recorded faults.
@@ -2030,14 +2030,15 @@ export function excludedOperationFor(
 	 * the refusal can say *why* and name the console rather than answering a bare "no such tool".
 	 */
 	const guesses: Record<string, string> = {
-		group_delete: '/admin/api/groups/:id',
-		bucket_delete: '/admin/api/buckets/:id',
-		bucket_purge: '/admin/api/buckets/:id/purge',
+		team_delete: '/admin/api/teams/:id',
+		project_delete: '/admin/api/projects/:id',
+		project_purge: '/admin/api/projects/:id/purge',
 		setup_bootstrap: '/admin/api/setup',
 		logout: '/admin/api/logout',
 		scope_switch: '/admin/api/scope',
 		error_purge: '/admin/api/errors',
-		federation_provider_try: '/admin/api/buckets/:id/federation/:providerId/try'
+		federation_provider_try:
+			'/admin/api/projects/:id/federation/:providerId/try'
 	};
 	const path = guesses[name];
 	return path

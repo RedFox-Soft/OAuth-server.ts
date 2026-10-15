@@ -141,7 +141,7 @@ export class SessionNotFound extends InvalidRequest {}
  */
 export class UnknownBucket extends OIDCProviderError {
 	allow_redirect = false;
-	error_description = 'no user bucket is served at this address';
+	error_description = 'no project is served at this address';
 
 	constructor() {
 		super(404, 'not_found');

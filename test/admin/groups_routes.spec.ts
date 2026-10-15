@@ -46,7 +46,7 @@ const Refusal = Type.Object({
 });
 
 async function makeGroup(cookie: string, name = 'Acme') {
-	const res = await client.admin.api.groups.post(
+	const res = await client.admin.api.teams.post(
 		{ name },
 		{ headers: { cookie } }
 	);
@@ -76,7 +76,7 @@ describe('groups API', () => {
 		const a = await admin();
 		const created = answered((await makeGroup(a.cookie)).data);
 
-		const list = await client.admin.api.groups.get({
+		const list = await client.admin.api.teams.get({
 			headers: { cookie: a.cookie }
 		});
 		const ids = answered(list.data).map((g) => g._id);
@@ -89,13 +89,13 @@ describe('groups API', () => {
 		const b = await admin();
 		const group = answered((await makeGroup(a.cookie)).data);
 
-		const list = await client.admin.api.groups.get({
+		const list = await client.admin.api.teams.get({
 			headers: { cookie: b.cookie }
 		});
 		expect(answered(list.data).map((g) => g._id)).not.toContain(group._id);
 
 		const read = await client.admin.api
-			.groups({ id: group._id })
+			.teams({ id: group._id })
 			.get({ headers: { cookie: b.cookie } });
 		expect(read.status).toBe(403);
 	});
@@ -107,7 +107,7 @@ describe('groups API', () => {
 			const group = answered((await makeGroup(owner.cookie)).data);
 
 			const added = await client.admin.api
-				.groups({ id: group._id })
+				.teams({ id: group._id })
 				.members.post(
 					{ userId: member.userId, role: 'member' },
 					{ headers: { cookie: owner.cookie } }
@@ -119,11 +119,11 @@ describe('groups API', () => {
 			const bucketId = await bucketIn(group._id);
 
 			await client.admin.api.scope.put(
-				{ groupId: group._id },
+				{ teamId: group._id },
 				{ headers: { cookie: member.cookie } }
 			);
 			const read = await client.admin.api
-				.buckets({ id: bucketId })
+				.projects({ id: bucketId })
 				.get({ headers: { cookie: member.cookie } });
 			expect(read.status).toBe(200);
 		});
@@ -134,14 +134,14 @@ describe('groups API', () => {
 			const third = await admin();
 			const group = answered((await makeGroup(owner.cookie)).data);
 			await client.admin.api
-				.groups({ id: group._id })
+				.teams({ id: group._id })
 				.members.post(
 					{ userId: member.userId, role: 'member' },
 					{ headers: { cookie: owner.cookie } }
 				);
 
 			const add = await client.admin.api
-				.groups({ id: group._id })
+				.teams({ id: group._id })
 				.members.post(
 					{ userId: third.userId, role: 'member' },
 					{ headers: { cookie: member.cookie } }
@@ -149,13 +149,13 @@ describe('groups API', () => {
 			expect(add.status).toBe(403);
 
 			const promoteSelf = await client.admin.api
-				.groups({ id: group._id })
+				.teams({ id: group._id })
 				.members({ userId: member.userId })
 				.patch({ role: 'owner' }, { headers: { cookie: member.cookie } });
 			expect(promoteSelf.status).toBe(403);
 
 			const evictOwner = await client.admin.api
-				.groups({ id: group._id })
+				.teams({ id: group._id })
 				.members({ userId: owner.userId })
 				.delete(undefined, { headers: { cookie: member.cookie } });
 			expect(evictOwner.status).toBe(403);
@@ -166,25 +166,25 @@ describe('groups API', () => {
 			const member = await admin();
 			const group = answered((await makeGroup(owner.cookie)).data);
 			await client.admin.api
-				.groups({ id: group._id })
+				.teams({ id: group._id })
 				.members.post(
 					{ userId: member.userId, role: 'member' },
 					{ headers: { cookie: owner.cookie } }
 				);
 
 			const before = await client.admin.api
-				.groups({ id: group._id })
+				.teams({ id: group._id })
 				.get({ headers: { cookie: member.cookie } });
 			expect(before.status).toBe(200);
 
 			await client.admin.api
-				.groups({ id: group._id })
+				.teams({ id: group._id })
 				.members({ userId: member.userId })
 				.delete(undefined, { headers: { cookie: owner.cookie } });
 
 			// No re-login, no session flush: the next request resolves the new membership.
 			const after = await client.admin.api
-				.groups({ id: group._id })
+				.teams({ id: group._id })
 				.get({ headers: { cookie: member.cookie } });
 			expect(after.status).toBe(403);
 		});
@@ -194,13 +194,13 @@ describe('groups API', () => {
 			const group = answered((await makeGroup(owner.cookie)).data);
 
 			const demote = await client.admin.api
-				.groups({ id: group._id })
+				.teams({ id: group._id })
 				.members({ userId: owner.userId })
 				.patch({ role: 'member' }, { headers: { cookie: owner.cookie } });
 			expect(demote.status).toBe(409);
 
 			const remove = await client.admin.api
-				.groups({ id: group._id })
+				.teams({ id: group._id })
 				.members({ userId: owner.userId })
 				.delete(undefined, { headers: { cookie: owner.cookie } });
 			expect(remove.status).toBe(409);
@@ -215,7 +215,7 @@ describe('groups API', () => {
 		it('is never deletable', async () => {
 			const a = await admin();
 			const res = await client.admin.api
-				.groups({ id: await personalGroupId(a.userId) })
+				.teams({ id: await personalGroupId(a.userId) })
 				.delete(undefined, { headers: { cookie: a.cookie } });
 			expect(res.status).toBe(403);
 		});
@@ -227,19 +227,19 @@ describe('groups API', () => {
 			const member = await admin();
 			const group = answered((await makeGroup(owner.cookie)).data);
 			await client.admin.api
-				.groups({ id: group._id })
+				.teams({ id: group._id })
 				.members.post(
 					{ userId: member.userId, role: 'member' },
 					{ headers: { cookie: owner.cookie } }
 				);
 
 			const byMember = await client.admin.api
-				.groups({ id: group._id })
+				.teams({ id: group._id })
 				.delete(undefined, { headers: { cookie: member.cookie } });
 			expect(byMember.status).toBe(403);
 
 			const byOwner = await client.admin.api
-				.groups({ id: group._id })
+				.teams({ id: group._id })
 				.delete(undefined, { headers: { cookie: owner.cookie } });
 			expect(byOwner.status).toBe(200);
 		});
@@ -250,12 +250,12 @@ describe('groups API', () => {
 			await bucketIn(group._id);
 
 			const res = await client.admin.api
-				.groups({ id: group._id })
+				.teams({ id: group._id })
 				.delete(undefined, { headers: { cookie: owner.cookie } });
 			expect(res.status).toBe(409);
 			const refusal = shaped(Refusal, res.error?.value);
-			expect(refusal.message).toBe('group still owns buckets');
-			expect(refusal.blockers).toEqual([{ kind: 'bucket', count: 1 }]);
+			expect(refusal.message).toBe('team still owns projects');
+			expect(refusal.blockers).toEqual([{ kind: 'project', count: 1 }]);
 		});
 
 		it('never deletes a personal group', async () => {
@@ -263,7 +263,7 @@ describe('groups API', () => {
 			const personal = await personalGroupId(a.userId);
 
 			const res = await client.admin.api
-				.groups({ id: personal })
+				.teams({ id: personal })
 				.delete(undefined, { headers: { cookie: a.cookie } });
 			expect(res.status).toBe(403);
 		});

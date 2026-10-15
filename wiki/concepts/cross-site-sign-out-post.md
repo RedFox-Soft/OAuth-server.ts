@@ -4,7 +4,7 @@ title: "A cross-site sign-out post is bounced once, because Lax withholds the co
 tags: [oidc, gotcha, contract]
 sources: [oauth-server-codebase]
 created: 2026-09-30
-updated: 2026-09-30
+updated: 2026-10-15
 graph:
   node_type: concept
   relationships:
@@ -41,7 +41,7 @@ drives sign-out by GET never sees any of it, which is how the missing method wen
 
 ## What the endpoint does instead
 
-A POST carrying **no session cookie for the addressed bucket** and no `_resubmitted` marker is
+A POST carrying **no session cookie for the addressed project** and no `_resubmitted` marker is
 answered with the `form_post` self-submitting page (`lib/html/formPost.tsx`), re-posting the same
 fields plus `_resubmitted=1` to the same address (`lib/actions/end_session.ts:264`). That second post is
 initiated by a page on this server's own origin, so it is same-site and the browser sends the `Lax`

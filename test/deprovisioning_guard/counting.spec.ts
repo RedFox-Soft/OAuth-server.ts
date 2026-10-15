@@ -24,7 +24,7 @@ import {
 const ONE = { count: 1, windowSeconds: HOUR };
 
 function usersPath(g: Guarded, uid = ''): string {
-	return `/admin/api/buckets/${g.bucket._id}/users${uid ? `/${uid}` : ''}`;
+	return `/admin/api/projects/${g.bucket._id}/users${uid ? `/${uid}` : ''}`;
 }
 
 /**

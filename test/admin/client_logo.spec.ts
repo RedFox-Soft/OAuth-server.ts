@@ -73,7 +73,7 @@ describe('a client’s logo and links through the admin API', () => {
 	});
 
 	function clients() {
-		return api.admin.api.buckets({ id: bucketId }).clients;
+		return api.admin.api.projects({ id: bucketId }).clients;
 	}
 
 	async function create(extra: Record<string, unknown> = {}) {

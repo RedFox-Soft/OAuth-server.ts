@@ -271,7 +271,7 @@ export function UserProfileTab({
 										key: 'verification',
 										label: 'Verification',
 										children:
-											'This bucket requires a verified address: they are asked to verify when they next sign in.'
+											'This project requires a verified address: they are asked to verify when they next sign in.'
 									}
 								]
 							: [])
@@ -308,7 +308,7 @@ export function UserProfileTab({
 				{claims.length === 0 ? (
 					<Typography.Text type="secondary">
 						No claims of their own. A client receives only the account's email
-						and the claims the bucket's settings derive.
+						and the claims the project's settings derive.
 					</Typography.Text>
 				) : (
 					<Descriptions

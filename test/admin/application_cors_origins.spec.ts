@@ -50,7 +50,7 @@ async function applicationIn(
 	corsOrigins?: string[]
 ): Promise<string> {
 	const created = await client.admin.api
-		.buckets({ id: bucketId })
+		.projects({ id: bucketId })
 		.clients.post(
 			{ ...BROWSER_APP, ...(corsOrigins ? { corsOrigins } : {}) },
 			{ headers: { cookie } }
@@ -86,7 +86,7 @@ describe("an application's browser origins", () => {
 
 	it('accepts origins on create and returns them', async () => {
 		const created = await client.admin.api
-			.buckets({ id: bucketId })
+			.projects({ id: bucketId })
 			.clients.post(
 				{ ...BROWSER_APP, corsOrigins: ['https://app.example.com'] },
 				{ headers: { cookie: su.cookie } }
@@ -100,7 +100,7 @@ describe("an application's browser origins", () => {
 
 	it('defaults to an empty list when omitted', async () => {
 		const created = await client.admin.api
-			.buckets({ id: bucketId })
+			.projects({ id: bucketId })
 			.clients.post(BROWSER_APP, { headers: { cookie: su.cookie } });
 
 		expect(answered(created.data).corsOrigins).toEqual([]);
@@ -112,7 +112,7 @@ describe("an application's browser origins", () => {
 		]);
 
 		const replaced = await client.admin.api
-			.buckets({ id: bucketId })
+			.projects({ id: bucketId })
 			.clients({ clientId })
 			.patch(
 				{ corsOrigins: ['https://new.example.com'] },
@@ -131,7 +131,7 @@ describe("an application's browser origins", () => {
 		]);
 
 		const cleared = await client.admin.api
-			.buckets({ id: bucketId })
+			.projects({ id: bucketId })
 			.clients({ clientId })
 			.patch({ corsOrigins: [] }, { headers: { cookie: su.cookie } });
 
@@ -144,7 +144,7 @@ describe("an application's browser origins", () => {
 		]);
 
 		const renamed = await client.admin.api
-			.buckets({ id: bucketId })
+			.projects({ id: bucketId })
 			.clients({ clientId })
 			.patch({ clientName: 'Renamed' }, { headers: { cookie: su.cookie } });
 
@@ -155,7 +155,7 @@ describe("an application's browser origins", () => {
 
 	it('normalizes host case and collapses duplicates', async () => {
 		const created = await client.admin.api
-			.buckets({ id: bucketId })
+			.projects({ id: bucketId })
 			.clients.post(
 				{
 					...BROWSER_APP,
@@ -185,7 +185,7 @@ describe("an application's browser origins", () => {
 		]);
 
 		const res = await client.admin.api
-			.buckets({ id: bucketId })
+			.projects({ id: bucketId })
 			.clients({ clientId })
 			.patch({ corsOrigins: [origin] }, { headers: { cookie: su.cookie } });
 
@@ -207,7 +207,7 @@ describe("an application's browser origins", () => {
 		]);
 
 		const res = await client.admin.api
-			.buckets({ id: bucketId })
+			.projects({ id: bucketId })
 			.clients({ clientId })
 			.patch(
 				{
@@ -224,7 +224,7 @@ describe("an application's browser origins", () => {
 		const before = await adapter('Client').findByIndexed('bucketId', bucketId);
 
 		const res = await client.admin.api
-			.buckets({ id: bucketId })
+			.projects({ id: bucketId })
 			.clients.post(
 				{ ...BROWSER_APP, corsOrigins: ['https://bad.example.com/'] },
 				{ headers: { cookie: su.cookie } }
@@ -242,7 +242,7 @@ describe("an application's browser origins", () => {
 		]);
 
 		const res = await client.admin.api
-			.buckets({ id: bucketId })
+			.projects({ id: bucketId })
 			.clients({ clientId })
 			.patch({ corsOrigins: ['https://app.example.com'] });
 
@@ -257,7 +257,7 @@ describe("an application's browser origins", () => {
 		const stranger = await sessionCookieFor('plain');
 
 		const res = await client.admin.api
-			.buckets({ id: bucketId })
+			.projects({ id: bucketId })
 			.clients({ clientId })
 			.patch(
 				{ corsOrigins: ['https://app.example.com'] },
@@ -274,7 +274,7 @@ describe("an application's browser origins", () => {
 		const clientId = await applicationIn(own, member.cookie);
 
 		const res = await client.admin.api
-			.buckets({ id: own })
+			.projects({ id: own })
 			.clients({ clientId })
 			.patch(
 				{ corsOrigins: ['https://app.example.com'] },
@@ -289,13 +289,13 @@ describe("an application's browser origins", () => {
 	// origin to the console's own client.
 	it("refuses the administrators' bucket even to a super administrator, before validating the list", async () => {
 		const res = await client.admin.api
-			.buckets({ id: ADMIN_BUCKET_ID })
+			.projects({ id: ADMIN_BUCKET_ID })
 			.clients({ clientId: ADMIN_CLIENT_ID })
 			.patch({ corsOrigins: ['*'] }, { headers: { cookie: su.cookie } });
 
 		expect(res.status).toBe(403);
 		expect(shaped(MessageBody, res.error?.value).message).toBe(
-			"this operation is not available for the administrators' bucket"
+			"this operation is not available for the administrators' project"
 		);
 	});
 });

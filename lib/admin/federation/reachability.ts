@@ -29,7 +29,8 @@ export interface ReachabilityState {
 
 export async function loadReachabilityState(): Promise<ReachabilityState> {
 	const bucket = await getBucketStore().find(ADMIN_BUCKET_ID);
-	if (!bucket) throw new AdminError(500, 'the admin bucket is missing');
+	if (!bucket)
+		throw new AdminError(500, "the administrators' project is missing");
 	const users = getUserStore(ADMIN_BUCKET_ID);
 	const superAdministrators = (
 		await Promise.all((await superAdminIds()).map((id) => users.find(id)))
@@ -78,6 +79,6 @@ export function assertConsoleStaysReachable(
 	if (consoleStaysReachable(after)) return;
 	throw new AdminError(
 		409,
-		`${what} would leave no super administrator able to sign in to the console: password sign-in is off, and no other active super administrator is linked at an enabled identity provider of the Administrators bucket. Link one first, or turn password sign-in back on.`
+		`${what} would leave no super administrator able to sign in to the console: password sign-in is off, and no other active super administrator is linked at an enabled identity provider of the Administrators project. Link one first, or turn password sign-in back on.`
 	);
 }

@@ -75,21 +75,21 @@ describe('reading one bucket user', () => {
 		const group = shaped(
 			Type.Object({ id: Type.String() }),
 			(
-				await call('POST', `/admin/api/buckets/${b}/groups`, cookie, {
+				await call('POST', `/admin/api/projects/${b}/groups`, cookie, {
 					displayName: 'Readers'
 				})
 			).body
 		);
 		await call(
 			'POST',
-			`/admin/api/buckets/${b}/groups/${group.id}/members`,
+			`/admin/api/projects/${b}/groups/${group.id}/members`,
 			cookie,
 			{ userIds: [user._id] }
 		);
 
 		const { status, body } = await call(
 			'GET',
-			`/admin/api/buckets/${b}/users/${user._id}`,
+			`/admin/api/projects/${b}/users/${user._id}`,
 			cookie
 		);
 
@@ -104,7 +104,7 @@ describe('reading one bucket user', () => {
 		const created = shaped(
 			Type.Object({ _id: Type.String() }),
 			(
-				await call('POST', `/admin/api/buckets/${b}/users`, cookie, {
+				await call('POST', `/admin/api/projects/${b}/users`, cookie, {
 					email: 'with-password@example.com',
 					password: 'a long enough password'
 				})
@@ -113,7 +113,7 @@ describe('reading one bucket user', () => {
 
 		const { body } = await call(
 			'GET',
-			`/admin/api/buckets/${b}/users/${created._id}`,
+			`/admin/api/projects/${b}/users/${created._id}`,
 			cookie
 		);
 
@@ -126,14 +126,14 @@ describe('reading one bucket user', () => {
 		const locker = await signedIn();
 		await call(
 			'POST',
-			`/admin/api/buckets/${b}/users/${user._id}/lock`,
+			`/admin/api/projects/${b}/users/${user._id}/lock`,
 			locker.cookie,
 			{ reason: 'suspected phishing' }
 		);
 
 		const { body } = await call(
 			'GET',
-			`/admin/api/buckets/${b}/users/${user._id}`,
+			`/admin/api/projects/${b}/users/${user._id}`,
 			cookie
 		);
 
@@ -148,7 +148,7 @@ describe('reading one bucket user', () => {
 		const locker = await signedIn();
 		await call(
 			'POST',
-			`/admin/api/buckets/${b}/users/${user._id}/lock`,
+			`/admin/api/projects/${b}/users/${user._id}/lock`,
 			locker.cookie,
 			{ reason: 'left the company' }
 		);
@@ -156,7 +156,7 @@ describe('reading one bucket user', () => {
 
 		const { body } = await call(
 			'GET',
-			`/admin/api/buckets/${b}/users/${user._id}`,
+			`/admin/api/projects/${b}/users/${user._id}`,
 			cookie
 		);
 
@@ -168,7 +168,7 @@ describe('reading one bucket user', () => {
 
 		const { status } = await call(
 			'GET',
-			`/admin/api/buckets/${b}/users/absent-user`,
+			`/admin/api/projects/${b}/users/absent-user`,
 			cookie
 		);
 
@@ -184,7 +184,7 @@ describe('reading one bucket user', () => {
 
 		const { body } = await call(
 			'GET',
-			`/admin/api/buckets/${b}/users/${user._id}`,
+			`/admin/api/projects/${b}/users/${user._id}`,
 			cookie
 		);
 

@@ -54,7 +54,7 @@ async function tenant() {
 }
 
 function applications(bucket: Pick<UserBucket, '_id'>) {
-	return client.admin.api.buckets({ id: bucket._id }).clients;
+	return client.admin.api.projects({ id: bucket._id }).clients;
 }
 
 async function createPublic(bucket: Pick<UserBucket, '_id'>, cookie: string) {
@@ -143,7 +143,7 @@ describe("a bucket's applications", () => {
 		expect(created.status).toBe(201);
 		const body = answered(created.data);
 		expect(body.secret).toBeUndefined(); // public client
-		expect(body.bucketId).toBe(bucket._id);
+		expect(body.projectId).toBe(bucket._id);
 		expect(await storedBucketOf(body.clientId)).toBe(bucket._id);
 		const list = await applications(bucket).get({ headers: { cookie } });
 		expect(answered(list.data).map((c) => c.clientId)).toEqual([body.clientId]);
@@ -291,7 +291,7 @@ describe("a bucket's applications", () => {
 		}).delete(undefined, { headers: { cookie } });
 		expect(refusalOf(res)).toEqual({
 			status: 403,
-			message: "this operation is not available for the administrators' bucket"
+			message: "this operation is not available for the administrators' project"
 		});
 		expect(await adapter('Client').find(ADMIN_CLIENT_ID)).toBeTruthy();
 	});
@@ -330,7 +330,7 @@ describe("a bucket's applications", () => {
 					)
 				).data
 			);
-			expect(created.bucketId).toBe(bucket._id);
+			expect(created.projectId).toBe(bucket._id);
 			const app = applications(bucket)({ clientId: created.clientId });
 
 			const read = await app.get({ headers: { cookie } });
@@ -362,8 +362,8 @@ describe("a bucket's applications", () => {
 			expect(entries[0]).toMatchObject({
 				action: 'client.create',
 				targetId: clientId,
-				bucketId: bucket._id,
-				ownerGroupId: await personalGroupId(userId)
+				projectId: bucket._id,
+				ownerTeamId: await personalGroupId(userId)
 			});
 		});
 
@@ -410,7 +410,7 @@ describe("a bucket's applications", () => {
 
 			expect(refusalOf(unreachable)).toEqual({
 				status: 403,
-				message: 'no access to this bucket'
+				message: 'no access to this project'
 			});
 			expect(refusalOf(unreachable)).toEqual(refusalOf(missing));
 		});
@@ -451,8 +451,8 @@ describe("a bucket's applications", () => {
 			const clientId = await createPublic(bucket, cookie);
 
 			const res = await applications(bucket)({ clientId }).patch(
-				// @ts-expect-error submitted as an unknown field; the schema does not accept it.
-				{ clientName: 'moved?', bucketId: other._id },
+				// @ts-expect-error submitted as unknown fields, the edge name and the stored one; the schema accepts neither.
+				{ clientName: 'moved?', projectId: other._id, bucketId: other._id },
 				{ headers: { cookie } }
 			);
 
@@ -473,7 +473,7 @@ describe("a bucket's applications", () => {
 			);
 
 			expect(res.status).toBe(200);
-			expect(answered(res.data).bucketId).toBe(bucket._id);
+			expect(answered(res.data).projectId).toBe(bucket._id);
 			expect(await storedBucketOf(clientId)).toBe(bucket._id);
 		});
 

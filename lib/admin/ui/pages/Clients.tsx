@@ -190,7 +190,7 @@ function OriginsField({
 			</Space.Compact>
 			{siblings.length > 0 && (
 				<Select<number>
-					placeholder="Copy from another application of this bucket"
+					placeholder="Copy from another application of this project"
 					style={{ width: '100%' }}
 					value={null}
 					options={siblings.map((sibling, index) => ({
@@ -296,7 +296,7 @@ export function Clients({
 	bucketId: string;
 	writable: boolean;
 }) {
-	const base = `/admin/api/buckets/${encodeURIComponent(bucketId)}/clients`;
+	const base = `/admin/api/projects/${encodeURIComponent(bucketId)}/clients`;
 	const [rows, setRows] = useState<ClientRow[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [loadFailed, setLoadFailed] = useState<string | null>(null);
@@ -590,7 +590,7 @@ export function Clients({
 					showIcon
 					style={{ marginBottom: 16 }}
 					title="These applications are read-only to you"
-					description="Changing a bucket's applications takes membership of the group that owns it."
+					description="Changing a project's applications takes membership of the team that owns it."
 				/>
 			)}
 			{loadFailed !== null ? (
@@ -606,7 +606,7 @@ export function Clients({
 					locale={{
 						emptyText: (
 							<EmptyState
-								purpose="No applications in this bucket yet. An application is an OAuth client that signs this bucket's people in or calls an API through this server."
+								purpose="No applications in this project yet. An application is an OAuth client that signs this project's people in or calls an API through this server."
 								create={writable ? newClient : undefined}
 							/>
 						)
@@ -773,7 +773,7 @@ export function Clients({
 					<Form.Item
 						name="logo"
 						label="Logo on the consent page"
-						extra="Shown only to people who sign in through this organization’s own user bucket. PNG, JPEG or WebP, up to 64 KiB; square, at least 128 px."
+						extra="Shown only to people who sign in through this organization’s own project. PNG, JPEG or WebP, up to 64 KiB; square, at least 128 px."
 					>
 						<LogoField />
 					</Form.Item>

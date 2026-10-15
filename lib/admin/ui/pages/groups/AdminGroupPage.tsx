@@ -40,13 +40,13 @@ interface Owned {
 	name: string;
 }
 
-/* The group as `GET /admin/api/groups/:id` answers it (specs/085). */
+/* The team as `GET /admin/api/teams/:id` answers it (specs/085). */
 interface GroupDetail {
 	_id: string;
 	name: string;
 	kind: 'personal' | 'regular' | 'system';
 	members: Member[];
-	owns: { buckets: Owned[] };
+	owns: { projects: Owned[] };
 	can?: Partial<{
 		manageMembers: boolean;
 		invite: boolean;
@@ -74,14 +74,14 @@ function plural(n: number, one: string, many: string): string {
 	return `${String(n)} ${n === 1 ? one : many}`;
 }
 
-/* "2 buckets" — what membership of this group reaches, with everything those buckets hold. */
+/* "2 projects" — what membership of this team reaches, with everything those projects hold. */
 function reach(owns: GroupDetail['owns']): string {
-	return plural(owns.buckets.length, 'bucket', 'buckets');
+	return plural(owns.projects.length, 'project', 'projects');
 }
 
 function OwnedLinks({ owns }: { owns: GroupDetail['owns'] }) {
 	const links = [
-		...owns.buckets.map((b) => (
+		...owns.projects.map((b) => (
 			<Link
 				key={`b:${b.id}`}
 				href={bucketHref(b.id)}
@@ -103,11 +103,11 @@ function OwnedLinks({ owns }: { owns: GroupDetail['owns'] }) {
 }
 
 function memberUrl(groupId: string, userId: string): string {
-	return `/admin/api/groups/${encodeURIComponent(groupId)}/members/${encodeURIComponent(userId)}`;
+	return `/admin/api/teams/${encodeURIComponent(groupId)}/members/${encodeURIComponent(userId)}`;
 }
 
 /*
- * One administrator group (specs/085): who is in it, who has been invited, what membership reaches, and how it
+ * One team (specs/085): who is in it, who has been invited, what membership reaches, and how it
  * is deleted. Every owner runs it — inviting, promoting and removing — without a super administrator, and
  * every act that changes who reaches what says so in numbers before it happens.
  */
@@ -125,7 +125,7 @@ export function AdminGroupPage({ groupId }: { groupId: string }) {
 	const [renaming, setRenaming] = useState(false);
 	const [loading, setLoading] = useState(true);
 
-	const base = `/admin/api/groups/${encodeURIComponent(groupId)}`;
+	const base = `/admin/api/teams/${encodeURIComponent(groupId)}`;
 
 	// Every state write follows an await, so the mount effect may call it.
 	const load = useCallback(async () => {
@@ -153,9 +153,9 @@ export function AdminGroupPage({ groupId }: { groupId: string }) {
 	if (status !== null) {
 		return status === 403 || status === 404 ? (
 			<NoAccess
-				what="group"
-				backHref="/admin/groups"
-				backLabel="Back to Groups"
+				what="team"
+				backHref="/admin/teams"
+				backLabel="Back to Teams"
 			/>
 		) : (
 			<LoadFailed onRetry={() => setAttempt((n) => n + 1)} />
@@ -172,7 +172,7 @@ export function AdminGroupPage({ groupId }: { groupId: string }) {
 	const label = own ? 'Personal · Only you' : groupLabel(group);
 	const owners = group.members.filter((m) => m.role === 'owner').length;
 	const nameOf = (m: Pick<Member, 'userId' | 'email'>) => m.email ?? m.userId;
-	const ownsNothing = group.owns.buckets.length === 0;
+	const ownsNothing = group.owns.projects.length === 0;
 
 	async function act(
 		run: () => ReturnType<typeof request>,
@@ -193,7 +193,7 @@ export function AdminGroupPage({ groupId }: { groupId: string }) {
 		const yes = await confirm('group.member.promote', {
 			target: nameOf(m),
 			consequences: [
-				'They can invite and remove administrators, change roles, and delete the group once it owns nothing.',
+				'They can invite and remove administrators, change roles, and delete the team once it owns nothing.',
 				`They already reach its ${reach(current.owns)}; that does not change.`
 			]
 		});
@@ -208,7 +208,7 @@ export function AdminGroupPage({ groupId }: { groupId: string }) {
 		const yes = await confirm('group.member.demote', {
 			target: nameOf(m),
 			consequences: [
-				'They keep access to everything the group owns, but can no longer change its members or delete it.'
+				'They keep access to everything the team owns, but can no longer change its members or delete it.'
 			]
 		});
 		if (!yes) return;
@@ -223,7 +223,7 @@ export function AdminGroupPage({ groupId }: { groupId: string }) {
 			target: nameOf(m),
 			consequences: [
 				`They lose access to ${reach(current.owns)} at their next request.`,
-				'Their administrator account and their other groups are untouched.'
+				'Their administrator account and their other teams are untouched.'
 			]
 		});
 		if (!yes) return;
@@ -238,7 +238,7 @@ export function AdminGroupPage({ groupId }: { groupId: string }) {
 			target: label,
 			consequences: [
 				`You lose access to ${reach(current.owns)} at once.`,
-				'Only an owner of the group can add you back. This page will close.'
+				'Only an owner of the team can add you back. This page will close.'
 			]
 		});
 		if (!yes) return;
@@ -247,7 +247,7 @@ export function AdminGroupPage({ groupId }: { groupId: string }) {
 			`You left ${label}.`,
 			async () => {
 				await reloadMe();
-				void navigate('/admin/groups', { replace: true });
+				void navigate('/admin/teams', { replace: true });
 			}
 		);
 	}
@@ -278,10 +278,10 @@ export function AdminGroupPage({ groupId }: { groupId: string }) {
 		if (!yes) return;
 		await act(
 			() => request('DELETE', base),
-			`Group ${label} deleted.`,
+			`Team ${label} deleted.`,
 			async () => {
 				await reloadMe();
-				void navigate('/admin/groups', { replace: true });
+				void navigate('/admin/teams', { replace: true });
 			}
 		);
 	}
@@ -289,13 +289,13 @@ export function AdminGroupPage({ groupId }: { groupId: string }) {
 	function actionsFor(m: Member): RowAction[] {
 		const lastOwner =
 			m.role === 'owner' && owners === 1
-				? 'A group must keep at least one owner'
+				? 'A team must keep at least one owner'
 				: null;
 		const items: RowAction[] = [];
 		if (m.userId === self) {
 			items.push({
 				key: 'leave',
-				label: 'Leave group…',
+				label: 'Leave team…',
 				group: 'danger',
 				blocked: lastOwner,
 				onClick: () => void leave(m)
@@ -331,10 +331,10 @@ export function AdminGroupPage({ groupId }: { groupId: string }) {
 	}
 
 	const ownsCard = (
-		<Card title="What this group owns">
+		<Card title="What this team owns">
 			{ownsNothing ? (
 				<Typography.Text type="secondary">
-					Nothing yet. Buckets created while this group is selected in the
+					Nothing yet. Projects created while this team is selected in the
 					header belong to it.
 				</Typography.Text>
 			) : (
@@ -342,10 +342,10 @@ export function AdminGroupPage({ groupId }: { groupId: string }) {
 					vertical
 					gap={8}
 				>
-					{group.owns.buckets.length > 0 && (
+					{group.owns.projects.length > 0 && (
 						<div>
-							<Typography.Text strong>Buckets: </Typography.Text>
-							<OwnedLinks owns={{ buckets: group.owns.buckets }} />
+							<Typography.Text strong>Projects: </Typography.Text>
+							<OwnedLinks owns={{ projects: group.owns.projects }} />
 						</div>
 					)}
 				</Flex>
@@ -356,13 +356,13 @@ export function AdminGroupPage({ groupId }: { groupId: string }) {
 	return (
 		<>
 			<PageHeader
-				crumbs={[{ label: 'Groups', href: '/admin/groups' }, { label }]}
+				crumbs={[{ label: 'Teams', href: '/admin/teams' }, { label }]}
 				title={label}
 				tags={
 					group.kind === 'system' ? (
 						<Tag>System</Tag>
 					) : personal ? (
-						<Tag>Personal</Tag>
+						<Tag>Personal team</Tag>
 					) : undefined
 				}
 				actions={
@@ -381,13 +381,13 @@ export function AdminGroupPage({ groupId }: { groupId: string }) {
 						showIcon
 						title={
 							own
-								? 'A personal group can’t be shared. To work with colleagues, create a group and move buckets into it.'
-								: 'A personal group belongs to one administrator and can’t be shared.'
+								? 'A personal team can’t be shared. To work with colleagues, create a team and move projects into it.'
+								: 'A personal team belongs to one administrator and can’t be shared.'
 						}
 						action={
 							own ? (
-								<Link href="/admin/groups?new=1">
-									<Button size="small">New group</Button>
+								<Link href="/admin/teams?new=1">
+									<Button size="small">New team</Button>
 								</Link>
 							) : undefined
 						}
@@ -457,7 +457,7 @@ export function AdminGroupPage({ groupId }: { groupId: string }) {
 										type="primary"
 										onClick={() => setInviting(true)}
 									>
-										Invite administrator…
+										Invite to team…
 									</Button>
 								)}
 							</Space>
@@ -523,7 +523,7 @@ export function AdminGroupPage({ groupId }: { groupId: string }) {
 								gap={12}
 							>
 								<div>
-									<Typography.Text strong>Delete group</Typography.Text>
+									<Typography.Text strong>Delete team</Typography.Text>
 									<br />
 									<Typography.Text type="secondary">
 										{ownsNothing ? (
@@ -541,7 +541,7 @@ export function AdminGroupPage({ groupId }: { groupId: string }) {
 									disabled={!ownsNothing || can.delete === false}
 									onClick={() => void deleteGroup()}
 								>
-									Delete group…
+									Delete team…
 								</Button>
 							</Flex>
 						</Card>
@@ -612,7 +612,7 @@ function InviteDialog({
 		setBusy(true);
 		const result = await request(
 			'POST',
-			`/admin/api/groups/${encodeURIComponent(groupId)}/invitations`,
+			`/admin/api/teams/${encodeURIComponent(groupId)}/invitations`,
 			values
 		);
 		setBusy(false);
@@ -666,7 +666,7 @@ function InviteDialog({
 				title={`They'll get access to ${reachText} once they accept.`}
 				description={
 					role === 'owner'
-						? 'As an owner they can also invite and remove administrators and delete the group.'
+						? 'As an owner they can also invite and remove administrators and delete the team.'
 						: 'The link in the email works once and expires; you can revoke it until it is used.'
 				}
 			/>
@@ -701,7 +701,7 @@ function AddExistingDialog({
 		setBusy(true);
 		const result = await request(
 			'POST',
-			`/admin/api/groups/${encodeURIComponent(group._id)}/members`,
+			`/admin/api/teams/${encodeURIComponent(group._id)}/members`,
 			{ userId, role }
 		);
 		setBusy(false);
@@ -750,7 +750,7 @@ function AddExistingDialog({
 					]}
 				/>
 				<Typography.Text type="secondary">
-					They get access to everything this group owns at once.
+					They get access to everything this team owns at once.
 				</Typography.Text>
 			</Space>
 		</Modal>
@@ -774,7 +774,7 @@ function RenameDialog({
 		setBusy(true);
 		const result = await request(
 			'PATCH',
-			`/admin/api/groups/${encodeURIComponent(group._id)}`,
+			`/admin/api/teams/${encodeURIComponent(group._id)}`,
 			values
 		);
 		setBusy(false);
@@ -782,14 +782,14 @@ function RenameDialog({
 			feedback.failed(result, form);
 			return;
 		}
-		feedback.done(`Group renamed to “${values.name}”.`);
+		feedback.done(`Team renamed to “${values.name}”.`);
 		onRenamed();
 	}
 
 	return (
 		<Modal
 			open
-			title="Rename group"
+			title="Rename team"
 			okText="Save"
 			confirmLoading={busy}
 			onOk={() => form.submit()}

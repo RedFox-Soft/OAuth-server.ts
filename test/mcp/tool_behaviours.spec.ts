@@ -273,14 +273,14 @@ describe('individual tool behaviours', () => {
 		const { token, user } = await session();
 
 		const bucket = await rpc(
-			call('bucket_create', { name: 'Users', slug: 'users-1' }),
+			call('project_create', { name: 'Users', slug: 'users-1' }),
 			token
 		);
 		const { _id: bucketId } = result(Created, bucket);
 
 		const email = `member-${Math.random()}@x.io`;
 		const created = await rpc(
-			call('bucket_user_create', {
+			call('project_user_create', {
 				id: bucketId,
 				email,
 				password: 'a sufficiently long password'
@@ -289,7 +289,7 @@ describe('individual tool behaviours', () => {
 		);
 		const { _id: uid } = result(Created, created);
 
-		const reset = await perform(token, 'bucket_user_password_reset', {
+		const reset = await perform(token, 'project_user_password_reset', {
 			id: bucketId,
 			uid,
 			password: 'a different sufficiently long password'
@@ -305,7 +305,7 @@ describe('individual tool behaviours', () => {
 		expect(severed.result?.isError).toBe(true);
 
 		const stillThere = await rpc(
-			call('bucket_user_list', { id: bucketId }),
+			call('project_user_list', { id: bucketId }),
 			token
 		);
 		expect(JSON.stringify(stillThere)).toContain(email);

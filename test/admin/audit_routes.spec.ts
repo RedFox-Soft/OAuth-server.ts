@@ -220,7 +220,7 @@ describe('GET /admin/api/audit', () => {
 
 		it('matches action, target type, target id and scope, combining conjunctively', async () => {
 			const scope = unique('scope');
-			await seed(scope, { action: 'project.delete', targetId: 'p-gone' });
+			await seed(scope, { action: 'bucket.delete', targetId: 'p-gone' });
 			await seed(scope, {
 				action: 'enduser.delete',
 				targetType: 'EndUser',

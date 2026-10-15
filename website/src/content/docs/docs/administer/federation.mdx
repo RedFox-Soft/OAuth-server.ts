@@ -1,21 +1,21 @@
 ---
 title: Connect an upstream identity provider
-description: Let a bucket's users sign in through Google, Microsoft, Apple, GitHub or any OpenID provider, and decide which accounts such a sign-in may create or link.
+description: Let a project's users sign in through Google, Microsoft, Apple, GitHub or any OpenID provider, and decide which accounts such a sign-in may create or link.
 sidebar:
   order: 1
 ---
 
 import { Steps, Aside } from '@astrojs/starlight/components';
 
-A user bucket can carry upstream identity providers. Each enabled one becomes a button on that bucket's
+A project can carry upstream identity providers. Each enabled one becomes a button on that project's
 sign-in page. The user authenticates at the provider, and this server, acting as the provider's
 relying party, turns the assertion it gets back into an ordinary local session. Everything after that
 point is the same as a password sign-in: the same second-factor rules, the same consent, the same
 tokens.
 
-Providers are configured per bucket. Bucket A's Google application is not bucket B's, and whoever
-administers a bucket configures its providers without needing a super administrator. The one exception
-is the administrators' bucket, whose providers only a super administrator configures; see
+Providers are configured per project. Project A's Google application is not project B's, and whoever
+administers a project configures its providers without needing a super administrator. The one exception
+is the administrators' project, whose providers only a super administrator configures; see
 [Administrators signing in through your provider](#administrators-signing-in-through-your-provider).
 
 <Aside
@@ -77,14 +77,14 @@ same subject at another issuer is another person. To move to a new issuer, add a
 
 <Steps>
 
-1. Open the bucket in the console, go to **Identity providers**, and choose **New identity provider**.
-   A side panel walks you through choosing the provider, registering this bucket at it, pasting its
+1. Open the project in the console, go to **Identity providers**, and choose **New identity provider**.
+   A side panel walks you through choosing the provider, registering this project at it, pasting its
    values and deciding who may sign in.
 
 2. Copy **The redirect address to register** from the panel. After the provider is created, its page
-   shows the same address as **Callback address**. It is the bucket's issuer followed by
-   `/federation/callback`: `https://auth.example.com/acme/federation/callback` for a bucket at a path,
-   `https://login.acme.example/federation/callback` for a bucket with a hostname.
+   shows the same address as **Callback address**. It is the project's issuer followed by
+   `/federation/callback`: `https://auth.example.com/acme/federation/callback` for a project at a path,
+   `https://login.acme.example/federation/callback` for a project with a hostname.
 
 3. Register exactly that address at the provider. Providers compare it character for character.
 
@@ -93,10 +93,10 @@ same subject at another issuer is another person. To move to a new issuer, add a
 
 </Steps>
 
-The address belongs to the bucket's address, so changing the bucket's path or hostname changes it, and
-the provider will then refuse every sign-in with a redirect mismatch on its own page. A bucket that has
+The address belongs to the project's address, so changing the project's path or hostname changes it, and
+the provider will then refuse every sign-in with a redirect mismatch on its own page. A project that has
 no address yet gets a callback built from its record id. The console warns about this when you copy it,
-because that address stops matching as soon as the bucket is given a path.
+because that address stops matching as soon as the project is given a path.
 
 ## Who gets an account, and who gets linked
 
@@ -123,7 +123,7 @@ the order is what keeps one person's address from opening another person's accou
 5. **Does an account with that address already exist?** It is linked only if **Link existing accounts
    by verified email** is on and the token says `email_verified` is exactly `true`. Even then, an
    account that so far holds only a password is not linked on the spot: the user is sent to sign in to
-   that account with its password, and second factor where the bucket requires one, and the link is
+   that account with its password, and second factor where the project requires one, and the link is
    made when that sign-in completes. Without this, anyone who registered a victim's address first would
    inherit the victim's first federated sign-in.
 6. **Otherwise**, a new account is created or the sign-in refused, according to **First-time users**.
@@ -134,14 +134,14 @@ The only claims copied from the provider are `name`, `given_name`, `family_name`
 ## Try a provider before anyone relies on it
 
 **Try sign-in** on a provider's page opens the provider in a new tab. You sign in there, through the
-bucket's real callback, and the console then shows what the provider answered and what a real sign-in
+project's real callback, and the console then shows what the provider answered and what a real sign-in
 would do: link an account, create one, or refuse, and why. It writes nothing: no account, no link, no
 session. It works on a disabled provider, so you can test one before switching it on. It is in the
 console only, because its result is shown to the browser session that started it, and an agent has none.
 
 ## The order of the buttons
 
-The sign-in page shows a bucket's enabled providers in an order you choose. **Move up** and **Move
+The sign-in page shows a project's enabled providers in an order you choose. **Move up** and **Move
 down** on the **Identity providers** list change it one place at a time. An agent uses
 `federation_provider_move`. A provider added later appears after the ones already ordered.
 
@@ -166,16 +166,16 @@ revocation, and accepting back-channel logout from Keycloak, Auth0 or Ping. They
 
 ## Administrators signing in through your provider
 
-The administrators' bucket takes identity providers like any other bucket, so administrators can sign in
+The administrators' project takes identity providers like any other project, so administrators can sign in
 to the console with your organisation's provider. Only a super administrator configures them, on the
 **Administrators** page under **Identity providers**.
 
-- **Linking an existing administrator always asks for their password.** In this bucket, the account
+- **Linking an existing administrator always asks for their password.** In this project, the account
   behind an address may be a super administrator, so no provider is trusted to link one on its own.
   While password sign-in is off, no new link can be made at all.
 - **A new administrator is created only while the console takes sign-ups.** Such a sign-in creates an
-  administrator with a personal group, never the super administrator privilege.
-- **The second factor stays the provider's.** The bucket's authenticator requirement applies to
+  administrator with a personal team, never the super administrator privilege.
+- **The second factor stays the provider's.** The project's authenticator requirement applies to
   password sign-in only.
 
 Password sign-in to the console can be turned off, but only from a session that came in through a
@@ -184,6 +184,6 @@ without a way in: disabling, narrowing or deleting their provider, deactivating 
 their privilege. If the provider itself fails, run `bun run admin:password-sign-in` on the server. It
 turns password sign-in back on and records that in the audit trail.
 
-An agent may change these providers too, but on the administrators' bucket `federation_provider_create`,
+An agent may change these providers too, but on the administrators' project `federation_provider_create`,
 `federation_provider_update` and `federation_provider_move` ask for confirmation, as
-`federation_provider_delete` does on every bucket. An agent can never turn password sign-in off.
+`federation_provider_delete` does on every project. An agent can never turn password sign-in off.

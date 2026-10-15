@@ -14,7 +14,7 @@ import {
 import { admin, basic, token } from './helpers.ts';
 
 function connectionPath(c: Connected): string {
-	return `/admin/api/buckets/${c.bucket._id}/provisioning-connections/${c.connection._id}`;
+	return `/admin/api/projects/${c.bucket._id}/provisioning-connections/${c.connection._id}`;
 }
 
 function tokenPath(c: Connected): string {
@@ -125,7 +125,7 @@ describe('provisioning connection credentials', () => {
 		const one = await admin('GET', connectionPath(c), cookie);
 		const all = await admin(
 			'GET',
-			`/admin/api/buckets/${c.bucket._id}/provisioning-connections`,
+			`/admin/api/projects/${c.bucket._id}/provisioning-connections`,
 			cookie
 		);
 

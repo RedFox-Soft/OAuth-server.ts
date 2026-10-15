@@ -9,9 +9,9 @@ updated: 2026-10-15
 
 # Admin provisioning
 
-The records the console needs to exist — the "Administrators" bucket, the first-party `admin-panel` OAuth
-client (and `admin-mcp`, both carrying `bucketId` = the administrators' bucket, `lib/consts/admin_seed.ts:100`,
-`:121`), the default bucket and the `unassigned` system group — are
+The records the console needs to exist — the "Administrators" project, the first-party `admin-panel` OAuth
+client (and `admin-mcp`, both carrying `bucketId` = the administrators' project, `lib/consts/admin_seed.ts:100`,
+`:121`), the Default project and the `unassigned` system team — are
 written by the provisioning scripts, **not at boot**. There is no boot-time seeding, so console login
 requires a database-backed, provisioned deployment.
 
@@ -33,9 +33,9 @@ remember the other. That arrangement failed silently: a change made to one seede
 no-ops in production while the suite stays green, because the suite runs the copy production never
 does. Change a seeded value in `admin_seed.ts`, never in a seeder.
 
-One seeded value worth knowing: the reserved admin bucket is `registrationOpen: false`
-(`lib/consts/admin_seed.ts:68`), while the default bucket is open. See [[end-user-onboarding]]. Since spec
-078 a super administrator may open it on the bucket's settings ([[admin-bucket-settings]]); the seed is
+One seeded value worth knowing: the reserved administrators' project is `registrationOpen: false`
+(`lib/consts/admin_seed.ts:68`), while the Default project is open. See [[end-user-onboarding]]. Since spec
+078 a super administrator may open it on the project's settings ([[admin-project-settings]]); the seed is
 create-if-absent, so a re-run never closes it again.
 
 The first administrator account is **not** seeded; it is created by first-run setup — see
@@ -43,6 +43,6 @@ The first administrator account is **not** seeded; it is created by first-run se
 
 ## Related
 
-- [[group-ownership]] — the `unassigned` group the seed creates, and what it holds
+- [[team-ownership]] — the `unassigned` team the seed creates, and what it holds
 - [[signing-keys]] — the initial key the same scripts provision
 - [[postgresql-backend]] — why the PostgreSQL script can reuse the store path and MongoDB's cannot

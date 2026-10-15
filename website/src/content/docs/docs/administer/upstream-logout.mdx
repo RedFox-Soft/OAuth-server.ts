@@ -7,7 +7,7 @@ sidebar:
 
 import { Aside } from '@astrojs/starlight/components';
 
-When a bucket's users sign in through an [upstream identity provider](/docs/administer/federation/),
+When a project's users sign in through an [upstream identity provider](/docs/administer/federation/),
 signing out of that provider does not, by itself, sign them out here. Their session on this server and
 the tokens its relying parties hold are this server's. Two inbound signals close that gap, and which one
 applies depends entirely on which provider you use:
@@ -20,7 +20,7 @@ applies depends entirely on which provider you use:
 | Google                | RISC events, for consumer accounts only                                     | —                                                     |
 
 Both are opted into one provider at a time, under **Logout signals** on the provider's page in the
-bucket's **Identity providers**. Neither is accepted from a provider that has not been opted in, whatever
+project's **Identity providers**. Neither is accepted from a provider that has not been opted in, whatever
 it signs.
 
 ## Global token revocation: Okta Universal Logout
@@ -39,8 +39,8 @@ it signs.
 
 Turn on [`globalTokenRevocation.enabled`](/docs/reference/settings/#globalTokenRevocation.enabled), then,
 on the Okta provider, **Accept global token revocation (Okta Universal Logout)**. The provider's page
-then shows the **Endpoint to give the provider**: the bucket's issuer followed by
-`/global-token-revocation`. While the switch is on, each bucket's discovery document advertises it as
+then shows the **Endpoint to give the provider**: the project's issuer followed by
+`/global-token-revocation`. While the switch is on, each project's discovery document advertises it as
 `global_token_revocation_endpoint`.
 
 Okta's request is a JSON body naming the user, authenticated by a short-lived JWT that Okta signs with
@@ -75,7 +75,7 @@ provider configured with a custom authorization server's issuer may not match.
 OpenID Connect Back-Channel Logout 1.0 is a final specification, so this needs no switch of its own: it
 is served whenever [`federation.enabled`](/docs/reference/settings/#federation.enabled) is on. Opt the
 provider in with **Accept back-channel logout (Keycloak, Auth0, Ping)**, and register the **Back-channel
-logout address to register** in the provider's client settings. It is the bucket's issuer
+logout address to register** in the provider's client settings. It is the project's issuer
 followed by `/federation/backchannel-logout`. An agent sets the same option through
 `federation_provider_update`.
 
@@ -107,8 +107,8 @@ Some sessions are out of reach:
   (tokens with `sub`, which all three providers send, still reach it);
 - a sign-in still completing when the logout arrives.
 
-A provider registers one logout URL per application, so an upstream application shared by two buckets
-is heard only by the bucket at the URL it was given, and changing a bucket's address changes the URL.
+A provider registers one logout URL per application, so an upstream application shared by two projects
+is heard only by the project at the URL it was given, and changing a project's address changes the URL.
 
 ## What both refuse
 
@@ -126,6 +126,6 @@ held to the same checks, and no setting relaxes them:
 ## Doing the same thing yourself
 
 An administrator can end a user's sessions and tokens without any provider involved: **Sign out
-everywhere** on the user, or `bucket_user_sign_out`. It does what global token revocation does, and is
+everywhere** on the user, or `project_user_sign_out`. It does what global token revocation does, and is
 recorded in the audit trail under the same action. [End a user's access](/docs/administer/ending-access/)
 compares it with deactivation, the lock and deletion.

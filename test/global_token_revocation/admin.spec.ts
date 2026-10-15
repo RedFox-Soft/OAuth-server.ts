@@ -55,7 +55,7 @@ describe('opting a provider in to global token revocation', () => {
 
 		const res = await admin(
 			'POST',
-			`/admin/api/buckets/${bucket._id}/federation`,
+			`/admin/api/projects/${bucket._id}/federation`,
 			cookie,
 			{
 				id: 'corp',
@@ -80,7 +80,7 @@ describe('opting a provider in to global token revocation', () => {
 
 		await admin(
 			'PATCH',
-			`/admin/api/buckets/${bucket._id}/federation/corp`,
+			`/admin/api/projects/${bucket._id}/federation/corp`,
 			cookie,
 			{ acceptsGlobalTokenRevocation: true }
 		);
@@ -103,7 +103,7 @@ describe('opting a provider in to global token revocation', () => {
 
 		const res = await admin(
 			'PATCH',
-			`/admin/api/buckets/${bucket._id}/federation/corp`,
+			`/admin/api/projects/${bucket._id}/federation/corp`,
 			cookie,
 			{ acceptsGlobalTokenRevocation: true }
 		);
@@ -130,7 +130,7 @@ describe('opting a provider in to global token revocation', () => {
 
 		const res = await admin(
 			'PATCH',
-			`/admin/api/buckets/${bucket._id}/federation/github`,
+			`/admin/api/projects/${bucket._id}/federation/github`,
 			cookie,
 			{ acceptsGlobalTokenRevocation: true }
 		);

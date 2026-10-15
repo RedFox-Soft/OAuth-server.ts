@@ -87,7 +87,7 @@ async function applicationsOf(cookie: string, uid: string) {
 	const res = await adminCall(
 		cookie,
 		'GET',
-		`/admin/api/buckets/${DEFAULT_BUCKET_ID}/users/${uid}/sessions`
+		`/admin/api/projects/${DEFAULT_BUCKET_ID}/users/${uid}/sessions`
 	);
 	expect(res.status).toBe(200);
 	return { raw: res.body, ...shaped(Applications, res.body) };
@@ -97,7 +97,7 @@ function signOutOf(cookie: string, uid: string, clientId: string) {
 	return adminCall(
 		cookie,
 		'POST',
-		`/admin/api/buckets/${DEFAULT_BUCKET_ID}/users/${uid}/sessions/${encodeURIComponent(clientId)}/sign-out`
+		`/admin/api/projects/${DEFAULT_BUCKET_ID}/users/${uid}/sessions/${encodeURIComponent(clientId)}/sign-out`
 	);
 }
 
@@ -298,7 +298,7 @@ describe('a person’s sessions, one application at a time', () => {
 		const read = await adminCall(
 			outsiderCookie,
 			'GET',
-			`/admin/api/buckets/${DEFAULT_BUCKET_ID}/users/${person.accountId}/sessions`
+			`/admin/api/projects/${DEFAULT_BUCKET_ID}/users/${person.accountId}/sessions`
 		);
 		const signOut = await signOutOf(outsiderCookie, person.accountId, 'client');
 

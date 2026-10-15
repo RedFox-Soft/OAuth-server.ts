@@ -55,7 +55,7 @@ export function UserPage({
 		try {
 			const b = await request<BucketView>(
 				'GET',
-				`/admin/api/buckets/${encodeURIComponent(bucketId)}`
+				`/admin/api/projects/${encodeURIComponent(bucketId)}`
 			);
 			if (!b.ok) {
 				setLoadStatus(b.status);
@@ -69,7 +69,7 @@ export function UserPage({
 				request<EndUser>('GET', usersApi(bucketId, userId)),
 				request<ConnectionView[]>(
 					'GET',
-					`/admin/api/buckets/${encodeURIComponent(bucketId)}/provisioning-connections`
+					`/admin/api/projects/${encodeURIComponent(bucketId)}/provisioning-connections`
 				)
 			]);
 			if (!u.ok) {
@@ -105,9 +105,9 @@ export function UserPage({
 		return loadStatus === 403 || loadStatus === 404 ? (
 			<NoAccess
 				what="user"
-				backHref={loadStatus === 404 && bucket ? usersHref : '/admin/buckets'}
+				backHref={loadStatus === 404 && bucket ? usersHref : '/admin/projects'}
 				backLabel={
-					loadStatus === 404 && bucket ? 'Back to Users' : 'Back to Buckets'
+					loadStatus === 404 && bucket ? 'Back to Users' : 'Back to Projects'
 				}
 			/>
 		) : (
@@ -199,7 +199,7 @@ export function UserPage({
 		<>
 			<PageHeader
 				crumbs={[
-					{ label: 'Buckets', href: '/admin/buckets' },
+					{ label: 'Projects', href: '/admin/projects' },
 					{ label: bucket?.name ?? '…', href: bucketHref(bucketId) },
 					{ label: 'Users', href: usersHref },
 					{ label: user?.email ?? '…' }
@@ -238,7 +238,7 @@ export function UserPage({
 					type="info"
 					showIcon
 					style={{ marginBottom: 16 }}
-					title="Only members of the group that owns this bucket can change this."
+					title="Only members of the team that owns this project can change this."
 				/>
 			)}
 			{loading && !user && <Skeleton active />}

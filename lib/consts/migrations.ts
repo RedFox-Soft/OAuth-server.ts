@@ -1397,6 +1397,76 @@ const removeProjects: Migration = {
 	}
 };
 
+/*
+ * The setting that named buckets is named for projects (specs/100). Its key is at once the configuration key,
+ * the settings API's key and the stored key, so it is moved once rather than translated in each of those
+ * places forever. A value already stored under the new key wins: it can only have been written by an
+ * operator after the rename.
+ */
+const LEGACY_RESERVED_HOSTNAMES_KEY = 'buckets.reservedHostnames';
+const RESERVED_HOSTNAMES_KEY = 'projects.reservedHostnames';
+
+function movedSettings(config: Doc): Doc | null {
+	if (!(LEGACY_RESERVED_HOSTNAMES_KEY in config)) return null;
+	const { [LEGACY_RESERVED_HOSTNAMES_KEY]: value, ...rest } = config;
+	return RESERVED_HOSTNAMES_KEY in rest
+		? rest
+		: { ...rest, [RESERVED_HOSTNAMES_KEY]: value };
+}
+
+function settingsMovedReport(count: number): string[] {
+	return [`settings keys moved: ${String(count)}`];
+}
+
+const projectsReservedHostnames: Migration = {
+	id: '2026-10-17-projects-reserved-hostnames',
+	description:
+		'Store the reserved hostnames setting under projects.reservedHostnames, the name it is shown and accepted under',
+	reversible: false,
+	rerunnable:
+		'Only a settings document still holding buckets.reservedHostnames is written, and the write removes that key, so a second application finds nothing to move.',
+	mongodb: {
+		async apply(handle) {
+			// The runner passes the selected backend's handle; for MongoDB that is the driver's `Db`.
+			const db = handle as MongoHandle;
+			const area = db.collection(STORE_AREAS.serviceConfig);
+			/*
+			 * Read whole and rewritten whole: the key holds a dot, which a MongoDB filter or `$unset` would read as
+			 * a path into a nested document that does not exist.
+			 */
+			let moved = 0;
+			for (const doc of await area
+				.find({ config: { $type: 'object' } })
+				.toArray()) {
+				const config = member(doc, 'config');
+				const next = isRecord(config) ? movedSettings(config) : null;
+				if (!next) continue;
+				await area.updateOne({ _id: doc._id }, { $set: { config: next } }, {});
+				moved += 1;
+			}
+			return settingsMovedReport(moved);
+		}
+	},
+	postgres: {
+		async apply(handle) {
+			// The runner passes the selected backend's handle; for PostgreSQL that is Bun's SQL client.
+			const sql = handle as PostgresHandle;
+			const area = sql(STORE_AREAS.serviceConfig);
+			const rows = await sql`
+				SELECT id, doc FROM ${area} WHERE doc ? ${LEGACY_RESERVED_HOSTNAMES_KEY}
+			`;
+			let moved = 0;
+			for (const row of rows) {
+				const next = isRecord(row.doc) ? movedSettings(row.doc) : null;
+				if (!next) continue;
+				await sql`UPDATE ${area} SET doc = ${next} WHERE id = ${String(row.id)}`;
+				moved += 1;
+			}
+			return settingsMovedReport(moved);
+		}
+	}
+};
+
 export const MIGRATIONS: readonly Migration[] = [
 	namespacedProtectedResources,
 	rootKeysLifecycle,
@@ -1404,5 +1474,6 @@ export const MIGRATIONS: readonly Migration[] = [
 	personalGroupsSingleMember,
 	staticTokenExpiry,
 	projectsRequireBucket,
-	removeProjects
+	removeProjects,
+	projectsReservedHostnames
 ];

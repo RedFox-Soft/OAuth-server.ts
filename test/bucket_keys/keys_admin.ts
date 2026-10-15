@@ -71,7 +71,7 @@ export interface KeyView {
 export async function listed(bucketId: string, cookie: string) {
 	const { body } = await call(
 		'GET',
-		`/admin/api/buckets/${bucketId}/keys`,
+		`/admin/api/projects/${bucketId}/keys`,
 		cookie
 	);
 	return (body.keys ?? []) as KeyView[];

@@ -4,7 +4,7 @@ title: 'Why Microsoft, Apple and GitHub each needed more than a catalogue row'
 tags: [architecture, gotcha, oidc, contract]
 sources: [oauth-server-codebase]
 created: 2026-09-17
-updated: 2026-09-17
+updated: 2026-10-15
 graph:
   node_type: concept
   relationships:
@@ -135,9 +135,9 @@ somebody settles it against a real credential.
 ### The masking is one function, and it must stay that way
 
 A provider's secret leaked for a year because `present()` guarded the provider routes while `presentBucket`
-returned the containing bucket document whole. Adding `signingKey` reproduced that bug exactly unless both
+returned the containing project (`UserBucket`) document whole. Adding `signingKey` reproduced that bug exactly unless both
 were done together — and they were, because `presentBucket` now *delegates* to `presentAll` rather than
-repeating the rule. Anything new that returns a bucket must come through there too.
+repeating the rule. Anything new that returns a project must come through there too.
 
 ### A PEM needle never matches a JSON leak
 

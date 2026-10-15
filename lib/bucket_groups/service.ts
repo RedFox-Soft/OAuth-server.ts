@@ -48,7 +48,7 @@ const MAX_DISPLAY_NAME = 256;
 function assertGroupsAllowed(bucket: UserBucket): void {
 	/* The administrators' bucket groups its people only by administrator groups (specs/071 FR-005c). */
 	if (bucket._id === ADMIN_BUCKET_ID) {
-		throw new BucketGroupError(404, 'bucket not found');
+		throw new BucketGroupError(404, 'project not found');
 	}
 }
 
@@ -70,7 +70,7 @@ function takenAsError(error: unknown): never {
 			409,
 			error.field === 'externalId'
 				? 'externalId must be unique for this connection'
-				: 'displayName must be unique in this bucket'
+				: 'displayName must be unique in this project'
 		);
 	}
 	throw error;
@@ -144,7 +144,7 @@ async function assertMembersAllowed(
 				throw new BucketGroupError(
 					422,
 					actor.kind === 'admin'
-						? `user ${id} is not in this bucket`
+						? `user ${id} is not in this project`
 						: `member ${id} is not a user of this connection`
 				);
 			}
@@ -329,7 +329,7 @@ export async function walkHandOver(
 		);
 	}
 	if (connection.bucketId !== bucket._id) {
-		throw new BucketGroupError(422, 'connection belongs to another bucket');
+		throw new BucketGroupError(422, 'connection belongs to another project');
 	}
 	const users = getUserStore(bucket._id);
 	const walk: HandOverWalk = { managed: 0, foreign: 0, blockers: [] };

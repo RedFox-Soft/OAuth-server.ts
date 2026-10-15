@@ -77,8 +77,8 @@ function asScim(error: unknown): never {
 				409,
 				'uniqueness',
 				field
-					? `${field === 'email' ? 'that email' : field} is already taken in this bucket`
-					: 'a unique attribute is already taken in this bucket'
+					? `${field === 'email' ? 'that email' : field} is already taken in this project`
+					: 'a unique attribute is already taken in this project'
 			);
 		}
 		throw new ScimError(400, 'invalidValue', error.message);

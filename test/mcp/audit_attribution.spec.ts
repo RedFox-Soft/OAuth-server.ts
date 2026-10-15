@@ -73,7 +73,7 @@ function application(clientName: string) {
 
 async function createInConsole(cookie: string, clientName: string) {
 	return elysia.handle(
-		new Request(`http://e.ly/admin/api/buckets/${DEFAULT_BUCKET_ID}/clients`, {
+		new Request(`http://e.ly/admin/api/projects/${DEFAULT_BUCKET_ID}/clients`, {
 			method: 'POST',
 			headers: { 'content-type': 'application/json', cookie },
 			body: JSON.stringify(application(clientName))

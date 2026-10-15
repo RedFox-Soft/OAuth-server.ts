@@ -54,7 +54,7 @@ function mark(bucketId: string, uid: string) {
 	return adminCall(
 		cookie,
 		'POST',
-		`/admin/api/buckets/${bucketId}/users/${uid}/verified`
+		`/admin/api/projects/${bucketId}/users/${uid}/verified`
 	);
 }
 
@@ -128,7 +128,7 @@ describe('marking an address verified by hand', () => {
 		await adminCall(
 			cookie,
 			'POST',
-			`/admin/api/buckets/${bucketId}/users/${person.id}/verification`
+			`/admin/api/projects/${bucketId}/users/${person.id}/verification`
 		);
 		const link = present(
 			extractVerifyUrl(present(emailsTo(person.email).at(-1), 'a message')),
@@ -215,7 +215,7 @@ describe('resending verification to a directory’s person', () => {
 		const res = await adminCall(
 			cookie,
 			'POST',
-			`/admin/api/buckets/${bucketId}/users/${user._id}/verification`
+			`/admin/api/projects/${bucketId}/users/${user._id}/verification`
 		);
 
 		expect(res.status).toBe(409);

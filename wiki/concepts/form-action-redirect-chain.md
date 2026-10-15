@@ -4,7 +4,7 @@ title: "form-action governs the whole redirect chain"
 tags: [contract, gotcha, oauth]
 sources: [oauth-server-codebase]
 created: 2026-08-25
-updated: 2026-10-13
+updated: 2026-10-15
 graph:
   node_type: concept
   relationships:
@@ -82,7 +82,7 @@ on the list. Any page whose form's response is a redirect off this origin needs 
 ## The account-switch sign-out had it too (spec 092)
 
 Spec 092 put a "Switch account" link on the consent page. Signing in as another account of the same
-bucket ends the first session, so `resume` renders the sign-out confirmation. Confirming answers 303 to
+project ends the first session, so `resume` renders the sign-out confirmation. Confirming answers 303 to
 `/ui/:uid/resume`, which then redirects to the client. That last hop was off-origin and the page's policy
 was `'self'` alone, so the browser stopped there whenever the new account needed no consent. The person
 was left on the confirmation page. `resumeAction` now passes the pending request's `redirect_uri` to
@@ -92,13 +92,13 @@ Verified in a real browser on 2026-10-13: alice → Switch account → bob → c
 → Allow reached the relying party. As above, a test at the HTTP boundary can see the header, never the
 blocked hop. See [[consent-screen-decisions]].
 
-A bucket with a hostname of its own failed at the first hop instead. The confirmation sent the browser to
+A project with a hostname of its own failed at the first hop instead. The confirmation sent the browser to
 `${ISSUER}/ui/:uid/resume` — the root address — while the interaction, its cookie and its address guard all
-live on the bucket's host. Chrome refused the submission (`form-action` did not name the root), and the
-root would have refused the interaction anyway. The resume address is now the bucket's own origin when it
+live on the project's host. Chrome refused the submission (`form-action` did not name the root), and the
+root would have refused the interaction anyway. The resume address is now the project's own origin when it
 has a hostname (`lib/actions/authorization/resume.ts:75-89`), still the root otherwise. Found and fixed on
 2026-10-13 by walking the switch on `id.localhost` in Chrome; held by
-`test/end_session/account_change.spec.ts`. Locally it needs the server on port 80: a host bucket's issuer
+`test/end_session/account_change.spec.ts`. Locally it needs the server on port 80: a host project's issuer
 carries no port.
 
 ## Related

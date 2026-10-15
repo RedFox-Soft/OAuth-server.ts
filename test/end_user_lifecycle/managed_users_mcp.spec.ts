@@ -62,7 +62,7 @@ describe('an AI agent acting on a user managed by a provisioning connection', ()
 		const refused = await rpc(
 			'tools/call',
 			{
-				name: 'bucket_user_update',
+				name: 'project_user_update',
 				arguments: { id: DEFAULT_BUCKET_ID, uid: user._id, claims: {} }
 			},
 			token

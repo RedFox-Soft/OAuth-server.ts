@@ -20,14 +20,14 @@ import {
 
 function lock(cookie: string, uid: string, reason: string) {
 	return admin.admin.api
-		.buckets({ id: DEFAULT_BUCKET_ID })
+		.projects({ id: DEFAULT_BUCKET_ID })
 		.users({ uid })
 		.lock.post({ reason }, { headers: { cookie } });
 }
 
 function unlock(cookie: string, uid: string) {
 	return admin.admin.api
-		.buckets({ id: DEFAULT_BUCKET_ID })
+		.projects({ id: DEFAULT_BUCKET_ID })
 		.users({ uid })
 		.unlock.post(undefined, { headers: { cookie } });
 }

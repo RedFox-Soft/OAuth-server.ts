@@ -206,7 +206,7 @@ async function alertAdministrators(
 					since: hold.since,
 					count: hold.count,
 					/* The connection's page: a signed-out administrator lands there after sign-in (specs/084 R3). */
-					consoleUrl: `${ISSUER}/admin/buckets/${encodeURIComponent(bucket._id)}/provisioning/${encodeURIComponent(connection._id)}`
+					consoleUrl: `${ISSUER}/admin/projects/${encodeURIComponent(bucket._id)}/provisioning/${encodeURIComponent(connection._id)}`
 				}).catch(failed)
 			)
 		);

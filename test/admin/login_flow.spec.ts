@@ -175,7 +175,7 @@ describe('admin OIDC login (BFF)', () => {
 		expect(me.status).toBe(200);
 		const meData = answered(me.data);
 		expect(meData.superAdmin).toBe(true);
-		expect(meData.bucketId).toBe(ADMIN_BUCKET_ID);
+		expect(meData.projectId).toBe(ADMIN_BUCKET_ID);
 		// The admin shell header renders the email (not the raw user id).
 		expect(meData.email).toBe('root@x.io');
 	});
@@ -212,8 +212,8 @@ describe('admin OIDC login (BFF)', () => {
 
 	it('signing in returns to the address the person asked for', async () => {
 		expect(
-			await returnAddressAfterSignIn('/admin/buckets/b-1/keys?tab=retired')
-		).toBe('/admin/buckets/b-1/keys?tab=retired');
+			await returnAddressAfterSignIn('/admin/projects/b-1/keys?tab=retired')
+		).toBe('/admin/projects/b-1/keys?tab=retired');
 	});
 
 	/*

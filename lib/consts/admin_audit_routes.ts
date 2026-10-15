@@ -19,8 +19,8 @@ export interface AuditedAdminRoute {
  * table cannot compile at the call site, and a target type cannot be mistyped at all.
  *
  * Paths are written in Elysia's declaration form so they compare directly against `elysia.routes`.
- * Matching is exact on (method, path), never a prefix test: `POST /admin/api/buckets` and
- * `POST /admin/api/buckets/:id/users` are different operations on different entities.
+ * Matching is exact on (method, path), never a prefix test: `POST /admin/api/projects` and
+ * `POST /admin/api/projects/:id/users` are different operations on different entities.
  *
  * Deliberately imports nothing. Anything that transitively imports `lib/adapters/mongodb/db.ts`
  * connects at module scope and is therefore unloadable under test.
@@ -44,19 +44,19 @@ const routes = [
 	{
 		action: 'resource.create',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/resources',
+		path: '/admin/api/projects/:id/resources',
 		targetType: 'ProtectedResource'
 	},
 	{
 		action: 'resource.update',
 		method: 'PATCH',
-		path: '/admin/api/buckets/:id/resources/:resourceId',
+		path: '/admin/api/projects/:id/resources/:resourceId',
 		targetType: 'ProtectedResource'
 	},
 	{
 		action: 'resource.delete',
 		method: 'DELETE',
-		path: '/admin/api/buckets/:id/resources/:resourceId',
+		path: '/admin/api/projects/:id/resources/:resourceId',
 		targetType: 'ProtectedResource'
 	},
 
@@ -86,25 +86,25 @@ const routes = [
 	{
 		action: 'client.create',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/clients',
+		path: '/admin/api/projects/:id/clients',
 		targetType: 'Client'
 	},
 	{
 		action: 'client.update',
 		method: 'PATCH',
-		path: '/admin/api/buckets/:id/clients/:clientId',
+		path: '/admin/api/projects/:id/clients/:clientId',
 		targetType: 'Client'
 	},
 	{
 		action: 'client.secret.rotate',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/clients/:clientId/secret',
+		path: '/admin/api/projects/:id/clients/:clientId/secret',
 		targetType: 'Client'
 	},
 	{
 		action: 'client.delete',
 		method: 'DELETE',
-		path: '/admin/api/buckets/:id/clients/:clientId',
+		path: '/admin/api/projects/:id/clients/:clientId',
 		targetType: 'Client'
 	},
 
@@ -172,37 +172,37 @@ const routes = [
 	{
 		action: 'group.create',
 		method: 'POST',
-		path: '/admin/api/groups',
+		path: '/admin/api/teams',
 		targetType: 'Group'
 	},
 	{
 		action: 'group.update',
 		method: 'PATCH',
-		path: '/admin/api/groups/:id',
+		path: '/admin/api/teams/:id',
 		targetType: 'Group'
 	},
 	{
 		action: 'group.delete',
 		method: 'DELETE',
-		path: '/admin/api/groups/:id',
+		path: '/admin/api/teams/:id',
 		targetType: 'Group'
 	},
 	{
 		action: 'group.member.add',
 		method: 'POST',
-		path: '/admin/api/groups/:id/members',
+		path: '/admin/api/teams/:id/members',
 		targetType: 'Group'
 	},
 	{
 		action: 'group.member.update',
 		method: 'PATCH',
-		path: '/admin/api/groups/:id/members/:userId',
+		path: '/admin/api/teams/:id/members/:userId',
 		targetType: 'Group'
 	},
 	{
 		action: 'group.member.remove',
 		method: 'DELETE',
-		path: '/admin/api/groups/:id/members/:userId',
+		path: '/admin/api/teams/:id/members/:userId',
 		targetType: 'Group'
 	},
 	/*
@@ -213,13 +213,13 @@ const routes = [
 	{
 		action: 'invitation.create',
 		method: 'POST',
-		path: '/admin/api/groups/:id/invitations',
+		path: '/admin/api/teams/:id/invitations',
 		targetType: 'Group'
 	},
 	{
 		action: 'invitation.revoke',
 		method: 'DELETE',
-		path: '/admin/api/groups/:id/invitations/:inviteId',
+		path: '/admin/api/teams/:id/invitations/:inviteId',
 		targetType: 'Group'
 	},
 	{
@@ -232,7 +232,7 @@ const routes = [
 	{
 		action: 'bucket.create',
 		method: 'POST',
-		path: '/admin/api/buckets',
+		path: '/admin/api/projects',
 		targetType: 'UserBucket'
 	},
 	/*
@@ -244,7 +244,7 @@ const routes = [
 	{
 		action: 'bucket.update',
 		method: 'PATCH',
-		path: '/admin/api/buckets/:id',
+		path: '/admin/api/projects/:id',
 		targetType: 'UserBucket'
 	},
 	/*
@@ -256,7 +256,7 @@ const routes = [
 	{
 		action: 'bucket.address.change',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/address',
+		path: '/admin/api/projects/:id/address',
 		targetType: 'UserBucket'
 	},
 	/*
@@ -267,7 +267,7 @@ const routes = [
 	{
 		action: 'bucket.owner.change',
 		method: 'PUT',
-		path: '/admin/api/buckets/:id/owner',
+		path: '/admin/api/projects/:id/owner',
 		targetType: 'UserBucket'
 	},
 	/*
@@ -279,19 +279,19 @@ const routes = [
 	{
 		action: 'bucket.delete',
 		method: 'DELETE',
-		path: '/admin/api/buckets/:id',
+		path: '/admin/api/projects/:id',
 		targetType: 'UserBucket'
 	},
 	{
 		action: 'bucket.restore',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/restore',
+		path: '/admin/api/projects/:id/restore',
 		targetType: 'UserBucket'
 	},
 	{
 		action: 'bucket.purge',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/purge',
+		path: '/admin/api/projects/:id/purge',
 		targetType: 'UserBucket'
 	},
 
@@ -303,45 +303,45 @@ const routes = [
 	{
 		action: 'enduser.create',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/users',
+		path: '/admin/api/projects/:id/users',
 		targetType: 'EndUser'
 	},
 	{
 		action: 'enduser.update',
 		method: 'PATCH',
-		path: '/admin/api/buckets/:id/users/:uid',
+		path: '/admin/api/projects/:id/users/:uid',
 		targetType: 'EndUser'
 	},
 	{
 		action: 'enduser.password.reset',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/users/:uid/password',
+		path: '/admin/api/projects/:id/users/:uid/password',
 		targetType: 'EndUser'
 	},
 	/* A new login address. `attributes` names the field, never the addresses (specs/082). */
 	{
 		action: 'enduser.email.change',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/users/:uid/email',
+		path: '/admin/api/projects/:id/users/:uid/email',
 		targetType: 'EndUser'
 	},
 	/* A verification message an administrator asked to be mailed; its link or code never reaches the trail. */
 	{
 		action: 'enduser.verification.send',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/users/:uid/verification',
+		path: '/admin/api/projects/:id/users/:uid/verification',
 		targetType: 'EndUser'
 	},
 	{
 		action: 'enduser.lock',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/users/:uid/lock',
+		path: '/admin/api/projects/:id/users/:uid/lock',
 		targetType: 'EndUser'
 	},
 	{
 		action: 'enduser.unlock',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/users/:uid/unlock',
+		path: '/admin/api/projects/:id/users/:uid/unlock',
 		targetType: 'EndUser'
 	},
 	/*
@@ -351,13 +351,13 @@ const routes = [
 	{
 		action: 'enduser.signout',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/users/:uid/sign-out',
+		path: '/admin/api/projects/:id/users/:uid/sign-out',
 		targetType: 'EndUser'
 	},
 	{
 		action: 'enduser.totp.clear',
 		method: 'DELETE',
-		path: '/admin/api/buckets/:id/users/:uid/totp',
+		path: '/admin/api/projects/:id/users/:uid/totp',
 		targetType: 'EndUser'
 	},
 	/*
@@ -367,21 +367,21 @@ const routes = [
 	{
 		action: 'enduser.invitation.send',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/users/:uid/invitation',
+		path: '/admin/api/projects/:id/users/:uid/invitation',
 		targetType: 'EndUser'
 	},
 	/* An administrator's statement that the person controls their address. */
 	{
 		action: 'enduser.verified.mark',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/users/:uid/verified',
+		path: '/admin/api/projects/:id/users/:uid/verified',
 		targetType: 'EndUser'
 	},
 	/* Signing the person out of one application, named in the entry's `clientId`. */
 	{
 		action: 'enduser.application.signout',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/users/:uid/sessions/:clientId/sign-out',
+		path: '/admin/api/projects/:id/users/:uid/sessions/:clientId/sign-out',
 		targetType: 'EndUser'
 	},
 	/*
@@ -391,31 +391,31 @@ const routes = [
 	{
 		action: 'enduser.bulk.deactivate',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/users/bulk/deactivate',
+		path: '/admin/api/projects/:id/users/bulk/deactivate',
 		targetType: 'EndUser'
 	},
 	{
 		action: 'enduser.bulk.activate',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/users/bulk/activate',
+		path: '/admin/api/projects/:id/users/bulk/activate',
 		targetType: 'EndUser'
 	},
 	{
 		action: 'enduser.bulk.signout',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/users/bulk/sign-out',
+		path: '/admin/api/projects/:id/users/bulk/sign-out',
 		targetType: 'EndUser'
 	},
 	{
 		action: 'enduser.bulk.delete',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/users/bulk/delete',
+		path: '/admin/api/projects/:id/users/bulk/delete',
 		targetType: 'EndUser'
 	},
 	{
 		action: 'enduser.delete',
 		method: 'DELETE',
-		path: '/admin/api/buckets/:id/users/:uid',
+		path: '/admin/api/projects/:id/users/:uid',
 		targetType: 'EndUser'
 	},
 	/*
@@ -425,7 +425,7 @@ const routes = [
 	{
 		action: 'enduser.connection.assign',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/users/:uid/connection',
+		path: '/admin/api/projects/:id/users/:uid/connection',
 		targetType: 'EndUser'
 	},
 
@@ -437,38 +437,38 @@ const routes = [
 	{
 		action: 'bucketgroup.create',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/groups',
+		path: '/admin/api/projects/:id/groups',
 		targetType: 'BucketGroup'
 	},
 	{
 		action: 'bucketgroup.update',
 		method: 'PATCH',
-		path: '/admin/api/buckets/:id/groups/:gid',
+		path: '/admin/api/projects/:id/groups/:gid',
 		targetType: 'BucketGroup'
 	},
 	{
 		action: 'bucketgroup.delete',
 		method: 'DELETE',
-		path: '/admin/api/buckets/:id/groups/:gid',
+		path: '/admin/api/projects/:id/groups/:gid',
 		targetType: 'BucketGroup'
 	},
 	{
 		action: 'bucketgroup.member.add',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/groups/:gid/members',
+		path: '/admin/api/projects/:id/groups/:gid/members',
 		targetType: 'BucketGroup'
 	},
 	{
 		action: 'bucketgroup.member.remove',
 		method: 'DELETE',
-		path: '/admin/api/buckets/:id/groups/:gid/members/:uid',
+		path: '/admin/api/projects/:id/groups/:gid/members/:uid',
 		targetType: 'BucketGroup'
 	},
 	/* From then on the group is the connection's and read-only to every administrator. */
 	{
 		action: 'bucketgroup.connection.assign',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/groups/:gid/connection',
+		path: '/admin/api/projects/:id/groups/:gid/connection',
 		targetType: 'BucketGroup'
 	},
 
@@ -480,19 +480,19 @@ const routes = [
 	{
 		action: 'provisioning.connection.create',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/provisioning-connections',
+		path: '/admin/api/projects/:id/provisioning-connections',
 		targetType: 'ProvisioningConnection'
 	},
 	{
 		action: 'provisioning.connection.update',
 		method: 'PATCH',
-		path: '/admin/api/buckets/:id/provisioning-connections/:connectionId',
+		path: '/admin/api/projects/:id/provisioning-connections/:connectionId',
 		targetType: 'ProvisioningConnection'
 	},
 	{
 		action: 'provisioning.connection.delete',
 		method: 'DELETE',
-		path: '/admin/api/buckets/:id/provisioning-connections/:connectionId',
+		path: '/admin/api/projects/:id/provisioning-connections/:connectionId',
 		targetType: 'ProvisioningConnection'
 	},
 	/*
@@ -502,19 +502,19 @@ const routes = [
 	{
 		action: 'provisioning.connection.release',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/provisioning-connections/:connectionId/release',
+		path: '/admin/api/projects/:id/provisioning-connections/:connectionId/release',
 		targetType: 'ProvisioningConnection'
 	},
 	{
 		action: 'provisioning.credential.issue',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/provisioning-connections/:connectionId/credentials',
+		path: '/admin/api/projects/:id/provisioning-connections/:connectionId/credentials',
 		targetType: 'ProvisioningConnection'
 	},
 	{
 		action: 'provisioning.credential.revoke',
 		method: 'DELETE',
-		path: '/admin/api/buckets/:id/provisioning-connections/:connectionId/credentials/:kind',
+		path: '/admin/api/projects/:id/provisioning-connections/:connectionId/credentials/:kind',
 		targetType: 'ProvisioningConnection'
 	},
 	/*
@@ -524,7 +524,7 @@ const routes = [
 	{
 		action: 'provisioning.credential.retire',
 		method: 'DELETE',
-		path: '/admin/api/buckets/:id/provisioning-connections/:connectionId/credentials/:kind/previous',
+		path: '/admin/api/projects/:id/provisioning-connections/:connectionId/credentials/:kind/previous',
 		targetType: 'ProvisioningConnection'
 	},
 
@@ -539,19 +539,19 @@ const routes = [
 	{
 		action: 'federation.provider.create',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/federation',
+		path: '/admin/api/projects/:id/federation',
 		targetType: 'UserBucket'
 	},
 	{
 		action: 'federation.provider.update',
 		method: 'PATCH',
-		path: '/admin/api/buckets/:id/federation/:providerId',
+		path: '/admin/api/projects/:id/federation/:providerId',
 		targetType: 'UserBucket'
 	},
 	{
 		action: 'federation.provider.delete',
 		method: 'DELETE',
-		path: '/admin/api/buckets/:id/federation/:providerId',
+		path: '/admin/api/projects/:id/federation/:providerId',
 		targetType: 'UserBucket'
 	},
 	/*
@@ -561,14 +561,14 @@ const routes = [
 	{
 		action: 'federation.provider.try',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/federation/:providerId/try',
+		path: '/admin/api/projects/:id/federation/:providerId/try',
 		targetType: 'UserBucket'
 	},
 	/* One place up or down in the sign-in order; the entry's `from`/`to` are the order before and after. */
 	{
 		action: 'federation.provider.move',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/federation/:providerId/move',
+		path: '/admin/api/projects/:id/federation/:providerId/move',
 		targetType: 'UserBucket'
 	},
 	/*
@@ -578,32 +578,32 @@ const routes = [
 	{
 		action: 'bucket.key.generate',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/keys',
+		path: '/admin/api/projects/:id/keys',
 		targetType: 'UserBucket'
 	},
 	{
 		action: 'bucket.key.promote',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/keys/:kid/promote',
+		path: '/admin/api/projects/:id/keys/:kid/promote',
 		targetType: 'UserBucket'
 	},
 	{
 		action: 'bucket.key.retire',
 		method: 'DELETE',
-		path: '/admin/api/buckets/:id/keys/:kid',
+		path: '/admin/api/projects/:id/keys/:kid',
 		targetType: 'UserBucket'
 	},
 	/* One entry per act however many keys it touched; the entry's `keys` names each by its role (specs/087). */
 	{
 		action: 'bucket.key.rotate',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/keys/rotate',
+		path: '/admin/api/projects/:id/keys/rotate',
 		targetType: 'UserBucket'
 	},
 	{
 		action: 'bucket.key.revoke',
 		method: 'POST',
-		path: '/admin/api/buckets/:id/keys/:kid/revoke',
+		path: '/admin/api/projects/:id/keys/:kid/revoke',
 		targetType: 'UserBucket'
 	},
 	/*
@@ -614,7 +614,7 @@ const routes = [
 	{
 		action: 'federation.identity.delete',
 		method: 'DELETE',
-		path: '/admin/api/buckets/:id/users/:uid/identities/:providerId',
+		path: '/admin/api/projects/:id/users/:uid/identities/:providerId',
 		targetType: 'EndUser'
 	},
 

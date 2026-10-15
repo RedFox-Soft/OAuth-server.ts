@@ -96,7 +96,7 @@ describe('an agent moving a bucket to another group', () => {
 		const w = await world();
 
 		const described = await rpc(
-			call('bucket_owner_change', { id: w.bucket._id, groupId: w.team._id }),
+			call('project_owner_change', { id: w.bucket._id, teamId: w.team._id }),
 			w.token
 		);
 
@@ -110,11 +110,11 @@ describe('an agent moving a bucket to another group', () => {
 
 	it('sees the applications and APIs that would move when it confirms without `confirm`, and nothing moves', async () => {
 		const w = await world();
-		const args = { id: w.bucket._id, groupId: w.team._id };
-		const described = await rpc(call('bucket_owner_change', args), w.token);
+		const args = { id: w.bucket._id, teamId: w.team._id };
+		const described = await rpc(call('project_owner_change', args), w.token);
 
 		const previewed = await rpc(
-			call('bucket_owner_change', {
+			call('project_owner_change', {
 				...args,
 				confirmationToken:
 					described.result?.structuredContent?.confirmationToken
@@ -135,11 +135,11 @@ describe('an agent moving a bucket to another group', () => {
 
 	it('moves the bucket with a confirmation obtained for `confirm: true`, attributed to the agent', async () => {
 		const w = await world();
-		const args = { id: w.bucket._id, groupId: w.team._id, confirm: true };
-		const described = await rpc(call('bucket_owner_change', args), w.token);
+		const args = { id: w.bucket._id, teamId: w.team._id, confirm: true };
+		const described = await rpc(call('project_owner_change', args), w.token);
 
 		const performed = await rpc(
-			call('bucket_owner_change', {
+			call('project_owner_change', {
 				...args,
 				confirmationToken:
 					described.result?.structuredContent?.confirmationToken
@@ -161,11 +161,11 @@ describe('an agent moving a bucket to another group', () => {
 
 	it('cannot move with a confirmation obtained for the preview', async () => {
 		const w = await world();
-		const args = { id: w.bucket._id, groupId: w.team._id };
-		const described = await rpc(call('bucket_owner_change', args), w.token);
+		const args = { id: w.bucket._id, teamId: w.team._id };
+		const described = await rpc(call('project_owner_change', args), w.token);
 
 		const stretched = await rpc(
-			call('bucket_owner_change', {
+			call('project_owner_change', {
 				...args,
 				confirm: true,
 				confirmationToken:
@@ -188,7 +188,7 @@ describe('an agent moving a bucket to another group', () => {
 		);
 
 		const added = await rpc(
-			call('group_member_add', {
+			call('team_member_add', {
 				id: w.personal._id,
 				userId: colleague._id,
 				role: 'member'

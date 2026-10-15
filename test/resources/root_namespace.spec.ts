@@ -119,7 +119,7 @@ describe('a bucket without an address of its own', () => {
 		const bucket = await rootBucket(groupId);
 
 		const res = await api.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.resources.post(body, { headers: { cookie } });
 
 		expect(res.status).toBe(403);
@@ -127,7 +127,7 @@ describe('a bucket without an address of its own', () => {
 			(present(res.error, 'a refusal').value as { message?: string }).message
 		);
 		expect(message).toContain('super administrator');
-		expect(message).toContain('bucket');
+		expect(message).toContain('project');
 		expect(await getProtectedResourceStore().list()).toEqual([]);
 	});
 
@@ -137,7 +137,7 @@ describe('a bucket without an address of its own', () => {
 		await declaredAtRoot(bucket._id);
 
 		const res = await api.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.resources({ resourceId: encoded })
 			.patch({ name: 'Taken over' }, { headers: { cookie } });
 
@@ -150,7 +150,7 @@ describe('a bucket without an address of its own', () => {
 		await declaredAtRoot(bucket._id);
 
 		const res = await api.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.resources({ resourceId: encoded })
 			.delete(undefined, { headers: { cookie } });
 
@@ -163,7 +163,7 @@ describe('a bucket without an address of its own', () => {
 		const bucket = await rootBucket(groupId);
 
 		const res = await api.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.resources.post(
 				{ ...body, identifier: 'http://10.9.8.7/mcp' },
 				{ headers: { cookie } }

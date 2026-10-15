@@ -63,7 +63,7 @@ Run this to completion **before** rolling the Deployment, and gate the rollout o
 `kubectl wait --for=condition=complete job/oauth-server-setup-<version>` in your pipeline.
 
 The reason is the same one that puts `release_command` in the shipped `fly.toml`: without the
-reserved admin bucket and client the seed creates, `GET /admin/login` redirects to `/auth`
+reserved admin project and client the seed creates, `GET /admin/login` redirects to `/auth`
 with a `client_id` no client matches and the console is unreachable, while the first-run setup page
 still answers. From outside, that is easy to mistake for a login bug when the seed is what is
 missing. The Job also provisions the TTL and unique-e-mail indexes the collections would otherwise

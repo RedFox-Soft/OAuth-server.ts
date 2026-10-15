@@ -21,8 +21,8 @@ graph:
 A locked-out end user requests a reset from the login page, receives a single-use link, and sets a new
 password; the reset also ends that account's sessions. Before this, the login page's "Forgot password"
 control was `href=""` and the only path was an operator setting a password by hand through
-`POST /admin/api/buckets/:id/users/:uid/password` — a support ticket per lockout, and a password handed
-over out of band.
+`POST /admin/api/buckets/:id/users/:uid/password` (since spec 100 `/admin/api/projects/:id/users/:uid/password`,
+`lib/admin/users-end/routes.ts:403`) — a support ticket per lockout, and a password handed over out of band.
 
 The flow deliberately mirrors email verification (`lib/verification/`) — TTL'd challenge written straight
 through `adapter()`, per-address cooldown and daily cap, plain standalone pages, mail captured under test —
@@ -71,30 +71,31 @@ validates and renders the form; only the POST consumes, and it destroys the chal
 update so a replay arriving mid-flight finds nothing. The password-mismatch check lives in the route, not the
 engine, which makes "a mismatch does not consume the secret" true by construction.
 
-## Departure 4 — the reserved admin bucket is refused
+## Departure 4 — the reserved administrators' project is refused
 
-`resolveBucketForRequest` maps the reserved console client straight to the admin bucket, so **every end-user
+`resolveBucketForRequest` maps the reserved console client straight to the administrators' project (stored as
+the reserved bucket `admin`), so **every end-user
 surface mounted under `/ui` is operator-reachable unless it says otherwise**. A self-service reset records no
 audit entry (there is no actor to attribute), so allowing it here would have created an unaudited path to
-changing console credentials from the console's own sign-in page. `request()` refuses that bucket with the
+changing console credentials from the console's own sign-in page. `request()` refuses that project with the
 same non-committal page as any other unresolvable address; operator password changes stay in the audited
 admin-plane route. The next end-user feature mounted under `/ui` will have to make the same call.
 
 Since spec 078 the rule is one predicate, `selfServiceResetAllowed` (`lib/password_reset/eligibility.ts`),
 read by the request, the link and the sign-in page — which no longer shows "Forgot password" where the
-bucket refuses it, so the console's sign-in page stopped linking to this refusal
-([[admin-bucket-settings]]).
+project refuses it, so the console's sign-in page stopped linking to this refusal
+([[admin-project-settings]]).
 
-A bucket with `passwordLogin: false` is refused the same way, at both ends (added 2026-09-29): `request()`
-issues nothing for it and `load()` refuses a link that names it, so a link issued before the bucket closed
+A project with `passwordLogin: false` is refused the same way, at both ends (added 2026-09-29): `request()`
+issues nothing for it and `load()` refuses a link that names it, so a link issued before the project closed
 its password door cannot set one afterwards. The door in front refuses first; this is what holds for any
-path that did not pass it, which was every path from a client in no project (since spec 099: of no bucket)
-until the doors learned to
-resolve the bucket with the request's resource (see [[mcp-server-authorization]]).
+path that did not pass it, which was every path from a client in no old Project entity (a retired project;
+since spec 099: of no project) until the doors learned to
+resolve the project with the request's resource (see [[mcp-server-authorization]]).
 
 ## One response, and the one bounded exception
 
-Registered, unregistered, another bucket's address, deactivated, admin bucket, and *delivery failed* all
+Registered, unregistered, another project's address, deactivated, administrators' project, and *delivery failed* all
 return the same accepted page — a constant with nothing interpolated, so the property belongs to the page
 function rather than to its callers. A delivery failure is swallowed deliberately: a send only happens for an
 address that does have an account, so surfacing it would answer the question the uniform page exists to
@@ -129,7 +130,7 @@ two defects, both fixed:
 ## Consuming a reset marks the address verified
 
 Receiving the secret proves control of the address on file — precisely what the verification challenge
-proves. Without this an unverified account in a verification-required bucket is a permanent dead end: sign-in
+proves. Without this an unverified account in a verification-required project is a permanent dead end: sign-in
 is gated on `verified`, and re-registering is deliberately non-committal about an existing address, so
 nothing resends anything. The same `update()` writes the password hash, `passwordSet: true` (spec 082) and
 `verified: true`.

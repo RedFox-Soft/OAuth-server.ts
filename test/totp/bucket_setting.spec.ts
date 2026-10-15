@@ -40,7 +40,7 @@ describe('bucket sign-in method setting', () => {
 
 	it('defaults a newly created bucket to not requiring the second factor', async () => {
 		const cookie = await superCookie();
-		const res = await client.admin.api.buckets.post(
+		const res = await client.admin.api.projects.post(
 			{ name: unique('Defaults'), slug: uniqueSlug('Defaults') },
 			{ headers: { cookie } }
 		);
@@ -61,7 +61,7 @@ describe('bucket sign-in method setting', () => {
 		Reflect.deleteProperty(bucket, 'totpRequired');
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.get({ headers: { cookie } });
 		expect(res.status).toBe(200);
 		expect(answered(res.data).totpRequired).toBe(false);
@@ -69,7 +69,7 @@ describe('bucket sign-in method setting', () => {
 
 	it('accepts the setting at creation', async () => {
 		const cookie = await superCookie();
-		const res = await client.admin.api.buckets.post(
+		const res = await client.admin.api.projects.post(
 			{
 				name: unique('Strict'),
 				slug: uniqueSlug('Strict'),
@@ -84,7 +84,7 @@ describe('bucket sign-in method setting', () => {
 		const cookie = await superCookie();
 		const first = answered(
 			(
-				await client.admin.api.buckets.post(
+				await client.admin.api.projects.post(
 					{ name: unique('First'), slug: uniqueSlug('First') },
 					{ headers: { cookie } }
 				)
@@ -92,7 +92,7 @@ describe('bucket sign-in method setting', () => {
 		);
 		const second = answered(
 			(
-				await client.admin.api.buckets.post(
+				await client.admin.api.projects.post(
 					{ name: unique('Second'), slug: uniqueSlug('Second') },
 					{ headers: { cookie } }
 				)
@@ -101,14 +101,14 @@ describe('bucket sign-in method setting', () => {
 
 		const patched = await consenting((consent) =>
 			client.admin.api
-				.buckets({ id: first._id })
+				.projects({ id: first._id })
 				.patch({ totpRequired: true, ...consent }, { headers: { cookie } })
 		);
 		expect(patched.status).toBe(200);
 		expect(answered(patched.data).totpRequired).toBe(true);
 
 		const untouched = await client.admin.api
-			.buckets({ id: second._id })
+			.projects({ id: second._id })
 			.get({ headers: { cookie } });
 		expect(answered(untouched.data).totpRequired).toBe(false);
 
@@ -120,7 +120,7 @@ describe('bucket sign-in method setting', () => {
 		const cookie = await superCookie();
 		const bucket = answered(
 			(
-				await client.admin.api.buckets.post(
+				await client.admin.api.projects.post(
 					{
 						name: unique('Toggling'),
 						slug: uniqueSlug('Toggling'),
@@ -132,7 +132,7 @@ describe('bucket sign-in method setting', () => {
 		);
 
 		const patched = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.patch({ totpRequired: false }, { headers: { cookie } });
 		expect(answered(patched.data).totpRequired).toBe(false);
 	});
@@ -145,7 +145,7 @@ describe('bucket sign-in method setting', () => {
 		const cookie = await superCookie();
 		const bucket = answered(
 			(
-				await client.admin.api.buckets.post(
+				await client.admin.api.projects.post(
 					{ name: unique('Federated'), slug: uniqueSlug('Federated') },
 					{ headers: { cookie } }
 				)
@@ -173,7 +173,7 @@ describe('bucket sign-in method setting', () => {
 		});
 
 		const patched = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.patch({ totpRequired: true }, { headers: { cookie } });
 
 		expect(patched.status).toBe(200);
@@ -188,7 +188,7 @@ describe('bucket sign-in method setting', () => {
 		const cookie = await superCookie();
 		const bucket = answered(
 			(
-				await client.admin.api.buckets.post(
+				await client.admin.api.projects.post(
 					{ name: unique('Normal'), slug: uniqueSlug('Normal') },
 					{ headers: { cookie } }
 				)
@@ -197,7 +197,7 @@ describe('bucket sign-in method setting', () => {
 
 		const patched = await consenting((consent) =>
 			client.admin.api
-				.buckets({ id: bucket._id })
+				.projects({ id: bucket._id })
 				.patch({ totpRequired: true, ...consent }, { headers: { cookie } })
 		);
 		const body = answered(patched.data);
@@ -209,7 +209,7 @@ describe('bucket sign-in method setting', () => {
 		const outsider = await sessionCookieFor('plain');
 		const bucket = answered(
 			(
-				await client.admin.api.buckets.post(
+				await client.admin.api.projects.post(
 					{ name: unique('NotYours'), slug: uniqueSlug('NotYours') },
 					{ headers: { cookie } }
 				)
@@ -217,7 +217,7 @@ describe('bucket sign-in method setting', () => {
 		);
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.patch({ totpRequired: true }, { headers: { cookie: outsider.cookie } });
 
 		expect(res.status).toBe(403);
@@ -228,7 +228,7 @@ describe('bucket sign-in method setting', () => {
 		const cookie = await superCookie();
 		const bucket = answered(
 			(
-				await client.admin.api.buckets.post(
+				await client.admin.api.projects.post(
 					{ name: unique('Anon'), slug: uniqueSlug('Anon') },
 					{ headers: { cookie } }
 				)
@@ -236,7 +236,7 @@ describe('bucket sign-in method setting', () => {
 		);
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.patch({ totpRequired: true });
 
 		expect(res.status).toBe(401);
@@ -254,7 +254,7 @@ describe('bucket sign-in method setting', () => {
 		const admin = await sessionCookieFor('super');
 		const bucket = answered(
 			(
-				await client.admin.api.buckets.post(
+				await client.admin.api.projects.post(
 					{ name: unique('Audited'), slug: uniqueSlug('Audited') },
 					{ headers: { cookie: admin.cookie } }
 				)
@@ -263,7 +263,7 @@ describe('bucket sign-in method setting', () => {
 
 		await consenting((consent) =>
 			client.admin.api
-				.buckets({ id: bucket._id })
+				.projects({ id: bucket._id })
 				.patch(
 					{ totpRequired: true, ...consent },
 					{ headers: { cookie: admin.cookie } }
@@ -291,7 +291,7 @@ describe('bucket sign-in method setting', () => {
 		const cookie = await superCookie();
 		const bucket = answered(
 			(
-				await client.admin.api.buckets.post(
+				await client.admin.api.projects.post(
 					{
 						name: unique('StillReachable'),
 						slug: uniqueSlug('StillReachable'),

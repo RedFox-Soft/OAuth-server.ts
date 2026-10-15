@@ -18,7 +18,7 @@ let cookie: string;
 
 async function list(bucketId: string, query = '') {
 	const res = await adminApiRoutes.handle(
-		new Request(`http://e.ly/admin/api/buckets/${bucketId}/users${query}`, {
+		new Request(`http://e.ly/admin/api/projects/${bucketId}/users${query}`, {
 			headers: { cookie }
 		})
 	);

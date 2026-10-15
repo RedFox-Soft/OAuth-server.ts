@@ -70,7 +70,7 @@ async function assertMayTurnPasswordsOff(
 	if (!provider || !linked) {
 		throw new AdminError(
 			409,
-			"Sign in through one of this bucket's identity providers first, then turn password sign-in off."
+			"Sign in through one of this project's identity providers first, then turn password sign-in off."
 		);
 	}
 	const state = await loadReachabilityState();

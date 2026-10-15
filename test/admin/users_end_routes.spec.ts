@@ -46,7 +46,7 @@ describe('end-user API', () => {
 
 	it('rejects anonymous access', async () => {
 		const bucket = await makeBucket();
-		const res = await client.admin.api.buckets({ id: bucket._id }).users.get();
+		const res = await client.admin.api.projects({ id: bucket._id }).users.get();
 		expect(res.status).toBe(401);
 	});
 
@@ -54,7 +54,7 @@ describe('end-user API', () => {
 		const { cookie } = await sessionCookieFor('super');
 		const bucket = await makeBucket();
 		const created = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.users.post(
 				{ email: 'u@x.io', password: 'supersecret' },
 				{ headers: { cookie } }
@@ -66,20 +66,20 @@ describe('end-user API', () => {
 		const uid = body._id;
 
 		const list = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.users.get({ headers: { cookie } });
 		const { users } = answered(list.data);
 		expect(users.some((u) => u._id === uid)).toBe(true);
 		expect(users.every((u) => !('password' in u))).toBe(true);
 
 		const patched = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.users({ uid })
 			.patch({ active: false }, { headers: { cookie } });
 		expect(answered(patched.data).active).toBe(false);
 
 		const del = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.users({ uid })
 			.delete(undefined, { headers: { cookie } });
 		expect(del.status).toBe(200);
@@ -90,7 +90,7 @@ describe('end-user API', () => {
 		const { cookie } = await sessionCookieFor('super');
 		const bucket = await makeBucket();
 		const created = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.users.post(
 				{
 					email: 'claims-create@x.io',
@@ -116,7 +116,7 @@ describe('end-user API', () => {
 		});
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.users({ uid: user._id })
 			.patch(
 				{ claims: { name: 'After', address: { country: 'GB' } } },
@@ -163,7 +163,7 @@ describe('end-user API', () => {
 			);
 
 			const res = await client.admin.api
-				.buckets({ id: bucket._id })
+				.projects({ id: bucket._id })
 				.users({ uid: user._id })
 				.patch({ claims: { [reserved]: 'forged' } }, { headers: { cookie } });
 
@@ -183,7 +183,7 @@ describe('end-user API', () => {
 		);
 
 		await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.users({ uid: user._id })
 			.patch(
 				{ claims: { phone_number: '+44 20 7946 0000' } },
@@ -204,10 +204,10 @@ describe('end-user API', () => {
 		const bucket = await makeBucket();
 		const body = { email: 'dup@x.io', password: 'supersecret' };
 		await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.users.post(body, { headers: { cookie } });
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.users.post(body, { headers: { cookie } });
 		expect(res.status).toBe(409);
 	});
@@ -216,7 +216,7 @@ describe('end-user API', () => {
 		const { cookie } = await sessionCookieFor('super');
 		const bucket = await makeBucket();
 		const created = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.users.post(
 				{ email: 'pw@x.io', password: 'supersecret' },
 				{ headers: { cookie } }
@@ -224,7 +224,7 @@ describe('end-user API', () => {
 		const uid = answered(created.data)._id;
 		const before = (await getUserStore(bucket._id).find(uid))?.password;
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.users({ uid })
 			.password.post({ password: 'anothersecret' }, { headers: { cookie } });
 		expect(res.status).toBe(200);
@@ -236,7 +236,7 @@ describe('end-user API', () => {
 		const pa = await sessionCookieFor('plain');
 		const bucket = await makeBucket(await personalGroupId(pa.userId));
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.users.post(
 				{ email: 'via@x.io', password: 'supersecret' },
 				{ headers: { cookie: pa.cookie } }
@@ -248,7 +248,7 @@ describe('end-user API', () => {
 		const pa = await sessionCookieFor('plain');
 		const bucket = await makeBucket();
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.users.get({ headers: { cookie: pa.cookie } });
 		expect(res.status).toBe(403);
 	});
@@ -256,7 +256,7 @@ describe('end-user API', () => {
 	it('refuses to manage users of the reserved admin bucket', async () => {
 		const { cookie } = await sessionCookieFor('super');
 		const res = await client.admin.api
-			.buckets({ id: ADMIN_BUCKET_ID })
+			.projects({ id: ADMIN_BUCKET_ID })
 			.users.get({ headers: { cookie } });
 		expect(res.status).toBe(403);
 	});

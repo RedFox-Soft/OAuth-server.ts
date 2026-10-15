@@ -22,6 +22,15 @@ import {
 	AUDIT_PAGE_MAX_LIMIT
 } from '../../helpers/admin_audit_query.js';
 import { AuditQuery, ALLOWED_AUDIT_PARAMS } from './schema.js';
+import {
+	edgeAction,
+	edgeAuditAttribute,
+	edgeCascade,
+	edgeTargetType,
+	storedAction,
+	storedActionPrefix,
+	storedTargetType
+} from '../vocabulary.js';
 
 /*
  * Checked against the raw URL, not the validated `query` object, and this is not belt-and-braces:
@@ -87,6 +96,78 @@ async function actorNames(
 		}
 	}
 	return names;
+}
+
+/*
+ * An entry as the edge names it (specs/100). The stored entry is evidence and is never rewritten, so its
+ * history reads in today's words only here: a bucket is a project, an administrator group a team, a bucket
+ * group a group, and the entity spec 099 removed a retired project.
+ */
+function presentEntry(entry: AdminAuditEntry) {
+	const {
+		ownerGroupId,
+		formerOwnerGroupId,
+		bucketId,
+		formerBucketId,
+		attributes,
+		cascade,
+		...rest
+	} = entry;
+	return {
+		...rest,
+		action: edgeAction(entry.action),
+		targetType: edgeTargetType(entry.targetType),
+		...(ownerGroupId === undefined ? {} : { ownerTeamId: ownerGroupId }),
+		...(formerOwnerGroupId === undefined
+			? {}
+			: { formerOwnerTeamId: formerOwnerGroupId }),
+		...(bucketId === undefined ? {} : { projectId: bucketId }),
+		...(formerBucketId === undefined
+			? {}
+			: { formerProjectId: formerBucketId }),
+		...(attributes === undefined
+			? {}
+			: { attributes: attributes.map(edgeAuditAttribute) }),
+		...(cascade === undefined
+			? {}
+			: { cascade: cascade === null ? null : edgeCascade(cascade) })
+	};
+}
+
+/*
+ * The stored names an edge filter selects. Null where it names nothing — an old name such as
+ * `bucket.create`, which is not an edge name and must not reach the entries it once meant.
+ */
+function storedFilters(query: {
+	action?: string;
+	targetType?: string;
+	actionPrefix?: string;
+}): Pick<AdminAuditQuery, 'action' | 'targetType' | 'actionPrefix'> | null {
+	const action =
+		query.action === undefined ? undefined : storedAction(query.action);
+	const targetType =
+		query.targetType === undefined
+			? undefined
+			: storedTargetType(query.targetType);
+	const actionPrefix =
+		query.actionPrefix === undefined
+			? undefined
+			: storedActionPrefix(query.actionPrefix);
+	if (actionPrefix === 'ambiguous') {
+		throw new AdminError(
+			422,
+			'actionPrefix must name whole segments, such as project. or project.key.',
+			{ field: 'actionPrefix' }
+		);
+	}
+	if (action === null || targetType === null || actionPrefix === null) {
+		return null;
+	}
+	return {
+		...(action === undefined ? {} : { action }),
+		...(targetType === undefined ? {} : { targetType }),
+		...(actionPrefix === undefined ? {} : { actionPrefix: actionPrefix.prefix })
+	};
 }
 
 function parseBound(value: string | undefined, name: string): Date | undefined {
@@ -172,12 +253,13 @@ export const auditRoutes = new Elysia({ name: 'admin-audit' })
 				AUDIT_PAGE_MAX_LIMIT
 			);
 
+			const stored = storedFilters(query);
+			if (stored === null) {
+				return { entries: [], total: 0, page, pageSize };
+			}
 			const filters: AdminAuditQuery = {
 				...(query.actor === undefined ? {} : { actor: query.actor }),
-				...(query.action === undefined ? {} : { action: query.action }),
-				...(query.targetType === undefined
-					? {}
-					: { targetType: query.targetType }),
+				...stored,
 				...(query.targetId === undefined ? {} : { targetId: query.targetId }),
 				...(query.targetScope === undefined
 					? {}
@@ -188,13 +270,10 @@ export const auditRoutes = new Elysia({ name: 'admin-audit' })
 				...(query.viaClientId === undefined
 					? {}
 					: { viaClientId: query.viaClientId }),
-				...(query.bucket === undefined ? {} : { bucket: query.bucket }),
+				...(query.project === undefined ? {} : { bucket: query.project }),
 				...(query.connection === undefined
 					? {}
 					: { connection: query.connection }),
-				...(query.actionPrefix === undefined
-					? {}
-					: { actionPrefix: query.actionPrefix }),
 				...(from === undefined ? {} : { from }),
 				...(to === undefined ? {} : { to }),
 				...(ownerGroupIds === undefined ? {} : { ownerGroupIds }),
@@ -209,8 +288,11 @@ export const auditRoutes = new Elysia({ name: 'admin-audit' })
 			return {
 				entries: entries.map((entry) =>
 					names.has(entry.actorId)
-						? { ...entry, actorName: names.get(entry.actorId) ?? null }
-						: entry
+						? {
+								...presentEntry(entry),
+								actorName: names.get(entry.actorId) ?? null
+							}
+						: presentEntry(entry)
 				),
 				total,
 				page,

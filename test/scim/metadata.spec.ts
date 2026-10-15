@@ -59,7 +59,7 @@ describe('a bucket’s SCIM protected-resource metadata', () => {
 		const bucket = await scimBucket();
 		const res = await admin(
 			'POST',
-			`/admin/api/buckets/${DEFAULT_BUCKET_ID}/resources`,
+			`/admin/api/projects/${DEFAULT_BUCKET_ID}/resources`,
 			cookie,
 			{
 				identifier: `http://e.ly/${slugOf(bucket)}/scim/v2`,

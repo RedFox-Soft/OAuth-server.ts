@@ -40,7 +40,7 @@ async function declared(identifier: string) {
 async function vouching(identifier: string) {
 	const response = await app.handle(
 		new Request(
-			`http://e.ly/admin/api/buckets/${bucketId}/resources/${encodeURIComponent(identifier)}/vouching`,
+			`http://e.ly/admin/api/projects/${bucketId}/resources/${encodeURIComponent(identifier)}/vouching`,
 			{ headers: { cookie } }
 		)
 	);

@@ -4,7 +4,7 @@ title: 'Single use under concurrency'
 tags: [contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-09-29
-updated: 2026-10-08
+updated: 2026-10-15
 graph:
   node_type: concept
 ---
@@ -65,7 +65,7 @@ claimed through `ReplayDetection.unique`, whose insert-if-absent answers exactly
 
 - **a password reset link** (`consume` in `lib/password_reset/challenge.ts`), claimed by its record id for
   the link's lifetime before it is destroyed; two submissions used to both set a password;
-- **a group invitation** (`lib/admin/groups/accept.ts`), claimed by its id for the invitation's lifetime;
+- **a team invitation** (`lib/admin/groups/accept.ts`), claimed by its id for the invitation's lifetime;
   two acceptances used to both go through, one writing membership from a stale copy;
 - **first-run setup** (`lib/admin/auth/setup.ts`), claimed around the bootstrap and released in `finally`
   (`ReplayDetection.release`) — a success closes setup through `hasSuperAdmin`, and a failure must leave it

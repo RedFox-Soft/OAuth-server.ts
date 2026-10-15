@@ -88,8 +88,8 @@ document.**
 guard sees only a whole document stored as a string; a single *value* written as
 `jsonb_set(doc, '{slug}', ${JSON.stringify(slug)}::jsonb)` is JSON-encoded again by the client and lands
 as `"\"default\""` — still inside a valid object, so nothing threw. That was `repairReservedSlug`, the
-`db:setup:pg` repair that gives a reserved bucket its address on a database provisioned before addresses
-existed: it would have left `findBySlug` unable to find the console's own bucket. A value is now put in
+`db:setup:pg` repair that gives a reserved project its address on a database provisioned before addresses
+existed: it would have left `findBySlug` unable to find the console's own project. A value is now put in
 as text and made jsonb by the database (`to_jsonb(${value}::text)`, `lib/adapters/postgres/userBucketStore.ts`),
 the repair also heals the damaged value the old write left, and `database/verify_postgres.ts` checks both
 on a real database — the hermetic suite runs on the in-memory adapter and cannot see it.
@@ -117,10 +117,10 @@ invisible to the in-memory suite, and one of them total:
 - **A JS array bound as a parameter is not a PostgreSQL array.** `${values}::text[]` reaches the server
   as text it cannot parse ("malformed array literal", even for `[]`), so every account update threw —
   the statement always sends the list of keys it clears — and so did every audit read filtered by
-  group. `handle.array(values, 'text')` binds a real array (`userStore.ts`, `adminAuditStore.ts`).
+  team. `handle.array(values, 'text')` binds a real array (`userStore.ts`, `adminAuditStore.ts`).
 - **Bun reports SQLSTATE in `errno`, not `code`.** `code` is the client's own
   `ERR_POSTGRES_SERVER_ERROR` for every server error, so the classifiers that compared it with `23505`
-  never matched: a lost race for a bucket hostname answered 500 rather than "taken", and two instances
+  never matched: a lost race for a project hostname answered 500 rather than "taken", and two instances
   recording one new fault threw rather than merged. `lib/adapters/postgres/sqlState.ts` reads it for all
   of them. `database/verify_postgres.ts` checks both.
 
@@ -129,7 +129,7 @@ invisible to the in-memory suite, and one of them total:
 Constitution Principle III permits a suite that uses a real database under three binding conditions:
 invoked separately, unreachable from the default run, and confined to what an in-memory double
 cannot exhibit. `database/verify_postgres.ts`, `database/verify_migrations.ts` and, since 2026-09-29,
-`database/verify_mongodb.ts` (the namespaced declaration key, the bucket first-key claim, the
+`database/verify_mongodb.ts` (the namespaced declaration key, the project first-key claim, the
 all-or-none move and the first real migration, against a scratch MongoDB) are scripts rather than spec
 files precisely so `bun test` can never reach them, and
 `test/storage_contract/adapter_isolation.spec.ts` asserts that neither matches the runner's
@@ -196,14 +196,17 @@ startup gate closes that deliberately created divergence.
   (`lib/consts/migrations.ts:915`), which gives every SCIM static token without an expiry one
   ([[scim-credential-overlap]]); its new previous-token index needed no migration, since `db:setup` applies
   indexes. Spec 098 added `2026-10-15-projects-require-bucket`, and spec 099 `2026-10-16-remove-projects`
-  (`lib/consts/migrations.ts:1276`), which moves every project's clients, origins and declarations onto
-  `bucketId` and refuses, writing nothing, when one client is listed by projects on different buckets
-  ([[bucket-is-the-only-container]]). Both read an area that is no longer declared: `projects` left
+  (`lib/consts/migrations.ts:1276`); both concern the old Project entity (a retired project, not today's
+  project). The second moves every retired project's clients, origins and declarations onto `bucketId` and
+  refuses, writing nothing, when one client is listed by retired projects on different projects
+  ([[project-is-the-only-container]]). Both read an area that is no longer declared: `projects` left
   `STORE_AREAS` in spec 099, so the migrations name it by its literal, `LEGACY_PROJECTS_AREA` (`:115`), as the
   root-keys migration names `LEGACY_ROOT_KEYS_AREA`. Its collection or table stays on disk, because
-  provisioning never drops anything.
+  provisioning never drops anything. Spec 100 added `2026-10-17-projects-reserved-hostnames`
+  (`lib/consts/migrations.ts:1422`), which moves a stored `buckets.reservedHostnames` setting to
+  `projects.reservedHostnames` (a value already under the new key wins) on both backends.
 - The one-off `managedBy → ownerGroupId` conversion was **retired**, not carried in. See
-  [[group-ownership]]; a deployment old enough to need it upgrades through an earlier release first.
+  [[team-ownership]]; a deployment old enough to need it upgrades through an earlier release first.
 
 ## Liveness and readiness became two endpoints
 
@@ -234,7 +237,7 @@ The console's users search matches the *start* of the stored lower-case `email` 
 answers an anchored, case-sensitive regular expression from the ordinary index on the same key. PostgreSQL's
 default b-tree compares in the database collation and cannot bound `LIKE 'ada%'` unless that collation is C,
 so the inventory gained `IndexSpec.prefix` (`lib/consts/storage_inventory.ts:56`): `translateIndex` builds such
-an index with `text_pattern_ops` (`lib/adapters/postgres/jsonPath.ts:118`), named `…_pfx`, and the per-bucket area
+an index with `text_pattern_ops` (`lib/adapters/postgres/jsonPath.ts:118`), named `…_pfx`, and the per-project area
 declares one on `email` and a sparse one on `userNameKey` (`storage_inventory.ts:294-295`). MongoDB neither builds
 nor expects them — `documentIndexesFor` (`:874`) filters them out of its provisioning and reconciliation —
 because a second index on an identical key is refused there. Not a divergence entry: nothing a caller can
@@ -257,11 +260,12 @@ answer is "nothing" is a difference in implementation, not in behaviour.
 
 `database/verify_postgres.ts` reads it and fails on any difference it observes that is not listed —
 which is what makes it a gate rather than a document. Seven entries today: expiry reclamation cadence,
-the untimed-upsert expiry above, migration-record atomicity, bucket-group-change atomicity
-([[bucket-groups]]), what a write to an unprovisioned area does, and two convergences listed *because* they
-are convergences — email case normalisation, and refusing to start against an unreachable datastore, where
-the startup probe is the only thing holding the two backends together. `container-move-atomicity`, the
-half-done window of a bucket move that also rewrote its projects on a standalone `mongod`, was deleted in
+the untimed-upsert expiry above, migration-record atomicity, group-change atomicity
+(`bucket-group-change-atomicity`, [[project-groups]]), what a write to an unprovisioned area does, and two
+convergences listed *because* they are convergences — email case normalisation, and refusing to start against
+an unreachable datastore, where the startup probe is the only thing holding the two backends together.
+`container-move-atomicity`, the half-done window of a project move that also rewrote the old Project entities
+(retired projects) it held on a standalone `mongod`, was deleted in
 spec 099: a move is now one conditional write on every backend ([[container-ownership-transfer]]).
 
 **Listing a model area by a field is declared, too** (spec 099). `ModelAdapter.findByIndexed(field, value)`
@@ -269,5 +273,5 @@ spec 099: a move is now one conditional write on every backend ([[container-owne
 field, and each implementation first calls `assertIndexedField` (`lib/consts/storage_inventory.ts:953-964`),
 which throws unless the area declares a single-field index on `payload.<field>`. So a listing is never a
 scan, and no caller-chosen name reaches a query. Its one use is the Client area's `payload.bucketId`
-(`storage_inventory.ts:343`): a bucket's applications. `findByOwner` was not reused because owner fields feed
-the cascade engine, and a bucket is not that kind of owner.
+(`storage_inventory.ts:343`): a project's applications. `findByOwner` was not reused because owner fields feed
+the cascade engine, and a project is not that kind of owner.

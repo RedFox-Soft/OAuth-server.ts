@@ -39,8 +39,8 @@ const Entry = Type.Object({
 	targetType: Type.String(),
 	targetId: Type.String(),
 	targetScope: Type.Union([Type.String(), Type.Null()]),
-	bucketId: Type.Optional(Type.Union([Type.String(), Type.Null()])),
-	formerBucketId: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+	projectId: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+	formerProjectId: Type.Optional(Type.Union([Type.String(), Type.Null()])),
 	kid: Type.Optional(Type.Union([Type.String(), Type.Null()])),
 	actorName: Type.Optional(Type.Union([Type.String(), Type.Null()]))
 });
@@ -111,32 +111,32 @@ describe('the audit trail, filtered', () => {
 		const resourceId = `https://${slug('api')}.example.com`;
 
 		const steps = [
-			await call('PATCH', `/admin/api/buckets/${a._id}`, cookie, {
+			await call('PATCH', `/admin/api/projects/${a._id}`, cookie, {
 				name: 'Acme people'
 			}),
-			await call('PATCH', `/admin/api/buckets/${c._id}`, cookie, {
+			await call('PATCH', `/admin/api/projects/${c._id}`, cookie, {
 				name: 'Elsewhere still'
 			}),
-			await call('POST', `/admin/api/buckets/${a._id}/users`, cookie, {
+			await call('POST', `/admin/api/projects/${a._id}/users`, cookie, {
 				email: `${slug('person')}@acme.test`,
 				password: 'a password long enough'
 			}),
 			await call(
 				'POST',
-				`/admin/api/buckets/${a._id}/provisioning-connections`,
+				`/admin/api/projects/${a._id}/provisioning-connections`,
 				cookie,
 				{ displayName: 'Acme directory', providerId: 'corp' }
 			),
-			await call('POST', `/admin/api/buckets/${a._id}/keys`, cookie, {
+			await call('POST', `/admin/api/projects/${a._id}/keys`, cookie, {
 				alg: 'ES256'
 			}),
-			await call('POST', `/admin/api/buckets/${a._id}/clients`, cookie, {
+			await call('POST', `/admin/api/projects/${a._id}/clients`, cookie, {
 				clientName: 'Shop',
 				grantTypes: ['authorization_code'],
 				tokenEndpointAuthMethod: 'client_secret_basic',
 				redirectUris: ['https://shop.example.com/cb']
 			}),
-			await call('POST', `/admin/api/buckets/${b._id}/resources`, cookie, {
+			await call('POST', `/admin/api/projects/${b._id}/resources`, cookie, {
 				identifier: resourceId,
 				name: 'Orders API',
 				scopes: ['orders:read']
@@ -173,14 +173,14 @@ describe('the audit trail, filtered', () => {
 	});
 
 	it("finds a bucket's settings, people, provisioning, keys and applications, and nothing of another bucket", async () => {
-		const entries = await trail(w.cookie, { bucket: w.a._id });
+		const entries = await trail(w.cookie, { project: w.a._id });
 
 		expect(new Set(entries.map((e) => e.action))).toEqual(
 			new Set([
-				'bucket.update',
+				'project.update',
 				'enduser.create',
 				'provisioning.connection.create',
-				'bucket.key.generate',
+				'project.key.generate',
 				'client.create'
 			])
 		);
@@ -192,7 +192,7 @@ describe('the audit trail, filtered', () => {
 	});
 
 	it("finds an API declared in a bucket in that bucket's trail, and nothing of its sibling", async () => {
-		const entries = await trail(w.cookie, { bucket: w.b._id });
+		const entries = await trail(w.cookie, { project: w.b._id });
 
 		expect(entries.map((e) => [e.action, e.targetId])).toEqual([
 			['resource.create', w.resourceId]
@@ -210,17 +210,17 @@ describe('the audit trail, filtered', () => {
 
 	it('finds actions by the start of their name', async () => {
 		const entries = await trail(w.cookie, {
-			bucket: w.a._id,
-			actionPrefix: 'bucket.key.'
+			project: w.a._id,
+			actionPrefix: 'project.key.'
 		});
 
-		expect(entries.map((e) => e.action)).toEqual(['bucket.key.generate']);
+		expect(entries.map((e) => e.action)).toEqual(['project.key.generate']);
 	});
 
 	it('reads a prefix as text, not as a pattern', async () => {
 		const entries = await trail(w.cookie, {
-			bucket: w.a._id,
-			actionPrefix: 'bucket.key_'
+			project: w.a._id,
+			actionPrefix: 'project.key_'
 		});
 
 		expect(entries).toEqual([]);
@@ -228,8 +228,8 @@ describe('the audit trail, filtered', () => {
 
 	it('names the key a bucket key action acted on', async () => {
 		const entries = await trail(w.cookie, {
-			bucket: w.a._id,
-			action: 'bucket.key.generate'
+			project: w.a._id,
+			action: 'project.key.generate'
 		});
 
 		expect(entries.map((e) => e.kid)).toEqual([w.kid]);
@@ -269,7 +269,7 @@ describe('the audit trail, filtered', () => {
 	it("returns nothing of another group's bucket to a caller outside it", async () => {
 		const outsider = await cookieFor(await createAdministrator('plain'));
 
-		expect(await trail(outsider, { bucket: w.a._id })).toEqual([]);
+		expect(await trail(outsider, { project: w.a._id })).toEqual([]);
 	});
 
 	it("returns nothing of another group's connection to a caller outside it", async () => {

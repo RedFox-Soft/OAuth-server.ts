@@ -144,7 +144,7 @@ describe('published operation set is capability-invariant', () => {
 		const token = await session();
 
 		const bucket = await rpc(
-			call('bucket_create', { name: 'Fed', slug: 'fed-1' }),
+			call('project_create', { name: 'Fed', slug: 'fed-1' }),
 			token
 		);
 		const { _id: bucketId } = shaped(
@@ -163,7 +163,7 @@ describe('published operation set is capability-invariant', () => {
 
 		const createdProvider = await rpc(
 			call('federation_provider_create', {
-				bucketId,
+				projectId: bucketId,
 				id: 'okta',
 				displayName: 'Okta',
 				issuer: idp.origin,
@@ -210,7 +210,7 @@ describe('published operation set is capability-invariant', () => {
 		const token = await session();
 
 		const bucket = await rpc(
-			call('bucket_create', { name: 'Readable', slug: 'readable-2' }),
+			call('project_create', { name: 'Readable', slug: 'readable-2' }),
 			token
 		);
 		const { _id: bucketId } = shaped(

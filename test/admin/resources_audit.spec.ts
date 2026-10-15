@@ -70,7 +70,7 @@ describe('protected resource audit trail', () => {
 		const { cookie, userId } = await admin();
 		const bucket = await ownedBucket(userId, 'audit');
 		const headers = { cookie };
-		const resources = api.admin.api.buckets({ id: bucket._id }).resources;
+		const resources = api.admin.api.projects({ id: bucket._id }).resources;
 
 		await resources.post(
 			{ identifier: AUDIENCE, name: 'Acme MCP', scopes: ['mcp:tools-basic'] },
@@ -105,7 +105,7 @@ describe('protected resource audit trail', () => {
 		const bucket = await ownedBucket(userId, 'refused');
 
 		const res = await api.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.resources.post(
 				{ identifier: `${AUDIENCE}#tools`, name: 'x', scopes: ['a'] },
 				{ headers: { cookie } }
@@ -126,7 +126,7 @@ describe('protected resource audit trail', () => {
 		const { cookie, userId } = await admin();
 		const bucket = await ownedBucket(userId, 'filed');
 		const headers = { cookie };
-		const resources = api.admin.api.buckets({ id: bucket._id }).resources;
+		const resources = api.admin.api.projects({ id: bucket._id }).resources;
 
 		await resources.post(
 			{ identifier: AUDIENCE, name: 'Acme MCP', scopes: ['mcp:tools-basic'] },

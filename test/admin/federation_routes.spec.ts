@@ -73,7 +73,7 @@ describe('provider management', () => {
 		});
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.post(body(idp.origin), { headers: { cookie } });
 
 		expect(res.status).toBe(201);
@@ -102,11 +102,11 @@ describe('provider management', () => {
 			name: 'b'
 		});
 		await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.post(body(idp.origin), { headers: { cookie } });
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.get({ headers: { cookie } });
 
 		const list = answered(res.data);
@@ -124,12 +124,12 @@ describe('provider management', () => {
 			name: 'b'
 		});
 		await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.post(body(idp.origin), { headers: { cookie } });
 
 		// Renaming a provider must not require re-typing a secret.
 		await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation({ providerId: 'acme-sso' })
 			.patch({ displayName: 'Acme Single Sign-On' }, { headers: { cookie } });
 
@@ -143,7 +143,7 @@ describe('provider management', () => {
 		 * the placeholder, breaking sign-in in a way that looks like an upstream outage.
 		 */
 		await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation({ providerId: 'acme-sso' })
 			.patch({ clientSecret: SECRET_MASK }, { headers: { cookie } });
 
@@ -160,11 +160,11 @@ describe('provider management', () => {
 			name: 'b'
 		});
 		await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.post(body(idp.origin), { headers: { cookie } });
 
 		await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation({ providerId: 'acme-sso' })
 			.patch({ clientSecret: 'rotated' }, { headers: { cookie } });
 
@@ -182,7 +182,7 @@ describe('provider management', () => {
 		});
 
 		await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.post(body(idp.origin), { headers: { cookie } });
 
 		/*
@@ -210,11 +210,11 @@ describe('provider management', () => {
 			name: 'b'
 		});
 		await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.post(body(idp.origin), { headers: { cookie } });
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation({ providerId: 'acme-sso' })
 			.delete(undefined, { headers: { cookie } });
 
@@ -237,7 +237,7 @@ describe('provider management', () => {
 		});
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.post(body(idp.origin), { headers: { cookie } });
 
 		// Not the caller's mistake, so not a 4xx.
@@ -258,7 +258,7 @@ describe('provider management', () => {
 		});
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.post(body(idp.origin), { headers: { cookie } });
 
 		// The submitted value is the wrong thing, which is what 422 says.
@@ -273,7 +273,7 @@ describe('provider management', () => {
 		});
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.post(body('http://insecure.test'), { headers: { cookie } });
 
 		// No interceptor is registered, so this also proves nothing was fetched.
@@ -289,21 +289,21 @@ describe('provider management', () => {
 		});
 
 		const badId = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.post(body(idp.origin, { id: 'Not A Slug' }), {
 				headers: { cookie }
 			});
 		expect(badId.status).toBe(422);
 
 		const noOpenid = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.post(body(idp.origin, { scopes: ['email'] }), {
 				headers: { cookie }
 			});
 		expect(noOpenid.status).toBe(422);
 
 		const badDomain = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.post(
 				body(idp.origin, { allowedEmailDomains: ['@acme.test'] }),
 				{ headers: { cookie } }
@@ -314,12 +314,12 @@ describe('provider management', () => {
 		// Only now a valid one, so the duplicate below is the only thing being tested.
 		idp.expectDiscovery();
 		const first = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.post(body(idp.origin), { headers: { cookie } });
 		expect(first.status).toBe(201);
 
 		const duplicate = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.post(body(idp.origin), { headers: { cookie } });
 		expect(duplicate.status).toBe(422);
 	});
@@ -333,18 +333,18 @@ describe('provider management', () => {
 			name: 'b'
 		});
 		await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.post(body(idp.origin), { headers: { cookie } });
 		await getBucketStore().update(bucket._id, { passwordLogin: false });
 
 		const disabled = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation({ providerId: 'acme-sso' })
 			.patch({ enabled: false }, { headers: { cookie } });
 		expect(disabled.status).toBe(409);
 
 		const deleted = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation({ providerId: 'acme-sso' })
 			.delete(undefined, { headers: { cookie } });
 		expect(deleted.status).toBe(409);
@@ -368,7 +368,7 @@ describe('provider management', () => {
 		});
 
 		await client.admin.api
-			.buckets({ id: a._id })
+			.projects({ id: a._id })
 			.federation.post(body(idp.origin, { clientId: 'client-a' }), {
 				headers: { cookie }
 			});
@@ -379,7 +379,7 @@ describe('provider management', () => {
 		 */
 		idp.expectDiscovery();
 		await client.admin.api
-			.buckets({ id: b._id })
+			.projects({ id: b._id })
 			.federation.post(body(idp.origin, { clientId: 'client-b' }), {
 				headers: { cookie }
 			});
@@ -399,7 +399,7 @@ describe('provider management', () => {
 		const { cookie } = await cookieFor('super');
 		const idp = await idpStub('https://idp-admin-console.test');
 		idp.expectDiscovery();
-		const provider = client.admin.api.buckets({
+		const provider = client.admin.api.projects({
 			id: ADMIN_BUCKET_ID
 		}).federation;
 
@@ -443,7 +443,7 @@ describe('provider management', () => {
 	it('an administrator who is not a super administrator is refused every provider route on the Administrators bucket', async () => {
 		const { cookie } = await cookieFor('plain');
 		const idp = await idpStub('https://idp-admin-console-plain.test');
-		const bucket = client.admin.api.buckets({ id: ADMIN_BUCKET_ID });
+		const bucket = client.admin.api.projects({ id: ADMIN_BUCKET_ID });
 
 		const answers = [
 			(await bucket.federation.get({ headers: { cookie } })).status,
@@ -476,7 +476,7 @@ describe('provider management', () => {
 		const { cookie } = await cookieFor('super');
 		const idp = await idpStub('https://idp-admin-console-default.test');
 		idp.expectDiscovery();
-		const provider = client.admin.api.buckets({
+		const provider = client.admin.api.projects({
 			id: ADMIN_BUCKET_ID
 		}).federation;
 
@@ -494,7 +494,7 @@ describe('provider management', () => {
 		const { cookie, user } = await cookieFor('super');
 
 		const res = await client.admin.api
-			.buckets({ id: ADMIN_BUCKET_ID })
+			.projects({ id: ADMIN_BUCKET_ID })
 			.users({ uid: user._id })
 			.identities.get({ headers: { cookie } });
 
@@ -510,7 +510,7 @@ describe('provider management', () => {
 		});
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.post(body(idp.origin), { headers: { cookie } });
 
 		expect(res.status).toBe(403);
@@ -551,7 +551,7 @@ describe("an account's upstream identities", () => {
 		const user = await seedLinkedUser(bucket._id);
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.users({ uid: user._id })
 			.identities.get({ headers: { cookie } });
 
@@ -571,7 +571,7 @@ describe("an account's upstream identities", () => {
 		const user = await seedLinkedUser(bucket._id);
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.users({ uid: user._id })
 			.identities({ providerId: 'acme-sso' })
 			.delete(undefined, { headers: { cookie } });
@@ -601,7 +601,7 @@ describe("an account's upstream identities", () => {
 		const user = await seedLinkedUser(bucket._id);
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.users({ uid: user._id })
 			.identities({ providerId: 'never-linked' })
 			.delete(undefined, { headers: { cookie } });
@@ -624,7 +624,7 @@ describe("an account's upstream identities", () => {
 		const user = await seedLinkedUser(bucket._id);
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.users({ uid: user._id })
 			.identities.get({ headers: { cookie } });
 
@@ -655,7 +655,7 @@ describe("a provider's linked accounts", () => {
 			name: 'b'
 		});
 		await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.post(body(idp.origin), { headers: { cookie } });
 		const store = getUserStore(bucket._id);
 		const user = await store.create('linked@acme.test', 'hash', true);
@@ -673,7 +673,7 @@ describe("a provider's linked accounts", () => {
 		);
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation({ providerId: 'acme-sso' })
 			.patch({ issuer: 'https://idp-linked-b.test' }, { headers: { cookie } });
 
@@ -691,13 +691,13 @@ describe("a provider's linked accounts", () => {
 			name: 'b'
 		});
 		await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.post(body(first.origin), { headers: { cookie } });
 		const second = await idpStub('https://idp-unlinked-b.test');
 		second.expectDiscovery();
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation({ providerId: 'acme-sso' })
 			.patch({ issuer: second.origin }, { headers: { cookie } });
 
@@ -713,7 +713,7 @@ describe("a provider's linked accounts", () => {
 		);
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation({ providerId: 'acme-sso' })
 			.delete(undefined, { headers: { cookie } });
 

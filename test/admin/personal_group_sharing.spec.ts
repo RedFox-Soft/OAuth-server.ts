@@ -35,7 +35,7 @@ async function membersOf(groupId: string) {
 }
 
 const REFUSAL =
-	'a personal group cannot be shared; create a regular group and move the work there';
+	'a personal team cannot be shared; create a regular team and move the work there';
 
 /**
  * @proves A personal group never gains a member — not by direct addition, not by invitation, and not by
@@ -54,7 +54,7 @@ describe('sharing a personal group', () => {
 		const personal = await ensurePersonalGroup(owner._id, owner.email);
 
 		const res = await client.admin.api
-			.groups({ id: personal._id })
+			.teams({ id: personal._id })
 			.members.post(
 				{ userId: colleague._id, role: 'member' },
 				{ headers: { cookie: await cookieFor(owner) } }
@@ -73,7 +73,7 @@ describe('sharing a personal group', () => {
 		const personal = await ensurePersonalGroup(owner._id, owner.email);
 
 		const res = await client.admin.api
-			.groups({ id: personal._id })
+			.teams({ id: personal._id })
 			.members.post(
 				{ userId: superAdmin._id, role: 'owner' },
 				{ headers: { cookie: await cookieFor(superAdmin) } }
@@ -89,7 +89,7 @@ describe('sharing a personal group', () => {
 		const invitee = `invitee-${Math.random().toString(36).slice(2)}@x.io`;
 
 		const res = await client.admin.api
-			.groups({ id: personal._id })
+			.teams({ id: personal._id })
 			.invitations.post(
 				{ email: invitee, role: 'member' },
 				{ headers: { cookie: await cookieFor(owner) } }
@@ -131,7 +131,7 @@ describe('sharing a personal group', () => {
 		const owner = await admin();
 		const personal = await ensurePersonalGroup(owner._id, owner.email);
 
-		await client.admin.api.groups({ id: personal._id }).patch(
+		await client.admin.api.teams({ id: personal._id }).patch(
 			// @ts-expect-error -- `kind` is off-schema on purpose: the body declares only `name`.
 			{ name: 'Mine', kind: 'regular' },
 			{ headers: { cookie: await cookieFor(owner) } }
@@ -146,7 +146,7 @@ describe('sharing a personal group', () => {
 		const team = await regularGroup([owner]);
 
 		const res = await client.admin.api
-			.groups({ id: team._id })
+			.teams({ id: team._id })
 			.members.post(
 				{ userId: colleague._id, role: 'member' },
 				{ headers: { cookie: await cookieFor(owner) } }
@@ -165,7 +165,7 @@ describe('sharing a personal group', () => {
 		const invitee = `invitee-${Math.random().toString(36).slice(2)}@x.io`;
 
 		const res = await client.admin.api
-			.groups({ id: team._id })
+			.teams({ id: team._id })
 			.invitations.post(
 				{ email: invitee, role: 'member' },
 				{ headers: { cookie: await cookieFor(owner) } }

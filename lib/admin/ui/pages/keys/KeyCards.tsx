@@ -589,7 +589,7 @@ export function KeyCards({
 								'A retired key can’t be promoted again. To roll back you would need a new key.',
 								...(dependents && dependents.length > 0
 									? [
-											`Every bucket listed above uses this key set, including the administrators’ sign-in.`
+											`Every project listed above uses this key set, including the administrators’ sign-in.`
 										]
 									: [])
 							]
@@ -625,7 +625,7 @@ export function KeyCards({
 								'Unlike retiring, there is no day of grace, and a revoked key never comes back.',
 								...(dependents && dependents.length > 0
 									? [
-											'Every bucket listed above uses this key set, including the administrators’ sign-in.'
+											'Every project listed above uses this key set, including the administrators’ sign-in.'
 										]
 									: [])
 							]

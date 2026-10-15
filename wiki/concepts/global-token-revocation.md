@@ -4,7 +4,7 @@ title: 'Global token revocation: an upstream provider ends a user''s access here
 tags: [architecture, contract, gotcha, oauth, config]
 sources: [oauth-server-codebase]
 created: 2026-10-07
-updated: 2026-10-07
+updated: 2026-10-15
 graph:
   node_type: concept
   relationships:
@@ -18,7 +18,7 @@ graph:
 
 # Global token revocation: an upstream provider ends a user's access here
 
-Spec 072 — the first slice of part 4 of the SCIM series (issue #62, item 4a). A bucket's upstream identity
+Spec 072 — the first slice of part 4 of the SCIM series (issue #62, item 4a). A project's upstream identity
 provider, opted in, sends one signed request and everything a user it names holds here ends: sessions, refresh
 tokens, opaque access tokens, grants, with relying parties told by back-channel logout. The account is **not**
 deactivated — the user signs in again straight away and consents afresh. This is what Okta sends as
@@ -47,7 +47,7 @@ Three hedges follow from building on it:
 
 ## One core, many formats
 
-`lib/upstream_signals/` holds the request "an upstream provider of this bucket asks to end a user's access"
+`lib/upstream_signals/` holds the request "an upstream provider of this project asks to end a user's access"
 separately from any wire format. `authenticateUpstream` (`lib/upstream_signals/assertion.ts:137`) decides who may
 ask and how they are authenticated; `resolveReachableUser` (`lib/upstream_signals/subject.ts:22`) decides whom
 they may name; `endAccessForUpstream` (`lib/upstream_signals/end_access.ts`) ends it. The GTR plugin
@@ -66,7 +66,7 @@ tokens for a provider whose signature validation an operator had switched off. S
 
 - **No setting can relax verification.** Asymmetric algorithms only, a constant
   (`assertion.ts:46`) intersected with what the provider advertises; `none` and `HS*` are refused whatever any
-  provider, bucket or instance field says.
+  provider, project or instance field says.
 - **The provider is found by (issuer, client id) as two values** (`assertion.ts:95`), never a composed key —
   Keycloak #42209 broke brokered logout with a dot in a provider alias.
 - `aud` exactly the endpoint; `exp`, `iat`, `jti` required; lifetime ≤ 300 s measured as `exp − iat` and
@@ -100,8 +100,8 @@ provisioned user who never signed in through the provider has no link, so only `
 The audit table admits only actions backed by a mounted `/admin/api` route
 (`test/admin/audit_route_classification.spec.ts`), so the upstream request needed a real action rather than a
 second audit mechanism. It got one that administrators lacked anyway: **"sign out everywhere"**
-(`POST /admin/api/buckets/:id/users/:uid/sign-out`, `lib/admin/users-end/routes.ts:476`; MCP
-`bucket_user_sign_out`, ordinary), backed by `revokeEndUserAccess` (`lib/end_users/service.ts:318`). The upstream
+(`POST /admin/api/projects/:id/users/:uid/sign-out`, `lib/admin/users-end/routes.ts:642`; MCP
+`project_user_sign_out`, ordinary), backed by `revokeEndUserAccess` (`lib/end_users/service.ts:318`). The upstream
 request records the same `enduser.signout` through `recordUpstreamAudit` (`lib/admin/audit/record.ts:154`):
 actor `upstream:<bucketId>:<providerId>`, **`viaSurface: 'upstream'`**, target the user, never the identifier the
 provider named them by.
@@ -113,7 +113,7 @@ Mongo surface filter, `write()`'s input type, the console's audit page, and the 
 ## What it does not reach
 
 A JWT access token a resource server validates locally lives to its expiry — the known limit of
-[[end-user-lifecycle]]. IPSIE SL2 allows 15 minutes for unbound tokens (60 for DPoP-bound), so a bucket that
+[[end-user-lifecycle]]. IPSIE SL2 allows 15 minutes for unbound tokens (60 for DPoP-bound), so a project that
 claims SL2 sets short JWT access-token lifetimes. Sweeping grants goes beyond the draft's MUST (refresh tokens
 and re-authentication); the draft permits it, and one access-ending operation for every path was the #62 decision.
 

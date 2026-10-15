@@ -59,8 +59,8 @@ export interface AdminClientView {
 	policyUri?: string;
 	tosUri?: string;
 	logo?: string;
-	/* The bucket it belongs to, for life (specs/099). Absent only for a client registered at the root. */
-	bucketId?: string;
+	/* The project it belongs to, for life (specs/099). Absent only for a client registered at the root. */
+	projectId?: string;
 	corsOrigins: string[];
 	/* Registered on its own request; such a client is shown, and managed through its registration token. */
 	registeredDynamically: boolean;
@@ -296,7 +296,7 @@ function toView(client: Client): AdminClientView {
 		authorizationDetailsTypes: client.authorizationDetailsTypes && [
 			...client.authorizationDetailsTypes
 		],
-		bucketId: client.bucketId,
+		projectId: client.bucketId,
 		corsOrigins: [...(client.corsOrigins ?? [])],
 		registeredDynamically: client.registeredDynamically === true,
 		...keyAndRequestView(client)

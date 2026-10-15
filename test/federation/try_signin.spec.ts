@@ -111,7 +111,7 @@ async function bucketFor(
 }
 
 function tryPath(bucket: UserBucket): string {
-	return `/admin/api/buckets/${bucket._id}/federation/acme-sso/try`;
+	return `/admin/api/projects/${bucket._id}/federation/acme-sso/try`;
 }
 
 async function start(bucket: UserBucket, cookie: string) {
@@ -565,7 +565,7 @@ describe('trying a sign-in through a provider', () => {
 
 		const reply = await admin(
 			'GET',
-			`/admin/api/buckets/${bucket._id}/federation/acme-sso`,
+			`/admin/api/projects/${bucket._id}/federation/acme-sso`,
 			cookie
 		);
 

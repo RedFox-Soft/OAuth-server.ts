@@ -43,7 +43,7 @@ export function AdministratorsHome({ tab }: { tab: AdministratorsTab }) {
 	const [summaryFailed, setSummaryFailed] = useState(false);
 	const [failed, setFailed] = useState<string | null>(null);
 	const [loading, setLoading] = useState(true);
-	const base = `/admin/api/buckets/${ADMIN_BUCKET_ID}`;
+	const base = `/admin/api/projects/${ADMIN_BUCKET_ID}`;
 
 	// Every state write follows an await, so the mount effect calls this without setting `loading` first.
 	const fetchBucket = useCallback(async () => {

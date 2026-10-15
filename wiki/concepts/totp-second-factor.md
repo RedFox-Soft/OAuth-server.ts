@@ -4,7 +4,7 @@ title: 'The TOTP second factor'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-27
-updated: 2026-10-01
+updated: 2026-10-15
 graph:
   node_type: concept
   relationships:
@@ -18,8 +18,8 @@ graph:
 
 # The TOTP second factor
 
-A bucket may require that a password sign-in also carry a six-digit code from an authenticator app. The
-requirement is one boolean, `UserBucket.totpRequired`; everything else follows from where the state is
+A project may require that a password sign-in also carry a six-digit code from an authenticator app. The
+requirement is one boolean, `UserBucket.totpRequired` (a project is stored as a bucket); everything else follows from where the state is
 put, and each of those placements buys a guarantee that would otherwise have to be enforced by code
 somebody remembers to write.
 
@@ -44,16 +44,16 @@ collision resistance SHA-1 lost.
 
 | State | Where it lives | What that buys |
 |---|---|---|
-| The standing enrolment | `User.totp`, embedded | Deletion integrity. The account cascade destroys the row and bucket deletion destroys the area, so no cascade arm knows the field exists — the same reasoning `federated` records. |
+| The standing enrolment | `User.totp`, embedded | Deletion integrity. The account cascade destroys the row and project deletion destroys the area, so no cascade arm knows the field exists — the same reasoning `federated` records. |
 | The half-finished sign-in | `InteractionPayload.secondFactor` | Expiry. The interaction already has a TTL, so a sign-in stuck between the password and the code dies with the attempt it belongs to. No expiry logic exists for it. |
-| The unproved secret | `TotpEnrollment`, **keyed by the interaction uid**, naming its account and bucket | No handle to leak or guess; completable only from inside the interaction that started it, and only for the account it was offered to; and the same secret re-offered on every reload. |
+| The unproved secret | `TotpEnrollment`, **keyed by the interaction uid**, naming its account and project | No handle to leak or guess; completable only from inside the interaction that started it, and only for the account it was offered to; and the same secret re-offered on every reload. |
 | The failure window | `TotpAttempt`, id `${bucketId}:${accountId}` | Survives across interactions, which is the only way the throttle means anything. |
 
 **Present ⇔ enrolled.** There is no `enrolled` boolean beside the secret. Two fields claiming to say the
 same thing disagree after the first edit — the rule `passwordLogin` states about federation
 availability, applied again.
 
-## Why the bucket field is a boolean and not an enum
+## Why the project field is a boolean and not an enum
 
 `signInMethod: 'password' | 'password_totp'` reads better in isolation and is wrong here. `UserBucket`
 already carries `passwordLogin`, whose own comment records the rule: *"Two fields that both claim to say
@@ -65,14 +65,14 @@ special case. The admin route says so in an `advisory` rather than refusing.
 
 ## One enrolment flow, entered from two places
 
-A registrant in a requiring bucket and an existing account in a bucket that was just raised are the same
+A registrant in a requiring project and an existing account in a project that was just raised are the same
 situation: neither holds an authenticator, and both must get one before their sign-in completes. The
 login POST forks on `user.totp ? 'totp' : 'totp/enroll'` and that single line is the whole of the
 migration story — bringing existing accounts under the requirement needed no code of its own, and
 `test/totp/migration.spec.ts` passed the first time it ran.
 
 It also makes abandonment safe for free. A registrant who closes the tab mid-enrolment leaves an account
-that exists and is unenrolled; because the bucket requires the factor, their next sign-in is routed
+that exists and is unenrolled; because the project requires the factor, their next sign-in is routed
 straight back to enrolment. Nothing has to clean up.
 
 ## The secret cannot be hashed, so it must never be read
@@ -81,7 +81,7 @@ TOTP verification is symmetric. Unlike a password there is no one-way form to st
 available protection is that the value never appears in a read. `presentUser`
 (`lib/admin/users-end/routes.ts`) is that protection, and it lives in one function rather than at four
 call sites for a recorded reason: a presenter somebody forgets on one route is exactly how every
-administrator came to be handed every bucket's federation secrets. It substitutes `totpEnrolled` and
+administrator came to be handed every project's federation secrets. It substitutes `totpEnrolled` and
 `totpEnrolledAt`, which is everything an operator legitimately needs.
 
 `test/mcp/secrecy.spec.ts` sweeps every published read for this, which is why that sweep iterates rather
@@ -125,7 +125,7 @@ because the password step can be submitted again inside one interaction and each
 while the route signed in whichever account the *interaction* named, so someone holding a victim's
 password but not their authenticator signed in as an unenrolled account of their own, took its secret,
 submitted the victim's password, and proved the first secret — leaving signed in as the victim with
-`amr: ['pwd', 'otp']`. The record names its account and bucket, `offer` re-offers a secret only to
+`amr: ['pwd', 'otp']`. The record names its account and project, `offer` re-offers a secret only to
 them (`lib/totp/enrollment.ts:84`), and `confirm` refuses anyone else as expired
 (`lib/totp/enrollment.ts:138`); `test/totp/enrolment_binding.spec.ts` is the attack.
 
@@ -148,30 +148,30 @@ the shipped default is an absolute URI of this project's own and why an operator
 rename it to whatever their relying parties already expect.
 
 One consequence belongs here rather than there, because it is a property of this feature: the demand
-for a second factor is a **bucket** flag, so an end user with an authenticator enrolled in a bucket
+for a second factor is a **project** flag, so an end user with an authenticator enrolled in a project
 that does not require one signs in with a password and reports the single-factor context. A relying
 party that *requires* multi-factor is refused for that person.
 
 Federated sign-in is never gated. The upstream provider owns its own factor policy, mirroring the
 existing split where `passwordLogin` governs password doors and federation is enabled per provider. The
-console's own bucket follows the same rule since it accepts providers (spec 080, owner decision): its
+console's own project follows the same rule since it accepts providers (spec 080, owner decision): its
 "require an authenticator" setting says it applies to password sign-in only.
 
 A password reset neither clears nor bypasses an enrolment: a reset proves an address, and the next
 sign-in still asks for a code.
 
-## The administrator bucket needs its own door
+## The administrators' project needs its own door
 
 The console signs in through this same flow — `resolveBucketForRequest` maps the reserved console
-client straight to the admin bucket — so enforcement works there for free. Reaching the *setting* did
-not: `assertNotReserved` (`lib/admin/buckets/access.ts`) refused the admin bucket on every generic
-bucket route, so a one-field `GET`/`PATCH /admin/api/admins/settings` carrying `totpRequired` alone was
+client straight to the administrators' project — so enforcement works there for free. Reaching the *setting* did
+not: `assertNotReserved` (`lib/admin/buckets/access.ts`) refused the administrators' project on every generic
+project route, so a one-field `GET`/`PATCH /admin/api/admins/settings` carrying `totpRequired` alone was
 added, every other field excluded as a possible console brick.
 
 *Superseded in spec 078:* that endpoint and its two MCP tools are gone. A super administrator sets
-`totpRequired` — and registration and email verification — on the ordinary bucket settings, through a
-narrow loader that admits this bucket, with a guard on each setting that could shut the console
-([[admin-bucket-settings]]). The value always lived on the bucket record, so nothing migrated.
+`totpRequired` — and registration and email verification — on the ordinary project settings, through a
+narrow loader that admits this project, with a guard on each setting that could shut the console
+([[admin-project-settings]]). The value always lived on the project record (`UserBucket`), so nothing migrated.
 
 Turning it on locks nobody out: an administrator without an authenticator meets enrolment at their
 next sign-in, the same path that brings any existing account under the requirement. It does also
@@ -203,10 +203,10 @@ failing anywhere to reveal it.
 - [[admin-audit-trail]] — entries carry field *names* and never values, which is why clearing an
   enrolment records the act and nothing else.
 - [[admin-console-signin]] — the console is a relying party on this server's own issuer, which is why
-  putting the admin bucket behind a second factor needed no new enforcement, only a way to say so.
-- [[feature-flag-gating]] — this is bucket state rather than a feature flag, and deliberately so.
+  putting the administrators' project behind a second factor needed no new enforcement, only a way to say so.
+- [[feature-flag-gating]] — this is project state rather than a feature flag, and deliberately so.
 - [[login-door-throttle]] — the code step's throttle, moved one door earlier onto the password; the
-  ceiling there reads this bucket's second-factor setting rather than the bucket's id.
+  ceiling there reads this project's second-factor setting rather than the project's id.
 - [[html-response-security-policy]] — both new pages build through `htmlResponse`; the QR is inline SVG
   and needs no directive.
 - [[token-payload-access-contract]] — `amr` is read off the session via `session.payload.amr`.

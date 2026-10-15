@@ -179,7 +179,7 @@ describe('the issuer an authorization response names', () => {
 		const bucket = (await getBucketStore().find(bucketId)) as UserBucket;
 		const idp = await idpStub(origin);
 		idp.expectDiscovery();
-		const path = `/admin/api/buckets/${bucket._id}/federation/acme-sso/try`;
+		const path = `/admin/api/projects/${bucket._id}/federation/acme-sso/try`;
 		const started = await admin('POST', path, cookie);
 		const authorizationUrl = new URL(String(started.json.authorizationUrl));
 		const state = authorizationUrl.searchParams.get('state') ?? '';

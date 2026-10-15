@@ -380,7 +380,7 @@ export function ConnectionWizard({
 				<>
 					<Form.Item
 						name="directory"
-						label="Which directory provisions this bucket?"
+						label="Which directory provisions this project?"
 						extra="Decides the field names and advice shown from here on; nothing else."
 						initialValue="generic"
 						rules={[{ required: true }]}

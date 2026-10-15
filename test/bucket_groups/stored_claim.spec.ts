@@ -47,7 +47,7 @@ describe('a stored groups claim', () => {
 
 		const res = await admin(
 			'PATCH',
-			`/admin/api/buckets/${DEFAULT_BUCKET_ID}/users/${uid}`,
+			`/admin/api/projects/${DEFAULT_BUCKET_ID}/users/${uid}`,
 			cookie,
 			{ claims: { groups: ['Admins'] } }
 		);

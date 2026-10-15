@@ -51,7 +51,7 @@ async function agentToken(user: User): Promise<string> {
 
 async function viaConsole(user: User) {
 	const res = await elysia.handle(
-		new Request(`http://e.ly/admin/api/buckets/${bucketId}/activity`, {
+		new Request(`http://e.ly/admin/api/projects/${bucketId}/activity`, {
 			headers: { cookie: await cookieFor(user) }
 		})
 	);
@@ -95,7 +95,7 @@ describe('active users read by an agent', () => {
 		const token = await agentToken(owner);
 
 		const answer = await rpc(
-			call('bucket_activity_get', { id: bucketId }),
+			call('project_activity_get', { id: bucketId }),
 			token
 		);
 
@@ -109,7 +109,7 @@ describe('active users read by an agent', () => {
 		const token = await agentToken(foreigner);
 
 		const answer = await rpc(
-			call('bucket_activity_get', { id: bucketId }),
+			call('project_activity_get', { id: bucketId }),
 			token
 		);
 
@@ -131,8 +131,8 @@ describe('active users read by an agent', () => {
 		expect(answer.result?.isError).not.toBe(true);
 		const overview = answer.result?.structuredContent?.result as OverviewAnswer;
 		const console_ = (await viaRoute.json()) as OverviewAnswer;
-		expect(overview.buckets.map((b) => b.bucketId)).toEqual([bucketId]);
-		expect(overview.buckets).toEqual(console_.buckets);
+		expect(overview.projects.map((b) => b.projectId)).toEqual([bucketId]);
+		expect(overview.projects).toEqual(console_.projects);
 		expect(overview.customers).toEqual(console_.customers);
 	});
 
@@ -143,16 +143,16 @@ describe('active users read by an agent', () => {
 
 		expect(answer.result?.isError).not.toBe(true);
 		const overview = answer.result?.structuredContent?.result as OverviewAnswer;
-		const row = overview.buckets.find((b) => b.bucketId === bucketId);
+		const row = overview.projects.find((b) => b.projectId === bucketId);
 		expect(row?.customer).toMatchObject({
-			groupId: customer._id,
+			teamId: customer._id,
 			label: customer.name
 		});
 		const summed = overview.customers.find(
-			(c) => c.customer.groupId === customer._id
+			(c) => c.customer.teamId === customer._id
 		);
 		expect(summed).toMatchObject({
-			bucketIds: [bucketId],
+			projectIds: [bucketId],
 			contacts: [owner.email],
 			current: { total: 1 }
 		});

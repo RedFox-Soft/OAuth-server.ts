@@ -23,7 +23,7 @@ const SKIP_WORDS: Record<string, string> = {
 	provisioned: 'managed by a directory',
 	already_active: 'already active',
 	already_inactive: 'already deactivated',
-	not_found: 'no longer in this bucket'
+	not_found: 'no longer in this project'
 };
 
 function people(n: number): string {
@@ -82,7 +82,7 @@ export function BulkUsersBar({
 		{ id: string; displayName: string; provisionedBy?: string }[]
 	>([]);
 	const [groupId, setGroupId] = useState<string | undefined>(undefined);
-	const groupsApi = `/admin/api/buckets/${encodeURIComponent(bucketId)}/groups`;
+	const groupsApi = `/admin/api/projects/${encodeURIComponent(bucketId)}/groups`;
 	const n = selected.length;
 
 	function report(act: BulkAct, data: BulkResult) {
@@ -279,7 +279,7 @@ export function BulkUsersBar({
 					placeholder={
 						groups.length > 0
 							? 'Choose a group'
-							: 'No group administrators keep in this bucket'
+							: 'No group administrators keep in this project'
 					}
 					disabled={groups.length === 0}
 					value={groupId}

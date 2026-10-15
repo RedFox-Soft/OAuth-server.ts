@@ -1,7 +1,7 @@
 ---
 title: 使用 Docker Compose 运行
 description: 只需一条命令，即可启动 MongoDB、初始化数据库结构并运行授权服务器。
-source: 128950b62496
+source: 41dd23849ebd
 sidebar:
   order: 1
 ---
@@ -42,7 +42,7 @@ import { Steps, Aside } from '@astrojs/starlight/components';
 | `setup` | `ghcr.io/redfox-soft/oauth-server-ts:latest` | 运行 `bun run db:setup` 和 `bun run db:migrate` 后退出：创建集合、索引、初始 RS256 签名密钥、管理面板的种子数据，并执行所有 schema 迁移 |
 | `oauth` | `ghcr.io/redfox-soft/oauth-server-ts:latest` | 服务器本身，监听 3000 端口，仅在 `setup` 成功完成后才启动                                                                               |
 
-顺序很重要。如果没有 `setup` 预置的保留管理桶和 `admin-panel` 客户端，控制台的登录会重定向到一个没有任何 `Client` 文档能匹配的客户端。在这种状态下，首次运行的设置页面依然可用，这会让问题看起来像是登录 bug。服务器还会拒绝在迁移尚未运行的数据库上启动，这就是 `setup` 在 `db:setup` 之后运行 `db:migrate` 的原因。两者都可以安全地重复执行，因此在拉取更新的镜像后重新运行 `docker compose up`，也就是升级的方式；如果发布说明提到某个无法撤销的迁移，请先做备份。
+顺序很重要。如果没有 `setup` 预置的保留的管理员项目和 `admin-panel` 客户端，控制台的登录会重定向到一个没有任何 `Client` 文档能匹配的客户端。在这种状态下，首次运行的设置页面依然可用，这会让问题看起来像是登录 bug。服务器还会拒绝在迁移尚未运行的数据库上启动，这就是 `setup` 在 `db:setup` 之后运行 `db:migrate` 的原因。两者都可以安全地重复执行，因此在拉取更新的镜像后重新运行 `docker compose up`，也就是升级的方式；如果发布说明提到某个无法撤销的迁移，请先做备份。
 
 <Aside type="caution" title="在首次 docker compose up 之前设置 ISSUER">
 

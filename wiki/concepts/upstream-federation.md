@@ -18,7 +18,7 @@ graph:
 
 # Signing in through somebody else’s identity provider
 
-A user bucket may carry generic OIDC providers, and this server becomes a **relying party** on them: the
+A project may carry generic OIDC providers, and this server becomes a **relying party** on them: the
 login page offers each enabled provider, the user authenticates upstream, and an identity assertion is
 turned into a local session. The relying-party discipline was already in the repository pointed inward —
 `lib/admin/auth/login.ts` runs the same flow against this server's own issuer — so federation is that
@@ -96,11 +96,11 @@ that a round trip is a try only from that stored field (`lib/federation/routes.t
 3. **domain** allow-list → **before** the collision check. Reversed, it would answer "does an account exist
    for this address?" for addresses the provider is not allowed to speak for.
 4. **collision** → link only if `emailTrusted && email_verified === true`. Both halves required. And
-   immediately only if the account already holds an upstream identity (or the bucket has no password
+   immediately only if the account already holds an upstream identity (or the project has no password
    door); an account holding only a password links once its own sign-in completes. In the administrators'
-   bucket every new link waits for the password sign-in, with no exceptions (spec 080, [[console-federation]]).
-5. **provisioning** → `jit` creates; `existing_only` refuses. In the administrators' bucket a closed
-   sign-up (`registrationOpen: false`) refuses first, and a created account gets a personal group and an
+   project every new link waits for the password sign-in, with no exceptions (spec 080, [[console-federation]]).
+5. **provisioning** → `jit` creates; `existing_only` refuses. In the administrators' project a closed
+   sign-up (`registrationOpen: false`) refuses first, and a created account gets a personal team and an
    `admin.register` audit entry; providers there default to `existing_only` (spec 080).
 6. **active**, 7. **verification**, 8. sign in through the same `resume()` a password sign-in uses.
 
@@ -116,7 +116,7 @@ clear it. Failing it, the refusal says "sign in with your password": no second a
 silent takeover.
 
 **Passing it is not enough on its own** (corrected 2026-09-28). The assertion proves who controls the
-address, not who set the matching account's password — and in a bucket that does not verify addresses,
+address, not who set the matching account's password — and in a project that does not verify addresses,
 `verified` is written `true` at registration, so anybody could register a victim's address first. Their
 first federated sign-in then attached to that account and the registrant kept signing in with the
 password. The step now answers `password_required` for an account with no `federated` entry
@@ -124,7 +124,7 @@ password. The step now answers `password_required` for an account with no `feder
 sign-in, leg three writes it to `interaction.payload.pendingLink` and redirects to the login page with the
 `federation_link` notice, and `settlePendingLink` (`lib/federation/pending_link.ts:17`) links it at every
 door that completes a sign-in — after the second factor where there is one — only if the sign-in is of
-that account in that bucket. It is the shape Firebase's `account-exists-with-different-credential` and
+that account in that project. It is the shape Firebase's `account-exists-with-different-credential` and
 Keycloak's first-broker-login "verify existing account by re-authentication" both take.
 `test/federation/link_existing.spec.ts` is the attack.
 
@@ -171,13 +171,13 @@ impossible, and adding the three later entries needed no migration for the same 
 
 ## The order of the buttons
 
-A bucket's sign-in page and the console's providers table list providers in one order, computed by one
+A project's sign-in page and the console's providers table list providers in one order, computed by one
 function, `orderProviders` (`lib/federation/order.ts:16`), called by `signInOptions.ts` (the page's rule, split out
 of `loginOptions.ts` in spec 091 so the console's preview runs it too) and the admin `presentAll`. Until spec 088 the order was fixed: recognised providers in the catalogue's order, then the rest
 alphabetically by id — never connection order, which would rearrange a page end users know whenever a provider
 is added.
 
-Since spec 088 a bucket may hold `signInOrder`, a list of provider ids. Listed providers come first, in that
+Since spec 088 a project may hold `signInOrder`, a list of provider ids. Listed providers come first, in that
 order; the rest follow by the old rule. `POST …/federation/:providerId/move` with `up` or `down`
 (`lib/admin/federation/routes.ts:154`; MCP `federation_provider_move`) swaps a provider with its neighbour in the
 displayed order and writes the full id list. It is refused 409 at either end, and audited as
@@ -188,7 +188,7 @@ The order is a **separate field** rather than the order of the `federation` arra
 
 - every provider write is a read-modify-write of the whole array, so a move that rewrote the array could revert
   another administrator's provider edit made a moment earlier;
-- a bucket nobody has reordered keeps exactly its old order with no migration, because absent means the old
+- a project nobody has reordered keeps exactly its old order with no migration, because absent means the old
   rule.
 
 ## Gotchas
@@ -254,20 +254,20 @@ it (`findLinkedTo`, all three adapters). Since 0.10.x (after `95444eb`):
   nobody linked.
 
 Before this, both paths left the links in place, and the next upstream's users with a colliding `sub` signed
-in to other people's accounts. Severity was bounded — only a bucket administrator can repoint a provider, and
+in to other people's accounts. Severity was bounded — only a project administrator can repoint a provider, and
 one can already set any user's password — but the failure was silent.
 
-### A slugless bucket's callback address is real, registerable, and temporary
+### A slugless project's callback address is real, registerable, and temporary
 
 Found while connecting the first recognised provider, and it is the reason the guidance read
 reports a `callbackStability` rather than just an address.
 
 `callbackUri(bucket)` is `issuerFor(bucket) + '/federation/callback'`, and `issuerFor` falls back to the
-**record id** when a non-root bucket has no slug — `${ISSUER}/${bucket.slug ?? bucket._id}`. Its own
+**record id** when a non-root project has no slug — `${ISSUER}/${bucket.slug ?? bucket._id}`. Its own
 comment says the case disappears once slugs are assigned. Meanwhile `bucketAddressFor` classifies the same
-bucket as `kind: 'none'`, "reachable nowhere until an operator gives it one".
+project as `kind: 'none'`, "reachable nowhere until an operator gives it one".
 
-So an administrator connecting a provider to a slugless bucket is handed an address built from a
+So an administrator connecting a provider to a slugless project is handed an address built from a
 43-character nanoid, registers it upstream, and it **silently stops matching** the moment somebody assigns
 a slug. It surfaces weeks later as `redirect_uri_mismatch` on the upstream's own page, to an end user,
 with nothing on this server to connect it to the slug that caused it.
@@ -279,7 +279,7 @@ telling is useful: when the address is being copied.
 
 `lib/interactions/index.ts`'s `refuse()` called `loginServer(uid, { errorMessage, handOffTo })` and
 nothing else, so the re-render fell through to that function's defaults — a password form and **no
-providers**. Every mistyped password therefore removed the bucket's provider buttons from a page that had
+providers**. Every mistyped password therefore removed the project's provider buttons from a page that had
 just shown them, and the unverified-email re-render did the same.
 
 `loginOptions.ts` exists precisely to stop the four renderings of this page disagreeing, and its comment
@@ -323,7 +323,7 @@ this route is unauthenticated, so an attacker-triggerable log write is a vector 
 
 ## The callback checks which issuer answered
 
-Since spec 088. Several providers share a bucket's one callback address, so a response must prove it came from
+Since spec 088. Several providers share a project's one callback address, so a response must prove it came from
 the provider the round trip was started with. RFC 9700 §2.1 requires that mix-up defence of a client talking to
 more than one authorization server, and RFC 9207's `iss` response parameter is it (§2.4: the client "MUST reject"
 a mismatch). The callback passes the response's `iss` to the identity layer (`lib/federation/routes.ts`, the
@@ -342,21 +342,23 @@ a mismatch). The callback passes the response's `iss` to the identity layer (`li
 Both refusals are `rejected`, the class of an assertion that fails verification: a sign-in gets the usual
 rejected page, and a try reports the reason. `test/federation/response_issuer.spec.ts` holds the cases.
 
-## The masked secret leaked for a year through the bucket routes
+## The masked secret leaked for a year through the project routes
 
 `lib/admin/federation/service.ts` states the rule and means it: a provider's `clientSecret` is
 write-only, replaced by `SECRET_MASK` "on every read, for every role including super-admin". `present()`
 and `presentAll()` are where that happens, and the federation routes have always used them.
 
-The bucket routes did not. A `UserBucket` *contains* its `federation` array, and
-`GET /admin/api/buckets` and `GET /admin/api/buckets/:id` returned the document whole — so every
-configured provider's client secret went out in plaintext to any authenticated administrator, and the
-console's own Buckets page has been receiving them. The exposure was wider than super-admin:
-`bucket_get` authorizes with `loadBucketForUsers`, the *broader* check, so a manager of a project merely
-backed by the bucket got the secrets too. (Projects, and the reach they gave over a bucket, were removed in
-spec 099; the broader check is now membership of the bucket's group.)
+The project routes did not. A project (`UserBucket`) *contains* its `federation` array, and
+`GET /admin/api/buckets` and `GET /admin/api/buckets/:id` (the paths at the time; `/admin/api/projects…`
+since spec 100) returned the document whole — so every configured provider's client secret went out in
+plaintext to any authenticated administrator, and the console's own Buckets page (Projects since spec 100)
+had been receiving them. The exposure was wider than super-admin: `bucket_get` (now `project_get`)
+authorizes with `loadBucketForUsers`, the *broader* check, so a manager of an old Project entity merely
+backed by the project (then called a bucket) got the secrets too. (That old Project entity — a retired
+project — and the reach it gave over a bucket were removed in spec 099; the broader check is now membership of the team that owns the
+project.)
 
-Fixed by masking in every bucket projection (`presentBucket` in `lib/admin/buckets/routes.ts`, applied
+Fixed by masking in every project projection (`presentBucket` in `lib/admin/buckets/routes.ts`, applied
 to list, get, create and update). The shape of the bug is worth remembering more than the fix: an
 invariant enforced by a module's own presenter does not survive another module returning the document
 that module's data lives inside. Anywhere a nested entity carries a secret, the *containing* entity's
@@ -375,11 +377,11 @@ subject exists.
 - [[feature-flag-gating]] — why `gatedRoutes` outranks a prefix, and the coverage assertion that changed.
 - [[admin-audit-trail]] — the four rows this added, and why the identity row carries `targetScope`.
 - [[deletion-and-revocation]] — links ride the user row, so no cascade arm knows they exist.
-- [[account-resolution]] — per-bucket user storage, which is what `findByFederatedIdentity` queries.
+- [[account-resolution]] — per-project user storage, which is what `findByFederatedIdentity` queries.
 - [[self-service-password-reset]] — the digest-keyed-record rule this reuses, and the only route by which a
   provisioned account acquires a usable password.
 - [[admin-console-signin]] — the same relying-party discipline pointed at this server's own issuer.
-- [[admin-mcp-control-plane]] — the agent surface whose secrecy sweep found the bucket-route leak above.
+- [[admin-mcp-control-plane]] — the agent surface whose secrecy sweep found the project-route leak above.
 - [[federation-try-signin]] — an administrator's try of a provider: the ladder's reads-only half, bound to the console session.
 
 Verified against [[oauth-server-codebase]].

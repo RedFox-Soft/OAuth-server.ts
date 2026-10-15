@@ -67,7 +67,7 @@ async function tenant(label: string, kind: AdminKind = 'plain') {
 /* An application the tenant creates in its own bucket, named so a leak of it is recognisable. */
 async function applicationOf(owner: { cookie: string; bucketId: string }) {
 	const created = await client.admin.api
-		.buckets({ id: owner.bucketId })
+		.projects({ id: owner.bucketId })
 		.clients.post(
 			{
 				clientName: 'A application',
@@ -94,10 +94,10 @@ describe('group isolation', () => {
 		const a = await tenant('a');
 		const b = await tenant('b');
 		const application = await applicationOf(a);
-		expect(application.bucketId).toBe(a.bucketId);
+		expect(application.projectId).toBe(a.bucketId);
 
 		const bList = await client.admin.api
-			.buckets({ id: a.bucketId })
+			.projects({ id: a.bucketId })
 			.clients.get({ headers: { cookie: b.cookie } });
 
 		expect(bList.status).toBe(403);
@@ -109,11 +109,11 @@ describe('group isolation', () => {
 		const application = await applicationOf(a);
 
 		const foreign = await client.admin.api
-			.buckets({ id: a.bucketId })
+			.projects({ id: a.bucketId })
 			.clients({ clientId: application.clientId })
 			.get({ headers: { cookie: b.cookie } });
 		const absent = await client.admin.api
-			.buckets({ id: 'does-not-exist-at-all' })
+			.projects({ id: 'does-not-exist-at-all' })
 			.clients({ clientId: application.clientId })
 			.get({ headers: { cookie: b.cookie } });
 
@@ -130,11 +130,11 @@ describe('group isolation', () => {
 		const application = await applicationOf(a);
 
 		const foreign = await client.admin.api
-			.buckets({ id: b.bucketId })
+			.projects({ id: b.bucketId })
 			.clients({ clientId: application.clientId })
 			.get({ headers: { cookie: b.cookie } });
 		const absent = await client.admin.api
-			.buckets({ id: b.bucketId })
+			.projects({ id: b.bucketId })
 			.clients({ clientId: 'does-not-exist-at-all' })
 			.get({ headers: { cookie: b.cookie } });
 
@@ -146,21 +146,21 @@ describe('group isolation', () => {
 		const a = await tenant('a');
 		const b = await tenant('b');
 
-		const created = await client.admin.api.buckets.post(
+		const created = await client.admin.api.projects.post(
 			{ name: 'A users', slug: 'a-users-1' },
 			{ headers: { cookie: a.cookie } }
 		);
 		expect(created.status).toBe(201);
 		const bucket = answered(created.data);
-		expect(bucket.ownerGroupId).toBe(a.groupId);
+		expect(bucket.ownerTeamId).toBe(a.groupId);
 
-		const bList = await client.admin.api.buckets.get({
+		const bList = await client.admin.api.projects.get({
 			headers: { cookie: b.cookie }
 		});
 		expect(answered(bList.data).map((x) => x._id)).not.toContain(bucket._id);
 
 		const bRead = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.get({ headers: { cookie: b.cookie } });
 		expect(bRead.status).toBe(403);
 	});
@@ -176,19 +176,19 @@ describe('group isolation', () => {
 		const application = await applicationOf(a);
 
 		await client.admin.api
-			.buckets({ id: a.bucketId })
+			.projects({ id: a.bucketId })
 			.clients({ clientId: application.clientId })
 			.patch(
-				// @ts-expect-error an unknown field; the update schema does not declare it
-				{ bucketId: b.bucketId },
+				// @ts-expect-error unknown fields, the edge name and the stored one; the update schema declares neither
+				{ projectId: b.bucketId, bucketId: b.bucketId },
 				{ headers: { cookie: a.cookie } }
 			);
 
 		const after = await client.admin.api
-			.buckets({ id: a.bucketId })
+			.projects({ id: a.bucketId })
 			.clients({ clientId: application.clientId })
 			.get({ headers: { cookie: a.cookie } });
-		expect(answered(after.data).bucketId).toBe(a.bucketId);
+		expect(answered(after.data).projectId).toBe(a.bucketId);
 	});
 
 	it('names no foreign id in a refusal body', async () => {
@@ -197,7 +197,7 @@ describe('group isolation', () => {
 		const application = await applicationOf(a);
 
 		const denied = await client.admin.api
-			.buckets({ id: a.bucketId })
+			.projects({ id: a.bucketId })
 			.clients({ clientId: application.clientId })
 			.patch({ clientName: 'Renamed' }, { headers: { cookie: b.cookie } });
 
@@ -215,22 +215,22 @@ describe('group isolation', () => {
 	it('gives a plain administrator no reach over the Default bucket', async () => {
 		const a = await tenant('a');
 
-		const listed = await client.admin.api.buckets.get({
+		const listed = await client.admin.api.projects.get({
 			headers: { cookie: a.cookie }
 		});
 		const read = await client.admin.api
-			.buckets({ id: DEFAULT_BUCKET_ID })
+			.projects({ id: DEFAULT_BUCKET_ID })
 			.get({ headers: { cookie: a.cookie } });
 		const people = await app.handle(
 			new Request(
-				`http://localhost/admin/api/buckets/${DEFAULT_BUCKET_ID}/users`,
+				`http://localhost/admin/api/projects/${DEFAULT_BUCKET_ID}/users`,
 				{
 					headers: { cookie: a.cookie }
 				}
 			)
 		);
 		const applications = await client.admin.api
-			.buckets({ id: DEFAULT_BUCKET_ID })
+			.projects({ id: DEFAULT_BUCKET_ID })
 			.clients.get({ headers: { cookie: a.cookie } });
 
 		expect(answered(listed.data).map((b) => b._id)).not.toContain(
@@ -245,7 +245,7 @@ describe('group isolation', () => {
 		const a = await tenant('a');
 
 		const adminBucket = await client.admin.api
-			.buckets({ id: ADMIN_BUCKET_ID })
+			.projects({ id: ADMIN_BUCKET_ID })
 			.get({ headers: { cookie: a.cookie } });
 		expect(adminBucket.status).toBe(403);
 	});
@@ -270,7 +270,7 @@ describe('group isolation', () => {
 			const b = await tenant('b');
 
 			const res = await client.admin.api.scope.put(
-				{ groupId: b.groupId },
+				{ teamId: b.groupId },
 				{ headers: { cookie: a.cookie } }
 			);
 			expect(res.status).toBe(403);
@@ -281,7 +281,7 @@ describe('group isolation', () => {
 			const b = await tenant('b');
 
 			const res = await client.admin.api
-				.groups({ id: b.groupId })
+				.teams({ id: b.groupId })
 				.members.post(
 					{ userId: a.userId, role: 'owner' },
 					{ headers: { cookie: a.cookie } }
@@ -293,11 +293,11 @@ describe('group isolation', () => {
 			const a = await tenant('a');
 			const b = await tenant('b');
 
-			const res = await client.admin.api.buckets({ id: b.bucketId }).patch(
-				// `ownerGroupId` is not in the update body at all; submitted as an unknown field it is
-				// either refused or ignored, and either way the bucket must not move.
-				// @ts-expect-error an unknown field; the update schema does not declare it
-				{ ownerGroupId: a.groupId },
+			const res = await client.admin.api.projects({ id: b.bucketId }).patch(
+				// The owner is not in the update body at all, by its edge name or its stored one; submitted as
+				// unknown fields they are either refused or ignored, and either way the bucket must not move.
+				// @ts-expect-error unknown fields; the update schema declares neither
+				{ ownerTeamId: a.groupId, ownerGroupId: a.groupId },
 				{ headers: { cookie: a.cookie } }
 			);
 			expect([403, 422]).toContain(res.status);
@@ -320,7 +320,7 @@ describe('group isolation', () => {
 		const a = await tenant('a');
 
 		const res = await client.admin.api.scope.put(
-			{ groupId: a.groupId },
+			{ teamId: a.groupId },
 			{ headers: { cookie: root.cookie } }
 		);
 		expect(res.status).toBe(403);
@@ -328,7 +328,7 @@ describe('group isolation', () => {
 		// And the same for a group that does not exist, so the refusal cannot be read as "this one is
 		// personal" — the switcher does not offer it either way.
 		const invented = await client.admin.api.scope.put(
-			{ groupId: 'no-such-group' },
+			{ teamId: 'no-such-group' },
 			{ headers: { cookie: root.cookie } }
 		);
 		expect(invented.status).toBe(403);

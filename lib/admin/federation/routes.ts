@@ -70,7 +70,7 @@ export const federationAdminRoutes = new Elysia({ name: 'admin-federation' })
 			return adminErrorBody(error);
 		}
 	})
-	.get('/admin/api/buckets/:id/federation', async ({ admin, params }) => {
+	.get('/admin/api/projects/:id/federation', async ({ admin, params }) => {
 		const ctx = assertAuth(admin);
 		const bucket = await loadBucketForProviders(ctx, params.id, 'read');
 		return presentAll(bucket);
@@ -82,7 +82,7 @@ export const federationAdminRoutes = new Elysia({ name: 'admin-federation' })
 	 * administrator preparing a connection needs this before the capability is switched on.
 	 */
 	.get(
-		'/admin/api/buckets/:id/federation/catalogue',
+		'/admin/api/projects/:id/federation/catalogue',
 		async ({ admin, params }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForProviders(ctx, params.id, 'read');
@@ -95,7 +95,7 @@ export const federationAdminRoutes = new Elysia({ name: 'admin-federation' })
 	 * linked to it. Read with the list's right; the secrets are masked as in the list.
 	 */
 	.get(
-		'/admin/api/buckets/:id/federation/:providerId',
+		'/admin/api/projects/:id/federation/:providerId',
 		async ({ admin, params }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForProviders(ctx, params.id, 'read');
@@ -103,7 +103,7 @@ export const federationAdminRoutes = new Elysia({ name: 'admin-federation' })
 		}
 	)
 	.post(
-		'/admin/api/buckets/:id/federation',
+		'/admin/api/projects/:id/federation',
 		async ({ admin, params, body, set }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForProviders(ctx, params.id, 'edit');
@@ -122,7 +122,7 @@ export const federationAdminRoutes = new Elysia({ name: 'admin-federation' })
 		{ body: CreateProviderBody }
 	)
 	.patch(
-		'/admin/api/buckets/:id/federation/:providerId',
+		'/admin/api/projects/:id/federation/:providerId',
 		async ({ admin, params, body }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForProviders(ctx, params.id, 'edit');
@@ -137,7 +137,7 @@ export const federationAdminRoutes = new Elysia({ name: 'admin-federation' })
 		{ body: UpdateProviderBody }
 	)
 	.delete(
-		'/admin/api/buckets/:id/federation/:providerId',
+		'/admin/api/projects/:id/federation/:providerId',
 		async ({ admin, params }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForProviders(ctx, params.id, 'edit');
@@ -151,7 +151,7 @@ export const federationAdminRoutes = new Elysia({ name: 'admin-federation' })
 	 * the order and nothing else; refused (409) at an end. The entry records the order before and after.
 	 */
 	.post(
-		'/admin/api/buckets/:id/federation/:providerId/move',
+		'/admin/api/projects/:id/federation/:providerId/move',
 		async ({ admin, params, body }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForProviders(ctx, params.id, 'edit');
@@ -179,7 +179,7 @@ export const federationAdminRoutes = new Elysia({ name: 'admin-federation' })
 	 * result is not recorded.
 	 */
 	.post(
-		'/admin/api/buckets/:id/federation/:providerId/try',
+		'/admin/api/projects/:id/federation/:providerId/try',
 		async ({ admin, params, cookie, set }): Promise<TryStarted> => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForProviders(ctx, params.id, 'edit');
@@ -237,7 +237,7 @@ export const federationAdminRoutes = new Elysia({ name: 'admin-federation' })
 	 * session, bucket or provider, an unknown or expired try — is the same 404.
 	 */
 	.get(
-		'/admin/api/buckets/:id/federation/:providerId/try/:tryRef',
+		'/admin/api/projects/:id/federation/:providerId/try/:tryRef',
 		async ({ admin, params, cookie }): Promise<TryStatus> => {
 			const ctx = assertAuth(admin);
 			await loadBucketForProviders(ctx, params.id, 'read');
@@ -266,7 +266,7 @@ export const federationAdminRoutes = new Elysia({ name: 'admin-federation' })
 	 * router refuses two different parameter names in the same slot outright.
 	 */
 	.get(
-		'/admin/api/buckets/:id/users/:uid/identities',
+		'/admin/api/projects/:id/users/:uid/identities',
 		async ({ admin, params }) => {
 			const ctx = assertAuth(admin);
 			await loadBucketForUsers(ctx, params.id);
@@ -277,7 +277,7 @@ export const federationAdminRoutes = new Elysia({ name: 'admin-federation' })
 		}
 	)
 	.delete(
-		'/admin/api/buckets/:id/users/:uid/identities/:providerId',
+		'/admin/api/projects/:id/users/:uid/identities/:providerId',
 		async ({ admin, params }) => {
 			const ctx = assertAuth(admin);
 			await loadBucketForUsers(ctx, params.id);

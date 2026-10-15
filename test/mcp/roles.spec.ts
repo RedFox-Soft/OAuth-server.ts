@@ -162,10 +162,10 @@ describe('agent permissions match the console, per role', () => {
 
 		// The console agrees, bucket by bucket.
 		expect(
-			await viaConsole(`/admin/api/buckets/${mine._id}/clients`, cookie)
+			await viaConsole(`/admin/api/projects/${mine._id}/clients`, cookie)
 		).toBe(200);
 		expect(
-			await viaConsole(`/admin/api/buckets/${theirs._id}/clients`, cookie)
+			await viaConsole(`/admin/api/projects/${theirs._id}/clients`, cookie)
 		).toBe(403);
 		expect(await viaAgent('client_list', { id: theirs._id }, token)).toBe(
 			'forbidden'
@@ -182,13 +182,13 @@ describe('agent permissions match the console, per role', () => {
 	it("gives a super administrator's agent the administrators' bucket settings, exactly as the console does", async () => {
 		const { token, cookie } = await principal('super');
 
-		expect(await viaAgent('bucket_get', { id: ADMIN_BUCKET_ID }, token)).toBe(
+		expect(await viaAgent('project_get', { id: ADMIN_BUCKET_ID }, token)).toBe(
 			'ok'
 		);
 		expect(
-			await viaConsole(`/admin/api/buckets/${ADMIN_BUCKET_ID}`, cookie)
+			await viaConsole(`/admin/api/projects/${ADMIN_BUCKET_ID}`, cookie)
 		).toBe(200);
-		const listed = await rpc(call('bucket_list', {}), token);
+		const listed = await rpc(call('project_list', {}), token);
 		expect(JSON.stringify(listed)).toContain(`"${ADMIN_BUCKET_ID}"`);
 	});
 
@@ -196,7 +196,7 @@ describe('agent permissions match the console, per role', () => {
 		const { token, user } = await principal('super');
 		try {
 			const previewed = await rpc(
-				call('bucket_update', { id: ADMIN_BUCKET_ID, totpRequired: true }),
+				call('project_update', { id: ADMIN_BUCKET_ID, totpRequired: true }),
 				token
 			);
 			const preview = shaped(
@@ -210,7 +210,7 @@ describe('agent permissions match the console, per role', () => {
 			);
 			expect(
 				await viaAgent(
-					'bucket_update',
+					'project_update',
 					{
 						id: ADMIN_BUCKET_ID,
 						totpRequired: true,
@@ -237,14 +237,14 @@ describe('agent permissions match the console, per role', () => {
 		const { token, cookie } = await principal('super');
 
 		const agentAnswer = await rpc(
-			call('bucket_update', {
+			call('project_update', {
 				id: ADMIN_BUCKET_ID,
 				emailVerificationRequired: true
 			}),
 			token
 		);
 		const consoleAnswer = await elysia.handle(
-			new Request(`http://e.ly/admin/api/buckets/${ADMIN_BUCKET_ID}`, {
+			new Request(`http://e.ly/admin/api/projects/${ADMIN_BUCKET_ID}`, {
 				method: 'PATCH',
 				headers: { cookie, 'content-type': 'application/json' },
 				body: JSON.stringify({ emailVerificationRequired: true })
@@ -266,20 +266,20 @@ describe('agent permissions match the console, per role', () => {
 		// Administrators are managed through their own tools; the reserved bucket is not a place end-user
 		// operations may reach.
 		expect(
-			await viaAgent('bucket_user_list', { id: ADMIN_BUCKET_ID }, token)
+			await viaAgent('project_user_list', { id: ADMIN_BUCKET_ID }, token)
 		).toBe('forbidden');
 	});
 
 	it("hides the administrators' bucket from an agent acting for an administrator who is not a super administrator", async () => {
 		const { token, cookie } = await principal('plain');
 
-		expect(await viaAgent('bucket_get', { id: ADMIN_BUCKET_ID }, token)).toBe(
+		expect(await viaAgent('project_get', { id: ADMIN_BUCKET_ID }, token)).toBe(
 			'forbidden'
 		);
 		expect(
-			await viaConsole(`/admin/api/buckets/${ADMIN_BUCKET_ID}`, cookie)
+			await viaConsole(`/admin/api/projects/${ADMIN_BUCKET_ID}`, cookie)
 		).toBe(403);
-		const listed = await rpc(call('bucket_list', {}), token);
+		const listed = await rpc(call('project_list', {}), token);
 		expect(JSON.stringify(listed)).not.toContain(`"${ADMIN_BUCKET_ID}"`);
 	});
 
@@ -319,9 +319,9 @@ describe('agent permissions match the console, per role', () => {
 			expect: { applications: 0, connections: 0, providers: 0, resources: 0 }
 		};
 
-		const described = await rpc(call('bucket_address_change', args), token);
+		const described = await rpc(call('project_address_change', args), token);
 		const performed = await rpc(
-			call('bucket_address_change', {
+			call('project_address_change', {
 				...args,
 				confirmationToken:
 					described.result?.structuredContent?.confirmationToken
@@ -350,9 +350,9 @@ describe('agent permissions match the console, per role', () => {
 			expect: { applications: 0, connections: 0, providers: 0, resources: 0 }
 		};
 
-		const described = await rpc(call('bucket_address_change', args), token);
+		const described = await rpc(call('project_address_change', args), token);
 		const performed = await rpc(
-			call('bucket_address_change', {
+			call('project_address_change', {
 				...args,
 				confirmationToken:
 					described.result?.structuredContent?.confirmationToken
@@ -370,7 +370,7 @@ describe('agent permissions match the console, per role', () => {
 
 		expect(
 			await viaAgent(
-				'bucket_create',
+				'project_create',
 				{ name: 'Own bucket', slug: `own-bucket-${suffix}` },
 				token
 			)
@@ -378,7 +378,9 @@ describe('agent permissions match the console, per role', () => {
 		const bucket = (await getBucketStore().list()).find(
 			(b) => b.slug === `own-bucket-${suffix}`
 		);
-		expect(await viaAgent('bucket_get', { id: bucket?._id }, token)).toBe('ok');
+		expect(await viaAgent('project_get', { id: bucket?._id }, token)).toBe(
+			'ok'
+		);
 	});
 
 	/*
@@ -436,7 +438,7 @@ describe('agent permissions match the console, per role', () => {
 			(await rpc(call('resource_list', { id: bucket._id }), token)).result
 				?.structuredContent?.result
 		);
-		expect(apis.namespace).toBe('bucket');
+		expect(apis.namespace).toBe('project');
 		expect(apis.resources.map((r) => r.identifier)).toEqual([identifier]);
 	});
 

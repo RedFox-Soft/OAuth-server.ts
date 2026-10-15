@@ -29,9 +29,9 @@ export function BucketKeysPanel({
 	const id = encodeURIComponent(bucket._id);
 	return (
 		<KeyCards
-			base={`/admin/api/buckets/${id}/keys`}
+			base={`/admin/api/projects/${id}/keys`}
 			keySetUrl={bucket.issuer ? `${bucket.issuer}/jwks` : null}
-			historyHref={`/admin/audit?bucket=${id}&actionPrefix=bucket.key.`}
+			historyHref={`/admin/audit?project=${id}&actionPrefix=project.key.`}
 			canEdit={canEdit}
 		/>
 	);

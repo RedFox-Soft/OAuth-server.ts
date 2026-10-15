@@ -10,7 +10,7 @@ A standards-compliant OAuth 2.1 / OpenID Connect authorization server written in
 It is three surfaces on one core, and knowing which one you are in matters more than anything else in this file:
 
 1. **The protocol surface** — the OAuth/OIDC endpoints. Implemented: Authorization Code + PKCE, Client Credentials, Refresh Token, Device Flow, CIBA, PAR (RFC 9126), DPoP (RFC 9449), Resource Indicators (RFC 8707), token introspection/revocation, dynamic client registration, OIDC Core 1.0.
-2. **The administrative control plane** (`lib/admin/`) — a management API and a server-rendered console for user buckets and the OAuth clients and APIs they hold, administrators, end-users, upstream federation providers, settings, SMTP, signing keys and an immutable audit trail. Reachable at `/admin`, authenticated by an OIDC flow against this server's own issuer.
+2. **The administrative control plane** (`lib/admin/`) — a management API and a server-rendered console for projects (stored as buckets) and the OAuth clients and APIs they hold, administrators, end-users, upstream federation providers, settings, SMTP, signing keys and an immutable audit trail. Reachable at `/admin`, authenticated by an OIDC flow against this server's own issuer.
 3. **The MCP control plane** (`lib/mcp/`) — the same management API, served to an AI agent at `POST /mcp` as an OAuth 2.1 protected resource. Off by default (`mcp.enabled`).
 
 A fourth thing follows from the first: the server is also an authorization server **for other people's MCP servers**. An administrator declares a third-party MCP server as a protected resource of a bucket (`lib/resources/`, `lib/admin/resources/`) and this server mints audience-bound tokens for it — data, not code, so no source change and no restart. See `wiki/concepts/mcp-server-authorization.md`.
@@ -157,11 +157,16 @@ Each rule is the part that is easy to break. Read the named page before changing
   belongs to the bucket in its server-only `bucketId` for life, and carries its own `corsOrigins`; neither
   is ever recognised metadata. → `client-identity-from-database.md`,
   `client-registration-attributes.md`, `mcp-server-authorization.md`
+- **Names at the edge** — what a person or an agent reads says project, team and group; code and storage say
+  bucket, administrator group and bucket group. Rename only at the edge (paths, fields, tool names, words),
+  through explicit projections — never a generic key rewriter, since customer data passes through the same
+  responses — and show stored audit ids through `lib/admin/vocabulary.ts`, never by rewriting the trail.
+  → `admin-audit-trail.md`
 - **Buckets** — a bucket is addressed by a path segment or a hostname, never both, and is its own
   issuer. The request host is read only by `hostOfRequest`, never from `X-Forwarded-Host`. Which bucket
   a sign-in uses is `resolveBucketForRequest`, and every caller passes the resource it has and the
   bucket it was addressed at. A declared resource is unique per issuer namespace, and only a super
-  administrator declares at the root. → `bucket-is-an-issuer.md`, `per-issuer-isolation.md`,
+  administrator declares at the root. → `project-is-an-issuer.md`, `per-issuer-isolation.md`,
   `cookie-path-scoping.md`, `account-resolution.md`
 - **Ownership** — a group owns buckets, a bucket holds its applications and APIs for life, and membership is
   the only grant of access;
@@ -169,7 +174,7 @@ Each rule is the part that is easy to break. Read the named page before changing
   Super administrators (`lib/admin/super_admins.ts`), and end users are grouped only by bucket groups, whose
   members are records — change them through `lib/bucket_groups/service.ts`, never a member list read and
   written back. A personal group has exactly one member; a bucket changes group only through its move
-  route, and everything in it follows by reference. There are no projects. → `group-ownership.md`, `bucket-groups.md`,
+  route, and everything in it follows by reference. → `team-ownership.md`, `project-groups.md`,
   `container-ownership-transfer.md`
 - **Audit** — a mutating admin route records audit-first, after authorization, inside the handler.
   → `admin-audit-trail.md`

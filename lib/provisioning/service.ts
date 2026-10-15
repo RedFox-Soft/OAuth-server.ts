@@ -125,14 +125,14 @@ export async function createConnection(
 	if (bucket._id === ADMIN_BUCKET_ID) {
 		throw new ProvisioningError(
 			403,
-			'the administrators’ bucket cannot be provisioned by a directory'
+			'the administrators’ project cannot be provisioned by a directory'
 		);
 	}
 	const provider = bucket.federation.find((p) => p.id === input.providerId);
 	if (!provider) {
 		throw new ProvisioningError(
 			422,
-			`provider ${input.providerId} is not configured on this bucket`
+			`provider ${input.providerId} is not configured on this project`
 		);
 	}
 	const bound = await store().findByProvider(bucket._id, provider.id);
@@ -275,7 +275,7 @@ export async function deleteConnection(
 			{
 				blockers: [
 					...(managed > 0 ? [{ kind: 'enduser', count: managed }] : []),
-					...(groups > 0 ? [{ kind: 'bucketgroup', count: groups }] : [])
+					...(groups > 0 ? [{ kind: 'group', count: groups }] : [])
 				]
 			}
 		);
@@ -693,7 +693,7 @@ export async function destroyConnectionsOf(
 
 export type ConnectionWarning =
 	| 'scim_disabled'
-	| 'bucket_unaddressed'
+	| 'project_unaddressed'
 	| 'provider_disabled'
 	| 'client_credentials_disabled'
 	| 'credential_kind_disabled'
@@ -739,7 +739,7 @@ export interface StaticTokenView {
  */
 export interface ConnectionView {
 	id: string;
-	bucketId: string;
+	projectId: string;
 	displayName: string;
 	enabled: boolean;
 	providerId: string;
@@ -848,7 +848,7 @@ export function presentConnection(
 ): ConnectionView {
 	const warnings: ConnectionWarning[] = [];
 	if (!ApplicationConfig['scim.enabled']) warnings.push('scim_disabled');
-	if (scimBaseUrl(bucket) === null) warnings.push('bucket_unaddressed');
+	if (scimBaseUrl(bucket) === null) warnings.push('project_unaddressed');
 	const provider = bucket.federation.find(
 		(p) => p.id === connection.providerId
 	);
@@ -890,7 +890,7 @@ export function presentConnection(
 
 	return {
 		id: connection._id,
-		bucketId: connection.bucketId,
+		projectId: connection.bucketId,
 		displayName: connection.displayName,
 		enabled: connection.enabled,
 		providerId: connection.providerId,

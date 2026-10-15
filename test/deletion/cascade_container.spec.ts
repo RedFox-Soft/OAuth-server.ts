@@ -58,7 +58,7 @@ describe('deletion cascade: containers', () => {
 	async function deleteBucket(id: string, query?: Record<string, unknown>) {
 		const cookie = await superAdminCookie();
 		return agent.admin.api
-			.buckets({ id })
+			.projects({ id })
 			.delete(undefined, { headers: { cookie }, ...(query ? { query } : {}) });
 	}
 
@@ -67,7 +67,7 @@ describe('deletion cascade: containers', () => {
 		await deleteBucket(id, query);
 		const cookie = await superAdminCookie();
 		return agent.admin.api
-			.buckets({ id })
+			.projects({ id })
 			.purge.post(undefined, { headers: { cookie }, query });
 	}
 
@@ -218,7 +218,7 @@ describe('deletion cascade: containers', () => {
 
 			const deleted = await call(
 				'DELETE',
-				`/admin/api/buckets/${held._id}?cascade=endusers&expect=1`,
+				`/admin/api/projects/${held._id}?cascade=endusers&expect=1`,
 				cookie
 			);
 			const trail = await call(
@@ -233,7 +233,7 @@ describe('deletion cascade: containers', () => {
 					Type.Array(Type.Object({ action: Type.String() })),
 					trail.body.entries
 				).map((e) => e.action)
-			).toContain('bucket.delete');
+			).toContain('project.delete');
 		});
 
 		it('refuses a member who is not an owner a bucket holding accounts, and says why', async () => {
@@ -249,13 +249,13 @@ describe('deletion cascade: containers', () => {
 
 			const refused = await call(
 				'DELETE',
-				`/admin/api/buckets/${held._id}?cascade=endusers&expect=2`,
+				`/admin/api/projects/${held._id}?cascade=endusers&expect=2`,
 				await asMember(member)
 			);
 
 			expect(refused.status).toBe(403);
 			expect(refused.body.message).toBe(
-				'This bucket holds 2 accounts: only an owner of its group can delete it.'
+				'This project holds 2 accounts: only an owner of its team can delete it.'
 			);
 			expect((await getUserStore(held._id).list()).length).toBe(2);
 		});
@@ -271,7 +271,7 @@ describe('deletion cascade: containers', () => {
 
 			const deleted = await call(
 				'DELETE',
-				`/admin/api/buckets/${empty._id}`,
+				`/admin/api/projects/${empty._id}`,
 				await asMember(member)
 			);
 

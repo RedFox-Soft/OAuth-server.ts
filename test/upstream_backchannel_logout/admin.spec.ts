@@ -67,7 +67,7 @@ describe('connecting a provider’s back-channel logout', () => {
 
 		const res = await admin(
 			'POST',
-			`/admin/api/buckets/${bucket._id}/federation`,
+			`/admin/api/projects/${bucket._id}/federation`,
 			cookie,
 			{
 				id: 'corp',
@@ -92,7 +92,7 @@ describe('connecting a provider’s back-channel logout', () => {
 
 		const res = await admin(
 			'PATCH',
-			`/admin/api/buckets/${bucket._id}/federation/corp`,
+			`/admin/api/projects/${bucket._id}/federation/corp`,
 			cookie,
 			{ acceptsBackChannelLogout: true }
 		);
@@ -109,7 +109,7 @@ describe('connecting a provider’s back-channel logout', () => {
 		]);
 		await admin(
 			'PATCH',
-			`/admin/api/buckets/${bucket._id}/federation/corp`,
+			`/admin/api/projects/${bucket._id}/federation/corp`,
 			cookie,
 			{ acceptsBackChannelLogout: true }
 		);
@@ -133,7 +133,7 @@ describe('connecting a provider’s back-channel logout', () => {
 
 		const res = await admin(
 			'GET',
-			`/admin/api/buckets/${bucket._id}/federation`,
+			`/admin/api/projects/${bucket._id}/federation`,
 			cookie
 		);
 
@@ -166,7 +166,7 @@ describe('connecting a provider’s back-channel logout', () => {
 
 		const res = await admin(
 			'PATCH',
-			`/admin/api/buckets/${bucket._id}/federation/github`,
+			`/admin/api/projects/${bucket._id}/federation/github`,
 			cookie,
 			{ acceptsBackChannelLogout: true }
 		);
@@ -184,7 +184,7 @@ describe('connecting a provider’s back-channel logout', () => {
 		});
 		await admin(
 			'PATCH',
-			`/admin/api/buckets/${DEFAULT_BUCKET_ID}/federation/${upstream.provider.id}`,
+			`/admin/api/projects/${DEFAULT_BUCKET_ID}/federation/${upstream.provider.id}`,
 			cookie,
 			{ acceptsBackChannelLogout: true }
 		);
@@ -211,7 +211,7 @@ describe('connecting a provider’s back-channel logout', () => {
 		});
 		await admin(
 			'PATCH',
-			`/admin/api/buckets/${DEFAULT_BUCKET_ID}/federation/${upstream.provider.id}`,
+			`/admin/api/projects/${DEFAULT_BUCKET_ID}/federation/${upstream.provider.id}`,
 			cookie,
 			{ acceptsBackChannelLogout: false }
 		);

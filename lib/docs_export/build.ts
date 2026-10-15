@@ -24,6 +24,7 @@ import {
 	type McpTool
 } from '../mcp/catalogue.js';
 import { ADDON_SEAMS } from '../addon/seams.js';
+import { edgeAction, edgeTargetType } from '../admin/vocabulary.js';
 import {
 	BACKEND_SELECTORS,
 	PRODUCTION_BACKENDS,
@@ -67,8 +68,10 @@ export interface EndpointExport {
 
 export interface McpToolExport extends Omit<
 	McpTool,
-	'bodySchema' | 'querySchema'
+	'bodySchema' | 'querySchema' | 'action'
 > {
+	/* The audit action as the trail shows it, which is not always the stored id (specs/100). */
+	readonly action: string | null;
 	readonly bodySchema: Record<string, unknown> | null;
 	readonly querySchema: Record<string, unknown> | null;
 }
@@ -158,10 +161,23 @@ function exportEndpoint(
 	};
 }
 
+/*
+ * Audit actions as the trail shows them (specs/100), not as it stores them: a reader filters the trail by
+ * the name the reference gives.
+ */
+function exportAuditedRoute(route: AuditedAdminRoute): AuditedAdminRoute {
+	return {
+		...route,
+		action: edgeAction(route.action),
+		targetType: edgeTargetType(route.targetType)
+	};
+}
+
 function exportTool(tool: McpTool): McpToolExport {
 	const { bodySchema, querySchema, ...rest } = tool;
 	return {
 		...rest,
+		action: rest.action === null ? null : edgeAction(rest.action),
 		bodySchema: asJson(bodySchema),
 		querySchema: asJson(querySchema)
 	};
@@ -196,7 +212,7 @@ export function buildDocsExport(stamp: DocsExportStamp): DocsExport {
 				.map((route) => exportEndpoint(route, route.flag))
 		],
 		alwaysAvailablePrefixes: [...alwaysAvailablePrefixes],
-		adminApi: { audited: [...auditedAdminRoutes] },
+		adminApi: { audited: auditedAdminRoutes.map(exportAuditedRoute) },
 		mcp: {
 			tools: mcpCatalogue.map(exportTool),
 			excluded: [...excludedConsoleOperations]

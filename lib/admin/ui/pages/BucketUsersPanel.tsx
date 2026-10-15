@@ -107,7 +107,7 @@ export function BucketUsersPanel({
 		mailConfigured === false
 			? 'Set up mail delivery first (Settings → Mail).'
 			: passwordLogin === false
-				? "This bucket doesn't sign people in with a password."
+				? "This project doesn't sign people in with a password."
 				: null;
 
 	/* Writes the list's state into the address; the address is what the list reads. */
@@ -177,7 +177,7 @@ export function BucketUsersPanel({
 	useEffect(() => {
 		void request<ConnectionView[]>(
 			'GET',
-			`/admin/api/buckets/${encodeURIComponent(bucketId)}/provisioning-connections`
+			`/admin/api/projects/${encodeURIComponent(bucketId)}/provisioning-connections`
 		).then((c) => {
 			if (c.ok) setConnections(c.data);
 		});
@@ -467,7 +467,7 @@ export function BucketUsersPanel({
 						/>
 					) : (
 						<EmptyState
-							purpose="No end users in this bucket yet. People register here, arrive through an identity provider or a directory, or are created by an administrator."
+							purpose="No end users in this project yet. People register here, arrive through an identity provider or a directory, or are created by an administrator."
 							create={newUserButton}
 						/>
 					)

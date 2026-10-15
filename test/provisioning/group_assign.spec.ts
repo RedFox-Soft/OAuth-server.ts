@@ -32,7 +32,7 @@ describe('handing an administrator-kept group to a provisioning connection', () 
 	async function keptGroup(c: Connected, displayName: string): Promise<string> {
 		const res = await admin(
 			'POST',
-			`/admin/api/buckets/${c.bucket._id}/groups`,
+			`/admin/api/projects/${c.bucket._id}/groups`,
 			cookie,
 			{ displayName }
 		);
@@ -51,7 +51,7 @@ describe('handing an administrator-kept group to a provisioning connection', () 
 
 	/* As the console hands a group over: previewed, then confirmed with the counts the preview showed. */
 	async function assign(c: Connected, gid: string) {
-		const path = `/admin/api/buckets/${c.bucket._id}/groups/${gid}/connection`;
+		const path = `/admin/api/projects/${c.bucket._id}/groups/${gid}/connection`;
 		const body = { connectionId: c.connection._id };
 		const preview = await admin('POST', path, cookie, body);
 		expect(preview.status).toBe(409);
@@ -81,7 +81,7 @@ describe('handing an administrator-kept group to a provisioning connection', () 
 		const member = await provisionedUser(c);
 		await admin(
 			'POST',
-			`/admin/api/buckets/${c.bucket._id}/groups/${gid}/members`,
+			`/admin/api/projects/${c.bucket._id}/groups/${gid}/members`,
 			cookie,
 			{ userIds: [member] }
 		);
@@ -109,13 +109,13 @@ describe('handing an administrator-kept group to a provisioning connection', () 
 
 		const renamed = await admin(
 			'PATCH',
-			`/admin/api/buckets/${c.bucket._id}/groups/${gid}`,
+			`/admin/api/projects/${c.bucket._id}/groups/${gid}`,
 			cookie,
 			{ displayName: 'Mine' }
 		);
 		const deleted = await admin(
 			'DELETE',
-			`/admin/api/buckets/${c.bucket._id}/groups/${gid}`,
+			`/admin/api/projects/${c.bucket._id}/groups/${gid}`,
 			cookie
 		);
 
@@ -149,13 +149,13 @@ describe('handing an administrator-kept group to a provisioning connection', () 
 		const gid = await keptGroup(c, 'Finance');
 		const local = await admin(
 			'POST',
-			`/admin/api/buckets/${c.bucket._id}/users`,
+			`/admin/api/projects/${c.bucket._id}/users`,
 			cookie,
 			{ email: 'local@contoso.com', password: 'a password that is long enough' }
 		);
 		await admin(
 			'POST',
-			`/admin/api/buckets/${c.bucket._id}/groups/${gid}/members`,
+			`/admin/api/projects/${c.bucket._id}/groups/${gid}/members`,
 			cookie,
 			{ userIds: [local.json._id] }
 		);
@@ -177,11 +177,11 @@ describe('handing an administrator-kept group to a provisioning connection', () 
 
 		const res = await admin(
 			'DELETE',
-			`/admin/api/buckets/${c.bucket._id}/provisioning-connections/${c.connection._id}`,
+			`/admin/api/projects/${c.bucket._id}/provisioning-connections/${c.connection._id}`,
 			cookie
 		);
 
 		expect(res.status).toBe(409);
-		expect(res.json.blockers).toEqual([{ kind: 'bucketgroup', count: 1 }]);
+		expect(res.json.blockers).toEqual([{ kind: 'group', count: 1 }]);
 	});
 });

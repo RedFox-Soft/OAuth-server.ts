@@ -6,7 +6,7 @@
  */
 
 export interface UsagePreferences {
-	view: 'bucket' | 'customer';
+	view: 'project' | 'customer';
 	hideInactive: boolean;
 	hideReserved: boolean;
 	hideDeleted: boolean;
@@ -20,7 +20,7 @@ export interface UsagePreferences {
 const KEY = 'admin-console.usage.v2';
 
 export const DEFAULT_PREFERENCES: UsagePreferences = {
-	view: 'bucket',
+	view: 'project',
 	hideInactive: false,
 	hideReserved: false,
 	hideDeleted: false,
@@ -32,7 +32,8 @@ function isPreferences(value: unknown): value is UsagePreferences {
 	// A non-null object read as a bag of unknowns; every field is narrowed below before it is trusted.
 	const v = value as Record<string, unknown>;
 	return (
-		(v.view === 'bucket' || v.view === 'customer') &&
+		// A layout saved before spec 100 said 'bucket': it fails here and falls back to the defaults once.
+		(v.view === 'project' || v.view === 'customer') &&
 		typeof v.hideInactive === 'boolean' &&
 		typeof v.hideReserved === 'boolean' &&
 		typeof v.hideDeleted === 'boolean'

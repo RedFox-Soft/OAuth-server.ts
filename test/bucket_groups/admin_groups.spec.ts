@@ -48,7 +48,7 @@ describe('a bucket group kept by an administrator', () => {
 		const gid = await group(cookie, await bucket(), 'Editors');
 
 		expect((await auditOf(cookie, gid)).map((e) => e.action)).toEqual([
-			'bucketgroup.create'
+			'group.create'
 		]);
 	});
 
@@ -58,7 +58,7 @@ describe('a bucket group kept by an administrator', () => {
 
 		const renamed = await admin(
 			'PATCH',
-			`/admin/api/buckets/${b}/groups/${gid}`,
+			`/admin/api/projects/${b}/groups/${gid}`,
 			cookie,
 			{ displayName: 'Editors-EU' }
 		);
@@ -66,7 +66,7 @@ describe('a bucket group kept by an administrator', () => {
 		expect(renamed.status).toBe(200);
 		expect(renamed.json).toMatchObject({ id: gid, displayName: 'Editors-EU' });
 		expect((await auditOf(cookie, gid)).map((e) => e.action)).toContain(
-			'bucketgroup.update'
+			'group.update'
 		);
 	});
 
@@ -76,19 +76,19 @@ describe('a bucket group kept by an administrator', () => {
 
 		const deleted = await admin(
 			'DELETE',
-			`/admin/api/buckets/${b}/groups/${gid}`,
+			`/admin/api/projects/${b}/groups/${gid}`,
 			cookie
 		);
 		const after = await admin(
 			'GET',
-			`/admin/api/buckets/${b}/groups/${gid}`,
+			`/admin/api/projects/${b}/groups/${gid}`,
 			cookie
 		);
 
 		expect(deleted.status).toBe(204);
 		expect(after.status).toBe(404);
 		expect((await auditOf(cookie, gid)).map((e) => e.action)).toContain(
-			'bucketgroup.delete'
+			'group.delete'
 		);
 	});
 
@@ -96,7 +96,7 @@ describe('a bucket group kept by an administrator', () => {
 		const b = await bucket();
 		await group(cookie, b, 'Editors');
 
-		const res = await admin('POST', `/admin/api/buckets/${b}/groups`, cookie, {
+		const res = await admin('POST', `/admin/api/projects/${b}/groups`, cookie, {
 			displayName: 'editors'
 		});
 
@@ -108,7 +108,7 @@ describe('a bucket group kept by an administrator', () => {
 
 		const res = await admin(
 			'POST',
-			`/admin/api/buckets/${await bucket()}/groups`,
+			`/admin/api/projects/${await bucket()}/groups`,
 			cookie,
 			{ displayName: 'Editors' }
 		);
@@ -138,7 +138,7 @@ describe('a bucket group kept by an administrator', () => {
 		await addMembers(cookie, b, gid, [uid]);
 
 		const entry = (await auditOf(cookie, gid)).find(
-			(e) => e.action === 'bucketgroup.member.add'
+			(e) => e.action === 'group.member.add'
 		);
 		expect(entry?.attributes).toEqual(['members']);
 		expect(JSON.stringify(entry)).not.toContain(uid);
@@ -152,7 +152,7 @@ describe('a bucket group kept by an administrator', () => {
 
 		const res = await admin(
 			'DELETE',
-			`/admin/api/buckets/${b}/groups/${gid}/members/${u1}`,
+			`/admin/api/projects/${b}/groups/${gid}/members/${u1}`,
 			cookie
 		);
 
@@ -194,7 +194,7 @@ describe('a bucket group kept by an administrator', () => {
 		const uid = await endUser(cookie, b);
 		await addMembers(cookie, b, gid, [uid]);
 
-		const res = await admin('GET', `/admin/api/buckets/${b}/users`, cookie);
+		const res = await admin('GET', `/admin/api/projects/${b}/users`, cookie);
 
 		const listed = shaped(
 			Type.Object({
@@ -213,7 +213,7 @@ describe('a bucket group kept by an administrator', () => {
 		const uid = await endUser(cookie, b);
 		await addMembers(cookie, b, gid, [uid]);
 
-		await admin('PATCH', `/admin/api/buckets/${b}/users/${uid}`, cookie, {
+		await admin('PATCH', `/admin/api/projects/${b}/users/${uid}`, cookie, {
 			active: false
 		});
 
@@ -226,7 +226,7 @@ describe('a bucket group kept by an administrator', () => {
 		const uid = await endUser(cookie, b);
 		await addMembers(cookie, b, gid, [uid]);
 
-		await admin('DELETE', `/admin/api/buckets/${b}/users/${uid}`, cookie);
+		await admin('DELETE', `/admin/api/projects/${b}/users/${uid}`, cookie);
 
 		expect(await memberIds(cookie, b, gid)).toEqual([]);
 	});
@@ -236,8 +236,8 @@ describe('a bucket group kept by an administrator', () => {
 		const gid = await group(cookie, b, 'Readers');
 
 		/* A deletion schedules the destruction (specs/090); Delete now carries it out. */
-		await admin('DELETE', `/admin/api/buckets/${b}`, cookie);
-		const res = await admin('POST', `/admin/api/buckets/${b}/purge`, cookie);
+		await admin('DELETE', `/admin/api/projects/${b}`, cookie);
+		const res = await admin('POST', `/admin/api/projects/${b}/purge`, cookie);
 
 		expect(res.status).toBe(200);
 		expect(await getBucketGroupStore().find(gid)).toBeNull();
@@ -248,10 +248,14 @@ describe('a bucket group kept by an administrator', () => {
 		const gid = await group(cookie, b, 'Readers');
 		const outsider = await outsiderCookie();
 
-		const read = await admin('GET', `/admin/api/buckets/${b}/groups`, outsider);
+		const read = await admin(
+			'GET',
+			`/admin/api/projects/${b}/groups`,
+			outsider
+		);
 		const write = await admin(
 			'PATCH',
-			`/admin/api/buckets/${b}/groups/${gid}`,
+			`/admin/api/projects/${b}/groups/${gid}`,
 			outsider,
 			{ displayName: 'Mine' }
 		);
@@ -263,13 +267,13 @@ describe('a bucket group kept by an administrator', () => {
 	it('does not exist in the administrators bucket', async () => {
 		const res = await admin(
 			'POST',
-			`/admin/api/buckets/${ADMIN_BUCKET_ID}/groups`,
+			`/admin/api/projects/${ADMIN_BUCKET_ID}/groups`,
 			cookie,
 			{ displayName: 'Operators' }
 		);
 		const list = await admin(
 			'GET',
-			`/admin/api/buckets/${ADMIN_BUCKET_ID}/groups`,
+			`/admin/api/projects/${ADMIN_BUCKET_ID}/groups`,
 			cookie
 		);
 

@@ -66,7 +66,7 @@ export interface Guidance {
 }
 
 export function federationApi(bucketId: string, providerId?: string): string {
-	const base = `/admin/api/buckets/${encodeURIComponent(bucketId)}/federation`;
+	const base = `/admin/api/projects/${encodeURIComponent(bucketId)}/federation`;
 	return providerId === undefined
 		? base
 		: `${base}/${encodeURIComponent(providerId)}`;

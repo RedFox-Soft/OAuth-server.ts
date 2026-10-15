@@ -83,25 +83,30 @@ page nothing linked to. [[first-run-setup-had-two-surfaces]] records why one sur
 `ui/serverRender.tsx` reads an HTML template off disk, substitutes versioned asset addresses through
 [[html-rendering]]'s `versionedAsset`, renders `ConsoleRoot` (`ZeroRuntime`, antd `App`, the router at
 the requested path), and returns the document
-through `htmlResponse` so the console's policy is derived like every other page's. The props are
-injected as an inline script and hashed by that derivation — *"the authorization is derived from the
+through `htmlResponse` so the console's policy is derived like every other page's. The props
+(`window.PROPS`; its `me` is the same edge view `/admin/api/me` answers, built by `meView` in
+`lib/admin/me_view.ts`, so it says `projectId` and `activeTeamId` where the context says `bucketId` and
+`activeGroupId`) are injected as an inline script and hashed by that derivation — *"the authorization is derived from the
 script that is actually served rather than restated beside it"* — with every `<` in the JSON
 escaped to a unicode escape so the props cannot close the script tag.
 
 ## The route groups
 
-`auth` (setup, login, RBAC), `me`, `groups` (plus invitation acceptance), `scope`,
-`clients` and `resources` (a bucket's applications and APIs, under `/admin/api/buckets/:id/…`; `projects` was
-a group of its own until spec 099), `users` (administrators) and `users-end` (per-bucket end users), `buckets`, `federation`,
-`settings` (plus SMTP), `jwks`, `audit`, `errors`. Ownership and visibility across all of them is
-decided by [[group-ownership]], not by a per-container manager list.
+The groups keep their storage names in code; since spec 100 their paths use the names people read. `auth`
+(setup, login, RBAC), `me`, `groups` (teams, at `/admin/api/teams…`, plus invitation acceptance), `scope`,
+`clients` and `resources` (a project's applications and APIs, under `/admin/api/projects/:id/…`; the
+retired projects' `projects` group was one of its own until spec 099), `users` (administrators) and
+`users-end` (per-project end users), `buckets` (projects, at `/admin/api/projects…`; until spec 100 at
+`/admin/api/buckets…`, and old paths now answer 404), `federation`, `settings` (plus SMTP), `jwks`, `audit`,
+`errors`. Ownership and visibility across all of them is decided by [[team-ownership]] — a team owns
+projects — not by a per-container manager list.
 
 ## Related
 
 - [[admin-mcp-control-plane]] — the second consumer of `routes.ts`, and the parity guard it enables.
 - [[admin-plane-error-shape]] — why the plane's error body differs, and how registration order hid it.
 - [[admin-console-signin]] — the console is a relying party on its own issuer.
-- [[group-ownership]] — what grants access to anything the plane administers.
+- [[team-ownership]] — what grants access to anything the plane administers.
 - [[first-run-setup-had-two-surfaces]] — the deleted bootstrap twin.
 - [[error-store-capture-sites]] — the two places a fault is recorded.
 - [[html-rendering]] — the shell's page constructor.

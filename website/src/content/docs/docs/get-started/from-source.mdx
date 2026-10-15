@@ -77,15 +77,15 @@ turns an empty database into a working deployment:
 
 - **Collections**, one per storage area the server writes to.
 - **Indexes**: the TTL indexes that expire tokens, codes, sessions and interactions, and the unique
-  e-mail index on each bucket's end-user collection. It also drops stale expiry indexes left on
+  e-mail index on each project's end-user collection. It also drops stale expiry indexes left on
   collections that no longer write the field.
 - **The initial RS256 signing key**, stored with every issuer's keys in the `bucketKeys` area, which
   is why keys are not an environment variable here. (If the server ever starts against an empty key
   store it generates and persists one itself.)
-- **The admin panel seed**: the reserved "Administrators" user bucket with registration closed, the
+- **The admin panel seed**: the reserved "Administrators" project with registration closed, the
   first-party `admin-panel` OAuth client whose redirect URI is `$ISSUER/admin/callback`, the reserved
-  `admin-mcp` agent client, the system group that holds buckets no administrator manages, and the
-  default `redfox` end-user bucket.
+  `admin-mcp` agent client, the System team that holds projects no administrator manages, and the
+  default `redfox` end-user project.
 
 It is **idempotent**: every write is an upsert or a create-if-absent, so running it again changes
 nothing that already exists. Re-run it after upgrading an existing install, since a release that

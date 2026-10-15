@@ -38,7 +38,7 @@ export function serviceProviderConfig(
 				type: 'oauthbearertoken',
 				name: 'OAuth Bearer Token',
 				description:
-					'A scim-scoped access token from this bucket’s token endpoint, or the connection’s static token',
+					'A scim-scoped access token from this project’s token endpoint, or the connection’s static token',
 				specUri: 'https://www.rfc-editor.org/info/rfc6750',
 				primary: true
 			}
@@ -95,7 +95,7 @@ function schemaResources(base: string): Record<string, unknown>[] {
 			base,
 			SCIM_USER_SCHEMA,
 			'User',
-			'An end user of this bucket',
+			'An end user of this project',
 			SCIM_USER_ATTRIBUTES
 		),
 		schemaResource(
@@ -109,7 +109,7 @@ function schemaResources(base: string): Record<string, unknown>[] {
 			base,
 			SCIM_GROUP_SCHEMA,
 			'Group',
-			'A group of this bucket’s end users',
+			'A group of this project’s end users',
 			SCIM_GROUP_ATTRIBUTES
 		)
 	];
@@ -121,7 +121,7 @@ function groupResourceType(base: string): Record<string, unknown> {
 		id: 'Group',
 		name: 'Group',
 		endpoint: '/Groups',
-		description: 'Groups of this bucket’s end users',
+		description: 'Groups of this project’s end users',
 		schema: SCIM_GROUP_SCHEMA,
 		meta: {
 			resourceType: 'ResourceType',
@@ -136,7 +136,7 @@ function userResourceType(base: string): Record<string, unknown> {
 		id: 'User',
 		name: 'User',
 		endpoint: '/Users',
-		description: 'End users of this bucket',
+		description: 'End users of this project',
 		schema: SCIM_USER_SCHEMA,
 		schemaExtensions: [
 			{ schema: SCIM_ENTERPRISE_USER_SCHEMA, required: false }

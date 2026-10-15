@@ -1,7 +1,7 @@
 import { changeBetween, type OverviewRow } from '../../../activity/overview.js';
 
 /*
- * What the console shows of a bucket's active users, derived from the activity routes' answers
+ * What the console shows of a project's active users, derived from the activity routes' answers
  * (lib/admin/activity/routes.ts). Kept apart from the components so the one rule a reader depends on — a
  * figure that may still grow is never shown as if it were final — is a function of the answer alone.
  */
@@ -15,7 +15,7 @@ export interface PeriodFigureView {
 }
 
 export interface BucketActivityView {
-	bucketId: string;
+	projectId: string;
 	countingSince: string;
 	month: PeriodFigureView | null;
 	days: PeriodFigureView[];

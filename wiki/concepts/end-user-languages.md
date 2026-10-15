@@ -4,7 +4,7 @@ title: 'End-user pages and emails in English, Russian and Chinese'
 tags: [architecture, contract, gotcha, accessibility, security]
 sources: [oauth-server-codebase]
 created: 2026-10-14
-updated: 2026-10-14
+updated: 2026-10-15
 graph:
   node_type: concept
   relationships:
@@ -68,7 +68,7 @@ It is a form of its own posting to `POST /ui/:uid/language` (`lib/interactions/l
 is built from the uid and that closed list only. Pages outside a sign-in show no switch: they have no return
 target that is not a URL taken from the request.
 
-`_lang` is **not** partitioned by bucket, unlike the session cookie: the choice belongs to the person reading,
+`_lang` is **not** partitioned by project, unlike the session cookie: the choice belongs to the person reading,
 not to an identity, so it is one host-only cookie at `/` (`lib/i18n/cookie.ts`, one derivation —
 [[cookie-path-scoping]]).
 
@@ -119,7 +119,7 @@ issuer publish `ui_locales_supported: ["en", "ru", "zh-Hans"]` — a fact of the
 
 ## Not done, on purpose
 
-No per-bucket or global default language (the owner's decision; a bucket default would slot in before English
+No per-project or global default language (the owner's decision; a project default would slot in before English
 without changing the order). No operator text overrides — issue #71. No language-tagged client metadata
 (`client_name#ru`): application and operator text is shown as stored. The Chinese catalogue was written without
 native review.

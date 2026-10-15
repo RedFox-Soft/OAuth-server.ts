@@ -179,7 +179,7 @@ export function ProvisioningPanel({
 			</Space>
 
 			<Typography.Paragraph type="secondary">
-				A connection lets a directory create, update and remove this bucket's
+				A connection lets a directory create, update and remove this project's
 				people. Each one is bound to an identity provider, which then signs in
 				existing accounts only, so a person is never created twice.
 			</Typography.Paragraph>
@@ -192,7 +192,7 @@ export function ProvisioningPanel({
 					title={
 						providers.length === 0
 							? 'A directory needs an identity provider its people sign in with'
-							: 'Every identity provider of this bucket already has a connection'
+							: 'Every identity provider of this project already has a connection'
 					}
 					description={
 						<Flex
@@ -235,7 +235,7 @@ export function ProvisioningPanel({
 					locale={{
 						emptyText: loading
 							? ' '
-							: "No provisioning connections yet. No directory creates or removes this bucket's people."
+							: "No provisioning connections yet. No directory creates or removes this project's people."
 					}}
 					columns={[
 						{

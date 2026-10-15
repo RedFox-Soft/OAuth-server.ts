@@ -58,7 +58,7 @@ async function application(
 ) {
 	return answered(
 		(
-			await client.admin.api.buckets({ id: who.bucketId }).clients.post(
+			await client.admin.api.projects({ id: who.bucketId }).clients.post(
 				{
 					clientName: name,
 					grantTypes: ['authorization_code'],
@@ -97,7 +97,7 @@ describe('group-scoped audit read', () => {
 		expect(present(page.entries[0], 'page.entries[0]').action).toBe(
 			'client.create'
 		);
-		expect(present(page.entries[0], 'page.entries[0]').ownerGroupId).toBe(
+		expect(present(page.entries[0], 'page.entries[0]').ownerTeamId).toBe(
 			a.groupId
 		);
 	});
@@ -177,7 +177,7 @@ describe('group-scoped audit read', () => {
 		const doomed = await application(a, 'Doomed');
 
 		const deleted = await client.admin.api
-			.buckets({ id: a.bucketId })
+			.projects({ id: a.bucketId })
 			.clients({ clientId: doomed.clientId })
 			.delete(undefined, { headers: { cookie: a.cookie } });
 		expect(deleted.status).toBe(200);
@@ -237,9 +237,9 @@ describe('audit read of a move between groups', () => {
 		const destination = await regularGroup([owner], [joiner]);
 		const { bucket } = await bucketWithClients(source._id, 1);
 		await moveClient.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.owner.put(
-				{ groupId: destination._id, confirm: true },
+				{ teamId: destination._id, confirm: true },
 				{ headers: { cookie: await cookieFor(owner) } }
 			);
 		return { bucket, leaver, joiner, outsider };
@@ -252,7 +252,7 @@ describe('audit read of a move between groups', () => {
 		const page = answered(
 			(
 				await moveClient.admin.api.audit.get({
-					query: { targetId: bucketId, action: 'bucket.owner.change' },
+					query: { targetId: bucketId, action: 'project.owner.change' },
 					headers: { cookie: await cookieFor(reader) }
 				})
 			).data

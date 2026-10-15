@@ -432,7 +432,7 @@ export async function assertInvitationsPossible(
 	if (!bucket.passwordLogin) {
 		throw new EndUserError(
 			409,
-			'this bucket does not sign people in with a password'
+			'this project does not sign people in with a password'
 		);
 	}
 	if (!(await mailDeliveryConfigured())) {

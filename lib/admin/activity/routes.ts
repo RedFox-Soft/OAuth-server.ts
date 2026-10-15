@@ -150,7 +150,7 @@ async function bucketToRead(
 			snapshot: { _id: id, name: id, createdAt: new Date(0) },
 			tombstone: null
 		};
-	throw new AdminError(404, 'bucket not found');
+	throw new AdminError(404, 'project not found');
 }
 
 function present(figure: PeriodFigure | null): figure is PeriodFigure {
@@ -171,7 +171,7 @@ export const activityRoutes = new Elysia({ name: 'admin-activity' })
 	 * bucket to everyone but a super administrator, who may read any bucket's figures (`bucketToRead`).
 	 */
 	.get(
-		'/admin/api/buckets/:id/activity',
+		'/admin/api/projects/:id/activity',
 		async ({ admin, params, query, request }) => {
 			const ctx = assertAuth(admin);
 			assertNoUnknownParams(request.url, ALLOWED_BUCKET_ACTIVITY_PARAMS);
@@ -188,7 +188,7 @@ export const activityRoutes = new Elysia({ name: 'admin-activity' })
 				getActivityStore().countingSince(at)
 			]);
 			return {
-				bucketId: bucket._id,
+				projectId: bucket._id,
 				/*
 				 * Named, and dated when deleted (specs/086), so a deleted bucket's history page can say what it was
 				 * and when it went without a second read that no longer exists for it.
@@ -198,7 +198,7 @@ export const activityRoutes = new Elysia({ name: 'admin-activity' })
 				lastOwner:
 					tombstone?.ownerGroupId !== undefined &&
 					tombstone.ownerLabel !== undefined
-						? { groupId: tombstone.ownerGroupId, label: tombstone.ownerLabel }
+						? { teamId: tombstone.ownerGroupId, label: tombstone.ownerLabel }
 						: null,
 				countingSince: since.toISOString(),
 				month: months[0] ?? null,
@@ -296,7 +296,7 @@ export const activityRoutes = new Elysia({ name: 'admin-activity' })
 					lost ? null : (reads.figures.get(bucket._id) ?? null)
 				);
 				return {
-					bucketId: bucket._id,
+					projectId: bucket._id,
 					name: bucket.name,
 					slug: bucket.slug ?? null,
 					reserved: reservedOf(bucket._id),
@@ -326,7 +326,7 @@ export const activityRoutes = new Elysia({ name: 'admin-activity' })
 				countingSince: since.toISOString(),
 				months: monthLabels,
 				daysFinal: days.map((day) => isClosable(day, at)),
-				buckets: rows,
+				projects: rows,
 				customers: customerSummaries(rows, customers.details),
 				instance: instanceSummary(rows, MONTHS_SHOWN, month === monthOf(at)),
 				changes: sharpChanges(rows, monthLabels, monthClosed ? 0 : 1)

@@ -5,7 +5,11 @@ import {
 	getBucketStore,
 	getUserStore
 } from '../../adapters/index.js';
-import type { Group, GroupMember } from '../../adapters/types.js';
+import type {
+	Group,
+	GroupInvitation,
+	GroupMember
+} from '../../adapters/types.js';
 import {
 	assertAuth,
 	assertGroupMember,
@@ -46,13 +50,13 @@ async function loadGroup(admin: AdminContext, id: string): Promise<Group> {
 	 * the instance privilege, changed only by the grant and withdraw operations. To this surface it does not
 	 * exist, for every caller.
 	 */
-	if (isSuperAdminsGroup(id)) throw new AdminError(404, 'group not found');
+	if (isSuperAdminsGroup(id)) throw new AdminError(404, 'team not found');
 	const group = await getGroupStore().find(id);
 	if (!group) {
 		if (admin.superAdmin) {
-			throw new AdminError(404, 'group not found');
+			throw new AdminError(404, 'team not found');
 		}
-		throw new AdminError(403, 'no access to this group');
+		throw new AdminError(403, 'no access to this team');
 	}
 	assertGroupMember(admin, id);
 	return group;
@@ -64,7 +68,7 @@ async function loadGroup(admin: AdminContext, id: string): Promise<Group> {
  */
 function assertMutableMembership(group: Group): void {
 	if (group.kind === 'system') {
-		throw new AdminError(403, 'the System group is not a tenant');
+		throw new AdminError(403, 'the System team is not a tenant');
 	}
 }
 
@@ -83,7 +87,7 @@ function assertShareable(group: Group): void {
 	if (group.kind === 'personal') {
 		throw new AdminError(
 			403,
-			'a personal group cannot be shared; create a regular group and move the work there'
+			'a personal team cannot be shared; create a regular team and move the work there'
 		);
 	}
 }
@@ -93,10 +97,24 @@ function assertDeletable(group: Group): void {
 		throw new AdminError(
 			403,
 			group.kind === 'personal'
-				? 'a personal group cannot be deleted'
-				: 'the System group cannot be deleted'
+				? 'a personal team cannot be deleted'
+				: 'the System team cannot be deleted'
 		);
 	}
+}
+
+/*
+ * An invitation as the edge names it (specs/100): the team it admits to, and never its token digest, which
+ * is not part of what may be read.
+ */
+function invitationView({
+	tokenHash: _tokenHash,
+	groupId,
+	...rest
+}: GroupInvitation): Omit<GroupInvitation, 'tokenHash' | 'groupId'> & {
+	teamId: string;
+} {
+	return { ...rest, teamId: groupId };
 }
 
 /*
@@ -104,14 +122,14 @@ function assertDeletable(group: Group): void {
  * page lists (specs/085) — the same read, so the page never shows a group as empty that the delete refuses.
  */
 async function ownedContainers(groupId: string): Promise<{
-	buckets: { id: string; name: string }[];
+	projects: { id: string; name: string }[];
 }> {
 	const buckets = await getBucketStore().listByGroup(groupId);
 	const named = (items: readonly { _id: string; name: string }[]) =>
 		items
 			.map((item) => ({ id: item._id, name: item.name }))
 			.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
-	return { buckets: named(buckets) };
+	return { projects: named(buckets) };
 }
 
 /*
@@ -192,7 +210,7 @@ async function membersOf(group: Group): Promise<
  */
 function assertOwnerRemains(members: GroupMember[]): void {
 	if (!members.some((m) => m.role === 'owner')) {
-		throw new AdminError(409, 'a group must keep at least one owner');
+		throw new AdminError(409, 'a team must keep at least one owner');
 	}
 }
 
@@ -204,7 +222,7 @@ export const groupRoutes = new Elysia({ name: 'admin-groups' })
 			return adminErrorBody(error);
 		}
 	})
-	.get('/admin/api/groups', async ({ admin }) => {
+	.get('/admin/api/teams', async ({ admin }) => {
 		const ctx = assertAuth(admin);
 		/*
 		 * Scope-filtered, not role-gated. Unlike buckets this is NOT restricted to the active
@@ -223,14 +241,14 @@ export const groupRoutes = new Elysia({ name: 'admin-groups' })
 					return {
 						...group,
 						owns: {
-							buckets: owns.buckets.length
+							projects: owns.projects.length
 						}
 					};
 				})
 		);
 	})
 	.post(
-		'/admin/api/groups',
+		'/admin/api/teams',
 		async ({ admin, body, set }) => {
 			const ctx = assertAuth(admin);
 			// Allocated here so the audit entry can name the group that is about to exist.
@@ -251,7 +269,7 @@ export const groupRoutes = new Elysia({ name: 'admin-groups' })
 		},
 		{ body: CreateGroupBody }
 	)
-	.get('/admin/api/groups/:id', async ({ admin, params }) => {
+	.get('/admin/api/teams/:id', async ({ admin, params }) => {
 		const ctx = assertAuth(admin);
 		// A plain member may read the membership list; only an owner may change it.
 		const group = await loadGroup(ctx, params.id);
@@ -262,26 +280,26 @@ export const groupRoutes = new Elysia({ name: 'admin-groups' })
 		return { ...group, members, owns, can: groupCan(ctx, group) };
 	})
 	.patch(
-		'/admin/api/groups/:id',
+		'/admin/api/teams/:id',
 		async ({ admin, params, body }) => {
 			const ctx = assertAuth(admin);
 			const group = await loadGroup(ctx, params.id);
 			assertGroupOwner(ctx, params.id);
 			/* A system group's name is the console's label for a reserved purpose; the seed sets it. */
 			if (group.kind === 'system') {
-				throw new AdminError(403, 'a system group cannot be renamed');
+				throw new AdminError(403, 'a system team cannot be renamed');
 			}
 			await recordAdminAudit(ctx, 'group.update', params.id, {
 				attributes: Object.keys(body),
 				ownerGroupId: params.id
 			});
 			const updated = await getGroupStore().update(params.id, body);
-			if (!updated) throw new AdminError(404, 'group not found');
+			if (!updated) throw new AdminError(404, 'team not found');
 			return updated;
 		},
 		{ body: UpdateGroupBody }
 	)
-	.delete('/admin/api/groups/:id', async ({ admin, params }) => {
+	.delete('/admin/api/teams/:id', async ({ admin, params }) => {
 		const ctx = assertAuth(admin);
 		const group = await loadGroup(ctx, params.id);
 		assertGroupOwner(ctx, params.id);
@@ -292,9 +310,9 @@ export const groupRoutes = new Elysia({ name: 'admin-groups' })
 		 * in the way and the operator empties it deliberately.
 		 */
 		const held = await ownedContainers(params.id);
-		if (held.buckets.length > 0) {
-			throw new AdminError(409, 'group still owns buckets', {
-				blockers: [{ kind: 'bucket' as const, count: held.buckets.length }]
+		if (held.projects.length > 0) {
+			throw new AdminError(409, 'team still owns projects', {
+				blockers: [{ kind: 'project' as const, count: held.projects.length }]
 			});
 		}
 		await recordAdminAudit(ctx, 'group.delete', params.id, {
@@ -304,7 +322,7 @@ export const groupRoutes = new Elysia({ name: 'admin-groups' })
 		return { ok: true };
 	})
 	.post(
-		'/admin/api/groups/:id/members',
+		'/admin/api/teams/:id/members',
 		async ({ admin, params, body }) => {
 			const ctx = assertAuth(admin);
 			const group = await loadGroup(ctx, params.id);
@@ -317,7 +335,7 @@ export const groupRoutes = new Elysia({ name: 'admin-groups' })
 			const user = await getUserStore(ADMIN_BUCKET_ID).find(body.userId);
 			if (!user) throw new AdminError(404, 'administrator not found');
 			if (group.members.some((m) => m.userId === body.userId)) {
-				throw new AdminError(409, 'already a member of this group');
+				throw new AdminError(409, 'already a member of this team');
 			}
 
 			const members = [
@@ -333,14 +351,14 @@ export const groupRoutes = new Elysia({ name: 'admin-groups' })
 		{ body: AddMemberBody }
 	)
 	.patch(
-		'/admin/api/groups/:id/members/:userId',
+		'/admin/api/teams/:id/members/:userId',
 		async ({ admin, params, body }) => {
 			const ctx = assertAuth(admin);
 			const group = await loadGroup(ctx, params.id);
 			assertGroupOwner(ctx, params.id);
 			assertMutableMembership(group);
 			if (!group.members.some((m) => m.userId === params.userId)) {
-				throw new AdminError(404, 'not a member of this group');
+				throw new AdminError(404, 'not a member of this team');
 			}
 			const members = group.members.map((m) =>
 				m.userId === params.userId ? { ...m, role: body.role } : m
@@ -356,39 +374,36 @@ export const groupRoutes = new Elysia({ name: 'admin-groups' })
 		},
 		{ body: UpdateMemberBody }
 	)
-	.delete(
-		'/admin/api/groups/:id/members/:userId',
-		async ({ admin, params }) => {
-			const ctx = assertAuth(admin);
-			const group = await loadGroup(ctx, params.id);
-			assertGroupOwner(ctx, params.id);
-			assertMutableMembership(group);
-			if (!group.members.some((m) => m.userId === params.userId)) {
-				throw new AdminError(404, 'not a member of this group');
-			}
-			const members = group.members.filter((m) => m.userId !== params.userId);
-			assertOwnerRemains(members);
-			/*
-			 * The removed member loses access to everything the group owns on their next request: nothing
-			 * here touches their session, because `contextFor` re-reads memberships per request rather than
-			 * trusting anything cached at sign-in.
-			 */
-			await recordAdminAudit(ctx, 'group.member.remove', params.id, {
-				ownerGroupId: params.id
-			});
-			return getGroupStore().update(params.id, { members });
+	.delete('/admin/api/teams/:id/members/:userId', async ({ admin, params }) => {
+		const ctx = assertAuth(admin);
+		const group = await loadGroup(ctx, params.id);
+		assertGroupOwner(ctx, params.id);
+		assertMutableMembership(group);
+		if (!group.members.some((m) => m.userId === params.userId)) {
+			throw new AdminError(404, 'not a member of this team');
 		}
-	)
-	.get('/admin/api/groups/:id/invitations', async ({ admin, params }) => {
+		const members = group.members.filter((m) => m.userId !== params.userId);
+		assertOwnerRemains(members);
+		/*
+		 * The removed member loses access to everything the group owns on their next request: nothing
+		 * here touches their session, because `contextFor` re-reads memberships per request rather than
+		 * trusting anything cached at sign-in.
+		 */
+		await recordAdminAudit(ctx, 'group.member.remove', params.id, {
+			ownerGroupId: params.id
+		});
+		return getGroupStore().update(params.id, { members });
+	})
+	.get('/admin/api/teams/:id/invitations', async ({ admin, params }) => {
 		const ctx = assertAuth(admin);
 		await loadGroup(ctx, params.id);
 		// A plain member may see who has been invited, as they may see who is already in the group. The
 		// token is never part of an invitation record's readable shape, so nothing is masked here.
 		const pending = await getGroupInvitationStore().listByGroup(params.id);
-		return pending.map(({ tokenHash: _tokenHash, ...rest }) => rest);
+		return pending.map(invitationView);
 	})
 	.post(
-		'/admin/api/groups/:id/invitations',
+		'/admin/api/teams/:id/invitations',
 		async ({ admin, params, body, set }) => {
 			const ctx = assertAuth(admin);
 			const group = await loadGroup(ctx, params.id);
@@ -399,7 +414,7 @@ export const groupRoutes = new Elysia({ name: 'admin-groups' })
 			const email = body.email.trim().toLowerCase();
 			const existing = await getUserStore(ADMIN_BUCKET_ID).findByEmail(email);
 			if (existing && group.members.some((m) => m.userId === existing._id)) {
-				throw new AdminError(409, 'already a member of this group');
+				throw new AdminError(409, 'already a member of this team');
 			}
 
 			/*
@@ -439,13 +454,12 @@ export const groupRoutes = new Elysia({ name: 'admin-groups' })
 			});
 
 			set.status = 201;
-			const { tokenHash: _tokenHash, ...safe } = invitation;
-			return safe;
+			return invitationView(invitation);
 		},
 		{ body: CreateInvitationBody }
 	)
 	.delete(
-		'/admin/api/groups/:id/invitations/:inviteId',
+		'/admin/api/teams/:id/invitations/:inviteId',
 		async ({ admin, params }) => {
 			const ctx = assertAuth(admin);
 			await loadGroup(ctx, params.id);

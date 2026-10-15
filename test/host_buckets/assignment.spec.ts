@@ -22,7 +22,7 @@ async function cookieFor(kind: AdminKind) {
 
 async function createBucket(cookie: string, body: Record<string, unknown>) {
 	const response = await app.handle(
-		new Request('http://e.ly/admin/api/buckets', {
+		new Request('http://e.ly/admin/api/projects', {
 			method: 'POST',
 			redirect: 'manual',
 			headers: { 'content-type': 'application/json', cookie },
@@ -192,7 +192,7 @@ describe('refusing an address that cannot work or should not exist (US2)', () =>
 	});
 
 	it('refuses a hostname the operator reserved for this deployment', async () => {
-		const reserved = ApplicationConfig['buckets.reservedHostnames'];
+		const reserved = ApplicationConfig['projects.reservedHostnames'];
 		const restore = [...reserved];
 		reserved.push('STATUS.e.ly');
 

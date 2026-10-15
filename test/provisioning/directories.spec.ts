@@ -48,11 +48,11 @@ const MICROSOFT =
 	'https://login.microsoftonline.com/11112222-bbbb-3333-cccc-4444dddd5555/v2.0';
 
 function directoriesPath(bucketId: string): string {
-	return `/admin/api/buckets/${bucketId}/provisioning-connections/directories`;
+	return `/admin/api/projects/${bucketId}/provisioning-connections/directories`;
 }
 
 function connectionPath(c: Connected): string {
-	return `/admin/api/buckets/${c.bucket._id}/provisioning-connections/${c.connection._id}`;
+	return `/admin/api/projects/${c.bucket._id}/provisioning-connections/${c.connection._id}`;
 }
 
 async function agentToken(): Promise<string> {
@@ -188,7 +188,7 @@ describe('directory guidance for SCIM provisioning', () => {
 
 		const created = await admin(
 			'POST',
-			`/admin/api/buckets/${bucket._id}/provisioning-connections`,
+			`/admin/api/projects/${bucket._id}/provisioning-connections`,
 			cookie,
 			{ displayName: 'Okta', providerId: 'corp', directory: 'okta' }
 		);

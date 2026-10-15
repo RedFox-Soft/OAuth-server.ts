@@ -45,8 +45,8 @@ throttle keeps its counter in the database, through the same storage layer as al
 The count is the same on every replica, before and after a restart, however many IP addresses the
 guesses come from.
 
-Strictly, the throttle counts by two things together: the bucket and the email address. A bucket is
-this server's name for a group of end users with its own sign-in rules. (Once a bucket has its own
+Strictly, the throttle counts by two things together: the project and the email address. A project is
+this server's name for a set of end users with its own sign-in rules. (Once a project has its own
 URL, it also issues tokens in its own name, as a separate issuer.)
 
 <svg viewBox="0 0 800 380" width="100%" role="img" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">
@@ -66,7 +66,7 @@ URL, it also issues tokens in its own name, as a separate issuer.)
   <text x="50" y="300" font-size="13" fill="var(--diagram-line, #555)">a resource protection: keeps the server up</text>
   <rect x="410" y="90" width="360" height="230" rx="8" fill="none" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5"/>
   <text x="590" y="120" text-anchor="middle" font-size="16" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">Sign-in throttle</text>
-  <text x="430" y="158" font-size="14" fill="var(--diagram-fg, #1a1a1a)">keyed on: bucket + the email under attack</text>
+  <text x="430" y="158" font-size="14" fill="var(--diagram-fg, #1a1a1a)">keyed on: project + the email under attack</text>
   <text x="430" y="190" font-size="14" fill="var(--diagram-fg, #1a1a1a)">kept in: the database, shared by every replica</text>
   <text x="430" y="222" font-size="14" fill="var(--diagram-fg, #1a1a1a)">after a restart: still counting</text>
   <text x="430" y="254" font-size="14" fill="var(--diagram-accent, #d9480f)">sees: 1,000 guesses at one email, shuts at 5</text>
@@ -206,7 +206,7 @@ that a shut door costs one quick database read by index.
     <marker id="throttle-arrow-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--diagram-line, #555)"/></marker>
   </defs>
   <rect x="40" y="20" width="400" height="44" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
-  <text x="240" y="47" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">1  door shut for bucket:email?  (one read, no hash)</text>
+  <text x="240" y="47" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">1  door shut for project:email?  (one read, no hash)</text>
   <rect x="40" y="90" width="400" height="44" rx="8" fill="none" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5"/>
   <text x="240" y="117" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">2  count this attempt, atomically. Over the cap?</text>
   <rect x="40" y="160" width="400" height="44" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
@@ -269,8 +269,8 @@ email field either. The address is already in the record's key. Repeating it in 
 add one more indexed copy of every email anyone has ever typed into the sign-in form.
 
 The same decision applies to events. When the throttle refuses a sign-in, the server emits an event,
-and that event names only the bucket, nothing else. An operator needs to know which group of users is
-under attack. They do not need a log they could read people's email addresses out of.
+and that event names only the project, nothing else. An operator needs to know which project's users
+are under attack. They do not need a log they could read people's email addresses out of.
 
 ## Normalise the key the way the account lookup does, or one address gets 65,536 counters {#sixty-five-thousand-spellings-of-one-address}
 
@@ -320,7 +320,7 @@ account. Showing it only for those addresses brings the oracle back. Second, it 
 demand to any address anyone types. So anyone could use it to flood someone's inbox (email bombing).
 So it needs its own cap, and then the lockout has just moved there. Third, sign-in would stop working
 whenever mail does. Everywhere else on our server, mail is best-effort: we send it if we can. Fourth,
-it cannot help the administrators' own bucket, which has no self-service password reset at all.
+it cannot help the administrators' own project, which has no self-service password reset at all.
 
 What we do instead is narrower and, I think, correct. A completed password reset clears the counter.
 A requested one does not. The difference is what each one proves. Asking for a reset proves nothing.
@@ -330,17 +330,17 @@ email address. That proves you control that mailbox. It is the same proof the "e
 would have collected. Only here it is collected by a flow that already exists, and that flow already
 has its own pause between requests and its own daily cap.
 
-The administrators' bucket is the reason for the next rule. (It is not the reason the ceiling is one
+The administrators' project is the reason for the next rule. (It is not the reason the ceiling is one
 hour.) Administrators sign in through this same door, and they have no password reset to get out
 with. So a long escalation against an administrator's address is the one lockout nobody can undo. The
-rule that protects them is not written as "if this is the admin bucket". It says: "in a bucket that
+rule that protects them is not written as "if this is the admin project". It says: "in a project that
 requires a second factor, every lockout stays at the first window, however often the throttle trips".
-The reason is that in such a bucket a guessed password alone does not sign anyone in. So long lockouts
-there gain little, and they risk a lot: locking the real administrator out. The administrators' bucket
+The reason is that in such a project a guessed password alone does not sign anyone in. So long lockouts
+there gain little, and they risk a lot: locking the real administrator out. The administrators' project
 falls under this rule once its operator turns the second factor on. The first-administrator guide
 says to do that first.
 
-Written this way, the rule names the real reason. And it corrects itself: turn a bucket's second
+Written this way, the rule names the real reason. And it corrects itself: turn a project's second
 factor off, and its lockouts start growing again. Nobody has to remember to change anything.
 
 ## What not to do: an off switch, letting sign-ins through on a database error, and relying on the throttle alone {#what-i-would-not-do}

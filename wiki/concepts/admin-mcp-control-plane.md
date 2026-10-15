@@ -11,6 +11,14 @@ graph:
 
 # The administrative MCP control plane
 
+Since spec 100 the tools use the names a person reads in the console: a project (stored as a bucket,
+`UserBucket`), a team (stored as an administrator group, `Group`) and a project's group of end users (stored
+as a bucket group, `BucketGroup`). So the `bucket_*` tools are `project_*`, `bucket_user_*` `project_user_*`,
+`bucket_group_*` `project_group_*`, `bucket_key_*` `project_key_*`, and `group_*` `team_*`; `client_*`,
+`resource_*` and `federation_*` kept their names. The catalogue still publishes 118 tools, 37 of them
+high-consequence. Before spec 099, `project_*` tools such as `project_create` and `project_bucket_assign`
+administered the old Project entity, now called a retired project; where this page names them it says so.
+
 An AI agent administers this instance over MCP at `POST /mcp`, as an OAuth 2.1 protected resource of
 the very server it administers. The constitution requires it (Principle II) and requires it to have no
 back door: every agent action must run the same management API, authorization and audit trail as a
@@ -75,10 +83,10 @@ nothing, so its published schema is derived from the same catalog the handler en
 ## Six traps this cost us
 
 **One flat argument object cannot hold two things called `id`.** A tool takes a single flat object, so
-`federation_provider_create` — `POST /admin/api/buckets/:id/federation`, whose body carries the
+`federation_provider_create` — `POST /admin/api/projects/:id/federation`, whose body carries the
 *provider's* own `id` — silently dropped the provider id and failed every call. Path parameters can now
-be aliased (`pathArgs`, the bucket is `bucketId` there), and the drift guard refuses any tool whose
-final argument names collide.
+be aliased (`pathArgs`, the project is `projectId` there, `bucketId` until spec 100;
+`lib/mcp/catalogue.ts:1400`), and the drift guard refuses any tool whose final argument names collide.
 
 **A closed input schema breaks an open-map body.** `UpdateSettingsBody` is
 `t.Record(t.String(), t.Unknown())`, validated per key by the handler against the catalog. With
@@ -148,9 +156,9 @@ Two things make it work at all, and neither is obvious:
   `resourceIndicators.enabled` defaults true. Without a built-in answer for `MCP_RESOURCE`, no
   audience-bound token could ever be minted. It now answers for this server's own resource and delegates
   everything else.
-- `lib/admin/auth/resolveBucket.ts` routes a client to the administrator bucket only if it is the
-  reserved console client or a client whose stored `bucketId` is the admin bucket (until spec 099: one in a
-  project whose bucket was the admin bucket). A dynamically
+- `lib/admin/auth/resolveBucket.ts` routes a client to the administrators' project only if it is the
+  reserved console client or a client whose stored `bucketId` is that project (until spec 099: one in a
+  retired project whose bucket was the administrators' project). A dynamically
   registered client falls through to `redfox` and **cannot authenticate an administrator at all** — so
   the agent client is seeded (`admin-mcp`, public, PKCE) rather than obtained by DCR. A documented
   deviation from the MCP authorization spec's preference, and the reason a DCR-only MCP client cannot
@@ -163,7 +171,8 @@ RFC 9728 metadata is **path-aware**: a resource at `/mcp` publishes at
 answers only for a request `dispatchTool` built and marked (`lib/mcp/channel.ts`, a `WeakSet<Request>`
 nothing arriving from the network can be in). Before, it answered on the publicly mounted `/admin/api/*`
 as well, and everything below — the withheld operations, the confirmation — lives in the transport, so
-the same token sent straight to the REST routes deleted a project, permitted another client identity
+the same token sent straight to the REST routes deleted a project (the old Project entity, a retired
+project since spec 099), permitted another client identity
 and deleted a signing key with no confirmation. It gained the agent nothing its administrator lacked,
 but it made every agent-specific restriction advisory. `test/mcp/public_admin_api.spec.ts` is the
 attack. The DPoP verb collapse in `resolveAdmin` now applies only to dispatched requests, which is
@@ -171,13 +180,14 @@ where it was always meant to.
 
 ## What agents may not do
 
-Deleting a user bucket or a **group** is withheld — not confirmation-gated, absent. These
-are the operations that destroy a container with nothing left afterwards to inspect; a group joined
-them when ownership moved to groups ([[group-ownership]]), and for a sharper version of the same
-reason — destroying one takes with it the only thing that granted anyone access to what it held.
-Deleting a project was withheld for the same reason until spec 099 removed projects; the table now holds
-eight `withheld` entries (`lib/mcp/catalogue.ts:1848-2017`).
-Widening the project-administrator role deliberately did not widen this list. They are not
+Deleting a project (and destroying one scheduled for deletion) or a **team** is withheld — not
+confirmation-gated, absent. These are the operations that destroy a container with nothing left
+afterwards to inspect; a team joined them when ownership moved to teams ([[team-ownership]]), and for a
+sharper version of the same reason — destroying one takes with it the only thing that granted anyone
+access to what it held. Deleting the old Project entity (a retired project) was withheld for the same
+reason until spec 099 removed it; the table now holds eight `withheld` entries
+(`lib/mcp/catalogue.ts:1848-2013`).
+Widening the retired projects' administrator role deliberately did not widen this list. They are not
 registered as refusing tools either, because a registered tool appears in `tools/list` however it
 behaves; the server's `instructions` carry the explanation, read from the exclusion table so the two
 cannot disagree.
@@ -198,26 +208,34 @@ which is the point of matching narrowly: a mistake must not be dressed up as a p
 The table distinguishes two kinds of absence, and the distinction is what makes that claim true.
 `withheld` entries are operations an agent could perform and an operator has decided it may not;
 `inapplicable` ones have no meaning for an agent at all — there is no browser session to end, nobody to
-authorize first-run setup, and no agent principal to accept a group invitation as, since acceptance is
+authorize first-run setup, and no agent principal to accept a team invitation as, since acceptance is
 a person following a link in their own mail. "Verify my address" (spec 078) is inapplicable for the same
 reason: only the mailbox holder can complete it. So is "Try sign-in" (spec 088), start and result both: it is a
 person signing in at an upstream provider in a browser, and its result is bound to the console session that
 started it ([[federation-try-signin]]). Only the `withheld` ones reach the instructions, and they reach them by
 being filtered out of the table rather than named a second time. Naming them literally is the bug this
-replaced: the list read `['project_delete', 'bucket_delete']` directly beneath a comment claiming it
-could not disagree with the table, so a third withholding would have been refused correctly when
-guessed and silently missing from the announcement that exists so an agent need not guess. That third
-withholding has since arrived — `group_delete` — and cost only a table row, which is the arrangement
-working as intended.
+replaced: the list read `['project_delete', 'bucket_delete']` (the retired-project deletion and the
+bucket deletion, by their names then) directly beneath a comment claiming it could not disagree with the
+table, so a third withholding would have been refused correctly when guessed and silently missing from
+the announcement that exists so an agent need not guess. That third withholding has since arrived —
+`group_delete`, a team's deletion — and cost only a table row, which is the arrangement working as
+intended. Since spec 100 the guessed names are `project_delete`, `project_purge` and `team_delete`
+(`excludedOperationFor`, `lib/mcp/catalogue.ts:2032-2041`).
 
-The other high-consequence operations — 37 tools since spec 087 added `bucket_key_revoke`, `jwks_rotate` and
-`jwks_revoke`, still 37 after spec 088, whose new writes are ordinary, 38 since spec 090 added
-`bucket_restore`, while scheduling a bucket's deletion and `POST /admin/api/buckets/:id/purge` stay withheld
-([[bucket-soft-delete]]), 40 since spec 089 added `bucket_user_bulk_deactivate` and `bucket_user_bulk_delete`
-([[end-user-support]]), 39 since spec 098 removed `project_bucket_clear` with its route, and 37 since spec 099
-removed `project_bucket_assign` and `project_owner_change` with the projects (spec 085 made `project_bucket_assign` and `project_bucket_clear` high; spec 083 had added `admin_sign_out` and `admin_totp_clear`; spec 082 had added `bucket_user_email_change`; spec 075 `bucket_owner_change` and
-`project_owner_change`, the first tools whose body names a group, `groupId`) — take two calls: describe,
-then confirm. The confirmation binds
+The other high-consequence operations — 37 tools — take two calls: describe, then confirm. How the count
+got there, in the names the tools had at the time (spec 100 renamed `bucket_*` to `project_*` and `group_*`
+to `team_*` without changing the count; a `project_*` tool before spec 099 is a retired-project tool): 37
+since spec 087 added `bucket_key_revoke` (now `project_key_revoke`), `jwks_rotate` and `jwks_revoke`, still
+37 after spec 088, whose new writes are ordinary, 38 since spec 090 added `bucket_restore` (now
+`project_restore`), while scheduling a project's deletion and `POST /admin/api/projects/:id/purge` stay
+withheld ([[project-soft-delete]]), 40 since spec 089 added `bucket_user_bulk_deactivate` and
+`bucket_user_bulk_delete` (now `project_user_bulk_*`, [[end-user-support]]), 39 since spec 098 removed the
+retired-project tool `project_bucket_clear` with its route, and 37 since spec 099 removed the
+retired-project tools `project_bucket_assign` and `project_owner_change` (spec 085 made
+`project_bucket_assign` and `project_bucket_clear` high; spec 083 had added `admin_sign_out` and
+`admin_totp_clear`; spec 082 had added `bucket_user_email_change`, now `project_user_email_change`; spec
+075 `bucket_owner_change`, today's `project_owner_change`, and the retired-project `project_owner_change`,
+the first tools whose body names a team — `groupId` then, `teamId` since spec 100). The confirmation binds
 five ways — tool, target, arguments hash, administrator, agent — and each is a real case. Arguments,
 because a target-only binding would miss a password reset confirmed for one value and submitted with
 another. Administrator separately from agent, because one operator's confirmation must not be spendable
@@ -226,32 +244,36 @@ a token presented for the wrong operation is consumed rather than left to probe 
 
 **A route's own preview reaches the agent** (since spec 075). Some routes refuse without `confirm: true`
 and answer 409 with what the second call would do: an address change's clients, a move's applications and
-APIs (its projects, until spec 099). The
+APIs (its retired projects, until spec 099). The
 gate's consequence report reads no entity state, so it cannot supply that list. `toOutcome` used to reduce
 every 409 to `conflict: the operation was refused`, so no agent ever saw a preview. It now carries a
 `confirmationRequired` body whole as `preview` (`lib/mcp/result.ts:79`). Because `confirm` is one of the
 bound arguments, the preview and the change are confirmed separately.
 
-Since spec 083 an `ordinary` tool answers this way too: `bucket_update` previews a change that tightens a
-bucket's sign-in (passwords off, verification or an authenticator required, sign-up opened on a bucket served
-at the root) with counted `consequences` and an `expect`, and applies it only when repeated with
+Since spec 083 an `ordinary` tool answers this way too: `project_update` (`bucket_update` until spec 100)
+previews a change that tightens a project's sign-in (passwords off, verification or an authenticator
+required, sign-up opened on a project served at the root) with counted `consequences` and an `expect`, and applies it only when repeated with
 `confirm: true` and that `expect`. It stays ordinary because the route's own confirmation is the whole
-protection; the token gate would add a third call and nothing else ([[bucket-sign-in-policy]]). The
+protection; the token gate would add a third call and nothing else ([[project-sign-in-policy]]). The
 conflict message names `expect` for that reason.
 
-Since spec 084, `bucket_group_assign_connection` answers with a route preview as well: which members the
+Since spec 084, `project_group_assign_connection` (`bucket_group_assign_connection` until spec 100) answers
+with a route preview as well: which members the
 directory does not manage. It is high-consequence, so the agent sees the preview on the unconfirmed call and
 then goes through the token gate. A confirmed call refused for foreign members passes on only the message and
 `blockers`, under the generic rule. Two read tools came with it: `federation_provider_get` (one provider, with
 its callback, logout signals, bound connection and linked count) and `provisioning_hold_get` (the removals a
 held connection refused).
 
-From spec 085 until spec 099, changing a project's bucket answered with a route preview too (clearing it did
-as well, until spec 098 removed it), with the read tool `bucket_resource_list` beside it. Spec 099 removed
-both with the projects, together with `project_list`, `project_get`, `project_create`, `project_update`,
-`project_owner_change` and the withheld project deletion. `client_*` and `resource_*` kept their names; their
-`id` argument is now the bucket, because applications and APIs live under
-`/admin/api/buckets/:id/clients` and `/admin/api/buckets/:id/resources` ([[bucket-is-the-only-container]]).
+From spec 085 until spec 099, changing a retired project's bucket answered with a route preview too
+(clearing it did as well, until spec 098 removed it), with the read tool `bucket_resource_list` beside it.
+Spec 099 removed both with the old Project entity, together with the retired-project tools `project_list`,
+`project_get`, `project_create`, `project_update`, `project_owner_change` and the withheld retired-project
+deletion. Those names came back in spec 100 for different tools — the renamed bucket tools — so a
+`project_*` tool name met in anything written before spec 099 means the retired project. `client_*` and
+`resource_*` kept their names; their `id` argument is now the project, because applications and APIs live
+under `/admin/api/projects/:id/clients` and `/admin/api/projects/:id/resources`
+([[project-is-the-only-container]]).
 
 Spec 088 added four tools and two exclusions:
 
@@ -259,10 +281,10 @@ Spec 088 added four tools and two exclusions:
   is **ordinary**, like revoke, because it only removes access ([[scim-credential-overlap]]).
   `provisioning_credential_issue` stays high and gained `overlap` and `lifetimeDays`; its summary no longer says
   the previous credential is revoked at once.
-- `federation_provider_move` moves a provider one place in its bucket's sign-in order. It is ordinary, and high
-  on the administrators' bucket through `highWhen: onConsoleBucket` like its two siblings
-  (`lib/mcp/catalogue.ts:1436`; [[console-federation]]).
-- Two reads: `provisioning_hold_list` (held connections across the buckets the caller sees) and
+- `federation_provider_move` moves a provider one place in its project's sign-in order. It is ordinary, and high
+  on the administrators' project through `highWhen: onConsoleBucket` like its two siblings
+  (`lib/mcp/catalogue.ts:1442`; [[console-federation]]).
+- Two reads: `provisioning_hold_list` (held connections across the projects the caller sees) and
   `provisioning_directory_list` (Entra's, Okta's and a generic directory's field names, recommended credential
   and pitfalls). The second is published for the reason `federation_catalogue_list` is: an agent cannot derive
   those facts, and without them it would configure a directory wrongly ([[scim-provisioning]]).
@@ -299,8 +321,8 @@ the server does not serve, and there is no set to vary.
 - [[admin-plane-error-shape]] — the `{ error, message }` shape the dispatcher inherits.
 - [[model-graph-import-order]] — the cycle that forces the lazy import in `resolveAdmin`.
 - [[feature-flag-gating]] — how `mcp.enabled` makes a disabled endpoint indistinguishable from an absent one.
-- [[upstream-federation]] — the provider secrets the bucket routes were leaking until this feature's secrecy sweep found it.
+- [[upstream-federation]] — the provider secrets the project routes were leaking until this feature's secrecy sweep found it.
 - [[pkce-verifier-length]] — the token-endpoint bound that stopped a real MCP client signing in, and surfaced here as this page's own opaque 401.
 - [[loopback-redirect-port-matching]] — why this client's ephemeral callback port was refused before consent.
 - [[first-consent-grant-id]] — why approving consent for this client answered 401 until the grantId was resolved with tryFind.
-- [[group-ownership]] — the ownership model the group tools administer, and why `group_delete` joined the withheld list rather than the confirmation-gated one.
+- [[team-ownership]] — the ownership model the team tools administer, and why a team's deletion (`group_delete` until spec 100, guessed as `team_delete` now) joined the withheld list rather than the confirmation-gated one.

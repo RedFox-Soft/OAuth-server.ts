@@ -65,7 +65,7 @@ environment, once per deploy attempt, **before** any new Machine serves traffic,
 deploy on a non-zero exit.
 
 It has to run before the app serves because the seeds must exist for the deployment to be usable
-at all: without the reserved admin bucket and client, `GET /admin/login` redirects to
+at all: without the reserved admin project and client, `GET /admin/login` redirects to
 `/auth` with a `client_id` no `Client` document matches, and the admin plane is unreachable. The
 first-run setup page at `GET /admin` still works in that state, so the symptom looks like a login
 bug when the real problem is a missing seed. The same run provisions the TTL and unique-e-mail

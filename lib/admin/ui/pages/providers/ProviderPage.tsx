@@ -182,7 +182,7 @@ export function ProviderPage({
 			const [b, p] = await Promise.all([
 				request<BucketView>(
 					'GET',
-					`/admin/api/buckets/${encodeURIComponent(bucketId)}`
+					`/admin/api/projects/${encodeURIComponent(bucketId)}`
 				),
 				request<ProviderDetail>('GET', federationApi(bucketId, providerId))
 			]);
@@ -218,8 +218,8 @@ export function ProviderPage({
 		return loadStatus === 403 || loadStatus === 404 ? (
 			<NoAccess
 				what="identity provider"
-				backHref={bucket ? listHref : '/admin/buckets'}
-				backLabel={bucket ? 'Back to Identity providers' : 'Back to Buckets'}
+				backHref={bucket ? listHref : '/admin/projects'}
+				backLabel={bucket ? 'Back to Identity providers' : 'Back to Projects'}
 			/>
 		) : (
 			<LoadFailed
@@ -236,7 +236,7 @@ export function ProviderPage({
 				{ label: provider?.displayName ?? '…' }
 			]
 		: [
-				{ label: 'Buckets', href: '/admin/buckets' },
+				{ label: 'Projects', href: '/admin/projects' },
 				{ label: bucket?.name ?? '…', href: bucketHref(bucketId) },
 				{ label: 'Identity providers', href: listHref },
 				{ label: provider?.displayName ?? '…' }
@@ -650,17 +650,17 @@ function ProviderEditor({
 						</Radio.Group>
 						{bound ? (
 							<Typography.Text type="secondary">
-								Fixed while {bound.displayName} provisions this bucket: the
+								Fixed while {bound.displayName} provisions this project: the
 								directory creates the accounts.
 							</Typography.Text>
 						) : (
 							draft.provisioning === 'jit' && (
 								<Typography.Text type="secondary">
 									{consoleBucket
-										? 'On the console, this also needs sign-up open on this bucket.'
+										? 'On the console, this also needs sign-up open on this project.'
 										: bucket.registrationOpen
 											? 'Anyone the provider lets sign in gets an account.'
-											: "Anyone the provider lets sign in gets an account, even though this bucket's Sign-up is closed."}
+											: "Anyone the provider lets sign in gets an account, even though this project's Sign-up is closed."}
 								</Typography.Text>
 							)
 						)}
@@ -806,7 +806,7 @@ function ProviderEditor({
 						</Typography.Text>
 						<br />
 						<Typography.Text type="secondary">
-							The same for every provider of this bucket. If sign-in fails on
+							The same for every provider of this project. If sign-in fails on
 							the provider's own page, this address not being registered there
 							is the likeliest cause.
 						</Typography.Text>
@@ -816,7 +816,7 @@ function ProviderEditor({
 								type="warning"
 								showIcon
 								title="This address will change"
-								description="This bucket has no address of its own. If it gets a path or a host, the callback changes and the provider must be given the new one."
+								description="This project has no address of its own. If it gets a path or a host, the callback changes and the provider must be given the new one."
 							/>
 						)}
 					</div>

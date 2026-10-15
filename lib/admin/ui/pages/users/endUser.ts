@@ -32,14 +32,14 @@ export type EndUser = Omit<
 	passwordSet?: boolean;
 };
 
-/* One page of the users list (GET /admin/api/buckets/:id/users). */
+/* One page of the users list (GET /admin/api/projects/:id/users). */
 export interface EndUserPage {
 	users: EndUser[];
 	totalResults: number;
 }
 
 export function usersApi(bucketId: string, userId?: string): string {
-	const base = `/admin/api/buckets/${encodeURIComponent(bucketId)}/users`;
+	const base = `/admin/api/projects/${encodeURIComponent(bucketId)}/users`;
 	return userId ? `${base}/${encodeURIComponent(userId)}` : base;
 }
 

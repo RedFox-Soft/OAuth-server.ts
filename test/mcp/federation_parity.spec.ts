@@ -176,7 +176,7 @@ describe('an agent connecting a recognised provider', () => {
 
 		for (const body of bodies) {
 			const response = await rpc(
-				call('federation_provider_create', { bucketId: bucket._id, ...body }),
+				call('federation_provider_create', { projectId: bucket._id, ...body }),
 				token
 			);
 			expect(
@@ -214,7 +214,7 @@ describe('an agent connecting a recognised provider', () => {
 
 		const response = await rpc(
 			call('federation_provider_create', {
-				bucketId: bucket._id,
+				projectId: bucket._id,
 				catalogueId: 'microsoft',
 				tenant: 'not a tenant!',
 				clientId: '00001111-aaaa-2222-bbbb-3333cccc4444',
@@ -237,7 +237,7 @@ describe('an agent connecting a recognised provider', () => {
 
 		await rpc(
 			call('federation_provider_create', {
-				bucketId: bucket._id,
+				projectId: bucket._id,
 				catalogueId: 'apple',
 				clientId: apple.clientId,
 				teamId: apple.teamId,

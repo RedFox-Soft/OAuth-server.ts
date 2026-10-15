@@ -64,7 +64,7 @@ export function FederationPanel({
 				),
 				request<{ providerId: string; displayName: string }[]>(
 					'GET',
-					`/admin/api/buckets/${encodeURIComponent(bucketId)}/provisioning-connections`
+					`/admin/api/projects/${encodeURIComponent(bucketId)}/provisioning-connections`
 				)
 			]);
 			/*
@@ -144,7 +144,7 @@ export function FederationPanel({
 			</Space>
 
 			<Typography.Paragraph type="secondary">
-				People of this bucket can sign in through these providers.
+				People of this project can sign in through these providers.
 			</Typography.Paragraph>
 
 			{consoleBucket && (
@@ -153,7 +153,7 @@ export function FederationPanel({
 					type="warning"
 					showIcon
 					title="These providers sign administrators in to the console"
-					description="An administrator links their identity once, by also entering their password. A provider creates new administrator accounts only when it is set to and sign-up is open on this bucket; each new account gets a personal group and never the super administrator privilege."
+					description="An administrator links their identity once, by also entering their password. A provider creates new administrator accounts only when it is set to and sign-up is open on this project; each new account gets a personal team and never the super administrator privilege."
 				/>
 			)}
 

@@ -48,7 +48,7 @@ async function clientOf(
 	clientId: string
 ): Promise<AdminClientView> {
 	const view = await getClientView(clientId);
-	if (view?.bucketId !== bucket._id) {
+	if (view?.projectId !== bucket._id) {
 		throw new AdminError(404, 'client not found');
 	}
 	return view;
@@ -80,7 +80,7 @@ export const clientRoutes = new Elysia({ name: 'admin-clients' })
 			return adminErrorBody(error);
 		}
 	})
-	.get('/admin/api/buckets/:id/clients', async ({ admin, params }) => {
+	.get('/admin/api/projects/:id/clients', async ({ admin, params }) => {
 		const ctx = assertAuth(admin);
 		const bucket = await loadBucket(ctx, params.id, 'read');
 		const stored = await adapter('Client').findByIndexed(
@@ -95,7 +95,7 @@ export const clientRoutes = new Elysia({ name: 'admin-clients' })
 		return views;
 	})
 	.post(
-		'/admin/api/buckets/:id/clients',
+		'/admin/api/projects/:id/clients',
 		async ({ admin, params, body, set }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucket(ctx, params.id, 'edit');
@@ -112,7 +112,7 @@ export const clientRoutes = new Elysia({ name: 'admin-clients' })
 		{ body: CreateClientBody }
 	)
 	.get(
-		'/admin/api/buckets/:id/clients/:clientId',
+		'/admin/api/projects/:id/clients/:clientId',
 		async ({ admin, params }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucket(ctx, params.id, 'read');
@@ -120,7 +120,7 @@ export const clientRoutes = new Elysia({ name: 'admin-clients' })
 		}
 	)
 	.patch(
-		'/admin/api/buckets/:id/clients/:clientId',
+		'/admin/api/projects/:id/clients/:clientId',
 		async ({ admin, params, body }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucket(ctx, params.id, 'edit');
@@ -134,7 +134,7 @@ export const clientRoutes = new Elysia({ name: 'admin-clients' })
 		{ body: UpdateClientBody }
 	)
 	.post(
-		'/admin/api/buckets/:id/clients/:clientId/secret',
+		'/admin/api/projects/:id/clients/:clientId/secret',
 		async ({ admin, params }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucket(ctx, params.id, 'edit');
@@ -151,7 +151,7 @@ export const clientRoutes = new Elysia({ name: 'admin-clients' })
 		}
 	)
 	.delete(
-		'/admin/api/buckets/:id/clients/:clientId',
+		'/admin/api/projects/:id/clients/:clientId',
 		async ({ admin, params }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucket(ctx, params.id, 'edit');

@@ -133,7 +133,7 @@ export const invitationAcceptRoutes = new Elysia({ name: 'admin-invitations' })
 				ownerGroupId: group._id
 			});
 
-			return { ok: true, groupId: group._id };
+			return { ok: true, teamId: group._id };
 		},
 		{ body: AcceptInvitationBody }
 	);

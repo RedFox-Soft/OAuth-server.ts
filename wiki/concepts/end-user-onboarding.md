@@ -1,33 +1,34 @@
 ---
 type: concept
-title: "End-user onboarding: bucket-scoped registration and email verification"
+title: "End-user onboarding: project-scoped registration and email verification"
 tags: [architecture, config, oidc]
 sources: [oauth-server-codebase]
 created: 2026-09-23
-updated: 2026-10-11
+updated: 2026-10-15
 ---
 
 # End-user onboarding
 
 Whether a person may register, and whether they must prove their address first, is decided **per
-user bucket**, not per server. Each bucket carries `registrationOpen`, `emailVerificationRequired` and
-`verificationMethod` (`'link' | 'code'`). A bucket created through the admin API is **closed** with
+project**, not per server (a project is stored as a bucket, `UserBucket`). Each project carries
+`registrationOpen`, `emailVerificationRequired` and
+`verificationMethod` (`'link' | 'code'`). A project created through the admin API is **closed** with
 verification off unless its creator opens it (spec 083: `registrationOpen: body.registrationOpen ?? false`,
-`lib/admin/buckets/routes.ts:721`); before 083 it was open. Only the route defaults it: a stored bucket
-without the field still reads as open. The reserved admin bucket is seeded closed
+`lib/admin/buckets/routes.ts:825`); before 083 it was open. Only the route defaults it: a stored project
+without the field still reads as open. The reserved administrators' project is seeded closed
 ([[admin-provisioning]]), and since spec 078 a super administrator may open it and require verification
-there like anywhere else ([[admin-bucket-settings]]). Since spec 083, tightening any of these is previewed
-with its counts and confirmed, and opening sign-up is previewed on the default and admin buckets
-([[bucket-sign-in-policy]]).
+there like anywhere else ([[admin-project-settings]]). Since spec 083, tightening any of these is previewed
+with its counts and confirmed, and opening sign-up is previewed on the default and administrators' projects
+([[project-sign-in-policy]]).
 
 ## The door
 
-The registration screen resolves its bucket from the interaction's client through
+The registration screen resolves its project from the interaction's client through
 `resolveBucketForRequest` — on the **GET as well as the POST** (`lib/interactions/index.ts:1040`),
 because a form that can only be refused on submission is a dead end dressed as an invitation. A closed
-bucket refuses; a bucket that requires verification creates the user unverified and issues a challenge.
-The login POST then refuses an unverified user in such a bucket — and, since spec 078, sends what they
-need rather than only saying "check your inbox": an account that existed before its bucket required
+project refuses; a project that requires verification creates the user unverified and issues a challenge.
+The login POST then refuses an unverified user in such a project — and, since spec 078, sends what they
+need rather than only saying "check your inbox": an account that existed before its project required
 verification had never been sent anything. A live challenge is reused, so a registrant who signs in
 before following their link keeps it (`sendOnDemand`, `lib/verification/challenge.ts`).
 
@@ -42,26 +43,26 @@ redirect to the login path and a notice (`verify_resent`, `verify_recent`, `veri
 rendering the page itself: the client bundle reads the page from the path, so a login document served at
 `…/verification/resend` never hydrates.
 
-The sign-in page links to registration only when the bucket accepts it, and to password reset only when
-the bucket allows it, read from the same bucket the doors resolve (`lib/interactions/loginOptions.ts`).
+The sign-in page links to registration only when the project accepts it, and to password reset only when
+the project allows it, read from the same project the doors resolve (`lib/interactions/loginOptions.ts`).
 
 **An administrator's create follows the same policy** (spec 082): a person created in the console or by an
-agent starts verified only when the bucket does not require verification
-(`lib/admin/users-end/routes.ts:279`). The route used to write `verified: true` whatever the bucket said, so an
+agent starts verified only when the project does not require verification
+(`lib/admin/users-end/routes.ts:341`). The route used to write `verified: true` whatever the project said, so an
 address nobody had proven counted as proven because an administrator typed it. It may now create a person
 with no password at all, and an administrator may mail anyone unverified a fresh message from the person's
 page; neither sends anything by itself ([[end-user-lifecycle]]).
 
-*Corrected in spec 078:* the admin bucket used to be exempt from the verification check
+*Corrected in spec 078:* the administrators' project used to be exempt from the verification check
 (`verificationGates`), as a lockout guard — its administrators were all unverified and nothing could
 send them a message. The exemption is gone; the guard moved to the setting, which refuses to turn on
-without mail delivery or while the acting administrator is unverified ([[admin-bucket-settings]]).
+without mail delivery or while the acting administrator is unverified ([[admin-project-settings]]).
 
-*Corrected in spec 083:* the mail-delivery refusal holds on **every** bucket, not only the admin bucket
-("people could not receive the verification message: configure mail delivery first",
-`lib/admin/buckets/routes.ts:838-849`). An ordinary bucket used to accept the requirement without mail, after
+*Corrected in spec 083:* the mail-delivery refusal holds on **every** project, not only the administrators'
+project ("people could not receive the verification message: configure mail delivery first",
+`lib/admin/buckets/routes.ts:939-948`). An ordinary project used to accept the requirement without mail, after
 which every unverified person was sent to a message that could not be sent. Turning it off is always
-allowed ([[bucket-sign-in-policy]]).
+allowed ([[project-sign-in-policy]]).
 
 ## The challenge
 
@@ -92,6 +93,6 @@ in memory (`sentEmails`, `lib/mail/mailer.ts:20`).
 
 ## Related
 
-- [[self-service-password-reset]] — the other mailed flow, which keeps the admin bucket out for a related reason
+- [[self-service-password-reset]] — the other mailed flow, which keeps the administrators' project out for a related reason
 - [[interaction-page-families]] — why the verification pages carry no script
-- [[account-resolution]] — the bucket a sign-in resolves, which the door must agree with
+- [[account-resolution]] — the project a sign-in resolves, which the door must agree with

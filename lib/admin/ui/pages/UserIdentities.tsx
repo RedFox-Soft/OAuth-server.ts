@@ -34,7 +34,7 @@ export function UserIdentityLinks({
 	const [loadError, setLoadError] = useState<string | null>(null);
 	const [loading, setLoading] = useState(true);
 
-	const base = `/admin/api/buckets/${encodeURIComponent(bucketId)}/users/${encodeURIComponent(user._id)}/identities`;
+	const base = `/admin/api/projects/${encodeURIComponent(bucketId)}/users/${encodeURIComponent(user._id)}/identities`;
 
 	const fetchLinks = useCallback(async () => {
 		try {
@@ -106,7 +106,7 @@ export function UserIdentityLinks({
 			rowKey={(link) => `${link.providerId}:${link.sub}`}
 			locale={{
 				emptyText: (
-					<EmptyState purpose="No linked identities. One is added when they sign in through an identity provider of this bucket." />
+					<EmptyState purpose="No linked identities. One is added when they sign in through an identity provider of this project." />
 				)
 			}}
 			columns={[

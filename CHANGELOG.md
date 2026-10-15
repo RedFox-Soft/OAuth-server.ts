@@ -11,6 +11,15 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Changed
 
+- **Buckets are called projects, administrator groups are called teams** (spec 100). Everywhere an administrator or
+  an agent reads or types a name, a bucket is a project, an administrator group a team (a personal group a personal
+  team), and a bucket group a group of the project's end users; storage, the protocol and issued tokens are
+  unchanged. **Breaking, with no aliases:** `/admin/api/buckets…` is `/admin/api/projects…` and
+  `/admin/api/groups…` is `/admin/api/teams…`; the MCP tools are `project_*`, `project_user_*`, `project_group_*`,
+  `project_key_*` and `team_*`; fields are `ownerTeamId`, `projectId`, `teamId` and `activeTeamId`, and the audit
+  filter is `project`. The audit trail shows its history in the new names, entries about the projects removed by
+  spec 099 as `retiredproject.*`. The setting `buckets.reservedHostnames` is `projects.reservedHostnames`, moved by
+  the migration `2026-10-17-projects-reserved-hostnames` (run `db:migrate`). Old console addresses redirect.
 - **The bucket is the only container; projects are removed** (spec 099). An application (OAuth client) and an
   API (declared protected resource) belong to one bucket for life, recorded on the client as a server-only
   `bucketId` that no registration can set; a client's allowed browser origins are its own `corsOrigins`; machine

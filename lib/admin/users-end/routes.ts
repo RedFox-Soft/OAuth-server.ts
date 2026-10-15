@@ -270,7 +270,7 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 	 * and authenticator — every filter answered by the datastore, so a bucket of any size reads in one page.
 	 */
 	.get(
-		'/admin/api/buckets/:id/users',
+		'/admin/api/projects/:id/users',
 		async ({ admin, params, query, request }) => {
 			const ctx = assertAuth(admin);
 			await loadBucketForUsers(ctx, params.id);
@@ -292,7 +292,7 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 	 * them, read now from the administrators' store, so an account since deleted reads as `null` rather than
 	 * as an id nobody can place.
 	 */
-	.get('/admin/api/buckets/:id/users/:uid', async ({ admin, params }) => {
+	.get('/admin/api/projects/:id/users/:uid', async ({ admin, params }) => {
 		const ctx = assertAuth(admin);
 		await loadBucketForUsers(ctx, params.id);
 		const user = await getUserStore(params.id).find(params.uid);
@@ -311,7 +311,7 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 		};
 	})
 	.post(
-		'/admin/api/buckets/:id/users',
+		'/admin/api/projects/:id/users',
 		async ({ admin, params, body, set }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForUsers(ctx, params.id);
@@ -366,7 +366,7 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 		{ body: CreateEndUserBody }
 	)
 	.patch(
-		'/admin/api/buckets/:id/users/:uid',
+		'/admin/api/projects/:id/users/:uid',
 		async ({ admin, params, body }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForUsers(ctx, params.id);
@@ -400,7 +400,7 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 		{ body: UpdateEndUserBody }
 	)
 	.post(
-		'/admin/api/buckets/:id/users/:uid/password',
+		'/admin/api/projects/:id/users/:uid/password',
 		async ({ admin, params, body }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForUsers(ctx, params.id);
@@ -439,7 +439,7 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 	 * The entry names the field, never the addresses: they are personal data, and the trail outlives the account.
 	 */
 	.post(
-		'/admin/api/buckets/:id/users/:uid/email',
+		'/admin/api/projects/:id/users/:uid/email',
 		async ({ admin, params, body }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForUsers(ctx, params.id);
@@ -462,7 +462,7 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 	 * before the entry, so the trail records sends that were attempted.
 	 */
 	.post(
-		'/admin/api/buckets/:id/users/:uid/verification',
+		'/admin/api/projects/:id/users/:uid/verification',
 		async ({ admin, params, set }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForUsers(ctx, params.id);
@@ -514,7 +514,7 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 	 * the entry. Answers 204 and never the link: choosing the password is the person's act.
 	 */
 	.post(
-		'/admin/api/buckets/:id/users/:uid/invitation',
+		'/admin/api/projects/:id/users/:uid/invitation',
 		async ({ admin, params, set }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForUsers(ctx, params.id);
@@ -536,7 +536,7 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 	 * refused before the entry.
 	 */
 	.post(
-		'/admin/api/buckets/:id/users/:uid/verified',
+		'/admin/api/projects/:id/users/:uid/verified',
 		async ({ admin, params }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForUsers(ctx, params.id);
@@ -555,7 +555,7 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 	 * application last received a token. Names and times only — no address, browser or device is stored.
 	 */
 	.get(
-		'/admin/api/buckets/:id/users/:uid/sessions',
+		'/admin/api/projects/:id/users/:uid/sessions',
 		async ({ admin, params }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForUsers(ctx, params.id);
@@ -570,7 +570,7 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 	 * included. The person stays signed in everywhere else.
 	 */
 	.post(
-		'/admin/api/buckets/:id/users/:uid/sessions/:clientId/sign-out',
+		'/admin/api/projects/:id/users/:uid/sessions/:clientId/sign-out',
 		async ({ admin, params, set }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForUsers(ctx, params.id);
@@ -592,7 +592,7 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 	 * the user's provisioning connection sends. The reason lives on the record, not in the trail.
 	 */
 	.post(
-		'/admin/api/buckets/:id/users/:uid/lock',
+		'/admin/api/projects/:id/users/:uid/lock',
 		async ({ admin, params, body }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForUsers(ctx, params.id);
@@ -619,7 +619,7 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 		{ body: LockEndUserBody }
 	)
 	.post(
-		'/admin/api/buckets/:id/users/:uid/unlock',
+		'/admin/api/projects/:id/users/:uid/unlock',
 		async ({ admin, params }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForUsers(ctx, params.id);
@@ -639,7 +639,7 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 	 * compromised person, and what a bucket's upstream identity provider can also ask for (specs/072).
 	 */
 	.post(
-		'/admin/api/buckets/:id/users/:uid/sign-out',
+		'/admin/api/projects/:id/users/:uid/sign-out',
 		async ({ admin, params }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForUsers(ctx, params.id);
@@ -673,7 +673,7 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 	 * operator should not have to know the current state to reach the one they want.
 	 */
 	.delete(
-		'/admin/api/buckets/:id/users/:uid/totp',
+		'/admin/api/projects/:id/users/:uid/totp',
 		async ({ admin, params }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForUsers(ctx, params.id);
@@ -710,29 +710,29 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 	 * happened to each, so repeating a request is harmless.
 	 */
 	.post(
-		'/admin/api/buckets/:id/users/bulk/deactivate',
+		'/admin/api/projects/:id/users/bulk/deactivate',
 		({ admin, params, body }) =>
 			bulk(admin, params.id, body.userIds, 'deactivate'),
 		{ body: BulkUsersBody }
 	)
 	.post(
-		'/admin/api/buckets/:id/users/bulk/activate',
+		'/admin/api/projects/:id/users/bulk/activate',
 		({ admin, params, body }) =>
 			bulk(admin, params.id, body.userIds, 'activate'),
 		{ body: BulkUsersBody }
 	)
 	.post(
-		'/admin/api/buckets/:id/users/bulk/sign-out',
+		'/admin/api/projects/:id/users/bulk/sign-out',
 		({ admin, params, body }) =>
 			bulk(admin, params.id, body.userIds, 'sign-out'),
 		{ body: BulkUsersBody }
 	)
 	.post(
-		'/admin/api/buckets/:id/users/bulk/delete',
+		'/admin/api/projects/:id/users/bulk/delete',
 		({ admin, params, body }) => bulk(admin, params.id, body.userIds, 'delete'),
 		{ body: BulkUsersBody }
 	)
-	.delete('/admin/api/buckets/:id/users/:uid', async ({ admin, params }) => {
+	.delete('/admin/api/projects/:id/users/:uid', async ({ admin, params }) => {
 		const ctx = assertAuth(admin);
 		const bucket = await loadBucketForUsers(ctx, params.id);
 		const cascade = await asAdmin(

@@ -21,7 +21,7 @@ import { statedRightRoutes } from './can_routes.ts';
  */
 const app = new Elysia().use(adminApiRoutes);
 
-const BUCKET = '/admin/api/buckets/:id';
+const BUCKET = '/admin/api/projects/:id';
 
 async function request(
 	method: string,
@@ -154,7 +154,7 @@ describe('a bucket scheduled for deletion, administered', () => {
 
 			expect(res.status).toBe(409);
 			expect(shaped(Refusal, res.body).message).toMatch(
-				/^This bucket is scheduled for deletion on \d{4}-\d{2}-\d{2}\. Restore it first\.$/
+				/^This project is scheduled for deletion on \d{4}-\d{2}-\d{2}\. Restore it first\.$/
 			);
 		}
 	);

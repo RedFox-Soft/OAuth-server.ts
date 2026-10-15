@@ -46,7 +46,7 @@ export function DeleteBucketDialog({
 	const [busy, setBusy] = useState(false);
 	// When the dialog opened: the restore deadline it states is counted from here, not re-read on every render.
 	const [openedAt] = useState(() => Date.now());
-	const summaryPath = `/admin/api/buckets/${encodeURIComponent(bucket._id)}/summary`;
+	const summaryPath = `/admin/api/projects/${encodeURIComponent(bucket._id)}/summary`;
 	// The count is read once per opening, whatever the parent passes as `onClose` on each render.
 	const close = useRef(onClose);
 	useEffect(() => {
@@ -79,7 +79,7 @@ export function DeleteBucketDialog({
 			params.set('expect', String(accounts));
 		}
 		const qs = params.toString();
-		const path = `/admin/api/buckets/${encodeURIComponent(bucket._id)}${mode === 'purge' ? '/purge' : ''}`;
+		const path = `/admin/api/projects/${encodeURIComponent(bucket._id)}${mode === 'purge' ? '/purge' : ''}`;
 		const result = await request<{
 			endUsersDestroyed?: number;
 			scheduled?: { purgeAt: string };
@@ -113,8 +113,8 @@ export function DeleteBucketDialog({
 	const consequences =
 		mode === 'purge'
 			? [
-					'The bucket is gone permanently. There is nothing left to inspect or restore.',
-					'Its sign-in address is freed, and another bucket may take it.'
+					'The project is gone permanently. There is nothing left to inspect or restore.',
+					'Its sign-in address is freed, and another project may take it.'
 				]
 			: [
 					'It stops answering at once: nobody can sign in and no app can get a token.',
@@ -131,7 +131,7 @@ export function DeleteBucketDialog({
 					? `Delete ${bucket.name} now?`
 					: `Delete ${bucket.name}?`
 			}
-			okText={mode === 'purge' ? 'Delete now' : 'Delete bucket'}
+			okText={mode === 'purge' ? 'Delete now' : 'Delete project'}
 			warning={
 				mode === 'purge'
 					? undefined

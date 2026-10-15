@@ -111,7 +111,7 @@ describe('creating a bucket user and changing their address', () => {
 
 		const { status, body } = await call(
 			'POST',
-			`/admin/api/buckets/${b}/users`,
+			`/admin/api/projects/${b}/users`,
 			{
 				email: 'federated@example.com'
 			}
@@ -124,7 +124,7 @@ describe('creating a bucket user and changing their address', () => {
 	it('creates a person unverified when the bucket requires verification', async () => {
 		const b = await bucket(true);
 
-		const { body } = await call('POST', `/admin/api/buckets/${b}/users`, {
+		const { body } = await call('POST', `/admin/api/projects/${b}/users`, {
 			email: 'unproven@example.com',
 			password: 'a long enough password'
 		});
@@ -138,7 +138,7 @@ describe('creating a bucket user and changing their address', () => {
 
 		const { status, body } = await call(
 			'POST',
-			`/admin/api/buckets/${b}/users/${user._id}/email`,
+			`/admin/api/projects/${b}/users/${user._id}/email`,
 			{ email: 'New@Example.com' }
 		);
 
@@ -152,7 +152,7 @@ describe('creating a bucket user and changing their address', () => {
 		const b = await bucket();
 		const user = await getUserStore(b).create('before@example.com', 'h', true);
 
-		await call('POST', `/admin/api/buckets/${b}/users/${user._id}/email`, {
+		await call('POST', `/admin/api/projects/${b}/users/${user._id}/email`, {
 			email: 'after@example.com'
 		});
 
@@ -168,7 +168,7 @@ describe('creating a bucket user and changing their address', () => {
 
 		const { status, body } = await call(
 			'POST',
-			`/admin/api/buckets/${b}/users/${user._id}/email`,
+			`/admin/api/projects/${b}/users/${user._id}/email`,
 			{ email: 'TAKEN@example.com' }
 		);
 
@@ -184,7 +184,7 @@ describe('creating a bucket user and changing their address', () => {
 
 		const { status, body } = await call(
 			'POST',
-			`/admin/api/buckets/${b}/users/${user._id}/email`,
+			`/admin/api/projects/${b}/users/${user._id}/email`,
 			{ email: 'elsewhere@example.com' }
 		);
 
@@ -199,7 +199,7 @@ describe('creating a bucket user and changing their address', () => {
 
 		const { status } = await call(
 			'POST',
-			`/admin/api/buckets/${b}/users/absent-user/email`,
+			`/admin/api/projects/${b}/users/absent-user/email`,
 			{ email: 'nobody@example.com' }
 		);
 
@@ -212,7 +212,7 @@ describe('creating a bucket user and changing their address', () => {
 
 		const { status, body } = await call(
 			'POST',
-			`/admin/api/buckets/${b}/users/${user._id}/verification`
+			`/admin/api/projects/${b}/users/${user._id}/verification`
 		);
 
 		expect(status).toBe(204);
@@ -226,7 +226,7 @@ describe('creating a bucket user and changing their address', () => {
 
 		const { status } = await call(
 			'POST',
-			`/admin/api/buckets/${b}/users/${user._id}/verification`
+			`/admin/api/projects/${b}/users/${user._id}/verification`
 		);
 
 		expect(status).toBe(409);
@@ -240,7 +240,7 @@ describe('creating a bucket user and changing their address', () => {
 
 		const { status, body } = await call(
 			'POST',
-			`/admin/api/buckets/${b}/users/${user._id}/verification`
+			`/admin/api/projects/${b}/users/${user._id}/verification`
 		);
 
 		expect(status).toBe(409);
@@ -253,12 +253,12 @@ describe('creating a bucket user and changing their address', () => {
 		const user = await getUserStore(b).create('twice@example.com', 'h', false);
 		await call(
 			'POST',
-			`/admin/api/buckets/${b}/users/${user._id}/verification`
+			`/admin/api/projects/${b}/users/${user._id}/verification`
 		);
 
 		const { status } = await call(
 			'POST',
-			`/admin/api/buckets/${b}/users/${user._id}/verification`
+			`/admin/api/projects/${b}/users/${user._id}/verification`
 		);
 
 		expect(status).toBe(429);

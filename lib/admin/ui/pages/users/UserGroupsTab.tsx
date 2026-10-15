@@ -36,7 +36,7 @@ export function UserGroupsTab({
 	const [adding, setAdding] = useState<string | undefined>(undefined);
 	const [busy, setBusy] = useState(false);
 	const [loading, setLoading] = useState(true);
-	const groupsApi = `/admin/api/buckets/${encodeURIComponent(bucketId)}/groups`;
+	const groupsApi = `/admin/api/projects/${encodeURIComponent(bucketId)}/groups`;
 
 	const fetchGroups = useCallback(async () => {
 		try {
@@ -144,7 +144,7 @@ export function UserGroupsTab({
 						title: 'Group',
 						dataIndex: 'displayName',
 						render: (name: string) => (
-							<Link href={bucketHref(bucketId, 'user-groups')}>{name}</Link>
+							<Link href={bucketHref(bucketId, 'groups')}>{name}</Link>
 						)
 					},
 					{

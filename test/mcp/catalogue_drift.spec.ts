@@ -116,11 +116,11 @@ describe('MCP tool catalogue', () => {
 		// Asserted by name and not merely by the counts above, so the withholding cannot be undone by
 		// an accidental catalogue addition that happens to keep the arithmetic right (FR-031).
 		const published = new Set(mcpCatalogue.map(key));
-		expect(published.has('DELETE /admin/api/buckets/:id')).toBe(false);
-		expect(mcpCatalogue.some((t) => t.tool === 'bucket_delete')).toBe(false);
+		expect(published.has('DELETE /admin/api/projects/:id')).toBe(false);
+		expect(mcpCatalogue.some((t) => t.tool === 'project_delete')).toBe(false);
 
 		const excluded = new Set(excludedConsoleOperations.map(key));
-		expect(excluded.has('DELETE /admin/api/buckets/:id')).toBe(true);
+		expect(excluded.has('DELETE /admin/api/projects/:id')).toBe(true);
 	});
 
 	// The server's instructions announce the withheld operations and not the inapplicable ones, and it
@@ -141,10 +141,10 @@ describe('MCP tool catalogue', () => {
 			'POST /admin/api/mcp/clients',
 			'PATCH /admin/api/mcp/clients/:entryId',
 			'DELETE /admin/api/mcp/clients/:entryId',
-			'DELETE /admin/api/buckets/:id',
+			'DELETE /admin/api/projects/:id',
 			/* Delete now: the destruction a scheduled deletion ends in, at once (specs/090). */
-			'POST /admin/api/buckets/:id/purge',
-			'DELETE /admin/api/groups/:id',
+			'POST /admin/api/projects/:id/purge',
+			'DELETE /admin/api/teams/:id',
 			'DELETE /admin/api/errors'
 		]);
 		expect(
@@ -157,8 +157,8 @@ describe('MCP tool catalogue', () => {
 			'POST /admin/api/logout',
 			'POST /admin/api/me/verification',
 			'PUT /admin/api/scope',
-			'POST /admin/api/buckets/:id/federation/:providerId/try',
-			'GET /admin/api/buckets/:id/federation/:providerId/try/:tryRef'
+			'POST /admin/api/projects/:id/federation/:providerId/try',
+			'GET /admin/api/projects/:id/federation/:providerId/try/:tryRef'
 		]);
 	});
 
@@ -175,45 +175,44 @@ describe('MCP tool catalogue', () => {
 			/* Removes a second factor from an account that administers the instance. */
 			'admin_totp_clear',
 			'admin_update',
-			'bucket_address_change',
-			/* Makes a group read-only to every administrator and hands it to an external directory. */
-			'bucket_group_assign_connection',
-			/* Every member loses what relying parties grant for the group. */
-			'bucket_group_delete',
-			'bucket_key_retire',
-			/* Every token the key signed stops verifying at once (specs/087). */
-			'bucket_key_revoke',
-			/* The group it leaves loses a population of people, with no step of its own. */
-			'bucket_owner_change',
-			/* Gives a switched-off population its sign-in, sessions and tokens back (specs/090). */
-			'bucket_restore',
-			/* Makes a local user read-only to every administrator, for good. */
-			'bucket_user_assign_connection',
-			/* One call ends access for up to a hundred people (specs/089). */
-			'bucket_user_bulk_deactivate',
-			/* One call deletes up to a hundred people, irreversibly (specs/089). */
-			'bucket_user_bulk_delete',
-			'bucket_user_delete',
-			/* Hands the account's recovery to whoever holds the new mailbox. */
-			'bucket_user_email_change',
-			'bucket_user_password_reset',
-			/* Re-admits an account an administrator locked as compromised. */
-			'bucket_user_unlock',
 			'client_delete',
 			'client_secret_rotate',
 			'federation_identity_delete',
 			'federation_provider_delete',
-			'group_member_remove',
 			'jwks_generate',
 			'jwks_promote',
 			'jwks_retire',
 			'jwks_revoke',
 			'jwks_rotate',
+			'project_address_change',
+			/* Makes a group read-only to every administrator and hands it to an external directory. */
+			'project_group_assign_connection',
+			/* Every member loses what relying parties grant for the group. */
+			'project_group_delete',
+			'project_key_retire',
+			/* Every token the key signed stops verifying at once (specs/087). */
+			'project_key_revoke',
+			/* The team it leaves loses a population of people, with no step of its own. */
+			'project_owner_change',
+			/* Gives a switched-off population its sign-in, sessions and tokens back (specs/090). */
+			'project_restore',
+			/* Makes a local user read-only to every administrator, for good. */
+			'project_user_assign_connection',
+			/* One call ends access for up to a hundred people (specs/089). */
+			'project_user_bulk_deactivate',
+			/* One call deletes up to a hundred people, irreversibly (specs/089). */
+			'project_user_bulk_delete',
+			'project_user_delete',
+			/* Hands the account's recovery to whoever holds the new mailbox. */
+			'project_user_email_change',
+			'project_user_password_reset',
+			/* Re-admits an account an administrator locked as compromised. */
+			'project_user_unlock',
 			/* Ends a customer's provisioning and revokes its tokens at once. */
 			'provisioning_connection_delete',
 			/* Re-admits the mass deprovisioning a connection's guard held. */
 			'provisioning_connection_release',
-			/* Hands out the authority to change a bucket's people; the secret it returns is shown once. */
+			/* Hands out the authority to change a project's people; the secret it returns is shown once. */
 			'provisioning_credential_issue',
 			/*
 			 * Removing a declared resource stops token issuance for that audience on the next request, so a
@@ -224,7 +223,8 @@ describe('MCP tool catalogue', () => {
 			'resource_delete',
 			'sentry_settings_update',
 			'settings_update',
-			'smtp_settings_update'
+			'smtp_settings_update',
+			'team_member_remove'
 		]);
 	});
 
@@ -285,7 +285,7 @@ describe('MCP tool catalogue', () => {
 	 * A tool takes one flat argument object, so two different things cannot share an argument name —
 	 * one silently wins and the other is dropped.
 	 *
-	 * Not hypothetical. `federation_provider_create` posts to `/admin/api/buckets/:id/federation` while
+	 * Not hypothetical. `federation_provider_create` posts to `/admin/api/projects/:id/federation` while
 	 * its body carries the provider's own `id`, so the provider id vanished and every call failed
 	 * validation. `pathArgs` renames the path parameter; this is what stops the next such route from
 	 * shipping broken.

@@ -45,7 +45,7 @@ async function recorded(action: string, targetId: string): Promise<number> {
 
 /* Whether a console session still opens the console. */
 async function stillSignedIn(cookie: string): Promise<boolean> {
-	return (await request('GET', '/admin/api/buckets', cookie)).status !== 401;
+	return (await request('GET', '/admin/api/projects', cookie)).status !== 401;
 }
 
 /**

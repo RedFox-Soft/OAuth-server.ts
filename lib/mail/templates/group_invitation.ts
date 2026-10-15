@@ -35,12 +35,12 @@ export function groupInvitationEmail(params: InvitationParams): {
 	const safeInviter = escapeHtml(invitedByEmail);
 	const outcome = createsAccount
 		? 'Accepting creates an administrator account for this address.'
-		: 'Accepting adds your existing administrator account to the group.';
+		: 'Accepting adds your existing administrator account to the team.';
 
 	const html = [
 		`<div style="font-family: Arial, Helvetica, sans-serif; max-width: 480px; margin: 0 auto; color: #1f1f1f;">`,
-		`<h2 style="font-size: 20px;">Join ${safeGroup}</h2>`,
-		`<p>${safeInviter} invited you to administer ${safeGroup} on ${escapeHtml(appName)}.</p>`,
+		`<h2 style="font-size: 20px;">Join the ${safeGroup} team</h2>`,
+		`<p>${safeInviter} invited you to administer the ${safeGroup} team on ${escapeHtml(appName)}.</p>`,
 		`<p style="text-align: center; margin: 28px 0;">`,
 		`<a href="${safeUrl}" style="background: #1677ff; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 6px; display: inline-block;">Accept the invitation</a>`,
 		`</p>`,
@@ -52,7 +52,7 @@ export function groupInvitationEmail(params: InvitationParams): {
 		`</div>`
 	].join('');
 
-	const text = `${invitedByEmail} invited you to administer ${groupName} on ${appName}.\n\nOpen this link to accept:\n${acceptUrl}\n\n${outcome} This link expires in seven days and can be used once.\n\nIf you were not expecting this, you can ignore this email — nothing is shared with you unless you accept.`;
+	const text = `${invitedByEmail} invited you to administer the ${groupName} team on ${appName}.\n\nOpen this link to accept:\n${acceptUrl}\n\n${outcome} This link expires in seven days and can be used once.\n\nIf you were not expecting this, you can ignore this email — nothing is shared with you unless you accept.`;
 
-	return { subject: `Join ${groupName} on ${appName}`, html, text };
+	return { subject: `Join the ${groupName} team on ${appName}`, html, text };
 }

@@ -22,7 +22,7 @@ const NEW_PASSWORD = 'a new password that is long enough';
 
 function setPassword(cookie: string, uid: string, signOut?: boolean) {
 	return admin.admin.api
-		.buckets({ id: DEFAULT_BUCKET_ID })
+		.projects({ id: DEFAULT_BUCKET_ID })
 		.users({ uid })
 		.password.post(
 			{ password: NEW_PASSWORD, ...(signOut === undefined ? {} : { signOut }) },

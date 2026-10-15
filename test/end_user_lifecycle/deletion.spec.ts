@@ -50,7 +50,7 @@ describe('deleting an end user', () => {
 		}
 
 		const res = await admin.admin.api
-			.buckets({ id: DEFAULT_BUCKET_ID })
+			.projects({ id: DEFAULT_BUCKET_ID })
 			.users({ uid: user.accountId })
 			.delete(undefined, { headers: { cookie } });
 

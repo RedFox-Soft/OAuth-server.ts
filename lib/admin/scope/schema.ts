@@ -7,5 +7,5 @@ import { t } from 'elysia';
  * time and is unloadable under test.
  */
 export const SwitchScopeBody = t.Object({
-	groupId: t.String({ minLength: 1 })
+	teamId: t.String({ minLength: 1 })
 });

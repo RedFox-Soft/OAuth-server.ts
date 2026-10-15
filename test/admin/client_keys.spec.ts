@@ -52,7 +52,7 @@ function json(method: string, path: string, body?: unknown) {
 }
 
 async function createClient(body: Record<string, unknown>) {
-	return json('POST', `/admin/api/buckets/${bucketId}/clients`, body);
+	return json('POST', `/admin/api/projects/${bucketId}/clients`, body);
 }
 
 async function created(body: Record<string, unknown>) {
@@ -208,7 +208,7 @@ describe('a key-authenticated client registered by an operator', () => {
 
 		const res = await json(
 			'PATCH',
-			`/admin/api/buckets/${bucketId}/clients/${client.clientId}`,
+			`/admin/api/projects/${bucketId}/clients/${client.clientId}`,
 			{ jwksUri: null, jwks: { keys: [publicKey] } }
 		);
 

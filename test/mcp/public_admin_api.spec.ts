@@ -82,7 +82,7 @@ describe('an agent token presented directly to the management API', () => {
 	});
 
 	it('is refused for a read', async () => {
-		const res = await direct('GET', '/admin/api/buckets', await agentToken());
+		const res = await direct('GET', '/admin/api/projects', await agentToken());
 
 		expect(res.status).toBe(401);
 	});
@@ -95,7 +95,7 @@ describe('an agent token presented directly to the management API', () => {
 
 		await direct(
 			'DELETE',
-			`/admin/api/buckets/${bucket._id}`,
+			`/admin/api/projects/${bucket._id}`,
 			await agentToken()
 		);
 

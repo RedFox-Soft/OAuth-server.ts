@@ -51,7 +51,8 @@ asserts the second while meaning the first, which on a diagnostic surface is the
 Specification 025 asked for agent purging to be an operator opt-in. It cannot be. A conditionally
 registered tool fails the first guard; a tool that reads the flag in its body fails the second by
 construction. So `DELETE /admin/api/errors` is an unconditional entry in `excludedConsoleOperations`,
-alongside bucket and group deletion (and project deletion, until spec 099 removed projects), and
+alongside project and team deletion (and the old Project entity's deletion — a retired project — until
+spec 099 removed it), and
 `error_purge_preview` is published so an agent can still
 report what a purge would remove without performing one.
 

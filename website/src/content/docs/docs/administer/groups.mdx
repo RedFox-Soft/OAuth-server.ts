@@ -1,70 +1,31 @@
 ---
 title: Groups and the groups claim
-description: Administrator groups own buckets, which can move between them. Bucket groups gather end users, read in the groups claim.
+description: A group is a named set of one project's end users. Relying parties read a user's groups in the groups claim and decide for themselves.
 sidebar:
-  order: 4
+  order: 5
 ---
 
-There are no roles. End users are grouped by **bucket groups**, and a relying party that needs to know
-what someone may do reads the names of their groups from the `groups` claim and decides for itself.
+There are no roles. End users are gathered into **groups**, and a relying party that needs to know what
+someone may do reads the names of their groups from the `groups` claim and decides for itself.
 
-## Two kinds of group, kept apart on purpose
+A group is a named set of one project's end users. It grants nothing on this server; it exists to be read by
+relying parties. Agents manage groups with the `project_group_*` tools.
 
-The word means two different things here, and the console and the API keep them apart:
+A group is not a [team](/docs/administer/teams/). Teams are sets of administrators, and they own projects.
+The two are separate entities so that nothing a directory writes over SCIM, and nothing in a token, can reach
+the set that grants privilege here. A SCIM directory writes a project's groups; it cannot touch a team.
 
-- **Bucket groups** are named sets of one bucket's end users. They grant nothing on this server; they
-  exist to be read by relying parties. Agents manage them with the `bucket_group_*` tools.
-- **Administrator groups** own buckets, and with them everything a bucket holds: its end users, its
-  applications and its APIs. Membership is what gives an administrator access to them. One of them, **Super administrators**, is the instance-wide privilege. Agents manage
-  administrator groups with the `group_*` tools, and super administrator standing with
-  `admin_super_grant` and `admin_super_withdraw`.
+## Who keeps a group
 
-They are separate entities so that nothing a directory writes over SCIM, and nothing in a token, can
-reach the set that grants privilege here. A SCIM directory writes bucket groups; it cannot touch an
-administrator group.
+A group is kept either by administrators or by exactly one [SCIM connection](/docs/administer/scim/):
 
-## Administrator groups
-
-Every administrator has a **personal group**, created with their account. It has exactly one member,
-its administrator: adding a member to it, or inviting someone into it, is refused. Shared work goes into
-a regular group, created on the **Groups** page or with `group_create`.
-
-Each administrator group has a page. A member sees the other members with their email addresses, and what the
-group owns. An owner invites colleagues with **Invite administrator…**: an email with a single-use link,
-valid for 7 days, that also creates the account of someone who has none yet. Pending invitations are
-listed on the same page and can be revoked. Removing a member says first what they lose. Agents use
-`group_get`, `group_invite`, `group_invitation_list`, `group_invitation_revoke` and the
-`group_member_*` tools.
-
-A bucket is created in a group you choose: the console's creation dialog asks for it, and the API takes
-an optional `groupId`, which defaults to your active group. Applications and APIs are created inside a
-bucket and belong to its group for as long as they exist.
-
-### Moving a bucket to another group
-
-Work started in a personal group, or in the wrong team, moves with **Move to group…** on a bucket. Use
-`PUT /admin/api/buckets/:id/owner`, or `bucket_owner_change` for an agent. The bucket takes everything it
-holds with it in one step: its applications and its APIs move too, and nothing is left behind in the
-group it leaves. An application or an API never moves on its own.
-
-A move needs an owner of the group it leaves and a member of the group it joins. Without `confirm`, the
-call only previews what would move, with the counts of applications and APIs. End users, applications and
-sign-in addresses are untouched, and the audit entry is visible to both groups. A bucket cannot move into
-another administrator's personal group or into Super administrators, and the default bucket and the
-administrators' bucket never move. The agent tool is high-consequence and asks for confirmation.
-
-## Who keeps a bucket group
-
-A bucket group is kept either by administrators or by exactly one
-[SCIM connection](/docs/administer/scim/):
-
-- An **administrator-kept** group is created on the bucket's **User groups** tab or with
-  `bucket_group_create`, and its members are edited there. It may hold provisioned users too; the
+- An **administrator-kept** group is created on the project's **Groups** tab or with
+  `project_group_create`, and its members are edited there. It may hold provisioned users too; the
   membership belongs to the group, and the directory never sees it.
 - A **connection-owned** group is created by the directory through `/Groups`. Administrators can read it
   but not change it, and the connection may add only users it provisioned.
 
-Names are unique within a bucket regardless of letter case. If a directory tries to create a group whose
+Names are unique within a project regardless of letter case. If a directory tries to create a group whose
 name an administrator-kept group already holds, it is refused. An administrator can then hand the
 existing group over to the connection, once every member is someone that connection manages. The
 handover is never automatic: it is previewed first, and applies only when confirmed.
@@ -97,7 +58,7 @@ Where it appears:
   membership change shows up in the next token, not in one already issued.
 
 Because the value is the display name, renaming a group changes what relying parties receive. That is
-intended, since only the group's owner can rename it and names are unique in the bucket, but a relying
+intended, since only the group's owner can rename it and names are unique in the project, but a relying
 party that matches on a name has to learn the new one.
 
 ## Above 200 groups
@@ -122,7 +83,7 @@ more than 200 of them, give it another way to look them up.
 
 ## Moving from roles
 
-The 0.8.0 upgrade turned every role into an administrator-kept bucket group with the same members, and
-every holder of `super_admin` into a member of Super administrators. [Upgrading](/docs/deploy/upgrade/)
-has the details. A relying party that read roles from a custom claim reads `groups` now; a script that
-set `roles` through the admin API sets group memberships instead.
+The 0.8.0 upgrade turned every role into an administrator-kept group with the same members, and every holder
+of `super_admin` into a member of the [Super administrators](/docs/administer/teams/#kinds-of-team) team.
+[Upgrading](/docs/deploy/upgrade/) has the details. A relying party that read roles from a custom claim reads
+`groups` now; a script that set `roles` through the admin API sets group memberships instead.

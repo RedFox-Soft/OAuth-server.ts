@@ -104,7 +104,7 @@ describe('tool call latency', () => {
 
 		const viaConsole = await median(15, () =>
 			elysia.handle(
-				new Request('http://e.ly/admin/api/buckets', { headers: { cookie } })
+				new Request('http://e.ly/admin/api/projects', { headers: { cookie } })
 			)
 		);
 
@@ -114,7 +114,7 @@ describe('tool call latency', () => {
 					jsonrpc: '2.0',
 					id: ++rpcId,
 					method: 'tools/call',
-					params: { name: 'bucket_list', arguments: {} }
+					params: { name: 'project_list', arguments: {} }
 				},
 				token
 			)
@@ -141,14 +141,14 @@ describe('tool call latency', () => {
 		ApplicationConfig['mcp.enabled'] = false;
 		const off = await median(15, () =>
 			elysia.handle(
-				new Request('http://e.ly/admin/api/buckets', { headers: { cookie } })
+				new Request('http://e.ly/admin/api/projects', { headers: { cookie } })
 			)
 		);
 
 		ApplicationConfig['mcp.enabled'] = true;
 		const on = await median(15, () =>
 			elysia.handle(
-				new Request('http://e.ly/admin/api/buckets', { headers: { cookie } })
+				new Request('http://e.ly/admin/api/projects', { headers: { cookie } })
 			)
 		);
 

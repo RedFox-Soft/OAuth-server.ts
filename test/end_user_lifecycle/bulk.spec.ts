@@ -54,7 +54,7 @@ function bulk(act: Act, userIds: string[], asCookie = cookie) {
 	return adminCall(
 		asCookie,
 		'POST',
-		`/admin/api/buckets/${DEFAULT_BUCKET_ID}/users/bulk/${act}`,
+		`/admin/api/projects/${DEFAULT_BUCKET_ID}/users/bulk/${act}`,
 		{ userIds }
 	);
 }

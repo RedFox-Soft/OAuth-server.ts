@@ -28,8 +28,8 @@ const Holds = Type.Object({
 	count: Type.Number(),
 	connections: Type.Array(
 		Type.Object({
-			bucketId: Type.String(),
-			bucketName: Type.String(),
+			projectId: Type.String(),
+			projectName: Type.String(),
 			connectionId: Type.String(),
 			displayName: Type.String(),
 			since: Type.String(),
@@ -105,8 +105,8 @@ describe('held provisioning connections across buckets', () => {
 		expect(holds.count).toBe(1);
 		expect(holds.connections).toHaveLength(1);
 		expect(holds.connections[0]).toMatchObject({
-			bucketId: bucket._id,
-			bucketName: bucket.name,
+			projectId: bucket._id,
+			projectName: bucket.name,
 			connectionId: connection._id,
 			displayName: connection.displayName,
 			refused: 0
@@ -132,7 +132,7 @@ describe('held provisioning connections across buckets', () => {
 
 		const rows = shaped(
 			BucketRows,
-			await get('/admin/api/buckets', await cookieFor(outsider))
+			await get('/admin/api/projects', await cookieFor(outsider))
 		);
 
 		expect(rows.find((row) => row._id === bucket._id)).toMatchObject({

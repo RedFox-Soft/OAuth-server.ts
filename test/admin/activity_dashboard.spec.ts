@@ -72,8 +72,8 @@ async function bucketOf(groupId: string): Promise<string> {
 /* Deleted and then destroyed at once: a deletion only schedules the destruction (specs/090). */
 async function deleteBucket(bucketId: string, as: User) {
 	for (const [method, path] of [
-		['DELETE', `/admin/api/buckets/${bucketId}`],
-		['POST', `/admin/api/buckets/${bucketId}/purge`]
+		['DELETE', `/admin/api/projects/${bucketId}`],
+		['POST', `/admin/api/projects/${bucketId}/purge`]
 	] as const) {
 		const response = await app.handle(
 			new Request(`http://e.ly${path}`, {
@@ -86,7 +86,7 @@ async function deleteBucket(bucketId: string, as: User) {
 }
 
 function rowOf(answer: OverviewAnswer, bucketId: string) {
-	const row = answer.buckets.find((b) => b.bucketId === bucketId);
+	const row = answer.projects.find((b) => b.projectId === bucketId);
 	if (!row) throw new Error(`no row for ${bucketId}`);
 	return row;
 }
@@ -150,7 +150,7 @@ describe('the usage overview, for a super administrator', () => {
 
 		expect(row.deleted).not.toBeNull();
 		expect(row.customer).toMatchObject({
-			groupId: group._id,
+			teamId: group._id,
 			label: group.name
 		});
 	});
@@ -178,7 +178,7 @@ describe('the usage overview, for a super administrator', () => {
 			.finally(() => listed.mockRestore());
 
 		expect(row.customer).toEqual({
-			groupId: null,
+			teamId: null,
 			label: 'Unknown',
 			kind: null,
 			exists: false
@@ -191,7 +191,7 @@ describe('the usage overview, for a super administrator', () => {
 
 		const answer = await overview();
 		const customer = answer.customers.find((c) =>
-			c.bucketIds.includes(bucketId)
+			c.projectIds.includes(bucketId)
 		);
 
 		expect(customer?.contacts).toContain(owner.email);
@@ -208,11 +208,11 @@ describe('the usage overview, for a super administrator', () => {
 		await deleteBucket(gone, owner);
 
 		const customer = (await overview()).customers.find(
-			(c) => c.customer.groupId === group._id
+			(c) => c.customer.teamId === group._id
 		);
 
 		expect(customer?.current?.total).toBe(25);
-		expect(customer?.bucketIds.sort()).toEqual([kept, gone].sort());
+		expect(customer?.projectIds.sort()).toEqual([kept, gone].sort());
 	});
 
 	it('carries no change against the previous month while the month is in progress', async () => {
@@ -254,7 +254,7 @@ describe('the usage overview, for a super administrator', () => {
 			restoreClock = atDay(NOW);
 
 			const { changes } = await overview('2031-02');
-			const fall = changes.falls.find((c) => c.bucketId === fell);
+			const fall = changes.falls.find((c) => c.projectId === fell);
 
 			expect(fall).toMatchObject({
 				from: { period: '2031-01', total: 200 },
@@ -263,7 +263,7 @@ describe('the usage overview, for a super administrator', () => {
 				percent: -75
 			});
 			expect(fall?.customer.label).toBeTruthy();
-			expect(changes.rises.map((c) => c.bucketId)).toContain(rose);
+			expect(changes.rises.map((c) => c.projectId)).toContain(rose);
 		});
 
 		it('does not list a change among a handful of people', async () => {
@@ -272,7 +272,7 @@ describe('the usage overview, for a super administrator', () => {
 			const { changes } = await overview('2031-02');
 
 			expect(
-				[...changes.falls, ...changes.rises].map((c) => c.bucketId)
+				[...changes.falls, ...changes.rises].map((c) => c.projectId)
 			).not.toContain(small);
 		});
 
@@ -282,7 +282,7 @@ describe('the usage overview, for a super administrator', () => {
 			const { changes } = await overview();
 
 			expect(changes).toMatchObject({ from: '2031-01', to: '2031-02' });
-			expect(changes.falls.map((c) => c.bucketId)).toContain(fell);
+			expect(changes.falls.map((c) => c.projectId)).toContain(fell);
 		});
 	});
 });

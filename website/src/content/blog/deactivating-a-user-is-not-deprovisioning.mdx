@@ -247,8 +247,8 @@ the same sweep but leaves the user active. Delete when the account itself should
 ends access: the same steps run before deletion.
 
 Some of the machinery around the sweep arrived later than the sweep itself. A directory connects to
-our server through a provisioning connection — a record that links one directory to one bucket of
-users. A bucket is what our server calls a group of users with their own sign-in rules. Once a bucket
+our server through a provisioning connection — a record that links one directory to one project.
+A project is what our server calls a set of users with their own sign-in rules. Once a project
 has its own address, it issues tokens in its own name, that is, it becomes a separate issuer. If a
 connection starts disabling too many users at once, the connection is put on hold. That safeguard has
 passed its tests. But Okta's CRUD test (checking that users are created, read, updated and deleted) has

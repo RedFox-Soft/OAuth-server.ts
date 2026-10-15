@@ -61,11 +61,11 @@ fine and is subtly broken.
 
 <Aside
 	type="caution"
-	title="Upgrading from before ownership groups"
+	title="Upgrading from before ownership teams"
 >
-	A deployment old enough to predate ownership groups must upgrade through an
-	earlier release first. The one-off conversion that introduced them has been
-	retired, and current releases do not attempt it.
+	A deployment old enough to predate ownership teams (then called ownership
+	groups) must upgrade through an earlier release first. The one-off conversion
+	that introduced them has been retired, and current releases do not attempt it.
 </Aside>
 
 ## Why step 3 is not optional
@@ -79,7 +79,7 @@ upserts, so running it against an already-current database changes nothing. What
   script also drops stale expiry indexes for a field a release has stopped writing. On PostgreSQL
   there are no TTL indexes to create; the running server sweeps expired rows itself.
 - **Seed changes.** When a release changes the admin seed, `db:setup` is what applies it: a new
-  reserved client, a new field on the administrator bucket, a group the ownership model now expects.
+  reserved client, a new field on the administrators' project, a team the ownership model now expects.
   The reserved `admin-mcp` agent client arrived exactly this way: an existing install has it only
   once `db:setup` has run again.
 
@@ -130,7 +130,7 @@ admin API) as part of the change.
 - **Signing keys persist in the database** — every issuer's, the instance's included, as records in
   `bucketKeys`. An upgrade neither rotates nor invalidates them: tokens issued before it still verify,
   and every `/jwks` serves the same key set it did. Keys are not environment configuration and there
-  is nothing to carry across by hand. The one exception is the release that gave buckets keys of their
+  is nothing to carry across by hand. The one exception is the release that gave projects keys of their
   own, below; 0.8.0's migration moved the instance's keys into `bucketKeys` without changing them.
 - **SMTP settings** are read live from their own store on every send, so they are unaffected by a
   restart in either direction.
@@ -139,13 +139,13 @@ admin API) as part of the change.
 
 ## One upgrade signs your end users in again
 
-Upgrading **to the release that made user buckets addressable**, and only that one, ends every
+Upgrading **to the release that made projects addressable**, and only that one, ends every
 end-user sign-in once.
 
-A sign-in is held in a browser cookie, and that cookie is now named after the bucket it belongs to —
-`_session_default`, `_session_acme` — so that somebody can be signed in to two buckets at once
-without either sign-in disturbing the other. Cookies written before the upgrade carry the old,
-bucket-less name. They are not read, and the server expires them on the first request that presents
+A sign-in is held in a browser cookie, and that cookie is now named after the project it belongs to —
+`_session_default`, `_session_acme` — so that somebody can be signed in to two projects at once
+without either sign-in disturbing the other. Cookies written before the upgrade carry the old name,
+which names no project. They are not read, and the server expires them on the first request that presents
 one, so a browser stops sending a cookie that no longer means anything.
 
 What your end users see: the sign-in screen, once, the next time they visit. Nothing is lost —
@@ -154,29 +154,29 @@ without anybody signing in at all. There is nothing to do on your side and no or
 it is listed here so the support question is expected rather than alarming.
 
 The console is unaffected in one respect worth naming: it stays at `/admin`. An earlier plan moved
-it to free that word for a bucket address, and that turned out not to be necessary — the
-administrators bucket is served at the root and never puts its name in a URL.
+it to free that word for a project address, and that turned out not to be necessary — the
+administrators' project is served at the root and never puts its name in a URL.
 
-## One upgrade gives each bucket keys of its own
+## One upgrade gives each project keys of its own
 
-Upgrading **to the release that gave addressable buckets their own signing keys and resource
+Upgrading **to the release that gave addressable projects their own signing keys and resource
 namespaces** changes three things an integration can see. The instance's own issuer, its metadata and
-its `/jwks` are unchanged; everything below concerns buckets with a path or a hostname of their own.
+its `/jwks` are unchanged; everything below concerns projects with a path or a hostname of their own.
 
-- **A bucket signs with its own key from its first use.** Before, every bucket signed with the instance
+- **A project signs with its own key from its first use.** Before, every project signed with the instance
   keys and its discovery pointed `jwks_uri` at the instance's `/jwks`. Now its `jwks_uri` is beneath its
   own issuer — `https://auth.example.com/acme/jwks`, or its hostname's `/jwks` — and holds only its own
-  keys. A resource server that re-reads the bucket's metadata picks this up by itself; one configured
-  with the instance's `/jwks` by hand has to be pointed at the bucket's.
-- **Tokens a bucket issued before the upgrade stop verifying at its resource servers.** They were
-  signed with the instance keys, which the bucket no longer publishes. The switch is immediate, with no
+  keys. A resource server that re-reads the project's metadata picks this up by itself; one configured
+  with the instance's `/jwks` by hand has to be pointed at the project's.
+- **Tokens a project issued before the upgrade stop verifying at its resource servers.** They were
+  signed with the instance keys, which the project no longer publishes. The switch is immediate, with no
   overlap, because an overlap would keep one tenant's tokens verifiable at another's. Access and ID
   tokens are short-lived and refresh tokens are unaffected, so clients recover on their next refresh;
   plan the upgrade for a quiet moment if long-lived access tokens are in use.
 - **The release carries its first schema migration, and it cannot be undone.** It re-keys declared
   protected resources so that an identifier is unique per issuer rather than across the instance.
   `db:migrate --plan` names it; take a backup before `db:migrate`, which step 4 above runs. From then
-  on, declaring a resource in a bucket of one's own needs nothing from the resource, and at the
+  on, declaring a resource in a project of one's own needs nothing from the resource, and at the
   instance's root issuer only a super administrator declares.
 
 ## One upgrade turns roles into groups and moves the instance's keys
@@ -189,7 +189,7 @@ order:
 1. **Take a backup.** There is no way back from either migration except a restore.
 
 2. **Run `db:setup`** (or `db:setup:pg`). The release adds storage areas the migrations and the new
-   features write into — bucket groups and their memberships, provisioning connections, the
+   features write into — groups and their memberships, provisioning connections, the
    deprovisioning tally — and `db:migrate` expects them to exist.
 
 3. **Run `db:migrate --plan`**, then `db:migrate`. The plan names both migrations below. The server
@@ -198,7 +198,7 @@ order:
 
 </Steps>
 
-**`2026-09-30-root-keys-lifecycle`** moves the instance's signing keys into the store a bucket's keys
+**`2026-09-30-root-keys-lifecycle`** moves the instance's signing keys into the store a project's keys
 already use, so that the instance's keys rotate without a restart too. For each algorithm, the key that
 signs afterwards is the key the old server was signing with; on PostgreSQL, which keeps no insertion
 order, that is the key with the lowest `kid`. The migration prints which key it chose for each algorithm,
@@ -206,17 +206,17 @@ so check that output against what your relying parties expect. Every other key b
 it is still served at `/jwks` and still verifies, but it does not sign. A migrated key can be promoted
 once the 60-second publication window has passed. See [Rotate signing keys](/docs/administer/signing-keys/).
 
-**`2026-10-08-roles-to-groups`** removes roles. Every role a bucket declares, or an end user holds, becomes
-a bucket group with exactly the same holders as members. Role names that differ only in letter case are
-merged into one group, blank names are skipped, and a name some user held but the bucket never declared
+**`2026-10-08-roles-to-groups`** removes roles. Every role a project declares, or an end user holds, becomes
+a group with exactly the same holders as members. Role names that differ only in letter case are
+merged into one group, blank names are skipped, and a name some user held but the project never declared
 is kept as a group. The migration reports each of these as a count. On the administrator side, every
-holder of `super_admin`, active or deactivated, becomes a member of the Super administrators group.
+holder of `super_admin`, active or deactivated, becomes a member of the Super administrators team.
 `project_admin` disappears without replacement, because it never granted anything.
 
 What an integration sees after 0.8.0:
 
 - **`roles` is gone from the admin API and from MCP.** A script or agent that set `roles` on an
-  administrator, a bucket or an end user is now refused, because the field is unknown. Super
+  administrator, a project or an end user is now refused, because the field is unknown. Super
   administrator standing is granted and withdrawn by operations of its own, `admin_super_grant` and
   `admin_super_withdraw`, and end users are grouped with the `bucket_group_*` tools. Relying parties that
   read roles from a claim read the [`groups` claim](/docs/administer/groups/) instead.
@@ -230,7 +230,7 @@ What an integration sees after 0.8.0:
   federated sign-in carries none. A test or relying party that treated the mere presence of `amr` as
   "used a second factor" now gets that wrong. Look for `mfa` or `otp` in the array instead.
 - **`jwks_delete` is gone, and so is deleting a key.** Keys are retired instead, and a retire, of an
-  instance key or a bucket key, is refused unless its body names the key: `{ "confirm": "<kid>" }`.
+  instance key or a project key, is refused unless its body names the key: `{ "confirm": "<kid>" }`.
   The console makes the operator type the `kid`.
 
 ### Then 0.9.0
@@ -248,11 +248,11 @@ backup those releases asked for, then run `db:migrate` once.
 
 ### Then 0.10.0
 
-0.10.0 carries one schema migration, and it cannot be undone. A personal group used to be able to gain
+0.10.0 carries one schema migration, and it cannot be undone. A personal team used to be able to gain
 members; from this release it has exactly one, its owner. The migration
-`2026-10-09-personal-groups-single-member` removes everyone else from each personal group and writes one
-audit entry per group. Before you upgrade, list the personal groups with more than one member
-(`group_list` with `kind: personal`). Move what they hold into a regular group, or note who loses access.
+`2026-10-09-personal-groups-single-member` removes everyone else from each personal team and writes one
+audit entry per team. Before you upgrade, list the personal teams with more than one member
+(`group_list` with `kind: personal`). Move what they hold into a regular team, or note who loses access.
 
 Then take a backup and run `db:setup` (or `db:setup:pg`). It adds the `activityMarks` and
 `activityFigures` areas that count active users, and a new index on the audit trail. `db:migrate --plan`
@@ -260,9 +260,9 @@ names the migration, and `db:migrate` runs it.
 
 What else an operator or an integration sees after 0.10.0:
 
-- **The administrators' settings are bucket settings now.** `GET` and `PATCH /admin/api/admins/settings`
+- **The administrators' settings are project settings now.** `GET` and `PATCH /admin/api/admins/settings`
   and the MCP tools `admin_settings_read` and `admin_settings_update` are removed. Read and change the
-  administrators' bucket with `bucket_get` and `bucket_update`, as any other bucket.
+  administrators' project with `bucket_get` and `bucket_update`, as any other project.
 - **A setting stored with the wrong type stops startup.** The settings API never writes one, so this
   only concerns a value edited into the database by hand, such as a flag stored as the string `"false"`.
   The error names the key. A malformed `richAuthorizationRequests.types` stops startup too, even while
@@ -278,7 +278,7 @@ it sets and plan the replacements: a directory that still holds an expired token
 
 Then take a backup and run `db:setup` (or `db:setup:pg`). It adds the `provisioningRefusals` area, which
 records the removals a held connection refused, and new indexes: prefix search over users' emails and
-usernames, the audit trail's bucket filters, and a connection's previous static token. `db:migrate --plan`
+usernames, the audit trail's project filters, and a connection's previous static token. `db:migrate --plan`
 names the migration, and `db:migrate` runs it.
 
 What else an operator or an integration sees after 0.11.0:
@@ -288,16 +288,16 @@ What else an operator or an integration sees after 0.11.0:
   secret, readable by any super administrator or an agent acting for one.
 - **The users list is paged by the server.** `GET /admin/api/buckets/:id/users` and `bucket_user_list`
   answer `{ users, totalResults }` in email order, a page at a time, instead of an array of everyone.
-- **More changes ask to be confirmed.** Setting or clearing a project's bucket, tightening a bucket's
-  sign-in (passwords off, verification or an authenticator required, sign-up opened on a reserved bucket)
-  and handing a group to a directory answer 409 with what they do. They apply only when the request is
-  repeated with `confirm: true` and the same `expect`. A script that did any of these in one request must
-  now send the second.
-- **Deleting a bucket schedules it.** `DELETE /admin/api/buckets/:id` switches the bucket off and destroys
-  it 30 days later; `POST /admin/api/buckets/:id/purge` destroys a scheduled bucket at once, and
+- **More changes ask to be confirmed.** Setting or clearing the bucket of one of the old projects (removed
+  since), tightening a project's sign-in (passwords off, verification or an authenticator required, sign-up
+  opened on a reserved project) and handing a group to a directory answer 409 with what they do. They
+  apply only when the request is repeated with `confirm: true` and the same `expect`. A script that did
+  any of these in one request must now send the second.
+- **Deleting a project schedules it.** `DELETE /admin/api/buckets/:id` switches the project off and
+  destroys it 30 days later; `POST /admin/api/buckets/:id/purge` destroys a scheduled project at once, and
   `bucket_restore` brings it back. Its address stays taken until it is destroyed.
-- **New buckets are closed to sign-up** unless the request asks for it, and requiring a verified address
-  is refused on every bucket until mail delivery is configured.
+- **New projects are closed to sign-up** unless the request asks for it, and requiring a verified address
+  is refused on every project until mail delivery is configured.
 - **A user's profile wins over a stored claim of the same name.** An application that read a `given_name`
   from a user's claims document while the profile held another now receives the profile's.
 
@@ -310,7 +310,7 @@ What else an operator or an integration sees after 0.12.0:
 
 - **The consent form is bound to the account it was shown for.** It carries a hidden `accountId`, and a post
   for any other account is refused. A script that fills in the consent form itself must send it.
-- **The consent page is reworded and rebuilt.** It is headed by the bucket's new `displayName` (or its
+- **The consent page is reworded and rebuilt.** It is headed by the project's new `displayName` (or its
   address), names the account by email, and groups what an application asks for into what it will see, what it
   will do and what nobody described. A test or a script that reads the page's text must be updated.
 - **A refused permission can be granted again.** A permission someone left out is offered again when the
@@ -319,8 +319,44 @@ What else an operator or an integration sees after 0.12.0:
   person's own choice, the application's `ui_locales`, the account's stored locale and the browser, and they
   answer with `Content-Language` and `Vary: Accept-Language, Cookie`. Protocol answers do not change. Both
   discovery documents publish `ui_locales_supported`.
-- **Every bucket has a connected-apps page** at `/account/apps` on its own address, where people remove the
+- **Every project has a connected-apps page** at `/account/apps` on its own address, where people remove the
   access they gave. A removal is audited as `self-service`.
+
+### Then the next release
+
+The next release renames what an administrator or an agent reads and types. A bucket is now a **project**,
+an administrator group a **team** (a personal group a **personal team**), and a bucket group a **group** of
+the project's end users. The sections above already use the new words; the paths and tool names they quote
+are those of their release. Storage, the protocol and issued tokens do not change: issuer addresses,
+discovery, `/jwks`, tokens, SCIM and end-user pages are what they were.
+
+The release also removes the old projects, the containers that listed a bucket's applications, before it
+gives their name to buckets; the [changelog](/changelog/) describes that change and its migrations. It
+carries one migration of its own for the rename, and it cannot be undone:
+`2026-10-17-projects-reserved-hostnames` moves the stored value of the setting `buckets.reservedHostnames`
+to its new key, `projects.reservedHostnames`, and changes nothing else. Take a backup, then
+`db:migrate --plan` names the migrations and `db:migrate` runs them.
+
+What an integration sees, with no aliases kept for the old names:
+
+- **Admin API paths.** `/admin/api/buckets…` is `/admin/api/projects…`, a project's groups are at
+  `/admin/api/projects/:id/groups…`, and `/admin/api/groups…` is `/admin/api/teams…`. Every sub-path keeps
+  its suffix, and an old path answers 404. A script written for the old `/admin/api/projects` routes does
+  not work against the new ones.
+- **Fields.** `ownerGroupId` is `ownerTeamId`, an application's or API's `bucketId` is `projectId`, and
+  `groupId` is `teamId` when creating or moving a project, switching scope (`PUT /admin/api/scope`) and
+  accepting an invitation. `/admin/api/me` answers `activeTeamId`, and the audit filter `bucket` is
+  `project`. Error messages say project, team and group.
+- **MCP tools.** `bucket_*`, `bucket_user_*`, `bucket_group_*` and `bucket_key_*` are `project_*`,
+  `project_user_*`, `project_group_*` and `project_key_*`, and `group_*` is `team_*`. The count, each tool's
+  consequence class and its confirmation are unchanged. An agent that kept the old list gets "unknown tool"
+  and has to list the tools again.
+- **Console addresses.** The console lives at `/admin/projects/…` and `/admin/teams/…`, and a project's
+  groups at `/admin/projects/:id/groups`. Old addresses redirect, so bookmarks and the links in
+  held-deprovisioning emails already sent still open their page.
+- **The audit trail.** Entries are shown as `project.*`, `team.*` and `group.*`, those written before the
+  upgrade included, and a filter by a new name finds them; the stored entries are not changed. Entries about
+  the old projects are shown as `retiredproject.*` and do not match a filter for today's project actions.
 
 ## After the restart
 
@@ -335,6 +371,6 @@ automating. The shipped deploy workflow does exactly this, because the advertise
 value a deploy can get wrong without anything else noticing.
 
 Then open `/admin` and sign in. That single act exercises the seed, the console client, the
-administrator bucket and the authorization code flow at once, so if it works, the upgrade landed.
+administrators' project and the authorization code flow at once, so if it works, the upgrade landed.
 Super administrators should also glance at **Faults**. Only genuine defects are recorded there,
 never routine client rejections, so anything new after an upgrade is probably worth reading.

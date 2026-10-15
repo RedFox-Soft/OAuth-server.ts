@@ -4,7 +4,7 @@ title: "Token payload access contract"
 tags: [contract, gotcha, architecture]
 sources: [oauth-server-codebase]
 created: 2026-07-31
-updated: 2026-09-28
+updated: 2026-10-15
 graph:
   node_type: concept
   relationships:
@@ -174,7 +174,7 @@ persists.
 
 - [[deletion-and-revocation]] — owner fields live under `.payload.*`, which is what an owner sweep queries.
 - [[model-graph-import-order]] — the same `base_token` cycle, seen from the import side.
-- [[account-resolution]] — reads `_token.payload.clientId` to resolve the user bucket.
+- [[account-resolution]] — reads `_token.payload.clientId` to resolve the project.
 - [[client-identity-from-database]] — the validated-client object this contract does *not* apply to.
 - [[event-bus]] — why `base_token` → `base_model` → event bus module cycles matter for initialisation.
 - [[authentication-context-reporting]] — the second instance of this contract being broken, and the

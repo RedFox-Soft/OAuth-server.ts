@@ -155,7 +155,7 @@ async function destroyClaimed(
 		});
 		throw new AdminError(
 			500,
-			"the bucket's usage history could not be kept; nothing was deleted"
+			"the project's usage history could not be kept; nothing was deleted"
 		);
 	}
 

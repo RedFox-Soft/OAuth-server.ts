@@ -59,7 +59,7 @@ describe('deletion cascade: end-user', () => {
 	async function deleteUser(bucketId: string, uid: string) {
 		const cookie = await superAdminCookie();
 		return agent.admin.api
-			.buckets({ id: bucketId })
+			.projects({ id: bucketId })
 			.users({ uid })
 			.delete(undefined, { headers: { cookie } });
 	}

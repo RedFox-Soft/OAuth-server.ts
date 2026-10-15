@@ -120,7 +120,7 @@ describe('a provisioning connection is fenced in', () => {
 		).toBeGreaterThanOrEqual(400);
 		expect((await call('/mcp', 'POST')).status).toBeGreaterThanOrEqual(400);
 		expect(
-			(await call(`/admin/api/buckets/${a.bucket._id}/users`)).status
+			(await call(`/admin/api/projects/${a.bucket._id}/users`)).status
 		).toBeGreaterThanOrEqual(400);
 	});
 

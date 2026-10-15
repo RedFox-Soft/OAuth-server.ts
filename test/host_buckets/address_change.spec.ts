@@ -90,7 +90,7 @@ async function changeAddress(
 	body: Record<string, unknown>
 ) {
 	const response = await app.handle(
-		new Request(`http://e.ly/admin/api/buckets/${id}/address`, {
+		new Request(`http://e.ly/admin/api/projects/${id}/address`, {
 			method: 'POST',
 			redirect: 'manual',
 			headers: { 'content-type': 'application/json', cookie },
@@ -373,7 +373,7 @@ describe('moving a bucket to a different address (US3)', () => {
 				`mistyped-${counter}`
 			);
 			const entry = shaped(AuditPage, await trail.json()).entries.find(
-				(e) => e.action === 'bucket.address.change'
+				(e) => e.action === 'project.address.change'
 			);
 			expect(entry).toMatchObject({
 				from: `mistpyed-${counter}`,
@@ -412,7 +412,7 @@ describe('moving a bucket to a different address (US3)', () => {
 
 			expect(status).toBe(403);
 			expect(body.message).toBe(
-				"Used by 1 application, 0 identity providers and 0 provisioning connections: only an instance administrator can change this bucket's address now."
+				"Used by 1 application, 0 identity providers and 0 provisioning connections: only an instance administrator can change this project's address now."
 			);
 			expect((await getBucketStore().find(bucket._id))?.slug).toBe(
 				`used-${counter}`

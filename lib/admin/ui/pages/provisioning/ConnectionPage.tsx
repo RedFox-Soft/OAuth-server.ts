@@ -103,12 +103,12 @@ export function ConnectionPage({
 			const [b, c, f] = await Promise.all([
 				request<BucketView>(
 					'GET',
-					`/admin/api/buckets/${encodeURIComponent(bucketId)}`
+					`/admin/api/projects/${encodeURIComponent(bucketId)}`
 				),
 				request<ConnectionView>('GET', connectionsApi(bucketId, connectionId)),
 				request<FederationProvider[]>(
 					'GET',
-					`/admin/api/buckets/${encodeURIComponent(bucketId)}/federation`
+					`/admin/api/projects/${encodeURIComponent(bucketId)}/federation`
 				)
 			]);
 			if (!b.ok) {
@@ -143,8 +143,8 @@ export function ConnectionPage({
 		return loadStatus === 403 || loadStatus === 404 ? (
 			<NoAccess
 				what="provisioning connection"
-				backHref={bucket ? listHref : '/admin/buckets'}
-				backLabel={bucket ? 'Back to Provisioning' : 'Back to Buckets'}
+				backHref={bucket ? listHref : '/admin/projects'}
+				backLabel={bucket ? 'Back to Provisioning' : 'Back to Projects'}
 			/>
 		) : (
 			<LoadFailed
@@ -165,7 +165,7 @@ export function ConnectionPage({
 		<>
 			<PageHeader
 				crumbs={[
-					{ label: 'Buckets', href: '/admin/buckets' },
+					{ label: 'Projects', href: '/admin/projects' },
 					{ label: bucket?.name ?? '…', href: bucketHref(bucketId) },
 					{ label: 'Provisioning', href: listHref },
 					{ label: connection?.displayName ?? '…' }
@@ -229,7 +229,7 @@ export function ConnectionPage({
 					type="info"
 					showIcon
 					style={{ marginBottom: 16 }}
-					title="Only members of the group that owns this bucket can change this."
+					title="Only members of the team that owns this project can change this."
 				/>
 			)}
 			{connection && tab === 'overview' && (
@@ -320,7 +320,7 @@ export function ConnectionPage({
 											</Link>
 											{' · '}
 											<Link
-												href={`${bucketHref(bucketId, 'user-groups')}?keptBy=${encodeURIComponent(connection.id)}`}
+												href={`${bucketHref(bucketId, 'groups')}?keptBy=${encodeURIComponent(connection.id)}`}
 											>
 												{people(connection.managedGroups, 'group')}
 											</Link>
@@ -367,7 +367,7 @@ export function ConnectionPage({
 									<br />
 									<Typography.Text type="secondary">
 										{deleteBlock(connection) ??
-											'The directory can no longer provision this bucket, and every token it holds is revoked.'}
+											'The directory can no longer provision this project, and every token it holds is revoked.'}
 									</Typography.Text>
 								</div>
 								<Button
@@ -680,7 +680,7 @@ function CredentialsCard({
 			: await confirm('connection.credential.issue', {
 					target: connection.displayName,
 					consequences: [
-						'Whoever holds it can create, change and remove the people of this bucket.'
+						'Whoever holds it can create, change and remove the people of this project.'
 					]
 				});
 		if (proceed) await post(kind, extra);
@@ -708,7 +708,7 @@ function CredentialsCard({
 			proceed = await confirm('connection.credential.issue', {
 				target: connection.displayName,
 				consequences: [
-					'Whoever holds it can create, change and remove the people of this bucket.',
+					'Whoever holds it can create, change and remove the people of this project.',
 					...lifetime
 				]
 			});

@@ -51,7 +51,7 @@ export function RootKeysCard({
 	}, []);
 
 	return (
-		<Card title="This bucket signs with the instance keys">
+		<Card title="This project signs with the instance keys">
 			<Space
 				orientation="vertical"
 				style={{ width: '100%' }}
@@ -60,7 +60,7 @@ export function RootKeysCard({
 					type="info"
 					showIcon
 					title={`${bucketName} has no address of its own.`}
-					description={`It is served at the root issuer${issuer ? ` ${issuer}` : ''} and shares that issuer's key set with the default bucket, the administrators' sign-in and every other bucket without an address.`}
+					description={`It is served at the root issuer${issuer ? ` ${issuer}` : ''} and shares that issuer's key set with the default project, the administrators' sign-in and every other project without an address.`}
 				/>
 				<Descriptions
 					column={1}
@@ -112,7 +112,7 @@ export function RootKeysCard({
 					administrators on the Keys page.
 				</Typography.Text>
 				<Typography.Text>
-					To rotate this bucket&apos;s keys on its own, give it an address of
+					To rotate this project&apos;s keys on its own, give it an address of
 					its own.{' '}
 					{!superAdmin &&
 						'Only an instance administrator can change the address or the instance keys.'}

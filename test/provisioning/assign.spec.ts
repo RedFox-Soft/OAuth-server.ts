@@ -28,7 +28,7 @@ describe('handing a local user to a provisioning connection', () => {
 	async function localUser(bucketId: string, email: string): Promise<string> {
 		const res = await admin(
 			'POST',
-			`/admin/api/buckets/${bucketId}/users`,
+			`/admin/api/projects/${bucketId}/users`,
 			cookie,
 			{
 				email,
@@ -45,7 +45,7 @@ describe('handing a local user to a provisioning connection', () => {
 
 		const assigned = await admin(
 			'POST',
-			`/admin/api/buckets/${c.bucket._id}/users/${uid}/connection`,
+			`/admin/api/projects/${c.bucket._id}/users/${uid}/connection`,
 			cookie,
 			{ connectionId: c.connection._id, userName: 'olga@contoso.com' }
 		);
@@ -56,7 +56,7 @@ describe('handing a local user to a provisioning connection', () => {
 		);
 		const edited = await admin(
 			'PATCH',
-			`/admin/api/buckets/${c.bucket._id}/users/${uid}`,
+			`/admin/api/projects/${c.bucket._id}/users/${uid}`,
 			cookie,
 			{ active: false }
 		);
@@ -78,7 +78,7 @@ describe('handing a local user to a provisioning connection', () => {
 
 		const res = await admin(
 			'POST',
-			`/admin/api/buckets/${bucket._id}/users/${String(made.json.id)}/connection`,
+			`/admin/api/projects/${bucket._id}/users/${String(made.json.id)}/connection`,
 			cookie,
 			{ connectionId: b.connection._id, userName: 'pete2@contoso.com' }
 		);

@@ -82,7 +82,7 @@ describe('connecting Microsoft, Apple or GitHub', () => {
 		const bucket = await seedBucket();
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.catalogue.get({ headers: { cookie } });
 
 		const counts = {
@@ -115,7 +115,7 @@ describe('connecting Microsoft, Apple or GitHub', () => {
 		const bucket = await seedBucket();
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.catalogue.get({ headers: { cookie } });
 
 		const microsoft = guidanceFor(answered(res.data), 'microsoft');
@@ -153,7 +153,7 @@ describe('connecting Microsoft, Apple or GitHub', () => {
 		const bucket = await seedBucket();
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.post(
 				{
 					catalogueId: 'microsoft',
@@ -178,7 +178,7 @@ describe('connecting Microsoft, Apple or GitHub', () => {
 		const bucket = await seedBucket();
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.post(
 				{
 					catalogueId: 'microsoft',
@@ -200,7 +200,7 @@ describe('connecting Microsoft, Apple or GitHub', () => {
 		const bucket = await seedBucket();
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.post(
 				{
 					catalogueId: 'microsoft',
@@ -227,7 +227,7 @@ describe('connecting Microsoft, Apple or GitHub', () => {
 		const bucket = await seedBucket();
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.post(
 				{
 					catalogueId: 'apple',
@@ -258,7 +258,7 @@ describe('connecting Microsoft, Apple or GitHub', () => {
 		const bucket = await seedBucket();
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.post(
 				{
 					catalogueId: 'apple',
@@ -285,7 +285,7 @@ describe('connecting Microsoft, Apple or GitHub', () => {
 		const bucket = await seedBucket();
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.post(
 				{
 					catalogueId: 'apple',
@@ -308,7 +308,7 @@ describe('connecting Microsoft, Apple or GitHub', () => {
 		const bucket = await seedBucket();
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.post(
 				{
 					catalogueId: 'github',
@@ -334,7 +334,7 @@ describe('connecting Microsoft, Apple or GitHub', () => {
 		const bucket = await seedBucket();
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.post(
 				{
 					catalogueId: 'github',
@@ -358,7 +358,7 @@ describe('connecting Microsoft, Apple or GitHub', () => {
 		const bucket = await seedBucket();
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.post(
 				{
 					catalogueId: 'github',
@@ -388,7 +388,7 @@ describe('connecting Microsoft, Apple or GitHub', () => {
 		const bucket = await seedBucket();
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.post(
 				{
 					catalogueId: 'microsoft',
@@ -413,7 +413,7 @@ describe('connecting Microsoft, Apple or GitHub', () => {
 		const keyLine = idp.signingKey.split('\n')[1] ?? 'unreachable';
 
 		const res = await client.admin.api
-			.buckets({ id: bucket._id })
+			.projects({ id: bucket._id })
 			.federation.post(
 				{
 					catalogueId: 'apple',

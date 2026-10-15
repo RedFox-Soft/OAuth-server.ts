@@ -9,8 +9,8 @@
  */
 
 export type Section =
-	| 'buckets'
-	| 'groups'
+	| 'projects'
+	| 'teams'
 	| 'audit'
 	| 'administrators'
 	| 'usage'
@@ -72,12 +72,12 @@ interface RouteSpec {
 }
 
 export const ROUTES: readonly RouteSpec[] = [
-	{ key: 'buckets', pattern: ['buckets'], section: 'buckets' },
-	/* A bucket's bare address is its Overview (specs/081): a link that names the bucket lands there. */
+	{ key: 'buckets', pattern: ['projects'], section: 'projects' },
+	/* A project's bare address is its Overview (specs/081): a link that names the project lands there. */
 	{
 		key: 'bucket.overview',
-		pattern: ['buckets', ':bucket'],
-		section: 'buckets',
+		pattern: ['projects', ':project'],
+		section: 'projects',
 		area: 'Overview'
 	},
 	/*
@@ -86,84 +86,84 @@ export const ROUTES: readonly RouteSpec[] = [
 	 */
 	{
 		key: 'bucket.applications',
-		pattern: ['buckets', ':bucket', 'applications'],
-		section: 'buckets',
+		pattern: ['projects', ':project', 'applications'],
+		section: 'projects',
 		area: 'Applications'
 	},
 	{
 		key: 'bucket.apis',
-		pattern: ['buckets', ':bucket', 'apis'],
-		section: 'buckets',
+		pattern: ['projects', ':project', 'apis'],
+		section: 'projects',
 		area: 'APIs'
 	},
 	{
 		key: 'bucket.users',
-		pattern: ['buckets', ':bucket', 'users'],
-		section: 'buckets',
+		pattern: ['projects', ':project', 'users'],
+		section: 'projects',
 		area: 'Users'
 	},
 	/* One person in a bucket (specs/082); the bare address is their Profile. */
 	{
 		key: 'bucket.user',
-		pattern: ['buckets', ':bucket', 'users', ':user'],
-		section: 'buckets',
+		pattern: ['projects', ':project', 'users', ':user'],
+		section: 'projects',
 		area: 'Profile'
 	},
 	{
 		key: 'bucket.user.signIn',
-		pattern: ['buckets', ':bucket', 'users', ':user', 'sign-in-methods'],
-		section: 'buckets',
+		pattern: ['projects', ':project', 'users', ':user', 'sign-in-methods'],
+		section: 'projects',
 		area: 'Sign-in methods'
 	},
 	{
 		key: 'bucket.user.groups',
-		pattern: ['buckets', ':bucket', 'users', ':user', 'groups'],
-		section: 'buckets',
+		pattern: ['projects', ':project', 'users', ':user', 'groups'],
+		section: 'projects',
 		area: 'Groups'
 	},
 	{
 		key: 'bucket.user.activity',
-		pattern: ['buckets', ':bucket', 'users', ':user', 'activity'],
-		section: 'buckets',
+		pattern: ['projects', ':project', 'users', ':user', 'activity'],
+		section: 'projects',
 		area: 'Activity'
 	},
 	{
 		key: 'bucket.userGroups',
-		pattern: ['buckets', ':bucket', 'user-groups'],
-		section: 'buckets',
-		area: 'User groups'
+		pattern: ['projects', ':project', 'groups'],
+		section: 'projects',
+		area: 'Groups'
 	},
 	/* One group of people (specs/084): its members, its name, and who keeps it. */
 	{
 		key: 'bucket.userGroup',
-		pattern: ['buckets', ':bucket', 'user-groups', ':group'],
-		section: 'buckets',
-		area: 'User groups'
+		pattern: ['projects', ':project', 'groups', ':group'],
+		section: 'projects',
+		area: 'Groups'
 	},
 	/* How people get in (specs/083): its own address, between who is in the bucket and who vouches for them. */
 	{
 		key: 'bucket.signIn',
-		pattern: ['buckets', ':bucket', 'sign-in'],
-		section: 'buckets',
+		pattern: ['projects', ':project', 'sign-in'],
+		section: 'projects',
 		area: 'Sign-in'
 	},
 	{
 		key: 'bucket.providers',
-		pattern: ['buckets', ':bucket', 'identity-providers'],
-		section: 'buckets',
+		pattern: ['projects', ':project', 'identity-providers'],
+		section: 'projects',
 		area: 'Identity providers'
 	},
 	/* One identity provider (specs/084): everything about it after it is connected. */
 	{
 		key: 'bucket.provider',
-		pattern: ['buckets', ':bucket', 'identity-providers', ':provider'],
-		section: 'buckets',
+		pattern: ['projects', ':project', 'identity-providers', ':provider'],
+		section: 'projects',
 		area: 'Identity providers'
 	},
 	{
 		key: 'bucket.provisioning',
-		pattern: ['buckets', ':bucket', 'provisioning'],
-		section: 'buckets',
+		pattern: ['projects', ':project', 'provisioning'],
+		section: 'projects',
 		area: 'Provisioning'
 	},
 	/*
@@ -172,49 +172,55 @@ export const ROUTES: readonly RouteSpec[] = [
 	 */
 	{
 		key: 'bucket.connection',
-		pattern: ['buckets', ':bucket', 'provisioning', ':connection'],
-		section: 'buckets',
+		pattern: ['projects', ':project', 'provisioning', ':connection'],
+		section: 'projects',
 		area: 'Provisioning'
 	},
 	{
 		key: 'bucket.connection.setup',
 		pattern: [
-			'buckets',
-			':bucket',
+			'projects',
+			':project',
 			'provisioning',
 			':connection',
 			'directory-setup'
 		],
-		section: 'buckets',
+		section: 'projects',
 		area: 'Provisioning'
 	},
 	{
 		key: 'bucket.connection.settings',
-		pattern: ['buckets', ':bucket', 'provisioning', ':connection', 'settings'],
-		section: 'buckets',
+		pattern: [
+			'projects',
+			':project',
+			'provisioning',
+			':connection',
+			'settings'
+		],
+		section: 'projects',
 		area: 'Provisioning'
 	},
 	{
 		key: 'bucket.keys',
-		pattern: ['buckets', ':bucket', 'keys'],
-		section: 'buckets',
+		pattern: ['projects', ':project', 'keys'],
+		section: 'projects',
 		area: 'Signing keys'
 	},
 	{
 		key: 'bucket.activity',
-		pattern: ['buckets', ':bucket', 'activity'],
-		section: 'buckets',
+		pattern: ['projects', ':project', 'activity'],
+		section: 'projects',
 		area: 'Activity'
 	},
 	{
 		key: 'bucket.settings',
-		pattern: ['buckets', ':bucket', 'settings'],
-		section: 'buckets',
+		pattern: ['projects', ':project', 'settings'],
+		section: 'projects',
 		area: 'Settings'
 	},
-	{ key: 'groups', pattern: ['groups'], section: 'groups' },
-	/* One administrator group (specs/085): its members, invitations and what it owns. */
-	{ key: 'group', pattern: ['groups', ':group'], section: 'groups' },
+	{ key: 'groups', pattern: ['teams'], section: 'teams' },
+	/* One team (specs/085): its members, invitations and what it owns. */
+	{ key: 'group', pattern: ['teams', ':team'], section: 'teams' },
 	{ key: 'audit', pattern: ['audit'], section: 'audit' },
 	{
 		key: 'administrators',
@@ -258,12 +264,12 @@ export const ROUTES: readonly RouteSpec[] = [
 		instance: true,
 		area: 'Settings'
 	},
-	/* Every administrator's since specs/091, over the buckets their groups own; the server does the narrowing. */
+	/* Every administrator's since specs/091, over the projects their teams own; the server does the narrowing. */
 	{ key: 'usage', pattern: ['usage'], section: 'usage' },
-	/* A deleted bucket's history (specs/086): a tombstone belongs to Usage, not to Buckets. */
+	/* A deleted project's history (specs/086): a tombstone belongs to Usage, not to Projects. */
 	{
 		key: 'usage.bucket',
-		pattern: ['usage', 'buckets', ':bucket'],
+		pattern: ['usage', 'projects', ':project'],
 		section: 'usage'
 	},
 	{
@@ -301,43 +307,102 @@ export const ROUTES: readonly RouteSpec[] = [
 ];
 
 /*
- * Addresses that stand for another one. The bare console opens Buckets; a bucket's bare address is a page of
- * its own, its Overview. Kept apart from the table above so a
- * redirect never has a page that could drift from the page it names. Checked before the table, so the
- * literal administrators' bucket below wins over the Overview pattern.
+ * Addresses that stand for another one. The bare console opens Projects; a project's bare address is a page
+ * of its own, its Overview. Kept apart from the table above so a redirect never has a page that could drift
+ * from the page it names. Checked before the table, so the literal administrators' project below wins over
+ * the Overview pattern.
  */
-const REDIRECTS: readonly {
+interface Redirect {
 	readonly pattern: readonly string[];
 	readonly to: (params: Partial<Record<string, string>>) => string;
-}[] = [
-	{ pattern: [], to: () => '/admin/buckets' },
-	/*
-	 * The administrators' bucket lives on the Administrators page (specs/083): every address it had as a bucket
-	 * leads to the matching tab there, so an old link still lands somewhere that means the same. Its id is
-	 * written out rather than imported, so this module keeps importing nothing but types.
-	 */
-	{ pattern: ['buckets', 'admin'], to: () => '/admin/administrators/sign-in' },
-	...(
-		[
-			['sign-in', 'sign-in'],
-			['identity-providers', 'identity-providers'],
-			['activity', 'activity'],
-			['settings', 'settings'],
-			['users', ''],
-			// Areas it never had as a bucket land on its accounts rather than on a refusal.
-			['user-groups', ''],
-			['provisioning', ''],
-			['keys', '']
-		] as const
-	).map(([from, to]) => ({
-		pattern: ['buckets', 'admin', from],
-		to: () => `/admin/administrators${to ? `/${to}` : ''}`
-	})),
-	{
-		pattern: ['buckets', 'admin', 'identity-providers', ':provider'],
-		to: (p) =>
-			`/admin/administrators/identity-providers/${encodeURIComponent(p.provider ?? '')}`
+}
+
+/*
+ * The administrators' bucket lives on the Administrators page (specs/083): every address it had as a project
+ * leads to the matching tab there, so an old link still lands somewhere that means the same. Its id is
+ * written out rather than imported, so this module keeps importing nothing but types. Spelled under both the
+ * address it had before spec 100 and the one it would have now, so neither opens it as a project.
+ */
+function administratorsRedirects(
+	root: 'buckets' | 'projects',
+	groupsArea: 'user-groups' | 'groups'
+): Redirect[] {
+	return [
+		{ pattern: [root, 'admin'], to: () => '/admin/administrators/sign-in' },
+		...(
+			[
+				['sign-in', 'sign-in'],
+				['identity-providers', 'identity-providers'],
+				['activity', 'activity'],
+				['settings', 'settings'],
+				['users', ''],
+				// Areas it never had as a project land on its accounts rather than on a refusal.
+				[groupsArea, ''],
+				['provisioning', ''],
+				['keys', '']
+			] as const
+		).map(([from, to]) => ({
+			pattern: [root, 'admin', from],
+			to: () => `/admin/administrators${to ? `/${to}` : ''}`
+		})),
+		{
+			pattern: [root, 'admin', 'identity-providers', ':provider'],
+			to: (p) =>
+				`/admin/administrators/identity-providers/${encodeURIComponent(p.provider ?? '')}`
+		}
+	];
+}
+
+/*
+ * The address a page had before spec 100 named buckets, administrator groups and user groups by their
+ * storage names. Emailed held-connection links and bookmarks use the old addresses, so each one still opens
+ * its page: derived from the table rather than listed, so no page can gain an address its old one misses.
+ */
+function formerPattern(pattern: readonly string[]): string[] | null {
+	const [root, ...rest] = pattern;
+	if (root === 'projects') {
+		return [
+			'buckets',
+			...rest.map((segment, i) =>
+				i === 1 && segment === 'groups' ? 'user-groups' : segment
+			)
+		];
 	}
+	if (root === 'teams') return ['groups', ...rest];
+	if (root === 'usage' && rest[0] === 'projects')
+		return ['usage', 'buckets', ...rest.slice(1)];
+	return null;
+}
+
+function addressOf(
+	pattern: readonly string[],
+	params: Partial<Record<string, string>>
+): string {
+	return `/admin/${pattern
+		.map((segment) =>
+			segment.startsWith(':')
+				? encodeURIComponent(params[segment.slice(1)] ?? '')
+				: segment
+		)
+		.join('/')}`;
+}
+
+const REDIRECTS: readonly Redirect[] = [
+	{ pattern: [], to: () => '/admin/projects' },
+	...administratorsRedirects('buckets', 'user-groups'),
+	...administratorsRedirects('projects', 'groups'),
+	...ROUTES.flatMap((spec) => {
+		const former = formerPattern(spec.pattern);
+		return former
+			? [
+					{
+						pattern: former,
+						to: (p: Partial<Record<string, string>>) =>
+							addressOf(spec.pattern, p)
+					}
+				]
+			: [];
+	})
 ];
 
 export interface Route {
@@ -409,8 +474,8 @@ export function resolveAddress(pathname: string): Resolved {
 }
 
 export const SECTION_LABELS: Readonly<Record<Section, string>> = {
-	buckets: 'Buckets',
-	groups: 'Groups',
+	projects: 'Projects',
+	teams: 'Teams',
 	audit: 'Audit',
 	administrators: 'Administrators',
 	usage: 'Usage',
@@ -424,13 +489,13 @@ export function sectionHref(section: Section): string {
 	return `/admin/${section}`;
 }
 
-/* A bucket's address; without an area, its Overview. */
+/* A project's address; without an area, its Overview. */
 export function bucketHref(bucketId: string, area?: string): string {
-	const base = `/admin/buckets/${encodeURIComponent(bucketId)}`;
+	const base = `/admin/projects/${encodeURIComponent(bucketId)}`;
 	return area ? `${base}/${area}` : base;
 }
 
-/* One person in a bucket; without an area, their Profile. */
+/* One person in a project; without an area, their Profile. */
 export function userHref(
 	bucketId: string,
 	userId: string,
@@ -441,8 +506,8 @@ export function userHref(
 }
 
 /*
- * An identity provider's page. The console's own bucket keeps its providers under Administrators, so the
- * address depends on the bucket and every caller asks here rather than spelling it.
+ * An identity provider's page. The console's own project keeps its providers under Administrators, so the
+ * address depends on the project and every caller asks here rather than spelling it.
  */
 export function providerHref(bucketId: string, providerId: string): string {
 	const base =
@@ -463,14 +528,14 @@ export function connectionHref(
 }
 
 export function userGroupHref(bucketId: string, groupId: string): string {
-	return `${bucketHref(bucketId, 'user-groups')}/${encodeURIComponent(groupId)}`;
+	return `${bucketHref(bucketId, 'groups')}/${encodeURIComponent(groupId)}`;
 }
 
 export function groupHref(groupId: string): string {
-	return `/admin/groups/${encodeURIComponent(groupId)}`;
+	return `/admin/teams/${encodeURIComponent(groupId)}`;
 }
 
 export function usageBucketHref(bucketId: string, month?: string): string {
-	const base = `/admin/usage/buckets/${encodeURIComponent(bucketId)}`;
+	const base = `/admin/usage/projects/${encodeURIComponent(bucketId)}`;
 	return month ? `${base}?month=${encodeURIComponent(month)}` : base;
 }

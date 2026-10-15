@@ -4,7 +4,7 @@ title: 'An interaction is bound to its browser by the cookie’s value, not its 
 tags: [security, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-09-28
-updated: 2026-09-28
+updated: 2026-10-15
 graph:
   node_type: concept
   relationships:
@@ -36,7 +36,7 @@ sixteen months any browser holding a uid could continue that sign-in with a cook
 
 What that allowed, measured with a forged cookie:
 
-- **After the end user's correct password in a bucket requiring a second factor**, the interaction
+- **After the end user's correct password in a project requiring a second factor**, the interaction
   carries only `secondFactor.accountId` (`lib/interactions/index.ts:592`) and, on a first sign-in, no
   session to compare. The enrolment page showed the account's new authenticator secret to the other
   browser, which confirmed it, left with a session for the account, and left **its own** authenticator

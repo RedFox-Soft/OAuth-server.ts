@@ -236,13 +236,13 @@ function namespaceLine(
 	bucketName: string,
 	namespace: Namespace | null
 ): string {
-	if (namespace === 'bucket') {
-		return `Declared in ${bucketName}'s own namespace: an identifier must be unique within this bucket.`;
+	if (namespace === 'project') {
+		return `Declared in ${bucketName}'s own namespace: an identifier must be unique within this project.`;
 	}
-	return "Declared in the instance's shared root namespace, which every bucket without an address of its own shares.";
+	return "Declared in the instance's shared root namespace, which every project without an address of its own shares.";
 }
 
-type Namespace = 'bucket' | 'root';
+type Namespace = 'project' | 'root';
 
 /*
  * `canEdit` is the bucket's stated `edit` right. At the root namespace only a super administrator declares,
@@ -259,10 +259,10 @@ export function Resources({
 	canEdit: boolean;
 	superAdmin: boolean;
 }) {
-	const bucketBase = `/admin/api/buckets/${encodeURIComponent(bucketId)}`;
+	const bucketBase = `/admin/api/projects/${encodeURIComponent(bucketId)}`;
 	const base = `${bucketBase}/resources`;
 	const [namespace, setNamespace] = useState<Namespace | null>(null);
-	const writable = canEdit && (namespace === 'bucket' || superAdmin);
+	const writable = canEdit && (namespace === 'project' || superAdmin);
 	const [rows, setRows] = useState<ResourceView[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [loadFailed, setLoadFailed] = useState<string | null>(null);
@@ -464,8 +464,8 @@ export function Resources({
 					title="These APIs are read-only to you"
 					description={
 						canEdit
-							? "This bucket has no address of its own, so its APIs live in the instance's root namespace, where only a super administrator can declare or change them."
-							: "Changing a bucket's APIs takes membership of the group that owns it."
+							? "This project has no address of its own, so its APIs live in the instance's root namespace, where only a super administrator can declare or change them."
+							: "Changing a project's APIs takes membership of the team that owns it."
 					}
 				/>
 			)}
@@ -484,7 +484,7 @@ export function Resources({
 					locale={{
 						emptyText: (
 							<EmptyState
-								purpose="No APIs declared in this bucket yet. Declare one to have this server mint tokens for its audience."
+								purpose="No APIs declared in this project yet. Declare one to have this server mint tokens for its audience."
 								create={writable ? newResource : undefined}
 							/>
 						)

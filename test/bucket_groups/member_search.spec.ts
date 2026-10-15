@@ -44,7 +44,7 @@ describe('searching a bucket group’s members', () => {
 		if (paging.count) params.set('count', String(paging.count));
 		const res = await admin(
 			'GET',
-			`/admin/api/buckets/${bucketId}/groups/${gid}/members?${params.toString()}`,
+			`/admin/api/projects/${bucketId}/groups/${gid}/members?${params.toString()}`,
 			cookie
 		);
 		expect(res.status).toBe(200);

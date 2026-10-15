@@ -116,7 +116,7 @@ What a caller writes is wire metadata only. The base attributes the validator co
 (`BASE_METADATA_KEYS`, `lib/models/client/wire.ts:43`) are canonical names, and the translation from
 wire form drops any of them it finds (`CANONICAL_ONLY`, `wire.ts:94`), so a registration body or a client
 document cannot spell one. Since spec 099 that includes `bucketId` and `corsOrigins` (`wire.ts:76-77`), the
-bucket a client belongs to and its allowed browser origins, which only the server writes
+project a client belongs to and its allowed browser origins, which only the server writes
 ([[client-registration-attributes]]). Until 2026-09-28 they passed through: `clientId` placed after the server's own
 `client_id` overwrote any stored client, the console's included, and `consent.require: false` switched
 off the consent screen for a self-registered or document-identified client
@@ -132,7 +132,7 @@ keeps the check.
 
 Two clients are synthesized in code on every resolution, after the stored read and before the document branch
 (`lib/models/client/validate.ts:124`): a SCIM connection's `scim-<id>` ([[scim-provisioning]]) and, since spec
-095, a bucket's connected-apps page client `account.<bucketId>` ([[connected-apps-page]]). A stored record always
+095, a project's connected-apps page client `account.<bucketId>` ([[connected-apps-page]]). A stored record always
 wins over both, and registration refuses the `account.` prefix outright.
 
 The three shapes have one conversion each (`lib/models/client/projection.ts`): `fromWire` from a
@@ -152,7 +152,7 @@ Storage is reached through `adapter('Client')`; the former `Client.adapter` gett
 
 - [[deletion-and-revocation]] — a deleted client cannot authenticate on the next request, while every token it issued kept working until the cascade existed.
 - [[token-payload-access-contract]] — models keep state under `.payload`; validated clients do not.
-- [[account-resolution]] — maps a client id to the user bucket a subject is resolved from.
+- [[account-resolution]] — maps a client id to the project a subject is resolved from.
 - [[feature-flag-gating]] — the registration endpoints that create clients are flag-gated.
 - [[pairwise-identifier-salt]] — a pairwise client's sector identifier, read from this record, is the first input to the pseudonym every relying party keys its accounts on.
 

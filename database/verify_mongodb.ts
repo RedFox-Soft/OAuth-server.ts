@@ -13,6 +13,7 @@ import {
 	verifyPersonalGroupRepair
 } from './verify_container_ownership.js';
 import { verifyProjectRemoval } from './verify_remove_projects.js';
+import { verifyReservedHostnamesKey } from './verify_reserved_hostnames_key.js';
 
 /*
  * Storage fidelity for the MongoDB backend, against a real MongoDB — the properties of per-issuer
@@ -271,6 +272,37 @@ check(
 				);
 				if (!removal || 'noop' in removal.mongodb) return null;
 				return removal.mongodb.apply(db);
+			}
+		},
+		String(stamp),
+		check
+	);
+}
+
+/* The reserved hostnames setting moves to the key that names projects (specs/100). */
+{
+	type Raw = { _id: string } & Record<string, unknown>;
+	const settings = db.collection<Raw>(STORE_AREAS.serviceConfig);
+	await verifyReservedHostnamesKey(
+		{
+			insertSettings: async (id, config) => {
+				await settings.insertOne({ _id: id, config });
+			},
+			readSettings: async (id) => {
+				const config = (await settings.findOne({ _id: id }))?.config;
+				return config && typeof config === 'object'
+					? (config as Record<string, unknown>)
+					: null;
+			},
+			removeSettings: async (id) => {
+				await settings.deleteOne({ _id: id });
+			},
+			apply: async () => {
+				const move = MIGRATIONS.find((m) =>
+					m.id.endsWith('projects-reserved-hostnames')
+				);
+				if (!move || 'noop' in move.mongodb) return null;
+				return move.mongodb.apply(db);
 			}
 		},
 		String(stamp),

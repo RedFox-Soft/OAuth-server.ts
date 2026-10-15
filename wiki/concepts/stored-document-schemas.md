@@ -53,9 +53,9 @@ not a third). Model records differ on purpose: a token that fails its schema is 
 - **`undefined` stored as null.** The MongoDB driver's `ignoreUndefined` is off, so a member a writer
   left `undefined` is stored as BSON null. Where the schema declares the member optional and does not
   admit null, null is read as the absence it was written as. Found before it shipped: every console
-  session holds `tokens.refreshToken: null`, a host-addressed bucket `slug: null`, and a federation
+  session holds `tokens.refreshToken: null`, a host-addressed project `slug: null`, and a federation
   provider update `signingKey: null` — each would otherwise have failed its read. The writers now pass
-  `ABSENT_UNDEFINED` (`lib/adapters/mongodb/write_options.ts`) on every insert and on the bucket update,
+  `ABSENT_UNDEFINED` (`lib/adapters/mongodb/write_options.ts`) on every insert and on the project (`UserBucket`) update,
   so new documents carry no such null; the read rule stays for the ones already stored. The option is
   never put on an operation whose filter could hold undefined — there it drops the condition.
   Corrected 2026-09-30: the **model** adapter was left out. `MongoAdapter.upsert` and `create`
@@ -65,8 +65,8 @@ not a third). Model records differ on purpose: a token that fails its schema is 
   and `postLogoutRedirectUri` undefined; stored as nulls, the session vanished and the confirmation
   answered "could not find logout details". The conformance suite's `rp-initiated-logout` plan found it;
   both writes now pass the option.
-  Since spec 092 the bucket update no longer hands its patch to `$set` whole. With the option on, `$set`
-  drops an undefined member, so clearing a field would leave the old value, and clearing a bucket's
+  Since spec 092 the project update no longer hands its patch to `$set` whole. With the option on, `$set`
+  drops an undefined member, so clearing a field would leave the old value, and clearing a project's
   `displayName` needs a real removal. A key present with `undefined` now means "remove the field" on all
   three backends: MongoDB splits the patch into `$set` and `$unset`
   (`lib/adapters/mongodb/userBucketStore.ts:191-210`), PostgreSQL subtracts the keys before the merge

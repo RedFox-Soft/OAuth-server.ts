@@ -18,7 +18,7 @@ Three different operations are easy to confuse, and the code has always distingu
 | **Protocol revocation** (RFC 7009, end-session) | every token under one grant | the `Grant` record — the consent itself |
 | **Principal deletion** (client, end-user) | the principal, then every record naming it as owner, including its grants | nothing of that principal |
 | **Ending an end user's access** (deactivate, lock; spec 069) | every account-owned record — sessions, grants, tokens, codes — after a back-channel logout per session | the account, and its email-addressed throttles |
-| **Container deletion** (a bucket; a project too until spec 099) | nothing, unless the caller elected to take the end users — then every account inside, each by the principal cascade above. Since spec 090 a bucket's deletion only schedules this for 30 days later ([[bucket-soft-delete]]) | the bucket's applications and APIs: they must be removed one by one first |
+| **Container deletion** (a project; until spec 099 also the old Project entity, a retired project) | nothing, unless the caller elected to take the end users — then every account inside, each by the principal cascade above. Since spec 090 a project's deletion only schedules this for 30 days later ([[project-soft-delete]]) | the project's applications and APIs: they must be removed one by one first |
 
 "Revoke" reads as "remove everything" and the code disagrees. A grant is the record that a user
 authorized a client; revoking a token is not withdrawing that authorization, so only a principal cascade
@@ -27,40 +27,42 @@ destroys grant rows (`lib/helpers/revoke.ts`, `lib/helpers/cascade.ts`).
 ## Container deletion stopped being "refused while occupied"
 
 Until **051** (after `f0ea7db`) the third row read "nothing — it is *refused* while occupied", and that
-was the whole rule: a project holding clients and a bucket holding accounts were undeletable until an
-operator emptied them by hand. The console had no delete action for either, so in practice neither was
+was the whole rule: an old Project (a retired project) holding clients and a bucket — today's project —
+holding accounts were undeletable until an operator emptied them by hand. The console had no delete action for either, so in practice neither was
 deletable at all.
 
 Three things now hold instead, and the first two are the ones a reader is likely to guess wrong.
 
-**A cascade is elected, never default.** `?cascade=endusers` on the bucket route, carrying what the
-caller reviewed — the account count. (The project route took `?cascade=clients` with the client ids until
-spec 099 removed projects.) If the container's contents have changed since, the request is refused rather than
+**A cascade is elected, never default.** `?cascade=endusers` on the project's delete route
+(`DELETE /admin/api/projects/:id`, `/admin/api/buckets/:id` until spec 100), carrying what the caller
+reviewed — the account count. (The old Project route took `?cascade=clients` with the client ids until
+spec 099 removed that entity, now called a retired project.) If the container's contents have changed since, the request is refused rather than
 widened, because consent was given for what was on the screen. Without the election the old 409 is
 unchanged.
 
-**No election reaches an application or an API.** Since spec 099 a bucket refuses deletion while it holds
-an application an administrator registered or a declared API — 409 `bucket still holds applications or APIs`,
-checked before the end-user election and not clearable by it (`lib/admin/buckets/routes.ts:648-677`). Each is
-somebody's integration, removed on purpose, never as a side effect of the people in the bucket going. A
-self-registered application blocks nothing: nobody here vouched for it. The rule it replaced was "a project
-never reaches a bucket": buckets were shared by projects, so deleting a project could not reach one. Either
-way, it is the rule most likely to be "helpfully" broken by someone implementing a tidy-up.
+**No election reaches an application or an API.** Since spec 099 a project refuses deletion while it holds
+an application an administrator registered or a declared API — 409 `project still holds applications or APIs`
+(worded `bucket …` until spec 100), checked before the end-user election and not clearable by it
+(`lib/admin/buckets/routes.ts:660-681`). Each is somebody's integration, removed on purpose, never as a side
+effect of the people in the project going. A self-registered application blocks nothing: nobody here vouched
+for it. The rule it replaced was "an old Project never reaches a bucket": buckets — today's projects — were
+shared by the old Projects (now retired projects), so deleting one of those could not reach one. Either way,
+it is the rule most likely to be "helpfully" broken by someone implementing a tidy-up.
 
 **One deletion writes one audit entry**, carrying kind → count in `cascade`. This replaced one entry
 per withdrawn declaration, and the comment that argued for those — *"a bare number would not say which
 audiences stopped being served"* — no longer holds: a cascade is all-or-nothing over the container's
 contents, so the container's identity already determines which ones those were. A row per destroyed
-item would let one bucket-sized deletion bury everything else in the trail.
+item would let one project-sized deletion bury everything else in the trail.
 
-Two buckets are refused to everyone, empty or not: the administrators' bucket and the default bucket
+Two projects are refused to everyone, empty or not: the administrators' project and the Default project
 (`isUndeletableBucket`). That is deliberately a **separate set** from `isServedAtTheRoot`
-([[bucket-is-an-issuer]]) although the members are identical today: one rule is about issuer identity,
+([[project-is-an-issuer]]) although the members are identical today: one rule is about issuer identity,
 the other about the instance needing somewhere to sign its administrators in. Folding them would make a
-future third root-served bucket silently undeletable, or a future undeletable bucket silently claim the
-root issuer. Before 051 the delete route reached no reserved-bucket guard at all, because it does not
-go through `loadBucketForEdit` where `assertNotReserved` lives — so an empty administrators' or default
-bucket was deletable by a super administrator.
+future third root-served project silently undeletable, or a future undeletable project silently claim the
+root issuer. Before 051 the delete route reached no reserved-project guard at all, because it does not
+go through `loadBucketForEdit` where `assertNotReserved` lives — so an empty administrators' or Default
+project was deletable by a super administrator.
 
 ## The visible half of client deletion was already fixed; the invisible half was not
 
@@ -101,7 +103,7 @@ Both are easy to forget and neither announces itself. Sweeping by owner field re
 `VerificationResend`'s id **is** `${bucketId}:${email}`, and nothing else records the email. So the
 account cascade must read the user's email **before** destroying the account row. The obvious ordering —
 destroy, then cascade — skips that record, leaves no error anywhere, and looks correct in every test that
-does not assert it specifically. `cascadeForAccount` takes the already-computed id rather than the bucket
+does not assert it specifically. `cascadeForAccount` takes the already-computed id rather than the project
 and account precisely so the ordering is visible in its signature.
 
 This turned out to be a pattern rather than a one-off. `PasswordResetThrottle`
@@ -134,23 +136,24 @@ The filter only ever saved four no-op deletes. `revoke(grantId)` now takes the g
 
 ## Containers guard; principals cascade. The line is visibility
 
-An operator can see and name a bucket's applications, so refusing tells them exactly what they are about to
+An operator can see and name a project's applications, so refusing tells them exactly what they are about to
 destroy and keeps one audit entry per entity destroyed. Nobody can be asked to enumerate the tokens a
 client issued, least of all during an incident.
 
-- A bucket refuses while it holds an operator-registered application or a declared API. The applications are
-  read from the stored records by `bucketId` (`bucketClients`, `lib/admin/buckets/routes.ts:244-259`), so an id
-  that no longer resolves cannot block anything. Until spec 099 this rule was a project's: it refused while any
-  id in `clientIds` still **resolved** via `Client.tryFind`, so an unresolvable id could not make it permanently
-  undeletable. Either way a refused request prunes nothing, because **a conflict changes nothing at all**,
-  audit entry included.
-- A bucket refuses while any user exists, **including `active: false` accounts**, unless the end users are
+- A project refuses while it holds an operator-registered application or a declared API. The applications are
+  read from the stored records by `bucketId` (`bucketClients`, `lib/admin/buckets/routes.ts:247-259`), so an id
+  that no longer resolves cannot block anything. Until spec 099 this rule was the old Project's (a retired
+  project's): it refused while any id in `clientIds` still **resolved** via `Client.tryFind`, so an
+  unresolvable id could not make it permanently undeletable. Either way a refused request prunes nothing,
+  because **a conflict changes nothing at all**, audit entry included.
+- A project refuses while any user exists, **including `active: false` accounts**, unless the end users are
   elected: deactivation ends access (since 069 it sweeps the account's sessions and tokens —
   [[end-user-lifecycle]]) but is not absence.
 
 A refusal answers 409 with `blockers: [{ kind, count, ids? }]`, `kind` one of `client`, `resource`,
-`enduser` or `bucket` (a group's; `DeletionBlocker`, `lib/admin/auth/rbac.ts:73-77`). Client ids are listed; API and end-user blockers
-carry a **count only** — a bucket can hold thousands of accounts and their identities are not the
+`enduser` or `project` (a team's, refused while it still owns projects; `'bucket'` until spec 100;
+`DeletionBlocker`, `lib/admin/auth/rbac.ts:73-77`). Client ids are listed; API and end-user blockers
+carry a **count only** — a project can hold thousands of accounts and their identities are not the
 caller's business.
 
 ## Deliberately left behind
@@ -161,8 +164,8 @@ Each recorded in code rather than left implicit:
   and the entry is inert: `lib/models/base_token.ts` compares a token's `grantId` against
   `session.grantIdFor(clientId)`, which now resolves to a destroyed grant.
 - **Admin operator sessions.** Admin deletion deactivates rather than destroys.
-- **Bucket-scoping of the account sweep.** An `accountId` is a `nanoid`, globally unique, and tokens
-  record no bucket — so a second predicate would exclude nothing.
+- **Project-scoping of the account sweep.** An `accountId` is a `nanoid`, globally unique, and tokens
+  record no project — so a second predicate would exclude nothing.
 
 ## A partial failure is answered, not undone
 
@@ -171,15 +174,15 @@ principal gone, answers `500` with `failedAreas`, and a repeated `DELETE` answer
 accepted cost of closing the door first, and the residue is bounded by each area's TTL *because* the one
 unbounded area goes first.
 
-A bucket is the exception since spec 090. Its record goes **last** (`lib/admin/buckets/destroy.ts:195`), after
-its keys, connections, groups and user area. A destruction that fails part-way then leaves a scheduled, silent
-bucket for the next pass to finish. Destroyed first, as the old route did, it took with it the only handle on
-what was left ([[bucket-soft-delete]]).
+A project is the exception since spec 090. Its record goes **last** (`lib/admin/buckets/destroy.ts:208`), after
+its keys, connections, groups of end users and user area. A destruction that fails part-way then leaves a
+scheduled, silent project for the next pass to finish. Destroyed first, as the old route did, it took with it the only handle on
+what was left ([[project-soft-delete]]).
 
 ## Federated links need no cascade arm
 
 An account's upstream identities are embedded on its user row (`User.federated`), so destroying the row
-destroys them, and destroying a bucket's area destroys every row in it. No arm of the cascade mentions the
+destroys them, and destroying a project's user area destroys every row in it. No arm of the cascade mentions the
 field, and none needs to — which is the reason the alternative, a links area of its own, was rejected. The
 one thing the cascade *does* reach explicitly is an outstanding federated handoff, and only because the
 `FederationState` area declares `accountId` as its owner. See [[upstream-federation]].

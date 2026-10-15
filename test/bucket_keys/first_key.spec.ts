@@ -78,7 +78,7 @@ describe('an addressable bucket without keys of its own', () => {
 	it('has its key before it issues anything when created through the console', async () => {
 		const cookie = await cookieFor('plain');
 
-		const res = await send('POST', '/admin/api/buckets', cookie, {
+		const res = await send('POST', '/admin/api/projects', cookie, {
 			name: 'Console made',
 			slug: `console${Math.random().toString(36).slice(2, 8)}`
 		});
@@ -97,7 +97,7 @@ describe('an addressable bucket without keys of its own', () => {
 
 		const res = await send(
 			'POST',
-			`/admin/api/buckets/${legacy._id}/address`,
+			`/admin/api/projects/${legacy._id}/address`,
 			cookie,
 			{
 				slug: `legacy${Math.random().toString(36).slice(2, 8)}`,
@@ -122,7 +122,7 @@ describe('an addressable bucket without keys of its own', () => {
 		await keysFor(bucket);
 		const before = await kidsOf(bucket._id);
 
-		await send('POST', `/admin/api/buckets/${bucket._id}/address`, cookie, {
+		await send('POST', `/admin/api/projects/${bucket._id}/address`, cookie, {
 			slug: `moved${Math.random().toString(36).slice(2, 8)}`,
 			confirm: true,
 			expect: { applications: 0, connections: 0, providers: 0, resources: 0 }

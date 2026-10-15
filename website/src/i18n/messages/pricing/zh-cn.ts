@@ -1,6 +1,6 @@
 import type english from './en.ts';
 
-export const source = 'e736ac61dfd1';
+export const source = '112957035d22';
 
 export default {
 	title: '定价',
@@ -16,7 +16,7 @@ export default {
 		tagline: '你的基础设施，你的数据库，无需在我们这里开账户。',
 		items: [
 			'全部功能，无需在不同版本之间挑选',
-			'用户、用户桶、应用和令牌数量不限',
+			'用户、项目、应用和令牌数量不限',
 			'以 FSL-1.1-ALv2 许可源码可用',
 			'通过 GitHub issues 获得社区支持'
 		],

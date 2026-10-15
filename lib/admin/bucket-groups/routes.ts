@@ -103,7 +103,7 @@ export const bucketGroupRoutes = new Elysia({ name: 'admin-bucket-groups' })
 			return adminErrorBody(error);
 		}
 	})
-	.get('/admin/api/buckets/:id/groups', async ({ admin, params }) => {
+	.get('/admin/api/projects/:id/groups', async ({ admin, params }) => {
 		const ctx = assertAuth(admin);
 		const bucket = await loadBucketForUsers(ctx, params.id);
 		const groups: BucketGroup[] = [];
@@ -117,13 +117,13 @@ export const bucketGroupRoutes = new Elysia({ name: 'admin-bucket-groups' })
 		}
 		return { groups: await Promise.all(groups.map(present)) };
 	})
-	.get('/admin/api/buckets/:id/groups/:gid', async ({ admin, params }) => {
+	.get('/admin/api/projects/:id/groups/:gid', async ({ admin, params }) => {
 		const ctx = assertAuth(admin);
 		const bucket = await loadBucketForUsers(ctx, params.id);
 		return present(await asAdmin(loadGroup(bucket, ADMIN, params.gid)));
 	})
 	.get(
-		'/admin/api/buckets/:id/groups/:gid/members',
+		'/admin/api/projects/:id/groups/:gid/members',
 		async ({ admin, params, query }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForUsers(ctx, params.id);
@@ -172,7 +172,7 @@ export const bucketGroupRoutes = new Elysia({ name: 'admin-bucket-groups' })
 		{ query: BucketGroupMemberPageQuery }
 	)
 	.post(
-		'/admin/api/buckets/:id/groups',
+		'/admin/api/projects/:id/groups',
 		async ({ admin, params, body, set }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForEdit(ctx, params.id);
@@ -192,7 +192,7 @@ export const bucketGroupRoutes = new Elysia({ name: 'admin-bucket-groups' })
 		{ body: CreateBucketGroupBody }
 	)
 	.patch(
-		'/admin/api/buckets/:id/groups/:gid',
+		'/admin/api/projects/:id/groups/:gid',
 		async ({ admin, params, body }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForEdit(ctx, params.id);
@@ -215,7 +215,7 @@ export const bucketGroupRoutes = new Elysia({ name: 'admin-bucket-groups' })
 		{ body: RenameBucketGroupBody }
 	)
 	.delete(
-		'/admin/api/buckets/:id/groups/:gid',
+		'/admin/api/projects/:id/groups/:gid',
 		async ({ admin, params, set }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForEdit(ctx, params.id);
@@ -229,7 +229,7 @@ export const bucketGroupRoutes = new Elysia({ name: 'admin-bucket-groups' })
 		}
 	)
 	.post(
-		'/admin/api/buckets/:id/groups/:gid/members',
+		'/admin/api/projects/:id/groups/:gid/members',
 		async ({ admin, params, body }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForUsers(ctx, params.id);
@@ -248,7 +248,7 @@ export const bucketGroupRoutes = new Elysia({ name: 'admin-bucket-groups' })
 		{ body: AddBucketGroupMembersBody }
 	)
 	.delete(
-		'/admin/api/buckets/:id/groups/:gid/members/:uid',
+		'/admin/api/projects/:id/groups/:gid/members/:uid',
 		async ({ admin, params }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForUsers(ctx, params.id);
@@ -271,7 +271,7 @@ export const bucketGroupRoutes = new Elysia({ name: 'admin-bucket-groups' })
 	 * recorded for a hand-over that was only described or refused.
 	 */
 	.post(
-		'/admin/api/buckets/:id/groups/:gid/connection',
+		'/admin/api/projects/:id/groups/:gid/connection',
 		async ({ admin, params, body, status }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForEdit(ctx, params.id);

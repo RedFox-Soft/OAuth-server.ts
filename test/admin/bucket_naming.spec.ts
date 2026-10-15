@@ -23,7 +23,10 @@ async function superCookie() {
 }
 
 function create(cookie: string, slug: string, name = 'Some users') {
-	return client.admin.api.buckets.post({ name, slug }, { headers: { cookie } });
+	return client.admin.api.projects.post(
+		{ name, slug },
+		{ headers: { cookie } }
+	);
 }
 
 /**
@@ -95,7 +98,7 @@ describe('naming a bucket', () => {
 		const created = await create(cookie, 'immutable');
 		const id = answered(created.data)._id;
 
-		await client.admin.api.buckets({ id }).patch(
+		await client.admin.api.projects({ id }).patch(
 			// @ts-expect-error `slug` is not in the update body; the schema has no such field
 			{ name: 'Renamed', slug: 'something-else' },
 			{ headers: { cookie } }

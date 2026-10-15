@@ -74,7 +74,7 @@ describe('a resource declared with a significant trailing slash', () => {
 		bucketId = bucket._id;
 
 		const created = await admin.admin.api
-			.buckets({ id: bucketId })
+			.projects({ id: bucketId })
 			.resources.post(
 				{
 					identifier: WITH_SLASH,
@@ -101,7 +101,7 @@ describe('a resource declared with a significant trailing slash', () => {
 
 	it('is read by its exact spelling', async () => {
 		const read = await admin.admin.api
-			.buckets({ id: bucketId })
+			.projects({ id: bucketId })
 			.resources({ resourceId: encodeURIComponent(WITH_SLASH) })
 			.get({ headers: { cookie } });
 
@@ -110,7 +110,7 @@ describe('a resource declared with a significant trailing slash', () => {
 
 	it('is updated by its exact spelling', async () => {
 		const amended = await admin.admin.api
-			.buckets({ id: bucketId })
+			.projects({ id: bucketId })
 			.resources({ resourceId: encodeURIComponent(WITH_SLASH) })
 			.patch({ name: 'Slash MCP v2' }, { headers: { cookie } });
 

@@ -68,7 +68,7 @@ async function owned(providers: FederationProvider[]): Promise<Owned> {
 function read(o: Owned, providerId: string, cookie = o.cookie) {
 	return admin(
 		'GET',
-		`/admin/api/buckets/${o.bucket._id}/federation/${providerId}`,
+		`/admin/api/projects/${o.bucket._id}/federation/${providerId}`,
 		cookie
 	);
 }
@@ -123,7 +123,7 @@ describe('reading one identity provider of a bucket', () => {
 			(
 				await admin(
 					'GET',
-					`/admin/api/buckets/${o.bucket._id}/federation/catalogue`,
+					`/admin/api/projects/${o.bucket._id}/federation/catalogue`,
 					o.cookie
 				)
 			).json

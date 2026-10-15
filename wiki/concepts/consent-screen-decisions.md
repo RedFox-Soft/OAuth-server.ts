@@ -15,7 +15,7 @@ graph:
       confidence: high
       status: current
     - predicate: complements
-      object: concept:group-ownership
+      object: concept:team-ownership
       source: oauth-server-codebase
       evidence: "clientBelongsToBucket — the one test of \"these users are the tenant's own\" … the consent waiver honours an operator's stored flag there, and `clientProvenance` counts such a client as the instance's own."
       confidence: high
@@ -36,7 +36,7 @@ asking, what the app will be able to do, and for how long, in plain words. This 
 decisions behind that wording. Each one is easy to undo by accident.
 
 The work is split three ways. `consentViewFor` (`lib/interactions/index.ts:661`) only reads: the
-interaction, the client, the bucket, the person and their grant. `buildConsentView`
+interaction, the client, the project, the person and their grant. `buildConsentView`
 (`lib/interactions/consentView.ts:529`) decides what to say, and reads no configuration. `ConsentPage`
 (`lib/interactions/consentPage.tsx:771`) turns the result into words from one catalog. The view carries
 **data, never sentences** (`consentView.ts:22-31`). The server render and the browser's hydration then
@@ -48,15 +48,16 @@ hydration ([[interaction-page-families]]).
 `clientProvenance` (`lib/models/client/provenance.ts:68-78`) puts every client in one of three tiers:
 
 - **self-registered** — nobody here created it: dynamic registration, or a metadata document.
-- **this-organization** — the client belongs to the bucket being signed into, or it belongs to no bucket at
+- **this-organization** — the client belongs to the project being signed into, or it belongs to no project at
   all (the instance operator's own).
-- **operator-registered** — an administrator of this server created it, but in another bucket — for example
-  an application of the Default bucket that reaches this bucket through a declared resource. Until spec 099
-  the test compared the group owning the client's project with the bucket's group, and in a shared bucket
-  this tier was another tenant's app.
+- **operator-registered** — an administrator of this server created it, but in another project — for example
+  an application of the Default project that reaches this project through a declared resource. Until spec 099
+  the test compared the administrator group (a team, since spec 100) owning the client's old Project entity (a
+  retired project) with the group owning the bucket (today's project), and in a bucket shared by several
+  groups' old Projects this tier was another tenant's app.
 
 **Self-registered is tested first, and the order is the point.** A document client, and a dynamically
-registered one at the root, belongs to no bucket. The consent waiver reads "no bucket" as "the operator's own"
+registered one at the root, belongs to no project. The consent waiver reads "no project" as "the operator's own"
 (`lib/shared/consent_waiver.ts:33-44`). That reading is safe for the waiver only because such a client
 cannot switch consent off. For wording it would be wrong: every DCR and CIMD client would be headed as the
 organization's own app. The self-registered test reuses `redirectUrisVouchedFor` (`provenance.ts:25`), so
@@ -66,16 +67,16 @@ is explicitly kept out of self-registered (`provenance.ts:70-73`). It never reac
 function stays right for every client it can be handed.
 
 The comparison itself is `clientBelongsToBucket` (`provenance.ts:40-47`): the stored client's `bucketId` is
-the sign-in bucket's id. The waiver and the tiers share it. It answers `undefined` for a client that belongs to
-no bucket, and each caller decides what that means. Until spec 099 it was `projectGroupOwnsBucket`, which
-compared groups through the client's project; a client that fell out of its project then read as the
-operator's own, which is one of the defects that removed projects ([[bucket-is-the-only-container]]). See
-[[group-ownership]].
+the sign-in project's id. The waiver and the tiers share it. It answers `undefined` for a client that belongs to
+no project, and each caller decides what that means. Until spec 099 it was `projectGroupOwnsBucket`, which
+compared administrator groups (teams, since spec 100) through the client's old Project entity (a retired
+project); a client that fell out of its old Project then read as the operator's own, which is one of the
+defects that removed old Projects ([[project-is-the-only-container]]). See [[team-ownership]].
 
-The bucket compared is the **sign-in bucket** — the one `resolveBucketForRequest` chose, which the
+The project compared is the **sign-in project** — the one `resolveBucketForRequest` chose, which the
 interaction resolve now returns as `signsInto` (`lib/interactions/index.ts:1150`). Its users are the
-ones consenting. The addressed bucket would name the root service for an application's bucket reached at the
-root address.
+ones consenting. The addressed project would name the root service for an application's project reached at
+the root address.
 
 ## No positive trust signals
 
@@ -209,7 +210,7 @@ said about itself.
   every resolution — every authorization, token and introspection call (`tryFindClient`,
   `lib/models/client/validate.ts`) — and up to 87 KB of base64 would ride along on each for a picture
   only this page shows. Client-owned, so `cascadeForClient` sweeps it when the client is deleted. The
-  bucket's application list says `hasLogo` and carries no image (`listClientView`, `service.ts:368`).
+  project's application list says `hasLogo` and carries no image (`listClientView`, `service.ts:368`).
 - **Only this organization's own app, and never on a page that doubts the receiver**
   (`consentView.ts:653-655`). The logo is attacker pixels the moment anyone else can set it, so tier
   `this-organization` alone. The own-device-redirect warning and the device-flow warning also hide it: a
@@ -244,7 +245,7 @@ same answer as a mismatch, not a 422 naming the field.
 "Switch account" links to the interaction's login page. It is hidden when the request names its account
 in a way sign-in enforces: an `id_token_hint`, or `claims.id_token.sub` (`accountNamedByRequest`,
 `index.ts:567`). `login_hint` is not enforced, so it does not hide the link. Switching to another account
-of the same bucket goes through the sign-out confirmation. That page now gets the pending `redirect_uri`
+of the same project goes through the sign-out confirmation. That page now gets the pending `redirect_uri`
 as its hand-off, or the browser stops before the client ([[form-action-redirect-chain]]).
 
 ## A self-chosen name is shown with care
@@ -265,8 +266,8 @@ warning, never access, which is why a subset is enough.
 
 ## The header is the server's, never the client's
 
-The header shows the sign-in bucket's `displayName`, else the host of that bucket's issuer
-(`index.ts:668-672`). It never shows the bucket's internal `name`, which may say "prod-eu-users"
+The header shows the sign-in project's `displayName`, else the host of that project's issuer
+(`index.ts:668-672`). It never shows the project's internal `name`, which may say "prod-eu-users"
 (`UserBucket.displayName`, `lib/adapters/types.ts:1880-1881`). Nothing client-supplied appears there —
 the own app's logo (spec 094) sits beside the headline, below it.
 
@@ -295,9 +296,9 @@ Russian or Simplified Chinese ([[end-user-languages]]).
   (`checkConsentScopeDescriptions`, `lib/configs/configuration.ts:172`, called at `:724`). A key must be a
   defined scope and never a standard one (`lib/consts/oidc_scopes.ts`). Removing a described scope
   without its description is refused. See [[settings-console-descriptor]].
-- **Bucket display name.** `displayName` (1–60, trimmed, blank refused) on create and update; `null` on
+- **Project display name.** `displayName` (1–60, trimmed, blank refused) on create and update; `null` on
   update clears it (`lib/admin/buckets/schema.ts:43`, `:105`; `routes.ts:112`). See
-  [[admin-bucket-settings]] and [[stored-document-schemas]] for how the field is removed.
+  [[admin-project-settings]] and [[stored-document-schemas]] for how the field is removed.
 - **Client logo, privacy policy and terms.** `logo`, `policyUri`, `tosUri` on the client routes (spec 094,
   above).
 
@@ -309,8 +310,8 @@ name, its redirect URIs, and — for this organization's own app only — its po
 - No per-item selection unless an operator turned it on for the client (spec 093, above).
 - No logo for any app the organization does not stand behind, and no monogram or placeholder for one
   without a logo.
-- Since spec 095 the "remove this access later" line is here, below the buttons, linking the sign-in bucket's
-  connected-apps page in the same tab, absent in the administrators' bucket (`revokeHint`,
+- Since spec 095 the "remove this access later" line is here, below the buttons, linking the sign-in project's
+  connected-apps page in the same tab, absent in the administrators' project (`revokeHint`,
   `lib/interactions/index.ts:855`). It waited for that page to exist: see [[connected-apps-page]].
 - CIBA never renders this page.
 - No translation yet; the catalog is the seam.
@@ -318,7 +319,7 @@ name, its redirect URIs, and — for this organization's own app only — its po
 ## Related
 
 - [[untrusted-redirect-confirmation]] — the same provenance, read on the error path
-- [[group-ownership]] — the ownership comparison the tiers and the waiver share
+- [[team-ownership]] — the ownership comparison the tiers and the waiver share
 - [[rich-authorization-requests]] — rich details on this page, under "act"
 - [[form-action-redirect-chain]] — why the account-switch sign-out needed a hand-off
 - [[first-consent-grant-id]] — why the grant is read with `tryFind`

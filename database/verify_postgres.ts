@@ -19,6 +19,7 @@ import {
 	verifyPersonalGroupRepair
 } from './verify_container_ownership.js';
 import { verifyProjectRemoval } from './verify_remove_projects.js';
+import { verifyReservedHostnamesKey } from './verify_reserved_hostnames_key.js';
 import {
 	FIXED_AREAS,
 	STORE_AREAS,
@@ -578,6 +579,35 @@ await verifyProjectRemoval(
 			const removal = MIGRATIONS.find((m) => m.id.endsWith('remove-projects'));
 			if (!removal || 'noop' in removal.postgres) return null;
 			return removal.postgres.apply(handle);
+		}
+	},
+	String(Date.now()),
+	check
+);
+
+/* The reserved hostnames setting moves to the key that names projects (specs/100). */
+await verifyReservedHostnamesKey(
+	{
+		insertSettings: async (id, config) => {
+			await handle`
+				INSERT INTO ${handle(STORE_AREAS.serviceConfig)} (id, doc, expires_at)
+				VALUES (${id}, ${config}, NULL)
+			`;
+		},
+		readSettings: async (id) => {
+			const [row]: ({ doc: Record<string, unknown> } | undefined)[] =
+				await handle`SELECT doc FROM ${handle(STORE_AREAS.serviceConfig)} WHERE id = ${id}`;
+			return row?.doc ?? null;
+		},
+		removeSettings: async (id) => {
+			await handle`DELETE FROM ${handle(STORE_AREAS.serviceConfig)} WHERE id = ${id}`;
+		},
+		apply: async () => {
+			const move = MIGRATIONS.find((m) =>
+				m.id.endsWith('projects-reserved-hostnames')
+			);
+			if (!move || 'noop' in move.postgres) return null;
+			return move.postgres.apply(handle);
 		}
 	},
 	String(Date.now()),

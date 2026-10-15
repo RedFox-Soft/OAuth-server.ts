@@ -29,7 +29,7 @@ function setProfile(
 	return adminCall(
 		cookie,
 		'PATCH',
-		`/admin/api/buckets/${bucketId}/users/${uid}`,
+		`/admin/api/projects/${bucketId}/users/${uid}`,
 		{ profile }
 	);
 }

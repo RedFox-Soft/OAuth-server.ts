@@ -4,7 +4,7 @@ title: 'Admin console sign-in'
 tags: [architecture, contract, gotcha, oidc]
 sources: [oauth-server-codebase]
 created: 2026-08-04
-updated: 2026-09-24
+updated: 2026-10-15
 graph:
   node_type: concept
 ---
@@ -17,7 +17,7 @@ server's own `/auth`; `GET /admin/callback` exchanges the code over loopback HTT
 and reads the resulting identity token to learn which operator arrived
 (`lib/admin/auth/login.ts`). Since spec 080 the callback refuses an account that fails `canSignIn`
 (inactive or locally locked, as at every door) and records on the console session which of the
-administrators' bucket's providers the sign-in came through (`signedInWith`, read from the provider
+administrators' project's providers the sign-in came through (`signedInWith`, read from the provider
 session's `upstream`); see [[console-federation]]. Since spec 079 the callback returns to the console address the sign-in
 started from (`next`). The address is validated by `safeNext` both when it is stored and when it is used,
 because it rides in the `admin_oauth` cookie; see [[admin-console-frame]].
@@ -32,7 +32,7 @@ The callback used to base64url-decode the token's middle segment
 and trusted the `sub` it found. The code said so, with a comment promising that it "MUST be replaced
 with full signature verification". The consequence was the highest-value escalation available in the
 product: anything shaped like a token named any operator, including the super-administrator who can
-rewrite settings, mint clients and read every bucket. RBAC, the audit trail and the last-super-admin
+rewrite settings, mint clients and read every project. RBAC, the audit trail and the last-super-admin
 guard all rest on the identity this one step establishes, so they were all defeated at the front door.
 
 Verification now happens in `lib/admin/auth/verifyIdToken.ts` before any claim is read, and returns
@@ -125,15 +125,15 @@ toggling a protocol feature would silently disable console sign-out; and it answ
 operator has already pressed. The registered `post_logout_redirect_uris` such a redirect would need
 is consequently still empty, and deliberately so.
 
-The cost used to be real and is no longer: signing out of the console ends the **administrators
-bucket's** sign-in and that one only. A browser session now belongs to one user bucket, so an
+The cost used to be real and is no longer: signing out of the console ends the **administrators'
+project's** sign-in and that one only. A browser session now belongs to one project, so an
 administrator who is also an ordinary end user elsewhere keeps that sign-in when they leave the
 console.
 
 The older wording here — "the provider session is global to the browser, so leaving the console signs
 that browser out of every relying party" — described the mechanism of the time and presented it as a
 deliberate cost. It was a consequence of there being one session per browser, not a decision anybody
-made, and per-bucket sessions removed it. See [[bucket-is-an-issuer]].
+made, and per-project sessions removed it. See [[project-is-an-issuer]].
 
 ## Freshness is requested, not merely checked
 
@@ -175,7 +175,7 @@ repository's vocabulary, once.
 - [[cookie-path-scoping]] — why the sign-out cookie was cleared under the wrong path, and never removed.
 - [[feature-flag-gating]] — the other place a one-header or one-status difference was the whole
   fingerprint.
-- [[group-ownership]] — the session this establishes now also carries the console's active scope,
+- [[team-ownership]] — the session this establishes now also carries the console's active scope,
   server-held because it sits on an authorization boundary.
 
 Verified against [[oauth-server-codebase]].

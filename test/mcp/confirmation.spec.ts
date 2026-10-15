@@ -278,7 +278,7 @@ describe('MCP confirmation gate', () => {
 	it('refuses when the parameters changed after the description', async () => {
 		const { token } = await session('super');
 		const bucket = await rpc(
-			call('bucket_create', { name: 'Conf bucket', slug: 'conf-bucket-1' }),
+			call('project_create', { name: 'Conf bucket', slug: 'conf-bucket-1' }),
 			token
 		);
 		const { _id: bucketId } = shaped(
@@ -286,7 +286,7 @@ describe('MCP confirmation gate', () => {
 			bucket.result?.structuredContent?.result
 		);
 		const created = await rpc(
-			call('bucket_user_create', {
+			call('project_user_create', {
 				id: bucketId,
 				email: `u-${Math.random()}@x.io`,
 				password: 'correct horse battery staple'
@@ -299,7 +299,7 @@ describe('MCP confirmation gate', () => {
 		);
 
 		const described = await rpc(
-			call('bucket_user_password_reset', {
+			call('project_user_password_reset', {
 				id: bucketId,
 				uid,
 				password: 'first proposed password'
@@ -311,7 +311,7 @@ describe('MCP confirmation gate', () => {
 
 		// Same tool, same target, different payload. This is the case a target-only binding would miss.
 		const swapped = await rpc(
-			call('bucket_user_password_reset', {
+			call('project_user_password_reset', {
 				id: bucketId,
 				uid,
 				password: 'something else entirely',
@@ -329,7 +329,7 @@ describe('MCP confirmation gate', () => {
 	it('refuses a confirmation offered to an ordinary tool', async () => {
 		const { token } = await session('super');
 		const refused = await rpc(
-			call('group_create', {
+			call('team_create', {
 				name: 'X',
 				confirmationToken: 'anything'
 			}),
@@ -343,7 +343,7 @@ describe('MCP confirmation gate', () => {
 		 */
 		expect(refused.result?.isError).toBe(true);
 		const text = refused.result?.content?.[0]?.text ?? '';
-		expect(text).toContain('group_create');
+		expect(text).toContain('team_create');
 		expect(text).toContain('additional properties');
 	});
 

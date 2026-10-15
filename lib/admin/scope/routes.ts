@@ -59,7 +59,7 @@ export const scopeRoutes = new Elysia({ name: 'admin-scope' })
 				: await getGroupStore().listByMember(ctx.userId)
 		).filter((g) => !isSuperAdminsGroup(g._id));
 		return {
-			activeGroupId: ctx.activeGroupId,
+			activeTeamId: ctx.activeGroupId,
 			available: available.map((g) => ({
 				id: g._id,
 				name: g.name,
@@ -94,15 +94,15 @@ export const scopeRoutes = new Elysia({ name: 'admin-scope' })
 			 * ids are real or which of them are personal.
 			 */
 			/* Super administrators owns nothing, so there is nothing to act in. */
-			const group = isSuperAdminsGroup(body.groupId)
+			const group = isSuperAdminsGroup(body.teamId)
 				? null
-				: await getGroupStore().find(body.groupId);
-			if (!group) throw new AdminError(403, 'no access to this group');
+				: await getGroupStore().find(body.teamId);
+			if (!group) throw new AdminError(403, 'no access to this team');
 			if (group.kind === 'personal' && !isMember(ctx, group._id)) {
-				throw new AdminError(403, 'no access to this group');
+				throw new AdminError(403, 'no access to this team');
 			}
-			if (!ctx.superAdmin && !isMember(ctx, body.groupId)) {
-				throw new AdminError(403, 'no access to this group');
+			if (!ctx.superAdmin && !isMember(ctx, body.teamId)) {
+				throw new AdminError(403, 'no access to this team');
 			}
 
 			const sessionId = cookie[ADMIN_SESSION_COOKIE].value as
@@ -117,12 +117,12 @@ export const scopeRoutes = new Elysia({ name: 'admin-scope' })
 				 */
 				throw new AdminError(
 					400,
-					'the active scope is a console session setting; name the group per call instead'
+					'the active scope is a console session setting; name the team per call instead'
 				);
 			}
 
-			await adminSessionStore.setActiveGroup(sessionId, body.groupId);
-			return { activeGroupId: body.groupId };
+			await adminSessionStore.setActiveGroup(sessionId, body.teamId);
+			return { activeTeamId: body.teamId };
 		},
 		{ body: SwitchScopeBody }
 	);

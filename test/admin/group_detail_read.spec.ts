@@ -50,7 +50,7 @@ const GroupRead = Type.Object({
 			active: Type.Boolean()
 		})
 	),
-	owns: Type.Object({ buckets: Named }),
+	owns: Type.Object({ projects: Named }),
 	can: Can
 });
 
@@ -86,7 +86,7 @@ describe("an administrator group's read", () => {
 
 		const res = await send(
 			'GET',
-			`/admin/api/groups/${t.group._id}`,
+			`/admin/api/teams/${t.group._id}`,
 			await cookieFor(t.member)
 		);
 
@@ -97,7 +97,7 @@ describe("an administrator group's read", () => {
 			[t.member.email, 'member', true]
 		]);
 		expect(read.owns).toEqual({
-			buckets: [{ id: t.bucket._id, name: t.bucket.name }]
+			projects: [{ id: t.bucket._id, name: t.bucket.name }]
 		});
 	});
 
@@ -107,7 +107,7 @@ describe("an administrator group's read", () => {
 
 		const res = await send(
 			'GET',
-			`/admin/api/groups/${t.group._id}`,
+			`/admin/api/teams/${t.group._id}`,
 			await cookieFor(t.owner)
 		);
 
@@ -123,7 +123,7 @@ describe("an administrator group's read", () => {
 
 		const res = await send(
 			'GET',
-			`/admin/api/groups/${t.group._id}`,
+			`/admin/api/teams/${t.group._id}`,
 			await cookieFor(outsider)
 		);
 
@@ -136,7 +136,7 @@ describe("an administrator group's read", () => {
 
 		const res = await send(
 			'GET',
-			`/admin/api/groups/${t.group._id}`,
+			`/admin/api/teams/${t.group._id}`,
 			await cookieFor(t.member)
 		);
 
@@ -148,7 +148,7 @@ describe("an administrator group's read", () => {
 
 		const res = await send(
 			'GET',
-			`/admin/api/groups/${t.group._id}`,
+			`/admin/api/teams/${t.group._id}`,
 			await cookieFor(t.owner)
 		);
 
@@ -167,7 +167,7 @@ describe("an administrator group's read", () => {
 
 		const res = await send(
 			'GET',
-			`/admin/api/groups/${t.group._id}`,
+			`/admin/api/teams/${t.group._id}`,
 			await cookieFor(superAdmin)
 		);
 
@@ -186,7 +186,7 @@ describe("an administrator group's read", () => {
 
 		const res = await send(
 			'GET',
-			`/admin/api/groups/${personal._id}`,
+			`/admin/api/teams/${personal._id}`,
 			await cookieFor(owner)
 		);
 
@@ -198,7 +198,7 @@ describe("an administrator group's read", () => {
 
 		const res = await send(
 			'GET',
-			`/admin/api/groups/${UNASSIGNED_GROUP_ID}`,
+			`/admin/api/teams/${UNASSIGNED_GROUP_ID}`,
 			await cookieFor(superAdmin)
 		);
 
@@ -210,7 +210,7 @@ describe("an administrator group's read", () => {
 
 		const res = await send(
 			'DELETE',
-			`/admin/api/groups/${t.group._id}`,
+			`/admin/api/teams/${t.group._id}`,
 			await cookieFor(t.owner)
 		);
 
@@ -224,6 +224,6 @@ describe("an administrator group's read", () => {
 				}),
 				res.body
 			).blockers
-		).toEqual([{ kind: 'bucket', count: 1 }]);
+		).toEqual([{ kind: 'project', count: 1 }]);
 	});
 });

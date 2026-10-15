@@ -1,12 +1,12 @@
 ---
 title: Entra、Okta 的 SCIM 方言
 description: 严格遵循互操作规范的 SCIM 服务器，会拒绝 Entra 和 Okta 实际发送的请求。是哪些请求，为什么一个设置就够。
-source: bb28c1d03232
+source: 380dbaa22a65
 ---
 
 公司把员工信息放在目录服务里，比如 Okta 或 Microsoft Entra ID。目录服务会自动在公司用到的每个应用里，为每个人创建、更新和停用账号。这叫预配（provisioning），SCIM 就是目录服务做这件事时用的协议。
 
-下面是 Okta 通过 SCIM 停用用户的请求，格式与 Okta 自己的协议参考文档完全一致。它发往我们的一个用户桶，即路径里的 `acme`。用户桶是本服务器对一组终端用户的叫法，这组用户有自己的登录规则。用户桶有了自己的地址后，会以自己的名义签发令牌，也就是成为一个独立的签发者（issuer）。
+下面是 Okta 通过 SCIM 停用用户的请求，格式与 Okta 自己的协议参考文档完全一致。它发往我们的一个项目，即路径里的 `acme`。项目是本服务器对一组终端用户的叫法，这组用户有自己的登录规则。项目有了自己的地址后，会以自己的名义签发令牌，也就是成为一个独立的签发者（issuer）。
 
 ```http
 PATCH /acme/scim/v2/Users/2819c223-7f76-453a-919d-413861904646 HTTP/1.1
@@ -142,12 +142,12 @@ if (path === undefined || path === '') {
 
 只开启部分宽容项的服务器，并不符合规范。因此一组彼此独立的开关会带来几十种组合，而除了其中两种（全部开启或全部关闭），其余每一种对这两个目的来说都是错的。打开 `scim.strict` 后，表中的每一种形式都会得到 `400`。也只有在这时，`/ServiceProviderConfig`（SCIM 服务器说明自己支持哪些功能的端点）才会声明 `interopProfileConformant`。哪怕只接受其中一种形式，服务器也没有资格这样声明。
 
-凭据遵循同样的规则：运维者真正要做的每一个决定，对应一个开关。这里有两个决定。Entra 凭客户端密钥，在用户桶的令牌端点获取令牌。它通过 Basic 认证（放在 `Authorization` 请求头里）或在请求体中发送密钥，具体由它的管理员选择。在工作负载身份联合（workload identity federation，一种程序无需保存密钥就能登录的方式）覆盖到预配之前，Entra 能发送的只有密钥。Okta 发送的是它的静态令牌。
+凭据遵循同样的规则：运维者真正要做的每一个决定，对应一个开关。这里有两个决定。Entra 凭客户端密钥，在项目的令牌端点获取令牌。它通过 Basic 认证（放在 `Authorization` 请求头里）或在请求体中发送密钥，具体由它的管理员选择。在工作负载身份联合（workload identity federation，一种程序无需保存密钥就能登录的方式）覆盖到预配之前，Entra 能发送的只有密钥。Okta 发送的是它的静态令牌。
 
 两者都不是 IPSIE 所要求的。规范要的是客户端断言（client assertion）：一个由客户端签名、用来证明自身身份的 JWT。Entra 的密钥和 Okta 的静态令牌各有一个设置，即 `scim.secretCredentials` 和 `scim.staticTokens`，默认都开启。只想采用规范方式的运维者，可以把这两个设置都关掉，然后确切地看到哪些东西停止工作。
 
 <svg viewBox="0 0 800 330" width="100%" role="img" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">
-  <title>目录服务向用户桶的 SCIM 端点证明身份的三种方式：Entra 在令牌端点使用客户端密钥，遵循 IPSIE 的客户端在同一端点使用签名的 JWT，Okta 则把静态令牌直接发送到 SCIM 端点。每种方式各有一个设置</title>
+  <title>目录服务向项目的 SCIM 端点证明身份的三种方式：Entra 在令牌端点使用客户端密钥，遵循 IPSIE 的客户端在同一端点使用签名的 JWT，Okta 则把静态令牌直接发送到 SCIM 端点。每种方式各有一个设置</title>
   <defs>
     <marker id="scim-arrow-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"> <path d="M0,0 L10,5 L0,10 z" fill="var(--diagram-line, #555)"/></marker>
     <marker id="scim-arrow-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"> <path d="M0,0 L10,5 L0,10 z" fill="var(--diagram-accent, #d9480f)"/></marker>
@@ -163,7 +163,7 @@ if (path === undefined || path === '') {
   <text x="410" y="125" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">客户端 scim-&lt;连接 ID&gt;</text>
   <rect x="610" y="150" width="170" height="70" rx="8" fill="none" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5"/>
   <text x="695" y="180" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">/scim/v2</text>
-  <text x="695" y="200" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">仅限一个用户桶</text>
+  <text x="695" y="200" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">仅限一个项目</text>
   <line x1="190" y1="65" x2="318" y2="100" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#scim-arrow-a)"/>
   <text x="250" y="60" text-anchor="middle" font-size="12" fill="var(--diagram-fg, #1a1a1a)">客户端密钥</text>
   <line x1="190" y1="155" x2="318" y2="120" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#scim-arrow-a)"/>
@@ -177,9 +177,9 @@ if (path === undefined || path === '') {
   <text x="400" y="318" text-anchor="middle" font-size="13" fill="var(--diagram-line, #555)">只有中间那条路径是 IPSIE 所要求的。真实目录服务使用的另外两条，各有一个开关。</text>
 </svg>
 
-令牌端点这条路径有一个我不愿放弃的性质。目录服务通过预配连接与我们的服务器关联，预配连接就是把一个目录服务与一个用户桶关联起来的那条记录。每次需要时，服务器都根据这个连接现场构建 OAuth 客户端 `scim-<connection id>`。这个客户端本身不存储在任何地方。因此，SCIM 白得了整个令牌端点，包括防止同一个客户端断言被使用两次的保护，以及常数时间的密钥比较。常数时间比较无论猜测与真值多接近，花的时间都一样，所以从响应时间里得不到任何信息。更换一个凭据只需对连接写入一次，没有任何隐藏的副本需要保持同步。
+令牌端点这条路径有一个我不愿放弃的性质。目录服务通过预配连接与我们的服务器关联，预配连接就是把一个目录服务与一个项目关联起来的那条记录。每次需要时，服务器都根据这个连接现场构建 OAuth 客户端 `scim-<connection id>`。这个客户端本身不存储在任何地方。因此，SCIM 白得了整个令牌端点，包括防止同一个客户端断言被使用两次的保护，以及常数时间的密钥比较。常数时间比较无论猜测与真值多接近，花的时间都一样，所以从响应时间里得不到任何信息。更换一个凭据只需对连接写入一次，没有任何隐藏的副本需要保持同步。
 
-这个端点签发的令牌是不透明令牌：一个没有内容的随机字符串，只有我们的服务器能查到它代表什么。它只携带 `scim` 这一个 scope。它的受众是某一个用户桶的 SCIM URL，所以在别处都用不了。凭据一旦重新签发，它就立即失效。
+这个端点签发的令牌是不透明令牌：一个没有内容的随机字符串，只有我们的服务器能查到它代表什么。它只携带 `scim` 这一个 scope。它的受众是某一个项目的 SCIM URL，所以在别处都用不了。凭据一旦重新签发，它就立即失效。
 
 ## IPSIE §4.1 要求把凭据放在请求体中，随后又禁止这样做 {#ipsie-41-asks-for-two-things-no-client-can-do-at-once}
 

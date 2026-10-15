@@ -131,7 +131,7 @@ describe('settings catalog presentation metadata', () => {
 		expect(flagged).toEqual(
 			[
 				'authorization.allowOmittingSingleRegisteredRedirectUri',
-				'buckets.reservedHostnames',
+				'projects.reservedHostnames',
 				'conformIdTokenClaims',
 				'cors.enabled',
 				'globalTokenRevocation.enabled',

@@ -105,7 +105,7 @@ describe("an agent and the console's identity providers", () => {
 		const idp = await idpStub('https://idp-agent-console.test');
 		idp.expectDiscovery();
 		const args = {
-			bucketId: ADMIN_BUCKET_ID,
+			projectId: ADMIN_BUCKET_ID,
 			...provider(idp.origin, 'corp-sso')
 		};
 
@@ -145,7 +145,7 @@ describe("an agent and the console's identity providers", () => {
 
 		const response = await rpc(
 			call('federation_provider_create', {
-				bucketId: bucket._id,
+				projectId: bucket._id,
 				...provider(idp.origin, 'acme-sso')
 			}),
 			token
@@ -169,7 +169,7 @@ describe("an agent and the console's identity providers", () => {
 		const first = resultOf(
 			await rpc(
 				call('federation_provider_create', {
-					bucketId: ADMIN_BUCKET_ID,
+					projectId: ADMIN_BUCKET_ID,
 					...provider(idp.origin, 'corp-sso')
 				}),
 				token
@@ -178,7 +178,7 @@ describe("an agent and the console's identity providers", () => {
 
 		const spent = await rpc(
 			call('federation_provider_create', {
-				bucketId: bucket._id,
+				projectId: bucket._id,
 				...provider(idp.origin, 'corp-sso'),
 				confirmationToken: first.confirmationToken
 			}),
@@ -215,7 +215,7 @@ describe("an agent and the console's identity providers", () => {
 		});
 
 		const response = await rpc(
-			call('bucket_update', { id: ADMIN_BUCKET_ID, passwordLogin: false }),
+			call('project_update', { id: ADMIN_BUCKET_ID, passwordLogin: false }),
 			token
 		);
 

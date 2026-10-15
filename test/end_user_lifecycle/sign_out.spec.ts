@@ -37,7 +37,7 @@ const RELYING_PARTIES = [
 
 function signOut(cookie: string, uid: string) {
 	const user = admin.admin.api
-		.buckets({ id: DEFAULT_BUCKET_ID })
+		.projects({ id: DEFAULT_BUCKET_ID })
 		.users({ uid });
 	return user['sign-out'].post(undefined, { headers: { cookie } });
 }
