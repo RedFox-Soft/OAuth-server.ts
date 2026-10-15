@@ -24,7 +24,11 @@ const client = treaty(app);
 describe('admin API error shape', () => {
 	it('returns an admin-shaped validation error, not an OAuth body', async () => {
 		// name (minLength 1) and slug (pattern) are both invalid values → VALIDATION.
-		const res = await client.admin.api.projects.post({ name: '', slug: '' });
+		const res = await client.admin.api.projects.post({
+			name: '',
+			slug: '',
+			bucketId: 'any'
+		});
 		expect(res.status).toBe(422);
 		const body = res.error?.value;
 		expect(body).toMatchObject({ error: 'invalid_request' });

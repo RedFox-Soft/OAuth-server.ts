@@ -1225,7 +1225,11 @@ export const Project = t.Object({
 	type: t.Union([t.Literal('admin'), t.Literal('regular')]),
 	/* The group that owns this project. Every access decision resolves through it. */
 	ownerGroupId: t.String(),
-	bucketId: t.Union([t.String(), t.Null()]),
+	/*
+	 * The bucket its clients sign people into. Always set (specs/098): "no bucket" used to mean the Default
+	 * bucket, which put every tenant's bucket-less project into one shared population.
+	 */
+	bucketId: t.String(),
 	clientIds: t.Array(t.String()),
 	/*
 	 * Web origins whose browser code may read cross-origin responses on behalf of this project's
@@ -1245,7 +1249,7 @@ export interface ProjectStoreInstance {
 		slug: string;
 		type?: 'admin' | 'regular';
 		ownerGroupId: string;
-		bucketId?: string | null;
+		bucketId: string;
 		clientIds?: string[];
 		corsOrigins?: string[];
 	}): Promise<Project>;
@@ -2145,8 +2149,9 @@ export interface ContainerOwnershipStoreInstance {
 		to: string
 	): Promise<ContainerMoveResult>;
 	/*
-	 * Sets `ownerGroupId = to` on a project that is in `from` and uses no bucket; otherwise changes
-	 * nothing. A project with a bucket moves with it, never alone.
+	 * Sets `ownerGroupId = to` on a project that is in `from` and signs into the Default bucket; otherwise
+	 * changes nothing. The Default bucket never moves, so a project on it can only move alone; a project on
+	 * any other bucket moves with that bucket, never alone.
 	 */
 	moveProject(
 		projectId: string,

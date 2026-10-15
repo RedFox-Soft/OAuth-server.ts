@@ -12,10 +12,11 @@ export const CreateProjectBody = t.Object({
 	corsOrigins: t.Optional(t.Array(t.String())),
 	/*
 	 * Where the project is created, and the bucket it signs people into (specs/087). Without `groupId` it
-	 * lands in the caller's active group, as it always has; without `bucketId` it uses the default bucket.
+	 * lands in the caller's active group, as it always has. The bucket is always named (specs/098): a
+	 * project left without one used to sign people into the shared Default bucket, whoever owned it.
 	 */
 	groupId: t.Optional(t.String({ minLength: 1 })),
-	bucketId: t.Optional(t.String({ minLength: 1 }))
+	bucketId: t.String({ minLength: 1 })
 });
 
 export const UpdateProjectBody = t.Object({
@@ -24,8 +25,9 @@ export const UpdateProjectBody = t.Object({
 });
 
 /*
- * Moving a project with no bucket to another administrator group (specs/075). A project that uses a
- * bucket moves with it, through the bucket's own route. `confirm` is the second call, after the preview.
+ * Moving a project on the Default bucket to another administrator group (specs/075, specs/098). A project
+ * on any other bucket moves with it, through the bucket's own route. `confirm` is the second call, after
+ * the preview.
  */
 export const MoveProjectOwnerBody = t.Object({
 	groupId: t.String({ minLength: 1 }),
@@ -48,12 +50,6 @@ const BucketChangeExpect = t.Object({
 
 export const SetBucketBody = t.Object({
 	bucketId: t.String(),
-	confirm: t.Optional(t.Literal(true)),
-	expect: t.Optional(BucketChangeExpect)
-});
-
-/* Clearing is the same change towards the default bucket. The body is optional; without one it previews. */
-export const ClearBucketBody = t.Object({
 	confirm: t.Optional(t.Literal(true)),
 	expect: t.Optional(BucketChangeExpect)
 });

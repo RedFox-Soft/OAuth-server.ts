@@ -17,7 +17,8 @@ import {
 	ADMIN_PROJECT_ID,
 	ADMIN_CLIENT_ID,
 	ADMIN_SESSION_COOKIE,
-	UNASSIGNED_GROUP_ID
+	UNASSIGNED_GROUP_ID,
+	DEFAULT_BUCKET_ID
 } from 'lib/admin/consts.ts';
 import { createAdministrator, type AdminKind } from '../administrators.ts';
 
@@ -32,6 +33,7 @@ async function sessionCookieFor(kind: AdminKind) {
 
 async function makeProject(ownerGroupId = UNASSIGNED_GROUP_ID) {
 	return getProjectStore().create({
+		bucketId: DEFAULT_BUCKET_ID,
 		name: 'P',
 		slug: `p-${Math.random()}`,
 		ownerGroupId

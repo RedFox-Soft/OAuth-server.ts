@@ -9,7 +9,7 @@ import { adminSessionStore, adminAuditStore } from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { ADMIN_MCP_CLIENT_ID, MCP_RESOURCE } from 'lib/mcp/consts.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
-import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { DEFAULT_BUCKET_ID, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { createAdministrator } from '../administrators.ts';
 import { rpc } from './rpc.ts';
 
@@ -89,7 +89,11 @@ describe('MCP audit attribution', () => {
 				method: 'tools/call',
 				params: {
 					name: 'project_create',
-					arguments: { name: 'Attributed', slug: slug() }
+					arguments: {
+						name: 'Attributed',
+						slug: slug(),
+						bucketId: DEFAULT_BUCKET_ID
+					}
 				}
 			},
 			token
@@ -116,7 +120,11 @@ describe('MCP audit attribution', () => {
 			new Request('http://e.ly/admin/api/projects', {
 				method: 'POST',
 				headers: { 'content-type': 'application/json', cookie },
-				body: JSON.stringify({ name: 'Console made', slug: slug() })
+				body: JSON.stringify({
+					name: 'Console made',
+					slug: slug(),
+					bucketId: DEFAULT_BUCKET_ID
+				})
 			})
 		);
 		expect(res.status).toBe(201);
@@ -138,7 +146,7 @@ describe('MCP audit attribution', () => {
 				method: 'tools/call',
 				params: {
 					name: 'project_create',
-					arguments: { name: 'A', slug: slug() }
+					arguments: { name: 'A', slug: slug(), bucketId: DEFAULT_BUCKET_ID }
 				}
 			},
 			viaAgent.token
@@ -150,7 +158,11 @@ describe('MCP audit attribution', () => {
 			new Request('http://e.ly/admin/api/projects', {
 				method: 'POST',
 				headers: { 'content-type': 'application/json', cookie },
-				body: JSON.stringify({ name: 'B', slug: slug() })
+				body: JSON.stringify({
+					name: 'B',
+					slug: slug(),
+					bucketId: DEFAULT_BUCKET_ID
+				})
 			})
 		);
 
@@ -176,7 +188,11 @@ describe('MCP audit attribution', () => {
 				method: 'tools/call',
 				params: {
 					name: 'project_create',
-					arguments: { name: 'Agent one', slug: slug() }
+					arguments: {
+						name: 'Agent one',
+						slug: slug(),
+						bucketId: DEFAULT_BUCKET_ID
+					}
 				}
 			},
 			viaAgent.token
@@ -188,7 +204,11 @@ describe('MCP audit attribution', () => {
 			new Request('http://e.ly/admin/api/projects', {
 				method: 'POST',
 				headers: { 'content-type': 'application/json', cookie },
-				body: JSON.stringify({ name: 'Console one', slug: slug() })
+				body: JSON.stringify({
+					name: 'Console one',
+					slug: slug(),
+					bucketId: DEFAULT_BUCKET_ID
+				})
 			})
 		);
 
@@ -221,7 +241,11 @@ describe('MCP audit attribution', () => {
 				method: 'tools/call',
 				params: {
 					name: 'project_create',
-					arguments: { name: 'By agent', slug: slug() }
+					arguments: {
+						name: 'By agent',
+						slug: slug(),
+						bucketId: DEFAULT_BUCKET_ID
+					}
 				}
 			},
 			token

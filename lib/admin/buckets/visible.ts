@@ -1,6 +1,6 @@
 import { getBucketStore, getProjectStore } from '../../adapters/index.js';
 import type { UserBucket } from '../../adapters/types.js';
-import type { AdminContext } from '../auth/rbac.js';
+import { bucketReachedThrough, type AdminContext } from '../auth/rbac.js';
 import { ADMIN_BUCKET_ID } from '../consts.js';
 
 /*
@@ -21,8 +21,8 @@ export async function visibleBuckets(ctx: AdminContext): Promise<UserBucket[]> {
 		const owned = await store.listByGroup(ctx.activeGroupId);
 		const projects = await getProjectStore().listByGroup(ctx.activeGroupId);
 		const backing = projects
-			.map((p) => p.bucketId)
-			.filter((id): id is string => id !== null);
+			.map(bucketReachedThrough)
+			.filter((id): id is string => id !== undefined);
 		const missing = backing.filter((id) => !owned.some((b) => b._id === id));
 		const extra = (
 			await Promise.all(missing.map((id) => store.find(id)))

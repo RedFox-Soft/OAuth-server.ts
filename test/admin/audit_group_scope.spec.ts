@@ -8,7 +8,8 @@ import { projectRoutes } from 'lib/admin/projects/routes.ts';
 import { bucketRoutes } from 'lib/admin/buckets/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
-import { sessionFor } from '../admin_session.ts';
+import { sessionFor, personalGroupId } from '../admin_session.ts';
+import { getBucketStore } from 'lib/adapters/index.ts';
 import { answered } from './answered.ts';
 import { present } from 'test/shape.js';
 import { createAdministrator, type AdminKind } from '../administrators.ts';
@@ -41,7 +42,12 @@ async function tenant(kind: AdminKind = 'plain') {
 	const user = await createAdministrator(kind, `${slug('a')}@x.io`);
 	const session = await sessionFor(user);
 	const cookie = `${ADMIN_SESSION_COOKIE}=${session._id}`;
-	return { userId: user._id, cookie };
+	/* Every project names a bucket of its group (specs/098); each tenant starts with one. */
+	const bucket = await getBucketStore().create({
+		name: 'Own',
+		ownerGroupId: await personalGroupId(user._id)
+	});
+	return { userId: user._id, cookie, bucketId: bucket._id };
 }
 
 /**
@@ -58,7 +64,7 @@ describe('group-scoped audit read', () => {
 		const project = answered(
 			(
 				await client.admin.api.projects.post(
-					{ name: 'Mine', slug: slug('m') },
+					{ name: 'Mine', slug: slug('m'), bucketId: a.bucketId },
 					{ headers: { cookie: a.cookie } }
 				)
 			).data
@@ -89,7 +95,7 @@ describe('group-scoped audit read', () => {
 		const theirs = answered(
 			(
 				await client.admin.api.projects.post(
-					{ name: 'Theirs', slug: slug('t') },
+					{ name: 'Theirs', slug: slug('t'), bucketId: b.bucketId },
 					{ headers: { cookie: b.cookie } }
 				)
 			).data
@@ -164,7 +170,7 @@ describe('group-scoped audit read', () => {
 		const project = answered(
 			(
 				await client.admin.api.projects.post(
-					{ name: 'Doomed', slug: slug('d') },
+					{ name: 'Doomed', slug: slug('d'), bucketId: a.bucketId },
 					{ headers: { cookie: a.cookie } }
 				)
 			).data
@@ -195,7 +201,7 @@ describe('group-scoped audit read', () => {
 		const project = answered(
 			(
 				await client.admin.api.projects.post(
-					{ name: 'Someone else’s', slug: slug('x') },
+					{ name: 'Someone else’s', slug: slug('x'), bucketId: a.bucketId },
 					{ headers: { cookie: a.cookie } }
 				)
 			).data

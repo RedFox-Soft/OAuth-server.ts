@@ -88,8 +88,8 @@ signal.
 - **Agents are covered.** MCP dispatches into the same routes, so the same guard refuses an agent.
 - **Strangers learn nothing.** The guard answers only a caller who may read the bucket. Anyone else falls through
   to the handler's own 403/404, so a 409 never tells a stranger that a bucket exists and is scheduled.
-- **Outside the prefix.** Project assignment (`PUT /admin/api/projects/:id/bucket`, and creating a project with
-  `bucketId`) checks the same state itself.
+- **Outside the prefix.** Project assignment (`PUT /admin/api/projects/:id/bucket`, and creating a project,
+  which always names a `bucketId` since spec 098) checks the same state itself.
 
 The console folds the state into `bucketCan` once (`lib/admin/ui/frame/can.ts`), so every panel turns read-only
 without a change of its own. The server keeps state out of its `can` flags, as `lib/admin/auth/can.ts:15-17` asks.

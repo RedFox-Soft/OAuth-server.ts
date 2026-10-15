@@ -9,7 +9,6 @@ import {
 	CreateProjectBody,
 	UpdateProjectBody,
 	SetBucketBody,
-	ClearBucketBody,
 	MoveProjectOwnerBody
 } from '../admin/projects/schema.js';
 import { CreateClientBody, UpdateClientBody } from '../admin/clients/schema.js';
@@ -224,7 +223,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'One project: name, slug, managers, assigned user bucket, client ids, and CORS origins. `can` states which operations the server will accept from the caller on it: `edit` (project_update), `delete`, `manageClients` (client_*), `declareResources` (resource_declare, resource_update, resource_delete), `assignBucket` (project_bucket_assign, project_bucket_clear) and `move` (project_owner_change); a false flag is a refusal, so do not try it. A right is not a promise about state: `blockers.hasBucket` means the project moves only with its bucket. `bucket` names the bucket its applications sign in through — `id`, `name` and `addressForm` (root, path, host or unaddressed) — or is null for the default bucket; `clientCount` is how many applications it holds. Deleting a project stays console-only for agents even where `can.delete` is true.'
+			'One project: name, slug, managers, assigned user bucket, client ids, and CORS origins. `can` states which operations the server will accept from the caller on it: `edit` (project_update), `delete`, `manageClients` (client_*), `declareResources` (resource_declare, resource_update, resource_delete), `assignBucket` (project_bucket_assign) and `move` (project_owner_change); a false flag is a refusal, so do not try it. A right is not a promise about state: `blockers.hasBucket` means the project is on a bucket other than the default one, so it moves only with that bucket. `bucket` names the bucket its applications sign in through — `id`, `name` and `addressForm` (root, path, host or unaddressed); `clientCount` is how many applications it holds. Deleting a project stays console-only for agents even where `can.delete` is true.'
 	},
 	{
 		tool: 'resource_list',
@@ -406,7 +405,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			"Count what a user bucket holds, computed when asked: its accounts (`users`), how many are unverified, without an authenticator and without any linked upstream identity; its user groups; its provisioning connections and how many are holding a deprovisioning (`held`); its identity providers (`providers.enabled`, and `providers.creating` — enabled ones that create accounts on first sign-in); whether mail delivery is configured; and whether federation is switched on for the instance (`federationEnabled` — when false no bucket's sign-in page shows a provider button). `withoutEnabledLink` counts accounts with no link to an enabled identity provider (who could not sign in were passwords turned off) and `passwordWithoutAuthenticator` accounts with no authenticator whose password is not known to be absent (who an authenticator requirement would ask to enrol); on the default bucket `projects` counts the projects signing in there, those naming no bucket included. `activeThisMonth` is present only to a caller with `can.readActivity`, and absent rather than zero before counting began. Counts only, never who. Readable by anyone who may read the bucket (bucket_get's `can.read`)."
+			"Count what a user bucket holds, computed when asked: its accounts (`users`), how many are unverified, without an authenticator and without any linked upstream identity; its user groups; its provisioning connections and how many are holding a deprovisioning (`held`); its identity providers (`providers.enabled`, and `providers.creating` — enabled ones that create accounts on first sign-in); whether mail delivery is configured; and whether federation is switched on for the instance (`federationEnabled` — when false no bucket's sign-in page shows a provider button). `withoutEnabledLink` counts accounts with no link to an enabled identity provider (who could not sign in were passwords turned off) and `passwordWithoutAuthenticator` accounts with no authenticator whose password is not known to be absent (who an authenticator requirement would ask to enrol); on the default bucket `projects` counts the projects signing in there. `activeThisMonth` is present only to a caller with `can.readActivity`, and absent rather than zero before counting began. Counts only, never who. Readable by anyone who may read the bucket (bucket_get's `can.read`)."
 	},
 	{
 		tool: 'bucket_resource_list',
@@ -419,7 +418,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			"The protected resources declared in a user bucket's namespace, sorted by identifier, each with `name` and the project (`projectId`, `projectName`) that declares it. `namespace` is `bucket` for a bucket with an address of its own — an identifier is unique across all its projects — or `root` for one served at the root, which shares the root namespace with every other root-served bucket and every project with no bucket; then only this bucket's own projects' declarations are listed. Readable by anyone who may read the bucket (bucket_get's `can.read`)."
+			"The protected resources declared in a user bucket's namespace, sorted by identifier, each with `name` and the project (`projectId`, `projectName`) that declares it. `namespace` is `bucket` for a bucket with an address of its own — an identifier is unique across all its projects — or `root` for one served at the root, which shares the root namespace with every other root-served bucket; then only this bucket's own projects' declarations are listed. Readable by anyone who may read the bucket (bucket_get's `can.read`)."
 	},
 	{
 		tool: 'bucket_activity_get',
@@ -814,7 +813,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: [],
 		summary:
-			"Create a project: the container an instance groups OAuth clients into, with its own managers and CORS origins. `groupId` names the administrator group it belongs to — one this administrator is a member of (a super administrator: any group but another administrator's personal group); without it, the administrator's active group. `bucketId` names the user bucket it signs people into, which must belong to that same group (409 otherwise) and cannot be the administrators' bucket; leave it out to use the default bucket, which is refused by name. whoami states the right as `can.createProject`."
+			"Create a project: the container an instance groups OAuth clients into, with its own managers and CORS origins. `groupId` names the administrator group it belongs to — one this administrator is a member of (a super administrator: any group but another administrator's personal group); without it, the administrator's active group. `bucketId` is required and names the user bucket it signs people into, which must belong to that same group (409 otherwise) and cannot be the administrators' bucket. Only a super administrator may name the default bucket, shared by projects of every group; anyone else is refused as for any bucket out of their reach — create a bucket of the group first (bucket_create) and name it here. whoami states the right as `can.createProject`."
 	},
 	{
 		tool: 'project_update',
@@ -846,24 +845,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'Assign the user bucket whose accounts this project’s clients authenticate against. The bucket must belong to the same group as the project, so not every bucket bucket_list returns can be assigned to every project. The default bucket is never assignable — it belongs to no group — and does not need to be: a project with no bucket already signs its users in from it, so project_bucket_clear is how that is chosen. Called without `confirm`, it changes nothing and answers with a preview: `from` and `to` (each `bucketId`, `name`, `issuer`), `applications` (every client of the project, by name), `resources` (the declarations that move namespace), `conflicts` (identifiers already declared where they would go), `rootRefused`, `blocked`, `consequence` and `expect`, the counts. Called with `confirm: true` and that `expect`, it applies the change: the issuer of every listed application changes, people signed in through them sign in again in the new bucket and their accounts do not move, and tokens already issued keep working until they expire. If what it reaches changed since the preview, it is refused with 409 and the fresh preview; a `blocked` preview is refused when confirmed. project_get states the right as `can.assignBucket`.'
-	},
-	{
-		tool: 'project_bucket_clear',
-		method: 'DELETE',
-		path: '/admin/api/projects/:id/bucket',
-		action: 'project.bucket.clear',
-		/*
-		 * `high`, like the assignment it undoes (specs/085): it destroys nothing and is reversed by assigning
-		 * again, but it changes the issuer of every application in the project just the same.
-		 */
-		consequence: 'high',
-		superAdminOnly: false,
-		bodySchema: ClearBucketBody,
-		querySchema: null,
-		pathParams: ['id'],
-		summary:
-			'Remove the user bucket assigned to this project, returning its clients to the default bucket. Reversed by assigning one again. Called without `confirm`, it changes nothing and answers with the same preview as project_bucket_assign, `to` being the default bucket; call again with `confirm: true` and the preview’s `expect` to apply it, and a changed count answers with the fresh preview. project_get states the right as `can.assignBucket`; with resources declared, only a super-administrator may clear it, because they move into the shared root namespace — the preview says so as `rootRefused`.'
+			'Assign the user bucket whose accounts this project’s clients authenticate against. The bucket must belong to the same group as the project, so not every bucket bucket_list returns can be assigned to every project. The default bucket, shared by projects of every group, is the exception, and only a super administrator may assign it. A project always has a bucket; there is no removing one, only assigning another. Called without `confirm`, it changes nothing and answers with a preview: `from` and `to` (each `bucketId`, `name`, `issuer`), `applications` (every client of the project, by name), `resources` (the declarations that move namespace), `conflicts` (identifiers already declared where they would go), `rootRefused`, `blocked`, `consequence` and `expect`, the counts. Called with `confirm: true` and that `expect`, it applies the change: the issuer of every listed application changes, people signed in through them sign in again in the new bucket and their accounts do not move, and tokens already issued keep working until they expire. If what it reaches changed since the preview, it is refused with 409 and the fresh preview; a `blocked` preview is refused when confirmed. project_get states the right as `can.assignBucket`.'
 	},
 	{
 		tool: 'project_owner_change',
@@ -877,7 +859,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'Move a project that uses no bucket of its own to another administrator group (`groupId`), with its clients unchanged. Requires owning the group it is in now and belonging to the destination. A project that uses a bucket moves with the bucket: use bucket_owner_change. Called without `confirm`, it changes nothing and describes the move. project_get states the right as `can.move`, and `blockers.hasBucket` when the bucket is in the way.'
+			'Move a project on the default bucket to another administrator group (`groupId`), with its clients unchanged; the default bucket stays where it is. Requires owning the group it is in now and belonging to the destination. A project that uses a bucket moves with the bucket: use bucket_owner_change. Called without `confirm`, it changes nothing and describes the move. project_get states the right as `can.move`, and `blockers.hasBucket` when the bucket is in the way.'
 	},
 
 	/* ---------------------------------------- writes: protected resources (3) */

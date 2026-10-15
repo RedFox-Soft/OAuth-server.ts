@@ -13,7 +13,7 @@ import {
 	getProtectedResourceStore
 } from 'lib/adapters/index.js';
 import { ROOT_NAMESPACE } from 'lib/resources/namespace.js';
-import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.js';
+import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.js';
 import {
 	AUDIENCE,
 	REDIRECT_URI,
@@ -107,6 +107,7 @@ describe('an authorization error raised after the interaction', () => {
 	describe('a request that stops being valid before sign-in completes', () => {
 		it('delivers invalid_target to the client when the requested resource is withdrawn', async () => {
 			const project = await getProjectStore().create({
+				bucketId: DEFAULT_BUCKET_ID,
 				name: 'Delivery',
 				slug: `delivery-${Math.random()}`,
 				ownerGroupId: UNASSIGNED_GROUP_ID

@@ -31,7 +31,7 @@ export class ProjectStore implements ProjectStoreInstance {
 		slug: string;
 		type?: 'admin' | 'regular';
 		ownerGroupId: string;
-		bucketId?: string | null;
+		bucketId: string;
 		clientIds?: string[];
 		corsOrigins?: string[];
 	}): Promise<Project> {
@@ -42,7 +42,7 @@ export class ProjectStore implements ProjectStoreInstance {
 			slug: data.slug,
 			type: data.type ?? 'regular',
 			ownerGroupId: data.ownerGroupId,
-			bucketId: data.bucketId ?? null,
+			bucketId: data.bucketId,
 			clientIds: data.clientIds ?? [],
 			corsOrigins: data.corsOrigins ?? [],
 			createdAt: now,

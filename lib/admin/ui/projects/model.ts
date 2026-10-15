@@ -9,9 +9,8 @@ import type { Project, UserBucket } from '../../../adapters/types.js';
  * the project's owning group. Offering the rest puts a choice on the screen that answers 409, which is
  * how the default bucket came to be listed and unusable.
  *
- * The default bucket is therefore never here, and does not need to be: it belongs to no group, and a
- * project with no bucket already signs its users in from it. Choosing it and choosing nothing are the
- * same act, and "Not set" is how the screen says so.
+ * The default bucket is therefore never here: it belongs to no group, and the route accepts it from a
+ * super administrator alone (specs/098), so a screen offering it adds it for them explicitly.
  */
 export function assignableBuckets(
 	buckets: readonly UserBucket[],

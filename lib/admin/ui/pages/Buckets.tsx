@@ -247,7 +247,7 @@ export function Buckets() {
 							' '
 						) : (
 							<EmptyState
-								purpose="A bucket holds the people who sign in to your apps. Until you create one, your projects sign people in from the shared Default bucket."
+								purpose="A bucket holds the people who sign in to your apps. Every project signs people in from one; create a bucket here, or with your first project."
 								create={createButton}
 							/>
 						)

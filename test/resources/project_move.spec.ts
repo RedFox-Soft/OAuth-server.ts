@@ -12,7 +12,7 @@ import {
 	getProjectStore,
 	getProtectedResourceStore
 } from 'lib/adapters/index.ts';
-import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import { ADMIN_SESSION_COOKIE, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { ROOT_NAMESPACE } from 'lib/resources/namespace.ts';
 import { sessionFor } from '../admin_session.ts';
 import { createAdministrator, type AdminKind } from '../administrators.ts';
@@ -45,7 +45,7 @@ async function bucket(ownerGroupId: string, slug?: string) {
 	});
 }
 
-async function projectIn(ownerGroupId: string, bucketId: string | null) {
+async function projectIn(ownerGroupId: string, bucketId: string) {
 	return getProjectStore().create({
 		ownerGroupId,
 		name: 'Moving',
@@ -126,17 +126,21 @@ describe('a project with declarations changing bucket', () => {
 		).toBe(resident._id);
 	});
 
-	it('refuses a group administrator clearing the bucket of a project that declares resources', async () => {
+	it('refuses a group administrator moving a project that declares resources onto the Default bucket', async () => {
 		const { cookie, groupId } = await administrator('plain');
-		const from = await bucket(groupId, unique('clear'));
+		const from = await bucket(groupId, unique('shared'));
 		const project = await projectIn(groupId, from._id);
 		await declare(from._id, project._id);
 
 		const res = await send(
-			'DELETE',
+			'PUT',
 			`/admin/api/projects/${project._id}/bucket`,
 			cookie,
-			{ confirm: true, expect: { applications: 0, resources: 1 } }
+			{
+				bucketId: DEFAULT_BUCKET_ID,
+				confirm: true,
+				expect: { applications: 0, resources: 1 }
+			}
 		);
 
 		expect(res.status).toBe(403);

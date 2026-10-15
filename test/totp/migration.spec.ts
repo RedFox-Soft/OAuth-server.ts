@@ -16,7 +16,7 @@ import { elysia } from 'lib/index.ts';
 import { decodeBase32 } from 'lib/totp/base32.ts';
 import { hotp, stepFor } from 'lib/totp/code.ts';
 import epochTime from 'lib/helpers/epoch_time.ts';
-import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { shaped } from 'test/shape.js';
 
 const PASSWORD = 'correct horse battery';
@@ -114,6 +114,7 @@ describe('bringing existing accounts under the requirement (US4)', () => {
 		});
 		bucketId = bucket._id;
 		const project = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'Migrating',
 			slug: `migrate-${Math.random()}`

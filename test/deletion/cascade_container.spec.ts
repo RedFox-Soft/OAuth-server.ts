@@ -9,7 +9,11 @@ import {
 	getUserStore
 } from 'lib/adapters/index.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { ADMIN_SESSION_COOKIE, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import {
+	ADMIN_SESSION_COOKIE,
+	UNASSIGNED_GROUP_ID,
+	DEFAULT_BUCKET_ID
+} from 'lib/admin/consts.ts';
 import { Client } from 'lib/models/client.js';
 import { sessionFor } from '../admin_session.ts';
 import { answered } from '../admin/answered.ts';
@@ -66,6 +70,7 @@ describe('deletion cascade: containers', () => {
 
 	async function project(clientIds: string[], bucketId?: string) {
 		return getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'P',
 			slug: `p-${Math.random()}`,

@@ -20,7 +20,7 @@ import epochTime from 'lib/helpers/epoch_time.ts';
 import { resetSentEmails, sentEmails } from '../mail_capture.ts';
 import { TestAdapter } from 'test/models.js';
 import { present, shaped } from 'test/shape.js';
-import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 
 const PASSWORD = 'correct horse battery';
 const INVALID_CODE = 'Invalid code';
@@ -40,6 +40,7 @@ async function seedBucket(
 		...fields
 	});
 	const project = await getProjectStore().create({
+		bucketId: DEFAULT_BUCKET_ID,
 		ownerGroupId: UNASSIGNED_GROUP_ID,
 		name,
 		slug: `${clientId}-${Math.random()}`

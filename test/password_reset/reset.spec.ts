@@ -23,7 +23,8 @@ import { adminAuditStore } from 'lib/adapters/index.ts';
 import {
 	ADMIN_BUCKET_ID,
 	ADMIN_CLIENT_ID,
-	UNASSIGNED_GROUP_ID
+	UNASSIGNED_GROUP_ID,
+	DEFAULT_BUCKET_ID
 } from 'lib/admin/consts.ts';
 import { REQUEST_COOLDOWN_SECONDS } from 'lib/password_reset/consts.ts';
 import { throttleKey as throttleKeyFor } from 'lib/login_throttle/throttle.ts';
@@ -148,6 +149,7 @@ beforeAll(async () => {
 	});
 	bucketId = bucket._id;
 	const project = await getProjectStore().create({
+		bucketId: DEFAULT_BUCKET_ID,
 		ownerGroupId: UNASSIGNED_GROUP_ID,
 		name: 'Reset',
 		slug: `reset-${Math.random()}`
@@ -164,6 +166,7 @@ beforeAll(async () => {
 	});
 	otherBucketId = other._id;
 	const otherProject = await getProjectStore().create({
+		bucketId: DEFAULT_BUCKET_ID,
 		ownerGroupId: UNASSIGNED_GROUP_ID,
 		name: 'Reset Other',
 		slug: `reset-other-${Math.random()}`

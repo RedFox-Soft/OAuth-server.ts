@@ -8,7 +8,7 @@ import {
 	getProjectStore,
 	getProtectedResourceStore
 } from 'lib/adapters/index.ts';
-import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { ADMIN_MCP_CLIENT_ID, MCP_RESOURCE } from 'lib/mcp/consts.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { ROOT_NAMESPACE } from 'lib/resources/namespace.ts';
@@ -80,6 +80,7 @@ describe('an agent checking a resource', () => {
 		const token = await agent();
 		const identifier = `https://agent-vouch-${Math.random().toString(36).slice(2, 8)}.example/mcp`;
 		const project = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'Agent vouch',
 			slug: `agent-vouch-${Math.random().toString(36).slice(2)}`

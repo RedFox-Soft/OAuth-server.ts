@@ -11,7 +11,8 @@ import {
 import {
 	ADMIN_BUCKET_ID,
 	ADMIN_SESSION_COOKIE,
-	UNASSIGNED_GROUP_ID
+	UNASSIGNED_GROUP_ID,
+	DEFAULT_BUCKET_ID
 } from 'lib/admin/consts.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { sessionFor } from '../admin_session.ts';
@@ -82,6 +83,7 @@ describe.each([
 	it('still deletes an empty project', async () => {
 		const { cookie } = await cookieFor('super');
 		const project = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			name: 'Deletable',
 			slug: slug(),
 			ownerGroupId: UNASSIGNED_GROUP_ID
@@ -125,6 +127,7 @@ describe.each([
 	it('still refuses a populated project with its structured blockers', async () => {
 		const { cookie } = await cookieFor('super');
 		const project = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			name: 'Populated',
 			slug: slug(),
 			ownerGroupId: UNASSIGNED_GROUP_ID
@@ -193,7 +196,11 @@ describe.each([
 		const created = await admin('/admin/api/projects', {
 			method: 'POST',
 			cookie,
-			body: { name: 'Audited by console', slug: slug() }
+			body: {
+				name: 'Audited by console',
+				slug: slug(),
+				bucketId: DEFAULT_BUCKET_ID
+			}
 		});
 		expect(created.status).toBe(201);
 

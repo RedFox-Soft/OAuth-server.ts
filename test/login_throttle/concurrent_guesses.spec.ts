@@ -22,7 +22,7 @@ import {
 } from 'lib/adapters/index.ts';
 import { ApplicationConfig } from 'lib/configs/application.ts';
 import { elysia } from 'lib/index.ts';
-import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { present } from 'test/shape.js';
 
 /*
@@ -77,6 +77,7 @@ describe('a password guessed concurrently', () => {
 			name: 'Concurrent Password Bucket'
 		});
 		const project = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'Concurrent Password',
 			slug: `concurrent-password-${Math.random()}`

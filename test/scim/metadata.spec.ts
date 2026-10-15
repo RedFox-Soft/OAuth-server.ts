@@ -1,7 +1,7 @@
 import { describe, it, beforeAll, expect } from 'bun:test';
 
 import { getProjectStore } from 'lib/adapters/index.js';
-import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import bootstrap from '../test_helper.js';
 import { adminCookie } from '../end_user_lifecycle/fixtures.ts';
 import { admin } from '../provisioning/helpers.ts';
@@ -59,6 +59,7 @@ describe('a bucket’s SCIM protected-resource metadata', () => {
 		const cookie = await adminCookie();
 		const bucket = await scimBucket();
 		const project = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			name: 'Declarer',
 			slug: `declarer-${Math.random().toString(36).slice(2, 8)}`,
 			ownerGroupId: UNASSIGNED_GROUP_ID

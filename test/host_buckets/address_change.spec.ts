@@ -117,6 +117,7 @@ async function seedBucketWithClients(slug: string, clientIds: string[]) {
 		slug
 	});
 	const project = await getProjectStore().create({
+		bucketId: DEFAULT_BUCKET_ID,
 		ownerGroupId: UNASSIGNED_GROUP_ID,
 		name: `Movable ${slug}`,
 		slug: `proj-${slug}`

@@ -100,7 +100,7 @@ function namesOwnScimEndpoint(identifier: string): boolean {
 /*
  * The shared root namespace is a super administrator's to write.
  *
- * Every tenant served at the root — a project with no bucket, or a bucket with no address of its own —
+ * Every tenant served at the root — a project on the default bucket, or a bucket with no address of its own —
  * shares one issuer and so one namespace, and a resource's own metadata can say it trusts that issuer
  * but not which of those tenants it belongs to. No proof the resource could offer would stop one of
  * them declaring another's server first, so the only rule that closes squatting here is who may write.

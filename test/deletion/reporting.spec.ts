@@ -12,7 +12,11 @@ import {
 	getUserStore
 } from 'lib/adapters/index.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { ADMIN_SESSION_COOKIE, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import {
+	ADMIN_SESSION_COOKIE,
+	UNASSIGNED_GROUP_ID,
+	DEFAULT_BUCKET_ID
+} from 'lib/admin/consts.ts';
 import { sessionFor } from '../admin_session.ts';
 import { shaped } from 'test/shape.js';
 import { createAdministrator } from '../administrators.ts';
@@ -96,6 +100,7 @@ describe('deletion reporting', () => {
 		const first = await liveClient();
 		const second = await liveClient();
 		const project = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'P',
 			slug: `p-${Math.random()}`,
@@ -161,6 +166,7 @@ describe('deletion reporting', () => {
 		}).save();
 
 		const project = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'P',
 			slug: `p-${Math.random()}`,
@@ -232,6 +238,7 @@ describe('deletion reporting', () => {
 		);
 		try {
 			const project = await getProjectStore().create({
+				bucketId: DEFAULT_BUCKET_ID,
 				ownerGroupId: UNASSIGNED_GROUP_ID,
 				name: 'P',
 				slug: `p-${Math.random()}`,

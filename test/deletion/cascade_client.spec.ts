@@ -14,7 +14,11 @@ import { Grant } from 'lib/models/grant.js';
 import { Client } from 'lib/models/client.js';
 import { adapter, getProjectStore } from 'lib/adapters/index.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { ADMIN_SESSION_COOKIE, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import {
+	ADMIN_SESSION_COOKIE,
+	UNASSIGNED_GROUP_ID,
+	DEFAULT_BUCKET_ID
+} from 'lib/admin/consts.ts';
 import { updateClient } from 'lib/admin/clients/service.ts';
 import { sessionFor } from '../admin_session.ts';
 import { shaped } from 'test/shape.js';
@@ -83,6 +87,7 @@ describe('deletion cascade: client', () => {
 	async function deleteClient(clientId: string) {
 		const cookie = await superAdminCookie();
 		const project = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'P',
 			slug: `p-${Math.random()}`,

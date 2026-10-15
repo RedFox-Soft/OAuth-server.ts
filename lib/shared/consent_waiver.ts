@@ -8,16 +8,16 @@ import type { OIDCContext } from '../helpers/oidc_context.js';
  *
  * `consent.require: false` is a tenant's decision about its own users, so it is honoured only where they
  * are its own: in a bucket owned by the group that owns the client's project. Any member of a group can
- * create a project and a client in it with consent off, and a project with no bucket signs its clients
- * into the default bucket, which every tenant shares — so honouring the flag there handed a tenant the
+ * create a project and a client in it with consent off, and a project on the default bucket signs its
+ * clients into a population every such project shares — so honouring the flag there handed a tenant the
  * claims of every default-bucket user with a session, with `prompt=none` and no page shown.
  *
  * A client in no project keeps the flag as stored. Nothing a caller controls can set it on one: dynamic
  * registration and client documents cannot carry it (lib/models/client/wire.ts), so such a client was
  * provisioned by the operator.
  *
- * Decided per request, not at write time, so a project that later loses its bucket stops skipping consent
- * at once. Memoised per context: the consent policy and the grant loader both ask.
+ * Decided per request, not at write time, so a project re-pointed at the default bucket stops skipping
+ * consent at once. Memoised per context: the consent policy and the grant loader both ask.
  */
 const decided = new WeakMap<object, Promise<boolean>>();
 

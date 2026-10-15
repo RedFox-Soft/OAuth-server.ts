@@ -3,18 +3,23 @@ import {
 	getProjectStore,
 	mcpClientPermissionStore
 } from '../../adapters/index.js';
-import { ADMIN_CLIENT_ID, ADMIN_BUCKET_ID } from '../consts.js';
+import {
+	ADMIN_CLIENT_ID,
+	ADMIN_BUCKET_ID,
+	DEFAULT_BUCKET_ID
+} from '../consts.js';
 import { findDeclaredResource } from '../../resources/registry.js';
 import { namespaceOf } from '../../resources/namespace.js';
 import type { RequestBucket } from '../../configs/issuer.js';
 import { MCP_RESOURCE } from '../../mcp/consts.js';
 import { bucketIdOfAccountPageClient } from '../../account_page/client.js';
+import type { Project } from '../../adapters/types.js';
 
 /*
  * Which user bucket a request signs a user into, in order:
  *
  *   1. the reserved admin client → the admin bucket
- *   2. a client assigned to a project → that project's bucket
+ *   2. a client assigned to a project on a bucket other than the Default → that project's bucket
  *   2b. a client that registered itself at a bucket's own address → that bucket
  *   3. a request naming ONE resource declared in the addressed issuer's namespace → that resource's
  *      project's bucket
@@ -61,7 +66,8 @@ export async function resolveBucketForRequest(
 
 	if (clientId) {
 		const project = await getProjectStore().findByClientId(clientId);
-		if (project?.bucketId) return project.bucketId;
+		const pinned = pinnedBucketOf(project);
+		if (pinned) return pinned;
 
 		const registeredAt = await registeredAtBucketOf(clientId);
 		if (registeredAt) return registeredAt;
@@ -146,5 +152,18 @@ async function bucketForResource(
 	if (!declared) return undefined;
 
 	const project = await getProjectStore().find(declared.projectId);
-	return project?.bucketId ?? undefined;
+	return pinnedBucketOf(project);
+}
+
+/*
+ * The bucket a project holds its clients to, or none for the Default bucket. The Default bucket is where
+ * resolution ends anyway (rule 5), so a project on it must not end resolution early: until specs/098 such a
+ * project stored no bucket at all and its clients went on through rules 2b, 3 and 4, and the migration that
+ * wrote the Default bucket into it was not meant to change where a single person signs in.
+ */
+function pinnedBucketOf(
+	project: Pick<Project, 'bucketId'> | null
+): string | undefined {
+	if (!project || project.bucketId === DEFAULT_BUCKET_ID) return undefined;
+	return project.bucketId;
 }

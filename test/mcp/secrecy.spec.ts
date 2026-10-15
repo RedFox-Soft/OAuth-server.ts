@@ -16,7 +16,11 @@ import {
 	getUserStore,
 	adminAuditStore
 } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import {
+	ADMIN_BUCKET_ID,
+	UNASSIGNED_GROUP_ID,
+	DEFAULT_BUCKET_ID
+} from 'lib/admin/consts.ts';
 import { ADMIN_MCP_CLIENT_ID, MCP_RESOURCE } from 'lib/mcp/consts.ts';
 import { mcpCatalogue } from 'lib/mcp/catalogue.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
@@ -103,6 +107,7 @@ async function performGated(
 /* Fills the instance with things that hold secrets, so a leaky projection has something to leak. */
 async function seedSecretHolders(token: string) {
 	const project = await getProjectStore().create({
+		bucketId: DEFAULT_BUCKET_ID,
 		name: 'Secrets',
 		slug: `sec-${Math.floor(Math.random() * 1e6)}`,
 		ownerGroupId: UNASSIGNED_GROUP_ID

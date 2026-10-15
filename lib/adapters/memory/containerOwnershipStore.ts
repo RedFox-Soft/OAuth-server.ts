@@ -4,6 +4,7 @@ import type {
 	ProjectStoreInstance,
 	UserBucketStoreInstance
 } from '../types.js';
+import { DEFAULT_BUCKET_ID } from '../../admin/consts.js';
 
 /*
  * The memory stores hand out their live records, so the move reads them, checks them and writes them with
@@ -60,7 +61,7 @@ export class ContainerOwnershipStore implements ContainerOwnershipStoreInstance 
 		if (
 			!project ||
 			project.ownerGroupId !== from ||
-			project.bucketId !== null
+			project.bucketId !== DEFAULT_BUCKET_ID
 		) {
 			return { status: 'conflict' };
 		}

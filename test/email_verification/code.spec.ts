@@ -13,7 +13,7 @@ import {
 	lastEmail,
 	extractCode
 } from '../mail_capture.ts';
-import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { present } from 'test/shape.js';
 
 const CLIENT_ID = 'verify-code-app';
@@ -72,6 +72,7 @@ describe('email verification — code method', () => {
 		});
 		bucketId = bucket._id;
 		const project = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'Verify Code',
 			slug: `verify-code-${Math.random()}`

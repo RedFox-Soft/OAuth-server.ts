@@ -116,6 +116,7 @@ describe('an account change on a bucket with a hostname of its own', () => {
 		});
 		bucketId = bucket._id;
 		const project = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'Switch',
 			slug: `switch-${Math.random().toString(36).slice(2)}`

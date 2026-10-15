@@ -5,7 +5,7 @@ import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { getProjectStore, getBucketStore } from 'lib/adapters/index.ts';
-import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { ADMIN_MCP_CLIENT_ID, MCP_RESOURCE } from 'lib/mcp/consts.ts';
 import { excludedConsoleOperations, mcpCatalogue } from 'lib/mcp/catalogue.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
@@ -100,6 +100,7 @@ describe('withheld container deletions', () => {
 	it('deletes no project however insistently it is asked, even as a super-administrator', async () => {
 		const { token } = await superAdmin();
 		const project = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			name: 'Survivor',
 			slug: `wh-${Math.floor(Math.random() * 1e6)}`,
 			ownerGroupId: UNASSIGNED_GROUP_ID
@@ -141,6 +142,7 @@ describe('withheld container deletions', () => {
 	it('leaves the other steps of a multi-part instruction working', async () => {
 		const { token } = await superAdmin();
 		const project = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			name: 'Partly',
 			slug: `wh-${Math.floor(Math.random() * 1e6)}`,
 			ownerGroupId: UNASSIGNED_GROUP_ID
@@ -172,6 +174,7 @@ describe('withheld container deletions', () => {
 	it('still lets an operator learn what a deletion would involve', async () => {
 		const { token } = await superAdmin();
 		const project = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			name: 'Blocked',
 			slug: `wh-${Math.floor(Math.random() * 1e6)}`,
 			ownerGroupId: UNASSIGNED_GROUP_ID
@@ -237,6 +240,7 @@ describe('withheld container deletions', () => {
 	it('emptying a container stays available, one confirmed deletion at a time', async () => {
 		const { token } = await superAdmin();
 		const project = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			name: 'Emptied',
 			slug: `wh-${Math.floor(Math.random() * 1e6)}`,
 			ownerGroupId: UNASSIGNED_GROUP_ID

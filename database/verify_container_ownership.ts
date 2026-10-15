@@ -5,6 +5,7 @@ import type {
 	ProjectStoreInstance,
 	UserBucketStoreInstance
 } from '../lib/adapters/types.js';
+import { DEFAULT_BUCKET_ID } from '../lib/admin/consts.js';
 
 type Check = (name: string, ok: boolean, detail?: string) => void;
 
@@ -101,10 +102,11 @@ export async function verifyContainerOwnership(
 	const lone = await projects.create({
 		name: 'lone',
 		slug: `move-lone-${stamp}`,
-		ownerGroupId: src
+		ownerGroupId: src,
+		bucketId: DEFAULT_BUCKET_ID
 	});
 	check(
-		'a project with no bucket moves alone, and one using a bucket does not',
+		'a project on the Default bucket moves alone, and one on a bucket of its own does not',
 		(await ownership.moveProject(lone._id, src, 'move-dst')).status ===
 			'moved' &&
 			(await ownerOf(lone._id)) === 'move-dst' &&

@@ -10,7 +10,7 @@ import {
 	getProjectStore,
 	getProtectedResourceStore
 } from 'lib/adapters/index.ts';
-import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import { ADMIN_SESSION_COOKIE, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
 import { answered } from '../admin/answered.ts';
 import { createAdministrator, type AdminKind } from '../administrators.ts';
@@ -94,6 +94,7 @@ describe('declaring a protected resource for a project in an addressable bucket'
 
 	it('refuses an anonymous caller', async () => {
 		const project = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			name: 'Acme',
 			slug: `anon-${Math.random().toString(36).slice(2)}`,
 			ownerGroupId: 'unassigned'
@@ -243,7 +244,7 @@ describe('declaring a protected resource for a project in an addressable bucket'
 	it('refuses a second declaration of one identifier in one bucket', async () => {
 		const { cookie, userId } = await admin();
 		const projectA = await projectFor(userId);
-		const projectB = await projectFor(userId, projectA.bucketId ?? undefined);
+		const projectB = await projectFor(userId, projectA.bucketId);
 
 		await api.admin.api
 			.projects({ id: projectA._id })

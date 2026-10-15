@@ -469,17 +469,6 @@ export const statedRightRoutes: readonly StatedRightRoute[] = [
 		path: `${PROJECT}/bucket`,
 		body: { bucketId: 'absent' }
 	},
-	/*
-	 * Clearing is a project right, but it also moves the project's declarations into the shared root
-	 * namespace, which only a super administrator writes — so with declarations present it is refused to
-	 * anyone else whatever this flag says. The world this guard builds holds none.
-	 */
-	{
-		on: 'project',
-		flag: 'assignBucket',
-		method: 'DELETE',
-		path: `${PROJECT}/bucket`
-	},
 	{
 		on: 'project',
 		flag: 'move',

@@ -12,6 +12,7 @@ import {
 	ADMIN_BUCKET_ID,
 	ADMIN_SESSION_COOKIE,
 	ADMIN_SESSION_TTL_SECONDS,
+	DEFAULT_BUCKET_ID,
 	UNASSIGNED_GROUP_ID
 } from '../consts.js';
 import { isSuperAdminsGroup } from '../super_admins.js';
@@ -256,12 +257,25 @@ export function reachOf(
 ): ProjectReach {
 	const reach = new Map<string, Set<string>>();
 	for (const project of projects) {
-		if (!project.bucketId) continue;
-		const groups = reach.get(project.bucketId) ?? new Set<string>();
+		const bucketId = bucketReachedThrough(project);
+		if (bucketId === undefined) continue;
+		const groups = reach.get(bucketId) ?? new Set<string>();
 		groups.add(project.ownerGroupId);
-		reach.set(project.bucketId, groups);
+		reach.set(bucketId, groups);
 	}
 	return reach;
+}
+
+/*
+ * The bucket a project gives its group reach over — never the Default bucket (specs/098). Every tenant's
+ * project on it shares its population, so reach through one of them would hand a tenant every other
+ * tenant's end-users; only a super administrator reaches it. Before projects were required to name a bucket
+ * such a project named none, and this is what kept it that way.
+ */
+export function bucketReachedThrough(
+	project: Pick<Project, 'bucketId'>
+): string | undefined {
+	return project.bucketId === DEFAULT_BUCKET_ID ? undefined : project.bucketId;
 }
 
 /*

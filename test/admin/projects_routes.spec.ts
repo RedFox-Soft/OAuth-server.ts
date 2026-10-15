@@ -4,18 +4,24 @@ import { treaty } from '@elysiajs/eden';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { projectRoutes } from 'lib/admin/projects/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { getProjectStore, getBucketStore } from 'lib/adapters/index.ts';
+import {
+	adminAuditStore,
+	getProjectStore,
+	getBucketStore
+} from 'lib/adapters/index.ts';
 import {
 	ADMIN_BUCKET_ID,
 	ADMIN_PROJECT_ID,
 	ADMIN_SESSION_COOKIE,
-	UNASSIGNED_GROUP_ID
+	UNASSIGNED_GROUP_ID,
+	DEFAULT_BUCKET_ID
 } from 'lib/admin/consts.ts';
 import { Type } from '@sinclair/typebox';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
 import { shaped } from 'test/shape.js';
 import { answered } from './answered.ts';
 import { createAdministrator, type AdminKind } from '../administrators.ts';
+import { regularGroup } from './ownership_fixtures.ts';
 
 const MessageBody = Type.Object({ message: Type.String() });
 
@@ -45,7 +51,7 @@ describe('projects API', () => {
 	it('a super administrator creates and lists projects', async () => {
 		const { cookie } = await sessionCookieFor('super');
 		const created = await client.admin.api.projects.post(
-			{ name: 'Acme', slug: 'acme' },
+			{ name: 'Acme', slug: 'acme', bucketId: DEFAULT_BUCKET_ID },
 			{ headers: { cookie } }
 		);
 		expect(created.status).toBe(201);
@@ -62,18 +68,24 @@ describe('projects API', () => {
 	it('a project administrator creates into their own group and sees only that group', async () => {
 		const superSession = await sessionCookieFor('super');
 		const pa = await sessionCookieFor('plain');
+		const own = await getBucketStore().create({
+			name: 'Own',
+			ownerGroupId: await personalGroupId(pa.userId)
+		});
 
 		const mine = await client.admin.api.projects.post(
-			{ name: 'Mine', slug: 'mine' },
+			{ name: 'Mine', slug: 'mine', bucketId: own._id },
 			{ headers: { cookie: pa.cookie } }
 		);
 		expect(mine.status).toBe(201);
 		expect(answered(mine.data).ownerGroupId).toBe(
 			await personalGroupId(pa.userId)
 		);
+		expect(answered(mine.data).bucketId).toBe(own._id);
 
 		// A project belonging to nobody's group: created by a super admin, whose active scope is empty.
 		await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'Other',
 			slug: 'other'
@@ -94,6 +106,50 @@ describe('projects API', () => {
 				.map((p) => p.slug)
 				.sort()
 		).toContain('other');
+	});
+
+	it('refuses a project naming no bucket as invalid, and writes nothing', async () => {
+		const { cookie } = await sessionCookieFor('super');
+		const slug = `unbound-${Math.random().toString(36).slice(2)}`;
+		const created = (await adminAuditStore.list({ action: 'project.create' }))
+			.entries.length;
+
+		const res = await app.handle(
+			new Request('http://localhost/admin/api/projects', {
+				method: 'POST',
+				headers: { cookie, 'content-type': 'application/json' },
+				body: JSON.stringify({ name: 'Unbound', slug })
+			})
+		);
+
+		expect(res.status).toBe(422);
+		expect(await res.text()).toContain('bucketId');
+		expect(await getProjectStore().findBySlug(slug)).toBeNull();
+		expect(
+			(await adminAuditStore.list({ action: 'project.create' })).entries
+		).toHaveLength(created);
+	});
+
+	it('creates a super administrator project in a tenant group on the Default bucket', async () => {
+		const su = await sessionCookieFor('super');
+		const pa = await createAdministrator('plain', `t-${Math.random()}@x.io`);
+		const { _id: groupId } = await regularGroup([pa]);
+
+		const created = await client.admin.api.projects.post(
+			{
+				name: 'Shared',
+				slug: `shared-${Math.random().toString(36).slice(2)}`,
+				groupId,
+				bucketId: DEFAULT_BUCKET_ID
+			},
+			{ headers: { cookie: su.cookie } }
+		);
+
+		expect(created.status).toBe(201);
+		expect(answered(created.data)).toMatchObject({
+			ownerGroupId: groupId,
+			bucketId: DEFAULT_BUCKET_ID
+		});
 	});
 
 	it('never lists the admin project, even for a manager of it', async () => {
@@ -122,6 +178,7 @@ describe('projects API', () => {
 		const superSession = await sessionCookieFor('super');
 		const pa = await sessionCookieFor('plain');
 		const proj = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			name: 'PA Project',
 			slug: `pa-${Math.random()}`,
 			ownerGroupId: await personalGroupId(pa.userId)
@@ -160,6 +217,7 @@ describe('projects API', () => {
 	it('refuses the reserved administrator bucket as a project bucket', async () => {
 		const su = await sessionCookieFor('super');
 		const proj = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			name: 'Opportunist',
 			slug: `opp-${Math.random().toString(36).slice(2)}`,
 			ownerGroupId: UNASSIGNED_GROUP_ID
@@ -179,56 +237,6 @@ describe('projects API', () => {
 	});
 
 	/*
-	 * Assigning was one-way until this existed: the only route took a bucket id and there was no value
-	 * meaning "none", so a project pointed at the wrong bucket stayed pointed at it. Clearing returns the
-	 * project to the default bucket, which is what `resolveBucketForRequest` falls through to on an
-	 * empty `bucketId`.
-	 */
-	it('clears the bucket it was given', async () => {
-		const su = await sessionCookieFor('super');
-		const ownerGroupId = await personalGroupId(su.userId);
-		const bucket = await getBucketStore().create({
-			name: 'Own bucket',
-			ownerGroupId
-		});
-		const proj = await getProjectStore().create({
-			name: 'Reassigned',
-			slug: `re-${Math.random().toString(36).slice(2)}`,
-			ownerGroupId,
-			bucketId: bucket._id
-		});
-
-		const res = await client.admin.api
-			.projects({ id: proj._id })
-			.bucket.delete(
-				{ confirm: true, expect: { applications: 0, resources: 0 } },
-				{ headers: { cookie: su.cookie } }
-			);
-
-		expect(res.status).toBe(200);
-		expect((await getProjectStore().find(proj._id))?.bucketId).toBeNull();
-	});
-
-	it('denies clearing the bucket of a project the caller does not manage', async () => {
-		const pa = await sessionCookieFor('plain');
-		const proj = await getProjectStore().create({
-			name: 'Someone else',
-			slug: `else-${Math.random().toString(36).slice(2)}`,
-			ownerGroupId: 'a-group-nobody-here-belongs-to',
-			bucketId: 'some-bucket'
-		});
-
-		const res = await client.admin.api
-			.projects({ id: proj._id })
-			.bucket.delete(undefined, { headers: { cookie: pa.cookie } });
-
-		expect(res.status).toBe(403);
-		expect((await getProjectStore().find(proj._id))?.bucketId).toBe(
-			'some-bucket'
-		);
-	});
-
-	/*
 	 * CORS origins. Validated in the handler rather than by the body schema so a rejection returns the
 	 * admin_error shape and can name the offending value — a list that looks right but grants nothing is
 	 * the failure mode worth spending a message on.
@@ -240,6 +248,7 @@ describe('projects API', () => {
 				{
 					name: 'Browser app',
 					slug: `browser-${Math.random().toString(36).slice(2)}`,
+					bucketId: DEFAULT_BUCKET_ID,
 					corsOrigins: ['https://app.example.com']
 				},
 				{ headers: { cookie } }
@@ -256,7 +265,8 @@ describe('projects API', () => {
 			const created = await client.admin.api.projects.post(
 				{
 					name: 'No origins',
-					slug: `none-${Math.random().toString(36).slice(2)}`
+					slug: `none-${Math.random().toString(36).slice(2)}`,
+					bucketId: DEFAULT_BUCKET_ID
 				},
 				{ headers: { cookie } }
 			);
@@ -267,6 +277,7 @@ describe('projects API', () => {
 		it('replaces the list on patch, and clears it with an empty array', async () => {
 			const { cookie } = await sessionCookieFor('super');
 			const project = await getProjectStore().create({
+				bucketId: DEFAULT_BUCKET_ID,
 				ownerGroupId: UNASSIGNED_GROUP_ID,
 				name: 'Patch me',
 				slug: `patch-${Math.random().toString(36).slice(2)}`,
@@ -293,6 +304,7 @@ describe('projects API', () => {
 		it('leaves the list untouched when the key is omitted', async () => {
 			const { cookie } = await sessionCookieFor('super');
 			const project = await getProjectStore().create({
+				bucketId: DEFAULT_BUCKET_ID,
 				ownerGroupId: UNASSIGNED_GROUP_ID,
 				name: 'Rename only',
 				slug: `rename-${Math.random().toString(36).slice(2)}`,
@@ -314,6 +326,7 @@ describe('projects API', () => {
 				{
 					name: 'Normalize',
 					slug: `norm-${Math.random().toString(36).slice(2)}`,
+					bucketId: DEFAULT_BUCKET_ID,
 					corsOrigins: ['https://APP.Example.com', 'https://app.example.com']
 				},
 				{ headers: { cookie } }
@@ -337,6 +350,7 @@ describe('projects API', () => {
 		])('rejects %s (%s) and names the value', async (origin) => {
 			const { cookie } = await sessionCookieFor('super');
 			const project = await getProjectStore().create({
+				bucketId: DEFAULT_BUCKET_ID,
 				ownerGroupId: UNASSIGNED_GROUP_ID,
 				name: 'Guarded',
 				slug: `guard-${Math.random().toString(36).slice(2)}`,
@@ -361,6 +375,7 @@ describe('projects API', () => {
 		it('rejects the whole list when only one entry is invalid', async () => {
 			const { cookie } = await sessionCookieFor('super');
 			const project = await getProjectStore().create({
+				bucketId: DEFAULT_BUCKET_ID,
 				ownerGroupId: UNASSIGNED_GROUP_ID,
 				name: 'Partial',
 				slug: `partial-${Math.random().toString(36).slice(2)}`
@@ -381,6 +396,7 @@ describe('projects API', () => {
 
 		it('refuses an unauthenticated caller', async () => {
 			const project = await getProjectStore().create({
+				bucketId: DEFAULT_BUCKET_ID,
 				ownerGroupId: UNASSIGNED_GROUP_ID,
 				name: 'Anon',
 				slug: `anon-${Math.random().toString(36).slice(2)}`
@@ -396,6 +412,7 @@ describe('projects API', () => {
 		it('refuses a project administrator who does not manage the project', async () => {
 			const pa = await sessionCookieFor('plain');
 			const project = await getProjectStore().create({
+				bucketId: DEFAULT_BUCKET_ID,
 				name: 'Foreign',
 				slug: `foreign-${Math.random().toString(36).slice(2)}`,
 				ownerGroupId: 'a-group-nobody-here-belongs-to'
@@ -414,6 +431,7 @@ describe('projects API', () => {
 		it('lets a project administrator who manages the project set origins', async () => {
 			const pa = await sessionCookieFor('plain');
 			const project = await getProjectStore().create({
+				bucketId: DEFAULT_BUCKET_ID,
 				ownerGroupId: await personalGroupId(pa.userId),
 				name: 'Mine',
 				slug: `mine-${Math.random().toString(36).slice(2)}`

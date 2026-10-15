@@ -14,6 +14,7 @@ import { shaped } from 'test/shape.ts';
 import { createAdministrator } from '../administrators.ts';
 import { cookieFor, regularGroup } from './ownership_fixtures.ts';
 import { statedRightRoutes } from './can_routes.ts';
+import { DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 
 /*
  * Every request goes through the admin route set the console and the agent surface both mount, so what holds
@@ -189,6 +190,7 @@ describe('a bucket scheduled for deletion, administered', () => {
 	it('refuses to point a project at it', async () => {
 		const bucket = await scheduled(groupId);
 		const project = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			name: `p ${bucket._id}`,
 			slug: `p-${bucket._id}`.toLowerCase().replace(/[^a-z0-9-]/g, ''),
 			ownerGroupId: groupId

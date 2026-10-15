@@ -218,7 +218,6 @@ describe('MCP tool catalogue', () => {
 			 * in again, in a bucket where their accounts are not (specs/085).
 			 */
 			'project_bucket_assign',
-			'project_bucket_clear',
 			'project_owner_change',
 			/* Ends a customer's provisioning and revokes its tokens at once. */
 			'provisioning_connection_delete',

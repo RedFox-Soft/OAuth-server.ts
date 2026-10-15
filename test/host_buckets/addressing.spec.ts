@@ -10,7 +10,7 @@ import {
 } from 'lib/adapters/index.ts';
 import { elysia } from 'lib/index.ts';
 import { forgetBucketAddresses } from 'lib/admin/auth/bucketAddress.ts';
-import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { Type } from '@sinclair/typebox';
 import { present, shaped } from 'test/shape.ts';
 
@@ -31,6 +31,7 @@ async function seedBucket(name: string, host: string, clientId: string) {
 		host
 	});
 	const project = await getProjectStore().create({
+		bucketId: DEFAULT_BUCKET_ID,
 		ownerGroupId: UNASSIGNED_GROUP_ID,
 		name,
 		slug: `${name.toLowerCase()}-${Math.random()}`

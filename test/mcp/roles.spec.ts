@@ -13,7 +13,8 @@ import {
 import {
 	ADMIN_BUCKET_ID,
 	ADMIN_SESSION_COOKIE,
-	UNASSIGNED_GROUP_ID
+	UNASSIGNED_GROUP_ID,
+	DEFAULT_BUCKET_ID
 } from 'lib/admin/consts.ts';
 import { ADMIN_MCP_CLIENT_ID, MCP_RESOURCE } from 'lib/mcp/consts.ts';
 import { mcpCatalogue, pathArgName } from 'lib/mcp/catalogue.ts';
@@ -135,11 +136,13 @@ describe('agent permissions match the console, per role', () => {
 		const { token, cookie, user } = await principal('plain');
 
 		const mine = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			name: 'Mine',
 			slug: `mine-${Math.floor(Math.random() * 1e6)}`,
 			ownerGroupId: await personalGroupId(user._id)
 		});
 		const theirs = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			name: 'Theirs',
 			slug: `theirs-${Math.floor(Math.random() * 1e6)}`,
 			ownerGroupId: UNASSIGNED_GROUP_ID
@@ -380,21 +383,24 @@ describe('agent permissions match the console, per role', () => {
 		expect((await getBucketStore().find(bucket._id))?.host).toBeUndefined();
 	});
 
-	it('lets a non-super administrator create a project and a bucket into their own scope', async () => {
+	it('lets a non-super administrator create a bucket and a project on it into their own scope', async () => {
 		const { token } = await principal('plain');
 		const suffix = Math.floor(Math.random() * 1e6);
 
 		expect(
 			await viaAgent(
-				'project_create',
-				{ name: 'Own project', slug: `own-${suffix}` },
+				'bucket_create',
+				{ name: 'Own bucket', slug: `own-bucket-${suffix}` },
 				token
 			)
 		).toBe('ok');
+		const bucket = (await getBucketStore().list()).find(
+			(b) => b.slug === `own-bucket-${suffix}`
+		);
 		expect(
 			await viaAgent(
-				'bucket_create',
-				{ name: 'Own bucket', slug: `own-bucket-${suffix}` },
+				'project_create',
+				{ name: 'Own project', slug: `own-${suffix}`, bucketId: bucket?._id },
 				token
 			)
 		).toBe('ok');

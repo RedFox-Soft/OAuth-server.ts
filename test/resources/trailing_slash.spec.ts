@@ -10,7 +10,7 @@ import { resourceRoutes } from 'lib/admin/resources/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { getBucketStore, getProjectStore } from 'lib/adapters/index.ts';
 import { forgetBucketAddresses } from 'lib/admin/auth/bucketAddress.ts';
-import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import { ADMIN_SESSION_COOKIE, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { decode } from 'lib/helpers/jwt.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
 import { answered } from '../admin/answered.ts';
@@ -71,6 +71,7 @@ describe('a resource declared with a significant trailing slash', () => {
 			slug: SLUG
 		});
 		const project = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			ownerGroupId,
 			name: 'Slash',
 			slug: `slash-${Math.random().toString(36).slice(2)}`

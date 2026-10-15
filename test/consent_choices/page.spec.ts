@@ -6,7 +6,7 @@ import {
 	getProjectStore,
 	getProtectedResourceStore
 } from 'lib/adapters/index.ts';
-import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { ROOT_NAMESPACE } from 'lib/resources/namespace.js';
 import { CONSENT_TEXTS } from 'lib/i18n/texts/consent/index.ts';
 import { text as fill } from 'lib/i18n/message.tsx';
@@ -29,6 +29,7 @@ describe('the consent page with choices', () => {
 		setup = await bootstrap(import.meta.url, { config: 'consent_choices' });
 		await ensureAdminSeed();
 		const project = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			name: 'Company',
 			slug: 'company-choices',
 			ownerGroupId: UNASSIGNED_GROUP_ID

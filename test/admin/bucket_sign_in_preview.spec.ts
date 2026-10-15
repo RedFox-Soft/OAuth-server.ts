@@ -362,7 +362,7 @@ describe('changing how people sign in to a bucket', () => {
 			return shaped(Summary, answer.body).projects;
 		}
 
-		it('counts a project naming the default bucket and one naming no bucket as signing in there', async () => {
+		it('counts the projects on the default bucket as signing in there', async () => {
 			const counted = await projectsCounted();
 			await getProjectStore().create({
 				name: `names it ${nanoid()}`,
@@ -370,14 +370,8 @@ describe('changing how people sign in to a bucket', () => {
 				ownerGroupId,
 				bucketId: DEFAULT_BUCKET_ID
 			});
-			await getProjectStore().create({
-				name: `names none ${nanoid()}`,
-				slug: slug(),
-				ownerGroupId,
-				bucketId: null
-			});
 
-			expect(await projectsCounted()).toBe(counted + 2);
+			expect(await projectsCounted()).toBe(counted + 1);
 		});
 
 		it('opening sign-up says anyone can create an account, and how many projects it changes sign-in for', async () => {

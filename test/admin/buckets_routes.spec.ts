@@ -8,7 +8,8 @@ import { getProjectStore } from 'lib/adapters/index.ts';
 import {
 	ADMIN_BUCKET_ID,
 	ADMIN_SESSION_COOKIE,
-	UNASSIGNED_GROUP_ID
+	UNASSIGNED_GROUP_ID,
+	DEFAULT_BUCKET_ID
 } from 'lib/admin/consts.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
 import { answered } from './answered.ts';
@@ -58,6 +59,7 @@ describe('buckets API', () => {
 		);
 		const bucket = answered(res1.data);
 		const project = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'P',
 			slug: 'p'
@@ -181,6 +183,7 @@ describe('buckets API', () => {
 		const bucket = answered(created.data);
 		// a project pa manages points at it
 		const proj = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			ownerGroupId: await personalGroupId(pa.userId),
 			name: 'PB',
 			slug: `pb-${Math.random()}`
@@ -201,6 +204,7 @@ describe('buckets API', () => {
 		);
 		const bucket = answered(created.data);
 		const proj = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			name: 'PB2',
 			slug: `pb2-${Math.random()}`,
 			ownerGroupId: await personalGroupId(pa.userId)

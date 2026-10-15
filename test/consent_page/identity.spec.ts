@@ -35,6 +35,7 @@ describe('who the consent page says is asking', () => {
 			members: [{ userId: 'tenant-owner', role: 'owner' }]
 		});
 		const project = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			ownerGroupId: tenant._id,
 			name: 'Partner',
 			slug: 'partner-project'

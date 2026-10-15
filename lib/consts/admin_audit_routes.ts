@@ -59,12 +59,6 @@ const routes = [
 		path: '/admin/api/projects/:id/bucket',
 		targetType: 'Project'
 	},
-	{
-		action: 'project.bucket.clear',
-		method: 'DELETE',
-		path: '/admin/api/projects/:id/bucket',
-		targetType: 'Project'
-	},
 
 	/*
 	 * Declared protected resources. `targetId` is the canonical resource identifier and `targetScope`

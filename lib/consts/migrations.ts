@@ -20,6 +20,7 @@
 import { STORE_AREAS, userAreaFor } from './storage_inventory.js';
 import {
 	ADMIN_BUCKET_ID,
+	DEFAULT_BUCKET_ID,
 	isServedAtTheRoot,
 	SUPER_ADMINS_GROUP_ID,
 	SUPER_ADMINS_GROUP_NAME
@@ -112,6 +113,7 @@ interface MongoHandle {
 		find(filter: Doc): { toArray(): Promise<Doc[]> };
 		findOne(filter: Doc): Promise<Doc | null>;
 		updateOne(filter: Doc, update: Doc, options: Doc): Promise<unknown>;
+		updateMany(filter: Doc, update: Doc): Promise<{ modifiedCount: number }>;
 		deleteOne(filter: Doc): Promise<unknown>;
 	};
 }
@@ -1025,10 +1027,56 @@ const staticTokenExpiry: Migration = {
 	}
 };
 
+/*
+ * Every project names its bucket (specs/098). A project that named none signed people into the Default bucket,
+ * so writing the Default bucket into it changes nobody's sign-in — the resolver treats a project on the Default
+ * bucket as it treated one with no bucket — and leaves one spelling of that state instead of two. A document
+ * written before the field existed has no key at all, which both halves select alongside an explicit null.
+ */
+function projectsGivenABucketReport(count: number): string[] {
+	return [`projects given the default bucket: ${String(count)}`];
+}
+
+const projectsRequireBucket: Migration = {
+	id: '2026-10-15-projects-require-bucket',
+	description:
+		'Give every project that names no bucket the default bucket, which is where its clients already sign people in',
+	reversible: false,
+	rerunnable:
+		'Only projects whose bucket is null or absent are written, and every write sets one, so a second application selects nothing.',
+	mongodb: {
+		async apply(handle) {
+			// The runner passes the selected backend's handle; for MongoDB that is the driver's `Db`.
+			const db = handle as MongoHandle;
+			const result = await db
+				.collection(STORE_AREAS.projects)
+				.updateMany(
+					{ bucketId: null },
+					{ $set: { bucketId: DEFAULT_BUCKET_ID, updatedAt: new Date() } }
+				);
+			return projectsGivenABucketReport(result.modifiedCount);
+		}
+	},
+	postgres: {
+		async apply(handle) {
+			// The runner passes the selected backend's handle; for PostgreSQL that is Bun's SQL client.
+			const sql = handle as PostgresHandle;
+			const rows = await sql`
+				UPDATE ${sql(STORE_AREAS.projects)}
+				SET doc = doc || ${{ bucketId: DEFAULT_BUCKET_ID, updatedAt: new Date() }}
+				WHERE doc->'bucketId' IS NULL OR doc->'bucketId' = 'null'::jsonb
+				RETURNING id
+			`;
+			return projectsGivenABucketReport(rows.length);
+		}
+	}
+};
+
 export const MIGRATIONS: readonly Migration[] = [
 	namespacedProtectedResources,
 	rootKeysLifecycle,
 	rolesToGroups,
 	personalGroupsSingleMember,
-	staticTokenExpiry
+	staticTokenExpiry,
+	projectsRequireBucket
 ];

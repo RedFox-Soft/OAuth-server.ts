@@ -6,7 +6,7 @@ import {
 	getProjectStore,
 	getProtectedResourceStore
 } from 'lib/adapters/index.ts';
-import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { ROOT_NAMESPACE } from 'lib/resources/namespace.js';
 import { decode } from 'lib/helpers/jwt.js';
 import { openConsent, decide } from '../consent_page/flow.ts';
@@ -35,6 +35,7 @@ describe('what an application receives after a partial allow', () => {
 		setup = await bootstrap(import.meta.url, { config: 'consent_choices' });
 		await ensureAdminSeed();
 		const project = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			name: 'Company',
 			slug: 'company-outcome',
 			ownerGroupId: UNASSIGNED_GROUP_ID

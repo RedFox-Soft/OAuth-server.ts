@@ -13,7 +13,7 @@ import {
 	resetAdminMemoryStores
 } from 'lib/adapters/index.ts';
 import { elysia } from 'lib/index.ts';
-import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { decode as decodeJWT } from 'lib/helpers/jwt.ts';
 import { idTokenOf } from './response.ts';
 
@@ -29,6 +29,7 @@ async function seedBucket(name: string, clientId: string): Promise<string> {
 		name
 	});
 	const project = await getProjectStore().create({
+		bucketId: DEFAULT_BUCKET_ID,
 		ownerGroupId: UNASSIGNED_GROUP_ID,
 		name,
 		slug: `${clientId}-${Math.random()}`

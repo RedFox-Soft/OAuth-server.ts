@@ -17,7 +17,11 @@ import {
 	projectHref,
 	projectSettingsHref
 } from '../frame/routes.js';
-import { BucketField, GroupField } from '../frame/CreateDestination.js';
+import {
+	BucketField,
+	GroupField,
+	NEW_BUCKET
+} from '../frame/CreateDestination.js';
 import { PageHeader } from '../frame/PageHeader.js';
 import { request } from '../frame/request.js';
 import { useFeedback } from '../frame/feedback.js';
@@ -33,7 +37,8 @@ interface CreateProjectValues {
 	slug: string;
 	/* Chosen in the dialog (specs/087); the header's current group by default. */
 	groupId?: string;
-	bucketId?: string;
+	/* A bucket of that group, the Default bucket (super administrators), or NEW_BUCKET (specs/098). */
+	bucketId: string;
 }
 
 /*
@@ -154,6 +159,11 @@ export function Projects() {
 	const feedback = useFeedback();
 	const { me } = useMe();
 	const [originsFor, setOriginsFor] = useState<ProjectView | null>(null);
+	const [createdBucket, setCreatedBucket] = useState<{
+		_id: string;
+		name: string;
+		ownerGroupId: string;
+	} | null>(null);
 
 	// Every state write follows an await, so the mount effect calls this without setting
 	// `loading` first; `load` is the reload, which does.
@@ -179,12 +189,45 @@ export function Projects() {
 		void fetchProjects();
 	}, [fetchProjects]);
 
+	/*
+	 * A new bucket is two acts the server already has — the bucket, then the project in it — so each keeps its
+	 * own checks and its own entry in the trail (specs/098). Once made it stays selected: a project refused
+	 * afterwards (a taken slug, say) is retried into it rather than into a second bucket.
+	 */
+	async function bucketFor(
+		values: CreateProjectValues
+	): Promise<string | null> {
+		if (values.bucketId !== NEW_BUCKET) return values.bucketId;
+		const made = await request<{ _id: string; ownerGroupId: string }>(
+			'POST',
+			'/admin/api/buckets',
+			{ name: values.name, slug: values.slug, groupId: values.groupId }
+		);
+		if (!made.ok) {
+			if (made.status >= 500) feedback.failed(made);
+			else form.setFields([{ name: 'bucketId', errors: [made.error.message] }]);
+			return null;
+		}
+		setCreatedBucket({
+			_id: made.data._id,
+			name: values.name,
+			ownerGroupId: made.data.ownerGroupId
+		});
+		form.setFieldValue('bucketId', made.data._id);
+		return made.data._id;
+	}
+
 	async function onCreate(values: CreateProjectValues) {
 		setCreating(true);
+		const bucketId = await bucketFor(values);
+		if (bucketId === null) {
+			setCreating(false);
+			return;
+		}
 		const result = await request<{ _id: string }>(
 			'POST',
 			'/admin/api/projects',
-			values
+			{ ...values, bucketId }
 		);
 		setCreating(false);
 		if (!result.ok) {
@@ -193,6 +236,7 @@ export function Projects() {
 		}
 		feedback.done(`Project ${values.name} created.`);
 		setOpen(false);
+		setCreatedBucket(null);
 		form.resetFields();
 		// Opened at once: it may belong to a group other than the header's, where the list would not show it.
 		void navigate(projectHref(result.data._id));
@@ -297,7 +341,7 @@ export function Projects() {
 									</Link>
 								) : (
 									<Typography.Text type="secondary">
-										Default bucket
+										{row.bucketId}
 									</Typography.Text>
 								)
 						},
@@ -362,7 +406,7 @@ export function Projects() {
 					>
 						<Input placeholder="lowercase, digits, hyphens" />
 					</Form.Item>
-					<BucketField />
+					<BucketField created={createdBucket} />
 				</Form>
 			</Modal>
 		</>

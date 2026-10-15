@@ -191,6 +191,50 @@ check(
 );
 
 /*
+ * Every project names a bucket (specs/098): a project stored with a null bucket, and one written before the
+ * field existed, both come out on the Default bucket; one that named a bucket is left alone; and the second
+ * application selects nothing.
+ */
+const requireBucket = MIGRATIONS.find((m) =>
+	m.id.endsWith('projects-require-bucket')
+);
+const unbound = {
+	nulled: `fidelity-null-bucket-${stamp}`,
+	absent: `fidelity-absent-bucket-${stamp}`,
+	bound: `fidelity-bound-bucket-${stamp}`
+};
+await db
+	.collection<{ _id: string; slug: string; bucketId?: string | null }>(
+		STORE_AREAS.projects
+	)
+	.insertMany([
+		{ _id: unbound.nulled, slug: unbound.nulled, bucketId: null },
+		{ _id: unbound.absent, slug: unbound.absent },
+		{ _id: unbound.bound, slug: unbound.bound, bucketId: legacyBucket }
+	]);
+let secondRun: unknown = null;
+if (requireBucket && !('noop' in requireBucket.mongodb)) {
+	await requireBucket.mongodb.apply(db);
+	secondRun = await requireBucket.mongodb.apply(db);
+}
+const bucketsAfter = await Promise.all(
+	Object.values(unbound).map(async (id) => {
+		const doc = await db
+			.collection<{ _id: string; bucketId?: unknown }>(STORE_AREAS.projects)
+			.findOne({ _id: id });
+		return doc?.bucketId;
+	})
+);
+check(
+	'the bucket migration gives a null and an absent bucket the Default bucket, leaves a named one, and does nothing twice',
+	JSON.stringify(bucketsAfter) ===
+		JSON.stringify(['redfox', 'redfox', legacyBucket]) &&
+		JSON.stringify(secondRun) ===
+			JSON.stringify(['projects given the default bucket: 0']),
+	`${JSON.stringify(bucketsAfter)}; second run ${JSON.stringify(secondRun)}`
+);
+
+/*
  * The root keys migration, against legacy flat keys in the order MongoDB returns them: two RS256 keys, an
  * ES256 key and an encryption key. The first RS256 key in natural order signed before the upgrade and must
  * be the one that signs after it; applying the migration twice must change nothing.

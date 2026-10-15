@@ -61,13 +61,10 @@ export async function signInCounts(
 	return projects === undefined ? tally : { ...tally, projects };
 }
 
-/*
- * A project with no bucket of its own signs in at the default one (`resolveBucketForRequest`), so it is
- * reached by a change there as surely as one that names it.
- */
+/* Every project on the Default bucket is reached by a change there, whichever group owns it. */
 async function projectsAtTheDefault(): Promise<number> {
 	return (await getProjectStore().list()).filter(
-		(project) => !project.bucketId || project.bucketId === DEFAULT_BUCKET_ID
+		(project) => project.bucketId === DEFAULT_BUCKET_ID
 	).length;
 }
 

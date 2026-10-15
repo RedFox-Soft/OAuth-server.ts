@@ -6,7 +6,7 @@ import {
 	getProjectStore,
 	getProtectedResourceStore
 } from 'lib/adapters/index.ts';
-import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { ROOT_NAMESPACE } from 'lib/resources/namespace.js';
 import { openConsent, decide } from '../consent_page/flow.ts';
 import { MCP } from './consent_choices.config.ts';
@@ -24,6 +24,7 @@ describe('a consent submission that the page did not produce', () => {
 		setup = await bootstrap(import.meta.url, { config: 'consent_choices' });
 		await ensureAdminSeed();
 		const project = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			name: 'Company',
 			slug: 'company-tampering',
 			ownerGroupId: UNASSIGNED_GROUP_ID

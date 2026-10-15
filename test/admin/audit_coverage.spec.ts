@@ -25,7 +25,8 @@ import type { AdminAuditEntry } from 'lib/adapters/types.ts';
 import {
 	ADMIN_BUCKET_ID,
 	ADMIN_SESSION_COOKIE,
-	UNASSIGNED_GROUP_ID
+	UNASSIGNED_GROUP_ID,
+	DEFAULT_BUCKET_ID
 } from 'lib/admin/consts.ts';
 import { sessionFor } from '../admin_session.ts';
 import { answered } from './answered.ts';
@@ -119,6 +120,7 @@ function expectEntry(
 
 async function makeProject() {
 	return getProjectStore().create({
+		bucketId: DEFAULT_BUCKET_ID,
 		ownerGroupId: UNASSIGNED_GROUP_ID,
 		name: 'P',
 		slug: unique('p')
@@ -182,7 +184,7 @@ describe('admin audit coverage: projects', () => {
 		const { cookie, userId } = await superCookie();
 
 		const res = await client.admin.api.projects.post(
-			{ name: 'Audited', slug: unique('audited') },
+			{ name: 'Audited', slug: unique('audited'), bucketId: DEFAULT_BUCKET_ID },
 			{ headers: { cookie } }
 		);
 		expect(res.status).toBe(201);
@@ -192,7 +194,7 @@ describe('admin audit coverage: projects', () => {
 			action: 'project.create',
 			targetType: 'Project',
 			actorId: userId,
-			attributes: ['name', 'slug']
+			attributes: ['bucketId', 'name', 'slug']
 		});
 	});
 

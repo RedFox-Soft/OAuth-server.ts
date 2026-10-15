@@ -48,12 +48,10 @@ export async function seedBucket(
 		name: `bucket-${clientId}`,
 		...fields
 	});
-	const project = await getProjectStore().create({
+	await getProjectStore().create({
 		ownerGroupId: UNASSIGNED_GROUP_ID,
 		name: `project-${clientId}`,
-		slug: `${clientId}-${Math.random()}`
-	});
-	await getProjectStore().update(project._id, {
+		slug: `${clientId}-${Math.random()}`,
 		bucketId: bucket._id,
 		clientIds: [clientId]
 	});

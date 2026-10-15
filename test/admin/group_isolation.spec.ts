@@ -7,8 +7,14 @@ import { bucketRoutes } from 'lib/admin/buckets/routes.ts';
 import { groupRoutes } from 'lib/admin/groups/routes.ts';
 import { scopeRoutes } from 'lib/admin/scope/routes.ts';
 import { adminUserRoutes } from 'lib/admin/users/routes.ts';
+import { endUserRoutes } from 'lib/admin/users-end/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import {
+	ADMIN_BUCKET_ID,
+	ADMIN_SESSION_COOKIE,
+	DEFAULT_BUCKET_ID
+} from 'lib/admin/consts.ts';
+import { getBucketStore, getProjectStore } from 'lib/adapters/index.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
 import { answered } from './answered.ts';
 import { createAdministrator, type AdminKind } from '../administrators.ts';
@@ -32,7 +38,8 @@ const app = new Elysia()
 	.use(bucketRoutes)
 	.use(groupRoutes)
 	.use(scopeRoutes)
-	.use(adminUserRoutes);
+	.use(adminUserRoutes)
+	.use(endUserRoutes);
 const client = treaty(app);
 const superAdminOf = (id: string) =>
 	client.admin.api.admins({ id })['super-admin'];
@@ -51,10 +58,17 @@ async function tenant(label: string, kind: AdminKind = 'plain') {
 		`${label}-${Math.random()}@x.io`
 	);
 	const session = await sessionFor(user);
+	const groupId = await personalGroupId(user._id);
+	/* Every project names a bucket of its group (specs/098); each tenant starts with one. */
+	const bucket = await getBucketStore().create({
+		name: `${label} users`,
+		ownerGroupId: groupId
+	});
 	return {
 		userId: user._id,
 		cookie: `${ADMIN_SESSION_COOKIE}=${session._id}`,
-		groupId: await personalGroupId(user._id)
+		groupId,
+		bucketId: bucket._id
 	};
 }
 
@@ -72,7 +86,7 @@ describe('group isolation', () => {
 		const b = await tenant('b');
 
 		const created = await client.admin.api.projects.post(
-			{ name: 'A project', slug: slug('a') },
+			{ name: 'A project', slug: slug('a'), bucketId: a.bucketId },
 			{ headers: { cookie: a.cookie } }
 		);
 		expect(created.status).toBe(201);
@@ -96,7 +110,7 @@ describe('group isolation', () => {
 		const b = await tenant('b');
 
 		const created = await client.admin.api.projects.post(
-			{ name: 'A project', slug: slug('a') },
+			{ name: 'A project', slug: slug('a'), bucketId: a.bucketId },
 			{ headers: { cookie: a.cookie } }
 		);
 		const project = answered(created.data);
@@ -144,7 +158,7 @@ describe('group isolation', () => {
 		const b = await tenant('b');
 
 		const projectRes = await client.admin.api.projects.post(
-			{ name: 'A project', slug: slug('a') },
+			{ name: 'A project', slug: slug('a'), bucketId: a.bucketId },
 			{ headers: { cookie: a.cookie } }
 		);
 		const project = answered(projectRes.data);
@@ -174,7 +188,7 @@ describe('group isolation', () => {
 		const a = await tenant('a');
 
 		const projectRes = await client.admin.api.projects.post(
-			{ name: 'A project', slug: slug('a') },
+			{ name: 'A project', slug: slug('a'), bucketId: a.bucketId },
 			{ headers: { cookie: a.cookie } }
 		);
 		const project = answered(projectRes.data);
@@ -203,7 +217,7 @@ describe('group isolation', () => {
 		const b = await tenant('b');
 
 		const created = await client.admin.api.projects.post(
-			{ name: 'A project', slug: slug('a') },
+			{ name: 'A project', slug: slug('a'), bucketId: a.bucketId },
 			{ headers: { cookie: a.cookie } }
 		);
 		const project = answered(created.data);
@@ -217,6 +231,40 @@ describe('group isolation', () => {
 		expect(JSON.stringify(denied.error?.value ?? denied.data)).not.toContain(
 			'A project'
 		);
+	});
+
+	/*
+	 * The Default bucket holds every tenant's people whose project is on it (specs/098). A project of one
+	 * group on it must not make it that group's: reach through it would be reach over everybody else's.
+	 */
+	it('gives a group no reach over the Default bucket through a project of its own on it', async () => {
+		const a = await tenant('a');
+		await getProjectStore().create({
+			name: 'On the default',
+			slug: slug('d'),
+			ownerGroupId: a.groupId,
+			bucketId: DEFAULT_BUCKET_ID
+		});
+
+		const listed = await client.admin.api.buckets.get({
+			headers: { cookie: a.cookie }
+		});
+		const read = await client.admin.api
+			.buckets({ id: DEFAULT_BUCKET_ID })
+			.get({ headers: { cookie: a.cookie } });
+		const people = await app.handle(
+			new Request(
+				`http://localhost/admin/api/buckets/${DEFAULT_BUCKET_ID}/users`,
+				{
+					headers: { cookie: a.cookie }
+				}
+			)
+		);
+
+		expect(answered(listed.data).map((b) => b._id)).not.toContain(
+			DEFAULT_BUCKET_ID
+		);
+		expect([read.status, people.status]).toEqual([403, 403]);
 	});
 
 	it('does not let a project administrator reach the reserved admin containers', async () => {
@@ -278,7 +326,7 @@ describe('group isolation', () => {
 			const theirs = answered(
 				(
 					await client.admin.api.projects.post(
-						{ name: 'Theirs', slug: slug('t') },
+						{ name: 'Theirs', slug: slug('t'), bucketId: b.bucketId },
 						{ headers: { cookie: b.cookie } }
 					)
 				).data

@@ -13,7 +13,7 @@ import {
 	getProjectStore,
 	getUserStore
 } from 'lib/adapters/index.ts';
-import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { forgetBucketAddresses } from 'lib/admin/auth/bucketAddress.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { ACCOUNT_PAGE_COOKIE } from 'lib/consts/account_page.ts';
@@ -338,6 +338,7 @@ describe('who may see and change access on the page', () => {
 				ownerGroupId: UNASSIGNED_GROUP_ID
 			});
 			const project = await getProjectStore().create({
+				bucketId: DEFAULT_BUCKET_ID,
 				name: 'loose',
 				slug: `loose-${Math.random()}`,
 				ownerGroupId: UNASSIGNED_GROUP_ID

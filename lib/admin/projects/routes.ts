@@ -1,4 +1,4 @@
-import { Elysia, t } from 'elysia';
+import { Elysia } from 'elysia';
 import {
 	getProjectStore,
 	getBucketStore,
@@ -26,7 +26,6 @@ import {
 	CreateProjectBody,
 	UpdateProjectBody,
 	SetBucketBody,
-	ClearBucketBody,
 	DeleteProjectQuery,
 	MoveProjectOwnerBody
 } from './schema.js';
@@ -54,11 +53,7 @@ import {
 	planMove,
 	previewMove
 } from '../resources/move.js';
-import {
-	addressOf,
-	DEFAULT_REQUEST_BUCKET,
-	issuerFor
-} from '../../configs/issuer.js';
+import { addressOf, issuerFor } from '../../configs/issuer.js';
 
 /*
  * Normalizes a submitted origin list, or refuses the whole request. All-or-nothing on purpose: half a
@@ -95,21 +90,13 @@ function assertNotScheduled(bucket: UserBucket): void {
  * it is not the administrators' bucket, the caller reaches it, and it is in the group the project is
  * created in. No preview, unlike an assignment: a new project has no applications or declarations whose
  * issuer could change.
- *
- * The default bucket is refused by name rather than admitted: leaving `bucketId` out is how a project uses
- * it, and it belongs to the System group, so admitting it would succeed only for a super administrator
- * creating there — two spellings of one state, one of them reachable by almost nobody.
  */
 async function bucketForNewProject(
 	ctx: AdminContext,
 	bucketId: string,
 	ownerGroupId: string
 ): Promise<UserBucket> {
-	if (bucketId === DEFAULT_BUCKET_ID) {
-		throw new AdminError(422, 'leave bucketId out to use the default bucket', {
-			field: 'bucketId'
-		});
-	}
+	assertMayUseDefault(ctx, bucketId);
 	const bucket = await getBucketStore().find(bucketId);
 	/* Answered as a bucket the caller cannot reach, unless they reach every bucket: no existence oracle. */
 	if (!bucket) {
@@ -125,13 +112,29 @@ async function bucketForNewProject(
 	}
 	assertBucketAccess(ctx, bucket);
 	assertNotScheduled(bucket);
-	if (bucket.ownerGroupId !== ownerGroupId) {
+	if (!isDefaultBucket(bucket) && bucket.ownerGroupId !== ownerGroupId) {
 		throw new AdminError(
 			409,
 			'project and bucket must belong to the same group'
 		);
 	}
 	return bucket;
+}
+
+function isDefaultBucket(bucket: Pick<UserBucket, '_id'>): boolean {
+	return bucket._id === DEFAULT_BUCKET_ID;
+}
+
+/*
+ * The Default bucket is shared by every project on it, whichever group owns the project, and it belongs to
+ * the System group — so it is the one bucket a project may use across groups, and for that reason the one
+ * only a super administrator assigns (specs/098). Anyone else is answered as for any bucket out of their
+ * reach, so the refusal says nothing about the Default bucket that a refusal of a stranger's would not.
+ */
+function assertMayUseDefault(ctx: AdminContext, bucketId: string): void {
+	if (bucketId === DEFAULT_BUCKET_ID && !ctx.superAdmin) {
+		throw new AdminError(403, 'no access to this bucket');
+	}
 }
 
 /*
@@ -159,8 +162,8 @@ type AddressForm = ReturnType<typeof addressOf>['kind'];
 /*
  * The project's bucket as a row names it (specs/085), so a list says which bucket each project signs in
  * through without the caller reading the buckets — which a super administrator in another scope, or an
- * agent, would otherwise have to join by id. Null for the default bucket, and for a bucket record that is
- * gone, which the namespace reads the same way: served at the root.
+ * agent, would otherwise have to join by id. Null only for a bucket record that is gone — deleting a bucket
+ * is refused while a project uses it, so that is drift, and the namespace reads it as served at the root.
  */
 function bucketOfRow(
 	bucket: UserBucket | undefined
@@ -191,19 +194,22 @@ async function withRights<T extends Project>(
 > {
 	const buckets = new Map<string, UserBucket>();
 	for (const id of new Set(projects.map((project) => project.bucketId))) {
-		const bucket = id ? await getBucketStore().find(id) : null;
-		if (id && bucket) buckets.set(id, bucket);
+		const bucket = await getBucketStore().find(id);
+		if (bucket) buckets.set(id, bucket);
 	}
 	return projects.map((project) => {
-		const bucket = project.bucketId ? buckets.get(project.bucketId) : undefined;
+		const bucket = buckets.get(project.bucketId);
 		return {
 			...project,
 			can: projectCan(ctx, {
 				...project,
 				namespace: bucket ? namespaceOf(bucket) : ROOT_NAMESPACE
 			}),
-			/* As the move route reads it: a project using a bucket moves only with it. */
-			blockers: { hasBucket: project.bucketId !== null },
+			/*
+			 * As the move route reads it: a project moves alone only from the Default bucket, which never
+			 * moves; on any other bucket it moves only with that bucket.
+			 */
+			blockers: { hasBucket: project.bucketId !== DEFAULT_BUCKET_ID },
 			bucket: bucketOfRow(bucket),
 			clientCount: clientIdsOf(project).length
 		};
@@ -211,27 +217,16 @@ async function withRights<T extends Project>(
 }
 
 interface BucketSide {
-	bucketId: string | null;
+	bucketId: string;
 	name: string;
 	issuer: string | null;
 }
 
 /*
- * One end of a bucket change, as the preview names it. A project with no bucket signs in at the default
- * bucket, so "none" is named as that and given the root issuer; a bucket with no address of its own has no
- * issuer a client could be configured with, so null rather than the id-derived fallback.
+ * One end of a bucket change, as the preview names it. A bucket with no address of its own has no issuer a
+ * client could be configured with, so null rather than the id-derived fallback.
  */
-function sideOf(
-	bucketId: string | null,
-	bucket: UserBucket | null
-): BucketSide {
-	if (bucketId === null) {
-		return {
-			bucketId: null,
-			name: 'Default bucket',
-			issuer: issuerFor(DEFAULT_REQUEST_BUCKET)
-		};
-	}
+function sideOf(bucketId: string, bucket: UserBucket | null): BucketSide {
 	if (!bucket) return { bucketId, name: bucketId, issuer: null };
 	return {
 		bucketId,
@@ -270,8 +265,8 @@ interface BucketChangePreview {
 async function bucketChangePreview(
 	ctx: AdminContext,
 	project: Project,
-	from: { bucketId: string | null; bucket: UserBucket | null },
-	to: { bucketId: string | null; bucket: UserBucket | null }
+	from: { bucketId: string; bucket: UserBucket | null },
+	to: { bucketId: string; bucket: UserBucket | null }
 ): Promise<BucketChangePreview> {
 	const applications: BucketChangePreview['applications'] = [];
 	for (const clientId of clientIdsOf(project)) {
@@ -392,10 +387,11 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 				body.groupId === undefined
 					? assertActiveGroup(ctx)
 					: (await loadDestination(ctx, body.groupId))._id;
-			const bucket =
-				body.bucketId === undefined
-					? null
-					: await bucketForNewProject(ctx, body.bucketId, ownerGroupId);
+			const bucket = await bucketForNewProject(
+				ctx,
+				body.bucketId,
+				ownerGroupId
+			);
 			const store = getProjectStore();
 			if (await store.findBySlug(body.slug)) {
 				throw new AdminError(409, 'slug already exists', { field: 'slug' });
@@ -403,14 +399,11 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 			const corsOrigins = validateCorsOrigins(body.corsOrigins) ?? [];
 			// Allocated here so the audit entry can name the project that is about to exist.
 			const projectId = nanoid();
-			/*
-			 * With a bucket, the entry carries it as an assignment's does, so the creation is in that bucket's
-			 * trail too.
-			 */
+			/* The entry carries the bucket as an assignment's does, so the creation is in that bucket's trail too. */
 			await recordAdminAudit(ctx, 'project.create', projectId, {
 				attributes: Object.keys(body),
 				ownerGroupId,
-				...(bucket ? { bucketId: bucket._id } : {})
+				bucketId: bucket._id
 			});
 			// Every accepted key must be forwarded explicitly: the store takes more than this handler
 			// passes, so a schema addition alone would accept a value and silently discard it.
@@ -421,14 +414,15 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 				type: 'regular',
 				ownerGroupId,
 				corsOrigins,
-				...(bucket ? { bucketId: bucket._id } : {})
+				bucketId: bucket._id
 			});
 			/*
 			 * Checked again after the write, as an assignment is: a move of the bucket to another group can
 			 * commit in between, carrying the projects that used it then — not this one. A project with no
-			 * clients yet is simply not kept, so nothing is left in a group other than its bucket's.
+			 * clients yet is simply not kept, so nothing is left in a group other than its bucket's. The
+			 * Default bucket never moves.
 			 */
-			if (bucket) {
+			if (!isDefaultBucket(bucket)) {
 				const settled = await getBucketStore().find(bucket._id);
 				if (settled?.ownerGroupId !== ownerGroupId) {
 					await store.destroy(projectId);
@@ -596,6 +590,7 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 		async ({ admin, params, body, set }) => {
 			const ctx = assertAuth(admin);
 			const project = await loadProject(ctx, params.id);
+			assertMayUseDefault(ctx, body.bucketId);
 			const bucket = await getBucketStore().find(body.bucketId);
 			if (!bucket) throw new AdminError(404, 'bucket not found');
 			/*
@@ -621,13 +616,14 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 			 * the bucket — and letting that through would build a tenant whose end-users live in somebody
 			 * else's scope, reachable by people with no access to the project at all.
 			 *
-			 * It is not a way to reach the default bucket, and does not need to be. A project whose bucket
-			 * is unset already signs its users in from `redfox`, because `resolveBucketForRequest` falls
-			 * through on an empty `bucketId` to exactly that default. Leaving the bucket unset is the
-			 * supported way to use it; admitting the System group here would relax a tenant boundary to buy
-			 * nothing.
+			 * The Default bucket is the exception, and only a super administrator reaches this line with it
+			 * (`assertMayUseDefault`): it is shared by design, and a project on it gives its group no reach
+			 * over it (`reachOf`), so no tenant's end-users come within anybody else's scope through it.
 			 */
-			if (bucket.ownerGroupId !== project.ownerGroupId) {
+			if (
+				!isDefaultBucket(bucket) &&
+				bucket.ownerGroupId !== project.ownerGroupId
+			) {
 				throw new AdminError(
 					409,
 					'project and bucket must belong to the same group'
@@ -638,10 +634,7 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 			 * is never offered for a change that would be refused anyway; before the audit entry, so nothing is
 			 * recorded for a change that was only described.
 			 */
-			const former =
-				project.bucketId === null
-					? null
-					: await getBucketStore().find(project.bucketId);
+			const former = await getBucketStore().find(project.bucketId);
 			const preview = await bucketChangePreview(
 				ctx,
 				project,
@@ -668,9 +661,7 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 				attributes: ['bucketId'],
 				ownerGroupId: project.ownerGroupId,
 				bucketId: bucket._id,
-				...(project.bucketId === null
-					? {}
-					: { formerBucketId: project.bucketId })
+				formerBucketId: project.bucketId
 			});
 			await applyMove(project._id, move);
 			const bound = await getProjectStore().update(params.id, {
@@ -681,9 +672,13 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 			 * the check above and the write: it carries the projects using the bucket at that moment, and this
 			 * one was not yet among them. Whichever of the two writes comes second sees the other, so reading
 			 * the bucket now is enough to keep a project from ending up in a different group from its bucket.
+			 * The Default bucket never moves, and is never in the project's group.
 			 */
 			const settled = await getBucketStore().find(bucket._id);
-			if (settled?.ownerGroupId !== project.ownerGroupId) {
+			if (
+				!isDefaultBucket(bucket) &&
+				settled?.ownerGroupId !== project.ownerGroupId
+			) {
 				await getProjectStore().update(params.id, {
 					bucketId: project.bucketId
 				});
@@ -703,63 +698,10 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 		{ body: SetBucketBody }
 	)
 	/*
-	 * Its own route rather than a null the PUT accepts, because the action is what tells a reader of the
-	 * trail which change happened: one action would have written `project.bucket.assign` for a removal,
-	 * and the trail could not tell an operator which of the two had happened.
-	 *
-	 * Assigning was one-way until this existed — the body took a bucket id and had no value meaning
-	 * "none" — so a project pointed at the wrong bucket stayed pointed at it. Clearing returns it to the
-	 * default bucket, which is what `resolveBucketForRequest` falls through to on an empty `bucketId`.
-	 */
-	.delete(
-		'/admin/api/projects/:id/bucket',
-		async ({ admin, params, body, set }) => {
-			const ctx = assertAuth(admin);
-			const project = await loadProject(ctx, params.id);
-			/*
-			 * Project access only, deliberately. The entity changed is the project, and dropping a pointer
-			 * needs no authority over what it pointed at — a caller who has lost access to the bucket is
-			 * precisely somebody who needs to clear it. Its declarations are another matter: clearing moves
-			 * them into the shared root namespace, which only a super administrator writes — the preview says
-			 * so as `rootRefused`, and the confirmed change is refused for it.
-			 */
-			const former =
-				project.bucketId === null
-					? null
-					: await getBucketStore().find(project.bucketId);
-			const preview = await bucketChangePreview(
-				ctx,
-				project,
-				{ bucketId: project.bucketId, bucket: former },
-				{ bucketId: null, bucket: null }
-			);
-			const pending = unconfirmed(body, preview);
-			if (pending) {
-				set.status = 409;
-				return pending;
-			}
-			const move = await planMove(
-				ctx,
-				project._id,
-				former ? namespaceOf(former) : ROOT_NAMESPACE,
-				ROOT_NAMESPACE
-			);
-			/* In the history of the bucket the project left. */
-			await recordAdminAudit(ctx, 'project.bucket.clear', params.id, {
-				ownerGroupId: project.ownerGroupId,
-				...(project.bucketId === null
-					? {}
-					: { formerBucketId: project.bucketId })
-			});
-			await applyMove(project._id, move);
-			return getProjectStore().update(params.id, { bucketId: null });
-		},
-		{ body: t.Optional(ClearBucketBody) }
-	)
-	/*
-	 * Moving a project with no bucket to another administrator group (specs/075). A project that uses a
-	 * bucket moves with it, through the bucket's route: a project and the bucket it signs into must share a
-	 * group, so neither moves alone.
+	 * Moving a project on the Default bucket to another administrator group (specs/075, specs/098). The
+	 * Default bucket never moves and is shared by projects of any group, so such a project moves alone. A
+	 * project on any other bucket moves with it, through the bucket's route: a project and the bucket it
+	 * signs into must share a group, so neither moves alone.
 	 *
 	 * The same rules as the bucket's move, from the same module: an owner of the group it leaves, a member
 	 * of the one it joins, and never another administrator's personal group.
@@ -783,7 +725,7 @@ export const projectRoutes = new Elysia({ name: 'admin-projects' })
 						: 'group owner required'
 				);
 			}
-			if (project.bucketId !== null) {
+			if (project.bucketId !== DEFAULT_BUCKET_ID) {
 				throw new AdminError(
 					409,
 					'a project using a bucket moves with its bucket'

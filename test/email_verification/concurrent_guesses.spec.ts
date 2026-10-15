@@ -10,7 +10,7 @@ import {
 } from 'lib/adapters/index.ts';
 import { CODE_MAX_ATTEMPTS } from 'lib/verification/consts.ts';
 import { lastEmail, extractCode } from '../mail_capture.ts';
-import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { present } from 'test/shape.js';
 
 /*
@@ -68,6 +68,7 @@ describe('an emailed verification code guessed concurrently', () => {
 		});
 		bucketId = bucket._id;
 		const project = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'Concurrent Code',
 			slug: `concurrent-code-${Math.random()}`

@@ -514,7 +514,7 @@ async function rightsFacts(ctx: AdminContext): Promise<RightsFacts> {
 		: await projectsOfCallerGroups(ctx);
 	const visibleProjects = new Map<string, Project[]>();
 	for (const project of projects) {
-		if (!project.bucketId || !reachesProject(ctx, project)) continue;
+		if (!reachesProject(ctx, project)) continue;
 		visibleProjects.set(project.bucketId, [
 			...(visibleProjects.get(project.bucketId) ?? []),
 			project
@@ -919,7 +919,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			 */
 			withoutEnabledLink: counts.withoutEnabledLink,
 			passwordWithoutAuthenticator: counts.passwordWithoutAuthenticator,
-			/* The default bucket only: the projects whose sign-in lands there, those naming no bucket included. */
+			/* The default bucket only: the projects whose sign-in lands there. */
 			...(counts.projects === undefined ? {} : { projects: counts.projects }),
 			userGroups: groups.totalResults,
 			connections: connections.length,
@@ -1215,8 +1215,8 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			const ctx = assertAuth(admin);
 			/*
 			 * Before the bucket is loaded, as for an address change and a deletion. The administrators' bucket
-			 * belongs to no tenant, and the default bucket is where every tenant's bucket-less project signs
-			 * in: handing it to one group would hand that group everybody else's end users.
+			 * belongs to no tenant, and the default bucket is shared by projects of every group: handing it to
+			 * one group would hand that group everybody else's end users.
 			 */
 			if (isUndeletableBucket(params.id)) {
 				throw new AdminError(

@@ -12,7 +12,11 @@ import {
 	adminAuditStore,
 	getProjectStore
 } from 'lib/adapters/index.ts';
-import { ADMIN_SESSION_COOKIE, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import {
+	ADMIN_SESSION_COOKIE,
+	UNASSIGNED_GROUP_ID,
+	DEFAULT_BUCKET_ID
+} from 'lib/admin/consts.ts';
 import {
 	LOGO_FORMAT_MESSAGE,
 	LOGO_SIZE_MESSAGE
@@ -65,6 +69,7 @@ describe('a client’s logo and links through the admin API', () => {
 		);
 		cookie = `${ADMIN_SESSION_COOKIE}=${(await sessionFor(user))._id}`;
 		const project = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			name: 'Logos',
 			slug: `logos-${Math.random()}`,
 			ownerGroupId: UNASSIGNED_GROUP_ID

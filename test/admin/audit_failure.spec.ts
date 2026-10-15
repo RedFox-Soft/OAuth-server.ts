@@ -10,7 +10,11 @@ import {
 	getProjectStore,
 	getBucketStore
 } from 'lib/adapters/index.ts';
-import { ADMIN_SESSION_COOKIE, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import {
+	ADMIN_SESSION_COOKIE,
+	UNASSIGNED_GROUP_ID,
+	DEFAULT_BUCKET_ID
+} from 'lib/admin/consts.ts';
 import { Type } from '@sinclair/typebox';
 import { sessionFor } from '../admin_session.ts';
 import { shaped } from 'test/shape.js';
@@ -95,7 +99,7 @@ describe('admin audit write failure', () => {
 		const before = (await getProjectStore().list()).length;
 
 		const res = await client.admin.api.projects.post(
-			{ name: 'Never created', slug },
+			{ name: 'Never created', slug, bucketId: DEFAULT_BUCKET_ID },
 			{ headers: { cookie } }
 		);
 
@@ -107,6 +111,7 @@ describe('admin audit write failure', () => {
 	it('refuses an update and changes nothing', async () => {
 		const cookie = await superCookie();
 		const project = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'Original',
 			slug: unique('p')

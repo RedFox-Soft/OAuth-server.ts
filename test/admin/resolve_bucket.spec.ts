@@ -4,13 +4,16 @@ import {
 	getBucketStore,
 	getProjectStore,
 	getProtectedResourceStore,
+	mcpClientPermissionStore,
 	resetAdminMemoryStores
 } from 'lib/adapters/index.ts';
 import {
 	ADMIN_CLIENT_ID,
 	ADMIN_BUCKET_ID,
+	DEFAULT_BUCKET_ID,
 	UNASSIGNED_GROUP_ID
 } from 'lib/admin/consts.ts';
+import { MCP_RESOURCE } from 'lib/mcp/consts.ts';
 import { DEFAULT_REQUEST_BUCKET } from 'lib/configs/issuer.ts';
 import { ROOT_NAMESPACE } from 'lib/resources/namespace.ts';
 
@@ -168,6 +171,38 @@ describe('resolveBucketForRequest', () => {
 		expect(
 			await resolveBucketForRequest('unaffiliated', 'http://e.ly/mcp', AT_ROOT)
 		).toBe('redfox');
+	});
+
+	/*
+	 * A project on the Default bucket used to name no bucket at all (specs/098), and its clients went on
+	 * through the rules after rule 2. Naming the Default bucket must not end resolution early, or the
+	 * migration that wrote it would have moved people: so such a client resolves exactly as a client in
+	 * no project does, whatever the request names.
+	 */
+	it('resolves a client of a project on the Default bucket as it resolves a client in no project', async () => {
+		await declaredResourceIn('acme-users');
+		await getProjectStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
+			name: 'Shared',
+			slug: `shared-${Math.random()}`,
+			bucketId: DEFAULT_BUCKET_ID,
+			clientIds: ['on-default']
+		});
+		for (const clientId of ['on-default', 'unaffiliated']) {
+			await mcpClientPermissionStore.create({
+				_id: clientId,
+				kind: 'identifier'
+			});
+		}
+
+		for (const resource of [undefined, AUDIENCE, MCP_RESOURCE]) {
+			expect(
+				await resolveBucketForRequest('on-default', resource, AT_ROOT)
+			).toBe(await resolveBucketForRequest('unaffiliated', resource, AT_ROOT));
+		}
+		expect(
+			await resolveBucketForRequest('on-default', MCP_RESOURCE, AT_ROOT)
+		).toBe(ADMIN_BUCKET_ID);
 	});
 
 	/*

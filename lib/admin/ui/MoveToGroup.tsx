@@ -20,7 +20,7 @@ interface Preview {
 }
 
 /*
- * Moving a bucket, with the projects using it, or a project with no bucket, to another administrator
+ * Moving a bucket, with the projects using it, or a project on the Default bucket, to another administrator
  * group (specs/075). Class C4 (`bucket.move`, `project.move`).
  *
  * Two steps, because the server's preview is the only place the full list of what moves exists: the

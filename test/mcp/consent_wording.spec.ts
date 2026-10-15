@@ -74,6 +74,7 @@ describe('an agent wording the consent page', () => {
 	it('describes the scopes of a resource it declares, and the change is attributed to it', async () => {
 		const { token, userId } = await agentToken();
 		const project = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			name: 'Agent wording',
 			slug: `agent-wording-${Math.floor(Math.random() * 1e6)}`,
 			ownerGroupId: UNASSIGNED_GROUP_ID

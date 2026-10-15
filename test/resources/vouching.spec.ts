@@ -9,7 +9,7 @@ import {
 	getProjectStore,
 	getProtectedResourceStore
 } from 'lib/adapters/index.ts';
-import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import { ADMIN_SESSION_COOKIE, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { ISSUER } from 'lib/configs/env.ts';
 import { ROOT_NAMESPACE } from 'lib/resources/namespace.ts';
 import { assertNoPendingInterceptors, mock } from '../fetch_mock.ts';
@@ -68,6 +68,7 @@ describe("a declared resource's published metadata", () => {
 		cookie = `${ADMIN_SESSION_COOKIE}=${(await sessionFor(user))._id}`;
 		projectId = (
 			await getProjectStore().create({
+				bucketId: DEFAULT_BUCKET_ID,
 				ownerGroupId: group._id,
 				name: 'Vouched',
 				slug: `vouched-${Math.random().toString(36).slice(2)}`

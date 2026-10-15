@@ -143,8 +143,11 @@ published as a tool at all — it is named in `excludedConsoleOperations` as `in
 category as logout and first-run setup, so an agent is not offered an operation it has no principal
 for. Since spec 087 project and bucket creation take an optional `groupId` and check it with the moves'
 `loadDestination`: the caller must be a member, and Super administrators and another administrator's personal
-group are never a destination. Without it, the active group decides, as before. A project may also take a
-`bucketId` of that same group, but not the default bucket: leaving the field out already means that bucket. The
+group are never a destination. Without it, the active group decides, as before. Since spec 098 a project must
+name a `bucketId` of that same group; only a super administrator may name the default bucket, for a project
+in any group, and anyone else is refused it as any unreachable bucket (`assertMayUseDefault`,
+`lib/admin/projects/routes.ts`). A project on the default bucket gives its group no reach over it
+(`bucketReachedThrough`, `lib/admin/auth/rbac.ts`). The
 console's creation dialogs choose both, so the header switcher is a default rather than the only way to say
 where something goes.
 
@@ -162,8 +165,8 @@ another tenant observable".
 **Skipping consent is a decision about your own users only** (added 2026-09-29). A client's
 `consent.require: false` is honoured only when the bucket it signs into is owned by the group that owns
 its project (`consentWaived`, `lib/shared/consent_waiver.ts`), decided per request. Any member of a group
-can create a project and a consent-free client, and a project with no bucket signs into the default
-bucket, which every tenant shares — so honouring the flag there gave a tenant every default-bucket user's
+can create a project and a consent-free client, and a project on the default bucket (bucket-less, before
+spec 098) signs into a population every tenant shares — so honouring the flag there gave a tenant every default-bucket user's
 claims with `prompt=none` and no page. A client in no project keeps the flag as stored, since only the
 operator can have set it (registration and client documents cannot); the console's own client passes
 because the admin project and the admin bucket are both the System group's. `consentWaived` is the only
@@ -226,7 +229,7 @@ console asks somebody to confirm the grouping.
 
 ## Related
 
-- [[container-ownership-transfer]] — moving a bucket with its projects, or a bucket-less project, to
+- [[container-ownership-transfer]] — moving a bucket with its projects, or a project on the Default bucket, to
   another group; how sharing personal work is done since personal groups stopped being shareable.
 - [[admin-provisioning]] — the scripts that seed the `unassigned` group and the reserved containers
 - [[admin-audit-trail]] — the trail this feature made group-scoped, and the load-bearing route table

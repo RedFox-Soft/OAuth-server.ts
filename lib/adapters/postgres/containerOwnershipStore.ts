@@ -1,5 +1,6 @@
 import { sql, type Tx } from './db.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
+import { DEFAULT_BUCKET_ID } from '../../admin/consts.js';
 import { member } from '../../helpers/_/object.js';
 import type {
 	ContainerMoveResult,
@@ -66,7 +67,7 @@ export class ContainerOwnershipStore implements ContainerOwnershipStoreInstance 
 			UPDATE ${handle(this.projectArea)} SET doc = doc || ${patch}
 			WHERE id = ${projectId}
 				AND doc->>'ownerGroupId' = ${from}
-				AND doc->>'bucketId' IS NULL
+				AND doc->>'bucketId' = ${DEFAULT_BUCKET_ID}
 			RETURNING id
 		`;
 		return rows.length === 0

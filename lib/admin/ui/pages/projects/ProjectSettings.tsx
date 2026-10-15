@@ -17,6 +17,7 @@ import { groupLabel } from '../../../groups/label.js';
 import type { ScopeOption } from '../ScopeSwitcher.js';
 import type { ProjectView } from '../ProjectWorkspace.js';
 import { ChangeBucketDialog } from './ChangeBucketDialog.js';
+import { DEFAULT_BUCKET_ID } from '../../../consts.js';
 
 const FORM_LABEL: Record<string, string> = {
 	root: "served at the server's root",
@@ -121,10 +122,9 @@ function BucketCard({
 	preselect: string | undefined;
 	onChanged: () => void;
 }) {
-	const [dialog, setDialog] = useState<'change' | 'clear' | null>(
-		preselect && canAssign ? 'change' : null
-	);
+	const [dialog, setDialog] = useState(Boolean(preselect && canAssign));
 	const bucket = project.bucket ?? null;
+	const onDefault = project.bucketId === DEFAULT_BUCKET_ID;
 	const apps = project.clientCount ?? project.clientIds.length;
 
 	return (
@@ -136,7 +136,14 @@ function BucketCard({
 				vertical
 				gap={12}
 			>
-				{bucket ? (
+				{onDefault ? (
+					<Typography.Text>
+						This project uses the shared Default bucket, whose people only
+						instance administrators manage. Choose a bucket of its group to keep
+						this project&apos;s people apart, or{' '}
+						<Link href="/admin/buckets">create a new bucket</Link> first.
+					</Typography.Text>
+				) : bucket ? (
 					<Typography.Text>
 						Signs people in from{' '}
 						<Link href={bucketHref(bucket.id)}>{bucket.name}</Link>,{' '}
@@ -145,22 +152,13 @@ function BucketCard({
 					</Typography.Text>
 				) : (
 					<Typography.Text>
-						This project has no bucket of its own, so it uses the shared Default
-						bucket, whose people only instance administrators manage. Choose a
-						bucket to keep this project&apos;s people apart, or{' '}
-						<Link href="/admin/buckets">create a new bucket</Link> first.
+						Signs people in from bucket {project.bucketId}, which no longer
+						exists.
 					</Typography.Text>
 				)}
 				{canAssign ? (
 					<Space wrap>
-						<Button onClick={() => setDialog('change')}>
-							{bucket ? 'Change bucket…' : 'Choose a bucket…'}
-						</Button>
-						{bucket && (
-							<Button onClick={() => setDialog('clear')}>
-								Use the Default bucket…
-							</Button>
-						)}
+						<Button onClick={() => setDialog(true)}>Change bucket…</Button>
 					</Space>
 				) : (
 					<Typography.Text type="secondary">
@@ -171,11 +169,10 @@ function BucketCard({
 			{dialog && (
 				<ChangeBucketDialog
 					project={project}
-					mode={dialog}
 					preselect={preselect}
-					onClose={() => setDialog(null)}
+					onClose={() => setDialog(false)}
 					onChanged={() => {
-						setDialog(null);
+						setDialog(false);
 						onChanged();
 					}}
 				/>
@@ -223,6 +220,8 @@ export function ProjectSettings({
 	const group = groups.find((g) => g.id === project.ownerGroupId);
 	const groupName = group ? groupLabel(group) : 'a group you are not in';
 	const bucket = project.bucket ?? null;
+	/* The Default bucket never moves, so a project on it moves alone (specs/098). */
+	const movesAlone = project.bucketId === DEFAULT_BUCKET_ID;
 
 	/*
 	 * The clients are fetched rather than read off the project, because `clientIds` can hold an id whose
@@ -322,13 +321,13 @@ export function ProjectSettings({
 						<Typography.Text>
 							Owned by <Typography.Text strong>{groupName}</Typography.Text>
 						</Typography.Text>
-						{can.move && !bucket && (
+						{can.move && movesAlone && (
 							<Button onClick={() => setMoving(true)}>
 								Move to another group…
 							</Button>
 						)}
 					</Flex>
-					{bucket && (
+					{!movesAlone && bucket && (
 						<Typography.Text type="secondary">
 							A project and its bucket always share a group, so this project
 							moves with its bucket.{' '}

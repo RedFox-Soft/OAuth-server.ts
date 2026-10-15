@@ -100,8 +100,8 @@ Inactive and locked accounts are counted, as in the rest of the tally. `signInCo
 console's switches are the numbers a confirmation has to repeat. The summary
 (`GET /admin/api/buckets/:id/summary`, `routes.ts:777`) adds `withoutEnabledLink`,
 `passwordWithoutAuthenticator`, and, on the default bucket only, `projects`. `projects` counts projects
-whose `bucketId` is `redfox` or empty, because a project naming no bucket signs in at the default one
-(`resolveBucketForRequest`).
+whose `bucketId` is `redfox` (it also counted an empty one until spec 098 made every project name a
+bucket).
 
 ## Verification needs mail, on every bucket
 

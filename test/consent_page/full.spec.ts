@@ -6,7 +6,7 @@ import {
 	getProjectStore,
 	getProtectedResourceStore
 } from 'lib/adapters/index.ts';
-import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { ROOT_NAMESPACE } from 'lib/resources/namespace.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { MCP_RESOURCE } from 'lib/mcp/consts.js';
@@ -31,6 +31,7 @@ describe('the consent page for access to a service', () => {
 		setup = await bootstrap(import.meta.url, { config: 'consent_page' });
 		await ensureAdminSeed();
 		const project = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			name: 'Company',
 			slug: 'company-mcp',
 			ownerGroupId: UNASSIGNED_GROUP_ID

@@ -19,6 +19,7 @@ import {
 	cookieFor,
 	regularGroup
 } from './ownership_fixtures.ts';
+import { DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 
 const app = new Elysia({ normalize: false })
 	.use(resolveAdmin)
@@ -114,6 +115,7 @@ describe("a bucket's resource namespace", () => {
 			bucketId: legacy._id
 		});
 		const stranger = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			name: 'Stranger',
 			slug: `str-${nanoid()
 				.toLowerCase()

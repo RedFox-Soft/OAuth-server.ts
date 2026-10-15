@@ -4,7 +4,7 @@ import bootstrap, { agent, getHeader, type Setup } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { getGroupStore, getProjectStore } from 'lib/adapters/index.ts';
-import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 
 /*
  * Skipping the consent screen is a tenant's decision about its own users, not about anyone else's. Any
@@ -16,6 +16,7 @@ import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 
 async function projectHolding(clientId: string, ownerGroupId: string) {
 	const project = await getProjectStore().create({
+		bucketId: DEFAULT_BUCKET_ID,
 		ownerGroupId,
 		name: clientId,
 		slug: `${clientId}-${Math.random().toString(36).slice(2)}`

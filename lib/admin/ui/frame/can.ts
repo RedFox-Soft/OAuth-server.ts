@@ -34,6 +34,7 @@ export interface ProjectCan {
 }
 
 export interface ProjectBlockers {
+	/* On a bucket other than the Default (specs/098): the project moves only with that bucket. */
 	hasBucket: boolean;
 }
 

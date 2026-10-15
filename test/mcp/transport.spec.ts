@@ -7,7 +7,7 @@ import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { getProjectStore } from 'lib/adapters/index.ts';
-import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import {
 	ADMIN_MCP_CLIENT_ID,
 	MCP_RESOURCE,
@@ -271,6 +271,7 @@ describe('MCP transport', () => {
 	it('scopes a read to what the administrator may see', async () => {
 		const { token } = await tokenFor('plain');
 		await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			name: 'Not theirs',
 			slug: `nt-${Math.floor(Math.random() * 1e6)}`,
 			ownerGroupId: UNASSIGNED_GROUP_ID

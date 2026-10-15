@@ -1,5 +1,6 @@
 import { getGroupStore, getProjectStore } from 'lib/adapters/index.ts';
 import { writeLogo } from 'lib/models/client/logo.ts';
+import { DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 
 /* A logo as an administrator would have stored it — the stored record, never the client object. */
 export async function giveLogo(clientId: string, image: string): Promise<void> {
@@ -17,6 +18,7 @@ export async function tenantProject(clientIds: string[]): Promise<void> {
 		members: [{ userId: 'tenant-owner', role: 'owner' }]
 	});
 	const project = await getProjectStore().create({
+		bucketId: DEFAULT_BUCKET_ID,
 		ownerGroupId: tenant._id,
 		name: 'Partner',
 		slug: 'partner-project'

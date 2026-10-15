@@ -14,6 +14,7 @@ import {
 	cookieFor,
 	regularGroup
 } from './ownership_fixtures.ts';
+import { DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 
 const app = new Elysia({ normalize: false })
 	.use(resolveAdmin)
@@ -56,8 +57,9 @@ describe('project rows', () => {
 			bucket,
 			projects: [bucketed]
 		} = await bucketWithProjects(team._id, 1);
-		const unbucketed = await getProjectStore().create({
-			name: 'No bucket',
+		const shared = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
+			name: 'On the default',
 			slug: `nb-${nanoid()
 				.toLowerCase()
 				.replace(/[^a-z0-9]/g, '')}`,
@@ -77,8 +79,12 @@ describe('project rows', () => {
 			name: bucket.name,
 			addressForm: 'path'
 		});
-		expect(byId.get(unbucketed._id)?.bucket).toBeNull();
-		expect(byId.get(unbucketed._id)?.clientCount).toBe(2);
+		expect(byId.get(shared._id)?.bucket).toEqual({
+			id: DEFAULT_BUCKET_ID,
+			name: 'Default users',
+			addressForm: 'root'
+		});
+		expect(byId.get(shared._id)?.clientCount).toBe(2);
 	});
 
 	it('names the bucket on the read of one project', async () => {

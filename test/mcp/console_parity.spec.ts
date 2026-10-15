@@ -10,7 +10,11 @@ import {
 	getProjectStore,
 	getBucketStore
 } from 'lib/adapters/index.ts';
-import { ADMIN_SESSION_COOKIE, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import {
+	ADMIN_SESSION_COOKIE,
+	UNASSIGNED_GROUP_ID,
+	DEFAULT_BUCKET_ID
+} from 'lib/admin/consts.ts';
 import { ADMIN_MCP_CLIENT_ID, MCP_RESOURCE } from 'lib/mcp/consts.ts';
 import { mcpCatalogue, pathArgName } from 'lib/mcp/catalogue.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
@@ -105,6 +109,7 @@ describe('agent answers match the console, field for field', () => {
 
 		// Enough state that a read returning an empty collection cannot pass vacuously.
 		const project = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			name: 'Parity',
 			slug: `par-${Math.floor(Math.random() * 1e6)}`,
 			ownerGroupId: await personalGroupId(user._id)
@@ -233,6 +238,7 @@ describe('agent answers match the console, field for field', () => {
 		const cookie = `${ADMIN_SESSION_COOKIE}=${session._id}`;
 
 		const theirs = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			name: 'Not theirs',
 			slug: `nt-${Math.floor(Math.random() * 1e6)}`,
 			ownerGroupId: UNASSIGNED_GROUP_ID

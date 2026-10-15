@@ -13,7 +13,7 @@ import {
 	getUserStore,
 	resetAdminMemoryStores
 } from 'lib/adapters/index.ts';
-import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { ISSUER } from 'lib/configs/env.js';
 import { elysia } from 'lib/index.ts';
 import { CONSENT_TEXTS } from 'lib/i18n/texts/consent/index.ts';
@@ -121,6 +121,7 @@ describe('the language of the sign-in pages', () => {
 		});
 		bucketId = bucket._id;
 		const project = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'Languages',
 			slug: `languages-${Math.random()}`

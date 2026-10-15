@@ -14,7 +14,7 @@ import {
 	emailsTo,
 	extractVerifyUrl
 } from '../mail_capture.ts';
-import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { present } from 'test/shape.js';
 import { elysia } from 'lib/index.ts';
 
@@ -76,6 +76,7 @@ beforeAll(async () => {
 	});
 	bucketId = bucket._id;
 	const project = await getProjectStore().create({
+		bucketId: DEFAULT_BUCKET_ID,
 		ownerGroupId: UNASSIGNED_GROUP_ID,
 		name: 'Verify Link',
 		slug: `verify-link-${Math.random()}`
@@ -300,6 +301,7 @@ describe('registration gating', () => {
 			registrationOpen: false
 		});
 		const project = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'Closed',
 			slug: `closed-${Math.random()}`
@@ -338,6 +340,7 @@ describe('registration gating', () => {
 			emailVerificationRequired: false
 		});
 		const project = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'Off',
 			slug: `off-${Math.random()}`

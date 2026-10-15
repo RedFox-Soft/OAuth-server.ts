@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { Elysia } from 'elysia';
 import { treaty } from '@elysiajs/eden';
+import { getBucketStore } from 'lib/adapters/index.ts';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { groupRoutes } from 'lib/admin/groups/routes.ts';
 import { projectRoutes } from 'lib/admin/projects/routes.ts';
@@ -29,6 +30,11 @@ async function admin(kind: AdminKind = 'plain') {
 		email: user.email,
 		cookie: `${ADMIN_SESSION_COOKIE}=${session._id}`
 	};
+}
+
+/* Every project names a bucket of its group (specs/098). */
+async function bucketIn(ownerGroupId: string): Promise<string> {
+	return (await getBucketStore().create({ name: 'Own', ownerGroupId }))._id;
 }
 
 async function makeGroup(cookie: string, name = 'Acme') {
@@ -111,7 +117,8 @@ describe('groups API', () => {
 					await client.admin.api.projects.post(
 						{
 							name: 'Shared',
-							slug: `s-${Math.random().toString(36).slice(2)}`
+							slug: `s-${Math.random().toString(36).slice(2)}`,
+							bucketId: await bucketIn(group._id)
 						},
 						{ headers: { cookie: owner.cookie } }
 					)
@@ -252,7 +259,11 @@ describe('groups API', () => {
 				{ headers: { cookie: owner.cookie } }
 			);
 			await client.admin.api.projects.post(
-				{ name: 'Held', slug: `h-${Math.random().toString(36).slice(2)}` },
+				{
+					name: 'Held',
+					slug: `h-${Math.random().toString(36).slice(2)}`,
+					bucketId: await bucketIn(group._id)
+				},
 				{ headers: { cookie: owner.cookie } }
 			);
 

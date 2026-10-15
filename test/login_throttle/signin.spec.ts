@@ -18,7 +18,7 @@ import { throttleKey } from 'lib/login_throttle/throttle.ts';
 import { LoginThrottlePayload } from 'lib/login_throttle/types.ts';
 import { TestAdapter } from 'test/models.js';
 import { present, shaped } from 'test/shape.js';
-import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 
 /*
  * The password door under brute force, driven through the real HTTP layer: /auth to get an
@@ -66,6 +66,7 @@ async function seedBucket(
 		...fields
 	});
 	const project = await getProjectStore().create({
+		bucketId: DEFAULT_BUCKET_ID,
 		ownerGroupId: UNASSIGNED_GROUP_ID,
 		name,
 		slug: `${clientId}-${Math.random()}`

@@ -13,6 +13,7 @@ import { MCP_RESOURCE } from 'lib/mcp/consts.ts';
 import { clearPermissions, permitIdentifier } from './permissions.ts';
 import { createAdministrator } from '../administrators.ts';
 import { rpc } from './rpc.ts';
+import { DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 
 /*
  * Who the audit trail names when an agent acts through a permitted client identity.
@@ -89,7 +90,7 @@ describe('attributing an action taken through a permitted identity', () => {
 				method: 'tools/call',
 				params: {
 					name: 'project_create',
-					arguments: { name: 'Attributed', slug }
+					arguments: { name: 'Attributed', slug, bucketId: DEFAULT_BUCKET_ID }
 				}
 			},
 			token

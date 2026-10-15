@@ -183,7 +183,7 @@ async function heldClient(): Promise<string> {
 
 async function project(
 	ownerGroupId: string,
-	bucketId: string | null,
+	bucketId: string,
 	clientIds: string[] = []
 ) {
 	const id = nanoid().toLowerCase();
@@ -253,7 +253,9 @@ async function world(): Promise<World> {
 	await getUserStore(holding._id).create(`held-${id}@x.io`, 'hash', true);
 
 	const bucketed = await project(owning._id, regular._id, [await heldClient()]);
-	const alone = await project(owning._id, null, [await heldClient()]);
+	const alone = await project(owning._id, DEFAULT_BUCKET_ID, [
+		await heldClient()
+	]);
 	const throughProject = await project(reaching._id, regular._id);
 	await project(reaching._id, unaddressable._id);
 	await project(reaching._id, DEFAULT_BUCKET_ID);
@@ -364,18 +366,19 @@ const key = (r: { method: string; path: string }) => `${r.method} ${r.path}`;
  * stated the same rights as the console.
  */
 describe('stated rights on buckets and projects', () => {
-	let adminProjectBucket: string | null = null;
+	let adminProjectBucket = ADMIN_BUCKET_ID;
 
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'can_routes' });
 		await ensureAdminSeed();
 		adminProjectBucket =
-			(await getProjectStore().find(ADMIN_PROJECT_ID))?.bucketId ?? null;
+			(await getProjectStore().find(ADMIN_PROJECT_ID))?.bucketId ??
+			ADMIN_BUCKET_ID;
 	});
 
 	afterAll(async () => {
 		/*
-		 * The matrix lets a super administrator clear the console's own project's bucket and declare a
+		 * The matrix lets a super administrator change the console's own project's bucket and declare a
 		 * resource in the root namespace. Both are put back, because every spec after this one signs in
 		 * through that project.
 		 */

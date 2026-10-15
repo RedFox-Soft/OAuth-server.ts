@@ -5,7 +5,7 @@ import {
 	getProjectStore,
 	getProtectedResourceStore
 } from 'lib/adapters/index.ts';
-import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { Type } from '@sinclair/typebox';
 import { present, shaped } from 'test/shape.ts';
 
@@ -36,6 +36,7 @@ export async function tenant(
 		...address
 	});
 	const project = await getProjectStore().create({
+		bucketId: DEFAULT_BUCKET_ID,
 		ownerGroupId: UNASSIGNED_GROUP_ID,
 		name: clientId,
 		slug: `${clientId}-${Math.random().toString(36).slice(2)}`

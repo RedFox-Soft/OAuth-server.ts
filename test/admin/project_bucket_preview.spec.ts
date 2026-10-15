@@ -15,6 +15,7 @@ import {
 import type { User } from 'lib/adapters/types.ts';
 import { ISSUER } from 'lib/configs/env.ts';
 import { ROOT_NAMESPACE } from 'lib/resources/namespace.ts';
+import { DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import nanoid from 'lib/helpers/nanoid.ts';
 import { shaped } from 'test/shape.ts';
 import { createAdministrator } from '../administrators.ts';
@@ -25,7 +26,7 @@ const app = new Elysia({ normalize: false })
 	.use(projectRoutes);
 
 async function send(
-	method: 'PUT' | 'DELETE',
+	method: 'PUT',
 	path: string,
 	cookie: string,
 	body?: unknown
@@ -41,7 +42,7 @@ async function send(
 }
 
 const Side = Type.Object({
-	bucketId: Type.Union([Type.String(), Type.Null()]),
+	bucketId: Type.String(),
 	name: Type.String(),
 	issuer: Type.Union([Type.String(), Type.Null()])
 });
@@ -307,39 +308,47 @@ describe("changing a project's bucket", () => {
 		expect(await trailOf(w.project._id)).toBe(0);
 	});
 
-	it('states that clearing would move declarations into the root namespace a group administrator may not write', async () => {
+	it('refuses a group administrator the Default bucket before describing anything', async () => {
 		const w = await world();
 
 		const res = await send(
-			'DELETE',
+			'PUT',
 			`/admin/api/projects/${w.project._id}/bucket`,
-			w.cookie
+			w.cookie,
+			{ bucketId: DEFAULT_BUCKET_ID }
 		);
 
-		expect(res.status).toBe(409);
-		const preview = shaped(Preview, res.body);
-		expect(preview.to).toEqual({
-			bucketId: null,
-			name: 'Default bucket',
-			issuer: ISSUER
-		});
-		expect(preview.rootRefused).toBe(true);
-		expect(preview.blocked).toBe(true);
+		expect(res.status).toBe(403);
+		expect(Object.keys(shaped(Refusal, res.body))).not.toContain(
+			'applications'
+		);
+		expect((await getProjectStore().find(w.project._id))?.bucketId).toBe(
+			w.from._id
+		);
 	});
 
-	it('clears a bucket when a super administrator confirms the counts shown, recorded in the trail of the bucket it left', async () => {
+	it("moves a tenant group's project onto the Default bucket when a super administrator confirms the counts shown, recorded in the trail of the bucket it left", async () => {
 		const w = await world();
-		const superAdmin = await createAdministrator('super');
+		const cookie = await cookieFor(await createAdministrator('super'));
+		const path = `/admin/api/projects/${w.project._id}/bucket`;
 
-		const res = await send(
-			'DELETE',
-			`/admin/api/projects/${w.project._id}/bucket`,
-			await cookieFor(superAdmin),
-			{ confirm: true, expect: { applications: 2, resources: 1 } }
-		);
+		const preview = await send('PUT', path, cookie, {
+			bucketId: DEFAULT_BUCKET_ID
+		});
+		const res = await send('PUT', path, cookie, {
+			bucketId: DEFAULT_BUCKET_ID,
+			confirm: true,
+			expect: { applications: 2, resources: 1 }
+		});
 
+		expect(shaped(Preview, preview.body).to).toMatchObject({
+			bucketId: DEFAULT_BUCKET_ID,
+			issuer: ISSUER
+		});
 		expect(res.status).toBe(200);
-		expect((await getProjectStore().find(w.project._id))?.bucketId).toBeNull();
+		expect((await getProjectStore().find(w.project._id))?.bucketId).toBe(
+			DEFAULT_BUCKET_ID
+		);
 		expect(
 			(await getProtectedResourceStore().find(ROOT_NAMESPACE, w.identifier))
 				?.projectId
@@ -349,20 +358,15 @@ describe("changing a project's bucket", () => {
 			entries
 				.filter((e) => e.targetId === w.project._id)
 				.map((e) => [e.action, e.formerBucketId])
-		).toEqual([['project.bucket.clear', w.from._id]]);
+		).toEqual([['project.bucket.assign', w.from._id]]);
 	});
 
-	it('records nothing in the trail for a preview of either change', async () => {
+	it('records nothing in the trail for a preview of a change', async () => {
 		const w = await world();
 
 		await send('PUT', `/admin/api/projects/${w.project._id}/bucket`, w.cookie, {
 			bucketId: w.to._id
 		});
-		await send(
-			'DELETE',
-			`/admin/api/projects/${w.project._id}/bucket`,
-			w.cookie
-		);
 
 		expect(await trailOf(w.project._id)).toBe(0);
 	});

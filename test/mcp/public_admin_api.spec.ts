@@ -6,7 +6,7 @@ import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { getProjectStore } from 'lib/adapters/index.ts';
-import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import {
 	ADMIN_MCP_CLIENT_ID,
 	MCP_RESOURCE,
@@ -89,6 +89,7 @@ describe('an agent token presented directly to the management API', () => {
 
 	it('deletes nothing through an operation the agent surface withholds', async () => {
 		const project = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			name: 'Kept',
 			slug: `kept-${Math.random()}`,
 			ownerGroupId: UNASSIGNED_GROUP_ID

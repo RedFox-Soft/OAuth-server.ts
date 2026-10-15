@@ -14,7 +14,8 @@ import {
 import {
 	ADMIN_BUCKET_ID,
 	ADMIN_SESSION_COOKIE,
-	UNASSIGNED_GROUP_ID
+	UNASSIGNED_GROUP_ID,
+	DEFAULT_BUCKET_ID
 } from 'lib/admin/consts.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
 import { answered } from './answered.ts';
@@ -237,6 +238,7 @@ describe('end-user API', () => {
 		const pa = await sessionCookieFor('plain');
 		const bucket = await makeBucket(); // not owned by pa
 		const proj = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			name: 'PM',
 			slug: `pm-${Math.random()}`,
 			ownerGroupId: await personalGroupId(pa.userId)

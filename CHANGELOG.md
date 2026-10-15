@@ -9,6 +9,15 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+### Changed
+
+- **Every project names its bucket** (spec 098). `POST /admin/api/projects` and `project_create` now require
+  `bucketId`, and only a super administrator may name the Default bucket, for a project in any group — on a public
+  instance a project left without one put its people into a pool shared by every tenant and managed by none of
+  them. **Breaking:** `DELETE /admin/api/projects/:id/bucket` and `project_bucket_clear` are removed. The migration
+  `2026-10-15-projects-require-bucket` writes the Default bucket into every project that named none (run
+  `db:migrate`); sign-ins are unchanged. The console's new-project form can create the bucket in the same step.
+
 ## [0.12.0] - 2026-10-14
 
 The pages people see are rebuilt for the people who see them. The consent page says who is asking, which account

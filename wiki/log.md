@@ -264,3 +264,5 @@ Operations:
 ## [2026-10-14] update | [[spec-file-isolation]] — the test-mode listen guard keys on `NODE_ENV`, so the site capture (which boots with `NODE_ENV=test`) now listens itself; it had broken the site build since 7a2f110.
 
 ## [2026-10-14] ingest | [[end-user-languages]] — spec 097: end-user pages and emails in en/ru/zh-Hans; the resolution order and why it is decided once per sign-in, the switch and why it is not a menu, `_lang` unpartitioned by bucket, the catalogue rules, what stays English.
+
+## [2026-10-15] update | [[container-ownership-transfer]], [[group-ownership]], [[mcp-server-authorization]], [[admin-mcp-control-plane]], [[bucket-sign-in-policy]], [[bucket-soft-delete]] — spec 098: every project names a bucket; clearing one is gone; only a super administrator assigns the Default bucket, which grants no reach and does not end bucket resolution early; a project on it moves alone.

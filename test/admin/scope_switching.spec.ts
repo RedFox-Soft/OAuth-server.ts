@@ -6,8 +6,12 @@ import { groupRoutes } from 'lib/admin/groups/routes.ts';
 import { scopeRoutes } from 'lib/admin/scope/routes.ts';
 import { projectRoutes } from 'lib/admin/projects/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { adminAuditStore } from 'lib/adapters/index.ts';
-import { ADMIN_SESSION_COOKIE, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { adminAuditStore, getBucketStore } from 'lib/adapters/index.ts';
+import {
+	ADMIN_SESSION_COOKIE,
+	DEFAULT_BUCKET_ID,
+	UNASSIGNED_GROUP_ID
+} from 'lib/admin/consts.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
 import { answered } from './answered.ts';
 import { createAdministrator, type AdminKind } from '../administrators.ts';
@@ -21,6 +25,11 @@ const client = treaty(app);
 
 function slug(prefix: string): string {
 	return `${prefix}-${Math.random().toString(36).slice(2)}`;
+}
+
+/* Every project names a bucket of its group (specs/098). */
+async function bucketIn(ownerGroupId: string): Promise<string> {
+	return (await getBucketStore().create({ name: 'Own', ownerGroupId }))._id;
 }
 
 async function admin(kind: AdminKind = 'plain') {
@@ -76,7 +85,11 @@ describe('active scope', () => {
 		const personalProject = answered(
 			(
 				await client.admin.api.projects.post(
-					{ name: 'Personal', slug: slug('p') },
+					{
+						name: 'Personal',
+						slug: slug('p'),
+						bucketId: await bucketIn(await personalGroupId(a.userId))
+					},
 					{ headers: { cookie: a.cookie } }
 				)
 			).data
@@ -92,7 +105,11 @@ describe('active scope', () => {
 		const groupProject = answered(
 			(
 				await client.admin.api.projects.post(
-					{ name: 'Company', slug: slug('c') },
+					{
+						name: 'Company',
+						slug: slug('c'),
+						bucketId: await bucketIn(group._id)
+					},
 					{ headers: { cookie: a.cookie } }
 				)
 			).data
@@ -271,7 +288,7 @@ describe('active scope', () => {
 		const project = answered(
 			(
 				await client.admin.api.projects.post(
-					{ name: 'Company', slug: slug('c') },
+					{ name: 'Company', slug: slug('c'), bucketId: DEFAULT_BUCKET_ID },
 					{ headers: { cookie: root.cookie } }
 				)
 			).data

@@ -477,6 +477,57 @@ check(
 );
 
 /*
+ * Every project names a bucket (specs/098): a project stored with a JSON null bucket, and one written before
+ * the field existed, both come out on the Default bucket; one that named a bucket is left alone; and the
+ * second application selects nothing.
+ */
+const requireBucket = MIGRATIONS.find((m) =>
+	m.id.endsWith('projects-require-bucket')
+);
+const unboundStamp = Date.now();
+const unbound = {
+	nulled: `fidelity-null-bucket-${unboundStamp}`,
+	absent: `fidelity-absent-bucket-${unboundStamp}`,
+	bound: `fidelity-bound-bucket-${unboundStamp}`
+};
+for (const [id, doc] of [
+	[
+		unbound.nulled,
+		{ _id: unbound.nulled, slug: unbound.nulled, bucketId: null }
+	],
+	[unbound.absent, { _id: unbound.absent, slug: unbound.absent }],
+	[
+		unbound.bound,
+		{ _id: unbound.bound, slug: unbound.bound, bucketId: legacyBucket }
+	]
+] as const) {
+	await handle`
+		INSERT INTO ${handle(STORE_AREAS.projects)} (id, doc, expires_at)
+		VALUES (${id}, ${doc}, NULL)
+	`;
+}
+let secondRun: unknown = null;
+if (requireBucket && !('noop' in requireBucket.postgres)) {
+	await requireBucket.postgres.apply(handle);
+	secondRun = await requireBucket.postgres.apply(handle);
+}
+const bucketsAfter: unknown[] = [];
+for (const id of Object.values(unbound)) {
+	const [row]: ({ bucket: unknown } | undefined)[] = await handle`
+		SELECT doc->>'bucketId' AS bucket FROM ${handle(STORE_AREAS.projects)} WHERE id = ${id}
+	`;
+	bucketsAfter.push(row?.bucket);
+}
+check(
+	'the bucket migration gives a null and an absent bucket the Default bucket, leaves a named one, and does nothing twice',
+	JSON.stringify(bucketsAfter) ===
+		JSON.stringify(['redfox', 'redfox', legacyBucket]) &&
+		JSON.stringify(secondRun) ===
+			JSON.stringify(['projects given the default bucket: 0']),
+	`${JSON.stringify(bucketsAfter)}; second run ${JSON.stringify(secondRun)}`
+);
+
+/*
  * The root keys migration, against legacy flat keys in a table that has no order: two RS256 keys and an
  * ES256 key. With no order to recover, the lowest kid of each algorithm signs;
  * applying the migration twice must change nothing.

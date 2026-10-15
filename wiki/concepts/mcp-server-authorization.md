@@ -52,8 +52,8 @@ Nothing is taken from the resource's own metadata or an MCP server's tool list. 
 ## Unique within a namespace, and the namespace is the issuer
 
 A declaration is unique within its **namespace**: the bucket id of an addressable bucket, or `@root` for
-everything served at the root issuer — the default bucket, the administrators bucket, a legacy bucket
-with no address, a project with no bucket (`namespaceOf`, `lib/resources/namespace.ts:19`). The stored
+everything served at the root issuer — the default bucket and every project on it, the administrators
+bucket, a legacy bucket with no address (`namespaceOf`, `lib/resources/namespace.ts:19`). The stored
 `_id` is the two joined by one space (`lib/resources/declaration_id.ts`), which a canonical identifier
 cannot contain, so the datastore's primary key is still what enforces uniqueness rather than a rule a
 route remembers. The route reads before inserting for a better message and answers only the store's
@@ -88,6 +88,12 @@ that bug; the test did not catch it, reasoning did.
 bucket; client in a project → that project's bucket; **one** declared resource named → that resource's
 project's bucket; a permitted client identity naming the administrative MCP audience → admin bucket;
 otherwise `redfox`.
+
+A project on `redfox` does **not** end resolution at rule 2 (`pinnedBucketOf`,
+`lib/admin/auth/resolveBucket.ts`): until spec 098 such a project stored no bucket and its clients went on
+through rules 2b–4, and the migration that wrote `redfox` into it (`2026-10-15-projects-require-bucket`) was
+not meant to move a single sign-in. `test/admin/resolve_bucket.spec.ts` holds that a client of such a project
+resolves exactly as a client in no project does.
 
 Rule 3 answers a question the admin MCP control plane left open, and it is
 safe for the reason the rejected version was not: **an administrator authored the resource**, in a
@@ -127,8 +133,8 @@ console and through an agent.
 
 **Declarations move with their project.** A declaration's namespace is derived from its project's
 bucket, so a project that changed bucket without them would leave declarations that no longer resolve
-anywhere. `planMove`/`applyMove` (`lib/admin/resources/move.ts`) carry them on a bucket assign or
-clear, and when a legacy bucket gains its first address; a target that already declares one of the
+anywhere. `planMove`/`applyMove` (`lib/admin/resources/move.ts`) carry them on a bucket assign, and
+when a legacy bucket gains its first address; a target that already declares one of the
 identifiers answers 409 with the list, and a move into `@root` is held to the rule above. The plan is
 checked before the audit write; the store undoes its own moves on a race the plan could not see.
 `test/resources/project_move.spec.ts`.

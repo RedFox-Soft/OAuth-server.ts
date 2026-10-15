@@ -141,14 +141,20 @@ async function seed(ctx: BrowserContext): Promise<{
 	// The console's lists are scoped by the group held on the session, so everything created below
 	// has to be created *after* the switch or it lands in the bootstrap administrator's personal group.
 	await api(ctx, 'PUT', '/admin/api/scope', { groupId: group._id });
+	/*
+	 * Every project names its bucket (specs/098). These start on the shared Default bucket — open to the
+	 * bootstrap administrator, a super administrator — so the bucket change below has something to preview.
+	 */
 	const project = await api<Created>(ctx, 'POST', '/admin/api/projects', {
 		name: 'Acme Web',
 		slug: 'acme-web',
+		bucketId: 'redfox',
 		corsOrigins: ['https://acme.example.com']
 	});
 	await api(ctx, 'POST', '/admin/api/projects', {
 		name: 'Acme Mobile',
-		slug: 'acme-mobile'
+		slug: 'acme-mobile',
+		bucketId: 'redfox'
 	});
 	/*
 	 * The slug is the bucket's address, and it is required: a bucket is a tenant with its own issuer, so

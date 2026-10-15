@@ -12,7 +12,7 @@ import {
 	getProjectStore,
 	getProtectedResourceStore
 } from 'lib/adapters/index.ts';
-import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import { ADMIN_SESSION_COOKIE, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { AccessToken } from 'lib/models/access_token.ts';
 import { Client } from 'lib/models/client.ts';
 import { ADMIN_MCP_CLIENT_ID, MCP_RESOURCE } from 'lib/mcp/consts.ts';
@@ -57,6 +57,7 @@ async function administrator(kind: AdminKind) {
 
 async function rootProject(ownerGroupId: string) {
 	return getProjectStore().create({
+		bucketId: DEFAULT_BUCKET_ID,
 		name: 'Rootless',
 		slug: `rootless-${Math.random().toString(36).slice(2)}`,
 		ownerGroupId

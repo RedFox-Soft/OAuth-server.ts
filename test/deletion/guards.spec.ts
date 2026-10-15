@@ -66,6 +66,7 @@ describe('deletion guards: containers', () => {
 
 	async function project(clientIds: string[], bucketId?: string) {
 		return getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'P',
 			slug: `p-${Math.random()}`,

@@ -38,7 +38,6 @@ export const ACTIONS = {
 	 * only the server knows the full list (specs/085), so both are previewed, for agents too.
 	 */
 	'project.bucket.change': { class: 'C4' },
-	'project.bucket.clear': { class: 'C4' },
 	'project.rename': { class: 'C0' },
 	'project.move': { class: 'C4' },
 	'project.delete': { class: 'C3', word: 'delete' },

@@ -8,7 +8,7 @@ import { errorHandler } from 'lib/shared/authorization_error_handler.ts';
 import { adminApp } from 'lib/admin/index.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { adminAuditStore } from 'lib/adapters/index.ts';
-import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import { ADMIN_SESSION_COOKIE, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { flushForTest, resetQueue } from 'lib/error_store/queue.ts';
 import { sessionFor } from '../admin_session.ts';
 import { shaped } from 'test/shape.js';
@@ -75,7 +75,11 @@ describe('admin-plane fault capture', () => {
 						'content-type': 'application/json',
 						cookie: await superCookie()
 					},
-					body: JSON.stringify({ name: unique('p'), slug: unique('s') })
+					body: JSON.stringify({
+						name: unique('p'),
+						slug: unique('s'),
+						bucketId: DEFAULT_BUCKET_ID
+					})
 				})
 			);
 			const body = shaped(
@@ -112,7 +116,11 @@ describe('admin-plane fault capture', () => {
 			new Request('http://e.ly/admin/api/projects', {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ name: 'x', slug: 'y' })
+				body: JSON.stringify({
+					name: 'x',
+					slug: 'y',
+					bucketId: DEFAULT_BUCKET_ID
+				})
 			})
 		);
 		const body = shaped(

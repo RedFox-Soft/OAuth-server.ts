@@ -82,7 +82,8 @@ describe('admin audit route classification', () => {
 		 * (specs/083) + rotating and revoking a key, for a bucket and for the root (specs/087) + retiring a SCIM
 		 * connection's previous credential, trying a sign-in through a provider and moving a provider in the sign-in
 		 * order (specs/088) + restoring a bucket scheduled for deletion and destroying one at once (specs/090) +
-		 * an end-user's invitation, verification mark, sign-out of one application and four bulk acts (specs/089). A
+		 * an end-user's invitation, verification mark, sign-out of one application and four bulk acts (specs/089) −
+		 * clearing a project's bucket, removed when every project came to name one (specs/098). A
 		 * count that drifted
 		 * upward silently would let an audited route be swapped for an unaudited one without either
 		 * total changing.
@@ -92,8 +93,8 @@ describe('admin audit route classification', () => {
 		 * each of which touches only the caller's own standing and no managed entity. It filters to MUTATING methods, so no read appears in either
 		 * total.
 		 */
-		expect(auditedAdminRoutes).toHaveLength(91);
-		expect(mounted).toHaveLength(94);
+		expect(auditedAdminRoutes).toHaveLength(90);
+		expect(mounted).toHaveLength(93);
 	});
 
 	it('declares each route pattern only once', () => {

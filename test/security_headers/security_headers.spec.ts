@@ -19,7 +19,7 @@ import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { routeNames } from 'lib/consts/param_list.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
+import { ADMIN_SESSION_COOKIE, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 
 import {
 	gatedRoutes,
@@ -376,7 +376,8 @@ describe('security headers: the administrative control plane', () => {
 			// The slug pattern is ^[a-z0-9-]+$, so the decimal point in a raw Math.random() is a 422.
 			body: JSON.stringify({
 				name: 'P',
-				slug: `p-${Math.random().toString(36).slice(2)}`
+				slug: `p-${Math.random().toString(36).slice(2)}`,
+				bucketId: DEFAULT_BUCKET_ID
 			})
 		});
 

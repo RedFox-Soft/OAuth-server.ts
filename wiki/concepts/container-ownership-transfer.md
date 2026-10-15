@@ -10,8 +10,10 @@ updated: 2026-10-13
 # Moving a container to another group
 
 A bucket and the projects that use it move from one administrator group to another as **one change**
-(specs/075): `PUT /admin/api/buckets/:id/owner` (`lib/admin/buckets/routes.ts:561`). A project with no
-bucket of its own moves alone: `PUT /admin/api/projects/:id/owner` (`lib/admin/projects/routes.ts:417`).
+(specs/075): `PUT /admin/api/buckets/:id/owner` (`lib/admin/buckets/routes.ts:561`). A project on the
+Default bucket moves alone: `PUT /admin/api/projects/:id/owner` (`lib/admin/projects/routes.ts`). Until
+spec 098 that was "a project with no bucket"; every project now names one, the Default bucket never moves,
+and the store's `moveProject` gate is `bucketId = 'redfox'` on all three backends.
 These two routes are the only writers of a container's `ownerGroupId` after creation. `ownerGroupId` still
 appears in no create or update body (`lib/admin/groups/schema.ts:3-7`).
 
@@ -35,8 +37,9 @@ Moving one without the other would change all three, and nobody would have decid
 
 ## Changing a project's bucket is previewed (spec 085)
 
-Pointing a project at another bucket, or back to Default (`DELETE …/bucket`), gives every application of the
-project a new issuer. Everyone signed in through them must sign in again, because the account lookup follows
+Pointing a project at another bucket gives every application of the project a new issuer. (Spec 085 also
+had `DELETE …/bucket`, back to Default; spec 098 removed it — a project always names a bucket, and only a
+super administrator may point one at the Default bucket, from any group.) Everyone signed in through them must sign in again, because the account lookup follows
 the project's current bucket while their refresh tokens name the old one. Both routes are preview-then-confirm
 (`lib/admin/projects/routes.ts`):
 
@@ -61,8 +64,8 @@ project's Settings tab, in the Bucket card. The bucket's Overview only starts it
 - **Joining a group** needs only membership: any member may already create containers there, so receiving
   one grants nothing new. The owner chose this rule (spec Q2).
 - **Never a destination**: another administrator's personal group, Super administrators, and the group the
-  container is already in. **Never moved**: the administrators' bucket, the default bucket (every tenant's
-  bucket-less projects sign into it) and the console's own project.
+  container is already in. **Never moved**: the administrators' bucket, the default bucket (shared by
+  projects of every group) and the console's own project.
 
 `loadDestination` (`lib/admin/ownership/destination.ts:27`) refuses in an order that reveals nothing.
 Membership is checked before anything about the group's kind is said, so a caller outside the destination

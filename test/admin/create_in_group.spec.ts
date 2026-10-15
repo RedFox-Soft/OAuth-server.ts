@@ -127,7 +127,10 @@ describe('creating in a chosen group', () => {
 	it('creates a project in another group the administrator belongs to', async () => {
 		const w = await world();
 
-		const res = await createProject(w.cookie, { groupId: w.team._id });
+		const res = await createProject(w.cookie, {
+			groupId: w.team._id,
+			bucketId: w.teamBucket._id
+		});
 
 		expect(res.status).toBe(201);
 		expect(shaped(Created, res.body).ownerGroupId).toBe(w.team._id);
@@ -179,7 +182,9 @@ describe('creating in a chosen group', () => {
 	it('creates in the active group when no group is named', async () => {
 		const w = await world();
 
-		const project = await createProject(w.cookie);
+		const project = await createProject(w.cookie, {
+			bucketId: w.personalBucket._id
+		});
 		const bucket = await createBucket(w.cookie);
 
 		expect([
@@ -194,7 +199,8 @@ describe('creating in a chosen group', () => {
 
 		const project = await createProject(w.cookie, {
 			slug,
-			groupId: w.others._id
+			groupId: w.others._id,
+			bucketId: w.othersBucket._id
 		});
 		const bucket = await createBucket(w.cookie, { groupId: w.others._id });
 
@@ -253,12 +259,21 @@ describe('creating in a chosen group', () => {
 		expect(res.status).toBe(403);
 	});
 
-	it('refuses the default bucket by name, since leaving the bucket out uses it', async () => {
+	it('answers the Default bucket named by an administrator exactly as a bucket out of their reach', async () => {
 		const w = await world();
+		const slug = unique('shared');
 
-		const res = await createProject(w.cookie, { bucketId: DEFAULT_BUCKET_ID });
+		const shared = await createProject(w.cookie, {
+			slug,
+			bucketId: DEFAULT_BUCKET_ID
+		});
+		const foreign = await createProject(w.cookie, {
+			bucketId: w.othersBucket._id
+		});
 
-		expect(res.status).toBe(422);
+		expect(shared).toEqual(foreign);
+		expect(shared.status).toBe(403);
+		expect(await projectsNamed(slug)).toEqual([]);
 	});
 
 	it("refuses another administrator's personal group, even to a super administrator", async () => {
@@ -278,7 +293,8 @@ describe('creating in a chosen group', () => {
 		const superAdmin = await admin('super');
 
 		const res = await createProject(await cookieFor(superAdmin), {
-			groupId: SUPER_ADMINS_GROUP_ID
+			groupId: SUPER_ADMINS_GROUP_ID,
+			bucketId: DEFAULT_BUCKET_ID
 		});
 
 		expect(res.status).toBe(404);

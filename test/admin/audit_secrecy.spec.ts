@@ -15,7 +15,11 @@ import {
 	getProjectStore,
 	getBucketStore
 } from 'lib/adapters/index.ts';
-import { ADMIN_SESSION_COOKIE, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import {
+	ADMIN_SESSION_COOKIE,
+	UNASSIGNED_GROUP_ID,
+	DEFAULT_BUCKET_ID
+} from 'lib/admin/consts.ts';
 import { sessionFor } from '../admin_session.ts';
 import { answered } from './answered.ts';
 import { present } from 'test/shape.js';
@@ -74,6 +78,7 @@ describe('admin audit secrecy', () => {
 	it('records a client secret rotation without the secret', async () => {
 		const cookie = await superCookie();
 		const project = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'P',
 			slug: unique('p')
@@ -136,6 +141,7 @@ describe('admin audit secrecy', () => {
 	it('records a project deletion without the secrets of the clients it destroyed', async () => {
 		const cookie = await superCookie();
 		const project = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'P',
 			slug: unique('p')
@@ -258,6 +264,7 @@ describe('admin audit secrecy', () => {
 	it('records a client creation without the generated secret', async () => {
 		const cookie = await superCookie();
 		const project = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'P',
 			slug: unique('p')

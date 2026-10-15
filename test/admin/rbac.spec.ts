@@ -32,7 +32,7 @@ const project = (over: Partial<Project>): Project => ({
 	slug: 'acme',
 	type: 'regular',
 	ownerGroupId: 'g1',
-	bucketId: null,
+	bucketId: 'b1',
 	clientIds: [],
 	corsOrigins: [],
 	createdAt: new Date(),

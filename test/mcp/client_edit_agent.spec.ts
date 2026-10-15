@@ -12,7 +12,7 @@ import {
 	adminAuditStore,
 	getProjectStore
 } from 'lib/adapters/index.ts';
-import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { ADMIN_MCP_CLIENT_ID, MCP_RESOURCE } from 'lib/mcp/consts.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { createAdministrator } from '../administrators.ts';
@@ -92,6 +92,7 @@ describe('an agent editing a client', () => {
 		};
 		seedClient(record);
 		const project = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			name: 'Agent edit',
 			slug: `agent-edit-${Math.floor(Math.random() * 1e6)}`,
 			ownerGroupId: UNASSIGNED_GROUP_ID
@@ -132,6 +133,7 @@ describe('an agent editing a client', () => {
 		};
 		seedClient(record);
 		const project = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			name: 'Agent partial',
 			slug: `agent-partial-${Math.floor(Math.random() * 1e6)}`,
 			ownerGroupId: UNASSIGNED_GROUP_ID
@@ -172,6 +174,7 @@ describe('an agent editing a client', () => {
 		};
 		seedClient(record);
 		const project = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			name: 'Agent logo',
 			slug: `agent-logo-${Math.floor(Math.random() * 1e6)}`,
 			ownerGroupId: UNASSIGNED_GROUP_ID
@@ -225,6 +228,7 @@ describe('an agent editing a client', () => {
 				});
 		}
 		const project = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			name: 'Agent sector',
 			slug: `agent-sector-${Math.floor(Math.random() * 1e6)}`,
 			ownerGroupId: UNASSIGNED_GROUP_ID

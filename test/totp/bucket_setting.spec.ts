@@ -9,7 +9,11 @@ import {
 	getBucketStore,
 	getProjectStore
 } from 'lib/adapters/index.ts';
-import { ADMIN_SESSION_COOKIE, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import {
+	ADMIN_SESSION_COOKIE,
+	UNASSIGNED_GROUP_ID,
+	DEFAULT_BUCKET_ID
+} from 'lib/admin/consts.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
 import { answered } from '../admin/answered.ts';
 import { consenting } from '../admin/sign_in_consent.ts';
@@ -317,6 +321,7 @@ describe('bucket sign-in method setting', () => {
 			ownerGroupId: await personalGroupId(manager.userId)
 		});
 		const project = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			name: unique('Proj'),
 			slug: unique('proj'),
 			ownerGroupId: await personalGroupId(manager.userId)

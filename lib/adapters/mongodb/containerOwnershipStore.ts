@@ -1,6 +1,7 @@
 import type { ClientSession } from 'mongodb';
 import { client, db, supportsTransactions } from './db.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
+import { DEFAULT_BUCKET_ID } from '../../admin/consts.js';
 import type {
 	ContainerMoveResult,
 	ContainerOwnershipStoreInstance,
@@ -80,7 +81,7 @@ export class ContainerOwnershipStore implements ContainerOwnershipStoreInstance 
 		to: string
 	): Promise<ContainerMoveResult> {
 		const result = await this.projects.updateOne(
-			{ _id: projectId, ownerGroupId: from, bucketId: null },
+			{ _id: projectId, ownerGroupId: from, bucketId: DEFAULT_BUCKET_ID },
 			{ $set: { ownerGroupId: to, updatedAt: new Date() } }
 		);
 		return result.matchedCount === 0

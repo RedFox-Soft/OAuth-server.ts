@@ -12,7 +12,7 @@ import * as JWT from 'lib/helpers/jwt.ts';
 import nanoid from 'lib/helpers/nanoid.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { getProjectStore } from 'lib/adapters/index.ts';
-import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 
 const {
 	d: _d,
@@ -72,6 +72,7 @@ describe('a key-authenticated client registered by an operator', () => {
 		cookie = await superAdminCookie();
 		projectId = (
 			await getProjectStore().create({
+				bucketId: DEFAULT_BUCKET_ID,
 				name: 'Keys',
 				slug: `keys-${nanoid()}`,
 				ownerGroupId: UNASSIGNED_GROUP_ID

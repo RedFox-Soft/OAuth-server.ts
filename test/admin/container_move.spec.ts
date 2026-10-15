@@ -138,7 +138,7 @@ async function world() {
 
 /**
  * @proves A bucket moves to another administrator group with every project that uses it, only for an owner
- * of the group it leaves who belongs to the group it joins; a project with no bucket moves alone; every
+ * of the group it leaves who belongs to the group it joins; a project on the Default bucket moves alone; every
  * refusal changes nothing and reveals nothing about what the caller cannot see.
  */
 describe('moving a bucket to another group', () => {
@@ -415,6 +415,7 @@ describe('moving a bucket to another group', () => {
 	it('refuses binding a source-group project to a bucket that has just moved', async () => {
 		const w = await world();
 		const loose = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			name: 'loose',
 			slug: `loose-${Math.random().toString(36).slice(2)}`,
 			ownerGroupId: w.personal._id
@@ -432,7 +433,9 @@ describe('moving a bucket to another group', () => {
 		);
 
 		expect(status).toBe(409);
-		expect((await getProjectStore().find(loose._id))?.bucketId).toBeNull();
+		expect((await getProjectStore().find(loose._id))?.bucketId).toBe(
+			DEFAULT_BUCKET_ID
+		);
 	});
 
 	describe('as a super administrator', () => {
@@ -521,7 +524,7 @@ describe('moving a bucket to another group', () => {
 });
 
 /**
- * @proves A project with no bucket moves to another group alone, and a project that uses a bucket is
+ * @proves A project on the Default bucket moves to another group alone, and a project that uses a bucket is
  * pointed at its bucket instead.
  */
 describe('moving a project to another group', () => {
@@ -531,6 +534,7 @@ describe('moving a project to another group', () => {
 
 	async function loneProject(ownerGroupId: string) {
 		return getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			name: 'lone',
 			slug: `lone-${Math.random().toString(36).slice(2)}`,
 			ownerGroupId,
@@ -538,7 +542,7 @@ describe('moving a project to another group', () => {
 		});
 	}
 
-	it('gives the destination a project with no bucket, its clients unchanged', async () => {
+	it('gives the destination a project on the Default bucket, its clients unchanged', async () => {
 		const w = await world();
 		const project = await loneProject(w.personal._id);
 

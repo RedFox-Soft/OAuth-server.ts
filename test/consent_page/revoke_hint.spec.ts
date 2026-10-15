@@ -5,7 +5,11 @@ import { elysia } from 'lib/index.ts';
 import { ISSUER } from 'lib/configs/env.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { getBucketStore, getProjectStore } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import {
+	ADMIN_BUCKET_ID,
+	UNASSIGNED_GROUP_ID,
+	DEFAULT_BUCKET_ID
+} from 'lib/admin/consts.ts';
 import { forgetBucketAddresses } from 'lib/admin/auth/bucketAddress.ts';
 import { CONSENT_TEXTS } from 'lib/i18n/texts/consent/index.ts';
 import { text as fill } from 'lib/i18n/message.tsx';
@@ -59,6 +63,7 @@ describe('the consent page’s line about removing access later', () => {
 			ownerGroupId: UNASSIGNED_GROUP_ID
 		});
 		const acme = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'Acme',
 			slug: 'acme-project'
@@ -68,6 +73,7 @@ describe('the consent page’s line about removing access later', () => {
 			clientIds: ['tenant-app']
 		});
 		const admins = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'Admin tools',
 			slug: 'admin-tools'

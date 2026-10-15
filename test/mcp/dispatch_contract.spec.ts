@@ -16,7 +16,11 @@ import { jwksRoutes } from 'lib/admin/jwks/routes.ts';
 import { auditRoutes } from 'lib/admin/audit/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { getProjectStore } from 'lib/adapters/index.ts';
-import { ADMIN_SESSION_COOKIE, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import {
+	ADMIN_SESSION_COOKIE,
+	UNASSIGNED_GROUP_ID,
+	DEFAULT_BUCKET_ID
+} from 'lib/admin/consts.ts';
 import { sessionFor } from '../admin_session.ts';
 import { shaped } from 'test/shape.js';
 import { Type } from '@sinclair/typebox';
@@ -154,6 +158,7 @@ describe('in-process re-dispatch into the admin routes', () => {
 		expect(new AdminError(409, 'x', { blockers: [] }).adminPlane).toBe(true);
 
 		const proj = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			name: 'Spike',
 			slug: `spike-${Math.random()}`.replace(/[^a-z0-9-]/g, ''),
 			ownerGroupId: UNASSIGNED_GROUP_ID

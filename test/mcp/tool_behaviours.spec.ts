@@ -9,7 +9,7 @@ import {
 	adminAuditStore,
 	resetAdminMemoryStores
 } from 'lib/adapters/index.ts';
-import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { ADMIN_MCP_CLIENT_ID, MCP_RESOURCE } from 'lib/mcp/consts.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { shaped } from 'test/shape.js';
@@ -94,6 +94,7 @@ describe('individual tool behaviours', () => {
 	it('refuses an invalid redirect URI and leaves the client untouched', async () => {
 		const { token } = await session();
 		const project = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			name: 'Beh',
 			slug: `beh-${Math.floor(Math.random() * 1e6)}`,
 			ownerGroupId: UNASSIGNED_GROUP_ID
@@ -138,6 +139,7 @@ describe('individual tool behaviours', () => {
 	it('rotates a client secret, returning it once and recording the rotation', async () => {
 		const { token, user } = await session();
 		const project = await getProjectStore().create({
+			bucketId: DEFAULT_BUCKET_ID,
 			name: 'Rot',
 			slug: `rot-${Math.floor(Math.random() * 1e6)}`,
 			ownerGroupId: UNASSIGNED_GROUP_ID
