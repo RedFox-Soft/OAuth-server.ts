@@ -36,6 +36,14 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   `2026-10-15-projects-require-bucket` writes the Default bucket into every project that named none (run
   `db:migrate`); sign-ins are unchanged. The console's new-project form can create the bucket in the same step.
 
+### Fixed
+
+- **A team now reads its project's identity provider changes in the audit trail.** Creating, changing, reordering,
+  trying and deleting a project's identity provider, and removing a person's linked identity, were recorded without
+  the project's team, so only a super administrator could read them while the team read every other change to the
+  same project. Entries written before this fix stay super-administrator-only, because the trail is never
+  rewritten.
+
 ## [0.12.0] - 2026-10-14
 
 The pages people see are rebuilt for the people who see them. The consent page says who is asking, which account

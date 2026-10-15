@@ -1,6 +1,7 @@
 import { Elysia } from 'elysia';
 
 import { getUserStore } from '../../adapters/index.js';
+import type { UserBucket } from '../../adapters/types.js';
 import {
 	assertAuth,
 	AdminError,
@@ -44,6 +45,17 @@ function sessionCookieOf(
 ): string | undefined {
 	const value = cookie[ADMIN_SESSION_COOKIE].value;
 	return typeof value === 'string' && value ? value : undefined;
+}
+
+/*
+ * The team an entry belongs to, which is the only thing a team's read of the trail selects on. Without it a
+ * project's provider changes were visible to super administrators alone, while its team read every other
+ * change to the same project.
+ */
+function ownedBy(bucket: Pick<UserBucket, 'ownerGroupId'>): {
+	ownerGroupId: string;
+} {
+	return { ownerGroupId: bucket.ownerGroupId };
 }
 
 /*
@@ -113,7 +125,8 @@ export const federationAdminRoutes = new Elysia({ name: 'admin-federation' })
 			 * an entry means an authorized actor reached the point of applying a change, not that it landed.
 			 */
 			await recordAdminAudit(ctx, 'federation.provider.create', params.id, {
-				attributes: Object.keys(body)
+				attributes: Object.keys(body),
+				...ownedBy(bucket)
 			});
 			const created = await createProvider(bucket, ctx, body);
 			set.status = 201;
@@ -127,7 +140,8 @@ export const federationAdminRoutes = new Elysia({ name: 'admin-federation' })
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForProviders(ctx, params.id, 'edit');
 			await recordAdminAudit(ctx, 'federation.provider.update', params.id, {
-				attributes: Object.keys(body)
+				attributes: Object.keys(body),
+				...ownedBy(bucket)
 			});
 			return present(
 				await updateProvider(bucket, ctx, params.providerId, body),
@@ -141,7 +155,12 @@ export const federationAdminRoutes = new Elysia({ name: 'admin-federation' })
 		async ({ admin, params }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForProviders(ctx, params.id, 'edit');
-			await recordAdminAudit(ctx, 'federation.provider.delete', params.id);
+			await recordAdminAudit(
+				ctx,
+				'federation.provider.delete',
+				params.id,
+				ownedBy(bucket)
+			);
 			await deleteProvider(bucket, ctx, params.providerId);
 			return { ok: true };
 		}
@@ -164,7 +183,8 @@ export const federationAdminRoutes = new Elysia({ name: 'admin-federation' })
 			await recordAdminAudit(ctx, 'federation.provider.move', params.id, {
 				attributes: [params.providerId],
 				from: from.join(', '),
-				to: to.join(', ')
+				to: to.join(', '),
+				...ownedBy(bucket)
 			});
 			const moved = await moveProvider(bucket, to);
 			return { providers: presentAll(moved) };
@@ -210,7 +230,8 @@ export const federationAdminRoutes = new Elysia({ name: 'admin-federation' })
 				throw err;
 			}
 			await recordAdminAudit(ctx, 'federation.provider.try', params.id, {
-				attributes: [provider.id]
+				attributes: [provider.id],
+				...ownedBy(bucket)
 			});
 			const opened = await openTry({
 				bucketId: bucket._id,
@@ -280,7 +301,7 @@ export const federationAdminRoutes = new Elysia({ name: 'admin-federation' })
 		'/admin/api/projects/:id/users/:uid/identities/:providerId',
 		async ({ admin, params }) => {
 			const ctx = assertAuth(admin);
-			await loadBucketForUsers(ctx, params.id);
+			const bucket = await loadBucketForUsers(ctx, params.id);
 			const store = getUserStore(params.id);
 			const user = await store.find(params.uid);
 			if (!user) throw new AdminError(404, 'user not found');
@@ -298,7 +319,8 @@ export const federationAdminRoutes = new Elysia({ name: 'admin-federation' })
 			 * without knowing which bucket to look in.
 			 */
 			await recordAdminAudit(ctx, 'federation.identity.delete', params.uid, {
-				targetScope: params.id
+				targetScope: params.id,
+				...ownedBy(bucket)
 			});
 			await store.update(params.uid, { federated });
 			return { ok: true };

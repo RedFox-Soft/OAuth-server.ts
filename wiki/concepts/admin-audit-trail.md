@@ -212,6 +212,12 @@ person's Activity tab. They now carry the project's `ownerGroupId` (`scope`,
 `lib/admin/users-end/routes.ts:202`), as the provisioning and group entries already did. Entries
 written before stay as written, readable by a super administrator only, because the trail is never rewritten.
 
+**An entry about a project's identity providers carries the project's team** (fixed 2026-10-15, after spec 100).
+The `federation.provider.*` and `federation.identity.delete` entries named the project only as `targetId` or
+`targetScope`, so a team configured its own project's sign-in providers and could not read that it had, while it
+read every other change to the same project. They now carry `ownerGroupId` (`ownedBy`,
+`lib/admin/federation/routes.ts:55`). As above, the entries written before stay super-administrator-only.
+
 **A move belongs to two teams** (since spec 075). Moving a project (or, until spec 099, an old Project — now a
 retired project) to another team writes one entry. Its `ownerGroupId` (shown `ownerTeamId`) is the team the
 project joined, and `formerOwnerGroupId` (shown `formerOwnerTeamId`) is the team it left. The team-scoped read
