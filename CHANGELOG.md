@@ -52,6 +52,10 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- **A project's own SCIM endpoint is refused as a declared API at every address the project is served on**, not
+  only at the instance's own origin. At a subdomain or a hostname of its own it was accepted as a declaration that
+  could never take effect, because the built-in SCIM endpoint answers first.
+
 - **A team now reads its project's identity provider changes in the audit trail.** Creating, changing, reordering,
   trying and deleting a project's identity provider, and removing a person's linked identity, were recorded without
   the project's team, so only a super administrator could read them while the team read every other change to the

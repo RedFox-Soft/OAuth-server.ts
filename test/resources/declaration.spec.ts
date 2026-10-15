@@ -261,6 +261,50 @@ describe('declaring a protected resource in an addressable bucket', () => {
 	});
 
 	/*
+	 * A project's SCIM endpoint is built in and answered before any declaration is consulted, at whatever
+	 * origin the project is served on — the instance's own, a subdomain of it, or a hostname of its own.
+	 * Accepted, the declaration would do nothing, silently.
+	 */
+	it('refuses a project’s own SCIM endpoint at the instance, at a subdomain and at a hostname of its own', async () => {
+		const { cookie, userId } = await admin();
+		const bucket = await bucketFor(userId);
+		const hostName = `login-${Math.random().toString(36).slice(2)}.example.org`;
+		await getBucketStore().create({
+			name: 'Hosted',
+			host: hostName,
+			ownerGroupId: await personalGroupId(userId)
+		});
+
+		const statuses: number[] = [];
+		for (const identifier of [
+			`http://e.ly/${String(bucket.slug)}/scim/v2`,
+			`http://${String(bucket.slug)}.e.ly/scim/v2`,
+			`https://${hostName}/scim/v2`
+		]) {
+			const res = await api.admin.api
+				.projects({ id: bucket._id })
+				.resources.post({ ...body, identifier }, { headers: { cookie } });
+			statuses.push(res.status);
+		}
+
+		expect(statuses).toEqual([409, 409, 409]);
+	});
+
+	it('accepts a directory’s SCIM server elsewhere, which is somebody else’s resource', async () => {
+		const { cookie, userId } = await admin();
+		const bucket = await bucketFor(userId);
+
+		const res = await api.admin.api
+			.projects({ id: bucket._id })
+			.resources.post(
+				{ ...body, identifier: 'https://directory.example.com/scim/v2' },
+				{ headers: { cookie } }
+			);
+
+		expect(res.status).toBe(201);
+	});
+
+	/*
 	 * A client given no scope guidance requests everything `scopes_supported` lists, so an omnibus
 	 * scope is not a shorthand — it is a grant of everything to every client that arrives.
 	 */

@@ -190,9 +190,14 @@ a slug or a hostname ([[admin-audit-trail]]).
 
 - **Email links** still point at `ISSUER` for every form (`verifyUrlFor`, `lib/verification/challenge.ts:67`),
   as they already did for a hostname of its own.
-- **`namesOwnScimEndpoint`** (`lib/admin/resources/routes.ts:91`) compares a declared resource only against
-  `ISSUER`'s origin. A project's built-in SCIM endpoint on its own hostname is therefore not recognised as this
-  server's own. That gap already existed for hostnames, and subdomains inherit it. It is a backlog item.
+- **A project's own SCIM endpoint is refused as a declared resource at every origin it is served on**
+  (corrected 2026-10-15, after spec 101). `namesOwnScimEndpoint` (`lib/admin/resources/routes.ts:103`) compared
+  only against `ISSUER`'s origin, so `https://acme.<host>/scim/v2` or `https://login.acme.com/scim/v2` was
+  accepted as a declaration that could never take effect: the built-in SCIM arm answers first, and elsewhere the
+  token it would mint is refused by every SCIM principal. It now treats any name within the deployment's domain
+  (`isWithinDeploymentDomain`) or held by a project as a hostname as this server's own;
+  `test/resources/declaration.spec.ts` covers all three origins and a directory's SCIM server elsewhere, which
+  stays declarable. The gap predated subdomains: hostnames of their own had it since spec 056.
 
 ## Related
 

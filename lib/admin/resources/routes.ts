@@ -1,6 +1,9 @@
 import { Elysia } from 'elysia';
 
-import { getProtectedResourceStore } from '../../adapters/index.js';
+import {
+	getBucketStore,
+	getProtectedResourceStore
+} from '../../adapters/index.js';
 import {
 	assertAuth,
 	AdminError,
@@ -26,7 +29,11 @@ import { namespaceOf, ROOT_NAMESPACE } from '../../resources/namespace.js';
 import { findDeclaredResource } from '../../resources/registry.js';
 import { checkVouching } from '../../resources/vouching.js';
 import { issuerFor } from '../../configs/issuer.js';
-import { issuingBucket } from '../auth/bucketAddress.js';
+import {
+	issuingBucket,
+	isWithinDeploymentDomain
+} from '../auth/bucketAddress.js';
+import { normaliseHost } from '../../consts/request_host.js';
 import { ISSUER } from '../../configs/env.js';
 import { isUniqueValueTaken } from '../../adapters/conflicts.js';
 import { ROOT_DECLARATION_REFUSAL } from './refusals.js';
@@ -52,10 +59,10 @@ import { mayDeclareIn } from '../auth/can.js';
  * record into a stated conflict, which is the difference between an operator learning the rule and an
  * operator filing a bug.
  */
-function canonicalIdentifier(
+async function canonicalIdentifier(
 	input: string,
 	trailingSlashSignificant = false
-): string {
+): Promise<string> {
 	const result = canonicalizeResourceIdentifier(input, {
 		trailingSlashSignificant
 	});
@@ -70,7 +77,7 @@ function canonicalIdentifier(
 	}
 	if (
 		isMcpResource(result.identifier) ||
-		namesOwnScimEndpoint(result.identifier)
+		(await namesOwnScimEndpoint(result.identifier))
 	) {
 		throw new AdminError(
 			409,
@@ -85,14 +92,27 @@ function canonicalIdentifier(
  * A bucket's SCIM endpoint is built in (lib/provisioning/token_policy.ts) and held only by that bucket's
  * connections. A declaration of it would never resolve where the built-in arm answers first, and elsewhere it
  * would mint a token every SCIM principal refuses — so it is refused here, where an operator can be told why,
- * rather than accepted as a declaration that silently does nothing. Matched on this server's own origin; a
- * directory's SCIM server elsewhere is somebody else's resource and may be declared.
+ * rather than accepted as a declaration that silently does nothing. A directory's SCIM server elsewhere is
+ * somebody else's resource and may be declared.
+ *
+ * Matched on every origin this server answers for a project, not only its own: a project with a hostname of
+ * its own or a subdomain of the instance serves its SCIM endpoint there, and comparing against ISSUER alone
+ * let exactly those declarations through (specs/101 follow-up). A name beneath the instance's host that no
+ * project holds is refused at request time, so a declaration of it would be just as inert.
  */
-function namesOwnScimEndpoint(identifier: string): boolean {
+async function namesOwnScimEndpoint(identifier: string): Promise<boolean> {
 	const url = new URL(identifier);
+	if (
+		url.pathname !== SCIM_BASE_PATH &&
+		!url.pathname.endsWith(SCIM_BASE_PATH)
+	) {
+		return false;
+	}
+	const host = normaliseHost(url.hostname);
+	if (host === null) return false;
 	return (
-		url.origin === new URL(ISSUER).origin &&
-		(url.pathname === SCIM_BASE_PATH || url.pathname.endsWith(SCIM_BASE_PATH))
+		isWithinDeploymentDomain(host) ||
+		(await getBucketStore().findByHost(host)) !== null
 	);
 }
 
@@ -173,7 +193,7 @@ function prunedDescriptions(
  */
 async function loadResource(bucket: UserBucket, resourceId: string) {
 	// A malformed or reserved spelling is refused the way a write refuses it, before any lookup.
-	canonicalIdentifier(resourceId);
+	await canonicalIdentifier(resourceId);
 	const resource = await findDeclaredResource(resourceId, namespaceOf(bucket));
 	if (resource?.bucketId !== bucket._id) {
 		throw new AdminError(404, 'resource not declared in this project');
@@ -232,7 +252,7 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForEdit(ctx, params.id);
 
-			const identifier = canonicalIdentifier(
+			const identifier = await canonicalIdentifier(
 				body.identifier,
 				body.trailingSlashSignificant
 			);
