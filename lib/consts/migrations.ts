@@ -1089,9 +1089,10 @@ const projectsRequireBucket: Migration = {
  * refuses before anything is written when a client is listed by projects on different buckets: there is no
  * bucket it could honestly be given, and the server reading it today answers arbitrarily.
  *
- * A client listed by a project on the Default bucket that belonged to a tenant group loses its consent
- * waiver: the Default bucket is the System group's, and keeping a tenant's "skip consent" there would waive
- * consent across the shared population.
+ * A client listed by a project on the Default bucket that belonged to a tenant group has its stored consent
+ * waiver cleared. It changes no sign-in: since 0.7.0 the waiver was honoured only in a bucket owned by the
+ * project's group, and the Default bucket is the System group's. Once projects are gone that check has nothing
+ * to read, so the stored flag must already say what the server did.
  */
 interface ClientPlan {
 	readonly bucketId: string;
@@ -1263,7 +1264,7 @@ function projectRemovalReport(
 	return [
 		`clients given their bucket: ${String(counts.clients)}`,
 		`client ids listed by a project with no stored client: ${String(counts.ghosts)}`,
-		`clients whose consent waiver was turned off: ${String(counts.consent)}`,
+		`clients whose stored consent waiver was cleared (not honoured since 0.7.0, so no sign-in changes): ${String(counts.consent)}`,
 		`declarations given their bucket: ${String(counts.resources)}`,
 		`declarations whose project was missing: ${String(counts.orphans)}`,
 		...plan.report

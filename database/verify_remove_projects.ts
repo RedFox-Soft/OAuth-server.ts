@@ -155,7 +155,7 @@ export async function verifyProjectRemoval(
 			lines(secondRun).includes('clients given their bucket: 0') &&
 			lines(secondRun).includes('declarations given their bucket: 0') &&
 			lines(secondRun).includes(
-				'clients whose consent waiver was turned off: 0'
+				'clients whose stored consent waiver was cleared (not honoured since 0.7.0, so no sign-in changes): 0'
 			),
 		`${JSON.stringify(firstRun)}; second ${JSON.stringify(secondRun)}`
 	);

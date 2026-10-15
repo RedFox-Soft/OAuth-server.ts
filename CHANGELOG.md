@@ -42,7 +42,9 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   applications and APIs live under `/admin/api/buckets/:id/clients` and `/admin/api/buckets/:id/resources`, and
   the console shows them as a bucket's Applications and APIs tabs. The migration `2026-10-16-remove-projects`
   moves each project's bucket and origins to its clients and declarations (run `db:migrate`); sign-ins are
-  unchanged, and it refuses before writing if a client is listed by projects on different buckets.
+  unchanged, and it refuses before writing if a client is listed by projects on different buckets. It also clears
+  "skip consent" on applications of a tenant's project on the Default bucket, where it has not been honoured since
+  0.7.0, so their consent screen stays as it is.
 - **Every project names its bucket** (spec 098). `POST /admin/api/projects` and `project_create` now require
   `bucketId`, and only a super administrator may name the Default bucket, for a project in any group — on a public
   instance a project left without one put its people into a pool shared by every tenant and managed by none of
