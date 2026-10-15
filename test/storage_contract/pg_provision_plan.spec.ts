@@ -27,7 +27,7 @@ import {
  */
 
 const MODEL = areaNamed('AccessToken');
-const STORE = areaNamed('projects');
+const STORE = areaNamed('groups');
 
 /**
  * @proves The PostgreSQL provisioning plan covers every declared area with quoted identifiers,
@@ -43,7 +43,7 @@ describe('tableStatement', () => {
 
 	it('gives a store area the doc column', () => {
 		expect(tableStatement(STORE)).toBe(
-			'CREATE TABLE IF NOT EXISTS "projects" ' +
+			'CREATE TABLE IF NOT EXISTS "groups" ' +
 				'(id text PRIMARY KEY, doc jsonb NOT NULL, expires_at timestamptz)'
 		);
 	});
@@ -125,8 +125,8 @@ describe('indexStatements', () => {
 
 	it('builds a GIN index over an array container', () => {
 		expect(statementsFor(STORE)).toContain(
-			'CREATE INDEX IF NOT EXISTS "projects_clientIds_gin" ' +
-				'ON "projects" USING gin ((doc->\'clientIds\'))'
+			'CREATE INDEX IF NOT EXISTS "groups_members_gin" ' +
+				'ON "groups" USING gin ((doc->\'members\'))'
 		);
 	});
 

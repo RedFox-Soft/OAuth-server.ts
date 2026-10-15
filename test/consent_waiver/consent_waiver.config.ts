@@ -3,9 +3,10 @@ import getConfig from '../default.config.js';
 const config = getConfig();
 
 /*
- * Two clients that skip consent, neither in a project with a bucket of its own, so both sign into the
- * default bucket. The spec puts one in a tenant's project and the other in a project of the System
- * group that owns the default bucket; the only difference is who owns the bucket they reach.
+ * Two clients that skip consent. The spec puts `tenant-app` in a tenant's bucket and leaves
+ * `default-app` an application of the default bucket, which reaches the tenant's bucket through a
+ * resource that bucket declared. Both then sign the same person of the same bucket in; the only
+ * difference is which bucket the application belongs to.
  */
 export const clients = [
 	{
@@ -17,11 +18,11 @@ export const clients = [
 		'consent.require': false
 	},
 	{
-		clientId: 'system-app',
+		clientId: 'default-app',
 		clientSecret: 'secret',
 		grantTypes: ['authorization_code'],
 		responseTypes: ['code'],
-		redirectUris: ['https://system.example.com/cb'],
+		redirectUris: ['https://default.example.com/cb'],
 		'consent.require': false
 	}
 ];

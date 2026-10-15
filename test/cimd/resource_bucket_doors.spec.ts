@@ -3,20 +3,20 @@ import { describe, it, expect, beforeAll, beforeEach } from 'bun:test';
 import bootstrap, {
 	SESSION_COOKIE_PREFIX,
 	agent,
+	bindClientToBucket,
 	getHeader
 } from '../test_helper.ts';
 import { AuthorizationRequest } from '../AuthorizationRequest.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
 	getBucketStore,
-	getProjectStore,
 	getProtectedResourceStore,
 	getUserStore,
 	resetAdminMemoryStores
 } from 'lib/adapters/index.ts';
 import { ROOT_NAMESPACE } from 'lib/resources/namespace.ts';
 import { elysia } from 'lib/index.ts';
-import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { DEFAULT_BUCKET_ID, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import {
 	extractResetUrl,
 	lastEmail,
@@ -27,7 +27,7 @@ import { request as requestPasswordReset } from 'lib/password_reset/challenge.ts
 import { present } from 'test/shape.js';
 
 /*
- * A client belonging to no project signs into the bucket of the declared resource it names — and every
+ * An application of the default bucket signs into the bucket of the declared resource it names — and every
  * door of that sign-in has to consult that bucket's policy, not only the one that looks the account up.
  * The password door, the reset door and the registration door each resolved the bucket from the client
  * alone, landed on the default bucket, and read *its* policy: so in a bucket whose users may sign in only
@@ -50,16 +50,10 @@ async function bucketBehind(resource: string, fields: Record<string, unknown>) {
 		ownerGroupId: UNASSIGNED_GROUP_ID,
 		...fields
 	});
-	const project = await getProjectStore().create({
-		name: resource,
-		slug: `p-${Math.random().toString(36).slice(2)}`,
-		ownerGroupId: UNASSIGNED_GROUP_ID,
-		bucketId: bucket._id
-	});
 	await getProtectedResourceStore().create({
 		namespace: ROOT_NAMESPACE,
 		identifier: resource,
-		projectId: project._id,
+		bucketId: bucket._id,
 		name: resource,
 		scopes: ['mcp:tools-basic']
 	});
@@ -117,6 +111,7 @@ describe('the doors of a bucket reached through a declared resource', () => {
 		await bootstrap(import.meta.url, { config: 'project_association' });
 		resetAdminMemoryStores();
 		await ensureAdminSeed();
+		await bindClientToBucket('unaffiliated', DEFAULT_BUCKET_ID);
 
 		federatedBucketId = await bucketBehind(FEDERATED_ONLY, {
 			passwordLogin: false,

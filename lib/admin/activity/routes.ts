@@ -167,8 +167,7 @@ export const activityRoutes = new Elysia({ name: 'admin-activity' })
 	})
 	/*
 	 * One bucket's figures, for the group that owns it. The owning-group check rather than the broader one
-	 * the bucket's detail page uses: a group that only owns a project signing into the bucket administers its
-	 * users, not its plan. Both refuse a foreign bucket exactly as a missing one, and the administrators
+	 * the bucket's detail page once used: figures are the owning group's, as the bucket itself is. Both refuse a foreign bucket exactly as a missing one, and the administrators
 	 * bucket to everyone but a super administrator, who may read any bucket's figures (`bucketToRead`).
 	 */
 	.get(

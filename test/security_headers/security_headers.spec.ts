@@ -19,14 +19,14 @@ import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { routeNames } from 'lib/consts/param_list.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { ADMIN_SESSION_COOKIE, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
+import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 
 import {
 	gatedRoutes,
 	alwaysAvailableRoutes
 } from 'lib/consts/route_classification.js';
 
-import { sessionFor } from '../admin_session.ts';
+import { personalGroupId, sessionFor } from '../admin_session.ts';
 import {
 	expectNonPageProfile,
 	expectPageProfile,
@@ -357,7 +357,7 @@ describe('security headers: the administrative control plane', () => {
 	}
 
 	it('covers an authenticated read', async () => {
-		const res = await send('/admin/api/projects', {
+		const res = await send('/admin/api/buckets', {
 			method: 'GET',
 			headers: { cookie: await superAdminCookie() }
 		});
@@ -367,17 +367,22 @@ describe('security headers: the administrative control plane', () => {
 	});
 
 	it('covers an authenticated write', async () => {
-		const res = await send('/admin/api/projects', {
+		const user = await createAdministrator(
+			'super',
+			`writer-${Math.random()}@x.io`
+		);
+		const session = await sessionFor(user);
+		const res = await send('/admin/api/buckets', {
 			method: 'POST',
 			headers: {
-				cookie: await superAdminCookie(),
+				cookie: `${ADMIN_SESSION_COOKIE}=${session._id}`,
 				'content-type': 'application/json'
 			},
-			// The slug pattern is ^[a-z0-9-]+$, so the decimal point in a raw Math.random() is a 422.
 			body: JSON.stringify({
-				name: 'P',
-				slug: `p-${Math.random().toString(36).slice(2)}`,
-				bucketId: DEFAULT_BUCKET_ID
+				name: 'B',
+				// The slug pattern is ^[a-z0-9-]+$, so the decimal point in a raw Math.random() is a 422.
+				slug: `b-${Math.random().toString(36).slice(2)}`,
+				groupId: await personalGroupId(user._id)
 			})
 		});
 
@@ -386,7 +391,7 @@ describe('security headers: the administrative control plane', () => {
 	});
 
 	it('covers an unauthenticated refusal', async () => {
-		const res = await send('/admin/api/projects', { method: 'GET' });
+		const res = await send('/admin/api/buckets', { method: 'GET' });
 
 		expect(res.status).toBe(401);
 		expectNonPageProfile(res);
@@ -402,7 +407,7 @@ describe('security headers: the administrative control plane', () => {
 		// Authenticated deliberately: GET /admin only renders the shell for a signed-in admin (or
 		// before the first admin exists) and otherwise redirects, which made an anonymous request
 		// order-dependent — it rendered or redirected depending on what an earlier case had seeded.
-		const res = await send('/admin/projects', {
+		const res = await send('/admin/buckets', {
 			method: 'GET',
 			headers: { accept: 'text/html', cookie: await superAdminCookie() }
 		});

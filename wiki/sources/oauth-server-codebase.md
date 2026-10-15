@@ -7,7 +7,7 @@ url: null
 raw: lib/
 ingested: 2026-07-31
 created: 2026-07-31
-updated: 2026-07-31
+updated: 2026-10-15
 revision: 2125ad02c4c178eea0df357287b5ac1bfb8dbb23
 ---
 
@@ -43,7 +43,8 @@ code and committed documentation are treated as ingestable here.
 - `lib/plugins/` — Elysia lifecycle plugins, including `featureGate.ts` and `cors.ts`.
 - `lib/consts/route_classification.ts` — the route/flag table the gate and CORS both read.
 - `lib/adapters/` — persistence (`mongodb/`, `memory/`).
-- `lib/admin/` — the admin plane: buckets, clients, projects, users, JWKS, settings, audit, UI.
+- `lib/admin/` — the admin plane: buckets (with their clients and resources), users, JWKS, settings, audit,
+  UI. Projects were removed in spec 099 ([[bucket-is-the-only-container]]).
 - `lib/addon/` — deployment-facing resolvers such as `account.ts`. See [[account-resolution]].
 - `lib/event_bus.ts` — the lifecycle event emitter. See [[event-bus]].
 

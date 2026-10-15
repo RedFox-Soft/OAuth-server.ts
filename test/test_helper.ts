@@ -14,7 +14,6 @@ import {
 	adapter,
 	configStore,
 	getBucketStore,
-	getProjectStore,
 	getUserStore,
 	resetStoresForTests
 } from '../lib/adapters/index.ts';
@@ -370,7 +369,11 @@ export async function changeClient(
  * The next spec file never sees what this seeds: bootstrap() empties every store. Within one file it
  * stays until `clearSeededBuckets()`, which a file whose later cases must not find it calls.
  */
-const seededBuckets: Array<{ bucketId: string; projectId: string }> = [];
+const seededBuckets: Array<{
+	bucketId: string;
+	clientId: string;
+	formerBucketId: unknown;
+}> = [];
 
 export async function seedBucket({
 	bucketId,
@@ -405,40 +408,67 @@ export async function seedBucket({
 		ownerGroupId: 'unassigned'
 	});
 
-	const project = await getProjectStore().create({
-		name,
-		slug: bucketId,
-		ownerGroupId: 'unassigned',
-		bucketId,
-		clientIds: [clientId]
-	});
-
 	/*
 	 * Seeded only if the spec's own config has not already declared it. A spec that needs `login()` to
 	 * build a grant for this client has to declare it there — the harness grants against the config's
-	 * `clients` — and seeding it twice throws by design.
+	 * `clients` — and seeding it twice throws by design. Either way the client belongs to this bucket, as
+	 * an administrator-created client belongs to the bucket it was created in (specs/099).
 	 */
-	if (!TestAdapter.for('Client').syncFind(clientId)) {
+	const declared = TestAdapter.for('Client').syncFind(clientId);
+	if (declared) {
+		await adapter('Client').upsert(clientId, { ...declared, bucketId });
+	} else {
 		seedClient({
 			clientId,
 			clientSecret: `${clientId}-secret`,
 			grantTypes: ['authorization_code', 'refresh_token'],
 			responseTypes: ['code'],
 			redirectUris: [`https://${bucketId}.example.com/cb`],
-			...client
+			...client,
+			bucketId
 		});
 	}
 
 	seedAccount(accountId, user, bucketId);
 
-	seededBuckets.push({ bucketId, projectId: project._id });
+	seededBuckets.push({
+		bucketId,
+		clientId,
+		formerBucketId: declared?.bucketId
+	});
 	return { bucketId, clientId, accountId };
+}
+
+/*
+ * Makes a stored client belong to a bucket, as creating it in that bucket's Applications would (specs/099).
+ * The client must already be stored: this is the binding, not a registration.
+ */
+export async function bindClientToBucket(
+	clientId: string,
+	bucketId: string
+): Promise<void> {
+	const stored = await adapter('Client').find(clientId);
+	if (!stored) {
+		throw new Error(`no client '${clientId}' is seeded in the Client store`);
+	}
+	await adapter('Client').upsert(clientId, { ...stored, bucketId });
 }
 
 /* Removes exactly what seedBucket created, and nothing else — for the cases later in the same file. */
 export async function clearSeededBuckets(): Promise<void> {
-	for (const { bucketId, projectId } of seededBuckets.splice(0)) {
-		await getProjectStore().destroy(projectId);
+	for (const { bucketId, clientId, formerBucketId } of seededBuckets.splice(
+		0
+	)) {
+		const stored = await adapter('Client').find(clientId);
+		if (stored) {
+			const { bucketId: _seeded, ...rest } = stored;
+			await adapter('Client').upsert(
+				clientId,
+				formerBucketId === undefined
+					? rest
+					: { ...rest, bucketId: formerBucketId }
+			);
+		}
 		await getBucketStore().destroy(bucketId);
 	}
 	/* The other of the two events — see the note in `seedBucket`. */
@@ -446,7 +476,7 @@ export async function clearSeededBuckets(): Promise<void> {
 }
 
 /*
- * Everything the process keeps between spec files, forgotten: every store (buckets, projects, groups,
+ * Everything the process keeps between spec files, forgotten: every store (buckets, groups,
  * users, the audit trail, recorded faults, activity) and every cache derived from a store or from a
  * stubbed upstream. Each spec file starts from what its own *.config.ts and setup put there, so a case
  * cannot pass or fail by which file ran before it — an order Windows and CI do not share.

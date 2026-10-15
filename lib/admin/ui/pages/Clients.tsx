@@ -18,12 +18,10 @@ import { PlusOutlined } from '@ant-design/icons';
 import { request } from '../frame/request.js';
 import { useFeedback } from '../frame/feedback.js';
 import { useConfirm } from '../frame/confirm.js';
-import { projectCan } from '../frame/can.js';
 import { AreaToolbar } from '../frame/AreaToolbar.js';
 import { RowActions, type RowAction } from '../frame/RowActions.js';
 import { EmptyState, LoadFailed } from '../frame/states.js';
 import { SecretReveal } from '../frame/SecretReveal.js';
-import type { ProjectView } from './ProjectWorkspace.js';
 import {
 	LOGO_MAX_BYTES,
 	LOGO_SIZE_MESSAGE
@@ -114,6 +112,7 @@ interface ClientView {
 	hasLogo?: boolean;
 	policyUri?: string;
 	tosUri?: string;
+	corsOrigins?: string[];
 }
 type ClientRow = ClientView & KeyAttributes;
 interface FormValues extends Omit<KeyAttributes, 'jwks'> {
@@ -132,6 +131,82 @@ interface FormValues extends Omit<KeyAttributes, 'jwks'> {
 	logo?: string | null;
 	policyUri?: string;
 	tosUri?: string;
+	corsOrigins?: string[];
+}
+
+/*
+ * The application's browser origins (specs/099). Validation is deliberately left to the server: it owns
+ * the one rule shared with the request path, and its refusal names the offending value and the canonical
+ * form it should have been. An application in the same bucket is usually the same product, so its list
+ * can be copied in one step instead of retyped.
+ */
+function OriginsField({
+	value,
+	onChange,
+	siblings
+}: {
+	value?: string[];
+	onChange?: (value: string[]) => void;
+	siblings: { label: string; origins: string[] }[];
+}) {
+	const origins = value ?? [];
+	const [draft, setDraft] = useState('');
+	function add() {
+		const next = draft.trim();
+		setDraft('');
+		if (next && !origins.includes(next)) onChange?.([...origins, next]);
+	}
+	return (
+		<Space
+			orientation="vertical"
+			size={8}
+			style={{ width: '100%' }}
+		>
+			<Space wrap>
+				{origins.length === 0 && (
+					<Typography.Text type="secondary">No origins</Typography.Text>
+				)}
+				{origins.map((origin) => (
+					<Tag
+						key={origin}
+						closable
+						onClose={() => onChange?.(origins.filter((o) => o !== origin))}
+					>
+						{origin}
+					</Tag>
+				))}
+			</Space>
+			<Space.Compact style={{ width: '100%' }}>
+				<Input
+					value={draft}
+					placeholder="https://app.example.com"
+					onChange={(e) => setDraft(e.target.value)}
+					onPressEnter={(e) => {
+						e.preventDefault();
+						add();
+					}}
+				/>
+				<Button onClick={add}>Add</Button>
+			</Space.Compact>
+			{siblings.length > 0 && (
+				<Select<number>
+					placeholder="Copy from another application of this bucket"
+					style={{ width: '100%' }}
+					value={null}
+					options={siblings.map((sibling, index) => ({
+						label: `${sibling.label} (${sibling.origins.length})`,
+						value: index
+					}))}
+					onChange={(index) => {
+						const picked = siblings.at(index);
+						if (picked) {
+							onChange?.([...new Set([...origins, ...picked.origins])]);
+						}
+					}}
+				/>
+			)}
+		</Space>
+	);
 }
 
 /*
@@ -210,9 +285,18 @@ const DEFAULT_VALUES: FormValues = {
 	requireConsent: true
 };
 
-export function Clients({ project }: { project: ProjectView }) {
-	const base = `/admin/api/projects/${project._id}/clients`;
-	const writable = projectCan(project).manageClients;
+/*
+ * A bucket's applications (specs/099). `writable` is the bucket's stated `edit` right; a self-registered
+ * application is listed and readable but managed through its own registration access token.
+ */
+export function Clients({
+	bucketId,
+	writable
+}: {
+	bucketId: string;
+	writable: boolean;
+}) {
+	const base = `/admin/api/buckets/${encodeURIComponent(bucketId)}/clients`;
 	const [rows, setRows] = useState<ClientRow[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [loadFailed, setLoadFailed] = useState<string | null>(null);
@@ -277,6 +361,7 @@ export function Clients({ project }: { project: ProjectView }) {
 				row.backchannelClientNotificationEndpoint,
 			policyUri: row.policyUri ?? '',
 			tosUri: row.tosUri ?? '',
+			corsOrigins: row.corsOrigins ?? [],
 			logo: null,
 			jwksText: row.jwks ? JSON.stringify(row.jwks, null, 2) : '',
 			subjectType: row.subjectType,
@@ -347,6 +432,7 @@ export function Clients({ project }: { project: ProjectView }) {
 			scope: values.scope,
 			requireConsent: values.requireConsent,
 			partialConsent: Boolean(values.partialConsent),
+			corsOrigins: values.corsOrigins ?? [],
 			...(values.authorizationDetailsTypes?.length
 				? { authorizationDetailsTypes: values.authorizationDetailsTypes }
 				: {}),
@@ -503,8 +589,8 @@ export function Clients({ project }: { project: ProjectView }) {
 					type="info"
 					showIcon
 					style={{ marginBottom: 16 }}
-					title="This project is read-only to you"
-					description="It is a reserved project: its clients are part of how this server runs, so they can be looked at here but not changed."
+					title="These applications are read-only to you"
+					description="Changing a bucket's applications takes membership of the group that owns it."
 				/>
 			)}
 			{loadFailed !== null ? (
@@ -520,7 +606,7 @@ export function Clients({ project }: { project: ProjectView }) {
 					locale={{
 						emptyText: (
 							<EmptyState
-								purpose="No clients in this project yet. A client is an application that signs people in or calls an API through this server."
+								purpose="No applications in this bucket yet. An application is an OAuth client that signs this bucket's people in or calls an API through this server."
 								create={writable ? newClient : undefined}
 							/>
 						)
@@ -537,7 +623,7 @@ export function Clients({ project }: { project: ProjectView }) {
 							 */
 							render: (clientName: string | undefined, row: ClientRow) => (
 								<Space size={4}>
-									{writable ? (
+									{writable && !row.registeredDynamically ? (
 										<Typography.Link onClick={() => openEditModal(row)}>
 											{clientName || row.clientId}
 										</Typography.Link>
@@ -563,12 +649,13 @@ export function Clients({ project }: { project: ProjectView }) {
 									{
 										title: '',
 										key: 'actions',
-										render: (_: unknown, row: ClientRow) => (
-											<RowActions
-												name={row.clientName || row.clientId}
-												items={actionsFor(row)}
-											/>
-										)
+										render: (_: unknown, row: ClientRow) =>
+											row.registeredDynamically ? null : (
+												<RowActions
+													name={row.clientName || row.clientId}
+													items={actionsFor(row)}
+												/>
+											)
 									}
 								]
 							: [])
@@ -630,6 +717,24 @@ export function Clients({ project }: { project: ProjectView }) {
 						<Input.TextArea
 							rows={3}
 							placeholder="https://app.example.com/cb"
+						/>
+					</Form.Item>
+					<Form.Item
+						name="corsOrigins"
+						label="Browser origins"
+						extra="Web origins whose browser code may call this application's token and userinfo endpoints. Exact match, no wildcards; an empty list allows none."
+					>
+						<OriginsField
+							siblings={rows
+								.filter(
+									(row) =>
+										row.clientId !== editingClientId &&
+										(row.corsOrigins?.length ?? 0) > 0
+								)
+								.map((row) => ({
+									label: row.clientName || row.clientId,
+									origins: row.corsOrigins ?? []
+								}))}
 						/>
 					</Form.Item>
 					<Form.Item

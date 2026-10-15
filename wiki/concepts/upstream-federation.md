@@ -4,7 +4,7 @@ title: 'Signing in through somebody else’s identity provider'
 tags: [architecture, contract, gotcha, oidc]
 sources: [oauth-server-codebase]
 created: 2026-08-05
-updated: 2026-10-12
+updated: 2026-10-15
 graph:
   node_type: concept
   relationships:
@@ -353,7 +353,8 @@ The bucket routes did not. A `UserBucket` *contains* its `federation` array, and
 configured provider's client secret went out in plaintext to any authenticated administrator, and the
 console's own Buckets page has been receiving them. The exposure was wider than super-admin:
 `bucket_get` authorizes with `loadBucketForUsers`, the *broader* check, so a manager of a project merely
-backed by the bucket got the secrets too.
+backed by the bucket got the secrets too. (Projects, and the reach they gave over a bucket, were removed in
+spec 099; the broader check is now membership of the bucket's group.)
 
 Fixed by masking in every bucket projection (`presentBucket` in `lib/admin/buckets/routes.ts`, applied
 to list, get, create and update). The shape of the bug is worth remembering more than the fix: an

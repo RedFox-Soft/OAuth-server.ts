@@ -1,6 +1,6 @@
-import { agent, getHeader } from '../test_helper.js';
+import { agent, bindClientToBucket, getHeader } from '../test_helper.js';
 import { AuthorizationRequest } from '../AuthorizationRequest.js';
-import { getBucketStore, getProjectStore } from 'lib/adapters/index.js';
+import { getBucketStore } from 'lib/adapters/index.js';
 import { elysia } from 'lib/index.js';
 import { TestAdapter } from 'test/models.js';
 import type { FederationProvider } from 'lib/federation/types.js';
@@ -38,7 +38,7 @@ export function provider(
 	};
 }
 
-/* A bucket plus the project/client wiring that makes an interaction resolve to it. */
+/* A bucket plus the client binding that makes an interaction resolve to it (specs/099). */
 export async function seedBucket(
 	clientId: string,
 	fields: Record<string, unknown>
@@ -48,13 +48,7 @@ export async function seedBucket(
 		name: `bucket-${clientId}`,
 		...fields
 	});
-	await getProjectStore().create({
-		ownerGroupId: UNASSIGNED_GROUP_ID,
-		name: `project-${clientId}`,
-		slug: `${clientId}-${Math.random()}`,
-		bucketId: bucket._id,
-		clientIds: [clientId]
-	});
+	await bindClientToBucket(clientId, bucket._id);
 	return bucket._id;
 }
 

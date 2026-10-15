@@ -2,11 +2,8 @@ import { describe, it, expect, beforeAll } from 'bun:test';
 
 import bootstrap, { agent, setSeedClaims, type Setup } from '../test_helper.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import {
-	getProjectStore,
-	getProtectedResourceStore
-} from 'lib/adapters/index.ts';
-import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
+import { getProtectedResourceStore } from 'lib/adapters/index.ts';
+import { DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { ROOT_NAMESPACE } from 'lib/resources/namespace.js';
 import { decode } from 'lib/helpers/jwt.js';
 import { openConsent, decide } from '../consent_page/flow.ts';
@@ -34,16 +31,10 @@ describe('what an application receives after a partial allow', () => {
 	beforeAll(async () => {
 		setup = await bootstrap(import.meta.url, { config: 'consent_choices' });
 		await ensureAdminSeed();
-		const project = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			name: 'Company',
-			slug: 'company-outcome',
-			ownerGroupId: UNASSIGNED_GROUP_ID
-		});
 		await getProtectedResourceStore().create({
 			namespace: ROOT_NAMESPACE,
 			identifier: MCP,
-			projectId: project._id,
+			bucketId: DEFAULT_BUCKET_ID,
 			name: 'Company MCP',
 			scopes: ['tools:read', 'tools:call']
 		});

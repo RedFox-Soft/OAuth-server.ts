@@ -18,7 +18,6 @@ import { request } from './request.js';
 export interface MeCan {
 	createBucket: boolean;
 	createHost: boolean;
-	createProject: boolean;
 	createGroup: boolean;
 	instance: boolean;
 }
@@ -64,7 +63,6 @@ export function meCan(me: Me | null): MeCan {
 	return {
 		createBucket: me !== null,
 		createHost: instance,
-		createProject: me !== null,
 		createGroup: me !== null,
 		instance
 	};

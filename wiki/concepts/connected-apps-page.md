@@ -4,7 +4,7 @@ title: 'The connected-applications page: an end user sees and removes the access
 tags: [architecture, contract, gotcha, security]
 sources: [oauth-server-codebase]
 created: 2026-10-13
-updated: 2026-10-13
+updated: 2026-10-15
 graph:
   node_type: concept
   relationships:
@@ -62,7 +62,8 @@ How it is limited:
   deletion, or for an unknown one: `invalid_client`.
 - **No look-alikes.** `.` is outside nanoid's alphabet, so no generated id can collide with it. A registration
   is refused the prefix even through a deployment's own `idFactory` (`lib/models/client/register.ts:38`).
-- **No consent page.** It is in no project and has `consent.require: false`, so consent is waived.
+- **No consent page.** It belongs to no stored bucket record (no `bucketId`; until spec 099, no project) and
+  has `consent.require: false`, so consent is waived.
   `redirectUrisVouchedFor` answers true for it (`lib/models/client/provenance.ts:30`). Otherwise a cancelled
   sign-in would show the RFC 9700 "untrusted redirect" page instead of coming back.
 

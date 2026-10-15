@@ -44,11 +44,11 @@ export default {
 	console: {
 		eyebrow: 'The console',
 		heading: 'Everything an operator needs, without a second product.',
-		lead: "Projects, clients, user buckets, end-users, upstream providers, SCIM connections, settings, SMTP, signing keys, monthly active users and an append-only audit trail, all in one console that you sign into through the server's own OpenID Connect flow, or through your organisation's identity provider. A change that could lock people out says whom it affects before it applies. The same API is what an AI agent uses over MCP.",
+		lead: "User buckets with their applications and APIs, end-users, upstream providers, SCIM connections, settings, SMTP, signing keys, monthly active users and an append-only audit trail, all in one console that you sign into through the server's own OpenID Connect flow, or through your organisation's identity provider. A change that could lock people out says whom it affects before it applies. The same API is what an AI agent uses over MCP.",
 		screenshotAlt:
-			'The FoxAuth admin console listing the OAuth clients of a project.',
+			'The FoxAuth admin console listing the applications (OAuth clients) of a user bucket.',
 		screenshotCaption:
-			"A project's clients in the built-in console. Every change here is an audit entry."
+			"A bucket's applications in the built-in console. Every change here is an audit entry."
 	},
 	audiences: {
 		eyebrow: 'Who runs it',
@@ -99,7 +99,7 @@ export default {
 			},
 			{
 				title: 'Register a client',
-				body: 'Create a project and its first OAuth client in the console, with exact redirect URIs.'
+				body: 'Create a user bucket and its first OAuth client in the console, with exact redirect URIs.'
 			},
 			{
 				title: 'Get a token',
@@ -117,7 +117,7 @@ export default {
 		eyebrow: 'An OAuth server for MCP',
 		heading: 'Protect your MCP server, and let an agent operate this one.',
 		protect: rich(
-			'Declare your own MCP server as a protected resource of a project and this server mints tokens whose audience is exactly that resource. No code here, no restart. An agent host discovers it, signs your users in, and comes back with a token your MCP server verifies against the published keys without asking anything. A ',
+			'Declare your own MCP server as a protected resource of a user bucket and this server mints tokens whose audience is exactly that resource. No code here, no restart. An agent host discovers it, signs your users in, and comes back with a token your MCP server verifies against the published keys without asking anything. A ',
 			{ code: 'client_id' },
 			' that is an HTTPS URL is accepted as a client identity document, so a host with nothing to configure still connects.'
 		),

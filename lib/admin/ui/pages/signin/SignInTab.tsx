@@ -285,9 +285,9 @@ export function SignInTab({
 		: bucketHref(bucket._id, 'identity-providers');
 	const counts = summary;
 	const defaultBucket = bucket._id === DEFAULT_BUCKET_ID;
-	const projectsLine =
-		defaultBucket && counts?.projects !== undefined
-			? `This changes sign-in for ${plural(counts.projects, 'project', 'projects')}.`
+	const applicationsLine =
+		defaultBucket && counts?.applications !== undefined
+			? `This changes sign-in for ${plural(counts.applications, 'application', 'applications')}.`
 			: null;
 	const mayTurnPasswordsOff =
 		readiness !== null &&
@@ -320,7 +320,7 @@ export function SignInTab({
 				type={type}
 				showIcon
 				title={text}
-				description={projectsLine ?? undefined}
+				description={applicationsLine ?? undefined}
 			/>
 		);
 	}
@@ -572,7 +572,7 @@ export function SignInTab({
 						note(
 							consoleBucket
 								? 'Saving asks you to confirm: this opens the console to anyone who can reach it.'
-								: 'Saving asks you to confirm: projects without a bucket of their own sign people in here.',
+								: "Saving asks you to confirm: the instance's own applications sign people in here.",
 							'warning'
 						)}
 				</Setting>

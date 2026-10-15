@@ -6,7 +6,7 @@ import { getProtectedResourceStore } from 'lib/adapters/index.ts';
 import { ROOT_NAMESPACE } from 'lib/resources/namespace.ts';
 import { shaped } from 'test/shape.js';
 import { Type } from '@sinclair/typebox';
-import { projectOf } from './owning_project.js';
+import { bucketOf } from './owning_bucket.js';
 
 /*
  * The token endpoint resolving a declared resource. This is the integration half of what
@@ -16,7 +16,7 @@ import { projectOf } from './owning_project.js';
 
 const AUDIENCE = 'https://mcp.example.com/mcp';
 
-let projectId: string;
+let bucketId: string;
 
 const auth = {
 	headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
@@ -33,7 +33,7 @@ async function declare(
 	return getProtectedResourceStore().create({
 		namespace: ROOT_NAMESPACE,
 		identifier: identifier,
-		projectId,
+		bucketId,
 		name: 'Acme MCP',
 		scopes: overrides.scopes ?? ['mcp:tools-basic', 'mcp:files-read'],
 		tokenFormat: overrides.tokenFormat,
@@ -64,7 +64,7 @@ const OAuthError = Type.Object({ error: Type.String() });
 describe('issuing tokens for a declared protected resource', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);
-		projectId = await projectOf('client');
+		bucketId = await bucketOf('client');
 	});
 
 	beforeEach(async () => {

@@ -4,7 +4,7 @@ title: 'A user bucket is a tenant with its own issuer'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-09-15
-updated: 2026-09-30
+updated: 2026-10-15
 graph:
   node_type: concept
   relationships:
@@ -106,11 +106,11 @@ the air everywhere except the exact URL in `ISSUER`.
 **Changing an address changes the issuer**, so it is not a field on the bucket PATCH. It is its own
 route, `POST /admin/api/buckets/:id/address` (`lib/admin/buckets/routes.ts:404`), which answers with a
 preview until called with `confirm: true`, and is audited as its own action, `bucket.address.change`
-(`lib/consts/admin_audit_routes.ts:264`). Since spec 081 the preview names what breaks — each application
-with its project, each provisioning connection, each identity provider with its new callback address, each
+(`lib/consts/admin_audit_routes.ts:257`). Since spec 081 the preview names what breaks — each application
+(with its project, until spec 099), each provisioning connection, each identity provider with its new callback address, each
 declared resource — and the confirming call must repeat the preview's counts (`expect`), or it is refused
-with a fresh preview. A group owner may change a **path** while nothing depends on the bucket (no project,
-provider or connection); a host stays super-administrator-only. The change clears the bucket's recorded host
+with a fresh preview. A group owner may change a **path** while nothing depends on the bucket (no
+application — a project, until spec 099 — provider or connection); a host stays super-administrator-only. The change clears the bucket's recorded host
 arrivals, so a new host does not read as reached from the old one's traffic. See [[bucket-workspace]].
 
 **A slug is a name, not an address**, and three places need to know the difference: `issuerFor`, which
@@ -208,8 +208,10 @@ default client start a flow at `acme` and receive `acme`-issued tokens, so both 
 after the resource is final and before anything is stored (`lib/actions/authorization/device.ts`).
 Registration also honours its address, for the management URI it returns and — corrected 2026-10-05 —
 for the client it creates. A registration at a bucket's own address records that bucket on the client
-(`registeredAtBucket`, `lib/actions/registration.ts`), and `resolveBucketForRequest` reads it right after
-the project rule, so the client signs in that bucket's end users and is refused at any other address.
+(`bucketId`, `lib/actions/registration.ts:229`; a separate `registeredAtBucket`, read right after the project
+rule, until spec 099 folded both into the one field), and `resolveBucketForRequest` pins the client to it
+exactly as it pins an administrator-created application, so the client signs in that bucket's end users and
+is refused at any other address ([[bucket-is-the-only-container]]).
 Before, a registration "named no bucket": a client that followed `/acme`'s discovery to `/acme/reg` was
 the default bucket's, refused `unauthorized_client` at `/acme/auth` and accepted at the bare `/auth` —
 found by running the conformance suite against a named bucket. A registration at the root records
@@ -248,7 +250,7 @@ out by one issuer is not accepted by another.
 is RFC 7662 §2.2: `active: true` asserts that *this* authorization server issued the token, and every
 bucket is its own authorization server. A token of one bucket presented to another must be inactive,
 and answering that requires knowing who issued it. Deriving the issuer from the client instead gets it
-wrong the first time a client moves between projects — and a realm-confusion advisory against a
+wrong the first time a client moves between projects (which it could, until spec 099) — and a realm-confusion advisory against a
 Keycloak integration is the same defect from the other end, a token of one realm silently accepted by a
 policy configured for another.
 

@@ -42,7 +42,7 @@ describe('signing in after the bucket moved to another group', () => {
 		});
 		cookie = await setup.login({ accountId: ACCOUNT_ID, bucketId: BUCKET_ID });
 
-		// Seeded in the System group with its project; it moves, with the project, to a tenant.
+		// Seeded in the System group with its application; it moves, with the application, to a tenant.
 		const team = await getGroupStore().create({
 			name: 'Team',
 			kind: 'regular',

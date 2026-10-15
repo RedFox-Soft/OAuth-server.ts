@@ -8,14 +8,12 @@ import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
 	adminAuditStore,
 	getUserStore,
-	getBucketStore,
-	getProjectStore
+	getBucketStore
 } from 'lib/adapters/index.ts';
 import {
 	ADMIN_BUCKET_ID,
 	ADMIN_SESSION_COOKIE,
-	UNASSIGNED_GROUP_ID,
-	DEFAULT_BUCKET_ID
+	UNASSIGNED_GROUP_ID
 } from 'lib/admin/consts.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
 import { answered } from './answered.ts';
@@ -234,16 +232,9 @@ describe('end-user API', () => {
 		expect(after).not.toBe(before);
 	});
 
-	it('lets a project administrator manage users of a bucket backing their project', async () => {
+	it('lets an administrator manage users of a bucket their group owns', async () => {
 		const pa = await sessionCookieFor('plain');
-		const bucket = await makeBucket(); // not owned by pa
-		const proj = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			name: 'PM',
-			slug: `pm-${Math.random()}`,
-			ownerGroupId: await personalGroupId(pa.userId)
-		});
-		await getProjectStore().update(proj._id, { bucketId: bucket._id });
+		const bucket = await makeBucket(await personalGroupId(pa.userId));
 		const res = await client.admin.api
 			.buckets({ id: bucket._id })
 			.users.post(
@@ -253,7 +244,7 @@ describe('end-user API', () => {
 		expect(res.status).toBe(201);
 	});
 
-	it('denies a project administrator a bucket they neither own nor reach via a project', async () => {
+	it('denies an administrator a bucket their groups do not own', async () => {
 		const pa = await sessionCookieFor('plain');
 		const bucket = await makeBucket();
 		const res = await client.admin.api

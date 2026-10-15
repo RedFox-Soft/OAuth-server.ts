@@ -1,6 +1,6 @@
 ---
 title: Groups and the groups claim
-description: Administrator groups own projects and buckets, which can move between them. Bucket groups gather end users, read in the groups claim.
+description: Administrator groups own buckets, which can move between them. Bucket groups gather end users, read in the groups claim.
 sidebar:
   order: 4
 ---
@@ -14,8 +14,8 @@ The word means two different things here, and the console and the API keep them 
 
 - **Bucket groups** are named sets of one bucket's end users. They grant nothing on this server; they
   exist to be read by relying parties. Agents manage them with the `bucket_group_*` tools.
-- **Administrator groups** own projects and buckets, and membership is what gives an administrator
-  access to them. One of them, **Super administrators**, is the instance-wide privilege. Agents manage
+- **Administrator groups** own buckets, and with them everything a bucket holds: its end users, its
+  applications and its APIs. Membership is what gives an administrator access to them. One of them, **Super administrators**, is the instance-wide privilege. Agents manage
   administrator groups with the `group_*` tools, and super administrator standing with
   `admin_super_grant` and `admin_super_withdraw`.
 
@@ -36,25 +36,22 @@ listed on the same page and can be revoked. Removing a member says first what th
 `group_get`, `group_invite`, `group_invitation_list`, `group_invitation_revoke` and the
 `group_member_*` tools.
 
-A project or a bucket is created in a group you choose: the console's creation dialogs ask for it, and
-the API takes an optional `groupId`, which defaults to your active group. A project can also be given a
-`bucketId` of that group at creation.
+A bucket is created in a group you choose: the console's creation dialog asks for it, and the API takes
+an optional `groupId`, which defaults to your active group. Applications and APIs are created inside a
+bucket and belong to its group for as long as they exist.
 
-### Moving a project or a bucket to another group
+### Moving a bucket to another group
 
-Work started in a personal group, or in the wrong team, moves with **Move to group…** on a bucket, or
-**Move to another group…** on a project's **Settings** tab:
-
-- **A bucket moves with every project that uses it**, because a project and its bucket stay in the same
-  group. Use `PUT /admin/api/buckets/:id/owner`, or `bucket_owner_change` for an agent.
-- **A project with no bucket of its own moves alone.** Use `PUT /admin/api/projects/:id/owner`, or
-  `project_owner_change`.
+Work started in a personal group, or in the wrong team, moves with **Move to group…** on a bucket. Use
+`PUT /admin/api/buckets/:id/owner`, or `bucket_owner_change` for an agent. The bucket takes everything it
+holds with it in one step: its applications and its APIs move too, and nothing is left behind in the
+group it leaves. An application or an API never moves on its own.
 
 A move needs an owner of the group it leaves and a member of the group it joins. Without `confirm`, the
-call only previews what would move. End users, applications and sign-in addresses are untouched, and the
-audit entry is visible to both groups. A container cannot move into another administrator's personal
-group or into Super administrators, and the default bucket, the administrators' bucket and the
-console's own project never move. Both agent tools are high-consequence and ask for confirmation.
+call only previews what would move, with the counts of applications and APIs. End users, applications and
+sign-in addresses are untouched, and the audit entry is visible to both groups. A bucket cannot move into
+another administrator's personal group or into Super administrators, and the default bucket and the
+administrators' bucket never move. The agent tool is high-consequence and asks for confirmation.
 
 ## Who keeps a bucket group
 

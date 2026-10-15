@@ -210,10 +210,10 @@ async function create({
 	 * one an administrator made. Set after the wire translation so it cannot be supplied by the caller:
 	 * a registration body claiming `registered_dynamically: false` would otherwise be believed.
 	 *
-	 * There is deliberately no per-project acceptance check here, and the absence is a decision rather
-	 * than an omission. A registration request names no project — RFC 7591 has no field for one — so a
-	 * per-project rule could only rest on a project-scoped registration endpoint, which would hand an
-	 * unauthenticated caller an oracle for which projects exist. The bucket, which the address does name,
+	 * There is deliberately no per-tenant acceptance check here, and the absence is a decision rather
+	 * than an omission. A registration request names no tenant — RFC 7591 has no field for one — so a
+	 * per-tenant rule could only rest on a tenant-scoped registration endpoint, which would hand an
+	 * unauthenticated caller an oracle for which tenants exist. The bucket, which the address does name,
 	 * is recorded below; anything finer is supplied at authorization time, from the declared resource the
 	 * request names (`resolveBucketForRequest`), the same rule a document-identified client follows.
 	 */
@@ -223,10 +223,10 @@ async function create({
 	 * client that followed it is that bucket's client — and without this record it belonged to the
 	 * default bucket, was refused `unauthorized_client` at the very issuer it registered with, and was
 	 * accepted at the root instead. Only a bucket with an address of its own is recorded: a registration
-	 * at the root keeps the default, as before.
+	 * at the root belongs to no bucket, and resolves as before (specs/099).
 	 */
 	if (isAddressable(oidc.bucket)) {
-		properties.registeredAtBucket = oidc.bucket._id;
+		properties.bucketId = oidc.bucket._id;
 	}
 
 	/*
@@ -366,7 +366,7 @@ async function update({ params, body, headers, request, set }: ClientContext) {
 	 */
 	Object.assign(properties, {
 		registeredDynamically: client.registeredDynamically,
-		registeredAtBucket: client.registeredAtBucket,
+		bucketId: client.bucketId,
 		registrationUsedAt: client.registrationUsedAt
 	});
 

@@ -357,7 +357,7 @@ export interface CorsRoute {
  * new endpoint cannot become readable cross-origin without an explicit edit here.
  *
  * `open` echoes any Origin (the data is public to anyone who can issue a request). `client-based`
- * echoes only an Origin listed on the project owning the calling client.
+ * echoes only an Origin listed on the calling client itself.
  */
 const bareCorsRoutes: readonly CorsRoute[] = [
 	// OIDC Discovery 1.0 §4 and §3: a JavaScript client cannot know a deployment in advance, so it

@@ -87,7 +87,7 @@ groups:
         us:
           {
             status: yes,
-            text: "User buckets, each its own issuer with its own signing keys. A bucket takes a path beneath the server's URL or a hostname of its own, counts its own monthly active users, moves between administrator groups with its projects, and can be restored for 30 days after it is deleted."
+            text: "User buckets, each its own issuer with its own signing keys. A bucket takes a path beneath the server's URL or a hostname of its own, counts its own monthly active users, moves between administrator groups with its applications and APIs, and can be restored for 30 days after it is deleted."
           }
         them:
           {
@@ -202,7 +202,7 @@ groups:
         us:
           {
             status: yes,
-            text: 'Declare the MCP server as a protected resource of a project and tokens carry it as their sole audience, via the resource parameter (RFC 8707). No code change, no restart.'
+            text: 'Declare the MCP server as a protected resource of a user bucket and tokens carry it as their sole audience, via the resource parameter (RFC 8707). No code change, no restart.'
           }
         them:
           {
@@ -218,7 +218,7 @@ groups:
         us:
           {
             status: yes,
-            text: 'Projects, clients, administrators and their groups, user buckets, end-users, upstream providers, SCIM connections, usage, settings, SMTP, signing keys. Administrators can sign in through your own identity provider, and a change that could lock people out is previewed with counts before it applies.'
+            text: 'User buckets with their applications and APIs, administrators and their groups, end-users, upstream providers, SCIM connections, usage, settings, SMTP, signing keys. Administrators can sign in through your own identity provider, and a change that could lock people out is previewed with counts before it applies.'
           }
         them:
           {

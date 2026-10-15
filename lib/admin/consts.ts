@@ -1,4 +1,3 @@
-export const ADMIN_PROJECT_ID = 'admin';
 export const ADMIN_BUCKET_ID = 'admin';
 /*
  * The bucket a request reaches when nothing else routes it. Named here rather than repeated as a
@@ -73,10 +72,10 @@ export function reservedOf(
 
 /*
  * The group that owns containers no administrator owns. Reachable only by super administrators, and
- * exempt from the at-least-one-owner rule for the same reason the reserved admin project and bucket
- * are exempt from the group model: it is a holding area, not a tenant.
+ * exempt from the at-least-one-owner rule for the same reason the reserved administrators' bucket
+ * is exempt from the group model: it is a holding area, not a tenant.
  *
- * Real rather than defensive — a super administrator can create a project with no owner, so
+ * Real rather than defensive — a super administrator can create a bucket with no owner, so
  * containers in exactly this state already exist. It outlived the ownership migration that first
  * populated it, which is why this no longer says "at migration time": the group is how an unowned
  * container is reached, not residue of a one-off rewrite.

@@ -16,8 +16,9 @@ export const ApplicationConfig = {
 
 /*
  * `tenant-app` registered itself at the bucket's address, which is what places its tokens in that bucket
- * wherever they are presented — a client a project uses cannot exist for a scheduled bucket, because a bucket
- * a project uses cannot be scheduled. `bystander` asks about tokens without being part of the story.
+ * wherever they are presented — an application an administrator created there cannot exist for a scheduled
+ * bucket, because a bucket holding one cannot be scheduled. `bystander` asks about tokens without being part
+ * of the story.
  */
 export const clients = [
 	{
@@ -26,7 +27,8 @@ export const clients = [
 		grantTypes: ['authorization_code', 'refresh_token'],
 		responseTypes: ['code'],
 		redirectUris: ['https://tenant.example.com/cb'],
-		registeredAtBucket: 'doors-bucket'
+		bucketId: 'doors-bucket',
+		registeredDynamically: true
 	},
 	{
 		clientId: 'bystander',

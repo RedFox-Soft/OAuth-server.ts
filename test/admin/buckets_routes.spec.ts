@@ -4,13 +4,7 @@ import { treaty } from '@elysiajs/eden';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { bucketRoutes } from 'lib/admin/buckets/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { getProjectStore } from 'lib/adapters/index.ts';
-import {
-	ADMIN_BUCKET_ID,
-	ADMIN_SESSION_COOKIE,
-	UNASSIGNED_GROUP_ID,
-	DEFAULT_BUCKET_ID
-} from 'lib/admin/consts.ts';
+import { ADMIN_BUCKET_ID, ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
 import { answered } from './answered.ts';
 import { createAdministrator, type AdminKind } from '../administrators.ts';
@@ -29,8 +23,8 @@ async function superCookie() {
 }
 
 /**
- * @proves Buckets are administered only by those with rights over them, are never moved between
- * groups by an update, and cannot be deleted while a project still points at them.
+ * @proves Buckets are administered only by members of the group that owns them or a super
+ * administrator, and are never moved between groups by an update.
  */
 describe('buckets API', () => {
 	beforeEach(async () => {
@@ -51,27 +45,7 @@ describe('buckets API', () => {
 		expect(created.federation).toEqual([]);
 	});
 
-	it('refuses to delete a bucket still referenced by a project', async () => {
-		const cookie = await superCookie();
-		const res1 = await client.admin.api.buckets.post(
-			{ name: 'Shared', slug: 'shared-2' },
-			{ headers: { cookie } }
-		);
-		const bucket = answered(res1.data);
-		const project = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			ownerGroupId: UNASSIGNED_GROUP_ID,
-			name: 'P',
-			slug: 'p'
-		});
-		await getProjectStore().update(project._id, { bucketId: bucket._id });
-		const res = await client.admin.api
-			.buckets({ id: bucket._id })
-			.delete(undefined, { headers: { cookie } });
-		expect(res.status).toBe(409);
-	});
-
-	it('a super administrator GET /admin/api/buckets returns all buckets', async () => {
+	it('lists every bucket to a super administrator', async () => {
 		const { cookie } = await sessionCookieFor('super');
 		const otherPa = await sessionCookieFor('plain');
 		const a = await client.admin.api.buckets.post(
@@ -93,7 +67,7 @@ describe('buckets API', () => {
 		expect(ids).toContain(bucketB._id);
 	});
 
-	it('a project administrator GET /admin/api/buckets returns only their own group’s', async () => {
+	it('lists to an administrator who is not a super administrator only their own group’s buckets', async () => {
 		const pa = await sessionCookieFor('plain');
 		const otherPa = await sessionCookieFor('plain');
 		const mine = await client.admin.api.buckets.post(
@@ -116,7 +90,7 @@ describe('buckets API', () => {
 	 * The reported defect, now asserted the other way round. This test was named "project administrator cannot
 	 * create a bucket" and passed because the route answered 403 to an action the console still offered.
 	 */
-	it('a project administrator creates a bucket into their own group', async () => {
+	it('creates a bucket into the group of an administrator who is not a super administrator', async () => {
 		const pa = await sessionCookieFor('plain');
 		const res = await client.admin.api.buckets.post(
 			{ name: 'Allowed', slug: 'allowed-7' },
@@ -128,7 +102,7 @@ describe('buckets API', () => {
 		);
 	});
 
-	it('denies delete of an unreferenced bucket to a project administrator who does not manage it', async () => {
+	it('refuses deleting an empty bucket to an administrator outside its group', async () => {
 		const superSession = await sessionCookieFor('super');
 		const pa = await sessionCookieFor('plain');
 		const created = await client.admin.api.buckets.post(
@@ -142,7 +116,7 @@ describe('buckets API', () => {
 		expect(res.status).toBe(403);
 	});
 
-	it('a super administrator deletes an unreferenced bucket successfully', async () => {
+	it('deletes an empty bucket for a super administrator', async () => {
 		const cookie = await superCookie();
 		const created = await client.admin.api.buckets.post(
 			{ name: 'To delete', slug: 'to-delete-9' },
@@ -172,48 +146,24 @@ describe('buckets API', () => {
 		expect(answered(patched.data).name).toBe('Renamed');
 	});
 
-	it('lets a project administrator read a bucket backing a project they manage', async () => {
+	it('refuses reading and renaming a bucket to an administrator outside the group that owns it', async () => {
 		const su = await sessionCookieFor('super');
-		const pa = await sessionCookieFor('plain');
-		// bucket NOT owned by pa (managedBy empty)
+		const outsider = await sessionCookieFor('plain');
 		const created = await client.admin.api.buckets.post(
-			{ name: 'Backing', slug: 'backing-11' },
+			{ name: 'NotTheirs', slug: 'not-theirs-12' },
 			{ headers: { cookie: su.cookie } }
 		);
 		const bucket = answered(created.data);
-		// a project pa manages points at it
-		const proj = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			ownerGroupId: await personalGroupId(pa.userId),
-			name: 'PB',
-			slug: `pb-${Math.random()}`
-		});
-		await getProjectStore().update(proj._id, { bucketId: bucket._id });
+
 		const got = await client.admin.api
 			.buckets({ id: bucket._id })
-			.get({ headers: { cookie: pa.cookie } });
-		expect(got.status).toBe(200);
-	});
-
-	it('forbids a project administrator from editing a bucket they only reach via a project', async () => {
-		const su = await sessionCookieFor('super');
-		const pa = await sessionCookieFor('plain');
-		const created = await client.admin.api.buckets.post(
-			{ name: 'BackingRO', slug: 'backingro-12' },
-			{ headers: { cookie: su.cookie } }
-		);
-		const bucket = answered(created.data);
-		const proj = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			name: 'PB2',
-			slug: `pb2-${Math.random()}`,
-			ownerGroupId: await personalGroupId(pa.userId)
-		});
-		await getProjectStore().update(proj._id, { bucketId: bucket._id });
-		const res = await client.admin.api
+			.get({ headers: { cookie: outsider.cookie } });
+		const renamed = await client.admin.api
 			.buckets({ id: bucket._id })
-			.patch({ name: 'nope' }, { headers: { cookie: pa.cookie } });
-		expect(res.status).toBe(403);
+			.patch({ name: 'nope' }, { headers: { cookie: outsider.cookie } });
+
+		expect(got.status).toBe(403);
+		expect(renamed.status).toBe(403);
 	});
 
 	it("keeps the administrators' bucket out of reach of an administrator who is not a super administrator", async () => {

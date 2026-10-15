@@ -4,7 +4,7 @@ import bootstrap, { seedClient } from '../test_helper.ts';
 import { elysia } from 'lib/index.ts';
 import { ISSUER } from 'lib/configs/env.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { adminAuditStore, getProjectStore } from 'lib/adapters/index.ts';
+import { adminAuditStore } from 'lib/adapters/index.ts';
 import {
 	KEY_PUBLICATION_SECONDS,
 	RETIRED_KEY_LIFETIME_SECONDS
@@ -197,14 +197,8 @@ describe('the owning group administrator', () => {
 			clientSecret: 'secret',
 			grantTypes: ['authorization_code'],
 			responseTypes: ['code'],
-			redirectUris: ['https://keys.example.com/cb']
-		});
-		await getProjectStore().create({
-			ownerGroupId: groupId,
-			name: 'Relies on RS256',
-			slug: `relies-${Math.random().toString(36).slice(2)}`,
-			bucketId: bucket._id,
-			clientIds: [clientId]
+			redirectUris: ['https://keys.example.com/cb'],
+			bucketId: bucket._id
 		});
 		const { body } = await generate(bucket._id, cookie, 'PS256');
 		later(KEY_PUBLICATION_SECONDS + 1);

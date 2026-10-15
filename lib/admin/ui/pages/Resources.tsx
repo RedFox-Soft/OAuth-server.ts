@@ -23,15 +23,13 @@ import {
 import { request } from '../frame/request.js';
 import { useFeedback } from '../frame/feedback.js';
 import { useConfirm } from '../frame/confirm.js';
-import { projectCan } from '../frame/can.js';
 import { AreaToolbar } from '../frame/AreaToolbar.js';
 import { RowActions } from '../frame/RowActions.js';
 import { EmptyState, LoadFailed } from '../frame/states.js';
-import type { ProjectView } from './ProjectWorkspace.js';
 
 /*
- * A project's protected resources: the audiences this server will mint tokens for on the project's
- * behalf.
+ * A bucket's APIs — its declared protected resources: the audiences this server will mint tokens for on
+ * the bucket's behalf (specs/099).
  *
  * Two things on this screen are not decoration and should survive any redesign.
  *
@@ -231,23 +229,40 @@ function VouchingCell({ url }: { url: string }) {
 }
 
 /*
- * Where the project's declarations live (specs/085). An identifier is unique within a namespace, which every
- * project using the same addressable bucket shares, so a refusal to declare one is explained by naming it.
+ * Where the bucket's declarations live (specs/085). An identifier is unique within a namespace: the bucket's
+ * own when it has an address, the instance's root otherwise — shared with every other root-served bucket.
  */
-function namespaceLine(project: ProjectView): string {
-	const bucket = project.bucket ?? null;
-	if (
-		bucket &&
-		(bucket.addressForm === 'path' || bucket.addressForm === 'host')
-	) {
-		return `Declared in ${bucket.name}'s namespace: an identifier must be unique across every project using that bucket. Its Overview lists them all.`;
+function namespaceLine(
+	bucketName: string,
+	namespace: Namespace | null
+): string {
+	if (namespace === 'bucket') {
+		return `Declared in ${bucketName}'s own namespace: an identifier must be unique within this bucket.`;
 	}
-	return "Declared in the instance's shared root namespace, which every project without an addressable bucket shares.";
+	return "Declared in the instance's shared root namespace, which every bucket without an address of its own shares.";
 }
 
-export function Resources({ project }: { project: ProjectView }) {
-	const base = `/admin/api/projects/${project._id}/resources`;
-	const writable = projectCan(project).declareResources;
+type Namespace = 'bucket' | 'root';
+
+/*
+ * `canEdit` is the bucket's stated `edit` right. At the root namespace only a super administrator declares,
+ * so the screen is writable there for them alone — the server refuses anyone else the same way.
+ */
+export function Resources({
+	bucketId,
+	bucketName,
+	canEdit,
+	superAdmin
+}: {
+	bucketId: string;
+	bucketName: string;
+	canEdit: boolean;
+	superAdmin: boolean;
+}) {
+	const bucketBase = `/admin/api/buckets/${encodeURIComponent(bucketId)}`;
+	const base = `${bucketBase}/resources`;
+	const [namespace, setNamespace] = useState<Namespace | null>(null);
+	const writable = canEdit && (namespace === 'bucket' || superAdmin);
 	const [rows, setRows] = useState<ResourceView[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [loadFailed, setLoadFailed] = useState<string | null>(null);
@@ -267,9 +282,13 @@ export function Resources({ project }: { project: ProjectView }) {
 	// `loading` first; `load` is the reload, which does.
 	const fetchResources = useCallback(
 		() =>
-			request<ResourceView[]>('GET', base).then((result) => {
+			request<{ namespace: Namespace; resources: ResourceView[] }>(
+				'GET',
+				base
+			).then((result) => {
 				if (result.ok) {
-					setRows(result.data);
+					setNamespace(result.data.namespace);
+					setRows(result.data.resources);
 					setLoadFailed(null);
 				} else {
 					setLoadFailed(result.error.message);
@@ -283,8 +302,8 @@ export function Resources({ project }: { project: ProjectView }) {
 		return fetchResources();
 	}
 	/*
-	 * Reloads when the project changes and never on `load` identity — the list belongs to the project,
-	 * not to the closure.
+	 * Reloads when the bucket changes and never on `load` identity — the list belongs to the bucket, not to
+	 * the closure.
 	 */
 	useEffect(() => {
 		void fetchResources();
@@ -365,15 +384,20 @@ export function Resources({ project }: { project: ProjectView }) {
 
 	async function remove(row: ResourceView) {
 		/*
-		 * Any application of the project may hold tokens for the resource, so the question names them
-		 * (specs/085). A failed read leaves the question without names rather than blocking it.
+		 * The bucket's own applications may hold machine tokens for the resource, so the question names them
+		 * (specs/085, specs/099). A failed read leaves the question without names rather than blocking it.
 		 */
-		const clients = await request<{ clientId: string; clientName?: string }[]>(
-			'GET',
-			`/admin/api/projects/${encodeURIComponent(project._id)}/clients`
-		);
+		const clients = await request<
+			{
+				clientId: string;
+				clientName?: string;
+				registeredDynamically?: boolean;
+			}[]
+		>('GET', `${bucketBase}/clients`);
 		const apps = clients.ok
-			? clients.data.map((c) => c.clientName || c.clientId)
+			? clients.data
+					.filter((c) => !c.registeredDynamically)
+					.map((c) => c.clientName || c.clientId)
 			: [];
 		const agreed = await confirm('resource.remove', {
 			target: row.name,
@@ -414,7 +438,7 @@ export function Resources({ project }: { project: ProjectView }) {
 			 * rather than left to be discovered by a client that fails to connect.
 			 *
 			 * Not read from the settings API, unlike the Agent access screen: this page is reachable by a
-			 * project administrator, who may not read instance settings. So it names the dependency
+			 * tenant administrator, who may not read instance settings. So it names the dependency
 			 * without claiming to know the current value — which is honest, and is the same thing the
 			 * guide says.
 			 */}
@@ -427,7 +451,7 @@ export function Resources({ project }: { project: ProjectView }) {
 			/>
 
 			<Typography.Paragraph type="secondary">
-				{namespaceLine(project)}
+				{namespaceLine(bucketName, namespace)}
 			</Typography.Paragraph>
 
 			{writable ? (
@@ -437,8 +461,12 @@ export function Resources({ project }: { project: ProjectView }) {
 					type="info"
 					showIcon
 					style={{ marginBottom: 16 }}
-					title="This project is read-only to you"
-					description="It has no addressable bucket of its own, so its resources live in the instance's root namespace, where only a super administrator can declare or change them."
+					title="These APIs are read-only to you"
+					description={
+						canEdit
+							? "This bucket has no address of its own, so its APIs live in the instance's root namespace, where only a super administrator can declare or change them."
+							: "Changing a bucket's APIs takes membership of the group that owns it."
+					}
 				/>
 			)}
 
@@ -456,7 +484,7 @@ export function Resources({ project }: { project: ProjectView }) {
 					locale={{
 						emptyText: (
 							<EmptyState
-								purpose="No resources declared for this project yet. Declare one to have this server mint tokens for its audience."
+								purpose="No APIs declared in this bucket yet. Declare one to have this server mint tokens for its audience."
 								create={writable ? newResource : undefined}
 							/>
 						)

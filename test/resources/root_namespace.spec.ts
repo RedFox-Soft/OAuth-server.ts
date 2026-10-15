@@ -9,10 +9,10 @@ import { resourceRoutes } from 'lib/admin/resources/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { ensurePersonalGroup } from 'lib/admin/groups/personal.ts';
 import {
-	getProjectStore,
+	getBucketStore,
 	getProtectedResourceStore
 } from 'lib/adapters/index.ts';
-import { ADMIN_SESSION_COOKIE, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
+import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { AccessToken } from 'lib/models/access_token.ts';
 import { Client } from 'lib/models/client.ts';
 import { ADMIN_MCP_CLIENT_ID, MCP_RESOURCE } from 'lib/mcp/consts.ts';
@@ -23,7 +23,7 @@ import { createAdministrator, type AdminKind } from '../administrators.ts';
 import { rpc } from '../mcp/rpc.ts';
 
 /*
- * A project with no bucket of its own is served at the root issuer, whose namespace every such tenant
+ * A bucket with no address of its own is served at the root issuer, whose namespace every such tenant
  * shares. A resource's metadata can say it trusts the root issuer but not which of those tenants it
  * belongs to, so no proof closes squatting there — declaring at the root is a super administrator's.
  */
@@ -55,20 +55,15 @@ async function administrator(kind: AdminKind) {
 	};
 }
 
-async function rootProject(ownerGroupId: string) {
-	return getProjectStore().create({
-		bucketId: DEFAULT_BUCKET_ID,
-		name: 'Rootless',
-		slug: `rootless-${Math.random().toString(36).slice(2)}`,
-		ownerGroupId
-	});
+async function rootBucket(ownerGroupId: string) {
+	return getBucketStore().create({ name: 'Rootless users', ownerGroupId });
 }
 
-async function declaredAtRoot(projectId: string) {
+async function declaredAtRoot(bucketId: string) {
 	await getProtectedResourceStore().create({
 		namespace: ROOT_NAMESPACE,
 		identifier: AUDIENCE,
-		projectId,
+		bucketId,
 		name: 'Root MCP',
 		scopes: ['mcp:tools-basic']
 	});
@@ -105,7 +100,7 @@ async function agentFor(userId: string) {
  * amends or removes a protected resource, through the console and through an agent alike, and the
  * refusal says how a tenant can declare it instead.
  */
-describe('a project without an addressable bucket', () => {
+describe('a bucket without an address of its own', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'resources' });
 	});
@@ -121,10 +116,10 @@ describe('a project without an addressable bucket', () => {
 
 	it('refuses a group administrator declaring a resource, naming both ways out', async () => {
 		const { cookie, groupId } = await administrator('plain');
-		const project = await rootProject(groupId);
+		const bucket = await rootBucket(groupId);
 
 		const res = await api.admin.api
-			.projects({ id: project._id })
+			.buckets({ id: bucket._id })
 			.resources.post(body, { headers: { cookie } });
 
 		expect(res.status).toBe(403);
@@ -138,11 +133,11 @@ describe('a project without an addressable bucket', () => {
 
 	it('refuses a group administrator amending a resource declared there', async () => {
 		const { cookie, groupId } = await administrator('plain');
-		const project = await rootProject(groupId);
-		await declaredAtRoot(project._id);
+		const bucket = await rootBucket(groupId);
+		await declaredAtRoot(bucket._id);
 
 		const res = await api.admin.api
-			.projects({ id: project._id })
+			.buckets({ id: bucket._id })
 			.resources({ resourceId: encoded })
 			.patch({ name: 'Taken over' }, { headers: { cookie } });
 
@@ -151,11 +146,11 @@ describe('a project without an addressable bucket', () => {
 
 	it('refuses a group administrator removing a resource declared there', async () => {
 		const { cookie, groupId } = await administrator('plain');
-		const project = await rootProject(groupId);
-		await declaredAtRoot(project._id);
+		const bucket = await rootBucket(groupId);
+		await declaredAtRoot(bucket._id);
 
 		const res = await api.admin.api
-			.projects({ id: project._id })
+			.buckets({ id: bucket._id })
 			.resources({ resourceId: encoded })
 			.delete(undefined, { headers: { cookie } });
 
@@ -165,10 +160,10 @@ describe('a project without an addressable bucket', () => {
 
 	it('lets a super administrator declare a resource with no outbound request', async () => {
 		const { cookie, groupId } = await administrator('super');
-		const project = await rootProject(groupId);
+		const bucket = await rootBucket(groupId);
 
 		const res = await api.admin.api
-			.projects({ id: project._id })
+			.buckets({ id: bucket._id })
 			.resources.post(
 				{ ...body, identifier: 'http://10.9.8.7/mcp' },
 				{ headers: { cookie } }
@@ -179,7 +174,7 @@ describe('a project without an addressable bucket', () => {
 
 	it('refuses an agent acting for a group administrator declaring a resource', async () => {
 		const { user, groupId } = await administrator('plain');
-		const project = await rootProject(groupId);
+		const bucket = await rootBucket(groupId);
 		const token = await agentFor(user._id);
 
 		const answer = await rpc(
@@ -189,7 +184,7 @@ describe('a project without an addressable bucket', () => {
 				method: 'tools/call',
 				params: {
 					name: 'resource_declare',
-					arguments: { id: project._id, ...body }
+					arguments: { id: bucket._id, ...body }
 				}
 			},
 			token

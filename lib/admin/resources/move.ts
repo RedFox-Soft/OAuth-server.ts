@@ -5,10 +5,10 @@ import { AdminError, type AdminContext } from '../auth/rbac.js';
 import { ROOT_DECLARATION_REFUSAL } from './refusals.js';
 
 /*
- * Carrying a project's declarations into the namespace of the bucket it now belongs to.
+ * Carrying a bucket's declarations into the namespace its new address gives it.
  *
- * A declaration's namespace is derived from its project's bucket, so a project that changes bucket
- * without its declarations moving would leave them in a namespace that no longer resolves them — the
+ * A declaration's namespace is derived from its bucket's address, so a bucket that gains an address of its
+ * own without its declarations moving would leave them in a namespace that no longer resolves them — the
  * resource would stop being issued tokens at the new address and keep answering at the old one. Moving
  * them is therefore part of the change, and refusing the change is the only answer when they cannot
  * move: the target namespace already declares one of the identifiers, or the target is the shared root,
@@ -24,7 +24,7 @@ export class DeclarationsConflict extends AdminError {
 	constructor(readonly conflicts: string[]) {
 		super(
 			409,
-			'the bucket this project would move to already declares a resource this project declares'
+			'the namespace this bucket would move to already declares a resource this bucket declares'
 		);
 	}
 }
@@ -43,14 +43,14 @@ export interface MovePreview {
 
 export async function previewMove(
 	ctx: AdminContext,
-	projectId: string,
+	bucketId: string,
 	from: string,
 	to: string
 ): Promise<MovePreview> {
 	if (from === to) return { moving: [], conflicts: [], rootRefused: false };
 
 	const store = getProtectedResourceStore();
-	const moving = (await store.listByProject(projectId)).filter(
+	const moving = (await store.listByBucket(bucketId)).filter(
 		(r) => r.namespace === from
 	);
 	const conflicts: string[] = [];
@@ -69,14 +69,14 @@ export async function previewMove(
 /* Checked before the audit write, so a refused move leaves no entry describing a change nobody made. */
 export async function planMove(
 	ctx: AdminContext,
-	projectId: string,
+	bucketId: string,
 	from: string,
 	to: string
 ): Promise<MovePlan> {
 	if (from === to) return { from, to, count: 0 };
 
 	const store = getProtectedResourceStore();
-	const moving = (await store.listByProject(projectId)).filter(
+	const moving = (await store.listByBucket(bucketId)).filter(
 		(r) => r.namespace === from
 	);
 	if (moving.length === 0) return { from, to, count: 0 };
@@ -98,12 +98,12 @@ export async function planMove(
 
 /* After the audit write. The store refuses a race the plan could not see, and undoes its own moves. */
 export async function applyMove(
-	projectId: string,
+	bucketId: string,
 	plan: MovePlan
 ): Promise<void> {
 	if (plan.count === 0) return;
-	const result = await getProtectedResourceStore().moveProject(
-		projectId,
+	const result = await getProtectedResourceStore().moveBucketNamespace(
+		bucketId,
 		plan.from,
 		plan.to
 	);

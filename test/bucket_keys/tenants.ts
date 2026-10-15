@@ -2,10 +2,10 @@ import { elysia } from 'lib/index.ts';
 import { ISSUER } from 'lib/configs/env.ts';
 import {
 	getBucketStore,
-	getProjectStore,
 	getProtectedResourceStore
 } from 'lib/adapters/index.ts';
-import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
+import { bindClientToBucket } from '../test_helper.ts';
+import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { Type } from '@sinclair/typebox';
 import { present, shaped } from 'test/shape.ts';
 
@@ -25,7 +25,7 @@ export function addresses(prefix: string) {
 	};
 }
 
-/* A bucket at an address, a project in it holding one machine client, and one declared resource. */
+/* A bucket at an address holding one machine client and one declared resource. */
 export async function tenant(
 	address: { slug: string } | { host: string },
 	clientId: string
@@ -35,20 +35,11 @@ export async function tenant(
 		name: clientId,
 		...address
 	});
-	const project = await getProjectStore().create({
-		bucketId: DEFAULT_BUCKET_ID,
-		ownerGroupId: UNASSIGNED_GROUP_ID,
-		name: clientId,
-		slug: `${clientId}-${Math.random().toString(36).slice(2)}`
-	});
-	await getProjectStore().update(project._id, {
-		bucketId: bucket._id,
-		clientIds: [clientId]
-	});
+	await bindClientToBucket(clientId, bucket._id);
 	await getProtectedResourceStore().create({
 		namespace: bucket._id,
 		identifier: RESOURCE,
-		projectId: project._id,
+		bucketId: bucket._id,
 		name: RESOURCE,
 		scopes: ['keys:read']
 	});

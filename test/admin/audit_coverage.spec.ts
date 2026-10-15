@@ -3,7 +3,6 @@ import { Elysia } from 'elysia';
 import { treaty } from '@elysiajs/eden';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { adminSetup } from 'lib/admin/auth/setup.ts';
-import { projectRoutes } from 'lib/admin/projects/routes.ts';
 import { clientRoutes } from 'lib/admin/clients/routes.ts';
 import { adminUserRoutes } from 'lib/admin/users/routes.ts';
 import { bucketRoutes } from 'lib/admin/buckets/routes.ts';
@@ -15,7 +14,6 @@ import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
 	adminAuditStore,
 	getUserStore,
-	getProjectStore,
 	getBucketStore,
 	getSmtpSettingsStore,
 	configStore,
@@ -25,8 +23,7 @@ import type { AdminAuditEntry } from 'lib/adapters/types.ts';
 import {
 	ADMIN_BUCKET_ID,
 	ADMIN_SESSION_COOKIE,
-	UNASSIGNED_GROUP_ID,
-	DEFAULT_BUCKET_ID
+	UNASSIGNED_GROUP_ID
 } from 'lib/admin/consts.ts';
 import { sessionFor } from '../admin_session.ts';
 import { answered } from './answered.ts';
@@ -39,8 +36,7 @@ import { present } from 'test/shape.js';
 import { createAdministrator } from '../administrators.ts';
 
 /*
- * One audit entry per state-changing admin operation — all 23 of them, driven through the real HTTP
- * layer. The companion spec (audit_route_classification) proves nothing was forgotten; this one proves
+ * One audit entry per state-changing admin operation, driven through the real HTTP layer. The companion spec (audit_route_classification) proves nothing was forgotten; this one proves
  * each handler actually writes, with the right action, target and scope.
  *
  * Assertions are scoped by the entity's own id, never by a total count: the in-memory trail is a
@@ -48,13 +44,12 @@ import { createAdministrator } from '../administrators.ts';
  * have already written to it. The two singleton-configuration operations have no entity id, so those
  * two measure a delta instead.
  *
- * Fixtures (projects, buckets, target admins) are created through the stores rather than the API
+ * Fixtures (buckets, target admins) are created through the stores rather than the API
  * wherever they are not the operation under test, so "exactly one entry for this id" stays meaningful.
  */
 const app = new Elysia()
 	.use(resolveAdmin)
 	.use(adminSetup)
-	.use(projectRoutes)
 	.use(clientRoutes)
 	.use(adminUserRoutes)
 	.use(bucketRoutes)
@@ -118,15 +113,6 @@ function expectEntry(
 	expect(entry.attributes ?? []).toEqual(expected.attributes ?? []);
 }
 
-async function makeProject() {
-	return getProjectStore().create({
-		bucketId: DEFAULT_BUCKET_ID,
-		ownerGroupId: UNASSIGNED_GROUP_ID,
-		name: 'P',
-		slug: unique('p')
-	});
-}
-
 async function makeBucket() {
 	return getBucketStore().create({
 		ownerGroupId: UNASSIGNED_GROUP_ID,
@@ -175,88 +161,6 @@ describe('admin audit coverage: bootstrap', () => {
 	});
 });
 
-describe('admin audit coverage: projects', () => {
-	beforeEach(async () => {
-		await ensureAdminSeed();
-	});
-
-	it('records a project creation against the id the project will have', async () => {
-		const { cookie, userId } = await superCookie();
-
-		const res = await client.admin.api.projects.post(
-			{ name: 'Audited', slug: unique('audited'), bucketId: DEFAULT_BUCKET_ID },
-			{ headers: { cookie } }
-		);
-		expect(res.status).toBe(201);
-		const created = answered(res.data);
-
-		expectEntry(await soleEntry(created._id), {
-			action: 'project.create',
-			targetType: 'Project',
-			actorId: userId,
-			attributes: ['bucketId', 'name', 'slug']
-		});
-	});
-
-	it('records a project update', async () => {
-		const { cookie, userId } = await superCookie();
-		const project = await makeProject();
-
-		const res = await client.admin.api
-			.projects({ id: project._id })
-			.patch({ name: 'Renamed' }, { headers: { cookie } });
-		expect(res.status).toBe(200);
-
-		expectEntry(await soleEntry(project._id), {
-			action: 'project.update',
-			targetType: 'Project',
-			actorId: userId,
-			attributes: ['name']
-		});
-	});
-
-	it('records a project deletion', async () => {
-		const { cookie, userId } = await superCookie();
-		const project = await makeProject();
-
-		const res = await client.admin.api
-			.projects({ id: project._id })
-			.delete(undefined, { headers: { cookie } });
-		expect(res.status).toBe(200);
-
-		expectEntry(await soleEntry(project._id), {
-			action: 'project.delete',
-			targetType: 'Project',
-			actorId: userId
-		});
-	});
-
-	it('records a bucket assignment', async () => {
-		const { cookie, userId } = await superCookie();
-		const project = await makeProject();
-		const bucket = await makeBucket();
-
-		const res = await client.admin.api.projects({ id: project._id }).bucket.put(
-			{
-				bucketId: bucket._id,
-				confirm: true,
-				expect: { applications: 0, resources: 0 }
-			},
-			{ headers: { cookie } }
-		);
-		expect(res.status).toBe(200);
-
-		const entry = await soleEntry(project._id);
-		expectEntry(entry, {
-			action: 'project.bucket.assign',
-			targetType: 'Project',
-			actorId: userId,
-			attributes: ['bucketId']
-		});
-		expect(entry.bucketId).toBe(bucket._id);
-	});
-});
-
 describe('admin audit coverage: clients', () => {
 	beforeEach(async () => {
 		await ensureAdminSeed();
@@ -264,34 +168,38 @@ describe('admin audit coverage: clients', () => {
 
 	it('records a client creation against the id the client will have', async () => {
 		const { cookie, userId } = await superCookie();
-		const project = await makeProject();
+		const bucket = await makeBucket();
 
 		const res = await client.admin.api
-			.projects({ id: project._id })
+			.buckets({ id: bucket._id })
 			.clients.post(CLIENT_BODY, { headers: { cookie } });
 		expect(res.status).toBe(201);
 		const created = answered(res.data);
 
-		expectEntry(await soleEntry(created.clientId), {
+		const entry = await soleEntry(created.clientId);
+		expectEntry(entry, {
 			action: 'client.create',
 			targetType: 'Client',
 			actorId: userId
 		});
+		// The bucket it was created in and that bucket's group, so the group reads it in its own trail.
+		expect(entry.bucketId).toBe(bucket._id);
+		expect(entry.ownerGroupId).toBe(UNASSIGNED_GROUP_ID);
 	});
 
 	it('records a client update', async () => {
 		const { cookie, userId } = await superCookie();
-		const project = await makeProject();
+		const bucket = await makeBucket();
 		const created = answered(
 			(
 				await client.admin.api
-					.projects({ id: project._id })
+					.buckets({ id: bucket._id })
 					.clients.post(CLIENT_BODY, { headers: { cookie } })
 			).data
 		);
 
 		const res = await client.admin.api
-			.projects({ id: project._id })
+			.buckets({ id: bucket._id })
 			.clients({ clientId: created.clientId })
 			.patch({ clientName: 'Renamed' }, { headers: { cookie } });
 		expect(res.status).toBe(200);
@@ -312,17 +220,17 @@ describe('admin audit coverage: clients', () => {
 
 	it('records a secret rotation, without the secret', async () => {
 		const { cookie, userId } = await superCookie();
-		const project = await makeProject();
+		const bucket = await makeBucket();
 		const created = answered(
 			(
 				await client.admin.api
-					.projects({ id: project._id })
+					.buckets({ id: bucket._id })
 					.clients.post(CLIENT_BODY, { headers: { cookie } })
 			).data
 		);
 
 		const res = await client.admin.api
-			.projects({ id: project._id })
+			.buckets({ id: bucket._id })
 			.clients({ clientId: created.clientId })
 			.secret.post(undefined, { headers: { cookie } });
 		expect(res.status).toBe(200);
@@ -343,17 +251,17 @@ describe('admin audit coverage: clients', () => {
 
 	it('records a client deletion', async () => {
 		const { cookie, userId } = await superCookie();
-		const project = await makeProject();
+		const bucket = await makeBucket();
 		const created = answered(
 			(
 				await client.admin.api
-					.projects({ id: project._id })
+					.buckets({ id: bucket._id })
 					.clients.post(CLIENT_BODY, { headers: { cookie } })
 			).data
 		);
 
 		const res = await client.admin.api
-			.projects({ id: project._id })
+			.buckets({ id: bucket._id })
 			.clients({ clientId: created.clientId })
 			.delete(undefined, { headers: { cookie } });
 		expect(res.status).toBe(200);

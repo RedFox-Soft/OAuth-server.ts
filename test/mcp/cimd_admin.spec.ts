@@ -167,9 +167,9 @@ describe('the administrative plane through a client identity document', () => {
 	});
 
 	/*
-	 * And the reserved client is unaffected by any of it: its route to the administrator bucket is
-	 * membership of the reserved admin project, which needs neither an allowlist entry nor the
-	 * document capability.
+	 * And the reserved client is unaffected by any of it: its route to the administrator bucket is the
+	 * bucket its stored record names, which needs neither an allowlist entry nor the document
+	 * capability.
 	 */
 	it('leaves the reserved client working with the document capability off', async () => {
 		ApplicationConfig['clientIdMetadataDocument.enabled'] = false;

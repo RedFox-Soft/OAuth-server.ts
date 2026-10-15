@@ -71,11 +71,11 @@ describe('admin UI shell', () => {
 		const forbidden = await agent.admin.api.audit.get({ query: {} });
 		expect(forbidden.status).toBe(401);
 
-		const superShell = await page('/admin/projects', await cookieFor('super'));
+		const superShell = await page('/admin/buckets', await cookieFor('super'));
 		expect(superShell).toContain('Settings');
 		expect(superShell).toContain('Keys');
 
-		const shell = await page('/admin/projects', await cookieFor('plain'));
+		const shell = await page('/admin/buckets', await cookieFor('plain'));
 		expect(shell).not.toContain('Settings');
 		expect(shell).not.toContain('Faults');
 		// ...but the tenant's own surfaces are offered, including the two this feature unblocked.

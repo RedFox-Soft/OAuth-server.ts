@@ -28,7 +28,7 @@ operator-created client whose id is a URL: the shape of the id is not the test, 
 `tryFindClient` reads the store before trying a document.
 
 Since spec 092 the same answer is also read on the **success** path. The consent page classifies the
-client through `clientProvenance` (`provenance.ts:66-78`), whose first test is this one: a client nobody
+client through `clientProvenance` (`provenance.ts:68-79`), whose first test is this one: a client nobody
 vouched for is self-registered, and the page says "{service} hasn't checked this app" about it. Redirects
 are still unchanged; only the page's wording and warnings follow the tier. That replaced the consent
 page's own `https:`-shaped test of the client id, which was the very test this section rules out. See

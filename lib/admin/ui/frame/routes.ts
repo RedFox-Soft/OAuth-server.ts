@@ -9,7 +9,6 @@
  */
 
 export type Section =
-	| 'projects'
 	| 'buckets'
 	| 'groups'
 	| 'audit'
@@ -21,12 +20,10 @@ export type Section =
 	| 'faults';
 
 export type PageKey =
-	| 'projects'
-	| 'project.clients'
-	| 'project.resources'
-	| 'project.settings'
 	| 'buckets'
 	| 'bucket.overview'
+	| 'bucket.applications'
+	| 'bucket.apis'
 	| 'bucket.users'
 	| 'bucket.user'
 	| 'bucket.user.signIn'
@@ -75,26 +72,6 @@ interface RouteSpec {
 }
 
 export const ROUTES: readonly RouteSpec[] = [
-	{ key: 'projects', pattern: ['projects'], section: 'projects' },
-	{
-		key: 'project.clients',
-		pattern: ['projects', ':project', 'clients'],
-		section: 'projects',
-		area: 'Clients'
-	},
-	{
-		key: 'project.resources',
-		pattern: ['projects', ':project', 'resources'],
-		section: 'projects',
-		area: 'Resources'
-	},
-	/* Where the project's bucket, group and name are changed (specs/085), so none lives only in a list menu. */
-	{
-		key: 'project.settings',
-		pattern: ['projects', ':project', 'settings'],
-		section: 'projects',
-		area: 'Settings'
-	},
 	{ key: 'buckets', pattern: ['buckets'], section: 'buckets' },
 	/* A bucket's bare address is its Overview (specs/081): a link that names the bucket lands there. */
 	{
@@ -102,6 +79,22 @@ export const ROUTES: readonly RouteSpec[] = [
 		pattern: ['buckets', ':bucket'],
 		section: 'buckets',
 		area: 'Overview'
+	},
+	/*
+	 * What the bucket holds besides its people (specs/099): its applications (OAuth clients) and its APIs
+	 * (declared protected resources), each for its whole life.
+	 */
+	{
+		key: 'bucket.applications',
+		pattern: ['buckets', ':bucket', 'applications'],
+		section: 'buckets',
+		area: 'Applications'
+	},
+	{
+		key: 'bucket.apis',
+		pattern: ['buckets', ':bucket', 'apis'],
+		section: 'buckets',
+		area: 'APIs'
 	},
 	{
 		key: 'bucket.users',
@@ -308,8 +301,8 @@ export const ROUTES: readonly RouteSpec[] = [
 ];
 
 /*
- * Addresses that stand for another one. A bare project opens its first area and the bare console opens
- * Projects; a bucket's bare address is a page of its own, its Overview. Kept apart from the table above so a
+ * Addresses that stand for another one. The bare console opens Buckets; a bucket's bare address is a page of
+ * its own, its Overview. Kept apart from the table above so a
  * redirect never has a page that could drift from the page it names. Checked before the table, so the
  * literal administrators' bucket below wins over the Overview pattern.
  */
@@ -317,11 +310,7 @@ const REDIRECTS: readonly {
 	readonly pattern: readonly string[];
 	readonly to: (params: Partial<Record<string, string>>) => string;
 }[] = [
-	{ pattern: [], to: () => '/admin/projects' },
-	{
-		pattern: ['projects', ':project'],
-		to: (p) => `/admin/projects/${encodeURIComponent(p.project ?? '')}/clients`
-	},
+	{ pattern: [], to: () => '/admin/buckets' },
 	/*
 	 * The administrators' bucket lives on the Administrators page (specs/083): every address it had as a bucket
 	 * leads to the matching tab there, so an old link still lands somewhere that means the same. Its id is
@@ -420,7 +409,6 @@ export function resolveAddress(pathname: string): Resolved {
 }
 
 export const SECTION_LABELS: Readonly<Record<Section, string>> = {
-	projects: 'Projects',
 	buckets: 'Buckets',
 	groups: 'Groups',
 	audit: 'Audit',
@@ -476,25 +464,6 @@ export function connectionHref(
 
 export function userGroupHref(bucketId: string, groupId: string): string {
 	return `${bucketHref(bucketId, 'user-groups')}/${encodeURIComponent(groupId)}`;
-}
-
-export function projectHref(projectId: string, area = 'clients'): string {
-	return `/admin/projects/${encodeURIComponent(projectId)}/${area}`;
-}
-
-/*
- * A project's Settings, optionally at one card. `bucket` preselects a bucket in the Bucket card's change
- * dialog, so it implies that card.
- */
-export function projectSettingsHref(
-	projectId: string,
-	options: { bucket?: string; card?: 'bucket' | 'ownership' | 'danger' } = {}
-): string {
-	const query = options.bucket
-		? `?bucket=${encodeURIComponent(options.bucket)}`
-		: '';
-	const card = options.card ?? (options.bucket ? 'bucket' : undefined);
-	return `${projectHref(projectId, 'settings')}${query}${card ? `#${card}` : ''}`;
 }
 
 export function groupHref(groupId: string): string {

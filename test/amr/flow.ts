@@ -1,11 +1,8 @@
 import { expect } from 'bun:test';
 import { elysia } from 'lib/index.ts';
-import {
-	getBucketStore,
-	getProjectStore,
-	getUserStore
-} from 'lib/adapters/index.ts';
-import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
+import { getBucketStore, getUserStore } from 'lib/adapters/index.ts';
+import { bindClientToBucket } from '../test_helper.ts';
+import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { decode as decodeJWT } from 'lib/helpers/jwt.ts';
 import { isPlainObject } from 'lib/helpers/_/object.js';
 import { encodeBase32, decodeBase32 } from 'lib/totp/base32.ts';
@@ -26,7 +23,7 @@ export function codeFor(secret = SECRET): string {
 	return hotp(decodeBase32(secret), stepFor(epochTime()));
 }
 
-/* A bucket, and a project that routes the named clients' sign-ins to it. */
+/* A bucket the named clients belong to, so their sign-ins land in it. */
 export async function seedBucket(
 	name: string,
 	clientIds: string[],
@@ -37,16 +34,9 @@ export async function seedBucket(
 		name,
 		...fields
 	});
-	const project = await getProjectStore().create({
-		bucketId: DEFAULT_BUCKET_ID,
-		ownerGroupId: UNASSIGNED_GROUP_ID,
-		name,
-		slug: `${clientIds[0]}-${Math.random()}`
-	});
-	await getProjectStore().update(project._id, {
-		bucketId: bucket._id,
-		clientIds
-	});
+	for (const clientId of clientIds) {
+		await bindClientToBucket(clientId, bucket._id);
+	}
 	return bucket._id;
 }
 

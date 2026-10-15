@@ -8,7 +8,8 @@ import {
 	resolveAdmin,
 	type AdminContext
 } from '../auth/rbac.js';
-import { loadProject } from '../projects/access.js';
+import type { UserBucket } from '../../adapters/types.js';
+import { loadBucketForEdit, loadBucketForUsers } from '../buckets/access.js';
 import { recordAdminAudit } from '../audit/record.js';
 import { canonicalizeResourceIdentifier } from '../../resources/canonical.js';
 import {
@@ -21,10 +22,7 @@ import {
 import { isMcpResource } from '../../mcp/resource_server.js';
 import { SCIM_BASE_PATH } from '../../consts/scim.js';
 import { CreateResourceBody, UpdateResourceBody } from './schema.js';
-import {
-	namespaceOfProject,
-	ROOT_NAMESPACE
-} from '../../resources/namespace.js';
+import { namespaceOf, ROOT_NAMESPACE } from '../../resources/namespace.js';
 import { findDeclaredResource } from '../../resources/registry.js';
 import { checkVouching } from '../../resources/vouching.js';
 import { issuerFor } from '../../configs/issuer.js';
@@ -35,11 +33,12 @@ import { ROOT_DECLARATION_REFUSAL } from './refusals.js';
 import { mayDeclareIn } from '../auth/can.js';
 
 /*
- * Declared protected resources: the audiences this server will mint tokens for, owned by a project.
+ * Declared protected resources: the audiences this server will mint tokens for, each belonging to one
+ * bucket for its whole life (specs/099).
  *
- * Authorization is the project's, not a role's — `loadProject` resolves the project and refuses an
- * outsider identically whether it exists or not. Declaring a resource in a bucket with an address of its
- * own is ordinary work for the administrator who owns the project, and nothing about the resource is
+ * Authorization is the bucket's — reading needs its read right, changing its edit right, and an outsider is
+ * refused identically whether the bucket exists or not. Declaring a resource in a bucket with an address of
+ * its own is ordinary work for the administrator who holds the bucket, and nothing about the resource is
  * fetched or judged: the declaration is unique within that bucket's namespace, so it cannot be a claim
  * on anybody else's, and a server on an internal network or not yet deployed is as declarable as any.
  */
@@ -100,7 +99,7 @@ function namesOwnScimEndpoint(identifier: string): boolean {
 /*
  * The shared root namespace is a super administrator's to write.
  *
- * Every tenant served at the root — a project on the default bucket, or a bucket with no address of its own —
+ * Every tenant served at the root — the default bucket, or a bucket with no address of its own —
  * shares one issuer and so one namespace, and a resource's own metadata can say it trusts that issuer
  * but not which of those tenants it belongs to. No proof the resource could offer would stop one of
  * them declaring another's server first, so the only rule that closes squatting here is who may write.
@@ -108,7 +107,6 @@ function namesOwnScimEndpoint(identifier: string): boolean {
  * made would have the same reach by another route.
  */
 function assertMayWrite(ctx: AdminContext, namespace: string): void {
-	// The project's stated `declareResources` right, read from the same predicate.
 	if (!mayDeclareIn(ctx, namespace)) {
 		throw new AdminError(403, ROOT_DECLARATION_REFUSAL);
 	}
@@ -162,29 +160,33 @@ function prunedDescriptions(
 
 /*
  * Loads a declared resource by the spelling in the path, and refuses one that belongs to a different
- * project than the path names.
+ * bucket than the path names.
  *
  * Looked up the way a token request looks it up — the exact spelling, then the slash-free one — so a
  * resource whose trailing slash is significant is reachable here by the spelling it was declared with,
  * which canonicalizing with the default options made impossible.
  *
- * The project check still matters: a namespace holds every project of its bucket, so
- * `/projects/A/resources/<B's audience>` would otherwise read — and amend — a sibling project's
- * declaration through a project the caller does legitimately own. A 404 rather than a 403, because from
- * this project's point of view the resource genuinely is not there.
+ * The bucket check matters at the root: every bucket served there shares one namespace, so
+ * `/buckets/A/resources/<B's audience>` would otherwise read — and amend — another bucket's declaration
+ * through a bucket the caller does legitimately hold. A 404, as for a resource that does not exist, because
+ * from this bucket's point of view it genuinely is not there.
  */
-async function loadResource(
-	projectId: string,
-	namespace: string,
-	resourceId: string
-) {
+async function loadResource(bucket: UserBucket, resourceId: string) {
 	// A malformed or reserved spelling is refused the way a write refuses it, before any lookup.
 	canonicalIdentifier(resourceId);
-	const resource = await findDeclaredResource(resourceId, namespace);
-	if (!resource || resource.projectId !== projectId) {
-		throw new AdminError(404, 'resource not declared in this project');
+	const resource = await findDeclaredResource(resourceId, namespaceOf(bucket));
+	if (resource?.bucketId !== bucket._id) {
+		throw new AdminError(404, 'resource not declared in this bucket');
 	}
 	return resource;
+}
+
+function scopeOf(bucket: UserBucket, namespace: string) {
+	return {
+		bucketId: bucket._id,
+		ownerGroupId: bucket.ownerGroupId,
+		targetScope: namespace
+	};
 }
 
 export const resourceRoutes = new Elysia({ name: 'admin-resources' })
@@ -195,16 +197,30 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 			return adminErrorBody(error);
 		}
 	})
-	.get('/admin/api/projects/:id/resources', async ({ admin, params }) => {
+	/*
+	 * A bucket's declarations, with the namespace they are unique within: the bucket's own when it has an
+	 * address, the root otherwise — shared with every other root-served bucket, which is why only this
+	 * bucket's declarations are listed.
+	 */
+	.get('/admin/api/buckets/:id/resources', async ({ admin, params }) => {
 		const ctx = assertAuth(admin);
-		await loadProject(ctx, params.id);
-		return getProtectedResourceStore().listByProject(params.id);
+		const bucket = await loadBucketForUsers(ctx, params.id);
+		const namespace = namespaceOf(bucket);
+		const resources = (
+			await getProtectedResourceStore().listByBucket(bucket._id)
+		).sort((a, b) =>
+			a.identifier < b.identifier ? -1 : a.identifier > b.identifier ? 1 : 0
+		);
+		return {
+			namespace: namespace === ROOT_NAMESPACE ? 'root' : 'bucket',
+			resources
+		};
 	})
 	.post(
-		'/admin/api/projects/:id/resources',
+		'/admin/api/buckets/:id/resources',
 		async ({ admin, params, body, set }) => {
 			const ctx = assertAuth(admin);
-			const project = await loadProject(ctx, params.id);
+			const bucket = await loadBucketForEdit(ctx, params.id);
 
 			const identifier = canonicalIdentifier(
 				body.identifier,
@@ -215,7 +231,7 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 				body.scopeDescriptions === undefined
 					? undefined
 					: acceptedScopeDescriptions(body.scopeDescriptions, scopes);
-			const namespace = await namespaceOfProject(project);
+			const namespace = namespaceOf(bucket);
 			assertMayWrite(ctx, namespace);
 
 			/*
@@ -230,16 +246,18 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 				});
 			}
 
-			await recordAdminAudit(ctx, 'resource.create', identifier, {
-				ownerGroupId: project.ownerGroupId,
-				targetScope: namespace
-			});
+			await recordAdminAudit(
+				ctx,
+				'resource.create',
+				identifier,
+				scopeOf(bucket, namespace)
+			);
 
 			try {
 				const resource = await getProtectedResourceStore().create({
 					namespace,
 					identifier,
-					projectId: params.id,
+					bucketId: bucket._id,
 					name: body.name,
 					scopes,
 					...(scopeDescriptions ? { scopeDescriptions } : {}),
@@ -267,15 +285,11 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 		{ body: CreateResourceBody }
 	)
 	.get(
-		'/admin/api/projects/:id/resources/:resourceId',
+		'/admin/api/buckets/:id/resources/:resourceId',
 		async ({ admin, params }) => {
 			const ctx = assertAuth(admin);
-			const project = await loadProject(ctx, params.id);
-			return loadResource(
-				params.id,
-				await namespaceOfProject(project),
-				params.resourceId
-			);
+			const bucket = await loadBucketForUsers(ctx, params.id);
+			return loadResource(bucket, params.resourceId);
 		}
 	)
 	/*
@@ -288,16 +302,12 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 	 * no address, which no metadata document could ever be asked to name.
 	 */
 	.get(
-		'/admin/api/projects/:id/resources/:resourceId/vouching',
+		'/admin/api/buckets/:id/resources/:resourceId/vouching',
 		async ({ admin, params }) => {
 			const ctx = assertAuth(admin);
-			const project = await loadProject(ctx, params.id);
-			const namespace = await namespaceOfProject(project);
-			const resource = await loadResource(
-				params.id,
-				namespace,
-				params.resourceId
-			);
+			const bucket = await loadBucketForUsers(ctx, params.id);
+			const namespace = namespaceOf(bucket);
+			const resource = await loadResource(bucket, params.resourceId);
 			const expectedIssuer =
 				namespace === ROOT_NAMESPACE
 					? ISSUER
@@ -308,17 +318,13 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 		}
 	)
 	.patch(
-		'/admin/api/projects/:id/resources/:resourceId',
+		'/admin/api/buckets/:id/resources/:resourceId',
 		async ({ admin, params, body }) => {
 			const ctx = assertAuth(admin);
-			const project = await loadProject(ctx, params.id);
-			const namespace = await namespaceOfProject(project);
+			const bucket = await loadBucketForEdit(ctx, params.id);
+			const namespace = namespaceOf(bucket);
 			assertMayWrite(ctx, namespace);
-			const existing = await loadResource(
-				params.id,
-				namespace,
-				params.resourceId
-			);
+			const existing = await loadResource(bucket, params.resourceId);
 			const { identifier } = existing;
 
 			const scopes =
@@ -338,9 +344,8 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 			// After validation: an entry for a request about to be refused as malformed would describe a
 			// change nobody attempted.
 			await recordAdminAudit(ctx, 'resource.update', identifier, {
-				attributes,
-				ownerGroupId: project.ownerGroupId,
-				targetScope: namespace
+				...scopeOf(bucket, namespace),
+				attributes
 			});
 
 			return getProtectedResourceStore().update(namespace, identifier, {
@@ -352,22 +357,20 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 		{ body: UpdateResourceBody }
 	)
 	.delete(
-		'/admin/api/projects/:id/resources/:resourceId',
+		'/admin/api/buckets/:id/resources/:resourceId',
 		async ({ admin, params, set }) => {
 			const ctx = assertAuth(admin);
-			const project = await loadProject(ctx, params.id);
-			const namespace = await namespaceOfProject(project);
+			const bucket = await loadBucketForEdit(ctx, params.id);
+			const namespace = namespaceOf(bucket);
 			assertMayWrite(ctx, namespace);
-			const { identifier } = await loadResource(
-				params.id,
-				namespace,
-				params.resourceId
-			);
+			const { identifier } = await loadResource(bucket, params.resourceId);
 
-			await recordAdminAudit(ctx, 'resource.delete', identifier, {
-				ownerGroupId: project.ownerGroupId,
-				targetScope: namespace
-			});
+			await recordAdminAudit(
+				ctx,
+				'resource.delete',
+				identifier,
+				scopeOf(bucket, namespace)
+			);
 
 			await getProtectedResourceStore().destroy(namespace, identifier);
 			set.status = 204;

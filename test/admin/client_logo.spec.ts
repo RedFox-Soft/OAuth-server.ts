@@ -4,24 +4,20 @@ import { treaty } from '@elysiajs/eden';
 
 import bootstrap from '../test_helper.js';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
-import { projectRoutes } from 'lib/admin/projects/routes.ts';
 import { clientRoutes } from 'lib/admin/clients/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
 	adapter,
 	adminAuditStore,
-	getProjectStore
+	getBucketStore
 } from 'lib/adapters/index.ts';
-import {
-	ADMIN_SESSION_COOKIE,
-	UNASSIGNED_GROUP_ID,
-	DEFAULT_BUCKET_ID
-} from 'lib/admin/consts.ts';
+import { ADMIN_SESSION_COOKIE, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import {
 	LOGO_FORMAT_MESSAGE,
 	LOGO_SIZE_MESSAGE
 } from 'lib/consts/client_logo.ts';
 import { sessionFor } from '../admin_session.ts';
+import { answered } from './answered.ts';
 import { createAdministrator } from '../administrators.ts';
 import {
 	JPEG,
@@ -30,7 +26,7 @@ import {
 	WEBP
 } from '../consent_branding/consent_branding.config.ts';
 
-const app = new Elysia().use(resolveAdmin).use(projectRoutes).use(clientRoutes);
+const app = new Elysia().use(resolveAdmin).use(clientRoutes);
 const api = treaty(app);
 
 /* PNG bytes over the limit: the signature, then padding — what matters is what the bytes say and weigh. */
@@ -55,7 +51,7 @@ interface View {
  */
 describe('a client’s logo and links through the admin API', () => {
 	let cookie: string;
-	let projectId: string;
+	let bucketId: string;
 
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'admin' });
@@ -68,17 +64,16 @@ describe('a client’s logo and links through the admin API', () => {
 			`logo-${Math.random()}@x.io`
 		);
 		cookie = `${ADMIN_SESSION_COOKIE}=${(await sessionFor(user))._id}`;
-		const project = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
+		const bucket = await getBucketStore().create({
 			name: 'Logos',
-			slug: `logos-${Math.random()}`,
+			slug: `logos-${String(Math.random()).slice(2)}`,
 			ownerGroupId: UNASSIGNED_GROUP_ID
 		});
-		projectId = project._id;
+		bucketId = bucket._id;
 	});
 
 	function clients() {
-		return api.admin.api.projects({ id: projectId }).clients;
+		return api.admin.api.buckets({ id: bucketId }).clients;
 	}
 
 	async function create(extra: Record<string, unknown> = {}) {
@@ -207,14 +202,16 @@ describe('a client’s logo and links through the admin API', () => {
 	});
 
 	it('creates no client when the logo given with it is refused', async () => {
-		const before = (await getProjectStore().find(projectId))?.clientIds ?? [];
+		const listed = async () =>
+			answered((await clients().get({ headers: { cookie } })).data).map(
+				(c) => c.clientId
+			);
+		const before = await listed();
 
 		expect(await errorOf(await create({ logo: SVG }))).toBe(
 			LOGO_FORMAT_MESSAGE
 		);
-		expect((await getProjectStore().find(projectId))?.clientIds).toEqual(
-			before
-		);
+		expect(await listed()).toEqual(before);
 	});
 
 	it('sets, returns and clears the privacy policy and terms links', async () => {

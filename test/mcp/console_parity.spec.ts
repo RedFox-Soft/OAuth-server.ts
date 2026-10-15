@@ -5,20 +5,12 @@ import { elysia } from 'lib/index.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import {
-	getUserStore,
-	getProjectStore,
-	getBucketStore
-} from 'lib/adapters/index.ts';
-import {
-	ADMIN_SESSION_COOKIE,
-	UNASSIGNED_GROUP_ID,
-	DEFAULT_BUCKET_ID
-} from 'lib/admin/consts.ts';
+import { getUserStore, getBucketStore } from 'lib/adapters/index.ts';
+import { ADMIN_SESSION_COOKIE, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { ADMIN_MCP_CLIENT_ID, MCP_RESOURCE } from 'lib/mcp/consts.ts';
 import { mcpCatalogue, pathArgName } from 'lib/mcp/catalogue.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
-import { sessionFor, personalGroupId } from '../admin_session.ts';
+import { sessionFor } from '../admin_session.ts';
 import { shaped } from 'test/shape.js';
 import { Type } from '@sinclair/typebox';
 import { createAdministrator } from '../administrators.ts';
@@ -105,15 +97,9 @@ describe('agent answers match the console, field for field', () => {
 	});
 
 	it('returns identical payloads for every read the catalogue publishes', async () => {
-		const { token, cookie, user } = await principal();
+		const { token, cookie } = await principal();
 
 		// Enough state that a read returning an empty collection cannot pass vacuously.
-		const project = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			name: 'Parity',
-			slug: `par-${Math.floor(Math.random() * 1e6)}`,
-			ownerGroupId: await personalGroupId(user._id)
-		});
 		const bucket = await getBucketStore().create({
 			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'Parity bucket'
@@ -126,7 +112,7 @@ describe('agent answers match the console, field for field', () => {
 				params: {
 					name: 'client_create',
 					arguments: {
-						id: project._id,
+						id: bucket._id,
 						clientName: 'Parity',
 						grantTypes: ['authorization_code'],
 						redirectUris: ['https://p.example.com/cb'],
@@ -146,9 +132,9 @@ describe('agent answers match the console, field for field', () => {
 		);
 
 		const ARGS: Partial<Record<string, Partial<Record<string, string>>>> = {
-			project_get: { id: project._id },
-			client_list: { id: project._id },
-			client_get: { id: project._id, clientId },
+			client_list: { id: bucket._id },
+			client_get: { id: bucket._id, clientId },
+			resource_list: { id: bucket._id },
 			bucket_get: { id: bucket._id },
 			bucket_activity_get: { id: bucket._id },
 			bucket_summary_get: { id: bucket._id },
@@ -237,15 +223,13 @@ describe('agent answers match the console, field for field', () => {
 		const session = await sessionFor(user);
 		const cookie = `${ADMIN_SESSION_COOKIE}=${session._id}`;
 
-		const theirs = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			name: 'Not theirs',
-			slug: `nt-${Math.floor(Math.random() * 1e6)}`,
-			ownerGroupId: UNASSIGNED_GROUP_ID
+		const theirs = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
+			name: 'Not theirs'
 		});
 
 		const httpRes = await elysia.handle(
-			new Request(`http://e.ly/admin/api/projects/${theirs._id}`, {
+			new Request(`http://e.ly/admin/api/buckets/${theirs._id}/clients`, {
 				headers: { cookie }
 			})
 		);
@@ -259,7 +243,7 @@ describe('agent answers match the console, field for field', () => {
 				jsonrpc: '2.0',
 				id: ++rpcId,
 				method: 'tools/call',
-				params: { name: 'project_get', arguments: { id: theirs._id } }
+				params: { name: 'client_list', arguments: { id: theirs._id } }
 			},
 			token
 		);

@@ -4,12 +4,8 @@ import bootstrap from '../test_helper.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import {
-	getProjectStore,
-	adminAuditStore,
-	mcpConfirmationStore
-} from 'lib/adapters/index.ts';
-import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
+import { adminAuditStore, mcpConfirmationStore } from 'lib/adapters/index.ts';
+import { DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { ADMIN_MCP_CLIENT_ID, MCP_RESOURCE } from 'lib/mcp/consts.ts';
 import { mcpCatalogue } from 'lib/mcp/catalogue.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
@@ -71,17 +67,12 @@ function call(name: string, args: Record<string, unknown>) {
 	};
 }
 
-/* A project with one client in it, which is a legitimate target for client_delete. */
-async function projectWithClient(token: string) {
-	const project = await getProjectStore().create({
-		bucketId: DEFAULT_BUCKET_ID,
-		name: 'Conf',
-		slug: `conf-${Math.floor(Math.random() * 1e6)}`,
-		ownerGroupId: UNASSIGNED_GROUP_ID
-	});
+/* A client created in the Default bucket, which is a legitimate target for client_delete. */
+async function bucketWithClient(token: string) {
+	const bucketId = DEFAULT_BUCKET_ID;
 	const created = await rpc(
 		call('client_create', {
-			id: project._id,
+			id: bucketId,
 			clientName: 'Billing',
 			grantTypes: ['authorization_code'],
 			redirectUris: ['https://b.example.com/cb'],
@@ -93,7 +84,7 @@ async function projectWithClient(token: string) {
 		Type.Object({ clientId: Type.String() }),
 		created.result?.structuredContent?.result
 	);
-	return { project, clientId };
+	return { bucketId, clientId };
 }
 
 /**
@@ -112,15 +103,15 @@ describe('MCP confirmation gate', () => {
 
 	it('declares a confirmation argument on every high-consequence tool', () => {
 		const high = mcpCatalogue.filter((t) => t.consequence === 'high');
-		expect(high.length).toBe(39);
+		expect(high.length).toBe(37);
 	});
 
 	it('describes instead of acting, and changes nothing', async () => {
 		const { token } = await session('super');
-		const { project, clientId } = await projectWithClient(token);
+		const { bucketId, clientId } = await bucketWithClient(token);
 
 		const described = await rpc(
-			call('client_delete', { id: project._id, clientId }),
+			call('client_delete', { id: bucketId, clientId }),
 			token
 		);
 		const structured = described.result?.structuredContent;
@@ -132,7 +123,7 @@ describe('MCP confirmation gate', () => {
 
 		// Nothing happened: the client is still there.
 		const still = await rpc(
-			call('client_get', { id: project._id, clientId }),
+			call('client_get', { id: bucketId, clientId }),
 			token
 		);
 		expect(still.result?.isError).not.toBe(true);
@@ -140,10 +131,10 @@ describe('MCP confirmation gate', () => {
 
 	it('writes no audit entry for the description', async () => {
 		const { token, user } = await session('super');
-		const { project, clientId } = await projectWithClient(token);
+		const { bucketId, clientId } = await bucketWithClient(token);
 
 		const before = await adminAuditStore.list({ actor: user._id });
-		await rpc(call('client_delete', { id: project._id, clientId }), token);
+		await rpc(call('client_delete', { id: bucketId, clientId }), token);
 		const after = await adminAuditStore.list({ actor: user._id });
 
 		// The trail records actions applied. A step that deliberately applies nothing must not appear in
@@ -153,23 +144,23 @@ describe('MCP confirmation gate', () => {
 
 	it('performs the operation when the token is presented back', async () => {
 		const { token } = await session('super');
-		const { project, clientId } = await projectWithClient(token);
+		const { bucketId, clientId } = await bucketWithClient(token);
 
 		const described = await rpc(
-			call('client_delete', { id: project._id, clientId }),
+			call('client_delete', { id: bucketId, clientId }),
 			token
 		);
 		const confirmationToken =
 			described.result?.structuredContent?.confirmationToken;
 
 		const performed = await rpc(
-			call('client_delete', { id: project._id, clientId, confirmationToken }),
+			call('client_delete', { id: bucketId, clientId, confirmationToken }),
 			token
 		);
 		expect(performed.result?.isError).not.toBe(true);
 
 		const gone = await rpc(
-			call('client_get', { id: project._id, clientId }),
+			call('client_get', { id: bucketId, clientId }),
 			token
 		);
 		expect(gone.result?.isError).toBe(true);
@@ -177,21 +168,21 @@ describe('MCP confirmation gate', () => {
 
 	it('refuses a replayed confirmation', async () => {
 		const { token } = await session('super');
-		const { project, clientId } = await projectWithClient(token);
+		const { bucketId, clientId } = await bucketWithClient(token);
 
 		const described = await rpc(
-			call('client_delete', { id: project._id, clientId }),
+			call('client_delete', { id: bucketId, clientId }),
 			token
 		);
 		const confirmationToken =
 			described.result?.structuredContent?.confirmationToken;
 
 		await rpc(
-			call('client_delete', { id: project._id, clientId, confirmationToken }),
+			call('client_delete', { id: bucketId, clientId, confirmationToken }),
 			token
 		);
 		const replayed = await rpc(
-			call('client_delete', { id: project._id, clientId, confirmationToken }),
+			call('client_delete', { id: bucketId, clientId, confirmationToken }),
 			token
 		);
 
@@ -203,12 +194,12 @@ describe('MCP confirmation gate', () => {
 
 	it('refuses a confirmation aimed at a different target', async () => {
 		const { token } = await session('super');
-		const first = await projectWithClient(token);
-		const second = await projectWithClient(token);
+		const first = await bucketWithClient(token);
+		const second = await bucketWithClient(token);
 
 		const described = await rpc(
 			call('client_delete', {
-				id: first.project._id,
+				id: first.bucketId,
 				clientId: first.clientId
 			}),
 			token
@@ -218,7 +209,7 @@ describe('MCP confirmation gate', () => {
 
 		const misaimed = await rpc(
 			call('client_delete', {
-				id: second.project._id,
+				id: second.bucketId,
 				clientId: second.clientId,
 				confirmationToken
 			}),
@@ -231,7 +222,7 @@ describe('MCP confirmation gate', () => {
 		// And the second client still exists — the misaimed confirmation performed nothing.
 		const still = await rpc(
 			call('client_get', {
-				id: second.project._id,
+				id: second.bucketId,
 				clientId: second.clientId
 			}),
 			token
@@ -241,10 +232,10 @@ describe('MCP confirmation gate', () => {
 
 	it('refuses a confirmation issued for a different operation', async () => {
 		const { token } = await session('super');
-		const { project, clientId } = await projectWithClient(token);
+		const { bucketId, clientId } = await bucketWithClient(token);
 
 		const described = await rpc(
-			call('client_delete', { id: project._id, clientId }),
+			call('client_delete', { id: bucketId, clientId }),
 			token
 		);
 		const confirmationToken =
@@ -252,7 +243,7 @@ describe('MCP confirmation gate', () => {
 
 		const wrongTool = await rpc(
 			call('client_secret_rotate', {
-				id: project._id,
+				id: bucketId,
 				clientId,
 				confirmationToken
 			}),
@@ -266,17 +257,17 @@ describe('MCP confirmation gate', () => {
 	it('refuses a confirmation issued to a different administrator', async () => {
 		const alice = await session('super');
 		const bob = await session('super');
-		const { project, clientId } = await projectWithClient(alice.token);
+		const { bucketId, clientId } = await bucketWithClient(alice.token);
 
 		const described = await rpc(
-			call('client_delete', { id: project._id, clientId }),
+			call('client_delete', { id: bucketId, clientId }),
 			alice.token
 		);
 		const confirmationToken =
 			described.result?.structuredContent?.confirmationToken;
 
 		const byBob = await rpc(
-			call('client_delete', { id: project._id, clientId, confirmationToken }),
+			call('client_delete', { id: bucketId, clientId, confirmationToken }),
 			bob.token
 		);
 
@@ -338,9 +329,8 @@ describe('MCP confirmation gate', () => {
 	it('refuses a confirmation offered to an ordinary tool', async () => {
 		const { token } = await session('super');
 		const refused = await rpc(
-			call('project_create', {
+			call('group_create', {
 				name: 'X',
-				slug: `x-${Math.floor(Math.random() * 1e6)}`,
 				confirmationToken: 'anything'
 			}),
 			token
@@ -353,7 +343,7 @@ describe('MCP confirmation gate', () => {
 		 */
 		expect(refused.result?.isError).toBe(true);
 		const text = refused.result?.content?.[0]?.text ?? '';
-		expect(text).toContain('project_create');
+		expect(text).toContain('group_create');
 		expect(text).toContain('additional properties');
 	});
 

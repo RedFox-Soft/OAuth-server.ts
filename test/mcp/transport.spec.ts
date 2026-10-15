@@ -6,8 +6,8 @@ import { elysia } from 'lib/index.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { getProjectStore } from 'lib/adapters/index.ts';
-import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
+import { getBucketStore } from 'lib/adapters/index.ts';
+import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import {
 	ADMIN_MCP_CLIENT_ID,
 	MCP_RESOURCE,
@@ -211,7 +211,7 @@ describe('MCP transport', () => {
 		expect(payload?.result?.instructions).toContain('admin console');
 	});
 
-	it('lists the read tools and withholds the container deletions', async () => {
+	it('lists the read tools and withholds bucket deletion', async () => {
 		const { token } = await tokenFor('super');
 		await mcp(
 			'initialize',
@@ -226,12 +226,11 @@ describe('MCP transport', () => {
 		expect(status).toBe(200);
 
 		const names = (payload?.result?.tools ?? []).map((t) => t.name);
-		expect(names).toContain('project_list');
+		expect(names).toContain('bucket_list');
 		expect(names).toContain('whoami');
 		expect(names).toContain('audit_list');
 
 		// FR-031: absent from the published surface, not merely refused when called.
-		expect(names).not.toContain('project_delete');
 		expect(names).not.toContain('bucket_delete');
 	});
 
@@ -270,10 +269,8 @@ describe('MCP transport', () => {
 
 	it('scopes a read to what the administrator may see', async () => {
 		const { token } = await tokenFor('plain');
-		await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
+		await getBucketStore().create({
 			name: 'Not theirs',
-			slug: `nt-${Math.floor(Math.random() * 1e6)}`,
 			ownerGroupId: UNASSIGNED_GROUP_ID
 		});
 		await mcp(
@@ -287,16 +284,16 @@ describe('MCP transport', () => {
 		);
 		const { payload } = await mcp(
 			'tools/call',
-			{ name: 'project_list', arguments: {} },
+			{ name: 'bucket_list', arguments: {} },
 			token
 		);
 		// Required, not defaulted: a refused or empty-handed call must not pass as an empty list.
-		const projects = present(
+		const buckets = present(
 			payload?.result?.structuredContent?.result,
-			'the project list'
+			'the bucket list'
 		);
-		// A project administrator manages none of them, so the list is empty even though projects exist.
-		expect(projects).toEqual([]);
+		// An administrator whose groups own no bucket sees none, so the list is empty even though buckets exist.
+		expect(buckets).toEqual([]);
 	});
 
 	it('refuses a super-admin-gated read to a non-super-administrator, as forbidden', async () => {

@@ -4,7 +4,7 @@ title: 'The administrative MCP control plane'
 tags: [architecture, contract, gotcha, config]
 sources: [oauth-server-codebase]
 created: 2026-08-24
-updated: 2026-10-12
+updated: 2026-10-15
 graph:
   node_type: concept
 ---
@@ -149,7 +149,8 @@ Two things make it work at all, and neither is obvious:
   audience-bound token could ever be minted. It now answers for this server's own resource and delegates
   everything else.
 - `lib/admin/auth/resolveBucket.ts` routes a client to the administrator bucket only if it is the
-  reserved console client or belongs to a project whose bucket is the admin bucket. A dynamically
+  reserved console client or a client whose stored `bucketId` is the admin bucket (until spec 099: one in a
+  project whose bucket was the admin bucket). A dynamically
   registered client falls through to `redfox` and **cannot authenticate an administrator at all** — so
   the agent client is seeded (`admin-mcp`, public, PKCE) rather than obtained by DCR. A documented
   deviation from the MCP authorization spec's preference, and the reason a DCR-only MCP client cannot
@@ -170,10 +171,12 @@ where it was always meant to.
 
 ## What agents may not do
 
-Deleting a project, a user bucket, or a **group** is withheld — not confirmation-gated, absent. These
+Deleting a user bucket or a **group** is withheld — not confirmation-gated, absent. These
 are the operations that destroy a container with nothing left afterwards to inspect; a group joined
 them when ownership moved to groups ([[group-ownership]]), and for a sharper version of the same
 reason — destroying one takes with it the only thing that granted anyone access to what it held.
+Deleting a project was withheld for the same reason until spec 099 removed projects; the table now holds
+eight `withheld` entries (`lib/mcp/catalogue.ts:1848-2017`).
 Widening the project-administrator role deliberately did not widen this list. They are not
 registered as refusing tools either, because a registered tool appears in `tools/list` however it
 behaves; the server's `instructions` carry the explanation, read from the exclusion table so the two
@@ -211,7 +214,8 @@ The other high-consequence operations — 37 tools since spec 087 added `bucket_
 `jwks_revoke`, still 37 after spec 088, whose new writes are ordinary, 38 since spec 090 added
 `bucket_restore`, while scheduling a bucket's deletion and `POST /admin/api/buckets/:id/purge` stay withheld
 ([[bucket-soft-delete]]), 40 since spec 089 added `bucket_user_bulk_deactivate` and `bucket_user_bulk_delete`
-([[end-user-support]]), and 39 since spec 098 removed `project_bucket_clear` with its route (spec 085 made `project_bucket_assign` and `project_bucket_clear` high; spec 083 had added `admin_sign_out` and `admin_totp_clear`; spec 082 had added `bucket_user_email_change`; spec 075 `bucket_owner_change` and
+([[end-user-support]]), 39 since spec 098 removed `project_bucket_clear` with its route, and 37 since spec 099
+removed `project_bucket_assign` and `project_owner_change` with the projects (spec 085 made `project_bucket_assign` and `project_bucket_clear` high; spec 083 had added `admin_sign_out` and `admin_totp_clear`; spec 082 had added `bucket_user_email_change`; spec 075 `bucket_owner_change` and
 `project_owner_change`, the first tools whose body names a group, `groupId`) — take two calls: describe,
 then confirm. The confirmation binds
 five ways — tool, target, arguments hash, administrator, agent — and each is a real case. Arguments,
@@ -221,7 +225,8 @@ by another working through the same agent. The record is deleted *before* the bi
 a token presented for the wrong operation is consumed rather than left to probe with.
 
 **A route's own preview reaches the agent** (since spec 075). Some routes refuse without `confirm: true`
-and answer 409 with what the second call would do: an address change's clients, a move's projects. The
+and answer 409 with what the second call would do: an address change's clients, a move's applications and
+APIs (its projects, until spec 099). The
 gate's consequence report reads no entity state, so it cannot supply that list. `toOutcome` used to reduce
 every 409 to `conflict: the operation was refused`, so no agent ever saw a preview. It now carries a
 `confirmationRequired` body whole as `preview` (`lib/mcp/result.ts:79`). Because `confirm` is one of the
@@ -241,10 +246,12 @@ then goes through the token gate. A confirmed call refused for foreign members p
 its callback, logout signals, bound connection and linked count) and `provisioning_hold_get` (the removals a
 held connection refused).
 
-Since spec 085, changing a project's bucket answers with a route preview too (clearing it did as well, until spec 098 removed it): the project's
-applications by name, the issuer before and after, and the declarations that move or collide, with `expect` =
-`{applications, resources}` ([[container-ownership-transfer]]). Both tools are high, so like the hand-over the
-agent sees the preview and then passes the token gate. The read tool `bucket_resource_list` came with it.
+From spec 085 until spec 099, changing a project's bucket answered with a route preview too (clearing it did
+as well, until spec 098 removed it), with the read tool `bucket_resource_list` beside it. Spec 099 removed
+both with the projects, together with `project_list`, `project_get`, `project_create`, `project_update`,
+`project_owner_change` and the withheld project deletion. `client_*` and `resource_*` kept their names; their
+`id` argument is now the bucket, because applications and APIs live under
+`/admin/api/buckets/:id/clients` and `/admin/api/buckets/:id/resources` ([[bucket-is-the-only-container]]).
 
 Spec 088 added four tools and two exclusions:
 

@@ -1,5 +1,5 @@
 import { getBucketStore } from '../adapters/index.js';
-import { projectGroupOwnsBucket } from '../models/client/provenance.js';
+import { clientBelongsToBucket } from '../models/client/provenance.js';
 import { resolveBucketForRequest } from '../admin/auth/resolveBucket.js';
 import type { OIDCContext } from '../helpers/oidc_context.js';
 
@@ -7,17 +7,16 @@ import type { OIDCContext } from '../helpers/oidc_context.js';
  * Whether this request's client may skip the consent screen for the user signing in.
  *
  * `consent.require: false` is a tenant's decision about its own users, so it is honoured only where they
- * are its own: in a bucket owned by the group that owns the client's project. Any member of a group can
- * create a project and a client in it with consent off, and a project on the default bucket signs its
- * clients into a population every such project shares — so honouring the flag there handed a tenant the
- * claims of every default-bucket user with a session, with `prompt=none` and no page shown.
+ * are its own: in the bucket the client belongs to (specs/099). A client of one bucket can reach another's
+ * sign-in through a declared resource, and honouring the flag there would hand its tenant the claims of
+ * that bucket's users with a session, with `prompt=none` and no page shown.
  *
- * A client in no project keeps the flag as stored. Nothing a caller controls can set it on one: dynamic
- * registration and client documents cannot carry it (lib/models/client/wire.ts), so such a client was
- * provisioned by the operator.
+ * A client that belongs to no bucket keeps the flag as stored. Nothing a caller controls can set it on one:
+ * dynamic registration and client documents cannot carry it (lib/models/client/wire.ts), so such a client
+ * was provisioned by the operator.
  *
- * Decided per request, not at write time, so a project re-pointed at the default bucket stops skipping
- * consent at once. Memoised per context: the consent policy and the grant loader both ask.
+ * Decided per request rather than at write time, because the bucket signed into is the request's.
+ * Memoised per context: the consent policy and the grant loader both ask.
  */
 const decided = new WeakMap<object, Promise<boolean>>();
 
@@ -41,5 +40,5 @@ async function decide(oidc: OIDCContext): Promise<boolean> {
 			oidc.bucket
 		)
 	);
-	return (await projectGroupOwnsBucket(client.clientId, bucket)) ?? true;
+	return (await clientBelongsToBucket(client.clientId, bucket)) ?? true;
 }

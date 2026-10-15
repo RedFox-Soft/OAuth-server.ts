@@ -10,10 +10,10 @@ A standards-compliant OAuth 2.1 / OpenID Connect authorization server written in
 It is three surfaces on one core, and knowing which one you are in matters more than anything else in this file:
 
 1. **The protocol surface** — the OAuth/OIDC endpoints. Implemented: Authorization Code + PKCE, Client Credentials, Refresh Token, Device Flow, CIBA, PAR (RFC 9126), DPoP (RFC 9449), Resource Indicators (RFC 8707), token introspection/revocation, dynamic client registration, OIDC Core 1.0.
-2. **The administrative control plane** (`lib/admin/`) — a management API and a server-rendered console for projects, OAuth clients, administrators, user buckets, end-users, upstream federation providers, settings, SMTP, signing keys and an immutable audit trail. Reachable at `/admin`, authenticated by an OIDC flow against this server's own issuer.
+2. **The administrative control plane** (`lib/admin/`) — a management API and a server-rendered console for user buckets and the OAuth clients and APIs they hold, administrators, end-users, upstream federation providers, settings, SMTP, signing keys and an immutable audit trail. Reachable at `/admin`, authenticated by an OIDC flow against this server's own issuer.
 3. **The MCP control plane** (`lib/mcp/`) — the same management API, served to an AI agent at `POST /mcp` as an OAuth 2.1 protected resource. Off by default (`mcp.enabled`).
 
-A fourth thing follows from the first: the server is also an authorization server **for other people's MCP servers**. An administrator declares a third-party MCP server as a protected resource of a project (`lib/resources/`, `lib/admin/resources/`) and this server mints audience-bound tokens for it — data, not code, so no source change and no restart. See `wiki/concepts/mcp-server-authorization.md`.
+A fourth thing follows from the first: the server is also an authorization server **for other people's MCP servers**. An administrator declares a third-party MCP server as a protected resource of a bucket (`lib/resources/`, `lib/admin/resources/`) and this server mints audience-bound tokens for it — data, not code, so no source change and no restart. See `wiki/concepts/mcp-server-authorization.md`.
 
 The third exists because the constitution requires an agent to be able to do what a human operator can, with no privileged back door. It is built as a _consumer_ of the second: a tool rebuilds the HTTP request the console would have sent and dispatches it into the real admin routes in-process, so the permission checks, validation, invariants and audit write are the console's own code rather than a copy kept in step by review. If you are adding an administrative operation, add it to the admin routes; the parity guard will then tell you to publish it, exclude it, or explain yourself.
 
@@ -153,8 +153,9 @@ Each rule is the part that is easy to break. Read the named page before changing
   document, and that branch must stay after the adapter read. Registration attributes are declared once,
   in `lib/consts/client_attributes.ts`, and kept flat. A resolved client is frozen data: use the functions
   in `lib/models/client.ts`, read key material through `clientKeys(client)`, write only through
-  `registerClient`, and in a test change the stored record (`changeClient`), never the object.
-  → `client-identity-from-database.md`,
+  `registerClient`, and in a test change the stored record (`changeClient`), never the object. A client
+  belongs to the bucket in its server-only `bucketId` for life, and carries its own `corsOrigins`; neither
+  is ever recognised metadata. → `client-identity-from-database.md`,
   `client-registration-attributes.md`, `mcp-server-authorization.md`
 - **Buckets** — a bucket is addressed by a path segment or a hostname, never both, and is its own
   issuer. The request host is read only by `hostOfRequest`, never from `X-Forwarded-Host`. Which bucket
@@ -162,13 +163,13 @@ Each rule is the part that is easy to break. Read the named page before changing
   bucket it was addressed at. A declared resource is unique per issuer namespace, and only a super
   administrator declares at the root. → `bucket-is-an-issuer.md`, `per-issuer-isolation.md`,
   `cookie-path-scoping.md`, `account-resolution.md`
-- **Ownership** — a group owns every project and bucket, and membership is the only grant of access;
+- **Ownership** — a group owns buckets, a bucket holds its applications and APIs for life, and membership is
+  the only grant of access;
   instance-wide things stay super-admin-only. There are no roles: the instance privilege is membership of
   Super administrators (`lib/admin/super_admins.ts`), and end users are grouped only by bucket groups, whose
   members are records — change them through `lib/bucket_groups/service.ts`, never a member list read and
-  written back. A personal group has exactly one member; a container changes group only through the two
-  move routes, a bucket always with its projects. Every project names a bucket; only a super administrator
-  assigns the Default one, which gives no group reach and moves no project with it. → `group-ownership.md`, `bucket-groups.md`,
+  written back. A personal group has exactly one member; a bucket changes group only through its move
+  route, and everything in it follows by reference. There are no projects. → `group-ownership.md`, `bucket-groups.md`,
   `container-ownership-transfer.md`
 - **Audit** — a mutating admin route records audit-first, after authorization, inside the handler.
   → `admin-audit-trail.md`

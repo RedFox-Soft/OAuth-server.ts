@@ -4,7 +4,8 @@ import type { BucketBlockers, BucketCan } from '../frame/can.js';
 /*
  * The bucket as the API presents it (specs/081 data-model §1): the stored record plus what the server derives
  * for the console — the address form, the issuer and discovery addresses (the browser bundle never learns the
- * server's own address), the projects using it, and for a host, whether requests have arrived.
+ * server's own address), how many applications and APIs it holds, and for a host, whether requests have
+ * arrived.
  */
 export interface BucketView extends Omit<UserBucket, 'deletion'> {
 	reserved?: 'administrators';
@@ -14,7 +15,7 @@ export interface BucketView extends Omit<UserBucket, 'deletion'> {
 	blockers?: Partial<
 		BucketBlockers & {
 			dependents: {
-				projects: number;
+				applications: number;
 				providers: number;
 				connections: number;
 			} | null;
@@ -24,7 +25,9 @@ export interface BucketView extends Omit<UserBucket, 'deletion'> {
 	addressForm?: 'root' | 'path' | 'host' | 'unaddressed';
 	issuer?: string | null;
 	discoveryUrl?: string | null;
-	projects?: { id: string; name: string; clientCount: number }[];
+	/* What it holds besides its people (specs/099). */
+	applications?: number;
+	apis?: number;
 	address?: {
 		host: string;
 		requestsArrived: boolean;
@@ -51,8 +54,8 @@ export interface BucketSummary {
 	withoutEnabledLink: number;
 	/* Signs in with a password and holds no authenticator: who an authenticator requirement would ask. */
 	passwordWithoutAuthenticator: number;
-	/* The default bucket only: projects whose sign-in lands there. */
-	projects?: number;
+	applications?: number;
+	apis?: number;
 	userGroups: number;
 	connections: number;
 	held: number;
@@ -67,15 +70,10 @@ export interface BucketSummary {
 export interface AddressPreview {
 	from: string;
 	to: string;
-	applications: {
-		clientId: string;
-		name: string | null;
-		projectId: string;
-		projectName: string;
-	}[];
+	applications: { clientId: string; name: string | null }[];
 	connections: { id: string; displayName: string }[];
 	providers: { id: string; displayName: string; newCallback: string }[];
-	resources: { identifier: string; projectId: string; projectName: string }[];
+	resources: { identifier: string; name: string }[];
 	namespaceMove: boolean;
 	expect: {
 		applications: number;

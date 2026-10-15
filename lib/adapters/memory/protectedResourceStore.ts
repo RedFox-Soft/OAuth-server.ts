@@ -21,7 +21,7 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 	async create(data: {
 		namespace: string;
 		identifier: string;
-		projectId: string;
+		bucketId: string;
 		name: string;
 		scopes: string[];
 		scopeDescriptions?: Record<string, ScopeDescription>;
@@ -39,7 +39,7 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 			_id,
 			namespace: data.namespace,
 			identifier: data.identifier,
-			projectId: data.projectId,
+			bucketId: data.bucketId,
 			name: data.name,
 			scopes: [...data.scopes],
 			...(data.scopeDescriptions
@@ -62,10 +62,8 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 		return this.resources.get(declarationId(namespace, identifier)) ?? null;
 	}
 
-	async listByProject(projectId: string): Promise<ProtectedResource[]> {
-		return [...this.resources.values()].filter(
-			(r) => r.projectId === projectId
-		);
+	async listByBucket(bucketId: string): Promise<ProtectedResource[]> {
+		return [...this.resources.values()].filter((r) => r.bucketId === bucketId);
 	}
 
 	async list(): Promise<ProtectedResource[]> {
@@ -88,14 +86,14 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 	}
 
 	/*
-	 * Returns how many went, because the project-delete handler reports it. A cascade that said
-	 * nothing would leave an operator unable to tell a project with no resources from one whose
+	 * Returns how many went, because the deleting handler reports it. A cascade that said
+	 * nothing would leave an operator unable to tell a bucket with no resources from one whose
 	 * resources were removed under them.
 	 */
-	async destroyByProject(projectId: string): Promise<number> {
+	async destroyByBucket(bucketId: string): Promise<number> {
 		let removed = 0;
 		for (const [id, resource] of this.resources) {
-			if (resource.projectId === projectId) {
+			if (resource.bucketId === bucketId) {
 				this.resources.delete(id);
 				removed += 1;
 			}
@@ -103,13 +101,13 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 		return removed;
 	}
 
-	async moveProject(
-		projectId: string,
+	async moveBucketNamespace(
+		bucketId: string,
 		from: string,
 		to: string
 	): Promise<{ moved: number } | { conflicts: string[] }> {
 		const moving = [...this.resources.values()].filter(
-			(r) => r.projectId === projectId && r.namespace === from
+			(r) => r.bucketId === bucketId && r.namespace === from
 		);
 		const conflicts = moving
 			.filter((r) => this.resources.has(declarationId(to, r.identifier)))

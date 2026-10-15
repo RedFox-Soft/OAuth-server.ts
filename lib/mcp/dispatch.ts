@@ -79,7 +79,7 @@ function buildQuery(tool: McpTool, args: Record<string, unknown>): string {
 	for (const name of allowed) {
 		const value = args[name];
 		if (value === undefined || value === null) continue;
-		// A list is repeated members, as the console sends `client` on a project deletion; joined into
+		// A list is repeated members, as the console sends a repeated query parameter; joined into
 		// one string it named a single client `a,b`.
 		for (const item of Array.isArray(value) ? value : [value]) {
 			params.append(name, queryValue(name, item));

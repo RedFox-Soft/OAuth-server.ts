@@ -14,12 +14,13 @@ import bootstrap from '../test_helper.js';
 import { adminApiRoutes } from 'lib/admin/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
+	adapter,
 	adminAuditStore,
 	getActivityStore,
 	getBucketGroupStore,
 	getBucketKeysStore,
 	getBucketStore,
-	getProjectStore,
+	getProtectedResourceStore,
 	getProvisioningConnectionStore,
 	getUserStore
 } from 'lib/adapters/index.ts';
@@ -69,6 +70,16 @@ const Blockers = Type.Object({
 		Type.Object({ kind: Type.String(), count: Type.Number() })
 	)
 });
+const Refusal = Type.Object({
+	message: Type.String(),
+	blockers: Type.Array(
+		Type.Object({
+			kind: Type.String(),
+			count: Type.Number(),
+			ids: Type.Optional(Type.Array(Type.String()))
+		})
+	)
+});
 
 interface World {
 	owner: User;
@@ -105,6 +116,24 @@ async function bucketOf(groupId: string, accounts = 0): Promise<UserBucket> {
 		await getUserStore(bucket._id).create(`p${String(i)}-${id}@x.io`, 'h');
 	}
 	return bucket;
+}
+
+/* An application stored in the bucket, as creating it in the bucket's Applications stores it. */
+async function applicationIn(
+	bucket: UserBucket,
+	fields: Record<string, unknown> = {}
+): Promise<string> {
+	const clientId = `app-${nanoid()}`;
+	await adapter('Client').upsert(clientId, {
+		clientId,
+		bucketId: bucket._id,
+		grantTypes: ['authorization_code'],
+		responseTypes: ['code'],
+		redirectUris: ['https://app.example.com/cb'],
+		token_endpoint_auth_method: 'none',
+		...fields
+	});
+	return clientId;
 }
 
 function scheduleAs(cookie: string, bucket: UserBucket, query = '') {
@@ -237,16 +266,48 @@ describe('deleting a bucket', () => {
 			]);
 		});
 
-		it('refuses a bucket a project uses', async () => {
+		it('refuses a bucket holding an application an administrator created, naming it, and leaves it unscheduled', async () => {
 			const bucket = await bucketOf(w.groupId);
-			await getProjectStore().create({
-				name: `uses ${bucket._id}`,
-				slug: `u-${bucket._id}`.toLowerCase().replace(/[^a-z0-9-]/g, ''),
-				ownerGroupId: w.groupId,
-				bucketId: bucket._id
+			const clientId = await applicationIn(bucket);
+
+			const res = await scheduleAs(w.ownerCookie, bucket);
+
+			expect(res.status).toBe(409);
+			expect(shaped(Refusal, res.body)).toMatchObject({
+				message: 'bucket still holds applications or APIs',
+				blockers: [{ kind: 'client', count: 1, ids: [clientId] }]
+			});
+			expect(
+				(await getBucketStore().find(bucket._id))?.deletion
+			).toBeUndefined();
+		});
+
+		it('refuses a bucket that declares an API, counting it', async () => {
+			const bucket = await bucketOf(w.groupId);
+			await getProtectedResourceStore().create({
+				namespace: bucket._id,
+				identifier: `https://api-${bucket._id}.example.com/`,
+				bucketId: bucket._id,
+				name: 'Orders API',
+				scopes: ['read']
 			});
 
-			expect((await scheduleAs(w.ownerCookie, bucket)).status).toBe(409);
+			const res = await scheduleAs(w.ownerCookie, bucket);
+
+			expect(res.status).toBe(409);
+			expect(shaped(Refusal, res.body).blockers).toEqual([
+				{ kind: 'resource', count: 1 }
+			]);
+		});
+
+		it('schedules a bucket whose only application registered itself', async () => {
+			const bucket = await bucketOf(w.groupId);
+			await applicationIn(bucket, { registeredDynamically: true });
+
+			const res = await scheduleAs(w.ownerCookie, bucket);
+
+			expect(res.status).toBe(200);
+			shaped(Scheduled, res.body);
 		});
 
 		it.each([

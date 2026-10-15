@@ -41,6 +41,6 @@ const headings = [
 	<p>Whole subtrees that are unconditional by design, reached by redirect or through the console:</p>
 	<ul>{alwaysAvailablePrefixes.map((p) => <li><code>{p}/…</code></li>)}</ul>
 	<h2 id="classes">CORS and rate classes</h2>
-	<p><strong>CORS</strong>: <code>open</code> echoes any Origin; <code>client-based</code> echoes only an Origin listed on the project that owns the calling client; <code>none</code> is not readable cross-origin.</p>
+	<p><strong>CORS</strong>: <code>open</code> echoes any Origin; <code>client-based</code> echoes only an Origin listed on the calling application's own record; <code>none</code> is not readable cross-origin.</p>
 	<p><strong>Rate</strong>: <code>strict</code>, <code>ordinary</code> and <code>public</code> are the three per-origin allowances (defaults 60, 300 and 1200 requests per minute); <code>exempt</code> is never counted.</p>
 </StarlightPage>

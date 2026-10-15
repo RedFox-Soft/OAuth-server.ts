@@ -80,8 +80,8 @@ upserts, so running it against an already-current database changes nothing. What
   there are no TTL indexes to create; the running server sweeps expired rows itself.
 - **Seed changes.** When a release changes the admin seed, `db:setup` is what applies it: a new
   reserved client, a new field on the administrator bucket, a group the ownership model now expects.
-  The reserved `admin-mcp` agent client arrived exactly this way. The script carries an explicit
-  `$addToSet` for it, because `$setOnInsert` would not touch a project that already existed.
+  The reserved `admin-mcp` agent client arrived exactly this way: an existing install has it only
+  once `db:setup` has run again.
 
 `db:setup` exits non-zero when a constraint it declares is not in force, so make it a gate instead
 of a fire-and-forget. The shipped `fly.toml` runs it as `release_command` and Fly aborts the deploy

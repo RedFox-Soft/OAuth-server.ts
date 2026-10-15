@@ -1,4 +1,3 @@
-import { getBucketStore } from '../adapters/index.js';
 import { isAddressable } from '../admin/auth/bucketAddress.js';
 import { ROOT_NAMESPACE } from './declaration_id.js';
 
@@ -22,12 +21,4 @@ export function namespaceOf(bucket: {
 	host?: string;
 }): string {
 	return isAddressable(bucket) ? bucket._id : ROOT_NAMESPACE;
-}
-
-/* A project whose bucket record is gone is served at the root. */
-export async function namespaceOfProject(project: {
-	bucketId: string;
-}): Promise<string> {
-	const bucket = await getBucketStore().find(project.bucketId);
-	return bucket ? namespaceOf(bucket) : ROOT_NAMESPACE;
 }

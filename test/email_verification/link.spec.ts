@@ -1,10 +1,13 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'bun:test';
-import bootstrap, { agent, getHeader } from '../test_helper.ts';
+import bootstrap, {
+	bindClientToBucket,
+	agent,
+	getHeader
+} from '../test_helper.ts';
 import { AuthorizationRequest } from '../AuthorizationRequest.ts';
 import {
 	getUserStore,
 	getBucketStore,
-	getProjectStore,
 	resetAdminMemoryStores
 } from 'lib/adapters/index.ts';
 import {
@@ -14,7 +17,7 @@ import {
 	emailsTo,
 	extractVerifyUrl
 } from '../mail_capture.ts';
-import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
+import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { present } from 'test/shape.js';
 import { elysia } from 'lib/index.ts';
 
@@ -67,7 +70,7 @@ beforeAll(async () => {
 	await bootstrap(import.meta.url, { config: 'link' });
 	resetAdminMemoryStores();
 	// A dedicated bucket (link method, verification required) reached by CLIENT_ID
-	// through a project, so these specs never touch the shared 'redfox' bucket.
+	// which belongs to it, so these specs never touch the shared 'redfox' bucket.
 	const bucket = await getBucketStore().create({
 		ownerGroupId: UNASSIGNED_GROUP_ID,
 		name: 'Verify Link Bucket',
@@ -75,16 +78,7 @@ beforeAll(async () => {
 		verificationMethod: 'link'
 	});
 	bucketId = bucket._id;
-	const project = await getProjectStore().create({
-		bucketId: DEFAULT_BUCKET_ID,
-		ownerGroupId: UNASSIGNED_GROUP_ID,
-		name: 'Verify Link',
-		slug: `verify-link-${Math.random()}`
-	});
-	await getProjectStore().update(project._id, {
-		bucketId,
-		clientIds: [CLIENT_ID]
-	});
+	await bindClientToBucket(CLIENT_ID, bucketId);
 });
 
 /**
@@ -300,16 +294,7 @@ describe('registration gating', () => {
 			name: 'Closed Bucket',
 			registrationOpen: false
 		});
-		const project = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			ownerGroupId: UNASSIGNED_GROUP_ID,
-			name: 'Closed',
-			slug: `closed-${Math.random()}`
-		});
-		await getProjectStore().update(project._id, {
-			bucketId: closed._id,
-			clientIds: ['verify-closed-app']
-		});
+		await bindClientToBucket('verify-closed-app', closed._id);
 
 		const auth = new AuthorizationRequest({
 			client_id: 'verify-closed-app',
@@ -339,16 +324,7 @@ describe('registration gating', () => {
 			name: 'No Verify Bucket',
 			emailVerificationRequired: false
 		});
-		const project = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			ownerGroupId: UNASSIGNED_GROUP_ID,
-			name: 'Off',
-			slug: `off-${Math.random()}`
-		});
-		await getProjectStore().update(project._id, {
-			bucketId: off._id,
-			clientIds: ['verify-off-app']
-		});
+		await bindClientToBucket('verify-off-app', off._id);
 
 		const auth = new AuthorizationRequest({
 			client_id: 'verify-off-app',

@@ -141,7 +141,7 @@ export default {
 				},
 				cors: {
 					title: 'CORS closed by data',
-					body: 'An origin is readable only if the project that owns the calling client lists it. No wildcard setting opens it.'
+					body: 'An origin is readable only if the calling application lists it among its own allowed origins. No wildcard setting opens it.'
 				},
 				headers: {
 					title: 'Security headers',
@@ -161,7 +161,7 @@ export default {
 			items: {
 				console: {
 					title: 'Administration console',
-					body: 'Projects, OAuth clients, administrators and their groups, user buckets, end users, upstream providers, SCIM connections, settings, SMTP and signing keys. Every screen has an address. A change that could lock people out or break applications first says whom it affects, counted, and applies only once you confirm.'
+					body: 'User buckets with their applications and APIs, administrators and their groups, end users, upstream providers, SCIM connections, settings, SMTP and signing keys. Every screen has an address. A change that could lock people out or break applications first says whom it affects, counted, and applies only once you confirm.'
 				},
 				audit: {
 					title: 'Append-only audit trail',
@@ -178,7 +178,7 @@ export default {
 				},
 				mcpAuthorization: {
 					title: 'Authorization for your own MCP servers',
-					body: 'Declare a third-party MCP server as a protected resource of a project and this server mints tokens whose audience is exactly that resource, with no code change here and no restart. In a bucket with an address of its own the declaration needs nothing from the resource — it can be internal, on localhost or not yet deployed — and another tenant may declare the same URL without affecting yours. Tokens are self-contained by default, so the resource verifies them against its bucket’s published keys without credentials of its own.'
+					body: 'Declare a third-party MCP server as a protected resource of a user bucket and this server mints tokens whose audience is exactly that resource, with no code change here and no restart. In a bucket with an address of its own the declaration needs nothing from the resource — it can be internal, on localhost or not yet deployed — and another tenant may declare the same URL without affecting yours. Tokens are self-contained by default, so the resource verifies them against its bucket’s published keys without credentials of its own.'
 				},
 				clientIdMetadataDocument: {
 					title: 'Client identity documents',
@@ -198,7 +198,7 @@ export default {
 				},
 				groupOwnership: {
 					title: 'Group ownership',
-					body: 'Projects and user buckets are owned by a group. Nothing but membership grants access, and it is re-resolved on every request. A bucket moves to another group together with the projects that use it.'
+					body: 'User buckets are owned by a group, and so is everything in them: end users, applications and APIs. Nothing but membership grants access, and it is re-resolved on every request. A bucket moves to another group with everything it holds, in one step.'
 				},
 				bucketAddress: {
 					title: 'A bucket addressed by a path or a host',

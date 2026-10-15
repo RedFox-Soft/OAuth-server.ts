@@ -4,7 +4,7 @@ title: 'Authorization for MCP servers'
 tags: [architecture, contract, gotcha, config]
 sources: [oauth-server-codebase]
 created: 2026-09-08
-updated: 2026-10-13
+updated: 2026-10-15
 graph:
   node_type: concept
 ---
@@ -18,8 +18,12 @@ operator using it for their own MCP server, and both were fixed by turning code 
 
 `getResourceServerInfo` threw `InvalidTarget` for every audience except `${ISSUER}/mcp`, so protecting
 a third-party resource meant writing an addon override in this repository. And a client belonging to no
-project fell through to a hard-coded `redfox` bucket, which is what the README's compatibility note
-recorded.
+project (since spec 099: to no bucket) fell through to a hard-coded `redfox` bucket, which is what the
+README's compatibility note recorded.
+
+Since spec 099 a declared resource — an **API** in the console — belongs to a bucket, stored as `bucketId`
+on the declaration, as an application does ([[bucket-is-the-only-container]]). Until then it belonged to a
+project (`projectId`).
 
 ## A declared resource is data, and read every time
 
@@ -52,8 +56,10 @@ Nothing is taken from the resource's own metadata or an MCP server's tool list. 
 ## Unique within a namespace, and the namespace is the issuer
 
 A declaration is unique within its **namespace**: the bucket id of an addressable bucket, or `@root` for
-everything served at the root issuer — the default bucket and every project on it, the administrators
-bucket, a legacy bucket with no address (`namespaceOf`, `lib/resources/namespace.ts:19`). The stored
+everything served at the root issuer — the default bucket, the administrators bucket, a legacy bucket with
+no address (`namespaceOf`, `lib/resources/namespace.ts:18-24`). The namespace is still derived from the
+bucket's address, and `bucketId` is stored beside it, because `@root` cannot say which bucket a declaration
+belongs to. The stored
 `_id` is the two joined by one space (`lib/resources/declaration_id.ts`), which a canonical identifier
 cannot contain, so the datastore's primary key is still what enforces uniqueness rather than a rule a
 route remembers. The route reads before inserting for a better message and answers only the store's
@@ -68,12 +74,13 @@ their own may declare the same URL, and a request at one never reaches — or le
 it gets the `invalid_target` an undeclared identifier gets. `test/resources/namespace_resolution.spec.ts`
 is the case.
 
-**Reading a bucket's namespace (spec 085).** Two projects of one bucket share its namespace, so one project's
-declaration can block another's. `GET /admin/api/buckets/:id/resources` (MCP `bucket_resource_list`) lists the
-namespace's declarations with the project that made each. It is built from the bucket's projects and needs no
-store read by namespace. For a bucket served at the root it lists only that bucket's own projects, because the
-rest of `@root` belongs to other tenants. The console shows it on the bucket's Overview, and a project's
-Resources tab names the namespace its declarations live in.
+**Reading a bucket's APIs.** `GET /admin/api/buckets/:id/resources` (`lib/admin/resources/routes.ts:205-218`,
+MCP `resource_list`) answers `{ namespace: 'bucket' | 'root', resources }`: the bucket's own declarations,
+read with `listByBucket`. For a bucket served at the root it lists only that bucket's declarations, because the
+rest of `@root` belongs to other tenants. Since spec 099 this is the collection route the declare, read,
+update, delete and vouching routes sit under, and the console shows it as the bucket's APIs tab. Spec 085's
+version of the route listed the namespace's declarations with the project that made each, published as
+`bucket_resource_list`; both went with the projects.
 
 Canonicalization is one function used by *both* sides — declaration and request — which is what makes
 them unable to disagree. `resourceIdentifierMatches` takes the same options as
@@ -84,20 +91,24 @@ that bug; the test did not catch it, reasoning did.
 
 ## Which bucket a request signs into: five rules, and every caller must pass the resource
 
-`resolveBucketForRequest(clientId, resource, addressed)` resolves, in order: reserved console client → admin
-bucket; client in a project → that project's bucket; **one** declared resource named → that resource's
-project's bucket; a permitted client identity naming the administrative MCP audience → admin bucket;
-otherwise `redfox`.
+`resolveBucketForRequest(clientId, resource, addressed)` (`lib/admin/auth/resolveBucket.ts:46-75`) resolves,
+in order: reserved console client → admin bucket; a client that belongs to a bucket → that bucket, read from
+the stored record's `bucketId`; **one** declared resource named → that resource's `bucketId`; a permitted
+client identity naming the administrative MCP audience → admin bucket; otherwise `redfox`. Since spec 099
+rule 2 is one rule: it used to read the client's project, and a separate rule 2b read `registeredAtBucket`
+for a client that registered itself at a bucket's address. Both are now the client's `bucketId`, which only
+the server writes ([[client-registration-attributes]]). `admin-mcp` reaches the admin bucket through its own
+`bucketId`, not through the console's former project.
 
-A project on `redfox` does **not** end resolution at rule 2 (`pinnedBucketOf`,
-`lib/admin/auth/resolveBucket.ts`): until spec 098 such a project stored no bucket and its clients went on
-through rules 2b–4, and the migration that wrote `redfox` into it (`2026-10-15-projects-require-bucket`) was
-not meant to move a single sign-in. `test/admin/resolve_bucket.spec.ts` holds that a client of such a project
-resolves exactly as a client in no project does.
+Belonging to `redfox` does **not** end resolution at rule 2 or 3 (`pinnedBucketOf`, `resolveBucket.ts:151-154`):
+until spec 098 a project on it stored no bucket and its clients went on through rules 3 and 4, and neither
+the migration that wrote `redfox` into such projects nor spec 099's was meant to move a single sign-in.
+`test/admin/resolve_bucket.spec.ts` holds that an application on the Default bucket resolves exactly as a
+client in no bucket does.
 
 Rule 3 answers a question the admin MCP control plane left open, and it is
 safe for the reason the rejected version was not: **an administrator authored the resource**, in a
-project they own, whose bucket is their own choice. An attacker cannot declare a resource, so the
+bucket they hold. An attacker cannot declare a resource, so the
 parameter selects among an operator's options and cannot create one. `${ISSUER}/mcp` is not a declared
 resource — the built-in arm claims it and declaration refuses it — so the admin bucket is unreachable
 through rule 3.
@@ -127,17 +138,18 @@ fetches it per row after the list renders. `test/resources/vouching.spec.ts`.
 **The root namespace is a super administrator's.** Every tenant served at the root shares its issuer,
 and a resource's metadata can say it trusts that issuer but not which of those tenants it belongs to —
 so no proof closes squatting there. Create, amend and remove at `@root` answer 403 for anyone else,
-naming the way out: give the project an addressable bucket (`assertMayWrite`,
-`lib/admin/resources/routes.ts`). `test/resources/root_namespace.spec.ts` is the attack, through the
+naming the way out: give the bucket an address of its own (`assertMayWrite`,
+`lib/admin/resources/routes.ts:109-113`, wording in `lib/admin/resources/refusals.ts:6-7`). `test/resources/root_namespace.spec.ts` is the attack, through the
 console and through an agent.
 
-**Declarations move with their project.** A declaration's namespace is derived from its project's
-bucket, so a project that changed bucket without them would leave declarations that no longer resolve
-anywhere. `planMove`/`applyMove` (`lib/admin/resources/move.ts`) carry them on a bucket assign, and
-when a legacy bucket gains its first address; a target that already declares one of the
-identifiers answers 409 with the list, and a move into `@root` is held to the rule above. The plan is
-checked before the audit write; the store undoes its own moves on a race the plan could not see.
-`test/resources/project_move.spec.ts`.
+**Declarations move with their bucket's address.** A declaration's namespace is derived from its bucket's
+address, so a bucket that gains its first address without them would leave declarations that no longer
+resolve anywhere. `planMove`/`applyMove` (`lib/admin/resources/move.ts`, called from the address change at
+`lib/admin/buckets/routes.ts:1075-1089`) carry them, through the store's `moveBucketNamespace` in one call; a
+target that already declares one of the identifiers answers 409 with the list, and a move into `@root` is held
+to the rule above. The plan is checked before the audit write; the store undoes its own moves on a race the
+plan could not see. Until spec 099 they also moved when a project changed bucket, one project at a time; that
+operation is gone. `test/host_buckets/address_change.spec.ts`.
 
 **The gotcha.** Every caller must pass the resource it has, `findAccount` included. It did not, at
 first: login resolved the project bucket and found the user, `findAccount` resolved `redfox` and did
@@ -146,16 +158,16 @@ refusing. A caller that omits the resource silently resolves a different bucket 
 
 It happened again, and that time it was a hole rather than a crash (corrected 2026-09-29). The password
 door, the reset door, the registration door and the enrolment step's second-factor check resolved the
-bucket from the client alone, so for a client in no project they read the *default* bucket's policy while
+bucket from the client alone, so for a client in no project (now: of no bucket) they read the *default* bucket's policy while
 the sign-in used the resource's. A federated-only bucket reached through a declared resource verified
 passwords against its accounts, mailed resets that set a password on a federated account — around the
 provider's factors and offboarding — and let registration create password accounts. `passwordDoorClosed`
 now takes the interaction and `loginOptionsForClient` a required `resource`, so the omission no longer
 type-checks; `test/cimd/resource_bucket_doors.spec.ts` is the attack.
 
-## A machine token goes only to the declaring project's clients
+## A machine token goes only to the bucket's own applications
 
-Rule 3 is safe for a sign-in because an end user consents: any client, one belonging to no project
+Rule 3 is safe for a sign-in because an end user consents: any client, one belonging to no bucket
 included, may *ask* a person for a token to a declared resource. A client credentials token asks
 nobody. Until 2026-09-28 `getResourceServerInfo` ignored the client, and the grant took its bucket from
 the request address, so any confidential client of any tenant — or one that registered itself —
@@ -163,10 +175,16 @@ could call `/b/<victim-slug>/token` and receive a token with the victim resource
 victim bucket as its issuer and the victim's scopes: everything a resource server checks. Only
 `client_id` differed.
 
-`machineTokenPermitted` (`lib/resources/registry.ts:93`) now refuses it with `invalid_target` unless
-the client belongs to the project that declared the resource, and `client_credentials.ts` asks before
-minting. An identifier nobody declared is not its question — the built-in MCP audience and an addon
-override answer for themselves. `test/resources/machine_access.spec.ts` is the attack.
+`machineTokenPermitted` (`lib/resources/registry.ts:100-115`) now refuses it with `invalid_target` unless
+the client is **stored**, its `bucketId` is the resource's `bucketId`, and it did not register itself; and
+`client_credentials.ts:87-98` asks before minting. A client metadata document has no stored record and is
+refused; a self-registered client of the same bucket is refused because nobody vouched for it. Until spec 099
+the test was "the client is in the project that declared the resource", so a bucket with several projects
+kept their machine audiences apart; the upgrade reports such buckets, because every operator-registered
+application of the bucket now qualifies. A list of grantees on the resource was rejected, because it would
+reproduce the read-modify-write membership list that let a client fall out of its project. An identifier
+nobody declared is not its question — the built-in MCP audience and an addon override answer for themselves.
+`test/resources/machine_access.spec.ts` is the attack.
 
 ## A client whose id is a URL, stored nowhere
 
@@ -281,5 +299,6 @@ this server is naming the required scopes in a challenge — which `/mcp` now do
 
 - [[per-issuer-isolation]] — why declarations are unique per issuer and the root namespace is super-admin only
 - [[admin-mcp-control-plane]] — the plane this feature makes reachable by a second kind of client
-- [[group-ownership]] — what a project's owning group decides, which a declared resource inherits
+- [[group-ownership]] — what a bucket's owning group decides, which a declared resource inherits
+- [[bucket-is-the-only-container]] — why a declaration stores `bucketId`, and the upgrade that moved `projectId` to it
 - [[client-identity-from-database]] — the adapter-every-call rule the resource registry follows, and the memo whose staleness is why the registry has none

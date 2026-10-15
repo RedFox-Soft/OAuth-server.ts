@@ -1,7 +1,7 @@
 ---
 title: 创建第一个管理员
 description: 一次性设置页面、管理员登录的工作方式，以及在做任何其他事之前就应开启的第二因素认证。
-source: 6331eebac9b1
+source: 4ad7c018f507
 sidebar:
   order: 3
 ---
@@ -30,9 +30,9 @@ import ScreenshotFigure from '../../../../../components/ScreenshotFigure.astro';
 </Aside>
 
 <ScreenshotFigure
-	name="admin-projects"
-	alt="登录后的管理控制台，列出当前组范围内的项目。"
-	caption="管理员登录后首先看到的页面：范围切换器当前指向的那个组的项目。"
+	name="admin-buckets"
+	alt="登录后的管理控制台，列出当前组范围内的用户桶。"
+	caption="管理员登录后首先看到的页面：范围切换器当前指向的那个组的用户桶。"
 />
 
 ## 管理员通过此服务器自己的签发者登录 {#administrators-sign-in-through-this-servers-own-issuer}
@@ -54,7 +54,7 @@ import ScreenshotFigure from '../../../../../components/ScreenshotFigure.astro';
 
 ## 管理员能触及什么 {#what-an-administrator-can-reach}
 
-控制台的超级管理员功能覆盖实例本身：服务器设置、签名密钥、SMTP、管理员账户和故障存储。超级管理员的身份，就是保留的 **Super administrators** 组的成员资格；它的授予和撤回各自是独立的操作（**Administrators** 页面上的 **Make super administrator…** 和 **Withdraw super administration…**，对智能体而言则是 `admin_super_grant` 和 `admin_super_withdraw`）；最后一个活跃成员既不能被撤回，也不能被停用。其他任何管理员都可以创建项目、桶和组，通过电子邮件邀请他人加入自己的普通组，并读取自己所属组的审计日志和 **Usage** 页面。所有权按组划分：属于某个容器的所属组，就是获得其访问权限的方式。
+控制台的超级管理员功能覆盖实例本身：服务器设置、签名密钥、SMTP、管理员账户和故障存储。超级管理员的身份，就是保留的 **Super administrators** 组的成员资格；它的授予和撤回各自是独立的操作（**Administrators** 页面上的 **Make super administrator…** 和 **Withdraw super administration…**，对智能体而言则是 `admin_super_grant` 和 `admin_super_withdraw`）；最后一个活跃成员既不能被撤回，也不能被停用。其他任何管理员都可以创建桶、桶中的应用和 API，以及组，通过电子邮件邀请他人加入自己的普通组，并读取自己所属组的审计日志和 **Usage** 页面。所有权按组划分：属于某个容器的所属组，就是获得其访问权限的方式。
 
 每一个改变状态的操作，无论来自控制台还是智能体，都会在变更发生之前写入只追加的审计日志，记录操作者、操作和目标。该存储不提供任何更新或删除接口。
 

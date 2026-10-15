@@ -1,4 +1,4 @@
-import { adapter, getProjectStore } from '../../adapters/index.js';
+import { adapter } from '../../adapters/index.js';
 import type { UserBucket } from '../../adapters/types.js';
 import { connectionClientRecord } from '../../provisioning/client.js';
 import type { Client } from './types.ts';
@@ -32,18 +32,18 @@ export async function redirectUrisVouchedFor(client: Client): Promise<boolean> {
 }
 
 /*
- * Whether the group that owns this client's project also owns `bucket` — the one test of "these users are
- * the tenant's own". Undefined when the client is in no project, so each caller decides what that means:
- * the consent waiver honours an operator's stored flag there, and `clientProvenance` counts such a client
- * as the instance's own.
+ * Whether this client belongs to `bucket` — the one test of "these users are the tenant's own" (specs/099):
+ * a client belongs to the bucket it was created in, and that bucket's group is its group. Undefined when
+ * the client belongs to no bucket, so each caller decides what that means: the consent waiver honours an
+ * operator's stored flag there, and `clientProvenance` counts such a client as the instance's own.
  */
-export async function projectGroupOwnsBucket(
+export async function clientBelongsToBucket(
 	clientId: string,
-	bucket: Pick<UserBucket, 'ownerGroupId'> | null | undefined
+	bucket: Pick<UserBucket, '_id'> | null | undefined
 ): Promise<boolean | undefined> {
-	const project = await getProjectStore().findByClientId(clientId);
-	if (!project) return undefined;
-	return bucket?.ownerGroupId === project.ownerGroupId;
+	const bucketId = (await adapter('Client').find(clientId))?.bucketId;
+	if (typeof bucketId !== 'string') return undefined;
+	return bucket?._id === bucketId;
 }
 
 export type ProvenanceTier =
@@ -54,20 +54,20 @@ export type ProvenanceTier =
  * and warnings are chosen by.
  *
  *  - self-registered: nobody here created it — dynamic registration, or a metadata document. Tested
- *    first, and that order is the point: such a client is in no project, and "no project" alone would
- *    otherwise read as the instance's own (it is the consent waiver's reading, which is safe there only
- *    because such a client cannot switch consent off).
- *  - this-organization: created by an administrator of the group that owns the bucket being signed into,
- *    or by the instance's operator outside any project.
- *  - operator-registered: created by an administrator of this server, but of another group. In a shared
- *    bucket that is another tenant's app, and the page must not speak of it as the organization's own.
+ *    first, and that order is the point: such a client may belong to no bucket, and "no bucket" alone
+ *    would otherwise read as the instance's own (it is the consent waiver's reading, which is safe there
+ *    only because such a client cannot switch consent off).
+ *  - this-organization: created by an administrator in the bucket being signed into, or by the
+ *    instance's operator outside any bucket.
+ *  - operator-registered: created by an administrator in another bucket — one that reaches this bucket
+ *    through a declared resource — and the page must not speak of it as the organization's own.
  *
  * A provisioning connection's client is synthesized rather than stored and is not self-registered; it
  * never reaches a consent page (client credentials only), but is classified correctly all the same.
  */
 export async function clientProvenance(
 	client: Client,
-	signInBucket: Pick<UserBucket, 'ownerGroupId'> | null | undefined
+	signInBucket: Pick<UserBucket, '_id'> | null | undefined
 ): Promise<ProvenanceTier> {
 	if (
 		!(await redirectUrisVouchedFor(client)) &&
@@ -75,6 +75,6 @@ export async function clientProvenance(
 	) {
 		return 'self-registered';
 	}
-	const owns = await projectGroupOwnsBucket(client.clientId, signInBucket);
-	return owns === false ? 'operator-registered' : 'this-organization';
+	const belongs = await clientBelongsToBucket(client.clientId, signInBucket);
+	return belongs === false ? 'operator-registered' : 'this-organization';
 }

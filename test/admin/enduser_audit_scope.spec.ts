@@ -6,7 +6,7 @@ import { getUserStore } from 'lib/adapters/index.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { createAdministrator } from '../administrators.ts';
 import {
-	bucketWithProjects,
+	bucketWithClients,
 	cookieFor,
 	regularGroup
 } from './ownership_fixtures.ts';
@@ -51,7 +51,7 @@ describe('the trail of a bucket’s people, for the group that owns it', () => {
 		await ensureAdminSeed();
 		const admin = await createAdministrator('plain', `a-${Math.random()}@x.io`);
 		const group = await regularGroup([admin]);
-		bucketId = (await bucketWithProjects(group._id, 0)).bucket._id;
+		bucketId = (await bucketWithClients(group._id, 0)).bucket._id;
 		cookie = await cookieFor(admin);
 	});
 

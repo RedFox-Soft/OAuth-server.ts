@@ -1,8 +1,7 @@
 import getConfig from '../default.config.js';
 
 /*
- * A machine client of its own: the project store outlives a spec file, and a client held by two
- * specs' projects would belong to whichever ran first.
+ * A machine client of its own, bound by the spec to the bucket that declares the resource.
  */
 export const ApplicationConfig = {
 	...getConfig(),

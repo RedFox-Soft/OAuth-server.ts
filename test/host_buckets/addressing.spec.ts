@@ -1,16 +1,15 @@
 import { shownAccount } from '../consent_form.js';
 import { createHash, randomBytes } from 'node:crypto';
 import { describe, it, expect, beforeAll } from 'bun:test';
-import bootstrap from '../test_helper.ts';
+import bootstrap, { bindClientToBucket } from '../test_helper.ts';
 import {
 	getBucketStore,
-	getProjectStore,
 	getUserStore,
 	resetAdminMemoryStores
 } from 'lib/adapters/index.ts';
 import { elysia } from 'lib/index.ts';
 import { forgetBucketAddresses } from 'lib/admin/auth/bucketAddress.ts';
-import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
+import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { Type } from '@sinclair/typebox';
 import { present, shaped } from 'test/shape.ts';
 
@@ -30,16 +29,7 @@ async function seedBucket(name: string, host: string, clientId: string) {
 		name,
 		host
 	});
-	const project = await getProjectStore().create({
-		bucketId: DEFAULT_BUCKET_ID,
-		ownerGroupId: UNASSIGNED_GROUP_ID,
-		name,
-		slug: `${name.toLowerCase()}-${Math.random()}`
-	});
-	await getProjectStore().update(project._id, {
-		bucketId: bucket._id,
-		clientIds: [clientId]
-	});
+	await bindClientToBucket(clientId, bucket._id);
 	return bucket._id;
 }
 

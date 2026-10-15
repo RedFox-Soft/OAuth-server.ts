@@ -1,27 +1,30 @@
 import { describe, it, expect, beforeAll } from 'bun:test';
 
-import bootstrap, { agent, getHeader } from '../test_helper.ts';
+import bootstrap, {
+	agent,
+	bindClientToBucket,
+	getHeader
+} from '../test_helper.ts';
 import { AuthorizationRequest } from '../AuthorizationRequest.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
 	getBucketStore,
-	getProjectStore,
 	getProtectedResourceStore,
 	getUserStore,
 	resetAdminMemoryStores
 } from 'lib/adapters/index.ts';
 import { ROOT_NAMESPACE } from 'lib/resources/namespace.ts';
-import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { DEFAULT_BUCKET_ID, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 
 /*
- * Which project a client with no prior relationship belongs to, and therefore whose end-users it can
- * sign in.
+ * Whose end-users an application of the default bucket signs in when it names a resource another bucket
+ * declared.
  *
  * This is the question `specs/024-admin-mcp-control-plane/research.md` D6 left open, and the answer is
  * derived from the declared protected resource the request names. What makes that safe — and what made
- * D6's rejected version unsafe — is who authored the resource: an administrator declared it in a
- * project they own, and that project's bucket is their own choice. An attacker cannot declare a
- * resource, so the parameter selects among an operator's options rather than creating one.
+ * D6's rejected version unsafe — is who authored the resource: an administrator declared it in a bucket
+ * they hold. An attacker cannot declare a resource, so the parameter selects among an operator's options
+ * rather than creating one.
  *
  * Driven through the real authorization dance, on the pattern of
  * `test/admin/interactions_bucket.spec.ts`: a successful login hands back to the authorization
@@ -56,10 +59,10 @@ function authParams(extra: Record<string, unknown> = {}) {
 }
 
 /**
- * @proves A client belonging to no project reaches the right tenant users through the resource
- * it names, and reaches the default bucket only when it names none.
+ * @proves An application of the default bucket reaches the right tenant users through the resource it
+ * names, and reaches the default bucket only when it names none.
  */
-describe('bucket resolution for a client that belongs to no project', () => {
+describe('bucket resolution for an application of the default bucket', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'project_association' });
 		resetAdminMemoryStores();
@@ -69,21 +72,16 @@ describe('bucket resolution for a client that belongs to no project', () => {
 			name: 'Acme users',
 			ownerGroupId: UNASSIGNED_GROUP_ID
 		});
-		const project = await getProjectStore().create({
-			name: 'Acme',
-			slug: 'acme',
-			ownerGroupId: UNASSIGNED_GROUP_ID,
-			bucketId: bucket._id
-		});
+		await bindClientToBucket('unaffiliated', DEFAULT_BUCKET_ID);
 		await getProtectedResourceStore().create({
 			namespace: ROOT_NAMESPACE,
 			identifier: AUDIENCE,
-			projectId: project._id,
+			bucketId: bucket._id,
 			name: 'Acme MCP',
 			scopes: ['mcp:tools-basic']
 		});
 
-		/* Exists only in the project's own bucket, never in the default one. */
+		/* Exists only in the declaring bucket, never in the default one. */
 		await getUserStore(bucket._id).create(
 			'acme-only@x.io',
 			await Bun.password.hash(PASSWORD)
@@ -95,7 +93,7 @@ describe('bucket resolution for a client that belongs to no project', () => {
 		);
 	});
 
-	it('signs in the project bucket user when the request names the project resource', async () => {
+	it('signs in the declaring bucket’s user when the request names its resource', async () => {
 		expect(
 			await login(authParams({ resource: AUDIENCE }), 'acme-only@x.io')
 		).toBe(303);

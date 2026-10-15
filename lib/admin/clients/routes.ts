@@ -1,5 +1,6 @@
 import { Elysia } from 'elysia';
-import { getProjectStore } from '../../adapters/index.js';
+import { adapter } from '../../adapters/index.js';
+import type { UserBucket } from '../../adapters/types.js';
 import {
 	assertAuth,
 	AdminError,
@@ -7,8 +8,7 @@ import {
 	resolveAdmin,
 	type AdminContext
 } from '../auth/rbac.js';
-import { managesProject } from '../auth/can.js';
-import { ADMIN_CLIENT_ID } from '../consts.js';
+import { loadBucketForEdit, loadBucketForUsers } from '../buckets/access.js';
 import { CreateClientBody, UpdateClientBody } from './schema.js';
 import {
 	createClient,
@@ -16,34 +16,60 @@ import {
 	listClientView,
 	updateClient,
 	rotateSecret,
-	deleteClientRecord
+	deleteClientRecord,
+	type AdminClientView
 } from './service.js';
 import { recordAdminAudit } from '../audit/record.js';
 import { cascadeForClient } from '../../helpers/cascade.js';
 import nanoid from '../../helpers/nanoid.js';
 
-// Load a REGULAR project the caller may access, or throw. Client management never
-// applies to the reserved admin project.
-async function loadManageableProject(admin: AdminContext, id: string) {
-	const project = await getProjectStore().find(id);
-	if (!project) throw new AdminError(404, 'project not found');
-	// The project's stated `manageClients` right, so the console is never shown a control this refuses.
-	if (!managesProject(admin, project))
-		throw new AdminError(
-			403,
-			project.type === 'admin'
-				? 'cannot manage admin project clients'
-				: 'no access to this project'
-		);
-	return project;
+/*
+ * A bucket's applications (specs/099). The bucket is the only container: an application belongs to one
+ * for its whole life, and every route here is addressed under it. Reading needs the bucket's read right,
+ * changing needs its edit right — the administrators' bucket is closed to both, so its own clients are
+ * never managed here.
+ */
+function loadBucket(
+	ctx: AdminContext,
+	id: string,
+	mode: 'read' | 'edit'
+): Promise<UserBucket> {
+	return mode === 'read'
+		? loadBucketForUsers(ctx, id)
+		: loadBucketForEdit(ctx, id);
 }
 
-// Ownership scoping: the client id must belong to this project.
-function assertOwnsClient(project: { clientIds: string[] }, clientId: string) {
-	if (clientId === ADMIN_CLIENT_ID)
-		throw new AdminError(403, 'cannot manage the reserved admin client');
-	if (!project.clientIds.includes(clientId))
-		throw new AdminError(404, 'client not found in this project');
+/*
+ * The application under this bucket, answered exactly as a missing one when the bucket does not hold it,
+ * so naming another bucket's application tells the caller nothing about it.
+ */
+async function clientOf(
+	bucket: UserBucket,
+	clientId: string
+): Promise<AdminClientView> {
+	const view = await getClientView(clientId);
+	if (view?.bucketId !== bucket._id) {
+		throw new AdminError(404, 'client not found');
+	}
+	return view;
+}
+
+/*
+ * A self-registered application is listed and readable here, but changed only through its own
+ * registration access token: the administrator did not create it, and its consent setting in particular
+ * must stay what the registration made it.
+ */
+function assertManaged(view: AdminClientView): void {
+	if (view.registeredDynamically) {
+		throw new AdminError(
+			409,
+			'this application registered itself and is managed through its registration access token'
+		);
+	}
+}
+
+function scopeOf(bucket: UserBucket) {
+	return { bucketId: bucket._id, ownerGroupId: bucket.ownerGroupId };
 }
 
 export const clientRoutes = new Elysia({ name: 'admin-clients' })
@@ -54,28 +80,31 @@ export const clientRoutes = new Elysia({ name: 'admin-clients' })
 			return adminErrorBody(error);
 		}
 	})
-	.get('/admin/api/projects/:id/clients', async ({ admin, params }) => {
+	.get('/admin/api/buckets/:id/clients', async ({ admin, params }) => {
 		const ctx = assertAuth(admin);
-		const project = await loadManageableProject(ctx, params.id);
+		const bucket = await loadBucket(ctx, params.id, 'read');
+		const stored = await adapter('Client').findByIndexed(
+			'bucketId',
+			bucket._id
+		);
 		const views = [];
-		for (const clientId of project.clientIds) {
-			const view = await listClientView(clientId);
+		for (const record of stored) {
+			const view = await listClientView(String(record.clientId));
 			if (view) views.push(view);
 		}
 		return views;
 	})
 	.post(
-		'/admin/api/projects/:id/clients',
+		'/admin/api/buckets/:id/clients',
 		async ({ admin, params, body, set }) => {
 			const ctx = assertAuth(admin);
-			const project = await loadManageableProject(ctx, params.id);
-			// Allocated here so the entry names the client that is about to exist. One entry for the
-			// request, even though it also attaches the client to its project.
+			const bucket = await loadBucket(ctx, params.id, 'edit');
+			// Allocated here so the entry names the client that is about to exist.
 			const clientId = nanoid();
-			await recordAdminAudit(ctx, 'client.create', clientId);
-			const { view, secret } = await createClient({ ...body, clientId });
-			await getProjectStore().update(params.id, {
-				clientIds: [...project.clientIds, view.clientId]
+			await recordAdminAudit(ctx, 'client.create', clientId, scopeOf(bucket));
+			const { view, secret } = await createClient(bucket._id, {
+				...body,
+				clientId
 			});
 			set.status = 201;
 			return { ...view, secret };
@@ -83,23 +112,21 @@ export const clientRoutes = new Elysia({ name: 'admin-clients' })
 		{ body: CreateClientBody }
 	)
 	.get(
-		'/admin/api/projects/:id/clients/:clientId',
+		'/admin/api/buckets/:id/clients/:clientId',
 		async ({ admin, params }) => {
 			const ctx = assertAuth(admin);
-			const project = await loadManageableProject(ctx, params.id);
-			assertOwnsClient(project, params.clientId);
-			const view = await getClientView(params.clientId);
-			if (!view) throw new AdminError(404, 'client not found');
-			return view;
+			const bucket = await loadBucket(ctx, params.id, 'read');
+			return clientOf(bucket, params.clientId);
 		}
 	)
 	.patch(
-		'/admin/api/projects/:id/clients/:clientId',
+		'/admin/api/buckets/:id/clients/:clientId',
 		async ({ admin, params, body }) => {
 			const ctx = assertAuth(admin);
-			const project = await loadManageableProject(ctx, params.id);
-			assertOwnsClient(project, params.clientId);
+			const bucket = await loadBucket(ctx, params.id, 'edit');
+			assertManaged(await clientOf(bucket, params.clientId));
 			await recordAdminAudit(ctx, 'client.update', params.clientId, {
+				...scopeOf(bucket),
 				attributes: Object.keys(body)
 			});
 			return updateClient(params.clientId, body);
@@ -107,32 +134,38 @@ export const clientRoutes = new Elysia({ name: 'admin-clients' })
 		{ body: UpdateClientBody }
 	)
 	.post(
-		'/admin/api/projects/:id/clients/:clientId/secret',
+		'/admin/api/buckets/:id/clients/:clientId/secret',
 		async ({ admin, params }) => {
 			const ctx = assertAuth(admin);
-			const project = await loadManageableProject(ctx, params.id);
-			assertOwnsClient(project, params.clientId);
+			const bucket = await loadBucket(ctx, params.id, 'edit');
+			assertManaged(await clientOf(bucket, params.clientId));
 			// The rotation is the recorded fact; the secret itself never enters the trail.
-			await recordAdminAudit(ctx, 'client.secret.rotate', params.clientId);
+			await recordAdminAudit(
+				ctx,
+				'client.secret.rotate',
+				params.clientId,
+				scopeOf(bucket)
+			);
 			const secret = await rotateSecret(params.clientId);
 			return { clientId: params.clientId, secret };
 		}
 	)
 	.delete(
-		'/admin/api/projects/:id/clients/:clientId',
+		'/admin/api/buckets/:id/clients/:clientId',
 		async ({ admin, params }) => {
 			const ctx = assertAuth(admin);
-			const project = await loadManageableProject(ctx, params.id);
-			assertOwnsClient(project, params.clientId);
-			await recordAdminAudit(ctx, 'client.delete', params.clientId);
+			const bucket = await loadBucket(ctx, params.id, 'edit');
+			assertManaged(await clientOf(bucket, params.clientId));
+			await recordAdminAudit(
+				ctx,
+				'client.delete',
+				params.clientId,
+				scopeOf(bucket)
+			);
 			await deleteClientRecord(params.clientId);
-			await getProjectStore().update(params.id, {
-				clientIds: project.clientIds.filter((c) => c !== params.clientId)
-			});
 			/*
-			 * Audit, then destroy the principal, then cascade — and "destroy the principal" is both the
-			 * record delete and the unlink above, so the sweep runs after both rather than between them:
-			 * the client is not gone from the admin plane until neither half of it remains.
+			 * Audit, then destroy the principal, then cascade — the sweep runs after the record is gone, so
+			 * the client is not usable while its tokens are being revoked.
 			 *
 			 * A sweep that fails partway is answered, not rolled back. The client is already gone, so a
 			 * repeated DELETE answers 404, and the residue is bounded by each area's own TTL because the

@@ -99,7 +99,7 @@ describe the answer rather than only send it (`lib/response_modes/describe.ts`),
 form carries exactly what the redirect would have. See [[untrusted-redirect-confirmation]].
 
 This module is no longer the only reader of that answer. Since spec 092 the consent page reads it too,
-through `clientProvenance` (`provenance.ts:66-78`), to decide how it speaks of the app on the success
+through `clientProvenance` (`provenance.ts:68-79`), to decide how it speaks of the app on the success
 path. Delivery itself did not change ([[consent-screen-decisions]]).
 
 ## Not covered

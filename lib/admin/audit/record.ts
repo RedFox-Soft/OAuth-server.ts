@@ -38,8 +38,8 @@ export interface AuditDetail {
 	 */
 	formerOwnerGroupId?: string;
 	/*
-	 * A project's bucket change (specs/085): the bucket it now uses and the one it used before, so the entry
-	 * is in the trail of both buckets.
+	 * The bucket an application or API action happened in (specs/099), and — on a project bucket change the
+	 * trail recorded before projects were removed (specs/085) — the bucket it left.
 	 */
 	bucketId?: string;
 	formerBucketId?: string;

@@ -4,8 +4,8 @@ const config = getConfig();
 
 /*
  * The consent page decides what to say from who stands behind a client and where it sends the answer, so
- * this harness holds one client of each kind: the organization's own, another tenant's (put in a tenant's
- * project by the spec), two that registered themselves, a program on this computer, and an app claiming
+ * this harness holds one client of each kind: the organization's own, another tenant's (put in a bucket
+ * by the spec), two that registered themselves, a program on this computer, and an app claiming
  * a private-use scheme. `billing` is a scope of the instance's own with no standard meaning.
  */
 export const ApplicationConfig = {

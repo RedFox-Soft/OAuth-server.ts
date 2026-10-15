@@ -7,13 +7,9 @@ import bootstrap, {
 	redirectParameter,
 	type Setup
 } from '../test_helper.js';
-import {
-	adapter,
-	getProjectStore,
-	getProtectedResourceStore
-} from 'lib/adapters/index.js';
+import { adapter, getProtectedResourceStore } from 'lib/adapters/index.js';
 import { ROOT_NAMESPACE } from 'lib/resources/namespace.js';
-import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.js';
+import { DEFAULT_BUCKET_ID } from 'lib/admin/consts.js';
 import {
 	AUDIENCE,
 	REDIRECT_URI,
@@ -106,16 +102,10 @@ describe('an authorization error raised after the interaction', () => {
 
 	describe('a request that stops being valid before sign-in completes', () => {
 		it('delivers invalid_target to the client when the requested resource is withdrawn', async () => {
-			const project = await getProjectStore().create({
-				bucketId: DEFAULT_BUCKET_ID,
-				name: 'Delivery',
-				slug: `delivery-${Math.random()}`,
-				ownerGroupId: UNASSIGNED_GROUP_ID
-			});
 			await getProtectedResourceStore().create({
 				namespace: ROOT_NAMESPACE,
 				identifier: AUDIENCE,
-				projectId: project._id,
+				bucketId: DEFAULT_BUCKET_ID,
 				name: 'Delivery API',
 				scopes: []
 			});

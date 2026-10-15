@@ -12,9 +12,9 @@ import bootstrap from '../test_helper.js';
 import { elysia } from 'lib/index.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
+	adapter,
 	adminAuditStore,
 	getBucketStore,
-	getProjectStore,
 	getSmtpSettingsStore,
 	getUserStore
 } from 'lib/adapters/index.ts';
@@ -58,7 +58,7 @@ const Applied = Type.Object({
 	totpRequired: Type.Boolean(),
 	name: Type.String()
 });
-const Summary = Type.Object({ projects: Type.Number() });
+const Summary = Type.Object({ applications: Type.Number() });
 
 const MAIL: SmtpSettings = {
 	host: 'smtp.example.test',
@@ -283,8 +283,7 @@ describe('changing how people sign in to a bucket', () => {
 			Type.Object({
 				users: Type.Number(),
 				withoutEnabledLink: Type.Number(),
-				passwordWithoutAuthenticator: Type.Number(),
-				projects: Type.Optional(Type.Number())
+				passwordWithoutAuthenticator: Type.Number()
 			}),
 			answer.body
 		);
@@ -294,8 +293,6 @@ describe('changing how people sign in to a bucket', () => {
 			withoutEnabledLink: 3,
 			passwordWithoutAuthenticator: 2
 		});
-		/* Counted on the default bucket only, where a project naming no bucket signs in. */
-		expect(summary.projects).toBeUndefined();
 	});
 
 	it('requiring an authenticator while password sign-in stays off applies at once, with the advisory', async () => {
@@ -353,29 +350,32 @@ describe('changing how people sign in to a bucket', () => {
 			}
 		});
 
-		async function projectsCounted(): Promise<number> {
+		async function applicationsCounted(): Promise<number> {
 			const answer = await request(
 				'GET',
 				`/admin/api/buckets/${DEFAULT_BUCKET_ID}/summary`,
 				superCookie
 			);
-			return shaped(Summary, answer.body).projects;
+			return shaped(Summary, answer.body).applications;
 		}
 
-		it('counts the projects on the default bucket as signing in there', async () => {
-			const counted = await projectsCounted();
-			await getProjectStore().create({
-				name: `names it ${nanoid()}`,
-				slug: slug(),
-				ownerGroupId,
-				bucketId: DEFAULT_BUCKET_ID
+		it('counts the applications of the default bucket as signing in there', async () => {
+			const counted = await applicationsCounted();
+			const clientId = `default-app-${nanoid()}`;
+			await adapter('Client').upsert(clientId, {
+				clientId,
+				bucketId: DEFAULT_BUCKET_ID,
+				grantTypes: ['authorization_code'],
+				responseTypes: ['code'],
+				redirectUris: ['https://default-app.example.com/cb'],
+				token_endpoint_auth_method: 'none'
 			});
 
-			expect(await projectsCounted()).toBe(counted + 1);
+			expect(await applicationsCounted()).toBe(counted + 1);
 		});
 
-		it('opening sign-up says anyone can create an account, and how many projects it changes sign-in for', async () => {
-			const projects = await projectsCounted();
+		it('opening sign-up says anyone can create an account, and how many applications it changes sign-in for', async () => {
+			const applications = await applicationsCounted();
 
 			const answer = await request(
 				'PATCH',
@@ -388,9 +388,9 @@ describe('changing how people sign in to a bucket', () => {
 			expect(shaped(SignInPreview, answer.body)).toMatchObject({
 				consequences: [
 					'Anyone who can reach the sign-in page can create an account.',
-					`This changes sign-in for ${projects} project${projects === 1 ? '' : 's'}.`
+					`This changes sign-in for ${applications} application${applications === 1 ? '' : 's'}.`
 				],
-				expect: { projects },
+				expect: { applications },
 				changes: ['signUpOpen']
 			});
 		});

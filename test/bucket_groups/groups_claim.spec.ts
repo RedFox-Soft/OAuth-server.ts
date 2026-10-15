@@ -26,7 +26,7 @@ import bootstrap, {
 	type Setup
 } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
-import { projectOf } from '../resources/owning_project.js';
+import { bucketOf } from '../resources/owning_bucket.js';
 
 const JWT_RESOURCE = 'https://api.example.com/jwt';
 const OPAQUE_RESOURCE = 'https://api.example.com/opaque';
@@ -51,7 +51,7 @@ describe('the groups claim', () => {
 
 	beforeAll(async () => {
 		setup = await bootstrap(import.meta.url, { config: 'groups_claim' });
-		const projectId = await projectOf('client');
+		const bucketId = await bucketOf('client');
 		const store = getProtectedResourceStore();
 		for (const [identifier, tokenFormat] of [
 			[JWT_RESOURCE, 'jwt'],
@@ -60,7 +60,7 @@ describe('the groups claim', () => {
 			await store.create({
 				namespace: ROOT_NAMESPACE,
 				identifier,
-				projectId,
+				bucketId,
 				name: identifier,
 				scopes: ['api:read'],
 				tokenFormat

@@ -5,7 +5,7 @@ import bootstrap, { agent } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { getProtectedResourceStore } from 'lib/adapters/index.ts';
 import { ROOT_NAMESPACE } from 'lib/resources/namespace.ts';
-import { projectOf } from './owning_project.js';
+import { bucketOf } from './owning_bucket.js';
 
 /*
  * How a declared resource's tokens are verified, and how long they live.
@@ -19,7 +19,7 @@ import { projectOf } from './owning_project.js';
 
 const AUDIENCE = 'https://mcp.example.com/mcp';
 
-let projectId: string;
+let bucketId: string;
 
 const auth = {
 	headers: AuthorizationRequest.basicAuthHeader('client', 'secret')
@@ -32,7 +32,7 @@ async function declare(overrides: {
 	return getProtectedResourceStore().create({
 		namespace: ROOT_NAMESPACE,
 		identifier: AUDIENCE,
-		projectId,
+		bucketId,
 		name: 'Acme MCP',
 		scopes: ['mcp:tools-basic'],
 		...overrides
@@ -60,7 +60,7 @@ async function token() {
 describe('token format and lifetime for a declared resource', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'resources' });
-		projectId = await projectOf('client');
+		bucketId = await bucketOf('client');
 	});
 
 	beforeEach(async () => {
@@ -135,7 +135,7 @@ describe('token format and lifetime for a declared resource', () => {
 		await getProtectedResourceStore().create({
 			namespace: ROOT_NAMESPACE,
 			identifier: 'https://other.example.com/mcp',
-			projectId,
+			bucketId,
 			name: 'Other MCP',
 			scopes: ['mcp:tools-basic']
 		});

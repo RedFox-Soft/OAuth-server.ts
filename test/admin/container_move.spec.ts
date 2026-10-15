@@ -3,27 +3,28 @@ import { Elysia } from 'elysia';
 import { Type, type TSchema, type Static } from '@sinclair/typebox';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { bucketRoutes } from 'lib/admin/buckets/routes.ts';
-import { projectRoutes } from 'lib/admin/projects/routes.ts';
+import { clientRoutes } from 'lib/admin/clients/routes.ts';
+import { resourceRoutes } from 'lib/admin/resources/routes.ts';
 import { scopeRoutes } from 'lib/admin/scope/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { ensurePersonalGroup } from 'lib/admin/groups/personal.ts';
 import {
 	getBucketStore,
 	getGroupStore,
-	getProjectStore
+	getProtectedResourceStore
 } from 'lib/adapters/index.ts';
-import type { User } from 'lib/adapters/types.ts';
+import type { User, UserBucket } from 'lib/adapters/types.ts';
 import {
 	ADMIN_BUCKET_ID,
-	ADMIN_PROJECT_ID,
 	DEFAULT_BUCKET_ID,
 	SUPER_ADMINS_GROUP_ID,
 	UNASSIGNED_GROUP_ID
 } from 'lib/admin/consts.ts';
+import { namespaceOf } from 'lib/resources/namespace.ts';
 import { shaped } from 'test/shape.ts';
 import { createAdministrator, type AdminKind } from '../administrators.ts';
 import {
-	bucketWithProjects,
+	bucketWithClients,
 	cookieFor,
 	regularGroup
 } from './ownership_fixtures.ts';
@@ -31,7 +32,8 @@ import {
 const app = new Elysia()
 	.use(resolveAdmin)
 	.use(bucketRoutes)
-	.use(projectRoutes)
+	.use(clientRoutes)
+	.use(resourceRoutes)
 	.use(scopeRoutes);
 
 async function call(
@@ -71,21 +73,18 @@ const BucketPreview = Type.Object({
 	from: GroupRef,
 	to: GroupRef,
 	bucket: Named,
-	projects: Type.Array(Named),
+	applications: Type.Number(),
+	apis: Type.Number(),
 	consequence: Type.String()
 });
 const BucketMoved = Type.Object({
-	bucket: Type.Object({ id: Type.String(), ownerGroupId: Type.String() }),
-	projects: Type.Array(Named)
-});
-const ProjectPreview = Type.Object({
-	confirmationRequired: Type.Literal(true),
-	from: GroupRef,
-	to: GroupRef,
-	project: Named,
-	consequence: Type.String()
+	bucket: Type.Object({ id: Type.String(), ownerGroupId: Type.String() })
 });
 const Listed = Type.Array(Type.Object({ _id: Type.String() }));
+const Applications = Type.Array(Type.Object({ clientId: Type.String() }));
+const Apis = Type.Object({
+	resources: Type.Array(Type.Object({ identifier: Type.String() }))
+});
 
 function admin(kind: AdminKind = 'plain'): Promise<User> {
 	return createAdministrator(kind, `${kind}-${Math.random()}@x.io`);
@@ -97,23 +96,26 @@ const moveBucket = (
 	body: Record<string, unknown>
 ) => call('PUT', `/admin/api/buckets/${id}/owner`, cookie, body);
 
-const moveProject = (
-	cookie: string,
-	id: string,
-	body: Record<string, unknown>
-) => call('PUT', `/admin/api/projects/${id}/owner`, cookie, body);
-
 async function ownerOfBucket(id: string) {
 	return (await getBucketStore().find(id))?.ownerGroupId;
 }
 
-async function ownerOfProject(id: string) {
-	return (await getProjectStore().find(id))?.ownerGroupId;
+/* An API declared in the bucket, as its Resources page would declare it. */
+async function apiIn(bucket: UserBucket): Promise<string> {
+	const identifier = `https://api-${bucket._id.toLowerCase()}.example.com/mcp`;
+	await getProtectedResourceStore().create({
+		namespace: namespaceOf(bucket),
+		identifier,
+		bucketId: bucket._id,
+		name: 'API',
+		scopes: ['read']
+	});
+	return identifier;
 }
 
 /*
- * Alice keeps a bucket with two projects in her personal group and owns Team, where Bob is a plain member.
- * Carol belongs to Alice's... nothing: a stranger to both groups.
+ * Alice keeps a bucket with two applications and one API in her personal group and owns Team, where Bob
+ * is a plain member. Carol belongs to Alice's... nothing: a stranger to both groups.
  */
 async function world() {
 	const alice = await admin();
@@ -121,7 +123,8 @@ async function world() {
 	const carol = await admin();
 	const personal = await ensurePersonalGroup(alice._id, alice.email);
 	const team = await regularGroup([alice], [bob]);
-	const { bucket, projects } = await bucketWithProjects(personal._id, 2);
+	const { bucket, clientIds } = await bucketWithClients(personal._id, 2);
+	const api = await apiIn(bucket);
 	return {
 		alice,
 		bob,
@@ -129,7 +132,8 @@ async function world() {
 		personal,
 		team,
 		bucket,
-		projects,
+		clientIds,
+		api,
 		aliceCookie: await cookieFor(alice),
 		bobCookie: await cookieFor(bob),
 		carolCookie: await cookieFor(carol)
@@ -137,16 +141,16 @@ async function world() {
 }
 
 /**
- * @proves A bucket moves to another administrator group with every project that uses it, only for an owner
- * of the group it leaves who belongs to the group it joins; a project on the Default bucket moves alone; every
- * refusal changes nothing and reveals nothing about what the caller cannot see.
+ * @proves A bucket moves to another administrator group with every application and API it holds, only for
+ * an owner of the group it leaves who belongs to the group it joins; every refusal changes nothing and
+ * reveals nothing about what the caller cannot see.
  */
 describe('moving a bucket to another group', () => {
 	beforeEach(async () => {
 		await ensureAdminSeed();
 	});
 
-	it('gives the destination the bucket and every project using it after the source’s owner confirms', async () => {
+	it('gives the destination the bucket after the source’s owner confirms', async () => {
 		const w = await world();
 
 		const { status, body } = await moveBucket(w.aliceCookie, w.bucket._id, {
@@ -155,15 +159,11 @@ describe('moving a bucket to another group', () => {
 		});
 
 		expect(status).toBe(200);
-		expect(
-			as(BucketMoved, body)
-				.projects.map((p) => p.id)
-				.sort()
-		).toEqual(w.projects.map((p) => p._id).sort());
+		expect(as(BucketMoved, body).bucket).toEqual({
+			id: w.bucket._id,
+			ownerGroupId: w.team._id
+		});
 		expect(await ownerOfBucket(w.bucket._id)).toBe(w.team._id);
-		for (const p of w.projects) {
-			expect(await ownerOfProject(p._id)).toBe(w.team._id);
-		}
 	});
 
 	it('moves a bucket for an owner of the source who is a plain member of the destination', async () => {
@@ -179,7 +179,7 @@ describe('moving a bucket to another group', () => {
 		expect(await ownerOfBucket(w.bucket._id)).toBe(other._id);
 	});
 
-	it('lists the moved bucket and its projects to the destination’s members', async () => {
+	it('lists the moved bucket to the destination’s members', async () => {
 		const w = await world();
 		await moveBucket(w.aliceCookie, w.bucket._id, {
 			groupId: w.team._id,
@@ -193,15 +193,46 @@ describe('moving a bucket to another group', () => {
 			Listed,
 			(await call('GET', '/admin/api/buckets', w.bobCookie)).body
 		);
-		const projects = as(
-			Listed,
-			(await call('GET', '/admin/api/projects', w.bobCookie)).body
-		);
 
 		expect(buckets.map((b) => b._id)).toContain(w.bucket._id);
-		expect(projects.map((p) => p._id).sort()).toEqual(
-			w.projects.map((p) => p._id).sort()
+	});
+
+	it('gives the destination’s members every application of the moved bucket', async () => {
+		const w = await world();
+		await moveBucket(w.aliceCookie, w.bucket._id, {
+			groupId: w.team._id,
+			confirm: true
+		});
+
+		const { status, body } = await call(
+			'GET',
+			`/admin/api/buckets/${w.bucket._id}/clients`,
+			w.bobCookie
 		);
+
+		expect(status).toBe(200);
+		expect(
+			as(Applications, body)
+				.map((c) => c.clientId)
+				.sort()
+		).toEqual([...w.clientIds].sort());
+	});
+
+	it('gives the destination’s members every API of the moved bucket', async () => {
+		const w = await world();
+		await moveBucket(w.aliceCookie, w.bucket._id, {
+			groupId: w.team._id,
+			confirm: true
+		});
+
+		const { status, body } = await call(
+			'GET',
+			`/admin/api/buckets/${w.bucket._id}/resources`,
+			w.bobCookie
+		);
+
+		expect(status).toBe(200);
+		expect(as(Apis, body).resources.map((r) => r.identifier)).toEqual([w.api]);
 	});
 
 	it('refuses a member of only the source the moved bucket as it refuses one that does not exist', async () => {
@@ -236,29 +267,61 @@ describe('moving a bucket to another group', () => {
 		);
 	});
 
-	it('refuses the source’s former members the moved projects', async () => {
+	/* The source group's colleague, after its owner moved their shared bucket away. */
+	async function movedAwayFromColleague() {
 		const owner = await admin();
 		const colleague = await admin();
 		const source = await regularGroup([owner], [colleague]);
 		const target = await regularGroup([owner]);
-		const { bucket, projects } = await bucketWithProjects(source._id, 1);
+		const { bucket, clientIds } = await bucketWithClients(source._id, 1);
+		await apiIn(bucket);
 		await moveBucket(await cookieFor(owner), bucket._id, {
 			groupId: target._id,
 			confirm: true
 		});
-		const project = projects[0]?._id ?? '';
+		return {
+			bucket,
+			clientId: clientIds[0] ?? '',
+			cookie: await cookieFor(colleague)
+		};
+	}
+
+	it('refuses the source’s former members the moved bucket’s applications as it refuses a bucket that does not exist', async () => {
+		const { bucket, clientId, cookie } = await movedAwayFromColleague();
 
 		const moved = await call(
 			'GET',
-			`/admin/api/projects/${project}`,
-			await cookieFor(colleague)
+			`/admin/api/buckets/${bucket._id}/clients/${clientId}`,
+			cookie
 		);
 		const missing = await call(
 			'GET',
-			'/admin/api/projects/no-such-project',
-			await cookieFor(colleague)
+			`/admin/api/buckets/no-such-bucket/clients/${clientId}`,
+			cookie
 		);
 
+		expect(moved.status).toBe(403);
+		expect(moved.status).toBe(missing.status);
+		expect(as(Refusal, moved.body).message).toBe(
+			as(Refusal, missing.body).message
+		);
+	});
+
+	it('refuses the source’s former members the moved bucket’s APIs as it refuses a bucket that does not exist', async () => {
+		const { bucket, cookie } = await movedAwayFromColleague();
+
+		const moved = await call(
+			'GET',
+			`/admin/api/buckets/${bucket._id}/resources`,
+			cookie
+		);
+		const missing = await call(
+			'GET',
+			'/admin/api/buckets/no-such-bucket/resources',
+			cookie
+		);
+
+		expect(moved.status).toBe(403);
 		expect(moved.status).toBe(missing.status);
 		expect(as(Refusal, moved.body).message).toBe(
 			as(Refusal, missing.body).message
@@ -267,7 +330,7 @@ describe('moving a bucket to another group', () => {
 
 	it('refuses a plain member of the source, and moves nothing', async () => {
 		const w = await world();
-		const { bucket } = await bucketWithProjects(w.team._id, 1);
+		const { bucket } = await bucketWithClients(w.team._id, 1);
 		const bobs = await ensurePersonalGroup(w.bob._id, w.bob.email);
 
 		const { status } = await moveBucket(w.bobCookie, bucket._id, {
@@ -328,7 +391,7 @@ describe('moving a bucket to another group', () => {
 		expect(await ownerOfBucket(DEFAULT_BUCKET_ID)).not.toBe(team._id);
 	});
 
-	it('previews the bucket and its projects by name without confirmation, and moves nothing', async () => {
+	it('previews the bucket by name and counts what it holds without confirmation, and moves nothing', async () => {
 		const w = await world();
 
 		const { status, body } = await moveBucket(w.aliceCookie, w.bucket._id, {
@@ -344,9 +407,8 @@ describe('moving a bucket to another group', () => {
 		});
 		expect(preview.to.id).toBe(w.team._id);
 		expect(preview.bucket).toEqual({ id: w.bucket._id, name: w.bucket.name });
-		expect(preview.projects.map((p) => p.name).sort()).toEqual(
-			w.projects.map((p) => p.name).sort()
-		);
+		expect(preview.applications).toBe(w.clientIds.length);
+		expect(preview.apis).toBe(1);
 		expect(await ownerOfBucket(w.bucket._id)).toBe(w.personal._id);
 	});
 
@@ -361,89 +423,12 @@ describe('moving a bucket to another group', () => {
 		expect(status).toBe(409);
 	});
 
-	it('completes a move left part-done when it is repeated', async () => {
-		const w = await world();
-		await getBucketStore().update(w.bucket._id, { ownerGroupId: w.team._id });
-		await getProjectStore().update(w.projects[0]?._id ?? '', {
-			ownerGroupId: w.team._id
-		});
-
-		const { status } = await moveBucket(w.aliceCookie, w.bucket._id, {
-			groupId: w.team._id,
-			confirm: true
-		});
-
-		expect(status).toBe(200);
-		expect(await ownerOfProject(w.projects[1]?._id ?? '')).toBe(w.team._id);
-	});
-
-	it('refuses a bucket whose projects are in two groups other than the destination, naming neither', async () => {
-		const w = await world();
-		const elsewhere = await regularGroup([w.alice]);
-		await getProjectStore().update(w.projects[0]?._id ?? '', {
-			ownerGroupId: elsewhere._id
-		});
-
-		const { status, body } = await moveBucket(w.aliceCookie, w.bucket._id, {
-			groupId: w.team._id,
-			confirm: true
-		});
-
-		expect(status).toBe(409);
-		const message = as(Refusal, body).message;
-		expect(message).not.toContain(elsewhere._id);
-		expect(message).not.toContain(w.personal._id);
-		expect(await ownerOfBucket(w.bucket._id)).toBe(w.personal._id);
-	});
-
-	it('repairs a bucket by moving it into the group of its one mismatched project', async () => {
-		const w = await world();
-		await getProjectStore().update(w.projects[0]?._id ?? '', {
-			ownerGroupId: w.team._id
-		});
-
-		const { status } = await moveBucket(w.aliceCookie, w.bucket._id, {
-			groupId: w.team._id,
-			confirm: true
-		});
-
-		expect(status).toBe(200);
-		expect(await ownerOfBucket(w.bucket._id)).toBe(w.team._id);
-		expect(await ownerOfProject(w.projects[1]?._id ?? '')).toBe(w.team._id);
-	});
-
-	it('refuses binding a source-group project to a bucket that has just moved', async () => {
-		const w = await world();
-		const loose = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			name: 'loose',
-			slug: `loose-${Math.random().toString(36).slice(2)}`,
-			ownerGroupId: w.personal._id
-		});
-		await moveBucket(w.aliceCookie, w.bucket._id, {
-			groupId: w.team._id,
-			confirm: true
-		});
-
-		const { status } = await call(
-			'PUT',
-			`/admin/api/projects/${loose._id}/bucket`,
-			w.aliceCookie,
-			{ bucketId: w.bucket._id }
-		);
-
-		expect(status).toBe(409);
-		expect((await getProjectStore().find(loose._id))?.bucketId).toBe(
-			DEFAULT_BUCKET_ID
-		);
-	});
-
 	describe('as a super administrator', () => {
 		it('moves a bucket out of the System group into a regular group', async () => {
 			const superAdmin = await admin('super');
 			const member = await admin();
 			const team = await regularGroup([member]);
-			const { bucket } = await bucketWithProjects(UNASSIGNED_GROUP_ID, 1);
+			const { bucket } = await bucketWithClients(UNASSIGNED_GROUP_ID, 1);
 
 			const { status } = await moveBucket(
 				await cookieFor(superAdmin),
@@ -520,96 +505,5 @@ describe('moving a bucket to another group', () => {
 				as(Refusal, unknown.body).message
 			);
 		});
-	});
-});
-
-/**
- * @proves A project on the Default bucket moves to another group alone, and a project that uses a bucket is
- * pointed at its bucket instead.
- */
-describe('moving a project to another group', () => {
-	beforeEach(async () => {
-		await ensureAdminSeed();
-	});
-
-	async function loneProject(ownerGroupId: string) {
-		return getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			name: 'lone',
-			slug: `lone-${Math.random().toString(36).slice(2)}`,
-			ownerGroupId,
-			clientIds: ['client-a']
-		});
-	}
-
-	it('gives the destination a project on the Default bucket, its clients unchanged', async () => {
-		const w = await world();
-		const project = await loneProject(w.personal._id);
-
-		const { status } = await moveProject(w.aliceCookie, project._id, {
-			groupId: w.team._id,
-			confirm: true
-		});
-
-		expect(status).toBe(200);
-		const stored = await getProjectStore().find(project._id);
-		expect(stored?.ownerGroupId).toBe(w.team._id);
-		expect(stored?.clientIds).toEqual(['client-a']);
-	});
-
-	it('previews a project move without confirmation, and moves nothing', async () => {
-		const w = await world();
-		const project = await loneProject(w.personal._id);
-
-		const { status, body } = await moveProject(w.aliceCookie, project._id, {
-			groupId: w.team._id
-		});
-
-		expect(status).toBe(409);
-		expect(as(ProjectPreview, body).project.id).toBe(project._id);
-		expect(await ownerOfProject(project._id)).toBe(w.personal._id);
-	});
-
-	it('refuses a project that uses a bucket, pointing to its bucket', async () => {
-		const w = await world();
-
-		const { status, body } = await moveProject(
-			w.aliceCookie,
-			w.projects[0]?._id ?? '',
-			{ groupId: w.team._id, confirm: true }
-		);
-
-		expect(status).toBe(409);
-		expect(as(Refusal, body).message).toBe(
-			'a project using a bucket moves with its bucket'
-		);
-	});
-
-	it('refuses the console’s own project', async () => {
-		const superAdmin = await admin('super');
-		const team = await regularGroup([superAdmin]);
-
-		const { status } = await moveProject(
-			await cookieFor(superAdmin),
-			ADMIN_PROJECT_ID,
-			{ groupId: team._id, confirm: true }
-		);
-
-		expect(status).toBe(403);
-		expect(await ownerOfProject(ADMIN_PROJECT_ID)).not.toBe(team._id);
-	});
-
-	it('refuses a plain member of the project’s group', async () => {
-		const w = await world();
-		const project = await loneProject(w.team._id);
-		const bobs = await ensurePersonalGroup(w.bob._id, w.bob.email);
-
-		const { status } = await moveProject(w.bobCookie, project._id, {
-			groupId: bobs._id,
-			confirm: true
-		});
-
-		expect(status).toBe(403);
-		expect(await ownerOfProject(project._id)).toBe(w.team._id);
 	});
 });

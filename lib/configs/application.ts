@@ -446,8 +446,8 @@ export const ApplicationConfig = {
 	 * title: Cross-Origin Resource Sharing for browser-based clients
 	 *
 	 * description: Enables the CORS layer: public metadata endpoints answer any origin, and the
-	 * endpoints a browser app calls directly answer origins listed on the owning project's
-	 * `corsOrigins`. Defaults to enabled because closure is achieved by data — a project with no
+	 * endpoints a browser app calls directly answer origins listed on the calling application's own
+	 * `corsOrigins`. Defaults to enabled because closure is achieved by data — an application with no
 	 * origins grants nothing, so a fresh deployment is closed with this on. It exists as an incident
 	 * kill switch. There is deliberately no `cors.maxAge` companion: the preflight cache lifetime is
 	 * dictated by browser behaviour, not by deployment, and would be the first numeric key here.
@@ -908,7 +908,7 @@ export const ApplicationConfig = {
 	 * capability switches, which `test/mcp/capability_invariance.spec.ts` asserts twice over — on the tool
 	 * list under every flag combination, and on `lib/mcp/server.ts` containing no flag read at all.
 	 *
-	 * Purging is therefore withheld from agents outright, alongside project and bucket deletion. The
+	 * Purging is therefore withheld from agents outright, alongside bucket deletion. The
 	 * exclusion table in `lib/mcp/catalogue.ts` records the same reasoning at the point it takes effect.
 	 */
 

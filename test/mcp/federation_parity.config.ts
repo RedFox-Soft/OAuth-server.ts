@@ -1,5 +1,6 @@
 import getConfig from '../default.config.js';
 import { ADMIN_MCP_CLIENT_ID } from 'lib/mcp/consts.ts';
+import { ADMIN_BUCKET_ID } from 'lib/admin/consts.ts';
 
 /*
  * Harness for the administrative MCP control plane.
@@ -13,14 +14,15 @@ export const ApplicationConfig = {
 };
 
 /*
- * The reserved client an MCP agent authenticates as. Public with mandatory PKCE, and it must belong to
- * the admin project for `resolveBucketForClient` to route it to the administrator bucket — see
- * research.md D6. `ensureAdminSeed` does that wiring; this registration is what the token endpoint
- * needs to exist.
+ * The reserved client an MCP agent authenticates as. Public with mandatory PKCE, and it belongs to the
+ * administrators bucket, as its provisioned seed does: a sign-in through it resolves to that bucket
+ * because the stored client names it. A spec seeds it here, before `ensureAdminSeed` runs, so this
+ * registration has to carry the binding the seed would otherwise have written.
  */
 export const clients = [
 	{
 		clientId: ADMIN_MCP_CLIENT_ID,
+		bucketId: ADMIN_BUCKET_ID,
 		token_endpoint_auth_method: 'none',
 		grantTypes: ['authorization_code', 'refresh_token'],
 		responseTypes: ['code'],

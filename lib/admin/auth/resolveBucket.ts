@@ -1,8 +1,4 @@
-import {
-	adapter,
-	getProjectStore,
-	mcpClientPermissionStore
-} from '../../adapters/index.js';
+import { adapter, mcpClientPermissionStore } from '../../adapters/index.js';
 import {
 	ADMIN_CLIENT_ID,
 	ADMIN_BUCKET_ID,
@@ -13,30 +9,29 @@ import { namespaceOf } from '../../resources/namespace.js';
 import type { RequestBucket } from '../../configs/issuer.js';
 import { MCP_RESOURCE } from '../../mcp/consts.js';
 import { bucketIdOfAccountPageClient } from '../../account_page/client.js';
-import type { Project } from '../../adapters/types.js';
 
 /*
  * Which user bucket a request signs a user into, in order:
  *
  *   1. the reserved admin client → the admin bucket
- *   2. a client assigned to a project on a bucket other than the Default → that project's bucket
- *   2b. a client that registered itself at a bucket's own address → that bucket
+ *   2. a client that belongs to a bucket other than the Default → that bucket — whether an administrator
+ *      created it there or it registered itself at that bucket's own address (specs/099)
  *   3. a request naming ONE resource declared in the addressed issuer's namespace → that resource's
- *      project's bucket
+ *      bucket
  *   4. a permitted client identity naming the administrative MCP audience → the admin bucket
  *   5. otherwise → the default 'redfox' bucket
  *
  * Rule 3 is the answer to the question `specs/024-admin-mcp-control-plane/research.md` D6 left open:
- * how a client that belongs to no project — a dynamically registered one, or one identified by a
- * document it hosts — comes to sign in the right deployment's end-users.
+ * how a client that belongs to no bucket — one registered at the root, or one identified by a document
+ * it hosts — comes to sign in the right deployment's end-users.
  *
  * D6 rejected the shape this resembles, and the difference is decisive. Its rejected version routed a
  * client to the ADMIN bucket on the strength of `resource=<issuer>/mcp`, which would have made a
  * public endpoint a way to obtain a client targeting administrator accounts. Rule 3 cannot do that:
  * `${ISSUER}/mcp` is not a declared resource — it is claimed by the built-in arm of
  * `getResourceServerInfo` and refused at declaration time — so no request can reach the admin bucket
- * through here. What rule 3 can reach is a resource an administrator declared in a project they own,
- * whose bucket is that administrator's own choice. The parameter selects among an operator's options;
+ * through here. What rule 3 can reach is a resource an administrator declared in a bucket they own,
+ * which is that administrator's own choice. The parameter selects among an operator's options;
  * it cannot create one. An attacker who cannot declare a resource cannot steer this.
  *
  * It chooses only among buckets that share the addressed issuer, which is what `addressed` is for. At
@@ -45,8 +40,8 @@ import type { Project } from '../../adapters/types.js';
  * a super administrator's. Before declarations were namespaced it read every tenant's, so whoever
  * declared another tenant's MCP server first had that server's clients signed into their population.
  *
- * Rule 2 still comes first, so a client explicitly assigned to a project is never redirected elsewhere
- * by a parameter — the stronger, operator-established relationship wins.
+ * Rule 2 still comes first, so a client that belongs to a bucket is never redirected elsewhere by a
+ * parameter — the stronger, operator-established relationship wins.
  */
 export async function resolveBucketForRequest(
 	clientId: string | undefined,
@@ -65,12 +60,8 @@ export async function resolveBucketForRequest(
 	if (pageBucket) return pageBucket;
 
 	if (clientId) {
-		const project = await getProjectStore().findByClientId(clientId);
-		const pinned = pinnedBucketOf(project);
+		const pinned = pinnedBucketOf(await storedBucketOf(clientId));
 		if (pinned) return pinned;
-
-		const registeredAt = await registeredAtBucketOf(clientId);
-		if (registeredAt) return registeredAt;
 	}
 
 	const derived = await bucketForResource(resource, namespaceOf(addressed));
@@ -84,21 +75,18 @@ export async function resolveBucketForRequest(
 }
 
 /*
- * Rule 2b: a client that registered itself at a bucket's own address belongs to that bucket.
+ * Rule 2: the bucket a client belongs to.
  *
  * Read from the stored record rather than from a resolved client, because this runs for every caller
- * with only an identifier in hand. The registration endpoint writes the field from the address and
- * nothing else (`lib/actions/registration.ts`), so a request cannot steer it — the property D6 asked of
- * every rule here. A client identified by a document it hosts has no record and so no such field.
+ * with only an identifier in hand. Only the server writes the field — the admin route that created the
+ * client, or the registration endpoint from the address it was reached at — and no registration request
+ * or document can name it (`lib/models/client/wire.ts`), so a request cannot steer it: the property D6
+ * asked of every rule here. A client identified by a document it hosts has no record and so no bucket.
  */
-async function registeredAtBucketOf(
-	clientId: string
-): Promise<string | undefined> {
+async function storedBucketOf(clientId: string): Promise<string | undefined> {
 	const stored = await adapter('Client').find(clientId);
-	const registeredAt = stored?.registeredAtBucket;
-	return typeof registeredAt === 'string' && registeredAt
-		? registeredAt
-		: undefined;
+	const bucketId = stored?.bucketId;
+	return typeof bucketId === 'string' && bucketId ? bucketId : undefined;
 }
 
 /*
@@ -111,7 +99,7 @@ async function registeredAtBucketOf(
  * it at all was decided in advance by a super administrator, and recorded in the audit trail. The
  * missing operator decision is exactly what D6 named as missing.
  *
- * Last, after every other rule, so it can never take a client away from a project it belongs to.
+ * Last, after every other rule, so it can never take a client away from a bucket it belongs to.
  */
 async function permittedAtAdministrativePlane(
 	clientId: string | undefined,
@@ -127,7 +115,7 @@ async function permittedAtAdministrativePlane(
 
 /*
  * Only a single named resource derives a bucket. Two would be ambiguous — they may belong to different
- * projects, and picking one would be a guess about which set of accounts the user should be offered.
+ * buckets, and picking one would be a guess about which set of accounts the user should be offered.
  * Falling through to the default instead is the answer that cannot be wrong in a way nobody notices.
  */
 async function bucketForResource(
@@ -151,19 +139,16 @@ async function bucketForResource(
 	const declared = await findDeclaredResource(identifiers[0], namespace);
 	if (!declared) return undefined;
 
-	const project = await getProjectStore().find(declared.projectId);
-	return pinnedBucketOf(project);
+	return pinnedBucketOf(declared.bucketId);
 }
 
 /*
- * The bucket a project holds its clients to, or none for the Default bucket. The Default bucket is where
- * resolution ends anyway (rule 5), so a project on it must not end resolution early: until specs/098 such a
- * project stored no bucket at all and its clients went on through rules 2b, 3 and 4, and the migration that
- * wrote the Default bucket into it was not meant to change where a single person signs in.
+ * The bucket a client or a declaration holds resolution to, or none for the Default bucket. The Default
+ * bucket is where resolution ends anyway (rule 5), so belonging to it must not end resolution early: until
+ * specs/098 such a client's project stored no bucket at all and it went on through rules 3 and 4, and
+ * neither that migration nor specs/099's was meant to change where a single person signs in.
  */
-function pinnedBucketOf(
-	project: Pick<Project, 'bucketId'> | null
-): string | undefined {
-	if (!project || project.bucketId === DEFAULT_BUCKET_ID) return undefined;
-	return project.bucketId;
+function pinnedBucketOf(bucketId: string | undefined): string | undefined {
+	if (!bucketId || bucketId === DEFAULT_BUCKET_ID) return undefined;
+	return bucketId;
 }

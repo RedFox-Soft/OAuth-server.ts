@@ -2,15 +2,15 @@ import { beforeAll, describe, expect, it } from 'bun:test';
 import { Elysia } from 'elysia';
 import { treaty } from '@elysiajs/eden';
 
-import bootstrap from '../test_helper.ts';
+import bootstrap, { bindClientToBucket } from '../test_helper.ts';
 import { elysia } from 'lib/index.ts';
 import { ISSUER } from 'lib/configs/env.ts';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { resourceRoutes } from 'lib/admin/resources/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { getBucketStore, getProjectStore } from 'lib/adapters/index.ts';
+import { getBucketStore } from 'lib/adapters/index.ts';
 import { forgetBucketAddresses } from 'lib/admin/auth/bucketAddress.ts';
-import { ADMIN_SESSION_COOKIE, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
+import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { decode } from 'lib/helpers/jwt.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
 import { answered } from '../admin/answered.ts';
@@ -46,7 +46,7 @@ async function machineToken(resource: string) {
 }
 
 let cookie: string;
-let projectId: string;
+let bucketId: string;
 
 /**
  * @proves A resource declared with a significant trailing slash is a different audience from its
@@ -70,20 +70,11 @@ describe('a resource declared with a significant trailing slash', () => {
 			name: 'Slash users',
 			slug: SLUG
 		});
-		const project = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			ownerGroupId,
-			name: 'Slash',
-			slug: `slash-${Math.random().toString(36).slice(2)}`
-		});
-		await getProjectStore().update(project._id, {
-			bucketId: bucket._id,
-			clientIds: ['slash-machine']
-		});
-		projectId = project._id;
+		await bindClientToBucket('slash-machine', bucket._id);
+		bucketId = bucket._id;
 
 		const created = await admin.admin.api
-			.projects({ id: projectId })
+			.buckets({ id: bucketId })
 			.resources.post(
 				{
 					identifier: WITH_SLASH,
@@ -110,7 +101,7 @@ describe('a resource declared with a significant trailing slash', () => {
 
 	it('is read by its exact spelling', async () => {
 		const read = await admin.admin.api
-			.projects({ id: projectId })
+			.buckets({ id: bucketId })
 			.resources({ resourceId: encodeURIComponent(WITH_SLASH) })
 			.get({ headers: { cookie } });
 
@@ -119,7 +110,7 @@ describe('a resource declared with a significant trailing slash', () => {
 
 	it('is updated by its exact spelling', async () => {
 		const amended = await admin.admin.api
-			.projects({ id: projectId })
+			.buckets({ id: bucketId })
 			.resources({ resourceId: encodeURIComponent(WITH_SLASH) })
 			.patch({ name: 'Slash MCP v2' }, { headers: { cookie } });
 

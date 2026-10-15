@@ -4,7 +4,7 @@ title: 'Deletion and revocation'
 tags: [architecture, contract, gotcha, oauth]
 sources: [oauth-server-codebase]
 created: 2026-08-04
-updated: 2026-10-06
+updated: 2026-10-15
 graph:
   node_type: concept
 ---
@@ -18,7 +18,7 @@ Three different operations are easy to confuse, and the code has always distingu
 | **Protocol revocation** (RFC 7009, end-session) | every token under one grant | the `Grant` record — the consent itself |
 | **Principal deletion** (client, end-user) | the principal, then every record naming it as owner, including its grants | nothing of that principal |
 | **Ending an end user's access** (deactivate, lock; spec 069) | every account-owned record — sessions, grants, tokens, codes — after a back-channel logout per session | the account, and its email-addressed throttles |
-| **Container deletion** (project, bucket) | nothing, unless the caller elected to take the contents — then every principal inside, each by the principal cascade above. Since spec 090 a bucket's deletion only schedules this for 30 days later ([[bucket-soft-delete]]) | the bucket a project merely pointed at, always |
+| **Container deletion** (a bucket; a project too until spec 099) | nothing, unless the caller elected to take the end users — then every account inside, each by the principal cascade above. Since spec 090 a bucket's deletion only schedules this for 30 days later ([[bucket-soft-delete]]) | the bucket's applications and APIs: they must be removed one by one first |
 
 "Revoke" reads as "remove everything" and the code disagrees. A grant is the record that a user
 authorized a client; revoking a token is not withdrawing that authorization, so only a principal cascade
@@ -33,15 +33,19 @@ deletable at all.
 
 Three things now hold instead, and the first two are the ones a reader is likely to guess wrong.
 
-**A cascade is elected, never default.** `?cascade=clients` on the project route and
-`?cascade=endusers` on the bucket route, each carrying what the caller reviewed — the client ids, or
-the account count. If the container's contents have changed since, the request is refused rather than
+**A cascade is elected, never default.** `?cascade=endusers` on the bucket route, carrying what the
+caller reviewed — the account count. (The project route took `?cascade=clients` with the client ids until
+spec 099 removed projects.) If the container's contents have changed since, the request is refused rather than
 widened, because consent was given for what was on the screen. Without the election the old 409 is
 unchanged.
 
-**A project never reaches a bucket.** Buckets are shared and hold people with no relationship to any
-one project, so no election reaches one. This is the rule most likely to be "helpfully" broken by
-someone implementing a tidy-up.
+**No election reaches an application or an API.** Since spec 099 a bucket refuses deletion while it holds
+an application an administrator registered or a declared API — 409 `bucket still holds applications or APIs`,
+checked before the end-user election and not clearable by it (`lib/admin/buckets/routes.ts:648-677`). Each is
+somebody's integration, removed on purpose, never as a side effect of the people in the bucket going. A
+self-registered application blocks nothing: nobody here vouched for it. The rule it replaced was "a project
+never reaches a bucket": buckets were shared by projects, so deleting a project could not reach one. Either
+way, it is the rule most likely to be "helpfully" broken by someone implementing a tidy-up.
 
 **One deletion writes one audit entry**, carrying kind → count in `cascade`. This replaced one entry
 per withdrawn declaration, and the comment that argued for those — *"a bare number would not say which
@@ -130,19 +134,22 @@ The filter only ever saved four no-op deletes. `revoke(grantId)` now takes the g
 
 ## Containers guard; principals cascade. The line is visibility
 
-An operator can see and name a project's clients, so refusing tells them exactly what they are about to
+An operator can see and name a bucket's applications, so refusing tells them exactly what they are about to
 destroy and keeps one audit entry per entity destroyed. Nobody can be asked to enumerate the tokens a
 client issued, least of all during an incident.
 
-- A project refuses deletion while any id in `clientIds` still **resolves** via `Client.tryFind`. An
-  unresolvable id must never make a project permanently undeletable — and a refused request prunes
-  nothing, because **a conflict changes nothing at all**, audit entry included.
-- A bucket refuses while any user exists, **including `active: false` accounts**: deactivation ends
-  access (since 069 it sweeps the account's sessions and tokens — [[end-user-lifecycle]]) but is not
-  absence.
-- An assigned bucket is not a blocker on its own. Buckets are shared and outlive projects.
+- A bucket refuses while it holds an operator-registered application or a declared API. The applications are
+  read from the stored records by `bucketId` (`bucketClients`, `lib/admin/buckets/routes.ts:244-259`), so an id
+  that no longer resolves cannot block anything. Until spec 099 this rule was a project's: it refused while any
+  id in `clientIds` still **resolved** via `Client.tryFind`, so an unresolvable id could not make it permanently
+  undeletable. Either way a refused request prunes nothing, because **a conflict changes nothing at all**,
+  audit entry included.
+- A bucket refuses while any user exists, **including `active: false` accounts**, unless the end users are
+  elected: deactivation ends access (since 069 it sweeps the account's sessions and tokens —
+  [[end-user-lifecycle]]) but is not absence.
 
-A refusal answers 409 with `blockers: [{ kind, count, ids? }]`. Client ids are listed; end-user blockers
+A refusal answers 409 with `blockers: [{ kind, count, ids? }]`, `kind` one of `client`, `resource`,
+`enduser` or `bucket` (a group's; `DeletionBlocker`, `lib/admin/auth/rbac.ts:73-77`). Client ids are listed; API and end-user blockers
 carry a **count only** — a bucket can hold thousands of accounts and their identities are not the
 caller's business.
 

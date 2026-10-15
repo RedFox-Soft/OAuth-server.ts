@@ -5,9 +5,10 @@ import bootstrap from '../test_helper.js';
 import { elysia } from 'lib/index.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
+	adapter,
 	getBucketGroupStore,
 	getBucketStore,
-	getProjectStore,
+	getProtectedResourceStore,
 	getProvisioningConnectionStore,
 	getUserStore
 } from 'lib/adapters/index.ts';
@@ -47,6 +48,8 @@ const Summary = Type.Object({
 	userGroups: Type.Number(),
 	connections: Type.Number(),
 	held: Type.Number(),
+	applications: Type.Number(),
+	apis: Type.Number(),
 	providers: Type.Object({ enabled: Type.Number(), creating: Type.Number() }),
 	activeThisMonth: Type.Optional(Type.Number()),
 	mailDeliveryConfigured: Type.Boolean()
@@ -56,13 +59,8 @@ const BucketRead = Type.Object({
 	addressForm: Type.String(),
 	issuer: Type.Union([Type.String(), Type.Null()]),
 	discoveryUrl: Type.Union([Type.String(), Type.Null()]),
-	projects: Type.Array(
-		Type.Object({
-			id: Type.String(),
-			name: Type.String(),
-			clientCount: Type.Number()
-		})
-	)
+	applications: Type.Number(),
+	apis: Type.Number()
 });
 
 const ListRow = Type.Object({
@@ -108,21 +106,15 @@ async function connection(bucketId: string, providerId: string) {
 describe("a bucket's overview", () => {
 	let owner: User;
 	let ownerCookie: string;
-	let throughProjectCookie: string;
 	let superCookie: string;
 	let bucket: UserBucket;
-	let projectId: string;
-	let projectName: string;
 
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);
 		await ensureAdminSeed();
 		owner = await createAdministrator();
-		const reaching = await createAdministrator();
 		const owning = await regularGroup([owner]);
-		const other = await regularGroup([reaching]);
 		ownerCookie = await cookieFor(owner);
-		throughProjectCookie = await cookieFor(reaching);
 		superCookie = await cookieFor(await createAdministrator('super'));
 
 		const id = unique();
@@ -136,20 +128,22 @@ describe("a bucket's overview", () => {
 				provider('disabled', { enabled: false })
 			]
 		});
-		const project = await getProjectStore().create({
-			name: `uses ${id}`,
-			slug: `uses-${id}`,
-			ownerGroupId: owning._id,
+		for (const clientId of [`overview-app-a-${id}`, `overview-app-b-${id}`]) {
+			await adapter('Client').upsert(clientId, {
+				clientId,
+				bucketId: bucket._id,
+				grantTypes: ['authorization_code'],
+				responseTypes: ['code'],
+				redirectUris: [`https://${clientId}.example.com/cb`],
+				token_endpoint_auth_method: 'none'
+			});
+		}
+		await getProtectedResourceStore().create({
+			namespace: bucket._id,
+			identifier: `https://api-${id}.example.com/`,
 			bucketId: bucket._id,
-			clientIds: ['overview-app-a', 'overview-app-b']
-		});
-		projectId = project._id;
-		projectName = project.name;
-		await getProjectStore().create({
-			name: `reaches ${id}`,
-			slug: `reaches-${id}`,
-			ownerGroupId: other._id,
-			bucketId: bucket._id
+			name: 'Overview API',
+			scopes: ['read']
 		});
 
 		const users = getUserStore(bucket._id);
@@ -185,7 +179,7 @@ describe("a bucket's overview", () => {
 		return shaped(Summary, answer.body);
 	}
 
-	it('counts users, unverified, without an authenticator, without a linked identity, user groups, connections, held connections and providers', async () => {
+	it('counts users, unverified, without an authenticator, without a linked identity, user groups, connections, held connections, applications, APIs and providers', async () => {
 		const summary = await summaryAs(ownerCookie);
 
 		expect(summary).toMatchObject({
@@ -196,6 +190,8 @@ describe("a bucket's overview", () => {
 			userGroups: 1,
 			connections: 2,
 			held: 1,
+			applications: 2,
+			apis: 1,
 			providers: { enabled: 2, creating: 1 }
 		});
 	});
@@ -204,13 +200,6 @@ describe("a bucket's overview", () => {
 		const summary = await summaryAs(ownerCookie);
 
 		expect(typeof summary.activeThisMonth).toBe('number');
-	});
-
-	it('withholds active users from a caller who may read the bucket but not its activity', async () => {
-		const summary = await summaryAs(throughProjectCookie);
-
-		expect(summary.users).toBe(3);
-		expect('activeThisMonth' in summary).toBe(false);
 	});
 
 	it('refuses the summary to an administrator outside the bucket', async () => {
@@ -225,7 +214,7 @@ describe("a bucket's overview", () => {
 		expect(answer.status).toBe(403);
 	});
 
-	it('gives the issuer and discovery address discovery itself serves, the address form and the projects using it with their application counts', async () => {
+	it('gives the issuer and discovery address discovery itself serves, the address form and how many applications and APIs it holds', async () => {
 		const read = shaped(
 			BucketRead,
 			(await request('GET', `/admin/api/buckets/${bucket._id}`, ownerCookie))
@@ -240,9 +229,8 @@ describe("a bucket's overview", () => {
 			String(read.issuer)
 		);
 		expect(read.addressForm).toBe('path');
-		expect(read.projects).toEqual([
-			{ id: projectId, name: projectName, clientCount: 2 }
-		]);
+		expect(read.applications).toBe(2);
+		expect(read.apis).toBe(1);
 	});
 
 	it('gives no issuer for a bucket with no address of its own', async () => {

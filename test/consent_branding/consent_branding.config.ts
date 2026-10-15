@@ -6,7 +6,8 @@ const config = getConfig();
  * Whether a consent page shows a client's logo and links depends on who stands behind the client and where
  * it sends the answer, so this harness holds the organization's own app in each shape that matters — links
  * on its redirect host, on another host, over http, a native app with no host, a program on this computer
- * — plus another tenant's app (put in a tenant's project by the spec) and one that registered itself.
+ * — plus another tenant's app (signing into another bucket, arranged by the spec) and one that registered
+ * itself.
  */
 export const ApplicationConfig = {
 	scopes: ['openid', 'billing']

@@ -8,7 +8,6 @@ import bootstrap from '../test_helper.js';
 import { elysia } from 'lib/index.ts';
 import {
 	errorStore,
-	getProjectStore,
 	getProtectedResourceStore,
 	getUserStore
 } from 'lib/adapters/index.ts';
@@ -17,7 +16,7 @@ import { DeviceCode } from 'lib/models/device_code.js';
 import { writeLogo } from 'lib/models/client/logo.js';
 import { flushForTest, resetQueue } from 'lib/error_store/queue.ts';
 import { ROOT_NAMESPACE } from 'lib/resources/namespace.js';
-import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.js';
+import { DEFAULT_BUCKET_ID } from 'lib/admin/consts.js';
 import { AUDIENCE, MFA } from './device_flow_end_to_end.config.js';
 
 const PASSWORD = 'correct horse battery';
@@ -226,16 +225,10 @@ describe('a device sign-in from a browser with no session', () => {
 	});
 
 	it('tells the device invalid_target when the requested resource is withdrawn before approval', async () => {
-		const project = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			name: 'TV',
-			slug: `tv-${Math.random()}`,
-			ownerGroupId: UNASSIGNED_GROUP_ID
-		});
 		await getProtectedResourceStore().create({
 			namespace: ROOT_NAMESPACE,
 			identifier: AUDIENCE,
-			projectId: project._id,
+			bucketId: DEFAULT_BUCKET_ID,
 			name: 'TV API',
 			scopes: []
 		});

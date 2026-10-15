@@ -4,16 +4,14 @@ import bootstrap from '../test_helper.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import {
-	adapter,
-	adminAuditStore,
-	getProjectStore
-} from 'lib/adapters/index.ts';
+import { adapter, adminAuditStore } from 'lib/adapters/index.ts';
 import { MCP_RESOURCE } from 'lib/mcp/consts.ts';
 import { clearPermissions, permitIdentifier } from './permissions.ts';
 import { createAdministrator } from '../administrators.ts';
 import { rpc } from './rpc.ts';
 import { DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
+import { shaped } from 'test/shape.js';
+import { Type } from '@sinclair/typebox';
 
 /*
  * Who the audit trail names when an agent acts through a permitted client identity.
@@ -82,29 +80,36 @@ describe('attributing an action taken through a permitted identity', () => {
 			token
 		);
 
-		const slug = `attributed-${Math.random().toString(36).slice(2)}`;
 		const response = await rpc(
 			{
 				jsonrpc: '2.0',
 				id: ++rpcId,
 				method: 'tools/call',
 				params: {
-					name: 'project_create',
-					arguments: { name: 'Attributed', slug, bucketId: DEFAULT_BUCKET_ID }
+					name: 'client_create',
+					arguments: {
+						id: DEFAULT_BUCKET_ID,
+						clientName: 'Attributed',
+						grantTypes: ['authorization_code'],
+						redirectUris: ['https://attributed.example.com/cb'],
+						tokenEndpointAuthMethod: 'none'
+					}
 				}
 			},
 			token
 		);
 		expect(response.result?.isError).not.toBe(true);
 
-		const created = await getProjectStore().findBySlug(slug);
-		expect(created).toBeTruthy();
+		const { clientId } = shaped(
+			Type.Object({ clientId: Type.String() }),
+			response.result?.structuredContent?.result
+		);
 
 		const entries = await adminAuditStore.list({
-			action: 'project.create',
+			action: 'client.create',
 			limit: 25
 		});
-		const mine = entries.entries.find((e) => e.targetId === created?._id);
+		const mine = entries.entries.find((e) => e.targetId === clientId);
 
 		/* The administrator who authorized the agent... */
 		expect(mine?.actorId).toBe(user._id);

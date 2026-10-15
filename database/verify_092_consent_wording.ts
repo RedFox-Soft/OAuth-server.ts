@@ -100,7 +100,7 @@ try {
 	await getProtectedResourceStore().create({
 		namespace,
 		identifier,
-		projectId: `v092-project-${stamp}`,
+		bucketId: `v092-bucket-${stamp}`,
 		name: 'v092 MCP',
 		scopes: ['tools:read', 'tools:call'],
 		scopeDescriptions: {

@@ -1,8 +1,8 @@
 /*
- * The rights the server states on a bucket and a project (specs/079 data-model §2), as the console reads
+ * The rights the server states on a bucket (specs/079 data-model §2), as the console reads
  * them. Each flag answers one question: would the route accept this request from this caller?
  *
- * Read through `bucketCan`/`projectCan`, which answer "yes" for a flag the response does not carry: the
+ * Read through `bucketCan`, which answers "yes" for a flag the response does not carry: the
  * server still refuses what it refuses, so a missing flag can only cost a 403 the console used to show
  * anyway, never hide something the operator may do.
  */
@@ -19,23 +19,7 @@ export interface BucketCan {
 }
 
 export interface BucketBlockers {
-	usedByProjects: { id: string; name: string }[];
 	addressable: boolean;
-}
-
-export interface ProjectCan {
-	read: boolean;
-	edit: boolean;
-	delete: boolean;
-	manageClients: boolean;
-	declareResources: boolean;
-	assignBucket: boolean;
-	move: boolean;
-}
-
-export interface ProjectBlockers {
-	/* On a bucket other than the Default (specs/098): the project moves only with that bucket. */
-	hasBucket: boolean;
 }
 
 const ALL_BUCKET: BucketCan = {
@@ -47,16 +31,6 @@ const ALL_BUCKET: BucketCan = {
 	changeAddress: true,
 	move: true,
 	delete: true
-};
-
-const ALL_PROJECT: ProjectCan = {
-	read: true,
-	edit: true,
-	delete: true,
-	manageClients: true,
-	declareResources: true,
-	assignBucket: true,
-	move: true
 };
 
 /*
@@ -78,10 +52,4 @@ export function bucketCan(
 		changeAddress: false,
 		move: false
 	};
-}
-
-export function projectCan(
-	project: { can?: Partial<ProjectCan> } | null
-): ProjectCan {
-	return { ...ALL_PROJECT, ...project?.can };
 }

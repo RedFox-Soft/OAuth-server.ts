@@ -1,6 +1,7 @@
 import { describe, it, beforeAll, expect } from 'bun:test';
 
 import bootstrap, {
+	bindClientToBucket,
 	DEFAULT_SESSION_COOKIE,
 	seedAccount
 } from '../test_helper.js';
@@ -11,7 +12,7 @@ import { Session } from 'lib/models/session.js';
 import { Interaction } from 'lib/models/interaction.js';
 import nanoid from '../../lib/helpers/nanoid.ts';
 import epochTime from '../../lib/helpers/epoch_time.ts';
-import { getBucketStore, getProjectStore } from 'lib/adapters/index.js';
+import { getBucketStore } from 'lib/adapters/index.js';
 import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.js';
 import { sessionCookieName } from 'lib/consts/param_list.js';
 import {
@@ -115,16 +116,7 @@ describe('an account change on a bucket with a hostname of its own', () => {
 			host: HOST
 		});
 		bucketId = bucket._id;
-		const project = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			ownerGroupId: UNASSIGNED_GROUP_ID,
-			name: 'Switch',
-			slug: `switch-${Math.random().toString(36).slice(2)}`
-		});
-		await getProjectStore().update(project._id, {
-			bucketId,
-			clientIds: ['client']
-		});
+		await bindClientToBucket('client', bucketId);
 		seedAccount('carol', {}, bucketId);
 		seedAccount('dave', {}, bucketId);
 	});

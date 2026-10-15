@@ -7,7 +7,6 @@ import { resourceRoutes } from 'lib/admin/resources/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
 	getBucketStore,
-	getProjectStore,
 	getProtectedResourceStore
 } from 'lib/adapters/index.ts';
 import { ADMIN_SESSION_COOKIE, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
@@ -49,26 +48,16 @@ async function admin(kind: AdminKind = 'plain') {
 }
 
 /*
- * A project in a bucket of its own, owned by the administrator's group — the case this file is about.
+ * A bucket of its own, with an address, owned by the administrator's group — the case this file is about.
  * A bucket with an address is its own issuer, so its declarations are its own namespace; the shared
  * root namespace, where declaring is reserved, is root_namespace.spec.ts.
  */
-async function projectFor(userId: string, bucketId?: string) {
+async function bucketFor(userId: string) {
 	const ownerGroupId = await personalGroupId(userId);
-	const bucket =
-		bucketId ??
-		(
-			await getBucketStore().create({
-				name: 'Acme users',
-				slug: `acme-${Math.random().toString(36).slice(2)}`,
-				ownerGroupId
-			})
-		)._id;
-	return getProjectStore().create({
-		name: 'Acme',
+	return getBucketStore().create({
+		name: 'Acme users',
 		slug: `acme-${Math.random().toString(36).slice(2)}`,
-		ownerGroupId,
-		bucketId: bucket
+		ownerGroupId
 	});
 }
 
@@ -83,7 +72,7 @@ const body = {
  * resource having to be reachable, uniquely within that bucket and independently of every other, and
  * cannot claim an identifier this server serves or amend one already issuing tokens.
  */
-describe('declaring a protected resource for a project in an addressable bucket', () => {
+describe('declaring a protected resource in an addressable bucket', () => {
 	beforeEach(async () => {
 		await ensureAdminSeed();
 		const store = getProtectedResourceStore();
@@ -93,15 +82,8 @@ describe('declaring a protected resource for a project in an addressable bucket'
 	});
 
 	it('refuses an anonymous caller', async () => {
-		const project = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			name: 'Acme',
-			slug: `anon-${Math.random().toString(36).slice(2)}`,
-			ownerGroupId: 'unassigned'
-		});
-
 		const res = await api.admin.api
-			.projects({ id: project._id })
+			.buckets({ id: DEFAULT_BUCKET_ID })
 			.resources.get();
 
 		expect(res.status).toBe(401);
@@ -109,16 +91,18 @@ describe('declaring a protected resource for a project in an addressable bucket'
 
 	it('declares, lists, reads, amends and removes a resource', async () => {
 		const { cookie, userId } = await admin();
-		const project = await projectFor(userId);
+		const bucket = await bucketFor(userId);
 		const headers = { cookie };
-		const resources = api.admin.api.projects({ id: project._id }).resources;
+		const resources = api.admin.api.buckets({ id: bucket._id }).resources;
 
 		const created = await resources.post(body, { headers });
 		expect(created.status).toBe(201);
 
 		const listed = await resources.get({ headers });
 		expect(listed.status).toBe(200);
-		expect(answered(listed.data).map((r) => r.identifier)).toEqual([AUDIENCE]);
+		expect(answered(listed.data).resources.map((r) => r.identifier)).toEqual([
+			AUDIENCE
+		]);
 
 		const read = await resources({ resourceId: encoded }).get({ headers });
 		expect(read.status).toBe(200);
@@ -138,14 +122,16 @@ describe('declaring a protected resource for a project in an addressable bucket'
 			headers
 		});
 		expect(removed.status).toBe(204);
-		expect((await resources.get({ headers })).data).toEqual([]);
+		expect(answered((await resources.get({ headers })).data).resources).toEqual(
+			[]
+		);
 	});
 
 	it('canonicalizes on write, so two spellings cannot become two declarations', async () => {
 		const { cookie, userId } = await admin();
-		const project = await projectFor(userId);
+		const bucket = await bucketFor(userId);
 		const headers = { cookie };
-		const resources = api.admin.api.projects({ id: project._id }).resources;
+		const resources = api.admin.api.buckets({ id: bucket._id }).resources;
 
 		const created = await resources.post(
 			{ ...body, identifier: 'HTTPS://MCP.Example.com/mcp/' },
@@ -158,10 +144,10 @@ describe('declaring a protected resource for a project in an addressable bucket'
 
 	it('refuses an identifier carrying a fragment', async () => {
 		const { cookie, userId } = await admin();
-		const project = await projectFor(userId);
+		const bucket = await bucketFor(userId);
 
 		const res = await api.admin.api
-			.projects({ id: project._id })
+			.buckets({ id: bucket._id })
 			.resources.post(
 				{ ...body, identifier: `${AUDIENCE}#tools` },
 				{ headers: { cookie } }
@@ -172,10 +158,10 @@ describe('declaring a protected resource for a project in an addressable bucket'
 
 	it('refuses an identifier that is not an absolute URI', async () => {
 		const { cookie, userId } = await admin();
-		const project = await projectFor(userId);
+		const bucket = await bucketFor(userId);
 
 		const res = await api.admin.api
-			.projects({ id: project._id })
+			.buckets({ id: bucket._id })
 			.resources.post(
 				{ ...body, identifier: 'mcp.example.com' },
 				{ headers: { cookie } }
@@ -197,10 +183,10 @@ describe('declaring a protected resource for a project in an addressable bucket'
 	]) {
 		it(`is created with no outbound request for ${identifier}`, async () => {
 			const { cookie, userId } = await admin();
-			const project = await projectFor(userId);
+			const bucket = await bucketFor(userId);
 
 			const res = await api.admin.api
-				.projects({ id: project._id })
+				.buckets({ id: bucket._id })
 				.resources.post({ ...body, identifier }, { headers: { cookie } });
 
 			expect(res.status).toBe(201);
@@ -215,14 +201,14 @@ describe('declaring a protected resource for a project in an addressable bucket'
 	it('is created in two buckets without either affecting the other', async () => {
 		const first = await admin();
 		const second = await admin();
-		const projectA = await projectFor(first.userId);
-		const projectB = await projectFor(second.userId);
+		const bucketA = await bucketFor(first.userId);
+		const bucketB = await bucketFor(second.userId);
 
 		const inA = await api.admin.api
-			.projects({ id: projectA._id })
+			.buckets({ id: bucketA._id })
 			.resources.post(body, { headers: { cookie: first.cookie } });
 		const inB = await api.admin.api
-			.projects({ id: projectB._id })
+			.buckets({ id: bucketB._id })
 			.resources.post(
 				{ ...body, name: 'Globex MCP' },
 				{ headers: { cookie: second.cookie } }
@@ -231,26 +217,25 @@ describe('declaring a protected resource for a project in an addressable bucket'
 		expect(inA.status).toBe(201);
 		expect(inB.status).toBe(201);
 		const readA = await api.admin.api
-			.projects({ id: projectA._id })
+			.buckets({ id: bucketA._id })
 			.resources({ resourceId: encoded })
 			.get({ headers: { cookie: first.cookie } });
 		expect(answered(readA.data).name).toBe('Acme MCP');
 	});
 
 	/*
-	 * Within one bucket the identifier is still the boundary an audience draws: two projects of one
-	 * issuer declaring it would make one token valid at two owners' resources.
+	 * Within one bucket the identifier is still the boundary an audience draws: two declarations of it
+	 * in one issuer would make one token valid at two resources.
 	 */
 	it('refuses a second declaration of one identifier in one bucket', async () => {
 		const { cookie, userId } = await admin();
-		const projectA = await projectFor(userId);
-		const projectB = await projectFor(userId, projectA.bucketId);
+		const bucket = await bucketFor(userId);
 
 		await api.admin.api
-			.projects({ id: projectA._id })
+			.buckets({ id: bucket._id })
 			.resources.post(body, { headers: { cookie } });
 		const clash = await api.admin.api
-			.projects({ id: projectB._id })
+			.buckets({ id: bucket._id })
 			.resources.post(body, { headers: { cookie } });
 
 		expect(clash.status).toBe(409);
@@ -263,10 +248,10 @@ describe('declaring a protected resource for a project in an addressable bucket'
 	 */
 	it('refuses an identifier this server serves itself', async () => {
 		const { cookie, userId } = await admin();
-		const project = await projectFor(userId);
+		const bucket = await bucketFor(userId);
 
 		const res = await api.admin.api
-			.projects({ id: project._id })
+			.buckets({ id: bucket._id })
 			.resources.post(
 				{ ...body, identifier: 'http://e.ly/mcp' },
 				{ headers: { cookie } }
@@ -281,24 +266,24 @@ describe('declaring a protected resource for a project in an addressable bucket'
 	 */
 	it('refuses a wildcard or omnibus scope', async () => {
 		const { cookie, userId } = await admin();
-		const project = await projectFor(userId);
+		const bucket = await bucketFor(userId);
 		const headers = { cookie };
 
 		for (const scopes of [[], ['*'], ['all'], ['full-access'], ['a b']]) {
 			const res = await api.admin.api
-				.projects({ id: project._id })
+				.buckets({ id: bucket._id })
 				.resources.post({ ...body, scopes }, { headers });
 			expect(res.status).toBe(400);
 		}
 	});
 
-	it('refuses an administrator outside the project owning group', async () => {
+	it('refuses an administrator outside the group owning the bucket', async () => {
 		const owner = await admin();
 		const outsider = await admin();
-		const project = await projectFor(owner.userId);
+		const bucket = await bucketFor(owner.userId);
 
 		const res = await api.admin.api
-			.projects({ id: project._id })
+			.buckets({ id: bucket._id })
 			.resources.get({ headers: { cookie: outsider.cookie } });
 
 		expect(res.status).toBe(403);
@@ -306,9 +291,9 @@ describe('declaring a protected resource for a project in an addressable bucket'
 
 	it('refuses to amend the identifier, which is the audience of every token issued', async () => {
 		const { cookie, userId } = await admin();
-		const project = await projectFor(userId);
+		const bucket = await bucketFor(userId);
 		const headers = { cookie };
-		const resources = api.admin.api.projects({ id: project._id }).resources;
+		const resources = api.admin.api.buckets({ id: bucket._id }).resources;
 		await resources.post(body, { headers });
 
 		const res = await resources({ resourceId: encoded }).patch(

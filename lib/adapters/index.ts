@@ -3,7 +3,6 @@ import {
 	UserStore as MemoryUser,
 	GroupStore as MemoryGroupStore,
 	GroupInvitationStore as MemoryGroupInvitationStore,
-	ProjectStore as MemoryProjectStore,
 	ProtectedResourceStore as MemoryProtectedResourceStore,
 	ProvisioningConnectionStore as MemoryProvisioningConnectionStore,
 	ProvisioningRefusalStore as MemoryProvisioningRefusalStore,
@@ -41,8 +40,6 @@ import type {
 	McpConfirmationStoreInstance,
 	ModelAdapter,
 	ModelAdapterConstructor,
-	ProjectStoreConstructor,
-	ProjectStoreInstance,
 	ProtectedResourceStoreConstructor,
 	ProvisioningConnectionStoreConstructor,
 	ProvisioningConnectionStoreInstance,
@@ -80,7 +77,6 @@ let UserStore: UserStoreConstructor = MemoryUser;
 let GroupStoreClass: GroupStoreConstructor = MemoryGroupStore;
 let GroupInvitationStoreClass: GroupInvitationStoreConstructor =
 	MemoryGroupInvitationStore;
-let ProjectStoreClass: ProjectStoreConstructor = MemoryProjectStore;
 let ProtectedResourceStoreClass: ProtectedResourceStoreConstructor =
 	MemoryProtectedResourceStore;
 let ProvisioningConnectionStoreClass: ProvisioningConnectionStoreConstructor =
@@ -125,7 +121,6 @@ if (backend === 'postgres') {
 	UserStore = postgres.UserStore;
 	GroupStoreClass = postgres.GroupStore;
 	GroupInvitationStoreClass = postgres.GroupInvitationStore;
-	ProjectStoreClass = postgres.ProjectStore;
 	ProtectedResourceStoreClass = postgres.ProtectedResourceStore;
 	ProvisioningConnectionStoreClass = postgres.ProvisioningConnectionStore;
 	ProvisioningRefusalStoreClass = postgres.ProvisioningRefusalStore;
@@ -160,7 +155,6 @@ if (backend === 'mongodb') {
 	UserStore = mongodb.UserStore;
 	GroupStoreClass = mongodb.GroupStore;
 	GroupInvitationStoreClass = mongodb.GroupInvitationStore;
-	ProjectStoreClass = mongodb.ProjectStore;
 	ProtectedResourceStoreClass = mongodb.ProtectedResourceStore;
 	ProvisioningConnectionStoreClass = mongodb.ProvisioningConnectionStore;
 	ProvisioningRefusalStoreClass = mongodb.ProvisioningRefusalStore;
@@ -324,6 +318,10 @@ export function checkedAdapter<S extends TObject>(
 			(await raw.findByOwner(field, value)).map((record) =>
 				documentOf(name, schema, record)
 			),
+		findByIndexed: async (field, value) =>
+			(await raw.findByIndexed(field, value)).map((record) =>
+				documentOf(name, schema, record)
+			),
 		destroyUnusedSince: (markerField, usedField, ageField, before) =>
 			raw.destroyUnusedSince(markerField, usedField, ageField, before)
 	};
@@ -359,14 +357,6 @@ export function getGroupInvitationStore(): GroupInvitationStoreInstance {
 		groupInvitationStoreSingleton = new GroupInvitationStoreClass();
 	}
 	return groupInvitationStoreSingleton;
-}
-
-let projectStoreSingleton: ProjectStoreInstance | null = null;
-export function getProjectStore(): ProjectStoreInstance {
-	if (!projectStoreSingleton) {
-		projectStoreSingleton = new ProjectStoreClass();
-	}
-	return projectStoreSingleton;
 }
 
 /*
@@ -431,15 +421,14 @@ export function getBucketKeysStore(): BucketKeysStoreInstance {
 }
 
 /*
- * The one writer of a container's group after creation (specs/075). Built over the bucket and project
- * stores so the memory backend can move the records those instances hold.
+ * The one writer of a bucket's group after creation (specs/075). Built over the bucket store so the memory
+ * backend can move the record that instance holds.
  */
 let containerOwnershipStoreSingleton: ContainerOwnershipStoreInstance | null =
 	null;
 export function getContainerOwnershipStore(): ContainerOwnershipStoreInstance {
 	containerOwnershipStoreSingleton ??= new ContainerOwnershipStoreClass({
-		buckets: getBucketStore(),
-		projects: getProjectStore()
+		buckets: getBucketStore()
 	});
 	return containerOwnershipStoreSingleton;
 }
@@ -500,13 +489,12 @@ export function getSmtpSettingsStore(): SmtpSettingsStoreInstance {
 }
 
 // Test-only: drop the cached admin store singletons so a spec that requires a
-// clean admin bucket/project (e.g. first-run setup, the UI shell) is not
-// contaminated by users/projects another spec seeded earlier in the same
+// clean admin bucket (e.g. first-run setup, the UI shell) is not
+// contaminated by users/buckets another spec seeded earlier in the same
 // process. The memory stores hold state in-instance; for the mongo stores this
 // only drops stateless wrapper caches, so it is safe in any mode.
 export function resetAdminMemoryStores(): void {
 	userStores.clear();
-	projectStoreSingleton = null;
 	bucketStoreSingleton = null;
 	groupStoreSingleton = null;
 	groupInvitationStoreSingleton = null;

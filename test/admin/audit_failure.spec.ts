@@ -2,19 +2,15 @@ import { describe, it, expect, beforeEach, afterEach, spyOn } from 'bun:test';
 import { Elysia } from 'elysia';
 import { treaty } from '@elysiajs/eden';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
-import { projectRoutes } from 'lib/admin/projects/routes.ts';
+import { clientRoutes } from 'lib/admin/clients/routes.ts';
 import { bucketRoutes } from 'lib/admin/buckets/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
+	adapter,
 	adminAuditStore,
-	getProjectStore,
 	getBucketStore
 } from 'lib/adapters/index.ts';
-import {
-	ADMIN_SESSION_COOKIE,
-	UNASSIGNED_GROUP_ID,
-	DEFAULT_BUCKET_ID
-} from 'lib/admin/consts.ts';
+import { ADMIN_SESSION_COOKIE, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { Type } from '@sinclair/typebox';
 import { sessionFor } from '../admin_session.ts';
 import { shaped } from 'test/shape.js';
@@ -32,7 +28,7 @@ import { createAdministrator } from '../administrators.ts';
  * One creating, one updating and one deleting operation, because the three differ in where the id comes
  * from and therefore in how much has already happened by the time the write is attempted.
  */
-const app = new Elysia().use(resolveAdmin).use(projectRoutes).use(bucketRoutes);
+const app = new Elysia().use(resolveAdmin).use(clientRoutes).use(bucketRoutes);
 
 const client = treaty(app);
 
@@ -95,34 +91,40 @@ describe('admin audit write failure', () => {
 
 	it('refuses a creation and creates nothing', async () => {
 		const cookie = await superCookie();
-		const slug = unique('never');
-		const before = (await getProjectStore().list()).length;
+		const bucket = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
+			name: 'Holds nothing'
+		});
 
-		const res = await client.admin.api.projects.post(
-			{ name: 'Never created', slug, bucketId: DEFAULT_BUCKET_ID },
+		const res = await client.admin.api.buckets({ id: bucket._id }).clients.post(
+			{
+				clientName: 'Never created',
+				grantTypes: ['authorization_code'],
+				tokenEndpointAuthMethod: 'client_secret_basic',
+				redirectUris: ['https://rp.example.com/cb']
+			},
 			{ headers: { cookie } }
 		);
 
 		expectAuditFailure(res.status, res.error?.value ?? res.data);
-		expect(await getProjectStore().findBySlug(slug)).toBeNull();
-		expect((await getProjectStore().list()).length).toBe(before);
+		expect(
+			await adapter('Client').findByIndexed('bucketId', bucket._id)
+		).toEqual([]);
 	});
 
 	it('refuses an update and changes nothing', async () => {
 		const cookie = await superCookie();
-		const project = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
+		const bucket = await getBucketStore().create({
 			ownerGroupId: UNASSIGNED_GROUP_ID,
-			name: 'Original',
-			slug: unique('p')
+			name: 'Original'
 		});
 
 		const res = await client.admin.api
-			.projects({ id: project._id })
+			.buckets({ id: bucket._id })
 			.patch({ name: 'Renamed' }, { headers: { cookie } });
 
 		expectAuditFailure(res.status, res.error?.value ?? res.data);
-		expect((await getProjectStore().find(project._id))?.name).toBe('Original');
+		expect((await getBucketStore().find(bucket._id))?.name).toBe('Original');
 	});
 
 	it('refuses a deletion and deletes nothing', async () => {

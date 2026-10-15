@@ -5,16 +5,10 @@ import {
 	adapter,
 	adminAuditStore,
 	getBucketStore,
-	getProjectStore,
 	getUserStore
 } from 'lib/adapters/index.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import {
-	ADMIN_SESSION_COOKIE,
-	UNASSIGNED_GROUP_ID,
-	DEFAULT_BUCKET_ID
-} from 'lib/admin/consts.ts';
-import { Client } from 'lib/models/client.js';
+import { ADMIN_SESSION_COOKIE, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { sessionFor } from '../admin_session.ts';
 import { answered } from '../admin/answered.ts';
 import { createAdministrator } from '../administrators.ts';
@@ -23,19 +17,17 @@ import { elysia } from 'lib/index.ts';
 import { Type } from '@sinclair/typebox';
 import { regularGroup } from '../admin/ownership_fixtures.ts';
 
-// A container may take its contents with it, on an election the administrator makes separately from
+// A bucket may take its accounts with it, on an election the administrator makes separately from
 // confirming the deletion.
 //
 // The claims worth proving here are the ones an operator would be wrong about if they guessed. That a
-// cascaded client is destroyed as completely as one deleted on its own — the shallow version, where the
-// record goes and the tokens do not, is the failure mode that looks correct from the console. That a
-// project never reaches its bucket, because buckets are shared and hold people the project never knew
-// about. And that one deletion leaves one entry, because a trail nobody can read is not a record.
+// cascaded account is destroyed as completely as one deleted on its own — including the records addressed
+// by its email, which nothing else points at. And that one deletion leaves one entry, because a trail
+// nobody can read is not a record.
 
 /**
- * @proves A container deleted with its contents destroys each of them as completely as deleting
- * that one thing would, never reaches a bucket it merely pointed at, and leaves exactly one entry
- * in the trail whatever it destroyed — an entry the group that owned a bucket can read. A bucket
+ * @proves A bucket deleted with its accounts destroys each of them completely and leaves exactly one
+ * entry in the trail whatever it destroyed — an entry the group that owned the bucket can read. A bucket
  * holding accounts is deleted only by an owner of its group or a super administrator.
  */
 describe('deletion cascade: containers', () => {
@@ -56,41 +48,11 @@ describe('deletion cascade: containers', () => {
 		return `${ADMIN_SESSION_COOKIE}=${session._id}`;
 	}
 
-	async function liveClient(): Promise<string> {
-		const clientId = `held-${Math.random().toString(36).slice(2)}`;
-		await adapter('Client').upsert(clientId, {
-			clientId,
-			clientSecret: 'secret',
-			grantTypes: ['authorization_code'],
-			responseTypes: ['code'],
-			redirectUris: [`https://${clientId}.example.com/cb`]
-		});
-		return clientId;
-	}
-
-	async function project(clientIds: string[], bucketId?: string) {
-		return getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			ownerGroupId: UNASSIGNED_GROUP_ID,
-			name: 'P',
-			slug: `p-${Math.random()}`,
-			clientIds,
-			...(bucketId ? { bucketId } : {})
-		});
-	}
-
 	async function bucket() {
 		return getBucketStore().create({
 			name: `b-${Math.random()}`,
 			ownerGroupId: UNASSIGNED_GROUP_ID
 		});
-	}
-
-	async function deleteProject(id: string, query?: Record<string, unknown>) {
-		const cookie = await superAdminCookie();
-		return agent.admin.api
-			.projects({ id })
-			.delete(undefined, { headers: { cookie }, ...(query ? { query } : {}) });
 	}
 
 	async function deleteBucket(id: string, query?: Record<string, unknown>) {
@@ -113,80 +75,6 @@ describe('deletion cascade: containers', () => {
 		const trail = await adminAuditStore.list({ targetId });
 		return trail.entries.filter((e) => e.action === action);
 	}
-
-	it('removes a project and its clients when the administrator consents to their destruction', async () => {
-		const first = await liveClient();
-		const second = await liveClient();
-		const proj = await project([first, second]);
-
-		const res = await deleteProject(proj._id, {
-			cascade: 'clients',
-			client: [first, second]
-		});
-
-		expect(res.status).toBe(200);
-		expect(answered(res.data).clientsDestroyed).toBe(2);
-		expect(await getProjectStore().find(proj._id)).toBeNull();
-		expect(await Client.tryFind(first)).toBeUndefined();
-		expect(await Client.tryFind(second)).toBeUndefined();
-	});
-
-	/*
-	 * The shallow cascade is the one that looks right from the console: the client is gone from the
-	 * list and from the project, so the operator concludes the deletion took effect — while the
-	 * registration access token it holds may carry no expiry at all, so its residue is not even bounded
-	 * by a TTL. A cascaded client has to be destroyed the way a directly deleted one is, not almost.
-	 */
-	it('destroys a cascaded client records as completely as deleting that client alone would', async () => {
-		const clientId = await liveClient();
-		await adapter('RegistrationAccessToken').upsert(`rat-${clientId}`, {
-			jti: `rat-${clientId}`,
-			kind: 'RegistrationAccessToken',
-			clientId,
-			iat: Math.floor(Date.now() / 1000)
-		});
-		const proj = await project([clientId]);
-
-		expect(
-			(
-				await deleteProject(proj._id, {
-					cascade: 'clients',
-					client: [clientId]
-				})
-			).status
-		).toBe(200);
-
-		expect(
-			await adapter('RegistrationAccessToken').find(`rat-${clientId}`)
-		).toBe(undefined);
-	});
-
-	/*
-	 * The instruction that is easy to be helpful about and wrong. A bucket is shared between projects
-	 * and holds people who have no relationship with any one of them, so no project deletion reaches
-	 * one — not even the bucket that project alone was pointing at, and not under any election.
-	 */
-	it('leaves a projects bucket and every account in it intact when the project is deleted', async () => {
-		const backing = await bucket();
-		const account = await getUserStore(backing._id).create(
-			'resident@example.com',
-			'hash'
-		);
-		const clientId = await liveClient();
-		const proj = await project([clientId], backing._id);
-
-		expect(
-			(
-				await deleteProject(proj._id, {
-					cascade: 'clients',
-					client: [clientId]
-				})
-			).status
-		).toBe(200);
-
-		expect(await getBucketStore().find(backing._id)).not.toBeNull();
-		expect(await getUserStore(backing._id).find(account._id)).not.toBeNull();
-	});
 
 	it('removes a bucket and its end-user accounts when the administrator consents to their destruction', async () => {
 		const held = await bucket();
@@ -235,43 +123,27 @@ describe('deletion cascade: containers', () => {
 	});
 
 	/*
-	 * For every container deletion, the trail grows by exactly one entry — checked against a container
-	 * holding one thing and one holding several, because a per-item trail passes the single-item case
-	 * and only diverges as the deletion gets big enough to matter.
+	 * For every bucket deletion, the trail grows by exactly one entry — checked against a bucket holding
+	 * one account and one holding several, because a per-item trail passes the single-item case and only
+	 * diverges as the deletion gets big enough to matter.
 	 */
-	it('writes exactly one entry per deletion, whether the container held one thing or several', async () => {
-		const oneId = await liveClient();
-		const one = await project([oneId]);
+	it('writes exactly one entry per deletion, whether the bucket held one account or several', async () => {
+		const one = await bucket();
+		await getUserStore(one._id).create('only@example.com', 'hash');
 		expect(
-			(await deleteProject(one._id, { cascade: 'clients', client: [oneId] }))
+			(await deleteBucket(one._id, { cascade: 'endusers', expect: 1 })).status
+		).toBe(200);
+		expect((await entriesFor(one._id, 'bucket.delete')).length).toBe(1);
+
+		const several = await bucket();
+		await getUserStore(several._id).create('a@example.com', 'hash');
+		await getUserStore(several._id).create('b@example.com', 'hash');
+		await getUserStore(several._id).create('c@example.com', 'hash');
+		expect(
+			(await deleteBucket(several._id, { cascade: 'endusers', expect: 3 }))
 				.status
 		).toBe(200);
-		expect((await entriesFor(one._id, 'project.delete')).length).toBe(1);
-
-		const clients = [
-			await liveClient(),
-			await liveClient(),
-			await liveClient()
-		];
-		const several = await project(clients);
-		expect(
-			(
-				await deleteProject(several._id, {
-					cascade: 'clients',
-					client: clients
-				})
-			).status
-		).toBe(200);
-		expect((await entriesFor(several._id, 'project.delete')).length).toBe(1);
-
-		const held = await bucket();
-		await getUserStore(held._id).create('a@example.com', 'hash');
-		await getUserStore(held._id).create('b@example.com', 'hash');
-		await getUserStore(held._id).create('c@example.com', 'hash');
-		expect(
-			(await deleteBucket(held._id, { cascade: 'endusers', expect: 3 })).status
-		).toBe(200);
-		expect((await entriesFor(held._id, 'bucket.delete')).length).toBe(1);
+		expect((await entriesFor(several._id, 'bucket.delete')).length).toBe(1);
 	});
 
 	/*
@@ -280,17 +152,6 @@ describe('deletion cascade: containers', () => {
 	 * introduces personal data to an append-only store nobody can edit afterwards.
 	 */
 	it('records what a deletion destroyed as counts, carrying no identifier of it', async () => {
-		const clientId = await liveClient();
-		const proj = await project([clientId]);
-		await deleteProject(proj._id, { cascade: 'clients', client: [clientId] });
-
-		const projectEntry = present(
-			(await entriesFor(proj._id, 'project.delete')).at(0),
-			'the project.delete entry'
-		);
-		expect(projectEntry.cascade).toEqual({ clients: 1 });
-		expect(JSON.stringify(projectEntry)).not.toContain(clientId);
-
 		const held = await bucket();
 		const account = await getUserStore(held._id).create(
 			'private@example.com',
@@ -309,17 +170,17 @@ describe('deletion cascade: containers', () => {
 	});
 
 	/*
-	 * An empty container says nothing rather than saying zero: an entry from before cascades existed
-	 * and an entry for a deletion that took nothing with it are the same fact, and should read as one.
+	 * An empty bucket says nothing rather than saying zero: an entry from before cascades existed and an
+	 * entry for a deletion that took nothing with it are the same fact, and should read as one.
 	 */
-	it('records no cascade for a deletion that destroyed only the container', async () => {
-		const empty = await project([]);
-		await deleteProject(empty._id);
+	it('records no cascade for a deletion that destroyed only the bucket', async () => {
+		const empty = await bucket();
+		await deleteBucket(empty._id);
 
 		// Present first: with no entry at all, `cascade` would read as absent and the case would pass.
 		const entry = present(
-			(await entriesFor(empty._id, 'project.delete')).at(0),
-			'the project.delete entry'
+			(await entriesFor(empty._id, 'bucket.delete')).at(0),
+			'the bucket.delete entry'
 		);
 		expect(entry.cascade ?? null).toBeNull();
 	});

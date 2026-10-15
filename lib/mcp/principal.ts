@@ -209,7 +209,7 @@ export async function resolveMcpPrincipal(
  * is the remedy an operator needs when a permitted host is taken over.
  *
  * The reserved client is exempt and needs no entry: its route to the administrator bucket is
- * membership of the reserved admin project, which predates the allowlist and is an operator decision
+ * belonging to the administrators' bucket (specs/099), which predates the allowlist and is an operator decision
  * of its own. A dynamically registered client is refused here whatever the list says, because its
  * identity is minted on demand by whoever asked and so cannot be allowlisted in any meaningful sense.
  */

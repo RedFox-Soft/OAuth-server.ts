@@ -96,7 +96,7 @@ export async function getResourceServerInfo(
 	}
 
 	/*
-	 * A resource an administrator declared in one of their projects. Second, not first: the arm above
+	 * A resource an administrator declared in one of their buckets. Second, not first: the arm above
 	 * claims this server's own MCP audience, and a declaration must never be able to take it over —
 	 * which is also why `${ISSUER}/mcp` is refused at declaration time rather than only here.
 	 *

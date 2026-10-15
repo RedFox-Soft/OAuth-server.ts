@@ -1,12 +1,15 @@
 import { describe, it, expect, beforeAll, jest, spyOn } from 'bun:test';
 import { Type } from '@sinclair/typebox';
 
-import bootstrap, { agent, getHeader } from '../test_helper.ts';
+import bootstrap, {
+	bindClientToBucket,
+	agent,
+	getHeader
+} from '../test_helper.ts';
 import { SESSION_COOKIE_PREFIX } from '../test_helper.ts';
 import { AuthorizationRequest } from '../AuthorizationRequest.ts';
 import {
 	getBucketStore,
-	getProjectStore,
 	getUserStore,
 	resetAdminMemoryStores
 } from 'lib/adapters/index.ts';
@@ -18,7 +21,7 @@ import { throttleKey } from 'lib/login_throttle/throttle.ts';
 import { LoginThrottlePayload } from 'lib/login_throttle/types.ts';
 import { TestAdapter } from 'test/models.js';
 import { present, shaped } from 'test/shape.js';
-import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
+import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 
 /*
  * The password door under brute force, driven through the real HTTP layer: /auth to get an
@@ -65,16 +68,7 @@ async function seedBucket(
 		name,
 		...fields
 	});
-	const project = await getProjectStore().create({
-		bucketId: DEFAULT_BUCKET_ID,
-		ownerGroupId: UNASSIGNED_GROUP_ID,
-		name,
-		slug: `${clientId}-${Math.random()}`
-	});
-	await getProjectStore().update(project._id, {
-		bucketId: bucket._id,
-		clientIds: [clientId]
-	});
+	await bindClientToBucket(clientId, bucket._id);
 	return bucket._id;
 }
 

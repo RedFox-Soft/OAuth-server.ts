@@ -3,7 +3,6 @@ import {
 	getBucketStore,
 	getBucketGroupStore,
 	getContainerOwnershipStore,
-	getProjectStore,
 	getProtectedResourceStore,
 	getProvisioningConnectionStore,
 	getUserStore
@@ -14,9 +13,6 @@ import {
 	assertGroupOwner,
 	AdminError,
 	adminErrorBody,
-	projectReach,
-	projectsOfCallerGroups,
-	reachOf,
 	resolveAdmin,
 	type AdminContext
 } from '../auth/rbac.js';
@@ -25,14 +21,11 @@ import {
 	bucketFactsWanted,
 	holdsBucket,
 	meCan,
-	NO_PROJECT_REACH,
-	reachesProject,
 	type BucketCan,
 	type BucketDependents,
-	type BucketFacts,
-	type ProjectReach
+	type BucketFacts
 } from '../auth/can.js';
-import type { Project, UserBucket } from '../../adapters/types.js';
+import type { UserBucket } from '../../adapters/types.js';
 import { isUniqueValueTaken } from '../../adapters/conflicts.js';
 import { presentAll } from '../federation/service.js';
 import { ADMIN_BUCKET_ID, isUndeletableBucket, reservedOf } from '../consts.js';
@@ -81,6 +74,7 @@ import { addressOf, issuerFor } from '../../configs/issuer.js';
 import { callbackUri } from '../../federation/flow.js';
 import { mailDeliveryConfigured } from '../../mail/mailer.js';
 import { listClientView } from '../clients/service.js';
+import { adapter } from '../../adapters/index.js';
 import {
 	forgetBucketAddresses,
 	isAddressable,
@@ -246,11 +240,22 @@ async function refusingATakenHostname<T>(write: () => Promise<T>): Promise<T> {
 	}
 }
 
-/* As stored: a project document written before `clientIds` existed has none. */
-function clientIdsOf(project: {
-	clientIds?: readonly string[];
-}): readonly string[] {
-	return project.clientIds ?? [];
+/*
+ * The applications a bucket holds, as stored (specs/099). `operatorOnly` leaves out the ones that registered
+ * themselves: those break nobody's integration that an administrator owns, and never block a deletion.
+ */
+async function bucketClients(
+	bucketId: string,
+	operatorOnly = false
+): Promise<{ clientId: string; registeredDynamically: boolean }[]> {
+	const stored = await adapter('Client').findByIndexed('bucketId', bucketId);
+	return stored
+		.map((record) => ({
+			clientId: String(record.clientId),
+			registeredDynamically: record.registeredDynamically === true
+		}))
+		.filter((client) => !operatorOnly || !client.registeredDynamically)
+		.sort((a, b) => a.clientId.localeCompare(b.clientId));
 }
 
 interface AddressChangeCounts {
@@ -263,15 +268,10 @@ interface AddressChangeCounts {
 interface AddressChangePreview {
 	from: string;
 	to: string;
-	applications: {
-		clientId: string;
-		name: string | null;
-		projectId: string;
-		projectName: string;
-	}[];
+	applications: { clientId: string; name: string | null }[];
 	connections: { id: string; displayName: string }[];
 	providers: { id: string; displayName: string; newCallback: string }[];
-	resources: { identifier: string; projectId: string; projectName: string }[];
+	resources: { identifier: string; name: string }[];
 	namespaceMove: boolean;
 	expect: AddressChangeCounts;
 	consequence: string;
@@ -281,31 +281,19 @@ interface AddressChangePreview {
  * Everything an address change reaches, named before the change (specs/081 FR-013).
  *
  * Named rather than counted, because "14 clients" tells an operator nothing they can act on: each
- * application with the project it belongs to is what they take to whoever owns it, each identity provider
- * with the callback address its upstream registration must be given, each provisioning connection whose
- * directory must be re-pointed, and each declared resource whose tokens will carry the new issuer. Read
- * through the projects that point at the bucket, which is where an application's membership is recorded.
+ * application is what they take to whoever owns it, each identity provider with the callback address its
+ * upstream registration must be given, each provisioning connection whose directory must be re-pointed, and
+ * each declared resource whose tokens will carry the new issuer.
  */
 async function addressChangePreview(
 	bucket: UserBucket,
 	address: { slug?: string; host?: string }
 ): Promise<AddressChangePreview> {
 	const target = { _id: bucket._id, ...address };
-	const projects = (await getProjectStore().list())
-		.filter((project) => project.bucketId === bucket._id)
-		.sort((a, b) => a.name.localeCompare(b.name));
-
 	const applications: AddressChangePreview['applications'] = [];
-	for (const project of projects) {
-		for (const clientId of [...clientIdsOf(project)].sort()) {
-			const view = await listClientView(clientId);
-			applications.push({
-				clientId,
-				name: view?.clientName ?? null,
-				projectId: project._id,
-				projectName: project.name
-			});
-		}
+	for (const { clientId } of await bucketClients(bucket._id)) {
+		const view = await listClientView(clientId);
+		applications.push({ clientId, name: view?.clientName ?? null });
 	}
 	/*
 	 * A SCIM connection's base URL and token audience are both derived from the address, so a customer's
@@ -321,18 +309,11 @@ async function addressChangePreview(
 		newCallback: callbackUri(target)
 	}));
 	const resources = (
-		await Promise.all(
-			projects.map(async (project) =>
-				(await getProtectedResourceStore().listByProject(project._id)).map(
-					(resource) => ({
-						identifier: resource.identifier,
-						projectId: project._id,
-						projectName: project.name
-					})
-				)
-			)
-		)
-	).flat();
+		await getProtectedResourceStore().listByBucket(bucket._id)
+	).map((resource) => ({
+		identifier: resource.identifier,
+		name: resource.name
+	}));
 
 	return {
 		from: issuerFor(bucket),
@@ -388,16 +369,16 @@ function addressing(bucket: Pick<UserBucket, '_id' | 'slug' | 'host'>): {
 	};
 }
 
-/* Counted across the instance, so an owner is never told a bucket is unused while another group's project uses it. */
+/* Every application counts here, a self-registered one included: its integration breaks like any other. */
 async function dependentsOf(
 	bucket: Pick<UserBucket, '_id' | 'federation'>
 ): Promise<BucketDependents> {
-	const [projects, connections] = await Promise.all([
-		getProjectStore().countByBucket(bucket._id),
+	const [applications, connections] = await Promise.all([
+		bucketClients(bucket._id),
 		getProvisioningConnectionStore().listByBucket(bucket._id)
 	]);
 	return {
-		projects,
+		applications: applications.length,
 		providers: bucket.federation.length,
 		connections: connections.length
 	};
@@ -441,9 +422,9 @@ function addressRefusal(
 	const dependents = facts.dependents;
 	if (
 		dependents &&
-		dependents.projects + dependents.providers + dependents.connections > 0
+		dependents.applications + dependents.providers + dependents.connections > 0
 	) {
-		return `Used by ${countOf(dependents.projects, 'project')}, ${countOf(dependents.providers, 'identity provider')} and ${countOf(dependents.connections, 'provisioning connection')}: only an instance administrator can change this bucket's address now.`;
+		return `Used by ${countOf(dependents.applications, 'application')}, ${countOf(dependents.providers, 'identity provider')} and ${countOf(dependents.connections, 'provisioning connection')}: only an instance administrator can change this bucket's address now.`;
 	}
 	if (bucketFactsWanted(ctx, bucket).dependents || ctx.superAdmin) {
 		return 'this bucket address cannot be changed';
@@ -466,7 +447,7 @@ function countOf(n: number, noun: string): string {
  * routes and not here, because a bucket document *contains* its providers and these handlers returned it
  * whole. So `GET /admin/api/buckets` handed every provider secret to any authenticated administrator, and
  * `GET /admin/api/buckets/:id` handed a bucket's secrets to anyone with the broader
- * `loadBucketForUsers` access — a project manager, not only the bucket's own.
+ * `loadBucketForUsers` access, not only the bucket's editors.
  *
  * Found by the MCP surface's secrecy sweep (test/mcp/secrecy.spec.ts), which is why that sweep iterates
  * every published read rather than the ones somebody thought to check.
@@ -500,51 +481,18 @@ function withoutPurgeClaim<T extends Pick<UserBucket, 'deletion'>>(
 }
 
 /*
- * What a bucket's rights are decided from, gathered once per request so a list states every row's rights
- * from the same reads: the caller's reach through their projects, and the projects they can see by bucket.
- */
-interface RightsFacts {
-	readonly access: ProjectReach;
-	readonly visibleProjects: ReadonlyMap<string, readonly Project[]>;
-}
-
-async function rightsFacts(ctx: AdminContext): Promise<RightsFacts> {
-	const projects = ctx.superAdmin
-		? await getProjectStore().list()
-		: await projectsOfCallerGroups(ctx);
-	const visibleProjects = new Map<string, Project[]>();
-	for (const project of projects) {
-		if (!reachesProject(ctx, project)) continue;
-		visibleProjects.set(project.bucketId, [
-			...(visibleProjects.get(project.bucketId) ?? []),
-			project
-		]);
-	}
-	return {
-		access: ctx.superAdmin ? NO_PROJECT_REACH : reachOf(projects),
-		visibleProjects
-	};
-}
-
-/*
  * The caller's rights on a bucket, and the state that would refuse a right they hold — so the console hides
  * what it may not do and disables, with the reason, what it may do but not yet.
- *
- * Only the projects the caller can reach are named. A bucket whose projects sit in another group is
- * reachable only through data older than the rule that a project and its bucket share a group, and naming
- * them would tell one tenant what another calls its work; the deletion's own 409 still refuses it.
  */
 function withRights<
 	T extends Pick<UserBucket, '_id' | 'ownerGroupId' | 'slug' | 'host'>
 >(
 	ctx: AdminContext,
 	bucket: T,
-	facts: RightsFacts,
 	state: BucketFacts
 ): T & {
 	can: BucketCan;
 	blockers: {
-		usedByProjects: { id: string; name: string }[];
 		addressable: boolean;
 		/*
 		 * The state the two state-dependent rights were decided from (specs/081), so the console can say why
@@ -556,11 +504,8 @@ function withRights<
 } {
 	return {
 		...bucket,
-		can: bucketCan(ctx, bucket, facts.access, state),
+		can: bucketCan(ctx, bucket, state),
 		blockers: {
-			usedByProjects: (facts.visibleProjects.get(bucket._id) ?? []).map(
-				(project) => ({ id: project._id, name: project.name })
-			),
 			addressable: isAddressable(bucket),
 			dependents: state.dependents ?? null,
 			accounts: state.accounts ?? null
@@ -630,31 +575,21 @@ function withInertTotpAdvisory<
 
 /* One bucket as `GET /admin/api/buckets/:id` answers it, and as a restore answers with what it brought back. */
 async function bucketDetail(ctx: AdminContext, bucket: UserBucket) {
-	const [facts, state] = await Promise.all([
-		rightsFacts(ctx),
-		bucketFacts(ctx, bucket)
+	const [state, applications, apis] = await Promise.all([
+		bucketFacts(ctx, bucket),
+		bucketClients(bucket._id),
+		getProtectedResourceStore().listByBucket(bucket._id)
 	]);
-	/*
-	 * The projects named are those the caller can reach, for the reason `withRights` gives; each with how
-	 * many applications it holds, which is what a change to this bucket's sign-in reaches through it.
-	 */
-	const projects = (facts.visibleProjects.get(bucket._id) ?? []).map(
-		(project) => ({
-			id: project._id,
-			name: project.name,
-			clientCount: clientIdsOf(project).length
-		})
-	);
 	return {
-		...withAddressGuidance(
-			withRights(ctx, presentBucket(bucket), facts, state)
-		),
+		...withAddressGuidance(withRights(ctx, presentBucket(bucket), state)),
 		/*
 		 * Sent by the server because the console cannot derive it: ISSUER is kept out of the browser
 		 * bundle (lib/configs/issuer.ts).
 		 */
 		...addressing(bucket),
-		projects
+		/* What a change to this bucket's sign-in reaches: its applications and the APIs they call. */
+		applications: applications.length,
+		apis: apis.length
 	};
 }
 
@@ -694,7 +629,7 @@ async function deletionChecked(
 	 * deletable by any member of its group. Counted by the datastore, not by reading every account.
 	 */
 	const held = (await store.tally()).total;
-	if (!bucketCan(ctx, bucket, NO_PROJECT_REACH, { accounts: held }).delete) {
+	if (!bucketCan(ctx, bucket, { accounts: held }).delete) {
 		throw new AdminError(
 			403,
 			held > 0 && holdsBucket(ctx, bucket)
@@ -710,12 +645,32 @@ async function deletionChecked(
 		throw scheduledForDeletion(bucket.deletion.purgeAt);
 	}
 	/*
-	 * Before the election is even considered, and unclearable by it. What this protects is
-	 * outside the bucket: a project left pointing at a bucket that no longer exists is a broken
-	 * tenant, which is not something the bucket's own contents can consent away.
+	 * Before the election is even considered, and unclearable by it. An application an administrator
+	 * registered here, or an API declared here, is somebody's integration: it is removed on purpose, one by
+	 * one, never as a side effect of the people in the bucket going. A self-registered application blocks
+	 * nothing — nobody here vouched for it (specs/099).
 	 */
-	if ((await getProjectStore().countByBucket(id)) > 0) {
-		throw new AdminError(409, 'bucket is assigned to one or more projects');
+	const [applications, apis] = await Promise.all([
+		bucketClients(id, true),
+		getProtectedResourceStore().listByBucket(id)
+	]);
+	if (applications.length > 0 || apis.length > 0) {
+		throw new AdminError(409, 'bucket still holds applications or APIs', {
+			blockers: [
+				...(applications.length > 0
+					? [
+							{
+								kind: 'client' as const,
+								count: applications.length,
+								ids: applications.map((client) => client.clientId)
+							}
+						]
+					: []),
+				...(apis.length > 0
+					? [{ kind: 'resource' as const, count: apis.length }]
+					: [])
+			]
+		});
 	}
 	/*
 	 * `list()` does not filter, which is what makes a deactivated account count — deactivation is
@@ -726,7 +681,7 @@ async function deletionChecked(
 	 */
 	const accounts = (await store.list()).length;
 	/* An account that arrived since the count still counts: the right is decided over what is destroyed. */
-	if (!bucketCan(ctx, bucket, NO_PROJECT_REACH, { accounts }).delete) {
+	if (!bucketCan(ctx, bucket, { accounts }).delete) {
 		throw new AdminError(
 			403,
 			`This bucket holds ${countOf(accounts, 'account')}: only an owner of its group can delete it.`
@@ -770,8 +725,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 		const ctx = assertAuth(admin);
 		/* The same set the held-connections count is taken over (lib/admin/buckets/visible.ts). */
 		const listed = await visibleBuckets(ctx);
-		const [facts, holding, states] = await Promise.all([
-			rightsFacts(ctx),
+		const [holding, states] = await Promise.all([
 			getProvisioningConnectionStore().listHeld(),
 			Promise.all(listed.map((b) => bucketFacts(ctx, b)))
 		]);
@@ -788,7 +742,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			const heldConnectionId = heldIn.get(b._id);
 			const { addressForm, issuer } = addressing(b);
 			return {
-				...withRights(ctx, presentBucket(b), facts, states[i] ?? {}),
+				...withRights(ctx, presentBucket(b), states[i] ?? {}),
 				addressForm,
 				issuer,
 				/*
@@ -815,7 +769,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 					? assertActiveGroup(ctx)
 					: (await loadDestination(ctx, body.groupId))._id;
 			/*
-			 * Naming a hostname is an instance-level act, never a group-level one. A project administrator
+			 * Naming a hostname is an instance-level act, never a group-level one. A tenant administrator
 			 * may create buckets in their own group; letting them name one would put a name in the
 			 * operator's own domain under their control — an escalation out of the group boundary, and out
 			 * of whatever else that domain is used for.
@@ -895,17 +849,20 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 	.get('/admin/api/buckets/:id/summary', async ({ admin, params }) => {
 		const ctx = assertAuth(admin);
 		const bucket = await loadBucketForSettings(ctx, params.id, 'read');
-		const readsActivity = bucketCan(ctx, bucket, NO_PROJECT_REACH).readActivity;
-		const [counts, groups, connections, mail, figure] = await Promise.all([
-			signInCounts(bucket),
-			getBucketGroupStore().query(
-				{ bucketId: bucket._id },
-				{ startIndex: 1, count: 0 }
-			),
-			getProvisioningConnectionStore().listByBucket(bucket._id),
-			mailDeliveryConfigured(),
-			readsActivity ? readPeriod(bucket._id, monthOf(now())) : null
-		]);
+		const readsActivity = bucketCan(ctx, bucket).readActivity;
+		const [counts, groups, connections, mail, figure, applications, apis] =
+			await Promise.all([
+				signInCounts(bucket),
+				getBucketGroupStore().query(
+					{ bucketId: bucket._id },
+					{ startIndex: 1, count: 0 }
+				),
+				getProvisioningConnectionStore().listByBucket(bucket._id),
+				mailDeliveryConfigured(),
+				readsActivity ? readPeriod(bucket._id, monthOf(now())) : null,
+				bucketClients(bucket._id),
+				getProtectedResourceStore().listByBucket(bucket._id)
+			]);
 		const enabled = bucket.federation.filter((provider) => provider.enabled);
 		return {
 			users: counts.total,
@@ -919,8 +876,8 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			 */
 			withoutEnabledLink: counts.withoutEnabledLink,
 			passwordWithoutAuthenticator: counts.passwordWithoutAuthenticator,
-			/* The default bucket only: the projects whose sign-in lands there. */
-			...(counts.projects === undefined ? {} : { projects: counts.projects }),
+			applications: applications.length,
+			apis: apis.length,
 			userGroups: groups.totalResults,
 			connections: connections.length,
 			held: connections.filter((c) => c.hold !== undefined).length,
@@ -942,45 +899,6 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			 * of that rule a browser cannot otherwise know.
 			 */
 			federationEnabled: ApplicationConfig['federation.enabled']
-		};
-	})
-	/*
-	 * The resource namespace a bucket's projects declare into (specs/085), read from the projects using it —
-	 * which is where a declaration's namespace comes from — rather than from a store query by namespace.
-	 *
-	 * An addressable bucket is a namespace of its own, so every declaration in it is listed. A bucket served
-	 * at the root shares the root namespace with every other root-served bucket and every project with no
-	 * bucket, so only its own projects' declarations are listed: listing the whole root would show one
-	 * tenant what another declares.
-	 */
-	.get('/admin/api/buckets/:id/resources', async ({ admin, params }) => {
-		const ctx = assertAuth(admin);
-		const bucket = await loadBucketForSettings(ctx, params.id, 'read');
-		const namespace = namespaceOf(bucket);
-		const projects = (await getProjectStore().list()).filter(
-			(project) => project.bucketId === bucket._id
-		);
-		const resources = (
-			await Promise.all(
-				projects.map(async (project) =>
-					(await getProtectedResourceStore().listByProject(project._id))
-						.filter((resource) => resource.namespace === namespace)
-						.map((resource) => ({
-							identifier: resource.identifier,
-							name: resource.name,
-							projectId: project._id,
-							projectName: project.name
-						}))
-				)
-			)
-		)
-			.flat()
-			.sort((a, b) =>
-				a.identifier < b.identifier ? -1 : a.identifier > b.identifier ? 1 : 0
-			);
-		return {
-			namespace: namespace === ROOT_NAMESPACE ? 'root' : 'bucket',
-			resources
 		};
 	})
 	.patch(
@@ -1100,7 +1018,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			 */
 			const bucket = await loadBucketForSettings(ctx, params.id, 'read');
 			const facts = await bucketFacts(ctx, bucket);
-			if (!bucketCan(ctx, bucket, NO_PROJECT_REACH, facts).changeAddress) {
+			if (!bucketCan(ctx, bucket, facts).changeAddress) {
 				throw new AdminError(403, addressRefusal(ctx, bucket, facts));
 			}
 			/*
@@ -1128,7 +1046,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 				return { ...preview, confirmationRequired: true };
 			}
 			/*
-			 * The confirmation is of what was previewed. A project, provider or connection that arrived since
+			 * The confirmation is of what was previewed. An application, provider or connection that arrived since
 			 * would be broken by a consent given before it existed, so the commit is refused with the fresh
 			 * preview — and for an owner, that is also the moment the change becomes an instance
 			 * administrator's, which the next attempt's right check states.
@@ -1148,22 +1066,18 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 
 			/*
 			 * A legacy bucket gaining its first address leaves the shared root namespace for one of its own,
-			 * and its projects' declarations have to come with it or they would stop resolving. A bucket
-			 * that already had an address keeps its namespace, which is keyed by id, not by address.
+			 * and its declarations have to come with it or they would stop resolving. A bucket that already
+			 * had an address keeps its namespace, which is keyed by id, not by address.
 			 */
-			const moves: Array<{ projectId: string; plan: MovePlan }> = [];
-			if (namespaceOf(bucket) === ROOT_NAMESPACE) {
-				const to = namespaceOf({ ...bucket, ...address });
-				const inBucket = (await getProjectStore().list()).filter(
-					(project) => project.bucketId === params.id
-				);
-				for (const project of inBucket) {
-					moves.push({
-						projectId: project._id,
-						plan: await planMove(ctx, project._id, ROOT_NAMESPACE, to)
-					});
-				}
-			}
+			const move: MovePlan | null =
+				namespaceOf(bucket) === ROOT_NAMESPACE
+					? await planMove(
+							ctx,
+							params.id,
+							ROOT_NAMESPACE,
+							namespaceOf({ ...bucket, ...address })
+						)
+					: null;
 
 			await recordAdminAudit(ctx, 'bucket.address.change', params.id, {
 				from: bucket.host ?? bucket.slug ?? null,
@@ -1171,9 +1085,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 				/* So the owning group reads the change in its own trail, not only a super administrator. */
 				ownerGroupId: bucket.ownerGroupId
 			});
-			for (const { projectId, plan } of moves) {
-				await applyMove(projectId, plan);
-			}
+			if (move) await applyMove(params.id, move);
 			/*
 			 * A legacy bucket gaining its first address becomes an issuer, and gets its key with it. A
 			 * bucket that already had one keeps its keys: they are keyed by id, and a new issuer string for
@@ -1199,12 +1111,9 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 		{ body: ChangeBucketAddressBody }
 	)
 	/*
-	 * Moving a bucket, with every project using it, to another administrator group (specs/075).
-	 *
-	 * The bucket and its projects move as one, because two things compare their owners: consent is waived
-	 * only where a client's project and the bucket it signs into share a group, and a project's group may
-	 * administer the end users of the bucket it uses. Splitting them would change both without anyone
-	 * deciding to.
+	 * Moving a bucket, with everything it holds, to another administrator group (specs/075). Its
+	 * applications and APIs belong to it by reference, so they follow with no write of their own and no
+	 * state in which part of a bucket is in one group and part in another (specs/099).
 	 *
 	 * Taking a bucket away removes every other member's access to it, so the caller must own the group it
 	 * leaves. Belonging to the destination is enough: any member may already create a bucket there.
@@ -1215,8 +1124,8 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			const ctx = assertAuth(admin);
 			/*
 			 * Before the bucket is loaded, as for an address change and a deletion. The administrators' bucket
-			 * belongs to no tenant, and the default bucket is shared by projects of every group: handing it to
-			 * one group would hand that group everybody else's end users.
+			 * belongs to no tenant, and the default bucket is the instance's own: handing it to one group would
+			 * hand that group everybody else's end users.
 			 */
 			if (isUndeletableBucket(params.id)) {
 				throw new AdminError(
@@ -1226,23 +1135,20 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			}
 			const bucket = await loadBucketForEdit(ctx, params.id);
 			/*
-			 * The right before anything about the destination or the projects using the bucket, so a member
-			 * who may not move it is told that rather than which group it would have left.
+			 * The right before anything about the destination, so a member who may not move it is told that
+			 * rather than which group it would have left.
 			 */
-			if (!bucketCan(ctx, bucket, await projectReach(ctx)).move) {
+			if (!bucketCan(ctx, bucket).move) {
 				throw new AdminError(403, 'group owner required');
 			}
 			const destination = await loadDestination(ctx, body.groupId);
-			const bound = (await getProjectStore().list()).filter(
-				(project) => project.bucketId === bucket._id
-			);
-			const from = sourceGroupOf(
-				[bucket.ownerGroupId, ...bound.map((project) => project.ownerGroupId)],
-				destination._id
-			);
+			const from = sourceGroupOf([bucket.ownerGroupId], destination._id);
 			assertGroupOwner(ctx, from);
 
-			const moving = bound.filter((project) => project.ownerGroupId === from);
+			const [applications, apis] = await Promise.all([
+				bucketClients(bucket._id, true),
+				getProtectedResourceStore().listByBucket(bucket._id)
+			]);
 			if (body.confirm !== true) {
 				set.status = 409;
 				return {
@@ -1250,12 +1156,10 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 					from: await describeGroup(from),
 					to: await describeGroup(destination._id),
 					bucket: { id: bucket._id, name: bucket.name },
-					projects: moving.map((project) => ({
-						id: project._id,
-						name: project.name
-					})),
+					applications: applications.length,
+					apis: apis.length,
 					consequence:
-						'the bucket and these projects will be administered by the members of the destination group, and no longer by members of the source group only; end users, clients and sign-in addresses are not affected'
+						'the bucket, with its applications and APIs, will be administered by the members of the destination group, and no longer by members of the source group; end users, clients and sign-in addresses are not affected'
 				};
 			}
 
@@ -1263,7 +1167,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 				ownerGroupId: destination._id,
 				formerOwnerGroupId: from,
 				attributes: ['ownerGroupId'],
-				cascade: { projects: moving.length }
+				cascade: { applications: applications.length, apis: apis.length }
 			});
 			const result = await getContainerOwnershipStore().moveBucket(
 				bucket._id,
@@ -1276,16 +1180,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 					'the bucket changed while it was being moved; reload and try again'
 				);
 			}
-			const names = new Map(
-				bound.map((project) => [project._id, project.name])
-			);
-			return {
-				bucket: { id: bucket._id, ownerGroupId: destination._id },
-				projects: result.projectIds.map((id) => ({
-					id,
-					name: names.get(id) ?? id
-				}))
-			};
+			return { bucket: { id: bucket._id, ownerGroupId: destination._id } };
 		},
 		{ body: MoveBucketOwnerBody }
 	)
@@ -1354,7 +1249,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 		const ctx = assertAuth(admin);
 		const bucket = await loadBucketForSettings(ctx, params.id, 'read');
 		const held = (await getUserStore(params.id).tally()).total;
-		if (!bucketCan(ctx, bucket, NO_PROJECT_REACH, { accounts: held }).delete) {
+		if (!bucketCan(ctx, bucket, { accounts: held }).delete) {
 			throw new AdminError(
 				403,
 				held > 0 && holdsBucket(ctx, bucket)

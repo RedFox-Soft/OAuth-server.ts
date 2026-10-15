@@ -1,8 +1,8 @@
 import { Elysia } from 'elysia';
 
 import { getBucketStore } from '../../adapters/index.js';
-import { AdminError, projectReach, resolveAdmin } from '../auth/rbac.js';
-import { bucketCan, holdsBucket, NO_PROJECT_REACH } from '../auth/can.js';
+import { AdminError, resolveAdmin } from '../auth/rbac.js';
+import { bucketCan } from '../auth/can.js';
 
 const BUCKET = '/admin/api/buckets/:id';
 
@@ -54,10 +54,7 @@ export const scheduledBucketGuard = new Elysia({
 			if (typeof id !== 'string') return;
 			const bucket = await getBucketStore().find(id);
 			if (!bucket?.deletion) return;
-			const access = holdsBucket(admin, bucket)
-				? NO_PROJECT_REACH
-				: await projectReach(admin);
-			if (!bucketCan(admin, bucket, access).read) return;
+			if (!bucketCan(admin, bucket).read) return;
 			throw scheduledForDeletion(bucket.deletion.purgeAt);
 		}
 	);

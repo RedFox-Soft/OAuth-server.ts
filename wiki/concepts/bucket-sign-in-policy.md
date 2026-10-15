@@ -4,7 +4,7 @@ title: "Bucket sign-in policy: refusals first, then a counted preview to confirm
 tags: [architecture, contract]
 sources: [oauth-server-codebase]
 created: 2026-10-11
-updated: 2026-10-12
+updated: 2026-10-15
 ---
 
 # Bucket sign-in policy
@@ -44,8 +44,9 @@ Nothing is audited for any 409: the entry is written only when the change applie
 | `totpRequired` false → true, while passwords stay on | `authenticatorOn` | "N password users have no authenticator yet; they set one up at their next sign-in." | `passwordWithoutAuthenticator` |
 | `registrationOpen` false → true, on the default or the administrators' bucket only | `signUpOpen` | "Anyone who can reach the sign-in page can create an account." (an administrator account, on the console's bucket) | none |
 
-On the default bucket (`redfox`) every preview adds "This changes sign-in for N projects." with
-`expect.projects` (`sign_in_preview.ts:158`).
+On the default bucket (`redfox`) every preview adds "This changes sign-in for N applications." with
+`expect.applications` (`sign_in_preview.ts:154-158`) — N projects and `expect.projects` until spec 099 removed
+projects.
 
 Not previewed: renaming, the verification method, closing sign-up, turning any requirement off, and opening
 sign-up on an ordinary bucket. Opening sign-up is what an ordinary bucket is for. On the two buckets served
@@ -98,10 +99,10 @@ The counts come from `tally(options)` on every user store (memory, MongoDB, Post
 Inactive and locked accounts are counted, as in the rest of the tally. `signInCounts(bucket)`
 (`sign_in_preview.ts:50`) feeds both the bucket summary and the preview, so the numbers shown under the
 console's switches are the numbers a confirmation has to repeat. The summary
-(`GET /admin/api/buckets/:id/summary`, `routes.ts:777`) adds `withoutEnabledLink`,
-`passwordWithoutAuthenticator`, and, on the default bucket only, `projects`. `projects` counts projects
-whose `bucketId` is `redfox` (it also counted an empty one until spec 098 made every project name a
-bucket).
+(`GET /admin/api/buckets/:id/summary`, `routes.ts:850`) adds `withoutEnabledLink`,
+`passwordWithoutAuthenticator`, and, on the default bucket only, `applications`: the clients whose stored
+`bucketId` is `redfox` (`applicationsAtTheDefault`, `sign_in_preview.ts:64-68`). Until spec 099 it was
+`projects`, counting projects whose `bucketId` was `redfox`.
 
 ## Verification needs mail, on every bucket
 

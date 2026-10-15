@@ -7,6 +7,10 @@ import {
 	deleteClientRecord
 } from 'lib/admin/clients/service.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
+import { DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
+
+// The bucket every client here is created in; the service takes it from the route, never the body.
+const BUCKET_ID = DEFAULT_BUCKET_ID;
 
 /**
  * @proves A client gets the credential its authentication method needs and no other, defaults to
@@ -14,7 +18,7 @@ import { ApplicationConfig } from 'lib/configs/application.js';
  */
 describe('admin client service', () => {
 	it('creates a public client (no secret) with derived response types', async () => {
-		const { view, secret } = await createClient({
+		const { view, secret } = await createClient(BUCKET_ID, {
 			clientName: 'SPA',
 			applicationType: 'web',
 			grantTypes: ['authorization_code', 'refresh_token'],
@@ -29,7 +33,7 @@ describe('admin client service', () => {
 	});
 
 	it('defaults requireConsent to true when not specified (secure default)', async () => {
-		const { view } = await createClient({
+		const { view } = await createClient(BUCKET_ID, {
 			clientName: 'Default Consent',
 			grantTypes: ['authorization_code'],
 			redirectUris: ['https://consent-default.example.com/cb'],
@@ -39,7 +43,7 @@ describe('admin client service', () => {
 	});
 
 	it('allows opting out of consent via requireConsent: false', async () => {
-		const { view } = await createClient({
+		const { view } = await createClient(BUCKET_ID, {
 			clientName: 'No Consent',
 			grantTypes: ['authorization_code'],
 			redirectUris: ['https://consent-optout.example.com/cb'],
@@ -50,7 +54,7 @@ describe('admin client service', () => {
 	});
 
 	it('lets people choose permissions once an administrator turns it on', async () => {
-		const { view } = await createClient({
+		const { view } = await createClient(BUCKET_ID, {
 			clientName: 'Assistant',
 			grantTypes: ['authorization_code'],
 			redirectUris: ['https://partial-on.example.com/cb'],
@@ -64,7 +68,7 @@ describe('admin client service', () => {
 	});
 
 	it('keeps partial consent through an edit that does not name it', async () => {
-		const { view } = await createClient({
+		const { view } = await createClient(BUCKET_ID, {
 			clientName: 'Assistant',
 			grantTypes: ['authorization_code'],
 			redirectUris: ['https://partial-kept.example.com/cb'],
@@ -80,7 +84,7 @@ describe('admin client service', () => {
 	});
 
 	it('creates a confidential client and returns the secret once', async () => {
-		const { view, secret } = await createClient({
+		const { view, secret } = await createClient(BUCKET_ID, {
 			clientName: 'Server',
 			grantTypes: ['client_credentials'],
 			tokenEndpointAuthMethod: 'client_secret_basic'
@@ -96,7 +100,7 @@ describe('admin client service', () => {
 	});
 
 	it('rejects rotating the secret of a public client', async () => {
-		const { view } = await createClient({
+		const { view } = await createClient(BUCKET_ID, {
 			grantTypes: ['authorization_code'],
 			redirectUris: ['https://a.example.com/cb'],
 			tokenEndpointAuthMethod: 'none'
@@ -105,7 +109,7 @@ describe('admin client service', () => {
 	});
 
 	it('updates redirect uris and preserves the secret', async () => {
-		const { view, secret } = await createClient({
+		const { view, secret } = await createClient(BUCKET_ID, {
 			grantTypes: ['authorization_code'],
 			redirectUris: ['https://one.example.com/cb'],
 			tokenEndpointAuthMethod: 'client_secret_basic'
@@ -118,7 +122,7 @@ describe('admin client service', () => {
 	});
 
 	it('drops the secret when a confidential client switches to auth method none', async () => {
-		const { view, secret } = await createClient({
+		const { view, secret } = await createClient(BUCKET_ID, {
 			grantTypes: ['authorization_code'],
 			redirectUris: ['https://three.example.com/cb'],
 			tokenEndpointAuthMethod: 'client_secret_basic'
@@ -133,7 +137,7 @@ describe('admin client service', () => {
 	});
 
 	it('mints a secret when a public client switches to a confidential auth method', async () => {
-		const { view } = await createClient({
+		const { view } = await createClient(BUCKET_ID, {
 			grantTypes: ['authorization_code'],
 			redirectUris: ['https://four.example.com/cb'],
 			tokenEndpointAuthMethod: 'none'
@@ -154,7 +158,7 @@ describe('admin client service', () => {
 
 		it('creates a CIBA client with a poll delivery mode', async () => {
 			ApplicationConfig['ciba.enabled'] = true;
-			const { view, secret } = await createClient({
+			const { view, secret } = await createClient(BUCKET_ID, {
 				clientName: 'CIBA Client',
 				grantTypes: ['urn:openid:params:grant-type:ciba'],
 				tokenEndpointAuthMethod: 'client_secret_basic',
@@ -192,7 +196,7 @@ describe('admin client service', () => {
 		});
 
 		it('persists the permitted authorization types on create and reads them back', async () => {
-			const { view } = await createClient({
+			const { view } = await createClient(BUCKET_ID, {
 				clientName: 'RAR client',
 				grantTypes: ['authorization_code'],
 				redirectUris: ['https://rar-create.example.com/cb'],
@@ -206,7 +210,7 @@ describe('admin client service', () => {
 		});
 
 		it('updates the permitted authorization types and preserves them across an unrelated patch', async () => {
-			const { view } = await createClient({
+			const { view } = await createClient(BUCKET_ID, {
 				clientName: 'RAR update',
 				grantTypes: ['authorization_code'],
 				redirectUris: ['https://rar-update.example.com/cb'],
@@ -228,7 +232,7 @@ describe('admin client service', () => {
 		// Delegated validation: the type must be one the server is configured to accept.
 		it('refuses a type that is not configured', async () => {
 			await expect(
-				createClient({
+				createClient(BUCKET_ID, {
 					clientName: 'RAR bad type',
 					grantTypes: ['authorization_code'],
 					redirectUris: ['https://rar-bad.example.com/cb'],
@@ -249,7 +253,7 @@ describe('admin client service', () => {
 			ApplicationConfig['richAuthorizationRequests.enabled'] = false;
 			ApplicationConfig['richAuthorizationRequests.types'] = {};
 
-			const { view } = await createClient({
+			const { view } = await createClient(BUCKET_ID, {
 				clientName: 'RAR off',
 				grantTypes: ['authorization_code'],
 				redirectUris: ['https://rar-off.example.com/cb'],

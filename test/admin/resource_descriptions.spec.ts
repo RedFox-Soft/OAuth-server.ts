@@ -8,7 +8,6 @@ import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
 	adminAuditStore,
 	getBucketStore,
-	getProjectStore,
 	getProtectedResourceStore
 } from 'lib/adapters/index.ts';
 import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
@@ -36,16 +35,10 @@ async function declarer() {
 		slug: `described-${Math.random().toString(36).slice(2)}`,
 		ownerGroupId
 	});
-	const project = await getProjectStore().create({
-		name: 'Described',
-		slug: `described-${Math.random().toString(36).slice(2)}`,
-		ownerGroupId,
-		bucketId: bucket._id
-	});
 	return {
 		headers: { cookie: `${ADMIN_SESSION_COOKIE}=${session._id}` },
 		userId: user._id,
-		resources: api.admin.api.projects({ id: project._id }).resources
+		resources: api.admin.api.buckets({ id: bucket._id }).resources
 	};
 }
 

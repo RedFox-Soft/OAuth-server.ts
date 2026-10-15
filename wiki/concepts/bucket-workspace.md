@@ -4,7 +4,7 @@ title: "The bucket workspace: an Overview that says what needs attention, a Sett
 tags: [architecture, admin, console, contract]
 sources: [oauth-server-codebase]
 created: 2026-10-11
-updated: 2026-10-12
+updated: 2026-10-15
 ---
 
 # The bucket workspace
@@ -28,18 +28,20 @@ and create only; each group, provider and connection has a page of its own
   (since spec 088, [[scim-credential-overlap]]); a host no
   request has reached; email verification required while the server cannot send mail; an authenticator
   required while password sign-in is off; a bucket owned by the System group (super administrators only); a
-  bucket no project uses; a bucket with no address of its own. Each item links to where it is fixed. With
+  bucket no application signs in to yet (no project used, until spec 099; `BucketOverview.tsx:207-222`); a
+  bucket with no address of its own. Each item links to where it is fixed. With
   none, nothing is drawn: an "all good" card is one people learn to ignore.
 - **Connection details**: the issuer and discovery addresses, copyable. The server sends them
   (`issuer`, `discoveryUrl` on `GET /admin/api/buckets/:id`) because the browser bundle may not know the
   server's own address (`lib/configs/issuer.ts`). Unaddressed buckets get `null`, not an issuer that 404s.
 - **Sign-in at a glance**, read-only, with one link to change it, and the numbers.
+- Since spec 099 the bucket's details say what it **holds**: its applications and APIs, counted, each count a
+  link to its tab (`BucketOverview.tsx:329-345`). **Applications** and **APIs** are tabs of the bucket
+  (`BucketDetail.tsx:61-62`), reusing the client and resource pages against `/admin/api/buckets/:id`
+  ([[bucket-is-the-only-container]]). Spec 085's **Used by** (the projects, with **Use in a project…**) and
+  **Protected resources** (the namespace's declarations with the project that made each) went with the
+  projects.
 - Since spec 085:
-  - **Used by** lists the projects read-only. **Use in a project…** picks a project of the same group and opens
-    that project's Bucket card with this bucket chosen. The project owns the field, so the change and its
-    preview happen there ([[container-ownership-transfer]]).
-  - **Protected resources** lists every resource declared in the bucket's namespace, with the project that
-    declared it (`GET /admin/api/buckets/:id/resources`, [[mcp-server-authorization]]).
   - **Recent changes** shows the bucket's five latest audit entries (`bucket=<id>`, [[admin-audit-trail]]). It
     is shown only to editors and super administrators: a users-only caller would see a partial history that
     looks complete.
@@ -49,7 +51,8 @@ new adapter read, `UserStoreInstance.tally()` (`lib/adapters/types.ts:477`): tot
 authenticator, without any linked identity — counted the same way on every backend (absent and empty
 `federated` both count as unlinked) and verified on real MongoDB and PostgreSQL. Spec 083 added two counts
 the sign-in preview confirms against — without a link to an *enabled* provider, and password users without an
-authenticator — and, on the default bucket, the projects signing in there ([[bucket-sign-in-policy]]). Users active this month
+authenticator — and, on the default bucket, the applications signing in there (`applications`; `projects`
+until spec 099) ([[bucket-sign-in-policy]]). Users active this month
 appear only to a caller who may read the bucket's activity, and are absent, not zero, before counting began.
 
 ## Rights that depend on the bucket's state
@@ -57,8 +60,9 @@ appear only to a caller who may read the bucket's activity, and are absent, not 
 Two owner decisions made two rights state-aware (`lib/admin/auth/can.ts:205`):
 
 - **`changeAddress`**: a super administrator, or an owner of the bucket's group while the bucket is served at a
-  path (or has no address) and nothing depends on it — no project (counted across the instance, not only the
-  ones the caller sees), no identity provider, no provisioning connection. A host target is super-administrator
+  path (or has no address) and nothing depends on it — no application in it, a self-registered one included
+  (`dependentsOf`, `lib/admin/buckets/routes.ts:372-385`; a project, until spec 099), no identity provider, no
+  provisioning connection. A host target is super-administrator
   only, checked in the route because `can` is per bucket, not per target.
 - **`delete`**: as before, plus: a bucket that still holds accounts only for an owner of its group or a super
   administrator.
@@ -71,8 +75,9 @@ nothing new. `blockers.dependents` and `blockers.accounts` carry the facts so th
 
 ## The Danger zone
 
-- **Change address…** previews by name (applications with their projects, connections, providers with their
-  new callback address, resources) and commits only with the preview's counts (`expect`). A change in between
+- **Change address…** previews by name (applications, connections, providers with their new callback address,
+  resources — `applications: {clientId, name}[]` and `resources: {identifier, name}[]` since spec 099, which
+  dropped the project beside each application) and commits only with the preview's counts (`expect`). A change in between
   is refused with a fresh preview — never applied silently. The audit entry now carries the owning group, so an
   owner sees their own change in their trail.
 - **Delete bucket…** reads the account count when the dialog opens (`DeleteBucketDialog.tsx`, shared with the

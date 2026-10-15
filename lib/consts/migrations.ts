@@ -23,12 +23,13 @@ import {
 	DEFAULT_BUCKET_ID,
 	isServedAtTheRoot,
 	SUPER_ADMINS_GROUP_ID,
-	SUPER_ADMINS_GROUP_NAME
+	SUPER_ADMINS_GROUP_NAME,
+	UNASSIGNED_GROUP_ID
 } from '../admin/consts.js';
 import { displayNameKeyOf, membershipIdOf } from '../adapters/end_user_keys.js';
 import { declarationId, ROOT_NAMESPACE } from '../resources/declaration_id.js';
 import { ROOT_KEY_OWNER } from './key_owner.js';
-import { isList, member } from '../helpers/_/object.js';
+import { isList, isRecord, member } from '../helpers/_/object.js';
 import { auditTargetTypeFor, MIGRATION_ACTOR } from './admin_audit_routes.js';
 
 /*
@@ -106,6 +107,13 @@ function namespaceFor(
 
 type Doc = Record<string, unknown>;
 
+/*
+ * Where projects lived before the bucket became the only container (specs/099). Named here, by its literal,
+ * because the area is gone from the inventory: the migrations that read it are its only readers, and the
+ * collection or table stays on disk, since provisioning never drops anything.
+ */
+export const LEGACY_PROJECTS_AREA = 'projects';
+
 /* The part of the MongoDB driver's `Db` the step uses — declared structurally so this module imports no
  * driver. */
 interface MongoHandle {
@@ -143,7 +151,7 @@ const namespacedProtectedResources: Migration = {
 			for (const record of legacy) {
 				const identifier = String(record._id);
 				const project = await db
-					.collection(STORE_AREAS.projects)
+					.collection(LEGACY_PROJECTS_AREA)
 					.findOne({ _id: record.projectId });
 				const bucket =
 					typeof project?.bucketId === 'string'
@@ -175,7 +183,7 @@ const namespacedProtectedResources: Migration = {
 				const doc = row.doc as Doc;
 				const project = (
 					await sql`
-					SELECT doc FROM ${sql(STORE_AREAS.projects)} WHERE id = ${String(doc.projectId)}
+					SELECT doc FROM ${sql(LEGACY_PROJECTS_AREA)} WHERE id = ${String(doc.projectId)}
 				`
 				).at(0);
 				const bucketId = (project?.doc as Doc | undefined)?.bucketId;
@@ -1049,7 +1057,7 @@ const projectsRequireBucket: Migration = {
 			// The runner passes the selected backend's handle; for MongoDB that is the driver's `Db`.
 			const db = handle as MongoHandle;
 			const result = await db
-				.collection(STORE_AREAS.projects)
+				.collection(LEGACY_PROJECTS_AREA)
 				.updateMany(
 					{ bucketId: null },
 					{ $set: { bucketId: DEFAULT_BUCKET_ID, updatedAt: new Date() } }
@@ -1062,12 +1070,329 @@ const projectsRequireBucket: Migration = {
 			// The runner passes the selected backend's handle; for PostgreSQL that is Bun's SQL client.
 			const sql = handle as PostgresHandle;
 			const rows = await sql`
-				UPDATE ${sql(STORE_AREAS.projects)}
+				UPDATE ${sql(LEGACY_PROJECTS_AREA)}
 				SET doc = doc || ${{ bucketId: DEFAULT_BUCKET_ID, updatedAt: new Date() }}
 				WHERE doc->'bucketId' IS NULL OR doc->'bucketId' = 'null'::jsonb
 				RETURNING id
 			`;
 			return projectsGivenABucketReport(rows.length);
+		}
+	}
+};
+
+/*
+ * The bucket becomes the only container (specs/099). Every fact a project held moves to what it held: its
+ * bucket and its origins to each of its clients, its bucket to each of its declarations. A self-registered
+ * client's `registeredAtBucket` becomes the same `bucketId`.
+ *
+ * Planned once from the projects as stored, then applied per backend, so both halves decide alike. The plan
+ * refuses before anything is written when a client is listed by projects on different buckets: there is no
+ * bucket it could honestly be given, and the server reading it today answers arbitrarily.
+ *
+ * A client listed by a project on the Default bucket that belonged to a tenant group loses its consent
+ * waiver: the Default bucket is the System group's, and keeping a tenant's "skip consent" there would waive
+ * consent across the shared population.
+ */
+interface ClientPlan {
+	readonly bucketId: string;
+	readonly corsOrigins: readonly string[];
+	readonly requireConsent: boolean;
+}
+
+interface ProjectRemovalPlan {
+	readonly clients: ReadonlyMap<string, ClientPlan>;
+	readonly resourceBuckets: ReadonlyMap<string, string>;
+	readonly report: string[];
+}
+
+function stringsOf(value: unknown): string[] {
+	return isList(value)
+		? value.filter((item): item is string => typeof item === 'string')
+		: [];
+}
+
+function createdOf(project: Doc): number {
+	const created = project.createdAt;
+	if (created instanceof Date) return created.getTime();
+	if (typeof created === 'string') return Date.parse(created) || 0;
+	return 0;
+}
+
+function planProjectRemoval(
+	projects: readonly Doc[],
+	declaringProjectIds: readonly string[]
+): ProjectRemovalPlan {
+	const ordered = [...projects].sort(
+		(a, b) =>
+			createdOf(a) - createdOf(b) || String(a._id).localeCompare(String(b._id))
+	);
+	const bucketsOf = new Map<string, Set<string>>();
+	const clients = new Map<string, ClientPlan>();
+	const resourceBuckets = new Map<string, string>();
+	const projectsPerBucket = new Map<string, string[]>();
+	let sharedOneBucket = 0;
+
+	for (const project of ordered) {
+		const bucketId = project.bucketId;
+		if (typeof bucketId !== 'string') continue;
+		const projectId = String(project._id);
+		resourceBuckets.set(projectId, bucketId);
+		projectsPerBucket.set(bucketId, [
+			...(projectsPerBucket.get(bucketId) ?? []),
+			projectId
+		]);
+		const requireConsent =
+			bucketId === DEFAULT_BUCKET_ID &&
+			project.ownerGroupId !== UNASSIGNED_GROUP_ID;
+		for (const clientId of stringsOf(project.clientIds)) {
+			const seen = bucketsOf.get(clientId) ?? new Set<string>();
+			seen.add(bucketId);
+			bucketsOf.set(clientId, seen);
+			const earlier = clients.get(clientId);
+			if (earlier) {
+				sharedOneBucket += 1;
+				clients.set(clientId, {
+					...earlier,
+					requireConsent: earlier.requireConsent || requireConsent
+				});
+				continue;
+			}
+			clients.set(clientId, {
+				bucketId,
+				corsOrigins: stringsOf(project.corsOrigins),
+				requireConsent
+			});
+		}
+	}
+
+	const ambiguous = [...bucketsOf]
+		.filter(([, buckets]) => buckets.size > 1)
+		.map(([clientId]) => clientId);
+	if (ambiguous.length > 0) {
+		throw new Error(
+			`clients listed by projects on different buckets, so none can be given one: ${ambiguous.join(', ')} — remove each from all projects but one, then run again`
+		);
+	}
+
+	const declaring = new Set(declaringProjectIds);
+	const widened = [...projectsPerBucket.values()].filter(
+		(ids) => ids.length > 1 && ids.some((id) => declaring.has(id))
+	).length;
+	return {
+		clients,
+		resourceBuckets,
+		report: [
+			`clients listed by several projects of one bucket (origins taken from the earliest): ${String(sharedOneBucket)}`,
+			`buckets where machine tokens now reach every administrator-created client: ${String(widened)}`
+		]
+	};
+}
+
+/*
+ * The client's payload after the change, or null when it is already there. Every write is conditional on
+ * the target being absent, which is what makes a second application change nothing.
+ */
+function migratedClient(
+	payload: Doc,
+	plan: ClientPlan | undefined
+): Doc | null {
+	const next: Doc = { ...payload };
+	let changed = false;
+	if (plan) {
+		if (next.bucketId === undefined) {
+			next.bucketId = plan.bucketId;
+			changed = true;
+		}
+		if (plan.corsOrigins.length > 0 && next.corsOrigins === undefined) {
+			next.corsOrigins = [...plan.corsOrigins];
+			changed = true;
+		}
+		if (plan.requireConsent && next['consent.require'] !== true) {
+			next['consent.require'] = true;
+			changed = true;
+		}
+	}
+	if (typeof next.registeredAtBucket === 'string') {
+		next.bucketId ??= next.registeredAtBucket;
+		delete next.registeredAtBucket;
+		changed = true;
+	}
+	return changed ? next : null;
+}
+
+function resourceBucketOf(
+	doc: Doc,
+	plan: ProjectRemovalPlan
+): { bucketId: string; orphaned: boolean } {
+	if (typeof doc.bucketId === 'string') {
+		return { bucketId: doc.bucketId, orphaned: false };
+	}
+	const fromProject = plan.resourceBuckets.get(String(doc.projectId));
+	if (fromProject) return { bucketId: fromProject, orphaned: false };
+	const namespace = doc.namespace;
+	return {
+		bucketId:
+			typeof namespace === 'string' && namespace !== ROOT_NAMESPACE
+				? namespace
+				: DEFAULT_BUCKET_ID,
+		orphaned: true
+	};
+}
+
+interface RemovalCounts {
+	clients: number;
+	ghosts: number;
+	consent: number;
+	resources: number;
+	orphans: number;
+}
+
+function countClientChange(counts: RemovalCounts, before: Doc, next: Doc) {
+	if (before.bucketId === undefined && next.bucketId !== undefined) {
+		counts.clients += 1;
+	}
+	if (before['consent.require'] !== true && next['consent.require'] === true) {
+		counts.consent += 1;
+	}
+}
+
+function projectRemovalReport(
+	plan: ProjectRemovalPlan,
+	counts: RemovalCounts
+): string[] {
+	return [
+		`clients given their bucket: ${String(counts.clients)}`,
+		`client ids listed by a project with no stored client: ${String(counts.ghosts)}`,
+		`clients whose consent waiver was turned off: ${String(counts.consent)}`,
+		`declarations given their bucket: ${String(counts.resources)}`,
+		`declarations whose project was missing: ${String(counts.orphans)}`,
+		...plan.report
+	];
+}
+
+/* A client is a model document: its fields are under `payload` on both backends. */
+const CLIENT_AREA = 'Client';
+
+const removeProjects: Migration = {
+	id: '2026-10-16-remove-projects',
+	description:
+		'Move what each project held to its clients and declarations — the bucket and the allowed origins — and retire projects',
+	reversible: false,
+	rerunnable:
+		'A client or declaration gains a bucket only where it has none, a client gains origins only where it has none, and a dynamic client loses `registeredAtBucket` only once it is copied; the plan is read from the projects, which are never written, so a second application finds nothing to change.',
+	mongodb: {
+		async apply(handle) {
+			// The runner passes the selected backend's handle; for MongoDB that is the driver's `Db`.
+			const db = handle as MongoHandle;
+			const resources = db.collection(STORE_AREAS.protectedResources);
+			const unmigrated = await resources
+				.find({ projectId: { $exists: true } })
+				.toArray();
+			const plan = planProjectRemoval(
+				await db.collection(LEGACY_PROJECTS_AREA).find({}).toArray(),
+				unmigrated.map((doc) => String(doc.projectId))
+			);
+			const counts: RemovalCounts = {
+				clients: 0,
+				ghosts: 0,
+				consent: 0,
+				resources: 0,
+				orphans: 0
+			};
+			const area = db.collection(CLIENT_AREA);
+			const dynamic = await area
+				.find({ 'payload.registeredAtBucket': { $exists: true } })
+				.toArray();
+			const ids = new Set([
+				...plan.clients.keys(),
+				...dynamic.map((doc) => String(doc._id))
+			]);
+			for (const id of ids) {
+				const stored = await area.findOne({ _id: id });
+				const before = member(stored, 'payload');
+				if (!isRecord(before)) {
+					counts.ghosts += 1;
+					continue;
+				}
+				const next = migratedClient(before, plan.clients.get(id));
+				if (!next) continue;
+				countClientChange(counts, before, next);
+				// The whole payload: `consent.require` is one key with a dot in it, which a `$set` path would split.
+				await area.updateOne({ _id: id }, { $set: { payload: next } }, {});
+			}
+			for (const doc of unmigrated) {
+				const { bucketId, orphaned } = resourceBucketOf(doc, plan);
+				await resources.updateOne(
+					{ _id: doc._id },
+					{ $set: { bucketId }, $unset: { projectId: '' } },
+					{}
+				);
+				counts.resources += 1;
+				if (orphaned) counts.orphans += 1;
+			}
+			return projectRemovalReport(plan, counts);
+		}
+	},
+	postgres: {
+		async apply(handle) {
+			// The runner passes the selected backend's handle; for PostgreSQL that is Bun's SQL client.
+			const sql = handle as PostgresHandle;
+			const present = await sql`
+				SELECT 1 FROM information_schema.tables WHERE table_name = ${LEGACY_PROJECTS_AREA}
+			`;
+			const projects =
+				present.length === 0
+					? []
+					: (await sql`SELECT doc FROM ${sql(LEGACY_PROJECTS_AREA)}`).map(
+							(row) => row.doc as Doc
+						);
+			const resourceArea = sql(STORE_AREAS.protectedResources);
+			const unmigrated = await sql`
+				SELECT id, doc FROM ${resourceArea} WHERE doc ? 'projectId'
+			`;
+			const plan = planProjectRemoval(
+				projects,
+				unmigrated.map((row) => String((row.doc as Doc).projectId))
+			);
+			const counts: RemovalCounts = {
+				clients: 0,
+				ghosts: 0,
+				consent: 0,
+				resources: 0,
+				orphans: 0
+			};
+			const area = sql(CLIENT_AREA);
+			const dynamic = await sql`
+				SELECT id FROM ${area} WHERE payload ? 'registeredAtBucket'
+			`;
+			const ids = new Set([
+				...plan.clients.keys(),
+				...dynamic.map((row) => String(row.id))
+			]);
+			for (const id of ids) {
+				const stored = (
+					await sql`SELECT payload FROM ${area} WHERE id = ${id}`
+				).at(0);
+				const before = member(stored, 'payload');
+				if (!isRecord(before)) {
+					counts.ghosts += 1;
+					continue;
+				}
+				const next = migratedClient(before, plan.clients.get(id));
+				if (!next) continue;
+				countClientChange(counts, before, next);
+				await sql`UPDATE ${area} SET payload = ${next} WHERE id = ${id}`;
+			}
+			for (const row of unmigrated) {
+				const { bucketId, orphaned } = resourceBucketOf(row.doc as Doc, plan);
+				await sql`
+					UPDATE ${resourceArea} SET doc = (doc - 'projectId') || ${{ bucketId }}
+					WHERE id = ${String(row.id)}
+				`;
+				counts.resources += 1;
+				if (orphaned) counts.orphans += 1;
+			}
+			return projectRemovalReport(plan, counts);
 		}
 	}
 };
@@ -1078,5 +1403,6 @@ export const MIGRATIONS: readonly Migration[] = [
 	rolesToGroups,
 	personalGroupsSingleMember,
 	staticTokenExpiry,
-	projectsRequireBucket
+	projectsRequireBucket,
+	removeProjects
 ];

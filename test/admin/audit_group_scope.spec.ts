@@ -4,7 +4,7 @@ import { treaty } from '@elysiajs/eden';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { auditRoutes } from 'lib/admin/audit/routes.ts';
 import { groupRoutes } from 'lib/admin/groups/routes.ts';
-import { projectRoutes } from 'lib/admin/projects/routes.ts';
+import { clientRoutes } from 'lib/admin/clients/routes.ts';
 import { bucketRoutes } from 'lib/admin/buckets/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
@@ -14,7 +14,7 @@ import { answered } from './answered.ts';
 import { present } from 'test/shape.js';
 import { createAdministrator, type AdminKind } from '../administrators.ts';
 import {
-	bucketWithProjects,
+	bucketWithClients,
 	cookieFor,
 	regularGroup
 } from './ownership_fixtures.ts';
@@ -22,7 +22,7 @@ import {
 /*
  * The tenant boundary of the audit trail.
  *
- * A group must be able to answer "who changed this, and when" about its own containers without the
+ * A group must be able to answer "who changed this, and when" about its own buckets without the
  * operator, and must not be able to retrieve anything about another group by any combination of
  * filters. The second half is the one that needs testing hardest: the restriction is applied where
  * entries are selected, and a bug there answers 200 with somebody else's history.
@@ -31,7 +31,7 @@ const app = new Elysia()
 	.use(resolveAdmin)
 	.use(auditRoutes)
 	.use(groupRoutes)
-	.use(projectRoutes);
+	.use(clientRoutes);
 const client = treaty(app);
 
 function slug(prefix: string): string {
@@ -42,38 +42,52 @@ async function tenant(kind: AdminKind = 'plain') {
 	const user = await createAdministrator(kind, `${slug('a')}@x.io`);
 	const session = await sessionFor(user);
 	const cookie = `${ADMIN_SESSION_COOKIE}=${session._id}`;
-	/* Every project names a bucket of its group (specs/098); each tenant starts with one. */
+	/* Each tenant starts with a bucket of its own group, to hold the applications it registers. */
+	const groupId = await personalGroupId(user._id);
 	const bucket = await getBucketStore().create({
 		name: 'Own',
-		ownerGroupId: await personalGroupId(user._id)
+		ownerGroupId: groupId
 	});
-	return { userId: user._id, cookie, bucketId: bucket._id };
+	return { userId: user._id, cookie, bucketId: bucket._id, groupId };
+}
+
+/* An application registered by `who` in their own bucket. */
+async function application(
+	who: { bucketId: string; cookie: string },
+	name: string
+) {
+	return answered(
+		(
+			await client.admin.api.buckets({ id: who.bucketId }).clients.post(
+				{
+					clientName: name,
+					grantTypes: ['authorization_code'],
+					tokenEndpointAuthMethod: 'client_secret_basic',
+					redirectUris: ['https://rp.example.com/cb']
+				},
+				{ headers: { cookie: who.cookie } }
+			)
+		).data
+	);
 }
 
 /**
- * @proves A project administrator reads the trail of the containers their groups own and nothing
- * else, under every filter and after the container is gone.
+ * @proves An administrator reads the trail of the buckets their groups own, and of the applications
+ * those buckets hold, and nothing else, under every filter and after the application is gone.
  */
 describe('group-scoped audit read', () => {
 	beforeEach(async () => {
 		await ensureAdminSeed();
 	});
 
-	it('shows a group its own container history', async () => {
+	it('shows a group the history of an application in its own bucket', async () => {
 		const a = await tenant();
-		const project = answered(
-			(
-				await client.admin.api.projects.post(
-					{ name: 'Mine', slug: slug('m'), bucketId: a.bucketId },
-					{ headers: { cookie: a.cookie } }
-				)
-			).data
-		);
+		const mine = await application(a, 'Mine');
 
 		const page = answered(
 			(
 				await client.admin.api.audit.get({
-					query: { targetId: project._id },
+					query: { targetId: mine.clientId },
 					headers: { cookie: a.cookie }
 				})
 			).data
@@ -81,25 +95,18 @@ describe('group-scoped audit read', () => {
 
 		expect(page.total).toBe(1);
 		expect(present(page.entries[0], 'page.entries[0]').action).toBe(
-			'project.create'
+			'client.create'
 		);
-		expect(
-			present(page.entries[0], 'page.entries[0]').ownerGroupId
-		).toBeString();
+		expect(present(page.entries[0], 'page.entries[0]').ownerGroupId).toBe(
+			a.groupId
+		);
 	});
 
 	it('hides another group’s history under every filter, including a direct one', async () => {
 		const a = await tenant();
 		const b = await tenant();
 
-		const theirs = answered(
-			(
-				await client.admin.api.projects.post(
-					{ name: 'Theirs', slug: slug('t'), bucketId: b.bucketId },
-					{ headers: { cookie: b.cookie } }
-				)
-			).data
-		);
+		const theirs = await application(b, 'Theirs');
 
 		// Unfiltered.
 		const all = answered(
@@ -110,13 +117,13 @@ describe('group-scoped audit read', () => {
 				})
 			).data
 		);
-		expect(JSON.stringify(all.entries)).not.toContain(theirs._id);
+		expect(JSON.stringify(all.entries)).not.toContain(theirs.clientId);
 
-		// Aimed straight at the other tenant's container.
+		// Aimed straight at the other tenant's application.
 		const aimed = answered(
 			(
 				await client.admin.api.audit.get({
-					query: { targetId: theirs._id },
+					query: { targetId: theirs.clientId },
 					headers: { cookie: a.cookie }
 				})
 			).data
@@ -127,15 +134,15 @@ describe('group-scoped audit read', () => {
 		const byAction = answered(
 			(
 				await client.admin.api.audit.get({
-					query: { action: 'project.create' },
+					query: { action: 'client.create' },
 					headers: { cookie: a.cookie }
 				})
 			).data
 		);
-		expect(JSON.stringify(byAction.entries)).not.toContain(theirs._id);
+		expect(JSON.stringify(byAction.entries)).not.toContain(theirs.clientId);
 	});
 
-	it('keeps instance-wide entries out of a project administrator’s reach', async () => {
+	it('keeps instance-wide entries out of a tenant administrator’s reach', async () => {
 		const a = await tenant();
 
 		/*
@@ -165,52 +172,39 @@ describe('group-scoped audit read', () => {
 		expect(res.status).toBe(422);
 	});
 
-	it('keeps an entry readable after the container it describes is gone', async () => {
+	it('keeps an entry readable after the application it describes is gone', async () => {
 		const a = await tenant();
-		const project = answered(
-			(
-				await client.admin.api.projects.post(
-					{ name: 'Doomed', slug: slug('d'), bucketId: a.bucketId },
-					{ headers: { cookie: a.cookie } }
-				)
-			).data
-		);
+		const doomed = await application(a, 'Doomed');
 
 		const deleted = await client.admin.api
-			.projects({ id: project._id })
+			.buckets({ id: a.bucketId })
+			.clients({ clientId: doomed.clientId })
 			.delete(undefined, { headers: { cookie: a.cookie } });
 		expect(deleted.status).toBe(200);
 
 		const page = answered(
 			(
 				await client.admin.api.audit.get({
-					query: { targetId: project._id },
+					query: { targetId: doomed.clientId },
 					headers: { cookie: a.cookie }
 				})
 			).data
 		);
 
 		// Creation and deletion both survive: the entry carries its group, so it does not depend on the
-		// container still existing to be attributed.
+		// application still existing to be attributed.
 		expect(page.total).toBe(2);
 	});
 
 	it('serves a super administrator the whole trail', async () => {
 		const su = await tenant('super');
 		const a = await tenant();
-		const project = answered(
-			(
-				await client.admin.api.projects.post(
-					{ name: 'Someone else’s', slug: slug('x'), bucketId: a.bucketId },
-					{ headers: { cookie: a.cookie } }
-				)
-			).data
-		);
+		const theirs = await application(a, 'Someone else’s');
 
 		const page = answered(
 			(
 				await client.admin.api.audit.get({
-					query: { targetId: project._id },
+					query: { targetId: theirs.clientId },
 					headers: { cookie: su.cookie }
 				})
 			).data
@@ -226,7 +220,7 @@ const moveApp = new Elysia()
 const moveClient = treaty(moveApp);
 
 /**
- * @proves A container moved between groups is in the trail of the group it left and of the group it
+ * @proves A bucket moved between groups is in the trail of the group it left and of the group it
  * joined, and of no other.
  */
 describe('audit read of a move between groups', () => {
@@ -241,7 +235,7 @@ describe('audit read of a move between groups', () => {
 		const outsider = await createAdministrator('plain', `${slug('x')}@x.io`);
 		const source = await regularGroup([owner], [leaver]);
 		const destination = await regularGroup([owner], [joiner]);
-		const { bucket } = await bucketWithProjects(source._id, 1);
+		const { bucket } = await bucketWithClients(source._id, 1);
 		await moveClient.admin.api
 			.buckets({ id: bucket._id })
 			.owner.put(

@@ -24,10 +24,9 @@ const client = treaty(app);
 describe('admin API error shape', () => {
 	it('returns an admin-shaped validation error, not an OAuth body', async () => {
 		// name (minLength 1) and slug (pattern) are both invalid values → VALIDATION.
-		const res = await client.admin.api.projects.post({
+		const res = await client.admin.api.buckets.post({
 			name: '',
-			slug: '',
-			bucketId: 'any'
+			slug: ''
 		});
 		expect(res.status).toBe(422);
 		const body = res.error?.value;
@@ -129,7 +128,7 @@ describe('admin API error shape through the real app', () => {
 	});
 
 	it('keeps the admin shape when adminApp is mounted on the root app', async () => {
-		const res = await agent.admin.api.projects.get();
+		const res = await agent.admin.api.buckets.get();
 
 		expect(res.status).toBe(401);
 		const body = shaped(

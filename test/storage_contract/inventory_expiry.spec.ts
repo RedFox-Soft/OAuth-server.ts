@@ -14,7 +14,7 @@ import {
 // The two failures this guards are opposite and both silent. An area that should expire and does not
 // grows without bound — expired verification challenges accumulating forever is the defect that
 // prompted this feature. An area that should NOT expire but does deletes production data: clients,
-// projects and buckets all carried an expiry index before this table, harmless only because they
+// projects (since removed) and buckets all carried an expiry index before this table, harmless only because they
 // never write the field it keys on. Neither shows up in a functional test.
 
 const REAPED_ON_EXPIRES_AT = [
@@ -100,11 +100,9 @@ const PERMANENT = [
 	 * drop the key an issuer is signing with, and every token it minted would stop verifying at once.
 	 */
 	'bucketKeys',
-	'projects',
 	/*
-	 * A declared protected resource outlives everything except the project that owns it. An expiry
-	 * here would stop tokens being minted for a live third-party integration with nothing to say why —
-	 * the same failure mode as an expiring project, one level down.
+	 * A declared protected resource outlives everything except the bucket that owns it. An expiry
+	 * here would stop tokens being minted for a live third-party integration with nothing to say why.
 	 */
 	'protectedResources',
 	/*
@@ -203,8 +201,9 @@ describe('storage inventory: expiry', () => {
 	});
 
 	/*
-	 * `Client` is permanent and declares one ordinary index — the one backing the sweep that reclaims
-	 * self-registered clients which never completed an authorization. What must stay absent is an
+	 * `Client` is permanent and declares ordinary indexes only — the one backing the sweep that reclaims
+	 * self-registered clients which never completed an authorization, and the one listing a bucket's
+	 * applications. What must stay absent is an
 	 * *expiry* index: a stale `expiresAt` surviving an upsert would delete an administrator-created
 	 * client, which is why that area is `reaped: null` and why the sweep exists instead. Asserted as
 	 * "no expiry index among them" rather than "no indexes at all", so the distinction is the thing
@@ -213,14 +212,6 @@ describe('storage inventory: expiry', () => {
 	it('derives no expiry index for a permanent area', () => {
 		const specs = indexesFor(areaNamed('Client'));
 
-		expect(specs).toEqual([
-			{
-				key: {
-					'payload.registeredDynamically': 1,
-					'payload.client_id_issued_at': 1
-				}
-			}
-		]);
 		expect(
 			specs.some((spec) => spec.expireAfterSeconds !== undefined)
 		).toBeFalse();

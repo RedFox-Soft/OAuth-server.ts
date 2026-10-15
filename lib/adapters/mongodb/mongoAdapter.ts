@@ -1,3 +1,4 @@
+import { assertIndexedField } from '../../consts/storage_inventory.js';
 import { db } from './db.js';
 import { ABSENT_UNDEFINED } from './write_options.js';
 import type { ModelAdapter } from '../types.js';
@@ -104,6 +105,12 @@ export class MongoAdapter<
 		return found
 			.map((document) => payloadOf(document))
 			.filter((payload): payload is StoredRecord => payload !== undefined);
+	}
+
+	/* `field` is a declared index of this area, never caller input — so the same filter, and indexed. */
+	async findByIndexed(field: string, value: string) {
+		assertIndexedField(this.name, field);
+		return this.findByOwner(field, value);
 	}
 
 	async destroyUnusedSince(

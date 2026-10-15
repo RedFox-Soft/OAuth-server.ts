@@ -307,6 +307,14 @@ export interface ModelAdapter<TPayload = unknown> {
 	 */
 	findByOwner(field: string, value: string): Promise<TPayload[]>;
 	/*
+	 * Reads every record in this area whose `field` equals `value`, as stored. The listing twin of
+	 * `findByOwner` for a field that names a container rather than a principal — a client's bucket
+	 * (specs/099) — which is not an owner the deletion engine sweeps by. `field` must be a single-field
+	 * index declared on the area in lib/consts/storage_inventory.ts, so a listing is never a scan and,
+	 * as with the owner methods, no caller-chosen name reaches a query.
+	 */
+	findByIndexed(field: string, value: string): Promise<TPayload[]>;
+	/*
 	 * Destroys every record in this area whose `markerField` is set, whose `usedField` is absent, and
 	 * whose `ageField` is older than `before`. Returns how many went.
 	 *
@@ -691,11 +699,11 @@ export const AdminAuditEntry = t.Object({
 	 */
 	formerOwnerGroupId: t.Optional(t.Union([t.String(), t.Null()])),
 	/*
-	 * The bucket a project now uses, set only by `project.bucket.assign`, and the bucket it used before, set
-	 * by an assignment that replaced one and by `project.bucket.clear` (specs/085).
+	 * The bucket an entry belongs to, and the bucket something left (specs/085). Written today by client and
+	 * resource actions (`bucketId`, specs/099); `formerBucketId` survives on the project bucket changes the
+	 * trail recorded before projects were removed, which still belong to the history of both buckets.
 	 *
-	 * A project's bucket change belongs to the history of both buckets — the one it joined and the one it
-	 * left — and neither is where the project resolves, which is what `targetScope` means. Two fields rather
+	 * Neither is where the target resolves, which is what `targetScope` means. Two fields rather
 	 * than an array because each needs an ordinary index to serve the bucket filter on every backend.
 	 *
 	 * Optional for the reason `attributes` is: no backfill, only absence on older entries.
@@ -752,8 +760,8 @@ export const AdminAuditEntry = t.Object({
 	 * and absent would otherwise say the same thing in two ways.
 	 *
 	 * Two actions carry something other than a deletion's count here (specs/075), for the same reason a
-	 * deletion does — one entry, however much went with it: a move between groups counts the projects
-	 * that moved with the bucket, and the upgrade that made personal groups personal counts the members
+	 * deletion does — one entry, however much went with it: a move between groups counts the applications
+	 * and APIs that moved with the bucket, and the upgrade that made personal groups personal counts the members
 	 * it removed. What happened to them is the action's, so a reader takes the verb from `action`.
 	 */
 	cascade: t.Optional(t.Union([t.Record(t.String(), t.Number()), t.Null()])),
@@ -819,8 +827,8 @@ export interface AdminAuditQuery {
 	viaClientId?: string;
 	/*
 	 * Everything that happened to or in one bucket (specs/085): the bucket itself as the target, anything
-	 * resolving within it (`targetScope`), and a project joining or leaving it (`bucketId`,
-	 * `formerBucketId`). A narrowing like every other filter — the group boundary above still applies.
+	 * resolving within it (`targetScope`), and an entry carrying it (`bucketId`, or
+	 * `formerBucketId` on a historical project move). A narrowing like every other filter — the group boundary above still applies.
 	 */
 	bucket?: string;
 	/* What one provisioning connection did (its `connection:<id>` actor) and what was done to it. */
@@ -1120,7 +1128,7 @@ export const GroupMember = t.Object({
 export type GroupMember = Static<typeof GroupMember>;
 
 /*
- * The owner of every project and user bucket, and the only thing that grants access to one.
+ * The owner of every user bucket, and the only thing that grants access to one.
  *
  * Replaces the per-container `managedBy: string[]` it was built from. That arrangement could not
  * express a tenant: a container was reachable by the people named on it, so it died with the account
@@ -1130,7 +1138,7 @@ export type GroupMember = Static<typeof GroupMember>;
  * resolved — every access decision anywhere is "does the caller belong to the group that owns this".
  *   - `personal` is created with an account and presented by the console as "Personal". Undeletable,
  *     and its administrator is its one member (specs/075): nobody joins it. Work meant for several people
- *     lives in a regular group, and a bucket or project moves there from a personal one.
+ *     lives in a regular group, and a bucket moves there from a personal one.
  *   - `regular` is a company or a team.
  *   - `system` is the reserved `unassigned` holding group, which has no members and is exempt from the
  *     at-least-one-owner rule.
@@ -1218,63 +1226,6 @@ export interface GroupInvitationStoreConstructor {
 	new (): GroupInvitationStoreInstance;
 }
 
-export const Project = t.Object({
-	_id: t.String(),
-	name: t.String(),
-	slug: t.String(),
-	type: t.Union([t.Literal('admin'), t.Literal('regular')]),
-	/* The group that owns this project. Every access decision resolves through it. */
-	ownerGroupId: t.String(),
-	/*
-	 * The bucket its clients sign people into. Always set (specs/098): "no bucket" used to mean the Default
-	 * bucket, which put every tenant's bucket-less project into one shared population.
-	 */
-	bucketId: t.String(),
-	clientIds: t.Array(t.String()),
-	/*
-	 * Web origins whose browser code may read cross-origin responses on behalf of this project's
-	 * clients. Operator-managed, empty by default — a project grants nothing until one is added.
-	 * Stored canonical and matched by exact equality (lib/helpers/cors_origin.ts).
-	 */
-	corsOrigins: t.Array(t.String()),
-	createdAt: t.Date(),
-	updatedAt: t.Date()
-});
-export type Project = Static<typeof Project>;
-
-export interface ProjectStoreInstance {
-	create(data: {
-		_id?: string;
-		name: string;
-		slug: string;
-		type?: 'admin' | 'regular';
-		ownerGroupId: string;
-		bucketId: string;
-		clientIds?: string[];
-		corsOrigins?: string[];
-	}): Promise<Project>;
-	find(id: string): Promise<Project | null>;
-	findBySlug(slug: string): Promise<Project | null>;
-	list(): Promise<Project[]>;
-	listByGroup(groupId: string): Promise<Project[]>;
-	update(
-		id: string,
-		patch: Partial<
-			Pick<
-				Project,
-				'name' | 'ownerGroupId' | 'bucketId' | 'clientIds' | 'corsOrigins'
-			>
-		>
-	): Promise<Project | null>;
-	destroy(id: string): Promise<void>;
-	countByBucket(bucketId: string): Promise<number>;
-	findByClientId(clientId: string): Promise<Project | null>;
-}
-
-export interface ProjectStoreConstructor {
-	new (): ProjectStoreInstance;
-}
-
 /*
  * An audience this server will mint tokens for, declared by an administrator rather than compiled in.
  *
@@ -1282,8 +1233,8 @@ export interface ProjectStoreConstructor {
  * and `_id` is the two joined (`lib/resources/namespace.ts`), so the uniqueness is still the primary key
  * rather than a rule somebody has to remember to check. The same identifier may be declared by two
  * tenants that each have an issuer of their own; resolution only ever reads the namespace of the
- * address a request arrived at. Ownership is not stored here: the resource names its project, the
- * project names its owning group, and every access decision resolves through that — one source of
+ * address a request arrived at. Ownership is not stored here: the resource names its bucket, the
+ * bucket names its owning group, and every access decision resolves through that — one source of
  * ownership, as everywhere else.
  */
 /*
@@ -1302,7 +1253,11 @@ export const ProtectedResource = t.Object({
 	namespace: t.String(),
 	/* The canonical identifier: the token audience, and what the admin API addresses. */
 	identifier: t.String(),
-	projectId: t.String(),
+	/*
+	 * The bucket it belongs to, for its whole life (specs/099). Not derivable from `namespace`: every bucket
+	 * served at the root shares `@root`.
+	 */
+	bucketId: t.String(),
 	name: t.String(),
 	/*
 	 * What the resource recognises. Held as an array and joined only at the `ResourceServer` seam,
@@ -1344,7 +1299,7 @@ export interface ProtectedResourceStoreInstance {
 	create(data: {
 		namespace: string;
 		identifier: string;
-		projectId: string;
+		bucketId: string;
 		name: string;
 		scopes: string[];
 		scopeDescriptions?: Record<string, ScopeDescription>;
@@ -1356,7 +1311,7 @@ export interface ProtectedResourceStoreInstance {
 		namespace: string,
 		identifier: string
 	): Promise<ProtectedResource | null>;
-	listByProject(projectId: string): Promise<ProtectedResource[]>;
+	listByBucket(bucketId: string): Promise<ProtectedResource[]>;
 	list(): Promise<ProtectedResource[]>;
 	update(
 		namespace: string,
@@ -1364,15 +1319,16 @@ export interface ProtectedResourceStoreInstance {
 		patch: ProtectedResourcePatch
 	): Promise<ProtectedResource | null>;
 	destroy(namespace: string, identifier: string): Promise<void>;
-	destroyByProject(projectId: string): Promise<number>;
+	destroyByBucket(bucketId: string): Promise<number>;
 	/*
-	 * Moves every declaration of a project from one namespace to another, all or nothing. Answers the
+	 * Moves every declaration of a bucket from one namespace to another, all or nothing — what a bucket's
+	 * first address of its own does to the declarations it made at the root. Answers the
 	 * identifiers already taken in the target instead of moving any, including one taken by a
 	 * concurrent declaration part-way through — the adapter contract has no multi-record transaction,
 	 * so the moves already made are undone rather than left half-applied.
 	 */
-	moveProject(
-		projectId: string,
+	moveBucketNamespace(
+		bucketId: string,
 		from: string,
 		to: string
 	): Promise<{ moved: number } | { conflicts: string[] }>;
@@ -2117,44 +2073,20 @@ export interface UserBucketStoreConstructor {
 }
 
 /*
- * Moving a container from one administrator group to another (specs/075). The one writer of a bucket's
- * or a project's `ownerGroupId` after creation.
+ * Moving a bucket from one administrator group to another (specs/075). The one writer of a bucket's
+ * `ownerGroupId` after creation; everything in the bucket — its applications and APIs — belongs to it by
+ * reference and follows without a write of its own (specs/099).
  *
- * Its own store, rather than two `update` calls in the route, because a bucket and the projects using it
- * must never be observed in different groups — consent waiver and end-user administration both compare
- * the two owners — and only an adapter can make several writes one change. The adapter contract offers
- * business logic no transaction (see `BucketGroupChange`), so the transaction lives here.
- *
- * Each method re-checks its precondition inside the write and changes nothing when it no longer holds,
- * answering `conflict`. That is what makes two concurrent moves of one bucket safe: the second finds the
- * bucket no longer in a group it may move from.
+ * The write re-checks its precondition and changes nothing when it no longer holds, answering `conflict`:
+ * that is what makes two concurrent moves of one bucket safe, since the second finds the bucket no longer
+ * in a group it may move from.
  */
-export type ContainerMoveResult =
-	{ status: 'moved'; projectIds: string[] } | { status: 'conflict' };
+export type ContainerMoveResult = { status: 'moved' } | { status: 'conflict' };
 
 export interface ContainerOwnershipStoreInstance {
-	/*
-	 * Sets `ownerGroupId = to` on the bucket and on every project whose `bucketId` is the bucket, provided
-	 * the bucket and each such project is currently in `from` or already in `to`; otherwise changes nothing.
-	 *
-	 * "Already in `to`" is admitted so that a move a standalone `mongod` left part-done (bucket written,
-	 * projects not) completes when repeated — the declared `container-move-atomicity` divergence. The
-	 * projects are found inside the write rather than passed in, so one bound a moment before still moves.
-	 *
-	 * `projectIds` lists the projects this call moved, not those it found already in `to`.
-	 */
+	/* Sets `ownerGroupId = to` on the bucket provided it is currently in `from`; otherwise changes nothing. */
 	moveBucket(
 		bucketId: string,
-		from: string,
-		to: string
-	): Promise<ContainerMoveResult>;
-	/*
-	 * Sets `ownerGroupId = to` on a project that is in `from` and signs into the Default bucket; otherwise
-	 * changes nothing. The Default bucket never moves, so a project on it can only move alone; a project on
-	 * any other bucket moves with that bucket, never alone.
-	 */
-	moveProject(
-		projectId: string,
 		from: string,
 		to: string
 	): Promise<ContainerMoveResult>;
@@ -2162,13 +2094,11 @@ export interface ContainerOwnershipStoreInstance {
 
 export interface ContainerOwnershipStoreConstructor {
 	/*
-	 * Handed the store instances it moves records of. Only the memory backend uses them — its records live
-	 * inside those instances — while the database backends address the areas directly, inside one
-	 * transaction the instances' own methods could not join.
+	 * Handed the bucket store, which the memory backend writes through — its records live inside that
+	 * instance — while the database backends address the area directly.
 	 */
 	new (stores: {
 		buckets: UserBucketStoreInstance;
-		projects: ProjectStoreInstance;
 	}): ContainerOwnershipStoreInstance;
 }
 

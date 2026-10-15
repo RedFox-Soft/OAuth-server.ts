@@ -4,16 +4,15 @@
 
 import { beforeAll, describe, expect, it } from 'bun:test';
 
-import bootstrap, { type Setup } from '../test_helper.js';
+import bootstrap, { bindClientToBucket, type Setup } from '../test_helper.js';
 import { AuthorizationRequest } from '../AuthorizationRequest.ts';
 import { withCookies } from '../consent_page/flow.ts';
 import {
 	getBucketStore,
-	getProjectStore,
 	getUserStore,
 	resetAdminMemoryStores
 } from 'lib/adapters/index.ts';
-import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
+import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { ISSUER } from 'lib/configs/env.js';
 import { elysia } from 'lib/index.ts';
 import { CONSENT_TEXTS } from 'lib/i18n/texts/consent/index.ts';
@@ -120,16 +119,7 @@ describe('the language of the sign-in pages', () => {
 			emailVerificationRequired: false
 		});
 		bucketId = bucket._id;
-		const project = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			ownerGroupId: UNASSIGNED_GROUP_ID,
-			name: 'Languages',
-			slug: `languages-${Math.random()}`
-		});
-		await getProjectStore().update(project._id, {
-			bucketId,
-			clientIds: [CLIENT_ID]
-		});
+		await bindClientToBucket(CLIENT_ID, bucketId);
 	});
 
 	it('shows the sign-in page in Russian and says so when the browser asks for Russian', async () => {

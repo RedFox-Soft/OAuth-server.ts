@@ -1,13 +1,16 @@
 import { describe, it, expect, beforeAll, beforeEach, spyOn } from 'bun:test';
 import crypto from 'node:crypto';
 
-import bootstrap, { agent, getHeader } from '../test_helper.ts';
+import bootstrap, {
+	bindClientToBucket,
+	agent,
+	getHeader
+} from '../test_helper.ts';
 import { AuthorizationRequest } from '../AuthorizationRequest.ts';
 import {
 	adapter,
 	getUserStore,
 	getBucketStore,
-	getProjectStore,
 	resetAdminMemoryStores
 } from 'lib/adapters/index.ts';
 import epochTime from 'lib/helpers/epoch_time.js';
@@ -23,8 +26,7 @@ import { adminAuditStore } from 'lib/adapters/index.ts';
 import {
 	ADMIN_BUCKET_ID,
 	ADMIN_CLIENT_ID,
-	UNASSIGNED_GROUP_ID,
-	DEFAULT_BUCKET_ID
+	UNASSIGNED_GROUP_ID
 } from 'lib/admin/consts.ts';
 import { REQUEST_COOLDOWN_SECONDS } from 'lib/password_reset/consts.ts';
 import { throttleKey as throttleKeyFor } from 'lib/login_throttle/throttle.ts';
@@ -141,23 +143,14 @@ function expire(token: string): void {
 beforeAll(async () => {
 	await bootstrap(import.meta.url, { config: 'reset' });
 	resetAdminMemoryStores();
-	// A dedicated bucket reached by CLIENT_ID through a project, so these specs never touch the shared
+	// A dedicated bucket that CLIENT_ID belongs to, so these specs never touch the shared
 	// 'redfox' bucket that the second client falls through to.
 	const bucket = await getBucketStore().create({
 		ownerGroupId: UNASSIGNED_GROUP_ID,
 		name: 'Reset Bucket'
 	});
 	bucketId = bucket._id;
-	const project = await getProjectStore().create({
-		bucketId: DEFAULT_BUCKET_ID,
-		ownerGroupId: UNASSIGNED_GROUP_ID,
-		name: 'Reset',
-		slug: `reset-${Math.random()}`
-	});
-	await getProjectStore().update(project._id, {
-		bucketId,
-		clientIds: [CLIENT_ID]
-	});
+	await bindClientToBucket(CLIENT_ID, bucketId);
 
 	const other = await getBucketStore().create({
 		ownerGroupId: UNASSIGNED_GROUP_ID,
@@ -165,16 +158,7 @@ beforeAll(async () => {
 		emailVerificationRequired: true
 	});
 	otherBucketId = other._id;
-	const otherProject = await getProjectStore().create({
-		bucketId: DEFAULT_BUCKET_ID,
-		ownerGroupId: UNASSIGNED_GROUP_ID,
-		name: 'Reset Other',
-		slug: `reset-other-${Math.random()}`
-	});
-	await getProjectStore().update(otherProject._id, {
-		bucketId: otherBucketId,
-		clientIds: [OTHER_CLIENT_ID]
-	});
+	await bindClientToBucket(OTHER_CLIENT_ID, otherBucketId);
 });
 
 /**

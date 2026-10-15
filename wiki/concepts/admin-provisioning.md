@@ -4,13 +4,14 @@ title: "Admin provisioning: seeded by a script, never at boot"
 tags: [architecture, config, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-09-23
-updated: 2026-09-23
+updated: 2026-10-15
 ---
 
 # Admin provisioning
 
-The records the console needs to exist — the reserved admin project, the "Administrators" bucket, the
-first-party `admin-panel` OAuth client, the default bucket and the `unassigned` system group — are
+The records the console needs to exist — the "Administrators" bucket, the first-party `admin-panel` OAuth
+client (and `admin-mcp`, both carrying `bucketId` = the administrators' bucket, `lib/consts/admin_seed.ts:100`,
+`:121`), the default bucket and the `unassigned` system group — are
 written by the provisioning scripts, **not at boot**. There is no boot-time seeding, so console login
 requires a database-backed, provisioned deployment.
 

@@ -11,8 +11,8 @@ export const ApplicationConfig = {
 };
 
 /*
- * One pair per spec file: the project store outlives a file, and a client held by two files' projects
- * would belong to whichever ran first.
+ * One pair per spec file: a client belongs to exactly one bucket, so two files' tenants cannot share
+ * one.
  */
 export const clients = [
 	{

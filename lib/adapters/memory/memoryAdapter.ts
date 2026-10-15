@@ -1,3 +1,4 @@
+import { assertIndexedField } from '../../consts/storage_inventory.js';
 import epochTime from '../../helpers/epoch_time.js';
 import { getStorage } from './storage.js';
 import {
@@ -224,6 +225,12 @@ export class MemoryAdapter<
 			}
 		}
 		return found;
+	}
+
+	/* A scan here as `findByOwner` is; the datastores answer from the declared index. */
+	async findByIndexed(field: string, value: string) {
+		assertIndexedField(this.model, field);
+		return this.findByOwner(field, value);
 	}
 
 	async destroyUnusedSince(

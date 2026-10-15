@@ -4,7 +4,7 @@ title: 'The PostgreSQL backend: two expiry reversals, a silent encoding defect, 
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-09-10
-updated: 2026-10-12
+updated: 2026-10-15
 ---
 
 # The PostgreSQL backend
@@ -193,9 +193,15 @@ startup gate closes that deliberately created divergence.
   `2026-10-09-personal-groups-single-member`, also writes audit entries, as raw documents with
   deterministic ids, because this import-free module cannot reach the audit writer
   ([[container-ownership-transfer]]). Spec 088 added a fifth, `2026-10-12-static-token-expiry`
-  (`lib/consts/migrations.ts:905`), which gives every SCIM static token without an expiry one
+  (`lib/consts/migrations.ts:915`), which gives every SCIM static token without an expiry one
   ([[scim-credential-overlap]]); its new previous-token index needed no migration, since `db:setup` applies
-  indexes.
+  indexes. Spec 098 added `2026-10-15-projects-require-bucket`, and spec 099 `2026-10-16-remove-projects`
+  (`lib/consts/migrations.ts:1276`), which moves every project's clients, origins and declarations onto
+  `bucketId` and refuses, writing nothing, when one client is listed by projects on different buckets
+  ([[bucket-is-the-only-container]]). Both read an area that is no longer declared: `projects` left
+  `STORE_AREAS` in spec 099, so the migrations name it by its literal, `LEGACY_PROJECTS_AREA` (`:115`), as the
+  root-keys migration names `LEGACY_ROOT_KEYS_AREA`. Its collection or table stays on disk, because
+  provisioning never drops anything.
 - The one-off `managedBy → ownerGroupId` conversion was **retired**, not carried in. See
   [[group-ownership]]; a deployment old enough to need it upgrades through an earlier release first.
 
@@ -250,8 +256,18 @@ that they differ; `observable` says what a caller could actually notice, and an 
 answer is "nothing" is a difference in implementation, not in behaviour.
 
 `database/verify_postgres.ts` reads it and fails on any difference it observes that is not listed —
-which is what makes it a gate rather than a document. Six entries today: expiry reclamation cadence,
-the untimed-upsert expiry above, migration-record atomicity, what a write to an unprovisioned area
-does, and two convergences listed *because* they are convergences — email case normalisation, and
-refusing to start against an unreachable datastore, where the startup probe is the only thing
-holding the two backends together.
+which is what makes it a gate rather than a document. Seven entries today: expiry reclamation cadence,
+the untimed-upsert expiry above, migration-record atomicity, bucket-group-change atomicity
+([[bucket-groups]]), what a write to an unprovisioned area does, and two convergences listed *because* they
+are convergences — email case normalisation, and refusing to start against an unreachable datastore, where
+the startup probe is the only thing holding the two backends together. `container-move-atomicity`, the
+half-done window of a bucket move that also rewrote its projects on a standalone `mongod`, was deleted in
+spec 099: a move is now one conditional write on every backend ([[container-ownership-transfer]]).
+
+**Listing a model area by a field is declared, too** (spec 099). `ModelAdapter.findByIndexed(field, value)`
+(`lib/adapters/types.ts:316`, implemented on all three backends) lists a model area's records by one payload
+field, and each implementation first calls `assertIndexedField` (`lib/consts/storage_inventory.ts:953-964`),
+which throws unless the area declares a single-field index on `payload.<field>`. So a listing is never a
+scan, and no caller-chosen name reaches a query. Its one use is the Client area's `payload.bucketId`
+(`storage_inventory.ts:343`): a bucket's applications. `findByOwner` was not reused because owner fields feed
+the cascade engine, and a bucket is not that kind of owner.

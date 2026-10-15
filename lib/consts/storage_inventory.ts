@@ -140,7 +140,6 @@ export const STORE_AREAS = {
 	 * `jwks` area; the 2026-09-30-root-keys-lifecycle migration moves them here.
 	 */
 	bucketKeys: 'bucketKeys',
-	projects: 'projects',
 	/*
 	 * Audiences this server will mint tokens for, declared by an administrator. The document `_id` is
 	 * the namespace and the canonical resource identifier joined, so uniqueness within a namespace is
@@ -159,13 +158,13 @@ export const STORE_AREAS = {
 	provisioningRefusals: 'provisioningRefusals',
 	/*
 	 * A bucket's groups of end users — what its roles became. Distinct from `groups`, which hold administrators
-	 * and own projects and buckets; the two are never the same record.
+	 * and own buckets; the two are never the same record.
 	 */
 	bucketGroups: 'bucketGroups',
 	/* One record per membership of a bucket group, so a change to a large group costs only the change. */
 	bucketGroupMembers: 'bucketGroupMembers',
 	userBuckets: 'userBuckets',
-	/* The owner of every project and user bucket, and the only thing that grants access to one. */
+	/* The owner of every user bucket, and the only thing that grants access to one. */
 	groups: 'groups',
 	/* Pending invitations into a group. Single-use, and reaped on their own expiry. */
 	groupInvitations: 'groupInvitations',
@@ -336,7 +335,12 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 					'payload.registeredDynamically': 1,
 					'payload.client_id_issued_at': 1
 				}
-			}
+			},
+			/*
+			 * The bucket a client belongs to (specs/099): how a bucket's applications are listed and how its
+			 * deletion finds the ones that block it, through `findByIndexed`.
+			 */
+			{ key: { 'payload.bucketId': 1 } }
 		]
 	),
 	/*
@@ -526,43 +530,24 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 		[{ key: { bucketId: 1 } }]
 	),
 	/*
-	 * `clientIds` is not unique — a client belongs to one project, but nothing in the schema enforces
-	 * that. It is indexed because projectStore.findByClientId runs on every browser-origin request to
-	 * a client-based CORS endpoint, so the lookup has to be a point read rather than a scan.
-	 */
-	storeArea(
-		STORE_AREAS.projects,
-		null,
-		unowned(
-			'a container: guarded against deletion while occupied, never cascaded'
-		),
-		[
-			{ key: { slug: 1 }, unique: true },
-			/* Multikey: read as findOne({ clientIds }) in projectStore, i.e. containment over the array. */
-			{ key: { clientIds: 1 }, multikey: 'clientIds' },
-			{ key: { ownerGroupId: 1 } }
-		]
-	),
-	/*
 	 * Never reaped, and that is the point rather than housekeeping: a declaration that expired on its
 	 * own would stop every token being minted for a live integration, with nothing to say why.
 	 *
-	 * Unowned by an account or a client. It is owned by a *project*, and a project is not a principal —
+	 * Unowned by an account or a client. It is owned by a *bucket*, and a bucket is not a principal —
 	 * owner fields here drive the account and client cascades, which sweep model areas, so declaring
-	 * one would claim a sweep that never reaches this area. The project-delete route cascades it
-	 * explicitly instead, and reports how many went.
+	 * one would claim a sweep that never reaches this area. A bucket is refused deletion while it holds
+	 * any, so nothing is left behind (specs/099).
 	 *
-	 * `projectId` is indexed because the console lists a project's resources and the delete cascade
-	 * reads by it; the identifier needs no index, being half of the `_id`, and every resolution reads
-	 * by the whole of it.
+	 * `bucketId` is indexed because the console lists a bucket's resources by it; the identifier needs no
+	 * index, being half of the `_id`, and every resolution reads by the whole of it.
 	 */
 	storeArea(
 		STORE_AREAS.protectedResources,
 		null,
 		unowned(
-			'owned by a project, which is not a principal; cascaded by the project-delete route'
+			'owned by a bucket, which is not a principal; a bucket that holds any is refused deletion'
 		),
-		[{ key: { projectId: 1 } }]
+		[{ key: { bucketId: 1 } }]
 	),
 	/*
 	 * Never reaped: a connection that expired on its own would stop a customer's provisioning with nothing
@@ -681,7 +666,7 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 		]
 	),
 	/*
-	 * Groups own every project and user bucket, so `members.userId` is read on every admin request —
+	 * Groups own every user bucket, so `members.userId` is read on every admin request —
 	 * `contextFor` resolves the caller's memberships there, where it previously scanned projects by
 	 * manager. Indexed for that reason, not for reporting.
 	 *
@@ -784,7 +769,7 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 			{ key: { targetType: 1, targetId: 1, timestamp: 1 } },
 			{ key: { targetScope: 1, timestamp: 1 } },
 			/*
-			 * The group-scoped read, which is every audit read a project administrator makes: their
+			 * The group-scoped read, which is every audit read a tenant administrator makes: their
 			 * groups' entries, newest first. Compound rather than a bare `ownerGroupId` because the
 			 * restriction and the ordering are never applied apart.
 			 */
@@ -795,7 +780,7 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 			 */
 			{ key: { formerOwnerGroupId: 1, timestamp: 1 } },
 			/*
-			 * The bucket filter's two arms that no other index serves (specs/085): a project joining a
+			 * The bucket filter's two arms that no other index serves (specs/085): an entry joining a
 			 * bucket and leaving one. Its other two arms ride the target and `targetScope` indexes above.
 			 */
 			{ key: { bucketId: 1, timestamp: 1 } },
@@ -958,4 +943,22 @@ export function areaNamed(name: string): StorageArea {
 		throw new Error(`no storage area declared for '${name}'`);
 	}
 	return found;
+}
+
+/*
+ * The field a model area may be listed by through `ModelAdapter.findByIndexed` (specs/099): only one with a
+ * single-field index of its own declared above. Checked by every adapter before it queries, so a listing is
+ * never a scan and no caller-chosen name reaches a query — the rule the owner fields keep by construction.
+ */
+export function assertIndexedField(areaName: string, field: string): void {
+	const area = areaNamed(areaName);
+	const declared = area.indexes.some((spec) => {
+		const keys = Object.keys(spec.key);
+		return keys.length === 1 && keys[0] === `payload.${field}`;
+	});
+	if (!declared) {
+		throw new TypeError(
+			`${areaName} declares no index on payload.${field}, so it cannot be listed by it`
+		);
+	}
 }

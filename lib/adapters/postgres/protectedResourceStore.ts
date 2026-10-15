@@ -27,7 +27,7 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 	async create(data: {
 		namespace: string;
 		identifier: string;
-		projectId: string;
+		bucketId: string;
 		name: string;
 		scopes: string[];
 		scopeDescriptions?: Record<string, ScopeDescription>;
@@ -40,7 +40,7 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 			_id: declarationId(data.namespace, data.identifier),
 			namespace: data.namespace,
 			identifier: data.identifier,
-			projectId: data.projectId,
+			bucketId: data.bucketId,
 			name: data.name,
 			scopes: [...data.scopes],
 			...(data.scopeDescriptions
@@ -81,10 +81,10 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 		return this.resourceOf(rows[0]);
 	}
 
-	async listByProject(projectId: string): Promise<ProtectedResource[]> {
+	async listByBucket(bucketId: string): Promise<ProtectedResource[]> {
 		const handle = sql();
 		const rows = await handle`
-			SELECT doc FROM ${handle(this.area)} WHERE doc->>'projectId' = ${projectId}
+			SELECT doc FROM ${handle(this.area)} WHERE doc->>'bucketId' = ${bucketId}
 		`;
 		return this.resourcesOf(rows);
 	}
@@ -118,10 +118,10 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 		`;
 	}
 
-	async destroyByProject(projectId: string): Promise<number> {
+	async destroyByBucket(bucketId: string): Promise<number> {
 		const handle = sql();
 		const rows = await handle`
-			DELETE FROM ${handle(this.area)} WHERE doc->>'projectId' = ${projectId}
+			DELETE FROM ${handle(this.area)} WHERE doc->>'bucketId' = ${bucketId}
 			RETURNING id
 		`;
 		return rows.length;
@@ -133,12 +133,12 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 	 * check — rolls every earlier copy back with it, and the originals are never touched until all the
 	 * copies are in.
 	 */
-	async moveProject(
-		projectId: string,
+	async moveBucketNamespace(
+		bucketId: string,
 		from: string,
 		to: string
 	): Promise<{ moved: number } | { conflicts: string[] }> {
-		const moving = await this.listByProject(projectId).then((all) =>
+		const moving = await this.listByBucket(bucketId).then((all) =>
 			all.filter((r) => r.namespace === from)
 		);
 		if (moving.length === 0) return { moved: 0 };

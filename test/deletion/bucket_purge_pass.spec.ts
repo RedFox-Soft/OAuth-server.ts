@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it, spyOn } from 'bun:test';
 
 import bootstrap from '../test_helper.js';
 import {
+	adapter,
 	adminAuditStore,
 	getActivityStore,
 	getBucketGroupStore,
@@ -70,7 +71,7 @@ async function purgeEntries(bucket: UserBucket) {
 
 /**
  * @proves A bucket whose thirty days of scheduled deletion have run out is destroyed by the server without
- * anyone asking — everything it held, except its usage history — and recorded once as the server's act in its
+ * anyone asking — everything it held, its self-registered applications included, except its usage history — and recorded once as the server's act in its
  * owner's trail; one not yet due is left alone; two passes at once destroy it once; and a destruction that
  * failed part-way is finished later without a second record.
  */
@@ -92,6 +93,23 @@ describe('the scheduled-deletion pass', () => {
 			await getProvisioningConnectionStore().find(connection._id)
 		).toBeNull();
 		expect(await getActivityStore().tombstone(bucket._id)).not.toBeNull();
+	});
+
+	it('destroys the applications that registered themselves in a due bucket', async () => {
+		const { bucket } = await scheduledBucket(31);
+		const clientId = `self-registered-${nanoid()}`;
+		await adapter('Client').upsert(clientId, {
+			clientId,
+			bucketId: bucket._id,
+			registeredDynamically: true,
+			grantTypes: ['authorization_code'],
+			responseTypes: ['code'],
+			redirectUris: ['https://app.example.com/cb']
+		});
+
+		await purgeDueBuckets();
+
+		expect(await adapter('Client').find(clientId)).toBeUndefined();
 	});
 
 	it('records the destruction once as the server’s, with the accounts it destroyed, for the owning group', async () => {

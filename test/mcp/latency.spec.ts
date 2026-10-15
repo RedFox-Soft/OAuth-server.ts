@@ -5,12 +5,8 @@ import { elysia } from 'lib/index.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { getProjectStore } from 'lib/adapters/index.ts';
-import {
-	ADMIN_SESSION_COOKIE,
-	UNASSIGNED_GROUP_ID,
-	DEFAULT_BUCKET_ID
-} from 'lib/admin/consts.ts';
+import { getBucketStore } from 'lib/adapters/index.ts';
+import { ADMIN_SESSION_COOKIE, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { ADMIN_MCP_CLIENT_ID, MCP_RESOURCE } from 'lib/mcp/consts.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { sessionFor } from '../admin_session.ts';
@@ -100,17 +96,15 @@ describe('tool call latency', () => {
 	it('costs no more than 4× the admin route it wraps', async () => {
 		const { token, cookie } = await setup();
 		for (let i = 0; i < 20; i += 1) {
-			await getProjectStore().create({
-				bucketId: DEFAULT_BUCKET_ID,
+			await getBucketStore().create({
 				name: `Load ${i}`,
-				slug: `load-${i}-${Math.floor(Math.random() * 1e6)}`,
 				ownerGroupId: UNASSIGNED_GROUP_ID
 			});
 		}
 
 		const viaConsole = await median(15, () =>
 			elysia.handle(
-				new Request('http://e.ly/admin/api/projects', { headers: { cookie } })
+				new Request('http://e.ly/admin/api/buckets', { headers: { cookie } })
 			)
 		);
 
@@ -120,7 +114,7 @@ describe('tool call latency', () => {
 					jsonrpc: '2.0',
 					id: ++rpcId,
 					method: 'tools/call',
-					params: { name: 'project_list', arguments: {} }
+					params: { name: 'bucket_list', arguments: {} }
 				},
 				token
 			)
@@ -147,14 +141,14 @@ describe('tool call latency', () => {
 		ApplicationConfig['mcp.enabled'] = false;
 		const off = await median(15, () =>
 			elysia.handle(
-				new Request('http://e.ly/admin/api/projects', { headers: { cookie } })
+				new Request('http://e.ly/admin/api/buckets', { headers: { cookie } })
 			)
 		);
 
 		ApplicationConfig['mcp.enabled'] = true;
 		const on = await median(15, () =>
 			elysia.handle(
-				new Request('http://e.ly/admin/api/projects', { headers: { cookie } })
+				new Request('http://e.ly/admin/api/buckets', { headers: { cookie } })
 			)
 		);
 

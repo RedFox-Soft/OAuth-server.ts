@@ -68,8 +68,8 @@ export function isReservedBucketName(name: string): boolean {
  * What a bucket's slug may be, as a string so the request schema and any other consumer share one
  * declaration rather than two that agree today.
  *
- * Tighter than the project slug beside it (`^[a-z0-9-]+$`) in three ways, each with a reason a
- * project slug did not have. No leading or trailing hyphen, because this is a path segment of an
+ * Tighter than a plain slug (`^[a-z0-9-]+$`) in three ways, each with a reason a
+ * label would not have. No leading or trailing hyphen, because this is a path segment of an
  * issuer identifier and `https://host/-` is a poor one. Bounded at 63, because unbounded is harmless
  * in a column and unpleasant in every URL, log line and token. And lowercase only rather than
  * case-normalised: URL paths are case-sensitive and issuer identifiers are compared by exact string,

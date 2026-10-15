@@ -2,11 +2,6 @@ import { describe, it, expect } from 'bun:test';
 import { t } from 'elysia';
 
 import {
-	CreateProjectBody,
-	UpdateProjectBody,
-	SetBucketBody
-} from 'lib/admin/projects/schema.ts';
-import {
 	CreateBucketBody,
 	UpdateBucketBody
 } from 'lib/admin/buckets/schema.ts';
@@ -29,9 +24,6 @@ import { bridgeSchema } from 'lib/mcp/schema_bridge.ts';
  */
 
 const schemas = {
-	CreateProjectBody,
-	UpdateProjectBody,
-	SetBucketBody,
 	CreateBucketBody,
 	UpdateBucketBody,
 	CreateClientBody,
@@ -148,9 +140,9 @@ describe('TypeBox admin schemas bridge into MCP tool schemas', () => {
 	// Optionality must survive too: TypeBox marks optional fields by omission from `required`,
 	// and an update body that requires every field would refuse every legitimate PATCH.
 	it('preserves optionality: an update body requires nothing', () => {
-		expect(UpdateProjectBody.required ?? []).toBeArrayOfSize(0);
+		expect(UpdateClientBody.required ?? []).toBeArrayOfSize(0);
 		expect(UpdateBucketBody.required ?? []).toBeArrayOfSize(0);
-		expect(CreateProjectBody.required).toContain('name');
-		expect(CreateProjectBody.required).toContain('slug');
+		expect(CreateClientBody.required).toContain('grantTypes');
+		expect(CreateClientBody.required).toContain('tokenEndpointAuthMethod');
 	});
 });

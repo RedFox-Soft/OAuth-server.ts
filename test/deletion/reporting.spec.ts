@@ -8,7 +8,7 @@ import { AccessToken } from 'lib/models/access_token.js';
 import {
 	adapter,
 	getBucketStore,
-	getProjectStore,
+	getProtectedResourceStore,
 	getUserStore
 } from 'lib/adapters/index.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
@@ -17,6 +17,7 @@ import {
 	UNASSIGNED_GROUP_ID,
 	DEFAULT_BUCKET_ID
 } from 'lib/admin/consts.ts';
+import { ROOT_NAMESPACE } from 'lib/resources/namespace.ts';
 import { sessionFor } from '../admin_session.ts';
 import { shaped } from 'test/shape.js';
 import { createAdministrator } from '../administrators.ts';
@@ -76,16 +77,27 @@ describe('deletion reporting', () => {
 		return `${ADMIN_SESSION_COOKIE}=${session._id}`;
 	}
 
-	async function liveClient(): Promise<string> {
+	/* An application an administrator created in `bucketId` — the default bucket unless a case says. */
+	async function liveClient(
+		bucketId: string = DEFAULT_BUCKET_ID
+	): Promise<string> {
 		const clientId = `rep-${Math.random().toString(36).slice(2)}`;
 		await adapter('Client').upsert(clientId, {
 			clientId,
 			clientSecret: 'secret',
 			grantTypes: ['authorization_code'],
 			responseTypes: ['code'],
-			redirectUris: [`https://${clientId}.example.com/cb`]
+			redirectUris: [`https://${clientId}.example.com/cb`],
+			bucketId
 		});
 		return clientId;
+	}
+
+	async function deleteClient(clientId: string, cookie: string) {
+		return agent.admin.api
+			.buckets({ id: DEFAULT_BUCKET_ID })
+			.clients({ clientId })
+			.delete(undefined, { headers: { cookie } });
 	}
 
 	/* Narrowed from `unknown`: Eden's response type differs per route, so naming one shape here would
@@ -95,20 +107,24 @@ describe('deletion reporting', () => {
 		return shaped(schema, data ?? error?.value);
 	}
 
-	it('lists the blocking client ids on a refused project deletion', async () => {
+	it('lists the blocking application ids and counts the APIs on a refused bucket deletion', async () => {
 		const cookie = await superAdminCookie();
-		const first = await liveClient();
-		const second = await liveClient();
-		const project = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			ownerGroupId: UNASSIGNED_GROUP_ID,
-			name: 'P',
-			slug: `p-${Math.random()}`,
-			clientIds: [first, 'ghost', second]
+		const bucket = await getBucketStore().create({
+			name: `b-${Math.random()}`,
+			ownerGroupId: UNASSIGNED_GROUP_ID
+		});
+		const first = await liveClient(bucket._id);
+		const second = await liveClient(bucket._id);
+		await getProtectedResourceStore().create({
+			namespace: ROOT_NAMESPACE,
+			identifier: `https://api-${Math.random().toString(36).slice(2)}.example/`,
+			bucketId: bucket._id,
+			name: 'API',
+			scopes: ['api:read']
 		});
 
 		const res = await agent.admin.api
-			.projects({ id: project._id })
+			.buckets({ id: bucket._id })
 			.delete(undefined, { headers: { cookie } });
 
 		expect(res.status).toBe(409);
@@ -116,7 +132,8 @@ describe('deletion reporting', () => {
 		// The existing envelope is unchanged; blockers ride alongside it.
 		expect(body.error).toBe('admin_error');
 		expect(body.blockers).toEqual([
-			{ kind: 'client', count: 2, ids: [first, second] }
+			{ kind: 'client', count: 2, ids: [first, second].sort() },
+			{ kind: 'resource', count: 1 }
 		]);
 	});
 
@@ -165,17 +182,7 @@ describe('deletion reporting', () => {
 			scope: 'openid'
 		}).save();
 
-		const project = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			ownerGroupId: UNASSIGNED_GROUP_ID,
-			name: 'P',
-			slug: `p-${Math.random()}`,
-			clientIds: [clientId]
-		});
-		const res = await agent.admin.api
-			.projects({ id: project._id })
-			.clients({ clientId })
-			.delete(undefined, { headers: { cookie } });
+		const res = await deleteClient(clientId, cookie);
 
 		expect(res.status).toBe(200);
 		const body = shaped(Swept, res.data);
@@ -237,17 +244,7 @@ describe('deletion reporting', () => {
 			new Error('storage unavailable')
 		);
 		try {
-			const project = await getProjectStore().create({
-				bucketId: DEFAULT_BUCKET_ID,
-				ownerGroupId: UNASSIGNED_GROUP_ID,
-				name: 'P',
-				slug: `p-${Math.random()}`,
-				clientIds: [clientId]
-			});
-			const res = await agent.admin.api
-				.projects({ id: project._id })
-				.clients({ clientId })
-				.delete(undefined, { headers: { cookie } });
+			const res = await deleteClient(clientId, cookie);
 
 			expect(res.status).toBe(500);
 			const body = bodyOf(

@@ -4,7 +4,7 @@ title: "Spec-file isolation"
 tags: [testing, gotcha, decision]
 sources: [oauth-server-codebase]
 created: 2026-10-13
-updated: 2026-10-14
+updated: 2026-10-15
 ---
 
 # Spec-file isolation
@@ -38,7 +38,7 @@ and failed whenever a file enabling mTLS ran just before it. The boundary now ap
 
 **In `bootstrap()` — `test/test_helper.ts:509`.** Every store and every cache built from one.
 `resetStoresForTests()` (`lib/adapters/index.ts:528`) replaces every store singleton: buckets,
-projects, groups, users, the audit trail, recorded faults, activity, keys and the rest. The five stores
+groups, users, the audit trail, recorded faults, activity, keys and the rest. The five stores
 built at import time became `export let` (`lib/adapters/index.ts:191`) so they can be replaced. An
 importer sees the new instance through the live binding. The derived caches are forgotten next to
 them:

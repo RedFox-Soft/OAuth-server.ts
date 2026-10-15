@@ -2,7 +2,6 @@ import {
 	ADMIN_BUCKET_ID,
 	DEFAULT_BUCKET_ID,
 	ADMIN_CLIENT_ID,
-	ADMIN_PROJECT_ID,
 	UNASSIGNED_GROUP_ID
 } from '../admin/consts.js';
 import { ADMIN_MCP_CLIENT_ID } from '../mcp/consts.js';
@@ -26,7 +25,7 @@ import { ADMIN_MCP_CLIENT_ID } from '../mcp/consts.js';
 
 /*
  * The holding group for containers no administrator owns. Seeded before anything that could own a
- * container; the reserved project and bucket are given it as a formality, since both sit outside the
+ * container; the reserved buckets are given it as a formality, since both sit outside the
  * group model and every route touching them refuses before ownership is consulted.
  *
  * The name is deliberately NOT here: it is `$set` rather than `$setOnInsert` on the script path, so a
@@ -70,7 +69,7 @@ export const ADMIN_BUCKET_SEED = {
 } as const;
 
 /*
- * The default bucket, which backs every client not assigned to a project (see resolveBucketForClient).
+ * The default bucket, which backs every client that belongs to no other bucket (see resolveBucketForRequest).
  * Seeded so it is manageable in the admin Buckets UI rather than existing only by implication.
  */
 export const DEFAULT_BUCKET_SEED = {
@@ -91,16 +90,6 @@ export const DEFAULT_BUCKET_SEED = {
 	verificationMethod: 'link'
 } as const;
 
-export const ADMIN_PROJECT_SEED = {
-	_id: ADMIN_PROJECT_ID,
-	name: 'Administration',
-	slug: 'admin',
-	type: 'admin',
-	ownerGroupId: UNASSIGNED_GROUP_ID,
-	bucketId: ADMIN_BUCKET_ID,
-	clientIds: [ADMIN_CLIENT_ID, ADMIN_MCP_CLIENT_ID]
-} as const;
-
 /*
  * The console's own client. Public — the console runs in a browser and has no secret to keep — and
  * consent is not required of an administrator signing in to the instance they administer.
@@ -108,6 +97,7 @@ export const ADMIN_PROJECT_SEED = {
 export function adminConsoleClientSeed(issuer: string) {
 	return {
 		clientId: ADMIN_CLIENT_ID,
+		bucketId: ADMIN_BUCKET_ID,
 		applicationType: 'web',
 		grantTypes: ['authorization_code'],
 		responseTypes: ['code'],
@@ -119,16 +109,16 @@ export function adminConsoleClientSeed(issuer: string) {
 
 /*
  * The reserved MCP agent client. Public with mandatory PKCE, so nothing secret needs distributing,
- * and it lives in the admin project because that is what routes it to the administrator bucket:
- * `resolveBucketForClient` sends a client there only if it is the reserved console client or belongs
- * to a project whose bucket is the admin bucket. A dynamically registered client falls through to the
- * default bucket and cannot authenticate an administrator at all.
+ * and it belongs to the administrators' bucket, which is what routes it there: `resolveBucketForRequest`
+ * pins a client to the bucket it records (specs/099). A dynamically registered client records no such
+ * bucket and cannot authenticate an administrator at all.
  *
  * Loopback redirect URIs, which is what a local MCP client can actually receive a code on. The port is
  * unpredictable, so the standard three are registered; OAuth 2.1 allows a loopback port to vary.
  */
 export const ADMIN_MCP_CLIENT_SEED = {
 	clientId: ADMIN_MCP_CLIENT_ID,
+	bucketId: ADMIN_BUCKET_ID,
 	applicationType: 'native',
 	grantTypes: ['authorization_code', 'refresh_token'],
 	responseTypes: ['code'],

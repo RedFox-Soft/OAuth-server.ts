@@ -8,7 +8,7 @@ import { text as fill } from 'lib/i18n/message.tsx';
 
 const T = CONSENT_TEXTS.en;
 import { openConsent, type ConsentPage } from '../consent_page/flow.ts';
-import { tenantProject } from './seed.ts';
+import { signedInElsewhere } from './seed.ts';
 
 const NBSP = String.fromCharCode(0xa0);
 
@@ -42,11 +42,12 @@ function external(page: ConsentPage) {
 describe('the privacy policy and terms links on the consent page', () => {
 	let setup: Setup;
 	let cookie: string;
+	let elsewhere: { cookie: string; resource: string[] };
 
 	beforeAll(async () => {
 		setup = await bootstrap(import.meta.url, { config: 'consent_branding' });
 		await ensureAdminSeed();
-		await tenantProject(['tenant-app']);
+		elsewhere = await signedInElsewhere(setup, 'tenant-app');
 		cookie = await setup.login({ scope: 'openid' });
 	});
 
@@ -108,16 +109,25 @@ describe('the privacy policy and terms links on the consent page', () => {
 		);
 	});
 
-	it.each([
-		['an app that registered itself', 'self-registered'],
-		['another tenant’s app', 'tenant-app']
-	])(
-		'links nothing for %s, though its links are on its redirect host',
-		async (_, clientId) => {
-			const page = await open(clientId);
+	it('links nothing for an app that registered itself, though its links are on its redirect host', async () => {
+		const page = await open('self-registered');
 
-			expect(page.view.links).toBeUndefined();
-			expect(external(page)).toEqual([]);
-		}
-	);
+		expect(page.view.links).toBeUndefined();
+		expect(external(page)).toEqual([]);
+	});
+
+	it('links nothing for another tenant’s app, though its links are on its redirect host', async () => {
+		const page = await openConsent(
+			{
+				client_id: 'tenant-app',
+				scope: 'openid',
+				prompt: 'consent',
+				resource: elsewhere.resource
+			},
+			elsewhere.cookie
+		);
+
+		expect(page.view.links).toBeUndefined();
+		expect(external(page)).toEqual([]);
+	});
 });

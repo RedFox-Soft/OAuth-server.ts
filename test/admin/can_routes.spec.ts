@@ -1,11 +1,4 @@
-import {
-	describe,
-	it,
-	expect,
-	beforeAll,
-	beforeEach,
-	afterAll
-} from 'bun:test';
+import { describe, it, expect, beforeAll, afterAll } from 'bun:test';
 import { Elysia } from 'elysia';
 import { Type, type Static } from '@sinclair/typebox';
 
@@ -16,17 +9,12 @@ import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { createClient } from 'lib/admin/clients/service.ts';
 import {
 	getBucketStore,
-	getProjectStore,
 	getProtectedResourceStore,
 	getProvisioningConnectionStore,
 	getUserStore
 } from 'lib/adapters/index.ts';
 import type { User } from 'lib/adapters/types.ts';
-import {
-	ADMIN_BUCKET_ID,
-	ADMIN_PROJECT_ID,
-	DEFAULT_BUCKET_ID
-} from 'lib/admin/consts.ts';
+import { ADMIN_BUCKET_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
@@ -47,8 +35,8 @@ import {
 
 /*
  * The console hides what the server would refuse and offers what it would accept, so the rights it is
- * told have to be the server's own answer. This guard holds every bucket and project route to that: for
- * each caller and each kind of bucket or project, a route answers 403 exactly when the right the server
+ * told have to be the server's own answer. This guard holds every bucket route to that: for each caller
+ * and each kind of bucket, a route answers 403 exactly when the right the server
  * stated for that caller is false. Generated from the declaration in can_routes.ts rather than written
  * out, so a route added later is held to the same rule by adding one line — and the drift check below
  * fails until somebody does.
@@ -87,32 +75,20 @@ const BucketCan = Type.Object({
 	move: Type.Boolean(),
 	delete: Type.Boolean()
 });
-const ProjectCan = Type.Object({
-	read: Type.Boolean(),
-	edit: Type.Boolean(),
-	delete: Type.Boolean(),
-	manageClients: Type.Boolean(),
-	declareResources: Type.Boolean(),
-	assignBucket: Type.Boolean(),
-	move: Type.Boolean()
-});
 const MeCan = Type.Object({
 	createBucket: Type.Boolean(),
 	createHost: Type.Boolean(),
-	createProject: Type.Boolean(),
 	createGroup: Type.Boolean(),
 	instance: Type.Boolean()
 });
-const Named = Type.Object({ id: Type.String(), name: Type.String() });
 const BucketRead = Type.Object({
 	_id: Type.String(),
 	can: BucketCan,
 	blockers: Type.Object({
-		usedByProjects: Type.Array(Named),
 		addressable: Type.Boolean(),
 		dependents: Type.Union([
 			Type.Object({
-				projects: Type.Number(),
+				applications: Type.Number(),
 				providers: Type.Number(),
 				connections: Type.Number()
 			}),
@@ -121,12 +97,10 @@ const BucketRead = Type.Object({
 		accounts: Type.Union([Type.Number(), Type.Null()])
 	})
 });
-const ProjectRead = Type.Object({
-	_id: Type.String(),
-	can: ProjectCan,
-	blockers: Type.Object({ hasBucket: Type.Boolean() })
-});
 const MeRead = Type.Object({ can: MeCan });
+const ApiList = Type.Object({
+	namespace: Type.Union([Type.Literal('bucket'), Type.Literal('root')])
+});
 
 type Rights = Readonly<Record<string, boolean>>;
 
@@ -134,7 +108,6 @@ const CALLERS = [
 	'super administrator',
 	'group owner',
 	'group member',
-	'member reaching it only through a project',
 	'outsider'
 ] as const;
 type Caller = (typeof CALLERS)[number];
@@ -149,21 +122,11 @@ const BUCKETS = [
 ] as const;
 type BucketKind = (typeof BUCKETS)[number];
 
-const PROJECTS = [
-	'without a bucket',
-	'with a bucket',
-	'administrators'
-] as const;
-type ProjectKind = (typeof PROJECTS)[number];
-
 interface World {
 	readonly cookies: Readonly<Record<Caller, string>>;
 	readonly users: Readonly<Record<Caller, User>>;
 	readonly buckets: Readonly<Record<BucketKind, string>>;
-	readonly projects: Readonly<Record<ProjectKind, string>>;
 	readonly placeholders: Readonly<Record<string, string>>;
-	readonly throughProjectName: string;
-	readonly bucketedName: string;
 	readonly owningGroupId: string;
 }
 
@@ -171,37 +134,22 @@ const RESOURCE = `https://can-routes-${nanoid()
 	.toLowerCase()
 	.replace(/[^a-z0-9]/g, '')}.example.com/api`;
 
-async function heldClient(): Promise<string> {
-	const { view } = await createClient({
+/* An application an administrator registered in the bucket: what keeps the bucket from being deleted. */
+async function holdApplication(bucketId: string): Promise<void> {
+	await createClient(bucketId, {
 		clientId: nanoid(),
 		grantTypes: ['authorization_code'],
 		redirectUris: ['https://app.example.com/cb'],
 		tokenEndpointAuthMethod: 'none'
 	});
-	return view.clientId;
-}
-
-async function project(
-	ownerGroupId: string,
-	bucketId: string,
-	clientIds: string[] = []
-) {
-	const id = nanoid().toLowerCase();
-	return getProjectStore().create({
-		name: `project ${id}`,
-		slug: `p-${id}`.replace(/[^a-z0-9-]/g, ''),
-		ownerGroupId,
-		bucketId,
-		clientIds
-	});
 }
 
 /*
- * A regular bucket and one with no address, both owned by a group with an owner and a plain member; a second
- * group whose only tie to every bucket is a project pointing at it — the reserved two included; an outsider;
- * a super administrator; and a destination group the members belong to, so a move is decided by its rights
- * and not by where it was asked to go. Two more buckets of the owning group carry the state two rights depend
- * on (specs/081): one nothing uses and that holds no accounts, and one no project uses that holds an account.
+ * A regular bucket and one with no address, both owned by a group with an owner and a plain member and each
+ * holding an application; an outsider; a super administrator; and a destination group the members belong to,
+ * so a move is decided by its rights and not by where it was asked to go. Two more buckets of the owning group
+ * carry the state two rights depend on (specs/081): one that holds nothing at all, and one that holds an
+ * account and no application.
  * Built fresh per route, because some routes the right admits do change what the next caller finds — the
  * unused bucket is deleted by the first caller whose right admits it, and every later caller is then refused
  * it as a bucket that does not exist, which a caller who is not a super administrator cannot tell apart.
@@ -212,7 +160,6 @@ async function world(): Promise<World> {
 		'super administrator': await createAdministrator('super'),
 		'group owner': await createAdministrator(),
 		'group member': await createAdministrator(),
-		'member reaching it only through a project': await createAdministrator(),
 		outsider: await createAdministrator()
 	} satisfies Record<Caller, User>;
 
@@ -220,12 +167,9 @@ async function world(): Promise<World> {
 		[users['group owner']],
 		[users['group member']]
 	);
-	const reaching = await regularGroup([
-		users['member reaching it only through a project']
-	]);
 	const destination = await regularGroup(
 		[users['group owner']],
-		[users['group member'], users['member reaching it only through a project']]
+		[users['group member']]
 	);
 
 	const id = nanoid()
@@ -252,14 +196,8 @@ async function world(): Promise<World> {
 	});
 	await getUserStore(holding._id).create(`held-${id}@x.io`, 'hash', true);
 
-	const bucketed = await project(owning._id, regular._id, [await heldClient()]);
-	const alone = await project(owning._id, DEFAULT_BUCKET_ID, [
-		await heldClient()
-	]);
-	const throughProject = await project(reaching._id, regular._id);
-	await project(reaching._id, unaddressable._id);
-	await project(reaching._id, DEFAULT_BUCKET_ID);
-	await project(reaching._id, ADMIN_BUCKET_ID);
+	await holdApplication(regular._id);
+	await holdApplication(unaddressable._id);
 
 	const cookies = {} as Record<Caller, string>;
 	for (const caller of CALLERS)
@@ -276,19 +214,11 @@ async function world(): Promise<World> {
 			unused: unused._id,
 			'holding accounts': holding._id
 		},
-		projects: {
-			'without a bucket': alone._id,
-			'with a bucket': bucketed._id,
-			administrators: ADMIN_PROJECT_ID
-		},
 		placeholders: {
 			':destination': destination._id,
 			':taken-bucket-slug': `cr-${id}`,
-			':taken-project-slug': alone.slug,
 			':resource': RESOURCE
 		},
-		throughProjectName: throughProject.name,
-		bucketedName: bucketed.name,
 		owningGroupId: owning._id
 	};
 }
@@ -328,63 +258,59 @@ function bodyFor(
 
 const NO_RIGHTS: Rights = new Proxy({}, { get: () => false });
 
+async function meRights(cookie: string): Promise<Rights> {
+	return shaped(MeRead, (await request('GET', '/admin/api/me', cookie)).body)
+		.can;
+}
+
 /*
- * What the console is told about this caller and this entity. A caller refused the read is offered
- * nothing, so every right is false for them.
+ * Whether the console is told the caller may do what this route does, to this entity. A caller refused the
+ * read is offered nothing, so every right is false for them. A write to APIs that live in the shared root
+ * namespace is offered as the console offers it: on the bucket's right and the caller's own right together,
+ * with the namespace read from the API list as the console reads it.
  */
-async function statedRights(
+async function statedRight(
 	route: StatedRightRoute,
 	cookie: string,
 	entityId: string
-): Promise<Rights> {
-	if (route.on === 'me') {
-		return shaped(MeRead, (await request('GET', '/admin/api/me', cookie)).body)
-			.can;
-	}
-	const read = await request(
-		'GET',
-		`/admin/api/${route.on === 'bucket' ? 'buckets' : 'projects'}/${encodeURIComponent(entityId)}`,
-		cookie
+): Promise<boolean> {
+	if (route.on === 'me') return (await meRights(cookie))[route.flag] ?? false;
+	const base = `/admin/api/buckets/${encodeURIComponent(entityId)}`;
+	const read = await request('GET', base, cookie);
+	const rights: Rights =
+		read.status === 403 ? NO_RIGHTS : shaped(BucketRead, read.body).can;
+	const bucketRight = rights[route.flag] ?? false;
+	if (!bucketRight || route.atRoot === undefined) return bucketRight;
+	const apis = shaped(
+		ApiList,
+		(await request('GET', `${base}/resources`, cookie)).body
 	);
-	if (read.status === 403) return NO_RIGHTS;
-	return route.on === 'bucket'
-		? shaped(BucketRead, read.body).can
-		: shaped(ProjectRead, read.body).can;
+	return (
+		apis.namespace === 'bucket' ||
+		((await meRights(cookie))[route.atRoot] ?? false)
+	);
 }
 
 function entitiesFor(route: StatedRightRoute, w: World): [string, string][] {
 	if (route.on === 'bucket') return BUCKETS.map((k) => [k, w.buckets[k]]);
-	if (route.on === 'project') return PROJECTS.map((k) => [k, w.projects[k]]);
 	return [['the caller', '']];
 }
 
 const key = (r: { method: string; path: string }) => `${r.method} ${r.path}`;
 
 /**
- * @proves Every bucket and project route refuses a caller with 403 exactly when the right the server
- * stated for that caller is false, every such route is governed by a declared right, and an agent is
- * stated the same rights as the console.
+ * @proves Every bucket route refuses a caller with 403 exactly when the right the server stated for that
+ * caller is false, every such route is governed by a declared right, and an agent is stated the same
+ * rights as the console.
  */
-describe('stated rights on buckets and projects', () => {
-	let adminProjectBucket = ADMIN_BUCKET_ID;
-
+describe('stated rights on buckets', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'can_routes' });
 		await ensureAdminSeed();
-		adminProjectBucket =
-			(await getProjectStore().find(ADMIN_PROJECT_ID))?.bucketId ??
-			ADMIN_BUCKET_ID;
 	});
 
 	afterAll(async () => {
-		/*
-		 * The matrix lets a super administrator change the console's own project's bucket and declare a
-		 * resource in the root namespace. Both are put back, because every spec after this one signs in
-		 * through that project.
-		 */
-		await getProjectStore().update(ADMIN_PROJECT_ID, {
-			bucketId: adminProjectBucket
-		});
+		/* The matrix lets a super administrator declare an API in the shared root namespace; it is put back. */
 		await getProtectedResourceStore().destroy(ROOT_NAMESPACE, RESOURCE);
 	});
 
@@ -393,7 +319,7 @@ describe('stated rights on buckets and projects', () => {
 			.filter((route) => isGovernedSurface(route.method, route.path))
 			.map((route) => ({ method: route.method, path: route.path }));
 
-		it('governs every mounted bucket and project route by a stated right or a recorded exclusion', () => {
+		it('governs every mounted bucket route by a stated right or a recorded exclusion', () => {
 			const declared = new Set([
 				...statedRightRoutes.map(key),
 				...excludedRightRoutes.map(key)
@@ -415,26 +341,19 @@ describe('stated rights on buckets and projects', () => {
 	});
 
 	describe('a route refuses a caller exactly when the stated right is false', () => {
-		beforeEach(async () => {
-			await getProjectStore().update(ADMIN_PROJECT_ID, {
-				bucketId: adminProjectBucket
-			});
-		});
-
 		for (const route of statedRightRoutes) {
-			it(`${route.method} ${route.path} answers 403 exactly when ${route.on === 'me' ? 'the caller' : `the ${route.on}`} states ${route.flag} false`, async () => {
+			it(`${route.method} ${route.path} answers 403 exactly when ${route.on === 'me' ? 'the caller' : 'the bucket'} states ${route.flag} false${route.on === 'bucket' && route.atRoot ? ` or, at the root namespace, the caller states ${route.atRoot} false` : ''}`, async () => {
 				const w = await world();
 				const mismatches: string[] = [];
 				let asked = 0;
 
 				for (const caller of CALLERS) {
 					for (const [kind, entityId] of entitiesFor(route, w)) {
-						const rights = await statedRights(
+						const stated = await statedRight(
 							route,
 							w.cookies[caller],
 							entityId
 						);
-						const stated = rights[route.flag];
 						const { status } = await request(
 							route.method,
 							pathFor(route, entityId),
@@ -444,7 +363,7 @@ describe('stated rights on buckets and projects', () => {
 						asked += 1;
 						if (status === 403 ? stated : !stated) {
 							mismatches.push(
-								`${caller} on the ${kind} ${route.on}: answered ${String(status)} while ${route.flag} is ${String(stated)}`
+								`${caller} on the ${kind} ${route.on}: answered ${String(status)} while the stated right is ${String(stated)}`
 							);
 						} else if (status >= 500) {
 							mismatches.push(
@@ -480,22 +399,6 @@ describe('stated rights on buckets and projects', () => {
 			);
 		}
 
-		it('states the right to manage users but not to change the bucket to an administrator who reaches it only through a project', async () => {
-			const { can } = await bucketAs(
-				'member reaching it only through a project',
-				'regular'
-			);
-
-			expect(can).toMatchObject({
-				read: true,
-				manageUsers: true,
-				editSettings: false,
-				edit: false,
-				move: false,
-				delete: false
-			});
-		});
-
 		it('states the right to move a bucket to an owner of its group and not to a plain member', async () => {
 			const owner = await bucketAs('group owner', 'regular');
 			const member = await bucketAs('group member', 'regular');
@@ -530,22 +433,6 @@ describe('stated rights on buckets and projects', () => {
 			});
 		});
 
-		it('names the projects still using a bucket among the reasons it cannot be deleted', async () => {
-			const { blockers } = await bucketAs('super administrator', 'regular');
-
-			expect(blockers.usedByProjects.map((p) => p.name).sort()).toEqual(
-				[w.bucketedName, w.throughProjectName].sort()
-			);
-		});
-
-		it('never names a project the caller cannot reach among a bucket’s blockers', async () => {
-			const { blockers } = await bucketAs('group owner', 'regular');
-
-			expect(blockers.usedByProjects.map((p) => p.name)).toEqual([
-				w.bucketedName
-			]);
-		});
-
 		it('reports whether a bucket has an address of its own', async () => {
 			const regular = await bucketAs('super administrator', 'regular');
 			const legacy = await bucketAs('super administrator', 'not addressable');
@@ -565,13 +452,13 @@ describe('stated rights on buckets and projects', () => {
 				false
 			]);
 			expect(owner.blockers.dependents).toEqual({
-				projects: 0,
+				applications: 0,
 				providers: 0,
 				connections: 0
 			});
 		});
 
-		it('states the right to change the address of a bucket a project uses to a super administrator only, and tells an owner what depends on it', async () => {
+		it('states the right to change the address of a bucket holding an application to a super administrator only, and tells an owner what depends on it', async () => {
 			const owner = await bucketAs('group owner', 'regular');
 			const superAdmin = await bucketAs('super administrator', 'regular');
 
@@ -579,9 +466,8 @@ describe('stated rights on buckets and projects', () => {
 				false,
 				true
 			]);
-			/* Counted across the instance: the project another group points at it counts too. */
 			expect(owner.blockers.dependents).toEqual({
-				projects: 2,
+				applications: 1,
 				providers: 0,
 				connections: 0
 			});
@@ -664,16 +550,6 @@ describe('stated rights on buckets and projects', () => {
 			expect(member.blockers.accounts).toBe(0);
 		});
 
-		it('reports a project that uses a bucket as one that moves only with it', async () => {
-			const read = await request(
-				'GET',
-				`/admin/api/projects/${w.projects['with a bucket']}`,
-				w.cookies['group owner']
-			);
-
-			expect(shaped(ProjectRead, read.body).blockers.hasBucket).toBe(true);
-		});
-
 		it('states the same rights on every row of the bucket list as on the bucket itself', async () => {
 			const caller = 'super administrator';
 			const rows = shaped(
@@ -692,34 +568,6 @@ describe('stated rights on buckets and projects', () => {
 						await request(
 							'GET',
 							`/admin/api/buckets/${row._id}`,
-							w.cookies[caller]
-						)
-					).body
-				);
-				expect(row.can).toEqual(own.can);
-				expect(row.blockers).toEqual(own.blockers);
-			}
-		});
-
-		it('states the same rights on every row of the project list as on the project itself', async () => {
-			const caller = 'group owner';
-			await request('PUT', '/admin/api/scope', w.cookies[caller], {
-				groupId: (await getProjectStore().find(w.projects['with a bucket']))
-					?.ownerGroupId
-			});
-			const rows = shaped(
-				Type.Array(ProjectRead),
-				(await request('GET', '/admin/api/projects', w.cookies[caller])).body
-			);
-
-			expect(rows.length).toBeGreaterThan(0);
-			for (const row of rows) {
-				const own = shaped(
-					ProjectRead,
-					(
-						await request(
-							'GET',
-							`/admin/api/projects/${row._id}`,
 							w.cookies[caller]
 						)
 					).body
@@ -783,24 +631,6 @@ describe('stated rights on buckets and projects', () => {
 
 			expect(agent.can).toEqual(viaConsole.can);
 			expect(agent.can.edit).toBe(true);
-		});
-
-		it('receives the same stated rights on a project as the console', async () => {
-			const id = w.projects['without a bucket'];
-			const viaConsole = shaped(
-				ProjectRead,
-				(
-					await request(
-						'GET',
-						`/admin/api/projects/${id}`,
-						w.cookies['group owner']
-					)
-				).body
-			);
-			const agent = shaped(ProjectRead, await viaAgent('project_get', id));
-
-			expect(agent.can).toEqual(viaConsole.can);
-			expect(agent.can.delete).toBe(true);
 		});
 	});
 });

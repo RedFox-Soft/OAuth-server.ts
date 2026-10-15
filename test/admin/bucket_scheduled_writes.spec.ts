@@ -6,7 +6,7 @@ import bootstrap from '../test_helper.js';
 import { elysia } from 'lib/index.ts';
 import { adminApiRoutes } from 'lib/admin/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { getBucketStore, getProjectStore } from 'lib/adapters/index.ts';
+import { getBucketStore } from 'lib/adapters/index.ts';
 import type { UserBucket } from 'lib/adapters/types.ts';
 import { purgeAtOf } from 'lib/consts/bucket_deletion.ts';
 import nanoid from 'lib/helpers/nanoid.ts';
@@ -14,7 +14,6 @@ import { shaped } from 'test/shape.ts';
 import { createAdministrator } from '../administrators.ts';
 import { cookieFor, regularGroup } from './ownership_fixtures.ts';
 import { statedRightRoutes } from './can_routes.ts';
-import { DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 
 /*
  * Every request goes through the admin route set the console and the agent surface both mount, so what holds
@@ -116,7 +115,7 @@ async function scheduled(groupId: string): Promise<UserBucket> {
  * @proves For every mounted route that changes a bucket or anything it holds, a bucket scheduled for deletion
  * refuses the change with a message saying it must be restored first — to the console and to an agent alike —
  * while a caller who may not read the bucket is refused exactly as before and never told it is scheduled;
- * reading it keeps working, and no project can be pointed at it.
+ * reading it keeps working.
  */
 describe('a bucket scheduled for deletion, administered', () => {
 	let owner: string;
@@ -186,44 +185,4 @@ describe('a bucket scheduled for deletion, administered', () => {
 			expect(res.status).toBe(200);
 		}
 	);
-
-	it('refuses to point a project at it', async () => {
-		const bucket = await scheduled(groupId);
-		const project = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			name: `p ${bucket._id}`,
-			slug: `p-${bucket._id}`.toLowerCase().replace(/[^a-z0-9-]/g, ''),
-			ownerGroupId: groupId
-		});
-
-		const res = await request(
-			'PUT',
-			`/admin/api/projects/${project._id}/bucket`,
-			owner,
-			{ bucketId: bucket._id }
-		);
-
-		expect(res.status).toBe(409);
-		expect(shaped(Refusal, res.body).message).toBe(
-			'That bucket is scheduled for deletion.'
-		);
-	});
-
-	it('refuses to create a project signing into it', async () => {
-		const bucket = await scheduled(groupId);
-
-		const res = await request('POST', '/admin/api/projects', owner, {
-			name: 'New',
-			slug: `new-${nanoid()
-				.toLowerCase()
-				.replace(/[^a-z0-9]/g, '')}`,
-			groupId,
-			bucketId: bucket._id
-		});
-
-		expect(res.status).toBe(409);
-		expect(shaped(Refusal, res.body).message).toBe(
-			'That bucket is scheduled for deletion.'
-		);
-	});
 });

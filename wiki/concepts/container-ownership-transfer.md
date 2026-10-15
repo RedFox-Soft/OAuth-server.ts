@@ -4,59 +4,37 @@ title: 'Moving a container to another group'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-10-10
-updated: 2026-10-13
+updated: 2026-10-15
 ---
 
 # Moving a container to another group
 
-A bucket and the projects that use it move from one administrator group to another as **one change**
-(specs/075): `PUT /admin/api/buckets/:id/owner` (`lib/admin/buckets/routes.ts:561`). A project on the
-Default bucket moves alone: `PUT /admin/api/projects/:id/owner` (`lib/admin/projects/routes.ts`). Until
-spec 098 that was "a project with no bucket"; every project now names one, the Default bucket never moves,
-and the store's `moveProject` gate is `bucketId = 'redfox'` on all three backends.
-These two routes are the only writers of a container's `ownerGroupId` after creation. `ownerGroupId` still
-appears in no create or update body (`lib/admin/groups/schema.ts:3-7`).
+A bucket moves from one administrator group to another with `PUT /admin/api/buckets/:id/owner`
+(spec 075; `lib/admin/buckets/routes.ts:1122-1186`). Since spec 099 the bucket is the only
+container ([[bucket-is-the-only-container]]), so this is the only move. Until then a project moved with its
+bucket, and a project on the Default bucket moved alone through `PUT /admin/api/projects/:id/owner`; that
+route and the project are gone. The bucket route is the only writer of a container's `ownerGroupId` after
+creation. `ownerGroupId` still appears in no create or update body (`lib/admin/groups/schema.ts:3-7`).
 
 The operation exists because a personal group stopped being shareable in the same change (see
 [[group-ownership]]). Work started in someone's own workspace needs a way into a team's.
 
-## Why the bucket and its projects move together
+## Why what the bucket holds moves with it
 
-Three things compare a project's owner with the owner of the bucket it signs into:
+Three things compare an application's bucket with the bucket it signs into:
 
-- consent is waived only where they match (`consentWaived`, `lib/shared/consent_waiver.ts:33-45`);
-- a project's group may administer the end users of its bucket (the bucket's `manageUsers` right,
-  `bucketCan` in `lib/admin/auth/can.ts` since spec 079);
+- consent is waived only where they match (`consentWaived`, `lib/shared/consent_waiver.ts:33-44`);
+- the bucket's group administers the end users that application signs in (`bucketCan`,
+  `lib/admin/auth/can.ts:186-213`);
 - since spec 092, the consent page calls a client "this organization's" only where they match, and
-  "operator-registered" otherwise (`clientProvenance`, `lib/models/client/provenance.ts:68-78`). The waiver
-  and the page share the comparison, `projectGroupOwnsBucket` (`provenance.ts:38-45`). See
+  "operator-registered" otherwise (`clientProvenance`, `lib/models/client/provenance.ts:68-79`). The waiver
+  and the page share the comparison, `clientBelongsToBucket` (`provenance.ts:40-47`). See
   [[consent-screen-decisions]].
 
-Moving one without the other would change all three, and nobody would have decided that. This is the same reason
-`PUT /admin/api/projects/:id/bucket` refuses to bind a project to another group's bucket.
-
-## Changing a project's bucket is previewed (spec 085)
-
-Pointing a project at another bucket gives every application of the project a new issuer. (Spec 085 also
-had `DELETE …/bucket`, back to Default; spec 098 removed it — a project always names a bucket, and only a
-super administrator may point one at the Default bucket, from any group.) Everyone signed in through them must sign in again, because the account lookup follows
-the project's current bucket while their refresh tokens name the old one. Both routes are preview-then-confirm
-(`lib/admin/projects/routes.ts`):
-
-- The rights and state refusals above come first.
-- Without `confirm`, the route answers 409 naming the applications, `from`/`to` (bucket, name and issuer), the
-  declarations that move (`previewMove`, `lib/admin/resources/move.ts`), `conflicts`, `rootRefused`, and
-  `expect: {applications, resources}`. Nothing is audited.
-- A confirm with other counts gets the fresh preview. A blocked change is still refused at confirm by
-  `planMove`.
-
-Tokens are deliberately left alone (owner decision, 2026-10-11): refresh tokens and grants are not revoked.
-They fail against the new bucket and would work again if the project moved back, and issued access tokens
-verify until they expire. The preview says so instead.
-
-The audit entry records the destination as `bucketId` and the previous bucket as `formerBucketId`, so the
-change appears in both buckets' trails ([[admin-audit-trail]]). In the console the change lives on the
-project's Settings tab, in the Bucket card. The bucket's Overview only starts it ("Use in a project…").
+Until spec 099 those compared a project's group with the bucket's group, so a move had to carry every
+project using the bucket in one change, or nobody would have decided the consequences. Now an application and
+an API store the bucket's id, not a group, so they follow it **by reference**: the move writes the bucket
+alone, and no state exists in which part of a bucket is in one group and part in another.
 
 ## Who may move what
 
@@ -64,122 +42,87 @@ project's Settings tab, in the Bucket card. The bucket's Overview only starts it
 - **Joining a group** needs only membership: any member may already create containers there, so receiving
   one grants nothing new. The owner chose this rule (spec Q2).
 - **Never a destination**: another administrator's personal group, Super administrators, and the group the
-  container is already in. **Never moved**: the administrators' bucket, the default bucket (shared by
-  projects of every group) and the console's own project.
+  container is already in. **Never moved**: the administrators' bucket and the Default bucket
+  (`isUndeletableBucket`, checked before the bucket is loaded).
 
-`loadDestination` (`lib/admin/ownership/destination.ts:27`) refuses in an order that reveals nothing.
+`loadDestination` (`lib/admin/ownership/destination.ts:27-44`) refuses in an order that reveals nothing.
 Membership is checked before anything about the group's kind is said, so a caller outside the destination
-gets the same answer as for an unknown id. The project route refuses `type === 'admin'` explicitly
-(through `mayMoveProject`, `lib/admin/auth/can.ts`), because `loadProject` admits a super administrator to
-the console's project. The bucket route checks `isUndeletableBucket` before loading.
+gets the same answer as for an unknown id.
 
-Since spec 079 both routes decide the caller's right — the `move` flag the console and agents are shown —
-before the destination and the source rule below: for a project, owning its group; for a bucket, owning its
-group or a group whose project uses it (`bucketCan`). A member without it gets 403, where before it could
-get a 409 that described how the container was attached. `assertGroupOwner(from)` still runs after the
-source rule, so a body-dependent case (moving a mixed-group bucket into the group of its stray project)
-can still answer 403 to a caller the flag admitted.
+Since spec 079 the route decides the caller's right — the `move` flag the console and agents are shown —
+before the destination: owning the bucket's group, or being a super administrator (`bucketCan`,
+`can.ts:208-210`). A member without it gets 403, never a 409 describing the bucket.
 
-## The source rule, and why a repeated move completes
+## The source rule
 
-`sourceGroupOf` (`destination.ts:70`) takes the owners of the bucket and of every project using it, drops
-the destination, and requires exactly one group to remain:
+`sourceGroupOf` (`destination.ts:64-74`) takes the bucket's owner, drops the destination, and requires a group
+to remain: none left → 409 `already owned by this group`. Until spec 099 it took the owners of the bucket and
+of every project using it, so a move could repair a half-done move or a project in a different group from its
+bucket; with one owner there is nothing to repair. `assertGroupOwner(from)` then runs as before.
 
-- **none left** → 409 `already owned by this group`;
-- **two or more** → 409, naming no group;
-- **one** → that group is the source.
+## One conditional write
 
-Dropping the destination first is what makes two awkward states repairable without a special path:
+The write goes through `ContainerOwnershipStore.moveBucket` (`lib/adapters/types.ts:2084-2093`), which sets
+`ownerGroupId = to` only while the bucket is still in `from`, and answers `{status: 'conflict'}` otherwise.
+It is a single conditional update on all three backends (for example
+`lib/adapters/postgres/containerOwnershipStore.ts`), so of two racing moves only one finds the bucket in a
+group it may leave; the route answers the other with 409. Business logic still gets no transaction from the
+adapter contract, and now needs none.
 
-- a move that a standalone `mongod` left half-done, with the bucket in the destination and some projects
-  still in the source;
-- legacy data where a project is in a different group from its bucket. Moving the bucket into the project's
-  group repairs it.
-
-## One change, per backend
-
-The write goes through `ContainerOwnershipStore` (`lib/adapters/types.ts:1740`). Business logic gets no
-transaction from the adapter contract. Each method re-checks its precondition inside the write — every
-owner involved is `from` or already `to` — and changes nothing otherwise.
-
-| Backend | How the move is one change |
-|---|---|
-| PostgreSQL | one transaction, with the bucket row locked first |
-| MongoDB, replica set | a transaction |
-| MongoDB, standalone | ordered conditional writes: the bucket first, then its projects |
-| Memory | no `await` between the check and the last write |
-
-**Bucket first** on a standalone `mongod`, because the bucket's conditional write is the lock. Of two
-racing moves only one finds the bucket still in a group it may leave. The real-database check for this
-lives in `database/verify_container_ownership.ts`. The remaining half-done window is the declared
-`container-move-atomicity` divergence (`lib/consts/storage_divergences.ts:85`). While it lasts, consent is
-*not* waived for the bucket's clients, which is the safe direction. For the same reason the consent page
-speaks of them as another group's apps (operator-registered) until the projects follow, which is the
-cautious reading too.
-
-The store finds the bound projects inside the write instead of taking a list. A project bound a moment
-earlier therefore still moves.
-
-## A binding that races a move
-
-One race remains:
-
-1. a bind request reads the bucket while it is still in the source group;
-2. the move commits;
-3. the bind writes.
-
-The bind route re-reads the bucket after its write (`projects/routes.ts:358`). If the owners now differ, it
-restores the previous binding and the declaration namespace, then answers the same 409. Whichever of the
-two writes comes second sees the other, so this needs no lock.
-
-The reverted bind still leaves its `project.bucket.assign` entry. An entry records that an authorized actor
-reached the change, not that the change held ([[admin-audit-trail]]).
+Until spec 099 the move also rewrote every project using the bucket. On a standalone `mongod` that was
+ordered conditional writes, bucket first, which left a half-done window declared as the
+`container-move-atomicity` divergence, and a bind route that re-read the bucket after its write to undo a
+binding raced by a move. Both are gone with the projects, and so is the divergence
+(`lib/consts/storage_divergences.ts`). `database/verify_container_ownership.ts` checks the conditional write
+against real databases.
 
 ## The trail sees both groups
 
 A move writes one entry:
 
 - `ownerGroupId` is the group the container joined;
-- `formerOwnerGroupId` is the group it left (`types.ts:606`, `lib/admin/audit/record.ts:199`).
+- `formerOwnerGroupId` is the group it left (`types.ts:700`, `lib/admin/audit/record.ts:261-263`).
 
 The group-scoped read matches either field in all three backends:
 
-- memory: `admin_audit_query.ts:90`;
-- MongoDB: `adminAuditStore.ts:54`;
-- PostgreSQL: `adminAuditStore.ts:75`.
+- memory: `admin_audit_query.ts:123`;
+- MongoDB: `adminAuditStore.ts:88`;
+- PostgreSQL: `adminAuditStore.ts:110`.
 
-Each field has its own index (`storage_inventory.ts:731`).
+Each field has its own index (`storage_inventory.ts:781`).
 
 A second field is used rather than a second entry, because one action writes one entry and audit-first
 could not write two atomically. Entries written before a move keep the group that owned the container at
 the time; they are never re-derived. The joining group sees the container's history from the move onward.
 
-**`cascade` is no longer only a deletion's.** A bucket move counts the projects that moved with it there
-(`{ projects: n }`), and the personal-group migration counts the members it removed. One entry still covers
-everything the action reached, as [[deletion-and-revocation]] argues for deletions. The verb belongs to the
-action, though, so the console's column is now **Also affected** and derives the word from `action`: moved,
-removed or destroyed (`lib/admin/ui/pages/Audit.tsx`). It was titled "Also destroyed", and a move read
-there as two destroyed projects — found while walking the console through a move.
+**`cascade` is no longer only a deletion's.** A bucket move counts what moved with it
+(`{ applications, apis }` since spec 099, `{ projects }` before), and the personal-group migration counts the
+members it removed. One entry still covers everything the action reached, as [[deletion-and-revocation]]
+argues for deletions. The verb belongs to the action, though, so the console's column is **Also affected**
+and derives the word from `action`: moved, removed or destroyed (`lib/admin/ui/pages/Audit.tsx:364-375`). It
+was titled "Also destroyed", and a move read there as two destroyed projects — found while walking the
+console through a move.
 
 ## The agent sees the preview
 
-Both routes refuse without `confirm: true`, answering 409 with a preview that names the projects. The MCP
-gate's consequence report reads no entity state, so it cannot provide that list itself. Until this change,
-`toOutcome` reduced every 409 to `conflict: the operation was refused`, so an agent never saw a preview,
+The route refuses without `confirm: true`, answering 409 with a preview: `from`, `to`, the bucket, and the
+counts of `applications` and `apis` that move with it, plus the consequence in words. The MCP gate's
+consequence report reads no entity state, so it cannot provide that itself. Until spec 075, `toOutcome`
+reduced every 409 to `conflict: the operation was refused`, so an agent never saw a preview,
 `bucket_address_change`'s included. It now passes a `confirmationRequired` body through whole as `preview`
-(`lib/mcp/result.ts:79`).
+(`lib/mcp/result.ts:79`). A confirmed move answers `{ bucket: { id, ownerGroupId } }`.
 
 A confirmation token binds the arguments, and `confirm` is one of them. An agent therefore confirms the
-preview and the move separately. Both tools are `high`.
+preview and the move separately. `bucket_owner_change` is `high`.
 
 ## Making personal groups personal on upgrade
 
-Migration `2026-10-09-personal-groups-single-member` (`lib/consts/migrations.ts:757`) removes every member
+Migration `2026-10-09-personal-groups-single-member` (`lib/consts/migrations.ts:768`) removes every member
 of a personal group except its first, and makes that one the owner. Before writing the group, it writes one
 `group.member.remove` entry per group with:
 
 - the deterministic id `<migration>:<group>`, so a rerun inserts nothing;
-- actor `system:migration` (`lib/consts/admin_audit_routes.ts:623`);
+- actor `system:migration` (`lib/consts/admin_audit_routes.ts:758`);
 - `cascade: { members: n }`.
 
 The entry counts the removed members and names none. The trail records field names and counts, never
@@ -190,16 +133,17 @@ reversible, and `db:migrate --plan` says so.
 ## Known residual race
 
 A move into a group that is being deleted at the same moment can leave the container owned by a group that
-no longer exists. Group deletion checks for emptiness, then destroys (`lib/admin/groups/routes.ts`, the
+no longer exists. Group deletion checks for emptiness, then destroys (`lib/admin/groups/routes.ts:284`, the
 `DELETE /admin/api/groups/:id` handler). The same race already exists for creating a container into a group
 being deleted. A super administrator can move the orphan out. It is recorded here rather than fixed.
 
 ## Related
 
+- [[bucket-is-the-only-container]] — why projects were removed, and what a bucket holds instead.
 - [[group-ownership]] — the ownership model this moves within, and why a personal group is no longer
   shareable.
 - [[admin-audit-trail]] — the two-field group-scoped read.
-- [[admin-mcp-control-plane]] — the two `high` tools and the preview pass-through.
+- [[admin-mcp-control-plane]] — the `high` tool and the preview pass-through.
 - [[postgresql-backend]] — the migration machinery and the divergence register.
 
 Verified against [[oauth-server-codebase]].

@@ -120,6 +120,12 @@ export const CreateClientBody = t.Object({
 	// must opt in explicitly. Validation is delegated to validateClient, which recognizes the metadata
 	// only when the feature is enabled and checks each value against the configured types.
 	authorizationDetailsTypes: t.Optional(t.Array(t.String())),
+	/*
+	 * Web origins whose browser code may read this application's cross-origin responses (specs/099).
+	 * Typed only as strings here: the origin rule runs in the handler, so a refusal can name the
+	 * offending value (lib/helpers/cors_origin.ts).
+	 */
+	corsOrigins: t.Optional(t.Array(t.String())),
 	...creatable,
 	...presented
 });
@@ -146,6 +152,7 @@ export const UpdateClientBody = t.Object({
 		t.Union([t.Literal('poll'), t.Literal('ping')])
 	),
 	backchannelClientNotificationEndpoint: t.Optional(t.String()),
+	corsOrigins: t.Optional(t.Array(t.String())),
 	authorizationDetailsTypes: t.Optional(t.Array(t.String())),
 	...editable,
 	...presentedEditable

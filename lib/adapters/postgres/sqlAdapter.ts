@@ -1,3 +1,4 @@
+import { assertIndexedField } from '../../consts/storage_inventory.js';
 import { sql } from './db.js';
 import { payloadOf } from './json.js';
 import type { ModelAdapter } from '../types.js';
@@ -121,6 +122,12 @@ export class SqlAdapter<
 				(payload: StoredRecord | undefined): payload is StoredRecord =>
 					payload !== undefined
 			);
+	}
+
+	/* `field` is a declared index of this area, bound as a parameter like the owner fields above. */
+	async findByIndexed(field: string, value: string): Promise<StoredRecord[]> {
+		assertIndexedField(this.name, field);
+		return this.findByOwner(field, value);
 	}
 
 	async destroyByOwner(field: string, value: string): Promise<number> {

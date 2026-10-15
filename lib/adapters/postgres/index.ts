@@ -3,7 +3,6 @@ export { configStore } from './configStore.js';
 export { UserStore } from './userStore.js';
 export { GroupStore } from './groupStore.js';
 export { GroupInvitationStore } from './groupInvitationStore.js';
-export { ProjectStore } from './projectStore.js';
 export { ProtectedResourceStore } from './protectedResourceStore.js';
 export { ProvisioningConnectionStore } from './provisioningConnectionStore.js';
 export { ProvisioningRefusalStore } from './provisioningRefusalStore.js';

@@ -21,8 +21,8 @@ export function NotFound({
 			title="Page not found"
 			subTitle="There is nothing at this address in the console."
 			extra={
-				<Link href={backHref ?? '/admin/projects'}>
-					{backLabel ?? 'Go to Projects'}
+				<Link href={backHref ?? '/admin/buckets'}>
+					{backLabel ?? 'Go to Buckets'}
 				</Link>
 			}
 		/>
@@ -53,7 +53,7 @@ export function InstanceOnly() {
 		<Result
 			status="403"
 			title="Only an instance administrator can open this page"
-			extra={<Link href="/admin/projects">Go to Projects</Link>}
+			extra={<Link href="/admin/buckets">Go to Buckets</Link>}
 		/>
 	);
 }

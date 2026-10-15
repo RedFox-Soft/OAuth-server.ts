@@ -4,7 +4,7 @@ title: "Client identity from the database"
 tags: [contract, architecture, oauth]
 sources: [oauth-server-codebase]
 created: 2026-07-31
-updated: 2026-09-28
+updated: 2026-10-15
 graph:
   node_type: concept
 ---
@@ -114,8 +114,10 @@ re-checked until the client is next written. OIDC Core §8.1 places the check at
 
 What a caller writes is wire metadata only. The base attributes the validator copies verbatim
 (`BASE_METADATA_KEYS`, `lib/models/client/wire.ts:43`) are canonical names, and the translation from
-wire form drops any of them it finds (`wire.ts:90`), so a registration body or a client document
-cannot spell one. Until 2026-09-28 they passed through: `clientId` placed after the server's own
+wire form drops any of them it finds (`CANONICAL_ONLY`, `wire.ts:94`), so a registration body or a client
+document cannot spell one. Since spec 099 that includes `bucketId` and `corsOrigins` (`wire.ts:76-77`), the
+bucket a client belongs to and its allowed browser origins, which only the server writes
+([[client-registration-attributes]]). Until 2026-09-28 they passed through: `clientId` placed after the server's own
 `client_id` overwrote any stored client, the console's included, and `consent.require: false` switched
 off the consent screen for a self-registered or document-identified client
 (`test/registration_management/internal_keys.spec.ts`, `test/cimd/internal_keys.spec.ts`). The console

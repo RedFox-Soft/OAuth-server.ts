@@ -2,7 +2,6 @@ import { Elysia } from 'elysia';
 import {
 	getGroupStore,
 	getGroupInvitationStore,
-	getProjectStore,
 	getBucketStore,
 	getUserStore
 } from '../../adapters/index.js';
@@ -38,7 +37,7 @@ import { sendGroupInvitationEmail } from '../../mail/send.js';
 /*
  * Loads a group the caller may see, refusing identically whether it is missing or another tenant's.
  *
- * Same rule the project and bucket loaders follow, and for the same reason: a status that differs
+ * Same rule the bucket loaders follow, and for the same reason: a status that differs
  * between "does not exist" and "exists but is not yours" is an oracle for enumerating group ids.
  */
 async function loadGroup(admin: AdminContext, id: string): Promise<Group> {
@@ -76,7 +75,7 @@ function assertMutableMembership(group: Group): void {
  * It was shareable until then, and sharing it is what made "their personal group" ambiguous: an
  * administrator added to a colleague's personal group had two, and the console could pick the wrong one as
  * their default scope. Work meant for several people belongs in a regular group, and the move routes carry
- * a bucket and its projects there from a personal one.
+ * a bucket, with everything it holds, there from a personal one.
  *
  * Checked after the owner check, so a non-owner still gets the refusal that says nothing about the group.
  */
@@ -105,18 +104,14 @@ function assertDeletable(group: Group): void {
  * page lists (specs/085) — the same read, so the page never shows a group as empty that the delete refuses.
  */
 async function ownedContainers(groupId: string): Promise<{
-	projects: { id: string; name: string }[];
 	buckets: { id: string; name: string }[];
 }> {
-	const [projects, buckets] = await Promise.all([
-		getProjectStore().listByGroup(groupId),
-		getBucketStore().listByGroup(groupId)
-	]);
+	const buckets = await getBucketStore().listByGroup(groupId);
 	const named = (items: readonly { _id: string; name: string }[]) =>
 		items
 			.map((item) => ({ id: item._id, name: item.name }))
 			.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
-	return { projects: named(projects), buckets: named(buckets) };
+	return { buckets: named(buckets) };
 }
 
 /*
@@ -129,7 +124,7 @@ async function ownedContainers(groupId: string): Promise<{
  * reading every administrator of the instance, which only they may. The route itself also accepts an owner
  * who already knows the id, so this flag withholds a control, never a right.
  *
- * A right is not a promise about state: a group that still owns projects or buckets refuses deletion, and
+ * A right is not a promise about state: a group that still owns buckets refuses deletion, and
  * `owns` is that state.
  */
 function groupCan(
@@ -212,7 +207,7 @@ export const groupRoutes = new Elysia({ name: 'admin-groups' })
 	.get('/admin/api/groups', async ({ admin }) => {
 		const ctx = assertAuth(admin);
 		/*
-		 * Scope-filtered, not role-gated. Unlike projects and buckets this is NOT restricted to the active
+		 * Scope-filtered, not role-gated. Unlike buckets this is NOT restricted to the active
 		 * scope: the list is what the scope switcher is built from, so restricting it to the current scope
 		 * would leave an administrator no way to reach their other groups.
 		 */
@@ -228,7 +223,6 @@ export const groupRoutes = new Elysia({ name: 'admin-groups' })
 					return {
 						...group,
 						owns: {
-							projects: owns.projects.length,
 							buckets: owns.buckets.length
 						}
 					};
@@ -293,21 +287,14 @@ export const groupRoutes = new Elysia({ name: 'admin-groups' })
 		assertGroupOwner(ctx, params.id);
 		assertDeletable(group);
 		/*
-		 * Guarded rather than cascaded, like a project or a bucket. Destroying a group would orphan every
+		 * Guarded rather than cascaded, like a bucket. Destroying a group would orphan every
 		 * container pointing at it — reachable by nobody, listed by nothing — so the refusal names what is
 		 * in the way and the operator empties it deliberately.
 		 */
 		const held = await ownedContainers(params.id);
-		if (held.projects.length > 0 || held.buckets.length > 0) {
-			throw new AdminError(409, 'group still owns projects or buckets', {
-				blockers: [
-					...(held.projects.length > 0
-						? [{ kind: 'project' as const, count: held.projects.length }]
-						: []),
-					...(held.buckets.length > 0
-						? [{ kind: 'bucket' as const, count: held.buckets.length }]
-						: [])
-				]
+		if (held.buckets.length > 0) {
+			throw new AdminError(409, 'group still owns buckets', {
+				blockers: [{ kind: 'bucket' as const, count: held.buckets.length }]
 			});
 		}
 		await recordAdminAudit(ctx, 'group.delete', params.id, {

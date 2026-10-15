@@ -5,7 +5,7 @@ import {
 	adapter,
 	adminAuditStore,
 	getBucketStore,
-	getProjectStore,
+	getProtectedResourceStore,
 	getUserStore
 } from 'lib/adapters/index.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
@@ -16,6 +16,7 @@ import {
 	UNASSIGNED_GROUP_ID
 } from 'lib/admin/consts.ts';
 import { Client } from 'lib/models/client.js';
+import { ROOT_NAMESPACE } from 'lib/resources/namespace.ts';
 import { userAreaFor } from 'lib/consts/storage_inventory.js';
 import { sessionFor } from '../admin_session.ts';
 import { createAdministrator } from '../administrators.ts';
@@ -23,18 +24,20 @@ import { createAdministrator } from '../administrators.ts';
 // User Story 3 — a container refuses deletion while it still holds something.
 //
 // The line between guarding and cascading is drawn by visibility: an operator can see and name a
-// project's clients, so refusing tells them exactly what they are about to destroy and keeps one audit
-// entry per entity destroyed. Nobody can be asked to enumerate the tokens a client issued.
+// bucket's applications and APIs, which are somebody's integrations, so refusing tells them exactly what
+// they are about to break and keeps one audit entry per entity destroyed. Nobody can be asked to enumerate
+// the tokens an application issued.
 //
 // The *shape* of the refusal body belongs to User Story 4; here the claims are that the refusal happens,
 // that it changes nothing, and that an emptied container then deletes cleanly.
 
 /**
- * @proves A container holding anything is not deleted unless its contents were reviewed and
- * consented to, a refusal changes nothing, an emptied container takes its per-bucket area with it,
- * and the two buckets the instance is built on are refused to everyone.
+ * @proves A bucket holding accounts is not deleted unless they were reviewed and consented to, one
+ * holding applications or APIs an administrator put there is not deleted at all until they are removed,
+ * a refusal changes nothing, an emptied bucket takes its per-bucket area with it, and the two buckets the
+ * instance is built on are refused to everyone.
  */
-describe('deletion guards: containers', () => {
+describe('deletion guards: buckets', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);
 	});
@@ -52,26 +55,31 @@ describe('deletion guards: containers', () => {
 		return `${ADMIN_SESSION_COOKIE}=${session._id}`;
 	}
 
-	async function liveClient(): Promise<string> {
+	/* An application an administrator created in `bucketId`, or one that registered itself there. */
+	async function liveClient(
+		bucketId: string,
+		registeredDynamically = false
+	): Promise<string> {
 		const clientId = `held-${Math.random().toString(36).slice(2)}`;
 		await adapter('Client').upsert(clientId, {
 			clientId,
 			clientSecret: 'secret',
 			grantTypes: ['authorization_code'],
 			responseTypes: ['code'],
-			redirectUris: [`https://${clientId}.example.com/cb`]
+			redirectUris: [`https://${clientId}.example.com/cb`],
+			bucketId,
+			...(registeredDynamically ? { registeredDynamically } : {})
 		});
 		return clientId;
 	}
 
-	async function project(clientIds: string[], bucketId?: string) {
-		return getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			ownerGroupId: UNASSIGNED_GROUP_ID,
-			name: 'P',
-			slug: `p-${Math.random()}`,
-			clientIds,
-			...(bucketId ? { bucketId } : {})
+	async function declaredApi(bucketId: string) {
+		await getProtectedResourceStore().create({
+			namespace: ROOT_NAMESPACE,
+			identifier: `https://api-${Math.random().toString(36).slice(2)}.example/`,
+			bucketId,
+			name: 'API',
+			scopes: ['api:read']
 		});
 	}
 
@@ -82,13 +90,6 @@ describe('deletion guards: containers', () => {
 		});
 	}
 
-	async function deleteProject(id: string, query?: Record<string, unknown>) {
-		const cookie = await superAdminCookie();
-		return agent.admin.api
-			.projects({ id })
-			.delete(undefined, { headers: { cookie }, ...(query ? { query } : {}) });
-	}
-
 	async function deleteBucket(id: string, query?: Record<string, unknown>) {
 		const cookie = await superAdminCookie();
 		return agent.admin.api
@@ -96,54 +97,13 @@ describe('deletion guards: containers', () => {
 			.delete(undefined, { headers: { cookie }, ...(query ? { query } : {}) });
 	}
 
-	async function deleteClient(projectId: string, clientId: string) {
+	async function deleteClient(bucketId: string, clientId: string) {
 		const cookie = await superAdminCookie();
 		return agent.admin.api
-			.projects({ id: projectId })
+			.buckets({ id: bucketId })
 			.clients({ clientId })
 			.delete(undefined, { headers: { cookie } });
 	}
-
-	it('refuses a project that still holds clients (scenario 1)', async () => {
-		const clientId = await liveClient();
-		const proj = await project([clientId]);
-
-		const res = await deleteProject(proj._id);
-
-		expect(res.status).toBe(409);
-		expect(await getProjectStore().find(proj._id)).not.toBeNull();
-	});
-
-	it('deletes the project once its clients are gone (scenario 2)', async () => {
-		const clientId = await liveClient();
-		const proj = await project([clientId]);
-
-		expect((await deleteProject(proj._id)).status).toBe(409);
-		expect((await deleteClient(proj._id, clientId)).status).toBe(200);
-		const res = await deleteProject(proj._id);
-
-		expect(res.status).toBe(200);
-		expect(await getProjectStore().find(proj._id)).toBeNull();
-	});
-
-	// An id left in `clientIds` after its client vanished must never make a project undeletable.
-	it('deletes a project whose client ids no longer resolve (scenario 3)', async () => {
-		const proj = await project(['ghost-a', 'ghost-b']);
-
-		const res = await deleteProject(proj._id);
-
-		expect(res.status).toBe(200);
-		expect(await getProjectStore().find(proj._id)).toBeNull();
-	});
-
-	it('does not treat an assigned bucket as a blocker (scenario 4)', async () => {
-		const assigned = await bucket();
-		const proj = await project([], assigned._id);
-
-		const res = await deleteProject(proj._id);
-
-		expect(res.status).toBe(200);
-	});
 
 	it('refuses a bucket that still holds users (scenario 5)', async () => {
 		const held = await bucket();
@@ -167,13 +127,50 @@ describe('deletion guards: containers', () => {
 		expect(res.status).toBe(409);
 	});
 
-	it('keeps the existing refusal for a bucket assigned to a project (scenario 7)', async () => {
-		const assigned = await bucket();
-		await project([], assigned._id);
+	it('refuses a bucket that still holds an application an administrator created (scenario 7)', async () => {
+		const holding = await bucket();
+		await liveClient(holding._id);
 
-		const res = await deleteBucket(assigned._id);
+		const res = await deleteBucket(holding._id);
 
 		expect(res.status).toBe(409);
+		expect(
+			(await getBucketStore().find(holding._id))?.deletion
+		).toBeUndefined();
+	});
+
+	it('refuses a bucket that still declares an API', async () => {
+		const holding = await bucket();
+		await declaredApi(holding._id);
+
+		const res = await deleteBucket(holding._id);
+
+		expect(res.status).toBe(409);
+		expect(
+			(await getBucketStore().find(holding._id))?.deletion
+		).toBeUndefined();
+	});
+
+	it('deletes the bucket once its applications are gone', async () => {
+		const holding = await bucket();
+		const clientId = await liveClient(holding._id);
+
+		expect((await deleteBucket(holding._id)).status).toBe(409);
+		expect((await deleteClient(holding._id, clientId)).status).toBe(200);
+		const res = await deleteBucket(holding._id);
+
+		expect(res.status).toBe(200);
+		expect((await getBucketStore().find(holding._id))?.deletion).toBeDefined();
+	});
+
+	/* Nobody here vouched for an application that registered itself, so it is nobody's integration to break. */
+	it('does not count an application that registered itself as holding the bucket', async () => {
+		const holding = await bucket();
+		await liveClient(holding._id, true);
+
+		const res = await deleteBucket(holding._id);
+
+		expect(res.status).toBe(200);
 	});
 
 	it('destroys an emptied bucket and drops its user area (scenario 8)', async () => {
@@ -198,28 +195,21 @@ describe('deletion guards: containers', () => {
 
 	// A conflict is not a partial deletion: nothing is written, including the audit trail.
 	it('changes nothing when it refuses', async () => {
-		const clientId = await liveClient();
-		const proj = await project([clientId, 'ghost']);
+		const holding = await bucket();
+		const clientId = await liveClient(holding._id);
 		const held = await bucket();
 		await getUserStore(held._id).create('stays@example.com', 'hash');
 
-		expect((await deleteProject(proj._id)).status).toBe(409);
+		expect((await deleteBucket(holding._id)).status).toBe(409);
 		expect((await deleteBucket(held._id)).status).toBe(409);
 
-		const stillThere = await getProjectStore().find(proj._id);
-		// The unresolvable id is not tidied up either — a refused request changes nothing at all.
-		expect(stillThere?.clientIds).toEqual([clientId, 'ghost']);
-
-		const trail = await adminAuditStore.list({
-			targetId: proj._id
-		});
-		expect(trail.entries.filter((e) => e.action === 'project.delete')).toEqual(
-			[]
-		);
-		const bucketTrail = await adminAuditStore.list({ targetId: held._id });
-		expect(
-			bucketTrail.entries.filter((e) => e.action === 'bucket.delete')
-		).toEqual([]);
+		expect(await Client.tryFind(clientId)).toBeDefined();
+		for (const { _id } of [holding, held]) {
+			const trail = await adminAuditStore.list({ targetId: _id });
+			expect(trail.entries.filter((e) => e.action === 'bucket.delete')).toEqual(
+				[]
+			);
+		}
 	});
 
 	/*
@@ -254,14 +244,14 @@ describe('deletion guards: containers', () => {
 	});
 
 	/*
-	 * A bucket assigned to a project is the one blocker no election clears, because what it protects
-	 * is outside the bucket: a project left pointing at a bucket that no longer exists is a broken
-	 * tenant, not a tidy-up.
+	 * An application or API is the one blocker no election clears, because what it protects is outside
+	 * the bucket: an integration somebody built on it breaks, and it is removed on purpose, one by one,
+	 * never as a side effect of the people in the bucket going.
 	 */
-	it('refuses an assigned bucket even when the accounts are consented to', async () => {
+	it('refuses a bucket holding an application even when the accounts are consented to', async () => {
 		const assigned = await bucket();
 		await getUserStore(assigned._id).create('inside@example.com', 'hash');
-		await project([], assigned._id);
+		await liveClient(assigned._id);
 
 		const res = await deleteBucket(assigned._id, {
 			cascade: 'endusers',
@@ -274,26 +264,10 @@ describe('deletion guards: containers', () => {
 	});
 
 	/*
-	 * Consent is given for what was on the screen. These two cases are the reason the election carries
-	 * the reviewed set rather than only the word "yes": without them, an administrator who reviewed two
-	 * clients authorises destroying a third that arrived while they were reading.
+	 * Consent is given for what was on the screen: the election carries the reviewed count rather than
+	 * only the word "yes", so an administrator who reviewed one account does not authorise destroying a
+	 * second that arrived while they were reading.
 	 */
-	it('refuses a project cascade when its clients are not the ones consented to', async () => {
-		const reviewed = await liveClient();
-		const arrivedLater = await liveClient();
-		const proj = await project([reviewed, arrivedLater]);
-
-		const res = await deleteProject(proj._id, {
-			cascade: 'clients',
-			client: [reviewed]
-		});
-
-		expect(res.status).toBe(409);
-		expect(await getProjectStore().find(proj._id)).not.toBeNull();
-		expect(await Client.tryFind(reviewed)).toBeDefined();
-		expect(await Client.tryFind(arrivedLater)).toBeDefined();
-	});
-
 	it('refuses a bucket cascade when it holds more accounts than were consented to', async () => {
 		const held = await bucket();
 		await getUserStore(held._id).create('reviewed@example.com', 'hash');

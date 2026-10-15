@@ -46,9 +46,9 @@ after the deployment comes up, and do not leave a reachable, un-provisioned inst
 </Aside>
 
 <ScreenshotFigure
-	name="admin-projects"
-	alt="The admin console after sign-in, listing the projects in the current group scope."
-	caption="What a signed-in administrator lands on: the projects of the group the scope switcher is pointed at."
+	name="admin-buckets"
+	alt="The admin console after sign-in, listing the user buckets in the current group scope."
+	caption="What a signed-in administrator lands on: the buckets of the group the scope switcher is pointed at."
 />
 
 ## Administrators sign in through this server's own issuer
@@ -97,8 +97,8 @@ The console's super-admin surface covers the instance itself: server settings, s
 administrator accounts and the fault store. Being a super administrator is membership of the reserved
 **Super administrators** group, granted and withdrawn as operations of their own (**Make super administrator…** and **Withdraw super administration…** on the **Administrators**
 page, or `admin_super_grant` and `admin_super_withdraw` for an agent); the last active member
-can be neither withdrawn nor deactivated. Any other administrator creates projects, buckets and
-groups, invites people into their regular groups by e-mail, and reads the audit trail and **Usage**
+can be neither withdrawn nor deactivated. Any other administrator creates buckets, the applications
+and APIs in them, and groups, invites people into their regular groups by e-mail, and reads the audit trail and **Usage**
 for their own groups. Ownership is by group: belonging to a container's owning group is what grants access to
 it.
 

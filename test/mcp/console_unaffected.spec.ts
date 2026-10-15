@@ -3,15 +3,10 @@ import { describe, it, expect, beforeAll, beforeEach } from 'bun:test';
 import bootstrap from '../test_helper.js';
 import { elysia } from 'lib/index.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import {
-	getProjectStore,
-	getBucketStore,
-	adminAuditStore
-} from 'lib/adapters/index.ts';
+import { getBucketStore, adminAuditStore } from 'lib/adapters/index.ts';
 import {
 	ADMIN_BUCKET_ID,
 	ADMIN_SESSION_COOKIE,
-	UNASSIGNED_GROUP_ID,
 	DEFAULT_BUCKET_ID
 } from 'lib/admin/consts.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
@@ -21,7 +16,7 @@ import { Type } from '@sinclair/typebox';
 import { createAdministrator, type AdminKind } from '../administrators.ts';
 
 /*
- * FR-036: the console keeps both container deletions in full, and nothing about the agent surface
+ * FR-036: the console keeps bucket deletion in full, and nothing about the agent surface
  * weakens what a human operator can do.
  *
  * This is a regression guard over shared code, not a feature test. Adding the MCP surface changed three
@@ -80,23 +75,6 @@ describe.each([
 		await ensureAdminSeed();
 	});
 
-	it('still deletes an empty project', async () => {
-		const { cookie } = await cookieFor('super');
-		const project = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			name: 'Deletable',
-			slug: slug(),
-			ownerGroupId: UNASSIGNED_GROUP_ID
-		});
-
-		const res = await admin(`/admin/api/projects/${project._id}`, {
-			method: 'DELETE',
-			cookie
-		});
-		expect(res.status).toBe(200);
-		expect(await getProjectStore().find(project._id)).toBeNull();
-	});
-
 	it('still deletes an empty bucket', async () => {
 		const { cookie } = await cookieFor('super');
 		const created = await admin('/admin/api/buckets', {
@@ -124,15 +102,19 @@ describe.each([
 		expect(await getBucketStore().find(bucket._id)).toBeNull();
 	});
 
-	it('still refuses a populated project with its structured blockers', async () => {
+	it('still refuses a bucket that holds an application, with its structured blockers', async () => {
 		const { cookie } = await cookieFor('super');
-		const project = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			name: 'Populated',
-			slug: slug(),
-			ownerGroupId: UNASSIGNED_GROUP_ID
+		const made = await admin('/admin/api/buckets', {
+			method: 'POST',
+			cookie,
+			body: { name: 'Populated bucket', slug: slug() }
 		});
-		const created = await admin(`/admin/api/projects/${project._id}/clients`, {
+		expect(made.status).toBe(201);
+		const bucket = shaped(
+			Type.Object({ _id: Type.String() }),
+			await made.json()
+		);
+		const created = await admin(`/admin/api/buckets/${bucket._id}/clients`, {
 			method: 'POST',
 			cookie,
 			body: {
@@ -144,7 +126,7 @@ describe.each([
 		});
 		expect(created.status).toBe(201);
 
-		const refused = await admin(`/admin/api/projects/${project._id}`, {
+		const refused = await admin(`/admin/api/buckets/${bucket._id}`, {
 			method: 'DELETE',
 			cookie
 		});
@@ -182,7 +164,6 @@ describe.each([
 		expect(me.email).toBe(user.email);
 		expect(me.superAdmin).toBe(true);
 		expect(me.bucketId).toBe(ADMIN_BUCKET_ID);
-		// `managedProjectIds` was replaced by group memberships when ownership moved to groups.
 		expect(me.memberships).toBeArray();
 		expect(me.activeGroupId).toBeString();
 		// The agent marker must be absent for a console session, or every audit entry it writes would
@@ -193,15 +174,19 @@ describe.each([
 	it('writes console audit entries with no agent attribution', async () => {
 		const { cookie, user } = await cookieFor('super');
 
-		const created = await admin('/admin/api/projects', {
-			method: 'POST',
-			cookie,
-			body: {
-				name: 'Audited by console',
-				slug: slug(),
-				bucketId: DEFAULT_BUCKET_ID
+		const created = await admin(
+			`/admin/api/buckets/${DEFAULT_BUCKET_ID}/clients`,
+			{
+				method: 'POST',
+				cookie,
+				body: {
+					clientName: 'Audited by console',
+					grantTypes: ['authorization_code'],
+					redirectUris: ['https://a.example.com/cb'],
+					tokenEndpointAuthMethod: 'none'
+				}
 			}
-		});
+		);
 		expect(created.status).toBe(201);
 
 		const { entries } = await adminAuditStore.list({ actor: user._id });
@@ -211,14 +196,14 @@ describe.each([
 	});
 
 	it('still refuses an unauthenticated console request', async () => {
-		const res = await admin('/admin/api/projects');
+		const res = await admin('/admin/api/buckets');
 		expect(res.status).toBe(401);
 	});
 
 	it('refuses a bearer credential that is not an MCP-audience token', async () => {
 		// The second credential arm must not become a way in for an arbitrary Authorization header.
 		const res = await elysia.handle(
-			new Request('http://e.ly/admin/api/projects', {
+			new Request('http://e.ly/admin/api/buckets', {
 				headers: { authorization: 'Bearer not-a-real-token' }
 			})
 		);

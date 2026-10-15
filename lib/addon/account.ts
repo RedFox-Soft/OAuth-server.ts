@@ -40,8 +40,8 @@ export async function findAccount<
 	const clientId = oidc?.entities.Client?.clientId ?? _token?.payload.clientId;
 	/*
 	 * The resource matters here for the same reason the client does, and leaving it out is not a
-	 * harmless omission: bucket resolution can derive a project from the declared resource a request
-	 * names, so a login that found the user in a project's bucket while this resolved against the
+	 * harmless omission: bucket resolution can derive a bucket from the declared resource a request
+	 * names, so a login that found the user in that bucket while this resolved against the
 	 * default one would authenticate somebody the very next step could not load. That is not a
 	 * hypothetical — it is what happened before this argument was passed, and it surfaced as a 500 in
 	 * the consent prompt rather than as a refusal, because `loadGrant` leaves the grant (`oidc.entities.Grant`) unset when

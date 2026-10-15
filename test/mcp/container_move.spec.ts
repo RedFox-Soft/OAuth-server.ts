@@ -13,7 +13,7 @@ import { ApplicationConfig } from 'lib/configs/application.js';
 import { shaped } from 'test/shape.js';
 import { createAdministrator } from '../administrators.ts';
 import {
-	bucketWithProjects,
+	bucketWithClients,
 	regularGroup
 } from '../admin/ownership_fixtures.ts';
 import { rpc } from './rpc.ts';
@@ -55,10 +55,11 @@ function call(name: string, args: Record<string, unknown>) {
 
 const Preview = Type.Object({
 	confirmationRequired: Type.Literal(true),
-	projects: Type.Array(Type.Object({ id: Type.String(), name: Type.String() }))
+	applications: Type.Number(),
+	apis: Type.Number()
 });
 
-/* Alice keeps a bucket with two projects in her personal group and owns Team; her agent moves it. */
+/* Alice keeps a bucket with two applications in her personal group and owns Team; her agent moves it. */
 async function world() {
 	const alice = await createAdministrator(
 		'plain',
@@ -66,20 +67,19 @@ async function world() {
 	);
 	const personal = await ensurePersonalGroup(alice._id, alice.email);
 	const team = await regularGroup([alice]);
-	const { bucket, projects } = await bucketWithProjects(personal._id, 2);
+	const { bucket } = await bucketWithClients(personal._id, 2);
 	return {
 		alice,
 		personal,
 		team,
 		bucket,
-		projects,
 		token: await agentFor(alice)
 	};
 }
 
 /**
- * @proves An agent moves a bucket and its projects to another group only through two confirmed calls, sees
- * which projects move before it does, cannot stretch a confirmation given for the preview to the move
+ * @proves An agent moves a bucket and what it holds to another group only through two confirmed calls,
+ * sees how many applications and APIs move with it before it does, cannot stretch a confirmation given for the preview to the move
  * itself, and is attributed in the trail beside its administrator; it cannot share a personal group.
  */
 describe('an agent moving a bucket to another group', () => {
@@ -108,7 +108,7 @@ describe('an agent moving a bucket to another group', () => {
 		);
 	});
 
-	it('sees the projects that would move when it confirms without `confirm`, and nothing moves', async () => {
+	it('sees the applications and APIs that would move when it confirms without `confirm`, and nothing moves', async () => {
 		const w = await world();
 		const args = { id: w.bucket._id, groupId: w.team._id };
 		const described = await rpc(call('bucket_owner_change', args), w.token);
@@ -126,9 +126,8 @@ describe('an agent moving a bucket to another group', () => {
 			Preview,
 			previewed.result?.structuredContent?.preview
 		);
-		expect(preview.projects.map((p) => p.id).sort()).toEqual(
-			w.projects.map((p) => p._id).sort()
-		);
+		expect(preview.applications).toBe(2);
+		expect(preview.apis).toBe(0);
 		expect((await getBucketStore().find(w.bucket._id))?.ownerGroupId).toBe(
 			w.personal._id
 		);

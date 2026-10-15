@@ -20,7 +20,7 @@ import { meCan, useMe } from '../frame/me.js';
 import { PreviewConfirm, type PreviewStep } from '../frame/PreviewConfirm.js';
 import { request } from '../frame/request.js';
 import { Link, useLeaveGuard, useNavigate } from '../frame/router.js';
-import { projectSettingsHref } from '../frame/routes.js';
+import { bucketHref } from '../frame/routes.js';
 import { DeleteBucketDialog } from './DeleteBucketDialog.js';
 import { useScheduledActions } from './ScheduledBanner.js';
 import type { AddressPreview, BucketView } from './bucketView.js';
@@ -253,9 +253,7 @@ function AddressPreviewView({ preview }: { preview: AddressPreview }) {
 							</Typography.Text>
 							<ul style={{ margin: 0 }}>
 								{preview.applications.map((a) => (
-									<li key={a.clientId}>
-										{a.name ?? a.clientId} — {a.projectName}
-									</li>
+									<li key={a.clientId}>{a.name ?? a.clientId}</li>
 								))}
 							</ul>
 						</div>
@@ -295,8 +293,8 @@ function AddressPreviewView({ preview }: { preview: AddressPreview }) {
 							<Typography.Text strong>Declared resources</Typography.Text>
 							<ul style={{ margin: 0 }}>
 								{preview.resources.map((r) => (
-									<li key={`${r.projectId}:${r.identifier}`}>
-										{r.identifier} — {r.projectName}
+									<li key={r.identifier}>
+										{r.identifier} — {r.name}
 									</li>
 								))}
 							</ul>
@@ -306,7 +304,7 @@ function AddressPreviewView({ preview }: { preview: AddressPreview }) {
 			)}
 			{preview.namespaceMove && (
 				<Typography.Text type="secondary">
-					The projects' resource declarations move with the bucket.
+					The bucket's API declarations move with it.
 				</Typography.Text>
 			)}
 			<Alert
@@ -444,7 +442,8 @@ export function BucketSettings({
 		onDeleted: () => void navigate('/admin/buckets', { replace: true })
 	});
 	const fixed = isUndeletableBucket(bucket._id);
-	const usedBy = bucket.blockers?.usedByProjects ?? [];
+	const holdsApplications = bucket.applications ?? 0;
+	const holdsApis = bucket.apis ?? 0;
 	const dependents = bucket.blockers?.dependents;
 	const ownsGroup = (me?.memberships ?? []).some(
 		(m) => m.groupId === bucket.ownerGroupId && m.role === 'owner'
@@ -456,7 +455,7 @@ export function BucketSettings({
 	 */
 	const addressReason =
 		!can.changeAddress && !bucket.deletion && ownsGroup && dependents
-			? `Used by ${plural(dependents.projects, 'project', 'projects')}, ${plural(dependents.providers, 'identity provider', 'identity providers')} and ${plural(dependents.connections, 'provisioning connection', 'provisioning connections')}: only an instance administrator can change this bucket's address now.`
+			? `Used by ${plural(dependents.applications, 'application', 'applications')}, ${plural(dependents.providers, 'identity provider', 'identity providers')} and ${plural(dependents.connections, 'provisioning connection', 'provisioning connections')}: only an instance administrator can change this bucket's address now.`
 			: null;
 
 	async function afterMove() {
@@ -576,20 +575,21 @@ export function BucketSettings({
 								<div>
 									<Typography.Text strong>Delete bucket</Typography.Text>
 									<br />
-									{usedBy.length > 0 ? (
+									{holdsApplications + holdsApis > 0 ? (
 										<Typography.Text type="secondary">
-											Used by{' '}
-											{usedBy.map((p, i) => (
-												<span key={p.id}>
-													{i > 0 ? ', ' : ''}
-													<Link
-														href={projectSettingsHref(p.id, { card: 'bucket' })}
-													>
-														{p.name}
-													</Link>
-												</span>
-											))}{' '}
-											— assign them another bucket first.
+											It still holds{' '}
+											<Link href={bucketHref(bucket._id, 'applications')}>
+												{plural(
+													holdsApplications,
+													'application',
+													'applications'
+												)}
+											</Link>{' '}
+											and{' '}
+											<Link href={bucketHref(bucket._id, 'apis')}>
+												{plural(holdsApis, 'API', 'APIs')}
+											</Link>{' '}
+											— delete them first.
 										</Typography.Text>
 									) : (
 										<Typography.Text type="secondary">
@@ -601,7 +601,7 @@ export function BucketSettings({
 								</div>
 								<Button
 									danger
-									disabled={usedBy.length > 0}
+									disabled={holdsApplications + holdsApis > 0}
 									onClick={() => setDeleting(true)}
 								>
 									Delete bucket…
@@ -614,7 +614,6 @@ export function BucketSettings({
 
 			{moving && (
 				<MoveToGroup
-					kind="bucket"
 					id={bucket._id}
 					name={bucket.name}
 					sourceGroupId={bucket.ownerGroupId}

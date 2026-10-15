@@ -82,10 +82,10 @@ turns an empty database into a working deployment:
 - **The initial RS256 signing key**, stored with every issuer's keys in the `bucketKeys` area, which
   is why keys are not an environment variable here. (If the server ever starts against an empty key
   store it generates and persists one itself.)
-- **The admin panel seed**: the reserved admin project, its "Administrators" user bucket with
-  registration closed, the first-party `admin-panel` OAuth client whose redirect URI is
-  `$ISSUER/admin/callback`, the reserved `admin-mcp` agent client, the system group that holds
-  containers no administrator manages, and the default `redfox` end-user bucket.
+- **The admin panel seed**: the reserved "Administrators" user bucket with registration closed, the
+  first-party `admin-panel` OAuth client whose redirect URI is `$ISSUER/admin/callback`, the reserved
+  `admin-mcp` agent client, the system group that holds buckets no administrator manages, and the
+  default `redfox` end-user bucket.
 
 It is **idempotent**: every write is an upsert or a create-if-absent, so running it again changes
 nothing that already exists. Re-run it after upgrading an existing install, since a release that

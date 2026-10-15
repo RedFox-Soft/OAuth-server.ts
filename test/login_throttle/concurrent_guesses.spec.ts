@@ -10,19 +10,16 @@ import {
 } from 'bun:test';
 
 import bootstrap, {
+	bindClientToBucket,
 	SESSION_COOKIE_PREFIX,
 	agent,
 	getHeader
 } from '../test_helper.ts';
 import { AuthorizationRequest } from '../AuthorizationRequest.ts';
-import {
-	getBucketStore,
-	getProjectStore,
-	getUserStore
-} from 'lib/adapters/index.ts';
+import { getBucketStore, getUserStore } from 'lib/adapters/index.ts';
 import { ApplicationConfig } from 'lib/configs/application.ts';
 import { elysia } from 'lib/index.ts';
-import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
+import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { present } from 'test/shape.js';
 
 /*
@@ -76,16 +73,7 @@ describe('a password guessed concurrently', () => {
 			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'Concurrent Password Bucket'
 		});
-		const project = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			ownerGroupId: UNASSIGNED_GROUP_ID,
-			name: 'Concurrent Password',
-			slug: `concurrent-password-${Math.random()}`
-		});
-		await getProjectStore().update(project._id, {
-			bucketId: bucket._id,
-			clientIds: [CLIENT_ID]
-		});
+		await bindClientToBucket(CLIENT_ID, bucket._id);
 		for (const email of ['burst@x.io', 'burst-two@x.io']) {
 			await getUserStore(bucket._id).create(
 				email,

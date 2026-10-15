@@ -1,16 +1,19 @@
 import { describe, it, expect, beforeAll } from 'bun:test';
 
-import bootstrap, { agent, getHeader } from '../test_helper.ts';
+import bootstrap, {
+	bindClientToBucket,
+	agent,
+	getHeader
+} from '../test_helper.ts';
 import { AuthorizationRequest } from '../AuthorizationRequest.ts';
 import {
 	getUserStore,
 	getBucketStore,
-	getProjectStore,
 	resetAdminMemoryStores
 } from 'lib/adapters/index.ts';
 import { CODE_MAX_ATTEMPTS } from 'lib/verification/consts.ts';
 import { lastEmail, extractCode } from '../mail_capture.ts';
-import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
+import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { present } from 'test/shape.js';
 
 /*
@@ -67,16 +70,7 @@ describe('an emailed verification code guessed concurrently', () => {
 			verificationMethod: 'code'
 		});
 		bucketId = bucket._id;
-		const project = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			ownerGroupId: UNASSIGNED_GROUP_ID,
-			name: 'Concurrent Code',
-			slug: `concurrent-code-${Math.random()}`
-		});
-		await getProjectStore().update(project._id, {
-			bucketId,
-			clientIds: [CLIENT_ID]
-		});
+		await bindClientToBucket(CLIENT_ID, bucketId);
 	});
 
 	it('refuses the right code after a burst of wrong ones', async () => {

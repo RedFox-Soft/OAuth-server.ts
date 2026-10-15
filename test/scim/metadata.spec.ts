@@ -1,7 +1,6 @@
 import { describe, it, beforeAll, expect } from 'bun:test';
 
-import { getProjectStore } from 'lib/adapters/index.js';
-import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
+import { DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import bootstrap from '../test_helper.js';
 import { adminCookie } from '../end_user_lifecycle/fixtures.ts';
 import { admin } from '../provisioning/helpers.ts';
@@ -58,16 +57,9 @@ describe('a bucket’s SCIM protected-resource metadata', () => {
 	it('refuses to declare a bucket’s SCIM endpoint as a protected resource', async () => {
 		const cookie = await adminCookie();
 		const bucket = await scimBucket();
-		const project = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			name: 'Declarer',
-			slug: `declarer-${Math.random().toString(36).slice(2, 8)}`,
-			ownerGroupId: UNASSIGNED_GROUP_ID
-		});
-
 		const res = await admin(
 			'POST',
-			`/admin/api/projects/${project._id}/resources`,
+			`/admin/api/buckets/${DEFAULT_BUCKET_ID}/resources`,
 			cookie,
 			{
 				identifier: `http://e.ly/${slugOf(bucket)}/scim/v2`,

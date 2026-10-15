@@ -586,7 +586,7 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 		type: 'boolean',
 		risk: 'security',
 		description:
-			'Lets browser-based apps read responses from the metadata and key endpoints, and from the endpoints listed on a project’s browser origins. Closure normally comes from data — a project with no origins grants nothing — so this is an incident kill switch rather than the usual control.'
+			'Lets browser-based apps read responses from the metadata and key endpoints, and from the endpoints listed on an application’s browser origins. Closure normally comes from data — an application with no origins grants nothing — so this is an incident kill switch rather than the usual control.'
 	},
 
 	{
@@ -765,7 +765,7 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 		summary: 'Let an AI agent administer this server over MCP',
 		type: 'boolean',
 		description:
-			'Serves this control plane to an AI agent over MCP at /mcp, as an OAuth 2.1 protected resource of this server. An agent acts as the administrator who authorized it and gets exactly that account’s permissions: every operation runs through the same routes, the same checks and the same audit trail as the console, and each entry records both the operator and the agent. Deleting a project or a user bucket is withheld from agents entirely and stays console-only. Off by default — with it off, neither /mcp nor its metadata document is served.'
+			'Serves this control plane to an AI agent over MCP at /mcp, as an OAuth 2.1 protected resource of this server. An agent acts as the administrator who authorized it and gets exactly that account’s permissions: every operation runs through the same routes, the same checks and the same audit trail as the console, and each entry records both the operator and the agent. Deleting a user bucket is withheld from agents entirely and stays console-only. Off by default — with it off, neither /mcp nor its metadata document is served.'
 	},
 
 	/*

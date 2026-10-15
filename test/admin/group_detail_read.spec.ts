@@ -11,7 +11,7 @@ import { ADMIN_BUCKET_ID, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { shaped } from 'test/shape.ts';
 import { createAdministrator } from '../administrators.ts';
 import {
-	bucketWithProjects,
+	bucketWithClients,
 	cookieFor,
 	regularGroup
 } from './ownership_fixtures.ts';
@@ -50,17 +50,17 @@ const GroupRead = Type.Object({
 			active: Type.Boolean()
 		})
 	),
-	owns: Type.Object({ projects: Named, buckets: Named }),
+	owns: Type.Object({ buckets: Named }),
 	can: Can
 });
 
-/* A team with an owner and a member, owning a bucket and the project using it. */
+/* A team with an owner and a member, owning a bucket with an application in it. */
 async function team() {
 	const owner = await createAdministrator('plain');
 	const member = await createAdministrator('plain');
 	const group = await regularGroup([owner], [member]);
-	const { bucket, projects } = await bucketWithProjects(group._id, 1);
-	return { owner, member, group, bucket, project: projects[0] };
+	const { bucket } = await bucketWithClients(group._id, 1);
+	return { owner, member, group, bucket };
 }
 
 const NONE = {
@@ -74,7 +74,7 @@ const NONE = {
 /**
  * @proves A group's page tells everyone who may read it who is in it by email, what it owns and what they
  * may do there — each right the one the group routes would grant — tells nothing to anyone else, and a
- * refused deletion names the projects and buckets in the way.
+ * refused deletion names the buckets in the way.
  */
 describe("an administrator group's read", () => {
 	beforeEach(async () => {
@@ -97,7 +97,6 @@ describe("an administrator group's read", () => {
 			[t.member.email, 'member', true]
 		]);
 		expect(read.owns).toEqual({
-			projects: [{ id: t.project._id, name: t.project.name }],
 			buckets: [{ id: t.bucket._id, name: t.bucket.name }]
 		});
 	});
@@ -206,7 +205,7 @@ describe("an administrator group's read", () => {
 		expect(shaped(GroupRead, res.body).can).toEqual(NONE);
 	});
 
-	it('names the projects and buckets in the way when an owner deletes a group that still owns them', async () => {
+	it('names the buckets in the way when an owner deletes a group that still owns them', async () => {
 		const t = await team();
 
 		const res = await send(
@@ -225,9 +224,6 @@ describe("an administrator group's read", () => {
 				}),
 				res.body
 			).blockers
-		).toEqual([
-			{ kind: 'project', count: 1 },
-			{ kind: 'bucket', count: 1 }
-		]);
+		).toEqual([{ kind: 'bucket', count: 1 }]);
 	});
 });

@@ -4,7 +4,7 @@ title: 'Monthly active users per bucket'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-10-10
-updated: 2026-10-12
+updated: 2026-10-15
 ---
 
 # Monthly active users per bucket
@@ -95,9 +95,10 @@ otherwise do later under the tombstone's name.
 
 ## Reading it
 
-`GET /admin/api/buckets/:id/activity` (`lib/admin/activity/routes.ts:176`) uses the owning-group check
-(`loadBucketForEdit`), not the broader one a bucket's page uses: a group that only owns a project signing
-into the bucket administers its users, not its plan. A super administrator may read **any** bucket's figures
+`GET /admin/api/buckets/:id/activity` (`lib/admin/activity/routes.ts:173`) uses the owning-group check
+(`loadBucketForEdit`, `:139`), not the broader one a bucket's page uses. Until spec 099 they differed: a group
+that only owned a project signing into the bucket administered its users, not its plan. With projects gone
+both admit exactly the members of the bucket's group. A super administrator may read **any** bucket's figures
 there — the reserved buckets and deleted ones, from their tombstones (`bucketToRead`, `:123`, since spec 077) —
 because every one of them is already in their overview. **Since spec 091 the group a deleted bucket's tombstone
 names (`ownerGroupId`) may read it too** (`heldDeletedBucket`, `lib/admin/auth/can.ts`): its active users

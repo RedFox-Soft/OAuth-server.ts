@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'bun:test';
 import {
 	assertSuperAdmin,
-	assertProjectAccess,
+	assertBucketAccess,
 	AdminError,
 	type AdminContext
 } from 'lib/admin/auth/rbac.ts';
-import type { Project } from 'lib/adapters/types.ts';
+import type { UserBucket } from 'lib/adapters/types.ts';
 
 const superAdmin: AdminContext = {
 	userId: 'u1',
@@ -17,7 +17,7 @@ const superAdmin: AdminContext = {
 	activeGroupId: '',
 	signedInWith: null
 };
-const projectAdmin: AdminContext = {
+const groupAdmin: AdminContext = {
 	userId: 'u2',
 	email: 'pa@x.io',
 	superAdmin: false,
@@ -26,15 +26,16 @@ const projectAdmin: AdminContext = {
 	activeGroupId: 'g1',
 	signedInWith: null
 };
-const project = (over: Partial<Project>): Project => ({
-	_id: 'p1',
-	name: 'Acme',
-	slug: 'acme',
-	type: 'regular',
+const bucket = (over: Partial<UserBucket>): UserBucket => ({
+	_id: 'b1',
+	name: 'Acme users',
 	ownerGroupId: 'g1',
-	bucketId: 'b1',
-	clientIds: [],
-	corsOrigins: [],
+	passwordLogin: true,
+	federation: [],
+	registrationOpen: false,
+	emailVerificationRequired: false,
+	verificationMethod: 'link',
+	totpRequired: false,
 	createdAt: new Date(),
 	updatedAt: new Date(),
 	...over
@@ -42,13 +43,13 @@ const project = (over: Partial<Project>): Project => ({
 
 /**
  * @proves Instance-wide operations require a super administrator, and a scoped administrator
- * reaches a project only through the group that owns it.
+ * reaches a bucket only through the group that owns it.
  */
 describe('RBAC guards', () => {
 	it('lets a super administrator through an instance-wide check and refuses anyone else with 403', () => {
 		expect(() => assertSuperAdmin(superAdmin)).not.toThrow();
 		try {
-			assertSuperAdmin(projectAdmin);
+			assertSuperAdmin(groupAdmin);
 			throw new Error('should have thrown');
 		} catch (e) {
 			if (!(e instanceof AdminError)) throw e;
@@ -56,16 +57,13 @@ describe('RBAC guards', () => {
 		}
 	});
 
-	it('project admin can access a project their group owns', () => {
-		expect(() => assertProjectAccess(projectAdmin, project({}))).not.toThrow();
+	it('lets an administrator reach a bucket their group owns', () => {
+		expect(() => assertBucketAccess(groupAdmin, bucket({}))).not.toThrow();
 	});
 
-	it('project admin cannot access the admin project even by id', () => {
+	it('refuses an administrator a bucket another group owns with 403', () => {
 		try {
-			assertProjectAccess(
-				projectAdmin,
-				project({ type: 'admin', ownerGroupId: 'g1' })
-			);
+			assertBucketAccess(groupAdmin, bucket({ ownerGroupId: 'g9' }));
 			throw new Error('should have thrown');
 		} catch (e) {
 			if (!(e instanceof AdminError)) throw e;
@@ -73,12 +71,9 @@ describe('RBAC guards', () => {
 		}
 	});
 
-	it('super admin can access any project', () => {
+	it('lets a super administrator reach a bucket of any group', () => {
 		expect(() =>
-			assertProjectAccess(
-				superAdmin,
-				project({ type: 'admin', ownerGroupId: 'g9' })
-			)
+			assertBucketAccess(superAdmin, bucket({ ownerGroupId: 'g9' }))
 		).not.toThrow();
 	});
 });

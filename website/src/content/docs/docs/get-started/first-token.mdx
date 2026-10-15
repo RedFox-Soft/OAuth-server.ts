@@ -23,7 +23,7 @@ The endpoint paths below are this server's defaults. Do not hard-code them in a 
 reflects which capabilities are enabled, so it is the honest answer to "what does this deployment
 support".
 
-This matters more than it used to. If your client's project points at a bucket you created, that
+This matters more than it used to. If your client belongs to a bucket you created, that
 bucket is its own issuer: its endpoints live under `<ISSUER>/<slug>` and its discovery document is at
 `<ISSUER>/<slug>/.well-known/openid-configuration`. A request for such a client sent to the bare
 `/auth` is refused with `unauthorized_client` — "client is not authorized at this address" — because a
@@ -75,7 +75,7 @@ default `redfox` bucket, which is served at the root.
    `unsupported_grant_type`.
 
 3. **Sign in and consent.** The server redirects to its own interaction screens: a sign-in form for
-   the bucket this client's project points at, then a consent screen listing the scopes (consent is
+   the bucket this client belongs to, then a consent screen listing the scopes (consent is
    on by default for a new client). Approving both sends the browser to
 
    ```
@@ -142,7 +142,7 @@ The two screens step 3 passes through, on a default deployment:
 <ScreenshotFigure
 	name="sign-in"
 	alt="The server's sign-in screen: a username field, a password field, remember-me and a log-in button."
-	caption="The sign-in screen, served for the bucket the client's project points at."
+	caption="The sign-in screen, served for the bucket the client belongs to."
 />
 
 <ScreenshotFigure

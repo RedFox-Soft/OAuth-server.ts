@@ -2,11 +2,8 @@ import { describe, it, expect, beforeAll, afterEach } from 'bun:test';
 
 import bootstrap, { setSeedClaims, type Setup } from '../test_helper.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import {
-	getProjectStore,
-	getProtectedResourceStore
-} from 'lib/adapters/index.ts';
-import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
+import { getProtectedResourceStore } from 'lib/adapters/index.ts';
+import { DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { ROOT_NAMESPACE } from 'lib/resources/namespace.js';
 import { CONSENT_TEXTS } from 'lib/i18n/texts/consent/index.ts';
 import { text as fill } from 'lib/i18n/message.tsx';
@@ -26,16 +23,10 @@ describe('the consent page when an application asks for more', () => {
 	beforeAll(async () => {
 		setup = await bootstrap(import.meta.url, { config: 'consent_page' });
 		await ensureAdminSeed();
-		const project = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			name: 'Company',
-			slug: 'company-repeat',
-			ownerGroupId: UNASSIGNED_GROUP_ID
-		});
 		await getProtectedResourceStore().create({
 			namespace: ROOT_NAMESPACE,
 			identifier: MCP,
-			projectId: project._id,
+			bucketId: DEFAULT_BUCKET_ID,
 			name: 'Company MCP',
 			scopes: ['tools:call'],
 			scopeDescriptions: {

@@ -2,17 +2,14 @@ import { describe, it, expect, beforeAll, afterEach } from 'bun:test';
 
 import bootstrap, { type Setup } from '../test_helper.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import {
-	getBucketStore,
-	getGroupStore,
-	getProjectStore
-} from 'lib/adapters/index.ts';
+import { getBucketStore } from 'lib/adapters/index.ts';
 import { DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { CONSENT_TEXTS } from 'lib/i18n/texts/consent/index.ts';
 import { text as fill } from 'lib/i18n/message.tsx';
 
 const T = CONSENT_TEXTS.en;
 import { openConsent } from './flow.ts';
+import { signedInElsewhere } from '../consent_branding/seed.ts';
 
 /**
  * @proves An application that named itself cannot borrow the server's credibility on the consent page:
@@ -23,26 +20,12 @@ import { openConsent } from './flow.ts';
 describe('who the consent page says is asking', () => {
 	let setup: Setup;
 	let cookie: string;
+	let elsewhere: { cookie: string; resource: string[] };
 
 	beforeAll(async () => {
 		setup = await bootstrap(import.meta.url, { config: 'consent_page' });
 		await ensureAdminSeed();
-		// Another tenant's project: an administrator of this server made the client, but not of the
-		// group that owns the default bucket every tenant shares.
-		const tenant = await getGroupStore().create({
-			name: 'Tenant',
-			kind: 'regular',
-			members: [{ userId: 'tenant-owner', role: 'owner' }]
-		});
-		const project = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			ownerGroupId: tenant._id,
-			name: 'Partner',
-			slug: 'partner-project'
-		});
-		await getProjectStore().update(project._id, {
-			clientIds: ['tenant-app']
-		});
+		elsewhere = await signedInElsewhere(setup, 'tenant-app');
 		cookie = await setup.login({ scope: 'openid' });
 	});
 
@@ -87,10 +70,14 @@ describe('who the consent page says is asking', () => {
 		expect(page.text).toContain(`${T.host.label} evil.example.net`);
 	});
 
-	it('does not speak of another tenant’s app as the organization’s own in the shared bucket', async () => {
+	it('does not speak of another bucket’s app as the organization’s own', async () => {
 		const page = await openConsent(
-			{ client_id: 'tenant-app', scope: 'openid email' },
-			cookie
+			{
+				client_id: 'tenant-app',
+				scope: 'openid email',
+				resource: elsewhere.resource
+			},
+			elsewhere.cookie
 		);
 
 		expect(page.view.client.tier).toBe('operator-registered');

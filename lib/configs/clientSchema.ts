@@ -153,21 +153,31 @@ export const ClientSchema = t.Object({
 	 *
 	 * description: Whether this client was created on its own request through dynamic client
 	 * registration, rather than by an administrator. Declared here — and therefore persisted, since a
-	 * model stores only the keys its schema declares — because the console marks such a client in a
-	 * project's client list, and because telling the two apart must not rest on a heuristic about the
+	 * model stores only the keys its schema declares — because the console marks such a client in its
+	 * bucket's application list, and because telling the two apart must not rest on a heuristic about the
 	 * shape of an id.
 	 */
 	registeredDynamically: t.Optional(t.Boolean()),
 
 	/*
-	 * registeredAtBucket
+	 * bucketId
 	 *
-	 * description: The bucket whose own address a self-registered client registered at — its
-	 * `<issuer>/reg`, advertised by that bucket's discovery. Absent for a registration at the root and
-	 * for every client an administrator created. `resolveBucketForRequest` reads it after the project
-	 * rule, so the client signs in that bucket's end users, and is refused at any other address.
+	 * description: The bucket this client belongs to, for its whole life (specs/099). Set by the server
+	 * only: by the admin route that created it, or — for a self-registered client — to the bucket whose
+	 * own `<issuer>/reg` it registered at. Absent for a registration at the root, a client metadata
+	 * document and a synthesized client. A base key, so no registration request or document can name it:
+	 * the bucket a client signs people into is exactly what an attacker would want to choose.
 	 */
-	registeredAtBucket: t.Optional(t.String()),
+	bucketId: t.Optional(t.String()),
+
+	/*
+	 * corsOrigins
+	 *
+	 * description: Web origins whose browser code may read this client's cross-origin responses. Set by an
+	 * administrator, stored canonical and matched by exact equality (lib/helpers/cors_origin.ts); absent
+	 * grants nothing. A base key for the reason `bucketId` is one: a client may not grant itself CORS.
+	 */
+	corsOrigins: t.Optional(t.Array(t.String())),
 
 	/*
 	 * registrationUsedAt

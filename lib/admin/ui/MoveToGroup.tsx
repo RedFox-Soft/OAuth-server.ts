@@ -15,13 +15,14 @@ interface GroupRef {
 interface Preview {
 	from: GroupRef;
 	to: GroupRef;
-	projects?: Array<{ id: string; name: string }>;
+	applications?: number;
+	apis?: number;
 	consequence: string;
 }
 
 /*
- * Moving a bucket, with the projects using it, or a project on the Default bucket, to another administrator
- * group (specs/075). Class C4 (`bucket.move`, `project.move`).
+ * Moving a bucket, with everything it holds, to another administrator group (specs/075, specs/099). Class
+ * C4 (`bucket.move`).
  *
  * Two steps, because the server's preview is the only place the full list of what moves exists: the
  * first request names the destination and is answered with what would move; the second repeats it with
@@ -29,14 +30,12 @@ interface Preview {
  * anyone who owns the group it lands in.
  */
 export function MoveToGroup({
-	kind,
 	id,
 	name,
 	sourceGroupId,
 	onClose,
 	onMoved
 }: {
-	kind: 'bucket' | 'project';
 	id: string;
 	name: string;
 	sourceGroupId: string;
@@ -76,7 +75,7 @@ export function MoveToGroup({
 	async function step(commit: boolean): Promise<PreviewStep<Preview>> {
 		const result = await request(
 			'PUT',
-			`/admin/api/${kind === 'bucket' ? 'buckets' : 'projects'}/${encodeURIComponent(id)}/owner`,
+			`/admin/api/buckets/${encodeURIComponent(id)}/owner`,
 			commit ? { groupId, confirm: true } : { groupId }
 		);
 		if (!result.ok) {
@@ -89,12 +88,11 @@ export function MoveToGroup({
 			}
 			return { kind: 'failed', result };
 		}
-		const noun = kind === 'bucket' ? 'Bucket' : 'Project';
 		return {
 			kind: 'done',
 			text: preview
-				? `${noun} ${name} moved to ${labelOf(preview.to)}.`
-				: `${noun} ${name} moved.`
+				? `Bucket ${name} moved to ${labelOf(preview.to)}.`
+				: `Bucket ${name} moved.`
 		};
 	}
 
@@ -118,13 +116,9 @@ export function MoveToGroup({
 						From <strong>{labelOf(shown.from)}</strong> to{' '}
 						<strong>{labelOf(shown.to)}</strong>
 					</Typography.Text>
-					{kind === 'bucket' && (
-						<Typography.Text>
-							{shown.projects && shown.projects.length > 0
-								? `Moves with it: ${shown.projects.map((p) => p.name).join(', ')}.`
-								: 'No project uses this bucket.'}
-						</Typography.Text>
-					)}
+					<Typography.Text>
+						{`Moves with it: ${String(shown.applications ?? 0)} application${shown.applications === 1 ? '' : 's'} and ${String(shown.apis ?? 0)} API${shown.apis === 1 ? '' : 's'}.`}
+					</Typography.Text>
 					<Alert
 						type="info"
 						showIcon

@@ -11,6 +11,10 @@ import { AdminError } from '../auth/rbac.js';
 import { OIDCProviderError } from '../../helpers/errors.js';
 import { isHttpsUri } from '../../helpers/valid_url.js';
 import {
+	InvalidOriginError,
+	normalizeOrigins
+} from '../../helpers/cors_origin.js';
+import {
 	LOGO_FORMAT_MESSAGE,
 	LOGO_SIZE_MESSAGE
 } from '../../consts/client_logo.js';
@@ -55,9 +59,14 @@ export interface AdminClientView {
 	policyUri?: string;
 	tosUri?: string;
 	logo?: string;
+	/* The bucket it belongs to, for life (specs/099). Absent only for a client registered at the root. */
+	bucketId?: string;
+	corsOrigins: string[];
+	/* Registered on its own request; such a client is shown, and managed through its registration token. */
+	registeredDynamically: boolean;
 }
 
-/* A client in a list: whether it has a logo, never the image — a project may hold many. */
+/* A client in a list: whether it has a logo, never the image — a bucket may hold many. */
 export type AdminClientListItem = Omit<AdminClientView, 'logo'> & {
 	hasLogo: boolean;
 };
@@ -156,8 +165,28 @@ export interface CreateClientInput extends KeyAndRequestInput {
 	backchannelTokenDeliveryMode?: string;
 	backchannelClientNotificationEndpoint?: string;
 	authorizationDetailsTypes?: readonly string[];
+	corsOrigins?: readonly string[];
 	/* A `data:` URL; null on an update removes the logo. Never part of the client record. */
 	logo?: string | null;
+}
+
+/*
+ * Normalizes a submitted origin list, or refuses the whole request. All-or-nothing on purpose: half a
+ * list is a configuration an operator did not ask for, and the browser-facing consequence of a silently
+ * dropped entry is an app that cannot reach the server.
+ */
+function validatedOrigins(
+	origins: readonly string[] | undefined
+): string[] | undefined {
+	if (origins === undefined) return undefined;
+	try {
+		return normalizeOrigins([...origins]);
+	} catch (err) {
+		if (err instanceof InvalidOriginError) {
+			throw new AdminError(400, err.message, { field: 'corsOrigins' });
+		}
+		throw err;
+	}
 }
 
 export type UpdateClientInput = Partial<CreateClientInput>;
@@ -234,13 +263,15 @@ function toMetadata(input: CreateClientInput, clientId: string) {
 	}
 	/*
 	 * Forwarded explicitly: this builder is an allow-list, so a field added to the request schema alone
-	 * is accepted by the route and then silently discarded here — the same defect the projects route had
+	 * is accepted by the route and then silently discarded here — the same defect a route once had
 	 * with `clientIds`. validateClient recognizes this metadata only when the feature is enabled and
 	 * validates each value against the configured types, so no gate is restated here.
 	 */
 	if (input.authorizationDetailsTypes !== undefined) {
 		metadata.authorization_details_types = input.authorizationDetailsTypes;
 	}
+	const origins = validatedOrigins(input.corsOrigins);
+	if (origins !== undefined) metadata.corsOrigins = origins;
 	applyKeyAndRequestAttributes(metadata, input);
 	return metadata;
 }
@@ -265,6 +296,9 @@ function toView(client: Client): AdminClientView {
 		authorizationDetailsTypes: client.authorizationDetailsTypes && [
 			...client.authorizationDetailsTypes
 		],
+		bucketId: client.bucketId,
+		corsOrigins: [...(client.corsOrigins ?? [])],
+		registeredDynamically: client.registeredDynamically === true,
 		...keyAndRequestView(client)
 	};
 }
@@ -299,12 +333,20 @@ async function validateAndStore(metadata: Record<string, unknown>) {
 	}
 }
 
+/*
+ * `bucketId` is an argument, never part of the input: the bucket a client signs people into is the route's,
+ * set once here and carried by every later write (specs/099).
+ */
 export async function createClient(
+	bucketId: string,
 	input: CreateClientInput
 ): Promise<{ view: AdminClientView; secret?: string }> {
 	const clientId = input.clientId ?? nanoid();
 	const logo = checkedPresentation(input);
-	const metadata = toMetadata(input, clientId);
+	const metadata: Record<string, unknown> = {
+		...toMetadata(input, clientId),
+		bucketId
+	};
 	let secret: string | undefined;
 	if (needsSecret(metadata)) {
 		secret = generateSecret();
@@ -358,7 +400,8 @@ export async function updateClient(
 			patch.backchannelClientNotificationEndpoint ??
 			existing.backchannelClientNotificationEndpoint,
 		authorizationDetailsTypes:
-			patch.authorizationDetailsTypes ?? existing.authorizationDetailsTypes
+			patch.authorizationDetailsTypes ?? existing.authorizationDetailsTypes,
+		corsOrigins: patch.corsOrigins ?? existing.corsOrigins
 	};
 	/*
 	 * Applied over the stored record, not in place of it. The console shows a subset of a client's

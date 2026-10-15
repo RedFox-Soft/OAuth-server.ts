@@ -1,9 +1,7 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
 
 import { ContainerOwnershipStore } from 'lib/adapters/memory/containerOwnershipStore.ts';
-import { ProjectStore } from 'lib/adapters/memory/projectStore.ts';
 import { UserBucketStore } from 'lib/adapters/memory/userBucketStore.ts';
-import { DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 
 /*
  * Memory implementation only, for the reason every store spec here gives: the database backends connect at
@@ -11,132 +9,79 @@ import { DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
  */
 
 let buckets: UserBucketStore;
-let projects: ProjectStore;
 let ownership: ContainerOwnershipStore;
 
-async function ownerOf(kind: 'bucket' | 'project', id: string) {
-	const record =
-		kind === 'bucket' ? await buckets.find(id) : await projects.find(id);
-	return record?.ownerGroupId;
+async function ownerOf(id: string) {
+	return (await buckets.find(id))?.ownerGroupId;
 }
 
 /**
- * @proves A container changes group only as a whole: a bucket and every project using it move together or
- * not at all, a move left half-done completes when repeated, and only a project on the Default bucket moves
- * alone.
+ * @proves A bucket changes group only from the group the mover saw it in: a move from any other group
+ * changes nothing, and of two moves racing from the same group exactly one takes effect.
  */
-describe('moving a container to another group', () => {
+describe('moving a bucket to another group', () => {
 	beforeEach(() => {
 		buckets = new UserBucketStore();
-		projects = new ProjectStore();
-		ownership = new ContainerOwnershipStore({ buckets, projects });
+		ownership = new ContainerOwnershipStore({ buckets });
 	});
 
-	async function bucketWith(owner: string, projectOwners: string[]) {
-		const bucket = await buckets.create({ name: 'b', ownerGroupId: owner });
-		const bound = [];
-		for (const [i, projectOwner] of projectOwners.entries()) {
-			bound.push(
-				await projects.create({
-					name: `p${i}`,
-					slug: `p${i}-${bucket._id}`,
-					ownerGroupId: projectOwner,
-					bucketId: bucket._id
-				})
-			);
-		}
-		return { bucket, bound };
-	}
-
-	it('moves a bucket and every project using it', async () => {
-		const { bucket, bound } = await bucketWith('src', ['src', 'src']);
+	it('moves a bucket that is in the group it is moved from', async () => {
+		const bucket = await buckets.create({ name: 'b', ownerGroupId: 'src' });
 
 		const result = await ownership.moveBucket(bucket._id, 'src', 'dst');
 
-		expect(result).toEqual({
-			status: 'moved',
-			projectIds: bound.map((p) => p._id)
-		});
-		expect(await ownerOf('bucket', bucket._id)).toBe('dst');
-		for (const p of bound) expect(await ownerOf('project', p._id)).toBe('dst');
-	});
-
-	it('changes nothing when one of the bucket’s projects belongs to a third group', async () => {
-		const { bucket, bound } = await bucketWith('src', ['src', 'third']);
-
-		expect((await ownership.moveBucket(bucket._id, 'src', 'dst')).status).toBe(
-			'conflict'
-		);
-		expect(await ownerOf('bucket', bucket._id)).toBe('src');
-		expect(await ownerOf('project', bound[0]?._id ?? '')).toBe('src');
+		expect(result).toEqual({ status: 'moved' });
+		expect(await ownerOf(bucket._id)).toBe('dst');
 	});
 
 	it('changes nothing when the bucket belongs to a third group', async () => {
-		const { bucket, bound } = await bucketWith('third', ['src']);
-
-		expect((await ownership.moveBucket(bucket._id, 'src', 'dst')).status).toBe(
-			'conflict'
-		);
-		expect(await ownerOf('bucket', bucket._id)).toBe('third');
-		expect(await ownerOf('project', bound[0]?._id ?? '')).toBe('src');
-	});
-
-	it('moves the remaining projects of a move that stopped after the bucket', async () => {
-		const { bucket, bound } = await bucketWith('dst', ['dst', 'src']);
+		const bucket = await buckets.create({ name: 'b', ownerGroupId: 'third' });
 
 		const result = await ownership.moveBucket(bucket._id, 'src', 'dst');
 
-		expect(result).toEqual({
-			status: 'moved',
-			projectIds: [bound[1]?._id ?? '']
+		expect(result).toEqual({ status: 'conflict' });
+		expect(await ownerOf(bucket._id)).toBe('third');
+	});
+
+	/* A bucket already where the mover wanted it was moved by somebody else, whose move is not this one. */
+	it('reports a conflict for a bucket already in the destination group', async () => {
+		const bucket = await buckets.create({ name: 'b', ownerGroupId: 'dst' });
+
+		const result = await ownership.moveBucket(bucket._id, 'src', 'dst');
+
+		expect(result).toEqual({ status: 'conflict' });
+		expect(await ownerOf(bucket._id)).toBe('dst');
+	});
+
+	it('reports a conflict for a bucket that does not exist', async () => {
+		expect(await ownership.moveBucket('no-such-bucket', 'src', 'dst')).toEqual({
+			status: 'conflict'
 		});
-		for (const p of bound) expect(await ownerOf('project', p._id)).toBe('dst');
 	});
 
-	it('leaves projects of other buckets where they are', async () => {
-		const { bucket } = await bucketWith('src', ['src']);
-		const { bound: elsewhere } = await bucketWith('src', ['src']);
+	/*
+	 * Two administrators moving the same bucket from the same group at once: one move wins, and the other is
+	 * told so rather than silently overwriting it.
+	 */
+	it('lets exactly one of two concurrent moves from the same group take effect', async () => {
+		const bucket = await buckets.create({ name: 'b', ownerGroupId: 'src' });
 
-		await ownership.moveBucket(bucket._id, 'src', 'dst');
+		const results = await Promise.all([
+			ownership.moveBucket(bucket._id, 'src', 'first'),
+			ownership.moveBucket(bucket._id, 'src', 'second')
+		]);
 
-		expect(await ownerOf('project', elsewhere[0]?._id ?? '')).toBe('src');
+		expect(results.map((r) => r.status).sort()).toEqual(['conflict', 'moved']);
+		const winner = results[0].status === 'moved' ? 'first' : 'second';
+		expect(await ownerOf(bucket._id)).toBe(winner);
 	});
 
-	it('moves a project on the Default bucket alone', async () => {
-		const project = await projects.create({
-			bucketId: DEFAULT_BUCKET_ID,
-			name: 'solo',
-			slug: 'solo',
-			ownerGroupId: 'src'
-		});
+	it('leaves other buckets where they are', async () => {
+		const moved = await buckets.create({ name: 'a', ownerGroupId: 'src' });
+		const other = await buckets.create({ name: 'b', ownerGroupId: 'src' });
 
-		expect(
-			(await ownership.moveProject(project._id, 'src', 'dst')).status
-		).toBe('moved');
-		expect(await ownerOf('project', project._id)).toBe('dst');
-	});
+		await ownership.moveBucket(moved._id, 'src', 'dst');
 
-	it('changes nothing for a project on a bucket of its own', async () => {
-		const { bound } = await bucketWith('src', ['src']);
-		const id = bound[0]?._id ?? '';
-
-		expect((await ownership.moveProject(id, 'src', 'dst')).status).toBe(
-			'conflict'
-		);
-		expect(await ownerOf('project', id)).toBe('src');
-	});
-
-	it('changes nothing for a project no longer in the group it is moved from', async () => {
-		const project = await projects.create({
-			bucketId: DEFAULT_BUCKET_ID,
-			name: 'solo',
-			slug: 'solo-2',
-			ownerGroupId: 'elsewhere'
-		});
-
-		expect(
-			(await ownership.moveProject(project._id, 'src', 'dst')).status
-		).toBe('conflict');
-		expect(await ownerOf('project', project._id)).toBe('elsewhere');
+		expect(await ownerOf(other._id)).toBe('src');
 	});
 });

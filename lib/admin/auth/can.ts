@@ -1,11 +1,11 @@
-import type { Project, UserBucket } from '../../adapters/types.js';
+import type { UserBucket } from '../../adapters/types.js';
 import { addressOf } from '../../configs/issuer.js';
 import { ROOT_NAMESPACE } from '../../resources/declaration_id.js';
 import { ADMIN_BUCKET_ID, isUndeletableBucket } from '../consts.js';
 import type { AdminContext } from './rbac.js';
 
 /*
- * The rights a caller holds over a bucket, a project and the instance, stated as data (specs/079).
+ * The rights a caller holds over a bucket and the instance, stated as data (specs/079).
  *
  * The routes decide through these functions, and the presenters attach their answers to what the routes
  * return, so the console learns what the server will accept from the server's own predicates instead of a
@@ -13,7 +13,7 @@ import type { AdminContext } from './rbac.js';
  * for this entity as it is now. Most answers depend on the caller alone; two depend on the bucket's state
  * for one kind of caller (specs/081): a group owner may change the address of a bucket nothing depends on,
  * and a plain member may delete a bucket holding no accounts. A state refusal that applies to every caller
- * — a bucket still used by projects cannot be deleted by anyone — stays out of the flags: the bucket is
+ * — a bucket still holding applications cannot be deleted by anyone — stays out of the flags: the bucket is
  * deletable by right and refused by state, and the console shows those two differently.
  *
  * Pure on purpose. Nothing here reads a store: the state a flag depends on arrives as `BucketFacts`, which
@@ -28,7 +28,10 @@ export interface BucketCan {
 	manageUsers: boolean;
 	/* The bucket's own settings (PATCH). */
 	editSettings: boolean;
-	/* Provider, provisioning and user-group writes, signing keys, handing a user to a connection. */
+	/*
+	 * Provider, provisioning and user-group writes, signing keys, handing a user to a connection, and the
+	 * bucket's applications and APIs (specs/099).
+	 */
 	edit: boolean;
 	readActivity: boolean;
 	changeAddress: boolean;
@@ -36,38 +39,13 @@ export interface BucketCan {
 	delete: boolean;
 }
 
-export interface ProjectCan {
-	read: boolean;
-	edit: boolean;
-	delete: boolean;
-	manageClients: boolean;
-	declareResources: boolean;
-	assignBucket: boolean;
-	move: boolean;
-}
-
 export interface MeCan {
 	createBucket: boolean;
 	createHost: boolean;
-	createProject: boolean;
 	createGroup: boolean;
 	/* The instance-wide surfaces: settings, keys, administrators, agent access, usage, faults. */
 	instance: boolean;
 }
-
-/*
- * The buckets a caller reaches through a project one of their groups owns, each with those groups — the one
- * fact a predicate cannot read off the context and the entity, so it is gathered once per request
- * (`projectReach` in rbac.ts) and handed in. The users right is widened by it, and so is moving: a bucket
- * moves with its projects, so an owner of a group whose project uses it is an owner of what moves.
- */
-export type ProjectReach = ReadonlyMap<string, ReadonlySet<string>>;
-
-/*
- * For a decision that never consults the reach: owning a bucket, editing it and deleting it are membership
- * questions about the bucket's own group.
- */
-export const NO_PROJECT_REACH: ProjectReach = new Map();
 
 function belongsTo(ctx: AdminContext, groupId: string): boolean {
 	return ctx.memberships.some((m) => m.groupId === groupId);
@@ -107,22 +85,10 @@ export function heldDeletedBucket(
 	);
 }
 
-/*
- * Broader than holding the bucket: a group that owns a project signing into it administers its end users,
- * though not the bucket — reading its detail and managing its users, never editing the bucket entity. Says
- * nothing about the administrators' bucket, which `bucketCan` refuses first, by its own rule.
- */
-function reachesBucketUsers(
-	ctx: AdminContext,
-	bucket: Pick<UserBucket, '_id' | 'ownerGroupId'>,
-	access: ProjectReach
-): boolean {
-	return holdsBucket(ctx, bucket) || access.has(bucket._id);
-}
-
 /* What depends on a bucket, counted across the instance rather than among what the caller can see. */
 export interface BucketDependents {
-	readonly projects: number;
+	/* Every application in it, a self-registered one included: its integration breaks like any other. */
+	readonly applications: number;
 	readonly providers: number;
 	readonly connections: number;
 }
@@ -174,8 +140,7 @@ export function bucketFactsWanted(
 
 /*
  * Changing an address changes a bucket's issuer identifier and breaks every client integrated with it, so it
- * stays a super administrator's once anything is integrated: a project (and so its applications), an
- * identity provider registered with the old callback, or a provisioning connection pointed at the old base
+ * stays a super administrator's once anything is integrated: an application, an identity provider registered with the old callback, or a provisioning connection pointed at the old base
  * URL. Before then nothing breaks, and an owner who mistyped a path corrects it themselves. A hostname target
  * is a super administrator's whatever the bucket's state, which the route checks, because this answers per
  * bucket and not per target. The two buckets served at the root keep theirs, or the console would lock every
@@ -193,7 +158,7 @@ function mayChangeBucketAddress(
 		ownsGroup(ctx, bucket.ownerGroupId) &&
 		ownerMayReaddress(bucket) &&
 		dependents !== undefined &&
-		dependents.projects === 0 &&
+		dependents.applications === 0 &&
 		dependents.providers === 0 &&
 		dependents.connections === 0
 	);
@@ -221,7 +186,6 @@ function mayDeleteBucket(
 export function bucketCan(
 	ctx: AdminContext,
 	bucket: AddressedBucket,
-	access: ProjectReach,
 	facts: BucketFacts = NO_BUCKET_FACTS
 ): BucketCan {
 	/*
@@ -232,62 +196,22 @@ export function bucketCan(
 	/* The instance is built on these two: neither moves, changes address or is deleted. */
 	const fixed = isUndeletableBucket(bucket._id);
 	const holds = holdsBucket(ctx, bucket);
-	const users = reachesBucketUsers(ctx, bucket, access);
 	const edit = !reserved && holds;
-	const ownsWhatMoves =
-		ownsGroup(ctx, bucket.ownerGroupId) ||
-		[...(access.get(bucket._id) ?? [])].some((groupId) =>
-			ownsGroup(ctx, groupId)
-		);
 	return {
-		read: ctx.superAdmin || (!reserved && users),
-		manageUsers: !reserved && users,
+		read: ctx.superAdmin || (!reserved && holds),
+		manageUsers: !reserved && holds,
 		editSettings: ctx.superAdmin || edit,
 		edit,
 		/* A super administrator reads any bucket's figures, the reserved ones included. */
 		readActivity: ctx.superAdmin || edit,
 		changeAddress: mayChangeBucketAddress(ctx, bucket, facts),
-		/*
-		 * Taking a bucket away removes every other member's access to it, so it is an owner's act — of its
-		 * group, or of a group whose project moves with it, which is how a move left half-done is finished.
-		 */
-		move: !fixed && holds && (ctx.superAdmin || ownsWhatMoves),
+		/* Taking a bucket away removes every other member's access to it, so it is an owner's act. */
+		move:
+			!fixed &&
+			holds &&
+			(ctx.superAdmin || ownsGroup(ctx, bucket.ownerGroupId)),
 		delete: mayDeleteBucket(ctx, bucket, facts)
 	};
-}
-
-/*
- * Reaching a project at all. The console's own project sits outside the group model, so no membership is
- * the thing that grants it; only a super administrator reaches it.
- */
-export function reachesProject(
-	ctx: AdminContext,
-	project: Pick<Project, 'type' | 'ownerGroupId'>
-): boolean {
-	if (ctx.superAdmin) return true;
-	return project.type !== 'admin' && belongsTo(ctx, project.ownerGroupId);
-}
-
-/* Changing, deleting and managing the clients of a project: never the console's own. */
-export function managesProject(
-	ctx: AdminContext,
-	project: Pick<Project, 'type' | 'ownerGroupId'>
-): boolean {
-	return reachesProject(ctx, project) && project.type !== 'admin';
-}
-
-/*
- * Moving a project to another group removes every other member's access to it, so it is an owner's act, as
- * moving a bucket is.
- */
-export function mayMoveProject(
-	ctx: AdminContext,
-	project: Pick<Project, 'type' | 'ownerGroupId'>
-): boolean {
-	return (
-		managesProject(ctx, project) &&
-		(ctx.superAdmin || ownsGroup(ctx, project.ownerGroupId))
-	);
 }
 
 /*
@@ -296,27 +220,6 @@ export function mayMoveProject(
  */
 export function mayDeclareIn(ctx: AdminContext, namespace: string): boolean {
 	return ctx.superAdmin || namespace !== ROOT_NAMESPACE;
-}
-
-/*
- * `namespace` is where the project's declarations live (`namespaceOfProject`): read from its bucket, so the
- * caller resolves it and hands it in rather than this module reading a store.
- */
-export function projectCan(
-	ctx: AdminContext,
-	project: Pick<Project, 'type' | 'ownerGroupId'> & { namespace: string }
-): ProjectCan {
-	const reaches = reachesProject(ctx, project);
-	const manages = managesProject(ctx, project);
-	return {
-		read: reaches,
-		edit: manages,
-		delete: manages,
-		manageClients: manages,
-		declareResources: reaches && mayDeclareIn(ctx, project.namespace),
-		assignBucket: reaches,
-		move: mayMoveProject(ctx, project)
-	};
 }
 
 export function meCan(ctx: AdminContext): MeCan {
@@ -329,7 +232,6 @@ export function meCan(ctx: AdminContext): MeCan {
 		createBucket: creates,
 		/* Naming a hostname puts a name in the operator's own domain under the caller's control. */
 		createHost: ctx.superAdmin,
-		createProject: creates,
 		createGroup: true,
 		instance: ctx.superAdmin
 	};

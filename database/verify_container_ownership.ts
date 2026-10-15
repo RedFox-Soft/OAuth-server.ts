@@ -2,116 +2,62 @@ import type {
 	AdminAuditStoreInstance,
 	ContainerOwnershipStoreInstance,
 	GroupStoreInstance,
-	ProjectStoreInstance,
 	UserBucketStoreInstance
 } from '../lib/adapters/types.js';
-import { DEFAULT_BUCKET_ID } from '../lib/admin/consts.js';
 
 type Check = (name: string, ok: boolean, detail?: string) => void;
 
 /*
- * Moving containers between administrator groups, and the upgrade that made personal groups personal
+ * Moving a bucket between administrator groups, and the upgrade that made personal groups personal
  * (specs/075), against a real datastore: what an in-memory double cannot show is whether the move is one
  * change under two concurrent requests, and whether the migration's raw writes read back through the stores.
- * Shared by verify_mongodb.ts and verify_postgres.ts so both backends answer the same questions in the same
- * words.
+ * Since specs/099 a bucket holds its applications and APIs by reference, so the move is one conditional write
+ * of the bucket. Shared by verify_mongodb.ts and verify_postgres.ts so both backends answer the same
+ * questions in the same words.
  */
 export async function verifyContainerOwnership(
 	stores: {
 		buckets: UserBucketStoreInstance;
-		projects: ProjectStoreInstance;
 		ownership: ContainerOwnershipStoreInstance;
 		audit: AdminAuditStoreInstance;
 	},
 	check: Check
 ): Promise<void> {
-	const { buckets, projects, ownership, audit } = stores;
+	const { buckets, ownership, audit } = stores;
 	const stamp = Date.now();
 	const src = `move-src-${stamp}`;
-
-	async function bucketWith(owner: string, projectOwners: string[]) {
-		const bucket = await buckets.create({
+	const bucketIn = (owner: string) =>
+		buckets.create({
 			name: `move-${stamp}-${Math.random()}`,
 			ownerGroupId: owner
 		});
-		const bound = [];
-		for (const [i, projectOwner] of projectOwners.entries()) {
-			bound.push(
-				await projects.create({
-					name: `p${String(i)}`,
-					slug: `move-${stamp}-${bucket._id}-${String(i)}`.toLowerCase(),
-					ownerGroupId: projectOwner,
-					bucketId: bucket._id
-				})
-			);
-		}
-		return { bucket, bound };
-	}
-	const ownerOf = async (id: string) => (await projects.find(id))?.ownerGroupId;
+	const ownerOf = async (id: string) => (await buckets.find(id))?.ownerGroupId;
 
-	const plain = await bucketWith(src, [src, src]);
-	const moved = await ownership.moveBucket(plain.bucket._id, src, 'move-dst');
+	const plain = await bucketIn(src);
+	const moved = await ownership.moveBucket(plain._id, src, 'move-dst');
 	check(
-		'a bucket move carries the bucket and every project using it',
-		moved.status === 'moved' &&
-			moved.projectIds.length === 2 &&
-			(await buckets.find(plain.bucket._id))?.ownerGroupId === 'move-dst' &&
-			(await ownerOf(plain.bound[0]?._id ?? '')) === 'move-dst' &&
-			(await ownerOf(plain.bound[1]?._id ?? '')) === 'move-dst',
+		'a bucket move changes the group of a bucket in the group it leaves',
+		moved.status === 'moved' && (await ownerOf(plain._id)) === 'move-dst',
 		JSON.stringify(moved)
 	);
 
-	const stray = await bucketWith(src, [src, 'move-third']);
-	const refused = await ownership.moveBucket(stray.bucket._id, src, 'move-dst');
+	const elsewhere = await bucketIn('move-third');
+	const refused = await ownership.moveBucket(elsewhere._id, src, 'move-dst');
 	check(
-		'a bucket move changes nothing when a project using it is in a third group',
+		'a bucket move changes nothing when the bucket is not in the group it is said to leave',
 		refused.status === 'conflict' &&
-			(await buckets.find(stray.bucket._id))?.ownerGroupId === src &&
-			(await ownerOf(stray.bound[0]?._id ?? '')) === src
+			(await ownerOf(elsewhere._id)) === 'move-third'
 	);
 
-	const halfDone = await bucketWith(src, [src, src]);
-	await buckets.update(halfDone.bucket._id, { ownerGroupId: 'move-dst' });
-	const completed = await ownership.moveBucket(
-		halfDone.bucket._id,
-		src,
-		'move-dst'
-	);
-	check(
-		'repeating a move left after the bucket write completes it',
-		completed.status === 'moved' &&
-			(await ownerOf(halfDone.bound[1]?._id ?? '')) === 'move-dst'
-	);
-
-	const raced = await bucketWith(src, [src, src, src]);
+	const raced = await bucketIn(src);
 	const outcomes = await Promise.all([
-		ownership.moveBucket(raced.bucket._id, src, 'move-a'),
-		ownership.moveBucket(raced.bucket._id, src, 'move-b')
+		ownership.moveBucket(raced._id, src, 'move-a'),
+		ownership.moveBucket(raced._id, src, 'move-b')
 	]);
-	const winner = (await buckets.find(raced.bucket._id))?.ownerGroupId;
-	const projectOwners = await Promise.all(
-		raced.bound.map((p) => ownerOf(p._id))
-	);
 	check(
-		'two simultaneous moves of one bucket: exactly one wins, and its projects follow the winner',
-		outcomes.filter((o) => o.status === 'moved').length === 1 &&
-			projectOwners.every((owner) => owner === winner),
-		`${outcomes.map((o) => o.status).join(', ')}; bucket in ${String(winner)}, projects in ${projectOwners.join(', ')}`
-	);
-
-	const lone = await projects.create({
-		name: 'lone',
-		slug: `move-lone-${stamp}`,
-		ownerGroupId: src,
-		bucketId: DEFAULT_BUCKET_ID
-	});
-	check(
-		'a project on the Default bucket moves alone, and one on a bucket of its own does not',
-		(await ownership.moveProject(lone._id, src, 'move-dst')).status ===
-			'moved' &&
-			(await ownerOf(lone._id)) === 'move-dst' &&
-			(await ownership.moveProject(stray.bound[0]?._id ?? '', src, 'move-dst'))
-				.status === 'conflict'
+		'two simultaneous moves of one bucket: exactly one wins',
+		outcomes.filter((o) => o.status === 'moved').length === 1,
+		`${outcomes.map((o) => o.status).join(', ')}; bucket in ${String(await ownerOf(raced._id))}`
 	);
 
 	await audit.record({
@@ -119,17 +65,17 @@ export async function verifyContainerOwnership(
 		actorEmail: 'fidelity@x.io',
 		action: 'bucket.owner.change',
 		targetType: 'UserBucket',
-		targetId: plain.bucket._id,
+		targetId: plain._id,
 		ownerGroupId: 'move-dst',
 		formerOwnerGroupId: src
 	});
 	const left = await audit.list({
 		ownerGroupIds: [src],
-		targetId: plain.bucket._id
+		targetId: plain._id
 	});
 	const joined = await audit.list({
 		ownerGroupIds: ['move-dst'],
-		targetId: plain.bucket._id
+		targetId: plain._id
 	});
 	check(
 		'a move is read by the group it left and by the group it joined',

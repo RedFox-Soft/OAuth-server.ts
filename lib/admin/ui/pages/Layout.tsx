@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { Layout as AntLayout, Badge, Button, Menu, Typography } from 'antd';
 import type { MenuProps } from 'antd';
 import {
-	ProjectOutlined,
 	DatabaseOutlined,
 	TeamOutlined,
 	ApartmentOutlined,
@@ -20,7 +19,6 @@ import { meCan, useMe } from '../frame/me.js';
 import { sectionHref, type PageKey, type Section } from '../frame/routes.js';
 import { InstanceOnly, NotFound } from '../frame/states.js';
 import { BucketDetail, type BucketTab } from './BucketDetail.js';
-import { ProjectWorkspace } from './ProjectWorkspace.js';
 import { AdminGroupPage } from './groups/AdminGroupPage.js';
 import { UserPage, type UserTab } from './users/UserPage.js';
 import { ProviderPage } from './providers/ProviderPage.js';
@@ -31,7 +29,6 @@ import {
 import { UserGroupPage } from './groups/UserGroupPage.js';
 import { Groups } from './Groups.js';
 import { ScopeSwitcher } from './ScopeSwitcher.js';
-import { Projects } from './Projects.js';
 import { Buckets } from './Buckets.js';
 import {
 	AdministratorsHome,
@@ -46,16 +43,12 @@ import { Usage } from './Usage.js';
 import { UsageBucketHistory } from './UsageBucketHistory.js';
 import { ADMIN_BUCKET_ID } from '../../consts.js';
 
-const PROJECT_AREAS = {
-	'project.clients': 'clients',
-	'project.resources': 'resources',
-	'project.settings': 'settings'
-} as const;
-
 const { Sider, Header, Content } = AntLayout;
 
 const BUCKET_TABS: Partial<Record<PageKey, BucketTab>> = {
 	'bucket.overview': 'overview',
+	'bucket.applications': 'applications',
+	'bucket.apis': 'apis',
 	'bucket.users': 'users',
 	'bucket.userGroups': 'userGroups',
 	'bucket.signIn': 'signIn',
@@ -134,7 +127,6 @@ export function Layout() {
 			type: 'group',
 			label: 'Build',
 			children: [
-				{ key: 'projects', icon: <ProjectOutlined />, label: 'Projects' },
 				{
 					key: 'buckets',
 					icon: <DatabaseOutlined />,
@@ -269,16 +261,6 @@ export function Layout() {
 			);
 		}
 		switch (route.key) {
-			case 'project.clients':
-			case 'project.resources':
-			case 'project.settings':
-				return (
-					<ProjectWorkspace
-						key={route.params.project}
-						projectId={route.params.project ?? ''}
-						area={PROJECT_AREAS[route.key]}
-					/>
-				);
 			case 'group':
 				return (
 					<AdminGroupPage
@@ -310,7 +292,7 @@ export function Layout() {
 			case 'faults':
 				return <Errors />;
 			default:
-				return <Projects />;
+				return <Buckets />;
 		}
 	}
 

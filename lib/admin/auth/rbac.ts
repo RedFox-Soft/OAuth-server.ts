@@ -2,21 +2,19 @@ import { Elysia } from 'elysia';
 import {
 	adminSessionStore,
 	getUserStore,
-	getProjectStore,
 	getGroupStore
 } from '../../adapters/index.js';
-import type { Group, Project, UserBucket } from '../../adapters/types.js';
+import type { Group, UserBucket } from '../../adapters/types.js';
 import { ApplicationConfig } from '../../configs/application.js';
 import { isDispatched } from '../../mcp/channel.js';
 import {
 	ADMIN_BUCKET_ID,
 	ADMIN_SESSION_COOKIE,
 	ADMIN_SESSION_TTL_SECONDS,
-	DEFAULT_BUCKET_ID,
 	UNASSIGNED_GROUP_ID
 } from '../consts.js';
 import { isSuperAdminsGroup } from '../super_admins.js';
-import { holdsBucket, reachesProject, type ProjectReach } from './can.js';
+import { holdsBucket } from './can.js';
 
 export interface AdminContext {
 	userId: string;
@@ -66,13 +64,14 @@ export interface AdminContext {
  * dialog and an MCP agent both need to list the consequences without parsing prose.
  *
  * `ids` is present for clients and absent for end-users, which is a privacy decision rather than an
- * omission — a project's clients are objects the operator administers, while a bucket may hold thousands
- * of accounts whose identities are not the caller's business.
+ * omission — a bucket's applications are objects the operator administers, while a bucket may hold
+ * thousands of accounts whose identities are not the caller's business.
  *
- * `project` and `bucket` are what keep a group from being deleted: the containers it still owns, counted.
+ * `client` and `resource` are what keep a bucket from being deleted (specs/099); `bucket` is what keeps a
+ * group from being deleted: the containers it still owns, counted.
  */
 export interface DeletionBlocker {
-	readonly kind: 'client' | 'enduser' | 'project' | 'bucket';
+	readonly kind: 'client' | 'resource' | 'enduser' | 'bucket';
 	readonly count: number;
 	readonly ids?: readonly string[];
 }
@@ -194,7 +193,7 @@ export function assertGroupOwner(admin: AdminContext, groupId: string): void {
  * keeps instance-level provisioning working as it always did, and keeps the migration's rule for an
  * empty manager list and this rule the same rule.
  *
- * A project administrator always has one, because a personal group is created with the account. The
+ * A tenant administrator always has one, because a personal group is created with the account. The
  * refusal below is therefore a broken deployment rather than a caller's mistake, and says so instead
  * of silently dropping the container somewhere.
  */
@@ -211,15 +210,6 @@ export function assertActiveGroup(admin: AdminContext): string {
  * The refusals below decide through `can.ts`, the same predicates the rights stated to the console come
  * from, so a right the console is shown and the check a route makes cannot drift apart.
  */
-export function assertProjectAccess(
-	admin: AdminContext,
-	project: Project
-): void {
-	if (!reachesProject(admin, project)) {
-		throw new AdminError(403, 'no access to this project');
-	}
-}
-
 export function assertBucketAccess(
 	admin: AdminContext,
 	bucket: UserBucket
@@ -227,55 +217,6 @@ export function assertBucketAccess(
 	if (!holdsBucket(admin, bucket)) {
 		throw new AdminError(403, 'no access to this bucket');
 	}
-}
-
-/*
- * The buckets backing a project one of the caller's groups owns — every group, not only the active one,
- * because access follows membership and the scope only decides what is listed. A super administrator's is
- * never consulted, so it is not read.
- */
-export async function projectReach(admin: AdminContext): Promise<ProjectReach> {
-	if (admin.superAdmin) return new Map();
-	return reachOf(await projectsOfCallerGroups(admin));
-}
-
-/* Every project owned by a group the caller belongs to. */
-export async function projectsOfCallerGroups(
-	admin: AdminContext
-): Promise<Project[]> {
-	const store = getProjectStore();
-	const all: Project[] = [];
-	for (const membership of admin.memberships) {
-		all.push(...(await store.listByGroup(membership.groupId)));
-	}
-	return all;
-}
-
-/* The reach those projects give, for a caller who already read them for something else. */
-export function reachOf(
-	projects: readonly Pick<Project, 'bucketId' | 'ownerGroupId'>[]
-): ProjectReach {
-	const reach = new Map<string, Set<string>>();
-	for (const project of projects) {
-		const bucketId = bucketReachedThrough(project);
-		if (bucketId === undefined) continue;
-		const groups = reach.get(bucketId) ?? new Set<string>();
-		groups.add(project.ownerGroupId);
-		reach.set(bucketId, groups);
-	}
-	return reach;
-}
-
-/*
- * The bucket a project gives its group reach over — never the Default bucket (specs/098). Every tenant's
- * project on it shares its population, so reach through one of them would hand a tenant every other
- * tenant's end-users; only a super administrator reaches it. Before projects were required to name a bucket
- * such a project named none, and this is what kept it that way.
- */
-export function bucketReachedThrough(
-	project: Pick<Project, 'bucketId'>
-): string | undefined {
-	return project.bucketId === DEFAULT_BUCKET_ID ? undefined : project.bucketId;
 }
 
 /*
@@ -423,7 +364,7 @@ export const resolveAdmin = new Elysia({ name: 'admin-resolve' }).derive(
 		 * with `Cannot access 'BaseTokenPayload' before initialization` when the graph is entered
 		 * cold (see wiki/concepts/model-graph-import-order.md). A static import here would put that
 		 * cycle in the import chain of every admin route group — rbac.ts is imported by all ten — so
-		 * merely loading `projectRoutes` would crash. Measured: it took the whole admin suite down.
+		 * merely loading `bucketRoutes` would crash. Measured: it took the whole admin suite down.
 		 *
 		 * By the time a request is served the graph is warm, and the module cache makes this a map
 		 * lookup after the first call. Same remedy, for the same reason, as the lazy import in

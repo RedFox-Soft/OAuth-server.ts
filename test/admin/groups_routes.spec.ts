@@ -4,11 +4,13 @@ import { treaty } from '@elysiajs/eden';
 import { getBucketStore } from 'lib/adapters/index.ts';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { groupRoutes } from 'lib/admin/groups/routes.ts';
-import { projectRoutes } from 'lib/admin/projects/routes.ts';
+import { bucketRoutes } from 'lib/admin/buckets/routes.ts';
 import { scopeRoutes } from 'lib/admin/scope/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
+import { Type } from '@sinclair/typebox';
+import { shaped } from 'test/shape.ts';
 import { answered } from './answered.ts';
 import { createAdministrator, type AdminKind } from '../administrators.ts';
 
@@ -16,7 +18,7 @@ const app = new Elysia()
 	.use(resolveAdmin)
 	.use(groupRoutes)
 	.use(scopeRoutes)
-	.use(projectRoutes);
+	.use(bucketRoutes);
 const client = treaty(app);
 
 async function admin(kind: AdminKind = 'plain') {
@@ -32,10 +34,16 @@ async function admin(kind: AdminKind = 'plain') {
 	};
 }
 
-/* Every project names a bucket of its group (specs/098). */
 async function bucketIn(ownerGroupId: string): Promise<string> {
 	return (await getBucketStore().create({ name: 'Own', ownerGroupId }))._id;
 }
+
+const Refusal = Type.Object({
+	message: Type.String(),
+	blockers: Type.Array(
+		Type.Object({ kind: Type.String(), count: Type.Number() })
+	)
+});
 
 async function makeGroup(cookie: string, name = 'Acme') {
 	const res = await client.admin.api.groups.post(
@@ -106,31 +114,16 @@ describe('groups API', () => {
 				);
 			expect(added.status).toBe(200);
 
-			// The owner creates a project in the group, then the member reaches it — without being named
-			// on the project itself, which is the whole point of group ownership.
-			await client.admin.api.scope.put(
-				{ groupId: group._id },
-				{ headers: { cookie: owner.cookie } }
-			);
-			const project = answered(
-				(
-					await client.admin.api.projects.post(
-						{
-							name: 'Shared',
-							slug: `s-${Math.random().toString(36).slice(2)}`,
-							bucketId: await bucketIn(group._id)
-						},
-						{ headers: { cookie: owner.cookie } }
-					)
-				).data
-			);
+			// The group holds a bucket, then the member reaches it — without being named on the bucket
+			// itself, which is the whole point of group ownership.
+			const bucketId = await bucketIn(group._id);
 
 			await client.admin.api.scope.put(
 				{ groupId: group._id },
 				{ headers: { cookie: member.cookie } }
 			);
 			const read = await client.admin.api
-				.projects({ id: project._id })
+				.buckets({ id: bucketId })
 				.get({ headers: { cookie: member.cookie } });
 			expect(read.status).toBe(200);
 		});
@@ -251,26 +244,18 @@ describe('groups API', () => {
 			expect(byOwner.status).toBe(200);
 		});
 
-		it('refuses while the group still owns a project, and names what', async () => {
+		it('refuses while the group still owns a bucket, and names the buckets', async () => {
 			const owner = await admin();
 			const group = answered((await makeGroup(owner.cookie)).data);
-			await client.admin.api.scope.put(
-				{ groupId: group._id },
-				{ headers: { cookie: owner.cookie } }
-			);
-			await client.admin.api.projects.post(
-				{
-					name: 'Held',
-					slug: `h-${Math.random().toString(36).slice(2)}`,
-					bucketId: await bucketIn(group._id)
-				},
-				{ headers: { cookie: owner.cookie } }
-			);
+			await bucketIn(group._id);
 
 			const res = await client.admin.api
 				.groups({ id: group._id })
 				.delete(undefined, { headers: { cookie: owner.cookie } });
 			expect(res.status).toBe(409);
+			const refusal = shaped(Refusal, res.error?.value);
+			expect(refusal.message).toBe('group still owns buckets');
+			expect(refusal.blockers).toEqual([{ kind: 'bucket', count: 1 }]);
 		});
 
 		it('never deletes a personal group', async () => {

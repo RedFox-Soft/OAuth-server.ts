@@ -361,7 +361,7 @@ export function Audit() {
 				)
 		},
 		/*
-		 * What else the action carried with it: what a deletion destroyed, the projects that moved with a
+		 * What else the action carried with it: what a deletion destroyed, the applications and APIs that moved with a
 		 * bucket, the members an upgrade removed. A separate column from "Fields set" rather than more
 		 * tags in it, because the two answer different questions: one says what the request changed, this
 		 * says what else it reached. The verb comes from the action, so a move is never read as a deletion.

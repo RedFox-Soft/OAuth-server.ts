@@ -11,13 +11,12 @@ import {
 	Typography
 } from 'antd';
 import { Link, useNavigate } from '../frame/router.js';
-import { bucketHref, connectionHref, projectHref } from '../frame/routes.js';
+import { bucketHref, connectionHref } from '../frame/routes.js';
 import { request } from '../frame/request.js';
 import type { BucketCan } from '../frame/can.js';
 import { UNASSIGNED_GROUP_ID, reservedOf } from '../../consts.js';
 import type { BucketSummary, BucketView } from './bucketView.js';
 import { RecentChanges } from '../frame/RecentChanges.js';
-import { ProtectedResources, UseInProject } from './BucketProjects.js';
 
 /*
  * A bucket's landing page (specs/081): what needs attention, how to connect an application to it, how people
@@ -95,7 +94,8 @@ export function BucketOverview({
 			c.warnings.includes('static_token_expired')
 	);
 	const settingsHref = bucketHref(bucket._id, 'settings');
-	const projects = bucket.projects ?? [];
+	const applications = bucket.applications ?? 0;
+	const apis = bucket.apis ?? 0;
 
 	/* In the order of FR-003: what stops people first, what only looks odd last. */
 	const attention: Attention[] = [];
@@ -204,17 +204,17 @@ export function BucketOverview({
 			)
 		});
 	}
-	if (!special && projects.length === 0) {
+	if (!special && applications === 0) {
 		attention.push({
 			key: 'unused',
 			type: 'info',
-			title: 'No project signs in here yet.',
+			title: 'No application signs in here yet.',
 			action: (
 				<Button
 					size="small"
-					onClick={() => void navigate('/admin/projects')}
+					onClick={() => void navigate(bucketHref(bucket._id, 'applications'))}
 				>
-					Open Projects
+					Open Applications
 				</Button>
 			)
 		});
@@ -325,31 +325,20 @@ export function BucketOverview({
 								},
 								{ key: 'group', label: 'Owning group', children: groupName },
 								{
-									key: 'projects',
-									label: 'Used by',
+									key: 'holds',
+									label: 'Holds',
 									children: (
 										<Flex
 											wrap
 											gap={8}
 											align="center"
 										>
-											{projects.length === 0 ? (
-												<Typography.Text type="secondary">
-													No project
-												</Typography.Text>
-											) : (
-												projects.map((p) => (
-													<Link
-														key={p.id}
-														href={projectHref(p.id)}
-													>
-														{`${p.name} (${plural(p.clientCount, 'application', 'applications')})`}
-													</Link>
-												))
-											)}
-											{can.edit && special === null && (
-												<UseInProject bucket={bucket} />
-											)}
+											<Link href={bucketHref(bucket._id, 'applications')}>
+												{plural(applications, 'application', 'applications')}
+											</Link>
+											<Link href={bucketHref(bucket._id, 'apis')}>
+												{plural(apis, 'API', 'APIs')}
+											</Link>
 										</Flex>
 									)
 								},
@@ -445,8 +434,6 @@ export function BucketOverview({
 					))}
 				</Row>
 			)}
-
-			<ProtectedResources bucket={bucket} />
 
 			{(can.edit || superAdmin) && (
 				<RecentChanges

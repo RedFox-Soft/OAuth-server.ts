@@ -21,7 +21,7 @@ interface Group {
 	name: string;
 	kind: 'personal' | 'regular' | 'system';
 	members: GroupMember[];
-	owns?: { projects: number; buckets: number };
+	owns?: { buckets: number };
 }
 
 function plural(n: number, one: string, many: string): string {
@@ -125,7 +125,7 @@ export function Groups({ currentUserId }: { currentUserId: string | null }) {
 					locale={{
 						emptyText: (
 							<EmptyState
-								purpose="No groups yet. Create one to share projects and user buckets with colleagues."
+								purpose="No groups yet. Create one to share user buckets with colleagues."
 								create={mayCreate ? newGroup : undefined}
 							/>
 						)
@@ -155,9 +155,7 @@ export function Groups({ currentUserId }: { currentUserId: string | null }) {
 							title: 'Owns',
 							key: 'owns',
 							render: (_: unknown, g: Group) =>
-								g.owns
-									? `${plural(g.owns.projects, 'project', 'projects')} · ${plural(g.owns.buckets, 'bucket', 'buckets')}`
-									: '—'
+								g.owns ? plural(g.owns.buckets, 'bucket', 'buckets') : '—'
 						}
 					]}
 				/>

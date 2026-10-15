@@ -4,7 +4,7 @@ title: 'Self-service password reset'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-04
-updated: 2026-10-11
+updated: 2026-10-15
 graph:
   node_type: concept
   relationships:
@@ -88,7 +88,8 @@ bucket refuses it, so the console's sign-in page stopped linking to this refusal
 A bucket with `passwordLogin: false` is refused the same way, at both ends (added 2026-09-29): `request()`
 issues nothing for it and `load()` refuses a link that names it, so a link issued before the bucket closed
 its password door cannot set one afterwards. The door in front refuses first; this is what holds for any
-path that did not pass it, which was every path from a client in no project until the doors learned to
+path that did not pass it, which was every path from a client in no project (since spec 099: of no bucket)
+until the doors learned to
 resolve the bucket with the request's resource (see [[mcp-server-authorization]]).
 
 ## One response, and the one bounded exception

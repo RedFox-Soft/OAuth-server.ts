@@ -8,8 +8,8 @@ import {
 import { isSuperAdminsGroup } from '../super_admins.js';
 
 /*
- * The rules a move between administrator groups is decided by (specs/075), in one place so that moving a
- * bucket and moving a project cannot answer the same request differently.
+ * The rules a move between administrator groups is decided by (specs/075), in one place. Only a bucket
+ * moves; everything it holds follows it (specs/099).
  */
 
 /*
@@ -58,26 +58,14 @@ export async function describeGroup(id: string): Promise<{
 }
 
 /*
- * The one group a container is moving out of, from the owners of everything that moves.
- *
- * For a bucket that is the bucket and every project using it. They should agree, but a move a standalone
- * `mongod` left half-done does not, and neither does data from before a project and its bucket had to
- * share a group. Dropping the destination first is what makes both repairable: the half-done move has
- * one source left, and so does a bucket whose stray project is in the group it is being moved to.
- *
- * Neither refusal names a group. The second could otherwise tell a caller who another tenant is.
+ * The one group a bucket is moving out of. A bucket moving into the group that already owns it is refused,
+ * without naming the group.
  */
 export function sourceGroupOf(
 	owners: readonly string[],
 	destination: string
 ): string {
 	const sources = [...new Set(owners)].filter((id) => id !== destination);
-	if (sources.length > 1) {
-		throw new AdminError(
-			409,
-			'the projects using this bucket are not all in one group'
-		);
-	}
 	const only = sources.at(0);
 	if (only === undefined) {
 		throw new AdminError(409, 'already owned by this group');

@@ -4,7 +4,6 @@ import { adminApiRoutes } from 'lib/admin/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
 	getBucketStore,
-	getProjectStore,
 	getProtectedResourceStore,
 	getProvisioningConnectionStore
 } from 'lib/adapters/index.ts';
@@ -47,9 +46,7 @@ const Preview = Type.Object({
 	applications: Type.Array(
 		Type.Object({
 			clientId: Type.String(),
-			name: Type.Union([Type.String(), Type.Null()]),
-			projectId: Type.String(),
-			projectName: Type.String()
+			name: Type.Union([Type.String(), Type.Null()])
 		})
 	),
 	connections: Type.Array(
@@ -65,8 +62,7 @@ const Preview = Type.Object({
 	resources: Type.Array(
 		Type.Object({
 			identifier: Type.String(),
-			projectId: Type.String(),
-			projectName: Type.String()
+			name: Type.String()
 		})
 	),
 	namespaceMove: Type.Boolean(),
@@ -110,21 +106,11 @@ async function changeAddress(
 	};
 }
 
-async function seedBucketWithClients(slug: string, clientIds: string[]) {
+async function movableBucket(slug: string) {
 	const bucket = await getBucketStore().create({
 		ownerGroupId: UNASSIGNED_GROUP_ID,
 		name: `Movable ${slug}`,
 		slug
-	});
-	const project = await getProjectStore().create({
-		bucketId: DEFAULT_BUCKET_ID,
-		ownerGroupId: UNASSIGNED_GROUP_ID,
-		name: `Movable ${slug}`,
-		slug: `proj-${slug}`
-	});
-	await getProjectStore().update(project._id, {
-		bucketId: bucket._id,
-		clientIds
 	});
 	return bucket._id;
 }
@@ -147,16 +133,16 @@ describe('moving a bucket to a different address (US3)', () => {
 		counter += 1;
 	});
 
-	it('names each application with its project, connection, provider with its new callback, and resource, before an address changes', async () => {
+	it('names each application, connection, provider with its new callback, and resource, before an address changes', async () => {
 		const slug = `preview-${counter}`;
-		const { view } = await createClient({
+		const id = await movableBucket(slug);
+		const { view } = await createClient(id, {
 			clientId: `billing-${nanoid()}`,
 			clientName: 'Billing',
 			grantTypes: ['authorization_code'],
 			redirectUris: ['https://billing.example.com/cb'],
 			tokenEndpointAuthMethod: 'none'
 		});
-		const id = await seedBucketWithClients(slug, [view.clientId]);
 		await getBucketStore().update(id, { federation: [provider('corp')] });
 		const connection = await getProvisioningConnectionStore().create({
 			_id: nanoid(),
@@ -168,17 +154,13 @@ describe('moving a bucket to a different address (US3)', () => {
 			emailTrust: 'untrusted',
 			oauthCredential: null
 		});
-		const project = present(
-			await getProjectStore().findBySlug(`proj-${slug}`),
-			'project'
-		);
 		const identifier = `https://api-${String(counter)}-${nanoid()
 			.toLowerCase()
 			.replace(/[^a-z0-9]/g, '')}.example.com/mcp`;
 		await getProtectedResourceStore().create({
 			namespace: id,
 			identifier,
-			projectId: project._id,
+			bucketId: id,
 			name: 'API',
 			scopes: ['read']
 		});
@@ -192,12 +174,7 @@ describe('moving a bucket to a different address (US3)', () => {
 		 * is what they take to whoever owns it. */
 		expect(status).toBe(409);
 		expect(preview.applications).toEqual([
-			{
-				clientId: view.clientId,
-				name: 'Billing',
-				projectId: project._id,
-				projectName: project.name
-			}
+			{ clientId: view.clientId, name: 'Billing' }
 		]);
 		expect(preview.connections).toEqual([
 			{ id: connection._id, displayName: 'Directory' }
@@ -209,9 +186,7 @@ describe('moving a bucket to a different address (US3)', () => {
 				newCallback: `http://preview-${counter}.e.ly/federation/callback`
 			}
 		]);
-		expect(preview.resources).toEqual([
-			{ identifier, projectId: project._id, projectName: project.name }
-		]);
+		expect(preview.resources).toEqual([{ identifier, name: 'API' }]);
 		expect([preview.from, preview.to]).toEqual([
 			`http://e.ly/${slug}`,
 			`http://preview-${counter}.e.ly`
@@ -219,7 +194,7 @@ describe('moving a bucket to a different address (US3)', () => {
 	});
 
 	it('refuses a commit whose expectation no longer matches, with the fresh preview', async () => {
-		const id = await seedBucketWithClients(`stale-${counter}`, []);
+		const id = await movableBucket(`stale-${counter}`);
 		const { body } = await changeAddress(superCookie, id, {
 			slug: `stale-moved-${counter}`
 		});
@@ -241,7 +216,7 @@ describe('moving a bucket to a different address (US3)', () => {
 	});
 
 	it('refuses a commit that does not carry the counts of the preview it confirms', async () => {
-		const id = await seedBucketWithClients(`blind-${counter}`, []);
+		const id = await movableBucket(`blind-${counter}`);
 
 		const { status } = await changeAddress(superCookie, id, {
 			slug: `blind-moved-${counter}`,
@@ -253,7 +228,7 @@ describe('moving a bucket to a different address (US3)', () => {
 	});
 
 	it('refuses to complete an address change without a separate confirmation', async () => {
-		const id = await seedBucketWithClients(`unconfirmed-${counter}`, []);
+		const id = await movableBucket(`unconfirmed-${counter}`);
 
 		const { status, body } = await changeAddress(superCookie, id, {
 			host: `unconfirmed-${counter}.e.ly`
@@ -272,7 +247,7 @@ describe('moving a bucket to a different address (US3)', () => {
 	 * operator who loses the race is owed the same refusal rather than an internal fault. The stubbed
 	 * lookup is the race — it answers "free" about a name another bucket holds. */
 	it('refuses with a conflict when the hostname is taken between the check and the write', async () => {
-		const id = await seedBucketWithClients(`raced-${counter}`, []);
+		const id = await movableBucket(`raced-${counter}`);
 		const held = `holder-${counter}.e.ly`;
 		await getBucketStore().create({
 			ownerGroupId: UNASSIGNED_GROUP_ID,
@@ -297,7 +272,7 @@ describe('moving a bucket to a different address (US3)', () => {
 	});
 
 	it('changes the issuer identifier when the change is confirmed', async () => {
-		const id = await seedBucketWithClients(`moved-${counter}`, []);
+		const id = await movableBucket(`moved-${counter}`);
 		const host = `moved-${counter}.e.ly`;
 
 		const { status } = await changeAddress(superCookie, id, {
@@ -314,7 +289,7 @@ describe('moving a bucket to a different address (US3)', () => {
 
 	it('stops answering at the previous address once the change is confirmed', async () => {
 		const slug = `vacated-${counter}`;
-		const id = await seedBucketWithClients(slug, []);
+		const id = await movableBucket(slug);
 
 		await changeAddress(superCookie, id, {
 			host: `vacated-${counter}.e.ly`,
@@ -329,7 +304,7 @@ describe('moving a bucket to a different address (US3)', () => {
 	});
 
 	it('reports one address for a bucket, never two', async () => {
-		const id = await seedBucketWithClients(`single-${counter}`, []);
+		const id = await movableBucket(`single-${counter}`);
 
 		await changeAddress(superCookie, id, {
 			host: `single-${counter}.e.ly`,
@@ -419,13 +394,14 @@ describe('moving a bucket to a different address (US3)', () => {
 			expect((await getBucketStore().find(bucket._id))?.host).toBeUndefined();
 		});
 
-		it('refuses an owner once a project uses the bucket, and says what depends on it', async () => {
+		it('refuses an owner once an application belongs to the bucket, and says what depends on it', async () => {
 			const bucket = await ownBucket(`used-${counter}`);
-			await getProjectStore().create({
-				ownerGroupId: groupId,
-				name: `Uses ${counter}`,
-				slug: `uses-${counter}`,
-				bucketId: bucket._id
+			await createClient(bucket._id, {
+				clientId: `uses-${nanoid()}`,
+				clientName: `Uses ${counter}`,
+				grantTypes: ['authorization_code'],
+				redirectUris: ['https://uses.example.com/cb'],
+				tokenEndpointAuthMethod: 'none'
 			});
 
 			const { status, body } = await changeAddress(ownerCookie, bucket._id, {
@@ -436,7 +412,7 @@ describe('moving a bucket to a different address (US3)', () => {
 
 			expect(status).toBe(403);
 			expect(body.message).toBe(
-				"Used by 1 project, 0 identity providers and 0 provisioning connections: only an instance administrator can change this bucket's address now."
+				"Used by 1 application, 0 identity providers and 0 provisioning connections: only an instance administrator can change this bucket's address now."
 			);
 			expect((await getBucketStore().find(bucket._id))?.slug).toBe(
 				`used-${counter}`
@@ -468,7 +444,7 @@ describe('moving a bucket to a different address (US3)', () => {
 
 	it('refuses a caller who is not a super administrator alike for a missing bucket and a forbidden one', async () => {
 		const outsider = await cookieFor('plain');
-		const forbidden = await seedBucketWithClients(`forbidden-${counter}`, []);
+		const forbidden = await movableBucket(`forbidden-${counter}`);
 
 		const missing = await changeAddress(outsider, `missing-${counter}`, {
 			slug: `missing-moved-${counter}`

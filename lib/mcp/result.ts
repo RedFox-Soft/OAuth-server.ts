@@ -27,7 +27,7 @@ export interface ToolFailure {
 	readonly failedAreas?: readonly string[];
 	/*
 	 * What a two-step admin route would do, when it was called without its `confirm` and changed nothing:
-	 * an address change's affected clients, a move's projects. Passed through whole, because it is the
+	 * an address change's affected clients, a move's counts. Passed through whole, because it is the
 	 * content of the answer — reduced to "conflict" it told an agent only that it had been refused.
 	 */
 	readonly preview?: unknown;
@@ -108,8 +108,8 @@ export function toOutcome(result: DispatchResult): ToolOutcome {
 		ok: false,
 		reason,
 		message,
-		// Passed through verbatim, counts and ids exactly as the admin plane discloses them: a project's
-		// clients are named because they are objects the operator administers, a bucket's end-users are
+		// Passed through verbatim, counts and ids exactly as the admin plane discloses them: a bucket's
+		// applications are named because they are objects the operator administers, a bucket's end-users are
 		// only counted because their identities are not the caller's business.
 		...(body.blockers ? { blockers: body.blockers } : {})
 	};

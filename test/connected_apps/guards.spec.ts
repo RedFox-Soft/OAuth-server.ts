@@ -7,13 +7,9 @@ import {
 	setSystemTime
 } from 'bun:test';
 
-import bootstrap, { encodeParams } from '../test_helper.js';
-import {
-	getBucketStore,
-	getProjectStore,
-	getUserStore
-} from 'lib/adapters/index.ts';
-import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
+import bootstrap, { bindClientToBucket, encodeParams } from '../test_helper.js';
+import { getBucketStore, getUserStore } from 'lib/adapters/index.ts';
+import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { forgetBucketAddresses } from 'lib/admin/auth/bucketAddress.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { ACCOUNT_PAGE_COOKIE } from 'lib/consts/account_page.ts';
@@ -337,16 +333,7 @@ describe('who may see and change access on the page', () => {
 				name: 'loose people',
 				ownerGroupId: UNASSIGNED_GROUP_ID
 			});
-			const project = await getProjectStore().create({
-				bucketId: DEFAULT_BUCKET_ID,
-				name: 'loose',
-				slug: `loose-${Math.random()}`,
-				ownerGroupId: UNASSIGNED_GROUP_ID
-			});
-			await getProjectStore().update(project._id, {
-				bucketId: bucket._id,
-				clientIds: ['loose-app']
-			});
+			await bindClientToBucket('loose-app', bucket._id);
 			const { email } = await person('loose-bucket');
 			const browser = new Browser();
 			const auth = new AuthorizationRequest({

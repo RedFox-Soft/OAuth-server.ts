@@ -4,7 +4,7 @@ title: "The admin console frame: addresses, stated rights, one confirmation ladd
 tags: [architecture, contract, admin]
 sources: [oauth-server-codebase]
 created: 2026-10-11
-updated: 2026-10-11
+updated: 2026-10-15
 ---
 
 # The admin console frame: addresses, stated rights, one confirmation ladder
@@ -26,7 +26,9 @@ One pure route table, `ROUTES` (`lib/admin/ui/frame/routes.ts:57`), is read by b
   requested path. It answers 404 for an address no route matches, redirects a signed-out request to
   `/admin/login?next=<address>`, and serves the one public page, `/admin/accept-invitation`, without a
   session. A mistyped `/admin/api/*` path stays a JSON 404 and is never rendered as a page. `REDIRECTS`
-  (`routes.ts:156`) send `/admin` to `/admin/projects`, and a project's bare address to its first tab. A bucket's bare address
+  (`routes.ts:309-313`) send `/admin` to `/admin/buckets` — to `/admin/projects` until spec 099 removed projects,
+  when a project's bare address also led to its first tab. A bucket's applications and APIs are its tabs
+  `bucket.applications` and `bucket.apis` (`routes.ts:84-95`). A bucket's bare address
 is a page of its own since spec 081, its Overview ([[bucket-workspace]]). Since spec 083 every address of the
 administrators' bucket redirects to the matching tab of `/admin/administrators` ([[bucket-sign-in-policy]]).
 - **The client.** The path goes into `window.PROPS.path` and becomes the server snapshot of an in-house
@@ -53,28 +55,35 @@ An entity page gives way to its list, because the entity may belong to the group
   lists show the whole instance whatever is chosen, so the control only decides where new things land.
 - With one group it is plain text.
 - The operator's own personal group reads "Personal · Only you".
-- Every New project and New bucket dialog begins with `frame/CreateDestination.tsx`: "Will be created in **X**
-  · Change". Change closes the dialog and focuses the switcher rather than opening a chooser over it.
+- The New bucket dialog chooses its group with `GroupField` (`frame/CreateDestination.tsx`, spec 087), the
+  header's group preselected. The New project dialog, which also chose a bucket there, went with projects in
+  spec 099.
 
 ## The server states the rights
 
-Bucket and project responses carry `can` and `blockers`, and `GET /admin/api/me` carries `can`. The
-predicates live in `lib/admin/auth/can.ts` (`bucketCan` `:113`, `projectCan` `:196`, `meCan` `:213`).
+Bucket responses carry `can` and `blockers`, and `GET /admin/api/me` carries `can`. The
+predicates live in `lib/admin/auth/can.ts` (`bucketCan` `:186`, `meCan` `:223`). Project responses carried
+them through `projectCan` until spec 099 removed projects; a bucket's `edit` flag now also governs its
+applications and APIs.
 The route loaders decide through them, so there is one source: a route refuses with 403 exactly when the
 stated flag is false. `test/admin/can_routes.spec.ts` checks this from both directions. Every mounted
-bucket and project route is declared against a flag or a recorded exclusion, and the generated cases (five
-callers × several buckets or projects) check that 403 ⇔ flag false. A 409 is a state refusal, not a
+bucket route is declared against a flag or a recorded exclusion, and the generated cases (five
+callers × several buckets) check that 403 ⇔ flag false. A 409 is a state refusal, not a
 rights refusal.
 
 `can` never depends on `viaClientId`, so an agent at `/mcp` is told the same rights as the console (the
-console-parity rule, [[admin-mcp-control-plane]]). `blockers.usedByProjects` lists only projects the caller
-can reach, so another tenant's project names never leak.
+console-parity rule, [[admin-mcp-control-plane]]). `blockers` carries counts, never names
+(`withRights`, `lib/admin/buckets/routes.ts:488-515`): `addressable`, `dependents` (applications, identity providers and
+provisioning connections) and `accounts`, each null where it could not change this caller's answer. Until
+spec 099 `blockers.usedByProjects` named the projects using a bucket, filtered to those the caller could
+reach so another tenant's project names never leaked.
 
 The console has two answers (`frame/rights.tsx`):
 
 - **No right:** the control is hidden.
 - **The right, but state blocks it:** the control is disabled and the reason is written beside it. For
-  example, "Moves with its bucket" or the projects using a bucket. A tooltip alone is not enough.
+  example, the applications, providers and connections that keep an owner from changing a bucket's address.
+  A tooltip alone is not enough.
 
 `frame/can.ts` reads a missing flag as allowed. The server still refuses, so a gap costs a 403, never a
 hidden control.
@@ -89,7 +98,7 @@ hidden control.
 | C1 | Small, reversible | A plain question (`useConfirm`) |
 | C2 | Ends access, revokes, replaces, or is irreversible for one object | A danger question with Cancel focused and the consequences listed |
 | C3 | Destroys an unbounded set, or a key | `ConfirmDestruction` with a typed word: `delete`, `retire` or `release` (plus, since spec 084, an optional `acknowledgement` checkbox the release uses) |
-| C4 | Only the server knows the full list | `PreviewConfirm`: preview first, then commit (a move, the faults purge, since spec 085 a project's bucket change) |
+| C4 | Only the server knows the full list | `PreviewConfirm`: preview first, then commit (a bucket's move or address change, the faults purge; a project's bucket change from spec 085 until 099) |
 
 The table is the product decision; the components are mechanics. `useConfirm` refuses C3 and C4 ids, and
 answers no while another confirmation is open, so a double click cannot stack two dialogs.

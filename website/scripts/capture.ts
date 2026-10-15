@@ -107,7 +107,7 @@ async function api<T>(
 }
 
 /*
- * The console's sign-in leg. `GET /admin/projects` redirects to `/admin/login`, which starts an authorization
+ * The console's sign-in leg. `GET /admin/buckets` redirects to `/admin/login`, which starts an authorization
  * code flow against this server's own issuer and lands on the interaction's login page — so the form
  * filled in here is `lib/interactions/loginPage.tsx`, not an admin-specific screen. Its inputs carry
  * placeholders rather than labels, which is why these are placeholder locators.
@@ -117,12 +117,12 @@ async function signIn(
 	email: string,
 	password: string
 ): Promise<void> {
-	await page.goto(`${ORIGIN}/admin/projects`);
+	await page.goto(`${ORIGIN}/admin/buckets`);
 	await page.getByPlaceholder('Username').fill(email);
 	await page.getByPlaceholder('Password').fill(password);
 	await page.getByRole('button', { name: 'Log in' }).click();
 	// Sign-in returns to the address it was started from (`next`).
-	await page.waitForURL(`${ORIGIN}/admin/projects`);
+	await page.waitForURL(`${ORIGIN}/admin/buckets`);
 }
 
 interface Created {
@@ -130,10 +130,9 @@ interface Created {
 }
 
 async function seed(ctx: BrowserContext): Promise<{
-	projectId: string;
-	projectName: string;
 	bucketId: string;
 	bucketSlug: string;
+	clientId: string;
 }> {
 	const group = await api<Created>(ctx, 'POST', '/admin/api/groups', {
 		name: 'Acme Corp'
@@ -142,21 +141,9 @@ async function seed(ctx: BrowserContext): Promise<{
 	// has to be created *after* the switch or it lands in the bootstrap administrator's personal group.
 	await api(ctx, 'PUT', '/admin/api/scope', { groupId: group._id });
 	/*
-	 * Every project names its bucket (specs/098). These start on the shared Default bucket — open to the
-	 * bootstrap administrator, a super administrator — so the bucket change below has something to preview.
-	 */
-	const project = await api<Created>(ctx, 'POST', '/admin/api/projects', {
-		name: 'Acme Web',
-		slug: 'acme-web',
-		bucketId: 'redfox',
-		corsOrigins: ['https://acme.example.com']
-	});
-	await api(ctx, 'POST', '/admin/api/projects', {
-		name: 'Acme Mobile',
-		slug: 'acme-mobile',
-		bucketId: 'redfox'
-	});
-	/*
+	 * The bucket is the only container (specs/099): it holds the people, their sign-in, the applications
+	 * and the APIs, so it comes first and everything else is created in it.
+	 *
 	 * The slug is the bucket's address, and it is required: a bucket is a tenant with its own issuer, so
 	 * it cannot be created without somewhere to be served. Omitting it is what broke this capture — and
 	 * with it the whole site build — from the commit that made buckets addressable.
@@ -177,57 +164,46 @@ async function seed(ctx: BrowserContext): Promise<{
 		displayName: 'Support'
 	});
 	/*
-	 * A bucket change is previewed first (specs/085): the first request is answered 409 with what the change
-	 * reaches and the counts to send back, and only the confirmed repeat applies it.
+	 * Every application is created through the API rather than the console's dialog, which is also what
+	 * keeps the client secret out of frame: the value is returned once, to this script, and the
+	 * "copy it now" modal that would have shown it never opens. The allowed browser origins belong to
+	 * the application itself.
 	 */
-	const preview = await ctx.request.fetch(
-		`${ORIGIN}/admin/api/projects/${project._id}/bucket`,
+	const web = await api<{ clientId: string }>(
+		ctx,
+		'POST',
+		`/admin/api/buckets/${bucket._id}/clients`,
 		{
-			method: 'PUT',
-			headers: { 'content-type': 'application/json' },
-			data: JSON.stringify({ bucketId: bucket._id })
+			clientName: 'acme-web',
+			applicationType: 'web',
+			grantTypes: ['authorization_code', 'refresh_token'],
+			redirectUris: ['https://acme.example.com/callback'],
+			tokenEndpointAuthMethod: 'none',
+			corsOrigins: ['https://acme.example.com'],
+			/*
+			 * Named explicitly so the consent screen lists more than one permission. It has to be a subset
+			 * of ApplicationConfig.scopes — `profile`/`email` are not among them on a default install, and
+			 * the client route refuses metadata naming a scope the server does not support.
+			 */
+			scope: 'openid offline_access',
+			requireConsent: true
 		}
 	);
-	const { expect } = (await preview.json()) as { expect: unknown };
-	await api(ctx, 'PUT', `/admin/api/projects/${project._id}/bucket`, {
-		bucketId: bucket._id,
-		confirm: true,
-		expect
-	});
-	/*
-	 * Both clients are created through the API rather than the console's dialog, which is also what
-	 * keeps the client secret out of frame: the value is returned once, to this script, and the
-	 * "copy it now" modal that would have shown it never opens.
-	 */
-	await api(ctx, 'POST', `/admin/api/projects/${project._id}/clients`, {
-		clientName: 'acme-web',
-		applicationType: 'web',
-		grantTypes: ['authorization_code', 'refresh_token'],
-		redirectUris: ['https://acme.example.com/callback'],
-		tokenEndpointAuthMethod: 'none',
-		/*
-		 * Named explicitly so the consent screen lists more than one permission. It has to be a subset
-		 * of ApplicationConfig.scopes — `profile`/`email` are not among them on a default install, and
-		 * the client route refuses metadata naming a scope the server does not support.
-		 */
-		scope: 'openid offline_access',
-		requireConsent: true
-	});
-	await api(ctx, 'POST', `/admin/api/projects/${project._id}/clients`, {
+	await api(ctx, 'POST', `/admin/api/buckets/${bucket._id}/clients`, {
 		clientName: 'acme-backend',
 		applicationType: 'web',
 		grantTypes: ['client_credentials'],
 		tokenEndpointAuthMethod: 'client_secret_basic'
 	});
-	// Two more so the clients table reads as a real project rather than a two-row demo.
-	await api(ctx, 'POST', `/admin/api/projects/${project._id}/clients`, {
+	// Two more so the applications table reads as a real bucket rather than a two-row demo.
+	await api(ctx, 'POST', `/admin/api/buckets/${bucket._id}/clients`, {
 		clientName: 'acme-mobile',
 		applicationType: 'native',
 		grantTypes: ['authorization_code', 'refresh_token'],
 		redirectUris: ['com.acme.app:/callback', 'http://127.0.0.1/callback'],
 		tokenEndpointAuthMethod: 'none'
 	});
-	await api(ctx, 'POST', `/admin/api/projects/${project._id}/clients`, {
+	await api(ctx, 'POST', `/admin/api/buckets/${bucket._id}/clients`, {
 		clientName: 'acme-cli',
 		applicationType: 'native',
 		grantTypes: [
@@ -236,6 +212,20 @@ async function seed(ctx: BrowserContext): Promise<{
 		],
 		redirectUris: [],
 		tokenEndpointAuthMethod: 'none'
+	});
+	/*
+	 * The bucket's APIs: protected resources it mints audience-bound tokens for — one of them an MCP
+	 * server. The bucket has an address, so they are declared in its own namespace.
+	 */
+	await api(ctx, 'POST', `/admin/api/buckets/${bucket._id}/resources`, {
+		identifier: 'https://mcp.acme.example.com/mcp',
+		name: 'Acme support MCP server',
+		scopes: ['tickets:read', 'tickets:write']
+	});
+	await api(ctx, 'POST', `/admin/api/buckets/${bucket._id}/resources`, {
+		identifier: 'https://api.acme.example.com',
+		name: 'Acme orders API',
+		scopes: ['orders:read', 'orders:write']
 	});
 	for (const email of [
 		'dana.rivera@example.com',
@@ -260,37 +250,10 @@ async function seed(ctx: BrowserContext): Promise<{
 		'deviceFlow.enabled': true
 	});
 	return {
-		projectId: project._id,
-		projectName: 'Acme Web',
 		bucketId: bucket._id,
-		bucketSlug: BUCKET_SLUG
+		bucketSlug: BUCKET_SLUG,
+		clientId: web.clientId
 	};
-}
-
-/*
- * The end-user client is registered by the seed above and its generated id is not knowable from here,
- * so it is read back off the project. The console's own `admin-panel` client is in a different
- * project and never appears in this list.
- */
-async function endUserClientId(
-	ctx: BrowserContext,
-	projectName: string
-): Promise<string> {
-	const projects = await api<{ _id: string; name: string }[]>(
-		ctx,
-		'GET',
-		'/admin/api/projects'
-	);
-	const project = projects.find((p) => p.name === projectName);
-	if (!project) throw new Error(`project ${projectName} is missing`);
-	const clients = await api<{ clientId: string; clientName?: string }[]>(
-		ctx,
-		'GET',
-		`/admin/api/projects/${project._id}/clients`
-	);
-	const client = clients.find((c) => c.clientName === 'acme-web');
-	if (!client) throw new Error('client acme-web is missing');
-	return client.clientId;
 }
 
 function pkce(): { challenge: string } {
@@ -357,18 +320,20 @@ try {
 	const page = await ctx.newPage();
 	await signIn(page, ADMIN.email, ADMIN.password);
 	const names = await seed(ctx);
-	const clientId = await endUserClientId(ctx, names.projectName);
 
 	// Reloaded rather than continued: the scope switch happened on the session after this page was
 	// rendered, and the console re-reads its lists on load.
-	await open(page, '/admin/projects');
-	await shoot(page, 'admin-projects');
-
-	await open(page, `/admin/projects/${names.projectId}/clients`);
-	await shoot(page, 'admin-project-clients');
+	await open(page, '/admin/buckets');
+	await shoot(page, 'admin-buckets');
 
 	await open(page, `/admin/buckets/${names.bucketId}`);
 	await shoot(page, 'admin-bucket-overview');
+
+	await open(page, `/admin/buckets/${names.bucketId}/applications`);
+	await shoot(page, 'admin-bucket-applications');
+
+	await open(page, `/admin/buckets/${names.bucketId}/apis`);
+	await shoot(page, 'admin-bucket-apis');
 
 	await open(page, `/admin/buckets/${names.bucketId}/users`);
 	await shoot(page, 'admin-bucket-users');
@@ -391,14 +356,14 @@ try {
 	const userPage = await userCtx.newPage();
 	const { challenge } = pkce();
 	/*
-	 * Addressed to the bucket, not to the bare path. The demo client belongs to a project whose bucket
+	 * Addressed to the bucket, not to the bare path. The demo application belongs to a bucket that
 	 * has an address, and `check_bucket.ts` refuses such a client anywhere else — "client is not
 	 * authorized at this address", delivered to the redirect_uri, which the browser then cannot resolve.
 	 * That is the rule working, and this script is an integration like any other.
 	 */
 	const auth = new URL(`${ORIGIN}/${names.bucketSlug}/auth`);
 	auth.search = new URLSearchParams({
-		client_id: clientId,
+		client_id: names.clientId,
 		response_type: 'code',
 		scope: 'openid offline_access',
 		redirect_uri: 'https://acme.example.com/callback',

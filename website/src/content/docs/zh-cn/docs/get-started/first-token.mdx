@@ -1,7 +1,7 @@
 ---
 title: 获取第一个令牌
 description: 用 curl 手动走一遍授权码 + PKCE 流程：从 challenge 到解码 ID 令牌，再到调用 UserInfo。
-source: fd7f1a489fe5
+source: ab445cf4fe2f
 sidebar:
   order: 5
 ---
@@ -17,7 +17,7 @@ import ScreenshotFigure from '../../../../../components/ScreenshotFigure.astro';
 
 下面的端点路径是本服务器的默认值。不要在真实客户端中硬编码它们，而应读取 `GET /.well-known/openid-configuration` 并使用其中公布的地址。该文档也反映了哪些功能已启用，因此它才是「这个部署支持什么」的如实答案。
 
-这一点比以前更重要了。如果客户端所在项目指向你创建的用户桶，那么该用户桶就是它自己的签发者：其端点位于 `<ISSUER>/<slug>` 之下，发现文档位于 `<ISSUER>/<slug>/.well-known/openid-configuration`。此类客户端的请求如果发往不带路径的 `/auth`，会以 `unauthorized_client` 被拒绝——"client is not authorized at this address"——因为客户端只能在其所属用户桶的地址上使用。下面的演练使用默认的 `redfox` 用户桶，它在根路径提供服务。
+这一点比以前更重要了。如果客户端属于你创建的用户桶，那么该用户桶就是它自己的签发者：其端点位于 `<ISSUER>/<slug>` 之下，发现文档位于 `<ISSUER>/<slug>/.well-known/openid-configuration`。此类客户端的请求如果发往不带路径的 `/auth`，会以 `unauthorized_client` 被拒绝——"client is not authorized at this address"——因为客户端只能在其所属用户桶的地址上使用。下面的演练使用默认的 `redfox` 用户桶，它在根路径提供服务。
 
 </Aside>
 
@@ -54,7 +54,7 @@ import ScreenshotFigure from '../../../../../components/ScreenshotFigure.astro';
 
    （全部写在一行，去掉缩进。）`state` 由你在回调时自行校验；`nonce` 会被回显到 ID 令牌中，让你可以把令牌与本次请求关联起来。`scope=openid` 使这成为一个 OpenID Connect 请求，并产生 ID 令牌。若要获得刷新令牌，还需要 scope 中包含 `offline_access`，**并且**此 URL 中带上 `prompt=consent`，**并且**客户端的授权类型中包含 `refresh_token`。在控制台创建的客户端默认只有 `authorization_code`。三者缺一，该 scope 就会被静默丢弃，不报任何错误：你得到的令牌响应中没有 `refresh_token`。服务器还必须在其支持的 scope 中列出 `offline_access`（默认如此）；未列出期间，令牌端点会以 `unsupported_grant_type` 拒绝所有刷新令牌。
 
-3. **登录并同意授权**。服务器会重定向到它自己的交互页面：先是该客户端所在项目指向的用户桶的登录表单，然后是列出 scope 的授权同意页面（新客户端默认开启授权同意）。两者都通过后，浏览器会被发送到
+3. **登录并同意授权**。服务器会重定向到它自己的交互页面：先是该客户端所属用户桶的登录表单，然后是列出 scope 的授权同意页面（新客户端默认开启授权同意）。两者都通过后，浏览器会被发送到
 
    ```
    http://localhost:8080/callback?code=<code>&state=8f2c1d&iss=http%3A%2F%2Flocalhost%3A3000
@@ -111,7 +111,7 @@ import ScreenshotFigure from '../../../../../components/ScreenshotFigure.astro';
 <ScreenshotFigure
 	name="sign-in"
 	alt="服务器的登录页面：用户名输入框、密码输入框、「记住我」选项和登录按钮。"
-	caption="登录页面，为客户端所在项目指向的用户桶提供。"
+	caption="登录页面，为客户端所属的用户桶提供。"
 />
 
 <ScreenshotFigure

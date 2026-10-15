@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll } from 'bun:test';
 import bootstrap, {
+	bindClientToBucket,
 	agent,
 	getHeader,
 	locationParameter,
@@ -8,12 +9,11 @@ import bootstrap, {
 import { AuthorizationRequest } from '../AuthorizationRequest.ts';
 import {
 	getBucketStore,
-	getProjectStore,
 	getUserStore,
 	resetAdminMemoryStores
 } from 'lib/adapters/index.ts';
 import { elysia } from 'lib/index.ts';
-import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
+import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { decode as decodeJWT } from 'lib/helpers/jwt.ts';
 import { idTokenOf } from './response.ts';
 
@@ -28,16 +28,7 @@ async function seedBucket(name: string, clientId: string): Promise<string> {
 		ownerGroupId: UNASSIGNED_GROUP_ID,
 		name
 	});
-	const project = await getProjectStore().create({
-		bucketId: DEFAULT_BUCKET_ID,
-		ownerGroupId: UNASSIGNED_GROUP_ID,
-		name,
-		slug: `${clientId}-${Math.random()}`
-	});
-	await getProjectStore().update(project._id, {
-		bucketId: bucket._id,
-		clientIds: [clientId]
-	});
+	await bindClientToBucket(clientId, bucket._id);
 	return bucket._id;
 }
 

@@ -199,7 +199,7 @@ describe('every index the inventory declares translates', () => {
 		});
 	}
 
-	it('emits a GIN index for exactly the two array-valued declarations', () => {
+	it('emits a GIN index for exactly the one array-valued declaration', () => {
 		// Pinned as a count rather than left implicit: a third multikey key is a design decision
 		// somebody must make deliberately, because it changes both the index and the query that uses it.
 		const gin = areas.flatMap((area) =>
@@ -209,9 +209,6 @@ describe('every index the inventory declares translates', () => {
 				.map((translated) => `${area.name}:${translated.columns.join(',')}`)
 		);
 
-		expect(gin.sort()).toEqual([
-			"groups:(doc->'members')",
-			"projects:(doc->'clientIds')"
-		]);
+		expect(gin.sort()).toEqual(["groups:(doc->'members')"]);
 	});
 });

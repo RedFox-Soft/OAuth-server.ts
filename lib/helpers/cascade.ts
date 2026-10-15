@@ -12,7 +12,7 @@ import { STORAGE_INVENTORY, areaNamed } from 'lib/consts/storage_inventory.js';
  * reaches it, and a registration access token may carry no expiry, so what it leaves behind is not even
  * bounded by a TTL. Both are easy to forget and neither announces itself.
  *
- * Containers are not cascaded, deliberately: a project's clients and a bucket's users are things an
+ * Containers are not cascaded, deliberately: a bucket's applications and its users are things an
  * operator can see and name, so those deletions are refused with the contents listed instead. Nobody can
  * be asked to enumerate the tokens a client issued.
  */

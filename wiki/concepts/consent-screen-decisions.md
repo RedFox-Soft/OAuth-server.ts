@@ -4,7 +4,7 @@ title: 'The consent page: what it says, and why'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-10-13
-updated: 2026-10-13
+updated: 2026-10-15
 graph:
   node_type: concept
   relationships:
@@ -17,7 +17,7 @@ graph:
     - predicate: complements
       object: concept:group-ownership
       source: oauth-server-codebase
-      evidence: "projectGroupOwnsBucket — the one test of \"these users are the tenant's own\" … the consent waiver honours an operator's stored flag there, and `clientProvenance` counts such a client as the instance's own."
+      evidence: "clientBelongsToBucket — the one test of \"these users are the tenant's own\" … the consent waiver honours an operator's stored flag there, and `clientProvenance` counts such a client as the instance's own."
       confidence: high
       status: current
     - predicate: depends_on
@@ -48,14 +48,16 @@ hydration ([[interaction-page-families]]).
 `clientProvenance` (`lib/models/client/provenance.ts:68-78`) puts every client in one of three tiers:
 
 - **self-registered** — nobody here created it: dynamic registration, or a metadata document.
-- **this-organization** — the group that owns the client's project also owns the bucket being signed
-  into, or the client is in no project at all (the instance operator's own).
-- **operator-registered** — an administrator of this server created it, but for another group. In a
-  shared bucket that is another tenant's app.
+- **this-organization** — the client belongs to the bucket being signed into, or it belongs to no bucket at
+  all (the instance operator's own).
+- **operator-registered** — an administrator of this server created it, but in another bucket — for example
+  an application of the Default bucket that reaches this bucket through a declared resource. Until spec 099
+  the test compared the group owning the client's project with the bucket's group, and in a shared bucket
+  this tier was another tenant's app.
 
-**Self-registered is tested first, and the order is the point.** A dynamically registered or document
-client is in no project. The consent waiver reads "no project" as "the operator's own"
-(`lib/shared/consent_waiver.ts:33-45`). That reading is safe for the waiver only because such a client
+**Self-registered is tested first, and the order is the point.** A document client, and a dynamically
+registered one at the root, belongs to no bucket. The consent waiver reads "no bucket" as "the operator's own"
+(`lib/shared/consent_waiver.ts:33-44`). That reading is safe for the waiver only because such a client
 cannot switch consent off. For wording it would be wrong: every DCR and CIMD client would be headed as the
 organization's own app. The self-registered test reuses `redirectUrisVouchedFor` (`provenance.ts:25`), so
 "who vouched for this client" has one definition for both this page and
@@ -63,14 +65,17 @@ organization's own app. The self-registered test reuses `redirectUrisVouchedFor`
 is explicitly kept out of self-registered (`provenance.ts:70-73`). It never reaches consent, but the
 function stays right for every client it can be handed.
 
-The ownership comparison itself is `projectGroupOwnsBucket` (`provenance.ts:38-45`). The waiver and the
-tiers share it. It answers `undefined` for a client in no project, and each caller decides what that
-means. The waiver's own behaviour did not change. See [[group-ownership]].
+The comparison itself is `clientBelongsToBucket` (`provenance.ts:40-47`): the stored client's `bucketId` is
+the sign-in bucket's id. The waiver and the tiers share it. It answers `undefined` for a client that belongs to
+no bucket, and each caller decides what that means. Until spec 099 it was `projectGroupOwnsBucket`, which
+compared groups through the client's project; a client that fell out of its project then read as the
+operator's own, which is one of the defects that removed projects ([[bucket-is-the-only-container]]). See
+[[group-ownership]].
 
 The bucket compared is the **sign-in bucket** — the one `resolveBucketForRequest` chose, which the
-interaction resolve now returns as `signsInto` (`lib/interactions/index.ts:1087-1100`). Its users are the
-ones consenting. The addressed bucket would name the root service for a project bucket reached at the root
-address.
+interaction resolve now returns as `signsInto` (`lib/interactions/index.ts:1150`). Its users are the
+ones consenting. The addressed bucket would name the root service for an application's bucket reached at the
+root address.
 
 ## No positive trust signals
 
@@ -204,7 +209,7 @@ said about itself.
   every resolution — every authorization, token and introspection call (`tryFindClient`,
   `lib/models/client/validate.ts`) — and up to 87 KB of base64 would ride along on each for a picture
   only this page shows. Client-owned, so `cascadeForClient` sweeps it when the client is deleted. The
-  project's client list says `hasLogo` and carries no image (`listClientView`, `service.ts:326`).
+  bucket's application list says `hasLogo` and carries no image (`listClientView`, `service.ts:368`).
 - **Only this organization's own app, and never on a page that doubts the receiver**
   (`consentView.ts:653-655`). The logo is attacker pixels the moment anyone else can set it, so tier
   `this-organization` alone. The own-device-redirect warning and the device-flow warning also hide it: a

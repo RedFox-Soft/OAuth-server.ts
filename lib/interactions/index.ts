@@ -903,7 +903,7 @@ async function consentViewFor(
 /*
  * Takes the interaction rather than the client id so the bucket is resolved the way the sign-in resolves
  * it — with the resource the request names. Resolved from the client alone it was the default bucket for
- * a client in no project, so a federated-only bucket reached through a declared resource had its password,
+ * a client that belongs to no bucket, so a federated-only bucket reached through a declared resource had its password,
  * reset and registration doors judged by the default bucket's policy and left open.
  */
 async function passwordDoorClosed(

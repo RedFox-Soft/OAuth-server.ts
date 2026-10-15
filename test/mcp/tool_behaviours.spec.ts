@@ -4,12 +4,8 @@ import bootstrap from '../test_helper.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import {
-	getProjectStore,
-	adminAuditStore,
-	resetAdminMemoryStores
-} from 'lib/adapters/index.ts';
-import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
+import { adminAuditStore, resetAdminMemoryStores } from 'lib/adapters/index.ts';
+import { DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { ADMIN_MCP_CLIENT_ID, MCP_RESOURCE } from 'lib/mcp/consts.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { shaped } from 'test/shape.js';
@@ -93,15 +89,9 @@ describe('individual tool behaviours', () => {
 	// US2 AS-3: a change the console would refuse is refused the same way, and changes nothing.
 	it('refuses an invalid redirect URI and leaves the client untouched', async () => {
 		const { token } = await session();
-		const project = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			name: 'Beh',
-			slug: `beh-${Math.floor(Math.random() * 1e6)}`,
-			ownerGroupId: UNASSIGNED_GROUP_ID
-		});
 		const created = await rpc(
 			call('client_create', {
-				id: project._id,
+				id: DEFAULT_BUCKET_ID,
 				clientName: 'Valid',
 				grantTypes: ['authorization_code'],
 				redirectUris: ['https://ok.example.com/cb'],
@@ -116,7 +106,7 @@ describe('individual tool behaviours', () => {
 
 		const refused = await rpc(
 			call('client_update', {
-				id: project._id,
+				id: DEFAULT_BUCKET_ID,
 				clientId,
 				redirectUris: ['not a uri at all']
 			}),
@@ -126,7 +116,7 @@ describe('individual tool behaviours', () => {
 
 		// Untouched, not partially applied.
 		const reread = await rpc(
-			call('client_get', { id: project._id, clientId }),
+			call('client_get', { id: DEFAULT_BUCKET_ID, clientId }),
 			token
 		);
 		expect(
@@ -138,15 +128,9 @@ describe('individual tool behaviours', () => {
 	// US2 AS-4: rotation returns a new secret once, and the rotation is recorded.
 	it('rotates a client secret, returning it once and recording the rotation', async () => {
 		const { token, user } = await session();
-		const project = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			name: 'Rot',
-			slug: `rot-${Math.floor(Math.random() * 1e6)}`,
-			ownerGroupId: UNASSIGNED_GROUP_ID
-		});
 		const created = await rpc(
 			call('client_create', {
-				id: project._id,
+				id: DEFAULT_BUCKET_ID,
 				clientName: 'Confidential',
 				grantTypes: ['authorization_code'],
 				redirectUris: ['https://ok.example.com/cb'],
@@ -160,7 +144,7 @@ describe('individual tool behaviours', () => {
 		);
 
 		const rotated = await perform(token, 'client_secret_rotate', {
-			id: project._id,
+			id: DEFAULT_BUCKET_ID,
 			clientId
 		});
 		const { secret: next } = result(

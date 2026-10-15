@@ -5,8 +5,8 @@ import { elysia } from 'lib/index.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { getProjectStore } from 'lib/adapters/index.ts';
-import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
+import { getBucketStore } from 'lib/adapters/index.ts';
+import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import {
 	ADMIN_MCP_CLIENT_ID,
 	MCP_RESOURCE,
@@ -19,7 +19,7 @@ import { createAdministrator } from '../administrators.ts';
  * An agent's token administers the server through `/mcp` and nowhere else. The operations withheld from
  * an agent and the confirmation asked of it for a destructive one live in that transport, so the same
  * token presented straight to the management API skipped both: an agent able to make an HTTP request —
- * one following instructions injected into data it had read, say — could delete a project, or permit
+ * one following instructions injected into data it had read, say — could delete a bucket, or permit
  * another client identity onto the administrative plane, with nothing but its own credential.
  */
 
@@ -82,25 +82,26 @@ describe('an agent token presented directly to the management API', () => {
 	});
 
 	it('is refused for a read', async () => {
-		const res = await direct('GET', '/admin/api/projects', await agentToken());
+		const res = await direct('GET', '/admin/api/buckets', await agentToken());
 
 		expect(res.status).toBe(401);
 	});
 
 	it('deletes nothing through an operation the agent surface withholds', async () => {
-		const project = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
+		const bucket = await getBucketStore().create({
 			name: 'Kept',
-			slug: `kept-${Math.random()}`,
 			ownerGroupId: UNASSIGNED_GROUP_ID
 		});
 
 		await direct(
 			'DELETE',
-			`/admin/api/projects/${project._id}`,
+			`/admin/api/buckets/${bucket._id}`,
 			await agentToken()
 		);
 
-		expect(await getProjectStore().find(project._id)).toBeTruthy();
+		const kept = await getBucketStore().find(bucket._id);
+		expect(kept).toBeTruthy();
+		// Not even scheduled: a deletion schedules rather than destroys (specs/090).
+		expect(kept?.deletion).toBeUndefined();
 	});
 });

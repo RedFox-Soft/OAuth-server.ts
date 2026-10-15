@@ -1,16 +1,13 @@
 import { describe, it, expect, beforeAll } from 'bun:test';
 import bootstrap, {
+	bindClientToBucket,
 	agent,
 	findSessionSetCookie,
 	getHeader
 } from '../test_helper.ts';
 import { AuthorizationRequest } from '../AuthorizationRequest.ts';
-import {
-	getBucketStore,
-	getProjectStore,
-	resetAdminMemoryStores
-} from 'lib/adapters/index.ts';
-import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
+import { getBucketStore, resetAdminMemoryStores } from 'lib/adapters/index.ts';
+import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { ttl } from 'lib/configs/liveTime.ts';
 
 const CLIENT_ID = 'ui-open-app';
@@ -134,16 +131,7 @@ describe('the "Remember me" choice at sign-in', () => {
 			name: 'Remember Me Bucket',
 			emailVerificationRequired: false
 		});
-		const project = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			ownerGroupId: UNASSIGNED_GROUP_ID,
-			name: 'Remember Me',
-			slug: `remember-me-${Math.random()}`
-		});
-		await getProjectStore().update(project._id, {
-			bucketId: bucket._id,
-			clientIds: [CLIENT_ID]
-		});
+		await bindClientToBucket(CLIENT_ID, bucket._id);
 	});
 
 	it('is not retained past the browsing session when the end user declines to be remembered', async () => {

@@ -67,8 +67,14 @@ export const BASE_METADATA_KEYS = [
 	 * picked by the validator.
 	 */
 	'registeredDynamically',
-	'registeredAtBucket',
 	'registrationUsedAt',
+	/*
+	 * The bucket a client belongs to and the origins it may be read from (specs/099). Written by the server
+	 * and by an administrator only; a registration that could name either would choose its own issuer or
+	 * grant itself CORS.
+	 */
+	'bucketId',
+	'corsOrigins',
 	/*
 	 * A provisioning connection's client, synthesized from the connection and never stored
 	 * (lib/provisioning/client.ts). Base keys for the reason the three above are: no wire input may claim

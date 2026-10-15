@@ -67,7 +67,7 @@ export const clients = [
 		redirectUris: ['https://retired.acme.test/cb']
 	},
 	{
-		// Placed by a spec in a project of a bucket with no address of its own.
+		// Placed by a spec in a bucket with no address of its own.
 		clientId: 'loose-app',
 		clientSecret: 'secret',
 		client_name: 'Loose Tool',

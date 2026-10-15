@@ -4,30 +4,21 @@ import { treaty } from '@elysiajs/eden';
 
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { resourceRoutes } from 'lib/admin/resources/routes.ts';
-import { projectRoutes } from 'lib/admin/projects/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
 	adminAuditStore,
 	getBucketStore,
-	getProjectStore,
 	getProtectedResourceStore
 } from 'lib/adapters/index.ts';
 import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
-import { answered } from './answered.ts';
 import { createAdministrator } from '../administrators.ts';
 
-/*
- * The audit trail for protected-resource operations, and the one cascade a project delete performs.
- *
- * Both route groups are mounted because the cascade spans them: the project route is what removes a
- * project's declarations, and the entry it writes has to say how many went.
- */
+/* The audit trail for protected-resource operations. */
 
 const app = new Elysia({ normalize: false })
 	.use(resolveAdmin)
-	.use(resourceRoutes)
-	.use(projectRoutes);
+	.use(resourceRoutes);
 const api = treaty(app);
 
 const AUDIENCE = 'https://mcp.example.com/mcp';
@@ -51,21 +42,14 @@ async function entriesFor(action: string) {
 }
 
 /*
- * A project in a bucket of its own, so its administrator declares without a super administrator: at the
- * root, declaring is reserved (root_namespace.spec.ts).
+ * A bucket with an address of its own, so its administrator declares without a super administrator: at
+ * the root, declaring is reserved (root_namespace.spec.ts).
  */
-async function ownedProject(userId: string, prefix: string) {
-	const ownerGroupId = await personalGroupId(userId);
-	const bucket = await getBucketStore().create({
+async function ownedBucket(userId: string, prefix: string) {
+	return getBucketStore().create({
 		name: `${prefix} users`,
 		slug: `${prefix}-${Math.random().toString(36).slice(2)}`,
-		ownerGroupId
-	});
-	return getProjectStore().create({
-		name: 'Acme',
-		slug: `${prefix}-${Math.random().toString(36).slice(2)}`,
-		ownerGroupId,
-		bucketId: bucket._id
+		ownerGroupId: await personalGroupId(userId)
 	});
 }
 
@@ -84,9 +68,9 @@ describe('protected resource audit trail', () => {
 
 	it('records the actor, the action and the identifier for every change', async () => {
 		const { cookie, userId } = await admin();
-		const project = await ownedProject(userId, 'audit');
+		const bucket = await ownedBucket(userId, 'audit');
 		const headers = { cookie };
-		const resources = api.admin.api.projects({ id: project._id }).resources;
+		const resources = api.admin.api.buckets({ id: bucket._id }).resources;
 
 		await resources.post(
 			{ identifier: AUDIENCE, name: 'Acme MCP', scopes: ['mcp:tools-basic'] },
@@ -118,10 +102,10 @@ describe('protected resource audit trail', () => {
 
 	it('leaves no entry for a declaration it refused', async () => {
 		const { cookie, userId } = await admin();
-		const project = await ownedProject(userId, 'refused');
+		const bucket = await ownedBucket(userId, 'refused');
 
 		const res = await api.admin.api
-			.projects({ id: project._id })
+			.buckets({ id: bucket._id })
 			.resources.post(
 				{ identifier: `${AUDIENCE}#tools`, name: 'x', scopes: ['a'] },
 				{ headers: { cookie } }
@@ -135,55 +119,37 @@ describe('protected resource audit trail', () => {
 	});
 
 	/*
-	 * A project's declarations go with it. Unlike its clients — which block the delete, because an
-	 * operator can see and name them — a resource declaration is a property of the project rather than
-	 * a thing living inside it, and leaving one behind would strand an audience whose owning project no
-	 * longer exists.
+	 * What lets a tenant read its own APIs' history: every entry names the bucket and the group that owns
+	 * it, so it appears in that bucket's trail and that group's, and nobody else's.
 	 */
-	it('cascades a project delete onto its declarations and says how many went', async () => {
+	it("files every change in the trail of the API's bucket and that bucket's group", async () => {
 		const { cookie, userId } = await admin();
-		const project = await ownedProject(userId, 'cascade');
+		const bucket = await ownedBucket(userId, 'filed');
 		const headers = { cookie };
-		const resources = api.admin.api.projects({ id: project._id }).resources;
+		const resources = api.admin.api.buckets({ id: bucket._id }).resources;
 
 		await resources.post(
-			{ identifier: AUDIENCE, name: 'One', scopes: ['mcp:tools-basic'] },
+			{ identifier: AUDIENCE, name: 'Acme MCP', scopes: ['mcp:tools-basic'] },
 			{ headers }
 		);
-		await resources.post(
-			{
-				identifier: 'https://other.example.com/mcp',
-				name: 'Two',
-				scopes: ['mcp:tools-basic']
-			},
+		await resources({ resourceId: encoded }).patch(
+			{ name: 'Acme MCP v2' },
 			{ headers }
 		);
+		await resources({ resourceId: encoded }).delete(undefined, { headers });
 
-		const deleted = await api.admin.api
-			.projects({ id: project._id })
-			.delete(undefined, { headers });
-
-		expect(deleted.status).toBe(200);
-		expect(answered(deleted.data).resourcesRemoved).toBe(2);
-		expect(
-			await getProtectedResourceStore().listByProject(project._id)
-		).toEqual([]);
-
-		/*
-		 * A count on the project's own entry, and exactly one entry — not one per declaration, as this
-		 * asserted until 051. The old shape argued that a bare number would not say which audiences
-		 * stopped being served; the project's identity says it, because a deletion is all-or-nothing
-		 * over what the project declared. What the change bought is a trail a bucket-sized deletion
-		 * cannot bury.
-		 */
-		const mine = (await entriesFor('project.delete')).filter(
-			(e) => e.actorId === userId
+		const { entries } = await adminAuditStore.list({
+			bucket: bucket._id,
+			ownerGroupIds: [bucket.ownerGroupId],
+			actionPrefix: 'resource.'
+		});
+		expect(entries.map((e) => e.action).sort()).toEqual([
+			'resource.create',
+			'resource.delete',
+			'resource.update'
+		]);
+		expect(entries.map((e) => [e.bucketId, e.ownerGroupId])).toEqual(
+			entries.map(() => [bucket._id, bucket.ownerGroupId])
 		);
-		expect(mine.length).toBe(1);
-		expect(mine[0]?.cascade).toEqual({ resources: 2 });
-
-		expect(
-			(await entriesFor('resource.delete')).filter((e) => e.actorId === userId)
-		).toEqual([]);
 	});
 });

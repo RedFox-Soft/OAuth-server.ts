@@ -90,7 +90,7 @@ async function needsLoopbackAcknowledgement(
 	 *
 	 * A permission may therefore be granted while the capability is off. That is deliberate: the entry
 	 * is a standing decision, inert until document identifiers are accepted at all, exactly as the
-	 * reserved client's project membership is inert until the MCP surface is switched on.
+	 * reserved client's place in the administrators' bucket is inert until the MCP surface is switched on.
 	 */
 	const retrieved = await fetchClientDocument(value);
 	if (!retrieved.ok) {

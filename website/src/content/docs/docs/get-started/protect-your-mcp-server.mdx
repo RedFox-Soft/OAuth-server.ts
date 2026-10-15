@@ -22,27 +22,27 @@ Compose](/docs/get-started/docker-compose/) adds about two more.
 	title="What you need first"
 >
 	A running instance with an administrator account ([Create the first
-	administrator](/docs/get-started/first-admin/)) and a project with a user
-	bucket ([Register your first client](/docs/get-started/first-client/) walks
-	that). Your MCP server can be a stub; it does not need to do anything yet
-	except answer HTTP.
+	administrator](/docs/get-started/first-admin/)) and a user bucket of your own
+	([Register your first client](/docs/get-started/first-client/) walks that).
+	Your MCP server can be a stub; it does not need to do anything yet except
+	answer HTTP.
 </Aside>
 
 ## 1. Declare your MCP server as a resource
 
-Declare it in a project whose user bucket has an address of its own — a path like `/acme` or a
+Declare it in a user bucket that has an address of its own — a path like `/acme` or a
 hostname. Such a bucket is its own issuer, and a resource identifier is unique only within its issuer,
 so nothing about your MCP server is fetched or checked when you declare it. It can be on an internal
 network, on `localhost` while you develop, or not deployed yet. Another tenant with a bucket of its own
 may declare the same URL without affecting yours.
 
-A project with no bucket of its own is served at the instance's root issuer, which every such tenant
+A bucket with no address of its own is served at the instance's root issuer, which every such bucket
 shares. There, only a super administrator can declare a resource, because the resource's own metadata
-cannot say which of those tenants it belongs to.
+cannot say which of those buckets it belongs to.
 
 <Steps>
 
-1. In the console, open your project and choose **Resources**, then **Declare a resource**.
+1. In the console, open your bucket and choose its **APIs** tab, then **New resource**.
 
 2. Fill in three things.
 
@@ -93,7 +93,7 @@ to it and the audience check in step 3:
 ```
 
 `resource` is the identifier you declared in step 1, character for character. `authorization_servers`
-names the issuer of the user bucket your project signs into: the bucket's own issuer when it has an
+names the issuer of the user bucket you declared the resource in: the bucket's own issuer when it has an
 address — `https://auth.example.com/acme`, or its hostname — and the instance's `ISSUER` otherwise. The
 document may live at `/.well-known/oauth-protected-resource` followed by your resource's path, as RFC
 9728 forms it, at the root as above, or wherever the challenge below points.
@@ -218,7 +218,7 @@ Three calls. The refusals matter as much as the success, because without them th
 No code in this server, and no restart for the resource itself: a declaration is data, read on every
 token request. No client secret for your MCP server, because it verifies tokens against published
 keys instead of asking anything. And no allowlist of agent hosts for an ordinary resource: which
-end-users a client can sign in follows from the resource it names, so the project that owns the
+end-users a client can sign in follows from the resource it names, so the bucket that holds the
 resource owns that answer.
 
 The endpoints this page touches are in the [endpoints reference](/docs/reference/endpoints/), and every

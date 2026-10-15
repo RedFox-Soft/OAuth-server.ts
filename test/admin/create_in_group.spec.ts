@@ -3,13 +3,13 @@ import { Elysia } from 'elysia';
 import { Type } from '@sinclair/typebox';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { bucketRoutes } from 'lib/admin/buckets/routes.ts';
-import { projectRoutes } from 'lib/admin/projects/routes.ts';
+import { clientRoutes } from 'lib/admin/clients/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { ensurePersonalGroup } from 'lib/admin/groups/personal.ts';
 import {
+	adapter,
 	adminAuditStore,
-	getBucketStore,
-	getProjectStore
+	getBucketStore
 } from 'lib/adapters/index.ts';
 import type { User } from 'lib/adapters/types.ts';
 import {
@@ -21,12 +21,12 @@ import nanoid from 'lib/helpers/nanoid.ts';
 import { shaped } from 'test/shape.ts';
 import { createAdministrator, type AdminKind } from '../administrators.ts';
 import {
-	bucketWithProjects,
+	bucketWithClients,
 	cookieFor,
 	regularGroup
 } from './ownership_fixtures.ts';
 
-const app = new Elysia().use(resolveAdmin).use(bucketRoutes).use(projectRoutes);
+const app = new Elysia().use(resolveAdmin).use(bucketRoutes).use(clientRoutes);
 
 async function call(
 	path: string,
@@ -49,11 +49,11 @@ async function call(
 }
 
 const Created = Type.Object(
-	{
-		_id: Type.String(),
-		ownerGroupId: Type.String(),
-		bucketId: Type.Optional(Type.Union([Type.String(), Type.Null()]))
-	},
+	{ _id: Type.String(), ownerGroupId: Type.String() },
+	{ additionalProperties: true }
+);
+const CreatedApplication = Type.Object(
+	{ clientId: Type.String(), bucketId: Type.String() },
 	{ additionalProperties: true }
 );
 
@@ -67,11 +67,12 @@ function unique(prefix: string) {
 		.replace(/[^a-z0-9]/g, '')}`;
 }
 
-const createProject = (cookie: string, body: Record<string, unknown> = {}) =>
-	call('/admin/api/projects', cookie, {
-		name: 'Created',
-		slug: unique('p'),
-		...body
+/* An application in a bucket, as its Applications page would create it. */
+const createApplication = (cookie: string, bucketId: string) =>
+	call(`/admin/api/buckets/${bucketId}/clients`, cookie, {
+		clientName: unique('app'),
+		grantTypes: ['client_credentials'],
+		tokenEndpointAuthMethod: 'client_secret_basic'
 	});
 
 const createBucket = (cookie: string, body: Record<string, unknown> = {}) =>
@@ -81,10 +82,8 @@ const createBucket = (cookie: string, body: Record<string, unknown> = {}) =>
 		...body
 	});
 
-async function projectsNamed(slugPrefix: string) {
-	return (await getProjectStore().list()).filter((p) =>
-		p.slug.startsWith(slugPrefix)
-	);
+async function applicationsIn(bucketId: string) {
+	return adapter('Client').findByIndexed('bucketId', bucketId);
 }
 
 /*
@@ -97,9 +96,9 @@ async function world() {
 	const personal = await ensurePersonalGroup(alice._id, alice.email);
 	const team = await regularGroup([alice]);
 	const others = await regularGroup([bob]);
-	const { bucket: teamBucket } = await bucketWithProjects(team._id, 0);
-	const { bucket: personalBucket } = await bucketWithProjects(personal._id, 0);
-	const { bucket: othersBucket } = await bucketWithProjects(others._id, 0);
+	const { bucket: teamBucket } = await bucketWithClients(team._id, 0);
+	const { bucket: personalBucket } = await bucketWithClients(personal._id, 0);
+	const { bucket: othersBucket } = await bucketWithClients(others._id, 0);
 	return {
 		alice,
 		bob,
@@ -114,26 +113,14 @@ async function world() {
 }
 
 /**
- * @proves An administrator creates a project or a bucket directly in any group they belong to — a project
- * already using a bucket of that group — while a group they may not create in, another group's bucket and
- * the administrators' bucket are refused with nothing created, and a creation that names no group lands in
- * the active group as before.
+ * @proves An administrator creates a bucket directly in any group they belong to, and an application in any
+ * bucket of such a group, while a group they may not create in, another group's bucket, the Default bucket
+ * and the administrators' bucket are refused with nothing created, and a bucket created without naming a
+ * group lands in the active group as before.
  */
 describe('creating in a chosen group', () => {
 	beforeEach(async () => {
 		await ensureAdminSeed();
-	});
-
-	it('creates a project in another group the administrator belongs to', async () => {
-		const w = await world();
-
-		const res = await createProject(w.cookie, {
-			groupId: w.team._id,
-			bucketId: w.teamBucket._id
-		});
-
-		expect(res.status).toBe(201);
-		expect(shaped(Created, res.body).ownerGroupId).toBe(w.team._id);
 	});
 
 	it('creates a bucket in another group the administrator belongs to', async () => {
@@ -146,134 +133,90 @@ describe('creating in a chosen group', () => {
 		expect((await getBucketStore().find(_id))?.ownerGroupId).toBe(w.team._id);
 	});
 
-	it('creates a project already using a bucket of the chosen group', async () => {
+	it('creates an application in a bucket of another group the administrator belongs to', async () => {
 		const w = await world();
 
-		const res = await createProject(w.cookie, {
-			groupId: w.team._id,
-			bucketId: w.teamBucket._id
-		});
+		const res = await createApplication(w.cookie, w.teamBucket._id);
 
 		expect(res.status).toBe(201);
-		const { _id } = shaped(Created, res.body);
-		expect((await getProjectStore().find(_id))?.bucketId).toBe(
+		expect(shaped(CreatedApplication, res.body).bucketId).toBe(
 			w.teamBucket._id
 		);
 	});
 
-	it("puts a project created with a bucket in that bucket's trail, naming the fields it set", async () => {
+	it("puts an application created in a bucket in that bucket's trail, under the bucket's group", async () => {
 		const w = await world();
 
-		const res = await createProject(w.cookie, {
-			groupId: w.team._id,
-			bucketId: w.teamBucket._id
-		});
+		const res = await createApplication(w.cookie, w.teamBucket._id);
 
-		const { _id } = shaped(Created, res.body);
+		const { clientId } = shaped(CreatedApplication, res.body);
 		const { entries } = await adminAuditStore.list({
 			bucket: w.teamBucket._id,
-			action: 'project.create'
+			action: 'client.create'
 		});
-		expect(
-			entries.map((e) => [e.targetId, e.ownerGroupId, e.attributes])
-		).toEqual([[_id, w.team._id, ['bucketId', 'groupId', 'name', 'slug']]]);
+		expect(entries.map((e) => [e.targetId, e.ownerGroupId])).toEqual([
+			[clientId, w.team._id]
+		]);
 	});
 
-	it('creates in the active group when no group is named', async () => {
+	it('creates a bucket in the active group when no group is named', async () => {
 		const w = await world();
 
-		const project = await createProject(w.cookie, {
-			bucketId: w.personalBucket._id
-		});
 		const bucket = await createBucket(w.cookie);
 
-		expect([
-			shaped(Created, project.body).ownerGroupId,
-			shaped(Created, bucket.body).ownerGroupId
-		]).toEqual([w.personal._id, w.personal._id]);
+		expect(shaped(Created, bucket.body).ownerGroupId).toBe(w.personal._id);
 	});
 
 	it('refuses a group the administrator is not a member of, and creates nothing', async () => {
 		const w = await world();
-		const slug = unique('refused');
 
-		const project = await createProject(w.cookie, {
-			slug,
-			groupId: w.others._id,
-			bucketId: w.othersBucket._id
-		});
 		const bucket = await createBucket(w.cookie, { groupId: w.others._id });
 
-		expect([project.status, bucket.status]).toEqual([403, 403]);
-		expect(await projectsNamed(slug)).toEqual([]);
+		expect(bucket.status).toBe(403);
 		expect(await getBucketStore().listByGroup(w.others._id)).toHaveLength(1);
 	});
 
-	it('refuses a bucket of another group than the one chosen, and creates nothing', async () => {
+	it('refuses an application in a bucket of a group the administrator does not belong to, and creates nothing', async () => {
 		const w = await world();
-		const slug = unique('mixed');
 
-		const res = await createProject(w.cookie, {
-			slug,
-			groupId: w.team._id,
-			bucketId: w.personalBucket._id
-		});
-
-		expect(res.status).toBe(409);
-		expect(await projectsNamed(slug)).toEqual([]);
-	});
-
-	it('refuses a bucket of a group the administrator does not belong to', async () => {
-		const w = await world();
-		const slug = unique('foreign');
-
-		const res = await createProject(w.cookie, {
-			slug,
-			bucketId: w.othersBucket._id
-		});
+		const res = await createApplication(w.cookie, w.othersBucket._id);
 
 		expect(res.status).toBe(403);
-		expect(await projectsNamed(slug)).toEqual([]);
+		expect(await applicationsIn(w.othersBucket._id)).toEqual([]);
 	});
 
 	it('answers a bucket that does not exist as one of another group, so nothing learns which exist', async () => {
 		const w = await world();
 
-		const unknown = await createProject(w.cookie, {
-			bucketId: 'no-such-bucket'
-		});
-		const foreign = await createProject(w.cookie, {
-			bucketId: w.othersBucket._id
-		});
+		const unknown = await createApplication(w.cookie, 'no-such-bucket');
+		const foreign = await createApplication(w.cookie, w.othersBucket._id);
 
 		expect(unknown).toEqual(foreign);
 	});
 
-	it("refuses the administrators' bucket, even to a super administrator", async () => {
+	it("refuses an application in the administrators' bucket, even to a super administrator", async () => {
 		const superAdmin = await admin('super');
+		const before = await applicationsIn(ADMIN_BUCKET_ID);
 
-		const res = await createProject(await cookieFor(superAdmin), {
-			bucketId: ADMIN_BUCKET_ID
-		});
+		const res = await createApplication(
+			await cookieFor(superAdmin),
+			ADMIN_BUCKET_ID
+		);
 
 		expect(res.status).toBe(403);
+		expect(await applicationsIn(ADMIN_BUCKET_ID)).toEqual(before);
 	});
 
 	it('answers the Default bucket named by an administrator exactly as a bucket out of their reach', async () => {
 		const w = await world();
-		const slug = unique('shared');
+		const before = await applicationsIn(DEFAULT_BUCKET_ID);
 
-		const shared = await createProject(w.cookie, {
-			slug,
-			bucketId: DEFAULT_BUCKET_ID
-		});
-		const foreign = await createProject(w.cookie, {
-			bucketId: w.othersBucket._id
-		});
+		const shared = await createApplication(w.cookie, DEFAULT_BUCKET_ID);
+		const foreign = await createApplication(w.cookie, w.othersBucket._id);
 
 		expect(shared).toEqual(foreign);
 		expect(shared.status).toBe(403);
-		expect(await projectsNamed(slug)).toEqual([]);
+		expect(await applicationsIn(DEFAULT_BUCKET_ID)).toEqual(before);
 	});
 
 	it("refuses another administrator's personal group, even to a super administrator", async () => {
@@ -292,24 +235,40 @@ describe('creating in a chosen group', () => {
 	it('refuses Super administrators as a group to create in', async () => {
 		const superAdmin = await admin('super');
 
-		const res = await createProject(await cookieFor(superAdmin), {
-			groupId: SUPER_ADMINS_GROUP_ID,
-			bucketId: DEFAULT_BUCKET_ID
+		const res = await createBucket(await cookieFor(superAdmin), {
+			groupId: SUPER_ADMINS_GROUP_ID
 		});
 
 		expect(res.status).toBe(404);
+		expect(await getBucketStore().listByGroup(SUPER_ADMINS_GROUP_ID)).toEqual(
+			[]
+		);
 	});
 
 	it('creates in a group a super administrator does not belong to', async () => {
 		const w = await world();
 		const superAdmin = await admin('super');
 
-		const res = await createProject(await cookieFor(superAdmin), {
-			groupId: w.team._id,
-			bucketId: w.teamBucket._id
+		const res = await createBucket(await cookieFor(superAdmin), {
+			groupId: w.team._id
 		});
 
 		expect(res.status).toBe(201);
 		expect(shaped(Created, res.body).ownerGroupId).toBe(w.team._id);
+	});
+
+	it('creates an application in a bucket of a group a super administrator does not belong to', async () => {
+		const w = await world();
+		const superAdmin = await admin('super');
+
+		const res = await createApplication(
+			await cookieFor(superAdmin),
+			w.teamBucket._id
+		);
+
+		expect(res.status).toBe(201);
+		expect(shaped(CreatedApplication, res.body).bucketId).toBe(
+			w.teamBucket._id
+		);
 	});
 });

@@ -3,8 +3,8 @@ import getConfig from '../default.config.js';
 const config = getConfig();
 
 /*
- * One client that skips consent, in a project using a bucket of its own. Seeded by the spec into the
- * bucket's project, so the client signs that bucket's users in.
+ * One client that skips consent. Seeded by the spec into a bucket of its own, so the client signs that
+ * bucket's users in.
  */
 export const clients = [
 	{

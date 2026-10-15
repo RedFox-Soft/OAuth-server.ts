@@ -63,7 +63,7 @@ export const CreateBucketBody = t.Object({
  * connection, identity provider and declared resource the change reaches, and an operator who has not
  * seen that list has not been told what the change costs — so the change refuses until they say they have.
  *
- * `expect` is what they saw, counted, and the confirming call must carry it (specs/081 FR-013): a project
+ * `expect` is what they saw, counted, and the confirming call must carry it (specs/081 FR-013): an application
  * or a provider added while the preview was open would otherwise be broken by a consent given before it
  * existed. Counts rather than names for the reason the deletion's `expect` gives — a count is what survives
  * a large set — and each list is short enough that a changed member set without a changed count is a
@@ -87,12 +87,12 @@ export const ChangeBucketAddressBody = t.Object({
 });
 
 /*
- * Moving a bucket, with every project using it, to another administrator group (specs/075). The one
+ * Moving a bucket, with everything it holds, to another administrator group (specs/075). The one
  * body in which a group is named: every other body leaves it out (lib/admin/groups/schema.ts), and this
  * route proves the caller's standing in both groups before honouring it.
  *
- * `confirm` is the second call, as for an address change: the preview names every project that moves
- * with the bucket, and the move refuses until the caller has seen it.
+ * `confirm` is the second call, as for an address change: the preview counts what moves with the bucket,
+ * and the move refuses until the caller has seen it.
  */
 export const MoveBucketOwnerBody = t.Object({
 	groupId: t.String({ minLength: 1 }),
@@ -144,7 +144,7 @@ export const UpdateBucketBody = t.Object({
 			withoutEnabledLink: t.Optional(PreviewCount),
 			unverified: t.Optional(PreviewCount),
 			passwordWithoutAuthenticator: t.Optional(PreviewCount),
-			projects: t.Optional(PreviewCount)
+			applications: t.Optional(PreviewCount)
 		})
 	)
 });
@@ -152,7 +152,7 @@ export const UpdateBucketBody = t.Object({
 /*
  * What a bucket deletion may take with it, and how many the caller reviewed before deciding.
  *
- * `expect` is a count where the project's equivalent is a list of ids, and the asymmetry is the
+ * `expect` is a count where an application blocker is a list of ids, and the asymmetry is the
  * point rather than an optimisation: a client is configuration an administrator named, an end-user
  * is a person, and nothing here asks an administrator to decide about people by name. A count also
  * survives a bucket holding thousands, where a list would not.

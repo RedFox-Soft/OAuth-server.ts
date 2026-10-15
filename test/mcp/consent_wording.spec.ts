@@ -7,10 +7,9 @@ import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
 	adminAuditStore,
 	getBucketStore,
-	getProjectStore,
 	getProtectedResourceStore
 } from 'lib/adapters/index.ts';
-import { DEFAULT_BUCKET_ID, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { ADMIN_MCP_CLIENT_ID, MCP_RESOURCE } from 'lib/mcp/consts.ts';
 import { ROOT_NAMESPACE } from 'lib/resources/namespace.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
@@ -73,17 +72,11 @@ describe('an agent wording the consent page', () => {
 
 	it('describes the scopes of a resource it declares, and the change is attributed to it', async () => {
 		const { token, userId } = await agentToken();
-		const project = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			name: 'Agent wording',
-			slug: `agent-wording-${Math.floor(Math.random() * 1e6)}`,
-			ownerGroupId: UNASSIGNED_GROUP_ID
-		});
 		const identifier = `https://wording-${Math.floor(Math.random() * 1e6)}.example.com/mcp`;
 
 		const response = await rpc(
 			call('resource_declare', {
-				id: project._id,
+				id: DEFAULT_BUCKET_ID,
 				identifier,
 				name: 'Worded MCP',
 				scopes: ['tools:call'],

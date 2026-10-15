@@ -4,7 +4,7 @@ title: "Client registration attributes are declared once"
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-09-23
-updated: 2026-09-23
+updated: 2026-10-15
 ---
 
 # Client registration attributes are declared once
@@ -30,6 +30,15 @@ The recognised set is `ATTRIBUTES` filtered by capability flags (`recognizedFrom
 `lib/consts/client_attributes.ts:306`). A base key placed in that table would be recognised as
 metadata and projected onto the wire under a snake_case name it has never had. Keeping the base keys
 in their own table means no derivation has to remember to exclude them.
+
+Since spec 099 two server-only base keys say where a client belongs: `bucketId`, the bucket it signs people
+into for its whole life, and `corsOrigins`, the browser origins that may read its responses
+(`lib/models/client/wire.ts:76-77`, declared in `lib/configs/clientSchema.ts:162-180`). They replaced
+`registeredAtBucket` and the project's client list and origin allowlist ([[bucket-is-the-only-container]]).
+Neither is in `ATTRIBUTES` or the wire map, so a registration request or a client metadata document cannot
+set either: one would choose its own issuer, the other grant itself CORS. Only the admin route that created
+the client, or the registration endpoint from the bucket address it was reached at (`bucketId` alone,
+`lib/actions/registration.ts:229`), writes them, and every update path carries them forward.
 
 ## Three things that fail silently if you get them wrong
 

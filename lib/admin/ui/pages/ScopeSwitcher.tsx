@@ -39,7 +39,7 @@ interface ScopeView {
  * The active scope is held on the session, so every list is scoped by the server on its next request.
  * After a switch the operator's identity is re-read and the page subtree remounts (Layout keys it by the
  * active group), so every list re-fetches at once — the consistency the old full reload bought, without
- * losing the address. The operator stays in the same section; an entity page (one bucket, one project)
+ * losing the address. The operator stays in the same section; an entity page (one bucket)
  * gives way to its list, because the entity may belong to the group just left.
  */
 export function ScopeSwitcher() {
@@ -80,13 +80,13 @@ export function ScopeSwitcher() {
 	const active = scope.available.find((g) => g.id === scope.activeGroupId);
 	/*
 	 * Named by what it does (specs/085). A super administrator's lists show the whole instance whatever is
-	 * chosen, so for them the control only decides where new projects and buckets land; for everyone else it
+	 * chosen, so for them the control only decides where new buckets land; for everyone else it
 	 * is the group they are working in.
 	 */
 	const label = superAdmin ? (
 		<Typography.Text type="secondary">
 			Create in{' '}
-			<Tooltip title="Lists show the whole instance. This decides which group new projects and buckets are created in.">
+			<Tooltip title="Lists show the whole instance. This decides which group new buckets are created in.">
 				<InfoCircleOutlined aria-label="What Create in means" />
 			</Tooltip>
 		</Typography.Text>

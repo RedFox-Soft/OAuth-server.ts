@@ -6,10 +6,10 @@ import { resourceRoutes } from 'lib/admin/resources/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { ensurePersonalGroup } from 'lib/admin/groups/personal.ts';
 import {
-	getProjectStore,
+	getBucketStore,
 	getProtectedResourceStore
 } from 'lib/adapters/index.ts';
-import { ADMIN_SESSION_COOKIE, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
+import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import { ISSUER } from 'lib/configs/env.ts';
 import { ROOT_NAMESPACE } from 'lib/resources/namespace.ts';
 import { assertNoPendingInterceptors, mock } from '../fetch_mock.ts';
@@ -25,13 +25,13 @@ const app = new Elysia({ normalize: false })
 	.use(resourceRoutes);
 
 let cookie: string;
-let projectId: string;
+let bucketId: string;
 
 async function declared(identifier: string) {
 	await getProtectedResourceStore().create({
 		namespace: ROOT_NAMESPACE,
 		identifier,
-		projectId,
+		bucketId,
 		name: identifier,
 		scopes: ['mcp:tools-basic']
 	});
@@ -40,7 +40,7 @@ async function declared(identifier: string) {
 async function vouching(identifier: string) {
 	const response = await app.handle(
 		new Request(
-			`http://e.ly/admin/api/projects/${projectId}/resources/${encodeURIComponent(identifier)}/vouching`,
+			`http://e.ly/admin/api/buckets/${bucketId}/resources/${encodeURIComponent(identifier)}/vouching`,
 			{ headers: { cookie } }
 		)
 	);
@@ -66,12 +66,11 @@ describe("a declared resource's published metadata", () => {
 		);
 		const group = await ensurePersonalGroup(user._id, user.email);
 		cookie = `${ADMIN_SESSION_COOKIE}=${(await sessionFor(user))._id}`;
-		projectId = (
-			await getProjectStore().create({
-				bucketId: DEFAULT_BUCKET_ID,
+		// No address of its own, so its tokens carry the root issuer and its declarations share the root.
+		bucketId = (
+			await getBucketStore().create({
 				ownerGroupId: group._id,
-				name: 'Vouched',
-				slug: `vouched-${Math.random().toString(36).slice(2)}`
+				name: 'Vouched users'
 			})
 		)._id;
 	});

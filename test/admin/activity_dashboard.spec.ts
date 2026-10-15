@@ -13,7 +13,7 @@ import type { OverviewAnswer } from 'lib/activity/overview.ts';
 import nanoid from 'lib/helpers/nanoid.ts';
 import { createAdministrator } from '../administrators.ts';
 import {
-	bucketWithProjects,
+	bucketWithClients,
 	cookieFor,
 	regularGroup
 } from './ownership_fixtures.ts';
@@ -66,7 +66,7 @@ async function markMany(
 }
 
 async function bucketOf(groupId: string): Promise<string> {
-	return (await bucketWithProjects(groupId, 0)).bucket._id;
+	return (await bucketWithClients(groupId, 0)).bucket._id;
 }
 
 /* Deleted and then destroyed at once: a deletion only schedules the destruction (specs/090). */

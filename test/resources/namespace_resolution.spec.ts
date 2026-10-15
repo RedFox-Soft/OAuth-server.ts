@@ -1,15 +1,14 @@
 import { beforeAll, describe, expect, it } from 'bun:test';
 
-import bootstrap from '../test_helper.ts';
+import bootstrap, { bindClientToBucket } from '../test_helper.ts';
 import { elysia } from 'lib/index.ts';
 import { ISSUER } from 'lib/configs/env.ts';
 import {
 	getBucketStore,
-	getProjectStore,
 	getProtectedResourceStore
 } from 'lib/adapters/index.ts';
 import { forgetBucketAddresses } from 'lib/admin/auth/bucketAddress.ts';
-import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
+import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { decode } from 'lib/helpers/jwt.ts';
 import { Type } from '@sinclair/typebox';
 import { present, shaped } from 'test/shape.ts';
@@ -35,21 +34,12 @@ async function tenant(
 		name: clientId,
 		...address
 	});
-	const project = await getProjectStore().create({
-		bucketId: DEFAULT_BUCKET_ID,
-		ownerGroupId: UNASSIGNED_GROUP_ID,
-		name: clientId,
-		slug: `${clientId}-${Math.random().toString(36).slice(2)}`
-	});
-	await getProjectStore().update(project._id, {
-		bucketId: bucket._id,
-		clientIds: [clientId]
-	});
+	await bindClientToBucket(clientId, bucket._id);
 	for (const { identifier, scopes } of declarations) {
 		await getProtectedResourceStore().create({
 			namespace: bucket._id,
 			identifier,
-			projectId: project._id,
+			bucketId: bucket._id,
 			name: identifier,
 			scopes
 		});

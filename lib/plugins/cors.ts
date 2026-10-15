@@ -2,7 +2,8 @@ import type { Elysia } from 'elysia';
 
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { isOriginAllowed } from 'lib/helpers/cors_origin.js';
-import { getProjectStore } from 'lib/adapters/index.js';
+import { adapter } from 'lib/adapters/index.js';
+import { isList, member } from 'lib/helpers/_/object.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import {
 	corsMethodsForPath,
@@ -15,7 +16,7 @@ import {
  *
  *   corsOpen            — mounted in discovery and jwks; echoes any Origin.
  *   corsClientBased(fn) — mounted in token, userinfo, revocation, par and deviceAuth; echoes an
- *                         Origin only when it is listed on the project owning the calling client.
+ *                         Origin only when it is listed on the calling client itself.
  *   corsPreflight       — mounted once in lib/index.ts; answers OPTIONS for both classes.
  *
  * Route classes live in lib/consts/route_classification.ts beside the feature-gate table, under the
@@ -189,8 +190,21 @@ export const corsClientBased =
 				return;
 			}
 
-			const project = await getProjectStore().findByClientId(clientId);
-			if (!isOriginAllowed(origin, project?.corsOrigins)) {
+			/*
+			 * The stored record, never `Client.find`: that would resolve a client metadata document, and the
+			 * client id here is the caller's to choose — an Origin header would make this server fetch any URL.
+			 * Such a client has no origins anyway; only an administrator sets them (specs/099).
+			 */
+			const stored = await adapter('Client').find(clientId);
+			const origins = member(stored, 'corsOrigins');
+			if (
+				!isOriginAllowed(
+					origin,
+					isList(origins)
+						? origins.filter((o): o is string => typeof o === 'string')
+						: undefined
+				)
+			) {
 				return;
 			}
 

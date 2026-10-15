@@ -1,6 +1,6 @@
 ---
 title: Register your first client
-description: Groups, projects and clients in the console, public versus confidential, and how a client decides which users it signs in.
+description: Groups, buckets and applications in the console, public versus confidential, and how a client decides which users it signs in.
 sidebar:
   order: 4
 ---
@@ -8,59 +8,57 @@ sidebar:
 import { Steps, Aside } from '@astrojs/starlight/components';
 import ScreenshotFigure from '../../../../components/ScreenshotFigure.astro';
 
-A client is an application that asks this server for tokens. Clients live inside projects, projects
-belong to groups, and a project points at the user bucket its clients sign users in from. That is
-four concepts, but they nest, so the console walks them in order.
+A client is an application that asks this server for tokens. The console calls it an
+**application**. Every application lives in a user bucket, and every bucket belongs to a group. That
+is three concepts, but they nest, so the console walks them in order.
 
-## Groups, projects, buckets
+## Groups, buckets, applications
 
-- A **group** owns things. Every project and every user bucket carries an owning group, and
-  belonging to that group is what grants access to it. There is no separate list of named managers.
-  Each administrator already has a **Personal** group, which is usually a fine place for a first
-  client; a **regular** group is a company or a team you share with colleagues.
-- A **project** is a set of clients that belong to one application or one product, plus the bucket
-  its users come from.
+- A **group** owns things. Every user bucket carries an owning group, and belonging to that group is
+  what grants access to the bucket and everything in it. There is no separate list of named
+  managers. Each administrator already has a **Personal** group, which is usually a fine place for a
+  first client; a **regular** group is a company or a team you share with colleagues.
 - A **user bucket** is a population of end-users: their accounts, and the policy for how they
-  register and verify themselves. A bucket you create is also a tenant with **its own issuer** — it
-  is served at `<ISSUER>/<slug>`, or at a hostname of its own, and mints tokens carrying that issuer, so a client in a project pointed at
-  it integrates against that address rather than the bare one. The default `redfox` bucket is the
-  exception: it keeps the bare issuer, which is what lets an existing deployment stay as it is.
+  register and verify themselves. It also holds the **applications** that sign those people in and
+  the **APIs** they get tokens for. A bucket you create is also a tenant with **its own issuer** — it
+  is served at `<ISSUER>/<slug>`, or at a hostname of its own, and mints tokens carrying that issuer,
+  so an application in it integrates against that address rather than the bare one. The default
+  `redfox` bucket is the exception: it keeps the bare issuer, which is what lets an existing
+  deployment stay as it is.
+- An **application** is an OAuth client. It belongs to the bucket it was created in for its whole
+  life; no operation moves it to another bucket.
 
 <Steps>
 
-1. **Choose a group.** The dialogs that create a project or a bucket ask which group it goes in,
-   starting from the one chosen at the top of the console. Your **Personal** group is fine for a
-   first client, but it has exactly one member, so work you will share belongs in a regular group,
-   created under **Groups**, or is moved there later.
+1. **Choose a group.** The dialog that creates a bucket asks which group it goes in, starting from
+   the one chosen at the top of the console. Your **Personal** group is fine for a first client, but
+   it has exactly one member, so work you will share belongs in a regular group, created under
+   **Groups**, or is moved there later.
 
-2. **Create a bucket** under **Buckets**, unless you want to use the default `redfox` bucket. It
-   takes a name and an address: a path, which becomes the last part of the issuer in its tokens, or
-   a hostname of its own. Pick it deliberately: an issuer identifier is a promise made to every
-   client configured against it, and changing it later is previewed and confirmed because every
-   application using the bucket is affected. A new bucket is closed to sign-up unless you choose
-   **Anyone who can reach the sign-in page**; you can change that later on its **Sign-in** tab.
+2. **Create a bucket** under **Buckets**. It takes a name and an address: a path, which becomes the
+   last part of the issuer in its tokens, or a hostname of its own. Pick it deliberately: an issuer
+   identifier is a promise made to every client configured against it, and changing it later is
+   previewed and confirmed because every application in the bucket is affected. A new bucket is
+   closed to sign-up unless you choose **Anyone who can reach the sign-in page**; you can change
+   that later on its **Sign-in** tab.
 
    The Buckets table shows each bucket's address in its **Address** column. The reserved buckets read
-   _served at the root_ there rather than a path, since they keep the bare issuer.
+   _served at the root_ there rather than a path, since they keep the bare issuer. Only a super
+   administrator can add applications to the default `redfox` bucket, and nobody can add them to
+   the administrators' bucket.
 
-3. **Create a project** under **Projects**. It takes a name and a slug (lower-case letters, digits
-   and hyphens), and a **Bucket**, chosen from the buckets of its group — pick the one from the
-   previous step. Leaving it empty is how you use the default `redfox` bucket, shown as **Default
-   bucket**; it belongs to no group, so it is never in the list. You can change it later with
-   **Change bucket…** or on the project's **Settings** tab. Once people have signed in through the
-   project's applications, the change is previewed and asks you to confirm, because they will have
-   to sign in again.
-
-4. **Create a client** under the project's **Clients**. Pick the application type and the token
-   endpoint authentication method, then enter the redirect URIs. The next section is about that
-   choice.
+3. **Create a client** on the bucket's **Applications** tab, with **New client**. Pick the
+   application type and the token endpoint authentication method, then enter the redirect URIs. The
+   next section is about that choice. If browser code on another origin will call the token
+   endpoint, list that origin under **Browser origins**; the list can be copied from another
+   application of the same bucket.
 
 </Steps>
 
 <ScreenshotFigure
-	name="admin-project-clients"
-	alt="A project's clients table in the admin console, showing a public PKCE client and a confidential one."
-	caption="A project's clients: the generated client id, the application type and the token endpoint auth method that decides whether it has a secret."
+	name="admin-bucket-applications"
+	alt="A bucket's Applications tab in the admin console, showing a public PKCE client and a confidential one."
+	caption="A bucket's applications: the generated client id, the application type and the token endpoint auth method that decides whether it has a secret."
 />
 
 ## Public or confidential
@@ -109,23 +107,23 @@ receive the code. PKCE closes it, which is why it is mandatory.
 
 ## Which users a client signs in
 
-Login routing is decided by the project a client belongs to, never by the client itself:
+Login routing is decided by the bucket a client belongs to, never by the client itself:
 
 1. the reserved console client always goes to the administrator bucket;
-2. a client assigned to a project goes to **that project's bucket**;
+2. an application created in a bucket goes to **that bucket**;
 3. a client registered dynamically at a bucket's address (its `/reg`) belongs to that bucket;
-4. anything else (an unassigned client, or one registered at the root) goes to the default `redfox`
-   bucket.
+4. a request that names one API declared at the address it was sent to goes to that API's bucket;
+5. anything else (a client registered at the root, or one identified by a metadata document) goes
+   to the default `redfox` bucket.
 
-So a client with no project signs users in from the default bucket, which is rarely what you want.
-Set the project's bucket.
+An application of the default `redfox` bucket is not pinned to it: rules 4 and 5 still apply to it.
 
 The bucket is also where onboarding policy lives: whether registration is open
 (`registrationOpen`), whether a new account must verify its e-mail
 (`emailVerificationRequired`), whether that happens by link or by six-digit code
 (`verificationMethod`), whether password sign-in is offered at all (`passwordLogin`), and whether an
-authenticator app is required (`totpRequired`). None of it is set on the client. Two clients in the
-same project share all of it, because they share the accounts.
+authenticator app is required (`totpRequired`). None of it is set on the client. Two applications in
+the same bucket share all of it, because they share the accounts.
 
 <Aside type="note">
 

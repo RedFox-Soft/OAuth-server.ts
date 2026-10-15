@@ -1,18 +1,30 @@
-import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
+import {
+	describe,
+	it,
+	expect,
+	beforeEach,
+	afterEach,
+	type Mock
+} from 'bun:test';
 import { hash } from 'node:crypto';
 
 import { SignJWT, exportJWK, generateKeyPair } from 'jose';
 
-import bootstrap, { jsonToFormUrlEncoded, type Setup } from '../test_helper.js';
+import bootstrap, {
+	changeClient,
+	jsonToFormUrlEncoded,
+	type Setup
+} from '../test_helper.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
-import { getProjectStore } from 'lib/adapters/index.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { corsRoutes } from 'lib/consts/route_classification.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { elysia } from 'lib/index.js';
+import { clearDocumentCache } from 'lib/client_metadata_document/cache.ts';
+import { resolver } from 'lib/client_metadata_document/fetch.ts';
 import { expectUnservedEquivalent, send } from '../feature_gate/helpers.js';
-import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
+import { DOC_ORIGIN, mock, serveDocument } from '../cimd/document_host.js';
 
 /*
  * The CORS contract suite. Contract of record:
@@ -26,9 +38,10 @@ import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
  * Coverage, by the contract's own sections:
  *
  *   open class          — echo for any origin, Vary always, no expose-headers, no-Origin unchanged
- *   client-based class  — echo when the owning project lists the origin, over all six routes
- *   filtering           — origin absent, project empty, no project, no client, unknown token,
- *                         malformed credential; each proving the request is otherwise unaffected
+ *   client-based class  — echo when the application lists the origin, over all six routes
+ *   filtering           — origin absent, list empty, no list, no client, unknown token,
+ *                         malformed credential; each proving the request is otherwise unaffected;
+ *                         a document URL as the client id is never fetched
  *   client id sources   — body client_id, Basic username, access token
  *   error paths         — the transform-stage 401, a 400 from validation, a 400 from a handler
  *   exposed headers     — the RFC 9449 pair on the DPoP nonce 401 and on successes
@@ -82,39 +95,15 @@ function postForm(
 }
 
 /*
- * The in-memory project store is a process-wide singleton that bootstrap() does not clear, and
- * findByClientId returns the first project holding the id — so a project left behind by an earlier
- * case would answer for a later one and quietly invert its result. Every project this suite creates is
- * therefore tracked and destroyed after the test, rather than wiping the store (which other spec files
- * rely on for the reserved admin project).
+ * The origins an application lists are part of its stored record, set by an administrator. bootstrap()
+ * reseeds every client from the config before each case, so a list set here never outlives its case.
  */
-const createdProjects: string[] = [];
-
-export async function seedProjectWithOrigins(
-	clientIds: string[],
-	corsOrigins: string[]
-) {
-	const project = await getProjectStore().create({
-		bucketId: DEFAULT_BUCKET_ID,
-		ownerGroupId: UNASSIGNED_GROUP_ID,
-		name: 'CORS project',
-		slug: `cors-${Math.random().toString(36).slice(2)}`,
-		clientIds,
-		corsOrigins
-	});
-	createdProjects.push(project._id);
-	return project;
-}
-
-export async function destroySeededProjects() {
-	const store = getProjectStore();
-	for (const id of createdProjects.splice(0)) {
-		await store.destroy(id);
-	}
+async function listOrigins(corsOrigins: string[]) {
+	await changeClient('cors-client', { corsOrigins });
 }
 
 /**
- * @proves A browser client reads a response cross-origin only from an origin its project lists,
+ * @proves A browser client reads a response cross-origin only from an origin its application lists,
  * on success and on every kind of refusal, and nothing at all when the capability is off.
  */
 describe('CORS', () => {
@@ -122,10 +111,6 @@ describe('CORS', () => {
 
 	beforeEach(async () => {
 		setup = await bootstrap(import.meta.url);
-	});
-
-	afterEach(async () => {
-		await destroySeededProjects();
 	});
 
 	// Guards the config itself: every later case reads a header off an endpoint that only exists
@@ -216,8 +201,8 @@ describe('CORS', () => {
 		);
 	});
 
-	// US2 — the endpoints a browser app calls directly. The origin has to be listed on the project
-	// owning the calling client, so every case here turns on identifying that client.
+	// US2 — the endpoints a browser app calls directly. The origin has to be listed on the calling
+	// application itself, so every case here turns on identifying that client.
 	describe('client-based endpoints', () => {
 		async function accessTokenFor(clientId: string) {
 			await setup.login();
@@ -229,9 +214,9 @@ describe('CORS', () => {
 			}).save();
 		}
 
-		describe('with the origin listed on the owning project', () => {
+		describe('with the origin listed on the application', () => {
 			beforeEach(async () => {
-				await seedProjectWithOrigins(['cors-client'], [ORIGIN]);
+				await listOrigins([ORIGIN]);
 			});
 
 			it.each(FORM_ENDPOINTS.map((e) => [e.path, e] as const))(
@@ -359,16 +344,16 @@ describe('CORS', () => {
 			}
 
 			it('filters an origin absent from the list', async () => {
-				await seedProjectWithOrigins(['cors-client'], [ORIGIN]);
+				await listOrigins([ORIGIN]);
 				await expectFilteredButUnaffected(OTHER_ORIGIN);
 			});
 
-			it('filters every origin when the project lists none', async () => {
-				await seedProjectWithOrigins(['cors-client'], []);
+			it('filters every origin when the application lists none', async () => {
+				await listOrigins([]);
 				await expectFilteredButUnaffected(ORIGIN);
 			});
 
-			it('filters when the client belongs to no project at all', async () => {
+			it('filters when the application has no origins recorded at all', async () => {
 				const res = await postForm(
 					'/token/revocation',
 					{ client_id: 'cors-orphan', client_secret: 'secret', token: 'x' },
@@ -380,7 +365,7 @@ describe('CORS', () => {
 			});
 
 			it('filters when no client can be identified from the body', async () => {
-				await seedProjectWithOrigins(['cors-client'], [ORIGIN]);
+				await listOrigins([ORIGIN]);
 
 				const res = await postForm(
 					'/token',
@@ -392,7 +377,7 @@ describe('CORS', () => {
 			});
 
 			it('filters when the access token is unknown', async () => {
-				await seedProjectWithOrigins(['cors-client'], [ORIGIN]);
+				await listOrigins([ORIGIN]);
 
 				const res = await send('/userinfo', {
 					method: 'GET',
@@ -404,22 +389,67 @@ describe('CORS', () => {
 			});
 
 			// US4's payoff at the protocol layer: an operator's edit governs the very next request,
-			// because the project is resolved per request rather than captured at boot.
+			// because the application is read per request rather than captured at boot.
 			it('starts echoing as soon as an operator adds the origin', async () => {
-				const project = await seedProjectWithOrigins(['cors-client'], []);
+				await listOrigins([]);
 				const body = { ...secret, token: 'no-such-token' };
 
 				const before = await postForm('/token/revocation', body, ORIGIN);
 				expect(before.headers.get('access-control-allow-origin')).toBeNull();
 
-				await getProjectStore().update(project._id, { corsOrigins: [ORIGIN] });
+				await listOrigins([ORIGIN]);
 
 				const after = await postForm('/token/revocation', body, ORIGIN);
 				expect(after.headers.get('access-control-allow-origin')).toBe(ORIGIN);
 			});
 
+			/*
+			 * The client id here is whatever the caller wrote, and with client metadata documents switched
+			 * on, resolving a URL-shaped one fetches it. The CORS layer reads only stored applications, so an
+			 * Origin header cannot make this server issue a request of the caller's choosing. The Basic
+			 * header names a different client, so the endpoint itself refuses the request before resolving
+			 * anyone — any fetch of the document could only have come from the CORS layer.
+			 */
+			describe('naming a client metadata document as the client id', () => {
+				beforeEach(() => {
+					clearDocumentCache();
+					resolver.lookup = async () => ['93.184.216.34'];
+				});
+
+				afterEach(() => {
+					mock.restore();
+					resolver.lookup = resolver.realLookup;
+				});
+
+				it('fetches nothing', async () => {
+					const { identifier } = serveDocument();
+					const basic = Buffer.from('cors-client:secret').toString('base64');
+
+					const res = await send('/token/revocation', {
+						method: 'POST',
+						headers: {
+							...form,
+							origin: ORIGIN,
+							authorization: `Basic ${basic}`
+						},
+						body: jsonToFormUrlEncoded({ client_id: identifier, token: 'x' })
+					});
+
+					expect(res.status).toBe(400);
+					const fetched = (
+						globalThis.fetch as unknown as Mock<typeof fetch>
+					).mock.calls.filter(([input]) =>
+						String(input instanceof Request ? input.url : input).startsWith(
+							DOC_ORIGIN
+						)
+					);
+					expect(fetched).toHaveLength(0);
+					expect(res.headers.get('access-control-allow-origin')).toBeNull();
+				});
+			});
+
 			it('filters when the authorization header is malformed rather than erroring', async () => {
-				await seedProjectWithOrigins(['cors-client'], [ORIGIN]);
+				await listOrigins([ORIGIN]);
 
 				const res = await send('/userinfo', {
 					method: 'GET',
@@ -502,7 +532,7 @@ describe('CORS', () => {
 		}
 
 		it('exposes both challenge headers on the DPoP nonce 401', async () => {
-			await seedProjectWithOrigins(['cors-client'], [ORIGIN]);
+			await listOrigins([ORIGIN]);
 			ApplicationConfig['dpop.requireNonce'] = true;
 			const token = await new AccessToken({
 				accountId: setup.getAccountId(),
@@ -534,7 +564,7 @@ describe('CORS', () => {
 		// Fixed per route class, not per response: a client cannot ask for the list conditionally, and a
 		// header that appears only on failures would be unreadable exactly when it is needed.
 		it('exposes them on successful client-based responses too', async () => {
-			await seedProjectWithOrigins(['cors-client'], [ORIGIN]);
+			await listOrigins([ORIGIN]);
 
 			const res = await postForm(
 				'/token/revocation',
@@ -560,7 +590,7 @@ describe('CORS', () => {
 		});
 
 		it('exposes nothing when the origin is filtered', async () => {
-			await seedProjectWithOrigins(['cors-client'], [ORIGIN]);
+			await listOrigins([ORIGIN]);
 
 			const res = await postForm(
 				'/token/revocation',
@@ -697,7 +727,7 @@ describe('CORS', () => {
 		it.each([
 			'/auth',
 			'/ui/x/login',
-			'/admin/api/projects',
+			'/admin/api/buckets',
 			'/token/introspect'
 		])('falls through to 404 on the none-class route %s', async (path) => {
 			const res = await preflight(path, 'POST');
@@ -729,7 +759,7 @@ describe('CORS', () => {
 
 		// A preflight carries no credentials and no body, so no per-client decision is possible: the
 		// client-based restriction applies to the real request only.
-		it('answers a client-based route for an origin no project lists', async () => {
+		it('answers a client-based route for an origin no application lists', async () => {
 			const res = await preflight('/token', 'POST');
 
 			expect(res.status).toBe(204);
@@ -738,12 +768,12 @@ describe('CORS', () => {
 	});
 
 	/*
-	 * US5 — the kill switch. Not the primary means of closure (a project with no origins already grants
+	 * US5 — the kill switch. Not the primary means of closure (an application with no origins already grants
 	 * nothing, which is why the default is on) but the lever an operator reaches for during an incident.
 	 */
 	describe('cors.enabled: false', () => {
 		beforeEach(async () => {
-			await seedProjectWithOrigins(['cors-client'], [ORIGIN]);
+			await listOrigins([ORIGIN]);
 			ApplicationConfig['cors.enabled'] = false;
 		});
 

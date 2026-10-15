@@ -68,8 +68,6 @@ const BODIES: Record<string, Record<string, unknown>> = {
 	bucket_group_assign_connection: { connectionId: 'any' },
 	provisioning_credential_issue: { kind: 'static_token' },
 	bucket_owner_change: { groupId: 'any' },
-	project_owner_change: { groupId: 'any' },
-	project_bucket_assign: { bucketId: 'any' },
 
 	settings_update: { 'dpop.requireNonce': true },
 	smtp_settings_update: {
@@ -110,7 +108,7 @@ describe('every high-consequence tool is gated', () => {
 		 * membership is named in catalogue_drift rather than counted here.
 		 */
 		expect(HIGH.length).toBeGreaterThan(0);
-		expect(HIGH.length).toBe(39);
+		expect(HIGH.length).toBe(37);
 	});
 
 	it.each(HIGH.map((t) => [t.tool, t] as const))(

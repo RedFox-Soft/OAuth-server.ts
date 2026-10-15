@@ -11,7 +11,7 @@ import { t } from 'elysia';
  * The identifier and the scope list are typed only loosely here. Both have rules a TypeBox pattern
  * could not express usefully — canonical form, instance-wide uniqueness, the reserved administrative
  * audience, the omnibus-scope refusal — and each rejection needs to name what was wrong with which
- * value. Same reasoning as `corsOrigins` in the projects schema: the check runs in the handler so the
+ * value. Same reasoning as `corsOrigins` in the clients schema: the check runs in the handler so the
  * answer arrives in the admin error shape with something an operator can act on.
  */
 /*
@@ -44,7 +44,7 @@ export const CreateResourceBody = t.Object(
 	/*
 	 * Closed on purpose, and not the framework default. TypeBox objects admit unknown keys unless told
 	 * otherwise, which would have made a misspelled field a silently discarded value rather than a
-	 * refusal — the same failure the projects route guards against by forwarding every accepted key
+	 * refusal — the same failure the clients service guards against by forwarding every accepted key
 	 * explicitly.
 	 */
 	{ additionalProperties: false }

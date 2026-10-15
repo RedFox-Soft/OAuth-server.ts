@@ -1,4 +1,5 @@
 import {
+	adapter,
 	getActivityStore,
 	getBucketGroupStore,
 	getBucketKeysStore,
@@ -10,7 +11,7 @@ import type { BucketDeletion, UserBucket } from '../../adapters/types.js';
 import { now } from '../../activity/clock.js';
 import { BUCKET_PURGE_CLAIM_MS } from '../../consts/bucket_deletion.js';
 import { RETENTION_ACTOR } from '../../consts/admin_audit_routes.js';
-import { cascadeForAccount } from '../../helpers/cascade.js';
+import { cascadeForAccount, cascadeForClient } from '../../helpers/cascade.js';
 import { emailScopedId } from '../../helpers/email_scoped_id.js';
 import { invalidateBucketKeys } from '../../keys/issuer_keys.js';
 import { destroyConnectionsOf } from '../../provisioning/service.js';
@@ -184,6 +185,18 @@ async function destroyClaimed(
 	 * credential refused at the token endpoint, not answered with a token for nothing.
 	 */
 	for (const swept of await destroyConnectionsOf(id)) {
+		failedAreas.push(...swept.failedAreas);
+	}
+	/*
+	 * Its self-registered applications go too, with everything they were issued (specs/099). They belong to
+	 * the bucket and to nobody who could remove them — an administrator-created application or a declared API
+	 * blocks the deletion, so these are the only ones left — and a client pinned to a bucket that no longer
+	 * exists would otherwise outlive it with its registration access token.
+	 */
+	for (const record of await adapter('Client').findByIndexed('bucketId', id)) {
+		const clientId = String(record.clientId);
+		await adapter('Client').destroy(clientId);
+		const swept = await cascadeForClient(clientId);
 		failedAreas.push(...swept.failedAreas);
 	}
 	/* Its groups and every membership in them; nothing outside the bucket refers to either. */

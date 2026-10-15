@@ -10,6 +10,8 @@ import { bucketCan, type BucketCan } from '../frame/can.js';
 import { reservedOf } from '../../consts.js';
 import { useMe } from '../frame/me.js';
 import { BucketOverview } from './BucketOverview.js';
+import { Clients } from './Clients.js';
+import { Resources } from './Resources.js';
 import { BucketSettings } from './BucketSettings.js';
 import type { BucketSummary, BucketView } from './bucketView.js';
 import { FederationPanel } from './FederationPanel.js';
@@ -43,6 +45,8 @@ function ReadOnlyNotice() {
  */
 export type BucketTab =
 	| 'overview'
+	| 'applications'
+	| 'apis'
 	| 'users'
 	| 'userGroups'
 	| 'signIn'
@@ -54,6 +58,8 @@ export type BucketTab =
 
 const TABS: { key: BucketTab; segment?: string; label: string }[] = [
 	{ key: 'overview', label: 'Overview' },
+	{ key: 'applications', segment: 'applications', label: 'Applications' },
+	{ key: 'apis', segment: 'apis', label: 'APIs' },
 	{ key: 'users', segment: 'users', label: 'Users' },
 	{ key: 'userGroups', segment: 'user-groups', label: 'User groups' },
 	{ key: 'signIn', segment: 'sign-in', label: 'Sign-in' },
@@ -73,6 +79,11 @@ function tabAllowed(key: BucketTab, can: BucketCan): boolean {
 	if (key === 'overview' || key === 'settings' || key === 'signIn') {
 		return can.read;
 	}
+	/*
+	 * Read with the bucket's people (`loadBucketForUsers`): closed on the administrators' bucket to everyone,
+	 * whose own clients are part of how the server runs and are never managed here.
+	 */
+	if (key === 'applications' || key === 'apis') return can.manageUsers;
 	if (key === 'keys') return can.edit;
 	if (key === 'activity') return can.readActivity;
 	return true;
@@ -240,7 +251,7 @@ export function BucketDetail({
 				}
 				description={
 					special === 'default'
-						? "Projects without a bucket of their own sign people in here. Served at the server's root. It cannot be moved, re-addressed or deleted."
+						? "The instance's own bucket, served at the server's root. Only super administrators manage its applications. It cannot be moved, re-addressed or deleted."
 						: undefined
 				}
 				tabs={tabs}
@@ -288,6 +299,20 @@ export function BucketDetail({
 					summaryFailed={summaryFailed}
 					can={can}
 					onSaved={() => void load()}
+				/>
+			)}
+			{bucket && !tabRefused && shownTab === 'applications' && (
+				<Clients
+					bucketId={bucketId}
+					writable={can.edit && !bucket.deletion}
+				/>
+			)}
+			{bucket && !tabRefused && shownTab === 'apis' && (
+				<Resources
+					bucketId={bucketId}
+					bucketName={bucket.name}
+					canEdit={can.edit && !bucket.deletion}
+					superAdmin={me?.superAdmin === true}
 				/>
 			)}
 			{/* A scheduled bucket's banner already says why nothing can be changed. */}

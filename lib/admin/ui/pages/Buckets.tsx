@@ -30,7 +30,6 @@ import {
 } from '../frame/can.js';
 import { meCan, useMe } from '../frame/me.js';
 import { EmptyState, LoadFailed } from '../frame/states.js';
-import { projectHref } from '../frame/routes.js';
 import { DeleteBucketDialog } from './DeleteBucketDialog.js';
 import { useScheduledActions } from './ScheduledBanner.js';
 import type { BucketDeletionView } from './bucketView.js';
@@ -196,20 +195,14 @@ export function Buckets() {
 		}
 		if (can.delete) {
 			/*
-			 * Named, not counted: "one project" leaves the administrator hunting through a list for which
-			 * one. Refused here rather than inside the dialog, so nobody consents to destroying every
-			 * account in a bucket only to be told no for a reason unrelated to the accounts.
+			 * A bucket that still holds applications or APIs is refused by the server, which names them; the
+			 * list does not read every bucket's contents to say so in advance — its Settings tab does.
 			 */
-			const usedBy = row.blockers?.usedByProjects ?? [];
 			items.push({
 				key: 'delete',
 				label: 'Delete…',
 				group: 'danger',
-				onClick: () => setDeleting(row),
-				blocked:
-					usedBy.length > 0
-						? `Used by ${usedBy.map((p) => p.name).join(', ')} — assign them another bucket first`
-						: null
+				onClick: () => setDeleting(row)
 			});
 		}
 		return items;
@@ -247,7 +240,7 @@ export function Buckets() {
 							' '
 						) : (
 							<EmptyState
-								purpose="A bucket holds the people who sign in to your apps. Every project signs people in from one; create a bucket here, or with your first project."
+								purpose="A bucket holds the people who sign in to your apps, and the apps and APIs that sign them in. Create one, then register your first application in it."
 								create={createButton}
 							/>
 						)
@@ -348,27 +341,6 @@ export function Buckets() {
 									</Typography.Text>
 								) : null
 						},
-						{
-							title: 'Used by',
-							key: 'usedBy',
-							render: (_: unknown, row: BucketRow) => {
-								const used = row.blockers?.usedByProjects ?? [];
-								if (used.length === 0) return '—';
-								return (
-									<Space
-										wrap
-										size={4}
-									>
-										{used.map((p, i) => (
-											<span key={p.id}>
-												{i > 0 ? ', ' : ''}
-												<Link href={projectHref(p.id)}>{p.name}</Link>
-											</span>
-										))}
-									</Space>
-								);
-							}
-						},
 						...(superAdmin
 							? [
 									{
@@ -395,7 +367,6 @@ export function Buckets() {
 			)}
 			{moving && (
 				<MoveToGroup
-					kind="bucket"
 					id={moving._id}
 					name={moving.name}
 					sourceGroupId={moving.ownerGroupId}

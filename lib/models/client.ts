@@ -41,7 +41,7 @@ export { sectorIdentifier } from './client/sector.ts';
 export {
 	redirectUrisVouchedFor,
 	clientProvenance,
-	projectGroupOwnsBucket,
+	clientBelongsToBucket,
 	type ProvenanceTier
 } from './client/provenance.ts';
 

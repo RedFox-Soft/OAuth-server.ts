@@ -12,6 +12,7 @@ import {
 	verifyContainerOwnership,
 	verifyPersonalGroupRepair
 } from './verify_container_ownership.js';
+import { verifyProjectRemoval } from './verify_remove_projects.js';
 
 /*
  * Storage fidelity for the MongoDB backend, against a real MongoDB — the properties of per-issuer
@@ -50,14 +51,14 @@ const {
 	BucketKeysStore,
 	ContainerOwnershipStore,
 	GroupStore,
-	ProjectStore,
 	ProtectedResourceStore,
 	ProvisioningConnectionStore,
 	UserBucketStore,
 	UserStore
 } = await import('../lib/adapters/mongodb/index.js');
 const { db } = await import('../lib/adapters/mongodb/db.js');
-const { MIGRATIONS } = await import('../lib/consts/migrations.js');
+const { LEGACY_PROJECTS_AREA, MIGRATIONS } =
+	await import('../lib/consts/migrations.js');
 const { generateJWKS } = await import('../lib/helpers/jwks.js');
 
 let failures = 0;
@@ -77,7 +78,7 @@ const declaredTwice = await Promise.allSettled(
 		resources.create({
 			namespace: '@root',
 			identifier,
-			projectId: 'fidelity',
+			bucketId: 'fidelity',
 			name,
 			scopes: ['read']
 		})
@@ -117,34 +118,34 @@ check(
 );
 
 /* No multi-document transaction on a standalone mongod, so the store undoes its own copies. */
-const moveProject = `fidelity-move-${stamp}`;
+const moveBucket = `fidelity-move-${stamp}`;
 for (const suffix of ['a', 'b']) {
 	await resources.create({
-		namespace: `${moveProject}-from`,
+		namespace: `${moveBucket}-from`,
 		identifier: `https://move.invalid/${suffix}`,
-		projectId: moveProject,
+		bucketId: moveBucket,
 		name: suffix,
 		scopes: ['read']
 	});
 }
 await resources.create({
-	namespace: `${moveProject}-to`,
+	namespace: `${moveBucket}-to`,
 	identifier: 'https://move.invalid/b',
-	projectId: 'someone-else',
+	bucketId: 'someone-else',
 	name: 'taken',
 	scopes: ['read']
 });
-const refused = await resources.moveProject(
-	moveProject,
-	`${moveProject}-from`,
-	`${moveProject}-to`
+const refused = await resources.moveBucketNamespace(
+	moveBucket,
+	`${moveBucket}-from`,
+	`${moveBucket}-to`
 );
 check(
 	'a move into a namespace already declaring one identifier moves nothing',
 	'conflicts' in refused &&
-		(await resources.find(`${moveProject}-from`, 'https://move.invalid/a')) !==
+		(await resources.find(`${moveBucket}-from`, 'https://move.invalid/a')) !==
 			null &&
-		(await resources.find(`${moveProject}-to`, 'https://move.invalid/a')) ===
+		(await resources.find(`${moveBucket}-to`, 'https://move.invalid/a')) ===
 			null,
 	JSON.stringify(refused)
 );
@@ -163,7 +164,7 @@ await db.collection<{ _id: string }>(STORE_AREAS.userBuckets).insertOne({
 	_id: string;
 });
 await db
-	.collection<{ _id: string }>(STORE_AREAS.projects)
+	.collection<{ _id: string }>(LEGACY_PROJECTS_AREA)
 	.insertOne({ _id: legacyProject, bucketId: legacyBucket } as { _id: string });
 await db.collection<{ _id: string }>(STORE_AREAS.protectedResources).insertOne({
 	_id: legacyIdentifier,
@@ -180,7 +181,12 @@ if (namespacing && !('noop' in namespacing.mongodb)) {
 	await namespacing.mongodb.apply(db);
 	await namespacing.mongodb.apply(db);
 }
-const rekeyed = await resources.find(legacyBucket, legacyIdentifier);
+/* Read raw: until the 2026-10-16 migration the re-keyed record still names its project, not its bucket. */
+const rekeyed = await db
+	.collection<{ _id: string; identifier?: string }>(
+		STORE_AREAS.protectedResources
+	)
+	.findOne({ _id: `${legacyBucket} ${legacyIdentifier}` });
 const forProject = await db
 	.collection(STORE_AREAS.protectedResources)
 	.countDocuments({ projectId: legacyProject });
@@ -205,7 +211,7 @@ const unbound = {
 };
 await db
 	.collection<{ _id: string; slug: string; bucketId?: string | null }>(
-		STORE_AREAS.projects
+		LEGACY_PROJECTS_AREA
 	)
 	.insertMany([
 		{ _id: unbound.nulled, slug: unbound.nulled, bucketId: null },
@@ -220,7 +226,7 @@ if (requireBucket && !('noop' in requireBucket.mongodb)) {
 const bucketsAfter = await Promise.all(
 	Object.values(unbound).map(async (id) => {
 		const doc = await db
-			.collection<{ _id: string; bucketId?: unknown }>(STORE_AREAS.projects)
+			.collection<{ _id: string; bucketId?: unknown }>(LEGACY_PROJECTS_AREA)
 			.findOne({ _id: id });
 		return doc?.bucketId;
 	})
@@ -233,6 +239,44 @@ check(
 			JSON.stringify(['projects given the default bucket: 0']),
 	`${JSON.stringify(bucketsAfter)}; second run ${JSON.stringify(secondRun)}`
 );
+
+/* The bucket becomes the only container (specs/099). */
+{
+	type Raw = { _id: string } & Record<string, unknown>;
+	await verifyProjectRemoval(
+		{
+			insertProject: async (doc) => {
+				await db.collection<Raw>(LEGACY_PROJECTS_AREA).insertOne(doc as Raw);
+			},
+			insertClient: async (id, payload) => {
+				await db.collection<Raw>('Client').insertOne({ _id: id, payload });
+			},
+			readClient: async (id) => {
+				const found = await db.collection<Raw>('Client').findOne({ _id: id });
+				const payload = found?.payload;
+				return payload && typeof payload === 'object'
+					? (payload as Record<string, unknown>)
+					: null;
+			},
+			insertResource: async (doc) => {
+				await db
+					.collection<Raw>(STORE_AREAS.protectedResources)
+					.insertOne(doc as Raw);
+			},
+			readResource: async (id) =>
+				db.collection<Raw>(STORE_AREAS.protectedResources).findOne({ _id: id }),
+			apply: async () => {
+				const removal = MIGRATIONS.find((m) =>
+					m.id.endsWith('remove-projects')
+				);
+				if (!removal || 'noop' in removal.mongodb) return null;
+				return removal.mongodb.apply(db);
+			}
+		},
+		String(stamp),
+		check
+	);
+}
 
 /*
  * The root keys migration, against legacy flat keys in the order MongoDB returns them: two RS256 keys, an
@@ -417,12 +461,10 @@ await verifyActivity(
 /* Moving containers between groups, and making personal groups personal again (specs/075). */
 {
 	const moveBuckets = new UserBucketStore();
-	const moveProjects = new ProjectStore();
 	const moveAudit = new AdminAuditStore();
 	await verifyContainerOwnership(
 		{
 			buckets: moveBuckets,
-			projects: moveProjects,
 			ownership: new ContainerOwnershipStore(),
 			audit: moveAudit
 		},

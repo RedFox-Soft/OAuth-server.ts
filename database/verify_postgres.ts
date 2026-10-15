@@ -18,6 +18,7 @@ import {
 	verifyContainerOwnership,
 	verifyPersonalGroupRepair
 } from './verify_container_ownership.js';
+import { verifyProjectRemoval } from './verify_remove_projects.js';
 import {
 	FIXED_AREAS,
 	STORE_AREAS,
@@ -83,7 +84,6 @@ const {
 	BucketKeysStore,
 	ContainerOwnershipStore,
 	GroupStore,
-	ProjectStore,
 	ProtectedResourceStore,
 	ProvisioningConnectionStore,
 	SingletonSecretStore,
@@ -298,14 +298,14 @@ const declaredTwice = await Promise.allSettled([
 	resources.create({
 		namespace: '@root',
 		identifier,
-		projectId: 'fidelity',
+		bucketId: 'fidelity',
 		name: 'first',
 		scopes: ['read']
 	}),
 	resources.create({
 		namespace: '@root',
 		identifier,
-		projectId: 'fidelity',
+		bucketId: 'fidelity',
 		name: 'second',
 		scopes: ['read']
 	})
@@ -401,17 +401,17 @@ check(
 	claimedBy.join(', ')
 );
 
-/* A project's declarations move all or none. The target already declares one of the two, so the move
+/* A bucket's declarations move all or none. The target already declares one of the two, so the move
  * is refused and both stay where they were — in one transaction here, which the hermetic store can
  * only imitate. */
-const moveProject = `fidelity-move-${Date.now()}`;
-const moveFrom = `${moveProject}-from`;
-const moveTo = `${moveProject}-to`;
+const moveBucket = `fidelity-move-${Date.now()}`;
+const moveFrom = `${moveBucket}-from`;
+const moveTo = `${moveBucket}-to`;
 for (const suffix of ['a', 'b']) {
 	await resources.create({
 		namespace: moveFrom,
 		identifier: `https://move.invalid/${suffix}`,
-		projectId: moveProject,
+		bucketId: moveBucket,
 		name: suffix,
 		scopes: ['read']
 	});
@@ -419,11 +419,15 @@ for (const suffix of ['a', 'b']) {
 await resources.create({
 	namespace: moveTo,
 	identifier: 'https://move.invalid/b',
-	projectId: 'someone-else',
+	bucketId: 'someone-else',
 	name: 'taken',
 	scopes: ['read']
 });
-const refusedMove = await resources.moveProject(moveProject, moveFrom, moveTo);
+const refusedMove = await resources.moveBucketNamespace(
+	moveBucket,
+	moveFrom,
+	moveTo
+);
 check(
 	'a move into a namespace already declaring one identifier moves nothing',
 	'conflicts' in refusedMove &&
@@ -433,7 +437,14 @@ check(
 );
 
 /* The first declared migration, applied twice to a legacy record: re-keyed once, then left alone. */
-const { MIGRATIONS } = await import('../lib/consts/migrations.js');
+const { LEGACY_PROJECTS_AREA, MIGRATIONS } =
+	await import('../lib/consts/migrations.js');
+/* Gone from the inventory (specs/099), so provisioning no longer makes it; the migrations still read it. */
+await handle`
+	CREATE TABLE IF NOT EXISTS ${handle(LEGACY_PROJECTS_AREA)} (
+		id TEXT PRIMARY KEY, doc JSONB NOT NULL, expires_at TIMESTAMPTZ
+	)
+`;
 const namespacing = MIGRATIONS.find((m) =>
 	m.id.endsWith('protected-resources-namespaced')
 );
@@ -445,7 +456,7 @@ await handle`
 	VALUES (${legacyBucket}, ${{ _id: legacyBucket, name: 'legacy', slug: `legacy${Date.now()}` }}, NULL)
 `;
 await handle`
-	INSERT INTO ${handle(STORE_AREAS.projects)} (id, doc, expires_at)
+	INSERT INTO ${handle(LEGACY_PROJECTS_AREA)} (id, doc, expires_at)
 	VALUES (${legacyProject}, ${{ _id: legacyProject, bucketId: legacyBucket }}, NULL)
 `;
 await handle`
@@ -466,7 +477,12 @@ if (namespacing && !('noop' in namespacing.postgres)) {
 	await namespacing.postgres.apply(handle);
 	await namespacing.postgres.apply(handle);
 }
-const rekeyed = await resources.find(legacyBucket, legacyIdentifier);
+/* Read raw: until the 2026-10-16 migration the re-keyed record still names its project, not its bucket. */
+const [rekeyedRow]: ({ doc: { identifier?: string } } | undefined)[] =
+	await handle`
+	SELECT doc FROM ${handle(STORE_AREAS.protectedResources)} WHERE id = ${`${legacyBucket} ${legacyIdentifier}`}
+`;
+const rekeyed = rekeyedRow?.doc;
 const leftovers: unknown[] = await handle`
 	SELECT id FROM ${handle(STORE_AREAS.protectedResources)} WHERE doc->>'projectId' = ${legacyProject}
 `;
@@ -502,7 +518,7 @@ for (const [id, doc] of [
 	]
 ] as const) {
 	await handle`
-		INSERT INTO ${handle(STORE_AREAS.projects)} (id, doc, expires_at)
+		INSERT INTO ${handle(LEGACY_PROJECTS_AREA)} (id, doc, expires_at)
 		VALUES (${id}, ${doc}, NULL)
 	`;
 }
@@ -514,7 +530,7 @@ if (requireBucket && !('noop' in requireBucket.postgres)) {
 const bucketsAfter: unknown[] = [];
 for (const id of Object.values(unbound)) {
 	const [row]: ({ bucket: unknown } | undefined)[] = await handle`
-		SELECT doc->>'bucketId' AS bucket FROM ${handle(STORE_AREAS.projects)} WHERE id = ${id}
+		SELECT doc->>'bucketId' AS bucket FROM ${handle(LEGACY_PROJECTS_AREA)} WHERE id = ${id}
 	`;
 	bucketsAfter.push(row?.bucket);
 }
@@ -525,6 +541,47 @@ check(
 		JSON.stringify(secondRun) ===
 			JSON.stringify(['projects given the default bucket: 0']),
 	`${JSON.stringify(bucketsAfter)}; second run ${JSON.stringify(secondRun)}`
+);
+
+/* The bucket becomes the only container (specs/099). */
+await verifyProjectRemoval(
+	{
+		insertProject: async (doc) => {
+			await handle`
+				INSERT INTO ${handle(LEGACY_PROJECTS_AREA)} (id, doc, expires_at)
+				VALUES (${String(doc._id)}, ${doc}, NULL)
+			`;
+		},
+		insertClient: async (id, payload) => {
+			await handle`
+				INSERT INTO ${handle('Client')} (id, payload, expires_at)
+				VALUES (${id}, ${payload}, NULL)
+			`;
+		},
+		readClient: async (id) => {
+			const [row]: ({ payload: Record<string, unknown> } | undefined)[] =
+				await handle`SELECT payload FROM ${handle('Client')} WHERE id = ${id}`;
+			return row?.payload ?? null;
+		},
+		insertResource: async (doc) => {
+			await handle`
+				INSERT INTO ${handle(STORE_AREAS.protectedResources)} (id, doc, expires_at)
+				VALUES (${String(doc._id)}, ${doc}, NULL)
+			`;
+		},
+		readResource: async (id) => {
+			const [row]: ({ doc: Record<string, unknown> } | undefined)[] =
+				await handle`SELECT doc FROM ${handle(STORE_AREAS.protectedResources)} WHERE id = ${id}`;
+			return row?.doc ?? null;
+		},
+		apply: async () => {
+			const removal = MIGRATIONS.find((m) => m.id.endsWith('remove-projects'));
+			if (!removal || 'noop' in removal.postgres) return null;
+			return removal.postgres.apply(handle);
+		}
+	},
+	String(Date.now()),
+	check
 );
 
 /*
@@ -585,8 +642,9 @@ check(
 }
 
 /* The fixture rows go, so the provisioning checks below see only what provisioning made. */
-await handle`DELETE FROM ${handle(STORE_AREAS.protectedResources)} WHERE doc->>'projectId' = ${legacyProject}`;
-await handle`DELETE FROM ${handle(STORE_AREAS.projects)} WHERE id = ${legacyProject}`;
+await handle`DELETE FROM ${handle(STORE_AREAS.protectedResources)} WHERE id LIKE ${'%fidelity%'} OR doc->>'bucketId' LIKE ${'fidelity-%'}`;
+await handle`DELETE FROM ${handle('Client')} WHERE id LIKE ${'fidelity-%'}`;
+await handle`DROP TABLE ${handle(LEGACY_PROJECTS_AREA)}`;
 await handle`DELETE FROM ${handle(STORE_AREAS.userBuckets)} WHERE id = ${legacyBucket}`;
 
 /* ---- 5. the sweeper removes what expired, and nothing else ---------------------------------- */
@@ -928,12 +986,10 @@ await verifyActivity(
 /* Moving containers between groups, and making personal groups personal again (specs/075). */
 {
 	const moveBuckets = new UserBucketStore();
-	const moveProjects = new ProjectStore();
 	const moveAudit = new AdminAuditStore();
 	await verifyContainerOwnership(
 		{
 			buckets: moveBuckets,
-			projects: moveProjects,
 			ownership: new ContainerOwnershipStore(),
 			audit: moveAudit
 		},

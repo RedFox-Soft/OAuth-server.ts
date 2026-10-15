@@ -1,9 +1,5 @@
-import {
-	getBucketStore,
-	getGroupStore,
-	getProjectStore
-} from 'lib/adapters/index.ts';
-import type { Group, Project, User, UserBucket } from 'lib/adapters/types.ts';
+import { adapter, getBucketStore, getGroupStore } from 'lib/adapters/index.ts';
+import type { Group, User, UserBucket } from 'lib/adapters/types.ts';
 import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
 import nanoid from 'lib/helpers/nanoid.ts';
 import { sessionFor } from '../admin_session.ts';
@@ -28,29 +24,31 @@ export async function regularGroup(
 	});
 }
 
-/* A bucket and `projectCount` projects using it, all owned by one group. */
-export async function bucketWithProjects(
+/* A bucket and `clientCount` applications in it, all owned by one group (specs/099). */
+export async function bucketWithClients(
 	ownerGroupId: string,
-	projectCount: number
-): Promise<{ bucket: UserBucket; projects: Project[] }> {
+	clientCount: number
+): Promise<{ bucket: UserBucket; clientIds: string[] }> {
 	const id = nanoid().toLowerCase();
 	const bucket = await getBucketStore().create({
 		name: `bucket ${id}`,
 		slug: `b-${id}`.replace(/[^a-z0-9-]/g, ''),
 		ownerGroupId
 	});
-	const projects: Project[] = [];
-	for (let i = 0; i < projectCount; i += 1) {
-		projects.push(
-			await getProjectStore().create({
-				name: `project ${String(i)} ${id}`,
-				slug: `p${String(i)}-${id}`.replace(/[^a-z0-9-]/g, ''),
-				ownerGroupId,
-				bucketId: bucket._id
-			})
-		);
+	const clientIds: string[] = [];
+	for (let i = 0; i < clientCount; i += 1) {
+		const clientId = `app-${String(i)}-${id}`;
+		await adapter('Client').upsert(clientId, {
+			clientId,
+			bucketId: bucket._id,
+			grantTypes: ['authorization_code'],
+			responseTypes: ['code'],
+			redirectUris: [`https://${clientId}.example.com/cb`],
+			token_endpoint_auth_method: 'none'
+		});
+		clientIds.push(clientId);
 	}
-	return { bucket, projects };
+	return { bucket, clientIds };
 }
 
 /* The cookie header of a fresh console session for `user`, scoped to their personal group. */

@@ -26,10 +26,9 @@ export const MCP_METADATA_ROUTE = routeNames.mcp_metadata;
 export const MCP_RESOURCE = `${ISSUER.replace(/\/$/, '')}${MCP_ROUTE}`;
 
 /*
- * The reserved client an MCP agent authenticates as. Seeded into the admin project, which is what
- * routes it to the admin bucket: `lib/admin/auth/resolveBucket.ts` sends a client to that bucket only
- * when it is the reserved console client or belongs to a project whose bucket is the admin bucket. A
- * dynamically registered client falls through to 'redfox' and cannot authenticate an administrator at
+ * The reserved client an MCP agent authenticates as. Seeded as a client of the administrators' bucket,
+ * which is what routes it there: `lib/admin/auth/resolveBucket.ts` sends a client to that bucket only
+ * when it is the reserved console client or belongs to it (specs/099). A dynamically registered client falls through to 'redfox' and cannot authenticate an administrator at
  * all — see specs/024-admin-mcp-control-plane/research.md D6 for why DCR is not the path here.
  */
 export const ADMIN_MCP_CLIENT_ID = 'admin-mcp';

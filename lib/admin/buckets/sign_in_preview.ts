@@ -1,4 +1,4 @@
-import { getProjectStore, getUserStore } from '../../adapters/index.js';
+import { adapter, getUserStore } from '../../adapters/index.js';
 import type { EndUserTally, UserBucket } from '../../adapters/types.js';
 import { canSignIn } from '../../end_users/can_sign_in.js';
 import { ADMIN_BUCKET_ID, DEFAULT_BUCKET_ID } from '../consts.js';
@@ -38,34 +38,33 @@ interface SignInPatch {
 }
 
 export interface SignInCounts extends EndUserTally {
-	/* Present on the default bucket only: the projects whose sign-in lands there. */
-	projects?: number;
+	/* Present on the default bucket only: the applications whose sign-in lands there. */
+	applications?: number;
 }
 
 /*
- * The bucket's tally against its enabled providers, and on the default bucket the projects signing in at
- * it. One function for the summary and the preview, so the numbers an operator reads on the tab are the
+ * The bucket's tally against its enabled providers, and on the default bucket the applications signing in
+ * at it. One function for the summary and the preview, so the numbers an operator reads on the tab are the
  * numbers the confirmation must repeat.
  */
 export async function signInCounts(
 	bucket: Pick<UserBucket, '_id' | 'federation'>
 ): Promise<SignInCounts> {
-	const [tally, projects] = await Promise.all([
+	const [tally, applications] = await Promise.all([
 		getUserStore(bucket._id).tally({
 			enabledProviderIds: bucket.federation
 				.filter((provider) => provider.enabled)
 				.map((provider) => provider.id)
 		}),
-		bucket._id === DEFAULT_BUCKET_ID ? projectsAtTheDefault() : undefined
+		bucket._id === DEFAULT_BUCKET_ID ? applicationsAtTheDefault() : undefined
 	]);
-	return projects === undefined ? tally : { ...tally, projects };
+	return applications === undefined ? tally : { ...tally, applications };
 }
 
-/* Every project on the Default bucket is reached by a change there, whichever group owns it. */
-async function projectsAtTheDefault(): Promise<number> {
-	return (await getProjectStore().list()).filter(
-		(project) => project.bucketId === DEFAULT_BUCKET_ID
-	).length;
+/* Every application of the Default bucket is reached by a change there. */
+async function applicationsAtTheDefault(): Promise<number> {
+	return (await adapter('Client').findByIndexed('bucketId', DEFAULT_BUCKET_ID))
+		.length;
 }
 
 function plural(n: number, one: string, many = `${one}s`): string {
@@ -152,10 +151,10 @@ export async function signInPreview(
 		}
 	}
 
-	if (counts.projects !== undefined) {
-		expect.projects = counts.projects;
+	if (counts.applications !== undefined) {
+		expect.applications = counts.applications;
 		consequences.push(
-			`This changes sign-in for ${plural(counts.projects, 'project')}.`
+			`This changes sign-in for ${plural(counts.applications, 'application')}.`
 		);
 	}
 	return { consequences, expect, changes };

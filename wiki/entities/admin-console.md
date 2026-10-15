@@ -6,7 +6,7 @@ aliases: [adminApp, admin console, control plane, lib/admin]
 tags: [architecture, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-09-01
-updated: 2026-09-01
+updated: 2026-10-15
 graph:
   node_id: subsystem:admin-console
   node_type: subsystem
@@ -90,8 +90,9 @@ escaped to a unicode escape so the props cannot close the script tag.
 
 ## The route groups
 
-`auth` (setup, login, RBAC), `me`, `groups` (plus invitation acceptance), `scope`, `projects`,
-`clients`, `users` (administrators) and `users-end` (per-bucket end users), `buckets`, `federation`,
+`auth` (setup, login, RBAC), `me`, `groups` (plus invitation acceptance), `scope`,
+`clients` and `resources` (a bucket's applications and APIs, under `/admin/api/buckets/:id/…`; `projects` was
+a group of its own until spec 099), `users` (administrators) and `users-end` (per-bucket end users), `buckets`, `federation`,
 `settings` (plus SMTP), `jwks`, `audit`, `errors`. Ownership and visibility across all of them is
 decided by [[group-ownership]], not by a per-container manager list.
 

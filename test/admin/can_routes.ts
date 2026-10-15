@@ -1,11 +1,11 @@
-import type { BucketCan, MeCan, ProjectCan } from 'lib/admin/auth/can.ts';
+import type { BucketCan, MeCan } from 'lib/admin/auth/can.ts';
 
 /*
- * Which stated right governs each bucket and project route — the declaration the stated-rights guard
- * (can_routes.spec.ts) is generated from.
+ * Which stated right governs each bucket route — the declaration the stated-rights guard (can_routes.spec.ts)
+ * is generated from.
  *
- * A right is stated on the entity the path names: `:id` is the bucket under /buckets and the project under
- * /projects, and the two create routes answer to the caller's own rights on `GET /admin/api/me`.
+ * A right is stated on the entity the path names: `:id` is the bucket, and the create route answers to the
+ * caller's own rights on `GET /admin/api/me`.
  *
  * Every body below is one the route's schema admits, because a body the schema refuses is answered 422 before
  * the handler runs and so before any right is consulted. Where the right holds, each is chosen to be refused
@@ -23,12 +23,19 @@ interface Governed {
 }
 
 export type StatedRightRoute =
-	| (Governed & { readonly on: 'bucket'; readonly flag: keyof BucketCan })
-	| (Governed & { readonly on: 'project'; readonly flag: keyof ProjectCan })
+	| (Governed & {
+			readonly on: 'bucket';
+			readonly flag: keyof BucketCan;
+			/*
+			 * A write to the bucket's APIs where they live in the instance's shared root namespace needs, besides
+			 * the bucket's right, this right of the caller's own — as the console combines the namespace the API
+			 * list states with the caller's rights on `GET /admin/api/me`.
+			 */
+			readonly atRoot?: keyof MeCan;
+	  })
 	| (Governed & { readonly on: 'me'; readonly flag: keyof MeCan });
 
 const BUCKET = '/admin/api/buckets/:id';
-const PROJECT = '/admin/api/projects/:id';
 
 export const statedRightRoutes: readonly StatedRightRoute[] = [
 	{
@@ -46,17 +53,15 @@ export const statedRightRoutes: readonly StatedRightRoute[] = [
 		path: '/admin/api/buckets',
 		body: { name: 'Hosted', host: 'not a hostname' }
 	},
-	{
-		on: 'me',
-		flag: 'createProject',
-		method: 'POST',
-		path: '/admin/api/projects',
-		body: { name: 'Taken', slug: ':taken-project-slug' }
-	},
 
 	{ on: 'bucket', flag: 'read', method: 'GET', path: BUCKET },
 	{ on: 'bucket', flag: 'read', method: 'GET', path: `${BUCKET}/summary` },
-	{ on: 'bucket', flag: 'read', method: 'GET', path: `${BUCKET}/resources` },
+	{
+		on: 'bucket',
+		flag: 'manageUsers',
+		method: 'GET',
+		path: `${BUCKET}/resources`
+	},
 	{
 		on: 'bucket',
 		flag: 'editSettings',
@@ -459,35 +464,18 @@ export const statedRightRoutes: readonly StatedRightRoute[] = [
 		body: { confirm: 'absent-key' }
 	},
 
-	{ on: 'project', flag: 'read', method: 'GET', path: PROJECT },
-	{ on: 'project', flag: 'edit', method: 'PATCH', path: PROJECT, body: {} },
-	{ on: 'project', flag: 'delete', method: 'DELETE', path: PROJECT },
+	/* A bucket's applications (specs/099): read with the bucket, changed with its `edit` right. */
 	{
-		on: 'project',
-		flag: 'assignBucket',
-		method: 'PUT',
-		path: `${PROJECT}/bucket`,
-		body: { bucketId: 'absent' }
-	},
-	{
-		on: 'project',
-		flag: 'move',
-		method: 'PUT',
-		path: `${PROJECT}/owner`,
-		body: { groupId: ':destination' }
-	},
-
-	{
-		on: 'project',
-		flag: 'manageClients',
+		on: 'bucket',
+		flag: 'manageUsers',
 		method: 'GET',
-		path: `${PROJECT}/clients`
+		path: `${BUCKET}/clients`
 	},
 	{
-		on: 'project',
-		flag: 'manageClients',
+		on: 'bucket',
+		flag: 'edit',
 		method: 'POST',
-		path: `${PROJECT}/clients`,
+		path: `${BUCKET}/clients`,
 		body: {
 			grantTypes: ['authorization_code'],
 			redirectUris: ['https://app.example.com/cb'],
@@ -495,68 +483,71 @@ export const statedRightRoutes: readonly StatedRightRoute[] = [
 		}
 	},
 	{
-		on: 'project',
-		flag: 'manageClients',
+		on: 'bucket',
+		flag: 'manageUsers',
 		method: 'GET',
-		path: `${PROJECT}/clients/:clientId`
+		path: `${BUCKET}/clients/:clientId`
 	},
 	{
-		on: 'project',
-		flag: 'manageClients',
+		on: 'bucket',
+		flag: 'edit',
 		method: 'PATCH',
-		path: `${PROJECT}/clients/:clientId`,
+		path: `${BUCKET}/clients/:clientId`,
 		body: {}
 	},
 	{
-		on: 'project',
-		flag: 'manageClients',
+		on: 'bucket',
+		flag: 'edit',
 		method: 'POST',
-		path: `${PROJECT}/clients/:clientId/secret`
+		path: `${BUCKET}/clients/:clientId/secret`
 	},
 	{
-		on: 'project',
-		flag: 'manageClients',
+		on: 'bucket',
+		flag: 'edit',
 		method: 'DELETE',
-		path: `${PROJECT}/clients/:clientId`
+		path: `${BUCKET}/clients/:clientId`
 	},
 
-	{ on: 'project', flag: 'read', method: 'GET', path: `${PROJECT}/resources` },
+	/* A bucket's APIs: at the shared root namespace only a super administrator declares or changes one. */
 	{
-		on: 'project',
-		flag: 'declareResources',
+		on: 'bucket',
+		flag: 'edit',
+		atRoot: 'instance',
 		method: 'POST',
-		path: `${PROJECT}/resources`,
+		path: `${BUCKET}/resources`,
 		body: { identifier: ':resource', name: 'Probe', scopes: ['read'] }
 	},
 	{
-		on: 'project',
-		flag: 'read',
+		on: 'bucket',
+		flag: 'manageUsers',
 		method: 'GET',
-		path: `${PROJECT}/resources/:resourceId`
+		path: `${BUCKET}/resources/:resourceId`
 	},
 	{
-		on: 'project',
-		flag: 'read',
+		on: 'bucket',
+		flag: 'manageUsers',
 		method: 'GET',
-		path: `${PROJECT}/resources/:resourceId/vouching`
+		path: `${BUCKET}/resources/:resourceId/vouching`
 	},
 	{
-		on: 'project',
-		flag: 'declareResources',
+		on: 'bucket',
+		flag: 'edit',
+		atRoot: 'instance',
 		method: 'PATCH',
-		path: `${PROJECT}/resources/:resourceId`,
+		path: `${BUCKET}/resources/:resourceId`,
 		body: {}
 	},
 	{
-		on: 'project',
-		flag: 'declareResources',
+		on: 'bucket',
+		flag: 'edit',
+		atRoot: 'instance',
 		method: 'DELETE',
-		path: `${PROJECT}/resources/:resourceId`
+		path: `${BUCKET}/resources/:resourceId`
 	}
 ];
 
 /*
- * Mounted bucket and project routes no stated right governs, each with the reason. Empty today: every one
+ * Mounted bucket routes no stated right governs, each with the reason. Empty today: every one
  * is decided by a right on the entity it names. A route belongs here only when the console has no
  * control for it to hide or show — never because the matrix found it inconvenient.
  */
@@ -566,12 +557,10 @@ export const excludedRightRoutes: readonly {
 	readonly reason: string;
 }[] = [];
 
-/* The routes the declaration has to cover: every one under a bucket or a project, and the two that create one. */
+/* The routes the declaration has to cover: every one under a bucket, and the one that creates one. */
 export function isGovernedSurface(method: string, path: string): boolean {
 	return (
 		path.startsWith('/admin/api/buckets/:id') ||
-		path.startsWith('/admin/api/projects/:id') ||
-		(method === 'POST' &&
-			(path === '/admin/api/buckets' || path === '/admin/api/projects'))
+		(method === 'POST' && path === '/admin/api/buckets')
 	);
 }

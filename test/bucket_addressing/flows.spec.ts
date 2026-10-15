@@ -560,8 +560,8 @@ describe('a flow started at a named bucket address', () => {
 					redirect_uris: ['https://registered.example.com/cb'],
 					grant_types: ['authorization_code'],
 					response_types: ['code'],
-					registeredAtBucket: BUCKET_ID,
-					registered_at_bucket: BUCKET_ID
+					bucketId: BUCKET_ID,
+					bucket_id: BUCKET_ID
 				})
 			})
 		);

@@ -11,16 +11,8 @@ import bootstrap from '../test_helper.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import {
-	getProjectStore,
-	getUserStore,
-	adminAuditStore
-} from 'lib/adapters/index.ts';
-import {
-	ADMIN_BUCKET_ID,
-	UNASSIGNED_GROUP_ID,
-	DEFAULT_BUCKET_ID
-} from 'lib/admin/consts.ts';
+import { getUserStore, adminAuditStore } from 'lib/adapters/index.ts';
+import { ADMIN_BUCKET_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { ADMIN_MCP_CLIENT_ID, MCP_RESOURCE } from 'lib/mcp/consts.ts';
 import { mcpCatalogue } from 'lib/mcp/catalogue.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
@@ -106,17 +98,11 @@ async function performGated(
 
 /* Fills the instance with things that hold secrets, so a leaky projection has something to leak. */
 async function seedSecretHolders(token: string) {
-	const project = await getProjectStore().create({
-		bucketId: DEFAULT_BUCKET_ID,
-		name: 'Secrets',
-		slug: `sec-${Math.floor(Math.random() * 1e6)}`,
-		ownerGroupId: UNASSIGNED_GROUP_ID
-	});
-
 	// A confidential client, whose secret is generated server-side and shown exactly once.
+	const clientBucketId = DEFAULT_BUCKET_ID;
 	const created = await rpc(
 		call('client_create', {
-			id: project._id,
+			id: clientBucketId,
 			clientName: 'Confidential',
 			grantTypes: ['authorization_code'],
 			redirectUris: ['https://c.example.com/cb'],
@@ -278,7 +264,7 @@ async function seedSecretHolders(token: string) {
 	);
 
 	return {
-		project,
+		clientBucketId,
 		clientId: createdBody.clientId,
 		clientSecret: createdBody.secret,
 		/*
@@ -339,13 +325,16 @@ describe('MCP surface leaks no secrets', () => {
 		expect(secret.length).toBeGreaterThan(8);
 
 		const read = await rpc(
-			call('client_get', { id: seeded.project._id, clientId: seeded.clientId }),
+			call('client_get', {
+				id: seeded.clientBucketId,
+				clientId: seeded.clientId
+			}),
 			token
 		);
 		expect(JSON.stringify(read)).not.toContain(secret);
 
 		const listed = await rpc(
-			call('client_list', { id: seeded.project._id }),
+			call('client_list', { id: seeded.clientBucketId }),
 			token
 		);
 		expect(JSON.stringify(listed)).not.toContain(secret);
@@ -374,9 +363,9 @@ describe('MCP surface leaks no secrets', () => {
 				id: seeded.bucketId,
 				connectionId: seeded.connectionId
 			},
-			project_get: { id: seeded.project._id },
-			client_list: { id: seeded.project._id },
-			client_get: { id: seeded.project._id, clientId: seeded.clientId },
+			resource_list: { id: seeded.bucketId },
+			client_list: { id: seeded.clientBucketId },
+			client_get: { id: seeded.clientBucketId, clientId: seeded.clientId },
 			bucket_get: { id: seeded.bucketId },
 			bucket_activity_get: { id: seeded.bucketId },
 			bucket_summary_get: { id: seeded.bucketId },
@@ -448,10 +437,10 @@ describe('MCP surface leaks no secrets', () => {
 		// messages quote back part of a request.
 		const failures = [
 			call('client_get', {
-				id: seeded.project._id,
+				id: seeded.clientBucketId,
 				clientId: 'no-such-client'
 			}),
-			call('project_get', { id: 'no-such-project' }),
+			call('bucket_get', { id: 'no-such-bucket' }),
 			call('federation_provider_update', {
 				id: seeded.bucketId,
 				providerId: 'okta',

@@ -4,7 +4,7 @@ title: 'Admin plane error shape'
 tags: [contract, gotcha, architecture]
 sources: [oauth-server-codebase]
 created: 2026-08-04
-updated: 2026-10-11
+updated: 2026-10-15
 graph:
   node_type: concept
 ---
@@ -14,7 +14,7 @@ graph:
 The administrative control plane answers errors in its own shape, not the OAuth one:
 
 ```json
-{ "error": "admin_error", "message": "project not found" }
+{ "error": "admin_error", "message": "client not found" }
 ```
 
 plus `blockers` on a deletion conflict, `failedAreas` on a partial cascade failure and `field` on a
@@ -33,7 +33,8 @@ the OAuth handler answered first, and every admin API error reached the caller a
 { "error": "server_error", "error_description": "An unexpected error occurred" }
 ```
 
-Right status, wrong shape, `message` gone. Measured on `DELETE /admin/api/projects/does-not-exist`:
+Right status, wrong shape, `message` gone. Measured on `DELETE /admin/api/projects/does-not-exist` (a route
+removed with projects in spec 099):
 `404` with `admin_error` through a standalone `new Elysia().use(adminApp)`, `404` with `server_error`
 through the composed app.
 

@@ -4,17 +4,9 @@ import { treaty } from '@elysiajs/eden';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { bucketRoutes } from 'lib/admin/buckets/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import {
-	adminAuditStore,
-	getBucketStore,
-	getProjectStore
-} from 'lib/adapters/index.ts';
-import {
-	ADMIN_SESSION_COOKIE,
-	UNASSIGNED_GROUP_ID,
-	DEFAULT_BUCKET_ID
-} from 'lib/admin/consts.ts';
-import { sessionFor, personalGroupId } from '../admin_session.ts';
+import { adminAuditStore, getBucketStore } from 'lib/adapters/index.ts';
+import { ADMIN_SESSION_COOKIE, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
+import { sessionFor } from '../admin_session.ts';
 import { answered } from '../admin/answered.ts';
 import { consenting } from '../admin/sign_in_consent.ts';
 import { createAdministrator, type AdminKind } from '../administrators.ts';
@@ -311,29 +303,5 @@ describe('bucket sign-in method setting', () => {
 		);
 		expect(bucket.totpRequired).toBe(true);
 		expect(bucket.passwordLogin).toBe(true);
-	});
-
-	it('keeps the setting out of a project-scoped manager they do not manage', async () => {
-		const cookie = await superCookie();
-		const manager = await sessionCookieFor('plain');
-		const bucket = await getBucketStore().create({
-			name: unique('Managed'),
-			ownerGroupId: await personalGroupId(manager.userId)
-		});
-		const project = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			name: unique('Proj'),
-			slug: unique('proj'),
-			ownerGroupId: await personalGroupId(manager.userId)
-		});
-		await getProjectStore().update(project._id, { bucketId: bucket._id });
-
-		// A project admin may read the bucket their project points at, and must see the setting.
-		const read = await client.admin.api
-			.buckets({ id: bucket._id })
-			.get({ headers: { cookie: manager.cookie } });
-		expect(read.status).toBe(200);
-		expect(answered(read.data).totpRequired).toBe(false);
-		expect(cookie).toBeTruthy();
 	});
 });

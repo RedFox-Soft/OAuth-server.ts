@@ -4,7 +4,7 @@ title: 'The error store is not flag-gated (and the agent purge cannot be)'
 tags: [architecture, gotcha, config]
 sources: [oauth-server-codebase]
 created: 2026-08-26
-updated: 2026-08-26
+updated: 2026-10-15
 graph:
   node_type: concept
   relationships:
@@ -51,7 +51,8 @@ asserts the second while meaning the first, which on a diagnostic surface is the
 Specification 025 asked for agent purging to be an operator opt-in. It cannot be. A conditionally
 registered tool fails the first guard; a tool that reads the flag in its body fails the second by
 construction. So `DELETE /admin/api/errors` is an unconditional entry in `excludedConsoleOperations`,
-alongside project and bucket deletion, and `error_purge_preview` is published so an agent can still
+alongside bucket and group deletion (and project deletion, until spec 099 removed projects), and
+`error_purge_preview` is published so an agent can still
 report what a purge would remove without performing one.
 
 There is no `errorStore.mcpPurgeEnabled`. It was removed rather than left inert: a setting that does

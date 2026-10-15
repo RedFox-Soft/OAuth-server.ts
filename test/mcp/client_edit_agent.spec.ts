@@ -7,12 +7,8 @@ import { Client } from 'lib/models/client.js';
 import { readLogo } from 'lib/models/client/logo.js';
 import { PNG } from '../consent_branding/consent_branding.config.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import {
-	adapter,
-	adminAuditStore,
-	getProjectStore
-} from 'lib/adapters/index.ts';
-import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
+import { adapter, adminAuditStore } from 'lib/adapters/index.ts';
+import { DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { ADMIN_MCP_CLIENT_ID, MCP_RESOURCE } from 'lib/mcp/consts.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { createAdministrator } from '../administrators.ts';
@@ -75,12 +71,12 @@ describe('an agent editing a client', () => {
 		const token = await agentToken();
 		const record = {
 			clientId: 'agent-edit-private-key',
+			bucketId: DEFAULT_BUCKET_ID,
 			applicationType: 'web',
 			redirectUris: ['https://rp.example.com/cb'],
 			responseTypes: ['code'],
 			grantTypes: ['authorization_code'],
 			subjectType: 'public',
-			registeredDynamically: true,
 			client_id_issued_at: 1_700_000_000,
 			client_name: 'Before',
 			contacts: ['ops@rp.example.com'],
@@ -91,20 +87,11 @@ describe('an agent editing a client', () => {
 			token_endpoint_auth_method: 'private_key_jwt'
 		};
 		seedClient(record);
-		const project = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			name: 'Agent edit',
-			slug: `agent-edit-${Math.floor(Math.random() * 1e6)}`,
-			ownerGroupId: UNASSIGNED_GROUP_ID
-		});
-		await getProjectStore().update(project._id, {
-			clientIds: [record.clientId]
-		});
 		const before = await adapter('Client').find(record.clientId);
 
 		const response = await rpc(
 			call('client_update', {
-				id: project._id,
+				id: DEFAULT_BUCKET_ID,
 				clientId: record.clientId,
 				clientName: 'After'
 			}),
@@ -125,6 +112,7 @@ describe('an agent editing a client', () => {
 		const token = await agentToken();
 		const record = {
 			clientId: 'agent-edit-partial',
+			bucketId: DEFAULT_BUCKET_ID,
 			applicationType: 'web',
 			redirectUris: ['https://rp.example.com/cb'],
 			responseTypes: ['code'],
@@ -132,19 +120,10 @@ describe('an agent editing a client', () => {
 			token_endpoint_auth_method: 'none'
 		};
 		seedClient(record);
-		const project = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			name: 'Agent partial',
-			slug: `agent-partial-${Math.floor(Math.random() * 1e6)}`,
-			ownerGroupId: UNASSIGNED_GROUP_ID
-		});
-		await getProjectStore().update(project._id, {
-			clientIds: [record.clientId]
-		});
 
 		const response = await rpc(
 			call('client_update', {
-				id: project._id,
+				id: DEFAULT_BUCKET_ID,
 				clientId: record.clientId,
 				partialConsent: true
 			}),
@@ -166,6 +145,7 @@ describe('an agent editing a client', () => {
 		const token = await agentToken();
 		const record = {
 			clientId: 'agent-edit-logo',
+			bucketId: DEFAULT_BUCKET_ID,
 			applicationType: 'web',
 			redirectUris: ['https://rp.example.com/cb'],
 			responseTypes: ['code'],
@@ -173,25 +153,19 @@ describe('an agent editing a client', () => {
 			token_endpoint_auth_method: 'none'
 		};
 		seedClient(record);
-		const project = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			name: 'Agent logo',
-			slug: `agent-logo-${Math.floor(Math.random() * 1e6)}`,
-			ownerGroupId: UNASSIGNED_GROUP_ID
-		});
-		await getProjectStore().update(project._id, {
-			clientIds: [record.clientId]
-		});
 
 		const response = await rpc(
 			call('client_update', {
-				id: project._id,
+				id: DEFAULT_BUCKET_ID,
 				clientId: record.clientId,
 				logo: PNG
 			}),
 			token
 		);
-		const listed = await rpc(call('client_list', { id: project._id }), token);
+		const listed = await rpc(
+			call('client_list', { id: DEFAULT_BUCKET_ID }),
+			token
+		);
 
 		expect(response.result?.isError).not.toBe(true);
 		expect(await readLogo(record.clientId)).toBe(PNG);
@@ -211,6 +185,7 @@ describe('an agent editing a client', () => {
 		const token = await agentToken();
 		const record = {
 			clientId: 'agent-edit-sector',
+			bucketId: DEFAULT_BUCKET_ID,
 			applicationType: 'web',
 			redirectUris: ['https://rp.example.com/cb'],
 			responseTypes: ['code'],
@@ -227,20 +202,11 @@ describe('an agent editing a client', () => {
 					headers: { 'content-type': 'application/json' }
 				});
 		}
-		const project = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			name: 'Agent sector',
-			slug: `agent-sector-${Math.floor(Math.random() * 1e6)}`,
-			ownerGroupId: UNASSIGNED_GROUP_ID
-		});
-		await getProjectStore().update(project._id, {
-			clientIds: [record.clientId]
-		});
 		const before = await adapter('Client').find(record.clientId);
 
 		const response = await rpc(
 			call('client_update', {
-				id: project._id,
+				id: DEFAULT_BUCKET_ID,
 				clientId: record.clientId,
 				redirectUris: [
 					'https://rp.example.com/cb',

@@ -4,7 +4,7 @@ title: 'Bucket soft delete: Delete switches a bucket off for 30 days, then the s
 tags: [architecture, contract, gotcha, security]
 sources: [oauth-server-codebase]
 created: 2026-10-12
-updated: 2026-10-12
+updated: 2026-10-15
 graph:
   node_type: concept
   relationships:
@@ -88,8 +88,10 @@ signal.
 - **Agents are covered.** MCP dispatches into the same routes, so the same guard refuses an agent.
 - **Strangers learn nothing.** The guard answers only a caller who may read the bucket. Anyone else falls through
   to the handler's own 403/404, so a 409 never tells a stranger that a bucket exists and is scheduled.
-- **Outside the prefix.** Project assignment (`PUT /admin/api/projects/:id/bucket`, and creating a project,
-  which always names a `bucketId` since spec 098) checks the same state itself.
+- **Outside the prefix.** Nothing since spec 099. Project assignment (`PUT /admin/api/projects/:id/bucket`,
+  and creating a project, which named a `bucketId` since spec 098) checked the same state itself; both went with
+  the projects, and a bucket's applications and APIs are now routed under its own prefix
+  (`/admin/api/buckets/:id/clients`, `/admin/api/buckets/:id/resources`), so the guard covers them.
 
 The console folds the state into `bucketCan` once (`lib/admin/ui/frame/can.ts`), so every panel turns read-only
 without a change of its own. The server keeps state out of its `can` flags, as `lib/admin/auth/can.ts:15-17` asks.

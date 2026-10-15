@@ -22,7 +22,7 @@ export async function loginOptionsForBucket(
  * route to a bucket: a bucket id taken from a request would let anyone aim the page at any tenant.
  *
  * `resource` is required, not optional, because leaving it out resolves a different bucket than the
- * sign-in does for a client in no project: the page then shows, and the enrolment step then enforces,
+ * sign-in does for a client that belongs to no bucket: the page then shows, and the enrolment step then enforces,
  * the default bucket's options instead of the bucket the request named. */
 export async function loginOptionsForClient(
 	clientId: string | undefined,

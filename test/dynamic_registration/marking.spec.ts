@@ -12,10 +12,10 @@ import { present } from 'test/shape.js';
  * kinds are otherwise indistinguishable — a deployment's `idFactory` can issue any id it likes,
  * including a URL, which `test/client_id_uri/` already relies on.
  *
- * There is deliberately nothing here about per-project acceptance of registration. That was specified
- * and then removed: a registration request names no project, so the only way to build such a rule
- * would be a project-scoped registration endpoint, which hands an unauthenticated caller an oracle for
- * which projects exist. The project association arrives at authorization time instead, and
+ * There is deliberately nothing here about per-tenant acceptance of registration. That was specified
+ * and then removed: a registration request names no tenant, so the only way to build such a rule
+ * would be a tenant-scoped registration endpoint, which hands an unauthenticated caller an oracle for
+ * which tenants exist. The bucket association arrives at authorization time instead, and
  * `test/cimd/project_association.spec.ts` covers it.
  */
 

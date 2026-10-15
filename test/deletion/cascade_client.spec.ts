@@ -12,13 +12,9 @@ import { BackchannelAuthenticationRequest } from 'lib/models/backchannel_authent
 import { RegistrationAccessToken } from 'lib/models/registration_access_token.js';
 import { Grant } from 'lib/models/grant.js';
 import { Client } from 'lib/models/client.js';
-import { adapter, getProjectStore } from 'lib/adapters/index.ts';
+import { adapter } from 'lib/adapters/index.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import {
-	ADMIN_SESSION_COOKIE,
-	UNASSIGNED_GROUP_ID,
-	DEFAULT_BUCKET_ID
-} from 'lib/admin/consts.ts';
+import { ADMIN_SESSION_COOKIE, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { updateClient } from 'lib/admin/clients/service.ts';
 import { sessionFor } from '../admin_session.ts';
 import { shaped } from 'test/shape.js';
@@ -65,7 +61,9 @@ describe('deletion cascade: client', () => {
 				'urn:ietf:params:oauth:grant-type:device_code'
 			],
 			responseTypes: ['code'],
-			redirectUris: [`https://${clientId}.example.com/cb`]
+			redirectUris: [`https://${clientId}.example.com/cb`],
+			// An application of the default bucket, as an administrator creating it there would leave it.
+			bucketId: DEFAULT_BUCKET_ID
 		});
 		const client = await Client.tryFind(clientId);
 		if (!client) throw new Error(`client ${clientId} did not resolve`);
@@ -86,15 +84,8 @@ describe('deletion cascade: client', () => {
 
 	async function deleteClient(clientId: string) {
 		const cookie = await superAdminCookie();
-		const project = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			ownerGroupId: UNASSIGNED_GROUP_ID,
-			name: 'P',
-			slug: `p-${Math.random()}`,
-			clientIds: [clientId]
-		});
 		return agent.admin.api
-			.projects({ id: project._id })
+			.buckets({ id: DEFAULT_BUCKET_ID })
 			.clients({ clientId })
 			.delete(undefined, { headers: { cookie } });
 	}

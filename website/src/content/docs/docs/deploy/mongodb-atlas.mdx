@@ -7,7 +7,7 @@ sidebar:
 
 import { Steps, Aside } from '@astrojs/starlight/components';
 
-Everything this server cannot lose lives in MongoDB: end-user accounts, clients, projects, buckets,
+Everything this server cannot lose lives in MongoDB: end-user accounts, buckets, clients,
 sessions, the append-only audit trail, and the signing keys. A managed instance is probably the
 shortest path to having that backed up.
 
@@ -80,7 +80,7 @@ Nothing but `bun run db:setup` should be creating structure in this database:
   index exists. A deployment whose indexes were never created accumulates dead documents forever;
 - the unique e-mail index on each bucket's end-user collection;
 - the initial RS256 signing key;
-- the admin panel seed (reserved project, "Administrators" bucket, the `admin-panel` and
+- the admin panel seed (the reserved "Administrators" bucket, the `admin-panel` and
   `admin-mcp` clients, the system group, the default `redfox` bucket).
 
 It also drops stale expiry indexes on collections that no longer write the field they indexed. It is

@@ -31,17 +31,6 @@ export interface ActionSpec {
 }
 
 export const ACTIONS = {
-	'project.create': { class: 'C0' },
-	'project.origins.save': { class: 'C0' },
-	/*
-	 * Every application of the project gets a new issuer and everyone signed in through them signs in again;
-	 * only the server knows the full list (specs/085), so both are previewed, for agents too.
-	 */
-	'project.bucket.change': { class: 'C4' },
-	'project.rename': { class: 'C0' },
-	'project.move': { class: 'C4' },
-	'project.delete': { class: 'C3', word: 'delete' },
-
 	'client.create': { class: 'C0' },
 	'client.edit': { class: 'C0' },
 	'client.secret.rotate': {
@@ -57,10 +46,10 @@ export const ACTIONS = {
 
 	'resource.declare': { class: 'C0' },
 	'resource.edit': { class: 'C0' },
-	// Any application of the project may hold tokens for it, so the question names them (specs/085).
+	// The bucket's own applications may hold tokens for it, so the question names them (specs/085).
 	'resource.remove': {
 		class: 'C2',
-		title: (t) => `Remove ${t} from this project?`,
+		title: (t) => `Remove ${t} from this bucket?`,
 		okText: 'Remove'
 	},
 

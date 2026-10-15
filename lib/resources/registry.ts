@@ -1,7 +1,4 @@
-import {
-	getProjectStore,
-	getProtectedResourceStore
-} from '../adapters/index.js';
+import { adapter, getProtectedResourceStore } from '../adapters/index.js';
 import type { ProtectedResource } from '../adapters/types.js';
 import { canonicalizeResourceIdentifier } from './canonical.js';
 
@@ -91,11 +88,14 @@ export async function resolveDeclaredResource(
 
 /*
  * Whether a client may hold a token for this resource that acts for nobody — the client credentials
- * grant, where no end user signs in and nobody consents. A declared resource belongs to the project
- * that declared it, and such a token goes to that project's clients alone; otherwise any client of any
- * tenant, or one that registered itself, could mint a token carrying another tenant's audience and
- * scopes. An identifier nobody declared is not this function's question — the built-in MCP audience and
- * a deployment's override answer for themselves — so it is permitted here and resolved as before.
+ * grant, where no end user signs in and nobody consents. A declared resource belongs to its bucket, and
+ * such a token goes to the clients an administrator created in that bucket alone (specs/099); otherwise
+ * any client of any tenant, or one that registered itself, could mint a token carrying another tenant's
+ * audience and scopes. A self-registered client of the same bucket is refused too: nobody vouched for it.
+ * Read from the stored record — a client metadata document has none, and so is refused.
+ *
+ * An identifier nobody declared is not this function's question — the built-in MCP audience and a
+ * deployment's override answer for themselves — so it is permitted here and resolved as before.
  */
 export async function machineTokenPermitted(
 	identifier: string,
@@ -105,6 +105,10 @@ export async function machineTokenPermitted(
 	const resource = await findDeclaredResource(identifier, namespace);
 	if (!resource) return true;
 
-	const project = await getProjectStore().findByClientId(clientId);
-	return project?._id === resource.projectId;
+	const stored = await adapter('Client').find(clientId);
+	return (
+		stored !== undefined &&
+		stored.bucketId === resource.bucketId &&
+		stored.registeredDynamically !== true
+	);
 }

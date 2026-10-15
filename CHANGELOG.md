@@ -11,6 +11,15 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Changed
 
+- **The bucket is the only container; projects are removed** (spec 099). An application (OAuth client) and an
+  API (declared protected resource) belong to one bucket for life, recorded on the client as a server-only
+  `bucketId` that no registration can set; a client's allowed browser origins are its own `corsOrigins`; machine
+  tokens for an API go to the administrator-created applications of its bucket. **Breaking:** every
+  `/admin/api/projects` route and the `project_*` and `bucket_resource_list` MCP tools are removed —
+  applications and APIs live under `/admin/api/buckets/:id/clients` and `/admin/api/buckets/:id/resources`, and
+  the console shows them as a bucket's Applications and APIs tabs. The migration `2026-10-16-remove-projects`
+  moves each project's bucket and origins to its clients and declarations (run `db:migrate`); sign-ins are
+  unchanged, and it refuses before writing if a client is listed by projects on different buckets.
 - **Every project names its bucket** (spec 098). `POST /admin/api/projects` and `project_create` now require
   `bucketId`, and only a super administrator may name the Default bucket, for a project in any group — on a public
   instance a project left without one put its people into a pool shared by every tenant and managed by none of

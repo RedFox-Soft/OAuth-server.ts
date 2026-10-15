@@ -4,7 +4,7 @@ title: 'The admin audit trail'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-03
-updated: 2026-10-12
+updated: 2026-10-15
 graph:
   node_type: concept
   relationships:
@@ -165,9 +165,9 @@ Three consequences to keep in mind:
 ## Creations allocate their id before recording
 
 A creation has no identifier to name until it exists, which collides with audit-first. Every creating
-route therefore allocates the id itself and passes it to the store: `projectStore.create` and
-`userBucketStore.create` already accepted an optional `_id`, and `UserStoreInstance.create` and
-`createClient` gained one. No per-operation exception to audit-first, at the cost of two signature
+route therefore allocates the id itself and passes it to the store: `userBucketStore.create` (and the
+project store, until spec 099 removed it) already accepted an optional `_id`, and `UserStoreInstance.create`
+and `createClient` gained one (`lib/admin/clients/routes.ts:96-101`). No per-operation exception to audit-first, at the cost of two signature
 changes.
 
 ## Per-bucket targets need their bucket
@@ -210,8 +210,8 @@ person's Activity tab. They now carry the bucket's `ownerGroupId` (`scope`,
 `lib/admin/users-end/routes.ts:202`), as the provisioning and bucket-group entries already did. Entries
 written before stay as written, readable by a super administrator only, because the trail is never rewritten.
 
-**A move belongs to two groups** (since spec 075). Moving a bucket or a project to another group writes
-one entry. Its `ownerGroupId` is the group the container joined, and `formerOwnerGroupId` is the group
+**A move belongs to two groups** (since spec 075). Moving a bucket (or, until spec 099, a project) to
+another group writes one entry. Its `ownerGroupId` is the group the container joined, and `formerOwnerGroupId` is the group
 it left. The group-scoped read selects on either field in all three backends, and each field has its own
 index ([[container-ownership-transfer]]). A second field rather than a second entry, because one action
 writes one entry. The migration that made personal groups personal writes its removals under the
@@ -225,8 +225,11 @@ The read is newest-first, offset-paged, and filterable by actor (id
 **or** email), action, target type, target id, scope and an inclusive time window. Since spec 085 there are
 three more filters, all ANDed with the rest and with the group boundary, so they only narrow:
 - `bucket=b` matches entries whose target is the bucket (settings, address, owner, keys, providers), whose
-  `targetScope` is it (end users, user groups, provisioning, resources), or whose new `bucketId` or
-  `formerBucketId` is it (a project attached or detached).
+  `targetScope` is it (end users, user groups, provisioning, resources), or whose `bucketId` or
+  `formerBucketId` is it. Since spec 099 client and resource entries carry the bucket as `bucketId` and its
+  group as `ownerGroupId`, so a tenant reads its applications' and APIs' changes in its own trail — before,
+  client entries carried no group and only a super administrator could read them. `formerBucketId` survives
+  only on project bucket changes recorded before projects were removed (`lib/adapters/types.ts:701-712`).
 - `connection=c` matches the directory's own entries (`actor connection:c`) and entries targeting the
   connection.
 - `actionPrefix` matches actions by prefix, escaped on every backend.

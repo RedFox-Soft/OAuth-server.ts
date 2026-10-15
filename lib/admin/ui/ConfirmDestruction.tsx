@@ -30,7 +30,7 @@ export interface CascadeOffer {
 }
 
 /*
- * The one destructive-confirmation gesture in this console, shared by the project and bucket screens.
+ * The one destructive-confirmation gesture in this console, shared by the screens that destroy things.
  *
  * Three acts, deliberately separate and deliberately in this order: see what would go, consent to its
  * destruction, then type the word. Collapsing any two of them would let one gesture do the work of

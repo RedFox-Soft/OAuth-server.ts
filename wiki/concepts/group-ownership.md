@@ -1,10 +1,10 @@
 ---
 type: concept
-title: 'Group ownership of projects and buckets'
+title: 'Group ownership of buckets'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-29
-updated: 2026-10-13
+updated: 2026-10-15
 graph:
   node_type: concept
   relationships:
@@ -16,10 +16,12 @@ graph:
       status: current
 ---
 
-# Group ownership of projects and buckets
+# Group ownership of buckets
 
-Every project and every user bucket is owned by exactly one **group**, and belonging to that group is
-the only thing that grants access to it. There is no second ownership mechanism.
+Every user bucket is owned by exactly one **group**, and belonging to that group is the only thing that
+grants access to it — and to the applications and APIs it holds. There is no second ownership mechanism.
+Until spec 099 projects were owned the same way and gave their group reach over the bucket they named; the
+project is gone, and the bucket is the only container ([[bucket-is-the-only-container]]).
 
 This replaced `managedBy: string[]` — a list of administrator ids on each container. That arrangement
 could not express a tenant: a container was reachable by the people named on it, so it died with the
@@ -39,7 +41,7 @@ resolved (`lib/adapters/types.ts`):
   what let a colleague's default scope land in someone else's personal group (see The active scope
   below). Now adding a member and inviting someone are both refused (`assertShareable`,
   `lib/admin/groups/routes.ts:83`), and so is accepting an invitation issued earlier
-  (`lib/admin/groups/accept.ts:75`). Sharing *is* a transfer now: the bucket or project moves into a
+  (`lib/admin/groups/accept.ts:75`). Sharing *is* a transfer now: the bucket moves into a
   regular group ([[container-ownership-transfer]]). The upgrade removed every member but the first
   from existing personal groups, one audit entry per group. The Groups table still does not list
   personal groups.
@@ -80,14 +82,15 @@ privilege would have been. (Accounts carry no roles at all since spec 071; [[buc
 the group's owners, not only by super administrators.
 - `GET /admin/api/groups/:id` gives every member their colleagues' emails and `active` flags. Before, the
   console took names from the super-administrator-only administrator list, so an owner saw raw ids.
-- The read also gives `owns` (projects and buckets) and `can`: `manageMembers`, `invite` and `delete` for
+- The read also gives `owns` (buckets; projects too until spec 099) and `can`: `manageMembers`, `invite` and `delete` for
   owners of a regular group; `addExisting` for super administrators; `rename` everywhere but System.
 - List rows carry `owns` counts.
 - Any owner invites by email; the form states what the invitee will reach.
-- Removing a member states "they lose access to N projects and M buckets". Leaving has its own text.
+- Removing a member states "they lose access to N buckets" (`AdminGroupPage.tsx:225`). Leaving has its own text.
 - The last owner's role change and removal are shown unavailable before the server's 409.
-- A refused deletion's blockers are `{kind: 'project' | 'bucket'}`; until 085 they were mislabelled `client`
-  and `enduser`.
+- A refused deletion answers 409 `group still owns buckets` with blockers `[{kind: 'bucket', count}]`
+  (`lib/admin/groups/routes.ts:296-297`); until 085 they were mislabelled `client` and `enduser`, and until
+  099 a `project` kind stood beside `bucket`.
 
 ## The hot path
 
@@ -141,19 +144,17 @@ See [[admin-audit-trail]].
 An agent has no session, so there is nothing for it to switch. `PUT /admin/api/scope` is therefore not
 published as a tool at all — it is named in `excludedConsoleOperations` as `inapplicable`, the same
 category as logout and first-run setup, so an agent is not offered an operation it has no principal
-for. Since spec 087 project and bucket creation take an optional `groupId` and check it with the moves'
-`loadDestination`: the caller must be a member, and Super administrators and another administrator's personal
-group are never a destination. Without it, the active group decides, as before. Since spec 098 a project must
-name a `bucketId` of that same group; only a super administrator may name the default bucket, for a project
-in any group, and anyone else is refused it as any unreachable bucket (`assertMayUseDefault`,
-`lib/admin/projects/routes.ts`). A project on the default bucket gives its group no reach over it
-(`bucketReachedThrough`, `lib/admin/auth/rbac.ts`). The
-console's creation dialogs choose both, so the header switcher is a default rather than the only way to say
-where something goes.
+for. Since spec 087 bucket creation takes an optional `groupId` and checks it with the move's
+`loadDestination` (`lib/admin/buckets/routes.ts:769-771`): the caller must be a member, and Super
+administrators and another administrator's personal group are never a destination. Without it, the active
+group decides, as before. An application or API is created inside a bucket, so it needs no group of its own:
+it is the bucket's group's (spec 099, which removed project creation and its `groupId` with it). The
+console's creation dialog chooses the group, so the header switcher is a default rather than the only way to
+say where something goes.
 
 ## Gotchas
 
-**A refusal must not reveal existence.** `loadProject`, `loadGroup` and the bucket loaders answer the
+**A refusal must not reveal existence.** `loadGroup` and the bucket loaders answer the
 same status for a container that does not exist as for one owned by another group, for any caller
 without instance-wide authority. They did not before this feature: 404 versus 403 was an oracle for
 enumerating ids, harmless while ids came only from an operator and not harmless once every id belongs
@@ -163,37 +164,38 @@ from every other spec: not "can this administrator do what they should" but "is 
 another tenant observable".
 
 **Skipping consent is a decision about your own users only** (added 2026-09-29). A client's
-`consent.require: false` is honoured only when the bucket it signs into is owned by the group that owns
-its project (`consentWaived`, `lib/shared/consent_waiver.ts`), decided per request. Any member of a group
-can create a project and a consent-free client, and a project on the default bucket (bucket-less, before
-spec 098) signs into a population every tenant shares — so honouring the flag there gave a tenant every default-bucket user's
-claims with `prompt=none` and no page. A client in no project keeps the flag as stored, since only the
-operator can have set it (registration and client documents cannot); the console's own client passes
-because the admin project and the admin bucket are both the System group's. `consentWaived` is the only
+`consent.require: false` is honoured only when the bucket it signs into is the bucket it belongs to
+(`consentWaived`, `lib/shared/consent_waiver.ts:33-44`), decided per request. Until spec 099 the test was
+"the group owning its project owns the bucket", and a project on the default bucket signed into a population
+every tenant shares — so honouring the flag there gave a tenant every default-bucket user's claims with
+`prompt=none` and no page. Since 099 a tenant cannot have an application on the default bucket at all, and
+the upgrade turned consent back on for those that came from tenant projects there. A client that belongs to
+no bucket keeps the flag as stored, since only the operator can have set it (registration and client
+documents cannot); the console's own client passes because it belongs to the admin bucket
+(`lib/consts/admin_seed.ts:100`). `consentWaived` is the only
 reader of the flag that makes a grant `trusted` (via `loadExistingGrant`, `lib/addon/account.ts`): until
 2026-10-09 the `Grant` constructor also derived `trusted` from `consent.require` when handed a client,
 skipping the bucket check — unreachable only because no caller passed one. It now defaults to `false`. The
 spec is `test/consent_waiver/`.
 
-Since spec 092 the comparison itself is one function, `projectGroupOwnsBucket`
-(`lib/models/client/provenance.ts:40-45`). The waiver calls it (`lib/shared/consent_waiver.ts:44`), and so
-does `clientProvenance`, which words the consent page: a client whose project's group owns the sign-in
-bucket is "this organization's", one of another group's project is "operator-registered". The two callers
-read a client in no project differently, on purpose. The waiver keeps the stored flag, which a
+Since spec 092 the comparison itself is one function — `projectGroupOwnsBucket` until spec 099,
+`clientBelongsToBucket` since (`lib/models/client/provenance.ts:40-47`). The waiver calls it
+(`lib/shared/consent_waiver.ts:43`), and so does `clientProvenance`, which words the consent page: a client
+of the sign-in bucket is "this organization's", one of another bucket is "operator-registered". The two
+callers read a client of no bucket differently, on purpose. The waiver keeps the stored flag, which a
 self-registered client cannot carry. The page tests self-registration first, so by the time it asks, "no
-project" can only mean the operator's own. `consentWaived` is still the only reader of `consent.require`. See [[consent-screen-decisions]].
+bucket" can only mean the operator's own. `consentWaived` is still the only reader of `consent.require`. See [[consent-screen-decisions]].
 
-**A project and its bucket must share a group.** Enforced on `PUT /admin/api/projects/:id/bucket`, and
-it is a coherence rule about the data rather than a statement about authority — so a super
-administrator is refused too. Joining them across groups would leave a project's end-users administered
-by a group with no access to the project. The same rule is why a bucket moves to another group *with*
-every project using it, and why the bind route re-checks after its write: a move can commit in between
-([[container-ownership-transfer]]).
+**An application and its bucket cannot be in different groups.** Until spec 099 a project recorded a
+group that had to equal its bucket's, enforced on the bind route and re-checked after the write, because a
+move could commit in between. Since 099 an application and an API carry no group at all, only `bucketId`, so
+there is nothing to disagree and a bucket's move carries them by reference ([[container-ownership-transfer]]).
 
 **Listing has to agree with access.** A bucket's `read` right (`bucketCan`, `lib/admin/auth/can.ts`,
-which replaced `assertBucketUserAccess` in spec 079) admits a bucket backing a project the caller's group
-owns, so `GET /admin/api/buckets` has to admit it as well. It did not before this
-feature, and a bucket you could administer but never see was the result.
+which replaced `assertBucketUserAccess` in spec 079) is membership of its group, so `GET /admin/api/buckets`
+lists the active group's buckets (`lib/admin/buckets/visible.ts`). Until spec 099 the right also admitted a
+bucket backing a project the caller's group owned, and the list had to add those; before this feature it
+did not, and a bucket you could administer but never see was the result.
 
 **The audit trail's group is written, never derived.** `AdminAuditEntry.ownerGroupId` is a separate
 field from `targetScope`, which already means "the bucket within which `targetId` resolves". It is
@@ -229,8 +231,9 @@ console asks somebody to confirm the grouping.
 
 ## Related
 
-- [[container-ownership-transfer]] — moving a bucket with its projects, or a project on the Default bucket, to
-  another group; how sharing personal work is done since personal groups stopped being shareable.
+- [[container-ownership-transfer]] — moving a bucket, with what it holds, to another group; how sharing
+  personal work is done since personal groups stopped being shareable.
+- [[bucket-is-the-only-container]] — why the project went, and what replaced each thing it did.
 - [[admin-provisioning]] — the scripts that seed the `unassigned` group and the reserved containers
 - [[admin-audit-trail]] — the trail this feature made group-scoped, and the load-bearing route table
   every new group route had to be added to.
@@ -238,7 +241,9 @@ console asks somebody to confirm the grouping.
   confirmation-gated: it destroys a container with nothing left afterwards to inspect, the same class
   as the two container deletions already withheld.
 - [[admin-console-signin]] — how the session that now carries the active scope is established.
-- [[account-resolution]] — per-bucket end-user storage, which is why bucket access has a broad form and
-  a strict one.
+- [[account-resolution]] — per-bucket end-user storage, which is why bucket access had a broad form and
+  a strict one. Since spec 099 the two loaders (`loadBucketForUsers`, `loadBucketForEdit`,
+  `lib/admin/buckets/access.ts:49-118`) admit the same callers — membership of the bucket's group — because
+  the broad form's extra reach came through projects.
 
 Verified against [[oauth-server-codebase]].

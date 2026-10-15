@@ -178,7 +178,7 @@ integration's token ends up working at another integration.
   <rect x="285" y="30" width="230" height="120" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
   <text x="400" y="56" text-anchor="middle" font-size="14" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">Operator declares</text>
   <text x="400" y="84" text-anchor="middle" font-size="13" fill="var(--diagram-accent, #d9480f)">identifier: mcp.example.com/mcp</text>
-  <text x="400" y="108" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">in project acme, whose issuer is /acme</text>
+  <text x="400" y="108" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">in bucket acme, whose issuer is /acme</text>
   <text x="400" y="132" text-anchor="middle" font-size="13" fill="var(--diagram-fg, #1a1a1a)">scopes: [mcp:tools-basic]</text>
   <rect x="540" y="30" width="230" height="120" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
   <text x="655" y="56" text-anchor="middle" font-size="14" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">Client sends</text>
@@ -284,19 +284,19 @@ than one team uses it.
 
 Suppose the server hosts several tenants. A tenant is a team that shares the server but has its own
 users. Now an agent host arrives, identified by a metadata document. It belongs to no tenant; it is
-just a URL. Whose users does it sign in? The answer we settled on: the resource decides. An
-administrator of a tenant declared that MCP server in one of their projects. So a request that names
-that resource signs in that project's users. It is worth saying precisely why this is safe. The
-client did not link this resource to this project; an administrator did, in a project they own. So
-the `resource` parameter can only choose among declarations an operator has made. It cannot create a
-new one.
+just a URL. Whose users does it sign in? The answer we settled on: the resource decides. A bucket is
+this server's name for a set of end users with its own sign-in rules. An administrator of a tenant
+declared that MCP server in one of their buckets. So a request that names that resource signs in that
+bucket's users. It is worth saying precisely why this is safe. The client did not link this resource
+to this bucket. An administrator did, in a bucket they own. So the `resource` parameter can only
+choose among declarations an operator has made. It cannot create a new one.
 
 More precisely, it was safe against attackers without a console account. Anyone with an account
 could declare anything. Identifiers were unique across the whole instance, and whoever declared one
 first kept it. So a hostile tenant could declare somebody else's MCP server. The real owner would
 then run into a conflict every time they tried to declare it, for good. And sign-ins for that MCP
-server would go to the hostile tenant's bucket. A bucket is this server's name for a set of end users
-with its own sign-in rules. Once a bucket has an address of its own, it is also its own issuer.
+server would go to the hostile tenant's bucket. Once a bucket has an address of its own, it is also
+its own issuer.
 
 The first fix made every declaration prove itself. The server fetched the resource's own metadata
 and checked that it named this issuer. It is the natural fix. But it also refused every MCP server
@@ -375,8 +375,9 @@ A client credentials token is different: the client gets it for itself, and nobo
 we noticed, the following worked. Any confidential client (a client with a secret of its own) of any
 tenant, or a client that had registered itself, could ask a victim tenant's token endpoint for a
 token. And it got one, with the victim's resource as the audience and the victim's issuer. Now a
-machine token for a declared resource goes only to a client of the project that declared that
-resource. The specification says nothing about this. It would not: the question only exists when
+machine token for a declared resource goes only to a client of the bucket that declared that
+resource. An administrator must have created that client. A client that registered itself never gets
+one. The specification says nothing about this. It would not: the question only exists when
 several tenants share one server.
 
 ## Every agent may be granted every scope you list, so keep the list short {#the-scope-list-is-a-grant-not-a-menu}

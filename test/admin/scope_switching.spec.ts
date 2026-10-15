@@ -4,14 +4,10 @@ import { treaty } from '@elysiajs/eden';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
 import { groupRoutes } from 'lib/admin/groups/routes.ts';
 import { scopeRoutes } from 'lib/admin/scope/routes.ts';
-import { projectRoutes } from 'lib/admin/projects/routes.ts';
+import { bucketRoutes } from 'lib/admin/buckets/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { adminAuditStore, getBucketStore } from 'lib/adapters/index.ts';
-import {
-	ADMIN_SESSION_COOKIE,
-	DEFAULT_BUCKET_ID,
-	UNASSIGNED_GROUP_ID
-} from 'lib/admin/consts.ts';
+import { adminAuditStore } from 'lib/adapters/index.ts';
+import { ADMIN_SESSION_COOKIE, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { sessionFor, personalGroupId } from '../admin_session.ts';
 import { answered } from './answered.ts';
 import { createAdministrator, type AdminKind } from '../administrators.ts';
@@ -20,16 +16,11 @@ const app = new Elysia()
 	.use(resolveAdmin)
 	.use(groupRoutes)
 	.use(scopeRoutes)
-	.use(projectRoutes);
+	.use(bucketRoutes);
 const client = treaty(app);
 
 function slug(prefix: string): string {
 	return `${prefix}-${Math.random().toString(36).slice(2)}`;
-}
-
-/* Every project names a bucket of its group (specs/098). */
-async function bucketIn(ownerGroupId: string): Promise<string> {
-	return (await getBucketStore().create({ name: 'Own', ownerGroupId }))._id;
 }
 
 async function admin(kind: AdminKind = 'plain') {
@@ -81,15 +72,11 @@ describe('active scope', () => {
 			).data
 		);
 
-		// One project in the personal scope...
-		const personalProject = answered(
+		// One bucket in the personal scope...
+		const personalBucket = answered(
 			(
-				await client.admin.api.projects.post(
-					{
-						name: 'Personal',
-						slug: slug('p'),
-						bucketId: await bucketIn(await personalGroupId(a.userId))
-					},
+				await client.admin.api.buckets.post(
+					{ name: 'Personal', slug: slug('p') },
 					{ headers: { cookie: a.cookie } }
 				)
 			).data
@@ -102,25 +89,21 @@ describe('active scope', () => {
 		);
 		expect(switched.status).toBe(200);
 
-		const groupProject = answered(
+		const groupBucket = answered(
 			(
-				await client.admin.api.projects.post(
-					{
-						name: 'Company',
-						slug: slug('c'),
-						bucketId: await bucketIn(group._id)
-					},
+				await client.admin.api.buckets.post(
+					{ name: 'Company', slug: slug('c') },
 					{ headers: { cookie: a.cookie } }
 				)
 			).data
 		);
-		expect(groupProject.ownerGroupId).toBe(group._id);
+		expect(groupBucket.ownerGroupId).toBe(group._id);
 
 		const inGroup = answered(
-			(await client.admin.api.projects.get({ headers: { cookie: a.cookie } }))
+			(await client.admin.api.buckets.get({ headers: { cookie: a.cookie } }))
 				.data
 		);
-		expect(inGroup.map((p) => p._id)).toEqual([groupProject._id]);
+		expect(inGroup.map((b) => b._id)).toEqual([groupBucket._id]);
 
 		// Switching back shows the other set — nothing is merged.
 		await client.admin.api.scope.put(
@@ -128,10 +111,10 @@ describe('active scope', () => {
 			{ headers: { cookie: a.cookie } }
 		);
 		const inPersonal = answered(
-			(await client.admin.api.projects.get({ headers: { cookie: a.cookie } }))
+			(await client.admin.api.buckets.get({ headers: { cookie: a.cookie } }))
 				.data
 		);
-		expect(inPersonal.map((p) => p._id)).toEqual([personalProject._id]);
+		expect(inPersonal.map((b) => b._id)).toEqual([personalBucket._id]);
 	});
 
 	it('persists the choice across requests within the session', async () => {
@@ -285,15 +268,15 @@ describe('active scope', () => {
 		);
 		expect(later.activeGroupId).toBe(theirs._id);
 
-		const project = answered(
+		const bucket = answered(
 			(
-				await client.admin.api.projects.post(
-					{ name: 'Company', slug: slug('c'), bucketId: DEFAULT_BUCKET_ID },
+				await client.admin.api.buckets.post(
+					{ name: 'Company', slug: slug('c') },
 					{ headers: { cookie: root.cookie } }
 				)
 			).data
 		);
-		expect(project.ownerGroupId).toBe(theirs._id);
+		expect(bucket.ownerGroupId).toBe(theirs._id);
 	});
 
 	/*

@@ -69,7 +69,7 @@ export function matchesAuditQuery(
 	}
 	/*
 	 * Four arms, because what happened "in a bucket" is recorded four ways: the bucket as the target, a target
-	 * resolving within it, and a project joining it or leaving it.
+	 * resolving within it, and an entry carrying it (or, historically, a project leaving it).
 	 */
 	if (query.bucket !== undefined) {
 		const b = query.bucket;

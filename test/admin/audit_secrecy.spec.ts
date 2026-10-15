@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach } from 'bun:test';
 import { Elysia } from 'elysia';
 import { treaty } from '@elysiajs/eden';
 import { resolveAdmin } from 'lib/admin/auth/rbac.ts';
-import { projectRoutes } from 'lib/admin/projects/routes.ts';
 import { clientRoutes } from 'lib/admin/clients/routes.ts';
 import { bucketRoutes } from 'lib/admin/buckets/routes.ts';
 import { endUserRoutes } from 'lib/admin/users-end/routes.ts';
@@ -12,14 +11,9 @@ import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import {
 	adminAuditStore,
 	getUserStore,
-	getProjectStore,
 	getBucketStore
 } from 'lib/adapters/index.ts';
-import {
-	ADMIN_SESSION_COOKIE,
-	UNASSIGNED_GROUP_ID,
-	DEFAULT_BUCKET_ID
-} from 'lib/admin/consts.ts';
+import { ADMIN_SESSION_COOKIE, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { sessionFor } from '../admin_session.ts';
 import { answered } from './answered.ts';
 import { present } from 'test/shape.js';
@@ -36,7 +30,6 @@ import { createAdministrator } from '../administrators.ts';
  */
 const app = new Elysia()
 	.use(resolveAdmin)
-	.use(projectRoutes)
 	.use(clientRoutes)
 	.use(bucketRoutes)
 	.use(endUserRoutes)
@@ -51,6 +44,13 @@ const unique = (prefix: string) => `${prefix}-${Date.now()}-${(seq += 1)}`;
 const CLIENT_SECRET_MARKER = 'do-not-record-this-client-secret';
 const PASSWORD_MARKER = 'do-not-record-this-password-1';
 const MAIL_PASSWORD_MARKER = 'do-not-record-this-mail-password';
+
+async function makeBucket() {
+	return getBucketStore().create({
+		ownerGroupId: UNASSIGNED_GROUP_ID,
+		name: 'B'
+	});
+}
 
 async function superCookie() {
 	const user = await createAdministrator('super', `${unique('super')}@x.io`);
@@ -77,15 +77,10 @@ describe('admin audit secrecy', () => {
 
 	it('records a client secret rotation without the secret', async () => {
 		const cookie = await superCookie();
-		const project = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			ownerGroupId: UNASSIGNED_GROUP_ID,
-			name: 'P',
-			slug: unique('p')
-		});
+		const bucket = await makeBucket();
 		const created = answered(
 			(
-				await client.admin.api.projects({ id: project._id }).clients.post(
+				await client.admin.api.buckets({ id: bucket._id }).clients.post(
 					{
 						grantTypes: ['authorization_code'],
 						tokenEndpointAuthMethod: 'client_secret_basic',
@@ -97,7 +92,7 @@ describe('admin audit secrecy', () => {
 		);
 
 		const rotated = await client.admin.api
-			.projects({ id: project._id })
+			.buckets({ id: bucket._id })
 			.clients({ clientId: created.clientId })
 			.secret.post(undefined, { headers: { cookie } });
 		const { secret } = answered(rotated.data);
@@ -134,21 +129,16 @@ describe('admin audit secrecy', () => {
 	});
 
 	/*
-	 * The cascade is a new way for a secret-bearing entity to be destroyed, and the entry describing it
-	 * is written by a different handler from the one that created the entity. A sweep that covers only
-	 * the creating handler would pass while the destroying one recorded whatever it happened to hold.
+	 * The entry describing a destruction is written by a different handler from the one that created the
+	 * secret-bearing entity. A sweep that covers only the creating handler would pass while the destroying
+	 * one recorded whatever it happened to hold.
 	 */
-	it('records a project deletion without the secrets of the clients it destroyed', async () => {
+	it('records an application deletion without its secret', async () => {
 		const cookie = await superCookie();
-		const project = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			ownerGroupId: UNASSIGNED_GROUP_ID,
-			name: 'P',
-			slug: unique('p')
-		});
+		const bucket = await makeBucket();
 		const created = answered(
 			(
-				await client.admin.api.projects({ id: project._id }).clients.post(
+				await client.admin.api.buckets({ id: bucket._id }).clients.post(
 					{
 						grantTypes: ['authorization_code'],
 						tokenEndpointAuthMethod: 'client_secret_basic',
@@ -159,16 +149,21 @@ describe('admin audit secrecy', () => {
 			).data
 		);
 
-		await client.admin.api.projects({ id: project._id }).delete(undefined, {
-			headers: { cookie },
-			query: { cascade: 'clients', client: [created.clientId] }
-		});
+		const deleted = await client.admin.api
+			.buckets({ id: bucket._id })
+			.clients({ clientId: created.clientId })
+			.delete(undefined, { headers: { cookie } });
+		expect(deleted.status).toBe(200);
 
-		const trail = await trailFor(project._id);
+		const { entries } = await adminAuditStore.list({
+			targetId: created.clientId,
+			action: 'client.delete'
+		});
+		expect(entries).toHaveLength(1);
 		expect(created.secret).toBeTruthy();
-		expect(trail).not.toContain(present(created.secret, 'created.secret'));
-		// Nor the identity of what it destroyed: the entry carries how many, never which.
-		expect(trail).not.toContain(created.clientId);
+		expect(JSON.stringify(entries)).not.toContain(
+			present(created.secret, 'created.secret')
+		);
 	});
 
 	it('records a bucket deletion without the addresses of the accounts it destroyed', async () => {
@@ -263,16 +258,11 @@ describe('admin audit secrecy', () => {
 
 	it('records a client creation without the generated secret', async () => {
 		const cookie = await superCookie();
-		const project = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			ownerGroupId: UNASSIGNED_GROUP_ID,
-			name: 'P',
-			slug: unique('p')
-		});
+		const bucket = await makeBucket();
 
 		const created = answered(
 			(
-				await client.admin.api.projects({ id: project._id }).clients.post(
+				await client.admin.api.buckets({ id: bucket._id }).clients.post(
 					{
 						clientName: CLIENT_SECRET_MARKER,
 						grantTypes: ['authorization_code'],

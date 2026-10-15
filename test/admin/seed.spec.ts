@@ -2,37 +2,29 @@ import { describe, it, expect, beforeAll } from 'bun:test';
 
 import bootstrap from '../test_helper.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import {
-	getProjectStore,
-	getBucketStore,
-	getGroupStore,
-	resetAdminMemoryStores
-} from 'lib/adapters/index.ts';
-import {
-	ADMIN_PROJECT_ID,
-	ADMIN_BUCKET_ID,
-	ADMIN_CLIENT_ID
-} from 'lib/admin/consts.ts';
+import { getBucketStore, getGroupStore } from 'lib/adapters/index.ts';
+import { ADMIN_BUCKET_ID, ADMIN_CLIENT_ID } from 'lib/admin/consts.ts';
+import { resolveBucketForRequest } from 'lib/admin/auth/resolveBucket.ts';
+import { DEFAULT_REQUEST_BUCKET } from 'lib/configs/issuer.ts';
+import { ADMIN_MCP_CLIENT_ID } from 'lib/mcp/consts.ts';
 import { Client } from 'lib/models/client.ts';
 import { UNASSIGNED_GROUP_ID, SYSTEM_GROUP_NAME } from 'lib/admin/consts.ts';
 
 /**
- * @proves Provisioning is idempotent and leaves an instance with a working admin project,
- * bucket, console client and default bucket.
+ * @proves Provisioning is idempotent and leaves an instance with a working administrators' bucket,
+ * console and agent clients that sign in there, and a default bucket.
  */
 describe('ensureAdminSeed', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'admin' });
 	});
 
-	it('is idempotent and seeds admin project + bucket + client', async () => {
+	it('is idempotent and seeds the administrators bucket and the console client', async () => {
 		await ensureAdminSeed();
 		await ensureAdminSeed();
 
-		const project = await getProjectStore().find(ADMIN_PROJECT_ID);
 		const bucket = await getBucketStore().find(ADMIN_BUCKET_ID);
 
-		expect(project).toMatchObject({ type: 'admin', bucketId: ADMIN_BUCKET_ID });
 		expect(bucket?._id).toBe(ADMIN_BUCKET_ID);
 
 		const client = await Client.find(ADMIN_CLIENT_ID);
@@ -40,28 +32,20 @@ describe('ensureAdminSeed', () => {
 		expect(client.tokenEndpointAuthMethod).toBe('none');
 	});
 
-	it('seeds the admin project with the panel client id', async () => {
+	/*
+	 * The agent client has no rule of its own, as the console client does: it signs administrators in only
+	 * because the seed puts it in their bucket. Outside it, it would fall through to the default bucket.
+	 */
+	it('seeds the agent client so that it signs in to the administrators bucket', async () => {
 		await ensureAdminSeed();
-		const project = await getProjectStore().find(ADMIN_PROJECT_ID);
-		expect(project?.clientIds).toContain(ADMIN_CLIENT_ID);
-	});
 
-	it('backfills clientIds on an admin project that predates the field', async () => {
-		resetAdminMemoryStores();
-		const store = getProjectStore();
-		const p = await store.create({
-			ownerGroupId: UNASSIGNED_GROUP_ID,
-			_id: ADMIN_PROJECT_ID,
-			name: 'Administration',
-			slug: 'admin',
-			type: 'admin',
-			bucketId: ADMIN_BUCKET_ID
-		});
-		// Simulate a legacy document created before clientIds existed.
-		Reflect.deleteProperty(p, 'clientIds');
-		await ensureAdminSeed();
-		const reloaded = await store.find(ADMIN_PROJECT_ID);
-		expect(reloaded?.clientIds).toContain(ADMIN_CLIENT_ID);
+		expect(
+			await resolveBucketForRequest(
+				ADMIN_MCP_CLIENT_ID,
+				undefined,
+				DEFAULT_REQUEST_BUCKET
+			)
+		).toBe(ADMIN_BUCKET_ID);
 	});
 
 	/*

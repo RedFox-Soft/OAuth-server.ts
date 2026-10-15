@@ -5,8 +5,8 @@ import { resolve } from 'node:path';
 import {
 	ADMIN_BUCKET_SEED,
 	ADMIN_MCP_CLIENT_SEED,
-	ADMIN_PROJECT_SEED,
-	DEFAULT_BUCKET_SEED
+	DEFAULT_BUCKET_SEED,
+	adminConsoleClientSeed
 } from 'lib/consts/admin_seed.js';
 
 /*
@@ -33,8 +33,6 @@ function source(path: string): string {
 const SEEDED_LITERALS = [
 	ADMIN_BUCKET_SEED.name,
 	DEFAULT_BUCKET_SEED.name,
-	ADMIN_PROJECT_SEED.name,
-	ADMIN_PROJECT_SEED.slug,
 	...ADMIN_MCP_CLIENT_SEED.redirectUris
 ];
 
@@ -74,13 +72,13 @@ describe('admin seed declaration', () => {
 		expect(ADMIN_MCP_CLIENT_SEED['consent.require']).toBe(true);
 	});
 
-	it('puts both reserved clients in the admin project', () => {
-		// What routes them to the administrator bucket: resolveBucketForClient sends a client there only
-		// if it belongs to a project whose bucket is the admin bucket. A client outside it falls through
-		// to the default bucket and cannot authenticate an administrator at all.
-		expect(ADMIN_PROJECT_SEED.clientIds).toContain(
-			ADMIN_MCP_CLIENT_SEED.clientId
+	it('puts both reserved clients in the administrators bucket', () => {
+		// What routes the agent client to the administrator bucket: a client belongs to the bucket it
+		// records, and one outside it falls through to the default bucket and cannot authenticate an
+		// administrator at all.
+		expect(ADMIN_MCP_CLIENT_SEED.bucketId).toBe(ADMIN_BUCKET_SEED._id);
+		expect(adminConsoleClientSeed('https://op.example.com').bucketId).toBe(
+			ADMIN_BUCKET_SEED._id
 		);
-		expect(ADMIN_PROJECT_SEED.bucketId).toBe(ADMIN_BUCKET_SEED._id);
 	});
 });

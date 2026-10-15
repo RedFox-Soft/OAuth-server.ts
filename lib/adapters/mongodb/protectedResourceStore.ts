@@ -48,7 +48,7 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 	async create(data: {
 		namespace: string;
 		identifier: string;
-		projectId: string;
+		bucketId: string;
 		name: string;
 		scopes: string[];
 		scopeDescriptions?: Record<string, ScopeDescription>;
@@ -61,7 +61,7 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 			_id: declarationId(data.namespace, data.identifier),
 			namespace: data.namespace,
 			identifier: data.identifier,
-			projectId: data.projectId,
+			bucketId: data.bucketId,
 			name: data.name,
 			scopes: [...data.scopes],
 			...(data.scopeDescriptions
@@ -95,8 +95,8 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 		);
 	}
 
-	async listByProject(projectId: string): Promise<ProtectedResource[]> {
-		return resourcesOf(await this.collection.find({ projectId }).toArray());
+	async listByBucket(bucketId: string): Promise<ProtectedResource[]> {
+		return resourcesOf(await this.collection.find({ bucketId }).toArray());
 	}
 
 	async list(): Promise<ProtectedResource[]> {
@@ -122,8 +122,8 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 		});
 	}
 
-	async destroyByProject(projectId: string): Promise<number> {
-		const result = await this.collection.deleteMany({ projectId });
+	async destroyByBucket(bucketId: string): Promise<number> {
+		const result = await this.collection.deleteMany({ bucketId });
 		return result.deletedCount;
 	}
 
@@ -132,13 +132,13 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 	 * namespace whole and only the new copies to undo. The primary key refuses a copy whose identifier
 	 * a concurrent declaration took after the check below, which is the case the undo exists for.
 	 */
-	async moveProject(
-		projectId: string,
+	async moveBucketNamespace(
+		bucketId: string,
 		from: string,
 		to: string
 	): Promise<{ moved: number } | { conflicts: string[] }> {
 		const moving = resourcesOf(
-			await this.collection.find({ projectId, namespace: from }).toArray()
+			await this.collection.find({ bucketId, namespace: from }).toArray()
 		);
 		if (moving.length === 0) return { moved: 0 };
 		const taken = resourcesOf(

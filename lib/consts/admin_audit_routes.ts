@@ -35,31 +35,6 @@ const routes = [
 		targetType: 'AdminUser'
 	},
 
-	{
-		action: 'project.create',
-		method: 'POST',
-		path: '/admin/api/projects',
-		targetType: 'Project'
-	},
-	{
-		action: 'project.update',
-		method: 'PATCH',
-		path: '/admin/api/projects/:id',
-		targetType: 'Project'
-	},
-	{
-		action: 'project.delete',
-		method: 'DELETE',
-		path: '/admin/api/projects/:id',
-		targetType: 'Project'
-	},
-	{
-		action: 'project.bucket.assign',
-		method: 'PUT',
-		path: '/admin/api/projects/:id/bucket',
-		targetType: 'Project'
-	},
-
 	/*
 	 * Declared protected resources. `targetId` is the canonical resource identifier and `targetScope`
 	 * the namespace it is unique within — the bucket, or `@root` — so an entry names the audience itself
@@ -69,19 +44,19 @@ const routes = [
 	{
 		action: 'resource.create',
 		method: 'POST',
-		path: '/admin/api/projects/:id/resources',
+		path: '/admin/api/buckets/:id/resources',
 		targetType: 'ProtectedResource'
 	},
 	{
 		action: 'resource.update',
 		method: 'PATCH',
-		path: '/admin/api/projects/:id/resources/:resourceId',
+		path: '/admin/api/buckets/:id/resources/:resourceId',
 		targetType: 'ProtectedResource'
 	},
 	{
 		action: 'resource.delete',
 		method: 'DELETE',
-		path: '/admin/api/projects/:id/resources/:resourceId',
+		path: '/admin/api/buckets/:id/resources/:resourceId',
 		targetType: 'ProtectedResource'
 	},
 
@@ -111,25 +86,25 @@ const routes = [
 	{
 		action: 'client.create',
 		method: 'POST',
-		path: '/admin/api/projects/:id/clients',
+		path: '/admin/api/buckets/:id/clients',
 		targetType: 'Client'
 	},
 	{
 		action: 'client.update',
 		method: 'PATCH',
-		path: '/admin/api/projects/:id/clients/:clientId',
+		path: '/admin/api/buckets/:id/clients/:clientId',
 		targetType: 'Client'
 	},
 	{
 		action: 'client.secret.rotate',
 		method: 'POST',
-		path: '/admin/api/projects/:id/clients/:clientId/secret',
+		path: '/admin/api/buckets/:id/clients/:clientId/secret',
 		targetType: 'Client'
 	},
 	{
 		action: 'client.delete',
 		method: 'DELETE',
-		path: '/admin/api/projects/:id/clients/:clientId',
+		path: '/admin/api/buckets/:id/clients/:clientId',
 		targetType: 'Client'
 	},
 
@@ -190,7 +165,7 @@ const routes = [
 	},
 
 	/*
-	 * Groups: the owner of every project and bucket, and therefore the thing that decides who may reach
+	 * Groups: the owner of every bucket, and therefore the thing that decides who may reach
 	 * one. Membership changes are audited as carefully as container changes, because adding somebody to
 	 * a group grants them everything it owns in a single call.
 	 */
@@ -285,16 +260,10 @@ const routes = [
 		targetType: 'UserBucket'
 	},
 	/*
-	 * Moving a bucket, with the projects using it, to another administrator group (specs/075). The entry
-	 * carries both groups — `ownerGroupId` the one it joined, `formerOwnerGroupId` the one it left — so
-	 * each reads it.
+	 * Moving a bucket, with everything it holds, to another administrator group (specs/075, specs/099). The
+	 * entry carries both groups — `ownerGroupId` the one it joined, `formerOwnerGroupId` the one it left —
+	 * so each reads it.
 	 */
-	{
-		action: 'project.owner.change',
-		method: 'PUT',
-		path: '/admin/api/projects/:id/owner',
-		targetType: 'Project'
-	},
 	{
 		action: 'bucket.owner.change',
 		method: 'PUT',

@@ -1,20 +1,15 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'bun:test';
 
-import bootstrap from '../test_helper.js';
+import bootstrap, { seedClient } from '../test_helper.js';
 import { elysia } from 'lib/index.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import {
-	adminAuditStore,
-	getProjectStore,
-	getBucketStore
-} from 'lib/adapters/index.ts';
+import { adminAuditStore, getBucketStore } from 'lib/adapters/index.ts';
 import {
 	ADMIN_BUCKET_ID,
 	ADMIN_SESSION_COOKIE,
-	UNASSIGNED_GROUP_ID,
-	DEFAULT_BUCKET_ID
+	UNASSIGNED_GROUP_ID
 } from 'lib/admin/consts.ts';
 import { ADMIN_MCP_CLIENT_ID, MCP_RESOURCE } from 'lib/mcp/consts.ts';
 import { mcpCatalogue, pathArgName } from 'lib/mcp/catalogue.ts';
@@ -132,70 +127,56 @@ describe('agent permissions match the console, per role', () => {
 		}
 	);
 
-	it('scopes a project read to what the account manages, on both surfaces', async () => {
+	it('scopes an application read to the buckets the account’s groups own, on both surfaces', async () => {
 		const { token, cookie, user } = await principal('plain');
+		const suffix = Math.floor(Math.random() * 1e6);
 
-		const mine = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
+		const mine = await getBucketStore().create({
 			name: 'Mine',
-			slug: `mine-${Math.floor(Math.random() * 1e6)}`,
 			ownerGroupId: await personalGroupId(user._id)
 		});
-		const theirs = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
+		const theirs = await getBucketStore().create({
 			name: 'Theirs',
-			slug: `theirs-${Math.floor(Math.random() * 1e6)}`,
 			ownerGroupId: UNASSIGNED_GROUP_ID
 		});
+		for (const [bucket, clientId] of [
+			[mine, `mine-app-${suffix}`],
+			[theirs, `their-app-${suffix}`]
+		] as const) {
+			seedClient({
+				clientId,
+				bucketId: bucket._id,
+				grantTypes: ['authorization_code'],
+				responseTypes: ['code'],
+				redirectUris: ['https://app.example.com/cb'],
+				token_endpoint_auth_method: 'none'
+			});
+		}
 
-		const listed = await rpc(call('project_list', {}), token);
+		const listed = await rpc(call('client_list', { id: mine._id }), token);
 		const ids = shaped(
-			Type.Array(Type.Object({ _id: Type.String() })),
+			Type.Array(Type.Object({ clientId: Type.String() })),
 			listed.result?.structuredContent?.result ?? []
-		).map((p) => p._id);
-		expect(ids).toContain(mine._id);
-		expect(ids).not.toContain(theirs._id);
+		).map((c) => c.clientId);
+		expect(ids).toEqual([`mine-app-${suffix}`]);
 
-		// The console agrees, project by project.
-		expect(await viaConsole(`/admin/api/projects/${mine._id}`, cookie)).toBe(
-			200
-		);
-		expect(await viaConsole(`/admin/api/projects/${theirs._id}`, cookie)).toBe(
-			403
-		);
-		expect(await viaAgent('project_get', { id: mine._id }, token)).toBe('ok');
-		expect(await viaAgent('project_get', { id: theirs._id }, token)).toBe(
+		// The console agrees, bucket by bucket.
+		expect(
+			await viaConsole(`/admin/api/buckets/${mine._id}/clients`, cookie)
+		).toBe(200);
+		expect(
+			await viaConsole(`/admin/api/buckets/${theirs._id}/clients`, cookie)
+		).toBe(403);
+		expect(await viaAgent('client_list', { id: theirs._id }, token)).toBe(
 			'forbidden'
 		);
-	});
-
-	it('grants bucket-user access to a project manager but not bucket-entity access', async () => {
-		const { token, user } = await principal('plain');
-
-		const bucket = await getBucketStore().create({
-			ownerGroupId: UNASSIGNED_GROUP_ID,
-			name: 'Backing'
-		});
-		await getProjectStore().create({
-			name: 'Backed',
-			slug: `backed-${Math.floor(Math.random() * 1e6)}`,
-			ownerGroupId: await personalGroupId(user._id),
-			bucketId: bucket._id
-		});
-
-		// The broader access: managing the users of a bucket that backs a project they manage.
-		expect(await viaAgent('bucket_user_list', { id: bucket._id }, token)).toBe(
-			'ok'
-		);
-		expect(await viaAgent('bucket_get', { id: bucket._id }, token)).toBe('ok');
-
-		// The stricter access: editing the bucket entity needs manager rights on the bucket itself.
-		const renamed = await rpc(
-			call('bucket_update', { id: bucket._id, name: 'Renamed' }),
-			token
-		);
-		expect(renamed.result?.isError).toBe(true);
-		expect(renamed.result?.structuredContent?.reason).toBe('forbidden');
+		expect(
+			await viaAgent(
+				'client_get',
+				{ id: theirs._id, clientId: `their-app-${suffix}` },
+				token
+			)
+		).toBe('forbidden');
 	});
 
 	it("gives a super administrator's agent the administrators' bucket settings, exactly as the console does", async () => {
@@ -383,7 +364,7 @@ describe('agent permissions match the console, per role', () => {
 		expect((await getBucketStore().find(bucket._id))?.host).toBeUndefined();
 	});
 
-	it('lets a non-super administrator create a bucket and a project on it into their own scope', async () => {
+	it('lets a non-super administrator create a bucket into their own scope', async () => {
 		const { token } = await principal('plain');
 		const suffix = Math.floor(Math.random() * 1e6);
 
@@ -397,20 +378,73 @@ describe('agent permissions match the console, per role', () => {
 		const bucket = (await getBucketStore().list()).find(
 			(b) => b.slug === `own-bucket-${suffix}`
 		);
-		expect(
-			await viaAgent(
-				'project_create',
-				{ name: 'Own project', slug: `own-${suffix}`, bucketId: bucket?._id },
-				token
-			)
-		).toBe('ok');
+		expect(await viaAgent('bucket_get', { id: bucket?._id }, token)).toBe('ok');
+	});
+
+	/*
+	 * FR-010: a tenant's agent sets up an integration end to end in its own bucket — the application that
+	 * signs people in and the API it calls — through the bucket-scoped tools alone, with no container
+	 * between the bucket and either.
+	 */
+	it('adds an application and an API to a bucket of its own for a non-super administrator, and lists both there', async () => {
+		const { token, user } = await principal('plain');
+		const suffix = Math.floor(Math.random() * 1e6);
+		const bucket = await getBucketStore().create({
+			name: 'Tenant',
+			slug: `tenant-${suffix}`,
+			ownerGroupId: await personalGroupId(user._id)
+		});
+		const identifier = `https://api-${suffix}.example.com/mcp`;
+
+		const created = await rpc(
+			call('client_create', {
+				id: bucket._id,
+				clientName: 'Tenant app',
+				grantTypes: ['authorization_code'],
+				redirectUris: ['https://tenant.example.com/cb'],
+				tokenEndpointAuthMethod: 'none'
+			}),
+			token
+		);
+		const declared = await rpc(
+			call('resource_declare', {
+				id: bucket._id,
+				identifier,
+				name: 'Tenant API',
+				scopes: ['tools:call']
+			}),
+			token
+		);
+
+		expect(created.result?.isError).not.toBe(true);
+		expect(declared.result?.isError).not.toBe(true);
+		const { clientId } = shaped(
+			Type.Object({ clientId: Type.String() }),
+			created.result?.structuredContent?.result
+		);
+		const clients = shaped(
+			Type.Array(Type.Object({ clientId: Type.String() })),
+			(await rpc(call('client_list', { id: bucket._id }), token)).result
+				?.structuredContent?.result
+		);
+		expect(clients.map((c) => c.clientId)).toEqual([clientId]);
+		const apis = shaped(
+			Type.Object({
+				namespace: Type.String(),
+				resources: Type.Array(Type.Object({ identifier: Type.String() }))
+			}),
+			(await rpc(call('resource_list', { id: bucket._id }), token)).result
+				?.structuredContent?.result
+		);
+		expect(apis.namespace).toBe('bucket');
+		expect(apis.resources.map((r) => r.identifier)).toEqual([identifier]);
 	});
 
 	it('cannot escalate by asking a different tool for the same thing', async () => {
 		const { token } = await principal('plain');
 
 		/*
-		 * The audit trail is no longer super-admin only: it is scope-filtered, so a project administrator
+		 * The audit trail is no longer super-admin only: it is scope-filtered, so a tenant administrator
 		 * reads it and sees only their own groups' entries. What must stay unreachable is the instance's
 		 * own surfaces below — and the tenant isolation of the trail itself, which
 		 * test/admin/audit_group_scope.spec.ts asserts directly rather than through a status code.

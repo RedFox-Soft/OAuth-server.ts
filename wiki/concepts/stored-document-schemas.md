@@ -4,7 +4,7 @@ title: 'Stored documents are checked against their schema on the way out'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-09-28
-updated: 2026-10-13
+updated: 2026-10-15
 graph:
   node_type: concept
   relationships:
@@ -24,7 +24,7 @@ graph:
 
 # Stored documents are checked against their schema on the way out
 
-Every store document type in `lib/adapters/types.ts` — `User`, `UserBucket`, `Group`, `Project`,
+Every store document type in `lib/adapters/types.ts` — `User`, `UserBucket`, `Group`,
 `AdminSession`, `ErrorGroup` and the rest, with `FederationProvider` and `FederatedIdentity` in
 `lib/federation/types.ts` and `StoredJWK` in `lib/configs/verifyJWKs.ts` — is a TypeBox schema, and its
 TypeScript type is `Static<typeof …>` of it. One declaration, so the type and the check cannot drift.

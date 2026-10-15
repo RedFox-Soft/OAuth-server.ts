@@ -22,7 +22,7 @@ export default {
 		tagline: 'Your infrastructure, your database, no account with us.',
 		items: [
 			'Every feature, with no editions to choose between',
-			'Unlimited users, clients, projects and tokens',
+			'Unlimited users, buckets, applications and tokens',
 			'Source-available under FSL-1.1-ALv2',
 			'Community support on GitHub issues'
 		],

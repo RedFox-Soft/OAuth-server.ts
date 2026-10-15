@@ -10,7 +10,7 @@ import { ADMIN_BUCKET_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import type { User } from 'lib/adapters/types.ts';
 import { createAdministrator } from '../administrators.ts';
 import {
-	bucketWithProjects,
+	bucketWithClients,
 	cookieFor,
 	regularGroup
 } from './ownership_fixtures.ts';
@@ -98,7 +98,7 @@ describe('reading active users', () => {
 			`activity-super-${Math.random()}@x.io`
 		);
 		const group = await regularGroup([owner]);
-		bucketId = (await bucketWithProjects(group._id, 0)).bucket._id;
+		bucketId = (await bucketWithClients(group._id, 0)).bucket._id;
 		await mark('activity-account-a', '2031-02-10T09:00:00Z');
 		await mark('activity-account-b', '2031-02-11T09:00:00Z');
 		await mark('activity-account-a', '2031-03-14T09:00:00Z');
@@ -154,7 +154,7 @@ describe('reading active users', () => {
 
 		beforeAll(async () => {
 			const group = await regularGroup([owner]);
-			const { bucket } = await bucketWithProjects(group._id, 0);
+			const { bucket } = await bucketWithClients(group._id, 0);
 			deletedId = bucket._id;
 			deletedName = bucket.name;
 			formerGroup = group;

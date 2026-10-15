@@ -79,7 +79,7 @@ function conditionsFor(handle: Sql, query: AdminAuditQuery) {
 			handle`doc->>'action' LIKE ${`${likeEscaped(query.actionPrefix)}%`} ESCAPE ${LIKE_ESCAPE}`
 		);
 	}
-	/* Four arms — the bucket as the target, a target within it, a project joining it or leaving it. */
+	/* Four arms — the bucket as the target, a target within it, an entry carrying it, a historical project leaving it. */
 	if (query.bucket !== undefined) {
 		const b = query.bucket;
 		and(

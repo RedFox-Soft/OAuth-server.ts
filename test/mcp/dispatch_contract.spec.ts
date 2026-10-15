@@ -4,7 +4,6 @@ import { Elysia } from 'elysia';
 import { adminDispatchTarget } from 'lib/mcp/dispatch.ts';
 import { mcpCatalogue } from 'lib/mcp/catalogue.ts';
 import { resolveAdmin, AdminError } from 'lib/admin/auth/rbac.ts';
-import { projectRoutes } from 'lib/admin/projects/routes.ts';
 import { clientRoutes } from 'lib/admin/clients/routes.ts';
 import { adminUserRoutes } from 'lib/admin/users/routes.ts';
 import { bucketRoutes } from 'lib/admin/buckets/routes.ts';
@@ -15,12 +14,7 @@ import { smtpSettingsRoutes } from 'lib/admin/settings/smtp/routes.ts';
 import { jwksRoutes } from 'lib/admin/jwks/routes.ts';
 import { auditRoutes } from 'lib/admin/audit/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { getProjectStore } from 'lib/adapters/index.ts';
-import {
-	ADMIN_SESSION_COOKIE,
-	UNASSIGNED_GROUP_ID,
-	DEFAULT_BUCKET_ID
-} from 'lib/admin/consts.ts';
+import { ADMIN_SESSION_COOKIE, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { sessionFor } from '../admin_session.ts';
 import { shaped } from 'test/shape.js';
 import { Type } from '@sinclair/typebox';
@@ -47,7 +41,6 @@ import { createAdministrator, type AdminKind } from '../administrators.ts';
 // Mirrors the root instance's options, which is part of what is under test.
 const composed = new Elysia({ strictPath: true, normalize: false })
 	.use(resolveAdmin)
-	.use(projectRoutes)
 	.use(clientRoutes)
 	.use(adminUserRoutes)
 	.use(bucketRoutes)
@@ -68,7 +61,7 @@ const withValidationArm = new Elysia({ strictPath: true, normalize: false })
 		}
 	})
 	.use(resolveAdmin)
-	.use(projectRoutes)
+	.use(clientRoutes)
 	.use(bucketRoutes);
 
 async function sessionCookieFor(kind: AdminKind) {
@@ -118,14 +111,14 @@ describe('in-process re-dispatch into the admin routes', () => {
 	// Q1. Does `.handle(new Request(...))` reach a route at all outside the root instance?
 	it('routes a Request to a mounted admin handler', async () => {
 		const { cookie } = await sessionCookieFor('super');
-		const res = await get(composed, '/admin/api/projects', cookie);
+		const res = await get(composed, '/admin/api/buckets', cookie);
 		expect(res.status).toBe(200);
 		expect(await res.json()).toBeArray();
 	});
 
 	// Q2. Does the `resolveAdmin` scoped derive run, and does authorization actually bite?
 	it('refuses an admin request with no session as 401 and a wrong role as 403', async () => {
-		const anon = await get(composed, '/admin/api/projects');
+		const anon = await get(composed, '/admin/api/buckets');
 		expect(anon.status).toBe(401);
 
 		// `/admin/api/admins` is role-gated. `/admin/api/buckets` deliberately is NOT — it is
@@ -145,11 +138,15 @@ describe('in-process re-dispatch into the admin routes', () => {
 	// means the dispatcher does not have to reproduce it.
 	it('maps AdminError to the admin_error body with its status', async () => {
 		const { cookie } = await sessionCookieFor('super');
-		const res = await get(composed, '/admin/api/projects/nope', cookie);
+		const res = await get(
+			composed,
+			`/admin/api/buckets/${DEFAULT_BUCKET_ID}/clients/nope`,
+			cookie
+		);
 		expect(res.status).toBe(404);
 		expect(await res.json()).toEqual({
 			error: 'admin_error',
-			message: 'project not found'
+			message: 'client not found'
 		});
 	});
 
@@ -157,15 +154,23 @@ describe('in-process re-dispatch into the admin routes', () => {
 		const { cookie } = await sessionCookieFor('super');
 		expect(new AdminError(409, 'x', { blockers: [] }).adminPlane).toBe(true);
 
-		const proj = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			name: 'Spike',
-			slug: `spike-${Math.random()}`.replace(/[^a-z0-9-]/g, ''),
-			ownerGroupId: UNASSIGNED_GROUP_ID
-		});
+		const made = await post(
+			composed,
+			'/admin/api/buckets',
+			{
+				name: 'Spike',
+				slug: `spike-${Math.random()}`.replace(/[^a-z0-9-]/g, '')
+			},
+			cookie
+		);
+		expect(made.status).toBe(201);
+		const bucket = shaped(
+			Type.Object({ _id: Type.String() }),
+			await made.json()
+		);
 		const created = await post(
 			composed,
-			`/admin/api/projects/${proj._id}/clients`,
+			`/admin/api/buckets/${bucket._id}/clients`,
 			{
 				clientName: 'SPA',
 				grantTypes: ['authorization_code'],
@@ -177,7 +182,7 @@ describe('in-process re-dispatch into the admin routes', () => {
 		expect(created.status).toBe(201);
 
 		const refused = await composed.handle(
-			new Request(`http://e.ly/admin/api/projects/${proj._id}`, {
+			new Request(`http://e.ly/admin/api/buckets/${bucket._id}`, {
 				method: 'DELETE',
 				headers: { cookie }
 			})
@@ -210,10 +215,10 @@ describe('in-process re-dispatch into the admin routes', () => {
 		const { cookie } = await sessionCookieFor('super');
 		const bad = { slug: 'no-name-field' };
 
-		const bare = await post(composed, '/admin/api/projects', bad, cookie);
+		const bare = await post(composed, '/admin/api/buckets', bad, cookie);
 		const armed = await post(
 			withValidationArm,
-			'/admin/api/projects',
+			'/admin/api/buckets',
 			bad,
 			cookie
 		);
@@ -232,8 +237,8 @@ describe('in-process re-dispatch into the admin routes', () => {
 	// must not silently relax.
 	it('honours strictPath: a trailing slash is not the same route', async () => {
 		const { cookie } = await sessionCookieFor('super');
-		const exact = await get(composed, '/admin/api/projects', cookie);
-		const slashed = await get(composed, '/admin/api/projects/', cookie);
+		const exact = await get(composed, '/admin/api/buckets', cookie);
+		const slashed = await get(composed, '/admin/api/buckets/', cookie);
 		expect(exact.status).toBe(200);
 		expect(slashed.status).not.toBe(200);
 	});

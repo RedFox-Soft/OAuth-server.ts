@@ -5,7 +5,7 @@
  * What an agent may not do is decided in the `/mcp` transport: the operations withheld from it are not
  * published, and a destructive one asks for confirmation. The management API itself is publicly
  * mounted, so a token it accepted from the network would skip both — and an agent able to make an HTTP
- * request, following instructions injected into data it had read, could delete a project or permit
+ * request, following instructions injected into data it had read, could delete an application or permit
  * another client identity with nothing but its own credential.
  *
  * A membership test on the Request object rather than a header, because nothing arriving from the

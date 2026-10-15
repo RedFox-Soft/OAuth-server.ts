@@ -1,15 +1,18 @@
 import { describe, it, expect, beforeAll } from 'bun:test';
 
-import bootstrap, { agent, getHeader } from '../test_helper.ts';
+import bootstrap, {
+	bindClientToBucket,
+	agent,
+	getHeader
+} from '../test_helper.ts';
 import { AuthorizationRequest } from '../AuthorizationRequest.ts';
 import {
 	getBucketStore,
-	getProjectStore,
 	getUserStore,
 	resetAdminMemoryStores
 } from 'lib/adapters/index.ts';
 import { request as requestReset } from 'lib/password_reset/challenge.ts';
-import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
+import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { extractResetUrl, lastEmail } from '../mail_capture.ts';
 import { present, textOf } from 'test/shape.js';
 import { END_USER_PASSWORD_TOO_SHORT } from 'lib/consts/password_policy.ts';
@@ -37,16 +40,7 @@ describe('the password an end user chooses', () => {
 				name: 'Password policy'
 			})
 		)._id;
-		const project = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			ownerGroupId: UNASSIGNED_GROUP_ID,
-			name: 'Password policy',
-			slug: `policy-${Math.random().toString(36).slice(2)}`
-		});
-		await getProjectStore().update(project._id, {
-			bucketId,
-			clientIds: [CLIENT_ID]
-		});
+		await bindClientToBucket(CLIENT_ID, bucketId);
 	});
 
 	it('creates no account for a registration with a short password', async () => {

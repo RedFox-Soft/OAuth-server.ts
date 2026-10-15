@@ -61,8 +61,24 @@ async function cookieFor(userId: string) {
 	return `${ADMIN_SESSION_COOKIE}=${s._id}`;
 }
 
-function slug() {
-	return `attr-${Math.floor(Math.random() * 1e6)}`;
+/* A public application in the Default bucket, which a super administrator may create in either surface. */
+function application(clientName: string) {
+	return {
+		clientName,
+		grantTypes: ['authorization_code'],
+		redirectUris: ['https://attributed.example.com/cb'],
+		tokenEndpointAuthMethod: 'none'
+	};
+}
+
+async function createInConsole(cookie: string, clientName: string) {
+	return elysia.handle(
+		new Request(`http://e.ly/admin/api/buckets/${DEFAULT_BUCKET_ID}/clients`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json', cookie },
+			body: JSON.stringify(application(clientName))
+		})
+	);
 }
 
 /**
@@ -88,12 +104,8 @@ describe('MCP audit attribution', () => {
 				id: ++rpcId,
 				method: 'tools/call',
 				params: {
-					name: 'project_create',
-					arguments: {
-						name: 'Attributed',
-						slug: slug(),
-						bucketId: DEFAULT_BUCKET_ID
-					}
+					name: 'client_create',
+					arguments: { id: DEFAULT_BUCKET_ID, ...application('Attributed') }
 				}
 			},
 			token
@@ -108,25 +120,15 @@ describe('MCP audit attribution', () => {
 		expect(entry.actorEmail).toBe(user.email);
 		expect(entry.viaClientId).toBe(ADMIN_MCP_CLIENT_ID);
 		expect(entry.viaSurface).toBe('mcp');
-		expect(entry.action).toBe('project.create');
-		expect(entry.targetType).toBe('Project');
+		expect(entry.action).toBe('client.create');
+		expect(entry.targetType).toBe('Client');
 	});
 
 	it('records a console action with no surface, so absence means console', async () => {
 		const { user } = await adminAndToken();
 		const cookie = await cookieFor(user._id);
 
-		const res = await elysia.handle(
-			new Request('http://e.ly/admin/api/projects', {
-				method: 'POST',
-				headers: { 'content-type': 'application/json', cookie },
-				body: JSON.stringify({
-					name: 'Console made',
-					slug: slug(),
-					bucketId: DEFAULT_BUCKET_ID
-				})
-			})
-		);
+		const res = await createInConsole(cookie, 'Console made');
 		expect(res.status).toBe(201);
 
 		const { entries } = await adminAuditStore.list({ actor: user._id });
@@ -145,8 +147,8 @@ describe('MCP audit attribution', () => {
 				id: ++rpcId,
 				method: 'tools/call',
 				params: {
-					name: 'project_create',
-					arguments: { name: 'A', slug: slug(), bucketId: DEFAULT_BUCKET_ID }
+					name: 'client_create',
+					arguments: { id: DEFAULT_BUCKET_ID, ...application('A') }
 				}
 			},
 			viaAgent.token
@@ -154,17 +156,7 @@ describe('MCP audit attribution', () => {
 
 		const viaConsole = await adminAndToken();
 		const cookie = await cookieFor(viaConsole.user._id);
-		await elysia.handle(
-			new Request('http://e.ly/admin/api/projects', {
-				method: 'POST',
-				headers: { 'content-type': 'application/json', cookie },
-				body: JSON.stringify({
-					name: 'B',
-					slug: slug(),
-					bucketId: DEFAULT_BUCKET_ID
-				})
-			})
-		);
+		await createInConsole(cookie, 'B');
 
 		const agentEntry = (
 			await adminAuditStore.list({ actor: viaAgent.user._id })
@@ -187,12 +179,8 @@ describe('MCP audit attribution', () => {
 				id: ++rpcId,
 				method: 'tools/call',
 				params: {
-					name: 'project_create',
-					arguments: {
-						name: 'Agent one',
-						slug: slug(),
-						bucketId: DEFAULT_BUCKET_ID
-					}
+					name: 'client_create',
+					arguments: { id: DEFAULT_BUCKET_ID, ...application('Agent one') }
 				}
 			},
 			viaAgent.token
@@ -200,17 +188,7 @@ describe('MCP audit attribution', () => {
 
 		const viaConsole = await adminAndToken();
 		const cookie = await cookieFor(viaConsole.user._id);
-		await elysia.handle(
-			new Request('http://e.ly/admin/api/projects', {
-				method: 'POST',
-				headers: { 'content-type': 'application/json', cookie },
-				body: JSON.stringify({
-					name: 'Console one',
-					slug: slug(),
-					bucketId: DEFAULT_BUCKET_ID
-				})
-			})
-		);
+		await createInConsole(cookie, 'Console one');
 
 		const agentOnly = await adminAuditStore.list({ viaSurface: 'mcp' });
 		expect(agentOnly.entries.length).toBeGreaterThan(0);
@@ -240,12 +218,8 @@ describe('MCP audit attribution', () => {
 				id: ++rpcId,
 				method: 'tools/call',
 				params: {
-					name: 'project_create',
-					arguments: {
-						name: 'By agent',
-						slug: slug(),
-						bucketId: DEFAULT_BUCKET_ID
-					}
+					name: 'client_create',
+					arguments: { id: DEFAULT_BUCKET_ID, ...application('By agent') }
 				}
 			},
 			token

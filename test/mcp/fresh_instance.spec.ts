@@ -94,7 +94,7 @@ describe('connecting an agent to a freshly provisioned instance', () => {
 	});
 
 	/*
-	 * What provisioning leaves behind. `db:setup` seeds the reserved project, bucket and clients — but
+	 * What provisioning leaves behind. `db:setup` seeds the reserved buckets and clients — but
 	 * no person, because an administrator is created by whoever runs the first-run setup. So this is
 	 * the state every new deployment is in before anybody signs in, and the state the failure was
 	 * reported from.

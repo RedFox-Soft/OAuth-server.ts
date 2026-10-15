@@ -22,7 +22,7 @@ import { useMe } from '../../frame/me.js';
 import { PageHeader } from '../../frame/PageHeader.js';
 import { request } from '../../frame/request.js';
 import { Link, useNavigate } from '../../frame/router.js';
-import { bucketHref, projectHref } from '../../frame/routes.js';
+import { bucketHref } from '../../frame/routes.js';
 import { RowActions, type RowAction } from '../../frame/RowActions.js';
 import { LoadFailed, NoAccess } from '../../frame/states.js';
 
@@ -46,7 +46,7 @@ interface GroupDetail {
 	name: string;
 	kind: 'personal' | 'regular' | 'system';
 	members: Member[];
-	owns: { projects: Owned[]; buckets: Owned[] };
+	owns: { buckets: Owned[] };
 	can?: Partial<{
 		manageMembers: boolean;
 		invite: boolean;
@@ -74,21 +74,13 @@ function plural(n: number, one: string, many: string): string {
 	return `${String(n)} ${n === 1 ? one : many}`;
 }
 
-/* "3 projects and 2 buckets" — what membership of this group reaches. */
+/* "2 buckets" — what membership of this group reaches, with everything those buckets hold. */
 function reach(owns: GroupDetail['owns']): string {
-	return `${plural(owns.projects.length, 'project', 'projects')} and ${plural(owns.buckets.length, 'bucket', 'buckets')}`;
+	return plural(owns.buckets.length, 'bucket', 'buckets');
 }
 
 function OwnedLinks({ owns }: { owns: GroupDetail['owns'] }) {
 	const links = [
-		...owns.projects.map((p) => (
-			<Link
-				key={`p:${p.id}`}
-				href={projectHref(p.id)}
-			>
-				{p.name}
-			</Link>
-		)),
 		...owns.buckets.map((b) => (
 			<Link
 				key={`b:${b.id}`}
@@ -180,8 +172,7 @@ export function AdminGroupPage({ groupId }: { groupId: string }) {
 	const label = own ? 'Personal · Only you' : groupLabel(group);
 	const owners = group.members.filter((m) => m.role === 'owner').length;
 	const nameOf = (m: Pick<Member, 'userId' | 'email'>) => m.email ?? m.userId;
-	const ownsNothing =
-		group.owns.projects.length === 0 && group.owns.buckets.length === 0;
+	const ownsNothing = group.owns.buckets.length === 0;
 
 	async function act(
 		run: () => ReturnType<typeof request>,
@@ -343,28 +334,18 @@ export function AdminGroupPage({ groupId }: { groupId: string }) {
 		<Card title="What this group owns">
 			{ownsNothing ? (
 				<Typography.Text type="secondary">
-					Nothing yet. Projects and buckets created while this group is selected
-					in the header belong to it.
+					Nothing yet. Buckets created while this group is selected in the
+					header belong to it.
 				</Typography.Text>
 			) : (
 				<Flex
 					vertical
 					gap={8}
 				>
-					{group.owns.projects.length > 0 && (
-						<div>
-							<Typography.Text strong>Projects: </Typography.Text>
-							<OwnedLinks
-								owns={{ projects: group.owns.projects, buckets: [] }}
-							/>
-						</div>
-					)}
 					{group.owns.buckets.length > 0 && (
 						<div>
 							<Typography.Text strong>Buckets: </Typography.Text>
-							<OwnedLinks
-								owns={{ projects: [], buckets: group.owns.buckets }}
-							/>
+							<OwnedLinks owns={{ buckets: group.owns.buckets }} />
 						</div>
 					)}
 				</Flex>
@@ -400,7 +381,7 @@ export function AdminGroupPage({ groupId }: { groupId: string }) {
 						showIcon
 						title={
 							own
-								? 'A personal group can’t be shared. To work with colleagues, create a group and move projects and buckets into it.'
+								? 'A personal group can’t be shared. To work with colleagues, create a group and move buckets into it.'
 								: 'A personal group belongs to one administrator and can’t be shared.'
 						}
 						action={

@@ -1,11 +1,12 @@
 import getConfig from '../default.config.js';
 
 /*
- * A client belonging to no project, which is the whole point.
+ * An application of the default bucket, which is the whole point.
  *
- * Rule 2 of bucket resolution — a client assigned to a project — must miss, so that the rule under
- * test is the one that reaches a project through the *declared resource* the request names. A client
- * seeded into a project would satisfy rule 2 and the spec would pass without the new rule existing.
+ * Rule 2 of bucket resolution — the bucket an application belongs to — pins every bucket but the default
+ * one, so the rule under test is the one that reaches a bucket through the *declared resource* the request
+ * names. An application of any other bucket would satisfy rule 2 and the spec would pass without that rule
+ * existing. The specs bind it to the default bucket, since buckets are not configuration.
  */
 export const ApplicationConfig = {
 	...getConfig(),

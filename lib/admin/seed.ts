@@ -1,13 +1,7 @@
-import {
-	getProjectStore,
-	getBucketStore,
-	getGroupStore,
-	adapter
-} from '../adapters/index.js';
+import { getBucketStore, getGroupStore, adapter } from '../adapters/index.js';
 import { Client } from '../models/client.js';
 import { ISSUER } from '../configs/env.js';
 import {
-	ADMIN_PROJECT_ID,
 	ADMIN_CLIENT_ID,
 	UNASSIGNED_GROUP_ID,
 	SYSTEM_GROUP_NAME
@@ -17,7 +11,6 @@ import { ensureSuperAdminsGroup } from './super_admins.js';
 import {
 	ADMIN_BUCKET_SEED,
 	ADMIN_MCP_CLIENT_SEED,
-	ADMIN_PROJECT_SEED,
 	DEFAULT_BUCKET_SEED,
 	SYSTEM_GROUP_SEED,
 	adminConsoleClientSeed
@@ -75,32 +68,6 @@ export async function ensureAdminSeed(): Promise<void> {
 
 	await ensureReservedBucket(ADMIN_BUCKET_SEED);
 	await ensureReservedBucket(DEFAULT_BUCKET_SEED);
-
-	const projects = getProjectStore();
-	const existingAdminProject = await projects.find(ADMIN_PROJECT_ID);
-	if (!existingAdminProject) {
-		await projects.create({
-			...ADMIN_PROJECT_SEED,
-			clientIds: [...ADMIN_PROJECT_SEED.clientIds]
-		});
-	} else {
-		/*
-		 * An existing deployment's admin project predates the MCP agent client. Without adding the id the
-		 * client exists but belongs to no project, `resolveBucketForClient` routes it to the default
-		 * bucket, and an administrator cannot sign an agent in.
-		 */
-		// As stored, not as typed: a document written before the field existed has none.
-		const held: { clientIds?: readonly string[] } = existingAdminProject;
-		const existingClientIds = held.clientIds ?? [];
-		const missing = ADMIN_PROJECT_SEED.clientIds.filter(
-			(id) => !existingClientIds.includes(id)
-		);
-		if (missing.length > 0) {
-			await projects.update(ADMIN_PROJECT_ID, {
-				clientIds: [...existingClientIds, ...missing]
-			});
-		}
-	}
 
 	if (!(await Client.tryFind(ADMIN_MCP_CLIENT_ID))) {
 		await adapter('Client').upsert(ADMIN_MCP_CLIENT_ID, {

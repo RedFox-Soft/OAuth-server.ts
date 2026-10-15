@@ -16,7 +16,7 @@ import type { User } from 'lib/adapters/types.ts';
 import { monthOf } from 'lib/activity/periods.ts';
 import { createAdministrator } from '../administrators.ts';
 import {
-	bucketWithProjects,
+	bucketWithClients,
 	cookieFor,
 	regularGroup
 } from '../admin/ownership_fixtures.ts';
@@ -108,7 +108,7 @@ describe('active users after the bucket and its people change', () => {
 			'plain',
 			`history-owner-${Math.random()}@x.io`
 		);
-		bucketId = (await bucketWithProjects((await regularGroup([owner]))._id, 0))
+		bucketId = (await bucketWithClients((await regularGroup([owner]))._id, 0))
 			.bucket._id;
 		endUserId = (
 			await getUserStore(bucketId).create(

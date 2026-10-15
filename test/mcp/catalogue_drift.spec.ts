@@ -112,28 +112,25 @@ describe('MCP tool catalogue', () => {
 		expect(both).toEqual([]);
 	});
 
-	it('withholds project and bucket deletion, asserted by name', () => {
+	it('withholds bucket deletion, asserted by name', () => {
 		// Asserted by name and not merely by the counts above, so the withholding cannot be undone by
 		// an accidental catalogue addition that happens to keep the arithmetic right (FR-031).
 		const published = new Set(mcpCatalogue.map(key));
-		expect(published.has('DELETE /admin/api/projects/:id')).toBe(false);
 		expect(published.has('DELETE /admin/api/buckets/:id')).toBe(false);
-		expect(mcpCatalogue.some((t) => t.tool === 'project_delete')).toBe(false);
 		expect(mcpCatalogue.some((t) => t.tool === 'bucket_delete')).toBe(false);
 
 		const excluded = new Set(excludedConsoleOperations.map(key));
-		expect(excluded.has('DELETE /admin/api/projects/:id')).toBe(true);
 		expect(excluded.has('DELETE /admin/api/buckets/:id')).toBe(true);
 	});
 
 	// The server's instructions announce the withheld operations and not the inapplicable ones, and it
-	// builds that announcement from this field. Pinned so the two container deletions cannot quietly
+	// builds that announcement from this field. Pinned so the container deletions cannot quietly
 	// drop out of what the agent is told, which is the only way it can answer "do it in the console"
 	// instead of guessing a tool name (FR-034).
 	it('marks the destructive and escalating operations withheld, and the rest inapplicable', () => {
 		const withheld = withheldConsoleOperations.map(key);
-		// A group joined the two containers it owns: destroying one leaves nothing behind to inspect,
-		// and takes with it the only thing that granted anyone access to what it held.
+		// A group joined the bucket it owns: destroying one leaves nothing behind to inspect, and takes
+		// with it the only thing that granted anyone access to what it held.
 		//
 		// The four `/admin/api/mcp/clients` rows are withheld for a different reason: they decide which
 		// client identities may administer this instance, so an agent able to call them could grant
@@ -144,7 +141,6 @@ describe('MCP tool catalogue', () => {
 			'POST /admin/api/mcp/clients',
 			'PATCH /admin/api/mcp/clients/:entryId',
 			'DELETE /admin/api/mcp/clients/:entryId',
-			'DELETE /admin/api/projects/:id',
 			'DELETE /admin/api/buckets/:id',
 			/* Delete now: the destruction a scheduled deletion ends in, at once (specs/090). */
 			'POST /admin/api/buckets/:id/purge',
@@ -213,12 +209,6 @@ describe('MCP tool catalogue', () => {
 			'jwks_retire',
 			'jwks_revoke',
 			'jwks_rotate',
-			/*
-			 * The issuer of every application in the project changes, so everyone signed in through them signs
-			 * in again, in a bucket where their accounts are not (specs/085).
-			 */
-			'project_bucket_assign',
-			'project_owner_change',
 			/* Ends a customer's provisioning and revokes its tokens at once. */
 			'provisioning_connection_delete',
 			/* Re-admits the mass deprovisioning a connection's guard held. */

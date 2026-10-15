@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, spyOn } from 'bun:test';
 import bootstrap, {
+	bindClientToBucket,
 	SESSION_COOKIE_PREFIX,
 	agent,
 	getHeader
@@ -8,7 +9,6 @@ import { AuthorizationRequest } from '../AuthorizationRequest.ts';
 import {
 	adapter,
 	getBucketStore,
-	getProjectStore,
 	getUserStore,
 	resetAdminMemoryStores
 } from 'lib/adapters/index.ts';
@@ -22,7 +22,7 @@ import {
 import epochTime from 'lib/helpers/epoch_time.ts';
 import { TestAdapter } from 'test/models.js';
 import { present } from 'test/shape.js';
-import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
+import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 
 const PASSWORD = 'correct horse battery';
 const SECRET = encodeBase32(Buffer.from('12345678901234567890', 'ascii'));
@@ -53,16 +53,7 @@ async function seedBucket(
 		name,
 		...fields
 	});
-	const project = await getProjectStore().create({
-		bucketId: DEFAULT_BUCKET_ID,
-		ownerGroupId: UNASSIGNED_GROUP_ID,
-		name,
-		slug: `${clientId}-${Math.random()}`
-	});
-	await getProjectStore().update(project._id, {
-		bucketId: bucket._id,
-		clientIds: [clientId]
-	});
+	await bindClientToBucket(clientId, bucket._id);
 	return bucket._id;
 }
 

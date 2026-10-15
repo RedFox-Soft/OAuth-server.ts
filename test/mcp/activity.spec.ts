@@ -12,7 +12,7 @@ import type { Group, User } from 'lib/adapters/types.ts';
 import type { OverviewAnswer } from 'lib/activity/overview.ts';
 import { createAdministrator } from '../administrators.ts';
 import {
-	bucketWithProjects,
+	bucketWithClients,
 	cookieFor,
 	regularGroup
 } from '../admin/ownership_fixtures.ts';
@@ -81,7 +81,7 @@ describe('active users read by an agent', () => {
 			`mcp-activity-foreign-${Math.random()}@x.io`
 		);
 		customer = await regularGroup([owner]);
-		bucketId = (await bucketWithProjects(customer._id, 0)).bucket._id;
+		bucketId = (await bucketWithClients(customer._id, 0)).bucket._id;
 		await getActivityStore().mark({
 			bucketId,
 			accountId: 'mcp-activity-account',

@@ -2,7 +2,7 @@ import { rich } from '../../types.ts';
 import type english from './en.ts';
 import type { HomeFacts } from './en.ts';
 
-export const source = 'b842fadd8554';
+export const source = 'c68bb1380e53';
 
 export default {
 	title: 'FoxAuth — 面向智能体时代的授权服务器',
@@ -42,10 +42,10 @@ export default {
 	console: {
 		eyebrow: '控制台',
 		heading: '运维所需的一切，无需第二个产品。',
-		lead: '项目、客户端、用户桶、最终用户、上游身份提供商、SCIM 连接、设置、SMTP、签名密钥、月活跃用户，以及只追加的审计日志，全部集中在一个控制台里；登录控制台走的是服务器自身的 OpenID Connect 流程，也可以通过你所在组织的身份提供商登录。可能让人无法登录的更改，会在生效前先告诉你影响到谁。AI 智能体通过 MCP 使用的也是同一套 API。',
-		screenshotAlt: 'FoxAuth 管理控制台，列出某个项目的 OAuth 客户端。',
+		lead: '用户桶及其中的应用和 API、最终用户、上游身份提供商、SCIM 连接、设置、SMTP、签名密钥、月活跃用户，以及只追加的审计日志，全部集中在一个控制台里；登录控制台走的是服务器自身的 OpenID Connect 流程，也可以通过你所在组织的身份提供商登录。可能让人无法登录的更改，会在生效前先告诉你影响到谁。AI 智能体通过 MCP 使用的也是同一套 API。',
+		screenshotAlt: 'FoxAuth 管理控制台，列出某个用户桶的应用（OAuth 客户端）。',
 		screenshotCaption:
-			'内置控制台中某个项目的客户端。这里的每一次更改都会生成一条审计记录。'
+			'内置控制台中某个用户桶的应用。这里的每一次更改都会生成一条审计记录。'
 	},
 	audiences: {
 		eyebrow: '谁在运行它',
@@ -94,7 +94,7 @@ export default {
 			},
 			{
 				title: '注册客户端',
-				body: '在控制台中创建一个项目及其第一个 OAuth 客户端，并填写精确匹配的重定向 URI。'
+				body: '在控制台中创建一个用户桶及其第一个 OAuth 客户端，并填写精确匹配的重定向 URI。'
 			},
 			{
 				title: '获取令牌',
@@ -112,7 +112,7 @@ export default {
 		eyebrow: '为 MCP 打造的 OAuth 服务器',
 		heading: '保护你的 MCP 服务器，并让智能体来运维这一台。',
 		protect: rich(
-			'把你自己的 MCP 服务器声明为某个项目的受保护资源，本服务器就会签发受众恰好是该资源的令牌。这里不用写代码，也不用重启。智能体宿主会发现它、让你的用户登录，然后带着令牌回来；你的 MCP 服务器对照公开的密钥即可验证该令牌，无需向任何一方询问。值为 HTTPS URL 的 ',
+			'把你自己的 MCP 服务器声明为某个用户桶的受保护资源，本服务器就会签发受众恰好是该资源的令牌。这里不用写代码，也不用重启。智能体宿主会发现它、让你的用户登录，然后带着令牌回来；你的 MCP 服务器对照公开的密钥即可验证该令牌，无需向任何一方询问。值为 HTTPS URL 的 ',
 			{ code: 'client_id' },
 			' 会被当作客户端身份文档接受，因此一个什么都不用配置的宿主也能连上。'
 		),

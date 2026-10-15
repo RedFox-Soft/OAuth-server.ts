@@ -18,12 +18,17 @@ export const ApplicationConfig = {
 	'userinfo.enabled': true,
 	'clientCredentials.enabled': true,
 	'dpop.enabled': true,
-	'dpop.nonceSecret': Buffer.alloc(32, 0)
+	'dpop.nonceSecret': Buffer.alloc(32, 0),
+	/*
+	 * On so that a client id naming a document is one this deployment would resolve by fetching it —
+	 * the case where a CORS lookup that resolved clients the way the endpoints do would fetch too.
+	 */
+	'clientIdMetadataDocument.enabled': true
 };
 
 export const clients = [
 	/*
-	 * The browser app: its origin is listed on the project that owns it. Confidential rather than
+	 * The browser app: each case lists its origins on it. Confidential rather than
 	 * public only so `client_credentials` gives the suite a 200 from /token without standing up a
 	 * full authorization-code flow — the CORS layer never looks at the grant type.
 	 */
@@ -33,7 +38,7 @@ export const clients = [
 		grantTypes: ['authorization_code', 'client_credentials'],
 		redirectUris: ['https://app.example.com/cb']
 	},
-	// Belongs to no project, so no origin can ever be resolved for it.
+	// Lists no origins, so no origin can ever be allowed for it.
 	{
 		clientId: 'cors-orphan',
 		clientSecret: 'secret',

@@ -138,7 +138,7 @@ describe('permitting a client identity at the administrative plane', () => {
 
 	/*
 	 * The reserved client keeps working exactly as documented, with no entry in the list. Its route to
-	 * the administrator bucket is membership of the reserved admin project, which predates all of this.
+	 * the administrator bucket is the bucket its stored record names, which predates all of this.
 	 */
 	it('leaves the reserved administrative client unaffected', async () => {
 		const res = await callMcp(await tokenFor(ADMIN_MCP_CLIENT_ID));

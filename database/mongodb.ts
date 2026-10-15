@@ -30,7 +30,6 @@ import { ROOT_KEY_OWNER } from '../lib/consts/key_owner.js';
 import { checksumOf } from '../lib/migrations/state.js';
 import { ISSUER } from '../lib/configs/env.js';
 import {
-	ADMIN_PROJECT_ID,
 	ADMIN_BUCKET_ID,
 	ADMIN_CLIENT_ID,
 	UNASSIGNED_GROUP_ID,
@@ -42,7 +41,6 @@ import { ADMIN_MCP_CLIENT_ID } from '../lib/mcp/consts.js';
 import {
 	ADMIN_BUCKET_SEED,
 	ADMIN_MCP_CLIENT_SEED,
-	ADMIN_PROJECT_SEED,
 	DEFAULT_BUCKET_SEED,
 	SYSTEM_GROUP_SEED,
 	SUPER_ADMINS_GROUP_SEED,
@@ -208,7 +206,7 @@ if (
 	);
 }
 
-// Idempotent seed of the reserved admin project + bucket + OAuth client. Written
+// Idempotent seed of the reserved admin bucket and its OAuth clients. Written
 // against this script's own `db` connection (not the app singletons in
 // lib/admin/seed.ts) to avoid opening a second connection from a one-shot script.
 // The `Client` document mirrors the shape `adapter('Client').upsert` persists
@@ -286,7 +284,7 @@ await db
 		{ $set: { slug: ADMIN_BUCKET_SEED.slug } }
 	);
 // The default ('redfox') bucket backs the pre-existing default user collection and
-// every client not assigned to a project (see resolveBucketForClient). Seeded here
+// every client that belongs to no other bucket (see resolveBucketForRequest). Seeded here
 // so it is manageable in the admin Buckets UI. Mirrors ensureAdminSeed (lib/admin/seed.ts),
 // which db:setup does not call — this script owns the deployment seed.
 await db.collection<{ _id: string }>(STORE_AREAS.userBuckets).updateOne(
@@ -307,30 +305,6 @@ await db
 		{ _id: 'redfox', slug: { $exists: false } },
 		{ $set: { slug: DEFAULT_BUCKET_SEED.slug } }
 	);
-await db.collection<{ _id: string }>(STORE_AREAS.projects).updateOne(
-	{ _id: ADMIN_PROJECT_ID },
-	{
-		$setOnInsert: {
-			...withoutId(ADMIN_PROJECT_SEED),
-			createdAt: seedNow,
-			updatedAt: seedNow
-		}
-	},
-	{ upsert: true }
-);
-/*
- * An existing deployment's admin project predates the MCP agent client, and `$setOnInsert` above will
- * not touch it — so the id is added explicitly. Without it the client exists but belongs to no project,
- * `resolveBucketForClient` routes it to the default bucket, and an administrator cannot sign an agent in.
- */
-await db.collection<{ _id: string }>(STORE_AREAS.projects).updateOne(
-	{ _id: ADMIN_PROJECT_ID },
-	{
-		$addToSet: {
-			clientIds: { $each: [ADMIN_CLIENT_ID, ADMIN_MCP_CLIENT_ID] }
-		}
-	}
-);
 /*
  * The seed writes straight to the model area, since a one-shot script has no adapter instance.
  * Annotated with the inventory's own type so a typo here cannot name a collection nothing provisions —

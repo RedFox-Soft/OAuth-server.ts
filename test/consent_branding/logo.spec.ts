@@ -4,7 +4,7 @@ import bootstrap, { type Setup } from '../test_helper.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { openConsent, type ConsentPage } from '../consent_page/flow.ts';
 import { PNG, WEBP } from './consent_branding.config.ts';
-import { giveLogo, tenantProject } from './seed.ts';
+import { giveLogo, signedInElsewhere } from './seed.ts';
 
 /* Every `<img>` on the page, as the browser would read its source and text alternative. */
 function images(html: string): { src: string; alt: string }[] {
@@ -28,11 +28,12 @@ function clientImages(page: ConsentPage) {
 describe('the client logo on the consent page', () => {
 	let setup: Setup;
 	let cookie: string;
+	let elsewhere: { cookie: string; resource: string[] };
 
 	beforeAll(async () => {
 		setup = await bootstrap(import.meta.url, { config: 'consent_branding' });
 		await ensureAdminSeed();
-		await tenantProject(['tenant-app']);
+		elsewhere = await signedInElsewhere(setup, 'tenant-app');
 		for (const clientId of [
 			'own-app',
 			'own-loopback',
@@ -50,6 +51,19 @@ describe('the client logo on the consent page', () => {
 		return openConsent(
 			{ client_id: clientId, scope, prompt: 'consent' },
 			cookie
+		);
+	}
+
+	/* The same, by an application of another bucket that signs this person in through their bucket's API. */
+	function openElsewhere(clientId: string, scope: string) {
+		return openConsent(
+			{
+				client_id: clientId,
+				scope,
+				prompt: 'consent',
+				resource: elsewhere.resource
+			},
+			elsewhere.cookie
 		);
 	}
 
@@ -111,7 +125,7 @@ describe('the client logo on the consent page', () => {
 	});
 
 	it('never shows a logo for another tenant’s app', async () => {
-		const page = await open('tenant-app', 'openid');
+		const page = await openElsewhere('tenant-app', 'openid');
 
 		expect(page.view.client.tier).toBe('operator-registered');
 		expect(page.view.client.logo).toBeUndefined();

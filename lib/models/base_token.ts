@@ -19,7 +19,7 @@ export const BaseTokenPayload = t.Object({
 	 *
 	 * Every bucket is its own issuer, so `iss` is a fact about the moment of issuance and not about the
 	 * current configuration. Deriving it later — from the client, say — gets it wrong the first time a
-	 * client moves between projects, and, worse, cannot answer the question RFC 7662 §2.2 makes
+	 * client's bucket changes address, and, worse, cannot answer the question RFC 7662 §2.2 makes
 	 * introspection answer: `active: true` asserts that *this* authorization server issued the token, so
 	 * a token of another bucket presented here has to be refused, and refusing it means knowing who
 	 * issued it. A realm-confusion advisory against a Keycloak integration is the same defect from the

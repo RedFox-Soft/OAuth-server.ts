@@ -4,8 +4,7 @@ import bootstrap from '../test_helper.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { getProjectStore, getBucketStore } from 'lib/adapters/index.ts';
-import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
+import { getBucketStore } from 'lib/adapters/index.ts';
 import { ADMIN_MCP_CLIENT_ID, MCP_RESOURCE } from 'lib/mcp/consts.ts';
 import { excludedConsoleOperations, mcpCatalogue } from 'lib/mcp/catalogue.ts';
 import { ApplicationConfig } from 'lib/configs/application.js';
@@ -15,10 +14,10 @@ import { createAdministrator } from '../administrators.ts';
 import { call, rpc } from './rpc.ts';
 
 /*
- * The two withheld operations: deleting a project and deleting a user bucket.
+ * The withheld container deletion: deleting a user bucket.
  *
  * FR-031 says the surface must not *publish* them, which is stronger than refusing them when called —
- * so the assertions are about absence from `tools/list` and about no container ever disappearing, not
+ * so the assertions are about absence from `tools/list` and about no bucket ever disappearing, not
  * merely about an error being returned.
  *
  * FR-034 then says the refusal must read as "not available here" rather than as a permission problem,
@@ -29,6 +28,37 @@ let rpcId = 0;
 
 const Created = Type.Object({ _id: Type.String() });
 const CreatedClient = Type.Object({ clientId: Type.String() });
+
+/* A bucket made by the agent itself, so nothing about it is console-only to begin with. */
+async function agentBucket(token: string, name: string) {
+	const created = await rpc(
+		call('bucket_create', {
+			name,
+			slug: `wh-${Math.floor(Math.random() * 1e6)}`
+		}),
+		token
+	);
+	return shaped(Created, created.result?.structuredContent?.result)._id;
+}
+
+async function agentClient(
+	token: string,
+	bucketId: string,
+	clientName: string
+) {
+	const created = await rpc(
+		call('client_create', {
+			id: bucketId,
+			clientName,
+			grantTypes: ['authorization_code'],
+			redirectUris: ['https://a.example.com/cb'],
+			tokenEndpointAuthMethod: 'none'
+		}),
+		token
+	);
+	return shaped(CreatedClient, created.result?.structuredContent?.result)
+		.clientId;
+}
 
 async function superAdmin() {
 	const user = await createAdministrator('super', `wh-${Math.random()}@x.io`);
@@ -56,10 +86,10 @@ async function superAdmin() {
 }
 
 /**
- * @proves The two container deletions are absent rather than gated, stay absent however
- * insistently they are asked for, and the agent is told where to do them instead.
+ * @proves Deleting a bucket is absent rather than gated, stays absent however insistently it is
+ * asked for, and the agent is told where to do it instead.
  */
-describe('withheld container deletions', () => {
+describe('withheld bucket deletion', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);
 	});
@@ -69,7 +99,7 @@ describe('withheld container deletions', () => {
 		await ensureAdminSeed();
 	});
 
-	it('publishes neither deletion, and neither is in the catalogue', async () => {
+	it('does not publish bucket deletion under any name', async () => {
 		const { token } = await superAdmin();
 		const listed = await rpc(
 			{ jsonrpc: '2.0', id: ++rpcId, method: 'tools/list', params: {} },
@@ -79,11 +109,9 @@ describe('withheld container deletions', () => {
 			(t: { name: string }) => t.name
 		);
 
-		expect(names).not.toContain('project_delete');
 		expect(names).not.toContain('bucket_delete');
-		// And nothing else that reaches the same routes by another name.
+		// And nothing else that reaches the same route by another name.
 		const paths = new Set(mcpCatalogue.map((t) => `${t.method} ${t.path}`));
-		expect(paths.has('DELETE /admin/api/projects/:id')).toBe(false);
 		expect(paths.has('DELETE /admin/api/buckets/:id')).toBe(false);
 	});
 
@@ -93,43 +121,12 @@ describe('withheld container deletions', () => {
 
 		// So an agent can answer correctly without a tool existing to discover the absence from.
 		expect(instructions).toContain('admin console');
-		expect(instructions.toLowerCase()).toContain('project');
 		expect(instructions.toLowerCase()).toContain('bucket');
-	});
-
-	it('deletes no project however insistently it is asked, even as a super-administrator', async () => {
-		const { token } = await superAdmin();
-		const project = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			name: 'Survivor',
-			slug: `wh-${Math.floor(Math.random() * 1e6)}`,
-			ownerGroupId: UNASSIGNED_GROUP_ID
-		});
-
-		// Plainly, then again, then under a name an agent might invent.
-		for (const name of [
-			'project_delete',
-			'project_delete',
-			'delete_project',
-			'project_remove'
-		]) {
-			const refused = await rpc(call(name, { id: project._id }), token);
-			expect(refused.result?.isError ?? refused.error !== undefined).toBe(true);
-		}
-
-		expect(await getProjectStore().find(project._id)).not.toBeNull();
 	});
 
 	it('deletes no bucket however insistently it is asked', async () => {
 		const { token } = await superAdmin();
-		const created = await rpc(
-			call('bucket_create', { name: 'Survivor', slug: 'survivor-1' }),
-			token
-		);
-		const { _id: bucketId } = shaped(
-			Created,
-			created.result?.structuredContent?.result
-		);
+		const bucketId = await agentBucket(token, 'Survivor');
 
 		for (const name of ['bucket_delete', 'bucket_delete', 'delete_bucket']) {
 			const refused = await rpc(call(name, { id: bucketId }), token);
@@ -141,17 +138,12 @@ describe('withheld container deletions', () => {
 
 	it('leaves the other steps of a multi-part instruction working', async () => {
 		const { token } = await superAdmin();
-		const project = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			name: 'Partly',
-			slug: `wh-${Math.floor(Math.random() * 1e6)}`,
-			ownerGroupId: UNASSIGNED_GROUP_ID
-		});
+		const bucketId = await agentBucket(token, 'Partly');
 
 		// A withheld step buried between two that should succeed.
 		const before = await rpc(
 			call('client_create', {
-				id: project._id,
+				id: bucketId,
 				clientName: 'Before',
 				grantTypes: ['authorization_code'],
 				redirectUris: ['https://a.example.com/cb'],
@@ -159,54 +151,34 @@ describe('withheld container deletions', () => {
 			}),
 			token
 		);
-		const withheld = await rpc(
-			call('project_delete', { id: project._id }),
-			token
-		);
-		const after = await rpc(call('project_get', { id: project._id }), token);
+		const withheld = await rpc(call('bucket_delete', { id: bucketId }), token);
+		const after = await rpc(call('bucket_get', { id: bucketId }), token);
 
 		expect(before.result?.isError).not.toBe(true);
 		expect(withheld.result?.isError ?? withheld.error !== undefined).toBe(true);
 		expect(after.result?.isError).not.toBe(true);
-		expect(await getProjectStore().find(project._id)).not.toBeNull();
+		expect(await getBucketStore().find(bucketId)).not.toBeNull();
 	});
 
 	it('still lets an operator learn what a deletion would involve', async () => {
 		const { token } = await superAdmin();
-		const project = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			name: 'Blocked',
-			slug: `wh-${Math.floor(Math.random() * 1e6)}`,
-			ownerGroupId: UNASSIGNED_GROUP_ID
-		});
-		const created = await rpc(
-			call('client_create', {
-				id: project._id,
-				clientName: 'Blocker',
-				grantTypes: ['authorization_code'],
-				redirectUris: ['https://a.example.com/cb'],
-				tokenEndpointAuthMethod: 'none'
-			}),
-			token
-		);
-		const { clientId } = shaped(
-			CreatedClient,
-			created.result?.structuredContent?.result
-		);
+		const bucketId = await agentBucket(token, 'Blocked');
+		const clientId = await agentClient(token, bucketId, 'Blocker');
 
 		/*
 		 * FR-035 asks for this through *ordinary* read operations, under those reads' own disclosure
 		 * rules — which is exactly what the existing reads give, so no extra affordance was built. A
-		 * project names the clients that block it; a bucket's end-users are countable.
+		 * bucket counts the applications that block it, and lists them by name; its end-users are
+		 * countable.
 		 */
-		const detail = await rpc(call('project_get', { id: project._id }), token);
-		const { clientIds: holds } = shaped(
-			Type.Object({ clientIds: Type.Array(Type.String()) }),
+		const detail = await rpc(call('bucket_get', { id: bucketId }), token);
+		const { applications } = shaped(
+			Type.Object({ applications: Type.Number() }),
 			detail.result?.structuredContent?.result
 		);
-		expect(holds).toContain(clientId);
+		expect(applications).toBe(1);
 
-		const clients = await rpc(call('client_list', { id: project._id }), token);
+		const clients = await rpc(call('client_list', { id: bucketId }), token);
 		expect(JSON.stringify(clients)).toContain(clientId);
 	});
 
@@ -237,32 +209,14 @@ describe('withheld container deletions', () => {
 		expect(held.length).toBe(1);
 	});
 
-	it('emptying a container stays available, one confirmed deletion at a time', async () => {
+	it('emptying a bucket stays available, one confirmed deletion at a time', async () => {
 		const { token } = await superAdmin();
-		const project = await getProjectStore().create({
-			bucketId: DEFAULT_BUCKET_ID,
-			name: 'Emptied',
-			slug: `wh-${Math.floor(Math.random() * 1e6)}`,
-			ownerGroupId: UNASSIGNED_GROUP_ID
-		});
-		const created = await rpc(
-			call('client_create', {
-				id: project._id,
-				clientName: 'Only',
-				grantTypes: ['authorization_code'],
-				redirectUris: ['https://a.example.com/cb'],
-				tokenEndpointAuthMethod: 'none'
-			}),
-			token
-		);
-		const { clientId } = shaped(
-			CreatedClient,
-			created.result?.structuredContent?.result
-		);
+		const bucketId = await agentBucket(token, 'Emptied');
+		const clientId = await agentClient(token, bucketId, 'Only');
 
-		// Each item is its own confirmed deletion — the container cannot be cleared in one step.
+		// Each item is its own confirmed deletion — the bucket cannot be cleared in one step.
 		const described = await rpc(
-			call('client_delete', { id: project._id, clientId }),
+			call('client_delete', { id: bucketId, clientId }),
 			token
 		);
 		const confirmationToken =
@@ -270,18 +224,15 @@ describe('withheld container deletions', () => {
 		expect(confirmationToken).toBeString();
 
 		const deleted = await rpc(
-			call('client_delete', { id: project._id, clientId, confirmationToken }),
+			call('client_delete', { id: bucketId, clientId, confirmationToken }),
 			token
 		);
 		expect(deleted.result?.isError).not.toBe(true);
 
-		// The project is now empty — and still not deletable from here.
-		const refused = await rpc(
-			call('project_delete', { id: project._id }),
-			token
-		);
+		// The bucket is now empty — and still not deletable from here.
+		const refused = await rpc(call('bucket_delete', { id: bucketId }), token);
 		expect(refused.result?.isError ?? refused.error !== undefined).toBe(true);
-		expect(await getProjectStore().find(project._id)).not.toBeNull();
+		expect(await getBucketStore().find(bucketId)).not.toBeNull();
 	});
 
 	/*
@@ -295,15 +246,15 @@ describe('withheld container deletions', () => {
 			const { token } = await superAdmin();
 
 			const refused = await rpc(
-				call('project_delete', { id: 'anything' }),
+				call('bucket_delete', { id: 'anything' }),
 				token
 			);
 
 			const expected = present(
 				excludedConsoleOperations.find(
-					(e) => e.path === '/admin/api/projects/:id' && e.method === 'DELETE'
+					(e) => e.path === '/admin/api/buckets/:id' && e.method === 'DELETE'
 				),
-				'the project deletion in the exclusion table'
+				'the bucket deletion in the exclusion table'
 			);
 			expect(refused.result?.isError).toBe(true);
 			expect(refused.result?.structuredContent?.reason).toBe(
@@ -330,7 +281,7 @@ describe('withheld container deletions', () => {
 
 			// Not in the exclusion table, so nothing here should claim to explain it. The point of the
 			// narrow match: a typo must not be dressed up as a policy decision.
-			const typo = await rpc(call('projct_delete', { id: 'anything' }), token);
+			const typo = await rpc(call('buckt_delete', { id: 'anything' }), token);
 
 			expect(typo.result?.structuredContent?.reason).not.toBe(
 				'not_available_here'

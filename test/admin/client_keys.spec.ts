@@ -11,8 +11,8 @@ import { shaped } from '../shape.js';
 import * as JWT from 'lib/helpers/jwt.ts';
 import nanoid from 'lib/helpers/nanoid.js';
 import { ISSUER } from 'lib/configs/env.js';
-import { getProjectStore } from 'lib/adapters/index.ts';
-import { UNASSIGNED_GROUP_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
+import { getBucketStore } from 'lib/adapters/index.ts';
+import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 
 const {
 	d: _d,
@@ -41,7 +41,7 @@ const ClientView = Type.Object({
 });
 
 let cookie: string;
-let projectId: string;
+let bucketId: string;
 
 function json(method: string, path: string, body?: unknown) {
 	return send(path, {
@@ -52,7 +52,7 @@ function json(method: string, path: string, body?: unknown) {
 }
 
 async function createClient(body: Record<string, unknown>) {
-	return json('POST', `/admin/api/projects/${projectId}/clients`, body);
+	return json('POST', `/admin/api/buckets/${bucketId}/clients`, body);
 }
 
 async function created(body: Record<string, unknown>) {
@@ -70,11 +70,12 @@ describe('a key-authenticated client registered by an operator', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'client_keys' });
 		cookie = await superAdminCookie();
-		projectId = (
-			await getProjectStore().create({
-				bucketId: DEFAULT_BUCKET_ID,
+		bucketId = (
+			await getBucketStore().create({
 				name: 'Keys',
-				slug: `keys-${nanoid()}`,
+				slug: `keys-${nanoid()
+					.toLowerCase()
+					.replace(/[^a-z0-9]/g, '')}`,
 				ownerGroupId: UNASSIGNED_GROUP_ID
 			})
 		)._id;
@@ -207,7 +208,7 @@ describe('a key-authenticated client registered by an operator', () => {
 
 		const res = await json(
 			'PATCH',
-			`/admin/api/projects/${projectId}/clients/${client.clientId}`,
+			`/admin/api/buckets/${bucketId}/clients/${client.clientId}`,
 			{ jwksUri: null, jwks: { keys: [publicKey] } }
 		);
 

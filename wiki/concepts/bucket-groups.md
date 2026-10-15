@@ -4,7 +4,7 @@ title: 'Bucket groups: what roles became, the groups claim, and Super administra
 tags: [architecture, contract, gotcha, oauth]
 sources: [oauth-server-codebase]
 created: 2026-10-07
-updated: 2026-10-07
+updated: 2026-10-15
 graph:
   node_type: concept
   relationships:
@@ -27,7 +27,8 @@ nothing (it was assigned and never read) and is gone.
 
 A bucket group (`BucketGroup`, `lib/adapters/types.ts:1316`) is a named set of one bucket's end users, kept by
 administrators or owned by exactly one provisioning connection (`provisionedBy`, the same field and meaning as
-on `User`). An administrator group owns projects and buckets and has owner/member standing and invitations.
+on `User`). An administrator group owns buckets (and owned projects, until spec 099 removed them) and has owner/member
+standing and invitations.
 
 They are not merged. They hold different people, have different shapes, and — the deciding reason — keeping the
 privilege-granting set in a different entity from the one SCIM writes means no SCIM request and no token can
@@ -106,8 +107,8 @@ be renamed. Granting and withdrawing are operations of their own — `POST`/`DEL
 deactivated (`activeSuperAdminsWithout`, `:68`); first-run setup makes its administrator a member and stays closed
 while the group has an active member.
 
-Found while doing this: MCP's `project_create` and `bucket_create` were marked super-admin-only although their
-routes had no such gate — an MCP-only refusal the console never applied. They are `superAdminOnly: false` now.
+Found while doing this: MCP's `project_create` (removed with projects in spec 099) and `bucket_create` were
+marked super-admin-only although their routes had no such gate — an MCP-only refusal the console never applied. They are `superAdminOnly: false` now.
 
 ## The migration
 

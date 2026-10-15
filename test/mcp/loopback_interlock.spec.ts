@@ -60,8 +60,11 @@ async function superAdmin() {
 	};
 }
 
-async function projectAdmin() {
-	const user = await createAdministrator('plain', `proj-${Math.random()}@x.io`);
+async function plainAdmin() {
+	const user = await createAdministrator(
+		'plain',
+		`plain-${Math.random()}@x.io`
+	);
 	const session = await sessionFor(user);
 	return { cookie: `${ADMIN_SESSION_COOKIE}=${session._id}` };
 }
@@ -89,7 +92,7 @@ describe('permitting a client identity through the admin API', () => {
 	});
 
 	it('refuses anyone who is not a super administrator', async () => {
-		const { cookie } = await projectAdmin();
+		const { cookie } = await plainAdmin();
 
 		const res = await api.admin.api.mcp.clients.get({ headers: { cookie } });
 

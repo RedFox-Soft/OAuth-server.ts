@@ -5,7 +5,7 @@ import { Type } from '@sinclair/typebox';
 import { adminApiRoutes } from 'lib/admin/routes.ts';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { recordConnectionAudit } from 'lib/admin/audit/record.ts';
-import { getBucketStore, getProjectStore } from 'lib/adapters/index.ts';
+import { getBucketStore } from 'lib/adapters/index.ts';
 import type { User, UserBucket } from 'lib/adapters/types.ts';
 import { forgetBucketAddresses } from 'lib/admin/auth/bucketAddress.ts';
 import nanoid from 'lib/helpers/nanoid.ts';
@@ -76,8 +76,8 @@ async function bucketOf(ownerGroupId: string, name: string) {
 
 /*
  * One team, its two buckets and a third it also owns, and what an owner does to them through the admin API:
- * settings, an end user, a provisioning connection, a signing key, and a project that leaves one bucket
- * for the other. Built once: every case below only reads the trail.
+ * settings, an end user, a provisioning connection, a signing key and an application in one bucket, and an
+ * API declared in the other. Built once: every case below only reads the trail.
  */
 interface World {
 	owner: User;
@@ -85,7 +85,8 @@ interface World {
 	a: UserBucket;
 	b: UserBucket;
 	c: UserBucket;
-	projectId: string;
+	clientId: string;
+	resourceId: string;
 	connectionId: string;
 	kid: string;
 }
@@ -107,12 +108,7 @@ describe('the audit trail, filtered', () => {
 		const a = await bucketOf(team._id, 'Acme customers');
 		const b = await bucketOf(team._id, 'Beta customers');
 		const c = await bucketOf(team._id, 'Elsewhere');
-		const project = await getProjectStore().create({
-			name: 'Shop',
-			slug: slug('shop'),
-			ownerGroupId: team._id,
-			bucketId: b._id
-		});
+		const resourceId = `https://${slug('api')}.example.com`;
 
 		const steps = [
 			await call('PATCH', `/admin/api/buckets/${a._id}`, cookie, {
@@ -134,10 +130,16 @@ describe('the audit trail, filtered', () => {
 			await call('POST', `/admin/api/buckets/${a._id}/keys`, cookie, {
 				alg: 'ES256'
 			}),
-			await call('PUT', `/admin/api/projects/${project._id}/bucket`, cookie, {
-				bucketId: a._id,
-				confirm: true,
-				expect: { applications: 0, resources: 0 }
+			await call('POST', `/admin/api/buckets/${a._id}/clients`, cookie, {
+				clientName: 'Shop',
+				grantTypes: ['authorization_code'],
+				tokenEndpointAuthMethod: 'client_secret_basic',
+				redirectUris: ['https://shop.example.com/cb']
+			}),
+			await call('POST', `/admin/api/buckets/${b._id}/resources`, cookie, {
+				identifier: resourceId,
+				name: 'Orders API',
+				scopes: ['orders:read']
 			})
 		];
 		for (const step of steps) expect(step.status).toBeLessThan(300);
@@ -147,6 +149,10 @@ describe('the audit trail, filtered', () => {
 			steps[3]?.body
 		).id;
 		const kid = shaped(Type.Object({ kid: Type.String() }), steps[4]?.body).kid;
+		const clientId = shaped(
+			Type.Object({ clientId: Type.String() }),
+			steps[5]?.body
+		).clientId;
 		/* What the directory itself does, as the SCIM surface records it. */
 		await recordConnectionAudit(connectionId, 'enduser.create', 'someone', {
 			targetScope: a._id,
@@ -159,13 +165,14 @@ describe('the audit trail, filtered', () => {
 			a,
 			b,
 			c,
-			projectId: project._id,
+			clientId,
+			resourceId,
 			connectionId,
 			kid
 		};
 	});
 
-	it("finds a bucket's settings, people, provisioning, keys and a project joining it, and nothing of another bucket", async () => {
+	it("finds a bucket's settings, people, provisioning, keys and applications, and nothing of another bucket", async () => {
 		const entries = await trail(w.cookie, { bucket: w.a._id });
 
 		expect(new Set(entries.map((e) => e.action))).toEqual(
@@ -174,17 +181,21 @@ describe('the audit trail, filtered', () => {
 				'enduser.create',
 				'provisioning.connection.create',
 				'bucket.key.generate',
-				'project.bucket.assign'
+				'client.create'
 			])
 		);
+		expect(entries.find((e) => e.action === 'client.create')?.targetId).toBe(
+			w.clientId
+		);
 		expect(entries.some((e) => e.targetId === w.c._id)).toBe(false);
+		expect(entries.some((e) => e.targetId === w.resourceId)).toBe(false);
 	});
 
-	it('finds a project leaving a bucket in the trail of the bucket it left', async () => {
+	it("finds an API declared in a bucket in that bucket's trail, and nothing of its sibling", async () => {
 		const entries = await trail(w.cookie, { bucket: w.b._id });
 
 		expect(entries.map((e) => [e.action, e.targetId])).toEqual([
-			['project.bucket.assign', w.projectId]
+			['resource.create', w.resourceId]
 		]);
 	});
 

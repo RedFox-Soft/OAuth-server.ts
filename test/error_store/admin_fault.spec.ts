@@ -69,18 +69,21 @@ describe('admin-plane fault capture', () => {
 
 		try {
 			const response = await app.handle(
-				new Request('http://e.ly/admin/api/projects', {
-					method: 'POST',
-					headers: {
-						'content-type': 'application/json',
-						cookie: await superCookie()
-					},
-					body: JSON.stringify({
-						name: unique('p'),
-						slug: unique('s'),
-						bucketId: DEFAULT_BUCKET_ID
-					})
-				})
+				new Request(
+					`http://e.ly/admin/api/buckets/${DEFAULT_BUCKET_ID}/resources`,
+					{
+						method: 'POST',
+						headers: {
+							'content-type': 'application/json',
+							cookie: await superCookie()
+						},
+						body: JSON.stringify({
+							identifier: `https://${unique('api')}.example/`,
+							name: 'API',
+							scopes: ['api:read']
+						})
+					}
+				)
 			);
 			const body = shaped(
 				Type.Object({
@@ -98,7 +101,9 @@ describe('admin-plane fault capture', () => {
 			expect(body.message).toContain('audit unavailable');
 			expect(body.error_reference).toMatch(/^err_[A-Za-z0-9_-]{16}$/);
 
-			const page = await errorStore.list({ route: '/admin/api/projects' });
+			const page = await errorStore.list({
+				route: '/admin/api/buckets/:id/resources'
+			});
 			expect(page.total).toBe(1);
 			expect(page.groups[0].surface).toBe('admin');
 			expect(page.groups[0].errorCode).toBe('admin_error');
@@ -113,15 +118,18 @@ describe('admin-plane fault capture', () => {
 	// A deliberate refusal is not a fault, whatever plane it comes from.
 	it('records nothing for a 4xx AdminError', async () => {
 		const response = await app.handle(
-			new Request('http://e.ly/admin/api/projects', {
-				method: 'POST',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({
-					name: 'x',
-					slug: 'y',
-					bucketId: DEFAULT_BUCKET_ID
-				})
-			})
+			new Request(
+				`http://e.ly/admin/api/buckets/${DEFAULT_BUCKET_ID}/resources`,
+				{
+					method: 'POST',
+					headers: { 'content-type': 'application/json' },
+					body: JSON.stringify({
+						identifier: 'https://api.example/',
+						name: 'API',
+						scopes: ['api:read']
+					})
+				}
+			)
 		);
 		const body = shaped(
 			Type.Object({
