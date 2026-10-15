@@ -21,6 +21,7 @@ import {
 } from './verify_container_ownership.js';
 import { verifyProjectRemoval } from './verify_remove_projects.js';
 import { verifyReservedHostnamesKey } from './verify_reserved_hostnames_key.js';
+import { verifyPlans } from './verify_plans.js';
 import {
 	FIXED_AREAS,
 	STORE_AREAS,
@@ -614,6 +615,26 @@ await verifyReservedHostnamesKey(
 	String(Date.now()),
 	check
 );
+
+{
+	const { UserBucketStore: PlanBucketStore, PlanCatalogueStore } =
+		await import('../lib/adapters/postgres/index.js');
+	await verifyPlans(
+		{
+			buckets: new PlanBucketStore(),
+			catalogue: new PlanCatalogueStore(),
+			apply: async () => {
+				const record = MIGRATIONS.find((m) =>
+					m.id.endsWith('projects-record-plan')
+				);
+				if (!record || 'noop' in record.postgres) return null;
+				return record.postgres.apply(handle);
+			}
+		},
+		String(Date.now()),
+		check
+	);
+}
 
 /*
  * The root keys migration, against legacy flat keys in a table that has no order: two RS256 keys and an

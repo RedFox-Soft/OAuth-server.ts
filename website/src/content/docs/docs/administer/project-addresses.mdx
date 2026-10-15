@@ -58,6 +58,9 @@ is **Address forms**, under **Settings → Project addresses**. It has three val
 - `both`: teams choose. The console's **New project** dialog has the subdomain selected, and the team can switch
   to the path.
 
+The setting decides the form, never the name. On an instance with [plans](/docs/administer/plans/) turned on, a
+Free project's slug is generated: the team picks the form, and the server picks an 8-character name for it.
+
 The default is `path` on every instance, new and upgraded. A subdomain only works once the wildcard DNS record
 and certificate exist, and the server cannot see either. So nothing is offered until the operator has set them
 up and turned the setting on.

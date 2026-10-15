@@ -184,6 +184,9 @@ describe('MCP tool catalogue', () => {
 			'jwks_retire',
 			'jwks_revoke',
 			'jwks_rotate',
+			'plan_create',
+			'plan_delete',
+			'plan_update',
 			'project_address_change',
 			/* Makes a group read-only to every administrator and hands it to an external directory. */
 			'project_group_assign_connection',
@@ -194,6 +197,7 @@ describe('MCP tool catalogue', () => {
 			'project_key_revoke',
 			/* The team it leaves loses a population of people, with no step of its own. */
 			'project_owner_change',
+			'project_plan_set',
 			/* Gives a switched-off population its sign-in, sessions and tokens back (specs/090). */
 			'project_restore',
 			/* Makes a local user read-only to every administrator, for good. */

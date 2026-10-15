@@ -386,6 +386,26 @@ export const ACTIONS = {
 		okText: 'Disable'
 	},
 	'faults.purge': { class: 'C4' },
+
+	'plan.create': { class: 'C0' },
+	'plan.edit': { class: 'C0' },
+	// Every project created from now on lands on it; nothing already on another plan moves.
+	'plan.makeDefault': {
+		class: 'C1',
+		title: (t) => `Make ${t} the default plan?`,
+		okText: 'Make default'
+	},
+	'plan.delete': {
+		class: 'C2',
+		title: (t) => `Delete plan ${t}?`,
+		okText: 'Delete plan'
+	},
+	// Limits gate only what is created next, so a smaller plan switches nothing off: a plain question.
+	'bucket.plan.change': {
+		class: 'C1',
+		title: (t) => `Change the plan of ${t}?`,
+		okText: 'Change plan'
+	},
 	'scope.switch': { class: 'C0' },
 	'self.verification.send': { class: 'C0' }
 } as const satisfies Record<string, ActionSpec>;

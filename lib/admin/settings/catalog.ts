@@ -30,7 +30,8 @@ export type SettingDomain =
 	| 'endpoints'
 	| 'signin-abuse'
 	| 'diagnostics'
-	| 'integrations';
+	| 'integrations'
+	| 'plans';
 
 /*
  * The sub-nav, in order. Lives here rather than in the console so the panes cannot disagree with the
@@ -70,6 +71,12 @@ export const SETTING_DOMAINS: {
 		id: 'integrations',
 		label: 'Integrations',
 		blurb: 'Outbound services, and machine access to this console.'
+	},
+	{
+		id: 'plans',
+		label: 'Plans & limits',
+		blurb:
+			'What each project’s plan lets its team create, and the plan catalogue.'
 	}
 ];
 
@@ -533,6 +540,29 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 		risk: 'security',
 		description:
 			'Hostnames beneath this deployment’s domain that no project may be assigned. The deployment’s own canonical host is always refused and does not need listing; this is for everything else you run under the same domain — a marketing site, a status page, a staging instance — which this server has no way to discover. Empty by default, deliberately: a guess would either refuse a name you meant to use for a tenant or admit one that shadows something you already serve. Names are compared in normalised form, so case and a trailing dot do not matter. A project subdomain is refused when its full name is listed here.'
+	},
+
+	{
+		key: 'plans.enabled',
+		domain: 'plans',
+		group: 'Enforce plans',
+		label: 'Enforce plans',
+		summary: 'Limit what each team may create by its project’s plan',
+		type: 'boolean',
+		description:
+			'Turns on the limits of each project’s plan: how many projects an administrator may own, how many applications and APIs a project may hold, whether it may use enterprise sign-in or name its own address, and the monthly active users at which it stops accepting new self-service sign-ups. Turn it on for a public instance where anyone may register as an administrator; leave it off for your own organisation’s instance. Limits apply only to a new creation, and never to a super administrator or a System project: nothing that already exists is switched off, and no existing user is ever refused a sign-in. Every project already records its plan, so turning this on changes no data, and turning it off keeps every assignment and the catalogue for next time.'
+	},
+	{
+		key: 'plans.regularTeamsPerAdministrator',
+		domain: 'plans',
+		group: 'Enforce plans',
+		label: 'Teams per administrator',
+		summary: 'How many regular teams one administrator may own',
+		type: 'number',
+		unit: 'teams',
+		dependsOn: 'plans.enabled',
+		description:
+			'The number of regular teams one administrator may own while plans are on, counted over every team in which they have the owner role. Their personal team never counts. A team has no plan of its own, so this is one number for the whole instance rather than a plan limit. Lowering it removes nobody from a team they already own; it only refuses the next team, or the next time someone would make them an owner.'
 	},
 
 	{

@@ -18,6 +18,7 @@ import { GroupCard } from '../settings/GroupCard.js';
 import { SaveBar } from '../settings/SaveBar.js';
 import { SmtpCard } from '../settings/SmtpCard.js';
 import { SentryCard } from '../settings/SentryCard.js';
+import { PlansCard } from '../settings/PlansCard.js';
 import { useLeaveGuard } from '../frame/router.js';
 import { PageHeader } from '../frame/PageHeader.js';
 import { request } from '../frame/request.js';
@@ -274,7 +275,7 @@ export function Settings() {
 						))}
 
 						{/*
-						 * The two runtime surfaces, each on the pane it belongs to and each saved by its own
+						 * The runtime surfaces, each on the pane it belongs to and each saved by its own
 						 * button, because each is its own endpoint that applies immediately. The Sentry
 						 * credential sits beside the Error Store card rather than nested inside it: it is the
 						 * prerequisite for the reporting toggle there, so it has to be reachable without first
@@ -282,6 +283,7 @@ export function Settings() {
 						 */}
 						{!searching && pane === 'diagnostics' && <SentryCard />}
 						{!searching && pane === 'integrations' && <SmtpCard />}
+						{!searching && pane === 'plans' && <PlansCard />}
 
 						<SaveBar
 							changes={changes}

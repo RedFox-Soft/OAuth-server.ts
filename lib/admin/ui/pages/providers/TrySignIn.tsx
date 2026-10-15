@@ -45,7 +45,9 @@ const REFUSALS: Record<RefusalReason, string> = {
 	inactive: 'the account is locked or deactivated',
 	not_provisioned: 'the directory has provisioned nobody matching this sign-in',
 	link_conflict:
-		'the matching person is already linked to another identity at this provider'
+		'the matching person is already linked to another identity at this provider',
+	signups_paused:
+		"no account has this address, and sign-ups are paused: this project has reached its plan's monthly active users"
 };
 
 function accountName(account: { id: string; email?: string } | undefined) {

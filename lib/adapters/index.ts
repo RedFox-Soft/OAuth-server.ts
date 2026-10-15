@@ -17,6 +17,7 @@ import {
 	ErrorStore as MemoryErrorStore,
 	McpConfirmationStore as MemoryMcpConfirmationStore,
 	SmtpSettingsStore as MemorySmtpSettingsStore,
+	PlanCatalogueStore as MemoryPlanCatalogueStore,
 	SingletonSecretStore as MemorySingletonSecretStore,
 	SchemaMigrationStore as MemorySchemaMigrationStore,
 	MigrationLeaseStore as MemoryMigrationLeaseStore,
@@ -62,6 +63,8 @@ import type {
 	SecretStoreInstance,
 	SmtpSettingsStoreConstructor,
 	SmtpSettingsStoreInstance,
+	PlanCatalogueStoreConstructor,
+	PlanCatalogueStoreInstance,
 	UserBucketStoreConstructor,
 	UserBucketStoreInstance,
 	UserStoreConstructor,
@@ -99,6 +102,8 @@ let McpConfirmationStoreClass: McpConfirmationStoreConstructor =
 	MemoryMcpConfirmationStore;
 let SmtpSettingsStoreClass: SmtpSettingsStoreConstructor =
 	MemorySmtpSettingsStore;
+let PlanCatalogueStoreClass: PlanCatalogueStoreConstructor =
+	MemoryPlanCatalogueStore;
 let SecretStoreClass: SecretStoreConstructor = MemorySingletonSecretStore;
 let SchemaMigrationStoreClass: SchemaMigrationStoreConstructor =
 	MemorySchemaMigrationStore;
@@ -135,6 +140,7 @@ if (backend === 'postgres') {
 	ErrorStoreClass = postgres.ErrorStore;
 	McpConfirmationStoreClass = postgres.McpConfirmationStore;
 	SmtpSettingsStoreClass = postgres.SmtpSettingsStore;
+	PlanCatalogueStoreClass = postgres.PlanCatalogueStore;
 	SecretStoreClass = postgres.SingletonSecretStore;
 	SchemaMigrationStoreClass = postgres.SchemaMigrationStore;
 	MigrationLeaseStoreClass = postgres.MigrationLeaseStore;
@@ -169,6 +175,7 @@ if (backend === 'mongodb') {
 	ErrorStoreClass = mongodb.ErrorStore;
 	McpConfirmationStoreClass = mongodb.McpConfirmationStore;
 	SmtpSettingsStoreClass = mongodb.SmtpSettingsStore;
+	PlanCatalogueStoreClass = mongodb.PlanCatalogueStore;
 	SecretStoreClass = mongodb.SingletonSecretStore;
 	SchemaMigrationStoreClass = mongodb.SchemaMigrationStore;
 	MigrationLeaseStoreClass = mongodb.MigrationLeaseStore;
@@ -488,6 +495,14 @@ export function getSmtpSettingsStore(): SmtpSettingsStoreInstance {
 	return smtpSettingsStoreSingleton;
 }
 
+let planCatalogueStoreSingleton: PlanCatalogueStoreInstance | null = null;
+export function getPlanCatalogueStore(): PlanCatalogueStoreInstance {
+	if (!planCatalogueStoreSingleton) {
+		planCatalogueStoreSingleton = new PlanCatalogueStoreClass();
+	}
+	return planCatalogueStoreSingleton;
+}
+
 // Test-only: drop the cached admin store singletons so a spec that requires a
 // clean admin bucket (e.g. first-run setup, the UI shell) is not
 // contaminated by users/buckets another spec seeded earlier in the same
@@ -523,6 +538,7 @@ export function resetStoresForTests(): void {
 	schemaMigrationStoreSingleton = null;
 	migrationLeaseStoreSingleton = null;
 	smtpSettingsStoreSingleton = null;
+	planCatalogueStoreSingleton = null;
 	adminSessionStore = new AdminSessionStoreClass();
 	adminAuditStore = new AdminAuditStoreClass();
 	mcpConfirmationStore = new McpConfirmationStoreClass();

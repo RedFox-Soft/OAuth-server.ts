@@ -1,6 +1,7 @@
 import { AdminError } from '../auth/rbac.js';
 import type { UserBucket } from '../../adapters/types.js';
 import type { FederationProvider } from '../../federation/types.js';
+import { MICROSOFT_SHARED_TENANTS } from '../../consts/known_providers.js';
 
 /*
  * Every rule a provider configuration has to satisfy, and the one rule about the bucket as a whole.
@@ -187,7 +188,7 @@ export function assertSuppliedValues(
 }
 
 /* Microsoft's documented words, or one organisation's own identifier. */
-const TENANT_WORDS = ['common', 'organizations', 'consumers'];
+const TENANT_WORDS: readonly string[] = MICROSOFT_SHARED_TENANTS;
 /* A GUID, or a verified domain — the two forms an organisation is named by. */
 const TENANT_ID =
 	/^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+)$/i;

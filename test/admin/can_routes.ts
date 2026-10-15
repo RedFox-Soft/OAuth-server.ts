@@ -79,6 +79,14 @@ export const statedRightRoutes: readonly StatedRightRoute[] = [
 
 	{ on: 'bucket', flag: 'read', method: 'GET', path: BUCKET },
 	{ on: 'bucket', flag: 'read', method: 'GET', path: `${BUCKET}/summary` },
+	/* A project's plan is an instance-level decision (specs/102): a super administrator's, whoever owns the project. */
+	{
+		on: 'bucket',
+		flag: 'setPlan',
+		method: 'PUT',
+		path: `${BUCKET}/plan`,
+		body: { planId: 'free' }
+	},
 	{
 		on: 'bucket',
 		flag: 'manageUsers',

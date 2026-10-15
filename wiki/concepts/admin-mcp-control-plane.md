@@ -15,8 +15,8 @@ Since spec 100 the tools use the names a person reads in the console: a project 
 `UserBucket`), a team (stored as an administrator group, `Group`) and a project's group of end users (stored
 as a bucket group, `BucketGroup`). So the `bucket_*` tools are `project_*`, `bucket_user_*` `project_user_*`,
 `bucket_group_*` `project_group_*`, `bucket_key_*` `project_key_*`, and `group_*` `team_*`; `client_*`,
-`resource_*` and `federation_*` kept their names. The catalogue still publishes 118 tools, 37 of them
-high-consequence. Before spec 099, `project_*` tools such as `project_create` and `project_bucket_assign`
+`resource_*` and `federation_*` kept their names. The catalogue published 118 tools, 37 of them
+high-consequence, until spec 102 added the plan tools: 123 since, 41 of them high-consequence ([[plans]]). Before spec 099, `project_*` tools such as `project_create` and `project_bucket_assign`
 administered the old Project entity, now called a retired project; where this page names them it says so.
 
 An AI agent administers this instance over MCP at `POST /mcp`, as an OAuth 2.1 protected resource of
@@ -222,7 +222,7 @@ the announcement that exists so an agent need not guess. That third withholding 
 intended. Since spec 100 the guessed names are `project_delete`, `project_purge` and `team_delete`
 (`excludedOperationFor`, `lib/mcp/catalogue.ts:2032-2041`).
 
-The other high-consequence operations — 37 tools — take two calls: describe, then confirm. How the count
+The other high-consequence operations — 41 tools since spec 102 — take two calls: describe, then confirm. How the count
 got there, in the names the tools had at the time (spec 100 renamed `bucket_*` to `project_*` and `group_*`
 to `team_*` without changing the count; a `project_*` tool before spec 099 is a retired-project tool): 37
 since spec 087 added `bucket_key_revoke` (now `project_key_revoke`), `jwks_rotate` and `jwks_revoke`, still
@@ -231,7 +231,8 @@ since spec 087 added `bucket_key_revoke` (now `project_key_revoke`), `jwks_rotat
 withheld ([[project-soft-delete]]), 40 since spec 089 added `bucket_user_bulk_deactivate` and
 `bucket_user_bulk_delete` (now `project_user_bulk_*`, [[end-user-support]]), 39 since spec 098 removed the
 retired-project tool `project_bucket_clear` with its route, and 37 since spec 099 removed the
-retired-project tools `project_bucket_assign` and `project_owner_change` (spec 085 made
+retired-project tools `project_bucket_assign` and `project_owner_change`, and 41 since spec 102 added
+`plan_create`, `plan_update`, `plan_delete` and `project_plan_set` ([[plans]]) (spec 085 made
 `project_bucket_assign` and `project_bucket_clear` high; spec 083 had added `admin_sign_out` and
 `admin_totp_clear`; spec 082 had added `bucket_user_email_change`, now `project_user_email_change`; spec
 075 `bucket_owner_change`, today's `project_owner_change`, and the retired-project `project_owner_change`,

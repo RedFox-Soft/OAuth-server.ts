@@ -431,6 +431,16 @@ function checkScimRateLimit(config: ConfigurationInput) {
 	}
 }
 
+/* How many regular teams one administrator may own while plans are on (specs/102); zero is a real answer. */
+function checkPlans(config: ConfigurationInput) {
+	const allowance = config['plans.regularTeamsPerAdministrator'];
+	if (!Number.isSafeInteger(allowance) || allowance < 0) {
+		throw new TypeError(
+			'plans.regularTeamsPerAdministrator must be a whole number, zero or more'
+		);
+	}
+}
+
 /*
  * The login throttle's numbers, checked at boot for the reason checkRateLimit states — a bad value
  * here fails silently at runtime — plus one this feature adds: the range is what stands in for the
@@ -742,6 +752,7 @@ export function validateConfiguration(
 	checkSentry(config);
 	checkRateLimit(config);
 	checkScimRateLimit(config);
+	checkPlans(config);
 	checkLoginThrottle(config);
 
 	return {

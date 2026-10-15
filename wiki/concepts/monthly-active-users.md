@@ -12,8 +12,9 @@ updated: 2026-10-15
 Every project counts, per UTC month and per UTC day, the distinct end users it **issued tokens to**
 (spec 076). The Default and administrators' projects are counted like any other. Each figure is broken down
 by how the person was active — `local` (a sign-in at this server), `federated` (through an upstream
-provider), `renewal` (tokens without a fresh sign-in) — and by whether a directory provisioned them. Plans
-will be priced per project on these figures; none exist yet, so nothing is refused or charged here.
+provider), `renewal` (tokens without a fresh sign-in) — and by whether a directory provisioned them. Since
+spec 102 a project's plan reads the current month's figure for its soft cap: at the cap, new self-service
+accounts are paused and no sign-in is ever refused ([[plans]]). Nothing is charged here.
 
 A project is stored as a bucket (`UserBucket`) and its owning team as an administrator group (`Group`); the
 stores and the code keep those names. What a reader sees changed in spec 100: the activity answers carry

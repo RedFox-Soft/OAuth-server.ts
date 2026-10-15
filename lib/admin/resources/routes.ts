@@ -38,6 +38,7 @@ import { ISSUER } from '../../configs/env.js';
 import { isUniqueValueTaken } from '../../adapters/conflicts.js';
 import { ROOT_DECLARATION_REFUSAL } from './refusals.js';
 import { mayDeclareIn } from '../auth/can.js';
+import { assertApiRoom } from '../../plans/enforce.js';
 
 /*
  * Declared protected resources: the audiences this server will mint tokens for, each belonging to one
@@ -275,6 +276,7 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 					field: 'identifier'
 				});
 			}
+			await assertApiRoom(ctx, bucket);
 
 			await recordAdminAudit(
 				ctx,

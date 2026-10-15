@@ -93,8 +93,12 @@ export function Buckets() {
 		onDeleted: () => void load()
 	});
 	const navigate = useNavigate();
-	const { me } = useMe();
+	const { me, reload } = useMe();
 	const mine = meCan(me);
+	const projectsFull =
+		mine.projects && mine.projects.count >= mine.projects.max
+			? mine.projects
+			: null;
 	const instanceHost = useInstanceHost();
 	const slugTyped = Form.useWatch('slug', form);
 	const [deleting, setDeleting] = useState<BucketRow | null>(null);
@@ -150,14 +154,19 @@ export function Buckets() {
 			const named = shown ? { ...rest, displayName: shown } : rest;
 			// The choice is not rendered when only one form is offered, and then that one is the form.
 			const chosen = addressForm ?? mine.addressForms[0];
+			/*
+			 * A plan without a custom address name (specs/102) is given no slug at all: the server generates one in
+			 * the chosen form, and refuses a named one.
+			 */
+			const slugPart = mine.nameSlug === false ? {} : { slug };
 			const result = await request<{ _id: string }>(
 				'POST',
 				'/admin/api/projects',
 				chosen === 'host'
 					? { ...named, host }
 					: chosen === 'subdomain'
-						? { ...named, slug, addressForm: 'subdomain' }
-						: { ...named, slug }
+						? { ...named, ...slugPart, addressForm: 'subdomain' }
+						: { ...named, ...slugPart }
 			);
 			if (!result.ok) {
 				feedback.failed(result, form);
@@ -166,6 +175,8 @@ export function Buckets() {
 			feedback.done(`Project ${values.name} created.`);
 			setOpen(false);
 			form.resetFields();
+			// The plan's count of the operator's projects moved; `me.can.projects` says so.
+			void reload();
 			// Opened at once: it may belong to a team other than the header's, where the list would not show it.
 			void navigate(bucketHref(result.data._id));
 		} finally {
@@ -223,13 +234,22 @@ export function Buckets() {
 	}
 
 	const createButton = mine.createProject ? (
-		<Button
-			type="primary"
-			icon={<PlusOutlined />}
-			onClick={() => setOpen(true)}
+		<Tooltip
+			title={
+				projectsFull
+					? `You own ${String(projectsFull.count)} of ${String(projectsFull.max)} projects on the ${projectsFull.plan.name} plan. Ask for a larger plan to create more.`
+					: undefined
+			}
 		>
-			New project
-		</Button>
+			<Button
+				type="primary"
+				icon={<PlusOutlined />}
+				disabled={projectsFull !== null}
+				onClick={() => setOpen(true)}
+			>
+				New project
+			</Button>
+		</Tooltip>
 	) : null;
 
 	return (
@@ -509,6 +529,21 @@ export function Buckets() {
 								);
 							}
 							const subdomain = chosen === 'subdomain';
+							if (mine.nameSlug === false) {
+								return (
+									<Form.Item
+										label="Address"
+										tooltip="Where this project is served, and the issuer in the tokens it mints."
+									>
+										<Typography.Text type="secondary">
+											{subdomain
+												? `A name of eight letters and digits is generated for it, served as a subdomain of ${instanceHost}.`
+												: 'A name of eight letters and digits is generated for it, served as a path of this server.'}{' '}
+											Choosing the name yourself needs a larger plan.
+										</Typography.Text>
+									</Form.Item>
+								);
+							}
 							const label =
 								typeof slugTyped === 'string' && slugTyped.trim()
 									? slugTyped.trim()

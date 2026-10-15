@@ -239,6 +239,17 @@ const GOOGLE: KnownProvider = {
 	choices: []
 };
 
+/*
+ * Microsoft's directories open to more than one organisation: anyone (`common`), any organisation's accounts
+ * (`organizations`), personal accounts (`consumers`). Any other tenant names one organisation's directory — on a
+ * plan without enterprise sign-in that is a corporate single sign-on, not a social one (specs/102).
+ */
+export const MICROSOFT_SHARED_TENANTS: readonly string[] = [
+	'common',
+	'organizations',
+	'consumers'
+];
+
 const MICROSOFT: KnownProvider = {
 	catalogueId: 'microsoft',
 	defaultProviderId: 'microsoft',

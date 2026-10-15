@@ -17,6 +17,7 @@ import type { BucketCan } from '../frame/can.js';
 import { UNASSIGNED_GROUP_ID, reservedOf } from '../../consts.js';
 import type { BucketSummary, BucketView } from './bucketView.js';
 import { RecentChanges } from '../frame/RecentChanges.js';
+import { BucketPlanCard } from './BucketPlanCard.js';
 
 /*
  * A bucket's landing page (specs/081): what needs attention, how to connect an application to it, how people
@@ -50,7 +51,8 @@ export function BucketOverview({
 	can,
 	superAdmin,
 	groupName,
-	onOpenSignIn
+	onOpenSignIn,
+	onChanged
 }: {
 	bucket: BucketView;
 	summary: BucketSummary | null;
@@ -59,6 +61,8 @@ export function BucketOverview({
 	superAdmin: boolean;
 	groupName: string;
 	onOpenSignIn: () => void;
+	/* The project moved to another plan; the page reads it and its summary again. */
+	onChanged: () => void;
 }) {
 	const navigate = useNavigate();
 	const special = reservedOf(bucket._id);
@@ -413,6 +417,16 @@ export function BucketOverview({
 					</Card>
 				</Col>
 			</Row>
+
+			{summary?.plan && (
+				<BucketPlanCard
+					bucketId={bucket._id}
+					bucketName={bucket.name}
+					plan={summary.plan}
+					canSetPlan={can.setPlan}
+					onChanged={onChanged}
+				/>
+			)}
 
 			{summaryFailed && (
 				<Alert

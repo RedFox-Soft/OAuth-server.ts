@@ -23,7 +23,8 @@ export type SettingDomain =
 	| 'endpoints'
 	| 'signin-abuse'
 	| 'diagnostics'
-	| 'integrations';
+	| 'integrations'
+	| 'plans';
 
 export interface Descriptor {
 	key: string;

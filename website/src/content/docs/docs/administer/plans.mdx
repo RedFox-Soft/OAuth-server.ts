@@ -1,0 +1,275 @@
+---
+title: Plans and Free-tier limits
+description: 'Limit what each team on a shared instance may create: projects, applications, APIs, enterprise sign-in and new sign-ups. Off by default.'
+sidebar:
+  order: 9
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+A **plan** is a named set of limits on a project. It says how many applications and APIs the project may hold,
+which sign-in providers it may use, whether its team may name its address, and how many end users it serves
+before new sign-ups pause. Every project outside the System team is on exactly one plan.
+
+Plans are for a public instance, where anyone may register as an administrator. There, nothing else stops one
+person from creating a hundred projects. On your own organisation's instance you do not need them, and they are
+off by default.
+
+Plans charge nothing. There is no billing, no payment and no self-service upgrade. The only way to a larger plan
+is a super administrator's decision.
+
+## Turning plans on {#turning-plans-on}
+
+The setting [`plans.enabled`](/docs/reference/settings/#plans.enabled) is the switch. In the console it is
+**Enforce plans**, under **Settings → Plans & limits**. It is off on every instance, new and upgraded.
+
+While it is off, nothing in this page is enforced, and a team sees nothing about plans. Projects still record
+their plan, so turning it on changes no data. Turning it off again keeps every project's plan and the catalogue
+for next time.
+
+A save takes effect on the next request, without a restart.
+
+## The Free plan {#the-free-plan}
+
+The instance comes with one plan, **Free**, and it is the default: the plan a new project is put on. Its limits
+are:
+
+| Limit                           | Free                                                                        |
+| ------------------------------- | --------------------------------------------------------------------------- |
+| Monthly active users            | 100,000 per project; reaching it pauses new self-service sign-ups only      |
+| Projects per administrator      | 2 Free projects, counted over every team the administrator owns             |
+| Regular teams per administrator | 1, from the setting `plans.regularTeamsPerAdministrator`                    |
+| Applications per project        | 10; applications that register themselves are not counted                   |
+| APIs per project                | 10                                                                          |
+| Sign-in providers               | Social sign-in only: Google, Apple, GitHub, and Microsoft for every account |
+| The project's address name      | Generated, 8 characters; the team cannot choose it                          |
+| A hostname of the project's own | Not included; giving one stays a super administrator's act                  |
+
+The sections below explain each one.
+
+### Monthly active users {#monthly-active-users}
+
+A project's **monthly active users** are the distinct end users it issued tokens to in one calendar month (UTC).
+A sign-in counts, and so does a token renewal without a new sign-in. The figure is the one the console already
+shows on the **Usage** page.
+
+The cap is soft. When a Free project reaches 100,000 in a month, it stops creating new accounts on the end
+user's own initiative:
+
+- **Self-registration** is refused. The person sees a page saying that the application is not accepting new
+  accounts at the moment. The page names no plan, price or number, and it is shown in the person's language.
+- **A first sign-in through an upstream provider** that would create a new account is refused the same way.
+
+Nobody who already has an account is ever refused. Sign-in by any method, token renewal and linking an upstream
+identity to an existing account all work as before. An administrator can still create or invite end users, and
+a SCIM directory can still provision them.
+
+Sign-ups open again when a new month starts, or when a super administrator moves the project to a plan with a
+higher cap. The server re-reads the figure at most about every 5 minutes, so a change takes up to that long to
+show. If the figure cannot be read at all, sign-ups stay open: a storage fault must not lock new people out.
+
+In the console, **Try sign-in** on a provider names this reason when it applies, so an administrator can tell it
+from a misconfiguration.
+
+### Projects and teams per administrator {#projects-and-teams-per-administrator}
+
+An administrator **owns** a team when they are its member with the owner role. Their personal team counts; so
+does every regular team they own. On Free, one administrator may own 2 Free projects across all of those teams
+together.
+
+The count cannot be got around by moving things. It is checked whenever a project would arrive in a team:
+
+- when a project is created there;
+- when a project is moved there from another team;
+- when a project scheduled for deletion is restored there. A project scheduled for deletion does not count until
+  it is restored.
+
+A team may have several owners. Then every project in the team counts toward each of them, and a project may
+arrive only if no owner would go over their limit.
+
+Separately, an administrator may own a limited number of **regular teams**. The setting
+[`plans.regularTeamsPerAdministrator`](/docs/reference/settings/#plans.regularTeamsPerAdministrator) decides it,
+and it is 1 by default. The personal team never counts. A team has no plan of its own, so this is one number for
+the whole instance rather than a plan limit.
+
+Becoming an owner is checked too. Adding someone to a team as an owner, changing a member's role to owner, or
+accepting an invitation as an owner is refused when it would put that person over either count.
+
+### Applications and APIs {#applications-and-apis}
+
+A Free project may hold 10 applications and 10 APIs. Only applications an administrator creates are counted.
+An application that registers itself through dynamic client registration is neither counted nor refused.
+
+### Social sign-in and enterprise sign-in {#social-and-enterprise-sign-in}
+
+A Free project may let its users sign in through the [recognised providers](/docs/administer/federation/):
+Google, Apple, GitHub, and Microsoft open to every account. Microsoft is open to every account when its tenant
+is `common`, `organizations` or `consumers`: personal accounts, any organisation's accounts, or both.
+
+**Enterprise sign-in** needs a larger plan. It is either of these:
+
+- a generic OpenID Connect provider, one that is not on the recognised list;
+- Microsoft bound to one organisation's directory, by that directory's ID or domain.
+
+The check runs when a provider is added, and when an existing provider's issuer or Microsoft tenant is changed.
+In the console, the **Sign-in** tab shows enterprise choices as not included on such a plan.
+
+### A generated address name {#a-generated-address-name}
+
+A project's address contains its **slug**, the short name that becomes its path or its subdomain (see
+[Project addresses](/docs/administer/project-addresses/)). On Free, the server generates the slug: 8 random
+lowercase letters and digits, such as `k3x9w2qa`. It is drawn at random rather than made from the project's
+name, so the address does not reveal who runs the project.
+
+A generated slug passes every rule a chosen one does. It is unique on the instance, never a reserved name, and
+never the subdomain or hostname of another project.
+
+The team still chooses the address **form**, among those the instance offers through the setting
+[`projects.addressForms`](/docs/reference/settings/#projects.addressForms): a path, a subdomain, or either. The
+plan never chooses the form: if the setting offers subdomains only, a Free project gets a generated slug at a
+subdomain. A Free project may later move between the path and the subdomain form, under the usual rules for an
+[address change](/docs/administer/project-addresses/#changing-a-projects-address), as long as it keeps its slug.
+
+Naming a slug is refused on Free, both for a new project and for an address change. A hostname of the project's
+own is not part of any team's choice yet: only a super administrator gives one, as before.
+
+## What a limit never does {#what-a-limit-never-does}
+
+- **A limit gates only something new.** A project already at or over a limit keeps working. Nothing is deleted,
+  switched off, moved or hidden because of a limit. This holds when plans are turned on over existing data, when a
+  plan's numbers are lowered, and when a project moves to a smaller plan.
+- **A super administrator is never limited.** That holds in the console and for an agent acting for one. A
+  project a super administrator creates in a team still counts toward that team's owners.
+- **System projects carry no plan.** The default project and the administrators' project belong to the System
+  team. They are never limited, and their plan cannot be set.
+- **No existing user is refused a sign-in.** The active-user cap pauses new accounts only.
+
+Two creations that arrive at the same moment, when a project is one below a limit, may both succeed. The project
+is then one over its limit. This is accepted: the project keeps working, and the next creation is refused.
+
+## Which plan a project is on {#which-plan-a-project-is-on}
+
+A project records its plan when it is created. It gets the plan that is the default at that moment, whether or not
+plans are turned on.
+
+So **making another plan the default affects only projects created afterwards**. Existing projects keep the plan
+they record. Editing a plan's limits is different: it applies at once to every project on that plan, from the next
+creation.
+
+Projects that existed before plans did are given Free by the upgrade's migration,
+`2026-10-18-projects-record-plan`. It writes only projects outside the System team that record no plan, and it
+reports how many it wrote. Run it with `bun run db:migrate`, as for any release (see
+[Upgrading](/docs/deploy/upgrade/)).
+
+A project moved to another team keeps its plan. Only a super administrator moves a project to another plan.
+
+## Managing plans {#managing-plans}
+
+Only a super administrator manages plans. Every change is recorded in the audit trail before it takes effect.
+
+<Steps>
+
+1. **Edit the catalogue.** Open **Settings → Plans & limits**. The catalogue lists each plan with its limits, its
+   features and how many projects are on it. Add a plan, change a plan's limits, make it the default, or delete
+   it. A limit may be unlimited.
+
+2. **Move a project to another plan.** Open the project. Its overview has a **Plan** card; choose the new plan
+   there and confirm. The project's next creation is judged by the new plan. The audit trail records the former
+   plan and the new one.
+
+3. **Turn plans on** with **Enforce plans** on the same settings pane, once the catalogue says what you want.
+
+</Steps>
+
+A plan cannot be deleted while it is the default, or while any project is on it. The refusal says how many
+projects use it. Move them first, or make another plan the default.
+
+## What a team sees {#what-a-team-sees}
+
+While plans are on, each project's overview shows its plan, each limit with what the project uses (for example
+`8 / 10 applications`), and a warning at 80% and at 100% of a limit. For the active-user cap, the warning at 100%
+says that sign-ups are closed. The **Usage** page shows the plan and the same warnings for every project.
+
+An action already at its limit says so before anyone fills in a form. On Free, the **New project** dialog asks for
+the address form only and says that the name will be generated. When an administrator already owns as many Free
+projects as Free allows, **New project** is disabled and names the limit. **New team**, and the create actions on
+the **Applications** and **APIs** tabs, behave the same way.
+
+A super administrator sees the plan and usage of every project, even while plans are off, so that plans can be set
+up before they are turned on. A team sees nothing about plans while they are off.
+
+## In the admin API and for agents {#in-the-admin-api-and-for-agents}
+
+A creation refused by a plan answers `409` with `code: 'plan_limit'`:
+
+```json
+{
+	"error": "admin_error",
+	"message": "This project is on the Free plan, which allows 10 applications. Ask for a larger plan to add more.",
+	"code": "plan_limit",
+	"limit": {
+		"name": "applicationsPerProject",
+		"plan": { "id": "free", "name": "Free" },
+		"count": 10,
+		"max": 10
+	}
+}
+```
+
+It is not an authorization failure. The caller has the permission; the plan has no room. Retrying does not help,
+and only a larger plan, set by a super administrator, lifts the limit. `limit.name` is one of:
+
+| `limit.name`                   | Refused at                                                                   |
+| ------------------------------ | ---------------------------------------------------------------------------- |
+| `projectsPerAdministrator`     | creating a project, moving one into a team, restoring one, becoming an owner |
+| `regularTeamsPerAdministrator` | creating a regular team, becoming an owner of one                            |
+| `applicationsPerProject`       | creating an application                                                      |
+| `apisPerProject`               | declaring an API                                                             |
+| `enterpriseSignIn`             | adding a provider, changing its issuer or Microsoft tenant                   |
+| `customSlug`                   | creating a project with a `slug`, changing its address to another `slug`     |
+
+`count` and `max` are present where the caller may see them. When another owner of a destination team is the
+one at the limit, the message says only that an owner of that team is at the limit, with no name and no count.
+`regularTeamsPerAdministrator` names no `plan`, because the team allowance is an instance setting.
+
+On a plan without a custom slug, `POST /admin/api/projects` takes neither `slug` nor `host`, and a slug is
+generated in the requested `addressForm`:
+
+```json
+{ "name": "Acme", "addressForm": "subdomain" }
+```
+
+What a caller may still create is readable before trying. `GET /admin/api/me` answers, in `can`:
+
+- `nameSlug`: whether a new project may be given a named slug;
+- `projects`: the caller's projects on the default plan, as `count` against `max`, with the plan; `null` when
+  unlimited;
+- `teams`: the caller's regular teams, as `count` against `max`.
+
+`GET /admin/api/projects/:id/summary` carries the project's `plan`: its limits, its features, its usage, its
+warnings (`near` at 80%, `reached` at 100%) and `signUpsPaused`. It is `null` for a System project.
+
+Agents read the same through `whoami` and `project_summary_get`. A `plan_limit` refusal reaches an agent as a
+conflict carrying the same `code` and `limit`, so it can tell a plan's limit from every other conflict. A super
+administrator's agent manages plans with these [MCP tools](/docs/reference/mcp-tools/):
+
+| Tool                                                              | Does                                                               | Consequence |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------ | ----------- |
+| [`plan_list`](/docs/reference/mcp-tools/#plan_list)               | Lists the catalogue, with how many projects are on each plan       | Read        |
+| [`plan_create`](/docs/reference/mcp-tools/#plan_create)           | Adds a plan; `default: true` makes it the default                  | High        |
+| [`plan_update`](/docs/reference/mcp-tools/#plan_update)           | Changes a plan's name, limits or features, or makes it the default | High        |
+| [`plan_delete`](/docs/reference/mcp-tools/#plan_delete)           | Removes a plan no project uses and that is not the default         | High        |
+| [`project_plan_set`](/docs/reference/mcp-tools/#project_plan_set) | Moves a project to another plan                                    | High        |
+
+A high-consequence tool asks for confirmation before it runs. The admin API routes behind them are
+`/admin/api/plans` and `PUT /admin/api/projects/:id/plan`; all are for super administrators only.
+
+## What plans do not cover {#what-plans-do-not-cover}
+
+- **SCIM provisioning is not a plan feature.** A shared instance keeps
+  [`scim.enabled`](/docs/reference/settings/#scim.enabled) off. Directory provisioning is for an organisation
+  running an instance of its own. Where it is on, the active-user cap never refuses it.
+- **Billing is out of scope.** There are no prices, invoices or payments, and no public plan picker.
+- **End users, groups, signing keys and SCIM connections** are not limited, beyond the active-user cap on new
+  sign-ups.
+- **No email is sent** when a project nears or reaches a limit. The warnings are in the console.

@@ -33,6 +33,11 @@ import {
 } from '../admin/federation/schema.js';
 import { PublishedSettingsBody } from '../admin/settings/schema.js';
 import { UpdateSmtpBody } from '../admin/settings/smtp/schema.js';
+import {
+	CreatePlanBody,
+	SetProjectPlanBody,
+	UpdatePlanBody
+} from '../admin/plans/schema.js';
 import { UpdateSentryBody } from '../admin/settings/sentry/schema.js';
 import {
 	GenerateKeyBody,
@@ -191,7 +196,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: [],
 		summary:
-			'The administrator this agent is acting as: their id, email, whether they are a super administrator, and the teams they belong to. `can` states what they may create — `createProject`, `addressForms` (the address forms they may give a project: `path`, `subdomain` and, for a super administrator, `host`; the first is the one to offer by default), `createTeam` — and `instance`, whether the instance-wide operations are theirs.'
+			'The administrator this agent is acting as: their id, email, whether they are a super administrator, and the teams they belong to. `can` states what they may create — `createProject`, `addressForms` (the address forms they may give a project: `path`, `subdomain` and, for a super administrator, `host`; the first is the one to offer by default), `createTeam` — and `instance`, whether the instance-wide operations are theirs. While plans are enforced it also states what the plan still allows them: `nameSlug` (false when a new project is given a generated address name, so `slug` must be left out of project_create), `projects` and `teams` (`count` against `max`; null when unlimited).'
 	},
 	{
 		tool: 'resource_list',
@@ -373,7 +378,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			"Count what a project holds, computed when asked: its accounts (`users`), how many are unverified, without an authenticator and without any linked upstream identity; its groups of end users (`groups`); its provisioning connections and how many are holding a deprovisioning (`held`); its identity providers (`providers.enabled`, and `providers.creating` — enabled ones that create accounts on first sign-in); whether mail delivery is configured; and whether federation is switched on for the instance (`federationEnabled` — when false no project's sign-in page shows a provider button). `withoutEnabledLink` counts accounts with no link to an enabled identity provider (who could not sign in were passwords turned off) and `passwordWithoutAuthenticator` accounts with no authenticator whose password is not known to be absent (who an authenticator requirement would ask to enrol); `applications` and `apis` count the applications and declared APIs it holds; on the default project a sign-in change's preview also counts the applications signing in there. `activeThisMonth` is present only to a caller with `can.readActivity`, and absent rather than zero before counting began. Counts only, never who. Readable by anyone who may read the project (project_get's `can.read`)."
+			"Count what a project holds, computed when asked: its accounts (`users`), how many are unverified, without an authenticator and without any linked upstream identity; its groups of end users (`groups`); its provisioning connections and how many are holding a deprovisioning (`held`); its identity providers (`providers.enabled`, and `providers.creating` — enabled ones that create accounts on first sign-in); whether mail delivery is configured; and whether federation is switched on for the instance (`federationEnabled` — when false no project's sign-in page shows a provider button). `withoutEnabledLink` counts accounts with no link to an enabled identity provider (who could not sign in were passwords turned off) and `passwordWithoutAuthenticator` accounts with no authenticator whose password is not known to be absent (who an authenticator requirement would ask to enrol); `applications` and `apis` count the applications and declared APIs it holds; on the default project a sign-in change's preview also counts the applications signing in there. `activeThisMonth` is present only to a caller with `can.readActivity`, and absent rather than zero before counting began. Counts only, never who. `plan`, while plans are enforced (to a super administrator always), is the project's plan: its `limits`, `features`, `usage`, `warnings` (`near` at 80% of a limit, `reached` at 100%) and `signUpsPaused` (new self-service accounts paused at the monthly-active-user cap; sign-ins never are); null for a System project, which has none. Readable by anyone who may read the project (project_get's `can.read`)."
 	},
 	{
 		tool: 'project_activity_get',
@@ -618,6 +623,19 @@ const catalogue = [
 		pathParams: [],
 		summary:
 			'The editable server settings, with the catalogue describing each one and its current value.'
+	},
+	{
+		tool: 'plan_list',
+		method: 'GET',
+		path: '/admin/api/plans',
+		action: null,
+		consequence: 'read',
+		superAdminOnly: true,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: [],
+		summary:
+			'The plan catalogue: each plan’s limits (monthly active users per project, projects per administrator, applications and APIs per project; null is unlimited), its features (enterpriseSignIn, customSlug, customDomain), whether it is the default a new project is put on, and how many projects are on it. Plans limit tenants only while the plans.enabled setting is on, and never a super administrator or a System project.'
 	},
 	{
 		tool: 'smtp_settings_get',
@@ -1061,7 +1079,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: [],
 		summary:
-			"Create a project. `displayName` is the name its people know the service by, shown at the top of the page where they allow an app access (the consent page); without it that page shows the project's address. A project cannot be created unreachable: at creation it has no providers, so password login cannot be switched off. `totpRequired` makes a password sign-in also require a one-time code from an authenticator app; it governs password sign-in only and never gates a federated one. A `slug` is served as a path beneath this instance, or with `addressForm: 'subdomain'` as a subdomain of its host (`<slug>.<instance host>`); a `host` is a hostname of its own. Each form must be listed in `can.addressForms` from whoami — the operator's `projects.addressForms` setting decides between path and subdomain for a team — and creating at all needs `can.createProject`. `teamId` names the team it belongs to — one this administrator is a member of (a super administrator: any team but another administrator's personal team); without it, the administrator's active team."
+			"Create a project. `displayName` is the name its people know the service by, shown at the top of the page where they allow an app access (the consent page); without it that page shows the project's address. A project cannot be created unreachable: at creation it has no providers, so password login cannot be switched off. `totpRequired` makes a password sign-in also require a one-time code from an authenticator app; it governs password sign-in only and never gates a federated one. A `slug` is served as a path beneath this instance, or with `addressForm: 'subdomain'` as a subdomain of its host (`<slug>.<instance host>`); a `host` is a hostname of its own. Each form must be listed in `can.addressForms` from whoami — the operator's `projects.addressForms` setting decides between path and subdomain for a team — and creating at all needs `can.createProject`. While plans are enforced and whoami's `can.nameSlug` is false, leave `slug` out: a random eight-character name is generated in the chosen form, and naming one is refused with `code: 'plan_limit'`; a refusal with that code names the limit and the plan, and only a larger plan, set by a super administrator, lifts it. `teamId` names the team it belongs to — one this administrator is a member of (a super administrator: any team but another administrator's personal team); without it, the administrator's active team."
 	},
 	{
 		tool: 'project_address_change',
@@ -1811,6 +1829,58 @@ const catalogue = [
 		pathParams: [],
 		summary:
 			'Change server settings. The merged configuration is validated first, so a combination the server would refuse at boot is refused here instead of taking the instance down on restart. A change takes effect in the instance that serves this call: the result names what it put in force (appliedKeys), what cannot be applied to a running server (pendingRestartKeys), and what is stored but not in force here (notInForceKeys).'
+	},
+	{
+		tool: 'plan_create',
+		method: 'POST',
+		path: '/admin/api/plans',
+		action: 'plan.create',
+		consequence: 'high',
+		superAdminOnly: true,
+		bodySchema: CreatePlanBody,
+		querySchema: null,
+		pathParams: [],
+		summary:
+			'Add a plan to the catalogue. `default: true` makes it the plan every new project is put on; existing projects keep the plan they record. High-consequence: describe it and confirm before running.'
+	},
+	{
+		tool: 'plan_update',
+		method: 'PATCH',
+		path: '/admin/api/plans/:id',
+		action: 'plan.update',
+		consequence: 'high',
+		superAdminOnly: true,
+		bodySchema: UpdatePlanBody,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			'Change a plan’s name, a limit or a feature — it applies at once to every project on the plan, and only to what is created next: nothing that exists is removed — or make it the default with `default: true`, which affects only projects created afterwards. High-consequence: describe it and confirm before running.'
+	},
+	{
+		tool: 'plan_delete',
+		method: 'DELETE',
+		path: '/admin/api/plans/:id',
+		action: 'plan.delete',
+		consequence: 'high',
+		superAdminOnly: true,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			'Remove a plan. Refused for the default plan and for a plan any project is on, with how many. High-consequence: describe it and confirm before running.'
+	},
+	{
+		tool: 'project_plan_set',
+		method: 'PUT',
+		path: '/admin/api/projects/:id/plan',
+		action: 'bucket.plan',
+		consequence: 'high',
+		superAdminOnly: true,
+		bodySchema: SetProjectPlanBody,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			'Move a tenant’s project to another plan; its team’s next creation is judged by the new plan’s limits. Refused for a System project, which carries no plan. High-consequence: describe it and confirm before running.'
 	},
 	{
 		tool: 'smtp_settings_update',

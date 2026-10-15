@@ -374,6 +374,18 @@ an operator or an integration sees:
 - **New addresses are audited in full.** A new `project.address.change` entry records the old and the new issuer,
   so a path and a subdomain with the same slug are told apart. Entries written before the upgrade are unchanged.
 
+The same release adds [plans](/docs/administer/plans/): a named set of limits on each project, for a public
+instance where anyone may register as an administrator. What an operator or an integration sees:
+
+- **Nothing is limited until you turn it on.** The new setting `plans.enabled` starts off on every instance, so
+  teams can create exactly what they could before.
+- **Every existing project is put on Free.** The migration `2026-10-18-projects-record-plan` records the Free plan
+  on every project outside the System team that records none, and reports how many. It cannot be undone, but it
+  changes nothing else, and it can safely run twice. `db:migrate --plan` names it, and `db:migrate` runs it.
+- **New answers, no removed ones.** A project's summary gains a `plan` block, `GET /admin/api/me` gains
+  `can.nameSlug`, `can.projects` and `can.teams`, and the MCP surface gains four `plan_*` tools and
+  `project_plan_set`. While plans are on, a creation over a limit is refused with `409` and `code: 'plan_limit'`.
+
 ## After the restart
 
 ```bash

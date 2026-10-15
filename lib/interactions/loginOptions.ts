@@ -3,6 +3,7 @@ import { federationEnabled } from '../federation/providers.js';
 import { resolveBucketForRequest } from '../admin/auth/resolveBucket.js';
 import type { RequestBucket } from '../configs/issuer.js';
 import { signInOptionsOf, type LoginOptions } from './signInOptions.js';
+import { signUpsPaused } from '../plans/signups.js';
 
 export type { LoginOptions } from './signInOptions.js';
 
@@ -15,7 +16,11 @@ export async function loginOptionsForBucket(
 	bucketId: string
 ): Promise<LoginOptions> {
 	const bucket = await getBucketStore().find(bucketId);
-	return signInOptionsOf(bucketId, bucket, federationEnabled());
+	const options = signInOptionsOf(bucketId, bucket, federationEnabled());
+	/* A project at its plan's active-user cap offers no sign-up (specs/102); the doors refuse it too. */
+	return bucket && options.registrationOpen && (await signUpsPaused(bucket))
+		? { ...options, registrationOpen: false }
+		: options;
 }
 
 /* The same answer, reached from the client that started the interaction — which is the only trustworthy

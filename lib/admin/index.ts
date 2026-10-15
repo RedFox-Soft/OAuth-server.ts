@@ -14,6 +14,7 @@ import { renderAdminShell } from './ui/serverRender.js';
 import { meView } from './me_view.js';
 import { meCan } from './auth/can.js';
 import { ISSUER } from '../configs/env.js';
+import { planRightsOf } from '../plans/rights.js';
 
 /*
  * The console: the admin API plus the HTML shell that drives it.
@@ -113,7 +114,10 @@ async function consolePage({
 	return renderAdminShell(
 		{
 			needsSetup: false,
-			me: { ...meView(admin), can: meCan(admin) },
+			me: {
+				...meView(admin),
+				can: { ...meCan(admin), ...(await planRightsOf(admin)) }
+			},
 			path,
 			instanceHost
 		},

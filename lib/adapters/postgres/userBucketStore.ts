@@ -55,6 +55,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 		verificationMethod?: UserBucket['verificationMethod'];
 		totpRequired?: boolean;
 		subdomain?: true;
+		planId?: string;
 	}): Promise<UserBucket> {
 		const now = new Date();
 		const bucket: UserBucket = {
@@ -68,6 +69,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 			 * second bucket created without a hostname would collide with the first. */
 			...(data.host !== undefined ? { host: data.host } : {}),
 			...(data.subdomain ? { subdomain: true as const } : {}),
+			...(data.planId !== undefined ? { planId: data.planId } : {}),
 			ownerGroupId: data.ownerGroupId,
 			passwordLogin: data.passwordLogin ?? true,
 			federation: data.federation ?? [],
@@ -240,6 +242,17 @@ export class UserBucketStore implements UserBucketStoreInstance {
 		const rows = await handle`
 			UPDATE ${handle(this.area)}
 			SET doc = (doc - ${handle.array(remove, 'text')}) || ${set}
+			WHERE id = ${id}
+			RETURNING doc
+		`;
+		return this.bucketOf(rows[0]);
+	}
+
+	async setPlan(id: string, planId: string): Promise<UserBucket | null> {
+		const handle = sql();
+		const rows = await handle`
+			UPDATE ${handle(this.area)}
+			SET doc = doc || ${{ planId, updatedAt: new Date() }}
 			WHERE id = ${id}
 			RETURNING doc
 		`;

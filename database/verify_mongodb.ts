@@ -15,6 +15,7 @@ import {
 } from './verify_container_ownership.js';
 import { verifyProjectRemoval } from './verify_remove_projects.js';
 import { verifyReservedHostnamesKey } from './verify_reserved_hostnames_key.js';
+import { verifyPlans } from './verify_plans.js';
 
 /*
  * Storage fidelity for the MongoDB backend, against a real MongoDB — the properties of per-issuer
@@ -307,6 +308,26 @@ check(
 			}
 		},
 		String(stamp),
+		check
+	);
+}
+
+{
+	const { UserBucketStore: PlanBucketStore, PlanCatalogueStore } =
+		await import('../lib/adapters/mongodb/index.js');
+	await verifyPlans(
+		{
+			buckets: new PlanBucketStore(),
+			catalogue: new PlanCatalogueStore(),
+			apply: async () => {
+				const record = MIGRATIONS.find((m) =>
+					m.id.endsWith('projects-record-plan')
+				);
+				if (!record || 'noop' in record.mongodb) return null;
+				return record.mongodb.apply(db);
+			}
+		},
+		String(Date.now()),
 		check
 	);
 }

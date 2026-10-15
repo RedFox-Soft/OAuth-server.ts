@@ -49,6 +49,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 		verificationMethod?: UserBucket['verificationMethod'];
 		totpRequired?: boolean;
 		subdomain?: true;
+		planId?: string;
 	}): Promise<UserBucket> {
 		if (data.host !== undefined && this.hostHolder(data.host)) {
 			throw new UniqueValueTaken('host', data.host);
@@ -67,6 +68,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 			slug: data.slug,
 			...(data.host !== undefined ? { host: data.host } : {}),
 			...(data.subdomain ? { subdomain: true as const } : {}),
+			...(data.planId !== undefined ? { planId: data.planId } : {}),
 			ownerGroupId: data.ownerGroupId,
 			// A bucket accepts passwords unless someone says otherwise, and holds no providers until one is
 			// configured. Defaulted here and on read, so a document written before these fields existed
@@ -197,6 +199,13 @@ export class UserBucketStore implements UserBucketStoreInstance {
 			else Reflect.set(b, field, value);
 		}
 		b.updatedAt = new Date();
+		return b;
+	}
+
+	async setPlan(id: string, planId: string): Promise<UserBucket | null> {
+		const b = this.buckets.get(id);
+		if (!b) return null;
+		Object.assign(b, { planId, updatedAt: new Date() });
 		return b;
 	}
 

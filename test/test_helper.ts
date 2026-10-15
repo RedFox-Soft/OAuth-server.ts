@@ -22,6 +22,7 @@ import {
 	invalidateRootKeys,
 	rootKeys
 } from '../lib/keys/issuer_keys.ts';
+import { forgetSignUpReadings } from 'lib/plans/signups.ts';
 import { resetActivityCacheForTests } from '../lib/activity/note.ts';
 import { forgetHostArrivals } from '../lib/admin/auth/hostArrivals.ts';
 import {
@@ -490,6 +491,7 @@ function forgetProcessState(): void {
 	forgetBucketAddresses();
 	forgetHostArrivals();
 	resetActivityCacheForTests();
+	forgetSignUpReadings();
 	resetUnauthenticatedCharge();
 	setUnauthenticatedChargeClock(null);
 	resetScimRateLimiter();

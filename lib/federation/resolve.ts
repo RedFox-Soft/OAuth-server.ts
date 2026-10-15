@@ -18,6 +18,7 @@ import type {
 } from './types.js';
 import { domainAllowed } from './domains.js';
 import { ADMIN_BUCKET_ID } from '../admin/consts.js';
+import { signUpsPaused } from '../plans/signups.js';
 
 /*
  * Turn a verified assertion into a signed-in account, or into a refusal.
@@ -279,6 +280,10 @@ export async function decideFederatedAccount(
 	}
 	if (provider.provisioning === 'existing_only') {
 		return { kind: 'refuse', reason: 'provisioning_closed' };
+	}
+	/* The project's plan has reached its monthly active users (specs/102): no new account, every sign-in still. */
+	if (await signUpsPaused(bucket)) {
+		return { kind: 'refuse', reason: 'signups_paused' };
 	}
 
 	const profile = copiedClaims(claims);

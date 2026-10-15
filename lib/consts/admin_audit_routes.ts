@@ -271,6 +271,16 @@ const routes = [
 		targetType: 'UserBucket'
 	},
 	/*
+	 * A project moved to another plan (specs/102). Its own action: what a plan allows is what the project's team may
+	 * create, and the entry carries the former plan and the new one (`from`, `to`).
+	 */
+	{
+		action: 'bucket.plan',
+		method: 'PUT',
+		path: '/admin/api/projects/:id/plan',
+		targetType: 'UserBucket'
+	},
+	/*
 	 * Since specs/090 a deletion schedules the bucket's destruction thirty days out rather than destroying
 	 * it; the action keeps its name, so the trail reads one deletion whichever version wrote it. The
 	 * destruction itself is `bucket.purge` — by an administrator's Delete now, or by the server when the
@@ -649,6 +659,25 @@ const routes = [
 		targetType: 'jwks'
 	},
 
+	/* The plan catalogue (specs/102), instance-wide: these entries belong to no team. */
+	{
+		action: 'plan.create',
+		method: 'POST',
+		path: '/admin/api/plans',
+		targetType: 'Plan'
+	},
+	{
+		action: 'plan.update',
+		method: 'PATCH',
+		path: '/admin/api/plans/:id',
+		targetType: 'Plan'
+	},
+	{
+		action: 'plan.delete',
+		method: 'DELETE',
+		path: '/admin/api/plans/:id',
+		targetType: 'Plan'
+	},
 	{
 		action: 'settings.update',
 		method: 'PUT',

@@ -4,6 +4,7 @@ import { ROOT_NAMESPACE } from '../../resources/declaration_id.js';
 import { ADMIN_BUCKET_ID, isUndeletableBucket } from '../consts.js';
 import { ApplicationConfig } from '../../configs/application.js';
 import type { AdminContext } from './rbac.js';
+import type { PlanRights } from '../../plans/rights.js';
 
 /*
  * The rights a caller holds over a bucket and the instance, stated as data (specs/079).
@@ -38,6 +39,11 @@ export interface BucketCan {
 	changeAddress: boolean;
 	move: boolean;
 	delete: boolean;
+	/*
+	 * Moving the project to another plan (specs/102): an instance-level decision, so a super administrator's alone,
+	 * whoever owns the project. A System project is refused by its state, not by this right: it carries no plan.
+	 */
+	setPlan: boolean;
 }
 
 /* The address forms a project can be given (specs/101): a path, a subdomain of the instance, a hostname. */
@@ -53,6 +59,13 @@ export interface MeCan {
 	createTeam: boolean;
 	/* The instance-wide surfaces: settings, keys, administrators, agent access, usage, faults. */
 	instance: boolean;
+	/*
+	 * What the plans still let the caller create (specs/102), stated beside these by the routes that answer `can`
+	 * (lib/plans/rights.ts). Absent from `meCan` itself, which reads no store; absent means unlimited.
+	 */
+	nameSlug?: PlanRights['nameSlug'];
+	projects?: PlanRights['projects'];
+	teams?: PlanRights['teams'];
 }
 
 function belongsTo(ctx: AdminContext, groupId: string): boolean {
@@ -219,7 +232,8 @@ export function bucketCan(
 			!fixed &&
 			holds &&
 			(ctx.superAdmin || ownsGroup(ctx, bucket.ownerGroupId)),
-		delete: mayDeleteBucket(ctx, bucket, facts)
+		delete: mayDeleteBucket(ctx, bucket, facts),
+		setPlan: ctx.superAdmin
 	};
 }
 

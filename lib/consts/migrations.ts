@@ -29,6 +29,7 @@ import {
 import { displayNameKeyOf, membershipIdOf } from '../adapters/end_user_keys.js';
 import { declarationId, ROOT_NAMESPACE } from '../resources/declaration_id.js';
 import { ROOT_KEY_OWNER } from './key_owner.js';
+import { FREE_PLAN_ID } from './plans.js';
 import { isList, isRecord, member } from '../helpers/_/object.js';
 import { auditTargetTypeFor, MIGRATION_ACTOR } from './admin_audit_routes.js';
 
@@ -1468,6 +1469,56 @@ const projectsReservedHostnames: Migration = {
 	}
 };
 
+/*
+ * Every project records its plan (specs/102). The plan a bucket is on is recorded rather than implied, so that making
+ * another plan the default moves no existing project; a bucket created from now on records the default when it is
+ * created, and this gives every bucket that predates plans the one plan there was — Free. A bucket of the System
+ * group carries no plan and is left alone.
+ *
+ * `free` rather than a catalogue read: no catalogue can be stored before the release that brings this migration, so
+ * the built-in catalogue is the one in force and Free is its default.
+ */
+function plansRecordedReport(count: number): string[] {
+	return [`projects given the Free plan: ${String(count)}`];
+}
+
+const projectsRecordPlan: Migration = {
+	id: '2026-10-18-projects-record-plan',
+	description:
+		'Record the Free plan on every project outside the System team, so its plan is stored rather than implied',
+	reversible: false,
+	rerunnable:
+		'Only projects with no recorded plan are written, and every write records one, so a second application selects nothing.',
+	mongodb: {
+		async apply(handle) {
+			// The runner passes the selected backend's handle; for MongoDB that is the driver's `Db`.
+			const db = handle as MongoHandle;
+			const result = await db.collection(STORE_AREAS.userBuckets).updateMany(
+				{
+					ownerGroupId: { $ne: UNASSIGNED_GROUP_ID },
+					planId: { $exists: false }
+				},
+				{ $set: { planId: FREE_PLAN_ID } }
+			);
+			return plansRecordedReport(result.modifiedCount);
+		}
+	},
+	postgres: {
+		async apply(handle) {
+			// The runner passes the selected backend's handle; for PostgreSQL that is Bun's SQL client.
+			const sql = handle as PostgresHandle;
+			const rows = await sql`
+				UPDATE ${sql(STORE_AREAS.userBuckets)}
+				SET doc = doc || ${{ planId: FREE_PLAN_ID }}
+				WHERE doc->>'ownerGroupId' IS DISTINCT FROM ${UNASSIGNED_GROUP_ID}
+					AND NOT (doc ? 'planId')
+				RETURNING id
+			`;
+			return plansRecordedReport(rows.length);
+		}
+	}
+};
+
 export const MIGRATIONS: readonly Migration[] = [
 	namespacedProtectedResources,
 	rootKeysLifecycle,
@@ -1476,5 +1527,6 @@ export const MIGRATIONS: readonly Migration[] = [
 	staticTokenExpiry,
 	projectsRequireBucket,
 	removeProjects,
-	projectsReservedHostnames
+	projectsReservedHostnames,
+	projectsRecordPlan
 ];

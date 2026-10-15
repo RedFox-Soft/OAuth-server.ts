@@ -12,6 +12,7 @@ import {
 	Switch,
 	Tag,
 	Collapse,
+	Tooltip,
 	Upload
 } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
@@ -22,6 +23,7 @@ import { AreaToolbar } from '../frame/AreaToolbar.js';
 import { RowActions, type RowAction } from '../frame/RowActions.js';
 import { EmptyState, LoadFailed } from '../frame/states.js';
 import { SecretReveal } from '../frame/SecretReveal.js';
+import { atLimit, type PlanView } from '../planText.js';
 import {
 	LOGO_MAX_BYTES,
 	LOGO_SIZE_MESSAGE
@@ -291,10 +293,16 @@ const DEFAULT_VALUES: FormValues = {
  */
 export function Clients({
 	bucketId,
-	writable
+	writable,
+	plan,
+	onChanged
 }: {
 	bucketId: string;
 	writable: boolean;
+	/* The plan the caller is held to (specs/102); null when nothing limits them. */
+	plan?: PlanView | null;
+	/* An application was added or deleted: the project's counts, and so its plan's use, changed. */
+	onChanged?: () => void;
 }) {
 	const base = `/admin/api/projects/${encodeURIComponent(bucketId)}/clients`;
 	const [rows, setRows] = useState<ClientRow[]>([]);
@@ -464,6 +472,7 @@ export function Clients({
 		setOpen(false);
 		form.resetFields();
 		if (result.data.secret) setSecret(result.data.secret);
+		onChanged?.();
 		await load();
 	}
 
@@ -520,6 +529,7 @@ export function Clients({
 			return;
 		}
 		feedback.done('Client deleted.');
+		onChanged?.();
 		await load();
 	}
 
@@ -570,14 +580,18 @@ export function Clients({
 		return items;
 	}
 
+	const full = atLimit(plan, 'applications');
 	const newClient = (
-		<Button
-			type="primary"
-			icon={<PlusOutlined />}
-			onClick={openCreateModal}
-		>
-			New client
-		</Button>
+		<Tooltip title={full ?? undefined}>
+			<Button
+				type="primary"
+				icon={<PlusOutlined />}
+				disabled={full !== null}
+				onClick={openCreateModal}
+			>
+				New client
+			</Button>
+		</Tooltip>
 	);
 
 	return (

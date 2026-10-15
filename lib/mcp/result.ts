@@ -1,4 +1,5 @@
 import type { DeletionBlocker } from '../admin/auth/rbac.js';
+import type { PlanLimitDetail } from '../consts/plans.js';
 import { excludedOperationFor, type McpTool } from './catalogue.js';
 import type { DispatchResult } from './dispatch.js';
 
@@ -31,6 +32,9 @@ export interface ToolFailure {
 	 * content of the answer — reduced to "conflict" it told an agent only that it had been refused.
 	 */
 	readonly preview?: unknown;
+	/* A plan's refusal (specs/102): which limit, of which plan, and the numbers the caller may see. */
+	readonly code?: 'plan_limit';
+	readonly limit?: PlanLimitDetail;
 }
 
 export interface ToolSuccess {
@@ -63,6 +67,8 @@ interface AdminErrorBody {
 	confirmationRequired?: boolean;
 	blockers?: readonly DeletionBlocker[];
 	failedAreas?: readonly string[];
+	code?: 'plan_limit';
+	limit?: PlanLimitDetail;
 }
 
 export function toOutcome(result: DispatchResult): ToolOutcome {
@@ -111,7 +117,9 @@ export function toOutcome(result: DispatchResult): ToolOutcome {
 		// Passed through verbatim, counts and ids exactly as the admin plane discloses them: a bucket's
 		// applications are named because they are objects the operator administers, a bucket's end-users are
 		// only counted because their identities are not the caller's business.
-		...(body.blockers ? { blockers: body.blockers } : {})
+		...(body.blockers ? { blockers: body.blockers } : {}),
+		...(body.code ? { code: body.code } : {}),
+		...(body.limit ? { limit: body.limit } : {})
 	};
 }
 

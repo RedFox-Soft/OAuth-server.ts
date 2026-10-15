@@ -1,6 +1,7 @@
 import { StoredJWK } from 'lib/configs/verifyJWKs.ts';
 import { Type as t, type Static } from '@sinclair/typebox';
 import { FederatedIdentity, FederationProvider } from '../federation/types.js';
+import type { PlanCatalogue } from '../consts/plans.js';
 
 const ProfileString = t.String({ maxLength: 256 });
 const ProfileContact = t.Object(
@@ -374,6 +375,19 @@ export interface SmtpSettingsStoreInstance {
 
 export interface SmtpSettingsStoreConstructor {
 	new (): SmtpSettingsStoreInstance;
+}
+
+/*
+ * The plan catalogue (specs/102): one document, absent until a super administrator first edits it. `null` reads as
+ * the built-in catalogue (lib/consts/plans.ts), so nothing is seeded and nothing an operator stored is overwritten.
+ */
+export interface PlanCatalogueStoreInstance {
+	get(): Promise<PlanCatalogue | null>;
+	set(catalogue: PlanCatalogue): Promise<void>;
+}
+
+export interface PlanCatalogueStoreConstructor {
+	new (): PlanCatalogueStoreInstance;
 }
 
 /*
@@ -1904,6 +1918,13 @@ export const UserBucket = t.Object({
 	/* The group that owns this bucket. Every access decision resolves through it. */
 	ownerGroupId: t.String(),
 	/*
+	 * The plan this bucket is on (specs/102), recorded rather than implied: the catalogue's default when the bucket
+	 * was created, so making another plan the default moves no existing bucket. Present on every bucket outside the
+	 * System group — written at creation, by the 2026-10-18 migration, and when an owner change takes a bucket out
+	 * of the System group — and changed only by `setPlan`. Ignored on a System-group bucket, which has no plan.
+	 */
+	planId: t.Optional(t.String()),
+	/*
 	 * Whether this bucket accepts an email and a password at all. Replaces `authMethods`, which was a
 	 * dead field: nothing read it, and the admin bodies omitted it entirely, so no operator could set it.
 	 *
@@ -1989,6 +2010,7 @@ export interface UserBucketStoreInstance {
 		totpRequired?: boolean;
 		host?: string;
 		subdomain?: true;
+		planId?: string;
 	}): Promise<UserBucket>;
 	find(id: string): Promise<UserBucket | null>;
 	/* Resolves a bucket by its address. Returns null for a slug nothing holds, which is what tells the
@@ -2052,6 +2074,12 @@ export interface UserBucketStoreInstance {
 			>
 		>
 	): Promise<UserBucket | null>;
+	/*
+	 * Puts a bucket on a plan, and is not part of `update` for the reason `setAddress` is not: the plan decides what
+	 * the bucket's administrators may create, so it is changed by a super administrator through its own route and
+	 * audit action, never as a side effect of an ordinary edit.
+	 */
+	setPlan(id: string, planId: string): Promise<UserBucket | null>;
 	/*
 	 * Writes a reserved bucket's slug only where the record has none (lib/admin/seed.ts): `update`
 	 * cannot, because an address is not an ordinary edit.

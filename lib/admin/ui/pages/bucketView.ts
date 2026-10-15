@@ -1,6 +1,7 @@
 import type { UserBucket } from '../../../adapters/types.js';
 import type { BucketBlockers, BucketCan } from '../frame/can.js';
 import type { AddressFormChoice } from '../frame/me.js';
+import type { PlanView } from '../planText.js';
 
 /* What a person reads for each address form a project can be given, in the dialogs that offer them (specs/101). */
 export const ADDRESS_FORM_CHOICE: Record<AddressFormChoice, string> = {
@@ -81,6 +82,11 @@ export interface BucketSummary {
 	mailDeliveryConfigured: boolean;
 	/* The instance's `federation.enabled`: the preview's one input the console cannot read elsewhere (specs/091). */
 	federationEnabled: boolean;
+	/*
+	 * The project's plan (specs/102): null for a System project, absent for a tenant while plans are off. A super
+	 * administrator always reads it, and is never held to it.
+	 */
+	plan?: PlanView | null;
 }
 
 /* The address change's preview (data-model §6). */

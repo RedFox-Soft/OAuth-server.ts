@@ -393,6 +393,22 @@ export const ApplicationConfig = {
 	'projects.addressForms': setting<ProjectAddressForms>('path'),
 
 	/*
+	 * plans.enabled
+	 *
+	 * description: Whether the plan of each project limits what its team may create (specs/102). Off by default:
+	 * a self-hosted instance has no tenants to limit, and with it off nothing is checked and no plan is shown to
+	 * anyone but a super administrator. Never refuses a sign-in, only a new creation or a new self-service sign-up.
+	 */
+	'plans.enabled': false,
+	/*
+	 * plans.regularTeamsPerAdministrator
+	 *
+	 * description: How many regular teams one administrator may own while plans are on. Instance-wide rather than
+	 * per plan, because a team has no plan of its own. A personal team never counts.
+	 */
+	'plans.regularTeamsPerAdministrator': 1,
+
+	/*
 	 * features.requestObjects
 	 *
 	 * title: [`JAR`](https://www.rfc-editor.org/rfc/rfc9101.html) - JWT Secured Authorization Request

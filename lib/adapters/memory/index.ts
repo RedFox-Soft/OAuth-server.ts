@@ -16,6 +16,7 @@ export { AdminAuditStore } from './adminAuditStore.js';
 export { ErrorStore } from './errorStore.js';
 export { McpConfirmationStore } from './mcpConfirmationStore.js';
 export { SmtpSettingsStore } from './smtpSettingsStore.js';
+export { PlanCatalogueStore } from './planCatalogueStore.js';
 export { SingletonSecretStore } from './singletonSecretStore.js';
 export { SchemaMigrationStore } from './schemaMigrationStore.js';
 export { MigrationLeaseStore } from './migrationLeaseStore.js';

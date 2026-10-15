@@ -26,6 +26,7 @@ import { useConfirm } from '../frame/confirm.js';
 import { AreaToolbar } from '../frame/AreaToolbar.js';
 import { RowActions } from '../frame/RowActions.js';
 import { EmptyState, LoadFailed } from '../frame/states.js';
+import { atLimit, type PlanView } from '../planText.js';
 
 /*
  * A bucket's APIs — its declared protected resources: the audiences this server will mint tokens for on
@@ -252,12 +253,18 @@ export function Resources({
 	bucketId,
 	bucketName,
 	canEdit,
-	superAdmin
+	superAdmin,
+	plan,
+	onChanged
 }: {
 	bucketId: string;
 	bucketName: string;
 	canEdit: boolean;
 	superAdmin: boolean;
+	/* The plan the caller is held to (specs/102); null when nothing limits them. */
+	plan?: PlanView | null;
+	/* An API was declared or removed: the project's counts, and so its plan's use, changed. */
+	onChanged?: () => void;
 }) {
 	const bucketBase = `/admin/api/projects/${encodeURIComponent(bucketId)}`;
 	const base = `${bucketBase}/resources`;
@@ -379,6 +386,7 @@ export function Resources({
 		}
 		feedback.done(mode === 'create' ? 'Resource declared.' : 'Resource saved.');
 		setOpen(false);
+		if (mode === 'create') onChanged?.();
 		await load();
 	}
 
@@ -418,17 +426,22 @@ export function Resources({
 			return;
 		}
 		feedback.done('Resource removed.');
+		onChanged?.();
 		await load();
 	}
 
+	const full = atLimit(plan, 'apis');
 	const newResource = (
-		<Button
-			type="primary"
-			icon={<PlusOutlined />}
-			onClick={openCreateModal}
-		>
-			New resource
-		</Button>
+		<Tooltip title={full ?? undefined}>
+			<Button
+				type="primary"
+				icon={<PlusOutlined />}
+				disabled={full !== null}
+				onClick={openCreateModal}
+			>
+				New resource
+			</Button>
+		</Tooltip>
 	);
 
 	return (

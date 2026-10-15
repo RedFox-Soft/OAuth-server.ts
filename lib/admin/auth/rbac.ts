@@ -5,6 +5,7 @@ import {
 	getGroupStore
 } from '../../adapters/index.js';
 import type { Group, UserBucket } from '../../adapters/types.js';
+import type { PlanLimitDetail } from '../../consts/plans.js';
 import { ApplicationConfig } from '../../configs/application.js';
 import { isDispatched } from '../../mcp/channel.js';
 import {
@@ -101,6 +102,12 @@ export class AdminError extends Error {
 	field?: string;
 	/* Seconds until a refused send may be asked for again, on a 429 from a mail throttle. */
 	retryAfter?: number;
+	/*
+	 * Set on the 409 a plan answers (specs/102), so the console and an agent can tell "the plan stops this" from
+	 * every other conflict and say what to do next — ask for a larger plan — rather than retry.
+	 */
+	code?: 'plan_limit';
+	limit?: PlanLimitDetail;
 	constructor(
 		status: number,
 		message: string,
@@ -110,6 +117,8 @@ export class AdminError extends Error {
 			acknowledgementRequired?: boolean;
 			field?: string;
 			retryAfter?: number;
+			code?: 'plan_limit';
+			limit?: PlanLimitDetail;
 		}
 	) {
 		super(message);
@@ -119,6 +128,8 @@ export class AdminError extends Error {
 		this.acknowledgementRequired = extra?.acknowledgementRequired;
 		this.field = extra?.field;
 		this.retryAfter = extra?.retryAfter;
+		this.code = extra?.code;
+		this.limit = extra?.limit;
 	}
 }
 
@@ -134,10 +145,14 @@ export function adminErrorBody(error: AdminError): {
 	acknowledgementRequired?: boolean;
 	field?: string;
 	retryAfter?: number;
+	code?: 'plan_limit';
+	limit?: PlanLimitDetail;
 } {
 	return {
 		error: 'admin_error',
 		message: error.message,
+		...(error.code === undefined ? {} : { code: error.code }),
+		...(error.limit === undefined ? {} : { limit: error.limit }),
 		...(error.field === undefined ? {} : { field: error.field }),
 		...(error.retryAfter === undefined ? {} : { retryAfter: error.retryAfter }),
 		...(error.blockers ? { blockers: error.blockers } : {}),

@@ -11,6 +11,7 @@ import {
 import { meCan } from './auth/can.js';
 import { meView } from './me_view.js';
 import { ADMIN_BUCKET_ID } from './consts.js';
+import { planRightsOf } from '../plans/rights.js';
 
 /*
  * Who the caller is, as the admin plane resolved them: id, email, whether a super administrator, bucket
@@ -37,11 +38,14 @@ export const meRoutes = new Elysia({ name: 'admin-me' })
 	.get('/admin/api/me', async ({ admin }) => {
 		const ctx = assertAuth(admin);
 		const account = await getUserStore(ADMIN_BUCKET_ID).find(ctx.userId);
-		/* `can`: what the caller may create, and whether the instance-wide surfaces are theirs. */
+		/*
+		 * `can`: what the caller may create, and whether the instance-wide surfaces are theirs — with what their
+		 * plan still allows them to create (specs/102).
+		 */
 		return {
 			...meView(ctx),
 			verified: account?.verified === true,
-			can: meCan(ctx)
+			can: { ...meCan(ctx), ...(await planRightsOf(ctx)) }
 		};
 	})
 	/*

@@ -1,5 +1,6 @@
 import type { ActivityTally } from '../adapters/types.js';
 import type { PeriodFigure } from './read.js';
+import type { PlanWarning } from '../plans/view.js';
 
 /*
  * The super administrator's usage overview (specs/077): the shape of `GET /admin/api/activity` and the
@@ -42,6 +43,13 @@ export interface OverviewRow {
 	days: (number | null)[];
 	previousDays: (number | null)[];
 	unavailable: boolean;
+	/*
+	 * The project's plan and its warnings (specs/102), where plans are shown to the reader: null for a System
+	 * project, absent for a deleted one and while plans are hidden. The active-user warning is the current
+	 * month's only.
+	 */
+	plan?: { id: string; name: string } | null;
+	warnings?: PlanWarning[];
 }
 
 /*

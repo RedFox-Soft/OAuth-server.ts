@@ -16,6 +16,7 @@ import {
 import { ApiOutlined } from '@ant-design/icons';
 /* The login page's own marks, not a second copy: one table, corrected in one place. */
 import { providerMark } from '../../../../interactions/providerMark.js';
+import { MICROSOFT_SHARED_TENANTS } from '../../../../consts/known_providers.js';
 import { request } from '../../frame/request.js';
 import { useFeedback } from '../../frame/feedback.js';
 import { useNavigate } from '../../frame/router.js';
@@ -60,11 +61,26 @@ type Values = Record<string, unknown> & {
 
 const TRUST_FIELDS = ['provisioning', 'allowedEmailDomains', 'emailTrusted'];
 
+const NOT_ON_PLAN =
+	"Not included on this project's plan: enterprise sign-in needs a larger plan.";
+
+/*
+ * Whether an answer to a provider's question binds it to one organisation's directory — Microsoft's "only people in
+ * one organisation" — which a plan counts as enterprise sign-in (lib/plans/provider.ts).
+ */
+function enterpriseChoice(name: string, value: string | null): boolean {
+	return (
+		name === 'tenant' &&
+		(value === null || !MICROSOFT_SHARED_TENANTS.includes(value.toLowerCase()))
+	);
+}
+
 export function ProviderWizard({
 	bucketId,
 	guidance,
 	registrationOpen,
 	consoleBucket,
+	enterpriseSignIn = true,
 	start,
 	onClose
 }: {
@@ -72,6 +88,11 @@ export function ProviderWizard({
 	guidance: Guidance[];
 	registrationOpen: boolean;
 	consoleBucket: boolean;
+	/*
+	 * False on a plan without enterprise sign-in (specs/102): a generic provider and Microsoft for one organisation
+	 * are shown as not included rather than left to a refusal at the last step.
+	 */
+	enterpriseSignIn?: boolean;
 	/* A tile pressed on the empty state opens the panel at step two with that provider chosen. */
 	start?: string;
 	onClose: () => void;
@@ -218,6 +239,7 @@ export function ProviderWizard({
 			</Typography.Paragraph>
 			<ProviderTiles
 				guidance={guidance}
+				enterpriseSignIn={enterpriseSignIn}
 				onChoose={choose}
 			/>
 		</Flex>
@@ -350,11 +372,17 @@ export function ProviderWizard({
 								rules={[{ required: true }]}
 							>
 								<Select
-									options={choice.options.map((option) => ({
-										value: option.value ?? SUPPLY_IT,
-										label: option.label,
-										title: option.consequence
-									}))}
+									options={choice.options.map((option) => {
+										const excluded =
+											!enterpriseSignIn &&
+											enterpriseChoice(choice.name, option.value);
+										return {
+											value: option.value ?? SUPPLY_IT,
+											label: option.label,
+											title: excluded ? NOT_ON_PLAN : option.consequence,
+											disabled: excluded
+										};
+									})}
 									optionRender={(option) => (
 										<div>
 											<div>{option.label}</div>
@@ -536,9 +564,12 @@ export function ProviderWizard({
  */
 export function ProviderTiles({
 	guidance,
+	enterpriseSignIn = true,
 	onChoose
 }: {
 	guidance: Guidance[];
+	/* False on a plan without enterprise sign-in: the generic tile is shown, disabled, saying why. */
+	enterpriseSignIn?: boolean;
 	onChoose: (catalogueId: string) => void;
 }) {
 	return (
@@ -582,10 +613,19 @@ export function ProviderTiles({
 					block
 					icon={<ApiOutlined />}
 					aria-label="Connect another OIDC provider"
+					disabled={!enterpriseSignIn}
 					onClick={() => onChoose(OTHER)}
 				>
 					Other OIDC provider
 				</Button>
+				{!enterpriseSignIn && (
+					<Typography.Text
+						type="secondary"
+						style={{ fontSize: 12 }}
+					>
+						{NOT_ON_PLAN}
+					</Typography.Text>
+				)}
 			</Card>
 		</Flex>
 	);

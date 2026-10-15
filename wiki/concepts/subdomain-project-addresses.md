@@ -205,3 +205,4 @@ a slug or a hostname ([[admin-audit-trail]]).
 - [[per-issuer-isolation]] — keys and namespaces keyed by id, so a move between forms keeps them
 - [[cookie-path-scoping]] — why only path projects need a suffixed cookie name
 - [[project-workspace]] — who may change an address, and the preview
+- [[plans]] — on a plan without a custom slug the name is generated, in whichever form this setting offers (spec 102)

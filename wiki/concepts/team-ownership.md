@@ -254,6 +254,7 @@ console asks somebody to confirm the grouping.
   confirmation-gated: it destroys a container with nothing left afterwards to inspect, the same class
   as the two container deletions already withheld.
 - [[admin-console-signin]] — how the session that now carries the active scope is established.
+- [[plans]] — the per-administrator limits count the teams in which an administrator holds the owner role (spec 102).
 - [[account-resolution]] — per-project end-user storage, which is why project access had a broad form and
   a strict one. Since spec 099 the two loaders (`loadBucketForUsers`, `loadBucketForEdit`,
   `lib/admin/buckets/access.ts:49-118`) admit the same callers — membership of the project's team — because

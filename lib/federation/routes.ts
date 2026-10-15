@@ -30,6 +30,7 @@ import { completeTry } from './try.js';
 import type { Language } from '../i18n/languages.js';
 import { languageOfRequest } from '../i18n/request.js';
 import { Interaction } from '../models/interaction.js';
+import { registrationClosedPage } from '../interactions/registrationPages.js';
 
 /*
  * The return leg from an upstream provider.
@@ -257,6 +258,12 @@ async function completeReturn(params: ReturnParams, request: Request) {
 						: federationProvisioningClosedPage(language);
 				case 'inactive':
 					return federationInactivePage(language);
+				/*
+				 * The page a paused self-registration answers, not the provisioning-closed one: that one tells the
+				 * person to ask an administrator for an account, which is not what a paused project needs (specs/102).
+				 */
+				case 'signups_paused':
+					return registrationClosedPage(language);
 			}
 		}
 

@@ -81,6 +81,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 		verificationMethod?: UserBucket['verificationMethod'];
 		totpRequired?: boolean;
 		subdomain?: true;
+		planId?: string;
 	}): Promise<UserBucket> {
 		const now = new Date();
 		const bucket: UserBucket = {
@@ -97,6 +98,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 			 */
 			...(data.host !== undefined ? { host: data.host } : {}),
 			...(data.subdomain ? { subdomain: true as const } : {}),
+			...(data.planId !== undefined ? { planId: data.planId } : {}),
 			ownerGroupId: data.ownerGroupId,
 			passwordLogin: data.passwordLogin ?? true,
 			federation: data.federation ?? [],
@@ -240,6 +242,16 @@ export class UserBucketStore implements UserBucketStoreInstance {
 					: { $set: set },
 				// A federation list carries providers whose optional secrets may be undefined.
 				{ returnDocument: 'after', ...ABSENT_UNDEFINED }
+			)
+		);
+	}
+
+	async setPlan(id: string, planId: string): Promise<UserBucket | null> {
+		return withDefaults(
+			await this.collection.findOneAndUpdate(
+				{ _id: id },
+				{ $set: { planId, updatedAt: new Date() } },
+				{ returnDocument: 'after' }
 			)
 		);
 	}

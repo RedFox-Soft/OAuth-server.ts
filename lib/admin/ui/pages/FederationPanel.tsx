@@ -28,8 +28,11 @@ export function FederationPanel({
 	bucket,
 	onChanged,
 	canEdit = true,
-	consoleBucket = false
+	consoleBucket = false,
+	enterpriseSignIn = true
 }: {
+	/* False when the project's plan, which holds the caller, has no enterprise sign-in (specs/102). */
+	enterpriseSignIn?: boolean;
 	bucket: BucketView;
 	/*
 	 * The console's own bucket (specs/080): its providers decide who can sign in to the console, so the tab
@@ -174,6 +177,7 @@ export function FederationPanel({
 					{canEdit && (
 						<ProviderTiles
 							guidance={guidance}
+							enterpriseSignIn={enterpriseSignIn}
 							onChoose={(id) => setWizard({ start: id })}
 						/>
 					)}
@@ -312,6 +316,7 @@ export function FederationPanel({
 					guidance={guidance}
 					registrationOpen={bucket.registrationOpen}
 					consoleBucket={consoleBucket}
+					enterpriseSignIn={enterpriseSignIn}
 					start={wizard.start}
 					onClose={() => setWizard(null)}
 				/>

@@ -38,6 +38,7 @@ import { federationEnabled } from '../../federation/providers.js';
 import { openTry, readTry, sessionDigestOf } from '../../federation/state.js';
 import type { TryStarted, TryStatus } from '../../federation/types.js';
 import { upstreamMetadata } from '../../federation/upstream.js';
+import { assertSocialSignIn } from '../../plans/enforce.js';
 
 /* The console session cookie's value, read as the scope route reads it; absent for an agent's bearer token. */
 function sessionCookieOf(
@@ -119,6 +120,7 @@ export const federationAdminRoutes = new Elysia({ name: 'admin-federation' })
 		async ({ admin, params, body, set }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForProviders(ctx, params.id, 'edit');
+			await assertSocialSignIn(ctx, bucket, body);
 			/*
 			 * Recorded before the write, and after the validation that can refuse it: an entry for a request a
 			 * 422 rejected would describe a provider that was never configured. The read surface already says
@@ -139,6 +141,21 @@ export const federationAdminRoutes = new Elysia({ name: 'admin-federation' })
 		async ({ admin, params, body }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForProviders(ctx, params.id, 'edit');
+			/*
+			 * Only a change of who the provider signs in is judged by the plan (specs/102): a provider the project
+			 * already has stays editable in every other respect, whatever its plan now offers.
+			 */
+			if (body.issuer !== undefined || body.tenant !== undefined) {
+				const current = bucket.federation.find(
+					(provider) => provider.id === params.providerId
+				);
+				await assertSocialSignIn(ctx, bucket, {
+					issuer: body.issuer ?? current?.issuer,
+					tenant:
+						body.tenant ??
+						(body.issuer === undefined ? current?.tenant : undefined)
+				});
+			}
 			await recordAdminAudit(ctx, 'federation.provider.update', params.id, {
 				attributes: Object.keys(body),
 				...ownedBy(bucket)

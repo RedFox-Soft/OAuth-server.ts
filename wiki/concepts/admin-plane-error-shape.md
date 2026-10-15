@@ -17,8 +17,11 @@ The administrative control plane answers errors in its own shape, not the OAuth 
 { "error": "admin_error", "message": "client not found" }
 ```
 
-plus `blockers` on a deletion conflict, `failedAreas` on a partial cascade failure and `field` on a
-refusal about one form field (`lib/admin/auth/rbac.ts`, `adminErrorBody`). The console renders `message` and
+plus `blockers` on a deletion conflict, `failedAreas` on a partial cascade failure, `field` on a
+refusal about one form field, and since spec 102 `code: 'plan_limit'` with a `limit` on a refusal by a project's
+plan, a 409 the console and an agent tell from every other conflict by its code ([[plans]])
+(`lib/admin/auth/rbac.ts`, `adminErrorBody`). The MCP result carries `code` and `limit` through
+(`lib/mcp/result.ts`, `toOutcome`). The console renders `message` and
 [[deletion-and-revocation]]'s dialogs read `blockers`, so the shape is a consumed contract rather than a
 presentation detail — and the same contract MCP-initiated administration answers on.
 

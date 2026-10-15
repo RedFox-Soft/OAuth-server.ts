@@ -10,6 +10,7 @@ import { recordBootstrapAudit } from '../audit/record.js';
 import { ensurePersonalGroup } from './personal.js';
 import { invitationTokenHash } from './invite.js';
 import { AcceptInvitationBody } from './schema.js';
+import { assertMayBecomeOwner } from '../../plans/enforce.js';
 
 /*
  * Accepting an invitation into a group.
@@ -57,6 +58,22 @@ export const invitationAcceptRoutes = new Elysia({ name: 'admin-invitations' })
 					400,
 					'a password is required to create your administrator account'
 				);
+			}
+
+			/*
+			 * Before the claim, so a refusal leaves the invitation usable once the invitee has room (specs/102).
+			 * Their allowance as it is now, not as it was when they were invited: the plan judges what they would
+			 * own on accepting.
+			 */
+			if (invitation.role === 'owner') {
+				const inviting = await getGroupStore().find(invitation.groupId);
+				if (inviting) {
+					await assertMayBecomeOwner(
+						{ superAdmin: false, userId: existing?._id },
+						existing?._id,
+						inviting
+					);
+				}
 			}
 
 			/*

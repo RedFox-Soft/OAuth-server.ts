@@ -151,6 +151,8 @@ export type PendingLinkIdentity = Static<typeof PendingLinkIdentity>;
  *   never by a first sign-in, and never found by email.
  * - `link_conflict`: the correlated user is already linked to a different subject at this provider. Not
  *   re-linked: two upstream identities claiming one provisioned person is an incident, not a sign-in.
+ * - `signups_paused`: nobody has an account, and the project's plan has reached its monthly active users
+ *   (specs/102). Only a sign-in that would create an account is refused this way.
  */
 export const RefusalReason = t.Union([
 	t.Literal('no_email'),
@@ -159,7 +161,8 @@ export const RefusalReason = t.Union([
 	t.Literal('provisioning_closed'),
 	t.Literal('inactive'),
 	t.Literal('not_provisioned'),
-	t.Literal('link_conflict')
+	t.Literal('link_conflict'),
+	t.Literal('signups_paused')
 ]);
 export type RefusalReason = Static<typeof RefusalReason>;
 

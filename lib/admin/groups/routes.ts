@@ -37,6 +37,7 @@ import {
 	newInvitationToken
 } from './invite.js';
 import { sendGroupInvitationEmail } from '../../mail/send.js';
+import { assertMayBecomeOwner, assertTeamRoom } from '../../plans/enforce.js';
 
 /*
  * Loads a group the caller may see, refusing identically whether it is missing or another tenant's.
@@ -251,6 +252,7 @@ export const groupRoutes = new Elysia({ name: 'admin-groups' })
 		'/admin/api/teams',
 		async ({ admin, body, set }) => {
 			const ctx = assertAuth(admin);
+			await assertTeamRoom(ctx);
 			// Allocated here so the audit entry can name the group that is about to exist.
 			const groupId = nanoid();
 			await recordAdminAudit(ctx, 'group.create', groupId, {
@@ -337,6 +339,9 @@ export const groupRoutes = new Elysia({ name: 'admin-groups' })
 			if (group.members.some((m) => m.userId === body.userId)) {
 				throw new AdminError(409, 'already a member of this team');
 			}
+			if (body.role === 'owner') {
+				await assertMayBecomeOwner(ctx, body.userId, group);
+			}
 
 			const members = [
 				...group.members,
@@ -366,6 +371,9 @@ export const groupRoutes = new Elysia({ name: 'admin-groups' })
 			// Applies to demoting yourself as much as anyone else: the invariant is about the group, not
 			// about who is asking.
 			assertOwnerRemains(members);
+			if (body.role === 'owner') {
+				await assertMayBecomeOwner(ctx, params.userId, group);
+			}
 			await recordAdminAudit(ctx, 'group.member.update', params.id, {
 				attributes: [body.role],
 				ownerGroupId: params.id
@@ -415,6 +423,10 @@ export const groupRoutes = new Elysia({ name: 'admin-groups' })
 			const existing = await getUserStore(ADMIN_BUCKET_ID).findByEmail(email);
 			if (existing && group.members.some((m) => m.userId === existing._id)) {
 				throw new AdminError(409, 'already a member of this team');
+			}
+			/* Judged again at acceptance, when the invitee may own more than they do now (specs/102). */
+			if (body.role === 'owner') {
+				await assertMayBecomeOwner(ctx, existing?._id, group);
 			}
 
 			/*

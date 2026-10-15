@@ -22,6 +22,7 @@ import {
 import { recordAdminAudit } from '../audit/record.js';
 import { cascadeForClient } from '../../helpers/cascade.js';
 import nanoid from '../../helpers/nanoid.js';
+import { assertApplicationRoom } from '../../plans/enforce.js';
 
 /*
  * A bucket's applications (specs/099). The bucket is the only container: an application belongs to one
@@ -99,6 +100,7 @@ export const clientRoutes = new Elysia({ name: 'admin-clients' })
 		async ({ admin, params, body, set }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucket(ctx, params.id, 'edit');
+			await assertApplicationRoom(ctx, bucket);
 			// Allocated here so the entry names the client that is about to exist.
 			const clientId = nanoid();
 			await recordAdminAudit(ctx, 'client.create', clientId, scopeOf(bucket));

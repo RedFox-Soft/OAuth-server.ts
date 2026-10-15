@@ -20,6 +20,9 @@ export interface AdminErrorBody {
 	acknowledgementRequired?: unknown;
 	conflicts?: unknown;
 	confirmationRequired?: unknown;
+	/* A plan's refusal (specs/102): shown as what the plan allows, never as a permission error. */
+	code?: unknown;
+	limit?: unknown;
 	[key: string]: unknown;
 }
 

@@ -63,6 +63,7 @@ import { UsageCustomerDrawer } from './UsageCustomerDrawer.js';
 import { PageHeader } from '../frame/PageHeader.js';
 import { request, type RequestResult } from '../frame/request.js';
 import { EmptyState, LoadFailed, NoMatch } from '../frame/states.js';
+import { warningTag } from '../planText.js';
 
 /*
  * The usage dashboard (specs/077): every bucket's monthly active users beside the customer that owns it, the
@@ -277,6 +278,34 @@ export function Usage({ superAdmin }: { superAdmin: boolean }) {
 			sortOrder: sortOrderOf('customer'),
 			render: (_: unknown, row: OverviewRow) => customerCell(row.customer)
 		},
+		/*
+		 * Only when the server states plans at all (specs/102): a tenant reads none while they are off, and an empty
+		 * column would suggest every project is on no plan.
+		 */
+		...(answer?.projects.some((row) => row.plan !== undefined)
+			? [
+					{
+						title: 'Plan',
+						key: 'plan',
+						render: (_: unknown, row: OverviewRow) => (
+							<Space
+								size={4}
+								wrap
+							>
+								{row.plan ? nowrap(row.plan.name) : '—'}
+								{(row.warnings ?? []).map((warning) => (
+									<Tag
+										key={warning.limit}
+										color={warning.level === 'reached' ? 'red' : 'orange'}
+									>
+										{warningTag(warning)}
+									</Tag>
+								))}
+							</Space>
+						)
+					}
+				]
+			: []),
 		{
 			title: answer?.month ?? 'This month',
 			key: 'current',

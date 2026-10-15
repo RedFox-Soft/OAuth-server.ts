@@ -7,6 +7,7 @@ import {
 	type ReactNode
 } from 'react';
 import type { AdminMeView } from '../../me_view.js';
+import type { PlanRights } from '../../../plans/rights.js';
 import { request } from './request.js';
 
 /*
@@ -24,6 +25,10 @@ export interface MeCan {
 	addressForms: AddressFormChoice[];
 	createTeam: boolean;
 	instance: boolean;
+	/* What the plans still let this operator create (specs/102); absent means unlimited. */
+	nameSlug?: PlanRights['nameSlug'];
+	projects?: PlanRights['projects'];
+	teams?: PlanRights['teams'];
 }
 
 export type Me = AdminMeView & { verified?: boolean; can?: MeCan };

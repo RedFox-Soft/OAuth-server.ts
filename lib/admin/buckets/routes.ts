@@ -3,6 +3,7 @@ import {
 	getBucketStore,
 	getBucketGroupStore,
 	getContainerOwnershipStore,
+	getGroupStore,
 	getProtectedResourceStore,
 	getProvisioningConnectionStore,
 	getUserStore
@@ -29,7 +30,12 @@ import {
 import type { BucketAddressWrite, UserBucket } from '../../adapters/types.js';
 import { isUniqueValueTaken } from '../../adapters/conflicts.js';
 import { presentAll } from '../federation/service.js';
-import { ADMIN_BUCKET_ID, isUndeletableBucket, reservedOf } from '../consts.js';
+import {
+	ADMIN_BUCKET_ID,
+	UNASSIGNED_GROUP_ID,
+	isUndeletableBucket,
+	reservedOf
+} from '../consts.js';
 import { recordAdminAudit } from '../audit/record.js';
 import nanoid from '../../helpers/nanoid.js';
 import { ensureBucketKey } from '../../keys/issuer_keys.js';
@@ -77,11 +83,19 @@ import { ISSUER } from '../../configs/env.js';
 import { now } from '../../activity/clock.js';
 import { monthOf } from '../../activity/periods.js';
 import { readPeriod } from '../../activity/read.js';
+import { bucketClients } from '../../plans/usage.js';
+import { SLUG_DRAWS, drawSlug } from '../../plans/slug.js';
+import { catalogue, planOf } from '../../plans/catalogue.js';
+import {
+	assertProjectRoom,
+	mayNameSlug,
+	newProjectPlan,
+	refuseNamedSlug
+} from '../../plans/enforce.js';
 import { addressOf, hasOwnOrigin, issuerFor } from '../../configs/issuer.js';
 import { callbackUri } from '../../federation/flow.js';
 import { mailDeliveryConfigured } from '../../mail/mailer.js';
 import { listClientView } from '../clients/service.js';
-import { adapter } from '../../adapters/index.js';
 import {
 	forgetBucketAddresses,
 	isAddressable,
@@ -92,6 +106,7 @@ import {
 	loadDestination,
 	sourceGroupOf
 } from '../ownership/destination.js';
+import { planViewOf, plansShownTo } from '../../plans/view.js';
 
 /*
  * What the slug's pattern cannot check: that this address is free to take.
@@ -230,6 +245,27 @@ async function resolveAddress(
 	if (!subdomain) return { slug };
 	await assertSubdomainAvailable(slug, keeping?._id);
 	return { slug, subdomain: true };
+}
+
+/*
+ * A generated name is judged by every rule a named one is — reserved, taken, a colliding subdomain — and drawn again
+ * when one refuses it (specs/102).
+ */
+async function generatedAddress(
+	body: AddressBody
+): Promise<BucketAddressWrite> {
+	for (let draw = 0; draw < SLUG_DRAWS; draw += 1) {
+		try {
+			return await resolveAddress({ ...body, slug: drawSlug() });
+		} catch (error) {
+			if (error instanceof AdminError && error.field === 'slug') continue;
+			throw error;
+		}
+	}
+	throw new AdminError(
+		500,
+		'no free address name could be drawn for the project'
+	);
 }
 
 /*
@@ -386,24 +422,6 @@ async function refusingATakenName<T>(write: () => Promise<T>): Promise<T> {
 		}
 		throw error;
 	}
-}
-
-/*
- * The applications a bucket holds, as stored (specs/099). `operatorOnly` leaves out the ones that registered
- * themselves: those break nobody's integration that an administrator owns, and never block a deletion.
- */
-async function bucketClients(
-	bucketId: string,
-	operatorOnly = false
-): Promise<{ clientId: string; registeredDynamically: boolean }[]> {
-	const stored = await adapter('Client').findByIndexed('bucketId', bucketId);
-	return stored
-		.map((record) => ({
-			clientId: String(record.clientId),
-			registeredDynamically: record.registeredDynamically === true
-		}))
-		.filter((client) => !operatorOnly || !client.registeredDynamically)
-		.sort((a, b) => a.clientId.localeCompare(b.clientId));
 }
 
 interface AddressChangeCounts {
@@ -936,8 +954,26 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 				body.teamId === undefined
 					? assertActiveGroup(ctx)
 					: (await loadDestination(ctx, body.teamId))._id;
-			assertOneForm(body);
+			/*
+			 * The plan the project will be on (specs/102): the default, recorded at creation whether or not plans
+			 * are enforced, so that making another plan the default later moves no existing project. A project of
+			 * the System team has none.
+			 */
+			const plan =
+				ownerGroupId === UNASSIGNED_GROUP_ID ? null : await newProjectPlan();
+			const generated = !mayNameSlug(ctx, plan);
+			if (generated && body.slug !== undefined && plan) refuseNamedSlug(plan);
+			if (!generated || body.host !== undefined) assertOneForm(body);
 			assertMayChooseForm(ctx, requestedForm(body));
+			if (plan) {
+				const group = await getGroupStore().find(ownerGroupId);
+				if (group) {
+					await assertProjectRoom(ctx, group, {
+						ownerGroupId,
+						planId: plan.id
+					});
+				}
+			}
 			/*
 			 * A new bucket cannot be created unreachable. Providers are added through their own routes, so at
 			 * creation there are none — which makes `passwordLogin: false` here always a lockout.
@@ -950,7 +986,10 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			 * Before the audit entry, for the reason stated on the sign-in guard above: an entry describing
 			 * a bucket a 409 refused to create would record an address that never existed.
 			 */
-			const address = await resolveAddress(body);
+			const address =
+				generated && body.host === undefined
+					? await generatedAddress(body)
+					: await resolveAddress(body);
 			const displayName = acceptedDisplayName(body.displayName) ?? undefined;
 			// The id is allocated here, not by the store, so the audit entry can name the bucket that is
 			// about to exist — audit-first has nothing to point at otherwise.
@@ -963,6 +1002,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 					...(displayName ? { displayName } : {}),
 					...address,
 					ownerGroupId,
+					...(plan ? { planId: plan.id } : {}),
 					passwordLogin: body.passwordLogin,
 					/*
 					 * Closed unless asked for (specs/083): a bucket's people arrive through its administrators, its
@@ -1019,7 +1059,12 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 				getProtectedResourceStore().listByBucket(bucket._id)
 			]);
 		const enabled = bucket.federation.filter((provider) => provider.enabled);
+		/* The project's plan, its use and its warnings (specs/102); null for a System project, which has none. */
+		const plan = plansShownTo(ctx)
+			? { plan: await planViewOf(bucket, figure?.total ?? null) }
+			: {};
 		return {
+			...plan,
 			users: counts.total,
 			unverified: counts.unverified,
 			withoutAuthenticator: counts.withoutAuthenticator,
@@ -1184,6 +1229,14 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			assertOneForm(body);
 			assertMayChooseForm(ctx, requestedForm(body));
 
+			/*
+			 * On a plan without a custom slug the name stays the one the project was given; moving between path and
+			 * subdomain under it is still the team's to do (specs/102).
+			 */
+			if (body.slug !== undefined && body.slug !== bucket.slug) {
+				const plan = planOf(bucket, await catalogue());
+				if (plan && !mayNameSlug(ctx, plan)) refuseNamedSlug(plan);
+			}
 			const address = await resolveAddress(body, bucket);
 
 			/*
@@ -1299,6 +1352,8 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			const destination = await loadDestination(ctx, body.teamId);
 			const from = sourceGroupOf([bucket.ownerGroupId], destination._id);
 			assertGroupOwner(ctx, from);
+			/* Before the preview, so a move the plan would refuse is never offered for confirmation (specs/102). */
+			await assertProjectRoom(ctx, destination, bucket);
 
 			const [applications, apis] = await Promise.all([
 				bucketClients(bucket._id, true),
@@ -1334,6 +1389,16 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 					409,
 					'the project changed while it was being moved; reload and try again'
 				);
+			}
+			/*
+			 * A System-team project carries no plan; leaving that team it is put on the default, as a new project
+			 * is, so every project outside it records one (specs/102).
+			 */
+			if (
+				bucket.planId === undefined &&
+				destination._id !== UNASSIGNED_GROUP_ID
+			) {
+				await getBucketStore().setPlan(bucket._id, (await newProjectPlan()).id);
 			}
 			return { project: { id: bucket._id, ownerTeamId: destination._id } };
 		},
@@ -1419,6 +1484,9 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 		if (destructionUnderway(bucket, now())) {
 			throw new AdminError(409, 'This project is already being deleted.');
 		}
+		/* A scheduled project counts toward nobody until it is back (specs/102). */
+		const team = await getGroupStore().find(bucket.ownerGroupId);
+		if (team) await assertProjectRoom(ctx, team, bucket);
 		await recordAdminAudit(ctx, 'bucket.restore', params.id, {
 			ownerGroupId: bucket.ownerGroupId,
 			/* The schedule this restore cancelled. */

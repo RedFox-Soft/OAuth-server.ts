@@ -103,7 +103,7 @@ describe('MCP confirmation gate', () => {
 
 	it('declares a confirmation argument on every high-consequence tool', () => {
 		const high = mcpCatalogue.filter((t) => t.consequence === 'high');
-		expect(high.length).toBe(37);
+		expect(high.length).toBe(41);
 	});
 
 	it('describes instead of acting, and changes nothing', async () => {

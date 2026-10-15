@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Form, Input, Modal, Table, Tag } from 'antd';
+import { Button, Form, Input, Modal, Table, Tag, Tooltip } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { groupLabel } from '../../groups/label.js';
 import { PageHeader } from '../frame/PageHeader.js';
@@ -36,13 +36,19 @@ export function Groups({ currentUserId }: { currentUserId: string | null }) {
 	const feedback = useFeedback();
 	const navigate = useNavigate();
 	const { query } = useRoute();
-	const { me } = useMe();
-	const mayCreate = meCan(me).createTeam;
+	const { me, reload } = useMe();
+	const mine = meCan(me);
+	const mayCreate = mine.createTeam;
+	// The instance's allowance of regular teams per administrator (specs/102), when this operator is at it.
+	const teamsFull =
+		mine.teams && mine.teams.count >= mine.teams.max ? mine.teams : null;
 	const [groups, setGroups] = useState<Group[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [failed, setFailed] = useState<string | null>(null);
 	// A personal team's page offers "New team", which lands here with the dialog open.
-	const [open, setOpen] = useState(query.get('new') === '1');
+	const [open, setOpen] = useState(
+		query.get('new') === '1' && teamsFull === null
+	);
 	const [form] = Form.useForm<{ name: string }>();
 
 	// Every state write follows an await, so the mount effect calls this without setting
@@ -78,6 +84,8 @@ export function Groups({ currentUserId }: { currentUserId: string | null }) {
 		feedback.done(`Team ${values.name} created.`);
 		setOpen(false);
 		form.resetFields();
+		// The allowance's count moved; `me.can.teams` says so.
+		void reload();
 		void navigate(groupHref(result.data._id));
 	}
 
@@ -97,13 +105,22 @@ export function Groups({ currentUserId }: { currentUserId: string | null }) {
 		g.kind === 'personal' ? 'Personal · Only you' : groupLabel(g);
 
 	const newGroup = (
-		<Button
-			type="primary"
-			icon={<PlusOutlined />}
-			onClick={() => setOpen(true)}
+		<Tooltip
+			title={
+				teamsFull
+					? `You own ${String(teamsFull.count)} of the ${String(teamsFull.max)} teams one administrator may own on this instance.`
+					: undefined
+			}
 		>
-			New team
-		</Button>
+			<Button
+				type="primary"
+				icon={<PlusOutlined />}
+				disabled={teamsFull !== null}
+				onClick={() => setOpen(true)}
+			>
+				New team
+			</Button>
+		</Tooltip>
 	);
 
 	return (

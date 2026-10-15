@@ -199,6 +199,7 @@ function invalidCode(interaction: Interaction): string {
 
 import { ApplicationConfig, configuration } from 'lib/configs/application.js';
 import { isPlainObject } from 'lib/helpers/_/object.js';
+import { signUpsPaused } from '../plans/signups.js';
 
 /*
  * Returns an error that ended a resumed authorization request to the client that made it.
@@ -1830,7 +1831,8 @@ export const ui = new Elysia()
 				await addressedBucketOf(interaction)
 			)
 		);
-		if (bucket && !bucket.registrationOpen) {
+		/* Closed by the project, or paused by its plan's active-user cap (specs/102): one page, naming neither. */
+		if (bucket && (!bucket.registrationOpen || (await signUpsPaused(bucket)))) {
 			return registrationClosedPage(languageOf(interaction));
 		}
 		return registrationServer(uid, {
@@ -1854,8 +1856,12 @@ export const ui = new Elysia()
 			);
 			const bucket = await getBucketStore().find(bucketId);
 
-			// A closed bucket accepts no self-service sign-ups: no account, no email.
-			if (bucket && !bucket.registrationOpen) {
+			// A closed bucket accepts no self-service sign-ups: no account, no email. Nor does one whose plan's
+			// active-user cap is reached (specs/102).
+			if (
+				bucket &&
+				(!bucket.registrationOpen || (await signUpsPaused(bucket)))
+			) {
 				return registrationClosedPage(languageOf(interaction));
 			}
 

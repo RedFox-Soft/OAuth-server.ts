@@ -16,6 +16,8 @@ export interface BucketCan {
 	changeAddress: boolean;
 	move: boolean;
 	delete: boolean;
+	/* Moving the project to another plan (specs/102): a super administrator's. */
+	setPlan: boolean;
 }
 
 export interface BucketBlockers {
@@ -30,7 +32,8 @@ const ALL_BUCKET: BucketCan = {
 	readActivity: true,
 	changeAddress: true,
 	move: true,
-	delete: true
+	delete: true,
+	setPlan: true
 };
 
 /*
@@ -50,6 +53,7 @@ export function bucketCan(
 		editSettings: false,
 		edit: false,
 		changeAddress: false,
-		move: false
+		move: false,
+		setPlan: false
 	};
 }

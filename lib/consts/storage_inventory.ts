@@ -192,10 +192,10 @@ export const STORE_AREAS = {
 	 * inspecting the data a migration would have changed.
 	 */
 	schemaMigrations: 'schemaMigrations',
-	/* One area, four writers: configStore keeps the persisted ApplicationConfig, SmtpSettingsStore the
-	 * SMTP credentials, and two SingletonSecretStore instances the server's DPoP nonce secret and its
-	 * pairwise identifier salt — singleton documents distinguished only by a derived ObjectId. One
-	 * inventory entry, therefore, not four. Both secrets joined this area rather than claiming one
+	/* One area, five writers: configStore keeps the persisted ApplicationConfig, SmtpSettingsStore the
+	 * SMTP credentials, PlanCatalogueStore the plan catalogue (specs/102), and two SingletonSecretStore
+	 * instances the server's DPoP nonce secret and its pairwise identifier salt — singleton documents
+	 * distinguished only by a derived ObjectId. One inventory entry, therefore, not five. Both secrets joined this area rather than claiming one
 	 * each because it is already declared permanent (`reaped: null` below): a secret that expired on
 	 * its own would be silently regenerated at the next startup, churning every client's nonces for no
 	 * visible reason — and, for the salt, permanently breaking every relying party's account linkage. */

@@ -45,6 +45,7 @@ import {
 	ALLOWED_BUCKET_ACTIVITY_PARAMS,
 	BucketActivityQuery
 } from './schema.js';
+import { planViewOf, plansShownTo } from '../../plans/view.js';
 
 /*
  * Monthly and daily active users per bucket (specs/076): two reads, neither audited, because a count of how
@@ -312,6 +313,20 @@ export const activityRoutes = new Elysia({ name: 'admin-activity' })
 					unavailable: lost
 				};
 			});
+			if (plansShownTo(ctx)) {
+				const live = new Map(liveBuckets.map((bucket) => [bucket._id, bucket]));
+				const thisMonth = month === monthOf(at);
+				for (const row of rows) {
+					const bucket = live.get(row.projectId);
+					if (!bucket) continue;
+					const view = await planViewOf(
+						bucket,
+						thisMonth ? (row.current?.total ?? null) : null
+					);
+					row.plan = view ? { id: view.id, name: view.name } : null;
+					row.warnings = view?.warnings ?? [];
+				}
+			}
 			rows.sort(
 				(a, b) =>
 					Number(a.deleted !== null) - Number(b.deleted !== null) ||

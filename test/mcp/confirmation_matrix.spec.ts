@@ -68,6 +68,19 @@ const BODIES: Record<string, Record<string, unknown>> = {
 	project_group_assign_connection: { connectionId: 'any' },
 	provisioning_credential_issue: { kind: 'static_token' },
 	project_owner_change: { teamId: 'any' },
+	project_plan_set: { planId: 'free' },
+	plan_create: {
+		id: 'gated',
+		name: 'Gated',
+		default: false,
+		limits: {
+			monthlyActiveUsers: null,
+			projectsPerAdministrator: null,
+			applicationsPerProject: null,
+			apisPerProject: null
+		},
+		features: { enterpriseSignIn: true, customSlug: true, customDomain: true }
+	},
 
 	settings_update: { 'dpop.requireNonce': true },
 	smtp_settings_update: {
@@ -108,7 +121,7 @@ describe('every high-consequence tool is gated', () => {
 		 * membership is named in catalogue_drift rather than counted here.
 		 */
 		expect(HIGH.length).toBeGreaterThan(0);
-		expect(HIGH.length).toBe(37);
+		expect(HIGH.length).toBe(41);
 	});
 
 	it.each(HIGH.map((t) => [t.tool, t] as const))(

@@ -1,7 +1,7 @@
 ---
 title: 文档
 description: 如何运行、集成和管理 FoxAuth 背后的引擎 OAuth-server.ts：从第一个容器到生产环境部署。
-source: 710186543c46
+source: 5e1c93a02448
 ---
 
 FoxAuth 构建于 **OAuth-server.ts** 之上。这是一个由你自己运行的 OAuth 2.1 与 OpenID Connect 授权服务器，源码可用（source-available，并非开源许可）。本文档涵盖三项工作：让服务器跑起来、把应用接入它，以及在真实用户依赖它之后运维它。选择你眼下正在做的那一项即可。
@@ -30,7 +30,7 @@ FoxAuth 构建于 **OAuth-server.ts** 之上。这是一个由你自己运行的
 
 一旦有人通过它登录，工作重心就转到了控制台。[连接上游身份提供商](/zh-cn/docs/administer/federation/)让一个项目的用户可以通过 Google、Microsoft、Apple、GitHub 或任意 OpenID 提供商登录，并决定这样的登录可以创建或关联哪些账户。在此基础上，[从 Entra ID 或 Okta 预配用户](/zh-cn/docs/administer/scim/)通过 SCIM 把项目中用户和用户组的管理交给目录服务，而[来自上游提供商的登出](/zh-cn/docs/administer/upstream-logout/)让那边的登出能够结束这里的会话。
 
-[团队与项目所有权](/zh-cn/docs/administer/teams/)介绍了拥有项目的管理员团队，以及如何在团队之间转移项目。[项目地址](/zh-cn/docs/administer/project-addresses/)比较了项目可以使用的三种地址：路径、子域名和独立的主机名，并说明了启用子域名之前需要在 DNS 和证书上做的准备。[用户组与 groups 声明](/zh-cn/docs/administer/groups/)介绍了依赖方（relying party）用来代替角色读取的最终用户组。[终止用户的访问](/zh-cn/docs/administer/ending-access/)比较了停用、锁定、全局登出和删除，并指出其中任何一种都无法收回的那一种令牌。[轮换签名密钥](/zh-cn/docs/administer/signing-keys/)演示如何在不重启的情况下一步轮换实例的密钥和每个项目的密钥，以及如何立即吊销已泄露的密钥。
+[团队与项目所有权](/zh-cn/docs/administer/teams/)介绍了拥有项目的管理员团队，以及如何在团队之间转移项目。[项目地址](/zh-cn/docs/administer/project-addresses/)比较了项目可以使用的三种地址：路径、子域名和独立的主机名，并说明了启用子域名之前需要在 DNS 和证书上做的准备。[用户组与 groups 声明](/zh-cn/docs/administer/groups/)介绍了依赖方（relying party）用来代替角色读取的最终用户组。[终止用户的访问](/zh-cn/docs/administer/ending-access/)比较了停用、锁定、全局登出和删除，并指出其中任何一种都无法收回的那一种令牌。[轮换签名密钥](/zh-cn/docs/administer/signing-keys/)演示如何在不重启的情况下一步轮换实例的密钥和每个项目的密钥，以及如何立即吊销已泄露的密钥。[套餐与 Free 限额](/zh-cn/docs/administer/plans/)适用于任何人都能注册为管理员的公共实例：套餐限制每个团队可以创建的内容，并在项目达到每月活跃用户上限时暂停新用户注册。
 
 ## 决定是否信任它 {#deciding-whether-to-trust-it}
 

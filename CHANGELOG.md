@@ -11,6 +11,16 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- **Plans and Free-tier limits** (spec 102), off by default (`plans.enabled`). A project is on a plan from a catalogue
+  super administrators edit (Settings → Plans & limits, `/admin/api/plans`, the `plan_*` and `project_plan_set`
+  tools); the built-in Free plan allows 100,000 monthly active users per project, 2 projects per administrator,
+  10 applications and 10 APIs per project, and social sign-in only, and generates the project's address name.
+  `plans.regularTeamsPerAdministrator` (1) caps regular teams. Limits gate only new creations and never a super
+  administrator or a System project; at the active-user cap only new self-service sign-ups pause, never a sign-in.
+  A refusal is a 409 whose body carries `code: 'plan_limit'` and the `limit`; `can` on `GET /admin/api/me` states
+  what is still allowed. The migration `2026-10-18-projects-record-plan` records Free on every existing project
+  (run `db:migrate`).
+
 - **A project can live on a subdomain of the instance** (spec 101): `https://acme.auth.example.com`, derived from
   its slug, beside a path and a hostname of its own. A new setting, `projects.addressForms` (`path` by default,
   `subdomain` or `both`), decides which of the two a team may choose; super administrators may give any form, and

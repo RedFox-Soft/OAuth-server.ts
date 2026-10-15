@@ -195,6 +195,10 @@ Each rule is the part that is easy to break. Read the named page before changing
 - **Monthly active users** — recorded only in `executeGrant`, by `noteActivity`, never awaited; the bucket
   is the one `findAccount` resolved, never the token's `bucketId`; marks and figures are unowned and never
   swept, and a frozen figure is never rewritten. → `monthly-active-users.md`
+- **Plans** — a project's plan is recorded on it (`planId`), never implied from the default; a limit is checked in
+  the admin route, after authorization and before the audit write, through `lib/plans/`, never in a store, and is a
+  409 `plan_limit`; a plan never refuses a sign-in, only a new creation or a new self-service sign-up.
+  → `plans.md`
 - **Sentry** — reporting is off the request path: `lib/sentry/` mounts nothing into Elysia, and
   `@sentry/elysia` is deliberately not a dependency. → `sentry-plugin-not-used.md`
 - **Interaction screens** — a page is either the antd shell (inside an interaction) or plain and

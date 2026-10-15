@@ -21,6 +21,7 @@ import { provisioningHoldRoutes } from './provisioning/holds.js';
 import { bucketGroupRoutes } from './bucket-groups/routes.js';
 import { settingsRoutes } from './settings/routes.js';
 import { smtpSettingsRoutes } from './settings/smtp/routes.js';
+import { planRoutes } from './plans/routes.js';
 import { sentrySettingsRoutes } from './settings/sentry/routes.js';
 import { jwksRoutes } from './jwks/routes.js';
 import { bucketKeyRoutes } from './bucket_keys/routes.js';
@@ -114,6 +115,7 @@ export const adminApiRoutes = new Elysia({ name: 'admin-api' })
 	.use(bucketGroupRoutes)
 	.use(settingsRoutes)
 	.use(smtpSettingsRoutes)
+	.use(planRoutes)
 	.use(sentrySettingsRoutes)
 	.use(jwksRoutes)
 	.use(bucketKeyRoutes)

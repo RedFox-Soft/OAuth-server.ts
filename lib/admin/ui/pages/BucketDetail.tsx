@@ -213,6 +213,11 @@ export function BucketDetail({
 	const shownTabLabel = TABS.find((t) => t.key === shownTab)?.label ?? '';
 	const tabRefused = bucket !== null && !tabAllowed(shownTab, granted);
 	const openSignIn = () => void navigate(bucketHref(bucketId, 'sign-in'));
+	/*
+	 * The plan this caller is held to (specs/102), for the create actions it gates. A super administrator reads the
+	 * plan but is never limited by it, and a tenant reads none while plans are off.
+	 */
+	const heldTo = me?.superAdmin === true ? null : (summary?.plan ?? null);
 
 	return (
 		<>
@@ -281,6 +286,7 @@ export function BucketDetail({
 					superAdmin={me?.superAdmin === true}
 					groupName={groupName}
 					onOpenSignIn={openSignIn}
+					onChanged={() => void load()}
 				/>
 			)}
 			{bucket && !tabRefused && shownTab === 'settings' && (
@@ -305,6 +311,8 @@ export function BucketDetail({
 				<Clients
 					bucketId={bucketId}
 					writable={can.edit && !bucket.deletion}
+					plan={heldTo}
+					onChanged={() => void load()}
 				/>
 			)}
 			{bucket && !tabRefused && shownTab === 'apis' && (
@@ -313,6 +321,8 @@ export function BucketDetail({
 					bucketName={bucket.name}
 					canEdit={can.edit && !bucket.deletion}
 					superAdmin={me?.superAdmin === true}
+					plan={heldTo}
+					onChanged={() => void load()}
 				/>
 			)}
 			{/* A scheduled bucket's banner already says why nothing can be changed. */}
@@ -351,6 +361,7 @@ export function BucketDetail({
 					key={federationKey}
 					bucket={bucket}
 					canEdit={can.edit}
+					enterpriseSignIn={heldTo?.features.enterpriseSignIn !== false}
 					onChanged={() => {
 						void load();
 						setProvisioningKey((k) => k + 1);
