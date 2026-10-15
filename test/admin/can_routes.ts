@@ -1,4 +1,8 @@
-import type { BucketCan, MeCan } from 'lib/admin/auth/can.ts';
+import type {
+	AddressFormChoice,
+	BucketCan,
+	MeCan
+} from 'lib/admin/auth/can.ts';
 
 /*
  * Which stated right governs each bucket route — the declaration the stated-rights guard (can_routes.spec.ts)
@@ -16,6 +20,13 @@ import type { BucketCan, MeCan } from 'lib/admin/auth/can.ts';
 
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
+/*
+ * A right the caller states on `GET /admin/api/me`: one of its flags, or one address form listed in
+ * `addressForms` (specs/101), which is a list rather than a flag because it also says which form comes first.
+ */
+export type MeRight =
+	Exclude<keyof MeCan, 'addressForms'> | `addressForms:${AddressFormChoice}`;
+
 interface Governed {
 	readonly method: Method;
 	readonly path: string;
@@ -31,9 +42,9 @@ export type StatedRightRoute =
 			 * the bucket's right, this right of the caller's own — as the console combines the namespace the API
 			 * list states with the caller's rights on `GET /admin/api/me`.
 			 */
-			readonly atRoot?: keyof MeCan;
+			readonly atRoot?: MeRight;
 	  })
-	| (Governed & { readonly on: 'me'; readonly flag: keyof MeCan });
+	| (Governed & { readonly on: 'me'; readonly flag: MeRight });
 
 const BUCKET = '/admin/api/projects/:id';
 
@@ -48,10 +59,22 @@ export const statedRightRoutes: readonly StatedRightRoute[] = [
 	/* The same route, asked for a hostname: an instance-level act, decided before the hostname is judged. */
 	{
 		on: 'me',
-		flag: 'createHost',
+		flag: 'addressForms:host',
 		method: 'POST',
 		path: '/admin/api/projects',
 		body: { name: 'Hosted', host: 'not a hostname' }
+	},
+	/* And asked for a subdomain: the operator's setting decides, before the name is judged (specs/101). */
+	{
+		on: 'me',
+		flag: 'addressForms:subdomain',
+		method: 'POST',
+		path: '/admin/api/projects',
+		body: {
+			name: 'Subdomain',
+			slug: ':taken-bucket-slug',
+			addressForm: 'subdomain'
+		}
 	},
 
 	{ on: 'bucket', flag: 'read', method: 'GET', path: BUCKET },

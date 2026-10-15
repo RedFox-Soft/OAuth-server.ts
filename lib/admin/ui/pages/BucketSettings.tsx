@@ -23,7 +23,14 @@ import { Link, useLeaveGuard, useNavigate } from '../frame/router.js';
 import { bucketHref } from '../frame/routes.js';
 import { DeleteBucketDialog } from './DeleteBucketDialog.js';
 import { useScheduledActions } from './ScheduledBanner.js';
-import type { AddressPreview, BucketView } from './bucketView.js';
+import { originOf } from '../bucketAddress.js';
+import { useInstanceHost } from '../frame/instance.js';
+import type { AddressFormChoice } from '../frame/me.js';
+import {
+	ADDRESS_FORM_CHOICE,
+	type AddressPreview,
+	type BucketView
+} from './bucketView.js';
 
 /*
  * A bucket's own properties (specs/081): its name, its address, the group that owns it, and — at the foot,
@@ -35,6 +42,7 @@ import type { AddressPreview, BucketView } from './bucketView.js';
 const FORM_LABEL: Record<NonNullable<BucketView['addressForm']>, string> = {
 	root: "Served at the server's root",
 	path: 'A path of the server',
+	subdomain: 'A subdomain of the server',
 	host: 'A hostname of its own',
 	unaddressed: 'No address of its own'
 };
@@ -143,7 +151,17 @@ export function GeneralCard({
 }
 
 function AddressCard({ bucket }: { bucket: BucketView }) {
+	const { me } = useMe();
 	const address = bucket.address;
+	/*
+	 * The setting narrowed after this project was addressed (specs/101). Its address is not moved — that
+	 * would break every client integrated with it — so its team is told why the form is not offered for a
+	 * new project, rather than left to find out at the dialog. A super administrator is offered every form.
+	 */
+	const formWithdrawn =
+		(bucket.addressForm === 'path' || bucket.addressForm === 'subdomain') &&
+		me?.superAdmin !== true &&
+		!meCan(me).addressForms.includes(bucket.addressForm);
 	return (
 		<Card title="Address">
 			<Descriptions
@@ -175,20 +193,36 @@ function AddressCard({ bucket }: { bucket: BucketView }) {
 									key: 'dns',
 									label: 'DNS record',
 									children: (
-										<Space wrap>
-											<Typography.Text code>
-												{address.dnsRecord.name}
-											</Typography.Text>
-											<Typography.Text>
-												{address.dnsRecord.type}
-											</Typography.Text>
-											<Typography.Text
-												code
-												copyable
-											>
-												{address.dnsRecord.value}
-											</Typography.Text>
-										</Space>
+										<Flex
+											vertical
+											gap={4}
+										>
+											<Space wrap>
+												<Typography.Text code>
+													{address.dnsRecord.name}
+												</Typography.Text>
+												<Typography.Text>
+													{address.dnsRecord.type}
+												</Typography.Text>
+												<Typography.Text
+													code
+													copyable
+												>
+													{address.dnsRecord.value}
+												</Typography.Text>
+											</Space>
+											{/*
+											 * One record and one certificate serve every subdomain project, so there is
+											 * nothing to create for this one: asking for a per-project record would send
+											 * the operator to do something that cannot help.
+											 */}
+											{address.dnsRecord.shared && (
+												<Typography.Text type="secondary">
+													This instance's wildcard record and certificate cover
+													this project; it needs no record of its own.
+												</Typography.Text>
+											)}
+										</Flex>
 									)
 								},
 								{
@@ -210,6 +244,14 @@ function AddressCard({ bucket }: { bucket: BucketView }) {
 						: [])
 				]}
 			/>
+			{formWithdrawn && (
+				<Alert
+					style={{ marginTop: 12 }}
+					type="info"
+					showIcon
+					title="New projects on this instance can no longer use this form. This project keeps its address."
+				/>
+			)}
 			{address?.stillToDo && (
 				<Alert
 					style={{ marginTop: 12 }}
@@ -326,17 +368,26 @@ function ChangeAddressDialog({
 	onChanged: () => void;
 }) {
 	const { me } = useMe();
-	const mayHost = meCan(me).createHost;
-	const [form, setForm] = useState<'path' | 'host'>(
-		bucket.addressForm === 'host' && mayHost ? 'host' : 'path'
-	);
-	const [value, setValue] = useState('');
+	const instanceHost = useInstanceHost();
+	const forms = meCan(me).addressForms;
+	const [form, setForm] = useState<AddressFormChoice>(forms[0]);
+	/*
+	 * The current slug, so a move between a path and a subdomain — the same name under another form — is a
+	 * choice of form and nothing to retype. A hostname is never prefilled: the current one is no change.
+	 */
+	const currentSlug =
+		bucket.addressForm === 'path' || bucket.addressForm === 'subdomain'
+			? (bucket.slug ?? '')
+			: '';
+	const [value, setValue] = useState(form === 'host' ? '' : currentSlug);
 	const [preview, setPreview] = useState<AddressPreview | null>(null);
 	const [moved, setMoved] = useState(false);
 
 	async function step(commit: boolean): Promise<PreviewStep<AddressPreview>> {
 		const target =
-			form === 'host' ? { host: value.trim() } : { slug: value.trim() };
+			form === 'host'
+				? { host: value.trim() }
+				: { slug: value.trim(), addressForm: form };
 		const result = await request<{ to?: string }>(
 			'POST',
 			`/admin/api/projects/${encodeURIComponent(bucket._id)}/address`,
@@ -391,23 +442,31 @@ function ChangeAddressDialog({
 				vertical
 				gap={12}
 			>
-				{mayHost && (
-					<Segmented
+				{forms.length > 1 && (
+					<Segmented<AddressFormChoice>
 						value={form}
-						options={[
-							{ label: 'Path', value: 'path' },
-							{ label: 'Hostname', value: 'host' }
-						]}
+						options={forms.map((choice) => ({
+							label: ADDRESS_FORM_CHOICE[choice],
+							value: choice
+						}))}
 						onChange={(next) => {
-							setForm(next as 'path' | 'host');
+							// Between a path and a subdomain the name carries over; to or from a hostname it cannot.
+							if (next === 'host' || form === 'host') {
+								setValue(next === 'host' ? '' : currentSlug);
+							}
+							setForm(next);
 							setPreview(null);
+							setMoved(false);
 						}}
 					/>
 				)}
 				<Input
 					autoFocus
-					prefix={form === 'path' ? '/' : 'https://'}
-					placeholder={form === 'path' ? 'acme' : 'login.acme.com'}
+					prefix={
+						form === 'path' ? '/' : form === 'host' ? 'https://' : undefined
+					}
+					suffix={form === 'subdomain' ? `.${instanceHost}` : undefined}
+					placeholder={form === 'host' ? 'login.acme.com' : 'acme'}
 					value={value}
 					onChange={(event) => {
 						setValue(event.target.value);
@@ -415,6 +474,14 @@ function ChangeAddressDialog({
 						setMoved(false);
 					}}
 				/>
+				{form === 'subdomain' && (
+					<Typography.Text type="secondary">
+						Served at{' '}
+						<Typography.Text code>
+							{originOf(`${value.trim() || 'acme'}.${instanceHost}`)}
+						</Typography.Text>
+					</Typography.Text>
+				)}
 			</Flex>
 		</PreviewConfirm>
 	);

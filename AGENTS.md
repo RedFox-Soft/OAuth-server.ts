@@ -162,11 +162,13 @@ Each rule is the part that is easy to break. Read the named page before changing
   through explicit projections — never a generic key rewriter, since customer data passes through the same
   responses — and show stored audit ids through `lib/admin/vocabulary.ts`, never by rewriting the trail.
   → `admin-audit-trail.md`
-- **Buckets** — a bucket is addressed by a path segment or a hostname, never both, and is its own
-  issuer. The request host is read only by `hostOfRequest`, never from `X-Forwarded-Host`. Which bucket
-  a sign-in uses is `resolveBucketForRequest`, and every caller passes the resource it has and the
-  bucket it was addressed at. A declared resource is unique per issuer namespace, and only a super
-  administrator declares at the root. → `project-is-an-issuer.md`, `per-issuer-isolation.md`,
+- **Buckets** — a bucket is addressed by one of a path segment, a subdomain of the instance (its slug plus
+  the `subdomain` marker) or a hostname, never two, and is its own issuer. Whether a bucket is on an
+  origin of its own is `hasOwnOrigin`, never `bucket.host`. The request host is read only by
+  `hostOfRequest`, never from `X-Forwarded-Host`. Which bucket a sign-in uses is
+  `resolveBucketForRequest`, and every caller passes the resource it has and the bucket it was addressed
+  at. A declared resource is unique per issuer namespace, and only a super administrator declares at the
+  root. → `project-is-an-issuer.md`, `subdomain-project-addresses.md`, `per-issuer-isolation.md`,
   `cookie-path-scoping.md`, `account-resolution.md`
 - **Ownership** — a group owns buckets, a bucket holds its applications and APIs for life, and membership is
   the only grant of access;

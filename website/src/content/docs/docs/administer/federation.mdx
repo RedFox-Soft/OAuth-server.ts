@@ -84,6 +84,7 @@ same subject at another issuer is another person. To move to a new issuer, add a
 2. Copy **The redirect address to register** from the panel. After the provider is created, its page
    shows the same address as **Callback address**. It is the project's issuer followed by
    `/federation/callback`: `https://auth.example.com/acme/federation/callback` for a project at a path,
+   `https://acme.auth.example.com/federation/callback` for a project on a subdomain, and
    `https://login.acme.example/federation/callback` for a project with a hostname.
 
 3. Register exactly that address at the provider. Providers compare it character for character.
@@ -93,7 +94,8 @@ same subject at another issuer is another person. To move to a new issuer, add a
 
 </Steps>
 
-The address belongs to the project's address, so changing the project's path or hostname changes it, and
+The address belongs to the project's address, so [changing the project's
+address](/docs/administer/project-addresses/#changing-a-projects-address) changes it, and
 the provider will then refuse every sign-in with a redirect mismatch on its own page. A project that has
 no address yet gets a callback built from its record id. The console warns about this when you copy it,
 because that address stops matching as soon as the project is given a path.

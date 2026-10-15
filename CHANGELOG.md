@@ -9,7 +9,21 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+### Added
+
+- **A project can live on a subdomain of the instance** (spec 101): `https://acme.auth.example.com`, derived from
+  its slug, beside a path and a hostname of its own. A new setting, `projects.addressForms` (`path` by default,
+  `subdomain` or `both`), decides which of the two a team may choose; super administrators may give any form, and
+  changing the setting moves no project. The operator points one wildcard DNS record and certificate at the
+  instance. Subdomains the deployment keeps for itself (`www`, `api`, `mcp`, …), reserved hostnames and `xn--`-style
+  labels are refused.
+
 ### Changed
+
+- **`can.createHost` is now `can.addressForms`** on `GET /admin/api/me` (spec 101): the list of forms the caller
+  may give a project, the first one preselected. Project slugs are now unique by an index that `db:setup` creates;
+  it reports and skips the index if two projects already share a slug. Address-change audit entries record the
+  old and new issuer rather than the bare name.
 
 - **Buckets are called projects, administrator groups are called teams** (spec 100). Everywhere an administrator or
   an agent reads or types a name, a bucket is a project, an administrator group a team (a personal group a personal

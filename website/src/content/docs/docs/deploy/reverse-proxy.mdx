@@ -22,7 +22,7 @@ wrong `ISSUER` produces a deployment that half-works, in ways that tend to be te
 See the [environment reference](/docs/reference/environment/).
 
 **Pass the original `Host` through.** The server reads that header, and only that header, to work out
-which project a request is addressed to when projects are given hostnames of their own. It
+which project a request is addressed to when projects are given subdomains or hostnames of their own. It
 deliberately does not read `X-Forwarded-Host`: that header is set by whatever spoke to your proxy, so a
 proxy which does not strip an inbound copy would let a caller choose which population answers them —
 the highest-leverage thing a request could influence here. `Host` is what the client actually connected
@@ -30,10 +30,19 @@ to, and what your proxy's own routing already matched on.
 
 The nginx block below sets `proxy_set_header Host $host;` for this reason, and Caddy's `reverse_proxy`
 preserves it by default. A proxy that rewrites `Host` to the upstream's internal name leaves every
-host-addressed project unreachable; path-addressed projects are unaffected, which is what makes this
+project on a subdomain or a hostname of its own unreachable; path-addressed projects are unaffected, which is what makes this
 worth stating rather than leaving to be discovered.
 
 **Choose `rateLimit.trustedProxy` on purpose.** The next section covers it.
+
+### Subdomain projects {#subdomain-projects}
+
+When [projects may have subdomains](/docs/administer/project-addresses/#setting-up-subdomains), the proxy must
+accept every name one label beneath the instance's host, `*.auth.example.com`, hold a wildcard certificate for
+it, and send those requests to the same server with their own `Host`. In nginx that is a second name on the same
+`server` block, `server_name auth.example.com *.auth.example.com;`. Caddy can serve a site address of
+`*.auth.example.com`, but Let's Encrypt issues a wildcard certificate only through the DNS challenge, so Caddy
+needs credentials for your DNS provider and a build with that provider's module. The server still never reads `X-Forwarded-Host`, for subdomains as for hostnames.
 
 <Aside type="note" title="HSTS is emitted unconditionally">
 

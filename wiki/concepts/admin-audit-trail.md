@@ -269,7 +269,9 @@ Also since spec 085:
   question, and shows applied filters as removable chips.
 
 `bucket.address.change` entries (shown `project.address.change`) record the address before and after
-(`from`/`to`, a slug or hostname, null for none). The route always passed them, but until 085 `write()` dropped
+(`from`/`to`). Since spec 101 (2026-10-15) they are issuer URLs (`lib/admin/buckets/routes.ts:1249-1251`),
+because a path `acme` and a subdomain `acme` share a slug ([[subdomain-project-addresses]]). Entries from 085
+until then hold a slug or hostname, null for none. The route always passed them, but until 085 `write()` dropped
 them and the entry schema had no such fields, so earlier address changes in the trail do not say where the
 project was. Ordering is
 `(timestamp desc, _id desc)`: `_id` is unique, so the order is total, which is what stops a page

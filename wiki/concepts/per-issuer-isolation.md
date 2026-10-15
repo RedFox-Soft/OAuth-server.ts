@@ -33,12 +33,13 @@ belong to it. The counter-model is Entra ID, whose tenants share signing keys an
 `iss`/`tid`. Getting that check wrong is a known class of multi-tenant vulnerability, and this server's
 own resource servers are third-party code nobody here reviews.
 
-A project with an address, whether a path or a hostname, is an issuer ([[project-is-an-issuer]]).
+A project with an address is an issuer, whether that address is a path, a subdomain of the instance (since spec
+101, [[subdomain-project-addresses]]) or a hostname ([[project-is-an-issuer]]).
 Everything served at the root shares one issuer: the default project, the administrators' project and a
 project with no address. So all of those share one namespace (`@root`) and one key set (the instance
 keys). Giving them separate key sets would mean one issuer publishing keys that some of its own tokens
 do not verify against. Both the namespace and the key set are keyed by project **id** (`bucketId`), not by issuer
-string, so a move between path and hostname changes the issuer and keeps both.
+string, so a move between address forms changes the issuer and keeps both.
 
 ## Why the root namespace is super-admin only, and nowhere else needs proof
 

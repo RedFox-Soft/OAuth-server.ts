@@ -12,6 +12,8 @@ import { adminApiRoutes } from './routes.js';
 import { resolveAddress } from './ui/frame/routes.js';
 import { renderAdminShell } from './ui/serverRender.js';
 import { meView } from './me_view.js';
+import { meCan } from './auth/can.js';
+import { ISSUER } from '../configs/env.js';
 
 /*
  * The console: the admin API plus the HTML shell that drives it.
@@ -60,6 +62,9 @@ export const adminApp = new Elysia({ name: 'admin' })
  * addresses: this handler and the console's own router both read it, so the server cannot answer 200
  * for a page the console then has nothing to draw for.
  */
+/* `host`, not `hostname`: a development instance on `localhost:3000` serves `acme.localhost:3000`. */
+const instanceHost = new URL(ISSUER).host;
+
 async function consolePage({
 	admin,
 	request,
@@ -80,12 +85,22 @@ async function consolePage({
 	}
 	if (!(await hasSuperAdmin())) {
 		if (url.pathname !== '/admin') return redirect('/admin', 302);
-		return renderAdminShell({ needsSetup: true, me: null, path: '/admin' });
+		return renderAdminShell({
+			needsSetup: true,
+			me: null,
+			path: '/admin',
+			instanceHost
+		});
 	}
 	const resolved = resolveAddress(url.pathname);
 	// The one public page: the invitee following the link from their mail has no session yet.
 	if (resolved.kind === 'page' && resolved.route.public) {
-		return renderAdminShell({ needsSetup: false, me: null, path });
+		return renderAdminShell({
+			needsSetup: false,
+			me: null,
+			path,
+			instanceHost
+		});
 	}
 	if (!admin) {
 		return redirect(
@@ -96,7 +111,12 @@ async function consolePage({
 	if (resolved.kind === 'redirect')
 		return redirect(resolved.to + url.search, 302);
 	return renderAdminShell(
-		{ needsSetup: false, me: meView(admin), path },
+		{
+			needsSetup: false,
+			me: { ...meView(admin), can: meCan(admin) },
+			path,
+			instanceHost
+		},
 		resolved.kind === 'none' ? 404 : 200
 	);
 }

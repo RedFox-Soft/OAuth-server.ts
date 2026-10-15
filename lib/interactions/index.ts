@@ -125,7 +125,7 @@ import { adapter } from 'lib/adapters/index.js';
 import { clientProvenance, grantTypeAllowed } from 'lib/models/client.js';
 import { readLogo } from 'lib/models/client/logo.js';
 import { profileClaims } from 'lib/consts/profile_claims.js';
-import { issuerFor } from 'lib/configs/issuer.js';
+import { hasOwnOrigin, issuerFor } from 'lib/configs/issuer.js';
 import { ttl } from 'lib/configs/liveTime.js';
 import epochTime from 'lib/helpers/epoch_time.js';
 import { denormalize } from 'lib/helpers/user_codes.js';
@@ -1111,7 +1111,7 @@ export const ui = new Elysia()
 			 * completed only there, and a request arriving at a bucket's host may complete only that
 			 * bucket's interactions.
 			 */
-			if (startedBucket.host || arrivedAt) {
+			if (hasOwnOrigin(startedBucket) || arrivedAt) {
 				if (arrivedAt?._id !== startedBucket._id) {
 					throw new SessionNotFound(
 						'interaction session not found at this address'

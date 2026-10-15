@@ -15,9 +15,13 @@ import { request } from './request.js';
  * a console where half the screens knew the new team and half the old one.
  */
 
+/* A path, a subdomain of the instance, or a hostname of its own (specs/101). */
+export type AddressFormChoice = 'path' | 'subdomain' | 'host';
+
 export interface MeCan {
 	createProject: boolean;
-	createHost: boolean;
+	/* The forms this operator may give a project, in the order offered: the first is preselected. */
+	addressForms: AddressFormChoice[];
 	createTeam: boolean;
 	instance: boolean;
 }
@@ -62,7 +66,7 @@ export function meCan(me: Me | null): MeCan {
 	const instance = me?.superAdmin === true;
 	return {
 		createProject: me !== null,
-		createHost: instance,
+		addressForms: instance ? ['path', 'subdomain', 'host'] : ['path'],
 		createTeam: me !== null,
 		instance
 	};

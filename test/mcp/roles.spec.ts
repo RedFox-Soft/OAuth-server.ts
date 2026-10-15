@@ -364,6 +364,64 @@ describe('agent permissions match the console, per role', () => {
 		expect((await getBucketStore().find(bucket._id))?.host).toBeUndefined();
 	});
 
+	it("moves an unused project its administrator's team owns to its subdomain only once confirmed, as the console does", async () => {
+		const { token, user } = await principal('plain');
+		const suffix = Math.floor(Math.random() * 1e6);
+		const bucket = await getBucketStore().create({
+			name: 'Moving',
+			slug: `moving-${suffix}`,
+			ownerGroupId: await personalGroupId(user._id)
+		});
+		const args = {
+			id: bucket._id,
+			slug: `moving-${suffix}`,
+			addressForm: 'subdomain',
+			confirm: true,
+			expect: { applications: 0, connections: 0, providers: 0, resources: 0 }
+		};
+		ApplicationConfig['projects.addressForms'] = 'both';
+		try {
+			const described = await rpc(call('project_address_change', args), token);
+			const untouched = (await getBucketStore().find(bucket._id))?.subdomain;
+			const performed = await rpc(
+				call('project_address_change', {
+					...args,
+					confirmationToken:
+						described.result?.structuredContent?.confirmationToken
+				}),
+				token
+			);
+
+			expect(untouched).toBeUndefined();
+			expect(performed.result?.isError).not.toBe(true);
+			expect((await getBucketStore().find(bucket._id))?.subdomain).toBe(true);
+		} finally {
+			ApplicationConfig['projects.addressForms'] = 'path';
+		}
+	});
+
+	it('refuses an agent a subdomain the operator does not offer to teams, as the console does', async () => {
+		const { token } = await principal('plain');
+		const suffix = Math.floor(Math.random() * 1e6);
+
+		expect(
+			await viaAgent(
+				'project_create',
+				{
+					name: 'Refused subdomain',
+					slug: `refused-${suffix}`,
+					addressForm: 'subdomain'
+				},
+				token
+			)
+		).not.toBe('ok');
+		expect(
+			(await getBucketStore().list()).some(
+				(b) => b.slug === `refused-${suffix}`
+			)
+		).toBe(false);
+	});
+
 	it('lets a non-super administrator create a bucket into their own scope', async () => {
 		const { token } = await principal('plain');
 		const suffix = Math.floor(Math.random() * 1e6);

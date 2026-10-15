@@ -105,7 +105,8 @@ describe('reporting whether an address works (US4)', () => {
 		expect(address?.dnsRecord).toEqual({
 			name: `guided-${counter}.e.ly`,
 			type: 'CNAME',
-			value: 'e.ly'
+			value: 'e.ly',
+			shared: false
 		});
 	});
 

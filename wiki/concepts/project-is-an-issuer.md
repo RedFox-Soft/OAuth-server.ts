@@ -61,8 +61,8 @@ breaking release for every integration and every token in circulation, not a ref
 A project with an address signs with keys of its own and advertises `jwks_uri` beneath its own issuer
 (since 2026-09-29, [[signing-keys]]); everything served at the root shares the root's. Keys follow the
 issuer, not the project record — which is why a project without an address has none of its own: it has no
-issuer to publish them under. They are keyed by the project's id, so a move between path and hostname
-keeps them.
+issuer to publish them under. They are keyed by the project's id, so a move between any two address forms
+(path, subdomain since spec 101, hostname) keeps them.
 
 ## Two reserved projects are not addressable
 
@@ -76,12 +76,18 @@ identifier may not have.
 This is why the console did **not** move off `/admin`: the move existed only to free that word for the
 administrators' project, and the project never puts it in a URL.
 
-**As of `056-host-addressed-buckets` there are two address forms, and a project holds exactly one.** A
-named project carries a path segment (`<ISSUER>/acme`) **or** a hostname of its own
-(`https://acme.auth.example.com`), never both — two addresses would be two issuer identifiers for one
-population. Which of the three states a project is in is now one derived answer, `addressOf` in
-`lib/configs/issuer.ts`, and `issuerFor` and `sessionCookieName` switch on it rather than each
-re-inferring from two fields and a reserved-id predicate. A third consumer, `pathPrefixFor`, shipped
+**A project holds exactly one address form.** `056-host-addressed-buckets` introduced the second form, and
+spec 101 (2026-10-15) the third. A named project carries one of:
+
+- a path segment (`<ISSUER>/acme`);
+- a subdomain of the instance (`https://acme.auth.example.com`, derived from the slug plus a `subdomain`
+  marker; see [[subdomain-project-addresses]]);
+- a hostname of its own (`https://login.acme.com`).
+
+Two addresses would be two issuer identifiers for one population. Which state a project is in is one derived
+answer, `addressOf` (`lib/configs/issuer.ts:42`): root, host, subdomain, path or unaddressed, tested in that
+order. Subdomain is tested before path because a subdomain project has a slug too. `issuerFor` and
+`sessionCookieName` switch on it rather than each re-inferring from the fields and a reserved-id predicate. A third consumer, `pathPrefixFor`, shipped
 with `056` and was **removed** once a coverage report showed it had never had a caller: the router
 mounts the same plugins under a dynamic `/:bucket` segment instead of building a prefix string, and the
 console derives the string in `lib/admin/ui/bucketAddress.ts`, which cannot delegate here because it is
@@ -91,7 +97,8 @@ existed while the cookie falls back to `default`, and collapsing those two into 
 a cookie the bare `/auth` never looks for — the sign-in completes and then does not exist.
 
 Everything below about slugs continues to hold; a hostname simply takes the same place in the same
-rules. Three consequences are specific to the host form. The request's host is read in one place
+rules. Three consequences are specific to the host form. Since spec 101 they hold for a subdomain project as
+well, since it also has an origin of its own (`hasOwnOrigin`, `lib/configs/issuer.ts:145`). The request's host is read in one place
 (`hostOfRequest`), from `Host` and never `X-Forwarded-Host`, because that header is attacker-settable
 and here it selects the tenant. A host-addressed project needs only the single well-known location, since
 its issuer is an origin with no path and the two specifications stop disagreeing. And an interaction now
@@ -102,22 +109,24 @@ origin of the second.
 
 **Not every unknown host is refused.** A server answers at more names than its canonical one —
 `localhost`, the platform's own name, the address a health check uses — so the rule keys on the
-deployment's own domain (`isWithinDeploymentDomain`, `lib/admin/auth/bucketAddress.ts:122`). A name
+deployment's own domain (`isWithinDeploymentDomain`, `lib/admin/auth/bucketAddress.ts:183`). A name
 beneath the canonical host that no project holds is a typo of a tenant address and is refused, since
 serving the default population there would make the mistake look like it worked; a name outside it
 resolves by path, as every request did before hostnames. Refusing both would take the deployment off
 the air everywhere except the exact URL in `ISSUER`.
 
 **Changing an address changes the issuer**, so it is not a field on the project PATCH. It is its own
-route, `POST /admin/api/projects/:id/address` (`lib/admin/buckets/routes.ts:1011`), which answers with a
+route, `POST /admin/api/projects/:id/address` (`lib/admin/buckets/routes.ts:1171`), which answers with a
 preview until called with `confirm: true`, and is audited as its own action — stored as
 `bucket.address.change` (`lib/consts/admin_audit_routes.ts:257`), shown in the trail as
-`project.address.change`. Since spec 081 the preview names what breaks — each application (until spec
+`project.address.change`. Since spec 101 the entry records `from`/`to` as issuer URLs (`:1249-1251`), because a
+path `acme` and a subdomain `acme` share a slug; earlier entries keep a slug or a hostname. Since spec 081 the preview names what breaks — each application (until spec
 099, with the retired project it sat in), each provisioning connection, each identity provider with its
 new callback address, each declared resource — and the confirming call must repeat the preview's counts
-(`expect`), or it is refused with a fresh preview. A team owner may change a **path** while nothing
-depends on the project (no application — before spec 099, no retired project either — provider or
-connection); a host stays super-administrator-only. The change clears the project's recorded host
+(`expect`), or it is refused with a fresh preview. A team owner may change a **path** — since spec 101 a
+**path or subdomain**, into a form `can.addressForms` lists — while nothing depends on the project (no
+application — before spec 099, no retired project either — provider or connection); a host stays
+super-administrator-only. The change clears the project's recorded host
 arrivals, so a new host does not read as reached from the old one's traffic. See [[project-workspace]].
 
 **A slug is a name, not an address**, and three places need to know the difference: `issuerFor`, which
@@ -148,11 +157,13 @@ address, so `/auth` resolves the population from the *client* instead (`OIDCCont
 assigned from `checkBucket`'s resolution) — see [[cookie-path-scoping]] for the sign-in this
 disagreement broke.
 
-**A host-addressed project needs no such suffix and gets the bare `_session`.** The suffix exists only
-because path-addressed projects share one origin; a project on its own origin already has its cookie kept
-apart by the browser, since nothing here sets a `Domain` attribute. Which name is produced follows from
-`addressOf`, not from whether a slug is present — a host-addressed project has no slug and must not fall
-into the branch written for a project that has no address at all.
+**A project on its own origin needs no such suffix and gets the bare `_session`.** That means a
+host-addressed project and, since spec 101, a subdomain project (`lib/consts/param_list.ts:268-270`). The
+suffix exists only because path-addressed projects share one origin; a project on its own origin already has
+its cookie kept apart by the browser, since nothing here sets a `Domain` attribute. Which name is produced
+follows from `addressOf`, not from whether a slug is present. A host-addressed project has no slug and must
+not fall into the branch written for a project that has no address at all. A subdomain project *does* keep its
+slug and must not fall into the path branch.
 
 This did not ship with the rest of the feature, and the gap was not visible from the outside: the
 projects *were* isolated — reaching one while signed in to another asked you to sign in, correctly —
@@ -170,7 +181,9 @@ document named its origin. The host now travels with the slug. `GET /logout` had
 resolved the project without the request host, so at a project's host it read the default project's session.
 The existing cases passed through both, because they asserted the metadata's issuer and a refusal —
 `test/host_buckets/addressing.spec.ts` now completes a sign-in and a sign-out at the host and reads
-`iss` off the authorization response.
+`iss` off the authorization response. Since spec 101 the subdomain marker travels the same way
+(`requestBucketOf`, `lib/admin/auth/bucketAddress.ts:350`), since a subdomain project read back without it
+would be taken for a path one.
 
 **The path-addressed half of the sign-out (fixed 2026-09-30, spec 064).** The confirmation form
 rendered by `/:bucket/logout` posted to the root-relative `/logout/confirm` — the *default* project's

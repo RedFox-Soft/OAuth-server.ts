@@ -164,3 +164,17 @@ export function canonicalHostOf(issuer: string): string | null {
 		return null;
 	}
 }
+
+/*
+ * The single label a host carries directly beneath the instance's own host, or null: `acme` for
+ * `acme.auth.example.com` when the instance is `auth.example.com` (specs/101). Exactly one label, because a
+ * project's subdomain is one label and anything deeper names no project. Both arguments are normalised.
+ */
+export function subdomainLabelOf(
+	host: string,
+	canonical: string | null
+): string | null {
+	if (canonical === null || !host.endsWith(`.${canonical}`)) return null;
+	const label = host.slice(0, -(canonical.length + 1));
+	return LABEL.test(label) && label.length <= LABEL_MAX_LENGTH ? label : null;
+}

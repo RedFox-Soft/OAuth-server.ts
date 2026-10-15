@@ -65,6 +65,60 @@ export function isReservedBucketName(name: string): boolean {
 }
 
 /*
+ * The labels no project may take as a subdomain of the instance's host (specs/101), beyond the path names
+ * above, which every slug already avoids.
+ *
+ * A separate list because the two protect different things. The path names keep a project from shadowing one
+ * of this server's routes, so `www` is harmless as `/www`; as `www.auth.example.com` it is a name in the
+ * operator's own domain under a tenant's control. These are the names an operator commonly runs beside an
+ * authorization server, and the ones a phishing page would most like to borrow. Anything else the operator
+ * runs goes in `projects.reservedHostnames`.
+ */
+export const RESERVED_SUBDOMAIN_LABELS: readonly string[] = [
+	'www',
+	'admin',
+	'api',
+	'mcp',
+	'mail',
+	'smtp',
+	'imap',
+	'pop',
+	'ftp',
+	'auth',
+	'login',
+	'sso',
+	'id',
+	'oauth',
+	'status',
+	'docs',
+	'help',
+	'support',
+	'blog',
+	'cdn',
+	'static',
+	'assets',
+	'app',
+	'dashboard',
+	'console',
+	'billing'
+] as const;
+
+const reservedSubdomains = new Set(RESERVED_SUBDOMAIN_LABELS);
+
+export function isReservedSubdomainLabel(label: string): boolean {
+	return reservedSubdomains.has(label);
+}
+
+/*
+ * Whether a label has hyphens in its third and fourth characters — the shape RFC 5891 §4.2.3.1 reserves for
+ * encoded names such as `xn--…`. A browser may show such a label as other characters, so as a subdomain it is
+ * a way to look like a name it is not. Harmless as a path, which nobody renders.
+ */
+export function hasEncodedLabelShape(label: string): boolean {
+	return label.slice(2, 4) === '--';
+}
+
+/*
  * What a bucket's slug may be, as a string so the request schema and any other consumer share one
  * declaration rather than two that agree today.
  *

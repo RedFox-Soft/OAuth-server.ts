@@ -1,12 +1,20 @@
 import type { UserBucket } from '../../../adapters/types.js';
 import type { BucketBlockers, BucketCan } from '../frame/can.js';
+import type { AddressFormChoice } from '../frame/me.js';
+
+/* What a person reads for each address form a project can be given, in the dialogs that offer them (specs/101). */
+export const ADDRESS_FORM_CHOICE: Record<AddressFormChoice, string> = {
+	subdomain: 'Subdomain',
+	path: 'Path',
+	host: 'Hostname of its own'
+};
 
 /*
  * The project as the API presents it (specs/081 data-model §1): the stored record under its edge names
  * (specs/100: the owning team is `ownerTeamId`, never the stored `ownerGroupId`) plus what the server derives
- * for the console — the address form, the issuer and discovery addresses (the browser bundle never learns the
- * server's own address), how many applications and APIs it holds, and for a host, whether requests have
- * arrived.
+ * for the console — the address form, the issuer and discovery addresses (derived on the server, whose scheme
+ * and paths the browser bundle does not know), how many applications and APIs it holds, and for an origin of
+ * its own, whether requests have arrived.
  */
 export interface BucketView extends Omit<
 	UserBucket,
@@ -27,7 +35,7 @@ export interface BucketView extends Omit<
 			accounts: number | null;
 		}
 	>;
-	addressForm?: 'root' | 'path' | 'host' | 'unaddressed';
+	addressForm?: 'root' | 'path' | 'subdomain' | 'host' | 'unaddressed';
 	issuer?: string | null;
 	discoveryUrl?: string | null;
 	/* What it holds besides its people (specs/099). */
@@ -38,7 +46,11 @@ export interface BucketView extends Omit<
 		requestsArrived: boolean;
 		firstArrivalAt?: string;
 		lastArrivalAt?: string;
-		dnsRecord: { name: string; type: string; value: string };
+		/*
+		 * `shared` marks the instance's wildcard record, which covers every subdomain project at once, as
+		 * opposed to the record a hostname of its own needs (specs/101).
+		 */
+		dnsRecord: { name: string; type: string; value: string; shared?: boolean };
 		stillToDo?: string;
 	};
 }

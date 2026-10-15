@@ -19,6 +19,7 @@ import {
 import { isReservedBucketName } from '../lib/consts/reserved_names.js';
 import {
 	duplicateEmailReport,
+	duplicateSlugReport,
 	exitCodeFor,
 	reservedAddressReport,
 	type DuplicateEmailRow,
@@ -158,8 +159,46 @@ async function provisionArea(
 	}
 }
 
+/*
+ * A stored `slug: null`, removed before the unique slug index is built (specs/101). Until 2026-09-28 the store
+ * inserted without `ignoreUndefined`, so a bucket created with a hostname between specs/056 and then holds an
+ * explicit null where it should hold nothing. A sparse index skips an absent field but indexes a null, so two such
+ * buckets would refuse the index. Only explicit nulls are touched, and a null slug is no address and no name, so
+ * removing it changes nothing a request or an operator can observe.
+ */
+const nullSlugs = await db
+	.collection(STORE_AREAS.userBuckets)
+	.updateMany({ slug: { $type: 'null' } }, { $unset: { slug: '' } });
+if (nullSlugs.modifiedCount > 0) {
+	console.log(
+		`removed a stored null slug from ${String(nullSlugs.modifiedCount)} project(s)`
+	);
+}
+
+/*
+ * Slugs already held twice, pre-checked for the reason duplicate emails are below: createIndex would name one
+ * offending value and abort, while the operator needs the whole list. Aggregating a collection that does not
+ * exist yet yields nothing, so a fresh database passes straight through.
+ */
+const duplicateSlugs = duplicateSlugReport(
+	await db
+		.collection(STORE_AREAS.userBuckets)
+		.aggregate<DuplicateEmailRow>([
+			{ $match: { slug: { $type: 'string' } } },
+			{ $group: { _id: '$slug', count: { $sum: 1 } } },
+			{ $match: { count: { $gt: 1 } } },
+			{ $sort: { _id: 1 } },
+			{ $project: { _id: 0, value: '$_id', count: 1 } }
+		])
+		.toArray()
+);
+if (duplicateSlugs) console.error(duplicateSlugs);
+
 for (const area of FIXED_AREAS) {
-	await provisionArea(area);
+	await provisionArea(area, {
+		blockUnique:
+			area.name === STORE_AREAS.userBuckets && duplicateSlugs !== null
+	});
 }
 
 /*

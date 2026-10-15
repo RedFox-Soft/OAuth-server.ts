@@ -19,6 +19,9 @@ export type RegistrationPolicy = (
 ) => unknown;
 
 /* A constraint on one RFC 9396 §2 field of an authorization details type. */
+/* Which address forms a tenant may give a project (specs/101); a super administrator is never limited. */
+export type ProjectAddressForms = 'path' | 'subdomain' | 'both';
+
 export type RarFieldConstraint = { required?: boolean; allowed?: string[] };
 
 /* One authorization details type this server accepts; described at `richAuthorizationRequests.types`. */
@@ -378,6 +381,16 @@ export const ApplicationConfig = {
 	 * that shadows something they run.
 	 */
 	'projects.reservedHostnames': [] as string[],
+	/*
+	 * projects.addressForms
+	 *
+	 * description: Which address forms an administrator who is not a super administrator may give a
+	 * project: a path beneath this instance (`path`), a subdomain of its host (`subdomain`), or either
+	 * (`both`). `path` by default because a subdomain answers only once the operator has pointed a wildcard
+	 * DNS record and a wildcard certificate at the instance, and the server cannot see whether they have.
+	 * Read when an address is chosen, never when a request is served, so changing it moves no project.
+	 */
+	'projects.addressForms': setting<ProjectAddressForms>('path'),
 
 	/*
 	 * features.requestObjects

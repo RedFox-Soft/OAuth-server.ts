@@ -65,13 +65,18 @@ appear only to a caller who may read the project's activity, and are absent, not
 
 ## Rights that depend on the project's state
 
-Two owner decisions made two rights state-aware (`lib/admin/auth/can.ts:186-218`):
+Two owner decisions made two rights state-aware (`bucketCan`, `lib/admin/auth/can.ts:195`; `mayChangeBucketAddress`, `:158`):
 
 - **`changeAddress`**: a super administrator, or an owner of the project's team while the project is served at a
-  path (or has no address) and nothing depends on it — no application in it, a self-registered one included
-  (`dependentsOf`, `lib/admin/buckets/routes.ts:373-385`; a retired project, until spec 099), no identity
-  provider, no provisioning connection. A host target is super-administrator
-  only, checked in the route because `can` is per project, not per target.
+  path, at a subdomain of the instance (since spec 101, `ownerMayReaddress`, `lib/admin/auth/can.ts:126`) or
+  has no address, and nothing depends on it — no application in it, a self-registered one included
+  (`dependentsOf`, `lib/admin/buckets/routes.ts:528`; a retired project, until spec 099), no identity
+  provider, no provisioning connection. The target form is checked in the route, because `can` is per project,
+  not per target: a host target is super-administrator only, and an owner may move only into a form
+  `GET /admin/api/me`'s `can.addressForms` lists (`assertMayChooseForm`, `lib/admin/buckets/routes.ts:198`).
+  That list replaced the boolean `can.createHost` in spec 101. It is ordered, its first entry is the form the
+  console preselects, and for a team it follows the `projects.addressForms` setting
+  ([[subdomain-project-addresses]]).
 - **`delete`**: as before, plus: a project that still holds accounts only for an owner of its team or a super
   administrator.
 

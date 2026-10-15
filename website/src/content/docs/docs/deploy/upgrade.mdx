@@ -358,6 +358,22 @@ What an integration sees, with no aliases kept for the old names:
   upgrade included, and a filter by a new name finds them; the stored entries are not changed. Entries about
   the old projects are shown as `retiredproject.*` and do not match a filter for today's project actions.
 
+The same release adds a third form of project address, a subdomain of the instance's own host
+(`https://acme.auth.example.com`); [Project addresses](/docs/administer/project-addresses/) describes it. What
+an operator or an integration sees:
+
+- **Nothing changes until you turn it on.** The new setting `projects.addressForms` starts at `path` on every
+  instance, so teams are offered exactly what they had. Set up the wildcard DNS record and certificate first,
+  then switch it to `subdomain` or `both`.
+- **`db:setup` adds a unique index on project slugs.** It fails if two projects already share a slug. Before
+  upgrading, find any such pair and give one of them a new address; nothing renames a slug for you, because a
+  slug is part of an issuer.
+- **`GET /admin/api/me` answers `can.addressForms` instead of `can.createHost`.** It lists the forms the caller
+  may give a project; a super administrator gets `path`, `subdomain` and `host`. No alias is kept, so a script
+  that read `can.createHost` must read `can.addressForms` and look for `host`.
+- **New addresses are audited in full.** A new `project.address.change` entry records the old and the new issuer,
+  so a path and a subdomain with the same slug are told apart. Entries written before the upgrade are unchanged.
+
 ## After the restart
 
 ```bash

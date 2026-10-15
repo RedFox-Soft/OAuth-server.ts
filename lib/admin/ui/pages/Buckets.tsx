@@ -15,7 +15,7 @@ import { PlusOutlined } from '@ant-design/icons';
 import type { UserBucket } from '../../../adapters/types.js';
 import { Link, useNavigate } from '../frame/router.js';
 import { bucketHref, connectionHref } from '../frame/routes.js';
-import { bucketAddressFor } from '../bucketAddress.js';
+import { bucketAddressFor, originOf } from '../bucketAddress.js';
 import { MoveToGroup } from '../MoveToGroup.js';
 import { isUndeletableBucket, reservedOf } from '../../consts.js';
 import { GroupField } from '../frame/CreateDestination.js';
@@ -28,18 +28,22 @@ import {
 	type BucketBlockers,
 	type BucketCan
 } from '../frame/can.js';
-import { meCan, useMe } from '../frame/me.js';
+import { useInstanceHost } from '../frame/instance.js';
+import { meCan, useMe, type AddressFormChoice } from '../frame/me.js';
 import { EmptyState, LoadFailed } from '../frame/states.js';
 import { DeleteBucketDialog } from './DeleteBucketDialog.js';
 import { useScheduledActions } from './ScheduledBanner.js';
-import type { BucketDeletionView } from './bucketView.js';
+import { ADDRESS_FORM_CHOICE, type BucketDeletionView } from './bucketView.js';
 
 interface CreateBucketValues {
 	name: string;
 	/* What the bucket's people see on the page where they allow an app access; empty means its address. */
 	displayName?: string;
-	/* Which form the operator chose. Never sent — the body carries `slug` or `host`, never both. */
-	addressForm?: 'path' | 'host';
+	/*
+	 * Which form the operator chose. Sent only for a subdomain: the body carries `slug` or `host`, never
+	 * both, and a slug without a form is a path.
+	 */
+	addressForm?: AddressFormChoice;
 	slug?: string;
 	host?: string;
 	/* Who can create accounts (specs/083): closed unless the creator opens it. */
@@ -91,6 +95,8 @@ export function Buckets() {
 	const navigate = useNavigate();
 	const { me } = useMe();
 	const mine = meCan(me);
+	const instanceHost = useInstanceHost();
+	const slugTyped = Form.useWatch('slug', form);
 	const [deleting, setDeleting] = useState<BucketRow | null>(null);
 	const [moving, setMoving] = useState<BucketRow | null>(null);
 	// Owning groups by name, for a super administrator's Owner column.
@@ -142,10 +148,16 @@ export function Buckets() {
 			const { addressForm, slug, host, displayName, ...rest } = values;
 			const shown = displayName?.trim();
 			const named = shown ? { ...rest, displayName: shown } : rest;
+			// The choice is not rendered when only one form is offered, and then that one is the form.
+			const chosen = addressForm ?? mine.addressForms[0];
 			const result = await request<{ _id: string }>(
 				'POST',
 				'/admin/api/projects',
-				addressForm === 'host' ? { ...named, host } : { ...named, slug }
+				chosen === 'host'
+					? { ...named, host }
+					: chosen === 'subdomain'
+						? { ...named, slug, addressForm: 'subdomain' }
+						: { ...named, slug }
 			);
 			if (!result.ok) {
 				feedback.failed(result, form);
@@ -302,17 +314,19 @@ export function Buckets() {
 							 * question as whether the bucket has a slug — see `bucketAddressFor`.
 							 */
 							render: (_slug: string | undefined, row: BucketRow) => {
-								const address = bucketAddressFor(row);
+								const address = bucketAddressFor(row, instanceHost);
 								if (address.kind === 'prefix')
 									return <code>{address.path}</code>;
-								if (address.kind === 'host') {
+								if (address.kind === 'host' || address.kind === 'subdomain') {
 									return (
 										<Space
 											orientation="vertical"
 											size={0}
 										>
-											<Tooltip title="Served at a host of its own. Its tokens carry that origin as their issuer, and its sign-in cookie is isolated by the browser rather than by name.">
-												<code>{`https://${address.host}`}</code>
+											<Tooltip
+												title={`Served at ${address.kind === 'host' ? 'a host of its own' : 'a subdomain of this instance'}. Its tokens carry that origin as their issuer, and its sign-in cookie is isolated by the browser rather than by name.`}
+											>
+												<code>{originOf(address.host)}</code>
 											</Tooltip>
 											{row.hostReached === false && (
 												<Typography.Text type="warning">
@@ -435,30 +449,31 @@ export function Buckets() {
 					 * because an operator choosing one has no other way to know it is permanent.
 					 */}
 					{/*
-					 * Which form, asked before the value, because the two are alternatives rather than a
-					 * field and an option. The API refuses a body carrying both, so a form offering both at
-					 * once would invite a refusal the operator could not have anticipated.
+					 * Which form, asked before the value, because the forms are alternatives rather than a
+					 * field and an option. The API refuses a body carrying both a slug and a host, so a form
+					 * offering both at once would invite a refusal the operator could not have anticipated.
 					 *
-					 * The help text states the trade-off rather than recommending blindly: a host is better
-					 * where a deployment can pay for one, and the payment is a DNS record and a certificate
-					 * this server neither creates nor can see.
+					 * Exactly the forms the server says this operator may give, in its order, the first
+					 * selected (`me.can.addressForms`, specs/101). A choice of one is not a question, so it is
+					 * not asked.
 					 *
-					 * Asked only of someone who may give away a name in the deployment's domain; anyone else
-					 * has one form, and a choice of one is not a question.
+					 * The help text states the trade-off rather than recommending blindly: an origin of its own
+					 * isolates the project's cookies, and costs DNS and a certificate this server neither
+					 * creates nor can see — once for every subdomain, or once per hostname.
 					 */}
-					{mine.createHost && (
+					{mine.addressForms.length > 1 && (
 						<Form.Item
 							name="addressForm"
 							label="Address form"
-							initialValue="path"
-							tooltip="A host isolates this project's sign-in cookie by origin and publishes one metadata location instead of two. It needs a DNS record and a TLS certificate, which you provide — this server creates neither."
+							initialValue={mine.addressForms[0]}
+							tooltip="A subdomain or a hostname gives this project an origin of its own, which isolates its sign-in cookie and publishes one metadata location instead of two. A subdomain is covered by this instance's wildcard DNS record and certificate; a hostname of its own needs a DNS record and a TLS certificate you provide — this server creates neither."
 						>
 							<Radio.Group
 								optionType="button"
-								options={[
-									{ label: 'Path', value: 'path' },
-									{ label: 'Host of its own', value: 'host' }
-								]}
+								options={mine.addressForms.map((value) => ({
+									label: ADDRESS_FORM_CHOICE[value],
+									value
+								}))}
 							/>
 						</Form.Item>
 					)}
@@ -468,34 +483,55 @@ export function Buckets() {
 							before.addressForm !== after.addressForm
 						}
 					>
-						{({ getFieldValue }) =>
-							getFieldValue('addressForm') === 'host' ? (
-								<Form.Item
-									name="host"
-									label="Hostname"
-									tooltip="Where this project is served, and the issuer in the tokens it mints. Changing it later breaks every client integrated with this project."
-									rules={[
-										{ required: true },
-										{
-											pattern: /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i,
-											message:
-												'a fully qualified hostname — no scheme, no path, no port, no wildcard'
-										},
-										{ max: 253 }
-									]}
-									extra="Point this name at the deployment and obtain a certificate for it. Until a request arrives, the project page will say so."
-								>
-									<Input placeholder="acme.auth.example.com" />
-								</Form.Item>
-							) : (
+						{({ getFieldValue }) => {
+							const chosen =
+								(getFieldValue('addressForm') as
+									AddressFormChoice | undefined) ?? mine.addressForms[0];
+							if (chosen === 'host') {
+								return (
+									<Form.Item
+										name="host"
+										label="Hostname"
+										tooltip="Where this project is served, and the issuer in the tokens it mints. Changing it later breaks every client integrated with this project."
+										rules={[
+											{ required: true },
+											{
+												pattern: /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i,
+												message:
+													'a fully qualified hostname — no scheme, no path, no port, no wildcard'
+											},
+											{ max: 253 }
+										]}
+										extra="Point this name at the deployment and obtain a certificate for it. Until a request arrives, the project page will say so."
+									>
+										<Input placeholder="acme.auth.example.com" />
+									</Form.Item>
+								);
+							}
+							const subdomain = chosen === 'subdomain';
+							const label =
+								typeof slugTyped === 'string' && slugTyped.trim()
+									? slugTyped.trim()
+									: 'acme';
+							return (
 								<Form.Item
 									label="Address"
 									required
 									tooltip="Where this project is served, and the issuer in the tokens it mints. Changing it later breaks every client integrated with this project."
+									extra={
+										subdomain ? (
+											<>
+												Served at{' '}
+												<Typography.Text code>
+													{originOf(`${label}.${instanceHost}`)}
+												</Typography.Text>
+											</>
+										) : undefined
+									}
 								>
 									{/* The inner item binds the field; the outer one labels it and shows its errors. */}
 									<Space.Compact block>
-										<Space.Addon>/</Space.Addon>
+										{!subdomain && <Space.Addon>/</Space.Addon>}
 										<Form.Item
 											name="slug"
 											noStyle
@@ -512,10 +548,11 @@ export function Buckets() {
 										>
 											<Input placeholder="acme" />
 										</Form.Item>
+										{subdomain && <Space.Addon>.{instanceHost}</Space.Addon>}
 									</Space.Compact>
 								</Form.Item>
-							)
-						}
+							);
+						}}
 					</Form.Item>
 					<Form.Item<CreateBucketValues>
 						name="registrationOpen"

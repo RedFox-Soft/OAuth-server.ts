@@ -27,6 +27,7 @@ import { RecentChanges } from '../frame/RecentChanges.js';
 const ADDRESS_FORM: Record<NonNullable<BucketView['addressForm']>, string> = {
 	root: "Served at the server's root",
 	path: 'A path of the server',
+	subdomain: 'A subdomain of the server',
 	host: 'A hostname of its own',
 	unaddressed: 'No address of its own'
 };
@@ -142,7 +143,13 @@ export function BucketOverview({
 		attention.push({
 			key: 'host',
 			type: 'warning',
-			title: `No request has reached ${bucket.address.host} yet. Create the DNS record so applications can reach it.`,
+			/*
+			 * A subdomain has no record of its own to create: the instance's wildcard covers every one, so
+			 * asking for a per-project record would send the operator to do something that cannot help.
+			 */
+			title: bucket.address.dnsRecord.shared
+				? `No request has reached ${bucket.address.host} yet. It is reached through this instance's wildcard DNS record ${bucket.address.dnsRecord.name} and its certificate, which must exist for any subdomain project to answer.`
+				: `No request has reached ${bucket.address.host} yet. Create the DNS record so applications can reach it.`,
 			action: (
 				<Button
 					size="small"

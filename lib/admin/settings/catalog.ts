@@ -512,6 +512,18 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 	},
 
 	{
+		key: 'projects.addressForms',
+		domain: 'endpoints',
+		group: 'Project addresses',
+		label: 'Address forms',
+		summary: 'Whether teams give projects a path, a subdomain, or either',
+		type: 'enum',
+		options: ['path', 'subdomain', 'both'],
+		risk: 'security',
+		description:
+			'Which address a team may give a project. "path" serves it beneath this instance (https://auth.example.com/acme); "subdomain" serves it on a subdomain of this instance’s host (https://acme.auth.example.com), so every project has an origin of its own; "both" lets the team choose, with the subdomain offered first. Turn subdomains on only after you have pointed a wildcard DNS record and a wildcard TLS certificate for *.<this instance’s host> at the server: the server cannot see DNS or certificates, and without them a subdomain project is unreachable. Super administrators may always give any form, including a hostname of its own. Changing this never moves an existing project: one whose form is no longer offered keeps its address, and its team can still move it to a form that is.'
+	},
+	{
 		key: 'projects.reservedHostnames',
 		domain: 'endpoints',
 		group: 'Project addresses',
@@ -520,7 +532,7 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 		type: 'string-array',
 		risk: 'security',
 		description:
-			'Hostnames beneath this deployment’s domain that no project may be assigned. The deployment’s own canonical host is always refused and does not need listing; this is for everything else you run under the same domain — a marketing site, a status page, a staging instance — which this server has no way to discover. Empty by default, deliberately: a guess would either refuse a name you meant to use for a tenant or admit one that shadows something you already serve. Names are compared in normalised form, so case and a trailing dot do not matter.'
+			'Hostnames beneath this deployment’s domain that no project may be assigned. The deployment’s own canonical host is always refused and does not need listing; this is for everything else you run under the same domain — a marketing site, a status page, a staging instance — which this server has no way to discover. Empty by default, deliberately: a guess would either refuse a name you meant to use for a tenant or admit one that shadows something you already serve. Names are compared in normalised form, so case and a trailing dot do not matter. A project subdomain is refused when its full name is listed here.'
 	},
 
 	{

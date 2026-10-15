@@ -75,9 +75,14 @@ const BucketCan = Type.Object({
 	move: Type.Boolean(),
 	delete: Type.Boolean()
 });
+const AddressFormChoice = Type.Union([
+	Type.Literal('path'),
+	Type.Literal('subdomain'),
+	Type.Literal('host')
+]);
 const MeCan = Type.Object({
 	createProject: Type.Boolean(),
-	createHost: Type.Boolean(),
+	addressForms: Type.Array(AddressFormChoice),
 	createTeam: Type.Boolean(),
 	instance: Type.Boolean()
 });
@@ -259,8 +264,16 @@ function bodyFor(
 const NO_RIGHTS: Rights = new Proxy({}, { get: () => false });
 
 async function meRights(cookie: string): Promise<Rights> {
-	return shaped(MeRead, (await request('GET', '/admin/api/me', cookie)).body)
-		.can;
+	const { addressForms, ...flags } = shaped(
+		MeRead,
+		(await request('GET', '/admin/api/me', cookie)).body
+	).can;
+	return {
+		...flags,
+		...Object.fromEntries(
+			addressForms.map((form) => [`addressForms:${form}`, true])
+		)
+	};
 }
 
 /*
@@ -406,7 +419,7 @@ describe('stated rights on buckets', () => {
 			expect([owner.can.move, member.can.move]).toEqual([true, false]);
 		});
 
-		it('offers every member with an active group a new bucket, and a hostname only to a super administrator', async () => {
+		it('offers every member with an active group a new bucket at a path, and a hostname only to a super administrator', async () => {
 			const member = shaped(
 				MeRead,
 				(await request('GET', '/admin/api/me', w.cookies['group member'])).body
@@ -424,11 +437,11 @@ describe('stated rights on buckets', () => {
 
 			expect(member.can).toMatchObject({
 				createProject: true,
-				createHost: false
+				addressForms: ['path']
 			});
 			expect(superAdmin.can).toMatchObject({
 				createProject: true,
-				createHost: true,
+				addressForms: ['path', 'subdomain', 'host'],
 				instance: true
 			});
 		});

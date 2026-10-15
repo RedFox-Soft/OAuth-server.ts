@@ -2,6 +2,7 @@ import type { UserBucket } from '../../adapters/types.js';
 import { addressOf } from '../../configs/issuer.js';
 import { ROOT_NAMESPACE } from '../../resources/declaration_id.js';
 import { ADMIN_BUCKET_ID, isUndeletableBucket } from '../consts.js';
+import { ApplicationConfig } from '../../configs/application.js';
 import type { AdminContext } from './rbac.js';
 
 /*
@@ -39,9 +40,16 @@ export interface BucketCan {
 	delete: boolean;
 }
 
+/* The address forms a project can be given (specs/101): a path, a subdomain of the instance, a hostname. */
+export type AddressFormChoice = 'path' | 'subdomain' | 'host';
+
 export interface MeCan {
 	createProject: boolean;
-	createHost: boolean;
+	/*
+	 * The forms this caller may give a project, in the order the console offers them: the first is the one
+	 * selected. A team is limited by `projects.addressForms`; a super administrator never is.
+	 */
+	addressForms: AddressFormChoice[];
 	createTeam: boolean;
 	/* The instance-wide surfaces: settings, keys, administrators, agent access, usage, faults. */
 	instance: boolean;
@@ -107,16 +115,17 @@ export const NO_BUCKET_FACTS: BucketFacts = {};
 
 type AddressedBucket = Pick<
 	UserBucket,
-	'_id' | 'ownerGroupId' | 'slug' | 'host'
+	'_id' | 'ownerGroupId' | 'slug' | 'host' | 'subdomain'
 >;
 
 /*
- * A path, or none of its own yet: the forms whose change a group owner may make. A hostname reaches into the
- * operator's domain, and the root belongs to the two buckets the instance is built on.
+ * A path, a subdomain, or none of its own yet: the forms whose change a group owner may make. A hostname
+ * reaches into the operator's domain, and the root belongs to the two buckets the instance is built on. Which
+ * form an owner may move *to* is `addressForms`, checked by the route.
  */
 function ownerMayReaddress(bucket: AddressedBucket): boolean {
 	const kind = addressOf(bucket).kind;
-	return kind === 'path' || kind === 'unaddressed';
+	return kind === 'path' || kind === 'subdomain' || kind === 'unaddressed';
 }
 
 /*
@@ -230,9 +239,29 @@ export function meCan(ctx: AdminContext): MeCan {
 	const creates = ctx.superAdmin || ctx.activeGroupId !== '';
 	return {
 		createProject: creates,
-		/* Naming a hostname puts a name in the operator's own domain under the caller's control. */
-		createHost: ctx.superAdmin,
+		addressForms: addressFormsFor(ctx),
 		createTeam: true,
 		instance: ctx.superAdmin
 	};
+}
+
+/*
+ * Read live, at the moment a form is chosen, so a saved setting judges the next request without a restart.
+ * Subdomain first wherever it is offered: an operator who has switched it on has the wildcard DNS it needs,
+ * and an origin of its own keeps a project's cookies and pages apart from every other project's.
+ */
+function addressFormsFor(ctx: AdminContext): AddressFormChoice[] {
+	const setting = ApplicationConfig['projects.addressForms'];
+	const team: AddressFormChoice[] =
+		setting === 'path'
+			? ['path']
+			: setting === 'subdomain'
+				? ['subdomain']
+				: ['subdomain', 'path'];
+	if (!ctx.superAdmin) return team;
+	/* Naming a hostname puts a name in the operator's own domain under the caller's control. */
+	const rest: AddressFormChoice[] = (['subdomain', 'path'] as const).filter(
+		(form) => !team.includes(form)
+	);
+	return [...team, ...rest, 'host'];
 }

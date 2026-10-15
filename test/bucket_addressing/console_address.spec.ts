@@ -5,13 +5,19 @@ import { elysia } from 'lib/index.js';
 import { getBucketStore } from 'lib/adapters/index.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { ensureAdminSeed } from 'lib/admin/seed.js';
-import { DEFAULT_BUCKET_ID } from 'lib/admin/consts.js';
+import { DEFAULT_BUCKET_ID, UNASSIGNED_GROUP_ID } from 'lib/admin/consts.js';
+import { forgetBucketAddresses } from 'lib/admin/auth/bucketAddress.js';
 import { bucketAddressFor } from 'lib/admin/ui/bucketAddress.js';
 import { present, shaped } from 'test/shape.js';
 import { Type } from '@sinclair/typebox';
 
 // The one member read; a document without it (an error body) still reaches the toEqual and says so.
 const Metadata = Type.Object({ issuer: Type.Optional(Type.String()) });
+
+/* What the server renders into `window.PROPS.instanceHost`: ISSUER's host, so `e.ly` here (specs/101). */
+const INSTANCE_HOST = new URL(ISSUER).host;
+
+let subdomainBucketId: string;
 
 async function discoveryAt(prefix: string) {
 	return elysia.handle(
@@ -38,10 +44,22 @@ describe('the address the console reports for a bucket', () => {
 			clientId: 'default-app',
 			accountId: 'ana'
 		});
+		// A subdomain project needs no client to answer discovery, so it is created bare.
+		subdomainBucketId = (
+			await getBucketStore().create({
+				name: 'Beta',
+				slug: 'beta',
+				subdomain: true,
+				ownerGroupId: UNASSIGNED_GROUP_ID
+			})
+		)._id;
+		forgetBucketAddresses();
 	});
 
 	afterAll(async () => {
 		await clearSeededBuckets();
+		await getBucketStore().destroy(subdomainBucketId);
+		forgetBucketAddresses();
 	});
 
 	/*
@@ -54,7 +72,7 @@ describe('the address the console reports for a bucket', () => {
 		const bucket = await getBucketStore().find(DEFAULT_BUCKET_ID);
 
 		expect(bucket?.slug).toBe('default');
-		expect(bucketAddressFor(present(bucket, 'bucket'))).toEqual({
+		expect(bucketAddressFor(present(bucket, 'bucket'), INSTANCE_HOST)).toEqual({
 			kind: 'root'
 		});
 	});
@@ -74,13 +92,13 @@ describe('the address the console reports for a bucket', () => {
 		const formsSeen = new Set<string>();
 
 		for (const bucket of buckets) {
-			const address = bucketAddressFor(bucket);
+			const address = bucketAddressFor(bucket, INSTANCE_HOST);
 			if (address.kind === 'none') continue;
 			formsSeen.add(address.kind);
 
-			// A host-addressed bucket answers at its own origin, its issuer taking ISSUER's scheme.
+			// An own-origin bucket (a host, a subdomain) answers there, its issuer taking ISSUER's scheme.
 			const { origin, issuer } =
-				address.kind === 'host'
+				address.kind === 'host' || address.kind === 'subdomain'
 					? {
 							origin: `http://${address.host}`,
 							issuer: `${new URL(ISSUER).protocol}//${address.host}`
@@ -102,7 +120,9 @@ describe('the address the console reports for a bucket', () => {
 				issuer: shaped(Metadata, await response.json()).issuer
 			}).toEqual({ bucket: bucket._id, issuer });
 		}
-		/* The seeded buckets guarantee these two, so the walk cannot pass by checking nothing. */
-		expect(formsSeen.has('root') && formsSeen.has('prefix')).toBe(true);
+		/* The seeded buckets guarantee these three, so the walk cannot pass by checking nothing. */
+		expect(
+			['prefix', 'root', 'subdomain'].filter((kind) => !formsSeen.has(kind))
+		).toEqual([]);
 	});
 });

@@ -57,7 +57,13 @@ not a third). Model records differ on purpose: a token that fails its schema is 
   provider update `signingKey: null` — each would otherwise have failed its read. The writers now pass
   `ABSENT_UNDEFINED` (`lib/adapters/mongodb/write_options.ts`) on every insert and on the project (`UserBucket`) update,
   so new documents carry no such null; the read rule stays for the ones already stored. The option is
-  never put on an operation whose filter could hold undefined — there it drops the condition.
+  never put on an operation whose filter could hold undefined — there it drops the condition. The stored
+  nulls mattered beyond reads once spec 101 added a unique sparse index on `userBuckets.slug`. A MongoDB
+  sparse index skips a missing field but indexes a stored null, so two host-addressed projects holding
+  `slug: null` would have refused that index. `db:setup` now unsets every explicit null slug before it
+  provisions the fixed areas (`database/mongodb.ts:163-176`), and this was verified against a scratch MongoDB
+  ([[subdomain-project-addresses]]). The other stored nulls are left as they are; the read rule still covers
+  them.
   Corrected 2026-09-30: the **model** adapter was left out. `MongoAdapter.upsert` and `create`
   (`lib/adapters/mongodb/mongoAdapter.ts`) wrote protocol records without the option, and model reads go
   through `BaseModel.fromStored`, not this translation — so a nested null failed the model's schema and

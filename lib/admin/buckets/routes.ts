@@ -21,11 +21,12 @@ import {
 	bucketFactsWanted,
 	holdsBucket,
 	meCan,
+	type AddressFormChoice,
 	type BucketCan,
 	type BucketDependents,
 	type BucketFacts
 } from '../auth/can.js';
-import type { UserBucket } from '../../adapters/types.js';
+import type { BucketAddressWrite, UserBucket } from '../../adapters/types.js';
 import { isUniqueValueTaken } from '../../adapters/conflicts.js';
 import { presentAll } from '../federation/service.js';
 import { ADMIN_BUCKET_ID, isUndeletableBucket, reservedOf } from '../consts.js';
@@ -60,9 +61,15 @@ import {
 	UpdateBucketBody,
 	DeleteBucketQuery
 } from './schema.js';
-import { isReservedBucketName } from '../../consts/reserved_names.js';
 import {
+	hasEncodedLabelShape,
+	isReservedBucketName,
+	isReservedSubdomainLabel
+} from '../../consts/reserved_names.js';
+import {
+	canonicalHostOf,
 	normaliseHost,
+	subdomainLabelOf,
 	validateBucketHost
 } from '../../consts/request_host.js';
 import { ApplicationConfig } from '../../configs/application.js';
@@ -70,7 +77,7 @@ import { ISSUER } from '../../configs/env.js';
 import { now } from '../../activity/clock.js';
 import { monthOf } from '../../activity/periods.js';
 import { readPeriod } from '../../activity/read.js';
-import { addressOf, issuerFor } from '../../configs/issuer.js';
+import { addressOf, hasOwnOrigin, issuerFor } from '../../configs/issuer.js';
 import { callbackUri } from '../../federation/flow.js';
 import { mailDeliveryConfigured } from '../../mail/mailer.js';
 import { listClientView } from '../clients/service.js';
@@ -131,17 +138,22 @@ async function assertSlugAvailable(slug: string) {
 	}
 }
 
-/*
- * The address a bucket is being given, judged before anything is written.
- *
- * Exactly one form, never both and never neither. Refused rather than resolved by precedence: a rule
- * that silently prefers the slug is a rule nobody reads, and the operator who supplied a hostname would
- * believe it took effect while their bucket answered somewhere else entirely.
- */
-async function resolveAddress(body: {
+/* The host a project subdomain sits beneath (specs/101): `acme` is served at `acme.<this>`. */
+const INSTANCE_HOST = canonicalHostOf(ISSUER);
+
+interface AddressBody {
 	slug?: string;
 	host?: string;
-}): Promise<{ slug?: string; host?: string }> {
+	addressForm?: 'path' | 'subdomain';
+}
+
+/*
+ * Exactly one form, never both and never neither. Refused rather than resolved by precedence: a rule that
+ * silently prefers the slug is a rule nobody reads, and the operator who supplied a hostname would believe it
+ * took effect while their bucket answered somewhere else entirely. Judged before the right to the form, so a
+ * malformed body is told what is malformed rather than what it may not choose.
+ */
+function assertOneForm(body: AddressBody): void {
 	if (body.slug !== undefined && body.host !== undefined) {
 		throw new AdminError(
 			400,
@@ -154,13 +166,127 @@ async function resolveAddress(body: {
 			'a project needs an address: supply a slug or a hostname'
 		);
 	}
-
-	if (body.slug !== undefined) {
-		await assertSlugAvailable(body.slug);
-		return { slug: body.slug };
+	if (body.host !== undefined && body.addressForm !== undefined) {
+		throw new AdminError(
+			400,
+			'a hostname is a form of its own; addressForm goes with a slug',
+			{ field: 'addressForm' }
+		);
 	}
+}
 
-	return { host: await assertHostAvailable(body.host as string) };
+/* The form a body asks for. A slug with no form is a path, whatever the setting (specs/101 FR-025). */
+function requestedForm(body: AddressBody): AddressFormChoice {
+	if (body.host !== undefined) return 'host';
+	return body.addressForm ?? 'path';
+}
+
+/*
+ * Whether this caller may give a project this form. Decided before any name is judged, so a caller without
+ * the right is refused for that and not told whether the name they tried is free.
+ *
+ * Naming a hostname is an instance-level act, never a team's: it would put a name in the operator's own domain
+ * under the team's control. Between path and subdomain the operator decides, through `projects.addressForms`.
+ */
+function assertMayChooseForm(ctx: AdminContext, form: AddressFormChoice): void {
+	const allowed = meCan(ctx).addressForms;
+	if (allowed.includes(form)) return;
+	if (form === 'host') {
+		throw new AdminError(
+			403,
+			'only an administrator of this instance may give a project a hostname of its own'
+		);
+	}
+	const only = allowed.includes('subdomain') ? 'a subdomain' : 'a path';
+	throw new AdminError(
+		403,
+		`this instance lets teams address a project by ${only} only (projects.addressForms); an administrator of this instance can give it another form`,
+		{ field: 'addressForm' }
+	);
+}
+
+/*
+ * The address a bucket is being given, judged before anything is written. `keeping` is the bucket being moved,
+ * whose own slug is not "taken" when it moves between path and subdomain under the same name.
+ */
+async function resolveAddress(
+	body: AddressBody,
+	keeping?: UserBucket
+): Promise<BucketAddressWrite> {
+	if (body.host !== undefined) {
+		return { host: await assertHostAvailable(body.host, keeping?._id) };
+	}
+	const slug = body.slug as string;
+	const subdomain = body.addressForm === 'subdomain';
+	if (keeping?.slug === slug) {
+		if (Boolean(keeping.subdomain) === subdomain) {
+			throw new AdminError(409, 'this project already has that address', {
+				field: 'slug'
+			});
+		}
+	} else {
+		await assertSlugAvailable(slug);
+	}
+	if (!subdomain) return { slug };
+	await assertSubdomainAvailable(slug, keeping?._id);
+	return { slug, subdomain: true };
+}
+
+/*
+ * What a slug must also be to serve as a subdomain of this instance (specs/101). Every refusal names the rule
+ * it broke. Asked of every caller, super administrators included: these protect names in the operator's own
+ * domain, not a team's quota.
+ */
+async function assertSubdomainAvailable(
+	slug: string,
+	exceptId?: string
+): Promise<void> {
+	if (INSTANCE_HOST === null) {
+		throw new AdminError(
+			409,
+			"this instance's address has no host a project subdomain can sit beneath",
+			{ field: 'addressForm' }
+		);
+	}
+	if (isReservedSubdomainLabel(slug)) {
+		throw new AdminError(
+			409,
+			`'${slug}' is reserved for this deployment's own services and cannot be a project subdomain`,
+			{ field: 'slug' }
+		);
+	}
+	if (hasEncodedLabelShape(slug)) {
+		throw new AdminError(
+			400,
+			`'${slug}' cannot be a subdomain: a label with '--' as its third and fourth characters may be shown by browsers as other characters`,
+			{ field: 'slug' }
+		);
+	}
+	const name = `${slug}.${INSTANCE_HOST}`;
+	if (
+		ApplicationConfig['projects.reservedHostnames'].some(
+			(reserved) => normaliseHost(reserved) === name
+		)
+	) {
+		throw new AdminError(
+			409,
+			`'${name}' is reserved for this deployment and cannot be a project's address`,
+			{ field: 'slug' }
+		);
+	}
+	/*
+	 * A hostname given before subdomains existed may already be this name. It keeps it: the resolver asks for
+	 * hostnames first, so the name has one holder either way, and refusing here says so instead of creating a
+	 * project that would never answer.
+	 */
+	const holder = await getBucketStore().findByHost(name);
+	if (holder && holder._id !== exceptId) {
+		throw new AdminError(
+			409,
+			`'${name}' is already the address of the project '${holder.name}'`,
+			{ field: 'slug' }
+		);
+	}
 }
 
 /*
@@ -169,7 +295,10 @@ async function resolveAddress(body: {
  * Every refusal names the rule it broke, for the reason `assertSlugAvailable` states about reserved
  * slugs — an operator who typed the deployment's own hostname has no way to guess the rule otherwise.
  */
-async function assertHostAvailable(value: string): Promise<string> {
+async function assertHostAvailable(
+	value: string,
+	exceptId?: string
+): Promise<string> {
 	const judged = validateBucketHost(value);
 	if (!judged.ok) {
 		throw new AdminError(
@@ -205,12 +334,28 @@ async function assertHostAvailable(value: string): Promise<string> {
 		);
 	}
 	const holder = await getBucketStore().findByHost(host);
-	if (holder) {
+	if (holder && holder._id !== exceptId) {
 		throw new AdminError(
 			409,
 			`hostname '${host}' is already taken by the project '${holder.name}'`,
 			{ field: 'host' }
 		);
+	}
+	/*
+	 * A name one label beneath this instance is the subdomain a slug would take (specs/101): a slug and
+	 * `<slug>.<instance host>` are one name, so a hostname may not claim a slug another project holds — in
+	 * whichever form, because a path project can move to its subdomain later.
+	 */
+	const label = subdomainLabelOf(host, INSTANCE_HOST);
+	if (label !== null) {
+		const slugHolder = await getBucketStore().findBySlug(label);
+		if (slugHolder && slugHolder._id !== exceptId) {
+			throw new AdminError(
+				409,
+				`'${host}' is the subdomain of the project '${slugHolder.name}'`,
+				{ field: 'host' }
+			);
+		}
 	}
 	return host;
 }
@@ -227,14 +372,17 @@ async function assertHostAvailable(value: string): Promise<string> {
  * No holder is named here. Naming one costs a second read on a path reached only by a race, and the
  * operator's next step — choose another name — is the same either way.
  */
-async function refusingATakenHostname<T>(write: () => Promise<T>): Promise<T> {
+async function refusingATakenName<T>(write: () => Promise<T>): Promise<T> {
 	try {
 		return await write();
 	} catch (error) {
 		if (isUniqueValueTaken(error)) {
-			throw new AdminError(409, `hostname '${error.value}' is already taken`, {
-				field: 'host'
-			});
+			const slug = error.field === 'slug';
+			throw new AdminError(
+				409,
+				`${slug ? 'slug' : 'hostname'} '${error.value}' is already taken`,
+				{ field: slug ? 'slug' : 'host' }
+			);
 		}
 		throw error;
 	}
@@ -287,7 +435,7 @@ interface AddressChangePreview {
  */
 async function addressChangePreview(
 	bucket: UserBucket,
-	address: { slug?: string; host?: string }
+	address: BucketAddressWrite
 ): Promise<AddressChangePreview> {
 	const target = { _id: bucket._id, ...address };
 	const applications: AddressChangePreview['applications'] = [];
@@ -533,13 +681,22 @@ function withRights<
  * would be believed indefinitely while the name behind it was repointed.
  */
 function withAddressGuidance<
-	T extends Pick<UserBucket, 'host' | 'hostFirstSeenAt' | 'hostLastSeenAt'>
+	T extends Pick<
+		UserBucket,
+		'_id' | 'slug' | 'host' | 'subdomain' | 'hostFirstSeenAt' | 'hostLastSeenAt'
+	>
 >(bucket: T): T | (T & { address: Record<string, unknown> }) {
-	if (!bucket.host) return bucket;
+	if (!hasOwnOrigin(bucket)) return bucket;
+	const host = new URL(issuerFor(bucket)).hostname;
+	/*
+	 * A subdomain is covered by the instance's one wildcard record and certificate (specs/101), so the record
+	 * named is that one, marked shared: creating a record per project would be wrong advice.
+	 */
+	const shared = addressOf(bucket).kind === 'subdomain';
 	return {
 		...bucket,
 		address: {
-			host: bucket.host,
+			host,
 			requestsArrived: bucket.hostLastSeenAt !== undefined,
 			firstArrivalAt: bucket.hostFirstSeenAt ?? null,
 			lastArrivalAt: bucket.hostLastSeenAt ?? null,
@@ -548,12 +705,16 @@ function withAddressGuidance<
 			 * to look something up; a record they can copy does not.
 			 */
 			dnsRecord: {
-				name: bucket.host,
+				name: shared ? `*.${INSTANCE_HOST ?? ''}` : host,
 				type: 'CNAME',
-				value: new URL(ISSUER).hostname
+				value: new URL(ISSUER).hostname,
+				shared
 			},
-			stillToDo:
-				bucket.hostLastSeenAt === undefined
+			stillToDo: shared
+				? bucket.hostLastSeenAt === undefined
+					? "No request has reached this subdomain yet. It is served through this instance's wildcard DNS record and wildcard TLS certificate, which the operator sets up once for every project; until both exist, this address cannot be reached."
+					: "This subdomain is served through this instance's wildcard DNS record and wildcard TLS certificate; nothing is needed for this project alone."
+				: bucket.hostLastSeenAt === undefined
 					? 'No request has reached this hostname yet. Create the DNS record above and obtain a TLS certificate for the name — neither is done by this server, and it cannot tell you whether either has been done, only whether a request has arrived.'
 					: 'A TLS certificate is still required for this name; this server does not issue one and cannot confirm that one exists.'
 		}
@@ -756,7 +917,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 				 * An arrival is the one fact this server can observe about a hostname; a host nobody has
 				 * reached is the row an operator has still to finish setting up.
 				 */
-				hostReached: b.host !== undefined && b.hostLastSeenAt !== undefined,
+				hostReached: hasOwnOrigin(b) && b.hostLastSeenAt !== undefined,
 				held: heldConnectionId !== undefined,
 				/* The held connection an "On hold" mark links to (specs/088 US5). */
 				...(heldConnectionId ? { heldConnectionId } : {})
@@ -775,21 +936,8 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 				body.teamId === undefined
 					? assertActiveGroup(ctx)
 					: (await loadDestination(ctx, body.teamId))._id;
-			/*
-			 * Naming a hostname is an instance-level act, never a group-level one. A tenant administrator
-			 * may create buckets in their own group; letting them name one would put a name in the
-			 * operator's own domain under their control — an escalation out of the group boundary, and out
-			 * of whatever else that domain is used for.
-			 *
-			 * Decided before the hostname is judged, so a caller without the right is refused for that and
-			 * not told whether the name they tried is free.
-			 */
-			if (body.host !== undefined && !meCan(ctx).createHost) {
-				throw new AdminError(
-					403,
-					'only an administrator of this instance may give a project a hostname of its own'
-				);
-			}
+			assertOneForm(body);
+			assertMayChooseForm(ctx, requestedForm(body));
 			/*
 			 * A new bucket cannot be created unreachable. Providers are added through their own routes, so at
 			 * creation there are none — which makes `passwordLogin: false` here always a lockout.
@@ -808,7 +956,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			// about to exist — audit-first has nothing to point at otherwise.
 			const bucketId = nanoid();
 			await recordAdminAudit(ctx, 'bucket.create', bucketId, { ownerGroupId });
-			const bucket = await refusingATakenHostname(() =>
+			const bucket = await refusingATakenName(() =>
 				getBucketStore().create({
 					_id: bucketId,
 					name: body.name,
@@ -1029,18 +1177,14 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 				throw new AdminError(403, addressRefusal(ctx, bucket, facts));
 			}
 			/*
-			 * A hostname reaches into the operator's domain, so naming one stays an instance-level act whatever
-			 * the bucket's state — the right above is per bucket, not per target. Decided before the hostname
-			 * is judged, so a caller without the right is not told whether the name they tried is free.
+			 * The right above is per bucket; which form it may move to is per target. A hostname stays an
+			 * instance-level act whatever the bucket's state, and between path and subdomain the operator
+			 * decides through `projects.addressForms` (specs/101).
 			 */
-			if (body.host !== undefined && !meCan(ctx).createHost) {
-				throw new AdminError(
-					403,
-					'only an administrator of this instance may give a project a hostname of its own'
-				);
-			}
+			assertOneForm(body);
+			assertMayChooseForm(ctx, requestedForm(body));
 
-			const address = await resolveAddress(body);
+			const address = await resolveAddress(body, bucket);
 
 			/*
 			 * What will break, named before anything changes. An operator who has not seen this list has
@@ -1086,9 +1230,13 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 						)
 					: null;
 
+			/*
+			 * Whole issuers, not names: a path `acme` and a subdomain `acme` carry the same slug, and an entry
+			 * recording only the name could not tell a move between them from no move at all (specs/101).
+			 */
 			await recordAdminAudit(ctx, 'bucket.address.change', params.id, {
-				from: bucket.host ?? bucket.slug ?? null,
-				to: address.host ?? address.slug ?? null,
+				from: preview.from,
+				to: preview.to,
 				/* So the owning group reads the change in its own trail, not only a super administrator. */
 				ownerGroupId: bucket.ownerGroupId
 			});
@@ -1102,7 +1250,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 				await ensureBucketKey(params.id);
 			}
 
-			const moved = await refusingATakenHostname(() =>
+			const moved = await refusingATakenName(() =>
 				getBucketStore().setAddress(params.id, address)
 			);
 			if (!moved) throw new AdminError(404, 'project not found');

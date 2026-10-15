@@ -376,8 +376,8 @@ describe('moving a bucket to a different address (US3)', () => {
 				(e) => e.action === 'project.address.change'
 			);
 			expect(entry).toMatchObject({
-				from: `mistpyed-${counter}`,
-				to: `mistyped-${counter}`
+				from: issuerFor({ _id: bucket._id, slug: `mistpyed-${counter}` }),
+				to: issuerFor({ _id: bucket._id, slug: `mistyped-${counter}` })
 			});
 		});
 

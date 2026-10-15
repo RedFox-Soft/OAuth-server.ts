@@ -42,11 +42,20 @@ const BucketHost = t.String({ minLength: 1, maxLength: 253 });
  */
 const BucketDisplayName = t.String({ minLength: 1, maxLength: 60 });
 
+/*
+ * How a slug is used: as a path segment beneath the instance (`auth.example.com/acme`) or as a subdomain of
+ * it (`acme.auth.example.com`) — specs/101. It goes with `slug` only; a hostname is a form of its own.
+ * Omitted means a path whatever `projects.addressForms` says, so a request an existing integration already
+ * sends keeps the meaning it had.
+ */
+const AddressForm = t.Union([t.Literal('path'), t.Literal('subdomain')]);
+
 export const CreateBucketBody = t.Object({
 	name: t.String({ minLength: 1 }),
 	displayName: t.Optional(BucketDisplayName),
 	slug: t.Optional(BucketSlug),
 	host: t.Optional(BucketHost),
+	addressForm: t.Optional(AddressForm),
 	passwordLogin: t.Optional(t.Boolean()),
 	registrationOpen: t.Optional(t.Boolean()),
 	emailVerificationRequired: t.Optional(t.Boolean()),
@@ -75,6 +84,7 @@ const PreviewCount = t.Number({ minimum: 0, multipleOf: 1 });
 export const ChangeBucketAddressBody = t.Object({
 	slug: t.Optional(BucketSlug),
 	host: t.Optional(t.String({ minLength: 1, maxLength: 253 })),
+	addressForm: t.Optional(AddressForm),
 	confirm: t.Optional(t.Boolean()),
 	expect: t.Optional(
 		t.Object({

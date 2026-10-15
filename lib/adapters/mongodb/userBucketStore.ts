@@ -5,6 +5,7 @@ import { provisionUserArea } from './provision.js';
 import { documentOf } from '../documents.js';
 import {
 	UserBucket,
+	type BucketAddressWrite,
 	type BucketDeletion,
 	type UserBucketStoreInstance
 } from '../types.js';
@@ -42,6 +43,23 @@ function bucketOf(bucket: Partial<UserBucket>): UserBucket {
 	});
 }
 
+/*
+ * Which unique name a duplicate-key error is about. Two unique indexes cover this area since specs/101 —
+ * `host` and `slug` — and the driver reports the index's key pattern, so the refusal can name the field the
+ * caller has to change rather than guessing from what the write happened to carry.
+ */
+function duplicatedField(error: unknown): 'slug' | 'host' | null {
+	if (!isDuplicateKey(error)) return null;
+	const pattern =
+		typeof error === 'object' && error !== null && 'keyPattern' in error
+			? error.keyPattern
+			: undefined;
+	if (typeof pattern === 'object' && pattern !== null && 'slug' in pattern) {
+		return 'slug';
+	}
+	return 'host';
+}
+
 function withDefaults(bucket: Partial<UserBucket> | null): UserBucket | null {
 	return bucket ? bucketOf(bucket) : null;
 }
@@ -62,6 +80,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 		emailVerificationRequired?: boolean;
 		verificationMethod?: UserBucket['verificationMethod'];
 		totpRequired?: boolean;
+		subdomain?: true;
 	}): Promise<UserBucket> {
 		const now = new Date();
 		const bucket: UserBucket = {
@@ -77,6 +96,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 			 * first — the failure the index is sparse to avoid.
 			 */
 			...(data.host !== undefined ? { host: data.host } : {}),
+			...(data.subdomain ? { subdomain: true as const } : {}),
 			ownerGroupId: data.ownerGroupId,
 			passwordLogin: data.passwordLogin ?? true,
 			federation: data.federation ?? [],
@@ -90,7 +110,11 @@ export class UserBucketStore implements UserBucketStoreInstance {
 		try {
 			await this.collection.insertOne(bucket, ABSENT_UNDEFINED);
 		} catch (error) {
-			if (data.host !== undefined && isDuplicateKey(error)) {
+			const field = duplicatedField(error);
+			if (field === 'slug' && data.slug !== undefined) {
+				throw new UniqueValueTaken('slug', data.slug);
+			}
+			if (field === 'host' && data.host !== undefined) {
 				throw new UniqueValueTaken('host', data.host);
 			}
 			throw error;
@@ -126,19 +150,21 @@ export class UserBucketStore implements UserBucketStoreInstance {
 
 	async setAddress(
 		id: string,
-		address: { slug?: string; host?: string }
+		address: BucketAddressWrite
 	): Promise<UserBucket | null> {
-		/* One form set, the other unset in the same update: a bucket holds one address, never both. An
-		 * absent hostname must be *removed* rather than written null, or it would occupy the unique
-		 * sparse index and collide with every other bucket that has none. Arrivals at the old address say
-		 * nothing about the new one, so they go in the same update. */
+		/* One form set, every other unset in the same update: a bucket holds one address. An absent
+		 * hostname or slug must be *removed* rather than written null, or it would occupy its unique sparse
+		 * index and collide with every other bucket that has none. Arrivals at the old address say nothing
+		 * about the new one, so they go in the same update. */
 		const unset: {
 			host?: '';
 			slug?: '';
+			subdomain?: '';
 			hostFirstSeenAt: '';
 			hostLastSeenAt: '';
 		} = {
 			...(address.host === undefined ? { host: '' } : { slug: '' }),
+			...(address.subdomain ? {} : { subdomain: '' }),
 			hostFirstSeenAt: '',
 			hostLastSeenAt: ''
 		};
@@ -151,7 +177,11 @@ export class UserBucketStore implements UserBucketStoreInstance {
 				)
 			);
 		} catch (error) {
-			if (address.host !== undefined && isDuplicateKey(error)) {
+			const field = duplicatedField(error);
+			if (field === 'slug' && address.slug !== undefined) {
+				throw new UniqueValueTaken('slug', address.slug);
+			}
+			if (field === 'host' && address.host !== undefined) {
 				throw new UniqueValueTaken('host', address.host);
 			}
 			throw error;

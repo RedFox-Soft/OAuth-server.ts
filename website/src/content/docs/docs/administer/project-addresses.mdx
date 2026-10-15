@@ -1,0 +1,174 @@
+---
+title: Project addresses
+description: 'A project is its own issuer at one address: a path, a subdomain or a hostname of its own. Who may choose which, and what the subdomain form needs.'
+sidebar:
+  order: 8
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+A project's address is its **issuer**: the URL every token it signs carries in `iss`, and the base of its
+discovery document. A project has one address at a time, and it answers only there. The address takes one of
+three forms.
+
+## Three forms {#three-forms}
+
+For an instance whose `ISSUER` is `https://auth.example.com`, a project with the slug `acme` can be at:
+
+| Form                  | The project's issuer            | Who may give it                                           | What the operator provides                                 |
+| --------------------- | ------------------------------- | --------------------------------------------------------- | ---------------------------------------------------------- |
+| A path                | `https://auth.example.com/acme` | A team, when the setting allows it; a super administrator | Nothing                                                    |
+| A subdomain           | `https://acme.auth.example.com` | A team, when the setting allows it; a super administrator | One wildcard DNS record and one wildcard certificate, once |
+| A hostname of its own | `https://login.acme.com`        | A super administrator only                                | A DNS record and a certificate for that name               |
+
+The **slug** is the project's short name. It names both the path and the subdomain, so it is unique across all
+projects whatever their form, and it stays the same when a project moves between the two.
+
+A subdomain is always exactly one label beneath the instance's own host. An instance at `auth.foxauth.dev`
+serves `acme.auth.foxauth.dev`, never `acme.foxauth.dev`, and `a.b.auth.foxauth.dev` names no project. If you
+want the shorter names, run the instance at the registrable domain itself, or give projects hostnames of their
+own.
+
+The default project and the administrators' project are served at the root, at `ISSUER` itself. They have no
+path and no subdomain, whatever the setting says.
+
+## Why a subdomain {#why-a-subdomain}
+
+A path project shares its origin with every other path project. The origin is the scheme and host a browser
+uses to keep sites apart. A subdomain project, like a project with a hostname, has an origin of its own:
+
+- its cookies are written for its own host only, so no other project and not the console can read them or be
+  sent them;
+- its sign-in pages, consent page and logout are served on its own origin;
+- it publishes one metadata location instead of two.
+
+Links in verification, password-reset and invitation emails still point at the instance's own address, as they
+do for a project with a hostname.
+
+Compared with a hostname, a subdomain costs the operator nothing per project. The operator sets up the wildcard
+once, and after that any team can put a project on its own subdomain without anybody touching DNS.
+
+## Which forms a team may choose {#which-forms-a-team-may-choose}
+
+The setting [`projects.addressForms`](/docs/reference/settings/#projects.addressForms) decides. In the console it
+is **Address forms**, under **Settings → Project addresses**. It has three values:
+
+- `path`, the default: teams give projects a path.
+- `subdomain`: teams give projects a subdomain.
+- `both`: teams choose. The console's **New project** dialog has the subdomain selected, and the team can switch
+  to the path.
+
+The default is `path` on every instance, new and upgraded. A subdomain only works once the wildcard DNS record
+and certificate exist, and the server cannot see either. So nothing is offered until the operator has set them
+up and turned the setting on.
+
+The setting limits teams only. A super administrator may give any project any form, including a hostname of its
+own. A hostname stays a super administrator's act because the name lives in somebody's DNS, and every such name
+needs its own record and certificate.
+
+A save takes effect on the next request, without a restart. **Changing the setting never moves a project.** A
+project whose form is no longer offered keeps its address and keeps working. Its team can still manage
+everything about it, and can move it to a form that is still offered.
+
+## Names a subdomain cannot take {#names-a-subdomain-cannot-take}
+
+A project's subdomain is a name in the operator's own domain. A team holding `www.auth.example.com` or
+`login.auth.example.com` could put a sign-in page there that looks like the operator's own, which is a phishing
+page made easy. So the subdomain form is refused for:
+
+- **The built-in list**: `www`, `admin`, `api`, `mcp`, `mail`, `smtp`, `imap`, `pop`, `ftp`, `auth`, `login`,
+  `sso`, `id`, `oauth`, `status`, `docs`, `help`, `support`, `blog`, `cdn`, `static`, `assets`, `app`,
+  `dashboard`, `console` and `billing`. These are the names an operator commonly runs beside an authorization
+  server, and the ones a phishing page would most like to borrow.
+- **Your own reserved names**: anything listed in
+  [`projects.reservedHostnames`](/docs/reference/settings/#projects.reservedHostnames). Add there every other
+  name you run under the instance's host, such as `staging.auth.example.com`.
+- **Labels with `--` as their third and fourth characters**, such as `xn--…`. A browser may show such a label as
+  different characters, so it can pass for a name it is not.
+- **A name another project holds.** A slug and the hostname `<slug>.<instance host>` are one name. A subdomain is
+  refused when another project has that name as its hostname, and the hostname is refused when another project
+  has that label as its slug.
+
+The slugs every project already avoids, because they would shadow the server's own paths, are refused too. Each
+refusal names the rule it broke.
+
+## Changing a project's address {#changing-a-projects-address}
+
+Moving a project between a path, a subdomain and a hostname is an **address change**, the same operation as
+choosing a new path. It changes the project's issuer, so it breaks every integration configured with the old one.
+
+<Steps>
+
+1. Open the project, go to **Settings**, and choose **Change address…** under **Danger zone**. Pick the form and
+   the name.
+
+2. Read the preview. It names everything the change reaches: the applications to reconfigure with the new
+   issuer, the identity providers whose callback address changes (with the new one to register at the
+   provider), the SCIM connections whose base URL changes, and the APIs declared in the project. It shows the
+   old and the new issuer.
+
+3. Confirm. The project answers at the new address at once, the old address stops answering, and everyone signed
+   in to the project signs in again.
+
+</Steps>
+
+The project keeps its slug, its signing keys, its end users, its applications, its APIs and its team. The audit
+trail records the change with the old and the new address in full, so a path `acme` and a subdomain `acme` are
+told apart.
+
+An owner of the project's team may change the address between the forms the setting allows, while no
+application, identity provider or SCIM connection depends on the project. Otherwise only a super administrator
+may. Only a super administrator gives a project a hostname.
+
+## Setting up subdomains {#setting-up-subdomains}
+
+This is the operator's part, done once per instance.
+
+<Steps>
+
+1. **Point a wildcard DNS record at the instance.** For an instance at `auth.example.com` the record is
+   `*.auth.example.com`, aimed wherever `auth.example.com` is aimed: the same `A`/`AAAA` addresses, or a `CNAME`
+   to the same target.
+
+2. **Get a wildcard TLS certificate** for `*.auth.example.com`. Most certificate authorities issue a wildcard
+   only through a DNS challenge, so this usually means adding one more DNS record. On Fly.io, see
+   [Subdomain project addresses](/docs/deploy/fly/#subdomain-project-addresses).
+
+3. **Let the proxy in front of the server accept every name beneath the host** and pass the original `Host`
+   header through. See [Behind a reverse proxy](/docs/deploy/reverse-proxy/#subdomain-projects).
+
+4. **Turn the setting on**: `subdomain` or `both`.
+
+</Steps>
+
+The server cannot test DNS or certificates from inside. A subdomain project's page shows whether any request has
+reached its subdomain yet. Until one has, check the record and the certificate first.
+
+<Aside type="caution" title="Changing ISSUER moves every subdomain project">
+
+A subdomain project's issuer is built from the instance's host. If you change `ISSUER`, every subdomain
+project's issuer changes with it, just as every path project's does. Treat it as a breaking change for every
+such project.
+
+</Aside>
+
+## In the admin API and for agents {#in-the-admin-api-and-for-agents}
+
+`POST /admin/api/projects` and `POST /admin/api/projects/:id/address` take the form as `addressForm`, beside
+`slug`:
+
+```json
+{ "name": "Acme", "slug": "acme", "addressForm": "subdomain" }
+```
+
+Without `addressForm`, a `slug` means a path, whatever the setting says, so a request an existing script sends
+keeps its meaning. A `host` is a form of its own and takes no `addressForm`. A form the caller may not choose is
+refused with `403`, naming the setting and the forms allowed. Each project is returned with its `addressForm`,
+its `issuer` and its discovery URL.
+
+`GET /admin/api/me` answers `can.addressForms`: the forms the caller may give a project, in the order the console
+offers them. A super administrator gets `path`, `subdomain` and `host`.
+
+Agents use the same fields through `project_create` and `project_address_change`, and read `can.addressForms`
+from `whoami`. An address change from an agent is high-consequence and asks for confirmation, with the same
+preview.

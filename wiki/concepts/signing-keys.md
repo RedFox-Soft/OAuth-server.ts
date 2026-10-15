@@ -107,7 +107,8 @@ and `database/verify_postgres.ts`.
 
 ## An addressable project signs with keys of its own
 
-Since 2026-09-29 an addressable project — addressed by path or by hostname, it is its own issuer — signs,
+Since 2026-09-29 an addressable project — addressed by path, by hostname or (since spec 101) by a subdomain of
+the instance, it is its own issuer — signs,
 verifies and decrypts with keys of its own, so a token one project mints fails signature verification at a
 resource server trusting another project's or the root's keys. Before, every project's `jwks_uri` pointed at
 the root `/jwks` and tenant separation at a resource server rested entirely on its `iss` check — the Entra

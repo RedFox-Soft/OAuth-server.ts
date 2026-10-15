@@ -87,8 +87,10 @@ facts.
 ## The server states the rights
 
 Project responses carry `can` and `blockers`, and `GET /admin/api/me` carries `can` (`createProject`,
-`createTeam` since spec 100, `createBucket` and `createGroup` before). The predicates live in
-`lib/admin/auth/can.ts` (`bucketCan` `:186`, `meCan` `:225`). Retired-project responses carried them
+`createTeam` since spec 100, `createBucket` and `createGroup` before; `addressForms`, an ordered list of the
+address forms the caller may give a project, since spec 101, which replaced the boolean `createHost` —
+[[subdomain-project-addresses]]). The predicates live in
+`lib/admin/auth/can.ts` (`bucketCan` `:195`, `meCan` `:234`). Retired-project responses carried them
 through `projectCan` until spec 099 removed that entity; a project's `edit` flag now also governs its
 applications and APIs.
 The route loaders decide through them, so there is one source: a route refuses with 403 exactly when the

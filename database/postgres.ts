@@ -1,5 +1,6 @@
 import {
 	FIXED_AREAS,
+	STORE_AREAS,
 	areaForBucket,
 	userAreaFor,
 	type StorageArea
@@ -19,6 +20,7 @@ import {
 import { isReservedBucketName } from '../lib/consts/reserved_names.js';
 import {
 	duplicateEmailReport,
+	duplicateSlugReport,
 	exitCodeFor,
 	reservedAddressReport,
 	type DuplicateEmailRow,
@@ -232,9 +234,33 @@ if (CHECK_ONLY) {
 	process.exit(code);
 }
 
+/*
+ * Slugs already held twice, which would make the unique slug index (specs/101) refuse to build — listed in
+ * full rather than left to the failure, which names one value.
+ */
+async function duplicateSlugs(): Promise<DuplicateEmailRow[]> {
+	const handle = sql();
+	if (!(await tableExists(handle, STORE_AREAS.userBuckets))) return [];
+	const rows = await handle`
+		SELECT doc->>'slug' AS value, count(*)::int AS count
+		FROM ${handle(STORE_AREAS.userBuckets)}
+		WHERE doc->>'slug' IS NOT NULL
+		GROUP BY doc->>'slug'
+		HAVING count(*) > 1
+		ORDER BY doc->>'slug'
+	`;
+	return rows as DuplicateEmailRow[];
+}
+
+const slugConflicts = duplicateSlugReport(await duplicateSlugs());
+if (slugConflicts) console.error(slugConflicts);
+
 for (const area of FIXED_AREAS) {
 	try {
-		await provisionArea(area);
+		await provisionArea(area, {
+			blockUnique:
+				area.name === STORE_AREAS.userBuckets && slugConflicts !== null
+		});
 	} catch (error) {
 		fail(`provisioning ${area.name}`, error);
 	}

@@ -3,7 +3,7 @@ import { routeNames, type PipelineParams } from 'lib/consts/param_list.js';
 import type { Interaction } from 'lib/models/interaction.js';
 import nanoid from '../../helpers/nanoid.js';
 import { ISSUER } from 'lib/configs/env.js';
-import { issuerFor } from 'lib/configs/issuer.js';
+import { hasOwnOrigin, issuerFor } from 'lib/configs/issuer.js';
 import { logout } from 'lib/html/logout.js';
 import { recordOwnLanguage } from 'lib/end_users/service.js';
 import { SessionNotFound } from '../../helpers/errors.js';
@@ -79,7 +79,7 @@ export default async function resumeAction(
 		 * the browser to the root issuer after the sign-out ended the switch on a page the browser would not
 		 * even submit to. Every other bucket's screens live at the root, as before.
 		 */
-		const resumeAt = oidc.bucket.host
+		const resumeAt = hasOwnOrigin(oidc.bucket)
 			? new URL(issuerFor(oidc.bucket)).origin
 			: ISSUER;
 		// On the payload: only payload keys are stored, and the sign-out confirmation reads it from there.

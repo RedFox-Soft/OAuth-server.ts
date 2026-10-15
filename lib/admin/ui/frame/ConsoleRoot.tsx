@@ -5,6 +5,7 @@ import { AcceptInvitation } from '../pages/AcceptInvitation.js';
 import { Layout } from '../pages/Layout.js';
 import { Setup } from '../pages/Setup.js';
 import { FeedbackBridge } from './feedback.js';
+import { InstanceHostProvider } from './instance.js';
 import { MeProvider } from './me.js';
 import { RouterProvider } from './router.js';
 import { resolveAddress } from './routes.js';
@@ -14,7 +15,12 @@ import { resolveAddress } from './routes.js';
  * what wraps the page. antd's `App` is what makes `App.useApp()` — the console's only way to show a
  * message, a notification or a confirmation — available everywhere below it.
  */
-export function ConsoleRoot({ needsSetup, me, path }: AdminShellProps) {
+export function ConsoleRoot({
+	needsSetup,
+	me,
+	path,
+	instanceHost
+}: AdminShellProps) {
 	const initialPath = path ?? '/admin';
 	const resolved = resolveAddress(initialPath.split('?')[0] ?? initialPath);
 	const isPublic = resolved.kind === 'page' && resolved.route.public;
@@ -28,9 +34,11 @@ export function ConsoleRoot({ needsSetup, me, path }: AdminShellProps) {
 					) : isPublic ? (
 						<AcceptInvitation />
 					) : (
-						<MeProvider initial={me}>
-							<Layout />
-						</MeProvider>
+						<InstanceHostProvider value={instanceHost ?? ''}>
+							<MeProvider initial={me}>
+								<Layout />
+							</MeProvider>
+						</InstanceHostProvider>
 					)}
 				</RouterProvider>
 			</App>

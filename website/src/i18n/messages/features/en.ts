@@ -201,8 +201,8 @@ export default {
 					body: 'Projects are owned by a team of administrators, and so is everything in them: end users, applications and APIs. Nothing but membership of the team grants access, and it is re-resolved on every request. A project moves to another team with everything it holds, in one step.'
 				},
 				bucketAddress: {
-					title: 'A project addressed by a path or a host',
-					body: 'Each project is its own issuer, with its own metadata and signing keys, reached at a path beneath the server or at a hostname of its own — one or the other, never both. A hostname lets the browser isolate that project’s sign-in cookie by origin and publishes one metadata location instead of two; it costs a DNS record and a certificate you provide. Changing an address is its own operation: it shows you which clients it will break before it breaks them.'
+					title: 'A project addressed by a path, a subdomain or a host',
+					body: 'Each project is its own issuer, with its own metadata and signing keys, reached at exactly one address: a path beneath the server, a subdomain of it, or a hostname of its own. A subdomain or a hostname lets the browser isolate that project’s sign-in cookie by origin and publishes one metadata location instead of two. Subdomains cost one wildcard DNS record and certificate for the whole instance; a hostname costs a record and a certificate of its own. Changing an address is its own operation: it shows you which clients it will break before it breaks them.'
 				},
 				bucketDeletion: {
 					title: 'Deleting a project can be undone',

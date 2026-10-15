@@ -258,7 +258,7 @@ export function sessionCookieName(bucket: RequestBucket): string {
 	 * would complete and then not exist.
 	 *
 	 * A host-addressed bucket also holds no slug and must NOT reach that branch: it has an address, just
-	 * not a path one. It needs no distinguishing name either. The suffix exists because path-addressed
+	 * not a path one. Neither it nor a subdomain bucket (specs/101) needs a distinguishing name. The suffix exists because path-addressed
 	 * buckets share one origin — "two sign-ins in one browser are two cookies" — and a bucket on its own
 	 * origin already has its cookie kept apart by the browser, since nothing here sets a domain
 	 * attribute. A suffix would distinguish what is already distinct.
@@ -266,6 +266,7 @@ export function sessionCookieName(bucket: RequestBucket): string {
 	const address = addressOf(bucket);
 	switch (address.kind) {
 		case 'host':
+		case 'subdomain':
 			return cookieNames.session;
 		case 'path':
 			return `${cookieNames.session}_${address.segment}`;

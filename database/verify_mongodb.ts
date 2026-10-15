@@ -2,7 +2,8 @@ import { STORE_AREAS } from '../lib/consts/storage_inventory.js';
 import {
 	verifyAddressChangeForgetsArrivals,
 	verifyEndUserIdentity,
-	verifyEndUserSearch
+	verifyEndUserSearch,
+	verifySubdomainAddressing
 } from './verify_end_user_identity.js';
 import { verifyProvisioningConnections } from './verify_provisioning_connections.js';
 import { verifyAdminSessionsByUser } from './verify_admin_sessions.js';
@@ -541,6 +542,7 @@ await verifyAddressChangeForgetsArrivals(
 	identityBucket._id,
 	check
 );
+await verifySubdomainAddressing(new UserBucketStore(), check);
 await verifyProvisioningConnections(new ProvisioningConnectionStore(), check);
 
 /* Provisioned by db:setup from the inventory: the index ending an administrator's sessions reads by (specs/083). */

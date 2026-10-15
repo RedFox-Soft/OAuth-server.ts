@@ -5,6 +5,7 @@ import { provisionUserArea } from './provision.js';
 import { documentOf } from '../documents.js';
 import {
 	UserBucket,
+	type BucketAddressWrite,
 	type BucketDeletion,
 	type UserBucketStoreInstance
 } from '../types.js';
@@ -53,6 +54,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 		emailVerificationRequired?: boolean;
 		verificationMethod?: UserBucket['verificationMethod'];
 		totpRequired?: boolean;
+		subdomain?: true;
 	}): Promise<UserBucket> {
 		const now = new Date();
 		const bucket: UserBucket = {
@@ -65,6 +67,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 			/* Written only when present: a stored null would occupy the partial unique index, so the
 			 * second bucket created without a hostname would collide with the first. */
 			...(data.host !== undefined ? { host: data.host } : {}),
+			...(data.subdomain ? { subdomain: true as const } : {}),
 			ownerGroupId: data.ownerGroupId,
 			passwordLogin: data.passwordLogin ?? true,
 			federation: data.federation ?? [],
@@ -83,10 +86,10 @@ export class UserBucketStore implements UserBucketStoreInstance {
 				VALUES (${bucket._id}, ${bucket}, NULL)
 			`;
 		} catch (error) {
-			if (data.host !== undefined && isUniqueViolation(error)) {
-				throw new UniqueValueTaken('host', data.host);
-			}
-			throw error;
+			const taken = isUniqueViolation(error)
+				? await this.takenName(data, bucket._id)
+				: null;
+			throw taken ?? error;
 		}
 
 		/*
@@ -133,17 +136,18 @@ export class UserBucketStore implements UserBucketStoreInstance {
 
 	async setAddress(
 		id: string,
-		address: { slug?: string; host?: string }
+		address: BucketAddressWrite
 	): Promise<UserBucket | null> {
 		const handle = sql();
 		/*
-		 * Merge one form, then drop the other: a bucket holds one address, never both. `-` removes the
-		 * key outright rather than setting it null, which matters because a null would occupy the partial
-		 * unique index rather than being excluded from it. Arrivals at the old address say nothing about
-		 * the new one, so they are dropped in the same write.
+		 * Merge one form, then drop every other: a bucket holds one address. `-` removes the key outright
+		 * rather than setting it null, which matters because a null would occupy a partial unique index
+		 * rather than being excluded from it. Arrivals at the old address say nothing about the new one, so
+		 * they are dropped in the same write.
 		 */
 		const dropped = [
 			address.host === undefined ? 'host' : 'slug',
+			...(address.subdomain ? [] : ['subdomain']),
 			'hostFirstSeenAt',
 			'hostLastSeenAt'
 		];
@@ -157,11 +161,32 @@ export class UserBucketStore implements UserBucketStoreInstance {
 			`;
 			return this.bucketOf(rows[0]);
 		} catch (error) {
-			if (address.host !== undefined && isUniqueViolation(error)) {
-				throw new UniqueValueTaken('host', address.host);
-			}
-			throw error;
+			const taken = isUniqueViolation(error)
+				? await this.takenName(address, id)
+				: null;
+			throw taken ?? error;
 		}
+	}
+
+	/*
+	 * Which unique name a violation is about, now that two indexes cover this area (`host`, and `slug`
+	 * since specs/101). The client reports the SQLSTATE but not reliably the index, so the losing write asks
+	 * which of its names another bucket holds — a read only on the path a lost race reaches.
+	 */
+	private async takenName(
+		address: { slug?: string; host?: string },
+		id: string
+	): Promise<UniqueValueTaken | null> {
+		if (address.slug !== undefined) {
+			const holder = await this.findBySlug(address.slug);
+			if (holder && holder._id !== id) {
+				return new UniqueValueTaken('slug', address.slug);
+			}
+		}
+		if (address.host !== undefined) {
+			return new UniqueValueTaken('host', address.host);
+		}
+		return null;
 	}
 
 	async list(): Promise<UserBucket[]> {

@@ -19,8 +19,9 @@ Each issuer has its own keys, and so its own rotation:
 - **The instance's keys** sign for everything served at the root: the default project, the
   administrators' project and any project without an address of its own. They are published at `/jwks`.
   Only super administrators manage them, on the console's **Keys** page or with the `jwks_*` tools.
-- **A project's keys**, for a project with a path or a hostname of its own. It signs with them alone and
-  publishes them under its own issuer, `https://auth.example.com/acme/jwks` or its hostname's `/jwks`, so a
+- **A project's keys**, for a project with a path, a subdomain or a hostname of its own. It signs with them
+  alone and publishes them under its own issuer, such as `https://auth.example.com/acme/jwks` or
+  `https://acme.auth.example.com/jwks`, so a
   token from one project never verifies against another project's keys. The team that owns the project
   manages them on the project's **Signing keys** tab, or with the `project_key_*` tools.
 

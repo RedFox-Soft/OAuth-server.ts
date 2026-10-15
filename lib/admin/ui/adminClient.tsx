@@ -45,6 +45,7 @@ hydrateRoot(
 			needsSetup={props.needsSetup ?? false}
 			me={props.me ?? null}
 			path={props.path ?? window.location.pathname + window.location.search}
+			instanceHost={props.instanceHost ?? window.location.host}
 		/>
 	</StrictMode>
 );

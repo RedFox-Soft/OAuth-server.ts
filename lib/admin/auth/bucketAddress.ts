@@ -13,7 +13,11 @@ import {
 	type RequestBucket
 } from '../../configs/issuer.js';
 import { ISSUER } from '../../configs/env.js';
-import { canonicalHostOf, normaliseHost } from '../../consts/request_host.js';
+import {
+	canonicalHostOf,
+	normaliseHost,
+	subdomainLabelOf
+} from '../../consts/request_host.js';
 
 /*
  * Which bucket a request is addressed to, from the address itself.
@@ -201,7 +205,9 @@ export async function bucketAtHost(
 		return known;
 	}
 
-	const bucket = await getBucketStore().findByHost(host);
+	const bucket =
+		(await getBucketStore().findByHost(host)) ??
+		(await bucketAtSubdomain(host, options));
 	if (!bucket) return null;
 	if (!isAddressable(bucket)) return null;
 	/*
@@ -223,6 +229,23 @@ export async function bucketAtHost(
 }
 
 /*
+ * The bucket a subdomain of the instance's host names, or null (specs/101).
+ *
+ * Asked only after the exact hostname lookup missed, so a hostname given to a bucket before subdomains
+ * existed keeps its name even when it looks like one. Only a bucket marked as subdomain-addressed answers:
+ * a path bucket's slug is a path segment, and serving it here as well would give it a second issuer.
+ */
+async function bucketAtSubdomain(
+	host: string,
+	options: AddressOptions
+): Promise<UserBucket | null> {
+	const label = subdomainLabelOf(host, CANONICAL_HOST);
+	if (label === null) return null;
+	const bucket = await bucketHoldingSlug(label, options);
+	return bucket?.subdomain === true ? bucket : null;
+}
+
+/*
  * Resolves the bucket a request is addressed to.
  *
  * `undefined` for the slug means the bare address — the default bucket, whose issuer is the server's
@@ -240,6 +263,22 @@ export async function bucketAtAddress(
 		return getBucketStore().find(DEFAULT_BUCKET_ID);
 	}
 
+	/*
+	 * A subdomain bucket is not served at its slug as a path: one bucket, one address, one issuer
+	 * (specs/101). Its slug still belongs to it, so no other bucket can take the path either.
+	 */
+	const bucket = await bucketHoldingSlug(slug, options);
+	return bucket?.subdomain === true ? null : bucket;
+}
+
+/*
+ * The addressable bucket holding a slug, in whichever form it uses the slug. Cached and refused for a
+ * schedule exactly as both callers need: the path resolver above and the subdomain resolver.
+ */
+async function bucketHoldingSlug(
+	slug: string,
+	options: AddressOptions
+): Promise<UserBucket | null> {
 	const known = cached(bySlug, slug);
 	if (known && !isScheduledForDeletion(known)) return known;
 
@@ -288,7 +327,7 @@ export async function requestBucketFor(
 			/* One bucket, one address: a leading segment here names no bucket, and honouring it would
 			 * give that bucket a second address and therefore a second issuer identifier. */
 			if (slug !== undefined) throw new UnknownBucket();
-			return { _id: addressed._id, host: addressed.host };
+			return requestBucketOf(addressed);
 		}
 
 		/*
@@ -305,6 +344,16 @@ export async function requestBucketFor(
 	const bucket = await bucketAtAddress(slug, options);
 	if (!bucket) throw new UnknownBucket();
 	return { _id: bucket._id, slug: bucket.slug };
+}
+
+/* The address fields a request bucket needs, so its issuer and cookie name derive as the record's do. */
+function requestBucketOf(bucket: UserBucket): RequestBucket {
+	return {
+		_id: bucket._id,
+		...(bucket.slug !== undefined ? { slug: bucket.slug } : {}),
+		...(bucket.host !== undefined ? { host: bucket.host } : {}),
+		...(bucket.subdomain ? { subdomain: true as const } : {})
+	};
 }
 
 /*
@@ -336,13 +385,13 @@ export async function issuingBucket(
 	 * the outcome wanted.
 	 */
 	/*
-	 * The host travels with the slug: an issuer and a session cookie are both derived from the address
-	 * (addressOf), and a host-addressed bucket read back without its host is taken for one with no
-	 * address at all — its tokens named `ISSUER/<id>` and its sign-in wrote a cookie its own host never
-	 * reads.
+	 * The host and the subdomain marker travel with the slug: an issuer and a session cookie are both
+	 * derived from the address (addressOf), and a host-addressed bucket read back without its host was
+	 * taken for one with no address at all — its tokens named `ISSUER/<id>` and its sign-in wrote a cookie
+	 * its own host never reads. A subdomain bucket read back without its marker would be taken for a path.
 	 */
 	const resolved: RequestBucket = bucket
-		? { _id: bucket._id, slug: bucket.slug, host: bucket.host }
+		? requestBucketOf(bucket)
 		: { _id: bucketId, slug: undefined };
 
 	remember(byId, bucketId, resolved);

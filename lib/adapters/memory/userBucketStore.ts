@@ -1,4 +1,5 @@
 import type {
+	BucketAddressWrite,
 	BucketDeletion,
 	UserBucket,
 	UserBucketStoreInstance
@@ -26,6 +27,14 @@ export class UserBucketStore implements UserBucketStoreInstance {
 		return undefined;
 	}
 
+	/* The same, for the unique sparse index on `slug` (specs/101): a subdomain made the slug an origin. */
+	private slugHolder(slug: string, exceptId?: string): UserBucket | undefined {
+		for (const b of this.buckets.values()) {
+			if (b.slug === slug && b._id !== exceptId) return b;
+		}
+		return undefined;
+	}
+
 	async create(data: {
 		_id?: string;
 		name: string;
@@ -39,9 +48,13 @@ export class UserBucketStore implements UserBucketStoreInstance {
 		emailVerificationRequired?: boolean;
 		verificationMethod?: UserBucket['verificationMethod'];
 		totpRequired?: boolean;
+		subdomain?: true;
 	}): Promise<UserBucket> {
 		if (data.host !== undefined && this.hostHolder(data.host)) {
 			throw new UniqueValueTaken('host', data.host);
+		}
+		if (data.slug !== undefined && this.slugHolder(data.slug)) {
+			throw new UniqueValueTaken('slug', data.slug);
 		}
 
 		const now = new Date();
@@ -53,6 +66,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 				: {}),
 			slug: data.slug,
 			...(data.host !== undefined ? { host: data.host } : {}),
+			...(data.subdomain ? { subdomain: true as const } : {}),
 			ownerGroupId: data.ownerGroupId,
 			// A bucket accepts passwords unless someone says otherwise, and holds no providers until one is
 			// configured. Defaulted here and on read, so a document written before these fields existed
@@ -118,17 +132,21 @@ export class UserBucketStore implements UserBucketStoreInstance {
 
 	async setAddress(
 		id: string,
-		address: { slug?: string; host?: string }
+		address: BucketAddressWrite
 	): Promise<UserBucket | null> {
 		const b = this.buckets.get(id);
 		if (!b) return null;
 		if (address.host !== undefined && this.hostHolder(address.host, id)) {
 			throw new UniqueValueTaken('host', address.host);
 		}
+		if (address.slug !== undefined && this.slugHolder(address.slug, id)) {
+			throw new UniqueValueTaken('slug', address.slug);
+		}
 
-		/* One form written, the other removed in the same step: a bucket holds one address, never both. */
+		/* One form written, every other removed in the same step: a bucket holds one address. */
 		delete b.slug;
 		delete b.host;
+		delete b.subdomain;
 		/* Arrivals at the old address say nothing about the new one. */
 		delete b.hostFirstSeenAt;
 		delete b.hostLastSeenAt;

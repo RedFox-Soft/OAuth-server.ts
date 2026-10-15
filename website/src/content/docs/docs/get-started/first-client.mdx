@@ -21,7 +21,8 @@ is three concepts, but they nest, so the console walks them in order.
 - A **project** is a population of end-users: their accounts, and the policy for how they
   register and verify themselves. It also holds the **applications** that sign those people in and
   the **APIs** they get tokens for. A project you create is also a tenant with **its own issuer** — it
-  is served at `<ISSUER>/<slug>`, or at a hostname of its own, and mints tokens carrying that issuer,
+  is served at `<ISSUER>/<slug>`, on a subdomain of the instance, or at a hostname of its own, and mints
+  tokens carrying that issuer,
   so an application in it integrates against that address rather than the bare one. The default
   `redfox` project is the exception: it keeps the bare issuer, which is what lets an existing
   deployment stay as it is.
@@ -36,7 +37,9 @@ is three concepts, but they nest, so the console walks them in order.
    **Teams**, or is moved there later.
 
 2. **Create a project** under **Projects**, with **New project**. It takes a name and an address: a
-   path, which becomes the last part of the issuer in its tokens, or a hostname of its own. Pick it
+   path, which becomes the last part of the issuer in its tokens, or a subdomain such as
+   `acme.auth.example.com` when the instance offers one; a super administrator can also give it a hostname of
+   its own ([Project addresses](/docs/administer/project-addresses/) compares the three). Pick it
    deliberately: an issuer identifier is a promise made to every client configured against it, and
    changing it later is previewed and confirmed because every application in the project is affected.
    A new project is closed to sign-up unless you choose **Anyone who can reach the sign-in page**; you

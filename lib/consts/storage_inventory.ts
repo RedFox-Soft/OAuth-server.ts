@@ -662,7 +662,13 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 			 * whichever document the datastore returns first. Sparse because every bucket addressed by a
 			 * path holds no hostname at all, and absent values must not collide with each other.
 			 */
-			{ key: { host: 1 }, unique: true, sparse: true }
+			{ key: { host: 1 }, unique: true, sparse: true },
+			/*
+			 * The same for the slug (specs/101). It was a read-then-write check in the handler alone, so two
+			 * creates with one slug both succeeded; once a slug can be a subdomain, that is two projects
+			 * claiming one origin. Sparse because a bucket addressed by a hostname holds no slug.
+			 */
+			{ key: { slug: 1 }, unique: true, sparse: true }
 		]
 	),
 	/*

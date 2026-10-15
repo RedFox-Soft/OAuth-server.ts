@@ -416,3 +416,90 @@ export async function verifyAddressChangeForgetsArrivals(
 		JSON.stringify(reread)
 	);
 }
+
+/*
+ * The subdomain form (specs/101), as a real backend stores it: the slug is unique by an index, so two buckets
+ * racing for one slug end with one and a taken-value refusal naming the slug; and the subdomain marker is
+ * written with a slug and removed when the bucket moves to a path or a hostname — a marker left behind would
+ * keep a path bucket answering at its subdomain.
+ */
+export async function verifySubdomainAddressing(
+	buckets: UserBucketStoreInstance,
+	check: (name: string, ok: boolean, detail?: string) => void
+): Promise<void> {
+	const stamp = Date.now();
+	const contested = `fidelity-slug-${stamp}`;
+	const racing = await Promise.allSettled([
+		buckets.create({
+			name: `slug-a-${stamp}`,
+			ownerGroupId: 'unassigned',
+			slug: contested
+		}),
+		buckets.create({
+			name: `slug-b-${stamp}`,
+			ownerGroupId: 'unassigned',
+			slug: contested
+		})
+	]);
+	check(
+		'two buckets given one slug at once: exactly one succeeds',
+		racing.filter((r) => r.status === 'fulfilled').length === 1,
+		racing.map((r) => r.status).join(', ')
+	);
+	const loser = racing.find((r) => r.status === 'rejected');
+	const reason: unknown = loser?.reason;
+	check(
+		'and the loser is refused as a taken slug, not as an internal fault',
+		typeof reason === 'object' &&
+			reason !== null &&
+			'name' in reason &&
+			reason.name === 'UniqueValueTaken' &&
+			'field' in reason &&
+			reason.field === 'slug',
+		String(reason)
+	);
+
+	const slugless = await Promise.allSettled([
+		buckets.create({ name: `slugless-a-${stamp}`, ownerGroupId: 'unassigned' }),
+		buckets.create({ name: `slugless-b-${stamp}`, ownerGroupId: 'unassigned' })
+	]);
+	check(
+		'two buckets with no slug do not collide, which is what sparse buys',
+		slugless.every((r) => r.status === 'fulfilled'),
+		slugless.map((r) => r.status).join(', ')
+	);
+
+	const marked = await buckets.create({
+		name: `marked-${stamp}`,
+		ownerGroupId: 'unassigned',
+		slug: `marked-${stamp}`,
+		subdomain: true
+	});
+	check(
+		'a subdomain bucket reads back with its marker and its slug',
+		(await buckets.find(marked._id))?.subdomain === true,
+		JSON.stringify(await buckets.find(marked._id))
+	);
+	await buckets.setAddress(marked._id, { slug: `marked-${stamp}` });
+	const pathed = await buckets.find(marked._id);
+	check(
+		'moving it to a path removes the marker and keeps the slug',
+		pathed?.subdomain === undefined && pathed?.slug === `marked-${stamp}`,
+		JSON.stringify(pathed)
+	);
+	await buckets.setAddress(marked._id, {
+		slug: `marked-${stamp}`,
+		subdomain: true
+	});
+	await buckets.setAddress(marked._id, {
+		host: `marked-${stamp}.example.test`
+	});
+	const hosted = await buckets.find(marked._id);
+	check(
+		'moving it to a hostname removes both the marker and the slug',
+		hosted?.subdomain === undefined &&
+			hosted?.slug === undefined &&
+			hosted?.host === `marked-${stamp}.example.test`,
+		JSON.stringify(hosted)
+	);
+}

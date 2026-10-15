@@ -1864,16 +1864,27 @@ export const UserBucket = t.Object({
 	 * identifier may not have, and a silent precedence rule leaves the operator who supplied the other
 	 * believing it took effect.
 	 *
-	 * Present ⇔ host-addressed. There is deliberately no third field recording which form is in use:
-	 * it would claim what these two already determine and disagree with them the first time somebody
-	 * wrote one and not the other — the shape `passwordLogin` and `totpRequired` both warn about below.
-	 * Which of the three address states a bucket is in (root, path, host) is therefore *derived*, by
-	 * `addressOf` in lib/configs/issuer.ts, and read from there rather than re-inferred at each site.
+	 * Present ⇔ addressed by a hostname of its own. A subdomain of the instance's host is not stored
+	 * here: it is derived from the slug, and `subdomain` below says the slug is used that way. Which
+	 * address state a bucket is in is *derived*, by `addressOf` in lib/configs/issuer.ts, and read from
+	 * there rather than re-inferred at each site.
 	 *
 	 * Stored normalised — case folded, no trailing dot, no port (lib/consts/request_host.ts) — because
 	 * uniqueness over a name compared in two forms is not uniqueness.
 	 */
 	host: t.Optional(t.String()),
+	/*
+	 * The slug is a subdomain of the instance's host rather than a path segment beneath it:
+	 * `acme.auth.example.com` instead of `auth.example.com/acme` (specs/101).
+	 *
+	 * Present only with `slug`, never with `host`. The full name is not stored because it embeds the
+	 * instance's host: stored, it would keep answering beneath the old host after `ISSUER` changed, while
+	 * derived it follows `ISSUER` exactly as a path issuer does. The slug stays the project's one name
+	 * across path and subdomain, so moving between the two writes no name at all.
+	 *
+	 * Absent on every record written before the form existed, which reads as the form it already had.
+	 */
+	subdomain: t.Optional(t.Literal(true)),
 	/*
 	 * When a request first reached this bucket's hostname, and when one last did.
 	 *
@@ -1958,6 +1969,11 @@ export const UserBucket = t.Object({
 });
 export type UserBucket = Static<typeof UserBucket>;
 
+/* One address form, as written: a slug (a path, or a subdomain with the marker) or a hostname. */
+export type BucketAddressWrite =
+	| { slug: string; subdomain?: true; host?: never }
+	| { host: string; slug?: never; subdomain?: never };
+
 export interface UserBucketStoreInstance {
 	create(data: {
 		_id?: string;
@@ -1972,6 +1988,7 @@ export interface UserBucketStoreInstance {
 		verificationMethod?: VerificationMethod;
 		totpRequired?: boolean;
 		host?: string;
+		subdomain?: true;
 	}): Promise<UserBucket>;
 	find(id: string): Promise<UserBucket | null>;
 	/* Resolves a bucket by its address. Returns null for a slug nothing holds, which is what tells the
@@ -1995,10 +2012,11 @@ export interface UserBucketStoreInstance {
 	 * integrated client validating tokens, so it carries its own route, its own audit action and its own
 	 * `high` classification — the shape the comment on `slug` in the admin update body prescribes.
 	 *
-	 * **One call that writes one form and removes the other**, rather than a setter per form. A bucket
-	 * holds a slug or a hostname, never both, and two setters each responsible for clearing the other's
-	 * field is the arrangement where one of them eventually forgets — leaving a bucket reachable at two
-	 * addresses, which is two issuer identifiers for one population.
+	 * **One call that writes one form and removes every other**, rather than a setter per form. A bucket
+	 * holds a slug (as a path or a subdomain) or a hostname, never two, and setters each responsible for
+	 * clearing the others' fields is the arrangement where one of them eventually forgets — leaving a
+	 * bucket reachable at two addresses, which is two issuer identifiers for one population. A slug given
+	 * without `subdomain` removes the marker: the slug is then a path again.
 	 *
 	 * Rejects rather than overwrites when the name is taken: the uniqueness guarantee is the store's,
 	 * because a read-then-write in a handler cannot promise it.
@@ -2009,7 +2027,7 @@ export interface UserBucketStoreInstance {
 	 */
 	setAddress(
 		id: string,
-		address: { slug?: string; host?: string }
+		address: BucketAddressWrite
 	): Promise<UserBucket | null>;
 	list(): Promise<UserBucket[]>;
 	listByGroup(groupId: string): Promise<UserBucket[]>;

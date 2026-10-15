@@ -83,6 +83,28 @@ export function duplicateEmailReport(
 }
 
 /*
+ * Slugs held by more than one bucket, which the unique slug index (specs/101) cannot be built over.
+ *
+ * Before that index a slug was unique only by a read-then-write check, so two creates racing for one name
+ * could both have landed. Reported, never resolved: a slug is part of an issuer identifier, so which project
+ * keeps it is the operator's decision, made through the address-change route. The rest of the area is still
+ * provisioned; only its unique constraints wait for the fix.
+ */
+export function duplicateSlugReport(
+	rows: readonly DuplicateEmailRow[]
+): string | null {
+	if (rows.length === 0) return null;
+	const conflicts = rows
+		.map((row) => `  ${row.value} (${row.count} projects)`)
+		.join('\n');
+	return (
+		`skipped the unique project slug constraint — ${rows.length} slug(s) are already held by more than one project:\n` +
+		`${conflicts}\n` +
+		'  give all but one of each a new address through POST /admin/api/projects/:id/address and re-run; no records were changed.'
+	);
+}
+
+/*
  * Buckets whose address is a name the server has since reserved for its own route (lib/consts/reserved_names.ts).
  * Reported, never changed: renaming a bucket changes its issuer identifier, which every integrated client
  * notices, so it is an operator's decision made through the address-change route. Nothing is refused either —

@@ -135,11 +135,13 @@ into `bucket`, which is what `issuerFor` stamps into a token — a project with 
 would silently change issuer.
 
 The bare `_session` is no longer a legacy name: since `536d9b7` it is the session cookie of a project
-addressed by a hostname of its own ([[project-is-an-issuer]]). A `clearLegacySessionCookie` used to
+addressed by a hostname of its own ([[project-is-an-issuer]]), and since spec 101 (2026-10-15) also of a project
+addressed by a subdomain of the instance ([[subdomain-project-addresses]]). Both are on an origin of their own. A `clearLegacySessionCookie` used to
 expire it on every request that presented it; on such a project's origin that cleared the live cookie,
 and an anonymous session not re-issued in the same response was lost. It was removed on 2026-10-08. On
-the issuer's origin the pre-2026-09-16 cookie is simply never read, and no host-addressed project shares
-that origin, so a stale one cannot reach the project that now owns the name.
+the issuer's origin the pre-2026-09-16 cookie is simply never read, and no own-origin project shares
+that origin, so a stale one cannot reach the project that now owns the name. A subdomain origin is a different
+origin from the issuer's, and no cookie here sets `Domain`, so the instance host's cookies are not sent to it.
 
 The connected-apps page's pending sign-in cookie, `_account_apps` (spec 095), follows the rule from birth: it
 lives on the page's own path (`/account/apps` or `/<slug>/account/apps`), and the set and the clear derive that

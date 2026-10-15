@@ -11,7 +11,12 @@ import {
  * resolve an issuer, so anything they reach must not reach back into the request pipeline. This module
  * imports the environment and one import-free constants module, and nothing else.
  */
-export type RequestBucket = { _id: string; slug?: string; host?: string };
+export type RequestBucket = {
+	_id: string;
+	slug?: string;
+	host?: string;
+	subdomain?: true;
+};
 
 /*
  * How a bucket is addressed — the one place the question is answered.
@@ -31,11 +36,20 @@ export type BucketAddress =
 	| { kind: 'root' }
 	| { kind: 'path'; segment: string }
 	| { kind: 'host'; host: string }
+	| { kind: 'subdomain'; label: string }
 	| { kind: 'unaddressed' };
 
 export function addressOf(bucket: RequestBucket): BucketAddress {
 	if (isServedAtTheRoot(bucket._id)) return { kind: 'root' };
 	if (bucket.host) return { kind: 'host', host: bucket.host };
+	/*
+	 * Before `path`, because a subdomain bucket carries a slug too: tested the other way round, every
+	 * subdomain bucket would read as path-addressed and mint `<ISSUER>/<slug>` while its discovery
+	 * document named its own origin (specs/101).
+	 */
+	if (bucket.slug && bucket.subdomain) {
+		return { kind: 'subdomain', label: bucket.slug };
+	}
 	if (bucket.slug) return { kind: 'path', segment: bucket.slug };
 	/*
 	 * A bucket written before slugs existed, which `isAddressable` already refuses to route to. It is a
@@ -97,6 +111,15 @@ export function issuerFor(bucket: RequestBucket): string {
 		case 'host':
 			return `${new URL(ISSUER).protocol}//${address.host}`;
 		/*
+		 * A name beneath the instance's own host, derived rather than stored, so it follows `ISSUER` as a
+		 * path issuer does. Scheme and port come from ISSUER: the subdomain is served by the same listener,
+		 * so a development instance on `localhost:3000` serves `acme.localhost:3000`.
+		 */
+		case 'subdomain': {
+			const instance = new URL(ISSUER);
+			return `${instance.protocol}//${address.label}.${instance.host}`;
+		}
+		/*
 		 * The slug, not the record id: the id is internal and may be a 43-character nanoid, while the slug
 		 * is what an operator chose and what a client sees.
 		 */
@@ -109,6 +132,19 @@ export function issuerFor(bucket: RequestBucket): string {
 		case 'unaddressed':
 			return `${ISSUER}/${bucket._id}`;
 	}
+}
+
+/*
+ * Whether a bucket is served on an origin of its own — a hostname, or a subdomain of the instance.
+ *
+ * Asked wherever the answer changes behaviour: the session cookie's name, whether an interaction is bound to
+ * the origin it began at, and where a resumed request returns. Each of those once tested `bucket.host`, which
+ * meant the same thing while a hostname was the only origin a bucket could have; a subdomain bucket has a slug
+ * and no host, and would have taken the path branch at every one of them (specs/101).
+ */
+export function hasOwnOrigin(bucket: RequestBucket): boolean {
+	const kind = addressOf(bucket).kind;
+	return kind === 'host' || kind === 'subdomain';
 }
 
 /*

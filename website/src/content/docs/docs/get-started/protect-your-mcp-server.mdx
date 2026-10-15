@@ -30,8 +30,8 @@ Compose](/docs/get-started/docker-compose/) adds about two more.
 
 ## 1. Declare your MCP server as a resource
 
-Declare it in a project that has an address of its own — a path like `/acme` or a
-hostname. Such a project is its own issuer, and a resource identifier is unique only within its issuer,
+Declare it in a project that has an address of its own — a path like `/acme`, a subdomain like
+`acme.auth.example.com`, or a hostname. Such a project is its own issuer, and a resource identifier is unique only within its issuer,
 so nothing about your MCP server is fetched or checked when you declare it. It can be on an internal
 network, on `localhost` while you develop, or not deployed yet. Another tenant with a project of its own
 may declare the same URL without affecting yours.
@@ -94,7 +94,8 @@ to it and the audience check in step 3:
 
 `resource` is the identifier you declared in step 1, character for character. `authorization_servers`
 names the issuer of the project you declared the resource in: the project's own issuer when it has an
-address — `https://auth.example.com/acme`, or its hostname — and the instance's `ISSUER` otherwise. The
+address — `https://auth.example.com/acme`, `https://acme.auth.example.com`, or its hostname — and the
+instance's `ISSUER` otherwise. The
 document may live at `/.well-known/oauth-protected-resource` followed by your resource's path, as RFC
 9728 forms it, at the root as above, or wherever the challenge below points.
 

@@ -147,6 +147,39 @@ config is what stops the check from merely agreeing with itself.
 
 </Aside>
 
+## Subdomain project addresses
+
+A project can be served on a subdomain of the instance, `https://acme.auth.example.com` for an instance at
+`auth.example.com`. [Project addresses](/docs/administer/project-addresses/#setting-up-subdomains) explains the
+form. On Fly.io it needs a wildcard certificate and two kinds of DNS record, added once per app:
+
+<Steps>
+
+1. **Add the wildcard certificate.** Quote the name, so the shell does not expand the `*`:
+
+   ```bash
+   fly certs add "*.auth.example.com"
+   ```
+
+2. **Create the validation record.** Fly issues a wildcard certificate only through the DNS-01 challenge, which
+   needs a `CNAME` record named `_acme-challenge.auth.example.com`. Its target is unique to your app. Fly shows
+   the exact record when you run the command; `fly certs setup "*.auth.example.com"` shows it again. Copy it
+   from there rather than guessing it.
+
+3. **Point the wildcard name at the app.** Add `*.auth.example.com` with the same `A` and `AAAA` addresses as
+   `auth.example.com`, or as a `CNAME` to the app's target. Fly shows the records it expects in the dashboard
+   and in the output of `fly certs add`.
+
+4. **Check it.** `fly certs check "*.auth.example.com"` runs the validation and reports what is still missing.
+
+</Steps>
+
+Then turn on [`projects.addressForms`](/docs/reference/settings/#projects.addressForms). Fly's proxy passes the
+original `Host` through, so nothing else changes in `fly.toml`. Each Fly app needs its own wildcard: a second
+instance at `conformance.example.com` needs `*.conformance.example.com`.
+
+Fly's own page on this is [Custom domains](https://fly.io/docs/networking/custom-domain/).
+
 ## The rest of the file
 
 - `internal_port = 3000` matches the `EXPOSE 3000` in the Dockerfile and the port `bun start`
