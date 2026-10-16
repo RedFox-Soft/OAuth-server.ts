@@ -136,6 +136,7 @@ import { namespaceOf } from 'lib/resources/namespace.js';
 import { isMcpResource } from 'lib/mcp/resource_server.js';
 import { isLoopbackRedirect } from 'lib/client_metadata_document/identifier.js';
 import {
+	NOTICE_FEDERATION_ABORTED,
 	NOTICE_FEDERATION_LINK,
 	NOTICE_VERIFY,
 	NOTICE_VERIFY_RECENT,
@@ -1167,6 +1168,12 @@ export const ui = new Elysia()
 			const clientId = clientIdOf(interaction);
 			return loginServer(uid, {
 				notice: resolveNotice(query.notice, languageOf(interaction)),
+				/*
+				 * Back from a provider that was cancelled or refused: the notice says so, and the provider may be one
+				 * of those folded away (specs/105), so the fold opens. The notice does not name the provider, so it
+				 * opens whichever was chosen — harmless when that one was in sight.
+				 */
+				providersOpen: query.notice === NOTICE_FEDERATION_ABORTED,
 				// Only once this sign-in has proved the password of an unverified account (see the resend route).
 				verificationResend:
 					interaction.payload.pendingVerification !== undefined,

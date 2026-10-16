@@ -15,6 +15,7 @@ import { sentEmails, resetSentEmails } from '../mail_capture.ts';
 import { UNASSIGNED_GROUP_ID } from 'lib/admin/consts.ts';
 import { present, shaped } from 'test/shape.js';
 import { Type } from '@sinclair/typebox';
+import { SIGN_IN_TEXTS } from 'lib/i18n/texts/signIn/index.ts';
 
 const PASSWORD = 'correct horse battery';
 
@@ -375,7 +376,9 @@ describe('interaction UI — registration refusals (US2)', () => {
 		const login = await getPage(`/ui/${uid}/login`, cookie);
 
 		// Nothing federated: neither the label nor the icon a stripped-down button would still carry.
-		expect(login.text).not.toContain('Sign in with Google');
+		expect(login.text).not.toContain(
+			SIGN_IN_TEXTS.en.login.signInWith.replace('{provider}', 'Google')
+		);
 		expect(login.text).not.toContain('anticon-google');
 		expect(login.text).not.toContain('data-icon="google"');
 

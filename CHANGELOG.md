@@ -14,6 +14,17 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 - **Send test email** on the mail settings (`POST /admin/api/settings/smtp/test`, MCP `smtp_settings_test`). A super
   administrator sends a test message through the saved settings to their own address, never anyone else's; a refusal
   answers with the mail server's own reply, such as `535 Authentication failed`. Audited as `smtp.settings.test`.
+- **Warnings for confusing provider buttons.** The providers list gives each provider `signInWarnings` and a
+  provider's detail `warnings`: `duplicate_brand` for a second enabled Google, Apple or GitHub connection, and
+  `named_like_brand` for an unrecognised provider named like a recognised one. Shown in the console and to agents.
+
+### Changed
+
+- **Provider buttons on the sign-in page fit any number of providers.** Every provider is one full-width button
+  of the same size with a mark (a neutral one for an unrecognised provider). Past six, five are shown and the rest
+  fold under **More sign-in options**, which works without JavaScript and opens after a cancelled provider sign-in;
+  Google, Microsoft, Apple and GitHub are never folded. Two connections to one brand show their names as a second
+  line. The sign-in card fits a 320 px phone, and the console's Sign-in preview draws the buttons with their frame.
 
 ### Fixed
 

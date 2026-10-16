@@ -143,3 +143,31 @@ export function providerMark(brand: string | undefined): ReactElement | null {
 	const mark = MARKS[brand];
 	return mark ? mark() : null;
 }
+
+/*
+ * The mark of a provider this server does not recognise (specs/105), so that every button on the sign-in page
+ * carries one and none reads as lesser for lacking it. Ours, not a third party's, so unlike Apple's and GitHub's
+ * it may follow the button's text colour through `currentColor` in either scheme.
+ *
+ * Not returned by `providerMark`: the console draws a recognised provider's mark beside its name and nothing
+ * beside the rest, and a generic glyph there would say nothing.
+ */
+export function genericMark(): ReactElement {
+	return (
+		<svg
+			xmlns="http://www.w3.org/2000/svg"
+			viewBox="0 0 24 24"
+			width="18"
+			height="18"
+			aria-hidden="true"
+			focusable="false"
+			data-mark="generic"
+		>
+			<path
+				fill="currentColor"
+				d="M10 17l1.41-1.41L8.83 13H20v-2H8.83l2.58-2.59L10 7l-5 5 5 5zm-6 4h8v-2H4V5h8V3H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2z"
+				transform="matrix(-1 0 0 1 24 0)"
+			/>
+		</svg>
+	);
+}

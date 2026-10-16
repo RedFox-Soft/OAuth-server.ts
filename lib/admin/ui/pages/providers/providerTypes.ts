@@ -6,6 +6,8 @@ export type PresentedProvider = FederationProvider & {
 	backChannelLogoutEndpoint?: string;
 	/* The list's answer to "is its button on the sign-in page now": its own switch and the instance's. */
 	onSignInPage?: boolean;
+	/* How its button would confuse people on the sign-in page, judged against the project's other providers (specs/105). */
+	signInWarnings?: string[];
 };
 
 /*

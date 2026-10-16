@@ -21,7 +21,8 @@ export const ru: SignInTexts = {
 		registerPrompt: '{link}',
 		register: 'Зарегистрироваться',
 		resendLink: 'Отправить ссылку ещё раз',
-		orContinueWith: 'или войдите другим способом',
+		providersDivider: 'или',
+		moreProviders: 'Другие способы входа',
 		signInWith: 'Войти через {provider}'
 	},
 

@@ -4,7 +4,7 @@ title: 'Signing in through somebody else’s identity provider'
 tags: [architecture, contract, gotcha, oidc]
 sources: [oauth-server-codebase]
 created: 2026-08-05
-updated: 2026-10-15
+updated: 2026-10-16
 graph:
   node_type: concept
   relationships:
@@ -190,6 +190,46 @@ The order is a **separate field** rather than the order of the `federation` arra
   another administrator's provider edit made a moment earlier;
 - a project nobody has reordered keeps exactly its old order with no migration, because absent means the old
   rule.
+
+## How the buttons are laid out
+
+Since spec 105 every provider is one full-width button in one frame — the `provider-*` palette, at least 44 px,
+a mark and "Sign in with …" — in a single column (`ProviderLink`, `lib/interactions/loginPage.tsx:342`). Before
+it, only a recognised provider got that frame; any other was a lighter, shorter box with no mark, and read as
+the lesser option. A provider this server does not recognise now carries a neutral glyph of ours, `genericMark()`,
+which the console deliberately does not use (`providerMark(undefined)` stays null there).
+
+Three things are decided by the page's shared rule, `signInOptionsOf`, and travel in the props, so the page, its
+hydration and the console's preview cannot disagree (`laidOut`, `lib/interactions/signInOptions.ts:134`):
+
+- **The fold.** Up to six providers all show. Past six the page shows five and folds the rest under a native
+  `<details>` "More sign-in options", which opens without a script, so the policy the page derives is unchanged.
+  A fold of one is never made. **A recognised provider is never folded**, even past five: Google's and Apple's
+  branding terms require their button to be no less prominent than any other option. The places left go to the
+  other providers in the administrator's order, which is kept inside both groups.
+- **The second line.** Two connections to one brand — two Microsoft organisations is the ordinary case — keep the
+  brand's wording, which an administrator may not change, and show the administrator's name beneath it. Without
+  that they were two identical buttons.
+- Not decided there: whether the fold **starts open**. That belongs to the request, not the project: the login GET
+  opens it when it follows a cancelled provider sign-in (`lib/interactions/index.ts:1176`), because the notice
+  then names a button that may be folded. The notice does not say which provider, so it opens whatever was chosen.
+
+With password sign-in off the buttons come first, under any notice; with it on, an "or" divider separates them
+from the form. The card is fluid up to 400 px, with its own padding melting below 368 px, so a 320 px phone no
+longer scrolls sideways.
+
+Two setups make a confusing button, and the providers read warns about both (`lib/federation/brand_conflicts.ts:20`,
+browser-safe so the console's preview runs it too): `duplicate_brand`, a second enabled connection to a provider a
+project needs once — Google, Apple, GitHub, by the catalogue's `oneConnectionPerProject`
+(`lib/consts/known_providers.ts:139`), so Microsoft is exempt as data, not as a branch — and `named_like_brand`, an
+unrecognised provider named like a recognised one, whose button would read "Sign in with Google" without Google's
+mark. The list carries them as `signInWarnings` (`lib/admin/federation/service.ts:134`), a provider's detail in
+`warnings`.
+
+Deliberately not done: icon-only buttons (every brand's terms forbid a mark without its text), a "last used" hint
+(a new cookie that tells the next person at a shared computer which provider was used), skipping the page when one
+provider is offered (a decline would loop, and `prompt=login` and the registration and reset links would be lost),
+and routing by email domain first.
 
 ## Gotchas
 

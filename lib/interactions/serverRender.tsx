@@ -6,6 +6,7 @@ import { RegistrationPage } from './registration.js';
 import { TotpPage } from './totpPage.js';
 import type { ConsentView } from './consentView.js';
 import type { SwitcherProps } from './languageSwitch.js';
+import type { OfferedProvider } from './signInOptions.js';
 import type { Language } from '../i18n/languages.js';
 import { CONSENT_TEXTS } from '../i18n/texts/consent/index.js';
 import { SIGN_IN_TEXTS } from '../i18n/texts/signIn/index.js';
@@ -80,7 +81,9 @@ export async function loginServer(
 		 * an unverified account, never from anything in the request.
 		 */
 		verificationResend?: boolean;
-		providers?: { id: string; displayName: string; brand?: string }[];
+		providers?: OfferedProvider[];
+		/* "More sign-in options" starts open — after a cancelled provider sign-in (specs/105). */
+		providersOpen?: boolean;
 		/*
 		 * The pending authorization request's redirect_uri, which reaches this page's
 		 * Content-Security-Policy. `form-action` has to name it: the page posts to itself, and the
@@ -102,6 +105,7 @@ export async function loginServer(
 	const passwordReset = options.passwordReset !== false;
 	const verificationResend = options.verificationResend === true;
 	const providers = options.providers ?? [];
+	const providersOpen = options.providersOpen === true;
 
 	// Here and nowhere else: the version is the file's build time, which only the server can read (see LoginPage).
 	const logoSrc = versionedAsset('logo.svg');
@@ -123,6 +127,7 @@ export async function loginServer(
 			passwordReset,
 			verificationResend,
 			providers,
+			providersOpen,
 			logoSrc,
 			switcher
 		},
@@ -135,6 +140,7 @@ export async function loginServer(
 			passwordReset={passwordReset}
 			verificationResend={verificationResend}
 			providers={providers}
+			providersOpen={providersOpen}
 			logoSrc={logoSrc}
 			switcher={switcher}
 		/>,

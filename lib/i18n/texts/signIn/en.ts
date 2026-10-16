@@ -25,7 +25,10 @@ export const en = {
 		registerPrompt: 'or {link}',
 		register: 'Register now!',
 		resendLink: 'Send the link again',
-		orContinueWith: 'or continue with',
+		/* The line between the password form and the provider buttons. */
+		providersDivider: 'or',
+		/* Opens the providers folded away on a page with many of them (specs/105). */
+		moreProviders: 'More sign-in options',
 		// The provider's own name from the built-in catalogue, never the name an administrator gave it.
 		signInWith: 'Sign in with {provider}'
 	},

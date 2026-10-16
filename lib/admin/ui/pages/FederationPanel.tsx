@@ -15,6 +15,8 @@ import {
 } from './providers/providerTypes.js';
 import { ProviderTiles, ProviderWizard } from './providers/ProviderWizard.js';
 import { FederationOffNotice } from './providers/FederationOffNotice.js';
+import { BrandConflictTags } from './providers/BrandConflictNotice.js';
+import { brandNameOf } from './providers/brandName.js';
 import {
 	providerBlocks,
 	useProviderActions
@@ -198,7 +200,13 @@ export function FederationPanel({
 							title: 'Name',
 							dataIndex: 'displayName',
 							render: (name: string, row) => (
-								<Link href={providerHref(bucketId, row.id)}>{name}</Link>
+								<Space size={4}>
+									<Link href={providerHref(bucketId, row.id)}>{name}</Link>
+									<BrandConflictTags
+										warnings={row.signInWarnings}
+										name={brandNameOf(row)}
+									/>
+								</Space>
 							)
 						},
 						{ title: 'Id', dataIndex: 'id' },

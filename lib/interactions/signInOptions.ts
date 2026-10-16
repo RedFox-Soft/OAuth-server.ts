@@ -46,7 +46,21 @@ export interface LoginOptions {
 	 * exists: the login page renders twice from one props payload, and a value computed during render
 	 * would be computed twice and could differ. Resolved once, it travels with the rest.
 	 */
-	providers: { id: string; displayName: string; brand?: string }[];
+	providers: OfferedProvider[];
+}
+
+/*
+ * One provider button. `folded` and `subtitle` are decided here with the rest (specs/105), for the reason above:
+ * the page, its hydration and the console's preview each read them rather than work them out.
+ */
+export interface OfferedProvider {
+	id: string;
+	displayName: string;
+	brand?: string;
+	/* Under "More sign-in options" rather than in the first list. Present only when true. */
+	folded?: true;
+	/* The administrator's name, shown under the brand's wording when two providers share one brand. */
+	subtitle?: string;
 }
 
 /* The fields of a bucket the page depends on, and only those, so the console can pass a draft for a record. */
@@ -80,16 +94,67 @@ export function signInOptionsOf(
 		 * records that, deliberately. So a Google provider somebody typed in by hand long before the
 		 * catalogue existed renders with its mark on the next page load, and no migration is owed.
 		 */
-		providers: orderProviders(
-			offeredProviders(bucket, federationOn),
-			bucket?.signInOrder
-		).map((provider) => {
-			const known = knownProviderByIssuer(provider.issuer);
-			return {
-				id: provider.id,
-				displayName: provider.displayName,
-				...(known ? { brand: known.catalogueId } : {})
-			};
-		})
+		providers: laidOut(
+			orderProviders(
+				offeredProviders(bucket, federationOn),
+				bucket?.signInOrder
+			).map((provider) => {
+				const known = knownProviderByIssuer(provider.issuer);
+				return {
+					id: provider.id,
+					displayName: provider.displayName,
+					...(known ? { brand: known.catalogueId } : {})
+				};
+			})
+		)
 	};
+}
+
+/*
+ * How many buttons a page shows before folding the rest under "More sign-in options" (specs/105).
+ *
+ * Six all fit a phone's first screen below a password form, so up to six nothing folds; past six the page shows
+ * five and folds the rest. A fold of one is never made: it would spend a click to hide a single button.
+ */
+const ALL_VISIBLE_UP_TO = 6;
+const VISIBLE_WHEN_FOLDED = 5;
+const FOLD_AT_LEAST = 2;
+
+/*
+ * Marks the folded providers and names the ones that share a brand, keeping the administrator's order in both
+ * groups.
+ *
+ * A recognised provider is never folded, even past five: Google's and Apple's branding terms require their button
+ * to be no less prominent than any other sign-in option, and a button behind a disclosure is less prominent. The
+ * places left go to the other providers in the administrator's order.
+ *
+ * Two connections to one brand — two Microsoft organisations is the ordinary case — would otherwise be two
+ * identical buttons, since the brand fixes the wording; the administrator's name for each becomes its second line.
+ */
+function laidOut(providers: OfferedProvider[]): OfferedProvider[] {
+	const brandCount = new Map<string, number>();
+	for (const { brand } of providers)
+		if (brand !== undefined)
+			brandCount.set(brand, (brandCount.get(brand) ?? 0) + 1);
+
+	let foldedIds = new Set<string>();
+	if (providers.length > ALL_VISIBLE_UP_TO) {
+		const branded = providers.filter((p) => p.brand !== undefined).length;
+		let places = Math.max(0, VISIBLE_WHEN_FOLDED - branded);
+		for (const provider of providers) {
+			if (provider.brand !== undefined) continue;
+			if (places > 0) places--;
+			else foldedIds.add(provider.id);
+		}
+		if (foldedIds.size < FOLD_AT_LEAST) foldedIds = new Set();
+	}
+
+	return providers.map((provider) => ({
+		...provider,
+		...(foldedIds.has(provider.id) ? { folded: true as const } : {}),
+		...(provider.brand !== undefined &&
+		(brandCount.get(provider.brand) ?? 0) > 1
+			? { subtitle: provider.displayName }
+			: {})
+	}));
 }

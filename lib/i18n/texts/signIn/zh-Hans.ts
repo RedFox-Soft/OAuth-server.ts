@@ -21,7 +21,8 @@ export const zhHans: SignInTexts = {
 		registerPrompt: '或{link}',
 		register: '立即注册！',
 		resendLink: '重新发送链接',
-		orContinueWith: '或使用以下方式继续',
+		providersDivider: '或',
+		moreProviders: '更多登录方式',
 		signInWith: '使用{provider}登录'
 	},
 

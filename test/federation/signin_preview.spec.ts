@@ -29,7 +29,9 @@ const PageProps = Type.Object({
 		Type.Object({
 			id: Type.String(),
 			displayName: Type.String(),
-			brand: Type.Optional(Type.String())
+			brand: Type.Optional(Type.String()),
+			folded: Type.Optional(Type.Literal(true)),
+			subtitle: Type.Optional(Type.String())
 		})
 	)
 });
@@ -130,6 +132,29 @@ const CASES: {
 				provider(GOOGLE, { id: 'google', displayName: 'Google' }),
 				provider('https://alpha.idp.test', { id: 'alpha' }),
 				provider('https://zeta.idp.test', { id: 'zeta' })
+			]
+		}
+	},
+	{
+		/*
+		 * Enough providers to fold, two of one brand: what is folded and which buttons carry a second line are
+		 * decided with the rest, and a preview that worked them out its own way would disagree here (specs/105).
+		 */
+		name: 'eight providers, two of one brand, folded',
+		order: ['d1', 'contoso', 'd2', 'fabrikam', 'd3', 'd4', 'd5', 'd6'],
+		fields: {
+			federation: [
+				provider('https://login.microsoftonline.com/contoso.example/v2.0', {
+					id: 'contoso',
+					displayName: 'Contoso staff'
+				}),
+				provider('https://login.microsoftonline.com/fabrikam.example/v2.0', {
+					id: 'fabrikam',
+					displayName: 'Fabrikam staff'
+				}),
+				...[1, 2, 3, 4, 5, 6].map((n) =>
+					provider(`https://d${String(n)}.idp.test`, { id: `d${String(n)}` })
+				)
 			]
 		}
 	},

@@ -132,6 +132,12 @@ export interface KnownProvider {
 	 */
 	readonly buttonText: string;
 	/*
+	 * Whether one connection to this provider is all a project should ever need — so a second is almost always a
+	 * mistake, and two identical buttons on the sign-in page (specs/105). False for Microsoft, whose issuer names
+	 * an organisation: a project serving two organisations connects twice, and that is the ordinary case.
+	 */
+	readonly oneConnectionPerProject: boolean;
+	/*
 	 * Also how a stored provider is recognised. Matching on the issuer rather than on a stored "came from
 	 * the catalogue" flag is what lets a provider configured by hand years ago render with its mark, and is
 	 * why this feature needs no migration.
@@ -194,6 +200,7 @@ const GOOGLE: KnownProvider = {
 	defaultProviderId: 'google',
 	displayName: 'Google',
 	buttonText: 'Sign in with Google',
+	oneConnectionPerProject: true,
 	issuerRule: { kind: 'fixed', issuer: 'https://accounts.google.com' },
 	protocol: { kind: 'oidc' },
 	credential: { kind: 'secret' },
@@ -255,6 +262,7 @@ const MICROSOFT: KnownProvider = {
 	defaultProviderId: 'microsoft',
 	displayName: 'Microsoft',
 	buttonText: 'Sign in with Microsoft',
+	oneConnectionPerProject: false,
 	/*
 	 * The only templated entry, and the reason the field exists. Microsoft's issuer contains the
 	 * organisation, so no fixed string can equal every deployment's — and the documents it publishes for
@@ -352,6 +360,7 @@ const APPLE: KnownProvider = {
 	defaultProviderId: 'apple',
 	displayName: 'Apple',
 	buttonText: 'Sign in with Apple',
+	oneConnectionPerProject: true,
 	issuerRule: { kind: 'fixed', issuer: 'https://appleid.apple.com' },
 	protocol: { kind: 'oidc' },
 	/*
@@ -437,6 +446,7 @@ const GITHUB: KnownProvider = {
 	defaultProviderId: 'github',
 	displayName: 'GitHub',
 	buttonText: 'Sign in with GitHub',
+	oneConnectionPerProject: true,
 	/*
 	 * A real https URL that satisfies the issuer rules, and GitHub's canonical identity — but **never
 	 * fetched**, because this entry's protocol says there is nothing to discover. GitHub publishes no

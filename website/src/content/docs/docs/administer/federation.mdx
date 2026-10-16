@@ -147,6 +147,35 @@ The sign-in page shows a project's enabled providers in an order you choose. **M
 down** on the **Identity providers** list change it one place at a time. An agent uses
 `federation_provider_move`. A provider added later appears after the ones already ordered.
 
+## How the buttons look
+
+Every provider is one full-width button with a mark and **Sign in with …**. A recognised provider shows its
+own mark and wording; any other shows a neutral mark and the name you gave it. Every button has the same size.
+
+- **Up to six providers:** all of them are shown.
+- **Seven or more:** five are shown and the rest are under **More sign-in options**. People open it with a
+  click, and it works without JavaScript.
+- **Google, Microsoft, Apple and GitHub are never folded**, however many providers there are. Their branding
+  rules do not allow their button to be less visible than another. The other places go to your other providers,
+  in your order.
+- **Two connections to one brand,** for example two Microsoft organisations, both say **Sign in with
+  Microsoft**. Under each, a smaller line shows the name you gave that connection, so people can tell them
+  apart.
+- **If someone cancels at a provider,** they come back to the sign-in page with the folded options already
+  open.
+- **If password sign-in is off,** the provider buttons come first.
+
+The **Sign-in** tab shows the page as people will see it, with the folded options drawn open.
+
+The console warns about two setups that confuse people. An agent sees the same warnings in
+`federation_provider_list` (`signInWarnings`) and `federation_provider_get` (`warnings`):
+
+- **Duplicate button:** a second enabled Google, Apple or GitHub connection in the same project. Turn off the
+  one you no longer need. Two Microsoft organisations do not warn: that is the usual way to connect two.
+- **Named like a brand:** a provider the server does not recognise, but named like Google, Microsoft, Apple or
+  GitHub. Its button would say **Sign in with Google** without Google's mark, which is what an imitation looks
+  like. Connect the real provider from the list of recognised ones, or give this one another name.
+
 ## Turning a provider off, and unlinking
 
 **Disable…** keeps the provider's credentials, so taking it out of service during an incident costs

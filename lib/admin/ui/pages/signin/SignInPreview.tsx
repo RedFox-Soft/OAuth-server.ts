@@ -4,6 +4,8 @@ import { LoginPage } from '../../../../interactions/loginPage.js';
 import { DEFAULT_LOGO } from '../../../../interactions/logo.js';
 import { previewOptions, type PreviewDraft } from './previewOptions.js';
 import { FederationOffNotice } from '../providers/FederationOffNotice.js';
+import { brandConflicts } from '../../../../federation/brand_conflicts.js';
+import { foxVarsFor } from '../../../../html/theme/palette.js';
 
 /*
  * The bucket's sign-in page as people would meet it with the tab's switches as they stand, saved or not
@@ -38,6 +40,15 @@ export function SignInPreview({
 		federationOn: federationOn ?? false
 	});
 
+	/*
+	 * Worked out here from the list already read, by the rule the server warns with (specs/105), so the preview can
+	 * say why a button it draws is a problem without a request per provider.
+	 */
+	const conflicts = brandConflicts(known ? providers : []);
+	const confusing = (known ? providers : [])
+		.filter((provider) => conflicts.has(provider.id))
+		.map((provider) => provider.displayName);
+
 	return (
 		<Card
 			title="What people see"
@@ -47,6 +58,14 @@ export function SignInPreview({
 				{known && !federationOn && providers.some((p) => p.enabled) && (
 					<FederationOffNotice />
 				)}
+				{confusing.length > 0 && (
+					<Alert
+						type="warning"
+						showIcon
+						banner
+						title={`Some buttons may confuse people: ${confusing.join(', ')}. Open each provider to see why.`}
+					/>
+				)}
 				{!known && !loading && (
 					<Alert
 						type="warning"
@@ -55,19 +74,28 @@ export function SignInPreview({
 						title="Identity providers could not be read; their buttons are not shown."
 					/>
 				)}
-				{/* The page's card is a fixed 400 px: on a narrow window it scrolls here, never the console. */}
-				<div style={{ overflowX: 'auto' }}>
-					<div inert>
-						<LoginPage
-							embedded
-							uid="preview"
-							logoSrc={DEFAULT_LOGO}
-							passwordLogin={options.passwordLogin}
-							registrationOpen={options.registrationOpen}
-							passwordReset={options.passwordReset}
-							providers={options.providers}
-						/>
-					</div>
+				{/*
+				 * The light palette, declared here because the console's own page does not declare it: without it
+				 * every colour the page reads from the palette resolved to nothing.
+				 */}
+				<div
+					inert
+					style={foxVarsFor('light')}
+				>
+					{/*
+					 * The fold is drawn open: the preview is inert, so a closed one would hide from the administrator
+					 * exactly which providers people have to open it to find.
+					 */}
+					<LoginPage
+						embedded
+						uid="preview"
+						logoSrc={DEFAULT_LOGO}
+						passwordLogin={options.passwordLogin}
+						registrationOpen={options.registrationOpen}
+						passwordReset={options.passwordReset}
+						providers={options.providers}
+						providersOpen
+					/>
 				</div>
 				<Typography.Text
 					type="secondary"

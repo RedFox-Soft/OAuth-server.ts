@@ -4,7 +4,7 @@ title: "The two interaction page families"
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-04
-updated: 2026-10-15
+updated: 2026-10-16
 graph:
   node_type: concept
   relationships:
@@ -36,7 +36,10 @@ so a page reached from an inbox, with no bundle loaded, does not look like a dif
 096 every colour on it, as on the antd pages, is a palette role that follows the device's colour scheme
 ([[end-user-colour-scheme]]); the page carries one hashed `<style>`, the theme block, and still no script. Since spec 095 the card is fluid up to 400 px inside a 16 px
 gutter (`width:100%; max-width:400px`): the fixed `width:400px` scrolled every plain page sideways on a 320 px
-phone. A `wide` variant (640 px, top-aligned, left-aligned) serves the end user's connected-apps page — the
+phone. The antd login card followed in spec 105 (`maxWidth: 400`, `minHeight` rather than `height: 100vh`, which
+had also clipped a tall card at the top), and the console's Sign-in preview now declares the palette itself
+(`foxVarsFor`, `lib/html/theme/palette.ts:177`): the console's head carries no theme block, so the preview's
+provider buttons had been drawn with no frame. A `wide` variant (640 px, top-aligned, left-aligned) serves the end user's connected-apps page — the
 first plain page outside any interaction or email, chosen for the family because every step there must work
 without JavaScript ([[connected-apps-page]]).
 

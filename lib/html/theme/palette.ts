@@ -143,6 +143,16 @@ export const FOX_PALETTE = {
 		kind: 'text',
 		on: ['provider-bg']
 	},
+	/*
+	 * The second line of a provider button — the administrator's name for one of two connections to the same
+	 * brand (specs/105). Its own role because it sits on `provider-bg`, which `text-muted` is not checked against.
+	 */
+	'provider-text-muted': {
+		light: '#5f6368',
+		dark: '#a8abaf',
+		kind: 'text',
+		on: ['provider-bg']
+	},
 
 	/*
 	 * A monochrome provider mark (Apple's, GitHub's) on a dark button. Their terms allow black or white and
@@ -158,6 +168,20 @@ export const FOX_PALETTE = {
 } as const satisfies Record<string, Role>;
 
 export type FoxRole = keyof typeof FOX_PALETTE;
+
+/*
+ * The palette as custom properties for one scheme, for a page drawn inside another document — the console's
+ * Sign-in preview (specs/105). The console's head does not carry `themeHead`, so without these every `foxVar` in
+ * the preview resolved to nothing: provider buttons lost their frame and the card its background.
+ */
+export function foxVarsFor(scheme: 'light' | 'dark'): Record<string, string> {
+	return Object.fromEntries(
+		Object.entries(FOX_PALETTE).map(([role, value]) => [
+			`--fox-${role}`,
+			value[scheme]
+		])
+	);
+}
 
 export function foxVar(role: FoxRole): string {
 	return `var(--fox-${role})`;

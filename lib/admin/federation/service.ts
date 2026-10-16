@@ -31,6 +31,7 @@ import { stabilityOf } from './guidance.js';
 import { ApplicationConfig } from '../../configs/application.js';
 import { issuerFor } from '../../configs/issuer.js';
 import { routeNames } from '../../consts/param_list.js';
+import { brandConflicts } from '../../federation/brand_conflicts.js';
 import {
 	CredentialError,
 	clientCredential
@@ -120,10 +121,17 @@ export function presentAll(
 ) {
 	const { _id } = bucket;
 	const federationOn = ApplicationConfig['federation.enabled'];
+	const conflicts = brandConflicts(bucket.federation);
 	return orderProviders(bucket.federation, bucket.signInOrder).map(
 		(provider) => ({
 			...present(provider, _id === undefined ? undefined : { ...bucket, _id }),
-			onSignInPage: provider.enabled && federationOn
+			onSignInPage: provider.enabled && federationOn,
+			/*
+			 * How this provider's button would confuse people on the sign-in page (specs/105). In the list, because
+			 * it is about the providers together: the table is where a second Google connection is seen beside the
+			 * first. The detail's other warnings need reads this list does not make, so it carries only these.
+			 */
+			signInWarnings: conflicts.get(provider.id) ?? []
 		})
 	);
 }
@@ -133,7 +141,11 @@ export type ProviderWarning =
 	| 'signals_capability_off'
 	| 'bound_provider_disabled'
 	/* Enabled here, but the instance's `federation.enabled` is off, so its button is on no sign-in page. */
-	| 'federation_off';
+	| 'federation_off'
+	/* A second enabled connection to Google, Apple or GitHub: two identical brand buttons (specs/105). */
+	| 'duplicate_brand'
+	/* Not recognised, but named like a provider that is: a brand's wording without its mark (specs/105). */
+	| 'named_like_brand';
 
 /*
  * One provider with everything its page explains, read from the server rather than worked out in a browser
@@ -170,6 +182,7 @@ export async function presentDetail(bucket: UserBucket, providerId: string) {
 	if (bound && !provider.enabled) warnings.push('bound_provider_disabled');
 	if (provider.enabled && !ApplicationConfig['federation.enabled'])
 		warnings.push('federation_off');
+	warnings.push(...(brandConflicts(bucket.federation).get(provider.id) ?? []));
 
 	return {
 		...present(provider, bucket),

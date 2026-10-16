@@ -19,6 +19,7 @@ import {
 	walk
 } from './harness.ts';
 import { present } from 'test/shape.js';
+import { SIGN_IN_TEXTS } from 'lib/i18n/texts/signIn/index.ts';
 
 /*
  * The federated sign-in succeeding, end to end, against a stub upstream provider. Its refusals live in
@@ -364,14 +365,10 @@ describe('federated sign-in', () => {
 		// Server-rendered.
 		expect(page.text).toContain(`/ui/${uid}/federation/acme-sso/start`);
 		expect(page.text).toContain(`/ui/${uid}/federation/other-sso/start`);
-		/*
-		 * The label and the phrase are asserted apart because React's server renderer puts a `<!-- -->` text
-		 * separator between a literal and an interpolation, so "Sign in with Acme SSO" never appears as one
-		 * string in the markup. Asserting the parts is also what a reader actually cares about.
-		 */
-		expect(page.text).toContain('Sign in with ');
-		expect(page.text).toContain('Acme SSO');
-		expect(page.text).toContain('Other SSO');
+		// The wording from the sign-in texts, so a change of words there is not a failure here.
+		const signInWith = SIGN_IN_TEXTS.en.login.signInWith;
+		expect(page.text).toContain(signInWith.replace('{provider}', 'Acme SSO'));
+		expect(page.text).toContain(signInWith.replace('{provider}', 'Other SSO'));
 		/*
 		 * And in the props — the half that fails in a browser only. Without this the buttons render, then
 		 * React rebuilds the tree from props that never mentioned them and they vanish, with nothing logged
