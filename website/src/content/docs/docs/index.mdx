@@ -4,7 +4,7 @@ description: How to run, integrate and administer OAuth-server.ts, the engine be
 ---
 
 FoxAuth is built on **OAuth-server.ts**, a source-available OAuth 2.1 and OpenID Connect
-authorization server you run yourself. This documentation covers three jobs: getting a server
+authorization server. You can run it yourself, or use it free on FoxAuth Cloud. This documentation covers three jobs: getting a server
 running, connecting an application to it, and operating it once real users depend on it. Pick the
 one you are doing now.
 
@@ -18,6 +18,12 @@ source](/docs/get-started/from-source/) clones the repository and starts it with
 Either way the next step is [Create the first administrator](/docs/get-started/first-admin/): a
 fresh database has no accounts, and the one-time setup screen is how the first one is made. Turn on
 the second factor there before anything else.
+
+To skip running a server, [create a free account on FoxAuth Cloud](https://auth.foxauth.dev/admin), our
+instance at `auth.foxauth.dev`. You get a personal team, and up to two projects on the
+[Free plan](/docs/administer/plans/#the-free-plan). The Get started pages assume a server at
+`http://localhost:3000`: on the cloud, use your project's issuer, shown on its **Overview**, in its place.
+The Free plan offers sign-in through Google, Microsoft, Apple and GitHub only.
 
 ## Connecting an application
 

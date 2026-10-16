@@ -2,7 +2,7 @@
 title: FoxAuth compared with authentik
 competitor: authentik
 description: authentik is a self-hosted identity provider covering SAML, LDAP and RADIUS as well as OIDC. FoxAuth does OAuth 2.1 only, with the banking-grade profiles.
-lastChecked: '2026-09-06'
+lastChecked: '2026-10-16'
 sources:
   - https://github.com/goauthentik/authentik
   - https://docs.goauthentik.io/install-config/install/docker-compose/
@@ -52,6 +52,19 @@ groups:
           }
         verdict: different
         why: 'These are adjacent products, each built for a different job.'
+      - dimension: Sign-in through other providers
+        us:
+          {
+            status: flag,
+            text: 'Google, Microsoft, Apple and GitHub by name, and any other OIDC provider by hand, per project and behind federation.enabled. A TOTP second factor can be required per project.'
+          }
+        them:
+          {
+            status: yes,
+            text: 'Sources: social and OAuth providers, SAML, LDAP and more, with flows deciding what happens next.'
+          }
+        verdict: them
+        why: "Both let people sign in with an account they already have; authentik's sources reach further, into SAML and LDAP."
       - dimension: Runtime and stack
         us:
           { status: yes, text: 'TypeScript on Bun; the HTTP layer is Elysia.' }

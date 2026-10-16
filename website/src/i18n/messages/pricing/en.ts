@@ -11,10 +11,25 @@
 export default {
 	title: 'Pricing',
 	description:
-		'Self-hosting FoxAuth is free and complete. A managed cloud instance is planned, and an enterprise support contract is available for self-hosted deployments.',
+		'Start free on FoxAuth Cloud, or self-host the whole server for free. Paid cloud plans are in development, and enterprise support is available.',
 	eyebrow: 'Pricing',
-	heading: 'Free to run. Paid only if you want us on the hook.',
-	lead: 'There is one build of the server and it has every feature. What you can pay for is a managed instance or a support contract. No feature is held back for a paid tier.',
+	heading: 'Free to start, in our cloud or on your own servers.',
+	lead: 'Create a free account on FoxAuth Cloud and have a working authorization server in minutes, or run the same server yourself with every feature and no limits. Paid cloud plans, with higher limits and guarantees, are in development.',
+	cloudFree: {
+		badge: 'Available now',
+		name: 'Cloud Free',
+		price: 'Free',
+		tagline: 'Our instance at auth.foxauth.dev. No card, no call.',
+		items: [
+			'2 projects per administrator, each its own OpenID Connect issuer',
+			'100,000 monthly active users per project',
+			'10 applications and 10 APIs per project',
+			'Sign-in with Google, Apple, GitHub and Microsoft accounts of any organisation',
+			'Machine-to-machine tokens, device sign-in, DPoP and PAR, and administration by an AI agent over MCP',
+			'Community support on GitHub issues; no SLA yet'
+		],
+		cta: 'Create a free account'
+	},
 	selfHosted: {
 		badge: 'Available now',
 		name: 'Self-hosted',
@@ -29,14 +44,15 @@ export default {
 		cta: 'Get started'
 	},
 	cloud: {
-		badge: 'Coming soon',
+		badge: 'In development',
+		name: 'Cloud paid plans',
 		price: 'Not priced yet',
-		tagline: 'The same server, run by the people who wrote it.',
+		tagline: 'The same instance, with more room and someone on the hook.',
 		items: [
-			'Managed instance on your own domain',
-			'Backups and upgrades handled',
-			'An SLA and a support address',
-			'Your data stays in the region you pick'
+			'Higher limits on projects, applications and users',
+			'Sign-in through any OpenID provider, including one organisation’s Microsoft directory',
+			'Your own project address and your own domain',
+			'An SLA and a support address'
 		]
 	},
 	enterprise: {
@@ -62,12 +78,12 @@ export default {
 		{
 			question: 'Can I run it in production today?',
 			answer:
-				'FoxAuth can run in production today, self-hosted. The current release is 1.0.1. Since 1.0.0, the first stable release, the HTTP surface and the admin API change incompatibly only in a major release. Read the changelog before upgrading, take a backup when it names a migration that cannot be undone, and run the setup and migrate steps afterwards. The protocol endpoints follow the specs, so a client written for FoxAuth is in practice written against the RFC and should move to another server with little change.'
+				'FoxAuth can run in production today, self-hosted. The free cloud plan has no SLA yet, so it is a place to start rather than one to depend on. The current release is 1.0.1. Since 1.0.0, the first stable release, the HTTP surface and the admin API change incompatibly only in a major release. Read the changelog before upgrading, take a backup when it names a migration that cannot be undone, and run the setup and migrate steps afterwards. The protocol endpoints follow the specs, so a client written for FoxAuth is in practice written against the RFC and should move to another server with little change.'
 		},
 		{
-			question: 'What does the cloud waitlist commit me to?',
+			question: 'Is the free cloud plan really free?',
 			answer:
-				'The cloud waitlist commits you to nothing. We keep your address, mail you once when the managed FoxAuth instance opens, and delete it if you ask. There is no pricing to agree to yet.'
+				'The free plan on FoxAuth Cloud costs nothing and asks for no card. It allows two projects, 100,000 monthly active users per project, ten applications and ten APIs per project, and sign-in through Google, Microsoft, Apple and GitHub. At the user cap only new sign-ups pause; nobody who already has an account is refused. It has no SLA yet. Paid plans with higher limits and guarantees are in development; their waitlist commits you to nothing, and we mail you once when they open.'
 		},
 		{
 			question: 'Do you offer consulting?',

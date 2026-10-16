@@ -1,6 +1,7 @@
 ---
 import { getCollection } from 'astro:content';
 import Brand from './Brand.astro';
+import { CLOUD_SIGN_UP } from '../data/cloud.ts';
 import { loadVersion } from '../data/version';
 import { chrome } from '../i18n/chrome.ts';
 import { localizedHref, localizedRoute } from '../i18n/locale.ts';
@@ -30,6 +31,7 @@ const columns = await Promise.all(
 			links: [
 				{ href: '/features/', label: t.features },
 				{ href: '/pricing/', label: t.pricing },
+				{ href: CLOUD_SIGN_UP, label: t.cloud },
 				{ href: '/compare/', label: t.compare },
 				{ href: '/blog/', label: t.blog },
 				...comparisons

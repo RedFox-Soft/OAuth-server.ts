@@ -17,8 +17,12 @@ const t = messagesFor('forms', english, locale);
  * give a reader a way to reach us.
  */
 const formId = import.meta.env.PUBLIC_FORMSPREE_WAITLIST;
-/* The subject stays English because the team's inbox reads it; the tag says which page it came from. */
-const subject = locale === 'en' ? 'FoxAuth Cloud waitlist' : `FoxAuth Cloud waitlist [${locale}]`;
+/*
+ * The waitlist is for the paid cloud plans: the free plan is open to anyone. The subject stays English because
+ * the team's inbox reads it; the tag says which page it came from.
+ */
+const subject =
+	locale === 'en' ? 'FoxAuth Cloud paid plans waitlist' : `FoxAuth Cloud paid plans waitlist [${locale}]`;
 const address = 'hello@foxauth.dev';
 const fieldClass =
 	'w-full rounded-control border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100';

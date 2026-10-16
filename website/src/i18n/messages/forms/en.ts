@@ -20,12 +20,12 @@ export default {
 	waitlist: {
 		join: 'Join the waitlist',
 		reassurance:
-			'You’ll get one email when the cloud opens, and nothing else. No commitment.',
+			'You’ll get one email when paid cloud plans open, and nothing else. No commitment.',
 		fallback: (address: string, href: string) =>
 			rich(
 				'Email us at ',
 				{ link: address, href },
-				' to join the waitlist. You’ll get one email when the cloud opens, and no commitment.'
+				' to join the waitlist for paid cloud plans. You’ll get one email when they open, and no commitment.'
 			)
 	}
 };

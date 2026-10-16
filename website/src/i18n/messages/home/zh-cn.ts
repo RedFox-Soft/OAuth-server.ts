@@ -2,25 +2,26 @@ import { rich } from '../../types.ts';
 import type english from './en.ts';
 import type { HomeFacts } from './en.ts';
 
-export const source = '55dbde213a4a';
+export const source = 'e5f4d15a952d';
 
 export default {
 	title: 'FoxAuth — 面向智能体时代的授权服务器',
 	description:
-		'一个由你自行运行、源码可用的 OAuth 2.1 与 OpenID Connect 服务器，内置管理控制台，并支持 AI 智能体通过 MCP 进行管理。',
+		'源码可用的 OAuth 2.1 与 OpenID Connect 服务器：在 FoxAuth Cloud 免费使用或自行运行，支持 MCP 管理。',
 	hero: {
 		eyebrow: 'OAuth 2.1 · OpenID Connect · MCP',
 		heading: '面向智能体时代的授权服务器。',
-		lead: 'FoxAuth 构建于 OAuth-server.ts 之上，这是一个由你自行运行、源码可用的 OAuth 2.1 / OpenID Connect 服务器。它自带管理控制台和银行级安全规范，并支持 AI 智能体通过 MCP 进行管理。',
+		lead: 'FoxAuth 构建于 OAuth-server.ts 之上，这是一个源码可用的 OAuth 2.1 / OpenID Connect 服务器。你可以在 FoxAuth Cloud 上免费开始，也可以自己运行。它自带管理控制台和银行级安全规范，并支持 AI 智能体通过 MCP 进行管理。',
 		audience: (license: string) =>
 			rich(
-				'它面向需要把身份系统留在自有基础设施内的工程团队，也面向构建 AI 智能体、并要让智能体来管理它的开发者。在 Functional Source License（',
+				'它面向希望把身份系统放在自有基础设施或我们的基础设施上的工程团队，也面向构建 AI 智能体、并要让智能体来管理它的开发者。在 Functional Source License（',
 				{ code: license },
 				'）下，自托管免费且功能完整；每个版本发布两年后转为 Apache 2.0 许可。'
 			),
-		getStarted: '快速开始',
+		getStarted: '自己运行',
+		freeAccount: '创建免费账户',
 		github: '在 GitHub 上查看',
-		specifications: '25 项规范',
+		specifications: '30 项规范',
 		quickstartCaption: '两条命令，一个浏览器标签页',
 		givesHeading: '这两条命令为你准备好了什么',
 		gives: [
@@ -36,7 +37,10 @@ export default {
 				head: '发现文档',
 				body: '位于 /.well-known/openid-configuration，反映你设置的功能开关'
 			},
-			{ head: '无需注册', body: '没有租户，没有 API 密钥，也不用打电话' }
+			{
+				head: '无需账户',
+				body: '无需在我们这里开账户，没有 API 密钥，也不用打电话'
+			}
 		]
 	},
 	console: {
@@ -86,7 +90,7 @@ export default {
 	quickStart: {
 		eyebrow: '快速开始',
 		heading: '五分钟拿到令牌。',
-		lead: '无需注册，没有租户，也不要 API 密钥。读完三篇短文，你的终端里应该就有一个令牌了。',
+		lead: '无需在我们这里开账户，也不要 API 密钥。读完三篇短文，你的终端里应该就有一个令牌了。',
 		steps: [
 			{
 				title: '运行服务器',
@@ -104,7 +108,7 @@ export default {
 	},
 	standards: {
 		eyebrow: '标准',
-		heading: '25 项规范，均已实现。',
+		heading: '30 项规范，均已实现。',
 		lead: '下面每一项都是仓库里的代码，并且有测试。每一项都链接到它所实现的规范；参考文档写明了控制它的功能开关。',
 		reference: '端点参考'
 	},
@@ -137,10 +141,10 @@ export default {
 	},
 	start: {
 		eyebrow: '开始',
-		heading: '今天下午就自己跑起来。',
-		lead: '自托管免费且功能完整。托管实例是下一步。',
-		getStarted: '快速开始',
-		docs: '阅读文档',
-		waitlist: '加入云服务候补名单'
+		heading: '今天就免费开始。',
+		lead: '在 FoxAuth Cloud 创建免费账户，或者今天下午就自己运行服务器。自托管免费且功能完整；付费云方案正在开发中。',
+		freeAccount: '创建免费账户',
+		getStarted: '自己运行',
+		docs: '阅读文档'
 	}
 } satisfies typeof english;

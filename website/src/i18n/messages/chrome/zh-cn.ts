@@ -1,7 +1,7 @@
 import { rich } from '../../types.ts';
 import type english from './en.ts';
 
-export const source = '915265f710ba';
+export const source = 'b31fd282ef32';
 
 export default {
 	skipToContent: '跳到正文',
@@ -14,13 +14,14 @@ export default {
 		changelog: '更新日志',
 		github: 'GitHub'
 	},
-	getStarted: '快速开始',
+	startFree: '免费开始',
 	ariaMain: '主导航',
 	ariaMenu: '菜单',
 	ariaMainMenu: '主菜单',
 	ariaLanguage: '语言',
 	footer: {
 		product: '产品',
+		cloud: 'FoxAuth Cloud',
 		docs: '文档',
 		project: '项目',
 		contact: '联系',

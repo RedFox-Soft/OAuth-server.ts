@@ -14,6 +14,7 @@ import { localizedHref } from '../i18n/locale.ts';
 import { isStale, messagesFor } from '../i18n/messages.ts';
 import english from '../i18n/messages/pricing/en.ts';
 import type { LocaleKey } from '../data/seo.ts';
+import { CLOUD_SIGN_UP } from '../data/cloud.ts';
 
 interface Props {
 	locale: LocaleKey;
@@ -44,7 +45,34 @@ const contact = await localizedHref('/contact/', locale);
 	</Section>
 
 	<Section tone="muted">
-		<div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
+		<div class="grid grid-cols-1 items-start gap-6 md:grid-cols-2 xl:grid-cols-4">
+			<Card
+				id="free"
+				tone="accent"
+			>
+				<Badge tone="accent">{t.cloudFree.badge}</Badge>
+				<h2 class="mt-4 text-xl font-[650] tracking-tight">{t.cloudFree.name}</h2>
+				<p class="mt-2 text-3xl font-[650] tracking-tight">{t.cloudFree.price}</p>
+				<p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+					{t.cloudFree.tagline}
+				</p>
+				<ul class="mt-5 flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
+					{
+						t.cloudFree.items.map((item) => (
+							<li class="flex gap-2">
+								<span aria-hidden="true" class="text-accent-700 dark:text-accent-200">
+									→
+								</span>
+								<span>{item}</span>
+							</li>
+						))
+					}
+				</ul>
+				<p class="mt-6">
+					<Button href={CLOUD_SIGN_UP}>{t.cloudFree.cta}</Button>
+				</p>
+			</Card>
+
 			<Card>
 				<Badge tone="accent">{t.selfHosted.badge}</Badge>
 				<h2 class="mt-4 text-xl font-[650] tracking-tight">{t.selfHosted.name}</h2>
@@ -65,13 +93,16 @@ const contact = await localizedHref('/contact/', locale);
 					}
 				</ul>
 				<p class="mt-6">
-					<Button href={getStarted}>{t.selfHosted.cta}</Button>
+					<Button
+						href={getStarted}
+						variant="secondary">{t.selfHosted.cta}</Button
+					>
 				</p>
 			</Card>
 
-			<Card id="cloud" tone="accent">
+			<Card id="cloud">
 				<Badge tone="neutral">{t.cloud.badge}</Badge>
-				<h2 class="mt-4 text-xl font-[650] tracking-tight">FoxAuth Cloud</h2>
+				<h2 class="mt-4 text-xl font-[650] tracking-tight">{t.cloud.name}</h2>
 				<p class="mt-2 text-3xl font-[650] tracking-tight">{t.cloud.price}</p>
 				<p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
 					{t.cloud.tagline}

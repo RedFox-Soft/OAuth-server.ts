@@ -9,20 +9,21 @@ export interface HomeFacts {
 export default {
 	title: 'FoxAuth — the authorization server for the agent era',
 	description:
-		'A source-available OAuth 2.1 and OpenID Connect server you run yourself, with a built-in admin console and administration over MCP for AI agents.',
+		'A source-available OAuth 2.1 and OpenID Connect server: free on FoxAuth Cloud or on your own servers, with an admin console and administration over MCP.',
 	hero: {
 		eyebrow: 'OAuth 2.1 · OpenID Connect · MCP',
 		heading: 'The authorization server for the agent era.',
-		lead: 'FoxAuth is built on OAuth-server.ts, a source-available OAuth 2.1 / OpenID Connect server you run yourself. It ships with a built-in admin console, banking-grade profiles, and administration over MCP for AI agents.',
+		lead: 'FoxAuth is built on OAuth-server.ts, a source-available OAuth 2.1 / OpenID Connect server. Start free on FoxAuth Cloud, or run it yourself. It ships with a built-in admin console, banking-grade profiles, and administration over MCP for AI agents.',
 		audience: (license: string) =>
 			rich(
-				'It is for engineering teams who need identity inside their own infrastructure, and for anyone building agents that must administer it. Self-hosting is free and complete under the Functional Source License (',
+				'It is for engineering teams who want identity on their own infrastructure or on ours, and for anyone building agents that must administer it. Self-hosting is free and complete under the Functional Source License (',
 				{ code: license },
 				'), which becomes Apache 2.0 two years after each release.'
 			),
-		getStarted: 'Get started',
+		getStarted: 'Run it yourself',
+		freeAccount: 'Create a free account',
 		github: 'View on GitHub',
-		specifications: '25 specifications',
+		specifications: '30 specifications',
 		quickstartCaption: 'Two commands and a browser tab',
 		givesHeading: 'What those two commands give you',
 		gives: [
@@ -38,7 +39,10 @@ export default {
 				head: 'Discovery',
 				body: 'at /.well-known/openid-configuration, reflecting the flags you set'
 			},
-			{ head: 'No sign-up', body: 'no tenant, no API key, no phone call' }
+			{
+				head: 'No account',
+				body: 'no account with us, no API key, no phone call'
+			}
 		]
 	},
 	console: {
@@ -91,7 +95,7 @@ export default {
 	quickStart: {
 		eyebrow: 'Quick start',
 		heading: 'A token in five minutes.',
-		lead: 'No sign-up, no tenant, no API key. Three short pages, and you should have a token in your terminal.',
+		lead: 'No account with us, no API key. Three short pages, and you should have a token in your terminal.',
 		steps: [
 			{
 				title: 'Run the server',
@@ -109,7 +113,7 @@ export default {
 	},
 	standards: {
 		eyebrow: 'Standards',
-		heading: 'Twenty-five specifications, implemented.',
+		heading: 'Thirty specifications, implemented.',
 		lead: 'Every entry below is code in the repository, with tests. Each links to the spec it implements; the Reference names the flag that governs it.',
 		reference: 'Endpoint reference'
 	},
@@ -142,10 +146,10 @@ export default {
 	},
 	start: {
 		eyebrow: 'Start',
-		heading: 'Run it yourself this afternoon.',
-		lead: 'Self-hosting is free and complete. The managed instance is next.',
-		getStarted: 'Get started',
-		docs: 'Read the docs',
-		waitlist: 'Join the cloud waitlist'
+		heading: 'Start free, today.',
+		lead: 'Create a free account on FoxAuth Cloud, or run the server yourself this afternoon. Self-hosting is free and complete; paid cloud plans are in development.',
+		freeAccount: 'Create a free account',
+		getStarted: 'Run it yourself',
+		docs: 'Read the docs'
 	}
 };

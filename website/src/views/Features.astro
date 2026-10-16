@@ -112,6 +112,7 @@ const groups = [
 		{ ...administration.console },
 		{ ...administration.audit },
 		{ ...administration.usage },
+		{ ...administration.plans, flag: 'plans.enabled' },
 		{
 			title: administration.mcp.title,
 			body: administration.mcp.body(mcpToolCount),
@@ -133,6 +134,22 @@ const groups = [
 		{ ...administration.selfService },
 		{ ...administration.endUsers },
 		{ ...administration.federation, flag: 'federation.enabled' },
+		{
+			...administration.upstreamLogout,
+			flag: 'federation.enabled',
+			spec: {
+				label: 'OIDC Back-Channel Logout 1.0',
+				href: 'https://openid.net/specs/openid-connect-backchannel-1_0.html'
+			}
+		},
+		{
+			...administration.globalTokenRevocation,
+			flag: 'globalTokenRevocation.enabled',
+			spec: {
+				label: 'Global Token Revocation draft',
+				href: 'https://datatracker.ietf.org/doc/html/draft-parecki-oauth-global-token-revocation-06'
+			}
+		},
 		{ ...administration.scim, flag: 'scim.enabled', spec: rfc('7644') },
 		{ ...administration.signingKeys }
 	]),
@@ -174,6 +191,9 @@ const pricing = await localizedHref('/pricing/', locale);
 			{t.hero.lead}
 		</p>
 		<p class="mt-5 text-gray-600 dark:text-gray-400">
+			{t.hero.cloud}
+		</p>
+		<p class="mt-3 text-gray-600 dark:text-gray-400">
 			{t.hero.flags}
 		</p>
 		{
@@ -206,7 +226,10 @@ const pricing = await localizedHref('/pricing/', locale);
 				<h2 class="text-3xl font-[650] tracking-tight text-balance">{group.title}</h2>
 				<p class="mt-3 max-w-prose text-gray-600 dark:text-gray-400">{group.blurb}</p>
 				<div class="mt-10">
-					<FeatureGrid items={group.items} />
+					<FeatureGrid
+						items={group.items}
+						cloudLabel={t.hero.cloudBadge}
+					/>
 				</div>
 				{group.id === 'security' && (
 					<div class="mt-10">

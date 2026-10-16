@@ -1,7 +1,7 @@
 ---
 title: Получение первого токена
 description: 'Authorization Code с PKCE вручную через curl: от challenge до декодированного ID-токена и вызова UserInfo.'
-source: f953588b238e
+source: 4fd88837d0b8
 sidebar:
   order: 5
 ---
@@ -31,6 +31,15 @@ discovery-документ — по адресу `<ISSUER>/<slug>/.well-known/op
 authorized at this address», — потому что клиент можно использовать только по адресу проекта, которому
 он принадлежит. В пошаговом разборе ниже используется проект по умолчанию `redfox`, который
 обслуживается в корне.
+
+</Aside>
+
+<Aside type="note" title="В FoxAuth Cloud">
+
+Ваш клиент принадлежит созданному вами проекту, поэтому используйте издателя этого проекта, а не просто хост:
+`ISSUER=https://auth.foxauth.dev/<имя>`. Прочитайте `$ISSUER/.well-known/openid-configuration` и берите адреса
+эндпоинтов оттуда. Ниже замените `http://localhost:3000` на `$ISSUER`, а `demo` — на client id, который
+сгенерировала консоль. Тогда `iss` на шаге 3 и в ID-токене будет издателем вашего проекта.
 
 </Aside>
 

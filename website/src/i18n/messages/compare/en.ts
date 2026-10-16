@@ -7,7 +7,7 @@ import { rich } from '../../types.ts';
 export default {
 	title: 'Compare',
 	description:
-		'How FoxAuth compares with Keycloak and Auth0 on hosting, protocol coverage, administration and licensing, dated and sourced from their own documentation.',
+		'How FoxAuth compares with Keycloak, Auth0, Zitadel, authentik and Ory Hydra on hosting, protocols, administration and licensing, dated and sourced.',
 	eyebrow: 'Compare',
 	heading: 'Checked against their own documentation.',
 	lead: 'Each comparison lists the pages we read and the date we read them. Where a product\'s documentation did not answer a question, the row says "not documented" instead of guessing.',
@@ -18,7 +18,7 @@ export default {
 			{
 				question: 'Where does the data live?',
 				answer:
-					'In our experience this question settles most of them. A managed service holds your users on its infrastructure and bills you for them; FoxAuth holds them in a database you run and bills you for nothing. If a regulator, a contract or a procurement review requires identity data to stay in your own estate, the decision is already made and the rest of this page is detail.'
+					'In our experience this question settles most of them. A managed service holds your users on its infrastructure and bills you for them; self-hosted FoxAuth holds them in a database you run and bills you for nothing. FoxAuth Cloud holds them on our infrastructure, and its free plan bills nothing. If a regulator, a contract or a procurement review requires identity data to stay in your own estate, the decision is already made and the rest of this page is detail.'
 			},
 			{
 				question: 'What does the bill grow with?',

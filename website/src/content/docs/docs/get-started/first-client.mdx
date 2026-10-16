@@ -29,6 +29,15 @@ is three concepts, but they nest, so the console walks them in order.
 - An **application** is an OAuth client. It belongs to the project it was created in for its whole
   life; no operation moves it to another project.
 
+<Aside type="note" title="On FoxAuth Cloud">
+
+Create a project of your own first. Only a super administrator can add applications to the default `redfox`
+project, so a new account cannot. On the Free plan the server generates the name in the project's address,
+eight letters and digits. Your issuer is then `https://auth.foxauth.dev/<name>`, and a Free project holds up to
+10 applications.
+
+</Aside>
+
 <Steps>
 
 1. **Choose a team.** The dialog that creates a project asks which team it goes in, starting from

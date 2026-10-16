@@ -2,7 +2,7 @@
 title: FoxAuth compared with Zitadel
 competitor: Zitadel
 description: Zitadel is a multi-tenant identity platform with SAML and a managed cloud. FoxAuth is a smaller OAuth 2.1 server with the banking-grade profiles built in.
-lastChecked: '2026-09-18'
+lastChecked: '2026-10-16'
 sources:
   - https://github.com/zitadel/zitadel
   - https://zitadel.com/self-hosted
@@ -10,7 +10,7 @@ sources:
 bottomLine: 'Pick Zitadel if you need SAML or a managed cloud with an enterprise contract behind it. Pick FoxAuth for OAuth 2.1 behaviour by default, the banking-grade profiles without a plan tier, and a licence other than AGPL.'
 chooseThem:
   - 'You need SAML 2.0 as well as OpenID Connect.'
-  - 'You want a managed cloud option and an enterprise support contract from the vendor.'
+  - 'You want a managed cloud with an SLA and an enterprise support contract from the vendor.'
   - 'You want a mature multi-tenant model with organisations built into the product.'
   - 'AGPL-3.0 is acceptable to you, or you will buy the commercial licence that replaces it.'
 chooseUs:
@@ -26,7 +26,7 @@ faq:
   - question: 'Can I migrate from Zitadel to FoxAuth?'
     answer: "OIDC clients port over with an issuer and client id change. What does not port is anything relying on Zitadel's SAML support, its organisation model, or its management API; a directory that provisions over SCIM can be pointed at a FoxAuth project's `/scim/v2` instead. FoxAuth models tenancy as projects — its word for a tenant, not to be confused with a Zitadel project: each is its own issuer, addressed either by a path beneath the server's URL or by a hostname of its own, so a client integrates with one exactly as it would with any authorization server. Assess the migration by how much of your estate is OIDC-only, because that part is usually straightforward and the rest is not."
   - question: 'Which is more production-ready?'
-    answer: "Zitadel is the more mature of the two, on deployment history and on having a vendor-operated cloud and enterprise contracts behind it. FoxAuth reached its first stable release, 1.0.0, in October 2026, and has no deployment history to match. FoxAuth's advantage lies in specific protocol coverage and licence terms; it has none in maturity, and this page will not pretend otherwise."
+    answer: "Zitadel is the more mature of the two, on deployment history, and on a cloud with an SLA and enterprise contracts behind it. FoxAuth Cloud has a free plan but no SLA yet. FoxAuth reached its first stable release, 1.0.0, in October 2026, and has no deployment history to match. FoxAuth's advantage lies in specific protocol coverage and licence terms; it has none in maturity, and this page will not pretend otherwise."
 groups:
   - label: Scope and stack
     rows:
@@ -60,7 +60,7 @@ groups:
         us:
           {
             status: yes,
-            text: "Projects (FoxAuth's tenants), each its own issuer, addressed by a path or by a hostname of its own — team ownership decides who administers what. A project moves between teams with its applications and APIs and counts its own monthly active users."
+            text: "Projects (FoxAuth's tenants), each its own issuer, addressed by a path, a subdomain of the instance or a hostname of its own — team ownership decides who administers what. A project moves between teams with its applications and APIs and counts its own monthly active users."
           }
         them:
           {
@@ -69,6 +69,19 @@ groups:
           }
         verdict: them
         why: 'Zitadel has built its product around multi-tenancy for longer, and that experience probably shows.'
+      - dimension: Sign-in through other providers
+        us:
+          {
+            status: flag,
+            text: 'Google, Microsoft, Apple and GitHub by name, and any other OIDC provider by hand, per project and behind federation.enabled. A TOTP second factor can be required per project.'
+          }
+        them:
+          {
+            status: yes,
+            text: 'Social and enterprise identity providers, including generic OIDC, SAML and LDAP.'
+          }
+        verdict: them
+        why: 'Both let people sign in with an account they already have; Zitadel also connects SAML and LDAP directories.'
   - label: Protocol coverage
     rows:
       - dimension: Core OAuth and OIDC
@@ -131,7 +144,7 @@ groups:
         us:
           {
             status: flag,
-            text: 'A managed instance is on a waitlist; self-hosting is the only option today.'
+            text: 'A free plan on FoxAuth Cloud, with limits and no SLA yet; paid plans are in development. Self-hosting has no limits.'
           }
         them:
           {
@@ -139,7 +152,7 @@ groups:
             text: 'A vendor-operated cloud, alongside self-hosting.'
           }
         verdict: them
-        why: 'If you would rather not run it at all, Zitadel can take it off you today.'
+        why: 'Both can be used without running anything. Zitadel can also put a contract and an SLA behind its cloud today; FoxAuth Cloud cannot yet.'
       - dimension: Licence
         us:
           {

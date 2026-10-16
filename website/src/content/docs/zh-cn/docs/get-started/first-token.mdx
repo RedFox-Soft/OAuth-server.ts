@@ -1,7 +1,7 @@
 ---
 title: 获取第一个令牌
 description: 用 curl 手动走一遍授权码 + PKCE 流程：从 challenge 到解码 ID 令牌，再到调用 UserInfo。
-source: f953588b238e
+source: 4fd88837d0b8
 sidebar:
   order: 5
 ---
@@ -18,6 +18,12 @@ import ScreenshotFigure from '../../../../../components/ScreenshotFigure.astro';
 下面的端点路径是本服务器的默认值。不要在真实客户端中硬编码它们，而应读取 `GET /.well-known/openid-configuration` 并使用其中公布的地址。该文档也反映了哪些功能已启用，因此它才是「这个部署支持什么」的如实答案。
 
 这一点比以前更重要了。如果客户端属于你创建的项目，那么该项目就是它自己的签发者：其端点位于 `<ISSUER>/<slug>` 之下，发现文档位于 `<ISSUER>/<slug>/.well-known/openid-configuration`。此类客户端的请求如果发往不带路径的 `/auth`，会以 `unauthorized_client` 被拒绝——"client is not authorized at this address"——因为客户端只能在其所属项目的地址上使用。下面的演练使用默认的 `redfox` 项目，它在根路径提供服务。
+
+</Aside>
+
+<Aside type="note" title="在 FoxAuth Cloud 上">
+
+你的客户端属于你创建的项目，因此请使用该项目的签发者，而不是裸主机：`ISSUER=https://auth.foxauth.dev/<名称>`。读取 `$ISSUER/.well-known/openid-configuration`，从中获取各端点地址。在下文中，把 `http://localhost:3000` 换成 `$ISSUER`，把 `demo` 换成控制台生成的 client id。这样第 3 步和 ID 令牌中的 `iss` 就是你项目的签发者。
 
 </Aside>
 

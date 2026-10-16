@@ -12,13 +12,16 @@ export default {
 		changelog: 'Changelog',
 		github: 'GitHub'
 	},
-	getStarted: 'Get started',
+	/* The header's button: a free account on FoxAuth Cloud. */
+	startFree: 'Start free',
 	ariaMain: 'Main',
 	ariaMenu: 'Menu',
 	ariaMainMenu: 'Main menu',
 	ariaLanguage: 'Language',
 	footer: {
 		product: 'Product',
+		/* A product name, the same in every language. */
+		cloud: 'FoxAuth Cloud',
 		docs: 'Docs',
 		project: 'Project',
 		contact: 'Contact',

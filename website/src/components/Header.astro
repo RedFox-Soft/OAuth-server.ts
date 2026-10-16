@@ -1,4 +1,5 @@
 ---
+import { CLOUD_SIGN_UP } from '../data/cloud.ts';
 import Brand from './Brand.astro';
 import Button from './ui/Button.astro';
 import LanguageSwitch from './LanguageSwitch.astro';
@@ -29,7 +30,6 @@ const links = await Promise.all(
 		{ href: 'https://github.com/RedFox-Soft/OAuth-server.ts', label: t.nav.github }
 	].map(async (link) => ({ ...link, href: await localizedHref(link.href, locale) }))
 );
-const getStarted = await localizedHref('/docs/get-started/docker-compose/', locale);
 const linkClass =
 	'rounded-control px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-accent-50 hover:text-accent-700 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-accent-200';
 ---
@@ -43,26 +43,31 @@ const linkClass =
 			href={localizedRoute('/', locale)}
 		/>
 
+		{/*
+		 * The inline menu from `lg` up, not `md`: at 768 px the five links, the language links and the button did
+		 * not fit one row, and every page scrolled sideways (807 px in English, 1018 px in Russian).
+		 */}
 		<nav
 			aria-label={t.ariaMain}
-			class="ml-auto hidden items-center gap-1 md:flex"
+			class="ml-auto hidden items-center gap-1 lg:flex"
 		>
 			{links.map((link) => <a href={link.href} class={linkClass}>{link.label}</a>)}
 		</nav>
 
 		<LanguageSwitch
 			variant="links"
-			class="hidden items-center md:flex"
+			class="hidden items-center lg:flex"
 		/>
 
-		<div class="ml-auto md:ml-2">
+		{/* Hidden on a phone, where the logo, this button and the menu did not fit one row; the menu carries it. */}
+		<div class="ml-auto hidden sm:block lg:ml-2">
 			<Button
-				href={getStarted}
-				size="md">{t.getStarted}</Button
+				href={CLOUD_SIGN_UP}
+				size="md">{t.startFree}</Button
 			>
 		</div>
 
-		<details class="relative md:hidden">
+		<details class="relative ml-auto sm:ml-0 lg:hidden">
 			<summary
 				class="flex h-10 w-10 cursor-pointer items-center justify-center rounded-control border border-gray-300 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
 				aria-label={t.ariaMenu}><span aria-hidden="true">☰</span></summary
@@ -71,6 +76,10 @@ const linkClass =
 				aria-label={t.ariaMainMenu}
 				class="absolute right-0 mt-2 flex w-56 flex-col gap-1 rounded-card border border-gray-200 bg-white p-2 shadow-lg dark:border-gray-700 dark:bg-gray-900"
 			>
+				<a
+					href={CLOUD_SIGN_UP}
+					class={`${linkClass} sm:hidden`}>{t.startFree}</a
+				>
 				{links.map((link) => <a href={link.href} class={linkClass}>{link.label}</a>)}
 				<LanguageSwitch
 					variant="links"

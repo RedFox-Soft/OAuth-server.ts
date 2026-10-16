@@ -1,4 +1,5 @@
 ---
+import { CLOUD_SIGN_UP } from '../data/cloud.ts';
 import Site from '../layouts/Site.astro';
 import ScreenshotFigure from '../components/ScreenshotFigure.astro';
 import Button from '../components/ui/Button.astro';
@@ -45,8 +46,7 @@ const href = {
 	protectMcp: await localizedHref('/docs/get-started/protect-your-mcp-server/', locale),
 	mcpTools: await localizedHref('/docs/reference/mcp-tools/', locale),
 	license: await localizedHref('/license/', locale),
-	docs: await localizedHref('/docs/', locale),
-	cloud: await localizedHref('/pricing/#cloud', locale)
+	docs: await localizedHref('/docs/', locale)
 };
 
 const stepRoutes = [
@@ -74,6 +74,7 @@ const standards = [
 	{ label: 'RFC 7636', href: 'https://datatracker.ietf.org/doc/html/rfc7636' },
 	{ label: 'RFC 7519', href: 'https://datatracker.ietf.org/doc/html/rfc7519' },
 	{ label: 'RFC 7517', href: 'https://datatracker.ietf.org/doc/html/rfc7517' },
+	{ label: 'RFC 9068', href: 'https://datatracker.ietf.org/doc/html/rfc9068' },
 	{
 		label: 'OIDC Core 1.0',
 		href: 'https://openid.net/specs/openid-connect-core-1_0.html'
@@ -81,6 +82,14 @@ const standards = [
 	{
 		label: 'OIDC Discovery 1.0',
 		href: 'https://openid.net/specs/openid-connect-discovery-1_0.html'
+	},
+	{
+		label: 'OIDC RP-Initiated Logout 1.0',
+		href: 'https://openid.net/specs/openid-connect-rpinitiated-1_0.html'
+	},
+	{
+		label: 'OIDC Back-Channel Logout 1.0',
+		href: 'https://openid.net/specs/openid-connect-backchannel-1_0.html'
 	},
 	{ label: 'RFC 8414', href: 'https://datatracker.ietf.org/doc/html/rfc8414' },
 	{ label: 'RFC 9207', href: 'https://datatracker.ietf.org/doc/html/rfc9207' },
@@ -102,7 +111,12 @@ const standards = [
 		label: 'CIBA',
 		href: 'https://openid.net/specs/openid-client-initiated-backchannel-authentication-core-1_0.html'
 	},
-	{ label: 'JARM', href: 'https://openid.net/specs/oauth-v2-jarm.html' }
+	{ label: 'JARM', href: 'https://openid.net/specs/oauth-v2-jarm.html' },
+	{ label: 'RFC 6238', href: 'https://datatracker.ietf.org/doc/html/rfc6238' },
+	{
+		label: 'Client ID Metadata Document',
+		href: 'https://datatracker.ietf.org/doc/html/draft-ietf-oauth-client-id-metadata-document'
+	}
 ];
 
 const transcript = `agent  → settings_update { "deviceFlow.enabled": false }
@@ -160,12 +174,17 @@ server ← { "appliedKeys": ["deviceFlow.enabled"],
 				</p>
 				<div class="mt-8 flex flex-wrap gap-3">
 					<Button
+						href={CLOUD_SIGN_UP}
+						size="lg">{t.hero.freeAccount}</Button
+					>
+					<Button
 						href={href.getStarted}
+						variant="secondary"
 						size="lg">{t.hero.getStarted}</Button
 					>
 					<Button
 						href="https://github.com/RedFox-Soft/OAuth-server.ts"
-						variant="secondary"
+						variant="ghost"
 						size="lg">{t.hero.github}</Button
 					>
 				</div>
@@ -390,21 +409,19 @@ server ← { "appliedKeys": ["deviceFlow.enabled"],
 			</p>
 			<div class="mt-8 flex flex-wrap gap-3">
 				<Button
+					href={CLOUD_SIGN_UP}
+					size="lg">{t.start.freeAccount}</Button
+				>
+				<Button
 					href={href.getStarted}
+					variant="secondary"
 					size="lg">{t.start.getStarted}</Button
 				>
 				<Button
 					href={href.docs}
-					variant="secondary"
+					variant="ghost"
 					size="lg">{t.start.docs}</Button
 				>
-				<Button
-					href={href.cloud}
-					variant="ghost"
-					size="lg"
-				>
-					{t.start.waitlist}
-				</Button>
 			</div>
 		</Card>
 	</Section>

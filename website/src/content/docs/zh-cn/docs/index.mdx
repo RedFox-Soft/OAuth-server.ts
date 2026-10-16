@@ -1,16 +1,18 @@
 ---
 title: 文档
 description: 如何运行、集成和管理 FoxAuth 背后的引擎 OAuth-server.ts：从第一个容器到生产环境部署。
-source: d45aefbf0bb0
+source: 49c66c446adb
 ---
 
-FoxAuth 构建于 **OAuth-server.ts** 之上。这是一个由你自己运行的 OAuth 2.1 与 OpenID Connect 授权服务器，源码可用（source-available，并非开源许可）。本文档涵盖三项工作：让服务器跑起来、把应用接入它，以及在真实用户依赖它之后运维它。选择你眼下正在做的那一项即可。
+FoxAuth 构建于 **OAuth-server.ts** 之上。这是一个 OAuth 2.1 与 OpenID Connect 授权服务器，源码可用（source-available，并非开源许可）。你可以自己运行它，也可以在 FoxAuth Cloud 上免费使用。本文档涵盖三项工作：让服务器跑起来、把应用接入它，以及在真实用户依赖它之后运维它。选择你眼下正在做的那一项即可。
 
 ## 让它跑起来 {#getting-it-running}
 
 从[使用 Docker Compose 运行](/zh-cn/docs/get-started/docker-compose/)开始。一条命令即可启动 MongoDB、初始化数据库结构并运行授权服务器，这很可能是看到一个可用实例的最快方式。如果你更想直接基于源码工作，[从源码运行](/zh-cn/docs/get-started/from-source/)会克隆仓库并用 Bun 启动它。
 
 无论哪种方式，下一步都是[创建第一个管理员](/zh-cn/docs/get-started/first-admin/)：全新的数据库里没有任何账户，第一个账户就是通过那个一次性设置页面创建的。在做其他任何事之前，先在那里开启第二因素认证。
+
+如果不想自己运行服务器，可以[在 FoxAuth Cloud 创建免费账户](https://auth.foxauth.dev/admin)，也就是我们在 `auth.foxauth.dev` 上运行的实例。你会得到一个个人团队，以及最多两个 [Free 方案](/docs/administer/plans/#the-free-plan)的项目。“快速开始”各页假定服务器位于 `http://localhost:3000`：在云上，请改用项目的签发者地址，它显示在项目的 **Overview** 页上。Free 方案只支持通过 Google、Microsoft、Apple 和 GitHub 登录。
 
 ## 接入应用 {#connecting-an-application}
 

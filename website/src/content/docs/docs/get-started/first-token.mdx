@@ -32,6 +32,15 @@ default `redfox` project, which is served at the root.
 
 </Aside>
 
+<Aside type="note" title="On FoxAuth Cloud">
+
+Your client belongs to a project you created, so use that project's issuer, not the bare host:
+`ISSUER=https://auth.foxauth.dev/<name>`. Read `$ISSUER/.well-known/openid-configuration` and take the endpoints
+from it. Below, replace `http://localhost:3000` with `$ISSUER`, and `demo` with the client id the console
+generated. The `iss` in step 3 and in the ID token is then your project's issuer.
+
+</Aside>
+
 <Steps>
 
 1. **Generate a verifier and its challenge.** PKCE is mandatory for every `response_type=code`

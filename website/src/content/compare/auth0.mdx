@@ -1,8 +1,8 @@
 ---
 title: FoxAuth compared with Auth0
 competitor: Auth0
-description: Auth0 is a managed identity service billed per monthly active user. FoxAuth is a server you run, with every protocol feature included.
-lastChecked: '2026-09-17'
+description: Auth0 is a managed identity service billed per monthly active user. FoxAuth is a server you run yourself or use on a free cloud plan.
+lastChecked: '2026-10-16'
 sources:
   - https://auth0.com/docs/get-started/authentication-and-authorization-flow/authorization-code-flow-with-pkce
   - https://auth0.com/docs/secure/highly-regulated-identity
@@ -15,12 +15,12 @@ sources:
   - https://auth0.com/docs/api/management/v2
   - https://auth0.com/docs/get-started/auth0-mcp-server
   - https://auth0.com/pricing
-bottomLine: 'Auth0 is the better pick when you want identity as a service this week, with social connections and a FAPI certification you can hand to a reviewer. FoxAuth is the better pick when the data has to live in your own database, when the per-user bill is the problem, or when you need the banking-grade profiles without an Enterprise add-on.'
+bottomLine: 'Auth0 is the better pick when you want identity as a service with an SLA this week, with social connections and a FAPI certification you can hand to a reviewer. FoxAuth is the better pick when the data has to live in your own database, when the per-user bill is the problem, or when you need the banking-grade profiles without an Enterprise add-on.'
 chooseThem:
-  - 'You do not want to run a database or a container, ever.'
+  - 'You do not want to run anything, and you need an SLA today.'
   - 'You need social and enterprise connections working this week.'
   - 'You want certified FAPI conformance and a support organisation with a status page.'
-  - 'Your identity budget is smaller than the cost of an engineer keeping a server healthy.'
+  - 'You need a managed service with a support contract, and your budget is smaller than an engineer keeping a server healthy.'
 chooseUs:
   - 'Your cost grows with your user count and you would rather it grew with your infrastructure.'
   - 'A regulator or a contract requires identity data to stay in your own database.'
@@ -32,7 +32,7 @@ faq:
   - question: 'Does FoxAuth support social logins like Google and GitHub?'
     answer: 'Google, Microsoft, Apple and GitHub are recognised by name: FoxAuth tells you what to do at the provider, shows you the exact callback address to register, and asks only for the values that provider issues — two for Google and GitHub, three for Microsoft, four for Apple. Any other provider speaking OpenID Connect can be configured by hand, per project. Two caveats worth knowing before you compare: you still register the application at the provider yourself, because none of them lets a third party do it for you, and four recognised providers is not the connection catalogue Auth0 ships, which runs to dozens and includes SAML and AD/LDAP enterprise connections FoxAuth does not speak. Microsoft Entra ID and Okta can instead provision users and groups into FoxAuth over SCIM.'
   - question: 'Is FoxAuth cheaper than Auth0?'
-    answer: 'The bill has a different shape, and it is not uniformly smaller. FoxAuth is free to self-host under FSL-1.1-ALv2; what it costs you is a database, a container and the engineering time to keep them healthy, so the cost grows with infrastructure and is indifferent to monthly active users. Auth0 bills per monthly active user. At small scale that is usually the cheaper option, and at large scale it is what teams tend to come to us about.'
+    answer: 'The bill has a different shape, and it is not uniformly smaller. FoxAuth is free to self-host under FSL-1.1-ALv2; what it costs you is a database, a container and the engineering time to keep them healthy, so the cost grows with infrastructure and is indifferent to monthly active users. FoxAuth Cloud also has a free plan, capped at 100,000 monthly active users per project, with no SLA yet. Auth0 bills per monthly active user. At small scale that is usually the cheaper option, and at large scale it is what teams tend to come to us about.'
   - question: 'Do I get FAPI, DPoP and PAR without an enterprise plan?'
     answer: 'FoxAuth implements DPoP (RFC 9449), PAR (RFC 9126), mTLS (RFC 8705), CIBA, RAR (RFC 9396) and JARM, and each one is a feature flag on the instance you run. There is no plan tier and no add-on. All of them ship switched off and are turned on per deployment.'
 groups:
@@ -42,7 +42,7 @@ groups:
         us:
           {
             status: yes,
-            text: 'Self-hosted container, or imported as a library.'
+            text: 'Self-hosted container, imported as a library, or a free plan on FoxAuth Cloud with limits and no SLA yet.'
           }
         them:
           {
@@ -50,7 +50,7 @@ groups:
             text: 'Managed multi-tenant cloud, or Private Cloud on AWS or Azure. Self-hosting is not documented.'
           }
         verdict: different
-        why: 'Run it yourself, or have it run for you. Every other row follows from this one.'
+        why: "Both can be run for you. Auth0's cloud has an SLA and no self-hosted form; FoxAuth Cloud has no SLA yet, and FoxAuth can also run in your own infrastructure."
         note: 'Private Cloud is described as "A dedicated, managed cloud service".'
       - dimension: Runtime and code
         us:
@@ -78,7 +78,7 @@ groups:
         us:
           {
             status: flag,
-            text: 'Google, Microsoft, Apple and GitHub by name; any other OIDC provider by hand. Per project, behind federation.enabled. Entra ID, Okta or any SCIM 2.0 directory provisions users and groups (scim.enabled); no SAML or AD/LDAP connections.'
+            text: 'Google, Microsoft, Apple and GitHub by name; any other OIDC provider by hand. Per project, behind federation.enabled. Entra ID, Okta or any SCIM 2.0 directory provisions users and groups (scim.enabled); no SAML or AD/LDAP connections. On the FoxAuth Cloud free plan, the four named providers only.'
           }
         them:
           {
@@ -91,7 +91,7 @@ groups:
         us:
           {
             status: flag,
-            text: 'You run a database and a container, and you apply upgrades.'
+            text: 'Self-hosted, you run a database and a container and apply upgrades. On FoxAuth Cloud we do, with no SLA yet.'
           }
         them:
           {
@@ -251,7 +251,7 @@ groups:
         us:
           {
             status: yes,
-            text: 'Free to self-host, every feature included, with no charge per user. Monthly active users are counted per project and per owning team, so an instance run for others can report them. Support by agreement.'
+            text: 'Free to self-host, every feature included, with no charge per user. Monthly active users are counted per project and per owning team, so an instance run for others can report them. The free plan on FoxAuth Cloud allows 100,000 monthly active users per project and two projects; paid cloud plans are in development. Support by agreement.'
           }
         them:
           {

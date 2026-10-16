@@ -11,6 +11,10 @@ export default {
 		eyebrow: 'Features',
 		heading: 'Everything is in the box. Most of it is switched off.',
 		lead: 'FoxAuth ships one server with no feature editions. Authorization Code with PKCE and OpenID Connect run from the first start, and most of the rest wait behind a named flag. In practice your attack surface is the set of features you actually asked for. Each card says whether its feature is on from the first start or waits for its flag.',
+		cloud:
+			'On FoxAuth Cloud the flags are ours to set, and a plan limits what each project may create. On your own servers both are yours, and plans are off unless you turn them on. A card marked On in FoxAuth Cloud is switched on there.',
+		/* The badge on a card whose flag is on at FoxAuth Cloud. */
+		cloudBadge: 'On in FoxAuth Cloud',
 		flags:
 			'Each flag below links to its entry in the Settings reference, which is generated from the code and names the default and the consequence.',
 		getStarted: 'Get started',
@@ -171,6 +175,10 @@ export default {
 					title: 'Monthly active users per project',
 					body: 'Each project counts the people it issued tokens to, once per UTC month and day, split into local sign-in, upstream sign-in, renewal and directory provisioning. A closed month never changes, and the history outlives the people and the project. Usage shows every project beside the team that owns it, so an instance run for other teams or customers can say who used how much.'
 				},
+				plans: {
+					title: 'Plans for a shared instance',
+					body: 'A plan is a named set of limits on a project: monthly active users, applications, APIs, projects per administrator, enterprise sign-in, and whether the team names its address. A limit stops only something new: nothing that exists is switched off, and nobody is refused a sign-in. At the user cap, only new self-service sign-ups pause. A super administrator edits the plans and moves projects between them. Nothing is billed.'
+				},
 				mcp: {
 					title: 'Administration over MCP',
 					body: (toolCount: number) =>
@@ -210,7 +218,7 @@ export default {
 				},
 				selfService: {
 					title: 'End-user self-service',
-					body: 'Email verification and password reset per project, each with attempt caps, cooldowns and single-use links.'
+					body: 'Email verification and password reset per project, each with attempt caps, cooldowns and single-use links. An address counts as verified, and applications are told email_verified: true, only once it is proven: from the mailbox, by a trusted identity provider or directory, or by an administrator who marks it.'
 				},
 				endUsers: {
 					title: 'End-user administration',
@@ -219,6 +227,14 @@ export default {
 				federation: {
 					title: 'Sign in with Google, Microsoft, Apple or GitHub',
 					body: 'Connect one by name and the console shows you what to do at the provider and the exact callback address to register; you supply only the values it issues. Any other OIDC provider can be configured by hand. Per project, so each tenant uses its own application. Try sign-in shows what a real sign-in would do before anyone relies on the provider, and the callback refuses an answer from an issuer other than the one the sign-in started with. Administrators can sign in to the console through your organisation’s provider too.'
+				},
+				upstreamLogout: {
+					title: 'Sign-out at an upstream provider ends sessions here',
+					body: 'When a person signs out at Keycloak, Auth0 or Ping, the provider sends a logout token. The sessions here that began with that provider session end, and the applications they reached are told. Offline access is kept, because a sign-out is not a compromise. Each provider is opted in on its own, and the token must be signed with the provider’s published keys.'
+				},
+				globalTokenRevocation: {
+					title: 'Okta Universal Logout',
+					body: 'An opted-in provider sends one signed request, and everything the person holds here ends: sessions, refresh tokens, and every access token the server can revoke. The account stays active, so the person can sign in again. It follows an Internet-Draft that has expired, so it has a flag of its own.'
 				},
 				scim: {
 					title: 'SCIM 2.0 provisioning',

@@ -59,7 +59,8 @@ export function softwareApplication({
 			'@type': 'Offer',
 			price: '0',
 			priceCurrency: 'USD',
-			description: 'Self-hosted under a source-available licence'
+			description:
+				'Free to self-host under a source-available licence, or on the free plan of FoxAuth Cloud'
 		}
 	};
 }

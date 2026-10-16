@@ -1,12 +1,12 @@
 import { rich } from '../../types.ts';
 import type english from './en.ts';
 
-export const source = 'bde108a5a778';
+export const source = 'db6556430a2f';
 
 export default {
 	title: '对比',
 	description:
-		'FoxAuth 与 Keycloak、Auth0 在托管方式、协议覆盖、管理和许可上的对比，注明日期，依据它们自己的文档。',
+		'FoxAuth 与 Keycloak、Auth0、Zitadel、authentik 和 Ory Hydra 在托管、协议、管理和许可上的对比，注明日期和来源。',
 	eyebrow: '对比',
 	heading: '对照它们自己的文档核实。',
 	lead: '每篇对比都列出我们查阅过的页面和查阅日期。如果某个产品的文档没有回答某个问题，对应的行会写「not documented」（未记载），而不是去猜。',
@@ -17,7 +17,7 @@ export default {
 			{
 				question: '数据存放在哪里？',
 				answer:
-					'根据我们的经验，大多数选择都由这个问题决定。托管服务把你的用户放在它的基础设施上，并按用户向你收费；FoxAuth 把用户放在你自己运行的数据库里，不向你收取任何费用。如果监管机构、合同或采购审查要求身份数据留在你自己的环境内，那么答案已经确定，本页其余内容都只是细节。'
+					'根据我们的经验，大多数选择都由这个问题决定。托管服务把你的用户放在它的基础设施上，并按用户向你收费；自托管的 FoxAuth 把用户放在你自己运行的数据库里，不向你收取任何费用；FoxAuth Cloud 把用户放在我们的基础设施上，其免费方案同样不收费。如果监管机构、合同或采购审查要求身份数据留在你自己的环境内，那么答案已经确定，本页其余内容都只是细节。'
 			},
 			{
 				question: '费用随什么增长？',

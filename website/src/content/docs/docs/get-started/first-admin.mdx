@@ -11,6 +11,15 @@ import ScreenshotFigure from '../../../../components/ScreenshotFigure.astro';
 The server administers itself. There is no seeded password to look up in a log and no
 `create-admin` command — the first administrator is created from the browser, once.
 
+<Aside type="note" title="On FoxAuth Cloud">
+
+There is no setup screen on FoxAuth Cloud. Open `https://auth.foxauth.dev/admin`, choose **Register now!** and
+confirm your address from the email it sends. Your account gets a personal team and no projects: you create
+those yourself. The instance settings, mail and the **Administrators** page are ours, so the rest of this page is
+about running your own server.
+
+</Aside>
+
 <Steps>
 
 1. Open `/admin` on a freshly provisioned deployment, for example

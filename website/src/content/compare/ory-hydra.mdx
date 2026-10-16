@@ -2,7 +2,7 @@
 title: FoxAuth compared with Ory Hydra
 competitor: Ory Hydra
 description: Ory Hydra is an OAuth 2.0 and OpenID Connect server that delegates login to an app you write. FoxAuth ships the login, consent and admin surfaces with it.
-lastChecked: '2026-09-06'
+lastChecked: '2026-10-16'
 sources:
   - https://github.com/ory/hydra
   - https://www.ory.com/docs/hydra/self-hosted/quickstart
@@ -11,7 +11,7 @@ bottomLine: 'Pick Ory Hydra if you already have an identity system and want a ha
 chooseThem:
   - 'You already run your own user store and login UI, and want an OAuth server that stays out of it.'
   - 'You need a permissive Apache-2.0 licence with no source-available restriction.'
-  - 'You want Go, or a relational database you already operate.'
+  - 'You want Go, or MySQL or SQLite as the database.'
   - 'You want the option of a commercially supported build from the vendor.'
 chooseUs:
   - 'You want users, login, consent, registration and an admin console shipped with the server instead of left for you to build.'
@@ -34,7 +34,7 @@ groups:
         us:
           {
             status: yes,
-            text: 'OAuth 2.1 and OIDC server, plus end users, login, consent, registration and an admin console.'
+            text: 'OAuth 2.1 and OIDC server, plus end users, login, consent, registration, sign-in through other providers, a second factor and an admin console.'
           }
         them:
           {
@@ -57,6 +57,19 @@ groups:
           }
         verdict: different
         why: 'If you already run an identity system, Hydra staying out of it is probably what you want.'
+      - dimension: Sign-in through other providers
+        us:
+          {
+            status: flag,
+            text: 'Google, Microsoft, Apple and GitHub by name, and any other OIDC provider by hand, per project and behind federation.enabled. A TOTP second factor can be required per project.'
+          }
+        them:
+          {
+            status: no,
+            text: 'Delegated to the login application you provide.'
+          }
+        verdict: us
+        why: 'With Hydra, upstream sign-in and a second factor are part of the login application you build.'
       - dimension: Runtime and stack
         us:
           { status: yes, text: 'TypeScript on Bun; the HTTP layer is Elysia.' }
@@ -136,6 +149,19 @@ groups:
           }
         verdict: us
         why: 'Self-hosted Hydra is administered by API; FoxAuth ships the console with the server.'
+      - dimension: Managed hosting
+        us:
+          {
+            status: flag,
+            text: 'A free plan on FoxAuth Cloud, with limits and no SLA yet; paid plans are in development. Self-hosting has no limits.'
+          }
+        them:
+          {
+            status: yes,
+            text: 'Ory Network, the vendor-hosted service, alongside self-hosting.'
+          }
+        verdict: them
+        why: 'Both can be used without running anything. Ory can put a commercial agreement behind its hosted service today; FoxAuth Cloud cannot yet.'
       - dimension: Administration by an AI agent
         us:
           {

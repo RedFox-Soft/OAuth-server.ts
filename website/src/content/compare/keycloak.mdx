@@ -1,8 +1,8 @@
 ---
 title: FoxAuth compared with Keycloak
 competitor: Keycloak
-description: Both are servers you run yourself. They differ in runtime, storage, scope and how much of the protocol is on by default.
-lastChecked: '2026-09-18'
+description: Both are servers you can run yourself, and FoxAuth also has a free cloud plan. They differ in runtime, storage, scope and protocol defaults.
+lastChecked: '2026-10-16'
 sources:
   - https://www.keycloak.org/securing-apps/oidc-layers
   - https://www.keycloak.org/securing-apps/mcp-authz-server
@@ -26,9 +26,9 @@ chooseUs:
   - 'You want a server small enough to mount inside your own Bun service, on the PostgreSQL or MongoDB you already run.'
 faq:
   - question: 'Can I migrate from Keycloak to FoxAuth?'
-    answer: "Clients and users usually move from Keycloak to FoxAuth without much trouble. Both are OpenID Connect servers, so a client written against Keycloak's token endpoint works against FoxAuth's once the issuer and the client id change. A Keycloak realm maps onto a FoxAuth project more directly than the names suggest: a project is its own issuer, so `https://auth.example.com/acme` publishes its own metadata and mints tokens carrying itself as `iss`, exactly as `/realms/acme` does. A project can also take a hostname of its own — `https://acme.auth.example.com` — which Keycloak realms cannot; there the hostname is a server-wide setting, so host-per-tenant is something you build in front of Keycloak rather than configure in it. A project with an address also signs with keys of its own and publishes them at its own `jwks_uri`, as a realm does. What does not map is the rest of what a realm carries — authentication flows and mappers — and custom behaviour lives in 31 named override seams in TypeScript where Keycloak would have you write SPI implementations in Java."
+    answer: "Clients and users usually move from Keycloak to FoxAuth without much trouble. Both are OpenID Connect servers, so a client written against Keycloak's token endpoint works against FoxAuth's once the issuer and the client id change. A Keycloak realm maps onto a FoxAuth project more directly than the names suggest: a project is its own issuer, so `https://auth.example.com/acme` publishes its own metadata and mints tokens carrying itself as `iss`, exactly as `/realms/acme` does. A project can also take a subdomain of the instance or a hostname of its own — `https://acme.auth.example.com` — which Keycloak realms cannot; there the hostname is a server-wide setting, so host-per-tenant is something you build in front of Keycloak rather than configure in it. A project with an address also signs with keys of its own and publishes them at its own `jwks_uri`, as a realm does. What does not map is the rest of what a realm carries — authentication flows and mappers — and custom behaviour lives in 31 named override seams in TypeScript where Keycloak would have you write SPI implementations in Java."
   - question: 'Is FoxAuth lighter to run than Keycloak?'
-    answer: 'FoxAuth is a Bun process and one database, PostgreSQL or MongoDB, which is a smaller operational surface than a JVM application server and its relational schema. It starts in under a second, against tens of seconds for Keycloak. That is a real difference in memory and startup. It is no difference at all in what the protocol endpoints do. Keycloak has years more production hardening behind it, and that is worth weighing against a 0.x release.'
+    answer: 'FoxAuth is a Bun process and one database, PostgreSQL or MongoDB, which is a smaller operational surface than a JVM application server and its relational schema. It starts in under a second, against tens of seconds for Keycloak. That is a real difference in memory and startup. It is no difference at all in what the protocol endpoints do. Keycloak has years more production hardening behind it, and that is worth weighing against a server whose first stable release, 1.0.0, shipped in October 2026.'
   - question: 'Does FoxAuth support SAML?'
     answer: 'FoxAuth does not support SAML, and none is planned. For sign-in it implements OAuth 2.1 and OpenID Connect only; it also accepts SCIM 2.0 provisioning from a directory, which does not sign anyone in. If an application in your estate can only speak SAML, FoxAuth cannot serve it and Keycloak can, which is a good reason to stay where you are.'
   - question: 'Can an AI agent administer FoxAuth?'
@@ -40,7 +40,7 @@ groups:
         us:
           {
             status: yes,
-            text: 'Self-hosted container, or imported as a library into your own Bun service.'
+            text: 'Self-hosted container, imported as a library into your own Bun service, or a free plan on FoxAuth Cloud with limits and no SLA yet.'
           }
         them:
           {
@@ -48,7 +48,7 @@ groups:
             text: 'Self-hosted container; start-dev mode for a first look.'
           }
         verdict: even
-        why: 'Both run where you put them.'
+        why: 'Both run where you put them. FoxAuth can also be used without running anything.'
       - dimension: Runtime and stack
         us:
           { status: yes, text: 'TypeScript on Bun; the HTTP layer is Elysia.' }
@@ -87,7 +87,7 @@ groups:
         us:
           {
             status: yes,
-            text: "Projects, each its own issuer with its own signing keys. A project takes a path beneath the server's URL or a hostname of its own, counts its own monthly active users, moves between administrator teams with its applications and APIs, and can be restored for 30 days after it is deleted."
+            text: "Projects, each its own issuer with its own signing keys. A project takes a path beneath the server's URL, a subdomain of the instance or a hostname of its own, counts its own monthly active users, moves between administrator teams with its applications and APIs, and can be restored for 30 days after it is deleted."
           }
         them:
           {
@@ -256,7 +256,7 @@ groups:
         us:
           {
             status: yes,
-            text: 'Free to self-host, every feature included. Support by agreement.'
+            text: 'Free to self-host, every feature included and no limits. FoxAuth Cloud has a free plan with limits; paid cloud plans are in development. Support by agreement.'
           }
         them:
           {

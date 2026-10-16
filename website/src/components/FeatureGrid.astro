@@ -2,6 +2,7 @@
 import Card from './ui/Card.astro';
 import Badge from './ui/Badge.astro';
 import { loadExport } from '../data/export';
+import { CLOUD_FLAGS_ON } from '../data/cloud.ts';
 
 export interface Feature {
 	title: string;
@@ -15,8 +16,10 @@ export interface Feature {
 interface Props {
 	items: Feature[];
 	columns?: 2 | 3;
+	/* The badge text for a card whose flag is on at FoxAuth Cloud; no badge when omitted. */
+	cloudLabel?: string;
 }
-const { items, columns = 3 } = Astro.props;
+const { items, columns = 3, cloudLabel } = Astro.props;
 
 /*
  * The Reference renders one anchor per exported setting, so a flag badge only links when the
@@ -47,6 +50,9 @@ const settingKeys = new Set(loadExport().settings.entries.map((entry) => entry.k
 							) : (
 								<Badge tone="flag">{item.flag}</Badge>
 							))}
+						{cloudLabel && item.flag && CLOUD_FLAGS_ON.has(item.flag) && (
+							<Badge tone="accent">{cloudLabel}</Badge>
+						)}
 						{item.spec && (
 							<a
 								href={item.spec.href}

@@ -1,7 +1,7 @@
 import { rich } from '../../types.ts';
 import type english from './en.ts';
 
-export const source = '915265f710ba';
+export const source = 'b31fd282ef32';
 
 export default {
 	skipToContent: 'Перейти к содержанию',
@@ -14,13 +14,14 @@ export default {
 		changelog: 'Изменения',
 		github: 'GitHub'
 	},
-	getStarted: 'Начать',
+	startFree: 'Начать бесплатно',
 	ariaMain: 'Основная навигация',
 	ariaMenu: 'Меню',
 	ariaMainMenu: 'Главное меню',
 	ariaLanguage: 'Язык',
 	footer: {
 		product: 'Продукт',
+		cloud: 'FoxAuth Cloud',
 		docs: 'Документация',
 		project: 'Проект',
 		contact: 'Контакты',

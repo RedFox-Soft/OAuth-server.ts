@@ -4,9 +4,9 @@ export default {
 	auth0: {
 		title: 'FoxAuth 与 Auth0 对比',
 		description:
-			'Auth0 是按月活跃用户计费的托管身份服务。FoxAuth 是由你自己运行的服务器，包含全部协议功能。',
+			'Auth0 是按月活跃用户计费的托管身份服务。FoxAuth 是可以自己运行、也可以在免费云方案上使用的服务器。',
 		bottomLine:
-			'如果你想本周就用上身份即服务，还需要社交登录连接和一份可以交给审查方的 FAPI 认证，Auth0 是更好的选择。如果数据必须存放在你自己的数据库里、按用户计费成了问题，或者你需要银行级安全规范而不想购买 Enterprise 附加组件，FoxAuth 是更好的选择。'
+			'如果你想本周就用上带 SLA 的身份即服务，还需要社交登录连接和一份可以交给审查方的 FAPI 认证，Auth0 是更好的选择。如果数据必须存放在你自己的数据库里、按用户计费成了问题，或者你需要银行级安全规范而不想购买 Enterprise 附加组件，FoxAuth 是更好的选择。'
 	},
 	authentik: {
 		title: 'FoxAuth 与 authentik 对比',
@@ -18,7 +18,7 @@ export default {
 	keycloak: {
 		title: 'FoxAuth 与 Keycloak 对比',
 		description:
-			'两者都是由你自行运行的服务器，区别在于运行时、存储、覆盖范围，以及默认开启了多少协议功能。',
+			'两者都可以自行运行，FoxAuth 还提供免费云方案。区别在于运行时、存储、覆盖范围和默认的协议设置。',
 		bottomLine:
 			'如果你现在就需要 SAML、LDAP 联合身份或经过认证的 FAPI，选 Keycloak。如果团队写 TypeScript、希望默认就是 OAuth 2.1 的行为，或者希望 AI 智能体沿着与人相同的审计路径来管理服务器，FoxAuth 更合适。'
 	},
