@@ -3,6 +3,7 @@ import type { FederationProvider } from '../../../../federation/types.js';
 import { LoginPage } from '../../../../interactions/loginPage.js';
 import { DEFAULT_LOGO } from '../../../../interactions/logo.js';
 import { previewOptions, type PreviewDraft } from './previewOptions.js';
+import { FederationOffNotice } from '../providers/FederationOffNotice.js';
 
 /*
  * The bucket's sign-in page as people would meet it with the tab's switches as they stand, saved or not
@@ -43,6 +44,9 @@ export function SignInPreview({
 			styles={{ body: { padding: 0 } }}
 		>
 			<Flex vertical>
+				{known && !federationOn && providers.some((p) => p.enabled) && (
+					<FederationOffNotice />
+				)}
 				{!known && !loading && (
 					<Alert
 						type="warning"

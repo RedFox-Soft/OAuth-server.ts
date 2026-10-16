@@ -14,6 +14,7 @@ import {
 	type PresentedProvider
 } from './providers/providerTypes.js';
 import { ProviderTiles, ProviderWizard } from './providers/ProviderWizard.js';
+import { FederationOffNotice } from './providers/FederationOffNotice.js';
 import {
 	providerBlocks,
 	useProviderActions
@@ -158,6 +159,10 @@ export function FederationPanel({
 					title="These providers sign administrators in to the console"
 					description="An administrator links their identity once, by also entering their password. A provider creates new administrator accounts only when it is set to and sign-up is open on this project; each new account gets a personal team and never the super administrator privilege."
 				/>
+			)}
+
+			{rows.some((p) => p.enabled && p.onSignInPage === false) && (
+				<FederationOffNotice style={{ marginBottom: 12 }} />
 			)}
 
 			{loadFailure !== null ? (

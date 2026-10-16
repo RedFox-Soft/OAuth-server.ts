@@ -288,6 +288,19 @@ handler already — for the throttle and the second-factor step — and simply n
 resolver does not help if a call site does not use it; see [[interaction-page-families]], where this is
 the third distinct way this page has lost content it had rendered.
 
+### A connected provider missing from the sign-in page, and nothing saying why
+
+`federation.enabled` is off by default, and while it is off `offeredProviders` returns nothing, so a project
+can hold enabled, fully configured providers whose buttons appear on no sign-in page. The management routes are
+deliberately not gated by it, so nothing stopped an administrator connecting a provider; and nothing told them
+it would not show: the sign-in preview simply drew no buttons. Production met exactly this after 1.0.1's fresh
+database, and the owner reported it as a bug. The answer is now carried by the server, so the console and an
+agent read the same thing: the providers list gives each provider `onSignInPage` (its own switch and the
+instance's, `lib/admin/federation/service.ts:126`), and a provider's detail warns `federation_off`
+(`lib/admin/federation/service.ts:172`). The console shows one notice for it on the providers list, the
+provider's page and the sign-in preview, linking a super administrator to the setting and telling anyone
+else what to ask for.
+
 ## What the upstream is trusted for, and what it is not
 
 `jose`'s `createRemoteJWKSet` supplies the key caching — TTL, plus one refetch on an unknown `kid` — and

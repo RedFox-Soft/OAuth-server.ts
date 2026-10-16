@@ -68,7 +68,14 @@ export function Settings() {
 		setBaseline(body.values);
 		setPendingRestartKeys(body.pendingRestartKeys);
 		setNotInForceKeys(body.notInForceKeys);
-		setPane((current) => current ?? body.domains.at(0)?.id ?? null);
+		/*
+		 * `?pane=` opens a pane by its domain id, so a notice elsewhere can link to the setting it names
+		 * (the federation switch, from a project's providers). An id the catalog does not know falls back to
+		 * the first pane rather than to none.
+		 */
+		const asked = new URLSearchParams(window.location.search).get('pane');
+		const linked = body.domains.find((d) => d.id === asked)?.id;
+		setPane((current) => current ?? linked ?? body.domains.at(0)?.id ?? null);
 	}, []);
 
 	// Every state write follows an await: `loading` starts true, so the mount has nothing to set first.

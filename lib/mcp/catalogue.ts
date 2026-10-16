@@ -456,7 +456,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'The upstream identity providers configured on a project. Never returns a provider client secret.'
+			'The upstream identity providers configured on a project, in the order their buttons appear on its sign-in page. `onSignInPage` says whether a provider’s button is there now: false for a disabled provider, and for every provider while sign-in through providers is switched off on the instance (the `federation.enabled` setting), which is the usual reason a connected provider is missing from the sign-in page. Never returns a provider client secret.'
 	},
 	{
 		tool: 'federation_provider_get',
@@ -469,7 +469,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'providerId'],
 		summary:
-			"One upstream identity provider of a project, with what it takes to run it: `callbackUri` (the redirect URI to register at the provider) and `callbackStability` (`provisional` while the project's address may still change), `recognised` (the catalogue entry it matches, or null), `logoutSignals` (whether the provider can send Global Token Revocation and back-channel logout at all — never for GitHub), `capabilities` (whether this instance accepts each), `boundConnection` (the SCIM provisioning connection bound to it, or null), `linkedUsers` (how many of the project's users are linked to it — the people a disable or delete affects), `recommendedCorrelation` (the claim and SCIM attribute a provisioning connection should match on) and `warnings`. Never returns its client secret."
+			"One upstream identity provider of a project, with what it takes to run it: `callbackUri` (the redirect URI to register at the provider) and `callbackStability` (`provisional` while the project's address may still change), `recognised` (the catalogue entry it matches, or null), `logoutSignals` (whether the provider can send Global Token Revocation and back-channel logout at all — never for GitHub), `capabilities` (whether this instance accepts each), `boundConnection` (the SCIM provisioning connection bound to it, or null), `linkedUsers` (how many of the project's users are linked to it — the people a disable or delete affects), `recommendedCorrelation` (the claim and SCIM attribute a provisioning connection should match on) and `warnings` (`federation_off`: enabled, but sign-in through providers is switched off on the instance, so its button is on no sign-in page until a super administrator turns on `federation.enabled`). Never returns its client secret."
 	},
 	{
 		tool: 'project_group_list',

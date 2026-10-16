@@ -4,6 +4,8 @@ import type { FederationProvider } from '../../../../federation/types.js';
 export type PresentedProvider = FederationProvider & {
 	globalTokenRevocationEndpoint?: string;
 	backChannelLogoutEndpoint?: string;
+	/* The list's answer to "is its button on the sign-in page now": its own switch and the instance's. */
+	onSignInPage?: boolean;
 };
 
 /*

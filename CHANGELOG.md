@@ -17,6 +17,11 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- **The console says why a connected provider is missing from the sign-in page.** While sign-in through
+  providers is switched off on the instance (`federation.enabled`, off by default), no provider button appears,
+  and nothing said so. The providers list now gives each provider `onSignInPage`, a provider's detail warns
+  `federation_off`, and the console shows a notice on the providers list, the provider's page and the sign-in
+  preview, with a link to the setting for a super administrator.
 - **A message the mail server refuses is now logged with the server's reply.** Before, a refused verification,
   password-reset or invitation message left nothing in the log. Sends also time out (15 seconds to connect, 30 of
   silence) instead of holding a request for minutes. The console's hint to set up mail names the right place,

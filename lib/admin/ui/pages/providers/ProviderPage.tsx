@@ -34,6 +34,7 @@ import { ScheduledBanner } from '../ScheduledBanner.js';
 import { federationApi, type ProviderDetail } from './providerTypes.js';
 import { providerBlocks, useProviderActions } from './useProviderActions.js';
 import { useTrySignIn } from './TrySignIn.js';
+import { FederationOffNotice } from './FederationOffNotice.js';
 
 /*
  * One identity provider, at an address of its own (specs/084 US2): everything an operator does to it after it
@@ -341,6 +342,9 @@ export function ProviderPage({
 					canDelete={can.delete}
 					onRestored={() => void fetchAll()}
 				/>
+			)}
+			{provider?.warnings.includes('federation_off') && (
+				<FederationOffNotice style={{ marginBottom: 16 }} />
 			)}
 			{trySignIn.panel}
 			{bucket && provider && (

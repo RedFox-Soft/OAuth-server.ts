@@ -107,19 +107,33 @@ export function present(
 /*
  * A caller holding only the providers gets no endpoint address, since there is no issuer to build it from.
  * In sign-in order (specs/088 R10), so the console's table lists them as the sign-in page shows them.
+ *
+ * `onSignInPage` says whether the provider's button is on the sign-in page now, which takes both its own
+ * switch and the instance's `federation.enabled`. A list, not a document, so the instance switch cannot ride
+ * beside it; carried per provider, an agent asking why a connected provider is missing reads the answer in the
+ * same response, and the console tells "switched off here" from "switched off for everyone" without a second
+ * request. Only in this list view: `present` stays the provider as stored, which a form may send back.
  */
 export function presentAll(
 	bucket: Pick<UserBucket, 'federation'> &
 		Partial<Pick<UserBucket, '_id' | 'slug' | 'host' | 'signInOrder'>>
 ) {
 	const { _id } = bucket;
-	return orderProviders(bucket.federation, bucket.signInOrder).map((provider) =>
-		present(provider, _id === undefined ? undefined : { ...bucket, _id })
+	const federationOn = ApplicationConfig['federation.enabled'];
+	return orderProviders(bucket.federation, bucket.signInOrder).map(
+		(provider) => ({
+			...present(provider, _id === undefined ? undefined : { ...bucket, _id }),
+			onSignInPage: provider.enabled && federationOn
+		})
 	);
 }
 
 export type ProviderWarning =
-	'callback_provisional' | 'signals_capability_off' | 'bound_provider_disabled';
+	| 'callback_provisional'
+	| 'signals_capability_off'
+	| 'bound_provider_disabled'
+	/* Enabled here, but the instance's `federation.enabled` is off, so its button is on no sign-in page. */
+	| 'federation_off';
 
 /*
  * One provider with everything its page explains, read from the server rather than worked out in a browser
@@ -154,6 +168,8 @@ export async function presentDetail(bucket: UserBucket, providerId: string) {
 		warnings.push('signals_capability_off');
 	}
 	if (bound && !provider.enabled) warnings.push('bound_provider_disabled');
+	if (provider.enabled && !ApplicationConfig['federation.enabled'])
+		warnings.push('federation_off');
 
 	return {
 		...present(provider, bucket),
