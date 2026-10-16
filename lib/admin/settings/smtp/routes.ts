@@ -11,6 +11,12 @@ import {
 import { recordAdminAudit } from '../../audit/record.js';
 import { SMTP_TARGET_ID } from '../../../consts/admin_audit_routes.js';
 import { UpdateSmtpBody, SMTP_PASSWORD_MASK } from './schema.js';
+import { ISSUER } from '../../../configs/env.js';
+import {
+	describeDeliveryFailure,
+	mailDeliveryConfigured
+} from '../../../mail/mailer.js';
+import { sendSmtpTestEmail } from '../../../mail/send.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -113,4 +119,33 @@ export const smtpSettingsRoutes = new Elysia({ name: 'admin-settings-smtp' })
 			return present(await store.get());
 		},
 		{ body: UpdateSmtpBody }
-	);
+	)
+	/*
+	 * Sends a test message through the stored settings, to the caller's own address and nowhere else: a
+	 * recipient of the caller's choosing would make this a relay. The stored settings and not the form's,
+	 * so what is tested is what verification and invitations will use. A refusal answers with the mail
+	 * server's reply, because without it an operator learns only that nothing arrived.
+	 */
+	.post('/admin/api/settings/smtp/test', async ({ admin }) => {
+		const ctx = assertAuth(admin);
+		assertSuperAdmin(ctx);
+		if (!(await mailDeliveryConfigured())) {
+			throw new AdminError(
+				409,
+				'Mail delivery is not configured, so no message can be sent. Save the mail settings first.'
+			);
+		}
+
+		await recordAdminAudit(ctx, 'smtp.settings.test', SMTP_TARGET_ID, {
+			attributes: []
+		});
+		try {
+			await sendSmtpTestEmail({ email: ctx.email, issuer: ISSUER });
+		} catch (err) {
+			throw new AdminError(
+				502,
+				`The mail server did not accept the message: ${describeDeliveryFailure(err)}`
+			);
+		}
+		return { sent: true, to: ctx.email };
+	});

@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Card, Form, Input, InputNumber, Switch, Tag } from 'antd';
+import {
+	Alert,
+	Button,
+	Card,
+	Form,
+	Input,
+	InputNumber,
+	Switch,
+	Tag,
+	Tooltip
+} from 'antd';
 import { request } from '../frame/request.js';
 import { useFeedback } from '../frame/feedback.js';
 import { LoadFailed } from '../frame/states.js';
@@ -22,12 +32,23 @@ interface SmtpView {
  * the page never used to state it — the restart warning only appeared after a save had happened.
  *
  * The password is write-only — the API returns a mask and accepts the mask back to mean "unchanged".
+ *
+ * The test sends to the signed-in administrator through the *saved* settings, so it is offered only while
+ * the form holds nothing unsaved: testing values that are not what the server will use answers the wrong
+ * question. Its outcome stays on the card rather than in a toast, because a refusal carries the mail
+ * server's own reply, which is what the operator has to read and act on.
  */
 export function SmtpCard() {
 	const [form] = Form.useForm<SmtpView>();
 	const [loading, setLoading] = useState(true);
 	const [saving, setSaving] = useState(false);
 	const [failed, setFailed] = useState<string | null>(null);
+	const [configured, setConfigured] = useState(false);
+	const [dirty, setDirty] = useState(false);
+	const [testing, setTesting] = useState(false);
+	const [tested, setTested] = useState<
+		{ ok: true; to: string } | { ok: false; reason: string } | null
+	>(null);
 	const feedback = useFeedback();
 
 	// Every state write follows an await: `loading` starts true, so the mount has nothing to set first.
@@ -40,6 +61,8 @@ export function SmtpCard() {
 			}
 			setFailed(null);
 			form.setFieldsValue(result.data);
+			setConfigured(result.data.configured);
+			setDirty(false);
 		} finally {
 			setLoading(false);
 		}
@@ -65,11 +88,38 @@ export function SmtpCard() {
 				return;
 			}
 			form.setFieldsValue(result.data);
+			setConfigured(result.data.configured);
+			setDirty(false);
+			setTested(null);
 			feedback.done('SMTP settings saved.');
 		} finally {
 			setSaving(false);
 		}
 	}
+
+	async function sendTest() {
+		setTesting(true);
+		setTested(null);
+		try {
+			const result = await request<{ sent: true; to: string }>(
+				'POST',
+				'/admin/api/settings/smtp/test'
+			);
+			setTested(
+				result.ok
+					? { ok: true, to: result.data.to }
+					: { ok: false, reason: result.error.message }
+			);
+		} finally {
+			setTesting(false);
+		}
+	}
+
+	const testBlocked = !configured
+		? 'Save the mail settings first.'
+		: dirty
+			? 'Save your changes first: the test uses the saved settings.'
+			: null;
 
 	return (
 		<Card
@@ -80,6 +130,15 @@ export function SmtpCard() {
 			extra={
 				<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
 					<Tag color="green">applies immediately</Tag>
+					<Tooltip title={testBlocked}>
+						<Button
+							loading={testing}
+							disabled={failed !== null || testBlocked !== null}
+							onClick={() => void sendTest()}
+						>
+							Send test email
+						</Button>
+					</Tooltip>
 					<Button
 						type="primary"
 						loading={saving}
@@ -91,6 +150,24 @@ export function SmtpCard() {
 				</span>
 			}
 		>
+			{tested && (
+				<Alert
+					style={{ marginBottom: 16 }}
+					showIcon
+					closable={{ onClose: () => setTested(null) }}
+					type={tested.ok ? 'success' : 'error'}
+					title={
+						tested.ok
+							? `The mail server accepted a test message to ${tested.to}.`
+							: 'The test message was not sent.'
+					}
+					description={
+						tested.ok
+							? 'Accepted is not yet delivered: if it does not arrive in a few minutes, look in spam and check the sender domain’s SPF, DKIM and DMARC records.'
+							: tested.reason
+					}
+				/>
+			)}
 			{failed !== null && (
 				<LoadFailed
 					reason={failed}
@@ -106,6 +183,7 @@ export function SmtpCard() {
 				layout="vertical"
 				scrollToFirstError
 				hidden={failed !== null}
+				onValuesChange={() => setDirty(true)}
 				onFinish={save}
 			>
 				<Form.Item

@@ -64,19 +64,62 @@ export async function deliver(email: OutgoingEmail): Promise<void> {
 		secure: smtp.secure,
 		auth: smtp.username
 			? { user: smtp.username, pass: smtp.password }
-			: undefined
+			: undefined,
+		/*
+		 * Several sends are awaited inside a request, the console's test among them. Left at nodemailer's
+		 * defaults (two minutes to connect, ten of socket silence) an unreachable server held that request
+		 * for minutes before saying anything.
+		 */
+		connectionTimeout: 15_000,
+		greetingTimeout: 15_000,
+		socketTimeout: 30_000
 	});
 
-	await transport.sendMail({
-		from: smtp.fromName
-			? `${smtp.fromName} <${smtp.fromEmail}>`
-			: smtp.fromEmail,
-		to: email.to,
-		subject: email.subject,
-		text: email.text,
-		html: email.html,
-		...(email.language
-			? { headers: { 'Content-Language': email.language } }
-			: {})
-	});
+	try {
+		await transport.sendMail({
+			from: smtp.fromName
+				? `${smtp.fromName} <${smtp.fromEmail}>`
+				: smtp.fromEmail,
+			to: email.to,
+			subject: email.subject,
+			text: email.text,
+			html: email.html,
+			...(email.language
+				? { headers: { 'Content-Language': email.language } }
+				: {})
+		});
+	} catch (err) {
+		/*
+		 * Logged here, the one place every message passes, because most callers cannot say why: the
+		 * password reset hides a failure from the requester, verification turns it into a bare outcome, and
+		 * an operator who saw "no mail arrived" had nothing to read. No recipient, which is personal data.
+		 */
+		console.error(
+			`mail could not be delivered: ${describeDeliveryFailure(err)}`
+		);
+		throw err;
+	}
+}
+
+/*
+ * Why a send failed, in the mail server's own words where it gave any: its reply line ("535 5.7.8
+ * Authentication failed"), else the transport's message, with nodemailer's code (EAUTH, EENVELOPE,
+ * ECONNECTION, ETIMEDOUT) after it. Shown to a super administrator and written to the log, and safe for
+ * both: a server's reply never echoes the password, and nodemailer's own messages name only host and port.
+ */
+export function describeDeliveryFailure(err: unknown): string {
+	if (!(err instanceof Error)) return String(err).slice(0, 500);
+	const { code, response } = err as Error & {
+		code?: unknown;
+		response?: unknown;
+	};
+	const said =
+		typeof response === 'string' && response.trim()
+			? response.trim()
+			: err.message;
+	const described =
+		typeof code === 'string' && !said.includes(code)
+			? `${said} (${code})`
+			: said;
+	return described.slice(0, 500);
 }

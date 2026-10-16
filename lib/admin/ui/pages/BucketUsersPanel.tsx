@@ -105,7 +105,7 @@ export function BucketUsersPanel({
 	const [selected, setSelected] = useState<Map<string, EndUser>>(new Map());
 	const inviteBlocked =
 		mailConfigured === false
-			? 'Set up mail delivery first (Settings → Mail).'
+			? 'Set up mail delivery first (Settings → Integrations → Email (SMTP)).'
 			: passwordLogin === false
 				? "This project doesn't sign people in with a password."
 				: null;

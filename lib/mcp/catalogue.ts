@@ -1896,6 +1896,19 @@ const catalogue = [
 			'Change the outbound mail settings. The password is write-only: it can be set but never read back.'
 	},
 	{
+		tool: 'smtp_settings_test',
+		method: 'POST',
+		path: '/admin/api/settings/smtp/test',
+		action: 'smtp.settings.test',
+		consequence: 'ordinary',
+		superAdminOnly: true,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: [],
+		summary:
+			'Send a test message through the stored mail settings to the address of the administrator who authorized this connection, never anyone else. Answers with that address when the mail server accepted it; when it refused, the error carries the server’s own reply (for example "535 Authentication failed" or a rejected sender), which is what to fix in smtp_settings_update. Accepted does not mean delivered: ask the administrator whether it arrived, and whether in spam.'
+	},
+	{
 		tool: 'sentry_settings_update',
 		method: 'PUT',
 		path: '/admin/api/settings/sentry',

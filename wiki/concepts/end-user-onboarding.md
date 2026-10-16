@@ -100,7 +100,18 @@ the SMTP settings store on every send** (`lib/mail/mailer.ts:34`), not from `App
 is deliberately absent from the settings catalogue, and a restart neither applies nor disturbs it. A
 super administrator sets it at `/admin/api/settings/smtp`; the password is write-only, masked on read,
 and the change is audited. Under `NODE_ENV=test` nothing reaches the network: every message is captured
-in memory (`sentEmails`, `lib/mail/mailer.ts:20`).
+in memory (`sentEmails`, `lib/mail/mailer.ts:27`).
+
+A failed send is logged in `deliver` itself (`lib/mail/mailer.ts:97`), the one place every message passes,
+with the server's reply described by `describeDeliveryFailure` (`lib/mail/mailer.ts:110`) and no recipient.
+Through 1.0.1 it was logged nowhere: verification turned a refusal into a bare `delivery_failed`, the reset
+hides failures from the requester by design, and an operator whose first message never arrived (Porkbun, a
+sender address that was not the login) found an empty log. `POST /admin/api/settings/smtp/test`
+(`smtp_settings_test`, the console's **Send test email**) sends through the *stored* settings to the caller
+only, never a chosen recipient, which would make it a relay, and answers a refusal with the server's reply.
+It changes nothing and is audited anyway (`smtp.settings.test`), because it makes the server send mail.
+The transport also has timeouts now (15 s connect and greeting, 30 s socket), so an unreachable server
+no longer holds an awaiting request for minutes.
 
 ## Related
 

@@ -86,8 +86,8 @@ describe('admin audit route classification', () => {
 		 * clearing a project's bucket, removed when every project came to name one (specs/098) − the five
 		 * project rows that remained (create, amend, delete, assign a bucket, move to another group), removed
 		 * with projects when the bucket became the only container (specs/099) + adding, changing and removing a
-		 * plan and moving a project to another plan (specs/102). A
-		 * count that drifted
+		 * plan and moving a project to another plan (specs/102) + sending a test message from the mail
+		 * settings. A count that drifted
 		 * upward silently would let an audited route be swapped for an unaudited one without either
 		 * total changing.
 		 *
@@ -96,8 +96,8 @@ describe('admin audit route classification', () => {
 		 * each of which touches only the caller's own standing and no managed entity. It filters to MUTATING methods, so no read appears in either
 		 * total.
 		 */
-		expect(auditedAdminRoutes).toHaveLength(89);
-		expect(mounted).toHaveLength(92);
+		expect(auditedAdminRoutes).toHaveLength(90);
+		expect(mounted).toHaveLength(93);
 	});
 
 	it('declares each route pattern only once', () => {

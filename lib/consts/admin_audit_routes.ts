@@ -690,6 +690,16 @@ const routes = [
 		path: '/admin/api/settings/smtp',
 		targetType: 'SmtpSettings'
 	},
+	/*
+	 * Changes nothing, and is recorded all the same: it makes this server send mail, and which administrator
+	 * did, and when, is the question the trail answers about every outbound act.
+	 */
+	{
+		action: 'smtp.settings.test',
+		method: 'POST',
+		path: '/admin/api/settings/smtp/test',
+		targetType: 'SmtpSettings'
+	},
 	{
 		action: 'sentry.settings.update',
 		method: 'PUT',

@@ -92,6 +92,21 @@ throttle. The throttle's own settings are `loginThrottle.failureCap`,
 `loginThrottle.windowSeconds` and `loginThrottle.windowCeilingSeconds` in the
 [settings reference](/docs/reference/settings/#loginThrottle.failureCap).
 
+## Set up mail
+
+The server sends mail to verify addresses, reset passwords and invite people. Until mail is set up, none
+of that works, and administrators' sign-up cannot open.
+
+1. Open **Settings → Integrations** and fill in **Email (SMTP)**: the host and port of your mail
+   provider, the login and password, and the sender's name and address. Many providers accept only a
+   sender address that matches the login or one of its aliases.
+2. Press **Save**, then **Send test email**. The message goes to your own address.
+3. If the mail server refuses, the card shows its reply, for example `535 Authentication failed`. If it
+   accepts the message but nothing arrives, look in spam and check the SPF, DKIM and DMARC records of the
+   sender's domain.
+
+An agent does the same with `smtp_settings_update` and `smtp_settings_test`.
+
 ## What an administrator can reach
 
 The console's super-admin surface covers the instance itself: server settings, signing keys, SMTP,

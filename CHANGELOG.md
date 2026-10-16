@@ -9,6 +9,19 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+### Added
+
+- **Send test email** on the mail settings (`POST /admin/api/settings/smtp/test`, MCP `smtp_settings_test`). A super
+  administrator sends a test message through the saved settings to their own address, never anyone else's; a refusal
+  answers with the mail server's own reply, such as `535 Authentication failed`. Audited as `smtp.settings.test`.
+
+### Fixed
+
+- **A message the mail server refuses is now logged with the server's reply.** Before, a refused verification,
+  password-reset or invitation message left nothing in the log. Sends also time out (15 seconds to connect, 30 of
+  silence) instead of holding a request for minutes. The console's hint to set up mail names the right place,
+  **Settings → Integrations → Email (SMTP)**.
+
 ## [1.0.1] - 2026-10-16
 
 A new instance tells applications the person's email address. No migration and no new storage area; an

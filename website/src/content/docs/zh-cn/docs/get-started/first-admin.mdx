@@ -1,7 +1,7 @@
 ---
 title: 创建第一个管理员
 description: 一次性设置页面、管理员登录的工作方式，以及在做任何其他事之前就应开启的第二因素认证。
-source: f51a122991fe
+source: 64371e9c323e
 sidebar:
   order: 3
 ---
@@ -51,6 +51,16 @@ import ScreenshotFigure from '../../../../../components/ScreenshotFigure.astro';
 之后登录除了密码，还需要一个六位数的验证码。开启它不会把任何人锁在门外：尚未绑定身份验证器的管理员会在下次登录时完成绑定。这也包括使用 `database/mongodb.ts` 预置的保留 `admin-mcp` 客户端登录的智能体，因为它走的是同一扇门。通过身份提供商登录的管理员则使用该提供商的第二因素；这项要求只适用于密码登录。
 
 这件事比看上去更重要。失败的密码尝试按项目和电子邮件地址计数，达到上限的地址会在一段时间内被拒绝。按照设计，要求一次性验证码的项目无论被触发多少次，都停留在第一个锁定时间窗口：在那里猜中密码也无法让任何人登录。管理员也没有自助重置密码的途径来摆脱锁定。真正让这扇门变得坚固的是第二因素，而不是节流。节流本身的设置是[设置参考](/docs/reference/settings/#loginThrottle.failureCap)中的 `loginThrottle.failureCap`、`loginThrottle.windowSeconds` 和 `loginThrottle.windowCeilingSeconds`。
+
+## 设置邮件 {#set-up-mail}
+
+服务器通过邮件来验证地址、重置密码和邀请他人。在设置好邮件之前，这些功能都无法使用，管理员注册也无法开放。
+
+1. 打开 **Settings → Integrations**，填写 **Email (SMTP)** 卡片：邮件服务商的主机和端口、登录名和密码，以及发件人的名称和地址。许多服务商只接受与登录名或其别名一致的发件人地址。
+2. 点击 **Save**，再点击 **Send test email**。邮件会发送到你自己的地址。
+3. 如果邮件服务器拒绝，卡片会显示它的回复，例如 `535 Authentication failed`。如果服务器接受了邮件但没有收到，请查看垃圾邮件，并检查发件人域名的 SPF、DKIM 和 DMARC 记录。
+
+智能体用 `smtp_settings_update` 和 `smtp_settings_test` 完成同样的操作。
 
 ## 管理员能触及什么 {#what-an-administrator-can-reach}
 

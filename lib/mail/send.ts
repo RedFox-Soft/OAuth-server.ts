@@ -4,6 +4,7 @@ import { deliver } from './mailer.js';
 import { deprovisioningHeldEmail } from './templates/deprovisioning_held.js';
 import { groupInvitationEmail } from './templates/group_invitation.js';
 import { passwordResetEmail } from './templates/password_reset.js';
+import { smtpTestEmail } from './templates/smtp_test.js';
 import { userInvitationEmail } from './templates/user_invitation.js';
 import {
 	verificationLinkEmail,
@@ -107,4 +108,19 @@ export async function sendGroupInvitationEmail(params: {
 }): Promise<void> {
 	const { email, ...rest } = params;
 	await deliver({ to: email, ...groupInvitationEmail(rest) });
+}
+
+/*
+ * Delivers the mail settings' test message to the super administrator who asked for it. Throws on delivery
+ * failure, and the route turns the server's reply into its answer: finding out why mail does not go is the
+ * whole point of sending it.
+ */
+export async function sendSmtpTestEmail(params: {
+	email: string;
+	issuer: string;
+}): Promise<void> {
+	await deliver({
+		to: params.email,
+		...smtpTestEmail({ issuer: params.issuer })
+	});
 }
