@@ -18,6 +18,7 @@ import {
 	BucketKeysStore
 } from '../lib/adapters/postgres/index.js';
 import { isReservedBucketName } from '../lib/consts/reserved_names.js';
+import { isServedAtTheRoot } from '../lib/admin/consts.js';
 import {
 	duplicateEmailReport,
 	duplicateSlugReport,
@@ -377,7 +378,8 @@ const reservedAddresses = reservedAddressReport(
 		_id: row.id,
 		slug: row.slug
 	})),
-	isReservedBucketName
+	isReservedBucketName,
+	isServedAtTheRoot
 );
 if (reservedAddresses) console.error(reservedAddresses);
 for (const row of bucketRows) {

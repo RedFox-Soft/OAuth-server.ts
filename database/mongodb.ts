@@ -36,7 +36,8 @@ import {
 	UNASSIGNED_GROUP_ID,
 	SYSTEM_GROUP_NAME,
 	SUPER_ADMINS_GROUP_ID,
-	SUPER_ADMINS_GROUP_NAME
+	SUPER_ADMINS_GROUP_NAME,
+	isServedAtTheRoot
 } from '../lib/admin/consts.js';
 import { ADMIN_MCP_CLIENT_ID } from '../lib/mcp/consts.js';
 import {
@@ -391,7 +392,11 @@ const buckets = await db
 	.find({}, { projection: { _id: 1, slug: 1 } })
 	.toArray();
 
-const reservedAddresses = reservedAddressReport(buckets, isReservedBucketName);
+const reservedAddresses = reservedAddressReport(
+	buckets,
+	isReservedBucketName,
+	isServedAtTheRoot
+);
 if (reservedAddresses) console.error(reservedAddresses);
 
 /*

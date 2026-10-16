@@ -9,6 +9,16 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A new instance releases `email` and `email_verified` under the `email` scope.** The shipped claims map had no
+  `email` scope, so on a default instance no application learned whom it signed in or whether the address was
+  proven. An instance that saved its claims setting keeps what it saved: add `"email": ["email", "email_verified"]`
+  under Settings → Claims there.
+- **`db:setup` no longer tells an operator to readdress the instance's own projects.** On every fresh database it
+  reported the administrators' and default projects as using reserved addresses; their `admin` and `default` names
+  only name a cookie and never become a path.
+
 ## [1.0.0] - 2026-10-16
 
 The first stable release, and the one that makes FoxAuth fit to be offered to strangers. A project, formerly a

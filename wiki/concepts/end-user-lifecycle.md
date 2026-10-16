@@ -165,7 +165,10 @@ win (`lib/addon/account.ts:113`), and a local user's profile is editable too ([[
 **Gotcha found while planning:** the default claims setting mapped no `profile` or `phone` scope, so no
 profile claim — including ones an administrator stored — reached a token on a default instance. The default
 now carries the OIDC Core §5.4 lists; an instance that saved its claims setting keeps what it saved, because
-the stored object replaces the default whole (the same trap [[amr-reporting]] records).
+the stored object replaces the default whole (the same trap [[amr-reporting]] records). The same fix missed
+`email`: until 1.0.1 a default instance advertised no `email` scope, so no application received `email` or
+`email_verified` (`lib/configs/application.ts:737`). Found on production after a fresh `db:setup`, because the
+test configs all declare their own `email` scope and hid it.
 
 ## Related
 

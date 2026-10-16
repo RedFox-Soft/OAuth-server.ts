@@ -6,6 +6,35 @@ import {
 	reloadConfiguration,
 	type ClaimsSetting
 } from 'lib/configs/application.js';
+import { applicationDefaultSettings } from '../config_baseline.js';
+
+/**
+ * @proves A new instance tells an application the person's email address, and whether it was proven,
+ * when the application is granted the `email` scope.
+ */
+describe('shipped claims', () => {
+	const original = ApplicationConfig.claims;
+
+	afterEach(() => {
+		ApplicationConfig.claims = original;
+		reloadConfiguration();
+	});
+
+	it('advertises the email scope and releases email and email_verified under it', () => {
+		ApplicationConfig.claims = structuredClone(
+			applicationDefaultSettings.claims
+		);
+		reloadConfiguration();
+
+		expect(configuration.scopes).toContain('email');
+		expect(configuration.claims.email).toEqual({
+			email: null,
+			email_verified: null
+		});
+		expect(configuration.claimsSupported).toContain('email');
+		expect(configuration.claimsSupported).toContain('email_verified');
+	});
+});
 
 // Claims and acrValues are server settings, read from ApplicationConfig at initialisation.
 // The claims map declared here is merged over the shipped one exactly as before, so these

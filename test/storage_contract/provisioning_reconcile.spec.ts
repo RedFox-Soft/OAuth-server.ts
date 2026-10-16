@@ -17,6 +17,7 @@ import {
 import {
 	duplicateEmailReport,
 	exitCodeFor,
+	reservedAddressReport,
 	type DuplicateEmailRow,
 	type ProvisioningSummary
 } from '../../database/provisioning_report.js';
@@ -348,6 +349,41 @@ describe('duplicateEmailReport', () => {
 		]);
 
 		expect(report).toContain('4');
+	});
+});
+
+/**
+ * @proves An operator is told to readdress a project only when its address really reads as one of the
+ * server's routes, never for the instance's own projects.
+ */
+describe('reservedAddressReport', () => {
+	const isReserved = (name: string) =>
+		['admin', 'default', 'mcp'].includes(name);
+	const servedAtTheRoot = (id: string) => id === 'admin' || id === 'redfox';
+
+	it('says nothing on a fresh database, whose own projects carry reserved names', () => {
+		const seeded = [
+			{ _id: 'admin', slug: 'admin' },
+			{ _id: 'redfox', slug: 'default' }
+		];
+
+		expect(
+			reservedAddressReport(seeded, isReserved, servedAtTheRoot)
+		).toBeNull();
+	});
+
+	it('names a tenant project whose path is a reserved name', () => {
+		const report = reservedAddressReport(
+			[
+				{ _id: 'admin', slug: 'admin' },
+				{ _id: 'tenant', slug: 'mcp' }
+			],
+			isReserved,
+			servedAtTheRoot
+		);
+
+		expect(report).toContain('tenant at /mcp');
+		expect(report).not.toContain('  admin at /admin');
 	});
 });
 

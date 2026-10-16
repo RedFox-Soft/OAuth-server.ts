@@ -110,13 +110,20 @@ export function duplicateSlugReport(
  * notices, so it is an operator's decision made through the address-change route. Nothing is refused either —
  * the router still resolves such a bucket, because a static route wins over a bucket segment; what the report
  * prevents is an operator handing a customer an address that reads as the server's own.
+ *
+ * A bucket served at the root is skipped: its slug only names its session cookie and never becomes a path, and
+ * the two the seed creates carry `admin` and `default`, so without the skip every fresh database told its
+ * operator to readdress the instance's own buckets.
  */
 export function reservedAddressReport(
 	buckets: readonly { _id: string; slug?: string | null }[],
-	isReserved: (name: string) => boolean
+	isReserved: (name: string) => boolean,
+	isServedAtTheRoot: (bucketId: string) => boolean
 ): string | null {
 	const clashing = buckets.flatMap(({ _id, slug }) =>
-		typeof slug === 'string' && isReserved(slug) ? [`  ${_id} at /${slug}`] : []
+		typeof slug === 'string' && isReserved(slug) && !isServedAtTheRoot(_id)
+			? [`  ${_id} at /${slug}`]
+			: []
 	);
 	if (clashing.length === 0) return null;
 	return (
