@@ -62,7 +62,7 @@ export default {
 		{
 			question: 'Can I run it in production today?',
 			answer:
-				'FoxAuth can run in production today, self-hosted. The current release is 1.0.0, the first stable one: from it on, the HTTP surface and the admin API change incompatibly only in a major release. Read the changelog before upgrading, take a backup when it names a migration that cannot be undone, and run the setup and migrate steps afterwards. The protocol endpoints follow the specs, so a client written for FoxAuth is in practice written against the RFC and should move to another server with little change.'
+				'FoxAuth can run in production today, self-hosted. The current release is 1.0.1. Since 1.0.0, the first stable release, the HTTP surface and the admin API change incompatibly only in a major release. Read the changelog before upgrading, take a backup when it names a migration that cannot be undone, and run the setup and migrate steps afterwards. The protocol endpoints follow the specs, so a client written for FoxAuth is in practice written against the RFC and should move to another server with little change.'
 		},
 		{
 			question: 'What does the cloud waitlist commit me to?',

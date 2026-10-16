@@ -9,6 +9,11 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-10-16
+
+A new instance tells applications the person's email address. No migration and no new storage area; an
+instance that saved its claims setting adds the `email` scope there.
+
 ### Fixed
 
 - **A new instance releases `email` and `email_verified` under the `email` scope.** The shipped claims map had no
@@ -2013,7 +2018,8 @@ found`. The refusal text existed and never ran: the call that delivered it sat i
 - The DPoP nonce secret is self-provisioned at startup, making the requireNonce-without-secret 500
   state unrepresentable (spec 014)
 
-[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.12.0...v1.0.0
 [0.12.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.10.0...v0.11.0

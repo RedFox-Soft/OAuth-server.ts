@@ -432,6 +432,18 @@ integration sees:
   upgrade keep their recorded value, because nothing records why an account is verified. Turning verification on
   for a project asks everyone who is not verified, and only them.
 
+### Then 1.0.1
+
+1.0.1 carries no schema migration and no new storage area. It fixes two things an operator sees:
+
+- **A new instance releases `email` and `email_verified` under the `email` scope.** Before, the shipped claims
+  map had no `email` scope, so no application learned whom it signed in. An instance that saved its claims
+  setting keeps what it saved, because the stored map replaces the default whole: add
+  `"email": ["email", "email_verified"]` under **Settings → Claims** there.
+- **`db:setup` no longer asks you to readdress the instance's own projects.** On a fresh database it reported the
+  administrators' and default projects as using reserved addresses. Their names never become a path, so there
+  was nothing to do.
+
 ## After the restart
 
 ```bash

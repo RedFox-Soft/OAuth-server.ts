@@ -1,6 +1,6 @@
 import type english from './en.ts';
 
-export const source = 'd5163f404f80';
+export const source = '0fd577d05ec6';
 
 export default {
 	title: '定价',
@@ -56,7 +56,7 @@ export default {
 		{
 			question: '现在就能用于生产环境吗？',
 			answer:
-				'FoxAuth 现在就可以自托管用于生产环境。当前版本是 1.0.0，这是首个稳定版本：从这个版本起，HTTP 接口和管理 API 只会在主版本中做不兼容的变更。升级前请阅读更新日志；如果其中提到无法撤销的迁移，请先做备份，升级后再运行 setup 和 migrate 步骤。协议端点遵循规范，因此为 FoxAuth 编写的客户端实际上是按 RFC 编写的，换到其他服务器时应该只需很少的改动。'
+				'FoxAuth 现在就可以自托管用于生产环境。当前版本是 1.0.1。从首个稳定版本 1.0.0 起，HTTP 接口和管理 API 只会在主版本中做不兼容的变更。升级前请阅读更新日志；如果其中提到无法撤销的迁移，请先做备份，升级后再运行 setup 和 migrate 步骤。协议端点遵循规范，因此为 FoxAuth 编写的客户端实际上是按 RFC 编写的，换到其他服务器时应该只需很少的改动。'
 		},
 		{
 			question: '加入云服务候补名单需要承担什么义务？',
