@@ -444,6 +444,21 @@ integration sees:
   administrators' and default projects as using reserved addresses. Their names never become a path, so there
   was nothing to do.
 
+### Then 1.1.0
+
+1.1.0 carries no schema migration, no new storage area and no new setting, so there is nothing to run beyond the
+usual steps. What an operator sees:
+
+- **Provider buttons fit any number of providers.** Past six, five stay on the sign-in page and the rest fold
+  under **More sign-in options**; Google, Microsoft, Apple and GitHub are never folded. Check the **Sign-in**
+  tab's preview of a project with many providers, and act on any warning about a duplicate or confusingly named
+  provider.
+- **The console says why a provider is missing from the sign-in page.** While `federation.enabled` is off, the
+  providers list, the provider's page and the sign-in preview say so.
+- **Mail can be tested from its settings.** **Settings → Integrations → Email (SMTP)** sends a test message to your
+  own address and shows the mail server's reply if it refuses. A refused message is now logged, and sends time out
+  instead of holding a request.
+
 ## After the restart
 
 ```bash

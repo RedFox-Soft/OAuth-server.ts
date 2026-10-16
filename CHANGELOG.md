@@ -9,6 +9,11 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-16
+
+Provider buttons on the sign-in page fit any number of providers, the console says when one is missing from it and
+why, and a super administrator can send a test message from the mail settings. No migration and no new storage area.
+
 ### Added
 
 - **Send test email** on the mail settings (`POST /admin/api/settings/smtp/test`, MCP `smtp_settings_test`). A super
@@ -2047,7 +2052,8 @@ found`. The refusal text existed and never ran: the call that delivered it sat i
 - The DPoP nonce secret is self-provisioned at startup, making the requireNonce-without-secret 500
   state unrepresentable (spec 014)
 
-[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.12.0...v1.0.0
 [0.12.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.11.0...v0.12.0
