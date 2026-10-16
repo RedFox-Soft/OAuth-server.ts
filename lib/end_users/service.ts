@@ -171,17 +171,20 @@ export async function createEndUser(
 	 * without the colliding field, and a provisioning client retrying the refused create then collided on the
 	 * email of that half-made account for ever (specs/070 R13).
 	 */
-	return store
-		.create(input.email, hash, input.verified ?? true, input.id, {
-			claims: input.claims,
-			userName: input.userName,
-			externalId: input.externalId,
-			profile: input.profile,
-			provisionedBy,
-			active: input.active,
-			passwordSet: input.password !== undefined
-		})
-		.catch(duplicateAsError);
+	return (
+		store
+			// Unproven unless the caller says otherwise (specs/104): a caller that forgets gets the honest answer.
+			.create(input.email, hash, input.verified ?? false, input.id, {
+				claims: input.claims,
+				userName: input.userName,
+				externalId: input.externalId,
+				profile: input.profile,
+				provisionedBy,
+				active: input.active,
+				passwordSet: input.password !== undefined
+			})
+			.catch(duplicateAsError)
+	);
 }
 
 export interface UpdateEndUserInput {

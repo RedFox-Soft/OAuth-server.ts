@@ -62,7 +62,8 @@ describe('end-user API', () => {
 		expect(created.status).toBe(201);
 		const body = answered(created.data);
 		expect(body).not.toHaveProperty('password');
-		expect(body.verified).toBe(true);
+		// Unproven, whatever the project requires (specs/104).
+		expect(body.verified).toBe(false);
 		const uid = body._id;
 
 		const list = await client.admin.api

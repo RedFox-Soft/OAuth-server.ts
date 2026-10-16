@@ -30,6 +30,12 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Changed
 
+- **`email_verified` is true only for an address that was proven** (spec 104). A person who signs up, or whom an
+  administrator creates, now starts unverified in every project; before, a project that did not require verification
+  recorded them verified and told every application `email_verified: true` for an address nobody had proven. Sign-in
+  is unchanged. Applications may notice new unproven people arriving with `email_verified: false`. Existing accounts
+  keep their recorded value (nothing records why one is verified); turning verification on asks whoever is not.
+
 - **`can.createHost` is now `can.addressForms`** on `GET /admin/api/me` (spec 101): the list of forms the caller
   may give a project, the first one preselected. Project slugs are now unique by an index that `db:setup` creates;
   it reports and skips the index if two projects already share a slug. Address-change audit entries record the

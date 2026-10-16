@@ -424,6 +424,12 @@ integration sees:
   [Names a path cannot take](/docs/administer/project-addresses/#names-a-path-cannot-take).
 - **The console's own sign-in applications work only at the instance's root address.** A sign-in request for one
   of them at a project's address is refused.
+- **`email_verified` is `true` only for an address that was proven.** A person who signs up, or whom an
+  administrator creates, now starts unverified in every project. Before, a project that did not require
+  verification recorded them as verified, and applications were told `email_verified: true`. Sign-in does not
+  change. Applications may notice new people arriving with `email_verified: false`. Accounts created before the
+  upgrade keep their recorded value, because nothing records why an account is verified. Turning verification on
+  for a project asks everyone who is not verified, and only them.
 
 ## After the restart
 

@@ -596,7 +596,9 @@ export function SignInTab({
 						effect={
 							draft.emailVerificationRequired
 								? `Unverified ${people} are sent a message at their next sign-in and cannot continue until they follow it.`
-								: `${consoleBucket ? 'Administrators' : 'People'} can sign in before they have verified their address.`
+								: consoleBucket
+									? 'Administrators can sign in before they have verified their address.'
+									: 'People can sign in before they have verified their address. Until they do, applications are told their address is not verified.'
 						}
 					>
 						{verificationBlock && (

@@ -128,6 +128,10 @@ The project is also where onboarding policy lives: whether registration is open
 authenticator app is required (`totpRequired`). None of it is set on the client. Two applications in
 the same project share all of it, because they share the accounts.
 
+Whether a project requires verification decides only who may sign in. It does not decide what applications are
+told. A new account's address counts as verified, and applications receive `email_verified: true`, only after it
+is proven: by a link from the mailbox, by a trusted identity provider, or by an administrator who marks it.
+
 <Aside type="note">
 
 Consent is on by default (`consent.require` defaults to `true` for a new client), so the first

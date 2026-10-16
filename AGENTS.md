@@ -183,7 +183,8 @@ Each rule is the part that is easy to break. Read the named page before changing
   → `admin-audit-trail.md`
 - **End users** — change an end user only through `lib/end_users/service.ts`, never the user store
   from a route; whether a user may sign in is `canSignIn`, and anything that makes them unable to runs
-  `revokeAccountAccess`. A provisioned user is read-only to administrators except the local lock.
+  `revokeAccountAccess`. A provisioned user is read-only to administrators except the local lock. An address is
+  recorded verified only when it was proven, whatever the project requires, because that is what `email_verified` says.
   → `end-user-lifecycle.md`
 - **SCIM provisioning** — a connection's OAuth client `scim-<id>` is synthesized from the connection and
   never stored; its tokens are opaque and only the addressed bucket's SCIM arm (ahead of MCP's) may mint

@@ -318,7 +318,8 @@ describe('registration gating', () => {
 		expect(sentEmails.length).toBe(0);
 	});
 
-	it('creates a verified account with no email when verification is off', async () => {
+	// Unverified all the same (specs/104): nobody proved the address. Only the requirement gates sign-in.
+	it('creates an unverified account, mails nothing and signs it in when verification is off', async () => {
 		const off = await getBucketStore().create({
 			ownerGroupId: UNASSIGNED_GROUP_ID,
 			name: 'No Verify Bucket',
@@ -345,10 +346,10 @@ describe('registration gating', () => {
 			);
 		expect(res.response.status).toBe(303);
 		const user = await getUserStore(off._id).findByEmail(email);
-		expect(user?.verified).toBe(true);
+		expect(user?.verified).toBe(false);
 		expect(sentEmails.length).toBe(0);
 
-		// verified immediately → login succeeds
+		// not required → login succeeds unverified
 		const auth2 = new AuthorizationRequest({
 			client_id: 'verify-off-app',
 			scope: 'openid'

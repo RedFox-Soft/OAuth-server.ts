@@ -1907,7 +1907,13 @@ export const ui = new Elysia()
 				user = await store.create(
 					body.email,
 					await Bun.password.hash(body.password),
-					!verificationRequired,
+					/*
+					 * Not verified, whatever the project requires (specs/104): nobody has proven the address, and
+					 * this is what every application is told as `email_verified`. Recording it verified because the
+					 * project did not ask told them a stranger's sign-up was the address's owner. Only the
+					 * requirement gates sign-in, so a project that does not require proof still lets them in.
+					 */
+					false,
 					undefined,
 					{ passwordSet: true }
 				);

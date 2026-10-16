@@ -26,7 +26,12 @@ with its counts and confirmed, and opening sign-up is previewed on the default a
 The registration screen resolves its project from the interaction's client through
 `resolveBucketForRequest` — on the **GET as well as the POST** (`lib/interactions/index.ts:1040`),
 because a form that can only be refused on submission is a dead end dressed as an invitation. A closed
-project refuses; a project that requires verification creates the user unverified and issues a challenge.
+project refuses; every project creates the user unverified, and one that requires verification also issues a
+challenge. Until spec 104 a project that did not require verification created the user *verified*, and the ID token
+and userinfo said `email_verified: true` for an address nobody had proven (`lib/addon/account.ts:116`) — a stranger
+signing up under someone's address was presented to every application as that address's owner, and a project that
+later turned verification on never asked them. Only the requirement gates sign-in, so storing the truth locks nobody
+out.
 The login POST then refuses an unverified user in such a project — and, since spec 078, sends what they
 need rather than only saying "check your inbox": an account that existed before its project required
 verification had never been sent anything. A live challenge is reused, so a registrant who signs in
@@ -46,10 +51,16 @@ rendering the page itself: the client bundle reads the page from the path, so a 
 The sign-in page links to registration only when the project accepts it, and to password reset only when
 the project allows it, read from the same project the doors resolve (`lib/interactions/loginOptions.ts`).
 
-**An administrator's create follows the same policy** (spec 082): a person created in the console or by an
-agent starts verified only when the project does not require verification
-(`lib/admin/users-end/routes.ts:341`). The route used to write `verified: true` whatever the project said, so an
-address nobody had proven counted as proven because an administrator typed it. It may now create a person
+**An administrator's create follows the same rule** (spec 104): a person created in the console or by an agent
+starts unverified whatever the project requires (`lib/admin/users-end/routes.ts:341`); marking them verified is a
+separate, audited act. Spec 082 had made it follow the project's setting, which still recorded an address nobody had
+proven as proven whenever the project did not require verification.
+
+**What makes an address verified** — proof, and nothing else: following a reset, invitation or verification link
+from the mailbox (`lib/password_reset/challenge.ts`, `lib/verification/`), a federated sign-in whose provider is
+trusted for `email_verified`, a SCIM connection trusted for addresses, or an administrator's explicit mark. Accounts
+recorded verified before spec 104 keep that value: nothing records *why* an account is verified, so a migration
+could only have flipped the proven ones too. Turning verification on asks whoever is not verified, and only them. It may now create a person
 with no password at all, and an administrator may mail anyone unverified a fresh message from the person's
 page; neither sends anything by itself ([[end-user-lifecycle]]).
 

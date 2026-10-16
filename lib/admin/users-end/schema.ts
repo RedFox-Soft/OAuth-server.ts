@@ -9,8 +9,8 @@ const EndUserClaims = t.Record(t.String(), t.Unknown());
 
 /*
  * Without a password the account holds one nobody knows: the person signs in through an identity provider,
- * or sets one through password reset. Whether its address starts verified is the bucket's policy, not the
- * administrator's say.
+ * or sets one through password reset. Its address starts unverified whatever the project requires (specs/104):
+ * an administrator vouches for it only by marking it verified, a separate and audited act.
  *
  * `invite` mails the person a link to choose their own password (specs/089) instead of an administrator
  * choosing one; it cannot be combined with `password`, which the route refuses with 422.

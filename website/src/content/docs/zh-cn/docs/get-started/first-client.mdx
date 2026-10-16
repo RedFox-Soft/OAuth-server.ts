@@ -1,7 +1,7 @@
 ---
 title: 注册第一个客户端
 description: 控制台中的团队、项目和应用，公开与机密客户端的区别，以及客户端为哪些用户提供登录。
-source: efaf9d2e9a41
+source: 7892ecb9ed08
 sidebar:
   order: 4
 ---
@@ -78,6 +78,8 @@ import ScreenshotFigure from '../../../../../components/ScreenshotFigure.astro';
 默认 `redfox` 项目中的应用并不固定在该项目：规则 4 和 5 对它仍然适用。
 
 项目也是注册引导策略所在之处：是否开放注册（`registrationOpen`）、新账户是否必须验证电子邮件（`emailVerificationRequired`）、验证是通过链接还是六位数验证码（`verificationMethod`）、是否提供密码登录（`passwordLogin`），以及是否要求使用身份验证器应用（`totpRequired`）。这些都不在客户端上设置。同一项目中的两个应用共享全部这些设置，因为它们共享同一批账户。
+
+项目是否要求验证电子邮件，只决定谁可以登录，不决定告诉应用什么。新账户的地址只有在被证明之后才算已验证，应用也才会收到 `email_verified: true`：证明方式是邮件中的链接、受信任的身份提供方，或由管理员标记为已验证。
 
 <Aside type="note">
 

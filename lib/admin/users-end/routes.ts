@@ -336,9 +336,9 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 						id: userId,
 						email: body.email,
 						password: body.password,
-						// The bucket's policy, as registration applies it: an address nobody has proven is not
-						// verified because an administrator typed it.
-						verified: !bucket.emailVerificationRequired,
+						// An address nobody has proven is not verified because an administrator typed it, whatever
+						// the project requires (specs/104); marking it verified is a separate, audited act.
+						verified: false,
 						claims: body.claims
 					},
 					() =>
