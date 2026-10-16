@@ -1,7 +1,7 @@
 import { rich } from '../../types.ts';
 import type english from './en.ts';
 
-export const source = '3a1df3dfd09a';
+export const source = 'bde108a5a778';
 
 export default {
 	title: '对比',
@@ -31,9 +31,9 @@ export default {
 			}
 		],
 		candour: rich(
-			'FoxAuth 确实落后的地方，这些页面会直说：它不支持 SAML，也没有支持计划；它处于 ',
-			{ code: '0.x' },
-			' 版本，HTTP 接口在次版本之间仍可能变化；它也没有多年部署才能积累出的生产环境打磨。它领先的地方，表格里同样会写明：无需更高套餐就能用上银行级安全规范，以及 AI 智能体通过与人相同的、经过审计的路径来管理实例。'
+			'FoxAuth 确实落后的地方，这些页面会直说：它不支持 SAML，也没有支持计划；它的首个稳定版本 ',
+			{ code: '1.0.0' },
+			' 直到 2026 年 10 月才发布；它也没有多年部署才能积累出的生产环境打磨。它领先的地方，表格里同样会写明：无需更高套餐就能用上银行级安全规范，以及 AI 智能体通过与人相同的、经过审计的路径来管理实例。'
 		)
 	},
 	lastChecked: {

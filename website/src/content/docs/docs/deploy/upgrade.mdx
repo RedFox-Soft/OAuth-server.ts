@@ -322,15 +322,16 @@ What else an operator or an integration sees after 0.12.0:
 - **Every project has a connected-apps page** at `/account/apps` on its own address, where people remove the
   access they gave. A removal is audited as `self-service`.
 
-### Then the next release
+### Then 1.0.0
 
-The next release renames what an administrator or an agent reads and types. A bucket is now a **project**,
+1.0.0 is the first stable release: from it on, an incompatible change to the HTTP surface, the admin API
+or the MCP tools comes only in a major release. It renames what an administrator or an agent reads and types. A bucket is now a **project**,
 an administrator group a **team** (a personal group a **personal team**), and a bucket group a **group** of
 the project's end users. The sections above already use the new words; the paths and tool names they quote
 are those of their release. Storage, the protocol and issued tokens do not change: issuer addresses,
 discovery, `/jwks`, tokens, SCIM and end-user pages are what they were.
 
-The release also removes the old projects, the containers that listed a bucket's applications, before it
+It also removes the old projects, the containers that listed a bucket's applications, before it
 gives their name to buckets; the [changelog](/changelog/) describes that change and its migrations. It
 carries one migration of its own for the rename, and it cannot be undone:
 `2026-10-17-projects-reserved-hostnames` moves the stored value of the setting `buckets.reservedHostnames`

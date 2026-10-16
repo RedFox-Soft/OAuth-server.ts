@@ -1,7 +1,7 @@
 ---
 title: 文档
 description: 如何运行、集成和管理 FoxAuth 背后的引擎 OAuth-server.ts：从第一个容器到生产环境部署。
-source: 5e1c93a02448
+source: d45aefbf0bb0
 ---
 
 FoxAuth 构建于 **OAuth-server.ts** 之上。这是一个由你自己运行的 OAuth 2.1 与 OpenID Connect 授权服务器，源码可用（source-available，并非开源许可）。本文档涵盖三项工作：让服务器跑起来、把应用接入它，以及在真实用户依赖它之后运维它。选择你眼下正在做的那一项即可。
@@ -24,7 +24,7 @@ FoxAuth 构建于 **OAuth-server.ts** 之上。这是一个由你自己运行的
 
 [部署](/zh-cn/docs/deploy/fly/)涵盖了大家实际在用的目标：[Fly.io](/zh-cn/docs/deploy/fly/)、[Kubernetes](/zh-cn/docs/deploy/kubernetes/)，以及单台主机上的 [Docker Compose](/zh-cn/docs/deploy/docker-compose/)。数据库有两种可选：[MongoDB](/zh-cn/docs/deploy/mongodb-atlas/) 或 [PostgreSQL](/zh-cn/docs/deploy/postgresql/)，你设置的连接字符串决定用哪一个。无论选哪个，[位于反向代理之后](/zh-cn/docs/deploy/reverse-proxy/)都很重要。签发者（issuer）URL 必须是 `https://` 地址，并且必须与客户端配置的一致。代理在没有被要求的情况下改写请求头，通常就是令牌在本地校验通过、到了生产环境却失败的原因。
 
-在不同版本之间迁移之前，请先阅读[升级](/zh-cn/docs/deploy/upgrade/)。服务器目前处于 `0.x` 版本，这意味着 HTTP 接口和管理 API 在次版本之间仍可能发生变化；变更日志会说明改了什么。升级之后必须重新运行设置脚本，以便创建新的集合和索引，然后运行 `bun run db:migrate`，处理新版本需要重塑的部分。
+在不同版本之间迁移之前，请先阅读[升级](/zh-cn/docs/deploy/upgrade/)。从 1.0.0 起，HTTP 接口和管理 API 只会在主版本中做不兼容的变更；变更日志会说明改了什么。升级之后必须重新运行设置脚本，以便创建新的集合和索引，然后运行 `bun run db:migrate`，处理新版本需要重塑的部分。
 
 ## 为真实用户运行 {#running-it-for-real-users}
 

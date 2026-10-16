@@ -47,9 +47,8 @@ issuer URL must be an `https://` address and must match what clients were config
 that rewrites headers without being told to is the usual cause of tokens that validate locally and
 fail in production.
 
-Read [Upgrading](/docs/deploy/upgrade/) before you move between versions. The server is at a `0.x`
-release, which means the HTTP surface and the admin API may still change between minor versions;
-the changelog says what moved, and the setup script has to be re-run afterwards so new collections
+Read [Upgrading](/docs/deploy/upgrade/) before you move between versions. Since 1.0.0 the HTTP surface and
+the admin API change incompatibly only in a major release; the changelog says what moved, and the setup script has to be re-run afterwards so new collections
 and indexes exist, followed by `bun run db:migrate` for anything a release has to reshape.
 
 ## Running it for real users

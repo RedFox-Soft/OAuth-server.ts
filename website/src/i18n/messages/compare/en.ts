@@ -32,9 +32,9 @@ export default {
 			}
 		],
 		candour: rich(
-			'Where FoxAuth is genuinely behind, the pages say so plainly: it has no SAML support and none planned, it is at a ',
-			{ code: '0.x' },
-			' release with an HTTP surface that may still change between minor versions, and it has none of the production hardening years of deployment buys. Where it is ahead, the rows say that too: the banking-grade profiles without a plan tier, and an AI agent administering the instance through the same audited path a human uses.'
+			'Where FoxAuth is genuinely behind, the pages say so plainly: it has no SAML support and none planned, its first stable release, ',
+			{ code: '1.0.0' },
+			', came only in October 2026, and it has none of the production hardening years of deployment buys. Where it is ahead, the rows say that too: the banking-grade profiles without a plan tier, and an AI agent administering the instance through the same audited path a human uses.'
 		)
 	},
 	lastChecked: {

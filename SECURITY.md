@@ -35,8 +35,8 @@ against third-party dependencies without a demonstrated effect on this server.
 
 ## Supported versions
 
-Security fixes are released for the latest minor version. Until 1.0, that means the latest `0.x`
-release; a fix is not backported to an earlier `0.x`.
+Security fixes are released for the latest minor version of the latest major version; a fix is not
+backported to an earlier minor or major version.
 
 ## Safe harbour
 

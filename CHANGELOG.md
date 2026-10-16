@@ -9,6 +9,24 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-16
+
+The first stable release, and the one that makes FoxAuth fit to be offered to strangers. A project, formerly a
+bucket, is the one container: it is its own issuer and holds its applications, APIs and people for life. A team,
+formerly an administrator group, owns projects. A project can live on a subdomain of the instance. Plans put
+limits on what a team can create. The gaps one team could use against another are closed, and `email_verified` is
+true only for an address that was proven. From this release on the version numbers mean what Semantic Versioning
+says: an incompatible change to the protocol endpoints, the admin API, the MCP tools or the settings comes only in
+a major release.
+
+The upgrade asks a backup, `db:setup` (or `db:setup:pg`) for the new `TeamInvitationThrottle` area and the unique
+index on project slugs, and `db:migrate` for five migrations (`2026-10-15` to `2026-10-19`), some of which cannot
+be undone. What an integration meets, with no aliases kept: admin API paths, fields and MCP tool names say project
+and team; the old `/admin/api/projects` routes are gone; `can.createHost` is `can.addressForms`; a team owner
+invites rather than adds; team invitations, signing keys, names and request bodies are bounded; and new end users
+arrive with `email_verified: false` until they prove their address. The
+[upgrade guide](https://foxauth.dev/docs/deploy/upgrade/) walks through it.
+
 ### Added
 
 - **Plans and Free-tier limits** (spec 102), off by default (`plans.enabled`). A project is on a plan from a catalogue
@@ -1985,7 +2003,8 @@ found`. The refusal text existed and never ran: the call that delivered it sat i
 - The DPoP nonce secret is self-provisioned at startup, making the requireNonce-without-secret 500
   state unrepresentable (spec 014)
 
-[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.12.0...v1.0.0
 [0.12.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.9.0...v0.10.0
