@@ -64,9 +64,11 @@ into the same route ([[admin-mcp-control-plane]]). A check is never in a store: 
 it runs after the audit entry.
 
 The checks live in `lib/plans/enforce.ts`. Each is a no-op while plans are off and for a super administrator
-(`exempt`, `:36`). The thirteen check points are project create, move, restore and address change; team create;
-becoming a team owner by member add, role change, invitation and acceptance; application create; API declare; and
-federation provider create and change.
+(`exempt`, `:36`). The check points are project create, move, restore and address change; team create; becoming a
+team owner by member add, role change and invitation acceptance; application create; API declare; and federation
+provider create and change. Since spec 103 a member add is a super administrator's alone, so it never limits, and an
+owner invitation is not judged when it is sent — a refusal there told the inviter whether the address belongs to an
+administrator who owns projects.
 
 **Limits gate only new creations.** A project already over a limit keeps working, is editable, and signs everyone
 in. Nothing is deleted, disabled, moved or hidden because a plan allows less than it holds.
@@ -91,8 +93,8 @@ and never gives their count (`assertProjectRoom`, `lib/plans/enforce.ts:152`).
 the owner role ([[team-ownership]]). A project moving between two teams of the same owner is left out of their
 existing count, so the move changes nothing. A project scheduled for deletion does not count until it is restored,
 which is why a restore is a check point. Becoming an owner — added as one, promoted, or by an invitation — takes on
-the team and every project in it. An invitation is judged again when it is accepted, before the single-use claim, so
-a refusal leaves it usable once the invitee has room (`assertMayBecomeOwner`, `:207`).
+the team and every project in it. An invitation is judged only when it is accepted (spec 103), before the single-use
+claim, so a refusal leaves it usable once the invitee has room (`assertMayBecomeOwner`, `:207`).
 
 "Regular teams per administrator" is an instance setting, not a plan limit (`plans.regularTeamsPerAdministrator`):
 a team has no plan of its own. A personal team never counts.

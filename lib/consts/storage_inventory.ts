@@ -119,6 +119,7 @@ export const MODEL_AREAS = [
 	'RegistrationAccessToken',
 	'ReplayDetection',
 	'Session',
+	'TeamInvitationThrottle',
 	'TotpAttempt',
 	'TotpEnrollment',
 	'UpstreamSession',
@@ -429,6 +430,20 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 		'PasswordResetThrottle',
 		EXPIRES_AT,
 		unowned('addressed by the computed id `${bucketId}:${email}`, never swept')
+	),
+	/*
+	 * Counters bounding team invitation mail (specs/103), in PasswordResetThrottle's shape: one per address and
+	 * team (`${teamId}:${email}`) and one per inviter (`inviter:${adminId}`). Separate from the invitations
+	 * themselves because revoking an invitation destroys its record, and a bound counted from records would
+	 * reset on every revoke. Owns nothing — a counter exists for an address that may have no account — and
+	 * expires with its window.
+	 */
+	modelArea(
+		'TeamInvitationThrottle',
+		EXPIRES_AT,
+		unowned(
+			'addressed by a computed id `${teamId}:${email}` or `inviter:${adminId}`, never swept'
+		)
 	),
 	modelArea(
 		'PushedAuthorizationRequest',

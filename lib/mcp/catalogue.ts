@@ -313,7 +313,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			"One team: its name, kind, and the administrators in it — each with `role`, `email` and `active` (false for a deactivated account), owners first. `owns` names the projects it owns, which are what keep it from being deleted. `can` states what the server will accept from the caller on it: `manageMembers` (team_member_update, team_member_remove), `invite` (team_invite, team_invitation_revoke), `addExisting` (team_member_add — stated only for a super administrator, the one caller who can list administrators to choose from, though an owner who knows an administrator's id is accepted too), `rename` (team_update) and `delete`; a personal team can be renamed and nothing else, and the System team nothing. Readable by its members and super administrators."
+			'One team: its name, kind, and the administrators in it — each with `role`, `email` and `active` (false for a deactivated account), owners first. `owns` names the projects it owns, which are what keep it from being deleted. `can` states what the server will accept from the caller on it: `manageMembers` (team_member_update, team_member_remove), `invite` (team_invite, team_invitation_revoke), `addExisting` (team_member_add — a super administrator only; anyone else adds people with team_invite), `rename` (team_update) and `delete`; a personal team can be renamed and nothing else, and the System team nothing. Readable by its members and super administrators.'
 	},
 	{
 		tool: 'team_invitation_list',
@@ -1014,7 +1014,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'Add an existing administrator to a team as an owner or a plain member. This grants them everything the team owns, in one call. Owner-only. Refused for a personal team, which cannot be shared.'
+			'Add an existing administrator to a team as an owner or a plain member. This grants them everything the team owns, in one call, without their agreement — so it is a super administrator’s operation only; anyone else adds people with team_invite, which the person accepts. Refused for a personal team, which cannot be shared.'
 	},
 	{
 		tool: 'team_member_update',
@@ -1053,7 +1053,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'Invite somebody into a team by email, as an owner or a plain member. Creates an administrator account for them when they accept, if the address has none. Owner-only. Refused for a personal team, which cannot be shared.'
+			'Invite somebody into a team by email, as an owner or a plain member. Creates an administrator account for them when they accept, if the address has none. Owner-only. Refused for a personal team, which cannot be shared. An owner invitation is judged against the invitee’s plan when it is accepted, not when it is sent. Bounded, to protect the instance’s mail: one invitation per address and team every 10 minutes and at most 5 a day, 100 a day per inviter, and 50 open invitations per team — a refusal carries `retryAfter` in seconds where waiting helps.'
 	},
 	{
 		tool: 'team_invitation_revoke',
@@ -1152,7 +1152,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			"Change a project's name, the name shown to its people (`displayName`; null removes it), or its registration, verification and second-factor settings. Editing the project itself needs membership of the project's team — project_get states it as `can.editSettings`. `totpRequired` governs password sign-in only — it is accepted but inert while `passwordLogin` is off, and it never gates a federated sign-in, so it is not a way to secure a project that signs in through an upstream provider. Requiring verification is refused on every project until mail delivery is configured. A change that tightens who can get in — `passwordLogin` off, `emailVerificationRequired` or `totpRequired` (while passwords are on) turned on, or `registrationOpen` turned on for the default or the administrators' project — changes nothing when called alone: it answers with a preview, `consequences` (one sentence per change, counted), `expect` (the counts) and `changes`; call again with the same settings, `confirm: true` and that `expect` to apply it. If the counts changed since, it is refused with 409 and the fresh preview. Other changes apply at once. A super-administrator configures the administrators' own project here too: opening its registration lets anyone register a console account (the answer carries an advisory while verification is off); requiring verification is also refused until the acting administrator has verified their own address; turning password sign-in off is refused unless the caller's console session signed in through one of its identity providers and a super administrator stays reachable — so an agent, having no console session, is always refused it. Each refusal names its remedy."
+			"Change a project's name, the name shown to its people (`displayName`; null removes it), or its registration, verification and second-factor settings. Editing the project itself needs membership of the project's team — project_get states it as `can.editSettings`. `totpRequired` governs password sign-in only — it is accepted but inert while `passwordLogin` is off, and it never gates a federated sign-in, so it is not a way to secure a project that signs in through an upstream provider. Requiring verification is refused on every project until mail delivery is configured. A change that tightens who can get in — `passwordLogin` off, `emailVerificationRequired` or `totpRequired` (while passwords are on) turned on, or `registrationOpen` turned on for the default or the administrators' project — changes nothing when called alone: it answers with a preview, `consequences` (one sentence per change, counted), `expect` (the counts) and `changes`; call again with the same settings, `confirm: true` and that `expect` to apply it. If the counts changed since, it is refused with 409 and the fresh preview. Other changes apply at once. A super-administrator configures the administrators' own project here too: opening its registration lets anyone register a console account (the answer carries an advisory while verification is off); requiring verification is also refused until the acting administrator has verified their own address; turning password sign-in off is refused unless the caller's console session signed in through one of its identity providers and a super administrator stays reachable — so an agent, having no console session, is always refused it; and sign-up (`registrationOpen`) may be open only while `emailVerificationRequired` is on, so open both in one change and close sign-up before turning verification off. Each refusal names its remedy."
 	},
 
 	/* ----------------------------------------------- writes: end-users (10) */
@@ -1694,7 +1694,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: [],
 		summary:
-			'Generate a signing key for the instance key set, in any supported algorithm. The key is published at once and signs only once promoted, which the server allows after the publication window so every instance serves it first.'
+			'Generate a signing key for the instance key set, in any supported algorithm. The key is published at once and signs only once promoted, which the server allows after the publication window so every instance serves it first. Bounded: at most 12 keys held (signing, published, or retired and still verifying) and 20 made in a day, revoked ones counted; past either the answer is 409 with `reason: "key_limit"`.'
 	},
 	{
 		tool: 'jwks_promote',
@@ -1733,7 +1733,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: [],
 		summary:
-			'Rotate one algorithm of the instance key set in one step. When a published key of that algorithm is past its promotableAt, the oldest such key starts signing (`promoted`), the previous signer returns to published and keeps verifying what it signed (`demoted`), and a new key is generated and published as the next one (`generated`). When no key is ready, only the next key is generated, nothing changes who signs, and `rotatableAt` says from when the algorithm can rotate. Never promotes a key inside its publication window. Every project served at the root signs with these keys, the administrators included, which is why it is gated.'
+			'Rotate one algorithm of the instance key set in one step. When a published key of that algorithm is past its promotableAt, the oldest such key starts signing (`promoted`), the previous signer returns to published and keeps verifying what it signed (`demoted`), and a new key is generated and published as the next one (`generated`). When no key is ready, only the next key is generated, nothing changes who signs, and `rotatableAt` says from when the algorithm can rotate. Never promotes a key inside its publication window. Every project served at the root signs with these keys, the administrators included, which is why it is gated. Bounded: at most 12 keys held (signing, published, or retired and still verifying) and 20 made in a day, revoked ones counted; past either the answer is 409 with `reason: "key_limit"`.'
 	},
 	{
 		tool: 'jwks_revoke',
@@ -1759,7 +1759,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			'Generate a signing key for a project with an address of its own. The key is published at once and signs only once promoted, which the server allows after the publication window so every instance serves it first.'
+			'Generate a signing key for a project with an address of its own. The key is published at once and signs only once promoted, which the server allows after the publication window so every instance serves it first. Bounded: at most 12 keys held (signing, published, or retired and still verifying) and 20 made in a day, revoked ones counted; past either the answer is 409 with `reason: "key_limit"`.'
 	},
 	{
 		tool: 'project_key_promote',
@@ -1799,7 +1799,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			"Rotate one algorithm of a project's keys in one step. When a published key of that algorithm is past its promotableAt, the oldest such key starts signing (`promoted`), the previous signer returns to published and keeps verifying what it signed (`demoted`), and a new key is generated and published as the next one (`generated`). When no key is ready, only the next key is generated, nothing changes who signs, and `rotatableAt` says from when the algorithm can rotate. Never promotes a key inside its publication window. Refused for a project served at the root (its keys are the instance's) and for an unsupported algorithm."
+			'Rotate one algorithm of a project\'s keys in one step. When a published key of that algorithm is past its promotableAt, the oldest such key starts signing (`promoted`), the previous signer returns to published and keeps verifying what it signed (`demoted`), and a new key is generated and published as the next one (`generated`). When no key is ready, only the next key is generated, nothing changes who signs, and `rotatableAt` says from when the algorithm can rotate. Never promotes a key inside its publication window. Refused for a project served at the root (its keys are the instance\'s) and for an unsupported algorithm. Bounded: at most 12 keys held (signing, published, or retired and still verifying) and 20 made in a day, revoked ones counted; past either the answer is 409 with `reason: "key_limit"`.'
 	},
 	{
 		tool: 'project_key_revoke',

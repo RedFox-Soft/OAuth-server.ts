@@ -386,6 +386,45 @@ instance where anyone may register as an administrator. What an operator or an i
   `can.nameSlug`, `can.projects` and `can.teams`, and the MCP surface gains four `plan_*` tools and
   `project_plan_set`. While plans are on, a creation over a limit is refused with `409` and `code: 'plan_limit'`.
 
+The same release tightens what one team, or one stranger, can do to the others on a shared instance. Run
+`db:setup` (or `db:setup:pg`): it adds the `TeamInvitationThrottle` area, which counts team invitations. The
+release carries one migration, `2026-10-19-admin-signup-requires-verification`. What an operator or an
+integration sees:
+
+- **Administrators' sign-up needs email verification.** The administrators' project holds the console's own
+  accounts. It can no longer be saved with sign-up open and email verification off, because then anyone could
+  register an administrator account under a colleague's address. The migration closes administrators' sign-up
+  where it was open without verification, and its report says whether it did. To reopen it, turn sign-up and
+  verification on together, in one change, on the **Sign-in** tab of the **Administrators** page. The migration
+  can be undone, and it can safely run twice.
+- **An invitation can take over an unconfirmed account.** While administrators must verify their address, an
+  invitation to an address whose administrator account was never confirmed asks the invitee to choose a password.
+  That password replaces the account's, its second factor and linked identity providers are removed, and all its
+  sessions end. A confirmed account joins the team as before. See
+  [Accepting an invitation](/docs/administer/teams/#accepting-an-invitation).
+- **Only a super administrator adds an existing administrator to a team directly.** A team owner who calls
+  `POST /admin/api/teams/:id/members` or `team_member_add` gets `403`, and invites the person instead.
+- **An owner invitation is always sent.** Under plans, whether the invitee may become an owner is checked when they
+  accept it. A refused acceptance leaves the invitation usable.
+- **Team invitations are limited**, for super administrators too: one per address and team every 10 minutes and at
+  most 5 a day, at most 100 a day per inviter across all teams, and at most 50 open invitations per team. A refusal
+  says how long to wait, and carries `retryAfter` in seconds where waiting helps.
+- **Signing keys are limited per key set**, the instance's and each project's: at most 12 keys held and at most 20
+  made in a day, revoked keys included. A refusal is `409` with `reason: "key_limit"`. See
+  [How many keys](/docs/administer/signing-keys/#how-many-keys).
+- **Stored values have upper limits.** Project, application and identity-provider names are up to 100 characters.
+  An application holds up to 50 redirect URIs and 50 post-logout redirect URIs, each up to 2000 characters, and up
+  to 50 browser origins, each up to 300 characters. An identity provider holds up to 50 scopes and up to 100
+  allowed email domains. Only new values are checked: a value already stored keeps working. A request body over
+  1 MiB is refused with `413`, on every endpoint.
+- **An application's `jwks_uri` and `backchannel_logout_uri` must use `https`** when they are set or changed. An
+  application that already stores an `http` value keeps working, and its other fields can still be edited.
+- **More words are refused as a new project path**: every name on the subdomain form's built-in list, and
+  `account`, `health` and `ready`. An existing project with such a path keeps it. See
+  [Names a path cannot take](/docs/administer/project-addresses/#names-a-path-cannot-take).
+- **The console's own sign-in applications work only at the instance's root address.** A sign-in request for one
+  of them at a project's address is refused.
+
 ## After the restart
 
 ```bash

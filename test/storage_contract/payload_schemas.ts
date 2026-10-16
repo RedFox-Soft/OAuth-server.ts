@@ -31,6 +31,7 @@ import {
 	PasswordResetThrottlePayload
 } from 'lib/password_reset/types.js';
 import { PushedAuthorizationRequestPayload } from 'lib/models/pushed_authorization_request.js';
+import { TeamInvitationThrottlePayload } from 'lib/admin/groups/invite_bounds.js';
 import { RefreshTokenSchema } from 'lib/models/refresh_token.js';
 import { RegistrationAccessTokenPayload } from 'lib/models/registration_access_token.js';
 import { ReplayDetectionPayload } from 'lib/models/replay_detection.js';
@@ -68,6 +69,7 @@ export const PAYLOAD_SCHEMAS: Readonly<
 	RegistrationAccessToken: RegistrationAccessTokenPayload,
 	ReplayDetection: ReplayDetectionPayload,
 	Session: SessionPayload,
+	TeamInvitationThrottle: TeamInvitationThrottlePayload,
 	TotpAttempt: TotpAttemptPayload,
 	TotpEnrollment: TotpEnrollmentPayload,
 	UpstreamSession: UpstreamSessionPayload,

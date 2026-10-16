@@ -55,6 +55,11 @@ const REAPED_ON_EXPIRES_AT = [
 	'ReplayDetection',
 	'Session',
 	/*
+	 * Team invitation mail counters (specs/103). Expiry is the control: a window that never ended would hold an
+	 * address, or an inviter, at their bound for good.
+	 */
+	'TeamInvitationThrottle',
+	/*
 	 * The second factor's two areas, and expiry is the control in both rather than housekeeping. An
 	 * enrolment offer that outlived its window would leave a secret nobody proved sitting against a
 	 * live account; a failure window that never expired would lock an account out for good on ten

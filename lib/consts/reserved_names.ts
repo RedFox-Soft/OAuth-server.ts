@@ -110,6 +110,27 @@ export function isReservedSubdomainLabel(label: string): boolean {
 }
 
 /*
+ * Names a project may not be given as a new path address (specs/103), wider than the router's list above.
+ *
+ * The router's list keeps a project from shadowing a route, and it is read on every request, so widening it would
+ * make an existing project of one of these names stop answering. This is asked only when a name is chosen. It adds
+ * what the subdomain list already holds — the words a phishing page would most like to borrow — because
+ * `/login` and `/sso` on the instance's own host read as official exactly as `login.` and `sso.` would; and the
+ * routes the router's list missed (`/account/apps`, `/health`, `/ready`), which a static route already wins but a
+ * project name would still confuse.
+ */
+const refusedAsNewPath = new Set([
+	...RESERVED_SUBDOMAIN_LABELS,
+	'account',
+	'health',
+	'ready'
+]);
+
+export function isRefusedAsNewPathName(name: string): boolean {
+	return reserved.has(name) || refusedAsNewPath.has(name);
+}
+
+/*
  * Whether a label has hyphens in its third and fourth characters — the shape RFC 5891 §4.2.3.1 reserves for
  * encoded names such as `xn--…`. A browser may show such a label as other characters, so as a subdomain it is
  * a way to look like a name it is not. Harmless as a path, which nobody renders.

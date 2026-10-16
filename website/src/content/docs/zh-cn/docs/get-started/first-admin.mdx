@@ -1,7 +1,7 @@
 ---
 title: 创建第一个管理员
 description: 一次性设置页面、管理员登录的工作方式，以及在做任何其他事之前就应开启的第二因素认证。
-source: 93f703c859b9
+source: f51a122991fe
 sidebar:
   order: 3
 ---
@@ -21,7 +21,7 @@ import ScreenshotFigure from '../../../../../components/ScreenshotFigure.astro';
 
 </Steps>
 
-一旦 Super administrators 有了一个活跃成员，设置路由就会关闭，此后一律返回 `409 already_initialized`。`/admin` 变成登录页面。后续的管理员在控制台的 **Administrators** 页面上通过 **New administrator** 创建，同样需要一个电子邮件地址和一个至少十二个字符的密码。超级管理员还可以在该页面的 **Sign-in** 标签页上开放注册，让人们自行注册，或者在 **Identity providers** 下连接你所在组织的身份提供商。无论通过哪种方式加入，新管理员都不会是超级管理员：这一身份要由超级管理员在账户菜单中通过 **Make super administrator…** 单独授予。（另外，常规团队的成员资格是通过电子邮件邀请提供的。）如果你在一个本应已有管理员的部署上看到了设置页面，就值得调查一下：这意味着此服务器读取的账户集合里一个账户都没有。
+一旦 Super administrators 有了一个活跃成员，设置路由就会关闭，此后一律返回 `409 already_initialized`。`/admin` 变成登录页面。后续的管理员在控制台的 **Administrators** 页面上通过 **New administrator** 创建，同样需要一个电子邮件地址和一个至少十二个字符的密码。超级管理员还可以在该页面的 **Sign-in** 标签页上开放注册，让人们自行注册，或者在 **Identity providers** 下连接你所在组织的身份提供商。注册只能与电子邮件验证在同一次更改中一起开启。如果不要求验证，任何人都能用同事的地址注册一个管理员账户。无论通过哪种方式加入，新管理员都不会是超级管理员：这一身份要由超级管理员在账户菜单中通过 **Make super administrator…** 单独授予。（另外，常规团队的成员资格是通过电子邮件邀请提供的。）如果你在一个本应已有管理员的部署上看到了设置页面，就值得调查一下：这意味着此服务器读取的账户集合里一个账户都没有。
 
 <Aside type="caution">
 

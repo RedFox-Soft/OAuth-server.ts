@@ -34,19 +34,20 @@ export async function renderAdminShell(props: AdminShellProps, status = 200) {
 	// Hashed for the page's content security policy, so the authorization is derived from the script
 	// that is actually served rather than restated beside it.
 	const propsScript = `window.PROPS=${JSON.stringify(props).replace(/</g, '\\u003c')}`;
+	const styles = `<link rel="stylesheet" href="${versionedAsset('reset.css')}" /><link rel="stylesheet" href="${versionedAsset('antd.css')}" />`;
+	const body = renderToString(
+		<StrictMode>
+			<ConsoleRoot {...props} />
+		</StrictMode>
+	);
+	/*
+	 * Function replacements, as lib/interactions/serverRender.tsx uses: a string replacement expands `$'`, `` $` ``
+	 * and `$&`, and the props carry the page's own address, so a link to `/admin/x$'` spliced the rest of the
+	 * template into the script and the console never loaded (specs/103).
+	 */
 	html = html
-		.replace('<!--app-props-->', `<script>${propsScript}</script>`)
-		.replace(
-			'<!--app-styles-->',
-			`<link rel="stylesheet" href="${versionedAsset('reset.css')}" /><link rel="stylesheet" href="${versionedAsset('antd.css')}" />`
-		)
-		.replace(
-			'<!--app-html-->',
-			renderToString(
-				<StrictMode>
-					<ConsoleRoot {...props} />
-				</StrictMode>
-			)
-		);
+		.replace('<!--app-props-->', () => `<script>${propsScript}</script>`)
+		.replace('<!--app-styles-->', () => styles)
+		.replace('<!--app-html-->', () => body);
 	return htmlResponse(html, { status });
 }

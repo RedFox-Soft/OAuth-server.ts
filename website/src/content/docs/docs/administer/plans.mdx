@@ -93,7 +93,9 @@ and it is 1 by default. The personal team never counts. A team has no plan of it
 the whole instance rather than a plan limit.
 
 Becoming an owner is checked too. Adding someone to a team as an owner, changing a member's role to owner, or
-accepting an invitation as an owner is refused when it would put that person over either count.
+accepting an invitation as an owner is refused when it would put that person over either count. An owner
+invitation is always sent: it is checked when the person accepts it, not when it is sent. A refused acceptance
+leaves the invitation usable, so the person can accept it later, once they have room.
 
 ### Applications and APIs {#applications-and-apis}
 
@@ -270,6 +272,7 @@ A high-consequence tool asks for confirmation before it runs. The admin API rout
   [`scim.enabled`](/docs/reference/settings/#scim.enabled) off. Directory provisioning is for an organisation
   running an instance of its own. Where it is on, the active-user cap never refuses it.
 - **Billing is out of scope.** There are no prices, invoices or payments, and no public plan picker.
-- **End users, groups, signing keys and SCIM connections** are not limited, beyond the active-user cap on new
-  sign-ups.
+- **End users, groups, signing keys and SCIM connections** are not limited by a plan, beyond the active-user cap
+  on new sign-ups. Signing keys have a fixed limit of their own, the same for every project:
+  [How many keys](/docs/administer/signing-keys/#how-many-keys).
 - **No email is sent** when a project nears or reaches a limit. The warnings are in the console.

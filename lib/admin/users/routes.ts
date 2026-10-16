@@ -1,6 +1,5 @@
 import { Elysia } from 'elysia';
 import {
-	adminSessionStore,
 	getBucketStore,
 	getGroupStore,
 	getUserStore
@@ -21,7 +20,7 @@ import {
 	reachableThroughProvider
 } from '../federation/reachability.js';
 import { canSignIn } from '../../end_users/can_sign_in.js';
-import { revokeAccountAccess } from '../../end_users/revoke_access.js';
+import { signOutAdministrator } from './sign_out.js';
 import { clearAttempts } from '../../totp/verify.js';
 import { CreateAdminBody, UpdateAdminBody } from './schema.js';
 import { presentUser } from '../users-end/routes.js';
@@ -106,24 +105,6 @@ async function assertAddressKeepsConsoleReachable(
 		},
 		'Changing this address'
 	);
-}
-
-/*
- * Ends a colleague's access to the console without touching their account (specs/083): every console
- * session they hold, and every grant and token at the console's issuer — so an agent acting for them loses
- * its token too. They can sign in again at once, as themselves. Answers how many console sessions ended.
- */
-async function signOutAdministrator(userId: string): Promise<number> {
-	const sessions = await adminSessionStore.destroyByUser(userId);
-	const revoked = await revokeAccountAccess(userId);
-	if (revoked.failedAreas.length > 0) {
-		throw new AdminError(
-			500,
-			`the administrator was signed out of the console, but their access survives in: ${revoked.failedAreas.join(', ')}`,
-			{ failedAreas: revoked.failedAreas }
-		);
-	}
-	return sessions;
 }
 
 /*

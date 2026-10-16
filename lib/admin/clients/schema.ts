@@ -51,6 +51,16 @@ const JwkSet = t.Object({ keys: t.Array(t.Record(t.String(), t.Unknown())) });
 const SubjectType = t.Union([t.Literal('public'), t.Literal('pairwise')]);
 
 /*
+ * Bounded because every one of these is read with the client on each resolution, and a tenant's unbounded list
+ * would be carried by every request for that client (specs/103). Far above any real application: a client with
+ * fifty redirect addresses is already unusual. Only new values are judged; a stored list is never re-validated.
+ */
+const RedirectUriList = t.Array(t.String({ maxLength: 2000 }), {
+	maxItems: 50
+});
+const OriginList = t.Array(t.String({ maxLength: 300 }), { maxItems: 50 });
+
+/*
  * The attributes a client authenticating with its own key, and a client held to FAPI's request
  * protections, is registered with — the ones dynamic registration always accepted and the console did
  * not. Validation is validateClient's, exactly as for a self-registered client: a key set with private
@@ -96,13 +106,13 @@ const editable = {
 };
 
 export const CreateClientBody = t.Object({
-	clientName: t.Optional(t.String({ minLength: 1 })),
+	clientName: t.Optional(t.String({ minLength: 1, maxLength: 100 })),
 	applicationType: t.Optional(t.Union([t.Literal('web'), t.Literal('native')])),
 	grantTypes: t.Array(GrantType, {
 		minItems: 1
 	}),
-	redirectUris: t.Optional(t.Array(t.String())),
-	postLogoutRedirectUris: t.Optional(t.Array(t.String())),
+	redirectUris: t.Optional(RedirectUriList),
+	postLogoutRedirectUris: t.Optional(RedirectUriList),
 	tokenEndpointAuthMethod: AuthMethod,
 	scope: t.Optional(t.String()),
 	requireConsent: t.Optional(t.Boolean()),
@@ -125,21 +135,21 @@ export const CreateClientBody = t.Object({
 	 * Typed only as strings here: the origin rule runs in the handler, so a refusal can name the
 	 * offending value (lib/helpers/cors_origin.ts).
 	 */
-	corsOrigins: t.Optional(t.Array(t.String())),
+	corsOrigins: t.Optional(OriginList),
 	...creatable,
 	...presented
 });
 
 export const UpdateClientBody = t.Object({
-	clientName: t.Optional(t.String({ minLength: 1 })),
+	clientName: t.Optional(t.String({ minLength: 1, maxLength: 100 })),
 	applicationType: t.Optional(t.Union([t.Literal('web'), t.Literal('native')])),
 	grantTypes: t.Optional(
 		t.Array(GrantType, {
 			minItems: 1
 		})
 	),
-	redirectUris: t.Optional(t.Array(t.String())),
-	postLogoutRedirectUris: t.Optional(t.Array(t.String())),
+	redirectUris: t.Optional(RedirectUriList),
+	postLogoutRedirectUris: t.Optional(RedirectUriList),
 	tokenEndpointAuthMethod: t.Optional(AuthMethod),
 	scope: t.Optional(t.String()),
 	requireConsent: t.Optional(t.Boolean()),
@@ -152,7 +162,7 @@ export const UpdateClientBody = t.Object({
 		t.Union([t.Literal('poll'), t.Literal('ping')])
 	),
 	backchannelClientNotificationEndpoint: t.Optional(t.String()),
-	corsOrigins: t.Optional(t.Array(t.String())),
+	corsOrigins: t.Optional(OriginList),
 	authorizationDetailsTypes: t.Optional(t.Array(t.String())),
 	...editable,
 	...presentedEditable

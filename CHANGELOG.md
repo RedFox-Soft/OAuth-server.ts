@@ -74,6 +74,22 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   same project. Entries written before this fix stay super-administrator-only, because the trail is never
   rewritten.
 
+### Security
+
+- **Tenant hardening before open administrator sign-up** (spec 103). Accepting a team invitation no longer joins an
+  account someone else registered under the invitee's address: administrators' sign-up may be open only with email
+  verification on (a 409 otherwise, where it used to be an advisory), and while verification is required, accepting
+  an invitation for an account whose address was never confirmed asks for a password, replaces the account's, and
+  removes its authenticator, linked providers, sessions and tokens. Only a super administrator adds someone to a team
+  directly; owners invite. Team invitations are bounded (one per address and team every 10 minutes and 5 a day, 100 a
+  day per inviter, 50 open per team), an owner invitation is judged against the plan only when accepted, keys are
+  bounded at 12 held and 20 made a day per project, request bodies at 1 MiB, and project, application and provider
+  names and lists have maximum lengths. New project paths may not use the reserved subdomain words or `account`,
+  `health`, `ready`; `jwks_uri` and `backchannel_logout_uri` must be https when set; the console's own clients are
+  accepted only at the instance root. **Upgrade:** run `db:setup` (new area `TeamInvitationThrottle`) and `db:migrate`;
+  `2026-10-19-admin-signup-requires-verification` closes administrators' sign-up where it was open without
+  verification — reopen it with verification on.
+
 ## [0.12.0] - 2026-10-14
 
 The pages people see are rebuilt for the people who see them. The consent page says who is asking, which account

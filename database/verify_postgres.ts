@@ -22,6 +22,7 @@ import {
 import { verifyProjectRemoval } from './verify_remove_projects.js';
 import { verifyReservedHostnamesKey } from './verify_reserved_hostnames_key.js';
 import { verifyPlans } from './verify_plans.js';
+import { verifyAdminSignUp } from './verify_admin_signup.js';
 import {
 	FIXED_AREAS,
 	STORE_AREAS,
@@ -632,6 +633,24 @@ await verifyReservedHostnamesKey(
 			}
 		},
 		String(Date.now()),
+		check
+	);
+}
+
+{
+	const { UserBucketStore: SignUpBucketStore } =
+		await import('../lib/adapters/postgres/index.js');
+	await verifyAdminSignUp(
+		{
+			buckets: new SignUpBucketStore(),
+			apply: async () => {
+				const signUp = MIGRATIONS.find((m) =>
+					m.id.endsWith('admin-signup-requires-verification')
+				);
+				if (!signUp || 'noop' in signUp.postgres) return null;
+				return signUp.postgres.apply(handle);
+			}
+		},
 		check
 	);
 }

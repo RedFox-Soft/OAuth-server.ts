@@ -95,7 +95,10 @@ in the operator's own domain, not a team's quota.
   `api`, `login`, `status` and the like. It is separate from the path list because the two protect different
   things. A path name keeps a project from shadowing a route, so `www` is harmless as `/www`. As
   `www.auth.example.com` it would be a name in the operator's domain under a tenant's control, and these are
-  the names a phishing page would most like to borrow.
+  the names a phishing page would most like to borrow. Since spec 103 a *new* path name is refused on the same list
+  as well, plus `account`, `health` and `ready` (`isRefusedAsNewPathName`, `lib/consts/reserved_names.ts`):
+  `/login` on the instance's own host reads as official as `login.` does. The router's narrower list is left alone,
+  because it is read on every request and widening it would stop an existing project of such a name answering.
 - **The encoded-label shape.** `hasEncodedLabelShape` (`:117`) refuses `--` as the third and fourth
   characters. That is the shape RFC 5891 §4.2.3.1 reserves for encoded names such as `xn--…`, which a browser
   may display as other characters. As a path, which nobody renders, the same slug is accepted

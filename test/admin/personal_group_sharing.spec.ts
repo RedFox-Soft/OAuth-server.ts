@@ -49,7 +49,8 @@ describe('sharing a personal group', () => {
 	});
 
 	it('refuses its owner adding a colleague, and the membership is unchanged', async () => {
-		const owner = await admin();
+		// A super administrator, the one caller who adds anybody directly (specs/103); their own team is no exception.
+		const owner = await admin('super');
 		const colleague = await admin();
 		const personal = await ensurePersonalGroup(owner._id, owner.email);
 
@@ -141,7 +142,8 @@ describe('sharing a personal group', () => {
 	});
 
 	it('still adds a member to a regular group its caller owns', async () => {
-		const owner = await admin();
+		// A super administrator: nobody else adds a member directly (specs/103).
+		const owner = await admin('super');
 		const colleague = await admin();
 		const team = await regularGroup([owner]);
 

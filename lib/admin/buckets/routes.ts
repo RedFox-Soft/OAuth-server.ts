@@ -51,10 +51,7 @@ import {
 } from '../resources/move.js';
 import { loadBucketForSettings, loadBucketForEdit } from './access.js';
 import { visibleBuckets } from './visible.js';
-import {
-	adminBucketAdvisory,
-	assertAdminBucketChange
-} from './admin_bucket.js';
+import { assertAdminBucketChange } from './admin_bucket.js';
 import { sameExpect, signInCounts, signInPreview } from './sign_in_preview.js';
 import {
 	assertSomeWayToSignIn,
@@ -69,7 +66,7 @@ import {
 } from './schema.js';
 import {
 	hasEncodedLabelShape,
-	isReservedBucketName,
+	isRefusedAsNewPathName,
 	isReservedSubdomainLabel
 } from '../../consts/reserved_names.js';
 import {
@@ -139,7 +136,7 @@ function acceptedDisplayName(
 }
 
 async function assertSlugAvailable(slug: string) {
-	if (isReservedBucketName(slug)) {
+	if (isRefusedAsNewPathName(slug)) {
 		throw new AdminError(
 			409,
 			`'${slug}' is reserved for this server's own addresses and cannot be a project slug`,
@@ -319,7 +316,8 @@ async function assertSubdomainAvailable(
 	if (holder && holder._id !== exceptId) {
 		throw new AdminError(
 			409,
-			`'${name}' is already the address of the project '${holder.name}'`,
+			// The holder is not named: it may be another tenant's project, and its name is theirs (specs/103).
+			`'${name}' is already taken`,
 			{ field: 'slug' }
 		);
 	}
@@ -1181,12 +1179,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			});
 			const updated = await getBucketStore().update(params.id, changes);
 			if (!updated) throw new AdminError(404, 'project not found');
-			const presented = withInertTotpAdvisory(presentBucket(updated));
-			const advisory =
-				params.id === ADMIN_BUCKET_ID
-					? adminBucketAdvisory(updated)
-					: undefined;
-			return { ...presented, ...(advisory ? { advisory } : {}) };
+			return withInertTotpAdvisory(presentBucket(updated));
 		},
 		{ body: UpdateBucketBody }
 	)

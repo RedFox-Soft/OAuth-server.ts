@@ -43,6 +43,12 @@ const BucketHost = t.String({ minLength: 1, maxLength: 253 });
 const BucketDisplayName = t.String({ minLength: 1, maxLength: 60 });
 
 /*
+ * A project's own name reaches the subject of the mail its people are sent, under the operator's mail identity, so it
+ * is bounded like a team's (specs/103). Only new values are judged: a stored name is never re-validated.
+ */
+const PROJECT_NAME_MAX_LENGTH = 100;
+
+/*
  * How a slug is used: as a path segment beneath the instance (`auth.example.com/acme`) or as a subdomain of
  * it (`acme.auth.example.com`) — specs/101. It goes with `slug` only; a hostname is a form of its own.
  * Omitted means a path whatever `projects.addressForms` says, so a request an existing integration already
@@ -51,7 +57,7 @@ const BucketDisplayName = t.String({ minLength: 1, maxLength: 60 });
 const AddressForm = t.Union([t.Literal('path'), t.Literal('subdomain')]);
 
 export const CreateBucketBody = t.Object({
-	name: t.String({ minLength: 1 }),
+	name: t.String({ minLength: 1, maxLength: PROJECT_NAME_MAX_LENGTH }),
 	displayName: t.Optional(BucketDisplayName),
 	slug: t.Optional(BucketSlug),
 	host: t.Optional(BucketHost),
@@ -110,7 +116,9 @@ export const MoveBucketOwnerBody = t.Object({
 });
 
 export const UpdateBucketBody = t.Object({
-	name: t.Optional(t.String({ minLength: 1 })),
+	name: t.Optional(
+		t.String({ minLength: 1, maxLength: PROJECT_NAME_MAX_LENGTH })
+	),
 	/* `null` removes it, and the pages go back to showing the bucket's address. */
 	displayName: t.Optional(t.Union([BucketDisplayName, t.Null()])),
 	/*

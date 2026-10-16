@@ -20,6 +20,7 @@ import type { RefreshTokenPayload } from '../models/refresh_token.js';
 import type { RegistrationAccessTokenPayloadType } from '../models/registration_access_token.js';
 import type { ReplayDetectionPayloadType } from '../models/replay_detection.js';
 import type { SessionPayloadType } from '../models/session.js';
+import type { TeamInvitationThrottlePayload } from '../admin/groups/invite_bounds.js';
 import type {
 	TotpAttemptPayload,
 	TotpEnrollmentPayload
@@ -66,6 +67,7 @@ export interface ModelPayloadByName {
 	RegistrationAccessToken: RegistrationAccessTokenPayloadType;
 	ReplayDetection: ReplayDetectionPayloadType;
 	Session: SessionPayloadType;
+	TeamInvitationThrottle: TeamInvitationThrottlePayload;
 	TotpAttempt: TotpAttemptPayload;
 	TotpEnrollment: TotpEnrollmentPayload;
 	UpstreamSession: UpstreamSessionPayload;

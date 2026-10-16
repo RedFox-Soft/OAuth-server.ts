@@ -176,8 +176,9 @@ Each rule is the part that is easy to break. Read the named page before changing
   Super administrators (`lib/admin/super_admins.ts`), and end users are grouped only by bucket groups, whose
   members are records — change them through `lib/bucket_groups/service.ts`, never a member list read and
   written back. A personal group has exactly one member; a bucket changes group only through its move
-  route, and everything in it follows by reference. → `team-ownership.md`, `project-groups.md`,
-  `container-ownership-transfer.md`
+  route, and everything in it follows by reference. A group is joined only by accepting an invitation or by a
+  super administrator, and accepting one reclaims an account whose address was never proven.
+  → `team-ownership.md`, `project-groups.md`, `container-ownership-transfer.md`
 - **Audit** — a mutating admin route records audit-first, after authorization, inside the handler.
   → `admin-audit-trail.md`
 - **End users** — change an end user only through `lib/end_users/service.ts`, never the user store

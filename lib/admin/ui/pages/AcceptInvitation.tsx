@@ -19,7 +19,9 @@ import { useRoute } from '../frame/router.js';
  *
  * The page cannot tell whether the invitee already has an account — saying so would confirm which
  * addresses are administrators — so the password is asked for always and used only when the account is
- * new. An existing administrator leaves it empty and simply joins the group.
+ * new, or when the account for the address was never confirmed and the invitation hands it to whoever holds
+ * the mailbox (specs/103); the server then says so, and the field is still there to fill in. An existing
+ * administrator leaves it empty and simply joins the group.
  */
 export function AcceptInvitation() {
 	const { query } = useRoute();
@@ -72,7 +74,7 @@ export function AcceptInvitation() {
 						<Typography.Paragraph type="secondary">
 							If you already administer this server, leave the password empty:
 							you join the team with the account you have. Otherwise choose a
-							password for your new administrator account.
+							password for your administrator account.
 						</Typography.Paragraph>
 						{error && (
 							<Alert
@@ -90,7 +92,7 @@ export function AcceptInvitation() {
 						>
 							<Form.Item
 								name="password"
-								label="Password for a new account"
+								label="Password"
 								rules={[
 									{ min: 8, message: 'At least 8 characters' },
 									{ max: 200, message: 'At most 200 characters' }

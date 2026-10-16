@@ -165,20 +165,6 @@ describe("the administrators' bucket on the bucket settings", () => {
 		expect(entry?.ownerGroupId).toBe(UNASSIGNED_GROUP_ID);
 	});
 
-	it('opens administrator registration and warns that, without verification, any address can be claimed', async () => {
-		const res = await consenting((consent) =>
-			client.admin.api
-				.projects({ id: ADMIN_BUCKET_ID })
-				.patch(
-					{ registrationOpen: true, ...consent },
-					{ headers: { cookie: admin.cookie } }
-				)
-		);
-		expect(res.status).toBe(200);
-		expect(answered(res.data).registrationOpen).toBe(true);
-		expect(answered(res.data).advisory).toContain('any address can be claimed');
-	});
-
 	it('refuses a setting the bucket does not have', async () => {
 		const res = await client.admin.api.projects({ id: ADMIN_BUCKET_ID }).patch(
 			{

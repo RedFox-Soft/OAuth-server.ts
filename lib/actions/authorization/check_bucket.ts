@@ -2,7 +2,7 @@ import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import type { PipelineParams } from 'lib/consts/param_list.js';
 import { getBucketStore } from '../../adapters/index.js';
 import { resolveBucketForRequest } from '../../admin/auth/resolveBucket.js';
-import { DEFAULT_BUCKET_ID } from '../../admin/consts.js';
+import { ADMIN_BUCKET_ID, DEFAULT_BUCKET_ID } from '../../admin/consts.js';
 import { isAddressable } from '../../admin/auth/bucketAddress.js';
 import { UnauthorizedClient } from '../../helpers/errors.js';
 
@@ -48,6 +48,16 @@ export default async function checkBucket(
 	if (belongsTo === oidc.bucket._id) return belongsTo;
 
 	/*
+	 * The console's own clients, at the root only (specs/103). The administrators' bucket has no address, so the
+	 * look below would let them through at every address — a tenant's path, subdomain or hostname included — and
+	 * the console sign-in would then run on a tenant's origin.
+	 */
+	if (belongsTo === ADMIN_BUCKET_ID) {
+		if (oidc.bucket._id === DEFAULT_BUCKET_ID) return belongsTo;
+		throw notAuthorizedHere();
+	}
+
+	/*
 	 * The default bucket is addressable by definition: its address is the root, which exists whether or
 	 * not anybody has provisioned its record. A client of it at a named address is therefore always at
 	 * the wrong one, and is refused without a lookup — the lookup below would otherwise let it through
@@ -69,7 +79,11 @@ export default async function checkBucket(
 	 * is wrong is that this client is not authorized at this address. Saying so discloses nothing a
 	 * caller could not already determine — the client is theirs and the address is published.
 	 */
-	throw new UnauthorizedClient(
+	throw notAuthorizedHere();
+}
+
+function notAuthorizedHere(): InstanceType<typeof UnauthorizedClient> {
+	return new UnauthorizedClient(
 		'client is not authorized at this address',
 		'the client belongs to a different user bucket than the one addressed'
 	);

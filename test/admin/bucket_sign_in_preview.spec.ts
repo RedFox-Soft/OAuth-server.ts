@@ -397,6 +397,10 @@ describe('changing how people sign in to a bucket', () => {
 	});
 
 	it("opening sign-up on the administrators' bucket says anyone can create an administrator account", async () => {
+		// Sign-up opens only beside a verification requirement already in force (specs/103).
+		await getBucketStore().update(ADMIN_BUCKET_ID, {
+			emailVerificationRequired: true
+		});
 		try {
 			const answer = await request(
 				'PATCH',
@@ -410,7 +414,8 @@ describe('changing how people sign in to a bucket', () => {
 			]);
 		} finally {
 			await getBucketStore().update(ADMIN_BUCKET_ID, {
-				registrationOpen: false
+				registrationOpen: false,
+				emailVerificationRequired: false
 			});
 		}
 	});

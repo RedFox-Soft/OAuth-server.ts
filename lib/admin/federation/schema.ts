@@ -3,6 +3,18 @@ import { t } from 'elysia';
 const Provisioning = t.Union([t.Literal('jit'), t.Literal('existing_only')]);
 
 /*
+ * Bounded because a project's providers are read with the project on every sign-in, and the display name is shown
+ * on its sign-in page (specs/103). Only new values are judged; a stored provider is never re-validated.
+ */
+const ProviderName = t.String({ minLength: 1, maxLength: 100 });
+const ScopeList = t.Array(t.String({ minLength: 1, maxLength: 200 }), {
+	maxItems: 50
+});
+const DomainList = t.Array(t.String({ minLength: 1, maxLength: 253 }), {
+	maxItems: 100
+});
+
+/*
  * The provider bodies.
  *
  * Only `id`, `displayName`, `issuer`, `clientId` and `clientSecret` are required on create; everything else
@@ -23,7 +35,7 @@ export const CreateProviderBody = t.Object({
 	 */
 	catalogueId: t.Optional(t.String({ minLength: 1 })),
 	id: t.Optional(t.String({ minLength: 1, maxLength: 32 })),
-	displayName: t.Optional(t.String({ minLength: 1 })),
+	displayName: t.Optional(ProviderName),
 	issuer: t.Optional(t.String({ minLength: 1 })),
 	clientId: t.String({ minLength: 1 }),
 	/*
@@ -40,10 +52,10 @@ export const CreateProviderBody = t.Object({
 	keyId: t.Optional(t.String({ minLength: 1 })),
 	signingKey: t.Optional(t.String({ minLength: 1 })),
 	enabled: t.Optional(t.Boolean()),
-	scopes: t.Optional(t.Array(t.String({ minLength: 1 }))),
+	scopes: t.Optional(ScopeList),
 	emailTrusted: t.Optional(t.Boolean()),
 	provisioning: t.Optional(Provisioning),
-	allowedEmailDomains: t.Optional(t.Array(t.String({ minLength: 1 }))),
+	allowedEmailDomains: t.Optional(DomainList),
 	emailClaim: t.Optional(t.String({ minLength: 1 })),
 	/* Whether the provider may end its users' access here (global token revocation, specs/072). Off unless set. */
 	acceptsGlobalTokenRevocation: t.Optional(t.Boolean()),
@@ -69,7 +81,7 @@ export const MoveProviderBody = t.Object(
  * have to re-type a secret. The stored value can therefore only be replaced deliberately.
  */
 export const UpdateProviderBody = t.Object({
-	displayName: t.Optional(t.String({ minLength: 1 })),
+	displayName: t.Optional(ProviderName),
 	issuer: t.Optional(t.String({ minLength: 1 })),
 	clientId: t.Optional(t.String({ minLength: 1 })),
 	clientSecret: t.Optional(t.String({ minLength: 1 })),
@@ -80,10 +92,10 @@ export const UpdateProviderBody = t.Object({
 	 * re-pasting a private key. */
 	signingKey: t.Optional(t.String({ minLength: 1 })),
 	enabled: t.Optional(t.Boolean()),
-	scopes: t.Optional(t.Array(t.String({ minLength: 1 }))),
+	scopes: t.Optional(ScopeList),
 	emailTrusted: t.Optional(t.Boolean()),
 	provisioning: t.Optional(Provisioning),
-	allowedEmailDomains: t.Optional(t.Array(t.String({ minLength: 1 }))),
+	allowedEmailDomains: t.Optional(DomainList),
 	emailClaim: t.Optional(t.String({ minLength: 1 })),
 	acceptsGlobalTokenRevocation: t.Optional(t.Boolean()),
 	acceptsBackChannelLogout: t.Optional(t.Boolean())

@@ -27,8 +27,13 @@ import {
 export async function assertAdminBucketChange(
 	ctx: AdminContext,
 	bucket: UserBucket,
-	patch: { emailVerificationRequired?: boolean; passwordLogin?: boolean }
+	patch: {
+		emailVerificationRequired?: boolean;
+		passwordLogin?: boolean;
+		registrationOpen?: boolean;
+	}
 ): Promise<void> {
+	assertSignUpNeedsVerification({ ...bucket, ...patch });
 	if (patch.passwordLogin === false && bucket.passwordLogin) {
 		await assertMayTurnPasswordsOff(ctx, bucket);
 	}
@@ -43,17 +48,24 @@ export async function assertAdminBucketChange(
 }
 
 /*
- * Said on every write that leaves the bucket in this state rather than refused: an open console with no
- * proof of address is a legitimate choice for an instance behind its own network, but it is one an operator
- * should make knowingly, and an agent reading the response gets the same sentence the console shows.
+ * Sign-up open means verification required, judged on the state the change would leave (specs/103).
+ *
+ * This used to be said rather than refused — an open console with no proof of address was taken to be a choice
+ * for an instance behind its own network. It is not one: anyone could register under a colleague's address, and
+ * the colleague's next team invitation joined that account to the team, as an owner if that was the invitation.
+ * A closed network narrows who can register; it does not make the address theirs. With proof required, such an
+ * account cannot sign in, and accepting the invitation hands it to whoever holds the mailbox
+ * (lib/admin/groups/accept.ts).
  */
-export function adminBucketAdvisory(
-	bucket: Pick<UserBucket, 'registrationOpen' | 'emailVerificationRequired'>
-): string | undefined {
-	if (!bucket.registrationOpen || bucket.emailVerificationRequired) {
-		return undefined;
+function assertSignUpNeedsVerification(
+	state: Pick<UserBucket, 'registrationOpen' | 'emailVerificationRequired'>
+): void {
+	if (state.registrationOpen && !state.emailVerificationRequired) {
+		throw new AdminError(
+			409,
+			'administrators can sign up only with email verification on: turn verification on in the same change'
+		);
 	}
-	return 'anyone can register an administrator account, and without email verification any address can be claimed';
 }
 
 async function assertMayTurnPasswordsOff(

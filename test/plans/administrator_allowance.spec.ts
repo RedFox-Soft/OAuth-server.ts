@@ -160,22 +160,22 @@ describe('what one administrator may own on Free', () => {
 		});
 	});
 
-	it('refuses to make an administrator at the team limit an owner by adding or promoting them', async () => {
+	/*
+	 * Promotion is the way a tenant makes somebody an owner directly: only a super administrator adds anybody by id,
+	 * and is not limited (specs/103). The member is put in through the store, as an accepted invitation would.
+	 */
+	async function asMemberOf(teamId: string, userId: string): Promise<void> {
+		const team = await getGroupStore().find(teamId);
+		await getGroupStore().update(teamId, {
+			members: [...(team?.members ?? []), { userId, role: 'member' }]
+		});
+	}
+
+	it('refuses to promote an administrator at the team limit to owner', async () => {
 		const owner = await tenant();
 		const full = await tenant();
+		await asMemberOf(owner.teamId, full.user._id);
 
-		const added = await call(
-			'POST',
-			`/admin/api/teams/${owner.teamId}/members`,
-			owner.cookie,
-			{ userId: full.user._id, role: 'owner' }
-		);
-		const asMember = await call(
-			'POST',
-			`/admin/api/teams/${owner.teamId}/members`,
-			owner.cookie,
-			{ userId: full.user._id, role: 'member' }
-		);
 		const promoted = await call(
 			'PATCH',
 			`/admin/api/teams/${owner.teamId}/members/${full.user._id}`,
@@ -183,29 +183,32 @@ describe('what one administrator may own on Free', () => {
 			{ role: 'owner' }
 		);
 
-		expect(refusalOf(added).limit.name).toBe('regularTeamsPerAdministrator');
-		expect(asMember.status).toBe(200);
 		expect(refusalOf(promoted).limit.name).toBe('regularTeamsPerAdministrator');
 	});
 
-	it('refuses to make an owner of an administrator who would then own too many Free projects', async () => {
+	it('refuses to promote an administrator who would then own too many Free projects', async () => {
 		const owner = await tenant();
 		idOf(await createProject(owner));
 		const busy = await newcomer();
 		await twoProjects(busy);
 		await storeCatalogue([...BUILT_IN_PLANS]);
+		await asMemberOf(owner.teamId, busy.user._id);
 
-		const added = await call(
-			'POST',
-			`/admin/api/teams/${owner.teamId}/members`,
+		const promoted = await call(
+			'PATCH',
+			`/admin/api/teams/${owner.teamId}/members/${busy.user._id}`,
 			owner.cookie,
-			{ userId: busy.user._id, role: 'owner' }
+			{ role: 'owner' }
 		);
 
-		expect(refusalOf(added).limit.name).toBe('projectsPerAdministrator');
+		expect(refusalOf(promoted).limit.name).toBe('projectsPerAdministrator');
 	});
 
-	it('refuses an owner invitation to an administrator at the limit, and its acceptance once they reach it', async () => {
+	/*
+	 * Sent whatever the invitee owns — a refusal here would tell the inviter whether the address is an administrator
+	 * who owns projects (specs/103) — and judged when accepted, leaving it usable once they have room.
+	 */
+	it('sends an owner invitation to an administrator at the limit, and refuses its acceptance', async () => {
 		const owner = await tenant();
 		const full = await tenant();
 		const invited = await call(
@@ -231,7 +234,7 @@ describe('what one administrator may own on Free', () => {
 		});
 		const team = await getGroupStore().find(owner.teamId);
 
-		expect(refusalOf(invited).limit.name).toBe('regularTeamsPerAdministrator');
+		expect(invited.status).toBe(201);
 		expect(refusalOf(accepted).limit.name).toBe('regularTeamsPerAdministrator');
 		expect(team?.members.some((m) => m.userId === later.user._id)).toBe(false);
 	});

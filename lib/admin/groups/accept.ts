@@ -1,5 +1,6 @@
 import { Elysia } from 'elysia';
 import {
+	getBucketStore,
 	getGroupInvitationStore,
 	getGroupStore,
 	getUserStore
@@ -11,6 +12,8 @@ import { ensurePersonalGroup } from './personal.js';
 import { invitationTokenHash } from './invite.js';
 import { AcceptInvitationBody } from './schema.js';
 import { assertMayBecomeOwner } from '../../plans/enforce.js';
+import { signOutAdministrator } from '../users/sign_out.js';
+import { clearAttempts } from '../../totp/verify.js';
 
 /*
  * Accepting an invitation into a group.
@@ -53,10 +56,36 @@ export const invitationAcceptRoutes = new Elysia({ name: 'admin-invitations' })
 			 */
 			const users = getUserStore(ADMIN_BUCKET_ID);
 			const existing = await users.findByEmail(invitation.email);
+			// A deactivated account is not one an invitation may bring back, by joining it or by reclaiming it.
+			if (existing && !existing.active) throw invalid();
 			if (!existing && !body.password) {
 				throw new AdminError(
 					400,
 					'a password is required to create your administrator account'
+				);
+			}
+			/*
+			 * An account under this address whose address nobody has proven may belong to somebody else: anyone may
+			 * register an administrator account under any address while sign-up is open, and joining it here
+			 * handed them the team, even as an owner (specs/103). Holding the token proves the mailbox, as a
+			 * password reset relies on, so the invitee takes the account over — with a password of their own,
+			 * chosen here, before the claim below spends the invitation.
+			 *
+			 * Only while this bucket requires verification. That is the only state sign-up can be open in, so the
+			 * only one a stranger's account can come from; and an unproven account cannot sign in then anyway, so
+			 * its real owner loses nothing by the reset. With verification off, sign-up is closed, every account
+			 * was made by an operator, and most are unproven simply because nobody was ever asked to prove one —
+			 * resetting those would sign a colleague out of everything for accepting an invitation.
+			 */
+			const adminBucket = await getBucketStore().find(ADMIN_BUCKET_ID);
+			const reclaiming =
+				existing !== null &&
+				!existing.verified &&
+				adminBucket?.emailVerificationRequired === true;
+			if (reclaiming && !body.password) {
+				throw new AdminError(
+					400,
+					'choose a password to finish joining: it becomes the password of the administrator account for this address'
 				);
 			}
 
@@ -116,7 +145,24 @@ export const invitationAcceptRoutes = new Elysia({ name: 'admin-invitations' })
 			if (!inviterStillOwner) throw invalid();
 
 			let userId: string;
-			if (existing) {
+			if (existing && reclaiming) {
+				/*
+				 * Nothing the earlier registrant set up may survive: their password, a second factor they enrolled
+				 * (the invitee would be stopped by it), an upstream identity they linked (a way back in), and every
+				 * session and token they hold.
+				 */
+				await users.update(existing._id, {
+					password: await Bun.password.hash(body.password ?? ''),
+					passwordSet: true,
+					verified: true,
+					totp: undefined,
+					federated: []
+				});
+				// So the invitee's own enrolment does not begin inside a lockout the earlier registrant earned.
+				await clearAttempts(ADMIN_BUCKET_ID, existing._id);
+				await signOutAdministrator(existing._id);
+				userId = existing._id;
+			} else if (existing) {
 				// Already an administrator: they join the group and nothing else about the account changes.
 				// Asking them for a password here would be a credential change nobody requested.
 				userId = existing._id;
@@ -147,7 +193,9 @@ export const invitationAcceptRoutes = new Elysia({ name: 'admin-invitations' })
 			 * trail, where the owners who issued the invitation can see it was taken up.
 			 */
 			await recordBootstrapAudit('invitation.accept', group._id, {
-				ownerGroupId: group._id
+				ownerGroupId: group._id,
+				// So the owners can see that joining reset an account rather than adding one as it was.
+				...(reclaiming ? { attributes: ['address-reclaimed'] } : {})
 			});
 
 			return { ok: true, teamId: group._id };

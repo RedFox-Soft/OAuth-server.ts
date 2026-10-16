@@ -216,7 +216,9 @@ a way the compensating control does not cover is a vulnerability report.
   else; the default is a choice about first-run friction rather than a limitation of the control.
 - **The outbound address check and the request resolve the name separately.** A host that answers
   a public address to the check and a private one to the connection (DNS rebinding) is not stopped by
-  the server alone; closing that needs an egress proxy, which is a deployment control.
+  the server alone; closing that needs an egress proxy, which is a deployment control. An application's
+  `jwks_uri` and `backchannel_logout_uri` must use `https` when they are set or changed, so for those two a
+  rebound name also fails the certificate check; a value stored over `http` before that rule keeps working.
 - **The agent confirms its own destructive calls.** The confirmation token for a high-consequence
   tool is returned to the agent that asked, so an agent following injected instructions can make the
   second call as readily as the first. It protects against a mistaken call and against one agent or

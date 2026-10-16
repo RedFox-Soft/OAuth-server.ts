@@ -108,6 +108,43 @@ function visible(key: BucketKey, now: number): boolean {
 	return key.state !== 'retired' || now < retiredKeyRemovableAt(key).getTime();
 }
 
+/*
+ * How many keys an owner may hold and make (specs/103). Generating a key is the most expensive thing a tenant can
+ * ask of the processor every tenant shares — an RSA key pair costs real time — and each key is stored and published
+ * for good, growing the set every client fetches. One signer and one published key for each algorithm, with the
+ * retired ones still verifying, stays well under the first bound.
+ *
+ * The second counts revoked keys too, because revoking a signer generates its replacement: without it, generating
+ * and revoking in a loop would make keys without limit while never holding more than a few.
+ */
+export const MAX_HELD_KEYS = 12;
+export const MAX_KEYS_PER_DAY = 20;
+const DAY_MS = 86_400_000;
+
+function assertKeyRoom(
+	all: readonly BucketKey[],
+	{ adds }: { adds: boolean }
+): void {
+	const now = Date.now();
+	if (adds && all.filter((key) => visible(key, now)).length >= MAX_HELD_KEYS) {
+		throw new KeyActionRefused(
+			409,
+			`${String(MAX_HELD_KEYS)} keys are already held: retire one before adding another`,
+			{ reason: 'key_limit' }
+		);
+	}
+	if (
+		all.filter((key) => now - key.createdAt.getTime() < DAY_MS).length >=
+		MAX_KEYS_PER_DAY
+	) {
+		throw new KeyActionRefused(
+			409,
+			`${String(MAX_KEYS_PER_DAY)} keys were made here in the last day: try again later`,
+			{ reason: 'key_limit' }
+		);
+	}
+}
+
 async function keyOf(owner: KeyOwner, kid: string): Promise<BucketKey> {
 	const key = await getBucketKeysStore().find(owner.id, kid);
 	if (!key || !visible(key, Date.now())) {
@@ -206,6 +243,9 @@ export async function listKeys(owner: KeyOwner) {
 }
 
 export async function generateKey(owner: KeyOwner, alg: SupportedAlg) {
+	assertKeyRoom(await getBucketKeysStore().listByBucket(owner.id), {
+		adds: true
+	});
 	const jwk = await freshJwk(alg);
 
 	await owner.audit('generate', jwk.kid);
@@ -286,6 +326,7 @@ export async function rotateKey(owner: KeyOwner, alg: SupportedAlg) {
 	const now = Date.now();
 	const next = oldestReady(all, alg, now);
 	const displaced = next ? signerOf(all, alg, next.kid) : undefined;
+	assertKeyRoom(all, { adds: true });
 	// Generated before the audit entry, so the entry can name it; stored after, as generation is.
 	const jwk = await freshJwk(alg);
 
@@ -416,9 +457,12 @@ export async function revokeKey(
 	}
 
 	const signs = key.state === 'signing' && key.use === 'sig';
+	const held = await store.listByBucket(owner.id);
 	const standby = signs
-		? oldestReady(await store.listByBucket(owner.id), key.alg, Date.now(), kid)
+		? oldestReady(held, key.alg, Date.now(), kid)
 		: undefined;
+	// A replacement is generated only when no published key can take over; that one counts against the day.
+	if (signs && !standby) assertKeyRoom(held, { adds: false });
 	let fresh:
 		| { jwk: Awaited<ReturnType<typeof freshJwk>>; alg: SupportedAlg }
 		| undefined;

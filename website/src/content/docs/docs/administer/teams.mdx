@@ -37,6 +37,39 @@ that also creates the account of someone who has none yet. Pending invitations a
 can be revoked. Removing a member says first what they lose. Agents use `team_get`, `team_invite`,
 `team_invitation_list`, `team_invitation_revoke` and the `team_member_*` tools.
 
+An invitation is the way into a team. A team owner cannot add an existing administrator directly, because that
+would join them without their agreement. Only a super administrator can, with **Add administrator…**
+on the team's page or `team_member_add`.
+
+Invitations are limited, because each one is an email sent under the instance's own mail identity. The same
+limits apply to super administrators:
+
+- one invitation to the same address and team every 10 minutes, and at most 5 a day;
+- at most 100 invitations a day from one inviter, across all teams;
+- at most 50 open invitations in one team. Revoke one, or wait for one to be accepted, to send another.
+
+When one of the first two limits refuses an invitation, the refusal says how long to wait.
+
+### Accepting an invitation {#accepting-an-invitation}
+
+Accepting an invitation to an address that already has an administrator account adds that account to the team,
+and nothing else about the account changes. Accepting an invitation to an address with no account creates one,
+with the password the invitee chooses.
+
+There is one exception. Sometimes an administrator account exists under the invited address, but nobody ever
+confirmed that the address belongs to its holder. If the administrators' project requires email verification,
+accepting the invitation asks the invitee to choose a password. The invitation link proves that the invitee
+holds the mailbox, so the account becomes theirs:
+
+- the chosen password replaces the account's password;
+- its second factor and its linked identity providers are removed;
+- every session it had ends.
+
+The audit entry for the acceptance records that the account was taken over this way, so the owners can see it.
+
+An owner invitation is always sent. Whether the invitee may become an owner under [plans](/docs/administer/plans/)
+is checked when they accept it.
+
 A project is created in a team you choose: the console's **New project** dialog asks for it, and
 `POST /admin/api/projects` takes an optional `teamId`, which defaults to your active team. Applications and
 APIs are created inside a project and belong to it for as long as they exist.

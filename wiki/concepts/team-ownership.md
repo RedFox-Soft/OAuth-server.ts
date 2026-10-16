@@ -93,7 +93,7 @@ the team's owners, not only by super administrators.
   console took names from the super-administrator-only administrator list, so an owner saw raw ids.
 - The read also gives `owns` (`owns.projects`; retired projects too until spec 099) and `can`:
   `manageMembers`, `invite` and `delete` for owners of a shared team; `addExisting` for super
-  administrators; `rename` everywhere but System.
+  administrators, and since spec 103 the route refuses everyone else; `rename` everywhere but System.
 - List rows carry `owns` counts.
 - Any owner invites by email; the form states what the invitee will reach.
 - Removing a member states "They lose access to N projects" (`AdminGroupPage.tsx:225`). Leaving has its own text.
@@ -102,6 +102,31 @@ the team's owners, not only by super administrators.
   (`lib/admin/groups/routes.ts:314-315`); until 085 they were mislabelled `client` and `enduser`, until
   099 a kind for the retired project stood beside the bucket's, and until spec 100 the message read
   `group still owns buckets` with kind `'bucket'`.
+
+## Joining a team: only by saying yes (spec 103)
+
+A team's membership changes only by an invitation its invitee accepts, or by a super administrator. Three gaps
+the tenant-isolation review of 2026-10-16 found are what made this a rule rather than a habit:
+
+- **Adding by id.** `POST /admin/api/teams/:id/members` accepted any administrator id from a team owner, as owner
+  too. The added person never agreed, the adder read their current address, and on a plan the person's own allowance
+  filled with the adder's team. It is now a super administrator's alone, refused before any lookup so the answer
+  says nothing about the id (`lib/admin/groups/routes.ts`). `addExisting` stopped being a hidden control over an open
+  right.
+- **An account under someone else's address.** With administrator sign-up open and verification off, anyone could
+  register under a colleague's address; accepting that colleague's invitation then joined the stranger's account,
+  because acceptance finds the account by email (`lib/admin/groups/accept.ts`). Now sign-up requires verification
+  ([[admin-project-settings]]), and while verification is required, accepting an invitation for an account whose
+  address was never proven reclaims it: the invitee chooses a password, the authenticator and linked providers go,
+  every session and token ends (`signOutAdministrator`, `lib/admin/users/sign_out.ts`), and the audit entry says
+  `address-reclaimed`. Holding the token proves the mailbox, as a reset does. With verification off it does not
+  reclaim: sign-up is closed then, and accounts an operator created are stored unproven
+  (`lib/admin/users/routes.ts:182`), so a reset would sign a colleague out of everything for accepting.
+- **Invitation mail.** Invitations go out under the operator's mail identity with a team name the inviter chose.
+  `lib/admin/groups/invite_bounds.ts` bounds them with the reset flow's arithmetic under the `TeamInvitationThrottle`
+  area: one per address and team every 10 minutes and 5 a day, 100 a day per inviter, 50 open per team, super
+  administrators included. Counted in their own area because revoking destroys an invitation's record, and a bound
+  counted from records would reset on every revoke.
 
 ## The hot path
 

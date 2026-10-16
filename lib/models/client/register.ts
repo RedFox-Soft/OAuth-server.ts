@@ -18,6 +18,28 @@ import { isAccountPageClient } from '../../account_page/client.js';
  * `store: false` is for a client that is never stored: one described by a metadata document, whose
  * resolution is its registration.
  */
+/*
+ * The two addresses this server fetches from or posts to on a client's behalf, required to be https when they are
+ * written (specs/103). The egress guard resolves a name and refuses private addresses, but the request then resolves
+ * it again; a name that answers differently the second time reaches the private network over plain http, while over
+ * https the certificate check fails. Judged only when the value is new or changed, against the stored record, so a
+ * client stored with an http address keeps resolving and can still have its other fields edited.
+ */
+const FETCHED = [
+	['jwksUri', 'jwks_uri'],
+	['backchannelLogoutUri', 'backchannel_logout_uri']
+] as const;
+
+async function assertFetchedOverTls(client: Client): Promise<void> {
+	const stored = await adapter('Client').find(client.clientId);
+	for (const [field, wire] of FETCHED) {
+		const value = client[field];
+		if (typeof value !== 'string' || value.startsWith('https://')) continue;
+		if (stored?.[wire] === value) continue;
+		throw new InvalidClientMetadata(`${wire} must use https`);
+	}
+}
+
 export async function registerClient(
 	record: ClientRecord,
 	{ store }: { store: boolean }
@@ -42,6 +64,8 @@ export async function registerClient(
 	if (client.sectorIdentifierUri !== undefined) {
 		await sectorValidate(client);
 	}
+
+	if (store) await assertFetchedOverTls(client);
 
 	if (store) {
 		await adapter('Client').upsert(client.clientId, toStored(client));

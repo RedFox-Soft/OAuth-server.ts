@@ -45,10 +45,15 @@ async function groupOwnedBy(cookie: string, name = 'Acme') {
 	return answered(res.data);
 }
 
-async function invite(cookie: string, groupId: string, email: string) {
+async function invite(
+	cookie: string,
+	groupId: string,
+	email: string,
+	role: 'member' | 'owner' = 'member'
+) {
 	return client.admin.api
 		.teams({ id: groupId })
-		.invitations.post({ email, role: 'member' }, { headers: { cookie } });
+		.invitations.post({ email, role }, { headers: { cookie } });
 }
 
 function tokenFor(email: string): string {
@@ -224,12 +229,11 @@ describe('group invitations', () => {
 		const founder = await admin();
 		const second = await admin();
 		const group = await groupOwnedBy(founder.cookie);
-		await client.admin.api
-			.teams({ id: group._id })
-			.members.post(
-				{ userId: second.userId, role: 'owner' },
-				{ headers: { cookie: founder.cookie } }
-			);
+		// Made a co-owner through their own accepted invitation, as an owner adds anybody (specs/103).
+		await invite(founder.cookie, group._id, second.email, 'owner');
+		await client.admin.api.invitations.accept.post({
+			token: tokenFor(second.email)
+		});
 
 		const invitee = `stale-${unique()}@x.io`;
 		await invite(second.cookie, group._id, invitee);

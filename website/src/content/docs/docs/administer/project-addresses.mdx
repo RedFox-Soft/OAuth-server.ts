@@ -30,7 +30,8 @@ want the shorter names, run the instance at the registrable domain itself, or gi
 own.
 
 The default project and the administrators' project are served at the root, at `ISSUER` itself. They have no
-path and no subdomain, whatever the setting says.
+path and no subdomain, whatever the setting says. The console's own sign-in applications are accepted only there:
+a sign-in request for one of them at a project's address is refused.
 
 ## Why a subdomain {#why-a-subdomain}
 
@@ -94,6 +95,18 @@ page made easy. So the subdomain form is refused for:
 
 The slugs every project already avoids, because they would shadow the server's own paths, are refused too. Each
 refusal names the rule it broke.
+
+## Names a path cannot take {#names-a-path-cannot-take}
+
+A path such as `https://auth.example.com/login` reads as the operator's own page just as `login.auth.example.com`
+does. So a new path is refused for:
+
+- the server's own paths, which a project would otherwise shadow;
+- every name on the subdomain's built-in list above;
+- `account`, `health` and `ready`.
+
+The list applies only when a project is given a new path. A project that already has one of these names keeps it
+and keeps working.
 
 ## Changing a project's address {#changing-a-projects-address}
 

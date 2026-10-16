@@ -51,6 +51,12 @@ or the models. An await inside the model import graph reorders module evaluation
 
 ## The lifecycle — generate, promote, retire, hidden
 
+**Bounded since spec 103.** An owner holds at most 12 keys that still sign or verify, and makes at most 20 in a day
+(`MAX_HELD_KEYS`, `MAX_KEYS_PER_DAY`, `lib/admin/key_lifecycle.ts`). Generating a key is the most expensive thing a
+tenant can ask of the shared processor, and every key is published for good. Revoked keys count towards the day,
+because revoking a signer generates its replacement — generate-and-revoke in a loop would otherwise be unbounded. A
+revocation that needs no replacement is never refused.
+
 One core, `lib/admin/key_lifecycle.ts`, serves both owners: the root (`lib/admin/jwks/`, super
 administrators) and a project (`lib/admin/bucket_keys/`, its owning team). Each is a `KeyOwner`
 (`lib/admin/key_lifecycle.ts:24`) naming its audit verb and its cache invalidator. Every step is written

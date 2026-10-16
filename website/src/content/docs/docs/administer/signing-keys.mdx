@@ -114,6 +114,20 @@ algorithm without one.
 A new algorithm needs no restart. Generate an `ES256` key, promote it, and discovery advertises `ES256`
 from then on, so clients can register for it straight away.
 
+## How many keys {#how-many-keys}
+
+Making a key costs the server real processor time, and every key stays in the key set that clients download.
+So each key set, the instance's and each project's, has two limits:
+
+- **At most 12 keys held.** A key counts while it signs, while it is published, and while it is retired but still
+  verifies. One signer and one published key per algorithm, with a few retired keys, stays well under it.
+- **At most 20 keys made in one day.** Revoked keys count too, because revoking the signing key can make a new key
+  to replace it.
+
+Generate and Rotate past either limit answer `409` with `reason: "key_limit"`, and the message says what to do:
+retire a key, or try again later. Revoking the signing key is refused the same way when no published key can take
+over and 20 keys were already made that day. Keeping a published key ready, as Rotate does, avoids that.
+
 ## What a relying party has to do
 
 The sixty-second window protects this server's own instances. It cannot protect a relying party that

@@ -1519,6 +1519,61 @@ const projectsRecordPlan: Migration = {
 	}
 };
 
+/*
+ * Administrators sign up only with their address proven (specs/103). An account registered under somebody else's
+ * address, with nothing asking for proof, used to be joined to a team when that person's invitation was accepted —
+ * the team handed to a stranger. The settings route now refuses sign-up open without verification; this brings a
+ * deployment already in that state into line.
+ *
+ * It closes sign-up rather than turning verification on. Requiring verification refuses every administrator whose
+ * address was never proven at their next sign-in, and the route lets it be switched on only by someone already proven,
+ * with mail delivery configured — neither of which a migration can check. Closing sign-up locks nobody out: the
+ * operator reopens it together with verification, through that guarded setting.
+ */
+function adminSignUpClosedReport(count: number): string[] {
+	return [
+		`administrators' sign-up closed (it was open without email verification): ${String(count)}`
+	];
+}
+
+const adminSignUpRequiresVerification: Migration = {
+	id: '2026-10-19-admin-signup-requires-verification',
+	description:
+		"Close administrators' sign-up where it is open without email verification, which the settings route no longer allows",
+	reversible: true,
+	rerunnable:
+		'Only an administrators’ bucket with sign-up open and verification off is written, and the write closes sign-up, so a second application selects nothing.',
+	mongodb: {
+		async apply(handle) {
+			const db = handle as MongoHandle;
+			// updateMany on one id: the narrow handle types updateOne without a result.
+			const result = await db.collection(STORE_AREAS.userBuckets).updateMany(
+				{
+					_id: ADMIN_BUCKET_ID,
+					registrationOpen: true,
+					emailVerificationRequired: { $ne: true }
+				},
+				{ $set: { registrationOpen: false } }
+			);
+			return adminSignUpClosedReport(result.modifiedCount);
+		}
+	},
+	postgres: {
+		async apply(handle) {
+			const sql = handle as PostgresHandle;
+			const rows = await sql`
+				UPDATE ${sql(STORE_AREAS.userBuckets)}
+				SET doc = doc || ${{ registrationOpen: false }}
+				WHERE id = ${ADMIN_BUCKET_ID}
+					AND doc->'registrationOpen' = 'true'::jsonb
+					AND doc->'emailVerificationRequired' IS DISTINCT FROM 'true'::jsonb
+				RETURNING id
+			`;
+			return adminSignUpClosedReport(rows.length);
+		}
+	}
+};
+
 export const MIGRATIONS: readonly Migration[] = [
 	namespacedProtectedResources,
 	rootKeysLifecycle,
@@ -1528,5 +1583,6 @@ export const MIGRATIONS: readonly Migration[] = [
 	projectsRequireBucket,
 	removeProjects,
 	projectsReservedHostnames,
-	projectsRecordPlan
+	projectsRecordPlan,
+	adminSignUpRequiresVerification
 ];

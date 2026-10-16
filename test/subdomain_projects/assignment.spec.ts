@@ -115,7 +115,8 @@ describe('the names a project subdomain may not take', () => {
 		expect(created.status).toBe(201);
 	});
 
-	it('refuses a subdomain another project answers at as its hostname, naming that project', async () => {
+	// Without naming the holder: it may be another tenant's project, and its name is theirs (specs/103).
+	it('refuses a subdomain another project answers at as its hostname, without naming that project', async () => {
 		const slug = freshSlug('held');
 		await getBucketStore().create({
 			ownerGroupId: UNASSIGNED_GROUP_ID,
@@ -129,7 +130,8 @@ describe('the names a project subdomain may not take', () => {
 		});
 
 		expect(refused.status).toBe(409);
-		expect(messageOf(refused.body)).toContain('Holder');
+		expect(messageOf(refused.body)).toBe(`'${slug}.e.ly' is already taken`);
+		expect(messageOf(refused.body)).not.toContain('Holder');
 	});
 
 	it('refuses a hostname one label beneath the instance when that label is another project’s slug', async () => {

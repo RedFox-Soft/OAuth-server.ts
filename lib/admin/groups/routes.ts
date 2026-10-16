@@ -38,6 +38,7 @@ import {
 } from './invite.js';
 import { sendGroupInvitationEmail } from '../../mail/send.js';
 import { assertMayBecomeOwner, assertTeamRoom } from '../../plans/enforce.js';
+import { assertMayInvite, chargeInvitation } from './invite_bounds.js';
 
 /*
  * Loads a group the caller may see, refusing identically whether it is missing or another tenant's.
@@ -139,9 +140,8 @@ async function ownedContainers(groupId: string): Promise<{
  * super administrator's), refused on the System group, which is not a tenant, and on a personal group, which
  * nobody joins and whose one member must stay its owner; renaming is refused only on the System group;
  * deleting is refused on both.
- * `addExisting` is stated for a super administrator only, because choosing an existing administrator means
- * reading every administrator of the instance, which only they may. The route itself also accepts an owner
- * who already knows the id, so this flag withholds a control, never a right.
+ * `addExisting` is stated for a super administrator only, and the route refuses everyone else (specs/103): adding
+ * somebody by id joins them without their agreement, so an owner invites instead.
  *
  * A right is not a promise about state: a group that still owns buckets refuses deletion, and
  * `owns` is that state.
@@ -327,6 +327,16 @@ export const groupRoutes = new Elysia({ name: 'admin-groups' })
 		'/admin/api/teams/:id/members',
 		async ({ admin, params, body }) => {
 			const ctx = assertAuth(admin);
+			/*
+			 * Super administrators only (specs/103). It is the one way to change another administrator's
+			 * memberships without their act: an owner who learned an id — from a team both had left, or an audit
+			 * entry — could put that person into a team of theirs, read their current address, and fill their plan
+			 * allowance with it. Everyone else adds people by invitation, which the person accepts. Refused before
+			 * any lookup, so the answer says nothing about whether the id names anybody.
+			 */
+			if (!ctx.superAdmin) {
+				throw new AdminError(403, 'add people to a team by inviting them');
+			}
 			const group = await loadGroup(ctx, params.id);
 			assertGroupOwner(ctx, params.id);
 			assertMutableMembership(group);
@@ -424,10 +434,12 @@ export const groupRoutes = new Elysia({ name: 'admin-groups' })
 			if (existing && group.members.some((m) => m.userId === existing._id)) {
 				throw new AdminError(409, 'already a member of this team');
 			}
-			/* Judged again at acceptance, when the invitee may own more than they do now (specs/102). */
-			if (body.role === 'owner') {
-				await assertMayBecomeOwner(ctx, existing?._id, group);
-			}
+			/*
+			 * An owner invitation is judged against the invitee's plan when it is accepted, and only then
+			 * (specs/103): a refusal here told the inviter whether the address belongs to an administrator who
+			 * already owns projects — the probe administrator sign-up is written to deny.
+			 */
+			await assertMayInvite(params.id, email, ctx.userId);
 
 			/*
 			 * The token exists only in this scope and in the mail. What is stored is its digest, so a
@@ -443,6 +455,7 @@ export const groupRoutes = new Elysia({ name: 'admin-groups' })
 				tokenHash: invitationTokenHash(token),
 				ttlSeconds: INVITATION_TTL_SECONDS
 			});
+			await chargeInvitation(params.id, email, ctx.userId);
 
 			await recordAdminAudit(ctx, 'invitation.create', params.id, {
 				attributes: [body.role],

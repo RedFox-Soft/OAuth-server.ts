@@ -2,6 +2,7 @@ import { Elysia } from 'elysia';
 
 import { bucketAtHost, isCanonicalHost } from 'lib/admin/auth/bucketAddress.js';
 import { hostOfRequest } from 'lib/consts/request_host.js';
+import { MAX_REQUEST_BODY_BYTES } from 'lib/consts/request_limits.js';
 
 /*
  * The first path segments that belong to the instance rather than to any population.
@@ -16,6 +17,34 @@ export const INSTANCE_PLANE_PREFIXES: readonly string[] = ['/admin', '/mcp'];
 function isInstancePlanePath(pathname: string): boolean {
 	return INSTANCE_PLANE_PREFIXES.some(
 		(prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+	);
+}
+
+/*
+ * A body larger than the server reads, refused before anything parses it (specs/103).
+ *
+ * The listener enforces the same bound itself (`maxRequestBodySize` where lib/index.ts listens), and that is what
+ * stops a chunked body that never declares a length. This is the half that holds when an application mounts
+ * `elysia` into a server of its own, whose listener this server does not configure: a declared length over the
+ * bound is answered here, in the shape the addressed surface uses, before Elysia reads a byte of it.
+ *
+ * Called first from the `onRequest` below, for the reason given there: anything later runs after body parsing has
+ * begun. A function rather than a plugin of its own because the app's chain in lib/index.ts is already as long as
+ * the type checker will follow.
+ */
+function oversizeBodyRefusal(request: Request): Response | undefined {
+	const declared = Number(request.headers.get('content-length'));
+	if (!Number.isFinite(declared) || declared <= MAX_REQUEST_BODY_BYTES) {
+		return undefined;
+	}
+	return Response.json(
+		isInstancePlanePath(new URL(request.url).pathname)
+			? { error: 'admin_error', message: 'request body too large' }
+			: {
+					error: 'invalid_request',
+					error_description: 'request body too large'
+				},
+		{ status: 413 }
 	);
 }
 
@@ -42,6 +71,10 @@ function isInstancePlanePath(pathname: string): boolean {
 export const instancePlaneOnly = new Elysia({
 	name: 'instance-plane-only'
 }).onRequest(async ({ request, set }) => {
+	// First, before anything reads the body.
+	const oversize = oversizeBodyRefusal(request);
+	if (oversize) return oversize;
+
 	if (!isInstancePlanePath(new URL(request.url).pathname)) return;
 
 	const host = hostOfRequest(request);

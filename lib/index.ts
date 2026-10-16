@@ -1,4 +1,5 @@
 import { instancePlaneOnly } from 'lib/plugins/instancePlane.js';
+import { MAX_REQUEST_BODY_BYTES } from 'lib/consts/request_limits.js';
 import { eventBus } from './event_bus.ts';
 import * as errors from './helpers/errors.ts';
 import * as interactionPolicy from './helpers/interaction_policy/index.ts';
@@ -79,6 +80,7 @@ import { startBucketPurger } from './admin/buckets/purge_pass.js';
 initSentry();
 
 export const elysia = new Elysia({ strictPath: true, normalize: false })
+	// Also refuses an oversize body, first (lib/plugins/bodyLimit.ts).
 	.use(instancePlaneOnly)
 	.error({
 		invalid_request: errors.InvalidRequest,
@@ -311,7 +313,8 @@ if (process.env.NODE_ENV !== 'test') {
  */
 if (process.env.NODE_ENV !== 'test') {
 	try {
-		elysia.listen(3000);
+		// Bun reads up to 128 MB by default; refused here, chunked bodies included (specs/103).
+		elysia.listen({ port: 3000, maxRequestBodySize: MAX_REQUEST_BODY_BYTES });
 	} catch (error) {
 		await reportStartupFailure(
 			error instanceof Error ? error.name : 'unknown',

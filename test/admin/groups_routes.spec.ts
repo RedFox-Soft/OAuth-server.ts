@@ -101,8 +101,10 @@ describe('groups API', () => {
 	});
 
 	describe('membership', () => {
-		it('lets an owner add a member, who then reaches what the group owns', async () => {
+		// Directly by id only a super administrator adds anybody (specs/103); an owner invites.
+		it('lets a super administrator add a member, who then reaches what the group owns', async () => {
 			const owner = await admin();
+			const operator = await admin('super');
 			const member = await admin();
 			const group = answered((await makeGroup(owner.cookie)).data);
 
@@ -110,7 +112,7 @@ describe('groups API', () => {
 				.teams({ id: group._id })
 				.members.post(
 					{ userId: member.userId, role: 'member' },
-					{ headers: { cookie: owner.cookie } }
+					{ headers: { cookie: operator.cookie } }
 				);
 			expect(added.status).toBe(200);
 
@@ -163,13 +165,14 @@ describe('groups API', () => {
 
 		it('ends a removed member’s access on their very next request', async () => {
 			const owner = await admin();
+			const operator = await admin('super');
 			const member = await admin();
 			const group = answered((await makeGroup(owner.cookie)).data);
 			await client.admin.api
 				.teams({ id: group._id })
 				.members.post(
 					{ userId: member.userId, role: 'member' },
-					{ headers: { cookie: owner.cookie } }
+					{ headers: { cookie: operator.cookie } }
 				);
 
 			const before = await client.admin.api
