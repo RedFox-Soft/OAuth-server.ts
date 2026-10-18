@@ -35,13 +35,14 @@ export function organization(): JsonLd {
 }
 
 export interface SoftwareApplicationInput {
-	/** Must match how the page words the licence, because the verifier checks it appears there. */
-	license: string;
 	version?: string;
 }
 
+/*
+ * The licence is given as the URL of the licence page, which schema.org allows, so a page can carry this block
+ * without naming the licence in its own copy.
+ */
 export function softwareApplication({
-	license,
 	version
 }: SoftwareApplicationInput): JsonLd {
 	return {
@@ -53,14 +54,14 @@ export function softwareApplication({
 		operatingSystem: 'Docker, Linux, macOS, Windows',
 		url: SITE_ORIGIN,
 		downloadUrl: REPOSITORY,
-		license,
+		license: new URL('/license/', SITE_ORIGIN).href,
 		...(version ? { softwareVersion: version } : {}),
 		offers: {
 			'@type': 'Offer',
 			price: '0',
 			priceCurrency: 'USD',
 			description:
-				'Free to self-host under a source-available licence, or on the free plan of FoxAuth Cloud'
+				'Free on FoxAuth Cloud for up to 1,000,000 monthly active users per project, or free to run on your own servers'
 		}
 	};
 }

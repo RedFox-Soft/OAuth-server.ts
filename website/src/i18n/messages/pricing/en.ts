@@ -22,7 +22,7 @@ export default {
 		tagline: 'Our instance at auth.foxauth.dev. No card, no call.',
 		items: [
 			'2 projects per administrator, each its own OpenID Connect issuer',
-			'100,000 monthly active users per project',
+			'1,000,000 monthly active users per project',
 			'10 applications and 10 APIs per project',
 			'Sign-in with Google, Apple, GitHub and Microsoft accounts of any organisation',
 			'Machine-to-machine tokens, device sign-in, DPoP and PAR, and administration by an AI agent over MCP',
@@ -83,7 +83,7 @@ export default {
 		{
 			question: 'Is the free cloud plan really free?',
 			answer:
-				'The free plan on FoxAuth Cloud costs nothing and asks for no card. It allows two projects, 100,000 monthly active users per project, ten applications and ten APIs per project, and sign-in through Google, Microsoft, Apple and GitHub. At the user cap only new sign-ups pause; nobody who already has an account is refused. It has no SLA yet. Paid plans with higher limits and guarantees are in development; their waitlist commits you to nothing, and we mail you once when they open.'
+				'The free plan on FoxAuth Cloud costs nothing and asks for no card. It allows two projects, 1,000,000 monthly active users per project, ten applications and ten APIs per project, and sign-in through Google, Microsoft, Apple and GitHub. At the user cap only new sign-ups pause; nobody who already has an account is refused. It has no SLA yet. Paid plans with higher limits and guarantees are in development; their waitlist commits you to nothing, and we mail you once when they open.'
 		},
 		{
 			question: 'Do you offer consulting?',

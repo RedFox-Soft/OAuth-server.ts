@@ -9,21 +9,16 @@ export interface HomeFacts {
 export default {
 	title: 'FoxAuth — the authorization server for the agent era',
 	description:
-		'A source-available OAuth 2.1 and OpenID Connect server: free on FoxAuth Cloud or on your own servers, with an admin console and administration over MCP.',
+		'One server for sign-in, APIs and AI agents: OAuth 2.1 and OpenID Connect, free on FoxAuth Cloud for up to 1,000,000 monthly active users.',
 	hero: {
 		eyebrow: 'OAuth 2.1 · OpenID Connect · MCP',
-		heading: 'The authorization server for the agent era.',
-		lead: 'FoxAuth is built on OAuth-server.ts, a source-available OAuth 2.1 / OpenID Connect server. Start free on FoxAuth Cloud, or run it yourself. It ships with a built-in admin console, banking-grade profiles, and administration over MCP for AI agents.',
-		audience: (license: string) =>
-			rich(
-				'It is for engineering teams who want identity on their own infrastructure or on ours, and for anyone building agents that must administer it. Self-hosting is free and complete under the Functional Source License (',
-				{ code: license },
-				'), which becomes Apache 2.0 two years after each release.'
-			),
+		heading: 'One server for your users, your APIs and your AI agents.',
+		lead: 'Sign-in, enterprise identity providers, directory sync, banking-grade token security and authorization for AI agents: 30 standards that take a team years to build, already built and tested. Start free on FoxAuth Cloud with up to 1,000,000 monthly active users per project, or run it yourself.',
 		getStarted: 'Run it yourself',
 		freeAccount: 'Create a free account',
 		github: 'View on GitHub',
 		specifications: '30 specifications',
+		freeUsers: '1,000,000 MAU free',
 		quickstartCaption: 'Two commands and a browser tab',
 		givesHeading: 'What those two commands give you',
 		gives: [
@@ -138,16 +133,10 @@ export default {
 		protectButton: 'Protect your MCP server',
 		allTools: (tools: number) => `All ${tools} MCP tools`
 	},
-	licensing: {
-		eyebrow: 'Licensing',
-		heading: 'Source-available, honestly.',
-		body: 'The code is public and you may read, modify, self-host and redistribute it — for anything except offering it to others as a competing hosted service. Two years after each version ships, that version converts to the Apache License 2.0.',
-		read: 'Read the license'
-	},
 	start: {
 		eyebrow: 'Start',
 		heading: 'Start free, today.',
-		lead: 'Create a free account on FoxAuth Cloud, or run the server yourself this afternoon. Self-hosting is free and complete; paid cloud plans are in development.',
+		lead: 'Create a free account on FoxAuth Cloud, with up to 1,000,000 monthly active users per project, or run the server yourself this afternoon. Paid cloud plans are in development.',
 		freeAccount: 'Create a free account',
 		getStarted: 'Run it yourself',
 		docs: 'Read the docs'

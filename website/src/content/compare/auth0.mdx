@@ -32,7 +32,7 @@ faq:
   - question: 'Does FoxAuth support social logins like Google and GitHub?'
     answer: 'Google, Microsoft, Apple and GitHub are recognised by name: FoxAuth tells you what to do at the provider, shows you the exact callback address to register, and asks only for the values that provider issues — two for Google and GitHub, three for Microsoft, four for Apple. Any other provider speaking OpenID Connect can be configured by hand, per project. Two caveats worth knowing before you compare: you still register the application at the provider yourself, because none of them lets a third party do it for you, and four recognised providers is not the connection catalogue Auth0 ships, which runs to dozens and includes SAML and AD/LDAP enterprise connections FoxAuth does not speak. Microsoft Entra ID and Okta can instead provision users and groups into FoxAuth over SCIM.'
   - question: 'Is FoxAuth cheaper than Auth0?'
-    answer: 'The bill has a different shape, and it is not uniformly smaller. FoxAuth is free to self-host under FSL-1.1-ALv2; what it costs you is a database, a container and the engineering time to keep them healthy, so the cost grows with infrastructure and is indifferent to monthly active users. FoxAuth Cloud also has a free plan, capped at 100,000 monthly active users per project, with no SLA yet. Auth0 bills per monthly active user. At small scale that is usually the cheaper option, and at large scale it is what teams tend to come to us about.'
+    answer: 'The bill has a different shape, and it is not uniformly smaller. FoxAuth is free to self-host under FSL-1.1-ALv2; what it costs you is a database, a container and the engineering time to keep them healthy, so the cost grows with infrastructure and is indifferent to monthly active users. FoxAuth Cloud also has a free plan, capped at 1,000,000 monthly active users per project, with no SLA yet. Auth0 bills per monthly active user. At small scale that is usually the cheaper option, and at large scale it is what teams tend to come to us about.'
   - question: 'Do I get FAPI, DPoP and PAR without an enterprise plan?'
     answer: 'FoxAuth implements DPoP (RFC 9449), PAR (RFC 9126), mTLS (RFC 8705), CIBA, RAR (RFC 9396) and JARM, and each one is a feature flag on the instance you run. There is no plan tier and no add-on. All of them ship switched off and are turned on per deployment.'
 groups:
@@ -251,7 +251,7 @@ groups:
         us:
           {
             status: yes,
-            text: 'Free to self-host, every feature included, with no charge per user. Monthly active users are counted per project and per owning team, so an instance run for others can report them. The free plan on FoxAuth Cloud allows 100,000 monthly active users per project and two projects; paid cloud plans are in development. Support by agreement.'
+            text: 'Free to self-host, every feature included, with no charge per user. Monthly active users are counted per project and per owning team, so an instance run for others can report them. The free plan on FoxAuth Cloud allows 1,000,000 monthly active users per project and two projects; paid cloud plans are in development. Support by agreement.'
           }
         them:
           {

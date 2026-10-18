@@ -1,6 +1,6 @@
 import type english from './en.ts';
 
-export const source = '75ed23952f7f';
+export const source = '6e6a33b73359';
 
 export default {
 	title: '定价',
@@ -16,7 +16,7 @@ export default {
 		tagline: '我们在 auth.foxauth.dev 上运行的实例。无需信用卡，无需电话。',
 		items: [
 			'每位管理员 2 个项目，每个项目都是独立的 OpenID Connect 签发者',
-			'每个项目每月 100,000 名活跃用户',
+			'每个项目每月 1,000,000 名活跃用户',
 			'每个项目 10 个应用和 10 个 API',
 			'通过 Google、Apple、GitHub 和任意组织的 Microsoft 账户登录',
 			'服务间令牌、设备登录、DPoP 和 PAR，以及 AI 智能体通过 MCP 进行管理',
@@ -77,7 +77,7 @@ export default {
 		{
 			question: '免费云方案真的免费吗？',
 			answer:
-				'FoxAuth Cloud 的免费方案不收取任何费用，也不需要信用卡。它提供 2 个项目、每个项目每月 100,000 名活跃用户、每个项目 10 个应用和 10 个 API，以及通过 Google、Microsoft、Apple 和 GitHub 登录。达到用户上限时，只会暂停新用户注册，已有账户的人不会被拒绝登录。它暂时没有 SLA。提供更高限额和保障的付费方案正在开发中；加入候补名单不需要承担任何义务，方案开放时我们只会给你发一封邮件。'
+				'FoxAuth Cloud 的免费方案不收取任何费用，也不需要信用卡。它提供 2 个项目、每个项目每月 1,000,000 名活跃用户、每个项目 10 个应用和 10 个 API，以及通过 Google、Microsoft、Apple 和 GitHub 登录。达到用户上限时，只会暂停新用户注册，已有账户的人不会被拒绝登录。它暂时没有 SLA。提供更高限额和保障的付费方案正在开发中；加入候补名单不需要承担任何义务，方案开放时我们只会给你发一封邮件。'
 		},
 		{
 			question: '你们提供咨询服务吗？',

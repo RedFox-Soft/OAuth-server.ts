@@ -40,7 +40,7 @@ export default {
 		llms: 'For LLMs (llms.txt)',
 		contactUs: 'Contact us',
 		about:
-			'FoxAuth is built on OAuth-server.ts, a source-available OAuth 2.1 / OpenID Connect server.',
+			'FoxAuth is built on OAuth-server.ts, an OAuth 2.1 / OpenID Connect server.',
 		siteVersion: (
 			lastTag: string | null,
 			commit: string,

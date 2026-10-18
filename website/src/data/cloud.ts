@@ -4,8 +4,8 @@
  *
  * The Free plan's limits are written in the pricing messages rather than computed, because they are the
  * production instance's plan catalogue, not this repository's defaults. Checked against production on
- * 2026-10-16 (plan `free`: 100,000 monthly active users, 2 projects per administrator, 10 applications and
- * 10 APIs per project, no enterprise sign-in, custom slug or custom domain).
+ * 2026-10-18 (plan `free`: 1,000,000 monthly active users, raised from 100,000 that day; 2 projects per
+ * administrator, 10 applications and 10 APIs per project, no enterprise sign-in, custom slug or custom domain).
  */
 export const CLOUD_SIGN_UP = 'https://auth.foxauth.dev/admin';
 

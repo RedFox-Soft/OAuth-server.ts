@@ -1,7 +1,7 @@
 import { rich } from '../../types.ts';
 import type english from './en.ts';
 
-export const source = 'b31fd282ef32';
+export const source = '273f6ab64561';
 
 export default {
 	skipToContent: '跳到正文',
@@ -40,7 +40,7 @@ export default {
 		llms: '面向 LLM（llms.txt）',
 		contactUs: '联系我们',
 		about:
-			'FoxAuth 构建于 OAuth-server.ts 之上，这是一个源码可用的 OAuth 2.1 / OpenID Connect 服务器。',
+			'FoxAuth 构建于 OAuth-server.ts 之上，这是一个 OAuth 2.1 / OpenID Connect 服务器。',
 		siteVersion: (
 			lastTag: string | null,
 			commit: string,

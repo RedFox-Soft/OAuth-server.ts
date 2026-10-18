@@ -2,26 +2,21 @@ import { rich } from '../../types.ts';
 import type english from './en.ts';
 import type { HomeFacts } from './en.ts';
 
-export const source = 'e5f4d15a952d';
+export const source = 'bd32b9336b38';
 
 export default {
 	title: 'FoxAuth — 面向智能体时代的授权服务器',
 	description:
-		'源码可用的 OAuth 2.1 与 OpenID Connect 服务器：在 FoxAuth Cloud 免费使用或自行运行，支持 MCP 管理。',
+		'用户登录、API 与 AI 智能体共用一个 OAuth 2.1 / OIDC 服务器，FoxAuth Cloud 每月免费 100 万活跃用户。',
 	hero: {
 		eyebrow: 'OAuth 2.1 · OpenID Connect · MCP',
-		heading: '面向智能体时代的授权服务器。',
-		lead: 'FoxAuth 构建于 OAuth-server.ts 之上，这是一个源码可用的 OAuth 2.1 / OpenID Connect 服务器。你可以在 FoxAuth Cloud 上免费开始，也可以自己运行。它自带管理控制台和银行级安全规范，并支持 AI 智能体通过 MCP 进行管理。',
-		audience: (license: string) =>
-			rich(
-				'它面向希望把身份系统放在自有基础设施或我们的基础设施上的工程团队，也面向构建 AI 智能体、并要让智能体来管理它的开发者。在 Functional Source License（',
-				{ code: license },
-				'）下，自托管免费且功能完整；每个版本发布两年后转为 Apache 2.0 许可。'
-			),
+		heading: '一个服务器，服务你的用户、API 和 AI 智能体。',
+		lead: '用户登录、企业身份提供商、目录同步、银行级令牌安全，以及 AI 智能体授权：一个团队要花数年才能做完的 30 项标准，这里已经实现并经过测试。在 FoxAuth Cloud 上免费开始，每个项目每月最多 1,000,000 名活跃用户；也可以自己运行。',
 		getStarted: '自己运行',
 		freeAccount: '创建免费账户',
 		github: '在 GitHub 上查看',
 		specifications: '30 项规范',
+		freeUsers: '1,000,000 MAU 免费',
 		quickstartCaption: '两条命令，一个浏览器标签页',
 		givesHeading: '这两条命令为你准备好了什么',
 		gives: [
@@ -133,16 +128,10 @@ export default {
 		protectButton: '保护你的 MCP 服务器',
 		allTools: (tools: number) => `全部 ${tools} 个 MCP 工具`
 	},
-	licensing: {
-		eyebrow: '许可',
-		heading: '源码可用，实话实说。',
-		body: '代码是公开的，你可以阅读、修改、自托管和再分发——唯一不允许的是把它作为竞争性的托管服务提供给他人。每个版本发布两年后，该版本即转为 Apache License 2.0。',
-		read: '阅读许可证'
-	},
 	start: {
 		eyebrow: '开始',
 		heading: '今天就免费开始。',
-		lead: '在 FoxAuth Cloud 创建免费账户，或者今天下午就自己运行服务器。自托管免费且功能完整；付费云方案正在开发中。',
+		lead: '在 FoxAuth Cloud 创建免费账户，每个项目每月最多 1,000,000 名活跃用户；或者今天下午就自己运行服务器。付费云方案正在开发中。',
 		freeAccount: '创建免费账户',
 		getStarted: '自己运行',
 		docs: '阅读文档'

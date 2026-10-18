@@ -24,13 +24,7 @@ interface Props {
 const { locale } = Astro.props;
 const t = messagesFor('home', english, locale);
 
-/*
- * `license` is the abbreviation this page visibly shows in its badge row, not a URL: the guardrail
- * checks that every human-readable string a block claims also appears in the rendered text, so a
- * structured claim and the visible copy cannot drift apart unnoticed.
- */
-const license = 'FSL-1.1-ALv2';
-const jsonLd = [organization(), softwareApplication({ license })];
+const jsonLd = [organization(), softwareApplication({})];
 // Counted from the catalogue the build exports, so the number cannot drift from the tool list.
 const mcpToolCount = loadExport().mcp.tools.length;
 const facts: HomeFacts = { backends: backendChoice(locale), tools: mcpToolCount };
@@ -45,7 +39,6 @@ const href = {
 	endpoints: await localizedHref('/docs/reference/endpoints/', locale),
 	protectMcp: await localizedHref('/docs/get-started/protect-your-mcp-server/', locale),
 	mcpTools: await localizedHref('/docs/reference/mcp-tools/', locale),
-	license: await localizedHref('/license/', locale),
 	docs: await localizedHref('/docs/', locale)
 };
 
@@ -160,17 +153,11 @@ server ← { "appliedKeys": ["deviceFlow.enabled"],
 				<h1 class="text-4xl font-[650] leading-[1.15] tracking-tight text-balance sm:text-5xl">
 					{t.hero.heading}
 				</h1>
+				<!-- The opening has to stand alone: it is the first screen a search visitor sees,
+				     and the passage an assistant quotes when asked what this project is. What it does,
+				     why it would be costly to build, and how to start, before any scrolling. -->
 				<p class="mt-5 max-w-prose text-lg text-gray-600 dark:text-gray-400">
 					{t.hero.lead}
-				</p>
-				<!-- The opening has to stand alone: it is the first screen a search visitor sees,
-				     and the passage an assistant quotes when asked what this project is. What it is,
-				     who runs it and how it is licensed, before any scrolling. -->
-				<p class="mt-3 max-w-prose text-lg text-gray-600 dark:text-gray-400">
-					<RichText
-						text={t.hero.audience(license)}
-						codeClass=""
-					/>
 				</p>
 				<div class="mt-8 flex flex-wrap gap-3">
 					<Button
@@ -190,8 +177,8 @@ server ← { "appliedKeys": ["deviceFlow.enabled"],
 				</div>
 				<p class="mt-6 flex flex-wrap items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
 					<Badge tone="accent">{t.hero.specifications}</Badge>
+					<Badge tone="accent">{t.hero.freeUsers}</Badge>
 					<Badge tone="neutral">Bun + Elysia</Badge>
-					<Badge tone="neutral">{license}</Badge>
 				</p>
 			</div>
 			<div class="flex flex-col gap-6 lg:pt-8">
@@ -374,25 +361,6 @@ server ← { "appliedKeys": ["deviceFlow.enabled"],
 			<pre
 				class="overflow-x-auto rounded-card border border-gray-200 bg-gray-50 p-5 font-mono text-xs leading-relaxed text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200">{transcript}</pre>
 		</div>
-	</Section>
-
-	<Section
-		tone="muted"
-		narrow
-	>
-		<Eyebrow>{t.licensing.eyebrow}</Eyebrow>
-		<h2 class="text-3xl font-[650] tracking-tight text-balance">
-			{t.licensing.heading}
-		</h2>
-		<p class="mt-4 text-gray-600 dark:text-gray-400">
-			{t.licensing.body}
-		</p>
-		<p class="mt-6">
-			<Button
-				href={href.license}
-				variant="secondary">{t.licensing.read}</Button
-			>
-		</p>
 	</Section>
 
 	<Section>

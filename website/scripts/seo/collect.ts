@@ -124,7 +124,9 @@ function assertedStringsOf(block: Record<string, unknown>): string[] {
 	const type = block['@type'];
 	if (type === 'SoftwareApplication') {
 		push(block.name);
-		push(block.license);
+		// A licence named by its URL is excluded like any other URL; a licence named in words must be on the page.
+		if (typeof block.license === 'string' && !URL.canParse(block.license))
+			push(block.license);
 	} else if (type === 'Organization') {
 		push(block.name);
 	} else if (type === 'TechArticle') {

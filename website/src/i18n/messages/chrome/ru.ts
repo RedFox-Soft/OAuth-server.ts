@@ -1,7 +1,7 @@
 import { rich } from '../../types.ts';
 import type english from './en.ts';
 
-export const source = 'b31fd282ef32';
+export const source = '273f6ab64561';
 
 export default {
 	skipToContent: 'Перейти к содержанию',
@@ -40,7 +40,7 @@ export default {
 		llms: 'Для LLM (llms.txt)',
 		contactUs: 'Написать нам',
 		about:
-			'FoxAuth построен на OAuth-server.ts — сервере OAuth 2.1 / OpenID Connect с доступным исходным кодом (source-available).',
+			'FoxAuth построен на OAuth-server.ts — сервере OAuth 2.1 / OpenID Connect.',
 		siteVersion: (
 			lastTag: string | null,
 			commit: string,
