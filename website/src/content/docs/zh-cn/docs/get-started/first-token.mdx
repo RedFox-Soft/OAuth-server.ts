@@ -1,7 +1,7 @@
 ---
 title: 获取第一个令牌
 description: 用 curl 手动走一遍授权码 + PKCE 流程：从 challenge 到解码 ID 令牌，再到调用 UserInfo。
-source: 4fd88837d0b8
+source: b365f0b19682
 sidebar:
   order: 5
 ---
@@ -23,7 +23,7 @@ import ScreenshotFigure from '../../../../../components/ScreenshotFigure.astro';
 
 <Aside type="note" title="在 FoxAuth Cloud 上">
 
-你的客户端属于你创建的项目，因此请使用该项目的签发者，而不是裸主机：`ISSUER=https://auth.foxauth.dev/<名称>`。读取 `$ISSUER/.well-known/openid-configuration`，从中获取各端点地址。在下文中，把 `http://localhost:3000` 换成 `$ISSUER`，把 `demo` 换成控制台生成的 client id。这样第 3 步和 ID 令牌中的 `iss` 就是你项目的签发者。
+你的客户端属于你创建的项目，因此请使用该项目的签发者，而不是裸主机：`ISSUER=https://<名称>.auth.foxauth.dev`，即项目 **Overview** 页面上显示的地址。读取 `$ISSUER/.well-known/openid-configuration`，从中获取各端点地址。在下文中，把 `http://localhost:3000` 换成 `$ISSUER`，把 `demo` 换成控制台生成的 client id。这样第 3 步和 ID 令牌中的 `iss` 就是你项目的签发者。
 
 </Aside>
 

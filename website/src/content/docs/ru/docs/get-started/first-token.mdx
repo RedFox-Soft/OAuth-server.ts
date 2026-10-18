@@ -1,7 +1,7 @@
 ---
 title: Получение первого токена
 description: 'Authorization Code с PKCE вручную через curl: от challenge до декодированного ID-токена и вызова UserInfo.'
-source: 4fd88837d0b8
+source: b365f0b19682
 sidebar:
   order: 5
 ---
@@ -37,7 +37,7 @@ authorized at this address», — потому что клиент можно и
 <Aside type="note" title="В FoxAuth Cloud">
 
 Ваш клиент принадлежит созданному вами проекту, поэтому используйте издателя этого проекта, а не просто хост:
-`ISSUER=https://auth.foxauth.dev/<имя>`. Прочитайте `$ISSUER/.well-known/openid-configuration` и берите адреса
+`ISSUER=https://<имя>.auth.foxauth.dev`, как он указан на странице **Overview** проекта. Прочитайте `$ISSUER/.well-known/openid-configuration` и берите адреса
 эндпоинтов оттуда. Ниже замените `http://localhost:3000` на `$ISSUER`, а `demo` — на client id, который
 сгенерировала консоль. Тогда `iss` на шаге 3 и в ID-токене будет издателем вашего проекта.
 

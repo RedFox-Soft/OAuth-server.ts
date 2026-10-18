@@ -35,7 +35,7 @@ default `redfox` project, which is served at the root.
 <Aside type="note" title="On FoxAuth Cloud">
 
 Your client belongs to a project you created, so use that project's issuer, not the bare host:
-`ISSUER=https://auth.foxauth.dev/<name>`. Read `$ISSUER/.well-known/openid-configuration` and take the endpoints
+`ISSUER=https://<name>.auth.foxauth.dev`, as the project's **Overview** shows it. Read `$ISSUER/.well-known/openid-configuration` and take the endpoints
 from it. Below, replace `http://localhost:3000` with `$ISSUER`, and `demo` with the client id the console
 generated. The `iss` in step 3 and in the ID token is then your project's issuer.
 
