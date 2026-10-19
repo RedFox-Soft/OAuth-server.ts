@@ -23,9 +23,9 @@
 		},
 		{
 			"type": "streamable-http",
-			"url": "https://{host}/mcp",
+			"url": "https://{foxauth_host}/mcp",
 			"variables": {
-				"host": {
+				"foxauth_host": {
 					"description": "Host of your own FoxAuth instance, such as auth.example.com, with mcp.enabled on",
 					"isRequired": true
 				}
