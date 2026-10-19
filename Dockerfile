@@ -9,7 +9,7 @@
 # Dependabot can actually move. The trade is that a Bun upgrade now arrives as a reviewable pull
 # request instead of silently on the next build, which for the layer that carries OpenSSL is the
 # direction worth having.
-FROM oven/bun:1.4.2-alpine@sha256:d888c0ae6c86d7866ff10c5aafdd9077b36aee6455b33dd270fb93c0dd5cef6f AS base
+FROM oven/bun:1.4.3-alpine@sha256:629e17411f1f129dbec3af78d5af9c9f2a937435c80349437206c6b0b7422373 AS base
 
 # Bun app lives here
 WORKDIR /app
