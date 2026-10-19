@@ -1,8 +1,8 @@
 diff --git a/test.d.ts b/test.d.ts
-index 714a2f71d6d10ccfc77559a7dcda572d96cc1bce..ed352c7574ff8e789530533d5ef0b7ccf639f9df 100644
+index 736bb5728aab81ce2f9a0349344ec5da8c01499e..eb6a3c5cf577c1bddeb16cdc5b70c9cad5bd48ba 100644
 --- a/test.d.ts
 +++ b/test.d.ts
-@@ -750,6 +750,19 @@ declare module "bun:test" {
+@@ -773,6 +773,19 @@ declare module "bun:test" {
     */
    export interface Matchers<T = unknown> extends MatchersBuiltin<T> {}
  
@@ -22,7 +22,7 @@ index 714a2f71d6d10ccfc77559a7dcda572d96cc1bce..ed352c7574ff8e789530533d5ef0b7cc
    /**
     * Extend this interface with declaration merging to add type support for custom asymmetric matchers.
     * @example
-@@ -925,7 +938,7 @@ declare module "bun:test" {
+@@ -948,7 +961,7 @@ declare module "bun:test" {
       * @example
       * expect(Promise.resolve(1)).resolves.toBe(1);
       */
@@ -31,7 +31,7 @@ index 714a2f71d6d10ccfc77559a7dcda572d96cc1bce..ed352c7574ff8e789530533d5ef0b7cc
  
      /**
       * Expects the value to be a promise that rejects.
-@@ -933,7 +946,7 @@ declare module "bun:test" {
+@@ -956,7 +969,7 @@ declare module "bun:test" {
       * @example
       * expect(Promise.reject("error")).rejects.toBe("error");
       */
