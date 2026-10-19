@@ -7,6 +7,7 @@ import zhCN from 'antd/es/locale/zh_CN.js';
 import { LanguageContext } from '../../i18n/context.js';
 import type { Language } from '../../i18n/languages.js';
 import { CSS_VAR_KEY, DARK_TOKENS, LIGHT_TOKENS } from './tokens.js';
+import { accentTokens, type PaintedAccent } from './accent.js';
 
 export type Scheme = 'light' | 'dark';
 
@@ -22,6 +23,9 @@ export type Scheme = 'light' | 'dark';
  *
  * `language` sets antd's own words — the copy button's "Copy", for one — to the page's language (specs/097).
  * English is antd's built-in default, so it passes no locale object at all.
+ *
+ * `accent` is an application's own primary colour (specs/106), already made legible for each scheme; without
+ * it the tokens are exactly the server's.
  */
 // antd's locale modules are ES modules typed as CommonJS, so under `nodenext` the default import is typed as
 // the module object while the runtime hands over the locale itself; this accepts either.
@@ -38,13 +42,16 @@ export function EndUserTheme({
 	children,
 	scheme = 'light',
 	zeroRuntime = false,
-	language = 'en'
+	language = 'en',
+	accent
 }: {
 	children: ReactNode;
 	scheme?: Scheme;
 	zeroRuntime?: boolean;
 	language?: Language;
+	accent?: PaintedAccent;
 }) {
+	const tokens = scheme === 'dark' ? DARK_TOKENS : LIGHT_TOKENS;
 	return (
 		<ConfigProvider
 			locale={ANTD_LOCALES[language]}
@@ -52,7 +59,7 @@ export function EndUserTheme({
 				cssVar: { key: CSS_VAR_KEY },
 				algorithm:
 					scheme === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm,
-				token: scheme === 'dark' ? DARK_TOKENS : LIGHT_TOKENS,
+				token: accent ? { ...tokens, ...accentTokens(scheme, accent) } : tokens,
 				...(zeroRuntime ? { zeroRuntime: true } : {})
 			}}
 		>

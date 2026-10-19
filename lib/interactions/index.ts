@@ -122,8 +122,10 @@ import {
 	type SelectableItem
 } from './consentChoices.js';
 import { adapter } from 'lib/adapters/index.js';
-import { clientProvenance, grantTypeAllowed } from 'lib/models/client.js';
+import { grantTypeAllowed } from 'lib/models/client.js';
 import { readLogo } from 'lib/models/client/logo.js';
+import { brandingFor, signInBranding } from 'lib/interactions/branding.js';
+import type { PaintedAccent } from 'lib/html/theme/accent.js';
 import { profileClaims } from 'lib/consts/profile_claims.js';
 import { hasOwnOrigin, issuerFor } from 'lib/configs/issuer.js';
 import { ttl } from 'lib/configs/liveTime.js';
@@ -691,13 +693,14 @@ async function allowsNothing(
 /*
  * Everything the consent page shows, gathered from the interaction, the client, the bucket being signed
  * into, the person and their existing grant. The decisions about what to say are buildConsentView's; this
- * only reads.
+ * only reads. The application's colour comes back beside the view rather than in it: it is the page's theme,
+ * decided with the other pages of the sign-in (specs/106), not something the page says.
  */
 async function consentViewFor(
 	uid: string,
 	interaction: Interaction,
 	signsInto: string
-): Promise<ConsentView> {
+): Promise<{ view: ConsentView; accent?: PaintedAccent }> {
 	const clientId = clientIdOf(interaction) ?? '';
 	const client = clientId ? await Client.tryFind(clientId) : undefined;
 	const params = (interaction.payload.params ?? {}) as Record<string, unknown>;
@@ -718,12 +721,10 @@ async function consentViewFor(
 		? { ...storedClaims, ...profile, email: user.email }
 		: {};
 
-	const tier = client
-		? await clientProvenance(client, bucket)
-		: 'self-registered';
-	// Read only where it could be shown: no other app's logo ever reaches the page (specs/094).
-	const logo =
-		tier === 'this-organization' ? await readLogo(clientId) : undefined;
+	const branding = await brandingFor(client, bucket, interaction);
+	const { tier } = branding;
+	// Read only where it could be shown: no other app's logo ever reaches the page (specs/094, specs/106).
+	const logo = branding.showsBranding ? await readLogo(clientId) : undefined;
 	/*
 	 * A client nobody registered here and that did not come through dynamic registration was resolved from
 	 * its metadata document, so its client_id is a URL whose host the document proved control of.
@@ -846,7 +847,7 @@ async function consentViewFor(
 		)
 	);
 
-	return buildConsentView({
+	const view = buildConsentView({
 		uid,
 		logoSrc: versionedAsset('logo.svg'),
 		service,
@@ -892,6 +893,7 @@ async function consentViewFor(
 					revokeHref: accountPageUrl(bucket ?? (await issuingBucket(signsInto)))
 				})
 	});
+	return { view, ...(branding.accent ? { accent: branding.accent } : {}) };
 }
 
 /*
@@ -977,6 +979,7 @@ async function unverifiedAtSignIn(
 		handOffTo: redirectUriOf(interaction),
 		language: languageOf(interaction),
 		switcher: switcherOf(interaction, 'login'),
+		...(await accentFor(interaction, bucket._id)),
 		...loginOptions
 	});
 }
@@ -984,6 +987,18 @@ async function unverifiedAtSignIn(
 /* The client that began an interaction — the only trustworthy route to a bucket. */
 function clientIdOf(interaction: Interaction): string | undefined {
 	return interaction.payload.params?.client_id;
+}
+
+/*
+ * The application's own colour for a page of this sign-in, when it may show one (specs/106) — spread into
+ * every render of the sign-in, two-step, registration and consent pages, so they agree.
+ */
+async function accentFor(
+	interaction: Interaction,
+	signsInto: string
+): Promise<{ accent?: PaintedAccent }> {
+	const { accent } = await signInBranding(interaction, signsInto);
+	return accent ? { accent } : {};
 }
 
 /*
@@ -1158,7 +1173,7 @@ export const ui = new Elysia()
 	 */
 	.get(
 		'ui/:uid/login',
-		async ({ params: { uid }, query, interaction }) => {
+		async ({ params: { uid }, query, interaction, signsInto }) => {
 			/*
 			 * The bucket is resolved on the GET as well as the POST, exactly as the registration route already
 			 * does: what this page offers — a password form, provider buttons, or only the latter — is a
@@ -1180,6 +1195,7 @@ export const ui = new Elysia()
 				handOffTo: redirectUriOf(interaction),
 				language: languageOf(interaction),
 				switcher: switcherOf(interaction, 'login'),
+				...(await accentFor(interaction, signsInto)),
 				...(await loginOptionsForClient(
 					clientId,
 					resourceOf(interaction),
@@ -1208,6 +1224,7 @@ export const ui = new Elysia()
 			 * once is not only cheaper — two lookups are two chances to disagree about one bucket.
 			 */
 			const loginOptions = await loginOptionsForBucket(bucketId);
+			const branded = await accentFor(interaction, bucketId);
 
 			/*
 			 * The one refusal this door gives. Every path that turns a sign-in away shares this expression
@@ -1229,6 +1246,7 @@ export const ui = new Elysia()
 					handOffTo: redirectUriOf(interaction),
 					language: languageOf(interaction),
 					switcher: switcherOf(interaction, 'login'),
+					...branded,
 					...loginOptions
 				});
 
@@ -1384,7 +1402,8 @@ export const ui = new Elysia()
 			mode: 'verify',
 			handOffTo: redirectUriOf(interaction),
 			language: languageOf(interaction),
-			switcher: switcherOf(interaction, 'totp')
+			switcher: switcherOf(interaction, 'totp'),
+			...(await accentFor(interaction, bucketId))
 		});
 	})
 	.post(
@@ -1400,13 +1419,15 @@ export const ui = new Elysia()
 				resourceOf(interaction),
 				await addressedBucketOf(interaction)
 			);
+			const branded = await accentFor(interaction, bucketId);
 			const refuse = () =>
 				totpServer(uid, {
 					mode: 'verify',
 					errorMessage: invalidCode(interaction),
 					handOffTo: redirectUriOf(interaction),
 					language: languageOf(interaction),
-					switcher: switcherOf(interaction, 'totp')
+					switcher: switcherOf(interaction, 'totp'),
+					...branded
 				});
 
 			if (pending.attempts >= MAX_ATTEMPTS_PER_INTERACTION) {
@@ -1500,7 +1521,8 @@ export const ui = new Elysia()
 			secretText,
 			handOffTo: redirectUriOf(interaction),
 			language: languageOf(interaction),
-			switcher: switcherOf(interaction, 'totp/enroll')
+			switcher: switcherOf(interaction, 'totp/enroll'),
+			...(await accentFor(interaction, bucketId))
 		});
 	})
 	.post(
@@ -1572,7 +1594,8 @@ export const ui = new Elysia()
 					secretText,
 					handOffTo: redirectUriOf(interaction),
 					language: languageOf(interaction),
-					switcher: switcherOf(interaction, 'totp/enroll')
+					switcher: switcherOf(interaction, 'totp/enroll'),
+					...(await accentFor(interaction, bucketId))
 				});
 			}
 
@@ -1826,28 +1849,35 @@ export const ui = new Elysia()
 	 * The bucket is resolved on the GET as well as the POST: a form that can only be refused on
 	 * submission is a dead end dressed as an invitation, and the two extra reads are point lookups.
 	 */
-	.get('ui/:uid/registration', async ({ params: { uid }, interaction }) => {
-		const clientId = clientIdOf(interaction);
-		const closed = await passwordDoorClosed(interaction, uid);
-		if (closed) return closed;
+	.get(
+		'ui/:uid/registration',
+		async ({ params: { uid }, interaction, signsInto }) => {
+			const clientId = clientIdOf(interaction);
+			const closed = await passwordDoorClosed(interaction, uid);
+			if (closed) return closed;
 
-		const bucket = await getBucketStore().find(
-			await resolveBucketForRequest(
-				clientId,
-				resourceOf(interaction),
-				await addressedBucketOf(interaction)
-			)
-		);
-		/* Closed by the project, or paused by its plan's active-user cap (specs/102): one page, naming neither. */
-		if (bucket && (!bucket.registrationOpen || (await signUpsPaused(bucket)))) {
-			return registrationClosedPage(languageOf(interaction));
+			const bucket = await getBucketStore().find(
+				await resolveBucketForRequest(
+					clientId,
+					resourceOf(interaction),
+					await addressedBucketOf(interaction)
+				)
+			);
+			/* Closed by the project, or paused by its plan's active-user cap (specs/102): one page, naming neither. */
+			if (
+				bucket &&
+				(!bucket.registrationOpen || (await signUpsPaused(bucket)))
+			) {
+				return registrationClosedPage(languageOf(interaction));
+			}
+			return registrationServer(uid, {
+				handOffTo: redirectUriOf(interaction),
+				language: languageOf(interaction),
+				switcher: switcherOf(interaction, 'registration'),
+				...(await accentFor(interaction, signsInto))
+			});
 		}
-		return registrationServer(uid, {
-			handOffTo: redirectUriOf(interaction),
-			language: languageOf(interaction),
-			switcher: switcherOf(interaction, 'registration')
-		});
-	})
+	)
 	.post(
 		'ui/:uid/registration',
 		async ({ body, params: { uid }, interaction }) => {
@@ -1881,7 +1911,8 @@ export const ui = new Elysia()
 					email: body.email,
 					handOffTo: redirectUriOf(interaction),
 					language: languageOf(interaction),
-					switcher: switcherOf(interaction, 'registration')
+					switcher: switcherOf(interaction, 'registration'),
+					...(await accentFor(interaction, bucketId))
 				});
 			}
 			// Before the existing-address branch, so a short password is refused the same way whether or
@@ -1895,7 +1926,8 @@ export const ui = new Elysia()
 					email: body.email,
 					handOffTo: redirectUriOf(interaction),
 					language: languageOf(interaction),
-					switcher: switcherOf(interaction, 'registration')
+					switcher: switcherOf(interaction, 'registration'),
+					...(await accentFor(interaction, bucketId))
 				});
 			}
 
@@ -1982,12 +2014,21 @@ export const ui = new Elysia()
 			})
 		}
 	)
-	.get('ui/:uid/consent', async ({ params: { uid }, interaction, signsInto }) =>
-		consentServer(await consentViewFor(uid, interaction, signsInto), {
-			handOffTo: redirectUriOf(interaction),
-			language: languageOf(interaction),
-			switcher: switcherOf(interaction, 'consent')
-		})
+	.get(
+		'ui/:uid/consent',
+		async ({ params: { uid }, interaction, signsInto }) => {
+			const { view, accent } = await consentViewFor(
+				uid,
+				interaction,
+				signsInto
+			);
+			return consentServer(view, {
+				handOffTo: redirectUriOf(interaction),
+				language: languageOf(interaction),
+				switcher: switcherOf(interaction, 'consent'),
+				...(accent ? { accent } : {})
+			});
+		}
 	)
 	.post(
 		'ui/:uid/consent',

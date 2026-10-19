@@ -1,5 +1,6 @@
 import { t } from 'elysia';
 import { LOGO_MAX_LENGTH } from '../../consts/client_logo.js';
+import { PRIMARY_COLOR_MAX_LENGTH } from '../../consts/client_branding.js';
 
 /*
  * Written as literal tuples, not `list.map((v) => t.Literal(v))`: a union built from a mapped array
@@ -31,16 +32,21 @@ const AuthMethod = t.Union([
 /*
  * How the client appears on the consent page (specs/094). The logo is a `data:` URL whose bytes the service
  * checks — PNG, JPEG or WebP, at most 64 KiB — and the links must be https; both are shown only for this
- * organization's own app. On an edit, null removes one.
+ * organization's own app. The primary colour paints its sign-in pages for the same people (specs/106); its
+ * `#rrggbb` form is the service's check, so a refusal can name it. On an edit, null removes one.
  */
 const presented = {
 	logo: t.Optional(t.String({ maxLength: LOGO_MAX_LENGTH })),
+	primaryColor: t.Optional(t.String({ maxLength: PRIMARY_COLOR_MAX_LENGTH })),
 	policyUri: t.Optional(t.String()),
 	tosUri: t.Optional(t.String())
 };
 const presentedEditable = {
 	logo: t.Optional(
 		t.Union([t.String({ maxLength: LOGO_MAX_LENGTH }), t.Null()])
+	),
+	primaryColor: t.Optional(
+		t.Union([t.String({ maxLength: PRIMARY_COLOR_MAX_LENGTH }), t.Null()])
 	),
 	policyUri: t.Optional(t.Union([t.String(), t.Null()])),
 	tosUri: t.Optional(t.Union([t.String(), t.Null()]))

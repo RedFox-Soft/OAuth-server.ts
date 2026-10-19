@@ -90,4 +90,13 @@ describe('a client document naming internal client attributes', () => {
 
 		expect(await adapter('ClientLogo').find(client.clientId)).toBeUndefined();
 	});
+
+	it('gives the app no colour on its sign-in pages when its document supplies one', async () => {
+		const { client } = await resolveServed({
+			primaryColor: '#ff0000',
+			primary_color: '#ff0000'
+		});
+
+		expect(client.primaryColor).toBeUndefined();
+	});
 });

@@ -94,7 +94,7 @@ export interface ConsentView {
 	logoSrc: string;
 	/* The header: the bucket's display name, else its address. Only ever server data. */
 	service: { displayName?: string; host: string };
-	/* `logo` only for this organization's own app, on a page that does not warn about the receiver. */
+	/* `logo` only where the sign-in may show the app's own face (lib/interactions/branding.ts). */
 	client: { name: string; tier: ProvenanceTier; logo?: string };
 	redirect: {
 		kind: RedirectKind;
@@ -201,7 +201,7 @@ export interface ConsentInput {
 		 * proved a place the answer can go, and its loopback use is stated without alarm.
 		 */
 		loopbackOnly?: boolean;
-		/* The operator's logo, read only for this organization's own app (specs/094). */
+		/* The operator's logo, read only where the sign-in may show the app's own face (specs/094, specs/106). */
 		logo?: string;
 		policyUri?: string;
 		tosUri?: string;
@@ -671,16 +671,11 @@ export function buildConsentView(input: ConsentInput): ConsentView {
 			name,
 			tier: input.client.tier,
 			/*
-			 * Only an app this organization stands behind, and never on a page that warns the receiver may not be
-			 * who it seems: a familiar logo is exactly what makes a phished device code or a local program look
-			 * like the real thing (specs/094).
+			 * Decided with the rest of the sign-in's branding, from facts rather than from which warning this page
+			 * shows: the administrator-rights warning outranks the device and own-device ones, and testing the shown
+			 * warning let a logo onto a device's consent page (specs/106).
 			 */
-			...(input.client.logo &&
-			input.client.tier === 'this-organization' &&
-			warning?.kind !== 'loopback' &&
-			warning?.kind !== 'device'
-				? { logo: input.client.logo }
-				: {})
+			...(input.client.logo ? { logo: input.client.logo } : {})
 		},
 		redirect: { ...redirect, ...(documentHost ? { documentHost } : {}) },
 		account: { id: input.account.id, label: accountLabel(input.account) },

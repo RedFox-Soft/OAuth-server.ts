@@ -5,6 +5,7 @@ import { emptyConsentView } from './consentView.ts';
 import { RegistrationPage } from './registration.tsx';
 import { TotpPage } from './totpPage.tsx';
 import { EndUserTheme } from '../html/theme/provider.tsx';
+import type { PaintedAccent } from '../html/theme/accent.ts';
 import { isLanguage } from '../i18n/languages.ts';
 
 /*
@@ -18,13 +19,20 @@ export function clientRoot(
 	uid: string,
 	props: object
 ): ReactElement {
-	// The server put the page's language in the props (serverRender.tsx); anything else there is ignored.
-	const { language } = props as { language?: unknown };
+	/*
+	 * The server put the page's language and, for an application's own sign-in, its colour in the props
+	 * (serverRender.tsx); the colour is the server's decision, handed over already painted (specs/106).
+	 */
+	const { language, accent } = props as {
+		language?: unknown;
+		accent?: PaintedAccent;
+	};
 	return (
 		<StrictMode>
 			<EndUserTheme
 				zeroRuntime
 				language={isLanguage(language) ? language : 'en'}
+				accent={accent}
 			>
 				{pageElement(page, uid, props)}
 			</EndUserTheme>

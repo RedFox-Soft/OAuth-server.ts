@@ -4,7 +4,7 @@ title: "Rendered pages and their content security policy"
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-04
-updated: 2026-10-15
+updated: 2026-10-19
 graph:
   node_type: concept
   relationships:
@@ -109,6 +109,13 @@ them by hand. (That count is from before spec 092. The rebuilt consent page alon
 from 5, and the console has grown past ten pages; the argument is unchanged.) An attribute decorates the one element it is attached to; a `<style>` block restyles the
 whole document and can exfiltrate input values by attribute selector. The block form is the one
 `style-src-elem` closes.
+
+**One per-request style block rides on that looseness (spec 106, 2026-10-19).** On the four hydrated
+sign-in pages, an application's colour adds a `<style>` with `--fox-link` and changes the inline antd
+custom properties. These pages already allow `'unsafe-inline'` style elements, because they load a script.
+So there is no hash backstop, and validation is the only guard: `#rrggbb` on write, again on read, and only
+values the colour module formatted itself are ever written out ([[client-primary-colour]]). No other page
+family changes.
 
 The `form_post` auto-submit page (`lib/html/formPost.tsx`) omits `frame-ancestors`. Silent
 authentication (`prompt=none` in a hidden iframe) with `response_mode=form_post` renders that page

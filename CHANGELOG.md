@@ -9,6 +9,15 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+### Added
+
+- **An application's primary colour** (`primaryColor` on the client routes and the MCP client tools; `null` removes
+  it). The sign-in, registration, two-step and consent pages paint it for the organization's own people, in both
+  colour schemes, shifted to the nearest shade that keeps WCAG AA; the response's `paintedPrimaryColor` shows what
+  they will see. A registration or metadata document cannot set it. The consent logo now follows the same rule per
+  sign-in, which also keeps it off a device's consent page that asks for administrator rights. No migration and no
+  new storage area.
+
 ## [1.1.0] - 2026-10-16
 
 Provider buttons on the sign-in page fit any number of providers, the console says when one is missing from it and

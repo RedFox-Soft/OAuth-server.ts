@@ -4,7 +4,7 @@ title: 'End-user pages follow the device colour scheme'
 tags: [architecture, contract, gotcha, accessibility]
 sources: [oauth-server-codebase]
 created: 2026-10-13
-updated: 2026-10-13
+updated: 2026-10-19
 graph:
   node_type: concept
   relationships:
@@ -43,7 +43,7 @@ deliberately left out: it keeps `lib/html/zeroRuntime.tsx` and none of what foll
      extracted CSS are byte-identical except for those values.
    - `darkOverrides` renders the page's own tree a second time under `theme.darkAlgorithm` and keeps only the
      `--ant-*` declarations (`lib/html/theme/dark.tsx:41`).
-   - The result is memoized by the set of light selectors.
+   - The result is memoized by the set of light selectors and, since spec 106, the application's colour (see Gotchas).
 
 ## Gotchas
 
@@ -62,6 +62,15 @@ deliberately left out: it keeps `lib/html/zeroRuntime.tsx` and none of what foll
     same page.
   - A disagreement on the key, the tokens or `zeroRuntime` would diverge hydration in the browser only.
     `test/dark_theme/hydration.spec.ts` renders both.
+- **An application's colour changes the tokens per page (spec 106, 2026-10-19).**
+  - On the four hydrated pages of a sign-in, an application's colour replaces the primary and link tokens and
+    the `--fox-link` role ([[client-primary-colour]]).
+  - The dark-block memo is now keyed by the colour's dark seeds as well as by the selector set, and is bounded
+    at 256 entries (`dark.tsx:30`, `:53`). Before that, the selector set alone was the key, and the first
+    coloured page's dark block would have reached every later page with the same components.
+  - The colour has to reach `clientRoot` through `window.PROPS` too. The markup is identical without it, but
+    cssinjs would put the default blue back after hydration.
+  - `themeHead()` is still a constant.
 
 ## AA in both schemes, including light
 

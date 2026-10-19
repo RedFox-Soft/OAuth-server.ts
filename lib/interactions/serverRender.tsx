@@ -13,6 +13,7 @@ import { SIGN_IN_TEXTS } from '../i18n/texts/signIn/index.js';
 import { htmlResponse } from '../html/csp.js';
 import { versionedAsset } from '../html/versionedAsset.js';
 import { renderEndUserTree } from '../html/theme/dark.js';
+import { accentStyle, type PaintedAccent } from '../html/theme/accent.js';
 
 const htmlTeamplate = Bun.file('./lib/interactions/htmlTeamplate.html');
 
@@ -42,24 +43,34 @@ function hydratedPage(
 	title: string,
 	props: object,
 	page: ReactElement,
-	language: Language
+	language: Language,
+	accent: PaintedAccent | undefined
 ): string {
 	const tree = renderEndUserTree(page, {
 		zeroRuntime: true,
 		language,
+		accent,
 		render: (element) => renderToString(<StrictMode>{element}</StrictMode>)
 	});
 	/*
 	 * The language travels in the props as well as in the markup: the browser rebuilds the tree from the props,
-	 * and a client that defaulted to English would rewrite a Russian page on load (specs/097).
+	 * and a client that defaulted to English would rewrite a Russian page on load (specs/097). An application's
+	 * colour travels the same way (specs/106): the markup is identical without it — antd's class hash ignores
+	 * token values — but on hydration cssinjs writes its own light custom properties, which would put the
+	 * default blue back after load, in the browser only and with nothing logged.
 	 */
 	return template
 		.replace('__APP_LANG__', language)
 		.replace('/public/loginClient.js', versionedAsset('loginClient.js'))
 		.replace('/public/favicon.ico', versionedAsset('favicon.ico'))
 		.replace('<!--app-title-->', () => title)
-		.replace('<!--app-styles-->', () => styleLinks() + tree.head)
-		.replace('<!--app-props-->', () => propsScript({ ...props, language }))
+		.replace(
+			'<!--app-styles-->',
+			() => styleLinks() + tree.head + (accent ? accentStyle(accent) : '')
+		)
+		.replace('<!--app-props-->', () =>
+			propsScript({ ...props, language, ...(accent ? { accent } : {}) })
+		)
 		.replace('<!--app-html-->', () => tree.html);
 }
 
@@ -93,6 +104,7 @@ export async function loginServer(
 		handOffTo?: string;
 		language?: Language;
 		switcher?: SwitcherProps;
+		accent?: PaintedAccent;
 	} = {}
 ) {
 	const { errorMessage, switcher } = options;
@@ -144,7 +156,8 @@ export async function loginServer(
 			logoSrc={logoSrc}
 			switcher={switcher}
 		/>,
-		language
+		language,
+		options.accent
 	);
 	// A notice is not a failure: only the error re-render answers 400.
 	return htmlResponse(html, {
@@ -162,6 +175,7 @@ export async function registrationServer(
 		handOffTo?: string;
 		language?: Language;
 		switcher?: SwitcherProps;
+		accent?: PaintedAccent;
 	} = {}
 ) {
 	const { errorMessage, email, switcher } = options;
@@ -183,7 +197,8 @@ export async function registrationServer(
 			logoSrc={logoSrc}
 			switcher={switcher}
 		/>,
-		language
+		language,
+		options.accent
 	);
 	// Neither submitted password reaches this document — not the markup, not the props (spec FR-011).
 	return htmlResponse(html, {
@@ -203,6 +218,7 @@ export async function totpServer(
 		handOffTo?: string;
 		language?: Language;
 		switcher?: SwitcherProps;
+		accent?: PaintedAccent;
 	}
 ) {
 	const { mode, errorMessage, otpauthUri, secretText, switcher } = options;
@@ -229,7 +245,8 @@ export async function totpServer(
 			logoSrc={logoSrc}
 			switcher={switcher}
 		/>,
-		language
+		language,
+		options.accent
 	);
 	/*
 	 * The submitted code never comes back with the page, in the markup or the props — the same rule the
@@ -250,6 +267,7 @@ export async function consentServer(
 		handOffTo?: string;
 		language?: Language;
 		switcher?: SwitcherProps;
+		accent?: PaintedAccent;
 	} = {}
 ) {
 	const language = options.language ?? 'en';
@@ -262,7 +280,8 @@ export async function consentServer(
 			{...view}
 			switcher={switcher}
 		/>,
-		language
+		language,
+		options.accent
 	);
 	return htmlResponse(html, { handOffTo: options.handOffTo, language });
 }

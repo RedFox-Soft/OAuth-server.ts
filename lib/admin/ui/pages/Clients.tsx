@@ -13,7 +13,8 @@ import {
 	Tag,
 	Collapse,
 	Tooltip,
-	Upload
+	Upload,
+	ColorPicker
 } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { request } from '../frame/request.js';
@@ -28,6 +29,7 @@ import {
 	LOGO_MAX_BYTES,
 	LOGO_SIZE_MESSAGE
 } from '../../../consts/client_logo.js';
+import { paintedAccent } from '../../../html/theme/accent.js';
 
 const GRANT_OPTIONS = [
 	{ label: 'authorization_code', value: 'authorization_code' },
@@ -112,6 +114,7 @@ interface ClientView {
 	authorizationDetailsTypes?: string[];
 	registeredDynamically?: boolean;
 	hasLogo?: boolean;
+	primaryColor?: string;
 	policyUri?: string;
 	tosUri?: string;
 	corsOrigins?: string[];
@@ -131,6 +134,7 @@ interface FormValues extends Omit<KeyAttributes, 'jwks'> {
 	backchannelClientNotificationEndpoint?: string;
 	authorizationDetailsTypes?: string[];
 	logo?: string | null;
+	primaryColor?: string | null;
 	policyUri?: string;
 	tosUri?: string;
 	corsOrigins?: string[];
@@ -280,6 +284,76 @@ function LogoField({
 	);
 }
 
+/*
+ * The application's colour, and what its sign-in pages will make of it: a primary button on a light page and on a
+ * dark one, painted by the very code the pages use (lib/html/theme/accent.ts), so the preview is the page.
+ */
+function PrimaryColorField({
+	value,
+	onChange
+}: {
+	value?: string | null;
+	onChange?: (value: string | null) => void;
+}) {
+	const accent = value ? paintedAccent(value) : undefined;
+	const tile = (background: string, fill: string, scheme: string) => (
+		<span
+			style={{
+				display: 'inline-flex',
+				alignItems: 'center',
+				padding: 8,
+				borderRadius: 8,
+				background,
+				border: '1px solid #e6e8eb'
+			}}
+		>
+			<span
+				role="img"
+				aria-label={`Primary button on a ${scheme} page, ${fill}`}
+				style={{
+					padding: '4px 12px',
+					borderRadius: 6,
+					background: fill,
+					color: '#ffffff'
+				}}
+			>
+				Continue
+			</span>
+		</span>
+	);
+	return (
+		<Space
+			orientation="vertical"
+			size={4}
+		>
+			<Space align="center">
+				<ColorPicker
+					value={value ?? undefined}
+					format="hex"
+					disabledAlpha
+					disabledFormat
+					showText={() => value ?? 'Server default'}
+					onChangeComplete={(color) => onChange?.(color.toHexString())}
+				/>
+				{value ? (
+					<Button onClick={() => onChange?.(null)}>Remove</Button>
+				) : null}
+			</Space>
+			{accent ? (
+				<Space align="center">
+					{tile('#ffffff', accent.light.primary, 'light')}
+					{tile('#141414', accent.dark.primary, 'dark')}
+				</Space>
+			) : null}
+			{accent?.adjusted ? (
+				<Typography.Text type="secondary">
+					Adjusted for legibility — people will see the shades shown.
+				</Typography.Text>
+			) : null}
+		</Space>
+	);
+}
+
 const DEFAULT_VALUES: FormValues = {
 	applicationType: 'web',
 	grantTypes: ['authorization_code'],
@@ -371,6 +445,7 @@ export function Clients({
 			tosUri: row.tosUri ?? '',
 			corsOrigins: row.corsOrigins ?? [],
 			logo: null,
+			primaryColor: row.primaryColor ?? null,
 			jwksText: row.jwks ? JSON.stringify(row.jwks, null, 2) : '',
 			subjectType: row.subjectType,
 			...Object.fromEntries(
@@ -422,6 +497,13 @@ export function Clients({
 		}
 		const logo = values.logo ?? null;
 		if (editing ? logo !== storedLogo : logo) body.logo = logo;
+		// Sent on an edit only when changed, so saving an unrelated field never writes the colour back.
+		const colour = values.primaryColor ?? null;
+		const storedColour = editing
+			? (rows.find((row) => row.clientId === editingClientId)?.primaryColor ??
+				null)
+			: null;
+		if (editing ? colour !== storedColour : colour) body.primaryColor = colour;
 		return body;
 	}
 
@@ -790,6 +872,13 @@ export function Clients({
 						extra="Shown only to people who sign in through this organization’s own project. PNG, JPEG or WebP, up to 64 KiB; square, at least 128 px."
 					>
 						<LogoField />
+					</Form.Item>
+					<Form.Item
+						name="primaryColor"
+						label="Primary colour"
+						extra="Used on the sign-in, two-step and consent pages, only for people of this organization’s own projects. Shifted to a darker or lighter shade where the colour itself would be hard to read."
+					>
+						<PrimaryColorField />
 					</Form.Item>
 					<Form.Item
 						name="policyUri"

@@ -69,12 +69,14 @@ export const BASE_METADATA_KEYS = [
 	'registeredDynamically',
 	'registrationUsedAt',
 	/*
-	 * The bucket a client belongs to and the origins it may be read from (specs/099). Written by the server
-	 * and by an administrator only; a registration that could name either would choose its own issuer or
-	 * grant itself CORS.
+	 * The bucket a client belongs to and the origins it may be read from (specs/099), and the colour its
+	 * sign-in pages are painted in (specs/106). Written by the server and by an administrator only; a
+	 * registration that could name any of them would choose its own issuer, grant itself CORS, or dress
+	 * itself in an organization's colours.
 	 */
 	'bucketId',
 	'corsOrigins',
+	'primaryColor',
 	/*
 	 * A provisioning connection's client, synthesized from the connection and never stored
 	 * (lib/provisioning/client.ts). Base keys for the reason the three above are: no wire input may claim

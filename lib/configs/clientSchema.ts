@@ -180,6 +180,16 @@ export const ClientSchema = t.Object({
 	corsOrigins: t.Optional(t.Array(t.String())),
 
 	/*
+	 * primaryColor
+	 *
+	 * description: The colour the sign-in pages paint this client's buttons and links in (specs/106), stored
+	 * lower-case as `#rrggbb`. Set by an administrator only, and shown only to this organization's own people.
+	 * A base key for the reason `corsOrigins` is one: a client may not dress itself in an organization's
+	 * colours.
+	 */
+	primaryColor: t.Optional(t.String()),
+
+	/*
 	 * registrationUsedAt
 	 *
 	 * description: When a self-registered client first completed an authorization, in epoch seconds.

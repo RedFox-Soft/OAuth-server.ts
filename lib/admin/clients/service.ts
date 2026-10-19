@@ -25,6 +25,11 @@ import {
 	readLogo,
 	writeLogo
 } from '../../models/client/logo.js';
+import {
+	PRIMARY_COLOR_MESSAGE,
+	PRIMARY_COLOR_PATTERN
+} from '../../consts/client_branding.js';
+import { paintedAccent, readPrimaryColor } from '../../html/theme/accent.js';
 
 export interface AdminClientView {
 	clientId: string;
@@ -59,6 +64,14 @@ export interface AdminClientView {
 	policyUri?: string;
 	tosUri?: string;
 	logo?: string;
+	/* The colour its sign-in pages are painted in, for this organization's own users (specs/106). */
+	primaryColor?: string;
+	/*
+	 * What those pages actually show: the light shade, the dark one, and whether the light one had to move to stay
+	 * legible. The dark one always differs — antd paints every colour darker on a dark page — so it is shown, not
+	 * flagged.
+	 */
+	paintedPrimaryColor?: { light: string; dark: string; adjusted: boolean };
 	/* The project it belongs to, for life (specs/099). Absent only for a client registered at the root. */
 	projectId?: string;
 	corsOrigins: string[];
@@ -66,8 +79,14 @@ export interface AdminClientView {
 	registeredDynamically: boolean;
 }
 
-/* A client in a list: whether it has a logo, never the image — a bucket may hold many. */
-export type AdminClientListItem = Omit<AdminClientView, 'logo'> & {
+/*
+ * A client in a list: whether it has a logo, never the image — a bucket may hold many — and its colour, without
+ * the shades, so listing a project works nothing out.
+ */
+export type AdminClientListItem = Omit<
+	AdminClientView,
+	'logo' | 'paintedPrimaryColor'
+> & {
 	hasLogo: boolean;
 };
 
@@ -168,6 +187,8 @@ export interface CreateClientInput extends KeyAndRequestInput {
 	corsOrigins?: readonly string[];
 	/* A `data:` URL; null on an update removes the logo. Never part of the client record. */
 	logo?: string | null;
+	/* `#rrggbb`, any case; null on an update removes it. */
+	primaryColor?: string | null;
 }
 
 /*
@@ -205,6 +226,12 @@ function checkedPresentation(
 			throw new AdminError(422, `${field} must be an https URL`);
 		}
 	}
+	if (
+		typeof input.primaryColor === 'string' &&
+		!PRIMARY_COLOR_PATTERN.test(input.primaryColor)
+	) {
+		throw new AdminError(422, PRIMARY_COLOR_MESSAGE);
+	}
 	if (input.logo === undefined || input.logo === null) return input.logo;
 	const parsed = parseLogo(input.logo);
 	if (!parsed.ok) {
@@ -224,7 +251,22 @@ async function storeLogo(clientId: string, logo: string | null | undefined) {
 
 async function withLogo(view: AdminClientView): Promise<AdminClientView> {
 	const logo = await readLogo(view.clientId);
-	return logo ? { ...view, logo } : view;
+	return withPaintedColour(logo ? { ...view, logo } : view);
+}
+
+// Beside the logo on the single view: what the colour will look like is worked out for one client, never a list.
+function withPaintedColour(view: AdminClientView): AdminClientView {
+	const accent = view.primaryColor && paintedAccent(view.primaryColor);
+	return accent
+		? {
+				...view,
+				paintedPrimaryColor: {
+					light: accent.light.primary,
+					dark: accent.dark.primary,
+					adjusted: accent.adjusted
+				}
+			}
+		: view;
 }
 
 function generateSecret(): string {
@@ -272,12 +314,16 @@ function toMetadata(input: CreateClientInput, clientId: string) {
 	}
 	const origins = validatedOrigins(input.corsOrigins);
 	if (origins !== undefined) metadata.corsOrigins = origins;
+	if (typeof input.primaryColor === 'string') {
+		metadata.primaryColor = input.primaryColor.toLowerCase();
+	}
 	applyKeyAndRequestAttributes(metadata, input);
 	return metadata;
 }
 
 // The view is handed out, so its lists are copies rather than the frozen client's own.
 function toView(client: Client): AdminClientView {
+	const primaryColor = readPrimaryColor(client.primaryColor);
 	return {
 		clientId: client.clientId,
 		clientName: client.clientName,
@@ -299,6 +345,7 @@ function toView(client: Client): AdminClientView {
 		projectId: client.bucketId,
 		corsOrigins: [...(client.corsOrigins ?? [])],
 		registeredDynamically: client.registeredDynamically === true,
+		...(primaryColor ? { primaryColor } : {}),
 		...keyAndRequestView(client)
 	};
 }
@@ -416,6 +463,9 @@ export async function updateClient(
 	};
 	// Only what the patch names: the rest of these already survive in `stored`.
 	applyKeyAndRequestAttributes(metadata, patch);
+	if (patch.primaryColor === null) delete metadata.primaryColor;
+	else if (patch.primaryColor !== undefined)
+		metadata.primaryColor = patch.primaryColor.toLowerCase();
 	// Mirror createClient's secret logic on the merged (post-patch) metadata, not
 	// the pre-patch existing client — otherwise a confidential -> public transition
 	// leaves a stale clientSecret (so rotateSecret wrongly succeeds on what is now

@@ -41,6 +41,7 @@
 		"start": "bun lib/index.ts"
 	},
 	"dependencies": {
+		"@ant-design/colors": "^8.0.1",
 		"@ant-design/cssinjs": "^2.1.2",
 		"@ant-design/icons": "^6.3.4",
 		"@elysiajs/static": "^1.4.10",

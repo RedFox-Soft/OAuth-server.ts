@@ -4,6 +4,7 @@ import { createCache, extractStyle, StyleProvider } from '@ant-design/cssinjs';
 import { EndUserTheme } from './provider.js';
 import { themeHead } from './head.js';
 import type { Language } from '../../i18n/languages.js';
+import type { PaintedAccent } from './accent.js';
 
 interface Rule {
 	selector: string;
@@ -26,6 +27,7 @@ function customPropertyRules(css: string): Rule[] {
 }
 
 const darkBlocks = new Map<string, string>();
+const DARK_BLOCK_LIMIT = 256;
 
 /*
  * The dark scheme for an antd page, as one block of custom-property overrides (specs/096 research R1). With
@@ -36,18 +38,24 @@ const darkBlocks = new Map<string, string>();
  * Every selector gains `:root `. On a hydrated page cssinjs may append its own light block after this one, and
  * at equal specificity the later block would win; one pseudo-class more wins whatever the order.
  *
- * Memoized by the set of light selectors: the dark values for a given set of components never change while
- * the process runs, and the pages mount only a handful of combinations.
+ * Memoized by the set of light selectors and the application's colour (specs/106). The selectors alone are
+ * the same whatever the token values — the scope key is fixed and antd's hash ignores tokens — so without the
+ * colour in the key the first coloured page's dark block would be served to every later page with the same
+ * components. Bounded, because the colours are operator-controlled: every one ever saved could otherwise stay
+ * in memory for the life of the process.
  */
 function darkOverrides(
 	page: ReactElement,
 	lightCss: string,
-	zeroRuntime: boolean
+	zeroRuntime: boolean,
+	accent: PaintedAccent | undefined
 ): string {
-	const key = customPropertyRules(lightCss)
+	const key = `${accent ? `${accent.dark.seed}/${accent.dark.linkSeed}` : 'default'}|${customPropertyRules(
+		lightCss
+	)
 		.map((r) => r.selector)
 		.sort()
-		.join(',');
+		.join(',')}`;
 	const known = darkBlocks.get(key);
 	if (known !== undefined) return known;
 
@@ -57,6 +65,7 @@ function darkOverrides(
 			<EndUserTheme
 				scheme="dark"
 				zeroRuntime={zeroRuntime}
+				accent={accent}
 			>
 				{page}
 			</EndUserTheme>
@@ -66,6 +75,8 @@ function darkOverrides(
 		.map((r) => `:root ${r.selector}{${r.declarations.join(';')}}`)
 		.join('');
 	const block = `<style>@media (prefers-color-scheme: dark){${rules}}</style>`;
+	if (darkBlocks.size >= DARK_BLOCK_LIMIT)
+		darkBlocks.delete(darkBlocks.keys().next().value as string);
 	darkBlocks.set(key, block);
 	return block;
 }
@@ -81,11 +92,13 @@ export function renderEndUserTree(
 	{
 		zeroRuntime = false,
 		render = renderToStaticMarkup,
-		language = 'en'
+		language = 'en',
+		accent
 	}: {
 		zeroRuntime?: boolean;
 		render?: (element: ReactElement) => string;
 		language?: Language;
+		accent?: PaintedAccent;
 	} = {}
 ): { html: string; head: string } {
 	const cache = createCache();
@@ -94,6 +107,7 @@ export function renderEndUserTree(
 			<EndUserTheme
 				zeroRuntime={zeroRuntime}
 				language={language}
+				accent={accent}
 			>
 				{page}
 			</EndUserTheme>
@@ -105,6 +119,6 @@ export function renderEndUserTree(
 		head:
 			themeHead() +
 			extractStyle(cache) +
-			darkOverrides(page, light, zeroRuntime)
+			darkOverrides(page, light, zeroRuntime, accent)
 	};
 }

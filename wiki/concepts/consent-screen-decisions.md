@@ -4,7 +4,7 @@ title: 'The consent page: what it says, and why'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-10-13
-updated: 2026-10-15
+updated: 2026-10-19
 graph:
   node_type: concept
   relationships:
@@ -35,7 +35,7 @@ it said "Consent Required", printed the account id, and listed scope tokens. Sin
 asking, what the app will be able to do, and for how long, in plain words. This page records the
 decisions behind that wording. Each one is easy to undo by accident.
 
-The work is split three ways. `consentViewFor` (`lib/interactions/index.ts:661`) only reads: the
+The work is split three ways. `consentViewFor` (`lib/interactions/index.ts:699`) only reads: the
 interaction, the client, the project, the person and their grant. `buildConsentView`
 (`lib/interactions/consentView.ts:529`) decides what to say, and reads no configuration. `ConsentPage`
 (`lib/interactions/consentPage.tsx:771`) turns the result into words from one catalog. The view carries
@@ -198,38 +198,44 @@ said about itself.
   or WebP, at most 64 KiB (`sniff`, `parseLogo`, `lib/models/client/logo.ts:30`, `:53`;
   `lib/consts/client_logo.ts:8`). SVG is refused: it is a document that can carry script and
   references, and a crisp vector "Verified" badge is the easiest forgery there is. A refused logo or
-  link is checked before anything is written (`checkedPresentation`, `lib/admin/clients/service.ts:170`),
-  and the logo is stored only after the client record is (`storeLogo`, `:191`). The audit entry names
+  link is checked before anything is written (`checkedPresentation`, `lib/admin/clients/service.ts:220`),
+  and the logo is stored only after the client record is (`storeLogo`, `:247`). The audit entry names
   `logo`, never the image.
 - **A client's `logo_uri` is never read.** Not fetched, not proxied, not rendered — for any client. A
   fetched logo can change after review, track every person who opens the page and point the server at an
   internal address (CIMD §8.8, §9.2). Dynamic registration and metadata documents cannot reach the
   operator's logo at all: it is not client metadata.
 - **The logo lives beside the client record, not in it.** A model area of its own, `ClientLogo`, keyed by
-  client id (`lib/consts/storage_inventory.ts:355`). The client record is read, serialized and hashed on
+  client id (`lib/consts/storage_inventory.ts:360`). The client record is read, serialized and hashed on
   every resolution — every authorization, token and introspection call (`tryFindClient`,
   `lib/models/client/validate.ts`) — and up to 87 KB of base64 would ride along on each for a picture
   only this page shows. Client-owned, so `cascadeForClient` sweeps it when the client is deleted. The
-  project's application list says `hasLogo` and carries no image (`listClientView`, `service.ts:368`).
-- **Only this organization's own app, and never on a page that doubts the receiver**
-  (`consentView.ts:653-655`). The logo is attacker pixels the moment anyone else can set it, so tier
-  `this-organization` alone. The own-device-redirect warning and the device-flow warning also hide it: a
-  familiar logo is exactly what makes a phished device code or a local program look like the real thing,
-  so the device page never shows one. The administrator-rights warning is about the request, not who is
-  asking, and leaves the logo. The read itself happens only for that tier (`lib/interactions/index.ts:691`).
+  project's application list says `hasLogo` and carries no image (`listClientView`, `service.ts:415`).
+- **Only this organization's own app, and never in a sign-in that doubts the receiver.** The logo is
+  attacker pixels the moment anyone else can set it, so tier `this-organization` alone. A device flow and an
+  app whose redirects are all loopback also hide it: a familiar logo is exactly what makes a phished device
+  code or a local program look like the real thing, so the device page never shows one.
+  - Since spec 106 (2026-10-19) this is decided once per sign-in from those facts, by `brandingFor`
+    (`lib/interactions/branding.ts:33`). The same decision gates the application's colour
+    ([[client-primary-colour]]).
+  - Spec 094 tested which warning the page showed (`warning?.kind`). Because the administrator-rights warning
+    outranks the device and own-device ones, a device's consent page asking for the admin MCP displayed the
+    logo.
+  - The read happens only when the decision allows it (`lib/interactions/index.ts:727`), and the view builder
+    passes on whatever it was given (`consentView.ts:678`).
 - **On a light plate in either colour scheme** (spec 096). The tile is the palette's `logo-plate`, light even
   on a dark page, because the logo was drawn for a white one ([[end-user-colour-scheme]]).
 - **Embedded, so the policy stays.** The image is in the page as `data:` (`ClientLogo`,
-  `consentPage.tsx:572`), which `img-src 'self' data:` already allowed. It appears twice — in the markup
+  `consentPage.tsx:634`), which `img-src 'self' data:` already allowed. It appears twice — in the markup
   and in `window.PROPS` — which the 64 KiB cap keeps small. Its `alt` is the sanitized client name; it
   sits outside the `<h1>` and never in the header.
-- **Links only on the app's own site** (`linksOf`, `consentView.ts:705`). For a `this-organization` app,
+- **Links only on the app's own site** (`linksOf`, `consentView.ts:727`). For a `this-organization` app,
   `policy_uri` and `tos_uri` are each shown only when https and on the hostname of one of the app's own
   http(s) redirect URIs, compared in the URL parser's ASCII form. A native app with a private-use scheme
   has no host, so it gets no links. RFC 9700 §4.2.4 says the authorization page should not link off-site;
   this is the narrow reading that still meets RFC 7591's "SHOULD display". Opened in a new tab with
   `noopener noreferrer`, marked external for a screen reader, darker than antd's link blue for contrast
-  (`AppLinks`, `consentPage.tsx:525`). Administrators may set only https ones; dynamic registration may
+  (`AppLinks`, `consentPage.tsx:584`). Administrators may set only https ones; dynamic registration may
   still store http ones, which are simply never shown.
 
 ## The decision belongs to the account it was shown for

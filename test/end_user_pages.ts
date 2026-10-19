@@ -56,6 +56,7 @@ import {
 } from 'lib/federation/pages.tsx';
 import type { Language } from 'lib/i18n/languages.ts';
 import { renderAdminShell } from 'lib/admin/ui/serverRender.tsx';
+import { paintedAccent } from 'lib/html/theme/accent.ts';
 
 export type PageFamily = 'hydrated' | 'terminal' | 'plain';
 
@@ -147,6 +148,29 @@ export const END_USER_PAGES: Array<
 					client: { name: 'Client</script>', tier: 'self-registered' }
 				},
 				{ language }
+			)
+	],
+	/*
+	 * An application's colour adds a style block and a prop to these pages (specs/106), so a coloured page is
+	 * held to the same rules as a plain one: one theme head, no colour in a style attribute, no new source in
+	 * the content-security policy.
+	 */
+	[
+		'sign-in of an application with a colour',
+		'hydrated',
+		(language) =>
+			loginServer('uid-1', { language, accent: paintedAccent('#2f7d32') })
+	],
+	[
+		'consent of an application with a colour',
+		'hydrated',
+		(language) =>
+			consentServer(
+				{
+					...emptyConsentView('uid-1'),
+					client: { name: 'Timesheets', tier: 'this-organization' }
+				},
+				{ language, accent: paintedAccent('#2f7d32') }
 			)
 	],
 	[

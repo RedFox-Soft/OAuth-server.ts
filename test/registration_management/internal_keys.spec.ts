@@ -142,4 +142,33 @@ describe('a registration body naming internal client attributes', () => {
 
 		expect(await adapter('ClientLogo').find(own.clientId)).toBeUndefined();
 	});
+
+	it('gives the app no colour on its sign-in pages for a registration that supplies one', async () => {
+		const { clientId } = await register({
+			primaryColor: '#ff0000',
+			primary_color: '#ff0000'
+		});
+
+		expect(
+			(await adapter('Client').find(clientId))?.primaryColor
+		).toBeUndefined();
+	});
+
+	it('gives the app no colour on its sign-in pages for an update that supplies one', async () => {
+		const own = await register();
+
+		await agent.reg({ clientId: own.clientId }).put(
+			{
+				client_id: own.clientId,
+				redirect_uris: ['https://client.example.com/cb'],
+				primaryColor: '#ff0000',
+				primary_color: '#ff0000'
+			},
+			{ headers: { ...json, ...bearer(own.token) } }
+		);
+
+		expect(
+			(await adapter('Client').find(own.clientId))?.primaryColor
+		).toBeUndefined();
+	});
 });

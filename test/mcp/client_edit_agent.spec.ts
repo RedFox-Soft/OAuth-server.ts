@@ -181,6 +181,46 @@ describe('an agent editing a client', () => {
 		expect(text).not.toContain('data:image');
 	});
 
+	it('gives a client a primary colour, recorded as the agent and by name, and lists it', async () => {
+		const token = await agentToken();
+		const record = {
+			clientId: 'agent-edit-colour',
+			bucketId: DEFAULT_BUCKET_ID,
+			applicationType: 'web',
+			redirectUris: ['https://rp.example.com/cb'],
+			responseTypes: ['code'],
+			grantTypes: ['authorization_code'],
+			token_endpoint_auth_method: 'none'
+		};
+		seedClient(record);
+
+		const response = await rpc(
+			call('client_update', {
+				id: DEFAULT_BUCKET_ID,
+				clientId: record.clientId,
+				primaryColor: '#2f7d32'
+			}),
+			token
+		);
+		const listed = await rpc(
+			call('client_list', { id: DEFAULT_BUCKET_ID }),
+			token
+		);
+
+		expect(response.result?.isError).not.toBe(true);
+		expect((await adapter('Client').find(record.clientId))?.primaryColor).toBe(
+			'#2f7d32'
+		);
+		const { entries } = await adminAuditStore.list({
+			targetId: record.clientId,
+			action: 'client.update'
+		});
+		expect(entries).toHaveLength(1);
+		expect(entries[0]?.attributes).toEqual(['primaryColor']);
+		expect(entries[0]?.viaClientId).toBe(ADMIN_MCP_CLIENT_ID);
+		expect(JSON.stringify(listed.result)).toContain('primaryColor');
+	});
+
 	it('is refused a redirect URI the sector identifier document of a pairwise client does not list', async () => {
 		const token = await agentToken();
 		const record = {
