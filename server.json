@@ -1,0 +1,35 @@
+{
+	"$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+	"name": "dev.foxauth/admin",
+	"title": "FoxAuth",
+	"description": "Administer a FoxAuth OAuth 2.1 / OpenID Connect server: projects, apps, users, keys and settings.",
+	"websiteUrl": "https://foxauth.dev/docs/reference/mcp-tools/",
+	"repository": {
+		"url": "https://github.com/RedFox-Soft/OAuth-server.ts",
+		"source": "github"
+	},
+	"version": "1.1.0",
+	"icons": [
+		{
+			"src": "https://foxauth.dev/logo.svg",
+			"mimeType": "image/svg+xml",
+			"sizes": ["any"]
+		}
+	],
+	"remotes": [
+		{
+			"type": "streamable-http",
+			"url": "https://auth.foxauth.dev/mcp"
+		},
+		{
+			"type": "streamable-http",
+			"url": "https://{host}/mcp",
+			"variables": {
+				"host": {
+					"description": "Host of your own FoxAuth instance, such as auth.example.com, with mcp.enabled on",
+					"isRequired": true
+				}
+			}
+		}
+	]
+}
