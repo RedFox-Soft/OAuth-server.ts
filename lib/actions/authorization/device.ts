@@ -231,6 +231,16 @@ export const backchannelAuth = new Elysia()
 					`${backchannelAuthGrantType} is not allowed for this client`
 				);
 			}
+			/*
+			 * CIBA Core §7.1: the client authenticates here. `none` authenticates nothing, so anyone holding the
+			 * public client_id could start a sign-in on a person's device and collect its tokens
+			 * (lib/consts/confidential_grants.ts).
+			 */
+			if (client.tokenEndpointAuthMethod === 'none') {
+				throw new UnauthorizedClient(
+					`${backchannelAuthGrantType} requires a client that authenticates`
+				);
+			}
 
 			try {
 				if (

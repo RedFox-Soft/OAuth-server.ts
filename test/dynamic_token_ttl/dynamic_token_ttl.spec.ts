@@ -24,6 +24,7 @@ import { ttl } from 'lib/configs/liveTime.js';
 import { AuthorizationCode } from 'lib/models/authorization_code.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { ClientCredentials } from 'lib/models/client_credentials.js';
+import { MACHINE_SECRET } from './dynamic_token_ttl.config.ts';
 
 /**
  * @proves Every token, code and device code takes the lifetime a deployment ttl function
@@ -48,7 +49,8 @@ describe('dynamic ttl', () => {
 		const clientSpy = spyOn(ttl, 'ClientCredentials').mockReturnValue(123);
 
 		const { data, status } = await agent.token.post({
-			client_id: 'client',
+			client_id: 'machine',
+			client_secret: MACHINE_SECRET,
 			grant_type: 'client_credentials'
 		});
 		expect(status).toBe(200);
@@ -56,7 +58,7 @@ describe('dynamic ttl', () => {
 
 		expect(clientSpy).toBeCalledTimes(1);
 		expect(clientSpy.mock.calls[0][0]).toBeInstanceOf(ClientCredentials);
-		expect(clientSpy.mock.calls[0][1]).toMatchObject({ clientId: 'client' });
+		expect(clientSpy.mock.calls[0][1]).toMatchObject({ clientId: 'machine' });
 	});
 
 	it('the device code lifetime is the one the dynamic ttl function returned', async function () {

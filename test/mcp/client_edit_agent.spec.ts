@@ -25,6 +25,24 @@ function call(name: string, args: Record<string, unknown>) {
 	};
 }
 
+/*
+ * A change to where a client may send codes, or how it authenticates, is described first and applied only
+ * with the confirmation that description returns (lib/mcp/catalogue.ts, `highWhenSets`).
+ */
+async function confirmed(
+	name: string,
+	args: Record<string, unknown>,
+	token: string
+) {
+	const described = await rpc(call(name, args), token);
+	const confirmationToken =
+		described.result?.structuredContent?.confirmationToken;
+	if (typeof confirmationToken !== 'string') {
+		throw new Error(`expected ${name} to ask for confirmation`);
+	}
+	return rpc(call(name, { ...args, confirmationToken }), token);
+}
+
 async function agentToken() {
 	const user = await createAdministrator(
 		'super',
@@ -244,20 +262,83 @@ describe('an agent editing a client', () => {
 		}
 		const before = await adapter('Client').find(record.clientId);
 
-		const response = await rpc(
-			call('client_update', {
+		const response = await confirmed(
+			'client_update',
+			{
 				id: DEFAULT_BUCKET_ID,
 				clientId: record.clientId,
 				redirectUris: [
 					'https://rp.example.com/cb',
 					'https://rp.example.com/unlisted'
 				]
-			}),
+			},
 			token
 		);
 
 		mock.restore();
 		expect(response.result?.isError).toBe(true);
 		expect(await adapter('Client').find(record.clientId)).toEqual(before);
+	});
+
+	it('changes nothing when it adds a redirect URI without confirming, and says what it would do', async () => {
+		const token = await agentToken();
+		const record = {
+			clientId: 'agent-edit-redirect',
+			bucketId: DEFAULT_BUCKET_ID,
+			applicationType: 'web',
+			redirectUris: ['https://rp.example.com/cb'],
+			responseTypes: ['code'],
+			grantTypes: ['authorization_code'],
+			token_endpoint_auth_method: 'none'
+		};
+		seedClient(record);
+		const before = await adapter('Client').find(record.clientId);
+
+		const response = await rpc(
+			call('client_update', {
+				id: DEFAULT_BUCKET_ID,
+				clientId: record.clientId,
+				redirectUris: [
+					'https://rp.example.com/cb',
+					'https://attacker.example/cb'
+				]
+			}),
+			token
+		);
+
+		expect(response.result?.structuredContent?.confirmationToken).toBeString();
+		expect(await adapter('Client').find(record.clientId)).toEqual(before);
+	});
+
+	it('applies a redirect URI once the change is confirmed', async () => {
+		const token = await agentToken();
+		const record = {
+			clientId: 'agent-edit-redirect-confirmed',
+			bucketId: DEFAULT_BUCKET_ID,
+			applicationType: 'web',
+			redirectUris: ['https://rp.example.com/cb'],
+			responseTypes: ['code'],
+			grantTypes: ['authorization_code'],
+			token_endpoint_auth_method: 'none'
+		};
+		seedClient(record);
+
+		const response = await confirmed(
+			'client_update',
+			{
+				id: DEFAULT_BUCKET_ID,
+				clientId: record.clientId,
+				redirectUris: [
+					'https://rp.example.com/cb',
+					'https://rp.example.com/two'
+				]
+			},
+			token
+		);
+
+		expect(response.result?.isError).not.toBe(true);
+		expect((await Client.find(record.clientId)).redirectUris).toContain(
+			'https://rp.example.com/two'
+		);
 	});
 });

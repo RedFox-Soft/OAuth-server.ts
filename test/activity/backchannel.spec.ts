@@ -6,6 +6,7 @@ import { Grant } from 'lib/models/grant.js';
 import { resetAdminMemoryStores } from 'lib/adapters/index.ts';
 import { DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { figureOf, startCounting, thisMonth } from './fixtures.ts';
+import { CIBA_CLIENT_SECRET } from './backchannel.config.ts';
 
 const ACCOUNT = 'ciba-activity-account';
 
@@ -25,6 +26,7 @@ describe('active users approving a back-channel authentication', () => {
 		const before = await figureOf(DEFAULT_BUCKET_ID, thisMonth());
 		const asked = await formAgent.backchannel.post({
 			client_id: 'ciba-poll',
+			client_secret: CIBA_CLIENT_SECRET,
 			scope: 'openid',
 			login_hint: ACCOUNT
 		});
@@ -37,6 +39,7 @@ describe('active users approving a back-channel authentication', () => {
 
 		const tokens = await formAgent.token.post({
 			client_id: 'ciba-poll',
+			client_secret: CIBA_CLIENT_SECRET,
 			grant_type: 'urn:openid:params:grant-type:ciba',
 			auth_req_id: id
 		});

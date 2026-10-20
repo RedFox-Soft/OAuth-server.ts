@@ -29,6 +29,7 @@ import {
 	LOGO_MAX_BYTES,
 	LOGO_SIZE_MESSAGE
 } from '../../../consts/client_logo.js';
+import { grantRefusedToPublicClient } from '../../../consts/confidential_grants.js';
 import { paintedAccent } from '../../../html/theme/accent.js';
 
 const GRANT_OPTIONS = [
@@ -794,7 +795,25 @@ export function Clients({
 					<Form.Item
 						name="grantTypes"
 						label="Grant types"
-						rules={[{ required: true }]}
+						dependencies={['tokenEndpointAuthMethod']}
+						rules={[
+							{ required: true },
+							({ getFieldValue }) => ({
+								validator(_, grants: string[] | undefined) {
+									const refused = grantRefusedToPublicClient(
+										getFieldValue('tokenEndpointAuthMethod'),
+										grants ?? []
+									);
+									return refused
+										? Promise.reject(
+												new Error(
+													`${refused} needs a client that authenticates — choose a token endpoint auth method other than none.`
+												)
+											)
+										: Promise.resolve();
+								}
+							})
+						]}
 					>
 						<Select
 							mode="multiple"

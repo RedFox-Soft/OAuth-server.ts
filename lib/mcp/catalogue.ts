@@ -146,6 +146,13 @@ export interface McpTool {
 	 * one project cannot be spent on another.
 	 */
 	readonly highWhen?: { readonly pathParam: string; readonly equals: string };
+	/*
+	 * High-consequence when the call sets any of these arguments, and ordinary otherwise. For a client, where it
+	 * may send codes and how it proves itself: an agent following injected instructions could otherwise add an
+	 * address of its own to a live application's redirect URIs and receive its people's codes, in one ordinary
+	 * call. Renaming the application or changing its colour stays one call.
+	 */
+	readonly highWhenSets?: readonly string[];
 	readonly summary: string;
 }
 
@@ -167,13 +174,19 @@ export function isHighCall(
 	return (
 		tool.consequence === 'high' ||
 		(tool.highWhen !== undefined &&
-			pathValues(tool, args)[tool.highWhen.pathParam] === tool.highWhen.equals)
+			pathValues(tool, args)[tool.highWhen.pathParam] ===
+				tool.highWhen.equals) ||
+		(tool.highWhenSets?.some((arg) => args[arg] !== undefined) ?? false)
 	);
 }
 
 /* Whether some call of this tool can be gated, so its schema must offer the confirmation. */
 export function mayBeHigh(tool: McpTool): boolean {
-	return tool.consequence === 'high' || tool.highWhen !== undefined;
+	return (
+		tool.consequence === 'high' ||
+		tool.highWhen !== undefined ||
+		tool.highWhenSets !== undefined
+	);
 }
 
 const onConsoleBucket = { pathParam: 'id', equals: ADMIN_BUCKET_ID } as const;
@@ -838,6 +851,7 @@ const catalogue = [
 		bodySchema: UpdateClientBody,
 		querySchema: null,
 		pathParams: ['id', 'clientId'],
+		highWhenSets: ['redirectUris', 'grantTypes', 'tokenEndpointAuthMethod'],
 		summary:
 			"Change a client's registered metadata — redirect URIs, grant types, and the rest. partialConsent lets the person untick individual permissions on the consent page — turn it on only for an application that copes with receiving fewer permissions than it asked for. logo takes a data:image/png, image/jpeg or image/webp base64 URL of at most 64 KiB (null removes it), and policyUri and tosUri take https addresses; the consent page shows them only to this organization’s own users, the links only when they are on a redirect URI’s host. primaryColor takes a colour written #rrggbb (null removes it); the sign-in, two-step and consent pages paint it, shifted to the nearest legible shade where needed, only for this organization’s own users — the response’s paintedPrimaryColor shows the light and dark shades they will see."
 	},

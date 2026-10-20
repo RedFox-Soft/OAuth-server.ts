@@ -31,10 +31,14 @@ export const ApplicationConfig = {
 	}
 };
 
+// CIBA Core §7.1: the client authenticates at the backchannel endpoint and the token endpoint.
+export const CIBA_CLIENT_SECRET = 'backchannel-client-secret-0123456789';
+
 export const clients = [
 	{
 		clientId: 'ciba-poll',
-		token_endpoint_auth_method: 'none',
+		token_endpoint_auth_method: 'client_secret_post',
+		clientSecret: CIBA_CLIENT_SECRET,
 		grantTypes: ['urn:openid:params:grant-type:ciba'],
 		responseTypes: [],
 		redirectUris: [],
@@ -42,7 +46,8 @@ export const clients = [
 	},
 	{
 		clientId: 'ciba-ping',
-		token_endpoint_auth_method: 'none',
+		token_endpoint_auth_method: 'client_secret_post',
+		clientSecret: CIBA_CLIENT_SECRET,
 		grantTypes: ['urn:openid:params:grant-type:ciba'],
 		responseTypes: [],
 		redirectUris: [],

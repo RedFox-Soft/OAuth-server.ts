@@ -14,6 +14,7 @@ import { Grant } from 'lib/models/grant.js';
 import { decode as decodeJWT } from 'lib/helpers/jwt.ts';
 import { idTokenOf } from './response.ts';
 import { isPlainObject } from 'lib/helpers/_/object.js';
+import { CIBA_CLIENT_SECRET } from './backchannel.config.ts';
 
 const PWD = 'urn:example:acr:pwd';
 const MFA = 'urn:example:acr:mfa';
@@ -27,6 +28,7 @@ async function request(
 ) {
 	const res = await formAgent.backchannel.post({
 		client_id: clientId,
+		client_secret: CIBA_CLIENT_SECRET,
 		scope: 'openid',
 		login_hint: ACCOUNT,
 		// A ping-mode client supplies the token the server echoes back when it notifies.
@@ -57,6 +59,7 @@ async function report(
 async function collect(authReqId: string, clientId: string) {
 	const res = await formAgent.token.post({
 		client_id: clientId,
+		client_secret: CIBA_CLIENT_SECRET,
 		grant_type: 'urn:openid:params:grant-type:ciba',
 		auth_req_id: authReqId
 	});

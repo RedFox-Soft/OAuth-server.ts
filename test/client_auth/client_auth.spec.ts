@@ -80,13 +80,22 @@ describe('client authentication options', () => {
 	});
 
 	describe('none "auth"', () => {
-		it('a client using auth method none is accepted', async function () {
-			const res = await agent.token.post({
+		/*
+		 * With no authentication the client_id is the whole credential, and it is public, so a machine token
+		 * here would go to anyone who read it (RFC 6749 §4.4.2) — whatever grants the client was stored with.
+		 */
+		it('refuses client_credentials to a client that does not authenticate', async function () {
+			const { status, error } = await agent.token.post({
 				grant_type: 'client_credentials',
 				client_id: 'client-none'
 			});
-			expect(res.status).toBe(200);
-			expect(res.data).toHaveProperty('access_token');
+			if (!error) throw new Error('expected error response');
+			expect(status).toBe(400);
+			expect(error.value).toEqual({
+				error: 'unauthorized_client',
+				error_description:
+					'client_credentials requires a client that authenticates'
+			});
 		});
 
 		it('rejects the "auth" if secret was also provided', async function () {

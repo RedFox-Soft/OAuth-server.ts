@@ -291,6 +291,13 @@ Spec 088 added four tools and two exclusions:
   those facts, and without them it would configure a directory wrongly ([[scim-provisioning]]).
 - Try sign-in's start and result are excluded as `inapplicable` (above).
 
+**A third gate shape, `highWhenSets` (2026-10-20).** `client_update` is ordinary, but high when the call sets
+`redirectUris`, `grantTypes` or `tokenEndpointAuthMethod` (`lib/mcp/catalogue.ts`, `isHighCall`). An agent
+following injected instructions could otherwise add an address of its own to a live application's redirect URIs
+in one ordinary call and receive its people's codes. The confirmation binds the exact arguments, so a token for
+one redirect list cannot be spent on another. Data, not a predicate, like `highWhen`; the drift guard checks
+every named argument exists on the tool.
+
 Neither identity may fall back to a placeholder, and both once did. `principalId` defaulted to `''` when
 `whoami` failed and `viaClientId` to `''` when `authInfo` carried no client — either turns that binding
 into a wildcard, so two callers whose id could not be read would match each other's confirmations. A

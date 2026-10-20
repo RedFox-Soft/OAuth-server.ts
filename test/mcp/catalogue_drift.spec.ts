@@ -250,6 +250,26 @@ describe('MCP tool catalogue', () => {
 		}
 	});
 
+	/*
+	 * The third shape of the gate: high when the call sets particular arguments (`highWhenSets`). For a
+	 * client, where it may send codes and how it proves itself; every named argument must exist on the tool,
+	 * or the gate would never fire.
+	 */
+	it('names every tool that is high-consequence for some arguments, each argument one the tool takes', () => {
+		const sometimes = mcpCatalogue.filter((t) => t.highWhenSets !== undefined);
+		expect(sometimes.map((t) => t.tool).sort()).toEqual(['client_update']);
+		for (const tool of sometimes) {
+			expect(mayBeHigh(tool)).toBe(true);
+			const properties = Object.keys(
+				(tool.bodySchema as { properties?: Record<string, unknown> } | null)
+					?.properties ?? {}
+			);
+			for (const arg of tool.highWhenSets ?? []) {
+				expect(properties, `${tool.tool}.${arg}`).toContain(arg);
+			}
+		}
+	});
+
 	it('gives every write an audit action matching the audit table', () => {
 		for (const tool of mcpCatalogue) {
 			if (tool.method === 'GET') {

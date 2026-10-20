@@ -6,5 +6,6 @@ export {
 	addons,
 	ApplicationConfig,
 	clients,
+	CIBA_CLIENT_SECRET,
 	default
 } from '../acr/backchannel.config.ts';

@@ -130,6 +130,10 @@ function describe(tool: McpTool): string {
 		parts.push(
 			'High-consequence for some targets (named above): there, called without a confirmationToken it changes nothing and returns a description of what it would do, plus a token to confirm that exact operation.'
 		);
+	} else if (tool.highWhenSets) {
+		parts.push(
+			`High-consequence when it sets ${tool.highWhenSets.join(', ')}: then, called without a confirmationToken it changes nothing and returns a description of what it would do, plus a token to confirm that exact operation.`
+		);
 	}
 	return parts.join(' ');
 }

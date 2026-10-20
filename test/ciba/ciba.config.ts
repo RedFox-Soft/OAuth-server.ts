@@ -54,13 +54,17 @@ export const addons: Partial<AddonImplementations> = {
 	}
 };
 
+export const CLIENT_SECRET = 'ciba-client-secret-0123456789abcdef';
+
 export const clients = [
 	{
 		clientId: 'client',
 		grantTypes: ['urn:openid:params:grant-type:ciba', 'refresh_token'],
 		responseTypes: [],
 		redirectUris: [],
-		token_endpoint_auth_method: 'none',
+		// CIBA Core §7.1: the client authenticates at the backchannel endpoint.
+		token_endpoint_auth_method: 'client_secret_post',
+		clientSecret: CLIENT_SECRET,
 		backchannel_token_delivery_mode: 'poll'
 	},
 	{
@@ -68,7 +72,9 @@ export const clients = [
 		grantTypes: ['urn:openid:params:grant-type:ciba', 'refresh_token'],
 		responseTypes: [],
 		redirectUris: [],
-		token_endpoint_auth_method: 'none',
+		// CIBA Core §7.1: the client authenticates at the backchannel endpoint.
+		token_endpoint_auth_method: 'client_secret_post',
+		clientSecret: CLIENT_SECRET,
 		backchannel_client_notification_endpoint: 'https://rp.example.com/ping',
 		backchannel_token_delivery_mode: 'ping'
 	},
@@ -77,10 +83,20 @@ export const clients = [
 		grantTypes: ['urn:openid:params:grant-type:ciba', 'refresh_token'],
 		responseTypes: [],
 		redirectUris: [],
-		token_endpoint_auth_method: 'none',
+		// CIBA Core §7.1: the client authenticates at the backchannel endpoint.
+		token_endpoint_auth_method: 'client_secret_post',
+		clientSecret: CLIENT_SECRET,
 		backchannel_token_delivery_mode: 'poll',
 		'requestObject.backChannelSigningAlg': 'ES256',
 		jwks_uri: 'https://rp.example.com/jwks'
+	},
+	{
+		clientId: 'client-public',
+		grantTypes: ['urn:openid:params:grant-type:ciba'],
+		responseTypes: [],
+		redirectUris: [],
+		token_endpoint_auth_method: 'none',
+		backchannel_token_delivery_mode: 'poll'
 	},
 	{
 		clientId: 'client-not-allowed',

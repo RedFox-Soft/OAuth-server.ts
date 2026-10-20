@@ -63,6 +63,8 @@ export const ApplicationConfig = {
 	'resourceIndicators.enabled': true
 };
 
+export const CONFIDENTIAL_SECRET = 'resource-indicators-secret-0123456789';
+
 export const clients = [
 	{
 		clientId: 'client',
@@ -75,6 +77,23 @@ export const clients = [
 			'client_credentials',
 			'authorization_code',
 			'urn:ietf:params:oauth:grant-type:device_code',
+			'urn:openid:params:grant-type:ciba'
+		]
+	},
+	/*
+	 * client_credentials and CIBA need a client that authenticates (lib/consts/confidential_grants.ts), so the
+	 * cases on those grants use this one; the public client above keeps the browser and device flows.
+	 */
+	{
+		clientId: 'client-confidential',
+		token_endpoint_auth_method: 'client_secret_post',
+		clientSecret: CONFIDENTIAL_SECRET,
+		redirectUris: [],
+		responseTypes: [],
+		backchannel_token_delivery_mode: 'poll',
+		grantTypes: [
+			'refresh_token',
+			'client_credentials',
 			'urn:openid:params:grant-type:ciba'
 		]
 	}

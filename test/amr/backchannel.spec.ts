@@ -4,6 +4,7 @@ import { backchannelResult } from 'lib/actions/authorization/backchannel_result.
 import { Grant } from 'lib/models/grant.js';
 import { isPlainObject } from 'lib/helpers/_/object.js';
 import { amrOf } from './flow.ts';
+import { CIBA_CLIENT_SECRET } from './backchannel.config.ts';
 
 const ACCOUNT = 'ciba-amr-account';
 
@@ -14,6 +15,7 @@ const ACCOUNT = 'ciba-amr-account';
 async function authenticate(amr?: string[]) {
 	const asked = await formAgent.backchannel.post({
 		client_id: 'ciba-poll',
+		client_secret: CIBA_CLIENT_SECRET,
 		scope: 'openid',
 		login_hint: ACCOUNT
 	});
@@ -25,6 +27,7 @@ async function authenticate(amr?: string[]) {
 	await backchannelResult(id, grant, amr ? { amr } : {});
 	const res = await formAgent.token.post({
 		client_id: 'ciba-poll',
+		client_secret: CIBA_CLIENT_SECRET,
 		grant_type: 'urn:openid:params:grant-type:ciba',
 		auth_req_id: id
 	});

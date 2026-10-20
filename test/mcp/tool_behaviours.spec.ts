@@ -104,14 +104,11 @@ describe('individual tool behaviours', () => {
 			created
 		);
 
-		const refused = await rpc(
-			call('client_update', {
-				id: DEFAULT_BUCKET_ID,
-				clientId,
-				redirectUris: ['not a uri at all']
-			}),
-			token
-		);
+		const refused = await perform(token, 'client_update', {
+			id: DEFAULT_BUCKET_ID,
+			clientId,
+			redirectUris: ['not a uri at all']
+		});
 		expect(refused.result?.isError).toBe(true);
 
 		// Untouched, not partially applied.

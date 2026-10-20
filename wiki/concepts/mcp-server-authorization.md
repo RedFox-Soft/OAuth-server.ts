@@ -193,6 +193,17 @@ fall out of its old Project. An identifier
 nobody declared is not its question — the built-in MCP audience and an addon override answer for themselves.
 `test/resources/machine_access.spec.ts` is the attack.
 
+**A machine token also needs a client that authenticates** (2026-10-20). Until then a stored, same-project,
+operator-created client registered with `token_endpoint_auth_method: none` passed every check above: the token
+endpoint accepts `none` with no proof (`lib/shared/token_auth.ts`), so anyone who read the client_id off an
+authorization URL — it is public, and the console's form defaulted to `none` — received machine tokens for every
+API the project declared. A test asserted it as "accepted". RFC 6749 §4.4.2 and OAuth 2.1 confine the grant to
+confidential clients. `client_credentials.ts` now answers `unauthorized_client` to a `none` client, which binds
+every client already stored; the admin route (`lib/admin/clients/service.ts`) and the console refuse the
+combination with 422, as does CIBA's backchannel endpoint for its grant. The list is
+`lib/consts/confidential_grants.ts`. It is deliberately **not** in the registration validator yet: every lookup
+re-validates, so a rule there would stop such clients resolving for their browser sign-ins too.
+
 ## A client whose id is a URL, stored nowhere
 
 The current MCP authorization revision (2026-07-28) marks dynamic client registration **deprecated**

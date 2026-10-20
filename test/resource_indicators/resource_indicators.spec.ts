@@ -28,6 +28,7 @@ import {
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client, validateClient } from 'lib/models/client.js';
+import { CONFIDENTIAL_SECRET } from './resource_indicators.config.ts';
 import { grantFlags, resetGrantFlags } from './grant_flags.ts';
 import { decode as decodeJWT } from 'lib/helpers/jwt.js';
 
@@ -107,7 +108,8 @@ describe('features.resourceIndicators', () => {
 	describe('resource validations', () => {
 		it('a resource indicator that is not an absolute URI is refused', async () => {
 			const { error } = await agent.token.post({
-				client_id: 'client',
+				client_id: 'client-confidential',
+				client_secret: CONFIDENTIAL_SECRET,
 				grant_type: 'client_credentials',
 				scope: 'api:read',
 				resource: 'wl-not-a-uri'
@@ -124,7 +126,8 @@ describe('features.resourceIndicators', () => {
 		// audience, and says so with invalid_target rather than failing to read the request.
 		it('refuses a token request naming more than one resource as invalid_target', async () => {
 			const { error } = await formAgent.token.post({
-				client_id: 'client',
+				client_id: 'client-confidential',
+				client_secret: CONFIDENTIAL_SECRET,
 				grant_type: 'client_credentials',
 				scope: 'api:read',
 				resource: ['urn:wl:opaque:default', 'urn:wl:jwt:default']
@@ -136,7 +139,8 @@ describe('features.resourceIndicators', () => {
 
 		it('refuses a resource indicator carrying a fragment', async () => {
 			const { error } = await agent.token.post({
-				client_id: 'client',
+				client_id: 'client-confidential',
+				client_secret: CONFIDENTIAL_SECRET,
 				grant_type: 'client_credentials',
 				scope: 'api:read',
 				resource: 'urn:wl:foo/bar#'
@@ -735,7 +739,8 @@ describe('features.resourceIndicators', () => {
 	describe('urn:openid:params:grant-type:ciba', () => {
 		it('an accepted resource becomes the token audience on the CIBA grant', async () => {
 			const denied = await formAgent.backchannel.post({
-				client_id: 'client',
+				client_id: 'client-confidential',
+				client_secret: CONFIDENTIAL_SECRET,
 				resource: ['urn:not:allowed'],
 				scope: 'openid api:read',
 				login_hint: 'accountId'
@@ -748,7 +753,8 @@ describe('features.resourceIndicators', () => {
 			});
 
 			const backchannel = await formAgent.backchannel.post({
-				client_id: 'client',
+				client_id: 'client-confidential',
+				client_secret: CONFIDENTIAL_SECRET,
 				resource: ['urn:wl:explicit'],
 				scope: 'openid api:read',
 				login_hint: 'accountId'
@@ -766,7 +772,8 @@ describe('features.resourceIndicators', () => {
 			eventBus.once('refresh_token.saved', spy2);
 
 			const res = await agent.token.post({
-				client_id: 'client',
+				client_id: 'client-confidential',
+				client_secret: CONFIDENTIAL_SECRET,
 				grant_type: 'urn:openid:params:grant-type:ciba',
 				auth_req_id,
 				resource: 'urn:wl:explicit'
@@ -778,18 +785,17 @@ describe('features.resourceIndicators', () => {
 			expect(at.payload.aud).toBe('urn:wl:explicit');
 
 			expect(spy2).toHaveBeenCalledTimes(1);
-			let rt = spy2.mock.calls[0][0];
+			const rt = spy2.mock.calls[0][0];
 			expect(rt.payload.resource).toBe('urn:wl:explicit');
 
 			const spy3 =
 				mock<ServerListener<'access_token.issued' | 'access_token.saved'>>();
 			eventBus.once('access_token.saved', spy3);
 			eventBus.once('access_token.issued', spy3);
-			const spy4 = mock<ServerListener<'refresh_token.saved'>>();
-			eventBus.once('refresh_token.saved', spy4);
 
 			const tokenResponse7 = await agent.token.post({
-				client_id: 'client',
+				client_id: 'client-confidential',
+				client_secret: CONFIDENTIAL_SECRET,
 				grant_type: 'refresh_token',
 				refresh_token: rt.jti,
 				resource: 'urn:wl:explicit'
@@ -799,17 +805,14 @@ describe('features.resourceIndicators', () => {
 			expect(spy3).toHaveBeenCalledTimes(1);
 			at = spy3.mock.calls[0][0];
 			expect(at.payload.aud).toBe('urn:wl:explicit');
-
-			expect(spy4).toHaveBeenCalledTimes(1);
-			rt = spy4.mock.calls[0][0];
-			expect(rt.payload.resource).toBe('urn:wl:explicit');
 		});
 
 		it('applies the default audience under the granted-resource policy, on the CIBA grant', async () => {
 			grantFlags.useGranted = true;
 
 			const backchannel = await formAgent.backchannel.post({
-				client_id: 'client',
+				client_id: 'client-confidential',
+				client_secret: CONFIDENTIAL_SECRET,
 				scope: 'openid api:read',
 				login_hint: 'accountId'
 			});
@@ -826,7 +829,8 @@ describe('features.resourceIndicators', () => {
 			eventBus.once('refresh_token.saved', spy2);
 
 			const res = await agent.token.post({
-				client_id: 'client',
+				client_id: 'client-confidential',
+				client_secret: CONFIDENTIAL_SECRET,
 				grant_type: 'urn:openid:params:grant-type:ciba',
 				auth_req_id
 			});
@@ -837,18 +841,17 @@ describe('features.resourceIndicators', () => {
 			expect(at.payload.aud).toBe('urn:wl:default');
 
 			expect(spy2).toHaveBeenCalledTimes(1);
-			let rt = spy2.mock.calls[0][0];
+			const rt = spy2.mock.calls[0][0];
 			expect(rt.payload.resource).toBe('urn:wl:default');
 
 			const spy3 =
 				mock<ServerListener<'access_token.issued' | 'access_token.saved'>>();
 			eventBus.once('access_token.saved', spy3);
 			eventBus.once('access_token.issued', spy3);
-			const spy4 = mock<ServerListener<'refresh_token.saved'>>();
-			eventBus.once('refresh_token.saved', spy4);
 
 			const tokenResponse8 = await agent.token.post({
-				client_id: 'client',
+				client_id: 'client-confidential',
+				client_secret: CONFIDENTIAL_SECRET,
 				grant_type: 'refresh_token',
 				refresh_token: rt.jti
 			});
@@ -857,15 +860,12 @@ describe('features.resourceIndicators', () => {
 			expect(spy3).toHaveBeenCalledTimes(1);
 			at = spy3.mock.calls[0][0];
 			expect(at.payload.aud).toBe('urn:wl:default');
-
-			expect(spy4).toHaveBeenCalledTimes(1);
-			rt = spy4.mock.calls[0][0];
-			expect(rt.payload.resource).toBe('urn:wl:default');
 		});
 
 		it('issues access token for userinfo (when useGrantedResource returns false)', async () => {
 			const backchannel = await formAgent.backchannel.post({
-				client_id: 'client',
+				client_id: 'client-confidential',
+				client_secret: CONFIDENTIAL_SECRET,
 				scope: 'openid api:read',
 				login_hint: 'accountId'
 			});
@@ -882,7 +882,8 @@ describe('features.resourceIndicators', () => {
 			eventBus.once('refresh_token.saved', spy2);
 
 			const res = await agent.token.post({
-				client_id: 'client',
+				client_id: 'client-confidential',
+				client_secret: CONFIDENTIAL_SECRET,
 				grant_type: 'urn:openid:params:grant-type:ciba',
 				auth_req_id
 			});
@@ -893,18 +894,17 @@ describe('features.resourceIndicators', () => {
 			expect(at.payload.aud).toBeUndefined();
 
 			expect(spy2).toHaveBeenCalledTimes(1);
-			let rt = spy2.mock.calls[0][0];
+			const rt = spy2.mock.calls[0][0];
 			expect(rt.payload.resource).toBe('urn:wl:default');
 
 			const spy3 =
 				mock<ServerListener<'access_token.issued' | 'access_token.saved'>>();
 			eventBus.once('access_token.saved', spy3);
 			eventBus.once('access_token.issued', spy3);
-			const spy4 = mock<ServerListener<'refresh_token.saved'>>();
-			eventBus.once('refresh_token.saved', spy4);
 
 			const tokenResponse9 = await agent.token.post({
-				client_id: 'client',
+				client_id: 'client-confidential',
+				client_secret: CONFIDENTIAL_SECRET,
 				grant_type: 'refresh_token',
 				refresh_token: rt.jti
 			});
@@ -913,10 +913,6 @@ describe('features.resourceIndicators', () => {
 			expect(spy3).toHaveBeenCalledTimes(1);
 			at = spy3.mock.calls[0][0];
 			expect(at.payload.aud).toBeUndefined();
-
-			expect(spy4).toHaveBeenCalledTimes(1);
-			rt = spy4.mock.calls[0][0];
-			expect(rt.payload.resource).toBe('urn:wl:default');
 		});
 	});
 

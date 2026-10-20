@@ -14,7 +14,7 @@ import { generateKeyPair, SignJWT, exportJWK } from 'jose';
 import { AccessDenied } from '../../lib/helpers/errors.ts';
 import bootstrap, { agent, seedAccount, formAgent } from '../test_helper.js';
 
-import { emitter } from './ciba.config.js';
+import { emitter, CLIENT_SECRET } from './ciba.config.js';
 import { eventBus, type ServerListener } from 'lib/event_bus.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { BackchannelAuthenticationRequest } from 'lib/models/backchannel_authentication_request.js';
@@ -290,7 +290,8 @@ describe('features.ciba', () => {
 						scope: 'openid',
 						login_hint: 'accountId',
 						user_code: 'a-user-code',
-						client_id: 'client'
+						client_id: 'client',
+						client_secret: CLIENT_SECRET
 					}),
 					emitted('verifyUserCode')
 				]);
@@ -304,7 +305,8 @@ describe('features.ciba', () => {
 					post({
 						scope: 'openid',
 						login_hint: 'accountId',
-						client_id: 'client'
+						client_id: 'client',
+						client_secret: CLIENT_SECRET
 					}),
 					deviceTriggered(),
 					once(emitter, 'processLoginHint'),
@@ -343,6 +345,7 @@ describe('features.ciba', () => {
 					scope: 'openid',
 					login_hint: 'accountId',
 					client_id: 'client',
+					client_secret: CLIENT_SECRET,
 					requested_expiry: 300
 				});
 				if (!data) throw new Error('expected response data');
@@ -355,7 +358,8 @@ describe('features.ciba', () => {
 					post({
 						scope: 'openid',
 						login_hint_token: 'accountId',
-						client_id: 'client'
+						client_id: 'client',
+						client_secret: CLIENT_SECRET
 					}),
 					deviceTriggered(),
 					once(emitter, 'processLoginHintToken'),
@@ -393,7 +397,8 @@ describe('features.ciba', () => {
 					post({
 						scope: 'openid',
 						login_hint_token: 'accountId',
-						client_id: 'client'
+						client_id: 'client',
+						client_secret: CLIENT_SECRET
 					}),
 					deviceTriggered()
 				]);
@@ -407,6 +412,7 @@ describe('features.ciba', () => {
 
 				const { data: tokenData } = await formAgent.token.post({
 					client_id: 'client',
+					client_secret: CLIENT_SECRET,
 					grant_type: 'urn:openid:params:grant-type:ciba',
 					auth_req_id: request.jti
 				});
@@ -418,7 +424,8 @@ describe('features.ciba', () => {
 						post({
 							scope: 'openid',
 							id_token_hint: id_token,
-							client_id: 'client'
+							client_id: 'client',
+							client_secret: CLIENT_SECRET
 						}),
 						deviceTriggered(),
 						once(emitter, 'validateBindingMessage'),
@@ -465,6 +472,22 @@ describe('features.ciba', () => {
 					expect(spy).toBeCalledTimes(1);
 				});
 
+				it('refuses a client that does not authenticate, which holds nothing but its public client_id', async () => {
+					const { error } = await post({
+						client_id: 'client-public',
+						scope: 'openid',
+						login_hint: 'accountId'
+					});
+					if (!error) throw new Error('expected error response');
+
+					expect(error.status).toBe(400);
+					expect(error.value).toEqual({
+						error: 'unauthorized_client',
+						error_description:
+							'urn:openid:params:grant-type:ciba requires a client that authenticates'
+					});
+				});
+
 				it('rejects invalid clients', async () => {
 					const spy =
 						mock<ServerListener<'backchannel_authentication.error'>>();
@@ -489,7 +512,8 @@ describe('features.ciba', () => {
 				eventBus.once('backchannel_authentication.error', spy);
 
 				const { error } = await agent.backchannel.post({
-					client_id: 'client'
+					client_id: 'client',
+					client_secret: CLIENT_SECRET
 				});
 				if (!error) throw new Error('expected error response');
 
@@ -511,6 +535,7 @@ describe('features.ciba', () => {
 
 						const { error } = await post({
 							client_id: 'client',
+							client_secret: CLIENT_SECRET,
 							scope: 'openid',
 							[param]: 'some'
 						});
@@ -532,7 +557,8 @@ describe('features.ciba', () => {
 					const { error } = await post({
 						scope: 'openid',
 						login_hint: 'notfound',
-						client_id: 'client'
+						client_id: 'client',
+						client_secret: CLIENT_SECRET
 					});
 					if (!error) throw new Error('expected error response');
 
@@ -552,7 +578,8 @@ describe('features.ciba', () => {
 					const { error } = await post({
 						scope: 'openid',
 						login_hint_token: 'notfound',
-						client_id: 'client'
+						client_id: 'client',
+						client_secret: CLIENT_SECRET
 					});
 					if (!error) throw new Error('expected error response');
 
@@ -570,7 +597,8 @@ describe('features.ciba', () => {
 					eventBus.once('backchannel_authentication.error', spy);
 
 					const { error } = await post({
-						client_id: 'client'
+						client_id: 'client',
+						client_secret: CLIENT_SECRET
 					});
 					if (!error) throw new Error('expected error response');
 
@@ -589,6 +617,7 @@ describe('features.ciba', () => {
 
 					const { error } = await post({
 						client_id: 'client-ping',
+						client_secret: CLIENT_SECRET,
 						scope: 'openid'
 					});
 					if (!error) throw new Error('expected error response');
@@ -609,6 +638,7 @@ describe('features.ciba', () => {
 
 					const { error } = await post({
 						client_id: 'client',
+						client_secret: CLIENT_SECRET,
 						scope: 'foo'
 					});
 					if (!error) throw new Error('expected error response');
@@ -628,6 +658,7 @@ describe('features.ciba', () => {
 
 					const { error } = await post({
 						client_id: 'client',
+						client_secret: CLIENT_SECRET,
 						scope: 'openid',
 						requested_expiry: 0
 					});
@@ -648,6 +679,7 @@ describe('features.ciba', () => {
 
 					const { error } = await post({
 						client_id: 'client',
+						client_secret: CLIENT_SECRET,
 						scope: 'openid'
 					});
 					if (!error) throw new Error('expected error response');
@@ -668,6 +700,7 @@ describe('features.ciba', () => {
 
 					const { error } = await post({
 						client_id: 'client',
+						client_secret: CLIENT_SECRET,
 						scope: 'openid',
 						login_hint_token: 'foo',
 						login_hint: 'foo'
@@ -719,6 +752,7 @@ describe('features.ciba', () => {
 
 						const { error } = await post({
 							client_id: 'client',
+							client_secret: CLIENT_SECRET,
 							scope: 'openid',
 							[param]: 'some'
 						});
@@ -739,6 +773,7 @@ describe('features.ciba', () => {
 
 					const { error } = await post({
 						client_id: 'client-signed',
+						client_secret: CLIENT_SECRET,
 						scope: 'openid'
 					});
 					if (!error) throw new Error('expected error response');
@@ -764,6 +799,7 @@ describe('features.ciba', () => {
 
 					const { status } = await post({
 						client_id: 'client-signed',
+						client_secret: CLIENT_SECRET,
 						request: await new SignJWT({
 							client_id: 'client-signed',
 							scope: 'openid',
@@ -791,6 +827,7 @@ describe('features.ciba', () => {
 
 					const { error } = await post({
 						client_id: 'client-signed',
+						client_secret: CLIENT_SECRET,
 						request: await new SignJWT({
 							client_id: 'client-signed',
 							scope: 'openid',
@@ -823,6 +860,7 @@ describe('features.ciba', () => {
 
 					const { error } = await post({
 						client_id: 'client-signed',
+						client_secret: CLIENT_SECRET,
 						request: await new SignJWT({
 							client_id: 'client-signed',
 							scope: 'openid',
@@ -855,6 +893,7 @@ describe('features.ciba', () => {
 
 					const { error } = await post({
 						client_id: 'client-signed',
+						client_secret: CLIENT_SECRET,
 						request: await new SignJWT({
 							client_id: 'client-signed',
 							scope: 'openid',
@@ -887,6 +926,7 @@ describe('features.ciba', () => {
 
 					const { error } = await post({
 						client_id: 'client-signed',
+						client_secret: CLIENT_SECRET,
 						request: await new SignJWT({
 							client_id: 'client-signed',
 							scope: 'openid',
@@ -917,6 +957,7 @@ describe('features.ciba', () => {
 
 					const { error } = await post({
 						client_id: 'client-signed',
+						client_secret: CLIENT_SECRET,
 						scope: 'openid',
 						request: '....'
 					});

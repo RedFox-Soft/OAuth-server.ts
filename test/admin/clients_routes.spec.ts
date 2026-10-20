@@ -226,6 +226,31 @@ describe("a bucket's applications", () => {
 		}
 	});
 
+	it('refuses to create an application that would get machine tokens without authenticating', async () => {
+		const { cookie } = await sessionCookieFor('super');
+		const bucket = await makeBucket();
+		const res = await applications(bucket).post(
+			{ grantTypes: ['client_credentials'], tokenEndpointAuthMethod: 'none' },
+			{ headers: { cookie } }
+		);
+		expect(res.status).toBe(422);
+	});
+
+	it('refuses to give client_credentials to an application that does not authenticate', async () => {
+		const { cookie } = await sessionCookieFor('super');
+		const bucket = await makeBucket();
+		const id = await createPublic(bucket, cookie);
+		const patched = await applications(bucket)({ clientId: id }).patch(
+			{ grantTypes: ['authorization_code', 'client_credentials'] },
+			{ headers: { cookie } }
+		);
+		expect(patched.status).toBe(422);
+		const reloaded = await applications(bucket)({ clientId: id }).get({
+			headers: { cookie }
+		});
+		expect(answered(reloaded.data).grantTypes).toEqual(['authorization_code']);
+	});
+
 	it('updates an application via PATCH', async () => {
 		const { cookie } = await sessionCookieFor('super');
 		const bucket = await makeBucket();

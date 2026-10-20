@@ -30,6 +30,7 @@ import {
 	PRIMARY_COLOR_PATTERN
 } from '../../consts/client_branding.js';
 import { paintedAccent, readPrimaryColor } from '../../html/theme/accent.js';
+import { grantRefusedToPublicClient } from '../../consts/confidential_grants.js';
 
 export interface AdminClientView {
 	clientId: string;
@@ -370,6 +371,16 @@ function keyAndRequestView(client: Client): Partial<AdminClientView> {
  * plane's own refusal, which that handler stands aside for (wiki/concepts/admin-plane-error-shape.md).
  */
 async function validateAndStore(metadata: Record<string, unknown>) {
+	const refused = grantRefusedToPublicClient(
+		metadata.token_endpoint_auth_method,
+		(metadata.grantTypes as string[] | undefined) ?? []
+	);
+	if (refused) {
+		throw new AdminError(
+			422,
+			`${refused} needs a client that authenticates; choose a token endpoint auth method other than none`
+		);
+	}
 	try {
 		return await registerClient(metadata, { store: true });
 	} catch (error) {

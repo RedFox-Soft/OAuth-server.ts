@@ -22,6 +22,16 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   publishes `prompt_values_supported`. `GET /admin/signup` opens the console's registration the same way, and the
   site's sign-up links point at it.
 
+### Security
+
+- **A public client could get machine tokens with its client_id alone.** A client registered with token endpoint
+  auth `none` and the `client_credentials` grant received access tokens for every API and MCP server its project
+  declared, and a client_id is public. The token endpoint now answers `unauthorized_client` to such a client
+  (including ones already stored), CIBA's backchannel endpoint does the same for its grant, and the admin API and
+  console refuse the combination. An agent's `client_update` that sets redirect URIs, grant types or the auth
+  method now needs the two-call confirmation. Check for clients with auth `none` and `client_credentials`: their
+  machine tokens stop; give them a secret or a key.
+
 ### Fixed
 
 - **Emails and authenticator apps named a project by its console-only name.** Verification, reset and invitation

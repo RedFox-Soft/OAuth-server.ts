@@ -4,7 +4,8 @@ import {
 	InvalidGrant,
 	InvalidTarget,
 	InvalidScope,
-	InvalidRequest
+	InvalidRequest,
+	UnauthorizedClient
 } from '../../helpers/errors.js';
 import { member } from '../../helpers/_/object.js';
 import { configuration } from 'lib/configs/application.js';
@@ -24,6 +25,17 @@ export async function clientCredentials(
 ) {
 	const { client } = oidc;
 	const { scopes: statics } = configuration;
+
+	/*
+	 * A client that does not authenticate holds nothing but its public client_id, so a token issued here
+	 * would go to anyone who read that id off an authorization URL (lib/consts/confidential_grants.ts).
+	 * Checked at issuance so it binds every client already stored, whatever it was registered with.
+	 */
+	if (client.tokenEndpointAuthMethod === 'none') {
+		throw new UnauthorizedClient(
+			'client_credentials requires a client that authenticates'
+		);
+	}
 
 	// Unreachable while the /token schema refuses the parameter: the seam RFC 9396 §7 support plugs
 	// into (wiki/concepts/rich-authorization-requests.md), read as the unknown it would then be.
