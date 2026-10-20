@@ -252,6 +252,7 @@ export const DiscoveryResponse = t.Object(
 		client_id_metadata_document_supported: t.Optional(t.Boolean()),
 		request_uri_parameter_supported: t.Optional(t.Boolean()),
 		claims_parameter_supported: t.Optional(t.Boolean()),
+		prompt_values_supported: t.Optional(t.Array(t.String())),
 		require_pushed_authorization_requests: t.Optional(t.Boolean()),
 		request_parameter_supported: t.Optional(t.Boolean()),
 		require_signed_request_object: t.Optional(t.Boolean()),

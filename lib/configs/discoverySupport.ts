@@ -138,7 +138,8 @@ function endpoint(issuer: string, route: string): string {
 // featuresKeyMap and applies operator discovery overrides.
 export function calculateDiscovery(
 	bucket?: { _id: string; slug?: string; host?: string },
-	keys?: IssuerKeys
+	keys?: IssuerKeys,
+	prompts?: string[]
 ) {
 	const config = ApplicationConfig;
 	const acrValues = deriveAcrValues(config);
@@ -249,6 +250,12 @@ export function calculateDiscovery(
 		request_uri_parameter_supported: false,
 
 		claims_parameter_supported: true,
+		/*
+		 * Initiating User Registration via OpenID Connect 1.0 §4.1: a provider that supports `create` MUST
+		 * publish this member, listing every prompt value it accepts. Handed in by the caller, which reads the
+		 * resolved interaction policy — this module does not import the behaviour layer.
+		 */
+		prompt_values_supported: prompts,
 		require_pushed_authorization_requests:
 			ClientDefaults['authorization.requirePushedAuthorizationRequests'],
 		dpop_signing_alg_values_supported: dPoPSigningAlgValues,
@@ -510,6 +517,7 @@ export const metadataClassification: Record<DiscoveryKey, MetadataAudience> = {
 	acr_values_supported: { audience: 'oidc' },
 	claims_supported: { audience: 'oidc' },
 	claims_parameter_supported: { audience: 'oidc' },
+	prompt_values_supported: { audience: 'oidc' },
 	end_session_endpoint: { audience: 'oidc' },
 	backchannel_logout_supported: { audience: 'oidc' },
 	backchannel_logout_session_supported: { audience: 'oidc' }

@@ -118,7 +118,7 @@ async function signIn(
 	password: string
 ): Promise<void> {
 	await page.goto(`${ORIGIN}/admin/projects`);
-	await page.getByPlaceholder('Username').fill(email);
+	await page.getByPlaceholder('Email', { exact: true }).fill(email);
 	await page.getByPlaceholder('Password').fill(password);
 	await page.getByRole('button', { name: 'Log in' }).click();
 	// Sign-in returns to the address it was started from (`next`).
@@ -379,7 +379,9 @@ try {
 	}).toString();
 	await userPage.goto(auth.href);
 	await shoot(userPage, 'sign-in');
-	await userPage.getByPlaceholder('Username').fill('dana.rivera@example.com');
+	await userPage
+		.getByPlaceholder('Email', { exact: true })
+		.fill('dana.rivera@example.com');
 	await userPage.getByPlaceholder('Password').fill(USER_PASSWORD);
 	await userPage.getByRole('button', { name: 'Log in' }).click();
 	await userPage.waitForURL(/\/ui\/[^/]+\/consent/);

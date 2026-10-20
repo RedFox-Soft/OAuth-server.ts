@@ -11,6 +11,7 @@ import {
 	type SetPasswordPurpose
 } from './types.js';
 import type { User, UserBucket } from '../adapters/types.js';
+import { shownNameOf } from '../configs/issuer.js';
 import { ISSUER } from '../configs/env.js';
 import { isScheduledForDeletion } from '../consts/bucket_deletion.js';
 import { endSessionsForAccount } from '../helpers/cascade.js';
@@ -159,7 +160,7 @@ async function issueAndSend(
 
 	await plan.send(
 		user.email,
-		bucket.name || 'the application',
+		shownNameOf(bucket),
 		resetUrlFor(token),
 		language
 	);
@@ -309,7 +310,7 @@ export async function load(token: string): Promise<LoadOutcome> {
 		id,
 		challenge,
 		purpose: challenge.purpose ?? 'reset',
-		bucketName: bucket?.name || 'the application'
+		bucketName: bucket ? shownNameOf(bucket) : 'the application'
 	};
 }
 

@@ -5,7 +5,8 @@ export const zhHans: PlainTexts = {
 		success: {
 			title: '电子邮件地址已验证',
 			heading: '电子邮件地址已验证',
-			body: '您的电子邮件地址已确认。现在可以登录了。'
+			body: '您的电子邮件地址已确认。请返回登录页面登录。',
+			console: '前往控制台'
 		},
 		failure: {
 			title: '验证失败',

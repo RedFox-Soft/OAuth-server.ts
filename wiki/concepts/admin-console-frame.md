@@ -59,9 +59,9 @@ feature worth a library, which is blocking navigation while a form is dirty (`us
 
 **Sign-in returns to the address.** `safeNext` (`lib/admin/auth/next.ts:15`) admits only `/admin` or a
 path under it. It refuses `//`, backslashes, control characters, dot segments (including `%2e`) and the
-`/admin/api`, `/admin/login` and `/admin/callback` subtrees; anything else becomes `/admin`. It runs twice,
+`/admin/api`, `/admin/login`, `/admin/signup` and `/admin/callback` subtrees (`/admin/signup` since 2026-10-20); anything else becomes `/admin`. It runs twice,
 because the value travels through the provider in the `admin_oauth` cookie: once when `/admin/login`
-stores it (`login.ts:48`) and again when the callback redirects to it (`login.ts:148`).
+stores it (`startSignIn` in `login.ts`) and again when the callback redirects to it (`/admin/callback` in `login.ts`).
 
 **A team switch keeps the section.** The switcher re-reads `/admin/api/me` and replaces the address
 with the current section's list. The page subtree is keyed by `activeTeamId` (`pages/Layout.tsx:346`), so

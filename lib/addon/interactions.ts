@@ -1,5 +1,6 @@
 import { base } from '../helpers/interaction_policy/index.ts';
 import { resolve } from './registry.js';
+import { CREATE_PROMPT } from '../consts/prompt_create.ts';
 import type { OIDCContext } from '../helpers/oidc_context.ts';
 import type { PipelineParams } from '../consts/param_list.ts';
 import type { CheckPartial } from '../helpers/interaction_policy/prompt.ts';
@@ -96,6 +97,8 @@ export function supportedPrompts() {
 	const prompts = new Set(['none']);
 	for (const { name, requestable } of active()) {
 		if (requestable) prompts.add(name);
+		// `create` is carried by the login prompt (lib/consts/prompt_create.ts), so it exists while that does.
+		if (name === 'login') prompts.add(CREATE_PROMPT);
 	}
 	return prompts;
 }

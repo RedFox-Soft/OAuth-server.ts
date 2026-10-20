@@ -10,7 +10,12 @@
  */
 const HOME = '/admin';
 const MAX_LENGTH = 2048;
-const NOT_PAGES = ['/admin/api', '/admin/login', '/admin/callback'];
+const NOT_PAGES = [
+	'/admin/api',
+	'/admin/login',
+	'/admin/signup',
+	'/admin/callback'
+];
 
 export function safeNext(value: unknown): string {
 	if (typeof value !== 'string') return HOME;

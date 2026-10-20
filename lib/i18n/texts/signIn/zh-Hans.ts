@@ -11,8 +11,8 @@ export const zhHans: SignInTexts = {
 	logoAlt: '徽标',
 
 	login: {
-		usernameRequired: '请输入用户名！',
-		usernamePlaceholder: '用户名',
+		emailRequired: '请输入电子邮件地址！',
+		emailPlaceholder: '电子邮件地址',
 		passwordRequired: '请输入密码！',
 		passwordPlaceholder: '密码',
 		remember: '记住我',

@@ -127,7 +127,7 @@ import { readLogo } from 'lib/models/client/logo.js';
 import { brandingFor, signInBranding } from 'lib/interactions/branding.js';
 import type { PaintedAccent } from 'lib/html/theme/accent.js';
 import { profileClaims } from 'lib/consts/profile_claims.js';
-import { hasOwnOrigin, issuerFor } from 'lib/configs/issuer.js';
+import { hasOwnOrigin, issuerFor, shownNameOf } from 'lib/configs/issuer.js';
 import { ttl } from 'lib/configs/liveTime.js';
 import epochTime from 'lib/helpers/epoch_time.js';
 import { denormalize } from 'lib/helpers/user_codes.js';
@@ -203,6 +203,7 @@ function invalidCode(interaction: Interaction): string {
 import { ApplicationConfig, configuration } from 'lib/configs/application.js';
 import { isPlainObject } from 'lib/helpers/_/object.js';
 import { signUpsPaused } from '../plans/signups.js';
+import { CREATE_PROMPT_REASON } from '../consts/prompt_create.js';
 
 /*
  * Returns an error that ended a resumed authorization request to the client that made it.
@@ -896,6 +897,13 @@ async function consentViewFor(
 	return { view, ...(branding.accent ? { accent: branding.accent } : {}) };
 }
 
+// Whether the authorization request asked for the account-creation page (`prompt=create`).
+function createRequested(interaction: Interaction): boolean {
+	return (
+		interaction.payload.prompt?.reasons.includes(CREATE_PROMPT_REASON) ?? false
+	);
+}
+
 /*
  * The password-only doors of a federated-only bucket.
  *
@@ -903,6 +911,8 @@ async function consentViewFor(
  * one function. Each caller invokes it **before** any other check — including registration's deliberately
  * non-committal handling of an address that already exists: with the door shut there is nothing to be
  * non-committal about, and the refusal reveals a bucket setting rather than anything about an account.
+ * Registration's GET first sends a `prompt=create` request to the sign-in page instead, which reveals no
+ * more than this page would.
  */
 /*
  * Takes the interaction rather than the client id so the bucket is resolved the way the sign-in resolves
@@ -1512,7 +1522,10 @@ export const ui = new Elysia()
 			uid,
 			user._id,
 			bucketId,
-			{ email: user.email, label: bucket?.name || 'the application' }
+			{
+				email: user.email,
+				label: bucket ? shownNameOf(bucket) : 'the application'
+			}
 		);
 
 		return totpServer(uid, {
@@ -1584,7 +1597,7 @@ export const ui = new Elysia()
 					bucketId,
 					{
 						email: user?.email ?? '',
-						label: bucket?.name || 'the application'
+						label: bucket ? shownNameOf(bucket) : 'the application'
 					}
 				);
 				return totpServer(uid, {
@@ -1853,9 +1866,6 @@ export const ui = new Elysia()
 		'ui/:uid/registration',
 		async ({ params: { uid }, interaction, signsInto }) => {
 			const clientId = clientIdOf(interaction);
-			const closed = await passwordDoorClosed(interaction, uid);
-			if (closed) return closed;
-
 			const bucket = await getBucketStore().find(
 				await resolveBucketForRequest(
 					clientId,
@@ -1864,10 +1874,23 @@ export const ui = new Elysia()
 				)
 			);
 			/* Closed by the project, or paused by its plan's active-user cap (specs/102): one page, naming neither. */
+			const signUpsClosed =
+				bucket !== null &&
+				(!bucket.registrationOpen || (await signUpsPaused(bucket)));
+			/*
+			 * An application that asked for `prompt=create` was sent here without knowing whether this project
+			 * takes sign-ups, and the specification leaves a refusal undefined. Its user is offered the sign-in
+			 * page instead — the same request, completed another way — rather than a page with no way forward.
+			 */
 			if (
-				bucket &&
-				(!bucket.registrationOpen || (await signUpsPaused(bucket)))
+				createRequested(interaction) &&
+				(signUpsClosed || bucket?.passwordLogin === false)
 			) {
+				return Response.redirect(`/ui/${uid}/login`, 303);
+			}
+			const closed = await passwordDoorClosed(interaction, uid);
+			if (closed) return closed;
+			if (signUpsClosed) {
 				return registrationClosedPage(languageOf(interaction));
 			}
 			return registrationServer(uid, {

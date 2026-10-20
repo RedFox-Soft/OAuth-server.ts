@@ -21,6 +21,7 @@ import {
 } from 'lib/admin/auth/bucketAddress.js';
 import { hostOfRequest, normaliseHost } from 'lib/consts/request_host.js';
 import { keysFor, rootKeys } from 'lib/keys/issuer_keys.js';
+import { supportedPrompts } from '../addon/index.js';
 
 type BucketAddress = { _id: string; slug?: string; host?: string };
 
@@ -72,7 +73,8 @@ async function openidConfiguration(bucket?: BucketAddress) {
 	return gateAndExtend(
 		calculateDiscovery(
 			bucket,
-			bucket ? await keysFor(bucket) : await rootKeys()
+			bucket ? await keysFor(bucket) : await rootKeys(),
+			[...supportedPrompts()]
 		)
 	);
 }

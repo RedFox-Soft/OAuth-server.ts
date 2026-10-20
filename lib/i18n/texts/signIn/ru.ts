@@ -11,8 +11,8 @@ export const ru: SignInTexts = {
 	logoAlt: 'Логотип',
 
 	login: {
-		usernameRequired: 'Введите имя пользователя',
-		usernamePlaceholder: 'Имя пользователя',
+		emailRequired: 'Введите адрес электронной почты',
+		emailPlaceholder: 'Электронная почта',
 		passwordRequired: 'Введите пароль',
 		passwordPlaceholder: 'Пароль',
 		remember: 'Запомнить меня',

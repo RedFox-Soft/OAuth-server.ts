@@ -11,6 +11,7 @@ import { eventBus } from '../../event_bus.js';
 import { consentWaived } from '../../shared/consent_waiver.js';
 import { getUserStore } from '../../adapters/index.js';
 import { languageFromCookieHeader } from '../../i18n/cookie.js';
+import { CREATE_PROMPT_REASON } from '../../consts/prompt_create.js';
 import {
 	acceptLanguageRanges,
 	resolveLanguage,
@@ -167,7 +168,12 @@ export default async function interactions(oidc: OIDCContext<PipelineParams>) {
 	});
 
 	eventBus.emit('interaction.started', oidc, prompt);
-	const destination = `/ui/${uid}/${prompt.name}`;
+	// `prompt=create` opens on the registration page; it is the login prompt that carries it.
+	const page =
+		prompt.name === 'login' && prompt.reasons.includes(CREATE_PROMPT_REASON)
+			? 'registration'
+			: prompt.name;
+	const destination = `/ui/${uid}/${page}`;
 	return destination;
 }
 

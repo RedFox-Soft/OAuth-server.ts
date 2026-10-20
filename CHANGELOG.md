@@ -17,6 +17,19 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   they will see. A registration or metadata document cannot set it. The consent logo now follows the same rule per
   sign-in, which also keeps it off a device's consent page that asks for administrator rights. No migration and no
   new storage area.
+- **`prompt=create`** (OpenID Connect Initiating User Registration 1.0): an application can open its user's sign-in
+  on account creation; where the project takes no sign-ups the user gets its sign-in page instead. Discovery now
+  publishes `prompt_values_supported`. `GET /admin/signup` opens the console's registration the same way, and the
+  site's sign-up links point at it.
+
+### Fixed
+
+- **Emails and authenticator apps named a project by its console-only name.** Verification, reset and invitation
+  emails and the TOTP label now use the name shown to users, or the issuer's host when there is none — a console
+  sign-up was asked to verify its address "for Administrators". The confirmation page offers a way into the console
+  for an administrator's address and tells everyone else to go back to the sign-in page. Sign-in pages are titled
+  "Sign in" and "Create account", ask for an email rather than a username, and carry `autocomplete` so password
+  managers fill and generate passwords; the console's application form reads "New application".
 
 ## [1.1.0] - 2026-10-16
 

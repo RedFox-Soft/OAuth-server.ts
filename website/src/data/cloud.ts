@@ -7,7 +7,7 @@
  * 2026-10-18 (plan `free`: 1,000,000 monthly active users, raised from 100,000 that day; 2 projects per
  * administrator, 10 applications and 10 APIs per project, no enterprise sign-in, custom slug or custom domain).
  */
-export const CLOUD_SIGN_UP = 'https://auth.foxauth.dev/admin';
+export const CLOUD_SIGN_UP = 'https://auth.foxauth.dev/admin/signup';
 
 /*
  * The flags switched on at auth.foxauth.dev, so the Features page can mark the cards a cloud project gets. Not read

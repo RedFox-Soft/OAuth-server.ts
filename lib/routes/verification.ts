@@ -16,6 +16,8 @@ import {
 	verifyRateLimitedPage
 } from '../interactions/verifyPages.js';
 import { PLAIN_TEXTS } from '../i18n/texts/plain/index.js';
+import { ADMIN_BUCKET_ID } from '../admin/consts.js';
+import { ISSUER } from '../configs/env.js';
 
 /*
  * These pages are opened from an email, often in another browser, so they speak the language the email was
@@ -24,6 +26,11 @@ import { PLAIN_TEXTS } from '../i18n/texts/plain/index.js';
 async function pageLanguage(request: Request, id: string): Promise<Language> {
 	return languageOfRequest(request, [singleRange(await challengeLanguage(id))])
 		.language;
+}
+
+// An administrator who has just proven their address is on their way to the console.
+function consoleFor(bucketId: string): string | undefined {
+	return bucketId === ADMIN_BUCKET_ID ? `${ISSUER}/admin` : undefined;
 }
 
 // Public, standalone verification endpoints. Deliberately NOT under the `ui/:uid/*`
@@ -36,7 +43,7 @@ export const verificationRoutes = new Elysia({ name: 'verification' })
 			const language = await pageLanguage(request, query.token);
 			const result = await verifyLink(query.token);
 			return result.ok
-				? verifySuccessPage(language)
+				? verifySuccessPage(language, consoleFor(result.bucketId))
 				: verifyFailurePage(
 						PLAIN_TEXTS[language].verify.messages.invalidLink,
 						language
@@ -60,7 +67,9 @@ export const verificationRoutes = new Elysia({ name: 'verification' })
 			const language = await pageLanguage(request, body.ref);
 			const messages = PLAIN_TEXTS[language].verify.messages;
 			const result = await verifyCode(body.ref, body.code);
-			if (result.ok) return verifySuccessPage(language);
+			if (result.ok) {
+				return verifySuccessPage(language, consoleFor(result.bucketId));
+			}
 			if (result.reason === 'too_many') {
 				return codeEntryPage(body.ref, messages.tooManyAttempts, language);
 			}

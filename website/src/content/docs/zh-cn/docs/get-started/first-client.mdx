@@ -1,7 +1,7 @@
 ---
 title: 注册第一个客户端
 description: 控制台中的团队、项目和应用，公开与机密客户端的区别，以及客户端为哪些用户提供登录。
-source: e4c168ac6ec4
+source: 36cc789360fe
 sidebar:
   order: 4
 ---
@@ -31,7 +31,7 @@ import ScreenshotFigure from '../../../../../components/ScreenshotFigure.astro';
 
    Projects 表在 **Address** 列中显示每个项目的地址。保留的项目在这一列显示的是 _served at the root_（在根路径提供服务），而不是路径，因为它们沿用不带路径的签发者。只有超级管理员可以向默认的 `redfox` 项目添加应用，任何人都不能向管理员项目添加应用。
 
-3. 在项目的 **Applications** 标签页上点击 **New client** **创建客户端**。选择应用类型和令牌端点认证方式，然后填写重定向 URI。下一节讨论的正是这个选择。如果另一个来源（origin）上的浏览器代码会调用令牌端点，请在 **Browser origins** 中列出该来源；这个列表可以从同一项目的另一个应用复制过来。
+3. 在项目的 **Applications** 标签页上点击 **New application** **创建客户端**。选择应用类型和令牌端点认证方式，然后填写重定向 URI。下一节讨论的正是这个选择。如果另一个来源（origin）上的浏览器代码会调用令牌端点，请在 **Browser origins** 中列出该来源；这个列表可以从同一项目的另一个应用复制过来。
 
 </Steps>
 

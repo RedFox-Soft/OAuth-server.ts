@@ -20,7 +20,9 @@ and reads the resulting identity token to learn which operator arrived
 administrators' project's providers the sign-in came through (`signedInWith`, read from the provider
 session's `upstream`); see [[console-federation]]. Since spec 079 the callback returns to the console address the sign-in
 started from (`next`). The address is validated by `safeNext` both when it is stored and when it is used,
-because it rides in the `admin_oauth` cookie; see [[admin-console-frame]].
+because it rides in the `admin_oauth` cookie; see [[admin-console-frame]]. Since 2026-10-20 `GET /admin/signup`
+starts the same leg with `prompt=create`, so a newcomer lands on registration instead of a password form
+(`startSignIn` serves both routes); see [[prompt-create]].
 
 So the console is a **relying party on its own issuer**, and that is the whole difficulty: being the
 issuer is not a licence to skip verification. Nothing about receiving a token over a loopback exchange

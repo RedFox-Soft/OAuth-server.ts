@@ -6,8 +6,8 @@
 
 export const en = {
 	titles: {
-		login: 'Login Page',
-		registration: 'Registration Page',
+		login: 'Sign in',
+		registration: 'Create account',
 		totpEnroll: 'Set Up Authenticator',
 		totpVerify: 'Two-Step Verification'
 	},
@@ -15,8 +15,8 @@ export const en = {
 	logoAlt: 'Logo',
 
 	login: {
-		usernameRequired: 'Please input your Username!',
-		usernamePlaceholder: 'Username',
+		emailRequired: 'Please input your Email!',
+		emailPlaceholder: 'Email',
 		passwordRequired: 'Please input your Password!',
 		passwordPlaceholder: 'Password',
 		remember: 'Remember me',

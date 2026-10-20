@@ -1,6 +1,6 @@
 import { Form, Input, Button, Checkbox, Flex, Card, Divider } from 'antd';
 import {
-	UserOutlined,
+	MailOutlined,
 	LockOutlined,
 	ExclamationCircleOutlined,
 	InfoCircleOutlined
@@ -224,12 +224,14 @@ export function LoginPage({
 						<>
 							<Form.Item
 								name="username"
-								rules={[{ required: true, message: T.login.usernameRequired }]}
+								rules={[{ required: true, message: T.login.emailRequired }]}
 							>
 								<Input
 									name="username"
-									prefix={<UserOutlined aria-hidden="true" />}
-									placeholder={T.login.usernamePlaceholder}
+									prefix={<MailOutlined aria-hidden="true" />}
+									placeholder={T.login.emailPlaceholder}
+									autoComplete="username"
+									inputMode="email"
 								/>
 							</Form.Item>
 							<Form.Item
@@ -241,6 +243,7 @@ export function LoginPage({
 									prefix={<LockOutlined aria-hidden="true" />}
 									type="password"
 									placeholder={T.login.passwordPlaceholder}
+									autoComplete="current-password"
 								/>
 							</Form.Item>
 							<Form.Item>

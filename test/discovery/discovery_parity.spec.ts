@@ -32,6 +32,8 @@ const DEFAULT_MEMBERS = [
 	'id_token_signing_alg_values_supported',
 	'issuer',
 	'jwks_uri',
+	// Required of a provider that accepts prompt=create (Initiating User Registration 1.0 §4.1).
+	'prompt_values_supported',
 	'request_uri_parameter_supported',
 	'response_modes_supported',
 	'response_types_supported',

@@ -29,6 +29,7 @@ import {
 import type { SmtpSettings } from 'lib/adapters/types.ts';
 import { DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { elysia } from 'lib/index.ts';
+import { shownNameOf } from 'lib/configs/issuer.ts';
 import { text as fill } from 'lib/i18n/message.tsx';
 import { EMAIL_TEXTS } from 'lib/i18n/texts/email/index.ts';
 import type { Language } from 'lib/i18n/languages.ts';
@@ -109,7 +110,8 @@ describe('end-user emails in the person’s language', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url);
 		const bucket = await defaultBucket();
-		appName = bucket.name || 'the application';
+		// The name the person is shown, which is what an email calls the project (lib/configs/issuer.ts).
+		appName = shownNameOf(bucket);
 		previousMail = await withMail();
 	});
 

@@ -21,6 +21,7 @@ import {
 } from '../consts.js';
 import { safeNext } from './next.js';
 import { canSignIn } from '../../end_users/can_sign_in.js';
+import { CREATE_PROMPT } from '../../consts/prompt_create.js';
 
 const REDIRECT_URI = `${ISSUER}/admin/callback`;
 
@@ -44,45 +45,66 @@ async function providerSignedInWith(
 	return session?.payload.upstream?.providerId ?? null;
 }
 
-export const adminLogin = new Elysia({ name: 'admin-login' })
-	.get('/admin/login', ({ cookie, query, redirect }) => {
-		const verifier = base64url(crypto.randomBytes(32));
-		const challenge = base64url(
-			crypto.createHash('sha256').update(verifier).digest()
-		);
-		const state = base64url(crypto.randomBytes(16));
-		// Freshness, not CSRF: `state` binds the callback to the browser that started the
-		// flow, `nonce` binds the identity token to this attempt — so a genuine token
-		// captured from another sign-in cannot be replayed into this one.
-		const nonce = base64url(crypto.randomBytes(32));
-		cookie.admin_oauth.set({
-			// Where to return after sign-in, validated here and again on the way out: the cookie is the
-			// browser's to keep, so its contents are not trusted just because this route wrote them.
-			value: JSON.stringify({
-				verifier,
-				state,
-				nonce,
-				next: safeNext(query.next)
-			}),
-			httpOnly: true,
-			sameSite: 'lax',
-			secure: true,
-			path: '/admin',
-			maxAge: 600
-		});
-		const url = new URL(`${ISSUER}${routeNames.authorization}`);
-		url.search = new URLSearchParams({
-			client_id: ADMIN_CLIENT_ID,
-			response_type: 'code',
-			redirect_uri: REDIRECT_URI,
-			scope: 'openid',
+type StartContext = {
+	cookie: Record<
+		string,
+		{ set: (attributes: Record<string, unknown>) => void }
+	>;
+	query: { next?: string };
+	redirect: (url: string, status: 302) => Response;
+};
+
+/*
+ * Starts the console's sign-in leg. `create` asks the sign-in page to open on account creation
+ * (`prompt=create`): the address a "create an account" link points at, so a newcomer is not shown a
+ * password form for an account they do not have. Everything after the authorization request is shared.
+ */
+function startSignIn(
+	{ cookie, query, redirect }: StartContext,
+	create: boolean
+): Response {
+	const verifier = base64url(crypto.randomBytes(32));
+	const challenge = base64url(
+		crypto.createHash('sha256').update(verifier).digest()
+	);
+	const state = base64url(crypto.randomBytes(16));
+	// Freshness, not CSRF: `state` binds the callback to the browser that started the
+	// flow, `nonce` binds the identity token to this attempt — so a genuine token
+	// captured from another sign-in cannot be replayed into this one.
+	const nonce = base64url(crypto.randomBytes(32));
+	cookie.admin_oauth.set({
+		// Where to return after sign-in, validated here and again on the way out: the cookie is the
+		// browser's to keep, so its contents are not trusted just because this route wrote them.
+		value: JSON.stringify({
+			verifier,
 			state,
 			nonce,
-			code_challenge: challenge,
-			code_challenge_method: 'S256'
-		}).toString();
-		return redirect(url.toString(), 302);
-	})
+			next: safeNext(query.next)
+		}),
+		httpOnly: true,
+		sameSite: 'lax',
+		secure: true,
+		path: '/admin',
+		maxAge: 600
+	});
+	const url = new URL(`${ISSUER}${routeNames.authorization}`);
+	url.search = new URLSearchParams({
+		client_id: ADMIN_CLIENT_ID,
+		response_type: 'code',
+		redirect_uri: REDIRECT_URI,
+		scope: 'openid',
+		state,
+		nonce,
+		code_challenge: challenge,
+		code_challenge_method: 'S256',
+		...(create ? { prompt: CREATE_PROMPT } : {})
+	}).toString();
+	return redirect(url.toString(), 302);
+}
+
+export const adminLogin = new Elysia({ name: 'admin-login' })
+	.get('/admin/login', (context) => startSignIn(context, false))
+	.get('/admin/signup', (context) => startSignIn(context, true))
 	.get(
 		'/admin/callback',
 		async ({ query, cookie, redirect, set }) => {

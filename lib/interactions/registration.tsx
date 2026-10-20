@@ -100,6 +100,8 @@ export function RegistrationPage({
 							name="email"
 							prefix={<MailOutlined aria-hidden="true" />}
 							placeholder={T.registration.emailPlaceholder}
+							autoComplete="email"
+							inputMode="email"
 						/>
 					</Form.Item>
 					<Form.Item
@@ -113,6 +115,7 @@ export function RegistrationPage({
 							prefix={<LockOutlined aria-hidden="true" />}
 							type="password"
 							placeholder={T.registration.passwordPlaceholder}
+							autoComplete="new-password"
 						/>
 					</Form.Item>
 					<Form.Item
@@ -137,6 +140,7 @@ export function RegistrationPage({
 							prefix={<LockOutlined aria-hidden="true" />}
 							type="password"
 							placeholder={T.registration.confirmPlaceholder}
+							autoComplete="new-password"
 						/>
 					</Form.Item>
 

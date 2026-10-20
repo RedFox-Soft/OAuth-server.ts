@@ -3,7 +3,8 @@ export const en = {
 		success: {
 			title: 'Email verified',
 			heading: 'Email verified',
-			body: 'Your email address has been confirmed. You can now sign in.'
+			body: 'Your email address has been confirmed. Go back to the sign-in page and sign in.',
+			console: 'Continue to the console'
 		},
 		failure: {
 			title: 'Verification failed',

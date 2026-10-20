@@ -9,11 +9,22 @@ import type { Language } from '../i18n/languages.js';
 import { html } from '../i18n/message.js';
 import { PLAIN_TEXTS } from '../i18n/texts/plain/index.js';
 
-export function verifySuccessPage(language: Language = 'en'): Response {
+/*
+ * `consoleUrl` is given only for an administrator's address. That is the one case where the server knows
+ * where the reader is going next; an end user's application is somewhere this page cannot name, so they
+ * are sent back to the sign-in page they came from, which is still open in the tab they signed up in.
+ */
+export function verifySuccessPage(
+	language: Language = 'en',
+	consoleUrl?: string
+): Response {
 	const t = PLAIN_TEXTS[language].verify.success;
+	const next = consoleUrl
+		? `<a href="${esc(consoleUrl)}" style="display:inline-block; background:${foxVar('primary-solid')}; color:${foxVar('on-primary')}; padding:10px 20px; border-radius:6px; text-decoration:none;">${html(t.console)}</a>`
+		: '';
 	return page(
 		t.title,
-		`<h2 style="color:${foxVar('text')};">${html(t.heading)}</h2><p style="color:${foxVar('text-secondary')};">${html(t.body)}</p>`,
+		`<h2 style="color:${foxVar('text')};">${html(t.heading)}</h2><p style="color:${foxVar('text-secondary')};">${html(t.body)}</p>${next}`,
 		200,
 		{ language }
 	);

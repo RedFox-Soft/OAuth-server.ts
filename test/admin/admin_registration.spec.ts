@@ -34,6 +34,7 @@ import { elysia } from 'lib/index.ts';
 import { sessionFor } from '../admin_session.ts';
 import { createAdministrator } from '../administrators.ts';
 import { present } from 'test/shape.js';
+import { ISSUER } from 'lib/configs/env.ts';
 
 const PASSWORD = 'correct horse battery';
 
@@ -102,6 +103,52 @@ describe('registering an administrator account', () => {
 		await setRegistration(false);
 		await getBucketStore().update(ADMIN_BUCKET_ID, {
 			emailVerificationRequired: false
+		});
+	});
+
+	it('opens on the registration page for a person arriving at the console sign-up address', async () => {
+		const start = await elysia.handle(new Request(`${ISSUER}/admin/signup`));
+		const authorize = new URL(getHeader(start, 'location'));
+		expect(authorize.searchParams.get('prompt')).toBe('create');
+
+		const auth = await elysia.handle(new Request(authorize.toString()));
+		expect(getHeader(auth, 'location')).toMatch(/^\/ui\/[^/]+\/registration$/);
+	});
+
+	describe('while administrators must verify their address', () => {
+		beforeEach(async () => {
+			await getBucketStore().update(ADMIN_BUCKET_ID, {
+				emailVerificationRequired: true,
+				verificationMethod: 'link'
+			});
+		});
+
+		afterAll(async () => {
+			await getBucketStore().update(ADMIN_BUCKET_ID, {
+				emailVerificationRequired: false
+			});
+		});
+
+		it('names the instance in the verification email, never the console-only name of its project', async () => {
+			const email = unique();
+			await register(email);
+			const subject = present(emailsTo(email)[0], 'emailsTo(email)[0]').subject;
+			expect(subject).toContain(new URL(ISSUER).host);
+			expect(subject).not.toContain('Administrators');
+		});
+
+		it('offers the way into the console once the mailed link is followed', async () => {
+			const email = unique();
+			await register(email);
+			const url = present(
+				extractVerifyUrl(present(emailsTo(email)[0], 'emailsTo(email)[0]')),
+				'extractVerifyUrl'
+			);
+			const token = present(new URL(url).searchParams.get('token'), 'token');
+			const opened = await agent['verify-email'].get({ query: { token } });
+			expect(String(opened.data as unknown)).toContain(
+				`href="${ISSUER}/admin"`
+			);
 		});
 	});
 

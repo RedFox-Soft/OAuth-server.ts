@@ -4,6 +4,10 @@ import { Prompt, type CheckPartial } from '../prompt.js';
 import type { OIDCContext } from '../../oidc_context.ts';
 import { claimRequest } from '../../claim_request.ts';
 import type { PipelineParams } from '../../../consts/param_list.ts';
+import {
+	CREATE_PROMPT,
+	CREATE_PROMPT_REASON
+} from '../../../consts/prompt_create.ts';
 
 class LoginPromt extends Prompt {
 	name = 'login';
@@ -25,6 +29,17 @@ class LoginPromt extends Prompt {
 	}
 
 	checks: CheckPartial[] = [
+		/*
+		 * `prompt=create` asks for the account-creation page even when somebody is already signed in, the
+		 * way `prompt=login` asks for the sign-in page. It is answered by the interaction that follows —
+		 * the new account signs in at the end of it — so once a sign-in result exists it is satisfied.
+		 */
+		{
+			reason: CREATE_PROMPT_REASON,
+			description: 'account creation was requested',
+			error: 'login_required',
+			check: (oidc) => oidc.prompts.has(CREATE_PROMPT) && !oidc.result?.login
+		},
 		{
 			reason: 'no_session',
 			description: 'End-User authentication is required',

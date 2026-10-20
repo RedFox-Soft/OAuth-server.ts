@@ -671,7 +671,7 @@ export function Clients({
 				disabled={full !== null}
 				onClick={openCreateModal}
 			>
-				New client
+				New application
 			</Button>
 		</Tooltip>
 	);
@@ -759,7 +759,8 @@ export function Clients({
 				/>
 			)}
 			<Modal
-				title={mode === 'create' ? 'New client' : 'Edit client'}
+				title={mode === 'create' ? 'New application' : 'Edit application'}
+				okText={mode === 'create' ? 'Create application' : 'Save'}
 				open={open}
 				onCancel={() => setOpen(false)}
 				onOk={() => form.submit()}

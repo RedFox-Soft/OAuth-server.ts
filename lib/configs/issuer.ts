@@ -135,6 +135,18 @@ export function issuerFor(bucket: RequestBucket): string {
 }
 
 /*
+ * The name a person signing in to a bucket is shown: the name the bucket chose to show them, or else the
+ * host they are at — the consent page's rule. Never `name`: the console promises an administrator that the
+ * name is "only for this console", and the reserved administrators' bucket is called `Administrators`, which
+ * is how every console sign-up received an email about verifying "for Administrators".
+ */
+export function shownNameOf(
+	bucket: RequestBucket & { displayName?: string }
+): string {
+	return bucket.displayName || new URL(issuerFor(bucket)).host;
+}
+
+/*
  * Whether a bucket is served on an origin of its own — a hostname, or a subdomain of the instance.
  *
  * Asked wherever the answer changes behaviour: the session cookie's name, whether an interaction is bound to

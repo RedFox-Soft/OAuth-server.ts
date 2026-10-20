@@ -13,6 +13,7 @@ import type {
 	UserBucket,
 	VerificationMethod
 } from '../adapters/types.js';
+import { shownNameOf } from '../configs/issuer.js';
 import { ISSUER } from '../configs/env.js';
 import { isScheduledForDeletion } from '../consts/bucket_deletion.js';
 import { emailScopedId } from '../helpers/email_scoped_id.js';
@@ -126,7 +127,7 @@ export async function issueAndSend(
 		RESEND_WINDOW_SECONDS
 	);
 
-	const appName = bucket.name || 'the application';
+	const appName = shownNameOf(bucket);
 	await sendVerificationEmail({
 		email: user.email,
 		appName,
@@ -139,7 +140,9 @@ export async function issueAndSend(
 	return { id, method };
 }
 
-export type VerifyOutcome = { ok: true } | { ok: false; reason: 'invalid' };
+/* `bucketId` says whose address it was, so the page can say where to go next. */
+export type VerifyOutcome =
+	{ ok: true; bucketId: string } | { ok: false; reason: 'invalid' };
 
 /*
  * Whether the account still holds the address the challenge was sent to. A message proves control of the
@@ -182,11 +185,12 @@ export async function verifyLink(token: string): Promise<VerifyOutcome> {
 	});
 	await challenges().destroy(token);
 	await resends().destroy(resendKey(challenge.bucketId, challenge.email));
-	return { ok: true };
+	return { ok: true, bucketId: challenge.bucketId };
 }
 
 export type CodeOutcome =
-	{ ok: true } | { ok: false; reason: 'invalid' | 'wrong' | 'too_many' };
+	| { ok: true; bucketId: string }
+	| { ok: false; reason: 'invalid' | 'wrong' | 'too_many' };
 
 // Verify a submitted 6-digit code against the challenge identified by `ref`. Counts wrong
 // attempts and, once the cap is reached, refuses even a correct code until a new one is
@@ -230,7 +234,7 @@ export async function verifyCode(
 		});
 		await challenges().destroy(ref);
 		await resends().destroy(resendKey(challenge.bucketId, challenge.email));
-		return { ok: true };
+		return { ok: true, bucketId: challenge.bucketId };
 	}
 
 	return {
