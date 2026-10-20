@@ -19,6 +19,7 @@ import { AuthorizationCodePayload } from 'lib/models/authorization_code.js';
 import { BackchannelAuthenticationRequestPayload } from 'lib/models/backchannel_authentication_request.js';
 import { ClientCredentialsPayload } from 'lib/models/client_credentials.js';
 import { ClientLogoPayload } from 'lib/models/client/logo.js';
+import { ClientUsagePayload } from 'lib/models/client/usage.js';
 import { DeviceCodePayload } from 'lib/models/device_code.js';
 import { DeprovisionSlotPayload } from 'lib/provisioning/tally_types.js';
 import { FederationStatePayload } from 'lib/federation/types.js';
@@ -55,6 +56,7 @@ export const PAYLOAD_SCHEMAS: Readonly<
 	BackchannelAuthenticationRequest: BackchannelAuthenticationRequestPayload,
 	ClientCredentials: ClientCredentialsPayload,
 	ClientLogo: ClientLogoPayload,
+	ClientUsage: ClientUsagePayload,
 	DeprovisionSlot: DeprovisionSlotPayload,
 	DeviceCode: DeviceCodePayload,
 	FederationState: FederationStatePayload,

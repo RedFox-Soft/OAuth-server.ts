@@ -134,6 +134,28 @@ export function issuerFor(bucket: RequestBucket): string {
 	}
 }
 
+/* How a bucket is addressed, and the issuer and discovery addresses a client is configured with. */
+export function addressing(bucket: RequestBucket): {
+	addressForm: ReturnType<typeof addressOf>['kind'];
+	issuer: string | null;
+	discoveryUrl: string | null;
+} {
+	const addressForm = addressOf(bucket).kind;
+	/*
+	 * Null rather than the id-derived identifier `issuerFor` falls back to: a bucket with no address of its
+	 * own is not routed at that path, so its "issuer" would answer 404 to the client given it.
+	 */
+	if (addressForm === 'unaddressed') {
+		return { addressForm, issuer: null, discoveryUrl: null };
+	}
+	const issuer = issuerFor(bucket);
+	return {
+		addressForm,
+		issuer,
+		discoveryUrl: `${issuer}/.well-known/openid-configuration`
+	};
+}
+
 /*
  * The name a person signing in to a bucket is shown: the name the bucket chose to show them, or else the
  * host they are at — the consent page's rule. Never `name`: the console promises an administrator that the

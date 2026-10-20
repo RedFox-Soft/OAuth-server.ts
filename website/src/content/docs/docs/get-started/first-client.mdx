@@ -59,24 +59,36 @@ eight letters and digits. The project is served on a subdomain of its own, so yo
    administrator can add applications to the default `redfox` project, and nobody can add them to
    the administrators' project.
 
-3. **Create a client** on the project's **Applications** tab, with **New application**. Pick the
-   application type and the token endpoint authentication method, then enter the redirect URIs. The
-   next section is about that choice. If browser code on another origin will call the token
-   endpoint, list that origin under **Browser origins**; the list can be copied from another
-   application of the same project.
+3. **Create an application** on the project's **Applications** tab, with **New application**. Choose
+   the situation that matches your app: a web app with a server, a single-page app, a mobile, desktop or
+   command-line app, a device without a keyboard, or a service calling your API. Then say where the app
+   runs while you develop, for example `http://localhost:3000`. The console fills in the protocol settings
+   the next section describes, and the callback and sign-out addresses, which you can still edit. It then
+   opens the application's own page on its **Connect** tab: the client ID, the project's issuer and
+   discovery address, and a configuration block to paste into your app. To set everything by hand, choose
+   **Configure everything yourself** or **Show all settings**.
+
+   Protecting an MCP server or an API is not an application. Choose that card and the console takes you
+   to the project's **APIs** tab to declare it; the agent hosts that call it get their own client
+   identity.
+
+4. **Let someone sign in.** A new project holds nobody and is closed to sign-up, so the first sign-in
+   through your app would have nobody to let in. The Connect tab says so and offers two ways in: invite
+   yourself as a test user, or open sign-up. Once your app has really signed someone in, the status at
+   the top of its page shows when.
 
 </Steps>
 
 <ScreenshotFigure
 	name="admin-project-applications"
 	alt="A project's Applications tab in the admin console, showing a public PKCE client and a confidential one."
-	caption="A project's applications: the generated client id, the application type and the token endpoint auth method that decides whether it has a secret."
+	caption="A project's applications: the generated client id, what kind of application each one is, and when it was last used."
 />
 
 ## Public or confidential
 
-The choice is the **token endpoint auth method**, and it follows from whether your application can
-keep a secret:
+The situation you choose sets the **token endpoint auth method** for you. It follows from whether your
+application can keep a secret, and you can change it on the application's **Settings** tab:
 
 | Method                 | Use for                                                                    | Credential                                   |
 | ---------------------- | -------------------------------------------------------------------------- | -------------------------------------------- |
@@ -92,9 +104,10 @@ verifier.
 
 <Aside type="caution" title="The secret is shown once">
 
-When a confidential client is created, or when you rotate its secret from the clients table, the
-value appears in a dialog reading "Copy this secret now — it will not be shown again." It is not
-recoverable afterwards. The way back is a rotation, which invalidates the old one.
+When a confidential application is created, its secret is shown once, on the application's page, inside
+the configuration block. It is not recoverable afterwards. The way back is a rotation, which invalidates
+the old one and shows the new one once in the same place. The block never puts the secret under a
+variable name that a front-end build would ship to every visitor.
 
 </Aside>
 

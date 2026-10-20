@@ -99,6 +99,8 @@ const PERMANENT = [
 	'Client',
 	/* A logo stays until an administrator removes it or the client is deleted. */
 	'ClientLogo',
+	/* "Last used" stays meaningful however long ago it was; it leaves with its application. */
+	'ClientUsage',
 	/*
 	 * An issuer's keys — each bucket's and the root's — leave by their state — retired, and past the
 	 * lifetime of every token they could have signed — never by the record's age. An expiry here would

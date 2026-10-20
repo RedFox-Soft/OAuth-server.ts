@@ -24,6 +24,7 @@ import {
 } from '../lib/keys/issuer_keys.ts';
 import { forgetSignUpReadings } from 'lib/plans/signups.ts';
 import { resetActivityCacheForTests } from '../lib/activity/note.ts';
+import { resetClientUseForTests } from '../lib/models/client/usage.ts';
 import { forgetHostArrivals } from '../lib/admin/auth/hostArrivals.ts';
 import {
 	resetUnauthenticatedCharge,
@@ -491,6 +492,7 @@ function forgetProcessState(): void {
 	forgetBucketAddresses();
 	forgetHostArrivals();
 	resetActivityCacheForTests();
+	resetClientUseForTests();
 	forgetSignUpReadings();
 	resetUnauthenticatedCharge();
 	setUnauthenticatedChargeClock(null);

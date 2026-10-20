@@ -62,7 +62,9 @@ describe('admin client service', () => {
 		});
 		expect(view.partialConsent).toBe(false);
 
-		const updated = await updateClient(view.clientId, { partialConsent: true });
+		const { view: updated } = await updateClient(view.clientId, {
+			partialConsent: true
+		});
 
 		expect(updated.partialConsent).toBe(true);
 	});
@@ -76,7 +78,7 @@ describe('admin client service', () => {
 			partialConsent: true
 		});
 
-		const updated = await updateClient(view.clientId, {
+		const { view: updated } = await updateClient(view.clientId, {
 			clientName: 'Assistant 2'
 		});
 
@@ -115,7 +117,7 @@ describe('admin client service', () => {
 			tokenEndpointAuthMethod: 'client_secret_basic'
 		});
 		expect(secret).toBeTruthy();
-		const updated = await updateClient(view.clientId, {
+		const { view: updated } = await updateClient(view.clientId, {
 			redirectUris: ['https://two.example.com/cb']
 		});
 		expect(updated.redirectUris).toEqual(['https://two.example.com/cb']);
@@ -128,7 +130,7 @@ describe('admin client service', () => {
 			tokenEndpointAuthMethod: 'client_secret_basic'
 		});
 		expect(secret).toBeTruthy();
-		const updated = await updateClient(view.clientId, {
+		const { view: updated } = await updateClient(view.clientId, {
 			tokenEndpointAuthMethod: 'none'
 		});
 		expect(updated.tokenEndpointAuthMethod).toBe('none');
@@ -142,7 +144,7 @@ describe('admin client service', () => {
 			redirectUris: ['https://four.example.com/cb'],
 			tokenEndpointAuthMethod: 'none'
 		});
-		const updated = await updateClient(view.clientId, {
+		const { view: updated } = await updateClient(view.clientId, {
 			tokenEndpointAuthMethod: 'client_secret_basic'
 		});
 		expect(updated.tokenEndpointAuthMethod).toBe('client_secret_basic');
@@ -218,12 +220,12 @@ describe('admin client service', () => {
 			});
 			expect(view.authorizationDetailsTypes ?? []).toEqual([]);
 
-			const updated = await updateClient(view.clientId, {
+			const { view: updated } = await updateClient(view.clientId, {
 				authorizationDetailsTypes: [PAYMENT]
 			});
 			expect(updated.authorizationDetailsTypes).toEqual([PAYMENT]);
 
-			const afterUnrelated = await updateClient(view.clientId, {
+			const { view: afterUnrelated } = await updateClient(view.clientId, {
 				clientName: 'Renamed'
 			});
 			expect(afterUnrelated.authorizationDetailsTypes).toEqual([PAYMENT]);

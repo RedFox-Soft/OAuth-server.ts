@@ -69,7 +69,7 @@ function gateAndExtend(body: DiscoveryDocument): DiscoveryDocument {
  * pure function of what it is handed, and the algorithms it advertises follow the key set every instance
  * reloads rather than the one this process booted with.
  */
-async function openidConfiguration(bucket?: BucketAddress) {
+export async function openidConfiguration(bucket?: BucketAddress) {
 	return gateAndExtend(
 		calculateDiscovery(
 			bucket,

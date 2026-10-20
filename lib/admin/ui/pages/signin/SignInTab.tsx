@@ -17,7 +17,7 @@ import { Link, useLeaveGuard } from '../../frame/router.js';
 import { bucketHref } from '../../frame/routes.js';
 import { request } from '../../frame/request.js';
 import { useFeedback } from '../../frame/feedback.js';
-import { useConfirm } from '../../frame/confirm.js';
+import { useSignInSave } from './useSignInSave.js';
 import type { BucketCan } from '../../frame/can.js';
 import { SaveBar } from '../../settings/SaveBar.js';
 import type { Change } from '../../settings/model.js';
@@ -62,23 +62,6 @@ interface SignInReadiness {
 	callerLinkedAt: string[];
 	reachableSuperAdministrators: number;
 	unlinkedAdministrators: { id: string; email: string }[];
-}
-
-/* The server's account of a change that can shut people out (specs/083 data-model §3). */
-interface Preview {
-	confirmationRequired: true;
-	consequences: string[];
-	expect: Record<string, number>;
-}
-
-function isPreview(body: unknown): body is Preview {
-	return (
-		typeof body === 'object' &&
-		body !== null &&
-		(body as { confirmationRequired?: unknown }).confirmationRequired ===
-			true &&
-		Array.isArray((body as { consequences?: unknown }).consequences)
-	);
 }
 
 function plural(n: number, one: string, many: string): string {
@@ -142,7 +125,6 @@ export function SignInTab({
 }) {
 	const base = `/admin/api/projects/${encodeURIComponent(bucket._id)}`;
 	const feedback = useFeedback();
-	const confirm = useConfirm();
 	const baseline = policyOf(bucket);
 	const [draft, setDraft] = useState<Policy>(baseline);
 	const [saving, setSaving] = useState(false);
@@ -200,51 +182,24 @@ export function SignInTab({
 		setDraft((d) => ({ ...d, [key]: value }));
 	}
 
-	/*
-	 * Sent without consent first. A change that can shut people out is answered with the server's own
-	 * account of it, asked as a danger question, and sent again carrying the counts that were shown — so
-	 * consent is always to the numbers the operator read, and a count that moved in between is asked again.
-	 */
-	async function save(consent?: Record<string, number>): Promise<void> {
-		const body: Record<string, unknown> = Object.fromEntries(
-			dirty.map((key) => [key, draft[key]])
-		);
-		if (consent) {
-			body.confirm = true;
-			body.expect = consent;
-		}
+	const send = useSignInSave(bucket._id, bucket.name);
+
+	async function save(): Promise<void> {
 		setSaving(true);
-		let preview: Preview | null = null;
 		try {
 			setAdvisory(null);
-			const result = await request<{ advisory?: string }>('PATCH', base, body);
-			if (result.ok) {
-				feedback.done(`Sign-in of ${bucket.name} saved.`);
-				if (result.data.advisory) setAdvisory(result.data.advisory);
+			const outcome = await send(
+				Object.fromEntries(dirty.map((key) => [key, draft[key]]))
+			);
+			if (outcome.kind === 'saved') {
+				if (outcome.advisory) setAdvisory(outcome.advisory);
 				onSaved();
-				return;
-			}
-			if (result.status === 409 && isPreview(result.error)) {
-				preview = result.error;
-			} else if (result.status >= 500 || result.error.error_reference) {
-				feedback.failed(result);
-			} else {
-				setRefusal(result.error.message);
+			} else if (outcome.kind === 'refused') {
+				setRefusal(outcome.message);
 			}
 		} finally {
 			setSaving(false);
 		}
-		if (!preview) return;
-		const agreed = await confirm('bucket.signIn.confirm', {
-			target: bucket.name,
-			consequences: consent
-				? [
-						'What this change affects has changed since you last looked.',
-						...preview.consequences
-					]
-				: preview.consequences
-		});
-		if (agreed) await save(preview.expect);
 	}
 
 	async function onVerifySelf() {

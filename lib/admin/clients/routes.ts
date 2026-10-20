@@ -23,6 +23,8 @@ import { recordAdminAudit } from '../audit/record.js';
 import { cascadeForClient } from '../../helpers/cascade.js';
 import nanoid from '../../helpers/nanoid.js';
 import { assertApplicationRoom } from '../../plans/enforce.js';
+import { connectionOf } from './connection.js';
+import { readClientUsage } from '../../models/client/usage.js';
 
 /*
  * A bucket's applications (specs/099). The bucket is the only container: an application belongs to one
@@ -69,6 +71,18 @@ function assertManaged(view: AdminClientView): void {
 	}
 }
 
+/* The view with what an application needs to be configured, read the way the console and an agent both get it. */
+async function connected(view: AdminClientView, bucket: UserBucket) {
+	return {
+		...view,
+		connection: await connectionOf(
+			view,
+			bucket,
+			await readClientUsage(view.clientId)
+		)
+	};
+}
+
 function scopeOf(bucket: UserBucket) {
 	return { bucketId: bucket._id, ownerGroupId: bucket.ownerGroupId };
 }
@@ -91,7 +105,12 @@ export const clientRoutes = new Elysia({ name: 'admin-clients' })
 		const views = [];
 		for (const record of stored) {
 			const view = await listClientView(String(record.clientId));
-			if (view) views.push(view);
+			if (view) {
+				views.push({
+					...view,
+					lastUsed: await readClientUsage(view.clientId)
+				});
+			}
 		}
 		return views;
 	})
@@ -109,7 +128,7 @@ export const clientRoutes = new Elysia({ name: 'admin-clients' })
 				clientId
 			});
 			set.status = 201;
-			return { ...view, secret };
+			return { ...(await connected(view, bucket)), secret };
 		},
 		{ body: CreateClientBody }
 	)
@@ -118,7 +137,7 @@ export const clientRoutes = new Elysia({ name: 'admin-clients' })
 		async ({ admin, params }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucket(ctx, params.id, 'read');
-			return clientOf(bucket, params.clientId);
+			return connected(await clientOf(bucket, params.clientId), bucket);
 		}
 	)
 	.patch(
@@ -131,7 +150,11 @@ export const clientRoutes = new Elysia({ name: 'admin-clients' })
 				...scopeOf(bucket),
 				attributes: Object.keys(body)
 			});
-			return updateClient(params.clientId, body);
+			const { view, secret } = await updateClient(params.clientId, body);
+			return {
+				...(await connected(view, bucket)),
+				...(secret ? { secret } : {})
+			};
 		},
 		{ body: UpdateClientBody }
 	)

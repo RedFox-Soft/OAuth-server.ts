@@ -89,7 +89,13 @@ import {
 	newProjectPlan,
 	refuseNamedSlug
 } from '../../plans/enforce.js';
-import { addressOf, hasOwnOrigin, issuerFor } from '../../configs/issuer.js';
+import { agentClients } from './agent_clients.js';
+import {
+	addressing,
+	addressOf,
+	hasOwnOrigin,
+	issuerFor
+} from '../../configs/issuer.js';
 import { callbackUri } from '../../federation/flow.js';
 import { mailDeliveryConfigured } from '../../mail/mailer.js';
 import { listClientView } from '../clients/service.js';
@@ -511,28 +517,6 @@ function sameCounts(
 	);
 }
 
-/* How a bucket is addressed, and the issuer and discovery addresses a client is configured with. */
-function addressing(bucket: Pick<UserBucket, '_id' | 'slug' | 'host'>): {
-	addressForm: ReturnType<typeof addressOf>['kind'];
-	issuer: string | null;
-	discoveryUrl: string | null;
-} {
-	const addressForm = addressOf(bucket).kind;
-	/*
-	 * Null rather than the id-derived identifier `issuerFor` falls back to: a bucket with no address of its
-	 * own is not routed at that path, so its "issuer" would answer 404 to the client given it.
-	 */
-	if (addressForm === 'unaddressed') {
-		return { addressForm, issuer: null, discoveryUrl: null };
-	}
-	const issuer = issuerFor(bucket);
-	return {
-		addressForm,
-		issuer,
-		discoveryUrl: `${issuer}/.well-known/openid-configuration`
-	};
-}
-
 /* Every application counts here, a self-registered one included: its integration breaks like any other. */
 async function dependentsOf(
 	bucket: Pick<UserBucket, '_id' | 'federation'>
@@ -773,7 +757,8 @@ async function bucketDetail(ctx: AdminContext, bucket: UserBucket) {
 		...addressing(bucket),
 		/* What a change to this bucket's sign-in reaches: its applications and the APIs they call. */
 		applications: applications.length,
-		apis: apis.length
+		apis: apis.length,
+		agentClients: agentClients()
 	};
 }
 

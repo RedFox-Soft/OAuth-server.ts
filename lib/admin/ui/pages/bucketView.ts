@@ -42,6 +42,11 @@ export interface BucketView extends Omit<
 	/* What it holds besides its people (specs/099). */
 	applications?: number;
 	apis?: number;
+	/* How agent hosts get a client identity here (spec 107). */
+	agentClients?: {
+		urlClientIds: boolean;
+		selfRegistration: 'open' | 'token' | 'off';
+	};
 	address?: {
 		host: string;
 		requestsArrived: boolean;

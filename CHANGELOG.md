@@ -21,6 +21,14 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   on account creation; where the project takes no sign-ups the user gets its sign-in page instead. Discovery now
   publishes `prompt_values_supported`. `GET /admin/signup` opens the console's registration the same way, and the
   site's sign-up links point at it.
+- **An application page, and creating an application from a situation.** New application asks what the app is (web
+  app with a server, single-page app, mobile/desktop/CLI, device, service, or an MCP server/API, which goes to the
+  APIs tab) and where it runs while you develop, then opens the application's own page. Its Connect tab holds the
+  client ID, the one-time secret inside a configuration block, the project's issuer and endpoints, the callback and
+  sign-out addresses, who can sign in (invite yourself or open sign-ups), the sign-in page, a copy for an AI agent,
+  and "last sign-in"; Settings replaces the edit window. The admin API returns the same `connection` values, so
+  agents get them too, plus `hasSecret`; a project states how agent hosts get in, and each declared API what it must
+  serve and check. Upgrade: `db:setup` provisions the new `ClientUsage` area (it runs on deploy).
 
 ### Security
 
@@ -34,6 +42,9 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- **Application secrets in the console.** An edit that gave an application a secret now shows it once (it was minted
+  and never returned); "Rotate secret" is offered only to an application that has a secret; the sign-out return URIs
+  the API always accepted can now be set in the console.
 - **Emails and authenticator apps named a project by its console-only name.** Verification, reset and invitation
   emails and the TOTP label now use the name shown to users, or the issuer's host when there is none — a console
   sign-up was asked to verify its address "for Administrators". The confirmation page offers a way into the console

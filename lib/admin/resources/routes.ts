@@ -28,6 +28,10 @@ import { CreateResourceBody, UpdateResourceBody } from './schema.js';
 import { namespaceOf, ROOT_NAMESPACE } from '../../resources/namespace.js';
 import { findDeclaredResource } from '../../resources/registry.js';
 import { checkVouching } from '../../resources/vouching.js';
+import {
+	resourceConnection,
+	type ResourceConnection
+} from '../../resources/connection.js';
 import { issuerFor } from '../../configs/issuer.js';
 import {
 	issuingBucket,
@@ -202,14 +206,31 @@ async function loadResource(bucket: UserBucket, resourceId: string) {
 	return resource;
 }
 
-/* A declaration as the edge names it (specs/100): the project it belongs to, where storage says bucket. */
-function resourceView({ bucketId, ...rest }: ProtectedResource): Omit<
-	ProtectedResource,
-	'bucketId'
-> & {
+/*
+ * The issuer the project's declared resources get their tokens from: the project's own when it has an address, the
+ * root's otherwise. `issuerFor` alone would answer `<ISSUER>/<id>` for a project with no address, which no metadata
+ * document could ever be asked to name.
+ */
+async function tokensIssuer(bucket: UserBucket): Promise<string> {
+	const namespace = namespaceOf(bucket);
+	return namespace === ROOT_NAMESPACE
+		? ISSUER
+		: issuerFor(await issuingBucket(namespace));
+}
+
+/* A declaration as the edge names it (specs/100), with what the API it declares must serve and check (spec 107). */
+function resourceView(
+	{ bucketId, ...rest }: ProtectedResource,
+	issuer: string
+): Omit<ProtectedResource, 'bucketId'> & {
 	projectId: string;
+	connection: ResourceConnection;
 } {
-	return { ...rest, projectId: bucketId };
+	return {
+		...rest,
+		projectId: bucketId,
+		connection: resourceConnection(rest, issuer)
+	};
 }
 
 function scopeOf(bucket: UserBucket, namespace: string) {
@@ -242,9 +263,10 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 		).sort((a, b) =>
 			a.identifier < b.identifier ? -1 : a.identifier > b.identifier ? 1 : 0
 		);
+		const issuer = await tokensIssuer(bucket);
 		return {
 			namespace: namespace === ROOT_NAMESPACE ? 'root' : 'project',
-			resources: resources.map(resourceView)
+			resources: resources.map((resource) => resourceView(resource, issuer))
 		};
 	})
 	.post(
@@ -298,7 +320,7 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 					trailingSlashSignificant: body.trailingSlashSignificant
 				});
 				set.status = 201;
-				return resourceView(resource);
+				return resourceView(resource, await tokensIssuer(bucket));
 			} catch (error) {
 				/*
 				 * The primary key refused it between the read above and this write. A conflict rather than a
@@ -321,7 +343,10 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 		async ({ admin, params }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForUsers(ctx, params.id);
-			return resourceView(await loadResource(bucket, params.resourceId));
+			return resourceView(
+				await loadResource(bucket, params.resourceId),
+				await tokensIssuer(bucket)
+			);
 		}
 	)
 	/*
@@ -338,12 +363,8 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 		async ({ admin, params }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForUsers(ctx, params.id);
-			const namespace = namespaceOf(bucket);
 			const resource = await loadResource(bucket, params.resourceId);
-			const expectedIssuer =
-				namespace === ROOT_NAMESPACE
-					? ISSUER
-					: issuerFor(await issuingBucket(namespace));
+			const expectedIssuer = await tokensIssuer(bucket);
 			return checkVouching(resource.identifier, expectedIssuer, {
 				trailingSlashSignificant: resource.trailingSlashSignificant
 			});
@@ -389,7 +410,7 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 					...(scopeDescriptions === undefined ? {} : { scopeDescriptions })
 				}
 			);
-			return updated && resourceView(updated);
+			return updated && resourceView(updated, await tokensIssuer(bucket));
 		},
 		{ body: UpdateResourceBody }
 	)

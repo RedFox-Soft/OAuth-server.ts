@@ -48,7 +48,7 @@ export const STORAGE_DIVERGENCES: readonly StorageDivergence[] = [
 			'asked to keep. Neither buys anything while the difference is unreachable.',
 		observable:
 			'nothing, and a guard keeps it that way: a reaped area receives a ttl on every upsert and ' +
-			'`Client`, the one area upserted without one, has no expiry index for a stale value to feed ' +
+			'the areas upserted without one (`Client`, `ClientLogo`, `ClientUsage`) have no expiry index for a stale value to feed ' +
 			'(test/storage_contract/ttl_pairing.spec.ts).'
 	},
 	{

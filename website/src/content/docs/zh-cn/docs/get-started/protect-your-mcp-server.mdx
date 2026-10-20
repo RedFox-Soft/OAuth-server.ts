@@ -1,7 +1,7 @@
 ---
 title: 用 OAuth 保护 MCP 服务器
 description: 十分钟内把你的 MCP 服务器变成 OAuth 2.1 受保护资源：在此声明、发布元数据、校验令牌，并验证两种结果。
-source: 731e84ac2a9b
+source: e5ca7e3c5168
 sidebar:
   order: 6
 ---
@@ -39,6 +39,8 @@ import { Steps, Aside } from '@astrojs/starlight/components';
    **Scopes it recognises**（它识别的 scope）——你的工具所区分的权限。先从一个开始，例如 `mcp:tools-basic`。
 
 3. 令牌设置保持不变即可。默认是自包含令牌，由你的 MCP 服务器依据本服务器公布的密钥进行验证，有效期为十五分钟。正因如此，下面的第 3 节「校验令牌」才不需要它自己的凭据。
+
+4. 在该 API 所在行点击 **Connect**。这里列出后面几节要用到的值，可以直接复制：签发者、它的令牌所带的确切受众、受保护资源元数据文档，以及 401 响应的质询头。
 
 </Steps>
 
@@ -126,7 +128,7 @@ export async function principalFor(authorization) {
 
 智能体宿主通常只知道一个 URL，也没有地方让你输入客户端标识符。当前规范给出的答案是 **Client ID Metadata Documents**（客户端 ID 元数据文档）：客户端的 `client_id` *本身就是*一个 HTTPS URL，指向一份描述该客户端的 JSON 文档；本服务器按需获取并校验该文档，完全不创建客户端记录。
 
-在 **Settings** 中开启它：[`clientIdMetadataDocument.enabled`](/docs/reference/settings/#clientIdMetadataDocument.enabled)。保存后立即生效。开启后，发现文档会公布 `client_id_metadata_document_supported`，客户端在尝试之前会检查这一项。
+项目的 **APIs** 标签页会显示智能体宿主能否用这种方式表明身份。在你自己的服务器上，由超级管理员在 **Settings** 中开启它：[`clientIdMetadataDocument.enabled`](/docs/reference/settings/#clientIdMetadataDocument.enabled)。保存后立即生效。开启后，发现文档会公布 `client_id_metadata_document_supported`，客户端在尝试之前会检查这一项。
 
 <Aside type="note" title="旧版宿主，以及各个接口面的要求">
 有些智能体宿主只支持**动态客户端注册**，当前规范将其标记为已弃用，但仍予保留。它可以正常工作：开启 [`registration.enabled`](/docs/reference/settings/#registration.enabled)，这类客户端就会自行注册，然后完全按上述方式访问你的资源。

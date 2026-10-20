@@ -78,6 +78,11 @@ export interface AdminClientView {
 	corsOrigins: string[];
 	/* Registered on its own request; such a client is shown, and managed through its registration token. */
 	registeredDynamically: boolean;
+	/*
+	 * Whether it holds a client secret, so a secret is offered for rotation only where one exists (spec 107). Read off
+	 * the record, not the auth method: `none` with a symmetric algorithm holds one, `private_key_jwt` does not.
+	 */
+	hasSecret: boolean;
 }
 
 /*
@@ -346,6 +351,7 @@ function toView(client: Client): AdminClientView {
 		projectId: client.bucketId,
 		corsOrigins: [...(client.corsOrigins ?? [])],
 		registeredDynamically: client.registeredDynamically === true,
+		hasSecret: Boolean(client.clientSecret),
 		...(primaryColor ? { primaryColor } : {}),
 		...keyAndRequestView(client)
 	};
@@ -435,7 +441,7 @@ export async function listClientView(
 export async function updateClient(
 	clientId: string,
 	patch: UpdateClientInput
-): Promise<AdminClientView> {
+): Promise<{ view: AdminClientView; secret?: string }> {
 	const existing = await Client.tryFind(clientId);
 	if (!existing) throw new AdminError(404, 'client not found');
 	const logo = checkedPresentation(patch);
@@ -482,9 +488,15 @@ export async function updateClient(
 	// leaves a stale clientSecret (so rotateSecret wrongly succeeds on what is now
 	// a public client), and a public -> confidential transition throws an unhandled
 	// InvalidClientMetadata (clientSecret is mandatory but never gets minted).
+	/*
+	 * A secret minted by this edit exists nowhere else, so it leaves with the answer, once, as a created client's
+	 * does (spec 107): returned only from here, never readable again.
+	 */
+	let minted: string | undefined;
 	if (needsSecret(metadata)) {
 		// keep the existing secret, or mint one if transitioning public -> confidential
-		metadata.clientSecret = existing.clientSecret ?? generateSecret();
+		if (!existing.clientSecret) minted = generateSecret();
+		metadata.clientSecret = existing.clientSecret ?? minted;
 		metadata.client_secret_expires_at = existing.clientSecret
 			? (existing.clientSecretExpiresAt ?? 0)
 			: 0;
@@ -495,7 +507,10 @@ export async function updateClient(
 	}
 	const client = await validateAndStore(metadata);
 	await storeLogo(clientId, logo);
-	return withLogo(toView(client));
+	return {
+		view: await withLogo(toView(client)),
+		...(minted ? { secret: minted } : {})
+	};
 }
 
 export async function rotateSecret(clientId: string): Promise<string> {

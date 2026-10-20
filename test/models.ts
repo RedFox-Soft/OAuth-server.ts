@@ -90,6 +90,7 @@ export class TestAdapter extends MemoryAdapter {
 			this.model !== 'InitialAccessToken' &&
 			this.model !== 'Client' &&
 			this.model !== 'ClientLogo' &&
+			this.model !== 'ClientUsage' &&
 			this.model !== 'Grant'
 		) {
 			expect(payload).toHaveProperty('exp');

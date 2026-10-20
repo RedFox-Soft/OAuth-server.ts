@@ -27,6 +27,10 @@ import {
 	type ConnectionTab
 } from './provisioning/ConnectionPage.js';
 import { UserGroupPage } from './groups/UserGroupPage.js';
+import {
+	ApplicationPage,
+	type ApplicationTab
+} from './applications/ApplicationPage.js';
 import { Groups } from './Groups.js';
 import { ScopeSwitcher } from './ScopeSwitcher.js';
 import { Buckets } from './Buckets.js';
@@ -81,6 +85,12 @@ const CONNECTION_TABS: Partial<Record<PageKey, ConnectionTab>> = {
 	'bucket.connection': 'overview',
 	'bucket.connection.setup': 'setup',
 	'bucket.connection.settings': 'settings'
+};
+
+/* One application (spec 107); the bare address is its Connect tab. */
+const APPLICATION_TABS: Partial<Record<PageKey, ApplicationTab>> = {
+	'bucket.application': 'connect',
+	'bucket.application.settings': 'settings'
 };
 
 /*
@@ -210,6 +220,17 @@ export function Layout() {
 					bucketId={route.params.project ?? ''}
 					userId={route.params.user ?? ''}
 					tab={userTab}
+				/>
+			);
+		}
+		const applicationTab = APPLICATION_TABS[route.key];
+		if (applicationTab) {
+			return (
+				<ApplicationPage
+					key={`${route.params.project ?? ''}/${route.params.client ?? ''}`}
+					bucketId={route.params.project ?? ''}
+					clientId={route.params.client ?? ''}
+					tab={applicationTab}
 				/>
 			);
 		}

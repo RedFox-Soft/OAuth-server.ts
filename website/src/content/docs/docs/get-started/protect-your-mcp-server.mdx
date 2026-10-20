@@ -59,6 +59,10 @@ cannot say which of those projects it belongs to.
    against this server's published keys, with a fifteen-minute lifetime. That is what lets section 3
    below, _Validate the token_, need no credentials of its own.
 
+4. Choose **Connect** on the API's row. It shows the values the next sections use, ready to copy: the
+   issuer, the exact audience its tokens carry, the protected resource metadata document and the
+   challenge line.
+
 </Steps>
 
 <Aside
@@ -170,7 +174,8 @@ current specification's answer is **Client ID Metadata Documents**: the client's
 HTTPS URL naming a JSON document that describes it, and this server fetches and validates that document
 on demand, and creates no client record at all.
 
-Turn it on in **Settings**:
+The project's **APIs** tab says whether agent hosts can identify themselves this way. On your own
+server, a super administrator turns it on in **Settings**:
 [`clientIdMetadataDocument.enabled`](/docs/reference/settings/#clientIdMetadataDocument.enabled).
 It is in force as soon as you save it. Once it is on, discovery advertises
 `client_id_metadata_document_supported`, which is what a client checks before trying.

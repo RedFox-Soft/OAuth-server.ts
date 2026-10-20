@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
 	Table,
 	Button,
@@ -25,6 +25,7 @@ import { useFeedback } from '../frame/feedback.js';
 import { useConfirm } from '../frame/confirm.js';
 import { AreaToolbar } from '../frame/AreaToolbar.js';
 import { RowActions } from '../frame/RowActions.js';
+import { useRoute } from '../frame/router.js';
 import { EmptyState, LoadFailed } from '../frame/states.js';
 import { atLimit, type PlanView } from '../planText.js';
 
@@ -64,6 +65,20 @@ interface ResourceView {
 	tokenFormat: 'jwt' | 'opaque';
 	accessTokenTTL: number;
 	trailingSlashSignificant: boolean;
+	/* What the API itself must serve and check, as the server states it (spec 107). */
+	connection?: {
+		issuer: string;
+		audience: string;
+		metadata: Record<string, unknown>;
+		metadataUrl: string | null;
+		challenge: string | null;
+	};
+}
+
+/* How agent hosts get a client identity here, from the project's own public configuration (spec 107). */
+export interface AgentClients {
+	urlClientIds: boolean;
+	selfRegistration: 'open' | 'token' | 'off';
 }
 
 // Form.useWatch is typed as the field's value, but it answers undefined until the field registers.
@@ -209,7 +224,7 @@ function VouchingCell({ url }: { url: string }) {
 	const detail =
 		vouching.status === 'vouched'
 			? `Found through ${STEP_LABEL[vouching.step ?? 'path_inserted']}.`
-			: `${REASON_LABEL[vouching.reason ?? ''] ?? 'not vouched'}. It must list ${vouching.expectedIssuer} in authorization_servers.`;
+			: `${REASON_LABEL[vouching.reason ?? ''] ?? 'Metadata not found'}. It must list ${vouching.expectedIssuer} in authorization_servers.`;
 	const color =
 		vouching.status === 'vouched'
 			? 'green'
@@ -218,14 +233,87 @@ function VouchingCell({ url }: { url: string }) {
 				: 'orange';
 	const label =
 		vouching.status === 'vouched'
-			? 'vouched'
+			? 'found'
 			: vouching.status === 'not_checked'
 				? 'not checked'
-				: 'not vouched';
+				: 'not found';
 	return (
 		<Tooltip title={detail}>
 			<Tag color={color}>{label}</Tag>
 		</Tooltip>
+	);
+}
+
+/*
+ * What a developer protecting this API must serve and check (spec 107): the values this server's tokens for it carry,
+ * the metadata document an agent host looks for, and the challenge that sends it there — each to copy as it is.
+ */
+function ResourceConnectionDetails({
+	connection
+}: {
+	connection: NonNullable<ResourceView['connection']>;
+}) {
+	const copyable = (value: string) => (
+		<Typography.Text
+			code
+			copyable={{ text: value }}
+		>
+			{value}
+		</Typography.Text>
+	);
+	return (
+		<Space
+			orientation="vertical"
+			size={12}
+			style={{ width: '100%' }}
+		>
+			<div>
+				<Typography.Text strong>Issuer</Typography.Text>
+				<div>{copyable(connection.issuer)}</div>
+			</div>
+			<div>
+				<Typography.Text strong>Audience (aud) of its tokens</Typography.Text>
+				<div>{copyable(connection.audience)}</div>
+			</div>
+			{connection.metadataUrl && (
+				<div>
+					<Typography.Text strong>
+						Serve this protected resource metadata at
+					</Typography.Text>
+					<div>{copyable(connection.metadataUrl)}</div>
+					<Typography.Paragraph
+						copyable={{ text: JSON.stringify(connection.metadata, null, 2) }}
+					>
+						<pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
+							{JSON.stringify(connection.metadata, null, 2)}
+						</pre>
+					</Typography.Paragraph>
+				</div>
+			)}
+			{connection.challenge && (
+				<div>
+					<Typography.Text strong>
+						Answer a request without a valid token with 401 and
+					</Typography.Text>
+					<div>{copyable(`WWW-Authenticate: ${connection.challenge}`)}</div>
+				</div>
+			)}
+			<div>
+				<Typography.Text strong>
+					On every request, your server checks
+				</Typography.Text>
+				<ul style={{ margin: '4px 0 0', paddingInlineStart: 20 }}>
+					<li>the token's aud is exactly {connection.audience};</li>
+					<li>its iss is {connection.issuer};</li>
+					<li>
+						its signature verifies against the keys published at{' '}
+						{connection.issuer}/jwks;
+					</li>
+					<li>it is an access token (typ at+jwt), and it has not expired;</li>
+					<li>it is never passed on to another service.</li>
+				</ul>
+			</div>
+		</Space>
 	);
 }
 
@@ -255,12 +343,14 @@ export function Resources({
 	canEdit,
 	superAdmin,
 	plan,
+	agentClients,
 	onChanged
 }: {
 	bucketId: string;
 	bucketName: string;
 	canEdit: boolean;
 	superAdmin: boolean;
+	agentClients?: AgentClients;
 	/* The plan the caller is held to (specs/102); null when nothing limits them. */
 	plan?: PlanView | null;
 	/* An API was declared or removed: the project's counts, and so its plan's use, changed. */
@@ -280,6 +370,10 @@ export function Resources({
 	const [form] = Form.useForm<FormValues>();
 	const feedback = useFeedback();
 	const confirm = useConfirm();
+	const [connecting, setConnecting] = useState<ResourceView | null>(null);
+	/* "My MCP server or API" in New application lands here with ?declare=1 (spec 107): open the form once, if allowed. */
+	const declareRequested = useRoute().query.get('declare') === '1';
+	const declareOffered = useRef(false);
 
 	const scopesValue = useWatched(form, 'scopes') ?? '';
 	const ttlValue = useWatched(form, 'accessTokenTTL') ?? 900;
@@ -297,12 +391,22 @@ export function Resources({
 					setNamespace(result.data.namespace);
 					setRows(result.data.resources);
 					setLoadFailed(null);
+					const mayDeclare =
+						canEdit && (result.data.namespace === 'project' || superAdmin);
+					if (declareRequested && mayDeclare && !declareOffered.current) {
+						declareOffered.current = true;
+						setMode('create');
+						setEditing(null);
+						form.resetFields();
+						form.setFieldsValue(DEFAULT_VALUES);
+						setOpen(true);
+					}
 				} else {
 					setLoadFailed(result.error.message);
 				}
 				setLoading(false);
 			}),
-		[base]
+		[base, canEdit, superAdmin, declareRequested, form]
 	);
 	function load() {
 		setLoading(true);
@@ -455,13 +559,19 @@ export function Resources({
 			 * without claiming to know the current value — which is honest, and is the same thing the
 			 * guide says.
 			 */}
-			<Alert
-				type="info"
-				showIcon
-				style={{ marginBottom: 16 }}
-				title="A declared resource is half of the setup"
-				description="Declaring the resource is what makes this server mint tokens for it. For an agent host to obtain one it also needs a client identity: either clientIdMetadataDocument.enabled, so a client_id that is an HTTPS URL is accepted, or registration.enabled for an older host that registers itself. Both are instance settings and both are off by default."
-			/>
+			{agentClients && (
+				<Alert
+					type={
+						agentClients.urlClientIds || agentClients.selfRegistration !== 'off'
+							? 'info'
+							: 'warning'
+					}
+					showIcon
+					style={{ marginBottom: 16 }}
+					title="How agent hosts get in"
+					description={`Agent hosts that identify by a URL (Client ID Metadata Document): ${agentClients.urlClientIds ? 'accepted' : 'not accepted'}. Self-registration: ${agentClients.selfRegistration === 'open' ? 'open' : agentClients.selfRegistration === 'token' ? 'with an initial access token' : 'off'}. ${agentClients.urlClientIds || agentClients.selfRegistration !== 'off' ? 'Claude, Cursor and VS Code can connect to the APIs declared here.' : 'An agent host cannot get a client identity here; only applications created in this project can obtain tokens.'}`}
+				/>
+			)}
 
 			<Typography.Paragraph type="secondary">
 				{namespaceLine(bucketName, namespace)}
@@ -571,6 +681,19 @@ export function Resources({
 								</Space>
 							)
 						},
+						{
+							title: '',
+							key: 'connect',
+							render: (_: unknown, row: ResourceView) =>
+								row.connection ? (
+									<Button
+										size="small"
+										onClick={() => setConnecting(row)}
+									>
+										Connect
+									</Button>
+								) : null
+						},
 						...(writable
 							? [
 									{
@@ -601,6 +724,19 @@ export function Resources({
 					]}
 				/>
 			)}
+
+			<Modal
+				open={connecting !== null}
+				title={connecting ? `Connect ${connecting.name}` : 'Connect'}
+				onCancel={() => setConnecting(null)}
+				footer={null}
+				width={720}
+				destroyOnHidden
+			>
+				{connecting?.connection && (
+					<ResourceConnectionDetails connection={connecting.connection} />
+				)}
+			</Modal>
 
 			<Modal
 				open={open}

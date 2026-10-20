@@ -251,7 +251,7 @@ describe('editing a client through the console', () => {
 			jwks_uri: `${RP}/jwks`
 		});
 
-		const view = await updateClient('edit-private-key', {
+		const { view } = await updateClient('edit-private-key', {
 			redirectUris: [`${RP}/two`]
 		});
 

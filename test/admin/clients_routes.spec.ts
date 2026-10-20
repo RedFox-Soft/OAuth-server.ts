@@ -23,6 +23,9 @@ import {
 	DEFAULT_BUCKET_ID
 } from 'lib/admin/consts.ts';
 import { createAdministrator, type AdminKind } from '../administrators.ts';
+import { elysia } from 'lib/index.ts';
+import type { Connection } from 'lib/admin/clients/connection.ts';
+import { present } from 'test/shape.js';
 
 const app = new Elysia().use(resolveAdmin).use(clientRoutes).use(auditRoutes);
 const client = treaty(app);
@@ -122,6 +125,114 @@ describe("a bucket's applications", () => {
 		await ensureAdminSeed();
 	});
 
+	describe('what an application needs to be configured', () => {
+		it("names the project's issuer, discovery address and the endpoints that address serves", async () => {
+			const { cookie } = await sessionCookieFor('super');
+			const bucket = await makeBucket();
+			const id = await createPublic(bucket, cookie);
+
+			const read = await applications(bucket)({ clientId: id }).get({
+				headers: { cookie }
+			});
+			const { connection } = answered(read.data) as unknown as {
+				connection: Connection;
+			};
+
+			const served = (await (
+				await elysia.handle(
+					new Request(present(connection.discoveryUrl, 'discoveryUrl'))
+				)
+			).json()) as Record<string, unknown>;
+			expect(connection.issuer).toBe(served.issuer as string);
+			expect(connection.endpoints.authorization_endpoint).toBe(
+				served.authorization_endpoint as string
+			);
+			expect(connection.endpoints.token_endpoint).toBe(
+				served.token_endpoint as string
+			);
+			expect(connection.endpoints.jwks_uri).toBe(served.jwks_uri as string);
+			expect(connection.clientId).toBe(id);
+			expect(connection.redirectUris).toEqual(['https://spa.example.com/cb']);
+			// The project's own account page: its real sign-in page, with no authorization run for this application.
+			expect(connection.signInPageUrl).toBe(
+				`${present(connection.issuer, 'issuer')}/account/apps`
+			);
+		});
+
+		it('gives no issuer, endpoints or sign-in page for a project without an address of its own', async () => {
+			const { cookie } = await sessionCookieFor('super');
+			const bucket = await getBucketStore().create({
+				name: `unaddressed ${nanoid()}`,
+				ownerGroupId: UNASSIGNED_GROUP_ID
+			});
+			const id = await createPublic(bucket, cookie);
+
+			const read = await applications(bucket)({ clientId: id }).get({
+				headers: { cookie }
+			});
+			const { connection } = answered(read.data) as unknown as {
+				connection: Connection;
+			};
+			expect(connection.issuer).toBeNull();
+			expect(connection.discoveryUrl).toBeNull();
+			expect(connection.endpoints).toEqual({});
+			expect(connection.signInPageUrl).toBeNull();
+		});
+	});
+
+	describe('whether an application holds a secret', () => {
+		it('reports no secret for a public application', async () => {
+			const { cookie } = await sessionCookieFor('super');
+			const bucket = await makeBucket();
+			const id = await createPublic(bucket, cookie);
+			const read = await applications(bucket)({ clientId: id }).get({
+				headers: { cookie }
+			});
+			expect(answered(read.data).hasSecret).toBe(false);
+		});
+
+		it('reports a secret for a confidential application', async () => {
+			const { cookie } = await sessionCookieFor('super');
+			const bucket = await makeBucket();
+			const created = await createConfidential(bucket, cookie);
+			const read = await applications(bucket)({
+				clientId: created.clientId
+			}).get({ headers: { cookie } });
+			expect(answered(read.data).hasSecret).toBe(true);
+		});
+
+		it('returns the secret an edit gives an application, once', async () => {
+			const { cookie } = await sessionCookieFor('super');
+			const bucket = await makeBucket();
+			const id = await createPublic(bucket, cookie);
+			const patched = await applications(bucket)({ clientId: id }).patch(
+				{ tokenEndpointAuthMethod: 'client_secret_basic' },
+				{ headers: { cookie } }
+			);
+			expect(patched.status).toBe(200);
+			const minted = (patched.data as unknown as { secret?: string }).secret;
+			expect(minted).toBeString();
+			expect(answered(patched.data).hasSecret).toBe(true);
+
+			const read = await applications(bucket)({ clientId: id }).get({
+				headers: { cookie }
+			});
+			expect(answered(read.data)).not.toHaveProperty('secret');
+			expect(JSON.stringify(read.data)).not.toContain(String(minted));
+		});
+
+		it('returns no secret from an edit that leaves the secret as it was', async () => {
+			const { cookie } = await sessionCookieFor('super');
+			const bucket = await makeBucket();
+			const created = await createConfidential(bucket, cookie);
+			const patched = await applications(bucket)({
+				clientId: created.clientId
+			}).patch({ clientName: 'Renamed' }, { headers: { cookie } });
+			expect(patched.status).toBe(200);
+			expect(patched.data).not.toHaveProperty('secret');
+		});
+	});
+
 	it('refuses an anonymous caller', async () => {
 		const bucket = await makeBucket();
 		const res = await applications(bucket).get();
@@ -160,6 +271,9 @@ describe("a bucket's applications", () => {
 		const view = answered(one.data);
 		expect(view).not.toHaveProperty('secret');
 		expect(view).not.toHaveProperty('clientSecret');
+		// The connection values are what a developer reads back later; the secret is never among them.
+		expect(view).toHaveProperty('connection');
+		expect(JSON.stringify(view)).not.toContain(String(body.secret));
 	});
 
 	it('maps invalid client metadata to 422', async () => {

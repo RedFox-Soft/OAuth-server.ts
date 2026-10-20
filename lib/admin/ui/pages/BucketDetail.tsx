@@ -322,6 +322,7 @@ export function BucketDetail({
 					canEdit={can.edit && !bucket.deletion}
 					superAdmin={me?.superAdmin === true}
 					plan={heldTo}
+					agentClients={bucket.agentClients}
 					onChanged={() => void load()}
 				/>
 			)}

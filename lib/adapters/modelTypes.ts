@@ -4,6 +4,7 @@ import type { AuthorizationCodePayloadType } from '../models/authorization_code.
 import type { BackchannelAuthenticationRequestPayloadType } from '../models/backchannel_authentication_request.js';
 import type { ClientCredentialsPayload } from '../models/client_credentials.js';
 import type { ClientLogoPayload } from '../models/client/logo.js';
+import type { ClientUsagePayload } from '../models/client/usage.js';
 import type { StoredClient } from '../models/client/types.js';
 import type { DeviceCodePayloadType } from '../models/device_code.js';
 import type { FederationStatePayload } from '../federation/types.js';
@@ -54,6 +55,7 @@ export interface ModelPayloadByName {
 	Client: StoredClient;
 	ClientCredentials: ClientCredentialsPayload;
 	ClientLogo: ClientLogoPayload;
+	ClientUsage: ClientUsagePayload;
 	DeviceCode: DeviceCodePayloadType;
 	FederationState: FederationStatePayload;
 	Grant: GrantPayloadType;

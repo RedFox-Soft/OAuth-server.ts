@@ -23,6 +23,8 @@ export type PageKey =
 	| 'buckets'
 	| 'bucket.overview'
 	| 'bucket.applications'
+	| 'bucket.application'
+	| 'bucket.application.settings'
 	| 'bucket.apis'
 	| 'bucket.users'
 	| 'bucket.user'
@@ -87,6 +89,22 @@ export const ROUTES: readonly RouteSpec[] = [
 	{
 		key: 'bucket.applications',
 		pattern: ['projects', ':project', 'applications'],
+		section: 'projects',
+		area: 'Applications'
+	},
+	/*
+	 * One application (spec 107): the bare address is its Connect tab, the place a developer comes back to for its
+	 * values; Settings holds everything else about it.
+	 */
+	{
+		key: 'bucket.application',
+		pattern: ['projects', ':project', 'applications', ':client'],
+		section: 'projects',
+		area: 'Applications'
+	},
+	{
+		key: 'bucket.application.settings',
+		pattern: ['projects', ':project', 'applications', ':client', 'settings'],
 		section: 'projects',
 		area: 'Applications'
 	},
@@ -515,6 +533,16 @@ export function providerHref(bucketId: string, providerId: string): string {
 			? '/admin/administrators/identity-providers'
 			: bucketHref(bucketId, 'identity-providers');
 	return `${base}/${encodeURIComponent(providerId)}`;
+}
+
+/* An application's page; without a tab, its Connect tab. */
+export function applicationHref(
+	bucketId: string,
+	clientId: string,
+	tab?: 'settings'
+): string {
+	const base = `${bucketHref(bucketId, 'applications')}/${encodeURIComponent(clientId)}`;
+	return tab ? `${base}/${tab}` : base;
 }
 
 /* A provisioning connection; without an area, its Overview. */

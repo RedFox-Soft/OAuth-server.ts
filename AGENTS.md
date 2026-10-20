@@ -155,8 +155,9 @@ Each rule is the part that is easy to break. Read the named page before changing
   in `lib/models/client.ts`, read key material through `clientKeys(client)`, write only through
   `registerClient`, and in a test change the stored record (`changeClient`), never the object. A client
   belongs to the bucket in its server-only `bucketId` for life, and carries its own `corsOrigins`; neither
-  is ever recognised metadata. → `client-identity-from-database.md`,
-  `client-registration-attributes.md`, `mcp-server-authorization.md`
+  is ever recognised metadata. In the console an application is edited only on its own page, and a
+  "situation" is a console preset, never an API field. → `client-identity-from-database.md`,
+  `client-registration-attributes.md`, `mcp-server-authorization.md`, `application-page.md`
 - **Names at the edge** — what a person or an agent reads says project, team and group; code and storage say
   bucket, administrator group and bucket group. Rename only at the edge (paths, fields, tool names, words),
   through explicit projections — never a generic key rewriter, since customer data passes through the same

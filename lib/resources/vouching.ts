@@ -50,7 +50,7 @@ export interface VouchingStatus {
 }
 
 /* RFC 9728 §3.1: the well-known segment goes between the host and the resource's path. */
-function pathInserted(identifier: URL): string {
+export function pathInserted(identifier: URL): string {
 	const path = identifier.pathname === '/' ? '' : identifier.pathname;
 	return `${identifier.origin}/.well-known/oauth-protected-resource${path}`;
 }

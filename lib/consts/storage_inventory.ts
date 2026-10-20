@@ -105,6 +105,7 @@ export const MODEL_AREAS = [
 	'Client',
 	'ClientCredentials',
 	'ClientLogo',
+	'ClientUsage',
 	'DeprovisionSlot',
 	'DeviceCode',
 	'FederationState',
@@ -358,6 +359,11 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 	 * sweeps it.
 	 */
 	modelArea('ClientLogo', null, byClient),
+	/*
+	 * When an application first and last received a token (spec 107), one record per operator-created client. Never
+	 * reaped: "last used" is meaningful however long ago it was. Client-owned, so deleting the client sweeps it.
+	 */
+	modelArea('ClientUsage', null, byClient),
 	modelArea('DeviceCode', EXPIRES_AT, byAccountAndClient, [
 		grantId,
 		{ key: { 'payload.userCode': 1 }, unique: true }
