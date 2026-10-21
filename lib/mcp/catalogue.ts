@@ -72,6 +72,10 @@ import {
 	IssueCredentialBody,
 	UpdateConnectionBody
 } from '../admin/provisioning/schema.js';
+import {
+	CreateOutsideServerBody,
+	UpdateOutsideServerBody
+} from '../admin/outside-servers/schema.js';
 
 /*
  * THE published surface of the administrative MCP control plane: one entry per tool, mapped to the one
@@ -548,6 +552,32 @@ const catalogue = [
 		pathParams: ['id', 'connectionId'],
 		summary:
 			'One SCIM provisioning connection: everything a directory administrator needs to configure it, which credentials it holds, which kinds of credential this instance would issue it now (`availableCredentialKinds`), and how many users and groups it manages. Never returns a secret or a static token.'
+	},
+	{
+		tool: 'outside_authorization_server_list',
+		method: 'GET',
+		path: '/admin/api/projects/:id/outside-authorization-servers',
+		action: null,
+		consequence: 'read',
+		superAdminOnly: false,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			"The outside authorization servers a project vouches for its people to with ID-JAGs (MCP enterprise-managed authorization): each server's issuer, which of the project's applications may ask and their client ids there, who may get which MCP servers and scopes, and when it was last used."
+	},
+	{
+		tool: 'outside_authorization_server_get',
+		method: 'GET',
+		path: '/admin/api/projects/:id/outside-authorization-servers/:serverId',
+		action: null,
+		consequence: 'read',
+		superAdminOnly: false,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id', 'serverId'],
+		summary:
+			'One outside authorization server connection of a project. A group a rule names that has since been deleted is shown with a null name and matches nobody.'
 	},
 	{
 		tool: 'provisioning_hold_get',
@@ -1431,6 +1461,8 @@ const catalogue = [
 		// The body carries the provider's own `id`, so the project needs a different argument name.
 		pathArgs: { id: 'projectId' },
 		highWhen: onConsoleBucket,
+		/* Trusting a provider's assertions lets it mint tokens for the project's people (specs/108). */
+		highWhenSets: ['acceptsIdentityAssertions', 'plainAssertions'],
 		summary:
 			'Configure an upstream identity provider on a project. Available whether or not federation is switched on, so a provider can be prepared first. On the Administrators project (`admin`) this decides who can sign in to the console: only a super administrator may, and each such change must be confirmed.'
 	},
@@ -1445,6 +1477,8 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'providerId'],
 		highWhen: onConsoleBucket,
+		/* Trusting a provider's assertions lets it mint tokens for the project's people (specs/108). */
+		highWhenSets: ['acceptsIdentityAssertions', 'plainAssertions'],
 		summary:
 			"Change an upstream provider's configuration, or enable/disable it. On the Administrators project (`admin`) this decides who can sign in to the console: only a super administrator may, and each such change must be confirmed."
 	},
@@ -1547,6 +1581,48 @@ const catalogue = [
 		pathParams: ['id', 'connectionId'],
 		summary:
 			'Delete a SCIM provisioning connection and revoke every token it obtained. Refused while it still manages any user — disable it instead.'
+	},
+	{
+		tool: 'outside_authorization_server_create',
+		method: 'POST',
+		path: '/admin/api/projects/:id/outside-authorization-servers',
+		action: 'outside.server.create',
+		/* High: the project then vouches for its people to that server, which mints tokens on their behalf. */
+		consequence: 'high',
+		superAdminOnly: false,
+		bodySchema: CreateOutsideServerBody,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			"Connect an outside authorization server (an MCP server's) to a project, so the applications you allow can exchange a person's ID token or refresh token for an ID-JAG that server honours without a browser or a consent screen. Say which confidential applications may ask (with their client id at that server unless their own id is a URL) and, per rule, who — everyone or members of named project groups — may get which MCP servers and scopes there. Needs token exchange switched on to be used."
+	},
+	{
+		tool: 'outside_authorization_server_update',
+		method: 'PATCH',
+		path: '/admin/api/projects/:id/outside-authorization-servers/:serverId',
+		action: 'outside.server.update',
+		/* High: it changes whom the project vouches for, and for what. */
+		consequence: 'high',
+		superAdminOnly: false,
+		bodySchema: UpdateOutsideServerBody,
+		querySchema: null,
+		pathParams: ['id', 'serverId'],
+		summary:
+			'Change which applications may ask, the rules of who may get what, the sign-in application or whether a verified email is included. The issuer cannot be changed: connect the other server instead.'
+	},
+	{
+		tool: 'outside_authorization_server_delete',
+		method: 'DELETE',
+		path: '/admin/api/projects/:id/outside-authorization-servers/:serverId',
+		action: 'outside.server.delete',
+		/* High: agents relying on it stop reaching that MCP server at once. */
+		consequence: 'high',
+		superAdminOnly: false,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id', 'serverId'],
+		summary:
+			'Disconnect an outside authorization server: the project stops vouching for its people there at once. ID-JAGs already issued live out their few minutes.'
 	},
 	{
 		tool: 'provisioning_credential_issue',

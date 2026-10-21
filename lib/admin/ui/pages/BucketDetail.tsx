@@ -23,6 +23,7 @@ import { BucketGroupsPanel } from './BucketGroupsPanel.js';
 import { BucketUsersPanel } from './BucketUsersPanel.js';
 import { ScheduledBanner } from './ScheduledBanner.js';
 import { SignInTab, signInKey } from './signin/SignInTab.js';
+import { OutsideServersPanel } from './OutsideServersPanel.js';
 
 /*
  * Said once, above an area the caller may look at but not change, instead of a page of controls that
@@ -52,6 +53,7 @@ export type BucketTab =
 	| 'signIn'
 	| 'providers'
 	| 'provisioning'
+	| 'outsideServers'
 	| 'keys'
 	| 'activity'
 	| 'settings';
@@ -69,6 +71,11 @@ const TABS: { key: BucketTab; segment?: string; label: string }[] = [
 		label: 'Identity providers'
 	},
 	{ key: 'provisioning', segment: 'provisioning', label: 'Provisioning' },
+	{
+		key: 'outsideServers',
+		segment: 'outside-servers',
+		label: 'Outside servers'
+	},
 	{ key: 'keys', segment: 'keys', label: 'Signing keys' },
 	{ key: 'activity', segment: 'activity', label: 'Activity' },
 	{ key: 'settings', segment: 'settings', label: 'Settings' }
@@ -83,7 +90,9 @@ function tabAllowed(key: BucketTab, can: BucketCan): boolean {
 	 * Read with the bucket's people (`loadBucketForUsers`): closed on the administrators' bucket to everyone,
 	 * whose own clients are part of how the server runs and are never managed here.
 	 */
-	if (key === 'applications' || key === 'apis') return can.manageUsers;
+	if (key === 'applications' || key === 'apis' || key === 'outsideServers') {
+		return can.manageUsers;
+	}
 	if (key === 'keys') return can.edit;
 	if (key === 'activity') return can.readActivity;
 	return true;
@@ -313,6 +322,13 @@ export function BucketDetail({
 					writable={can.edit && !bucket.deletion}
 					plan={heldTo}
 					onChanged={() => void load()}
+				/>
+			)}
+			{bucket && !tabRefused && shownTab === 'outsideServers' && (
+				<OutsideServersPanel
+					bucketId={bucketId}
+					canEdit={can.edit && !bucket.deletion}
+					exchangeOn={bucket.assertionGrants?.tokenExchange === true}
 				/>
 			)}
 			{bucket && !tabRefused && shownTab === 'apis' && (

@@ -59,7 +59,7 @@ export function ClientFormFields({
 							return refused
 								? Promise.reject(
 										new Error(
-											`${refused} needs a client that authenticates — choose a token endpoint auth method other than none.`
+											`${GRANT_OPTIONS.find((option) => option.value === refused)?.label ?? refused} needs a client that authenticates — choose a token endpoint auth method other than none.`
 										)
 									)
 								: Promise.resolve();

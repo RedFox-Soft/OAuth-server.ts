@@ -292,7 +292,14 @@ export const ATTRIBUTES: Readonly<Record<string, AttributeRules>> = {
 		default: [],
 		requires: ['richAuthorizationRequests.enabled'],
 		values: (c) => c.authorizationDetailsTypes
-	}
+	},
+
+	/*
+	 * The authorization grant profiles a client implements (ID-JAG §8). Recognised whatever the grant flags
+	 * say: it describes the client, it grants nothing, and a profile the instance does not run is simply
+	 * never exercised. Which grant types a declared profile requires is a cross-field rule.
+	 */
+	authorization_grant_profiles_supported: { string: true, array: true }
 };
 
 /*

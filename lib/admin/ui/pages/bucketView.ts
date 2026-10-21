@@ -49,6 +49,8 @@ export interface BucketView extends Omit<
 		urlClientIds: boolean;
 		selfRegistration: 'open' | 'token' | 'off';
 	};
+	/* Whether this instance runs token exchange and the JWT bearer grant (specs/108). */
+	assertionGrants?: { tokenExchange: boolean; jwtBearer: boolean };
 	address?: {
 		host: string;
 		requestsArrived: boolean;

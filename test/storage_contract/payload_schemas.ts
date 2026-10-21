@@ -15,6 +15,7 @@
 import '../test_helper.js';
 
 import { AccessTokenPayload } from 'lib/models/access_token.js';
+import { AssertionUsagePayload } from 'lib/assertions/usage.js';
 import { AuthorizationCodePayload } from 'lib/models/authorization_code.js';
 import { BackchannelAuthenticationRequestPayload } from 'lib/models/backchannel_authentication_request.js';
 import { ClientCredentialsPayload } from 'lib/models/client_credentials.js';
@@ -52,6 +53,7 @@ export const PAYLOAD_SCHEMAS: Readonly<
 	Partial<Record<string, ReadableSchema>>
 > = {
 	AccessToken: AccessTokenPayload,
+	AssertionUsage: AssertionUsagePayload,
 	AuthorizationCode: AuthorizationCodePayload,
 	BackchannelAuthenticationRequest: BackchannelAuthenticationRequestPayload,
 	ClientCredentials: ClientCredentialsPayload,

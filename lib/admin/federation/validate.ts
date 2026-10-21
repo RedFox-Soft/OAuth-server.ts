@@ -146,6 +146,46 @@ export function assertCanAcceptUpstreamSignals(
 }
 
 /*
+ * A provider may be trusted to vouch for people with assertions (specs/108) only if its signature can be
+ * checked — it publishes keys — and only if no other provider of the bucket with the same issuer is trusted
+ * too: an assertion names its issuer, never a provider, so two would leave which link it means a guess.
+ */
+export function assertAssertionTrust(
+	provider: Pick<
+		FederationProvider,
+		'issuer' | 'acceptsIdentityAssertions' | 'plainAssertions'
+	>,
+	others: readonly FederationProvider[],
+	protocol: 'oidc' | 'profile_api'
+): void {
+	const trusted = (
+		candidate: Pick<
+			FederationProvider,
+			'acceptsIdentityAssertions' | 'plainAssertions'
+		>
+	) =>
+		candidate.acceptsIdentityAssertions === true ||
+		candidate.plainAssertions !== undefined;
+	if (!trusted(provider)) return;
+	if (protocol !== 'oidc') {
+		throw new AdminError(
+			422,
+			'this provider publishes no signing keys, so its assertions cannot be trusted',
+			{ field: 'acceptsIdentityAssertions' }
+		);
+	}
+	if (
+		others.some((other) => other.issuer === provider.issuer && trusted(other))
+	) {
+		throw new AdminError(
+			409,
+			'another provider of this project with the same issuer is already trusted for assertions',
+			{ field: 'acceptsIdentityAssertions' }
+		);
+	}
+}
+
+/*
  * Every value the named provider asks for is present, and none it does not ask for was sent.
  *
  * Driven entirely by the entry's own `requiredValues`, so this function knows about no provider in

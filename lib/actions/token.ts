@@ -7,7 +7,9 @@ import {
 	deviceCodeGrantParameters,
 	executeGrant,
 	hasGrant,
-	refreshTokenGrantParameters
+	jwtBearerGrantParameters,
+	refreshTokenGrantParameters,
+	tokenExchangeGrantParameters
 } from './grants/index.js';
 import { refusedParam, routeNames } from 'lib/consts/param_list.js';
 import {
@@ -45,6 +47,8 @@ const TokenRequestBody = t.Object({
 	...t.Partial(refreshTokenGrantParameters).properties,
 	...t.Partial(deviceCodeGrantParameters).properties,
 	...t.Partial(cibaGrantParameters).properties,
+	...t.Partial(jwtBearerGrantParameters).properties,
+	...t.Partial(tokenExchangeGrantParameters).properties,
 	/*
 	 * RFC 9396 §7 defines authorization_details here as a way for a client to *narrow* the grant it
 	 * is exchanging. This server does not implement that, and ignoring it would hand back a token

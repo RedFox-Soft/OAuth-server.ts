@@ -100,6 +100,7 @@ export interface StorageArea {
  */
 export const MODEL_AREAS = [
 	'AccessToken',
+	'AssertionUsage',
 	'AuthorizationCode',
 	'BackchannelAuthenticationRequest',
 	'Client',
@@ -158,6 +159,11 @@ export const STORE_AREAS = {
 	 * a release can show whom it lets the directory remove (specs/084 R2).
 	 */
 	provisioningRefusals: 'provisioningRefusals',
+	/*
+	 * The outside authorization servers a project vouches for its people to with ID-JAGs (specs/108). The `_id`
+	 * is derived from the project and the issuer, so one connection per issuer per project is the primary key.
+	 */
+	outsideAuthorizationServers: 'outsideAuthorizationServers',
 	/*
 	 * A bucket's groups of end users — what its roles became. Distinct from `groups`, which hold administrators
 	 * and own buckets; the two are never the same record.
@@ -364,6 +370,20 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 	 * reaped: "last used" is meaningful however long ago it was. Client-owned, so deleting the client sweeps it.
 	 */
 	modelArea('ClientUsage', null, byClient),
+	/*
+	 * When a trusted provider's assertion was last accepted, and when an outside authorization server
+	 * connection last had an ID-JAG issued for it (specs/108), keyed `provider:<bucketId>:<providerId>` and
+	 * `outside:<connectionId>`. Never reaped, like ClientUsage. Not a field of the provider: providers live in
+	 * the bucket document's `federation` array, which every write replaces whole, so a usage write there
+	 * would race an administrator's edit.
+	 */
+	modelArea(
+		'AssertionUsage',
+		null,
+		unowned(
+			'owned by a bucket, which is not a principal; deleted with the provider, the connection or the bucket'
+		)
+	),
 	modelArea('DeviceCode', EXPIRES_AT, byAccountAndClient, [
 		grantId,
 		{ key: { 'payload.userCode': 1 }, unique: true }
@@ -611,6 +631,20 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 	 * `{connectionId, epoch, lastAt}` serves the one read: a generation's refusals, most recent first.
 	 * `bucketId` serves the bucket-delete cascade.
 	 */
+	/*
+	 * Never reaped: a connection that expired on its own would stop a project's agents reaching an outside MCP
+	 * server with nothing to say why. Owned by a bucket, which is not a principal, so the bucket-delete route
+	 * cascades it. `bucketId` is indexed because the console lists a project's connections by it; issuance
+	 * reads by the derived `_id`.
+	 */
+	storeArea(
+		STORE_AREAS.outsideAuthorizationServers,
+		null,
+		unowned(
+			'owned by a bucket, which is not a principal; cascaded by the bucket-delete route'
+		),
+		[{ key: { bucketId: 1 } }]
+	),
 	storeArea(
 		STORE_AREAS.provisioningRefusals,
 		null,

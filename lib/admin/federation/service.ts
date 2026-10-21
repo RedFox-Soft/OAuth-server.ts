@@ -5,6 +5,16 @@ import {
 } from '../../adapters/index.js';
 import { AdminError } from '../auth/rbac.js';
 import { ADMIN_BUCKET_ID } from '../consts.js';
+import { belongsToProject } from '../project_applications.js';
+import { JWT_BEARER_GRANT } from '../../consts/assertion_grants.js';
+import { tryFindClient } from '../../models/client.js';
+import { findDeclaredResource } from '../../resources/registry.js';
+import { namespaceOf } from '../../resources/namespace.js';
+import {
+	forgetAssertionUsage,
+	providerUsageKey,
+	readAssertionUsage
+} from '../../assertions/usage.js';
 import {
 	assertConsoleStaysReachable,
 	loadReachabilityState
@@ -38,6 +48,7 @@ import {
 } from '../../federation/credential.js';
 import {
 	assertAppleIdentifiers,
+	assertAssertionTrust,
 	assertCanAcceptUpstreamSignals,
 	assertClientIdShape,
 	assertEmailDomains,
@@ -79,8 +90,18 @@ export function present(
 	 * document whole while this function guarded the provider routes. Anything new that returns a bucket,
 	 * or anything containing one, must come through here too.
 	 */
+	const { plainAssertions, ...rest } = provider;
 	return {
-		...provider,
+		...rest,
+		/* In the console's words, as the request bodies spell it (specs/108). */
+		...(plainAssertions
+			? {
+					plainAssertions: {
+						applications: plainAssertions.clientIds,
+						apis: plainAssertions.resources
+					}
+				}
+			: {}),
 		...(provider.clientSecret ? { clientSecret: SECRET_MASK } : {}),
 		...(provider.signingKey ? { signingKey: SECRET_MASK } : {}),
 		/*
@@ -160,11 +181,14 @@ export async function presentDetail(bucket: UserBucket, providerId: string) {
 		globalTokenRevocation: ApplicationConfig['globalTokenRevocation.enabled'],
 		backChannelLogout: ApplicationConfig['federation.enabled'],
 		/* A try runs the real exchange and ladder, so it needs federation on, as a sign-in does (specs/088). */
-		trySignIn: ApplicationConfig['federation.enabled']
+		trySignIn: ApplicationConfig['federation.enabled'],
+		/* Whether this instance redeems the assertions the provider may be trusted for (specs/108). */
+		identityAssertions: ApplicationConfig['jwtBearer.enabled']
 	};
-	const [bound, linkedUsers] = await Promise.all([
+	const [bound, linkedUsers, assertionsLastUsedAt] = await Promise.all([
 		getProvisioningConnectionStore().findByProvider(bucket._id, provider.id),
-		getUserStore(bucket._id).countLinkedTo(provider.id)
+		getUserStore(bucket._id).countLinkedTo(provider.id),
+		readAssertionUsage(providerUsageKey(bucket._id, provider.id))
 	]);
 	const callbackStability = stabilityOf(bucket);
 
@@ -196,6 +220,8 @@ export async function presentDetail(bucket: UserBucket, providerId: string) {
 			? { id: bound._id, displayName: bound.displayName }
 			: null,
 		linkedUsers,
+		/* When an assertion this provider signed was last honoured — seconds since the epoch, or null. */
+		assertionsLastUsedAt,
 		recommendedCorrelation: defaultCorrelationFor(provider),
 		warnings
 	};
@@ -387,6 +413,79 @@ async function assertConsoleKeepsADoor(
 	);
 }
 
+/* The console's words for a provider's plain-assertion trust (specs/108 story 4). */
+export interface PlainAssertionsInput {
+	applications: string[];
+	apis: { identifier: string; scopes: string[] }[];
+}
+
+function storedPlainAssertions(
+	input: PlainAssertionsInput
+): NonNullable<FederationProvider['plainAssertions']> {
+	return {
+		clientIds: [...new Set(input.applications)],
+		resources: input.apis.map(({ identifier, scopes }) => ({
+			identifier,
+			scopes: [...new Set(scopes)]
+		}))
+	};
+}
+
+/*
+ * A plain assertion names no client, so its trust says who may present one and the most it may yield: only the
+ * project's own confidential applications holding the JWT bearer grant (ID-JAG §9.1 applies to plain assertions
+ * a fortiori), and only APIs the project declares, with scopes they declare.
+ */
+async function assertPlainAssertions(
+	bucket: UserBucket,
+	plain: FederationProvider['plainAssertions']
+): Promise<void> {
+	if (!plain) return;
+	const refuse = (message: string) =>
+		new AdminError(422, message, { field: 'plainAssertions' });
+	if (plain.clientIds.length === 0) {
+		throw refuse(
+			'at least one application must be allowed to present assertions'
+		);
+	}
+	for (const clientId of plain.clientIds) {
+		const client = (await belongsToProject(bucket, clientId))
+			? await tryFindClient(clientId)
+			: undefined;
+		if (!client) {
+			throw refuse(
+				`application ${clientId} is not an application of this project`
+			);
+		}
+		if (client.tokenEndpointAuthMethod === 'none') {
+			throw refuse(
+				`application ${clientId} does not authenticate, so it cannot present assertions`
+			);
+		}
+		if (!client.grantTypes.includes(JWT_BEARER_GRANT)) {
+			throw refuse(
+				`application ${clientId} does not have the JWT bearer grant`
+			);
+		}
+	}
+	if (plain.resources.length === 0) {
+		throw refuse('at least one API must be allowed');
+	}
+	for (const { identifier, scopes } of plain.resources) {
+		const declared = await findDeclaredResource(
+			identifier,
+			namespaceOf(bucket)
+		);
+		if (!declared) {
+			throw refuse(`API ${identifier} is not declared in this project`);
+		}
+		const stray = scopes.find((scope) => !declared.scopes.includes(scope));
+		if (stray !== undefined) {
+			throw refuse(`API ${identifier} declares no scope ${stray}`);
+		}
+	}
+}
+
 export async function createProvider(
 	bucket: UserBucket,
 	actor: ProviderActor,
@@ -409,6 +508,8 @@ export async function createProvider(
 		emailClaim?: string;
 		acceptsGlobalTokenRevocation?: boolean;
 		acceptsBackChannelLogout?: boolean;
+		acceptsIdentityAssertions?: boolean;
+		plainAssertions?: PlainAssertionsInput;
 	}
 ): Promise<FederationProvider> {
 	assertMayConfigure(bucket, actor);
@@ -486,11 +587,20 @@ export async function createProvider(
 		/* Opted into deliberately: it lets a third party end any of this provider's users' sessions here. */
 		acceptsGlobalTokenRevocation: body.acceptsGlobalTokenRevocation ?? false,
 		/* Opted into deliberately too: it lets a third party end sessions here, if only ones it began. */
-		acceptsBackChannelLogout: body.acceptsBackChannelLogout ?? false
+		acceptsBackChannelLogout: body.acceptsBackChannelLogout ?? false,
+		/* And this one most of all: it lets the provider vouch for people to this project's APIs (specs/108). */
+		...(body.acceptsIdentityAssertions === true
+			? { acceptsIdentityAssertions: true }
+			: {}),
+		...(body.plainAssertions
+			? { plainAssertions: storedPlainAssertions(body.plainAssertions) }
+			: {})
 	};
 
 	assertScopes(provider.scopes, entry?.protocol.kind ?? 'oidc');
 	assertCanAcceptUpstreamSignals(provider, entry?.protocol.kind ?? 'oidc');
+	assertAssertionTrust(provider, existing, entry?.protocol.kind ?? 'oidc');
+	await assertPlainAssertions(bucket, provider.plainAssertions);
 	assertEmailDomains(provider.allowedEmailDomains);
 	if (provider.tenant) assertTenant(provider.tenant);
 	if (provider.teamId || provider.keyId) {
@@ -508,10 +618,21 @@ export async function updateProvider(
 	bucket: UserBucket,
 	actor: ProviderActor,
 	providerId: string,
-	body: Partial<Omit<FederationProvider, 'id'>>
+	input: Partial<Omit<FederationProvider, 'id' | 'plainAssertions'>> & {
+		plainAssertions?: PlainAssertionsInput | null;
+	}
 ): Promise<FederationProvider> {
 	assertMayConfigure(bucket, actor);
 	const current = find(bucket, providerId);
+	const { plainAssertions: plainInput, ...body } = input;
+	/* Absent keeps it, `null` withdraws it, a value replaces it — projected onto the stored names. */
+	const { plainAssertions: currentPlain, ...kept } = current;
+	const plain =
+		plainInput === undefined
+			? currentPlain
+			: plainInput === null
+				? undefined
+				: storedPlainAssertions(plainInput);
 	if (body.provisioning === 'jit') {
 		await assertNotBound(
 			bucket,
@@ -521,8 +642,9 @@ export async function updateProvider(
 	}
 
 	const next: FederationProvider = {
-		...current,
+		...kept,
 		...body,
+		...(plain ? { plainAssertions: plain } : {}),
 		// Absent means unchanged. The mask arriving as a value means the same thing, following the SMTP
 		// settings precedent — it is never stored either way, and a console that round-trips its own form
 		// therefore cannot overwrite a secret with a placeholder.
@@ -547,6 +669,12 @@ export async function updateProvider(
 	}
 	assertScopes(next.scopes, entry?.protocol.kind ?? 'oidc');
 	assertCanAcceptUpstreamSignals(next, entry?.protocol.kind ?? 'oidc');
+	assertAssertionTrust(
+		next,
+		providersOf(bucket).filter((p) => p.id !== providerId),
+		entry?.protocol.kind ?? 'oidc'
+	);
+	if (plainInput) await assertPlainAssertions(bucket, next.plainAssertions);
 	assertEmailDomains(next.allowedEmailDomains);
 	if (next.tenant) assertTenant(next.tenant);
 	if (next.teamId || next.keyId) {
@@ -636,6 +764,8 @@ export async function deleteProvider(
 			? { signInOrder: bucket.signInOrder.filter((id) => id !== providerId) }
 			: {})
 	});
+	/* For the reason the links go: a provider created later under this id must not inherit its "last used". */
+	await forgetAssertionUsage(providerUsageKey(bucket._id, providerId));
 }
 
 /*

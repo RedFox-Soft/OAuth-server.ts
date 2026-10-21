@@ -357,7 +357,9 @@ export const ClientSchema = t.Object({
 	// scope: space-delimited scope whitelist for the client.
 	scope: t.Optional(t.String()),
 	// authorizationDetailsTypes: allowed RAR authorization_details types.
-	authorizationDetailsTypes: t.Optional(t.Array(t.String()))
+	authorizationDetailsTypes: t.Optional(t.Array(t.String())),
+	// authorizationGrantProfilesSupported: the grant profiles the client implements (ID-JAG §8).
+	authorizationGrantProfilesSupported: t.Optional(t.Array(t.String()))
 });
 
 export type ClientSchemaType = Static<typeof ClientSchema>;

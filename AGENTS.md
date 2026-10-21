@@ -187,6 +187,11 @@ Each rule is the part that is easy to break. Read the named page before changing
   `revokeAccountAccess`. A provisioned user is read-only to administrators except the local lock. An address is
   recorded verified only when it was proven, whatever the project requires, because that is what `email_verified` says.
   → `end-user-lifecycle.md`
+- **Enterprise-managed authorization (ID-JAG)** — trust in another issuer's assertions lives on the sign-in
+  provider (`acceptsIdentityAssertions`, `plainAssertions`), never a separate store; a presented assertion
+  resolves the person through the browser sign-in's ladder, never a copy; an ID-JAG may be re-submitted, a
+  plain assertion is single-use; assertion tokens carry no Grant and no refresh token; no assertion ever
+  reaches the administrative MCP or SCIM endpoints. → `enterprise-managed-authorization.md`
 - **SCIM provisioning** — a connection's OAuth client `scim-<id>` is synthesized from the connection and
   never stored; its tokens are opaque and only the addressed bucket's SCIM arm (ahead of MCP's) may mint
   them; a bound provider's unlinked sign-in correlates by the connection's rule and never reaches the email

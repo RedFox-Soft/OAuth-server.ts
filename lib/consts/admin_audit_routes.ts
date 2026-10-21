@@ -539,6 +539,29 @@ const routes = [
 	},
 
 	/*
+	 * The outside authorization servers a project vouches for its people to with ID-JAGs (specs/108). The
+	 * entries name the connection, the project travels as the scope — as for provisioning connections.
+	 */
+	{
+		action: 'outside.server.create',
+		method: 'POST',
+		path: '/admin/api/projects/:id/outside-authorization-servers',
+		targetType: 'OutsideAuthorizationServer'
+	},
+	{
+		action: 'outside.server.update',
+		method: 'PATCH',
+		path: '/admin/api/projects/:id/outside-authorization-servers/:serverId',
+		targetType: 'OutsideAuthorizationServer'
+	},
+	{
+		action: 'outside.server.delete',
+		method: 'DELETE',
+		path: '/admin/api/projects/:id/outside-authorization-servers/:serverId',
+		targetType: 'OutsideAuthorizationServer'
+	},
+
+	/*
 	 * Upstream federation providers. `targetType` is the bucket, because a provider has no identity outside
 	 * the bucket it belongs to — it is an element of that bucket's document, and an entry naming only
 	 * `acme-sso` would not say whose.

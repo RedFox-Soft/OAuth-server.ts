@@ -221,6 +221,27 @@ export const ACTIONS = {
 		okText: 'Delete provider'
 	},
 
+	/*
+	 * A project vouching for its people to an outside authorization server (specs/108): the applications it
+	 * allows then get tokens there for those people with no consent screen, so connecting and changing it are
+	 * danger questions, and so is ending it, which stops agents relying on it.
+	 */
+	'outsideServer.connect': {
+		class: 'C2',
+		title: (t) => `Vouch for this project's people to ${t}?`,
+		okText: 'Connect'
+	},
+	'outsideServer.edit': {
+		class: 'C2',
+		title: (t) => `Change what this project vouches to ${t}?`,
+		okText: 'Save'
+	},
+	'outsideServer.delete': {
+		class: 'C2',
+		title: (t) => `Disconnect ${t}?`,
+		okText: 'Disconnect'
+	},
+
 	'connection.create': { class: 'C0' },
 	'connection.enable': { class: 'C0' },
 	'connection.disable': {

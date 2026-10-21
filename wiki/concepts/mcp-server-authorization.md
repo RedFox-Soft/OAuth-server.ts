@@ -201,7 +201,8 @@ API the project declared. A test asserted it as "accepted". RFC 6749 §4.4.2 and
 confidential clients. `client_credentials.ts` now answers `unauthorized_client` to a `none` client, which binds
 every client already stored; the admin route (`lib/admin/clients/service.ts`) and the console refuse the
 combination with 422, as does CIBA's backchannel endpoint for its grant. The list is
-`lib/consts/confidential_grants.ts`. It is deliberately **not** in the registration validator yet: every lookup
+`lib/consts/confidential_grants.ts`; since spec 108 it also holds the token-exchange, JWT bearer and `jwt-dpop`
+grants, whose handlers refuse a `none` client the same way ([[enterprise-managed-authorization]]). It is deliberately **not** in the registration validator yet: every lookup
 re-validates, so a rule there would stop such clients resolving for their browser sign-ins too.
 
 ## A client whose id is a URL, stored nowhere

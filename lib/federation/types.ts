@@ -93,7 +93,28 @@ export const FederationProvider = t.Object({
 	 * upstream session's sessions here, a revocation ends everything, and an operator may want either alone.
 	 * Read as `=== true`, so every provider stored before it is off and there was no migration.
 	 */
-	acceptsBackChannelLogout: t.Optional(t.Boolean())
+	acceptsBackChannelLogout: t.Optional(t.Boolean()),
+	/*
+	 * Whether this project accepts identity assertion grants (ID-JAG, specs/108) signed by this provider: an
+	 * agent its people signed in to through the provider then gets tokens for the project's APIs with no
+	 * browser and no consent. The trust lives here because an ID-JAG's `sub` is the identifier this provider
+	 * gives the project's own sign-in (ID-JAG §5), which is the link this provider already keeps. Read as
+	 * `=== true`; absent is off, so there was no migration.
+	 */
+	acceptsIdentityAssertions: t.Optional(t.Boolean()),
+	/*
+	 * Plain RFC 7523 assertions about a person from this provider (specs/108 story 4). Unlike an ID-JAG a
+	 * plain assertion names no client, so the trust says which of the project's applications may present
+	 * one and the most it may yield; its presence is the trust.
+	 */
+	plainAssertions: t.Optional(
+		t.Object({
+			clientIds: t.Array(t.String()),
+			resources: t.Array(
+				t.Object({ identifier: t.String(), scopes: t.Array(t.String()) })
+			)
+		})
+	)
 });
 export type FederationProvider = Static<typeof FederationProvider>;
 

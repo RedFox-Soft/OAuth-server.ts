@@ -85,6 +85,16 @@ export interface IdpStub {
 		claims: { aud: string | string[] | undefined } & Record<string, unknown>,
 		opts?: AssertionOptions
 	): Promise<string>;
+	/*
+	 * Mint any assertion this provider signs (specs/108): issued by it, an `iat` of now, an expiry five minutes
+	 * ahead and a fresh `jti`, then `claims` over them (`undefined` deletes one). `typ` is the header's type
+	 * unless `opts.typ` overrides it; `opts` breaks it in exactly one way per field.
+	 */
+	assertion(
+		claims: Record<string, unknown>,
+		typ: string,
+		opts?: AssertionOptions
+	): Promise<string>;
 }
 
 export const BACKCHANNEL_LOGOUT_EVENT =
@@ -247,6 +257,28 @@ export async function idpStub(
 		return signAssertion(payload, opts, 'logout+jwt');
 	}
 
+	async function assertion(
+		claims: Record<string, unknown>,
+		typ: string,
+		opts: AssertionOptions = {}
+	): Promise<string> {
+		const now = Math.floor(Date.now() / 1000);
+		const payload: Record<string, unknown> = {
+			iss: origin,
+			iat: now + (opts.issuedIn ?? 0),
+			exp: now + (opts.expiresIn ?? 300),
+			jti: crypto.randomUUID(),
+			...claims
+		};
+		if (opts.notBefore !== undefined && opts.notBefore !== null) {
+			payload.nbf = now + opts.notBefore;
+		}
+		for (const [name, value] of Object.entries(payload)) {
+			if (value === undefined) delete payload[name];
+		}
+		return signAssertion(payload, opts, typ);
+	}
+
 	async function signAssertion(
 		payload: Record<string, unknown>,
 		opts: AssertionOptions,
@@ -351,6 +383,7 @@ export async function idpStub(
 		publicJwks,
 		rotateKey,
 		revocationAssertion,
-		logoutToken
+		logoutToken,
+		assertion
 	};
 }

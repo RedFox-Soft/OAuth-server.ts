@@ -5,6 +5,11 @@ import {
 	recognizedFrom,
 	type ValueSetContext
 } from '../../consts/client_attributes.ts';
+import {
+	ID_JAG_PROFILE,
+	JWT_BEARER_GRANT,
+	TOKEN_EXCHANGE_GRANT
+} from '../../consts/assertion_grants.ts';
 import { ApplicationConfig, configuration } from '../../configs/application.ts';
 import { ClientDefaults } from '../../configs/clientBase.ts';
 
@@ -478,6 +483,7 @@ export default function getSchema() {
 		 *   - at most one proof-of-possession mechanism may be required
 		 *   - tls_client_auth needs exactly one certificate subject; other methods carry none
 		 *   - an inline key set and a key-set URI are not both allowed
+		 *   - the ID-JAG grant profile requires both the token-exchange and the JWT bearer grant
 		 *
 		 * The order is the order they have always been checked in.
 		 */
@@ -572,6 +578,22 @@ export default function getSchema() {
 
 			if (this.jwks !== undefined && this.jwks_uri !== undefined) {
 				this.invalidate('jwks and jwks_uri must not be used at the same time');
+			}
+
+			/*
+			 * ID-JAG §8: a client that says it implements the profile obtains the grant by token exchange and
+			 * redeems it with the JWT bearer grant, so it carries both or it does not implement it.
+			 */
+			const profiles: unknown = this.authorization_grant_profiles_supported;
+			if (Array.isArray(profiles) && profiles.includes(ID_JAG_PROFILE)) {
+				const grants: unknown = this.metadata.grantTypes;
+				const has = (grant: string) =>
+					Array.isArray(grants) && grants.includes(grant);
+				if (!has(TOKEN_EXCHANGE_GRANT) || !has(JWT_BEARER_GRANT)) {
+					this.invalidate(
+						`grantTypes must contain '${TOKEN_EXCHANGE_GRANT}' and '${JWT_BEARER_GRANT}' when '${ID_JAG_PROFILE}' is amongst authorization_grant_profiles_supported`
+					);
+				}
 			}
 		}
 

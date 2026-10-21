@@ -6,6 +6,7 @@ import {
 	verifySubdomainAddressing
 } from './verify_end_user_identity.js';
 import { verifyProvisioningConnections } from './verify_provisioning_connections.js';
+import { verifyOutsideServers } from './verify_outside_servers.js';
 import { verifyAdminSessionsByUser } from './verify_admin_sessions.js';
 import { verifyBucketGroups } from './verify_bucket_groups.js';
 import { verifyActivity } from './verify_activity.js';
@@ -55,12 +56,14 @@ const {
 	BucketKeysStore,
 	ContainerOwnershipStore,
 	GroupStore,
+	OutsideAuthorizationServerStore,
 	ProtectedResourceStore,
 	ProvisioningConnectionStore,
 	UserBucketStore,
 	UserStore
 } = await import('../lib/adapters/mongodb/index.js');
 const { db } = await import('../lib/adapters/mongodb/db.js');
+const { adapter } = await import('../lib/adapters/index.js');
 const { LEGACY_PROJECTS_AREA, MIGRATIONS } =
 	await import('../lib/consts/migrations.js');
 const { generateJWKS } = await import('../lib/helpers/jwks.js');
@@ -584,6 +587,11 @@ await verifyAddressChangeForgetsArrivals(
 );
 await verifySubdomainAddressing(new UserBucketStore(), check);
 await verifyProvisioningConnections(new ProvisioningConnectionStore(), check);
+await verifyOutsideServers(
+	new OutsideAuthorizationServerStore(),
+	adapter('AssertionUsage'),
+	check
+);
 
 /* Provisioned by db:setup from the inventory: the index ending an administrator's sessions reads by (specs/083). */
 const sessionIndexes = await db.collection(STORE_AREAS.adminSession).indexes();

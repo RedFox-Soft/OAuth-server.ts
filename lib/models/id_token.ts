@@ -291,6 +291,30 @@ export class IdToken {
 		issuer: string,
 		bucket: RequestBucket
 	) {
+		return IdToken.verify(jwt, client, issuer, bucket, true);
+	}
+
+	/*
+	 * The same check, refusing an expired token: an ID token presented as the subject of a token exchange
+	 * (specs/108, ID-JAG §4.3.3) is an assertion that the person is signed in now, which a hint is not. Retired
+	 * keys still verify, so a key rotation does not void an ID token that has not expired.
+	 */
+	static async verifyFresh(
+		jwt: string,
+		client: Client,
+		issuer: string,
+		bucket: RequestBucket
+	) {
+		return IdToken.verify(jwt, client, issuer, bucket, false);
+	}
+
+	private static async verify(
+		jwt: string,
+		client: Client,
+		issuer: string,
+		bucket: RequestBucket,
+		ignoreExpiration: boolean
+	) {
 		const alg = client.idTokenSignedResponseAlg;
 
 		let keyOrStore;
@@ -305,7 +329,7 @@ export class IdToken {
 		}
 
 		const opts = {
-			ignoreExpiration: true,
+			ignoreExpiration,
 			audience: client.clientId,
 			issuer,
 			clockTolerance,

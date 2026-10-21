@@ -24,7 +24,7 @@ unconsumed state is part of the write's own condition — `'payload.consumed': {
 MongoDB (`lib/adapters/mongodb/mongoAdapter.ts:118`), `payload->'consumed' IS NULL OR = 'false'` with
 `RETURNING` in PostgreSQL (`lib/adapters/postgres/sqlAdapter.ts:154`) — so of racing callers exactly one
 is told `true`. The memory adapter is atomic because there is no `await` between its read and its write.
-Every grant now decides on the answer (`lib/actions/grants/authorization_code.ts:112`,
+Every grant that spends a record now decides on the answer (`lib/actions/grants/authorization_code.ts:112`,
 `refresh_token.ts`, `device_code.ts`, `ciba.ts`, `lib/actions/authorization/respond.ts`); the early
 `payload.consumed` check stays only as the cheap path for a record already spent in sequence.
 

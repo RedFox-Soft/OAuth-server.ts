@@ -43,7 +43,7 @@ const MAX_LIFETIME_SECONDS = 300;
  * client id and upstream subject an attacker needed are not secrets. A shared-secret algorithm is refused for
  * the same reason — nobody but the provider may hold the key that signs these.
  */
-const ASYMMETRIC_ALGORITHMS = new Set([
+export const ASYMMETRIC_ALGORITHMS: ReadonlySet<string> = new Set([
 	'RS256',
 	'RS384',
 	'RS512',

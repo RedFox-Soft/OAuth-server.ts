@@ -761,7 +761,12 @@ async function bucketDetail(ctx: AdminContext, bucket: UserBucket) {
 		/* What a change to this bucket's sign-in reaches: its applications and the APIs they call. */
 		applications: applications.length,
 		apis: apis.length,
-		agentClients: agentClients()
+		agentClients: agentClients(),
+		/* Whether this instance runs the assertion grants (specs/108), which the console cannot read for a tenant. */
+		assertionGrants: {
+			tokenExchange: ApplicationConfig['tokenExchange.enabled'],
+			jwtBearer: ApplicationConfig['jwtBearer.enabled']
+		}
 	};
 }
 

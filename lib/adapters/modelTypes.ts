@@ -1,5 +1,6 @@
 import type { ModelAreaName } from '../consts/storage_inventory.js';
 import type { AccessTokenPayloadType } from '../models/access_token.js';
+import type { AssertionUsagePayload } from '../assertions/usage.js';
 import type { AuthorizationCodePayloadType } from '../models/authorization_code.js';
 import type { BackchannelAuthenticationRequestPayloadType } from '../models/backchannel_authentication_request.js';
 import type { ClientCredentialsPayload } from '../models/client_credentials.js';
@@ -50,6 +51,7 @@ export type { SessionPayloadType } from '../models/session.js';
 
 export interface ModelPayloadByName {
 	AccessToken: AccessTokenPayloadType;
+	AssertionUsage: AssertionUsagePayload;
 	AuthorizationCode: AuthorizationCodePayloadType;
 	BackchannelAuthenticationRequest: BackchannelAuthenticationRequestPayloadType;
 	Client: StoredClient;

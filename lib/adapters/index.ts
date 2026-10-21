@@ -6,6 +6,7 @@ import {
 	ProtectedResourceStore as MemoryProtectedResourceStore,
 	ProvisioningConnectionStore as MemoryProvisioningConnectionStore,
 	ProvisioningRefusalStore as MemoryProvisioningRefusalStore,
+	OutsideAuthorizationServerStore as MemoryOutsideAuthorizationServerStore,
 	BucketGroupStore as MemoryBucketGroupStore,
 	ContainerOwnershipStore as MemoryContainerOwnershipStore,
 	ActivityStore as MemoryActivityStore,
@@ -46,6 +47,8 @@ import type {
 	ProvisioningConnectionStoreInstance,
 	ProvisioningRefusalStoreConstructor,
 	ProvisioningRefusalStoreInstance,
+	OutsideAuthorizationServerStoreConstructor,
+	OutsideAuthorizationServerStoreInstance,
 	BucketGroupStoreConstructor,
 	BucketGroupStoreInstance,
 	ContainerOwnershipStoreConstructor,
@@ -86,6 +89,8 @@ let ProvisioningConnectionStoreClass: ProvisioningConnectionStoreConstructor =
 	MemoryProvisioningConnectionStore;
 let ProvisioningRefusalStoreClass: ProvisioningRefusalStoreConstructor =
 	MemoryProvisioningRefusalStore;
+let OutsideAuthorizationServerStoreClass: OutsideAuthorizationServerStoreConstructor =
+	MemoryOutsideAuthorizationServerStore;
 let BucketGroupStoreClass: BucketGroupStoreConstructor = MemoryBucketGroupStore;
 let BucketKeysStoreClass: BucketKeysStoreConstructor = MemoryBucketKeysStore;
 let ContainerOwnershipStoreClass: ContainerOwnershipStoreConstructor =
@@ -129,6 +134,8 @@ if (backend === 'postgres') {
 	ProtectedResourceStoreClass = postgres.ProtectedResourceStore;
 	ProvisioningConnectionStoreClass = postgres.ProvisioningConnectionStore;
 	ProvisioningRefusalStoreClass = postgres.ProvisioningRefusalStore;
+	OutsideAuthorizationServerStoreClass =
+		postgres.OutsideAuthorizationServerStore;
 	BucketGroupStoreClass = postgres.BucketGroupStore;
 	ContainerOwnershipStoreClass = postgres.ContainerOwnershipStore;
 	ActivityStoreClass = postgres.ActivityStore;
@@ -164,6 +171,8 @@ if (backend === 'mongodb') {
 	ProtectedResourceStoreClass = mongodb.ProtectedResourceStore;
 	ProvisioningConnectionStoreClass = mongodb.ProvisioningConnectionStore;
 	ProvisioningRefusalStoreClass = mongodb.ProvisioningRefusalStore;
+	OutsideAuthorizationServerStoreClass =
+		mongodb.OutsideAuthorizationServerStore;
 	BucketGroupStoreClass = mongodb.BucketGroupStore;
 	ContainerOwnershipStoreClass = mongodb.ContainerOwnershipStore;
 	ActivityStoreClass = mongodb.ActivityStore;
@@ -397,6 +406,20 @@ export function getProvisioningConnectionStore(): ProvisioningConnectionStoreIns
 }
 
 /*
+ * Outside authorization server connections (specs/108). No memo in front of it, for the reason the
+ * protected-resource store has none: a removed connection must stop new ID-JAGs on the very next request.
+ */
+let outsideAuthorizationServerStoreSingleton: OutsideAuthorizationServerStoreInstance | null =
+	null;
+export function getOutsideAuthorizationServerStore(): OutsideAuthorizationServerStoreInstance {
+	if (!outsideAuthorizationServerStoreSingleton) {
+		outsideAuthorizationServerStoreSingleton =
+			new OutsideAuthorizationServerStoreClass();
+	}
+	return outsideAuthorizationServerStoreSingleton;
+}
+
+/*
  * The removals a held connection was refused (specs/084 R2). Written by a held SCIM request, read by the
  * console's hold panel, cleared by release.
  */
@@ -532,6 +555,7 @@ export function resetStoresForTests(): void {
 	resetAdminMemoryStores();
 	protectedResourceStoreSingleton = null;
 	provisioningRefusalStoreSingleton = null;
+	outsideAuthorizationServerStoreSingleton = null;
 	bucketGroupStoreSingleton = null;
 	bucketKeysStoreSingleton = null;
 	activityStoreSingleton = null;

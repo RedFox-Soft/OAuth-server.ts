@@ -12,6 +12,7 @@ import {
 	verifySubdomainAddressing
 } from './verify_end_user_identity.js';
 import { verifyProvisioningConnections } from './verify_provisioning_connections.js';
+import { verifyOutsideServers } from './verify_outside_servers.js';
 import { verifyAdminSessionsByUser } from './verify_admin_sessions.js';
 import { verifyBucketGroups } from './verify_bucket_groups.js';
 import { verifyActivity } from './verify_activity.js';
@@ -88,6 +89,7 @@ const {
 	BucketKeysStore,
 	ContainerOwnershipStore,
 	GroupStore,
+	OutsideAuthorizationServerStore,
 	ProtectedResourceStore,
 	ProvisioningConnectionStore,
 	SingletonSecretStore,
@@ -915,6 +917,11 @@ await verifyEndUserSearch(runtimeUsers, check);
 await verifyAddressChangeForgetsArrivals(buckets, runtime._id, check);
 await verifySubdomainAddressing(buckets, check);
 await verifyProvisioningConnections(new ProvisioningConnectionStore(), check);
+await verifyOutsideServers(
+	new OutsideAuthorizationServerStore(),
+	adapter('AssertionUsage'),
+	check
+);
 
 /* The index ending an administrator's sessions reads by (specs/083), as provisioned from the inventory. */
 const sessionArea = areaNamed(STORE_AREAS.adminSession);

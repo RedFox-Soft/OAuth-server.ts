@@ -1,3 +1,7 @@
+import {
+	JWT_BEARER_GRANT,
+	JWT_DPOP_GRANT
+} from '../../consts/assertion_grants.js';
 import { LOOPBACKS } from '../../consts/client_attributes.js';
 import { type Client } from './types.ts';
 
@@ -26,6 +30,14 @@ export function grantTypeAllowed(
 	client: Pick<Client, 'grantTypes'>,
 	type: string
 ): boolean {
+	/*
+	 * `jwt-dpop` is the JWT bearer grant for an assertion bound to a key (draft-parecki-oauth-jwt-dpop-grant
+	 * §3.1), not a different permission: a client allowed the one may present the other, as ID-JAG §9.8.1.2.1
+	 * expects a client of the profile to.
+	 */
+	if (type === JWT_DPOP_GRANT && client.grantTypes.includes(JWT_BEARER_GRANT)) {
+		return true;
+	}
 	return client.grantTypes.includes(type);
 }
 

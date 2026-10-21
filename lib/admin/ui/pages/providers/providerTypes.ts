@@ -1,7 +1,14 @@
 import type { FederationProvider } from '../../../../federation/types.js';
 
+export interface PlainAssertionsView {
+	applications: string[];
+	apis: { identifier: string; scopes: string[] }[];
+}
+
 /* A provider as the list presents it: the address to paste into its logout settings rides along when it applies. */
-export type PresentedProvider = FederationProvider & {
+export type PresentedProvider = Omit<FederationProvider, 'plainAssertions'> & {
+	/* The plain-assertion trust in the console's words, as the server presents it (specs/108). */
+	plainAssertions?: PlainAssertionsView;
 	globalTokenRevocationEndpoint?: string;
 	backChannelLogoutEndpoint?: string;
 	/* The list's answer to "is its button on the sign-in page now": its own switch and the instance's. */
@@ -25,7 +32,11 @@ export type ProviderDetail = PresentedProvider & {
 		backChannelLogout: boolean;
 		/* Try sign-in needs the callback route, which exists only while federation is on (specs/088). */
 		trySignIn: boolean;
+		/* Whether this instance redeems the identity assertions the provider may be trusted for (specs/108). */
+		identityAssertions: boolean;
 	};
+	/* When an assertion this provider signed was last honoured, in seconds since the epoch. */
+	assertionsLastUsedAt: number | null;
 	boundConnection: { id: string; displayName: string } | null;
 	linkedUsers: number;
 	recommendedCorrelation: {

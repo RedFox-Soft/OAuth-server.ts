@@ -12,7 +12,15 @@ export const GRANT_OPTIONS = [
 		label: 'device_code',
 		value: 'urn:ietf:params:oauth:grant-type:device_code'
 	},
-	{ label: 'ciba', value: 'urn:openid:params:grant-type:ciba' }
+	{ label: 'ciba', value: 'urn:openid:params:grant-type:ciba' },
+	{
+		label: 'Token exchange (ID-JAG)',
+		value: 'urn:ietf:params:oauth:grant-type:token-exchange'
+	},
+	{
+		label: 'JWT bearer (assertions)',
+		value: 'urn:ietf:params:oauth:grant-type:jwt-bearer'
+	}
 ];
 export const AUTH_OPTIONS = [
 	{ label: 'none (public / PKCE)', value: 'none' },

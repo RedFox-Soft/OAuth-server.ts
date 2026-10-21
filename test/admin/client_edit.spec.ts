@@ -129,7 +129,9 @@ function fixtures(): ({ clientId: string } & Record<string, unknown>)[] {
 		backchannel_token_delivery_mode: 'poll',
 		backchannel_user_code_parameter: true,
 		dpop_bound_access_tokens: true,
-		authorization_details_types: [PAYMENT_TYPE]
+		authorization_details_types: [PAYMENT_TYPE],
+		// Any profile carries the attribute; the ID-JAG one would also require two grants this client lacks.
+		authorization_grant_profiles_supported: ['urn:example:grant-profile:edit']
 	};
 
 	const secret = {

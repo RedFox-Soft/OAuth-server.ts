@@ -159,7 +159,7 @@ function assertPermittedOrganisation(
  * The claims record is copied rather than mutated: it came out of a verified assertion, and rewriting it
  * in place would leave later readers unable to tell what the provider actually said.
  */
-function withFallbackAddress(
+export function withFallbackAddress(
 	provider: { issuer: string; emailClaim: string },
 	claims: Record<string, unknown>
 ): Record<string, unknown> {

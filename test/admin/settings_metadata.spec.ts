@@ -136,6 +136,8 @@ describe('settings catalog presentation metadata', () => {
 				'conformIdTokenClaims',
 				'cors.enabled',
 				'globalTokenRevocation.enabled',
+				'jwtBearer.enabled',
+				'tokenExchange.enabled',
 				'mTLS.trustProxyCertificateHeader',
 				'par.allowUnregisteredRedirectUris',
 				'pkce.required',

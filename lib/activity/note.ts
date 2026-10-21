@@ -7,6 +7,10 @@ import { captureFault } from '../error_store/capture.js';
 import { now } from './clock.js';
 import { dayOf } from './periods.js';
 import { kindOf } from './kinds.js';
+import {
+	JWT_BEARER_GRANT,
+	JWT_DPOP_GRANT
+} from '../consts/assertion_grants.js';
 
 /*
  * Records that a successful grant was activity of an end user in their bucket (specs/076). Called once, by
@@ -78,6 +82,15 @@ export function noteActivity(oidc: OIDCContext<TokenParams>): void {
 
 /* The sign-in the artifact behind this grant recorded, if it recorded one. */
 function signInOf(oidc: OIDCContext<TokenParams>) {
+	/*
+	 * An assertion grant has no artifact: the person arrived through a provider the project trusts, which is a
+	 * federated sign-in by another door (specs/108). Read off the grant rather than written onto the context,
+	 * because the grant type alone already says it.
+	 */
+	const grantType = oidc.params.grant_type;
+	if (grantType === JWT_BEARER_GRANT || grantType === JWT_DPOP_GRANT) {
+		return 'federated';
+	}
 	const { AuthorizationCode, DeviceCode, BackchannelAuthenticationRequest } =
 		oidc.entities;
 	return (AuthorizationCode ?? DeviceCode ?? BackchannelAuthenticationRequest)

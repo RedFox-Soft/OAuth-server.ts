@@ -58,6 +58,7 @@ const BUCKET_TABS: Partial<Record<PageKey, BucketTab>> = {
 	'bucket.signIn': 'signIn',
 	'bucket.providers': 'providers',
 	'bucket.provisioning': 'provisioning',
+	'bucket.outsideServers': 'outsideServers',
 	'bucket.keys': 'keys',
 	'bucket.activity': 'activity',
 	'bucket.settings': 'settings'

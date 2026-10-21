@@ -16,7 +16,10 @@ const GrantType = t.Union([
 	t.Literal('refresh_token'),
 	t.Literal('client_credentials'),
 	t.Literal('urn:ietf:params:oauth:grant-type:device_code'),
-	t.Literal('urn:openid:params:grant-type:ciba')
+	t.Literal('urn:openid:params:grant-type:ciba'),
+	t.Literal('urn:ietf:params:oauth:grant-type:token-exchange'),
+	/* Also admits `jwt-dpop`, its DPoP-bound form, which is therefore not offered on its own. */
+	t.Literal('urn:ietf:params:oauth:grant-type:jwt-bearer')
 ]);
 
 // Which of these a deployment admits is the `clientAuthMethods` setting's decision, checked by

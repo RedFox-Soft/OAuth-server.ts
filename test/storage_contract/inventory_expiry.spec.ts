@@ -101,6 +101,8 @@ const PERMANENT = [
 	'ClientLogo',
 	/* "Last used" stays meaningful however long ago it was; it leaves with its application. */
 	'ClientUsage',
+	/* The same for an assertion trust (specs/108); it leaves with its provider, connection or bucket. */
+	'AssertionUsage',
 	/*
 	 * An issuer's keys — each bucket's and the root's — leave by their state — retired, and past the
 	 * lifetime of every token they could have signed — never by the record's age. An expiry here would
@@ -122,6 +124,11 @@ const PERMANENT = [
 	 * re-admit the removal of somebody the administrator releasing it was never shown.
 	 */
 	'provisioningRefusals',
+	/*
+	 * An outside authorization server connection lives until an administrator removes it. An expiry here
+	 * would stop a project's agents reaching an outside MCP server with nothing to say why.
+	 */
+	'outsideAuthorizationServers',
 	/*
 	 * A bucket group and its memberships live until an administrator or the owning directory removes them.
 	 * An expiry here would silently change what every relying party lets those people do.

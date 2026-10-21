@@ -26,7 +26,9 @@ const SCOPES = ApplicationConfig.scopes;
 const FLAGS = [
 	'clientCredentials.enabled',
 	'deviceFlow.enabled',
-	'ciba.enabled'
+	'ciba.enabled',
+	'jwtBearer.enabled',
+	'tokenExchange.enabled'
 ] as const;
 
 type Combination = { offlineAccess: boolean } & Record<
@@ -34,13 +36,24 @@ type Combination = { offlineAccess: boolean } & Record<
 	boolean
 >;
 
-// Every assignment of the four inputs that decide which grants the server supports.
-const combinations: Combination[] = Array.from({ length: 16 }, (_, bits) => ({
-	offlineAccess: Boolean(bits & 1),
-	'clientCredentials.enabled': Boolean(bits & 2),
-	'deviceFlow.enabled': Boolean(bits & 4),
-	'ciba.enabled': Boolean(bits & 8)
-}));
+// Every assignment of the inputs that decide which grants the server supports: offline access and each flag.
+const combinations: Combination[] = Array.from(
+	{ length: 2 ** (FLAGS.length + 1) },
+	(_, bits) => {
+		const combination: Combination = {
+			offlineAccess: Boolean(bits & 1),
+			'clientCredentials.enabled': false,
+			'deviceFlow.enabled': false,
+			'ciba.enabled': false,
+			'jwtBearer.enabled': false,
+			'tokenExchange.enabled': false
+		};
+		FLAGS.forEach((flag, index) => {
+			combination[flag] = Boolean(bits & (2 << index));
+		});
+		return combination;
+	}
+);
 
 function apply(combination: Combination) {
 	ApplicationConfig.scopes = combination.offlineAccess

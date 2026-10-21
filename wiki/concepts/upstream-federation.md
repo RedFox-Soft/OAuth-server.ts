@@ -360,6 +360,9 @@ that path does not do the cached-set signature retry either. The provider record
 `acceptsGlobalTokenRevocation` (optional, read as `=== true`, refused for a provider that publishes no keys). See
 [[global-token-revocation]]. Spec 073's back-channel logout tokens are presented JWTs too and use the same cache;
 their provider option is `acceptsBackChannelLogout`, under the same rules ([[upstream-back-channel-logout]]).
+Spec 108 added two more trust fields of the same kind — `acceptsIdentityAssertions` (ID-JAGs) and
+`plainAssertions` (plain RFC 7523 assertions) — whose presented JWTs use the same cache and resolve the person
+through this page's ladder ([[enterprise-managed-authorization]]).
 `lib/helpers/jwt.ts` is deliberately **not** extended: it takes this server's own keystore object, so
 adapting an upstream key set to that shape would mean writing a second keystore implementation to reach a
 verifier jose already exposes.

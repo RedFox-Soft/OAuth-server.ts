@@ -48,6 +48,26 @@ export const cibaGrantParameters = t.Object({
 	auth_req_id: t.String()
 });
 
+/* RFC 7523 §2.1: a single JWT. Whether it is one is the grant's to answer, as invalid_grant. */
+export const jwtBearerGrantParameters = t.Object({
+	assertion: t.String()
+});
+
+/*
+ * RFC 8693 §2.1. `actor_token` is declared, not refused with `refusedParam`: refusing it here would refuse it
+ * on every grant, while RFC 6749 §3.2 has the others ignore it, and the exchange must be able to see it was
+ * sent to refuse it (ID-JAG §4.3 defines no processing for it). `audience` may repeat, as `resource` does,
+ * so the exchange can refuse more than one rather than read the first.
+ */
+export const tokenExchangeGrantParameters = t.Object({
+	subject_token: t.String(),
+	subject_token_type: t.String(),
+	requested_token_type: t.String(),
+	audience: t.Union([t.String(), t.Array(t.String())]),
+	actor_token: t.String(),
+	actor_token_type: t.String()
+});
+
 export * as authorization_code from './authorization_code.ts';
 export * as refresh_token from './refresh_token.ts';
 export * as 'urn:ietf:params:oauth:grant-type:device_code' from './device_code.ts';
@@ -55,6 +75,13 @@ export * as 'urn:openid:params:grant-type:ciba' from './ciba.ts';
 
 import * as authorization_code from './authorization_code.ts';
 import { clientCredentials } from './client_credentials.ts';
+import { jwtBearer } from './jwt_bearer.ts';
+import { tokenExchange } from './token_exchange.ts';
+import {
+	JWT_BEARER_GRANT,
+	JWT_DPOP_GRANT,
+	TOKEN_EXCHANGE_GRANT
+} from 'lib/consts/assertion_grants.js';
 import * as refresh_token from './refresh_token.ts';
 import * as device_code from './device_code.ts';
 import * as ciba from './ciba.ts';
@@ -74,7 +101,10 @@ export const grantStore: Map<string, GrantHandler> = new Map([
 	['client_credentials', clientCredentials],
 	['refresh_token', refresh_token.handler],
 	['urn:ietf:params:oauth:grant-type:device_code', device_code.handler],
-	['urn:openid:params:grant-type:ciba', ciba.handler]
+	['urn:openid:params:grant-type:ciba', ciba.handler],
+	[JWT_BEARER_GRANT, jwtBearer],
+	[JWT_DPOP_GRANT, jwtBearer],
+	[TOKEN_EXCHANGE_GRANT, tokenExchange]
 ]);
 
 // Read from the same derivation discovery advertises, never a second table of flags: two lists

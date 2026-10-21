@@ -9,6 +9,16 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+### Added
+
+- **MCP enterprise-managed authorization (ID-JAG), in both roles** — the JWT bearer grant (`jwtBearer.enabled`,
+  RFC 7523 with 7523bis, plus `jwt-dpop`) lets a project honour identity assertions from a sign-in provider it
+  marks `acceptsIdentityAssertions` (or plain assertions under `plainAssertions`), giving an agent a token for one of
+  its APIs with no browser, consent or refresh token; token exchange (`tokenExchange.enabled`, RFC 8693, ID-JAG
+  profile only) lets it issue ID-JAGs for outside authorization servers it connects, with group-based rules. Both
+  off by default and tracked from IETF draft -04. One new storage area each for connections and last use, no
+  migration — re-run `db:setup`.
+
 ## [1.2.0] - 2026-10-21
 
 A newcomer's path from sign-up to a first working sign-in: applications are created from a situation and get a page

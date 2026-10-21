@@ -78,6 +78,14 @@ export function describe(view: ClientView): string {
 	if (view.grantTypes.includes('client_credentials')) {
 		flows.push('client credentials');
 	}
+	if (
+		view.grantTypes.includes('urn:ietf:params:oauth:grant-type:token-exchange')
+	) {
+		flows.push('vouches to outside servers (ID-JAG)');
+	}
+	if (view.grantTypes.includes('urn:ietf:params:oauth:grant-type:jwt-bearer')) {
+		flows.push('presents assertions');
+	}
 	return flows.length
 		? `${who} ${kind} · ${flows.join(' · ')}`
 		: `${who} ${kind}`;

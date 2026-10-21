@@ -453,6 +453,10 @@ the integration installed, has not been run.
 | On a standalone `mongod`, a group change interrupted by a database failure may be partly applied (RFC 7644 §3.5.2)                                                | A standalone `mongod` has no multi-document transaction. Every refusal is still decided before the first write; only a failure mid-request (answered 500) can leave part of a change, and the client's retry converges. PostgreSQL and MongoDB replica sets (Atlas) apply each change in one transaction. Declared as `bucket-group-change-atomicity`.                          | — (a failure mode of one topology)     |
 | A held connection refuses further deprovisioning, so a leaver may keep access until an administrator releases it (IPSIE SL2: deprovisioning ends access promptly) | A wrong scoping rule or a compromised directory credential could otherwise deprovision a whole bucket — every session, grant and consent — in minutes. Refused with `429` and `Retry-After: 300`, the one status Okta retries by itself; Entra retries any failure from its escrow, so both converge after the release                                                          | `threshold` on the connection (absent) |
 
+Workload identity federation, named in the first row, is a platform's token presented as _client authentication_
+(RFC 7523 §2.2). It is not the JWT bearer _authorization grant_ (§2.1), which spec 108 implements for identity
+assertions; the two are often confused.
+
 **§4.1 contradicts itself.** It requires "`client_credentials` … with JWT Client Authentication as defined
 in [RFC7523] section 2.2", and a few lines later "HTTP Basic authentication in the Authorization request
 header. Transmission of client credentials (e.g., `client_assertion`, `client_secret`) in the HTTP request

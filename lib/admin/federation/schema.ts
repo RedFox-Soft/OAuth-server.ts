@@ -15,6 +15,32 @@ const DomainList = t.Array(t.String({ minLength: 1, maxLength: 253 }), {
 });
 
 /*
+ * The provider's trust for plain RFC 7523 assertions (specs/108 story 4), in the console's words: which of the
+ * project's applications may present them and which APIs and scopes they may yield. The service projects it
+ * onto the stored `clientIds`/`resources`.
+ */
+const PlainAssertions = t.Object(
+	{
+		applications: t.Array(t.String({ minLength: 1, maxLength: 2048 }), {
+			maxItems: 50
+		}),
+		apis: t.Array(
+			t.Object(
+				{
+					identifier: t.String({ minLength: 1, maxLength: 2048 }),
+					scopes: t.Array(t.String({ minLength: 1, maxLength: 200 }), {
+						maxItems: 50
+					})
+				},
+				{ additionalProperties: false }
+			),
+			{ maxItems: 50 }
+		)
+	},
+	{ additionalProperties: false }
+);
+
+/*
  * The provider bodies.
  *
  * Only `id`, `displayName`, `issuer`, `clientId` and `clientSecret` are required on create; everything else
@@ -60,7 +86,11 @@ export const CreateProviderBody = t.Object({
 	/* Whether the provider may end its users' access here (global token revocation, specs/072). Off unless set. */
 	acceptsGlobalTokenRevocation: t.Optional(t.Boolean()),
 	/* Whether the provider's back-channel logout tokens are received (specs/073). Off unless set. */
-	acceptsBackChannelLogout: t.Optional(t.Boolean())
+	acceptsBackChannelLogout: t.Optional(t.Boolean()),
+	/* Whether the project accepts identity assertions (ID-JAG) this provider signs (specs/108). Off unless set. */
+	acceptsIdentityAssertions: t.Optional(t.Boolean()),
+	/* Whether, and for what, the project accepts this provider's plain assertions (specs/108). Off unless set. */
+	plainAssertions: t.Optional(PlainAssertions)
 });
 
 /* One place up or down in the bucket's sign-in order (specs/088 R10). */
@@ -98,5 +128,8 @@ export const UpdateProviderBody = t.Object({
 	allowedEmailDomains: t.Optional(DomainList),
 	emailClaim: t.Optional(t.String({ minLength: 1 })),
 	acceptsGlobalTokenRevocation: t.Optional(t.Boolean()),
-	acceptsBackChannelLogout: t.Optional(t.Boolean())
+	acceptsBackChannelLogout: t.Optional(t.Boolean()),
+	acceptsIdentityAssertions: t.Optional(t.Boolean()),
+	/* `null` withdraws the trust. */
+	plainAssertions: t.Optional(t.Union([PlainAssertions, t.Null()]))
 });

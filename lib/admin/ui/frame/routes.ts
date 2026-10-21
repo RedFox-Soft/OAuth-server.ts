@@ -40,6 +40,7 @@ export type PageKey =
 	| 'bucket.connection'
 	| 'bucket.connection.setup'
 	| 'bucket.connection.settings'
+	| 'bucket.outsideServers'
 	| 'bucket.keys'
 	| 'bucket.activity'
 	| 'bucket.settings'
@@ -218,6 +219,13 @@ export const ROUTES: readonly RouteSpec[] = [
 		section: 'projects',
 		area: 'Provisioning'
 	},
+	/* The outside authorization servers the project vouches for its people to (specs/108). */
+	{
+		key: 'bucket.outsideServers',
+		pattern: ['projects', ':project', 'outside-servers'],
+		section: 'projects',
+		area: 'Outside servers'
+	},
 	{
 		key: 'bucket.keys',
 		pattern: ['projects', ':project', 'keys'],
@@ -357,6 +365,7 @@ function administratorsRedirects(
 				// Areas it never had as a project land on its accounts rather than on a refusal.
 				[groupsArea, ''],
 				['provisioning', ''],
+				['outside-servers', ''],
 				['keys', '']
 			] as const
 		).map(([from, to]) => ({

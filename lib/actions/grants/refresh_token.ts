@@ -1,4 +1,3 @@
-import type { X509Certificate } from 'node:crypto';
 import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import type { TokenParams } from 'lib/actions/token.js';
 import difference from '../../helpers/_/difference.ts';
@@ -9,10 +8,7 @@ import {
 } from '../../helpers/errors.ts';
 import { member } from '../../helpers/_/object.ts';
 import presence from '../../helpers/validate_presence.ts';
-import { findAccount } from '../../addon/account.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
-import revoke from '../../helpers/revoke.ts';
-import certificateThumbprint from '../../helpers/certificate_thumbprint.ts';
 import * as formatters from '../../helpers/formatters.ts';
 import filterClaims from '../../helpers/filter_claims.ts';
 import resolveResource from '../../helpers/resolve_resource.ts';
@@ -29,12 +25,16 @@ import { issuingBucket } from 'lib/admin/auth/bucketAddress.js';
 import { IdToken } from 'lib/models/id_token.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
 import { AccessToken } from 'lib/models/access_token.js';
-import { Grant } from 'lib/models/grant.js';
 import ResourceServer from 'lib/helpers/resource_server.js';
 import type { DPoPProof } from 'lib/helpers/validate_dpop.js';
 import { resourceTokenGroups } from '../../bucket_groups/claim.js';
 import { issuerFor } from '../../configs/issuer.js';
 import { routeNames } from '../../consts/param_list.js';
+import {
+	RefreshTokenRefused,
+	revokeReused,
+	usableRefreshToken
+} from '../../shared/refresh_token_validation.js';
 
 function rarSupported(token: RefreshToken) {
 	// The payload's `gty`: the model has no top-level accessor for it (token-payload-access-contract).
@@ -53,57 +53,21 @@ export const handler = async function refreshTokenHandler(
 	const { client } = oidc;
 
 	let refreshTokenValue = oidc.params.refresh_token;
-	let refreshToken = await RefreshToken.find(refreshTokenValue, {
-		ignoreExpiration: true,
-		error: new InvalidGrant('refresh token not found')
-	});
-
-	if (refreshToken.payload.clientId !== client.clientId) {
-		throw new InvalidGrant('client mismatch');
-	}
-
-	if (refreshToken.isExpired) {
-		throw new InvalidGrant('refresh token is expired');
-	}
-
-	let cert: X509Certificate | undefined;
-	if (
-		client.tlsClientCertificateBoundAccessTokens ||
-		refreshToken.payload['x5t#S256']
-	) {
-		cert = oidc.getClientCertificate();
-		if (!cert) {
-			throw new InvalidGrant('mutual TLS client certificate not provided');
+	/*
+	 * Everything that makes the token usable is checked where the token exchange checks it too
+	 * (lib/shared/refresh_token_validation.ts); what is left here is what only a redemption does.
+	 */
+	let usable;
+	try {
+		usable = await usableRefreshToken(oidc, refreshTokenValue, dPoP);
+	} catch (error) {
+		if (error instanceof RefreshTokenRefused) {
+			throw new InvalidGrant(error.reason);
 		}
+		throw error;
 	}
-
-	if (!dPoP && oidc.client.dpopBoundAccessTokens) {
-		throw new InvalidGrant('DPoP proof JWT not provided');
-	}
-
-	if (
-		refreshToken.payload['x5t#S256'] &&
-		(!cert || refreshToken.payload['x5t#S256'] !== certificateThumbprint(cert))
-	) {
-		throw new InvalidGrant('failed x5t#S256 verification');
-	}
-
-	const { grantId } = refreshToken.payload;
-	if (!grantId) {
-		throw new InvalidGrant('grant not found');
-	}
-	const grant = await Grant.find(grantId, {
-		ignoreExpiration: true,
-		error: new InvalidGrant('grant not found')
-	});
-
-	if (grant.isExpired) {
-		throw new InvalidGrant('grant is expired');
-	}
-
-	if (grant.payload.clientId !== client.clientId) {
-		throw new InvalidGrant('client mismatch');
-	}
+	const { grant, account, cert } = usable;
+	let { refreshToken } = usable;
 
 	if (oidc.params.scope) {
 		const missing = difference(
@@ -119,51 +83,12 @@ export const handler = async function refreshTokenHandler(
 		}
 	}
 
-	if (
-		refreshToken.payload.jkt &&
-		(!dPoP || refreshToken.payload.jkt !== dPoP.thumbprint)
-	) {
-		throw new InvalidGrant('failed jkt verification');
-	}
-
 	oidc.entity('RefreshToken', refreshToken);
 	oidc.entity('Grant', grant);
-
-	const account = await findAccount(
-		oidc,
-		refreshToken.payload.accountId,
-		refreshToken
-	);
-
-	if (!account) {
-		throw new InvalidGrant(
-			'refresh token invalid (referenced account not found)'
-		);
-	}
-
-	if (refreshToken.payload.accountId !== grant.payload.accountId) {
-		throw new InvalidGrant('accountId mismatch');
-	}
-
 	oidc.entity('Account', account);
 
-	/*
-	 * Reuse of a rotated token revokes the whole grant, whether the earlier use was a request that has
-	 * finished or one racing this one — the second is what a stolen token's holder and its owner
-	 * refreshing at once looks like, and it must not yield two live chains.
-	 */
-	const reused = async () => {
-		const { grantId: consumedGrantId } = refreshToken.payload;
-		await Promise.all([
-			refreshToken.destroy(),
-			consumedGrantId && revoke(consumedGrantId, oidc)
-		]);
-		return new InvalidGrant('refresh token already used');
-	};
-
-	if (refreshToken.payload.consumed) {
-		throw await reused();
-	}
+	const reused = async () =>
+		new InvalidGrant((await revokeReused(oidc, refreshToken)).reason);
 
 	// Unreachable while the /token schema refuses the parameter: the seam RFC 9396 §7 support plugs
 	// into (wiki/concepts/rich-authorization-requests.md), read as the unknown it would then be.

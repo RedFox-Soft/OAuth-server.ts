@@ -68,6 +68,12 @@ const BODIES: Record<string, Record<string, unknown>> = {
 	project_group_assign_connection: { connectionId: 'any' },
 	provisioning_credential_issue: { kind: 'static_token' },
 	project_owner_change: { teamId: 'any' },
+	outside_authorization_server_create: {
+		issuer: 'https://as.gated.example',
+		displayName: 'Gated',
+		applications: [],
+		rules: []
+	},
 	project_plan_set: { planId: 'free' },
 	plan_create: {
 		id: 'gated',
@@ -121,7 +127,7 @@ describe('every high-consequence tool is gated', () => {
 		 * membership is named in catalogue_drift rather than counted here.
 		 */
 		expect(HIGH.length).toBeGreaterThan(0);
-		expect(HIGH.length).toBe(41);
+		expect(HIGH.length).toBe(44);
 	});
 
 	it.each(HIGH.map((t) => [t.tool, t] as const))(

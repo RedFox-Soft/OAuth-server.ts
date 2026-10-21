@@ -339,6 +339,43 @@ export const statedRightRoutes: readonly StatedRightRoute[] = [
 		on: 'bucket',
 		flag: 'manageUsers',
 		method: 'GET',
+		path: `${BUCKET}/outside-authorization-servers`
+	},
+	{
+		on: 'bucket',
+		flag: 'manageUsers',
+		method: 'GET',
+		path: `${BUCKET}/outside-authorization-servers/:serverId`
+	},
+	{
+		on: 'bucket',
+		flag: 'edit',
+		method: 'POST',
+		path: `${BUCKET}/outside-authorization-servers`,
+		body: {
+			issuer: 'https://as.probe.example',
+			displayName: 'Probe',
+			applications: [],
+			rules: []
+		}
+	},
+	{
+		on: 'bucket',
+		flag: 'edit',
+		method: 'PATCH',
+		path: `${BUCKET}/outside-authorization-servers/:serverId`,
+		body: {}
+	},
+	{
+		on: 'bucket',
+		flag: 'edit',
+		method: 'DELETE',
+		path: `${BUCKET}/outside-authorization-servers/:serverId`
+	},
+	{
+		on: 'bucket',
+		flag: 'manageUsers',
+		method: 'GET',
 		path: `${BUCKET}/provisioning-connections`
 	},
 	{

@@ -327,6 +327,56 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 	},
 
 	{
+		key: 'tokenExchange.enabled',
+		domain: 'grants',
+		group: 'Token Exchange (ID-JAG)',
+		label: 'Enable token exchange for ID-JAG',
+		summary:
+			'Let projects vouch for their people to outside authorization servers',
+		type: 'boolean',
+		risk: 'security',
+		experimental: true,
+		description:
+			'Accepts grant_type=urn:ietf:params:oauth:grant-type:token-exchange for one purpose: an application holding a person’s ID token or refresh token gets an identity assertion (ID-JAG) for an outside authorization server, which trades it for its own access token with no browser and no consent screen. This is how an agent your people signed in to reaches MCP servers run by others. Nothing is issued until a project connects an outside server and says who may get what there. Turn it on when a project needs to act as its people’s identity provider for MCP; turning it off stops every new assertion at once, while assertions already issued live out their few minutes. The profile is an IETF draft, so its details may still change.'
+	},
+	{
+		key: 'tokenExchange.idJagLifetime',
+		domain: 'grants',
+		group: 'Token Exchange (ID-JAG)',
+		label: 'ID-JAG lifetime in seconds',
+		summary: 'How long an identity assertion this server issues stays valid',
+		type: 'number',
+		unit: 'seconds',
+		dependsOn: 'tokenExchange.enabled',
+		description:
+			'How long an identity assertion issued here stays valid, from 30 to 600 seconds. The outside server may present the same assertion again for a fresh access token until it expires, so this is the longest a person’s access, once ended here, can still be renewed elsewhere. Shorter means faster revocation and more exchanges; the five-minute default is what the specification’s own examples use.'
+	},
+	{
+		key: 'jwtBearer.enabled',
+		domain: 'grants',
+		group: 'JWT Bearer (assertions)',
+		label: 'Enable the JWT bearer grant',
+		summary: 'Accept signed assertions about a person from trusted providers',
+		type: 'boolean',
+		risk: 'security',
+		experimental: true,
+		description:
+			'Accepts grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer (and its DPoP-bound form, jwt-dpop): an application presents a signed assertion about a person from a sign-in provider the project trusts for it, and gets an access token for one of the project’s APIs. This is the receiving side of MCP enterprise-managed authorization — an enterprise identity provider issues the assertion (ID-JAG) and your project honours it without a browser or a consent screen. Nothing is accepted until a project marks a provider as trusted for assertions. Turning it off refuses every new presentation at once; access tokens already issued live until they expire. The ID-JAG profile is an IETF draft.'
+	},
+	{
+		key: 'jwtBearer.maxAssertionLifetime',
+		domain: 'grants',
+		group: 'JWT Bearer (assertions)',
+		label: 'Longest accepted assertion in seconds',
+		summary: 'Refuse assertions that claim to live longer than this',
+		type: 'number',
+		unit: 'seconds',
+		dependsOn: 'jwtBearer.enabled',
+		description:
+			'The longest lifetime, from issue to expiry, an assertion presented to the JWT bearer grant may claim — 60 to 3600 seconds. An assertion that claims to live longer is refused even if its signature is good, so a provider cannot hand an agent what amounts to a standing credential. The ten-minute default leaves room for the five-minute assertions identity providers usually issue plus clock skew; raise it only for a provider that genuinely issues longer ones.'
+	},
+
+	{
 		key: 'backchannelLogout.enabled',
 		domain: 'endpoints',
 		group: 'Back-Channel Logout',

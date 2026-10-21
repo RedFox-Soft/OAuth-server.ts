@@ -1589,6 +1589,73 @@ export interface ProvisioningConnectionStoreConstructor {
 	new (): ProvisioningConnectionStoreInstance;
 }
 
+/*
+ * Who an outside authorization server connection's rule applies to: everyone in the project, or the members
+ * of any of these bucket groups (specs/108). Groups are named by id, which a rename never changes; a group
+ * deleted since matches nobody, because nothing points back to a group for a deletion to cascade along.
+ */
+export const OutsideServerAudience = t.Union([
+	t.Literal('everyone'),
+	t.Object({ groupIds: t.Array(t.String()) })
+]);
+export type OutsideServerAudience = Static<typeof OutsideServerAudience>;
+
+export const OutsideServerRule = t.Object({
+	appliesTo: OutsideServerAudience,
+	resources: t.Array(
+		t.Object({ identifier: t.String(), scopes: t.Array(t.String()) })
+	)
+});
+export type OutsideServerRule = Static<typeof OutsideServerRule>;
+
+/*
+ * An outside authorization server a project vouches for its people to with ID-JAGs (specs/108): which of the
+ * project's applications may ask, how each is known there, and who may get which MCP servers and scopes.
+ * The `_id` is derived from the project and the issuer (lib/assertions/outside_server_id.ts), so one issuer
+ * per project is the primary key rather than a rule a route has to remember.
+ */
+export const OutsideAuthorizationServer = t.Object({
+	_id: t.String(),
+	bucketId: t.String(),
+	issuer: t.String(),
+	displayName: t.String(),
+	clients: t.Array(
+		t.Object({
+			clientId: t.String(),
+			externalClientId: t.Optional(t.String())
+		})
+	),
+	rules: t.Array(OutsideServerRule),
+	/* The project application the outside server signs people in with, which decides the `sub` it knows them by. */
+	signInClientId: t.Optional(t.String()),
+	includeEmail: t.Boolean(),
+	createdAt: t.Date(),
+	updatedAt: t.Date()
+});
+export type OutsideAuthorizationServer = Static<
+	typeof OutsideAuthorizationServer
+>;
+
+export interface OutsideAuthorizationServerStoreInstance {
+	/* Throws `UniqueValueTaken` when the project already connects this issuer. */
+	create(
+		record: OutsideAuthorizationServer
+	): Promise<OutsideAuthorizationServer>;
+	find(id: string): Promise<OutsideAuthorizationServer | null>;
+	listByBucket(bucketId: string): Promise<OutsideAuthorizationServer[]>;
+	/*
+	 * The whole record, written in place of the stored one. Whole rather than a patch so that removing an
+	 * optional member means the same on every backend; the record is small and edited by one administrator.
+	 */
+	replace(record: OutsideAuthorizationServer): Promise<void>;
+	destroy(id: string): Promise<void>;
+	destroyByBucket(bucketId: string): Promise<number>;
+}
+
+export interface OutsideAuthorizationServerStoreConstructor {
+	new (): OutsideAuthorizationServerStoreInstance;
+}
+
 export const RefusedOperation = t.Union([
 	t.Literal('deactivate'),
 	t.Literal('delete')

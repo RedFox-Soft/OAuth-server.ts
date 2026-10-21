@@ -29,6 +29,7 @@ import {
 } from './blocks.js';
 import type { HandOff } from './handOff.js';
 import { WhoCanSignIn } from './WhoCanSignIn.js';
+import { EnterpriseCard } from './EnterpriseCard.js';
 
 interface DeclaredApi {
 	identifier: string;
@@ -295,6 +296,12 @@ export function ConnectTab({
 					</Flex>
 				)}
 			</Card>
+
+			<EnterpriseCard
+				bucketId={bucket._id}
+				clientId={client.clientId}
+				grantTypes={client.grantTypes}
+			/>
 
 			<Card
 				size="small"

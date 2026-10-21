@@ -218,6 +218,47 @@ export const ApplicationConfig = {
 	'clientCredentials.enabled': false,
 
 	/*
+	 * tokenExchange.enabled
+	 *
+	 * title: [`RFC8693`](https://www.rfc-editor.org/rfc/rfc8693.html) - Token Exchange, as the ID-JAG
+	 * profile (draft-ietf-oauth-identity-assertion-authz-grant-04)
+	 *
+	 * description: Lets a project vouch for its people to an outside authorization server: an application
+	 * holding a person's ID token or refresh token exchanges it for an Identity Assertion JWT
+	 * Authorization Grant that the outside server trades for its own access token. Nothing is issued until
+	 * a project connects an outside server. Off by default because the profile is still a draft.
+	 */
+	'tokenExchange.enabled': false,
+	/*
+	 * tokenExchange.idJagLifetime
+	 *
+	 * description: Seconds an ID-JAG this server issues stays valid, 30 to 600. The outside server may
+	 * re-submit it for a fresh access token until then (ID-JAG §4.4.3), so this is the longest a person's
+	 * access, once ended here, can still be renewed elsewhere.
+	 */
+	'tokenExchange.idJagLifetime': 300,
+
+	/*
+	 * jwtBearer.enabled
+	 *
+	 * title: [`RFC7523`](https://www.rfc-editor.org/rfc/rfc7523.html) - JWT Bearer authorization grant
+	 * (with draft-ietf-oauth-rfc7523bis), including ID-JAG and `jwt-dpop`
+	 *
+	 * description: Lets a project accept signed assertions about a person from a sign-in provider it
+	 * trusts and answer them with an access token for one of its APIs — the receiving side of MCP
+	 * enterprise-managed authorization. Nothing is accepted until a project trusts a provider for it.
+	 */
+	'jwtBearer.enabled': false,
+	/*
+	 * jwtBearer.maxAssertionLifetime
+	 *
+	 * description: The longest an assertion presented to the JWT bearer grant may live (`exp − iat`), 60 to
+	 * 3600 seconds. RFC 7521 §5.2 lets a server refuse one "unreasonably far in the future"; this is how far
+	 * that is, so a provider cannot hand out what amounts to a standing credential.
+	 */
+	'jwtBearer.maxAssertionLifetime': 600,
+
+	/*
 	 * features.backchannelLogout
 	 *
 	 * title: [`OIDC Back-Channel Logout 1.0`](https://openid.net/specs/openid-connect-backchannel-1_0-final.html)

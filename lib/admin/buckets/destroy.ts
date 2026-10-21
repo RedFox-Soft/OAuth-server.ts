@@ -5,8 +5,14 @@ import {
 	getBucketKeysStore,
 	getBucketStore,
 	getGroupStore,
+	getOutsideAuthorizationServerStore,
 	getUserStore
 } from '../../adapters/index.js';
+import {
+	forgetAssertionUsage,
+	outsideServerUsageKey,
+	providerUsageKey
+} from '../../assertions/usage.js';
 import type { BucketDeletion, UserBucket } from '../../adapters/types.js';
 import { now } from '../../activity/clock.js';
 import { BUCKET_PURGE_CLAIM_MS } from '../../consts/bucket_deletion.js';
@@ -198,6 +204,18 @@ async function destroyClaimed(
 		await adapter('Client').destroy(clientId);
 		const swept = await cascadeForClient(clientId);
 		failedAreas.push(...swept.failedAreas);
+	}
+	/*
+	 * The outside authorization servers it vouched to, and when each of its trusts was last used (specs/108):
+	 * all of it is about this bucket's people, and none of it means anything once they are gone.
+	 */
+	const outsideServers = getOutsideAuthorizationServerStore();
+	for (const connection of await outsideServers.listByBucket(id)) {
+		await forgetAssertionUsage(outsideServerUsageKey(connection._id));
+	}
+	await outsideServers.destroyByBucket(id);
+	for (const provider of claimed.federation) {
+		await forgetAssertionUsage(providerUsageKey(id, provider.id));
 	}
 	/* Its groups and every membership in them; nothing outside the bucket refers to either. */
 	await getBucketGroupStore().destroyByBucket(id);

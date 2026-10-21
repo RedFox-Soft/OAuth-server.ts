@@ -117,13 +117,13 @@ describe('settings catalog', () => {
 	});
 
 	/*
-	 * RAR was the last entry marked experimental, and it tracked a draft. RFC 9396 has been published
-	 * since May 2023 and the implementation now conforms to it within a recorded boundary, so the tag
-	 * and the "behaviour may change" sentence are gone. The `experimental` field itself is kept as
-	 * catalog vocabulary for the next feature tracked from a draft — this test pins that nothing claims
-	 * it today, so the tag cannot rot back into place unnoticed.
+	 * RAR was once marked experimental, and it tracked a draft. RFC 9396 has been published since May
+	 * 2023 and the implementation now conforms to it within a recorded boundary, so the tag and the
+	 * "behaviour may change" sentence are gone. The tag now belongs to the two grants built on the ID-JAG
+	 * draft (specs/108) and to nothing else — pinned, so it can neither rot back onto a finished feature
+	 * nor fall silently off a draft one.
 	 */
-	it('claims no draft-spec feature, and cites the published RFC for RAR', () => {
+	it('claims a draft-spec tag only for the ID-JAG grants, and cites the published RFC for RAR', () => {
 		const rar = SETTINGS_CATALOG.find(
 			(d) => d.key === 'richAuthorizationRequests.enabled'
 		);
@@ -131,10 +131,12 @@ describe('settings catalog', () => {
 		expect(rar?.description).toContain('RFC 9396');
 		expect(rar?.description).not.toContain('draft');
 
-		const experimental = SETTINGS_CATALOG.filter((d) => d.experimental).map(
-			(d) => d.key
+		const experimental: string[] = SETTINGS_CATALOG.filter(
+			(d) => d.experimental
+		).map((d) => d.key);
+		expect(experimental.sort()).toEqual(
+			['jwtBearer.enabled', 'tokenExchange.enabled'].sort()
 		);
-		expect(experimental).toEqual([]);
 	});
 
 	it('declared enum/option values match the ApplicationConfig defaults domain', () => {

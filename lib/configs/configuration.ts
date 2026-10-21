@@ -486,6 +486,26 @@ function checkLoginThrottle(config: ConfigurationInput) {
 	}
 }
 
+/*
+ * The two assertion-grant lifetimes (specs/108). Bounded rather than free because each is a security
+ * ceiling spelled as a number: an ID-JAG that lives an hour is a refresh token by another name, and an
+ * accepted assertion lifetime of a day lets a provider issue standing credentials.
+ */
+function checkAssertionGrants(config: ConfigurationInput) {
+	const issued = config['tokenExchange.idJagLifetime'];
+	if (!Number.isSafeInteger(issued) || issued < 30 || issued > 600) {
+		throw new TypeError(
+			'tokenExchange.idJagLifetime must be an integer from 30 to 600 seconds'
+		);
+	}
+	const accepted = config['jwtBearer.maxAssertionLifetime'];
+	if (!Number.isSafeInteger(accepted) || accepted < 60 || accepted > 3600) {
+		throw new TypeError(
+			'jwtBearer.maxAssertionLifetime must be an integer from 60 to 3600 seconds'
+		);
+	}
+}
+
 function checkDependantFeatures(config: ConfigurationInput) {
 	if (config['jwtIntrospection.enabled'] && !config['introspection.enabled']) {
 		throw new TypeError(
@@ -754,6 +774,7 @@ export function validateConfiguration(
 	checkScimRateLimit(config);
 	checkPlans(config);
 	checkLoginThrottle(config);
+	checkAssertionGrants(config);
 
 	return {
 		scopes,

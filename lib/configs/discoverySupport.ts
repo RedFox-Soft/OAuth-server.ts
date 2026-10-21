@@ -5,6 +5,13 @@ import { ClientDefaults } from 'lib/configs/clientBase.js';
 import { ApplicationConfig } from './application.js';
 import { isList, isPlainObject } from '../helpers/_/object.js';
 import { withGroupsScope } from '../consts/groups_claim.js';
+import {
+	ID_JAG_PROFILE,
+	ID_JAG_TOKEN_TYPE,
+	JWT_BEARER_GRANT,
+	JWT_DPOP_GRANT,
+	TOKEN_EXCHANGE_GRANT
+} from '../consts/assertion_grants.js';
 import type { IssuerKeys } from '../keys/issuer_keys.js';
 import {
 	authorizationEncryptionAlgValues,
@@ -70,6 +77,14 @@ export function supportedGrantTypes(config: Config): string[] {
 	}
 	if (config['ciba.enabled']) {
 		grantTypes.add('urn:openid:params:grant-type:ciba');
+	}
+	/* One switch for both: `jwt-dpop` is the same grant for a key-bound assertion (ID-JAG §9.8.1.2). */
+	if (config['jwtBearer.enabled']) {
+		grantTypes.add(JWT_BEARER_GRANT);
+		grantTypes.add(JWT_DPOP_GRANT);
+	}
+	if (config['tokenExchange.enabled']) {
+		grantTypes.add(TOKEN_EXCHANGE_GRANT);
 	}
 	return [...grantTypes];
 }
@@ -214,6 +229,14 @@ export function calculateDiscovery(
 		global_token_revocation_endpoint_auth_methods_supported: [
 			'private_key_jwt'
 		],
+		/*
+		 * ID-JAG §7.2: this server processes the profile — which is how an MCP client finds out (MCP
+		 * enterprise-managed authorization §6). It says nothing about which issuers any project trusts, and
+		 * must not (§9.4).
+		 */
+		authorization_grant_profiles_supported: [ID_JAG_PROFILE],
+		/* ID-JAG §7.1, defined by draft-ietf-oauth-identity-chaining §3: this server issues ID-JAGs. */
+		identity_chaining_requested_token_types_supported: [ID_JAG_TOKEN_TYPE],
 
 		scopes_supported: deriveScopes(config),
 		claims_supported: deriveClaimsSupported(config),
@@ -395,6 +418,15 @@ export const metadataClassification: Record<DiscoveryKey, MetadataAudience> = {
 		audience: 'both',
 		registeredBy: 'draft-parecki-oauth-global-token-revocation-06'
 	},
+	/* Not yet IANA-registered: both drafts request it, so the revision is the truthful registrar to name. */
+	authorization_grant_profiles_supported: {
+		audience: 'both',
+		registeredBy: 'draft-ietf-oauth-identity-assertion-authz-grant-04'
+	},
+	identity_chaining_requested_token_types_supported: {
+		audience: 'both',
+		registeredBy: 'draft-ietf-oauth-identity-chaining-17'
+	},
 	code_challenge_methods_supported: {
 		audience: 'both',
 		registeredBy: 'RFC 8414'
@@ -546,6 +578,10 @@ export const featuresKeyMap: Partial<Record<FeatureFlagKey, DiscoveryKey[]>> = {
 	'globalTokenRevocation.enabled': [
 		'global_token_revocation_endpoint',
 		'global_token_revocation_endpoint_auth_methods_supported'
+	],
+	'jwtBearer.enabled': ['authorization_grant_profiles_supported'],
+	'tokenExchange.enabled': [
+		'identity_chaining_requested_token_types_supported'
 	],
 	'backchannelLogout.enabled': [
 		'backchannel_logout_supported',

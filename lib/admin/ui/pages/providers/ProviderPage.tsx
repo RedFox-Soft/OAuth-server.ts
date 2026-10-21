@@ -31,7 +31,11 @@ import type { Change } from '../../settings/model.js';
 import { ADMIN_BUCKET_ID } from '../../../consts.js';
 import type { BucketView } from '../bucketView.js';
 import { ScheduledBanner } from '../ScheduledBanner.js';
-import { federationApi, type ProviderDetail } from './providerTypes.js';
+import {
+	federationApi,
+	type PlainAssertionsView,
+	type ProviderDetail
+} from './providerTypes.js';
 import { providerBlocks, useProviderActions } from './useProviderActions.js';
 import { useTrySignIn } from './TrySignIn.js';
 import { FederationOffNotice } from './FederationOffNotice.js';
@@ -51,6 +55,8 @@ interface Draft {
 	emailTrusted: boolean;
 	acceptsGlobalTokenRevocation: boolean;
 	acceptsBackChannelLogout: boolean;
+	acceptsIdentityAssertions: boolean;
+	plainAssertions: PlainAssertionsView | null;
 	clientId: string;
 	// Empty means "keep the stored one": a secret is replaced, never shown or edited.
 	clientSecret: string;
@@ -68,6 +74,8 @@ const LABELS: Record<keyof Draft, string> = {
 	emailTrusted: 'Link existing accounts by verified email',
 	acceptsGlobalTokenRevocation: 'Accept global token revocation',
 	acceptsBackChannelLogout: 'Accept back-channel logout',
+	acceptsIdentityAssertions: 'Accept identity assertions (ID-JAG)',
+	plainAssertions: 'Accept plain assertions',
 	clientId: 'Client id',
 	clientSecret: 'Client secret',
 	scopes: 'Scopes',
@@ -87,6 +95,8 @@ function draftOf(p: ProviderDetail): Draft {
 		emailTrusted: p.emailTrusted,
 		acceptsGlobalTokenRevocation: p.acceptsGlobalTokenRevocation === true,
 		acceptsBackChannelLogout: p.acceptsBackChannelLogout === true,
+		acceptsIdentityAssertions: p.acceptsIdentityAssertions === true,
+		plainAssertions: p.plainAssertions ?? null,
 		clientId: p.clientId,
 		clientSecret: '',
 		scopes: p.scopes,
@@ -158,6 +168,20 @@ function trustLines(
 	};
 	signal('acceptsGlobalTokenRevocation', 'Global token revocation');
 	signal('acceptsBackChannelLogout', 'Back-channel logout');
+	if (from.acceptsIdentityAssertions !== to.acceptsIdentityAssertions) {
+		(to.acceptsIdentityAssertions ? widen : narrow).push(
+			to.acceptsIdentityAssertions
+				? "Identity assertions: an agent the provider vouches for gets tokens for this project's APIs, with no consent screen."
+				: 'Identity assertions: no longer accepted.'
+		);
+	}
+	if (!same(from.plainAssertions, to.plainAssertions)) {
+		(to.plainAssertions ? widen : narrow).push(
+			to.plainAssertions
+				? `Plain assertions: ${to.plainAssertions.applications.join(', ') || 'no application'} may present the provider's assertions for ${to.plainAssertions.apis.map((api) => api.identifier).join(', ') || 'no API'}.`
+				: 'Plain assertions: no longer accepted.'
+		);
+	}
 	return { widen, narrow };
 }
 
@@ -563,6 +587,10 @@ function ProviderEditor({
 							label: 'Back-channel logout',
 							children: provider.acceptsBackChannelLogout ? 'Accepted' : 'Off'
 						},
+						{
+							label: 'Identity assertions (ID-JAG)',
+							children: provider.acceptsIdentityAssertions ? 'Accepted' : 'Off'
+						},
 						{ label: 'Callback address', children: provider.callbackUri },
 						{ label: 'Issuer', children: provider.issuer },
 						{ label: 'Client id', children: provider.clientId }
@@ -804,6 +832,16 @@ function ProviderEditor({
 				)}
 			</Card>
 
+			<AssertionsCard
+				bucketId={bucketId}
+				provider={provider}
+				github={github}
+				checked={draft.acceptsIdentityAssertions}
+				onChange={(v) => set('acceptsIdentityAssertions', v)}
+				plain={draft.plainAssertions}
+				onPlainChange={(v) => set('plainAssertions', v)}
+			/>
+
 			<Card title="Connection">
 				<Flex
 					vertical
@@ -999,6 +1037,247 @@ function ProviderEditor({
 					setDraft(baseline);
 				}}
 			/>
+		</Flex>
+	);
+}
+
+/*
+ * Whether this provider may vouch for people to the project's APIs with identity assertions (specs/108): the
+ * receiving side of MCP enterprise-managed authorization. Its own card, apart from the logout signals, because
+ * it lets more in rather than fewer.
+ */
+function AssertionsCard({
+	bucketId,
+	provider,
+	github,
+	checked,
+	onChange,
+	plain,
+	onPlainChange
+}: {
+	bucketId: string;
+	provider: ProviderDetail;
+	github: boolean;
+	checked: boolean;
+	onChange: (value: boolean) => void;
+	plain: PlainAssertionsView | null;
+	onPlainChange: (value: PlainAssertionsView | null) => void;
+}) {
+	const lastUsed = provider.assertionsLastUsedAt;
+	return (
+		<Card
+			title="Agents and assertions"
+			extra={<Tag color="orange">affects who can get tokens</Tag>}
+		>
+			{github ? (
+				<Typography.Text type="secondary">
+					{provider.displayName} publishes no signing keys, so its assertions
+					cannot be trusted.
+				</Typography.Text>
+			) : (
+				<Flex
+					vertical
+					gap={8}
+				>
+					<Flex
+						gap={12}
+						align="start"
+					>
+						<Switch
+							aria-label={LABELS.acceptsIdentityAssertions}
+							checked={checked}
+							onChange={onChange}
+						/>
+						<div>
+							<Typography.Text strong>
+								{LABELS.acceptsIdentityAssertions}
+							</Typography.Text>
+							<br />
+							<Typography.Text type="secondary">
+								Lets an agent your users signed in to through this provider get
+								tokens for this project's APIs without a browser or a consent
+								screen. The provider decides who may; this project still limits
+								what.
+							</Typography.Text>
+						</div>
+					</Flex>
+					{!provider.capabilities.identityAssertions && (
+						<Typography.Text type="secondary">
+							Turned off for this instance in Settings → Grants.
+						</Typography.Text>
+					)}
+					<Typography.Text type="secondary">
+						Last used:{' '}
+						{lastUsed === null
+							? 'never'
+							: new Date(lastUsed * 1000).toLocaleString()}
+					</Typography.Text>
+					<Collapse
+						ghost
+						items={[
+							{
+								key: 'plain',
+								label: 'Advanced: accept plain assertions',
+								children: (
+									<PlainAssertionsEditor
+										bucketId={bucketId}
+										value={plain}
+										onChange={onPlainChange}
+									/>
+								)
+							}
+						]}
+					/>
+				</Flex>
+			)}
+		</Card>
+	);
+}
+
+const JWT_BEARER = 'urn:ietf:params:oauth:grant-type:jwt-bearer';
+
+interface ApplicationChoice {
+	clientId: string;
+	clientName?: string;
+	grantTypes: string[];
+	tokenEndpointAuthMethod: string;
+}
+
+/* Every application is listed, so one that cannot present them says why rather than going missing. */
+function plainChoiceOf(application: ApplicationChoice) {
+	const name = application.clientName
+		? `${application.clientName} (${application.clientId})`
+		: application.clientId;
+	const why =
+		application.tokenEndpointAuthMethod === 'none'
+			? 'does not authenticate'
+			: application.grantTypes.includes(JWT_BEARER)
+				? null
+				: 'lacks the JWT bearer grant';
+	return {
+		value: application.clientId,
+		label: why ? `${name} — ${why}` : name,
+		disabled: why !== null
+	};
+}
+
+/*
+ * A plain RFC 7523 assertion names no client and no grant (specs/108 story 4), so the trust itself says which of
+ * the project's applications may present one and the most it may yield. The server checks every name.
+ */
+function PlainAssertionsEditor({
+	bucketId,
+	value,
+	onChange
+}: {
+	bucketId: string;
+	value: PlainAssertionsView | null;
+	onChange: (value: PlainAssertionsView | null) => void;
+}) {
+	const [applications, setApplications] = useState<ApplicationChoice[]>([]);
+	useEffect(() => {
+		let live = true;
+		void request<ApplicationChoice[]>(
+			'GET',
+			`/admin/api/projects/${encodeURIComponent(bucketId)}/clients`
+		).then((result) => {
+			if (live && result.ok) setApplications(result.data);
+		});
+		return () => {
+			live = false;
+		};
+	}, [bucketId]);
+	const apis = value?.apis ?? [];
+	const setApis = (next: PlainAssertionsView['apis']) =>
+		onChange({ applications: value?.applications ?? [], apis: next });
+	return (
+		<Flex
+			vertical
+			gap={8}
+			style={{ maxWidth: 560 }}
+		>
+			<Flex
+				gap={12}
+				align="start"
+			>
+				<Switch
+					aria-label={LABELS.plainAssertions}
+					checked={value !== null}
+					onChange={(on) =>
+						onChange(on ? { applications: [], apis: [] } : null)
+					}
+				/>
+				<Typography.Text type="secondary">
+					For a trusted system that signs short JWTs about a person — a legacy
+					identity system being migrated, a partner platform. Each assertion is
+					accepted once.
+				</Typography.Text>
+			</Flex>
+			{value && (
+				<>
+					<div>
+						<Typography.Text strong>
+							Applications that may present them
+						</Typography.Text>
+						<Select
+							aria-label="Applications that may present plain assertions"
+							mode="multiple"
+							showSearch={{ optionFilterProp: 'label' }}
+							options={applications.map(plainChoiceOf)}
+							value={value.applications}
+							onChange={(applications: string[]) =>
+								onChange({ ...value, applications })
+							}
+							style={{ display: 'block' }}
+						/>
+					</div>
+					<Typography.Text strong>
+						APIs and scopes they may yield
+					</Typography.Text>
+					{apis.map((api, index) => (
+						<Flex
+							key={index}
+							gap={8}
+						>
+							<Input
+								aria-label="API"
+								placeholder="https://api.example.com/"
+								value={api.identifier}
+								onChange={(e) =>
+									setApis(
+										apis.map((a, i) =>
+											i === index ? { ...a, identifier: e.target.value } : a
+										)
+									)
+								}
+							/>
+							<Select
+								aria-label="Scopes"
+								mode="tags"
+								placeholder="Scopes"
+								value={api.scopes}
+								onChange={(scopes: string[]) =>
+									setApis(
+										apis.map((a, i) => (i === index ? { ...a, scopes } : a))
+									)
+								}
+								style={{ minWidth: 200 }}
+							/>
+							<Button
+								aria-label="Remove API"
+								onClick={() => setApis(apis.filter((_, i) => i !== index))}
+							>
+								Remove
+							</Button>
+						</Flex>
+					))}
+					<Button
+						onClick={() => setApis([...apis, { identifier: '', scopes: [] }])}
+					>
+						Add API
+					</Button>
+				</>
+			)}
 		</Flex>
 	);
 }

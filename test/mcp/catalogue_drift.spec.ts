@@ -184,6 +184,9 @@ describe('MCP tool catalogue', () => {
 			'jwks_retire',
 			'jwks_revoke',
 			'jwks_rotate',
+			'outside_authorization_server_create',
+			'outside_authorization_server_delete',
+			'outside_authorization_server_update',
 			'plan_create',
 			'plan_delete',
 			'plan_update',
@@ -252,12 +255,16 @@ describe('MCP tool catalogue', () => {
 
 	/*
 	 * The third shape of the gate: high when the call sets particular arguments (`highWhenSets`). For a
-	 * client, where it may send codes and how it proves itself; every named argument must exist on the tool,
-	 * or the gate would never fire.
+	 * client, where it may send codes and how it proves itself; for a provider, whether the project trusts its
+	 * assertions (specs/108). Every named argument must exist on the tool, or the gate would never fire.
 	 */
 	it('names every tool that is high-consequence for some arguments, each argument one the tool takes', () => {
 		const sometimes = mcpCatalogue.filter((t) => t.highWhenSets !== undefined);
-		expect(sometimes.map((t) => t.tool).sort()).toEqual(['client_update']);
+		expect(sometimes.map((t) => t.tool).sort()).toEqual([
+			'client_update',
+			'federation_provider_create',
+			'federation_provider_update'
+		]);
 		for (const tool of sometimes) {
 			expect(mayBeHigh(tool)).toBe(true);
 			const properties = Object.keys(

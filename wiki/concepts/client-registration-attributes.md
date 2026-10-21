@@ -80,7 +80,9 @@ algorithms as well as its method, so it is a cross-field rule.
 Rules that are predicates over the whole registration rather than one attribute: the conditional
 mandatory rules in `required()` (`lib/models/client/schema.ts:187`), the pairwise-grant rule in
 `pairwiseGrantAuthMethod()` (`lib/models/client/schema.ts:307`), and the list in `crossFieldRules()`
-(`lib/models/client/schema.ts:431`). Eleven refusals in all, and the complete set.
+(`lib/models/client/schema.ts:431`). Twelve refusals in all, and the complete set — spec 108 added the
+twelfth: declaring the ID-JAG grant profile in `authorization_grant_profiles_supported` requires both the
+token-exchange and the JWT bearer grant (ID-JAG §8, [[enterprise-managed-authorization]]).
 
 `pairwiseGrantAuthMethod()` is raised at the moment the authentication method's value set is
 consulted, not with the other cross-field rules. That is where it has always fired, and moving it would
