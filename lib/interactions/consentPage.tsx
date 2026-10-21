@@ -28,6 +28,7 @@ import {
 } from '../i18n/texts/consent/index.js';
 import { buildUILoginPath } from './buildUIPath.js';
 import { DEFAULT_LOGO } from './logo.js';
+import { ClientLogo } from './signInMasthead.js';
 import { LanguageSwitch, type SwitcherProps } from './languageSwitch.js';
 import { foxVar } from '../html/theme/palette.js';
 
@@ -624,36 +625,6 @@ function AppLinks({
 				))}
 			</Flex>
 		</nav>
-	);
-}
-
-/*
- * The app's own logo, on a plain tile so a picture with no background of its own still reads as a tile and
- * not as part of the page. Named by the app's name: the image is who is asking, not decoration.
- */
-function ClientLogo({ src, name }: { src: string; name: string }) {
-	return (
-		<span
-			style={{
-				flex: 'none',
-				display: 'block',
-				width: 40,
-				height: 40,
-				padding: 3,
-				boxSizing: 'border-box',
-				background: foxVar('logo-plate'),
-				border: `1px solid ${foxVar('logo-plate-border')}`,
-				borderRadius: 8
-			}}
-		>
-			<img
-				src={src}
-				alt={name}
-				width={32}
-				height={32}
-				style={{ display: 'block', objectFit: 'contain' }}
-			/>
-		</span>
 	);
 }
 

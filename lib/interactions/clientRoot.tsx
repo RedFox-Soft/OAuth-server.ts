@@ -4,6 +4,7 @@ import { ConsentPage } from './consentPage.tsx';
 import { emptyConsentView } from './consentView.ts';
 import { RegistrationPage } from './registration.tsx';
 import { TotpPage } from './totpPage.tsx';
+import type { SignInFace } from './signInMasthead.tsx';
 import { EndUserTheme } from '../html/theme/provider.tsx';
 import type { PaintedAccent } from '../html/theme/accent.ts';
 import { isLanguage } from '../i18n/languages.ts';
@@ -40,6 +41,13 @@ export function clientRoot(
 	);
 }
 
+/*
+ * Only for the type: the server puts the page's face in the props of every sign-in page, and the spread that
+ * follows it wins. A page hydrated without one would lose its heading in the browser, which the hydration
+ * tests would see.
+ */
+const UNNAMED: SignInFace = { service: '' };
+
 function pageElement(
 	page: string | undefined,
 	uid: string,
@@ -50,6 +58,7 @@ function pageElement(
 			return (
 				<LoginPage
 					uid={uid}
+					face={UNNAMED}
 					{...props}
 				/>
 			);
@@ -67,6 +76,7 @@ function pageElement(
 			return (
 				<RegistrationPage
 					uid={uid}
+					face={UNNAMED}
 					{...props}
 				/>
 			);
@@ -84,6 +94,7 @@ function pageElement(
 			return (
 				<TotpPage
 					uid={uid}
+					face={UNNAMED}
 					mode="verify"
 					{...props}
 				/>

@@ -4,7 +4,7 @@ title: 'An application’s primary colour on its sign-in pages'
 tags: [architecture, contract, gotcha, accessibility, security]
 sources: [oauth-server-codebase]
 created: 2026-10-19
-updated: 2026-10-19
+updated: 2026-10-21
 graph:
   node_type: concept
   relationships:
@@ -76,8 +76,24 @@ It decides once, from facts, never from which warning a page happens to show:
   Spec 106 moved the logo onto this decision (`consentView.ts:678`, `lib/interactions/index.ts:727`);
   `test/client_branding/logo.spec.ts` holds it.
 
-Every render of the four pages spreads `accentFor(interaction, signsInto)` (`index.ts:996`). On a POST, the
-handler's resolved `bucketId` is the same value as `signsInto`.
+Every render of the sign-in, registration and two-step pages spreads `signInLook(interaction, signsInto)`
+(`branding.ts:66`, `index.ts:992`; it was `accentFor` until 2026-10-21). On a POST, the handler's resolved
+`bucketId` is the same value as `signsInto`.
+
+## The names on the page (2026-10-21)
+
+`signInLook` also returns a `face`, which `SignInMasthead` (`lib/interactions/signInMasthead.tsx`) draws at the top
+of those three pages as the consent page opens: the server's mark beside the project's name, then the heading.
+
+- **The project is always named**, by `shownNameOf` — the display name, else the issuer's host — never the
+  console-only `name`. A page without a face (a direct `loginServer` call) names the instance's host.
+- **The application is named by this decision, and only by it**, with its logo: "Sign in to Timesheets",
+  "Create an account for Timesheets". Otherwise the heading names the account ("Sign in to your Acme account").
+  These pages carry no warning that could qualify a name, so anyone could register "Acme Payroll" and have
+  the page vouch for it. The name passes `sanitiseClientName` first, as on consent.
+- The console's Sign-in tab preview gets the same name from the project detail's `shownName`
+  (`lib/admin/buckets/routes.ts:760`): the console cannot compute a project's host without an address.
+- `test/client_branding/names.spec.ts` holds it for the four shapes that are never named.
 
 ## The nearest legible shade (`paintedAccent`)
 

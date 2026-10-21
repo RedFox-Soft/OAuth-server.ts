@@ -12,7 +12,16 @@ export const en = {
 		totpVerify: 'Two-Step Verification'
 	},
 
-	logoAlt: 'Logo',
+	/*
+	 * The heading under the project's name (signInMasthead.tsx). The application is named only when its project
+	 * stands behind it; otherwise the page names the account the person is signing in to.
+	 */
+	headings: {
+		login: 'Sign in to your {service} account',
+		loginToApp: 'Sign in to {app}',
+		registration: 'Create your {service} account',
+		registrationForApp: 'Create an account for {app}'
+	},
 
 	login: {
 		emailRequired: 'Please input your Email!',
@@ -34,7 +43,6 @@ export const en = {
 	},
 
 	registration: {
-		heading: 'Create Account',
 		emailRequired: 'Please input your Email!',
 		emailInvalid: 'Please enter a valid Email!',
 		emailPlaceholder: 'Email',

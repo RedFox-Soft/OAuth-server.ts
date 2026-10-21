@@ -8,7 +8,12 @@ export const zhHans: SignInTexts = {
 		totpVerify: '两步验证'
 	},
 
-	logoAlt: '徽标',
+	headings: {
+		login: '登录您的{service}账户',
+		loginToApp: '登录{app}',
+		registration: '创建您的{service}账户',
+		registrationForApp: '注册{app}'
+	},
 
 	login: {
 		emailRequired: '请输入电子邮件地址！',
@@ -27,7 +32,6 @@ export const zhHans: SignInTexts = {
 	},
 
 	registration: {
-		heading: '创建账户',
 		emailRequired: '请输入电子邮件地址！',
 		emailInvalid: '请输入有效的电子邮件地址！',
 		emailPlaceholder: '电子邮件地址',

@@ -6,6 +6,7 @@ import {
 import { Button, Card, Flex, Form, Input } from 'antd';
 import { buildUILoginPath, buildUIRegistrationPath } from './buildUIPath.js';
 import { DEFAULT_LOGO } from './logo.js';
+import { SignInMasthead, type SignInFace } from './signInMasthead.js';
 import { foxVar } from '../html/theme/palette.js';
 import { LanguageSwitch, type SwitcherProps } from './languageSwitch.js';
 import { useLanguage } from '../i18n/context.js';
@@ -17,7 +18,8 @@ export function RegistrationPage({
 	errorMessage,
 	email,
 	logoSrc = DEFAULT_LOGO,
-	switcher
+	switcher,
+	face
 }: {
 	uid: string;
 	errorMessage?: string;
@@ -25,6 +27,8 @@ export function RegistrationPage({
 	/* The logo's versioned address, from the server: see LoginPage. */
 	logoSrc?: string;
 	switcher?: SwitcherProps;
+	/* Where this sign-in leads: see LoginPage. */
+	face: SignInFace;
 }) {
 	const T = SIGN_IN_TEXTS[useLanguage()];
 	return (
@@ -45,14 +49,23 @@ export function RegistrationPage({
 					boxShadow: `0 2px 8px ${foxVar('shadow')}`
 				}}
 			>
-				<div style={{ textAlign: 'center', marginBottom: 24 }}>
-					<img
-						src={logoSrc}
-						alt={T.logoAlt}
-						style={{ width: 120 }}
-					/>
-					<h2>{T.registration.heading}</h2>
-				</div>
+				<SignInMasthead
+					face={face}
+					logoSrc={logoSrc}
+					heading={
+						face.app ? (
+							<Message
+								t={T.headings.registrationForApp}
+								values={{ app: face.app.name }}
+							/>
+						) : (
+							<Message
+								t={T.headings.registration}
+								values={{ service: face.service }}
+							/>
+						)
+					}
+				/>
 				<Form
 					name="registration"
 					method="post"

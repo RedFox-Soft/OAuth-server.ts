@@ -293,6 +293,7 @@ export function SignInTab({
 	const preview = (
 		<SignInPreview
 			bucketId={bucket._id}
+			service={bucket.shownName ?? bucket.displayName ?? ''}
 			draft={editable ? draft : baseline}
 			providers={providers}
 			federationOn={summary ? summary.federationEnabled : null}

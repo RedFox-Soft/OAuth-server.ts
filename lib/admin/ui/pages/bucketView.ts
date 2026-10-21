@@ -39,6 +39,8 @@ export interface BucketView extends Omit<
 	addressForm?: 'root' | 'path' | 'subdomain' | 'host' | 'unaddressed';
 	issuer?: string | null;
 	discoveryUrl?: string | null;
+	/* What its sign-in pages call it: the display name, else the host people sign in at. */
+	shownName?: string;
 	/* What it holds besides its people (specs/099). */
 	applications?: number;
 	apis?: number;

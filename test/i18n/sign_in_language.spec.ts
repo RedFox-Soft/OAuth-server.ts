@@ -170,7 +170,7 @@ describe('the language of the sign-in pages', () => {
 		const page = await get(`/ui/${uid}/registration`, cookie);
 
 		expect(langOf(page.html)).toBe('ru');
-		expect(page.html).toContain(SIGN_IN_TEXTS.ru.registration.heading);
+		expect(page.html).toContain(SIGN_IN_TEXTS.ru.registration.submit);
 	});
 
 	it('keeps the consent page in the language the sign-in started in, even when the account’s stored language differs', async () => {

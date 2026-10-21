@@ -5,6 +5,7 @@ import {
 import { Button, Card, Flex, Form, Input, QRCode, Typography } from 'antd';
 import { buildUIPath } from './buildUIPath.js';
 import { DEFAULT_LOGO } from './logo.js';
+import { SignInMasthead, type SignInFace } from './signInMasthead.js';
 import { foxVar } from '../html/theme/palette.js';
 import { LanguageSwitch, type SwitcherProps } from './languageSwitch.js';
 import { useLanguage } from '../i18n/context.js';
@@ -35,6 +36,8 @@ export interface TotpPageProps {
 	/* The logo's versioned address, from the server: see LoginPage. */
 	logoSrc?: string;
 	switcher?: SwitcherProps;
+	/* Where this sign-in leads: see LoginPage. */
+	face: SignInFace;
 }
 
 function ErrorBanner({ message }: { message: string }) {
@@ -69,7 +72,8 @@ export function TotpPage({
 	otpauthUri,
 	secretText,
 	logoSrc = DEFAULT_LOGO,
-	switcher
+	switcher,
+	face
 }: TotpPageProps) {
 	const T = SIGN_IN_TEXTS[useLanguage()];
 	const enrolling = mode === 'enroll';
@@ -93,20 +97,17 @@ export function TotpPage({
 					boxShadow: `0 2px 8px ${foxVar('shadow')}`
 				}}
 			>
-				<div style={{ textAlign: 'center', marginBottom: 24 }}>
-					<img
-						src={logoSrc}
-						alt={T.logoAlt}
-						style={{ width: 120 }}
-					/>
-					<h2>{enrolling ? T.totp.enrollHeading : T.totp.verifyHeading}</h2>
-					<Typography.Text
-						type="secondary"
-						style={{ fontSize: 13 }}
-					>
-						{enrolling ? T.totp.enrollHint : T.totp.verifyHint}
-					</Typography.Text>
-				</div>
+				<SignInMasthead
+					face={face}
+					logoSrc={logoSrc}
+					heading={enrolling ? T.totp.enrollHeading : T.totp.verifyHeading}
+				/>
+				<Typography.Paragraph
+					type="secondary"
+					style={{ fontSize: 13, marginTop: -12, marginBottom: 24 }}
+				>
+					{enrolling ? T.totp.enrollHint : T.totp.verifyHint}
+				</Typography.Paragraph>
 
 				{enrolling && otpauthUri && (
 					<Flex

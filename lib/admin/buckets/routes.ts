@@ -92,6 +92,7 @@ import {
 import { agentClients } from './agent_clients.js';
 import {
 	addressing,
+	shownNameOf,
 	addressOf,
 	hasOwnOrigin,
 	issuerFor
@@ -755,6 +756,8 @@ async function bucketDetail(ctx: AdminContext, bucket: UserBucket) {
 		 * bundle (lib/configs/issuer.ts).
 		 */
 		...addressing(bucket),
+		/* The name its sign-in pages open with — the display name, else the host — for the Sign-in tab's preview. */
+		shownName: shownNameOf(bucket),
 		/* What a change to this bucket's sign-in reaches: its applications and the APIs they call. */
 		applications: applications.length,
 		apis: apis.length,

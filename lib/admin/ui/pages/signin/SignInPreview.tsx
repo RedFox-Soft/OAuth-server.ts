@@ -18,12 +18,15 @@ import { foxVarsFor } from '../../../../html/theme/palette.js';
  */
 export function SignInPreview({
 	bucketId,
+	service,
 	draft,
 	providers,
 	federationOn,
 	loading
 }: {
 	bucketId: string;
+	/* The name the page opens with: the project's display name, else its address. */
+	service: string;
 	draft: PreviewDraft;
 	/* Null until read, or when the read failed: the buttons are then unknown, not absent. */
 	providers: FederationProvider[] | null;
@@ -95,6 +98,7 @@ export function SignInPreview({
 						passwordReset={options.passwordReset}
 						providers={options.providers}
 						providersOpen
+						face={{ service }}
 					/>
 				</div>
 				<Typography.Text

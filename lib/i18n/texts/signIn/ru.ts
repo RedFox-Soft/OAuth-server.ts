@@ -8,7 +8,12 @@ export const ru: SignInTexts = {
 		totpVerify: 'Двухэтапная проверка'
 	},
 
-	logoAlt: 'Логотип',
+	headings: {
+		login: 'Вход в аккаунт {service}',
+		loginToApp: 'Вход в {app}',
+		registration: 'Создайте аккаунт {service}',
+		registrationForApp: 'Регистрация в {app}'
+	},
 
 	login: {
 		emailRequired: 'Введите адрес электронной почты',
@@ -27,7 +32,6 @@ export const ru: SignInTexts = {
 	},
 
 	registration: {
-		heading: 'Создание аккаунта',
 		emailRequired: 'Введите адрес электронной почты',
 		emailInvalid: 'Введите правильный адрес электронной почты',
 		emailPlaceholder: 'Электронная почта',

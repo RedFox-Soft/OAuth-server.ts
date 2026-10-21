@@ -7,6 +7,8 @@ import { TotpPage } from './totpPage.js';
 import type { ConsentView } from './consentView.js';
 import type { SwitcherProps } from './languageSwitch.js';
 import type { OfferedProvider } from './signInOptions.js';
+import type { SignInFace } from './signInMasthead.js';
+import { ISSUER } from '../configs/env.js';
 import type { Language } from '../i18n/languages.js';
 import { CONSENT_TEXTS } from '../i18n/texts/consent/index.js';
 import { SIGN_IN_TEXTS } from '../i18n/texts/signIn/index.js';
@@ -16,6 +18,14 @@ import { renderEndUserTree } from '../html/theme/dark.js';
 import { accentStyle, type PaintedAccent } from '../html/theme/accent.js';
 
 const htmlTeamplate = Bun.file('./lib/interactions/htmlTeamplate.html');
+
+/*
+ * A page rendered without saying where its sign-in leads names the instance: never nothing, and never a project
+ * or an application nobody resolved.
+ */
+function faceOr(face: SignInFace | undefined): SignInFace {
+	return face ?? { service: new URL(ISSUER).host };
+}
 
 // escape `<` so a client name / scope value can't break out of the script tag
 function propsScript(props: unknown): string {
@@ -105,10 +115,12 @@ export async function loginServer(
 		language?: Language;
 		switcher?: SwitcherProps;
 		accent?: PaintedAccent;
+		face?: SignInFace;
 	} = {}
 ) {
 	const { errorMessage, switcher } = options;
 	const language = options.language ?? 'en';
+	const face = faceOr(options.face);
 	// Exclusivity is a property of this function rather than a promise made at each call site: a rejected
 	// submission must never be accompanied by the notice the page was reached with.
 	const notice = errorMessage ? undefined : options.notice;
@@ -141,7 +153,8 @@ export async function loginServer(
 			providers,
 			providersOpen,
 			logoSrc,
-			switcher
+			switcher,
+			face
 		},
 		<LoginPage
 			uid={uid}
@@ -155,6 +168,7 @@ export async function loginServer(
 			providersOpen={providersOpen}
 			logoSrc={logoSrc}
 			switcher={switcher}
+			face={face}
 		/>,
 		language,
 		options.accent
@@ -176,10 +190,12 @@ export async function registrationServer(
 		language?: Language;
 		switcher?: SwitcherProps;
 		accent?: PaintedAccent;
+		face?: SignInFace;
 	} = {}
 ) {
 	const { errorMessage, email, switcher } = options;
 	const language = options.language ?? 'en';
+	const face = faceOr(options.face);
 
 	// Here and nowhere else: the version is the file's build time, which only the server can read (see LoginPage).
 	const logoSrc = versionedAsset('logo.svg');
@@ -189,13 +205,14 @@ export async function registrationServer(
 	const html = hydratedPage(
 		await htmlTeamplate.text(),
 		SIGN_IN_TEXTS[language].titles.registration,
-		{ uid, errorMessage, email, logoSrc, switcher },
+		{ uid, errorMessage, email, logoSrc, switcher, face },
 		<RegistrationPage
 			uid={uid}
 			errorMessage={errorMessage}
 			email={email}
 			logoSrc={logoSrc}
 			switcher={switcher}
+			face={face}
 		/>,
 		language,
 		options.accent
@@ -219,10 +236,12 @@ export async function totpServer(
 		language?: Language;
 		switcher?: SwitcherProps;
 		accent?: PaintedAccent;
+		face?: SignInFace;
 	}
 ) {
 	const { mode, errorMessage, otpauthUri, secretText, switcher } = options;
 	const language = options.language ?? 'en';
+	const face = faceOr(options.face);
 	const T = SIGN_IN_TEXTS[language];
 
 	// Here and nowhere else: the version is the file's build time, which only the server can read (see LoginPage).
@@ -235,7 +254,16 @@ export async function totpServer(
 	const html = hydratedPage(
 		await htmlTeamplate.text(),
 		mode === 'enroll' ? T.titles.totpEnroll : T.titles.totpVerify,
-		{ uid, mode, errorMessage, otpauthUri, secretText, logoSrc, switcher },
+		{
+			uid,
+			mode,
+			errorMessage,
+			otpauthUri,
+			secretText,
+			logoSrc,
+			switcher,
+			face
+		},
 		<TotpPage
 			uid={uid}
 			mode={mode}
@@ -244,6 +272,7 @@ export async function totpServer(
 			secretText={secretText}
 			logoSrc={logoSrc}
 			switcher={switcher}
+			face={face}
 		/>,
 		language,
 		options.accent

@@ -13,6 +13,7 @@ import {
 	buildUIPath
 } from './buildUIPath.js';
 import { DEFAULT_LOGO } from './logo.js';
+import { SignInMasthead, type SignInFace } from './signInMasthead.js';
 import { knownProvider } from '../consts/known_providers.js';
 import { genericMark, providerMark } from './providerMark.js';
 import { LanguageSwitch, type SwitcherProps } from './languageSwitch.js';
@@ -34,7 +35,8 @@ export function LoginPage({
 	providersOpen = false,
 	logoSrc = DEFAULT_LOGO,
 	embedded = false,
-	switcher
+	switcher,
+	face
 }: {
 	uid: string;
 	errorMessage?: string;
@@ -63,6 +65,8 @@ export function LoginPage({
 	embedded?: boolean;
 	/* The language switch (specs/097), present only for a visitor with a language other than English. */
 	switcher?: SwitcherProps;
+	/* Where this sign-in leads: the project, and the application when its project stands behind it. */
+	face: SignInFace;
 }) {
 	const T = SIGN_IN_TEXTS[useLanguage()];
 	const link = (provider: OfferedProvider) => (
@@ -144,13 +148,23 @@ export function LoginPage({
 					boxShadow: `0 2px 8px ${foxVar('shadow')}`
 				}}
 			>
-				<div style={{ textAlign: 'center', marginBottom: 24 }}>
-					<img
-						src={logoSrc}
-						alt={T.logoAlt}
-						style={{ width: 120 }}
-					/>
-				</div>
+				<SignInMasthead
+					face={face}
+					logoSrc={logoSrc}
+					heading={
+						face.app ? (
+							<Message
+								t={T.headings.loginToApp}
+								values={{ app: face.app.name }}
+							/>
+						) : (
+							<Message
+								t={T.headings.login}
+								values={{ service: face.service }}
+							/>
+						)
+					}
+				/>
 				{/*
 				 * Above the form rather than inside it, so a notice still leads a page that has no password form
 				 * and opens with provider buttons (specs/105).

@@ -124,7 +124,7 @@ import {
 import { adapter } from 'lib/adapters/index.js';
 import { grantTypeAllowed } from 'lib/models/client.js';
 import { readLogo } from 'lib/models/client/logo.js';
-import { brandingFor, signInBranding } from 'lib/interactions/branding.js';
+import { brandingFor, signInLook } from 'lib/interactions/branding.js';
 import type { PaintedAccent } from 'lib/html/theme/accent.js';
 import { profileClaims } from 'lib/consts/profile_claims.js';
 import { hasOwnOrigin, issuerFor, shownNameOf } from 'lib/configs/issuer.js';
@@ -989,7 +989,7 @@ async function unverifiedAtSignIn(
 		handOffTo: redirectUriOf(interaction),
 		language: languageOf(interaction),
 		switcher: switcherOf(interaction, 'login'),
-		...(await accentFor(interaction, bucket._id)),
+		...(await signInLook(interaction, bucket._id)),
 		...loginOptions
 	});
 }
@@ -997,18 +997,6 @@ async function unverifiedAtSignIn(
 /* The client that began an interaction — the only trustworthy route to a bucket. */
 function clientIdOf(interaction: Interaction): string | undefined {
 	return interaction.payload.params?.client_id;
-}
-
-/*
- * The application's own colour for a page of this sign-in, when it may show one (specs/106) — spread into
- * every render of the sign-in, two-step, registration and consent pages, so they agree.
- */
-async function accentFor(
-	interaction: Interaction,
-	signsInto: string
-): Promise<{ accent?: PaintedAccent }> {
-	const { accent } = await signInBranding(interaction, signsInto);
-	return accent ? { accent } : {};
 }
 
 /*
@@ -1205,7 +1193,7 @@ export const ui = new Elysia()
 				handOffTo: redirectUriOf(interaction),
 				language: languageOf(interaction),
 				switcher: switcherOf(interaction, 'login'),
-				...(await accentFor(interaction, signsInto)),
+				...(await signInLook(interaction, signsInto)),
 				...(await loginOptionsForClient(
 					clientId,
 					resourceOf(interaction),
@@ -1234,7 +1222,7 @@ export const ui = new Elysia()
 			 * once is not only cheaper — two lookups are two chances to disagree about one bucket.
 			 */
 			const loginOptions = await loginOptionsForBucket(bucketId);
-			const branded = await accentFor(interaction, bucketId);
+			const branded = await signInLook(interaction, bucketId);
 
 			/*
 			 * The one refusal this door gives. Every path that turns a sign-in away shares this expression
@@ -1413,7 +1401,7 @@ export const ui = new Elysia()
 			handOffTo: redirectUriOf(interaction),
 			language: languageOf(interaction),
 			switcher: switcherOf(interaction, 'totp'),
-			...(await accentFor(interaction, bucketId))
+			...(await signInLook(interaction, bucketId))
 		});
 	})
 	.post(
@@ -1429,7 +1417,7 @@ export const ui = new Elysia()
 				resourceOf(interaction),
 				await addressedBucketOf(interaction)
 			);
-			const branded = await accentFor(interaction, bucketId);
+			const branded = await signInLook(interaction, bucketId);
 			const refuse = () =>
 				totpServer(uid, {
 					mode: 'verify',
@@ -1535,7 +1523,7 @@ export const ui = new Elysia()
 			handOffTo: redirectUriOf(interaction),
 			language: languageOf(interaction),
 			switcher: switcherOf(interaction, 'totp/enroll'),
-			...(await accentFor(interaction, bucketId))
+			...(await signInLook(interaction, bucketId))
 		});
 	})
 	.post(
@@ -1608,7 +1596,7 @@ export const ui = new Elysia()
 					handOffTo: redirectUriOf(interaction),
 					language: languageOf(interaction),
 					switcher: switcherOf(interaction, 'totp/enroll'),
-					...(await accentFor(interaction, bucketId))
+					...(await signInLook(interaction, bucketId))
 				});
 			}
 
@@ -1897,7 +1885,7 @@ export const ui = new Elysia()
 				handOffTo: redirectUriOf(interaction),
 				language: languageOf(interaction),
 				switcher: switcherOf(interaction, 'registration'),
-				...(await accentFor(interaction, signsInto))
+				...(await signInLook(interaction, signsInto))
 			});
 		}
 	)
@@ -1935,7 +1923,7 @@ export const ui = new Elysia()
 					handOffTo: redirectUriOf(interaction),
 					language: languageOf(interaction),
 					switcher: switcherOf(interaction, 'registration'),
-					...(await accentFor(interaction, bucketId))
+					...(await signInLook(interaction, bucketId))
 				});
 			}
 			// Before the existing-address branch, so a short password is refused the same way whether or
@@ -1950,7 +1938,7 @@ export const ui = new Elysia()
 					handOffTo: redirectUriOf(interaction),
 					language: languageOf(interaction),
 					switcher: switcherOf(interaction, 'registration'),
-					...(await accentFor(interaction, bucketId))
+					...(await signInLook(interaction, bucketId))
 				});
 			}
 

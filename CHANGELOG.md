@@ -17,6 +17,11 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   they will see. A registration or metadata document cannot set it. The consent logo now follows the same rule per
   sign-in, which also keeps it off a device's consent page that asks for administrator rights. No migration and no
   new storage area.
+- **Sign-in pages say where they lead.** The sign-in, registration and two-step pages open with the project's name
+  (its display name, else its host) and, for an application its project stands behind, the application's name and
+  logo — "Sign in to Timesheets". An app that registered itself, another tenant's, a device's sign-in or one that
+  answers to a program on the person's computer is never named; the page names the account instead. The project
+  detail gains `shownName`.
 - **`prompt=create`** (OpenID Connect Initiating User Registration 1.0): an application can open its user's sign-in
   on account creation; where the project takes no sign-ups the user gets its sign-in page instead. Discovery now
   publishes `prompt_values_supported`. `GET /admin/signup` opens the console's registration the same way, and the
