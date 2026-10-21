@@ -34,6 +34,7 @@ import {
 	superAdminIds,
 	withdrawSuperAdmin
 } from '../super_admins.js';
+import { revokeAccountAccess } from '../../end_users/revoke_access.js';
 
 const store = () => getUserStore(ADMIN_BUCKET_ID);
 
@@ -324,5 +325,11 @@ export const adminUserRoutes = new Elysia({ name: 'admin-users' })
 		await recordAdminAudit(ctx, 'admin.deactivate', params.id);
 		const updated = await store().update(params.id, { active: false });
 		if (!updated) throw new AdminError(404, 'admin not found');
+		/*
+		 * Everything they hold ends now, as it does for an end user made unable to sign in. The console and `/mcp`
+		 * re-read `active` on every request and `findAccount` refuses a refresh, but an application of the
+		 * administrators' project (specs/109) holds tokens that would otherwise live out their lifetime.
+		 */
+		await revokeAccountAccess(params.id);
 		return { ok: true };
 	});

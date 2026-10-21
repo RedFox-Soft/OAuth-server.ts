@@ -553,6 +553,33 @@ const catalogue = [
 		summary:
 			'One SCIM provisioning connection: everything a directory administrator needs to configure it, which credentials it holds, which kinds of credential this instance would issue it now (`availableCredentialKinds`), and how many users and groups it manages. Never returns a secret or a static token.'
 	},
+	/* ---------------- reads: applications in the administrators' project (specs/109) */
+	{
+		tool: 'administrator_application_list',
+		method: 'GET',
+		path: '/admin/api/administrators/applications',
+		action: null,
+		consequence: 'read',
+		superAdminOnly: true,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: [],
+		summary:
+			"The applications a super administrator registered in the administrators' project so internal tools can sign the instance's administrators in: each one's name, client id, redirect and sign-out addresses, authentication method, whether it gets refresh tokens, the root issuer it uses and when it was last used. Registering, changing and deleting them is console-only."
+	},
+	{
+		tool: 'administrator_application_get',
+		method: 'GET',
+		path: '/admin/api/administrators/applications/:clientId',
+		action: null,
+		consequence: 'read',
+		superAdminOnly: true,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['clientId'],
+		summary:
+			"One application of the administrators' project, as administrator_application_list describes it. The console's and the agent's own clients are not among them and answer as unknown."
+	},
 	{
 		tool: 'outside_authorization_server_list',
 		method: 'GET',
@@ -2082,6 +2109,40 @@ export const excludedConsoleOperations: readonly ExcludedConsoleOperation[] = [
 		absence: 'withheld',
 		reason:
 			'Withdrawing a permitted identity is how an operator revokes administrative access — including, potentially, the agent making the call. Console-only.'
+	},
+	/*
+	 * Applications in the administrators' project (specs/109), the writes. Registering one decides which
+	 * outside service may sign the instance's administrators in — the same class as permitting another client
+	 * identity above, and for the same reason an operator gains nothing from automating it. The reads are
+	 * published.
+	 */
+	{
+		method: 'POST',
+		path: '/admin/api/administrators/applications',
+		absence: 'withheld',
+		reason:
+			"Registering an application in the administrators' project decides which outside service may sign this instance's administrators in. A super administrator does this in the console."
+	},
+	{
+		method: 'PATCH',
+		path: '/admin/api/administrators/applications/:clientId',
+		absence: 'withheld',
+		reason:
+			"Changing an administrators' application — where it may send administrators back to, how it authenticates — changes who receives administrators' identities. Console-only, beside registering it."
+	},
+	{
+		method: 'POST',
+		path: '/admin/api/administrators/applications/:clientId/secret',
+		absence: 'withheld',
+		reason:
+			"A new secret for an administrators' application is a credential that signs administrators in to an outside service, and is shown once to whoever rotates it. Console-only."
+	},
+	{
+		method: 'DELETE',
+		path: '/admin/api/administrators/applications/:clientId',
+		absence: 'withheld',
+		reason:
+			"Deleting an administrators' application ends every administrator's sign-in to that tool at once. Console-only, beside registering it."
 	},
 	{
 		method: 'POST',

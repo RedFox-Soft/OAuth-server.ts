@@ -35,6 +35,7 @@ import {
 	revokeReused,
 	usableRefreshToken
 } from '../../shared/refresh_token_validation.js';
+import { conformedIdTokenScope } from '../../consts/groups_claim.js';
 
 function rarSupported(token: RefreshToken) {
 	// The payload's `gty`: the model has no top-level accessor for it (token-payload-access-contract).
@@ -248,7 +249,7 @@ export const handler = async function refreshTokenHandler(
 			ApplicationConfig['userinfo.enabled'] &&
 			!at.payload.aud
 		) {
-			token.scope = 'openid';
+			token.scope = conformedIdTokenScope(grant.getOIDCScopeFiltered(scope));
 		} else {
 			token.scope = grant.getOIDCScopeFiltered(scope);
 		}

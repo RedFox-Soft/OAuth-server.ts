@@ -12,9 +12,15 @@ import { FederationPanel } from '../FederationPanel.js';
 import { BucketActivityPanel } from '../BucketActivityPanel.js';
 import { GeneralCard } from '../BucketSettings.js';
 import { Admins } from '../Admins.js';
+import { ApplicationsPanel } from './ApplicationsPanel.js';
 
 export type AdministratorsTab =
-	'accounts' | 'signIn' | 'providers' | 'activity' | 'settings';
+	| 'accounts'
+	| 'signIn'
+	| 'providers'
+	| 'applications'
+	| 'activity'
+	| 'settings';
 
 const TABS: { key: AdministratorsTab; segment?: string; label: string }[] = [
 	{ key: 'accounts', label: 'Accounts' },
@@ -24,6 +30,7 @@ const TABS: { key: AdministratorsTab; segment?: string; label: string }[] = [
 		segment: 'identity-providers',
 		label: 'Identity providers'
 	},
+	{ key: 'applications', segment: 'applications', label: 'Applications' },
 	{ key: 'activity', segment: 'activity', label: 'Activity' },
 	{ key: 'settings', segment: 'settings', label: 'Settings' }
 ];
@@ -71,6 +78,7 @@ export function AdministratorsHome({ tab }: { tab: AdministratorsTab }) {
 	const can = bucketCan(bucket);
 
 	const body = () => {
+		if (tab === 'applications') return <ApplicationsPanel />;
 		if (tab === 'accounts') {
 			return (
 				<Admins

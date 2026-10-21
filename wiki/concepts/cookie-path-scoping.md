@@ -125,6 +125,11 @@ never checked here at all — so a token minted for one population ended another
 comparison is by cookie *name*, not by project id, because projects that share a cookie share a sign-in
 and their clients have always ended each other's at the bare endpoints.
 
+**Corrected by spec 109 (2026-10-21) for the administrators' sign-in.** An administrators'-bucket client at the root
+now ends the administrators' sign-in: the first leg resolves the client before reading the session, and carries the
+choice to the second leg as `?administrators` on the confirmation's address, where the session's own xsrf secret
+keeps a wrong choice from doing anything ([[administrators-applications]]).
+
 The fix is one field with one writer. `OIDCContext.signInBucket` defaults to `bucket` — the address,
 which is the honest answer everywhere else — and the authorization pipeline assigns it from
 `checkBucket`'s own resolution, which is why that check now returns the project it compared against

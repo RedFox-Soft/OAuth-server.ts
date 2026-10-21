@@ -175,12 +175,18 @@ describe('the groups claim', () => {
 		expect(claimsOf(tokens.id_token as string).groups).toEqual(['Editors']);
 	});
 
-	it('leaves groups out of the ID token when the access token is for userinfo', async () => {
+	/*
+	 * `conformIdTokenClaims` moves the claims of profile, email, address and phone to userinfo (OIDC Core §5.4);
+	 * `groups` is outside that rule, and a relying party admitting people by group reads the ID token (specs/109).
+	 */
+	it('names the user’s groups in the ID token even when the access token is for userinfo', async () => {
 		await inGroups('Editors');
 
-		const tokens = await signIn('openid groups');
+		const tokens = await signIn('openid groups email');
 
-		expect(claimsOf(tokens.id_token as string).groups).toBeUndefined();
+		const claims = claimsOf(tokens.id_token as string);
+		expect(claims.groups).toEqual(['Editors']);
+		expect(claims.email).toBeUndefined();
 	});
 
 	it('carries no groups anywhere when the scope was not requested', async () => {

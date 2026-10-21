@@ -226,6 +226,25 @@ export const ACTIONS = {
 	 * allows then get tokens there for those people with no consent screen, so connecting and changing it are
 	 * danger questions, and so is ending it, which stops agents relying on it.
 	 */
+	/*
+	 * Applications in the administrators' project (specs/109): each decides which outside tool may sign the
+	 * instance's administrators in, so registering, a new secret and deleting are all asked.
+	 */
+	'adminApplication.create': {
+		class: 'C2',
+		title: (t) => `Let administrators sign in to ${t}?`,
+		okText: 'Register'
+	},
+	'adminApplication.rotate': {
+		class: 'C2',
+		title: (t) => `Give ${t} a new secret?`,
+		okText: 'Rotate secret'
+	},
+	'adminApplication.delete': {
+		class: 'C2',
+		title: (t) => `Delete ${t}?`,
+		okText: 'Delete'
+	},
 	'outsideServer.connect': {
 		class: 'C2',
 		title: (t) => `Vouch for this project's people to ${t}?`,

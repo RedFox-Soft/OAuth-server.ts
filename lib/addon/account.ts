@@ -8,8 +8,12 @@ import { consentWaived } from '../shared/consent_waiver.js';
 import { canSignIn } from '../end_users/can_sign_in.js';
 import { profileClaims } from '../consts/profile_claims.js';
 import { routeNames } from '../consts/param_list.js';
-import { groupsClaimFor } from '../bucket_groups/claim.js';
+import {
+	administratorTeamsClaimFor,
+	groupsClaimFor
+} from '../bucket_groups/claim.js';
 import { isRecord } from '../helpers/_/object.js';
+import { ADMIN_BUCKET_ID } from '../admin/consts.js';
 
 // The token an account is loaded for at the token and userinfo endpoints.
 type AccountToken = {
@@ -115,10 +119,15 @@ export async function findAccount<
 				email: user.email,
 				email_verified: user.verified
 			};
-			const groups = await groupsClaimFor(bucketId, sub, {
-				reference: use === 'id_token',
-				userinfoEndpoint
-			});
+			/*
+			 * An administrator's groups are their teams (specs/109): the administrators' bucket can hold no groups
+			 * of its own, and an internal tool registered there admits people by team.
+			 */
+			const options = { reference: use === 'id_token', userinfoEndpoint };
+			const groups =
+				bucketId === ADMIN_BUCKET_ID
+					? await administratorTeamsClaimFor(sub, options)
+					: await groupsClaimFor(bucketId, sub, options);
 			if (groups.kind === 'list') {
 				claims.groups = groups.names;
 			} else if (groups.kind === 'reference') {

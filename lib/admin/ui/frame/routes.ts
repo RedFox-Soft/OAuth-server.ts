@@ -51,6 +51,7 @@ export type PageKey =
 	| 'administrators.signIn'
 	| 'administrators.providers'
 	| 'administrators.provider'
+	| 'administrators.applications'
 	| 'administrators.activity'
 	| 'administrators.settings'
 	| 'usage'
@@ -275,6 +276,14 @@ export const ROUTES: readonly RouteSpec[] = [
 		section: 'administrators',
 		instance: true,
 		area: 'Identity providers'
+	},
+	/* Applications that sign administrators in to the owner's internal tools (specs/109). */
+	{
+		key: 'administrators.applications',
+		pattern: ['administrators', 'applications'],
+		section: 'administrators',
+		instance: true,
+		area: 'Applications'
 	},
 	{
 		key: 'administrators.activity',

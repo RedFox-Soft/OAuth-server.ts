@@ -21,6 +21,7 @@ import type { DPoPProof } from 'lib/helpers/validate_dpop.js';
 import { resourceTokenGroups } from '../../bucket_groups/claim.js';
 import { issuerFor } from '../../configs/issuer.js';
 import { routeNames } from '../../consts/param_list.js';
+import { conformedIdTokenScope } from '../../consts/groups_claim.js';
 
 const { AuthorizationPending, ExpiredToken, InvalidGrant } = errors;
 
@@ -234,7 +235,9 @@ export const handler = async function cibaHandler(
 			ApplicationConfig['userinfo.enabled'] &&
 			!at.payload.aud
 		) {
-			token.scope = 'openid';
+			token.scope = conformedIdTokenScope(
+				grant.getOIDCScopeFiltered(request.scopes)
+			);
 		} else {
 			token.scope = grant.getOIDCScopeFiltered(request.scopes);
 		}

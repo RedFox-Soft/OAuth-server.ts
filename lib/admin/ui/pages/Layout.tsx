@@ -69,6 +69,7 @@ const ADMINISTRATORS_TABS: Partial<Record<PageKey, AdministratorsTab>> = {
 	administrators: 'accounts',
 	'administrators.signIn': 'signIn',
 	'administrators.providers': 'providers',
+	'administrators.applications': 'applications',
 	'administrators.activity': 'activity',
 	'administrators.settings': 'settings'
 };

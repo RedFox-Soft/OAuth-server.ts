@@ -74,6 +74,10 @@ resolved (`lib/adapters/types.ts`):
 belongs to no working team by virtue of the privilege (Super administrators is not among `memberships`). That is deliberate and keeps one rule: it is exactly what
 `managedBy: []` already meant, and it is the same rule the migration applies to an unmanaged container.
 
+**Team names reach tokens (spec 109).** For an administrator, the `groups` claim names their teams (personal team
+excluded), so an internal tool registered in the administrators' project can admit people by team — a read of names,
+nothing more ([[administrators-applications]]).
+
 ## Owner and member are properties of a membership, not roles
 
 `GroupMember.role` is `owner` or `member`. An owner decides who is in the team and whether it may be

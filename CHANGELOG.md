@@ -18,6 +18,12 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   profile only) lets it issue ID-JAGs for outside authorization servers it connects, with group-based rules. Both
   off by default and tracked from IETF draft -04. One new storage area each for connections and last use, no
   migration — re-run `db:setup`.
+- **Applications in the Administrators project** — a super administrator registers sign-in-only applications there
+  (console only; agents can read them, not change them) so internal tools admit the instance's administrators,
+  deciding by team: for an administrator `groups` names their teams. Such an application is refused every resource.
+  Also: `groups` now reaches the ID token whenever the scope is granted, even where other scope claims go to userinfo
+  only; RP-initiated sign-out from such an application ends the administrators' sign-in; deactivating an administrator
+  revokes their tokens. No migration, no setting.
 
 ### Fixed
 

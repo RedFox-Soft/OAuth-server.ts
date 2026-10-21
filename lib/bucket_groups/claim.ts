@@ -1,4 +1,4 @@
-import { getBucketGroupStore } from '../adapters/index.js';
+import { getBucketGroupStore, getGroupStore } from '../adapters/index.js';
 import { MAX_END_USER_PAGE } from '../adapters/types.js';
 import {
 	GROUPS_CLAIM,
@@ -46,6 +46,35 @@ export async function groupsClaimFor(
 		);
 	}
 	return { kind: 'list', names: names.sort() };
+}
+
+/*
+ * The `groups` claim for an administrator (specs/109): the names of the teams they are a member of, so an
+ * internal tool registered in the administrators' bucket can admit them by team. Their personal team is left
+ * out — nobody else can be in it, so no tool could gate on it. The same shape and the same reference rule as a
+ * project's groups, so a relying party reads both alike.
+ *
+ * A read of names into a signed response and nothing more: teams are still changed only by the team routes,
+ * and nothing a relying party sends back reaches them — the separation spec 071 made teams a different entity
+ * from the groups SCIM writes for.
+ */
+export async function administratorTeamsClaimFor(
+	userId: string,
+	options: { reference: boolean; userinfoEndpoint: string }
+): Promise<GroupsClaim> {
+	const names = (await getGroupStore().listByMember(userId))
+		.filter((team) => team.kind !== 'personal')
+		.map((team) => team.name)
+		.sort();
+	if (names.length === 0) return { kind: 'none' };
+	if (options.reference && names.length > GROUPS_TOKEN_LIMIT) {
+		return {
+			kind: 'reference',
+			claimNames: { [GROUPS_CLAIM]: GROUPS_SOURCE },
+			claimSources: { [GROUPS_SOURCE]: { endpoint: options.userinfoEndpoint } }
+		};
+	}
+	return { kind: 'list', names };
 }
 
 /*

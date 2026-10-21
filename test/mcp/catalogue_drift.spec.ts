@@ -141,6 +141,11 @@ describe('MCP tool catalogue', () => {
 			'POST /admin/api/mcp/clients',
 			'PATCH /admin/api/mcp/clients/:entryId',
 			'DELETE /admin/api/mcp/clients/:entryId',
+			/* Which outside service may sign administrators in (specs/109): the same class as the four above. */
+			'POST /admin/api/administrators/applications',
+			'PATCH /admin/api/administrators/applications/:clientId',
+			'POST /admin/api/administrators/applications/:clientId/secret',
+			'DELETE /admin/api/administrators/applications/:clientId',
 			'DELETE /admin/api/projects/:id',
 			/* Delete now: the destruction a scheduled deletion ends in, at once (specs/090). */
 			'POST /admin/api/projects/:id/purge',

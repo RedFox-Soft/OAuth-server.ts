@@ -4,6 +4,7 @@ import { MCP_RESOURCE_SERVER, isMcpResource } from '../mcp/resource_server.js';
 import { resolveDeclaredResource } from '../resources/registry.js';
 import { namespaceOf } from '../resources/namespace.js';
 import { scimBaseUrl } from '../provisioning/addresses.js';
+import { isAdministratorsApplication } from '../admin/administrators_application.js';
 import {
 	assertConnectionMayMint,
 	isScimResourceOf,
@@ -75,6 +76,19 @@ export async function getResourceServerInfo(
 	 * A deployment override still wins for every other indicator, because the registry resolves this
 	 * whole function; only the MCP identifier is claimed.
 	 */
+	/*
+	 * An application a super administrator registered for an internal tool in the administrators' bucket
+	 * (specs/109) signs administrators in and nothing else, first, before any arm could answer it. Without
+	 * this the MCP arm would mint it an administrative-audience token that `/mcp` then refuses, and — the
+	 * administrators' bucket being served at the root — the declared-resource lookup would hand it the
+	 * default project's root APIs.
+	 */
+	if (isAdministratorsApplication(client)) {
+		throw new errors.InvalidTarget(
+			'an application of the Administrators project is granted no resource'
+		);
+	}
+
 	/*
 	 * The addressed bucket's SCIM endpoint, built in for the reason the MCP arm below is: it is an endpoint
 	 * this server serves, so no deployment could declare it correctly. Only that bucket's enabled

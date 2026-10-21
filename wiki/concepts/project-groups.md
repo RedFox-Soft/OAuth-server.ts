@@ -96,7 +96,9 @@ checkable by a relying party; a rename changes it, which is acceptable because n
 only the owner renames. It is computed from membership after the account's stored claims are spread
 (`lib/addon/account.ts:87`), so a stored `groups` can never forge it, and the admin claims route refuses one.
 
-Where it appears: userinfo always; the ID token where scope claims go there today (`conformIdTokenClaims`); a
+Where it appears: userinfo always; the ID token whenever the scope was granted — since spec 109 also where
+`conformIdTokenClaims` sends other scope claims to userinfo (`conformedIdTokenScope`, [[administrators-applications]]);
+for an administrator the names are their teams rather than groups; a
 resource-bound access token and its introspection when the authorization granted `groups`
 (`resourceTokenGroups`, `lib/bucket_groups/claim.ts:62` — a snapshot at issue, RFC 9068 §2.2.3.1). Above
 `GROUPS_TOKEN_LIMIT` (200, Entra's JWT limit, `lib/consts/groups_claim.ts:21`) a token carries an OIDC Core

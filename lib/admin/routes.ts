@@ -17,6 +17,7 @@ import { scheduledBucketGuard } from './buckets/scheduled_guard.js';
 import { federationAdminRoutes } from './federation/routes.js';
 import { endUserRoutes } from './users-end/routes.js';
 import { outsideServerRoutes } from './outside-servers/routes.js';
+import { administratorApplicationRoutes } from './administrator-applications/routes.js';
 import { provisioningRoutes } from './provisioning/routes.js';
 import { provisioningHoldRoutes } from './provisioning/holds.js';
 import { bucketGroupRoutes } from './bucket-groups/routes.js';
@@ -124,3 +125,11 @@ export const adminApiRoutes = new Elysia({ name: 'admin-api' })
 	.use(auditRoutes)
 	.use(errorRoutes)
 	.use(activityRoutes);
+
+/*
+ * Applications in the administrators' project (specs/109), as a statement of its own for the reason lib/index.ts
+ * mounts SCIM that way: the chain above is at TypeScript's instantiation limit (TS2589 once this was added), and
+ * `.use` mutates the instance, so the routes register as a chained mount would while the inferred type does not
+ * grow. Nothing reads these routes off the type; the console and the agent reach them over HTTP or dispatch.
+ */
+adminApiRoutes.use(administratorApplicationRoutes);

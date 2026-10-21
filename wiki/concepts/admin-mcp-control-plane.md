@@ -185,7 +185,8 @@ confirmation-gated, absent. These are the operations that destroy a container wi
 afterwards to inspect; a team joined them when ownership moved to teams ([[team-ownership]]), and for a
 sharper version of the same reason — destroying one takes with it the only thing that granted anyone
 access to what it held. Deleting the old Project entity (a retired project) was withheld for the same
-reason until spec 099 removed it; the table now holds eight `withheld` entries
+reason until spec 099 removed it; the table now holds twelve `withheld` entries — spec 109 added the four writes of
+applications in the administrators' project, whose reads are published ([[administrators-applications]])
 (`lib/mcp/catalogue.ts:1848-2013`).
 Widening the retired projects' administrator role deliberately did not widen this list. They are not
 registered as refusing tools either, because a registered tool appears in `tools/list` however it

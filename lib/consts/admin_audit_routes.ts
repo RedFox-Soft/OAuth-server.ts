@@ -107,6 +107,34 @@ const routes = [
 		path: '/admin/api/projects/:id/clients/:clientId',
 		targetType: 'Client'
 	},
+	/*
+	 * Applications in the administrators' project (specs/109): their own routes, so the agent surface can
+	 * withhold the writes by name while the project application routes stay published.
+	 */
+	{
+		action: 'admin.application.create',
+		method: 'POST',
+		path: '/admin/api/administrators/applications',
+		targetType: 'Client'
+	},
+	{
+		action: 'admin.application.update',
+		method: 'PATCH',
+		path: '/admin/api/administrators/applications/:clientId',
+		targetType: 'Client'
+	},
+	{
+		action: 'admin.application.secret.rotate',
+		method: 'POST',
+		path: '/admin/api/administrators/applications/:clientId/secret',
+		targetType: 'Client'
+	},
+	{
+		action: 'admin.application.delete',
+		method: 'DELETE',
+		path: '/admin/api/administrators/applications/:clientId',
+		targetType: 'Client'
+	},
 
 	{
 		action: 'admin.create',

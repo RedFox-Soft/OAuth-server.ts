@@ -65,3 +65,16 @@ export function groupsMembersOf(payload: {
 	}
 	return {};
 }
+
+/*
+ * The scope an ID token is masked to when `conformIdTokenClaims` sends scope claims to userinfo: `openid`, and
+ * `groups` when it was granted. OIDC Core §5.4 moves the claims of profile, email, address and phone to userinfo
+ * when an access token is issued; `groups` is this server's own scope and outside that rule, and a relying party
+ * admitting people by group reads it from the ID token, as Okta and Entra put it there (specs/109). Above the
+ * token limit the claim is already a reference to userinfo, so the ID token stays bounded.
+ */
+export function conformedIdTokenScope(granted: string): string {
+	return granted.split(' ').includes(GROUPS_SCOPE)
+		? `openid ${GROUPS_SCOPE}`
+		: 'openid';
+}

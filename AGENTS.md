@@ -192,6 +192,10 @@ Each rule is the part that is easy to break. Read the named page before changing
   resolves the person through the browser sign-in's ladder, never a copy; an ID-JAG may be re-submitted, a
   plain assertion is single-use; assertion tokens carry no Grant and no refresh token; no assertion ever
   reaches the administrative MCP or SCIM endpoints. → `enterprise-managed-authorization.md`
+- **Administrators' applications** — an application in the administrators' project is sign-in only, registered by a
+  super administrator in the console (its writes are withheld from agents), and refused every resource indicator; for
+  an administrator the `groups` claim names their teams, and `groups` reaches the ID token whenever granted.
+  → `administrators-applications.md`
 - **SCIM provisioning** — a connection's OAuth client `scim-<id>` is synthesized from the connection and
   never stored; its tokens are opaque and only the addressed bucket's SCIM arm (ahead of MCP's) may mint
   them; a bound provider's unlinked sign-in correlates by the connection's rule and never reaches the email

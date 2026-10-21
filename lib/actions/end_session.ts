@@ -31,6 +31,7 @@ import {
 	requestBucketFor
 } from 'lib/admin/auth/bucketAddress.js';
 import { resolveBucketForRequest } from 'lib/admin/auth/resolveBucket.js';
+import { ADMIN_BUCKET_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.js';
 import sessionHandler, { expiredSessionCookie } from '../shared/session.ts';
 import {
 	backchannelLogoutFor,
@@ -61,6 +62,9 @@ const logoutParameters = t.Object({
 });
 
 type LogoutParams = Static<typeof logoutParameters>;
+
+/* The marker on the confirmation's address naming the administrators' sign-in (specs/109). */
+const ADMINISTRATORS_POPULATION = 'administrators';
 
 const logoutResponses = {
 	200: RedirectOrHtmlResponse,
@@ -110,7 +114,6 @@ async function endSession(
 	const { language } = languageOfContext(oidc, [
 		uiLocalesRanges(params.ui_locales)
 	]);
-	const setCookies = await sessionHandler(oidc);
 	let client;
 	if (params.id_token_hint) {
 		try {
@@ -182,12 +185,29 @@ async function endSession(
 	 * default bucket and every bucket with no address of its own must keep ending each other's —
 	 * which is the behaviour their clients have always had at the bare endpoints.
 	 */
-	if (client) {
-		const signsInto = await issuingBucket(
-			/* No resource here, so rule 3 cannot apply and the address only fills the slot. */
-			await resolveBucketForRequest(client.clientId, undefined, oidc.bucket)
-		);
-		if (sessionCookieName(signsInto) !== sessionCookieName(oidc.bucket)) {
+	const signsInto = client
+		? await issuingBucket(
+				/* No resource here, so rule 3 cannot apply and the address only fills the slot. */
+				await resolveBucketForRequest(client.clientId, undefined, oidc.bucket)
+			)
+		: undefined;
+	/*
+	 * The administrators' sign-in, at the root only — the rule `checkBucket` applies at `/auth`. Both it and the
+	 * default bucket are served at the root, so only the client tells them apart, and an application of the
+	 * administrators' bucket (specs/109) ends the sign-in it was given: the administrators'. The session is
+	 * read only now, once the client has named the population, for the reason the authorization endpoint
+	 * reads it after `checkBucket`.
+	 */
+	if (
+		signsInto?._id === ADMIN_BUCKET_ID &&
+		oidc.bucket._id === DEFAULT_BUCKET_ID
+	) {
+		oidc.signInBucket = signsInto;
+	}
+	const setCookies = await sessionHandler(oidc);
+
+	if (client && signsInto) {
+		if (sessionCookieName(signsInto) !== sessionCookieName(oidc.signInBucket)) {
 			throw new InvalidRequest(
 				'client is not authorized at this address',
 				undefined,
@@ -219,7 +239,13 @@ async function endSession(
 	if (oidc.session.payload.accountId) {
 		return logout(
 			secret,
-			ownFormAction(`${oidc.issuer}${routeNames.end_session_confirm}`),
+			ownFormAction(
+				`${oidc.issuer}${routeNames.end_session_confirm}${
+					oidc.signInBucket._id === ADMIN_BUCKET_ID
+						? `?${ADMINISTRATORS_POPULATION}`
+						: ''
+				}`
+			),
 			oidc.params.post_logout_redirect_uri,
 			language
 		);
@@ -333,6 +359,16 @@ export const logoutConfirmAction = new Elysia()
 				cookie,
 				headers: languageHeaders(request)
 			});
+			/*
+			 * The page the GET rendered names the administrators' sign-in when that is what it is ending; the
+			 * xsrf secret below is that session's own, so naming the wrong one only fails the check.
+			 */
+			if (
+				new URL(request.url).searchParams.has(ADMINISTRATORS_POPULATION) &&
+				bucket._id === DEFAULT_BUCKET_ID
+			) {
+				oidc.signInBucket = await issuingBucket(ADMIN_BUCKET_ID);
+			}
 			const setCookies = await sessionHandler(oidc);
 
 			const { session } = oidc;
@@ -367,7 +403,9 @@ export const logoutConfirmAction = new Elysia()
 				 * sign-in stayed alive — and, once buckets are separate cookies, would end the wrong
 				 * population's sign-in if it matched anything at all.
 				 */
-				cookie[sessionCookieName(oidc.bucket)].set(expiredSessionCookie());
+				cookie[sessionCookieName(oidc.signInBucket)].set(
+					expiredSessionCookie()
+				);
 			} else if (state.clientId) {
 				const grantId = session.grantIdFor(state.clientId);
 				if (
