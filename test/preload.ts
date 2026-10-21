@@ -3,7 +3,7 @@ import { afterEach, beforeEach, mock, setSystemTime } from 'bun:test';
 
 import { writeRootKeys } from './root_keys.js';
 import { resetToBaseline } from './addon_baseline.js';
-import { installFetchInterception } from './fetch_mock.js';
+import { installFetchInterception, mock as fetchMock } from './fetch_mock.js';
 import { resolver } from '../lib/shared/egress.js';
 import { testSigningKeys } from './jwks/fixtures.js';
 
@@ -41,7 +41,9 @@ beforeEach(() => {
 /*
  * Between two spec files, the process-wide state Bun does not restore on its own goes back to how the run
  * found it: every spy (`spyOn` patches the real object, and Bun leaves the patch in place for every later
- * file), the system clock (`setSystemTime` likewise), the environment, and the settings.
+ * file), the system clock (`setSystemTime` likewise), the environment, the settings, and the outbound-fetch
+ * registrations — an interceptor one file registered and never consumed otherwise failed the next file that
+ * asserts none is pending, and which file that is depends on the walk order (2026-10-21, CI only).
  *
  * The settings too, though bootstrap() also restores them: a spec that never calls bootstrap — one that
  * exercises the configuration itself — otherwise ran under whatever the previous file's config export
@@ -59,6 +61,7 @@ let restoreSettings: (() => void) | undefined;
 
 function restoreProcessState(): void {
 	mock.restore();
+	fetchMock.restore();
 	setSystemTime();
 	for (const name of Object.keys(process.env)) {
 		if (!(name in environment)) delete process.env[name];

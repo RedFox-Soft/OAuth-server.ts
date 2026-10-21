@@ -42,7 +42,8 @@ describe('the metadata of an instance that accepts ID-JAGs', () => {
 
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'id_jag_receiving' });
-		acme = await enterprise('discovery');
+		// No case here reaches the provider: the metadata never names it, and a switched-off grant is refused first.
+		acme = await enterprise('discovery', {}, { servesKeys: false });
 	});
 
 	afterEach(() => {

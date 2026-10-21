@@ -61,11 +61,14 @@ export interface Enterprise {
 /*
  * A stub IdP configured as a provider of the default project, trusted for identity assertions unless the
  * overrides say otherwise. Its discovery document and keys are registered once: the key cache outlives a
- * request, so a case presenting twice consumes them once.
+ * request, so a case presenting twice consumes them once. `servesKeys: false` registers neither, for a case
+ * refused before the provider is ever read: an interceptor left unconsumed fails whichever spec next asserts
+ * none is pending, which on CI's file order was an unrelated one.
  */
 export async function enterprise(
 	label: string,
-	overrides: Partial<FederationProvider> = {}
+	overrides: Partial<FederationProvider> = {},
+	{ servesKeys: keysServed = true }: { servesKeys?: boolean } = {}
 ): Promise<Enterprise> {
 	const origin = uniqueOrigin(label);
 	const stub = await idpStub(origin);
@@ -75,7 +78,7 @@ export async function enterprise(
 		...overrides
 	});
 	const bucket = await defaultBucketWith([provider]);
-	await servesKeys(stub);
+	if (keysServed) await servesKeys(stub);
 	return { stub, provider, bucket };
 }
 

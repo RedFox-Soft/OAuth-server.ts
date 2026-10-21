@@ -275,9 +275,11 @@ describe('an ID-JAG from a provider the project has not trusted for it', () => {
 	});
 
 	it('is refused with invalid_grant when the provider is configured but not trusted for assertions', async () => {
-		const acme = await enterprise('untrusted', {
-			acceptsIdentityAssertions: false
-		});
+		const acme = await enterprise(
+			'untrusted',
+			{ acceptsIdentityAssertions: false },
+			{ servesKeys: false }
+		);
 		const assertion = await idJag(acme.stub, {
 			resource: TICKETS,
 			scope: 'tickets.read'
@@ -289,7 +291,11 @@ describe('an ID-JAG from a provider the project has not trusted for it', () => {
 	});
 
 	it('is refused with invalid_grant while the trusted provider is disabled', async () => {
-		const acme = await enterprise('disabled', { enabled: false });
+		const acme = await enterprise(
+			'disabled',
+			{ enabled: false },
+			{ servesKeys: false }
+		);
 		const assertion = await idJag(acme.stub, {
 			resource: TICKETS,
 			scope: 'tickets.read'
