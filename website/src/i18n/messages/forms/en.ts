@@ -14,7 +14,7 @@ export default {
 			rich(
 				'Email us at ',
 				{ link: address, href },
-				' and tell us about your deployment shape and the guarantees you need. We reply within two working days.'
+				' and tell us about your deployment shape and the guarantees you need. We usually reply within two working days.'
 			)
 	},
 	waitlist: {
@@ -25,7 +25,7 @@ export default {
 			rich(
 				'Email us at ',
 				{ link: address, href },
-				' to join the waitlist for paid cloud plans. You’ll get one email when they open, and no commitment.'
+				' to join the waitlist for paid cloud plans. You’ll get one email when they open, and joining commits you to nothing.'
 			)
 	}
 };

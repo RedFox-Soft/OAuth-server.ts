@@ -6,7 +6,7 @@ export default {
 		'Reach the FoxAuth team: general enquiries at hello@foxauth.dev, vulnerability reports at security@foxauth.dev, and bugs on GitHub.',
 	eyebrow: 'Contact',
 	heading: 'Three addresses, and one of them is a repository.',
-	lead: 'Pick whichever fits what you have in hand. Bugs go to the tracker, vulnerabilities go to the security address, and everything else, from a deployment question to a support contract, comes to us through the form.',
+	lead: 'Pick the address that fits what you have in hand. Bugs go to the GitHub issue tracker, vulnerabilities go to the security address, and everything else, from a deployment question to a support contract, comes to us through the form.',
 	talk: {
 		heading: 'Talk to us',
 		body: 'Tell us the shape of the deployment you have in mind, ask about a support contract or consulting, or put the question the docs did not answer.'
@@ -15,9 +15,9 @@ export default {
 		heading: 'Report a vulnerability',
 		body: (address: string, href: string) =>
 			rich(
-				'Mail ',
+				'Email ',
 				{ link: address, href },
-				' and keep it off the public tracker. The security policy sets out what we do next and how long it takes.'
+				' and keep the report off the public tracker. The security policy sets out what we do next and how long it takes.'
 			),
 		policy: 'Security policy'
 	},

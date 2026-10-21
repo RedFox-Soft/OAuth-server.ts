@@ -22,9 +22,10 @@ is the administrators' project, whose providers only a super administrator confi
 	type="note"
 	title="What you need first"
 >
-	The [`federation.enabled`](/docs/reference/settings/#federation.enabled)
-	setting on, which serves the sign-in legs of the flow. The management routes
-	are not gated by it, so you can prepare a provider before switching it on, and
+	Turn on the
+	[`federation.enabled`](/docs/reference/settings/#federation.enabled) setting,
+	which serves the sign-in legs of the flow. The management routes are not gated
+	by the setting, so you can prepare a provider before switching it on, and
 	remove one you stopped trusting after switching it off.
 </Aside>
 
@@ -94,11 +95,11 @@ same subject at another issuer is another person. To move to a new issuer, add a
 
 </Steps>
 
-The address belongs to the project's address, so [changing the project's
-address](/docs/administer/project-addresses/#changing-a-projects-address) changes it, and
-the provider will then refuse every sign-in with a redirect mismatch on its own page. A project that has
-no address yet gets a callback built from its record id. The console warns about this when you copy it,
-because that address stops matching as soon as the project is given a path.
+The callback address is built from the project's address, so [changing the project's
+address](/docs/administer/project-addresses/#changing-a-projects-address) changes it. The
+provider then refuses every sign-in with a redirect mismatch, on its own page. A project that has
+no address yet gets a callback built from its record id. The console warns when you copy such a callback,
+because it stops matching as soon as the project is given a path.
 
 ## Who gets an account, and who gets linked
 
@@ -137,9 +138,9 @@ The only claims copied from the provider are `name`, `given_name`, `family_name`
 
 **Try sign-in** on a provider's page opens the provider in a new tab. You sign in there, through the
 project's real callback, and the console then shows what the provider answered and what a real sign-in
-would do: link an account, create one, or refuse, and why. It writes nothing: no account, no link, no
-session. It works on a disabled provider, so you can test one before switching it on. It is in the
-console only, because its result is shown to the browser session that started it, and an agent has none.
+would do: link an account, create one, or refuse, and why. Trying a provider writes nothing: no account, no link, no
+session. It works on a disabled provider, so you can test one before switching it on. **Try sign-in** is in
+the console only, because its result is shown to the browser session that started it, and an agent has none.
 
 ## The order of the buttons
 
@@ -147,7 +148,7 @@ The sign-in page shows a project's enabled providers in an order you choose. **M
 down** on the **Identity providers** list change it one place at a time. An agent uses
 `federation_provider_move`. A provider added later appears after the ones already ordered.
 
-## How the buttons look
+## How the buttons look, and when they fold {#how-the-buttons-look}
 
 Every provider is one full-width button with a mark and **Sign in with …**. A recognised provider shows its
 own mark and wording; any other shows a neutral mark and the name you gave it. Every button has the same size.
@@ -156,8 +157,8 @@ own mark and wording; any other shows a neutral mark and the name you gave it. E
 - **Seven or more:** five are shown and the rest are under **More sign-in options**. People open it with a
   click, and it works without JavaScript.
 - **Google, Microsoft, Apple and GitHub are never folded**, however many providers there are. Their branding
-  rules do not allow their button to be less visible than another. The other places go to your other providers,
-  in your order.
+  rules do not allow their button to be less visible than another. The remaining visible places go to your other
+  providers, in your order.
 - **Two connections to one brand,** for example two Microsoft organisations, both say **Sign in with
   Microsoft**. Under each, a smaller line shows the name you gave that connection, so people can tell them
   apart.
@@ -210,10 +211,10 @@ to the console with your organisation's provider. Only a super administrator con
   password sign-in only.
 
 Password sign-in to the console can be turned off, but only from a session that came in through a
-linked provider. While it is off, no change is accepted that would leave every super administrator
-without a way in: disabling, narrowing or deleting their provider, deactivating them, or withdrawing
-their privilege. If the provider itself fails, run `bun run admin:password-sign-in` on the server. It
-turns password sign-in back on and records that in the audit trail.
+linked provider. While password sign-in is off, no change is accepted that would leave every super
+administrator without a way in: disabling, narrowing or deleting their provider, deactivating them, or
+withdrawing their privilege. If the provider itself fails, run `bun run admin:password-sign-in` on the
+server. The command turns password sign-in back on and records that in the audit trail.
 
 An agent may change these providers too, but on the administrators' project `federation_provider_create`,
 `federation_provider_update` and `federation_provider_move` ask for confirmation, as

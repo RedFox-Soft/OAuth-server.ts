@@ -11,8 +11,8 @@ The dashboard was flat. Requests per second were normal. The error rate was norm
 (the counter that stops any one IP address from sending too many requests) had not fired once all
 night. And one account had a little over two thousand failed sign-ins.
 
-The attacker had done nothing clever. They had a few thousand IP addresses. From each one, they tried
-one password against the same email roughly every twenty seconds. Our limit per IP address is tuned
+The attacker had done nothing clever. They had a few thousand IP addresses. Each address tried one
+password against the same email, and a new guess arrived roughly every twenty seconds. Our limit per IP address is tuned
 for a browser doing something silly, and every one of those addresses stayed well inside it. The
 limiter did exactly what it was built to do: it stopped any single address from flooding the server.
 But nobody was flooding the server. They were guessing a password, slowly, from everywhere at once.
@@ -28,7 +28,7 @@ An attacker chooses the IP addresses. They choose how fast to go, how many machi
 to stop and start again. The one thing they cannot choose is the account they are attacking: that
 account is the whole point. So the counter that limits guessing has to count per account, by the
 email address being guessed, not per caller. Every other decision about its design follows from
-that one.
+that choice.
 
 The second decision is where to keep the count. Our rate limiter keeps its counters in the server
 process's memory. For its job, that is fine, even though it has three weak spots. If the server runs
@@ -74,9 +74,9 @@ URL, it also issues tokens in its own name, as a separate issuer.)
   <text x="400" y="358" text-anchor="middle" font-size="13" fill="var(--diagram-line, #555)">Both run. Neither replaces the other, because they answer different questions.</text>
 </svg>
 
-Both of them run in front of our sign-in endpoint. I want to be clear that the rate limiter is not
-wrong. It protects the server's resources: it keeps the server up. It is just not a sign-in throttle,
-which is a security boundary: it keeps the account closed. Once I stopped expecting the limiter to do
+Both of them run in front of our sign-in endpoint. The rate limiter is not wrong. It protects the
+server's resources: it keeps the server up. But it is not a sign-in throttle, which is a security
+boundary: it keeps the account closed. Once I stopped expecting the limiter to do
 the throttle's job, designing the real throttle came down to a few decisions about one counter stored
 in the database. Each decision could go wrong in a way that none of my tests would have caught.
 
@@ -103,7 +103,7 @@ throttle on second-factor codes works exactly like that, and there it is right, 
 has nothing to remember between windows. The password throttle does. It has to remember how many
 lockouts this address has already had, because that decides how long the next one is. If the record
 dies when the door reopens, the throttle forgets, and the next lockout starts at fifteen minutes again.
-An attacker who simply waits keeps the shortest window for ever. Nothing reports a problem. Every test
+An attacker who waits out each lockout keeps the shortest window for ever. Nothing reports a problem. Every test
 of "the door reopens after the window" passes, because the door does reopen.
 
 <svg viewBox="0 0 800 300" width="100%" role="img" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">
@@ -153,9 +153,9 @@ back plus one. Read, modify, write. Send five wrong passwords one after another,
 perfectly. Send fifteen at once, and all fifteen read the counter before any of them writes it back.
 Every one of them finds the door open, and every password gets checked.
 
-Afterwards the counter may well be high enough to shut the door. That is why a test that checks the
-door after the burst passes. A test that counts how many passwords the burst got checked fails. That
-is the test we have now.
+Afterwards the counter may well be high enough to shut the door, so a test that checks the door
+after the burst passes. A test that counts how many passwords were checked during the burst fails.
+We have that second test now.
 
 The fix is to count the attempt before checking the password, and to do it atomically: as one
 indivisible operation that no other request can interrupt halfway. Then the count decides whether the
@@ -187,14 +187,14 @@ export async function recordAttempt(bucketId: string, email: string): Promise<bo
 That increment is a single database operation on both of our databases: a `findOneAndUpdate` with
 `$inc` on MongoDB, an `UPDATE` with `RETURNING` over the jsonb column on PostgreSQL. So fifteen
 attempts at the same moment get fifteen different numbers, 1 to 15, and only the first five are
-within the cap. The same operation also moves the record's expiry to twenty-four hours from now. That
-is how "kept for twenty-four hours after the last failure" needs no second write.
+within the cap. The same operation also moves the record's expiry to twenty-four hours from now, so
+"kept for twenty-four hours after the last failure" needs no second write.
 
 One thing the function does not show is what keeps the count honest. If the password then turns out
 to be correct, the record is cleared. So only failures stay counted. And an attempt that was refused
 because the door was shut never gets its password checked at all.
 
-That last point matters. Checking a password with Argon2 (the algorithm we hash passwords with) is
+Checking a password with Argon2 (the algorithm we hash passwords with) is
 slow on purpose. Before the throttle check moved ahead of the account lookup, every guess at a known
 address cost the server a full hash calculation. A throttle placed after the password check limits
 the number of guesses but leaves the CPU cost exactly where it was. A throttle placed before it means
@@ -293,7 +293,7 @@ export function emailScopedId(bucketId: string, email: string): string {
 }
 ```
 
-The interesting part is the comment, not the code. It would be easy to read it as "remember to
+The comment matters more than the code. It would be easy to read it as "remember to
 lowercase" and move on. But the rule is different. The account lookup brings different spellings of
 an address to one form (this is called normalisation). Whatever normalisation the lookup does, the
 key has to do too. Suppose one day someone teaches the lookup to ignore dots in Gmail addresses. From
@@ -301,7 +301,7 @@ that day, lowercasing is no longer enough. The comment states the rule as "match
 one specific change to the text. That way, the next person who changes the lookup knows that this
 function has to change with it.
 
-That is also why this is one function, shared by the three storage areas keyed on an email address
+The same rule is why this is one function, shared by the three storage areas keyed on an email address
 (LoginThrottle, PasswordResetThrottle and VerificationResend), and not the same expression written
 three times. When it was three copies, one of them had already lost the lowercase call. It did no harm
 only because the MongoDB user store, the only one in production then (PostgreSQL support came later),
@@ -317,8 +317,8 @@ somebody's day, and the attacker can repeat it.
 The obvious way back is "enter the code we emailed you to keep trying". I went a fair way down that
 road before I wrote down why it is wrong. First, the message is only true for an address that has an
 account. Showing it only for those addresses brings the oracle back. Second, it sends an email on
-demand to any address anyone types. So anyone could use it to flood someone's inbox (email bombing).
-So it needs its own cap, and then the lockout has just moved there. Third, sign-in would stop working
+demand to any address anyone types. Anyone could use it to flood someone's inbox (email bombing).
+So it needs its own cap, and that cap becomes the new lockout. Third, sign-in would stop working
 whenever mail does. Everywhere else on our server, mail is best-effort: we send it if we can. Fourth,
 it cannot help the administrators' own project, which has no self-service password reset at all.
 
@@ -343,7 +343,7 @@ says to do that first.
 Written this way, the rule names the real reason. And it corrects itself: turn a project's second
 factor off, and its lockouts start growing again. Nobody has to remember to change anything.
 
-## What not to do: an off switch, letting sign-ins through on a database error, and relying on the throttle alone {#what-i-would-not-do}
+## What not to do with a sign-in throttle: an off switch, letting sign-ins through on a database error, and relying on it alone {#what-i-would-not-do}
 
 I would not give the throttle an off switch, and ours has none. That surprised the first person who
 looked for one in the settings console. The console has three numbers: the cap, the first window and
@@ -364,7 +364,7 @@ against one account. It does nothing against password spraying: one common passw
 against each of ten thousand accounts. Every account sees a single failure, so no counter gets
 anywhere near the cap. The rate limiter catches the naive version, sent from one IP address. A botnet
 (many machines under the attacker's control) gets past it exactly the way the attack at the start of
-this post got past mine. What actually stops spraying is two things: refusing passwords that appear in
+this post got past mine. Two things do stop spraying: refusing passwords that appear in
 lists of leaked passwords, and requiring a second factor. I have come round to the view that a sign-in
 throttle is mostly there to keep you safe enough without a second factor, until you have one.
 

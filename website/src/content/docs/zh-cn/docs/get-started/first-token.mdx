@@ -1,7 +1,7 @@
 ---
 title: 获取第一个令牌
 description: 用 curl 手动走一遍授权码 + PKCE 流程：从 challenge 到解码 ID 令牌，再到调用 UserInfo。
-source: b365f0b19682
+source: 66255a8f2eae
 sidebar:
   order: 5
 ---
@@ -17,7 +17,7 @@ import ScreenshotFigure from '../../../../../components/ScreenshotFigure.astro';
 
 下面的端点路径是本服务器的默认值。不要在真实客户端中硬编码它们，而应读取 `GET /.well-known/openid-configuration` 并使用其中公布的地址。该文档也反映了哪些功能已启用，因此它才是「这个部署支持什么」的如实答案。
 
-这一点比以前更重要了。如果客户端属于你创建的项目，那么该项目就是它自己的签发者：其端点位于 `<ISSUER>/<slug>` 之下，发现文档位于 `<ISSUER>/<slug>/.well-known/openid-configuration`。此类客户端的请求如果发往不带路径的 `/auth`，会以 `unauthorized_client` 被拒绝——"client is not authorized at this address"——因为客户端只能在其所属项目的地址上使用。下面的演练使用默认的 `redfox` 项目，它在根路径提供服务。
+如果客户端属于你创建的项目，那么该项目就是它自己的签发者：其端点位于 `<ISSUER>/<slug>` 之下，发现文档位于 `<ISSUER>/<slug>/.well-known/openid-configuration`。此类客户端的请求如果发往不带路径的 `/auth`，会以 `unauthorized_client`（"client is not authorized at this address"）被拒绝，因为客户端只能在其所属项目的地址上使用。下面的演练使用默认的 `redfox` 项目，它在根路径提供服务。
 
 </Aside>
 
@@ -58,7 +58,7 @@ import ScreenshotFigure from '../../../../../components/ScreenshotFigure.astro';
      &code_challenge_method=S256
    ```
 
-   （全部写在一行，去掉缩进。）`state` 由你在回调时自行校验；`nonce` 会被回显到 ID 令牌中，让你可以把令牌与本次请求关联起来。`scope=openid` 使这成为一个 OpenID Connect 请求，并产生 ID 令牌。若要获得刷新令牌，还需要 scope 中包含 `offline_access`，**并且**此 URL 中带上 `prompt=consent`，**并且**客户端的授权类型中包含 `refresh_token`。在控制台创建的客户端默认只有 `authorization_code`。三者缺一，该 scope 就会被静默丢弃，不报任何错误：你得到的令牌响应中没有 `refresh_token`。服务器还必须在其支持的 scope 中列出 `offline_access`（默认如此）；未列出期间，令牌端点会以 `unsupported_grant_type` 拒绝所有刷新令牌。
+   （全部写在一行，去掉缩进。）`state` 由你在回调时自行校验；`nonce` 会被回显到 ID 令牌中，让你可以把令牌与本次请求关联起来。`scope=openid` 使这成为一个 OpenID Connect 请求，并产生 ID 令牌。若要获得刷新令牌，还需要 scope 中包含 `offline_access`，**并且**此 URL 中带上 `prompt=consent`，**并且**客户端的授权类型中包含 `refresh_token`。在控制台创建的客户端默认只有 `authorization_code`。三者缺一，`offline_access` 就会被静默丢弃，不报任何错误：你得到的令牌响应中没有 `refresh_token`。服务器还必须在其支持的 scope 中列出 `offline_access`（默认如此）。如果没有列出，令牌端点会以 `unsupported_grant_type` 拒绝所有刷新令牌。
 
 3. **登录并同意授权**。服务器会重定向到它自己的交互页面：先是该客户端所属项目的登录表单，然后是列出 scope 的授权同意页面（新客户端默认开启授权同意）。两者都通过后，浏览器会被发送到
 
@@ -80,7 +80,7 @@ import ScreenshotFigure from '../../../../../components/ScreenshotFigure.astro';
      -d code_verifier=<verifier>
    ```
 
-   `redirect_uri` 必须与第 2 步中的逐字节一致——授权流程会将它与记录在授权码上的值比较，不一致即拒绝。对于机密客户端，去掉请求体中的 `client_id`，改为进行客户端认证：`client_secret_basic` 用 `-u demo:<secret>`，`client_secret_post` 用 `-d client_id=demo -d client_secret=<secret>`。
+   `redirect_uri` 必须与第 2 步中的逐字节一致。令牌端点会将它与记录在授权码上的值比较，不一致即拒绝。对于机密客户端，去掉请求体中的 `client_id`，改为进行客户端认证：`client_secret_basic` 用 `-u demo:<secret>`，`client_secret_post` 用 `-d client_id=demo -d client_secret=<secret>`。
 
    响应是标准的令牌响应：
 
@@ -100,7 +100,7 @@ import ScreenshotFigure from '../../../../../components/ScreenshotFigure.astro';
    echo '<id_token>' | cut -d. -f2 | tr '_-' '/+' | base64 -d 2>/dev/null | jq .
    ```
 
-   检查 `iss` 是否与你的 `ISSUER` 一致，`aud` 是否为你的 client id，`nonce` 是否与第 2 步一致。真实的客户端还要验证签名，所用密钥来自 `GET /jwks`，按令牌的 `kid` 选取。载荷还说明了用户的登录方式：密码登录时 `amr` 为 `["pwd"]`，使用一次性验证码时为 `["pwd", "otp", "mfa"]`；因此要求第二因素时，应检查是否包含 `mfa`，而不是检查该声明是否存在。
+   检查 `iss` 是否与你的 `ISSUER` 一致，`aud` 是否为你的 client id，`nonce` 是否与第 2 步一致。真实的客户端还要验证签名，所用密钥来自 `GET /jwks`，按令牌的 `kid` 选取。载荷还说明了用户的登录方式：密码登录时 `amr` 为 `["pwd"]`，使用一次性验证码时为 `["pwd", "otp", "mfa"]`。要求第二因素时，应检查 `amr` 是否包含 `mfa`，而不是检查该声明是否存在。
 
 6. **调用 UserInfo 端点**，带上访问令牌：
 

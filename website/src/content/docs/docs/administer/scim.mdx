@@ -12,19 +12,20 @@ SCIM client creates a project's users, keeps their profiles current, puts them i
 deactivates or deletes them when they leave. The same people then sign in through the same directory,
 and the sign-in finds their account by the directory's own identifier rather than by email address.
 
-All of that rests on one record per directory, the **provisioning connection**. It belongs to one
+Each directory is set up as one record, the **provisioning connection**. It belongs to one
 project and is bound to one of that project's upstream identity providers.
 
 <Aside
 	type="note"
 	title="What you need first"
 >
-	Three things. The [`scim.enabled`](/docs/reference/settings/#scim.enabled)
-	setting on: it is off by default, because it lets a third party's system write
-	end-user accounts, and connections can be prepared while it is off. A project
-	with an address, meaning one at a path, a subdomain or a hostname of its own,
-	or the default project at the root; the administrators' project cannot be
-	provisioned. And the directory configured as an [upstream identity
+	You need three things. First, the
+	[`scim.enabled`](/docs/reference/settings/#scim.enabled) setting on. It is off
+	by default because it lets a third party's system write end-user accounts. You
+	can prepare connections while it is off. Second, a project with an address:
+	one at a path, a subdomain or a hostname of its own, or the default project at
+	the root. The administrators' project cannot be provisioned. Third, the
+	directory configured as an [upstream identity
 	provider](/docs/administer/federation/) of that project, because the
 	connection is bound to it.
 </Aside>
@@ -36,9 +37,9 @@ project and is bound to one of that project's upstream identity providers.
 1. Open the project in the console, go to its **Provisioning** tab and choose **New provisioning
    connection**. A side panel walks you through the rest.
 
-2. **Directory.** Say which directory provisions the project: Entra ID, Okta or another SCIM client.
+2. **Directory.** Choose which directory provisions the project: Entra ID, Okta or another SCIM client.
    From then on the panel uses that directory's own names for each field and shows its advice. An agent
-   reads the same guide with `provisioning_directory_list`. Then pick the **Sign-in provider** the
+   reads the same per-directory advice with `provisioning_directory_list`. Then pick the **Sign-in provider** the
    directory's users will sign in with. One provider binds to at most one connection.
 
 3. **Matching & trust.** Check the **correlation rule**: the ID token claim and the SCIM attribute that
@@ -47,7 +48,7 @@ project and is bound to one of that project's upstream identity providers.
    object id is stable and is what Entra sends to SCIM as `externalId`. For everything else it is
    `preferred_username` ↔ `userName`, which is what Okta sends. Then choose what to do with **Email
    addresses from the directory**. Unverified, the default, stores them unverified. Verified marks them
-   verified, which you should choose only when the directory verifies addresses itself.
+   verified. Choose Verified only when the directory verifies addresses itself.
 
 4. **Safeguard.** Choose what happens when the directory removes many people at once: hold the
    connection above a limit, or apply every removal immediately. There is no default, and the panel
@@ -62,11 +63,11 @@ project and is bound to one of that project's upstream identity providers.
 </Steps>
 
 Creating the connection switches its provider to **Only allow accounts that already exist**, and keeps
-it there while the connection exists. A first sign-in that created an account would race the
+it there while the connection exists. Otherwise a first sign-in that created an account would race the
 directory's own create and leave one person with two accounts.
 
 At a provider bound to a connection, sign-in never looks at email addresses. The correlation rule must
-name exactly one provisioned user: no match is refused as not provisioned, and a match already linked
+name exactly one provisioned user: a sign-in with no match is refused as not provisioned, and a match already linked
 to a different upstream subject is refused rather than re-linked. Upstream claims are not copied onto a
 provisioned user, because the directory owns that profile.
 
@@ -82,7 +83,7 @@ https://login.acme.example/scim/v2
 It serves `/Users`, `/Groups`, `/ServiceProviderConfig`, `/Schemas` and `/ResourceTypes`. There is no
 `/Bulk`, and neither Entra ID nor Okta calls it. Each connection is rate-limited on its own, 50 requests
 a second by default ([`scim.rateLimit.max`](/docs/reference/settings/#scim.rateLimit.max)), rather than
-per address, because Entra and Okta send many customers' traffic from a few addresses.
+per IP address, because Entra and Okta send many customers' traffic from a few IP addresses.
 
 ## Microsoft Entra ID: client credentials
 
@@ -101,16 +102,17 @@ project's SCIM URL.
 In Entra's **How credentials are sent**, choose Header or Body, not Both: a token request that
 authenticates twice is refused (RFC 6749 §2.3). Leave the scopes empty or enter `scim`.
 
-A client secret is a deviation from the IPSIE profile this server targets, which requires a signed JWT
-assertion. It exists because Entra's and Okta's OAuth modes send a secret, and it can be switched off
-with [`scim.secretCredentials`](/docs/reference/settings/#scim.secretCredentials). A client that can sign
+A client secret is a deviation from the OpenID IPSIE profile (Interoperability Profiling for Secure
+Identity in the Enterprise) this server targets, which requires a signed JWT
+assertion. The server accepts secrets because Entra's and Okta's OAuth modes send one. You can switch
+secrets off with [`scim.secretCredentials`](/docs/reference/settings/#scim.secretCredentials). A client that can sign
 uses **Issue public key…** instead, with a key set pasted in or fetched from a URL.
 
 To rotate a secret, choose **Replace with a client secret…** and **Keep the current one working until
 the directory uses the new one**. The previous secret
 keeps working until the directory has used the new one and stopped using the old one for an hour, and
 never longer than 24 hours, so synchronisation does not stop while you paste the new value. **Retire
-previous now** ends it early, together with every token it obtained. If a secret leaked, replace it
+previous now** ends the previous secret early, together with every token it obtained. If a secret leaked, replace it
 with **Stop the current one now** instead: it stops at once. Issuing a public key, or switching between
 a secret and a key, replaces the previous credential at once. An agent issues and replaces credentials
 with `provisioning_credential_issue` (`overlap: false` stops the previous value at once), retires the
@@ -120,11 +122,11 @@ previous one early with `provisioning_credential_retire`, and removes one with
 ## Okta: a client secret, or a static token in header mode
 
 Okta's SCIM settings offer **OAuth2** with the Client Credentials grant type; use it where your Okta
-organisation offers it, with a client secret issued here, exactly as for Entra. Where it does not,
+organisation offers it, with a client secret issued here, as for Entra. Where it does not,
 Okta gets a static token. Under **Credentials**, choose **Issue static token…** and its lifetime, 90
 days or one year (`lifetimeDays` over the API). The token begins with `scimst_`, is shown once, and is stored only as a digest. In
 Okta's SCIM settings, choose **HTTP Header** authentication and paste the token as it is. Okta sends it
-without a `Bearer` prefix, and the prefix is what lets this server recognise it.
+without a `Bearer` prefix, and the `scimst_` prefix is what lets this server recognise it.
 
 A static token expires (RFC 7644 §7.4); the connection page and the project's overview warn 14 days
 before. To rotate, choose **Replace static token…**: as with a secret, the previous token keeps working
@@ -142,13 +144,13 @@ Deactivating a user through SCIM ends their access at once, exactly as an admini
 does: see [End a user's access](/docs/administer/ending-access/).
 
 `/Groups` manages the project's groups that the connection owns, and their members. A group PATCH answers
-`204`, which is what Entra and Okta expect, and large groups are filled by PATCH batches of members
+`204`, which is what Entra and Okta expect. Large groups are filled by PATCH batches of members
 rather than in the create. Relying parties read the result in the [`groups` claim](/docs/administer/groups/).
 
 Both directories send requests a strict SCIM server would refuse: a PATCH with no `path`, operations in
 capitals, booleans as the string `"False"`, attributes the schema does not declare, a `password` on
-every create, Entra's `manager` as a bare id. [`scim.strict`](/docs/reference/settings/#scim.strict),
-off by default, accepts them. Turn it on only if you are certifying against the profiles rather than
+every create, Entra's `manager` as a bare id. While [`scim.strict`](/docs/reference/settings/#scim.strict)
+is off, the default, the server accepts them. Turn it on only if you are certifying against the profiles rather than
 connecting Entra or Okta; `/ServiceProviderConfig` then declares the interoperability profile conformant.
 It is one switch rather than one per tolerance because no partial combination is conformant.
 
@@ -172,8 +174,8 @@ and deactivation here ends sessions, grants and consents. Each connection can ca
 A deactivation and a deletion of an existing user each count.
 
 The first deprovisioning beyond the threshold **holds** the connection. While it is held, every
-deactivation and deletion is refused with `429` and `Retry-After: 300` and changes nothing, while
-creates, updates and group changes keep flowing. The project's administrators get one email, which links
+deactivation and deletion is refused with `429` and `Retry-After: 300` and changes nothing.
+Creates, updates and group changes keep flowing. The project's administrators get one email, which links
 to the connection's page. Both directories retry a `429` by themselves, so nothing is lost: the refused
 requests land once the hold is released.
 
@@ -186,7 +188,7 @@ Only an explicit release ends a hold: **Release hold…** on the connection's pa
 `provisioning_connection_release` for an agent, which is a high-consequence tool that asks for
 confirmation. No edit ends one, and removing the threshold of a held connection is refused. Look at
 whom the directory was trying to remove before releasing; the refused deprovisionings arrive as soon as
-you do. The release clears the per-person records, and its audit entry keeps their count.
+you release it. The release clears the per-person records, and its audit entry keeps their count.
 
 The guard is off until you set a threshold, and setting one departs from the IPSIE profile, which wants
 deprovisioning to end access promptly: a leaver caught by a hold keeps access until the release. That
@@ -203,5 +205,5 @@ it provisioned first.
 Microsoft's SCIM validator and Okta's SCIM 2.0 Spec Test both pass against the conformance deployment,
 with users and groups. Okta's CRUD test, which needs an Okta organisation with the integration
 installed, has not been run, and certification has not been applied for. The detail, including the one
-validator failure counted as the validator's, is in
+validator failure attributed to the validator itself, is in
 [CONFORMANCE.md](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/CONFORMANCE.md#scim-provisioning-ipsie-al-scim-profile).

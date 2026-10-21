@@ -1,6 +1,6 @@
 ---
 title: Protect your MCP server with OAuth
-description: Make your MCP server an OAuth 2.1 protected resource in ten minutes. Declare it here, publish its metadata, validate a token, and prove both outcomes.
+description: Make your MCP server an OAuth 2.1 protected resource in ten minutes. Declare it in FoxAuth, publish its metadata, validate a token, and prove both outcomes.
 sidebar:
   order: 6
 ---
@@ -8,13 +8,13 @@ sidebar:
 import { Steps, Aside } from '@astrojs/starlight/components';
 
 An MCP server that anyone can call is a set of tools with no front door. The MCP authorization
-specification closes that by making the MCP server an **OAuth 2.1 protected resource**: an agent host
+specification adds that door by making the MCP server an **OAuth 2.1 protected resource**: an agent host
 that reaches it without a token is told where to get one, goes and gets it, and comes back with a
 token minted for that MCP server and nothing else.
 
-This page covers the whole job. You will declare your MCP server here, publish two things from it,
-check one token, and then watch it refuse an anonymous call and accept an authorized one. Call it ten
-minutes if you already have an instance running. If you do not, [Run with Docker
+You will declare your MCP server in FoxAuth, publish a metadata document and a `401` challenge from it,
+check one token, and then watch your MCP server refuse an anonymous call and accept an authorized one.
+This takes about ten minutes if you already have an instance running. If you do not, [Run with Docker
 Compose](/docs/get-started/docker-compose/) adds about two more.
 
 <Aside
@@ -30,14 +30,14 @@ Compose](/docs/get-started/docker-compose/) adds about two more.
 
 ## 1. Declare your MCP server as a resource
 
-Declare it in a project that has an address of its own — a path like `/acme`, a subdomain like
-`acme.auth.example.com`, or a hostname. Such a project is its own issuer, and a resource identifier is unique only within its issuer,
+Declare it in a project that has an address of its own: a path like `/acme`, a subdomain like
+`acme.auth.example.com`, or a hostname. Such a project is its own issuer. A resource identifier is unique only within its issuer,
 so nothing about your MCP server is fetched or checked when you declare it. It can be on an internal
 network, on `localhost` while you develop, or not deployed yet. Another tenant with a project of its own
 may declare the same URL without affecting yours.
 
 A project with no address of its own is served at the instance's root issuer, which every such project
-shares. There, only a super administrator can declare a resource, because the resource's own metadata
+shares. At the root issuer, only a super administrator can declare a resource, because the resource's own metadata
 cannot say which of those projects it belongs to.
 
 <Steps>
@@ -46,20 +46,20 @@ cannot say which of those projects it belongs to.
 
 2. Fill in three things.
 
-   **Resource identifier** — the canonical URI of your MCP server, exactly as its clients will name
-   it. `https://mcp.example.com/mcp`. No fragment, and no trailing slash: the specification asks
+   **Resource identifier**: the canonical URI of your MCP server, exactly as its clients will name
+   it, for example `https://mcp.example.com/mcp`. No fragment, and no trailing slash: the specification asks
    implementations to prefer the slash-free form, and this server stores it that way.
 
-   **Name** — what the end-user sees on the consent screen.
+   **Name**: what the end-user sees on the consent screen.
 
-   **Scopes it recognises** — the permissions your tools distinguish. Start with one, something like
+   **Scopes it recognises**: the permissions your tools distinguish. Start with one, something like
    `mcp:tools-basic`.
 
 3. Leave the token settings alone. The defaults are a self-contained token your MCP server verifies
-   against this server's published keys, with a fifteen-minute lifetime. That is what lets section 3
-   below, _Validate the token_, need no credentials of its own.
+   against this server's published keys, with a fifteen-minute lifetime. The self-contained format is
+   why section 3 below, _Validate the token_, needs no credentials of its own.
 
-4. Choose **Connect** on the API's row. It shows the values the next sections use, ready to copy: the
+4. Choose **Connect** on the API's row. **Connect** shows the values the next sections use, ready to copy: the
    issuer, the exact audience its tokens carry, the protected resource metadata document and the
    challenge line.
 
@@ -67,25 +67,26 @@ cannot say which of those projects it belongs to.
 
 <Aside
 	type="caution"
-	title="The scope list is a baseline, not a catalogue"
+	title="Agent hosts request every scope you advertise"
 >
 	An agent host that is given no scope guidance requests **every** scope your
 	resource advertises. The specification says so, and says it is intended: a
 	general-purpose client cannot choose sensibly among names it does not
-	understand. So a long list is not a menu of options. It is a grant of the
-	whole list to every client that ever arrives. Name the scopes your tools
-	actually distinguish, and let the rest be asked for later.
+	understand. So every client that ever arrives is granted the whole list,
+	however long it is. Name only the scopes your tools distinguish, and let the
+	rest be asked for later.
 </Aside>
 
 ## 2. Publish what an MCP server has to publish
 
-Two things, both from your own MCP server.
+Your MCP server serves both of these itself: a metadata document, and a `401` challenge that points to
+it.
 
 ### Protected resource metadata
 
 A JSON document at `/.well-known/oauth-protected-resource`, saying which authorization server protects
 you. The specification makes it a `MUST` for an MCP server, as it does the challenge below that points
-to it and the audience check in step 3:
+to it and the audience check in section 3:
 
 ```json
 {
@@ -96,15 +97,15 @@ to it and the audience check in step 3:
 }
 ```
 
-`resource` is the identifier you declared in step 1, character for character. `authorization_servers`
+`resource` is the identifier you declared in section 1, character for character. `authorization_servers`
 names the issuer of the project you declared the resource in: the project's own issuer when it has an
-address — `https://auth.example.com/acme`, `https://acme.auth.example.com`, or its hostname — and the
+address (`https://auth.example.com/acme`, `https://acme.auth.example.com`, or its hostname), and the
 instance's `ISSUER` otherwise. The
 document may live at `/.well-known/oauth-protected-resource` followed by your resource's path, as RFC
 9728 forms it, at the root as above, or wherever the challenge below points.
 
 The resource's row in the console shows whether this document currently vouches for your declaration,
-and which of the three places it was found at. It is a diagnostic only: it blocks nothing.
+and which of the three places it was found at. This check is a diagnostic only: it blocks nothing.
 
 ### A challenge that says where to go
 
@@ -123,13 +124,15 @@ your metadata document and requests everything in `scopes_supported`.
 ## 3. Validate the token
 
 Your MCP server has to establish two things about every token: that it is genuine, and that it was
-issued **for you**. The second is not optional. Accepting a token minted for something else is the
-confused-deputy hole that audience binding exists to close, and the specification forbids it outright.
+issued **for you**. The second is not optional. Accepting a token minted for something else opens the
+confused-deputy hole: your MCP server would act on authority that was granted to another service.
+Audience binding exists to close that hole, and the specification forbids accepting such a token
+outright.
 
 With the default token format there is nothing to ask this server at request time. Fetch the issuer's
-public keys once from the `jwks_uri` its metadata advertises, cache them, and check four claims. A
-project with an address signs with keys of its own, so its key set is beneath its own issuer —
-`https://auth.example.com/acme/jwks` below — and holds no other tenant's keys:
+public keys once from the `jwks_uri` its metadata advertises, cache them, and make four checks. A
+project with an address signs with keys of its own, so its key set is beneath its own issuer
+(`https://auth.example.com/acme/jwks` in the example below) and holds no other tenant's keys:
 
 ```js
 import { createRemoteJWKSet, jwtVerify } from 'jose';
@@ -164,20 +167,20 @@ library is your choice.
 	with [`POST /token/introspect`](/docs/reference/endpoints/). That endpoint
 	requires authentication, so your MCP server will need credentials of its own
 	and [`introspection.enabled`](/docs/reference/settings/#introspection.enabled)
-	switched on. That is the trade you are making.
+	switched on.
 </Aside>
 
 ## 4. Let an agent host identify itself
 
 An agent host usually knows nothing but a URL, and has nowhere for you to type a client identifier. The
 current specification's answer is **Client ID Metadata Documents**: the client's `client_id` _is_ an
-HTTPS URL naming a JSON document that describes it, and this server fetches and validates that document
+HTTPS URL naming a JSON document that describes it. This server fetches and validates that document
 on demand, and creates no client record at all.
 
 The project's **APIs** tab says whether agent hosts can identify themselves this way. On your own
-server, a super administrator turns it on in **Settings**:
+server, a super administrator turns this support on in **Settings**:
 [`clientIdMetadataDocument.enabled`](/docs/reference/settings/#clientIdMetadataDocument.enabled).
-It is in force as soon as you save it. Once it is on, discovery advertises
+The setting is in force as soon as you save it. Once it is on, discovery advertises
 `client_id_metadata_document_supported`, which is what a client checks before trying.
 
 <Aside type="note" title="Older hosts, and what each surface needs">
@@ -186,22 +189,22 @@ deprecated but retains. It works: switch on
 [`registration.enabled`](/docs/reference/settings/#registration.enabled) and such a client will
 register itself, then reach your resource exactly as above.
 
-The **administrative** MCP plane at `/mcp` is stricter, and worth knowing before you try it. A
+This server's own **administrative** MCP plane at `/mcp` is stricter. A
 dynamically registered client can never administer the instance, whatever else is configured. A
 document-identified client can, but only after a super administrator names it under **Agent access** in
-the console. Everything else can keep using the reserved `admin-mcp` client id, which needs no entry.
+the console. Other clients can keep using the reserved `admin-mcp` client id, which needs no entry.
 
 </Aside>
 
-## 5. Prove it both ways
+## 5. Prove it refuses and accepts {#5-prove-it-both-ways}
 
-Three calls. The refusals matter as much as the success, because without them there is no telling
+Make three calls. The refusals matter as much as the success, because without them there is no telling
 "protected" from "not reached yet".
 
 <Steps>
 
 1. **Call your MCP server with no token.** You should get `401`, and the `WWW-Authenticate` header from
-   step 2. If you get `200`, your validation is most likely not wired into the request path.
+   section 2. If you get `200`, your validation is most likely not wired into the request path.
 
    ```sh
    curl -i https://mcp.example.com/mcp -X POST \
@@ -214,8 +217,9 @@ Three calls. The refusals matter as much as the success, because without them th
    back with a token. The same call now answers `200`.
 
 3. **Try the token somewhere it does not belong.** Declare a second resource, get a token for it, and
-   present that one to your MCP server. It must be refused — the `aud` claim will not match. This is
-   the check that stops one integration's token working at another's, and it is worth seeing fail once.
+   present that one to your MCP server. It must be refused, because the `aud` claim will not match. The
+   audience check stops one integration's token working at another's, and it is worth seeing it refuse
+   a token once.
 
 </Steps>
 
@@ -223,7 +227,7 @@ Three calls. The refusals matter as much as the success, because without them th
 
 No code in this server, and no restart for the resource itself: a declaration is data, read on every
 token request. No client secret for your MCP server, because it verifies tokens against published
-keys instead of asking anything. And no allowlist of agent hosts for an ordinary resource: which
+keys instead of asking this server. And no allowlist of agent hosts for an ordinary resource: which
 end-users a client can sign in follows from the resource it names, so the project that holds the
 resource owns that answer.
 

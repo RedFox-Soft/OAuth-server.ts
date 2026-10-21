@@ -15,7 +15,7 @@ export const prerender = true;
  */
 export const GET: APIRoute = () => {
 	const lines = [
-		'# Generated from website/src/data/seo.ts — edit the list there, not this file.',
+		'# Generated from website/src/data/seo.ts. Edit the list there, not this file.',
 		'',
 		'User-agent: *',
 		'Allow: /',
@@ -29,7 +29,7 @@ export const GET: APIRoute = () => {
 		);
 		for (const crawler of CRAWLERS) {
 			lines.push(
-				`# ${crawler.purpose} — verified ${crawler.verified} against ${crawler.source}`,
+				`# ${crawler.purpose} (verified ${crawler.verified} against ${crawler.source})`,
 				`User-agent: ${crawler.agent}`,
 				`${crawler.allow ? 'Allow' : 'Disallow'}: /`,
 				''

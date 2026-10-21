@@ -1,9 +1,9 @@
 import type english from './en.ts';
 
-export const source = 'e30edf10b2ac';
+export const source = '15984ddedbb4';
 
 export default {
-	title: '页面未找到 — FoxAuth',
+	title: '页面未找到 | FoxAuth',
 	description:
 		'这个地址上什么也没有。要回到你原本想找的内容，最快的办法是回到首页或使用文档搜索。',
 	heading: '页面未找到。',

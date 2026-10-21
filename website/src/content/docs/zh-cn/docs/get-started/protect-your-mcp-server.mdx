@@ -1,16 +1,16 @@
 ---
 title: 用 OAuth 保护 MCP 服务器
-description: 十分钟内把你的 MCP 服务器变成 OAuth 2.1 受保护资源：在此声明、发布元数据、校验令牌，并验证两种结果。
-source: e5ca7e3c5168
+description: 十分钟内把你的 MCP 服务器变成 OAuth 2.1 受保护资源：在 FoxAuth 中声明、发布元数据、校验令牌，并验证两种结果。
+source: d9006bf04d89
 sidebar:
   order: 6
 ---
 
 import { Steps, Aside } from '@astrojs/starlight/components';
 
-任何人都能调用的 MCP 服务器，就是一组没有大门的工具。MCP 授权规范通过让 MCP 服务器成为 **OAuth 2.1 受保护资源**来解决这个问题：智能体宿主（agent host）在没有令牌的情况下访问它时，会被告知去哪里获取令牌；它取得令牌后再回来，而这个令牌只为该 MCP 服务器签发，别无他用。
+任何人都能调用的 MCP 服务器，就是一组没有大门的工具。MCP 授权规范装上这扇门的方式，是让 MCP 服务器成为 **OAuth 2.1 受保护资源**：智能体宿主（agent host）在没有令牌的情况下访问它时，会被告知去哪里获取令牌；它取得令牌后再回来，而这个令牌只为该 MCP 服务器签发，别无他用。
 
-本页涵盖完整的工作。你将在这里声明你的 MCP 服务器，从它那里发布两样东西，校验一个令牌，然后看着它拒绝匿名调用、接受经授权的调用。如果你已有正在运行的实例，大约需要十分钟。如果还没有，[使用 Docker Compose 运行](/zh-cn/docs/get-started/docker-compose/)大约还需要额外两分钟。
+你将在 FoxAuth 中声明你的 MCP 服务器，从它那里发布一份元数据文档和一个 `401` 质询，校验一个令牌，然后看着你的 MCP 服务器拒绝匿名调用、接受经授权的调用。如果你已有正在运行的实例，大约需要十分钟。如果还没有，[使用 Docker Compose 运行](/zh-cn/docs/get-started/docker-compose/)大约还需要额外两分钟。
 
 <Aside
 	type="note"
@@ -22,9 +22,9 @@ import { Steps, Aside } from '@astrojs/starlight/components';
 
 ## 1. 将你的 MCP 服务器声明为资源 {#1-declare-your-mcp-server-as-a-resource}
 
-在一个拥有独立地址的项目中声明它——地址可以是 `/acme` 这样的路径，可以是 `acme.auth.example.com` 这样的子域名，也可以是一个主机名。这样的项目就是它自己的签发者，而资源标识符只需在其签发者内唯一，因此声明时不会获取或检查你的 MCP 服务器的任何信息。它可以位于内部网络，可以是开发期间的 `localhost`，也可以尚未部署。另一个拥有独立项目的租户也可以声明相同的 URL，而不会影响你的声明。
+在一个拥有独立地址的项目中声明它：地址可以是 `/acme` 这样的路径，可以是 `acme.auth.example.com` 这样的子域名，也可以是一个主机名。这样的项目就是它自己的签发者。资源标识符只需在其签发者内唯一，因此声明时不会获取或检查你的 MCP 服务器的任何信息。它可以位于内部网络，可以是开发期间的 `localhost`，也可以尚未部署。另一个拥有独立项目的租户也可以声明相同的 URL，而不会影响你的声明。
 
-没有独立地址的项目在实例的根签发者下提供服务，所有此类项目共享这个签发者。在那里，只有超级管理员才能声明资源，因为资源自身的元数据无法表明它属于这些项目中的哪一个。
+没有独立地址的项目在实例的根签发者下提供服务，所有此类项目共享这个签发者。在根签发者下，只有超级管理员才能声明资源，因为资源自身的元数据无法表明它属于这些项目中的哪一个。
 
 <Steps>
 
@@ -32,34 +32,34 @@ import { Steps, Aside } from '@astrojs/starlight/components';
 
 2. 填写三项内容。
 
-   **Resource identifier**（资源标识符）——你的 MCP 服务器的规范 URI，与其客户端对它的称呼完全一致，例如 `https://mcp.example.com/mcp`。不带片段（fragment），也不带末尾斜杠：规范要求实现优先采用不带斜杠的形式，本服务器也按这种形式存储。
+   **Resource identifier**（资源标识符）：你的 MCP 服务器的规范 URI，与其客户端对它的称呼完全一致，例如 `https://mcp.example.com/mcp`。不带片段（fragment），也不带末尾斜杠：规范要求实现优先采用不带斜杠的形式，本服务器也按这种形式存储。
 
-   **Name**（名称）——最终用户在授权同意页面上看到的名称。
+   **Name**（名称）：最终用户在授权同意页面上看到的名称。
 
-   **Scopes it recognises**（它识别的 scope）——你的工具所区分的权限。先从一个开始，例如 `mcp:tools-basic`。
+   **Scopes it recognises**（它识别的 scope）：你的工具所区分的权限。先从一个开始，例如 `mcp:tools-basic`。
 
-3. 令牌设置保持不变即可。默认是自包含令牌，由你的 MCP 服务器依据本服务器公布的密钥进行验证，有效期为十五分钟。正因如此，下面的第 3 节「校验令牌」才不需要它自己的凭据。
+3. 令牌设置保持不变即可。默认是自包含令牌，由你的 MCP 服务器依据本服务器公布的密钥进行验证，有效期为十五分钟。由于采用自包含格式，下面的第 3 节「校验令牌」才不需要它自己的凭据。
 
-4. 在该 API 所在行点击 **Connect**。这里列出后面几节要用到的值，可以直接复制：签发者、它的令牌所带的确切受众、受保护资源元数据文档，以及 401 响应的质询头。
+4. 在该 API 所在行点击 **Connect**。**Connect** 列出后面几节要用到的值，可以直接复制：签发者、它的令牌所带的确切受众、受保护资源元数据文档，以及 401 响应的质询头。
 
 </Steps>
 
 <Aside
 	type="caution"
-	title="scope 列表是基线，而不是目录"
+	title="智能体宿主会请求你公布的每一个 scope"
 >
 	没有得到任何 scope 指引的智能体宿主，会请求你的资源公布的**每一个**
-	scope。规范明确这样规定，并说明这是有意为之：通用客户端无法在它不理解的名称之间做出合理选择。所以一个长列表并不是一份可选菜单，而是把整个列表授予以后到来的每一个客户端。只列出你的工具真正区分的
+	scope。规范明确这样规定，并说明这是有意为之：通用客户端无法在它不理解的名称之间做出合理选择。所以无论列表多长，以后到来的每一个客户端都会被授予整个列表。只列出你的工具所区分的
 	scope，其余的留待以后再申请。
 </Aside>
 
 ## 2. 发布 MCP 服务器必须发布的内容 {#2-publish-what-an-mcp-server-has-to-publish}
 
-两样东西，都由你自己的 MCP 服务器提供。
+下面两样东西都由你的 MCP 服务器自己提供：一份元数据文档，以及一个指向它的 `401` 质询。
 
 ### 受保护资源元数据 {#protected-resource-metadata}
 
-位于 `/.well-known/oauth-protected-resource` 的一个 JSON 文档，说明由哪个授权服务器保护你。规范把它规定为 MCP 服务器的 `MUST`，下文指向它的 `WWW-Authenticate` 质询和第 3 步的受众（audience）校验同样如此：
+位于 `/.well-known/oauth-protected-resource` 的一个 JSON 文档，说明由哪个授权服务器保护你。规范把它规定为 MCP 服务器的 `MUST`，下文指向它的 `WWW-Authenticate` 质询和第 3 节的受众（audience）校验同样如此：
 
 ```json
 {
@@ -70,9 +70,9 @@ import { Steps, Aside } from '@astrojs/starlight/components';
 }
 ```
 
-`resource` 是你在第 1 步中声明的标识符，必须逐字符一致。`authorization_servers` 填写你声明该资源的项目的签发者：如果该项目有独立地址，就是它自己的签发者——`https://auth.example.com/acme`、`https://acme.auth.example.com`，或其主机名——否则就是实例的 `ISSUER`。该文档可以位于 `/.well-known/oauth-protected-resource` 后接你的资源路径（即 RFC 9728 的构造方式），也可以如上所示位于根路径，或者位于下面的质询所指向的任何位置。
+`resource` 是你在第 1 节中声明的标识符，必须逐字符一致。`authorization_servers` 填写你声明该资源的项目的签发者：如果该项目有独立地址，就是它自己的签发者（`https://auth.example.com/acme`、`https://acme.auth.example.com` 或其主机名），否则就是实例的 `ISSUER`。该文档可以位于 `/.well-known/oauth-protected-resource` 后接你的资源路径（即 RFC 9728 的构造方式），也可以如上所示位于根路径，或者位于下面的质询所指向的任何位置。
 
-控制台中该资源所在的行会显示这个文档当前是否为你的声明背书，以及是在这三个位置中的哪一个找到的。这只是诊断信息：它不会阻止任何操作。
+控制台中该资源所在的行会显示这个文档当前是否为你的声明背书，以及是在这三个位置中的哪一个找到的。这项检查只是诊断信息：它不会阻止任何操作。
 
 ### 指明去向的质询 {#a-challenge-that-says-where-to-go}
 
@@ -88,9 +88,9 @@ WWW-Authenticate: Bearer resource_metadata="https://mcp.example.com/.well-known/
 
 ## 3. 校验令牌 {#3-validate-the-token}
 
-你的 MCP 服务器必须就每个令牌确认两件事：它是真实的，以及它是**为你**签发的。第二点不是可选的。接受为其他对象签发的令牌，正是受众绑定（audience binding）所要堵住的「混淆代理人」（confused deputy）漏洞，规范明令禁止这样做。
+你的 MCP 服务器必须就每个令牌确认两件事：它是真实的，以及它是**为你**签发的。第二点不是可选的。接受为其他对象签发的令牌，就会打开「混淆代理人」（confused deputy）漏洞：你的 MCP 服务器会凭借本来授予另一个服务的权限行事。受众绑定（audience binding）正是为堵住这个漏洞而存在，规范明令禁止接受这样的令牌。
 
-使用默认令牌格式时，处理请求时无需向本服务器询问任何事。从签发者元数据公布的 `jwks_uri` 获取一次其公钥并缓存，然后检查四个声明。有独立地址的项目使用它自己的密钥签名，所以其密钥集位于它自己的签发者之下——即下面示例中的 `https://auth.example.com/acme/jwks`——并且不包含任何其他租户的密钥：
+使用默认令牌格式时，处理请求时无需向本服务器询问任何事。从签发者元数据公布的 `jwks_uri` 获取一次其公钥并缓存，然后做四项检查。有独立地址的项目使用它自己的密钥签名，所以其密钥集位于它自己的签发者之下（即下面示例中的 `https://auth.example.com/acme/jwks`），并且不包含任何其他租户的密钥：
 
 ```js
 import { createRemoteJWKSet, jwtVerify } from 'jose';
@@ -121,29 +121,29 @@ export async function principalFor(authorization) {
 	**opaque**（不透明）令牌格式声明它，并通过 [`POST
 	/token/introspect`](/docs/reference/endpoints/)
 	检查每个令牌。该端点需要认证，因此你的 MCP 服务器需要有自己的凭据，并且要开启
-	[`introspection.enabled`](/docs/reference/settings/#introspection.enabled)。这就是你要做的取舍。
+	[`introspection.enabled`](/docs/reference/settings/#introspection.enabled)。
 </Aside>
 
 ## 4. 让智能体宿主标识自己 {#4-let-an-agent-host-identify-itself}
 
-智能体宿主通常只知道一个 URL，也没有地方让你输入客户端标识符。当前规范给出的答案是 **Client ID Metadata Documents**（客户端 ID 元数据文档）：客户端的 `client_id` *本身就是*一个 HTTPS URL，指向一份描述该客户端的 JSON 文档；本服务器按需获取并校验该文档，完全不创建客户端记录。
+智能体宿主通常只知道一个 URL，也没有地方让你输入客户端标识符。当前规范给出的答案是 **Client ID Metadata Documents**（客户端 ID 元数据文档）：客户端的 `client_id` *本身就是*一个 HTTPS URL，指向一份描述该客户端的 JSON 文档。本服务器按需获取并校验该文档，完全不创建客户端记录。
 
-项目的 **APIs** 标签页会显示智能体宿主能否用这种方式表明身份。在你自己的服务器上，由超级管理员在 **Settings** 中开启它：[`clientIdMetadataDocument.enabled`](/docs/reference/settings/#clientIdMetadataDocument.enabled)。保存后立即生效。开启后，发现文档会公布 `client_id_metadata_document_supported`，客户端在尝试之前会检查这一项。
+项目的 **APIs** 标签页会显示智能体宿主能否用这种方式表明身份。在你自己的服务器上，由超级管理员在 **Settings** 中开启这项支持：[`clientIdMetadataDocument.enabled`](/docs/reference/settings/#clientIdMetadataDocument.enabled)。保存后立即生效。开启后，发现文档会公布 `client_id_metadata_document_supported`，客户端在尝试之前会检查这一项。
 
 <Aside type="note" title="旧版宿主，以及各个接口面的要求">
 有些智能体宿主只支持**动态客户端注册**，当前规范将其标记为已弃用，但仍予保留。它可以正常工作：开启 [`registration.enabled`](/docs/reference/settings/#registration.enabled)，这类客户端就会自行注册，然后完全按上述方式访问你的资源。
 
-`/mcp` 上的**管理用** MCP 平面更为严格，在尝试之前值得了解。动态注册的客户端无论其他配置如何，都永远不能管理实例。由文档标识的客户端可以，但前提是超级管理员在控制台的 **Agent access** 下指定了它。其他所有客户端都可以继续使用保留的 `admin-mcp` client id，无需任何登记。
+本服务器自己位于 `/mcp` 的**管理用** MCP 平面更为严格。动态注册的客户端无论其他配置如何，都永远不能管理实例。由文档标识的客户端可以，但前提是超级管理员在控制台的 **Agent access** 下指定了它。其他所有客户端都可以继续使用保留的 `admin-mcp` client id，无需任何登记。
 
 </Aside>
 
-## 5. 双向验证 {#5-prove-it-both-ways}
+## 5. 验证它会拒绝也会接受 {#5-prove-it-both-ways}
 
-三次调用。拒绝与成功同样重要，因为没有拒绝，就无法区分「受保护」和「还没访问到」。
+进行三次调用。拒绝与成功同样重要，因为没有拒绝，就无法区分「受保护」和「还没访问到」。
 
 <Steps>
 
-1. **不带令牌调用你的 MCP 服务器**。你应该得到 `401`，以及第 2 步中的 `WWW-Authenticate` 头。如果得到 `200`，很可能是你的校验逻辑没有接入请求路径。
+1. **不带令牌调用你的 MCP 服务器**。你应该得到 `401`，以及第 2 节中的 `WWW-Authenticate` 头。如果得到 `200`，很可能是你的校验逻辑没有接入请求路径。
 
    ```sh
    curl -i https://mcp.example.com/mcp -X POST \
@@ -153,12 +153,12 @@ export async function principalFor(authorization) {
 
 2. **获取令牌后再次调用**。将你的智能体宿主指向你的 MCP 服务器，让它完成整个流程：它应当读取你的元数据文档，发现本服务器，让你的最终用户登录，然后带着令牌回来。同样的调用现在会返回 `200`。
 
-3. **把令牌用在它不该用的地方**。声明第二个资源，为它获取一个令牌，然后把这个令牌出示给你的 MCP 服务器。它必须被拒绝——`aud` 声明不会匹配。正是这项检查阻止了一个集成的令牌在另一个集成上生效，值得亲眼看它失败一次。
+3. **把令牌用在它不该用的地方**。声明第二个资源，为它获取一个令牌，然后把这个令牌出示给你的 MCP 服务器。它必须被拒绝，因为 `aud` 声明不会匹配。受众检查阻止了一个集成的令牌在另一个集成上生效，值得亲眼看它拒绝一次令牌。
 
 </Steps>
 
 ## 你无需做的事 {#what-you-did-not-have-to-do}
 
-不需要在本服务器中写任何代码，资源本身也不需要重启：声明就是数据，每次令牌请求时都会读取。你的 MCP 服务器不需要客户端密钥，因为它依据公布的公钥验证令牌，而不必询问任何东西。对于普通资源，也不需要智能体宿主的允许列表：一个客户端可以让哪些最终用户登录，取决于它所指定的资源，因此包含该资源的项目也就决定了这个答案。
+不需要在本服务器中写任何代码，资源本身也不需要重启：声明就是数据，每次令牌请求时都会读取。你的 MCP 服务器不需要客户端密钥，因为它依据公布的公钥验证令牌，而不必询问本服务器。对于普通资源，也不需要智能体宿主的允许列表：一个客户端可以让哪些最终用户登录，取决于它所指定的资源，因此包含该资源的项目也就决定了这个答案。
 
 本页涉及的端点见[端点参考](/docs/reference/endpoints/)；上文提到的每项设置，连同其默认值和设立理由，都在[设置参考](/docs/reference/settings/)中。

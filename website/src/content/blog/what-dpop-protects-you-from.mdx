@@ -16,15 +16,14 @@ outside crash-reporting service. The headers went too. So the vendor's dashboard
 vendor's support rota could read it. As far as I know, nobody used it. But if someone had, nothing in
 the protocol would have stopped them.
 
-This is not a bug in anyone's code. It is how a bearer token is defined. RFC 6750 says that anyone
-who holds a bearer token can use it. The resource server is the API that accepts the token. It
+Nobody's code had a bug. RFC 6750 defines a bearer token this way: anyone who holds it can use it.
+The resource server is the API that accepts the token. It
 checks the token's signature, its expiry, its audience (which API it was issued for) and its scope
 (what it allows). But it never asks the one question that mattered that afternoon: is the caller the
 same party the token was issued to? It cannot ask. The request contains nothing that would answer it.
 
-DPoP (RFC 9449) adds something to the request that answers that question. I want to be precise about
-what DPoP gives you and what it does not. I have seen it sold as "stops token theft". What it does is
-narrower, and more useful.
+DPoP (RFC 9449) adds something to the request that answers that question. I have seen DPoP sold as
+"stops token theft". What it does is narrower, and more useful.
 
 ## What the client signs on every request, and why a stolen token is useless without the key {#what-the-client-signs}
 
@@ -64,12 +63,12 @@ client.
   </defs>
   <rect x="30" y="30" width="270" height="340" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
   <text x="165" y="58" text-anchor="middle" font-size="16" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">DPoP proof (signed JWT)</text>
-  <text x="50" y="100" font-size="14" fill="var(--diagram-accent, #d9480f)">header.jwk — the public key</text>
-  <text x="50" y="145" font-size="14" fill="var(--diagram-fg, #1a1a1a)">ath — SHA-256 of the access token</text>
-  <text x="50" y="190" font-size="14" fill="var(--diagram-fg, #1a1a1a)">htm, htu — method and URL</text>
-  <text x="50" y="235" font-size="14" fill="var(--diagram-fg, #1a1a1a)">jti — unique per proof</text>
-  <text x="50" y="280" font-size="14" fill="var(--diagram-fg, #1a1a1a)">nonce — issued by the server</text>
-  <text x="50" y="325" font-size="14" fill="var(--diagram-fg, #1a1a1a)">iat — when it was signed</text>
+  <text x="50" y="100" font-size="14" fill="var(--diagram-accent, #d9480f)">header.jwk: the public key</text>
+  <text x="50" y="145" font-size="14" fill="var(--diagram-fg, #1a1a1a)">ath: SHA-256 of the access token</text>
+  <text x="50" y="190" font-size="14" fill="var(--diagram-fg, #1a1a1a)">htm, htu: method and URL</text>
+  <text x="50" y="235" font-size="14" fill="var(--diagram-fg, #1a1a1a)">jti: unique per proof</text>
+  <text x="50" y="280" font-size="14" fill="var(--diagram-fg, #1a1a1a)">nonce: issued by the server</text>
+  <text x="50" y="325" font-size="14" fill="var(--diagram-fg, #1a1a1a)">iat: when it was signed</text>
   <text x="50" y="352" font-size="12" fill="var(--diagram-line, #555)">signed by the private key, kept on the client</text>
   <rect x="470" y="70" width="300" height="70" rx="8" fill="none" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5"/>
   <text x="620" y="97" text-anchor="middle" font-size="15" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">Access token</text>
@@ -95,11 +94,11 @@ The highlighted arrow is the one the whole scheme depends on. It is the sender-c
 is tied to a key, and whoever sends the token must prove they hold that key. The access token carries
 a confirmation claim, `cnf.jkt` (cnf is short for "confirmation"). Its value is the thumbprint of the
 public key that signed the proof. A thumbprint is a short hash of a key, computed the way RFC 7638
-describes. Why does this matter? The resource server may never have talked to the client. Even so,
+describes. The resource server may never have talked to the client. Even so,
 the token alone tells it which key the token belongs to. Then it checks that this proof was signed
 with that key.
 
-The other claims do this. `ath` is a hash of the access token itself. It stops someone from taking a
+The other claims each close one kind of replay. `ath` is a hash of the access token itself. It stops someone from taking a
 proof made for one token and attaching it to another token that is bound to the same key. `htm` and
 `htu` are the request's method and URL. They stop a proof made for one endpoint from being replayed
 against a different one. `jti` is a unique identifier for each proof. It lets the server notice when
@@ -107,9 +106,9 @@ the same proof arrives twice. `nonce` and `iat` are both about freshness: how re
 made. They get their own section below, because that is where most of the trouble of running DPoP
 lives.
 
-Here is what this looks like in actual HTTP traffic. It starts with the code exchange, where the
-client trades its authorization code for tokens. Compared with an ordinary exchange that uses PKCE,
-only two things are new: the `DPoP` header in the request and the `token_type` field in the response:
+Here is what DPoP looks like in HTTP traffic. It starts with the code exchange, where the client
+trades its authorization code for tokens. Compared with an ordinary exchange that uses PKCE (the
+`code_verifier` that proves the same client started the request), only two things are new: the `DPoP` header in the request and the `token_type` field in the response:
 
 ```http
 POST /token HTTP/1.1
@@ -138,8 +137,8 @@ Cache-Control: no-store
 
 `token_type: DPoP` tells the client which scheme to write in the `Authorization` header from now
 on. The client sends `Authorization: DPoP <token>` instead of `Bearer`. If a server receives a
-DPoP-bound token under the `Bearer` scheme, it should refuse it. The reason: a client that writes
-`Bearer` does not know its token is bound to a key. So it will not send a proof either.
+DPoP-bound token under the `Bearer` scheme, it should refuse it, because a client that writes
+`Bearer` does not know its token is bound to a key. So that client will not send a proof either.
 
 Where the binding is kept depends on the kind of token. An opaque token is a random string with
 nothing inside it; only the authorization server knows what it stands for. To check one, the
@@ -188,7 +187,7 @@ resource server. That block of checks, step 4, is the part worth reading closely
   <text x="400" y="220" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">DPoP: proof(htm GET, htu /orders, ath = sha256(token), jti, jwk = pub(K))</text>
   <rect x="470" y="245" width="300" height="118" rx="8" fill="none" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5"/>
   <text x="620" y="268" text-anchor="middle" font-size="14" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">4  verifies, all of it or nothing</text>
-  <text x="485" y="290" font-size="12" fill="var(--diagram-fg, #1a1a1a)">token signature, exp, aud, scope — as before</text>
+  <text x="485" y="290" font-size="12" fill="var(--diagram-fg, #1a1a1a)">token signature, exp, aud, scope (as before)</text>
   <text x="485" y="307" font-size="12" fill="var(--diagram-fg, #1a1a1a)">proof signature verifies under header.jwk</text>
   <text x="485" y="324" font-size="12" fill="var(--diagram-accent, #d9480f)">thumbprint(header.jwk) equals token cnf.jkt</text>
   <text x="485" y="341" font-size="12" fill="var(--diagram-fg, #1a1a1a)">htm/htu are this request, ath is this token</text>
@@ -210,10 +209,10 @@ not be able to send again.
 
 ## What DPoP does not stop: code running where the key is kept {#the-part-that-gets-oversold}
 
-That is a real improvement. It is also the only improvement. DPoP protects you when the token leaks
-after it was issued, somewhere outside the client: a crash report, a proxy log, the `Referer` header,
-a browser extension that reads storage, a misconfigured cache. In every one of these cases the
-attacker ends up with the token but not the key.
+Shrinking a leaked token to a single request is a real improvement. It is also the only improvement.
+DPoP protects you when the token leaks after it was issued, somewhere outside the client: a crash
+report, a proxy log, the `Referer` header, a browser extension that reads storage, a misconfigured
+cache. In each of these cases the attacker ends up with the token but not the key.
 
 DPoP does nothing against an attacker whose code runs where the key is kept. Take cross-site
 scripting (XSS): someone else's script running inside your page. Say a single-page app (a web app
@@ -223,7 +222,7 @@ key. It calls the API as the real user, from the real page. Every check in step 
 should. Binding a token to a key that the attacker can also use protects nothing.
 
 In more than one design review I have heard this exchange: "What happens if the frontend is
-compromised?" "We use DPoP." That does not answer the question at all. DPoP stops a stolen token from
+compromised?" "We use DPoP." That reply does not answer the question at all. DPoP stops a stolen token from
 being replayed somewhere else. It does not help when the place that holds the key is itself
 compromised.
 
@@ -231,8 +230,7 @@ DPoP does not replace the boring basics either. Take a DPoP-bound token that liv
 no audience restriction. Whoever compromises the client gets a token that works for four hours,
 against any API. What limits that damage is short token lifetimes, audience restriction and
 refresh-token rotation. A refresh token is the longer-lived token the client uses to get new
-access tokens; rotation means each use of it returns a new one. DPoP works alongside these basics. It
-does not replace any of them.
+access tokens; rotation means each use of it returns a new one. DPoP works alongside these basics.
 
 ## Why the server hands out a nonce: the client's clock may be wrong {#the-nonce-and-why-the-real-enemy-is-clocks}
 
@@ -245,7 +243,7 @@ Someone will lose an afternoon to it. I have been that someone.
 
 A server nonce (RFC 9449, §8 and §9) takes the client's clock out of the picture and uses the
 server's instead. The nonce is a value the server hands out. The client does not need to understand
-what is inside it. It just puts the value in the `nonce` field of its next proof. The server accepts
+what is inside it. It puts the value in the `nonce` field of its next proof. The server accepts
 the proof if it issued that nonce recently. Freshness now comes from the nonce, and `iat` is only for
 reference. The price is the first request. On first contact the client has no nonce yet, so its
 first request fails, by design. That failure has to carry everything the client needs to fix it:
@@ -282,7 +280,7 @@ ordinary loop, not handle it as an error.
   <text x="400" y="193" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">2  GET /orders   DPoP: proof(nonce = n1)</text>
   <line x1="660" y1="250" x2="142" y2="250" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#dpop-arrow-c)"/>
   <text x="400" y="228" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">200 OK</text>
-  <text x="400" y="245" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">DPoP-Nonce: n2  — carried into the next proof; no second 401 while the client stays busy</text>
+  <text x="400" y="245" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">DPoP-Nonce: n2, carried into the next proof; no second 401 while the client stays busy</text>
   <text x="400" y="280" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">At the token endpoint the same refusal is a 400 with the error in the body, not a 401.</text>
 </svg>
 
@@ -300,8 +298,8 @@ The second was CORS: the rules a browser uses to decide what a script may read f
 by another origin (a different scheme, host or port). The browser will not let the script read the
 `WWW-Authenticate` or `DPoP-Nonce` header of such a response unless the server lists them in
 `Access-Control-Expose-Headers`. Without them, the single-page app sees a 401 but cannot see what is
-in it, so it can never retry. The spec mentions this in passing. Yet it decides whether DPoP works in
-a browser at all.
+in it, so it can never retry. The spec mentions the exposed headers in passing. Yet they decide
+whether DPoP works in a browser at all.
 
 Behind the nonce there is a design question that I find more interesting than the spec makes it
 look: how does the server know which nonces it issued recently? The obvious answer is to store them.
@@ -343,7 +341,7 @@ that holds the same secret accepts a nonce issued by any other replica. And a re
 nothing, because there was nothing to remember.
 
 What you give up is revocation. A computed nonce cannot be withdrawn early, and it is not tied to any
-one client. That is fine, because a nonce only shows that a proof is fresh. It does not make the
+one client. Neither limit matters, because a nonce only shows that a proof is fresh. It does not make the
 proof single-use. Single use comes from `jti`. Mixing the two up is how people come to believe that
 a nonce protects them from replay. It does not.
 
@@ -356,17 +354,16 @@ write on every API call that carries a token. Say your resource server is an aut
 no state of its own. Then this store is a new dependency that did not exist before DPoP. Usually,
 the first time anyone notices it is when the replay store is the thing setting off their alerts.
 
-It is tempting to switch replay detection off, and here I want to be open about a decision we made.
-Our server has a switch that turns replay detection off. It is set in the configuration the server
-reads at startup. On purpose, it is not in the admin console or in the management API. It exists for
+It is tempting to switch replay detection off, and our server has a switch that does it. The switch
+is set in the configuration the server reads at startup. On purpose, it is not in the admin console or in the management API. It exists for
 two cases. One is a conformance test suite (tests that check a server follows the standard) that
 replays one proof on purpose. The other is a person who repeats a request while tracking down a
 problem. Neither of those is administration.
 
-Now picture a switch that removes a security protection while discovery (the document where the
-server lists what it supports) keeps advertising the feature. That is exactly the kind of switch
-someone flips at two in the morning during an incident and never flips back. And at two in the
-morning, people are working in the console. So the switch is not there.
+A switch that removes a security protection while discovery (the document where the server lists
+what it supports) keeps advertising the feature is the kind someone flips at two in the morning
+during an incident and never flips back. And at two in the morning, people are working in the
+console. So the switch is not there.
 
 Without replay detection you lose much less than "DPoP stops working". Suppose an attacker captured a
 complete request, token and proof. They can replay that exact request, with the same method and URL,
@@ -387,12 +384,12 @@ method is `none`, the refresh token gets the same `jkt` as the access token.
 
 I think this clause is the strongest argument for DPoP in a browser, stronger than anything about
 the access token. In a single-page app the access token lives fifteen minutes, but the refresh token
-lives for days. It is kept in browser storage. That is exactly where an attacker is most likely to
-find it: in a leaked backup of the browser profile, or on a shared computer. Before DPoP, a refresh
+lives for days. It is kept in browser storage, and browser storage is where an attacker is most
+likely to find it: in a leaked backup of the browser profile, or on a shared computer. Before DPoP, a refresh
 token stolen from a browser opened the account for as long as rotation let that token live.
 
 Now add DPoP and a non-extractable WebCrypto key: a key the page can use but cannot copy out of the
-browser. A stolen refresh token is then just a string that cannot be exchanged. The exchange itself
+browser. A stolen refresh token is then a string that cannot be exchanged. The exchange itself
 needs a proof signed with the key, and the key never left the origin. Rotation still matters. But now
 it catches an attacker who has already been stopped, not one who is already inside.
 
@@ -401,7 +398,7 @@ request. It binds the authorization code to the key before the code is even issu
 intercepted between the redirect and the exchange then cannot be redeemed with a different key.
 PKCE already protects against most of that. And our server fills in `dpop_jkt` by itself when a proof
 arrives with a pushed authorization request (PAR, where the client first sends its authorization
-parameters straight to the server). So in practice it costs nothing. It is not a reason to turn DPoP
+parameters straight to the server). So in practice the binding costs nothing. It is not a reason to turn DPoP
 on. It is not a reason to turn it off either.
 
 ## When DPoP is worth its cost, and when it is not {#where-i-would-use-it-and-where-i-would-not}
@@ -409,7 +406,7 @@ on. It is not a reason to turn it off either.
 DPoP costs three things, and the signature is not one of them. First, the client needs a key, a place
 to keep it, and a proof on every request. In a browser the key should be a non-extractable
 `CryptoKey` in IndexedDB; in a native app, the platform's keystore. If the key can be extracted, you
-quietly lose most of what you paid for. Second, the client has to treat `use_dpop_nonce` as a reason
+silently lose most of what you paid for. Second, the client has to treat `use_dpop_nonce` as a reason
 to retry, not as a failure. And the server has to expose two headers to cross-origin callers, or the
 retry can never happen. Third, someone has to own a replay store whose entries expire after five
 minutes, or own the decision not to have one.
@@ -425,14 +422,14 @@ mTLS (TLS where the client also presents a certificate), or plain short-lived be
 the same thing with less client code.
 
 What I cannot answer is what browsers will do next. Device Bound Session Credentials (DBSC) started
-as a Chrome proposal and is now an IETF draft. It tries to give cookies the same property: binding to
-a key. There the key is held by the browser, not by the page. That is exactly the boundary DPoP
-cannot cross. If DBSC lands and grows a way to work with API tokens, much of today's client-side DPoP
+as a Chrome proposal and is now a W3C working draft. It tries to give cookies the same property: binding to
+a key. There the key is held by the browser, not by the page. DPoP cannot cross that boundary
+between page and browser. If DBSC lands and grows a way to work with API tokens, much of today's client-side DPoP
 code becomes something the platform does for you. If it stays a cookie-only feature, DPoP remains the
 only sender-constraint a browser client can use without a client certificate. I would build for the
 second outcome and be pleased by the first.
 
-If you want to see how this looks in a running server: in FoxAuth you switch DPoP on for the whole
+If you want to see how DPoP looks in a running server: in FoxAuth you switch DPoP on for the whole
 server first, then for each client through the `dpop_bound_access_tokens` client attribute. Whether a
 nonce is required is a setting. The replay switch is the one described above, kept out of the console
 on purpose. The [settings reference](/docs/reference/settings/) lists the options, the

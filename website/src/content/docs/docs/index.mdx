@@ -8,22 +8,22 @@ authorization server. You can run it yourself, or use it free on FoxAuth Cloud. 
 running, connecting an application to it, and operating it once real users depend on it. Pick the
 one you are doing now.
 
-## Getting it running
+## Getting a server running {#getting-it-running}
 
 Start with [Run with Docker Compose](/docs/get-started/docker-compose/). One command starts MongoDB,
-provisions the schema and serves the authorization server, and it is probably the fastest way to
+provisions the schema and serves the authorization server, which is probably the fastest way to
 see a working instance. If you would rather work against the source, [Run from
-source](/docs/get-started/from-source/) clones the repository and starts it with Bun.
+source](/docs/get-started/from-source/) clones the repository and starts the server with Bun.
 
 Either way the next step is [Create the first administrator](/docs/get-started/first-admin/): a
-fresh database has no accounts, and the one-time setup screen is how the first one is made. Turn on
+fresh database has no accounts, and the one-time setup screen creates the first one. Turn on
 the second factor there before anything else.
 
 To skip running a server, [create a free account on FoxAuth Cloud](https://auth.foxauth.dev/admin/signup), our
 instance at `auth.foxauth.dev`. You get a personal team, and up to two projects on the
 [Free plan](/docs/administer/plans/#the-free-plan). The Get started pages assume a server at
-`http://localhost:3000`: on the cloud, use your project's issuer, shown on its **Overview**, in its place.
-The Free plan offers sign-in through Google, Microsoft, Apple and GitHub only.
+`http://localhost:3000`: on the cloud, replace it with your project's issuer URL, shown on the project's **Overview**.
+On the Free plan, sign-in through an upstream provider is limited to Google, Microsoft, Apple and GitHub.
 
 ## Connecting an application
 
@@ -33,38 +33,38 @@ that trip people up: the difference between a public and a confidential client, 
 are matched exactly and never by pattern, and which project a client signs people in from.
 
 Then [Get your first token](/docs/get-started/first-token/) walks the Authorization Code flow with
-PKCE end to end using `curl`, from the code challenge to a decoded ID token and a UserInfo call.
-PKCE is mandatory for every client, not only public ones. That is OAuth 2.1, and in our experience
-it is the most common surprise for anyone arriving from an OAuth 2.0 server.
+PKCE (Proof Key for Code Exchange) end to end using `curl`, from the code challenge to a decoded ID token and a UserInfo call.
+By default PKCE is mandatory for every client, not only public ones. OAuth 2.1 requires it, and in our experience
+the requirement is the most common surprise for anyone arriving from an OAuth 2.0 server.
 
 If the application you are connecting is an **MCP server**, it is not an OAuth client but a protected
 resource, and the shape is different enough to have its own page: [Protect your MCP server with
-OAuth](/docs/get-started/protect-your-mcp-server/) declares it here, publishes the two things an MCP
+OAuth](/docs/get-started/protect-your-mcp-server/) declares the MCP server on this authorization server, publishes the two things an MCP
 server has to publish, validates a token, and shows both a refusal and a success.
 
-## Running it in production
+## Running the server in production {#running-it-in-production}
 
-[Deploy](/docs/deploy/fly/) covers the targets people actually use: [Fly.io](/docs/deploy/fly/),
+[Deploy](/docs/deploy/fly/) covers three targets: [Fly.io](/docs/deploy/fly/),
 [Kubernetes](/docs/deploy/kubernetes/), [Docker Compose](/docs/deploy/docker-compose/) on a single
-host. The database is a choice of two, [MongoDB](/docs/deploy/mongodb-atlas/) or
-[PostgreSQL](/docs/deploy/postgresql/), and the connection string you set is what picks between
-them. Whichever you choose, [Behind a reverse proxy](/docs/deploy/reverse-proxy/) matters. The
+host. The database is [MongoDB](/docs/deploy/mongodb-atlas/) or
+[PostgreSQL](/docs/deploy/postgresql/), and the connection string you set picks between
+them. Whichever you choose, read [Behind a reverse proxy](/docs/deploy/reverse-proxy/). The
 issuer URL must be an `https://` address and must match what clients were configured with. A proxy
 that rewrites headers without being told to is the usual cause of tokens that validate locally and
 fail in production.
 
-Read [Upgrading](/docs/deploy/upgrade/) before you move between versions. Since 1.0.0 the HTTP surface and
-the admin API change incompatibly only in a major release; the changelog says what moved, and the setup script has to be re-run afterwards so new collections
-and indexes exist, followed by `bun run db:migrate` for anything a release has to reshape.
+Read [Upgrading](/docs/deploy/upgrade/) before you move between versions. Since 1.0.0, the HTTP surface and
+the admin API change incompatibly only in a major release, and the changelog says what moved. After an upgrade, re-run the setup script so new collections
+and indexes exist, then run `bun run db:migrate` for anything a release has to reshape.
 
-## Running it for real users
+## Administering projects once users sign in {#running-it-for-real-users}
 
-Once people sign in through it, the work moves to the console. [Connect an upstream identity
+Once people sign in through the server, the work moves to the console. [Connect an upstream identity
 provider](/docs/administer/federation/) lets a project's users sign in through Google, Microsoft, Apple,
-GitHub or any OpenID provider, and decides which accounts such a sign-in may create or link. With that in
-place, [Provision users from Entra ID or Okta](/docs/administer/scim/) hands the project's users and
+GitHub or any OpenID provider, and decides which accounts such a sign-in may create or link. Once a provider
+is connected, [Provision users from Entra ID or Okta](/docs/administer/scim/) hands the project's users and
 groups to the directory over SCIM, and [Sign-out from upstream
-providers](/docs/administer/upstream-logout/) lets a sign-out there end the sessions here.
+providers](/docs/administer/upstream-logout/) lets a sign-out at the upstream provider end the user's sessions on this server.
 
 [Teams and project ownership](/docs/administer/teams/) covers the administrator teams that own
 projects and moving a project between them. [Project addresses](/docs/administer/project-addresses/)
@@ -75,10 +75,10 @@ access](/docs/administer/ending-access/) compares deactivation, the lock, signin
 deletion, and names the one token none of them can recall. [Rotate signing
 keys](/docs/administer/signing-keys/) rotates the instance's and each project's keys in one step
 without a restart, and revokes a compromised key at once. [Plans and Free-tier
-limits](/docs/administer/plans/) is for a public instance where anyone may register as an administrator: it
+limits](/docs/administer/plans/) is for a public instance where anyone may register as an administrator: a plan
 limits what each team may create, and pauses new sign-ups at a project's monthly active-user cap.
 
-## Deciding whether to trust it
+## Deciding whether to trust the server {#deciding-whether-to-trust-it}
 
 An authorization server is the front door of everything behind it. Before you put one in front of
 real users you are entitled to ask what it defends against and how anyone knows. The
@@ -88,26 +88,26 @@ that are true today. [Security assurance](/docs/security/assurance/) answers the
 scanning that runs on every push and every week, where each result is published, and what has not
 been done yet. Reporting a vulnerability is covered by the [security policy](/security/).
 
-## Looking something up
+## Reference pages generated from the source {#looking-something-up}
 
 The Reference section is generated from the server's own source on every build, so it describes the
 release the site was built from; nothing in it is maintained by hand:
 
-- **[Settings](/docs/reference/settings/)** — every server-wide flag and option, what it does, and
+- **[Settings](/docs/reference/settings/)**: every server-wide flag and option, what it does, and
   whether changing it needs a restart.
-- **[Endpoints](/docs/reference/endpoints/)** — every route the server serves, which feature flag
+- **[Endpoints](/docs/reference/endpoints/)**: every route the server serves, which feature flag
   governs it, and its CORS and rate-limit class.
-- **[Admin API](/docs/reference/admin-api/)** — the management API behind the console.
-- **[MCP tools](/docs/reference/mcp-tools/)** — the operations an AI agent may perform, an
+- **[Admin API](/docs/reference/admin-api/)**: the management API behind the console.
+- **[MCP tools](/docs/reference/mcp-tools/)**: the operations an AI agent may perform, an
   allow-list chosen on purpose and narrower than the whole admin surface.
-- **[Addon seams](/docs/reference/addon-seams/)** — the named functions you replace with your own
+- **[Addon seams](/docs/reference/addon-seams/)**: the named functions you replace with your own
   instead of forking.
-- **[Environment variables](/docs/reference/environment/)** — what has to be set before the server
+- **[Environment variables](/docs/reference/environment/)**: what has to be set before the server
   will start.
 
-## What this server is not
+## What the server does not support {#what-this-server-is-not}
 
-It speaks OAuth 2.1 and OpenID Connect, and nothing else. There is no SAML support and none planned.
+The server speaks OAuth 2.1 and OpenID Connect, and nothing else. There is no SAML support and none planned.
 The Implicit and Resource Owner Password Credentials grants are not implemented, because OAuth 2.1
 removes them. If an application depends on either, it needs changing before it can use this server.
 

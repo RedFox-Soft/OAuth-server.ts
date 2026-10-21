@@ -23,7 +23,7 @@ is a super administrator's decision.
 The setting [`plans.enabled`](/docs/reference/settings/#plans.enabled) is the switch. In the console it is
 **Enforce plans**, under **Settings → Plans & limits**. It is off on every instance, new and upgraded.
 
-While it is off, nothing in this page is enforced, and a team sees nothing about plans. Projects still record
+While it is off, nothing on this page is enforced, and a team sees nothing about plans. Projects still record
 their plan, so turning it on changes no data. Turning it off again keeps every project's plan and the catalogue
 for next time.
 
@@ -45,12 +45,10 @@ are:
 | The project's address name      | Generated, 8 characters; the team cannot choose it                          |
 | A hostname of the project's own | Not included; giving one stays a super administrator's act                  |
 
-The sections below explain each one.
-
 ### Monthly active users {#monthly-active-users}
 
 A project's **monthly active users** are the distinct end users it issued tokens to in one calendar month (UTC).
-A sign-in counts, and so does a token renewal without a new sign-in. The figure is the one the console already
+A sign-in counts, and so does a token renewal without a new sign-in. The figure is the one the console
 shows on the **Usage** page.
 
 The cap is soft. When a Free project reaches 100,000 in a month, it stops creating new accounts on the end
@@ -68,8 +66,8 @@ Sign-ups open again when a new month starts, or when a super administrator moves
 higher cap. The server re-reads the figure at most about every 5 minutes, so a change takes up to that long to
 show. If the figure cannot be read at all, sign-ups stay open: a storage fault must not lock new people out.
 
-In the console, **Try sign-in** on a provider names this reason when it applies, so an administrator can tell it
-from a misconfiguration.
+In the console, **Try sign-in** on a provider says when new sign-ups are paused by the cap, so an administrator
+can tell the pause from a misconfiguration.
 
 ### Projects and teams per administrator {#projects-and-teams-per-administrator}
 
@@ -77,7 +75,7 @@ An administrator **owns** a team when they are its member with the owner role. T
 does every regular team they own. On Free, one administrator may own 2 Free projects across all of those teams
 together.
 
-The count cannot be got around by moving things. It is checked whenever a project would arrive in a team:
+Moving projects between teams does not get around the count. It is checked whenever a project would arrive in a team:
 
 - when a project is created there;
 - when a project is moved there from another team;
@@ -88,9 +86,9 @@ A team may have several owners. Then every project in the team counts toward eac
 arrive only if no owner would go over their limit.
 
 Separately, an administrator may own a limited number of **regular teams**. The setting
-[`plans.regularTeamsPerAdministrator`](/docs/reference/settings/#plans.regularTeamsPerAdministrator) decides it,
-and it is 1 by default. The personal team never counts. A team has no plan of its own, so this is one number for
-the whole instance rather than a plan limit.
+[`plans.regularTeamsPerAdministrator`](/docs/reference/settings/#plans.regularTeamsPerAdministrator) sets the
+number, and it is 1 by default. The personal team never counts. A team has no plan of its own, so the team
+allowance is one number for the whole instance rather than a plan limit.
 
 Becoming an owner is checked too. Adding someone to a team as an owner, changing a member's role to owner, or
 accepting an invitation as an owner is refused when it would put that person over either count. An owner
@@ -114,7 +112,7 @@ is `common`, `organizations` or `consumers`: personal accounts, any organisation
 - Microsoft bound to one organisation's directory, by that directory's ID or domain.
 
 The check runs when a provider is added, and when an existing provider's issuer or Microsoft tenant is changed.
-In the console, the **Sign-in** tab shows enterprise choices as not included on such a plan.
+In the console, the **Sign-in** tab shows enterprise choices as not included on a plan without enterprise sign-in.
 
 ### A generated address name {#a-generated-address-name}
 
@@ -133,7 +131,7 @@ subdomain. A Free project may later move between the path and the subdomain form
 [address change](/docs/administer/project-addresses/#changing-a-projects-address), as long as it keeps its slug.
 
 Naming a slug is refused on Free, both for a new project and for an address change. A hostname of the project's
-own is not part of any team's choice yet: only a super administrator gives one, as before.
+own is not part of any team's choice yet: only a super administrator gives one.
 
 ## What a limit never does {#what-a-limit-never-does}
 
@@ -147,7 +145,7 @@ own is not part of any team's choice yet: only a super administrator gives one, 
 - **No existing user is refused a sign-in.** The active-user cap pauses new accounts only.
 
 Two creations that arrive at the same moment, when a project is one below a limit, may both succeed. The project
-is then one over its limit. This is accepted: the project keeps working, and the next creation is refused.
+is then one over its limit. That overshoot is accepted: the project keeps working, and the next creation is refused.
 
 ## Which plan a project is on {#which-plan-a-project-is-on}
 
@@ -155,8 +153,7 @@ A project records its plan when it is created. It gets the plan that is the defa
 plans are turned on.
 
 So **making another plan the default affects only projects created afterwards**. Existing projects keep the plan
-they record. Editing a plan's limits is different: it applies at once to every project on that plan, from the next
-creation.
+they record. Editing a plan's limits applies at once to every project on that plan, from the next creation.
 
 Projects that existed before plans did are given Free by the upgrade's migration,
 `2026-10-18-projects-record-plan`. It writes only projects outside the System team that record no plan, and it
@@ -173,7 +170,7 @@ Only a super administrator manages plans. Every change is recorded in the audit 
 
 1. **Edit the catalogue.** Open **Settings → Plans & limits**. The catalogue lists each plan with its limits, its
    features and how many projects are on it. Add a plan, change a plan's limits, make it the default, or delete
-   it. A limit may be unlimited.
+   it. A limit may be set to unlimited.
 
 2. **Move a project to another plan.** Open the project. Its overview has a **Plan** card; choose the new plan
    there and confirm. The project's next creation is judged by the new plan. The audit trail records the former

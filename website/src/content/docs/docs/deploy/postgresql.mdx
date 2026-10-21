@@ -17,12 +17,12 @@ Set both `MONGODB_URI` and `POSTGRES_URL` and the server refuses to start instea
 A server that quietly chose the wrong database would look, from the outside, exactly like total data
 loss: it starts, it serves, and everything you had is missing.
 
-Check `.env` and `.env.local` as well as your shell. The runtime loads those files automatically, so
+Check `.env` and `.env.local` as well as your shell. Bun, the runtime, loads those files automatically, so
 the variable causing the refusal is often one you cannot see with `env`.
 
 </Aside>
 
-## Setting it up
+## Setting up the database and schema {#setting-it-up}
 
 <Steps>
 
@@ -54,10 +54,10 @@ the variable causing the refusal is often one you cannot see with `env`.
 
 </Steps>
 
-## The shortest version
+## The shortest version: the shipped Compose file {#the-shortest-version}
 
-A Compose file ships for exactly this, and it is probably the fastest way to see the server on
-PostgreSQL:
+The repository ships a Compose file for PostgreSQL. It is probably the fastest way to see the server
+on PostgreSQL:
 
 ```bash
 docker compose -f docker-compose.postgres.yml up
@@ -73,10 +73,10 @@ server. The host port is 5433, so it does not collide with a PostgreSQL you alre
 bun run db:setup:pg --check
 ```
 
-Reports every table or index that is missing and changes nothing. Useful in a deployment pipeline
-before a release, and after one if something looks wrong.
+`--check` reports every table or index that is missing and changes nothing. Run it in a deployment
+pipeline before a release, and after one if something looks wrong.
 
-## Upgrading
+## Upgrading: setup, then migrate {#upgrading}
 
 Two steps, in this order, on every upgrade:
 
@@ -117,7 +117,7 @@ Two probes, and they answer different questions:
 | `/ready`  | Can it serve?          | Stop routing to it; do not restart. |
 
 `/ready` reports failure when the datastore is unreachable and recovers on its own when it returns.
-Point a liveness probe at the first and a readiness probe at the second. Wiring readiness to
-`/health` makes an outage invisible — the process is alive, so the probe passes while requests keep
-arriving at an instance that cannot serve them; wiring liveness to `/ready` restarts a healthy
-process for its dependency's outage.
+Point a liveness probe at `/health` and a readiness probe at `/ready`. Wiring readiness to
+`/health` makes an outage invisible: the process is alive, so the probe passes while requests keep
+arriving at an instance that cannot serve them. Wiring liveness to `/ready` restarts a healthy
+process for its database's outage.

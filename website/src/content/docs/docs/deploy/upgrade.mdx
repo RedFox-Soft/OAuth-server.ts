@@ -1,14 +1,14 @@
 ---
 title: Upgrading
-description: Read the changelog, move the tag, re-run db:setup, apply migrations and restart. Five steps, and what each one is actually for.
+description: Read the changelog, move the tag, re-run db:setup, apply migrations and restart. Five steps, and what each one is for.
 sidebar:
   order: 7
 ---
 
 import { Steps, Aside } from '@astrojs/starlight/components';
 
-An upgrade is five steps. Skip either of the two database steps and you get a deployment that looks
-fine and is subtly broken.
+An upgrade is five steps. Skip the provisioning step and you get a deployment that looks fine and is
+subtly broken. Skip the migration step and the server refuses to start.
 
 <Steps>
 
@@ -29,8 +29,8 @@ fine and is subtly broken.
    [GitHub releases page](https://github.com/RedFox-Soft/OAuth-server.ts/releases) and on the
    [container package page](https://github.com/RedFox-Soft/OAuth-server.ts/pkgs/container/oauth-server-ts).
    Images are signed and carry an SBOM, so this is the step at which to
-   [verify the version you are adopting](/docs/security/assurance/#the-released-image-and-how-to-check-it-is-ours)
-   — you are reading the changelog anyway.
+   [verify the version you are adopting](/docs/security/assurance/#the-released-image-and-how-to-check-it-is-ours),
+   since you are reading the changelog anyway.
 
 3. **Re-run the provisioning step** against the same database:
 
@@ -55,7 +55,8 @@ fine and is subtly broken.
 
 5. **Restart the server.** It refuses to start against a database whose schema is not the one the
    release expects: behind, ahead, or holding a record for a migration whose declaration has since
-   changed. A missed step 3 or 4 therefore stops the deploy instead of corrupting data quietly.
+   changed. A missed step 4 therefore stops the deploy instead of corrupting data quietly. A missed
+   step 3 does not stop it, which is why the shipped deploy files run `db:setup` as a gate of its own.
 
 </Steps>
 
@@ -70,17 +71,17 @@ fine and is subtly broken.
 
 ## Why step 3 is not optional
 
-`db:setup` is the only thing that applies a release's structural changes. It is also idempotent: it
+`db:setup` is the only command that applies a release's structural changes. It is also idempotent: it
 upserts, so running it against an already-current database changes nothing. What a release can add:
 
 - **New collections** (tables, on PostgreSQL), for a capability that did not exist before.
 - **New indexes**, TTL indexes included. A collection that MongoDB auto-creates on first write has
-  no TTL index, so documents that were meant to expire simply do not, and nothing complains. The
+  no TTL index, so documents that were meant to expire do not, and nothing complains. The
   script also drops stale expiry indexes for a field a release has stopped writing. On PostgreSQL
   there are no TTL indexes to create; the running server sweeps expired rows itself.
 - **Seed changes.** When a release changes the admin seed, `db:setup` is what applies it: a new
   reserved client, a new field on the administrators' project, a team the ownership model now expects.
-  The reserved `admin-mcp` agent client arrived exactly this way: an existing install has it only
+  The reserved `admin-mcp` agent client arrived this way: an existing install has it only
   once `db:setup` has run again.
 
 `db:setup` exits non-zero when a constraint it declares is not in force, so make it a gate instead
@@ -90,18 +91,19 @@ on failure; the Compose files run it as a `setup` service the server `depends_on
 
 ## Why step 4 is a separate step
 
-`db:setup` only ever adds things: a collection, an index, a seeded document. That is the only kind
-of change safe to repeat against a database in any state. Reshaping data that already exists is a
+`db:setup` adds things: a collection, an index, a seeded document. Its one removal is an expiry index
+nothing writes to any more. It never reshapes stored data, because adding is the only kind of change
+safe to repeat against a database in any state. Reshaping data that already exists is a
 different job. It has to run once, in a declared order, and be recorded so the next deploy knows it
-happened. That is what `db:migrate` does, on either datastore, and it is why the two are not one
+happened. `db:migrate` does that job, on either datastore, which is why the two are not one
 command.
 
-Three things follow from the record it keeps, and each of them stops a deploy instead of letting it
-proceed on a guess:
+The record `db:migrate` keeps tells three states apart, and each one stops a deploy instead of letting
+it proceed on a guess:
 
 - A database **behind** this release has outstanding migrations. Run them.
 - A database **ahead** of it holds a record for a migration this release does not declare, which
-  means the binary is older than the database — a rollback past a migration, usually.
+  means the binary is older than the database, usually after a rollback past a migration.
 - A database is **diverged** when a migration it already applied no longer matches the one declared
   under that name. A released migration edited after the fact is the cause; the fix is a new
   migration, and the released one stays as it was.
@@ -114,7 +116,7 @@ a database nobody may touch.
 
 Re-running `db:setup` does **not** repair a changed `ISSUER`. The console client's redirect URI is
 written once, with `$setOnInsert`, when the client is first created. If the public URL of a
-deployment has to change, plan for fixing that client's redirect URI through the console (or the
+deployment has to change, plan to fix that client's redirect URI through the console (or the
 admin API) as part of the change.
 
 </Aside>
@@ -123,11 +125,11 @@ admin API) as part of the change.
 
 - **Server settings are already in force.** A change saved in the console takes effect in the
   instance that saved it, so an upgrade neither applies nor re-applies it: the stored settings are
-  simply read again at startup. An upgrade is still a good moment to re-read the
+  read again at startup. An upgrade is still a good moment to re-read the
   [settings reference](/docs/reference/settings/) for anything the release added. A setting that
-  genuinely cannot be applied to a running server says so on its card and in the console, and there
+  cannot be applied to a running server says so on its card and in the console, and there
   are none at present.
-- **Signing keys persist in the database** — every issuer's, the instance's included, as records in
+- **Signing keys persist in the database**: every issuer's keys, the instance's included, are records in
   `bucketKeys`. An upgrade neither rotates nor invalidates them: tokens issued before it still verify,
   and every `/jwks` serves the same key set it did. Keys are not environment configuration and there
   is nothing to carry across by hand. The one exception is the release that gave projects keys of their
@@ -142,20 +144,19 @@ admin API) as part of the change.
 Upgrading **to the release that made projects addressable**, and only that one, ends every
 end-user sign-in once.
 
-A sign-in is held in a browser cookie, and that cookie is now named after the project it belongs to —
-`_session_default`, `_session_acme` — so that somebody can be signed in to two projects at once
+A sign-in is held in a browser cookie. The cookie is now named after the project it belongs to
+(`_session_default`, `_session_acme`), so that somebody can be signed in to two projects at once
 without either sign-in disturbing the other. Cookies written before the upgrade carry the old name,
 which names no project. They are not read, and the server expires them on the first request that presents
 one, so a browser stops sending a cookie that no longer means anything.
 
-What your end users see: the sign-in screen, once, the next time they visit. Nothing is lost —
-accounts, grants, consent and refresh tokens are all untouched, and a refresh token keeps working
+What your end users see: the sign-in screen, once, the next time they visit. Nothing is lost:
+accounts, grants, consent and refresh tokens are untouched, and a refresh token keeps working
 without anybody signing in at all. There is nothing to do on your side and no order to do it in;
-it is listed here so the support question is expected rather than alarming.
+the sign-out is listed here so the support question is expected rather than alarming.
 
-The console is unaffected in one respect worth naming: it stays at `/admin`. An earlier plan moved
-it to free that word for a project address, and that turned out not to be necessary — the
-administrators' project is served at the root and never puts its name in a URL.
+The console stays at `/admin`. It did not have to move to free that word for a project address,
+because the administrators' project is served at the root and never puts its name in a URL.
 
 ## One upgrade gives each project keys of its own
 
@@ -165,8 +166,8 @@ its `/jwks` are unchanged; everything below concerns projects with a path or a h
 
 - **A project signs with its own key from its first use.** Before, every project signed with the instance
   keys and its discovery pointed `jwks_uri` at the instance's `/jwks`. Now its `jwks_uri` is beneath its
-  own issuer — `https://auth.example.com/acme/jwks`, or its hostname's `/jwks` — and holds only its own
-  keys. A resource server that re-reads the project's metadata picks this up by itself; one configured
+  own issuer (`https://auth.example.com/acme/jwks`, or its hostname's `/jwks`) and holds only its own
+  keys. A resource server that re-reads the project's metadata picks up the new `jwks_uri` by itself; one configured
   with the instance's `/jwks` by hand has to be pointed at the project's.
 - **Tokens a project issued before the upgrade stop verifying at its resource servers.** They were
   signed with the instance keys, which the project no longer publishes. The switch is immediate, with no
@@ -177,7 +178,7 @@ its `/jwks` are unchanged; everything below concerns projects with a path or a h
   protected resources so that an identifier is unique per issuer rather than across the instance.
   `db:migrate --plan` names it; take a backup before `db:migrate`, which step 4 above runs. From then
   on, declaring a resource in a project of one's own needs nothing from the resource, and at the
-  instance's root issuer only a super administrator declares.
+  instance's root issuer only a super administrator declares a resource.
 
 ## One upgrade turns roles into groups and moves the instance's keys
 
@@ -188,9 +189,9 @@ order:
 
 1. **Take a backup.** There is no way back from either migration except a restore.
 
-2. **Run `db:setup`** (or `db:setup:pg`). The release adds storage areas the migrations and the new
-   features write into — groups and their memberships, provisioning connections, the
-   deprovisioning tally — and `db:migrate` expects them to exist.
+2. **Run `db:setup`** (or `db:setup:pg`). The release adds storage areas that the migrations and the new
+   features write into (groups and their memberships, provisioning connections, the
+   deprovisioning tally), and `db:migrate` expects them to exist.
 
 3. **Run `db:migrate --plan`**, then `db:migrate`. The plan names both migrations below. The server
    refuses to start against a database that has not run them, so a skipped step stops the deploy
@@ -239,12 +240,12 @@ What an integration sees after 0.8.0:
 [back-channel logout from upstream providers](/docs/administer/upstream-logout/) needs, so run
 `db:setup` (or `db:setup:pg`) and restart.
 
-One fix in it concerns the upgrade you have just read about. The Compose files shipped before 0.9.0 ran
+One fix in 0.9.0 concerns upgrades to 0.7.0 and 0.8.0. The Compose files shipped before 0.9.0 ran
 only `db:setup` in their `setup` service, so pulling 0.7.0 or 0.8.0 over an existing database left a
 server that refused to start. The shipped `docker-compose.yml` and `docker-compose.postgres.yml` now run
 `db:migrate` after it. If you keep your own copy of an older file, add the step to its `setup` command.
-A Compose deployment that has refused to start since it moved to 0.7.0 or 0.8.0 is this: take the
-backup those releases asked for, then run `db:migrate` once.
+If a Compose deployment has refused to start since it moved to 0.7.0 or 0.8.0, the missing `db:migrate`
+is the cause. Take the backup those releases asked for, then run `db:migrate` once.
 
 ### Then 0.10.0
 
@@ -324,8 +325,8 @@ What else an operator or an integration sees after 0.12.0:
 
 ### Then 1.0.0
 
-1.0.0 is the first stable release: from it on, an incompatible change to the HTTP surface, the admin API
-or the MCP tools comes only in a major release. It renames what an administrator or an agent reads and types. A bucket is now a **project**,
+1.0.0 is the first stable release: from 1.0.0 on, an incompatible change to the HTTP surface, the admin API
+or the MCP tools comes only in a major release. 1.0.0 renames what an administrator or an agent reads and types. A bucket is now a **project**,
 an administrator group a **team** (a personal group a **personal team**), and a bucket group a **group** of
 the project's end users. The sections above already use the new words; the paths and tool names they quote
 are those of their release. Storage, the protocol and issued tokens do not change: issuer addresses,
@@ -335,8 +336,8 @@ It also removes the old projects, the containers that listed a bucket's applicat
 gives their name to buckets; the [changelog](/changelog/) describes that change and its migrations. It
 carries one migration of its own for the rename, and it cannot be undone:
 `2026-10-17-projects-reserved-hostnames` moves the stored value of the setting `buckets.reservedHostnames`
-to its new key, `projects.reservedHostnames`, and changes nothing else. Take a backup, then
-`db:migrate --plan` names the migrations and `db:migrate` runs them.
+to its new key, `projects.reservedHostnames`, and changes nothing else. Take a backup.
+`db:migrate --plan` names the migrations, and `db:migrate` runs them.
 
 What an integration sees, with no aliases kept for the old names:
 
@@ -478,7 +479,7 @@ What an operator sees afterwards:
   and logo when the project stands behind it. Give each project a **Name shown to users** if it has none.
 - **Emails name a project the same way**, never by its console-only name.
 
-## After the restart
+## Check readiness and the issuer after the restart {#after-the-restart}
 
 ```bash
 curl -sf https://auth.example.com/ready
@@ -486,11 +487,11 @@ curl -s https://auth.example.com/.well-known/openid-configuration | jq -r .issue
 ```
 
 `/ready` rather than `/health` on purpose: `/health` answers for the process alone and would pass
-against a server that came up unable to reach its database. The second is the check worth
-automating. The shipped deploy workflow does exactly this, because the advertised issuer is the
+against a server that came up unable to reach its database. The issuer check is the one worth
+automating. The shipped deploy workflow does this, because the advertised issuer is the
 value a deploy can get wrong without anything else noticing.
 
-Then open `/admin` and sign in. That single act exercises the seed, the console client, the
+Then open `/admin` and sign in. Signing in exercises the seed, the console client, the
 administrators' project and the authorization code flow at once, so if it works, the upgrade landed.
-Super administrators should also glance at **Faults**. Only genuine defects are recorded there,
+Super administrators should also glance at **Faults**. Only defects are recorded there,
 never routine client rejections, so anything new after an upgrade is probably worth reading.

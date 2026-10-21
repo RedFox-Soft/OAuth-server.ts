@@ -1,7 +1,7 @@
 import { rich } from '../../types.ts';
 import type english from './en.ts';
 
-export const source = 'd764dd881672';
+export const source = '4aa3befb3eb8';
 
 export default {
 	workEmail: 'Рабочий email',
@@ -16,7 +16,7 @@ export default {
 			rich(
 				'Напишите нам на ',
 				{ link: address, href },
-				' и расскажите, как устроено ваше развёртывание и какие гарантии вам нужны. Мы отвечаем в течение двух рабочих дней.'
+				' и расскажите, как устроено ваше развёртывание и какие гарантии вам нужны. Обычно мы отвечаем в течение двух рабочих дней.'
 			)
 	},
 	waitlist: {

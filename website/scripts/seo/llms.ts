@@ -27,7 +27,7 @@ const SITE_SUMMARY =
 	'Source-available OAuth 2.1 and OpenID Connect authorization server, built on OAuth-server.ts. ' +
 	'Self-hosted or cloud-managed, with an admin console and an MCP control plane an AI agent can drive.';
 
-/** Titles carry a " — FoxAuth" suffix for search results; the index has the site name already. */
+/** Titles carry a " | FoxAuth" suffix for search results; the index has the site name already. */
 function label(title: string): string {
 	return title.replace(/\s+[—–|]\s+FoxAuth\s*$/, '').trim();
 }

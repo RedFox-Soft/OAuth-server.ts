@@ -11,10 +11,10 @@
 export default {
 	title: 'Pricing',
 	description:
-		'Start free on FoxAuth Cloud, or self-host the whole server for free. Paid cloud plans are in development, and enterprise support is available.',
+		'FoxAuth pricing: start free on FoxAuth Cloud, or self-host the whole server for free. Paid cloud plans are in development, and enterprise support is available.',
 	eyebrow: 'Pricing',
 	heading: 'Free to start, in our cloud or on your own servers.',
-	lead: 'Create a free account on FoxAuth Cloud and have a working authorization server in minutes, or run the same server yourself with every feature and no limits. Paid cloud plans, with higher limits and guarantees, are in development.',
+	lead: 'Create a free account on FoxAuth Cloud and have a working authorization server in minutes. Or run the same server yourself, with every feature and no limits. Paid cloud plans, with higher limits and guarantees, are in development.',
 	cloudFree: {
 		badge: 'Available now',
 		name: 'Cloud Free',
@@ -25,7 +25,7 @@ export default {
 			'1,000,000 monthly active users per project',
 			'10 applications and 10 APIs per project',
 			'Sign-in with Google, Apple, GitHub and Microsoft accounts of any organisation',
-			'Machine-to-machine tokens, device sign-in, DPoP and PAR, and administration by an AI agent over MCP',
+			'Machine-to-machine tokens, device sign-in, sender-constrained tokens (DPoP), pushed authorization requests (PAR), and administration by an AI agent over MCP',
 			'Community support on GitHub issues; no SLA yet'
 		],
 		cta: 'Create a free account'
@@ -61,29 +61,30 @@ export default {
 		price: 'Let’s talk',
 		tagline: 'Self-hosted, with a support contract behind it.',
 		items: [
-			'You self-host; we back you up',
+			'You self-host; we support you',
 			'Response-time SLA on defects',
 			'Security advisories ahead of public disclosure',
 			'Architecture review and priority fixes'
 		]
 	},
 	faqEyebrow: 'Questions',
-	faqHeading: 'The four we are asked every time.',
+	faqHeading:
+		'The four questions we are asked every time: the license, production use, the free plan and consulting.',
 	faq: [
 		{
-			question: 'Is it open?',
+			question: 'Is FoxAuth open source?',
 			answer:
-				'FoxAuth is source-available under FSL-1.1-ALv2. You may read, modify, self-host and redistribute the code, and build a business around it. The only thing you may not do is offer it to others as a competing hosted service. Two years after each version ships, that version converts to the Apache License 2.0, so the restriction expires on a published schedule with nothing left to our discretion.'
+				'FoxAuth is source-available under FSL-1.1-ALv2, which is not an open-source license. You may read, modify, self-host and redistribute the code, and build a business around it. The only thing you may not do is offer it to others as a competing hosted service. Two years after each version ships, that version converts to the Apache License 2.0, so the restriction expires on a published schedule with nothing left to our discretion.'
 		},
 		{
-			question: 'Can I run it in production today?',
+			question: 'Can I run FoxAuth in production today?',
 			answer:
 				'FoxAuth can run in production today, self-hosted. The free cloud plan has no SLA yet, so it is a place to start rather than one to depend on. The current release is 1.2.0. Since 1.0.0, the first stable release, the HTTP surface and the admin API change incompatibly only in a major release. Read the changelog before upgrading, take a backup when it names a migration that cannot be undone, and run the setup and migrate steps afterwards. The protocol endpoints follow the specs, so a client written for FoxAuth is in practice written against the RFC and should move to another server with little change.'
 		},
 		{
 			question: 'Is the free cloud plan really free?',
 			answer:
-				'The free plan on FoxAuth Cloud costs nothing and asks for no card. It allows two projects, 1,000,000 monthly active users per project, ten applications and ten APIs per project, and sign-in through Google, Microsoft, Apple and GitHub. At the user cap only new sign-ups pause; nobody who already has an account is refused. It has no SLA yet. Paid plans with higher limits and guarantees are in development; their waitlist commits you to nothing, and we mail you once when they open.'
+				'The free plan on FoxAuth Cloud costs nothing and asks for no card. It allows two projects per administrator, 1,000,000 monthly active users per project, ten applications and ten APIs per project, and sign-in through Google, Microsoft, Apple and GitHub. At the user cap only new sign-ups pause; nobody who already has an account is refused. The free plan has no SLA yet. Paid plans with higher limits and guarantees are in development; their waitlist commits you to nothing, and we email you once when they open.'
 		},
 		{
 			question: 'Do you offer consulting?',

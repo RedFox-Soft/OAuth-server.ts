@@ -1,9 +1,9 @@
 import type english from './en.ts';
 
-export const source = 'e30edf10b2ac';
+export const source = '15984ddedbb4';
 
 export default {
-	title: 'Страница не найдена — FoxAuth',
+	title: 'Страница не найдена | FoxAuth',
 	description:
 		'По этому адресу ничего нет. Быстрее всего вернуться к тому, что вы искали, через главную страницу или поиск по документации.',
 	heading: 'Страница не найдена.',

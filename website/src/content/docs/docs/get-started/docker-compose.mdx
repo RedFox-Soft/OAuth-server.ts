@@ -9,11 +9,11 @@ import { Steps, Aside } from '@astrojs/starlight/components';
 
 For most people the fastest way to see a working authorization server is the Compose file the
 repository ships. It brings up three services: MongoDB, a one-shot provisioning step, and the
-server. Nothing needs configuring beyond the one value discussed below.
+server. Nothing needs configuring beyond `ISSUER`, discussed below.
 
 **Prerequisites:** Docker with Compose v2 (`docker compose`, not the older `docker-compose`).
 
-## Bring it up
+## Start the three services {#bring-it-up}
 
 <Steps>
 
@@ -23,11 +23,11 @@ server. Nothing needs configuring beyond the one value discussed below.
    curl -O https://raw.githubusercontent.com/RedFox-Soft/OAuth-server.ts/main/docker-compose.yml
    ```
 
-2. Decide the `ISSUER` value now — the warning below explains why. If `http://localhost:3000` is
-   not where a browser will reach this server, edit it in **both** `environment:` blocks of
+2. Decide the `ISSUER` value now; the warning below explains why. If `http://localhost:3000` is
+   not where a browser will reach this server, edit `ISSUER` in **both** `environment:` blocks of
    `docker-compose.yml`, the `setup` service's and the `oauth` service's. Changing only one leaves
-   the seeded redirect URI and the advertised issuer disagreeing, and that is the mismatch the
-   warning below says cannot be repaired in place.
+   the seeded redirect URI and the advertised issuer disagreeing, and that mismatch cannot be
+   repaired in place.
 
 3. Start everything:
 
@@ -48,19 +48,19 @@ server. Nothing needs configuring beyond the one value discussed below.
 | `setup` | `ghcr.io/redfox-soft/oauth-server-ts:latest` | Runs `bun run db:setup` and `bun run db:migrate`, then exits: collections, indexes, the initial RS256 signing key, the admin panel seed, and any schema migrations |
 | `oauth` | `ghcr.io/redfox-soft/oauth-server-ts:latest` | The server itself on port 3000, started only after `setup` completes successfully                                                                                  |
 
-The ordering matters. Without the reserved administrators' project and `admin-panel` client that
+The server waits for `setup` for two reasons. Without the reserved administrators' project and `admin-panel` client that
 `setup` seeds, the console's sign-in redirects to a client no `Client` document matches. The
-first-run setup page still works in that state, which can make it look like a login bug. The server
+first-run setup page still works in that state, which can make the fault look like a login bug. The server
 also refuses to start against a database whose migrations have not run, which is why `setup` runs
-`db:migrate` after `db:setup`. Both are safe to repeat, so re-running `docker compose up` after
+`db:migrate` after `db:setup`. Both commands are safe to repeat, so re-running `docker compose up` after
 pulling a newer image is also the upgrade path; take a backup first when the release notes name a
 migration that cannot be undone.
 
 <Aside type="caution" title="Set ISSUER before the first docker compose up">
 
 `ISSUER` must be the URL a browser reaches the server at, and it must be final **before** the first
-`up`. The seeded admin client's redirect URI is derived from it once, with `$setOnInsert`, and a
-later change is not repaired by re-running `db:setup`.
+`up`. The seeded admin client's redirect URI is derived from it once, with `$setOnInsert` (written
+only when the document is first created), and a later change is not repaired by re-running `db:setup`.
 
 If you have already started with the wrong value, the workaround is to delete the datastore and
 start again:
@@ -71,14 +71,14 @@ docker compose down -v   # removes the mongo-data volume
 docker compose up
 ```
 
-Note that this destroys every account, client and signing key in that volume, so it is a fix for
+Deleting the volume destroys every account, client and signing key in it, so the workaround suits
 the first day only. On a deployment that already has data there is no repair from the console: the
 reserved admin client is the one client the console will not edit, which is why `ISSUER` has to be
 right before the first start.
 
 </Aside>
 
-## Where to go next
+## Addresses to open once the server is running {#where-to-go-next}
 
 - The console at `http://localhost:3000/admin`, where you [create the first administrator](/docs/get-started/first-admin/).
 - The discovery document, which is the authoritative list of endpoint URLs for a client library:
@@ -87,10 +87,10 @@ right before the first start.
 - A liveness probe that is never rate-limited: `http://localhost:3000/health`, and its readiness
   counterpart `http://localhost:3000/ready`, which also reaches the database.
 
-This file runs MongoDB. `docker-compose.postgres.yml` beside it is the same three services on
-PostgreSQL, started with `docker compose -f docker-compose.postgres.yml up`. The two are
-alternatives and are never combined. See [PostgreSQL](/docs/deploy/postgresql/) for which variable
-selects which.
+`docker-compose.yml` runs MongoDB. `docker-compose.postgres.yml` beside it is the same three services on
+PostgreSQL, started with `docker compose -f docker-compose.postgres.yml up`. The two files are
+alternatives; never combine them. See [PostgreSQL](/docs/deploy/postgresql/) for the variable that
+selects each backend.
 
 For a production-leaning Compose file, with pinned tags, an external database and a TLS proxy in
 front, see [Deploy with Docker Compose](/docs/deploy/docker-compose/).

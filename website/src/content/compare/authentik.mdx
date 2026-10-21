@@ -6,6 +6,7 @@ lastChecked: '2026-10-16'
 sources:
   - https://github.com/goauthentik/authentik
   - https://docs.goauthentik.io/install-config/install/docker-compose/
+  - https://docs.goauthentik.io/add-secure-apps/providers/oauth2/device_code/
 bottomLine: 'Pick authentik if you are replacing an SSO estate that speaks SAML, LDAP or RADIUS as well as OIDC. If the applications are your own and what you need is an OAuth 2.1 authorization server with the banking-grade profiles and no enterprise tier to buy, pick FoxAuth.'
 chooseThem:
   - 'Your estate has applications that speak SAML, LDAP or RADIUS alongside OpenID Connect.'
@@ -23,9 +24,9 @@ faq:
   - question: 'Does FoxAuth support LDAP or RADIUS?'
     answer: 'FoxAuth supports neither LDAP nor RADIUS, and neither is planned. For sign-in it implements OAuth 2.1 and OpenID Connect only; SCIM 2.0, which it also serves, provisions users and signs no one in. authentik supports LDAP and RADIUS as well as SAML, so if you need to put a login in front of an appliance or a legacy application that speaks one of those, FoxAuth cannot do it and authentik can.'
   - question: 'Is FoxAuth lighter to run than authentik?'
-    answer: 'FoxAuth is a single Bun process and one database, PostgreSQL or MongoDB. authentik documents a minimum of a host with at least 2 CPU cores and 2 GB of RAM, and its repository contains Python, Go, Rust and TypeScript components with PostgreSQL behind them. That is a broader surface, and it is broader because authentik does considerably more. Whether the extra weight is worth carrying depends on whether you need the protocols it adds.'
+    answer: "FoxAuth is a single Bun process and one database, PostgreSQL or MongoDB. authentik's install guide asks for a host with at least 2 CPU cores and 2 GB of RAM, and its repository contains Python, Go, Rust and TypeScript components with PostgreSQL behind them. authentik's surface is broader because authentik does considerably more. Whether the extra weight is worth carrying depends on whether you need the protocols it adds."
   - question: 'Can I migrate from authentik to FoxAuth?'
-    answer: 'Only if everything you have connected to authentik speaks OIDC. Those clients port over with an issuer and client id change. Anything connected over SAML, LDAP or RADIUS has no path, because FoxAuth does not implement those protocols. That part of the estate would have to be re-integrated over OIDC first, and in most cases that is a larger project than the migration itself.'
+    answer: 'Only if everything you have connected to authentik speaks OIDC. Those clients port over with an issuer and client id change. Anything connected over SAML, LDAP or RADIUS has no path, because FoxAuth does not implement those protocols. That part of the estate would have to be re-integrated over OIDC first, and in most cases the re-integration is a larger project than the migration itself.'
 groups:
   - label: Scope and stack
     rows:
@@ -71,7 +72,7 @@ groups:
         them:
           { status: yes, text: 'Python, Go, Rust and TypeScript components.' }
         verdict: different
-        why: 'A broader stack, because it does more; a smaller one tends to be easier to reason about.'
+        why: 'authentik has the broader stack because it does more; a smaller stack tends to be easier to reason about.'
       - dimension: Deployment footprint
         us: { status: yes, text: 'One process and a database.' }
         them:
@@ -88,7 +89,7 @@ groups:
         us:
           {
             status: yes,
-            text: 'OAuth 2.1 with PKCE mandatory for every client, OIDC Core and Discovery.'
+            text: 'OAuth 2.1 with PKCE mandatory for every client by default, OIDC Core and Discovery.'
           }
         them:
           {
@@ -96,32 +97,40 @@ groups:
             text: 'OAuth2 and OIDC as one of several supported protocols.'
           }
         verdict: us
-        why: 'Mandatory PKCE, exact redirect matching and no implicit grant are the OAuth 2.1 defaults, and here they are the entire product. Over there OAuth is one protocol among four.'
+        why: 'Mandatory PKCE, exact redirect matching and no implicit grant are the OAuth 2.1 defaults, and in FoxAuth OAuth is the entire product. In authentik, OAuth is one protocol among four.'
       - dimension: Sender-constrained tokens
-        us: { status: yes, text: 'DPoP (RFC 9449) and mTLS (RFC 8705).' }
+        us:
+          {
+            status: flag,
+            text: 'DPoP (RFC 9449) and mTLS (RFC 8705), each behind a flag.'
+          }
         them: { status: unknown, text: 'Not documented.' }
         verdict: us
-        why: 'A gap that matters mainly in regulated deployments, where it is likely to be decisive.'
+        why: 'Sender-constrained tokens matter mainly in regulated deployments, where they are likely to be decisive.'
       - dimension: 'PAR, CIBA, RAR and JARM'
         us:
           {
-            status: yes,
+            status: flag,
             text: 'PAR (RFC 9126), CIBA, RAR (RFC 9396) and JARM, each behind a flag.'
           }
         them: { status: unknown, text: 'Not documented.' }
         verdict: us
-        why: 'Here the banking-grade profiles are implemented, and nothing about them is waiting on a roadmap.'
+        why: 'FoxAuth implements all four of these banking-grade profiles; authentik does not document them.'
       - dimension: Device flow
-        us: { status: yes, text: 'RFC 8628, behind a feature flag.' }
-        them: { status: unknown, text: 'Not documented.' }
-        verdict: us
-        why: "Recorded as not documented, because authentik's documentation does not describe it. That is a weaker claim than absent."
+        us: { status: flag, text: 'RFC 8628, behind a feature flag.' }
+        them:
+          {
+            status: yes,
+            text: 'RFC 8628, once a device code flow is configured on the brand.'
+          }
+        verdict: even
+        why: 'Both implement it.'
   - label: Administration and licensing
     rows:
       - dimension: Administration by an AI agent
         us:
           {
-            status: yes,
+            status: flag,
             text: "MCP control plane over the console's own routes, audited and confirmation-gated. Off by default."
           }
         them: { status: unknown, text: 'Not documented.' }
@@ -153,10 +162,10 @@ groups:
             text: 'An established project with a large self-hosting community.'
           }
         verdict: them
-        why: 'The maturity gap is real, and this page will not soften it.'
+        why: 'authentik has the larger community and years more production deployment.'
 ---
 
-## These are adjacent products
+## authentik is an SSO identity provider; FoxAuth is an OAuth server {#these-are-adjacent-products}
 
 Most comparisons on this site weigh two implementations of the same thing. This one does not.
 
@@ -167,15 +176,15 @@ applications you build, and for sign-in it speaks nothing but OAuth and OpenID C
 
 Anyone consolidating logins across an estate wants authentik's category of product, and FoxAuth is
 not in it. If you are securing your own applications and every one of them speaks OIDC, the extra
-protocols are surface you would have to operate — and would probably never use.
+protocols are surface you would have to operate, and would probably never use.
 
-## Where the overlap is real
+## Where authentik and FoxAuth overlap: issuing OIDC tokens {#where-the-overlap-is-real}
 
 Both issue OIDC tokens, and for that job the differences are narrow but specific. FoxAuth defaults
-to OAuth 2.1 behaviour: PKCE is mandatory for every client, public or confidential, redirect URIs
-must match exactly, and there is no implicit grant. It can hold those defaults because OAuth is the
-entire product here, where for authentik it is one protocol among four. And the banking-grade
-profiles are implemented here and not documented there.
+to OAuth 2.1 behaviour: PKCE is mandatory for every client by default, public or confidential, redirect URIs
+must match exactly, and there is no implicit grant. FoxAuth can hold those defaults because OAuth is
+its entire product, where for authentik OAuth is one protocol among four. FoxAuth also implements
+the banking-grade profiles (DPoP, mTLS, PAR, CIBA, RAR and JARM), and authentik does not document them.
 
-Everywhere else on the table, the honest verdict goes the other way: a broader protocol surface, an
-MIT-licensed core, and years more production deployment.
+The table gives authentik the rows on protocols, sign-in sources, licence and maturity: a broader
+protocol surface, an MIT-licensed core, and years more production deployment.

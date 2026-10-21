@@ -3,7 +3,7 @@
  * and description are only ever read in English: the page is noindex, and the head is one per file.
  */
 export default {
-	title: 'Page not found — FoxAuth',
+	title: 'Page not found | FoxAuth',
 	description:
 		'There is nothing at this address. The home page and the documentation search are the quickest way back to whatever you were after.',
 	heading: 'Page not found.',

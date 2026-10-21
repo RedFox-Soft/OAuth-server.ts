@@ -1,18 +1,18 @@
 ---
 title: Rotate signing keys
-description: Rotate a signing key in one step, retire the old one, or revoke a compromised key at once — with no restart, for the instance and every project.
+description: Rotate a signing key in one step, retire the old one, or revoke a compromised key at once, for the instance and every project, with no restart.
 sidebar:
   order: 7
 ---
 
 import { Steps, Aside } from '@astrojs/starlight/components';
 
-Every token this server signs carries the `kid` of the key that signed it, and every relying party
-verifies it against a published key set. Rotating a key means changing which key signs without leaving
-any instance, or any relying party, holding a token it cannot verify. **Rotate** does it in one step,
-the steps it is made of can be taken one at a time, and none of them needs a restart.
+Every token this server signs carries the `kid` (key id) of the key that signed it, and every relying
+party verifies it against a published key set. Rotating a key means changing which key signs without
+leaving any instance, or any relying party, holding a token it cannot verify. **Rotate** changes the
+signer in one step. You can also take its steps one at a time. None of them needs a restart.
 
-## Whose keys
+## Instance keys and project keys {#whose-keys}
 
 Each issuer has its own keys, and so its own rotation:
 
@@ -27,10 +27,10 @@ Each issuer has its own keys, and so its own rotation:
 
 A project without an address has no keys of its own, and its key operations are refused. Its
 **Signing keys** tab says that it signs with the instance keys and lists their published ids. To rotate
-its keys on their own, give it an address of its own.
+keys for that project alone, give it an address of its own.
 
 The instance's **Keys** page and a project's **Signing keys** tab show one card per algorithm. Each
-key's state is stated in words: when it can sign, until when it signed, until when it verifies.
+card describes every key's state in words: when it can sign, until when it signed, until when it verifies.
 
 ## A key's life: published, signing, retired, hidden
 
@@ -61,7 +61,7 @@ algorithm that may sign now becomes its signer. The key that signed before goes 
 it keeps verifying what it signed. A new key is generated and published, ready for the next rotation.
 
 When no key of the algorithm may sign yet, Rotate only publishes the next key and changes nothing about
-who signs. The answer says from when the algorithm can rotate (`rotatableAt`). Rotate never promotes a
+who signs. The answer gives the earliest time the algorithm can rotate (`rotatableAt`). Rotate never promotes a
 key inside its publication window, so pressing it twice, a minute apart, puts a new key in charge.
 
 <Aside
@@ -77,11 +77,11 @@ key inside its publication window, so pressing it twice, a minute apart, puts a 
 
 ## Revoke a compromised key
 
-Retiring leaves a key verifying for a day. For a key that may have leaked, that is a day in which
-forged tokens verify. **Revoke now…** in a key's menu ends it at once instead. In the console you type
+Retiring leaves a key verifying for a day. For a key that may have leaked, forged tokens verify for
+that whole day. **Revoke now…** in a key's menu ends it at once instead. In the console you type
 the word `revoke`; over the API the body names the key, as for retiring.
 
-- The key leaves the key set and every verification: on the instance that revoked it at once, and on
+- The key leaves the key set and every verification: at once on the instance that revoked it, and on
   every other instance within the 30 seconds its cache lives. Every token it signed stops verifying, so
   people signed in with such tokens may have to sign in again.
 - Its state becomes **revoked**. It is never published again and cannot be brought back. The record is
@@ -114,7 +114,7 @@ algorithm without one.
 A new algorithm needs no restart. Generate an `ES256` key, promote it, and discovery advertises `ES256`
 from then on, so clients can register for it straight away.
 
-## How many keys {#how-many-keys}
+## Limits: 12 keys held, 20 made a day {#how-many-keys}
 
 Making a key costs the server real processor time, and every key stays in the key set that clients download.
 So each key set, the instance's and each project's, has two limits:
@@ -126,7 +126,7 @@ So each key set, the instance's and each project's, has two limits:
 
 Generate and Rotate past either limit answer `409` with `reason: "key_limit"`, and the message says what to do:
 retire a key, or try again later. Revoking the signing key is refused the same way when no published key can take
-over and 20 keys were already made that day. Keeping a published key ready, as Rotate does, avoids that.
+over and 20 keys were already made that day. Keeping a published key ready, as Rotate does, avoids that refusal.
 
 ## What a relying party has to do
 
@@ -139,12 +139,12 @@ caches the key set for an hour and never looks again. A relying party that copes
 - re-reads the key set when it sees a `kid` it does not know, with a short cooldown so a stream of
   forged `kid`s cannot make it fetch on every request.
 
-Most JWT libraries do all three when given the `jwks_uri`. If yours caches harder than that, generate the
+Most JWT libraries do all three when given the `jwks_uri`. If yours caches for longer than that, generate the
 new key well ahead of promoting it, at least as long ahead as that cache lives.
 
 ## A rotation, start to finish
 
-1. Press **Rotate** on the algorithm's card. If no next key was published yet, this publishes one and
+1. Press **Rotate** on the algorithm's card. If no next key was published yet, Rotate publishes one and
    signs nothing with it.
 2. Wait at least a minute, longer if a relying party caches the key set for longer, then press
    **Rotate** again. The next key signs, and a new next key is published.

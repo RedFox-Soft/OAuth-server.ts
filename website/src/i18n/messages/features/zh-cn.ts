@@ -1,15 +1,15 @@
 import type english from './en.ts';
 
-export const source = '268d98c6fc3f';
+export const source = 'ddde39c45e46';
 
 export default {
-	title: '功能',
+	title: 'OAuth 2.1 与 OIDC 功能',
 	description:
 		'全部授权类型、规范与控制：带 PKCE 的 OAuth 2.1、DPoP、PAR、FAPI、CIBA 与 mTLS，可审计的控制台，以及 MCP 服务器授权。',
 	hero: {
 		eyebrow: '功能',
-		heading: '功能一应俱全，大部分默认关闭。',
-		lead: 'FoxAuth 只发布一个服务器，不分功能版本。带 PKCE 的授权码流程和 OpenID Connect 从首次启动起就可用，其余大多数功能都在一个具名开关之后等待启用。实际上，你的攻击面就是你真正要求开启的那些功能。每张卡片都会注明该功能是首次启动即开启，还是等待其开关。',
+		heading: '所有功能都在同一个 OAuth 2.1 服务器里，大部分默认关闭。',
+		lead: 'FoxAuth 只发布一个 OAuth 2.1 与 OpenID Connect 授权服务器，不分功能版本。带 PKCE 的授权码流程和 OpenID Connect 从首次启动起就可用，其余大多数功能都在一个具名开关之后等待启用。实际上，你的攻击面就是你要求开启的那些功能。每张卡片都会注明该功能是首次启动即开启，还是等待其开关。',
 		cloud:
 			'在 FoxAuth Cloud 上，开关由我们设置，方案会限制每个项目能创建的内容。在你自己的服务器上，两者都由你决定，除非你开启，否则方案不生效。标有“FoxAuth Cloud 已开启”的卡片在云上已经可用。',
 		cloudBadge: 'FoxAuth Cloud 已开启',
@@ -21,13 +21,13 @@ export default {
 	groups: {
 		protocol: {
 			heading: '协议',
-			title: 'OAuth 2.1 客户端能请求的每一种授权类型。',
+			title: 'OAuth 2.1 的全部授权类型，另加设备流程与 CIBA。',
 			blurb:
 				'授权类型与端点。带 PKCE 的授权码流程和 OpenID Connect 始终开启；其余大多数需要打开开关。',
 			items: {
 				pkce: {
 					title: '带 PKCE 的授权码流程',
-					body: '按照 OAuth 2.1 的要求，每个客户端都必须使用 PKCE，无论是公开客户端还是机密客户端。重定向 URI 精确匹配。'
+					body: '按照 OAuth 2.1 的要求，默认情况下每个客户端都必须使用 PKCE，无论是公开客户端还是机密客户端。重定向 URI 精确匹配。'
 				},
 				oidc: {
 					title: 'OpenID Connect Core 1.0',
@@ -35,7 +35,7 @@ export default {
 				},
 				issuerIdentification: {
 					title: '颁发者标识',
-					body: '每个授权响应都携带 iss，客户端不会被诱骗接受另一个颁发者的授权码。'
+					body: '每个授权响应都携带 iss，校验它的客户端不会被诱骗接受另一个颁发者的授权码。'
 				},
 				resourceIndicators: {
 					title: '资源指示符',
@@ -105,7 +105,7 @@ export default {
 		},
 		security: {
 			heading: '安全',
-			title: '发送方约束，以及默认已开启的防护。',
+			title: '绑定发送方的令牌，以及默认已开启的防护。',
 			blurb:
 				'银行级安全规范是开关，不是单独的版本。列表中的其余各项从首次启动起就已开启。',
 			items: {
@@ -184,7 +184,7 @@ export default {
 				},
 				mcpAuthorization: {
 					title: '为你自己的 MCP 服务器提供授权',
-					body: '把第三方 MCP 服务器声明为某个项目的受保护资源，本服务器就会签发受众恰好是该资源的令牌，这里无需改代码，也无需重启。在拥有独立地址的项目中，声明不需要资源方提供任何东西——它可以是内部服务、运行在 localhost 上，甚至尚未部署——其他租户也可以声明同一个 URL，而不会影响你的声明。令牌默认是自包含的，资源方用所属项目公开的密钥即可验证，无需持有自己的凭据。'
+					body: '把第三方 MCP 服务器声明为某个项目的受保护资源，FoxAuth 就会签发受众恰好是该资源的令牌，无需修改 FoxAuth 的代码，也无需重启。在拥有独立地址的项目中，声明不需要资源方提供任何东西：资源可以是内部服务、运行在 localhost 上，甚至尚未部署。其他租户也可以声明同一个 URL，而不会影响你的声明。令牌默认是自包含的，资源方用所属项目公开的密钥即可验证，无需持有自己的凭据。'
 				},
 				clientIdMetadataDocument: {
 					title: '客户端身份文档',
@@ -232,7 +232,7 @@ export default {
 				},
 				globalTokenRevocation: {
 					title: 'Okta Universal Logout',
-					body: '已开启的提供商发送一个签名请求，用户在这里持有的一切随即失效：会话、刷新令牌，以及服务器能够撤销的所有访问令牌。账户保持启用，用户可以重新登录。它实现的是一份已过期的 Internet-Draft，因此有单独的开关。'
+					body: '已开启的提供商发送一个签名请求，用户在这里持有的一切随即失效：会话、刷新令牌，以及服务器能够撤销的所有访问令牌。账户保持启用，用户可以重新登录。该功能实现的是一份已过期的 Internet-Draft，因此有单独的开关。'
 				},
 				scim: {
 					title: 'SCIM 2.0 用户同步',
@@ -240,7 +240,7 @@ export default {
 				},
 				signingKeys: {
 					title: '签名密钥管理',
-					body: '每个拥有独立地址的项目都用自己的密钥签名，并发布在自己的 jwks_uri 上，因此一个租户的令牌永远无法在另一个租户的资源服务器上通过验证。拥有该项目的团队可以一步完成密钥轮换——新密钥先发布、后签名，退役的密钥会一直保持发布，直到它签发的令牌过期——也可以立即吊销已泄露的密钥，此后由它签名的任何内容都无法再通过验证。实例级密钥集仍由超级管理员掌管。'
+					body: '每个拥有独立地址的项目都用自己的密钥签名，并发布在自己的 jwks_uri 上，因此一个租户的令牌永远无法在另一个租户的资源服务器上通过验证。拥有该项目的团队可以一步完成密钥轮换：新密钥先发布、后签名，退役的密钥会一直保持发布，直到它签发的令牌过期。该团队也可以立即吊销已泄露的密钥，此后由它签名的任何内容都无法再通过验证。实例级密钥集仍由超级管理员掌管。'
 				}
 			}
 		},
@@ -260,7 +260,7 @@ export default {
 				},
 				mountable: {
 					title: '可挂载的 Elysia 应用',
-					body: '导入这个应用，挂载到你自己的 Bun 服务中。没有初始化步骤——导入即启动。'
+					body: '导入这个应用，挂载到你自己的 Bun 服务中。没有初始化步骤：导入这个应用即启动服务器。'
 				},
 				loginUi: {
 					title: '内置登录与授权同意界面',
@@ -270,8 +270,9 @@ export default {
 		},
 		operations: {
 			heading: '运维',
-			title: '出问题时你需要的东西。',
-			blurb: '发布它，观察它，查清某个请求为什么失败。',
+			title: '部署服务器，并查清请求为什么失败。',
+			blurb:
+				'可直接部署的容器镜像、服务器故障记录、可选的 Sentry 上报，以及由代码生成的参考文档。',
 			items: {
 				containerImage: {
 					title: '已发布的容器镜像',
@@ -291,7 +292,7 @@ export default {
 				},
 				machineReadable: {
 					title: '机器可读的参考文档',
-					body: '端点、设置、管理 API、MCP 工具和环境变量的参考文档，都直接由代码本身生成。'
+					body: '端点、设置、管理 API、MCP 工具和环境变量的参考文档，都由代码生成。'
 				}
 			}
 		}

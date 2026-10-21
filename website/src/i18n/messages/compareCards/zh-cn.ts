@@ -34,7 +34,7 @@ export default {
 		description:
 			'Zitadel 是一个支持 SAML 并提供托管云的多租户身份平台。FoxAuth 是一个更精简的 OAuth 2.1 服务器，内置银行级安全规范。',
 		bottomLine:
-			'如果你需要 SAML，或者需要背后有企业合同支撑的托管云，选 Zitadel。如果你想要默认的 OAuth 2.1 行为、无需更高套餐即可使用的银行级安全规范，以及 AGPL 以外的许可证，选 FoxAuth。'
+			'如果你需要 SAML，或者需要背后有企业合同支撑的托管云，选 Zitadel。如果你想要默认的 OAuth 2.1 行为、Zitadel 文档中没有提到的银行级安全规范，以及 AGPL 以外的许可证，选 FoxAuth。'
 	}
 } satisfies Record<
 	string,

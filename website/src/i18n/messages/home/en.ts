@@ -7,13 +7,13 @@ export interface HomeFacts {
 }
 
 export default {
-	title: 'FoxAuth — the authorization server for the agent era',
+	title: 'FoxAuth: the authorization server for the agent era',
 	description:
-		'One server for sign-in, APIs and AI agents: OAuth 2.1 and OpenID Connect, free on FoxAuth Cloud for up to 1,000,000 monthly active users.',
+		'One server for sign-in, APIs and AI agents: OAuth 2.1 and OpenID Connect, free on FoxAuth Cloud for up to 1,000,000 monthly active users per project.',
 	hero: {
 		eyebrow: 'OAuth 2.1 · OpenID Connect · MCP',
 		heading: 'One server for your users, your APIs and your AI agents.',
-		lead: 'Sign-in, enterprise identity providers, directory sync, banking-grade token security and authorization for AI agents: 30 standards that take a team years to build, already built and tested. Start free on FoxAuth Cloud with up to 1,000,000 monthly active users per project, or run it yourself.',
+		lead: 'FoxAuth handles sign-in, enterprise identity providers, directory sync, banking-grade token security and authorization for AI agents. Behind these features are 30 standards that take a team years to build, and all of them are already built and tested. Start free on FoxAuth Cloud with up to 1,000,000 monthly active users per project, or run the server yourself.',
 		getStarted: 'Run it yourself',
 		freeAccount: 'Create a free account',
 		github: 'View on GitHub',
@@ -36,14 +36,14 @@ export default {
 			},
 			{
 				head: 'No account',
-				body: 'no account with us, no API key, no phone call'
+				body: 'with us, no API key, no phone call'
 			}
 		]
 	},
 	console: {
 		eyebrow: 'The console',
 		heading: 'Everything an operator needs, without a second product.',
-		lead: "Projects with their applications and APIs, end-users, upstream providers, SCIM connections, settings, SMTP, signing keys, monthly active users and an append-only audit trail, all in one console that you sign into through the server's own OpenID Connect flow, or through your organisation's identity provider. A change that could lock people out says whom it affects before it applies. The same API is what an AI agent uses over MCP.",
+		lead: "Projects with their applications and APIs, end-users, upstream providers, SCIM connections, settings, SMTP, signing keys, monthly active users and an append-only audit trail, all in one console. You sign into it through the server's own OpenID Connect flow, or through your organisation's identity provider. A change that could lock people out says whom it affects before it applies. An AI agent uses the same API over MCP.",
 		screenshotAlt:
 			'The FoxAuth admin console listing the applications (OAuth clients) of a project.',
 		screenshotCaption:
@@ -68,7 +68,7 @@ export default {
 			},
 			{
 				title: 'For AI-agent builders',
-				body: 'Protect your own MCP server with it, and let an agent administer the instance through the console’s own code path. There is no separate privileged API to keep in step.',
+				body: 'Protect your own MCP server with FoxAuth, and let an agent administer the instance through the console’s own code path. There is no separate privileged API to keep in step.',
 				points: [
 					'Declare your MCP server; get audience-bound tokens (RFC 8707)',
 					'Client ID Metadata Documents, so an agent host needs no setup',
@@ -78,7 +78,7 @@ export default {
 			},
 			{
 				title: 'For regulated industries',
-				body: 'The banking-grade profiles are implemented today, and none of them is waiting on a roadmap. Turn on the flag your regulator asks for.',
+				body: 'The banking-grade profiles are all implemented today. Turn on the flag your regulator asks for.',
 				points: [
 					'FAPI, DPoP, PAR, mTLS, CIBA, RAR, JARM',
 					'Append-only admin audit trail',
@@ -90,7 +90,7 @@ export default {
 	quickStart: {
 		eyebrow: 'Quick start',
 		heading: 'A token in five minutes.',
-		lead: 'No account with us, no API key. Three short pages, and you should have a token in your terminal.',
+		lead: 'You need no account with us and no API key. After three short pages, you should have a token in your terminal.',
 		steps: [
 			{
 				title: 'Run the server',
@@ -108,15 +108,15 @@ export default {
 	},
 	standards: {
 		eyebrow: 'Standards',
-		heading: 'Thirty specifications, implemented.',
-		lead: 'Every entry below is code in the repository, with tests. Each links to the spec it implements; the Reference names the flag that governs it.',
+		heading: '30 specifications, implemented.',
+		lead: 'Every entry below is code in the repository, with tests. Each links to the spec it implements. The endpoint reference names the flag that governs each one.',
 		reference: 'Endpoint reference'
 	},
 	mcp: {
 		eyebrow: 'An OAuth server for MCP',
 		heading: 'Protect your MCP server, and let an agent operate this one.',
 		protect: rich(
-			'Declare your own MCP server as a protected resource of a project and this server mints tokens whose audience is exactly that resource. No code here, no restart. An agent host discovers it, signs your users in, and comes back with a token your MCP server verifies against the published keys without asking anything. A ',
+			'Declare your own MCP server as a protected resource of a project and this server mints tokens whose audience is exactly that resource. Declaring it needs no code on this server and no restart. An agent host discovers it, signs your users in, and comes back with a token your MCP server verifies against the published keys without asking anything. A ',
 			{ code: 'client_id' },
 			' that is an HTTPS URL is accepted as a client identity document, so a host with nothing to configure still connects.'
 		),
@@ -129,7 +129,7 @@ export default {
 				` as an OAuth 2.1 protected resource. Each of the ${tools} tools rebuilds the request the console would have sent and runs the console's own permission checks, validation and audit write, so no privileged back door can drift away from the console.`
 			),
 		confirm:
-			'Destructive and instance-wide operations need two calls: the first returns a confirmation token, the second carries it. It is off by default.',
+			'Destructive and instance-wide operations need two calls: the first returns a confirmation token, the second carries it. Administration over MCP is off by default.',
 		protectButton: 'Protect your MCP server',
 		allTools: (tools: number) => `All ${tools} MCP tools`
 	},

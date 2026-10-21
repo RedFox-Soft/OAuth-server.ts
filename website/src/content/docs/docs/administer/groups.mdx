@@ -13,7 +13,7 @@ relying parties. Agents manage groups with the `project_group_*` tools.
 
 A group is not a [team](/docs/administer/teams/). Teams are sets of administrators, and they own projects.
 The two are separate entities so that nothing a directory writes over SCIM, and nothing in a token, can reach
-the set that grants privilege here. A SCIM directory writes a project's groups; it cannot touch a team.
+the teams, which are what grants privilege here. A SCIM directory writes a project's groups; it cannot touch a team.
 
 ## Who keeps a group
 
@@ -26,7 +26,7 @@ A group is kept either by administrators or by exactly one [SCIM connection](/do
   but not change it, and the connection may add only users it provisioned.
 
 Names are unique within a project regardless of letter case. If a directory tries to create a group whose
-name an administrator-kept group already holds, it is refused. An administrator can then hand the
+name an administrator-kept group already holds, the directory's request is refused. An administrator can then hand the
 existing group over to the connection, once every member is someone that connection manages. The
 handover is never automatic: it is previewed first, and applies only when confirmed.
 
@@ -46,7 +46,7 @@ The scope is built in. It releases the claim whatever the [claims setting](/docs
 holds, and a `groups` value stored on an account's own claims can never stand in for it: the claim is
 always computed from membership.
 
-Where it appears:
+Where the claim appears:
 
 - **UserInfo**, always, when the access token carries the scope.
 - **The ID token** only if scope claims go there at all. With
@@ -54,14 +54,14 @@ Where it appears:
   for the `code` flow, which is the only flow this server runs; turn it off and the claim is in the ID
   token too.
 - **An access token for a declared resource**, and its introspection response, when the authorization
-  granted `groups`. This is a snapshot taken when the token was issued, as RFC 9068 describes, so a
+  granted `groups`. The claim is a snapshot taken when the token was issued, as RFC 9068 describes, so a
   membership change shows up in the next token, not in one already issued.
 
-Because the value is the display name, renaming a group changes what relying parties receive. That is
-intended, since only the group's owner can rename it and names are unique in the project, but a relying
+Because the value is the display name, renaming a group changes what relying parties receive. The change
+is intended, since only the group's owner can rename it and names are unique in the project, but a relying
 party that matches on a name has to learn the new one.
 
-## Above 200 groups
+## Above 200 groups, tokens point to UserInfo {#above-200-groups}
 
 A token cannot carry an unbounded list. For a user in more than 200 groups, which is the limit Entra ID
 applies to its own tokens and so the number relying parties already code against, the ID token and the
@@ -76,8 +76,8 @@ access token carry an OpenID Connect distributed-claim reference instead of the 
 }
 ```
 
-The relying party fetches the list from UserInfo, which always carries all of it. There is one case
-this does not cover: a resource server holding an access token bound to its own audience cannot call
+The relying party fetches the list from UserInfo, which always carries all of it. The reference does
+not cover one case: a resource server holding an access token bound to its own audience cannot call
 UserInfo with it, so it cannot follow the reference. If a resource server needs the groups of people in
 more than 200 of them, give it another way to look them up.
 

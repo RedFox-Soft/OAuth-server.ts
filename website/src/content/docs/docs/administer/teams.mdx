@@ -11,8 +11,8 @@ project holds: its end users, its groups, its sign-in configuration, its applica
 
 A team is not a [group](/docs/administer/groups/). A group is a named set of one project's end users, read
 by relying parties in the `groups` claim; it grants nothing on this server. The two are separate entities so
-that nothing a directory writes over SCIM, and nothing in a token, can reach the set that grants privilege
-here.
+that nothing a directory writes over SCIM, and nothing in a token, can reach the teams, which are what grants
+privilege here.
 
 ## Kinds of team
 
@@ -23,18 +23,18 @@ here.
   `team_create`.
 - **Super administrators** is the instance-wide privilege. It owns nothing; its members reach every project
   and manage what belongs to the whole instance, such as settings and signing keys. Agents grant and withdraw
-  that standing with `admin_super_grant` and `admin_super_withdraw`.
+  that privilege with `admin_super_grant` and `admin_super_withdraw`.
 - **System** holds the projects no other team owns. It has no members, and only super administrators reach
   it.
 
 Agents manage teams with the `team_*` tools.
 
-## A team's page
+## A team's page: members and invitations {#a-teams-page}
 
 Each team has a page. A member sees the other members with their email addresses, and the projects the team
 owns. An owner invites colleagues with **Invite to team…**: an email with a single-use link, valid for 7 days,
 that also creates the account of someone who has none yet. Pending invitations are listed on the same page and
-can be revoked. Removing a member says first what they lose. Agents use `team_get`, `team_invite`,
+can be revoked. Removing a member first shows what they lose. Agents use `team_get`, `team_invite`,
 `team_invitation_list`, `team_invitation_revoke` and the `team_member_*` tools.
 
 An invitation is the way into a team. A team owner cannot add an existing administrator directly, because that
@@ -70,22 +70,23 @@ The audit entry for the acceptance records that the account was taken over this 
 An owner invitation is always sent. Whether the invitee may become an owner under [plans](/docs/administer/plans/)
 is checked when they accept it.
 
+## Moving a project to another team
+
 A project is created in a team you choose: the console's **New project** dialog asks for it, and
 `POST /admin/api/projects` takes an optional `teamId`, which defaults to your active team. Applications and
 APIs are created inside a project and belong to it for as long as they exist.
-
-## Moving a project to another team
 
 Work started in a personal team, or in the wrong team, moves with **Move to team…** on a project. Use
 `PUT /admin/api/projects/:id/owner` with a `teamId`, or `project_owner_change` for an agent. The project takes
 everything it holds with it in one step: its applications and its APIs move too, and nothing is left behind in
 the team it leaves. An application or an API never moves on its own.
 
-A move needs an owner of the team it leaves and a member of the team it joins. Without `confirm`, the call only
-previews what would move, with the counts of applications and APIs. End users, applications and sign-in
-addresses are untouched, and the audit entry is visible to both teams. A project cannot move into another
-administrator's personal team or into Super administrators, and the default project and the administrators'
-project never move. The agent tool is high-consequence and asks for confirmation.
+The administrator who moves a project must be an owner of the team it leaves and a member of the team it
+joins. Without `confirm`, the call only previews what would move, with the counts of applications and APIs.
+The move changes no end user, application or sign-in address, and the audit entry is visible to both teams. A
+project cannot move into another administrator's personal team or into Super administrators, and the default
+project and the administrators' project never move. `project_owner_change` is high-consequence and asks for
+confirmation.
 
 ## Moving from roles
 

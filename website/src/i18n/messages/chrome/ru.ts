@@ -1,7 +1,7 @@
 import { rich } from '../../types.ts';
 import type english from './en.ts';
 
-export const source = '273f6ab64561';
+export const source = '65d0584e2611';
 
 export default {
 	skipToContent: 'Перейти к содержанию',
@@ -40,7 +40,7 @@ export default {
 		llms: 'Для LLM (llms.txt)',
 		contactUs: 'Написать нам',
 		about:
-			'FoxAuth построен на OAuth-server.ts — сервере OAuth 2.1 / OpenID Connect.',
+			'FoxAuth построен на OAuth-server.ts, сервере OAuth 2.1 / OpenID Connect.',
 		siteVersion: (
 			lastTag: string | null,
 			commit: string,
@@ -53,14 +53,16 @@ export default {
 					: `Версия сайта: не выпущена (${commit})`
 	},
 	compareLinks: {
-		before: 'Уже используете другое решение? Мы ведём датированные сравнения с',
-		after: ', и в каждом указано, какие страницы мы прочитали и когда.'
+		before:
+			'Если вы уже используете другое решение, у нас есть сравнения FoxAuth с',
+		after:
+			', с датой проверки и источниками. В каждом указано, какие страницы мы прочитали и когда.'
 	},
 	englishOnly: 'Страница доступна только на английском',
 	staleTranslation: (href: string) =>
 		rich(
 			{ strong: 'Английская версия новее.' },
-			' Этот перевод сделан с более ранней редакции страницы, и в нём может не быть того, что изменилось с тех пор. ',
+			' Этот перевод сделан с более ранней редакции страницы, и в нём может не хватать изменений, внесённых с тех пор. ',
 			{ link: 'Читать английскую версию', href },
 			'.'
 		),

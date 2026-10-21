@@ -10,7 +10,7 @@ import ScreenshotFigure from '../../../../components/ScreenshotFigure.astro';
 
 This is one full Authorization Code + PKCE round trip against a local deployment, done by hand.
 Every client library implements this flow, and having walked through it once yourself usually makes
-debugging one much easier.
+debugging a library much easier.
 
 The examples assume `ISSUER=http://localhost:3000` and a public client with the id `demo` whose
 registered redirect URI is `http://localhost:8080/callback`. Substitute your own from
@@ -23,10 +23,10 @@ The endpoint paths below are this server's defaults. Do not hard-code them in a 
 reflects which capabilities are enabled, so it is the honest answer to "what does this deployment
 support".
 
-This matters more than it used to. If your client belongs to a project you created, that
+If your client belongs to a project you created, that
 project is its own issuer: its endpoints live under `<ISSUER>/<slug>` and its discovery document is at
 `<ISSUER>/<slug>/.well-known/openid-configuration`. A request for such a client sent to the bare
-`/auth` is refused with `unauthorized_client` — "client is not authorized at this address" — because a
+`/auth` is refused with `unauthorized_client` ("client is not authorized at this address"), because a
 client may only be used at the address of the project it belongs to. The walk-through below uses the
 default `redfox` project, which is served at the root.
 
@@ -78,9 +78,9 @@ generated. The `iss` in step 3 and in the ID token is then your project's issuer
    OpenID Connect request and produces an ID token. A refresh token also needs `offline_access` in
    the scope **and** `prompt=consent` in this URL **and** `refresh_token` among the client's grant
    types. A console-created client has only `authorization_code` by default. If any of the three is
-   missing the scope is dropped silently, with no error: you get a token response with no
+   missing, `offline_access` is dropped silently, with no error: you get a token response with no
    `refresh_token` in it. The server must also list `offline_access` among its supported scopes, as
-   it does by default; while it does not, the token endpoint refuses every refresh token as
+   it does by default. If it does not, the token endpoint refuses every refresh token as
    `unsupported_grant_type`.
 
 3. **Sign in and consent.** The server redirects to its own interaction screens: a sign-in form for
@@ -107,8 +107,8 @@ generated. The `iss` in step 3 and in the ID token is then your project's issuer
      -d code_verifier=<verifier>
    ```
 
-   `redirect_uri` must be byte-identical to the one in step 2 — the grant compares it against the
-   value recorded on the code and refuses a mismatch. For a confidential client, drop `client_id`
+   `redirect_uri` must be byte-identical to the one in step 2. The token endpoint compares it against
+   the value recorded on the code and refuses a mismatch. For a confidential client, drop `client_id`
    from the body and authenticate instead: `-u demo:<secret>` for `client_secret_basic`, or
    `-d client_id=demo -d client_secret=<secret>` for `client_secret_post`.
 
@@ -133,8 +133,8 @@ generated. The `iss` in step 3 and in the ID token is then your project's issuer
    Check `iss` against your `ISSUER`, `aud` against your client id, and `nonce` against step 2. A
    real client verifies the signature as well, against a key from `GET /jwks` selected by the
    token's `kid`. The payload also says how the user signed in: `amr` is `["pwd"]` for a password,
-   or `["pwd", "otp", "mfa"]` with a one-time code, so to require a second factor test for `mfa`,
-   not for the claim being present.
+   or `["pwd", "otp", "mfa"]` with a one-time code. To require a second factor, test `amr` for
+   `mfa`, not for the claim being present.
 
 6. **Call the UserInfo endpoint** with the access token:
 

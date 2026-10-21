@@ -24,14 +24,14 @@ See the [environment reference](/docs/reference/environment/).
 **Pass the original `Host` through.** The server reads that header, and only that header, to work out
 which project a request is addressed to when projects are given subdomains or hostnames of their own. It
 deliberately does not read `X-Forwarded-Host`: that header is set by whatever spoke to your proxy, so a
-proxy which does not strip an inbound copy would let a caller choose which population answers them —
-the highest-leverage thing a request could influence here. `Host` is what the client actually connected
+proxy which does not strip an inbound copy would let a caller choose which project, with its own population of users, answers them.
+That choice is the most powerful thing a request could influence here. `Host` is what the client connected
 to, and what your proxy's own routing already matched on.
 
 The nginx block below sets `proxy_set_header Host $host;` for this reason, and Caddy's `reverse_proxy`
 preserves it by default. A proxy that rewrites `Host` to the upstream's internal name leaves every
-project on a subdomain or a hostname of its own unreachable; path-addressed projects are unaffected, which is what makes this
-worth stating rather than leaving to be discovered.
+project on a subdomain or a hostname of its own unreachable. Path-addressed projects are unaffected,
+so the fault is easy to miss.
 
 **Choose `rateLimit.trustedProxy` on purpose.** The next section covers it.
 
@@ -48,7 +48,7 @@ needs credentials for your DNS provider and a build with that provider's module.
 
 `Strict-Transport-Security: max-age=63072000; includeSubDomains` is sent on every response,
 including plaintext ones, and there is no branch on the scheme; that is intentional. In production
-the hop the RFC governs, server to user agent, _is_ HTTPS, because TLS terminated at your proxy. The
+the hop the HSTS specification governs, server to user agent, _is_ HTTPS, because TLS terminated at your proxy. The
 plaintext this process sees on its internal port is an artefact of termination. On
 `http://localhost` the header is inert, since a user agent must ignore it when it arrives over
 plaintext.
@@ -70,7 +70,7 @@ From the project's README:
 > any caller can set `Fly-Client-IP` to a fresh value per request and is never limited.
 
 So: **behind a proxy, leave [`rateLimit.trustedProxy`](/docs/reference/settings/#rateLimit.trustedProxy)
-at `true`**, and make sure your proxy actually sets a forwarded header and _overwrites_ any the
+at `true`**, and make sure your proxy sets a forwarded header and _overwrites_ any the
 client supplied instead of appending to it.
 
 ### Exactly which header the resolver reads
@@ -83,15 +83,15 @@ in this order:
 3. `X-Real-IP`
 
 The value is trimmed and truncated to 64 characters. If none of the three is present, the request
-falls into a single shared `unknown` bucket instead of going uncounted. Omitting the header must
-not be a way to bypass the limiter.
+falls into a single shared `unknown` bucket instead of going uncounted, so omitting the header is
+not a way to bypass the limiter.
 
 With `rateLimit.trustedProxy` set to `false`, none of those headers is read at all: the transport
 peer address is used, and a request with no identifiable peer also lands in the shared bucket.
 
 `Forwarded` (RFC 7239) is **not** read. If your proxy only emits that, add one of the three above.
 
-## Sample configuration
+## Sample nginx and Caddy configuration {#sample-configuration}
 
 <Tabs>
 <TabItem label="nginx">
@@ -152,8 +152,8 @@ Caddy obtains and renews the certificate itself, which is most of why its block 
 
 ## Client certificates (mTLS)
 
-Only for [RFC 8705](https://www.rfc-editor.org/rfc/rfc8705) — clients authenticating with a TLS
-certificate, or certificate-bound access tokens. TLS ends at the proxy, so the server never sees the
+This section applies only to [RFC 8705](https://www.rfc-editor.org/rfc/rfc8705): clients
+authenticating with a TLS certificate, or certificate-bound access tokens. TLS ends at the proxy, so the server never sees the
 handshake: the proxy has to verify the client certificate and forward it in a header, and the server
 has to be told to believe that header.
 
@@ -162,8 +162,8 @@ colons. A bare base64 `X-Client-Cert` is read when `Client-Cert` is absent, for 
 before RFC 9440. The server reads neither until
 [`mTLS.trustProxyCertificateHeader`](/docs/reference/settings/#mTLS.trustProxyCertificateHeader) is
 on, and that setting has a wrong answer in each direction: off, no certificate is ever read; on
-behind a proxy that passes an incoming header through, anyone can send a certificate — which is
-public — and be believed.
+behind a proxy that passes an incoming header through, anyone can send a certificate (certificates
+are public) and be believed.
 
 So the proxy must **set** the header on every request, overwriting whatever the client sent, and
 remove the other one. In Caddy:
@@ -184,8 +184,8 @@ auth.example.com {
 ```
 
 `verify_if_given` keeps every other client working without a certificate. nginx has no variable
-holding the DER certificate as base64 — `$ssl_client_escaped_cert` is URL-encoded PEM, which this
-server does not read — so behind nginx either put a proxy that can produce `Client-Cert` in front of
+holding the DER certificate as base64. Its `$ssl_client_escaped_cert` is URL-encoded PEM, which this
+server does not read. So behind nginx, either put a proxy that can produce `Client-Cert` in front of
 the server, or override `features.mTLS.getCertificate` to read nginx's form. Whichever you choose,
 clear both headers on requests that carry no certificate, then switch the setting on.
 
@@ -197,7 +197,7 @@ curl -s https://auth.example.com/.well-known/openid-configuration | jq -r .issue
 ```
 
 The second command must print the public `https` URL you set as `ISSUER`. If it prints an internal
-address or an `http://` URL, fix that before anything else — every client will believe it.
+address or an `http://` URL, fix that before anything else: every client will believe it.
 
 To confirm the forwarded header is reaching the server, watch what happens when you exceed a limit.
 A `429` with `Retry-After` that arrives for your address alone, while other callers carry on, is

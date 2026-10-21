@@ -9,12 +9,12 @@ import { Steps, Aside } from '@astrojs/starlight/components';
 import ScreenshotFigure from '../../../../components/ScreenshotFigure.astro';
 
 The server administers itself. There is no seeded password to look up in a log and no
-`create-admin` command — the first administrator is created from the browser, once.
+`create-admin` command. The first administrator is created from the browser, once.
 
 <Aside type="note" title="On FoxAuth Cloud">
 
 There is no setup screen on FoxAuth Cloud. Open `https://auth.foxauth.dev/admin/signup`, create your account and
-confirm your address from the email it sends. Your account gets a personal team and no projects: you create
+confirm your address from the email it sends. Your account gets a personal team (a team whose only member is you) and no projects: you create
 those yourself. The instance settings, mail and the **Administrators** page are ours, so the rest of this page is
 about running your own server.
 
@@ -27,7 +27,7 @@ about running your own server.
 
 2. The **Create the first super admin** screen asks for an e-mail address and a password of at
    least twelve characters. The account goes into the reserved "Administrators" project, is made a
-   member of **Super administrators** — the team whose members administer the whole instance — and
+   member of **Super administrators** (the team whose members administer the whole instance) and
    gets a personal team like any other administrator.
 
 3. Submit, then sign in with those credentials.
@@ -35,17 +35,21 @@ about running your own server.
 </Steps>
 
 The setup route closes as soon as Super administrators has an active member, and answers
-`409 already_initialized` from then on. `/admin` becomes a sign-in. Further administrators are
-created on the console's **Administrators** page with **New administrator**, an e-mail address and a
-password of at least twelve characters. A super administrator can also open sign-up on that page's
-**Sign-in** tab, so that people register themselves, or connect your organisation's identity provider
-under **Identity providers**. Sign-up opens only together with email verification, in the same change.
-Without verification, anyone could register an administrator account under a colleague's address. A new administrator is never a super administrator, however they
-arrived: a super administrator grants that separately, with **Make super administrator…** in the
-account's menu. (Membership of a regular team, separately,
-is offered by e-mail invitation.) If you reach a setup screen on a deployment that is supposed to have
-administrators, that is worth investigating: it means the account collection this server reads
-holds none.
+`409 already_initialized` from then on. `/admin` becomes a sign-in.
+
+Further administrators are created on the console's **Administrators** page with **New administrator**,
+an e-mail address and a password of at least twelve characters. A super administrator can also open
+sign-up on that page's **Sign-in** tab, so that people register themselves, or connect your
+organisation's identity provider under **Identity providers**. Sign-up opens only together with e-mail
+verification, in the same change. Without verification, anyone could register an administrator account
+under a colleague's address.
+
+A new administrator is never a super administrator, however they arrived. A super administrator grants
+that separately, with **Make super administrator…** in the account's menu. (Membership of a regular team
+is offered by e-mail invitation.)
+
+If you reach a setup screen on a deployment that is supposed to have administrators, investigate: it
+means the account collection this server reads holds none.
 
 <Aside type="caution">
 
@@ -63,7 +67,7 @@ after the deployment comes up, and do not leave a reachable, un-provisioned inst
 
 ## Administrators sign in through this server's own issuer
 
-Signing in to the console is an OpenID Connect authorization code flow against the very server the
+Signing in to the console is an OpenID Connect authorization code flow against the same server the
 console administers, using the first-party `admin-panel` client that `db:setup` seeds. There is no
 second password store and no admin-only credential path: an administrator is an end-user in the
 reserved administrators' project, and what the admin API lets them do follows from the teams they
@@ -73,7 +77,7 @@ Two consequences follow, and both come up in practice:
 
 - The seeded client's redirect URI is `$ISSUER/admin/callback`, written once when the client is
   first inserted. If `ISSUER` changed after the seed, sign-in redirects to a URI the client does not
-  have and fails; re-running `db:setup` does not repair it. See the
+  have and fails; re-running `db:setup` does not update the redirect URI. See the
   [Compose guide's warning](/docs/get-started/docker-compose/) for what to do about it.
 - The console cannot be reached without the seed. If `db:setup` never ran, `/admin/login` redirects
   to `/auth` with a `client_id` no client matches.
@@ -86,18 +90,17 @@ administrators only), open the **Sign-in** tab, switch on **Require an authentic
 sign-in** and save. The console first shows how many administrators have no authenticator yet and
 asks you to confirm.
 
-Signing in then needs a six-digit code as well as a password. Nobody is locked out by turning it on:
-administrators without an authenticator enrol one at their next sign-in. That includes an agent
-signing in with the reserved `admin-mcp` client that `database/mongodb.ts` seeds, since it uses the
-same door. Administrators who sign in through an identity provider use that provider's second
+Signing in then needs a six-digit code as well as a password. Turning the requirement on locks nobody
+out: administrators without an authenticator enrol one at their next sign-in. That includes an agent
+signing in with the reserved `admin-mcp` client that `db:setup` seeds, since it uses the same door. Administrators who sign in through an identity provider use that provider's second
 factor instead; the requirement applies to password sign-in only.
 
-This matters more than it might look. Failed password attempts are counted per project and
-e-mail address, and an address that reaches the cap is refused for a while. A project that requires a
-one-time code stays at the first lockout window however often it is tripped, by design: a guessed
-password there does not sign anyone in. Administrators also have no self-service password reset to
-escape a lockout with. The way to make that door properly hard is the second factor, not the
-throttle. The throttle's own settings are `loginThrottle.failureCap`,
+The second factor, not the login throttle, is what makes this door properly hard. The throttle counts
+failed password attempts per project and e-mail address, and refuses an address that reaches the cap
+for a while. Each further lockout is normally longer. A project that requires a one-time code stays at
+the first lockout length however often it is tripped, by design: a guessed password there does not sign
+anyone in. Administrators also have no self-service password reset to escape a lockout with. The
+throttle's own settings are `loginThrottle.failureCap`,
 `loginThrottle.windowSeconds` and `loginThrottle.windowCeilingSeconds` in the
 [settings reference](/docs/reference/settings/#loginThrottle.failureCap).
 
@@ -120,16 +123,18 @@ An agent does the same with `smtp_settings_update` and `smtp_settings_test`.
 
 The console's super-admin surface covers the instance itself: server settings, signing keys, SMTP,
 administrator accounts and the fault store. Being a super administrator is membership of the reserved
-**Super administrators** team, granted and withdrawn as operations of their own (**Make super administrator…** and **Withdraw super administration…** on the **Administrators**
-page, or `admin_super_grant` and `admin_super_withdraw` for an agent); the last active member
-can be neither withdrawn nor deactivated. Any other administrator creates projects, the applications
-and APIs in them, and teams, invites people into their regular teams by e-mail, and reads the audit trail and **Usage**
-for their own teams. Ownership is by team: belonging to a project's owning team is what grants access to
+**Super administrators** team. That membership is granted and withdrawn as operations of their own:
+**Make super administrator…** and **Withdraw super administration…** on the **Administrators** page, or
+`admin_super_grant` and `admin_super_withdraw` for an agent. The last active member can be neither
+withdrawn nor deactivated.
+
+Any other administrator creates projects, the applications and APIs in them, and teams. They invite
+people into their regular teams by e-mail, and read the audit trail and **Usage** for their own teams. Ownership is by team: belonging to a project's owning team is what grants access to
 it. [Teams and project ownership](/docs/administer/teams/) has the details.
 
 Every state-changing action, the console's and an agent's alike, is written to an append-only
 audit trail before the mutation, naming the actor, the action and the target. The store exposes no
 update or delete.
 
-If what you found is a security problem instead of a configuration one, our disclosure policy and
-contact are on the [security page](/security/).
+If you find a security problem rather than a configuration one, our disclosure policy and contact are
+on the [security page](/security/).

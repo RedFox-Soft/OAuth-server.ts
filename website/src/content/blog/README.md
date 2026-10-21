@@ -26,7 +26,7 @@ storageScope: PostgreSQL # optional; only for a backend-specific article
 
 `title` and `description` are the two that need care, because the build enforces them:
 
-- The rendered `<title>` is `<your title> — FoxAuth` and must land in **15–60 characters**, so the
+- The rendered `<title>` is `<your title> | FoxAuth` and must land in **15–60 characters**, so the
   title you write has roughly 5–50 to play with. Write the claim, not the topic.
 - `description` must be **70–160 characters** and unique across the whole site. It is the snippet
   under the title in a search result. If it could be pasted onto another article unchanged, it is

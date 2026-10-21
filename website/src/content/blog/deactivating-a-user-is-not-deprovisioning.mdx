@@ -7,7 +7,7 @@ tags: [deprovisioning, sessions, tokens, scim]
 ---
 
 We had this bug ourselves, in version 0.7.0 of our server (we fixed it in 0.8.0). Here is what it
-looked like. We disable a user in the console. We take the access token their application received
+looked like. We deactivate a user in the console. We take the access token their application received
 ten minutes earlier and ask the server whether that token is still valid (this request is called
 introspection). The answer is `"active": true`: it is valid. We open the application in the user's
 browser, and they are still signed in. The application's logs are empty: nobody told it that the user
@@ -24,7 +24,7 @@ answers. The difference between them is every session and token issued before th
 ## The active: false flag only stops the next sign-in, and issued sessions and tokens live on {#a-flag-checked-at-the-next-sign-in-ends-nothing}
 
 Deactivation sets the flag `active: false` on the account. That flag is about the future: it stops the
-next sign-in. But the sessions and tokens the user received before deactivation are not touched by it.
+next sign-in. But the flag does not touch the sessions and tokens the user received before deactivation.
 The check passed when they were issued, and nobody will run it again. The browser session on the
 authorization server stays valid until it expires. The access token stays valid until its `exp` (the
 expiry written into the token itself). If it is an opaque token (a random string with no contents,
@@ -32,12 +32,12 @@ known only to the server), then when asked "is this token valid?" the server sti
 looks at two things only: whether the token itself still exists, and whether the permission the user
 gave this application (the grant) still exists. It does not look at the `active` flag.
 
-Finally, the application has its own session — the one the user actually sees. The application trusts
+Finally, the application has its own session, and that is the session the user sees. The application trusts
 our server to check sign-ins, so the standards call it a relying party. How long that session lives is
 up to the application. And nobody told it anything.
 
 The picture below shows what happens after a user is disabled, in two versions of our server. At the
-top is 0.7.0: everything keeps working. At the bottom is 0.8.0, where this is fixed.
+top is 0.7.0: everything keeps working. At the bottom is 0.8.0, where the bug is fixed.
 
 <svg viewBox="0 0 800 340" width="100%" role="img" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">
   <title>What survives a user's deactivation over the next hour. Before, the relying party session, the server session and an opaque access token all lived on. Now everything ends at the moment of deactivation, except a self-contained JWT access token: it lives until it expires</title>
@@ -67,14 +67,14 @@ reach. We call it the sweep. And the order of its steps turned out to matter mor
 
 ## First note whom to tell about the sign-out, then delete the sessions {#read-the-sessions-before-you-sweep-them}
 
-The obvious solution is two lines: set `active: false`, then delete everything the user owns. That is
+The obvious approach is two lines: set `active: false`, then delete everything the user owns. That is
 a mistake, and a test of the "the sessions are gone" kind will not notice it. The relying parties have
 to be told that the user has signed out. OpenID Connect has back-channel logout for this: the server
-itself, without the browser, sends the application a logout token — a message saying "this session is
-over". One such token per session. Each one carries `sid`, the session's identifier. The application
+itself, without the browser, sends the application a logout token, a message saying "this session is
+over". One such token goes out per session. Each one carries `sid`, the session's identifier. The application
 uses it to find its own matching session and close it. And `sid` is stored only in the session record.
 So the server must first read the sessions and note which relying parties to tell, and with which
-`sid` — and only then delete them. If you delete the sessions first, the `sid` values go with them, and
+`sid`. Only then may it delete them. If you delete the sessions first, the `sid` values go with them, and
 there is nothing to send to the applications. The server has no sessions left, and in every
 application the user is still signed in.
 
@@ -92,14 +92,14 @@ export async function revokeAccountAccess(
 
 `notifyRelyingParties` first reads all of the user's sessions. The server could not do that before:
 the only way it had to find a user's records was the same method that deleted them. So all three
-storage adapters gained a `findByOwner` method — it only finds records and deletes nothing.
+storage adapters gained a `findByOwner` method, which only finds records and deletes nothing.
 
 If an application does not respond, the function does not stop. The server reports the failure as an
 event, the same as on an ordinary sign-out, and carries on. The user must lose access even if one of
 the applications has a sign-out address that is not working.
 
 <svg viewBox="0 0 800 380" width="100%" role="img" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">
-  <title>The order of steps when an administrator or a directory disables a user: the audit entry and the flag; reading the sessions; a logout token with the session id to each relying party; deleting every record the user owns; the answer — 200, or 500 listing what survived</title>
+  <title>The order of steps when an administrator or a directory disables a user: the audit entry and the flag; reading the sessions; a logout token with the session id to each relying party; deleting every record the user owns; the answer: 200, or 500 listing what survived</title>
   <defs>
     <marker id="deprov-arrow-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"> <path d="M0,0 L10,5 L0,10 z" fill="var(--diagram-line, #555)"/></marker>
     <marker id="deprov-arrow-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"> <path d="M0,0 L10,5 L0,10 z" fill="var(--diagram-accent, #d9480f)"/></marker>
@@ -126,14 +126,14 @@ the applications has a sign-out address that is not working.
   <text x="400" y="350" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">Swap 3 and 5 and every test of "the sessions are gone" passes while no relying party is told.</text>
 </svg>
 
-Now the sweep itself — deleting everything the user owns. It is not a list of tables someone wrote from
+Now the sweep itself, which deletes everything the user owns. It is not a list of tables someone wrote from
 memory. Records on our server are split into storage areas: sessions, tokens, codes and so on. Each
-area declares which of its fields holds the owner. The sweep simply deletes from every area everything
+area declares which of its fields holds the owner. The sweep deletes from every area everything
 that belongs to this user. So an area that appears in a future release will be swept automatically.
 Nobody has to remember to add it anywhere.
 
 I have written the hand-maintained list more than once. It breaks silently as soon as a new area
-appears: its records outlive the user, and nobody notices. There is another obvious approach — walking
+appears: its records outlive the user, and nobody notices. There is another obvious approach: walking
 the permissions (grants) issued to the user. But that misses most of the records. Sessions, sign-ins in
 progress, enrolled second factors and email-verification requests hang off the user, not off a grant.
 
@@ -145,7 +145,7 @@ opaque token stops working at once.
 
 The sweep deliberately leaves two areas alone: the counter of failed sign-in attempts and the counter
 of password-reset attempts. They are tied to an email address, not to the user. It may look as if they
-were forgotten. They were not. These counters let nobody in — they count how many times someone has
+were forgotten. They were not. These counters let nobody in. They count how many times someone has
 tried to guess the password for that address. And you are most likely to be disabling a user in a
 hurry exactly while they are under attack. Reset the counter at that moment and the attacker gets fresh
 attempts in the middle of the incident. Hence the rule: the sweep deletes what lets someone in and
@@ -155,20 +155,20 @@ keeps what keeps someone out.
 
 In our admin console, the audit trail has two rules. First: the entry is written before the change.
 Second: the trail can only be appended to, and old entries never change. Both rules are right. But
-together they rule out the simplest way to report a partial failure — adding "these three areas did
+together they rule out the simplest way to report a partial failure: adding "these three areas did
 not clear" to an entry written before the attempt.
 
 So if something is left after the sweep, the deactivation answers `500` and lists the areas that did
 not clear. By then the user can no longer sign in: the flag is set first. The leftover records live no
-longer than their area's usual expiry, and they never let anyone back in. To finish the job, just
+longer than their area's usual expiry, and they never let anyone back in. To finish the job,
 disable the user again. The server will not answer "already disabled"; it runs the sweep again. A
-repeat that does something every time looks strange — until you need to recover from a failure like
+repeat that does something every time looks strange until you need to recover from a failure like
 this.
 
 ## The directory will overwrite the active flag, so a separate lock is needed {#lock-is-not-active-because-active-belongs-to-the-directory}
 
 Users can be managed by a corporate directory, such as Entra or Okta. The directory itself creates,
-changes and disables users on our server over the SCIM protocol — this is called provisioning. For
+changes and disables users on our server over the SCIM protocol. This is called provisioning. For
 such users the `active` flag belongs to the directory: the directory writes it on every sync. Say an
 administrator disables such a user by hand on our side during an incident. A few minutes later the
 scheduled sync writes the flag again and quietly reverses the administrator's decision. That is not a
@@ -197,22 +197,22 @@ protection anyone should rely on.
   <text x="400" y="208" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">Nothing a directory sends reaches the lock, so its next sync cannot undo an incident response.</text>
 </svg>
 
-So we have a second flag — the lock. Only an administrator sets and clears it; the directory cannot
+So we have a second flag: the lock. Only an administrator sets and clears it; the directory cannot
 reach it. One function decides whether to let the user in: it checks both flags, and every sign-in path
-calls it. That matters as much as the flag itself. If the "let them in?" check exists in two copies,
+calls it. Having that single function matters as much as the flag itself. If the "let them in?" check exists in two copies,
 over time they drift apart, and a locked user gets through the copy that fell behind. That has already
 happened to us. Sign-in through an external identity provider (an upstream provider) checked only
 `active`. A locked user already linked to such a provider passed that step. Only the next check stopped
 them.
 
 The lock departs from the OpenID IPSIE profile (Interoperability Profiling for Secure Identity in the
-Enterprise — a set of security requirements for corporate sign-in systems). The profile forbids
+Enterprise, a set of security requirements for corporate sign-in systems). The profile forbids
 changing users locally when a directory manages them. I think this departure is justified. The lock
 touches only sign-in and does not change the user's data. And an incident response that waits for
 someone else's system to sync is not an incident response.
 
 Locking runs the same sweep as deactivation. Unlocking, though, we made harder. Our server can also be
-managed by an AI agent — through MCP (the protocol an AI agent uses to call external tools). For an
+managed by an AI agent through MCP (the protocol an AI agent uses to call external tools). For an
 agent, unlocking counts as a high-consequence operation and will not go through without confirmation.
 After all, it lets back in a user an administrator judged compromised.
 
@@ -223,8 +223,8 @@ mechanisms and authorizations".
 
 ## A JWT access token cannot be revoked: it lives until it expires {#the-token-you-cannot-reach}
 
-There is one thing the sweep cannot reach. It is better to say so plainly than to promise that
-"deactivation ends access at once". It is the JWT access token. The resource server (the API that
+There is one thing the sweep cannot reach: the JWT access token. It is better to say so plainly than
+to promise that "deactivation ends access at once". The resource server (the API that
 accepts the token) checks it on its own, against the published keys, and never asks the authorization
 server about it. So there is nothing for us to intercept and nothing to delete. Such a token stays
 valid until its `exp`.
@@ -241,13 +241,13 @@ up at once. Most resource servers I have worked on would choose the fifteen minu
 ## When to deactivate, when to lock, when to sign out everywhere, and when to delete {#when-each-one-is-the-right-button}
 
 Deactivate when the person should no longer sign in and you manage the user. Lock when sign-in has to
-close right now and a directory manages the user — or when you do not trust its next sync. Press "Sign
+close right now and a directory manages the user, or when you do not trust its next sync. Press "Sign
 out everywhere" when the person is fine but their device is not. That button ends all sessions with
 the same sweep but leaves the user active. Delete when the account itself should disappear. That also
 ends access: the same steps run before deletion.
 
 Some of the machinery around the sweep arrived later than the sweep itself. A directory connects to
-our server through a provisioning connection — a record that links one directory to one project.
+our server through a provisioning connection, a record that links one directory to one project.
 A project is what our server calls a set of users with their own sign-in rules. Once a project
 has its own address, it issues tokens in its own name, that is, it becomes a separate issuer. If a
 connection starts disabling too many users at once, the connection is put on hold. That safeguard has

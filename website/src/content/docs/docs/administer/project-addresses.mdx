@@ -11,7 +11,7 @@ A project's address is its **issuer**: the URL every token it signs carries in `
 discovery document. A project has one address at a time, and it answers only there. The address takes one of
 three forms.
 
-## Three forms {#three-forms}
+## A path, a subdomain or a hostname {#three-forms}
 
 For an instance whose `ISSUER` is `https://auth.example.com`, a project with the slug `acme` can be at:
 
@@ -26,14 +26,14 @@ projects whatever their form, and it stays the same when a project moves between
 
 A subdomain is always exactly one label beneath the instance's own host. An instance at `auth.foxauth.dev`
 serves `acme.auth.foxauth.dev`, never `acme.foxauth.dev`, and `a.b.auth.foxauth.dev` names no project. If you
-want the shorter names, run the instance at the registrable domain itself, or give projects hostnames of their
-own.
+want the shorter names, run the instance at the registrable domain itself (here `foxauth.dev`), or give projects
+hostnames of their own.
 
 The default project and the administrators' project are served at the root, at `ISSUER` itself. They have no
 path and no subdomain, whatever the setting says. The console's own sign-in applications are accepted only there:
 a sign-in request for one of them at a project's address is refused.
 
-## Why a subdomain {#why-a-subdomain}
+## A subdomain gives a project its own origin {#why-a-subdomain}
 
 A path project shares its origin with every other path project. The origin is the scheme and host a browser
 uses to keep sites apart. A subdomain project, like a project with a hostname, has an origin of its own:
@@ -138,7 +138,7 @@ may. Only a super administrator gives a project a hostname.
 
 ## Setting up subdomains {#setting-up-subdomains}
 
-This is the operator's part, done once per instance.
+The operator sets up subdomains once per instance.
 
 <Steps>
 
@@ -177,7 +177,7 @@ such project.
 { "name": "Acme", "slug": "acme", "addressForm": "subdomain" }
 ```
 
-Without `addressForm`, a `slug` means a path, whatever the setting says, so a request an existing script sends
+Without `addressForm`, a `slug` means a path, whatever the setting says, so an existing script's request
 keeps its meaning. A `host` is a form of its own and takes no `addressForm`. A form the caller may not choose is
 refused with `403`, naming the setting and the forms allowed. Each project is returned with its `addressForm`,
 its `issuer` and its discovery URL.

@@ -4,13 +4,14 @@
  * wrong setting.
  */
 export default {
-	title: 'Features',
+	title: 'OAuth 2.1 and OpenID Connect features',
 	description:
 		'Every grant, profile and control OAuth-server.ts implements: OAuth 2.1 with PKCE, DPoP, PAR, FAPI, CIBA and mTLS, an audited console, and OAuth for MCP servers.',
 	hero: {
 		eyebrow: 'Features',
-		heading: 'Everything is in the box. Most of it is switched off.',
-		lead: 'FoxAuth ships one server with no feature editions. Authorization Code with PKCE and OpenID Connect run from the first start, and most of the rest wait behind a named flag. In practice your attack surface is the set of features you actually asked for. Each card says whether its feature is on from the first start or waits for its flag.',
+		heading:
+			'Every feature ships in one OAuth 2.1 server. Most are switched off.',
+		lead: 'FoxAuth ships one OAuth 2.1 and OpenID Connect authorization server, with no feature editions. Authorization Code with PKCE and OpenID Connect run from the first start, and most of the rest wait behind a named flag. In practice your attack surface is the set of features you asked for. Each card says whether its feature is on from the first start or waits for its flag.',
 		cloud:
 			'On FoxAuth Cloud the flags are ours to set, and a plan limits what each project may create. On your own servers both are yours, and plans are off unless you turn them on. A card marked On in FoxAuth Cloud is switched on there.',
 		/* The badge on a card whose flag is on at FoxAuth Cloud. */
@@ -23,13 +24,13 @@ export default {
 	groups: {
 		protocol: {
 			heading: 'Protocol',
-			title: 'Every grant an OAuth 2.1 client can ask for.',
+			title: 'Every OAuth 2.1 grant, plus device flow and CIBA.',
 			blurb:
 				'The grants and endpoints. Authorization Code with PKCE and OpenID Connect are always on; most of the rest wait for a flag.',
 			items: {
 				pkce: {
 					title: 'Authorization Code with PKCE',
-					body: 'PKCE is mandatory for every client, public or confidential, as OAuth 2.1 requires. Redirect URIs match exactly.'
+					body: 'By default PKCE is mandatory for every client, public or confidential, as OAuth 2.1 requires. Redirect URIs match exactly.'
 				},
 				oidc: {
 					title: 'OpenID Connect Core 1.0',
@@ -37,7 +38,7 @@ export default {
 				},
 				issuerIdentification: {
 					title: 'Issuer identification',
-					body: 'Every authorization response carries iss, so a client cannot be tricked into accepting another issuer’s code.'
+					body: 'Every authorization response carries iss, so a client that checks it cannot be tricked into accepting another issuer’s code.'
 				},
 				resourceIndicators: {
 					title: 'Resource Indicators',
@@ -45,7 +46,7 @@ export default {
 				},
 				clientCredentials: {
 					title: 'Client Credentials grant',
-					body: 'Machine-to-machine tokens with no end-user, scoped per client.'
+					body: 'Machine-to-machine tokens with no end user, scoped per client.'
 				},
 				refreshToken: {
 					title: 'Refresh Token grant',
@@ -107,7 +108,7 @@ export default {
 		},
 		security: {
 			heading: 'Security',
-			title: 'Sender constraint, and defences that are already on.',
+			title: 'Sender-constrained tokens, and defences that are already on.',
 			blurb:
 				'The banking-grade profiles are flags, not editions. The rest of this list is on from the first start.',
 			items: {
@@ -165,7 +166,7 @@ export default {
 			items: {
 				console: {
 					title: 'Administration console',
-					body: 'Projects with their applications and APIs, administrators and their teams, end users, upstream providers, SCIM connections, settings, SMTP and signing keys. Every screen has an address. A change that could lock people out or break applications first says whom it affects, counted, and applies only once you confirm.'
+					body: 'Projects with their applications and APIs, administrators and their teams, end users, upstream providers, SCIM connections, settings, SMTP and signing keys. Every screen has an address. A change that could lock people out or break applications first shows who it affects and how many, and applies only once you confirm.'
 				},
 				audit: {
 					title: 'Append-only audit trail',
@@ -173,7 +174,7 @@ export default {
 				},
 				usage: {
 					title: 'Monthly active users per project',
-					body: 'Each project counts the people it issued tokens to, once per UTC month and day, split into local sign-in, upstream sign-in, renewal and directory provisioning. A closed month never changes, and the history outlives the people and the project. Usage shows every project beside the team that owns it, so an instance run for other teams or customers can say who used how much.'
+					body: 'Each project counts the people it issued tokens to, once per UTC month and day, split into local sign-in, upstream sign-in, renewal and directory provisioning. A closed month never changes, and the history outlives the people and the project. The Usage page shows every project beside the team that owns it, so whoever runs an instance for other teams or customers can see who used how much.'
 				},
 				plans: {
 					title: 'Plans for a shared instance',
@@ -182,15 +183,15 @@ export default {
 				mcp: {
 					title: 'Administration over MCP',
 					body: (toolCount: number) =>
-						`${toolCount} tools served to an AI agent at POST /mcp as an OAuth 2.1 protected resource, with two-call confirmation on high-consequence operations.`
+						`${toolCount} tools served to an AI agent at POST /mcp as an OAuth 2.1 protected resource. A high-consequence operation runs only after a second, confirming call.`
 				},
 				mcpAuthorization: {
 					title: 'Authorization for your own MCP servers',
-					body: 'Declare a third-party MCP server as a protected resource of a project and this server mints tokens whose audience is exactly that resource, with no code change here and no restart. In a project with an address of its own the declaration needs nothing from the resource — it can be internal, on localhost or not yet deployed — and another tenant may declare the same URL without affecting yours. Tokens are self-contained by default, so the resource verifies them against its project’s published keys without credentials of its own.'
+					body: 'Declare a third-party MCP server as a protected resource of a project, and FoxAuth mints tokens whose audience is exactly that resource, with no code change to FoxAuth and no restart. In a project with an address of its own, the declaration needs nothing from the resource: it can be internal, on localhost or not yet deployed. Another tenant may declare the same URL without affecting yours. Tokens are self-contained by default, so the resource verifies them against its project’s published keys without credentials of its own.'
 				},
 				clientIdMetadataDocument: {
 					title: 'Client identity documents',
-					body: 'A client_id that is an HTTPS URL naming a JSON document describing the client, retrieved and validated on demand and never stored — the mechanism the MCP authorization specification names first for a client with no prior relationship.'
+					body: 'A client_id can be an HTTPS URL that names a JSON document describing the client. The server retrieves and validates the document on demand and never stores it. The MCP authorization specification names this mechanism first for a client with no prior relationship to the server.'
 				},
 				registration: {
 					title: 'Dynamic client registration',
@@ -206,7 +207,7 @@ export default {
 				},
 				groupOwnership: {
 					title: 'Team ownership',
-					body: 'Projects are owned by a team of administrators, and so is everything in them: end users, applications and APIs. Nothing but membership of the team grants access, and it is re-resolved on every request. A project moves to another team with everything it holds, in one step.'
+					body: 'Projects are owned by a team of administrators, and so is everything in them: end users, applications and APIs. Only membership of the team grants access, and membership is checked again on every request. A project moves to another team with everything it holds, in one step.'
 				},
 				bucketAddress: {
 					title: 'A project addressed by a path, a subdomain or a host',
@@ -234,7 +235,7 @@ export default {
 				},
 				globalTokenRevocation: {
 					title: 'Okta Universal Logout',
-					body: 'An opted-in provider sends one signed request, and everything the person holds here ends: sessions, refresh tokens, and every access token the server can revoke. The account stays active, so the person can sign in again. It follows an Internet-Draft that has expired, so it has a flag of its own.'
+					body: 'An opted-in provider sends one signed request, and everything the person holds here ends: sessions, refresh tokens, and every access token the server can revoke. The account stays active, so the person can sign in again. The feature follows an Internet-Draft that has expired, so it has a flag of its own.'
 				},
 				scim: {
 					title: 'SCIM 2.0 provisioning',
@@ -242,7 +243,7 @@ export default {
 				},
 				signingKeys: {
 					title: 'Signing key management',
-					body: 'Each project with an address of its own signs with keys of its own, published at its own jwks_uri, so one tenant’s token never verifies at another’s resource server. The project’s owning team rotates them in one step — a new key is published before it may sign, and a retired one stays published until its tokens expire — and can revoke a compromised key at once, so nothing it signed verifies any more. The instance key set stays a super administrator’s.'
+					body: 'Each project with an address of its own signs with keys of its own, published at its own jwks_uri, so one tenant’s token never verifies at another’s resource server. The team that owns the project rotates them in one step. A new key is published before it may sign, and a retired one stays published until its tokens expire. The team can also revoke a compromised key at once, so nothing it signed verifies any more. The instance key set stays a super administrator’s.'
 				}
 			}
 		},
@@ -263,7 +264,7 @@ export default {
 				},
 				mountable: {
 					title: 'Mountable Elysia app',
-					body: 'Import the app and mount it in your own Bun service. There is no init step — importing is what boots it.'
+					body: 'Import the app and mount it in your own Bun service. There is no init step: importing the app is what boots it.'
 				},
 				loginUi: {
 					title: 'Built-in login and consent UI',
@@ -273,8 +274,9 @@ export default {
 		},
 		operations: {
 			heading: 'Operations',
-			title: 'What you need when something is wrong.',
-			blurb: 'Ship it, watch it, and find out why a request failed.',
+			title: 'Ship it, and find out why a request failed.',
+			blurb:
+				'A container image to ship, a record of server faults, optional Sentry reporting, and references generated from the code.',
 			items: {
 				containerImage: {
 					title: 'Published container image',
@@ -294,7 +296,7 @@ export default {
 				},
 				machineReadable: {
 					title: 'Machine-readable reference',
-					body: 'The endpoint, settings, admin API, MCP tool and environment references are generated from the code itself.'
+					body: 'The endpoint, settings, admin API, MCP tool and environment references are generated from the code.'
 				}
 			}
 		}
@@ -316,7 +318,7 @@ export default {
 	next: {
 		eyebrow: 'Next',
 		heading: 'Compare it with what you run today.',
-		lead: 'We keep a factual, dated comparison against the servers teams usually weigh this against.',
+		lead: 'We keep a factual, dated comparison with the servers teams usually weigh FoxAuth against.',
 		allComparisons: 'All comparisons',
 		pricing: 'Pricing'
 	}

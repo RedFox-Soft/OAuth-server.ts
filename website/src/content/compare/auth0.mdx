@@ -28,13 +28,13 @@ chooseUs:
   - 'You want an AI agent administering the instance through the same audited path a human uses.'
 faq:
   - question: 'Can I migrate from Auth0 to FoxAuth?'
-    answer: "Users, clients and their metadata port over. FoxAuth stores end users in projects you provision through the admin console, the management API or, from an enterprise directory, SCIM 2.0, and OAuth clients can be created there or by dynamic client registration. What does not port is anything written in Auth0's own extension model: Rules, Actions and Hooks have no equivalent and are rewritten as override seams, of which FoxAuth exposes 31, each resolved at call time. Budget the migration by how much logic lives in Actions; the user count has little to do with it."
+    answer: "Users, clients and their metadata port over; password hashes do not. FoxAuth stores end users in projects you provision through the admin console, the management API or, from an enterprise directory, SCIM 2.0, and OAuth clients can be created there or by dynamic client registration. What does not port is anything written in Auth0's own extension model: Rules, Actions and Hooks have no equivalent and are rewritten as override seams, of which FoxAuth exposes 31, each resolved at call time. Budget the migration by how much logic lives in Actions; the user count has little to do with it."
   - question: 'Does FoxAuth support social logins like Google and GitHub?'
-    answer: 'Google, Microsoft, Apple and GitHub are recognised by name: FoxAuth tells you what to do at the provider, shows you the exact callback address to register, and asks only for the values that provider issues — two for Google and GitHub, three for Microsoft, four for Apple. Any other provider speaking OpenID Connect can be configured by hand, per project. Two caveats worth knowing before you compare: you still register the application at the provider yourself, because none of them lets a third party do it for you, and four recognised providers is not the connection catalogue Auth0 ships, which runs to dozens and includes SAML and AD/LDAP enterprise connections FoxAuth does not speak. Microsoft Entra ID and Okta can instead provision users and groups into FoxAuth over SCIM.'
+    answer: 'Google, Microsoft, Apple and GitHub are recognised by name: FoxAuth tells you what to do at the provider, shows you the exact callback address to register, and asks only for the values that provider issues: two for Google and GitHub, three for Microsoft, four for Apple. Any other provider speaking OpenID Connect can be configured by hand, per project. Two caveats before you compare. You still register the application at the provider yourself, because none of them lets a third party do it for you. And four recognised providers is not the connection catalogue Auth0 ships, which runs to dozens and includes SAML and AD/LDAP enterprise connections FoxAuth does not speak. Microsoft Entra ID and Okta can instead provision users and groups into FoxAuth over SCIM.'
   - question: 'Is FoxAuth cheaper than Auth0?'
-    answer: 'The bill has a different shape, and it is not uniformly smaller. FoxAuth is free to self-host under FSL-1.1-ALv2; what it costs you is a database, a container and the engineering time to keep them healthy, so the cost grows with infrastructure and is indifferent to monthly active users. FoxAuth Cloud also has a free plan, capped at 1,000,000 monthly active users per project, with no SLA yet. Auth0 bills per monthly active user. At small scale that is usually the cheaper option, and at large scale it is what teams tend to come to us about.'
+    answer: "FoxAuth's bill has a different shape from Auth0's, and it is not uniformly smaller. FoxAuth is free to self-host under FSL-1.1-ALv2; what it costs you is a database, a container and the engineering time to keep them healthy, so the cost grows with infrastructure and is indifferent to monthly active users. FoxAuth Cloud also has a free plan, capped at 1,000,000 monthly active users per project, with no SLA yet. Auth0 bills per monthly active user. At small scale Auth0 is usually the cheaper option. At large scale Auth0's bill keeps growing with every user, while FoxAuth's does not."
   - question: 'Do I get FAPI, DPoP and PAR without an enterprise plan?'
-    answer: 'FoxAuth implements DPoP (RFC 9449), PAR (RFC 9126), mTLS (RFC 8705), CIBA, RAR (RFC 9396) and JARM, and each one is a feature flag on the instance you run. There is no plan tier and no add-on. All of them ship switched off and are turned on per deployment.'
+    answer: 'FoxAuth implements DPoP (RFC 9449), PAR (RFC 9126), mTLS (RFC 8705), CIBA, RAR (RFC 9396) and JARM, and each one is a feature flag on the instance you run. There is no plan tier and no add-on. All of them ship switched off and are turned on per deployment. FAPI profile behaviours sit behind fapi.enabled the same way, without a conformance certification.'
 groups:
   - label: Getting started and operations
     rows:
@@ -64,7 +64,7 @@ groups:
             text: "Auth0's runtime. Customisation is done in Actions, since the server itself is Auth0's."
           }
         verdict: different
-        why: 'One is software you own; the other is a service you configure.'
+        why: 'FoxAuth is software you own; Auth0 is a service you configure.'
       - dimension: Where the data lives
         us: { status: yes, text: 'Your own PostgreSQL or MongoDB database.' }
         them:
@@ -112,7 +112,7 @@ groups:
             text: 'Established product, support organisation, status page, years of certifications.'
           }
         verdict: them
-        why: 'The honest asymmetry.'
+        why: 'Auth0 has years of certifications and a support organisation behind it; FoxAuth has no conformance certification.'
   - label: Protocol coverage
     rows:
       - dimension: PKCE for every client (OAuth 2.1)
@@ -259,14 +259,14 @@ groups:
             text: 'Free up to 25,000 monthly active users, then per-MAU plans; regulated-industry features need Enterprise and an add-on.'
           }
         verdict: different
-        why: 'A fixed infrastructure cost versus a bill that grows with your users.'
+        why: 'A cost that grows with infrastructure and ignores user count, versus a bill that grows with your users.'
         note: 'Plans are "priced by Monthly Active Users (MAUs) and differ between B2C and B2B"; the free plan covers "Up to 25,000 monthly active users".'
 ---
 
-## Migrating
+## Migrating users and clients from Auth0 {#migrating}
 
 Auth0 can export users and clients, and its Management API can list both. On the FoxAuth side,
-clients are created through the admin API or dynamic registration and users in a project.
+clients are created through the admin API or dynamic registration, and users are created in a project.
 Password hashes do not port, so plan a reset-on-first-login window.
 
 - [Features, flag by flag](/features/)

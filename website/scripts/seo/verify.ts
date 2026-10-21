@@ -509,7 +509,7 @@ export function verify(input: VerifyInput): VerifyOutput {
 
 	for (const page of pages) {
 		/*
-		 * A card shows the site name in its own chrome, so dropping the " — FoxAuth" suffix from
+		 * A card shows the site name in its own chrome, so dropping the " | FoxAuth" suffix from
 		 * og:title is right rather than a mismatch — Starlight does exactly that. Either form passes;
 		 * an unrelated string does not.
 		 */

@@ -24,8 +24,8 @@ shortest path to having that backed up.
 
 3. **Allow the application's egress addresses** under Network Access. See the note below.
 
-4. **Set the two variables** — the connection string as `MONGODB_URI` and the database name
-   separately as `DATABASE_NAME`:
+4. **Set the two variables.** Put the connection string in `MONGODB_URI` and the database name,
+   separately, in `DATABASE_NAME`:
 
    ```bash
    fly secrets set MONGODB_URI='mongodb+srv://user:password@cluster.example.mongodb.net/?retryWrites=true&w=majority'
@@ -59,12 +59,12 @@ name in `DATABASE_NAME`.
 
 ## Network access
 
-Atlas denies every address by default. Add the addresses the server's egress actually uses:
+Atlas denies every address by default. Add the addresses the server's outbound traffic comes from:
 
 - **Fly.io**: Machines egress from shared addresses that are not stable per app. Either use Atlas
   Private Endpoints / peering, or allow the outbound addresses Fly documents for your region. If you
-  resort to `0.0.0.0/0`, understand that the database user's password is then all that protects the
-  data, so it must be long, unique, and rotated when anyone with a copy leaves.
+  fall back to `0.0.0.0/0` (every address), the database user's password is then all that protects
+  the data, so it must be long, unique, and rotated when anyone with a copy leaves.
 - **Kubernetes**: allow the cluster's NAT gateway addresses.
 - **A single VM**: allow its public address.
 
@@ -88,14 +88,14 @@ idempotent, and it exits non-zero when a constraint it declares is not in force,
 unique index it could not build because the existing data violates it. Treat that exit code as a
 failed deploy.
 
-## Backups
+## Backups, and what a restore brings back {#backups}
 
 Atlas takes scheduled snapshots. Enable them, set a retention period, and then do the part people
 usually skip: restore one into a throwaway cluster once, so you know the restore works and how long
 it takes.
 
-Two things worth knowing about a restore. The **signing keys** come back with the snapshot, so
+Two things about a restore are worth knowing. The **signing keys** come back with the snapshot, so
 tokens issued before it still verify; restoring a database without them would invalidate every
-live token and every session. And the **audit trail** is append-only by design, with no update or
+live token they signed. And the **audit trail** is append-only by design, with no update or
 delete exposed anywhere in the API. A restore that rolls it back is the only way an entry
 disappears, which is probably worth stating in whatever your compliance story is.

@@ -55,7 +55,7 @@ export default {
 	/* The sentence around the comparison links (CompareLinks.astro); the names are joined between. */
 	compareLinks: {
 		before:
-			'Already running something else? We keep dated, sourced comparisons with',
+			'If you already use something else, we keep dated, sourced comparisons with',
 		after: ', each listing the pages we read and the date we read them.'
 	},
 	/* Shown, in the reader's language, on a page that exists only in English. */
@@ -64,7 +64,7 @@ export default {
 	staleTranslation: (href: string) =>
 		rich(
 			{ strong: 'The English version is newer.' },
-			' This translation was made from an earlier revision of the page, and may be missing what changed since. ',
+			' This translation was made from an earlier revision of the page, and may be missing the changes made since. ',
 			{ link: 'Read the English version', href },
 			'.'
 		),

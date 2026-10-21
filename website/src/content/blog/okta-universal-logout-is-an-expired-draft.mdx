@@ -1,7 +1,7 @@
 ---
 title: Okta Universal Logout is an expired draft
 description: >-
-  Okta Universal Logout follows a draft standard that expired before anyone adopted it. What Okta sends, the nbf timing trap, and checks no setting can relax.
+  Okta Universal Logout follows a draft no working group adopted, and it has expired. What Okta sends, the nbf timing trap, and checks no setting can relax.
 publishedAt: '2026-10-08'
 tags: [logout, okta, federation, security]
 ---
@@ -10,20 +10,22 @@ The requirement sounded simple. A company's employees sign in to our authorizati
 company's identity provider (IdP): the service that holds the employees' accounts and where they sign
 in. Sometimes the company's security team decides that someone's access has to end, everywhere and
 right now. Then the identity provider should be able to tell us. Not at the person's next sign-in,
-which might be tomorrow. Now: their sessions, their refresh tokens, all of it.
+which might be tomorrow. Now: their sessions, their refresh tokens and everything else.
 
 So I went looking for the standard way an identity provider tells an application "end everything this
 person has". Such an application is called a relying party: it relies on the provider to check who is
-signing in. There is no standard way. There is a final specification, but for a narrower job. There is
-another one for a broader job, but the big providers do not send its messages to other companies'
+signing in. There is no standard way. There is a final specification (back-channel logout), but for a
+narrower job. There is another one (Shared Signals and CAEP) for a broader job, but the big providers do
+not send its messages to other companies'
 applications. And there is an individual Internet-Draft. An Internet-Draft is a working document on its
 way to becoming a standard. An individual one is written by its author alone, not by a working group.
-This one was never adopted, and it has expired. It is the one Okta sends.
+This one was never adopted, and it has expired. It is the one Okta sends, under the name Universal
+Logout.
 
 ## Of the big corporate identity providers, only Okta sends "end everything", and it follows an expired draft {#only-one-big-workforce-idp-pushes-end-everything-and-it-pushes-a-draft}
 
-Here is what each provider will actually send to an application like ours, as of October 2026. It is
-less than the marketing pages suggest.
+Here is what each provider sends to an application like ours, as of October 2026. Providers send less
+than their marketing pages suggest.
 
 <svg viewBox="0 0 800 330" width="100%" role="img" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">
   <title>What six identity providers send to a third-party relying party when a user's access should end: Okta sends global token revocation, Keycloak, Auth0 and Ping send OpenID Connect back-channel logout, Google sends RISC for consumer accounts only, and Microsoft Entra ID sends nothing</title>
@@ -66,8 +68,8 @@ it. There is no `draft-ietf-` successor either (that prefix marks a draft a work
 adopted). We looked at sixteen comparable products. Exactly one other of them, Auth0, accepts this
 request.
 
-I built it anyway, and I think that was right. But only with three safeguards, and I would now insist
-on them for anything built on an expired draft. First, we build to the request Okta documents. We do
+I built it anyway, and I think that was right, but only with three safeguards. I would now insist on
+them for anything built on an expired draft. First, we build to the request Okta documents. We do
 not read the draft as though it were a standard. Second, everything sits behind its own switch,
 `globalTokenRevocation.enabled`. It is off by default, and its description in the console says the
 draft has expired. Third, the wire format (exactly what arrives over the network, and in what shape)
@@ -105,16 +107,16 @@ assertion: a signed statement that one party makes to another.
 ```
 
 `iss` is the Okta organisation. `sub` is our client id in that organisation. Okta documents it as
-`client_id/appInstanceId`; only a real run will show which form actually arrives. Together, these two
+`client_id/appInstanceId`; only a real run will show which form arrives. Together, these two
 fields point to one upstream provider (an outside identity provider our users sign in through)
 configured on one project. A project is this server's name for a set of end users with their own sign-in
 rules. Once a project has its own address, it also issues tokens in its own name, that is, it becomes
 its own issuer.
 
 The body's `sub_id` names the person: by their subject (their id at that provider) or, in Okta's other
-format, by email. Not just anyone can be named. The provider can name only a user who signs in here
-through that provider, or a user whom the SCIM connection bound to that provider created. (SCIM is the
-protocol a company's user directory uses to create and disable accounts in other systems by itself. A
+format, by email. The provider can name only a user who signs in here through that provider, or a user
+created by the SCIM connection that is bound to that provider. (SCIM is the protocol a company's user
+directory uses to create and disable accounts in other systems automatically. A
 provisioning connection is the record that links one directory to one project.) Everyone else gets the
 same `404`, even people who do not exist. So nobody can use the endpoint to find out who has an
 account.
@@ -127,7 +129,7 @@ The draft's MUST, its required minimum, is smaller: revoke the refresh tokens an
 again. The draft allows doing more.
 
 Access can end along several paths: an administrator's action, this request from Okta, a deactivation
-over SCIM. All of them go through one and the same operation, and that was a deliberate decision. Our
+over SCIM. All of them go through the same operation, and that was a deliberate decision. Our
 administrators get the same thing from the "Sign out everywhere" button.
 
 ## Measure an assertion's lifetime from iat, not nbf, or you refuse every real request {#measure-the-lifetime-from-iat-never-from-nbf}
@@ -135,7 +137,7 @@ administrators get the same thing from the "Sign out everywhere" button.
 Look at the three times in that payload (the content of the JWT). `iat` is when the assertion was
 issued. `nbf` ("not before") is the moment before which it is not valid. `exp` is when it expires.
 `nbf` is five minutes before `iat`, and `exp` is five minutes after. Okta does this on purpose: if the
-receiver's clock is a little off from Okta's, the request still passes. That is entirely legitimate.
+receiver's clock is a little off from Okta's, the request still passes. That is legitimate.
 
 We cap the lifetime of a presented assertion at 300 seconds. The reason is replay: someone who
 intercepts an assertion can send it again. The longer it lives, the longer that window stays open. The
@@ -183,10 +185,10 @@ if (
 ```
 
 The checks against now are the half people leave out. Take an assertion dated tomorrow, with a
-five-minute lifetime. It passes the `exp - iat` check perfectly well. If that were the only check, the
-assertion would stay valid for a whole day. So we refuse an `iat` that lies in the future, and we cap
-how much time is left from now until `exp`. That closes the gap. And it means we trust the provider's
-clock for one thing only: which way time runs.
+five-minute lifetime. It passes the `exp - iat` check. If that were the only check, the assertion would
+stay valid for a whole day. So we refuse an `iat` that lies in the future, and we cap how much time is
+left from now until `exp`. With those two checks, we trust the provider's clock for one thing only:
+which way time runs.
 
 ## The checks are fixed in code, because a check you can switch off will be switched off and forgotten {#the-checks-are-constants-because-someone-will-turn-a-setting-off}
 
@@ -233,7 +235,7 @@ There is one more trap, and it is in the key cache, not in the checks. By defaul
 waits at least thirty seconds between two fetches of a provider's key set. That pause is called the
 cooldown. On the federated sign-in path (when a user signs in to us through an outside provider), our
 server switches the cooldown off. We switched it off because of the key-rotation test in the OpenID
-Foundation conformance suite, the tests that check a server follows the standard. It showed that after
+Foundation conformance suite, the tests that check a server follows the standard. The test showed that after
 every key change at the provider (a rotation), sign-ins failed for half a minute. And on that path the
 cooldown defends against nothing. We fetch the ID token ourselves, from the provider's own token
 endpoint. So an unknown `kid` (the id of the key that signed a token) can only come from the provider
@@ -259,7 +261,7 @@ export function presentedKeySetFor(jwksUri: string): RemoteKeySet {
 }
 ```
 
-The cost: we honour a genuine key rotation at Okta at most once every thirty seconds. A revocation that
+The cost is that we honour a genuine key rotation at Okta at most once every thirty seconds. A revocation that
 arrives inside that window, signed with the new `kid`, is refused. I would take that trade every time
 over an endpoint that fetches keys whenever anyone asks.
 
@@ -271,15 +273,15 @@ access. The global token revocation module adds only the details: which claim (f
 carries our client id, which audience (`aud`) it expects, which token types it accepts, a namespace
 for replay records, and which provider option switches it on.
 
-That split paid for itself almost at once. Back-channel logout that Keycloak, Auth0 and Ping send to us
+The split between core and module paid for itself almost at once. Back-channel logout that Keycloak, Auth0 and Ping send to us
 is the second module on the same core. It inherited every refusal described above, and none of them
 had to be written again. The only thing it had to change was where our client id lives. A logout token
 carries it in `aud`; Okta's assertion carries it in `sub`. Each format declares that place itself; the
-core does not guess it. If it guessed, a token could choose which provider it is checked against.
+core does not guess it. If the core guessed, a token could choose which provider it is checked against.
 Back-channel logout has been run against a real Keycloak 26.8.0. A CAEP `session-revoked` event, if
 any provider ever sends one, would be a third module.
 
-## When I would turn it on, and why it stays off by default {#when-i-would-turn-it-on}
+## When I would turn Universal Logout on, and what is still untested {#when-i-would-turn-it-on}
 
 I would turn it on for a deployment whose customers run Okta with Identity Threat Protection and expect
 Universal Logout to reach every application. Identity Threat Protection is the Okta licence under which
@@ -287,7 +289,7 @@ Okta sends Universal Logout. Even then, I would document the switch as experimen
 watch the refusal events for the first week. Everywhere else I would leave it off, because an endpoint
 you do not need is one more way in.
 
-And I would be honest about the state of it, as I am trying to be here. It has not been run against a
+And I would be honest about the feature's state, as I am trying to be here. The feature has not been run against a
 real Okta organisation, because that needs Identity Threat Protection. The tests replay the request as
 Okta documents it, signed with the keys of a stub provider (a fake provider made for the tests). Two
 questions stay open. First, Okta documents its `sub` as `client_id/appInstanceId`. That may not be the
@@ -298,5 +300,5 @@ the organisation's issuer that Okta's request carries. Only a real run will sett
 The SCIM side, which usually comes along with Universal Logout, has its own gaps. Okta's CRUD test (the
 check that users can be created, read, updated and deleted) has not been run, and there is no `/Bulk`
 endpoint. None of it has been put forward for certification. If the draft is revived and changes, the
-module changes with it. If it stays dead, Okta will presumably move to something else. And the core
+module changes with it. If the draft stays dead, Okta will presumably move to something else. And the core
 will still be the part worth having written.

@@ -7,7 +7,7 @@ sources:
   - https://github.com/zitadel/zitadel
   - https://zitadel.com/self-hosted
   - https://zitadel.com/docs
-bottomLine: 'Pick Zitadel if you need SAML or a managed cloud with an enterprise contract behind it. Pick FoxAuth for OAuth 2.1 behaviour by default, the banking-grade profiles without a plan tier, and a licence other than AGPL.'
+bottomLine: 'Pick Zitadel if you need SAML or a managed cloud with an enterprise contract behind it. Pick FoxAuth for OAuth 2.1 behaviour by default, the banking-grade profiles that Zitadel does not document, and a licence other than AGPL.'
 chooseThem:
   - 'You need SAML 2.0 as well as OpenID Connect.'
   - 'You want a managed cloud with an SLA and an enterprise support contract from the vendor.'
@@ -24,9 +24,9 @@ faq:
   - question: 'How do the licences differ?'
     answer: "Zitadel is AGPL-3.0 with Apache 2.0 and MIT exceptions for specific directories, and sells an enterprise contract whose commercial licence replaces the AGPL. FoxAuth is FSL-1.1-ALv2: you may read, modify, self-host and redistribute it and build a business around it, but not offer it as a competing hosted service. Each version converts to Apache 2.0 two years after it ships. AGPL's network-copyleft and FSL's competing-service restriction rule out different things, so which is the problem depends on what you are building."
   - question: 'Can I migrate from Zitadel to FoxAuth?'
-    answer: "OIDC clients port over with an issuer and client id change. What does not port is anything relying on Zitadel's SAML support, its organisation model, or its management API; a directory that provisions over SCIM can be pointed at a FoxAuth project's `/scim/v2` instead. FoxAuth models tenancy as projects — its word for a tenant, not to be confused with a Zitadel project: each is its own issuer, addressed either by a path beneath the server's URL or by a hostname of its own, so a client integrates with one exactly as it would with any authorization server. Assess the migration by how much of your estate is OIDC-only, because that part is usually straightforward and the rest is not."
+    answer: "OIDC clients port over with an issuer and client id change. What does not port is anything relying on Zitadel's SAML support, its organisation model, or its management API; a directory that provisions over SCIM can be pointed at a FoxAuth project's `/scim/v2` instead. FoxAuth models tenancy as projects. A FoxAuth project is a tenant, not to be confused with a Zitadel project. Each one is its own issuer, addressed by a path beneath the server's URL, a subdomain of the instance or a hostname of its own, so a client integrates with one exactly as it would with any authorization server. Assess the migration by how much of your estate is OIDC-only, because that part is usually straightforward and the rest is not."
   - question: 'Which is more production-ready?'
-    answer: "Zitadel is the more mature of the two, on deployment history, and on a cloud with an SLA and enterprise contracts behind it. FoxAuth Cloud has a free plan but no SLA yet. FoxAuth reached its first stable release, 1.0.0, in October 2026, and has no deployment history to match. FoxAuth's advantage lies in specific protocol coverage and licence terms; it has none in maturity, and this page will not pretend otherwise."
+    answer: "Zitadel is the more mature of the two, on deployment history and because its cloud has an SLA and enterprise contracts behind it. FoxAuth Cloud has a free plan but no SLA yet. FoxAuth reached its first stable release, 1.0.0, in October 2026, and has no deployment history to match. FoxAuth's advantage lies in specific protocol coverage and licence terms; it has none in maturity, and this page will not pretend otherwise."
 groups:
   - label: Scope and stack
     rows:
@@ -54,13 +54,13 @@ groups:
           }
         them: { status: yes, text: 'PostgreSQL 14 or newer.' }
         verdict: even
-        why: 'Both run on the database most teams already operate; we also run on MongoDB.'
+        why: 'Both run on PostgreSQL; we also run on MongoDB.'
         note: 'The repository states "PostgreSQL (≥ 14)".'
       - dimension: Multi-tenancy
         us:
           {
             status: yes,
-            text: "Projects (FoxAuth's tenants), each its own issuer, addressed by a path, a subdomain of the instance or a hostname of its own — team ownership decides who administers what. A project moves between teams with its applications and APIs and counts its own monthly active users."
+            text: "Projects (FoxAuth's tenants), each its own issuer, addressed by a path, a subdomain of the instance or a hostname of its own. Team ownership decides who administers what. A project moves between teams with its applications and APIs and counts its own monthly active users."
           }
         them:
           {
@@ -88,13 +88,13 @@ groups:
         us:
           {
             status: yes,
-            text: 'OAuth 2.1 with PKCE mandatory for every client, OIDC Core and Discovery.'
+            text: 'OAuth 2.1 with PKCE mandatory for every client by default, OIDC Core and Discovery.'
           }
         them: { status: yes, text: 'OpenID Connect certified.' }
         verdict: them
         why: 'Certification is third-party evidence; FoxAuth has none yet.'
       - dimension: Device flow
-        us: { status: yes, text: 'RFC 8628, behind a feature flag.' }
+        us: { status: flag, text: 'RFC 8628, behind a feature flag.' }
         them:
           {
             status: yes,
@@ -103,14 +103,18 @@ groups:
         verdict: even
         why: 'Both implement it.'
       - dimension: Sender-constrained tokens
-        us: { status: yes, text: 'DPoP (RFC 9449) and mTLS (RFC 8705).' }
+        us:
+          {
+            status: flag,
+            text: 'DPoP (RFC 9449) and mTLS (RFC 8705), each behind a flag.'
+          }
         them: { status: unknown, text: 'Not documented.' }
         verdict: us
         why: 'If a regulator asks for sender-constrained tokens, this row is the answer.'
       - dimension: 'PAR, CIBA, RAR and JARM'
         us:
           {
-            status: yes,
+            status: flag,
             text: 'PAR (RFC 9126), CIBA, RAR (RFC 9396) and JARM, each behind a flag.'
           }
         them: { status: unknown, text: 'Not documented.' }
@@ -119,8 +123,8 @@ groups:
       - dimension: Machine-to-machine
         us:
           {
-            status: yes,
-            text: 'Client credentials, with JWT client authentication.'
+            status: flag,
+            text: 'Client credentials, with JWT client authentication, behind a flag.'
           }
         them:
           {
@@ -134,7 +138,7 @@ groups:
       - dimension: Administration by an AI agent
         us:
           {
-            status: yes,
+            status: flag,
             text: "MCP control plane over the console's own routes, audited and confirmation-gated. Off by default."
           }
         them: { status: unknown, text: 'Not documented.' }
@@ -182,26 +186,24 @@ groups:
         why: 'The maturity gap is real, and it is probably the strongest argument for Zitadel.'
 ---
 
-## The row that usually decides it
+## SAML usually decides it: Zitadel has it, FoxAuth has no plans for it {#the-row-that-usually-decides-it}
 
 If anything in your estate speaks SAML and only SAML, this comparison is over: Zitadel documents
-SAML 2.0 and FoxAuth does not implement it and has no plans to. (Both serve SCIM 2.0 for
-provisioning, so that half of the old answer no longer separates them.) That is not a gap waiting to
-be filled. It is a scope boundary we chose, and it is the honest reason to choose Zitadel.
+SAML 2.0, and FoxAuth does not implement it and has no plans to. Both serve SCIM 2.0 for
+provisioning, so SCIM does not separate them. We left SAML out of scope by choice, so that gap will
+not be filled, and it is the honest reason to choose Zitadel.
 
-## Where FoxAuth is genuinely ahead
-
-Two places, and both are narrow.
+## FoxAuth is ahead in two narrow places: protocol profiles and licence {#where-foxauth-is-genuinely-ahead}
 
 The first is the banking-grade profiles. DPoP, PAR, CIBA, mTLS, RAR and JARM are implemented and
 flag-controlled on the instance you run. Zitadel's documentation does not describe them, so this
-page says "not documented" instead of "absent". The distinction matters: a claim their own
-documentation does not make is not one we will make for them.
+page says "not documented" instead of "absent": we will not make a claim about Zitadel that its own
+documentation does not make.
 
-The second is the licence, and only for some readers. AGPL-3.0 is a genuine obstacle if you
+The second is the licence, and only for some readers. AGPL-3.0 is an obstacle if you
 distribute software or offer a network service built on it, and the enterprise contract that
 replaces it is a commercial conversation. FSL-1.1-ALv2 has a narrower restriction: you may do
 anything except offer FoxAuth as a competing hosted service. It also expires on a schedule, with each
 version converting to Apache 2.0 two years after it ships.
 
-Neither licence is permissive. If that is what you need, neither of these is your answer.
+Neither licence is permissive. If you need a permissive licence, neither of these is your answer.

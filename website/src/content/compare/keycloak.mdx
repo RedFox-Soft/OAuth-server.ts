@@ -1,7 +1,7 @@
 ---
 title: FoxAuth compared with Keycloak
 competitor: Keycloak
-description: Both are servers you can run yourself, and FoxAuth also has a free cloud plan. They differ in runtime, storage, scope and protocol defaults.
+description: You can run Keycloak and FoxAuth yourself, and FoxAuth also has a free cloud plan. They differ in runtime, storage, scope and protocol defaults.
 lastChecked: '2026-10-16'
 sources:
   - https://www.keycloak.org/securing-apps/oidc-layers
@@ -26,9 +26,9 @@ chooseUs:
   - 'You want a server small enough to mount inside your own Bun service, on the PostgreSQL or MongoDB you already run.'
 faq:
   - question: 'Can I migrate from Keycloak to FoxAuth?'
-    answer: "Clients and users usually move from Keycloak to FoxAuth without much trouble. Both are OpenID Connect servers, so a client written against Keycloak's token endpoint works against FoxAuth's once the issuer and the client id change. A Keycloak realm maps onto a FoxAuth project more directly than the names suggest: a project is its own issuer, so `https://auth.example.com/acme` publishes its own metadata and mints tokens carrying itself as `iss`, exactly as `/realms/acme` does. A project can also take a subdomain of the instance or a hostname of its own — `https://acme.auth.example.com` — which Keycloak realms cannot; there the hostname is a server-wide setting, so host-per-tenant is something you build in front of Keycloak rather than configure in it. A project with an address also signs with keys of its own and publishes them at its own `jwks_uri`, as a realm does. What does not map is the rest of what a realm carries — authentication flows and mappers — and custom behaviour lives in 31 named override seams in TypeScript where Keycloak would have you write SPI implementations in Java."
+    answer: "Clients usually move from Keycloak to FoxAuth without much trouble. Users need more planning, because their password hashes do not carry over. Both are OpenID Connect servers, so a client written against Keycloak's token endpoint works against FoxAuth's once the issuer and the client id change. A Keycloak realm maps onto a FoxAuth project more directly than the names suggest: a project is its own issuer, so `https://auth.example.com/acme` publishes its own metadata and mints tokens carrying itself as `iss`, exactly as `/realms/acme` does. A project can also take a subdomain of the instance, such as `https://acme.auth.example.com`, or a hostname of its own. A Keycloak realm cannot: Keycloak's hostname is a server-wide setting, so a hostname per tenant is something you build in front of Keycloak rather than configure in it. A project with an address also signs with keys of its own and publishes them at its own `jwks_uri`, as a realm does. What does not map is the rest of what a realm carries: its authentication flows and mappers. Custom behaviour lives in 31 named override seams (behaviour functions you replace with your own TypeScript), where Keycloak would have you write SPI implementations in Java."
   - question: 'Is FoxAuth lighter to run than Keycloak?'
-    answer: 'FoxAuth is a Bun process and one database, PostgreSQL or MongoDB, which is a smaller operational surface than a JVM application server and its relational schema. It starts in under a second, against tens of seconds for Keycloak. That is a real difference in memory and startup. It is no difference at all in what the protocol endpoints do. Keycloak has years more production hardening behind it, and that is worth weighing against a server whose first stable release, 1.0.0, shipped in October 2026.'
+    answer: 'FoxAuth is a Bun process and one database, PostgreSQL or MongoDB, which is a smaller operational surface than a JVM application server and its relational schema. It starts faster and needs less memory than a JVM server. That difference is real, but it changes nothing about what the protocol endpoints do. Keycloak has years more production hardening behind it, and that is worth weighing against a server whose first stable release, 1.0.0, shipped in October 2026.'
   - question: 'Does FoxAuth support SAML?'
     answer: 'FoxAuth does not support SAML, and none is planned. For sign-in it implements OAuth 2.1 and OpenID Connect only; it also accepts SCIM 2.0 provisioning from a directory, which does not sign anyone in. If an application in your estate can only speak SAML, FoxAuth cannot serve it and Keycloak can, which is a good reason to stay where you are.'
   - question: 'Can an AI agent administer FoxAuth?'
@@ -95,7 +95,7 @@ groups:
             text: 'Realms, each its own issuer at /realms/name, carrying their own flows, mappers and signing keys.'
           }
         verdict: different
-        why: "Both sign with keys of their own, but a realm carries far more than a project does — its own authentication flows and mappers — and if you need that, it is not close. A project can take a hostname of its own, which a realm cannot: Keycloak's hostname is a server-wide setting, so host-per-tenant is built in front of it rather than configured in it."
+        why: "Both sign with keys of their own, but a realm carries far more than a project does: its own authentication flows and mappers. If you need those, it is not a close call. A project can take a hostname of its own, which a realm cannot: Keycloak's hostname is a server-wide setting, so a hostname per tenant is built in front of Keycloak rather than configured in it."
         note: "Keycloak's hostname configuration is documented at the server level, not per realm."
       - dimension: Maturity
         us:
@@ -130,7 +130,7 @@ groups:
         us:
           {
             status: flag,
-            text: 'Including server nonces, behind dpop.enabled.'
+            text: 'Implemented, including server nonces, behind dpop.enabled.'
           }
         them: { status: flag, text: 'Documented as a preview feature.' }
         verdict: us
@@ -211,7 +211,7 @@ groups:
           }
         verdict: us
         why: 'Both can front an MCP server. The difference is how the token is bound to it: the resource parameter the MCP specification requires of clients, against a per-server scope and mapper configured by hand.'
-        note: 'Keycloak states full support for MCP 2025-03-26 and partial support for later revisions, and that RFC 9728 metadata is the MCP server’s job rather than the authorization server’s — the same position taken here.'
+        note: 'Keycloak states full support for MCP 2025-03-26 and partial support for later revisions, and that protected-resource metadata (RFC 9728) is the MCP server’s job rather than the authorization server’s. FoxAuth takes the same position.'
   - label: Administration and agents
     rows:
       - dimension: Admin console
@@ -240,7 +240,7 @@ groups:
           }
         verdict: us
         why: "An agent runs the console's own code path, checks and audit trail; there is no second privileged API to keep in step."
-        note: 'Keycloak’s MCP page is about a different job — being the authorization server in front of an MCP server. That capability is compared separately below.'
+        note: 'Keycloak’s MCP page is about a different job: being the authorization server in front of an MCP server. That capability has its own row, "Authorization for your MCP server".'
   - label: Licence and cost
     rows:
       - dimension: Licence
@@ -267,7 +267,7 @@ groups:
         why: 'Both cost what running them costs.'
 ---
 
-## Migrating
+## Moving from Keycloak: no importer, and password hashes do not carry over {#migrating}
 
 There is no importer. Clients are re-registered through the admin API or dynamic registration, and
 end-user records are created per project. Password hashes are not portable between the two, so

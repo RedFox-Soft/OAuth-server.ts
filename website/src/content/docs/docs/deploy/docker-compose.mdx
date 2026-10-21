@@ -7,10 +7,10 @@ sidebar:
 
 import { Aside } from '@astrojs/starlight/components';
 
-The [Compose file in Get started](/docs/get-started/docker-compose/) is built for a first look. Four
-changes make it something you can leave running.
+The [Compose file in Get started](/docs/get-started/docker-compose/) is built for a first look. The
+changes below make it something you can leave running.
 
-## The file
+## The Compose file and its .env {#the-file}
 
 ```yaml
 services:
@@ -39,7 +39,7 @@ MONGODB_URI=mongodb+srv://user:password@cluster.example.mongodb.net
 DATABASE_NAME=OAuth
 ```
 
-## What changed, and why
+## What changed from Get started, and why {#what-changed-and-why}
 
 **Pin the image tag.** Images are published to `ghcr.io/redfox-soft/oauth-server-ts` on every
 release, tagged with the version and with `latest`. `latest` means a `docker compose pull` can move
@@ -60,8 +60,8 @@ cosign verify \
   ghcr.io/redfox-soft/oauth-server-ts:<version>
 ```
 
-It fits naturally into the same change that moves the pin, since that is usually the moment you are
-already reading the changelog. [What is attached and how to read the SBOM](/docs/security/assurance/#the-released-image-and-how-to-check-it-is-ours).
+Run it in the same change that moves the pin, since that is usually when you are already reading
+the changelog. [What is attached and how to read the SBOM](/docs/security/assurance/#the-released-image-and-how-to-check-it-is-ours).
 
 **Use a database you back up.** The Get started file runs `mongo:8` on a local named volume, which
 is convenient and has no backups. Either point `MONGODB_URI` at a managed instance such as
@@ -93,8 +93,8 @@ refuses to start instead of picking one. [PostgreSQL](/docs/deploy/postgresql/) 
 
 **`restart: unless-stopped` on the server, `restart: 'no'` on setup.** The `setup` service is a
 one-shot that must exit; restarting it would loop. The server should come back after a host reboot
-or a crash — remember that a Machine which cannot reach the datastore exits at boot instead of
-serving, so a restart policy is how it recovers once the database comes back.
+or a crash. A server container that cannot reach the datastore exits at boot instead of serving, so
+the restart policy is how it recovers once the database comes back.
 
 **Bind the port to loopback and put a proxy in front.** `'127.0.0.1:3000:3000'` keeps the plaintext
 port off the network. TLS terminates in the proxy, and `ISSUER` is the public `https` URL.
@@ -109,9 +109,9 @@ first `docker compose up`.
 
 </Aside>
 
-## Upgrading
+## Upgrading: change the tag and run setup again {#upgrading}
 
-Change the tag and bring it up again:
+Change the tag and bring the stack up again:
 
 ```bash
 docker compose pull

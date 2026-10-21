@@ -7,9 +7,9 @@ sidebar:
 
 import { Aside } from '@astrojs/starlight/components';
 
-There is no shipped chart. The manifests below are the minimum that reflects how the server actually
+There is no shipped chart. The manifests below are the minimum that reflects how the server
 boots: a Job that provisions the database before the Deployment rolls, two probes answering two
-different questions, and configuration out of a Secret.
+different questions, and configuration from a Secret.
 
 ## Secret
 
@@ -30,8 +30,8 @@ both. The server refuses to start when both are set instead of picking one, and 
 mode you want: a server that silently chose the other database looks exactly like total data loss.
 [PostgreSQL](/docs/deploy/postgresql/) covers it.
 
-Only the connection string is a credential; keeping all of them together is simply one `envFrom`
-instead of two. Each variable is described in the
+Only the connection string is a credential. The other values share its Secret so that one `envFrom`
+covers them all instead of two. Each variable is described in the
 [environment variables reference](/docs/reference/environment/). The published image tags are
 listed on the [GitHub releases page](https://github.com/RedFox-Soft/OAuth-server.ts/releases) and
 on the
@@ -59,7 +59,7 @@ spec:
 ```
 
 Run this to completion **before** rolling the Deployment, and gate the rollout on it: an
-`argocd.argoproj.io/hook: PreSync` annotation, a Helm `pre-install,pre-upgrade` hook, or simply
+`argocd.argoproj.io/hook: PreSync` annotation, a Helm `pre-install,pre-upgrade` hook, or
 `kubectl wait --for=condition=complete job/oauth-server-setup-<version>` in your pipeline.
 
 The reason is the same one that puts `release_command` in the shipped `fly.toml`: without the
@@ -74,8 +74,8 @@ migrations have not run: a release that declares one would otherwise roll out po
 Both are safe to repeat; `db:setup` exits non-zero when a constraint it declares is not in force, so
 a failed Job is a real signal and should stop the rollout. Name the Job after the release (as above)
 so each upgrade runs its own, and take a backup before one whose release notes name a migration that
-cannot be undone — `bun run db:migrate --plan` lists what would run and exits non-zero when work is
-outstanding, so a pipeline can stop there for it.
+cannot be undone. `bun run db:migrate --plan` lists what would run and exits non-zero when work is
+outstanding, so a pipeline can stop there for the backup.
 
 ## Deployment and Service
 
@@ -134,12 +134,12 @@ spec:
 
 The two probes answer two different questions and must not share a path. `/health` says the process
 is alive: it touches nothing outside itself, is served unconditionally with no feature flag behind
-it, and is the only route the rate limiter never counts — a refused liveness probe would restart a
-healthy pod. `/ready` says the pod can actually serve, which means reaching the datastore; when the
-database goes away it fails and the pod leaves the endpoints list, and when the database comes back
-it passes again within about a second, with no restart in between.
+it, and is the only route the rate limiter never counts, because a refused liveness probe would restart a
+healthy pod. `/ready` says the pod can serve, which means reaching the datastore. When the
+database goes away, `/ready` fails and the pod leaves the endpoints list. When the database comes
+back, it passes again within about a second, with no restart in between.
 
-Both mistakes are worth naming, because they fail in opposite directions. Pointing the readiness
+Swapping the two paths fails in opposite directions, so both mistakes are worth naming. Pointing the readiness
 probe at `/health` makes an outage invisible: the process is alive, so the probe passes, and the pod
 keeps receiving requests it cannot serve. Pointing the liveness probe at `/ready` kills every
 replica for the database's outage, in a loop, and a restart fixes nothing.
@@ -160,9 +160,9 @@ reach roughly 180 requests a minute against the token endpoint. If the aggregate
 care about, dividing the configured maxima by the replica count is usually the simplest answer, and
 it is worth re-checking whenever you scale.
 
-What does hold absolutely regardless of replica count are the per-identity throttles, because their
-counters are persisted: verification codes cap at five attempts, resends and password-reset requests
-are cooldown- and daily-capped, and the password sign-in door has its own brute-force throttle.
+The per-identity throttles hold regardless of replica count, because their counters are persisted:
+verification codes cap at five attempts, resends and password-reset requests have a cooldown and a
+daily cap, and password sign-in has its own brute-force throttle.
 Those are the security boundaries, and they are unaffected by how many pods you run.
 
 </Aside>
@@ -196,7 +196,7 @@ such a policy any meaning:
 | Subject (regexp) | `^https://github\.com/RedFox-Soft/OAuth-server\.ts/\.github/workflows/release\.yml@refs/tags/v` |
 
 A policy that checks for _a_ signature without pinning that identity admits anything anyone has
-signed, which is every image on the internet. The same two values verify by hand before you roll:
+signed. The same two values let you verify an image by hand before you roll it out:
 [cosign verify and the attestations](/docs/security/assurance/#the-released-image-and-how-to-check-it-is-ours).
 
 ## Scaling notes
@@ -205,8 +205,8 @@ signed, which is every image on the internet. The same two values verify by hand
   than one replica is fine as far as the protocol is concerned.
 - Signing keys need no restart. Every issuer's key set, the instance's included, is read from the
   database and cached for thirty seconds per replica, so a generated, promoted or retired key reaches
-  every replica within that time — which is why a new key cannot be promoted to signing until it has
-  been published for a minute.
+  every replica within that time. That cache is why a new key cannot be promoted to signing until it
+  has been published for a minute.
 - Server settings are the exception, as the caution above says: a save applies to the replica that
   served it, and the others take it on their next restart
   (`kubectl rollout restart deployment/oauth-server`).

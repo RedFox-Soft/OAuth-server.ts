@@ -9,21 +9,21 @@ import { Steps, Aside } from '@astrojs/starlight/components';
 import ScreenshotFigure from '../../../../components/ScreenshotFigure.astro';
 
 A client is an application that asks this server for tokens. The console calls it an
-**application**. Every application lives in a project, and every project belongs to a team. That
-is three concepts, but they nest, so the console walks them in order.
+**application**. Every application lives in a project, and every project belongs to a team. Teams,
+projects and applications nest, so the console walks you through them in that order.
 
-## Teams, projects, applications
+## Teams own projects, projects hold applications {#teams-projects-applications}
 
 - A **team** owns things. Every project carries an owning team, and belonging to that team is
   what grants access to the project and everything in it. There is no separate list of named
   managers. Each administrator already has a **personal team**, which is usually a fine place for a
-  first client; a **regular** team is a company or a set of colleagues you share work with.
+  first client. A **regular** team is a company or a set of colleagues you share work with.
 - A **project** is a population of end-users: their accounts, and the policy for how they
   register and verify themselves. It also holds the **applications** that sign those people in and
-  the **APIs** they get tokens for. A project you create is also a tenant with **its own issuer** — it
+  the **APIs** they get tokens for. A project you create is also a tenant with **its own issuer**. It
   is served at `<ISSUER>/<slug>`, on a subdomain of the instance, or at a hostname of its own, and mints
-  tokens carrying that issuer,
-  so an application in it integrates against that address rather than the bare one. The default
+  tokens carrying that issuer. An application in it therefore integrates against that address rather
+  than the bare issuer (`ISSUER` itself). The default
   `redfox` project is the exception: it keeps the bare issuer, which is what lets an existing
   deployment stay as it is.
 - An **application** is an OAuth client. It belongs to the project it was created in for its whole
@@ -33,26 +33,26 @@ is three concepts, but they nest, so the console walks them in order.
 
 Create a project of your own first. Only a super administrator can add applications to the default `redfox`
 project, so a new account cannot. On the Free plan the server generates the name in the project's address,
-eight letters and digits. The project is served on a subdomain of its own, so your issuer is then
-`https://<name>.auth.foxauth.dev`, and a Free project holds up to 10 applications.
+eight letters and digits. The project is served on a subdomain of its own, so your issuer is
+`https://<name>.auth.foxauth.dev`. A Free project holds up to 10 applications.
 
 </Aside>
 
 <Steps>
 
 1. **Choose a team.** The dialog that creates a project asks which team it goes in, starting from
-   the one chosen at the top of the console. Your personal team is fine for a first client, but
-   it has exactly one member, so work you will share belongs in a regular team, created under
-   **Teams**, or is moved there later.
+   the one chosen at the top of the console. Your personal team is fine for a first client. It has
+   exactly one member, so work you will share belongs in a regular team: create one under **Teams**,
+   or move the project there later.
 
 2. **Create a project** under **Projects**, with **New project**. It takes a name and an address: a
    path, which becomes the last part of the issuer in its tokens, or a subdomain such as
-   `acme.auth.example.com` when the instance offers one; a super administrator can also give it a hostname of
-   its own ([Project addresses](/docs/administer/project-addresses/) compares the three). Pick it
-   deliberately: an issuer identifier is a promise made to every client configured against it, and
-   changing it later is previewed and confirmed because every application in the project is affected.
-   A new project is closed to sign-up unless you choose **Anyone who can reach the sign-in page**; you
-   can change that later on its **Sign-in** tab.
+   `acme.auth.example.com` when the instance offers one. A super administrator can also give it a
+   hostname of its own. [Project addresses](/docs/administer/project-addresses/) compares the three.
+   Pick the address deliberately: an issuer identifier is a promise made to every client configured
+   against it. Changing the address later affects every application in the project, so the change is
+   previewed and must be confirmed. A new project is closed to sign-up unless you choose **Anyone who
+   can reach the sign-in page**. You can change that later on the project's **Sign-in** tab.
 
    The Projects table shows each project's address in its **Address** column. The reserved projects
    read _served at the root_ there rather than a path, since they keep the bare issuer. Only a super
@@ -68,13 +68,13 @@ eight letters and digits. The project is served on a subdomain of its own, so yo
    discovery address, and a configuration block to paste into your app. To set everything by hand, choose
    **Configure everything yourself** or **Show all settings**.
 
-   Protecting an MCP server or an API is not an application. Choose that card and the console takes you
-   to the project's **APIs** tab to declare it; the agent hosts that call it get their own client
+   Protecting an MCP server or an API is not an application. Choose the card for it and the console
+   takes you to the project's **APIs** tab to declare the API; the agent hosts that call it get their own client
    identity.
 
 4. **Let someone sign in.** A new project holds nobody and is closed to sign-up, so the first sign-in
    through your app would have nobody to let in. The Connect tab says so and offers two ways in: invite
-   yourself as a test user, or open sign-up. Once your app has really signed someone in, the status at
+   yourself as a test user, or open sign-up. Once your app has signed someone in, the status at
    the top of its page shows when.
 
 </Steps>
@@ -87,8 +87,8 @@ eight letters and digits. The project is served on a subdomain of its own, so yo
 
 ## Public or confidential
 
-The situation you choose sets the **token endpoint auth method** for you. It follows from whether your
-application can keep a secret, and you can change it on the application's **Settings** tab:
+The situation you choose sets the **token endpoint auth method** for you. The method follows from
+whether your application can keep a secret. You can change it on the application's **Settings** tab:
 
 | Method                 | Use for                                                                    | Credential                                   |
 | ---------------------- | -------------------------------------------------------------------------- | -------------------------------------------- |
@@ -128,7 +128,7 @@ exactly. The liberty is narrow by design:
   your client might use either.
 
 What stays open is a local port race: another process on the user's machine could bind the port and
-receive the code. PKCE closes it, which is why it is mandatory.
+receive the code. PKCE closes that race, which is why PKCE is mandatory.
 
 ## Which users a client signs in
 
@@ -148,7 +148,7 @@ The project is also where onboarding policy lives: whether registration is open
 (`emailVerificationRequired`), whether that happens by link or by six-digit code
 (`verificationMethod`), whether password sign-in is offered at all (`passwordLogin`), and whether an
 authenticator app is required (`totpRequired`). None of it is set on the client. Two applications in
-the same project share all of it, because they share the accounts.
+the same project share that policy, because they share the accounts.
 
 Whether a project requires verification decides only who may sign in. It does not decide what applications are
 told. A new account's address counts as verified, and applications receive `email_verified: true`, only after it

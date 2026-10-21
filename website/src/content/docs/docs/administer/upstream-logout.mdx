@@ -9,8 +9,8 @@ import { Aside } from '@astrojs/starlight/components';
 
 When a project's users sign in through an [upstream identity provider](/docs/administer/federation/),
 signing out of that provider does not, by itself, sign them out here. Their session on this server and
-the tokens its relying parties hold are this server's. Two inbound signals close that gap, and which one
-applies depends entirely on which provider you use:
+the tokens its relying parties hold are this server's. Two inbound signals let a provider end them, and
+which one applies depends on which provider you use:
 
 | Provider              | What it sends to an application like this one                               | Received here as                                      |
 | --------------------- | --------------------------------------------------------------------------- | ----------------------------------------------------- |
@@ -19,7 +19,7 @@ applies depends entirely on which provider you use:
 | Microsoft Entra ID    | Nothing a third-party application can receive                               | —                                                     |
 | Google                | RISC events, for consumer accounts only                                     | —                                                     |
 
-Both are opted into one provider at a time, under **Logout signals** on the provider's page in the
+Each signal is opted into per provider, under **Logout signals** on the provider's page in the
 project's **Identity providers**. Neither is accepted from a provider that has not been opted in, whatever
 it signs.
 
@@ -31,7 +31,7 @@ it signs.
 >
 	The request Okta sends is described by
 	draft-parecki-oauth-global-token-revocation-06, an individual Internet-Draft
-	that expired without being adopted on 2026-08-28. The format may change, so
+	that expired on 2026-08-28 without being adopted. The format may change, so
 	the endpoint sits behind its own switch, off by default. It has not yet been
 	run against a real Okta organisation; the test suite replays the request Okta
 	documents, signed with a stub provider's keys.
@@ -40,7 +40,7 @@ it signs.
 Turn on [`globalTokenRevocation.enabled`](/docs/reference/settings/#globalTokenRevocation.enabled), then,
 on the Okta provider, **Accept global token revocation (Okta Universal Logout)**. The provider's page
 then shows the **Endpoint to give the provider**: the project's issuer followed by
-`/global-token-revocation`. While the switch is on, each project's discovery document advertises it as
+`/global-token-revocation`. While the switch is on, each project's discovery document advertises the endpoint as
 `global_token_revocation_endpoint`.
 
 Okta's request is a JSON body naming the user, authenticated by a short-lived JWT that Okta signs with
@@ -62,20 +62,20 @@ by `iss_sub`, their subject at that provider, or by `email`. Okta may name only 
 here, or the users its bound [SCIM connection](/docs/administer/scim/) provisioned. Anyone else gets the
 same `404` as a user who does not exist.
 
-What it ends is everything: every session, grant, refresh token and opaque access token the user holds,
-with a back-channel logout to each relying party that asked for one. The account itself stays active,
+The revocation ends every session, grant, refresh token and opaque access token the user holds, with a
+back-channel logout to each relying party that asked for one. The account itself stays active,
 so the user can sign in again straight away, and is asked for consent afresh. The answer is `204`.
 
 Two things about Okta's request are unconfirmed until it runs against a real organisation. Okta
-documents its `sub` as `client_id/appInstanceId`, and its `iss` as the organisation's base URL, so a
+documents its `sub` as `client_id/appInstanceId`. It documents its `iss` as the organisation's base URL, so a
 provider configured with a custom authorization server's issuer may not match.
 
 ## Back-channel logout: Keycloak, Auth0 and Ping
 
-OpenID Connect Back-Channel Logout 1.0 is a final specification, so this needs no switch of its own: it
+OpenID Connect Back-Channel Logout 1.0 is a final specification, so back-channel logout needs no switch of its own: it
 is served whenever [`federation.enabled`](/docs/reference/settings/#federation.enabled) is on. Opt the
 provider in with **Accept back-channel logout (Keycloak, Auth0, Ping)**, and register the **Back-channel
-logout address to register** in the provider's client settings. It is the project's issuer
+logout address to register** in the provider's client settings. The address is the project's issuer
 followed by `/federation/backchannel-logout`. An agent sets the same option through
 `federation_provider_update`.
 
@@ -95,8 +95,8 @@ where the provider offers it.
 A token that matches nobody still gets `200`, so a provider learns nothing about who signed in here.
 A refused token gets `400` with one body, whatever the reason.
 
-Keycloak releases older than 24.0.0, except 22.0.8 and 23.0.4, send logout tokens with no `exp`, and are
-refused. The flow was run end to end against a real Keycloak 26.8.0, both with "Backchannel logout
+Keycloak releases older than 24.0.0, except 22.0.8 and 23.0.4, send logout tokens with no `exp`, so their
+tokens are refused. The flow was run end to end against a real Keycloak 26.8.0, both with "Backchannel logout
 session required" on and with it off. Auth0 and Ping are covered by the test suite replaying the token
 shapes they document.
 
@@ -112,8 +112,8 @@ is heard only by the project at the URL it was given, and changing a project's a
 
 ## What both refuse
 
-An endpoint that ends sessions is a lever over a whole workforce, and what an attacker needs to aim it,
-the provider's issuer, your client id there and a user's subject, is not secret. So both signals are
+An endpoint that ends sessions is a lever over a whole workforce, and what an attacker needs to aim it
+(the provider's issuer, your client id there and a user's subject) is not secret. So both signals are
 held to the same checks, and no setting relaxes them:
 
 - only asymmetric signatures, verified with the provider's own published keys, so `alg: none` and
@@ -123,9 +123,9 @@ held to the same checks, and no setting relaxes them:
 - the provider must be opted in, which is checked only after it has authenticated;
 - a failed credential is charged at the strict per-origin rate.
 
-## Doing the same thing yourself
+## End a user's sessions yourself {#doing-the-same-thing-yourself}
 
 An administrator can end a user's sessions and tokens without any provider involved: **Sign out
-everywhere** on the user, or `project_user_sign_out`. It does what global token revocation does, and is
+everywhere** on the user, or `project_user_sign_out`. The sign-out does what global token revocation does, and is
 recorded in the audit trail under the same action. [End a user's access](/docs/administer/ending-access/)
 compares it with deactivation, the lock and deletion.
