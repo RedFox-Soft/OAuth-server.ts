@@ -3,8 +3,11 @@ import { describe, it, expect, beforeAll } from 'bun:test';
 import bootstrap from '../test_helper.js';
 import { elysia } from 'lib/index.js';
 import { MCP_METADATA_ROUTE, MCP_ROUTE } from 'lib/mcp/consts.ts';
-import { MCP_RESOURCE_SERVER } from 'lib/mcp/resource_server.ts';
 import { insufficientScope } from 'lib/mcp/index.ts';
+import {
+	ApplicationConfig,
+	reloadConfiguration
+} from 'lib/configs/application.js';
 
 /*
  * What the surface tells a caller it needs.
@@ -48,21 +51,32 @@ describe('the challenge an unauthenticated caller receives', () => {
 		expect(challenge).toContain(
 			`resource_metadata="http://e.ly${MCP_METADATA_ROUTE}"`
 		);
-		expect(challenge).toContain(`scope="${MCP_RESOURCE_SERVER.scope}"`);
+		expect(challenge).toContain('scope="openid offline_access"');
 		expect(challenge).toContain('error="invalid_token"');
 	});
 
 	/*
-	 * The scope advertised in the challenge is the descriptor's own, so the two cannot drift into
-	 * telling a client to ask for something the resource does not recognise.
+	 * A client asks for exactly what it is told, so telling it to ask for a scope the instance no longer
+	 * offers would make every authorization fail with invalid_scope.
 	 */
-	it('advertises exactly the scope the resource descriptor declares', async () => {
-		const { challenge } = await challengeFor({
-			authorization: 'Bearer not-a-real-token'
-		});
+	it('does not advertise offline access on an instance that withdrew it', async () => {
+		const scopes = ApplicationConfig.scopes;
+		ApplicationConfig.scopes = scopes.filter((s) => s !== 'offline_access');
+		reloadConfiguration();
+		try {
+			const { challenge } = await challengeFor({
+				authorization: 'Bearer not-a-real-token'
+			});
+			expect(challenge).toContain('scope="openid"');
 
-		expect(challenge).toContain('scope="openid"');
-		expect(MCP_RESOURCE_SERVER.scope).toBe('openid');
+			const metadata = (await (
+				await elysia.handle(new Request(`http://e.ly${MCP_METADATA_ROUTE}`))
+			).json()) as { scopes_supported: string[] };
+			expect(metadata.scopes_supported).toEqual(['openid']);
+		} finally {
+			ApplicationConfig.scopes = scopes;
+			reloadConfiguration();
+		}
 	});
 
 	/*

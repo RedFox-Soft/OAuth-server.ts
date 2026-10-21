@@ -137,6 +137,17 @@ that browser out of every relying party" — described the mechanism of the time
 deliberate cost. It was a consequence of there being one session per browser, not a decision anybody
 made, and per-project sessions removed it. See [[project-is-an-issuer]].
 
+**An agent connected in the same browser survives it (2026-10-21).** Authorizing an MCP client adds `admin-mcp` to
+the same administrators' browser session, and `destroyProviderSession` revokes every grant in it that was made
+without `offline_access` (`lib/shared/destroy_session.ts:85-98`). Until this date `/mcp` told clients to ask for
+`openid` alone, so signing out of the console disconnected the agent — a side effect nobody chose: the paragraph above
+assumed the console was the only relying party in that session. `/mcp` now advertises `openid offline_access` in its
+`WWW-Authenticate` challenge and `scopes_supported` while the instance offers `offline_access` (`requestedScope`,
+`lib/mcp/index.ts`); the MCP SDK adds `prompt=consent` for it, which OIDC Core §11 requires and
+`lib/actions/authorization/check_scope.ts` enforces. The agent's grant then outlives the browser session, as access
+for when the administrator is away should. Ending it is "Sign out everywhere", deactivation, or revoking the agent.
+`test/mcp/console_logout.spec.ts` drives it.
+
 ## Freshness is requested, not merely checked
 
 The console generates a single-use `nonce` alongside the PKCE verifier and CSRF `state`, stores all

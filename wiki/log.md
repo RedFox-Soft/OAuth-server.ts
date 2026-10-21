@@ -302,3 +302,5 @@ Operations:
 ## [2026-10-21] update | [[client-primary-colour]] — the sign-in, registration and two-step pages open with the project's name (`shownNameOf`) and, under the colour's decision, the application's name and logo (`signInLook`, `SignInMasthead`); `accentFor` became `signInLook`; the project detail states `shownName` for the console preview.
 
 ## [2026-10-21] create | [[enterprise-managed-authorization]] — spec 108: token exchange (ID-JAG profile) and the JWT bearer grant (+ `jwt-dpop`), provider trust fields `acceptsIdentityAssertions`/`plainAssertions`, outside authorization server connections, shared refresh-token validation, `IdToken.verifyFresh`. Corrected [[mcp-server-authorization]] (confidential-only list), [[upstream-federation]] (trust fields), [[client-registration-attributes]] (twelfth cross-field rule), [[single-use-under-concurrency]] (grants that spend a record).
+
+## [2026-10-21] update | [[admin-console-signin]] — an MCP agent connected in the same browser now survives console sign-out: `/mcp` advertises `openid offline_access` (`requestedScope`) while the instance offers it, so the agent's grant outlives the browser session.

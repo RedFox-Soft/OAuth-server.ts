@@ -1,6 +1,7 @@
 import { Elysia, t, type Context } from 'elysia';
 import { createMcpHandler } from '@modelcontextprotocol/server';
 
+import { configuration } from '../configs/application.js';
 import { ISSUER } from '../configs/env.js';
 import { eventBus } from '../event_bus.js';
 import { UseDpopNonce } from '../helpers/validate_dpop.js';
@@ -79,13 +80,28 @@ const issuer = ISSUER.replace(/\/$/, '');
  * The constitution already requires an https ISSUER in production, so the check this drops is one the
  * deployment rules cover.
  */
-const metadata = {
-	resource: MCP_RESOURCE,
-	authorization_servers: [issuer],
-	scopes_supported: ['openid'],
-	bearer_methods_supported: ['header'],
-	resource_documentation: `${issuer}/admin`
-};
+function metadata() {
+	return {
+		resource: MCP_RESOURCE,
+		authorization_servers: [issuer],
+		scopes_supported: requestedScope().split(' '),
+		bearer_methods_supported: ['header'],
+		resource_documentation: `${issuer}/admin`
+	};
+}
+
+/*
+ * What a client is told to ask for: the descriptor's own scope, and `offline_access` while the instance offers
+ * it. An agent works while its administrator is away, which is what `offline_access` means (OIDC Core §11);
+ * without it the grant ends with the browser session it was made in, so an administrator who connected an
+ * agent and then signed out of the console in the same browser disconnected the agent too. The MCP SDK adds
+ * `prompt=consent` for it, as §11 requires. Read per request, because the supported scopes are a setting.
+ */
+export function requestedScope(): string {
+	return configuration.scopes.has('offline_access')
+		? `${MCP_RESOURCE_SERVER.scope} offline_access`
+		: MCP_RESOURCE_SERVER.scope;
+}
 
 /*
  * One handler for the process, and one fresh `McpServer` per request — the factory is called per
@@ -122,11 +138,10 @@ function challenge(set: McpContext['set']) {
 	 * client to the protected resource metadata to guess from `scopes_supported`, which is a round trip
 	 * for something this challenge already knows.
 	 *
-	 * The value is the descriptor's own scope, so the two cannot disagree — this surface takes its
-	 * authority from the administrator's own standing rather than from scopes, and `openid` is the whole of it.
+	 * The value is `requestedScope()`, the same the metadata publishes, so the two cannot disagree.
 	 */
 	set.headers['www-authenticate'] =
-		`Bearer resource_metadata="${issuer}${MCP_METADATA_ROUTE}", scope="${MCP_RESOURCE_SERVER.scope}", error="invalid_token"`;
+		`Bearer resource_metadata="${issuer}${MCP_METADATA_ROUTE}", scope="${requestedScope()}", error="invalid_token"`;
 	return {
 		jsonrpc: '2.0',
 		error: { code: -32001, message: 'authorization required' },
@@ -293,6 +308,6 @@ export const mcpApp = new Elysia({ name: 'mcp' })
 			return challenge(set);
 		}
 	})
-	.get(MCP_METADATA_ROUTE, () => metadata)
+	.get(MCP_METADATA_ROUTE, () => metadata())
 	.post(MCP_ROUTE, (ctx) => serve(ctx, 'POST'), { headers: mcpHeaders })
 	.get(MCP_ROUTE, (ctx) => serve(ctx, 'GET'), { headers: mcpHeaders });

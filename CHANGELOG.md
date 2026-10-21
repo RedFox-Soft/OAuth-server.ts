@@ -19,6 +19,13 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   off by default and tracked from IETF draft -04. One new storage area each for connections and last use, no
   migration — re-run `db:setup`.
 
+### Fixed
+
+- **Signing out of the console no longer disconnects an MCP agent** connected in the same browser. `/mcp` now tells
+  clients to ask for `openid offline_access` (while the instance offers `offline_access`), so the agent's grant
+  outlives the browser session and comes with a refresh token; agents already connected keep the old behaviour until
+  they authorize again.
+
 ## [1.2.0] - 2026-10-21
 
 A newcomer's path from sign-up to a first working sign-in: applications are created from a situation and get a page
