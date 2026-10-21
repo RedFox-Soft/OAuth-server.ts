@@ -9,6 +9,13 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-21
+
+A newcomer's path from sign-up to a first working sign-in: applications are created from a situation and get a page
+that says how to connect them, sign-in pages name the project and the application, and `prompt=create` opens on
+registration. One security fix ends machine tokens for clients without credentials — check for any before upgrading.
+No migration; `db:setup` provisions one new storage area.
+
 ### Added
 
 - **An application's primary colour** (`primaryColor` on the client routes and the MCP client tools; `null` removes
@@ -2100,7 +2107,8 @@ found`. The refusal text existed and never ran: the call that delivered it sat i
 - The DPoP nonce secret is self-provisioned at startup, making the requireNonce-without-secret 500
   state unrepresentable (spec 014)
 
-[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v0.12.0...v1.0.0

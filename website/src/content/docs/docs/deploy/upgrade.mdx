@@ -459,6 +459,25 @@ usual steps. What an operator sees:
   own address and shows the mail server's reply if it refuses. A refused message is now logged, and sends time out
   instead of holding a request.
 
+### Then 1.2.0
+
+1.2.0 carries no schema migration and no new setting. `db:setup`, which the usual steps already run, provisions one
+new storage area, `ClientUsage`, behind an application's "last sign-in". Check one thing before upgrading:
+
+- **A client without credentials no longer gets machine tokens.** An application registered with token endpoint
+  auth `none` and the `client_credentials` grant was given access tokens on its client_id alone, which is public.
+  From 1.2.0 it is answered `unauthorized_client`, and so is the same client at CIBA's backchannel endpoint. Look
+  for such clients first, and give each a secret or a key, or it stops getting tokens.
+
+What an operator sees afterwards:
+
+- **New application starts from a situation**, and each application has a page of its own with what it takes to
+  connect it: client ID, the secret once, the issuer and endpoints, its addresses and who can sign in. The edit
+  window is gone; its settings are on the page's **Settings** tab.
+- **Sign-in pages name where they lead**: the project's display name, else its host, and the application's own name
+  and logo when the project stands behind it. Give each project a **Name shown to users** if it has none.
+- **Emails name a project the same way**, never by its console-only name.
+
 ## After the restart
 
 ```bash
