@@ -9,6 +9,13 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-22
+
+Agents in the enterprise: a project can accept identity assertions (ID-JAG) for its APIs and issue them for outside
+authorization servers, and internal tools can sign in the instance's own administrators. Alignment with MCP
+2026-07-28 binds a client's credentials to its issuer — check that every client calls its own project's token
+endpoint before upgrading. No migration; `db:setup` provisions two new storage areas.
+
 ### Added
 
 - **MCP enterprise-managed authorization (ID-JAG), in both roles** — the JWT bearer grant (`jwtBearer.enabled`,
@@ -2147,7 +2154,8 @@ found`. The refusal text existed and never ran: the call that delivered it sat i
 - The DPoP nonce secret is self-provisioned at startup, making the requireNonce-without-secret 500
   state unrepresentable (spec 014)
 
-[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.0.0...v1.0.1

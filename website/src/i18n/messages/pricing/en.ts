@@ -79,7 +79,7 @@ export default {
 		{
 			question: 'Can I run FoxAuth in production today?',
 			answer:
-				'FoxAuth can run in production today, self-hosted. The free cloud plan has no SLA yet, so it is a place to start rather than one to depend on. The current release is 1.2.0. Since 1.0.0, the first stable release, the HTTP surface and the admin API change incompatibly only in a major release. Read the changelog before upgrading, take a backup when it names a migration that cannot be undone, and run the setup and migrate steps afterwards. The protocol endpoints follow the specs, so a client written for FoxAuth is in practice written against the RFC and should move to another server with little change.'
+				'FoxAuth can run in production today, self-hosted. The free cloud plan has no SLA yet, so it is a place to start rather than one to depend on. The current release is 1.3.0. Since 1.0.0, the first stable release, the HTTP surface and the admin API change incompatibly only in a major release. Read the changelog before upgrading, take a backup when it names a migration that cannot be undone, and run the setup and migrate steps afterwards. The protocol endpoints follow the specs, so a client written for FoxAuth is in practice written against the RFC and should move to another server with little change.'
 		},
 		{
 			question: 'Is the free cloud plan really free?',

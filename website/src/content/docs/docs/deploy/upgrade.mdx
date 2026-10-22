@@ -479,6 +479,37 @@ What an operator sees afterwards:
   and logo when the project stands behind it. Give each project a **Name shown to users** if it has none.
 - **Emails name a project the same way**, never by its console-only name.
 
+### Then 1.3.0
+
+1.3.0 carries no schema migration and no new setting that is on by default. `db:setup`, which the usual steps
+already run, provisions two new storage areas for enterprise-managed authorization. Check these before upgrading:
+
+- **A client is served only by its own project's endpoints.** An application of a project with an address of its
+  own is now unknown at every other address: another project's or the root's token, introspection, revocation and
+  pushed-request endpoints answer `invalid_client`. A code or refresh token is redeemed only at the address that
+  issued it. Client credentials at a project's address serve only that project's applications. If a client is
+  configured with the root's token endpoint while it signs in at a project's address, point it at the project's
+  own endpoints, which that project's discovery document lists.
+- **New plain-http redirect addresses must be loopback.** A new application, or an edit that adds a redirect
+  address, may use `http` only on `localhost`, `127.0.0.1` or `[::1]`. Addresses already stored keep working, and
+  such an application can still be edited.
+- **Agent access entries are compared as written.** An entry under **Agent access** now matches a client
+  identifier only when the two are the same string. If an entry was added with a different spelling of the host or
+  port than the agent presents, add it again exactly as the agent presents it.
+- **A client metadata document is held to draft -02.** If you accept URLs as client identifiers, a document is
+  now read from one request that answers 200, never through a redirect, and a document that publishes a client
+  secret is refused.
+
+What an operator sees afterwards:
+
+- **Enterprise-managed authorization**, off until switched on: a project can accept identity assertions from a
+  sign-in provider it trusts (`jwtBearer.enabled`) and issue them for outside authorization servers it connects
+  (`tokenExchange.enabled`).
+- **Applications in the Administrators project**: a super administrator can register a sign-in application there
+  so an internal tool signs in the instance's administrators.
+- **The registration settings explain themselves**: accepting a URL as a client identifier is described as the
+  path MCP recommends, and dynamic registration as the one it deprecates.
+
 ## Check readiness and the issuer after the restart {#after-the-restart}
 
 ```bash
