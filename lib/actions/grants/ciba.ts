@@ -10,7 +10,10 @@ import filterClaims from '../../helpers/filter_claims.ts';
 import revoke from '../../helpers/revoke.ts';
 import resolveResource from '../../helpers/resolve_resource.ts';
 import { getResourceServerInfo, issueRefreshToken } from '../../addon/index.js';
-import { issuingBucket } from 'lib/admin/auth/bucketAddress.js';
+import {
+	issuingBucket,
+	servingBucketIdOf
+} from 'lib/admin/auth/bucketAddress.js';
 import { IdToken } from 'lib/models/id_token.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
 import { AccessToken } from 'lib/models/access_token.js';
@@ -51,6 +54,11 @@ export const handler = async function cibaHandler(
 
 	if (request.payload.clientId !== oidc.client.clientId) {
 		throw new InvalidGrant('client mismatch');
+	}
+
+	/* Only at the issuer that issued it, and before it can be consumed — see authorization_code.ts. */
+	if ((await servingBucketIdOf(request.payload.bucketId)) !== oidc.bucket._id) {
+		throw new InvalidGrant('backchannel authentication request not found');
 	}
 
 	let cert: X509Certificate | undefined;

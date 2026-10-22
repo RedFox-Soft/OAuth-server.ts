@@ -5,8 +5,11 @@ import {
 	InvalidTarget,
 	InvalidScope,
 	InvalidRequest,
+	InvalidClientAuth,
 	UnauthorizedClient
 } from '../../helpers/errors.js';
+import { isAddressable } from '../../admin/auth/bucketAddress.js';
+import { storedBucketOf } from '../../admin/auth/resolveBucket.js';
 import { member } from '../../helpers/_/object.js';
 import { configuration } from 'lib/configs/application.js';
 import checkResource from '../../shared/check_resource.ts';
@@ -43,6 +46,22 @@ export async function clientCredentials(
 		throw new InvalidRequest(
 			'authorization_details is unsupported for this grant_type'
 		);
+	}
+
+	/*
+	 * At a project with its own address, only that project's clients. Every other grant redeems something a
+	 * sign-in at this issuer produced, and that artefact binds it here; this one has no earlier step, so the
+	 * client's membership is the only test there is. Without it a client registered at the root, belonging to
+	 * no project, would be issued tokens bearing any project's issuer it cared to address. A provisioning
+	 * connection's client is bound to its own project by lib/provisioning/token_policy.ts instead, since it is
+	 * synthesized and has no record to belong by.
+	 */
+	if (
+		!client.provisioningConnectionId &&
+		isAddressable(oidc.bucket) &&
+		(await storedBucketOf(client.clientId)) !== oidc.bucket._id
+	) {
+		throw new InvalidClientAuth('client not found');
 	}
 
 	await checkResource(oidc);

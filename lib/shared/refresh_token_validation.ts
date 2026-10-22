@@ -8,6 +8,7 @@ import revoke from '../helpers/revoke.js';
 import type { DPoPProof } from '../helpers/validate_dpop.js';
 import { Grant } from '../models/grant.js';
 import { RefreshToken } from '../models/refresh_token.js';
+import { servingBucketIdOf } from '../admin/auth/bucketAddress.js';
 
 /*
  * What makes a refresh token usable, in one place: the refresh grant redeems one and the token exchange
@@ -60,6 +61,18 @@ export async function usableRefreshToken(
 
 	if (refreshToken.payload.clientId !== client.clientId) {
 		throw new RefreshTokenRefused('client mismatch');
+	}
+
+	/*
+	 * Usable only at the issuer that issued it, and refused here before anything could consume, rotate or
+	 * revoke it: a token presented at the wrong address is a misconfigured client, not evidence of theft, and
+	 * the same token must go on working where it belongs. Compared by project id, as introspection compares,
+	 * so a project that moves between address forms keeps its tokens.
+	 */
+	if (
+		(await servingBucketIdOf(refreshToken.payload.bucketId)) !== oidc.bucket._id
+	) {
+		throw new RefreshTokenRefused('refresh token not found');
 	}
 
 	if (refreshToken.isExpired) {

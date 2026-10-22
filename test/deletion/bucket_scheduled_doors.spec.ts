@@ -207,7 +207,8 @@ describe('a bucket scheduled for deletion', () => {
 		}
 	});
 
-	it('refuses its refresh token at the root token endpoint with invalid_grant', async () => {
+	/* Its client belongs to an addressed project, so the root does not know it at all (RFC 6749 §2.2). */
+	it('refuses its client’s refresh token at the root token endpoint as an unknown client', async () => {
 		const { refresh } = await tokens();
 
 		const response = await post(`${ISSUER}/token`, {
@@ -215,9 +216,9 @@ describe('a bucket scheduled for deletion', () => {
 			refresh_token: refresh
 		});
 
-		expect(response.status).toBe(400);
+		expect(response.status).toBe(401);
 		expect(shaped(ErrorBody, await response.json()).error).toBe(
-			'invalid_grant'
+			'invalid_client'
 		);
 	});
 

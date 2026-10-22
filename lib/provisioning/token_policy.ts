@@ -8,11 +8,12 @@ import { scimBaseUrl } from './addresses.js';
 /*
  * Who may hold a token for a bucket's SCIM resource, and what a connection's client may hold at all.
  *
- * The token endpoint does not check a client's bucket (lib/actions/authorization/check_bucket.ts runs only
- * for the authorization and device flows) and a client-credentials token takes its bucket from the address
- * it was requested at. So without these rules a connection of bucket A could request a token at bucket B's
- * address, and any other client could request the SCIM audience. Both are closed here, once, and every
- * caller — the resource arm and the grant — asks this module.
+ * A connection's client is synthesized and has no stored record, so the token endpoint's check that a client
+ * belongs to the addressed project (`assertClientServedHere`, lib/actions/authorization/check_bucket.ts) has
+ * nothing to read it from, and a client-credentials token takes its bucket from the address it was requested
+ * at. So without these rules a connection of bucket A could request a token at bucket B's address, and any
+ * other client could request the SCIM audience. Both are closed here, once, and every caller — the resource
+ * arm and the grant — asks this module.
  */
 
 /*

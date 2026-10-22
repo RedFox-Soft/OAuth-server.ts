@@ -11,6 +11,7 @@ import {
 import bootstrap, {
 	clearSeededBuckets,
 	jsonToFormUrlEncoded,
+	seedAccount,
 	seedBucket,
 	type Setup
 } from '../test_helper.js';
@@ -60,6 +61,8 @@ describe('a flow started at a named bucket address', () => {
 			accountId: 'bob',
 			client: acmeClient
 		});
+		/* The default bucket's own end user, for the flows started at the bare address. */
+		seedAccount('ana');
 	});
 
 	afterAll(async () => {
@@ -187,6 +190,97 @@ describe('a flow started at a named bucket address', () => {
 		expect(issuerOfIdToken(idToken)).toBe(ACME_ISSUER);
 	});
 
+	/*
+	 * Issued at the bare address to a client of no project, then presented at the bucket's: the client-level
+	 * check lets such a client through everywhere, so only the artefact's own record of its issuer can refuse it.
+	 */
+	async function approvedDeviceCodeAtTheRoot(): Promise<string> {
+		const started = await post(
+			'/device/auth',
+			'default-device',
+			'default-secret',
+			{
+				scope: 'openid'
+			}
+		);
+		const { device_code: deviceCode } = shaped(
+			Type.Object({ device_code: Type.String() }),
+			await started.json()
+		);
+		TestAdapter.for('DeviceCode').syncUpdate(setup.getTokenJti(deviceCode), {
+			scope: 'openid',
+			accountId: 'ana',
+			grantId: await grantFor('default-device', 'ana')
+		});
+		return deviceCode;
+	}
+
+	async function backchannelRequestAtTheRoot(): Promise<string> {
+		const started = await post(
+			'/backchannel',
+			'default-device',
+			'default-secret',
+			{
+				scope: 'openid',
+				login_hint: 'ana'
+			}
+		);
+		return shaped(
+			Type.Object({ auth_req_id: Type.String() }),
+			await started.json()
+		).auth_req_id;
+	}
+
+	function redeemDeviceCode(at: string, deviceCode: string) {
+		return post(`${at}/token`, 'default-device', 'default-secret', {
+			grant_type: DEVICE,
+			device_code: deviceCode
+		});
+	}
+
+	function redeemBackchannel(at: string, authReqId: string) {
+		return post(`${at}/token`, 'default-device', 'default-secret', {
+			grant_type: CIBA,
+			auth_req_id: authReqId
+		});
+	}
+
+	it('refuses a device code at an issuer other than its own', async () => {
+		const deviceCode = await approvedDeviceCodeAtTheRoot();
+
+		const response = await redeemDeviceCode(`/${SLUG}`, deviceCode);
+
+		expect(response.status).toBe(400);
+		expect(await response.json()).toMatchObject({ error: 'invalid_grant' });
+	});
+
+	it('keeps a device code refused at another issuer redeemable at its own', async () => {
+		const deviceCode = await approvedDeviceCodeAtTheRoot();
+		await redeemDeviceCode(`/${SLUG}`, deviceCode);
+
+		const response = await redeemDeviceCode('', deviceCode);
+
+		expect(response.status).toBe(200);
+	});
+
+	it('refuses a backchannel authentication request at an issuer other than its own', async () => {
+		const authReqId = await backchannelRequestAtTheRoot();
+
+		const response = await redeemBackchannel(`/${SLUG}`, authReqId);
+
+		expect(response.status).toBe(400);
+		expect(await response.json()).toMatchObject({ error: 'invalid_grant' });
+	});
+
+	it('keeps a backchannel authentication request refused at another issuer redeemable at its own', async () => {
+		const authReqId = await backchannelRequestAtTheRoot();
+		await redeemBackchannel(`/${SLUG}`, authReqId);
+
+		const response = await redeemBackchannel('', authReqId);
+
+		expect(response.status).toBe(200);
+	});
+
 	it('refuses a client of the default bucket at the bucket device endpoint, storing nothing', async () => {
 		const stored = mock<ServerListener<'device_code.saved'>>();
 		eventBus.on('device_code.saved', stored);
@@ -310,6 +404,63 @@ describe('a flow started at a named bucket address', () => {
 		);
 
 		expect(body.registration_client_uri).toStartWith(`${ACME_ISSUER}/reg/`);
+	});
+
+	async function registeredAtTheBucket() {
+		const response = await elysia.handle(
+			new Request(`http://localhost/${SLUG}/reg`, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					redirect_uris: ['https://registered.example.com/cb'],
+					grant_types: ['authorization_code'],
+					response_types: ['code']
+				})
+			})
+		);
+		return shaped(
+			Type.Object({
+				client_id: Type.String(),
+				registration_access_token: Type.String()
+			}),
+			await response.json()
+		);
+	}
+
+	function readRegistration(at: string, clientId: string, token: string) {
+		return elysia.handle(
+			new Request(`http://localhost${at}/reg/${clientId}`, {
+				headers: { authorization: `Bearer ${token}` }
+			})
+		);
+	}
+
+	it('answers registration management at another address as for a token that does not exist', async () => {
+		const { client_id, registration_access_token } =
+			await registeredAtTheBucket();
+
+		const response = await readRegistration(
+			'',
+			client_id,
+			registration_access_token
+		);
+
+		expect(response.status).toBe(401);
+		expect(await response.json()).toMatchObject({ error: 'invalid_token' });
+	});
+
+	it('keeps a registration access token refused at another address usable at its own', async () => {
+		const { client_id, registration_access_token } =
+			await registeredAtTheBucket();
+		await readRegistration('', client_id, registration_access_token);
+
+		const response = await readRegistration(
+			`/${SLUG}`,
+			client_id,
+			registration_access_token
+		);
+
+		expect(response.status).toBe(200);
 	});
 
 	it('signs a client registered at the bucket address in at that bucket, and refuses it at the bare address', async () => {

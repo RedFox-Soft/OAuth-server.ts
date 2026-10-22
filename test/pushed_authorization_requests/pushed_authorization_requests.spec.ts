@@ -108,6 +108,28 @@ describe('Pushed Request Object', () => {
 					ApplicationConfig['par.allowUnregisteredRedirectUris'] = false;
 				});
 
+				/* An unregistered address is new by definition, so it is held to the rule every write is held to. */
+				it('refuses an unregistered plain-http redirect on a host that is not loopback', async function () {
+					const par = await formAgent.par.post(
+						{
+							scope: 'openid',
+							response_type: 'code',
+							code_challenge_method: 'S256',
+							code_challenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
+							client_id: clientId,
+							redirect_uri: 'http://intranet.example/callback'
+						},
+						{
+							headers: {
+								...AuthorizationRequest.basicAuthHeader(clientId, 'secret')
+							}
+						}
+					);
+
+					expect(par.response.status).toBe(400);
+					expect(par.error?.value).toMatchObject({ error: 'invalid_request' });
+				});
+
 				it('allows unregistered redirectUris to be used', async function () {
 					const code_verifier = randomBytes(32).toString('base64url');
 					const code_challenge = createHash('sha256')

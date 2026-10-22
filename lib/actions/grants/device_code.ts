@@ -10,7 +10,10 @@ import filterClaims from '../../helpers/filter_claims.ts';
 import revoke from '../../helpers/revoke.ts';
 import resolveResource from '../../helpers/resolve_resource.ts';
 import { getResourceServerInfo, issueRefreshToken } from '../../addon/index.js';
-import { issuingBucket } from 'lib/admin/auth/bucketAddress.js';
+import {
+	issuingBucket,
+	servingBucketIdOf
+} from 'lib/admin/auth/bucketAddress.js';
 import { IdToken } from 'lib/models/id_token.js';
 import { DeviceCode } from 'lib/models/device_code.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
@@ -48,6 +51,11 @@ export const handler = async function deviceCodeHandler(
 
 	if (code.payload.clientId !== oidc.client.clientId) {
 		throw new InvalidGrant('client mismatch');
+	}
+
+	/* Only at the issuer that issued it, and before it can be consumed — see authorization_code.ts. */
+	if ((await servingBucketIdOf(code.payload.bucketId)) !== oidc.bucket._id) {
+		throw new InvalidGrant('device code not found');
 	}
 
 	let cert: X509Certificate | undefined;

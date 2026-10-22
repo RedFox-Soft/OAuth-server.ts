@@ -4,7 +4,7 @@ title: 'Authorization for MCP servers'
 tags: [architecture, contract, gotcha, config]
 sources: [oauth-server-codebase]
 created: 2026-09-08
-updated: 2026-10-15
+updated: 2026-10-22
 graph:
   node_type: concept
 ---
@@ -191,7 +191,9 @@ projects, because every operator-registered application of the project now quali
 the resource was rejected, because it would reproduce the read-modify-write membership list that let a client
 fall out of its old Project. An identifier
 nobody declared is not its question — the built-in MCP audience and an addon override answer for themselves.
-`test/resources/machine_access.spec.ts` is the attack.
+`test/resources/machine_access.spec.ts` is the attack. Since spec 110 (2026-10-22) the grant also refuses, as an unknown client, any
+client that does not belong to the project whose address it was requested at, resource or no resource: a client
+of no project otherwise got a resource-less token bearing that project's issuer ([[project-is-an-issuer]]).
 
 **A machine token also needs a client that authenticates** (2026-10-20). Until then a stored, same-project,
 operator-created client registered with `token_endpoint_auth_method: none` passed every check above: the token
@@ -211,11 +213,33 @@ The current MCP authorization revision (2026-07-28) marks dynamic client registr
 and names OAuth Client ID Metadata Documents first. `lib/client_metadata_document/` implements that in
 four modules, and the split is deliberate: `fetch.ts` knows nothing about JSON shapes, so it can be
 reviewed for one question only — can a caller make this server talk to something it should not. It
-stops at 5 KB (`MAX_DOCUMENT_BYTES`, `lib/client_metadata_document/fetch.ts:33`) and keeps redirects on
-https; the address classes it will reach, the re-check of every redirect hop and the time bound are
-`lib/shared/egress.ts`'s. The whole branch is gated on `clientIdMetadataDocument.enabled`, **off by
-default** (`lib/configs/application.ts:554`), because it lets an unauthenticated caller make this server
-issue an outbound request.
+stops at 5 KB (`MAX_DOCUMENT_BYTES`, `lib/client_metadata_document/fetch.ts`) and makes **one** request:
+a 200 or nothing, no redirect followed (`maxRedirects: 0`, which `guardedFetch` answers by returning the
+redirect unread). The address classes it will reach and the time bound are `lib/shared/egress.ts`'s. The
+whole branch is gated on `clientIdMetadataDocument.enabled`, **off by default**
+(`lib/configs/application.ts:699`), because it lets an unauthenticated caller make this server issue an
+outbound request.
+
+**Written to draft -02 since spec 110** (2026-10-22); it was built to -00, which MCP 2026-07-28 still cites.
+-01 and -02 only narrow what a server accepts, so following them serves a client written to either:
+
+- **One request, 200 only** (-02 §5: "MUST NOT automatically follow HTTP redirects", every other status
+  "an error response"). Until spec 110 up to four https redirects were followed and any 2xx accepted.
+- **A published secret refuses the document** (§4.1). It used to be dropped, on the reasoning that the harm
+  was only in honouring it; -02 lists the secret properties beside private key material, which the client
+  model already refused, and a document that publishes one was written by someone expecting confidential
+  authentication they will not get.
+- **No `token_endpoint_auth_method` means `none`.** The RFC 7591 default, `client_secret_basic`, demanded a
+  secret no document can hold, so such a document — an ordinary public client — failed as
+  `invalid_client_metadata` at `/auth`.
+- **Every refusal is `invalid_client`.** `tryFindClient` turns an `InvalidClientMetadata` from the client
+  model into "no client", the answer every other document failure already got.
+- **Addresses inside the document are https** (§8.6: the special-use-address rule covers "any URLs contained
+  within" it): `registerClient` runs the write-time TLS check of specs/103 for documents too, which have no
+  record, so every value is new.
+- **Identifiers are compared as written** (§3). The administrative allowlist stored `URL.href`, which
+  lowercases the host and drops a default port, so an entry for `https://Tools.Example.com/client` could never
+  match — and the route then could not even add it, since it checked the document against the parsed form.
 
 **It was not the only such request** (corrected 2026-09-28). `fetch.ts` used to say it was "the only
 place this server makes an outbound request on behalf of an unauthenticated caller", and three more
@@ -295,7 +319,7 @@ which is how Principle III says a new storage requirement should be expressed, r
 registration time — the only moment that both correlates with growth and is already paying for a write.
 
 Restricting a permitted identifier's redirect targets to its own origin is what the CIMD draft names
-(§4.2, §6.1) for loopback impersonation, and it was the first recommendation made during clarification.
+(-00 §4.2, §6.1; -02 §8.1) for loopback impersonation, and it was the first recommendation made during clarification.
 §4.2 then expects an authorization server that restricts them to operate a public metadata-document
 service for developers in compensation — which this project will not do — and the restriction would
 exclude every local agent host, which is most of them. Rejected, and the risk carried explicitly

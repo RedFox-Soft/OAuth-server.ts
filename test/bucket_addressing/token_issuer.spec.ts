@@ -79,13 +79,20 @@ describe('a token minted by a named bucket', () => {
 		).searchParams.get('code');
 		expect(code).toBeTruthy();
 
-		/* Through the suite's own exchange helper, which carries the PKCE verifier and whatever client
-		 * authentication this client is configured for. */
-		const { data } = await auth.getToken(
-			present(code, 'an authorization code')
+		/* At the token endpoint of the address that issued the code: a code is redeemable nowhere else. Both
+		 * clients here are public, so the verifier is all the authentication there is. */
+		const redeemed = await post(`${prefix}/token`, {
+			grant_type: 'authorization_code',
+			client_id: clientId,
+			code: present(code, 'an authorization code'),
+			code_verifier: present(auth.code_verifier, 'a PKCE verifier'),
+			redirect_uri: redirect
+		});
+		const { access_token } = shaped(
+			Type.Object({ access_token: Type.String() }),
+			await redeemed.json()
 		);
-		expect(data?.access_token).toBeTruthy();
-		return { token: present(data?.access_token, 'an access token'), clientId };
+		return { token: access_token, clientId };
 	}
 
 	async function introspect(at: string, clientId: string) {

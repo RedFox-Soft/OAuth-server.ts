@@ -4,7 +4,7 @@
  *
  * Everything here is decided from the string alone, before any network call. That is the security
  * property, not a performance one: a malformed identifier that reached the fetch layer would be a
- * free probe of whatever this server can reach, and the draft's §6.5 says an authorization server
+ * free probe of whatever this server can reach, and the draft's §8.6 says an authorization server
  * accepting a URL from an unknown client is exactly an SSRF surface. Refusing on shape costs nothing.
  *
  * `not_a_url` is deliberately not a failure in the same sense as the rest. Every ordinary client id —

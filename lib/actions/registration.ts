@@ -27,6 +27,8 @@ import { RegistrationAccessToken } from 'lib/models/registration_access_token.js
 import { eventBus } from 'lib/event_bus.js';
 import { routeNames } from 'lib/consts/param_list.js';
 import { ISSUER } from 'lib/configs/env.js';
+import { servingBucketIdOf } from 'lib/admin/auth/bucketAddress.js';
+import { storedBucketOf } from 'lib/admin/auth/resolveBucket.js';
 import {
 	RegistrationResponse,
 	OAuthError
@@ -123,6 +125,18 @@ async function authenticate(
 	if (client?.clientId !== regAccessToken.payload.clientId) {
 		await regAccessToken.destroy();
 		throw new InvalidToken('client mismatch');
+	}
+
+	/*
+	 * Managed only at the address it registered at, which its `bucketId` records (none for the root). Answered
+	 * as a token that does not exist, and the token is kept: it is valid where it belongs, and destroying it
+	 * here would let any address revoke another project's registrations.
+	 */
+	if (
+		(await servingBucketIdOf(await storedBucketOf(client.clientId))) !==
+		oidc.bucket._id
+	) {
+		throw new InvalidToken('token not found');
 	}
 
 	oidc.entity('Client', client);

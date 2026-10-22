@@ -146,8 +146,17 @@ export async function tryFindClient(id: string): Promise<Client | undefined> {
 		 * Not memoized. The document's own reuse window is the cache (`cache.ts`), bounded by what its
 		 * host said; a second memo keyed on content would extend that silently past the bound the
 		 * operator's host asked for.
+		 *
+		 * A document the client model will not accept is a fact about that client, not a fault here: it
+		 * resolves to no client, as every other failure to honour a document does, and the caller answers
+		 * `invalid_client`. A registration error code would mean nothing to a browser arriving at `/auth`.
 		 */
-		return registerClient(document, { store: false });
+		try {
+			return await registerClient(document, { store: false });
+		} catch (err) {
+			if (err instanceof InvalidClientMetadata) return;
+			throw err;
+		}
 	}
 
 	const propHash = crypto.hash(

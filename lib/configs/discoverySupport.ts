@@ -458,7 +458,7 @@ export const metadataClassification: Record<DiscoveryKey, MetadataAudience> = {
 	 */
 	client_id_metadata_document_supported: {
 		audience: 'both',
-		registeredBy: 'draft-ietf-oauth-client-id-metadata-document-00'
+		registeredBy: 'draft-ietf-oauth-client-id-metadata-document-02'
 	},
 	tls_client_certificate_bound_access_tokens: {
 		audience: 'both',

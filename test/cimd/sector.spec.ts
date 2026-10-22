@@ -48,9 +48,24 @@ describe('a pairwise client identified by a document', () => {
 				headers: { 'content-type': 'application/json' }
 			});
 
-		await expect(tryFindClient(identifier)).rejects.toMatchObject({
-			error_description:
-				'all registered redirectUris must be included in the sector_identifier_uri response'
+		/* Resolving to no client is how a document the client model refuses is answered: `invalid_client`. */
+		expect(await tryFindClient(identifier)).toBeUndefined();
+	});
+
+	/* The control for the case above: the same document, its sector listing what it registers, resolves. */
+	it('is admitted when its sector identifier document lists its redirect URIs', async () => {
+		const { identifier } = serveDocument({
+			overrides: {
+				subject_type: 'pairwise',
+				sector_identifier_uri: `${SECTOR}/sector.json`
+			}
 		});
+		mock(SECTOR)
+			.intercept({ path: '/sector.json' })
+			.reply(200, JSON.stringify(['https://app.example.com/callback']), {
+				headers: { 'content-type': 'application/json' }
+			});
+
+		expect(await tryFindClient(identifier)).toBeDefined();
 	});
 });

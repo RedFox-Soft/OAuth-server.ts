@@ -597,9 +597,13 @@ describe('Client metadata validation', () => {
 		rejects('redirectUris', [123], /must only contain strings$/);
 		rejects('redirectUris', [], /must contain members$/);
 
-		allows('redirectUris', ['http://some'], {
-			applicationType: 'web'
-		});
+		/* MCP 2026-07-28: plain http only on a loopback host, a web client's included. */
+		rejects(
+			'redirectUris',
+			['http://some'],
+			/must use https unless its host is localhost/,
+			{ applicationType: 'web' }
+		);
 		allows('redirectUris', ['https://some'], {
 			applicationType: 'web'
 		});
@@ -720,9 +724,13 @@ describe('Client metadata validation', () => {
 		mustBeArray('post_logout_redirect_uris', [{}, 'string', 123, true]);
 		rejects('post_logout_redirect_uris', [123], /must only contain strings$/);
 
-		allows('post_logout_redirect_uris', ['http://some'], {
-			applicationType: 'web'
-		});
+		/* MCP 2026-07-28: plain http only on a loopback host, a web client's included. */
+		rejects(
+			'post_logout_redirect_uris',
+			['http://some'],
+			/must use https unless its host is localhost/,
+			{ applicationType: 'web' }
+		);
 		allows('post_logout_redirect_uris', ['https://some'], {
 			applicationType: 'web'
 		});

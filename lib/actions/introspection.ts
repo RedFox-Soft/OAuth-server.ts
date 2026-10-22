@@ -7,7 +7,7 @@ import {
 	pairwiseIdentifier,
 	rarForIntrospectionResponse
 } from '../addon/index.js';
-import { issuingBucket } from 'lib/admin/auth/bucketAddress.js';
+import { servingBucketIdOf } from 'lib/admin/auth/bucketAddress.js';
 import { groupsMembersOf } from 'lib/consts/groups_claim.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
 import { IdToken } from 'lib/models/id_token.js';
@@ -126,10 +126,14 @@ async function renderTokenResponse(
 	 *
 	 * Compared against the recorded issuing bucket rather than anything derived from the client, which
 	 * is the whole reason that field is stored. A token minted before buckets became tenants records
-	 * nothing and belongs to the default bucket, which is what `issuingBucket` resolves an absence to.
+	 * nothing and belongs to the default bucket, which is what `servingBucketIdOf` resolves an absence to.
+	 *
+	 * Through `servingBucketIdOf`, not the recorded id itself: a sign-in for a bucket with no address records
+	 * that bucket's id, yet introspection at the root is addressed as the default bucket, and every bucket
+	 * served at the root shares the one issuer there. Comparing the ids reported the root's own tokens for those
+	 * buckets inactive at the root.
 	 */
-	const issuedBy = await issuingBucket(payload.bucketId);
-	if (issuedBy._id !== oidc.bucket._id) {
+	if ((await servingBucketIdOf(payload.bucketId)) !== oidc.bucket._id) {
 		return { active: false };
 	}
 

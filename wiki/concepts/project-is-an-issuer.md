@@ -4,7 +4,7 @@ title: 'A project is a tenant with its own issuer'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-09-15
-updated: 2026-10-15
+updated: 2026-10-22
 graph:
   node_type: concept
   relationships:
@@ -239,6 +239,20 @@ the default project's, refused `unauthorized_client` at `/acme/auth` and accepte
 found by running the conformance suite against a named project. A registration at the root records
 nothing, and the field is written from the address alone, never from the body.
 
+**And the endpoints that authenticate a client** (spec 110, 2026-10-22). `checkBucket` guarded only the
+endpoints that start a flow, so a client of `acme` could call `/globex/token` with client credentials and get a
+token bearing `globex`'s issuer, or introspect and revoke there. RFC 6749 §2.2 makes a client identifier unique
+to the server that issued it, and MCP's SEP-2352 tells clients the same from their side. `assertClientServedHere`
+(`lib/actions/authorization/check_bucket.ts`), called by `tokenAuth` right after the client is found and before
+any credential is checked, refuses a client pinned to another addressable project — token, introspection,
+revocation, PAR, device authorization and backchannel authentication alike — with the exact answer an unknown
+client gets. It reads only the project a client is pinned to, never a requested resource: rule 3 is safe at
+`/auth` because the code it yields is bound to the project, and the one grant with no earlier step, client
+credentials, now serves only the addressed project's own clients there. Registration management answers a
+registration access token presented at another address as a token that does not exist, and keeps it. A
+client of no project, and a document client (portable across issuers, SEP-2352), keep their reach; the
+artifacts they get are what binds them.
+
 **A client assertion is audienced at the addressed issuer.** Corrected 2026-10-05: the accepted `aud`
 values (`lib/shared/token_jwt_auth.ts`) were the instance's — `ISSUER`, its token endpoint and the
 bare route — at every address, so an assertion naming `/acme/token` was refused at `/acme/token` while
@@ -281,8 +295,32 @@ A token minted before the field existed records nothing, and reading that absenc
 is exact rather than a fallback: the default project's issuer *is* the bare one such a token was minted
 with.
 
-Tokens minted against a stored artifact inherit the artifact's project rather than the address the
-redemption arrived at — the issuer is a fact about where the grant was established.
+**Introspection compares the serving project, not the recorded one** (fixed 2026-10-22). Until then
+`lib/actions/introspection.ts` compared the recorded id with the addressed project, and a token issued at the root
+to an application of a project with **no** address — signed in through the sign-in screens, which record the
+project the sign-in resolved — was reported `active: false` by the root, the very server that issued it. A token
+obtained from an existing session recorded the default project instead, which is why nothing had noticed. It now
+compares `servingBucketIdOf`, as the grants do; `test/bucket_addressing/unaddressed_introspection.spec.ts` is the
+case.
+
+Tokens minted against a stored artifact inherit the artifact's project — the issuer is a fact about where the
+grant was established. Since spec 110 (2026-10-22) the artifact is also **redeemable only there**: an
+authorization code, refresh token, device code or backchannel request presented at another issuer's token
+endpoint is refused `invalid_grant` before anything consumes, rotates or revokes it, so it still works where it
+belongs. Until then a code issued at `/acme` redeemed at the root, and a refresh token kept refreshing wherever
+it was sent. The comparison is `servingBucketIdOf` (`lib/admin/auth/bucketAddress.ts`), not the recorded id:
+a sign-in for a project with no address runs at the root and records that project's id, yet its redemption is
+addressed as the default project — every project served at the root shares the one issuer there. A project
+with an address answers as itself, so a move between address forms keeps its artifacts; a deleted one answers
+as itself too, and so matches nothing.
+
+**A project that is given its first address keeps its sign-ins.** A browser sign-in records the project it
+resolved — for a project with no address, that project's own id, not the default's — and a refresh token
+inherits it. Once the project has an address, `servingBucketIdOf` answers with its id, so those tokens refresh
+at the new address (and the tokens they mint carry its issuer, as the console warns: `BucketSettings.tsx`,
+"reconfigured with the new issuer") and no longer at the root, where the project's clients are now refused
+anyway. A device or backchannel request records the address it was started at, so one still pending at that
+moment is redeemable at the root only, and its client is refused there: it has to be started again.
 
 ## Six things that cost a debugging session each
 

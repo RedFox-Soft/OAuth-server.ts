@@ -42,6 +42,8 @@ const ClientView = Type.Object({
 
 let cookie: string;
 let bucketId: string;
+/* The project's own address: a client of a project with an address is served only there. */
+let slug: string;
 
 function json(method: string, path: string, body?: unknown) {
 	return send(path, {
@@ -70,12 +72,13 @@ describe('a key-authenticated client registered by an operator', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'client_keys' });
 		cookie = await superAdminCookie();
+		slug = `keys-${nanoid()
+			.toLowerCase()
+			.replace(/[^a-z0-9]/g, '')}`;
 		bucketId = (
 			await getBucketStore().create({
 				name: 'Keys',
-				slug: `keys-${nanoid()
-					.toLowerCase()
-					.replace(/[^a-z0-9]/g, '')}`,
+				slug,
 				ownerGroupId: UNASSIGNED_GROUP_ID
 			})
 		)._id;
@@ -91,7 +94,7 @@ describe('a key-authenticated client registered by an operator', () => {
 		const assertion = await JWT.sign(
 			{
 				jti: nanoid(),
-				aud: ISSUER,
+				aud: `${ISSUER}/${slug}`,
 				sub: client.clientId,
 				iss: client.clientId
 			},
@@ -99,7 +102,7 @@ describe('a key-authenticated client registered by an operator', () => {
 			'RS256',
 			{ expiresIn: 60 }
 		);
-		const res = await send('/token', {
+		const res = await send(`/${slug}/token`, {
 			method: 'POST',
 			headers: { 'content-type': 'application/x-www-form-urlencoded' },
 			body: new URLSearchParams({
@@ -125,11 +128,11 @@ describe('a key-authenticated client registered by an operator', () => {
 
 	/*
 	 * Through the composed server, not the admin routes mounted alone: a metadata refusal is a protocol
-	 * error class, and on its way out it reached the OAuth error handler first — the console received
+	 * error class, and on its way out it reached the OAuth error handler first â€” the console received
 	 * 400 in the protocol's shape, with no `message` to show. wiki/concepts/admin-plane-error-shape.md
 	 * records the same fault for the admin plane's own errors.
 	 */
-	it('answers a refused registration in the admin plane’s shape', async () => {
+	it('answers a refused registration in the admin planeâ€™s shape', async () => {
 		const res = await createClient({
 			grantTypes: ['authorization_code'],
 			tokenEndpointAuthMethod: 'none',

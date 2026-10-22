@@ -1,10 +1,20 @@
 import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import type { PipelineParams } from 'lib/consts/param_list.js';
+import type { RequestBucket } from 'lib/configs/issuer.js';
 import { getBucketStore } from '../../adapters/index.js';
-import { resolveBucketForRequest } from '../../admin/auth/resolveBucket.js';
-import { ADMIN_BUCKET_ID, DEFAULT_BUCKET_ID } from '../../admin/consts.js';
+import {
+	pinnedBucketOf,
+	resolveBucketForRequest,
+	storedBucketOf
+} from '../../admin/auth/resolveBucket.js';
+import {
+	ADMIN_BUCKET_ID,
+	ADMIN_CLIENT_ID,
+	DEFAULT_BUCKET_ID
+} from '../../admin/consts.js';
 import { isAddressable } from '../../admin/auth/bucketAddress.js';
-import { UnauthorizedClient } from '../../helpers/errors.js';
+import { bucketIdOfAccountPageClient } from '../../account_page/client.js';
+import { InvalidClientAuth, UnauthorizedClient } from '../../helpers/errors.js';
 
 /*
  * A client of an addressable bucket may only be used at that bucket's address.
@@ -80,6 +90,44 @@ export default async function checkBucket(
 	 * caller could not already determine — the client is theirs and the address is published.
 	 */
 	throw notAuthorizedHere();
+}
+
+/*
+ * The same refusal for the endpoints that authenticate a client — token, introspection, revocation, PAR,
+ * device authorization and backchannel authentication, all through `tokenAuth`. RFC 6749 §2.2 makes a client
+ * identifier unique to the server that issued it, and every project with an address is its own server, so a
+ * client of one is unknown to another; MCP's SEP-2352 tells clients the same from their side.
+ *
+ * Only the project a client is pinned to counts, never a requested resource. Rule 3 lets a client of no
+ * project reach a project through a resource declared there, and that is safe at `/auth` because the code it
+ * gets records the project and is redeemable nowhere else. Here a resource parameter would let such a client
+ * choose a project for a grant with no earlier step at all; client credentials answer that one themselves.
+ *
+ * Answered as an unknown client, and before any credential is checked: a refusal that differed from one, or
+ * that depended on the secret being right, would tell a caller the client exists at another issuer.
+ */
+export async function assertClientServedHere(
+	clientId: string,
+	addressed: RequestBucket
+): Promise<void> {
+	if (clientId === ADMIN_CLIENT_ID) {
+		if (addressed._id === DEFAULT_BUCKET_ID) return;
+		throw unknownHere();
+	}
+
+	const pinned =
+		bucketIdOfAccountPageClient(clientId) ??
+		pinnedBucketOf(await storedBucketOf(clientId));
+	if (!pinned || pinned === addressed._id) return;
+
+	const bucket = await getBucketStore().find(pinned);
+	if (!bucket || !isAddressable(bucket)) return;
+
+	throw unknownHere();
+}
+
+function unknownHere(): InstanceType<typeof InvalidClientAuth> {
+	return new InvalidClientAuth('client not found');
 }
 
 function notAuthorizedHere(): InstanceType<typeof UnauthorizedClient> {

@@ -1056,7 +1056,8 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 		label: 'Enable Dynamic Client Registration',
 		summary: 'Let a client register itself at runtime',
 		type: 'boolean',
-		description: 'Enables Dynamic Client Registration.'
+		description:
+			'Enables Dynamic Client Registration (RFC 7591, OIDC Dynamic Client Registration): a client registers itself at runtime and is stored as an application. The MCP authorization specification (2026-07-28) deprecates this for MCP clients and keeps it only for clients that cannot host a metadata document; accepting a URL as a client identifier is the path it recommends instead. Turn this on for MCP clients that still need it, or for other clients that register themselves. Switching it off stops new registrations; clients already registered keep working.'
 	},
 	{
 		key: 'registration.issueRegistrationAccessToken',
@@ -1077,7 +1078,7 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 		summary: 'Let a client identify itself with a document it hosts',
 		type: 'boolean',
 		description:
-			'Accepts an https URL carrying a path component as a `client_id`, retrieves the JSON document it names, and uses that as the metadata for the client — creating no client record at all. This is the mechanism the current MCP authorization specification names first for a client with no prior relationship, and it is what lets an agent host connect with nothing to configure. Off by default because switching it on lets an unauthenticated caller make this server issue an outbound HTTP request; the egress is bounded (private, loopback and link-local addresses refused, every redirect hop re-checked, 5 KB, short timeout) and the cache headers on the retrieved document bound how long it is reused. Advertised as `client_id_metadata_document_supported` only while this is on, because a client checks for that member before attempting the mechanism and falls back otherwise.'
+			'Accepts an https URL carrying a path component as a `client_id`, retrieves the JSON document it names, and uses that as the metadata for the client — creating no client record at all. Implemented to the OAuth Client ID Metadata Document draft -02, this is the registration path the MCP authorization specification (2026-07-28) recommends for a client with no prior relationship, and it is what lets an agent host connect with nothing to configure. Off by default because switching it on lets an unauthenticated caller make this server issue an outbound HTTP request; the egress is bounded (private, loopback and link-local addresses refused, no redirect followed, a 200 response required, 5 KB, short timeout) and the cache headers on the retrieved document bound how long it is reused. Advertised as `client_id_metadata_document_supported` only while this is on, because a client checks for that member before attempting the mechanism and falls back otherwise.'
 	},
 
 	{

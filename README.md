@@ -396,7 +396,7 @@ specific operation.
 > **Which client identity works here.** The reserved `client_id` above always works and needs no setup
 > beyond the toggle. An agent host that cannot be told a `client_id` can use this surface too, provided
 > it identifies itself with an [OAuth Client ID Metadata
-> Document](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-client-id-metadata-document-00) — an
+> Document](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-client-id-metadata-document-02) — an
 > HTTPS URL naming a document that describes it — and a super administrator has named that identity
 > under **Agent access** in the console. A client that registered itself through Dynamic Client
 > Registration cannot administer the instance under any configuration: its identity is minted on demand

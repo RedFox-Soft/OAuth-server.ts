@@ -4,7 +4,7 @@ title: 'The issuer is the unit of tenant isolation'
 tags: [architecture, contract, security]
 sources: [oauth-server-codebase]
 created: 2026-09-29
-updated: 2026-10-15
+updated: 2026-10-22
 ---
 
 # The issuer is the unit of tenant isolation
@@ -14,7 +14,10 @@ Two things used to be instance-wide and are now per issuer:
 - the namespace a declared protected resource is unique in;
 - the key set that signs a tenant's tokens.
 
-Both changes answer one audit finding, which had two halves.
+Both changes answer one audit finding, which had two halves. A third followed in spec 110 (2026-10-22): **a
+client's credentials**. A client of one project with an address is unknown at every other issuer's endpoints,
+the token side included, and what it was issued is redeemable only where it was issued — RFC 6749 §2.2, and
+MCP's SEP-2352 from the client's side. The mechanics are in [[project-is-an-issuer]].
 
 - **Squatting.** Any team member could declare another tenant's MCP server URL, first come, first
   served. The real owner got a permanent 409, and rule 3 routed that server's clients into the

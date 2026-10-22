@@ -15,7 +15,10 @@ import {
 	issueRefreshToken,
 	rarForCodeResponse
 } from '../../addon/index.js';
-import { issuingBucket } from 'lib/admin/auth/bucketAddress.js';
+import {
+	issuingBucket,
+	servingBucketIdOf
+} from 'lib/admin/auth/bucketAddress.js';
 import { IdToken } from 'lib/models/id_token.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
 import { AuthorizationCode } from 'lib/models/authorization_code.js';
@@ -57,6 +60,15 @@ export const handler = async function authorizationCodeHandler(
 
 	if (code.payload.clientId !== oidc.client.clientId) {
 		throw new InvalidGrant('client mismatch');
+	}
+
+	/*
+	 * Redeemable only at the issuer that issued it (RFC 6749 §2.2 makes a client identifier, and so what it
+	 * was issued, unique to one server). Checked before the code is consumed or the client marked used, so a
+	 * redemption at the wrong address leaves the code redeemable where it belongs.
+	 */
+	if ((await servingBucketIdOf(code.payload.bucketId)) !== oidc.bucket._id) {
+		throw new InvalidGrant('authorization code not found');
 	}
 
 	/*

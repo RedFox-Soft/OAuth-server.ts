@@ -1,7 +1,7 @@
 import { describe, it, beforeAll, expect } from 'bun:test';
 
 import { elysia } from 'lib/index.js';
-import bootstrap from '../test_helper.js';
+import bootstrap, { changeClient } from '../test_helper.js';
 import { basic, token } from '../provisioning/helpers.ts';
 import {
 	connect,
@@ -149,16 +149,25 @@ describe('a provisioning connection is fenced in', () => {
 		expect(otherResource.json.error).toBe('invalid_target');
 	});
 
+	/*
+	 * An application of the same bucket, so the only thing that can refuse it is the SCIM audience's own rule: a
+	 * client of no bucket would be refused at this address before the audience was ever considered.
+	 */
 	it('gives no other client a token for a bucket’s SCIM resource', async () => {
-		const res = await token(
-			`/${slugOf(a.bucket)}/token`,
-			{
-				grant_type: 'client_credentials',
-				resource: `http://e.ly/${slugOf(a.bucket)}/scim/v2`
-			},
-			basic('client', 'secret')
-		);
+		const undo = await changeClient('client', { bucketId: a.bucket._id });
+		try {
+			const res = await token(
+				`/${slugOf(a.bucket)}/token`,
+				{
+					grant_type: 'client_credentials',
+					resource: `http://e.ly/${slugOf(a.bucket)}/scim/v2`
+				},
+				basic('client', 'secret')
+			);
 
-		expect(res.json.error).toBe('invalid_target');
+			expect(res.json.error).toBe('invalid_target');
+		} finally {
+			await undo();
+		}
 	});
 });

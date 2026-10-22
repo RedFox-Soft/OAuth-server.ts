@@ -167,16 +167,28 @@ describe('validating a client description document', () => {
 	});
 
 	/*
-	 * A secret in a self-hosted, world-readable document is not a secret. Stripped rather than
-	 * refused, because the harm is in honouring it, and a document that carries one by mistake should
-	 * still be able to identify a public client.
+	 * Draft -02 §4.1 lists the secret properties beside private key material, which is refused too: a document
+	 * that publishes a secret was written by someone expecting confidential authentication they will not get.
 	 */
-	it('never carries a client secret out of a document', () => {
+	it.each(['client_secret', 'client_secret_expires_at'])(
+		'refuses a document that publishes %s',
+		(property) => {
+			const result = validate(documentFor(IDENTIFIER, { [property]: 'x' }));
+
+			expect(result).toEqual({ ok: false, reason: 'secret_published' });
+		}
+	);
+
+	/* No shared secret can exist for a document client, so the registration default could only fail. */
+	it('treats a document naming no authentication method as a public client', () => {
 		const result = validate(
-			documentFor(IDENTIFIER, { client_secret: 'not-a-secret-anymore' })
+			documentFor(IDENTIFIER, { token_endpoint_auth_method: undefined })
 		);
 
 		expect(result.ok).toBe(true);
-		if (result.ok) expect(result.metadata.clientSecret).toBeUndefined();
+		/* Recognised metadata stays snake_case here; the schema engine reads it (see the first case). */
+		if (result.ok) {
+			expect(result.metadata.token_endpoint_auth_method).toBe('none');
+		}
 	});
 });

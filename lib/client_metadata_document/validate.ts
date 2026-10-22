@@ -21,6 +21,7 @@ export type DocumentFailure =
 	| 'identifier_mismatch'
 	| 'bad_redirect_uris'
 	| 'symmetric_secret'
+	| 'secret_published'
 	| 'missing_jwks';
 
 export type DocumentResult =
@@ -114,13 +115,26 @@ export function validateClientDocument(
 	}
 
 	/*
-	 * A secret in a world-readable, self-hosted document is not a secret. Dropped rather than refused:
-	 * the harm is entirely in honouring it, and a document that carries one by mistake should still be
-	 * able to identify a public client. Dropped *before* translation so no canonical `clientSecret`
-	 * can reach the model either.
+	 * §4.1: the secret properties "MUST NOT be used", listed beside private key material, which the client
+	 * model refuses too. Refused rather than dropped: a document that publishes a secret was written by
+	 * someone expecting confidential authentication, and admitting it as a public client would hand them
+	 * something other than what they described, with nothing to tell them so.
 	 */
-	delete document.client_secret;
-	delete document.client_secret_expires_at;
+	if (
+		document.client_secret !== undefined ||
+		document.client_secret_expires_at !== undefined
+	) {
+		return { ok: false, reason: 'secret_published' };
+	}
+
+	/*
+	 * No shared secret can exist for a document client, so the registration default — a secret method —
+	 * could only ever fail, and it failed as a metadata error nobody at `/auth` could read. A document that
+	 * names no method describes a public client.
+	 */
+	if (document.token_endpoint_auth_method === undefined) {
+		document.token_endpoint_auth_method = 'none';
+	}
 
 	return { ok: true, metadata: snakeToCanonical(document) };
 }

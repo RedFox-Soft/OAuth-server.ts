@@ -46,7 +46,12 @@ function validateValue(kind: 'identifier' | 'host', value: string): string {
 				'an identifier must be an https URL with a path component, no dot segments, no fragment and no embedded credentials'
 			);
 		}
-		return parsed.url.href;
+		/*
+		 * Kept as written, not as parsed. Draft -02 §3 compares client identifier URLs as simple strings, and a
+		 * parsed URL lowercases the host and drops a default port, so an entry stored that way could never match
+		 * an identifier a client presents spelled any other way.
+		 */
+		return value;
 	}
 
 	/*

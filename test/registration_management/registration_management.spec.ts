@@ -438,4 +438,84 @@ describe('OAuth 2.0 Dynamic Client Registration Management Protocol', () => {
 			expect(res.status).toBe(204);
 		});
 	});
+
+	/*
+	 * MCP 2026-07-28: "All redirect URIs MUST be either localhost or use HTTPS". Plain http is for a program on
+	 * the end user's own machine; anywhere else it hands the code to whoever is on the network path.
+	 */
+	describe('a plain-http redirect on a host that is not loopback', () => {
+		it('is refused at registration, naming the address', async () => {
+			const res = await agent.reg.post(
+				{ redirect_uris: ['http://intranet.example/callback'] },
+				{ headers: json }
+			);
+
+			expect(res.status).toBe(400);
+			expect(body(res)).toMatchObject({ error: 'invalid_redirect_uri' });
+			expect(JSON.stringify(body(res))).toContain(
+				'http://intranet.example/callback'
+			);
+		});
+
+		it('is admitted at registration on a loopback host', async () => {
+			const res = await agent.reg.post(
+				{ redirect_uris: ['http://localhost:3000/callback'] },
+				{ headers: json }
+			);
+
+			expect(res.status).toBe(201);
+		});
+
+		it('is refused as a post-logout redirect at registration', async () => {
+			const res = await agent.reg.post(
+				{
+					redirect_uris: ['https://client.example.com/cb'],
+					post_logout_redirect_uris: ['http://intranet.example/bye']
+				},
+				{ headers: json }
+			);
+
+			expect(res.status).toBe(400);
+			expect(body(res)).toMatchObject({ error: 'invalid_client_metadata' });
+		});
+
+		it('is refused when an update adds it, leaving the registration as it was', async () => {
+			const client = await register();
+			await agent.reg({ clientId: client.client_id }).put(
+				updateProperties(client, {
+					redirect_uris: [
+						'https://client.example.com/cb',
+						'http://intranet.example/callback'
+					]
+				}),
+				{ headers: { ...json, ...bearer(client.registration_access_token) } }
+			);
+
+			const read = await agent
+				.reg({ clientId: client.client_id })
+				.get({ headers: bearer(client.registration_access_token) });
+
+			expect(read.status).toBe(200);
+			expect((read.data as { redirect_uris?: string[] }).redirect_uris).toEqual(
+				['https://client.example.com/cb']
+			);
+		});
+
+		it('refuses the update that adds it', async () => {
+			const client = await register();
+
+			const res = await agent.reg({ clientId: client.client_id }).put(
+				updateProperties(client, {
+					redirect_uris: [
+						'https://client.example.com/cb',
+						'http://intranet.example/callback'
+					]
+				}),
+				{ headers: { ...json, ...bearer(client.registration_access_token) } }
+			);
+
+			expect(res.status).toBe(400);
+			expect(body(res)).toMatchObject({ error: 'invalid_redirect_uri' });
+		});
+	});
 });

@@ -83,7 +83,9 @@ export async function resolveBucketForRequest(
  * or document can name it (`lib/models/client/wire.ts`), so a request cannot steer it: the property D6
  * asked of every rule here. A client identified by a document it hosts has no record and so no bucket.
  */
-async function storedBucketOf(clientId: string): Promise<string | undefined> {
+export async function storedBucketOf(
+	clientId: string
+): Promise<string | undefined> {
 	const stored = await adapter('Client').find(clientId);
 	const bucketId = stored?.bucketId;
 	return typeof bucketId === 'string' && bucketId ? bucketId : undefined;
@@ -148,7 +150,9 @@ async function bucketForResource(
  * specs/098 such a client's project stored no bucket at all and it went on through rules 3 and 4, and
  * neither that migration nor specs/099's was meant to change where a single person signs in.
  */
-function pinnedBucketOf(bucketId: string | undefined): string | undefined {
+export function pinnedBucketOf(
+	bucketId: string | undefined
+): string | undefined {
 	if (!bucketId || bucketId === DEFAULT_BUCKET_ID) return undefined;
 	return bucketId;
 }

@@ -61,7 +61,7 @@ export default function checkRedirectUri(
 		validateRedirectUri(
 			[oidc.params.redirect_uri],
 			oidc.client.applicationType,
-			{ label: 'redirect_uri', ErrorClass: InvalidRequest }
+			{ label: 'redirect_uri', ErrorClass: InvalidRequest, newUri: true }
 		);
 	}
 

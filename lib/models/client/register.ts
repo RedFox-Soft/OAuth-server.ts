@@ -5,6 +5,7 @@ import { validateClient } from './validate.ts';
 import { toStored } from './projection.ts';
 import { rootKeys } from '../../keys/issuer_keys.js';
 import { InvalidClientMetadata } from '../../helpers/errors.ts';
+import { LOOPBACKS } from '../../consts/client_attributes.js';
 import { isAccountPageClient } from '../../account_page/client.js';
 
 /*
@@ -24,19 +25,61 @@ import { isAccountPageClient } from '../../account_page/client.js';
  * it again; a name that answers differently the second time reaches the private network over plain http, while over
  * https the certificate check fails. Judged only when the value is new or changed, against the stored record, so a
  * client stored with an http address keeps resolving and can still have its other fields edited.
+ *
+ * A metadata document's addresses are held to it too, every time it is resolved: it has no stored record, so every
+ * value is new, and draft -02 §8.6 makes the special-use-address rule a MUST for "any URLs contained within" it.
  */
 const FETCHED = [
 	['jwksUri', 'jwks_uri'],
 	['backchannelLogoutUri', 'backchannel_logout_uri']
 ] as const;
 
-async function assertFetchedOverTls(client: Client): Promise<void> {
-	const stored = await adapter('Client').find(client.clientId);
+async function assertFetchedOverTls(
+	client: Client,
+	stored: ClientRecord | undefined
+): Promise<void> {
 	for (const [field, wire] of FETCHED) {
 		const value = client[field];
 		if (typeof value !== 'string' || value.startsWith('https://')) continue;
 		if (stored?.[wire] === value) continue;
 		throw new InvalidClientMetadata(`${wire} must use https`);
+	}
+}
+
+/*
+ * MCP 2026-07-28: "All redirect URIs MUST be either localhost or use HTTPS". Plain http serves a program on the end
+ * user's own machine (RFC 8252 §7.3); anywhere else it hands the authorization code, or the end of a sign-out, to
+ * whoever is on the network path. So plain http is accepted on a loopback host only, whatever the application type.
+ *
+ * Judged on the write, and only for an address the write adds, compared with the stored record — not by the schema,
+ * which validates every client each time it is resolved and would then strand every client stored before the rule
+ * with `invalid_client` at its next sign-in. A document client has no record, so every address of it is new.
+ *
+ * The description leads with the attribute's name because `InvalidClientMetadata` gives a `redirectUris` refusal
+ * the code RFC 7591 defines for it, `invalid_redirect_uri`, and every other one `invalid_client_metadata`.
+ */
+const REDIRECTED = [
+	['redirectUris', 'redirectUris'],
+	['postLogoutRedirectUris', 'post_logout_redirect_uris']
+] as const;
+
+function assertPlainHttpOnLoopback(
+	client: Client,
+	stored: ClientRecord | undefined
+): void {
+	for (const [field, storedAs] of REDIRECTED) {
+		const kept = stored?.[storedAs];
+		const before = new Set(Array.isArray(kept) ? kept : []);
+		for (const uri of client[field] ?? []) {
+			if (before.has(uri)) continue;
+			const parsed = URL.parse(uri);
+			if (parsed?.protocol !== 'http:' || LOOPBACKS.has(parsed.hostname)) {
+				continue;
+			}
+			throw new InvalidClientMetadata(
+				`${field} ${uri} must use https unless its host is localhost, 127.0.0.1 or [::1]`
+			);
+		}
 	}
 }
 
@@ -65,7 +108,12 @@ export async function registerClient(
 		await sectorValidate(client);
 	}
 
-	if (store) await assertFetchedOverTls(client);
+	/* A document client has no record by construction (validate.ts reads the adapter first), so there is none to read. */
+	const stored = store
+		? await adapter('Client').find(client.clientId)
+		: undefined;
+	await assertFetchedOverTls(client, stored);
+	assertPlainHttpOnLoopback(client, stored);
 
 	if (store) {
 		await adapter('Client').upsert(client.clientId, toStored(client));

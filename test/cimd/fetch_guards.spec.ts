@@ -34,7 +34,7 @@ afterEach(() => {
 
 /**
  * @proves The outbound fetch for a client document cannot be pointed at an internal address,
- * downgraded, redirected without re-checking, or used to read an unbounded body.
+ * redirected, or used to read an unbounded body.
  */
 describe('refusing a destination this server should not reach', () => {
 	it('refuses every private and reserved range, by name', async () => {
@@ -86,63 +86,33 @@ describe('refusing a destination this server should not reach', () => {
 	});
 });
 
-describe('following a redirect', () => {
-	it('re-validates each hop and refuses one that lands on a private address', async () => {
-		const lookup = spyOn(resolver, 'lookup').mockImplementation(
-			async (host: string) =>
-				host === 'app.example.com' ? ['93.184.216.34'] : ['10.0.0.5']
-		);
-
-		mock('https://app.example.com')
-			.intercept({ path: '/c.json' })
-			.reply(302, '', { headers: { location: 'https://internal.example/c' } });
-
-		const result = await fetchClientDocument(OK.identifier);
-
-		expect(result.ok).toBe(false);
-		if (!result.ok) expect(result.reason).toBe('blocked_address');
-		/* Both hosts were resolved: the second hop was checked rather than trusted. */
-		expect(lookup.mock.calls.length).toBeGreaterThanOrEqual(2);
-	});
-
-	it('refuses a redirect to a non-https destination', async () => {
-		resolveTo('93.184.216.34');
-		mock('https://app.example.com')
-			.intercept({ path: '/c.json' })
-			.reply(302, '', { headers: { location: 'http://app.example.com/c' } });
-
-		const result = await fetchClientDocument(OK.identifier);
-
-		expect(result.ok).toBe(false);
-		if (!result.ok) expect(result.reason).toBe('bad_redirect');
-	});
-
-	it('refuses a redirect chain that will not terminate', async () => {
-		resolveTo('93.184.216.34');
-		for (let hop = 0; hop < 8; hop += 1) {
+/*
+ * Draft -02 §5: "The authorization server MUST NOT automatically follow HTTP redirects." A document lives at its
+ * identifier or nowhere, so the destination is never asked for — the interceptor registered there is left
+ * waiting, which is the proof.
+ */
+describe('answering with a redirect', () => {
+	it.each([301, 302, 307, 308])(
+		'refuses a document host that answers %d, and never requests the destination',
+		async (status) => {
+			resolveTo('93.184.216.34');
 			mock('https://app.example.com')
-				.intercept({ path: `/c${hop}.json` })
-				.reply(302, '', {
-					headers: { location: `https://app.example.com/c${hop + 1}.json` }
+				.intercept({ path: '/c.json' })
+				.reply(status, '', {
+					headers: { location: 'https://app.example.com/moved.json' }
 				});
+			mock('https://app.example.com')
+				.intercept({ path: '/moved.json' })
+				.reply(200, '{}', { headers: { 'content-type': 'application/json' } });
+
+			const result = await fetchClientDocument(OK.identifier);
+
+			expect(result).toEqual({ ok: false, reason: 'status' });
+			expect(() => assertNoPendingInterceptors()).toThrow(
+				'https://app.example.com/moved.json'
+			);
 		}
-
-		const result = await fetchClientDocument('https://app.example.com/c0.json');
-
-		expect(result.ok).toBe(false);
-		if (!result.ok) expect(result.reason).toBe('too_many_redirects');
-		mock.restore();
-	});
-
-	it('refuses a redirect with no destination', async () => {
-		resolveTo('93.184.216.34');
-		mock('https://app.example.com').intercept({ path: '/c.json' }).reply(302);
-
-		const result = await fetchClientDocument(OK.identifier);
-
-		expect(result.ok).toBe(false);
-		if (!result.ok) expect(result.reason).toBe('bad_redirect');
-	});
+	);
 });
 
 describe('bounding what is accepted', () => {
@@ -187,6 +157,18 @@ describe('bounding what is accepted', () => {
 
 		expect(result.ok).toBe(false);
 		if (!result.ok) expect(result.reason).toBe('status');
+	});
+
+	/* Draft -02 §5: the document "MUST be served with a 200 OK", and every other status is an error. */
+	it('refuses a success status other than 200', async () => {
+		resolveTo('93.184.216.34');
+		mock('https://app.example.com')
+			.intercept({ path: '/c.json' })
+			.reply(203, '{}', { headers: { 'content-type': 'application/json' } });
+
+		const result = await fetchClientDocument(OK.identifier);
+
+		expect(result).toEqual({ ok: false, reason: 'status' });
 	});
 
 	it('reports a transport failure as unreachable rather than throwing', async () => {

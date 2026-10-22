@@ -677,20 +677,22 @@ export const ApplicationConfig = {
 	 *
 	 * title: [`OIDC Dynamic Client Registration 1.0`](https://openid.net/specs/openid-connect-registration-1_0-final.html) and [`RFC7591`](https://www.rfc-editor.org/rfc/rfc7591.html) - OAuth 2.0 Dynamic Client Registration Protocol
 	 *
-	 * description: Enables Dynamic Client Registration.
+	 * description: Enables Dynamic Client Registration. The MCP authorization specification (2026-07-28)
+	 * deprecates it for MCP clients, retaining it for those that cannot host a metadata document, and
+	 * recommends `clientIdMetadataDocument.enabled` instead.
 	 */
 	'registration.enabled': false,
 	/*
 	 * features.clientIdMetadataDocument.enabled
 	 *
-	 * title: [`OAuth Client ID Metadata Documents`](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-client-id-metadata-document-00) — the mechanism the MCP authorization specification names first for a client with no prior relationship
+	 * title: [`OAuth Client ID Metadata Documents`](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-client-id-metadata-document-02) — the registration path the MCP authorization specification (2026-07-28) recommends for a client with no prior relationship
 	 *
 	 * description: Accepts an https URL carrying a path component as a `client_id`, retrieves the JSON
 	 * document it names, and uses it as that client's metadata — creating no client record. Off by
 	 * default because switching it on lets an unauthenticated caller make this server issue an
 	 * outbound HTTP request, which is a capability a deployment consents to rather than inherits.
-	 * The egress is bounded (private, loopback and link-local addresses refused, every redirect hop
-	 * re-checked, 5 KB and a short timeout) and the document's own cache headers bound how long it is
+	 * The egress is bounded (private, loopback and link-local addresses refused, no redirect followed,
+	 * a 200 response required, 5 KB and a short timeout) and the document's own cache headers bound how long it is
 	 * reused. Advertised as `client_id_metadata_document_supported` only while this is on, because a
 	 * client checks for that member before attempting the mechanism and falls back otherwise.
 	 */

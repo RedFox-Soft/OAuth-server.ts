@@ -223,7 +223,9 @@ export interface EgressOptions {
  *
  * A redirect is followed for GET only. A POST answered with one is returned as it is, which every
  * caller here treats as the failure it is: a notification endpoint that redirects is not one that
- * received the notification.
+ * received the notification. So is a GET whose caller allows no redirect at all (`maxRedirects: 0`):
+ * returned unread, its Location never parsed or requested, for a caller whose target must be answered
+ * where it is or not at all.
  */
 export async function guardedFetch(
 	url: string | URL,
@@ -254,7 +256,12 @@ export async function guardedFetch(
 			);
 		}
 
-		if (method !== 'GET' || response.status < 300 || response.status >= 400) {
+		if (
+			method !== 'GET' ||
+			maxRedirects === 0 ||
+			response.status < 300 ||
+			response.status >= 400
+		) {
 			return response;
 		}
 

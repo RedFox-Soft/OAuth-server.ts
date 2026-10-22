@@ -289,6 +289,65 @@ describe('editing a client through the console', () => {
  * @proves A change to a pairwise client is checked against its sector identifier document when it is
  * made, not left to fail the next time somebody uses the client.
  */
+/**
+ * @proves A client stored before plain-http redirects were confined to loopback keeps every address it has and
+ * can still be edited, while an edit that adds such an address is refused, naming it.
+ */
+describe('editing a client stored with a plain-http redirect on a non-loopback host', () => {
+	const STORED = 'http://intranet.example/callback';
+
+	beforeAll(async () => {
+		await bootstrap(import.meta.url, { config: 'client_edit' });
+	});
+
+	/* Seeded straight into the store, as an upgrade finds it: no write rule ever judged it. */
+	function seedLegacy(): string {
+		const clientId = `legacy-${crypto.randomUUID()}`;
+		seedClient({
+			clientId,
+			clientSecret: 'secret',
+			grantTypes: ['authorization_code'],
+			responseTypes: ['code'],
+			redirectUris: [STORED]
+		});
+		return clientId;
+	}
+
+	it('lets an administrator rename it', async () => {
+		const clientId = seedLegacy();
+
+		await updateClient(clientId, { clientName: 'Renamed' });
+
+		expect((await storedClient(clientId)).client_name).toBe('Renamed');
+	});
+
+	it('refuses an edit that adds another such redirect, naming it, and keeps the record', async () => {
+		const clientId = seedLegacy();
+		const before = await storedClient(clientId);
+
+		const refusal = await updateClient(clientId, {
+			redirectUris: [STORED, 'http://other.example/callback']
+		}).then(
+			() => undefined,
+			(err: unknown) => err
+		);
+
+		expect(refusal).toMatchObject({ status: 422 });
+		expect(refusal instanceof Error ? refusal.message : '').toContain(
+			'http://other.example/callback'
+		);
+		expect(await storedClient(clientId)).toEqual(before);
+	});
+
+	it('still resolves with the stored redirect, so its sign-ins go on working', async () => {
+		const clientId = seedLegacy();
+
+		const client = await Client.find(clientId);
+
+		expect(client.redirectUris).toEqual([STORED]);
+	});
+});
+
 describe('editing a pairwise client with a sector identifier', () => {
 	beforeAll(async () => {
 		await bootstrap(import.meta.url, { config: 'client_edit' });

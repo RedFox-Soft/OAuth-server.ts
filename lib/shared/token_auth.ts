@@ -4,6 +4,7 @@ import certificateThumbprint from '../helpers/certificate_thumbprint.js';
 import { noVSCHAR } from '../consts/client_attributes.js';
 
 import { tokenJwtAuth } from './token_jwt_auth.js';
+import { assertClientServedHere } from '../actions/authorization/check_bucket.js';
 import {
 	certificateAuthorized,
 	certificateSubjectMatches
@@ -152,6 +153,8 @@ export async function tokenAuth(
 	const client = await Client.find(auth.clientId, {
 		error: new InvalidClientAuth('client not found')
 	});
+
+	await assertClientServedHere(client.clientId, oidc.bucket);
 
 	oidc.entity('Client', client);
 

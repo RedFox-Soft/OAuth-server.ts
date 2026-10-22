@@ -25,8 +25,25 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   only; RP-initiated sign-out from such an application ends the administrators' sign-in; deactivating an administrator
   revokes their tokens. No migration, no setting.
 
+### Changed
+
+- **Aligned with MCP 2026-07-28** — client ID metadata documents now follow draft -02: one request answered 200 (no
+  redirect followed), a document that publishes a secret is refused, one that names no authentication method is a
+  public client, every refusal is `invalid_client`, and addresses inside a document must be https. The settings now
+  call metadata documents MCP's recommended path and dynamic registration deprecated (behaviour unchanged, both still
+  off by default). A client of a project with an address is now unknown at every other issuer's token, introspection,
+  revocation and pushed-request endpoints, and a code, refresh token, device code or backchannel request redeems only
+  at the issuer that issued it; client credentials at a project's address serve only that project's clients. A client
+  configured with another project's or the root's token endpoint stops working until pointed at its own. New
+  registrations and edits may add a plain-http redirect only on `localhost`, `127.0.0.1` or `[::1]`; stored ones keep
+  working. An agent-access entry that matched only through URL normalisation must be re-added exactly as the client
+  presents it. No migration, no setting.
+
 ### Fixed
 
+- **Introspection at the root reports the root's own tokens active again** for applications of a project with no
+  address of its own. A token obtained through the sign-in screens recorded that project, and introspection compared
+  it with the default project the root is addressed as, answering `active: false`. No migration.
 - **Signing out of the console no longer disconnects an MCP agent** connected in the same browser. `/mcp` now tells
   clients to ask for `openid offline_access` (while the instance offers `offline_access`), so the agent's grant
   outlives the browser session and comes with a refresh token; agents already connected keep the old behaviour until

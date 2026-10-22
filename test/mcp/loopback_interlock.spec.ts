@@ -120,6 +120,35 @@ describe('permitting a client identity through the admin API', () => {
 	});
 
 	/*
+	 * Draft -02 §3: client identifier URLs are compared as simple strings. A URL parser lowercases the host and
+	 * drops a default port, so an entry stored in its parsed form could never match the identifier a client
+	 * actually presents when that identifier was written any other way.
+	 */
+	it('keeps an identifier exactly as written, so it matches only that spelling', async () => {
+		const { cookie } = await superAdmin();
+		const written = 'https://Tools.Example.com/client';
+		serveDocument({
+			origin: 'https://tools.example.com',
+			path: '/client',
+			overrides: {
+				client_id: written,
+				redirect_uris: ['https://app.example.com/callback']
+			}
+		});
+
+		const res = await api.admin.api.mcp.clients.post(
+			{ kind: 'identifier', value: written },
+			{ headers: { cookie } }
+		);
+
+		expect(res.status).toBe(201);
+		expect(await mcpClientPermissionStore.findFor(written)).not.toBeNull();
+		expect(
+			await mcpClientPermissionStore.findFor('https://tools.example.com/client')
+		).toBeNull();
+	});
+
+	/*
 	 * The interlock. The refusal carries the same words the console shows as the acknowledgement, so
 	 * what the administrator agreed to and what the route enforced cannot be two different statements.
 	 */

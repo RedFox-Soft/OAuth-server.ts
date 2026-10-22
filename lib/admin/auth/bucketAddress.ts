@@ -357,6 +357,25 @@ function requestBucketOf(bucket: UserBucket): RequestBucket {
 }
 
 /*
+ * Which addressed bucket's endpoints serve the issuer something was issued under, for the check that an
+ * authorization code, refresh token, device code or backchannel request is redeemed only where it was issued.
+ *
+ * Not the id the artefact recorded, and the difference is buckets with no address: a sign-in for one runs at
+ * the root and records that bucket's id, yet the request redeeming it arrives at the root and is addressed as
+ * the default bucket. Every bucket served at the root shares the one issuer there, so all of them answer as
+ * the default bucket here. A bucket with an address answers as itself, so one that moves between address forms
+ * keeps its artefacts; a bucket that no longer exists answers as itself too, and so matches no address at all.
+ */
+export async function servingBucketIdOf(
+	bucketId: string | undefined
+): Promise<string> {
+	if (!bucketId || bucketId === DEFAULT_BUCKET_ID) return DEFAULT_BUCKET_ID;
+	const bucket = await getBucketStore().find(bucketId);
+	if (bucket && !isAddressable(bucket)) return DEFAULT_BUCKET_ID;
+	return bucketId;
+}
+
+/*
  * The address of the bucket that issued something, from the record id that something stored.
  *
  * A token records the bucket's **id** rather than its slug, because the id is the durable key and a
