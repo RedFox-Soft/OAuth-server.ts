@@ -120,9 +120,11 @@ function deriveClaimsSupported(config: Config): string[] {
 	for (const [key, value] of Object.entries(claims)) {
 		if (value === null) supported.add(key);
 	}
-	// Mirrors lib/configs/configuration.ts: `amr` and `session_expiry` are supported whatever the stored setting holds.
+	// Mirrors lib/configs/configuration.ts: these are supported whatever the stored setting holds.
 	supported.add('amr');
 	supported.add('session_expiry');
+	supported.add('auth_time');
+	supported.add('acr');
 	return [...supported];
 }
 

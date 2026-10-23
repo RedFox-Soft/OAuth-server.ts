@@ -259,6 +259,12 @@ export const handler = async function refreshTokenHandler(
 
 		token.set('nonce', refreshToken.payload.nonce);
 		token.set('sid', refreshToken.payload.sid);
+		/* IPSIE SL1 §3.2.1: every ID token says when the person authenticated and which context that
+		 * satisfied, asked for or not; never invented where the sign-in did not record one. */
+		if (refreshToken.payload.authTime !== undefined) {
+			token.set('auth_time', refreshToken.payload.authTime);
+		}
+		if (refreshToken.payload.acr) token.set('acr', refreshToken.payload.acr);
 		token.sessionExpiry = await sessionExpiryInput(
 			refreshToken.payload.sessionUid
 		);

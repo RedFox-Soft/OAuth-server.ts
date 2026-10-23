@@ -775,10 +775,13 @@ export function validateConfiguration(
 	 * the request asked; it is not the claims setting's to release. Added here rather than to the
 	 * setting's default because a stored setting replaces that default whole, so an instance whose
 	 * operator once saved it would emit a claim it never advertised. Mirrored in discoverySupport.ts.
-	 * `session_expiry` (IPSIE SL1 §3.2.1) is in every ID token for the same reason, and added the same way.
+	 * `session_expiry`, `auth_time` and `acr` (IPSIE SL1 §3.2.1) are in every ID token for the same reason,
+	 * and added the same way.
 	 */
 	claimsSupported.add('amr');
 	claimsSupported.add('session_expiry');
+	claimsSupported.add('auth_time');
+	claimsSupported.add('acr');
 
 	checkDependantFeatures(config);
 	checkDeviceFlow(config);

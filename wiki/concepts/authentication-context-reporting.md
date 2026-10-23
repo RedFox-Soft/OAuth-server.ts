@@ -146,9 +146,14 @@ a claims-parameter finding: see [[feature-flag-gating]] for the general shape.
   one, signs in with a password and reports the single-factor context — and a relying party requiring
   multi-factor is refused for them. The setting's own description says so, because it arrives as a
   support question whose remedy is a different setting.
-- **A request that asks for nothing is unchanged.** §5.5.1.1 does not require the claim when it was
-  not requested, and the mask reflects that, which is what keeps every existing deployment's tokens
-  byte-identical.
+- **A request that asks for nothing is told too.** Reversed 2026-10-23. Until then, an unasked request got
+  no `acr`: OIDC Core §5.5.1.1 does not require the claim unless it was requested, and leaving it out kept
+  every existing deployment's tokens byte-identical. IPSIE SL1 §3.2.1 now requires `acr` and `auth_time`
+  in every ID token. The byte-identity argument had already gone, because `session_expiry` changed every
+  token the day before ([[session-expiry-claim]]). So the four grants set `acr` and `auth_time` after the
+  mask, as they set `amr`, whenever the sign-in recorded them, and both are advertised whatever the stored
+  claims setting holds. A backchannel authentication whose integration reported neither still yields
+  neither: the server never invents a context.
 
 ## Related
 

@@ -55,6 +55,8 @@ issuer-only, while opt-in, is the constitution's isolated deviation from two tex
 
 ## When the default flips
 
+Tracked in issue #80.
+
 rfc7523bis was approved by the IESG on 2026-04-30 and has sat in RFC Editor final review since
 (2026-10-19: "Blocked: Final Approval Pending"). **When it is published as an RFC, the default of
 `clientAuth.issuerOnlyAudience` (`lib/configs/application.ts:228`) becomes `true`.** One key covers both
@@ -90,6 +92,12 @@ in `lib/helpers/jwt.ts:36-49`.
 
 - The audience of a JWT used as an authorization grant (rfc7523bis §4 item 3a: issuer *or* token endpoint
   URL) — see [[enterprise-managed-authorization]].
-- Request Objects: OIDC Core errata 3 tightens their audience the same way; a separate item.
+- Request Objects, checked 2026-10-23. Every final text allows more than the issuer alone. OIDC Core errata set 2
+  §6.1 says "SHOULD be or include". RFC 9101 §4 says "should be". FAPI 2.0 Message Signing (final, 2025-09-25)
+  §5.3.1 item 2 says the server requires `aud` "to be, or to be an array containing" the issuer.
+  `processRequestObject` accepts any `aud` containing the issuer, which matches all three. Only OIDC Core
+  errata 3, still draft 36, tightens it ("MUST be the OP's Issuer Identifier … as a string"). Tightening now
+  would depart even from FAPI, so it waits for that errata's approval, tracked with the default flip in
+  issue #80.
 - This server sends no client assertion of its own (upstream federation authenticates with a secret), so the
   client-side half of rfc7523bis needs nothing.

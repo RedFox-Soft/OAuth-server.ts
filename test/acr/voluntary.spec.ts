@@ -113,8 +113,7 @@ function preferring(values: string, clientId = 'acr-app') {
 
 /**
  * @proves A relying party that asks how the end user authenticated is told the context the sign-in
- * actually satisfied, a preference that cannot be met never fails the request, and a request that
- * asks nothing is answered exactly as before.
+ * actually satisfied, and a preference that cannot be met never fails the request.
  */
 describe('a preferred authentication context', () => {
 	beforeAll(async () => {
@@ -159,20 +158,6 @@ describe('a preferred authentication context', () => {
 		);
 
 		expect(decodeJWT(idTokenOf(token)).payload.acr).toBe(MFA);
-	});
-
-	it('carries no authentication context when the request asks for none', async () => {
-		const email = `silent-${Math.random()}@x.io`;
-		await seedUser(plainBucketId, email);
-		const auth = new AuthorizationRequest({
-			client_id: 'acr-app',
-			scope: 'openid'
-		});
-
-		const token = await auth.getToken(await codeFrom(auth, email));
-
-		// The regression guard for every existing deployment: unasked, the claim stays absent.
-		expect(decodeJWT(idTokenOf(token)).payload).not.toHaveProperty('acr');
 	});
 
 	it('reports the original sign-in context when the client refreshes its tokens', async () => {

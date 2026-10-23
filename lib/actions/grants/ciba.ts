@@ -256,6 +256,12 @@ export const handler = async function cibaHandler(
 
 		token.set('nonce', request.payload.nonce);
 		token.set('sid', request.payload.sid);
+		/* IPSIE SL1 §3.2.1: every ID token says when the person authenticated and which context that
+		 * satisfied, asked for or not; never invented where the sign-in did not record one. */
+		if (request.payload.authTime !== undefined) {
+			token.set('auth_time', request.payload.authTime);
+		}
+		if (request.payload.acr) token.set('acr', request.payload.acr);
 		token.sessionExpiry = await sessionExpiryInput(request.payload.sessionUid);
 		if (request.payload.amr?.length) token.set('amr', request.payload.amr);
 

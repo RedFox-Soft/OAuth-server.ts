@@ -251,6 +251,12 @@ export const handler = async function deviceCodeHandler(
 
 		token.set('nonce', code.payload.nonce);
 		token.set('sid', code.payload.sid);
+		/* IPSIE SL1 §3.2.1: every ID token says when the person authenticated and which context that
+		 * satisfied, asked for or not; never invented where the sign-in did not record one. */
+		if (code.payload.authTime !== undefined) {
+			token.set('auth_time', code.payload.authTime);
+		}
+		if (code.payload.acr) token.set('acr', code.payload.acr);
 		token.sessionExpiry = await sessionExpiryInput(code.payload.sessionUid);
 		if (code.payload.amr?.length) token.set('amr', code.payload.amr);
 

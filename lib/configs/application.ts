@@ -784,8 +784,8 @@ export const ApplicationConfig = {
 	 *
 	 * description: Claims map used to derive `claims_supported` and claim-defined scopes for discovery.
 	 *   `{ claimName: null }` exposes a standalone claim; `{ scopeName: ['claim', ...] }` groups claims under a scope.
-	 *   `amr` and `session_expiry` are supported whatever this holds (lib/configs/configuration.ts says why),
-	 *   so neither needs an entry.
+	 *   `amr`, `session_expiry`, `auth_time` and `acr` are supported whatever this holds
+	 *   (lib/configs/configuration.ts says why), so none needs an entry.
 	 *   `profile`, `email` and `phone` carry the OpenID Connect Core §5.4 lists, which is what a provisioned
 	 *   profile is released under; without `email` no application could learn whom it signed in, or whether
 	 *   that address was proven. A deployment that saved this setting keeps what it saved: the stored object

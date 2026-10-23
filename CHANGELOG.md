@@ -20,6 +20,12 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   past the browser session and never under five minutes. A federated session ends when the provider's own
   `session_expiry` says, and a malformed or past value refuses the sign-in.
 
+### Changed
+
+- **`auth_time` and `acr` in every ID token** (IPSIE SL1 §3.2.1) — no longer only when the request asked
+  (`max_age`, `prompt=login`, `require_auth_time`, `acr_values`, a claims request). Both are advertised whatever the
+  stored claims setting holds. A backchannel authentication whose integration reported neither still yields neither.
+
 ## [1.3.0] - 2026-10-22
 
 Agents in the enterprise: a project can accept identity assertions (ID-JAG) for its APIs and issue them for outside

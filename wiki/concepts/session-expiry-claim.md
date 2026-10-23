@@ -88,9 +88,11 @@ connection and failing a sign-in whose provider sends no claim; here a missing c
 
 ## Known SL1 gaps left by spec 111
 
-- OpenID Provider: `auth_time`, `acr` and `amr` in every ID token; `acr` reporting the class actually
-  satisfied; `max_age` and `acr_values` requirements; 60-second authorization codes; no `http` redirect URIs;
-  no unauthenticated dynamic registration; DPoP-bound access tokens (SHOULD). Several are deliberate defaults
-  and need their own decision.
+- OpenID Provider: `amr` after a federated sign-in, where forwarding a trusted provider's methods is
+  deferred by decision ([[amr-reporting]]); no `http` redirect URIs; no unauthenticated dynamic
+  registration; DPoP-bound access tokens (SHOULD). The last three break RFC 8252 loopback apps and MCP's
+  DCR as defaults, so they belong to a profile switch of their own. Closed since: `auth_time` and `acr`
+  in every ID token (2026-10-23, [[authentication-context-reporting]]). Already held: 60-second
+  authorization codes (`lib/configs/liveTime.ts:49`), and `max_age` and `acr_values` support.
 - The admin console is itself a relying party of this server, with an absolute and a sliding expiry of its
   own, and does not read `session_expiry`.
