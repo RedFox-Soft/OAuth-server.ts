@@ -10,7 +10,8 @@ const NON_REJECTABLE_CLAIMS = new Set([
 	'auth_time',
 	'acr',
 	'amr',
-	'iss'
+	'iss',
+	'session_expiry'
 ]);
 
 export const GrantPayload = t.Object({

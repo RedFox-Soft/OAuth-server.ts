@@ -34,6 +34,7 @@ export type IdTokenRejectionReason =
 	| 'issued_in_future'
 	| 'subject'
 	| 'nonce'
+	| 'session_expiry'
 	| 'unverifiable';
 
 export class FederationIdTokenRejected extends Error {
@@ -242,6 +243,20 @@ export async function verifyFederatedIdToken(
 
 	if (typeof payload.sub !== 'string' || payload.sub.length === 0) {
 		throw new FederationIdTokenRejected('subject');
+	}
+
+	/*
+	 * IPSIE SL1 §3.2.2: this server, as the provider's relying party, "MUST re-authenticate the user through
+	 * the OpenID Provider after the time indicated in the `session_expiry` claim", a Unix timestamp (OpenID
+	 * Connect Enterprise Extensions §2.1). A value that is no such number cannot be honoured, and one already
+	 * past says the session it would start has ended — so either refuses the sign-in rather than ignoring it.
+	 */
+	if (
+		payload.session_expiry !== undefined &&
+		(!Number.isSafeInteger(payload.session_expiry) ||
+			Number(payload.session_expiry) < epochTime() - clockTolerance)
+	) {
+		throw new FederationIdTokenRejected('session_expiry');
 	}
 
 	return { subject: payload.sub, claims: payload };

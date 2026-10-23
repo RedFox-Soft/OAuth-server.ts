@@ -209,6 +209,25 @@ export const ApplicationConfig = {
 	'fapi.enabled': false,
 
 	/*
+	 * clientAuth.issuerOnlyAudience
+	 *
+	 * title: Issuer-only audience for client assertions ([draft-ietf-oauth-rfc7523bis](https://datatracker.ietf.org/doc/draft-ietf-oauth-rfc7523bis/) §4 item 3b, §5)
+	 *
+	 * description: A `private_key_jwt` or `client_secret_jwt` assertion is accepted only when its `aud`
+	 * is this server's issuer identifier and nothing else (a string, or a one-element array). This closes
+	 * the audience-injection attack (CVE-2025-27370, CVE-2025-27371) that rfc7523bis and OpenID Connect
+	 * Core errata set 3 §9 answer: an assertion a client wrote for a malicious server, audienced at this
+	 * server's token endpoint, can no longer be spent here.
+	 *
+	 * Off by default because, on, it departs from two texts still in force: RFC 9126 §2 ("MUST accept
+	 * its issuer identifier, token endpoint URL, or pushed authorization request endpoint URL") and CIBA
+	 * Core §7.1 (the same, with the Backchannel Authentication Endpoint URL). The default becomes `true`
+	 * once rfc7523bis is published as an RFC — IESG-approved 2026-04-30, at the RFC Editor since. Always
+	 * in force while `fapi.enabled` is on, which additionally requires a string.
+	 */
+	'clientAuth.issuerOnlyAudience': false,
+
+	/*
 	 * features.clientCredentials
 	 *
 	 * title: [`RFC6749`](https://www.rfc-editor.org/rfc/rfc6749.html#section-1.3.4) - Client Credentials
@@ -765,7 +784,8 @@ export const ApplicationConfig = {
 	 *
 	 * description: Claims map used to derive `claims_supported` and claim-defined scopes for discovery.
 	 *   `{ claimName: null }` exposes a standalone claim; `{ scopeName: ['claim', ...] }` groups claims under a scope.
-	 *   `amr` is supported whatever this holds (lib/configs/configuration.ts says why), so it needs no entry.
+	 *   `amr` and `session_expiry` are supported whatever this holds (lib/configs/configuration.ts says why),
+	 *   so neither needs an entry.
 	 *   `profile`, `email` and `phone` carry the OpenID Connect Core §5.4 lists, which is what a provisioned
 	 *   profile is released under; without `email` no application could learn whom it signed in, or whether
 	 *   that address was proven. A deployment that saved this setting keeps what it saved: the stored object
@@ -815,6 +835,20 @@ export const ApplicationConfig = {
 	 * title: ID Token only contains End-User claims when the requested `response_type` is `id_token`
 	 */
 	conformIdTokenClaims: true,
+
+	/*
+	 * idToken.relyingPartySessionLifetime
+	 *
+	 * title: How long after an ID Token is issued its `session_expiry` lies (IPSIE SL1 §3.2.1, OpenID
+	 * Connect Enterprise Extensions §2.1)
+	 *
+	 * description: Integer seconds, 300 to 1209600 (the session lifetime). Every ID Token says when the
+	 * relying party "MUST re-authenticate the user through the OpenID Provider" (SL1 §3.2.2); this is the
+	 * bound on that, lowered to the end of the browser session it came from — including an upstream
+	 * provider's own `session_expiry` — and never below `iat` + 300. 24 hours by default: NIST SP 800-63B-4
+	 * recommends an AAL2 overall reauthentication timeout of no more than that.
+	 */
+	'idToken.relyingPartySessionLifetime': 86400,
 
 	/*
 	 * discovery

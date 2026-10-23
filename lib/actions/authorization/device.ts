@@ -140,6 +140,7 @@ export const deviceAuth = new Elysia()
 			const oidc = new OIDCContext({
 				params: body,
 				headers,
+				route: 'device_authorization',
 				bucket: await bucketOf(params, request),
 				ip: server?.requestIP(request)?.address
 			});

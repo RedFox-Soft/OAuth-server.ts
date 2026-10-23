@@ -34,7 +34,8 @@ export const PROTOCOL_CLAIMS = new Set([
 	'amr',
 	'sid',
 	'auth_time',
-	'iss'
+	'iss',
+	'session_expiry'
 ]);
 
 /* The category an individually requested claim belongs to, or undefined for one nobody worded. */

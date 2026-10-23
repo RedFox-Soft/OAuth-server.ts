@@ -110,8 +110,14 @@ export async function findAccount<
 			 *
 			 * `groups` is never taken from the stored claims: it is the user's actual membership, and a stored
 			 * value would let whoever can edit an account's claims forge what every relying party authorizes on.
+			 * Nor is `session_expiry`, which the server computes at issuance: reserving the name stops new
+			 * writes only, and one stored before it was reserved would reach UserInfo through a claims request.
 			 */
-			const { groups: _stored, ...stored } = user.claims ?? {};
+			const {
+				groups: _stored,
+				session_expiry: _expiry,
+				...stored
+			} = user.claims ?? {};
 			const claims: Record<string, unknown> = {
 				...stored,
 				...profileClaims(user),

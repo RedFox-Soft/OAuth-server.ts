@@ -165,9 +165,12 @@ binding binds nothing. An MCP client that is public on either side cannot use th
 
 General token exchange of access tokens (delegation, `act`/`may_act`); SAML subject tokens and `sub_id`;
 `authorization_details`; step-up; protected issuer-acceptance discovery (ID-JAG §9.4 MAY); resolving a person
-by `aud_sub`; 7523bis's tightened client-authentication audience (still accepting the token endpoint URL —
-its own change); workload identity federation as Entra and GitHub practise it, which is federated *client
+by `aud_sub`; workload identity federation as Entra and GitHub practise it, which is federated *client
 authentication*, not this grant (RFC 7523 §3 item 2B requires such a JWT's `sub` to be the client id).
+
+7523bis's tightened client-authentication audience was listed here until spec 111 (2026-10-22), which made it
+an opt-in setting, `clientAuth.issuerOnlyAudience`, off until the RFC is published — see
+[[client-assertion-audience]].
 
 The two-project flow on one instance (spec story 3) is not covered by `bun test`: discovery of a provider
 requires https and an issuer that matches, and the test instance's `ISSUER` is `http://e.ly`. Resolving a

@@ -25,6 +25,7 @@ import { resourceTokenGroups } from '../../bucket_groups/claim.js';
 import { issuerFor } from '../../configs/issuer.js';
 import { routeNames } from '../../consts/param_list.js';
 import { conformedIdTokenScope } from '../../consts/groups_claim.js';
+import { sessionExpiryInput } from '../../shared/session_expiry.js';
 
 const { AuthorizationPending, ExpiredToken, InvalidGrant } = errors;
 
@@ -250,6 +251,7 @@ export const handler = async function deviceCodeHandler(
 
 		token.set('nonce', code.payload.nonce);
 		token.set('sid', code.payload.sid);
+		token.sessionExpiry = await sessionExpiryInput(code.payload.sessionUid);
 		if (code.payload.amr?.length) token.set('amr', code.payload.amr);
 
 		idToken = await token.issue('idtoken');

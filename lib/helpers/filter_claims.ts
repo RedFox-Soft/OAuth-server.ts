@@ -10,7 +10,17 @@ export default (
 	const granted = new Set(grant.getOIDCClaimsFiltered(new Set(requested)));
 
 	for (const claim of requested) {
-		if (['sub', 'sid', 'auth_time', 'acr', 'amr', 'iss'].includes(claim))
+		if (
+			[
+				'sub',
+				'sid',
+				'auth_time',
+				'acr',
+				'amr',
+				'iss',
+				'session_expiry'
+			].includes(claim)
+		)
 			continue;
 		if (!granted.has(claim)) {
 			delete claims[claim];

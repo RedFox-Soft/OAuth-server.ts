@@ -15,6 +15,8 @@ import { isUsableNonceSecret } from './nonceSecret.js';
 // bound is read from there rather than restated here so the throttle's own module and the validator
 // that guards it cannot disagree about how long a counter lives.
 import { LOGIN_RETENTION_SECONDS } from '../login_throttle/consts.js';
+// Same again: liveTime.ts imports nothing but types and epoch_time.
+import { ttl } from './liveTime.js';
 import {
 	ACR_DISTINCTIONS,
 	RESERVED_ACR_VALUE,
@@ -506,6 +508,19 @@ function checkAssertionGrants(config: ConfigurationInput) {
 	}
 }
 
+/*
+ * IPSIE SL1 §3.2.1: `session_expiry` is never less than 300 seconds after `iat`, so a smaller bound would
+ * be raised to that anyway; and a relying party cannot be promised a session longer than this server's own.
+ */
+function checkSessionExpiry(config: ConfigurationInput) {
+	const bound = config['idToken.relyingPartySessionLifetime'];
+	if (!Number.isSafeInteger(bound) || bound < 300 || bound > ttl.Session) {
+		throw new TypeError(
+			`idToken.relyingPartySessionLifetime must be an integer from 300 to ${ttl.Session} seconds`
+		);
+	}
+}
+
 function checkDependantFeatures(config: ConfigurationInput) {
 	if (config['jwtIntrospection.enabled'] && !config['introspection.enabled']) {
 		throw new TypeError(
@@ -760,8 +775,10 @@ export function validateConfiguration(
 	 * the request asked; it is not the claims setting's to release. Added here rather than to the
 	 * setting's default because a stored setting replaces that default whole, so an instance whose
 	 * operator once saved it would emit a claim it never advertised. Mirrored in discoverySupport.ts.
+	 * `session_expiry` (IPSIE SL1 §3.2.1) is in every ID token for the same reason, and added the same way.
 	 */
 	claimsSupported.add('amr');
+	claimsSupported.add('session_expiry');
 
 	checkDependantFeatures(config);
 	checkDeviceFlow(config);
@@ -775,6 +792,7 @@ export function validateConfiguration(
 	checkPlans(config);
 	checkLoginThrottle(config);
 	checkAssertionGrants(config);
+	checkSessionExpiry(config);
 
 	return {
 		scopes,

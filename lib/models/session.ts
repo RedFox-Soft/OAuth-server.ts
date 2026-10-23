@@ -37,7 +37,9 @@ export const SessionPayload = t.Object({
 	upstream: t.Optional(
 		t.Object({
 			providerId: t.String(),
-			sidDigest: t.Optional(t.String())
+			sidDigest: t.Optional(t.String()),
+			/* Epoch seconds: when the provider said its session ends; `save` never lets this one outlive it. */
+			sessionExpiry: t.Optional(t.Integer())
 		})
 	),
 	transient: t.Optional(t.Boolean()),
@@ -156,7 +158,18 @@ export class Session extends BaseModel<SessionPayloadType> {
 			this.#oldId = undefined;
 		}
 
-		const result = await super.save(lifetime);
+		/*
+		 * IPSIE SL1 §3.2.2: a sign-in through a provider that said when its session ends must go back to that
+		 * provider afterwards. Capping `exp` reuses the one expiry path sessions have, so every reader — the
+		 * authorization endpoint, device verification, logout, session-bound tokens, an ID token's
+		 * `session_expiry` — sees the bound without a check of its own.
+		 */
+		const upstreamEnd = this.payload.upstream?.sessionExpiry;
+		const result = await super.save(
+			upstreamEnd === undefined
+				? lifetime
+				: Math.max(1, Math.min(lifetime, upstreamEnd - epochTime()))
+		);
 		this.touched = false;
 		return result;
 	}
@@ -238,7 +251,11 @@ export class Session extends BaseModel<SessionPayloadType> {
 		loginTs?: number;
 		amr?: string[];
 		acr?: string;
-		upstream?: { providerId: string; sidDigest?: string };
+		upstream?: {
+			providerId: string;
+			sidDigest?: string;
+			sessionExpiry?: number;
+		};
 	}) {
 		const {
 			transient = false,

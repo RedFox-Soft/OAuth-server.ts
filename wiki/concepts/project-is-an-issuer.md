@@ -258,7 +258,9 @@ values (`lib/shared/token_jwt_auth.ts`) were the instance's — `ISSUER`, its to
 bare route — at every address, so an assertion naming `/acme/token` was refused at `/acme/token` while
 one naming the root was accepted there, and FAPI's single-issuer rule compared against the root too.
 They are now `issuerFor(oidc.bucket)` and the endpoints beneath it; the route is stripped of its
-`/:bucket` pattern first, since the matched route is a pattern, not a path.
+`/:bucket` pattern first, since the matched route is a pattern, not a path. Since spec 111 (2026-10-22) the
+endpoint value is always a path — device authorization and CIBA had glued a route *name* onto the issuer — and
+an opt-in rule accepts the issuer alone; see [[client-assertion-audience]].
 
 **So is a DPoP proof's `htu`.** Corrected the same day, for the same reason: `dpopValidate`
 (`lib/helpers/validate_dpop.ts`) compared `htu` with `ISSUER + route`, so at `/acme/token` a proof naming

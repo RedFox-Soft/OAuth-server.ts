@@ -41,6 +41,15 @@ const messages = {
 export type IdTokenUse =
 	'idtoken' | 'logout' | 'userinfo' | 'introspection' | 'authorization';
 
+/* What `session_expiry` is computed from: the operator's bound, and the browser session's end when known. */
+export interface SessionExpiryInput {
+	lifetime: number;
+	sessionEnd?: number;
+}
+
+/* IPSIE SL1 §3.2.1: "MUST NOT be less than 300 seconds (5 minutes) after the value of the `iat` claim". */
+const SESSION_EXPIRY_FLOOR = 300;
+
 export class IdToken {
 	client: Client;
 	available: Record<string, unknown>;
@@ -48,6 +57,7 @@ export class IdToken {
 	scope?: string;
 	mask?: Record<string, unknown>;
 	rejected?: string[];
+	sessionExpiry?: SessionExpiryInput;
 
 	/*
 	 * The bucket whose issuer this token carries.
@@ -101,6 +111,20 @@ export class IdToken {
 
 		switch (use) {
 			case 'idtoken':
+				/*
+				 * Computed here, from the same instant written as `iat`, and after every other claim source
+				 * has been merged: computed in a grant, a second boundary between the two clocks could put
+				 * it at iat + 299, and no account record or claims request may stand in for it.
+				 */
+				if (this.sessionExpiry) {
+					const iat = epochTime();
+					const { lifetime, sessionEnd } = this.sessionExpiry;
+					payload.iat = iat;
+					payload.session_expiry = Math.max(
+						iat + SESSION_EXPIRY_FLOOR,
+						Math.min(iat + lifetime, sessionEnd ?? Infinity)
+					);
+				}
 				alg = client.idTokenSignedResponseAlg;
 				signOptions = {
 					audience: client.clientId,

@@ -19,8 +19,7 @@ export const JWT_DPOP_GRANT = 'urn:ietf:params:oauth:grant-type:jwt-dpop';
 export const ID_JAG_PROFILE = 'urn:ietf:params:oauth:grant-profile:id-jag';
 /* ID-JAG §4.3: the requested and issued token type. */
 export const ID_JAG_TOKEN_TYPE = 'urn:ietf:params:oauth:token-type:id-jag';
-/* ID-JAG §3.1: the explicit JWT type an ID-JAG MUST carry. */
-export const ID_JAG_JWT_TYPE = 'oauth-id-jag+jwt';
+export { ID_JAG_JWT_TYPE } from './jwt_types.ts';
 
 /* RFC 8693 §3: the subject token types the ID-JAG exchange accepts (ID-JAG §4.3). */
 export const ID_TOKEN_TYPE = 'urn:ietf:params:oauth:token-type:id_token';

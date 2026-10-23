@@ -313,7 +313,20 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 			'Apply the extra Authorization Server behaviours of the FAPI profile',
 		type: 'boolean',
 		description:
-			'Extra Authorization Server behaviours defined in the FAPI profile.'
+			'Extra Authorization Server behaviours defined in the FAPI profile. While on, a client assertion must name this server’s issuer identifier as its only audience, sent as a string — the issuer-only rule below, made stricter.'
+	},
+
+	{
+		key: 'clientAuth.issuerOnlyAudience',
+		domain: 'request-security',
+		group: 'Client authentication',
+		label: 'Accept client assertions audienced at the issuer only',
+		summary:
+			'Refuse a signed client credential that names anything but this issuer',
+		type: 'boolean',
+		risk: 'security',
+		description:
+			'Accepts a client assertion (private_key_jwt, client_secret_jwt) only when its audience is this server’s issuer identifier and nothing else. This closes the audience-injection attack (CVE-2025-27370 and CVE-2025-27371) that draft-ietf-oauth-rfc7523bis and OpenID Connect Core errata set 3 answer: an assertion a client wrote for a malicious server, audienced at this server’s token endpoint, can no longer be spent here. Turning it on refuses, with invalid_client, every client that puts the token endpoint URL, another endpoint’s URL or several values in the audience — check your clients first. Off by default only because RFC 9126 and CIBA still require those values to be accepted; the default turns on once rfc7523bis is published as an RFC. Always in force while FAPI is on.'
 	},
 
 	{
@@ -1113,6 +1126,19 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 		description:
 			'When on, an ID Token carries End-User claims only where the requested response_type is id_token. Turning it off includes scope-derived claims in ID Tokens issued from other response types. On by default (spec-conformant).'
 	},
+	{
+		key: 'idToken.relyingPartySessionLifetime',
+		domain: 'grants',
+		group: 'ID Token',
+		label: 'Application session lifetime',
+		summary:
+			'How long an application may keep a session before sending the person back',
+		type: 'number',
+		unit: 'seconds',
+		risk: 'security',
+		description:
+			'Every ID Token carries session_expiry: the moment the application must send the person back through this server, which then checks again that they may still sign in — not deactivated, not locked. This is how far after the token is issued that moment lies, from 300 seconds (the IPSIE SL1 minimum) to 1209600 (this server’s own session lifetime). Shorter means a person removed here loses access to applications sooner, at the cost of more round trips; most return without a prompt while their session here lasts. A sign-in through an outside provider that states its own session end is never promised longer. 24 hours by default, the longest NIST SP 800-63B-4 recommends at AAL2. Applications that do not read session_expiry ignore it.'
+	},
 
 	{
 		key: 'scopes',
@@ -1131,7 +1157,7 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 		summary: 'Which claims each scope releases, and which stand alone',
 		type: 'json',
 		description:
-			'Which end-user claims this server can release, and under which scope, e.g. {"openid":["sub"],"profile":["name","given_name","family_name"],"email":["email","email_verified"],"acr":null,"sid":null,"auth_time":null,"iss":null}. A member whose value is a list of claim names defines a scope: that scope is advertised in discovery and a client granted it receives those claims. A member whose value is null is a claim of its own, released when requested by name. `openid` is required and always carries `sub`. `amr` — the authentication methods a sign-in used — is always supported and needs no entry here: every ID token from a sign-in carries it, and listing or omitting it changes nothing. A claim an end user holds but no entry names is never released, which is why the claims you set on an account in a project reach a client only once a scope here names them. A new instance maps `profile`, `email` and `phone` to their OpenID Connect Core §5.4 claims, which is what a provisioned profile is released under; an instance that saved this setting before keeps exactly what it saved.'
+			'Which end-user claims this server can release, and under which scope, e.g. {"openid":["sub"],"profile":["name","given_name","family_name"],"email":["email","email_verified"],"acr":null,"sid":null,"auth_time":null,"iss":null}. A member whose value is a list of claim names defines a scope: that scope is advertised in discovery and a client granted it receives those claims. A member whose value is null is a claim of its own, released when requested by name. `openid` is required and always carries `sub`. `amr` — the authentication methods a sign-in used — and `session_expiry` — when an application must send the person back — are always supported and need no entry here: every ID token carries them, and listing or omitting them changes nothing. A claim an end user holds but no entry names is never released, which is why the claims you set on an account in a project reach a client only once a scope here names them. A new instance maps `profile`, `email` and `phone` to their OpenID Connect Core §5.4 claims, which is what a provisioned profile is released under; an instance that saved this setting before keeps exactly what it saved.'
 	},
 	{
 		key: 'consent.scopeDescriptions',

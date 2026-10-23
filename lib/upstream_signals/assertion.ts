@@ -12,6 +12,7 @@ import { discover } from '../federation/discovery.js';
 import { presentedKeySetFor } from '../federation/jwks.js';
 import type { FederationProvider } from '../federation/types.js';
 import epochTime from '../helpers/epoch_time.js';
+import { soleAudience } from '../helpers/jwt.js';
 import {
 	InvalidToken,
 	UpstreamKeysUnavailable,
@@ -100,15 +101,6 @@ function providerFor(
 	return bucket.federation.find(
 		(provider) => provider.issuer === iss && provider.clientId === clientId
 	);
-}
-
-/* One audience only, as a string or a one-element array: a token audienced to several parties is not ours alone. */
-function soleAudience(aud: JWTPayload['aud']): string | undefined {
-	if (typeof aud === 'string') return aud || undefined;
-	if (Array.isArray(aud) && aud.length === 1 && typeof aud[0] === 'string') {
-		return aud[0] || undefined;
-	}
-	return undefined;
 }
 
 function typeAccepted(typ: unknown, types: readonly string[]): boolean {

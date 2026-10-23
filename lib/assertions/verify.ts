@@ -10,13 +10,14 @@ import type { UserBucket } from '../adapters/types.js';
 import { ApplicationConfig } from '../configs/application.js';
 import { issuerFor, type RequestBucket } from '../configs/issuer.js';
 import { clockTolerance } from '../configs/liveTime.js';
-import { ID_JAG_JWT_TYPE } from '../consts/assertion_grants.js';
+import { ID_JAG_JWT_TYPE, RESERVED_JWT_TYPES } from '../consts/jwt_types.js';
 import { knownProviderByIssuer } from '../consts/known_providers.js';
 import { discover } from '../federation/discovery.js';
 import { presentedKeySetFor } from '../federation/jwks.js';
 import type { FederationProvider } from '../federation/types.js';
 import epochTime from '../helpers/epoch_time.js';
 import { InvalidGrant } from '../helpers/errors.js';
+import { normalisedType, soleAudience } from '../helpers/jwt.js';
 import { ASYMMETRIC_ALGORITHMS } from '../upstream_signals/assertion.js';
 import { ReplayDetection } from '../models/replay_detection.js';
 import { routeNames } from '../consts/param_list.js';
@@ -49,35 +50,15 @@ export interface VerifiedAssertion {
 /*
  * Types this server or the governing texts reserve for another purpose. Accepting one as a grant would let a
  * token written for one job be replayed as another: a client's own authentication JWT (7523bis §4), a DPoP
- * proof, an access token, a logout or security event token, an introspection response.
+ * proof, an access token, a logout or security event token, an introspection response. An ID-JAG is the one
+ * reserved type a grant may carry: it is this grant's own profile.
  */
-const RESERVED_TYPES = new Set([
-	'client-authentication+jwt',
-	'dpop+jwt',
-	'at+jwt',
-	'logout+jwt',
-	'secevent+jwt',
-	'token-introspection+jwt',
-	'global-token-revocation+jwt'
-]);
+const RESERVED_TYPES = new Set(
+	[...RESERVED_JWT_TYPES].filter((type) => type !== ID_JAG_JWT_TYPE)
+);
 
 function refused(reason: string): InvalidGrant {
 	return new InvalidGrant(`assertion:${reason}`);
-}
-
-function normalisedType(typ: unknown): string | undefined {
-	return typeof typ === 'string'
-		? typ.toLowerCase().replace(/^application\//, '')
-		: undefined;
-}
-
-/* One audience only, as a string or a one-element array: a JWT audienced to several parties is not ours alone. */
-function soleAudience(aud: JWTPayload['aud']): string | undefined {
-	if (typeof aud === 'string') return aud || undefined;
-	if (Array.isArray(aud) && aud.length === 1 && typeof aud[0] === 'string') {
-		return aud[0] || undefined;
-	}
-	return undefined;
 }
 
 function trusts(

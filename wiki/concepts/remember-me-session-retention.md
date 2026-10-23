@@ -38,7 +38,9 @@ was told their choice mattered and it did not.
    than inert: the shared-machine user gets the opposite of what they chose.
 3. **Nothing read the flag.** `setCookies` in `lib/shared/session.ts` wrote
    `expires: session.payload.exp` unconditionally. `session.payload.transient` had no reader
-   anywhere, so no session this server ever issued was scoped to the browsing session.
+   anywhere, so no session this server ever issued was scoped to the browsing session. (Since spec 111
+   `exp` itself can be earlier than a full lifetime: a federated sign-in whose provider stated its own
+   `session_expiry` is capped at it — [[session-expiry-claim]].)
 4. **A decline was never cleared.** `loginAccount` did `transient ? { transient: true } : undefined`
    — it set the flag and never removed it. Since `resume` destroys a session only when the *account*
    changes, a user who signed in again ticking the box kept the earlier decline. This one is not in

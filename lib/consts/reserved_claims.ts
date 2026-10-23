@@ -25,6 +25,8 @@ export const RESERVED_CLAIMS: readonly string[] = [
 	'sid',
 	'at_hash',
 	'c_hash',
+	/* The server computes it at issuance (IPSIE SL1 §3.2.1); a stored value would tell an application a session lasts longer than it does. */
+	'session_expiry',
 	/* Always the user's actual bucket groups (lib/addon/account.ts); a stored value would forge authorization. */
 	'groups'
 ];

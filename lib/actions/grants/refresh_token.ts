@@ -36,6 +36,7 @@ import {
 	usableRefreshToken
 } from '../../shared/refresh_token_validation.js';
 import { conformedIdTokenScope } from '../../consts/groups_claim.js';
+import { sessionExpiryInput } from '../../shared/session_expiry.js';
 
 function rarSupported(token: RefreshToken) {
 	// The payload's `gty`: the model has no top-level accessor for it (token-payload-access-contract).
@@ -258,6 +259,9 @@ export const handler = async function refreshTokenHandler(
 
 		token.set('nonce', refreshToken.payload.nonce);
 		token.set('sid', refreshToken.payload.sid);
+		token.sessionExpiry = await sessionExpiryInput(
+			refreshToken.payload.sessionUid
+		);
 		if (refreshToken.payload.amr?.length) {
 			token.set('amr', refreshToken.payload.amr);
 		}

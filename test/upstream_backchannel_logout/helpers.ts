@@ -110,6 +110,8 @@ export async function signInThroughProvider(
 		clientId?: string;
 		scope?: string;
 		cookie?: string;
+		/* Further claims the provider's ID token carries, such as its own `session_expiry`. */
+		claims?: Record<string, unknown>;
 	}
 ): Promise<SignedIn> {
 	/* Restored on the way out, so a later authorization in the same case is prompted as a real one is. */
@@ -153,7 +155,8 @@ async function federatedSignIn(
 			claims: {
 				sub: options.sub,
 				email: options.email ?? `${options.sub}@example.com`,
-				...(options.sid ? { sid: options.sid } : {})
+				...(options.sid ? { sid: options.sid } : {}),
+				...options.claims
 			},
 			opts: { audience: CLIENT_AT_IDP }
 		},

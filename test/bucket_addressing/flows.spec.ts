@@ -551,6 +551,71 @@ describe('a flow started at a named bucket address', () => {
 		expect(await exchange(ISSUER)).toBe('invalid_client');
 	});
 
+	describe('while the issuer-only audience rule is on', () => {
+		beforeAll(() => {
+			ApplicationConfig['clientAuth.issuerOnlyAudience'] = true;
+		});
+
+		afterAll(() => {
+			ApplicationConfig['clientAuth.issuerOnlyAudience'] = false;
+		});
+
+		async function exchangeAtBucket(aud: string) {
+			const registered = await elysia.handle(
+				new Request(`http://localhost/${SLUG}/reg`, {
+					method: 'POST',
+					headers: { 'content-type': 'application/json' },
+					body: JSON.stringify({
+						redirect_uris: ['https://registered.example.com/cb'],
+						grant_types: ['authorization_code'],
+						response_types: ['code'],
+						token_endpoint_auth_method: 'client_secret_jwt'
+					})
+				})
+			);
+			const { client_id, client_secret } = shaped(
+				Type.Object({ client_id: Type.String(), client_secret: Type.String() }),
+				await registered.json()
+			);
+			const assertion = await new SignJWT({ jti: nanoid() })
+				.setProtectedHeader({ alg: 'HS256' })
+				.setIssuer(client_id)
+				.setSubject(client_id)
+				.setAudience(aud)
+				.setIssuedAt()
+				.setExpirationTime('1m')
+				.sign(new TextEncoder().encode(client_secret));
+			const response = await elysia.handle(
+				new Request(`http://localhost/${SLUG}/token`, {
+					method: 'POST',
+					headers: { 'content-type': 'application/x-www-form-urlencoded' },
+					body: jsonToFormUrlEncoded({
+						grant_type: 'authorization_code',
+						code: 'not-a-code',
+						redirect_uri: 'https://registered.example.com/cb',
+						client_id,
+						client_assertion_type:
+							'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
+						client_assertion: assertion
+					})
+				})
+			);
+			return shaped(ErrorBody, await response.json()).error;
+		}
+
+		it("accepts the bucket's issuer identifier as the audience", async () => {
+			expect(await exchangeAtBucket(ACME_ISSUER)).toBe('invalid_grant');
+		});
+
+		it("refuses the instance's issuer identifier as the audience at a bucket", async () => {
+			expect(await exchangeAtBucket(ISSUER)).toBe('invalid_client');
+		});
+
+		it("refuses another bucket's issuer identifier as the audience", async () => {
+			expect(await exchangeAtBucket(`${ISSUER}/globex`)).toBe('invalid_client');
+		});
+	});
+
 	it("accepts a DPoP proof whose htu is the bucket's token endpoint, and refuses the instance's", async () => {
 		const restore = ApplicationConfig['dpop.enabled'];
 		ApplicationConfig['dpop.enabled'] = true;

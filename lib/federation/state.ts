@@ -211,7 +211,7 @@ export async function openHandoff(handoff: {
 	interactionUid: string;
 	accountId: string;
 	link?: PendingLinkIdentity;
-	upstream?: { providerId: string; sid?: string };
+	upstream?: { providerId: string; sid?: string; sessionExpiry?: number };
 }): Promise<string> {
 	const ref = secret();
 	await records().upsert(

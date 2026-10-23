@@ -9,6 +9,17 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+### Added
+
+- **Spec alignment: rfc7523bis client-assertion audience and IPSIE SL1 `session_expiry`** — the opt-in
+  `clientAuth.issuerOnlyAudience` (off; FAPI implies it) accepts a client assertion only when the issuer is its sole
+  audience, closing CVE-2025-27370/27371, and becomes the default once rfc7523bis is an RFC. Under the default rule,
+  device authorization and CIBA now accept their own endpoint URLs (CIBA §7.1) and no longer accept
+  `<issuer>anonymous` or `<issuer>backchannel_authentication`. Any client assertion typed as another kind of JWT is
+  refused. Every ID token carries `session_expiry`: `iat` plus `idToken.relyingPartySessionLifetime` (24 h), never
+  past the browser session and never under five minutes. A federated session ends when the provider's own
+  `session_expiry` says, and a malformed or past value refuses the sign-in.
+
 ## [1.3.0] - 2026-10-22
 
 Agents in the enterprise: a project can accept identity assertions (ID-JAG) for its APIs and issue them for outside

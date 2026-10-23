@@ -222,7 +222,18 @@ async function completeReturn(params: ReturnParams, request: Request) {
 			typeof identity.claims.sid === 'string' && identity.claims.sid
 				? identity.claims.sid
 				: undefined;
-		const upstream = { providerId: provider.id, ...(sid ? { sid } : {}) };
+		/*
+		 * When the provider's own session ends (IPSIE SL1 §3.2.2), already checked to be a future integer by
+		 * the ID token verifier; the session this sign-in makes is capped at it.
+		 */
+		const sessionExpiry = Number.isSafeInteger(identity.claims.session_expiry)
+			? Number(identity.claims.session_expiry)
+			: undefined;
+		const bounds = {
+			...(sid ? { sid } : {}),
+			...(sessionExpiry === undefined ? {} : { sessionExpiry })
+		};
+		const upstream = { providerId: provider.id, ...bounds };
 
 		/*
 		 * Handed back like a sign-in, because leg three is where the interaction cookie applies again and so
@@ -232,7 +243,7 @@ async function completeReturn(params: ReturnParams, request: Request) {
 			const ref = await openHandoff({
 				interactionUid: uid,
 				accountId: resolution.account._id,
-				link: { ...resolution.link, ...(sid ? { sid } : {}) }
+				link: { ...resolution.link, ...bounds }
 			});
 			return Response.redirect(buildUIFederationCompletePath(uid, ref), 303);
 		}

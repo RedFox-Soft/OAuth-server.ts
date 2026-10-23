@@ -74,7 +74,10 @@ records carry no `accountId`, are matched by no sweep, and simply expire.
 Since spec 073 the stage-two record also carries `upstream: { providerId, sid? }` — the provider and its session
 identifier from the verified ID token — and the session the sign-in makes keeps the provider and a digest of the
 `sid` (`session.payload.upstream`, replaced or cleared at every sign-in), so that provider's back-channel logout can
-find it. See [[upstream-back-channel-logout]].
+find it. See [[upstream-back-channel-logout]]. Since spec 111 (2026-10-22) it also carries the provider's own
+`session_expiry` when the ID token has a valid one, and `Session.save` caps the session's `exp` at it, so the
+session ends when the provider said its own does; a malformed or past value refuses the sign-in. See
+[[session-expiry-claim]].
 
 Since spec 088 the area holds a third kind of record, `stage: 'try'`, keyed by the digest of a `tryRef`: the
 result of an administrator's try of a provider, bound to the console session that started it. A stage-one record

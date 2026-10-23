@@ -94,6 +94,35 @@ describe('FAPI 2.0 Final behaviours', () => {
 			);
 		});
 
+		it('refuses the issuer identifier sent as a one-element list', async function () {
+			const spy = mock<ServerListener<'pushed_authorization_request.error'>>();
+			eventBus.on('pushed_authorization_request.error', spy);
+
+			const res = await agent.par.post({
+				scope: 'openid',
+				client_id: 'client',
+				response_type: 'code',
+				client_assertion_type:
+					'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
+				client_assertion: await new SignJWT({
+					jti: crypto.randomUUID(),
+					sub: 'client',
+					iss: 'client',
+					aud: [ISSUER],
+					exp: epochTime() + 60,
+					nbf: epochTime()
+				})
+					.setProtectedHeader({ alg: 'ES256' })
+					.sign(keypair.privateKey),
+				code_challenge_method: 'S256',
+				code_challenge: crypto.hash('sha256', 'foo', 'base64url')
+			});
+			expect(res.status).toBe(401);
+			expect(providerError(spy.mock.calls[0][0]).error_detail).toBe(
+				'audience (aud) must equal the issuer identifier url'
+			);
+		});
+
 		it('refuses a client assertion audienced at the endpoint receiving it', async function () {
 			const spy = mock<ServerListener<'pushed_authorization_request.error'>>();
 			eventBus.on('pushed_authorization_request.error', spy);

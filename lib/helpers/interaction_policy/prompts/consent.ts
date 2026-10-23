@@ -98,7 +98,15 @@ class ConsentPromt extends Prompt {
 				for (const claim of oidc.requestParamClaims) {
 					if (
 						!encounteredClaims.has(claim) &&
-						!['sub', 'sid', 'auth_time', 'acr', 'amr', 'iss'].includes(claim)
+						![
+							'sub',
+							'sid',
+							'auth_time',
+							'acr',
+							'amr',
+							'iss',
+							'session_expiry'
+						].includes(claim)
 					) {
 						missing ||= [];
 						missing.push(claim);

@@ -154,7 +154,9 @@ export const PendingLinkIdentity = t.Object({
 	sub: t.String(),
 	claims: t.Optional(t.Record(t.String(), t.Unknown())),
 	/* The upstream session the identity was proven in, so the sign-in that completes the link answers to its logout. */
-	sid: t.Optional(t.String())
+	sid: t.Optional(t.String()),
+	/* When that upstream session ends (IPSIE SL1 §3.2.2), so the session the link completes ends with it. */
+	sessionExpiry: t.Optional(t.Integer())
 });
 export type PendingLinkIdentity = Static<typeof PendingLinkIdentity>;
 
@@ -311,7 +313,12 @@ export const FederationStatePayload = t.Object({
 	 * session that outlives it stores a digest.
 	 */
 	upstream: t.Optional(
-		t.Object({ providerId: t.String(), sid: t.Optional(t.String()) })
+		t.Object({
+			providerId: t.String(),
+			sid: t.Optional(t.String()),
+			/* Epoch seconds: when the provider said its session ends (IPSIE SL1 §3.2.2). */
+			sessionExpiry: t.Optional(t.Integer())
+		})
 	),
 	/*
 	 * Epoch seconds. Mirrors the adapter's expiry *and* is compared to now on every read: MongoDB's TTL

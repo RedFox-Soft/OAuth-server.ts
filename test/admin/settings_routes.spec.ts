@@ -174,6 +174,27 @@ describe('settings API', () => {
 	});
 
 	/*
+	 * SL1 §3.2.1: a relying party is never told to come back sooner than five minutes after the ID token
+	 * was issued, and a promise longer than the server's own session could not be kept.
+	 */
+	for (const [label, value] of [
+		['below five minutes', 299],
+		['longer than the server’s own session', 14 * 24 * 60 * 60 + 1]
+	] as const) {
+		it(`refuses an application session lifetime ${label}`, async () => {
+			const cookie = await sessionCookieFor('super');
+			const res = await client.admin.api.settings.put(
+				{ 'idToken.relyingPartySessionLifetime': value },
+				{ headers: { cookie } }
+			);
+			expect(res.status).toBe(422);
+			expect(JSON.stringify(res.error?.value)).toContain(
+				'idToken.relyingPartySessionLifetime must be an integer from 300 to 1209600 seconds'
+			);
+		});
+	}
+
+	/*
 	 * The RAR type map: the catalog's first structured (`json`) setting, and the reason the feature was
 	 * previously unconfigurable — the key used to be function-valued, so no catalog entry could carry it.
 	 * The rules here are not restated by the route: validateEffectiveConfig delegates to

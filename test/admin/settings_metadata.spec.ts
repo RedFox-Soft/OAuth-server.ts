@@ -131,11 +131,13 @@ describe('settings catalog presentation metadata', () => {
 		expect(flagged).toEqual(
 			[
 				'authorization.allowOmittingSingleRegisteredRedirectUri',
+				'clientAuth.issuerOnlyAudience',
 				'projects.addressForms',
 				'projects.reservedHostnames',
 				'conformIdTokenClaims',
 				'cors.enabled',
 				'globalTokenRevocation.enabled',
+				'idToken.relyingPartySessionLifetime',
 				'jwtBearer.enabled',
 				'tokenExchange.enabled',
 				'mTLS.trustProxyCertificateHeader',

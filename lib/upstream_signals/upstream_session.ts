@@ -26,16 +26,24 @@ import { UpstreamSessionPayload } from './types.js';
 export interface UpstreamOrigin {
 	providerId: string;
 	sid?: string;
+	sessionExpiry?: number;
 }
 
-/* What a session stores: the provider, and the digest of its session identifier rather than the value. */
+/*
+ * What a session stores: the provider, the digest of its session identifier rather than the value, and when
+ * the provider said its session ends.
+ */
 export function originOf(upstream: UpstreamOrigin): {
 	providerId: string;
 	sidDigest?: string;
+	sessionExpiry?: number;
 } {
 	return {
 		providerId: upstream.providerId,
-		...(upstream.sid ? { sidDigest: digest(upstream.sid) } : {})
+		...(upstream.sid ? { sidDigest: digest(upstream.sid) } : {}),
+		...(upstream.sessionExpiry === undefined
+			? {}
+			: { sessionExpiry: upstream.sessionExpiry })
 	};
 }
 

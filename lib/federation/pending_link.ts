@@ -58,12 +58,15 @@ export async function settlePendingLink(
  */
 function cameThrough(
 	payload: InteractionPayloadType,
-	pending: { providerId: string; sid?: string }
+	pending: { providerId: string; sid?: string; sessionExpiry?: number }
 ): void {
 	const login = payload.result?.login;
 	if (!login) return;
 	login.upstream = {
 		providerId: pending.providerId,
-		...(pending.sid ? { sid: pending.sid } : {})
+		...(pending.sid ? { sid: pending.sid } : {}),
+		...(pending.sessionExpiry === undefined
+			? {}
+			: { sessionExpiry: pending.sessionExpiry })
 	};
 }

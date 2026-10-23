@@ -5,7 +5,8 @@ import {
 	compactVerify,
 	decodeJwt,
 	decodeProtectedHeader,
-	errors
+	errors,
+	type JWTPayload
 } from 'jose';
 
 import { Type as t, type Static } from '@sinclair/typebox';
@@ -30,6 +31,22 @@ const {
 	JWKSNoMatchingKey,
 	JWSSignatureVerificationFailed
 } = errors;
+
+/* One audience only, as a string or a one-element array: a JWT audienced to several parties is not ours alone. */
+export function soleAudience(aud: JWTPayload['aud']): string | undefined {
+	if (typeof aud === 'string') return aud || undefined;
+	if (Array.isArray(aud) && aud.length === 1 && typeof aud[0] === 'string') {
+		return aud[0] || undefined;
+	}
+	return undefined;
+}
+
+/* RFC 7515 §4.1.9: a `typ` is a media type, compared case-insensitively, with `application/` optional. */
+export function normalisedType(typ: unknown): string | undefined {
+	return typeof typ === 'string'
+		? typ.toLowerCase().replace(/^application\//, '')
+		: undefined;
+}
 
 export async function sign(
 	payload: Record<string, unknown>,

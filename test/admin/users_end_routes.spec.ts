@@ -153,7 +153,8 @@ describe('end-user API', () => {
 		'auth_time',
 		'sid',
 		'at_hash',
-		'c_hash'
+		'c_hash',
+		'session_expiry'
 	]) {
 		it(`refuses to set the ${reserved} claim on an account`, async () => {
 			const { cookie } = await sessionCookieFor('super');

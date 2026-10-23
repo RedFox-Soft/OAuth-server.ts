@@ -24,6 +24,10 @@ import * as JWT from '../../lib/helpers/jwt.ts';
 import { ISSUER } from 'lib/configs/env.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
 import { Client, clientKeys } from 'lib/models/client.js';
+import {
+	CLIENT_AUTHENTICATION_JWT_TYPE,
+	RESERVED_JWT_TYPES
+} from 'lib/consts/jwt_types.js';
 
 const mtlsKeys: unknown = JSON.parse(
 	readFileSync('test/jwks/jwks.json', {
@@ -1155,6 +1159,66 @@ describe('client authentication options', () => {
 				expect(error.status).toBe(401);
 				expect(error.value).toEqual(tokenAuthRejected);
 			});
+		});
+
+		/*
+		 * draft-ietf-oauth-rfc7523bis §4 (new RFC 7523 §3.2): a client SHOULD type its assertion, and a
+		 * server should not refuse one that is untyped — every other case here is untyped. A JWT typed for
+		 * another job is never a client credential, whichever audience rule is in force.
+		 */
+		describe('explicit typing', () => {
+			function typedAssertion(typ: string) {
+				return JWT.sign(
+					{
+						jti: nanoid(),
+						aud: ISSUER,
+						sub: 'client-jwt-secret',
+						iss: 'client-jwt-secret'
+					},
+					key,
+					'HS256',
+					{ expiresIn: 60, typ }
+				);
+			}
+
+			for (const typ of [
+				'client-authentication+jwt',
+				'application/client-authentication+jwt'
+			]) {
+				it(`accepts an assertion typed ${typ}`, async function () {
+					const { status } = await agent.token.post({
+						client_assertion: await typedAssertion(typ),
+						grant_type: 'client_credentials',
+						client_assertion_type:
+							'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
+					});
+					expect(status).toBe(200);
+				});
+			}
+
+			for (const typ of [...RESERVED_JWT_TYPES].filter(
+				(type) => type !== CLIENT_AUTHENTICATION_JWT_TYPE
+			)) {
+				it(`refuses a client assertion typed ${typ}`, async function () {
+					const spy = mock<ServerListener<'grant.error'>>();
+					eventBus.once('grant.error', spy);
+
+					const { error } = await agent.token.post({
+						client_assertion: await typedAssertion(typ),
+						grant_type: 'client_credentials',
+						client_assertion_type:
+							'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
+					});
+					if (!error) throw new Error('expected error response');
+					expect(error.status).toBe(401);
+					expect(spy).toBeCalledWith(
+						expect.objectContaining({
+							error_detail:
+								'client assertion typ must be client-authentication+jwt or absent'
+						})
+					);
+				});
+			}
 		});
 	});
 

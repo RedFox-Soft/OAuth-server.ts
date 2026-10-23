@@ -64,6 +64,7 @@ they never advertised. Instead both mirrored derivations add it unconditionally
 (`lib/configs/configuration.ts` after `collectClaims`, `lib/configs/discoverySupport.ts`
 `deriveClaimsSupported`), the way `sub` is forced into `openid`. Listing or omitting `amr` in the
 setting changes nothing, and the parity fixture passing with `amr` absent from its claims is the proof.
+Since spec 111 (2026-10-22) `session_expiry` is added beside it the same way ([[session-expiry-claim]]).
 There is no switch to turn it off; nobody has asked for one.
 
 ## The two decisions the specifications leave open
