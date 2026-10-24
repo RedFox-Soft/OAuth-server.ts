@@ -15,7 +15,9 @@
 /*
  * Ordered weakest to strongest. The order is documentation, not logic — nothing compares
  * distinctions for strength, because "stronger" is a claim about the deployment's own policy and
- * only its operator can make it.
+ * only its operator can make it. The one comparison made is a fact rather than a policy: a
+ * multi-factor sign-in here is the password plus a second factor, so under the IPSIE SL1 profile it
+ * satisfies a request for the password class (lib/sl1/rules.ts, satisfiesAcr).
  */
 export const ACR_DISTINCTIONS = [
 	'password',

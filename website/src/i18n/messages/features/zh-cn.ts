@@ -1,6 +1,6 @@
 import type english from './en.ts';
 
-export const source = 'ddde39c45e46';
+export const source = '58a92ddd3532';
 
 export default {
 	title: 'OAuth 2.1 与 OIDC 功能',
@@ -32,6 +32,10 @@ export default {
 				oidc: {
 					title: 'OpenID Connect Core 1.0',
 					body: 'ID 令牌、UserInfo 端点和发现机制，支持标准声明集和成对主体标识符。'
+				},
+				sessionExpiry: {
+					title: '每个 ID 令牌都带会话到期时间',
+					body: '每个 ID 令牌都会说明应用何时必须让用户重新登录（session_expiry）。联合会话最迟在上游提供方设定的时间结束。'
 				},
 				issuerIdentification: {
 					title: '颁发者标识',
@@ -120,6 +124,14 @@ export default {
 				fapi: {
 					title: 'FAPI 规范行为',
 					body: 'Financial-grade API 规范要求的更严格检查，一个开关即可启用。'
+				},
+				ipsieSl1: {
+					title: 'IPSIE SL1 企业规范',
+					body: '一个开关即可启用 OpenID Foundation 企业规范草案中对身份提供方的要求：只允许预先注册的客户端、令牌绑定 DPoP、签名仅用 PS256、ES256 或 EdDSA，并强制满足请求的认证级别。启用前，就绪检查会列出所有阻碍项。'
+				},
+				assertionAudience: {
+					title: '客户端断言仅接受签发者作为受众',
+					body: '只有当客户端断言把本服务器的签发者作为唯一受众时，服务器才接受该断言。此规则可防范 rfc7523bis 所针对的受众注入攻击。在 rfc7523bis 成为 RFC 之前，此规则默认关闭。'
 				},
 				encryption: {
 					title: '令牌与响应加密',

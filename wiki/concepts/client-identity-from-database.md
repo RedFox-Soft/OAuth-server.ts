@@ -18,7 +18,7 @@ which read the adapter on **every call**.
 
 ## The lookup and its memo
 
-`tryFindClient` (`lib/models/client/validate.ts:111`) reads the adapter first, and only then
+`tryFindClient` (`lib/models/client/validate.ts:112`) reads the adapter first, and only then
 consults a cache:
 
 ```ts
@@ -56,7 +56,7 @@ exported from `lib/models/client.ts`: `redirectUriAllowed(client, uri)`,
 `checkClientSecretExpiration(client, …)`, `toStored(client)`, and so on.
 
 - **It is frozen.** `validateClient` returns `deepFreeze(structuredClone(client))`
-  (`lib/models/client/validate.ts:81`). One validated object is shared by every request using that
+  (`lib/models/client/validate.ts:82`). One validated object is shared by every request using that
   client until its record changes, so a write from one request would be seen by all of them. A copy is
   frozen because the object built during validation holds references into the stored record and into
   the shared `ClientDefaults`.
@@ -105,7 +105,7 @@ userinfo switched off); going through the record makes such a state impossible t
 ## One write path, and the sector check sits on it
 
 Every surface that writes a client — dynamic registration, registration management, the console, the
-agent — goes through `registerClient` (`lib/models/client/register.ts:20`): validate, check the
+agent — goes through `registerClient` (`lib/models/client/register.ts:26`): validate, check the
 sector identifier document, store `toStored(client)`. Resolving a **stored** client only validates it;
 it retrieves no sector document (`validate.ts:144`). So a client stays usable while its sector host is
 unreachable, and a settings save — which empties the memo — no longer turns into one outbound request
@@ -128,10 +128,17 @@ resolution instead, as an unrelated failure for whoever used the client next.
 
 A client described by a metadata document is the exception, because it is never stored: its
 resolution *is* its registration, so it goes through `registerClient(document, { store: false })` and
-keeps the check.
+keeps the check. Under the IPSIE SL1 profile the document branch is closed: a URL `client_id` is served
+only from a record an administrator stored under it, which the console now allows through
+`clientIdentifierUrl` on application create (spec 112, [[ipsie-sl1-profile]]).
+
+A profile can refuse a stored client at use without deleting it: under the IPSIE SL1 profile a client
+registered for an algorithm or method the profile forbids resolves as unknown. The console, the agent
+and the federation and outside-server configuration read with `tryFindClient(id, { administering: true })`,
+so an administrator always sees the record they have to put right.
 
 Two clients are synthesized in code on every resolution, after the stored read and before the document branch
-(`lib/models/client/validate.ts:124`): a SCIM connection's `scim-<id>` ([[scim-provisioning]]) and, since spec
+(`lib/models/client/validate.ts:132`): a SCIM connection's `scim-<id>` ([[scim-provisioning]]) and, since spec
 095, a project's connected-apps page client `account.<bucketId>` ([[connected-apps-page]]). A stored record always
 wins over both, and registration refuses the `account.` prefix outright.
 

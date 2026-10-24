@@ -147,8 +147,8 @@ close the gap. Resolver precedence still gives the name one holder: the exact ho
 
 ## The setting is read when a form is chosen, never while serving
 
-`projects.addressForms` takes `path` (the default), `subdomain` or `both` (`lib/configs/application.ts:393`;
-console descriptor at `lib/admin/settings/catalog.ts:526`). It limits teams only. A super administrator is
+`projects.addressForms` takes `path` (the default), `subdomain` or `both` (`lib/configs/application.ts:413`;
+console descriptor at `lib/admin/settings/catalog.ts:539`). It limits teams only. A super administrator is
 never limited, and a hostname stays super-administrator-only whatever the value.
 
 - **Why `path` is the default.** A subdomain answers only once the operator has pointed a wildcard DNS record

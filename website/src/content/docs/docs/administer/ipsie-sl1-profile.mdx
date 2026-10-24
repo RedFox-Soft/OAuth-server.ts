@@ -1,0 +1,99 @@
+---
+title: Turn on the IPSIE SL1 profile
+description: What the IPSIE SL1 enterprise profile changes, what it needs before it can be turned on, which applications it would refuse, and how to check before you switch.
+sidebar:
+  order: 10
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+One setting, `ipsieSl1.enabled`, turns on the IPSIE SL1 rules that this server cannot apply by default. The setting
+is off by default. While the profile is on, the server refuses applications that break the profile's rules, so run
+the readiness check before you switch.
+
+The OpenID Foundation's IPSIE working group (Interoperability Profile for Secure Identity in the Enterprise) writes
+profiles for enterprise sign-in: rules an identity provider and its applications follow so that a company can trust
+the whole chain. Its [IPSIE SL1 OpenID Connect Profile](https://openid.github.io/ipsie-openid-sl1/draft-openid-ipsie-sl1-profile.html),
+and the IPSIE Common Requirements it points to, say what the identity provider must do.
+
+This server already meets much of SL1 by default: every ID token carries `auth_time`, `acr` and
+`session_expiry`, authorization codes last 60 seconds and are used once, and PKCE is required. The rest
+cannot be a default, because each rule breaks something other standards allow. A native app may return to
+`http://127.0.0.1`, an MCP client may register itself, and `acr_values` is only a hint in OpenID Connect.
+[Half of IPSIE SL1 cannot be a default](/blog/half-of-ipsie-sl1-cannot-be-a-default/) explains the split and when
+to turn the profile on.
+
+<Aside
+	type="caution"
+	title="SL1 is still a draft, and some requirements are open"
+>
+	The profile is a working-group draft and may change. Three of its requirements
+	are not yet met here. An application can ask for a sign-in with a second
+	factor, and in a project that does not require one the request ends in an
+	error instead of asking the person for the second factor. After a sign-in
+	through an upstream provider, the ID token does not carry the provider's
+	`amr`. Tokens that other issuers send to this server, such as upstream ID
+	tokens, are still accepted in `RS256`.
+</Aside>
+
+## Seven rules the IPSIE SL1 profile enforces
+
+While the profile is on:
+
+- **Redirect URIs must use `https`** or the application's own scheme. `http` is refused, `localhost`
+  included, at sign-in and at sign-out.
+- **Only registered applications.** An administrator creates them in the console, or they register with an
+  initial access token. A client id that is a URL works only when an administrator created an application
+  under that URL. The server never fetches a client metadata document.
+- **Only the code flow.** `response_type=none` is refused.
+- **Every access token is bound to the application's key** with DPoP. A token request without a DPoP proof
+  is refused, whatever the grant.
+- **Only PS256, ES256 and EdDSA signatures.** An application that chose no algorithm, or kept the `RS256`
+  default, gets `PS256` signatures, and `PS256` is written into its record the next time the record is saved.
+  A new `RS256` or `HS256` registration is refused, and so is `client_secret_jwt`.
+- **`acr_values` is binding.** If the sign-in did not reach a requested level, the application receives
+  `unmet_authentication_requirements` instead of a token. A sign-in with a second factor satisfies a
+  request for the password level.
+- **A client assertion must name this server's issuer as its audience, as a single string, not an array.**
+
+The console, the administrators' MCP client, each project's account page and SCIM provisioning
+connections are outside these rules, because they are this server's own clients. The `PS256` default
+still applies to them.
+
+## Settings and keys the profile requires
+
+The switch is refused until every one of these holds:
+
+- DPoP is on (`dpop.enabled`);
+- PKCE is required (`pkce.required`);
+- encryption is on (`encryption.enabled`);
+- dynamic registration is off, or requires an initial access token;
+- pushed authorization requests accept no unregistered redirect URI;
+- every issuer has a `PS256` signing key: the instance, and every project with an address of its own.
+
+Every issuer needs a PS256 key because PS256 is the algorithm the profile gives applications that chose none.
+See [Rotate signing keys](/docs/administer/signing-keys/) for how to generate and promote a key.
+
+## Check readiness, then turn the profile on
+
+<Steps>
+
+1. Open **Settings**, then **Request security**. The **IPSIE SL1 readiness** card lists the settings that
+   stand in the way, the issuers without a `PS256` key, and every application the profile would refuse or
+   change, with the reason for each. An agent can read the same answer with the
+   `settings_ipsie_profile_readiness_get` tool.
+
+2. Fix the settings and generate the keys the card names. Then go through the applications the card lists.
+   An application with an `http` redirect URI, an `HS256` or other algorithm outside the profile,
+   `client_secret_jwt` or certificate-bound tokens will stop working. An application on the `RS256` default
+   will receive `PS256` signatures instead, so check that it verifies tokens with the key set rather than a
+   fixed algorithm.
+
+3. Turn on **Enforce the IPSIE SL1 profile** and save. The change applies at once, with no restart, and is
+   recorded in the audit trail.
+
+</Steps>
+
+Nothing is rewritten when the profile turns on. An application the profile refuses keeps its record, so turning
+the profile off restores the application on the next request. An application created by dynamic registration at
+the root belongs to no project and is not listed by the readiness check; the profile still applies to it.

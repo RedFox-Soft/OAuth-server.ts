@@ -1,0 +1,299 @@
+---
+title: Half of IPSIE SL1 cannot be a default
+description: >-
+  IPSIE SL1 is the OpenID Foundation's enterprise sign-in profile. Half of it belongs in every
+  server; the other half breaks other standards. When to use it.
+publishedAt: '2026-10-26'
+tags: [ipsie, oidc, enterprise, security]
+---
+
+Sooner or later a security questionnaire from an enterprise customer will contain a row like this:
+
+| Control | Answer |
+| --- | --- |
+| Does your identity provider conform to the IPSIE SL1 OpenID Connect profile? | Yes / No / Partially |
+
+The identity provider is the server that signs people in and issues tokens to applications. If you run
+one for business customers, that row is about you. Before you answer it, you need to know what SL1
+is, which of its rules your server already follows, and which ones would break something if you
+turned them on.
+
+I recently built SL1 into FoxAuth, and the profile split into two halves. Every server should follow
+the first half anyway. The second half contradicts standards that other clients depend on, so it
+cannot be a default. It has to be a switch, and the hard part is knowing when to turn it on.
+
+## IPSIE SL1 turns "supports SSO" into rules you can test {#what-sl1-is}
+
+IPSIE stands for Interoperability Profile for Secure Identity in the Enterprise. It is a working group
+of the OpenID Foundation, started in October 2024 by Okta together with Microsoft, Ping Identity and
+others ([Okta's announcement](https://www.okta.com/newsroom/press-releases/okta-openid-foundation-tech-firms-tackle-todays-biggest-cybersecurity/)).
+The group writes profiles: stricter rules on top of existing
+standards such as OpenID Connect, OAuth and SCIM. With a profile, a company can check what "supports
+single sign-on" actually means for each SaaS application it buys.
+
+The group sorts its requirements into levels on two tracks
+([IPSIE levels](https://github.com/openid/ipsie/blob/main/ipsie-levels.md)). The Session Lifecycle
+track (SL) is about sign-in and sessions. The Account Lifecycle track (AL) is about creating and
+removing accounts, which is SCIM's job (I wrote about IPSIE's SCIM profile in
+[what Entra and Okta send to SCIM](/blog/what-entra-and-okta-send-to-scim/)). SL1 is the first session level: single sign-on with multi-factor
+authentication, and a session lifetime that the identity provider sets and the application obeys.
+SL2 adds logout and termination deadlines. SL3 adds continuous signals between the two sides.
+
+The concrete text is the [IPSIE SL1 OpenID Connect Profile](https://openid.github.io/ipsie-openid-sl1/draft-openid-ipsie-sl1-profile.html).
+It lists what the identity provider and the application must each do, section by section. It also
+points to a second document, the [IPSIE Common Requirements](https://openid.github.io/ipsie-common-requirements-profile/draft-ipsie-common-requirements-profile.html), for rules shared by every IPSIE profile,
+such as which signature algorithms are allowed.
+
+Both are drafts. The editor's draft I worked from is dated 29 September 2026. The profile has already
+changed in ways that matter: draft 00 called the session claim `session_lifetime` and measured it in
+seconds, and the current text calls it `session_expiry` and makes it a timestamp. A server that
+implements SL1 today will have to follow the next draft too.
+
+## Most of SL1 should be your default anyway {#already-default}
+
+Read the provider's half of the profile and most rules are plain good practice. They conflict with no
+other standard, so nothing stops a server from following them for every client:
+
+- Authorization codes live at most 60 seconds and are used once.
+- PKCE (the code challenge that ties a code to the client that asked for it) uses S256.
+- A redirect URI must match a registered one exactly.
+- The authorization response carries `iss`, so a client can tell which server answered
+  ([RFC 9207](https://www.rfc-editor.org/rfc/rfc9207)).
+- Every ID token says when the person authenticated (`auth_time`), how (`acr` and `amr`), and when the
+  application's session must end (`session_expiry`).
+
+FoxAuth does all of this with the profile off. Here is an ID token payload from a password sign-in,
+decoded:
+
+```json
+{
+  "iss": "https://auth.example.com",
+  "sub": "2f6c1b0e-7c55-4b8e-9d2a-3a1f0c9e8b71",
+  "aud": "orders-web",
+  "iat": 1792745400,
+  "exp": 1792749000,
+  "auth_time": 1792745391,
+  "acr": "urn:foxauth:acr:pwd",
+  "amr": ["pwd"],
+  "session_expiry": 1792831800
+}
+```
+
+`session_expiry` is the new one. It is the moment after which the application must send the person
+back through the identity provider, which then checks again that they may still sign in. SL1 says it
+must lie at least 300 seconds after `iat`. Here it lies 24 hours later, which is the default of the
+`idToken.relyingPartySessionLifetime` setting. An application that does not read the claim
+ignores it, which is why it can be on for everyone.
+
+## The other half breaks a standard someone else depends on {#cannot-be-default}
+
+Four of SL1's rules are different. Each one contradicts another text that a real class of clients
+follows. Make any of them a default, and those clients stop working.
+
+- No `http` redirect URIs, not even `http://127.0.0.1`. But
+  [RFC 8252, section 7.3](https://www.rfc-editor.org/rfc/rfc8252#section-7.3), tells native apps
+  to receive the authorization response on exactly such a loopback address. Desktop apps and command
+  line tools do it every day.
+- Only clients registered in advance, and no unauthenticated dynamic registration. But MCP clients,
+  the AI tools that connect to MCP servers, usually arrive unannounced. The
+  [MCP authorization spec](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization)
+  asks servers to accept a client id that is the URL of a metadata document, fetched at first
+  contact, and keeps dynamic registration as a deprecated fallback. I described that flow in
+  [your MCP server is an OAuth resource server](/blog/your-mcp-server-is-an-oauth-resource-server/).
+- `acr_values` becomes binding. In
+  [OpenID Connect Core, section 3.1.2.1](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest),
+  the parameter a client uses to ask for an authentication level is a voluntary hint. A server may sign the person in some other
+  way and say so in `acr`. SL1 says the server must either meet the request or return an error.
+- Only PS256, ES256 and EdDSA signatures (Common Requirements, section 3.3). But
+  [OpenID Connect Registration](https://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata)
+  makes RS256 the default for a client that names no algorithm, and a verifier written for that
+  default may accept nothing else.
+
+The diagram puts the two halves side by side. The rules on the left cost nobody anything. Under each
+rule on the right is the text it contradicts.
+
+<svg viewBox="0 0 800 430" width="100%" role="img" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">
+  <title>The SL1 provider rules split in two: on the left, rules that are on for every client (60-second single-use codes, PKCE S256, exact redirect match, iss in the response, auth_time, acr, amr and session_expiry in every ID token); on the right, rules behind ipsieSl1.enabled, each with the text it contradicts: no http redirects against RFC 8252 section 7.3, only preregistered clients against MCP authorization, binding acr_values against OIDC Core 3.1.2.1, and PS256, ES256 or EdDSA only against the RS256 default of OIDC Registration</title>
+  <rect x="20" y="20" width="360" height="390" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <text x="200" y="50" text-anchor="middle" font-size="16" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">On for every client</text>
+  <text x="40" y="95" font-size="14" fill="var(--diagram-fg, #1a1a1a)">Codes live 60 s, used once</text>
+  <text x="40" y="140" font-size="14" fill="var(--diagram-fg, #1a1a1a)">PKCE with S256</text>
+  <text x="40" y="185" font-size="14" fill="var(--diagram-fg, #1a1a1a)">Exact redirect URI match</text>
+  <text x="40" y="230" font-size="14" fill="var(--diagram-fg, #1a1a1a)">iss in the authorization response</text>
+  <text x="40" y="275" font-size="14" fill="var(--diagram-fg, #1a1a1a)">auth_time, acr, amr in every ID token</text>
+  <text x="40" y="320" font-size="14" fill="var(--diagram-fg, #1a1a1a)">session_expiry in every ID token</text>
+  <text x="200" y="385" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">conflicts with no other standard</text>
+  <rect x="420" y="20" width="360" height="390" rx="8" fill="none" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5"/>
+  <text x="600" y="50" text-anchor="middle" font-size="16" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">Behind ipsieSl1.enabled</text>
+  <text x="440" y="95" font-size="14" fill="var(--diagram-fg, #1a1a1a)">No http redirect URIs</text>
+  <text x="440" y="115" font-size="12" fill="var(--diagram-accent, #d9480f)">breaks RFC 8252 §7.3 loopback apps</text>
+  <text x="440" y="165" font-size="14" fill="var(--diagram-fg, #1a1a1a)">Only preregistered clients</text>
+  <text x="440" y="185" font-size="12" fill="var(--diagram-accent, #d9480f)">breaks MCP clients that arrive unregistered</text>
+  <text x="440" y="235" font-size="14" fill="var(--diagram-fg, #1a1a1a)">acr_values is binding</text>
+  <text x="440" y="255" font-size="12" fill="var(--diagram-accent, #d9480f)">OIDC Core §3.1.2.1 makes it a hint</text>
+  <text x="440" y="305" font-size="14" fill="var(--diagram-fg, #1a1a1a)">PS256, ES256 or EdDSA only</text>
+  <text x="440" y="325" font-size="12" fill="var(--diagram-accent, #d9480f)">OIDC Registration defaults to RS256</text>
+  <text x="600" y="385" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">each one breaks a client class if made default</text>
+</svg>
+
+None of these four is wrong. For a company that controls every application it signs into, a loopback
+redirect or an unregistered client is a gap in the chain it is trying to trust. For a public
+developer tool, they are how things work. One server can serve both kinds of customer, so these four
+rules belong behind a setting.
+
+## One switch turns the rules on and refuses what breaks them {#the-switch}
+
+In FoxAuth the setting is `ipsieSl1.enabled`, off by default. Every rule reads it where the rule is
+enforced, through one function in `lib/sl1/rules.ts`:
+
+```ts
+export function sl1(): boolean {
+  return ApplicationConfig['ipsieSl1.enabled'];
+}
+```
+
+That makes the profile easy to audit: search the code for `sl1()` and you find every place it changes
+what the server does. The token endpoint is a good example. SL1 says access tokens should be
+sender-constrained with DPoP, a proof that ties each token to a key the client holds (more in
+[what DPoP protects you from](/blog/what-dpop-protects-you-from/)). Under the profile, the check runs
+before any grant, so no grant type is left out:
+
+```ts
+if (sl1() && !sl1Exempt(client)) {
+  if (client.tlsClientCertificateBoundAccessTokens) {
+    throw new InvalidClient('certificate-bound access tokens are not issued under the IPSIE SL1 profile');
+  }
+  if (!dPoP) {
+    throw new InvalidDpopProof('DPoP proof JWT not provided (IPSIE SL1 §3.2.1)');
+  }
+}
+```
+
+A client that asks for a token without a proof gets this answer:
+
+```http
+HTTP/1.1 400 Bad Request
+Content-Type: application/json
+
+{
+  "error": "invalid_dpop_proof",
+  "error_description": "DPoP proof JWT not provided (IPSIE SL1 §3.2.1)"
+}
+```
+
+The error names the section. I did that on purpose. The person who reads it is a developer of some
+other company's application, and the fastest way to fix their client is to show them the rule.
+
+The switch also refuses to turn on until the settings the profile depends on are in place. DPoP must be on and PKCE must
+be required. Encrypted ID tokens and responses must be available (`encryption.enabled`), because the
+Common Requirements say encryption must be offered. Dynamic registration must be off or demand an initial access
+token. Every issuer needs a PS256 signing key, because PS256 is what an application that chose no
+algorithm will now receive. DPoP and encryption are off in a fresh install, so most servers have work
+to do before the switch moves.
+
+Four clients stay outside the rules: the admin console, the administrators' MCP client, each
+project's account page and SCIM provisioning connections. They are the server's own, and each one
+needs something the profile forbids. The MCP client runs on the operator's machine with a loopback
+redirect. The account page asks with `response_type=none`. A SCIM directory holds no DPoP key, and
+its token reaches only the SCIM endpoint, which SL1 does not cover.
+
+## An RS256 in a stored record is usually a default nobody chose {#stored-rs256}
+
+The risky part of switching is the applications you already have. My first version of the switch
+would have refused nearly all of them.
+
+The rule looked simple. Common Requirements allows only PS256, ES256 and EdDSA, so a client
+registered for RS256 is refused. The test suite agreed. Then I tried it on a real database, and nearly every application
+created in the console was refused.
+
+The reason is how records are saved. When FoxAuth stores a client, it stores the validated record with
+its defaults filled in. So a client whose owner never thought about algorithms still holds
+`id_token_signed_response_alg: "RS256"`. The test fixtures were written by hand and carry no defaults,
+which is why the suite passed. From the record alone, an RS256 somebody chose and an RS256 the server
+filled in look the same.
+
+The fix treats a stored RS256 in those attributes as the default it almost always is. Under the
+profile, such a client receives PS256 signatures, and PS256 is written into the record the next time
+it is saved. Registering RS256 afresh, or changing an algorithm to RS256, is still refused.
+
+That changes what the application has to do: it must pick the verification key from the key set by
+`kid` and accept the algorithm the key states, not a fixed RS256. Most libraries do this. Some
+hand-written verifiers do not. Before you switch, the readiness check lists every application that
+will receive PS256, so you know whose verifier to ask about:
+
+<svg viewBox="0 0 800 300" width="100%" role="img" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">
+  <title>Switching on the profile in four steps: run the readiness check, which lists unmet settings, issuers without a PS256 key and every application the profile would refuse or change; fix settings and keys; review the listed applications; switch on. Switching off restores a refused application on the next request, because nothing was rewritten.</title>
+  <defs>
+    <marker id="sl1-arrow-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--diagram-line, #555)"/></marker>
+    <marker id="sl1-arrow-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--diagram-accent, #d9480f)"/></marker>
+  </defs>
+  <rect x="20" y="40" width="200" height="130" rx="8" fill="none" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5"/>
+  <text x="120" y="68" text-anchor="middle" font-size="15" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">Readiness check</text>
+  <text x="35" y="98" font-size="12" fill="var(--diagram-fg, #1a1a1a)">settings not yet met</text>
+  <text x="35" y="122" font-size="12" fill="var(--diagram-fg, #1a1a1a)">issuers without PS256</text>
+  <text x="35" y="146" font-size="12" fill="var(--diagram-fg, #1a1a1a)">applications, with reasons</text>
+  <rect x="270" y="40" width="150" height="130" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <text x="345" y="98" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">Fix settings</text>
+  <text x="345" y="122" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">and keys</text>
+  <rect x="470" y="40" width="150" height="130" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <text x="545" y="98" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">Review the</text>
+  <text x="545" y="122" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">listed applications</text>
+  <rect x="670" y="40" width="110" height="130" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <text x="725" y="110" text-anchor="middle" font-size="14" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">Switch on</text>
+  <line x1="220" y1="105" x2="268" y2="105" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#sl1-arrow-a)"/>
+  <line x1="420" y1="105" x2="468" y2="105" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#sl1-arrow-a)"/>
+  <line x1="620" y1="105" x2="668" y2="105" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#sl1-arrow-a)"/>
+  <path d="M725,170 L725,240 L545,240 L545,172" fill="none" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5" marker-end="url(#sl1-arrow-b)"/>
+  <text x="635" y="265" text-anchor="middle" font-size="12" fill="var(--diagram-accent, #d9480f)">switch off: refused applications work again on the next request</text>
+</svg>
+
+The readiness check is a card in the console under Settings, then Request security, and the same
+answer is available to an agent through the `settings_ipsie_profile_readiness_get` tool. For each
+application it names the rule and the attribute. `http_redirect_uri` means that redirect URI will be
+refused, while the application's `https` ones keep working. `signing_algorithm` means the application
+will be refused. `default_algorithm` means it will keep working but receive PS256.
+
+Turning the profile on rewrites nothing. A refused application keeps its record, so turning the
+profile off brings it back on the next request. That matters with a draft standard: you can back out
+the same afternoon.
+
+## Turn it on when a customer requires SL1, not because it sounds safer {#when-to-turn-it-on}
+
+The half of SL1 that conflicts with nothing is already on, so switching the profile on does not make
+an ordinary server noticeably safer. It makes the server stricter in four ways that some clients
+cannot follow. That trade is worth it in one situation: an enterprise customer requires SL1, and
+every application you serve can live with the rules.
+
+Turn it on when:
+
+- a customer's contract or security review asks for IPSIE SL1, and
+- every application you serve uses `https` redirect URIs, can send DPoP proofs and verifies signatures
+  by key set, and
+- you register applications yourself, in the console or with an initial access token.
+
+Leave it off when you serve any of these:
+
+- native or command line apps that receive the response on a loopback `http` address;
+- MCP clients that register themselves, or that you identify by a metadata document URL;
+- partners whose verifiers accept only RS256;
+- anything that relies on `response_type=none`.
+
+If you serve both kinds of customer, run them on separate instances, one with the profile on and one
+without. A FoxAuth project with an address of its own is its own issuer, but the switch is per
+instance, not per project.
+
+Answer the questionnaire honestly, too. Three SL1 requirements are not met here yet. An application
+can ask for a sign-in with a second factor, and in a project that does not require one, the request
+ends in an error instead of asking the person for the factor. After a sign-in through an upstream
+provider, the ID token does not carry that provider's `amr`. And tokens that other issuers send to
+this server, such as upstream ID tokens, are still accepted in RS256. The first is the next feature.
+No certification has been applied for.
+
+I looked for the same switch elsewhere. Auth0, Keycloak, Zitadel, authentik and Ory Hydra do not
+document being an SL1 OpenID Provider, as of the sources cited in the
+[comparison pages](/compare/). The profile is still a draft, so that may change.
+
+To try it, start with the readiness card and read
+[turn on the IPSIE SL1 profile](/docs/administer/ipsie-sl1-profile/), which lists every rule and every
+prerequisite. You will probably need a PS256 key first;
+[rotate signing keys](/docs/administer/signing-keys/) shows how to generate and promote one.

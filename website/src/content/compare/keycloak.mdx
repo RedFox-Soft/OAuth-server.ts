@@ -212,6 +212,15 @@ groups:
         verdict: us
         why: 'Both can front an MCP server. The difference is how the token is bound to it: the resource parameter the MCP specification requires of clients, against a per-server scope and mapper configured by hand.'
         note: 'Keycloak states full support for MCP 2025-03-26 and partial support for later revisions, and that protected-resource metadata (RFC 9728) is the MCP server’s job rather than the authorization server’s. FoxAuth takes the same position.'
+      - dimension: IPSIE SL1 profile
+        us:
+          {
+            status: flag,
+            text: 'The provider side of the draft behind ipsieSl1.enabled, with a readiness check before you switch. Some requirements are still open, such as prompting for a second factor when an application asks for one.'
+          }
+        them: { status: unknown, text: 'Not documented.' }
+        verdict: us
+        why: 'SL1 is an OpenID Foundation working-group draft for enterprise sign-in. FoxAuth implements SL1 provider rules behind a flag, and Keycloak’s documentation does not mention IPSIE.'
   - label: Administration and agents
     rows:
       - dimension: Admin console

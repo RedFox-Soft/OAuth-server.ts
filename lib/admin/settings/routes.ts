@@ -23,6 +23,10 @@ import {
 	type SettingDescriptor
 } from './catalog.js';
 import { UpdateSettingsBody } from './schema.js';
+import {
+	issuersWithoutDefaultSigner,
+	sl1Readiness
+} from '../../sl1/readiness.js';
 
 const running = (key: string): unknown =>
 	(ApplicationConfig as Record<string, unknown>)[key];
@@ -199,6 +203,12 @@ export const settingsRoutes = new Elysia({ name: 'admin-settings' })
 		assertSuperAdmin(ctx);
 		return currentState();
 	})
+	// Read-only: what turning the IPSIE SL1 profile on would need and refuse. Enables nothing, so it is not audited.
+	.get('/admin/api/settings/ipsie-sl1/readiness', async ({ admin }) => {
+		const ctx = assertAuth(admin);
+		assertSuperAdmin(ctx);
+		return sl1Readiness();
+	})
 	.put(
 		'/admin/api/settings',
 		async ({ admin, body }) => {
@@ -226,6 +236,25 @@ export const settingsRoutes = new Elysia({ name: 'admin-settings' })
 			// Still judged on the whole merged result, not on the changed keys alone: the invariants are
 			// cross-key, so a change can only be understood next to the settings it has to agree with.
 			validateEffectiveConfig({ ...ApplicationConfig, ...merged });
+			/*
+			 * The one IPSIE SL1 prerequisite the validator cannot see, because it lives in the key store: every issuer must
+			 * be able to sign for the profile's default algorithm, which clients that registered none are given. Checked on
+			 * the switch being turned on; keys cannot be lost later, since a signing key is replaced only within its
+			 * algorithm and never retired (lib/admin/key_lifecycle.ts).
+			 */
+			if (changes['ipsieSl1.enabled'] === true) {
+				const missing = await issuersWithoutDefaultSigner();
+				if (missing.length) {
+					throw new AdminError(
+						422,
+						`ipsieSl1.enabled needs a PS256 signing key at every issuer; missing at ${missing
+							.map((i) => i.issuer)
+							.join(
+								', '
+							)}. Generate and promote a PS256 key for each, then retry; readiness lists them.`
+					);
+				}
+			}
 			/*
 			 * Split by what each setting says about itself, before anything is written. The split is a
 			 * property of the catalog rather than of the apply below, which is what lets the audit entry

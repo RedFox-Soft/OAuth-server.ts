@@ -53,7 +53,7 @@ five copy sites for a value only meaningful while the session lives.
 
 ## The setting
 
-`idToken.relyingPartySessionLifetime`, integer seconds, default 86400 (`lib/configs/application.ts:851`),
+`idToken.relyingPartySessionLifetime`, integer seconds, default 86400 (`lib/configs/application.ts:871`),
 bounded 300 to 1 209 600 by `checkSessionExpiry` (`lib/configs/configuration.ts:515`). The floor is SL1's;
 the ceiling is `ttl.Session`, because a relying party cannot be promised a session longer than this
 server's own. 24 hours is NIST SP 800-63B-4's AAL2 overall reauthentication timeout ("SHOULD be no more
@@ -89,10 +89,11 @@ connection and failing a sign-in whose provider sends no claim; here a missing c
 ## Known SL1 gaps left by spec 111
 
 - OpenID Provider: `amr` after a federated sign-in, where forwarding a trusted provider's methods is
-  deferred by decision ([[amr-reporting]]); no `http` redirect URIs; no unauthenticated dynamic
-  registration; DPoP-bound access tokens (SHOULD). The last three break RFC 8252 loopback apps and MCP's
-  DCR as defaults, so they belong to a profile switch of their own. Closed since: `auth_time` and `acr`
-  in every ID token (2026-10-23, [[authentication-context-reporting]]). Already held: 60-second
+  deferred by decision ([[amr-reporting]]), and request-driven multi-factor step-up. Closed since:
+  `auth_time` and `acr` in every ID token (2026-10-23, [[authentication-context-reporting]]); no `http`
+  redirect URIs, no unauthenticated registration, DPoP-bound access tokens, the Common Requirements
+  algorithms and binding `acr_values`, behind the `ipsieSl1.enabled` switch, since they break RFC 8252
+  loopback apps and MCP's registration as defaults (spec 112, 2026-10-23, [[ipsie-sl1-profile]]). Already held: 60-second
   authorization codes (`lib/configs/liveTime.ts:49`), and `max_age` and `acr_values` support.
 - The admin console is itself a relying party of this server, with an absolute and a sliding expiry of its
   own, and does not read `session_expiry`.

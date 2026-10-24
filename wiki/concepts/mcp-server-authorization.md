@@ -217,7 +217,7 @@ stops at 5 KB (`MAX_DOCUMENT_BYTES`, `lib/client_metadata_document/fetch.ts`) an
 a 200 or nothing, no redirect followed (`maxRedirects: 0`, which `guardedFetch` answers by returning the
 redirect unread). The address classes it will reach and the time bound are `lib/shared/egress.ts`'s. The
 whole branch is gated on `clientIdMetadataDocument.enabled`, **off by default**
-(`lib/configs/application.ts:699`), because it lets an unauthenticated caller make this server issue an
+(`lib/configs/application.ts:719`), because it lets an unauthenticated caller make this server issue an
 outbound request.
 
 **Written to draft -02 since spec 110** (2026-10-22); it was built to -00, which MCP 2026-07-28 still cites.

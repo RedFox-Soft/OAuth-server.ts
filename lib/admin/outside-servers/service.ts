@@ -86,7 +86,7 @@ async function assertApplications(
 		}
 		seen.add(clientId);
 		const client = (await belongsToProject(bucket, clientId))
-			? await tryFindClient(clientId)
+			? await tryFindClient(clientId, { administering: true })
 			: undefined;
 		if (!client) {
 			throw refuse(

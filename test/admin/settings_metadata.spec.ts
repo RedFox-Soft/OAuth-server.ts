@@ -138,6 +138,7 @@ describe('settings catalog presentation metadata', () => {
 				'cors.enabled',
 				'globalTokenRevocation.enabled',
 				'idToken.relyingPartySessionLifetime',
+				'ipsieSl1.enabled',
 				'jwtBearer.enabled',
 				'tokenExchange.enabled',
 				'mTLS.trustProxyCertificateHeader',

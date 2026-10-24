@@ -114,6 +114,11 @@ algorithm without one.
 A new algorithm needs no restart. Generate an `ES256` key, promote it, and discovery advertises `ES256`
 from then on, so clients can register for it straight away.
 
+The [IPSIE SL1 profile](/docs/administer/ipsie-sl1-profile/) signs with `PS256` for every client that chose no
+algorithm, so the profile can only be turned on when every issuer has a `PS256` signer: the instance, and each
+project with an address of its own. Generate a `PS256` key for each issuer and promote the key once it can sign.
+A project created while the profile is on gets a `PS256` signer at once.
+
 ## Limits: 12 keys held, 20 made a day {#how-many-keys}
 
 Making a key costs the server real processor time, and every key stays in the key set that clients download.

@@ -40,7 +40,7 @@ Three hedges follow from building on it:
 - **The target is Okta's documented request, not the draft as a standard.** Okta's `typ` is
   `global-token-revocation+jwt`, its `iss` the organisation, its `sub` our client id there, a not-before five
   minutes back and an expiry five minutes ahead.
-- **Everything sits behind `globalTokenRevocation.enabled`, off** (`lib/configs/application.ts:272`), whose
+- **Everything sits behind `globalTokenRevocation.enabled`, off** (`lib/configs/application.ts:292`), whose
   console text says the draft expired. Discovery names the draft revision as the "registrar" of its two members
   (`lib/configs/discoverySupport.ts`), because they were never IANA-registered.
 - **The format is one module over a format-neutral core** — next section.

@@ -2,7 +2,7 @@ import { rich } from '../../types.ts';
 import type english from './en.ts';
 import type { HomeFacts } from './en.ts';
 
-export const source = '4a7a5f16fba1';
+export const source = '5591b93e2441';
 
 const plural = new Intl.PluralRules('ru');
 
@@ -86,7 +86,7 @@ export default {
 				title: 'Для регулируемых отраслей',
 				body: 'Все профили банковского уровня уже реализованы. Включите флаг, которого требует ваш регулятор.',
 				points: [
-					'FAPI, DPoP, PAR, mTLS, CIBA, RAR, JARM',
+					'FAPI, IPSIE SL1, DPoP, PAR, mTLS, CIBA, RAR, JARM',
 					'Журнал аудита действий администраторов, в который записи только добавляются',
 					'Ограничение неудачных попыток входа для каждой учётной записи'
 				]

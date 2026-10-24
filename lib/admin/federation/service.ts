@@ -450,7 +450,7 @@ async function assertPlainAssertions(
 	}
 	for (const clientId of plain.clientIds) {
 		const client = (await belongsToProject(bucket, clientId))
-			? await tryFindClient(clientId)
+			? await tryFindClient(clientId, { administering: true })
 			: undefined;
 		if (!client) {
 			throw refuse(

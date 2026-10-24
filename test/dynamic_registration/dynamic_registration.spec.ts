@@ -1,3 +1,4 @@
+import { generateKeyPairSync } from 'node:crypto';
 import {
 	describe,
 	it,
@@ -263,6 +264,23 @@ describe('registration features', () => {
 				'invalid_client_metadata',
 				"grantTypes must contain 'authorization_code' when code is amongst responseTypes"
 			);
+		});
+
+		// RFC 7518 §3.3: an RSA key shorter than 2048 bits is not a key the server will verify with.
+		it('refuses a key set holding an RSA key shorter than 2048 bits', async () => {
+			const short = generateKeyPairSync('rsa', {
+				modulusLength: 1024
+			}).publicKey.export({ format: 'jwk' });
+
+			const res = await reg({
+				token_endpoint_auth_method: 'private_key_jwt',
+				jwks: { keys: [{ ...short, alg: 'RS256', use: 'sig' }] }
+			});
+
+			expect(res.status).toBe(400);
+			expect(res.error?.value).toMatchObject({
+				error: 'invalid_client_metadata'
+			});
 		});
 
 		it('an unacceptable redirect_uri is refused at registration', async () => {

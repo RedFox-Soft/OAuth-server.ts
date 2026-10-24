@@ -1,6 +1,33 @@
 <!--
 SYNC IMPACT REPORT
 ==================
+Version change: 3.1.0 → 3.2.0 (MINOR — Principle VI admits a profile's declared default), 2026-10-23
+Modified principles:
+  VI. Security-First — "RS256 when it registered none" gains "or the default a named profile
+    setting declares while that profile is on", and the issuer obligation now reads "the default
+    in force included". Title and the rest of VI unchanged.
+Rationale (Governance §1):
+  The IPSIE Common Requirements Profile §3.3 permits only PS256, ES256 and EdDSA (Ed25519) for
+  JWTs an identity provider creates, and so forbids RS256. Under the IPSIE SL1 profile setting
+  (`ipsieSl1.enabled`, spec 112) a client record saved before the profile without a registered
+  algorithm is served PS256 until it is next saved, when PS256 is written into it. That lasts as
+  long as the profile exists, so it is a long-lived exception to the old sentence, and Governance
+  requires a long-lived exception to be an amendment rather than a note in a pull request. A
+  client saved while the profile is on has registered PS256 and was already covered.
+  The issuer obligation follows the default actually in force: enabling the profile is refused
+  unless every issuer holds a PS256 signing key, so no client is ever served an algorithm its
+  issuer cannot sign with.
+  MINOR rather than MAJOR: nothing compliant under 3.1.0 becomes non-compliant; the sentence
+  admits one more default, and only behind a named profile setting (Principle I).
+Added sections: none
+Removed sections: none
+Templates requiring updates:
+  ✅ .specify/templates/plan-template.md, spec-template.md, tasks-template.md — no reference to the
+    signing algorithm; unchanged.
+  ✅ AGENTS.md, README.md — neither states the RS256 rule; unchanged.
+Follow-up TODOs: none.
+
+Previous amendment:
 Version change: 3.0.1 → 3.1.0 (MINOR — Principle VI signing rule corrected and extended), 2026-09-30
 Modified principles:
   VI. Security-First — the sentence "JWT access and ID tokens MUST be RS256-signed from the
@@ -241,8 +268,9 @@ PKCE is mandatory for all public clients; the server MUST reject authorization r
 from public clients that omit a code challenge. DPoP binding MUST be validated on every
 request when a token is DPoP-bound. JWT access and ID tokens MUST be signed with an
 asymmetric key from the issuing issuer's own published key set, in the algorithm the client
-registered — RS256 when it registered none; an issuer MUST keep a signing key in every
-algorithm one of its clients relies on, the default included. Introspection and revocation
+registered — RS256 when it registered none, or the default a named profile setting declares
+while that profile is on; an issuer MUST keep a signing key in every algorithm one of its
+clients relies on, the default in force included. Introspection and revocation
 endpoints MUST require authentication. Key rotation MUST NOT invalidate currently valid tokens.
 
 ### VII. Code Discipline
@@ -310,4 +338,4 @@ requires deviating from a principle, the deviation MUST be documented in the PR
 description and, if the exception is long-lived, reflected as an amendment here.
 Runtime development guidance is maintained in `AGENTS.md`.
 
-**Version**: 3.1.0 | **Ratified**: 2026-06-19 | **Last Amended**: 2026-09-30
+**Version**: 3.2.0 | **Ratified**: 2026-06-19 | **Last Amended**: 2026-10-23

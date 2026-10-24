@@ -36,6 +36,10 @@ export default {
 					title: 'OpenID Connect Core 1.0',
 					body: 'ID tokens, the UserInfo endpoint and discovery, with the standard claim set and pairwise subjects.'
 				},
+				sessionExpiry: {
+					title: 'Session expiry in every ID token',
+					body: 'Every ID token says when the application must send the person back to sign in (session_expiry). A federated session ends no later than the time the upstream provider sets.'
+				},
 				issuerIdentification: {
 					title: 'Issuer identification',
 					body: 'Every authorization response carries iss, so a client that checks it cannot be tricked into accepting another issuer’s code.'
@@ -123,6 +127,14 @@ export default {
 				fapi: {
 					title: 'FAPI profile behaviours',
 					body: 'The stricter checks the Financial-grade API profiles require, as one switch.'
+				},
+				ipsieSl1: {
+					title: 'IPSIE SL1 enterprise profile',
+					body: 'One switch applies provider rules from the OpenID Foundation’s draft enterprise profile: preregistered clients only, DPoP-bound tokens, PS256, ES256 or EdDSA signatures and binding authentication levels. A readiness check lists what stands in the way before you switch.'
+				},
+				assertionAudience: {
+					title: 'Issuer-only client assertion audience',
+					body: 'The server accepts a client assertion only when the assertion names this server’s issuer as its sole audience. The rule closes the audience-injection attack that rfc7523bis answers. The rule is off by default until rfc7523bis becomes an RFC.'
 				},
 				encryption: {
 					title: 'Token and response encryption',

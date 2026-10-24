@@ -69,6 +69,11 @@ const OKPPubKey = t.Object({
 export type PublicJWK =
 	Static<typeof RSAPubKey> | Static<typeof ECPubKey> | Static<typeof OKPPubKey>;
 
+/* The size of an RSA modulus as a JWK carries it: base64url, big-endian, with no leading zero octets (RFC 7518 §6.3.1.1). */
+export function rsaModulusBits(n: string): number {
+	return Buffer.from(n, 'base64url').length * 8;
+}
+
 /* A key this server can use, undefined for one it skips (an unknown type or curve), or a refusal. */
 export function validateJWK(value: unknown): PublicJWK | undefined {
 	if (!isPlainObject(value)) {
@@ -106,6 +111,17 @@ export function validateJWK(value: unknown): PublicJWK | undefined {
 	// reject private keys: only public key material is accepted here
 	if (jwk.d !== undefined || !Value.Check(schema, jwk)) {
 		throw new InvalidClientMetadata('client JSON Web Key Set is invalid');
+	}
+
+	/*
+	 * RFC 7518 §3.3 and §3.5: "A key of size 2048 bits or larger MUST be used" with RS* and PS*. jose already refuses to
+	 * verify with a shorter one, so such a key could never authenticate anything; refusing it here names the reason
+	 * when it is registered or fetched rather than at the first sign-in that fails.
+	 */
+	if (jwk.kty === 'RSA' && rsaModulusBits(jwk.n) < 2048) {
+		throw new InvalidClientMetadata(
+			'client JSON Web Key Set holds an RSA key shorter than 2048 bits (RFC 7518 §3.3)'
+		);
 	}
 
 	return jwk;

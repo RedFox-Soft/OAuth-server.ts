@@ -21,7 +21,7 @@ graph:
 The `uid` of an interaction is in every URL of a sign-in (`/ui/${uid}/login`, `/totp/enroll`,
 `/consent`, …), so it is **not a secret**: it reaches access logs, browser history, screenshots and
 support tickets. What ties a sign-in to the browser that began it is a second value, `cookieID`, minted
-beside the uid and sent only in the `_interaction` cookie (`lib/actions/authorization/interactions.ts:114`,
+beside the uid and sent only in the `_interaction` cookie (`lib/actions/authorization/interactions.ts:118`,
 `:140`). The `ui` guard's cookie schema proves only that *some* `_interaction` cookie arrived; the
 comparison against `interaction.payload.cookieID` in the shared `resolve`
 (`lib/interactions/index.ts:395-409`) is the whole of the binding. It is constant-time and answers

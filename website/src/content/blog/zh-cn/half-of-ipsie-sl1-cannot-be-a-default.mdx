@@ -1,0 +1,205 @@
+---
+title: IPSIE SL1 有一半不能默认开启
+description: >-
+  IPSIE SL1 是 OpenID 基金会面向企业登录的规范。其中一半每台服务器都该遵守，另一半会破坏其他标准。这篇讲什么时候该打开它。
+source: e28aba4204e8
+---
+
+迟早有一天，企业客户发来的安全问卷里会出现这样一行：
+
+| 控制项 | 回答 |
+| --- | --- |
+| 你们的身份提供方是否符合 IPSIE SL1 OpenID Connect 规范？ | 是 / 否 / 部分符合 |
+
+身份提供方（identity provider）就是让人登录、并向应用程序签发令牌的那台服务器。如果你在为企业客户运行这样一台服务器，这一行问的就是你。回答之前，你需要知道三件事：SL1 是什么；它的规则里，哪些你的服务器已经在遵守；哪些一旦打开，就会弄坏某些东西。
+
+我最近在 FoxAuth 里实现了 SL1，结果这份规范分成了两半。前一半，每台服务器本来就该遵守。后一半与其他标准相矛盾，而别的客户端依赖那些标准，所以它不能默认开启。它只能做成一个开关。难的是知道什么时候该打开它。
+
+## IPSIE SL1 把「支持 SSO」变成可以检验的规则 {#what-sl1-is}
+
+IPSIE 是 Interoperability Profile for Secure Identity in the Enterprise 的缩写，意思是「企业安全身份互操作规范」。它是 OpenID 基金会的一个工作组，由 Okta 联合微软、Ping Identity 等公司于 2024 年 10 月发起（[Okta 的公告](https://www.okta.com/newsroom/press-releases/okta-openid-foundation-tech-firms-tackle-todays-biggest-cybersecurity/)）。这个工作组编写规范（profile），也就是在 OpenID Connect、OAuth、SCIM 等现有标准之上，再加一层更严格的规则。有了规范，企业就能逐个核实：自己买的每个 SaaS 应用所说的「支持单点登录」，到底是什么意思。
+
+工作组把要求分成两条路线，每条路线又分成若干级别（[IPSIE 级别](https://github.com/openid/ipsie/blob/main/ipsie-levels.md)）。会话生命周期路线（Session Lifecycle，简称 SL）管登录和会话。账户生命周期路线（Account Lifecycle，简称 AL）管账户的创建和删除，这是 SCIM 的工作（IPSIE 的 SCIM 规范，我在[Entra、Okta 的 SCIM 方言](/zh-cn/blog/what-entra-and-okta-send-to-scim/)里写过）。SL1 是会话路线的第一级：带多因素认证的单点登录，以及由身份提供方设定、由应用程序遵守的会话时长。SL2 增加了登出和终止访问的时限。SL3 增加了双方之间持续传递的信号。
+
+具体条文是 [IPSIE SL1 OpenID Connect Profile](https://openid.github.io/ipsie-openid-sl1/draft-openid-ipsie-sl1-profile.html)。它逐节列出身份提供方和应用程序各自必须做什么。它还引用了另一份文档，[IPSIE Common Requirements](https://openid.github.io/ipsie-common-requirements-profile/draft-ipsie-common-requirements-profile.html)（通用要求）。所有 IPSIE 规范共有的规则都放在那里，比如允许使用哪些签名算法。
+
+两份都是草案。我依据的编辑草案，日期是 2026 年 9 月 29 日。这份规范已经有过要紧的改动。令牌里表示会话的那个字段叫作会话声明（claim）。00 版草案把它叫作 `session_lifetime`，单位是秒；现在的文本把它叫作 `session_expiry`，并改成了一个时间戳。今天实现 SL1 的服务器，以后也得跟上下一版草案。
+
+## SL1 的大部分本来就该是默认行为 {#already-default}
+
+读一读规范中身份提供方那一半，大部分规则都只是普通的良好做法。它们不与任何其他标准冲突，所以没有什么能阻止服务器对所有客户端都遵守它们：
+
+- 授权码最多存活 60 秒，并且只能使用一次。
+- PKCE（把授权码绑定到申请它的那个客户端的 code challenge）使用 S256。
+- redirect URI 必须与某个已注册的 URI 完全一致。
+- 授权响应里带有 `iss`，这样客户端就能分辨是哪台服务器作出的回答
+  （[RFC 9207](https://www.rfc-editor.org/rfc/rfc9207)）。
+- 每个 ID 令牌都写明这个人何时完成认证（`auth_time`）、用什么方式认证（`acr` 和 `amr`），以及应用程序的会话必须在何时结束（`session_expiry`）。
+
+在 FoxAuth 里，即使不开启这份规范，这些也全都做到了。下面是一次密码登录得到的 ID 令牌 payload，已经解码：
+
+```json
+{
+  "iss": "https://auth.example.com",
+  "sub": "2f6c1b0e-7c55-4b8e-9d2a-3a1f0c9e8b71",
+  "aud": "orders-web",
+  "iat": 1792745400,
+  "exp": 1792749000,
+  "auth_time": 1792745391,
+  "acr": "urn:foxauth:acr:pwd",
+  "amr": ["pwd"],
+  "session_expiry": 1792831800
+}
+```
+
+`session_expiry` 是新加的。它表示一个时刻。过了这个时刻，应用程序必须把这个人送回身份提供方，由身份提供方再次确认他仍然可以登录。SL1 要求这个时刻至少比 `iat` 晚 300 秒。这里它晚了 24 小时，这是 `idToken.relyingPartySessionLifetime` 设置的默认值。不读取这个声明的应用程序会直接忽略它，所以它可以对所有人开启。
+
+## 另一半会破坏别人依赖的标准 {#cannot-be-default}
+
+SL1 有四条规则不一样。每一条都与另一份文本相矛盾，而现实中有一整类客户端遵循那份文本。把其中任何一条设为默认，那些客户端就会停止工作。
+
+- 不允许 `http` 的 redirect URI，连 `http://127.0.0.1` 也不行。可是
+  [RFC 8252 第 7.3 节](https://www.rfc-editor.org/rfc/rfc8252#section-7.3)恰恰让原生应用在这样的环回地址上接收授权响应。桌面应用和命令行工具每天都这样做。
+- 只接受预先注册的客户端，也不允许未经认证的动态注册。可是 MCP 客户端，也就是连接 MCP 服务器的那些 AI 工具，通常不打招呼就来了。
+  [MCP 授权规范](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization)让服务器接受一种 client id：它是一份元数据文档的 URL，服务器在第一次接触时去获取这份文档。动态注册则作为已弃用的备用方案保留下来。这个流程我在[MCP 服务器必须检查令牌是给谁的](/zh-cn/blog/your-mcp-server-is-an-oauth-resource-server/)里讲过。
+- `acr_values` 变成必须遵守的要求。客户端用这个参数要求某个认证级别。在
+  [OpenID Connect Core 第 3.1.2.1 节](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest)里，它只是一个可以不遵守的提示。服务器可以用别的方式让这个人登录，再在 `acr` 里如实说明。SL1 则规定，服务器要么满足这个要求，要么返回错误。
+- 只允许 PS256、ES256 和 EdDSA 签名（通用要求第 3.3 节）。可是
+  [OpenID Connect Registration](https://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata)
+  规定，客户端没有指定算法时，默认使用 RS256。为这个默认值编写的验证程序，可能别的算法一概不接受。
+
+下图把两半并排放在一起。左边的规则不会让任何人付出代价。右边每条规则下面，写着它所矛盾的那份文本。
+
+<svg viewBox="0 0 800 430" width="100%" role="img" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">
+  <title>SL1 中身份提供方的规则分成两半：左边是对所有客户端开启的规则（授权码有效 60 秒且只能用一次、PKCE 使用 S256、redirect URI 精确匹配、授权响应中带 iss、每个 ID 令牌都带 auth_time、acr、amr 和 session_expiry）；右边是由 ipsieSl1.enabled 控制的规则，每条都标出它所矛盾的文本：不允许 http 重定向与 RFC 8252 第 7.3 节矛盾，只接受预先注册的客户端与 MCP 授权规范矛盾，acr_values 具有约束力与 OIDC Core 第 3.1.2.1 节矛盾，只允许 PS256、ES256 或 EdDSA 与 OIDC Registration 默认的 RS256 矛盾</title>
+  <rect x="20" y="20" width="360" height="390" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <text x="200" y="50" text-anchor="middle" font-size="16" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">对所有客户端开启</text>
+  <text x="40" y="95" font-size="14" fill="var(--diagram-fg, #1a1a1a)">授权码有效 60 秒，只能用一次</text>
+  <text x="40" y="140" font-size="14" fill="var(--diagram-fg, #1a1a1a)">PKCE 使用 S256</text>
+  <text x="40" y="185" font-size="14" fill="var(--diagram-fg, #1a1a1a)">redirect URI 精确匹配</text>
+  <text x="40" y="230" font-size="14" fill="var(--diagram-fg, #1a1a1a)">授权响应中带 iss</text>
+  <text x="40" y="275" font-size="14" fill="var(--diagram-fg, #1a1a1a)">每个 ID 令牌都带 auth_time、acr、amr</text>
+  <text x="40" y="320" font-size="14" fill="var(--diagram-fg, #1a1a1a)">每个 ID 令牌都带 session_expiry</text>
+  <text x="200" y="385" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">不与任何其他标准冲突</text>
+  <rect x="420" y="20" width="360" height="390" rx="8" fill="none" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5"/>
+  <text x="600" y="50" text-anchor="middle" font-size="16" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">由 ipsieSl1.enabled 控制</text>
+  <text x="440" y="95" font-size="14" fill="var(--diagram-fg, #1a1a1a)">不允许 http redirect URI</text>
+  <text x="440" y="115" font-size="12" fill="var(--diagram-accent, #d9480f)">破坏 RFC 8252 §7.3 的环回应用</text>
+  <text x="440" y="165" font-size="14" fill="var(--diagram-fg, #1a1a1a)">只接受预先注册的客户端</text>
+  <text x="440" y="185" font-size="12" fill="var(--diagram-accent, #d9480f)">破坏未经注册就来的 MCP 客户端</text>
+  <text x="440" y="235" font-size="14" fill="var(--diagram-fg, #1a1a1a)">acr_values 具有约束力</text>
+  <text x="440" y="255" font-size="12" fill="var(--diagram-accent, #d9480f)">OIDC Core §3.1.2.1 把它定为提示</text>
+  <text x="440" y="305" font-size="14" fill="var(--diagram-fg, #1a1a1a)">只允许 PS256、ES256 或 EdDSA</text>
+  <text x="440" y="325" font-size="12" fill="var(--diagram-accent, #d9480f)">OIDC Registration 默认使用 RS256</text>
+  <text x="600" y="385" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">任何一条设为默认，都会破坏一类客户端</text>
+</svg>
+
+这四条都没有错。一家企业如果掌控着自己要登录的每一个应用程序，那么环回重定向或未注册的客户端，就是它想要信任的那条链上的一个缺口。可对面向公众的开发者工具来说，它们就是正常的工作方式。一台服务器可以同时服务这两类客户，所以这四条规则应该放在一个设置后面。
+
+## 一个开关打开这些规则，并拒绝会破坏它们的东西 {#the-switch}
+
+在 FoxAuth 里，这个设置叫 `ipsieSl1.enabled`，默认关闭。每条规则都在执行它的地方读取这个设置，而且都通过 `lib/sl1/rules.ts` 里的同一个函数来读：
+
+```ts
+export function sl1(): boolean {
+  return ApplicationConfig['ipsieSl1.enabled'];
+}
+```
+
+这样一来，审查这份规范就很容易：在代码里搜索 `sl1()`，就能找到它改变服务器行为的每一处。令牌端点是个好例子。SL1 规定，访问令牌应当用 DPoP 做发送方约束。DPoP 是一种证明，它把每个令牌绑定到客户端持有的一把密钥上（详见 [DPoP 能防什么，不能防什么](/zh-cn/blog/what-dpop-protects-you-from/)）。开启规范后，这项检查在处理任何授权（grant）之前运行，所以没有一种授权类型会被漏掉：
+
+```ts
+if (sl1() && !sl1Exempt(client)) {
+  if (client.tlsClientCertificateBoundAccessTokens) {
+    throw new InvalidClient('certificate-bound access tokens are not issued under the IPSIE SL1 profile');
+  }
+  if (!dPoP) {
+    throw new InvalidDpopProof('DPoP proof JWT not provided (IPSIE SL1 §3.2.1)');
+  }
+}
+```
+
+如果客户端申请令牌时没有附上证明，会收到这样的回答：
+
+```http
+HTTP/1.1 400 Bad Request
+Content-Type: application/json
+
+{
+  "error": "invalid_dpop_proof",
+  "error_description": "DPoP proof JWT not provided (IPSIE SL1 §3.2.1)"
+}
+```
+
+错误信息里写明了章节号。这是我有意这样做的。读到它的人，是另一家公司某个应用程序的开发者。要让他尽快修好客户端，最好的办法就是把规则指给他看。
+
+在规范所依赖的设置就位之前，这个开关也拒绝打开。DPoP 必须开启，PKCE 必须设为必需。加密的 ID 令牌和加密的响应必须可用（`encryption.enabled`），因为通用要求规定必须提供加密。动态注册必须关闭，或者必须要求出示初始访问令牌。每个签发者都需要一把 PS256 签名密钥，因为从此以后，没有选择算法的应用程序收到的就是 PS256。新安装的服务器里，DPoP 和加密都是关闭的，所以大多数服务器在打开开关之前，都还有活要干。
+
+有四个客户端不受这些规则约束：管理控制台、管理员的 MCP 客户端、每个项目的账户页面，以及 SCIM 预配连接。它们是服务器自己的客户端，而且每一个都需要规范所禁止的某样东西。MCP 客户端运行在运维者的机器上，使用环回重定向。账户页面用 `response_type=none` 发起请求。SCIM 目录服务不持有 DPoP 密钥，而且它的令牌只能用在 SCIM 端点上，而 SL1 并不涵盖这个端点。
+
+## 存储记录里的 RS256，通常是没人选过的默认值 {#stored-rs256}
+
+打开开关时，风险在于你已有的那些应用程序。我第一版的开关，几乎会把它们全部拒绝。
+
+规则看起来很简单。通用要求只允许 PS256、ES256 和 EdDSA，所以注册为 RS256 的客户端会被拒绝。测试套件也认可这一点。然后我在一个真实的数据库上试了试，结果几乎每个在控制台里创建的应用程序都被拒绝了。
+
+原因在于记录的保存方式。FoxAuth 保存客户端时，保存的是经过校验、已经填好默认值的记录。所以，即使所有者从没考虑过算法，这个客户端的记录里仍然有 `id_token_signed_response_alg: "RS256"`。测试用的数据是手写的，不带默认值，所以测试套件通过了。只看记录本身，有人主动选的 RS256 和服务器自动填上的 RS256，看起来一模一样。
+
+修复办法是：把这些属性里存储的 RS256 当作默认值处理，而它几乎总是默认值。开启规范后，这样的客户端会收到 PS256 签名；下次保存这条记录时，PS256 会写进记录。新注册时指定 RS256，或者把某个算法改成 RS256，仍然会被拒绝。
+
+这就改变了应用程序需要做的事：它必须按 `kid` 从密钥集里选出验证用的密钥，并接受这把密钥声明的算法，而不是固定使用 RS256。大多数库都是这样做的。有些手写的验证程序不是。打开开关之前，就绪检查会列出每一个将会收到 PS256 的应用程序，这样你就知道该去问谁的验证程序：
+
+<svg viewBox="0 0 800 300" width="100%" role="img" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">
+  <title>分四步开启规范：运行就绪检查，它会列出尚未满足的设置、没有 PS256 密钥的签发者，以及规范会拒绝或改变的每个应用程序；修正设置和密钥；逐一检查列出的应用程序；开启。关闭后，被拒绝的应用程序在下一个请求时就会恢复，因为没有任何东西被改写。</title>
+  <defs>
+    <marker id="sl1-arrow-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--diagram-line, #555)"/></marker>
+    <marker id="sl1-arrow-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--diagram-accent, #d9480f)"/></marker>
+  </defs>
+  <rect x="20" y="40" width="200" height="130" rx="8" fill="none" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5"/>
+  <text x="120" y="68" text-anchor="middle" font-size="15" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">就绪检查</text>
+  <text x="35" y="98" font-size="12" fill="var(--diagram-fg, #1a1a1a)">尚未满足的设置</text>
+  <text x="35" y="122" font-size="12" fill="var(--diagram-fg, #1a1a1a)">没有 PS256 的签发者</text>
+  <text x="35" y="146" font-size="12" fill="var(--diagram-fg, #1a1a1a)">应用程序及原因</text>
+  <rect x="270" y="40" width="150" height="130" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <text x="345" y="98" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">修正设置</text>
+  <text x="345" y="122" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">和密钥</text>
+  <rect x="470" y="40" width="150" height="130" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <text x="545" y="98" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">逐一检查</text>
+  <text x="545" y="122" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">列出的应用程序</text>
+  <rect x="670" y="40" width="110" height="130" rx="8" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <text x="725" y="110" text-anchor="middle" font-size="14" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">开启</text>
+  <line x1="220" y1="105" x2="268" y2="105" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#sl1-arrow-a)"/>
+  <line x1="420" y1="105" x2="468" y2="105" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#sl1-arrow-a)"/>
+  <line x1="620" y1="105" x2="668" y2="105" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#sl1-arrow-a)"/>
+  <path d="M725,170 L725,240 L545,240 L545,172" fill="none" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5" marker-end="url(#sl1-arrow-b)"/>
+  <text x="635" y="265" text-anchor="middle" font-size="12" fill="var(--diagram-accent, #d9480f)">关闭后：被拒绝的应用程序在下一个请求时恢复</text>
+</svg>
+
+就绪检查是控制台里的一张卡片，位于「Settings」（设置）下的「Request security」（请求安全）。智能体也能通过 `settings_ipsie_profile_readiness_get` 工具得到同样的结果。对每个应用程序，它都会写明涉及的规则和属性。`http_redirect_uri` 表示那个 redirect URI 将被拒绝，而这个应用程序的 `https` redirect URI 照常工作。`signing_algorithm` 表示这个应用程序将被拒绝。`default_algorithm` 表示它会继续工作，但收到的是 PS256。
+
+打开规范不会改写任何东西。被拒绝的应用程序仍保留着它的记录，所以关闭规范后，它在下一个请求时就会恢复。对于一份还是草案的标准，这一点很重要：当天下午你就可以撤回。
+
+## 在客户要求 SL1 时打开它，而不是因为它听起来更安全 {#when-to-turn-it-on}
+
+SL1 里不与任何东西冲突的那一半已经开着，所以对普通服务器来说，打开这份规范并不会让它明显更安全。它只会让服务器在四个方面更严格，而有些客户端做不到。只有一种情况值得这样取舍：企业客户要求 SL1，而且你服务的每个应用程序都能接受这些规则。
+
+在以下情况下打开它：
+
+- 客户的合同或安全审查要求 IPSIE SL1，并且
+- 你服务的每个应用程序都使用 `https` redirect URI，能发送 DPoP 证明，并通过密钥集验证签名，并且
+- 应用程序由你自己注册，在控制台里注册，或者用初始访问令牌注册。
+
+只要你服务以下任何一种，就保持关闭：
+
+- 在环回 `http` 地址上接收响应的原生应用或命令行应用；
+- 自行注册的 MCP 客户端，或者你通过元数据文档 URL 来识别的 MCP 客户端；
+- 验证程序只接受 RS256 的合作伙伴；
+- 任何依赖 `response_type=none` 的东西。
+
+如果两类客户你都要服务，就把它们放在不同的实例上运行：一个开启规范，一个不开启。在 FoxAuth 里，拥有独立地址的项目是一个独立的签发者，但这个开关是按实例设置的，不是按项目设置的。
+
+回答问卷时也要诚实。这里还有三项 SL1 要求没有满足。第一，应用程序可以要求用第二因素登录。如果项目本身不要求第二因素，这个请求会以错误结束，而不是让这个人去提供第二因素。第二，通过上游提供方（外部的身份提供方）登录之后，ID 令牌里不带那个提供方的 `amr`。第三，其他签发者发给这台服务器的令牌，比如上游的 ID 令牌，仍然接受 RS256 签名。第一项是下一个要做的功能。目前还没有申请任何认证。
+
+我也在别的产品里找过同样的开关。根据[对比页面](/zh-cn/compare/)所引用的资料，Auth0、Keycloak、Zitadel、authentik 和 Ory Hydra 都没有在文档里说明自己可以作为 SL1 的 OpenID 提供方（OpenID Provider）。这份规范仍是草案，所以情况可能会变。
+
+想试试的话，先看就绪卡片，再读[开启 IPSIE SL1 规范](/zh-cn/docs/administer/ipsie-sl1-profile/)，那里列出了每条规则和每项前提条件。你很可能需要先有一把 PS256 密钥；[轮换签名密钥](/zh-cn/docs/administer/signing-keys/)讲了怎样生成一把并把它提升为当前密钥。

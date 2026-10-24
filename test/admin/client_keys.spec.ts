@@ -1,4 +1,4 @@
-import { createPrivateKey } from 'node:crypto';
+import { createPrivateKey, generateKeyPairSync } from 'node:crypto';
 
 import { describe, it, expect, beforeAll } from 'bun:test';
 import { Type } from '@sinclair/typebox';
@@ -121,6 +121,21 @@ describe('a key-authenticated client registered by an operator', () => {
 			grantTypes: ['client_credentials'],
 			tokenEndpointAuthMethod: 'private_key_jwt',
 			jwks: { keys: [clientKey] }
+		});
+
+		expect(res.status).toBe(422);
+	});
+
+	// RFC 7518 §3.3: "A key of size 2048 bits or larger MUST be used" — with or without any profile.
+	it('refuses a key set holding an RSA key shorter than 2048 bits', async () => {
+		const short = generateKeyPairSync('rsa', {
+			modulusLength: 1024
+		}).publicKey.export({ format: 'jwk' });
+
+		const res = await createClient({
+			grantTypes: ['client_credentials'],
+			tokenEndpointAuthMethod: 'private_key_jwt',
+			jwks: { keys: [{ ...short, alg: 'RS256', use: 'sig' }] }
 		});
 
 		expect(res.status).toBe(422);

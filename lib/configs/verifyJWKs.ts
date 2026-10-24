@@ -143,6 +143,10 @@ export function verifyJWKs(jwks: unknown): asserts jwks is { keys: JWKS[] } {
 			const errorMessage = typeboxErrorMessage(error);
 			throw new Error(`jwks.keys[${i}] has validation failed ${errorMessage}`);
 		}
+		// RFC 7518 §3.3, §3.5: an RSA key below 2048 bits is not one this server may sign or decrypt with.
+		if (key.kty === 'RSA' && Buffer.from(key.n, 'base64url').length < 256) {
+			throw new Error(`jwks.keys[${i}] is an RSA key shorter than 2048 bits`);
+		}
 		key.use ??= SignAlg.has(key.alg) ? 'sig' : 'enc';
 		key.kid ??= calculateKid(key);
 		if (uniqueKid.has(key.kid)) {

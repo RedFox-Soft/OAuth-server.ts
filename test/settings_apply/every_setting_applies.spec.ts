@@ -69,7 +69,9 @@ const COMPANIONS: Record<string, Record<string, unknown>> = {
  */
 const NOT_EXERCISABLE_ALONE: Record<string, string> = {
 	'sentry.enabled':
-		'reporting requires an ingestion credential, which is deliberately absent from the catalog and is written through the Sentry card instead'
+		'reporting requires an ingestion credential, which is deliberately absent from the catalog and is written through the Sentry card instead',
+	'ipsieSl1.enabled':
+		'turning the profile on needs a PS256 signing key at every issuer, which the shared test key set does not hold; test/sl1/profile_switch.spec.ts proves it applies'
 };
 
 function isSetting(key: string): key is keyof typeof ApplicationConfig {

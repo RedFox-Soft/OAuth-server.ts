@@ -77,7 +77,7 @@ never on it either: a client's logo and links are already per client ([[consent-
 | The console's admin retired project held `admin-mcp` | Both administrators' clients carry `bucketId: ADMIN_BUCKET_ID` in the seed (`lib/consts/admin_seed.ts:100`, `:121`) |
 
 The administrative routes for both live under the project: `/admin/api/projects/:id/clients[/:clientId[/secret]]`
-(`lib/admin/clients/routes.ts:83-184`) and `/admin/api/projects/:id/resources[/:resourceId[/vouching]]`
+(`lib/admin/clients/routes.ts:84-203`) and `/admin/api/projects/:id/resources[/:resourceId[/vouching]]`
 (`lib/admin/resources/routes.ts:215` onward) — `/admin/api/buckets/…` until spec 100. Reading needs the
 project's `read` right, changing its `edit` right, and `edit` is false on the administrators' project for
 everyone (`can.ts:195-199`). An application or API named under a project that does not hold it answers

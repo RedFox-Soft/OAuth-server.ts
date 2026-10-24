@@ -169,7 +169,7 @@ A creation has no identifier to name until it exists, which collides with audit-
 route therefore allocates the id itself and passes it to the store: `userBucketStore.create` (and the
 store of the old Project entity — a retired project — until spec 099 removed it) already accepted an
 optional `_id`, and `UserStoreInstance.create`
-and `createClient` gained one (`lib/admin/clients/routes.ts:96-101`). No per-operation exception to audit-first, at the cost of two signature
+and `createClient` gained one (`lib/admin/clients/routes.ts:97-102`). No per-operation exception to audit-first, at the cost of two signature
 changes.
 
 ## Per-project targets need their project

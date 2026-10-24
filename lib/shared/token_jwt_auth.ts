@@ -1,3 +1,4 @@
+import { sl1 } from '../sl1/rules.ts';
 import { InvalidClientAuth } from '../helpers/errors.js';
 import * as JWT from '../helpers/jwt.js';
 import { ReplayDetection } from 'lib/models/replay_detection.js';
@@ -122,9 +123,10 @@ export async function tokenJwtAuth(
 	 *
 	 * FAPI 2.0 Security Profile §5.3.2.1 cl. 8 implies the issuer-only rule and §5.3.3.1 cl. 5 adds "as a
 	 * string not as an item in an array", which the strict equality enforces: a one-element array is not
-	 * `=== issuer`.
+	 * `=== issuer`. IPSIE SL1 §3.2.1 asks the same — "its issuer identifier value … as a string" — so the
+	 * profile switch selects this rule too.
 	 */
-	if (config['fapi.enabled']) {
+	if (config['fapi.enabled'] || sl1()) {
 		if (payload.aud !== issuer) {
 			throw new InvalidClientAuth(
 				'audience (aud) must equal the issuer identifier url'

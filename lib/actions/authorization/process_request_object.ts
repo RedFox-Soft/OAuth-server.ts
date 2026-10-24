@@ -1,3 +1,4 @@
+import { sl1Algorithms } from '../../sl1/rules.ts';
 import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import type { PipelineParams } from 'lib/consts/param_list.js';
 import * as JWT from '../../helpers/jwt.ts';
@@ -238,7 +239,11 @@ export default async function processRequestObject(
 		throw new InvalidRequestObject('request client_id mismatch');
 	}
 
-	if (!pushedRequestObject && !isOneOf(requestObjectSigningAlgValues, alg)) {
+	// Narrowed to PS256, ES256 and EdDSA under the IPSIE SL1 profile (IPSIE Common Requirements §3.3).
+	if (
+		!pushedRequestObject &&
+		!isOneOf(sl1Algorithms(requestObjectSigningAlgValues), alg)
+	) {
 		throw new InvalidRequestObject('unsupported signed request alg');
 	}
 

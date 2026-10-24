@@ -122,7 +122,7 @@ call it.
    still-scheduled, still-silent project, and the next pass finishes it once the claim lapses.
 
 The pass (`purgeDueBuckets` / `startBucketPurger`, `lib/admin/buckets/purge_pass.ts:17,54`) follows the
-`startCloser` pattern, started in `lib/index.ts:302` outside tests. It records as
+`startCloser` pattern, started in `lib/index.ts:303` outside tests. It records as
 `RETENTION_ACTOR = 'system:retention'` (`lib/consts/admin_audit_routes.ts:764`) through `recordSystemAudit`. The
 entry stores the owning team as `ownerGroupId` (presented as `ownerTeamId`), so that team reads it like its own
 deletion.

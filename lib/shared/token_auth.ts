@@ -1,3 +1,4 @@
+import { sl1Algorithms } from '../sl1/rules.ts';
 import { InvalidRequest, InvalidClientAuth } from '../helpers/errors.ts';
 import * as JWT from '../helpers/jwt.ts';
 import certificateThumbprint from '../helpers/certificate_thumbprint.js';
@@ -219,7 +220,9 @@ export async function tokenAuth(
 				clientKeys(client).asymmetric,
 				clientAuthSigningAlg
 					? [clientAuthSigningAlg]
-					: clientAuthSigningAlgValues.filter((alg) => !alg.startsWith('HS'))
+					: sl1Algorithms(
+							clientAuthSigningAlgValues.filter((alg) => !alg.startsWith('HS'))
+						)
 			);
 
 			break;

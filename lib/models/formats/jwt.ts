@@ -8,6 +8,8 @@ import { issuerFor } from 'lib/configs/issuer.js';
 import { issuingBucket } from 'lib/admin/auth/bucketAddress.js';
 import { groupsMembersOf } from 'lib/consts/groups_claim.js';
 import { ClientDefaults } from 'lib/configs/clientBase.js';
+import { sl1 } from 'lib/sl1/rules.js';
+import { SL1_DEFAULT_SIGNING_ALGORITHM } from 'lib/consts/sl1.js';
 import { pairwiseIdentifier } from '../../addon/index.js';
 import type { JWK } from 'jose';
 import type ResourceServer from '../../helpers/resource_server.ts';
@@ -21,7 +23,10 @@ async function getResourceServerConfig(
 	},
 	bucket: RequestBucket
 ) {
-	const defaultAlg = ClientDefaults.idTokenSignedResponseAlg;
+	// IPSIE Common Requirements §3.3 forbids RS256 while the SL1 profile is on (lib/models/client/schema.ts).
+	const defaultAlg = sl1()
+		? SL1_DEFAULT_SIGNING_ALGORITHM
+		: ClientDefaults.idTokenSignedResponseAlg;
 
 	// Resolved to a key object or one of this server's keys; raw secrets are converted first.
 	let sign:

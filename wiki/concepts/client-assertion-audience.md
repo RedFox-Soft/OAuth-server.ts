@@ -20,13 +20,13 @@ graph:
 
 A client that authenticates with a signed JWT (`private_key_jwt`, `client_secret_jwt`) names, in `aud`,
 the authorization server it wrote the assertion for. Which values this server accepts there is decided in
-one place, `tokenJwtAuth` (`lib/shared/token_jwt_auth.ts:127-149`), for all six endpoints that take client
+one place, `tokenJwtAuth` (`lib/shared/token_jwt_auth.ts:129-151`), for all six endpoints that take client
 authentication: token, introspection, revocation, PAR, device authorization and CIBA. Spec 111 (2026-10-22)
 made the rule a setting.
 
 ## The two rules
 
-| `aud` | Lenient (default) | Issuer-only (`clientAuth.issuerOnlyAudience`) | FAPI on |
+| `aud` | Lenient (default) | Issuer-only (`clientAuth.issuerOnlyAudience`) | FAPI or IPSIE SL1 on ([[ipsie-sl1-profile]]) |
 | --- | --- | --- | --- |
 | the issuer, as a string | accepted | accepted | accepted |
 | `[issuer]` | accepted | accepted | refused |
@@ -59,13 +59,13 @@ Tracked in issue #80.
 
 rfc7523bis was approved by the IESG on 2026-04-30 and has sat in RFC Editor final review since
 (2026-10-19: "Blocked: Final Approval Pending"). **When it is published as an RFC, the default of
-`clientAuth.issuerOnlyAudience` (`lib/configs/application.ts:228`) becomes `true`.** One key covers both
+`clientAuth.issuerOnlyAudience` (`lib/configs/application.ts:248`) becomes `true`.** One key covers both
 states: after the flip, `false` is the compatibility setting for clients that cannot yet change, and a
 stored `false` stays an operator's explicit choice — nothing to migrate. Before flipping, re-read the
 published RFC (only editorial change is expected from -11), and the state of the CIBA and OIDC Core errata:
 if CIBA is still unchanged, the flip keeps departing from §7.1 and the comments must say so.
 
-The catalog description (`lib/admin/settings/catalog.ts:320`) tells an operator which clients break when
+The catalog description (`lib/admin/settings/catalog.ts:333`) tells an operator which clients break when
 it is turned on: any that put the token endpoint URL, another endpoint's URL, or several values in `aud`.
 
 ## The lenient rule's third value is a path

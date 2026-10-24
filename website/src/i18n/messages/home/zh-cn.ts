@@ -2,7 +2,7 @@ import { rich } from '../../types.ts';
 import type english from './en.ts';
 import type { HomeFacts } from './en.ts';
 
-export const source = '4a7a5f16fba1';
+export const source = '5591b93e2441';
 
 export default {
 	title: 'FoxAuth：面向智能体时代的授权服务器',
@@ -75,7 +75,7 @@ export default {
 				title: '面向受监管行业',
 				body: '银行级安全规范如今已全部实现。监管方要求哪个，就打开哪个开关。',
 				points: [
-					'FAPI、DPoP、PAR、mTLS、CIBA、RAR、JARM',
+					'FAPI、IPSIE SL1、DPoP、PAR、mTLS、CIBA、RAR、JARM',
 					'只追加的管理审计日志',
 					'按身份的暴力破解节流'
 				]

@@ -138,6 +138,15 @@ groups:
           }
         verdict: even
         why: 'Both register clients dynamically.'
+      - dimension: IPSIE SL1 profile
+        us:
+          {
+            status: flag,
+            text: 'The provider side of the draft behind ipsieSl1.enabled, with a readiness check before you switch. Some requirements are still open, such as prompting for a second factor when an application asks for one.'
+          }
+        them: { status: unknown, text: 'Not documented for Hydra.' }
+        verdict: us
+        why: 'SL1 is an OpenID Foundation working-group draft for enterprise sign-in. FoxAuth implements SL1 provider rules behind a flag, and Hydra’s documentation does not mention IPSIE.'
   - label: Administration and licensing
     rows:
       - dimension: Admin console

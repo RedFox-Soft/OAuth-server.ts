@@ -106,7 +106,7 @@ what to check and shows the callback with Copy.
 
 - Starting a try is audited, `federation.provider.try`, before anything happens. It changes no managed entity,
   but it sends a browser to an upstream with the project's client credentials. The result is not recorded.
-- The start and the result are excluded from MCP as **inapplicable** (`lib/mcp/catalogue.ts:1949`): a try needs a
+- The start and the result are excluded from MCP as **inapplicable** (`lib/mcp/catalogue.ts:1962`): a try needs a
   person signing in at the provider in a browser, and its result belongs to the console session that started it.
   The guessed name `federation_provider_try` answers with that reason ([[admin-mcp-control-plane]]).
 - The [[upstream-federation]] RFC 9207 `iss` check applies to a try too; a refusal is reported as

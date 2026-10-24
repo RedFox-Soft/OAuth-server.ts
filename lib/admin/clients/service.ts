@@ -425,14 +425,14 @@ export async function createClient(
 export async function getClientView(
 	clientId: string
 ): Promise<AdminClientView | null> {
-	const client = await Client.tryFind(clientId);
+	const client = await Client.tryFind(clientId, { administering: true });
 	return client ? withLogo(toView(client)) : null;
 }
 
 export async function listClientView(
 	clientId: string
 ): Promise<AdminClientListItem | null> {
-	const client = await Client.tryFind(clientId);
+	const client = await Client.tryFind(clientId, { administering: true });
 	return client
 		? { ...toView(client), hasLogo: await hasLogo(clientId) }
 		: null;
@@ -442,7 +442,7 @@ export async function updateClient(
 	clientId: string,
 	patch: UpdateClientInput
 ): Promise<{ view: AdminClientView; secret?: string }> {
-	const existing = await Client.tryFind(clientId);
+	const existing = await Client.tryFind(clientId, { administering: true });
 	if (!existing) throw new AdminError(404, 'client not found');
 	const logo = checkedPresentation(patch);
 	const merged: CreateClientInput = {
@@ -514,7 +514,7 @@ export async function updateClient(
 }
 
 export async function rotateSecret(clientId: string): Promise<string> {
-	const existing = await Client.tryFind(clientId);
+	const existing = await Client.tryFind(clientId, { administering: true });
 	if (!existing) throw new AdminError(404, 'client not found');
 	if (!existing.clientSecret) {
 		throw new AdminError(400, 'client has no secret to rotate');

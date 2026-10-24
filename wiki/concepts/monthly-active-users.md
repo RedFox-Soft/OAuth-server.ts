@@ -50,13 +50,13 @@ type requires it.
 `signIn: 'local' | 'federated'` is a new optional field on `AuthorizationCode`, `DeviceCode` and
 `BackchannelAuthenticationRequest` (`lib/models/mixins/stores_auth.ts:27`), set where each is created
 (`lib/helpers/process_response_types.ts:41`, `lib/actions/authorization/device_user_flow_response.ts:34`,
-`lib/actions/authorization/backchannel_result.ts:136`). Absent means renewal, which is how an artifact
+`lib/actions/authorization/backchannel_result.ts:155`). Absent means renewal, which is how an artifact
 written before the field reads — no migration. Never on a refresh token: its use is a renewal by definition.
 
 **The trap: a sign-in is often not in the result that produces the artifact.** When consent follows the
 sign-in — always for a device approval — the code is minted when the *consent* interaction resumes, whose
 `result` holds only the consent. The sign-in is the previous interaction's result, which the new one carries
-as `lastSubmission` (`lib/actions/authorization/interactions.ts:126`). `signInOf` reads both
+as `lastSubmission` (`lib/actions/authorization/interactions.ts:130`). `signInOf` reads both
 (`lib/activity/kinds.ts:21-29`); reading `result.login` alone counted every device approval as a renewal.
 Comparing `authTime` with the code's `iat` cannot work either: a slow consent screen and a reused session
 look the same by time. `federated` comes from the session's `upstream`, never from `acr`, which an operator
@@ -77,7 +77,7 @@ uses containment (`@>`) rather than the `?` operator.
 
 `activityFigures` holds the figure of each ended period, written **insert-if-absent** — the first writer
 wins, nothing rewrites it. Three things freeze, all idempotent: an hourly closer
-(`lib/activity/closer.ts:25`, started from `lib/index.ts:296` — not beside the PostgreSQL sweeper, because it
+(`lib/activity/closer.ts:25`, started from `lib/index.ts:297` — not beside the PostgreSQL sweeper, because it
 reads the project store and starting it inside the adapter module is the cycle [[model-graph-import-order]]
 describes); the first read of an ended, unfrozen period (`readPeriods`, `lib/activity/read.ts:55`); and
 project deletion. A period is closable five minutes after it ends (`CLOSE_GRACE_MS`,

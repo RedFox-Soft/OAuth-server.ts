@@ -1,3 +1,5 @@
+import { sl1 } from '../sl1/rules.js';
+import { SL1_DEFAULT_SIGNING_ALGORITHM } from '../consts/sl1.js';
 import { getUserStore } from '../adapters/index.js';
 import { pairwiseIdentifier } from '../addon/index.js';
 import { ApplicationConfig } from '../configs/application.js';
@@ -39,6 +41,11 @@ async function subjectThere(
  * RSA key signs with what it has; its published set says which.
  */
 function algorithmOf(available: readonly string[] | undefined): string {
+	/*
+	 * IPSIE Common Requirements §3.3 forbids RS256 while the SL1 profile is on; turning the profile on requires a PS256
+	 * signer at every issuer (lib/sl1/readiness.ts), and a project created under it is given one.
+	 */
+	if (sl1()) return SL1_DEFAULT_SIGNING_ALGORITHM;
 	if (!available?.length || available.includes('RS256')) return 'RS256';
 	return available[0];
 }

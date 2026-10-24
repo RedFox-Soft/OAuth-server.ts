@@ -73,7 +73,7 @@ an administrator's replacement.
   `compareClientSecret` (`lib/models/client/secret.ts:45`) compares the presented value with **both** digests,
   always, with no short cut: whether a client has a previous secret, and which one matched, must not show in
   how long a refusal takes. It answers `'current' | 'previous' | null`. `tokenAuth` keeps the answer on
-  `oidc.clientSecretMatch` (`lib/shared/token_auth.ts:193`), because the resolved client is frozen data.
+  `oidc.clientSecretMatch` (`lib/shared/token_auth.ts:194`), because the resolved client is frozen data.
 - **Static token.** The SCIM principal makes two point reads: the current digest, then
   `findByPreviousStaticTokenDigest` (`staticTokenHolder`, `lib/scim/principal.ts:94`), so it knows which one
   matched. The previous digest has a sparse index (`lib/consts/storage_inventory.ts:592`). The index is **not

@@ -5,6 +5,7 @@ import { ClientDefaults } from 'lib/configs/clientBase.js';
 import { ApplicationConfig } from './application.js';
 import { isList, isPlainObject } from '../helpers/_/object.js';
 import { withGroupsScope } from '../consts/groups_claim.js';
+import { SL1_SIGNING_ALGORITHMS } from '../consts/sl1.js';
 import {
 	ID_JAG_PROFILE,
 	ID_JAG_TOKEN_TYPE,
@@ -162,14 +163,24 @@ export function calculateDiscovery(
 	const config = ApplicationConfig;
 	const acrValues = deriveAcrValues(config);
 	/*
+	 * The IPSIE SL1 profile accepts and signs only PS256, ES256 and EdDSA (IPSIE Common Requirements §3.3), so a relying
+	 * party reading this document is never offered anything else; read off the setting rather than through
+	 * lib/sl1/rules.ts, which this configuration-layer module must not import.
+	 */
+	const sl1 = config['ipsieSl1.enabled'];
+	const narrowed = <T extends string>(list: readonly T[]): T[] =>
+		sl1 ? list.filter((alg) => SL1_SIGNING_ALGORITHMS.has(alg)) : [...list];
+	/*
 	 * A bucket with keys of its own advertises what those keys sign and decrypt with; the root's lists
 	 * are read from the instance's live key set. HS256 and the symmetric key-wrapping
 	 * algorithms use the client's own secret, so every issuer offers them.
 	 */
 	const signing = <T extends string>(root: T[]): T[] =>
-		keys?.signingAlgorithms
-			? (['HS256', ...keys.signingAlgorithms] as T[])
-			: root;
+		narrowed(
+			keys?.signingAlgorithms
+				? (['HS256', ...keys.signingAlgorithms] as T[])
+				: root
+		);
 	const requestObjectEncryption = keys?.encryptionAlgorithms
 		? ([...keys.encryptionAlgorithms, 'A128KW', 'A256KW', 'dir'] as ReturnType<
 				typeof requestObjectEncryptionAlgValues
@@ -186,12 +197,14 @@ export function calculateDiscovery(
 	 * authenticate the caller through the same code against the method the client registered, and the
 	 * methods a client may register are these. Publishing a copy per endpoint would let one drift.
 	 */
-	const clientAuthMethods = deriveClientAuthMethods(config);
+	const clientAuthMethods = deriveClientAuthMethods(config).filter(
+		(method) => !sl1 || method !== 'client_secret_jwt'
+	);
 	// RFC 8414 §2: required while a signed-assertion method is listed, and meaningless otherwise.
 	const assertionAlgorithms = clientAuthMethods.some(
 		(method) => method === 'private_key_jwt' || method === 'client_secret_jwt'
 	)
-		? clientAuthSigningAlgValues
+		? narrowed(clientAuthSigningAlgValues)
 		: undefined;
 
 	return {
@@ -252,15 +265,17 @@ export function calculateDiscovery(
 		revocation_endpoint_auth_signing_alg_values_supported: assertionAlgorithms,
 		acr_values_supported: acrValues.length ? acrValues : undefined,
 
-		response_types_supported: ['none', 'code'],
+		// IPSIE SL1 §3.2.1: `code` is the only response type the profile accepts.
+		response_types_supported: sl1 ? ['code'] : ['none', 'code'],
 		response_modes_supported: config['responseMode.jwt.enabled']
 			? ['form_post', 'query', 'jwt', 'query.jwt', 'form_post.jwt']
 			: ['form_post', 'query'],
 		subject_types_supported: ['public', 'pairwise'],
 		code_challenge_methods_supported: ['S256'],
 		id_token_signing_alg_values_supported: signing(idTokenSigningAlgValues()),
-		token_endpoint_auth_signing_alg_values_supported:
-			clientAuthSigningAlgValues,
+		token_endpoint_auth_signing_alg_values_supported: narrowed(
+			clientAuthSigningAlgValues
+		),
 		authorization_response_iss_parameter_supported: true,
 		/*
 		 * Emitted only while the capability is on, and the conditionality is the point. A client is told
@@ -268,11 +283,8 @@ export function calculateDiscovery(
 		 * — so advertising it while the server would refuse the mechanism converts a working fallback
 		 * into a guaranteed failure.
 		 */
-		client_id_metadata_document_supported: config[
-			'clientIdMetadataDocument.enabled'
-		]
-			? true
-			: undefined,
+		client_id_metadata_document_supported:
+			config['clientIdMetadataDocument.enabled'] && !sl1 ? true : undefined,
 		request_uri_parameter_supported: false,
 
 		claims_parameter_supported: true,
@@ -290,7 +302,9 @@ export function calculateDiscovery(
 		id_token_encryption_enc_values_supported: idTokenEncryptionEncValues,
 
 		request_parameter_supported: true,
-		request_object_signing_alg_values_supported: requestObjectSigningAlgValues,
+		request_object_signing_alg_values_supported: narrowed(
+			requestObjectSigningAlgValues
+		),
 		require_signed_request_object: config[
 			'requestObjects.requireSignedRequestObject'
 		]
@@ -336,7 +350,9 @@ export function calculateDiscovery(
 		backchannel_authentication_request_signing_alg_values_supported: config[
 			'requestObjects.enabled'
 		]
-			? requestObjectSigningAlgValues.filter((alg) => !alg.startsWith('HS'))
+			? narrowed(
+					requestObjectSigningAlgValues.filter((alg) => !alg.startsWith('HS'))
+				)
 			: undefined,
 
 		authorization_details_types_supported: Object.keys(

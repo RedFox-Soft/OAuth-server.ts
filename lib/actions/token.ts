@@ -1,6 +1,11 @@
 import { Elysia, t, type Static } from 'elysia';
 import { issuerFor } from 'lib/configs/issuer.js';
-import { UnauthorizedClient, UnsupportedGrantType } from '../helpers/errors.js';
+import {
+	InvalidClient,
+	UnauthorizedClient,
+	UnsupportedGrantType
+} from '../helpers/errors.js';
+import { sl1, sl1Exempt } from '../sl1/rules.js';
 import {
 	cibaGrantParameters,
 	codeGrantParameters,
@@ -14,6 +19,7 @@ import {
 import { refusedParam, routeNames } from 'lib/consts/param_list.js';
 import {
 	dpopValidate,
+	InvalidDpopProof,
 	setNonceHeader,
 	validateReplay
 } from 'lib/helpers/validate_dpop.js';
@@ -77,6 +83,25 @@ export const tokenAction = new Elysia()
 			});
 			setNonceHeader(set.headers, dPoP);
 			await validateReplay(client.clientId, dPoP);
+
+			/*
+			 * IPSIE SL1 §3.2.1 asks that access tokens be sender-constrained with DPoP only; under the profile every one
+			 * is. Here, ahead of the grant, so no grant type is left out — token exchange included, which has no
+			 * per-client DPoP rule of its own. A certificate-bound client is refused first, with the real reason: a
+			 * token cannot carry both bindings.
+			 */
+			if (sl1() && !sl1Exempt(client)) {
+				if (client.tlsClientCertificateBoundAccessTokens) {
+					throw new InvalidClient(
+						'certificate-bound access tokens are not issued under the IPSIE SL1 profile'
+					);
+				}
+				if (!dPoP) {
+					throw new InvalidDpopProof(
+						'DPoP proof JWT not provided (IPSIE SL1 §3.2.1)'
+					);
+				}
+			}
 
 			const grantType = body.grant_type;
 			if (!hasGrant(grantType)) {

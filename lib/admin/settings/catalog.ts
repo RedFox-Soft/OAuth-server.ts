@@ -313,7 +313,20 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 			'Apply the extra Authorization Server behaviours of the FAPI profile',
 		type: 'boolean',
 		description:
-			'Extra Authorization Server behaviours defined in the FAPI profile. While on, a client assertion must name this server’s issuer identifier as its only audience, sent as a string — the issuer-only rule below, made stricter.'
+			'Extra Authorization Server behaviours defined in the FAPI profile. While on, a client assertion must name this server’s issuer identifier as its only audience, sent as a string — the issuer-only rule below, made stricter. The IPSIE SL1 profile applies the same string rule.'
+	},
+
+	{
+		key: 'ipsieSl1.enabled',
+		domain: 'request-security',
+		group: 'IPSIE SL1',
+		label: 'Enforce the IPSIE SL1 profile',
+		summary:
+			'Apply the IPSIE SL1 rules that cannot be defaults without breaking other clients',
+		type: 'boolean',
+		risk: 'security',
+		description:
+			'Applies the OpenID Provider rules of the IPSIE SL1 profile (draft-openid-ipsie-sl1-profile §3.2.1 and the IPSIE Common Requirements §3.3). While on: redirect URIs must not use http, loopback included; a client exists only when an administrator registered it or it registered with an initial access token, and a client id that is a URL is served only from a record an administrator stored under it, never from a fetched document; only response_type=code is accepted; every access token is bound to the client’s DPoP key, at every grant; everything signed uses PS256, ES256 or EdDSA, a client that registered no algorithm is signed for PS256 and gets PS256 written when it is next saved, and client_secret_jwt is refused; acr_values is binding, so a request the sign-in cannot satisfy ends in unmet_authentication_requirements; and a client assertion’s audience must be the issuer, as a string. What it breaks: native apps on a loopback http redirect, anonymous and metadata-document registration, clients registered for RS256 or HS256, clients using client_secret_jwt or certificate-bound tokens, and relying parties that treated acr_values as a hint. Turning it on is refused until DPoP, PKCE and encryption are on, registration requires an initial access token, PAR accepts no unregistered redirect URI, and every issuer holds a PS256 signing key — check readiness first, which also lists every client the profile would refuse. Not yet included: signing in with a second factor on request in a project that does not require one, which SL1 also asks for. The administrators’ project, account pages and SCIM connections keep working under it.'
 	},
 
 	{
@@ -326,7 +339,7 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 		type: 'boolean',
 		risk: 'security',
 		description:
-			'Accepts a client assertion (private_key_jwt, client_secret_jwt) only when its audience is this server’s issuer identifier and nothing else. This closes the audience-injection attack (CVE-2025-27370 and CVE-2025-27371) that draft-ietf-oauth-rfc7523bis and OpenID Connect Core errata set 3 answer: an assertion a client wrote for a malicious server, audienced at this server’s token endpoint, can no longer be spent here. Turning it on refuses, with invalid_client, every client that puts the token endpoint URL, another endpoint’s URL or several values in the audience — check your clients first. Off by default only because RFC 9126 and CIBA still require those values to be accepted; the default turns on once rfc7523bis is published as an RFC. Always in force while FAPI is on.'
+			'Accepts a client assertion (private_key_jwt, client_secret_jwt) only when its audience is this server’s issuer identifier and nothing else. This closes the audience-injection attack (CVE-2025-27370 and CVE-2025-27371) that draft-ietf-oauth-rfc7523bis and OpenID Connect Core errata set 3 answer: an assertion a client wrote for a malicious server, audienced at this server’s token endpoint, can no longer be spent here. Turning it on refuses, with invalid_client, every client that puts the token endpoint URL, another endpoint’s URL or several values in the audience — check your clients first. Off by default only because RFC 9126 and CIBA still require those values to be accepted; the default turns on once rfc7523bis is published as an RFC. Always in force while FAPI is on. or the IPSIE SL1 profile is on, both of which also require the audience as a string.'
 	},
 
 	{

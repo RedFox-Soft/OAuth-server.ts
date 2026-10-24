@@ -19,8 +19,18 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   refused. Every ID token carries `session_expiry`: `iat` plus `idToken.relyingPartySessionLifetime` (24 h), never
   past the browser session and never under five minutes. A federated session ends when the provider's own
   `session_expiry` says, and a malformed or past value refuses the sign-in.
+- **IPSIE SL1 profile switch** (`ipsieSl1.enabled`, off) — while on: no `http` redirect URIs, clients only by
+  administrator or token-gated registration (no metadata-document fetch), `response_type=code` only, a DPoP proof at
+  every grant, PS256/ES256/EdDSA only with PS256 written for clients that registered none, binding `acr_values`, and
+  an issuer-string client-assertion audience. Turning it on is refused until DPoP, PKCE, encryption, registration's
+  initial access token and a PS256 signer at every issuer are in place; a readiness answer (console card and
+  `settings_ipsie_profile_readiness_get`) lists what stands in the way and every application it would refuse. The
+  console can now create an application under a Client Identifier URL. Constitution 3.2.0 amends Principle VI.
 
 ### Changed
+
+- **RSA keys shorter than 2048 bits are refused** (RFC 7518 §3.3) in a client's key set, on registration, edit and
+  `jwks_uri` fetch, and among the server's own keys. jose already refused to verify with them.
 
 - **`auth_time` and `acr` in every ID token** (IPSIE SL1 §3.2.1) — no longer only when the request asked
   (`max_age`, `prompt=login`, `require_auth_time`, `acr_values`, a claims request). Both are advertised whatever the

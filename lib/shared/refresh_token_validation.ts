@@ -9,6 +9,7 @@ import type { DPoPProof } from '../helpers/validate_dpop.js';
 import { Grant } from '../models/grant.js';
 import { RefreshToken } from '../models/refresh_token.js';
 import { servingBucketIdOf } from '../admin/auth/bucketAddress.js';
+import { sl1, sl1Exempt } from '../sl1/rules.js';
 
 /*
  * What makes a refresh token usable, in one place: the refresh grant redeems one and the token exchange
@@ -125,6 +126,20 @@ export async function usableRefreshToken(
 		(!dPoP || refreshToken.payload.jkt !== dPoP.thumbprint)
 	) {
 		throw new RefreshTokenRefused('failed jkt verification');
+	}
+
+	/*
+	 * RFC 9449 §5 binds every public client's refresh token to its DPoP key, and under the IPSIE SL1 profile every
+	 * public client's tokens are bound, so an unbound one can only predate the profile. A confidential client's
+	 * refresh token is never bound (§5: client authentication constrains it); its new access token is bound below.
+	 */
+	if (
+		sl1() &&
+		!sl1Exempt(client) &&
+		client.tokenEndpointAuthMethod === 'none' &&
+		!refreshToken.payload.jkt
+	) {
+		throw new RefreshTokenRefused('refresh token is not bound to a DPoP key');
 	}
 
 	const account = await findAccount(

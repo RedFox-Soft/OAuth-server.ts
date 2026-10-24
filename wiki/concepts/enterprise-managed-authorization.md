@@ -90,7 +90,7 @@ project that requires verified email (`:31`).
 `emailTrusted` **and** the claims carry `email_verified: true`. An ID-JAG from an IdP that sends `email` alone
 cannot link to an existing account by address, and an account it creates is unverified — the answer a
 browser sign-in gives for the same claims. The issuing side therefore puts `email_verified: true` next to
-`email` (`lib/assertions/id_jag.ts:84`), and includes the address only when it is verified.
+`email` (`lib/assertions/id_jag.ts:91`), and includes the address only when it is verified.
 
 ## The access token: grant-less, no refresh
 
@@ -111,7 +111,7 @@ RFC 8707 section that defines no response member (`:243`).
 
 DPoP: an ID-JAG with `cnf.jkt` needs a proof by that key; `jwt-dpop` (from the expired
 `draft-parecki-oauth-jwt-dpop-grant-01`, which ID-JAG cites normatively) is accepted for bound assertions and
-allowed to any client allowed `jwt-bearer` (`lib/models/client/checks.ts:38`).
+allowed to any client allowed `jwt-bearer` (`lib/models/client/checks.ts:39`).
 
 Monthly activity counts the person as a `federated` sign-in, read off the grant type
 (`lib/activity/note.ts:91`).
@@ -127,7 +127,7 @@ the project will not vouch to `invalid_target` — rather than ID-JAG's non-norm
 application, checked with expiry by `IdToken.verifyFresh` (`lib/models/id_token.ts:302`; `validate` ignores
 expiry because hints may be stale) and typed `JWT` or untyped, so a logout token or introspection response
 signed by the same keys for the same audience is not accepted; or a refresh token, validated by the code the
-refresh grant uses (`lib/shared/refresh_token_validation.ts:49`), never consumed or rotated. Presenting a
+refresh grant uses (`lib/shared/refresh_token_validation.ts:50`), never consumed or rotated. Presenting a
 rotated-away refresh token revokes the grant there too (`:40`).
 
 **Gotcha — pairwise applications.** An ID token issued to an application with pairwise subjects is refused
@@ -148,9 +148,9 @@ cannot point at the project's own issuer, the administrative MCP endpoint or a S
 (`lib/admin/outside-servers/service.ts:55`), and an update cannot change the issuer.
 
 The ID-JAG's `sub` is what an ID token issued to the connection's named sign-in application would carry —
-pairwise where that application is — else the account id (`lib/assertions/id_jag.ts:25`). It is signed with
+pairwise where that application is — else the account id (`lib/assertions/id_jag.ts:27`). It is signed with
 the project's own keys, RS256 where the project holds an RSA key, since the outside server registered no
-algorithm (`:41`). Issuing an ID-JAG counts no monthly activity: no token for this project's resources is
+algorithm (`:43`), and PS256 while the IPSIE SL1 profile is on (spec 112, [[ipsie-sl1-profile]]). Issuing an ID-JAG counts no monthly activity: no token for this project's resources is
 issued.
 
 ## Deliberately stricter than MCP-EMA

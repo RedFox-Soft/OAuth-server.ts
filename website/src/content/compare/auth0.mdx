@@ -13,6 +13,8 @@ sources:
   - https://auth0.com/docs/get-started/applications/dynamic-client-registration
   - https://auth0.com/docs/deploy-monitor/deploy-private-cloud
   - https://auth0.com/docs/api/management/v2
+  - https://auth0.com/docs/authenticate/enterprise-connections/session-expiry-enterprise-connections
+  - https://auth0.com/changelog
   - https://auth0.com/docs/get-started/auth0-mcp-server
   - https://auth0.com/pricing
 bottomLine: 'Auth0 is the better pick when you want identity as a service with an SLA this week, with social connections and a FAPI certification you can hand to a reviewer. FoxAuth is the better pick when the data has to live in your own database, when the per-user bill is the problem, or when you need the banking-grade profiles without an Enterprise add-on.'
@@ -202,6 +204,20 @@ groups:
           }
         verdict: us
         why: 'Full RFC 7591 and 7592 without the restrictions.'
+      - dimension: IPSIE SL1 profile
+        us:
+          {
+            status: flag,
+            text: 'The provider side of the draft behind ipsieSl1.enabled, with a readiness check before you switch. Some requirements are still open, such as prompting for a second factor when an application asks for one.'
+          }
+        them:
+          {
+            status: unknown,
+            text: 'Not documented as an identity provider profile. Since July 2026 Auth0 reads session_expiry from upstream Okta and OIDC connections; adding the claim to Auth0’s own ID tokens takes a Post-Login Action.'
+          }
+        verdict: us
+        why: 'Auth0 documents the relying-party half of SL1: it reads session_expiry from upstream connections and passes the claim on only through a Post-Login Action. FoxAuth issues session_expiry, auth_time and acr in every ID token and enforces SL1 provider rules behind one switch.'
+        note: '"Auth0 supports the session_expiry claim based on the Interoperability Profile for Secure Identity in the Enterprise (IPSIE) standard for Okta and OIDC Enterprise connections." and "The Post-Login Action is required to inject the session_expiry claim into the ID Token."'
   - label: Administration and agents
     rows:
       - dimension: Admin console and API

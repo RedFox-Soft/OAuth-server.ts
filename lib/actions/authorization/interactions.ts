@@ -22,12 +22,16 @@ import {
 } from '../../i18n/resolve.js';
 
 /*
- * The two login-prompt checks that compare a requested authentication context against the one the
+ * The login-prompt checks that compare a requested authentication context against the one the
  * session carries. Named here rather than imported so this module does not reach into the prompt's
  * internals; the strings are the prompt's `reason` values, which are already public — they reach a
  * relying party in the interaction details.
  */
-const ACR_REASONS = new Set(['essential_acr', 'essential_acrs']);
+const ACR_REASONS = new Set([
+	'essential_acr',
+	'essential_acrs',
+	'sl1_acr_values'
+]);
 const isAcrReason = (reason: string) => ACR_REASONS.has(reason);
 
 /*

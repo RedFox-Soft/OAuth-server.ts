@@ -40,7 +40,7 @@ holds at least one setting and every setting names a declared domain".
   `signin-abuse`, `diagnostics`, `integrations`). Before it, sixty-odd settings sat on one
   unsectioned scroll and the `group` each descriptor already carried was discarded at render for
   fourteen of them. That field names the card a setting sits in on its pane — `projects.reservedHostnames`
-  sits in "Project addresses" (`lib/admin/settings/catalog.ts:515-517`) — and has nothing to do with the
+  sits in "Project addresses" (`lib/admin/settings/catalog.ts:528-530`) — and has nothing to do with the
   groups of end users or the teams of administrators the console otherwise names.
 - `summary` is one line, **bounded at 100 characters and pinned by test**
   (`lib/admin/settings/catalog.ts:83`). The bound is what stops summary and `description` collapsing

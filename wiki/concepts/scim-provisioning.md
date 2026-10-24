@@ -45,7 +45,7 @@ configuration — and the console offers disable instead.
 
 The key and secret credentials authenticate at the **project's own token endpoint** as the OAuth client
 `scim-<connectionId>`, which is **synthesized from the connection on every resolution and stored nowhere**
-(`lib/provisioning/client.ts:31`, consulted after the adapter read at `lib/models/client/validate.ts:124`).
+(`lib/provisioning/client.ts:31`, consulted after the adapter read at `lib/models/client/validate.ts:132`).
 That one decision buys the whole token endpoint for free — `private_key_jwt` with `jti` replay protection,
 constant-time comparison, the client-credentials grant — and keeps the connection the single source of its
 credential: rotation is one write, and there is no hidden stored client to keep in step or orphan.
@@ -62,10 +62,10 @@ new lifetime are in [[scim-credential-overlap]].
   previous digest too). Ordinary clients still store the
   plaintext, because `client_secret_jwt` and the symmetric keys derive from it — a standing gap against the
   constitution's "client secrets MUST be stored hashed" that this change did not widen.
-- **Basic and post alike** for a connection's secret (`lib/shared/token_auth.ts:169`): Entra lets its
+- **Basic and post alike** for a connection's secret (`lib/shared/token_auth.ts:170`): Entra lets its
   administrator choose either, and a wrong guess surfaces as `invalid_client` on the customer's "Test
   connection". Not both at once: a request carrying the secret in the header and the body is refused as
-  `invalid_request` (`lib/shared/token_auth.ts:83`, RFC 6749 §2.3), so Entra's "How credentials are sent" must be
+  `invalid_request` (`lib/shared/token_auth.ts:84`, RFC 6749 §2.3), so Entra's "How credentials are sent" must be
   Header or Body, never Both — one of the pitfalls the directory guidance below carries (since spec 088).
 - **No `scope` in the client metadata.** Client metadata may name only scopes the server advertises, and
   `scim` belongs to a project's SCIM resource, not to the server. That such a client gets `scim` and nothing
@@ -93,7 +93,7 @@ be revoked when a credential is rotated or a connection deleted.
 
 ## The SCIM surface
 
-`lib/scim/` is a protocol plugin, mounted bare and beneath `/:bucket` (`lib/index.ts:214`), so a project's
+`lib/scim/` is a protocol plugin, mounted bare and beneath `/:bucket` (`lib/index.ts:215`), so a project's
 base URL is `<its issuer>/scim/v2` in every addressing form. It is mounted with **statements of its own after
 the app chain**, not as links in it: adding it to the chain tipped TypeScript past its instantiation depth
 (TS2589), and typing the plugin `AnyElysia` instead erased the whole app's type and broke every Eden client
@@ -154,7 +154,7 @@ that are behaviours; the two that are absences — no `/Bulk`, and the administr
 switched and are documented in `CONFORMANCE.md`. Each carries an operator-facing explanation in the settings
 catalog (`lib/admin/settings/catalog.ts`).
 
-- **`scim.secretCredentials`** (on, `lib/configs/application.ts:794`). IPSIE AL SCIM §4.1 and §10 require
+- **`scim.secretCredentials`** (on, `lib/configs/application.ts:814`). IPSIE AL SCIM §4.1 and §10 require
   JWT client authentication (RFC 7523 §2.2); a client secret is not that. **On because Entra's OAuth2 Client
   Credentials Grant and Okta's OAuth 2 client-credentials mode both send a secret.** Corrected in spec 088: the
   reason used to read "Entra ID can only send a secret"; Entra also has a Workload Identity Federation mode,

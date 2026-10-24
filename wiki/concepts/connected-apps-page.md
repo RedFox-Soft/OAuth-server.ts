@@ -30,7 +30,7 @@ sign-in interaction (`/ui/:uid/*`). Before it, only an administrator could end a
 application ([[end-user-support]]).
 
 The routes are mounted bare and beneath `/:bucket` (the project's path segment), like every
-project-scoped surface (`lib/index.ts:253`). They are classified always-available: no switch may hide the one place consent can be
+project-scoped surface (`lib/index.ts:254`). They are classified always-available: no switch may hide the one place consent can be
 withdrawn. The routes are `GET /account/apps`, `POST /account/apps` and `GET /account/apps/callback`
 (`lib/account_page/routes.ts:213`).
 
@@ -51,7 +51,7 @@ an address it no longer has. A person who may not sign in (`canSignIn`) gets not
 With no usable session, the page starts an ordinary sign-in in the project through `account.<bucketId>`. That
 client is synthesized from the project on every resolution and never stored, like the SCIM client
 (`lib/account_page/client.ts:57`, resolved after the stored read and the SCIM client at
-`lib/models/client/validate.ts:127`).
+`lib/models/client/validate.ts:135`).
 
 How it is limited:
 - **No code, no token.** It has `response_type=none` and no grant type (`client.ts:67`). The page needs
@@ -61,7 +61,7 @@ How it is limited:
 - **Not for every project.** It does not exist for the administrators' project, for a project scheduled for
   deletion, or for an unknown one: `invalid_client`.
 - **No look-alikes.** `.` is outside nanoid's alphabet, so no generated id can collide with it. A registration
-  is refused the prefix even through a deployment's own `idFactory` (`lib/models/client/register.ts:38`).
+  is refused the prefix even through a deployment's own `idFactory` (`lib/models/client/register.ts:44`).
 - **No consent page.** It belongs to no stored project record (no `bucketId`; until spec 099, no old
   Project entity either — a retired project) and
   has `consent.require: false`, so consent is waived.

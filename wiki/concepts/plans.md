@@ -28,7 +28,7 @@ Since spec 102 (2026-10-15) a project (stored as a bucket) is on a **plan**: a n
 catalogue a super administrator edits. The public instance needs it because anyone may register as an
 administrator there; a self-hosted instance leaves it off. Nothing here charges money.
 
-The switch is `plans.enabled`, off by default (`lib/configs/application.ts:402`). While it is off nothing is
+The switch is `plans.enabled`, off by default (`lib/configs/application.ts:422`). While it is off nothing is
 checked and a tenant sees nothing of plans; a super administrator still sees and edits them, so the catalogue can be
 prepared before it is turned on.
 

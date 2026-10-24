@@ -98,10 +98,10 @@ Two properties follow from how it is maintained:
   values — the same rule the signing keys follow in `configs/keystore.ts`. `reloadConfiguration()`
   re-derives after in-place changes, for an applied save and for the tests alike.
 
-`applySettings` (`lib/configs/application.ts:904`) is synchronous end to end, so no request sees half
+`applySettings` (`lib/configs/application.ts:924`) is synchronous end to end, so no request sees half
 a change. After assigning it runs the invalidators registered with `onSettingsApplied`
-(`lib/configs/application.ts:876`) — today the validated-client memo
-(`lib/models/client/validate.ts:102`), the per-origin counter capacity (`lib/plugins/rateLimit.ts:91`)
+(`lib/configs/application.ts:896`) — today the validated-client memo
+(`lib/models/client/validate.ts:103`), the per-origin counter capacity (`lib/plugins/rateLimit.ts:91`)
 and the Sentry arming latch (`lib/sentry/client.ts:62`). A module that caches something derived from a
 setting registers one there, or the save applies and the cache goes on answering the old value. A
 setting that genuinely cannot be applied to a running process declares `apply: 'restart'` with a
@@ -183,5 +183,7 @@ still fails on an unclassified route and additionally fails on a declared route 
   a flag decides whether it runs, a registry decides *what* runs there.
 - [[settings-console-descriptor]] — the surface these flags are edited through, and why a key's
   absence from the catalog is what removes it from the console and the agent surface alike.
+- [[ipsie-sl1-profile]] — a profile switch rather than a capability flag: one flat key, read where each of its
+  rules is enforced, whose prerequisites are cross-key checks in `validateConfiguration`.
 
 Verified against [[oauth-server-codebase]] at commit `2125ad0`.

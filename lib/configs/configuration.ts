@@ -700,6 +700,68 @@ function checkSentry(config: ConfigurationInput) {
 	}
 }
 
+/*
+ * What the IPSIE SL1 profile needs from the other settings, as data: the validator refuses a configuration that breaks
+ * one, and readiness (lib/sl1/readiness.ts) reports them before an operator switches, from this one table.
+ *  - registration: SL1 §3.2.1 "MUST NOT support unauthenticated Dynamic Client Registration requests".
+ *  - DPoP: SL1 §3.2.1 "SHOULD only issue sender-constrained access tokens using DPoP"; the profile makes it every token.
+ *  - PKCE: SL1 §3.2.1 requires S256 PKCE, which only `pkce.required` makes unconditional.
+ *  - encryption: IPSIE Common Requirements §3.4, encryption of back-channel assertions "MUST be offered".
+ *  - PAR's unregistered redirect URIs: SL1 §3.2.1 requires preregistered redirect URIs, and that branch checks a URI
+ *    the per-request `http` refusal never sees (lib/actions/authorization/check_redirect_uri.ts).
+ */
+export const SL1_SETTING_PREREQUISITES: ReadonlyArray<{
+	key: keyof ConfigurationInput;
+	required: string;
+	holds: (config: ConfigurationInput) => boolean;
+}> = [
+	{
+		key: 'registration.enabled',
+		required:
+			'off, or registration.initialAccessToken set in deployment configuration',
+		holds: (config) =>
+			!config['registration.enabled'] ||
+			Boolean(config['registration.initialAccessToken'])
+	},
+	{
+		key: 'dpop.enabled',
+		required: 'on',
+		holds: (config) => config['dpop.enabled']
+	},
+	{
+		key: 'pkce.required',
+		required: 'on',
+		holds: (config) => config['pkce.required']
+	},
+	{
+		key: 'encryption.enabled',
+		required: 'on',
+		holds: (config) => config['encryption.enabled']
+	},
+	{
+		key: 'par.allowUnregisteredRedirectUris',
+		required: 'off',
+		holds: (config) => !config['par.allowUnregisteredRedirectUris']
+	}
+];
+
+/*
+ * Also refuses the reverse order — DPoP turned off while the profile is on — and holds at boot, as every check here does.
+ * The issuer prerequisite (a PS256 signing key at every issuer) needs the key store, so the settings route checks it.
+ */
+function checkIpsieSl1(config: ConfigurationInput) {
+	if (!config['ipsieSl1.enabled']) {
+		return;
+	}
+
+	const unmet = SL1_SETTING_PREREQUISITES.filter((p) => !p.holds(config));
+	if (unmet.length) {
+		throw new TypeError(
+			`ipsieSl1.enabled requires ${unmet.map((p) => `${p.key} ${p.required}`).join('; ')}`
+		);
+	}
+}
+
 function checkDeviceFlow(config: ConfigurationInput) {
 	if (config['deviceFlow.enabled']) {
 		if (!['base-20', 'digits'].includes(config['deviceFlow.charset'])) {
@@ -796,6 +858,7 @@ export function validateConfiguration(
 	checkLoginThrottle(config);
 	checkAssertionGrants(config);
 	checkSessionExpiry(config);
+	checkIpsieSl1(config);
 
 	return {
 		scopes,

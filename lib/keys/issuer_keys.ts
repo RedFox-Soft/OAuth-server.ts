@@ -10,6 +10,8 @@ import { generateJWKS } from '../helpers/jwks.js';
 import type { BucketKey } from '../adapters/types.js';
 import type { RequestBucket } from '../configs/issuer.js';
 import { ROOT_KEY_OWNER } from '../consts/key_owner.js';
+import { sl1 } from '../sl1/rules.js';
+import { SL1_DEFAULT_SIGNING_ALGORITHM } from '../consts/sl1.js';
 
 /*
  * The keys each issuer signs, verifies and decrypts with.
@@ -132,6 +134,27 @@ export async function ensureBucketKey(bucketId: string): Promise<void> {
 		createdAt: now,
 		stateChangedAt: now
 	});
+	/*
+	 * Under the IPSIE SL1 profile every issuer must sign for PS256, the algorithm clients that registered none are given
+	 * (lib/models/client/schema.ts), so a project born under it gets a PS256 signer beside its RS256 one. Signing at
+	 * once is safe for the same reason it is for the first key: no relying party has cached a set that lacks it.
+	 */
+	if (sl1()) {
+		const {
+			keys: [ps256]
+		} = await generateJWKS(SL1_DEFAULT_SIGNING_ALGORITHM);
+		await getBucketKeysStore().createIfAbsent({
+			_id: `${bucketId} #initial-${SL1_DEFAULT_SIGNING_ALGORITHM}`,
+			bucketId,
+			kid: ps256.kid,
+			jwk: ps256,
+			alg: SL1_DEFAULT_SIGNING_ALGORITHM,
+			use: 'sig',
+			state: 'signing',
+			createdAt: now,
+			stateChangedAt: now
+		});
+	}
 	invalidateBucketKeys(bucketId);
 }
 

@@ -80,7 +80,7 @@ export default {
 				title: 'For regulated industries',
 				body: 'The banking-grade profiles are all implemented today. Turn on the flag your regulator asks for.',
 				points: [
-					'FAPI, DPoP, PAR, mTLS, CIBA, RAR, JARM',
+					'FAPI, IPSIE SL1, DPoP, PAR, mTLS, CIBA, RAR, JARM',
 					'Append-only admin audit trail',
 					'Per-identity brute-force throttle'
 				]

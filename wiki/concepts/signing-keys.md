@@ -21,11 +21,11 @@ area, its three adapters and `configs/keys.ts` are gone; the root is now the own
 
 ## Where they come from
 
-`rootKeys()` (`lib/keys/issuer_keys.ts:181`) assembles the `'#root'` records through the same 30-second
+`rootKeys()` (`lib/keys/issuer_keys.ts:204`) assembles the `'#root'` records through the same 30-second
 cache every project uses. The first key is created exactly once: `ensureRootKey()`
-(`lib/keys/issuer_keys.ts:135`) inserts an RS256 key under the fixed id `'#root #initial'` with
+(`lib/keys/issuer_keys.ts:158`) inserts an RS256 key under the fixed id `'#root #initial'` with
 `createIfAbsent`, so concurrent first boots leave one. Boot calls `rootKeys()` right after the migration
-gate (`lib/index.ts:234`); `bun run db:setup` and `bun run db:setup:pg` write the same first key, and
+gate (`lib/index.ts:235`); `bun run db:setup` and `bun run db:setup:pg` write the same first key, and
 write none while legacy keys still await the migration below. Tests seed the in-memory store from
 `test/preload.ts` (`writeRootKeys`, `test/root_keys.ts`), once, and it is never reset between spec files.
 
@@ -38,7 +38,7 @@ the current keys. The mirror holds only the **signing and encryption** keys, not
 algorithm lists (`lib/configs/jwaAlgorithms.ts`) are functions of the live `publicJWKS`, and a key that
 cannot sign yet must not have its algorithm advertised or accepted at client registration.
 
-Sign, verify and decrypt through `keysFor(bucket)` (`lib/keys/issuer_keys.ts:203`), which answers a
+Sign, verify and decrypt through `keysFor(bucket)` (`lib/keys/issuer_keys.ts:226`), which answers a
 root-served project with `rootKeys()`. Readers that ran against the mirror before any request had loaded
 it — root discovery, the administrator ID Token check (`lib/admin/auth/verifyIdToken.ts`),
 `tryFindClient`, `registerClient` — now `await rootKeys()` first. Never reach for keys through
@@ -60,7 +60,7 @@ revocation that needs no replacement is never refused.
 One core, `lib/admin/key_lifecycle.ts`, serves both owners: the root (`lib/admin/jwks/`, super
 administrators) and a project (`lib/admin/bucket_keys/`, its owning team). Each is a `KeyOwner`
 (`lib/admin/key_lifecycle.ts:24`) naming its audit verb and its cache invalidator. Every step is written
-against the 30 s cache (`KEY_CACHE_SECONDS`, `lib/keys/issuer_keys.ts:33`), because there is no
+against the 30 s cache (`KEY_CACHE_SECONDS`, `lib/keys/issuer_keys.ts:35`), because there is no
 cross-instance messaging and the TTL is how far another instance can lag:
 
 - **generate** (`:101`) stores a *published* key — served in `/jwks`, verifying, not signing. Every
@@ -123,9 +123,13 @@ ID model, where skipping that check is a known class of vulnerability.
 - `keysFor` gives an addressable project its own signing, verification and decryption `KeyStore`s and
   public set; `IdToken.issue`, the JWT access-token format, `IdToken.validate` (id_token_hint) and
   request-object decryption all ask it with the issuing or addressed project.
-- **The first key is created once, when first needed** (`ensureBucketKey`, `lib/keys/issuer_keys.ts:111`):
+- **The first key is created once, when first needed** (`ensureBucketKey`, `lib/keys/issuer_keys.ts:121`):
   an RS256 key under the fixed id `<bucketId> #initial`. Lazily on first use for a project that predates
-  project keys, and not audited on that path, for the reason the root's own first key is not.
+  project keys, and not audited on that path, for the reason the root's own first key is not. While the
+  IPSIE SL1 profile is on, a PS256 signer is created beside it, because PS256 is the profile's default
+  algorithm (spec 112, [[ipsie-sl1-profile]]).
+- **RSA keys shorter than 2048 bits are refused** (RFC 7518 §3.3), among the server's own keys
+  (`lib/configs/verifyJWKs.ts:148`) as in a client's key set (`lib/models/client/keystore.ts:121`).
 - **`/jwks` answers per issuer**: mounted beneath `/:bucket` as well as at the bare path, resolved host
   first like every endpoint, so a tenant hostname serves its tenant's keys; an address naming no project
   is 404, never the root's keys. Discovery advertises `jwks_uri` under the issuer and, for a project, the

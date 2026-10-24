@@ -276,6 +276,81 @@ describe("a bucket's applications", () => {
 		expect(JSON.stringify(view)).not.toContain(String(body.secret));
 	});
 
+	/*
+	 * CIMD §7.2: an administrator may pre-register a Client Identifier URL. Under the IPSIE SL1 profile it is the only
+	 * way such a client exists, since the profile never fetches a document.
+	 */
+	describe('an application created under a Client Identifier URL', () => {
+		const url = () =>
+			`https://app-${nanoid()
+				.toLowerCase()
+				.replace(/[^a-z0-9]/g, '')}.example.com/oauth/client.json`;
+
+		it('is created with that URL as its client id', async () => {
+			const { cookie } = await sessionCookieFor('super');
+			const identifier = url();
+
+			const created = await applications(await makeBucket()).post(
+				{
+					clientIdentifierUrl: identifier,
+					clientName: 'Pre-registered',
+					grantTypes: ['authorization_code'],
+					redirectUris: ['https://pre.example.com/cb'],
+					tokenEndpointAuthMethod: 'none'
+				},
+				{ headers: { cookie } }
+			);
+
+			expect(created.status).toBe(201);
+			expect(answered(created.data).clientId).toBe(identifier);
+		});
+
+		it('is refused when the URL is not a Client Identifier URL', async () => {
+			const { cookie } = await sessionCookieFor('super');
+
+			const refused = await applications(await makeBucket()).post(
+				{
+					clientIdentifierUrl: 'http://app.example.com/oauth/client.json',
+					clientName: 'Plain http',
+					grantTypes: ['authorization_code'],
+					redirectUris: ['https://pre.example.com/cb'],
+					tokenEndpointAuthMethod: 'none'
+				},
+				{ headers: { cookie } }
+			);
+
+			expect(refused.status).toBe(422);
+			expect(JSON.stringify(refused.error?.value)).toContain(
+				'clientIdentifierUrl'
+			);
+		});
+
+		it('is refused when an application already has that URL as its client id', async () => {
+			const { cookie } = await sessionCookieFor('super');
+			const identifier = url();
+			const body = {
+				clientIdentifierUrl: identifier,
+				clientName: 'Pre-registered',
+				grantTypes: ['authorization_code' as const],
+				redirectUris: ['https://pre.example.com/cb'],
+				tokenEndpointAuthMethod: 'none' as const
+			};
+			expect(
+				(
+					await applications(await makeBucket()).post(body, {
+						headers: { cookie }
+					})
+				).status
+			).toBe(201);
+
+			const refused = await applications(await makeBucket()).post(body, {
+				headers: { cookie }
+			});
+
+			expect(refused.status).toBe(409);
+		});
+	});
+
 	it('maps invalid client metadata to 422', async () => {
 		const { cookie } = await sessionCookieFor('super');
 		const bucket = await makeBucket();

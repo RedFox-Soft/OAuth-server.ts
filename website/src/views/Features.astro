@@ -63,6 +63,14 @@ const groups = [
 				href: 'https://openid.net/specs/openid-connect-core-1_0.html'
 			}
 		},
+		{
+			...protocol.sessionExpiry,
+			flag: 'idToken.relyingPartySessionLifetime',
+			spec: {
+				label: 'OIDC Enterprise Extensions',
+				href: 'https://openid.net/specs/openid-connect-enterprise-extensions-1_0.html'
+			}
+		},
 		{ ...protocol.issuerIdentification, spec: rfc('9207') },
 		{ ...protocol.resourceIndicators, flag: 'resourceIndicators.enabled', spec: rfc('8707') },
 		{ ...protocol.clientCredentials, flag: 'clientCredentials.enabled' },
@@ -99,6 +107,22 @@ const groups = [
 		{ ...security.dpop, flag: 'dpop.enabled', spec: rfc('9449') },
 		{ ...security.mtls, flag: 'mTLS.enabled', spec: rfc('8705') },
 		{ ...security.fapi, flag: 'fapi.enabled' },
+		{
+			...security.ipsieSl1,
+			flag: 'ipsieSl1.enabled',
+			spec: {
+				label: 'IPSIE SL1',
+				href: 'https://openid.github.io/ipsie-openid-sl1/draft-openid-ipsie-sl1-profile.html'
+			}
+		},
+		{
+			...security.assertionAudience,
+			flag: 'clientAuth.issuerOnlyAudience',
+			spec: {
+				label: 'rfc7523bis',
+				href: 'https://datatracker.ietf.org/doc/draft-ietf-oauth-rfc7523bis/'
+			}
+		},
 		{ ...security.encryption, flag: 'encryption.enabled' },
 		{ ...security.totp, spec: rfc('6238') },
 		{ ...security.pairwise },

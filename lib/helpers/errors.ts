@@ -323,6 +323,10 @@ export const UnsupportedGrantType = E(
 	'unsupported_grant_type',
 	'unsupported grant_type requested'
 );
+export const UnsupportedResponseType = E(
+	'unsupported_response_type',
+	'unsupported response_type requested'
+);
 export const UnsupportedResponseMode = E(
 	'unsupported_response_mode',
 	'unsupported response_mode requested'

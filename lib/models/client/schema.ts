@@ -18,6 +18,8 @@ import * as formatters from '../../helpers/formatters.ts';
 import { pick } from '../../helpers/_/object.js';
 import omitBy from '../../helpers/_/omit_by.ts';
 import { needsSecret } from './secret.ts';
+import { DEFAULTED as SL1_DEFAULTED, sl1 } from '../../sl1/rules.ts';
+import { SL1_DEFAULT_SIGNING_ALGORITHM } from '../../consts/sl1.ts';
 import {
 	authorizationSigningAlgValues,
 	clientAuthSigningAlgValues,
@@ -124,6 +126,23 @@ export default function getSchema() {
 	const RECOGNIZED_METADATA = buildRecognizedMetadata();
 	const DEFAULT = structuredClone(DEFAULTS);
 	Object.assign(DEFAULT, wireFormatClientDefaults());
+	/*
+	 * Under the IPSIE SL1 profile a signed response a client registered no algorithm for is signed for PS256, not RS256,
+	 * which IPSIE Common Requirements §3.3 forbids — departing from OIDC Registration's default under the switch, as
+	 * Keycloak's secure-signing policy does. Applied on every pass, so a client saved under the profile has PS256
+	 * written into its record, and one stored earlier is served PS256 until it is (constitution 3.2.0, Principle VI).
+	 *
+	 * A stored RS256 counts as that default too: every save writes the validated record, defaults included, so RS256 in
+	 * a stored record is almost always the default a save wrote, never a choice — and the two cannot be told apart.
+	 * Registering RS256 afresh is refused at the write (lib/models/client/register.ts), not here.
+	 */
+	const sl1Defaults = sl1();
+	if (sl1Defaults) {
+		for (const name of SL1_DEFAULTED) {
+			if (DEFAULT[name] !== undefined)
+				DEFAULT[name] = SL1_DEFAULT_SIGNING_ALGORITHM;
+		}
+	}
 
 	/*
 	 * The instance is the metadata being validated: each pass reads, rewrites or removes recognised
@@ -149,6 +168,13 @@ export default function getSchema() {
 			this['requestObject.signingAlg'] = metadata['requestObject.signingAlg'];
 			this['requestObject.backChannelSigningAlg'] =
 				metadata['requestObject.backChannelSigningAlg'];
+
+			if (sl1Defaults) {
+				for (const name of SL1_DEFAULTED) {
+					if (this[name] === 'RS256')
+						this[name] = SL1_DEFAULT_SIGNING_ALGORITHM;
+				}
+			}
 
 			this.required();
 			this.baseKeys();

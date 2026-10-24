@@ -25,6 +25,7 @@ import nanoid from '../../helpers/nanoid.js';
 import { assertApplicationRoom } from '../../plans/enforce.js';
 import { connectionOf } from './connection.js';
 import { readClientUsage } from '../../models/client/usage.js';
+import { parseClientIdentifierUrl } from '../../client_metadata_document/identifier.js';
 
 /*
  * A bucket's applications (specs/099). The bucket is the only container: an application belongs to one
@@ -120,11 +121,29 @@ export const clientRoutes = new Elysia({ name: 'admin-clients' })
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucket(ctx, params.id, 'edit');
 			await assertApplicationRoom(ctx, bucket);
+			const { clientIdentifierUrl, ...metadata } = body;
 			// Allocated here so the entry names the client that is about to exist.
-			const clientId = nanoid();
+			const clientId = clientIdentifierUrl ?? nanoid();
+			if (clientIdentifierUrl !== undefined) {
+				const parsed = parseClientIdentifierUrl(clientIdentifierUrl);
+				if (!parsed.ok) {
+					throw new AdminError(
+						422,
+						`clientIdentifierUrl is not a Client Identifier URL (${parsed.reason})`,
+						{ field: 'clientIdentifierUrl' }
+					);
+				}
+				if (await adapter('Client').find(clientIdentifierUrl)) {
+					throw new AdminError(
+						409,
+						'an application with that client id already exists',
+						{ field: 'clientIdentifierUrl' }
+					);
+				}
+			}
 			await recordAdminAudit(ctx, 'client.create', clientId, scopeOf(bucket));
 			const { view, secret } = await createClient(bucket._id, {
-				...body,
+				...metadata,
 				clientId
 			});
 			set.status = 201;

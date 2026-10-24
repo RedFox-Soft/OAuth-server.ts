@@ -298,7 +298,7 @@ Russian or Simplified Chinese ([[end-user-languages]]).
   in the audit attributes (`routes.ts:150`, `:327-336`). Accepted values are trimmed and carry no
   `undefined` member (`lib/resources/scopes.ts:116-141`). See [[mcp-server-authorization]].
 - **Custom OpenID scope descriptions.** The setting `consent.scopeDescriptions`
-  (`lib/configs/application.ts:677-687`) is checked right after `collectScopes`
+  (`lib/configs/application.ts:697-707`) is checked right after `collectScopes`
   (`checkConsentScopeDescriptions`, `lib/configs/configuration.ts:172`, called at `:724`). A key must be a
   defined scope and never a standard one (`lib/consts/oidc_scopes.ts`). Removing a described scope
   without its description is refused. See [[settings-console-descriptor]].

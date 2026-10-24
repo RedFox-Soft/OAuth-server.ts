@@ -314,4 +314,38 @@ describe('individual tool behaviours', () => {
 		);
 		expect(resetEntry?.targetScope).toBe(bucketId);
 	});
+
+	// IPSIE SL1 FR-002: the agent meets the prerequisite refusal the console meets, and nothing is switched on.
+	it('refuses turning the IPSIE SL1 profile on over an unmet prerequisite, naming it', async () => {
+		const { token } = await session();
+
+		const refused = await perform(token, 'settings_update', {
+			'ipsieSl1.enabled': true
+		});
+
+		expect(refused.result?.isError).toBe(true);
+		expect(JSON.stringify(refused.result)).toContain('dpop.enabled');
+		expect(ApplicationConfig['ipsieSl1.enabled']).toBe(false);
+	});
+
+	// IPSIE SL1 FR-003: readiness reaches an agent as a read, with the console's own answer.
+	it('answers IPSIE SL1 readiness to an agent without enabling anything', async () => {
+		const { token } = await session();
+
+		const answered = await rpc(
+			call('settings_ipsie_profile_readiness_get', {}),
+			token
+		);
+
+		const readiness = result(
+			Type.Object({
+				enabled: Type.Boolean(),
+				canEnable: Type.Boolean(),
+				settings: Type.Array(Type.Object({ key: Type.String() }))
+			}),
+			answered
+		);
+		expect(readiness.enabled).toBe(false);
+		expect(readiness.settings.map((s) => s.key)).toContain('dpop.enabled');
+	});
 });

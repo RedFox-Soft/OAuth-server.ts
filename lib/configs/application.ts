@@ -209,6 +209,26 @@ export const ApplicationConfig = {
 	'fapi.enabled': false,
 
 	/*
+	 * ipsieSl1.enabled
+	 *
+	 * title: IPSIE SL1 profile ([draft-openid-ipsie-sl1-profile](https://openid.github.io/ipsie-openid-sl1/draft-openid-ipsie-sl1-profile.html) §3.2.1,
+	 * IPSIE Common Requirements §3.3)
+	 *
+	 * description: Applies the OpenID Provider rules of IPSIE Session Lifetime level 1 that cannot be defaults:
+	 * no `http` redirect URIs, clients only by preregistration, `response_type=code` only, DPoP-bound access
+	 * tokens at every grant, only PS256, ES256 and EdDSA for anything signed (PS256 when a client registered
+	 * none), binding `acr_values`, and a client-assertion audience that is the issuer as a string.
+	 *
+	 * Each rule departs from a text in force — RFC 8252 §7.3 (loopback `http` for native apps), MCP
+	 * Authorization's registration guidance (anonymous registration, metadata-document clients), OIDC Core
+	 * §3.1.2.1 (`acr_values` is voluntary) and OIDC Registration (RS256 when no algorithm is registered) — so
+	 * they sit behind this one switch (constitution, Principle I). Turning it on is refused until DPoP, PKCE,
+	 * encryption and registration's initial access token are in place, PAR accepts no unregistered redirect
+	 * URI, and every issuer holds a PS256 signing key.
+	 */
+	'ipsieSl1.enabled': false,
+
+	/*
 	 * clientAuth.issuerOnlyAudience
 	 *
 	 * title: Issuer-only audience for client assertions ([draft-ietf-oauth-rfc7523bis](https://datatracker.ietf.org/doc/draft-ietf-oauth-rfc7523bis/) §4 item 3b, §5)

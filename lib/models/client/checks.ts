@@ -3,6 +3,7 @@ import {
 	JWT_DPOP_GRANT
 } from '../../consts/assertion_grants.js';
 import { LOOPBACKS } from '../../consts/client_attributes.js';
+import { sl1, sl1Exempt } from '../../sl1/rules.ts';
 import { type Client } from './types.ts';
 
 // Allowance predicates over a validated client. Each declares only the attributes it reads, so a
@@ -66,11 +67,29 @@ export function grantTypeAllowed(
  * the port and receive the code. PKCE is what closes that, and it is mandatory for public clients
  * here, which is the same trade RFC 8252 §8.10 makes.
  */
+type Provenance = Partial<
+	Pick<Client, 'bucketId' | 'accountPageBucketId' | 'provisioningConnectionId'>
+>;
+
+/*
+ * IPSIE SL1 §3.2.1: the OpenID Provider "MUST NOT allow redirect URIs that use the `http` scheme" — loopback included,
+ * which departs from RFC 8252 §7.3 under the profile switch. Judged per URI, so a client keeps the addresses it may
+ * still use, and on the stored record as it is, so turning the profile off restores the rest.
+ */
+function plainHttpRefused(client: Provenance, value: string): boolean {
+	return sl1() && !sl1Exempt(client) && URL.parse(value)?.protocol === 'http:';
+}
+
 export function redirectUriAllowed(
 	client: Pick<Client, 'redirectUris'> &
-		Partial<Pick<Client, 'applicationType'>>,
+		Partial<Pick<Client, 'applicationType'>> &
+		Provenance,
 	value: string
 ): boolean {
+	if (plainHttpRefused(client, value)) {
+		return false;
+	}
+
 	if (client.redirectUris.includes(value)) {
 		return true;
 	}
@@ -101,11 +120,11 @@ export function redirectUriAllowed(
 }
 
 export function postLogoutRedirectUriAllowed(
-	client: Pick<Client, 'postLogoutRedirectUris'>,
+	client: Pick<Client, 'postLogoutRedirectUris'> & Provenance,
 	value: string
 ): boolean {
 	const parsed = URL.parse(value);
-	if (!parsed) return false;
+	if (!parsed || plainHttpRefused(client, value)) return false;
 	return !!client.postLogoutRedirectUris?.find(
 		(allowed) => URL.parse(allowed)?.href === parsed.href
 	);

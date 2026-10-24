@@ -42,7 +42,7 @@ The two seeded clients live in the same bucket and are not such applications.
 bucket: what an agent may do is decided per route in the MCP catalogue, so the reads are published
 (`administrator_application_list/get`) and the four writes are `withheld` — registering one decides which outside
 service may sign the instance's administrators in, the same class as permitting another client identity
-(`lib/mcp/catalogue.ts:2121`). Mounted as a statement after the `adminApiRoutes` chain, not a link in it: the chain is
+(`lib/mcp/catalogue.ts:2134`). Mounted as a statement after the `adminApiRoutes` chain, not a link in it: the chain is
 at TypeScript's instantiation limit (TS2589), as `lib/index.ts` already records for SCIM (`lib/admin/routes.ts:135`).
 The console shows them as the Administrators page's Applications tab.
 

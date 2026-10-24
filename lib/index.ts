@@ -121,6 +121,7 @@ export const elysia = new Elysia({ strictPath: true, normalize: false })
 		unmet_authentication_requirements: errors.UnmetAuthenticationRequirements,
 		unsupported_grant_type: errors.UnsupportedGrantType,
 		unsupported_response_mode: errors.UnsupportedResponseMode,
+		unsupported_response_type: errors.UnsupportedResponseType,
 		use_dpop_nonce: UseDpopNonce,
 		invalid_dpop_proof: InvalidDpopProof,
 		rate_limited: errors.RateLimited,

@@ -695,6 +695,19 @@ const catalogue = [
 			'The editable server settings, with the catalogue describing each one and its current value.'
 	},
 	{
+		tool: 'settings_ipsie_profile_readiness_get',
+		method: 'GET',
+		path: '/admin/api/settings/ipsie-sl1/readiness',
+		action: null,
+		consequence: 'read',
+		superAdminOnly: true,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: [],
+		summary:
+			'What turning the IPSIE SL1 profile (ipsieSl1.enabled) on would need and refuse, without turning it on: the settings that stand in the way, the issuers holding no PS256 signing key, and every application the profile would refuse or give PS256, each with the rule and the section of the profile behind it. canEnable says whether the switch would be accepted now.'
+	},
+	{
 		tool: 'plan_list',
 		method: 'GET',
 		path: '/admin/api/plans',

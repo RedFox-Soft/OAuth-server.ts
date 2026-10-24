@@ -86,7 +86,7 @@ nothing, so its published schema is derived from the same catalog the handler en
 `federation_provider_create` — `POST /admin/api/projects/:id/federation`, whose body carries the
 *provider's* own `id` — silently dropped the provider id and failed every call. Path parameters can now
 be aliased (`pathArgs`, the project is `projectId` there, `bucketId` until spec 100;
-`lib/mcp/catalogue.ts:1400`), and the drift guard refuses any tool whose final argument names collide.
+`lib/mcp/catalogue.ts:1413`), and the drift guard refuses any tool whose final argument names collide.
 
 **A closed input schema breaks an open-map body.** `UpdateSettingsBody` is
 `t.Record(t.String(), t.Unknown())`, validated per key by the handler against the catalog. With
@@ -128,7 +128,7 @@ Fixed at the source rather than translated at the boundary: `lib/admin/settings/
 `t.Number({ multipleOf: 1 })`, plain JSON Schema meaning the same thing (TypeBox's real `Type.Integer` is
 not reachable through Elysia's `t`). The console then has to send a number — antd's `<Input type="number">`
 submits a *string*, and leaning on the coercion was what hid that; it is an `InputNumber` now
-(`lib/admin/ui/pages/Settings.tsx:192`). `test/mcp/schema_bridge.spec.ts:108` walks every published schema
+(`lib/admin/ui/pages/Settings.tsx:193`). `test/mcp/schema_bridge.spec.ts:108` walks every published schema
 for a coercion format, so the next `t.Integer()` in an admin body fails a test instead of logging at boot.
 
 **`resolveAdmin` must import the model graph lazily.** Teaching it a second credential type meant
@@ -187,7 +187,7 @@ sharper version of the same reason — destroying one takes with it the only thi
 access to what it held. Deleting the old Project entity (a retired project) was withheld for the same
 reason until spec 099 removed it; the table now holds twelve `withheld` entries — spec 109 added the four writes of
 applications in the administrators' project, whose reads are published ([[administrators-applications]])
-(`lib/mcp/catalogue.ts:1848-2013`).
+(`lib/mcp/catalogue.ts:1861-2026`).
 Widening the retired projects' administrator role deliberately did not widen this list. They are not
 registered as refusing tools either, because a registered tool appears in `tools/list` however it
 behaves; the server's `instructions` carry the explanation, read from the exclusion table so the two
@@ -221,7 +221,7 @@ table, so a third withholding would have been refused correctly when guessed and
 the announcement that exists so an agent need not guess. That third withholding has since arrived —
 `group_delete`, a team's deletion — and cost only a table row, which is the arrangement working as
 intended. Since spec 100 the guessed names are `project_delete`, `project_purge` and `team_delete`
-(`excludedOperationFor`, `lib/mcp/catalogue.ts:2032-2041`).
+(`excludedOperationFor`, `lib/mcp/catalogue.ts:2045-2054`).
 
 The other high-consequence operations — 41 tools since spec 102 — take two calls: describe, then confirm. How the count
 got there, in the names the tools had at the time (spec 100 renamed `bucket_*` to `project_*` and `group_*`
@@ -285,7 +285,7 @@ Spec 088 added four tools and two exclusions:
   the previous credential is revoked at once.
 - `federation_provider_move` moves a provider one place in its project's sign-in order. It is ordinary, and high
   on the administrators' project through `highWhen: onConsoleBucket` like its two siblings
-  (`lib/mcp/catalogue.ts:1442`; [[console-federation]]).
+  (`lib/mcp/catalogue.ts:1455`; [[console-federation]]).
 - Two reads: `provisioning_hold_list` (held connections across the projects the caller sees) and
   `provisioning_directory_list` (Entra's, Okta's and a generic directory's field names, recommended credential
   and pitfalls). The second is published for the reason `federation_catalogue_list` is: an agent cannot derive

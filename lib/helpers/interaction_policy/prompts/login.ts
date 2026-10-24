@@ -1,3 +1,4 @@
+import { satisfiesAcr, sl1, sl1Exempt } from '../../../sl1/rules.ts';
 import * as errors from '../../errors.ts';
 import { pairwiseIdentifier } from '../../../addon/index.js';
 import { Prompt, type CheckPartial } from '../prompt.js';
@@ -187,6 +188,25 @@ class LoginPromt extends Prompt {
 				return true;
 			},
 			details: (oidc) => ({ acr: oidc.claims.id_token?.acr })
+		},
+		{
+			reason: 'sl1_acr_values',
+			description: 'requested ACR could not be obtained',
+			/*
+			 * IPSIE SL1 §3.2.1: with `acr_values` in the request the provider MUST "either authenticate the user in a
+			 * manner that satisfies one of the requested Authentication Context Class values, or return an error".
+			 * Departs from OIDC Core §3.1.2.1, where `acr_values` is voluntary, under the profile switch; the essential
+			 * checks above are untouched. A client's `default_acr_values` arrive as `acr_values` and bind the same way.
+			 */
+			error: 'unmet_authentication_requirements',
+			check: (oidc) => {
+				const values = oidc.params.acr_values;
+				if (!sl1() || sl1Exempt(oidc.client) || typeof values !== 'string') {
+					return false;
+				}
+				return !satisfiesAcr(values.split(' '), oidc.acr);
+			},
+			details: (oidc) => ({ acr_values: oidc.params.acr_values })
 		}
 	];
 }

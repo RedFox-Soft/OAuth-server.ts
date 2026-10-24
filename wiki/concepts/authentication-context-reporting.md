@@ -140,6 +140,11 @@ a claims-parameter finding: see [[feature-flag-gating]] for the general shape.
   Registration §2 requires. The individual claim request is now authoritative. §5.5.1.1 leaves a
   client sending both forms explicitly *unspecified*, so what is owed there is determinism, not a
   particular winner.
+- **`acr_values` binds under the IPSIE SL1 profile** (spec 112, 2026-10-23). With `ipsieSl1.enabled` on, a
+  request whose `acr_values` the sign-in does not satisfy ends in `unmet_authentication_requirements`
+  (a new login check, `sl1_acr_values`), and on the backchannel in `transaction_failed`. A multi-factor
+  sign-in satisfies a request for the password class. With the profile off `acr_values` stays voluntary
+  and the essential checks above are unchanged. See [[ipsie-sl1-profile]].
 - **A second factor is demanded by the project, not by the person.** `totpRequired` is a
   project (`UserBucket`) flag; `user.totp` is consulted only inside that branch, to choose the verify page over
   the enrolment page. So an end user with an authenticator enrolled, in a project that does not require

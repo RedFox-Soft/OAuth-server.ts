@@ -20,6 +20,7 @@ import { BASE_METADATA_KEYS } from './wire.ts';
 import { rootKeys } from '../../keys/issuer_keys.js';
 import { connectionClientRecord } from '../../provisioning/client.js';
 import { accountPageClientRecord } from '../../account_page/client.js';
+import { sl1, sl1ClientViolations, sl1Exempt } from '../../sl1/rules.ts';
 
 // Validate raw metadata → plain, frozen client object (defaults applied,
 // recognised metadata camelCased) or throw InvalidClientMetadata. Key material
@@ -110,7 +111,14 @@ onSettingsApplied(() => clientCache.clear());
 // keyed by a hash of the stored properties, so unchanged clients skip
 // re-validation. Nullable variant behind `Client.tryFind`; the strict
 // `Client.find` wraps this and throws on miss.
-export async function tryFindClient(id: string): Promise<Client | undefined> {
+/*
+ * `administering` is the console and the agent reading a record to show or change it: a profile that refuses a client
+ * at use never hides it from the administrator who has to put it right.
+ */
+export async function tryFindClient(
+	id: string,
+	{ administering = false }: { administering?: boolean } = {}
+): Promise<Client | undefined> {
 	// Validation reads the root issuer's algorithms synchronously; this keeps them current (see register.ts).
 	await rootKeys();
 	/*
@@ -169,6 +177,19 @@ export async function tryFindClient(id: string): Promise<Client | undefined> {
 		// No sector check: that runs when a client is written (register.ts), not each time it is used.
 		client = validateClient(properties);
 		clientCache.set(propHash, client);
+	}
+
+	/*
+	 * Under the IPSIE SL1 profile a client registered for an algorithm or an authentication method the profile forbids
+	 * (IPSIE Common Requirements §3.3) cannot be served at all, so it resolves as unknown and every endpoint answers
+	 * `invalid_client`. Its record stays, so turning the profile off restores it; the rules a single request can
+	 * avoid — an `http` redirect URI, `response_type=none` — are refused per request instead (lib/sl1/rules.ts).
+	 */
+	if (!administering && sl1() && !sl1Exempt(client)) {
+		const blocking = sl1ClientViolations(client).some(
+			(v) => v.rule === 'signing_algorithm' || v.rule === 'client_secret_jwt'
+		);
+		if (blocking) return undefined;
 	}
 
 	return client;

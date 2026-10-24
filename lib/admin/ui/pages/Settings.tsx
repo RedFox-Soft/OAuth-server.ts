@@ -19,6 +19,7 @@ import { SaveBar } from '../settings/SaveBar.js';
 import { SmtpCard } from '../settings/SmtpCard.js';
 import { SentryCard } from '../settings/SentryCard.js';
 import { PlansCard } from '../settings/PlansCard.js';
+import { Sl1ReadinessCard } from '../settings/Sl1ReadinessCard.js';
 import { useLeaveGuard } from '../frame/router.js';
 import { PageHeader } from '../frame/PageHeader.js';
 import { request } from '../frame/request.js';
@@ -291,6 +292,7 @@ export function Settings() {
 						{!searching && pane === 'diagnostics' && <SentryCard />}
 						{!searching && pane === 'integrations' && <SmtpCard />}
 						{!searching && pane === 'plans' && <PlansCard />}
+						{!searching && pane === 'request-security' && <Sl1ReadinessCard />}
 
 						<SaveBar
 							changes={changes}

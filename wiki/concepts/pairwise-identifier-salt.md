@@ -44,7 +44,7 @@ accessor:
 | --- | --- |
 | ID token / userinfo claims | `lib/helpers/claims.ts:71` |
 | Token introspection | `lib/actions/introspection.ts:101-105` |
-| Interaction prompts | `lib/helpers/interaction_policy/prompts/login.ts:71` |
+| Interaction prompts | `lib/helpers/interaction_policy/prompts/login.ts:72` |
 | Back-channel logout notification | via `IdToken.payload()` — see the gotcha below |
 
 One guard in the default implementation therefore covers every surface, and a fifth added later

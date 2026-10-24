@@ -7,6 +7,12 @@ import { rootKeys } from '../../keys/issuer_keys.js';
 import { InvalidClientMetadata } from '../../helpers/errors.ts';
 import { LOOPBACKS } from '../../consts/client_attributes.js';
 import { isAccountPageClient } from '../../account_page/client.js';
+import {
+	SIGNED_RESPONSES,
+	sl1,
+	sl1ClientViolations,
+	sl1Exempt
+} from '../../sl1/rules.ts';
 
 /*
  * The one way a client is written, whichever surface writes it — dynamic registration, registration
@@ -83,6 +89,42 @@ function assertPlainHttpOnLoopback(
 	}
 }
 
+/*
+ * The IPSIE SL1 profile refuses a write that adds what it forbids (lib/sl1/rules.ts names each rule and its section).
+ * Unlike the loopback rule above, an address already stored is not spared: the profile allows none, and a client
+ * that keeps one is refused at use instead. An omitted signing algorithm is no refusal: the schema writes PS256.
+ */
+function assertSl1(
+	client: Client,
+	record: ClientRecord,
+	stored: ClientRecord | undefined
+): void {
+	if (!sl1() || sl1Exempt(client)) return;
+	/*
+	 * The schema serves a stored RS256 default as PS256, so only the record can show RS256 being registered: refused
+	 * when the write adds or changes it, and let through when it is the value already stored, which a save rewrites.
+	 */
+	for (const [name, attribute] of SIGNED_RESPONSES) {
+		const sent = record[attribute] ?? record[name];
+		const before = stored?.[attribute] ?? stored?.[name];
+		if (sent === 'RS256' && before !== 'RS256') {
+			throw new InvalidClientMetadata(
+				`${attribute} RS256 is not allowed under the IPSIE SL1 profile (CR §3.3)`
+			);
+		}
+	}
+	const violation = sl1ClientViolations(client).at(0);
+	if (!violation) return;
+	// Named `redirectUris` so the refusal carries RFC 7591's `invalid_redirect_uri`, as the loopback rule's does.
+	const field =
+		violation.attribute === 'redirect_uris'
+			? 'redirectUris'
+			: violation.attribute;
+	throw new InvalidClientMetadata(
+		`${field}${violation.value ? ` ${violation.value}` : ''} is not allowed under the IPSIE SL1 profile (${violation.cites})`
+	);
+}
+
 export async function registerClient(
 	record: ClientRecord,
 	{ store }: { store: boolean }
@@ -114,6 +156,7 @@ export async function registerClient(
 		: undefined;
 	await assertFetchedOverTls(client, stored);
 	assertPlainHttpOnLoopback(client, stored);
+	assertSl1(client, record, stored);
 
 	if (store) {
 		await adapter('Client').upsert(client.clientId, toStored(client));

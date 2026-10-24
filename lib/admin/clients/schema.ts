@@ -115,6 +115,18 @@ const editable = {
 };
 
 export const CreateClientBody = t.Object({
+	/*
+	 * Pre-registers a Client Identifier URL (CIMD §7.2): the application's client id is this https URL instead of a
+	 * generated one, so a client presenting it is served from this record rather than from a fetched document. The
+	 * only way such a client exists while the IPSIE SL1 profile is on, which never fetches one.
+	 */
+	clientIdentifierUrl: t.Optional(
+		t.String({
+			maxLength: 2048,
+			description:
+				'An https URL to use as the client id (a pre-registered Client Identifier URL); omitted, one is generated.'
+		})
+	),
 	clientName: t.Optional(t.String({ minLength: 1, maxLength: 100 })),
 	applicationType: t.Optional(t.Union([t.Literal('web'), t.Literal('native')])),
 	grantTypes: t.Array(GrantType, {

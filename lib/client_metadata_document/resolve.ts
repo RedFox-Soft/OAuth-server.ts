@@ -1,4 +1,5 @@
 import { ApplicationConfig } from '../configs/application.js';
+import { sl1 } from '../sl1/rules.ts';
 import { parseClientIdentifierUrl } from './identifier.js';
 import { fetchClientDocument } from './fetch.js';
 import { validateClientDocument } from './validate.js';
@@ -22,8 +23,13 @@ export async function resolveClientDocument(
 	 * Gated, and off by default. Accepting a URL as a client id is what gives an unauthenticated caller
 	 * the ability to make this server issue an outbound request, which is a capability a deployment
 	 * consents to rather than inherits — the same reason `registration.enabled` defaults off.
+	 *
+	 * IPSIE SL1 §3.2.1 "MUST require clients to be preregistered": under the profile a URL client id is served only
+	 * from a record an administrator stored under it (CIMD §7.2), which the caller reads before asking here.
 	 */
-	if (!ApplicationConfig['clientIdMetadataDocument.enabled']) return undefined;
+	if (!ApplicationConfig['clientIdMetadataDocument.enabled'] || sl1()) {
+		return undefined;
+	}
 
 	const parsed = parseClientIdentifierUrl(identifier);
 	if (!parsed.ok) return undefined;

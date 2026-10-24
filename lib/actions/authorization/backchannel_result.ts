@@ -1,3 +1,4 @@
+import { satisfiesAcr, sl1, sl1Exempt } from '../../sl1/rules.ts';
 import { OIDCProviderError } from '../../helpers/errors.ts';
 import { BackchannelAuthenticationRequest } from '../../models/backchannel_authentication_request.js';
 import { Client } from '../../models/client.js';
@@ -46,6 +47,21 @@ function satisfiesRequiredAcr(
 	}
 	// Essential, but naming no acceptable value: any context satisfies it, absence does not.
 	return acr !== undefined;
+}
+
+/*
+ * IPSIE SL1 §3.2.1: under the profile `acr_values` binds on the backchannel as it does at `/auth`, so an authentication
+ * that satisfies none of them fails the transaction rather than yielding tokens for a weaker sign-in.
+ */
+function satisfiesSl1AcrValues(
+	acrValues: unknown,
+	acr: string | undefined,
+	client: Parameters<typeof sl1Exempt>[0]
+): boolean {
+	if (!sl1() || sl1Exempt(client) || typeof acrValues !== 'string') {
+		return true;
+	}
+	return satisfiesAcr(acrValues.split(' '), acr);
 }
 
 /* What the end user's authentication device reports with a successful result (see the addon's notes). */
@@ -111,7 +127,10 @@ export async function backchannelResult(
 			 * becomes known: leaving the request marked successful would tell a ping-mode client to
 			 * collect a token that will never exist.
 			 */
-			if (!satisfiesRequiredAcr(request.payload.claims, acr)) {
+			if (
+				!satisfiesRequiredAcr(request.payload.claims, acr) ||
+				!satisfiesSl1AcrValues(request.payload.params?.acr_values, acr, client)
+			) {
 				Object.assign(request.payload, {
 					error: 'transaction_failed',
 					errorDescription:
