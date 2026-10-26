@@ -12,7 +12,7 @@
 		"check": "astro check"
 	},
 	"dependencies": {
-		"@astrojs/markdown-satteri": "^0.4.4",
+		"@astrojs/markdown-satteri": "^0.4.5",
 		"@astrojs/rss": "^4.0.19",
 		"@astrojs/sitemap": "^3.7.4",
 		"@astrojs/starlight": "^0.42.6",
@@ -21,7 +21,7 @@
 		"@fontsource-variable/jetbrains-mono": "^5.3.0",
 		"@tailwindcss/typography": "^0.5.20",
 		"@tailwindcss/vite": "^4.3.3",
-		"astro": "^7.4.0",
+		"astro": "^7.4.2",
 		"marked": "^18.1.1",
 		"sharp": "^0.35.5",
 		"starlight-links-validator": "^0.27.0",
@@ -29,9 +29,9 @@
 		"tailwindcss": "^4.3.3"
 	},
 	"devDependencies": {
-		"@astrojs/check": "^0.9.10",
+		"@astrojs/check": "^0.9.12",
 		"@fontsource/noto-sans-sc": "^5.3.1",
-		"@types/bun": "^1.4.3",
+		"@types/bun": "^1.4.4",
 		"playwright": "^1.64.1",
 		"typescript": "^6.0.3"
 	}
