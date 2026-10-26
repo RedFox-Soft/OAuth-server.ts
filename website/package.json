@@ -3,13 +3,13 @@
 	"type": "module",
 	"version": "0.0.1",
 	"scripts": {
-		"dev": "astro dev",
+		"dev": "bun --bun astro dev",
 		"generate": "bun scripts/generate.ts",
 		"seo": "bun scripts/postbuild.ts && bun scripts/i18n/freshness.ts",
 		"i18n:stamp": "bun scripts/i18n/stamp.ts",
-		"build": "bun run generate && astro build && bun run seo",
-		"preview": "astro preview",
-		"check": "astro check"
+		"build": "bun run generate && bun --bun astro build && bun run seo",
+		"preview": "bun --bun astro preview",
+		"check": "bun --bun astro check"
 	},
 	"dependencies": {
 		"@astrojs/markdown-satteri": "^0.4.5",

@@ -12,6 +12,12 @@ and deploys it to GitHub Pages on every push to `main` that touches the site or 
 - `bun install` inside `website/` as well, for the site's own dependencies.
 - `bunx playwright install chromium`, once, for the screenshot/OG capture script.
 
+No Node is needed. The `astro` binary declares `#!/usr/bin/env node`, which `bun run` honours, so the
+scripts call it as `bun --bun astro` to run it on Bun instead. Without that, Astro ran on whatever Node
+the machine had and refused to start when it was older than Astro's floor (a CI runner, 2026-10-26).
+Bun's `Function.prototype.toString` returns transpiled source, so an inlined script such as
+`languageScript` is emitted in an equivalent but different form than under Node.
+
 ## Developing
 
 ```bash
@@ -23,8 +29,8 @@ bun run dev        # serves whatever is currently in generated/
 catalog, a route classification, or anything else the export reads.
 
 Astro 7's `astro dev` runs as a background daemon: the command returns at once and prints the URL
-(`http://localhost:4321/`). `bunx astro dev logs` tails it, `bunx astro dev status` shows it,
-`bunx astro dev stop` stops it. The server listens on both `127.0.0.1` and `::1`.
+(`http://localhost:4321/`). `bunx --bun astro dev logs` tails it, `bunx --bun astro dev status` shows it,
+`bunx --bun astro dev stop` stops it. The server listens on both `127.0.0.1` and `::1`.
 
 ## Building
 
