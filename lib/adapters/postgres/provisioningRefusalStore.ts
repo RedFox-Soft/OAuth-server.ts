@@ -72,7 +72,7 @@ export class ProvisioningRefusalStore implements ProvisioningRefusalStoreInstanc
 			refusals: rows.map((row: unknown) =>
 				documentOf(this.area, ProvisioningRefusal, docOf(row))
 			),
-			total: counted[0]?.total ?? 0
+			total: counted.at(0)?.total ?? 0
 		};
 	}
 

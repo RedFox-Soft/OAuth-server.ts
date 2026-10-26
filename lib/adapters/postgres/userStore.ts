@@ -230,7 +230,7 @@ export class UserStore implements UserStoreInstance {
 			SELECT count(*)::int AS count FROM ${handle(this.area)}
 			WHERE doc->'federated' @> ${match}
 		`;
-		return rows[0]?.count ?? 0;
+		return rows.at(0)?.count ?? 0;
 	}
 
 	/*

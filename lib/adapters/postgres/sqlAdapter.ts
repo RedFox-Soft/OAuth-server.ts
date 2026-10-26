@@ -223,7 +223,7 @@ export class SqlAdapter<
 						WHERE id = ${_id}
 						RETURNING (payload->>${field})::float8 AS value
 					`;
-		const value: unknown = rows[0]?.value;
+		const value: unknown = rows.at(0)?.value;
 		return typeof value === 'number' ? value : undefined;
 	}
 

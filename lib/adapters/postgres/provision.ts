@@ -192,7 +192,7 @@ export async function tableExists(sql: Sql, name: string): Promise<boolean> {
 	const rows = await sql<
 		{ present: unknown }[]
 	>`SELECT to_regclass(${quote(name)}) IS NOT NULL AS present`;
-	return Boolean(rows[0]?.present);
+	return Boolean(rows.at(0)?.present);
 }
 
 /*

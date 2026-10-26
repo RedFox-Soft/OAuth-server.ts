@@ -439,21 +439,21 @@ export function KeyCards({
 								items={[
 									{
 										title: 'Next key',
-										description:
+										content:
 											'Rotate publishes one if there is none; it signs nothing yet.'
 									},
 									{
 										title: 'Wait',
-										description: `At least ${String(Math.round((read?.publicationSeconds ?? 60) / 60) || 1)} minute, longer if your relying parties cache keys.`
+										content: `At least ${String(Math.round((read?.publicationSeconds ?? 60) / 60) || 1)} minute, longer if your relying parties cache keys.`
 									},
 									{
 										title: 'Rotate',
-										description:
+										content:
 											'The next key signs; the previous signer keeps verifying; a new next key is published.'
 									},
 									{
 										title: 'Retire',
-										description: 'The previous key, once nothing needs it.'
+										content: 'The previous key, once nothing needs it.'
 									}
 								]}
 							/>

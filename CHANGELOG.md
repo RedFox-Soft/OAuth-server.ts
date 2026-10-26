@@ -36,6 +36,12 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   (`max_age`, `prompt=login`, `require_auth_time`, `acr_values`, a claims request). Both are advertised whatever the
   stored claims setting holds. A backchannel authentication whose integration reported neither still yields neither.
 
+### Security
+
+- **nodemailer 10.2.1 and zod 4.6.7.** nodemailer's address parser could read a crafted recipient as a different
+  address than its header named (GHSA-85x2-q946-cp5h, GHSA-8c8m-p3m8-cjg8, GHSA-m943-m63m-w62w). zod, pulled in by the
+  MCP SDK, could exhaust memory validating an oversized array (CVE-2023-54404, GHSA-mrhx-c7xc-m3w5).
+
 ## [1.3.0] - 2026-10-22
 
 Agents in the enterprise: a project can accept identity assertions (ID-JAG) for its APIs and issue them for outside

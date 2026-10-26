@@ -991,12 +991,12 @@ await verifyAdminSessionsByUser(new AdminSessionStore(), check);
 				await handle<
 					{ n: number }[]
 				>`SELECT count(*)::int AS n FROM ${handle(STORE_AREAS.bucketGroups)} WHERE doc->>'bucketId' = ${rolesBucket._id}`
-			)[0]?.n,
+			).at(0)?.n,
 			memberships: (
 				await handle<
 					{ n: number }[]
 				>`SELECT count(*)::int AS n FROM ${handle(STORE_AREAS.bucketGroupMembers)} WHERE doc->>'bucketId' = ${rolesBucket._id}`
-			)[0]?.n
+			).at(0)?.n
 		});
 	let report: readonly string[] = [];
 	let afterFirst = '';

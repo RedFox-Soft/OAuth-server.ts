@@ -1,5 +1,5 @@
 diff --git a/test.d.ts b/test.d.ts
-index 736bb5728aab81ce2f9a0349344ec5da8c01499e..eb6a3c5cf577c1bddeb16cdc5b70c9cad5bd48ba 100644
+index 9192cab69b3ee3bdb1d826c9110baaaf0fba9e00..239781ab07438c71f511cfcec8744fdfd6b5912d 100644
 --- a/test.d.ts
 +++ b/test.d.ts
 @@ -773,6 +773,19 @@ declare module "bun:test" {
