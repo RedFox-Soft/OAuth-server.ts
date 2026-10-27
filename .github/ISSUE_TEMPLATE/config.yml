@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Question or help with a setup
+    url: https://github.com/RedFox-Soft/OAuth-server.ts/discussions/categories/q-a
+    about: Ask in Discussions. Issues are for bugs and concrete feature requests.
+  - name: Idea or proposal
+    url: https://github.com/RedFox-Soft/OAuth-server.ts/discussions/categories/ideas
+    about: Talk an idea through in Discussions before it becomes an issue.
+  - name: Security vulnerability
+    url: https://github.com/RedFox-Soft/OAuth-server.ts/security/advisories/new
+    about: Report it privately, or email security@foxauth.dev. Never in a public issue.

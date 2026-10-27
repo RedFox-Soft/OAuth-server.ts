@@ -471,6 +471,9 @@ certification — because a security page that only lists the good news is not o
 
 ## Contributing
 
+Questions and ideas go to [GitHub Discussions](https://github.com/RedFox-Soft/OAuth-server.ts/discussions):
+Q&A for how-do-I, Ideas for proposals.
+
 Contributions are welcome! Please open an issue or pull request. For significant changes, open an issue first to discuss your proposal.
 
 ## License
