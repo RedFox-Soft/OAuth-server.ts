@@ -1,5 +1,5 @@
 ---
-import { CLOUD_SIGN_UP } from '../data/cloud.ts';
+import { CLOUD_SIGN_UP, CLOUD_SIGN_UP_REL } from '../data/cloud.ts';
 import Brand from './Brand.astro';
 import Button from './ui/Button.astro';
 import LanguageSwitch from './LanguageSwitch.astro';
@@ -63,6 +63,7 @@ const linkClass =
 		<div class="ml-auto hidden sm:block lg:ml-2">
 			<Button
 				href={CLOUD_SIGN_UP}
+				rel={CLOUD_SIGN_UP_REL}
 				size="md">{t.startFree}</Button
 			>
 		</div>
@@ -78,6 +79,7 @@ const linkClass =
 			>
 				<a
 					href={CLOUD_SIGN_UP}
+					rel={CLOUD_SIGN_UP_REL}
 					class={`${linkClass} sm:hidden`}>{t.startFree}</a
 				>
 				{links.map((link) => <a href={link.href} class={linkClass}>{link.label}</a>)}

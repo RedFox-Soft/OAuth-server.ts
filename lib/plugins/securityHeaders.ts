@@ -104,5 +104,15 @@ export const securityHeaders = (app: Elysia) => {
 		 */
 		set.headers['Permissions-Policy'] =
 			'accelerometer=(), autoplay=(), camera=(), display-capture=(), encrypted-media=(), fullscreen=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), picture-in-picture=(), publickey-credentials-get=(), screen-wake-lock=(), usb=(), xr-spatial-tracking=()';
+		/*
+		 * Nothing an authorization server serves belongs in search results, and an indexed sign-in URL
+		 * carries a client_id, a redirect_uri and the hostnames of the projects behind it.
+		 *
+		 * WHY a header and no robots.txt. A `Disallow: /` stops a crawler fetching the page, so it never
+		 * sees this header, and a URL it found linked elsewhere is still indexed — only without its
+		 * content. Keycloak shipped exactly that robots.txt and removed it for this reason. OAuth clients
+		 * read neither, so no protocol surface is affected.
+		 */
+		set.headers['X-Robots-Tag'] = 'noindex, nofollow';
 	});
 };

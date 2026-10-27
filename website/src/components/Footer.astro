@@ -1,7 +1,7 @@
 ---
 import { getCollection } from 'astro:content';
 import Brand from './Brand.astro';
-import { CLOUD_SIGN_UP } from '../data/cloud.ts';
+import { CLOUD_SIGN_UP, CLOUD_SIGN_UP_REL } from '../data/cloud.ts';
 import { loadVersion } from '../data/version';
 import { chrome } from '../i18n/chrome.ts';
 import { localizedHref, localizedRoute } from '../i18n/locale.ts';
@@ -31,7 +31,7 @@ const columns = await Promise.all(
 			links: [
 				{ href: '/features/', label: t.features },
 				{ href: '/pricing/', label: t.pricing },
-				{ href: CLOUD_SIGN_UP, label: t.cloud },
+				{ href: CLOUD_SIGN_UP, label: t.cloud, rel: CLOUD_SIGN_UP_REL },
 				{ href: '/compare/', label: t.compare },
 				{ href: '/blog/', label: t.blog },
 				...comparisons
@@ -63,7 +63,7 @@ const columns = await Promise.all(
 				{ href: 'mailto:hello@foxauth.dev', label: 'hello@foxauth.dev' }
 			]
 		}
-	].map(async (column) => ({
+	].map(async (column: { heading: string; links: { href: string; label: string; rel?: string }[] }) => ({
 		...column,
 		links: await Promise.all(
 			column.links.map(async (link) => ({ ...link, href: await localizedHref(link.href, locale) }))
@@ -86,6 +86,7 @@ const columns = await Promise.all(
 								<li>
 									<a
 										href={link.href}
+										rel={link.rel}
 										class="text-sm text-gray-600 transition-colors hover:text-accent-700 dark:text-gray-400 dark:hover:text-accent-200"
 									>
 										{link.label}

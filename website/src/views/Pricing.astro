@@ -14,7 +14,7 @@ import { localizedHref } from '../i18n/locale.ts';
 import { isStale, messagesFor } from '../i18n/messages.ts';
 import english from '../i18n/messages/pricing/en.ts';
 import type { LocaleKey } from '../data/seo.ts';
-import { CLOUD_SIGN_UP } from '../data/cloud.ts';
+import { CLOUD_SIGN_UP, CLOUD_SIGN_UP_REL } from '../data/cloud.ts';
 
 interface Props {
 	locale: LocaleKey;
@@ -69,7 +69,9 @@ const contact = await localizedHref('/contact/', locale);
 					}
 				</ul>
 				<p class="mt-6">
-					<Button href={CLOUD_SIGN_UP}>{t.cloudFree.cta}</Button>
+					<Button
+						href={CLOUD_SIGN_UP}
+						rel={CLOUD_SIGN_UP_REL}>{t.cloudFree.cta}</Button>
 				</p>
 			</Card>
 

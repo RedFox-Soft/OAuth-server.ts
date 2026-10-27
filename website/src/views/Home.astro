@@ -1,5 +1,5 @@
 ---
-import { CLOUD_SIGN_UP } from '../data/cloud.ts';
+import { CLOUD_SIGN_UP, CLOUD_SIGN_UP_REL } from '../data/cloud.ts';
 import Site from '../layouts/Site.astro';
 import ScreenshotFigure from '../components/ScreenshotFigure.astro';
 import Button from '../components/ui/Button.astro';
@@ -162,6 +162,7 @@ server ← { "appliedKeys": ["deviceFlow.enabled"],
 				<div class="mt-8 flex flex-wrap gap-3">
 					<Button
 						href={CLOUD_SIGN_UP}
+						rel={CLOUD_SIGN_UP_REL}
 						size="lg">{t.hero.freeAccount}</Button
 					>
 					<Button
@@ -378,6 +379,7 @@ server ← { "appliedKeys": ["deviceFlow.enabled"],
 			<div class="mt-8 flex flex-wrap gap-3">
 				<Button
 					href={CLOUD_SIGN_UP}
+					rel={CLOUD_SIGN_UP_REL}
 					size="lg">{t.start.freeAccount}</Button
 				>
 				<Button

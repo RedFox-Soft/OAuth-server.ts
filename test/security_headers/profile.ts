@@ -18,13 +18,15 @@ export const STRICT_TRANSPORT = 'max-age=63072000; includeSubDomains';
  */
 export const PERMISSIONS_POLICY =
 	'accelerometer=(), autoplay=(), camera=(), display-capture=(), encrypted-media=(), fullscreen=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), picture-in-picture=(), publickey-credentials-get=(), screen-wake-lock=(), usb=(), xr-spatial-tracking=()';
+export const ROBOTS = 'noindex, nofollow';
 
 const PROFILE_NAMES = [
 	'x-content-type-options',
 	'referrer-policy',
 	'content-security-policy',
 	'strict-transport-security',
-	'permissions-policy'
+	'permissions-policy',
+	'x-robots-tag'
 ];
 
 /*
@@ -52,6 +54,7 @@ function expectSharedHeaders(res: Response): void {
 	expect(res.headers.get('referrer-policy')).toBe(REFERRER_POLICY);
 	expect(res.headers.get('strict-transport-security')).toBe(STRICT_TRANSPORT);
 	expect(res.headers.get('permissions-policy')).toBe(PERMISSIONS_POLICY);
+	expect(res.headers.get('x-robots-tag')).toBe(ROBOTS);
 }
 
 /*

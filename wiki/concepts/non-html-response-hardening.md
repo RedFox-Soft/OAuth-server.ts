@@ -4,7 +4,7 @@ title: 'Hardening headers on responses that are not pages'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-26
-updated: 2026-08-28
+updated: 2026-10-26
 graph:
   node_type: concept
   relationships:
@@ -24,8 +24,8 @@ graph:
 
 # Hardening headers on responses that are not pages
 
-Every response this server emits carries four headers, and every response that is **not** a rendered
-page carries a fifth:
+Every response this server emits carries five headers, and every response that is **not** a rendered
+page carries a sixth:
 
 | Header | Value | Since |
 | --- | --- | --- |
@@ -33,9 +33,10 @@ page carries a fifth:
 | `Referrer-Policy` | `no-referrer` | spec 026 |
 | `Strict-Transport-Security` | `max-age=63072000; includeSubDomains` | spec 029 |
 | `Permissions-Policy` | 17 features denied — see below | spec 029 |
+| `X-Robots-Tag` | `noindex, nofollow` | 2026-10-26 |
 | `Content-Security-Policy` | `default-src 'none'; frame-ancestors 'none'` *(non-page only)* | spec 026 |
 
-One `onRequest` hook writes all five: `securityHeaders` in `lib/plugins/securityHeaders.ts`, registered
+One `onRequest` hook writes all six: `securityHeaders` in `lib/plugins/securityHeaders.ts`, registered
 once in `lib/index.ts:93`.
 
 This is the companion to [[html-response-security-policy]], which owns the *page* policy. Between
@@ -135,6 +136,19 @@ The maximal list was rejected. `ambient-light-sensor`, `battery`, `document-doma
 from the spec, never shipped, or unrecognised by current engines — and an unrecognised feature denies
 nothing while logging a warning on **every page load**. Console noise is not free here: it is where the
 `@ant-design/icons` style-injection violation hides (see [[html-response-security-policy]]).
+
+## Gotcha: search engines are kept out by a header, never by robots.txt
+
+Nothing this server serves belongs in search results, and an indexed sign-in URL carries a `client_id`,
+a `redirect_uri` and the hostnames of the projects behind it, so every response says `noindex, nofollow`.
+It is unconditional, with no setting, because no operator has a page here worth ranking.
+
+There is deliberately **no** `robots.txt` with `Disallow: /`. A crawler that obeys it never fetches the
+page, so it never sees the header, and a URL it found linked elsewhere is still indexed, only without its
+content. Keycloak shipped exactly that file and removed it in 26.2 for this reason, keeping only its
+`X-Robots-Tag: none` default. OAuth and MCP clients read neither, so no protocol surface is affected.
+The public site links to the cloud sign-up with `rel="nofollow"` (`website/src/data/cloud.ts`), which is
+the crawl hint on the other side of the same boundary.
 
 ## What is deliberately not here
 

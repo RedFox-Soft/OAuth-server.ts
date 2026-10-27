@@ -10,6 +10,12 @@
 export const CLOUD_SIGN_UP = 'https://auth.foxauth.dev/admin/signup';
 
 /*
+ * Every link to the sign-up carries this. A crawler cannot register, and the page behind the link is a sign-in
+ * form with nothing to rank, so there is no reason to send it there from every page of the site.
+ */
+export const CLOUD_SIGN_UP_REL = 'nofollow';
+
+/*
  * The flags switched on at auth.foxauth.dev, so the Features page can mark the cards a cloud project gets. Not read
  * from production at build time — the site builds without credentials — so it is checked by hand: last read from
  * production's settings on 2026-10-16, after clientCredentials, revocation, introspection, backchannelLogout,

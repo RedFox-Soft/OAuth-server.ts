@@ -10,8 +10,9 @@ interface Props {
 	 * `type` wins if both are given.
 	 */
 	type?: 'button' | 'submit';
+	rel?: string;
 }
-const { href, variant = 'primary', size = 'md', type } = Astro.props;
+const { href, variant = 'primary', size = 'md', type, rel } = Astro.props;
 const asButton = type !== undefined || href === undefined;
 const Tag = asButton ? 'button' : 'a';
 const base =
@@ -29,6 +30,7 @@ const variants = {
 
 <Tag
 	href={asButton ? undefined : href}
+	rel={asButton ? undefined : rel}
 	type={asButton ? (type ?? 'button') : undefined}
 	class:list={[base, sizes[size], variants[variant]]}><slot /></Tag
 >

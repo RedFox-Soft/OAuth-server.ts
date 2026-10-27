@@ -26,6 +26,9 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   initial access token and a PS256 signer at every issuer are in place; a readiness answer (console card and
   `settings_ipsie_profile_readiness_get`) lists what stands in the way and every application it would refuse. The
   console can now create an application under a Client Identifier URL. Constitution 3.2.0 amends Principle VI.
+- **Kept out of search engines** — every response carries `X-Robots-Tag: noindex, nofollow`, so sign-in pages, the
+  console and project hostnames no longer reach search results. There is deliberately no `robots.txt`: a `Disallow`
+  would hide the header from crawlers and still let a linked URL be indexed.
 
 ### Changed
 
