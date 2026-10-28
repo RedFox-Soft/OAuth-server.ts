@@ -21,5 +21,6 @@ export { PlanCatalogueStore } from './planCatalogueStore.js';
 export { SingletonSecretStore } from './singletonSecretStore.js';
 export { SchemaMigrationStore } from './schemaMigrationStore.js';
 export { MigrationLeaseStore } from './migrationLeaseStore.js';
+export { TelemetryStateStore } from './telemetryStateStore.js';
 export { ContainerOwnershipStore } from './containerOwnershipStore.js';
 export { ActivityStore } from './activityStore.js';

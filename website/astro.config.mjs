@@ -182,6 +182,10 @@ export default defineConfig({
 						{
 							...sidebarLabel('environment'),
 							link: '/docs/reference/environment/'
+						},
+						{
+							...sidebarLabel('telemetry'),
+							link: '/docs/reference/telemetry/'
 						}
 					]
 				}

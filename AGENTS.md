@@ -108,6 +108,7 @@ lib/
   bucket_groups/        ← every change to a bucket group (admin and SCIM), and the `groups` claim
   error_store/          ← the one place a fault becomes a record (capture.ts is the choke point)
   sentry/               ← optional outbound reporting; registers NO Elysia hook
+  telemetry/            ← the daily anonymous usage report to FoxTrust (claim, counters, report, send)
 database/               ← provisioning (mongodb.ts, postgres.ts), migrate.ts, real-DB verify scripts
 test/                   ← test_helper.ts bootstrap; one dir per feature with *.config.ts + *.spec.ts
 ```
@@ -215,6 +216,11 @@ Each rule is the part that is easy to break. Read the named page before changing
   → `plans.md`
 - **Sentry** — reporting is off the request path: `lib/sentry/` mounts nothing into Elysia, and
   `@sentry/elysia` is deliberately not a dependency. → `sentry-plugin-not-used.md`
+- **Usage reporting** — everything a report may carry is declared in `lib/consts/telemetry_fields.ts`, and
+  a new boolean setting is classified there (reported, or not with a reason) in the same change; a report
+  that cannot be delivered is never an error; the console setting is the only switch, with no environment
+  variable, and the destination has no override.
+  → `instance-telemetry.md`
 - **Interaction screens** — a page is either the antd shell (inside an interaction) or plain and
   self-contained (opened from an email, no script); which one is not a style choice. Every word on them
   lives in `lib/i18n/texts/`, in all three languages in the same change, and a value inserted into a

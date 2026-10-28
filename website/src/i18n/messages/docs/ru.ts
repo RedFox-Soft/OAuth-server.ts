@@ -1,6 +1,6 @@
 import type english from './en.ts';
 
-export const source = '7751d0c02463';
+export const source = '3a4f1c53a9be';
 
 export default {
 	sidebar: {
@@ -14,6 +14,7 @@ export default {
 		adminApi: 'Admin API',
 		mcpTools: 'Инструменты MCP',
 		addonSeams: 'Точки расширения',
-		environment: 'Переменные окружения'
+		environment: 'Переменные окружения',
+		telemetry: 'Отчёты об использовании'
 	}
 } satisfies typeof english;

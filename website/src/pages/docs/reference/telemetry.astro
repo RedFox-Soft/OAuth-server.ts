@@ -1,0 +1,89 @@
+---
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import UnreleasedNotice from '../../../components/reference/UnreleasedNotice.astro';
+import { loadExport } from '../../../data/export';
+
+const { telemetry } = loadExport();
+---
+
+<StarlightPage
+	frontmatter={{
+		title: 'Usage reporting',
+		description:
+			'Every field of the daily anonymous report a FoxAuth server sends, and how to turn it off.'
+	}}
+>
+	<UnreleasedNotice />
+	<p>
+		Once a day, a FoxAuth server sends one small report to the FoxAuth maintainers. The report says which
+		version the server runs, on what, with which features on, and roughly how big it is. The maintainers
+		use it to decide what to keep, what to fix first and what nobody uses any more.
+	</p>
+	<p>
+		Reporting is on by default. Nothing in a report names you, your projects, your applications or your
+		users. A report that cannot be delivered is not an error: the server carries on and tries again the
+		next day.
+	</p>
+
+	<h2>Turning it off</h2>
+	<p>
+		In the console: <strong>Settings → Integrations → Usage reporting</strong>. The change applies at
+		once, without a restart. This setting is the only switch.
+	</p>
+	<p>
+		The console card under the switch shows the exact report the server last sent, so you can check
+		what left it.
+	</p>
+
+	<h2>Where it goes</h2>
+	<p>
+		Reports go to <code>{telemetry.destination}</code>, run by the FoxAuth maintainers. The receiver does
+		not store the address a report comes from, and keeps reports for 13 months.
+	</p>
+
+	<h2>Every field</h2>
+	<p>
+		This is format {telemetry.format}. Counts are never exact: each is sent as one of these ranges:{' '}
+		{telemetry.rangeLabels.map((label, index) => (
+			<>
+				{index > 0 ? ', ' : ''}
+				<code>{label}</code>
+			</>
+		))}.
+	</p>
+	<table>
+		<thead><tr><th>Field</th><th>What it says</th><th>Values</th></tr></thead>
+		<tbody>
+			{telemetry.fields.map((field) => (
+				<tr>
+					<td><code>{field.path}</code></td>
+					<td>
+						{field.meaning}
+						{field.absentWhen ? <> Left out when {field.absentWhen}.</> : ''}
+					</td>
+					<td>{field.values}</td>
+				</tr>
+			))}
+		</tbody>
+	</table>
+
+	<h2>Never sent</h2>
+	<p>
+		No name, email, hostname, issuer URL or network address. No identifier of a project, an application
+		or a person. No value of any setting: only whether the features below are on or off.
+	</p>
+
+	<h2>Settings whose on/off is reported</h2>
+	<ul>
+		{telemetry.reportedSettings.map((setting) => (
+			<li><a href={`/docs/reference/settings/#${setting.key}`}><code>{setting.key}</code></a>: {setting.label}</li>
+		))}
+	</ul>
+
+	<h2>Settings that are not reported</h2>
+	<ul>
+		{telemetry.unreportedSettings.map((setting) => (
+			<li><code>{setting.key}</code>: {setting.reason}.</li>
+		))}
+	</ul>
+</StarlightPage>

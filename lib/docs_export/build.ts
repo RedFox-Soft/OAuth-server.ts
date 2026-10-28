@@ -34,6 +34,15 @@ import {
 	ENVIRONMENT_VARIABLES,
 	type EnvironmentVariable
 } from './environment.js';
+import {
+	RANGE_LABELS,
+	REPORT_FIELDS,
+	REPORT_FORMAT,
+	REPORTED_SETTINGS,
+	TELEMETRY_DESTINATION,
+	UNREPORTED_SETTINGS,
+	type ReportField
+} from '../consts/telemetry_fields.js';
 
 /*
  * What the website builds its Reference section from. Assembled from the tables the server already
@@ -104,6 +113,18 @@ export interface DocsExport {
 	 */
 	readonly storage: {
 		readonly backends: readonly StorageBackendExport[];
+	};
+	/*
+	 * What the daily usage report carries (specs/113), from the same declaration the server builds it from,
+	 * so the public page cannot promise less than the server sends.
+	 */
+	readonly telemetry: {
+		readonly destination: string;
+		readonly format: number;
+		readonly fields: readonly ReportField[];
+		readonly rangeLabels: readonly string[];
+		readonly reportedSettings: readonly { key: string; label: string }[];
+		readonly unreportedSettings: readonly { key: string; reason: string }[];
 	};
 }
 
@@ -225,6 +246,20 @@ export function buildDocsExport(stamp: DocsExportStamp): DocsExport {
 				selectedBy: BACKEND_SELECTORS[name] as string,
 				label: BACKEND_LABELS[name]
 			}))
+		},
+		telemetry: {
+			destination: TELEMETRY_DESTINATION,
+			format: REPORT_FORMAT,
+			fields: REPORT_FIELDS,
+			rangeLabels: [...RANGE_LABELS],
+			reportedSettings: REPORTED_SETTINGS.map((key) => ({
+				key,
+				label:
+					SETTINGS_CATALOG.find((setting) => setting.key === key)?.label ?? key
+			})),
+			unreportedSettings: Object.entries(UNREPORTED_SETTINGS).map(
+				([key, reason]) => ({ key, reason })
+			)
 		}
 	};
 }

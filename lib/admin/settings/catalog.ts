@@ -1047,6 +1047,17 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 	 * against. Same technique, and same reason, as `dpop.nonceSecret` above.
 	 */
 	{
+		key: 'telemetry.enabled',
+		domain: 'integrations',
+		group: 'Usage reporting',
+		label: 'Send a daily anonymous usage report',
+		summary: 'Tell the FoxAuth maintainers, once a day, what this server runs',
+		type: 'boolean',
+		description:
+			'Once a day this server sends FoxTrust one small report: its FoxAuth version, runtime and database, which feature settings are on, and rough ranges of how many projects, applications, APIs, administrators and active users it has and how many tokens and server errors it produced the day before. It never sends a name, an email, a hostname, the issuer, an address, an identifier of a person or the value of any setting. The exact last report is shown below. On by default; turning it off changes nothing else.'
+	},
+
+	{
 		key: 'sentry.enabled',
 		domain: 'diagnostics',
 		group: 'Error Store',

@@ -111,6 +111,24 @@ export const DocsExportSchema = z.object({
 				})
 			)
 			.min(1)
+	}),
+	/* The daily usage report (specs/113): the page promises exactly what the server declares it sends. */
+	telemetry: z.object({
+		destination: z.string(),
+		format: z.number(),
+		fields: z.array(
+			z.object({
+				path: z.string(),
+				meaning: z.string(),
+				values: z.string(),
+				absentWhen: z.string().optional()
+			})
+		),
+		rangeLabels: z.array(z.string()),
+		reportedSettings: z.array(z.object({ key: z.string(), label: z.string() })),
+		unreportedSettings: z.array(
+			z.object({ key: z.string(), reason: z.string() })
+		)
 	})
 });
 

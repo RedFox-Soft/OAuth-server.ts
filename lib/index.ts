@@ -65,6 +65,9 @@ import { reportStartupFailure } from './sentry/startup.js';
 import { rootKeys } from './keys/issuer_keys.js';
 import { startCloser } from './activity/closer.js';
 import { startBucketPurger } from './admin/buckets/purge_pass.js';
+import { startTelemetry } from './telemetry/scheduler.js';
+import { reportingState } from './telemetry/status.js';
+import { selectBackend } from './adapters/selectBackend.js';
 
 /*
  * Armed before the app is built, and deliberately not as a plugin.
@@ -303,6 +306,20 @@ if (process.env.NODE_ENV !== 'test') {
 	 * reasons and under the same guard as the closer: a case runs a pass itself, on a clock it controls.
 	 */
 	startBucketPurger();
+	/*
+	 * The daily usage report (specs/113). Not on the in-memory backend: its identifier would be new at every
+	 * start and its counts mean nothing, so this guard, not the report pass, is what keeps such an instance
+	 * from reporting. The one line below is the notice FR-018 promises, printed only while reporting is on.
+	 */
+	if (selectBackend(process.env) !== 'memory') {
+		startTelemetry();
+		if (reportingState().enabled) {
+			console.log(
+				'usage reporting: on. A daily anonymous report goes to FoxTrust; turn it off in ' +
+					'Settings → Integrations. Every field: https://foxauth.dev/docs/reference/telemetry/'
+			);
+		}
+	}
 }
 
 /*

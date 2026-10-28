@@ -322,3 +322,5 @@ Operations:
 ## [2026-10-26] update | [[sentry-elysia-10.73.0]] — `@sentry/bun` moved from `11.8.0` to `11.9.0` (the page still said `11.6.0`; the 11.8.0 step had not updated it), still exact-pinned; the reading itself is unchanged.
 
 ## [2026-10-26] update | [[non-html-response-hardening]]: every response now carries `X-Robots-Tag: noindex, nofollow`, unconditionally; a new gotcha records why there is no `robots.txt` (a `Disallow` hides the header and still lets a linked URL be indexed, which is why Keycloak removed theirs).
+
+## [2026-10-28] create | spec 113 — [[instance-telemetry]]: the daily anonymous usage report to FoxTrust, the owner's decisions (on by default, silent failure, random identifier, no destination override), the claim and the slot, the counters, the declaration and its guards, the last report stored as text.

@@ -25,6 +25,7 @@ import { settingsRoutes } from './settings/routes.js';
 import { smtpSettingsRoutes } from './settings/smtp/routes.js';
 import { planRoutes } from './plans/routes.js';
 import { sentrySettingsRoutes } from './settings/sentry/routes.js';
+import { telemetrySettingsRoutes } from './settings/telemetry/routes.js';
 import { jwksRoutes } from './jwks/routes.js';
 import { bucketKeyRoutes } from './bucket_keys/routes.js';
 import { auditRoutes } from './audit/routes.js';
@@ -133,3 +134,5 @@ export const adminApiRoutes = new Elysia({ name: 'admin-api' })
  * grow. Nothing reads these routes off the type; the console and the agent reach them over HTTP or dispatch.
  */
 adminApiRoutes.use(administratorApplicationRoutes);
+// The usage reporting card (specs/113), mounted as a statement of its own for the same reason.
+adminApiRoutes.use(telemetrySettingsRoutes);

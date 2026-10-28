@@ -11,6 +11,11 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- **Daily anonymous usage report** (`telemetry.enabled`, **on by default**) — once a day the server sends FoxTrust
+  its version, runtime, storage backend, which feature settings are on, coarse ranges of its size and the previous
+  day's token and defect counts, under a random instance identifier. No name, email, hostname, issuer, address or
+  setting value is ever sent. Turn it off in Settings → Integrations. The console shows the exact last report; every field is listed at /docs/reference/telemetry/.
+  A report that cannot be delivered is silently skipped.
 - **Spec alignment: rfc7523bis client-assertion audience and IPSIE SL1 `session_expiry`** — the opt-in
   `clientAuth.issuerOnlyAudience` (off; FAPI implies it) accepts a client assertion only when the issuer is its sole
   audience, closing CVE-2025-27370/27371, and becomes the default once rfc7523bis is an RFC. Under the default rule,

@@ -650,6 +650,62 @@ export const MigrationLease = t.Object({
 });
 export type MigrationLease = Static<typeof MigrationLease>;
 
+/*
+ * The usage-reporting state (specs/113): one singleton in serviceConfig, like the lease above, because it
+ * belongs to the instance and to no principal.
+ *
+ * Times are ISO strings rather than dates so the document reads back identically from both backends: a
+ * jsonb column hands back strings where MongoDB hands back dates. A day's counts are partial until both
+ * kinds have been added to it, hence the optional members.
+ */
+export const TelemetryDayCounts = t.Object({
+	tokens: t.Optional(t.Record(t.String(), t.Number())),
+	serverErrors: t.Optional(t.Number())
+});
+export type TelemetryDayCounts = Static<typeof TelemetryDayCounts>;
+
+export const TelemetryState = t.Object({
+	instanceId: t.String(),
+	lastClaimedDay: t.Optional(t.String()),
+	lastDeliveredAt: t.Optional(t.String()),
+	/*
+	 * The report as the JSON text that was sent, not as a document: a jsonb column reorders an object's
+	 * keys, and the console promises the operator the report exactly as it left the server.
+	 */
+	lastReport: t.Optional(t.String()),
+	counts: t.Optional(t.Record(t.String(), TelemetryDayCounts))
+});
+export type TelemetryState = Static<typeof TelemetryState>;
+
+export interface TelemetryCountDeltas {
+	tokens: Record<string, number>;
+	serverErrors: number;
+}
+
+export interface TelemetryStateStoreInstance {
+	/* Get or create. A lost creation race adopts the stored value, so one database has one identifier. */
+	instanceId(): Promise<string>;
+	/*
+	 * Claims a report day. MUST be one atomic statement that succeeds only while the stored day is absent
+	 * or earlier: a read-then-write would let two processes both send, which is what this exists to stop.
+	 * Called after instanceId(), which guarantees the document exists.
+	 */
+	claimDay(day: string): Promise<boolean>;
+	/* Atomic increments for `day`; every day not in `keepDays` is dropped. */
+	addCounts(
+		day: string,
+		deltas: TelemetryCountDeltas,
+		keepDays: readonly string[]
+	): Promise<void>;
+	/* Records the JSON text that was sent; the delivery time only when it was delivered. */
+	recordSend(reportJson: string, deliveredAt: Date | null): Promise<void>;
+	read(): Promise<TelemetryState | null>;
+}
+
+export interface TelemetryStateStoreConstructor {
+	new (): TelemetryStateStoreInstance;
+}
+
 export interface MigrationLeaseStoreInstance {
 	read(): Promise<MigrationLease | null>;
 	/*

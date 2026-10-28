@@ -186,3 +186,5 @@ responses as plain JSON.
 few minutes costs one pair of upserts per person per day per instance; correctness never depends on it. A
 failed write is logged unconditionally and recorded as the error store's seventh capture site
 ([[error-store-capture-sites]]).
+
+The daily usage report ([[instance-telemetry]]) sums this month's figures over projects into one range.

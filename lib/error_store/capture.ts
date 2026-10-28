@@ -9,6 +9,7 @@ import { mintReference } from './reference.js';
 import { buildRecord, type CaptureSubject } from './redact.js';
 import { enqueue, installShutdownDrain } from './queue.js';
 import { reportFault } from '../sentry/dispatch.js';
+import { noteServerError } from '../telemetry/counters.js';
 
 /*
  * The one place a fault becomes a record.
@@ -55,6 +56,13 @@ let capturing = false;
  * "only recorded faults carry a reference" true by construction rather than by remembering to check.
  */
 export function captureFault(input: CaptureInput): string | undefined {
+	/*
+	 * Counted for the usage report before the store decides whether to record (specs/113): how many
+	 * defects an instance hits must not depend on whether its operator turned this store on. Callers gate
+	 * on a 5xx, and some record background work rather than a response, so the figure is defects, not
+	 * responses.
+	 */
+	noteServerError();
 	if (!ApplicationConfig['errorStore.enabled'] || capturing) {
 		return undefined;
 	}

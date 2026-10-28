@@ -4,6 +4,7 @@ import { t } from 'elysia';
 import { UnsupportedGrantType } from 'lib/helpers/errors.js';
 import { eventBus } from 'lib/event_bus.js';
 import { noteActivity } from 'lib/activity/note.js';
+import { noteTokens } from 'lib/telemetry/counters.js';
 import { noteClientUse } from 'lib/models/client/usage.js';
 import { TokenResponse } from 'lib/shared/response_schemas.js';
 
@@ -133,6 +134,8 @@ export async function executeGrant(
 	noteActivity(oidc);
 	// Beside it, for the same reasons: the application's own "last used" (spec 107), never awaited.
 	noteClientUse(oidc.entities.Client?.clientId);
+	// And the instance's daily token figure for the usage report (specs/113), the same way.
+	noteTokens(grantType);
 	eventBus.emit('grant.success', oidc);
 	return res;
 }

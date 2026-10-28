@@ -39,6 +39,7 @@ const ROUTE_DATA: Record<string, string[]> = {
 	'/docs/reference/mcp-tools/': ['lib/mcp/catalogue.ts'],
 	'/docs/reference/addon-seams/': ['lib/addon/seams.ts'],
 	'/docs/reference/environment/': ['lib/configs/env.ts'],
+	'/docs/reference/telemetry/': ['lib/consts/telemetry_fields.ts'],
 	'/changelog/': ['CHANGELOG.md'],
 	'/security/': ['SECURITY.md'],
 	'/license/': ['LICENSE', 'NOTICE']

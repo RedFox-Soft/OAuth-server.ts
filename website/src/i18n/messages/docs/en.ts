@@ -11,6 +11,7 @@ export default {
 		adminApi: 'Admin API',
 		mcpTools: 'MCP tools',
 		addonSeams: 'Addon seams',
-		environment: 'Environment variables'
+		environment: 'Environment variables',
+		telemetry: 'Usage reporting'
 	}
 };

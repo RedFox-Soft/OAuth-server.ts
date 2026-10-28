@@ -16,6 +16,7 @@ import { verifyOutsideServers } from './verify_outside_servers.js';
 import { verifyAdminSessionsByUser } from './verify_admin_sessions.js';
 import { verifyBucketGroups } from './verify_bucket_groups.js';
 import { verifyActivity } from './verify_activity.js';
+import { verifyTelemetry } from './verify_telemetry.js';
 import {
 	verifyContainerOwnership,
 	verifyPersonalGroupRepair
@@ -83,6 +84,7 @@ if (!THROWAWAY.test(database)) {
  */
 const {
 	ActivityStore,
+	TelemetryStateStore,
 	AdminAuditStore,
 	AdminSessionStore,
 	BucketGroupStore,
@@ -1061,6 +1063,9 @@ await verifyActivity(
 	},
 	check
 );
+
+/* The usage-reporting state (specs/113): one identifier, one claim per day, counts that add up. */
+await verifyTelemetry(() => new TelemetryStateStore(), check);
 
 /* Moving containers between groups, and making personal groups personal again (specs/075). */
 {

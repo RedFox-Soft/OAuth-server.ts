@@ -22,6 +22,7 @@ import {
 	SingletonSecretStore as MemorySingletonSecretStore,
 	SchemaMigrationStore as MemorySchemaMigrationStore,
 	MigrationLeaseStore as MemoryMigrationLeaseStore,
+	TelemetryStateStore as MemoryTelemetryStateStore,
 	configStore as memoryConfig
 } from './memory/index.js';
 import type {
@@ -64,6 +65,8 @@ import type {
 	SchemaMigrationStoreInstance,
 	SecretStoreConstructor,
 	SecretStoreInstance,
+	TelemetryStateStoreConstructor,
+	TelemetryStateStoreInstance,
 	SmtpSettingsStoreConstructor,
 	SmtpSettingsStoreInstance,
 	PlanCatalogueStoreConstructor,
@@ -114,6 +117,8 @@ let SchemaMigrationStoreClass: SchemaMigrationStoreConstructor =
 	MemorySchemaMigrationStore;
 let MigrationLeaseStoreClass: MigrationLeaseStoreConstructor =
 	MemoryMigrationLeaseStore;
+let TelemetryStateStoreClass: TelemetryStateStoreConstructor =
+	MemoryTelemetryStateStore;
 export let configStore: AdapterConfigStore = memoryConfig;
 
 /*
@@ -151,6 +156,7 @@ if (backend === 'postgres') {
 	SecretStoreClass = postgres.SingletonSecretStore;
 	SchemaMigrationStoreClass = postgres.SchemaMigrationStore;
 	MigrationLeaseStoreClass = postgres.MigrationLeaseStore;
+	TelemetryStateStoreClass = postgres.TelemetryStateStore;
 
 	/*
 	 * Started here rather than left to a caller, because MongoDB gets the equivalent from its server
@@ -188,6 +194,7 @@ if (backend === 'mongodb') {
 	SecretStoreClass = mongodb.SingletonSecretStore;
 	SchemaMigrationStoreClass = mongodb.SchemaMigrationStore;
 	MigrationLeaseStoreClass = mongodb.MigrationLeaseStore;
+	TelemetryStateStoreClass = mongodb.TelemetryStateStore;
 }
 
 if (process.env.NODE_ENV === 'test') {
@@ -518,6 +525,14 @@ export function getSmtpSettingsStore(): SmtpSettingsStoreInstance {
 	return smtpSettingsStoreSingleton;
 }
 
+let telemetryStateStoreSingleton: TelemetryStateStoreInstance | null = null;
+export function getTelemetryStateStore(): TelemetryStateStoreInstance {
+	if (!telemetryStateStoreSingleton) {
+		telemetryStateStoreSingleton = new TelemetryStateStoreClass();
+	}
+	return telemetryStateStoreSingleton;
+}
+
 let planCatalogueStoreSingleton: PlanCatalogueStoreInstance | null = null;
 export function getPlanCatalogueStore(): PlanCatalogueStoreInstance {
 	if (!planCatalogueStoreSingleton) {
@@ -561,6 +576,7 @@ export function resetStoresForTests(): void {
 	activityStoreSingleton = null;
 	schemaMigrationStoreSingleton = null;
 	migrationLeaseStoreSingleton = null;
+	telemetryStateStoreSingleton = null;
 	smtpSettingsStoreSingleton = null;
 	planCatalogueStoreSingleton = null;
 	adminSessionStore = new AdminSessionStoreClass();

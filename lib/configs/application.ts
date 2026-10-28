@@ -1069,7 +1069,24 @@ export const ApplicationConfig = {
 	 *   one it verifies, so a hash would make it useless; it sits beside the private signing keys the
 	 *   datastore already holds.
 	 */
-	'sentry.dsn': ''
+	'sentry.dsn': '',
+	/*
+	 * telemetry.enabled
+	 *
+	 * title: Usage reporting — a daily anonymous report to the FoxAuth maintainers
+	 *
+	 * description: Once a UTC day this server sends FoxTrust one small report (specs/113): its version,
+	 *   runtime and storage backend, which feature settings are on, and coarse ranges of how many
+	 *   projects, applications, APIs, administrators and active users it has and how many tokens and
+	 *   defects it produced the day before. Every field is declared in lib/consts/telemetry_fields.ts.
+	 *   No name, email, hostname, issuer, address, identifier of a person or setting value is ever sent.
+	 *
+	 * On by default, by owner decision (2026-10-28): the maintainers otherwise decide what to keep and
+	 *   what to retire without knowing what anyone runs. This setting is the only switch: there is
+	 *   deliberately no environment variable for it. A report that cannot be delivered is not an error
+	 *   and leaves no trace.
+	 */
+	'telemetry.enabled': true
 	/*
 	 * There are deliberately no `sentry.environment` or `sentry.release` settings.
 	 *

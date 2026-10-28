@@ -747,6 +747,19 @@ const catalogue = [
 			'The Sentry integration settings. The ingestion credential is never returned, only whether one is set.'
 	},
 	{
+		tool: 'telemetry_status_get',
+		method: 'GET',
+		path: '/admin/api/settings/telemetry',
+		action: null,
+		consequence: 'read',
+		superAdminOnly: true,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: [],
+		summary:
+			'Whether this server sends its daily anonymous usage report, why not if it does not, its instance identifier, when a report was last delivered, and the exact report last sent (or, before the first, the next one). Turned on and off with settings_update (`telemetry.enabled`); the environment can force it off.'
+	},
+	{
 		tool: 'jwks_list',
 		method: 'GET',
 		path: '/admin/api/jwks',

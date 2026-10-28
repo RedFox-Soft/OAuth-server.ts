@@ -18,6 +18,7 @@ import { GroupCard } from '../settings/GroupCard.js';
 import { SaveBar } from '../settings/SaveBar.js';
 import { SmtpCard } from '../settings/SmtpCard.js';
 import { SentryCard } from '../settings/SentryCard.js';
+import { TelemetryCard } from '../settings/TelemetryCard.js';
 import { PlansCard } from '../settings/PlansCard.js';
 import { Sl1ReadinessCard } from '../settings/Sl1ReadinessCard.js';
 import { useLeaveGuard } from '../frame/router.js';
@@ -290,6 +291,14 @@ export function Settings() {
 						 * opening anything.
 						 */}
 						{!searching && pane === 'diagnostics' && <SentryCard />}
+						{/*
+						 * Directly under the Usage reporting switch it explains, and keyed by the saved value of
+						 * that switch so a save reloads what the card says rather than leaving "reporting" on
+						 * screen after reporting was turned off.
+						 */}
+						{!searching && pane === 'integrations' && (
+							<TelemetryCard key={String(baseline['telemetry.enabled'])} />
+						)}
 						{!searching && pane === 'integrations' && <SmtpCard />}
 						{!searching && pane === 'plans' && <PlansCard />}
 						{!searching && pane === 'request-security' && <Sl1ReadinessCard />}

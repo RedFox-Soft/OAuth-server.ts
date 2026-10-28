@@ -113,3 +113,4 @@ project — addressing sent to the endpoint that issued it. The event payload ca
 - [[error-store-is-not-flag-gated]] — the capability's read surface, and why the MCP set stays invariant
 - [[feature-flag-gating]] — the gate `sentry.enabled` uses
 - [[admin-audit-trail]] — where a credential change is recorded, by name and never by value
+- [[instance-telemetry]] — the other thing that leaves the server: a daily anonymous usage report to the maintainers, on by default, counts only
