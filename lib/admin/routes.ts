@@ -26,6 +26,7 @@ import { smtpSettingsRoutes } from './settings/smtp/routes.js';
 import { planRoutes } from './plans/routes.js';
 import { sentrySettingsRoutes } from './settings/sentry/routes.js';
 import { telemetrySettingsRoutes } from './settings/telemetry/routes.js';
+import { attackReportsSettingsRoutes } from './settings/attack_reports/routes.js';
 import { clientAddressSettingsRoutes } from './settings/client_address/routes.js';
 import { jwksRoutes } from './jwks/routes.js';
 import { bucketKeyRoutes } from './bucket_keys/routes.js';
@@ -137,5 +138,7 @@ export const adminApiRoutes = new Elysia({ name: 'admin-api' })
 adminApiRoutes.use(administratorApplicationRoutes);
 // The usage reporting card (specs/113), mounted as a statement of its own for the same reason.
 adminApiRoutes.use(telemetrySettingsRoutes);
+// The attack reporting card (specs/114), for the same reason.
+adminApiRoutes.use(attackReportsSettingsRoutes);
 // The caller address check (specs/115), for the same reason.
 adminApiRoutes.use(clientAddressSettingsRoutes);

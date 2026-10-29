@@ -673,7 +673,14 @@ export const TelemetryState = t.Object({
 	 * keys, and the console promises the operator the report exactly as it left the server.
 	 */
 	lastReport: t.Optional(t.String()),
-	counts: t.Optional(t.Record(t.String(), TelemetryDayCounts))
+	counts: t.Optional(t.Record(t.String(), TelemetryDayCounts)),
+	/*
+	 * The last hourly attack report any process of this instance sent, and when one was last accepted
+	 * (specs/114). Text for the reason `lastReport` is; it holds addresses, is overwritten by the next report
+	 * and is read only by super administrators.
+	 */
+	lastAttackReport: t.Optional(t.String()),
+	lastAttackDeliveredAt: t.Optional(t.String())
 });
 export type TelemetryState = Static<typeof TelemetryState>;
 
@@ -699,6 +706,8 @@ export interface TelemetryStateStoreInstance {
 	): Promise<void>;
 	/* Records the JSON text that was sent; the delivery time only when it was delivered. */
 	recordSend(reportJson: string, deliveredAt: Date | null): Promise<void>;
+	/* The same for an attack report; the usage report's fields are left as they are. */
+	recordAttackSend(reportJson: string, deliveredAt: Date | null): Promise<void>;
 	read(): Promise<TelemetryState | null>;
 }
 

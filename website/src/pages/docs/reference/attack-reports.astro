@@ -1,0 +1,142 @@
+---
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import UnreleasedNotice from '../../../components/reference/UnreleasedNotice.astro';
+import { loadExport } from '../../../data/export';
+
+const { attackReports } = loadExport();
+---
+
+<StarlightPage
+	frontmatter={{
+		title: 'Attack reporting',
+		description:
+			'Which addresses a FoxAuth server reports to FoxTrust each hour, why, every field of a report, and how to turn it off.'
+	}}
+>
+	<UnreleasedNotice />
+	<p>
+		Every server on the internet is attacked. Someone guesses passwords at the sign-in page, tries stolen
+		client secrets at the token endpoint, or asks for files like <code>/.env</code> that would hold
+		secrets on a careless server. A FoxAuth server already refuses these requests. Attack reporting also
+		tells FoxTrust which addresses did it.
+	</p>
+	<p>
+		FoxTrust combines the reports of many FoxAuth servers. An address that guesses passwords at five
+		unrelated servers in one hour is an attacker, and every server can know that before the address
+		reaches it.
+	</p>
+
+	<h2>Why this is allowed</h2>
+	<p>
+		An IP address is personal data. Processing the addresses that attack a service, to protect that
+		service and others, is a legitimate interest in network and information security (GDPR, Recital 49).
+		No consent is needed for it, but you, the operator, must be able to say what is sent. This page is
+		that statement: you can point your own privacy notice at it.
+	</p>
+
+	<h2>Turning it off</h2>
+	<p>
+		In the console: <strong>Settings → Integrations → Attack reporting</strong>. The change applies at once,
+		without a restart, and what was counted and not yet sent is thrown away. This setting is the only
+		switch. It is separate from usage reporting, so you can keep one and turn off the other.
+	</p>
+	<p>
+		Turn it off while you test your own server, for example with a penetration test or a conformance
+		suite. Otherwise your testing address is reported like any other.
+	</p>
+	<p>
+		The card under the switch shows the exact report the server last sent, addresses included, and the
+		tables below.
+	</p>
+
+	<h2>When a report is sent</h2>
+	<p>
+		Each server process counts attacks in memory, for one UTC hour at a time. In the first half of the
+		next hour it sends one report, but only if some address crossed a threshold. A quiet hour sends
+		nothing. A report that cannot be delivered is thrown away and never sent again, and it is not an
+		error: the server shows nothing and logs nothing.
+	</p>
+
+	<h2>Where it goes</h2>
+	<p>
+		Reports go to <code>{attackReports.destination}</code>, run by the FoxAuth maintainers.{' '}
+		{attackReports.retention} FoxTrust never lists an address because of one server's reports alone,
+		because a report could be forged or come from a server whose proxy setting is wrong.
+	</p>
+
+	<h2>What counts as an attack</h2>
+	<p>
+		An address is reported for a type only once it reaches the threshold within one hour, in one server
+		process. The thresholds are set so that an honest visitor who mistypes a password or asks for a second
+		reset email never reaches them.
+	</p>
+	<table>
+		<thead><tr><th>Type</th><th>Reported at</th><th>What counts</th><th>What does not</th></tr></thead>
+		<tbody>
+			{attackReports.types.map((type) => (
+				<tr>
+					<td><code>{type.name}</code></td>
+					<td>{type.threshold}</td>
+					<td>{type.meaning}</td>
+					<td>{type.notCounted}</td>
+				</tr>
+			))}
+		</tbody>
+	</table>
+
+	<h2>Probe paths</h2>
+	<p>
+		A request for one of these paths is reported the first time. Each is a file or panel of another
+		product that no FoxAuth server has, so only a scanner asks for it. A path ending in … covers
+		everything under it. Other missing pages, such as a missing favicon, are never reported.
+	</p>
+	<table>
+		<thead><tr><th>Label</th><th>Paths</th></tr></thead>
+		<tbody>
+			{attackReports.probes.map((probe) => (
+				<tr>
+					<td><code>{probe.label}</code></td>
+					<td>
+						{probe.paths.map((path, index) => (
+							<>
+								{index > 0 ? ', ' : ''}
+								<code>{path}</code>
+							</>
+						))}
+					</td>
+				</tr>
+			))}
+		</tbody>
+	</table>
+
+	<h2>Which addresses are never sent</h2>
+	<p>
+		Only public internet addresses leave the server. Private, loopback, link-local, carrier-grade NAT,
+		documentation, benchmarking, multicast and reserved addresses are never sent, nor anything that is
+		not an address. An IPv6 address is sent only as its /64 network, never in full. Which address a
+		request came from follows your <a href="/docs/deploy/reverse-proxy/">caller address setting</a>, so
+		set it to match how the server is reached.
+	</p>
+
+	<h2>Every field</h2>
+	<p>
+		This is format {attackReports.format}. A report carries at most {attackReports.maxAddresses}
+		addresses, those with the highest counts. Nothing else is in it: no account, password, code, client
+		identifier, token, project, path, query, header, user agent or body.
+	</p>
+	<table>
+		<thead><tr><th>Field</th><th>What it says</th><th>Values</th></tr></thead>
+		<tbody>
+			{attackReports.fields.map((field) => (
+				<tr>
+					<td><code>{field.path}</code></td>
+					<td>
+						{field.meaning}
+						{field.absentWhen ? <> Left out when {field.absentWhen}.</> : ''}
+					</td>
+					<td>{field.values}</td>
+				</tr>
+			))}
+		</tbody>
+	</table>
+</StarlightPage>

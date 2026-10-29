@@ -1110,7 +1110,22 @@ export const ApplicationConfig = {
 	 *   deliberately no environment variable for it. A report that cannot be delivered is not an error
 	 *   and leaves no trace.
 	 */
-	'telemetry.enabled': true
+	'telemetry.enabled': true,
+	/*
+	 * attackReports.enabled
+	 *
+	 * title: Attack reporting: the addresses that attacked this server, hourly, to FoxTrust
+	 *
+	 * description: Once an hour each server process sends FoxTrust the public addresses that crossed a
+	 *   threshold of refused sign-ins, client credentials, SCIM or MCP credentials, rate-limit refusals,
+	 *   mail requests or scanner paths in the hour before (specs/114), with how many and nothing else.
+	 *   Every type, threshold and field is declared in lib/consts/attack_report_fields.ts.
+	 *
+	 * On by default, by owner decision (2026-10-28), under the legitimate interest in network and
+	 *   information security (GDPR Recital 49). A setting of its own, independent of usage reporting, and
+	 *   the only switch: there is no environment variable. Turning it off discards what was counted.
+	 */
+	'attackReports.enabled': true
 	/*
 	 * There are deliberately no `sentry.environment` or `sentry.release` settings.
 	 *

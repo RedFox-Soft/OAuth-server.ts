@@ -4,6 +4,7 @@ import { bucketAtHost, isCanonicalHost } from 'lib/admin/auth/bucketAddress.js';
 import { hostOfRequest } from 'lib/consts/request_host.js';
 import { MAX_REQUEST_BODY_BYTES } from 'lib/consts/request_limits.js';
 import { callerAddressOf } from 'lib/helpers/caller_address.js';
+import { noteAttack, probeLabelOf } from 'lib/attack_reports/tally.js';
 
 /*
  * The first path segments that belong to the instance rather than to any population.
@@ -78,6 +79,20 @@ export const instancePlaneOnly = new Elysia({
 	 * plugin of its own for the reason oversizeBodyRefusal gives.
 	 */
 	callerAddressOf(request, server);
+
+	/*
+	 * A scanner's request for a file of another product (specs/114). Here, on every request, because a probe
+	 * path matches no route and so reaches no handler; the check is a map lookup on the path.
+	 */
+	const url = request.url;
+	const start = url.indexOf('/', url.indexOf('://') + 3);
+	if (start !== -1) {
+		const query = url.indexOf('?', start);
+		const probe = probeLabelOf(
+			query === -1 ? url.slice(start) : url.slice(start, query)
+		);
+		if (probe !== null) noteAttack(request, 'probe', probe);
+	}
 
 	// First, before anything reads the body.
 	const oversize = oversizeBodyRefusal(request);

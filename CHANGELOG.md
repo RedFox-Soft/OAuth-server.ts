@@ -11,6 +11,11 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- **Hourly attack reports** (`attackReports.enabled`, **on by default**) — once an hour the server sends FoxTrust the
+  public addresses that crossed a threshold of failed sign-ins, wrong client or SCIM/MCP credentials, rate-limit
+  refusals, mail requests or scanner paths, with the counts and nothing else; IPv6 only as its /64. A switch of its own
+  in Settings → Integrations; the console shows the exact last report, and every field is listed at
+  /docs/reference/attack-reports/.
 - **Per-caller mail limit** (`mail.requestsPerCallerPerHour`, 10) — one address may make at most this many password
   reset requests, sign-ups and verification resends an hour, across every project; past it no email is sent and the
   visitor is asked to try later (429). Every request counts whatever its outcome, so the refusal reveals nothing about

@@ -207,6 +207,7 @@ import { isPlainObject } from 'lib/helpers/_/object.js';
 import { signUpsPaused } from '../plans/signups.js';
 import { CREATE_PROMPT_REASON } from '../consts/prompt_create.js';
 import { callerAddressOf } from '../helpers/caller_address.js';
+import { noteAttack } from '../attack_reports/tally.js';
 import { admitMailRequest, mailLimitedResponse } from '../mail_limit/tally.js';
 
 /*
@@ -1265,6 +1266,7 @@ export const ui = new Elysia()
 				/* The address is deliberately not carried: an operator needs to see which population is
 				 * under attack, not a log they could read names out of. */
 				eventBus.emit('login_throttled', { bucketId });
+				noteAttack(request, 'signin_failures');
 				return refuse();
 			}
 
@@ -1282,12 +1284,14 @@ export const ui = new Elysia()
 				))
 			) {
 				eventBus.emit('login_throttled', { bucketId });
+				noteAttack(request, 'signin_failures');
 				return refuse();
 			}
 
 			const userStore = getUserStore(bucketId);
 			const user = await userStore.findByEmail(body.username);
 			if (!user) {
+				noteAttack(request, 'signin_failures');
 				return refuse();
 			}
 			const validPassword = await Bun.password.verify(
@@ -1295,6 +1299,7 @@ export const ui = new Elysia()
 				user.password
 			);
 			if (!validPassword) {
+				noteAttack(request, 'signin_failures');
 				return refuse();
 			}
 			/*
@@ -1434,6 +1439,7 @@ export const ui = new Elysia()
 				});
 
 			if (pending.attempts >= MAX_ATTEMPTS_PER_INTERACTION) {
+				noteAttack(request, 'signin_failures');
 				return refuse();
 			}
 
@@ -1457,6 +1463,7 @@ export const ui = new Elysia()
 				 * attempts" would confirm to someone guessing that the account is real and that their
 				 * guesses are landing, which is the whole of what they wanted to learn.
 				 */
+				noteAttack(request, 'signin_failures');
 				return refuse();
 			}
 

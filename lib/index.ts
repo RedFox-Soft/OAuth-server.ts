@@ -67,6 +67,8 @@ import { startCloser } from './activity/closer.js';
 import { startBucketPurger } from './admin/buckets/purge_pass.js';
 import { startTelemetry } from './telemetry/scheduler.js';
 import { reportingState } from './telemetry/status.js';
+import { startAttackReports } from './attack_reports/scheduler.js';
+import { attackReportsState } from './attack_reports/status.js';
 import { selectBackend } from './adapters/selectBackend.js';
 
 /*
@@ -317,6 +319,17 @@ if (process.env.NODE_ENV !== 'test') {
 			console.log(
 				'usage reporting: on. A daily anonymous report goes to FoxTrust; turn it off in ' +
 					'Settings → Integrations. Every field: https://foxauth.dev/docs/reference/telemetry/'
+			);
+		}
+		/*
+		 * The hourly attack report (specs/114), under the same guards and for the same reasons. Its own line,
+		 * because it is its own switch and it sends addresses, which the usage report never does (FR-021).
+		 */
+		startAttackReports();
+		if (attackReportsState().enabled) {
+			console.log(
+				'attack reporting: on. Addresses that attack this server go to FoxTrust hourly; turn it off in ' +
+					'Settings → Integrations. Every field: https://foxauth.dev/docs/reference/attack-reports/'
 			);
 		}
 	}

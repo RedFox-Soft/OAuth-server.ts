@@ -223,8 +223,10 @@ Each rule is the part that is easy to break. Read the named page before changing
 - **Usage reporting** — everything a report may carry is declared in `lib/consts/telemetry_fields.ts`, and
   a new boolean setting is classified there (reported, or not with a reason) in the same change; a report
   that cannot be delivered is never an error; the console setting is the only switch, with no environment
-  variable, and the destination has no override.
-  → `instance-telemetry.md`
+  variable, and the destination has no override. An attack type, probe path or attack report field is declared
+  in `lib/consts/attack_report_fields.ts`; an attack is counted by one synchronous `noteAttack` beside the
+  refusal, only when a credential was presented, and its address never goes to a log line or a bus event.
+  → `instance-telemetry.md`, `attack-reports.md`
 - **Interaction screens** — a page is either the antd shell (inside an interaction) or plain and
   self-contained (opened from an email, no script); which one is not a style choice. Every word on them
   lives in `lib/i18n/texts/`, in all three languages in the same change, and a value inserted into a

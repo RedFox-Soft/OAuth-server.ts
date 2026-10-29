@@ -186,6 +186,10 @@ export default defineConfig({
 						{
 							...sidebarLabel('telemetry'),
 							link: '/docs/reference/telemetry/'
+						},
+						{
+							...sidebarLabel('attackReports'),
+							link: '/docs/reference/attack-reports/'
 						}
 					]
 				}

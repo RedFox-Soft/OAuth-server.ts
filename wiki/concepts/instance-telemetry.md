@@ -4,7 +4,7 @@ title: 'Instance telemetry: the daily usage report'
 tags: [architecture, contract, gotcha, config]
 sources: [oauth-server-codebase]
 created: 2026-10-28
-updated: 2026-10-28
+updated: 2026-10-29
 ---
 
 # Instance telemetry: the daily usage report
@@ -94,3 +94,8 @@ page (`/docs/reference/telemetry/`, via the docs export) all read it.
   on by default, and carries counts only.
 - **Monthly active users.** That figure is per project, for the operator ([[monthly-active-users]]). The report sums
   it into one range.
+- **Attack reports** ([[attack-reports]], spec 114). Hourly, under their own switch `attackReports.enabled`, and
+  they carry addresses, which this report never does. They reuse this report's identifier, sender
+  (`lib/telemetry/send.ts`), slot and state document: two optional fields, `lastAttackReport` and
+  `lastAttackDeliveredAt`, sit beside `lastReport`. The usage report carries whether attack reporting is on
+  (`REPORTED_SETTINGS`), so the receiver can tell "no attacks" from "off".

@@ -328,3 +328,7 @@ Operations:
 ## [2026-10-28] create | spec 115 — [[caller-address]]: the forgeable caller address it replaced (cascade of headers, leftmost X-Forwarded-For), the Fly.io probe, the five choices and the walk, shared address space excluded, the memo, the upgrade migration, and the per-caller mail limit.
 
 ## [2026-10-28] update | [[per-origin-rate-limiting]] and [[self-service-password-reset]] point to [[caller-address]] for who a request is counted against and for the per-caller mail limit; the [[instance-telemetry]] index line no longer claims environment off switches (removed in spec 113).
+
+## [2026-10-29] create | spec 114 — [[attack-reports]]: the owner's decisions, the six signal sites and what does not count, why not the event bus, the hard-capped hourly tally, the address reduction (IPv4-mapped trap), the per-process send without a claim, the state fields, the declaration and its guards, the receiver's obligation.
+
+## [2026-10-29] update | [[instance-telemetry]] gains a "not the same as" entry for [[attack-reports]] (shared identifier, sender and state document); [[caller-address]] no longer describes spec 114 as pending.

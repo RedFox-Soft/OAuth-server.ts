@@ -114,6 +114,23 @@ export class TelemetryStateStore implements TelemetryStateStoreInstance {
 		);
 	}
 
+	async recordAttackSend(
+		reportJson: string,
+		deliveredAt: Date | null
+	): Promise<void> {
+		await this.collection().updateOne(
+			{ _id: this.stateId },
+			{
+				$set: {
+					lastAttackReport: reportJson,
+					...(deliveredAt
+						? { lastAttackDeliveredAt: deliveredAt.toISOString() }
+						: {})
+				}
+			}
+		);
+	}
+
 	async read(): Promise<TelemetryState | null> {
 		const found = await this.collection().findOne({ _id: this.stateId });
 		if (!found) return null;

@@ -1,6 +1,6 @@
 import type english from './en.ts';
 
-export const source = '3a4f1c53a9be';
+export const source = '72f922bd67dd';
 
 export default {
 	sidebar: {
@@ -15,6 +15,7 @@ export default {
 		mcpTools: 'MCP 工具',
 		addonSeams: 'Addon 扩展点',
 		environment: '环境变量',
-		telemetry: '使用情况报告'
+		telemetry: '使用情况报告',
+		attackReports: '攻击报告'
 	}
 } satisfies typeof english;

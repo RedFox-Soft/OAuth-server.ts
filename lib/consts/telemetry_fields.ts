@@ -105,7 +105,9 @@ export const REPORTED_SETTINGS: readonly string[] = [
 	'clientIdMetadataDocument.enabled',
 	'registrationManagement.enabled',
 	'registrationManagement.rotateRegistrationAccessToken',
-	'conformIdTokenClaims'
+	'conformIdTokenClaims',
+	/* Whether this server feeds the attack reports; the receiver cannot otherwise tell "no attacks" from "off". */
+	'attackReports.enabled'
 ];
 
 export const UNREPORTED_SETTINGS: Readonly<Record<string, string>> = {

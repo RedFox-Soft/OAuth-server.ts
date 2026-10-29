@@ -12,6 +12,7 @@ export default {
 		mcpTools: 'MCP tools',
 		addonSeams: 'Addon seams',
 		environment: 'Environment variables',
-		telemetry: 'Usage reporting'
+		telemetry: 'Usage reporting',
+		attackReports: 'Attack reporting'
 	}
 };

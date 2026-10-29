@@ -1081,6 +1081,17 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 		description:
 			'Once a day this server sends FoxTrust one small report: its FoxAuth version, runtime and database, which feature settings are on, and rough ranges of how many projects, applications, APIs, administrators and active users it has and how many tokens and server errors it produced the day before. It never sends a name, an email, a hostname, the issuer, an address, an identifier of a person or the value of any setting. The exact last report is shown below. On by default; turning it off changes nothing else.'
 	},
+	{
+		key: 'attackReports.enabled',
+		domain: 'integrations',
+		group: 'Attack reporting',
+		label: 'Report attacking addresses to FoxTrust',
+		summary:
+			'Send FoxTrust, once an hour, the addresses that attacked this server',
+		type: 'boolean',
+		description:
+			'Once an hour this server sends FoxTrust the IP addresses that attacked it in the hour before: password guessing at the sign-in page, wrong client secrets, wrong SCIM or MCP credentials, floods past the rate limit, mass password-reset or sign-up requests, and scanners asking for files such as /.env. Each address goes with how many times it did each of these and nothing else: no account, password, path, header or body. An address is sent only after it crosses a threshold an honest visitor does not reach, only if it is a public internet address, and an IPv6 address only as its /64 network. FoxTrust combines the reports of many servers into a list of attacking addresses, which protects every server, a legitimate interest in network and information security (GDPR Recital 49). The exact last report is shown below, and every field is listed at foxauth.dev/docs/reference/attack-reports. On by default and independent of usage reporting. Turn it off while you test your own server, so your testing address is not reported.'
+	},
 
 	{
 		key: 'sentry.enabled',

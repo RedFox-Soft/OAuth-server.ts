@@ -43,6 +43,15 @@ import {
 	UNREPORTED_SETTINGS,
 	type ReportField
 } from '../consts/telemetry_fields.js';
+import {
+	ATTACK_DESTINATION,
+	ATTACK_MAX_ADDRESSES,
+	ATTACK_REPORT_FIELDS,
+	ATTACK_REPORT_FORMAT,
+	ATTACK_REPORT_RETENTION,
+	ATTACK_TYPES,
+	PROBE_PATHS
+} from '../consts/attack_report_fields.js';
 
 /*
  * What the website builds its Reference section from. Assembled from the tables the server already
@@ -125,6 +134,21 @@ export interface DocsExport {
 		readonly rangeLabels: readonly string[];
 		readonly reportedSettings: readonly { key: string; label: string }[];
 		readonly unreportedSettings: readonly { key: string; reason: string }[];
+	};
+	/* What the hourly attack report carries (specs/114), from the declaration the server counts and builds by. */
+	readonly attackReports: {
+		readonly destination: string;
+		readonly format: number;
+		readonly retention: string;
+		readonly maxAddresses: number;
+		readonly types: readonly {
+			name: string;
+			threshold: number;
+			meaning: string;
+			notCounted: string;
+		}[];
+		readonly probes: readonly { label: string; paths: readonly string[] }[];
+		readonly fields: readonly ReportField[];
 	};
 }
 
@@ -260,6 +284,18 @@ export function buildDocsExport(stamp: DocsExportStamp): DocsExport {
 			unreportedSettings: Object.entries(UNREPORTED_SETTINGS).map(
 				([key, reason]) => ({ key, reason })
 			)
+		},
+		attackReports: {
+			destination: ATTACK_DESTINATION,
+			format: ATTACK_REPORT_FORMAT,
+			retention: ATTACK_REPORT_RETENTION,
+			maxAddresses: ATTACK_MAX_ADDRESSES,
+			types: ATTACK_TYPES.map((type) => ({ ...type })),
+			probes: PROBE_PATHS.map((probe) => ({
+				label: probe.label,
+				paths: [...probe.exact, ...probe.prefixes.map((prefix) => `${prefix}…`)]
+			})),
+			fields: ATTACK_REPORT_FIELDS
 		}
 	};
 }

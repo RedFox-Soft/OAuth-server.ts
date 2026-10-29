@@ -4,7 +4,7 @@ title: 'The caller address and the per-caller mail limit'
 tags: [architecture, security, contract, gotcha, config]
 sources: [oauth-server-codebase]
 created: 2026-10-28
-updated: 2026-10-28
+updated: 2026-10-29
 ---
 
 # The caller address and the per-caller mail limit
@@ -81,8 +81,8 @@ header is believed only on a connection from a proxy the choice trusts (`isTrust
   Reading that also works for Cloudflare in front of nginx, where the peer is nginx and a peer check on
   Cloudflare's own header would fail.
 - **The classifier is shared.** `isPublicAddress` (`lib/helpers/public_address.ts:124`) moved out of
-  `lib/shared/egress.ts`, which now calls it. Spec 114 needs the same predicate to decide which addresses
-  may be reported.
+  `lib/shared/egress.ts`, which now calls it. [[attack-reports]] (spec 114) uses the same predicate to decide
+  which addresses may be reported.
 
 ## One answer per request, without `server`
 

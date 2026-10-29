@@ -129,6 +129,34 @@ export const DocsExportSchema = z.object({
 		unreportedSettings: z.array(
 			z.object({ key: z.string(), reason: z.string() })
 		)
+	}),
+	/* The hourly attack report (specs/114), from the declaration the server counts and builds by. */
+	attackReports: z.object({
+		destination: z.string(),
+		format: z.number(),
+		retention: z.string(),
+		maxAddresses: z.number(),
+		types: z
+			.array(
+				z.object({
+					name: z.string(),
+					threshold: z.number(),
+					meaning: z.string(),
+					notCounted: z.string()
+				})
+			)
+			.min(1),
+		probes: z
+			.array(z.object({ label: z.string(), paths: z.array(z.string()) }))
+			.min(1),
+		fields: z.array(
+			z.object({
+				path: z.string(),
+				meaning: z.string(),
+				values: z.string(),
+				absentWhen: z.string().optional()
+			})
+		)
 	})
 });
 

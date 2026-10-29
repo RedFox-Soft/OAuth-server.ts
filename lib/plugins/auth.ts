@@ -1,6 +1,7 @@
 import { hostOfRequest } from 'lib/consts/request_host.js';
 import { Elysia, Static, t } from 'elysia';
 import { InvalidClientAuth } from 'lib/helpers/errors.js';
+import { noteClientAuthFailure } from 'lib/attack_reports/tally.js';
 import { requestBucketFor } from 'lib/admin/auth/bucketAddress.js';
 import { OIDCContext } from 'lib/helpers/oidc_context.js';
 import { tokenAuth } from 'lib/shared/token_auth.js';
@@ -62,7 +63,12 @@ export const AuthPlugin = new Elysia().derive(
 			hostOfRequest(request)
 		);
 		const oidc = new OIDCContext({ params: body, headers, route, bucket });
-		await tokenAuth(body, headers, oidc);
+		try {
+			await tokenAuth(body, headers, oidc);
+		} catch (error) {
+			noteClientAuthFailure(request, body, headers, error);
+			throw error;
+		}
 		return { oidc };
 	}
 );

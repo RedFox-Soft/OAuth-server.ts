@@ -7,6 +7,7 @@ import {
 } from 'lib/configs/application.js';
 import { eventBus } from 'lib/event_bus.js';
 import { callerAddressOf } from 'lib/helpers/caller_address.js';
+import { noteAttack } from 'lib/attack_reports/tally.js';
 import { RateLimited } from 'lib/helpers/errors.js';
 import {
 	decide,
@@ -183,6 +184,7 @@ export const rateLimit = (app: Elysia) =>
 			class: rateClass,
 			origin
 		});
+		noteAttack(request, 'flood');
 
 		/*
 		 * The console answers in its own shape, and the root handler stands aside for it on a marker

@@ -74,4 +74,23 @@ export async function verifyTelemetry(
 			stored.lastClaimedDay === day,
 		JSON.stringify(stored)
 	);
+
+	// The hourly attack report (specs/114) shares the document and must leave the usage report's fields alone.
+	const attack = JSON.stringify({ format: 1, addresses: [], verify: 'attack' });
+	await makeStore().recordAttackSend(attack, at);
+	const later = JSON.stringify({ format: 1, addresses: [], verify: 'later' });
+	await makeStore().recordAttackSend(later, null);
+	const both = await makeStore().read();
+	check(
+		'an attack report reads back as the text sent, keeping the usage report untouched',
+		both?.lastAttackReport === later &&
+			both.lastReport === report &&
+			both.lastDeliveredAt === at.toISOString(),
+		JSON.stringify(both)
+	);
+	check(
+		'an undelivered attack report keeps the earlier delivery time',
+		both?.lastAttackDeliveredAt === at.toISOString(),
+		JSON.stringify(both)
+	);
 }

@@ -1,6 +1,7 @@
 import { checkedAdapter } from '../adapters/index.js';
 import { ApplicationConfig } from '../configs/application.js';
 import { callerAddressOf } from '../helpers/caller_address.js';
+import { noteAttack } from '../attack_reports/tally.js';
 import epochTime from '../helpers/epoch_time.js';
 import { MailRequestTallyPayload } from './types.js';
 
@@ -32,6 +33,8 @@ export type MailAdmission =
 export async function admitMailRequest(
 	request: Request
 ): Promise<MailAdmission> {
+	// Every mail request is reported past its threshold, admitted or not (specs/114).
+	noteAttack(request, 'mail_requests');
 	const caller = callerAddressOf(request);
 	if (caller.from === 'unattributed') return { admitted: true };
 

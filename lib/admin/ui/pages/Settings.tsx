@@ -19,6 +19,7 @@ import { SaveBar } from '../settings/SaveBar.js';
 import { SmtpCard } from '../settings/SmtpCard.js';
 import { SentryCard } from '../settings/SentryCard.js';
 import { TelemetryCard } from '../settings/TelemetryCard.js';
+import { AttackReportsCard } from '../settings/AttackReportsCard.js';
 import { CallerAddressCard } from '../settings/CallerAddressCard.js';
 import { PlansCard } from '../settings/PlansCard.js';
 import { Sl1ReadinessCard } from '../settings/Sl1ReadinessCard.js';
@@ -299,6 +300,15 @@ export function Settings() {
 						 */}
 						{!searching && pane === 'integrations' && (
 							<TelemetryCard key={String(baseline['telemetry.enabled'])} />
+						)}
+						{/*
+						 * Under the Attack reporting switch, keyed by its saved value for the same reason as the
+						 * usage reporting card above.
+						 */}
+						{!searching && pane === 'integrations' && (
+							<AttackReportsCard
+								key={`attack-reports-${String(baseline['attackReports.enabled'])}`}
+							/>
 						)}
 						{!searching && pane === 'integrations' && <SmtpCard />}
 						{/*

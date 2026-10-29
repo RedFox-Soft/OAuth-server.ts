@@ -4,6 +4,7 @@ import { createMcpHandler } from '@modelcontextprotocol/server';
 import { configuration } from '../configs/application.js';
 import { ISSUER } from '../configs/env.js';
 import { eventBus } from '../event_bus.js';
+import { noteAttack } from '../attack_reports/tally.js';
 import { UseDpopNonce } from '../helpers/validate_dpop.js';
 import { buildMcpServer } from './server.js';
 import {
@@ -260,6 +261,13 @@ async function serve(
 			throw err;
 		}
 		report(err instanceof McpUnauthorized ? err.reason : 'unknown');
+		/*
+		 * A refused credential (specs/114). Never a request without one, which the header schema answers before
+		 * here, and never a fault, which is not an McpUnauthorized and reports `unknown`.
+		 */
+		if (err instanceof McpUnauthorized) {
+			noteAttack(request, 'admin_credential_failures');
+		}
 		return challenge(set);
 	}
 

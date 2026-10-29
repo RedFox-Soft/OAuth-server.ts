@@ -757,7 +757,20 @@ const catalogue = [
 		querySchema: null,
 		pathParams: [],
 		summary:
-			'Whether this server sends its daily anonymous usage report, why not if it does not, its instance identifier, when a report was last delivered, and the exact report last sent (or, before the first, the next one). Turned on and off with settings_update (`telemetry.enabled`); the environment can force it off.'
+			'Whether this server sends its daily anonymous usage report, why not if it does not, its instance identifier, when a report was last delivered, and the exact report last sent (or, before the first, the next one). Turned on and off with settings_update (`telemetry.enabled`).'
+	},
+	{
+		tool: 'attack_reports_status_get',
+		method: 'GET',
+		path: '/admin/api/settings/attack-reports',
+		action: null,
+		consequence: 'read',
+		superAdminOnly: true,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: [],
+		summary:
+			'Whether this server reports the addresses that attack it to FoxTrust each hour, why not if it does not, when a report was last delivered, and the exact report last sent (or, before the first, an example with no real address). Turned on and off with settings_update (`attackReports.enabled`).'
 	},
 	{
 		tool: 'jwks_list',

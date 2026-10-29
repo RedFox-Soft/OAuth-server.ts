@@ -56,6 +56,7 @@ import {
 	OAuthError
 } from 'lib/shared/response_schemas.js';
 import { grantTypeAllowed } from 'lib/models/client.js';
+import { noteClientAuthFailure } from 'lib/attack_reports/tally.js';
 
 const deviceAuthGrantType = 'urn:ietf:params:oauth:grant-type:device_code';
 const backchannelAuthGrantType = 'urn:openid:params:grant-type:ciba';
@@ -107,9 +108,15 @@ function bucketOf(params: unknown, request: Request) {
 async function authentication(
 	params: authParamsType,
 	headers: Record<string, string | undefined>,
-	oidc: OIDCContext<PipelineParams>
+	oidc: OIDCContext<PipelineParams>,
+	request: Request
 ) {
-	await tokenAuth(params, headers, oidc);
+	try {
+		await tokenAuth(params, headers, oidc);
+	} catch (error) {
+		noteClientAuthFailure(request, params, headers, error);
+		throw error;
+	}
 
 	// params is the request body object here; setting client_id on it preserves prior behaviour
 	if (!params.client_id) {
@@ -145,7 +152,7 @@ export const deviceAuth = new Elysia()
 				ip: server?.requestIP(request)?.address
 			});
 
-			await authentication(body, headers, oidc);
+			await authentication(body, headers, oidc, request);
 			const client = oidc.client;
 			// RFC 8628 §3.2 answers with the token endpoint's errors (RFC 6749 §5.2): unauthorized_client.
 			if (!grantTypeAllowed(client, deviceAuthGrantType)) {
@@ -203,7 +210,7 @@ export const backchannelAuth = new Elysia()
 				bucket: await bucketOf(params, request)
 			});
 
-			await authentication(body, headers, oidc);
+			await authentication(body, headers, oidc, request);
 			const client = oidc.client;
 
 			// CIBA does not accept request_uri or registration; request (JAR) is only

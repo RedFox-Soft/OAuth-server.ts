@@ -25,6 +25,8 @@ import {
 import { forgetSignUpReadings } from 'lib/plans/signups.ts';
 import { resetActivityCacheForTests } from '../lib/activity/note.ts';
 import { resetTelemetryCountsForTests } from '../lib/telemetry/counters.ts';
+import { resetAttackTallyForTests } from '../lib/attack_reports/tally.ts';
+import { resetAttackSchedulerForTests } from '../lib/attack_reports/scheduler.ts';
 import { resetClientUseForTests } from '../lib/models/client/usage.ts';
 import { forgetHostArrivals } from '../lib/admin/auth/hostArrivals.ts';
 import {
@@ -495,6 +497,8 @@ function forgetProcessState(): void {
 	forgetHostArrivals();
 	resetActivityCacheForTests();
 	resetTelemetryCountsForTests();
+	resetAttackTallyForTests();
+	resetAttackSchedulerForTests();
 	resetClientUseForTests();
 	forgetSignUpReadings();
 	resetUnauthenticatedCharge();

@@ -102,6 +102,20 @@ export class TelemetryStateStore implements TelemetryStateStoreInstance {
 		`;
 	}
 
+	async recordAttackSend(
+		reportJson: string,
+		deliveredAt: Date | null
+	): Promise<void> {
+		const handle = sql();
+		const changes: Record<string, unknown> = { lastAttackReport: reportJson };
+		if (deliveredAt) changes.lastAttackDeliveredAt = deliveredAt.toISOString();
+		await handle`
+			UPDATE ${handle(this.area)}
+			SET doc = doc || ${changes}
+			WHERE id = ${this.stateId}
+		`;
+	}
+
 	async read(): Promise<TelemetryState | null> {
 		const handle = sql();
 		const rows = await handle`

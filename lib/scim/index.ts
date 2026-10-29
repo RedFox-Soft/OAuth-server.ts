@@ -17,6 +17,7 @@ import {
 import { captureFault } from '../error_store/capture.js';
 import { OIDCProviderError, UnknownBucket } from '../helpers/errors.js';
 import { callerAddressOf } from '../helpers/caller_address.js';
+import { noteAttack } from '../attack_reports/tally.js';
 import { scimBaseUrl } from '../provisioning/addresses.js';
 import {
 	resourceTypeById,
@@ -116,6 +117,10 @@ async function enter(
 		);
 	} catch (error) {
 		if (error instanceof ScimError && error.status === 401) {
+			// A request without a credential has guessed nothing (specs/114, FR-002).
+			if (request.headers.get('authorization')) {
+				noteAttack(request, 'admin_credential_failures');
+			}
 			chargeUnauthenticated(callerAddressOf(request, server).address);
 		}
 		throw error;
