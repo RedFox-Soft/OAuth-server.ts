@@ -89,6 +89,13 @@ export async function verifyForAccount(
 		return { ok: false, reason: 'throttled' };
 	}
 
+	/*
+	 * A secret the keyring cannot open (specs/116) is absent here, and the second factor is then refused like a
+	 * wrong code, never skipped; an administrator resets the authenticator so the person enrols again.
+	 */
+	if (typeof user.totp.secret !== 'string') {
+		return { ok: false, reason: 'invalid' };
+	}
 	const step = verifyAt(decodeBase32(user.totp.secret), code, now, {
 		after: user.totp.lastStep
 	});

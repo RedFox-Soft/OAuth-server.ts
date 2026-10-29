@@ -7,7 +7,7 @@ import type {
 import { faultMessage, fingerprintOf, parseOrigin } from './fingerprint.js';
 import { mintReference } from './reference.js';
 import { buildRecord, type CaptureSubject } from './redact.js';
-import { enqueue, installShutdownDrain } from './queue.js';
+import { enqueue, installShutdownDrain, trackAssembly } from './queue.js';
 import { reportFault } from '../sentry/dispatch.js';
 import { noteServerError } from '../telemetry/counters.js';
 
@@ -92,7 +92,7 @@ export function captureFault(input: CaptureInput): string | undefined {
 		 * its way to answering a request. The reference is minted above, synchronously, so it can be
 		 * returned now and the record that carries it can be built a microtask later.
 		 */
-		void buildRecord(input, reference, level)
+		const assembly = buildRecord(input, reference, level)
 			.then((record) => {
 				const occurrence = {
 					fingerprint,
@@ -127,6 +127,7 @@ export function captureFault(input: CaptureInput): string | undefined {
 				// unhandled rejection. The console is the fallback the server used before this feature.
 				console.error('error store could not assemble a record:', error);
 			});
+		trackAssembly(assembly);
 
 		return reference;
 	} catch (error) {

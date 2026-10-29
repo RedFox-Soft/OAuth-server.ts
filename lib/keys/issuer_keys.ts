@@ -12,6 +12,7 @@ import type { RequestBucket } from '../configs/issuer.js';
 import { ROOT_KEY_OWNER } from '../consts/key_owner.js';
 import { sl1 } from '../sl1/rules.js';
 import { SL1_DEFAULT_SIGNING_ALGORITHM } from '../consts/sl1.js';
+import { unreadableFieldsOf } from '../sealing/decorators.js';
 
 /*
  * The keys each issuer signs, verifies and decrypts with.
@@ -89,12 +90,39 @@ function storeOf(keys: readonly BucketKey[]): KeyStore {
 	return new KeyStore(keys.map((key) => structuredClone(key.jwk)));
 }
 
+/* A key whose private members could not be opened with the keyring (specs/116) can still be verified, never used. */
+function usable(key: BucketKey): boolean {
+	return unreadableFieldsOf(key.jwk).length === 0;
+}
+
 function assemble(records: readonly BucketKey[], now: number): IssuerKeys {
 	const published = records.filter((key) => stillPublished(key, now));
-	const signing = published.filter(
+	const designated = published.filter(
 		(key) => key.use === 'sig' && key.state === 'signing'
 	);
-	const decrypting = published.filter((key) => key.use === 'enc');
+	const signing = designated.filter(usable);
+	/*
+	 * An algorithm whose signing key cannot be opened signs with another published key of it, if there is one:
+	 * that key is already served by every instance, which is all its being `signing` would add.
+	 */
+	const orphaned = new Set(
+		designated
+			.filter((key) => !usable(key))
+			.map((key) => key.alg)
+			.filter((alg) => !signing.some((key) => key.alg === alg))
+	);
+	signing.push(
+		...published.filter(
+			(key) =>
+				key.use === 'sig' &&
+				key.state === 'published' &&
+				orphaned.has(key.alg) &&
+				usable(key)
+		)
+	);
+	const decrypting = published.filter(
+		(key) => key.use === 'enc' && usable(key)
+	);
 	return {
 		signing: storeOf(signing),
 		verification: storeOf(published.filter((key) => key.use === 'sig')),

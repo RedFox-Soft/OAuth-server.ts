@@ -4,7 +4,7 @@ title: 'Pairwise identifiers and the salt they depend on'
 tags: [oidc, contract, gotcha, architecture]
 sources: [oauth-server-codebase]
 created: 2026-08-23
-updated: 2026-08-23
+updated: 2026-10-29
 graph:
   node_type: concept
   relationships:
@@ -123,7 +123,10 @@ worth having precisely because the derivation sits a layer away from the notific
   `subjectType: 'pairwise'` clients were affected. After that they never move again — including
   across restarts, reschedules and scale-out.
 - **The salt lives in the datastore.** Losing the datastore permanently loses every pairwise
-  identifier, the same exposure the signing keys already carry. One backup covers both.
+  identifier, the same exposure the signing keys already carry. One backup covers both. Since spec 116
+  the signing keys and the DPoP nonce secret are stored sealed with the instance keyring, so a backup also
+  needs the keyring to restore them; the salt is deliberately left unsealed, because a lost keyring would
+  otherwise lose it too ([[secrets-encryption-at-rest]]).
 - **There is no rotation surface, and no admin surface at all.** Rotating the salt would invalidate
   every pairwise identifier the server ever issued; that is a product decision, not an operational
   one. The salt appears in no response, no discovery document, no admin API and no audit record.

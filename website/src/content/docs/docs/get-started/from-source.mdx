@@ -53,13 +53,23 @@ PostgreSQL, whichever you would rather run.
    bun run db:setup:pg   # PostgreSQL
    ```
 
-4. Bundle the console and the sign-in screens into `public/`:
+4. Create the keyring directory:
+
+   ```bash
+   mkdir keyring
+   ```
+
+   The server encrypts the secrets it stores with a keyring. When this directory exists, first-run
+   setup writes the keyring it generates here and uses it at once. [The keyring](#keyring) below has
+   the other ways to supply one.
+
+5. Bundle the console and the sign-in screens into `public/`:
 
    ```bash
    bun run build
    ```
 
-5. Start the server:
+6. Start the server:
 
    ```bash
    bun start
@@ -105,6 +115,32 @@ not create because the data already violates it, for instance. A deployment pipe
 the deploy on that exit code instead of logging a warning; the shipped `fly.toml` does that.
 
 </Aside>
+
+## The keyring {#keyring}
+
+The server encrypts the secrets it stores, such as application secrets and private signing keys, with a
+**keyring**: a small JSON document that you hold outside the database. It reaches the server in one of
+three ways:
+
+- **A keyring file in `keyring/`.** With the directory from step 4 in place, first-run setup generates
+  the keyring, writes it to `keyring/foxauth.keyring` and uses it. Setup shows it to you once, so save a
+  copy then. The repository ignores `keyring/`, so git never commits it.
+- **The `KEYRING` variable.** Run `bun run keyring new` and put its output in `KEYRING`.
+- **A file elsewhere.** Set `KEYRING_FILE` to its path. Under systemd, load the keyring with
+  `LoadCredential=` and point `KEYRING_FILE` at it under `$CREDENTIALS_DIRECTORY`:
+
+  ```ini
+  [Service]
+  LoadCredential=foxauth.keyring:/etc/foxauth/foxauth.keyring
+  Environment=KEYRING_FILE=%d/foxauth.keyring
+  ```
+
+  `%d` is systemd's name for the credentials directory, the same path as `$CREDENTIALS_DIRECTORY`.
+
+Use one of these. With both `KEYRING` and a keyring file, the server refuses to start. Without either,
+it runs and stores secrets unencrypted, and the console warns about it. Keep a copy of the keyring apart
+from your database backups, because the secrets in a backup cannot be read without it.
+[The keyring](/docs/deploy/upgrade/#keyring) explains rotation and what to do if a key is lost.
 
 ## What the console needs, and when settings apply {#notes}
 

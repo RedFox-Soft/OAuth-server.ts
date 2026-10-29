@@ -11,6 +11,14 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- **Encryption at rest for stored secrets** (security) — application secrets, sign-in provider credentials, the SMTP
+  password, private signing keys and authenticator secrets are now stored encrypted (AES-256-GCM, each value bound to
+  its record) with an operator-held keyring, supplied as `KEYRING` or a keyring file and never stored in the database;
+  first-run setup generates one when none is supplied, and `bun run keyring` rotates it. Upgrading changes nothing
+  until a keyring is in use, then existing secrets are encrypted automatically. **Operators:** generate the keyring
+  from Keys → Encryption at rest (or supply `KEYRING`) and back it up apart from the database; Compose users pull the
+  new compose file, which adds the keyring volume. Constitution 3.3.0 allows client secrets to be encrypted where they
+  cannot be hashed.
 - **Hourly attack reports** (`attackReports.enabled`, **on by default**) — once an hour the server sends FoxTrust the
   public addresses that crossed a threshold of failed sign-ins, wrong client or SCIM/MCP credentials, rate-limit
   refusals, mail requests or scanner paths, with the counts and nothing else; IPv6 only as its /64. A switch of its own

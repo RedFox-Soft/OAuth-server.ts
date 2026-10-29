@@ -17,5 +17,5 @@ const { environment } = loadExport();
 		<thead><tr><th>Variable</th><th>Requirement</th><th>Description</th><th>Example</th></tr></thead>
 		<tbody>{environment.map((v) => <tr><td><code>{v.name}</code></td><td>{v.requirement}</td><td>{v.description}</td><td>{v.example ? <code>{v.example}</code> : ''}</td></tr>)}</tbody>
 	</table>
-	<p>Signing keys, SMTP, the DPoP nonce secret and the pairwise salt are <em>not</em> environment variables: they live in the database and are provisioned by <code>bun run db:setup</code> or generated on first boot.</p>
+	<p>Signing keys, SMTP, the DPoP nonce secret and the pairwise salt are <em>not</em> environment variables: they live in the database and are provisioned by <code>bun run db:setup</code> or generated on first boot. The secrets among them (private signing keys, the SMTP password and the DPoP nonce secret) are stored encrypted with the keyring that <code>KEYRING</code> or <code>KEYRING_FILE</code> supplies. The pairwise salt is stored unencrypted on purpose. <a href="/docs/deploy/upgrade/#keyring">The keyring</a> explains why.</p>
 </StarlightPage>

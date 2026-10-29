@@ -69,6 +69,14 @@ subtly broken. Skip the migration step and the server refuses to start.
 	that introduced them has been retired, and current releases do not attempt it.
 </Aside>
 
+<Aside type="note" title="Stored secrets are encrypted with a keyring">
+
+The server now encrypts the secrets it stores with a keyring that you hold. An upgrade without a keyring
+breaks nothing, and the console warns you until there is one. [The keyring](#keyring) below explains how
+to start using one, how to rotate it, and what to do if a key is lost.
+
+</Aside>
+
 ## Why step 3 is not optional
 
 `db:setup` is the only command that applies a release's structural changes. It is also idempotent: it
@@ -131,13 +139,164 @@ admin API) as part of the change.
   are none at present.
 - **Signing keys persist in the database**: every issuer's keys, the instance's included, are records in
   `bucketKeys`. An upgrade neither rotates nor invalidates them: tokens issued before it still verify,
-  and every `/jwks` serves the same key set it did. Keys are not environment configuration and there
-  is nothing to carry across by hand. The one exception is the release that gave projects keys of their
+  and every `/jwks` serves the same key set it did. Keys are not environment configuration. Their private
+  parts are encrypted with the [keyring](#keyring), though, so the upgraded server needs the same keyring
+  as before. The one exception is the release that gave projects keys of their
   own, below; 0.8.0's migration moved the instance's keys into `bucketKeys` without changing them.
 - **SMTP settings** are read live from their own store on every send, so they are unaffected by a
-  restart in either direction.
+  restart in either direction. The mail password among them is encrypted with the keyring too.
 - **Tokens, sessions and grants survive**, since they live in the database. Users are not signed
   out by an upgrade, with one release-specific exception below.
+
+## Encryption at rest: the keyring {#keyring}
+
+The server encrypts the secrets it has to read back before it stores them. We call such a value
+**sealed**. The key that seals them sits in a **keyring**: a small file or variable that you hold,
+outside the database. Someone with a copy of the database but not the keyring cannot read these secrets.
+
+### What is sealed {#what-is-sealed}
+
+- application (client) secrets;
+- sign-in provider client secrets, and Apple signing keys;
+- the SMTP password;
+- private signing keys, the instance's and every project's;
+- authenticator (TOTP) secrets, including enrolments that are not finished yet;
+- the DPoP nonce secret;
+- the key that hashes caller addresses in the error log.
+
+Each value is encrypted with AES-256-GCM. It is also bound to its record and its field, so a sealed value
+copied into another record does not open there. MongoDB and PostgreSQL store sealed values in the same way.
+
+One secret stays unencrypted on purpose: the pairwise identifier salt. It decides the `sub` that each
+application sees for a person. If it were sealed and the key were lost, every application's `sub` would
+change for ever. So the salt is not sealed.
+
+### What a keyring looks like and where it goes {#keyring-format}
+
+A keyring is a JSON document:
+
+```json
+{ "v": 1, "write": "<kid>", "keys": { "<kid>": "<base64url, 32 bytes>" } }
+```
+
+`keys` holds every key the server may need to read a value, each under a key id (`kid`). `write` names the
+key that new values are sealed with.
+
+The server reads the keyring from one of two places:
+
+- the environment variable `KEYRING`, holding the JSON itself;
+- a keyring file at `KEYRING_FILE`. The default is `keyring/foxauth.keyring` under the working
+  directory, which is `/app/keyring/foxauth.keyring` in the Docker image.
+
+Use one of the two. With both, the server refuses to start. Each deploy page says which one fits that
+platform: [Docker Compose](/docs/deploy/docker-compose/#keyring), [Fly.io](/docs/deploy/fly/#keyring),
+[Kubernetes](/docs/deploy/kubernetes/#keyring), and [Run from source](/docs/get-started/from-source/#keyring)
+for a server you run yourself.
+
+The keyring is a deployment secret, like the database connection string. Never store it in the database.
+Keep a copy apart from your database backups as well. The secrets in a backup cannot be read without the
+keyring, and a backup stored next to its keyring protects nothing.
+
+The server never makes a keyring by itself at startup. A keyring is made in one of three ways: by
+first-run setup, by a super administrator in the console, or by you with `bun run keyring new`.
+
+### Upgrading an existing install {#upgrading-to-a-keyring}
+
+Nothing breaks on the upgrade. Without a keyring, the server works as before and stores secrets
+unencrypted. The console's **Keys** page then shows a warning in its **Encryption at rest** card. There
+are two ways to start using a keyring.
+
+**Generate it in the console.** On the **Keys** page, press **Generate keyring** in the **Encryption at
+rest** card. This needs a super administrator. The console shows the keyring once, with **Copy** and
+**Download** buttons. You continue only after ticking that you have saved it apart from your database
+backups. What happens next depends on the keyring directory:
+
+- If the directory exists, for example because a volume is mounted there, the server writes the keyring
+  file into it and uses it at once. Existing secrets are sealed straight away.
+- If it does not exist, the keyring is not in use yet. Set it as the `KEYRING` secret of your deployment
+  and restart.
+
+**Supply your own.** Run `bun run keyring new`, put its output in `KEYRING` or in the keyring file, and
+deploy.
+
+When a restart brings a keyring into use, the server seals the existing secrets about 10 minutes after it
+starts. The wait lets a blue-green or rolling deploy finish first. The previous release reads a sealed
+value as if it were plain text, so an application secret sealed while it still serves would stop
+matching there.
+
+The card shows how many values are sealed under each key and how many are still unencrypted.
+
+### Changing the keyring from the command line {#keyring-cli}
+
+`bun run keyring` makes and changes a keyring without touching the database. It reads the current
+keyring from `KEYRING`, else from the keyring file, else from standard input, and prints the result.
+
+| Command                        | What it does                                                    |
+| ------------------------------ | --------------------------------------------------------------- |
+| `bun run keyring new`          | Prints a new keyring with one key.                              |
+| `bun run keyring add`          | Adds a new key. Nothing is sealed with it yet.                  |
+| `bun run keyring write <kid>`  | Makes that key the write key.                                   |
+| `bun run keyring remove <kid>` | Removes a key. The write key cannot be removed.                 |
+| `bun run keyring show`         | Lists the key ids and their fingerprints, with no key material. |
+
+### Rotating the key {#rotating-the-key}
+
+A rotation is two changes and two deploys:
+
+<Steps>
+
+1. Run `bun run keyring add`, and deploy the new keyring to every instance. Each instance can now read
+   values under the new key, but none writes with it yet.
+
+2. Run `bun run keyring write <kid>` with the new key's id, and deploy again. New values are sealed with
+   the new key. About 10 minutes after each start, the server seals old values again under the new key.
+
+</Steps>
+
+Remove the old key with `bun run keyring remove <kid>` only when both of these are true:
+
+- the **Encryption at rest** card shows no values under that key;
+- no backup you keep was taken while the key was in use. Restoring such a backup needs the old key.
+
+Two steps matter because an instance that has not received the new key cannot open a value sealed with
+it. Deploying the key everywhere first means no instance ever meets a value it cannot read.
+
+The server refuses to start when a keyring gives a known key id different key material, which usually
+means a typo. It refuses before it writes anything.
+
+### If a key is lost {#lost-key}
+
+A lost key does not stop the server. It keeps running, and each check that needs a secret it cannot open
+fails closed:
+
+- an application whose secret cannot be opened is refused with `invalid_client`;
+- an authenticator that cannot be opened is refused;
+- mail is treated as not configured;
+- a sign-in provider is treated as not configured.
+
+The **Encryption at rest** card lists every such secret with its repair:
+
+| Secret that cannot be opened     | Repair                                    |
+| -------------------------------- | ----------------------------------------- |
+| An application secret            | Rotate the application's secret.          |
+| A sign-in provider secret or key | Enter the provider's secret or key again. |
+| The mail password                | Enter the mail password again.            |
+| A person's authenticator         | Reset that person's authenticator.        |
+| A project's signing key          | Generate a new key for the project.       |
+
+If you find the lost key later, putting it back into the keyring under its old id repairs everything at
+once.
+
+The console's own sign-in is signed with the instance's root signing keys. If the keyring cannot open
+those, nobody can sign in to the console. Run this with the keyring the server uses:
+
+```bash
+bun run admin:replace-root-keys
+```
+
+It revokes each root key that cannot be opened. For each algorithm, a key that can still be opened takes
+over signing, or the command makes a new key, sealed with the current keyring. Tokens signed by the
+revoked keys stop verifying. Relying parties fetch the new keys from `/jwks`.
 
 ## One upgrade signs your end users in again
 

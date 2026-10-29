@@ -4,7 +4,7 @@ title: "Signing keys: one lifecycle for every issuer, and a provider that holds 
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-09-23
-updated: 2026-10-15
+updated: 2026-10-29
 ---
 
 # Signing keys
@@ -18,6 +18,12 @@ Corrected 2026-09-30 (spec 063): the root keys used to live in their own `jwksSt
 with no state, loaded once at boot by `lib/configs/keys.ts`, so deleting one waited for a restart. That
 area, its three adapters and `configs/keys.ts` are gone; the root is now the owner `'#root'`
 (`ROOT_KEY_OWNER`, `lib/consts/key_owner.ts:7`) in the same area.
+
+Since spec 116 (2026-10-29) a key's private members (`d p q dp dq qi`) are stored sealed with the instance
+keyring; the public half is not, since it is published anyway. A key whose private members cannot be opened
+still verifies but never signs: `assemble()` skips it and lets another published key of that algorithm sign
+(`lib/keys/issuer_keys.ts:94`). Unreadable root keys lock the console, whose sign-in they sign;
+`bun run admin:replace-root-keys` replaces them ([[secrets-encryption-at-rest]]).
 
 ## Where they come from
 

@@ -39,6 +39,20 @@ export const ENVIRONMENT_VARIABLES: readonly EnvironmentVariable[] = [
 		example: 'postgres://user:password@localhost:5432/oauth'
 	},
 	{
+		name: 'KEYRING',
+		requirement: 'optional',
+		description:
+			'The instance keyring: the keys secrets stored in the database are encrypted with (client secrets, sign-in provider credentials, the SMTP password, private signing keys, authenticator secrets). A deployment secret like the connection string, never kept in the database it protects; store it in a secrets manager and back it up apart from the database. Generate one with `bun run keyring new`, or let first-run setup generate it. Supplying it here and through a keyring file at once is refused at startup. Without a keyring, secrets are stored unencrypted and the console says so. Not read when NODE_ENV is `test`.',
+		example: '{"v":1,"write":"20261029-ab12","keys":{"20261029-ab12":"…"}}'
+	},
+	{
+		name: 'KEYRING_FILE',
+		requirement: 'optional',
+		description:
+			'Where the keyring file is, when the keyring is supplied as a file (a mounted secret, a volume) rather than through `KEYRING`. Defaults to `keyring/foxauth.keyring` under the working directory (`/app/keyring/foxauth.keyring` in the image). First-run setup writes a generated keyring here only when the directory already exists, so a container without a volume never keeps a key it would lose. Under NODE_ENV `test` the default is a directory nobody creates, so a spec never writes into a working copy.',
+		example: '/run/secrets/foxauth.keyring'
+	},
+	{
 		name: 'NODE_ENV',
 		requirement: 'optional',
 		description:

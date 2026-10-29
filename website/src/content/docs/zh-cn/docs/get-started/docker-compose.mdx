@@ -1,7 +1,7 @@
 ---
 title: 使用 Docker Compose 运行
 description: 只需一条命令，即可启动 MongoDB、初始化数据库结构并运行授权服务器。
-source: 560cdcb4bd9a
+source: b351897a71d4
 sidebar:
   order: 1
 ---
@@ -36,11 +36,11 @@ import { Steps, Aside } from '@astrojs/starlight/components';
 
 ## 三个服务各做什么 {#what-the-three-services-do}
 
-| 服务    | 镜像                                         | 作用                                                                                                                                    |
-| ------- | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `mongo` | `mongo:8`                                    | 数据存储，位于名为 `mongo-data` 的卷上，带有一个 `mongosh` ping 健康检查，其他服务会等待它通过                                          |
-| `setup` | `ghcr.io/redfox-soft/oauth-server-ts:latest` | 运行 `bun run db:setup` 和 `bun run db:migrate` 后退出：创建集合、索引、初始 RS256 签名密钥、管理面板的种子数据，并执行所有 schema 迁移 |
-| `oauth` | `ghcr.io/redfox-soft/oauth-server-ts:latest` | 服务器本身，监听 3000 端口，仅在 `setup` 成功完成后才启动                                                                               |
+| 服务    | 镜像                                         | 作用                                                                                                                                                                                                                    |
+| ------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mongo` | `mongo:8`                                    | 数据存储，位于名为 `mongo-data` 的卷上，带有一个 `mongosh` ping 健康检查，其他服务会等待它通过                                                                                                                          |
+| `setup` | `ghcr.io/redfox-soft/oauth-server-ts:latest` | 运行 `bun run db:setup` 和 `bun run db:migrate` 后退出：创建集合、索引、初始 RS256 签名密钥、管理面板的种子数据，并执行所有 schema 迁移                                                                                 |
+| `oauth` | `ghcr.io/redfox-soft/oauth-server-ts:latest` | 服务器本身，监听 3000 端口，仅在 `setup` 成功完成后才启动。它把名为 `foxauth-keyring` 的卷挂载到 `/app/keyring`，首次运行的设置页面会把用来加密所存机密的[密钥环](/zh-cn/docs/deploy/docker-compose/#keyring)保存在那里 |
 
 服务器等待 `setup` 完成，原因有二。如果没有 `setup` 预置的保留的管理员项目和 `admin-panel` 客户端，控制台的登录会重定向到一个没有任何 `Client` 文档能匹配的客户端。在这种状态下，首次运行的设置页面依然可用，这会让问题看起来像是登录 bug。服务器还会拒绝在迁移尚未运行的数据库上启动，这就是 `setup` 在 `db:setup` 之后运行 `db:migrate` 的原因。这两条命令都可以安全地重复执行，因此在拉取更新的镜像后重新运行 `docker compose up`，也就是升级的方式；如果发布说明提到某个无法撤销的迁移，请先做备份。
 
@@ -51,12 +51,12 @@ import { Steps, Aside } from '@astrojs/starlight/components';
 如果你已经用错误的值启动了，变通办法是删除数据存储并重新开始：
 
 ```bash
-docker compose down -v   # removes the mongo-data volume
+docker compose down -v   # removes the mongo-data and foxauth-keyring volumes
 # edit ISSUER in docker-compose.yml
 docker compose up
 ```
 
-删除该卷会销毁其中的所有账户、客户端和签名密钥，所以这个变通办法只适用于第一天。在已有数据的部署上，无法通过控制台修复：保留的管理客户端是控制台唯一不允许编辑的客户端，所以必须在首次启动之前把 `ISSUER` 设置正确。
+删除这些卷会销毁所有账户、客户端和签名密钥，也会删除密钥环。在第一天这没有害处：数据和加密它的密钥环一起被清除，首次运行的设置页面会重新生成密钥环。但这个变通办法只适用于第一天。对于正在运行的实例，请先备份密钥环，再删除任何卷，否则数据库备份中的机密将永远无法读取。在已有数据的部署上，无法通过控制台修复：保留的管理客户端是控制台唯一不允许编辑的客户端，所以必须在首次启动之前把 `ISSUER` 设置正确。
 
 </Aside>
 

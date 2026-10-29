@@ -37,6 +37,8 @@
 		"db:setup:pg": "bun database/postgres.ts",
 		"db:migrate": "bun database/migrate.ts",
 		"admin:password-sign-in": "bun database/admin_password_sign_in.ts",
+		"admin:replace-root-keys": "bun database/replace_root_keys.ts",
+		"keyring": "bun database/keyring.ts",
 		"docs:export": "bun scripts/docs_export.ts",
 		"start": "bun lib/index.ts"
 	},

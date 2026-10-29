@@ -131,7 +131,19 @@ export function enqueue(
 	scheduleDrain();
 }
 
+/*
+ * Records still being assembled. Assembly opens the origin key, which is sealed (specs/116) and so takes more
+ * than a microtask; a spec that waits for the queue has to wait for what is on its way into it too.
+ */
+const assembling = new Set<Promise<unknown>>();
+
+export function trackAssembly(assembly: Promise<unknown>): void {
+	assembling.add(assembly);
+	void assembly.finally(() => assembling.delete(assembly));
+}
+
 /* Test seam: await the queue reaching empty, so a spec need not poll. */
 export async function flushForTest(): Promise<void> {
+	await Promise.allSettled([...assembling]);
 	await drainOnce();
 }

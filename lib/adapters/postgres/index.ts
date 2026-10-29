@@ -21,6 +21,8 @@ export { SingletonSecretStore } from './singletonSecretStore.js';
 export { SchemaMigrationStore } from './schemaMigrationStore.js';
 export { MigrationLeaseStore } from './migrationLeaseStore.js';
 export { TelemetryStateStore } from './telemetryStateStore.js';
+export { KeyringStateStore } from './keyringStateStore.js';
+export { SealingStore } from './sealingStore.js';
 
 /* Not a store: the expiry sweeper this backend needs in place of the TTL index PostgreSQL does not
  * have. Exported so the selection site can start it, rather than started here — a module that begins

@@ -201,7 +201,7 @@ export function pathArgName(tool: McpTool, param: string): string {
 }
 
 const catalogue = [
-	/* ---------------------------------------------------------------- reads (17) */
+	/* ---------------------------------------------------------------- reads (18) */
 	{
 		tool: 'whoami',
 		method: 'GET',
@@ -758,6 +758,19 @@ const catalogue = [
 		pathParams: [],
 		summary:
 			'Whether this server sends its daily anonymous usage report, why not if it does not, its instance identifier, when a report was last delivered, and the exact report last sent (or, before the first, the next one). Turned on and off with settings_update (`telemetry.enabled`).'
+	},
+	{
+		tool: 'keyring_status_get',
+		method: 'GET',
+		path: '/admin/api/keyring',
+		action: null,
+		consequence: 'read',
+		superAdminOnly: true,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: [],
+		summary:
+			'Whether stored secrets are encrypted at rest with the instance keyring, which key new values are sealed with, how many values each key protects, how many are still plaintext, and which secrets cannot be opened with the keyring in use (with the key each needs). Never returns key material. Generating a keyring and confirming its backup are console-only.'
 	},
 	{
 		tool: 'attack_reports_status_get',
@@ -2185,6 +2198,27 @@ export const excludedConsoleOperations: readonly ExcludedConsoleOperation[] = [
 	},
 	{
 		method: 'POST',
+		path: '/admin/api/keyring',
+		absence: 'withheld',
+		reason:
+			'Generating a keyring returns key material, which must never reach an agent. A super administrator generates it in the console (Keys) and stores it apart from the database backups.'
+	},
+	{
+		method: 'POST',
+		path: '/admin/api/keyring/backup-confirmation',
+		absence: 'withheld',
+		reason:
+			'Attests that a person holds a copy of the keyring outside the database, which an agent cannot do. Confirmed in the console (Keys).'
+	},
+	{
+		method: 'POST',
+		path: '/admin/api/setup/keyring-confirmation',
+		absence: 'inapplicable',
+		reason:
+			'Confirms, during first-run setup, that the person who ran it stored the keyring it showed them; no administrator exists yet who could authorize an agent. Console-only.'
+	},
+	{
+		method: 'POST',
 		path: '/admin/api/setup',
 		absence: 'inapplicable',
 		reason:
@@ -2314,6 +2348,8 @@ export function excludedOperationFor(
 		project_delete: '/admin/api/projects/:id',
 		project_purge: '/admin/api/projects/:id/purge',
 		setup_bootstrap: '/admin/api/setup',
+		keyring_generate: '/admin/api/keyring',
+		keyring_backup_confirm: '/admin/api/keyring/backup-confirmation',
 		logout: '/admin/api/logout',
 		scope_switch: '/admin/api/scope',
 		error_purge: '/admin/api/errors',

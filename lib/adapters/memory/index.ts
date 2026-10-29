@@ -24,3 +24,5 @@ export { MigrationLeaseStore } from './migrationLeaseStore.js';
 export { TelemetryStateStore } from './telemetryStateStore.js';
 export { ContainerOwnershipStore } from './containerOwnershipStore.js';
 export { ActivityStore } from './activityStore.js';
+export { KeyringStateStore } from './keyringStateStore.js';
+export { SealingStore, type MemorySealingSources } from './sealingStore.js';

@@ -39,18 +39,19 @@ against dependencies with no demonstrated effect on this server.
 
 What an attacker would want, roughly in order of blast radius.
 
-| Asset                                                                   | Where it lives                                                              | Why it matters                                                                                                             |
-| ----------------------------------------------------------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Signing keys                                                            | `bucketKeys`, one area for every issuer (the root's under owner `#root`)    | Whoever holds a private key mints tokens every relying party trusts                                                        |
-| Client secrets, registration access tokens                              | the `Client` collection                                                     | A stolen confidential-client secret impersonates that client to the token endpoint                                         |
-| Refresh tokens, authorization codes, access tokens                      | token collections, all with TTL indexes                                     | Direct access to a user's resources; a refresh token for as long as the grant lives                                        |
-| End-user and administrator credentials                                  | argon2id hashes on the user record; TOTP secrets                            | Account takeover, and for administrators, control of the instance                                                          |
-| Sessions and interaction state                                          | the `_session`, `_interaction` and admin cookies, opaque ids into the store | Riding an authenticated session without the credential                                                                     |
-| DPoP nonce secret, pairwise subject salt                                | singleton secret documents                                                  | Forging nonces; correlating users across relying parties                                                                   |
-| Configuration and the audit trail                                       | `configStore`, `adminAudit`                                                 | Turning off a control silently; rewriting the record of who did what                                                       |
-| SMTP credentials, upstream provider client secrets and signing keys     | settings and federation documents                                           | Sending mail as the instance; impersonating it to an upstream identity provider                                            |
-| SCIM credentials: static `scimst_` tokens and connection client secrets | `provisioningConnections`, both as SHA-256 digests                          | Whoever holds one creates, changes, deactivates and deletes a project's end users                                          |
-| Provisioning connections                                                | `provisioningConnections`, one per bound upstream provider                  | A connection decides which upstream sign-in is which provisioned account, and whether its directory may deprovision at all |
+| Asset                                                                   | Where it lives                                                                           | Why it matters                                                                                                             |
+| ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Signing keys                                                            | `bucketKeys`, one area for every issuer (the root's under owner `#root`)                 | Whoever holds a private key mints tokens every relying party trusts                                                        |
+| The instance keyring                                                    | `KEYRING` or the keyring file, supplied by the operator and never stored in the database | Together with a copy of the database, it opens every sealed secret listed below                                            |
+| Client secrets, registration access tokens                              | the `Client` collection                                                                  | A stolen confidential-client secret impersonates that client to the token endpoint                                         |
+| Refresh tokens, authorization codes, access tokens                      | token collections, all with TTL indexes                                                  | Direct access to a user's resources; a refresh token for as long as the grant lives                                        |
+| End-user and administrator credentials                                  | argon2id hashes on the user record; TOTP secrets                                         | Account takeover, and for administrators, control of the instance                                                          |
+| Sessions and interaction state                                          | the `_session`, `_interaction` and admin cookies, opaque ids into the store              | Riding an authenticated session without the credential                                                                     |
+| DPoP nonce secret, pairwise subject salt                                | singleton secret documents                                                               | Forging nonces; correlating users across relying parties                                                                   |
+| Configuration and the audit trail                                       | `configStore`, `adminAudit`                                                              | Turning off a control silently; rewriting the record of who did what                                                       |
+| SMTP credentials, upstream provider client secrets and signing keys     | settings and federation documents                                                        | Sending mail as the instance; impersonating it to an upstream identity provider                                            |
+| SCIM credentials: static `scimst_` tokens and connection client secrets | `provisioningConnections`, both as SHA-256 digests                                       | Whoever holds one creates, changes, deactivates and deletes a project's end users                                          |
+| Provisioning connections                                                | `provisioningConnections`, one per bound upstream provider                               | A connection decides which upstream sign-in is which provisioned account, and whether its directory may deprovision at all |
 
 ## Trust boundaries
 
@@ -75,8 +76,10 @@ or clients: an enterprise directory writing a project's users over SCIM, and an 
 provider asking for a user's sessions to end. Each is admitted per project, one connection or provider
 at a time, by an administrator, and authenticated with a credential the server checks itself; neither
 is trusted because of where it connects from. The database is inside the boundary: a party who can read it can read
-secrets, which is why a compromised database is out of scope and why the operator section below
-is not optional.
+accounts, tokens and the audit trail, which is why a compromised database is out of scope and why the
+operator section below is not optional. The secrets the server must read back are the exception. They are
+sealed with a keyring that the operator keeps outside the database, so reading the database alone does
+not reveal them ([Stored secrets](#stored-secrets)).
 
 ## Attackers
 
@@ -171,19 +174,32 @@ Each row is a threat, the control, and the evidence. Tests live under
 | Downgrade, sniffing, referrer leaks                     | `Strict-Transport-Security` for two years with subdomains, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, a denying `Permissions-Policy`, and `default-src 'none'` on every non-HTML response | [securityHeaders.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/plugins/securityHeaders.ts), `test/security_headers/` |
 | Exhausting the sign-in, token or registration endpoints | Per-origin rate limiting tiered by route class, mounted before routing so a refused request costs nothing                                                                                                         | [rateLimit.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/plugins/rateLimit.ts), `test/rate_limit/`                   |
 
+### Stored secrets
+
+| Threat                                                                                                         | Control                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | Evidence                                                                                                                                                                                                                                                                          |
+| -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Reading secrets from a copy of the database: a backup, a snapshot, a dump, or read-only access to the database | Every secret the server must read back is sealed: encrypted with AES-256-GCM under a keyring the operator supplies through `KEYRING` or a keyring file, and never stored in the database. That covers application secrets, sign-in provider secrets and Apple signing keys, the SMTP password, private signing keys, authenticator secrets including unfinished enrolments, the DPoP nonce secret and the error log's address key. A completeness test fails when a secret-looking field is neither sealed nor listed as deliberately left alone | [seal.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/sealing/seal.ts), [sealed_fields.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/consts/sealed_fields.ts), `test/sealing/declared_fields.spec.ts`, `test/sealing/inventory_sweep.spec.ts` |
+| Moving a sealed value into another record, or editing it                                                       | Each sealed value is bound to its record and field in its authenticated header, so a value copied elsewhere or altered does not open                                                                                                                                                                                                                                                                                                                                                                                                             | [seal.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/sealing/seal.ts), `test/sealing/tampering.spec.ts`                                                                                                                                                         |
+| A mistyped keyring sealing new values under the wrong key                                                      | Startup is refused when a keyring gives a known key id different key material, before anything is written                                                                                                                                                                                                                                                                                                                                                                                                                                        | [startup.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/sealing/startup.ts), `test/sealing/startup.spec.ts`                                                                                                                                                     |
+| A lost key turning a secret into an open door                                                                  | A check that needs a secret it cannot open fails closed: the application is refused as `invalid_client`, the authenticator is refused, mail and the sign-in provider count as not configured. The console lists each such secret with its repair                                                                                                                                                                                                                                                                                                 | [unreadable.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/sealing/unreadable.ts), `test/sealing/lost_key.spec.ts`                                                                                                                                              |
+
 ## Known limitations
 
 These are true today. Each is either a deliberate trade-off with its reasoning, or a gap with its
 compensating control. A fix that closes one is welcome; a report that one of them is exploitable in
 a way the compensating control does not cover is a vulnerability report.
 
-- **Client secrets, signing keys and the SMTP password are stored unencrypted in the database.**
-  An ordinary client's secret is stored in plaintext, because `client_secret_jwt` and the symmetric
-  keys are derived from it; only a SCIM connection's secret and static token are stored as digests.
-  The database is inside the trust boundary and a compromised database is out of scope; the
-  compensating control is the operator's: network isolation and access control on the database, and
-  encryption at rest where the platform offers it. Encrypting these fields with an operator-held key
-  remains an open design question; nothing has been decided against it.
+- **Stored secrets are encrypted with a keyring the operator holds. That protects a copy of the
+  database, not a running server.** Client secrets, signing keys, the SMTP password and the other
+  secrets in [Stored secrets](#stored-secrets) are sealed with a key that is never in the database. So a
+  copy of the database, a backup, a snapshot or read-only access to the database yields none of them. An
+  attacker who controls the running server or its environment is a different case: they can read the
+  keyring the same way the server does, and the encryption does not stop them. An ordinary client's
+  secret is still stored reversibly, because `client_secret_jwt` and the symmetric keys are derived from
+  it; only a SCIM connection's secret and static token are stored as digests. Two exceptions remain.
+  The pairwise subject salt is not sealed on purpose: if its key were lost, every
+  application's `sub` would change for ever. And an instance without a keyring stores every secret
+  unencrypted, as before, with a warning in the console until the operator supplies one.
 - **The rate limiter is a resource protection.** It is not a security boundary: counters are
   in-process, multiply per machine, reset on restart and fail open under an address-rotation flood.
   The boundaries that must hold absolutely, the sign-in throttle, verification attempt caps and TOTP
@@ -255,9 +271,12 @@ a way the compensating control does not cover is a vulnerability report.
 
 The controls above assume a deployment that: terminates TLS in front of the server with an
 `https://` issuer; chooses the `clientAddress.source` that matches the proxy in front of it; keeps the database, MongoDB or PostgreSQL, off the public network with authentication on and
-encryption at rest where available; turns on the TOTP requirement for the administrators' project; and backs up the database,
-because the signing keys are in it. [Behind a reverse proxy](/docs/deploy/reverse-proxy/) covers
-the first two.
+encryption at rest where available; supplies a keyring through `KEYRING` or a keyring file and never
+stores it in the database; turns on the TOTP requirement for the administrators' project; and backs up
+the database, because the signing keys are in it. The keyring is backed up separately from the database,
+because the sealed secrets in a backup cannot be opened without it, and a backup kept beside its keyring
+loses the protection. [Behind a reverse proxy](/docs/deploy/reverse-proxy/) covers the first two, and
+[The keyring](/docs/deploy/upgrade/#keyring) covers the keyring.
 
 ## How this page stays true
 

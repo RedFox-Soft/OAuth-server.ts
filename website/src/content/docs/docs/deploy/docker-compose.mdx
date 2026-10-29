@@ -84,7 +84,8 @@ mongo:
 
 with `depends_on: { mongo: { condition: service_healthy } }` on the `setup` service, and a scheduled
 `mongodump` against the volume. Everything a deployment cannot lose is in that database: end-user
-accounts, clients, the audit trail, and the signing keys.
+accounts, clients, the audit trail, and the signing keys. The one exception is the
+[keyring](#keyring) that encrypts the stored secrets, which you keep apart from it.
 
 To run PostgreSQL instead, swap the service for `postgres:17`, put `POSTGRES_URL` in the `.env` in
 place of `MONGODB_URI` and `DATABASE_NAME`, and change the setup command to
@@ -108,6 +109,33 @@ and a later change is not repaired by re-running it. Put the final public URL in
 first `docker compose up`.
 
 </Aside>
+
+## The keyring {#keyring}
+
+The server encrypts the secrets it stores, such as application secrets and private signing keys, with a
+**keyring**: a key file that you hold outside the database.
+[The keyring](/docs/deploy/upgrade/#keyring) describes what it covers and how to rotate it.
+
+Both shipped Compose files mount a named volume, `foxauth-keyring`, at `/app/keyring` on the `oauth`
+service. That directory is where the server looks for its keyring file. Because the directory exists,
+first-run setup can generate a keyring, write it there and use it at once. Setup also shows you the
+keyring once: save a copy then.
+
+For production, move the keyring into the `.env` instead:
+
+```ini
+KEYRING='{"v":1,"write":"<kid>","keys":{"<kid>":"<base64url key>"}}'
+```
+
+Then delete `foxauth.keyring` from the volume. With the variable and the file both present, the server
+refuses to start. To make a keyring yourself rather than through setup, the image carries the command:
+
+```bash
+docker run --rm ghcr.io/redfox-soft/oauth-server-ts:<version> bun run keyring new
+```
+
+Keep a copy of the keyring apart from your database backups. The secrets in a `mongodump` or a volume
+snapshot cannot be read without it.
 
 ## Upgrading: change the tag and run setup again {#upgrading}
 

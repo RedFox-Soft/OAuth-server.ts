@@ -206,6 +206,8 @@ describe('route classification', () => {
 			// Unauthenticated by construction — one is how the first super-admin comes to exist, the other
 			// is how somebody invited into a group accepts. Both perform an account write.
 			'POST /admin/api/setup',
+			// Setup's confirmation that the keyring was stored: unauthenticated for the same reason (specs/116).
+			'POST /admin/api/setup/keyring-confirmation',
 			'POST /admin/api/invitations/accept'
 		];
 

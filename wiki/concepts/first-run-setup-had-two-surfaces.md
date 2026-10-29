@@ -4,7 +4,7 @@ title: "First-run admin setup: one surface, not two"
 tags: [architecture, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-04
-updated: 2026-08-04
+updated: 2026-10-29
 graph:
   node_type: concept
   relationships:
@@ -19,9 +19,11 @@ graph:
 # First-run admin setup: one surface, not two
 
 A fresh deployment is bootstrapped through **`GET /admin`**. When no super-administrator exists,
-`lib/admin/index.ts:38-44` server-renders the console shell with `needsSetup: true`, which renders the
+`lib/admin/index.ts:89-97` server-renders the console shell with `needsSetup: true`, which renders the
 `<Setup />` page; the form posts to `POST /admin/api/setup`, which creates the first super-admin
-audit-first and then hard-gates with 409.
+audit-first and then hard-gates with 409. Since spec 116 (2026-10-29) it then generates the instance keyring
+when the deployment supplies none, and `<Setup />` shows it once before continuing; the person confirms they
+stored it through `POST /admin/api/setup/keyring-confirmation` ([[secrets-encryption-at-rest]]).
 
 ## The trap that was removed
 

@@ -33,7 +33,16 @@ adopt it as is or change it knowing what each part does.
    database name is part of that URL. Set one connection string, never both; see
    [PostgreSQL](/docs/deploy/postgresql/).
 
-3. **Set the two non-secret variables** in `fly.toml`:
+3. **Set the keyring as a secret**:
+
+   ```bash
+   fly secrets set KEYRING="$(bun run keyring new)"
+   ```
+
+   Run it in a clone of the repository, which carries the `keyring` command. The keyring encrypts the
+   secrets the server stores. [The keyring](#keyring) below explains why it must be a secret on Fly.
+
+4. **Set the two non-secret variables** in `fly.toml`:
 
    ```toml
    [env]
@@ -45,7 +54,7 @@ adopt it as is or change it knowing what each part does.
    the release command bakes it into the seeded console client's redirect URI once. Neither value is
    a credential, so neither needs to be a secret.
 
-4. **Deploy**:
+5. **Deploy**:
 
    ```bash
    fly deploy --remote-only
@@ -85,6 +94,21 @@ succeeds. Most releases declare none, and the step reports `current` and exits. 
 0.10.0, 0.11.0 and 1.0.0 each carried migrations that cannot be undone, so read the release notes before a
 deploy and take a backup when they name one. The `sh -c` wrapper makes `&&` a shell operator instead
 of two more arguments to `bun`.
+
+## The keyring {#keyring}
+
+The server encrypts the secrets it stores, such as application secrets and private signing keys, with a
+**keyring** that you hold outside the database. [The keyring](/docs/deploy/upgrade/#keyring) covers what
+it encrypts, how to rotate it and what to do if a key is lost.
+
+On Fly, supply the keyring as the `KEYRING` secret, as step 3 above does. A secrets manager that syncs
+into Fly works as well, for example Infisical's Fly.io secret sync. Do not rely on first-run setup to
+keep a keyring here. The shipped `fly.toml` attaches no volume, so a file written to a Machine's disk
+would be gone after the next deploy. Setup sees that there is no keyring directory, so it only shows you
+the keyring it generated and asks you to set it as the `KEYRING` secret and restart.
+
+Keep a copy of the keyring apart from your database backups. The secrets in a backup cannot be read
+without it.
 
 ## The health checks
 

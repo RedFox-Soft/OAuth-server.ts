@@ -332,3 +332,7 @@ Operations:
 ## [2026-10-29] create | spec 114 — [[attack-reports]]: the owner's decisions, the six signal sites and what does not count, why not the event bus, the hard-capped hourly tally, the address reduction (IPv4-mapped trap), the per-process send without a claim, the state fields, the declaration and its guards, the receiver's obligation.
 
 ## [2026-10-29] update | [[instance-telemetry]] gains a "not the same as" entry for [[attack-reports]] (shared identifier, sender and state document); [[caller-address]] no longer describes spec 114 as pending.
+
+## [2026-10-29] create | spec 116 — [[secrets-encryption-at-rest]]: threat model, the nine sealed leaves and the plaintext declarations, the format and binding, the decorators (and why not a Proxy), absence over placeholders, the keyring and fingerprints, generation into an existing directory only, the compare-and-set pass and its deferral, recovery, and the test-suite races it exposed.
+
+## [2026-10-29] update | spec 116 corrections: [[signing-keys]] (sealed private members, unreadable keys never sign), [[admin-provisioning]] (the root key is created at boot on an empty store; the keyring is never seeded), [[first-run-setup-had-two-surfaces]] (the keyring step; citations), [[pairwise-identifier-salt]] (a backup needs the keyring; the salt stays unsealed), [[scim-provisioning]] (the plaintext gap closed, constitution 3.3.0), [[security-assurance-evidence]], [[admin-mcp-control-plane]] (tool counts), [[totp-second-factor]], [[upstream-federation]], [[spec-file-isolation]], [[mongodb-test-fidelity]].

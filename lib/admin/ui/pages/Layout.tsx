@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Layout as AntLayout, Badge, Button, Menu, Typography } from 'antd';
+import {
+	Layout as AntLayout,
+	Alert,
+	Badge,
+	Button,
+	Menu,
+	Typography
+} from 'antd';
 import type { MenuProps } from 'antd';
 import {
 	DatabaseOutlined,
@@ -122,12 +129,52 @@ function useHeldConnections(pathname: string): number {
 	return count;
 }
 
+/*
+ * What a super administrator must not miss about encryption at rest (specs/116 FR-016): stored secrets not
+ * encrypted, a keyring not yet backed up, secrets that cannot be opened. Read on every move between pages,
+ * like the held connections above; nobody else is asked, since the status is instance-wide.
+ */
+function useKeyringAttention(
+	pathname: string,
+	instance: boolean
+): string | null {
+	const [message, setMessage] = useState<string | null>(null);
+	useEffect(() => {
+		if (!instance) return;
+		let live = true;
+		void request<{
+			state: string;
+			backupConfirmed: unknown;
+			unreadableTotal: number;
+		}>('GET', '/admin/api/keyring').then((r) => {
+			if (!live || !r.ok) return;
+			const status = r.data;
+			setMessage(
+				status.unreadableTotal > 0
+					? `${status.unreadableTotal} stored secret(s) cannot be opened with the keyring in use.`
+					: status.state === 'none'
+						? 'Stored secrets are not encrypted: generate a keyring.'
+						: status.state === 'generated-not-applied'
+							? 'A keyring was generated but is not in use: supply it to the deployment and restart.'
+							: !status.backupConfirmed
+								? 'Confirm that the instance keyring is backed up apart from the database.'
+								: null
+			);
+		});
+		return () => {
+			live = false;
+		};
+	}, [pathname, instance]);
+	return message;
+}
+
 export function Layout() {
 	const { me } = useMe();
 	const can = meCan(me);
 	const { resolved, location } = useRoute();
 	const navigate = useNavigate();
 	const held = useHeldConnections(location.pathname);
+	const keyringAttention = useKeyringAttention(location.pathname, can.instance);
 
 	/*
 	 * Grouped so an operator can tell their own work from the organisation around it and from the
@@ -369,6 +416,22 @@ export function Layout() {
 					key={me?.activeTeamId ?? 'none'}
 					style={{ margin: 24 }}
 				>
+					{keyringAttention && location.pathname !== '/admin/keys' && (
+						<Alert
+							type="warning"
+							showIcon
+							style={{ marginBottom: 16 }}
+							title={keyringAttention}
+							action={
+								<Button
+									size="small"
+									onClick={() => void navigate('/admin/keys')}
+								>
+									Open Keys
+								</Button>
+							}
+						/>
+					)}
 					{renderPage()}
 				</Content>
 			</AntLayout>

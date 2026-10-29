@@ -4,7 +4,7 @@ title: 'SCIM provisioning: connections, /Users, and the sign-in they feed'
 tags: [architecture, contract, gotcha, oauth, config]
 sources: [oauth-server-codebase]
 created: 2026-10-06
-updated: 2026-10-15
+updated: 2026-10-29
 graph:
   node_type: concept
   relationships:
@@ -59,9 +59,11 @@ new lifetime are in [[scim-credential-overlap]].
 
 - **The secret is a digest.** The synthesized client carries `clientSecretDigest` and no `clientSecret`;
   comparison hashes what is presented (`lib/models/client/secret.ts:45`; since spec 088 against the overlapping
-  previous digest too). Ordinary clients still store the
-  plaintext, because `client_secret_jwt` and the symmetric keys derive from it — a standing gap against the
-  constitution's "client secrets MUST be stored hashed" that this change did not widen.
+  previous digest too). Ordinary clients cannot store a
+  digest, because `client_secret_jwt` and the symmetric keys derive from the secret. They stored the plaintext
+  until spec 116, a standing gap against the constitution's "client secrets MUST be stored hashed"; since
+  then they are stored sealed with the keyring and the clause reads "hashed, or encrypted at rest where the
+  protocol needs the value back" (constitution 3.3.0, [[secrets-encryption-at-rest]]).
 - **Basic and post alike** for a connection's secret (`lib/shared/token_auth.ts:170`): Entra lets its
   administrator choose either, and a wrong guess surfaces as `invalid_client` on the customer's "Test
   connection". Not both at once: a request carrying the secret in the header and the body is refused as

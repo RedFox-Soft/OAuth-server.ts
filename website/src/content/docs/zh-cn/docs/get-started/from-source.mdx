@@ -1,7 +1,7 @@
 ---
 title: 从源码运行
 description: 克隆代码仓库、初始化数据库，然后使用 Bun 在本地启动这台授权服务器。
-source: 74c97c8d25f2
+source: be866a33c339
 sidebar:
   order: 2
 ---
@@ -46,13 +46,21 @@ import { Steps, Aside } from '@astrojs/starlight/components';
    bun run db:setup:pg   # PostgreSQL
    ```
 
-4. 将控制台和登录页面打包到 `public/`：
+4. 创建密钥环目录：
+
+   ```bash
+   mkdir keyring
+   ```
+
+   服务器用密钥环（keyring）中的密钥加密它存储的机密。只要这个目录存在，首次运行的设置页面就会把它生成的密钥环写到这里，并立即开始使用。提供密钥环的其他方式见下文的[密钥环](#keyring)一节。
+
+5. 将控制台和登录页面打包到 `public/`：
 
    ```bash
    bun run build
    ```
 
-5. 启动服务器：
+6. 启动服务器：
 
    ```bash
    bun start
@@ -80,6 +88,24 @@ import { Steps, Aside } from '@astrojs/starlight/components';
 当 `db:setup` 声明的某个约束没有生效时，它会以非零状态码退出：例如，由于现有数据已经违反了某个唯一索引，导致无法创建该索引。部署流水线应当根据这个退出码让部署失败，而不是只记录一条警告；仓库自带的 `fly.toml` 正是这样做的。
 
 </Aside>
+
+## 密钥环 {#keyring}
+
+服务器会加密它存储的机密，例如应用程序的密钥和签名私钥。加密用的是一个**密钥环**：一份由你保管、放在数据库之外的小型 JSON 文档。服务器通过以下三种方式之一拿到它：
+
+- **`keyring/` 目录中的文件。** 只要第 4 步创建的目录存在，首次运行的设置页面就会生成密钥环，写入 `keyring/foxauth.keyring`，并立即使用。设置页面只显示一次密钥环，所以请在那时保存一份副本。代码仓库的忽略列表包含 `keyring/`，因此 git 不会提交它。
+- **`KEYRING` 变量。** 运行 `bun run keyring new`，把输出放进 `KEYRING`。
+- **其他位置的文件。** 把 `KEYRING_FILE` 设为该文件的路径。在 systemd 下，用 `LoadCredential=` 加载密钥环，并让 `KEYRING_FILE` 指向 `$CREDENTIALS_DIRECTORY` 中的文件：
+
+  ```ini
+  [Service]
+  LoadCredential=foxauth.keyring:/etc/foxauth/foxauth.keyring
+  Environment=KEYRING_FILE=%d/foxauth.keyring
+  ```
+
+  `%d` 是 systemd 对凭据目录的写法，与 `$CREDENTIALS_DIRECTORY` 是同一路径。
+
+只选其中一种。如果同时提供了 `KEYRING` 和密钥环文件，服务器会拒绝启动。如果两者都没有，服务器照常运行，但以未加密的形式存储机密，控制台会对此发出警告。请把密钥环的副本与数据库备份分开保存：没有密钥环，就无法读取备份中的机密。如何轮换密钥、密钥丢失后怎么办，见[密钥环](/zh-cn/docs/deploy/upgrade/#keyring)。
 
 ## 控制台的前提与设置何时生效 {#notes}
 

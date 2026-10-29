@@ -4,7 +4,7 @@ title: 'Signing in through somebody else’s identity provider'
 tags: [architecture, contract, gotcha, oidc]
 sources: [oauth-server-codebase]
 created: 2026-08-05
-updated: 2026-10-16
+updated: 2026-10-29
 graph:
   node_type: concept
   relationships:
@@ -404,7 +404,9 @@ rejected page, and a try reports the reason. `test/federation/response_issuer.sp
 ## The masked secret leaked for a year through the project routes
 
 `lib/admin/federation/service.ts` states the rule and means it: a provider's `clientSecret` is
-write-only, replaced by `SECRET_MASK` "on every read, for every role including super-admin". `present()`
+write-only, replaced by `SECRET_MASK` "on every read, for every role including super-admin". (Masking protects
+the API, not the database; since spec 116 the stored value is sealed with the instance keyring,
+[[secrets-encryption-at-rest]].) `present()`
 and `presentAll()` are where that happens, and the federation routes have always used them.
 
 The project routes did not. A project (`UserBucket`) *contains* its `federation` array, and

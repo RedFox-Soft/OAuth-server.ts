@@ -9,7 +9,8 @@ import { Steps, Aside } from '@astrojs/starlight/components';
 
 Everything this server cannot lose lives in MongoDB: end-user accounts, projects, clients,
 sessions, the append-only audit trail, and the signing keys. A managed instance is probably the
-shortest path to having that backed up.
+shortest path to having that backed up. The one thing that must not live there is the
+[keyring](#keyring) that encrypts the stored secrets.
 
 <Steps>
 
@@ -88,14 +89,27 @@ idempotent, and it exits non-zero when a constraint it declares is not in force,
 unique index it could not build because the existing data violates it. Treat that exit code as a
 failed deploy.
 
+## Keyring {#keyring}
+
+The server encrypts the secrets it stores, such as application secrets and private signing keys, with a
+**keyring** that you hold outside the database. [The keyring](/docs/deploy/upgrade/#keyring) covers what
+it encrypts, how to supply it, how to rotate it and what to do if a key is lost.
+
+For Atlas, the point is where the keyring lives. Atlas holds the database and its snapshots, so the
+keyring must live somewhere else: in your platform's secrets, supplied as `KEYRING` or as a keyring file
+at `KEYRING_FILE`. Never store it in the cluster. Someone who reads the cluster or a snapshot then sees
+the encrypted secrets, not the secrets themselves.
+
 ## Backups, and what a restore brings back {#backups}
 
 Atlas takes scheduled snapshots. Enable them, set a retention period, and then do the part people
 usually skip: restore one into a throwaway cluster once, so you know the restore works and how long
 it takes.
 
-Two things about a restore are worth knowing. The **signing keys** come back with the snapshot, so
+Three things about a restore are worth knowing. The **signing keys** come back with the snapshot, so
 tokens issued before it still verify; restoring a database without them would invalidate every
-live token they signed. And the **audit trail** is append-only by design, with no update or
+live token they signed. The **keyring** does not come back with it, because it is not in the database.
+The restored server needs a keyring that holds every key in use when the snapshot was taken, or the
+secrets in it cannot be opened. And the **audit trail** is append-only by design, with no update or
 delete exposed anywhere in the API. A restore that rolls it back is the only way an entry
 disappears, which is probably worth stating in whatever your compliance story is.

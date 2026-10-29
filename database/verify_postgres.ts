@@ -17,6 +17,7 @@ import { verifyAdminSessionsByUser } from './verify_admin_sessions.js';
 import { verifyBucketGroups } from './verify_bucket_groups.js';
 import { verifyActivity } from './verify_activity.js';
 import { verifyTelemetry } from './verify_telemetry.js';
+import { verifySealing } from './verify_sealing.js';
 import {
 	verifyContainerOwnership,
 	verifyPersonalGroupRepair
@@ -1122,6 +1123,31 @@ await verifyActivity(
 
 /* The usage-reporting state (specs/113): one identifier, one claim per day, counts that add up. */
 await verifyTelemetry(() => new TelemetryStateStore(), check);
+
+/* The encryption pass's store and the keyring state (specs/116): each leaf compare-and-set where it is stored. */
+{
+	const { KeyringStateStore, SealingStore, SmtpSettingsStore, SqlAdapter } =
+		await import('../lib/adapters/postgres/index.js');
+	await verifySealing(
+		{
+			sealing: new SealingStore(),
+			keyring: () => new KeyringStateStore(),
+			buckets: new UserBucketStore(),
+			users: (bucketId) => new UserStore(bucketId),
+			keys: new BucketKeysStore(),
+			smtp: new SmtpSettingsStore(),
+			secret: (name) => new SingletonSecretStore(name),
+			model: (name) => new SqlAdapter(name),
+			forget: async (documentName) => {
+				await handle`
+					DELETE FROM ${handle(STORE_AREAS.serviceConfig)}
+					WHERE id = ${secretIdOf(documentName)}
+				`;
+			}
+		},
+		check
+	);
+}
 
 /* Moving containers between groups, and making personal groups personal again (specs/075). */
 {

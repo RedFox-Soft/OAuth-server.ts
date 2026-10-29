@@ -159,3 +159,6 @@ website/public/og/
 
 # Playwright MCP session output (review screenshots, snapshots)
 .playwright-mcp/
+
+# The instance keyring (specs/116): a deployment secret, never committed or baked into an image
+keyring/

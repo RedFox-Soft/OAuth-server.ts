@@ -35,9 +35,11 @@ primary_region = 'arn'
 #
 # `db:migrate` follows it in the same command because the server refuses to start against a database
 # that is behind (lib/migrations/gate.ts): a release declaring a migration would otherwise deploy an
-# image that cannot boot. The declared set ships empty, so today this reports `current` and exits —
-# which is the point of wiring it before the first migration rather than with it. `sh -c` is what
-# makes the `&&` a shell operator instead of two arguments to bun.
+# image that cannot boot. `sh -c` is what makes the `&&` a shell operator instead of two arguments to
+# bun.
+#
+# The keyring (specs/116) arrives as the KEYRING secret, from Infisical's Fly.io secret sync: there is no
+# volume here, so a keyring written to the machine's disk would not survive the next deploy.
 #
 # Requires MONGODB_URI (a secret) plus the two values above.
 [deploy]

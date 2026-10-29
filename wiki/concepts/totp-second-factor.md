@@ -4,7 +4,7 @@ title: 'The TOTP second factor'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-27
-updated: 2026-10-15
+updated: 2026-10-29
 graph:
   node_type: concept
   relationships:
@@ -78,7 +78,9 @@ straight back to enrolment. Nothing has to clean up.
 ## The secret cannot be hashed, so it must never be read
 
 TOTP verification is symmetric. Unlike a password there is no one-way form to store, so the only
-available protection is that the value never appears in a read. `presentUser`
+available protection is that the value never appears in a read. (Since spec 116 the stored value is also
+sealed with the instance keyring, which protects a copy of the database, not a read through the server;
+[[secrets-encryption-at-rest]].) `presentUser`
 (`lib/admin/users-end/routes.ts`) is that protection, and it lives in one function rather than at four
 call sites for a recorded reason: a presenter somebody forgets on one route is exactly how every
 administrator came to be handed every project's federation secrets. It substitutes `totpEnrolled` and

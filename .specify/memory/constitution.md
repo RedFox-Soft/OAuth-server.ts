@@ -1,6 +1,30 @@
 <!--
 SYNC IMPACT REPORT
 ==================
+Version change: 3.2.0 → 3.3.0 (MINOR — client secrets may be encrypted at rest where the protocol needs them back), 2026-10-29
+Modified principles: none
+Modified sections:
+  Security Requirements — "Client secrets MUST be stored hashed" becomes "Client secrets MUST be
+    stored hashed, or encrypted at rest where the protocol needs the value back". The rest of the
+    line (never in logs, error responses or token payloads) is unchanged.
+Rationale (Governance §1):
+  `client_secret_jwt` and the symmetric keys a client's HS* signatures and A*KW/dir encryption derive
+  from its secret need the secret itself, so an ordinary client's secret cannot be a digest; it was
+  stored in plaintext, a standing deviation (wiki scim-provisioning.md). Spec 116 seals it with the
+  instance keyring instead, which closes what a hash closes against a copy of the database. A hash
+  would add protection only against an attacker who controls the running server, who can capture the
+  secret as it is presented anyway. A long-lived exception has to be an amendment.
+  MINOR rather than MAJOR: nothing compliant under 3.2.0 becomes non-compliant; a hashed secret still
+  satisfies the line.
+Added sections: none
+Removed sections: none
+Templates requiring updates:
+  ✅ .specify/templates/plan-template.md, spec-template.md, tasks-template.md — no reference to how
+    client secrets are stored; unchanged.
+  ✅ AGENTS.md — gains a storage rule pointing at the sealed-fields declaration (spec 116).
+Follow-up TODOs: none.
+
+Previous amendment:
 Version change: 3.1.0 → 3.2.0 (MINOR — Principle VI admits a profile's declared default), 2026-10-23
 Modified principles:
   VI. Security-First — "RS256 when it registered none" gains "or the default a named profile
@@ -285,8 +309,8 @@ explicitly required by a specification or a documented migration plan.
 
 - All token and authorization endpoints MUST be served over HTTPS in production;
   the `ISSUER` environment variable MUST be an `https://` URL.
-- Client secrets MUST be stored hashed; they MUST NOT appear in logs, error responses,
-  or token payloads.
+- Client secrets MUST be stored hashed, or encrypted at rest where the protocol needs the
+  value back; they MUST NOT appear in logs, error responses, or token payloads.
 - Access tokens and refresh tokens MUST carry an explicit `exp` claim; unbounded token
   lifetimes are forbidden.
 - The `redirect_uri` MUST be validated against pre-registered values on every
@@ -338,4 +362,4 @@ requires deviating from a principle, the deviation MUST be documented in the PR
 description and, if the exception is long-lived, reflected as an amendment here.
 Runtime development guidance is maintained in `AGENTS.md`.
 
-**Version**: 3.2.0 | **Ratified**: 2026-06-19 | **Last Amended**: 2026-10-23
+**Version**: 3.3.0 | **Ratified**: 2026-06-19 | **Last Amended**: 2026-10-29

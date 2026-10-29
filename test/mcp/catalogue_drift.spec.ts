@@ -146,6 +146,9 @@ describe('MCP tool catalogue', () => {
 			'PATCH /admin/api/administrators/applications/:clientId',
 			'POST /admin/api/administrators/applications/:clientId/secret',
 			'DELETE /admin/api/administrators/applications/:clientId',
+			/* Key material and an attestation only a person can make (specs/116). */
+			'POST /admin/api/keyring',
+			'POST /admin/api/keyring/backup-confirmation',
 			'DELETE /admin/api/projects/:id',
 			/* Delete now: the destruction a scheduled deletion ends in, at once (specs/090). */
 			'POST /admin/api/projects/:id/purge',
@@ -157,6 +160,8 @@ describe('MCP tool catalogue', () => {
 				.filter((e) => e.absence === 'inapplicable')
 				.map(key)
 		).toEqual([
+			/* First-run setup's own confirmation, before any administrator exists (specs/116). */
+			'POST /admin/api/setup/keyring-confirmation',
 			'POST /admin/api/setup',
 			'POST /admin/api/invitations/accept',
 			/* Describes the HTTP connection of the request that asks; a dispatched call has none (specs/115). */

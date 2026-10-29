@@ -1,5 +1,10 @@
+import { createHash, randomBytes } from 'node:crypto';
 import { Elysia, t } from 'elysia';
-import { getUserStore } from '../../adapters/index.js';
+import { getKeyringStateStore, getUserStore } from '../../adapters/index.js';
+import { activeKeyring } from '../../sealing/keyring.js';
+import { generateAndPlaceKeyring } from '../../sealing/generate.js';
+import { BOOTSTRAP_ACTOR } from '../../consts/admin_audit_routes.js';
+import constantEquals from '../../helpers/constant_equals.js';
 import { ADMIN_BUCKET_ID } from '../consts.js';
 import { recordBootstrapAudit } from '../audit/record.js';
 import nanoid from '../../helpers/nanoid.js';
@@ -23,51 +28,80 @@ export async function hasSuperAdmin(): Promise<boolean> {
  * a favicon. A second, hand-written page competing with it is how the old one drifted into pointing
  * at an unserved bundle address and rendering an empty document.
  */
-export const adminSetup = new Elysia({ name: 'admin-setup' }).post(
-	'/admin/api/setup',
-	async ({ body, set }) => {
-		const closed = () => {
-			set.status = 409;
-			return { error: 'already_initialized', message: 'setup is closed' };
-		};
-		if (await hasSuperAdmin()) return closed();
-
-		/*
-		 * The check above and the creation below sit either side of a password hash, so two requests
-		 * arriving together both found setup open, and whoever raced the operator at first boot became a
-		 * silent second super administrator. One insert-if-absent claim decides which request runs; the
-		 * other is refused as closed. The claim is released when this request is done, succeeded or not —
-		 * a success closes setup through `hasSuperAdmin`, and a failure must leave it open to retry — and
-		 * it expires on its own should the process die holding it.
-		 *
-		 * Imported here rather than at the top: the model graph must not be entered cold from a module
-		 * the admin routes load (wiki/concepts/model-graph-import-order.md).
-		 */
-		const { ReplayDetection } =
-			await import('../../models/replay_detection.js');
-		if (
-			!(await ReplayDetection.unique(
-				SETUP_CLAIM_ISSUER,
-				SETUP_CLAIM_ID,
-				epochTime() + SETUP_CLAIM_SECONDS
-			))
-		) {
-			return closed();
-		}
-		try {
+export const adminSetup = new Elysia({ name: 'admin-setup' })
+	.post(
+		'/admin/api/setup',
+		async ({ body, set }) => {
+			const closed = () => {
+				set.status = 409;
+				return { error: 'already_initialized', message: 'setup is closed' };
+			};
 			if (await hasSuperAdmin()) return closed();
-			return await bootstrap(body, set);
-		} finally {
-			await ReplayDetection.release(SETUP_CLAIM_ISSUER, SETUP_CLAIM_ID);
+
+			/*
+			 * The check above and the creation below sit either side of a password hash, so two requests
+			 * arriving together both found setup open, and whoever raced the operator at first boot became a
+			 * silent second super administrator. One insert-if-absent claim decides which request runs; the
+			 * other is refused as closed. The claim is released when this request is done, succeeded or not —
+			 * a success closes setup through `hasSuperAdmin`, and a failure must leave it open to retry — and
+			 * it expires on its own should the process die holding it.
+			 *
+			 * Imported here rather than at the top: the model graph must not be entered cold from a module
+			 * the admin routes load (wiki/concepts/model-graph-import-order.md).
+			 */
+			const { ReplayDetection } =
+				await import('../../models/replay_detection.js');
+			if (
+				!(await ReplayDetection.unique(
+					SETUP_CLAIM_ISSUER,
+					SETUP_CLAIM_ID,
+					epochTime() + SETUP_CLAIM_SECONDS
+				))
+			) {
+				return closed();
+			}
+			try {
+				if (await hasSuperAdmin()) return closed();
+				return await bootstrap(body, set);
+			} finally {
+				await ReplayDetection.release(SETUP_CLAIM_ISSUER, SETUP_CLAIM_ID);
+			}
+		},
+		{
+			body: t.Object({
+				email: t.String({ format: 'email' }),
+				password: t.String({ minLength: 12 })
+			})
 		}
-	},
-	{
-		body: t.Object({
-			email: t.String({ format: 'email' }),
-			password: t.String({ minLength: 12 })
-		})
-	}
-);
+	)
+	/*
+	 * The person who ran setup confirms they stored the keyring it showed them (specs/116). They are not signed
+	 * in yet, so the credential is the one-time token setup returned to them alone, kept here only as a digest.
+	 * A wrong, used or absent token gets one answer, so the endpoint tells a guesser nothing.
+	 */
+	.post(
+		'/admin/api/setup/keyring-confirmation',
+		async ({ body, set }) => {
+			const store = getKeyringStateStore();
+			const expected = (await store.read())?.setupToken;
+			if (!expected || !constantEquals(expected, digestOf(body.token))) {
+				set.status = 404;
+				return { error: 'unknown_token', message: 'unknown token' };
+			}
+			await recordBootstrapAudit('setup.keyring.confirm', 'keyring');
+			await store.patch({
+				setupToken: null,
+				backupConfirmed: { at: new Date().toISOString(), by: BOOTSTRAP_ACTOR }
+			});
+			set.status = 204;
+			return null;
+		},
+		{ body: t.Object({ token: t.String({ minLength: 1, maxLength: 128 }) }) }
+	);
+
+function digestOf(value: string): string {
+	return createHash('sha256').update(value).digest('hex');
+}
 
 async function bootstrap(
 	body: { email: string; password: string },
@@ -92,5 +126,22 @@ async function bootstrap(
 	await ensurePersonalGroup(user._id, user.email);
 	await grantSuperAdmin(user._id);
 	set.status = 201;
-	return { ok: true };
+	if (activeKeyring()) return { ok: true };
+	/*
+	 * No keyring yet, and no way to continue without one (specs/116 Clarifications): it is made here, where the
+	 * person who owns the instance is present to store it, and shown to them once.
+	 */
+	await recordBootstrapAudit('keyring.generate', 'keyring');
+	const placement = await generateAndPlaceKeyring(BOOTSTRAP_ACTOR);
+	const confirmToken = randomBytes(32).toString('base64url');
+	await getKeyringStateStore().patch({ setupToken: digestOf(confirmToken) });
+	return {
+		ok: true,
+		keyring: {
+			value: placement.keyring,
+			applied: placement.applied,
+			...(placement.location ? { location: placement.location } : {}),
+			confirmToken
+		}
+	};
 }

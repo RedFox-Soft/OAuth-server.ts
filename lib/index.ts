@@ -45,6 +45,10 @@ import { registration } from './actions/registration.js';
 import { healthCheck } from './actions/health.js';
 import { readyCheck } from './actions/ready.js';
 import { assertMigrationsCurrent } from './migrations/gate.js';
+import { assertKeyring } from './sealing/startup.js';
+import { activeKeyring } from './sealing/keyring.js';
+import { startPassSoon } from './sealing/pass.js';
+import { getKeyringStateStore } from './adapters/index.js';
 import { securityTxt } from './actions/security_txt.js';
 import { featureGate } from './plugins/featureGate.js';
 import { rateLimit } from './plugins/rateLimit.js';
@@ -287,6 +291,13 @@ elysia.group('/:bucket', (bucketScoped) => bucketScoped.use(accountPageRoutes));
 await assertMigrationsCurrent();
 
 /*
+ * The keyring against the fingerprints the database recorded (specs/116). The stores already wait for this
+ * before their first seal or open; awaiting it here as well makes a refused keyring stop the start even when
+ * nothing has been opened yet.
+ */
+await assertKeyring();
+
+/*
  * The root issuer's keys, loaded — and on a fresh store the first one created — only now: before the gate
  * a database whose root keys still await migration would be handed a second signer. Every signing path
  * reaches the same set through keysFor, cached and reloaded from the store, so this only warms it and the
@@ -352,5 +363,13 @@ if (process.env.NODE_ENV !== 'test') {
 			'listen'
 		);
 		throw error;
+	}
+	/*
+	 * Seals what is still plaintext, and moves values to the write key after a rotation, ten minutes from now:
+	 * the previous release may still be reading the database (research R8). Without a keyring it only counts
+	 * values sealed under keys this process lacks, when there are any.
+	 */
+	if (activeKeyring() || (await getKeyringStateStore().read())) {
+		startPassSoon();
 	}
 }

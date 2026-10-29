@@ -23,6 +23,8 @@ import {
 	SchemaMigrationStore as MemorySchemaMigrationStore,
 	MigrationLeaseStore as MemoryMigrationLeaseStore,
 	TelemetryStateStore as MemoryTelemetryStateStore,
+	KeyringStateStore as MemoryKeyringStateStore,
+	SealingStore as MemorySealingStore,
 	configStore as memoryConfig
 } from './memory/index.js';
 import type {
@@ -74,8 +76,24 @@ import type {
 	UserBucketStoreConstructor,
 	UserBucketStoreInstance,
 	UserStoreConstructor,
-	UserStoreInstance
+	UserStoreInstance,
+	KeyringStateStoreConstructor,
+	KeyringStateStoreInstance,
+	SealingStoreInstance
 } from './types.js';
+import {
+	sealedBucketKeysStore,
+	sealedBucketStore,
+	sealedClientAdapter,
+	sealedSecretStore,
+	sealedSmtpSettingsStore,
+	sealedTotpEnrollmentAdapter,
+	sealedUserStore
+} from '../sealing/decorators.js';
+import {
+	resetKeyringCheckForTests,
+	useKeyringStateStore
+} from '../sealing/startup.js';
 import { selectBackend } from './selectBackend.js';
 import type { Static, TObject } from '@sinclair/typebox';
 import { documentOf } from './documents.js';
@@ -119,6 +137,20 @@ let MigrationLeaseStoreClass: MigrationLeaseStoreConstructor =
 	MemoryMigrationLeaseStore;
 let TelemetryStateStoreClass: TelemetryStateStoreConstructor =
 	MemoryTelemetryStateStore;
+let KeyringStateStoreClass: KeyringStateStoreConstructor =
+	MemoryKeyringStateStore;
+/* A factory rather than a class: the in-memory one reads through the undecorated stores this module holds. */
+let sealingStoreFactory: () => SealingStoreInstance = () =>
+	new MemorySealingStore({
+		buckets: rawBucketStore,
+		users: rawUserStore,
+		keys: rawBucketKeysStore,
+		smtp: rawSmtpSettingsStore,
+		secret: (kind) =>
+			kind === 'dpopNonceSecret'
+				? rawDpopNonceSecretStore
+				: rawErrorOriginSaltStore
+	});
 export let configStore: AdapterConfigStore = memoryConfig;
 
 /*
@@ -157,6 +189,8 @@ if (backend === 'postgres') {
 	SchemaMigrationStoreClass = postgres.SchemaMigrationStore;
 	MigrationLeaseStoreClass = postgres.MigrationLeaseStore;
 	TelemetryStateStoreClass = postgres.TelemetryStateStore;
+	KeyringStateStoreClass = postgres.KeyringStateStore;
+	sealingStoreFactory = () => new postgres.SealingStore();
 
 	/*
 	 * Started here rather than left to a caller, because MongoDB gets the equivalent from its server
@@ -195,6 +229,8 @@ if (backend === 'mongodb') {
 	SchemaMigrationStoreClass = mongodb.SchemaMigrationStore;
 	MigrationLeaseStoreClass = mongodb.MigrationLeaseStore;
 	TelemetryStateStoreClass = mongodb.TelemetryStateStore;
+	KeyringStateStoreClass = mongodb.KeyringStateStore;
+	sealingStoreFactory = () => new mongodb.SealingStore();
 }
 
 if (process.env.NODE_ENV === 'test') {
@@ -227,7 +263,12 @@ export let errorStore: ErrorStoreInstance = new ErrorStoreClass();
  * Two instances of one class, and the string is the whole distinction: it derives the document each
  * owns inside the shared serviceConfig area. Changing either string orphans that secret and silently
  * provisions a new one, which for the salt means reassigning every relying party's account key. */
-export const dpopNonceSecretStore: SecretStoreInstance = new SecretStoreClass(
+const rawDpopNonceSecretStore: SecretStoreInstance = new SecretStoreClass(
+	'dpopNonceSecret'
+);
+/* Sealed with the keyring (specs/116); the pairwise salt below deliberately is not, for the reason sealed_fields.ts gives. */
+export const dpopNonceSecretStore: SecretStoreInstance = sealedSecretStore(
+	rawDpopNonceSecretStore,
 	'dpopNonceSecret'
 );
 export const pairwiseSaltStore: SecretStoreInstance = new SecretStoreClass(
@@ -244,7 +285,11 @@ export const pairwiseSaltStore: SecretStoreInstance = new SecretStoreClass(
  * Shares the serviceConfig area's permanence for the reason the salt beside it does: a regenerated key
  * would silently stop correlating, and every record written before it would read as a different origin.
  */
-export const errorOriginSaltStore: SecretStoreInstance = new SecretStoreClass(
+const rawErrorOriginSaltStore: SecretStoreInstance = new SecretStoreClass(
+	'errorOriginSalt'
+);
+export const errorOriginSaltStore: SecretStoreInstance = sealedSecretStore(
+	rawErrorOriginSaltStore,
 	'errorOriginSalt'
 );
 
@@ -306,10 +351,20 @@ type StoredRecord = Record<string, unknown>;
 export function adapter(name: string): ModelAdapter<StoredRecord> {
 	let found = cache.get(name);
 	if (!found) {
-		found = new Adapter(name);
+		found = sealedModelAdapter(name, new Adapter(name));
 		cache.set(name, found);
 	}
 	return found;
+}
+
+/* The two model areas that hold a sealed leaf (lib/consts/sealed_fields.ts). */
+function sealedModelAdapter(
+	name: string,
+	raw: ModelAdapter<StoredRecord>
+): ModelAdapter<StoredRecord> {
+	if (name === 'Client') return sealedClientAdapter(raw);
+	if (name === 'TotpEnrollment') return sealedTotpEnrollmentAdapter(raw);
+	return raw;
 }
 
 /*
@@ -357,10 +412,19 @@ export type {
 } from './modelTypes.js';
 
 const userStores = new Map<string, UserStoreInstance>();
+const rawUserStores = new Map<string, UserStoreInstance>();
+function rawUserStore(area: string): UserStoreInstance {
+	let store = rawUserStores.get(area);
+	if (!store) {
+		store = new UserStore(area);
+		rawUserStores.set(area, store);
+	}
+	return store;
+}
 export function getUserStore(area = 'redfox'): UserStoreInstance {
 	let store = userStores.get(area);
 	if (!store) {
-		store = new UserStore(area);
+		store = sealedUserStore(rawUserStore(area), area);
 		userStores.set(area, store);
 	}
 	return store;
@@ -450,10 +514,13 @@ export function getBucketGroupStore(): BucketGroupStoreInstance {
  * rather than on every signature.
  */
 let bucketKeysStoreSingleton: BucketKeysStoreInstance | null = null;
+let rawBucketKeysStoreSingleton: BucketKeysStoreInstance | null = null;
+function rawBucketKeysStore(): BucketKeysStoreInstance {
+	rawBucketKeysStoreSingleton ??= new BucketKeysStoreClass();
+	return rawBucketKeysStoreSingleton;
+}
 export function getBucketKeysStore(): BucketKeysStoreInstance {
-	if (!bucketKeysStoreSingleton) {
-		bucketKeysStoreSingleton = new BucketKeysStoreClass();
-	}
+	bucketKeysStoreSingleton ??= sealedBucketKeysStore(rawBucketKeysStore());
 	return bucketKeysStoreSingleton;
 }
 
@@ -486,10 +553,13 @@ export function resetActivityStore(): void {
 }
 
 let bucketStoreSingleton: UserBucketStoreInstance | null = null;
+let rawBucketStoreSingleton: UserBucketStoreInstance | null = null;
+function rawBucketStore(): UserBucketStoreInstance {
+	rawBucketStoreSingleton ??= new BucketStoreClass();
+	return rawBucketStoreSingleton;
+}
 export function getBucketStore(): UserBucketStoreInstance {
-	if (!bucketStoreSingleton) {
-		bucketStoreSingleton = new BucketStoreClass();
-	}
+	bucketStoreSingleton ??= sealedBucketStore(rawBucketStore());
 	return bucketStoreSingleton;
 }
 
@@ -518,11 +588,32 @@ export function getMigrationLeaseStore(): MigrationLeaseStoreInstance {
 }
 
 let smtpSettingsStoreSingleton: SmtpSettingsStoreInstance | null = null;
+let rawSmtpSettingsStoreSingleton: SmtpSettingsStoreInstance | null = null;
+function rawSmtpSettingsStore(): SmtpSettingsStoreInstance {
+	rawSmtpSettingsStoreSingleton ??= new SmtpSettingsStoreClass();
+	return rawSmtpSettingsStoreSingleton;
+}
 export function getSmtpSettingsStore(): SmtpSettingsStoreInstance {
-	if (!smtpSettingsStoreSingleton) {
-		smtpSettingsStoreSingleton = new SmtpSettingsStoreClass();
-	}
+	smtpSettingsStoreSingleton ??= sealedSmtpSettingsStore(
+		rawSmtpSettingsStore()
+	);
 	return smtpSettingsStoreSingleton;
+}
+
+/* The keyring's state in serviceConfig (specs/116). Read before the first value is sealed or opened. */
+let keyringStateStoreSingleton: KeyringStateStoreInstance | null = null;
+export function getKeyringStateStore(): KeyringStateStoreInstance {
+	keyringStateStoreSingleton ??= new KeyringStateStoreClass();
+	return keyringStateStoreSingleton;
+}
+useKeyringStateStore(getKeyringStateStore);
+
+/*
+ * The encryption pass's own access (lib/sealing/pass.ts): stored values as they are, and a compare-and-set
+ * of one leaf. Nothing else may use it; every other reader goes through the decorated stores.
+ */
+export function getSealingStore(): SealingStoreInstance {
+	return sealingStoreFactory();
 }
 
 let telemetryStateStoreSingleton: TelemetryStateStoreInstance | null = null;
@@ -548,7 +639,9 @@ export function getPlanCatalogueStore(): PlanCatalogueStoreInstance {
 // only drops stateless wrapper caches, so it is safe in any mode.
 export function resetAdminMemoryStores(): void {
 	userStores.clear();
+	rawUserStores.clear();
 	bucketStoreSingleton = null;
+	rawBucketStoreSingleton = null;
 	groupStoreSingleton = null;
 	groupInvitationStoreSingleton = null;
 	provisioningConnectionStoreSingleton = null;
@@ -573,11 +666,15 @@ export function resetStoresForTests(): void {
 	outsideAuthorizationServerStoreSingleton = null;
 	bucketGroupStoreSingleton = null;
 	bucketKeysStoreSingleton = null;
+	rawBucketKeysStoreSingleton = null;
 	activityStoreSingleton = null;
 	schemaMigrationStoreSingleton = null;
 	migrationLeaseStoreSingleton = null;
 	telemetryStateStoreSingleton = null;
 	smtpSettingsStoreSingleton = null;
+	rawSmtpSettingsStoreSingleton = null;
+	keyringStateStoreSingleton = null;
+	resetKeyringCheckForTests();
 	planCatalogueStoreSingleton = null;
 	adminSessionStore = new AdminSessionStoreClass();
 	adminAuditStore = new AdminAuditStoreClass();

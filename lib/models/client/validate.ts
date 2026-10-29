@@ -21,6 +21,7 @@ import { rootKeys } from '../../keys/issuer_keys.js';
 import { connectionClientRecord } from '../../provisioning/client.js';
 import { accountPageClientRecord } from '../../account_page/client.js';
 import { sl1, sl1ClientViolations, sl1Exempt } from '../../sl1/rules.ts';
+import { unreadableFieldsOf } from '../../sealing/decorators.js';
 
 // Validate raw metadata → plain, frozen client object (defaults applied,
 // recognised metadata camelCased) or throw InvalidClientMetadata. Key material
@@ -165,6 +166,19 @@ export async function tryFindClient(
 			if (err instanceof InvalidClientMetadata) return;
 			throw err;
 		}
+	}
+
+	/*
+	 * A stored secret that cannot be opened (a key missing from the keyring, a tampered value) makes the client
+	 * unknown to the protocol, so it is refused exactly as a wrong secret is (specs/116 US5-1), never let
+	 * through and never reported as a registration fault the caller cannot act on. The console still reads it,
+	 * because rotating the secret is how an administrator repairs it.
+	 */
+	if (
+		!administering &&
+		unreadableFieldsOf(properties).includes('clientSecret')
+	) {
+		return;
 	}
 
 	const propHash = crypto.hash(

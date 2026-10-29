@@ -49,6 +49,12 @@ services:
       setup:
         condition: service_completed_successfully
     restart: unless-stopped
+    # The instance keyring (specs/116): first-run setup writes it here, on a volume of its own, never the
+    # database's. Copy it into a password manager or secrets manager when setup shows it; for production,
+    # supply it as KEYRING instead and delete the file, or startup refuses two sources.
+    volumes:
+      - foxauth-keyring:/app/keyring
 
 volumes:
   mongo-data:
+  foxauth-keyring:

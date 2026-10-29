@@ -2,6 +2,7 @@ import { StoredJWK } from 'lib/configs/verifyJWKs.ts';
 import { Type as t, type Static } from '@sinclair/typebox';
 import { FederatedIdentity, FederationProvider } from '../federation/types.js';
 import type { PlanCatalogue } from '../consts/plans.js';
+import type { SealKind, SealTarget } from '../consts/sealed_fields.js';
 
 const ProfileString = t.String({ maxLength: 256 });
 const ProfileContact = t.Object(
@@ -713,6 +714,91 @@ export interface TelemetryStateStoreInstance {
 
 export interface TelemetryStateStoreConstructor {
 	new (): TelemetryStateStoreInstance;
+}
+
+/*
+ * The keyring's state as the database knows it (specs/116): one singleton in serviceConfig, like the usage
+ * reporting state above and for the same reason. It holds no key material. Times are ISO strings so the
+ * document reads back identically from both backends.
+ *
+ * `fingerprints` confirms, per key id ever used, that the keyring's key under that id is the same key; the
+ * rest is what the encryption status shows.
+ */
+export const UnreadableSecret = t.Object({
+	kind: t.String(),
+	owner: t.Record(t.String(), t.String()),
+	needsKid: t.Optional(t.String()),
+	reason: t.Union([
+		t.Literal('missing-key'),
+		t.Literal('integrity'),
+		t.Literal('binding')
+	])
+});
+export type UnreadableSecret = Static<typeof UnreadableSecret>;
+
+export const SealingPassReport = t.Object({
+	at: t.String(),
+	mode: t.Union([t.Literal('seal'), t.Literal('count')]),
+	perKid: t.Record(t.String(), t.Number()),
+	plaintext: t.Number(),
+	unreadable: t.Array(UnreadableSecret),
+	unreadableTotal: t.Number()
+});
+export type SealingPassReport = Static<typeof SealingPassReport>;
+
+export const KeyringState = t.Object({
+	fingerprints: t.Record(t.String(), t.String()),
+	generated: t.Optional(
+		t.Object({ at: t.String(), applied: t.Boolean(), by: t.String() })
+	),
+	setupToken: t.Optional(t.String()),
+	backupConfirmed: t.Optional(t.Object({ at: t.String(), by: t.String() })),
+	report: t.Optional(SealingPassReport),
+	regenerated: t.Optional(t.Record(t.String(), t.String()))
+});
+export type KeyringState = Static<typeof KeyringState>;
+
+/* The fields `patch` sets; `null` removes one. `fingerprints` is written only by `addFingerprintIfAbsent`. */
+export type KeyringStatePatch = {
+	[K in Exclude<keyof KeyringState, 'fingerprints'>]?: KeyringState[K] | null;
+};
+
+export interface KeyringStateStoreInstance {
+	read(): Promise<KeyringState | null>;
+	/*
+	 * Records `fingerprint` for `kid` unless one is recorded already, and answers the one stored after the
+	 * call. Two processes recording the same key agree; a process recording different material for a known id
+	 * gets the stored one back, which is what lets the startup check refuse it.
+	 */
+	addFingerprintIfAbsent(kid: string, fingerprint: string): Promise<string>;
+	patch(fields: KeyringStatePatch): Promise<void>;
+}
+
+export interface KeyringStateStoreConstructor {
+	new (): KeyringStateStoreInstance;
+}
+
+/*
+ * What the encryption pass reads and writes (specs/116 research R8), and nothing else does: every stored leaf
+ * of one kind as it is stored, and a compare-and-set of one leaf. A field-level compare-and-set because the
+ * ordinary writes rewrite whole records (a bucket's whole `federation`, a person's whole `totp`), and a pass
+ * that wrote records back would undo an edit made between its read and its write.
+ */
+export interface SealedLeaf {
+	target: SealTarget;
+	value: string | Uint8Array;
+	/* A revoked key's private members are never used again; the pass leaves them as they are. */
+	revoked?: boolean;
+}
+
+export interface SealingStoreInstance {
+	scan(kind: SealKind): Promise<SealedLeaf[]>;
+	/* Writes `next` only while the leaf still equals `observed`; answers whether it wrote. */
+	sealAt(
+		target: SealTarget,
+		observed: string | Uint8Array,
+		next: string | Uint8Array
+	): Promise<boolean>;
 }
 
 export interface MigrationLeaseStoreInstance {

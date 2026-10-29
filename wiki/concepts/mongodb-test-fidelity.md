@@ -4,7 +4,7 @@ title: 'Testing the MongoDB adapter: two tiers, and why the default suite stays 
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-26
-updated: 2026-10-15
+updated: 2026-10-29
 ---
 
 # Testing the MongoDB adapter: two tiers, and why the default suite stays hermetic
@@ -21,7 +21,9 @@ neighbourhood: the Mongo singleton secret store handed back a BSON `Binary` wher
 required bytes, and the server could not boot against MongoDB at all. Nothing caught it, because the
 store contract spec exercises the memory implementation alone. The unwrap that fixes it now carries
 its own warning — `lib/adapters/mongodb/singletonSecretStore.ts:33-47` — and the class holds a second
-secret whose failure mode is worse than the first's.
+secret whose failure mode is worse than the first's. Since spec 116 two of its secrets are stored as the UTF-8
+bytes of a sealed value in the same `Binary`/`bytea` field, and `database/verify_sealing.ts` checks that round
+trip on both real backends ([[secrets-encryption-at-rest]]).
 
 ## The decision
 

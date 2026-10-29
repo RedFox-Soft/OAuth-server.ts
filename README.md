@@ -149,11 +149,22 @@ member of Super administrators; the setup route is closed once that team has an 
 
 ## Configuration
 
-| Variable        | Description                                | Example                     |
-| --------------- | ------------------------------------------ | --------------------------- |
-| `MONGODB_URI`   | MongoDB connection string                  | `mongodb://localhost:27017` |
-| `DATABASE_NAME` | Name of the database to use                | `OAuth`                     |
-| `ISSUER`        | Canonical URL of your authorization server | `https://auth.example.com`  |
+| Variable        | Description                                   | Example                        |
+| --------------- | --------------------------------------------- | ------------------------------ |
+| `MONGODB_URI`   | MongoDB connection string                     | `mongodb://localhost:27017`    |
+| `DATABASE_NAME` | Name of the database to use                   | `OAuth`                        |
+| `ISSUER`        | Canonical URL of your authorization server    | `https://auth.example.com`     |
+| `KEYRING`       | Instance keyring that encrypts stored secrets | `bun run keyring new`          |
+| `KEYRING_FILE`  | Keyring file, when not given as `KEYRING`     | `/run/secrets/foxauth.keyring` |
+
+### Keyring
+
+Secrets the server must read back (application secrets, sign-in provider credentials, the SMTP password,
+private signing keys, authenticator secrets) are stored encrypted with the instance keyring. Supply it as
+`KEYRING` or a keyring file; without one, first-run setup generates it, writing it to `keyring/` only when
+that directory exists, and shows it once. Keep it in a secrets manager and back it up apart from the
+database: a backup cannot be read without it. `bun run keyring add` and `bun run keyring write <kid>` rotate
+it in two steps.
 
 ### Signing keys
 

@@ -44,14 +44,26 @@ export interface CaptureSubject {
  */
 let saltPromise: Promise<Buffer> | undefined;
 
+function usable(value: unknown): value is Uint8Array {
+	return value instanceof Uint8Array && value.length === 32;
+}
+
+/*
+ * A stored salt this process cannot use (sealed under a key the keyring lacks, specs/116) is replaced, not
+ * worked around with a key of this process's own: a per-process key would make the same origin look different
+ * on every instance. Replacing it costs correlation with the records written before, which the encryption
+ * status says.
+ */
 function resolveSalt(): Promise<Buffer> {
 	saltPromise ??= (async () => {
 		const existing = await errorOriginSaltStore.read();
-		if (Buffer.isBuffer(existing) && existing.length === 32) {
-			return existing;
-		}
-		const created = await errorOriginSaltStore.create(randomBytes(32));
-		return Buffer.isBuffer(created) ? created : randomBytes(32);
+		if (usable(existing)) return Buffer.from(existing);
+		const fresh = randomBytes(32);
+		const written =
+			existing === null || existing === undefined
+				? await errorOriginSaltStore.create(fresh)
+				: await errorOriginSaltStore.replace(existing, fresh);
+		return usable(written) ? Buffer.from(written) : fresh;
 	})();
 	return saltPromise;
 }

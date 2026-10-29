@@ -4,7 +4,7 @@ title: "Admin provisioning: seeded by a script, never at boot"
 tags: [architecture, config, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-09-23
-updated: 2026-10-15
+updated: 2026-10-29
 ---
 
 # Admin provisioning
@@ -13,7 +13,10 @@ The records the console needs to exist — the "Administrators" project, the fir
 client (and `admin-mcp`, both carrying `bucketId` = the administrators' project, `lib/consts/admin_seed.ts:100`,
 `:121`), the Default project and the `unassigned` system team — are
 written by the provisioning scripts, **not at boot**. There is no boot-time seeding, so console login
-requires a database-backed, provisioned deployment.
+requires a database-backed, provisioned deployment. One exception, corrected 2026-10-29 (spec 116): the
+first root signing key is created at boot when the key store is empty (`ensureRootKey`,
+`lib/keys/issuer_keys.ts`), as well as by the scripts. The instance keyring is never seeded by either: the
+first-run setup generates it ([[secrets-encryption-at-rest]]).
 
 - **MongoDB**: `bun run db:setup` (`database/mongodb.ts`) writes raw documents with `$setOnInsert`,
   because a one-shot script deliberately avoids the application's module graph.

@@ -152,3 +152,6 @@ website/
 specs/
 wiki/
 docs/
+
+# The instance keyring (specs/116): mounted at run time, never part of the image
+keyring/

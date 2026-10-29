@@ -30,7 +30,10 @@ about running your own server.
    member of **Super administrators** (the team whose members administer the whole instance) and
    gets a personal team like any other administrator.
 
-3. Submit, then sign in with those credentials.
+3. Submit. If the server has no keyring yet, the next screen, **Save the instance keyring**, shows the
+   one setup has just generated. [The keyring step](#the-keyring-step) below explains it.
+
+4. Sign in with those credentials.
 
 </Steps>
 
@@ -58,6 +61,33 @@ and it cannot be, since no account exists yet. So provision the first administra
 after the deployment comes up, and do not leave a reachable, un-provisioned instance sitting around.
 
 </Aside>
+
+## The keyring step {#the-keyring-step}
+
+The server encrypts the secrets it stores with a **keyring**: a key that you hold outside the database.
+The secrets include application secrets, sign-in provider credentials, the mail password, private
+signing keys and authenticator secrets. A copy of the database is then of no use for reading them
+without the keyring.
+
+If you supplied no keyring, setup generates one after it creates your account. The server never does
+this silently at startup. What happens next depends on whether the keyring directory exists:
+
+- **It exists**, for example because the shipped Compose files mount a volume there, or because you ran
+  `mkdir keyring` before a run from source. Setup writes the keyring file there, and the server uses it
+  at once.
+- **It does not exist**, as on Fly.io. The keyring is not in use yet. Set it as the `KEYRING` secret of
+  your deployment and restart. Until then, secrets stay unencrypted.
+
+Either way, the screen shows the keyring only this once, with **Copy** and **Download** buttons. Save it in
+a password manager or a secrets manager, apart from your database backups. The secrets in a backup cannot
+be read without it. **Continue** stays disabled until you tick **I have saved this key apart from my
+database backups**.
+
+Until the keyring is in use and its backup is confirmed, the console reminds super administrators on
+every page. The **Encryption at rest** card on the **Keys** page shows its state. On an instance that
+was set up before this step existed, a super administrator generates a keyring in that card.
+[The keyring](/docs/deploy/upgrade/#keyring) covers each platform, rotation, and what to do if a key is
+lost.
 
 <ScreenshotFigure
 	name="admin-projects"

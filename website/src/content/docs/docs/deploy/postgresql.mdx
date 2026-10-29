@@ -98,6 +98,25 @@ pipeline can gate on it.
 	retired, and this release does not attempt it.
 </Aside>
 
+## Keyring {#keyring}
+
+The server encrypts the secrets it stores, such as application secrets and private signing keys, with a
+**keyring** that you hold outside the database. Encryption works the same on PostgreSQL as on MongoDB.
+[The keyring](/docs/deploy/upgrade/#keyring) covers what it encrypts, how to supply it, how to rotate it
+and what to do if a key is lost.
+
+Two points matter for a PostgreSQL deployment:
+
+- **Never store the keyring in PostgreSQL**, in this database or another table beside it. It is a
+  deployment secret, like `POSTGRES_URL`. Supply it as `KEYRING` or as a keyring file at `KEYRING_FILE`.
+- **Back it up apart from the database.** The secrets in a `pg_dump` or a managed snapshot cannot be read
+  without the keyring. Keep the keyring where your other deployment secrets live, not next to the dumps.
+
+The shipped `docker-compose.postgres.yml` mounts a `foxauth-keyring` volume at `/app/keyring` on the
+server, so first-run setup can keep a keyring there.
+[Deploy with Docker Compose](/docs/deploy/docker-compose/#keyring) explains how to move it into `.env`
+for production.
+
 ## What differs from MongoDB
 
 Nothing an application or an end user can observe. Two operational differences are worth knowing:

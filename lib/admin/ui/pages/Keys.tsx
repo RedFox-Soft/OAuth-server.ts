@@ -6,6 +6,7 @@ import { Link } from '../frame/router.js';
 import { bucketHref } from '../frame/routes.js';
 import { ADMIN_BUCKET_ID, DEFAULT_BUCKET_ID } from '../../consts.js';
 import { KeyCards, type Dependent } from './keys/KeyCards.js';
+import { KeyringCard } from './keys/KeyringCard.js';
 import type { BucketView } from './bucketView.js';
 
 /*
@@ -72,6 +73,7 @@ export function Keys() {
 						.
 					</Typography.Paragraph>
 				)}
+				<KeyringCard />
 				<KeyCards
 					base="/admin/api/jwks"
 					keySetUrl={null}

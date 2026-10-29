@@ -21,5 +21,7 @@ export { SingletonSecretStore } from './singletonSecretStore.js';
 export { SchemaMigrationStore } from './schemaMigrationStore.js';
 export { MigrationLeaseStore } from './migrationLeaseStore.js';
 export { TelemetryStateStore } from './telemetryStateStore.js';
+export { KeyringStateStore } from './keyringStateStore.js';
+export { SealingStore } from './sealingStore.js';
 export { ContainerOwnershipStore } from './containerOwnershipStore.js';
 export { ActivityStore } from './activityStore.js';

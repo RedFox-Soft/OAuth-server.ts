@@ -685,6 +685,29 @@ const routes = [
 		path: '/admin/api/jwks',
 		targetType: 'jwks'
 	},
+
+	/*
+	 * Encryption at rest (specs/116). The target is the instance's one keyring; no entry carries key material.
+	 * The setup confirmation is unauthenticated like setup and records the bootstrap actor.
+	 */
+	{
+		action: 'keyring.generate',
+		method: 'POST',
+		path: '/admin/api/keyring',
+		targetType: 'Keyring'
+	},
+	{
+		action: 'keyring.backup.confirm',
+		method: 'POST',
+		path: '/admin/api/keyring/backup-confirmation',
+		targetType: 'Keyring'
+	},
+	{
+		action: 'setup.keyring.confirm',
+		method: 'POST',
+		path: '/admin/api/setup/keyring-confirmation',
+		targetType: 'Keyring'
+	},
 	{
 		action: 'jwks.promote',
 		method: 'POST',
@@ -852,6 +875,13 @@ export const MIGRATION_ACTOR = 'system:migration';
  * (specs/090) — nobody asked at that moment, so nobody is named. The bootstrap's convention.
  */
 export const RETENTION_ACTOR = 'system:retention';
+
+/*
+ * Actor recorded when `bun run admin:replace-root-keys` replaces root keys the keyring cannot open (specs/116):
+ * the console sign-in needs those keys, so no administrator can be signed in to do it. The bootstrap's
+ * convention.
+ */
+export const KEYRING_RECOVERY_ACTOR = 'system:keyring-recovery';
 
 /*
  * Prefix of the actor recorded for a change a SCIM provisioning connection made: `connection:<id>`. The

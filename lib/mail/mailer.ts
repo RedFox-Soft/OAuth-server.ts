@@ -32,9 +32,15 @@ export function resetSentEmails(): void {
 
 const isTest = process.env.NODE_ENV === 'test';
 
+/*
+ * A password the keyring cannot open (specs/116) is absent from what the store returns; a mailer that
+ * authenticates without one is not configured, rather than one that tries and is refused by the server.
+ */
 async function configuredSmtp(): Promise<SmtpSettings | null> {
 	const smtp = await getSmtpSettingsStore().get();
-	return smtp && smtp.host && smtp.fromEmail ? smtp : null;
+	if (!smtp || !smtp.host || !smtp.fromEmail) return null;
+	if (smtp.username && typeof smtp.password !== 'string') return null;
+	return smtp;
 }
 
 /*

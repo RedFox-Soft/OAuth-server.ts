@@ -33,6 +33,7 @@ import { bucketKeyRoutes } from './bucket_keys/routes.js';
 import { auditRoutes } from './audit/routes.js';
 import { errorRoutes } from './errors/routes.js';
 import { activityRoutes } from './activity/routes.js';
+import { keyringRoutes } from './keyring/routes.js';
 
 /*
  * A request body, query or path the schema refused, said in words and named by field.
@@ -142,3 +143,5 @@ adminApiRoutes.use(telemetrySettingsRoutes);
 adminApiRoutes.use(attackReportsSettingsRoutes);
 // The caller address check (specs/115), for the same reason.
 adminApiRoutes.use(clientAddressSettingsRoutes);
+// Encryption at rest (specs/116), for the same reason.
+adminApiRoutes.use(keyringRoutes);

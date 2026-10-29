@@ -30,12 +30,41 @@ both. The server refuses to start when both are set instead of picking one, and 
 mode you want: a server that silently chose the other database looks exactly like total data loss.
 [PostgreSQL](/docs/deploy/postgresql/) covers it.
 
-Only the connection string is a credential. The other values share its Secret so that one `envFrom`
+Only the connection string is a credential here. The keyring is one too, and gets a Secret of its own
+in [Keyring](#keyring) below. The other values share the connection string's Secret so that one `envFrom`
 covers them all instead of two. Each variable is described in the
 [environment variables reference](/docs/reference/environment/). The published image tags are
 listed on the [GitHub releases page](https://github.com/RedFox-Soft/OAuth-server.ts/releases) and
 on the
 [container package page](https://github.com/RedFox-Soft/OAuth-server.ts/pkgs/container/oauth-server-ts).
+
+## Keyring {#keyring}
+
+The server encrypts the secrets it stores, such as application secrets and private signing keys, with a
+**keyring** that you hold outside the database. [The keyring](/docs/deploy/upgrade/#keyring) covers what
+it encrypts, how to rotate it and what to do if a key is lost.
+
+Put the keyring in a Secret of its own. Run this in a clone of the repository, which carries the
+`keyring` command:
+
+```bash
+kubectl create secret generic foxauth-keyring --from-literal=KEYRING="$(bun run keyring new)"
+```
+
+Then give it to the server in one of two ways, never both:
+
+- **As an environment variable.** Add a second `secretRef` to the Deployment's `envFrom`, naming
+  `foxauth-keyring`. The server reads `KEYRING`.
+- **As a file.** Mount the Secret as a volume and set `KEYRING_FILE` to the mounted file, for example
+  `/run/secrets/foxauth/KEYRING`.
+
+With both a `KEYRING` variable and a keyring file, the server refuses to start. Supply the keyring before
+the first start rather than relying on first-run setup. Setup writes a keyring file only into a keyring
+directory that already exists, and a pod has none unless you mount one. So in a pod, setup can only show
+the keyring it generated and ask you to set it as `KEYRING`.
+
+Keep a copy of the keyring apart from your database backups. The secrets in a backup cannot be read
+without it.
 
 ## Provisioning Job
 

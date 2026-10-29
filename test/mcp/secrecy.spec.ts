@@ -23,6 +23,7 @@ import { shaped } from 'test/shape.js';
 import { Type } from '@sinclair/typebox';
 import { createAdministrator } from '../administrators.ts';
 import { call, rpc } from './rpc.ts';
+import { FIXTURE_KEY_MATERIAL } from '../sealing/fixtures.ts';
 
 /*
  * FR-023 / SC-007: no secret may reach the agent surface, on any tool, in a success or an error, or in
@@ -346,6 +347,8 @@ describe('MCP surface leaks no secrets', () => {
 
 		const needles = [
 			...Object.values(SECRETS),
+			/* The keyring the suite seals with: key material never reaches an agent (specs/116 FR-006). */
+			...FIXTURE_KEY_MATERIAL,
 			...(seeded.clientSecret ? [seeded.clientSecret] : []),
 			/*
 			 * The other kind of credential a provider can hold. Swept by the same list rather than by a
@@ -425,6 +428,8 @@ describe('MCP surface leaks no secrets', () => {
 		const seeded = await seedSecretHolders(token);
 		const needles = [
 			...Object.values(SECRETS),
+			/* The keyring the suite seals with: key material never reaches an agent (specs/116 FR-006). */
+			...FIXTURE_KEY_MATERIAL,
 			...(seeded.clientSecret ? [seeded.clientSecret] : []),
 			/*
 			 * The other kind of credential a provider can hold. Swept by the same list rather than by a
@@ -474,6 +479,8 @@ describe('MCP surface leaks no secrets', () => {
 		const seeded = await seedSecretHolders(token);
 		const needles = [
 			...Object.values(SECRETS),
+			/* The keyring the suite seals with: key material never reaches an agent (specs/116 FR-006). */
+			...FIXTURE_KEY_MATERIAL,
 			...(seeded.clientSecret ? [seeded.clientSecret] : []),
 			/*
 			 * The other kind of credential a provider can hold. Swept by the same list rather than by a

@@ -4,7 +4,7 @@ title: "Spec-file isolation"
 tags: [testing, gotcha, decision]
 sources: [oauth-server-codebase]
 created: 2026-10-13
-updated: 2026-10-15
+updated: 2026-10-29
 ---
 
 # Spec-file isolation
@@ -55,7 +55,9 @@ These resets need imports from the model graph, which the preload must not load 
 ([[model-graph-import-order]]). That is why they live in `bootstrap()`.
 
 **Left alone on purpose:**
-- The three `serviceConfig` secrets, because they are read once at module scope.
+- The three `serviceConfig` secrets, because they are read once at module scope. (Since spec 116 the DPoP
+  nonce secret and the error-origin salt are stored sealed, while the suite's keyring is set by
+  `forgetProcessState`, after the nonce secret was resolved at import; the decorators open either form.)
 - `configStore`, because `bootstrap()` empties it itself (`test/test_helper.ts:564`).
 - `mock.module`, which `mock.restore()` does not undo.
 

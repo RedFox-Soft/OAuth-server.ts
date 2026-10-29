@@ -207,7 +207,11 @@ export const STORE_AREAS = {
 	 * distinguished only by a derived ObjectId. One inventory entry, therefore, not five. Both secrets joined this area rather than claiming one
 	 * each because it is already declared permanent (`reaped: null` below): a secret that expired on
 	 * its own would be silently regenerated at the next startup, churning every client's nonces for no
-	 * visible reason — and, for the salt, permanently breaking every relying party's account linkage. */
+	 * visible reason — and, for the salt, permanently breaking every relying party's account linkage.
+	 * Since specs/116 the area also holds the error-origin salt, the usage-reporting and migration-lease
+	 * singletons and the keyring's state (fingerprints and the encryption status, never key material); the
+	 * SMTP password, the DPoP nonce secret and the error-origin salt are stored sealed with the keyring, the
+	 * pairwise salt deliberately is not (lib/consts/sealed_fields.ts). */
 	serviceConfig: 'serviceConfig'
 } as const;
 

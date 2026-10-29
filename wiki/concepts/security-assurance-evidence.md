@@ -4,7 +4,7 @@ title: "Security assurance: what evidence the project publishes, and what it ref
 tags: [architecture, contract]
 sources: [oauth-server-codebase]
 created: 2026-09-07
-updated: 2026-10-15
+updated: 2026-10-29
 graph:
   node_type: concept
   relationships:
@@ -30,7 +30,8 @@ page records what was published to close it and, more usefully, the decisions in
   as a Starlight fallback page that is kept out of search ([[site-translations]], since 2026-10-08). Every control row names the source file and the spec
   under `test/` that holds it; the page's own maintenance rule is that a control without a test is
   a control that can vanish in a refactor unnoticed. It carries a **Known limitations** section
-  that names the real gaps — secrets unencrypted at rest, CSRF resting on `SameSite` alone (`Strict`
+  that names the real gaps — secrets unencrypted at rest (closed by spec 116 on 2026-10-29,
+  [[secrets-encryption-at-rest]]), CSRF resting on `SameSite` alone (`Strict`
   for the console, `Lax` for the end-user screens since 2026-09-15, because `Strict` withheld the
   cookie on the RP-initiated navigation every sign-in is made of — see
   [[end-user-cookie-attributes]]), cookies

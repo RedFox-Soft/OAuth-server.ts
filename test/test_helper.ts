@@ -59,6 +59,9 @@ import {
 	type SeedClient
 } from './AuthorizationRequest.js';
 import { setAddonBaseline } from './addon_baseline.js';
+import { resetKeyringForTests } from '../lib/sealing/keyring.ts';
+import { resetUnreadableForTests } from '../lib/sealing/unreadable.ts';
+import { TEST_KEYRING } from './sealing/fixtures.ts';
 import { interactionPolicy } from '../lib/addon/index.js';
 import { base as basePolicy } from '../lib/helpers/interaction_policy/index.js';
 
@@ -333,7 +336,20 @@ export function seedClient(
 			`duplicate client_id '${metadata.clientId}' seeded into the Client store`
 		);
 	}
-	void adapter('Client').upsert(metadata.clientId, metadata);
+	/*
+	 * Callers seed synchronously and read at once, but sealing is asynchronous: the record is stored as given
+	 * first, so it is there on the next line, and the sealing write then replaces it as production stores it.
+	 */
+	void TestAdapter.for('Client').upsert(metadata.clientId, metadata, 0);
+	const sealing = adapter('Client').upsert(metadata.clientId, metadata);
+	pendingSeeds.add(sealing);
+	void sealing.finally(() => pendingSeeds.delete(sealing));
+}
+
+/* Sealing writes seedClient started and nobody awaited; settled before the store is emptied or handed over. */
+const pendingSeeds = new Set<Promise<unknown>>();
+async function seedsSettled(): Promise<void> {
+	await Promise.allSettled([...pendingSeeds]);
 }
 
 /*
@@ -491,6 +507,9 @@ export async function clearSeededBuckets(): Promise<void> {
  * by test/preload.ts, so a spec that never calls bootstrap() is covered too.
  */
 function forgetProcessState(): void {
+	// Before the stores are rebuilt, so every record a spec seeds is sealed as production seals it.
+	resetKeyringForTests(TEST_KEYRING);
+	resetUnreadableForTests();
 	resetStoresForTests();
 	forgetIssuerKeys();
 	forgetBucketAddresses();
@@ -595,6 +614,8 @@ async function bootstrap(
 		clientSettings || {}
 	);
 
+	// A sealing write from the previous file landing after the clear would bring its client back.
+	await seedsSettled();
 	TestAdapter.clear();
 	forgetProcessState();
 	/*
@@ -626,6 +647,7 @@ async function bootstrap(
 	for (const cl of clients) {
 		seedClient(cl);
 	}
+	await seedsSettled();
 
 	let lastSession: Session;
 	let lastAccountId: string;

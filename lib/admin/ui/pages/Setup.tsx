@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Form, Input, Button, Card, Flex, Typography, Alert } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
+import { KeyringStep, type GeneratedKeyring } from './setup/KeyringStep.js';
 
 interface SetupValues {
 	email: string;
@@ -10,6 +11,21 @@ interface SetupValues {
 export function Setup() {
 	const [submitting, setSubmitting] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const [keyring, setKeyring] = useState<
+		(GeneratedKeyring & { confirmToken: string }) | null
+	>(null);
+
+	/* The confirmation is recorded where the setup token allows it; the console asks again if it was not. */
+	async function confirmSaved() {
+		if (keyring) {
+			await fetch('/admin/api/setup/keyring-confirmation', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ token: keyring.confirmToken })
+			}).catch(() => undefined);
+		}
+		window.location.href = '/admin';
+	}
 
 	async function onFinish(values: SetupValues) {
 		setSubmitting(true);
@@ -28,11 +44,45 @@ export function Setup() {
 				setSubmitting(false);
 				return;
 			}
+			const body = (await res.json().catch(() => null)) as {
+				keyring?: GeneratedKeyring & { confirmToken: string };
+			} | null;
+			if (body?.keyring) {
+				setKeyring(body.keyring);
+				return;
+			}
 			window.location.href = '/admin';
 		} catch {
 			setError('setup failed');
 			setSubmitting(false);
 		}
+	}
+
+	if (keyring) {
+		return (
+			<Flex
+				justify="center"
+				style={{
+					display: 'flex',
+					minHeight: '100vh',
+					alignItems: 'center',
+					backgroundColor: '#f0f2f5'
+				}}
+			>
+				<Card style={{ width: 520, padding: 24, borderRadius: 12 }}>
+					<Typography.Title
+						level={3}
+						style={{ textAlign: 'center' }}
+					>
+						Save the instance keyring
+					</Typography.Title>
+					<KeyringStep
+						keyring={keyring}
+						onContinue={confirmSaved}
+					/>
+				</Card>
+			</Flex>
+		);
 	}
 
 	return (
