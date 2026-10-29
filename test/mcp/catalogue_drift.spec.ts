@@ -159,6 +159,8 @@ describe('MCP tool catalogue', () => {
 		).toEqual([
 			'POST /admin/api/setup',
 			'POST /admin/api/invitations/accept',
+			/* Describes the HTTP connection of the request that asks; a dispatched call has none (specs/115). */
+			'GET /admin/api/settings/client-address',
 			'POST /admin/api/logout',
 			'POST /admin/api/me/verification',
 			'PUT /admin/api/scope',

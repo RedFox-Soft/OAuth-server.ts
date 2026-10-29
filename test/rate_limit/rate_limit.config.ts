@@ -12,7 +12,7 @@ const config = getConfig();
  */
 export const ApplicationConfig = {
 	'rateLimit.enabled': true,
-	'rateLimit.trustedProxy': true,
+	'clientAddress.source': 'fly' as const,
 	'rateLimit.maxTrackedOrigins': 100,
 	'rateLimit.strict.max': 3,
 	'rateLimit.strict.windowSeconds': 60,

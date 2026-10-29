@@ -23,6 +23,10 @@ import {
 } from './verify_container_ownership.js';
 import { verifyProjectRemoval } from './verify_remove_projects.js';
 import { verifyReservedHostnamesKey } from './verify_reserved_hostnames_key.js';
+import {
+	verifyClientAddress,
+	verifyMailTallyRace
+} from './verify_client_address.js';
 import { verifyPlans } from './verify_plans.js';
 import { verifyAdminSignUp } from './verify_admin_signup.js';
 import {
@@ -620,6 +624,58 @@ await verifyReservedHostnamesKey(
 	String(Date.now()),
 	check
 );
+
+/* How the server is reached replaces whether proxy headers are trusted (specs/115). */
+{
+	const { userAreaFor } = await import('../lib/consts/storage_inventory.js');
+	const { ADMIN_BUCKET_ID } = await import('../lib/admin/consts.js');
+	const settingsArea = handle(STORE_AREAS.serviceConfig);
+	const admins = handle(userAreaFor(ADMIN_BUCKET_ID));
+	const settingsId = '429643fc2242030b49d9df4f';
+	const markerId = 'fidelity-client-address-admin';
+	await verifyClientAddress(
+		{
+			writeSettings: async (config) => {
+				if (config === null) {
+					await handle`DELETE FROM ${settingsArea} WHERE id = ${settingsId}`;
+					return;
+				}
+				await handle`
+					INSERT INTO ${settingsArea} (id, doc, expires_at)
+					VALUES (${settingsId}, ${config}, NULL)
+					ON CONFLICT (id) DO UPDATE SET doc = EXCLUDED.doc
+				`;
+			},
+			readSettings: async () => {
+				const [row]: ({ doc: Record<string, unknown> } | undefined)[] =
+					await handle`SELECT doc FROM ${settingsArea} WHERE id = ${settingsId}`;
+				return row?.doc ?? null;
+			},
+			otherAdministratorsExist: async () =>
+				(await handle`SELECT 1 FROM ${admins} WHERE id <> ${markerId} LIMIT 1`)
+					.length > 0,
+			addAdministrator: async () => {
+				await handle`
+					INSERT INTO ${admins} (id, doc, expires_at)
+					VALUES (${markerId}, ${{ _id: markerId, email: `${markerId}@x.io` }}, NULL)
+					ON CONFLICT (id) DO NOTHING
+				`;
+			},
+			removeAdministrator: async () => {
+				await handle`DELETE FROM ${admins} WHERE id = ${markerId}`;
+			},
+			apply: async () => {
+				const step = MIGRATIONS.find((m) =>
+					m.id.endsWith('client-address-source')
+				);
+				if (!step || 'noop' in step.postgres) return null;
+				return step.postgres.apply(handle);
+			}
+		},
+		check
+	);
+}
+await verifyMailTallyRace(check);
 
 {
 	const { UserBucketStore: PlanBucketStore, PlanCatalogueStore } =

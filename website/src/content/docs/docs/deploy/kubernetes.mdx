@@ -146,7 +146,7 @@ replica for the database's outage, in a loop, and a restart fixes nothing.
 
 Terminate TLS at the Ingress and set `ISSUER` to the public `https` URL; the
 [reverse proxy page](/docs/deploy/reverse-proxy/) applies to an Ingress controller exactly as it
-does to nginx, including the `rateLimit.trustedProxy` decision.
+does to nginx, including how the server is reached (`clientAddress.source`).
 
 <Aside type="caution" title="Rate limiting is per instance">
 

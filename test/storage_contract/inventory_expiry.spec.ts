@@ -47,6 +47,7 @@ const REAPED_ON_EXPIRES_AT = [
 	 * cooldown for good — and would keep counting failures from months ago against it.
 	 */
 	'LoginThrottle',
+	'MailRequestTally',
 	'PasswordResetChallenge',
 	'PasswordResetThrottle',
 	'PushedAuthorizationRequest',

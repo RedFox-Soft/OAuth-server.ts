@@ -17,6 +17,13 @@ import { isUsableNonceSecret } from './nonceSecret.js';
 import { LOGIN_RETENTION_SECONDS } from '../login_throttle/consts.js';
 // Same again: liveTime.ts imports nothing but types and epoch_time.
 import { ttl } from './liveTime.js';
+// Both leaves: one imports nothing, the other only node:net.
+import {
+	CLIENT_ADDRESS_SOURCES,
+	MAIL_REQUESTS_PER_HOUR_MAX,
+	MAX_TRUSTED_PROXIES
+} from '../consts/client_address.js';
+import { rangeList } from '../helpers/public_address.js';
 import {
 	ACR_DISTINCTIONS,
 	RESERVED_ACR_VALUE,
@@ -405,6 +412,47 @@ function checkRateLimit(config: ConfigurationInput) {
 			// The key is named because an operator reading a failed boot has seven of these to choose from.
 			throw new TypeError(`${key} must be a positive integer`);
 		}
+	}
+}
+
+/*
+ * How the caller address is found. "listed" with nothing listed is refused rather than read as "direct":
+ * an operator who chose it meant to trust a proxy, and silently trusting none would put every caller
+ * behind that proxy into one allowance. A malformed entry refuses the whole list, never part of it.
+ */
+function checkClientAddress(config: ConfigurationInput) {
+	const source = config['clientAddress.source'];
+	if (!(CLIENT_ADDRESS_SOURCES as readonly string[]).includes(source)) {
+		throw new TypeError(
+			`clientAddress.source must be one of ${formatters.formatList([...CLIENT_ADDRESS_SOURCES])}`
+		);
+	}
+	const proxies = config['clientAddress.trustedProxies'];
+	if (
+		!Array.isArray(proxies) ||
+		proxies.length > MAX_TRUSTED_PROXIES ||
+		!proxies.every((entry) => typeof entry === 'string') ||
+		rangeList(proxies) === null
+	) {
+		throw new TypeError(
+			`clientAddress.trustedProxies must be at most ${MAX_TRUSTED_PROXIES} IP addresses or address/prefix ranges`
+		);
+	}
+	if (source === 'listed' && proxies.length === 0) {
+		throw new TypeError(
+			'clientAddress.source "listed" needs at least one address in clientAddress.trustedProxies'
+		);
+	}
+
+	const mail = config['mail.requestsPerCallerPerHour'];
+	if (
+		!Number.isSafeInteger(mail) ||
+		mail < 1 ||
+		mail > MAIL_REQUESTS_PER_HOUR_MAX
+	) {
+		throw new TypeError(
+			`mail.requestsPerCallerPerHour must be an integer from 1 to ${MAIL_REQUESTS_PER_HOUR_MAX}`
+		);
 	}
 }
 
@@ -853,6 +901,7 @@ export function validateConfiguration(
 	checkErrorStore(config);
 	checkSentry(config);
 	checkRateLimit(config);
+	checkClientAddress(config);
 	checkScimRateLimit(config);
 	checkPlans(config);
 	checkLoginThrottle(config);

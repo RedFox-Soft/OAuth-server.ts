@@ -112,8 +112,6 @@ export const UNREPORTED_SETTINGS: Readonly<Record<string, string>> = {
 	'telemetry.enabled':
 		'a report exists only while it is on, so it would always read true',
 	'mTLS.trustProxyCertificateHeader':
-		"describes the deployment's proxy in front of the server, not a feature anyone adopts",
-	'rateLimit.trustedProxy':
 		"describes the deployment's proxy in front of the server, not a feature anyone adopts"
 };
 

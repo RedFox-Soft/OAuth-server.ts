@@ -8,6 +8,7 @@ import { resolveNonceSecret } from './nonceSecret.js';
 // Import-free module, so this adds no runtime edge into the adapters or the models.
 import { DEFAULT_ACR_VALUES } from '../consts/acr.js';
 import type { UserCodeCharset } from '../helpers/user_codes.js';
+import type { ClientAddressSource } from '../consts/client_address.js';
 import { initPairwiseSalt } from './pairwiseSalt.js';
 import { SUPPORTED_LANGUAGES } from '../i18n/languages.js';
 import type { OIDCContext } from '../helpers/oidc_context.js';
@@ -583,17 +584,26 @@ export const ApplicationConfig = {
 	 */
 	'rateLimit.enabled': true,
 	/*
-	 * rateLimit.trustedProxy
+	 * clientAddress.source
 	 *
-	 * description: Whether the forwarded-origin headers (Fly-Client-IP, then the first hop of
-	 * X-Forwarded-For, then X-Real-IP) name the caller. This is the one setting here with a wrong answer
-	 * in each direction, so it is stated rather than defaulted silently: true while directly exposed
-	 * lets any caller rotate the header per request and never be limited; false while behind a proxy
-	 * puts the entire internet into one bucket and refuses everyone within seconds. Defaults to true to
-	 * match the shipped fly.toml — the failure it risks is bypass, and the opposite default risks a
-	 * total outage on the deployment this repository actually ships.
+	 * description: How a request reaches this server, which decides the one address every limit and record
+	 * attributes it to (lib/helpers/caller_address.ts). A forwarded header is believed only on a connection
+	 * from a proxy the choice trusts, because anyone can write one: "automatic" trusts proxies on a private
+	 * network and reads the rightmost X-Forwarded-For entry they did not add; "direct" believes no header;
+	 * "fly" reads Fly-Client-IP, which Fly's edge overwrites (the rightmost X-Forwarded-For entry on Fly is
+	 * the app's own address, so "automatic" would see one caller there); "cloudflare" also trusts
+	 * Cloudflare's published ranges; "listed" also trusts the operator's own. Defaults to "automatic", which
+	 * is right both directly exposed and behind an ordinary proxy; an existing instance is carried over from
+	 * the boolean this replaced by the 2026-10-29-client-address-source migration.
 	 */
-	'rateLimit.trustedProxy': true,
+	'clientAddress.source': setting<ClientAddressSource>('automatic'),
+	/*
+	 * clientAddress.trustedProxies
+	 *
+	 * description: The proxy addresses or ranges ("address" or "address/prefix") trusted under "listed",
+	 * for a proxy with a public address that is not Cloudflare. Ignored under every other choice.
+	 */
+	'clientAddress.trustedProxies': [] as string[],
 	/*
 	 * rateLimit.maxTrackedOrigins
 	 *
@@ -691,6 +701,20 @@ export const ApplicationConfig = {
 	 * and the validator refuses a ceiling below the first window.
 	 */
 	'loginThrottle.windowCeilingSeconds': 3600,
+
+	/*
+	 * mail.requestsPerCallerPerHour
+	 *
+	 * description: How many requests one caller address may make in a UTC hour that ask this server to
+	 * send mail to an address the caller names: password reset requests, self-service registrations and
+	 * verification resends, across every project (lib/mail_limit/). The per-recipient cooldown and daily
+	 * cap bound how often one person is mailed; nothing else bounds how many people one caller can have
+	 * mailed in the operator's name. Every such request counts, whatever its outcome, so the limit cannot
+	 * be read to learn which addresses have accounts. Held in the datastore, so it is one limit for the
+	 * instance however many machines serve it. Ten is above what an honest visitor needs (a reset asked
+	 * for twice, a registration and a resend) and far below what abuse needs.
+	 */
+	'mail.requestsPerCallerPerHour': 10,
 
 	/*
 	 * federation

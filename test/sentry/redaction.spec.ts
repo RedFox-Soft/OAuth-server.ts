@@ -14,6 +14,10 @@ import {
 } from 'lib/sentry/dispatch.ts';
 import { clearRecorded, recordedEnvelopes } from 'lib/sentry/transport.ts';
 import { shaped } from 'test/shape.js';
+import {
+	PEER_HEADER,
+	statePeerThroughHeader
+} from 'test/caller_address/helper.js';
 
 /*
  * What does not leave this server, asserted over the envelopes that would have been delivered.
@@ -92,6 +96,7 @@ describe('sentry redaction', () => {
 	beforeEach(() => {
 		resetQueue();
 		resetOriginSalt();
+		statePeerThroughHeader();
 		resetDispatch();
 		resetClient();
 		clearRecorded();
@@ -230,13 +235,16 @@ describe('sentry redaction', () => {
 		expect(serialized()).not.toContain('ZZuseragentZZ');
 	});
 
-	/* The network origin never exceeds what the store was told to keep. */
+	/*
+	 * The network origin never exceeds what the store was told to keep. The caller connects directly, so the
+	 * address the server attributes to it is the connection's own.
+	 */
 	it('reports the origin as not-captured when capture is omitted', async () => {
 		ApplicationConfig['errorStore.originCaptureLevel'] = 'omitted';
 		await provoke(
 			'/redact-origin-omitted',
 			new Request('http://e.ly/redact-origin-omitted', {
-				headers: { 'x-forwarded-for': SENTINELS.address }
+				headers: { [PEER_HEADER]: SENTINELS.address }
 			})
 		);
 
@@ -249,7 +257,7 @@ describe('sentry redaction', () => {
 		await provoke(
 			'/redact-origin-anon',
 			new Request('http://e.ly/redact-origin-anon', {
-				headers: { 'x-forwarded-for': SENTINELS.address }
+				headers: { [PEER_HEADER]: SENTINELS.address }
 			})
 		);
 
@@ -264,7 +272,7 @@ describe('sentry redaction', () => {
 		await provoke(
 			'/redact-origin-full',
 			new Request('http://e.ly/redact-origin-full', {
-				headers: { 'x-forwarded-for': SENTINELS.address }
+				headers: { [PEER_HEADER]: SENTINELS.address }
 			})
 		);
 

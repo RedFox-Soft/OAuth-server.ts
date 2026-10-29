@@ -17,6 +17,10 @@ import {
 } from './verify_container_ownership.js';
 import { verifyProjectRemoval } from './verify_remove_projects.js';
 import { verifyReservedHostnamesKey } from './verify_reserved_hostnames_key.js';
+import {
+	verifyClientAddress,
+	verifyMailTallyRace
+} from './verify_client_address.js';
 import { verifyPlans } from './verify_plans.js';
 import { verifyAdminSignUp } from './verify_admin_signup.js';
 
@@ -317,6 +321,62 @@ check(
 		check
 	);
 }
+
+/* How the server is reached replaces whether proxy headers are trusted (specs/115). */
+{
+	const { ObjectId } = await import('mongodb');
+	const { userAreaFor } = await import('../lib/consts/storage_inventory.js');
+	const { ADMIN_BUCKET_ID } = await import('../lib/admin/consts.js');
+	const settings = db.collection(STORE_AREAS.serviceConfig);
+	const admins = db.collection<{ _id: string } & Record<string, unknown>>(
+		userAreaFor(ADMIN_BUCKET_ID)
+	);
+	const settingsId = new ObjectId('429643fc2242030b49d9df4f');
+	const markerId = 'fidelity-client-address-admin';
+	await verifyClientAddress(
+		{
+			writeSettings: async (config) => {
+				if (config === null) {
+					await settings.deleteOne({ _id: settingsId });
+					return;
+				}
+				await settings.updateOne(
+					{ _id: settingsId },
+					{ $set: { config } },
+					{ upsert: true }
+				);
+			},
+			readSettings: async () => {
+				const config: unknown = (await settings.findOne({ _id: settingsId }))
+					?.config;
+				return config && typeof config === 'object'
+					? (config as Record<string, unknown>)
+					: null;
+			},
+			otherAdministratorsExist: async () =>
+				(await admins.findOne({ _id: { $ne: markerId } })) !== null,
+			addAdministrator: async () => {
+				await admins.updateOne(
+					{ _id: markerId },
+					{ $set: { email: `${markerId}@x.io` } },
+					{ upsert: true }
+				);
+			},
+			removeAdministrator: async () => {
+				await admins.deleteOne({ _id: markerId });
+			},
+			apply: async () => {
+				const step = MIGRATIONS.find((m) =>
+					m.id.endsWith('client-address-source')
+				);
+				if (!step || 'noop' in step.mongodb) return null;
+				return step.mongodb.apply(db);
+			}
+		},
+		check
+	);
+}
+await verifyMailTallyRace(check);
 
 {
 	const { UserBucketStore: PlanBucketStore, PlanCatalogueStore } =

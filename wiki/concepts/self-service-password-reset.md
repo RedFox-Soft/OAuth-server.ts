@@ -162,7 +162,15 @@ registration send deliberately does not spend the window (`bumpRate: false`), wh
 does — there is no "initial" reset. The two flows also keep separate counters, so exhausting verification
 resends cannot lock a user out of a password reset.
 
+**Per caller, too, since spec 115 (2026-10-28).** The limits above bound how often one recipient is mailed;
+`mail.requestsPerCallerPerHour` bounds how many reset requests, sign-ups and verification resends one caller
+address may make in an hour, across every project, counted in the datastore before any lookup and whatever
+the outcome, so the refusal (429, the form again) is the same for an address with an account and one
+without. See [[caller-address]].
+
 ## Related
+
+- [[caller-address]] — the per-caller mail limit and the address it counts by.
 
 - [[deletion-and-revocation]] — the ownership table and cascade engine this reuses; the computed-id parameter
   now covers two areas because of this feature.

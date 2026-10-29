@@ -14,6 +14,10 @@ import {
 	provider,
 	type Connected
 } from './helpers.ts';
+import {
+	PEER_HEADER,
+	statePeerThroughHeader
+} from '../caller_address/helper.ts';
 
 /**
  * @proves A connection may send the sustained rate IPSIE requires and is refused, in SCIM's own shape and
@@ -108,6 +112,29 @@ describe('SCIM rate limiting', () => {
 		}
 
 		const over = await attempt();
+
+		expect(over.status).toBe(429);
+	});
+	it('charges a failed credential to the attributed caller, whatever prefix it forged behind a private proxy', async () => {
+		setScimRateLimitClock(() => now);
+		ApplicationConfig['clientAddress.source'] = 'automatic';
+		statePeerThroughHeader();
+		const strict = ApplicationConfig['rateLimit.strict.max'];
+		const attempt = (forged: number) =>
+			elysia.handle(
+				new Request(`http://e.ly${a.base}/Users`, {
+					headers: {
+						authorization: 'Bearer guess',
+						[PEER_HEADER]: '10.0.0.2',
+						'x-forwarded-for': `192.0.2.${forged}, 203.0.113.44`
+					}
+				})
+			);
+		for (let i = 0; i < strict; i++) {
+			await attempt(i);
+		}
+
+		const over = await attempt(strict);
 
 		expect(over.status).toBe(429);
 	});

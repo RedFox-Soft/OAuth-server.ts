@@ -12,6 +12,7 @@ import type { ErrorSurface } from 'lib/adapters/types.js';
 import type { Language } from 'lib/i18n/languages.js';
 import { languageOfRequest } from 'lib/i18n/request.js';
 import { uiLocalesRanges } from 'lib/i18n/resolve.js';
+import { callerAddressOf } from '../helpers/caller_address.js';
 
 /*
  * Returning an authorization error to the client, wherever the request ended.
@@ -191,6 +192,7 @@ export async function deliverAuthorizationError(
 			status: 500,
 			errorCode: 'server_error',
 			error,
+			callerAddress: callerAddressOf(capture.request).address,
 			headers: capture.request.headers,
 			submittedFields: capture.submittedFields
 		});

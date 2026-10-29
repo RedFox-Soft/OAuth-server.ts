@@ -31,6 +31,7 @@ import {
 	resetUnauthenticatedCharge,
 	setUnauthenticatedChargeClock
 } from '../lib/helpers/unauthenticated_charge.ts';
+import { setPeerResolverForTests } from 'lib/helpers/caller_address.ts';
 import {
 	resetScimRateLimiter,
 	setScimRateLimitClock
@@ -497,6 +498,7 @@ function forgetProcessState(): void {
 	resetClientUseForTests();
 	forgetSignUpReadings();
 	resetUnauthenticatedCharge();
+	setPeerResolverForTests(null);
 	setUnauthenticatedChargeClock(null);
 	resetScimRateLimiter();
 	setScimRateLimitClock(null);

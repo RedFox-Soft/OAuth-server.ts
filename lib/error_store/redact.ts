@@ -4,6 +4,7 @@ import { errorOriginSaltStore } from '../adapters/index.js';
 import { ORIGIN_NOT_CAPTURED } from '../consts/error_origin.js';
 import type { ErrorRecord, OriginCaptureLevel } from '../adapters/types.js';
 import { truncate } from './fingerprint.js';
+import { UNATTRIBUTED } from '../helpers/caller_address.js';
 
 const USER_AGENT_LIMIT = 200;
 
@@ -27,6 +28,12 @@ export interface CaptureSubject {
 	requestId?: string | null;
 	/* Names only — never values. */
 	submittedFields?: string[];
+	/*
+	 * The address every limit attributed the request to (lib/helpers/caller_address.ts), never a header
+	 * read here: the record must name the caller the server believed, not one the caller wrote. Absent for
+	 * background work, which has no caller.
+	 */
+	callerAddress?: string | null;
 	headers: Headers;
 }
 
@@ -62,20 +69,15 @@ export function resetOriginSalt(): void {
  * configuration that was in force when the record was written.
  */
 export async function captureOrigin(
-	headers: Headers,
+	callerAddress: string | null | undefined,
 	level: OriginCaptureLevel
 ): Promise<string | null> {
 	if (level === 'omitted') {
 		return ORIGIN_NOT_CAPTURED;
 	}
 
-	/*
-	 * First hop of X-Forwarded-For, falling back to X-Real-IP. Both are client-supplied and therefore
-	 * spoofable; that is acceptable for a diagnostic record and would not be for an access decision,
-	 * which is why nothing authorizes on this value.
-	 */
-	const forwarded = headers.get('x-forwarded-for')?.split(',')[0]?.trim();
-	const address = forwarded || headers.get('x-real-ip')?.trim() || '';
+	const address =
+		callerAddress && callerAddress !== UNATTRIBUTED ? callerAddress : '';
 	if (!address) {
 		return null;
 	}
@@ -107,7 +109,7 @@ export async function buildRecord(
 		actor: subject.actor ?? null,
 		scope: subject.scope ?? null,
 		requestId: subject.requestId ?? null,
-		origin: await captureOrigin(subject.headers, level),
+		origin: await captureOrigin(subject.callerAddress, level),
 		userAgent:
 			truncate(subject.headers.get('user-agent') ?? '', USER_AGENT_LIMIT) ||
 			null,

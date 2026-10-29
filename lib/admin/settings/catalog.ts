@@ -708,6 +708,30 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 	},
 
 	{
+		key: 'clientAddress.source',
+		domain: 'signin-abuse',
+		group: 'Caller address',
+		label: 'How this server is reached',
+		summary: 'Where the caller’s address comes from',
+		type: 'enum',
+		options: ['automatic', 'direct', 'fly', 'cloudflare', 'listed'],
+		risk: 'security',
+		description:
+			'Decides the one address every request is attributed to, which the rate limits, the mail limit and the error store all use. A proxy header such as X-Forwarded-For is believed only when the connection comes from a proxy this choice trusts, because anyone can write one. "automatic" fits a server reached directly and a server behind nginx, a container ingress or a cloud load balancer on a private network: it trusts private-network connections and reads the address the nearest one recorded. "direct" believes no header. "fly" is for Fly.io, whose edge sets Fly-Client-IP; under "automatic" every Fly caller would look like one address and be refused together. "cloudflare" is for Cloudflare in front, directly or before your own proxy. "listed" trusts the proxy addresses you list below. A wrong choice either lets a caller pick its own address and escape every limit, or puts all callers into one allowance; the check below this setting shows what the server sees for you.'
+	},
+	{
+		key: 'clientAddress.trustedProxies',
+		domain: 'signin-abuse',
+		group: 'Caller address',
+		label: 'Trusted proxy addresses',
+		summary: 'Proxy addresses or ranges trusted under “listed”',
+		type: 'string-array',
+		risk: 'security',
+		description:
+			'Only for "listed": the addresses or ranges (203.0.113.10, 203.0.113.0/24, 2001:db8::/32) of the proxies in front of this server that have public addresses. Private-network proxies are trusted without listing. List only machines you run or pay for: a listed address can name any caller it likes. At most 64 entries.'
+	},
+
+	{
 		key: 'rateLimit.enabled',
 		domain: 'signin-abuse',
 		group: 'Rate limiting',
@@ -717,18 +741,6 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 		risk: 'security',
 		description:
 			'Refuses requests from one origin past its allowance inside a window, before the endpoint does any work. Allowances are tiered by route class, so the token endpoint and a static asset are not held to the same number. On by default; turn it off as an incident kill switch if it starts refusing traffic it should not.'
-	},
-	{
-		key: 'rateLimit.trustedProxy',
-		domain: 'signin-abuse',
-		group: 'Rate limiting',
-		label: 'Take the caller’s address from the proxy headers',
-		summary: 'Read the caller address from proxy headers',
-		type: 'boolean',
-		dependsOn: 'rateLimit.enabled',
-		risk: 'security',
-		description:
-			'Whether Fly-Client-IP, the first hop of X-Forwarded-For, or X-Real-IP names the caller. This one has a wrong answer in each direction. Leave it ON when a proxy or load balancer sits in front of this server: with it off, every caller arrives as the proxy’s address, so the whole internet shares one allowance and all traffic is refused within seconds. Turn it OFF only when the server is directly exposed: with it on, any caller can set the header to a fresh value per request and is never limited. Defaults to on, matching the shipped deployment.'
 	},
 	{
 		key: 'rateLimit.maxTrackedOrigins',
@@ -852,6 +864,19 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 		unit: 'seconds',
 		description:
 			'The longest the door will ever shut, however many times one address has run out of attempts. With the defaults the lockouts run 15 → 30 → 60 minutes, which holds a sustained attack to roughly 120 guesses a day. Cannot be shorter than the first lockout, and cannot exceed 24 hours — beyond that the counter would be forgotten before its own lockout ended, which would reopen the door. Someone locked out this long can still get straight back in by completing a password reset.'
+	},
+	{
+		key: 'mail.requestsPerCallerPerHour',
+		domain: 'signin-abuse',
+		group: 'Mail',
+		label: 'Mail requests per caller per hour',
+		summary:
+			'How many emails one caller can ask this server to send in an hour',
+		type: 'number',
+		unit: 'requests',
+		risk: 'security',
+		description:
+			'How many password reset requests, sign-ups and verification resends one address may make in an hour, across every project. Each recipient already has its own cooldown and daily cap; this bounds how many different people one caller can have mailed in your name. Every such request counts, whether or not an email went out, so the limit says nothing about which addresses have accounts. Past it, the visitor is asked to try again later and no email is sent. Raise it if many honest users share one address, such as an office or a school behind one connection. From 1 to 10 000.'
 	},
 
 	/*

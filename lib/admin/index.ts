@@ -15,6 +15,7 @@ import { meView } from './me_view.js';
 import { meCan } from './auth/can.js';
 import { ISSUER } from '../configs/env.js';
 import { planRightsOf } from '../plans/rights.js';
+import { callerAddressOf } from '../helpers/caller_address.js';
 
 /*
  * The console: the admin API plus the HTML shell that drives it.
@@ -45,6 +46,7 @@ export const adminApp = new Elysia({ name: 'admin' })
 							status: error.status,
 							errorCode: 'admin_error',
 							error,
+							callerAddress: callerAddressOf(request).address,
 							headers: request.headers
 						})
 					: undefined;

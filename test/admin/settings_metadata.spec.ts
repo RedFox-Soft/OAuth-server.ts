@@ -131,6 +131,8 @@ describe('settings catalog presentation metadata', () => {
 		expect(flagged).toEqual(
 			[
 				'authorization.allowOmittingSingleRegisteredRedirectUri',
+				'clientAddress.source',
+				'clientAddress.trustedProxies',
 				'clientAuth.issuerOnlyAudience',
 				'projects.addressForms',
 				'projects.reservedHostnames',
@@ -140,12 +142,12 @@ describe('settings catalog presentation metadata', () => {
 				'idToken.relyingPartySessionLifetime',
 				'ipsieSl1.enabled',
 				'jwtBearer.enabled',
+				'mail.requestsPerCallerPerHour',
 				'tokenExchange.enabled',
 				'mTLS.trustProxyCertificateHeader',
 				'par.allowUnregisteredRedirectUris',
 				'pkce.required',
 				'rateLimit.enabled',
-				'rateLimit.trustedProxy',
 				'scim.secretCredentials',
 				'scim.staticTokens',
 				'scim.strict'

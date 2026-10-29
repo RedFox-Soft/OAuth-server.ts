@@ -35,7 +35,8 @@ export const zhHans: PlainTexts = {
 			tooManyAttempts: '输错次数过多。请在下方重新请求验证码。',
 			incorrectCode: '验证码不正确，请重试。',
 			cooldown: '请稍等片刻，再请求新的验证邮件。',
-			dailyCap: '您今天请求的验证邮件过多。请稍后再试。'
+			dailyCap: '您今天请求的验证邮件过多。请稍后再试。',
+			callerLimit: '您的网络在过去一小时内请求的邮件过多。请稍后再试。'
 		}
 	},
 	reset: {

@@ -2185,6 +2185,13 @@ export const excludedConsoleOperations: readonly ExcludedConsoleOperation[] = [
 			'Unauthenticated, and completed by the invited person following a link in their own mail. There is no agent principal to accept as — the same reason first-run setup is inapplicable.'
 	},
 	{
+		method: 'GET',
+		path: '/admin/api/settings/client-address',
+		absence: 'inapplicable',
+		reason:
+			'Shows which address the server attributes to the request that asks, and which proxy headers arrived on it, so an operator can check how the server is reached. An agent’s call is dispatched inside the server and has no connection to describe. The setting it checks is changed through settings_update like any other.'
+	},
+	{
 		method: 'POST',
 		path: '/admin/api/logout',
 		absence: 'inapplicable',

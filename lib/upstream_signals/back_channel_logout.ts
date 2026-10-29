@@ -19,7 +19,7 @@ import {
 } from '../helpers/errors.js';
 import { chargeFailedCredential } from '../helpers/unauthenticated_charge.js';
 import type { Session } from '../models/session.js';
-import { originOf } from '../plugins/rateLimit.js';
+import { callerAddressOf } from '../helpers/caller_address.js';
 import { authenticateUpstream } from './assertion.js';
 import {
 	accountLinkedTo,
@@ -159,7 +159,7 @@ async function receive(
 			/* The strict per-origin charge shared with SCIM and global token revocation. */
 			if (error instanceof InvalidToken) {
 				chargeFailedCredential(
-					originOf(request, server),
+					callerAddressOf(request, server).address,
 					(retryAfterSeconds) => new RateLimited(retryAfterSeconds, 'strict')
 				);
 			}
@@ -198,6 +198,7 @@ async function receive(
 			status: 500,
 			errorCode: 'server_error',
 			error,
+			callerAddress: callerAddressOf(request).address,
 			headers: request.headers
 		});
 		return answer('logout_failed');

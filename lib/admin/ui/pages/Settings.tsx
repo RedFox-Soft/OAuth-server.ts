@@ -19,6 +19,7 @@ import { SaveBar } from '../settings/SaveBar.js';
 import { SmtpCard } from '../settings/SmtpCard.js';
 import { SentryCard } from '../settings/SentryCard.js';
 import { TelemetryCard } from '../settings/TelemetryCard.js';
+import { CallerAddressCard } from '../settings/CallerAddressCard.js';
 import { PlansCard } from '../settings/PlansCard.js';
 import { Sl1ReadinessCard } from '../settings/Sl1ReadinessCard.js';
 import { useLeaveGuard } from '../frame/router.js';
@@ -300,6 +301,15 @@ export function Settings() {
 							<TelemetryCard key={String(baseline['telemetry.enabled'])} />
 						)}
 						{!searching && pane === 'integrations' && <SmtpCard />}
+						{/*
+						 * On the pane that holds how the server is reached, keyed by the saved choice so a save
+						 * re-checks the operator's own request under the new one.
+						 */}
+						{!searching && pane === 'signin-abuse' && (
+							<CallerAddressCard
+								key={`${String(baseline['clientAddress.source'])}:${JSON.stringify(baseline['clientAddress.trustedProxies'])}`}
+							/>
+						)}
 						{!searching && pane === 'plans' && <PlansCard />}
 						{!searching && pane === 'request-security' && <Sl1ReadinessCard />}
 

@@ -123,14 +123,17 @@ little to gain from asking twice a minute about something a deploy cannot fix. L
 concern, since the endpoint holds its last answer for a second and shares one outstanding probe, so
 it cannot become database load.
 
-## `rateLimit.trustedProxy` stays on
+## Set `clientAddress.source` to `fly`
 
-Fly's proxy sits in front of the app, so every request arrives from it. Leave
-[`rateLimit.trustedProxy`](/docs/reference/settings/#rateLimit.trustedProxy) at its default of
-`true`: with it off, every caller is counted as the proxy's own address, the whole internet shares
-one allowance, and all traffic is refused within seconds. The origin resolver reads `Fly-Client-IP`
-first, which is the header Fly sets. [Behind a reverse proxy](/docs/deploy/reverse-proxy/)
-covers the opposite case, a server exposed directly, where the same default is wrong.
+Fly's proxy sits in front of the app, so every request arrives from it, from a private address. Set
+[`clientAddress.source`](/docs/reference/settings/#clientAddress.source) to `fly`. The server then reads
+`Fly-Client-IP`, which Fly's edge overwrites with the real caller, so a caller cannot choose its own address.
+
+The default, `automatic`, is wrong on Fly. Fly appends the app's own public address as the last entry of
+`X-Forwarded-For`, so `automatic` would count every caller as that one address and refuse them all together.
+An instance upgraded from a release before this setting existed is moved to `fly` by the migration; a new one
+needs the setting once, in Settings → Sign-in & abuse. The card under the setting shows the address the server
+sees for you, and warns if Fly's header is present under any other choice.
 
 <Aside type="note" title="A release deploys itself, and only a release reaches production">
 

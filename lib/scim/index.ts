@@ -16,7 +16,7 @@ import {
 } from '../consts/scim.js';
 import { captureFault } from '../error_store/capture.js';
 import { OIDCProviderError, UnknownBucket } from '../helpers/errors.js';
-import { originOf } from '../plugins/rateLimit.js';
+import { callerAddressOf } from '../helpers/caller_address.js';
 import { scimBaseUrl } from '../provisioning/addresses.js';
 import {
 	resourceTypeById,
@@ -116,7 +116,7 @@ async function enter(
 		);
 	} catch (error) {
 		if (error instanceof ScimError && error.status === 401) {
-			chargeUnauthenticated(originOf(request, server));
+			chargeUnauthenticated(callerAddressOf(request, server).address);
 		}
 		throw error;
 	}
@@ -213,6 +213,7 @@ export const scimApp = new Elysia({ name: 'scim' })
 						status: scim.status,
 						errorCode: 'scim_error',
 						error,
+						callerAddress: callerAddressOf(request).address,
 						headers: request.headers
 					})
 				: undefined;

@@ -137,8 +137,17 @@ signing keys included (`seedJwks` writes them again into the fresh `bucketKeys` 
 top-level `beforeEach` does fire for `describe`-nested tests (checked against bun 1.4.0, in both
 declaration orders), so per-file placement is not what rescues these.
 
+## Who a request is counted against
+
+Not decided here since spec 115 (2026-10-28): the limiter keys on `callerAddressOf(request, server).address`,
+the one answer every address-based decision shares, and a forwarded header counts only from a proxy the
+operator's `clientAddress.source` trusts. The old `originOf` read caller-written headers first and is gone.
+See [[caller-address]].
+
 ## Related
 
+- [[caller-address]] — who a request is counted against, and why a forged header no longer resets an
+  allowance.
 - [[feature-flag-gating]] — the indistinguishability property the mount order protects, and the
   `feature_disabled` emit this feature's `rate_limited` emit is modelled on.
 - [[non-html-response-hardening]] — the `onRequest` sibling whose measurements decided the hook stage;

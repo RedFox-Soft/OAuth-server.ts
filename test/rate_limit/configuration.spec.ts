@@ -69,14 +69,11 @@ describe('rate limit configuration', () => {
 		});
 	}
 
-	// The switches are booleans and carry no arithmetic, so they have no invariant of their own —
-	// pinned so that a later change making them numeric does not slip past this suite.
-	it('leaves the two switches unvalidated beyond their type', () => {
+	// The switch is a boolean and carries no arithmetic, so it has no invariant of its own — pinned so
+	// that a later change making it numeric does not slip past this suite.
+	it('leaves the switch unvalidated beyond its type', () => {
 		expect(() =>
 			validateConfiguration(withKey('rateLimit.enabled', false))
-		).not.toThrow();
-		expect(() =>
-			validateConfiguration(withKey('rateLimit.trustedProxy', false))
 		).not.toThrow();
 	});
 
@@ -104,12 +101,11 @@ describe('rate limit configuration', () => {
 	describe('the operator can reach every setting', () => {
 		const KEYS = [
 			'rateLimit.enabled',
-			'rateLimit.trustedProxy',
 			'rateLimit.maxTrackedOrigins',
 			...NUMERIC_KEYS
 		];
 
-		it('catalogs all nine keys', () => {
+		it('catalogs all eight keys', () => {
 			// Widened to string: the descriptor's key is a union of the declared settings, and comparing it
 			// against a plain list is the whole point of this assertion.
 			const catalogued = new Set<string>(
@@ -145,24 +141,24 @@ describe('rate limit configuration', () => {
 		});
 
 		/*
-		 * trustedProxy is the one setting here with a wrong answer in each direction, and an operator who
-		 * reads only half of that will pick the one that takes their deployment down. Both directions have
-		 * to be in the text they actually see.
+		 * How the server is reached has a wrong answer in each direction, and an operator who reads only half
+		 * of that will pick the one that takes their deployment down. Both directions have to be in the text
+		 * they actually see.
 		 */
-		it('describes both failure directions of the proxy setting', () => {
+		it('describes both failure directions of the caller address setting', () => {
 			const entry = SETTINGS_CATALOG.find(
-				(candidate) => candidate.key === 'rateLimit.trustedProxy'
+				(candidate) => candidate.key === 'clientAddress.source'
 			);
 
 			const text = entry?.description.toLowerCase() ?? '';
 
 			expect(entry).toBeDefined();
-			// The deployment shape the operator has to recognise to choose correctly.
+			// The deployment shapes the operator has to recognise to choose correctly.
 			expect(text).toContain('proxy');
-			expect(text).toContain('directly exposed');
-			// Leaving it wrongly ON: the bypass direction.
-			expect(text).toContain('never limited');
-			// Leaving it wrongly OFF: the outage direction.
+			expect(text).toContain('fly.io');
+			// A choice that trusts too much: the bypass direction.
+			expect(text).toContain('escape every limit');
+			// A choice that trusts too little: the outage direction.
 			expect(text).toContain('one allowance');
 		});
 	});

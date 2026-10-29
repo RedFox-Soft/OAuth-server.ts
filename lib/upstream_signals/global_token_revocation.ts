@@ -16,7 +16,7 @@ import {
 	UpstreamNotPermitted
 } from '../helpers/errors.js';
 import { chargeFailedCredential } from '../helpers/unauthenticated_charge.js';
-import { originOf } from '../plugins/rateLimit.js';
+import { callerAddressOf } from '../helpers/caller_address.js';
 import { authenticateUpstream } from './assertion.js';
 import { endAccessForUpstream } from './end_access.js';
 import { resolveReachableUser, type SubjectIdentifier } from './subject.js';
@@ -120,7 +120,7 @@ async function revoke(
 				/* The strict per-origin charge, shared with SCIM: a guesser gets no more room here than at /token. */
 				if (error instanceof InvalidToken) {
 					chargeFailedCredential(
-						originOf(request, server),
+						callerAddressOf(request, server).address,
 						(retryAfterSeconds) => new RateLimited(retryAfterSeconds, 'strict')
 					);
 				}

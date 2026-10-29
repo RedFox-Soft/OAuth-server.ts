@@ -67,10 +67,10 @@ upstream IdP --signed JWT, per project--> |   (global token revocation,
 ```
 
 The server assumes TLS is terminated in front of it and that the issuer is an `https://` URL. It
-trusts `X-Forwarded-For` and its relatives **only** when `rateLimit.trustedProxy` says so
-([rateLimit.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/plugins/rateLimit.ts));
-otherwise every request shares one origin bucket, which fails safe rather than letting a client
-choose its own address. Two kinds of inbound caller are somebody else's machines rather than browsers
+believes `X-Forwarded-For` **only** on a connection from a proxy `clientAddress.source` trusts, and
+reads it from the right, so the entries a client wrote are never the caller
+([caller_address.ts](https://github.com/RedFox-Soft/OAuth-server.ts/blob/main/lib/helpers/caller_address.ts));
+otherwise the connection's own address is the caller. Two kinds of inbound caller are somebody else's machines rather than browsers
 or clients: an enterprise directory writing a project's users over SCIM, and an upstream identity
 provider asking for a user's sessions to end. Each is admitted per project, one connection or provider
 at a time, by an administrator, and authenticated with a credential the server checks itself; neither
@@ -253,8 +253,7 @@ a way the compensating control does not cover is a vulnerability report.
 ## What the operator owns
 
 The controls above assume a deployment that: terminates TLS in front of the server with an
-`https://` issuer; sets `rateLimit.trustedProxy` only when a proxy it controls sets the forwarding
-headers; keeps the database, MongoDB or PostgreSQL, off the public network with authentication on and
+`https://` issuer; chooses the `clientAddress.source` that matches the proxy in front of it; keeps the database, MongoDB or PostgreSQL, off the public network with authentication on and
 encryption at rest where available; turns on the TOTP requirement for the administrators' project; and backs up the database,
 because the signing keys are in it. [Behind a reverse proxy](/docs/deploy/reverse-proxy/) covers
 the first two.

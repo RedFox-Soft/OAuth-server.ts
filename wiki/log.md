@@ -324,3 +324,7 @@ Operations:
 ## [2026-10-26] update | [[non-html-response-hardening]]: every response now carries `X-Robots-Tag: noindex, nofollow`, unconditionally; a new gotcha records why there is no `robots.txt` (a `Disallow` hides the header and still lets a linked URL be indexed, which is why Keycloak removed theirs).
 
 ## [2026-10-28] create | spec 113 — [[instance-telemetry]]: the daily anonymous usage report to FoxTrust, the owner's decisions (on by default, silent failure, random identifier, no destination override), the claim and the slot, the counters, the declaration and its guards, the last report stored as text.
+
+## [2026-10-28] create | spec 115 — [[caller-address]]: the forgeable caller address it replaced (cascade of headers, leftmost X-Forwarded-For), the Fly.io probe, the five choices and the walk, shared address space excluded, the memo, the upgrade migration, and the per-caller mail limit.
+
+## [2026-10-28] update | [[per-origin-rate-limiting]] and [[self-service-password-reset]] point to [[caller-address]] for who a request is counted against and for the per-caller mail limit; the [[instance-telemetry]] index line no longer claims environment off switches (removed in spec 113).

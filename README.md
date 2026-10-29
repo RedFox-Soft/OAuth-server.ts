@@ -186,23 +186,25 @@ enough to protect the token endpoint would refuse the console's asset burst:
 All of it is settable from the admin console under **Settings → Rate limiting**, or directly on
 `ApplicationConfig`. A change saved in the console applies at once, like every other server setting.
 
-| Setting                       | Default | Notes                                    |
-| ----------------------------- | ------- | ---------------------------------------- |
-| `rateLimit.enabled`           | `true`  | Incident kill switch                     |
-| `rateLimit.trustedProxy`      | `true`  | See below — no universally safe value    |
-| `rateLimit.maxTrackedOrigins` | `10000` | Per class; caps the limiter's own memory |
-| `rateLimit.strict.max`        | `60`    | With `.windowSeconds`, default `60`      |
-| `rateLimit.ordinary.max`      | `300`   | With `.windowSeconds`, default `60`      |
-| `rateLimit.public.max`        | `1200`  | With `.windowSeconds`, default `60`      |
+| Setting                       | Default     | Notes                                    |
+| ----------------------------- | ----------- | ---------------------------------------- |
+| `rateLimit.enabled`           | `true`      | Incident kill switch                     |
+| `clientAddress.source`        | `automatic` | How the server is reached; see below     |
+| `rateLimit.maxTrackedOrigins` | `10000`     | Per class; caps the limiter's own memory |
+| `rateLimit.strict.max`        | `60`        | With `.windowSeconds`, default `60`      |
+| `rateLimit.ordinary.max`      | `300`       | With `.windowSeconds`, default `60`      |
+| `rateLimit.public.max`        | `1200`      | With `.windowSeconds`, default `60`      |
 
 The server refuses to start if any of these is not a positive integer, rather than serving with
 limiting silently absent or silently total.
 
-**`rateLimit.trustedProxy` is the one setting with a wrong answer in each direction.** Leave it on
-when anything sits in front of this server (the shipped `fly.toml` does): with it off, every caller
-arrives as the proxy's own address, so the whole internet shares one allowance and all traffic is
-refused within seconds. Turn it off when the server is directly exposed: with it on, any caller can
-set `Fly-Client-IP` to a fresh value per request and is never limited.
+**Who a request is counted against is decided once**, by `clientAddress.source`: a proxy header is believed only
+on a connection from a proxy the choice trusts, because a caller can write any header. `automatic` (the default)
+fits a server reached directly and one behind nginx, an Ingress or a load balancer on a private network, and reads
+`X-Forwarded-For` from the right; `fly` reads Fly's own `Fly-Client-IP` (the shipped `fly.toml` needs it);
+`cloudflare` and `listed` add Cloudflare's ranges or your own proxy addresses; `direct` believes no header. The
+console card under the setting shows which address the server sees for you. See
+[Behind a reverse proxy](https://foxauth.dev/docs/deploy/reverse-proxy/).
 
 **Two properties to know before relying on this.** Counting is per instance and held in memory, so
 with N machines serving concurrently the effective allowance is N times the configured value, and an

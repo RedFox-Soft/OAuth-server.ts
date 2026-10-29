@@ -11,6 +11,10 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- **Per-caller mail limit** (`mail.requestsPerCallerPerHour`, 10) — one address may make at most this many password
+  reset requests, sign-ups and verification resends an hour, across every project; past it no email is sent and the
+  visitor is asked to try later (429). Every request counts whatever its outcome, so the refusal reveals nothing about
+  which addresses have accounts.
 - **Daily anonymous usage report** (`telemetry.enabled`, **on by default**) — once a day the server sends FoxTrust
   its version, runtime, storage backend, which feature settings are on, coarse ranges of its size and the previous
   day's token and defect counts, under a random instance identifier. No name, email, hostname, issuer, address or
@@ -46,6 +50,14 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Security
 
+- **A caller can no longer choose its own address.** With `rateLimit.trustedProxy` on (the default) the server took
+  the caller's address from `Fly-Client-IP`, then the first `X-Forwarded-For` entry, then `X-Real-IP`, all writable
+  by the caller, so on every deployment except Fly.io the per-address limits could be escaped by sending a new
+  header each time. The boolean is replaced by `clientAddress.source` (automatic, direct, fly, cloudflare, listed):
+  a proxy header is believed only from a proxy the choice trusts, and `X-Forwarded-For` is read from the right.
+  Upgrading needs no step on Fly.io: the migration selects "fly" for an instance in use, "direct" where the old
+  setting was off. **Not on Fly.io?** Open Settings → Sign-in & abuse after upgrading; the card there shows the address
+  the server sees for you and warns when the choice does not fit.
 - **nodemailer 10.2.1 and zod 4.6.7.** nodemailer's address parser could read a crafted recipient as a different
   address than its header named (GHSA-85x2-q946-cp5h, GHSA-8c8m-p3m8-cjg8, GHSA-m943-m63m-w62w). zod, pulled in by the
   MCP SDK, could exhaust memory validating an oversized array (CVE-2023-54404, GHSA-mrhx-c7xc-m3w5).

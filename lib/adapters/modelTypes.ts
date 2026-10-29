@@ -13,6 +13,7 @@ import type { GrantPayloadType } from '../models/grant.js';
 import type { InitialAccessTokenPayloadType } from '../models/initial_access_token.js';
 import type { InteractionPayloadType } from '../models/interaction.js';
 import type { LoginThrottlePayload } from '../login_throttle/types.js';
+import type { MailRequestTallyPayload } from '../mail_limit/types.js';
 import type {
 	PasswordResetChallengePayload,
 	PasswordResetThrottlePayload
@@ -64,6 +65,7 @@ export interface ModelPayloadByName {
 	InitialAccessToken: InitialAccessTokenPayloadType;
 	Interaction: InteractionPayloadType;
 	LoginThrottle: LoginThrottlePayload;
+	MailRequestTally: MailRequestTallyPayload;
 	PasswordResetChallenge: PasswordResetChallengePayload;
 	PasswordResetThrottle: PasswordResetThrottlePayload;
 	PushedAuthorizationRequest: PushedAuthorizationRequestPayloadType;

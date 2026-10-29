@@ -65,13 +65,15 @@ export const zhHans: SignInTexts = {
 		verifyRecent: '最近已发送过验证邮件。请查看收件箱，或者一分钟后重试。',
 		verifyUnsent: '我们无法发送验证邮件。请稍后重试。',
 		federationLink:
-			'此电子邮件地址在此处已有账户。请使用该账户的密码登录一次，以将其关联到您的身份提供商。'
+			'此电子邮件地址在此处已有账户。请使用该账户的密码登录一次，以将其关联到您的身份提供商。',
+		mailLimited: '您的网络在过去一小时内请求的邮件过多。请稍后再试。'
 	},
 
 	errors: {
 		invalidCredentials: '用户名或密码无效',
 		invalidCode: '验证码无效',
 		passwordsDiffer: '两次输入的密码不一致',
+		mailLimited: '您的网络在过去一小时内请求的邮件过多。请稍后再试。',
 		passwordTooShort: {
 			other: '请至少使用{count}个字符。'
 		},

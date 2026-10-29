@@ -3,6 +3,7 @@ import { Elysia } from 'elysia';
 import { bucketAtHost, isCanonicalHost } from 'lib/admin/auth/bucketAddress.js';
 import { hostOfRequest } from 'lib/consts/request_host.js';
 import { MAX_REQUEST_BODY_BYTES } from 'lib/consts/request_limits.js';
+import { callerAddressOf } from 'lib/helpers/caller_address.js';
 
 /*
  * The first path segments that belong to the instance rather than to any population.
@@ -70,7 +71,14 @@ function oversizeBodyRefusal(request: Request): Response | undefined {
  */
 export const instancePlaneOnly = new Elysia({
 	name: 'instance-plane-only'
-}).onRequest(async ({ request, set }) => {
+}).onRequest(async ({ request, server, set }) => {
+	/*
+	 * Settles the caller's address while the socket is in hand, so later readers that receive the
+	 * request but not `server` take this answer instead of reading a header. Here rather than in a
+	 * plugin of its own for the reason oversizeBodyRefusal gives.
+	 */
+	callerAddressOf(request, server);
+
 	// First, before anything reads the body.
 	const oversize = oversizeBodyRefusal(request);
 	if (oversize) return oversize;

@@ -19,7 +19,7 @@ describe('the per-origin limiter while its settings are changed', () => {
 		cookie = await superAdminCookie();
 		await saveSettings(cookie, {
 			'rateLimit.enabled': true,
-			'rateLimit.trustedProxy': true,
+			'clientAddress.source': 'fly',
 			'rateLimit.maxTrackedOrigins': 100,
 			'rateLimit.public.max': 2,
 			'rateLimit.public.windowSeconds': 60

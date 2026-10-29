@@ -1,5 +1,6 @@
 import { elysia } from '../../lib/index.ts';
 import { ISSUER } from 'lib/configs/env.js';
+import { setPeerResolverForTests } from 'lib/helpers/caller_address.ts';
 
 export { resetRateLimiter, setRateLimitClock } from 'lib/plugins/rateLimit.js';
 
@@ -20,15 +21,17 @@ export interface ProbeInit {
 /*
  * One request from a stated origin.
  *
- * The origin travels as `Fly-Client-IP` because that is what the deployment's proxy sets and what the
- * resolver reads first. A spec exercising the fallbacks supplies its own headers instead and passes
- * `origin` as null.
+ * The suite runs as the shipped deployment does: `clientAddress.source` is "fly", every connection comes
+ * from Fly's proxy on a private address, and the origin travels as the `Fly-Client-IP` that proxy sets.
+ * Passing `origin` as null sends a request the proxy named no caller for.
  */
+const FLY_PROXY = '172.16.27.146';
 export function send(
 	path: string,
 	origin: string | null,
 	init: ProbeInit = {}
 ): Promise<Response> {
+	setPeerResolverForTests(() => FLY_PROXY);
 	const headers: Record<string, string> = { ...(init.headers ?? {}) };
 	if (origin !== null) {
 		headers['Fly-Client-IP'] = origin;

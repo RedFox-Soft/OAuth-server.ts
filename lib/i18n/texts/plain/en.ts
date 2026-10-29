@@ -38,7 +38,9 @@ export const en = {
 			cooldown:
 				'Please wait a moment before requesting another verification email.',
 			dailyCap:
-				'You have requested too many verification emails today. Please try again later.'
+				'You have requested too many verification emails today. Please try again later.',
+			callerLimit:
+				'Too many emails were requested from your network in the last hour. Please try again later.'
 		}
 	},
 	reset: {

@@ -80,13 +80,17 @@ export const en = {
 		verifyUnsent:
 			'We could not send the verification message. Try again later.',
 		federationLink:
-			'An account with this email address already exists here. Sign in with its password once to link it to your identity provider.'
+			'An account with this email address already exists here. Sign in with its password once to link it to your identity provider.',
+		mailLimited:
+			'Too many emails were requested from your network in the last hour. Please try again later.'
 	},
 
 	errors: {
 		invalidCredentials: 'Invalid username or password',
 		invalidCode: 'Invalid code',
 		passwordsDiffer: 'Passwords do not match',
+		mailLimited:
+			'Too many emails were requested from your network in the last hour. Please try again later.',
 		passwordTooShort: {
 			one: 'Use at least {count} character.',
 			other: 'Use at least {count} characters.'

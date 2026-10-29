@@ -144,6 +144,7 @@ import {
 	NOTICE_VERIFY_RECENT,
 	NOTICE_VERIFY_RESENT,
 	NOTICE_VERIFY_UNSENT,
+	NOTICE_MAIL_LIMITED,
 	resolveNotice
 } from './notices.js';
 import {
@@ -158,6 +159,7 @@ import { text } from '../i18n/message.js';
 import { uiLocalesRanges } from '../i18n/resolve.js';
 import { CONSENT_TEXTS } from '../i18n/texts/consent/index.js';
 import { passwordTooShort, SIGN_IN_TEXTS } from '../i18n/texts/signIn/index.js';
+import { PLAIN_TEXTS } from '../i18n/texts/plain/index.js';
 import {
 	SWITCH_PAGES,
 	switcherFor,
@@ -204,6 +206,8 @@ import { ApplicationConfig, configuration } from 'lib/configs/application.js';
 import { isPlainObject } from 'lib/helpers/_/object.js';
 import { signUpsPaused } from '../plans/signups.js';
 import { CREATE_PROMPT_REASON } from '../consts/prompt_create.js';
+import { callerAddressOf } from '../helpers/caller_address.js';
+import { admitMailRequest, mailLimitedResponse } from '../mail_limit/tally.js';
 
 /*
  * Returns an error that ended a resumed authorization request to the client that made it.
@@ -487,6 +491,7 @@ async function completeDeviceInteraction(
 						status: 500,
 						errorCode: 'server_error',
 						error: err,
+						callerAddress: callerAddressOf(request).address,
 						headers: request.headers
 					});
 				}
@@ -1775,7 +1780,14 @@ export const ui = new Elysia()
 	 */
 	.post(
 		'ui/:uid/verification/resend',
-		async ({ params: { uid }, interaction }) => {
+		async ({ params: { uid }, interaction, request }) => {
+			const admission = await admitMailRequest(request);
+			if (!admission.admitted) {
+				return Response.redirect(
+					buildUILoginPath(uid, NOTICE_MAIL_LIMITED),
+					303
+				);
+			}
 			const pending = interaction.payload.pendingVerification;
 			const bucket = pending
 				? await getBucketStore().find(pending.bucketId)
@@ -1815,7 +1827,21 @@ export const ui = new Elysia()
 	})
 	.post(
 		'ui/:uid/forgot-password',
-		async ({ body, params: { uid }, interaction }) => {
+		async ({ body, params: { uid }, interaction, request }) => {
+			// First, before any lookup: the refusal must not depend on what a lookup would have found.
+			const admission = await admitMailRequest(request);
+			if (!admission.admitted) {
+				const language = languageOf(interaction);
+				return mailLimitedResponse(
+					resetRequestPage(
+						uid,
+						PLAIN_TEXTS[language].verify.messages.callerLimit,
+						language,
+						switcherOf(interaction, 'forgot-password')
+					),
+					admission.retryAfter
+				);
+			}
 			const clientId = clientIdOf(interaction);
 			const closed = await passwordDoorClosed(interaction, uid);
 			if (closed) return closed;
@@ -1891,7 +1917,22 @@ export const ui = new Elysia()
 	)
 	.post(
 		'ui/:uid/registration',
-		async ({ body, params: { uid }, interaction }) => {
+		async ({ body, params: { uid }, interaction, request }) => {
+			// First, before the account exists: a refused sign-up leaves nothing behind.
+			const admission = await admitMailRequest(request);
+			if (!admission.admitted) {
+				const language = languageOf(interaction);
+				return mailLimitedResponse(
+					registrationServer(uid, {
+						errorMessage: SIGN_IN_TEXTS[language].errors.mailLimited,
+						email: body.email,
+						handOffTo: redirectUriOf(interaction),
+						language,
+						switcher: switcherOf(interaction, 'registration')
+					}),
+					admission.retryAfter
+				);
+			}
 			const clientId = clientIdOf(interaction);
 			// Ahead of the non-committal existing-address handling below, deliberately.
 			const closed = await passwordDoorClosed(interaction, uid);

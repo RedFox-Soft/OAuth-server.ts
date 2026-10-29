@@ -40,6 +40,7 @@ import { captureFault } from 'lib/error_store/capture.js';
 import { fieldNamesOf } from 'lib/error_store/redact.js';
 import type { ErrorSurface } from 'lib/adapters/types.js';
 import { languageOfRequest } from 'lib/i18n/request.js';
+import { callerAddressOf } from '../helpers/caller_address.js';
 
 /*
  * Which plane a fault arose on, from the route it arrived at.
@@ -457,6 +458,7 @@ export async function errorHandler(obj: ErrorHandlerContext) {
 					status: numericStatus,
 					errorCode: 'server_error',
 					error,
+					callerAddress: callerAddressOf(request).address,
 					headers: request.headers,
 					submittedFields: fieldNamesOf(obj.query)
 				})

@@ -18,6 +18,7 @@ import {
 import { PLAIN_TEXTS } from '../i18n/texts/plain/index.js';
 import { ADMIN_BUCKET_ID } from '../admin/consts.js';
 import { ISSUER } from '../configs/env.js';
+import { admitMailRequest, mailLimitedResponse } from '../mail_limit/tally.js';
 
 /*
  * These pages are opened from an email, often in another browser, so they speak the language the email was
@@ -85,6 +86,13 @@ export const verificationRoutes = new Elysia({ name: 'verification' })
 		async ({ body, set, request }) => {
 			const language = await pageLanguage(request, body.ref);
 			const messages = PLAIN_TEXTS[language].verify.messages;
+			const admission = await admitMailRequest(request);
+			if (!admission.admitted) {
+				return mailLimitedResponse(
+					verifyRateLimitedPage(messages.callerLimit, language),
+					admission.retryAfter
+				);
+			}
 			const result = await resend(body.ref);
 			if (!result.ok) {
 				return verifyRateLimitedPage(

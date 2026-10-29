@@ -114,6 +114,7 @@ export const MODEL_AREAS = [
 	'InitialAccessToken',
 	'Interaction',
 	'LoginThrottle',
+	'MailRequestTally',
 	'PasswordResetChallenge',
 	'PasswordResetThrottle',
 	'PushedAuthorizationRequest',
@@ -439,6 +440,18 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 		'LoginThrottle',
 		EXPIRES_AT,
 		unowned('addressed by the computed id `${bucketId}:${email}`, never swept')
+	),
+	/*
+	 * How many mail-sending requests one caller address made in an hour (specs/115). Keyed by a network
+	 * address, which is personal data, and kept no longer than two hours. Owns nothing: the caller is not a
+	 * principal, and the count is for the asking, whoever was asked for.
+	 */
+	modelArea(
+		'MailRequestTally',
+		EXPIRES_AT,
+		unowned(
+			'addressed by the computed id `${address}:${hourStartEpochSeconds}`, never swept; holds a network address for at most two hours'
+		)
 	),
 	/*
 	 * The self-service password reset's two areas. The challenge is account-owned rather than merely

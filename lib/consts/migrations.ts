@@ -1574,6 +1574,114 @@ const adminSignUpRequiresVerification: Migration = {
 	}
 };
 
+/*
+ * How the server is reached replaces whether proxy headers are trusted (specs/115). The old boolean had no
+ * correct value on most deployments, so it is not translated value for value: an instance that turned it
+ * off says it is reached directly; an instance in use that left it on is carried to "fly", which is exactly
+ * what the old default did correctly on the shipped deployment and no worse than before anywhere else (the
+ * console warns there); a fresh database, which has no administrator until first-run setup, gets nothing
+ * written and so the code default, "automatic". A value already stored under the new key wins.
+ *
+ * The settings document has a derived id (sha256("appConfig"), first 24 hex characters, as both config
+ * stores derive it): an instance whose operator never saved a setting has none, and one is created.
+ */
+const LEGACY_TRUSTED_PROXY_KEY = 'rateLimit.trustedProxy';
+const CLIENT_ADDRESS_SOURCE_KEY = 'clientAddress.source';
+const SETTINGS_DOCUMENT_ID = '429643fc2242030b49d9df4f';
+
+function clientAddressSettings(
+	config: Doc,
+	inUse: boolean
+): { next: Doc; source: string | null } | null {
+	const { [LEGACY_TRUSTED_PROXY_KEY]: legacy, ...rest } = config;
+	if (CLIENT_ADDRESS_SOURCE_KEY in rest) {
+		return LEGACY_TRUSTED_PROXY_KEY in config
+			? { next: rest, source: null }
+			: null;
+	}
+	const source = legacy === false ? 'direct' : inUse ? 'fly' : null;
+	if (source === null) {
+		return LEGACY_TRUSTED_PROXY_KEY in config
+			? { next: rest, source: null }
+			: null;
+	}
+	return { next: { ...rest, [CLIENT_ADDRESS_SOURCE_KEY]: source }, source };
+}
+
+function clientAddressReport(source: string | null | undefined): string[] {
+	return [
+		source
+			? `clientAddress.source set to ${source}`
+			: 'clientAddress.source left at its default'
+	];
+}
+
+const clientAddressSource: Migration = {
+	id: '2026-10-29-client-address-source',
+	description:
+		'Replace rateLimit.trustedProxy with clientAddress.source: "direct" where it was off, "fly" on an instance in use, the default on a fresh one',
+	reversible: false,
+	rerunnable:
+		'A settings document that already holds clientAddress.source and no longer holds rateLimit.trustedProxy is left alone, so a second application writes nothing.',
+	mongodb: {
+		async apply(handle) {
+			// The runner passes the selected backend's handle; for MongoDB that is the driver's `Db`.
+			const db = handle as MongoHandle;
+			/*
+			 * The driver is imported here, inside the MongoDB step, rather than at the top: this module stays
+			 * importable without either driver, and this step only ever runs where the MongoDB one is installed.
+			 */
+			const { ObjectId } = await import('mongodb');
+			const area = db.collection(STORE_AREAS.serviceConfig);
+			const _id = new ObjectId(SETTINGS_DOCUMENT_ID);
+			const stored = await area.findOne({ _id });
+			const config = member(stored, 'config');
+			const inUse =
+				(await db.collection(userAreaFor(ADMIN_BUCKET_ID)).findOne({})) !==
+				null;
+			const change = clientAddressSettings(
+				isRecord(config) ? config : {},
+				inUse
+			);
+			if (!change) return clientAddressReport(undefined);
+			// Rewritten whole: the keys hold dots, which a filter or `$unset` would read as nested paths.
+			await area.updateOne(
+				{ _id },
+				{ $set: { config: change.next, updatedAt: new Date() } },
+				{ upsert: true }
+			);
+			return clientAddressReport(change.source);
+		}
+	},
+	postgres: {
+		async apply(handle) {
+			// The runner passes the selected backend's handle; for PostgreSQL that is Bun's SQL client.
+			const sql = handle as PostgresHandle;
+			const area = sql(STORE_AREAS.serviceConfig);
+			const stored = (
+				await sql`SELECT doc FROM ${area} WHERE id = ${SETTINGS_DOCUMENT_ID}`
+			).at(0);
+			const adminArea = userAreaFor(ADMIN_BUCKET_ID);
+			const adminsExist =
+				(
+					await sql`SELECT to_regclass(${`"${adminArea.replaceAll('"', '""')}"`}) IS NOT NULL AS present`
+				)[0]?.present === true;
+			const inUse =
+				adminsExist &&
+				(await sql`SELECT 1 FROM ${sql(adminArea)} LIMIT 1`).length > 0;
+			const doc = member(stored, 'doc');
+			const change = clientAddressSettings(isRecord(doc) ? doc : {}, inUse);
+			if (!change) return clientAddressReport(undefined);
+			await sql`
+				INSERT INTO ${area} (id, doc, expires_at)
+				VALUES (${SETTINGS_DOCUMENT_ID}, ${change.next}, NULL)
+				ON CONFLICT (id) DO UPDATE SET doc = EXCLUDED.doc
+			`;
+			return clientAddressReport(change.source);
+		}
+	}
+};
+
 export const MIGRATIONS: readonly Migration[] = [
 	namespacedProtectedResources,
 	rootKeysLifecycle,
@@ -1584,5 +1692,6 @@ export const MIGRATIONS: readonly Migration[] = [
 	removeProjects,
 	projectsReservedHostnames,
 	projectsRecordPlan,
-	adminSignUpRequiresVerification
+	adminSignUpRequiresVerification,
+	clientAddressSource
 ];

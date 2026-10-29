@@ -216,6 +216,10 @@ Each rule is the part that is easy to break. Read the named page before changing
   → `plans.md`
 - **Sentry** — reporting is off the request path: `lib/sentry/` mounts nothing into Elysia, and
   `@sentry/elysia` is deliberately not a dependency. → `sentry-plugin-not-used.md`
+- **Caller address** — every limit and record attributes a request to `callerAddressOf`
+  (`lib/helpers/caller_address.ts`), never to a header read on the spot; a forwarded header is believed only
+  from a proxy `clientAddress.source` trusts. A mail-sending request an unauthenticated caller can make calls
+  `admitMailRequest` first, before any lookup. → `caller-address.md`
 - **Usage reporting** — everything a report may carry is declared in `lib/consts/telemetry_fields.ts`, and
   a new boolean setting is classified there (reported, or not with a reason) in the same change; a report
   that cannot be delivered is never an error; the console setting is the only switch, with no environment

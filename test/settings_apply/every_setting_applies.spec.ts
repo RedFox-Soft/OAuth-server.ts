@@ -23,6 +23,7 @@ const ALTERNATIVES: Record<string, unknown> = {
 	/* Empty by default — the server cannot know what else lives in an operator's domain — so the second
 	 * value has to be a name rather than a shorter list. */
 	'projects.reservedHostnames': ['status.example.test'],
+	'clientAddress.trustedProxies': ['198.51.100.0/24'],
 	'errorStore.originCaptureLevel': 'full',
 	'richAuthorizationRequests.types': {
 		'https://example.test/type': { label: 'Example' }

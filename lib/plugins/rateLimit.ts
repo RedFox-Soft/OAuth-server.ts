@@ -6,6 +6,7 @@ import {
 	onSettingsApplied
 } from 'lib/configs/application.js';
 import { eventBus } from 'lib/event_bus.js';
+import { callerAddressOf } from 'lib/helpers/caller_address.js';
 import { RateLimited } from 'lib/helpers/errors.js';
 import {
 	decide,
@@ -129,46 +130,6 @@ function boundsFor(rateClass: RateClass): RateBounds {
 	};
 }
 
-/*
- * Everything unattributable shares one bucket, deliberately. Letting it through unlimited would make
- * omitting a header the way to bypass the limiter; throttling it together is noisy and visible, which
- * is what a misconfigured origin resolver should be.
- */
-const UNATTRIBUTED = 'unknown';
-
-/*
- * Who this request is counted against.
- *
- * The transport peer address is the proxy for every request on the shipped deployment, so counting on
- * it would put the entire internet into one bucket and refuse everyone within seconds of launch. The
- * forwarded headers are therefore read first — but they are client-supplied, so whether they are
- * believed is a deployment declaration (`rateLimit.trustedProxy`) rather than a constant. Trusting
- * them while directly exposed lets any caller rotate the header per request; not trusting them while
- * behind the proxy collapses everyone together. There is no value that is safe in both.
- *
- * Truncated because the header is attacker-controlled in length, and an untruncated key is a memory
- * amplifier even behind the LRU bound. Same 64 characters lib/error_store/redact.ts:82 settled on.
- */
-export function originOf(request: Request, server: unknown): string {
-	if (ApplicationConfig['rateLimit.trustedProxy']) {
-		const forwarded =
-			request.headers.get('fly-client-ip')?.trim() ||
-			request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-			request.headers.get('x-real-ip')?.trim();
-		return forwarded ? forwarded.slice(0, 64) : UNATTRIBUTED;
-	}
-
-	/*
-	 * Elysia hands the server instance to the hook only when one is listening; the specs drive
-	 * `elysia.handle()` directly, where there is none. A missing peer is the unattributed bucket rather
-	 * than an error — an origin the server genuinely cannot name is still traffic it must bound.
-	 */
-	const address = (
-		server as { requestIP?: (r: Request) => { address?: string } | null } | null
-	)?.requestIP?.(request)?.address;
-	return address ? address.slice(0, 64) : UNATTRIBUTED;
-}
-
 export const rateLimit = (app: Elysia) =>
 	app.onRequest(({ request, server }) => {
 		if (!ApplicationConfig['rateLimit.enabled']) {
@@ -195,7 +156,11 @@ export const rateLimit = (app: Elysia) =>
 			return;
 		}
 
-		const origin = originOf(request, server);
+		/*
+		 * Everything unattributable shares one bucket, deliberately: letting it through unlimited would make
+		 * omitting an address the way around the limiter.
+		 */
+		const origin = callerAddressOf(request, server).address;
 		const store = storeFor(rateClass);
 		const now = clock();
 		const decision = decide(store.get(origin), now, boundsFor(rateClass));

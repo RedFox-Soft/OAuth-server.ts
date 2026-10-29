@@ -33,7 +33,7 @@ preserves it by default. A proxy that rewrites `Host` to the upstream's internal
 project on a subdomain or a hostname of its own unreachable. Path-addressed projects are unaffected,
 so the fault is easy to miss.
 
-**Choose `rateLimit.trustedProxy` on purpose.** The next section covers it.
+**Check how the server is reached.** The next section covers `clientAddress.source`.
 
 ### Subdomain projects {#subdomain-projects}
 
@@ -59,37 +59,43 @@ domain, at their own edge.
 
 </Aside>
 
-## `rateLimit.trustedProxy` has a wrong answer in each direction
+## How the server finds the caller's address {#caller-address}
 
-From the project's README:
+Every limit counts requests per caller address: the rate limits, the failed-credential charges and the mail
+limit. A header such as `X-Forwarded-For` can be written by anyone, so the server believes one only on a
+connection from a proxy it trusts. Which proxies it trusts is
+[`clientAddress.source`](/docs/reference/settings/#clientAddress.source):
 
-> **`rateLimit.trustedProxy` is the one setting with a wrong answer in each direction.** Leave it on
-> when anything sits in front of this server (the shipped `fly.toml` does): with it off, every
-> caller arrives as the proxy's own address, so the whole internet shares one allowance and all
-> traffic is refused within seconds. Turn it off when the server is directly exposed: with it on,
-> any caller can set `Fly-Client-IP` to a fresh value per request and is never limited.
+| Choice                | When to use it                                                                               | What is read                                                                              |
+| --------------------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `automatic` (default) | Reached directly, or behind nginx, Caddy, an Ingress or a load balancer on a private network | `X-Forwarded-For`, only on a connection from a private network                            |
+| `direct`              | Reached directly, and you want no header read at all                                         | Nothing                                                                                   |
+| `fly`                 | Fly.io                                                                                       | `Fly-Client-IP`, which Fly's edge overwrites                                              |
+| `cloudflare`          | Cloudflare in front, directly or before your own proxy                                       | `X-Forwarded-For`, also trusting Cloudflare's published ranges                            |
+| `listed`              | A proxy with a public address that is not Cloudflare                                         | `X-Forwarded-For`, also trusting the addresses you list in `clientAddress.trustedProxies` |
 
-So: **behind a proxy, leave [`rateLimit.trustedProxy`](/docs/reference/settings/#rateLimit.trustedProxy)
-at `true`**, and make sure your proxy sets a forwarded header and _overwrites_ any the
-client supplied instead of appending to it.
+A private network here means the IPv4 private ranges, loopback, link-local and IPv6 unique-local addresses.
+Shared address space (`100.64.0.0/10`, used by carrier-grade NAT and by Tailscale) is not one: a client
+connecting from it is the caller.
 
-### Exactly which header the resolver reads
+### How `X-Forwarded-For` is read
 
-With `rateLimit.trustedProxy` set to `true`, the origin resolver takes the first non-empty value of,
-in this order:
+A proxy appends the address it received the request from, and keeps whatever the caller sent to the left of
+it. So the server reads the header from the right: it skips every entry a trusted proxy wrote, and the first
+entry that is not one is the caller. If every entry is a trusted proxy, the rightmost one is used. An entry that
+is not an IP address stops the walk, and the caller is the last trusted hop. Entries such as
+`203.0.113.7:51234` and `[2001:db8::1]:443` are read without the port.
 
-1. `Fly-Client-IP`
-2. the first comma-separated entry of `X-Forwarded-For`
-3. `X-Real-IP`
+Your proxy does not need to overwrite the header: appending, as nginx's `$proxy_add_x_forwarded_for` does, is
+what the server expects, and overwriting works too.
 
-The value is trimmed and truncated to 64 characters. If none of the three is present, the request
-falls into a single shared `unknown` bucket instead of going uncounted, so omitting the header is
-not a way to bypass the limiter.
+`X-Real-IP`, `CF-Connecting-IP` and `Forwarded` (RFC 7239) are never read.
 
-With `rateLimit.trustedProxy` set to `false`, none of those headers is read at all: the transport
-peer address is used, and a request with no identifiable peer also lands in the shared bucket.
+### Check it
 
-`Forwarded` (RFC 7239) is **not** read. If your proxy only emits that, add one of the three above.
+Open Settings → Sign-in & abuse in the console. The card under the setting shows the address the server sees
+for your own request, where it took it from, and a warning when the choice does not match what arrived. If
+the address is not the one you are connecting from, every limit is counting the wrong caller.
 
 ## Sample nginx and Caddy configuration {#sample-configuration}
 
@@ -109,10 +115,8 @@ server {
 		proxy_http_version 1.1;
 
 		proxy_set_header Host              $host;
-		# $remote_addr, not $proxy_add_x_forwarded_for: this overwrites any header the client sent
-		# instead of appending to it, and the resolver reads the FIRST entry.
-		proxy_set_header X-Real-IP         $remote_addr;
-		proxy_set_header X-Forwarded-For   $remote_addr;
+		# Appends the caller to whatever arrived; the server reads the entry this proxy wrote.
+		proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
 		proxy_set_header X-Forwarded-Proto $scheme;
 	}
 
@@ -136,11 +140,7 @@ server {
 ```caddy
 auth.example.com {
 	reverse_proxy 127.0.0.1:3000 {
-		# header_up REPLACES the header rather than appending, which is the point: Caddy's default
-		# X-Forwarded-For handling appends the peer to whatever the client sent, and this server
-		# reads the FIRST entry — so an appended header would let a caller choose its own origin.
-		header_up X-Forwarded-For {remote_host}
-		header_up X-Real-IP {remote_host}
+		# Caddy sets X-Forwarded-For to the caller by default; nothing to add.
 	}
 }
 ```
