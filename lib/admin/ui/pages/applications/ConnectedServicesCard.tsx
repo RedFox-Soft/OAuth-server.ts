@@ -50,7 +50,19 @@ export function ConnectedServicesCard({
 	const why = whyCannotExchange(client);
 
 	async function toggle(service: ServiceSummary, allowed: boolean) {
-		await confirm('connectedService.edit', { target: service.displayName });
+		if (
+			!allowed &&
+			!(await confirm('connectedService.application.withdraw', {
+				target: service.displayName,
+				consequences: [
+					`Its next request for anyone's ${service.displayName} token is refused.`,
+					`Tokens it already received stay valid at ${service.displayName} until they expire.`,
+					'People keep their consent: checking the box again restores access.'
+				]
+			}))
+		) {
+			return;
+		}
 		const next = allowed
 			? [...service.applications, client.clientId]
 			: service.applications.filter((id) => id !== client.clientId);

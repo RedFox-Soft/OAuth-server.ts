@@ -264,6 +264,15 @@ export const ACTIONS = {
 	/* Connected services (specs/117): deleting one disconnects every account people connected at it. */
 	'connectedService.create': { class: 'C0' },
 	'connectedService.edit': { class: 'C0' },
+	/*
+	 * One checkbox on the application's page that cuts its agent off for every person at once (specs/118). Not C2:
+	 * nothing is revoked and people's consents are kept, so checking it again restores everything.
+	 */
+	'connectedService.application.withdraw': {
+		class: 'C1',
+		title: (t) => `Stop this application obtaining tokens at ${t}?`,
+		okText: 'Stop'
+	},
 	'connectedService.delete': {
 		class: 'C2',
 		title: (t) => `Delete ${t}?`,
