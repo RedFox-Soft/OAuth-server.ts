@@ -62,6 +62,38 @@ async function fromEndpoint(
 	}
 }
 
+/*
+ * The account a refresh's answer names, when it names one without another request (specs/118 R10): the token
+ * answer itself, or the claims of an ID token in it. Read, not verified: the answer came from the provider's own
+ * token endpoint over TLS, and a mismatch only ever breaks the account, never grants anything.
+ */
+export function upstreamIdIn(
+	service: ResolvedService,
+	response: Record<string, unknown>
+): string | undefined {
+	const identity = service.identity;
+	let document: unknown;
+	if (identity.source === 'token') {
+		document = response;
+	} else if (
+		identity.source === 'id_token' &&
+		typeof response.id_token === 'string'
+	) {
+		try {
+			const part = response.id_token.split('.')[1] ?? '';
+			document = JSON.parse(Buffer.from(part, 'base64url').toString('utf8'));
+		} catch {
+			return undefined;
+		}
+	} else {
+		return undefined;
+	}
+	const parts = identity.idPaths.map((path) => textAt(document, path));
+	return parts.every((part) => part !== undefined)
+		? parts.join(':')
+		: undefined;
+}
+
 export async function identify(
 	service: ResolvedService,
 	client: { clientId: string },

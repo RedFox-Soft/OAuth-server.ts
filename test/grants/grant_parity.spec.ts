@@ -27,8 +27,7 @@ const FLAGS = [
 	'clientCredentials.enabled',
 	'deviceFlow.enabled',
 	'ciba.enabled',
-	'jwtBearer.enabled',
-	'tokenExchange.enabled'
+	'jwtBearer.enabled'
 ] as const;
 
 type Combination = { offlineAccess: boolean } & Record<
@@ -45,8 +44,7 @@ const combinations: Combination[] = Array.from(
 			'clientCredentials.enabled': false,
 			'deviceFlow.enabled': false,
 			'ciba.enabled': false,
-			'jwtBearer.enabled': false,
-			'tokenExchange.enabled': false
+			'jwtBearer.enabled': false
 		};
 		FLAGS.forEach((flag, index) => {
 			combination[flag] = Boolean(bits & (2 << index));

@@ -2,11 +2,12 @@
 title: FoxAuth compared with authentik
 competitor: authentik
 description: authentik is a self-hosted identity provider covering SAML, LDAP and RADIUS as well as OIDC. FoxAuth does OAuth 2.1 only, with the banking-grade profiles.
-lastChecked: '2026-10-16'
+lastChecked: '2026-11-02'
 sources:
   - https://github.com/goauthentik/authentik
   - https://docs.goauthentik.io/install-config/install/docker-compose/
   - https://docs.goauthentik.io/add-secure-apps/providers/oauth2/device_code/
+  - https://docs.goauthentik.io/users-sources/sources/protocols/oauth/
 bottomLine: 'Pick authentik if you are replacing an SSO estate that speaks SAML, LDAP or RADIUS as well as OIDC. If the applications are your own and what you need is an OAuth 2.1 authorization server with the banking-grade profiles and no enterprise tier to buy, pick FoxAuth.'
 chooseThem:
   - 'Your estate has applications that speak SAML, LDAP or RADIUS alongside OpenID Connect.'
@@ -145,6 +146,20 @@ groups:
         them: { status: unknown, text: 'Not documented.' }
         verdict: us
         why: "authentik's documentation describes no agent surface. Here an agent goes through the console's own routes and lands in the same audit trail a person does."
+      - dimension: Token vault for AI agents
+        us:
+          {
+            status: yes,
+            text: "A person's token at Google, GitHub, Slack, Microsoft or any OIDC or OAuth 2.0 provider, through a standard RFC 8693 token exchange. An administrator lists the applications allowed per service, and the person allows each agent per account and can withdraw it. One refresh at a time, idle accounts kept alive, and a mail to the person when an account breaks. Free to self-host; 10 connected services per project on the FoxAuth Cloud Free plan."
+          }
+        them:
+          {
+            status: unknown,
+            text: 'Not documented. An OAuth source passes the tokens of a sign-in to its property mappings during that sign-in. Storing them for applications, refreshing them, or handing them to an agent is not documented.'
+          }
+        verdict: us
+        why: 'authentik documents the upstream tokens only while a sign-in runs. FoxAuth keeps them, refreshes them, and hands them to the agents that an administrator and the person both allowed.'
+        note: 'The OAuth source page describes `token` as "A Python dictionary containing the OAuth tokens for this login."'
       - dimension: Licence
         us:
           {

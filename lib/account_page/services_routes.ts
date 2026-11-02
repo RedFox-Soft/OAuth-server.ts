@@ -30,6 +30,15 @@ import {
 } from '../connected_services/accounts.js';
 import { digestOf, spendConnect } from '../connected_services/state.js';
 import { resolveService } from '../connected_services/catalogue.js';
+import {
+	agentsByAccount,
+	changeConsent,
+	servicesFor
+} from '../connected_services/consent.js';
+import { getConnectedAccountStore } from '../adapters/index.js';
+import { grantsIn } from '../end_users/sessions.js';
+import { sanitiseClientName } from '../interactions/clientName.js';
+import { Client } from '../models/client.js';
 import { accountPageBase } from './client.js';
 import {
 	connectConfirmation,
@@ -128,7 +137,7 @@ const REVOCATION_KEY = {
  * The page's sentence after an act, built from the query only by whitelist: nothing a link carries is echoed, and
  * the service is named from the project's own record.
  */
-function noticeOf(
+async function noticeOf(
 	person: PagePerson,
 	language: Language,
 	query: {
@@ -136,13 +145,26 @@ function noticeOf(
 		notice?: string;
 		revocation?: string;
 		service?: string;
+		app?: string;
 	}
-): ServicesNotice | undefined {
+): Promise<ServicesNotice | undefined> {
 	const T = ACCOUNT_TEXTS[language];
 	const service = query.service
 		? serviceOf(person.bucket, query.service)
 		: undefined;
 	const name = service?.displayName ?? '';
+	if ((query.done === 'allowed' || query.done === 'withdrawn') && query.app) {
+		/* The application is named from its own record, never echoed back from the address bar. */
+		const app = await appName(query.app, language);
+		return {
+			lines: [
+				text(query.done === 'allowed' ? T.allowedDone : T.withdrawnDone, {
+					app,
+					service: name
+				})
+			]
+		};
+	}
 	const notice = NOTICES.find((value) => value === query.notice);
 	if (notice) return { lines: [T[NOTICE_KEY[notice]]] };
 	if (query.done === 'connected' || query.done === 'updated') {
@@ -198,15 +220,94 @@ const ListQuery = t.Object({
 	done: t.Optional(t.String()),
 	notice: t.Optional(t.String()),
 	revocation: t.Optional(t.String()),
-	service: t.Optional(t.String())
+	service: t.Optional(t.String()),
+	app: t.Optional(t.String())
 });
 
 const ActBody = t.Object({
 	action: t.Optional(t.String()),
 	serviceId: t.Optional(t.String()),
 	connectedAccountId: t.Optional(t.String()),
+	/* The application a use consent is given to or withdrawn from (specs/118). */
+	clientId: t.Optional(t.String()),
 	xsrf: t.Optional(t.String())
 });
+
+async function appName(clientId: string, language: Language): Promise<string> {
+	const client = await Client.tryFind(clientId);
+	if (!client) return ACCOUNT_TEXTS[language].deletedApp;
+	return sanitiseClientName(client.clientName) ?? clientId;
+}
+
+/* Whether `clientId`'s access, as the person granted it, could use a service: the page's offer and its check. */
+async function couldUse(
+	person: PagePerson,
+	clientId: string,
+	serviceId: string
+): Promise<boolean> {
+	const grants = (await grantsIn(person.bucket._id, person.user._id)).filter(
+		(grant) => grant.payload.clientId === clientId
+	);
+	if (grants.length === 0) return false;
+	const resources = grants.flatMap((grant) =>
+		Object.keys(grant.payload.resources ?? {})
+	);
+	return (await servicesFor(person.bucket, clientId, resources)).some(
+		(service) => service.id === serviceId
+	);
+}
+
+/*
+ * Per connected account: the applications the person allowed to use it, with their last use, and the ones they have
+ * granted access to that could use it but are not allowed yet (specs/118 FR-022, FR-022a).
+ */
+async function consentRows(
+	person: PagePerson,
+	language: Language
+): Promise<
+	Map<
+		string,
+		{
+			agents: { clientId: string; name: string; lastUsedAt?: number }[];
+			candidates: { clientId: string; name: string }[];
+		}
+	>
+> {
+	const records = await getConnectedAccountStore().listByAccount(
+		person.bucket._id,
+		person.user._id
+	);
+	const allowed = await agentsByAccount(
+		person.bucket,
+		person.user._id,
+		records
+	);
+	const grants = await grantsIn(person.bucket._id, person.user._id);
+	const applications = [
+		...new Set(grants.map((grant) => grant.payload.clientId))
+	];
+	const rows = new Map<
+		string,
+		{
+			agents: { clientId: string; name: string; lastUsedAt?: number }[];
+			candidates: { clientId: string; name: string }[];
+		}
+	>();
+	for (const record of records) {
+		const agents = [];
+		for (const agent of allowed.get(record._id) ?? []) {
+			agents.push({ ...agent, name: await appName(agent.clientId, language) });
+		}
+		const candidates = [];
+		for (const clientId of applications) {
+			if (agents.some((agent) => agent.clientId === clientId)) continue;
+			if (!(await couldUse(person, clientId, record.serviceId))) continue;
+			candidates.push({ clientId, name: await appName(clientId, language) });
+		}
+		rows.set(record._id, { agents, candidates });
+	}
+	return rows;
+}
 
 /* Providers add parameters of their own; only these are read. */
 const CallbackQuery = t.Object(
@@ -233,6 +334,7 @@ export const accountServicesRoutes = new Elysia({ name: 'account-services' })
 			const language = personLanguage(person, request);
 			const frame = frameFor(person, language);
 			const views = await listForPerson(person.bucket, person.user._id);
+			const consents = await consentRows(person, language);
 			const rows = views.map((view) => ({
 				id: view.id,
 				serviceName: view.serviceName,
@@ -240,7 +342,9 @@ export const accountServicesRoutes = new Elysia({ name: 'account-services' })
 				scopes: view.scopes,
 				missingScopes: view.missingScopes,
 				connectedAt: view.connectedAt,
-				status: view.status
+				status: view.status,
+				agents: consents.get(view.id)?.agents ?? [],
+				candidates: consents.get(view.id)?.candidates ?? []
 			}));
 			const offered = (person.bucket.connectedServices ?? []).map(
 				(service) => ({
@@ -275,7 +379,8 @@ export const accountServicesRoutes = new Elysia({ name: 'account-services' })
 				appsPath(person.bucket),
 				rows,
 				offered,
-				noticeOf(person, language, query)
+				await ensureXsrf(person.session),
+				await noticeOf(person, language, query)
 			);
 		},
 		{ query: ListQuery }
@@ -353,6 +458,54 @@ export const accountServicesRoutes = new Elysia({ name: 'account-services' })
 					}
 					throw err;
 				}
+			}
+
+			if (
+				(action === 'allow' || action === 'withdraw') &&
+				body.connectedAccountId &&
+				body.clientId
+			) {
+				const record = await getConnectedAccountStore().find(
+					person.bucket._id,
+					body.connectedAccountId
+				);
+				/* Another person's account, one already gone, one that never was: one answer for all three. */
+				if (!record || record.accountId !== accountId)
+					return seeOther(pagePath);
+				const change = action === 'allow' ? 'allowed' : 'withdrawn';
+				/* Only an application this account could serve is ever allowed: the same test the page drew. */
+				if (
+					change === 'allowed' &&
+					!(await couldUse(person, body.clientId, record.serviceId))
+				) {
+					return seeOther(pagePath);
+				}
+				await recordEndUserAudit(
+					person.bucket._id,
+					accountId,
+					'connected.account.consent',
+					{
+						targetScope: person.bucket._id,
+						connectedAccountId: record._id,
+						serviceId: record.serviceId,
+						clientId: body.clientId,
+						to: change,
+						ownerGroupId: person.bucket.ownerGroupId
+					}
+				);
+				const known = await changeConsent({
+					bucket: person.bucket,
+					record,
+					clientId: body.clientId,
+					change
+				});
+				if (!known) return seeOther(pagePath);
+				const params = new URLSearchParams({
+					done: change,
+					service: record.serviceId,
+					app: body.clientId
+				});
+				return seeOther(`${pagePath}?${params.toString()}`);
 			}
 
 			if (action === 'disconnect' && body.connectedAccountId) {

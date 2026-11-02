@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 
 import { getConnectedAccountStore } from '../adapters/index.js';
+import epochTime from '../helpers/epoch_time.js';
 import type { UserBucket } from '../adapters/types.js';
 import { eventBus, type RevocationOutcome } from '../event_bus.js';
 import { activeKeyring } from '../sealing/keyring.js';
@@ -11,13 +12,21 @@ import {
 	resolveService,
 	type ResolvedService
 } from './catalogue.js';
-import { exchangeConnectCode, type IssuedTokens } from './exchange.js';
+import {
+	exchangeConnectCode,
+	refreshUpstream,
+	type IssuedTokens
+} from './exchange.js';
+import { expiresSoon } from './refresh.js';
 import { authorizationRedirect, requestedScopes } from './flow.js';
 import { identify } from './identity.js';
+import { noticeRemoved } from './mail.js';
+import { adoptFirstAccount } from './consent.js';
 import { revokeUpstream } from './revoke.js';
 import { openConnect } from './state.js';
 import type {
 	ConnectedAccount,
+	ConnectedAccountBreak,
 	ConnectedService,
 	ConnectStatePayload
 } from './types.js';
@@ -171,14 +180,14 @@ export async function finishConnect(input: {
 		upstream.upstreamId
 	);
 	const existing = await store.find(bucket._id, id);
-	if (
-		!existing &&
-		(await store.countByAccountAndService(
-			bucket._id,
-			pending.accountId,
-			service.id
-		)) >= ACCOUNTS_PER_SERVICE
-	) {
+	const atService = existing
+		? undefined
+		: await store.countByAccountAndService(
+				bucket._id,
+				pending.accountId,
+				service.id
+			);
+	if (atService !== undefined && atService >= ACCOUNTS_PER_SERVICE) {
 		await revokeUpstream(resolved, client, tokens);
 		throw new ConnectRefused('limit');
 	}
@@ -204,9 +213,14 @@ export async function finishConnect(input: {
 		scopes: granted ?? pending.requestedScopes,
 		scopesInferred: granted === undefined,
 		connectedAt: existing?.connectedAt ?? now,
-		updatedAt: now
+		updatedAt: now,
+		refreshedAt: epochTime(),
+		/* A reconnect keeps when each agent last used the account; it clears `broken`, which re-arms its mail. */
+		...(existing?.usedBy ? { usedBy: existing.usedBy } : {})
 	};
 	const { created } = await store.put(record);
+	/* An answer given about the service before any account existed is this first account's (specs/118 FR-020). */
+	if (created && atService === 0) await adoptFirstAccount(bucket, record);
 	eventBus.emit(
 		created ? 'connected_account.connected' : 'connected_account.updated',
 		eventOf(record)
@@ -250,10 +264,15 @@ export interface ConnectedAccountView {
 	updatedAt: string;
 	accessTokenExpiresAt?: number;
 	status: ConnectedAccountStatus;
+	/* Why the provider no longer honours it, and since when (specs/118 R12). */
+	broken?: { reason: ConnectedAccountBreak; at: string };
+	lastRefreshedAt?: string;
 }
 
 export function statusOf(record: ConnectedAccount): ConnectedAccountStatus {
-	return unreadableFieldsOf(record).length > 0 || !record.accessToken
+	return record.broken !== undefined ||
+		unreadableFieldsOf(record).length > 0 ||
+		!record.accessToken
 		? 'needs_reconnection'
 		: 'connected';
 }
@@ -280,7 +299,18 @@ export function viewOf(
 		...(record.accessTokenExpiresAt
 			? { accessTokenExpiresAt: record.accessTokenExpiresAt }
 			: {}),
-		status: statusOf(record)
+		status: statusOf(record),
+		...(record.broken
+			? {
+					broken: {
+						reason: record.broken.reason,
+						at: new Date(record.broken.at * 1000).toISOString()
+					}
+				}
+			: {}),
+		...(record.refreshedAt
+			? { lastRefreshedAt: new Date(record.refreshedAt * 1000).toISOString() }
+			: {})
 	};
 }
 
@@ -316,9 +346,61 @@ function revocable(service: ConnectedService): boolean {
 	return true;
 }
 
+/* What a person's own disconnect gives a refresh before revoking, so both fit its five seconds (specs/118 R14). */
+const REFRESH_BEFORE_REVOKE_MS = 1_000;
+
+/*
+ * GitHub's grant deletion and Slack's `auth.revoke` authenticate with the access token, so an expired one cannot
+ * revoke anything (specs/117's known limit). Refreshed first, without a lease: the record is already deleted, so
+ * nothing else can be refreshing it. Whatever goes wrong, the stored tokens are revoked as they are.
+ */
+async function revocableTokens(
+	resolved: ResolvedService,
+	service: ConnectedService,
+	record: ConnectedAccount,
+	budgetMs: number | undefined
+): Promise<{ refreshToken?: string; accessToken?: string }> {
+	const stored = {
+		...(record.refreshToken ? { refreshToken: record.refreshToken } : {}),
+		...(record.accessToken ? { accessToken: record.accessToken } : {})
+	};
+	const kind = resolved.revocation.kind;
+	if (
+		(kind !== 'github_grant' && kind !== 'slack') ||
+		!record.refreshToken ||
+		!service.clientSecret ||
+		!expiresSoon(record)
+	) {
+		return stored;
+	}
+	const refresh = refreshUpstream(
+		resolved,
+		{ clientId: service.clientId, clientSecret: service.clientSecret },
+		record.refreshToken,
+		record.upstreamId
+	);
+	const outcome =
+		budgetMs === undefined
+			? await refresh
+			: await Promise.race([
+					refresh,
+					Bun.sleep(budgetMs).then(() => ({ kind: 'unavailable' }) as const)
+				]);
+	if (outcome.kind !== 'refreshed') return stored;
+	eventBus.emit('connected_account.refreshed', {
+		...eventOf(record),
+		trigger: 'revocation'
+	});
+	return {
+		refreshToken: outcome.tokens.refreshToken ?? record.refreshToken,
+		accessToken: outcome.tokens.accessToken
+	};
+}
+
 async function revokeOne(
 	bucket: UserBucket,
-	record: ConnectedAccount
+	record: ConnectedAccount,
+	refreshBudgetMs?: number
 ): Promise<RevocationOutcome> {
 	const service = serviceOf(bucket, record.serviceId);
 	let outcome: RevocationOutcome;
@@ -328,18 +410,16 @@ async function revokeOne(
 		outcome = 'unreadable';
 	} else {
 		try {
+			const resolved = await resolveService(service);
 			outcome = await revokeUpstream(
-				await resolveService(service),
+				resolved,
 				{
 					clientId: service.clientId,
 					...(service.clientSecret
 						? { clientSecret: service.clientSecret }
 						: {})
 				},
-				{
-					...(record.refreshToken ? { refreshToken: record.refreshToken } : {}),
-					...(record.accessToken ? { accessToken: record.accessToken } : {})
-				}
+				await revocableTokens(resolved, service, record, refreshBudgetMs)
 			);
 		} catch {
 			outcome = 'failed';
@@ -409,10 +489,15 @@ export async function disconnect(input: {
 	if (input.by === 'person') {
 		return {
 			removed: true,
-			revocation: await revokeOne(input.bucket, removed)
+			revocation: await revokeOne(
+				input.bucket,
+				removed,
+				REFRESH_BEFORE_REVOKE_MS
+			)
 		};
 	}
 	revokeInBackground(input.bucket, [removed]);
+	noticeRemoved(input.bucket, [removed], 'removed');
 	return { removed: true };
 }
 
@@ -450,6 +535,8 @@ export async function destroyServiceAccounts(
 	);
 	deletedByCascade(removed);
 	revokeInBackground(bucket, removed);
+	/* Only here among the cascades: a deleted person or project has nobody left to tell (specs/118 FR-026). */
+	noticeRemoved(bucket, removed, 'service_removed');
 	return removed.length;
 }
 

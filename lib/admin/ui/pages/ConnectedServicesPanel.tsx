@@ -17,6 +17,11 @@ import { request } from '../frame/request.js';
 import { useFeedback } from '../frame/feedback.js';
 import { useConfirm } from '../frame/confirm.js';
 import { Link } from '../frame/router.js';
+import {
+	applicationName,
+	exchangeOptions,
+	type ExchangeCandidate
+} from './applications/exchange.js';
 
 /*
  * A project's connected services (specs/117): the services its people may connect their accounts at, each with the
@@ -41,6 +46,10 @@ interface ServiceView {
 	displayName: string;
 	connectedAccounts: number;
 	callbackUri: string;
+	/* What an agent names as `audience` to obtain this service's tokens (specs/118). */
+	identifier: string;
+	/* The applications allowed to obtain a person's tokens here, once that person allows them. */
+	applications: string[];
 }
 
 interface CatalogueEntry {
@@ -73,6 +82,7 @@ interface ServiceForm {
 	clientSecret?: string;
 	scopes: string[];
 	displayName?: string;
+	applications: string[];
 }
 
 const MASK = '********';
@@ -99,7 +109,8 @@ function createBody(form: ServiceForm) {
 	const common = {
 		clientId: form.clientId.trim(),
 		clientSecret: form.clientSecret ?? '',
-		scopes: form.scopes
+		scopes: form.scopes,
+		...(form.applications.length ? { applications: form.applications } : {})
 	};
 	if (form.kind === 'catalogue') {
 		return {
@@ -136,6 +147,7 @@ function createBody(form: ServiceForm) {
 function updateBody(form: ServiceForm, service: ServiceView) {
 	return {
 		scopes: form.scopes,
+		applications: form.applications,
 		...(trimmed(form.displayName)
 			? { displayName: trimmed(form.displayName) }
 			: {}),
@@ -175,7 +187,8 @@ function formOf(service: ServiceView): ServiceForm {
 		clientId: service.clientId,
 		clientSecret: MASK,
 		scopes: service.scopes,
-		displayName: service.displayName
+		displayName: service.displayName,
+		applications: service.applications
 	};
 }
 
@@ -194,12 +207,14 @@ export function ConnectedServicesPanel({
 	bucketId: string;
 	canEdit: boolean;
 }) {
-	const base = `/admin/api/projects/${encodeURIComponent(bucketId)}/connected-services`;
+	const projectBase = `/admin/api/projects/${encodeURIComponent(bucketId)}`;
+	const base = `${projectBase}/connected-services`;
 	const feedback = useFeedback();
 	const confirm = useConfirm();
 	const [services, setServices] = useState<ServiceView[] | null>(null);
 	const [callbackUri, setCallbackUri] = useState('');
 	const [catalogue, setCatalogue] = useState<CatalogueEntry[]>([]);
+	const [applications, setApplications] = useState<ExchangeCandidate[]>([]);
 	const [editing, setEditing] = useState<ServiceView | 'new' | null>(null);
 	/*
 	 * Null while unknown, and for anyone but a super administrator, who alone may read the keyring status: a
@@ -215,9 +230,11 @@ export function ConnectedServicesPanel({
 		void Promise.all([
 			request<{ services: ServiceView[]; callbackUri: string }>('GET', base),
 			request<{ entries: CatalogueEntry[] }>('GET', `${base}/catalogue`),
-			request<{ state: string }>('GET', '/admin/api/keyring')
-		]).then(([list, entries, keyring]) => {
+			request<{ state: string }>('GET', '/admin/api/keyring'),
+			request<ExchangeCandidate[]>('GET', `${projectBase}/clients`)
+		]).then(([list, entries, keyring, clients]) => {
 			if (!live) return;
+			if (clients.ok) setApplications(clients.data);
 			if (keyring.ok) setKeyringInUse(keyring.data.state === 'in-use');
 			if (list.ok) {
 				setServices(list.data.services);
@@ -231,7 +248,7 @@ export function ConnectedServicesPanel({
 		return () => {
 			live = false;
 		};
-	}, [base, feedback, version]);
+	}, [base, projectBase, feedback, version]);
 
 	async function remove(service: ServiceView) {
 		const agreed = await confirm('connectedService.delete', {
@@ -321,9 +338,31 @@ export function ConnectedServicesPanel({
 						},
 						{ title: 'Provider', render: (_, service) => providerOf(service) },
 						{
+							title: 'Identifier for agents',
+							render: (_, service) => (
+								<Typography.Text
+									code
+									copyable
+								>
+									{service.identifier}
+								</Typography.Text>
+							)
+						},
+						{
 							title: 'Scopes',
 							render: (_, service) =>
 								service.scopes.length ? service.scopes.join(' ') : 'None'
+						},
+						{
+							title: 'Applications',
+							render: (_, service) =>
+								service.applications.length
+									? service.applications
+											.map((clientId) =>
+												applicationName(clientId, applications)
+											)
+											.join(', ')
+									: 'None'
 						},
 						{ title: 'Connected accounts', dataIndex: 'connectedAccounts' },
 						...(canEdit
@@ -351,6 +390,7 @@ export function ConnectedServicesPanel({
 					base={base}
 					service={editing === 'new' ? null : editing}
 					catalogue={catalogue}
+					applications={applications}
 					callbackUri={callbackUri}
 					onClose={() => setEditing(null)}
 					onSaved={() => {
@@ -367,6 +407,7 @@ function ServiceEditor({
 	base,
 	service,
 	catalogue,
+	applications,
 	callbackUri,
 	onClose,
 	onSaved
@@ -374,6 +415,7 @@ function ServiceEditor({
 	base: string;
 	service: ServiceView | null;
 	catalogue: CatalogueEntry[];
+	applications: ExchangeCandidate[];
 	callbackUri: string;
 	onClose: () => void;
 	onSaved: () => void;
@@ -450,6 +492,22 @@ function ServiceEditor({
 					description={refusal}
 				/>
 			)}
+			{editing && (
+				<Typography.Paragraph>
+					Identifier for agents:{' '}
+					<Typography.Text
+						code
+						copyable
+					>
+						{service.identifier}
+					</Typography.Text>
+					<br />
+					<Typography.Text type="secondary">
+						An application names it as the audience when it asks for a
+						person&apos;s token at this service.
+					</Typography.Text>
+				</Typography.Paragraph>
+			)}
 			{entry && !editing && (
 				<Alert
 					type="info"
@@ -493,7 +551,8 @@ function ServiceEditor({
 								kind: 'catalogue',
 								catalogueId: 'github',
 								scopes: ['read:user'],
-								identitySource: 'token'
+								identitySource: 'token',
+								applications: []
 							}
 				}
 				onFinish={(values) => void save(values)}
@@ -642,6 +701,19 @@ function ServiceEditor({
 					rules={kind === 'catalogue' ? [] : [{ required: true }]}
 				>
 					<Input placeholder={entry?.displayName} />
+				</Form.Item>
+				<Form.Item
+					name="applications"
+					label="Applications that may obtain tokens"
+					extra="An application listed here can obtain a person's token at this service only after that person allows it. Removing one stops its next request; tokens it already received stay valid at the provider until they expire."
+				>
+					<Select
+						mode="multiple"
+						allowClear
+						showSearch={{ optionFilterProp: 'label' }}
+						placeholder="None"
+						options={exchangeOptions(applications, service?.applications)}
+					/>
 				</Form.Item>
 			</Form>
 		</Drawer>

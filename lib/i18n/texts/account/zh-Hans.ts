@@ -76,5 +76,15 @@ export const zhHans: AccountTexts = {
 	noticeLimit: '您在此服务中连接的账号已达上限。请先断开一个。',
 	noticeUnavailable: '此服务目前无法连接。',
 	noticeExpired: '连接耗时过长。请重试。',
-	noticeRefused: '账号未连接：返回的结果不属于此处发起的连接。'
+	noticeRefused: '账号未连接：返回的结果不属于此处发起的连接。',
+	agentsHeading: '可以使用此账号的应用',
+	agentsNone: '没有应用可以使用此账号。',
+	agentUsed: '上次使用于{date}',
+	agentNotUsed: '尚未使用',
+	withdraw: '撤销',
+	allowHeading: '允许应用使用此账号',
+	allow: '允许',
+	allowedDone: '{app}现在可以使用您的{service}账号。',
+	withdrawnDone:
+		'{app}将无法再访问您的{service}账号。它已获得的访问权限在{service}处仍然有效，直到过期，通常不超过一小时。'
 };

@@ -15,7 +15,9 @@ export const OAuthError = t.Object({
 	error: t.String(),
 	error_description: t.Optional(t.String()),
 	state: t.Optional(t.String()),
-	iss: t.Optional(t.String())
+	iss: t.Optional(t.String()),
+	/* An upstream token exchange's refusal cause (specs/118 R6), an extension member. */
+	reason: t.Optional(t.String())
 });
 
 /*
@@ -49,7 +51,11 @@ export const TokenResponse = t.Object(
 	{
 		access_token: t.String(),
 		token_type: t.String(),
-		expires_in: t.Number(),
+		/*
+		 * Optional only for an upstream token that does not expire (specs/118; a GitHub OAuth app's): RFC 8693 §2.2.1
+		 * makes it RECOMMENDED. Every token this server issues itself carries it.
+		 */
+		expires_in: t.Optional(t.Number()),
 		scope: t.Optional(t.String()),
 		id_token: t.Optional(t.String()),
 		refresh_token: t.Optional(t.String()),

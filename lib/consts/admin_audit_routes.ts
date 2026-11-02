@@ -842,7 +842,9 @@ const nonRouteActions = [
 	{ action: 'admin.register', targetType: 'AdminUser' },
 	{ action: 'admin.passwordsignin.restore', targetType: 'UserBucket' },
 	/* A person connecting their own account from the account page (specs/117); no admin route does this. */
-	{ action: 'connected.account.connect', targetType: 'EndUser' }
+	{ action: 'connected.account.connect', targetType: 'EndUser' },
+	/* A person letting an application use one of their accounts, or withdrawing it (specs/118); the account page only. */
+	{ action: 'connected.account.consent', targetType: 'EndUser' }
 ] as const satisfies readonly { action: string; targetType: string }[];
 
 export const nonRouteAuditActions: readonly {

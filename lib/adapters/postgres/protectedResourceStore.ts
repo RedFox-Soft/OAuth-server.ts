@@ -101,9 +101,15 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 		patch: ProtectedResourcePatch
 	): Promise<ProtectedResource | null> {
 		const handle = sql();
-		const merged = { ...patch, updatedAt: new Date() };
+		const { exchangedBy, ...rest } = patch;
+		const merged = {
+			...rest,
+			...(typeof exchangedBy === 'string' ? { exchangedBy } : {}),
+			updatedAt: new Date()
+		};
+		const dropped = exchangedBy === null ? ['exchangedBy'] : [];
 		const rows = await handle`
-			UPDATE ${handle(this.area)} SET doc = doc || ${merged}
+			UPDATE ${handle(this.area)} SET doc = (doc || ${merged}) - ${handle.array(dropped, 'text')}
 			WHERE id = ${declarationId(namespace, identifier)}
 			RETURNING doc
 		`;

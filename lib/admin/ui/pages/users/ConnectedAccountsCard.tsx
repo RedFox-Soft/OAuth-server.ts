@@ -4,6 +4,10 @@ import { request } from '../../frame/request.js';
 import { useFeedback } from '../../frame/feedback.js';
 import { useConfirm } from '../../frame/confirm.js';
 import { EmptyState, LoadFailed } from '../../frame/states.js';
+import {
+	applicationName,
+	type ExchangeCandidate
+} from '../applications/exchange.js';
 
 /*
  * The accounts one person connected at the project's connected services (specs/117), and the means to disconnect
@@ -20,6 +24,24 @@ interface ConnectedAccountView {
 	missingScopes: string[];
 	connectedAt: string;
 	status: 'connected' | 'needs_reconnection';
+	/* The applications the person allowed to use this account, and when each last did (specs/118). */
+	agents: { clientId: string; lastUsedAt?: string }[];
+	broken?: { reason: BreakReason; at: string };
+	lastRefreshedAt?: string;
+}
+
+type BreakReason = 'refresh_rejected' | 'refresh_unsaved' | 'identity_changed';
+
+const BREAK_TEXT: Record<BreakReason, string> = {
+	refresh_rejected:
+		'Needs reconnecting: the provider rejected its refresh token',
+	refresh_unsaved:
+		'Needs reconnecting: the refreshed tokens could not be saved',
+	identity_changed: 'Needs reconnecting: the provider returned another account'
+};
+
+function when(at: string): string {
+	return new Date(at).toLocaleString();
 }
 
 export function ConnectedAccountsCard({
@@ -35,6 +57,7 @@ export function ConnectedAccountsCard({
 	const confirm = useConfirm();
 	const [accounts, setAccounts] = useState<ConnectedAccountView[] | null>(null);
 	const [loadError, setLoadError] = useState<string | null>(null);
+	const [applications, setApplications] = useState<ExchangeCandidate[]>([]);
 	const base = `/admin/api/projects/${encodeURIComponent(bucketId)}/users/${encodeURIComponent(userId)}/connected-accounts`;
 
 	const [version, setVersion] = useState(0);
@@ -57,6 +80,20 @@ export function ConnectedAccountsCard({
 			live = false;
 		};
 	}, [base, version]);
+
+	// Only to name the applications; without it each is shown by its client id.
+	useEffect(() => {
+		let live = true;
+		void request<ExchangeCandidate[]>(
+			'GET',
+			`/admin/api/projects/${encodeURIComponent(bucketId)}/clients`
+		).then((result) => {
+			if (live && result.ok) setApplications(result.data);
+		});
+		return () => {
+			live = false;
+		};
+	}, [bucketId]);
 
 	async function disconnect(account: ConnectedAccountView) {
 		const agreed = await confirm('connectedAccount.delete', {
@@ -129,18 +166,56 @@ export function ConnectedAccountsCard({
 							)
 						},
 						{
+							title: 'Applications allowed',
+							render: (_, account) =>
+								account.agents.length === 0 ? (
+									<Typography.Text type="secondary">None</Typography.Text>
+								) : (
+									<ul style={{ margin: 0, paddingInlineStart: 16 }}>
+										{account.agents.map((agent) => (
+											<li key={agent.clientId}>
+												{applicationName(agent.clientId, applications)}{' '}
+												<Typography.Text type="secondary">
+													{agent.lastUsedAt
+														? `last used ${when(agent.lastUsedAt)}`
+														: 'not used yet'}
+												</Typography.Text>
+											</li>
+										))}
+									</ul>
+								)
+						},
+						{
 							title: 'Connected',
-							dataIndex: 'connectedAt',
-							render: (at: string) => new Date(at).toLocaleString()
+							render: (_, account) => (
+								<>
+									{when(account.connectedAt)}
+									{account.lastRefreshedAt && (
+										<div>
+											<Typography.Text type="secondary">
+												Last refreshed {when(account.lastRefreshedAt)}
+											</Typography.Text>
+										</div>
+									)}
+								</>
+							)
 						},
 						{
 							title: 'Status',
-							dataIndex: 'status',
-							render: (status: ConnectedAccountView['status']) =>
-								status === 'connected' ? (
+							render: (_, account) =>
+								account.status === 'connected' ? (
 									<Tag color="green">Connected</Tag>
 								) : (
-									<Tag color="orange">Needs reconnection</Tag>
+									<>
+										<Tag color="orange">Needs reconnection</Tag>
+										{account.broken && (
+											<div>
+												<Typography.Text type="secondary">
+													{`${BREAK_TEXT[account.broken.reason]} (${when(account.broken.at)})`}
+												</Typography.Text>
+											</div>
+										)}
+									</>
 								)
 						},
 						{

@@ -108,9 +108,17 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 		identifier: string,
 		patch: ProtectedResourcePatch
 	): Promise<ProtectedResource | null> {
+		const { exchangedBy, ...rest } = patch;
 		const result = await this.collection.findOneAndUpdate(
 			{ _id: declarationId(namespace, identifier) },
-			{ $set: { ...patch, updatedAt: new Date() } },
+			{
+				$set: {
+					...rest,
+					...(typeof exchangedBy === 'string' ? { exchangedBy } : {}),
+					updatedAt: new Date()
+				},
+				...(exchangedBy === null ? { $unset: { exchangedBy: '' } } : {})
+			},
 			{ returnDocument: 'after' }
 		);
 		return resourceOf(result);

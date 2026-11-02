@@ -1,7 +1,13 @@
 import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import type { TokenParams } from 'lib/actions/token.js';
 import { InvalidRequest, UnauthorizedClient } from '../../helpers/errors.js';
-import { ID_JAG_TOKEN_TYPE } from '../../consts/assertion_grants.js';
+import {
+	ACCESS_TOKEN_TYPE,
+	ID_JAG_TOKEN_TYPE
+} from '../../consts/assertion_grants.js';
+import { ApplicationConfig } from '../../configs/application.js';
+import { upstreamExchange } from '../../connected_services/upstream_exchange.js';
+import type { TokenResponse } from '../../shared/response_schemas.js';
 import type { DPoPProof } from 'lib/helpers/validate_dpop.js';
 import { issueIdJag } from '../../assertions/id_jag.js';
 import { vouchingFor } from '../../assertions/policy.js';
@@ -9,18 +15,38 @@ import { subjectOf } from '../../assertions/subject_token.js';
 import { noteOutsideServerUse } from '../../assertions/usage.js';
 
 /*
- * OAuth 2.0 Token Exchange (RFC 8693), as the ID-JAG profile uses it (ID-JAG §4.3; specs/108): an application
- * a project allows on an outside authorization server exchanges a person's ID token or refresh token for an
- * Identity Assertion JWT Authorization Grant that server honours. Only that profile is implemented; general
- * exchange of access tokens for delegation or impersonation is not.
+ * OAuth 2.0 Token Exchange (RFC 8693), for two things and nothing else, told apart by the token asked for:
  *
- * The person's activity is not counted here: no token for this project's resources is issued, so no Account
- * entity is set on the context, and the grant event carries none.
+ * - an Identity Assertion JWT Authorization Grant (ID-JAG §4.3; specs/108): an application a project allows on an
+ *   outside authorization server exchanges a person's ID token or refresh token for an assertion that server
+ *   honours, while `tokenExchange.enabled` is on;
+ * - a person's access token at one of the project's connected services (specs/118), which an allowed agent obtains
+ *   with the person's access token here.
+ *
+ * General exchange of access tokens for delegation or impersonation is not implemented. The person's activity is
+ * not counted: no token for this project's resources is issued, so no Account entity is set on the context.
  */
 export async function tokenExchange(
 	oidc: OIDCContext<TokenParams>,
 	dPoP: DPoPProof
-) {
+): Promise<(typeof TokenResponse)['static']> {
+	if (oidc.params.requested_token_type === ACCESS_TOKEN_TYPE) {
+		return upstreamExchange(oidc, dPoP);
+	}
+	/*
+	 * The grant is advertised whatever this setting says, so a switched-off profile is an unacceptable token type,
+	 * never `unsupported_grant_type`: an advertised grant is never refused as unsupported (discoverySupport.ts).
+	 */
+	if (
+		oidc.params.requested_token_type === ID_JAG_TOKEN_TYPE &&
+		!ApplicationConfig['tokenExchange.enabled']
+	) {
+		throw new InvalidRequest('this server does not issue ID-JAGs');
+	}
+	return idJagExchange(oidc, dPoP);
+}
+
+async function idJagExchange(oidc: OIDCContext<TokenParams>, dPoP: DPoPProof) {
 	const { client, params } = oidc;
 
 	/*
@@ -42,7 +68,7 @@ export async function tokenExchange(
 	}
 	if (params.requested_token_type !== ID_JAG_TOKEN_TYPE) {
 		throw new InvalidRequest(
-			`requested_token_type must be ${ID_JAG_TOKEN_TYPE}`
+			`requested_token_type must be ${ID_JAG_TOKEN_TYPE} or ${ACCESS_TOKEN_TYPE}`
 		);
 	}
 

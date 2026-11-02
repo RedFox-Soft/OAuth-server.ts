@@ -89,6 +89,11 @@ export interface ConnectedServiceEntry {
 	readonly defaultScopes: readonly string[];
 	/* Where the person's tokens sit in the token response, when not at its top level. */
 	readonly tokenPath?: string;
+	/*
+	 * Where they sit in a refresh's answer (specs/118 R10), when that differs. The top level is tried after it,
+	 * because the provider's documentation does not settle the shape (Slack below).
+	 */
+	readonly refreshTokenPath?: string;
 	readonly pkce: 'S256' | 'never';
 	readonly identity: CatalogueIdentity;
 	readonly revocation: Revocation;
@@ -206,6 +211,13 @@ const SLACK: ConnectedServiceEntry = {
 	alwaysScopes: [],
 	defaultScopes: ['users:read'],
 	tokenPath: 'authed_user',
+	/*
+	 * Slack's token rotation guide shows a refreshed user token only as a fragment with the `authed_user` members,
+	 * and every complete example it gives (bot, app-level) is top-level
+	 * (https://docs.slack.dev/authentication/using-token-rotation, read 2026-11-02): `authed_user` first, then the
+	 * top level.
+	 */
+	refreshTokenPath: 'authed_user',
 	/*
 	 * Never: enabling PKCE on a Slack app marks it a public client, one-way, and caps its refresh tokens at 30
 	 * days. A confidential vault keeps its app confidential.

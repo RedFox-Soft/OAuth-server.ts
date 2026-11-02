@@ -77,7 +77,10 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 	): Promise<ProtectedResource | null> {
 		const resource = this.resources.get(declarationId(namespace, identifier));
 		if (!resource) return null;
-		Object.assign(resource, patch, { updatedAt: new Date() });
+		const { exchangedBy, ...rest } = patch;
+		Object.assign(resource, rest, { updatedAt: new Date() });
+		if (exchangedBy === null) delete resource.exchangedBy;
+		else if (exchangedBy !== undefined) resource.exchangedBy = exchangedBy;
 		return resource;
 	}
 

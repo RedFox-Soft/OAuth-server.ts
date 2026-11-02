@@ -9,11 +9,12 @@ updated: 2026-11-02
 
 # Connected services
 
-Spec 117, the floor of the token vault (spec 116 sealed stored secrets; 118 will issue the stored tokens to
-agents by token exchange; 119 adds the agent's connect link). A project declares **connected services**
+Spec 117, the floor of the token vault (spec 116 sealed stored secrets; 118 issues the stored tokens to agents by
+token exchange, below; 119 adds the agent's connect link). A project declares **connected services**
 (Google, GitHub, Slack, Microsoft, an OpenID Connect issuer, or a plain OAuth 2.0 provider) with its own
 registration at each provider. A person **connects** their account at one from their account page, and the
-provider's tokens are stored sealed. Nothing reads the tokens yet.
+provider's tokens are stored sealed. Since spec 118 an agent the administrator and the person both allowed obtains
+them by token exchange.
 
 Words: a *connected service* is the project's registration at a provider; a *connected account* is one person's
 account at one service. The account page's older list is *connected applications* (specs/095), the opposite
@@ -37,7 +38,7 @@ direction.
 "Owned by an account" in the inventory means "swept by `sweepAccountOwned`", which every lock, deactivation and
 end of access runs (`lib/end_users/revoke_access.ts`). The owner decided a lock **keeps** connected accounts: it is
 reversible, and an unlock must not make a person connect everything again; the lock already destroys the grants,
-and 118's exchange will check the person can sign in. So the store declares `unowned(...)` with that reason, and the
+and 118's exchange checks the person can sign in. So the store declares `unowned(...)` with that reason, and the
 three deletions that must remove accounts do so by hand:
 
 - the person deleted: `removeEndUser` (`lib/end_users/service.ts:331`), which the admin route, bulk delete and SCIM
@@ -97,10 +98,72 @@ RFC 7009 for a generic provider that has an endpoint, nothing for Microsoft (the
 page). Four seconds per request, so a person's own disconnect answers within five; every cascade revokes in the
 background, four at a time, never holding the request.
 
-Known limit, carried to 118: GitHub and Slack revoke with the access token, and 117 never refreshes, so an expired
-access token makes that revocation fail and the person is told to remove access at the provider.
+Since spec 118, GitHub's and Slack's revocations, which authenticate with the access token, refresh an expired one
+first (`revocableTokens`, `lib/connected_services/accounts.ts`): without a lease, because the record is already
+deleted, and within one second for the person's own disconnect so the whole stays under five.
 
-## Not here
+## Handing the tokens to agents (spec 118)
 
-Issuing tokens, refresh (one at a time per account, because GitHub and Slack refresh tokens are single-use),
-keep-alive, per-agent consent and the mail about a removed or broken account are spec 118.
+An agent exchanges a person's access token at `/token` by RFC 8693 with
+`requested_token_type=urn:ietf:params:oauth:token-type:access_token`, `audience=<service id>` and, when the person
+allowed several accounts there, `login_hint=<account label>` (Auth0 Token Vault's parameter for the same choice). The
+answer is the stored upstream access token, never the refresh token. Everything is in
+`lib/connected_services/upstream_exchange.ts:134`; the grant only routes there by token type
+(`lib/actions/grants/token_exchange.ts`).
+
+**Two consents, both checked on every exchange.** The administrator's: `ConnectedService.applications`, the
+applications that may obtain that service's tokens, edited through the service's own PATCH. The person's: a
+`connected` map on their Grant to the agent, keyed `account:<id>` (or `service:<id>` before they have an account
+there), so it goes wherever the grant goes (`lib/connected_services/consent.ts`). Nobody among ten vendors asks the
+person per agent; this is deliberate.
+
+**Who may exchange.** The agent itself when it is confidential, or the application an administrator linked to an API
+the agent's token was issued for (`ProtectedResource.exchangedBy`, the MCP server case, Auth0's "Custom API Client").
+`whyCannotExchange` (`lib/connected_services/eligibility.ts:14`) is the one test for both and for the exchange: an
+application of this project, created by an administrator, that authenticates and holds the token exchange grant.
+
+**Gotcha: a JWT access token is not stored.** `BaseModel.save` writes only when the format yields a payload, and the
+JWT format yields the value alone, so a JWT subject (an MCP server's, by default) has no record and names no grant.
+`exchangeSubject` (`lib/connected_services/subject.ts:123`) verifies it as its API would (keys, issuer, `at+jwt`,
+lifetime), takes the person from `sub` (refused for a pairwise agent) and reads the consent from the person's live
+grants to the agent: removing the application's access leaves none, so the token is refused although it cannot itself
+be revoked.
+
+**Refusals carry a `reason`** beside RFC 6749's `error` (`UpstreamTokenRefused`, `lib/helpers/errors.ts`):
+`not_permitted`, `consent_required`, `connect_required`, `account_selection_required`, `reconnect_required`,
+`temporarily_unavailable`. A bad subject token is plain `invalid_grant` with none, so no answer says anything about the
+person's accounts.
+
+**The grant is always advertised.** `supportedGrantTypes` lists token exchange whatever `tokenExchange.enabled` says
+(`lib/configs/discoverySupport.ts:92`); the setting now gates only ID-JAGs, and an ID-JAG request while it is off is
+`invalid_request`, never `unsupported_grant_type`, because an advertised grant is never refused as unsupported (see
+[[enterprise-managed-authorization]]).
+
+## One refresh at a time
+
+GitHub (expiring user tokens) and Slack (token rotation) spend a refresh token on use, so two concurrent refreshes
+lose the account. `freshAccount` (`lib/connected_services/refresh.ts:59`) shares one in-process promise per account and
+takes a 20-second lease written on the record itself (`claimRefresh` / `finishRefresh` / `releaseRefresh`, all three
+backends); a waiter polls the record for at most 12 seconds; a holder that died is taken over when its lease runs out.
+The new tokens are stored before anyone receives them; a refresh whose result could not be stored breaks the account
+(`refresh_unsaved`), because the provider has already spent the old refresh token.
+
+**Gotcha (found by the real-PostgreSQL verify):** dropping keys with `doc - ${array}::text[]` fails at runtime, since
+Bun binds a bare JS array as comma-joined text. Use `handle.array(keys, 'text')`, as every other store does.
+
+**Slack's refreshed user token** sits where the documentation does not say: its rotation guide shows the user case
+only as a fragment with the `authed_user` members. The catalogue's `refreshTokenPath: 'authed_user'` tries there, then
+the top level; the code exchange never falls back to the top level, where Slack puts the bot's token.
+
+## Keep-alive and mail
+
+An hourly pass (`lib/connected_services/keep_alive.ts:31`, started in `lib/index.ts`) refreshes, under the same lease,
+every account with a refresh token that an agent may use and did use within twelve months, when it was not refreshed
+for thirty days or its refresh token expires within a week. Thirty days sits inside Google's six idle months,
+Microsoft's ninety days and GitHub's six months, with no per-provider table to keep right. A token nobody uses is left
+to lapse.
+
+A break (`markBroken`, atomic, `first` true once) mails the person once; a reconnect writes a record without `broken`,
+which re-arms it. An administrator's disconnect and a service deletion mail too; the person's own disconnect and a
+person's or project's deletion do not (`lib/connected_services/mail.ts`). Only to a verified address, only with mail
+configured, in a background queue, never naming a token or an identifier.

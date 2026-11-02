@@ -238,6 +238,51 @@ export interface ServiceRowView {
 	missingScopes: readonly string[];
 	connectedAt: string;
 	status: 'connected' | 'needs_reconnection';
+	/* The applications that may use it, and those the person could let (specs/118 R8). */
+	agents: readonly { clientId: string; name: string; lastUsedAt?: number }[];
+	candidates: readonly { clientId: string; name: string }[];
+}
+
+function hidden(fields: Record<string, string>): string {
+	return Object.entries(fields)
+		.map(
+			([name, value]) =>
+				`<input type="hidden" name="${esc(name)}" value="${esc(value)}"/>`
+		)
+		.join('');
+}
+
+/* Who may use the account, each with a Withdraw, and a form to allow one more (specs/118 FR-022, FR-022a). */
+function agentsOf(row: ServiceRowView, frame: PageFrame, xsrf: string): string {
+	const T = ACCOUNT_TEXTS[frame.language];
+	const listed = row.agents.length
+		? `<ul style="list-style:none; padding:0; margin:4px 0 0;">${row.agents
+				.map(
+					(agent) =>
+						`<li style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:4px 0;"><span style="overflow-wrap:anywhere;">${esc(agent.name)}</span><span style="${MUTED}">${
+							agent.lastUsedAt === undefined
+								? esc(T.agentNotUsed)
+								: htmlWith(T.agentUsed, {
+										date: stamp(
+											new Date(agent.lastUsedAt * 1000),
+											frame.language
+										)
+									})
+						}</span><form method="post" action="${esc(frame.path)}" style="margin:0;">${hidden({ action: 'withdraw', connectedAccountId: row.id, clientId: agent.clientId, xsrf })}<button type="submit" style="${DANGER_LINK} background:none; border:none; padding:0; cursor:pointer;">${esc(T.withdraw)}<span style="position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0);">: ${esc(agent.name)}</span></button></form></li>`
+				)
+				.join('')}</ul>`
+		: `<p style="${MUTED} margin:4px 0 0;">${esc(T.agentsNone)}</p>`;
+	const allow = row.candidates.length
+		? `<form method="post" action="${esc(frame.path)}" style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:8px 0 0;">${hidden({ action: 'allow', connectedAccountId: row.id, xsrf })}<label style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">${esc(T.allowHeading)} <select name="clientId">${row.candidates
+				.map(
+					(candidate) =>
+						`<option value="${esc(candidate.clientId)}">${esc(candidate.name)}</option>`
+				)
+				.join(
+					''
+				)}</select></label><button type="submit" style="${PRIMARY}">${esc(T.allow)}</button></form>`
+		: '';
+	return `<h3 style="font-size:15px; margin:12px 0 0;">${esc(T.agentsHeading)}</h3>${listed}${allow}`;
 }
 
 export interface OfferedService {
@@ -266,7 +311,8 @@ function noticeBox(
 function serviceRow(
 	row: ServiceRowView,
 	index: number,
-	frame: PageFrame
+	frame: PageFrame,
+	xsrf: string
 ): string {
 	const T = ACCOUNT_TEXTS[frame.language];
 	const id = `service-${index}`;
@@ -285,6 +331,7 @@ function serviceRow(
 <h2 id="${id}" style="font-size:18px; margin:0; overflow-wrap:anywhere;">${esc(row.serviceName)}: ${esc(row.label)}</h2>
 ${scopes}${missing}${status}
 <p style="${MUTED} margin:8px 0 0;">${htmlWith(T.connectedAt, { date: stamp(new Date(row.connectedAt), frame.language) })}</p>
+${agentsOf(row, frame, xsrf)}
 <p style="margin:8px 0 0;"><a href="${esc(disconnectHref)}" style="${DANGER_LINK}">${esc(T.disconnect)}<span style="position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0);">: ${esc(row.label)}</span></a></p>
 </section>`;
 }
@@ -294,6 +341,7 @@ export function servicesPage(
 	appsHref: string,
 	rows: readonly ServiceRowView[],
 	offered: readonly OfferedService[],
+	xsrf: string,
 	notice?: ServicesNotice
 ): Response {
 	const T = ACCOUNT_TEXTS[frame.language];
@@ -308,7 +356,7 @@ export function servicesPage(
 	const body = `${header(frame)}<h1 style="font-size:24px; margin:0 0 8px;">${esc(T.servicesTitle)}</h1>
 <p style="margin:0 0 8px; overflow-wrap:anywhere;">${htmlWith(T.signedInAs, { email: `<strong>${esc(frame.email)}</strong>` })} · <a href="${esc(appsHref)}" style="${LINK}">${esc(T.appsLink)}</a> · <a href="${esc(frame.signOutHref)}" style="${LINK}">${esc(T.signOut)}</a></p>
 <div role="status">${noticeBox(notice, frame.language)}</div>
-${rows.length ? `<p style="margin:8px 0 16px;">${esc(T.servicesIntro)}</p>${rows.map((row, i) => serviceRow(row, i, frame)).join('')}` : `<p style="margin:8px 0;">${esc(T.servicesEmpty)}</p>`}
+${rows.length ? `<p style="margin:8px 0 16px;">${esc(T.servicesIntro)}</p>${rows.map((row, i) => serviceRow(row, i, frame, xsrf)).join('')}` : `<p style="margin:8px 0;">${esc(T.servicesEmpty)}</p>`}
 ${connect}`;
 	return page(T.servicesTitle, body, 200, {
 		wide: true,

@@ -64,25 +64,26 @@ describe('the metadata of an instance that issues ID-JAGs', () => {
 		});
 	}
 
-	it('advertises neither when token exchange is switched off', async () => {
+	/*
+	 * The grant itself stays advertised: it also issues upstream tokens from connected services (specs/118), which
+	 * no setting switches. Only the ID-JAG token type goes.
+	 */
+	it('advertises no ID-JAG token type when ID-JAG issuing is switched off', async () => {
 		ApplicationConfig['tokenExchange.enabled'] = false;
 
 		const metadata = shaped(Metadata, await openid());
 
-		expect(metadata.grant_types_supported).not.toContain(EXCHANGE);
 		expect(
 			metadata.identity_chaining_requested_token_types_supported
 		).toBeUndefined();
 	});
 
-	it('answers unsupported_grant_type when token exchange is switched off', async () => {
+	it('refuses an ID-JAG request as an unacceptable token type when ID-JAG issuing is switched off', async () => {
 		ApplicationConfig['tokenExchange.enabled'] = false;
 
 		const res = await exchange({ subjectToken: 'x', audience: OUTSIDE });
 
 		expect(res.status).toBe(400);
-		expect(shaped(OAuthError, res.error?.value).error).toBe(
-			'unsupported_grant_type'
-		);
+		expect(shaped(OAuthError, res.error?.value).error).toBe('invalid_request');
 	});
 });

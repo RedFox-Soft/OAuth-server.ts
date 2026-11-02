@@ -43,6 +43,7 @@ export interface ResolvedService {
 	alwaysScopes: readonly string[];
 	extraAuthorizationParams: Readonly<Record<string, string>>;
 	tokenPath?: string;
+	refreshTokenPath?: string;
 	identity: CatalogueIdentity;
 	revocation: Revocation;
 	manageAccessUrls: readonly string[];
@@ -91,6 +92,9 @@ export async function resolveService(
 			alwaysScopes: entry.alwaysScopes,
 			extraAuthorizationParams: entry.extraAuthorizationParams,
 			...(entry.tokenPath ? { tokenPath: entry.tokenPath } : {}),
+			...(entry.refreshTokenPath
+				? { refreshTokenPath: entry.refreshTokenPath }
+				: {}),
 			identity: entry.identity,
 			revocation: entry.revocation,
 			manageAccessUrls: entry.manageAccessUrls

@@ -43,6 +43,7 @@ import type { RegistrationAccessToken } from './models/registration_access_token
 import type { ReplayDetection } from './models/replay_detection.ts';
 import type { Session } from './models/session.ts';
 import type { StartedPrompt } from './actions/authorization/interactions.ts';
+import type { ConnectedAccountBreak } from './connected_services/types.ts';
 
 /* BaseModel.emit names an event `${snake_case(class name)}.${lifecycle}` and passes the instance. */
 interface ModelEventSubjects {
@@ -188,6 +189,28 @@ export type ServerEvents = ModelEvents &
 		];
 		'connected_account.refused': [
 			{ bucketId: string; serviceId?: string; reason: string }
+		];
+		/*
+		 * An agent obtained the upstream token (specs/118 R15). `clientId` is the agent the person consented to;
+		 * `exchangedBy` the application that asked, the same one unless an API's exchanging application did.
+		 */
+		'connected_account.exchanged': [
+			ConnectedAccountEvent & { clientId: string; exchangedBy: string }
+		];
+		'connected_account.refreshed': [
+			ConnectedAccountEvent & {
+				trigger: 'exchange' | 'keep_alive' | 'revocation';
+			}
+		];
+		'connected_account.broken': [
+			ConnectedAccountEvent & { reason: ConnectedAccountBreak }
+		];
+		'connected_account.consent': [
+			ConnectedAccountEvent & {
+				clientId: string;
+				change: 'allowed' | 'declined' | 'withdrawn';
+				via: 'consent_screen' | 'account_page';
+			}
 		];
 	};
 

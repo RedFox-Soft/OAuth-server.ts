@@ -229,6 +229,36 @@ export class InvalidGrant extends OIDCProviderError {
 	}
 }
 
+/*
+ * Why an upstream token exchange was refused (specs/118 R6), for a developer to branch on without parsing prose:
+ * an extension member beside RFC 6749 §5.2's, which a compliant client ignores. Only for the person's account
+ * state and the administrator's allow-list; a bad subject token is a plain `invalid_grant`, saying nothing.
+ */
+export type UpstreamRefusalReason =
+	| 'not_permitted'
+	| 'consent_required'
+	| 'connect_required'
+	| 'account_selection_required'
+	| 'reconnect_required'
+	| 'temporarily_unavailable';
+
+export class UpstreamTokenRefused extends OIDCProviderError {
+	readonly reason: UpstreamRefusalReason;
+
+	constructor(reason: UpstreamRefusalReason, description: string) {
+		const [status, code] =
+			reason === 'not_permitted'
+				? [400, 'invalid_target']
+				: reason === 'temporarily_unavailable'
+					? [503, 'temporarily_unavailable']
+					: [400, 'invalid_grant'];
+		super(status, code);
+		Error.captureStackTrace(this, this.constructor);
+		this.reason = reason;
+		Object.assign(this, { error_description: description });
+	}
+}
+
 export class InvalidRedirectUri extends OIDCProviderError {
 	error_description =
 		"redirect_uri did not match any of the client's registered redirectUris";

@@ -38,9 +38,27 @@ export const GrantPayload = t.Object({
 			)
 		})
 	),
-	rar: t.Optional(t.Array(t.Object({}, { additionalProperties: true })))
+	rar: t.Optional(t.Array(t.Object({}, { additionalProperties: true }))),
+	/*
+	 * The person's answer about this application using their connected accounts (specs/118 R7), keyed by
+	 * `account:<connected account id>` or, while they have no account at a service, `service:<service id>`. On the
+	 * grant so it goes wherever the grant goes: a lock, an end of access, the application's access removed.
+	 */
+	connected: t.Optional(
+		t.Record(t.String(), t.Union([t.Literal('allowed'), t.Literal('declined')]))
+	)
 });
 export type GrantPayloadType = Static<typeof GrantPayload>;
+
+export type ConnectedConsent = 'allowed' | 'declined';
+
+export function connectedAccountKey(connectedAccountId: string): string {
+	return `account:${connectedAccountId}`;
+}
+
+export function connectedServiceKey(serviceId: string): string {
+	return `service:${serviceId}`;
+}
 
 /*
  * What a grant records consent in: the grant's own payload, or the `rejected` record inside it, which
@@ -402,6 +420,30 @@ export class Grant extends BaseToken<GrantPayloadType> {
 	 * It lives on the model rather than in the overridable rarForAuthorizationCode default so that a
 	 * deployment shaping its own details cannot lose trusted-client handling.
 	 */
+	/*
+	 * Unlike the filters above, a trusted grant answers nothing here: a first-party application skips the consent
+	 * screen, but using the person's accounts elsewhere is theirs to allow (specs/118 FR-020), on the account page.
+	 */
+	connectedConsent(key: string): ConnectedConsent | undefined {
+		return this.payload.connected?.[key];
+	}
+
+	allowConnected(key: string) {
+		(this.payload.connected ||= {})[key] = 'allowed';
+	}
+
+	declineConnected(key: string) {
+		(this.payload.connected ||= {})[key] = 'declined';
+	}
+
+	withdrawConnected(key: string) {
+		if (!this.payload.connected) return;
+		delete this.payload.connected[key];
+		if (Object.keys(this.payload.connected).length === 0) {
+			delete this.payload.connected;
+		}
+	}
+
 	getRarFiltered(requested: unknown): unknown[] {
 		if (!isList(requested)) {
 			return [];

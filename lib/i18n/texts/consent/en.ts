@@ -91,6 +91,15 @@ export const en = {
 		rarTogether: 'These are allowed together with the rest, or not at all.'
 	},
 
+	/* The person's accounts at other services (specs/118): one unticked row per account. */
+	connected: {
+		heading: 'Your accounts at other services',
+		note: 'The app will get short-lived access to the accounts you tick and can act as you there. You can withdraw this on your account page.',
+		account: 'Use your {service} account {label}',
+		notConnected:
+			'Use your {service} account (not connected yet: you can connect it on your account page)'
+	},
+
 	nothingRequested: '“{app}” isn’t asking for any of your data.',
 
 	warning: {

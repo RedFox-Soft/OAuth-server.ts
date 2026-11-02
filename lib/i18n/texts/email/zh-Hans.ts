@@ -38,5 +38,18 @@ export const zhHans: EmailTexts = {
 		ignore:
 			'如果您并未预期收到这封邮件，可以忽略它——在设置密码之前，不会发生任何事情。',
 		text: '您受邀加入{bucket}。\n\n管理员已为您创建了账户。打开此链接以设置您的密码：\n{url}\n\n此链接在 7 天内有效，且只能使用一次。设置密码的同时也会确认此电子邮件地址。\n\n如果您并未预期收到这封邮件，可以忽略它——在设置密码之前，不会发生任何事情。'
+	},
+	connectedAccount: {
+		brokenSubject: '请重新连接您在{bucket}的{service}账户',
+		brokenHeading: '您的{service}账户需要重新连接',
+		brokenIntro:
+			'您连接到{bucket}的{service}账户{label}已无法使用：{service}不再接受其访问权限。在您重新连接之前，您允许使用它的应用都无法使用它。',
+		removedSubject: '您的{service}账户已与{bucket}断开连接',
+		removedHeading: '您的{service}账户已断开连接',
+		removedIntro:
+			'{bucket}的一位管理员断开了您的{service}账户{label}。您允许使用它的应用将无法再使用它。',
+		serviceRemovedIntro:
+			'{bucket}不再提供{service}，因此您的{service}账户{label}已断开连接。您允许使用它的应用将无法再使用它。',
+		button: '打开已连接的账户'
 	}
 };

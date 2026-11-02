@@ -66,6 +66,29 @@ export function githubStub() {
 					json
 				);
 		},
+		/*
+		 * A refresh GitHub refuses for good (specs/118): it answers 200 with an error member, as its documentation
+		 * shows for an expired or already-spent refresh token.
+		 */
+		expectRefreshRejected(error = 'bad_refresh_token') {
+			login
+				.intercept({
+					path: '/login/oauth/access_token',
+					method: 'POST',
+					body: (form) => form.includes('grant_type=refresh_token')
+				})
+				.reply(200, JSON.stringify({ error }), json);
+		},
+		/* A provider that cannot answer just now. */
+		expectRefreshUnavailable(status = 503) {
+			login
+				.intercept({
+					path: '/login/oauth/access_token',
+					method: 'POST',
+					body: (form) => form.includes('grant_type=refresh_token')
+				})
+				.reply(status, 'unavailable');
+		},
 		expectUser(profile: Record<string, unknown>, status = 200) {
 			api
 				.intercept({ path: '/user' })
@@ -102,9 +125,13 @@ export function slackStub() {
 				})
 				.reply(200, JSON.stringify(body), json);
 		},
-		expectRevoke(ok = true) {
+		expectRevoke(ok = true, check?: (form: string) => boolean) {
 			slack
-				.intercept({ path: '/api/auth.revoke', method: 'POST' })
+				.intercept({
+					path: '/api/auth.revoke',
+					method: 'POST',
+					...(check ? { body: check } : {})
+				})
 				.reply(200, JSON.stringify({ ok, revoked: ok }), json);
 		}
 	};

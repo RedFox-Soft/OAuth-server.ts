@@ -753,7 +753,10 @@ export function sealedConnectedAccountStore(
 			'destroy',
 			'destroyByAccount',
 			'destroyByService',
-			'destroyByBucket'
+			'destroyByBucket',
+			'claimRefresh',
+			'finishRefresh',
+			'listKeepAliveDue'
 		],
 		{
 			args: {
@@ -762,6 +765,29 @@ export function sealedConnectedAccountStore(
 					if (!isRecord(record)) return [record, ...rest];
 					noteReadableUnder(`connectedAccounts/${String(record._id)}/`);
 					return [await accountTokens(record, sealedText), ...rest];
+				},
+				/*
+				 * A refresh's tokens (specs/118 R9), sealed under the record's own binding. The person is not part of the
+				 * binding, so the patch needs no account id to be sealed as `put` would have sealed it.
+				 */
+				finishRefresh: async ([bucketId, id, holder, patch]) => {
+					if (!activeKeyring()) throw new KeyringRequired();
+					if (!isRecord(patch) || typeof id !== 'string')
+						return [bucketId, id, holder, patch];
+					noteReadableUnder(`connectedAccounts/${id}/`);
+					const sealedPatch = { ...patch };
+					for (const field of CONNECTED_ACCOUNT_TOKEN_FIELDS) {
+						if (field in sealedPatch) {
+							sealedPatch[field] = await sealedText(sealedPatch[field], {
+								kind: 'connectedAccountToken',
+								id,
+								field,
+								bucketId: typeof bucketId === 'string' ? bucketId : '',
+								accountId: ''
+							});
+						}
+					}
+					return [bucketId, id, holder, sealedPatch];
 				}
 			},
 			result: (result) =>

@@ -1,6 +1,6 @@
 ---
 title: Connected services
-description: Let a project's users connect their own accounts at Google, GitHub, Slack, Microsoft or another OAuth provider, with the tokens stored encrypted.
+description: Let a project's users connect their accounts at Google, GitHub, Slack, Microsoft or another OAuth provider, and let the agents they allow obtain those tokens.
 sidebar:
   order: 11
 ---
@@ -12,21 +12,25 @@ A project's users often have accounts at other services: a Google account, a Git
 each provider. A person then connects their account from their account page, and the provider gives this server
 tokens for that account. The server stores the tokens encrypted.
 
-Two words are used on this page:
+An agent working for the person can then obtain the person's token at that service and act there for them. The
+agent asks this server, never the provider, and needs two agreements: the administrator's and the person's. See
+[Letting agents use connected accounts](#letting-agents-use-connected-accounts).
+
+Three words are used on this page:
 
 - A **connected service** is the project's registration at one provider: Google, GitHub, Slack, Microsoft, an
   OpenID Connect provider, or a plain OAuth 2.0 provider.
 - A **connected account** is one person's account at one connected service.
+- An **agent** is an application of the project that the person signed in to and gave access, such as an AI
+  agent or an MCP client.
 
 <Aside
-	type="caution"
-	title="Nothing uses the stored tokens yet"
+	type="note"
+	title="Connecting alone gives nobody access"
 >
-	This release stores the tokens and does nothing else with them. No application
-	and no agent can obtain them yet. A later release will hand a person's token
-	to an AI agent through token exchange, only for agents an administrator allows
-	and only with that person's consent. Until then, connecting an account gives
-	nobody access to it.
+	A connected account is used only by an application that an administrator
+	allowed and that the person allowed too. Until both have said yes, no
+	application and no agent can obtain its token.
 </Aside>
 
 ## A connected service is not a way to sign in {#not-a-way-to-sign-in}
@@ -188,6 +192,170 @@ service.
 If something goes wrong, the page says so in plain words: the person declined at the provider, connecting took
 longer than ten minutes, the limit of 10 accounts is reached, or the service cannot be connected right now.
 
+## Letting agents use connected accounts {#letting-agents-use-connected-accounts}
+
+An agent obtains a person's token at a connected service only when two people have agreed. The administrator
+says which applications may obtain a service's tokens. The person says which of those applications may use each
+of their accounts. The server checks both on every request, so a change to either one applies to the next request.
+
+### What the administrator allows {#what-the-administrator-allows}
+
+An administrator of the project allows an application in either of two places:
+
+- in the service's editor, on the **Connected services** tab, under **Applications that may obtain tokens**;
+- on the application's own page, in the **Connected services** card, which has a checkbox per service.
+
+Both change the same list, and each change is recorded in the audit trail. Only an application that can obtain
+tokens may be allowed. It must:
+
+- be an application of this project, created by an administrator rather than registered by itself;
+- authenticate to the token endpoint, with a client secret or a key. A public application, such as a single-page
+  app or a mobile app, never obtains anyone's tokens;
+- have the **token exchange** grant type. When it lacks the grant or does not authenticate, the application's
+  card says so and links to its settings.
+
+The service's editor also shows the service's **Identifier for agents**, with a copy button. A developer sends
+this value to name the service (see [Obtaining a person's token](#obtaining-a-persons-token)).
+
+Removing an application from the list refuses its next request at once. Tokens it already received stay valid at
+the provider until they expire, which is usually within an hour.
+
+### An API that exchanges tokens for an agent {#an-api-that-exchanges-tokens}
+
+Sometimes the agent does not call the provider itself. It calls an API of the project, such as an MCP server
+declared on the **APIs** tab, and that API calls the provider for the person. The API receives the person's access
+token from the agent and exchanges that token for the person's token at the service.
+
+For this, open the API's page and choose an application under **Application that exchanges tokens for this API**.
+The API's server authenticates as that application when it exchanges tokens. The same rules apply as above: the
+application must be allowed the service, must authenticate, and must have the token exchange grant. The person's
+agreement is still the one they gave the agent, not the API.
+
+### What the person sees {#what-the-person-sees}
+
+The person agrees per account and per agent. They can do it in two places.
+
+- **On the consent screen.** When the person signs in to an agent that may use a service, the consent screen adds
+  a group called **Your accounts at other services**. It has one row per account, such as "Use your GitHub
+  account octocat". A person with no account there yet sees a row for the service itself, marked as not connected
+  yet. Every row starts unticked. The person is asked once: a row they answered is not shown again. The device
+  flow's consent screen has no room for these rows, so it never shows them.
+- **On their account page**, at `/account/services`. Each connected account lists the applications that may use
+  it, and when each one last obtained a token. The person can allow another application there, or **Withdraw**
+  one. Both need a sign-in within the last 15 minutes.
+
+A person who ticked a service before connecting any account there gets that agreement for the first account they
+connect. After a withdrawal, the page tells the person that tokens the agent already received stay valid at the
+provider until they expire, usually within an hour. When the person removes an application's access entirely, on
+the **Connected apps** page, every agreement given to that application goes with it.
+
+Administrators see these agreements but cannot give or withdraw them. A person's **Connected accounts** card shows,
+for each account, the applications allowed to use it and when each last did.
+
+## Obtaining a person's token {#obtaining-a-persons-token}
+
+This section is for the developer of an agent, or of an API that exchanges tokens for one. The agent holds the
+person's access token from this project. It asks the project's token endpoint for the person's token at a
+connected service, using **OAuth 2.0 Token Exchange** (RFC 8693). Token exchange is a standard way to trade one
+token for another at a token endpoint.
+
+### The request {#the-request}
+
+Send a `POST` to the project's token endpoint, which the project's discovery document lists as `token_endpoint`.
+The application authenticates as it does for any other token request. This example uses a client secret:
+
+```bash
+curl https://auth.example.com/acme/token \
+  -u "$CLIENT_ID:$CLIENT_SECRET" \
+  -d grant_type=urn:ietf:params:oauth:grant-type:token-exchange \
+  -d subject_token="$PERSON_ACCESS_TOKEN" \
+  -d subject_token_type=urn:ietf:params:oauth:token-type:access_token \
+  -d requested_token_type=urn:ietf:params:oauth:token-type:access_token \
+  -d audience="$SERVICE_IDENTIFIER" \
+  -d login_hint=octocat \
+  -d scope=read:user
+```
+
+| Parameter              | Value                                                                           |
+| ---------------------- | ------------------------------------------------------------------------------- |
+| `grant_type`           | `urn:ietf:params:oauth:grant-type:token-exchange`                               |
+| `subject_token`        | the person's access token from this project                                     |
+| `subject_token_type`   | `urn:ietf:params:oauth:token-type:access_token`                                 |
+| `requested_token_type` | `urn:ietf:params:oauth:token-type:access_token`                                 |
+| `audience`             | the service's **Identifier for agents**, from the console; exactly one          |
+| `login_hint`           | optional: which of the person's accounts there, by its name at the provider     |
+| `scope`                | optional: scopes at the provider that the token must carry, separated by spaces |
+
+The name in `login_hint` is the one the person's account page shows, such as a GitHub login or an email address.
+Auth0 Token Vault takes the same parameter for the same choice. Without it, the server picks the one account the
+person allowed this agent to use. If the person allowed several, the request must name one.
+
+The access token in `subject_token` must have been issued to the agent that sends it. The one exception is an API
+with an exchanging application: that application may send an access token issued for its API.
+
+### The answer {#the-answer}
+
+```json
+{
+	"access_token": "gho_EXAMPLE",
+	"issued_token_type": "urn:ietf:params:oauth:token-type:access_token",
+	"token_type": "Bearer",
+	"expires_in": 3412,
+	"scope": "read:user"
+}
+```
+
+- `access_token` is the person's token at the provider. Call the provider's API with it directly.
+- `expires_in` is how many seconds the token has left. It is absent when the provider's token does not expire, as
+  with a GitHub OAuth app.
+- `scope` lists the scopes the token carries at the provider.
+
+The answer never contains the provider's refresh token. It is sent with `Cache-Control: no-store`, so nothing on
+the way keeps a copy. Ask again when the token expires. The server returns the stored token while it has more
+than a minute left, and refreshes it otherwise.
+
+### When the request is refused {#when-the-request-is-refused}
+
+A refusal is a standard OAuth error with one more member, `reason`, which says what to do next:
+
+```json
+{
+	"error": "invalid_grant",
+	"error_description": "the person has not allowed this application to use their account at GitHub",
+	"reason": "consent_required"
+}
+```
+
+| `reason`                     | `error`                   | HTTP | What to do                                                                                 |
+| ---------------------------- | ------------------------- | ---- | ------------------------------------------------------------------------------------------ |
+| `not_permitted`              | `invalid_target`          | 400  | Ask the project's administrator to allow the application for this service.                 |
+| `consent_required`           | `invalid_grant`           | 400  | Send the person to their account page to allow the application.                            |
+| `connect_required`           | `invalid_grant`           | 400  | Ask the person to connect an account at the service first.                                 |
+| `account_selection_required` | `invalid_grant`           | 400  | The person allowed several accounts. Send `login_hint` to name one.                        |
+| `reconnect_required`         | `invalid_grant`           | 400  | Ask the person to connect the account again. `error_description` names any missing scopes. |
+| `temporarily_unavailable`    | `temporarily_unavailable` | 503  | Retry later.                                                                               |
+
+Other failures have no `reason`. An expired or revoked access token, a token from another project, an application
+that is not allowed to present the token, and a person who can no longer sign in are all refused as
+`invalid_grant`. An application that lacks the token exchange grant is refused as `unauthorized_client`. No
+refusal says anything about another person's accounts, or names an account the request did not name itself.
+
+## Keeping accounts working {#keeping-accounts-working}
+
+The server takes care of the stored tokens, so that agents and people rarely see a broken account.
+
+- **One refresh at a time.** When the stored access token has expired, the server refreshes it at the provider.
+  If many requests need the same account at once, exactly one refresh reaches the provider, and every request gets
+  its result. This also holds across several server processes. It matters because GitHub and Slack accept each
+  refresh token only once: a second refresh with the same token would break the account.
+- **Keeping idle accounts alive.** Google, Microsoft and GitHub discard a refresh token that nobody used for some
+  months. Every 30 days, the server refreshes each account that an agent may use, as long as an agent obtained a
+  token of it within the last 12 months. After a year without use, the account is left to lapse.
+- **Telling the person.** When the provider rejects an account's refresh token, the account is marked as needing
+  reconnection, and the person gets one mail with a link to their account page. The person also gets a mail when
+  an administrator disconnects their account or deletes the service. Mail goes only to a verified address, and
+  only when the instance can send mail. A person who disconnects an account themselves gets no mail.
+
 ## Disconnecting, and what the provider is asked {#disconnecting}
 
 A disconnect deletes the connected account here at once. Then the server asks the provider to revoke the tokens,
@@ -206,15 +374,16 @@ When the provider offers no revocation, as Microsoft does not, the person gets a
 where they can remove the application's access themselves. When the provider cannot be reached, or refuses, the
 person is told to remove the access at the provider themselves. Either way, the account is already gone here.
 
-This release never refreshes a token. GitHub and Slack revoke with the access token, so once that token has
-expired, their revocation fails, and the person is told to remove the access there.
+GitHub and Slack revoke with the access token, and an expired one cannot be revoked. So when the stored access
+token has expired, the server first refreshes it and then revokes with the new one. If that refresh fails, the
+account is deleted anyway, and the person is told to remove the access at the provider.
 
 ## Lock, deactivation and deletion {#lock-deactivation-and-deletion}
 
 [Locking or deactivating](/docs/administer/ending-access/) a person **keeps** their connected accounts. Both can
 be undone, and a person who is unlocked should not have to connect everything again. A lock already ends the
-person's sessions and grants at this server. The later release that hands out tokens will also refuse a person who
-cannot sign in.
+person's sessions and grants at this server. An agent's request for the token of a person who cannot sign in is
+refused, so a lock also stops every agent from obtaining that person's tokens.
 
 Three deletions remove connected accounts, and the server asks each provider to revoke the tokens in the
 background:
@@ -231,7 +400,10 @@ connected at it. Deleting a service asks for confirmation and says how many acco
 A person's connected accounts are on their **Sign-in** tab, in the **Connected accounts** card. It shows each
 account's service, its name at the provider, the scopes granted and whether it needs to be connected again. An
 administrator can disconnect one there. The provider is asked to revoke it, as for a person's own disconnect, and
-the person can connect it again later. No token, nor any part of one, is ever shown.
+the person can connect it again later, and gets a mail saying that an administrator of the project disconnected
+it. The card also shows, for each account, the applications the person allowed to use it and when each last
+obtained a token, when the server last refreshed it, and why it needs reconnecting if it does. No token, nor any
+part of one, is ever shown.
 
 ## The plan limit {#the-plan-limit}
 
@@ -242,32 +414,27 @@ accounts people connect.
 
 ## For agents {#for-agents}
 
-An agent does everything an administrator does here through these [MCP tools](/docs/reference/mcp-tools/):
+An AI agent that administers the instance does everything an administrator does here through these
+[MCP tools](/docs/reference/mcp-tools/):
 
-| Tool                                                                                              | Does                                                                     | Consequence |
-| ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ----------- |
-| [`connected_service_list`](/docs/reference/mcp-tools/#connected_service_list)                     | Lists a project's services, with the callback address and account counts | Read        |
-| [`connected_service_get`](/docs/reference/mcp-tools/#connected_service_get)                       | Reads one service                                                        | Read        |
-| [`connected_service_catalogue_list`](/docs/reference/mcp-tools/#connected_service_catalogue_list) | Lists the providers known by name, with the values each needs            | Read        |
-| [`connected_service_create`](/docs/reference/mcp-tools/#connected_service_create)                 | Declares a service                                                       | Ordinary    |
-| [`connected_service_update`](/docs/reference/mcp-tools/#connected_service_update)                 | Changes a service's scopes, name, secret or endpoints                    | Ordinary    |
-| [`connected_service_delete`](/docs/reference/mcp-tools/#connected_service_delete)                 | Deletes a service and disconnects every account at it                    | High        |
-| [`connected_account_list`](/docs/reference/mcp-tools/#connected_account_list)                     | Lists one person's connected accounts                                    | Read        |
-| [`connected_account_delete`](/docs/reference/mcp-tools/#connected_account_delete)                 | Disconnects one person's account                                         | High        |
+| Tool                                                                                              | Does                                                                        | Consequence |
+| ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ----------- |
+| [`connected_service_list`](/docs/reference/mcp-tools/#connected_service_list)                     | Lists a project's services, with the callback address and account counts    | Read        |
+| [`connected_service_get`](/docs/reference/mcp-tools/#connected_service_get)                       | Reads one service                                                           | Read        |
+| [`connected_service_catalogue_list`](/docs/reference/mcp-tools/#connected_service_catalogue_list) | Lists the providers known by name, with the values each needs               | Read        |
+| [`connected_service_create`](/docs/reference/mcp-tools/#connected_service_create)                 | Declares a service                                                          | Ordinary    |
+| [`connected_service_update`](/docs/reference/mcp-tools/#connected_service_update)                 | Changes a service's scopes, name, secret, endpoints or allowed applications | Ordinary    |
+| [`connected_service_delete`](/docs/reference/mcp-tools/#connected_service_delete)                 | Deletes a service and disconnects every account at it                       | High        |
+| [`connected_account_list`](/docs/reference/mcp-tools/#connected_account_list)                     | Lists one person's connected accounts                                       | Read        |
+| [`connected_account_delete`](/docs/reference/mcp-tools/#connected_account_delete)                 | Disconnects one person's account                                            | High        |
 
 A high-consequence tool asks for confirmation before it runs. No tool ever returns a client secret or a token.
+An API's exchanging application is set with [`resource_update`](/docs/reference/mcp-tools/#resource_update).
+The person's own agreements are theirs alone: no tool gives or withdraws them.
 The admin API routes behind them are under `/admin/api/projects/:id/connected-services` and
 `/admin/api/projects/:id/users/:uid/connected-accounts`.
 
 ## What comes later {#what-comes-later}
 
-This release builds the store: services, accounts and encrypted tokens. It does not yet:
-
-- give a stored token to an application or an agent;
-- refresh a token, or check that a connected account still works;
-- let an administrator choose which agents may use which service;
-- ask the person to consent per agent;
-- send mail when an account is removed or stops working.
-
-Issuing tokens to AI agents by token exchange, with an administrator's allow-list and each person's consent per
-agent, comes in a later release.
+Today a person connects an account from their account page. A later release will let an agent hand the person a
+link to connect a service, at the moment the agent finds that the account is missing.

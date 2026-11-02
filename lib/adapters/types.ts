@@ -3,7 +3,8 @@ import { Type as t, type Static } from '@sinclair/typebox';
 import { FederatedIdentity, FederationProvider } from '../federation/types.js';
 import {
 	ConnectedService,
-	type ConnectedAccount
+	type ConnectedAccount,
+	type ConnectedAccountBreak
 } from '../connected_services/types.js';
 import type { PlanCatalogue } from '../consts/plans.js';
 import type { SealKind, SealTarget } from '../consts/sealed_fields.js';
@@ -1450,6 +1451,11 @@ export const ProtectedResource = t.Object({
 	tokenFormat: t.Union([t.Literal('jwt'), t.Literal('opaque')]),
 	accessTokenTTL: t.Number(),
 	/*
+	 * The application that exchanges the access tokens this API receives for a person's upstream tokens (specs/118
+	 * R3): an MCP server calling GitHub for the agent that called it. One per API, as Auth0 links one client.
+	 */
+	exchangedBy: t.Optional(t.String()),
+	/*
 	 * Whether a trailing slash distinguishes this identifier from its sibling. Off for every resource
 	 * that does not say otherwise, because the MCP specification asks for the slash-free form.
 	 */
@@ -1464,7 +1470,10 @@ export type ProtectedResourcePatch = Partial<
 		ProtectedResource,
 		'name' | 'scopes' | 'scopeDescriptions' | 'tokenFormat' | 'accessTokenTTL'
 	>
->;
+> & {
+	/* `null` removes the API's exchanging application (specs/118 R3). */
+	exchangedBy?: string | null;
+};
 
 export interface ProtectedResourceStoreInstance {
 	/* Throws `UniqueValueTaken` when the identifier is already declared in that namespace. */
@@ -1843,6 +1852,62 @@ export interface ConnectedAccountStoreInstance {
 		serviceId: string
 	): Promise<ConnectedAccount[]>;
 	destroyByBucket(bucketId: string): Promise<ConnectedAccount[]>;
+	/*
+	 * The refresh lease (specs/118 R9). Takes it only when none is held or the held one ran out, and answers with the
+	 * record as stored at that moment, or `null` when another holder has it or the record is gone.
+	 */
+	claimRefresh(
+		bucketId: string,
+		id: string,
+		holder: string,
+		now: number,
+		until: number
+	): Promise<ConnectedAccount | null>;
+	/* Writes a refresh's result and frees the lease, only while `holder` still holds it. */
+	finishRefresh(
+		bucketId: string,
+		id: string,
+		holder: string,
+		patch: RefreshedTokens
+	): Promise<boolean>;
+	releaseRefresh(bucketId: string, id: string, holder: string): Promise<void>;
+	/* Marks the account broken unless it already is; `first` says this call broke it, so one mail goes. */
+	markBroken(
+		bucketId: string,
+		id: string,
+		reason: ConnectedAccountBreak,
+		at: number
+	): Promise<{ first: boolean }>;
+	/* A field update, never a whole-record write, so it cannot undo a refresh that lands beside it. */
+	noteUse(
+		bucketId: string,
+		id: string,
+		clientId: string,
+		at: number
+	): Promise<void>;
+	/* Accounts across projects the keep-alive pass is due to refresh (specs/118 R11). */
+	listKeepAliveDue(due: KeepAliveDue): Promise<ConnectedAccount[]>;
+}
+
+/* What a refresh writes. A refresh token the provider did not replace is passed through unchanged. */
+export interface RefreshedTokens {
+	accessToken: string;
+	refreshToken?: string;
+	tokenType: string;
+	accessTokenExpiresAt?: number;
+	refreshTokenExpiresAt?: number;
+	scopes: string[];
+	refreshedAt: number;
+}
+
+export interface KeepAliveDue {
+	/* Refreshed (or connected) before this, epoch seconds. */
+	staleBefore: number;
+	/* Or holding a refresh token that expires before this. */
+	expiringBefore: number;
+	/* And used by some agent at or after this. */
+	usedSince: number;
+	limit: number;
 }
 
 export interface ConnectedAccountStoreConstructor {

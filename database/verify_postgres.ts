@@ -1158,7 +1158,8 @@ await verifyTelemetry(() => new TelemetryStateStore(), check);
 		{
 			sealing: new SealingStore(),
 			buckets: new UserBucketStore(),
-			accounts: new ConnectedAccountStore()
+			accounts: new ConnectedAccountStore(),
+			resources
 		},
 		check
 	);

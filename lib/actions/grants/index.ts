@@ -66,7 +66,13 @@ export const tokenExchangeGrantParameters = t.Object({
 	requested_token_type: t.String(),
 	audience: t.Union([t.String(), t.Array(t.String())]),
 	actor_token: t.String(),
-	actor_token_type: t.String()
+	actor_token_type: t.String(),
+	/*
+	 * Which of the person's accounts at a connected service, by its label (specs/118 R5). Not an RFC 8693 parameter:
+	 * Auth0 Token Vault takes it for the same choice, so an agent written for it ports. Every other grant ignores it
+	 * (RFC 6749 §3.2).
+	 */
+	login_hint: t.String()
 });
 
 export * as authorization_code from './authorization_code.ts';
@@ -97,7 +103,10 @@ type GrantHandler = (
 	dPoP: DPoPProof
 ) => Promise<TokenResponseBody>;
 
-export const grantStore: Map<string, GrantHandler> = new Map([
+export const grantStore: Map<string, GrantHandler> = new Map<
+	string,
+	GrantHandler
+>([
 	['authorization_code', authorization_code.handler],
 	['client_credentials', clientCredentials],
 	['refresh_token', refresh_token.handler],

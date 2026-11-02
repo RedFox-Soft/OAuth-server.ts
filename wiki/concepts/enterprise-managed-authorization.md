@@ -30,6 +30,14 @@ authentication (`lib/shared/token_auth.ts`).
 Both grants are off by default (`jwtBearer.enabled`, `tokenExchange.enabled`) and catalogued as
 `experimental` and `risk: 'security'` (`lib/admin/settings/catalog.ts`), because the profile is a draft.
 
+**Changed by spec 118 (2026-11-02):** the token exchange grant also issues a person's upstream token from a connected
+service ([[connected-services]]), which no setting switches, so it is now always processed and always in
+`grant_types_supported`. `tokenExchange.enabled` decides only whether ID-JAGs are issued: while it is off,
+`identity_chaining_requested_token_types_supported` is not advertised and an ID-JAG request is `invalid_request`. Not
+`unsupported_grant_type`, as it was before, because `discoverySupport.ts` keeps the invariant that an advertised grant is
+never refused as unsupported (`test/grants/grant_parity.spec.ts`). The handler routes by `requested_token_type`
+(`lib/actions/grants/token_exchange.ts`).
+
 ## Where trust lives on the receiving side
 
 On the **sign-in provider**, as two optional fields (`lib/federation/types.ts:104`, `:110`):

@@ -80,6 +80,13 @@ export const zhHans: ConsentTexts = {
 		rarTogether: '这些内容只能与其余内容一并允许，或者全部不允许。'
 	},
 
+	connected: {
+		heading: '您在其他服务的账户',
+		note: '该应用将获得对您勾选账户的短期访问权限，并可以以您的身份在其中操作。您可以在账户页面撤销此授权。',
+		account: '使用您的{service}账户{label}',
+		notConnected: '使用您的{service}账户（尚未连接：您可以在账户页面连接它）'
+	},
+
 	nothingRequested: '「{app}」没有请求您的任何数据。',
 
 	warning: {

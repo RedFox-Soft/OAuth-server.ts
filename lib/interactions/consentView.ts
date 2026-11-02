@@ -1,6 +1,7 @@
 import { isLoopbackRedirect } from '../client_metadata_document/identifier.js';
 import type { ScopeDescription } from '../adapters/types.js';
 import type { ProvenanceTier } from '../models/client/provenance.js';
+import type { ConnectedOffer } from '../connected_services/consent.js';
 import { isStandardOidcScope } from '../consts/oidc_scopes.js';
 import {
 	isConfusableWith,
@@ -129,6 +130,8 @@ export interface ConsentView {
 	offline?: { key: string; refusedBefore?: true };
 	/* The after-approval summary lists only what is certain; the rest depends on the checkboxes. */
 	afterApprovalDependsOnChoice?: true;
+	/* Rows the person ticks to let the app use their accounts at other services; always a choice (specs/118). */
+	connected?: ConnectedOffer[];
 	/* The app's privacy policy and terms, each only when it is on one of the app's own redirect hosts. */
 	links?: { policy?: string; terms?: string };
 	/* The person's connected-applications page, where this access can be removed later (specs/095). */
@@ -170,6 +173,8 @@ export interface PromptDetails {
 	// computed to decide whether to interrupt at all, so the End-User is never asked to re-approve
 	// something they have already approved.
 	rar?: unknown[];
+	/* The person's accounts at other services this app could use, not yet answered (specs/118 R8). */
+	connectedOffers?: ConnectedOffer[];
 }
 
 /* What an existing grant already holds, for "you already allowed". */
@@ -579,8 +584,11 @@ export function buildConsentView(input: ConsentInput): ConsentView {
 	const resourceAsked = Object.values(asked.resourceScopes).some(
 		(s) => s.length > 0
 	);
+	/* Never in the device flow, where the page has no room for the choice (specs/118 FR-023). */
+	const connected = input.device ? [] : (details.connectedOffers ?? []);
 	const compact =
 		!choosing &&
+		connected.length === 0 &&
 		!input.adminResource &&
 		!offline &&
 		!customScopeAsked &&
@@ -660,7 +668,8 @@ export function buildConsentView(input: ConsentInput): ConsentView {
 		asked.oidcScopes.length > 0 ||
 		asked.oidcClaims.length > 0 ||
 		resourceAsked ||
-		asked.rar.length > 0;
+		asked.rar.length > 0 ||
+		connected.length > 0;
 
 	return {
 		uid: input.uid,
@@ -713,6 +722,7 @@ export function buildConsentView(input: ConsentInput): ConsentView {
 						: {})
 				}
 			: {}),
+		...(connected.length > 0 ? { connected } : {}),
 		...linksOf(input.client),
 		...(input.revokeHref ? { revokeHint: { href: input.revokeHref } } : {})
 	};

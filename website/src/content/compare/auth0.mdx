@@ -2,7 +2,7 @@
 title: FoxAuth compared with Auth0
 competitor: Auth0
 description: Auth0 is a managed identity service billed per monthly active user. FoxAuth is a server you run yourself or use on a free cloud plan.
-lastChecked: '2026-10-16'
+lastChecked: '2026-11-02'
 sources:
   - https://auth0.com/docs/get-started/authentication-and-authorization-flow/authorization-code-flow-with-pkce
   - https://auth0.com/docs/secure/highly-regulated-identity
@@ -17,6 +17,7 @@ sources:
   - https://auth0.com/changelog
   - https://auth0.com/docs/get-started/auth0-mcp-server
   - https://auth0.com/pricing
+  - https://auth0.com/docs/secure/call-apis-on-users-behalf/token-vault/access-token-exchange-with-token-vault
 bottomLine: 'Auth0 is the better pick when you want identity as a service with an SLA this week, with social connections and a FAPI certification you can hand to a reviewer. FoxAuth is the better pick when the data has to live in your own database, when the per-user bill is the problem, or when you need the banking-grade profiles without an Enterprise add-on.'
 chooseThem:
   - 'You do not want to run anything, and you need an SLA today.'
@@ -248,6 +249,20 @@ groups:
         verdict: even
         why: "Both exist. Ours runs inside the server through the console's code path; theirs is a separate component in front of the API."
         note: 'The Auth0 MCP Server "connects AI agents to your Auth0 tenant".'
+      - dimension: Token vault for AI agents
+        us:
+          {
+            status: yes,
+            text: "A person's token at Google, GitHub, Slack, Microsoft or any OIDC or OAuth 2.0 provider, through a standard RFC 8693 token exchange. An administrator lists the applications allowed per service, and the person allows each agent per account and can withdraw it. One refresh at a time, idle accounts kept alive, and a mail to the person when an account breaks. Free to self-host; 10 connected services per project on the FoxAuth Cloud Free plan."
+          }
+        them:
+          {
+            status: yes,
+            text: 'Token Vault: connected accounts, and an exchange on an Auth0 grant type that names the provider with a connection parameter. The subject is the application’s refresh token, or an access token exchanged by a Custom API Client linked to the API. Consent is given per connection, at the provider; the person does not allow each agent. The pricing page lists Token Vault at 2 on Free, 3 on Essentials and Professional, 4 on Enterprise, and unlimited with the AI Agents add-on, which adds 50% to the base price.'
+          }
+        verdict: us
+        why: 'FoxAuth takes the standard RFC 8693 request, asks the person about each agent, and limits connected services only on the Free cloud plan. Auth0 counts Token Vault per plan, but runs it for you, as a managed service with an SLA.'
+        note: 'The grant type is "urn:auth0:params:oauth:grant-type:token-exchange:federated-connection-access-token"; the AI Agents add-on unlocks "Unlimited Token Vault".'
   - label: Licence and cost
     rows:
       - dimension: Licence

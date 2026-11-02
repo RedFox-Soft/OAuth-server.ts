@@ -6,6 +6,7 @@ import {
 import epochTime from '../helpers/epoch_time.js';
 import type { ResolvedService } from './catalogue.js';
 import { valueAt } from './paths.js';
+import { upstreamIdIn } from './identity.js';
 
 /*
  * Redeeming a connect flow's code (specs/117 R6). Unlike the sign-in exchange, which keeps only the ID token,
@@ -40,11 +41,19 @@ function seconds(value: unknown): number | undefined {
 
 export function tokensOf(
 	service: ResolvedService,
-	response: Record<string, unknown>
+	response: Record<string, unknown>,
+	path: string | undefined = service.tokenPath,
+	/*
+	 * Only for a refresh, whose shape the provider may not document (catalogue `refreshTokenPath`). Never for a code
+	 * exchange: Slack's top level holds the bot's token, not the person's.
+	 */
+	orTopLevel = false
 ): IssuedTokens {
-	const holder = service.tokenPath
-		? valueAt(response, service.tokenPath)
-		: response;
+	let holder: unknown = response;
+	if (path) {
+		const nested = valueAt(response, path);
+		holder = nested !== undefined || !orTopLevel ? nested : response;
+	}
 	if (typeof holder !== 'object' || holder === null) {
 		throw new ConnectExchangeError('malformed');
 	}
@@ -106,6 +115,34 @@ export async function exchangeConnectCode(
 		client_id: client.clientId
 	});
 	if (codeVerifier) body.set('code_verifier', codeVerifier);
+	const answer = await tokenRequest(service, client, body);
+	// Slack answers 200 with `ok: false` for a refused code.
+	if (answer.ok === false || typeof answer.error === 'string') {
+		throw new ConnectExchangeError('refused');
+	}
+	return tokensOf(service, answer);
+}
+
+/* Client authentication as the service resolved it; the answer parsed, or why there was none. */
+async function tokenRequest(
+	service: ResolvedService,
+	client: { clientId: string; clientSecret: string },
+	body: URLSearchParams
+): Promise<Record<string, unknown>> {
+	const answer = await rawTokenRequest(service, client, body);
+	if (answer.kind === 'refused') throw new ConnectExchangeError('refused');
+	return answer.body;
+}
+
+type RawAnswer =
+	| { kind: 'answered'; body: Record<string, unknown> }
+	| { kind: 'refused'; status: number; body?: Record<string, unknown> };
+
+async function rawTokenRequest(
+	service: ResolvedService,
+	client: { clientId: string; clientSecret: string },
+	body: URLSearchParams
+): Promise<RawAnswer> {
 	const headers: Record<string, string> = {
 		'content-type': 'application/x-www-form-urlencoded',
 		accept: 'application/json'
@@ -118,6 +155,7 @@ export async function exchangeConnectCode(
 	}
 
 	let text: string;
+	let status: number;
 	try {
 		const response = await guardedFetch(service.tokenEndpoint, {
 			method: 'POST',
@@ -125,25 +163,98 @@ export async function exchangeConnectCode(
 			body,
 			timeoutMs: UPSTREAM_TIMEOUT_MS
 		});
-		if (!response.ok) throw new ConnectExchangeError('refused');
+		status = response.status;
 		text = await readBounded(response, MAX_UPSTREAM_DOCUMENT_BYTES);
-	} catch (err) {
-		if (err instanceof ConnectExchangeError) throw err;
+	} catch {
 		throw new ConnectExchangeError('unreachable');
 	}
 	let parsed: unknown;
 	try {
 		parsed = JSON.parse(text);
 	} catch {
+		if (status < 200 || status >= 300) return { kind: 'refused', status };
 		throw new ConnectExchangeError('malformed');
 	}
-	if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-		throw new ConnectExchangeError('malformed');
+	const answer =
+		typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
+			? (parsed as Record<string, unknown>)
+			: undefined;
+	if (status < 200 || status >= 300) {
+		return { kind: 'refused', status, ...(answer ? { body: answer } : {}) };
 	}
-	const answer = parsed as Record<string, unknown>;
-	// Slack answers 200 with `ok: false` for a refused code.
-	if (answer.ok === false || typeof answer.error === 'string') {
-		throw new ConnectExchangeError('refused');
+	if (!answer) throw new ConnectExchangeError('malformed');
+	return { kind: 'answered', body: answer };
+}
+
+// ---------------------------------------------------------------- refresh (specs/118 R10)
+
+export type RefreshOutcome =
+	| { kind: 'refreshed'; tokens: IssuedTokens }
+	| { kind: 'rejected' }
+	| { kind: 'unavailable' }
+	| { kind: 'identity_changed' };
+
+/*
+ * The answers that mean the person's refresh token is gone for good: RFC 6749 §5.2 `invalid_grant`, and Slack's own
+ * words for a spent, revoked or expired one (https://docs.slack.dev/reference/methods/oauth.v2.access). Anything
+ * else, including a refusal of this project's own credentials, leaves the account as it is: the person did nothing.
+ */
+const GONE = new Set([
+	'invalid_grant',
+	/* GitHub's, answered with status 200 (docs.github.com, "Refreshing user access tokens"). */
+	'bad_refresh_token',
+	'invalid_refresh_token',
+	'token_revoked',
+	'token_expired'
+]);
+
+export async function refreshUpstream(
+	service: ResolvedService,
+	client: { clientId: string; clientSecret: string },
+	refreshToken: string,
+	upstreamId: string
+): Promise<RefreshOutcome> {
+	const body = new URLSearchParams({
+		grant_type: 'refresh_token',
+		refresh_token: refreshToken,
+		client_id: client.clientId
+	});
+	let answer: RawAnswer;
+	try {
+		answer = await rawTokenRequest(service, client, body);
+	} catch {
+		return { kind: 'unavailable' };
 	}
-	return tokensOf(service, answer);
+	const error = answer.body?.error;
+	if (answer.kind === 'refused') {
+		return answer.status >= 400 &&
+			answer.status < 500 &&
+			answer.status !== 429 &&
+			typeof error === 'string' &&
+			GONE.has(error)
+			? { kind: 'rejected' }
+			: { kind: 'unavailable' };
+	}
+	if (answer.body.ok === false || typeof error === 'string') {
+		return typeof error === 'string' && GONE.has(error)
+			? { kind: 'rejected' }
+			: { kind: 'unavailable' };
+	}
+	const named = upstreamIdIn(service, answer.body);
+	if (named !== undefined && named !== upstreamId) {
+		return { kind: 'identity_changed' };
+	}
+	try {
+		return {
+			kind: 'refreshed',
+			tokens: tokensOf(
+				service,
+				answer.body,
+				service.refreshTokenPath ?? service.tokenPath,
+				true
+			)
+		};
+	} catch {
+		return { kind: 'unavailable' };
+	}
 }

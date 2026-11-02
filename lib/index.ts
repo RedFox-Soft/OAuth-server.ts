@@ -70,6 +70,7 @@ import { reportStartupFailure } from './sentry/startup.js';
 import { rootKeys } from './keys/issuer_keys.js';
 import { startCloser } from './activity/closer.js';
 import { startBucketPurger } from './admin/buckets/purge_pass.js';
+import { startKeepAlive } from './connected_services/keep_alive.js';
 import { startTelemetry } from './telemetry/scheduler.js';
 import { reportingState } from './telemetry/status.js';
 import { startAttackReports } from './attack_reports/scheduler.js';
@@ -325,6 +326,11 @@ if (process.env.NODE_ENV !== 'test') {
 	 * reasons and under the same guard as the closer: a case runs a pass itself, on a clock it controls.
 	 */
 	startBucketPurger();
+	/*
+	 * Refreshes connected accounts an agent still uses before their provider discards the refresh token (specs/118
+	 * R11), hourly, under the same guard: a case runs a pass itself, on a clock it controls.
+	 */
+	startKeepAlive();
 	/*
 	 * The daily usage report (specs/113). Not on the in-memory backend: its identifier would be new at every
 	 * start and its counts mean nothing, so this guard, not the report pass, is what keeps such an instance

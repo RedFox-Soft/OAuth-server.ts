@@ -46,5 +46,22 @@ export const en = {
 		ignore:
 			'If you were not expecting this, you can ignore this email — nothing happens until a password is chosen.',
 		text: "You're invited to {bucket}.\n\nAn administrator created an account for you. Open this link to choose your password:\n{url}\n\nThe link works for 7 days and can be used once. Setting a password also confirms this email address.\n\nIf you were not expecting this, you can ignore this email — nothing happens until a password is chosen."
+	},
+	/*
+	 * About a person's account at a connected service (specs/118 R12). Never a token, an account id or a project id:
+	 * forwarded, the message says what happened and links to the page, nothing more.
+	 */
+	connectedAccount: {
+		brokenSubject: 'Reconnect your {service} account at {bucket}',
+		brokenHeading: 'Your {service} account needs reconnecting',
+		brokenIntro:
+			'Your {service} account {label}, connected to {bucket}, no longer works: {service} stopped accepting its access. Applications you allowed to use it cannot, until you connect it again.',
+		removedSubject: 'Your {service} account was disconnected from {bucket}',
+		removedHeading: 'Your {service} account was disconnected',
+		removedIntro:
+			'An administrator of {bucket} disconnected your {service} account {label}. Applications you allowed to use it no longer can.',
+		serviceRemovedIntro:
+			'{bucket} no longer offers {service}, so your {service} account {label} was disconnected. Applications you allowed to use it no longer can.',
+		button: 'Open your connected accounts'
 	}
 } as const;

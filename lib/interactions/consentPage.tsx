@@ -18,6 +18,7 @@ import type {
 	ConsentView,
 	DataCategory
 } from './consentView.js';
+import type { ConnectedOffer } from '../connected_services/consent.js';
 import { useLanguage } from '../i18n/context.js';
 import { formatList } from '../i18n/format.js';
 import type { Language } from '../i18n/languages.js';
@@ -184,6 +185,65 @@ function ChoiceRow({
 				</span>
 			</Checkbox>
 		</li>
+	);
+}
+
+/*
+ * The person's accounts at other services the app could use (specs/118 R8). Always a choice, never preselected,
+ * whatever the application's partial-consent setting: the group is a `Checkbox.Group` of its own, named
+ * `connected`, so these answers post apart from the permissions above.
+ */
+function ConnectedAccounts({ offers }: { offers: readonly ConnectedOffer[] }) {
+	const T = useTexts();
+	return (
+		<section
+			aria-labelledby="connected-accounts"
+			style={{
+				display: 'flex',
+				flexDirection: 'column',
+				gap: 4,
+				paddingTop: 12,
+				borderTop: `1px solid ${foxVar('divider')}`
+			}}
+		>
+			<Text
+				strong
+				id="connected-accounts"
+			>
+				{T.connected.heading}
+			</Text>
+			<Checkbox.Group
+				name="connected"
+				role="none"
+				style={{ display: 'contents' }}
+			>
+				<ul style={{ margin: 0, padding: 0 }}>
+					{offers.map((offer) => (
+						<ChoiceRow
+							key={offer.key}
+							choiceKey={offer.key}
+							icon={<CloudServerOutlined aria-hidden="true" />}
+						>
+							{offer.label ? (
+								<Message
+									t={T.connected.account}
+									values={{
+										service: <>{offer.serviceName}</>,
+										label: <b>{offer.label}</b>
+									}}
+								/>
+							) : (
+								<Message
+									t={T.connected.notConnected}
+									values={{ service: <>{offer.serviceName}</> }}
+								/>
+							)}
+						</ChoiceRow>
+					))}
+				</ul>
+			</Checkbox.Group>
+			<Text style={{ color: MUTED, fontSize: 12.5 }}>{T.connected.note}</Text>
+		</section>
 	);
 }
 
@@ -1031,6 +1091,10 @@ export const ConsentPage: React.FC<
 								</div>
 							) : null}
 						</ChoiceGroup>
+
+						{view.connected ? (
+							<ConnectedAccounts offers={view.connected} />
+						) : null}
 
 						{afterApproval.length ? (
 							<div

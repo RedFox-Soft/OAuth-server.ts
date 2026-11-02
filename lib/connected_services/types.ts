@@ -75,10 +75,22 @@ export const ConnectedService = t.Object({
 	clientSecret: t.Optional(t.String()),
 	scopes: t.Array(t.String()),
 	displayName: t.String(),
+	/*
+	 * The applications an administrator allowed to obtain this service's tokens (specs/118 R4). On the service, as
+	 * an outside server lists its applications, so the relation has one writer and no client attribute.
+	 */
+	applications: t.Optional(t.Array(t.String())),
 	createdAt: t.String(),
 	updatedAt: t.String()
 });
 export type ConnectedService = Static<typeof ConnectedService>;
+
+export const ConnectedAccountBreak = t.Union([
+	t.Literal('refresh_rejected'),
+	t.Literal('refresh_unsaved'),
+	t.Literal('identity_changed')
+]);
+export type ConnectedAccountBreak = Static<typeof ConnectedAccountBreak>;
 
 /*
  * One person's account at one connected service. `_id` is derived from (project, service, person, upstream
@@ -103,7 +115,26 @@ export const ConnectedAccount = t.Object({
 	/* The provider sent no scope list, so `scopes` holds what was asked for. */
 	scopesInferred: t.Boolean(),
 	connectedAt: t.String(),
-	updatedAt: t.String()
+	updatedAt: t.String(),
+	/* Epoch seconds of the last connect or refresh; keep-alive measures from it (specs/118 R11). */
+	refreshedAt: t.Optional(t.Number()),
+	/*
+	 * One process refreshing this account (specs/118 R9). GitHub and Slack spend a refresh token on use, so a second
+	 * concurrent refresh would lose the account; the lease is on the record so it cannot outlive it.
+	 */
+	refreshLease: t.Optional(t.Object({ holder: t.String(), until: t.Number() })),
+	/* Present: the provider no longer honours the tokens, and the person must reconnect (specs/118 R12). */
+	broken: t.Optional(
+		t.Object({
+			reason: ConnectedAccountBreak,
+			at: t.Number(),
+			notified: t.Boolean()
+		})
+	),
+	/* Last exchange per agent. A list, not a map: a client id may be a URL, and a dot splits a MongoDB path. */
+	usedBy: t.Optional(
+		t.Array(t.Object({ clientId: t.String(), at: t.Number() }))
+	)
 });
 export type ConnectedAccount = Static<typeof ConnectedAccount>;
 

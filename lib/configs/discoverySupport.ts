@@ -84,9 +84,12 @@ export function supportedGrantTypes(config: Config): string[] {
 		grantTypes.add(JWT_BEARER_GRANT);
 		grantTypes.add(JWT_DPOP_GRANT);
 	}
-	if (config['tokenExchange.enabled']) {
-		grantTypes.add(TOKEN_EXCHANGE_GRANT);
-	}
+	/*
+	 * Always: the grant also issues a person's upstream token from a connected service (specs/118), which no
+	 * setting switches; a project's allow-list does. `tokenExchange.enabled` decides only whether ID-JAGs are
+	 * issued, which `identity_chaining_requested_token_types_supported` advertises.
+	 */
+	grantTypes.add(TOKEN_EXCHANGE_GRANT);
 	return [...grantTypes];
 }
 

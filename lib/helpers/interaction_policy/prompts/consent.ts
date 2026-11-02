@@ -2,6 +2,7 @@ import { Prompt, type CheckPartial } from '../prompt.js';
 import { canonicalKey, canonicalKeySet } from '../../rar_canonical.js';
 import type { OIDCContext } from '../../oidc_context.js';
 import type { PipelineParams } from '../../../consts/param_list.js';
+import { pendingOffers } from '../../../connected_services/consent.js';
 
 /*
  * What a check found missing, kept for its `details` to report. Beside the request context rather than
@@ -11,6 +12,7 @@ const missingOIDCScope = new WeakMap<object, unknown>();
 const missingOIDCClaims = new WeakMap<object, unknown>();
 const missingResourceScopes = new WeakMap<object, unknown>();
 const missingRar = new WeakMap<object, unknown>();
+const missingConnected = new WeakMap<object, unknown>();
 
 /*
  * Whether what the person refused counts as answered. It does — so they are not asked again on every
@@ -191,6 +193,22 @@ class ConsentPromt extends Prompt {
 				return true;
 			},
 			details: (oidc) => ({ rar: missingRar.get(oidc) })
+		},
+		{
+			reason: 'connected_services_missing',
+			description: 'the use of connected accounts was not answered',
+			/*
+			 * Whether this application may use the person's accounts at other services (specs/118 R8), asked once like
+			 * a new scope. Never in the device flow, whose page has no room for the choice: the account page gives it.
+			 */
+			check: async (oidc) => {
+				if (oidc.entities.DeviceCode || oidc.result?.consent) return false;
+				const offers = await pendingOffers(oidc, refusalsCountAsAnswered(oidc));
+				if (offers.length === 0) return false;
+				missingConnected.set(oidc, offers);
+				return true;
+			},
+			details: (oidc) => ({ connectedOffers: missingConnected.get(oidc) })
 		}
 	];
 }

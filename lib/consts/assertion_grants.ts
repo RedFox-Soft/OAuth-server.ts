@@ -25,3 +25,6 @@ export { ID_JAG_JWT_TYPE } from './jwt_types.ts';
 export const ID_TOKEN_TYPE = 'urn:ietf:params:oauth:token-type:id_token';
 export const REFRESH_TOKEN_TYPE =
 	'urn:ietf:params:oauth:token-type:refresh_token';
+/* RFC 8693 §3: the subject and the requested type of an upstream token exchange (specs/118). */
+export const ACCESS_TOKEN_TYPE =
+	'urn:ietf:params:oauth:token-type:access_token';

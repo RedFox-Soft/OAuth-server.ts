@@ -16,7 +16,15 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   person connects and disconnects accounts from their account page at `/account/services`; the provider's tokens are
   stored encrypted (never without a keyring), revoked at the provider on disconnect, and deleted with the person,
   service or project, while a lock keeps them. Console tab, admin API, MCP tools and a plan limit (Free: 10 per
-  project). Nothing uses the tokens yet: issuing them to agents comes next.
+  project).
+- **Agents obtain connected accounts' tokens** (spec 118) — an application holding a person's access token exchanges
+  it at `/token` (RFC 8693, `audience` = the connected service, optional `login_hint` = the account) for that person's
+  token at the service, only when an administrator listed the application on the service and the person allowed it,
+  per account, on the consent screen or their account page; an MCP server exchanges the tokens it receives once linked
+  to its API. Expired tokens are refreshed once however many requests arrive, accounts in use are kept alive, and the
+  person is mailed when an account breaks or an administrator removes it. Refusals carry a `reason`. The token exchange
+  grant is now always advertised; `tokenExchange.enabled` gates only ID-JAGs, which it now refuses with
+  `invalid_request` while off.
 - **Encryption at rest for stored secrets** (security) — application secrets, sign-in provider credentials, the SMTP
   password, private signing keys and authenticator secrets are now stored encrypted (AES-256-GCM, each value bound to
   its record) with an operator-held keyring, supplied as `KEYRING` or a keyring file and never stored in the database;

@@ -95,5 +95,16 @@ export const en = {
 	noticeUnavailable: 'This service cannot be connected right now.',
 	noticeExpired: 'Connecting took too long. Try again.',
 	noticeRefused:
-		'The account was not connected: the answer did not belong to the connection started here.'
+		'The account was not connected: the answer did not belong to the connection started here.',
+	/* Which applications may use an account (specs/118): given and withdrawn here. */
+	agentsHeading: 'Applications that may use it',
+	agentsNone: 'No application may use it.',
+	agentUsed: 'last used {date}',
+	agentNotUsed: 'not used yet',
+	withdraw: 'Withdraw',
+	allowHeading: 'Let an application use it',
+	allow: 'Allow',
+	allowedDone: '{app} may now use your {service} account.',
+	withdrawnDone:
+		'{app} can no longer get access to your {service} account. Access it already got stays valid at {service} until it expires, usually within an hour.'
 } as const;

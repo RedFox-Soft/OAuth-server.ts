@@ -2,8 +2,15 @@ import { db } from './db.js';
 import { ABSENT_UNDEFINED } from './write_options.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
 import { documentOf } from '../documents.js';
-import { ConnectedAccount } from '../../connected_services/types.js';
-import type { ConnectedAccountStoreInstance } from '../types.js';
+import {
+	ConnectedAccount,
+	type ConnectedAccountBreak
+} from '../../connected_services/types.js';
+import type {
+	ConnectedAccountStoreInstance,
+	KeepAliveDue,
+	RefreshedTokens
+} from '../types.js';
 
 /*
  * Connected accounts (specs/117). `replaceOne` with `upsert` on the derived `_id`: a reconnect of the same
@@ -74,6 +81,117 @@ export class ConnectedAccountStore implements ConnectedAccountStoreInstance {
 
 	async destroyByBucket(bucketId: string): Promise<ConnectedAccount[]> {
 		return this.removeAll({ bucketId });
+	}
+
+	async claimRefresh(
+		bucketId: string,
+		id: string,
+		holder: string,
+		now: number,
+		until: number
+	): Promise<ConnectedAccount | null> {
+		return this.recordOf(
+			await this.collection.findOneAndUpdate(
+				{
+					_id: id,
+					bucketId,
+					$or: [
+						{ refreshLease: { $exists: false } },
+						{ 'refreshLease.until': { $lte: now } }
+					]
+				},
+				{ $set: { refreshLease: { holder, until } } },
+				{ returnDocument: 'after' }
+			)
+		);
+	}
+
+	async finishRefresh(
+		bucketId: string,
+		id: string,
+		holder: string,
+		patch: RefreshedTokens
+	): Promise<boolean> {
+		const { refreshToken, accessTokenExpiresAt, ...rest } = patch;
+		const unset: Record<string, ''> = { refreshLease: '' };
+		if (accessTokenExpiresAt === undefined) unset.accessTokenExpiresAt = '';
+		const result = await this.collection.updateOne(
+			{ _id: id, bucketId, 'refreshLease.holder': holder },
+			{
+				$set: {
+					...rest,
+					...(refreshToken ? { refreshToken } : {}),
+					...(accessTokenExpiresAt !== undefined
+						? { accessTokenExpiresAt }
+						: {})
+				},
+				$unset: unset
+			}
+		);
+		return result.matchedCount === 1;
+	}
+
+	async releaseRefresh(
+		bucketId: string,
+		id: string,
+		holder: string
+	): Promise<void> {
+		await this.collection.updateOne(
+			{ _id: id, bucketId, 'refreshLease.holder': holder },
+			{ $unset: { refreshLease: '' } }
+		);
+	}
+
+	async markBroken(
+		bucketId: string,
+		id: string,
+		reason: ConnectedAccountBreak,
+		at: number
+	): Promise<{ first: boolean }> {
+		const result = await this.collection.updateOne(
+			{ _id: id, bucketId, broken: { $exists: false } },
+			{
+				$set: { broken: { reason, at, notified: true } },
+				$unset: { refreshLease: '' }
+			}
+		);
+		return { first: result.modifiedCount === 1 };
+	}
+
+	async noteUse(
+		bucketId: string,
+		id: string,
+		clientId: string,
+		at: number
+	): Promise<void> {
+		const updated = await this.collection.updateOne(
+			{ _id: id, bucketId, 'usedBy.clientId': clientId },
+			{ $set: { 'usedBy.$.at': at } }
+		);
+		if (updated.matchedCount === 1) return;
+		await this.collection.updateOne(
+			{ _id: id, bucketId, 'usedBy.clientId': { $ne: clientId } },
+			{ $push: { usedBy: { clientId, at } } }
+		);
+	}
+
+	/* An account connected before `refreshedAt` existed counts as due, as on the other backends. */
+	async listKeepAliveDue(due: KeepAliveDue): Promise<ConnectedAccount[]> {
+		return this.recordsOf(
+			await this.collection
+				.find({
+					refreshToken: { $exists: true },
+					broken: { $exists: false },
+					'usedBy.at': { $gte: due.usedSince },
+					$or: [
+						{ refreshedAt: { $exists: false } },
+						{ refreshedAt: { $lt: due.staleBefore } },
+						{ refreshTokenExpiresAt: { $lt: due.expiringBefore } }
+					]
+				})
+				.limit(due.limit)
+				.toArray()
+		);
 	}
 
 	/*

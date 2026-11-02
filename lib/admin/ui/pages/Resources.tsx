@@ -28,6 +28,11 @@ import { RowActions } from '../frame/RowActions.js';
 import { useRoute } from '../frame/router.js';
 import { EmptyState, LoadFailed } from '../frame/states.js';
 import { atLimit, type PlanView } from '../planText.js';
+import {
+	applicationName,
+	exchangeOptions,
+	type ExchangeCandidate
+} from './applications/exchange.js';
 
 /*
  * A bucket's APIs — its declared protected resources: the audiences this server will mint tokens for on
@@ -65,6 +70,8 @@ interface ResourceView {
 	tokenFormat: 'jwt' | 'opaque';
 	accessTokenTTL: number;
 	trailingSlashSignificant: boolean;
+	/* The application that exchanges the access tokens this API receives for people's upstream tokens (specs/118). */
+	exchangedBy?: string;
 	/* What the API itself must serve and check, as the server states it (spec 107). */
 	connection?: {
 		issuer: string;
@@ -99,6 +106,8 @@ interface FormValues {
 	// InputNumber answers null once the operator clears it.
 	accessTokenTTL: number | null;
 	trailingSlashSignificant: boolean;
+	/* Edit only; '' for none. */
+	exchangedBy?: string;
 }
 
 const DEFAULT_VALUES: FormValues = {
@@ -371,6 +380,7 @@ export function Resources({
 	const feedback = useFeedback();
 	const confirm = useConfirm();
 	const [connecting, setConnecting] = useState<ResourceView | null>(null);
+	const [applications, setApplications] = useState<ExchangeCandidate[]>([]);
 	/* "My MCP server or API" in New application lands here with ?declare=1 (spec 107): open the form once, if allowed. */
 	const declareRequested = useRoute().query.get('declare') === '1';
 	const declareOffered = useRef(false);
@@ -420,6 +430,20 @@ export function Resources({
 		void fetchResources();
 	}, [fetchResources]);
 
+	useEffect(() => {
+		let live = true;
+		void request<ExchangeCandidate[]>('GET', `${bucketBase}/clients`).then(
+			(result) => {
+				if (live && result.ok) setApplications(result.data);
+			}
+		);
+		return () => {
+			live = false;
+		};
+	}, [bucketBase]);
+	const editingExchangedBy =
+		rows.find((row) => row.identifier === editing)?.exchangedBy ?? '';
+
 	function openCreateModal() {
 		setMode('create');
 		setEditing(null);
@@ -438,7 +462,8 @@ export function Resources({
 			descriptions: row.scopeDescriptions ?? {},
 			tokenFormat: row.tokenFormat,
 			accessTokenTTL: row.accessTokenTTL,
-			trailingSlashSignificant: row.trailingSlashSignificant
+			trailingSlashSignificant: row.trailingSlashSignificant,
+			exchangedBy: row.exchangedBy ?? ''
 		});
 		setOpen(true);
 	}
@@ -446,6 +471,8 @@ export function Resources({
 	async function submit(values: FormValues) {
 		const scopes = splitScopes(values.scopes);
 		const scopeDescriptions = describedScopes(scopes, values.descriptions);
+		// Sent only when it changed, so an edit of anything else records no change of who exchanges.
+		const exchangedBy = values.exchangedBy ?? '';
 		/*
 		 * The identifier is absent from the edit payload deliberately, and the server refuses it if
 		 * sent: it is the audience of every token already minted for this resource, so replacing it is
@@ -470,7 +497,10 @@ export function Resources({
 						// The whole map, so a description emptied here is removed rather than kept.
 						scopeDescriptions,
 						tokenFormat: values.tokenFormat,
-						accessTokenTTL: values.accessTokenTTL ?? undefined
+						accessTokenTTL: values.accessTokenTTL ?? undefined,
+						...(exchangedBy !== editingExchangedBy
+							? { exchangedBy: exchangedBy || null }
+							: {})
 					};
 
 		const url =
@@ -632,6 +662,12 @@ export function Resources({
 										<Typography.Text strong>{row.name}</Typography.Text>
 									)}
 									<Typography.Text code>{identifier}</Typography.Text>
+									{row.exchangedBy && (
+										<Typography.Text type="secondary">
+											Tokens exchanged by{' '}
+											{applicationName(row.exchangedBy, applications)}
+										</Typography.Text>
+									)}
 								</Space>
 							)
 						},
@@ -870,6 +906,24 @@ export function Resources({
 							style={{ width: '100%' }}
 						/>
 					</Form.Item>
+					{mode === 'edit' && (
+						<Form.Item
+							name="exchangedBy"
+							label="Application that exchanges tokens for this API"
+							extra="The application that serves this API, when it calls a connected service for the person who called it: it presents the access tokens this API receives to obtain that person's token there."
+						>
+							<Select
+								showSearch={{ optionFilterProp: 'label' }}
+								options={[
+									{ value: '', label: 'None', disabled: false },
+									...exchangeOptions(
+										applications,
+										editingExchangedBy ? [editingExchangedBy] : []
+									)
+								]}
+							/>
+						</Form.Item>
+					)}
 					<Alert
 						type="info"
 						showIcon

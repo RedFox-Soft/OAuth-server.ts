@@ -35,7 +35,11 @@ import { dPoPSigningAlgValues } from 'lib/configs/jwaAlgorithms.js';
 import { InvalidDpopProof, UseDpopNonce } from 'lib/helpers/validate_dpop.js';
 import { DPoPNonces } from 'lib/helpers/dpop_nonces.js';
 import { FeatureDisabled } from 'lib/plugins/featureGate.js';
-import { MissingResourceCredential, RateLimited } from 'lib/helpers/errors.js';
+import {
+	MissingResourceCredential,
+	RateLimited,
+	UpstreamTokenRefused
+} from 'lib/helpers/errors.js';
 import { captureFault } from 'lib/error_store/capture.js';
 import { fieldNamesOf } from 'lib/error_store/redact.js';
 import type { ErrorSurface } from 'lib/adapters/types.js';
@@ -474,9 +478,11 @@ export async function errorHandler(obj: ErrorHandlerContext) {
 	 * A separate object rather than a mutation, so the WWW-Authenticate challenge below is built from
 	 * the unadorned error: a diagnostic handle has no business in an auth challenge header.
 	 */
-	const body = reference
-		? { ...errorObj, error_reference: reference }
-		: errorObj;
+	const body = {
+		...errorObj,
+		...(error instanceof UpstreamTokenRefused ? { reason: error.reason } : {}),
+		...(reference ? { error_reference: reference } : {})
+	};
 	if (isOIDError && status === 401) {
 		const auth = request.headers.get('authorization')?.toLowerCase() ?? '';
 		const isDpop = !!request.headers.get('dpop');

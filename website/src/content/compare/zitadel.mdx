@@ -2,11 +2,13 @@
 title: FoxAuth compared with Zitadel
 competitor: Zitadel
 description: Zitadel is a multi-tenant identity platform with SAML and a managed cloud. FoxAuth is a smaller OAuth 2.1 server with the banking-grade profiles built in.
-lastChecked: '2026-10-16'
+lastChecked: '2026-11-02'
 sources:
   - https://github.com/zitadel/zitadel
   - https://zitadel.com/self-hosted
   - https://zitadel.com/docs
+  - https://zitadel.com/docs/guides/integrate/login-ui/external-login
+  - https://zitadel.com/docs/guides/integrate/token-exchange
 bottomLine: 'Pick Zitadel if you need SAML or a managed cloud with an enterprise contract behind it. Pick FoxAuth for OAuth 2.1 behaviour by default, the banking-grade profiles that Zitadel does not document, and a licence other than AGPL.'
 chooseThem:
   - 'You need SAML 2.0 as well as OpenID Connect.'
@@ -153,6 +155,20 @@ groups:
         them: { status: unknown, text: 'Not documented.' }
         verdict: us
         why: "The agent path here runs through the console's own code, so there is no second privileged API to secure."
+      - dimension: Token vault for AI agents
+        us:
+          {
+            status: yes,
+            text: "A person's token at Google, GitHub, Slack, Microsoft or any OIDC or OAuth 2.0 provider, through a standard RFC 8693 token exchange. An administrator lists the applications allowed per service, and the person allows each agent per account and can withdraw it. One refresh at a time, idle accounts kept alive, and a mail to the person when an account breaks. Free to self-host; 10 connected services per project on the FoxAuth Cloud Free plan."
+          }
+        them:
+          {
+            status: unknown,
+            text: 'Not documented. A custom login UI can read the access token an external identity provider returned for one sign-in or account link. Storing it for applications, refreshing it, or exchanging it for an agent is not documented. Zitadel’s RFC 8693 token exchange covers its own tokens: narrowing scope and audience, impersonation and delegation.'
+          }
+        verdict: us
+        why: 'Zitadel documents the upstream token only inside a sign-in. FoxAuth keeps it, refreshes it, and hands it to the agents that an administrator and the person both allowed.'
+        note: 'The external login guide shows the provider’s accessToken in the answer to retrieving an identity provider intent, and its use there is creating a session or linking a user.'
       - dimension: Managed hosting
         us:
           {

@@ -30,6 +30,7 @@ import {
 import type { HandOff } from './handOff.js';
 import { WhoCanSignIn } from './WhoCanSignIn.js';
 import { EnterpriseCard } from './EnterpriseCard.js';
+import { ConnectedServicesCard } from './ConnectedServicesCard.js';
 
 interface DeclaredApi {
 	identifier: string;
@@ -301,6 +302,12 @@ export function ConnectTab({
 				bucketId={bucket._id}
 				clientId={client.clientId}
 				grantTypes={client.grantTypes}
+			/>
+
+			<ConnectedServicesCard
+				bucketId={bucket._id}
+				client={client}
+				writable={writable}
 			/>
 
 			<Card

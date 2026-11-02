@@ -18,6 +18,8 @@ import { discover, DiscoveryError } from '../../federation/discovery.js';
 import nanoid from '../../helpers/nanoid.js';
 import { activeKeyring } from '../../sealing/keyring.js';
 import { assertReachable } from '../../shared/egress.js';
+import { adapter } from '../../adapters/index.js';
+import { whyCannotExchange } from '../../connected_services/eligibility.js';
 import type { CreateServiceBody, UpdateServiceBody } from './schema.js';
 
 /*
@@ -32,6 +34,35 @@ export interface ServiceView extends Omit<ConnectedService, 'clientSecret'> {
 	clientSecret: string;
 	connectedAccounts: number;
 	callbackUri: string;
+	/* What an agent names in `audience` to obtain this service's tokens (specs/118 R5). */
+	identifier: string;
+	applications: string[];
+}
+
+/*
+ * Each listed application must be able to exchange at all (specs/118 FR-019), refused by name. An application deleted
+ * since it was listed is dropped rather than refused, so removing one is never blocked by another that is gone.
+ */
+async function acceptedApplications(
+	bucket: UserBucket,
+	applications: string[],
+	before: readonly string[]
+): Promise<string[]> {
+	const accepted: string[] = [];
+	for (const clientId of applications) {
+		const why = await whyCannotExchange(bucket, clientId);
+		if (!why) {
+			accepted.push(clientId);
+			continue;
+		}
+		if (before.includes(clientId) && !(await stillExists(clientId))) continue;
+		throw new AdminError(400, why, { field: 'applications' });
+	}
+	return accepted;
+}
+
+async function stillExists(clientId: string): Promise<boolean> {
+	return (await adapter('Client').find(clientId)) !== undefined;
 }
 
 const IMMUTABLE = [
@@ -59,8 +90,14 @@ export async function present(
 	bucket: UserBucket,
 	service: ConnectedService
 ): Promise<ServiceView> {
+	const applications: string[] = [];
+	for (const clientId of service.applications ?? []) {
+		if (await stillExists(clientId)) applications.push(clientId);
+	}
 	return {
 		...service,
+		identifier: service.id,
+		applications,
 		// Shown as set even when it cannot be opened: it was written, and the keyring card says which.
 		clientSecret: SECRET_MASK,
 		connectedAccounts: await getConnectedAccountStore().countByService(
@@ -261,6 +298,13 @@ export async function createService(
 			updatedAt: now
 		};
 	}
+	if (body.applications !== undefined) {
+		service.applications = await acceptedApplications(
+			bucket,
+			body.applications,
+			[]
+		);
+	}
 	await getBucketStore().update(bucket._id, {
 		connectedServices: [...servicesOf(bucket), service]
 	});
@@ -301,9 +345,18 @@ export async function updateService(
 		);
 	}
 	await assertGenericEndpoints(generic);
+	const applications =
+		body.applications === undefined
+			? undefined
+			: await acceptedApplications(
+					bucket,
+					body.applications,
+					current.applications ?? []
+				);
 	const next: ConnectedService = {
 		...current,
 		...generic,
+		...(applications === undefined ? {} : { applications }),
 		...(body.scopes !== undefined ? { scopes: body.scopes } : {}),
 		...(body.displayName !== undefined
 			? { displayName: body.displayName }

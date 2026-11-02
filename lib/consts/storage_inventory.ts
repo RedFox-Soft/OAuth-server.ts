@@ -689,7 +689,9 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 		),
 		[
 			{ key: { bucketId: 1, accountId: 1 } },
-			{ key: { bucketId: 1, serviceId: 1 } }
+			{ key: { bucketId: 1, serviceId: 1 } },
+			/* The keep-alive pass's scan across projects (specs/118 R11). */
+			{ key: { refreshedAt: 1 } }
 		]
 	),
 	storeArea(

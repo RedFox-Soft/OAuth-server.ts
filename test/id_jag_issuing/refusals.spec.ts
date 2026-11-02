@@ -238,7 +238,7 @@ describe('a token exchange the project must refuse', () => {
 		const res = await exchange({
 			subjectToken: idToken,
 			audience: TICKETS_AS,
-			requestedTokenType: 'urn:ietf:params:oauth:token-type:access_token'
+			requestedTokenType: 'urn:ietf:params:oauth:token-type:jwt'
 		});
 
 		expect(refusal(res).error).toBe('invalid_request');

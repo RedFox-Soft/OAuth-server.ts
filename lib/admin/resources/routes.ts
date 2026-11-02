@@ -25,6 +25,7 @@ import {
 import { isMcpResource } from '../../mcp/resource_server.js';
 import { SCIM_BASE_PATH } from '../../consts/scim.js';
 import { CreateResourceBody, UpdateResourceBody } from './schema.js';
+import { whyCannotExchange } from '../../connected_services/eligibility.js';
 import { namespaceOf, ROOT_NAMESPACE } from '../../resources/namespace.js';
 import { findDeclaredResource } from '../../resources/registry.js';
 import { checkVouching } from '../../resources/vouching.js';
@@ -393,12 +394,19 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 			if (scopeDescriptions && !attributes.includes('scopeDescriptions')) {
 				attributes.push('scopeDescriptions');
 			}
+			if (typeof body.exchangedBy === 'string') {
+				const why = await whyCannotExchange(bucket, body.exchangedBy);
+				if (why) throw new AdminError(400, why, { field: 'exchangedBy' });
+			}
 
 			// After validation: an entry for a request about to be refused as malformed would describe a
 			// change nobody attempted.
 			await recordAdminAudit(ctx, 'resource.update', identifier, {
 				...scopeOf(bucket, namespace),
-				attributes
+				attributes,
+				...(body.exchangedBy !== undefined
+					? { to: body.exchangedBy ?? '' }
+					: {})
 			});
 
 			const updated = await getProtectedResourceStore().update(

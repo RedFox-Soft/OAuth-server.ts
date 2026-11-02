@@ -121,6 +121,10 @@ import {
 	type ConsentChoices,
 	type SelectableItem
 } from './consentChoices.js';
+import {
+	recordAnswers,
+	type ConnectedOffer
+} from '../connected_services/consent.js';
 import { adapter } from 'lib/adapters/index.js';
 import { grantTypeAllowed } from 'lib/models/client.js';
 import { readLogo } from 'lib/models/client/logo.js';
@@ -520,7 +524,8 @@ async function completeDeviceInteraction(
 async function createGrant(
 	interaction: Interaction,
 	signsInto: string,
-	refuse: SelectableItem[] = []
+	refuse: SelectableItem[] = [],
+	connected: ReadonlySet<string> = new Set()
 ) {
 	const grantId = interaction.payload.grantId;
 	const details: PromptDetails = interaction.payload.prompt?.details ?? {};
@@ -583,6 +588,8 @@ async function createGrant(
 		if (item.scopes.length) grant.rejectOIDCScope(item.scopes);
 		if (item.claims.length) grant.rejectOIDCClaims(item.claims);
 	}
+	/* The person's accounts at other services: what was ticked allowed, the rest declined (specs/118 R8). */
+	recordAnswers(grant, connectedOffersOf(interaction), connected);
 
 	await grant.save();
 	// record the consent outcome the resume pipeline (loadExistingGrant) reads back
@@ -649,6 +656,13 @@ function decline(
 		error_description: 'End-User denied consent'
 	};
 	return resume(interaction, cookie, context);
+}
+
+/* The accounts at other services this interaction's page offered; none in the device flow (specs/118 FR-023). */
+function connectedOffersOf(interaction: Interaction): ConnectedOffer[] {
+	if (interaction.payload.deviceCode) return [];
+	const details: PromptDetails = interaction.payload.prompt?.details ?? {};
+	return details.connectedOffers ?? [];
 }
 
 /* What the person may leave out on this interaction's page — the same answer the page was drawn from. */
@@ -2118,6 +2132,13 @@ export const ui = new Elysia()
 				) {
 					throw new InvalidRequest('consent selection not offered');
 				}
+				const connected = asList(body.connected);
+				const connectedOffered = new Set(
+					connectedOffersOf(interaction).map((offer) => offer.key)
+				);
+				if (connected.some((key) => !connectedOffered.has(key))) {
+					throw new InvalidRequest('consent selection not offered');
+				}
 				if (
 					choices.active &&
 					(await allowsNothing(interaction, choices, ticked))
@@ -2129,7 +2150,8 @@ export const ui = new Elysia()
 					signsInto,
 					choices.active
 						? choices.selectable.filter((item) => !ticked.includes(item.key))
-						: []
+						: [],
+					new Set(connected)
 				);
 				return resume(interaction, cookie, { route, request });
 			}
@@ -2144,6 +2166,13 @@ export const ui = new Elysia()
 					t.Union([
 						t.String({ maxLength: 2048 }),
 						t.Array(t.String({ maxLength: 2048 }), { maxItems: 64 })
+					])
+				),
+				// The person's accounts at other services ticked (specs/118), one value per checkbox.
+				connected: t.Optional(
+					t.Union([
+						t.String({ maxLength: 512 }),
+						t.Array(t.String({ maxLength: 512 }), { maxItems: 128 })
 					])
 				),
 				/*

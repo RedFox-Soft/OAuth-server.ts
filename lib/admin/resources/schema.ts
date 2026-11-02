@@ -68,6 +68,13 @@ export const UpdateResourceBody = t.Object(
 		tokenFormat: t.Optional(t.Union([t.Literal('jwt'), t.Literal('opaque')])),
 		accessTokenTTL: t.Optional(
 			t.Number({ minimum: 30, maximum: 86400, multipleOf: 1 })
+		),
+		/*
+		 * The application that exchanges the access tokens this API receives for a person's upstream tokens (specs/118
+		 * R3), or `null` for none: an MCP server calling GitHub for the agent that called it.
+		 */
+		exchangedBy: t.Optional(
+			t.Union([t.String({ minLength: 1, maxLength: 512 }), t.Null()])
 		)
 	},
 	/*

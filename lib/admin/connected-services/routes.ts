@@ -1,6 +1,10 @@
 import { Elysia } from 'elysia';
 
-import { getUserStore } from '../../adapters/index.js';
+import {
+	getConnectedAccountStore,
+	getUserStore
+} from '../../adapters/index.js';
+import { agentsByAccount } from '../../connected_services/consent.js';
 import type { UserBucket } from '../../adapters/types.js';
 import {
 	assertAuth,
@@ -116,6 +120,8 @@ export const connectedServiceAdminRoutes = new Elysia({
 			await recordAdminAudit(ctx, 'connected.service.update', params.id, {
 				attributes: Object.keys(body),
 				serviceId: params.serviceId,
+				/* Who may now obtain its tokens (specs/118 R4), ids only. */
+				...(body.applications ? { to: body.applications.join(' ') } : {}),
 				...ownedBy(bucket)
 			});
 			return present(
@@ -148,7 +154,24 @@ export const connectedServiceAdminRoutes = new Elysia({
 			const user = await getUserStore(params.id).find(params.uid);
 			if (!user) throw new AdminError(404, 'user not found');
 			// Never a token: the view carries the account's identity, scopes, dates and status only.
-			return { accounts: await listForPerson(bucket, params.uid) };
+			const views = await listForPerson(bucket, params.uid);
+			const agents = await agentsByAccount(
+				bucket,
+				params.uid,
+				await getConnectedAccountStore().listByAccount(bucket._id, params.uid)
+			);
+			/* Which applications the person let use each account, and when each last did (specs/118 FR-024). */
+			return {
+				accounts: views.map((view) => ({
+					...view,
+					agents: (agents.get(view.id) ?? []).map((agent) => ({
+						clientId: agent.clientId,
+						...(agent.lastUsedAt === undefined
+							? {}
+							: { lastUsedAt: new Date(agent.lastUsedAt * 1000).toISOString() })
+					}))
+				}))
+			};
 		}
 	)
 	.delete(

@@ -14,6 +14,11 @@ const ScopeList = t.Array(t.String({ minLength: 1, maxLength: 200 }), {
 	maxItems: 50
 });
 const Path = t.String({ minLength: 1, maxLength: 200 });
+/* The applications allowed to obtain this service's tokens (specs/118 R4); the whole list, replaced. */
+const Applications = t.Array(t.String({ minLength: 1, maxLength: 512 }), {
+	maxItems: 100,
+	uniqueItems: true
+});
 
 const IdentitySourceBody = t.Union([
 	t.Object(
@@ -65,7 +70,8 @@ export const CreateServiceBody = t.Object(
 		clientSecret: ClientSecret,
 		scopes: t.Optional(ScopeList),
 		/* Required except for a catalogue service, which is named after its provider unless given one. */
-		displayName: t.Optional(DisplayName)
+		displayName: t.Optional(DisplayName),
+		applications: t.Optional(Applications)
 	},
 	{ additionalProperties: false }
 );
@@ -84,6 +90,7 @@ export const UpdateServiceBody = t.Object(
 		tokenEndpoint: t.Optional(Url),
 		identity: t.Optional(IdentitySourceBody),
 		revocationEndpoint: t.Optional(Url),
+		applications: t.Optional(Applications),
 		kind: t.Optional(t.String()),
 		catalogueId: t.Optional(t.String()),
 		issuer: t.Optional(t.String()),
