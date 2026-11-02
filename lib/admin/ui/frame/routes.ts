@@ -41,6 +41,7 @@ export type PageKey =
 	| 'bucket.connection.setup'
 	| 'bucket.connection.settings'
 	| 'bucket.outsideServers'
+	| 'bucket.connectedServices'
 	| 'bucket.keys'
 	| 'bucket.activity'
 	| 'bucket.settings'
@@ -227,6 +228,13 @@ export const ROUTES: readonly RouteSpec[] = [
 		section: 'projects',
 		area: 'Outside servers'
 	},
+	/* The services the project's people connect their accounts at (specs/117). */
+	{
+		key: 'bucket.connectedServices',
+		pattern: ['projects', ':project', 'connected-services'],
+		section: 'projects',
+		area: 'Connected services'
+	},
 	{
 		key: 'bucket.keys',
 		pattern: ['projects', ':project', 'keys'],
@@ -375,6 +383,7 @@ function administratorsRedirects(
 				[groupsArea, ''],
 				['provisioning', ''],
 				['outside-servers', ''],
+				['connected-services', ''],
 				['keys', '']
 			] as const
 		).map(([from, to]) => ({

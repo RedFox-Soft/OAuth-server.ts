@@ -28,8 +28,19 @@ export function page(
 	{
 		denyFraming,
 		wide,
-		language = 'en'
-	}: { denyFraming?: boolean; wide?: boolean; language?: Language } = {}
+		language = 'en',
+		handOffTo
+	}: {
+		denyFraming?: boolean;
+		wide?: boolean;
+		language?: Language;
+		/*
+		 * Where the page's own form ends up after the server's redirect (lib/html/csp.ts `handOffTo`): `form-action`
+		 * governs the whole redirect chain, so a form that posts here and is answered with a redirect to a provider
+		 * needs that provider's origin named.
+		 */
+		handOffTo?: string;
+	} = {}
 ): Response {
 	const layout = wide
 		? 'align-items:flex-start; justify-content:center; padding:32px 16px;'
@@ -38,5 +49,5 @@ export function page(
 		? 'max-width:640px; text-align:left;'
 		: 'max-width:400px; text-align:center;';
 	const html = `<!doctype html><html lang="${language}"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>${esc(title)}</title>${themeHead()}</head><body style="font-family: Arial, Helvetica, sans-serif; background:${foxVar('page')}; margin:0; min-height:100vh; box-sizing:border-box; display:flex; ${layout}"><div style="background:${foxVar('card')}; padding:32px; border-radius:12px; box-shadow:0 2px 8px ${foxVar('shadow')}; width:100%; box-sizing:border-box; ${card}">${bodyHtml}</div></body></html>`;
-	return htmlResponse(html, { status, denyFraming, language });
+	return htmlResponse(html, { status, denyFraming, language, handOffTo });
 }

@@ -30,14 +30,20 @@ export async function bucketClients(
 export interface BucketUsage {
 	applications: number;
 	apis: number;
+	connectedServices: number;
 }
 
 export async function bucketUsage(bucketId: string): Promise<BucketUsage> {
-	const [applications, apis] = await Promise.all([
+	const [applications, apis, bucket] = await Promise.all([
 		bucketClients(bucketId, true),
-		getProtectedResourceStore().listByBucket(bucketId)
+		getProtectedResourceStore().listByBucket(bucketId),
+		getBucketStore().find(bucketId)
 	]);
-	return { applications: applications.length, apis: apis.length };
+	return {
+		applications: applications.length,
+		apis: apis.length,
+		connectedServices: bucket?.connectedServices?.length ?? 0
+	};
 }
 
 export function ownsGroup(group: Group, userId: string): boolean {

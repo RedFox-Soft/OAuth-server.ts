@@ -59,6 +59,13 @@ const Preview = Type.Object({
 			newCallback: Type.String()
 		})
 	),
+	connectedServices: Type.Array(
+		Type.Object({
+			id: Type.String(),
+			displayName: Type.String(),
+			newCallback: Type.String()
+		})
+	),
 	resources: Type.Array(
 		Type.Object({
 			identifier: Type.String(),
@@ -412,7 +419,7 @@ describe('moving a bucket to a different address (US3)', () => {
 
 			expect(status).toBe(403);
 			expect(body.message).toBe(
-				"Used by 1 application, 0 identity providers and 0 provisioning connections: only an instance administrator can change this project's address now."
+				"Used by 1 application, 0 identity providers, 0 provisioning connections and 0 connected services: only an instance administrator can change this project's address now."
 			);
 			expect((await getBucketStore().find(bucket._id))?.slug).toBe(
 				`used-${counter}`

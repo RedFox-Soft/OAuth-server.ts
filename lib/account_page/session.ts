@@ -128,6 +128,13 @@ export interface PendingSignIn {
 	accountId?: string;
 	/* The application whose confirmation to return to; never acted on by itself. */
 	revoke?: string;
+	/*
+	 * The connected-services page (specs/117) asked for this sign-in: return there, and to the confirmation of the
+	 * service to connect or the account to disconnect, never to the act itself.
+	 */
+	services?: true;
+	connect?: string;
+	disconnect?: string;
 }
 
 /*
@@ -172,12 +179,23 @@ export function readPending(cookie: CookieJar): PendingSignIn | undefined {
 			return undefined;
 		}
 		/* Narrowed field by field above; the browser holds this value, so nothing else in it is trusted. */
-		const { state, startedAt, accountId, revoke } = parsed as PendingSignIn;
+		const {
+			state,
+			startedAt,
+			accountId,
+			revoke,
+			services,
+			connect,
+			disconnect
+		} = parsed as PendingSignIn;
 		return {
 			state,
 			startedAt,
 			...(typeof accountId === 'string' ? { accountId } : undefined),
-			...(typeof revoke === 'string' ? { revoke } : undefined)
+			...(typeof revoke === 'string' ? { revoke } : undefined),
+			...(services === true ? { services } : undefined),
+			...(typeof connect === 'string' ? { connect } : undefined),
+			...(typeof disconnect === 'string' ? { disconnect } : undefined)
 		};
 	} catch {
 		return undefined;
@@ -201,12 +219,25 @@ export function clearPending(cookie: CookieJar, bucket: RequestBucket): void {
 export function signInRedirect(
 	cookie: CookieJar,
 	bucket: RequestBucket,
-	options: { reauthenticate?: { accountId: string; revoke?: string } } = {}
+	options: {
+		reauthenticate?: {
+			accountId: string;
+			revoke?: string;
+			connect?: string;
+			disconnect?: string;
+		};
+		/* Return to the connected-services page rather than the applications page. */
+		services?: boolean;
+	} = {}
 ): string {
 	const state = crypto.randomBytes(32).toString('base64url');
+	const back = options.reauthenticate;
 	setPending(cookie, bucket, {
 		state,
 		startedAt: epochTime(),
+		...(options.services ? { services: true as const } : undefined),
+		...(back?.connect ? { connect: back.connect } : undefined),
+		...(back?.disconnect ? { disconnect: back.disconnect } : undefined),
 		...(options.reauthenticate
 			? {
 					accountId: options.reauthenticate.accountId,

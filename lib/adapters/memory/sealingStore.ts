@@ -1,5 +1,9 @@
 import { getStorage } from './storage.js';
-import { PRIVATE_JWK_MEMBERS } from '../../consts/sealed_fields.js';
+import {
+	CONNECTED_ACCOUNT_TOKEN_FIELDS,
+	PRIVATE_JWK_MEMBERS
+} from '../../consts/sealed_fields.js';
+import type { ConnectedAccountStore } from './connectedAccountStore.js';
 import { ROOT_KEY_OWNER } from '../../consts/key_owner.js';
 import type { SealKind, SealTarget } from '../../consts/sealed_fields.js';
 import type {
@@ -21,6 +25,7 @@ export interface MemorySealingSources {
 	users(bucketId: string): UserStoreInstance;
 	keys(): BucketKeysStoreInstance;
 	smtp(): SmtpSettingsStoreInstance;
+	connectedAccounts(): ConnectedAccountStore;
 	secret(kind: 'dpopNonceSecret' | 'errorOriginSalt'): SecretStoreInstance;
 }
 
@@ -146,6 +151,37 @@ export class SealingStore implements SealingStoreInstance {
 					}
 				}
 				return leaves;
+			case 'connectedServiceSecret':
+				for (const bucket of await this.sources.buckets().list()) {
+					for (const service of bucket.connectedServices ?? []) {
+						if (service.clientSecret) {
+							leaves.push({
+								target: { kind, bucketId: bucket._id, serviceId: service.id },
+								value: service.clientSecret
+							});
+						}
+					}
+				}
+				return leaves;
+			case 'connectedAccountToken':
+				for (const record of this.sources.connectedAccounts().all()) {
+					for (const field of CONNECTED_ACCOUNT_TOKEN_FIELDS) {
+						const value = record[field];
+						if (value) {
+							leaves.push({
+								target: {
+									kind,
+									id: record._id,
+									field,
+									bucketId: record.bucketId,
+									accountId: record.accountId
+								},
+								value
+							});
+						}
+					}
+				}
+				return leaves;
 			case 'dpopNonceSecret':
 			case 'errorOriginSalt': {
 				const value = await this.sources.secret(kind).read();
@@ -228,6 +264,32 @@ export class SealingStore implements SealingStoreInstance {
 				await users.update(target.userId, {
 					totp: { ...user.totp, secret: next as string }
 				});
+				return true;
+			}
+			case 'connectedServiceSecret': {
+				const bucket = await this.sources.buckets().find(target.bucketId);
+				const services = bucket?.connectedServices ?? [];
+				const service = services.find(
+					(candidate) => candidate.id === target.serviceId
+				);
+				if (!bucket || !service || !same(service.clientSecret, observed))
+					return false;
+				await this.sources.buckets().update(bucket._id, {
+					connectedServices: services.map((candidate) =>
+						candidate.id === target.serviceId
+							? { ...candidate, clientSecret: next as string }
+							: candidate
+					)
+				});
+				return true;
+			}
+			case 'connectedAccountToken': {
+				const store = this.sources.connectedAccounts();
+				const record = store
+					.all()
+					.find((candidate) => candidate._id === target.id);
+				if (!record || !same(record[target.field], observed)) return false;
+				await store.put({ ...record, [target.field]: next as string });
 				return true;
 			}
 			case 'dpopNonceSecret':

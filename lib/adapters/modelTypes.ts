@@ -7,6 +7,7 @@ import type { ClientCredentialsPayload } from '../models/client_credentials.js';
 import type { ClientLogoPayload } from '../models/client/logo.js';
 import type { ClientUsagePayload } from '../models/client/usage.js';
 import type { StoredClient } from '../models/client/types.js';
+import type { ConnectStatePayload } from '../connected_services/types.js';
 import type { DeviceCodePayloadType } from '../models/device_code.js';
 import type { FederationStatePayload } from '../federation/types.js';
 import type { GrantPayloadType } from '../models/grant.js';
@@ -59,6 +60,7 @@ export interface ModelPayloadByName {
 	ClientCredentials: ClientCredentialsPayload;
 	ClientLogo: ClientLogoPayload;
 	ClientUsage: ClientUsagePayload;
+	ConnectState: ConnectStatePayload;
 	DeviceCode: DeviceCodePayloadType;
 	FederationState: FederationStatePayload;
 	Grant: GrantPayloadType;

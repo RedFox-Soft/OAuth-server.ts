@@ -15,14 +15,16 @@ export const LIMIT_LABEL: Record<PlanLimitKey, string> = {
 	monthlyActiveUsers: 'Monthly active users',
 	projectsPerAdministrator: 'Projects per administrator',
 	applicationsPerProject: 'Applications per project',
-	apisPerProject: 'APIs per project'
+	apisPerProject: 'APIs per project',
+	connectedServicesPerProject: 'Connected services per project'
 };
 
 export const LIMIT_ORDER: readonly PlanLimitKey[] = [
 	'monthlyActiveUsers',
 	'projectsPerAdministrator',
 	'applicationsPerProject',
-	'apisPerProject'
+	'apisPerProject',
+	'connectedServicesPerProject'
 ];
 
 export const FEATURE_LABEL: Record<PlanFeatureKey, string> = {
@@ -49,7 +51,8 @@ export function limitText(max: number | null): string {
 const SUBJECT: Record<PlanWarning['limit'], string> = {
 	monthlyActiveUsers: 'Active users',
 	applicationsPerProject: 'Applications',
-	apisPerProject: 'APIs'
+	apisPerProject: 'APIs',
+	connectedServicesPerProject: 'Connected services'
 };
 
 /* A short label for a table cell. */
@@ -78,7 +81,11 @@ export function warningSentence(
 			: `This project has reached the ${plan.name} plan's monthly active users.`;
 	}
 	const what =
-		warning.limit === 'applicationsPerProject' ? 'applications' : 'APIs';
+		warning.limit === 'applicationsPerProject'
+			? 'applications'
+			: warning.limit === 'apisPerProject'
+				? 'APIs'
+				: 'connected services';
 	return warning.level === 'near'
 		? `Close to the ${plan.name} plan's limit on ${what}.`
 		: `The ${plan.name} plan's limit on ${what} is reached: no more can be added.`;
@@ -88,17 +95,27 @@ export function warningSentence(
  * Why a project's Applications or APIs tab cannot add one, or null when it can: the same sentence the server's
  * refusal gives. Only a plan the caller is held to is passed in: a super administrator is never limited.
  */
+const ROOM = {
+	applications: {
+		limit: 'applicationsPerProject',
+		one: 'application',
+		many: 'applications'
+	},
+	apis: { limit: 'apisPerProject', one: 'API', many: 'APIs' },
+	connectedServices: {
+		limit: 'connectedServicesPerProject',
+		one: 'connected service',
+		many: 'connected services'
+	}
+} as const;
+
 export function atLimit(
 	plan: PlanView | null | undefined,
-	kind: 'applications' | 'apis'
+	kind: keyof typeof ROOM
 ): string | null {
 	if (!plan) return null;
-	const max =
-		plan.limits[
-			kind === 'applications' ? 'applicationsPerProject' : 'apisPerProject'
-		];
+	const { limit, one, many } = ROOM[kind];
+	const max = plan.limits[limit];
 	if (max === null || plan.usage[kind] < max) return null;
-	const one = kind === 'applications' ? 'application' : 'API';
-	const many = kind === 'applications' ? 'applications' : 'APIs';
 	return `This project is on the ${plan.name} plan, which allows ${countText(max)} ${max === 1 ? one : many}. Ask for a larger plan to add more.`;
 }

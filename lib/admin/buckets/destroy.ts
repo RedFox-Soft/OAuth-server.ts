@@ -29,6 +29,7 @@ import {
 import { AdminError, type AdminContext } from '../auth/rbac.js';
 import { forgetBucketAddresses } from '../auth/bucketAddress.js';
 import { groupLabel } from '../groups/label.js';
+import { destroyBucketAccounts } from '../../connected_services/accounts.js';
 
 /* Who is destroying the bucket: an administrator's Delete now, or the server when the thirty days ran out. */
 export type DestroyingActor =
@@ -217,6 +218,12 @@ async function destroyClaimed(
 	for (const provider of claimed.federation) {
 		await forgetAssertionUsage(providerUsageKey(id, provider.id));
 	}
+	/*
+	 * Its people's connected accounts (specs/117), revoked at each provider in the background with the services the
+	 * record still holds. Not swept with the accounts above: that sweep follows account ownership, and connected
+	 * accounts are deliberately unowned so a lock keeps them.
+	 */
+	await destroyBucketAccounts(claimed);
 	/* Its groups and every membership in them; nothing outside the bucket refers to either. */
 	await getBucketGroupStore().destroyByBucket(id);
 	/* The half that was missing: without this a deleted bucket left its `user_<bucket>` area behind for

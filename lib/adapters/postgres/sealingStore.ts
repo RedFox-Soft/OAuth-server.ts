@@ -4,7 +4,10 @@ import { sql } from './db.js';
 import { SingletonSecretStore } from './singletonSecretStore.js';
 import { sqlState } from './sqlState.js';
 import { STORE_AREAS, userAreaFor } from '../../consts/storage_inventory.js';
-import { PRIVATE_JWK_MEMBERS } from '../../consts/sealed_fields.js';
+import {
+	CONNECTED_ACCOUNT_TOKEN_FIELDS,
+	PRIVATE_JWK_MEMBERS
+} from '../../consts/sealed_fields.js';
 import type {
 	PrivateJwkMember,
 	SealKind,
@@ -208,6 +211,57 @@ export class SealingStore implements SealingStoreInstance {
 				}
 				return leaves;
 			}
+			case 'connectedServiceSecret': {
+				const rows = await handle`
+					SELECT b.id AS bucket_id,
+						s.service->>'id' AS service_id,
+						s.service->>'clientSecret' AS value
+					FROM ${handle(STORE_AREAS.userBuckets)} AS b
+					CROSS JOIN LATERAL jsonb_array_elements(
+						CASE WHEN jsonb_typeof(b.doc->'connectedServices') = 'array'
+							THEN b.doc->'connectedServices' ELSE '[]'::jsonb END
+					) AS s(service)
+					WHERE jsonb_typeof(s.service->'clientSecret') = 'string'
+						AND jsonb_typeof(s.service->'id') = 'string'
+				`;
+				for (const row of rows) {
+					const bucketId = column(row, 'bucket_id');
+					const serviceId = column(row, 'service_id');
+					const value = column(row, 'value');
+					if (bucketId && serviceId !== undefined && value) {
+						leaves.push({ target: { kind, bucketId, serviceId }, value });
+					}
+				}
+				return leaves;
+			}
+			case 'connectedAccountToken': {
+				for (const field of CONNECTED_ACCOUNT_TOKEN_FIELDS) {
+					const rows = await handle`
+						SELECT id, doc->>${field}::text AS value,
+							doc->>'bucketId' AS bucket_id, doc->>'accountId' AS account_id
+						FROM ${handle(STORE_AREAS.connectedAccounts)}
+						WHERE jsonb_typeof(doc->${field}::text) = 'string'
+					`;
+					for (const row of rows) {
+						const id = column(row, 'id');
+						const value = column(row, 'value');
+						const bucketId = column(row, 'bucket_id');
+						const accountId = column(row, 'account_id');
+						if (
+							id !== undefined &&
+							value &&
+							bucketId !== undefined &&
+							accountId !== undefined
+						) {
+							leaves.push({
+								target: { kind, id, field, bucketId, accountId },
+								value
+							});
+						}
+					}
+				}
+				return leaves;
+			}
 			case 'dpopNonceSecret':
 			case 'errorOriginSalt': {
 				// The singleton store is the undecorated one, and the one place a bytea is normalised to bytes.
@@ -314,6 +368,46 @@ export class SealingStore implements SealingStoreInstance {
 					SET doc = jsonb_set(doc, '{totp,secret}', to_jsonb(${text(next)}::text))
 					WHERE id = ${target.userId}
 						AND doc->'totp'->>'secret' = ${text(observed)}
+					RETURNING id
+				`;
+				return rows.length === 1;
+			}
+			case 'connectedServiceSecret': {
+				const was = text(observed);
+				// As for a provider: the position is found, then checked again on the locked row.
+				const rows = await handle`
+					WITH found AS (
+						SELECT (s.position - 1)::int AS idx
+						FROM ${handle(STORE_AREAS.userBuckets)} AS b
+						CROSS JOIN LATERAL jsonb_array_elements(
+							CASE WHEN jsonb_typeof(b.doc->'connectedServices') = 'array'
+								THEN b.doc->'connectedServices' ELSE '[]'::jsonb END
+						) WITH ORDINALITY AS s(service, position)
+						WHERE b.id = ${target.bucketId}
+							AND s.service->>'id' = ${target.serviceId}
+							AND s.service->>'clientSecret' = ${was}
+						LIMIT 1
+					)
+					UPDATE ${handle(STORE_AREAS.userBuckets)} AS u
+					SET doc = jsonb_set(
+						u.doc,
+						ARRAY['connectedServices', found.idx::text, 'clientSecret'],
+						to_jsonb(${text(next)}::text)
+					)
+					FROM found
+					WHERE u.id = ${target.bucketId}
+						AND u.doc->'connectedServices'->found.idx->>'id' = ${target.serviceId}
+						AND u.doc->'connectedServices'->found.idx->>'clientSecret' = ${was}
+					RETURNING u.id
+				`;
+				return rows.length === 1;
+			}
+			case 'connectedAccountToken': {
+				const rows = await handle`
+					UPDATE ${handle(STORE_AREAS.connectedAccounts)}
+					SET doc = jsonb_set(doc, ARRAY[${target.field}::text], to_jsonb(${text(next)}::text))
+					WHERE id = ${target.id}
+						AND doc->>${target.field}::text = ${text(observed)}
 					RETURNING id
 				`;
 				return rows.length === 1;

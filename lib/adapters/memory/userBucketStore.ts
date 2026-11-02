@@ -183,6 +183,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 				| 'hostFirstSeenAt'
 				| 'hostLastSeenAt'
 				| 'signInOrder'
+				| 'connectedServices'
 			>
 		>
 	): Promise<UserBucket | null> {

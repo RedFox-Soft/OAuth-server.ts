@@ -66,6 +66,7 @@ const BUCKET_TABS: Partial<Record<PageKey, BucketTab>> = {
 	'bucket.providers': 'providers',
 	'bucket.provisioning': 'provisioning',
 	'bucket.outsideServers': 'outsideServers',
+	'bucket.connectedServices': 'connectedServices',
 	'bucket.keys': 'keys',
 	'bucket.activity': 'activity',
 	'bucket.settings': 'settings'

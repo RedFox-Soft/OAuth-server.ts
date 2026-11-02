@@ -40,5 +40,41 @@ export const zhHans: AccountTexts = {
 	failed: '我们无法让您登录已连接应用页面。',
 	tryAgain: '前往已连接应用页面',
 	refusedTitle: '请求被拒绝',
-	refused: '此请求并非来自您的已连接应用页面，因此未做任何更改。'
+	refused: '此请求并非来自您的已连接应用页面，因此未做任何更改。',
+	servicesTitle: '已连接服务',
+	servicesIntro:
+		'这些是您在此处连接的其他服务中的账号。您可以随时断开其中任何一个。',
+	servicesEmpty: '您尚未连接任何账号。',
+	servicesAvailable: '连接账号',
+	servicesLink: '已连接服务',
+	appsLink: '已连接应用',
+	connect: '连接 {service}',
+	connectedAt: '连接于 {date}',
+	scopesGranted: '已允许：{scopes}',
+	scopesMissing: '未允许：{scopes}',
+	needsReconnection: '需要重新连接',
+	disconnect: '断开连接',
+	connectTitle: '要连接您的 {service} 账号吗？',
+	connectEffect:
+		'您将前往 {service} 登录并授予访问权限。您可以随时在此处断开该账号。',
+	continue: '继续',
+	disconnectTitle: '要断开 {account} 吗？',
+	disconnectEffect:
+		'此处将不再保存您在 {service} 的这个账号，并会请求 {service} 撤销它授予的访问权限。',
+	connectedDone: '您的 {service} 账号已连接。',
+	updatedDone: '您的 {service} 账号已重新连接。',
+	disconnectedDone: '该账号已断开连接。',
+	revocationRevoked: '{service} 已撤销访问权限。',
+	revocationFailed: '无法联系 {service} 撤销访问权限。请您自行在该服务中撤销。',
+	revocationNotSupported:
+		'{service} 不允许此服务器撤销访问权限。请您自行在该服务中撤销。',
+	revocationUnreadable:
+		'此处已无法读取该账号，因此未请求 {service} 撤销访问权限。请您自行在该服务中撤销。',
+	manageAccess: '打开 {service} 的访问权限设置',
+	noticeDeclined: '账号未连接：访问未获允许。',
+	noticeFailed: '无法连接该账号。请重试。',
+	noticeLimit: '您在此服务中连接的账号已达上限。请先断开一个。',
+	noticeUnavailable: '此服务目前无法连接。',
+	noticeExpired: '连接耗时过长。请重试。',
+	noticeRefused: '账号未连接：返回的结果不属于此处发起的连接。'
 };

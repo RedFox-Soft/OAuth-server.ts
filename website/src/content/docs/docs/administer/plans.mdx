@@ -7,9 +7,9 @@ sidebar:
 
 import { Steps } from '@astrojs/starlight/components';
 
-A **plan** is a named set of limits on a project. It says how many applications and APIs the project may hold,
-which sign-in providers it may use, whether its team may name its address, and how many end users it serves
-before new sign-ups pause. Every project outside the System team is on exactly one plan.
+A **plan** is a named set of limits on a project. It says how many applications, APIs and connected services the
+project may hold, which sign-in providers it may use, whether its team may name its address, and how many end
+users it serves before new sign-ups pause. Every project outside the System team is on exactly one plan.
 
 Plans are for a public instance, where anyone may register as an administrator. There, nothing else stops one
 person from creating a hundred projects. On your own organisation's instance you do not need them, and they are
@@ -41,6 +41,7 @@ are:
 | Regular teams per administrator | 1, from the setting `plans.regularTeamsPerAdministrator`                    |
 | Applications per project        | 10; applications that register themselves are not counted                   |
 | APIs per project                | 10                                                                          |
+| Connected services per project  | 10                                                                          |
 | Sign-in providers               | Social sign-in only: Google, Apple, GitHub, and Microsoft for every account |
 | The project's address name      | Generated, 8 characters; the team cannot choose it                          |
 | A hostname of the project's own | Not included; giving one stays a super administrator's act                  |
@@ -99,6 +100,9 @@ leaves the invitation usable, so the person can accept it later, once they have 
 
 A Free project may hold 10 applications and 10 APIs. Only applications an administrator creates are counted.
 An application that registers itself through dynamic client registration is neither counted nor refused.
+
+A Free project may also declare 10 [connected services](/docs/administer/connected-services/). The limit counts
+the services, not the accounts people connect at them.
 
 ### Social sign-in and enterprise sign-in {#social-and-enterprise-sign-in}
 
@@ -224,6 +228,7 @@ and only a larger plan, set by a super administrator, lifts the limit. `limit.na
 | `regularTeamsPerAdministrator` | creating a regular team, becoming an owner of one                            |
 | `applicationsPerProject`       | creating an application                                                      |
 | `apisPerProject`               | declaring an API                                                             |
+| `connectedServicesPerProject`  | declaring a connected service                                                |
 | `enterpriseSignIn`             | adding a provider, changing its issuer or Microsoft tenant                   |
 | `customSlug`                   | creating a project with a `slug`, changing its address to another `slug`     |
 

@@ -44,12 +44,14 @@ const KIND_LABELS: Record<string, string> = {
 	totpSecret: 'Authenticator',
 	totpPending: 'Authenticator being enrolled',
 	dpopNonceSecret: 'DPoP nonce secret',
-	errorOriginSalt: 'Error log address key'
+	errorOriginSalt: 'Error log address key',
+	connectedServiceSecret: 'Connected service secret',
+	connectedAccountToken: "A person's connected account"
 };
 
 /* Where the reset path of an unreadable value is (specs/116 FR-017), or null when it has none to open. */
 function repairOf(entry: Unreadable): { href: string; label: string } | null {
-	const { bucketId, providerId, userId } = entry.owner;
+	const { bucketId, providerId, userId, accountId } = entry.owner;
 	switch (entry.kind) {
 		case 'providerSecret':
 		case 'providerSigningKey':
@@ -62,6 +64,20 @@ function repairOf(entry: Unreadable): { href: string; label: string } | null {
 			return bucketId && userId
 				? { href: userHref(bucketId, userId), label: 'reset the authenticator' }
 				: null;
+		case 'connectedServiceSecret':
+			return bucketId
+				? {
+						href: bucketHref(bucketId, 'connected-services'),
+						label: 're-enter it'
+					}
+				: null;
+		case 'connectedAccountToken':
+			return bucketId && accountId
+				? {
+						href: userHref(bucketId, accountId, 'sign-in-methods'),
+						label: 'reconnect or disconnect it'
+					}
+				: null;
 		case 'privateKey':
 			return bucketId && bucketId !== '#root'
 				? { href: bucketHref(bucketId, 'keys'), label: 'generate a new key' }
@@ -72,8 +88,11 @@ function repairOf(entry: Unreadable): { href: string; label: string } | null {
 }
 
 function ownerText(entry: Unreadable): string {
-	const { clientId, providerId, userId, kid } = entry.owner;
-	return clientId ?? providerId ?? userId ?? kid ?? '';
+	const { clientId, providerId, userId, kid, serviceId, accountId } =
+		entry.owner;
+	return (
+		clientId ?? providerId ?? userId ?? serviceId ?? accountId ?? kid ?? ''
+	);
 }
 
 /*

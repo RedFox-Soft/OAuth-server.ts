@@ -22,7 +22,9 @@ export const PlanLimits = t.Object(
 		projectsPerAdministrator: Limit,
 		/* Applications created by administrators; a dynamically registered one is neither refused nor counted. */
 		applicationsPerProject: Limit,
-		apisPerProject: Limit
+		apisPerProject: Limit,
+		/* Services the project lets its people connect (specs/117); the people and their accounts are not limited. */
+		connectedServicesPerProject: Limit
 	},
 	{ additionalProperties: false }
 );
@@ -93,7 +95,8 @@ export const BUILT_IN_PLANS: readonly Plan[] = [
 			monthlyActiveUsers: 100_000,
 			projectsPerAdministrator: 2,
 			applicationsPerProject: 10,
-			apisPerProject: 10
+			apisPerProject: 10,
+			connectedServicesPerProject: 10
 		},
 		features: {
 			enterpriseSignIn: false,

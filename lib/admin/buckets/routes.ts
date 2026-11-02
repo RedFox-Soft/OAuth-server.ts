@@ -111,6 +111,7 @@ import {
 	sourceGroupOf
 } from '../ownership/destination.js';
 import { planViewOf, plansShownTo } from '../../plans/view.js';
+import { connectCallbackUri } from '../../connected_services/catalogue.js';
 
 /*
  * What the slug's pattern cannot check: that this address is free to take.
@@ -442,6 +443,8 @@ interface AddressChangePreview {
 	applications: { clientId: string; name: string | null }[];
 	connections: { id: string; displayName: string }[];
 	providers: { id: string; displayName: string; newCallback: string }[];
+	/* Named, not counted in `expect`: no account stops working at once, only the next connect does (specs/117). */
+	connectedServices: { id: string; displayName: string; newCallback: string }[];
 	resources: { identifier: string; name: string }[];
 	namespaceMove: boolean;
 	expect: AddressChangeCounts;
@@ -479,6 +482,15 @@ async function addressChangePreview(
 		displayName: provider.displayName,
 		newCallback: callbackUri(target)
 	}));
+	/*
+	 * A connected service's registration matches the connect callback the same way, so the next connect at each one
+	 * fails until it has the new address; accounts already connected keep working.
+	 */
+	const connectedServices = (bucket.connectedServices ?? []).map((service) => ({
+		id: service.id,
+		displayName: service.displayName,
+		newCallback: connectCallbackUri(target)
+	}));
 	const resources = (
 		await getProtectedResourceStore().listByBucket(bucket._id)
 	).map((resource) => ({
@@ -492,6 +504,7 @@ async function addressChangePreview(
 		applications,
 		connections,
 		providers,
+		connectedServices,
 		resources,
 		namespaceMove: namespaceOf(bucket) === ROOT_NAMESPACE,
 		expect: {
@@ -501,7 +514,7 @@ async function addressChangePreview(
 			resources: resources.length
 		},
 		consequence:
-			'the issuer identifier changes, so every application listed stops validating tokens until it is reconfigured, every identity provider listed refuses sign-in until its upstream registration has the new callback address, and every provisioning connection listed stops until its directory is re-pointed; the previous address stops answering and everyone signed in signs in again'
+			'the issuer identifier changes, so every application listed stops validating tokens until it is reconfigured, every identity provider listed refuses sign-in until its upstream registration has the new callback address, and every provisioning connection listed stops until its directory is re-pointed, every connected service listed refuses new connections until its registration has the new callback address; the previous address stops answering and everyone signed in signs in again'
 	};
 }
 
@@ -520,7 +533,7 @@ function sameCounts(
 
 /* Every application counts here, a self-registered one included: its integration breaks like any other. */
 async function dependentsOf(
-	bucket: Pick<UserBucket, '_id' | 'federation'>
+	bucket: Pick<UserBucket, '_id' | 'federation' | 'connectedServices'>
 ): Promise<BucketDependents> {
 	const [applications, connections] = await Promise.all([
 		bucketClients(bucket._id),
@@ -529,7 +542,8 @@ async function dependentsOf(
 	return {
 		applications: applications.length,
 		providers: bucket.federation.length,
-		connections: connections.length
+		connections: connections.length,
+		connectedServices: bucket.connectedServices?.length ?? 0
 	};
 }
 
@@ -538,7 +552,12 @@ async function bucketFacts(
 	ctx: AdminContext,
 	bucket: Pick<
 		UserBucket,
-		'_id' | 'ownerGroupId' | 'slug' | 'host' | 'federation'
+		| '_id'
+		| 'ownerGroupId'
+		| 'slug'
+		| 'host'
+		| 'federation'
+		| 'connectedServices'
 	>
 ): Promise<BucketFacts> {
 	const wanted = bucketFactsWanted(ctx, bucket);
@@ -571,9 +590,13 @@ function addressRefusal(
 	const dependents = facts.dependents;
 	if (
 		dependents &&
-		dependents.applications + dependents.providers + dependents.connections > 0
+		dependents.applications +
+			dependents.providers +
+			dependents.connections +
+			dependents.connectedServices >
+			0
 	) {
-		return `Used by ${countOf(dependents.applications, 'application')}, ${countOf(dependents.providers, 'identity provider')} and ${countOf(dependents.connections, 'provisioning connection')}: only an instance administrator can change this project's address now.`;
+		return `Used by ${countOf(dependents.applications, 'application')}, ${countOf(dependents.providers, 'identity provider')}, ${countOf(dependents.connections, 'provisioning connection')} and ${countOf(dependents.connectedServices, 'connected service')}: only an instance administrator can change this project's address now.`;
 	}
 	if (bucketFactsWanted(ctx, bucket).dependents || ctx.superAdmin) {
 		return 'this project address cannot be changed';

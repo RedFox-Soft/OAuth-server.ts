@@ -72,7 +72,10 @@ export function isBlockedAddress(address: string): boolean {
 	return !isPublicAddress(address);
 }
 
-async function assertReachable(host: string): Promise<EgressFailure | null> {
+/* Exported for a write that must refuse an address before anything is ever sent to it (specs/117 FR-007). */
+export async function assertReachable(
+	host: string
+): Promise<EgressFailure | null> {
 	/*
 	 * A literal address needs no resolution, and passing one to the resolver would be a lookup of a
 	 * name that is not one. It is still checked — `https://10.0.0.1/…` named directly is the simplest
@@ -101,7 +104,8 @@ async function assertReachable(host: string): Promise<EgressFailure | null> {
 }
 
 export interface EgressOptions {
-	readonly method?: 'GET' | 'POST';
+	/* A redirect is followed for GET only; DELETE is a provider's revocation (specs/117), answered where it is. */
+	readonly method?: 'GET' | 'POST' | 'DELETE';
 	readonly headers?: Record<string, string>;
 	readonly body?: string | URLSearchParams;
 	readonly timeoutMs: number;

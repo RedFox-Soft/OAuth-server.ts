@@ -1,6 +1,10 @@
 import { StoredJWK } from 'lib/configs/verifyJWKs.ts';
 import { Type as t, type Static } from '@sinclair/typebox';
 import { FederatedIdentity, FederationProvider } from '../federation/types.js';
+import {
+	ConnectedService,
+	type ConnectedAccount
+} from '../connected_services/types.js';
 import type { PlanCatalogue } from '../consts/plans.js';
 import type { SealKind, SealTarget } from '../consts/sealed_fields.js';
 
@@ -891,6 +895,9 @@ export const AdminAuditEntry = t.Object({
 	 * public — every authorization request carries it — so the entry may name it.
 	 */
 	clientId: t.Optional(t.Union([t.String(), t.Null()])),
+	/* The connected service, and the connected account, an action changed (specs/117). Opaque ids, nothing personal. */
+	serviceId: t.Optional(t.Union([t.String(), t.Null()])),
+	connectedAccountId: t.Optional(t.Union([t.String(), t.Null()])),
 	/*
 	 * An address change (`bucket.address.change`): the slug or hostname the bucket answered at, and the one it
 	 * answers at now, null for none. Addresses are public, unlike field values. Entries written before these
@@ -1807,6 +1814,41 @@ export interface OutsideAuthorizationServerStoreConstructor {
 	new (): OutsideAuthorizationServerStoreInstance;
 }
 
+/*
+ * People's accounts at connected services (specs/117). Every read is scoped to a project, so an id that
+ * belongs to another project reads as absent. The `destroyBy*` methods return the records they removed, so
+ * the caller can ask each provider to revoke what it issued.
+ */
+export interface ConnectedAccountStoreInstance {
+	/* Writes the record under its derived id: an insert, or a replace of the same upstream account. */
+	put(record: ConnectedAccount): Promise<{ created: boolean }>;
+	find(bucketId: string, id: string): Promise<ConnectedAccount | null>;
+	listByAccount(
+		bucketId: string,
+		accountId: string
+	): Promise<ConnectedAccount[]>;
+	countByAccountAndService(
+		bucketId: string,
+		accountId: string,
+		serviceId: string
+	): Promise<number>;
+	countByService(bucketId: string, serviceId: string): Promise<number>;
+	destroy(bucketId: string, id: string): Promise<ConnectedAccount | null>;
+	destroyByAccount(
+		bucketId: string,
+		accountId: string
+	): Promise<ConnectedAccount[]>;
+	destroyByService(
+		bucketId: string,
+		serviceId: string
+	): Promise<ConnectedAccount[]>;
+	destroyByBucket(bucketId: string): Promise<ConnectedAccount[]>;
+}
+
+export interface ConnectedAccountStoreConstructor {
+	new (): ConnectedAccountStoreInstance;
+}
+
 export const RefusedOperation = t.Union([
 	t.Literal('deactivate'),
 	t.Literal('delete')
@@ -2164,6 +2206,12 @@ export const UserBucket = t.Object({
 	 * Absent means the catalogue order, so nothing reshuffles on upgrade; an id no longer present is ignored.
 	 */
 	signInOrder: t.Optional(t.Array(t.String())),
+	/*
+	 * The services this project lets its people connect (specs/117), beside `federation` for the same reasons:
+	 * owned by the project for life, deleted with it, sealed by the project store's decorator. Absent on a
+	 * project written before 117, read as none. Managed only through their own routes.
+	 */
+	connectedServices: t.Optional(t.Array(ConnectedService)),
 	// Whether self-service registration is accepted for this bucket. The reserved
 	// admin bucket seeds this false; every other bucket defaults true.
 	//
@@ -2289,6 +2337,7 @@ export interface UserBucketStoreInstance {
 				| 'hostFirstSeenAt'
 				| 'hostLastSeenAt'
 				| 'signInOrder'
+				| 'connectedServices'
 			>
 		>
 	): Promise<UserBucket | null>;

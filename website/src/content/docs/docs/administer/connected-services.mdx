@@ -1,0 +1,273 @@
+---
+title: Connected services
+description: Let a project's users connect their own accounts at Google, GitHub, Slack, Microsoft or another OAuth provider, with the tokens stored encrypted.
+sidebar:
+  order: 11
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+A project's users often have accounts at other services: a Google account, a GitHub account, a Slack workspace.
+**Connected services** let them connect those accounts to the project. The project registers an application at
+each provider. A person then connects their account from their account page, and the provider gives this server
+tokens for that account. The server stores the tokens encrypted.
+
+Two words are used on this page:
+
+- A **connected service** is the project's registration at one provider: Google, GitHub, Slack, Microsoft, an
+  OpenID Connect provider, or a plain OAuth 2.0 provider.
+- A **connected account** is one person's account at one connected service.
+
+<Aside
+	type="caution"
+	title="Nothing uses the stored tokens yet"
+>
+	This release stores the tokens and does nothing else with them. No application
+	and no agent can obtain them yet. A later release will hand a person's token
+	to an AI agent through token exchange, only for agents an administrator allows
+	and only with that person's consent. Until then, connecting an account gives
+	nobody access to it.
+</Aside>
+
+## A connected service is not a way to sign in {#not-a-way-to-sign-in}
+
+A connected service never appears on the sign-in page. People sign in to the project as before: with a password,
+or through an [upstream identity provider](/docs/administer/federation/). They connect an account afterwards, from
+their account page.
+
+A project may use Google both for sign-in and as a connected service. The two are configured separately, in
+different places in the console, and each has its own callback address.
+
+The account page already has a list called **Connected apps**, at `/account/apps`. That list goes the other way:
+it shows the applications that hold tokens issued by this server. Connected services are the accounts that this
+server holds tokens for.
+
+## What you need first: a keyring {#keyring-required}
+
+Connected accounts hold tokens, and the server never stores them unencrypted. So the instance must encrypt stored
+secrets with a **keyring**, a key that the operator holds outside the database. Setting one up is described in
+[Encryption at rest: the keyring](/docs/deploy/upgrade/#keyring).
+
+Without a keyring:
+
+- the **Connected services** tab shows a warning in place of the **Add** button;
+- the admin API and agents are refused with `409` and `code: 'keyring_required'`;
+- people cannot connect an account.
+
+If the keyring's key is lost, the tokens cannot be read any more. The person sees the account as needing to be
+connected again, and the console shows it the same way. The service's own client secret was encrypted with the
+same key, so an administrator enters the secret again first. Then each person connects the account again, and
+the new tokens replace the unreadable ones.
+
+## Declaring a service {#declaring-a-service}
+
+An administrator of the project declares a service. The administrators' project cannot have connected services.
+
+<Steps>
+
+1. Open the project and choose the **Connected services** tab. Choose **Add**.
+
+2. Under **Provider**, choose how the service is described: **By name** for Google, GitHub, Slack or Microsoft,
+   **OpenID Connect** for any OpenID Connect provider, or **OAuth 2.0** for a provider that speaks only OAuth 2.0.
+
+3. Register an application at the provider. The form links to the provider's console and lists the steps. Give
+   the provider the **callback address** that the tab shows (see [The callback address](#the-callback-address)).
+
+4. Paste the **Client ID** and **Client secret** that the provider issued. The secret is stored encrypted and is
+   never shown again.
+
+5. Under **Scopes**, list what applications will be able to ask for at that provider. **Name people see** is the
+   name on the person's account page; for a service by name it defaults to the provider's name.
+
+6. Save. The change is recorded in the audit trail.
+
+</Steps>
+
+You can later change a service's scopes, its name, its secret and, for a plain OAuth 2.0 service, its endpoints.
+Its provider and its client ID never change, because the connected accounts' tokens belong to that one
+registration. A different registration is a new service. When you add scopes, accounts that were already connected
+keep what they were granted. The scopes they lack are shown as not allowed, and the person can connect the account
+again to grant them.
+
+### Services by name {#services-by-name}
+
+Four providers are known by name. For each one you supply only the values that the provider issues:
+
+| Provider  | What you supply                               | Where you register the application                  |
+| --------- | --------------------------------------------- | --------------------------------------------------- |
+| Google    | Client ID, client secret                      | Google Cloud console, **Credentials**               |
+| GitHub    | Client ID, client secret                      | GitHub **Developer settings**                       |
+| Slack     | Client ID, client secret                      | Slack's app management page, `api.slack.com/apps`   |
+| Microsoft | Client ID, client secret, and a **Directory** | Microsoft Entra admin center, **App registrations** |
+
+Each provider has something to know:
+
+- **Google.** Create an OAuth client ID of type "Web application" and add the callback address as an authorised
+  redirect URI. Turn on the Google APIs your applications will call, and list their scopes here. The server always
+  asks for `openid` and `email`. It also asks Google for offline access, so that Google issues a refresh token
+  every time a person connects.
+- **GitHub.** Register an OAuth app, or a GitHub App with user authorization, and set its authorization callback
+  URL to the callback address. The suggested scope is `read:user`.
+- **Slack.** Create a Slack app and add the callback address as a redirect URL. List the **user token** scopes
+  you need; the suggested one is `users:read`. Turn on **token rotation**, or Slack issues no refresh token.
+  **Do not turn on PKCE** for the app. In Slack, PKCE makes the app a public client, the change cannot be undone,
+  and refresh tokens then last at most 30 days. The server never sends Slack a PKCE challenge. A Slack account is
+  one person in one workspace, so the same person connecting two workspaces has two connected accounts.
+- **Microsoft.** The **Directory** says whose accounts may connect: `common` for work and personal accounts,
+  `organizations` for work accounts only, `consumers` for personal accounts only, or one directory's ID. Register
+  an application with a "Web" redirect URI set to the callback address, and create a client secret under
+  **Certificates & secrets**. The server always asks for `openid`, `profile` and `offline_access`, so that
+  Microsoft issues a refresh token. The suggested scope is `User.Read`.
+
+Apple is not offered. Apple issues no token that its own service APIs accept, so there is nothing to connect.
+
+### An OpenID Connect provider {#an-openid-connect-provider}
+
+For any other OpenID Connect provider, give its **Issuer**, such as `https://accounts.example.com`. The server
+reads the provider's endpoints from its discovery document. It identifies the account by the `sub` claim of the
+ID token. If the discovery document names a revocation endpoint, the server uses it on disconnect.
+
+Many providers issue a refresh token only when asked for the scope `offline_access`. If yours does, add that scope.
+
+### A plain OAuth 2.0 provider {#a-plain-oauth-2-provider}
+
+A provider that does not speak OpenID Connect needs more values:
+
+- **Authorization endpoint** and **Token endpoint**: the provider's two OAuth addresses.
+- **Who the account is**: where the server finds the id of the person's account. This is required. Without it, a
+  second account at the provider could not be told apart from the same account connected again. Choose one source:
+  - **From an endpoint**: an **Identity endpoint** that the server calls with the new access token, such as
+    `https://example.com/api/me`, and the path to the account id in its answer.
+  - **From the token answer**: the path to the account id in the token endpoint's own answer.
+- **Path to the account id**: a dotted path into the JSON answer, such as `user.id`. `a|b` takes the first of
+  the two that is present.
+- **Path to a name for people** (optional): a path to a value the person recognises, such as a login or an
+  address. It is shown beside the account.
+- **Revocation endpoint** (optional): an RFC 7009 token revocation endpoint. Without one, the provider is not
+  asked to revoke anything on disconnect.
+
+The server authenticates to the token endpoint with HTTP Basic, using the client ID and secret. It always sends a
+PKCE challenge; a provider that does not support PKCE ignores it.
+
+## The callback address {#the-callback-address}
+
+Every connected service of a project uses one callback address: the project's address (its issuer) followed by
+`/account/services/callback`. The **Connected services** tab shows it with a copy button. For an instance at
+`https://auth.example.com` and a project with the slug `acme`:
+
+| The project's address             | Callback address                                          |
+| --------------------------------- | --------------------------------------------------------- |
+| A path                            | `https://auth.example.com/acme/account/services/callback` |
+| A subdomain                       | `https://acme.auth.example.com/account/services/callback` |
+| A hostname of its own             | `https://login.acme.com/account/services/callback`        |
+| The root, for the default project | `https://auth.example.com/account/services/callback`      |
+
+Register this exact address at each provider. The callback address follows the
+[project's address](/docs/administer/project-addresses/). If the project's address changes, register the new
+callback address at every provider as well. While the project has a connected service, only a super
+administrator may change its address. The address-change preview lists each connected service with its
+new callback address. Accounts already connected keep working; only new connections fail until the provider has
+the new address.
+
+## What people see and do {#what-people-see-and-do}
+
+A person manages connected accounts on the project's account page, at `/account/services` under the project's
+address. It links to **Connected apps**, and **Connected apps** links back once the project offers at least one
+service.
+
+- **Connect.** The page lists the project's services, each with a **Connect** button. The person confirms, goes
+  to the provider, signs in there and allows access. Then they come back to the page, which says that the account
+  is connected.
+- **Several accounts.** A person may connect up to 10 accounts at one service, for example a work and a personal
+  GitHub account. Connecting the same account again replaces its tokens. It does not add a second copy.
+- **What was granted.** Each account shows the scopes the provider granted, and any requested scopes that it did
+  not grant.
+- **A recent sign-in.** Connecting and disconnecting both need a sign-in within the last 15 minutes. Otherwise
+  the person is asked to sign in again, and then comes back to the same confirmation.
+
+If something goes wrong, the page says so in plain words: the person declined at the provider, connecting took
+longer than ten minutes, the limit of 10 accounts is reached, or the service cannot be connected right now.
+
+## Disconnecting, and what the provider is asked {#disconnecting}
+
+A disconnect deletes the connected account here at once. Then the server asks the provider to revoke the tokens,
+and tells the person what the provider answered:
+
+| Provider        | What the server asks                                                 |
+| --------------- | -------------------------------------------------------------------- |
+| Google          | Google revokes the refresh token, which ends the whole grant         |
+| GitHub          | GitHub deletes the grant the person gave the application             |
+| Slack           | Slack revokes the person's token                                     |
+| OpenID Connect  | the revocation endpoint from the discovery document, if it names one |
+| Plain OAuth 2.0 | the revocation endpoint you declared (RFC 7009), if you declared one |
+| Microsoft       | nothing: Microsoft offers no way to revoke one token                 |
+
+When the provider offers no revocation, as Microsoft does not, the person gets a link to the provider's own page
+where they can remove the application's access themselves. When the provider cannot be reached, or refuses, the
+person is told to remove the access at the provider themselves. Either way, the account is already gone here.
+
+This release never refreshes a token. GitHub and Slack revoke with the access token, so once that token has
+expired, their revocation fails, and the person is told to remove the access there.
+
+## Lock, deactivation and deletion {#lock-deactivation-and-deletion}
+
+[Locking or deactivating](/docs/administer/ending-access/) a person **keeps** their connected accounts. Both can
+be undone, and a person who is unlocked should not have to connect everything again. A lock already ends the
+person's sessions and grants at this server. The later release that hands out tokens will also refuse a person who
+cannot sign in.
+
+Three deletions remove connected accounts, and the server asks each provider to revoke the tokens in the
+background:
+
+- deleting the person, whether in the console, through the admin API, by an agent, or by a SCIM directory;
+- deleting the connected service, which disconnects every account at it;
+- the final destruction of the project, after its 30 days or by **Delete now**.
+
+## What administrators see {#what-administrators-see}
+
+The **Connected services** tab lists each service with its provider, its scopes and how many accounts people have
+connected at it. Deleting a service asks for confirmation and says how many accounts it will disconnect.
+
+A person's connected accounts are on their **Sign-in** tab, in the **Connected accounts** card. It shows each
+account's service, its name at the provider, the scopes granted and whether it needs to be connected again. An
+administrator can disconnect one there. The provider is asked to revoke it, as for a person's own disconnect, and
+the person can connect it again later. No token, nor any part of one, is ever shown.
+
+## The plan limit {#the-plan-limit}
+
+When [plans](/docs/administer/plans/) are turned on, a plan limits how many connected services a project may
+declare. On the Free plan the limit is 10. A service beyond the limit is refused with `409` and
+`code: 'plan_limit'`, with `limit.name` set to `connectedServicesPerProject`. The limit counts services, not the
+accounts people connect.
+
+## For agents {#for-agents}
+
+An agent does everything an administrator does here through these [MCP tools](/docs/reference/mcp-tools/):
+
+| Tool                                                                                              | Does                                                                     | Consequence |
+| ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ----------- |
+| [`connected_service_list`](/docs/reference/mcp-tools/#connected_service_list)                     | Lists a project's services, with the callback address and account counts | Read        |
+| [`connected_service_get`](/docs/reference/mcp-tools/#connected_service_get)                       | Reads one service                                                        | Read        |
+| [`connected_service_catalogue_list`](/docs/reference/mcp-tools/#connected_service_catalogue_list) | Lists the providers known by name, with the values each needs            | Read        |
+| [`connected_service_create`](/docs/reference/mcp-tools/#connected_service_create)                 | Declares a service                                                       | Ordinary    |
+| [`connected_service_update`](/docs/reference/mcp-tools/#connected_service_update)                 | Changes a service's scopes, name, secret or endpoints                    | Ordinary    |
+| [`connected_service_delete`](/docs/reference/mcp-tools/#connected_service_delete)                 | Deletes a service and disconnects every account at it                    | High        |
+| [`connected_account_list`](/docs/reference/mcp-tools/#connected_account_list)                     | Lists one person's connected accounts                                    | Read        |
+| [`connected_account_delete`](/docs/reference/mcp-tools/#connected_account_delete)                 | Disconnects one person's account                                         | High        |
+
+A high-consequence tool asks for confirmation before it runs. No tool ever returns a client secret or a token.
+The admin API routes behind them are under `/admin/api/projects/:id/connected-services` and
+`/admin/api/projects/:id/users/:uid/connected-accounts`.
+
+## What comes later {#what-comes-later}
+
+This release builds the store: services, accounts and encrypted tokens. It does not yet:
+
+- give a stored token to an application or an agent;
+- refresh a token, or check that a connected account still works;
+- let an administrator choose which agents may use which service;
+- ask the person to consent per agent;
+- send mail when an account is removed or stops working.
+
+Issuing tokens to AI agents by token exchange, with an administrator's allow-list and each person's consent per
+agent, comes in a later release.

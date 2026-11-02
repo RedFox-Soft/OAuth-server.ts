@@ -112,6 +112,8 @@ export interface BucketDependents {
 	readonly applications: number;
 	readonly providers: number;
 	readonly connections: number;
+	/* Its connected services (specs/117): each registration names the connect callback, which the address decides. */
+	readonly connectedServices: number;
 }
 
 /*
@@ -182,7 +184,8 @@ function mayChangeBucketAddress(
 		dependents !== undefined &&
 		dependents.applications === 0 &&
 		dependents.providers === 0 &&
-		dependents.connections === 0
+		dependents.connections === 0 &&
+		dependents.connectedServices === 0
 	);
 }
 

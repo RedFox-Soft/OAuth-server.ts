@@ -32,6 +32,8 @@ export interface ProviderMetadata {
 	 * `authorization_response_iss_parameter_supported`). Read as `=== true`; absent means it does not say.
 	 */
 	issParameterSupported?: boolean;
+	/* RFC 7009's endpoint, for a connected service (specs/117); never used by sign-in. https only when present. */
+	revocationEndpoint?: string;
 }
 
 /* Distinguishes "the other side is broken" from "your submitted value is wrong" for the caller. */
@@ -111,6 +113,16 @@ function parse(
 		issParameterSupported:
 			source.authorization_response_iss_parameter_supported === true
 	};
+	/*
+	 * Kept only when it is https: a revocation request carries the client credential, and an endpoint that is not
+	 * usable is the same as none — the connected account is deleted either way, and the person is told.
+	 */
+	const revocationEndpoint =
+		typeof source.revocation_endpoint === 'string' &&
+		URL.parse(source.revocation_endpoint)?.protocol === 'https:'
+			? source.revocation_endpoint
+			: undefined;
+	if (revocationEndpoint) metadata.revocationEndpoint = revocationEndpoint;
 
 	/*
 	 * Every endpoint on https. The document is the issuer's, and the issuer is a group member's to set, so

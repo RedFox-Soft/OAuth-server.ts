@@ -330,6 +330,26 @@ function AddressPreviewView({ preview }: { preview: AddressPreview }) {
 							</ul>
 						</div>
 					)}
+					{preview.connectedServices.length > 0 && (
+						<div>
+							<Typography.Text strong>
+								Connected services: register the new callback address
+							</Typography.Text>
+							<ul style={{ margin: 0 }}>
+								{preview.connectedServices.map((s) => (
+									<li key={s.id}>
+										{s.displayName}:{' '}
+										<Typography.Text
+											code
+											copyable
+										>
+											{s.newCallback}
+										</Typography.Text>
+									</li>
+								))}
+							</ul>
+						</div>
+					)}
 					{preview.resources.length > 0 && (
 						<div>
 							<Typography.Text strong>Declared resources</Typography.Text>
@@ -522,7 +542,7 @@ export function BucketSettings({
 	 */
 	const addressReason =
 		!can.changeAddress && !bucket.deletion && ownsGroup && dependents
-			? `Used by ${plural(dependents.applications, 'application', 'applications')}, ${plural(dependents.providers, 'identity provider', 'identity providers')} and ${plural(dependents.connections, 'provisioning connection', 'provisioning connections')}: only an instance administrator can change this project's address now.`
+			? `Used by ${plural(dependents.applications, 'application', 'applications')}, ${plural(dependents.providers, 'identity provider', 'identity providers')}, ${plural(dependents.connections, 'provisioning connection', 'provisioning connections')} and ${plural(dependents.connectedServices, 'connected service', 'connected services')}: only an instance administrator can change this project's address now.`
 			: null;
 
 	async function afterMove() {

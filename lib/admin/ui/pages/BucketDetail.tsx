@@ -24,6 +24,7 @@ import { BucketUsersPanel } from './BucketUsersPanel.js';
 import { ScheduledBanner } from './ScheduledBanner.js';
 import { SignInTab, signInKey } from './signin/SignInTab.js';
 import { OutsideServersPanel } from './OutsideServersPanel.js';
+import { ConnectedServicesPanel } from './ConnectedServicesPanel.js';
 
 /*
  * Said once, above an area the caller may look at but not change, instead of a page of controls that
@@ -54,6 +55,7 @@ export type BucketTab =
 	| 'providers'
 	| 'provisioning'
 	| 'outsideServers'
+	| 'connectedServices'
 	| 'keys'
 	| 'activity'
 	| 'settings';
@@ -75,6 +77,11 @@ const TABS: { key: BucketTab; segment?: string; label: string }[] = [
 		key: 'outsideServers',
 		segment: 'outside-servers',
 		label: 'Outside servers'
+	},
+	{
+		key: 'connectedServices',
+		segment: 'connected-services',
+		label: 'Connected services'
 	},
 	{ key: 'keys', segment: 'keys', label: 'Signing keys' },
 	{ key: 'activity', segment: 'activity', label: 'Activity' },
@@ -395,6 +402,12 @@ export function BucketDetail({
 						void load();
 						setFederationKey((k) => k + 1);
 					}}
+				/>
+			)}
+			{bucket && !tabRefused && shownTab === 'connectedServices' && (
+				<ConnectedServicesPanel
+					bucketId={bucketId}
+					canEdit={can.edit}
 				/>
 			)}
 			{bucket && !tabRefused && shownTab === 'keys' && (

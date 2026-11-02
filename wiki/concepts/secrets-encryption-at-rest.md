@@ -24,7 +24,9 @@ vault (specs 117-119) stores upstream refresh tokens on.
 
 ## What is sealed (`lib/consts/sealed_fields.ts:33`)
 
-Nine leaves: a sign-in provider's client secret and Apple signing key, an application's client secret, the
+Nine leaves at spec 116, eleven since spec 117 added a connected service's client secret and a connected
+account's tokens ([[connected-services]]; those tokens are never stored plaintext, even without a keyring). The
+nine: a sign-in provider's client secret and Apple signing key, an application's client secret, the
 SMTP password, the private members `d p q dp dq qi` of every signing and encryption key (root and per project),
 a person's TOTP secret and a pending enrolment's, the DPoP nonce secret and the error-origin salt.
 

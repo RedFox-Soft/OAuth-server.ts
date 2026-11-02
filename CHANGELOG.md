@@ -11,6 +11,12 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- **Connected services** (spec 117) — a project declares the services its people may connect their accounts at
+  (Google, GitHub, Slack, Microsoft, any OpenID Connect or OAuth 2.0 provider) with its own registration there, and a
+  person connects and disconnects accounts from their account page at `/account/services`; the provider's tokens are
+  stored encrypted (never without a keyring), revoked at the provider on disconnect, and deleted with the person,
+  service or project, while a lock keeps them. Console tab, admin API, MCP tools and a plan limit (Free: 10 per
+  project). Nothing uses the tokens yet: issuing them to agents comes next.
 - **Encryption at rest for stored secrets** (security) — application secrets, sign-in provider credentials, the SMTP
   password, private signing keys and authenticator secrets are now stored encrypted (AES-256-GCM, each value bound to
   its record) with an operator-held keyring, supplied as `KEYRING` or a keyring file and never stored in the database;

@@ -246,7 +246,12 @@ export const accountPageRoutes = new Elysia({ name: 'account-page' })
 					: query.gone !== undefined
 						? T.gone
 						: undefined;
-			return listPage(frame, rows, notice);
+			const servicesHref = person.bucket.connectedServices?.length
+				? new URL(
+						`${accountPageBase(person.bucket)}${routeNames.account_services}`
+					).pathname
+				: undefined;
+			return listPage(frame, rows, notice, servicesHref);
 		},
 		{ query: ListQuery }
 	)
@@ -402,6 +407,18 @@ export const accountPageRoutes = new Elysia({ name: 'account-page' })
 						`${pagePath}?revoke=${encodeURIComponent(pending.revoke)}`
 					);
 				}
+			}
+			/* Asked for by the connected-services page (specs/117): back there, to the confirmation and no further. */
+			if (pending.services) {
+				const services = new URL(
+					`${accountPageBase(person.bucket)}${routeNames.account_services}`
+				).pathname;
+				const back = pending.connect
+					? `?connect=${encodeURIComponent(pending.connect)}`
+					: pending.disconnect
+						? `?disconnect=${encodeURIComponent(pending.disconnect)}`
+						: '';
+				return seeOther(`${services}${back}`);
 			}
 			return seeOther(pagePath);
 		},

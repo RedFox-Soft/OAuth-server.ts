@@ -15,6 +15,7 @@ import { adminUserRoutes } from './users/routes.js';
 import { bucketRoutes } from './buckets/routes.js';
 import { scheduledBucketGuard } from './buckets/scheduled_guard.js';
 import { federationAdminRoutes } from './federation/routes.js';
+import { connectedServiceAdminRoutes } from './connected-services/routes.js';
 import { endUserRoutes } from './users-end/routes.js';
 import { outsideServerRoutes } from './outside-servers/routes.js';
 import { administratorApplicationRoutes } from './administrator-applications/routes.js';
@@ -145,3 +146,5 @@ adminApiRoutes.use(attackReportsSettingsRoutes);
 adminApiRoutes.use(clientAddressSettingsRoutes);
 // Encryption at rest (specs/116), for the same reason.
 adminApiRoutes.use(keyringRoutes);
+// Connected services (specs/117), for the same reason.
+adminApiRoutes.use(connectedServiceAdminRoutes);

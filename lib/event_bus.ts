@@ -174,7 +174,33 @@ export type ServerEvents = ModelEvents &
 			{ bucketId: string; providerId: string; accountId: string }
 		];
 		'upstream.revocation.refused': [{ bucketId: string; reason: string }];
+		/*
+		 * Connected accounts (specs/117 R11). Identifiers only: never a token, and never the upstream label, which
+		 * is personal data the audit trail already holds.
+		 */
+		'connected_account.connected': [ConnectedAccountEvent];
+		'connected_account.updated': [ConnectedAccountEvent];
+		'connected_account.deleted': [
+			ConnectedAccountEvent & { by: 'person' | 'administrator' | 'cascade' }
+		];
+		'connected_account.revocation': [
+			ConnectedAccountEvent & { outcome: RevocationOutcome }
+		];
+		'connected_account.refused': [
+			{ bucketId: string; serviceId?: string; reason: string }
+		];
 	};
+
+interface ConnectedAccountEvent {
+	bucketId: string;
+	serviceId: string;
+	connectedAccountId: string;
+	accountId: string;
+}
+
+/* What asking a provider to revoke came to; `unreadable` means the token could not be opened to send. */
+export type RevocationOutcome =
+	'revoked' | 'not_supported' | 'failed' | 'unreadable';
 
 export type ServerEventName = keyof ServerEvents;
 

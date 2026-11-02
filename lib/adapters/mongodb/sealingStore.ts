@@ -4,7 +4,10 @@ import { ObjectId } from 'mongodb';
 import { db } from './db.js';
 import { SingletonSecretStore } from './singletonSecretStore.js';
 import { STORE_AREAS, userAreaFor } from '../../consts/storage_inventory.js';
-import { PRIVATE_JWK_MEMBERS } from '../../consts/sealed_fields.js';
+import {
+	CONNECTED_ACCOUNT_TOKEN_FIELDS,
+	PRIVATE_JWK_MEMBERS
+} from '../../consts/sealed_fields.js';
 import type {
 	PrivateJwkMember,
 	SealKind,
@@ -207,6 +210,70 @@ export class SealingStore implements SealingStoreInstance {
 					}
 				}
 				return leaves;
+			case 'connectedServiceSecret': {
+				const buckets = await this.collection(STORE_AREAS.userBuckets)
+					.find(
+						{
+							connectedServices: {
+								$elemMatch: { clientSecret: { $type: 'string' } }
+							}
+						},
+						{ projection: { connectedServices: 1 } }
+					)
+					.toArray();
+				for (const bucket of buckets) {
+					const services = Array.isArray(bucket.connectedServices)
+						? (bucket.connectedServices as unknown[])
+						: [];
+					for (const service of services) {
+						if (!isRecord(service) || typeof service.id !== 'string') continue;
+						if (filled(service.clientSecret)) {
+							leaves.push({
+								target: { kind, bucketId: bucket._id, serviceId: service.id },
+								value: service.clientSecret
+							});
+						}
+					}
+				}
+				return leaves;
+			}
+			case 'connectedAccountToken': {
+				const records = await this.collection(STORE_AREAS.connectedAccounts)
+					.find(
+						{},
+						{
+							projection: {
+								refreshToken: 1,
+								accessToken: 1,
+								bucketId: 1,
+								accountId: 1
+							}
+						}
+					)
+					.toArray();
+				for (const record of records) {
+					for (const field of CONNECTED_ACCOUNT_TOKEN_FIELDS) {
+						const value = record[field];
+						if (
+							filled(value) &&
+							typeof record.bucketId === 'string' &&
+							typeof record.accountId === 'string'
+						) {
+							leaves.push({
+								target: {
+									kind,
+									id: record._id,
+									field,
+									bucketId: record.bucketId,
+									accountId: record.accountId
+								},
+								value
+							});
+						}
+					}
+				}
+				return leaves;
+			}
 			case 'dpopNonceSecret':
 			case 'errorOriginSalt': {
 				// The singleton store is the undecorated one, and the one place a stored Binary is unwrapped.
@@ -287,6 +354,32 @@ export class SealingStore implements SealingStoreInstance {
 				).updateOne(
 					{ _id: target.userId, 'totp.secret': text(observed) },
 					{ $set: { 'totp.secret': text(next) } }
+				);
+				return result.matchedCount === 1;
+			}
+			case 'connectedServiceSecret': {
+				const was = text(observed);
+				// As for a provider: the element is named by its id and its observed value.
+				const result = await this.collection(STORE_AREAS.userBuckets).updateOne(
+					{
+						_id: target.bucketId,
+						connectedServices: {
+							$elemMatch: { id: target.serviceId, clientSecret: was }
+						}
+					},
+					{ $set: { 'connectedServices.$[s].clientSecret': text(next) } },
+					{
+						arrayFilters: [{ 's.id': target.serviceId, 's.clientSecret': was }]
+					}
+				);
+				return result.matchedCount === 1;
+			}
+			case 'connectedAccountToken': {
+				const result = await this.collection(
+					STORE_AREAS.connectedAccounts
+				).updateOne(
+					{ _id: target.id, [target.field]: text(observed) },
+					{ $set: { [target.field]: text(next) } }
 				);
 				return result.matchedCount === 1;
 			}

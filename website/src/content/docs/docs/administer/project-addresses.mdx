@@ -120,8 +120,9 @@ choosing a new path. It changes the project's issuer, so it breaks every integra
 
 2. Read the preview. It names everything the change reaches: the applications to reconfigure with the new
    issuer, the identity providers whose callback address changes (with the new one to register at the
-   provider), the SCIM connections whose base URL changes, and the APIs declared in the project. It shows the
-   old and the new issuer.
+   provider), the [connected services](/docs/administer/connected-services/) whose callback address changes (also
+   with the new one), the SCIM connections whose base URL changes, and the APIs declared in the project. It shows
+   the old and the new issuer.
 
 3. Confirm. The project answers at the new address at once, the old address stops answering, and everyone signed
    in to the project signs in again.
@@ -133,7 +134,7 @@ trail records the change with the old and the new address in full, so a path `ac
 told apart.
 
 An owner of the project's team may change the address between the forms the setting allows, while no
-application, identity provider or SCIM connection depends on the project. Otherwise only a super administrator
+application, identity provider, SCIM connection or connected service depends on the project. Otherwise only a super administrator
 may. Only a super administrator gives a project a hostname.
 
 ## Setting up subdomains {#setting-up-subdomains}

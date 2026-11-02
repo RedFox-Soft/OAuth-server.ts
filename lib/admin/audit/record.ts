@@ -43,6 +43,10 @@ export interface AuditDetail {
 	 */
 	bucketId?: string;
 	formerBucketId?: string;
+	/* The connected service an action changed (specs/117). An id the console generated: names nothing personal. */
+	serviceId?: string;
+	/* The connected account removed (specs/117): a derived digest, never the upstream login or address. */
+	connectedAccountId?: string;
 	/* The signing key a key action acted on. Public, as it is in every token header the key signs. */
 	kid?: string;
 	/*
@@ -272,6 +276,12 @@ async function write(input: {
 			...(input.detail.clientId === undefined
 				? {}
 				: { clientId: input.detail.clientId }),
+			...(input.detail.serviceId === undefined
+				? {}
+				: { serviceId: input.detail.serviceId }),
+			...(input.detail.connectedAccountId === undefined
+				? {}
+				: { connectedAccountId: input.detail.connectedAccountId }),
 			...(input.detail.from === undefined ? {} : { from: input.detail.from }),
 			...(input.detail.to === undefined ? {} : { to: input.detail.to }),
 			...(input.detail.scheduledAt === undefined

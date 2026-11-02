@@ -154,6 +154,15 @@ export function BucketPlanCard({
 							)
 						},
 						{
+							key: 'connectedServices',
+							label: 'Connected services',
+							children: used(
+								plan.usage.connectedServices,
+								plan.limits.connectedServicesPerProject,
+								'connected services'
+							)
+						},
+						{
 							key: 'projects',
 							label: 'Projects per administrator',
 							children: limitText(plan.limits.projectsPerAdministrator)

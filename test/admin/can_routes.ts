@@ -372,6 +372,63 @@ export const statedRightRoutes: readonly StatedRightRoute[] = [
 		method: 'DELETE',
 		path: `${BUCKET}/outside-authorization-servers/:serverId`
 	},
+
+	/* Connected services (specs/117): read with the project's people, changed with the project. */
+	{
+		on: 'bucket',
+		flag: 'manageUsers',
+		method: 'GET',
+		path: `${BUCKET}/connected-services`
+	},
+	{
+		on: 'bucket',
+		flag: 'manageUsers',
+		method: 'GET',
+		path: `${BUCKET}/connected-services/catalogue`
+	},
+	{
+		on: 'bucket',
+		flag: 'manageUsers',
+		method: 'GET',
+		path: `${BUCKET}/connected-services/:serviceId`
+	},
+	{
+		on: 'bucket',
+		flag: 'edit',
+		method: 'POST',
+		path: `${BUCKET}/connected-services`,
+		body: {
+			kind: 'catalogue',
+			catalogueId: 'github',
+			clientId: 'probe-client',
+			clientSecret: 'probe-secret'
+		}
+	},
+	{
+		on: 'bucket',
+		flag: 'edit',
+		method: 'PATCH',
+		path: `${BUCKET}/connected-services/:serviceId`,
+		body: {}
+	},
+	{
+		on: 'bucket',
+		flag: 'edit',
+		method: 'DELETE',
+		path: `${BUCKET}/connected-services/:serviceId`
+	},
+	{
+		on: 'bucket',
+		flag: 'manageUsers',
+		method: 'GET',
+		path: `${BUCKET}/users/:uid/connected-accounts`
+	},
+	{
+		on: 'bucket',
+		flag: 'manageUsers',
+		method: 'DELETE',
+		path: `${BUCKET}/users/:uid/connected-accounts/:accountId`
+	},
 	{
 		on: 'bucket',
 		flag: 'manageUsers',

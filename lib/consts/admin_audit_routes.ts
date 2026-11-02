@@ -679,6 +679,36 @@ const routes = [
 		targetType: 'EndUser'
 	},
 
+	/*
+	 * Connected services (specs/117): a project's own registrations at other providers, then one person's account
+	 * at one of them. The account row is an end-user target and carries `targetScope`, as the rows above do. The
+	 * person's own connect and disconnect are recorded too, through the end-user audit with this same action.
+	 */
+	{
+		action: 'connected.service.create',
+		method: 'POST',
+		path: '/admin/api/projects/:id/connected-services',
+		targetType: 'UserBucket'
+	},
+	{
+		action: 'connected.service.update',
+		method: 'PATCH',
+		path: '/admin/api/projects/:id/connected-services/:serviceId',
+		targetType: 'UserBucket'
+	},
+	{
+		action: 'connected.service.delete',
+		method: 'DELETE',
+		path: '/admin/api/projects/:id/connected-services/:serviceId',
+		targetType: 'UserBucket'
+	},
+	{
+		action: 'connected.account.delete',
+		method: 'DELETE',
+		path: '/admin/api/projects/:id/users/:uid/connected-accounts/:accountId',
+		targetType: 'EndUser'
+	},
+
 	{
 		action: 'jwks.generate',
 		method: 'POST',
@@ -810,7 +840,9 @@ export const auditedAdminRoutes: readonly AuditedAdminRoute[] = routes;
  */
 const nonRouteActions = [
 	{ action: 'admin.register', targetType: 'AdminUser' },
-	{ action: 'admin.passwordsignin.restore', targetType: 'UserBucket' }
+	{ action: 'admin.passwordsignin.restore', targetType: 'UserBucket' },
+	/* A person connecting their own account from the account page (specs/117); no admin route does this. */
+	{ action: 'connected.account.connect', targetType: 'EndUser' }
 ] as const satisfies readonly { action: string; targetType: string }[];
 
 export const nonRouteAuditActions: readonly {

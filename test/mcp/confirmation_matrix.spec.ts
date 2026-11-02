@@ -83,7 +83,8 @@ const BODIES: Record<string, Record<string, unknown>> = {
 			monthlyActiveUsers: null,
 			projectsPerAdministrator: null,
 			applicationsPerProject: null,
-			apisPerProject: null
+			apisPerProject: null,
+			connectedServicesPerProject: null
 		},
 		features: { enterpriseSignIn: true, customSlug: true, customDomain: true }
 	},
@@ -127,7 +128,7 @@ describe('every high-consequence tool is gated', () => {
 		 * membership is named in catalogue_drift rather than counted here.
 		 */
 		expect(HIGH.length).toBeGreaterThan(0);
-		expect(HIGH.length).toBe(44);
+		expect(HIGH.length).toBe(46);
 	});
 
 	it.each(HIGH.map((t) => [t.tool, t] as const))(

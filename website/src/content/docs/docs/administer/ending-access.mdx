@@ -37,16 +37,19 @@ Each runs the same sequence:
 
 From that moment, introspection (a resource server asking this server whether a token is still valid)
 answers `active: false` for an opaque access token, because the grant behind it is gone. Deletion then
-also removes the account, its upstream identity links and its group memberships.
+also removes the account, its upstream identity links, its group memberships and its
+[connected accounts](/docs/administer/connected-services/#lock-deactivation-and-deletion).
 
 If the sweep fails partway, the action answers `500` naming the areas that survived. The account is
 already unable to sign in. Repeating the action sweeps again, which is why deactivating an already
 inactive user is allowed rather than refused as a no-op.
 
-Two things are deliberately not swept. First, the sign-in and password-reset throttles: they are keyed
+Three things are deliberately not swept. First, the sign-in and password-reset throttles: they are keyed
 by email address and limit guessing, so they are not access, and clearing them on an account under
 attack would reset the brute-force count mid-incident. Second, the audit trail: it records the action,
-never what the action swept.
+never what the action swept. Third, the person's [connected
+accounts](/docs/administer/connected-services/) at other services: a lock or a deactivation keeps them, so
+that undoing it does not make the person connect everything again. Only deletion removes them.
 
 ## Reactivation restores nothing
 

@@ -14,6 +14,7 @@ import { verifyBucketGroups } from './verify_bucket_groups.js';
 import { verifyActivity } from './verify_activity.js';
 import { verifyTelemetry } from './verify_telemetry.js';
 import { verifySealing } from './verify_sealing.js';
+import { verifyConnectedAccounts } from './verify_connected_accounts.js';
 import {
 	verifyContainerOwnership,
 	verifyPersonalGroupRepair
@@ -632,6 +633,20 @@ await verifyTelemetry(() => new TelemetryStateStore(), check);
 					.collection(STORE_AREAS.serviceConfig)
 					.deleteOne({ _id: new ObjectId(id) });
 			}
+		},
+		check
+	);
+}
+
+/* Connected services and accounts (specs/117): rows by derived id, scoped reads and deletions, the pass's writes. */
+{
+	const { ConnectedAccountStore, SealingStore } =
+		await import('../lib/adapters/mongodb/index.js');
+	await verifyConnectedAccounts(
+		{
+			sealing: new SealingStore(),
+			buckets: new UserBucketStore(),
+			accounts: new ConnectedAccountStore()
 		},
 		check
 	);

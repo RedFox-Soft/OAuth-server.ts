@@ -261,6 +261,20 @@ export const ACTIONS = {
 		okText: 'Disconnect'
 	},
 
+	/* Connected services (specs/117): deleting one disconnects every account people connected at it. */
+	'connectedService.create': { class: 'C0' },
+	'connectedService.edit': { class: 'C0' },
+	'connectedService.delete': {
+		class: 'C2',
+		title: (t) => `Delete ${t}?`,
+		okText: 'Delete'
+	},
+	'connectedAccount.delete': {
+		class: 'C2',
+		title: (t) => `Disconnect ${t}?`,
+		okText: 'Disconnect'
+	},
+
 	'connection.create': { class: 'C0' },
 	'connection.enable': { class: 'C0' },
 	'connection.disable': {

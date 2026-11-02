@@ -1,12 +1,14 @@
 import nanoid from '../helpers/nanoid.js';
 import {
 	bindingOf,
+	CONNECTED_ACCOUNT_TOKEN_FIELDS,
 	PRIVATE_JWK_MEMBERS,
 	type SealTarget
 } from '../consts/sealed_fields.js';
 import type {
 	BucketKey,
 	BucketKeysStoreInstance,
+	ConnectedAccountStoreInstance,
 	ModelAdapter,
 	SecretStoreInstance,
 	SmtpSettingsStoreInstance,
@@ -220,6 +222,56 @@ async function providers(
 	);
 }
 
+/* A project's connected services (specs/117): one secret each, bound to the service's id. */
+async function services(
+	bucketId: string,
+	connectedServices: unknown,
+	convert: (value: unknown, target: SealTarget) => Promise<unknown>
+): Promise<unknown> {
+	if (!Array.isArray(connectedServices)) return connectedServices;
+	return Promise.all(
+		connectedServices.map(async (service: unknown) => {
+			if (
+				!isRecord(service) ||
+				typeof service.id !== 'string' ||
+				!('clientSecret' in service)
+			) {
+				return service;
+			}
+			const copy = { ...service };
+			place(
+				copy,
+				'clientSecret',
+				await convert(copy.clientSecret, {
+					kind: 'connectedServiceSecret',
+					bucketId,
+					serviceId: service.id
+				})
+			);
+			return copy;
+		})
+	);
+}
+
+function holdsSecrets(data: Record<string, unknown>): boolean {
+	const federation = Array.isArray(data.federation) ? data.federation : [];
+	const connected = Array.isArray(data.connectedServices)
+		? data.connectedServices
+		: [];
+	return (
+		federation.some(
+			(provider: unknown) =>
+				isRecord(provider) &&
+				(typeof provider.clientSecret === 'string' ||
+					typeof provider.signingKey === 'string')
+		) ||
+		connected.some(
+			(service: unknown) =>
+				isRecord(service) && typeof service.clientSecret === 'string'
+		)
+	);
+}
+
 export function sealedBucketStore(
 	store: UserBucketStoreInstance
 ): UserBucketStoreInstance {
@@ -242,25 +294,33 @@ export function sealedBucketStore(
 		{
 			args: {
 				create: async ([data, ...rest]) => {
-					if (
-						!isRecord(data) ||
-						!Array.isArray(data.federation) ||
-						!data.federation.some(
-							(provider: unknown) =>
-								isRecord(provider) &&
-								(typeof provider.clientSecret === 'string' ||
-									typeof provider.signingKey === 'string')
-						)
-					) {
+					if (!isRecord(data) || !holdsSecrets(data)) {
 						return [data, ...rest];
 					}
-					// A binding needs the id, so a bucket created with provider credentials is given one here.
+					// A binding needs the id, so a bucket created with credentials is given one here.
 					const _id = typeof data._id === 'string' ? data._id : nanoid();
 					return [
 						{
 							...data,
 							_id,
-							federation: await providers(_id, data.federation, sealedText)
+							...('federation' in data
+								? {
+										federation: await providers(
+											_id,
+											data.federation,
+											sealedText
+										)
+									}
+								: {}),
+							...('connectedServices' in data
+								? {
+										connectedServices: await services(
+											_id,
+											data.connectedServices,
+											sealedText
+										)
+									}
+								: {})
 						},
 						...rest
 					];
@@ -269,19 +329,24 @@ export function sealedBucketStore(
 					if (
 						typeof id !== 'string' ||
 						!isRecord(patch) ||
-						!('federation' in patch)
+						!('federation' in patch || 'connectedServices' in patch)
 					) {
 						return [id, patch, ...rest];
 					}
-					noteReadableUnder(`userBuckets/${id}/federation/`);
-					return [
-						id,
-						{
-							...patch,
-							federation: await providers(id, patch.federation, sealedText)
-						},
-						...rest
-					];
+					const next: Record<string, unknown> = { ...patch };
+					if ('federation' in patch) {
+						noteReadableUnder(`userBuckets/${id}/federation/`);
+						next.federation = await providers(id, patch.federation, sealedText);
+					}
+					if ('connectedServices' in patch) {
+						noteReadableUnder(`userBuckets/${id}/connectedServices/`);
+						next.connectedServices = await services(
+							id,
+							patch.connectedServices,
+							sealedText
+						);
+					}
+					return [id, next, ...rest];
 				}
 			},
 			result: (result) =>
@@ -295,7 +360,16 @@ export function sealedBucketStore(
 							bucket._id as string,
 							bucket.federation,
 							openedText
-						)
+						),
+						...(Array.isArray(bucket.connectedServices)
+							? {
+									connectedServices: await services(
+										bucket._id as string,
+										bucket.connectedServices,
+										openedText
+									)
+								}
+							: {})
 					})
 				)
 		}
@@ -619,4 +693,86 @@ export function sealedSecretStore(
 		},
 		result: (result) => opened(result)
 	});
+}
+
+// ---------------------------------------------------------------- connected accounts: upstream tokens
+
+/*
+ * Thrown by the connected-account store for a write while no keyring is in use (specs/117 FR-017). Unlike every
+ * secret above, an upstream token is never kept in plaintext, not even until a keyring arrives: the service
+ * layer refuses earlier with a message for the person, and this makes the property hold for any caller.
+ */
+export class KeyringRequired extends Error {
+	constructor() {
+		super(
+			'a connected-account token cannot be stored while no keyring is in use'
+		);
+		this.name = 'KeyringRequired';
+	}
+}
+
+async function accountTokens(
+	record: Record<string, unknown>,
+	convert: (value: unknown, target: SealTarget) => Promise<unknown>
+): Promise<Record<string, unknown>> {
+	if (
+		typeof record._id !== 'string' ||
+		typeof record.bucketId !== 'string' ||
+		typeof record.accountId !== 'string'
+	) {
+		return record;
+	}
+	const copy = { ...record };
+	for (const field of CONNECTED_ACCOUNT_TOKEN_FIELDS) {
+		if (field in copy) {
+			place(
+				copy,
+				field,
+				await convert(copy[field], {
+					kind: 'connectedAccountToken',
+					id: record._id,
+					field,
+					bucketId: record.bucketId,
+					accountId: record.accountId
+				})
+			);
+		}
+	}
+	return copy;
+}
+
+export function sealedConnectedAccountStore(
+	store: ConnectedAccountStoreInstance
+): ConnectedAccountStoreInstance {
+	return decorate(
+		store,
+		[
+			'put',
+			'find',
+			'listByAccount',
+			'destroy',
+			'destroyByAccount',
+			'destroyByService',
+			'destroyByBucket'
+		],
+		{
+			args: {
+				put: async ([record, ...rest]) => {
+					if (!activeKeyring()) throw new KeyringRequired();
+					if (!isRecord(record)) return [record, ...rest];
+					noteReadableUnder(`connectedAccounts/${String(record._id)}/`);
+					return [await accountTokens(record, sealedText), ...rest];
+				}
+			},
+			result: (result) =>
+				walk(
+					result,
+					(record) =>
+						typeof record._id === 'string' &&
+						typeof record.serviceId === 'string',
+					(record) => accountTokens(record, openedText),
+					0
+				)
+		}
+	);
 }

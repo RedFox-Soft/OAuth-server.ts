@@ -9,6 +9,7 @@ import {
 	errorOriginSaltStore,
 	getBucketKeysStore,
 	getBucketStore,
+	getConnectedAccountStore,
 	getSealingStore,
 	getSmtpSettingsStore,
 	getUserStore
@@ -144,6 +145,52 @@ const writers: Record<
 			await errorOriginSaltStore.create(Buffer.alloc(32, 2));
 		else await errorOriginSaltStore.replace(current, Buffer.alloc(32, 2));
 		return (target) => target.kind === 'errorOriginSalt';
+	},
+	async connectedServiceSecret() {
+		const now = new Date().toISOString();
+		const bucket = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
+			name: `sealed-service-${Math.random()}`
+		});
+		await getBucketStore().update(bucket._id, {
+			connectedServices: [
+				{
+					id: 'sealed-github',
+					kind: 'catalogue',
+					catalogueId: 'github',
+					clientId: 'sealed-github-client',
+					clientSecret: 'service-secret-value',
+					scopes: ['read:user'],
+					displayName: 'GitHub',
+					createdAt: now,
+					updatedAt: now
+				}
+			]
+		});
+		return (target) =>
+			target.kind === 'connectedServiceSecret' &&
+			target.bucketId === bucket._id;
+	},
+	async connectedAccountToken() {
+		const now = new Date().toISOString();
+		await getConnectedAccountStore().put({
+			_id: 'sealed-connected-account',
+			bucketId: 'sealed-bucket',
+			serviceId: 'sealed-github',
+			accountId: 'sealed-person',
+			upstreamId: '42',
+			label: 'octocat',
+			refreshToken: 'ghr_refresh-value',
+			accessToken: 'gho_access-value',
+			tokenType: 'bearer',
+			scopes: ['read:user'],
+			scopesInferred: false,
+			connectedAt: now,
+			updatedAt: now
+		});
+		return (target) =>
+			target.kind === 'connectedAccountToken' &&
+			target.id === 'sealed-connected-account';
 	}
 };
 

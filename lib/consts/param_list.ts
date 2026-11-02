@@ -193,6 +193,9 @@ export const routeNames = {
 	/* The end-user connected-applications page and the return address of the sign-in it starts (specs/095). */
 	account_apps: '/account/apps',
 	account_apps_callback: '/account/apps/callback',
+	/* The person's connected services (specs/117), and where a provider sends them back after connecting one. */
+	account_services: '/account/services',
+	account_services_callback: '/account/services/callback',
 	authorization: '/auth',
 	backchannel_authentication: '/backchannel',
 	code_verification: '/device',

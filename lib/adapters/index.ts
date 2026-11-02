@@ -7,6 +7,7 @@ import {
 	ProvisioningConnectionStore as MemoryProvisioningConnectionStore,
 	ProvisioningRefusalStore as MemoryProvisioningRefusalStore,
 	OutsideAuthorizationServerStore as MemoryOutsideAuthorizationServerStore,
+	ConnectedAccountStore as MemoryConnectedAccountStore,
 	BucketGroupStore as MemoryBucketGroupStore,
 	ContainerOwnershipStore as MemoryContainerOwnershipStore,
 	ActivityStore as MemoryActivityStore,
@@ -52,6 +53,8 @@ import type {
 	ProvisioningRefusalStoreInstance,
 	OutsideAuthorizationServerStoreConstructor,
 	OutsideAuthorizationServerStoreInstance,
+	ConnectedAccountStoreConstructor,
+	ConnectedAccountStoreInstance,
 	BucketGroupStoreConstructor,
 	BucketGroupStoreInstance,
 	ContainerOwnershipStoreConstructor,
@@ -85,6 +88,7 @@ import {
 	sealedBucketKeysStore,
 	sealedBucketStore,
 	sealedClientAdapter,
+	sealedConnectedAccountStore,
 	sealedSecretStore,
 	sealedSmtpSettingsStore,
 	sealedTotpEnrollmentAdapter,
@@ -112,6 +116,8 @@ let ProvisioningRefusalStoreClass: ProvisioningRefusalStoreConstructor =
 	MemoryProvisioningRefusalStore;
 let OutsideAuthorizationServerStoreClass: OutsideAuthorizationServerStoreConstructor =
 	MemoryOutsideAuthorizationServerStore;
+let ConnectedAccountStoreClass: ConnectedAccountStoreConstructor =
+	MemoryConnectedAccountStore;
 let BucketGroupStoreClass: BucketGroupStoreConstructor = MemoryBucketGroupStore;
 let BucketKeysStoreClass: BucketKeysStoreConstructor = MemoryBucketKeysStore;
 let ContainerOwnershipStoreClass: ContainerOwnershipStoreConstructor =
@@ -146,6 +152,11 @@ let sealingStoreFactory: () => SealingStoreInstance = () =>
 		users: rawUserStore,
 		keys: rawBucketKeysStore,
 		smtp: rawSmtpSettingsStore,
+		connectedAccounts: () => {
+			const store = rawConnectedAccountStore();
+			/* Only the memory store is built here: this factory is replaced for both persistent backends. */
+			return store as MemoryConnectedAccountStore;
+		},
 		secret: (kind) =>
 			kind === 'dpopNonceSecret'
 				? rawDpopNonceSecretStore
@@ -173,6 +184,7 @@ if (backend === 'postgres') {
 	ProvisioningRefusalStoreClass = postgres.ProvisioningRefusalStore;
 	OutsideAuthorizationServerStoreClass =
 		postgres.OutsideAuthorizationServerStore;
+	ConnectedAccountStoreClass = postgres.ConnectedAccountStore;
 	BucketGroupStoreClass = postgres.BucketGroupStore;
 	ContainerOwnershipStoreClass = postgres.ContainerOwnershipStore;
 	ActivityStoreClass = postgres.ActivityStore;
@@ -213,6 +225,7 @@ if (backend === 'mongodb') {
 	ProvisioningRefusalStoreClass = mongodb.ProvisioningRefusalStore;
 	OutsideAuthorizationServerStoreClass =
 		mongodb.OutsideAuthorizationServerStore;
+	ConnectedAccountStoreClass = mongodb.ConnectedAccountStore;
 	BucketGroupStoreClass = mongodb.BucketGroupStore;
 	ContainerOwnershipStoreClass = mongodb.ContainerOwnershipStore;
 	ActivityStoreClass = mongodb.ActivityStore;
@@ -491,6 +504,28 @@ export function getOutsideAuthorizationServerStore(): OutsideAuthorizationServer
 }
 
 /*
+ * People's accounts at connected services (specs/117), behind the decorator that seals both tokens and refuses
+ * a write while no keyring is in use. The raw store is what the in-memory encryption pass reads.
+ */
+let rawConnectedAccountStoreSingleton: ConnectedAccountStoreInstance | null =
+	null;
+let connectedAccountStoreSingleton: ConnectedAccountStoreInstance | null = null;
+function rawConnectedAccountStore(): ConnectedAccountStoreInstance {
+	rawConnectedAccountStoreSingleton ??= new ConnectedAccountStoreClass();
+	return rawConnectedAccountStoreSingleton;
+}
+export function getConnectedAccountStore(): ConnectedAccountStoreInstance {
+	connectedAccountStoreSingleton ??= sealedConnectedAccountStore(
+		rawConnectedAccountStore()
+	);
+	return connectedAccountStoreSingleton;
+}
+/* Test-only: the records as stored, for asserting what a copy of the database would hold. */
+export function rawConnectedAccountStoreForTests(): ConnectedAccountStoreInstance {
+	return rawConnectedAccountStore();
+}
+
+/*
  * The removals a held connection was refused (specs/084 R2). Written by a held SCIM request, read by the
  * console's hold panel, cleared by release.
  */
@@ -664,6 +699,8 @@ export function resetStoresForTests(): void {
 	protectedResourceStoreSingleton = null;
 	provisioningRefusalStoreSingleton = null;
 	outsideAuthorizationServerStoreSingleton = null;
+	rawConnectedAccountStoreSingleton = null;
+	connectedAccountStoreSingleton = null;
 	bucketGroupStoreSingleton = null;
 	bucketKeysStoreSingleton = null;
 	rawBucketKeysStoreSingleton = null;

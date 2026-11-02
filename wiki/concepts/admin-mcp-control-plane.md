@@ -18,7 +18,8 @@ as a bucket group, `BucketGroup`). So the `bucket_*` tools are `project_*`, `buc
 `resource_*` and `federation_*` kept their names. The catalogue published 118 tools, 37 of them
 high-consequence, until spec 102 added the plan tools: 123 then, 41 of them high-consequence ([[plans]]).
 Later specs added reads and writes; after spec 116 added `keyring_status_get` (2026-10-29) the catalogue
-publishes 135 tools, 44 of them declared high-consequence. Before spec 099, `project_*` tools such as `project_create` and `project_bucket_assign`
+published 135 tools, 44 of them declared high-consequence; spec 117 added the eight connected-service tools
+(2026-11-02), two of them high (`connected_service_delete`, `connected_account_delete`): 143 tools, 46 high. Before spec 099, `project_*` tools such as `project_create` and `project_bucket_assign`
 administered the old Project entity, now called a retired project; where this page names them it says so.
 
 An AI agent administers this instance over MCP at `POST /mcp`, as an OAuth 2.1 protected resource of

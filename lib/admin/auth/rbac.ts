@@ -106,7 +106,7 @@ export class AdminError extends Error {
 	 * Set on the 409 a plan answers (specs/102), so the console and an agent can tell "the plan stops this" from
 	 * every other conflict and say what to do next — ask for a larger plan — rather than retry.
 	 */
-	code?: 'plan_limit';
+	code?: 'plan_limit' | 'keyring_required';
 	limit?: PlanLimitDetail;
 	constructor(
 		status: number,
@@ -117,7 +117,7 @@ export class AdminError extends Error {
 			acknowledgementRequired?: boolean;
 			field?: string;
 			retryAfter?: number;
-			code?: 'plan_limit';
+			code?: 'plan_limit' | 'keyring_required';
 			limit?: PlanLimitDetail;
 		}
 	) {
@@ -145,7 +145,7 @@ export function adminErrorBody(error: AdminError): {
 	acknowledgementRequired?: boolean;
 	field?: string;
 	retryAfter?: number;
-	code?: 'plan_limit';
+	code?: 'plan_limit' | 'keyring_required';
 	limit?: PlanLimitDetail;
 } {
 	return {

@@ -57,6 +57,20 @@ function declareApi(caller: Caller, projectId: string) {
 	);
 }
 
+function declareService(caller: Caller, projectId: string) {
+	return call(
+		'POST',
+		`/admin/api/projects/${projectId}/connected-services`,
+		caller.cookie,
+		{
+			kind: 'catalogue',
+			catalogueId: 'github',
+			clientId: freshSlug('gh'),
+			clientSecret: 'project-github-secret'
+		}
+	);
+}
+
 /* With plans on, a tenant's project on Free is given its address name. */
 async function projectFor(owner: Caller): Promise<string> {
 	return idOf(await createProject(owner));
@@ -127,6 +141,24 @@ describe('a project’s applications and APIs on its plan', () => {
 			count: 2,
 			max: 2
 		});
+	});
+
+	it('refuses the connected service one past the limit, before the audit record', async () => {
+		await storeFree({ connectedServicesPerProject: 1 });
+		const owner = await tenant();
+		const id = await projectFor(owner);
+		await fill(() => declareService(owner, id), 1);
+		const before = await auditCount();
+
+		const refusal = refusalOf(await declareService(owner, id));
+
+		expect(refusal.limit).toEqual({
+			name: 'connectedServicesPerProject',
+			plan: { id: 'free', name: 'Free' },
+			count: 1,
+			max: 1
+		});
+		expect(await auditCount()).toBe(before);
 	});
 
 	it('writes nothing and records nothing when it refuses', async () => {

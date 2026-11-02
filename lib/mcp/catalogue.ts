@@ -7,6 +7,10 @@ import {
 } from '../consts/admin_audit_routes.js';
 import { CreateClientBody, UpdateClientBody } from '../admin/clients/schema.js';
 import {
+	CreateServiceBody,
+	UpdateServiceBody
+} from '../admin/connected-services/schema.js';
+import {
 	CreateResourceBody,
 	UpdateResourceBody
 } from '../admin/resources/schema.js';
@@ -382,7 +386,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			"One project: its name, owning team, and registration and verification settings. Its groups of end users are read with project_group_list. A super-administrator may read the administrators' own project here (`reserved: \"administrators\"`); its accounts are read with admin_list, not through the project. `can` states which operations the server will accept from the caller on it: `manageUsers` (project_user_*, the identity tools, project_group_member_add/remove, and reading providers, provisioning and groups), `edit` (federation_provider_create/update/delete, provisioning_connection_create/update/delete/release, provisioning_credential_*, project_group_create/update/delete/assign_connection, project_user_assign_connection, project_key_*), `editSettings` (project_update), `readActivity` (project_activity_get), `changeAddress` (project_address_change), `move` (project_owner_change) and `delete`; a false flag is a refusal, so do not try it. `changeAddress` and `delete` also depend on the project's state for some callers: an owner of its team may change a path or subdomain address only while no application, identity provider or provisioning connection depends on it, and a member who is not an owner may delete it only while it holds no accounts. `blockers` is the state behind them: `addressable` is false for a project that signs with the instance keys, `dependents` counts the applications, providers and connections depending on it and `accounts` the accounts it holds — each null when it could not change the caller's answer and so was not read. `addressForm` is root, path, subdomain, host or unaddressed; `issuer` and `discoveryUrl` are what a client is configured with (null when unaddressed); `applications` and `apis` count what it holds (client_list, resource_list). `edit` also governs its applications and APIs (client_create/update/delete, client_secret_rotate, resource_declare/update/delete). Its counts are read with project_summary_get. A project scheduled for deletion carries `deletion` — `scheduledAt`, `purgeAt` (the date it will be destroyed) and `scheduledBy` — and answers nobody at its address until then: every change to it or to anything it holds is refused with 409 until project_restore brings it back, while reading keeps working. Deleting a project stays console-only for agents even where `can.delete` is true."
+			"One project: its name, owning team, and registration and verification settings. Its groups of end users are read with project_group_list. A super-administrator may read the administrators' own project here (`reserved: \"administrators\"`); its accounts are read with admin_list, not through the project. `can` states which operations the server will accept from the caller on it: `manageUsers` (project_user_*, the identity tools, project_group_member_add/remove, and reading providers, provisioning and groups), `edit` (federation_provider_create/update/delete, provisioning_connection_create/update/delete/release, provisioning_credential_*, project_group_create/update/delete/assign_connection, project_user_assign_connection, project_key_*), `editSettings` (project_update), `readActivity` (project_activity_get), `changeAddress` (project_address_change), `move` (project_owner_change) and `delete`; a false flag is a refusal, so do not try it. `changeAddress` and `delete` also depend on the project's state for some callers: an owner of its team may change a path or subdomain address only while no application, identity provider, provisioning connection or connected service depends on it, and a member who is not an owner may delete it only while it holds no accounts. `blockers` is the state behind them: `addressable` is false for a project that signs with the instance keys, `dependents` counts the applications, providers, connections and connected services depending on it and `accounts` the accounts it holds — each null when it could not change the caller's answer and so was not read. `addressForm` is root, path, subdomain, host or unaddressed; `issuer` and `discoveryUrl` are what a client is configured with (null when unaddressed); `applications` and `apis` count what it holds (client_list, resource_list). `edit` also governs its applications and APIs (client_create/update/delete, client_secret_rotate, resource_declare/update/delete). Its counts are read with project_summary_get. A project scheduled for deletion carries `deletion` — `scheduledAt`, `purgeAt` (the date it will be destroyed) and `scheduledBy` — and answers nobody at its address until then: every change to it or to anything it holds is refused with 409 until project_restore brings it back, while reading keeps working. Deleting a project stays console-only for agents even where `can.delete` is true."
 	},
 	{
 		tool: 'project_summary_get',
@@ -680,6 +684,58 @@ const catalogue = [
 		pathParams: ['id', 'uid'],
 		summary:
 			'The upstream identities linked to one end-user account, by provider.'
+	},
+	{
+		tool: 'connected_service_list',
+		method: 'GET',
+		path: '/admin/api/projects/:id/connected-services',
+		action: null,
+		consequence: 'read',
+		superAdminOnly: false,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			'The services a project lets its people connect their accounts at (Google, GitHub, Slack, Microsoft, an OpenID Connect issuer or a plain OAuth 2.0 provider), each with `connectedAccounts` (how many accounts people have connected) and `callbackUri` (the redirect address to register at the provider). A connected service is not a sign-in provider: people sign in elsewhere and connect it from their account page. Never returns a client secret (`clientSecret` is always masked).'
+	},
+	{
+		tool: 'connected_service_get',
+		method: 'GET',
+		path: '/admin/api/projects/:id/connected-services/:serviceId',
+		action: null,
+		consequence: 'read',
+		superAdminOnly: false,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id', 'serviceId'],
+		summary:
+			'One connected service of a project, with its scopes, `connectedAccounts` and `callbackUri`. Never returns its client secret.'
+	},
+	{
+		tool: 'connected_service_catalogue_list',
+		method: 'GET',
+		path: '/admin/api/projects/:id/connected-services/catalogue',
+		action: null,
+		consequence: 'read',
+		superAdminOnly: false,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			'The services a project can declare by name (google, github, slack, microsoft): the values each needs, its default scopes, where to register the application and the steps. Declare one by passing its catalogueId to connected_service_create.'
+	},
+	{
+		tool: 'connected_account_list',
+		method: 'GET',
+		path: '/admin/api/projects/:id/users/:uid/connected-accounts',
+		action: null,
+		consequence: 'read',
+		superAdminOnly: false,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id', 'uid'],
+		summary:
+			"The accounts one end-user has connected at the project's connected services: per account its service, the provider's account id and label (a login or an address), the scopes granted, `missingScopes` (asked for now but not granted), when it was connected and `status` (`connected`, or `needs_reconnection` when its tokens cannot be read with this instance's keyring). Never returns a token or any part of one."
 	},
 	{
 		tool: 'settings_get',
@@ -1600,6 +1656,60 @@ const catalogue = [
 		pathParams: ['id', 'uid', 'providerId'],
 		summary:
 			"Sever one end-user's link to one upstream provider. The account survives; only the link is removed."
+	},
+
+	/* ---------------------------------------- writes: connected services (4) */
+	{
+		tool: 'connected_service_create',
+		method: 'POST',
+		path: '/admin/api/projects/:id/connected-services',
+		action: 'connected.service.create',
+		consequence: 'ordinary',
+		superAdminOnly: false,
+		bodySchema: CreateServiceBody,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			'Declare a service a project\'s people may connect their accounts at, with the project\'s own application registered at that provider: `kind: "catalogue"` with a catalogueId (google, github, slack; microsoft also needs `tenant`), `kind: "oidc"` with an issuer, or `kind: "oauth2"` with its endpoints and a required `identity` source (an endpoint and the path to the account id in its answer, or the path to it in the token response). Register `callbackUri` from the answer at the provider. Refused with 409 `keyring_required` while stored secrets are not encrypted on the instance, with 409 `plan_limit` beyond the plan\'s connected services, and on the Administrators project.'
+	},
+	{
+		tool: 'connected_service_update',
+		method: 'PATCH',
+		path: '/admin/api/projects/:id/connected-services/:serviceId',
+		action: 'connected.service.update',
+		consequence: 'ordinary',
+		superAdminOnly: false,
+		bodySchema: UpdateServiceBody,
+		querySchema: null,
+		pathParams: ['id', 'serviceId'],
+		summary:
+			"Change a connected service's scopes, name, secret or (plain OAuth 2.0 only) endpoints. Its provider and client id never change: the connected accounts' tokens belong to that registration, so a different one is a new service. Accounts already connected keep the scopes they were granted."
+	},
+	{
+		tool: 'connected_service_delete',
+		method: 'DELETE',
+		path: '/admin/api/projects/:id/connected-services/:serviceId',
+		action: 'connected.service.delete',
+		consequence: 'high',
+		superAdminOnly: false,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id', 'serviceId'],
+		summary:
+			'Delete a connected service and disconnect every account people connected at it (connected_service_get says how many); each provider is asked to revoke its tokens in the background. Irreversible: people must connect again to a new service.'
+	},
+	{
+		tool: 'connected_account_delete',
+		method: 'DELETE',
+		path: '/admin/api/projects/:id/users/:uid/connected-accounts/:accountId',
+		action: 'connected.account.delete',
+		consequence: 'high',
+		superAdminOnly: false,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id', 'uid', 'accountId'],
+		summary:
+			"Disconnect one end-user's account at a connected service: it is deleted here and the provider is asked to revoke its tokens. The person can connect it again from their account page."
 	},
 
 	/* ---------------------------------------- writes: SCIM provisioning (8) */

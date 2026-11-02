@@ -47,7 +47,8 @@ const BLANK: Plan = {
 		monthlyActiveUsers: null,
 		projectsPerAdministrator: null,
 		applicationsPerProject: null,
-		apisPerProject: null
+		apisPerProject: null,
+		connectedServicesPerProject: null
 	},
 	features: { enterpriseSignIn: false, customSlug: false, customDomain: false }
 };

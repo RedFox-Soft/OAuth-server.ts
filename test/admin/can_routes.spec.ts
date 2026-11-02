@@ -95,7 +95,8 @@ const BucketRead = Type.Object({
 			Type.Object({
 				applications: Type.Number(),
 				providers: Type.Number(),
-				connections: Type.Number()
+				connections: Type.Number(),
+				connectedServices: Type.Number()
 			}),
 			Type.Null()
 		]),
@@ -467,7 +468,8 @@ describe('stated rights on buckets', () => {
 			expect(owner.blockers.dependents).toEqual({
 				applications: 0,
 				providers: 0,
-				connections: 0
+				connections: 0,
+				connectedServices: 0
 			});
 		});
 
@@ -482,7 +484,8 @@ describe('stated rights on buckets', () => {
 			expect(owner.blockers.dependents).toEqual({
 				applications: 1,
 				providers: 0,
-				connections: 0
+				connections: 0,
+				connectedServices: 0
 			});
 		});
 
@@ -509,6 +512,46 @@ describe('stated rights on buckets', () => {
 
 			expect(read.can.changeAddress).toBe(false);
 			expect(read.blockers.dependents?.providers).toBe(1);
+		});
+
+		it('states no right to an owner to change the address of a bucket a connected service depends on', async () => {
+			const bucket = await getBucketStore().create({
+				name: `with service ${nanoid()}`,
+				slug: `cs-${nanoid()
+					.toLowerCase()
+					.replace(/[^a-z0-9]/g, '')}`,
+				ownerGroupId: w.owningGroupId
+			});
+			const now = new Date().toISOString();
+			await getBucketStore().update(bucket._id, {
+				connectedServices: [
+					{
+						id: 'github',
+						kind: 'catalogue',
+						catalogueId: 'github',
+						clientId: 'project-app',
+						clientSecret: 'project-secret',
+						scopes: ['read:user'],
+						displayName: 'GitHub',
+						createdAt: now,
+						updatedAt: now
+					}
+				]
+			});
+
+			const read = shaped(
+				BucketRead,
+				(
+					await request(
+						'GET',
+						`/admin/api/projects/${bucket._id}`,
+						w.cookies['group owner']
+					)
+				).body
+			);
+
+			expect(read.can.changeAddress).toBe(false);
+			expect(read.blockers.dependents?.connectedServices).toBe(1);
 		});
 
 		it('states no right to an owner to change the address of a bucket a provisioning connection depends on', async () => {

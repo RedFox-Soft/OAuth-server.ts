@@ -42,7 +42,9 @@ administrator and for a project's upstream provider through [[global-token-revoc
    the inventory's owner declarations, so an area added later is included by construction — the same
    engine as [[deletion-and-revocation]]. Email-addressed areas (login and reset throttles) are *not*
    swept: they are rate limits, not access, and clearing a login throttle on an account under attack
-   would reset the brute-force counter mid-incident.
+   would reset the brute-force counter mid-incident. Nor are a person's **connected accounts** (spec 117):
+   that store is declared unowned on purpose so a lock keeps them, and only deleting the person, the service
+   or the project removes them ([[connected-services]]).
 
 Introspection needed no change: it already answers `active: false` once the grant behind a token is gone
 (`lib/actions/introspection.ts:134`).

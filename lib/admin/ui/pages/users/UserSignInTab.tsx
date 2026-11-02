@@ -7,6 +7,7 @@ import { UserIdentityLinks } from '../UserIdentities.js';
 import { usersApi, type EndUser } from './endUser.js';
 import { useUserActions } from './useUserActions.js';
 import { SessionsCard } from './SessionsCard.js';
+import { ConnectedAccountsCard } from './ConnectedAccountsCard.js';
 
 /* What can be said about their password. Older accounts carry no marker, and then nothing is claimed. */
 function passwordText(user: EndUser): string | null {
@@ -122,6 +123,12 @@ export function UserSignInTab({
 					onChanged={onChanged}
 				/>
 			</Card>
+
+			<ConnectedAccountsCard
+				bucketId={bucketId}
+				userId={user._id}
+				canDisconnect={can.manageUsers}
+			/>
 
 			<SessionsCard
 				bucketId={bucketId}

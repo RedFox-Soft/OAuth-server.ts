@@ -30,6 +30,7 @@ import {
 import { grantsIn, sessionsIn } from './sessions.js';
 import { lookup, type Language } from '../i18n/languages.js';
 import { storedLocaleRanges } from '../i18n/resolve.js';
+import { destroyConnectedAccountsOf } from '../connected_services/accounts.js';
 
 /*
  * Every change to an end user, whichever surface it arrives through — the admin API (and MCP, which
@@ -322,6 +323,12 @@ export async function removeEndUser(
 	/* Before the account, so no membership outlives it: a deleted user is in no group (specs/071 FR-004). */
 	await getBucketGroupStore().removeUser(bucket._id, id);
 	await getUserStore(bucket._id).destroy(id);
+	/*
+	 * Connected accounts are not account-owned in the inventory, so the sweep below never finds them: a lock keeps
+	 * them (specs/117), and only this deletion, of the person themselves, removes them and asks each provider to
+	 * revoke.
+	 */
+	await destroyConnectedAccountsOf(bucket, id);
 	return cascadeForAccount(id, scopedId);
 }
 

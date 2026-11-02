@@ -50,22 +50,35 @@ function plural(count: number, one: string, many: string): string {
 }
 
 /* A per-project count against its limit; `null` is unlimited. */
+const ROOM = {
+	applications: {
+		name: 'applicationsPerProject',
+		one: 'application',
+		many: 'applications'
+	},
+	apis: { name: 'apisPerProject', one: 'API', many: 'APIs' },
+	connectedServices: {
+		name: 'connectedServicesPerProject',
+		one: 'connected service',
+		many: 'connected services'
+	}
+} as const;
+
 async function assertRoomFor(
 	caller: Caller,
 	bucket: UserBucket,
-	kind: 'applications' | 'apis'
+	kind: keyof typeof ROOM
 ): Promise<void> {
 	if (exempt(caller)) return;
 	const plan = planOf(bucket, await catalogue());
 	if (!plan) return;
-	const name =
-		kind === 'applications' ? 'applicationsPerProject' : 'apisPerProject';
+	const { name, one, many } = ROOM[kind];
 	const max = plan.limits[name];
 	if (max === null) return;
 	const count = (await bucketUsage(bucket._id))[kind];
 	if (count < max) return;
 	refuse(
-		`This project is on the ${plan.name} plan, which allows ${plural(max, kind === 'applications' ? 'application' : 'API', kind === 'applications' ? 'applications' : 'APIs')}. Ask for a larger plan to add more.`,
+		`This project is on the ${plan.name} plan, which allows ${plural(max, one, many)}. Ask for a larger plan to add more.`,
 		{ name, plan: named(plan), count, max }
 	);
 }
@@ -82,6 +95,13 @@ export function assertApiRoom(
 	bucket: UserBucket
 ): Promise<void> {
 	return assertRoomFor(caller, bucket, 'apis');
+}
+
+export function assertConnectedServiceRoom(
+	caller: Caller,
+	bucket: UserBucket
+): Promise<void> {
+	return assertRoomFor(caller, bucket, 'connectedServices');
 }
 
 export async function assertSocialSignIn(

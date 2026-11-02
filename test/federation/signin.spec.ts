@@ -2,7 +2,11 @@ import { describe, it, expect, beforeAll, beforeEach } from 'bun:test';
 
 import bootstrap from '../test_helper.ts';
 import { findSessionSetCookie } from '../test_helper.ts';
-import { getUserStore, resetAdminMemoryStores } from 'lib/adapters/index.ts';
+import {
+	getUserStore,
+	rawConnectedAccountStoreForTests,
+	resetAdminMemoryStores
+} from 'lib/adapters/index.ts';
 import { TestAdapter } from 'test/models.ts';
 import { assertNoPendingInterceptors } from '../fetch_mock.ts';
 import { idpStub } from './idp_stub.ts';
@@ -294,6 +298,30 @@ describe('federated sign-in', () => {
 		expect(everything).not.toContain(
 			'upstream-refresh-token-must-not-be-stored'
 		);
+		assertNoPendingInterceptors();
+	});
+
+	it('creates no connected account, whatever the provider issued', async () => {
+		const idp = await idpStub('https://idp-no-connected.test');
+		const bucketId = await seedBucket(CLIENT, {
+			federation: [provider(idp.origin, { emailTrusted: true })]
+		});
+
+		idp.expectDiscovery();
+		const { uid, cookie } = await startInteraction();
+		await walk(uid, cookie, {
+			idp,
+			claims: { email: 'no-connected@acme.test', email_verified: true }
+		});
+
+		/*
+		 * Signing in and connecting are two acts (specs/117 FR-030): a sign-in through a provider that also offers
+		 * an API never leaves the person's tokens behind as a connected account.
+		 */
+		const [user] = await getUserStore(bucketId).list();
+		expect(
+			await rawConnectedAccountStoreForTests().listByAccount(bucketId, user._id)
+		).toEqual([]);
 		assertNoPendingInterceptors();
 	});
 

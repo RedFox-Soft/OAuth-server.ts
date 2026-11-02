@@ -174,11 +174,16 @@ ${row.keepsAccess ? `<p style="margin:8px 0 0;"><strong>${esc(T.keepsAccess)}</s
 export function listPage(
 	frame: PageFrame,
 	rows: readonly ApplicationRow[],
-	notice?: string
+	notice?: string,
+	/* The connected-services page (specs/117), linked only where the project offers a service to connect. */
+	servicesHref?: string
 ): Response {
 	const T = ACCOUNT_TEXTS[frame.language];
+	const services = servicesHref
+		? ` · <a href="${esc(servicesHref)}" style="${LINK}">${esc(T.servicesLink)}</a>`
+		: '';
 	const body = `${header(frame)}<h1 style="font-size:24px; margin:0 0 8px;">${esc(T.title)}</h1>
-<p style="margin:0 0 8px; overflow-wrap:anywhere;">${htmlWith(T.signedInAs, { email: `<strong>${esc(frame.email)}</strong>` })} · <a href="${esc(frame.signOutHref)}" style="${LINK}">${esc(T.signOut)}</a></p>
+<p style="margin:0 0 8px; overflow-wrap:anywhere;">${htmlWith(T.signedInAs, { email: `<strong>${esc(frame.email)}</strong>` })}${services} · <a href="${esc(frame.signOutHref)}" style="${LINK}">${esc(T.signOut)}</a></p>
 <div role="status">${notice ? `<p style="background:${foxVar('success-bg')}; border:1px solid ${foxVar('success-border')}; border-radius:6px; padding:8px 12px; margin:8px 0;">${esc(notice)}</p>` : ''}</div>
 ${rows.length ? `<p style="margin:8px 0 16px;">${esc(T.intro)}</p>${rows.map((row, i) => section(row, i, frame)).join('')}` : `<p style="margin:8px 0;">${esc(T.empty)}</p>`}`;
 	return page(T.title, body, 200, { wide: true, language: frame.language });
@@ -216,6 +221,181 @@ export function outcomePage(
 	return page(
 		title,
 		`<h1 style="font-size:20px; margin:0 0 8px;">${esc(title)}</h1><p>${esc(T[outcome])}</p><p><a href="${esc(path)}" style="${LINK}">${esc(T.tryAgain)}</a></p>`,
+		status,
+		{ language }
+	);
+}
+
+// ---------------------------------------------------------------- connected services (specs/117)
+
+const PRIMARY = `background:${foxVar('primary-solid')}; color:${foxVar('on-primary')}; border:0; border-radius:6px; padding:0 16px; min-height:32px; font-size:14px; cursor:pointer;`;
+
+export interface ServiceRowView {
+	id: string;
+	serviceName: string;
+	label: string;
+	scopes: readonly string[];
+	missingScopes: readonly string[];
+	connectedAt: string;
+	status: 'connected' | 'needs_reconnection';
+}
+
+export interface OfferedService {
+	id: string;
+	displayName: string;
+}
+
+/* What the page says after an act: a sentence, and the provider's own access page where the person must act. */
+export interface ServicesNotice {
+	lines: readonly string[];
+	manage?: { href: string; service: string } | undefined;
+}
+
+function noticeBox(
+	notice: ServicesNotice | undefined,
+	language: Language
+): string {
+	if (!notice || notice.lines.length === 0) return '';
+	const T = ACCOUNT_TEXTS[language];
+	const manage = notice.manage
+		? `<br/><a href="${esc(notice.manage.href)}" style="${LINK}" rel="noopener noreferrer">${html(T.manageAccess, { service: notice.manage.service })}</a>`
+		: '';
+	return `<p style="background:${foxVar('success-bg')}; border:1px solid ${foxVar('success-border')}; border-radius:6px; padding:8px 12px; margin:8px 0;">${notice.lines.map((line) => esc(line)).join('<br/>')}${manage}</p>`;
+}
+
+function serviceRow(
+	row: ServiceRowView,
+	index: number,
+	frame: PageFrame
+): string {
+	const T = ACCOUNT_TEXTS[frame.language];
+	const id = `service-${index}`;
+	const disconnectHref = `${frame.path}?disconnect=${encodeURIComponent(row.id)}`;
+	const scopes = row.scopes.length
+		? `<p style="${MUTED} margin:4px 0 0; overflow-wrap:anywhere;">${htmlWith(T.scopesGranted, { scopes: codes(row.scopes) })}</p>`
+		: '';
+	const missing = row.missingScopes.length
+		? `<p style="margin:4px 0 0; overflow-wrap:anywhere;">${htmlWith(T.scopesMissing, { scopes: codes(row.missingScopes) })}</p>`
+		: '';
+	const status =
+		row.status === 'needs_reconnection'
+			? `<p style="margin:4px 0 0;"><strong>${esc(T.needsReconnection)}</strong></p>`
+			: '';
+	return `<section aria-labelledby="${id}" style="border-top:1px solid ${foxVar('box-border')}; padding:16px 0;">
+<h2 id="${id}" style="font-size:18px; margin:0; overflow-wrap:anywhere;">${esc(row.serviceName)}: ${esc(row.label)}</h2>
+${scopes}${missing}${status}
+<p style="${MUTED} margin:8px 0 0;">${htmlWith(T.connectedAt, { date: stamp(new Date(row.connectedAt), frame.language) })}</p>
+<p style="margin:8px 0 0;"><a href="${esc(disconnectHref)}" style="${DANGER_LINK}">${esc(T.disconnect)}<span style="position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0);">: ${esc(row.label)}</span></a></p>
+</section>`;
+}
+
+export function servicesPage(
+	frame: PageFrame,
+	appsHref: string,
+	rows: readonly ServiceRowView[],
+	offered: readonly OfferedService[],
+	notice?: ServicesNotice
+): Response {
+	const T = ACCOUNT_TEXTS[frame.language];
+	const connect = offered.length
+		? `<h2 style="font-size:16px; margin:24px 0 8px;">${esc(T.servicesAvailable)}</h2><ul style="list-style:none; padding:0; margin:0;">${offered
+				.map(
+					(service) =>
+						`<li style="margin:4px 0;"><a href="${esc(`${frame.path}?connect=${encodeURIComponent(service.id)}`)}" style="${LINK}">${html(T.connect, { service: service.displayName })}</a></li>`
+				)
+				.join('')}</ul>`
+		: '';
+	const body = `${header(frame)}<h1 style="font-size:24px; margin:0 0 8px;">${esc(T.servicesTitle)}</h1>
+<p style="margin:0 0 8px; overflow-wrap:anywhere;">${htmlWith(T.signedInAs, { email: `<strong>${esc(frame.email)}</strong>` })} · <a href="${esc(appsHref)}" style="${LINK}">${esc(T.appsLink)}</a> · <a href="${esc(frame.signOutHref)}" style="${LINK}">${esc(T.signOut)}</a></p>
+<div role="status">${noticeBox(notice, frame.language)}</div>
+${rows.length ? `<p style="margin:8px 0 16px;">${esc(T.servicesIntro)}</p>${rows.map((row, i) => serviceRow(row, i, frame)).join('')}` : `<p style="margin:8px 0;">${esc(T.servicesEmpty)}</p>`}
+${connect}`;
+	return page(T.servicesTitle, body, 200, {
+		wide: true,
+		language: frame.language
+	});
+}
+
+function confirmForm(
+	frame: PageFrame,
+	fields: Record<string, string>,
+	xsrf: string,
+	label: string,
+	style: string
+): string {
+	const T = ACCOUNT_TEXTS[frame.language];
+	const hidden = Object.entries(fields)
+		.map(
+			([name, value]) =>
+				`<input type="hidden" name="${esc(name)}" value="${esc(value)}"/>`
+		)
+		.join('\n');
+	return `<form method="post" action="${esc(frame.path)}" style="display:flex; flex-wrap:wrap; gap:16px; align-items:center; margin-top:16px;">
+${hidden}
+<input type="hidden" name="xsrf" value="${esc(xsrf)}"/>
+<button type="submit" style="${style}">${esc(label)}</button>
+<a href="${esc(frame.path)}" style="${LINK}">${esc(T.cancel)}</a>
+</form>`;
+}
+
+export function connectConfirmation(
+	frame: PageFrame,
+	service: OfferedService,
+	xsrf: string,
+	/*
+	 * The provider's authorization endpoint. The form posts here and is answered with a redirect there, and Chrome
+	 * holds the whole chain to `form-action`, so without it the person's own Continue is blocked.
+	 */
+	providerAddress?: string
+): Response {
+	const T = ACCOUNT_TEXTS[frame.language];
+	const body = `${header(frame)}<h1 style="font-size:24px; margin:0 0 8px; overflow-wrap:anywhere;">${html(T.connectTitle, { service: service.displayName })}</h1>
+<p style="margin:8px 0;">${html(T.connectEffect, { service: service.displayName })}</p>
+${confirmForm(frame, { action: 'connect', serviceId: service.id }, xsrf, T.continue, PRIMARY)}`;
+	return page(
+		text(T.connectTitle, { service: service.displayName }),
+		body,
+		200,
+		{
+			wide: true,
+			language: frame.language,
+			// A confirmation is never framed, whatever origin it hands off to.
+			denyFraming: true,
+			...(providerAddress ? { handOffTo: providerAddress } : {})
+		}
+	);
+}
+
+export function disconnectConfirmation(
+	frame: PageFrame,
+	row: ServiceRowView,
+	xsrf: string
+): Response {
+	const T = ACCOUNT_TEXTS[frame.language];
+	const body = `${header(frame)}<h1 style="font-size:24px; margin:0 0 8px; overflow-wrap:anywhere;">${html(T.disconnectTitle, { account: row.label })}</h1>
+<p style="margin:8px 0;">${html(T.disconnectEffect, { service: row.serviceName })}</p>
+${confirmForm(frame, { action: 'disconnect', connectedAccountId: row.id }, xsrf, T.disconnect, BUTTON)}`;
+	return page(text(T.disconnectTitle, { account: row.label }), body, 200, {
+		wide: true,
+		language: frame.language
+	});
+}
+
+/*
+ * The connect callback's refusal, in the services page's words: the applications page's outcome speaks of signing
+ * in to that page, which is not what a person returning from a provider was doing.
+ */
+export function connectOutcomePage(
+	outcome: 'expired' | 'refused',
+	path: string,
+	status: number,
+	language: Language
+): Response {
+	const T = ACCOUNT_TEXTS[language];
+	const sentence = outcome === 'expired' ? T.noticeExpired : T.noticeRefused;
+	return page(
+		T.servicesTitle,
+		`<h1 style="font-size:20px; margin:0 0 8px;">${esc(T.servicesTitle)}</h1><p>${esc(sentence)}</p><p><a href="${esc(path)}" style="${LINK}">${esc(T.servicesLink)}</a></p>`,
 		status,
 		{ language }
 	);

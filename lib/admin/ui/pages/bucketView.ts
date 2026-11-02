@@ -32,6 +32,7 @@ export interface BucketView extends Omit<
 				applications: number;
 				providers: number;
 				connections: number;
+				connectedServices: number;
 			} | null;
 			accounts: number | null;
 		}
@@ -105,6 +106,7 @@ export interface AddressPreview {
 	applications: { clientId: string; name: string | null }[];
 	connections: { id: string; displayName: string }[];
 	providers: { id: string; displayName: string; newCallback: string }[];
+	connectedServices: { id: string; displayName: string; newCallback: string }[];
 	resources: { identifier: string; name: string }[];
 	namespaceMove: boolean;
 	expect: {

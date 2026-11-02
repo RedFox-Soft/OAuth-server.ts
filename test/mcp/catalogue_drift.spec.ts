@@ -189,6 +189,9 @@ describe('MCP tool catalogue', () => {
 			'admin_update',
 			'client_delete',
 			'client_secret_rotate',
+			/* Disconnects every account people connected at it, and revokes their tokens (specs/117). */
+			'connected_account_delete',
+			'connected_service_delete',
 			'federation_identity_delete',
 			'federation_provider_delete',
 			'jwks_generate',

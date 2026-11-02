@@ -56,6 +56,10 @@ The catalogue is one document in the shared settings area, absent until a super 
 absent document reads as the built-in catalogue (`lib/consts/plans.ts:87`), so nothing is seeded and nothing an
 operator stored is ever overwritten.
 
+A stored catalogue is read as stored, so a limit added later must reach the plans already saved by a migration. The
+first was `connectedServicesPerProject` (spec 117, Free 10): `2026-11-02-plan-connected-services-limit` gives each
+stored plan the value of its own `applicationsPerProject`, so a plan an operator made generous stays generous.
+
 ## Checked in the route, before the audit write
 
 Every limit is checked by the admin route, after its authorization and before `recordAdminAudit`. A refused request

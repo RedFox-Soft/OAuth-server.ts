@@ -18,7 +18,9 @@ export type SealKind =
 	| 'totpSecret'
 	| 'totpPending'
 	| 'dpopNonceSecret'
-	| 'errorOriginSalt';
+	| 'errorOriginSalt'
+	| 'connectedServiceSecret'
+	| 'connectedAccountToken';
 
 export interface SealedField {
 	kind: SealKind;
@@ -84,6 +86,22 @@ export const SEALED_FIELDS: readonly SealedField[] = [
 		area: 'serviceConfig',
 		path: 'errorOriginSalt.secret',
 		owner: 'the instance'
+	},
+	{
+		kind: 'connectedServiceSecret',
+		area: 'userBuckets',
+		path: 'connectedServices[].clientSecret',
+		owner: 'a connected service of a project'
+	},
+	/*
+	 * Never plaintext, unlike every row above: the connected-account store refuses a write while no keyring is in
+	 * use (specs/117 R3), so the encryption pass only ever moves these to a new write key.
+	 */
+	{
+		kind: 'connectedAccountToken',
+		area: 'connectedAccounts',
+		path: '{refreshToken,accessToken}',
+		owner: "a person's account at a connected service"
 	}
 ];
 
@@ -161,7 +179,23 @@ export type SealTarget =
 	  }
 	| { kind: 'totpSecret'; bucketId: string; userId: string }
 	| { kind: 'totpPending'; uid: string; bucketId: string; accountId: string }
-	| { kind: 'dpopNonceSecret' | 'errorOriginSalt' };
+	| { kind: 'dpopNonceSecret' | 'errorOriginSalt' }
+	| { kind: 'connectedServiceSecret'; bucketId: string; serviceId: string }
+	| {
+			kind: 'connectedAccountToken';
+			id: string;
+			field: ConnectedAccountTokenField;
+			/* Not in the binding: carried so the console can link the repair to the person (specs/117 FR-027). */
+			bucketId: string;
+			accountId: string;
+	  };
+
+export const CONNECTED_ACCOUNT_TOKEN_FIELDS = [
+	'refreshToken',
+	'accessToken'
+] as const;
+export type ConnectedAccountTokenField =
+	(typeof CONNECTED_ACCOUNT_TOKEN_FIELDS)[number];
 
 /*
  * What a sealed value is bound to. A pending enrolment is bound to its person rather than its interaction:
@@ -188,5 +222,9 @@ export function bindingOf(target: SealTarget): string {
 			return 'serviceConfig/dpopNonceSecret/secret';
 		case 'errorOriginSalt':
 			return 'serviceConfig/errorOriginSalt/secret';
+		case 'connectedServiceSecret':
+			return `userBuckets/${target.bucketId}/connectedServices/${target.serviceId}/clientSecret`;
+		case 'connectedAccountToken':
+			return `connectedAccounts/${target.id}/${target.field}`;
 	}
 }

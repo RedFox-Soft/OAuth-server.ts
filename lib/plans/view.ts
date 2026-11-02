@@ -13,7 +13,11 @@ import { bucketUsage } from './usage.js';
  */
 
 export interface PlanWarning {
-	limit: 'monthlyActiveUsers' | 'applicationsPerProject' | 'apisPerProject';
+	limit:
+		| 'monthlyActiveUsers'
+		| 'applicationsPerProject'
+		| 'apisPerProject'
+		| 'connectedServicesPerProject';
 	level: 'near' | 'reached';
 }
 
@@ -27,6 +31,7 @@ export interface PlanView {
 		monthlyActiveUsers: number | null;
 		applications: number;
 		apis: number;
+		connectedServices: number;
 	};
 	warnings: PlanWarning[];
 	signUpsPaused: boolean;
@@ -63,7 +68,12 @@ export function warningsOf(
 			usage.applications,
 			plan.limits.applicationsPerProject
 		),
-		...warning('apisPerProject', usage.apis, plan.limits.apisPerProject)
+		...warning('apisPerProject', usage.apis, plan.limits.apisPerProject),
+		...warning(
+			'connectedServicesPerProject',
+			usage.connectedServices,
+			plan.limits.connectedServicesPerProject
+		)
 	];
 }
 

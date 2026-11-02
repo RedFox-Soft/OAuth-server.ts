@@ -33,7 +33,8 @@ const STARTER: Plan = {
 		monthlyActiveUsers: 500_000,
 		projectsPerAdministrator: 5,
 		applicationsPerProject: 50,
-		apisPerProject: 50
+		apisPerProject: 50,
+		connectedServicesPerProject: 50
 	},
 	features: { enterpriseSignIn: true, customSlug: true, customDomain: false }
 };

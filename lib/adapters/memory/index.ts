@@ -8,6 +8,7 @@ export { ProtectedResourceStore } from './protectedResourceStore.js';
 export { ProvisioningConnectionStore } from './provisioningConnectionStore.js';
 export { ProvisioningRefusalStore } from './provisioningRefusalStore.js';
 export { OutsideAuthorizationServerStore } from './outsideAuthorizationServerStore.js';
+export { ConnectedAccountStore } from './connectedAccountStore.js';
 export { BucketGroupStore } from './bucketGroupStore.js';
 export { BucketKeysStore } from './bucketKeysStore.js';
 export { McpClientPermissionStore } from './mcpClientPermissionStore.js';

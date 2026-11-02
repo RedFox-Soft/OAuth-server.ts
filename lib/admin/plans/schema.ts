@@ -14,7 +14,8 @@ const Limits = {
 	monthlyActiveUsers: Limit,
 	projectsPerAdministrator: Limit,
 	applicationsPerProject: Limit,
-	apisPerProject: Limit
+	apisPerProject: Limit,
+	connectedServicesPerProject: Limit
 };
 
 const Features = {

@@ -35,6 +35,8 @@ export interface KeyringStatus {
 /* One entry per key rather than one per private member: the repair is the same, and so is the reader's question. */
 function bindingOfEntry(entry: UnreadableSecret): string {
 	if (entry.kind === 'privateKey') return `bucketKeys/${entry.owner.keyId}/`;
+	if (entry.kind === 'connectedAccountToken')
+		return `connectedAccounts/${entry.owner.id}/`;
 	return bindingOf({ kind: entry.kind, ...entry.owner } as SealTarget);
 }
 

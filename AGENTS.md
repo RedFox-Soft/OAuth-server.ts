@@ -100,6 +100,7 @@ lib/
   shared/               ← session, the shared onError, token auth, client notifications, resource validation
   resources/            ← declared protected resources: canonical form, matching, descriptors
   end_users/            ← the end-user service (every change to an end user), canSignIn, ending access
+  connected_services/   ← connected services and accounts: catalogue resolution, connect flow, revocation, cascades
   client_metadata_document/ ← a client_id that is a URL: form rules, SSRF-bounded fetch, cache
   admin/                ← the administrative control plane
     routes.ts           ← THE admin API route set; mounted by the console and by lib/mcp/dispatch.ts
@@ -144,8 +145,9 @@ Each rule is the part that is easy to break. Read the named page before changing
   `lib/consts/storage_divergences.ts`. Importing `lib/adapters/postgres/` opens no connection, and a
   jsonb column is written as an object, never `JSON.stringify(...)`. A secret the server must read back is
   declared in `lib/consts/sealed_fields.ts` and sealed by the store decorators, never stored plaintext; a
-  secret-looking field that is not is declared plaintext there with its reason. → `postgresql-backend.md`,
-  `mongodb-test-fidelity.md`, `secrets-encryption-at-rest.md`
+  secret-looking field that is not is declared plaintext there with its reason. A connected account is deliberately not account-owned (a lock keeps it), so
+  a path that deletes a person, a service or a project removes its connected accounts by hand.
+  → `postgresql-backend.md`, `mongodb-test-fidelity.md`, `secrets-encryption-at-rest.md`, `connected-services.md`
 - **Schema migrations** — declared in `lib/consts/migrations.ts`, applied by `bun run db:migrate`;
   startup refuses a database that is behind, ahead or diverged, and never migrates it itself. A
   migration must be safe to apply twice. → `postgresql-backend.md`

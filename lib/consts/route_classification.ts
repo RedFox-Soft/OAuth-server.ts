@@ -86,7 +86,9 @@ export const bucketScopedPaths: readonly string[] = [
 	routeNames.global_token_revocation,
 	SCIM_BASE_PATH,
 	routeNames.account_apps,
-	routeNames.account_apps_callback
+	routeNames.account_apps_callback,
+	routeNames.account_services,
+	routeNames.account_services_callback
 ];
 
 /* RFC 8414 §3 places the well-known segment before the issuer's path, so these two cannot be produced
@@ -306,7 +308,10 @@ const bareAlwaysAvailableRoutes: readonly AlwaysAvailableRoute[] = [
 	 */
 	{ method: 'GET', path: routeNames.account_apps },
 	{ method: 'POST', path: routeNames.account_apps },
-	{ method: 'GET', path: routeNames.account_apps_callback }
+	{ method: 'GET', path: routeNames.account_apps_callback },
+	{ method: 'GET', path: routeNames.account_services },
+	{ method: 'POST', path: routeNames.account_services },
+	{ method: 'GET', path: routeNames.account_services_callback }
 ];
 
 /*

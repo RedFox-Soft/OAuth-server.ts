@@ -52,5 +52,48 @@ export const en = {
 	tryAgain: 'Go to your connected apps page',
 	refusedTitle: 'Request refused',
 	refused:
-		'This request did not come from your connected apps page, so nothing was changed.'
+		'This request did not come from your connected apps page, so nothing was changed.',
+	/*
+	 * The connected-services page (specs/117): the person's accounts at other services, connected here. A service
+	 * name or an account label is always a value, never part of the sentence.
+	 */
+	servicesTitle: 'Connected services',
+	servicesIntro:
+		'These are your accounts at other services that you connected here. You can disconnect one at any time.',
+	servicesEmpty: 'You have not connected any accounts.',
+	servicesAvailable: 'Connect an account',
+	servicesLink: 'Connected services',
+	appsLink: 'Connected apps',
+	connect: 'Connect {service}',
+	connectedAt: 'Connected {date}',
+	scopesGranted: 'Allowed: {scopes}',
+	scopesMissing: 'Not allowed: {scopes}',
+	needsReconnection: 'Needs to be connected again',
+	disconnect: 'Disconnect',
+	connectTitle: 'Connect your {service} account?',
+	connectEffect:
+		'You will go to {service} to sign in and allow access. You can disconnect the account here at any time.',
+	continue: 'Continue',
+	disconnectTitle: 'Disconnect {account}?',
+	disconnectEffect:
+		'This account at {service} will be forgotten here, and {service} will be asked to cancel the access it gave.',
+	connectedDone: 'Your {service} account is connected.',
+	updatedDone: 'Your {service} account is connected again.',
+	disconnectedDone: 'The account was disconnected.',
+	revocationRevoked: '{service} was asked to cancel the access and agreed.',
+	revocationFailed:
+		'{service} could not be reached to cancel the access. Remove it there yourself.',
+	revocationNotSupported:
+		'{service} does not let this server cancel the access. Remove it there yourself.',
+	revocationUnreadable:
+		'The account could no longer be read here, so {service} was not asked to cancel the access. Remove it there yourself.',
+	manageAccess: 'Open the access settings at {service}',
+	noticeDeclined: 'The account was not connected: access was not allowed.',
+	noticeFailed: 'The account could not be connected. Try again.',
+	noticeLimit:
+		'You have connected as many accounts at this service as you can. Disconnect one first.',
+	noticeUnavailable: 'This service cannot be connected right now.',
+	noticeExpired: 'Connecting took too long. Try again.',
+	noticeRefused:
+		'The account was not connected: the answer did not belong to the connection started here.'
 } as const;

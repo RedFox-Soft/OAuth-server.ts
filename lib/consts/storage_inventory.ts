@@ -107,6 +107,7 @@ export const MODEL_AREAS = [
 	'ClientCredentials',
 	'ClientLogo',
 	'ClientUsage',
+	'ConnectState',
 	'DeprovisionSlot',
 	'DeviceCode',
 	'FederationState',
@@ -165,6 +166,12 @@ export const STORE_AREAS = {
 	 * is derived from the project and the issuer, so one connection per issuer per project is the primary key.
 	 */
 	outsideAuthorizationServers: 'outsideAuthorizationServers',
+	/*
+	 * People's accounts at the services their project lets them connect (specs/117), with the upstream tokens
+	 * sealed. The `_id` is derived from the project, the service, the person and the upstream account, so a
+	 * reconnect of the same upstream account is the same record by its primary key.
+	 */
+	connectedAccounts: 'connectedAccounts',
 	/*
 	 * A bucket's groups of end users — what its roles became. Distinct from `groups`, which hold administrators
 	 * and own buckets; the two are never the same record.
@@ -409,6 +416,11 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 	 * they simply expire, which is the true statement `unowned` was reaching for.
 	 */
 	modelArea('FederationState', EXPIRES_AT, byAccount),
+	/*
+	 * A connect flow in flight (specs/117 R5), keyed by sha256(state). Account-owned, unlike the accounts it
+	 * creates: a lock should end a connect that has not come back yet.
+	 */
+	modelArea('ConnectState', EXPIRES_AT, byAccount),
 	/*
 	 * The consent record. Only a principal cascade destroys these — protocol revocation deliberately
 	 * leaves them alive, because revoking a token is not withdrawing consent.
@@ -661,6 +673,24 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 			'owned by a bucket, which is not a principal; cascaded by the bucket-delete route'
 		),
 		[{ key: { bucketId: 1 } }]
+	),
+	/*
+	 * Never reaped: a token that expired upstream is still the person's connection until they or an
+	 * administrator remove it. Unowned on purpose, though every record names a person: an account owner here
+	 * means "swept by every lock, deactivation and end of access", and a person keeps connected accounts
+	 * through a lock (specs/117 Clarifications). The three paths that must delete them do so by hand: the
+	 * person's deletion, the service's deletion, and the bucket-delete route.
+	 */
+	storeArea(
+		STORE_AREAS.connectedAccounts,
+		null,
+		unowned(
+			'a person keeps connected accounts through a lock (specs/117); deleted by the person, service and project deletion paths'
+		),
+		[
+			{ key: { bucketId: 1, accountId: 1 } },
+			{ key: { bucketId: 1, serviceId: 1 } }
+		]
 	),
 	storeArea(
 		STORE_AREAS.provisioningRefusals,

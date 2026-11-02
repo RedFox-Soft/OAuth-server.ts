@@ -23,6 +23,11 @@ const REAPED_ON_EXPIRES_AT = [
 	'BackchannelAuthenticationRequest',
 	'ClientCredentials',
 	/*
+	 * A connect flow in flight (specs/117). Expiry is the control: a flow that outlived its ten minutes would be
+	 * a callback anyone holding the state could still complete.
+	 */
+	'ConnectState',
+	/*
 	 * A provisioning connection's deprovisioning tally. Expiry is the mechanism rather than housekeeping:
 	 * a slot frees itself one threshold window after it was taken, which is what makes the count rolling.
 	 */
@@ -130,6 +135,8 @@ const PERMANENT = [
 	 * would stop a project's agents reaching an outside MCP server with nothing to say why.
 	 */
 	'outsideAuthorizationServers',
+	/* A connected account is the person's until they, an administrator or a deletion removes it (specs/117). */
+	'connectedAccounts',
 	/*
 	 * A bucket group and its memberships live until an administrator or the owning directory removes them.
 	 * An expiry here would silently change what every relying party lets those people do.

@@ -1682,6 +1682,92 @@ const clientAddressSource: Migration = {
 	}
 };
 
+/*
+ * The plan catalogue's document in `serviceConfig`: the SHA-256 of 'planCatalogue', cut to 24 hex characters,
+ * as both catalogue stores derive it.
+ */
+const PLAN_CATALOGUE_DOCUMENT_ID = '261c53434dc43cdfe5f1d81f';
+
+/*
+ * A stored plan gains `connectedServicesPerProject` (specs/117) at its own `applicationsPerProject`: a plan an
+ * operator made generous stays generous, and a stored Free stays at the ten the built-in one allows. Null stays
+ * null. Returns the catalogue to write, or undefined when every plan already has the limit.
+ */
+function plansWithConnectedServices(
+	catalogue: unknown
+): Record<string, unknown> | undefined {
+	const plans = member(catalogue, 'plans');
+	if (!isList(plans) || !isRecord(catalogue)) return undefined;
+	const next = plans.map((plan) => {
+		const limits = member(plan, 'limits');
+		if (!isRecord(plan) || !isRecord(limits)) return plan;
+		if ('connectedServicesPerProject' in limits) return plan;
+		const applications = limits.applicationsPerProject;
+		return {
+			...plan,
+			limits: {
+				...limits,
+				connectedServicesPerProject:
+					typeof applications === 'number' ? applications : null
+			}
+		};
+	});
+	const changed = next.some((plan, index) => plan !== plans[index]);
+	return changed ? { ...catalogue, plans: next } : undefined;
+}
+
+function planLimitReport(changed: boolean): string[] {
+	return [
+		changed
+			? 'stored plans given a limit on connected services'
+			: 'no stored plan without a limit on connected services'
+	];
+}
+
+const planConnectedServicesLimit: Migration = {
+	id: '2026-11-02-plan-connected-services-limit',
+	description:
+		'Give every stored plan a limit on connected services per project, equal to its limit on applications',
+	reversible: true,
+	rerunnable:
+		'A plan that already states connectedServicesPerProject is left alone, so a second application writes nothing; an instance with no stored catalogue reads the built-in plans and has nothing to change.',
+	mongodb: {
+		async apply(handle) {
+			// The runner passes the selected backend's handle; for MongoDB that is the driver's `Db`.
+			const db = handle as MongoHandle;
+			const { ObjectId } = await import('mongodb');
+			const area = db.collection(STORE_AREAS.serviceConfig);
+			const _id = new ObjectId(PLAN_CATALOGUE_DOCUMENT_ID);
+			const stored = await area.findOne({ _id });
+			const next = plansWithConnectedServices(member(stored, 'catalogue'));
+			if (next === undefined) return planLimitReport(false);
+			await area.updateOne(
+				{ _id },
+				{ $set: { catalogue: next, updatedAt: new Date() } },
+				{}
+			);
+			return planLimitReport(true);
+		}
+	},
+	postgres: {
+		async apply(handle) {
+			// The runner passes the selected backend's handle; for PostgreSQL that is Bun's SQL client.
+			const sql = handle as PostgresHandle;
+			const area = sql(STORE_AREAS.serviceConfig);
+			const stored = (
+				await sql`SELECT doc FROM ${area} WHERE id = ${PLAN_CATALOGUE_DOCUMENT_ID}`
+			).at(0);
+			const next = plansWithConnectedServices(member(stored, 'doc'));
+			if (next === undefined) return planLimitReport(false);
+			await sql`
+				UPDATE ${area} SET doc = ${next}
+				WHERE id = ${PLAN_CATALOGUE_DOCUMENT_ID}
+			`;
+			return planLimitReport(true);
+		}
+	}
+};
+
 export const MIGRATIONS: readonly Migration[] = [
 	namespacedProtectedResources,
 	rootKeysLifecycle,
@@ -1693,5 +1779,6 @@ export const MIGRATIONS: readonly Migration[] = [
 	projectsReservedHostnames,
 	projectsRecordPlan,
 	adminSignUpRequiresVerification,
-	clientAddressSource
+	clientAddressSource,
+	planConnectedServicesLimit
 ];
