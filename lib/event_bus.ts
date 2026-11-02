@@ -209,10 +209,37 @@ export type ServerEvents = ModelEvents &
 			ConnectedAccountEvent & {
 				clientId: string;
 				change: 'allowed' | 'declined' | 'withdrawn';
-				via: 'consent_screen' | 'account_page';
+				via: 'consent_screen' | 'account_page' | 'connect_link';
+			}
+		];
+		/*
+		 * An agent's connect link (specs/119 R8), named by its public id: never its value, a token or a label.
+		 * `refused` is the link's own person check or recheck, never an unknown value, which identifies nothing.
+		 */
+		'connect_link.issued': [ConnectLinkEvent];
+		'connect_link.completed': [
+			ConnectLinkEvent & { connectedAccountId: string }
+		];
+		'connect_link.declined': [ConnectLinkEvent];
+		'connect_link.refused': [
+			{
+				bucketId: string;
+				serviceId: string;
+				connectId: string;
+				cause: 'other_person' | 'changed';
 			}
 		];
 	};
+
+interface ConnectLinkEvent {
+	bucketId: string;
+	accountId: string;
+	clientId: string;
+	exchangedBy: string;
+	serviceId: string;
+	act: 'connect' | 'consent' | 'reconnect';
+	connectId: string;
+}
 
 interface ConnectedAccountEvent {
 	bucketId: string;

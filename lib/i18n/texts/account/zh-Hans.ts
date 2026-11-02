@@ -86,5 +86,46 @@ export const zhHans: AccountTexts = {
 	allow: '允许',
 	allowedDone: '{app}现在可以使用您的{service}账号。',
 	withdrawnDone:
-		'{app}将无法再访问您的{service}账号。它已获得的访问权限在{service}处仍然有效，直到过期，通常不超过一小时。'
+		'{app}将无法再访问您的{service}账号。它已获得的访问权限在{service}处仍然有效，直到过期，通常不超过一小时。',
+	/* 智能体的连接链接（specs/119）：拒绝响应中的说明和链接页面。 */
+	linkMessageConnect: '打开此链接，连接您的{service}账号并允许{app}使用它。',
+	linkMessageConsent: '打开此链接，允许{app}使用您的{service}账号。',
+	linkMessageReconnect: '打开此链接，重新连接您的{service}账号。',
+	linkConnectTitle: '{app}请求使用您的{service}账号',
+	linkConnectEffect:
+		'您将前往{service}登录并允许访问。之后{app}即可使用该账号。您可以随时在账号页面撤销此授权。',
+	linkConnectButton: '连接{service}并允许{app}',
+	linkConnectAnother: '连接另一个{service}账号',
+	linkLimit: '您连接的{service}账号已达上限。您可以改为允许{app}使用其中一个。',
+	linkConsentOne: '允许{app}使用您的{service}账号{account}吗？',
+	linkConsentSeveral: '{app}可以使用您的哪些{service}账号？',
+	linkConsentNote: '您可以随时在账号页面撤销此授权。',
+	linkReconnectTitle: '重新连接您的{service}账号{account}',
+	linkReconnectEffect:
+		'{service}不再接受您的账号{account}。请重新连接，以便{app}可以再次使用它。',
+	linkReconnectButton: '重新连接{service}',
+	linkDecline: '拒绝',
+	linkTryAgain: '在链接有效期内，您可以从此链接重试。',
+	linkDoneTitle: '完成',
+	linkDoneConnected: '您的{service}账号已连接，{app}可以使用它。',
+	linkDoneConnectedOnly:
+		'您的{service}账号已连接，但{app}已不能再使用{service}。',
+	linkDoneAllowed: '{app}现在可以使用您的{service}账号。',
+	linkDoneReconnected: '您的{service}账号{account}已恢复正常。',
+	linkDoneOther: '已连接另一个{service}账号。{account}仍需重新连接。',
+	linkAlreadyDone: '此操作已完成。',
+	linkReturn: '您可以返回{app}。',
+	linkDeclinedTitle: '未做任何更改',
+	linkDeclined: '{app}不能使用您的{service}账号。您可以返回{app}。',
+	linkInvalidTitle: '此链接已失效',
+	linkInvalid: '请向应用索取新的链接。',
+	linkOtherTitle: '此链接属于另一个账号',
+	linkOther:
+		'此链接是为其他人生成的，因此未做任何更改。如果您想使用另一个账号，请先退出登录。',
+	linkChangedTitle: '此操作已无法完成',
+	linkChangedService: '此处已不再提供该服务。',
+	linkChangedApp: '{app}已不能再使用{service}。',
+	linkChangedAccess:
+		'{app}已无权访问您在此处的账号。请重新登录该应用以授予访问权限。',
+	linkChangedAccount: '该{service}账号已不再连接。'
 };

@@ -60,6 +60,7 @@ import { scimApp, scimMetadataApp } from './scim/index.js';
 import { federationBackChannelLogout } from './upstream_signals/back_channel_logout.js';
 import { accountPageRoutes } from './account_page/routes.js';
 import { accountServicesRoutes } from './account_page/services_routes.js';
+import { accountLinkRoutes } from './account_page/link_routes.js';
 import { globalTokenRevocation } from './upstream_signals/global_token_revocation.js';
 import { verificationRoutes } from './routes/verification.js';
 import { passwordResetRoutes } from './routes/password_reset.js';
@@ -271,6 +272,9 @@ elysia.use(accountServicesRoutes);
 elysia.group('/:bucket', (bucketScoped) =>
 	bucketScoped.use(accountServicesRoutes)
 );
+// Where an agent's connect link leads (specs/119), the same way.
+elysia.use(accountLinkRoutes);
+elysia.group('/:bucket', (bucketScoped) => bucketScoped.use(accountLinkRoutes));
 
 /*
  * Binding the port, and the one startup failure this module can report.

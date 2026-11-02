@@ -86,7 +86,7 @@ describe('an agent exchanging for a person with two GitHub accounts', () => {
 		expect(body.access_token).toBe(present(home.accessToken, 'a token'));
 	});
 
-	it('is asked to choose when the person allowed both and it names none, and learns no label', async () => {
+	it('is asked to choose when the person allowed both and it names none, with only their labels to choose from', async () => {
 		const { service, work, home, signedIn } = await twoAccounts();
 		await allowAccount(signedIn.grantId, work);
 		await allowAccount(signedIn.grantId, home);
@@ -101,6 +101,7 @@ describe('an agent exchanging for a person with two GitHub accounts', () => {
 		expect(body.reason).toBe('account_selection_required');
 		expect(body.error_description).not.toContain(work.label);
 		expect(body.error_description).not.toContain(home.label);
+		expect(body.accounts).toEqual([work.label, home.label].sort());
 	});
 
 	it('is refused as needing consent when it names an account the person did not allow', async () => {

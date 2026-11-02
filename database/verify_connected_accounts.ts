@@ -252,6 +252,7 @@ export async function verifyConnectedAccounts(
 	await verifyRefreshes(accounts, check, stamp);
 	await verifyKeepAliveIndex(check);
 	await verifyExchangingApplication(fixture.resources, check, stamp);
+	await verifyConnectLinks(check, stamp);
 
 	/* ---- tidy up ---- */
 
@@ -629,6 +630,53 @@ async function verifyRefreshes(
 
 	await accounts.destroyByBucket(bucketId);
 	await accounts.destroyByBucket(otherBucketId);
+}
+
+/*
+ * An agent's connect link (specs/119 R3, R4): found by its value through the area's own unique index, a slot
+ * rewritten under a new value no longer answers to the old one, and two slots can never share a value. The memory
+ * adapter had to be taught the second; this shows the real backends never needed it.
+ */
+async function verifyConnectLinks(check: Check, stamp: string): Promise<void> {
+	const { adapter } = await import('../lib/adapters/index.js');
+	const links = adapter('ConnectLink');
+	const now = Math.floor(Date.now() / 1000);
+	const link = (uid: string) => ({
+		uid,
+		ref: `ref-${uid}`,
+		bucketId: `connected-${stamp}`,
+		accountId: 'person-1',
+		clientId: 'agent',
+		exchangedBy: 'agent',
+		serviceId: 'svc-a',
+		act: 'connect',
+		state: 'open',
+		iat: now,
+		exp: now + 1800
+	});
+	const slot = `slot-${stamp}`;
+	const other = `slot-other-${stamp}`;
+	const first = `value-a-${stamp}`;
+	const second = `value-b-${stamp}`;
+	await links.upsert(slot, link(first), 1800);
+	const byValue = await links.findByUid(first);
+	await links.upsert(slot, link(second), 1800);
+	const stale = await links.findByUid(first);
+	const current = await links.findByUid(second);
+	check(
+		'connect links: found by value, and a rewritten slot no longer answers to its old value',
+		byValue?.uid === first && stale === undefined && current?.uid === second,
+		`${String(byValue?.uid)} ${String(stale?.uid)} ${String(current?.uid)}`
+	);
+	let shared = true;
+	try {
+		await links.upsert(other, link(second), 1800);
+	} catch {
+		shared = false;
+	}
+	check('connect links: two slots cannot hold the same value', !shared);
+	await links.destroy(slot);
+	await links.destroy(other);
 }
 
 /*

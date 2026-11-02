@@ -326,19 +326,84 @@ A refusal is a standard OAuth error with one more member, `reason`, which says w
 }
 ```
 
-| `reason`                     | `error`                   | HTTP | What to do                                                                                 |
-| ---------------------------- | ------------------------- | ---- | ------------------------------------------------------------------------------------------ |
-| `not_permitted`              | `invalid_target`          | 400  | Ask the project's administrator to allow the application for this service.                 |
-| `consent_required`           | `invalid_grant`           | 400  | Send the person to their account page to allow the application.                            |
-| `connect_required`           | `invalid_grant`           | 400  | Ask the person to connect an account at the service first.                                 |
-| `account_selection_required` | `invalid_grant`           | 400  | The person allowed several accounts. Send `login_hint` to name one.                        |
-| `reconnect_required`         | `invalid_grant`           | 400  | Ask the person to connect the account again. `error_description` names any missing scopes. |
-| `temporarily_unavailable`    | `temporarily_unavailable` | 503  | Retry later.                                                                               |
+| `reason`                     | `error`                   | HTTP | What to do                                                                               |
+| ---------------------------- | ------------------------- | ---- | ---------------------------------------------------------------------------------------- |
+| `not_permitted`              | `invalid_target`          | 400  | Ask the project's administrator to allow the application for this service.               |
+| `not_permitted`              | `invalid_scope`           | 400  | The service does not declare a scope you asked for. Ask the administrator to add it.     |
+| `consent_required`           | `invalid_grant`           | 400  | Show the person the link in `connect_uri`.                                               |
+| `connect_required`           | `invalid_grant`           | 400  | Show the person the link in `connect_uri`.                                               |
+| `account_selection_required` | `invalid_grant`           | 400  | Ask the person which of `accounts` to use, and send it as `login_hint`.                  |
+| `reconnect_required`         | `invalid_grant`           | 400  | Show the person the link in `connect_uri`. `error_description` names any missing scopes. |
+| `temporarily_unavailable`    | `temporarily_unavailable` | 503  | Retry later.                                                                             |
 
 Other failures have no `reason`. An expired or revoked access token, a token from another project, an application
 that is not allowed to present the token, and a person who can no longer sign in are all refused as
 `invalid_grant`. An application that lacks the token exchange grant is refused as `unauthorized_client`. No
-refusal says anything about another person's accounts, or names an account the request did not name itself.
+refusal says anything about another person's accounts. The only labels a refusal lists are those in `accounts`,
+the accounts the person allowed this application to use.
+
+### The person's link {#the-persons-link}
+
+Three of those refusals are fixed by the person, not by you: connecting a service, allowing your application, or
+connecting an account again. Each one carries a link you show the person:
+
+```json
+{
+	"error": "invalid_grant",
+	"error_description": "the person has not connected a GitHub account",
+	"reason": "connect_required",
+	"connect_uri": "https://auth.example.com/account/services/link/q3Jx…",
+	"connect_id": "c6m2…",
+	"connect_expires_in": 1800,
+	"connect_message": "Open this link to connect your GitHub account and let Repo Helper use it."
+}
+```
+
+- `connect_uri` is the address to show. It opens a page on this server that offers exactly one thing: connect the
+  service and allow your application, allow your application to use an account, or connect an account again.
+- `connect_message` is a sentence for the person, in their language when their account has one, else English.
+- `connect_id` stays the same while the link does. Ask again and you get the same link until it is used, declined
+  or replaced by a link for a different step.
+- `connect_expires_in` is how many seconds the link has left. A link lives thirty minutes.
+
+The link works only for the person whose access token you presented. Opening it asks them to sign in to the project
+if they have not done so in the last fifteen minutes. Anyone else who opens it is told it was made for another
+account, and nothing changes. The address carries no token and nothing about the person.
+
+The page ends by telling the person to return to your application. It does not send them back anywhere. Your
+application learns the outcome by repeating the exchange: once the person has done what the link asked, the next
+exchange returns the token.
+
+### Relaying the link from an MCP server {#relaying-the-link-from-an-mcp-server}
+
+An MCP server that exchanges tokens for its client passes the link on as a URL elicitation. Every field comes from
+the refusal.
+
+For an MCP 2025-11-25 client, answer the tool call with this error:
+
+```json
+{
+	"code": -32042,
+	"message": "Open this link to connect your GitHub account and let Repo Helper use it.",
+	"data": {
+		"elicitations": [
+			{
+				"mode": "url",
+				"elicitationId": "c6m2…",
+				"url": "https://auth.example.com/account/services/link/q3Jx…",
+				"message": "Open this link to connect your GitHub account and let Repo Helper use it."
+			}
+		]
+	}
+}
+```
+
+For an MCP 2026-07-28 client, return an `input_required` result whose URL request carries `connect_uri` and
+`connect_message`. In both versions the client retries the tool call after the person has finished, and the tool
+repeats the exchange.
+
+For `account_selection_required`, ask the person to choose with a form elicitation whose options are the labels in
+`accounts`, then repeat the exchange with the chosen label as `login_hint`.
 
 ## Keeping accounts working {#keeping-accounts-working}
 
@@ -433,8 +498,3 @@ An API's exchanging application is set with [`resource_update`](/docs/reference/
 The person's own agreements are theirs alone: no tool gives or withdraws them.
 The admin API routes behind them are under `/admin/api/projects/:id/connected-services` and
 `/admin/api/projects/:id/users/:uid/connected-accounts`.
-
-## What comes later {#what-comes-later}
-
-Today a person connects an account from their account page. A later release will let an agent hand the person a
-link to connect a service, at the moment the agent finds that the account is missing.

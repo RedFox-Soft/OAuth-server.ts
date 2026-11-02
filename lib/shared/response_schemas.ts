@@ -17,7 +17,13 @@ export const OAuthError = t.Object({
 	state: t.Optional(t.String()),
 	iss: t.Optional(t.String()),
 	/* An upstream token exchange's refusal cause (specs/118 R6), an extension member. */
-	reason: t.Optional(t.String())
+	reason: t.Optional(t.String()),
+	/* The link that lets the person fix it, and the accounts an agent may choose from (specs/119 R1). */
+	connect_uri: t.Optional(t.String()),
+	connect_id: t.Optional(t.String()),
+	connect_expires_in: t.Optional(t.Number()),
+	connect_message: t.Optional(t.String()),
+	accounts: t.Optional(t.Array(t.String()))
 });
 
 /*

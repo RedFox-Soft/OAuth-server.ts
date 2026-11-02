@@ -255,6 +255,26 @@ function unauthenticatedChallenge() {
 }
 
 /*
+ * An upstream token exchange's refusal: its cause (specs/118 R6), and what the agent can do about it, the person's
+ * connect link or the accounts to choose from (specs/119 R1). Extension members of RFC 6749 §5.2's object, which a
+ * client that does not know them ignores.
+ */
+function upstreamMembers(error: UpstreamTokenRefused) {
+	return {
+		reason: error.reason,
+		...(error.link
+			? {
+					connect_uri: error.link.uri,
+					connect_id: error.link.ref,
+					connect_expires_in: error.link.expiresIn,
+					connect_message: error.link.message
+				}
+			: {}),
+		...(error.accounts ? { accounts: [...error.accounts] } : {})
+	};
+}
+
+/*
  * A schema refusal on the protocol surface answers 400, not the validator's 422.
  *
  * The body was already right — `getObjFromError` renders a VALIDATION code as `invalid_request` with
@@ -480,7 +500,7 @@ export async function errorHandler(obj: ErrorHandlerContext) {
 	 */
 	const body = {
 		...errorObj,
-		...(error instanceof UpstreamTokenRefused ? { reason: error.reason } : {}),
+		...(error instanceof UpstreamTokenRefused ? upstreamMembers(error) : {}),
 		...(reference ? { error_reference: reference } : {})
 	};
 	if (isOIDError && status === 401) {

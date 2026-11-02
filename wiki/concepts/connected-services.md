@@ -10,7 +10,7 @@ updated: 2026-11-02
 # Connected services
 
 Spec 117, the floor of the token vault (spec 116 sealed stored secrets; 118 issues the stored tokens to agents by
-token exchange, below; 119 adds the agent's connect link). A project declares **connected services**
+token exchange, below; 119 puts a connect link for the person in the exchange's refusal, below). A project declares **connected services**
 (Google, GitHub, Slack, Microsoft, an OpenID Connect issuer, or a plain OAuth 2.0 provider) with its own
 registration at each provider. A person **connects** their account at one from their account page, and the
 provider's tokens are stored sealed. Since spec 118 an agent the administrator and the person both allowed obtains
@@ -132,12 +132,54 @@ be revoked.
 **Refusals carry a `reason`** beside RFC 6749's `error` (`UpstreamTokenRefused`, `lib/helpers/errors.ts`):
 `not_permitted`, `consent_required`, `connect_required`, `account_selection_required`, `reconnect_required`,
 `temporarily_unavailable`. A bad subject token is plain `invalid_grant` with none, so no answer says anything about the
-person's accounts.
+person's accounts. Since spec 119 (2026-11-02) `account_selection_required` lists `accounts`, the labels of the
+accounts the person allowed this agent and no others, and a scope the service does not declare is `not_permitted`
+with `error=invalid_scope` (it was `reconnect_required`, which a reconnect asking only for the declared scopes could
+never fix) (`assertScopes`, `lib/connected_services/upstream_exchange.ts:137`).
 
 **The grant is always advertised.** `supportedGrantTypes` lists token exchange whatever `tokenExchange.enabled` says
 (`lib/configs/discoverySupport.ts:92`); the setting now gates only ID-JAGs, and an ID-JAG request while it is off is
 `invalid_request`, never `unsupported_grant_type`, because an advertised grant is never refused as unsupported (see
 [[enterprise-managed-authorization]]).
+
+## The person's connect link (spec 119)
+
+Three refusals are the person's to fix, not the developer's: `connect_required`, `consent_required` and
+`reconnect_required`. Each carries `connect_uri`, `connect_id`, `connect_expires_in` and `connect_message`, which map
+one to one onto an MCP URL elicitation (`attachLink`, `lib/connected_services/upstream_exchange.ts:190`). The link is
+attached only after the person is known, so a bad subject token still answers the same whatever anyone has; a link that
+cannot be made leaves the refusal as it was.
+
+**One slot per person, agent and service.** A link request is a `ConnectLink` model record keyed by SHA-256 of
+(project, person, agent, service), found by its value through a unique `payload.uid` index as a session is
+(`lib/consts/storage_inventory.ts:430`), thirty minutes, owned by account and client so a lock or the agent's deletion
+ends it. A retry gets the same link while it is open and the act is unchanged; another act overwrites the slot, and the
+old value then finds nothing (`issueLink`, `lib/connected_services/link.ts:59`). No counter: open links are bounded by
+a person's agents times the project's services. No migration either: `db:setup` provisions the area and its index.
+
+**The value is not a credential.** `/account/services/link/:link` (`lib/account_page/link_routes.ts`) acts only for
+the person the agent's token named: unknown, expired, replaced and declined values read the same 404; nobody signed in
+goes to sign in and back; another person gets 403 naming no one; a sign-in older than fifteen minutes signs in again;
+only then does a used link say "already done" (`open`, `link_routes.ts:114`). Everything the exchange checked about the
+agent and the administrator is checked again before the page offers anything, and the act already done on the account
+page closes the link (`situation`, `link_routes.ts:180`). Every act is a button on a same-origin form with the page's
+anti-forgery value, as on `/account/services`.
+
+**Gotcha: a connect from a link carries the consent in its state.** `startConnect` stores `link` on the `ConnectState`,
+and the provider's return (`finishLink`, `lib/account_page/services_routes.ts:330`) records the agent's consent for
+the account just connected, after checking the allow-list and the agent's grant again, because thirty minutes and a
+provider lie between the press and the answer. A reconnect writes no consent; reconnecting as another upstream account
+connects that one as new and leaves the broken one. The link's done page is reached by `?done=` on the link itself,
+read by whitelist.
+
+**Gotcha: the memory adapter indexed `uid` for `Session` only.** MongoDB's and PostgreSQL's `findByUid` query any
+collection's `payload.uid`; the memory adapter kept one global pointer for sessions. It now keeps one per model and
+answers only while the record still holds the uid asked for, since a slot rewritten under a new uid left the old
+pointer behind (`lib/adapters/memory/memoryAdapter.ts:112`). Found by the replaced-link test on 2026-11-02.
+
+The agent learns the outcome by repeating the exchange, as MCP 2026-07-28 does for every out-of-band step; there is no
+status endpoint and no redirect back to the agent. `account_selection_required` carries no link: the choice belongs in
+the conversation, where the agent can ask with a form elicitation over `accounts`.
 
 ## One refresh at a time
 

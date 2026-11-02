@@ -29,6 +29,11 @@ import {
 	type ConnectNotice
 } from '../connected_services/accounts.js';
 import { digestOf, spendConnect } from '../connected_services/state.js';
+import { closeLink } from '../connected_services/link.js';
+import type {
+	ConnectedAccount,
+	ConnectStatePayload
+} from '../connected_services/types.js';
 import { resolveService } from '../connected_services/catalogue.js';
 import {
 	agentsByAccount,
@@ -39,7 +44,7 @@ import { getConnectedAccountStore } from '../adapters/index.js';
 import { grantsIn } from '../end_users/sessions.js';
 import { sanitiseClientName } from '../interactions/clientName.js';
 import { Client } from '../models/client.js';
-import { accountPageBase } from './client.js';
+import { accountPageBase, connectLinkUrl } from './client.js';
 import {
 	connectConfirmation,
 	connectOutcomePage,
@@ -65,14 +70,14 @@ import {
  * and beneath `/:bucket` with no `params` schema for the reason that page gives.
  */
 
-function addressOfRequest(params: unknown, request: Request) {
+export function addressOfRequest(params: unknown, request: Request) {
 	return requestBucketFor(
 		(params as { bucket?: string } | undefined)?.bucket,
 		hostOfRequest(request)
 	);
 }
 
-function servicesPath(bucket: RequestBucket): string {
+export function servicesPath(bucket: RequestBucket): string {
 	return new URL(`${accountPageBase(bucket)}${routeNames.account_services}`)
 		.pathname;
 }
@@ -82,11 +87,11 @@ function appsPath(bucket: RequestBucket): string {
 		.pathname;
 }
 
-function personLanguage(person: PagePerson, request: Request): Language {
+export function personLanguage(person: PagePerson, request: Request): Language {
 	return languageOfRequest(request, [storedLocaleRanges(person.user)]).language;
 }
 
-function frameFor(person: PagePerson, language: Language): PageFrame {
+export function frameFor(person: PagePerson, language: Language): PageFrame {
 	const base = accountPageBase(person.bucket);
 	return {
 		language,
@@ -98,11 +103,11 @@ function frameFor(person: PagePerson, language: Language): PageFrame {
 	};
 }
 
-function seeOther(location: string): Response {
+export function seeOther(location: string): Response {
 	return new Response(null, { status: 303, headers: { location } });
 }
 
-const NOTICES: readonly ConnectNotice[] = [
+export const NOTICES: readonly ConnectNotice[] = [
 	'declined',
 	'failed',
 	'limit',
@@ -117,7 +122,7 @@ const OUTCOMES: readonly RevocationOutcome[] = [
 	'unreadable'
 ];
 
-const NOTICE_KEY = {
+export const NOTICE_KEY = {
 	declined: 'noticeDeclined',
 	failed: 'noticeFailed',
 	limit: 'noticeLimit',
@@ -201,7 +206,7 @@ function noticeHref(
  * Where the connect form's redirect will go, for the page's `form-action`. Undefined when the service cannot be
  * resolved now: the form then posts and the server answers with the page's own notice, which needs no hand-off.
  */
-async function providerAddressOf(
+export async function providerAddressOf(
 	person: PagePerson,
 	serviceId: string
 ): Promise<string | undefined> {
@@ -233,7 +238,10 @@ const ActBody = t.Object({
 	xsrf: t.Optional(t.String())
 });
 
-async function appName(clientId: string, language: Language): Promise<string> {
+export async function appName(
+	clientId: string,
+	language: Language
+): Promise<string> {
 	const client = await Client.tryFind(clientId);
 	if (!client) return ACCOUNT_TEXTS[language].deletedApp;
 	return sanitiseClientName(client.clientName) ?? clientId;
@@ -307,6 +315,59 @@ async function consentRows(
 		rows.set(record._id, { agents, candidates });
 	}
 	return rows;
+}
+
+function linkPath(person: PagePerson, value: string): string {
+	return new URL(connectLinkUrl(person.bucket, value)).pathname;
+}
+
+/*
+ * A connect from an agent's link has come back connected (specs/119 R6). For a connect, the account just connected
+ * is the agent's to use, as the button said, once the administrator's list and the person's grant to the agent are
+ * checked again: thirty minutes and a provider lie between the press and now. A reconnect writes no consent; it says
+ * whether it was the account asked for.
+ */
+async function finishLink(
+	person: PagePerson,
+	link: NonNullable<ConnectStatePayload['link']>,
+	record: ConnectedAccount
+): Promise<'connected' | 'connectedOnly' | 'reconnected' | 'other'> {
+	let outcome: 'connected' | 'connectedOnly' | 'reconnected' | 'other';
+	if (link.act === 'reconnect') {
+		outcome = record._id === link.connectedAccountId ? 'reconnected' : 'other';
+	} else {
+		const service = serviceOf(person.bucket, record.serviceId);
+		const granted = (await grantsIn(person.bucket._id, person.user._id)).some(
+			(grant) => grant.payload.clientId === link.clientId
+		);
+		if (!granted || !(service?.applications ?? []).includes(link.exchangedBy)) {
+			outcome = 'connectedOnly';
+		} else {
+			await recordEndUserAudit(
+				person.bucket._id,
+				person.user._id,
+				'connected.account.consent',
+				{
+					targetScope: person.bucket._id,
+					connectedAccountId: record._id,
+					serviceId: record.serviceId,
+					clientId: link.clientId,
+					to: 'allowed',
+					ownerGroupId: person.bucket.ownerGroupId
+				}
+			);
+			await changeConsent({
+				bucket: person.bucket,
+				record,
+				clientId: link.clientId,
+				change: 'allowed',
+				via: 'connect_link'
+			});
+			outcome = 'connected';
+		}
+	}
+	await closeLink(link.value, link.slot, 'completed', record._id);
+	return outcome;
 }
 
 /* Providers add parameters of their own; only these are read. */
@@ -581,17 +642,18 @@ export const accountServicesRoutes = new Elysia({ name: 'account-services' })
 				refused('session', pending.serviceId);
 				return connectOutcomePage('refused', path, 403, language);
 			}
+			/* A connect started from an agent's link goes back to the link, which can be tried again while it lives. */
+			const back = (notice: ConnectNotice) =>
+				pending.link
+					? `${linkPath(person, pending.link.value)}?notice=${notice}`
+					: noticeHref(person, notice, pending.serviceId);
 			if (query.error !== undefined) {
 				return seeOther(
-					noticeHref(
-						person,
-						query.error === 'access_denied' ? 'declined' : 'failed',
-						pending.serviceId
-					)
+					back(query.error === 'access_denied' ? 'declined' : 'failed')
 				);
 			}
 			if (typeof query.code !== 'string' || !query.code) {
-				return seeOther(noticeHref(person, 'failed', pending.serviceId));
+				return seeOther(back('failed'));
 			}
 			try {
 				const { done, record } = await finishConnect({
@@ -611,12 +673,18 @@ export const accountServicesRoutes = new Elysia({ name: 'account-services' })
 						ownerGroupId: person.bucket.ownerGroupId
 					}
 				);
+				if (pending.link) {
+					const outcome = await finishLink(person, pending.link, record);
+					return seeOther(
+						`${linkPath(person, pending.link.value)}?done=${outcome}`
+					);
+				}
 				const params = new URLSearchParams({ done, service: record.serviceId });
 				return seeOther(`${servicesPath(person.bucket)}?${params.toString()}`);
 			} catch (err) {
 				if (err instanceof ConnectRefused) {
 					if (err.notice === 'refused') refused('issuer', pending.serviceId);
-					return seeOther(noticeHref(person, err.notice, pending.serviceId));
+					return seeOther(back(err.notice));
 				}
 				throw err;
 			}

@@ -448,3 +448,134 @@ export function connectOutcomePage(
 		{ language }
 	);
 }
+
+// ---------------------------------------------------------------- an agent's connect link (specs/119)
+
+export interface LinkAccount {
+	id: string;
+	label: string;
+}
+
+export interface LinkPageView {
+	act: 'connect' | 'consent' | 'reconnect';
+	app: string;
+	service: string;
+	/* The accounts a consent offers: one named by the agent shows one button, several a checkbox each. */
+	accounts: readonly LinkAccount[];
+	named: boolean;
+	/* The account a reconnect is for. */
+	account?: LinkAccount;
+	/* No other account may be connected at this service. */
+	atLimit: boolean;
+	/* What the provider's answer came to, when it sent the person back here. */
+	notice?: string;
+}
+
+function linkForm(
+	frame: PageFrame,
+	xsrf: string,
+	action: string,
+	inner: string,
+	label: string,
+	style: string
+): string {
+	return `<form method="post" action="${esc(frame.path)}" style="margin:16px 0 0;">${hidden({ action, xsrf })}${inner}<button type="submit" style="${style}">${esc(label)}</button></form>`;
+}
+
+/*
+ * The one act a link leads to, for the agent that asked (contracts/link-page.md). Every act is a button on a
+ * same-origin form with the page's anti-forgery value: opening the link changes nothing.
+ */
+export function linkPage(
+	frame: PageFrame,
+	view: LinkPageView,
+	xsrf: string,
+	providerAddress?: string
+): Response {
+	const T = ACCOUNT_TEXTS[frame.language];
+	const vars = { app: view.app, service: view.service };
+	const notice = view.notice
+		? noticeBox({ lines: [view.notice, T.linkTryAgain] }, frame.language)
+		: '';
+	const decline = `<form method="post" action="${esc(frame.path)}" style="margin:16px 0 0;">${hidden({ action: 'decline', xsrf })}<button type="submit" style="${LINK} background:none; border:none; padding:0; cursor:pointer;">${esc(T.linkDecline)}</button></form>`;
+	const another = view.atLimit
+		? `<p style="margin:16px 0 0;">${html(T.linkLimit, vars)}</p>`
+		: linkForm(
+				frame,
+				xsrf,
+				'connect',
+				'',
+				text(T.linkConnectAnother, vars),
+				PRIMARY
+			);
+	let title: string;
+	let body: string;
+	if (view.act === 'reconnect' && view.account) {
+		title = text(T.linkReconnectTitle, {
+			...vars,
+			account: view.account.label
+		});
+		body = `<p style="margin:8px 0;">${html(T.linkReconnectEffect, { ...vars, account: view.account.label })}</p>${linkForm(frame, xsrf, 'connect', '', text(T.linkReconnectButton, vars), PRIMARY)}`;
+	} else if (view.accounts.length === 0) {
+		title = text(T.linkConnectTitle, vars);
+		body = `<p style="margin:8px 0;">${html(T.linkConnectEffect, vars)}</p>${
+			view.atLimit
+				? `<p style="margin:16px 0 0;">${html(T.linkLimit, vars)}</p>`
+				: linkForm(
+						frame,
+						xsrf,
+						'connect',
+						'',
+						text(T.linkConnectButton, vars),
+						PRIMARY
+					)
+		}`;
+	} else if (view.named && view.accounts.length === 1) {
+		const [account] = view.accounts;
+		title = text(T.linkConsentOne, { ...vars, account: account.label });
+		body = `<p style="margin:8px 0; ${MUTED}">${esc(T.linkConsentNote)}</p>${linkForm(frame, xsrf, 'allow', hidden({ connectedAccountId: account.id }), T.allow, PRIMARY)}`;
+	} else {
+		title = text(T.linkConsentSeveral, vars);
+		const boxes = view.accounts
+			.map(
+				(account) =>
+					`<label style="display:flex; gap:8px; align-items:center; min-height:24px; margin:4px 0; overflow-wrap:anywhere;"><input type="checkbox" name="connectedAccountId" value="${esc(account.id)}"/>${esc(account.label)}</label>`
+			)
+			.join('');
+		body = `<p style="margin:8px 0; ${MUTED}">${esc(T.linkConsentNote)}</p>${linkForm(frame, xsrf, 'allow', boxes, T.allow, PRIMARY)}${another}`;
+	}
+	return page(
+		title,
+		`${header(frame)}<div role="status">${notice}</div><h1 style="font-size:24px; margin:0 0 8px; overflow-wrap:anywhere;">${esc(title)}</h1>${body}${decline}`,
+		200,
+		{
+			wide: true,
+			language: frame.language,
+			denyFraming: true,
+			...(providerAddress ? { handOffTo: providerAddress } : {})
+		}
+	);
+}
+
+/*
+ * A link's other pages: no longer valid, someone else's, no longer possible, done, declined. None names the person
+ * the link was made for or their accounts; the done pages are shown to that person only.
+ */
+export function linkOutcomePage(
+	title: string,
+	lines: readonly string[],
+	status: number,
+	language: Language,
+	servicesHref?: string
+): Response {
+	const T = ACCOUNT_TEXTS[language];
+	const back = servicesHref
+		? `<p><a href="${esc(servicesHref)}" style="${LINK}">${esc(T.servicesLink)}</a></p>`
+		: '';
+	return page(
+		title,
+		`<h1 style="font-size:20px; margin:0 0 8px;">${esc(title)}</h1>${lines.map((line) => `<p>${esc(line)}</p>`).join('')}${back}`,
+		status,
+		{ language }
+	);
+}

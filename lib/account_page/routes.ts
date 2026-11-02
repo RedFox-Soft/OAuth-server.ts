@@ -26,6 +26,7 @@ import { namespaceOf } from '../resources/namespace.js';
 import {
 	accountPageBase,
 	accountPageUrl,
+	connectLinkUrl,
 	isAccountPageClient
 } from './client.js';
 import {
@@ -407,6 +408,12 @@ export const accountPageRoutes = new Elysia({ name: 'account-page' })
 						`${pagePath}?revoke=${encodeURIComponent(pending.revoke)}`
 					);
 				}
+			}
+			/* Asked for by an agent's connect link (specs/119): back to the link, which checks who is signed in. */
+			if (pending.link !== undefined) {
+				return seeOther(
+					new URL(connectLinkUrl(person.bucket, pending.link)).pathname
+				);
 			}
 			/* Asked for by the connected-services page (specs/117): back there, to the confirmation and no further. */
 			if (pending.services) {

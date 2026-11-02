@@ -34,6 +34,7 @@ export interface ConnectStart {
 	withPkce: boolean;
 	withNonce: boolean;
 	requestedScopes: string[];
+	link?: ConnectStatePayload['link'];
 }
 
 export interface ConnectSecrets {
@@ -58,6 +59,7 @@ export async function openConnect(
 			...(verifier ? { verifier } : {}),
 			...(nonce ? { nonce } : {}),
 			requestedScopes: start.requestedScopes,
+			...(start.link ? { link: start.link } : {}),
 			exp: epochTime() + CONNECT_STATE_TTL_SECONDS
 		},
 		CONNECT_STATE_TTL_SECONDS

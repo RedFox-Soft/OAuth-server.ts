@@ -1,5 +1,5 @@
 export type GrantKey = `grant:${string}`;
-export type SessionUidKey = `sessionUid:${string}`;
+export type UidKey = `uid:${string}:${string}`;
 export type UserCodeKey = `userCode:${string}`;
 export type ModelStorageKey<TModelName extends string> =
 	`${TModelName}:${string}`;
@@ -15,8 +15,12 @@ export function grantKeyFor(id: string): GrantKey {
 	return `grant:${id}`;
 }
 
-export function sessionUidKeyFor(id: string): SessionUidKey {
-	return `sessionUid:${id}`;
+/*
+ * Per model, as MongoDB's and PostgreSQL's `findByUid` read one collection: a session and a connect link
+ * (specs/119) are both found by their uid, and one must never answer for the other.
+ */
+export function uidKeyFor(model: string, uid: string): UidKey {
+	return `uid:${model}:${uid}`;
 }
 
 export function userCodeKeyFor(userCode: string): UserCodeKey {

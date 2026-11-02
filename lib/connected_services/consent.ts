@@ -172,6 +172,8 @@ export async function changeConsent(input: {
 	record: ConnectedAccount;
 	clientId: string;
 	change: 'allowed' | 'withdrawn';
+	/* Where the person acted: the account page, or an agent's connect link (specs/119). */
+	via?: 'account_page' | 'connect_link';
 }): Promise<boolean> {
 	const grants = await grantsTo(
 		input.bucket,
@@ -189,7 +191,7 @@ export async function changeConsent(input: {
 		...eventOf(input.record),
 		clientId: input.clientId,
 		change: input.change,
-		via: 'account_page'
+		via: input.via ?? 'account_page'
 	});
 	return true;
 }

@@ -149,20 +149,20 @@ describe('an agent exchanging the person’s access token for their GitHub token
 		expect(body.expires_in).toBeUndefined();
 	});
 
-	it('refuses a scope the account was not granted, naming it, as needing reconnection', async () => {
-		const { service, signedIn } = await ready();
+	it('refuses a declared scope the account was not granted, naming it, as needing reconnection', async () => {
+		const { service, signedIn } = await ready({ scopes: ['read:user'] });
 
 		const body = refused(
 			await exchange({
 				subjectToken: signedIn.accessToken,
 				audience: service.id,
-				scope: 'repo admin:org'
+				scope: 'read:user repo'
 			})
 		);
 
 		expect(body.error).toBe('invalid_grant');
 		expect(body.reason).toBe('reconnect_required');
-		expect(body.error_description).toContain('admin:org');
-		expect(body.error_description).not.toContain('repo ');
+		expect(body.error_description).toContain('repo');
+		expect(body.error_description).not.toContain('read:user');
 	});
 });

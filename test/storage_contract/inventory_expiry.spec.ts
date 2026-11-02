@@ -28,6 +28,11 @@ const REAPED_ON_EXPIRES_AT = [
 	 */
 	'ConnectState',
 	/*
+	 * An agent's connect link (specs/119). Expiry is the control: a link the person was told is thirty minutes
+	 * long must not act on the thirty-first.
+	 */
+	'ConnectLink',
+	/*
 	 * A provisioning connection's deprovisioning tally. Expiry is the mechanism rather than housekeeping:
 	 * a slot frees itself one threshold window after it was taken, which is what makes the count rolling.
 	 */

@@ -4,7 +4,7 @@ import { getStorage } from './storage.js';
 import {
 	modelKeyFor,
 	grantKeyFor,
-	sessionUidKeyFor,
+	uidKeyFor,
 	userCodeKeyFor,
 	grantable,
 	type ModelStorageKey
@@ -105,9 +105,14 @@ export class MemoryAdapter<
 		return recordAt(this.key(id));
 	}
 
+	/*
+	 * The pointer outlives a rewrite of its record under a new uid, which MongoDB's and PostgreSQL's query by the
+	 * field never would: the record answers only while it still holds the uid asked for.
+	 */
 	async findByUid(uid: string) {
-		const id = idAt(sessionUidKeyFor(uid));
-		return id === undefined ? undefined : this.find(id);
+		const id = idAt(uidKeyFor(this.model, uid));
+		const record = id === undefined ? undefined : await this.find(id);
+		return record && stringField(record, 'uid') === uid ? record : undefined;
 	}
 
 	async findByUserCode(userCode: string) {
@@ -122,8 +127,8 @@ export class MemoryAdapter<
 		const grantId = stringField(payload, 'grantId');
 		const userCode = stringField(payload, 'userCode');
 
-		if (this.model === 'Session' && uid) {
-			storage.set(sessionUidKeyFor(uid), id, {
+		if (uid) {
+			storage.set(uidKeyFor(this.model, uid), id, {
 				maxAge: expiresIn * 1000
 			});
 		}

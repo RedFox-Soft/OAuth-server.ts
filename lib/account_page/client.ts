@@ -49,6 +49,11 @@ export function accountPageBase(bucket: RequestBucket): string {
 	return addressOf(bucket).kind === 'unaddressed' ? ISSUER : issuerFor(bucket);
 }
 
+/* An agent's connect link (specs/119): its value is the only variable part, base64url and so safe in a path. */
+export function connectLinkUrl(bucket: RequestBucket, value: string): string {
+	return `${accountPageBase(bucket)}${routeNames.account_services_link.replace(':link', value)}`;
+}
+
 export function accountPageUrl(bucket: RequestBucket): string {
 	return `${accountPageBase(bucket)}${routeNames.account_apps}`;
 }

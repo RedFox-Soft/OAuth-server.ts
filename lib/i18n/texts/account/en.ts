@@ -106,5 +106,51 @@ export const en = {
 	allow: 'Allow',
 	allowedDone: '{app} may now use your {service} account.',
 	withdrawnDone:
-		'{app} can no longer get access to your {service} account. Access it already got stays valid at {service} until it expires, usually within an hour.'
+		'{app} can no longer get access to your {service} account. Access it already got stays valid at {service} until it expires, usually within an hour.',
+	/* An agent's connect link (specs/119): the sentence in the refusal, and the link's pages. */
+	linkMessageConnect:
+		'Open this link to connect your {service} account and let {app} use it.',
+	linkMessageConsent: 'Open this link to let {app} use your {service} account.',
+	linkMessageReconnect: 'Open this link to reconnect your {service} account.',
+	linkConnectTitle: '{app} asks to use your {service} account',
+	linkConnectEffect:
+		'You will go to {service} to sign in and allow access. {app} will then be able to use the account. You can withdraw this on your account page at any time.',
+	linkConnectButton: 'Connect {service} and allow {app}',
+	linkConnectAnother: 'Connect another {service} account',
+	linkLimit:
+		'You have connected as many {service} accounts as you can. You can let {app} use one of them instead.',
+	linkConsentOne: 'Let {app} use your {service} account {account}?',
+	linkConsentSeveral: 'Which of your {service} accounts may {app} use?',
+	linkConsentNote: 'You can withdraw this on your account page at any time.',
+	linkReconnectTitle: 'Reconnect your {service} account {account}',
+	linkReconnectEffect:
+		'{service} no longer accepts your account {account}. Reconnect it so {app} can use it again.',
+	linkReconnectButton: 'Reconnect {service}',
+	linkDecline: 'Decline',
+	linkTryAgain: 'You can try again from this link while it is valid.',
+	linkDoneTitle: 'Done',
+	linkDoneConnected:
+		'Your {service} account is connected and {app} can use it.',
+	linkDoneConnectedOnly:
+		'Your {service} account is connected, but {app} may no longer use {service}.',
+	linkDoneAllowed: '{app} can now use your {service} account.',
+	linkDoneReconnected: 'Your {service} account {account} works again.',
+	linkDoneOther:
+		'Another {service} account was connected. {account} still needs to be connected again.',
+	linkAlreadyDone: 'This was already done.',
+	linkReturn: 'You can return to {app}.',
+	linkDeclinedTitle: 'Nothing was changed',
+	linkDeclined:
+		'{app} cannot use your {service} account. You can return to {app}.',
+	linkInvalidTitle: 'This link is no longer valid',
+	linkInvalid: 'Ask the application for a new one.',
+	linkOtherTitle: 'This link is for another account',
+	linkOther:
+		'It was made for someone else, so nothing was changed. Sign out first if you meant to use another account.',
+	linkChangedTitle: 'This can no longer be done',
+	linkChangedService: 'This service is no longer offered here.',
+	linkChangedApp: '{app} may no longer use {service}.',
+	linkChangedAccess:
+		'{app} no longer has access to your account here. Sign in to it again to give it access.',
+	linkChangedAccount: 'That {service} account is no longer connected.'
 } as const;

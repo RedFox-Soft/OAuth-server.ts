@@ -135,6 +135,8 @@ export interface PendingSignIn {
 	services?: true;
 	connect?: string;
 	disconnect?: string;
+	/* An agent's connect link (specs/119) asked for this sign-in: return to it, never to an act. */
+	link?: string;
 }
 
 /*
@@ -186,7 +188,8 @@ export function readPending(cookie: CookieJar): PendingSignIn | undefined {
 			revoke,
 			services,
 			connect,
-			disconnect
+			disconnect,
+			link
 		} = parsed as PendingSignIn;
 		return {
 			state,
@@ -195,7 +198,8 @@ export function readPending(cookie: CookieJar): PendingSignIn | undefined {
 			...(typeof revoke === 'string' ? { revoke } : undefined),
 			...(services === true ? { services } : undefined),
 			...(typeof connect === 'string' ? { connect } : undefined),
-			...(typeof disconnect === 'string' ? { disconnect } : undefined)
+			...(typeof disconnect === 'string' ? { disconnect } : undefined),
+			...(typeof link === 'string' ? { link } : undefined)
 		};
 	} catch {
 		return undefined;
@@ -228,6 +232,8 @@ export function signInRedirect(
 		};
 		/* Return to the connected-services page rather than the applications page. */
 		services?: boolean;
+		/* Return to this connect link (specs/119). */
+		link?: string;
 	} = {}
 ): string {
 	const state = crypto.randomBytes(32).toString('base64url');
@@ -236,6 +242,7 @@ export function signInRedirect(
 		state,
 		startedAt: epochTime(),
 		...(options.services ? { services: true as const } : undefined),
+		...(options.link ? { link: options.link } : undefined),
 		...(back?.connect ? { connect: back.connect } : undefined),
 		...(back?.disconnect ? { disconnect: back.disconnect } : undefined),
 		...(options.reauthenticate

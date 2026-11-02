@@ -196,6 +196,8 @@ export const routeNames = {
 	/* The person's connected services (specs/117), and where a provider sends them back after connecting one. */
 	account_services: '/account/services',
 	account_services_callback: '/account/services/callback',
+	/* Where an agent's connect link leads (specs/119): the one act that fixes the exchange's refusal. */
+	account_services_link: '/account/services/link/:link',
 	authorization: '/auth',
 	backchannel_authentication: '/backchannel',
 	code_verification: '/device',

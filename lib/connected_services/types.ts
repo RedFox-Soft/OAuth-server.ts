@@ -152,7 +152,56 @@ export const ConnectStatePayload = t.Object({
 	verifier: t.Optional(t.String()),
 	nonce: t.Optional(t.String()),
 	requestedScopes: t.Array(t.String()),
+	/*
+	 * A connect started from an agent's connect link (specs/119 R6). Carried here rather than read back from the
+	 * link, so a connect started within the link's life finishes even when the link expired at the provider.
+	 */
+	link: t.Optional(
+		t.Object({
+			slot: t.String(),
+			value: t.String(),
+			clientId: t.String(),
+			exchangedBy: t.String(),
+			act: t.Union([t.Literal('connect'), t.Literal('reconnect')]),
+			/* The account a reconnect is for, so another upstream account connected instead is told apart. */
+			connectedAccountId: t.Optional(t.String())
+		})
+	),
 	/* Epoch seconds, checked on every read as well as reaped. */
 	exp: t.Number()
 });
 export type ConnectStatePayload = Static<typeof ConnectStatePayload>;
+
+export const ConnectLinkAct = t.Union([
+	t.Literal('connect'),
+	t.Literal('consent'),
+	t.Literal('reconnect')
+]);
+export type ConnectLinkAct = Static<typeof ConnectLinkAct>;
+
+/*
+ * One open connect link per person, agent and service (specs/119 R3), keyed by that slot and found by its value.
+ * The value is not a credential: it does nothing without the person's own recent sign-in.
+ */
+export const ConnectLinkPayload = t.Object({
+	uid: t.String(),
+	/* The public `connect_id`, and what events name the link by. */
+	ref: t.String(),
+	bucketId: t.String(),
+	accountId: t.String(),
+	/* The agent, whose use consent the link gives. */
+	clientId: t.String(),
+	/* The application that asked, checked again on the service's list when the person acts. */
+	exchangedBy: t.String(),
+	serviceId: t.String(),
+	act: ConnectLinkAct,
+	connectedAccountId: t.Optional(t.String()),
+	state: t.Union([
+		t.Literal('open'),
+		t.Literal('completed'),
+		t.Literal('declined')
+	]),
+	iat: t.Number(),
+	exp: t.Number()
+});
+export type ConnectLinkPayload = Static<typeof ConnectLinkPayload>;

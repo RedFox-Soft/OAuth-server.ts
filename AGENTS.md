@@ -148,7 +148,9 @@ Each rule is the part that is easy to break. Read the named page before changing
   secret-looking field that is not is declared plaintext there with its reason. A connected account is deliberately not account-owned (a lock keeps it), so
   a path that deletes a person, a service or a project removes its connected accounts by hand. An upstream token
   leaves only through `upstream_exchange.ts` and is renewed only through `refresh.ts`'s lease, never by a direct
-  refresh, and a jsonb key list is bound with `handle.array(keys, 'text')`, never `${keys}::text[]`.
+  refresh, and a jsonb key list is bound with `handle.array(keys, 'text')`, never `${keys}::text[]`. An agent's
+  connect link acts only for the person the agent's token named, after that person's own recent sign-in, and a
+  consent a link's connect gives travels in its `ConnectState`, never read back from the link.
   → `postgresql-backend.md`, `mongodb-test-fidelity.md`, `secrets-encryption-at-rest.md`, `connected-services.md`
 - **Schema migrations** — declared in `lib/consts/migrations.ts`, applied by `bun run db:migrate`;
   startup refuses a database that is behind, ahead or diverged, and never migrates it itself. A

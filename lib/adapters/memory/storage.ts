@@ -6,7 +6,7 @@ type StorageOptions = {
 
 /*
  * Everything the memory backend keeps, each under its own key prefix (helpers.ts): a model's record
- * (`<Model>:<id>`), the id a session uid or a user code points at (`sessionUid:`, `userCode:`), and the
+ * (`<Model>:<id>`), the id a uid or a user code points at (`uid:<Model>:`, `userCode:`), and the
  * record keys issued under one grant (`grant:`). The one union a key can hold, so a reader narrows what
  * it finds instead of naming what it would like to find.
  */

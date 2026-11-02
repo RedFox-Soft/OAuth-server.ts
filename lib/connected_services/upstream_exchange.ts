@@ -19,12 +19,23 @@ import {
 } from '../helpers/errors.js';
 import type { OIDCContext } from '../helpers/oidc_context.js';
 import type { DPoPProof } from '../helpers/validate_dpop.js';
+import { text } from '../i18n/message.js';
+import { emailLanguage } from '../i18n/resolve.js';
+import { ACCOUNT_TEXTS } from '../i18n/texts/account/index.js';
+import { sanitiseClientName } from '../interactions/clientName.js';
+import { Client } from '../models/client.js';
 import { connectedAccountKey } from '../models/grant.js';
 import { activeKeyring } from '../sealing/keyring.js';
+import type { User } from '../adapters/types.js';
 import { serviceOf, statusOf } from './accounts.js';
+import { issueLink } from './link.js';
 import { freshAccount } from './refresh.js';
 import { exchangeSubject } from './subject.js';
-import type { ConnectedAccount } from './types.js';
+import type {
+	ConnectedAccount,
+	ConnectedService,
+	ConnectLinkAct
+} from './types.js';
 
 /*
  * An agent obtains a person's upstream access token at one of the project's connected services (specs/118,
@@ -91,22 +102,26 @@ function chooseAccount(
 		if (!allowed.includes(named)) {
 			throw new UpstreamTokenRefused(
 				'consent_required',
-				`the person has not allowed this application to use that ${serviceName} account`
+				`the person has not allowed this application to use that ${serviceName} account`,
+				{ target: named._id }
 			);
 		}
 		return named;
 	}
 	if (allowed.length === 1) return allowed[0];
 	if (allowed.length > 1) {
+		/* Only the accounts this agent may use: it would receive each of their tokens anyway (specs/119 FR-013). */
 		throw new UpstreamTokenRefused(
 			'account_selection_required',
-			`the person allowed more than one ${serviceName} account: name one with login_hint`
+			`the person allowed more than one ${serviceName} account: name one with login_hint`,
+			{ accounts: allowed.map((account) => account.label).sort() }
 		);
 	}
 	if (accounts.length > 0) {
 		throw new UpstreamTokenRefused(
 			'consent_required',
-			`the person has not allowed this application to use their ${serviceName} account`
+			`the person has not allowed this application to use their ${serviceName} account`,
+			accounts.length === 1 ? { target: accounts[0]._id } : {}
 		);
 	}
 	throw new UpstreamTokenRefused(
@@ -115,14 +130,100 @@ function chooseAccount(
 	);
 }
 
-function assertScopes(record: ConnectedAccount, asked: string[]): void {
+/*
+ * A scope the service does not declare cannot be had by reconnecting, which asks the provider for the declared ones
+ * only: that is the administrator's to add (specs/119 R2). A declared one the account lacks is the person's.
+ */
+function assertScopes(
+	record: ConnectedAccount,
+	asked: string[],
+	service: ConnectedService
+): void {
+	const declared = new Set(service.scopes);
+	const undeclared = asked.filter((scope) => !declared.has(scope));
+	if (undeclared.length > 0) {
+		throw new UpstreamTokenRefused(
+			'not_permitted',
+			`the service does not declare ${undeclared.join(' ')}: an administrator must add it`,
+			{ scope: true }
+		);
+	}
 	const held = new Set(record.scopes);
 	const missing = asked.filter((scope) => !held.has(scope));
 	if (missing.length > 0) {
 		throw new UpstreamTokenRefused(
 			'reconnect_required',
-			`the account lacks ${missing.join(' ')}: the person must reconnect it to grant more`
+			`the account lacks ${missing.join(' ')}: the person must reconnect it to grant more`,
+			{ target: record._id }
 		);
+	}
+}
+
+const MESSAGE = {
+	connect: 'linkMessageConnect',
+	consent: 'linkMessageConsent',
+	reconnect: 'linkMessageReconnect'
+} as const;
+
+function actOf(refusal: UpstreamTokenRefused): ConnectLinkAct | undefined {
+	switch (refusal.reason) {
+		case 'connect_required':
+			return 'connect';
+		case 'consent_required':
+			return 'consent';
+		case 'reconnect_required':
+			return 'reconnect';
+		default:
+			return undefined;
+	}
+}
+
+async function agentName(clientId: string): Promise<string> {
+	const client = await Client.tryFind(clientId);
+	return (client && sanitiseClientName(client.clientName)) ?? clientId;
+}
+
+/*
+ * The person's link, on a refusal only they can fix (specs/119 R2). A link that cannot be made leaves the refusal
+ * as it was: the agent still learns why, as it did before links existed.
+ */
+async function attachLink(
+	refusal: UpstreamTokenRefused,
+	at: {
+		bucket: UserBucket;
+		user: User;
+		service: ConnectedService;
+		agent: string;
+		exchangedBy: string;
+	}
+): Promise<void> {
+	const act = actOf(refusal);
+	if (!act) return;
+	try {
+		const issued = await issueLink({
+			bucket: at.bucket,
+			accountId: at.user._id,
+			clientId: at.agent,
+			exchangedBy: at.exchangedBy,
+			serviceId: at.service.id,
+			act,
+			...(refusal.target ? { connectedAccountId: refusal.target } : {})
+		});
+		const T = ACCOUNT_TEXTS[emailLanguage(at.user)];
+		refusal.link = {
+			uri: issued.uri,
+			ref: issued.ref,
+			expiresIn: issued.expiresIn,
+			message: text(T[MESSAGE[act]], {
+				service: at.service.displayName,
+				app: await agentName(at.agent)
+			})
+		};
+	} catch (error) {
+		console.error('connected services: a connect link could not be made', {
+			serviceId: at.service.id,
+			error
+		});
 	}
 }
 
@@ -171,6 +272,36 @@ export async function upstreamExchange(
 		);
 	}
 
+	try {
+		return await upstreamToken(
+			bucket,
+			service,
+			subject,
+			params,
+			client.clientId
+		);
+	} catch (err) {
+		if (err instanceof UpstreamTokenRefused) {
+			await attachLink(err, {
+				bucket,
+				user,
+				service,
+				agent: subject.agentClientId,
+				exchangedBy: client.clientId
+			});
+		}
+		throw err;
+	}
+}
+
+/* The checks past the administrator's list: the person's accounts, their consent, the account itself. */
+async function upstreamToken(
+	bucket: UserBucket,
+	service: ConnectedService,
+	subject: Awaited<ReturnType<typeof exchangeSubject>>,
+	params: TokenParams,
+	exchangedBy: string
+) {
 	const accounts = (
 		await getConnectedAccountStore().listByAccount(
 			bucket._id,
@@ -192,11 +323,12 @@ export async function upstreamExchange(
 	if (statusOf(chosen) === 'needs_reconnection') {
 		throw new UpstreamTokenRefused(
 			'reconnect_required',
-			`the person must reconnect their ${service.displayName} account`
+			`the person must reconnect their ${service.displayName} account`,
+			{ target: chosen._id }
 		);
 	}
 	const asked = params.scope?.split(' ').filter(Boolean) ?? [];
-	assertScopes(chosen, asked);
+	assertScopes(chosen, asked, service);
 
 	const fresh = await freshAccount(bucket, service, chosen, 'exchange');
 	if (fresh.kind === 'gone') {
@@ -208,7 +340,8 @@ export async function upstreamExchange(
 	if (fresh.kind === 'broken') {
 		throw new UpstreamTokenRefused(
 			'reconnect_required',
-			`the person must reconnect their ${service.displayName} account`
+			`the person must reconnect their ${service.displayName} account`,
+			{ target: chosen._id }
 		);
 	}
 	if (fresh.kind === 'unavailable') {
@@ -222,10 +355,11 @@ export async function upstreamExchange(
 	if (!accessToken) {
 		throw new UpstreamTokenRefused(
 			'reconnect_required',
-			`the person must reconnect their ${service.displayName} account`
+			`the person must reconnect their ${service.displayName} account`,
+			{ target: record._id }
 		);
 	}
-	assertScopes(record, asked);
+	assertScopes(record, asked, service);
 
 	noteUse(record, subject.agentClientId);
 	eventBus.emit('connected_account.exchanged', {
@@ -234,7 +368,7 @@ export async function upstreamExchange(
 		connectedAccountId: record._id,
 		accountId: record.accountId,
 		clientId: subject.agentClientId,
-		exchangedBy: client.clientId
+		exchangedBy
 	});
 
 	const expiresIn =

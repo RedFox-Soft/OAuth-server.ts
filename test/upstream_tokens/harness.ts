@@ -54,7 +54,9 @@ export const Exchanged = Type.Object({
 export const Refusal = Type.Object({
 	error: Type.String(),
 	error_description: Type.Optional(Type.String()),
-	reason: Type.Optional(Type.String())
+	reason: Type.Optional(Type.String()),
+	/* The labels an agent may choose from (specs/119). */
+	accounts: Type.Optional(Type.Array(Type.String()))
 });
 
 export async function project(): Promise<UserBucket> {

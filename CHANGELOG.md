@@ -25,6 +25,12 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   person is mailed when an account breaks or an administrator removes it. Refusals carry a `reason`. The token exchange
   grant is now always advertised; `tokenExchange.enabled` gates only ID-JAGs, which it now refuses with
   `invalid_request` while off.
+- **Connect links for agents** (spec 119) — when an agent's exchange is refused because the person must connect the
+  service, allow the agent or reconnect an account, the refusal carries `connect_uri`, `connect_id`,
+  `connect_expires_in` and `connect_message`, ready to relay as an MCP URL elicitation; the link leads to that one act
+  on the person's account page and works only for that person after their own recent sign-in, for thirty minutes.
+  `account_selection_required` now lists the labels the agent may choose from, and a scope the service does not
+  declare is refused as `invalid_scope`.
 - **Encryption at rest for stored secrets** (security) — application secrets, sign-in provider credentials, the SMTP
   password, private signing keys and authenticator secrets are now stored encrypted (AES-256-GCM, each value bound to
   its record) with an operator-held keyring, supplied as `KEYRING` or a keyring file and never stored in the database;

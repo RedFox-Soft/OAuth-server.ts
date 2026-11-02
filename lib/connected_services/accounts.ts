@@ -84,6 +84,8 @@ export async function startConnect(input: {
 	serviceId: string;
 	accountId: string;
 	sessionId: string;
+	/* Started from an agent's connect link (specs/119 R6): its return records that agent's consent. */
+	link?: ConnectStatePayload['link'];
 }): Promise<string> {
 	const service = serviceOf(input.bucket, input.serviceId);
 	if (!service) throw new ConnectRefused('refused');
@@ -104,7 +106,8 @@ export async function startConnect(input: {
 		sessionId: input.sessionId,
 		withPkce: resolved.pkce,
 		withNonce: resolved.oidc !== undefined,
-		requestedScopes: scopes
+		requestedScopes: scopes,
+		...(input.link ? { link: input.link } : {})
 	});
 	return authorizationRedirect(
 		resolved,

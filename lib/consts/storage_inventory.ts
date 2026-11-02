@@ -107,6 +107,7 @@ export const MODEL_AREAS = [
 	'ClientCredentials',
 	'ClientLogo',
 	'ClientUsage',
+	'ConnectLink',
 	'ConnectState',
 	'DeprovisionSlot',
 	'DeviceCode',
@@ -421,6 +422,14 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 	 * creates: a lock should end a connect that has not come back yet.
 	 */
 	modelArea('ConnectState', EXPIRES_AT, byAccount),
+	/*
+	 * An agent's connect link (specs/119 R3): one slot per person, agent and service, keyed by a digest of the
+	 * four, found by the link's value through its own index, as a session is by its uid. Owned by the person and
+	 * the agent, so a lock, a deactivation or the agent's deletion ends the links they had open.
+	 */
+	modelArea('ConnectLink', EXPIRES_AT, byAccountAndClient, [
+		{ key: { 'payload.uid': 1 }, unique: true }
+	]),
 	/*
 	 * The consent record. Only a principal cascade destroys these — protocol revocation deliberately
 	 * leaves them alive, because revoking a token is not withdrawing consent.

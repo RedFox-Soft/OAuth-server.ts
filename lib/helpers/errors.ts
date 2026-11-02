@@ -242,19 +242,45 @@ export type UpstreamRefusalReason =
 	| 'reconnect_required'
 	| 'temporarily_unavailable';
 
+/* The link an agent shows the person when only they can fix the refusal (specs/119 R1). */
+export interface UpstreamConnectLink {
+	uri: string;
+	ref: string;
+	expiresIn: number;
+	message: string;
+}
+
 export class UpstreamTokenRefused extends OIDCProviderError {
 	readonly reason: UpstreamRefusalReason;
+	/* Attached once the person is known, by the exchange that refused (specs/119 R1). */
+	link: UpstreamConnectLink | undefined;
+	/* The labels the agent may choose from, on `account_selection_required` only. */
+	readonly accounts: readonly string[] | undefined;
+	/* The connected account the refusal is about, for its link; never part of the answer. */
+	readonly target: string | undefined;
 
-	constructor(reason: UpstreamRefusalReason, description: string) {
+	constructor(
+		reason: UpstreamRefusalReason,
+		description: string,
+		extra: {
+			accounts?: readonly string[];
+			target?: string;
+			/* A scope the service does not declare is the administrator's ceiling, not the target (specs/119 R2). */
+			scope?: true;
+		} = {}
+	) {
 		const [status, code] =
 			reason === 'not_permitted'
-				? [400, 'invalid_target']
+				? [400, extra.scope ? 'invalid_scope' : 'invalid_target']
 				: reason === 'temporarily_unavailable'
 					? [503, 'temporarily_unavailable']
 					: [400, 'invalid_grant'];
 		super(status, code);
 		Error.captureStackTrace(this, this.constructor);
 		this.reason = reason;
+		this.link = undefined;
+		this.accounts = extra.accounts;
+		this.target = extra.target;
 		Object.assign(this, { error_description: description });
 	}
 }
