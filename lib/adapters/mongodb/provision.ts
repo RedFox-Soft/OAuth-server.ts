@@ -110,13 +110,17 @@ export async function applyIndexes(
 
 	for (const spec of specs) {
 		try {
-			await target.collection(name).createIndex(spec.key, {
-				...(spec.unique === true ? { unique: true } : {}),
-				...(spec.sparse === true ? { sparse: true } : {}),
-				...(spec.expireAfterSeconds !== undefined
-					? { expireAfterSeconds: spec.expireAfterSeconds }
-					: {})
-			});
+			await target.collection(name).createIndex(
+				spec.key,
+				{
+					...(spec.unique === true ? { unique: true } : {}),
+					...(spec.sparse === true ? { sparse: true } : {}),
+					...(spec.expireAfterSeconds !== undefined
+						? { expireAfterSeconds: spec.expireAfterSeconds }
+						: {})
+				},
+				undefined
+			);
 			created.push(spec);
 		} catch (error) {
 			if (!isIndexConflict(error)) {
