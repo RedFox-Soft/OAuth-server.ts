@@ -161,4 +161,4 @@ website/public/og/
 .playwright-mcp/
 
 # The instance keyring (specs/116): a deployment secret, never committed or baked into an image
-keyring/
+/keyring/
