@@ -1,12 +1,4 @@
-import {
-	accessSync,
-	closeSync,
-	constants,
-	existsSync,
-	openSync,
-	writeSync
-} from 'node:fs';
-import { dirname } from 'node:path';
+import { closeSync, openSync, writeSync } from 'node:fs';
 
 import { getKeyringStateStore } from '../adapters/index.js';
 import {
@@ -33,17 +25,11 @@ export interface Placement {
 /*
  * Written only into a directory that already exists: the server cannot tell a mounted volume from a
  * container's own writable layer, and a directory the operator created or mounted is the one signal that the
- * place survives a restart. `wx` makes the write fail rather than replace a keyring already there.
+ * place survives a restart. The open alone decides, with no check before it that the answer could change
+ * after: it never creates the directory, and `wx` fails rather than replace a keyring already there.
  */
 function writtenToFile(serialized: string): string | null {
 	const path = effectiveKeyringPath();
-	const directory = dirname(path);
-	if (!existsSync(directory) || existsSync(path)) return null;
-	try {
-		accessSync(directory, constants.W_OK);
-	} catch {
-		return null;
-	}
 	let descriptor: number | undefined;
 	try {
 		descriptor = openSync(path, 'wx', 0o600);
