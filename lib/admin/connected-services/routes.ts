@@ -24,6 +24,7 @@ import {
 import { CreateServiceBody, UpdateServiceBody } from './schema.js';
 import {
 	assertKeyringInUse,
+	assertSignInLink,
 	catalogueView,
 	createService,
 	deleteService,
@@ -100,8 +101,29 @@ export const connectedServiceAdminRoutes = new Elysia({
 			const bucket = await loadBucketForEdit(ctx, params.id);
 			assertKeyringInUse();
 			await assertConnectedServiceRoom(ctx, bucket);
+			if (body.signInProviderId) {
+				assertSignInLink(
+					bucket,
+					{
+						id: '',
+						kind: body.kind,
+						...(body.catalogueId ? { catalogueId: body.catalogueId } : {}),
+						...(body.issuer ? { issuer: body.issuer } : {}),
+						...(body.tenant ? { tenant: body.tenant } : {}),
+						clientId: body.clientId,
+						scopes: [],
+						displayName: '',
+						createdAt: '',
+						updatedAt: ''
+					},
+					body.signInProviderId
+				);
+			}
 			await recordAdminAudit(ctx, 'connected.service.create', params.id, {
 				attributes: Object.keys(body),
+				...(body.signInProviderId
+					? { signInProviderId: body.signInProviderId }
+					: {}),
 				...ownedBy(bucket)
 			});
 			const created = await createService(bucket, body);
@@ -116,12 +138,19 @@ export const connectedServiceAdminRoutes = new Elysia({
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForEdit(ctx, params.id);
 			assertKeyringInUse();
-			findService(bucket, params.serviceId);
+			const current = findService(bucket, params.serviceId);
+			/* Refused before the trail is written, so a link that cannot exist is never recorded (specs/120). */
+			if (typeof body.signInProviderId === 'string') {
+				assertSignInLink(bucket, current, body.signInProviderId);
+			}
 			await recordAdminAudit(ctx, 'connected.service.update', params.id, {
 				attributes: Object.keys(body),
 				serviceId: params.serviceId,
 				/* Who may now obtain its tokens (specs/118 R4), ids only. */
 				...(body.applications ? { to: body.applications.join(' ') } : {}),
+				...(body.signInProviderId !== undefined
+					? { signInProviderId: body.signInProviderId }
+					: {}),
 				...ownedBy(bucket)
 			});
 			return present(

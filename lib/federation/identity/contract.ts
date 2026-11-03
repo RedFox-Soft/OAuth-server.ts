@@ -12,6 +12,11 @@ import type { FederationProvider } from '../types.js';
 export interface UpstreamIdentity {
 	subject: string;
 	claims: Record<string, unknown>;
+	/*
+	 * The provider's whole token answer, present only when the request asked to `keep` it (specs/120): a sign-in
+	 * linked to a connected service. Otherwise the access and refresh tokens never leave the reader.
+	 */
+	tokenResponse?: Record<string, unknown>;
 }
 
 /*
@@ -26,11 +31,18 @@ export type IdentityStage = 'upstream' | 'rejected';
 export class IdentityError extends Error {
 	readonly stage: IdentityStage;
 	readonly reason: string;
+	/* The token endpoint's `error` and `suberror` codes, when it answered 400 with them (specs/120 R10). */
+	readonly upstream?: { error?: string; suberror?: string };
 
-	constructor(stage: IdentityStage, reason: string) {
+	constructor(
+		stage: IdentityStage,
+		reason: string,
+		upstream?: { error?: string; suberror?: string }
+	) {
 		super(`upstream identity: ${stage} (${reason})`);
 		this.stage = stage;
 		this.reason = reason;
+		if (upstream) this.upstream = upstream;
 	}
 }
 
@@ -47,4 +59,6 @@ export interface IdentityRequest {
 	 * started with — the mix-up defence RFC 9700 §2.1 requires of a client talking to more than one.
 	 */
 	iss?: string;
+	/* Hand the provider's token answer back (specs/120): only for a sign-in linked to a connected service. */
+	keep?: boolean;
 }

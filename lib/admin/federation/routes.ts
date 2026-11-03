@@ -39,6 +39,7 @@ import { openTry, readTry, sessionDigestOf } from '../../federation/state.js';
 import type { TryStarted, TryStatus } from '../../federation/types.js';
 import { upstreamMetadata } from '../../federation/upstream.js';
 import { assertSocialSignIn } from '../../plans/enforce.js';
+import { signInMatch } from '../../connected_services/link_signin.js';
 
 /* The console session cookie's value, read as the scope route reads it; absent for an agent's bearer token. */
 function sessionCookieOf(
@@ -53,6 +54,37 @@ function sessionCookieOf(
  * project's provider changes were visible to super administrators alone, while its team read every other
  * change to the same project.
  */
+/*
+ * A provider that keeps a connected service's tokens must stay the same provider and registration (specs/120 R3):
+ * an edit that would end the match is refused, naming the service, rather than leaving a link nothing could honour.
+ */
+function assertLinkSurvives(
+	bucket: UserBucket,
+	providerId: string,
+	body: { clientId?: string; issuer?: string; tenant?: string }
+): void {
+	const current = bucket.federation.find(
+		(provider) => provider.id === providerId
+	);
+	const service = (bucket.connectedServices ?? []).find(
+		(entry) => entry.signInProviderId === providerId
+	);
+	if (!current || !service) return;
+	const next = {
+		...current,
+		...(body.clientId !== undefined ? { clientId: body.clientId } : {}),
+		...(body.issuer !== undefined ? { issuer: body.issuer } : {}),
+		...(body.tenant !== undefined ? { tenant: body.tenant } : {})
+	};
+	if (signInMatch(service, next) !== 'ok') {
+		throw new AdminError(
+			409,
+			`this sign-in provider keeps tokens for ${service.displayName}; unlink it there before changing its provider or client id`,
+			{ code: 'linked_to_service' }
+		);
+	}
+}
+
 function ownedBy(bucket: Pick<UserBucket, 'ownerGroupId'>): {
 	ownerGroupId: string;
 } {
@@ -156,6 +188,7 @@ export const federationAdminRoutes = new Elysia({ name: 'admin-federation' })
 						(body.issuer === undefined ? current?.tenant : undefined)
 				});
 			}
+			assertLinkSurvives(bucket, params.providerId, body);
 			await recordAdminAudit(ctx, 'federation.provider.update', params.id, {
 				attributes: Object.keys(body),
 				...ownedBy(bucket)
@@ -172,12 +205,13 @@ export const federationAdminRoutes = new Elysia({ name: 'admin-federation' })
 		async ({ admin, params }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForProviders(ctx, params.id, 'edit');
-			await recordAdminAudit(
-				ctx,
-				'federation.provider.delete',
-				params.id,
-				ownedBy(bucket)
+			const keeping = (bucket.connectedServices ?? []).find(
+				(service) => service.signInProviderId === params.providerId
 			);
+			await recordAdminAudit(ctx, 'federation.provider.delete', params.id, {
+				...ownedBy(bucket),
+				...(keeping ? { unlinked: keeping.id } : {})
+			});
 			await deleteProvider(bucket, ctx, params.providerId);
 			return { ok: true };
 		}

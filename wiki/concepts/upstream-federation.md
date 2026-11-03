@@ -4,7 +4,7 @@ title: 'Signing in through somebody else’s identity provider'
 tags: [architecture, contract, gotcha, oidc]
 sources: [oauth-server-codebase]
 created: 2026-08-05
-updated: 2026-10-29
+updated: 2026-11-03
 graph:
   node_type: concept
   relationships:
@@ -374,7 +374,11 @@ The upstream's access and refresh tokens are destructured away and never bound t
 exchange. Only one provider calls an upstream API at all — GitHub, which asserts no identity and must be
 read back — and its token is used and dropped inside `identity/github.ts` rather than stored, so the rule
 is unchanged: keeping one would create a secret to leak and a refresh
-lifecycle to maintain.
+lifecycle to maintain. **Amended 2026-11-03 (spec 120):** the exception is a sign-in whose provider an
+administrator linked to a connected service. Its start sets `keepFor`, the identity layer then returns the token
+answer, and the tokens travel sealed in the handoff to leg three, where the connected-services module keeps them
+with the lifecycle 116-118 built ([[connected-services]], "Kept from sign-in"). Every other sign-in drops them as
+before.
 
 Verification failures answer one uninformative page; the reason goes to the event bus, never to the console —
 this route is unauthenticated, so an attacker-triggerable log write is a vector of its own. The reasoning is

@@ -96,6 +96,7 @@ export const zhHans: AccountTexts = {
 		'您将前往{service}登录并允许访问。之后{app}即可使用该账号。您可以随时在账号页面撤销此授权。',
 	linkConnectButton: '连接{service}并允许{app}',
 	linkConnectAnother: '连接另一个{service}账号',
+	connectedAtSignIn: '在您通过{provider}登录时连接。',
 	linkLimit: '您连接的{service}账号已达上限。您可以改为允许{app}使用其中一个。',
 	linkConsentOne: '允许{app}使用您的{service}账号{account}吗？',
 	linkConsentSeveral: '{app}可以使用您的哪些{service}账号？',

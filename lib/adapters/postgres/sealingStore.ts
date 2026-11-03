@@ -140,6 +140,29 @@ export class SealingStore implements SealingStoreInstance {
 				}
 				return leaves;
 			}
+			case 'signInTokenInTransit': {
+				const rows = await handle`
+					SELECT id,
+						payload->'kept'->>'tokens' AS value,
+						payload->>'accountId' AS account_id
+					FROM ${handle('FederationState')}
+					WHERE jsonb_typeof(payload->'kept'->'tokens') = 'string'
+						AND jsonb_typeof(payload->'accountId') = 'string'
+				`;
+				for (const row of rows) {
+					const id = column(row, 'id');
+					const value = column(row, 'value');
+					const accountId = column(row, 'account_id');
+					if (
+						id !== undefined &&
+						value !== undefined &&
+						accountId !== undefined
+					) {
+						leaves.push({ target: { kind, id, accountId }, value });
+					}
+				}
+				return leaves;
+			}
 			case 'smtpPassword': {
 				const rows = await handle`
 					SELECT doc->>'password' AS value FROM ${handle(STORE_AREAS.serviceConfig)}
@@ -332,6 +355,15 @@ export class SealingStore implements SealingStoreInstance {
 					UPDATE ${handle('TotpEnrollment')}
 					SET payload = jsonb_set(payload, '{secret}', to_jsonb(${text(next)}::text))
 					WHERE id = ${target.uid} AND payload->>'secret' = ${text(observed)}
+					RETURNING id
+				`;
+				return rows.length === 1;
+			}
+			case 'signInTokenInTransit': {
+				const rows = await handle`
+					UPDATE ${handle('FederationState')}
+					SET payload = jsonb_set(payload, '{kept,tokens}', to_jsonb(${text(next)}::text))
+					WHERE id = ${target.id} AND payload->'kept'->>'tokens' = ${text(observed)}
 					RETURNING id
 				`;
 				return rows.length === 1;

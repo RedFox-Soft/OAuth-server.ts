@@ -636,6 +636,63 @@ export function sealedTotpEnrollmentAdapter<T>(
 	});
 }
 
+// ---------------------------------------------------------------- a linked sign-in's tokens in transit (specs/120)
+
+function handoffTarget(
+	payload: Record<string, unknown>,
+	id: string
+): SealTarget | null {
+	return typeof payload.accountId === 'string' && isRecord(payload.kept)
+		? { kind: 'signInTokenInTransit', id, accountId: payload.accountId }
+		: null;
+}
+
+/*
+ * Never stored open: a handoff whose tokens cannot be sealed (no keyring) loses `kept`, and one whose tokens
+ * cannot be opened (the key gone within its five minutes) loses it too. Either way the sign-in goes on and
+ * nothing is kept, which is what spec 120 asks of any fault.
+ */
+export function sealedFederationStateAdapter<T>(
+	adapter: ModelAdapter<T>
+): ModelAdapter<T> {
+	const sealPayload: Hook = async ([id, payload, ...rest]) => {
+		if (typeof id !== 'string' || !isRecord(payload))
+			return [id, payload, ...rest];
+		const target = handoffTarget(payload, id);
+		if (!target) return [id, payload, ...rest];
+		const kept = payload.kept as Record<string, unknown>;
+		const sealed = await sealedText(kept.tokens, target);
+		if (typeof sealed !== 'string' || !isSealed(sealed)) {
+			const { kept: _dropped, ...withoutKept } = payload;
+			return [id, withoutKept, ...rest];
+		}
+		return [id, { ...payload, kept: { ...kept, tokens: sealed } }, ...rest];
+	};
+	return decorate(adapter, MODEL_METHODS, {
+		args: { upsert: sealPayload, create: sealPayload },
+		result: (result, args) =>
+			walk(
+				result,
+				(record) => isRecord(record.kept),
+				async (payload) => {
+					const target = handoffTarget(
+						payload,
+						typeof args[0] === 'string' ? args[0] : ''
+					);
+					if (!target) return payload;
+					const kept = payload.kept as Record<string, unknown>;
+					const opened = await openedText(kept.tokens, target);
+					if (opened === ABSENT || typeof opened !== 'string') {
+						const { kept: _dropped, ...withoutKept } = payload;
+						return withoutKept;
+					}
+					return { ...payload, kept: { ...kept, tokens: opened } };
+				},
+				0
+			)
+	});
+}
+
 // ---------------------------------------------------------------- server-wide singleton secrets
 
 /*

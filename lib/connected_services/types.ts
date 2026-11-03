@@ -80,6 +80,12 @@ export const ConnectedService = t.Object({
 	 * an outside server lists its applications, so the relation has one writer and no client attribute.
 	 */
 	applications: t.Optional(t.Array(t.String())),
+	/*
+	 * The one sign-in provider of the project whose sign-ins also keep this service's tokens (specs/120 R1): the same
+	 * provider and the same client id, so the tokens a sign-in returns are this registration's. On the service, as
+	 * `applications` is, so the link has one writer; a sign-in provider shows it by reading the services.
+	 */
+	signInProviderId: t.Optional(t.String()),
 	createdAt: t.String(),
 	updatedAt: t.String()
 });
@@ -88,9 +94,18 @@ export type ConnectedService = Static<typeof ConnectedService>;
 export const ConnectedAccountBreak = t.Union([
 	t.Literal('refresh_rejected'),
 	t.Literal('refresh_unsaved'),
-	t.Literal('identity_changed')
+	t.Literal('identity_changed'),
+	/* Its access token is due and nothing can renew it: kept from a sign-in that returned no refresh token (specs/120). */
+	t.Literal('no_refresh_token')
 ]);
 export type ConnectedAccountBreak = Static<typeof ConnectedAccountBreak>;
+
+export const ConnectedAccountVia = t.Union([
+	t.Literal('account_page'),
+	t.Literal('connect_link'),
+	t.Literal('sign_in')
+]);
+export type ConnectedAccountVia = Static<typeof ConnectedAccountVia>;
 
 /*
  * One person's account at one connected service. `_id` is derived from (project, service, person, upstream
@@ -134,7 +149,9 @@ export const ConnectedAccount = t.Object({
 	/* Last exchange per agent. A list, not a map: a client id may be a URL, and a dot splits a MongoDB path. */
 	usedBy: t.Optional(
 		t.Array(t.Object({ clientId: t.String(), at: t.Number() }))
-	)
+	),
+	/* How the latest connect happened (specs/120 R11); absent on accounts connected before it was recorded. */
+	via: t.Optional(ConnectedAccountVia)
 });
 export type ConnectedAccount = Static<typeof ConnectedAccount>;
 

@@ -23,6 +23,8 @@ export type PresentedProvider = Omit<FederationProvider, 'plainAssertions'> & {
  * whether the instance accepts them, the directory bound to it, and how many people sign in through it.
  */
 export type ProviderDetail = PresentedProvider & {
+	/* The connected service its sign-ins also connect accounts at (specs/120). */
+	keepsTokensFor?: { serviceId: string; displayName: string };
 	callbackUri: string;
 	callbackStability: 'stable' | 'provisional';
 	recognised: string | null;

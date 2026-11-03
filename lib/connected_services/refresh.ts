@@ -118,6 +118,16 @@ async function refreshClaimed(
 	try {
 		if (claimed.broken) return { kind: 'broken' };
 		if (!due(claimed)) return { kind: 'fresh', record: claimed };
+		/*
+		 * A sign-in may keep an account without a refresh token (specs/120 Clarifications: consent is never forced).
+		 * Once its access token is spent nothing can renew it, so the person must reconnect. Only then: keep-alive also
+		 * comes here for an account whose token never expires (a GitHub OAuth app's), which is not broken.
+		 */
+		if (!claimed.refreshToken && service.clientSecret && expiresSoon(claimed)) {
+			written = true;
+			await breakAccount(bucket, claimed, 'no_refresh_token');
+			return { kind: 'broken' };
+		}
 		if (!claimed.refreshToken || !service.clientSecret) {
 			return { kind: 'unavailable' };
 		}

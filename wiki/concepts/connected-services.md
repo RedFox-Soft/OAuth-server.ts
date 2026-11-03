@@ -4,13 +4,14 @@ title: 'Connected services: a person connects accounts at other services'
 tags: [architecture, security, storage, decision, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-11-02
-updated: 2026-11-02
+updated: 2026-11-03
 ---
 
 # Connected services
 
 Spec 117, the floor of the token vault (spec 116 sealed stored secrets; 118 issues the stored tokens to agents by
-token exchange, below; 119 puts a connect link for the person in the exchange's refusal, below). A project declares **connected services**
+token exchange, below; 119 puts a connect link for the person in the exchange's refusal, below; 120 lets a sign-in
+through a linked provider connect the account, below). A project declares **connected services**
 (Google, GitHub, Slack, Microsoft, an OpenID Connect issuer, or a plain OAuth 2.0 provider) with its own
 registration at each provider. A person **connects** their account at one from their account page, and the
 provider's tokens are stored sealed. Since spec 118 an agent the administrator and the person both allowed obtains
@@ -180,6 +181,42 @@ pointer behind (`lib/adapters/memory/memoryAdapter.ts:112`). Found by the replac
 The agent learns the outcome by repeating the exchange, as MCP 2026-07-28 does for every out-of-band step; there is no
 status endpoint and no redirect back to the agent. `account_selection_required` carries no link: the choice belongs in
 the conversation, where the agent can ask with a form elicitation over `accounts`.
+
+## Kept from sign-in (spec 120)
+
+A service's optional `signInProviderId` names one sign-in provider of the project whose sign-ins also connect the
+person's account at the service. Accepted only for the same provider and the **same client id**
+(`signInMatch`, `lib/connected_services/link_signin.ts:34`): tokens belong to the registration that asked for them,
+and the service refreshes and revokes with its own, so a kept account needs no second refresh path. Google, Microsoft
+(same tenant), GitHub and OIDC by issuer match; Slack does not, since its user tokens come from `oauth.v2.access`
+with `user_scope`, which its OIDC sign-in never calls. The link has one writer, the service's PATCH, as
+`applications` does; a provider edit that would end the match is refused `linked_to_service` and a provider's
+deletion clears the link (`assertLinkSurvives`, `lib/admin/federation/routes.ts:61`).
+
+The sign-in start adds the service's scopes and offline access, and **never `prompt=consent`**
+(`keepRequest`, `link_signin.ts:101`): every forced consent mints a new Google refresh token, and past 100 per
+account and client Google silently invalidates the oldest, which may be an agent's. So a sign-in may bring no
+refresh token; the store step then keeps the stored one (`storeConnectedAccount`,
+`lib/connected_services/accounts.ts:349`), and a new account without one is marked broken `no_refresh_token` once
+its access token is due (`lib/connected_services/refresh.ts:132`), which the exchange answers as
+`reconnect_required` with 119's link. Only when due: keep-alive also visits accounts whose token never expires
+(GitHub OAuth apps), which are not broken.
+
+**Gotcha: tokens are kept only at leg three.** Leg two (`keptFromSignIn`, `accounts.ts:219`) names the upstream
+account with 117's `identify`, not the sign-in's subject (Microsoft's sign-in `sub` is pairwise per registration
+while accounts are keyed `tid:oid`), and carries the tokens in the handoff record, where `kept.tokens` is one sealed
+JSON leaf (kind `signInTokenInTransit`, `sealedFederationStateAdapter`, `lib/sealing/decorators.ts:655`). Leg three
+keeps them only on the path that sets the login result (`lib/interactions/index.ts:1807`); the password-link and
+verification doors return first. Keeping at leg two would store a login-CSRF victim's tokens without the victim
+signing in. A keep never fails a sign-in: every fault is a `connected_account.refused` event with a reason.
+
+The person's own disconnect is remembered on their record, `connectionsDeclined`, at most 50 trimmed before the write
+(`recordConnectionDeclined`, `lib/end_users/service.ts:581`), and cleared by their own connect; an administrator's
+removal is not remembered. The list is barred from administrative reads by `presentUser`. A provider that refuses
+the extra scopes (`invalid_scope`, `consent_required`, `interaction_required`, or Microsoft's `invalid_grant` with
+`suberror=consent_required` at redemption) gets one retry without them (`lib/federation/routes.ts:118`);
+`access_denied` is not retried, since it is also how a person's cancel returns. A provider that blocks the scopes on
+its own page (Google Workspace `admin_policy_enforced`) never returns, so nothing can be retried.
 
 ## One refresh at a time
 

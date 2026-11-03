@@ -6,6 +6,7 @@ import epochTime from '../helpers/epoch_time.js';
 import { HANDOFF_TTL_SECONDS, STATE_TTL_SECONDS } from './consts.js';
 import {
 	FederationStatePayload,
+	type KeptFromSignIn,
 	type PendingLinkIdentity,
 	type TryResult
 } from './types.js';
@@ -46,6 +47,10 @@ export interface PendingStart {
 	providerId: string;
 	/* Omitted when the upstream advertises no S256, in which case no PKCE is sent. */
 	withPkce: boolean;
+	/* The connected service this sign-in also asks for (specs/120); only the interaction's sign-in start sets it. */
+	keepFor?: string;
+	/* The one retry without the service's scopes (specs/120 R10). */
+	retried?: boolean;
 }
 
 export interface PendingSecrets {
@@ -74,6 +79,8 @@ export async function openPending(
 			providerId: start.providerId,
 			nonce,
 			...(codeVerifier ? { codeVerifier } : {}),
+			...(start.keepFor ? { keepFor: start.keepFor } : {}),
+			...(start.retried ? { retried: true } : {}),
 			exp: epochTime() + STATE_TTL_SECONDS
 		},
 		STATE_TTL_SECONDS
@@ -212,6 +219,7 @@ export async function openHandoff(handoff: {
 	accountId: string;
 	link?: PendingLinkIdentity;
 	upstream?: { providerId: string; sid?: string; sessionExpiry?: number };
+	kept?: KeptFromSignIn;
 }): Promise<string> {
 	const ref = secret();
 	await records().upsert(
@@ -222,6 +230,7 @@ export async function openHandoff(handoff: {
 			accountId: handoff.accountId,
 			...(handoff.link ? { link: handoff.link } : {}),
 			...(handoff.upstream ? { upstream: handoff.upstream } : {}),
+			...(handoff.kept ? { kept: handoff.kept } : {}),
 			exp: epochTime() + HANDOFF_TTL_SECONDS
 		},
 		HANDOFF_TTL_SECONDS

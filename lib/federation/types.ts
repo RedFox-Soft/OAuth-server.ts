@@ -255,6 +255,27 @@ export interface TryStarted {
 export type TryStatus =
 	{ status: 'waiting' } | { status: 'done'; result: TryResult };
 
+/* The tokens a linked sign-in returned, as one JSON document so the handoff seals one leaf, not two. */
+export const KeptTokens = t.Object({
+	accessToken: t.String(),
+	refreshToken: t.Optional(t.String()),
+	tokenType: t.String(),
+	accessTokenExpiresAt: t.Optional(t.Number()),
+	refreshTokenExpiresAt: t.Optional(t.Number()),
+	grantedScopes: t.Optional(t.Array(t.String()))
+});
+export type KeptTokens = Static<typeof KeptTokens>;
+
+export const KeptFromSignIn = t.Object({
+	serviceId: t.String(),
+	upstreamId: t.String(),
+	label: t.String(),
+	requestedScopes: t.Array(t.String()),
+	/* `KeptTokens` as JSON, sealed at rest (kind `signInTokenInTransit`). */
+	tokens: t.String()
+});
+export type KeptFromSignIn = Static<typeof KeptFromSignIn>;
+
 export const FederationStatePayload = t.Object({
 	/*
 	 * `try` is the record a try of a provider writes its result into (specs/088): named by the digest of the
@@ -292,6 +313,13 @@ export const FederationStatePayload = t.Object({
 	/* Absent when the IdP advertises no S256, in which case no PKCE was sent. Stage 1 only. */
 	codeVerifier: t.Optional(t.String()),
 	/*
+	 * Stage 1 only: the connected service this sign-in also asks the provider for (specs/120 R4), set only by the
+	 * interaction's sign-in start, never by a try. The callback re-reads the link before keeping anything.
+	 */
+	keepFor: t.Optional(t.String()),
+	/* Stage 1 only: this round trip is the one retry without the service's scopes (specs/120 R10). */
+	retried: t.Optional(t.Boolean()),
+	/*
 	 * Stage 2 only — and **optional is what makes one area hold both stages**. The inventory declares this
 	 * area account-owned, because the reverse ownership check in
 	 * test/storage_contract/inventory_drift.spec.ts fails any area whose payload carries `accountId`
@@ -320,6 +348,12 @@ export const FederationStatePayload = t.Object({
 			sessionExpiry: t.Optional(t.Integer())
 		})
 	),
+	/*
+	 * Stage 2 only: the tokens of a linked sign-in, carried to leg three, where they are kept only if the sign-in
+	 * completes for this account (specs/120 R7). `kept.tokens` is sealed by the store's decorator (kind
+	 * `signInTokenInTransit`), and the whole member is omitted while no keyring is in use.
+	 */
+	kept: t.Optional(KeptFromSignIn),
 	/*
 	 * Epoch seconds. Mirrors the adapter's expiry *and* is compared to now on every read: MongoDB's TTL
 	 * monitor deletes lazily, so a record can outlive its expiry by a minute or more — and a stale handoff

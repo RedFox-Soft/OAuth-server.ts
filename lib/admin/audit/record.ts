@@ -45,6 +45,12 @@ export interface AuditDetail {
 	formerBucketId?: string;
 	/* The connected service an action changed (specs/117). An id the console generated: names nothing personal. */
 	serviceId?: string;
+	/*
+	 * The sign-in provider a connected service is linked to now, or null for none (specs/120), and on a provider's
+	 * deletion the service whose link went with it. Ids an administrator gave, naming nothing personal.
+	 */
+	signInProviderId?: string | null;
+	unlinked?: string;
 	/* The connected account removed (specs/117): a derived digest, never the upstream login or address. */
 	connectedAccountId?: string;
 	/* The signing key a key action acted on. Public, as it is in every token header the key signs. */
@@ -282,6 +288,12 @@ async function write(input: {
 			...(input.detail.connectedAccountId === undefined
 				? {}
 				: { connectedAccountId: input.detail.connectedAccountId }),
+			...(input.detail.signInProviderId === undefined
+				? {}
+				: { signInProviderId: input.detail.signInProviderId }),
+			...(input.detail.unlinked === undefined
+				? {}
+				: { unlinked: input.detail.unlinked }),
 			...(input.detail.from === undefined ? {} : { from: input.detail.from }),
 			...(input.detail.to === undefined ? {} : { to: input.detail.to }),
 			...(input.detail.scheduledAt === undefined

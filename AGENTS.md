@@ -150,7 +150,9 @@ Each rule is the part that is easy to break. Read the named page before changing
   leaves only through `upstream_exchange.ts` and is renewed only through `refresh.ts`'s lease, never by a direct
   refresh, and a jsonb key list is bound with `handle.array(keys, 'text')`, never `${keys}::text[]`. An agent's
   connect link acts only for the person the agent's token named, after that person's own recent sign-in, and a
-  consent a link's connect gives travels in its `ConnectState`, never read back from the link.
+  consent a link's connect gives travels in its `ConnectState`, never read back from the link. A sign-in keeps a
+  provider's tokens only for a provider linked to a service by the same client id, only at leg three, sealed in the
+  handoff, and never forces the provider's consent screen.
   → `postgresql-backend.md`, `mongodb-test-fidelity.md`, `secrets-encryption-at-rest.md`, `connected-services.md`
 - **Schema migrations** — declared in `lib/consts/migrations.ts`, applied by `bun run db:migrate`;
   startup refuses a database that is behind, ahead or diverged, and never migrates it itself. A

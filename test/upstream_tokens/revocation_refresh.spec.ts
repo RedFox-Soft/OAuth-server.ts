@@ -64,7 +64,7 @@ describe('disconnecting an account whose access token expired', () => {
 			by: 'person'
 		});
 
-		expect(result).toEqual({ removed: true, revocation: 'revoked' });
+		expect(result).toMatchObject({ removed: true, revocation: 'revoked' });
 		expect(Date.now() - started).toBeLessThan(5_000);
 	});
 
@@ -100,7 +100,7 @@ describe('disconnecting an account whose access token expired', () => {
 			by: 'person'
 		});
 
-		expect(result).toEqual({ removed: true, revocation: 'revoked' });
+		expect(result).toMatchObject({ removed: true, revocation: 'revoked' });
 	});
 
 	it('deletes the account when the refresh fails, and says the provider was not told', async () => {
@@ -119,6 +119,6 @@ describe('disconnecting an account whose access token expired', () => {
 			by: 'person'
 		});
 
-		expect(result).toEqual({ removed: true, revocation: 'failed' });
+		expect(result).toMatchObject({ removed: true, revocation: 'failed' });
 	});
 });

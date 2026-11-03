@@ -30,14 +30,20 @@ interface ConnectedAccountView {
 	lastRefreshedAt?: string;
 }
 
-type BreakReason = 'refresh_rejected' | 'refresh_unsaved' | 'identity_changed';
+type BreakReason =
+	| 'refresh_rejected'
+	| 'refresh_unsaved'
+	| 'identity_changed'
+	| 'no_refresh_token';
 
 const BREAK_TEXT: Record<BreakReason, string> = {
 	refresh_rejected:
 		'Needs reconnecting: the provider rejected its refresh token',
 	refresh_unsaved:
 		'Needs reconnecting: the refreshed tokens could not be saved',
-	identity_changed: 'Needs reconnecting: the provider returned another account'
+	identity_changed: 'Needs reconnecting: the provider returned another account',
+	no_refresh_token:
+		'Needs reconnecting: it was connected at sign-in without a refresh token, and its token expired'
 };
 
 function when(at: string): string {

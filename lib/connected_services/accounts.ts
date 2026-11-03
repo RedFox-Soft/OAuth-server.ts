@@ -1,6 +1,10 @@
 import crypto from 'crypto';
 
-import { getConnectedAccountStore } from '../adapters/index.js';
+import {
+	getBucketStore,
+	getConnectedAccountStore,
+	getUserStore
+} from '../adapters/index.js';
 import epochTime from '../helpers/epoch_time.js';
 import type { UserBucket } from '../adapters/types.js';
 import { eventBus, type RevocationOutcome } from '../event_bus.js';
@@ -15,11 +19,15 @@ import {
 import {
 	exchangeConnectCode,
 	refreshUpstream,
+	tokensOf,
 	type IssuedTokens
 } from './exchange.js';
+import { keepRequest, serviceKeepingFor } from './link_signin.js';
+import { Value } from '@sinclair/typebox/value';
+import { KeptTokens, type KeptFromSignIn } from '../federation/types.js';
 import { expiresSoon } from './refresh.js';
 import { authorizationRedirect, requestedScopes } from './flow.js';
-import { identify } from './identity.js';
+import { identify, type UpstreamAccount } from './identity.js';
 import { noticeRemoved } from './mail.js';
 import { adoptFirstAccount } from './consent.js';
 import { revokeUpstream } from './revoke.js';
@@ -27,6 +35,7 @@ import { openConnect } from './state.js';
 import type {
 	ConnectedAccount,
 	ConnectedAccountBreak,
+	ConnectedAccountVia,
 	ConnectedService,
 	ConnectStatePayload
 } from './types.js';
@@ -175,11 +184,180 @@ export async function finishConnect(input: {
 		throw new ConnectRefused('failed');
 	}
 
+	const stored = await storeConnectedAccount({
+		bucket,
+		service,
+		accountId: pending.accountId,
+		tokens,
+		upstream,
+		requestedScopes: pending.requestedScopes,
+		via: pending.link ? 'connect_link' : 'account_page',
+		keepStoredRefresh: false
+	});
+	if (stored === 'limit') {
+		await revokeUpstream(resolved, client, tokens);
+		throw new ConnectRefused('limit');
+	}
+	const { created, record } = stored;
+	return { done: created ? 'connected' : 'updated', record };
+}
+
+// ---------------------------------------------------------------- kept from a sign-in (specs/120)
+
+function keepRefused(bucketId: string, serviceId: string, reason: string) {
+	eventBus.emit('connected_account.refused', { bucketId, serviceId, reason });
+}
+
+/*
+ * Leg two of a sign-in through a linked provider (specs/120 R6, R7): the account the tokens belong to, named by the
+ * same identity the connect flow reads (Microsoft keys an account by organisation and object id, not the sign-in's
+ * pairwise subject), and the tokens to carry, or nothing. Never throws: keeping is a side effect of signing in.
+ */
+export async function keptFromSignIn(input: {
+	bucket: UserBucket;
+	providerId: string;
+	serviceId: string;
+	tokenResponse: Record<string, unknown> | undefined;
+	nonce: string;
+}): Promise<KeptFromSignIn | undefined> {
+	const { bucket } = input;
+	if (!activeKeyring()) {
+		keepRefused(bucket._id, input.serviceId, 'keyring_required');
+		return undefined;
+	}
+	const service = serviceKeepingFor(bucket, input.providerId);
+	if (
+		!service ||
+		service.id !== input.serviceId ||
+		!service.clientSecret ||
+		!input.tokenResponse
+	) {
+		keepRefused(bucket._id, input.serviceId, 'unavailable');
+		return undefined;
+	}
+	try {
+		const resolved = await resolveService(service);
+		const tokens = tokensOf(resolved, input.tokenResponse);
+		const upstream = await identify(
+			resolved,
+			{ clientId: service.clientId },
+			tokens,
+			input.nonce
+		);
+		const carried: KeptTokens = {
+			accessToken: tokens.accessToken,
+			tokenType: tokens.tokenType,
+			...(tokens.refreshToken ? { refreshToken: tokens.refreshToken } : {}),
+			...(tokens.accessTokenExpiresAt
+				? { accessTokenExpiresAt: tokens.accessTokenExpiresAt }
+				: {}),
+			...(tokens.refreshTokenExpiresAt
+				? { refreshTokenExpiresAt: tokens.refreshTokenExpiresAt }
+				: {}),
+			...(tokens.grantedScopes ? { grantedScopes: tokens.grantedScopes } : {})
+		};
+		return {
+			serviceId: service.id,
+			upstreamId: upstream.upstreamId,
+			label: upstream.label,
+			requestedScopes: keepRequest(service).scopes,
+			tokens: JSON.stringify(carried)
+		};
+	} catch {
+		keepRefused(bucket._id, input.serviceId, 'failed');
+		return undefined;
+	}
+}
+
+/*
+ * Leg three (specs/120 R8): the sign-in has completed for this person, so their account is created or refreshed,
+ * unless something changed since leg two or the person disconnected this upstream account themselves. Never throws:
+ * whatever happens here, the sign-in goes on.
+ */
+export async function keepFromSignIn(input: {
+	bucketId: string;
+	accountId: string;
+	providerId: string | undefined;
+	kept: KeptFromSignIn;
+}): Promise<void> {
+	const { bucketId, kept } = input;
+	try {
+		if (!activeKeyring()) {
+			keepRefused(bucketId, kept.serviceId, 'keyring_required');
+			return;
+		}
+		const bucket = await getBucketStore().find(bucketId);
+		const service =
+			bucket && input.providerId
+				? serviceKeepingFor(bucket, input.providerId)
+				: undefined;
+		if (!bucket || !service || service.id !== kept.serviceId) {
+			keepRefused(bucketId, kept.serviceId, 'unavailable');
+			return;
+		}
+		const person = await getUserStore(bucketId).find(input.accountId);
+		if (
+			person?.connectionsDeclined?.some(
+				(entry) =>
+					entry.serviceId === service.id && entry.upstreamId === kept.upstreamId
+			)
+		) {
+			keepRefused(bucketId, service.id, 'declined');
+			return;
+		}
+		const tokens: unknown = JSON.parse(kept.tokens);
+		if (!Value.Check(KeptTokens, tokens)) {
+			keepRefused(bucketId, service.id, 'failed');
+			return;
+		}
+		const stored = await storeConnectedAccount({
+			bucket,
+			service,
+			accountId: input.accountId,
+			tokens,
+			upstream: { upstreamId: kept.upstreamId, label: kept.label },
+			requestedScopes: kept.requestedScopes,
+			via: 'sign_in',
+			keepStoredRefresh: true
+		});
+		if (stored === 'limit') keepRefused(bucketId, service.id, 'limit');
+	} catch {
+		keepRefused(bucketId, kept.serviceId, 'failed');
+	}
+}
+
+export type StoredTokens = Pick<
+	IssuedTokens,
+	| 'accessToken'
+	| 'refreshToken'
+	| 'tokenType'
+	| 'accessTokenExpiresAt'
+	| 'refreshTokenExpiresAt'
+	| 'grantedScopes'
+>;
+
+/*
+ * The one way a connected account is written from a provider's answer, whether a connect or a sign-in brought it
+ * (specs/120 R8), so refresh, keep-alive and the exchange never see where it came from. `keepStoredRefresh` is a
+ * sign-in's: it never forces the consent screen, so a provider may answer without a refresh token while the
+ * account still holds a good one.
+ */
+async function storeConnectedAccount(input: {
+	bucket: UserBucket;
+	service: ConnectedService;
+	accountId: string;
+	tokens: StoredTokens;
+	upstream: UpstreamAccount;
+	requestedScopes: string[];
+	via: ConnectedAccountVia;
+	keepStoredRefresh: boolean;
+}): Promise<{ created: boolean; record: ConnectedAccount } | 'limit'> {
+	const { bucket, service, tokens, upstream } = input;
 	const store = getConnectedAccountStore();
 	const id = connectedAccountId(
 		bucket._id,
 		service.id,
-		pending.accountId,
+		input.accountId,
 		upstream.upstreamId
 	);
 	const existing = await store.find(bucket._id, id);
@@ -187,48 +365,61 @@ export async function finishConnect(input: {
 		? undefined
 		: await store.countByAccountAndService(
 				bucket._id,
-				pending.accountId,
+				input.accountId,
 				service.id
 			);
 	if (atService !== undefined && atService >= ACCOUNTS_PER_SERVICE) {
-		await revokeUpstream(resolved, client, tokens);
-		throw new ConnectRefused('limit');
+		return 'limit';
 	}
 
+	const refresh =
+		tokens.refreshToken !== undefined
+			? {
+					refreshToken: tokens.refreshToken,
+					...(tokens.refreshTokenExpiresAt
+						? { refreshTokenExpiresAt: tokens.refreshTokenExpiresAt }
+						: {})
+				}
+			: input.keepStoredRefresh && existing?.refreshToken
+				? {
+						refreshToken: existing.refreshToken,
+						...(existing.refreshTokenExpiresAt
+							? { refreshTokenExpiresAt: existing.refreshTokenExpiresAt }
+							: {})
+					}
+				: {};
 	const now = new Date().toISOString();
 	const granted = tokens.grantedScopes;
 	const record: ConnectedAccount = {
 		_id: id,
 		bucketId: bucket._id,
 		serviceId: service.id,
-		accountId: pending.accountId,
+		accountId: input.accountId,
 		upstreamId: upstream.upstreamId,
 		label: upstream.label,
 		accessToken: tokens.accessToken,
-		...(tokens.refreshToken ? { refreshToken: tokens.refreshToken } : {}),
+		...refresh,
 		tokenType: tokens.tokenType,
 		...(tokens.accessTokenExpiresAt
 			? { accessTokenExpiresAt: tokens.accessTokenExpiresAt }
 			: {}),
-		...(tokens.refreshTokenExpiresAt
-			? { refreshTokenExpiresAt: tokens.refreshTokenExpiresAt }
-			: {}),
-		scopes: granted ?? pending.requestedScopes,
+		scopes: granted ?? input.requestedScopes,
 		scopesInferred: granted === undefined,
 		connectedAt: existing?.connectedAt ?? now,
 		updatedAt: now,
 		refreshedAt: epochTime(),
 		/* A reconnect keeps when each agent last used the account; it clears `broken`, which re-arms its mail. */
-		...(existing?.usedBy ? { usedBy: existing.usedBy } : {})
+		...(existing?.usedBy ? { usedBy: existing.usedBy } : {}),
+		via: input.via
 	};
 	const { created } = await store.put(record);
 	/* An answer given about the service before any account existed is this first account's (specs/118 FR-020). */
 	if (created && atService === 0) await adoptFirstAccount(bucket, record);
 	eventBus.emit(
 		created ? 'connected_account.connected' : 'connected_account.updated',
-		eventOf(record)
+		{ ...eventOf(record), via: input.via }
 	);
-	return { done: created ? 'connected' : 'updated', record };
+	return { created, record };
 }
 
 /*
@@ -270,6 +461,10 @@ export interface ConnectedAccountView {
 	/* Why the provider no longer honours it, and since when (specs/118 R12). */
 	broken?: { reason: ConnectedAccountBreak; at: string };
 	lastRefreshedAt?: string;
+	/* How it was last connected (specs/120 R11); absent for an account connected before that was recorded. */
+	via?: ConnectedAccountVia;
+	/* For `via: 'sign_in'`: the sign-in provider that keeps tokens for its service now, by name. */
+	signedInWith?: string;
 }
 
 export function statusOf(record: ConnectedAccount): ConnectedAccountStatus {
@@ -278,6 +473,18 @@ export function statusOf(record: ConnectedAccount): ConnectedAccountStatus {
 		!record.accessToken
 		? 'needs_reconnection'
 		: 'connected';
+}
+
+function signedInWithOf(
+	bucket: UserBucket,
+	record: ConnectedAccount,
+	service: ConnectedService | undefined
+): { signedInWith?: string } {
+	if (record.via !== 'sign_in' || !service?.signInProviderId) return {};
+	const provider = bucket.federation.find(
+		(entry) => entry.id === service.signInProviderId
+	);
+	return provider ? { signedInWith: provider.displayName } : {};
 }
 
 export function viewOf(
@@ -303,6 +510,8 @@ export function viewOf(
 			? { accessTokenExpiresAt: record.accessTokenExpiresAt }
 			: {}),
 		status: statusOf(record),
+		...(record.via ? { via: record.via } : {}),
+		...signedInWithOf(bucket, record, service),
 		...(record.broken
 			? {
 					broken: {
@@ -478,7 +687,12 @@ export async function disconnect(input: {
 	accountId: string;
 	connectedAccountId: string;
 	by: 'person' | 'administrator';
-}): Promise<{ removed: boolean; revocation?: RevocationOutcome }> {
+}): Promise<{
+	removed: boolean;
+	revocation?: RevocationOutcome;
+	/* Which upstream account went, for the person's own disconnect to be remembered (specs/120 R9). */
+	account?: { serviceId: string; upstreamId: string };
+}> {
 	const store = getConnectedAccountStore();
 	const record = await store.find(input.bucket._id, input.connectedAccountId);
 	if (!record || record.accountId !== input.accountId)
@@ -492,6 +706,7 @@ export async function disconnect(input: {
 	if (input.by === 'person') {
 		return {
 			removed: true,
+			account: { serviceId: removed.serviceId, upstreamId: removed.upstreamId },
 			revocation: await revokeOne(
 				input.bucket,
 				removed,

@@ -20,6 +20,11 @@ import { activeKeyring } from '../../sealing/keyring.js';
 import { assertReachable } from '../../shared/egress.js';
 import { adapter } from '../../adapters/index.js';
 import { whyCannotExchange } from '../../connected_services/eligibility.js';
+import {
+	linkableSignInProviders,
+	signInMatch,
+	type SignInMatch
+} from '../../connected_services/link_signin.js';
 import type { CreateServiceBody, UpdateServiceBody } from './schema.js';
 
 /*
@@ -32,6 +37,9 @@ type UpdateBody = Static<typeof UpdateServiceBody>;
 
 export interface ServiceView extends Omit<ConnectedService, 'clientSecret'> {
 	clientSecret: string;
+	/* The linked sign-in provider, and those that could be linked now (specs/120). */
+	signInProvider?: { id: string; displayName: string };
+	linkableSignInProviders: { id: string; displayName: string }[];
 	connectedAccounts: number;
 	callbackUri: string;
 	/* What an agent names in `audience` to obtain this service's tokens (specs/118 R5). */
@@ -104,8 +112,75 @@ export async function present(
 			bucket._id,
 			service.id
 		),
-		callbackUri: connectCallbackUri(bucket)
+		callbackUri: connectCallbackUri(bucket),
+		...signInView(bucket, service)
 	};
+}
+
+function signInView(bucket: UserBucket, service: ConnectedService) {
+	const linked = service.signInProviderId
+		? bucket.federation.find((p) => p.id === service.signInProviderId)
+		: undefined;
+	return {
+		...(linked
+			? { signInProvider: { id: linked.id, displayName: linked.displayName } }
+			: {}),
+		linkableSignInProviders: linkableSignInProviders(bucket, service).map(
+			(provider) => ({ id: provider.id, displayName: provider.displayName })
+		)
+	};
+}
+
+const MISMATCH: Record<Exclude<SignInMatch, 'ok' | 'unlinkable'>, string> = {
+	provider: 'the sign-in provider is not the same provider as this service',
+	client_id:
+		'the sign-in provider uses another client id: its tokens could not be refreshed with this service’s registration',
+	tenant: 'the sign-in provider admits another Microsoft tenant'
+};
+
+/*
+ * Whether `providerId` may keep this service's tokens (specs/120 R2), refused with why before anything is written:
+ * the same provider and registration, not linked to another service, a keyring in use.
+ */
+export function assertSignInLink(
+	bucket: UserBucket,
+	service: ConnectedService,
+	providerId: string
+): void {
+	assertKeyringInUse();
+	const provider = bucket.federation.find((entry) => entry.id === providerId);
+	if (!provider) {
+		throw new AdminError(
+			404,
+			'no sign-in provider with that id in this project',
+			{
+				field: 'signInProviderId'
+			}
+		);
+	}
+	const match = signInMatch(service, provider);
+	if (match === 'unlinkable') {
+		throw new AdminError(
+			409,
+			'this service has no sign-in counterpart: its tokens do not come from a sign-in',
+			{ code: 'sign_in_provider_unlinkable' }
+		);
+	}
+	if (match !== 'ok') {
+		throw new AdminError(409, MISMATCH[match], {
+			code: 'sign_in_provider_mismatch'
+		});
+	}
+	const other = servicesOf(bucket).find(
+		(entry) => entry.id !== service.id && entry.signInProviderId === providerId
+	);
+	if (other) {
+		throw new AdminError(
+			409,
+			`that sign-in provider already keeps tokens for ${other.displayName}`,
+			{ code: 'sign_in_provider_taken' }
+		);
+	}
 }
 
 export async function presentAll(bucket: UserBucket) {
@@ -305,6 +380,10 @@ export async function createService(
 			[]
 		);
 	}
+	if (body.signInProviderId !== undefined) {
+		assertSignInLink(bucket, service, body.signInProviderId);
+		service.signInProviderId = body.signInProviderId;
+	}
 	await getBucketStore().update(bucket._id, {
 		connectedServices: [...servicesOf(bucket), service]
 	});
@@ -345,6 +424,12 @@ export async function updateService(
 		);
 	}
 	await assertGenericEndpoints(generic);
+	if (typeof body.signInProviderId === 'string') {
+		assertSignInLink(bucket, current, body.signInProviderId);
+	}
+	const { signInProviderId: wasLinked, ...unlinked } = current;
+	const linked =
+		body.signInProviderId === undefined ? wasLinked : body.signInProviderId;
 	const applications =
 		body.applications === undefined
 			? undefined
@@ -354,7 +439,8 @@ export async function updateService(
 					current.applications ?? []
 				);
 	const next: ConnectedService = {
-		...current,
+		...unlinked,
+		...(linked ? { signInProviderId: linked } : {}),
 		...generic,
 		...(applications === undefined ? {} : { applications }),
 		...(body.scopes !== undefined ? { scopes: body.scopes } : {}),

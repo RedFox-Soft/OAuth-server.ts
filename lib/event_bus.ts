@@ -43,7 +43,10 @@ import type { RegistrationAccessToken } from './models/registration_access_token
 import type { ReplayDetection } from './models/replay_detection.ts';
 import type { Session } from './models/session.ts';
 import type { StartedPrompt } from './actions/authorization/interactions.ts';
-import type { ConnectedAccountBreak } from './connected_services/types.ts';
+import type {
+	ConnectedAccountBreak,
+	ConnectedAccountVia
+} from './connected_services/types.ts';
 
 /* BaseModel.emit names an event `${snake_case(class name)}.${lifecycle}` and passes the instance. */
 interface ModelEventSubjects {
@@ -147,6 +150,8 @@ export type ServerEvents = ModelEvents &
 		'federation.link.conflict': [{ providerId: string; connectionId: string }];
 		'federation.upstream.error': [{ providerId: string; reason: string }];
 		'federation.idtoken.error': [{ providerId: string; reason: string }];
+		/* A linked sign-in the provider refused for the service's scopes, sent again without them (specs/120 R10). */
+		'federation.keep.retried': [{ providerId: string; error: string }];
 		'mcp.auth.error': [{ reason: string }];
 		'provisioning.held': [
 			{ bucketId: string; connectionId: string; count: number }
@@ -179,8 +184,12 @@ export type ServerEvents = ModelEvents &
 		 * Connected accounts (specs/117 R11). Identifiers only: never a token, and never the upstream label, which
 		 * is personal data the audit trail already holds.
 		 */
-		'connected_account.connected': [ConnectedAccountEvent];
-		'connected_account.updated': [ConnectedAccountEvent];
+		'connected_account.connected': [
+			ConnectedAccountEvent & { via?: ConnectedAccountVia }
+		];
+		'connected_account.updated': [
+			ConnectedAccountEvent & { via?: ConnectedAccountVia }
+		];
 		'connected_account.deleted': [
 			ConnectedAccountEvent & { by: 'person' | 'administrator' | 'cascade' }
 		];

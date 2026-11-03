@@ -208,8 +208,20 @@ export async function presentDetail(bucket: UserBucket, providerId: string) {
 		warnings.push('federation_off');
 	warnings.push(...(brandConflicts(bucket.federation).get(provider.id) ?? []));
 
+	const keeps = (bucket.connectedServices ?? []).find(
+		(service) => service.signInProviderId === provider.id
+	);
 	return {
 		...present(provider, bucket),
+		/* The connected service its sign-ins also connect accounts at (specs/120). */
+		...(keeps
+			? {
+					keepsTokensFor: {
+						serviceId: keeps.id,
+						displayName: keeps.displayName
+					}
+				}
+			: {}),
 		callbackUri: callbackUri(bucket),
 		callbackStability,
 		recognised: entry?.catalogueId ?? null,
@@ -758,10 +770,24 @@ export async function deleteProvider(
 	 * Its place in the sign-in order goes with it: a provider created later under the same id is a new
 	 * provider, and appears after the ordered ones rather than inheriting the deleted one's position.
 	 */
+	/* A service it kept tokens for keeps its accounts, refreshed with its own registration; only the link goes (specs/120). */
+	const services = bucket.connectedServices ?? [];
+	const unlinks = services.some(
+		(service) => service.signInProviderId === providerId
+	);
 	await getBucketStore().update(bucket._id, {
 		federation,
 		...(bucket.signInOrder?.includes(providerId)
 			? { signInOrder: bucket.signInOrder.filter((id) => id !== providerId) }
+			: {}),
+		...(unlinks
+			? {
+					connectedServices: services.map((service) => {
+						if (service.signInProviderId !== providerId) return service;
+						const { signInProviderId: _gone, ...rest } = service;
+						return rest;
+					})
+				}
 			: {})
 	});
 	/* For the reason the links go: a provider created later under this id must not inherit its "last used". */

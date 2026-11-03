@@ -40,7 +40,9 @@ or through an [upstream identity provider](/docs/administer/federation/). They c
 their account page.
 
 A project may use Google both for sign-in and as a connected service. The two are configured separately, in
-different places in the console, and each has its own callback address.
+different places in the console, and each has its own callback address. You can link them, so that signing in
+with Google also connects the person's Google account: see
+[Connecting an account when the person signs in](#connecting-at-sign-in).
 
 The account page already has a list called **Connected apps**, at `/account/apps`. That list goes the other way:
 it shows the applications that hold tokens issued by this server. Connected services are the accounts that this
@@ -191,6 +193,52 @@ service.
 
 If something goes wrong, the page says so in plain words: the person declined at the provider, connecting took
 longer than ten minutes, the limit of 10 accounts is reached, or the service cannot be connected right now.
+
+## Connecting an account when the person signs in {#connecting-at-sign-in}
+
+People who sign in with Google need not connect Google a second time. Link the project's Google sign-in provider
+to the Google service, and every sign-in through that provider also connects the person's Google account at the
+service.
+
+To link them, open the service on the **Connected services** tab and choose the provider under **Keep tokens when
+people sign in with**. Only a provider that matches can be chosen:
+
+- **The same provider.** Google with Google, Microsoft with Microsoft for the same tenant, GitHub with GitHub, or
+  an OpenID Connect provider with the same issuer.
+- **The same client ID.** Tokens belong to the registration that asked for them, and the service renews them with
+  its own registration. If the two were created with different registrations, declare the service again with the
+  sign-in provider's client ID and secret, and add the service's callback address to that registration.
+- **Not linked elsewhere.** One sign-in provider keeps tokens for one service.
+
+Slack cannot be linked: its tokens for people come from an endpoint that its sign-in never calls. As for declaring
+a service, a keyring must be in use. The sign-in provider's page shows the link too.
+
+A sign-in through a linked provider then works like this:
+
+- **What it asks for.** The service's scopes as well as the sign-in's own, and offline access where the provider
+  needs it: Google's `access_type=offline`, Microsoft's `offline_access`. It never forces the provider's consent
+  screen. A provider that remembers what the person allowed does not ask again.
+- **What it keeps.** When the sign-in completes, the account is connected exactly as if the person had connected it
+  on their account page, and the page says it was connected at sign-in. A sign-in that is refused, or that stops to
+  ask for the password of an existing account, connects nothing. The next sign-in does.
+- **Who may use it.** Signing in allows no application. An agent still needs the person's permission, as the next
+  section describes.
+- **No refresh token.** Google sends a refresh token only the first time a person allows the scopes. When a sign-in
+  brings none, the account keeps the refresh token it already has. A new account without one works until its access
+  token expires, and then needs connecting again.
+- **The person's own disconnect.** If the person disconnects the account themselves, later sign-ins do not connect
+  it again until the person connects it from their account page or through an agent's link. An account that an
+  administrator removed is connected again by the next sign-in.
+
+Some organisations do not let people allow access to APIs themselves; a Microsoft organisation, for example, may
+require an administrator's consent. When the provider refuses the extra scopes and says so, the sign-in is sent to
+the provider once more without them, and the person signs in as before, with nothing connected. An organisation
+that blocks the scopes on the provider's own page never sends the person back, so nothing can be retried: unlink
+the provider if your people belong to such an organisation. Whatever goes wrong while connecting, the person still
+signs in.
+
+To unlink, clear the same field. Accounts already connected stay and keep working. Deleting the sign-in provider
+removes the link in the same way.
 
 ## Letting agents use connected accounts {#letting-agents-use-connected-accounts}
 
@@ -482,16 +530,16 @@ accounts people connect.
 An AI agent that administers the instance does everything an administrator does here through these
 [MCP tools](/docs/reference/mcp-tools/):
 
-| Tool                                                                                              | Does                                                                        | Consequence |
-| ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ----------- |
-| [`connected_service_list`](/docs/reference/mcp-tools/#connected_service_list)                     | Lists a project's services, with the callback address and account counts    | Read        |
-| [`connected_service_get`](/docs/reference/mcp-tools/#connected_service_get)                       | Reads one service                                                           | Read        |
-| [`connected_service_catalogue_list`](/docs/reference/mcp-tools/#connected_service_catalogue_list) | Lists the providers known by name, with the values each needs               | Read        |
-| [`connected_service_create`](/docs/reference/mcp-tools/#connected_service_create)                 | Declares a service                                                          | Ordinary    |
-| [`connected_service_update`](/docs/reference/mcp-tools/#connected_service_update)                 | Changes a service's scopes, name, secret, endpoints or allowed applications | Ordinary    |
-| [`connected_service_delete`](/docs/reference/mcp-tools/#connected_service_delete)                 | Deletes a service and disconnects every account at it                       | High        |
-| [`connected_account_list`](/docs/reference/mcp-tools/#connected_account_list)                     | Lists one person's connected accounts                                       | Read        |
-| [`connected_account_delete`](/docs/reference/mcp-tools/#connected_account_delete)                 | Disconnects one person's account                                            | High        |
+| Tool                                                                                              | Does                                                                                                 | Consequence |
+| ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ----------- |
+| [`connected_service_list`](/docs/reference/mcp-tools/#connected_service_list)                     | Lists a project's services, with the callback address and account counts                             | Read        |
+| [`connected_service_get`](/docs/reference/mcp-tools/#connected_service_get)                       | Reads one service                                                                                    | Read        |
+| [`connected_service_catalogue_list`](/docs/reference/mcp-tools/#connected_service_catalogue_list) | Lists the providers known by name, with the values each needs                                        | Read        |
+| [`connected_service_create`](/docs/reference/mcp-tools/#connected_service_create)                 | Declares a service                                                                                   | Ordinary    |
+| [`connected_service_update`](/docs/reference/mcp-tools/#connected_service_update)                 | Changes a service's scopes, name, secret, endpoints, allowed applications or linked sign-in provider | Ordinary    |
+| [`connected_service_delete`](/docs/reference/mcp-tools/#connected_service_delete)                 | Deletes a service and disconnects every account at it                                                | High        |
+| [`connected_account_list`](/docs/reference/mcp-tools/#connected_account_list)                     | Lists one person's connected accounts                                                                | Read        |
+| [`connected_account_delete`](/docs/reference/mcp-tools/#connected_account_delete)                 | Disconnects one person's account                                                                     | High        |
 
 A high-consequence tool asks for confirmation before it runs. No tool ever returns a client secret or a token.
 An API's exchanging application is set with [`resource_update`](/docs/reference/mcp-tools/#resource_update).

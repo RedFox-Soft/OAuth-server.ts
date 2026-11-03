@@ -89,6 +89,7 @@ import {
 	sealedBucketStore,
 	sealedClientAdapter,
 	sealedConnectedAccountStore,
+	sealedFederationStateAdapter,
 	sealedSecretStore,
 	sealedSmtpSettingsStore,
 	sealedTotpEnrollmentAdapter,
@@ -370,13 +371,14 @@ export function adapter(name: string): ModelAdapter<StoredRecord> {
 	return found;
 }
 
-/* The two model areas that hold a sealed leaf (lib/consts/sealed_fields.ts). */
+/* The model areas that hold a sealed leaf (lib/consts/sealed_fields.ts). */
 function sealedModelAdapter(
 	name: string,
 	raw: ModelAdapter<StoredRecord>
 ): ModelAdapter<StoredRecord> {
 	if (name === 'Client') return sealedClientAdapter(raw);
 	if (name === 'TotpEnrollment') return sealedTotpEnrollmentAdapter(raw);
+	if (name === 'FederationState') return sealedFederationStateAdapter(raw);
 	return raw;
 }
 

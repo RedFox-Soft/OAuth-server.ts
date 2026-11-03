@@ -77,6 +77,18 @@ export interface DeletionBlocker {
 	readonly ids?: readonly string[];
 }
 
+/*
+ * A conflict a caller can act on, named so the console and an agent need not parse the message: a plan's limit
+ * (specs/102), a missing keyring (specs/117), and why a sign-in provider cannot keep a service's tokens (specs/120).
+ */
+export type AdminErrorCode =
+	| 'plan_limit'
+	| 'keyring_required'
+	| 'sign_in_provider_mismatch'
+	| 'sign_in_provider_taken'
+	| 'sign_in_provider_unlinkable'
+	| 'linked_to_service';
+
 export class AdminError extends Error {
 	/*
 	 * Read by the root error handler (lib/shared/authorization_error_handler.ts) to stand aside and let
@@ -106,7 +118,7 @@ export class AdminError extends Error {
 	 * Set on the 409 a plan answers (specs/102), so the console and an agent can tell "the plan stops this" from
 	 * every other conflict and say what to do next — ask for a larger plan — rather than retry.
 	 */
-	code?: 'plan_limit' | 'keyring_required';
+	code?: AdminErrorCode;
 	limit?: PlanLimitDetail;
 	constructor(
 		status: number,
@@ -117,7 +129,7 @@ export class AdminError extends Error {
 			acknowledgementRequired?: boolean;
 			field?: string;
 			retryAfter?: number;
-			code?: 'plan_limit' | 'keyring_required';
+			code?: AdminErrorCode;
 			limit?: PlanLimitDetail;
 		}
 	) {
@@ -145,7 +157,7 @@ export function adminErrorBody(error: AdminError): {
 	acknowledgementRequired?: boolean;
 	field?: string;
 	retryAfter?: number;
-	code?: 'plan_limit' | 'keyring_required';
+	code?: AdminErrorCode;
 	limit?: PlanLimitDetail;
 } {
 	return {

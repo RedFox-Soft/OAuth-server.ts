@@ -45,7 +45,9 @@ export interface IdpStub {
 	answerToken(
 		authorizeUrl: URL,
 		claims: Record<string, unknown>,
-		opts?: SignOptions
+		opts?: SignOptions,
+		/* Members of the token response to set over the defaults; `undefined` deletes one (specs/120). */
+		tokenResponse?: Record<string, unknown>
 	): Promise<void>;
 	/* Register discovery alone — for a case that asserts the metadata cache is used. */
 	expectDiscovery(): void;
@@ -353,21 +355,27 @@ export async function idpStub(
 	async function answerToken(
 		authorizeUrl: URL,
 		claims: Record<string, unknown>,
-		opts: SignOptions = {}
+		opts: SignOptions = {},
+		tokenResponse: Record<string, unknown> = {}
 	) {
 		if (!jwksPublished) {
 			await expectJwks();
 			jwksPublished = true;
 		}
 		const nonce = opts.nonce ?? authorizeUrl.searchParams.get('nonce') ?? '';
-		expectToken({
+		const body: Record<string, unknown> = {
 			// Both are deliberately present and must be discarded unread: a test that never supplied them
 			// could not tell "discarded" from "never received".
 			access_token: 'upstream-access-token-must-not-be-stored',
 			refresh_token: 'upstream-refresh-token-must-not-be-stored',
 			token_type: 'Bearer',
-			id_token: await idToken({ nonce, ...claims }, opts)
-		});
+			id_token: await idToken({ nonce, ...claims }, opts),
+			...tokenResponse
+		};
+		for (const [name, value] of Object.entries(body)) {
+			if (value === undefined) delete body[name];
+		}
+		expectToken(body);
 	}
 
 	return {

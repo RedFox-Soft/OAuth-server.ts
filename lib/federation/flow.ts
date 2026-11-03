@@ -66,14 +66,23 @@ export function authorizationUrl(
 	provider: FederationProvider,
 	metadata: ProviderMetadata,
 	secrets: { state: string; nonce: string; codeVerifier?: string },
-	bucket: RequestBucket
+	bucket: RequestBucket,
+	/*
+	 * A linked sign-in's extra request (specs/120 R4): passed only by the interaction's sign-in start, so a try of a
+	 * provider and an unlinked provider ask for exactly what they always did.
+	 */
+	keep?: { scopes: readonly string[]; params: Readonly<Record<string, string>> }
 ): string {
 	const url = new URL(metadata.authorizationEndpoint);
+	const scopes = keep
+		? [...new Set([...provider.scopes, ...keep.scopes])]
+		: provider.scopes;
 	const params = new URLSearchParams({
+		...(keep?.params ?? {}),
 		client_id: provider.clientId,
 		response_type: 'code',
 		redirect_uri: callbackUri(bucket),
-		scope: provider.scopes.join(' '),
+		scope: scopes.join(' '),
 		state: secrets.state,
 		nonce: secrets.nonce
 	});
@@ -114,10 +123,34 @@ export type ExchangeFailure = 'unsupported_auth' | 'unreachable' | 'malformed';
 
 export class ExchangeError extends Error {
 	readonly reason: ExchangeFailure;
+	/*
+	 * The OAuth `error` and Microsoft's `suberror` of a 400 answer, when it had them: a linked sign-in refused for
+	 * its extra scopes is told apart by these (specs/120 R10). Codes only, never the description.
+	 */
+	readonly upstream?: { error?: string; suberror?: string };
 
-	constructor(reason: ExchangeFailure, detail?: string) {
+	constructor(
+		reason: ExchangeFailure,
+		detail?: string,
+		upstream?: { error?: string; suberror?: string }
+	) {
 		super(`code exchange failed: ${reason}${detail ? ` (${detail})` : ''}`);
 		this.reason = reason;
+		if (upstream) this.upstream = upstream;
+	}
+}
+
+function errorCodesOf(text: string): { error?: string; suberror?: string } {
+	try {
+		const parsed: unknown = JSON.parse(text);
+		if (typeof parsed !== 'object' || parsed === null) return {};
+		const { error, suberror } = parsed as Record<string, unknown>;
+		return {
+			...(typeof error === 'string' ? { error } : {}),
+			...(typeof suberror === 'string' ? { suberror } : {})
+		};
+	} catch {
+		return {};
 	}
 }
 
@@ -135,9 +168,9 @@ function authMethod(metadata: ProviderMetadata): 'basic' | 'post' {
 /*
  * Exchange the code for an identity assertion.
  *
- * Returns the `id_token` and **nothing else**. The provider's access and refresh tokens are destructured
- * away here and never bound to a name that outlives this function: no feature calls an upstream API, so
- * keeping them would create a secret to leak and a refresh lifecycle to maintain.
+ * Returns the `id_token` and the whole answer. The identity layer hands the answer on only for a sign-in linked to a
+ * connected service (specs/120), whose tokens the vault then keeps sealed; for every other sign-in the access and
+ * refresh tokens go no further than the identity layer, as before.
  */
 export async function exchangeCode(
 	provider: FederationProvider,
@@ -145,7 +178,7 @@ export async function exchangeCode(
 	code: string,
 	bucket: RequestBucket,
 	codeVerifier?: string
-): Promise<string | undefined> {
+): Promise<{ idToken: string | undefined; response: Record<string, unknown> }> {
 	const method = authMethod(metadata);
 	/*
 	 * Resolved rather than read off the provider, because one recognised upstream issues no secret and
@@ -190,7 +223,15 @@ export async function exchangeCode(
 			timeoutMs: UPSTREAM_TIMEOUT_MS
 		});
 		if (!response.ok) {
-			throw new ExchangeError('unreachable', `status ${response.status}`);
+			throw new ExchangeError(
+				'unreachable',
+				`status ${response.status}`,
+				response.status === 400
+					? errorCodesOf(
+							await readBounded(response, MAX_UPSTREAM_DOCUMENT_BYTES)
+						)
+					: undefined
+			);
 		}
 		text = await readBounded(response, MAX_UPSTREAM_DOCUMENT_BYTES);
 	} catch (err) {
@@ -211,6 +252,10 @@ export async function exchangeCode(
 		throw new ExchangeError('malformed', 'not an object');
 	}
 
-	const idToken = (parsed as Record<string, unknown>).id_token;
-	return typeof idToken === 'string' ? idToken : undefined;
+	const answer = parsed as Record<string, unknown>;
+	const idToken = answer.id_token;
+	return {
+		idToken: typeof idToken === 'string' ? idToken : undefined,
+		response: answer
+	};
 }

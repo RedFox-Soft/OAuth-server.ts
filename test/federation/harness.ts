@@ -114,6 +114,8 @@ export interface Answer {
 	idp: Stub;
 	claims: Record<string, unknown>;
 	opts?: Parameters<Stub['answerToken']>[2];
+	/* Members of the provider's token response over the stub's defaults (specs/120). */
+	tokenResponse?: Record<string, unknown>;
 }
 
 /*
@@ -162,7 +164,12 @@ export async function walk(
 	const state = authorizeUrl.searchParams.get('state') ?? '';
 
 	if (answer) {
-		await answer.idp.answerToken(authorizeUrl, answer.claims, answer.opts);
+		await answer.idp.answerToken(
+			authorizeUrl,
+			answer.claims,
+			answer.opts,
+			answer.tokenResponse
+		);
 	}
 	if (options.onAuthorize) {
 		await options.onAuthorize(authorizeUrl);

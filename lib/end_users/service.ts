@@ -570,3 +570,48 @@ export async function recordOwnLanguage(
 		profile: { ...user.profile, locale: language }
 	});
 }
+
+const DECLINED_KEPT = 50;
+
+/*
+ * The person disconnected this upstream account themselves, so a sign-in through a linked provider must not connect
+ * it again (specs/120 R9). Their own act, as `recordOwnLanguage`'s is, so no audit record. The newest 50 are kept,
+ * trimmed here before the write: the schema's limit would refuse a 51st rather than drop the oldest.
+ */
+export async function recordConnectionDeclined(
+	bucketId: string,
+	accountId: string,
+	declined: { serviceId: string; upstreamId: string }
+): Promise<void> {
+	const store = getUserStore(bucketId);
+	const user = await store.find(accountId);
+	if (!user) return;
+	const others = (user.connectionsDeclined ?? []).filter(
+		(entry) =>
+			entry.serviceId !== declined.serviceId ||
+			entry.upstreamId !== declined.upstreamId
+	);
+	await store.update(accountId, {
+		connectionsDeclined: [...others, declined].slice(-DECLINED_KEPT)
+	});
+}
+
+/* The person connected that account again themselves, so sign-ins may keep it once more. */
+export async function clearConnectionDeclined(
+	bucketId: string,
+	accountId: string,
+	declined: { serviceId: string; upstreamId: string }
+): Promise<void> {
+	const store = getUserStore(bucketId);
+	const user = await store.find(accountId);
+	const list = user?.connectionsDeclined;
+	if (!list) return;
+	const rest = list.filter(
+		(entry) =>
+			entry.serviceId !== declined.serviceId ||
+			entry.upstreamId !== declined.upstreamId
+	);
+	if (rest.length !== list.length) {
+		await store.update(accountId, { connectionsDeclined: rest });
+	}
+}

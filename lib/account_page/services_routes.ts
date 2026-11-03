@@ -42,6 +42,10 @@ import {
 } from '../connected_services/consent.js';
 import { getConnectedAccountStore } from '../adapters/index.js';
 import { grantsIn } from '../end_users/sessions.js';
+import {
+	clearConnectionDeclined,
+	recordConnectionDeclined
+} from '../end_users/service.js';
 import { sanitiseClientName } from '../interactions/clientName.js';
 import { Client } from '../models/client.js';
 import { accountPageBase, connectLinkUrl } from './client.js';
@@ -403,6 +407,7 @@ export const accountServicesRoutes = new Elysia({ name: 'account-services' })
 				scopes: view.scopes,
 				missingScopes: view.missingScopes,
 				connectedAt: view.connectedAt,
+				...(view.signedInWith ? { signedInWith: view.signedInWith } : {}),
 				status: view.status,
 				agents: consents.get(view.id)?.agents ?? [],
 				candidates: consents.get(view.id)?.candidates ?? []
@@ -590,6 +595,14 @@ export const accountServicesRoutes = new Elysia({ name: 'account-services' })
 					connectedAccountId: view.id,
 					by: 'person'
 				});
+				/* The person's own choice holds against later sign-ins through a linked provider (specs/120 R9). */
+				if (result.account) {
+					await recordConnectionDeclined(
+						person.bucket._id,
+						accountId,
+						result.account
+					);
+				}
 				const params = new URLSearchParams({
 					done: 'disconnected',
 					service: view.serviceId,
@@ -661,6 +674,10 @@ export const accountServicesRoutes = new Elysia({ name: 'account-services' })
 					pending,
 					code: query.code,
 					iss: query.iss
+				});
+				await clearConnectionDeclined(person.bucket._id, person.user._id, {
+					serviceId: record.serviceId,
+					upstreamId: record.upstreamId
 				});
 				await recordEndUserAudit(
 					person.bucket._id,

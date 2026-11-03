@@ -148,7 +148,17 @@ export const User = t.Object({
 	 * account holds cannot be told from a real hash afterwards (lib/helpers/unusable_password.ts). Absent on
 	 * accounts written before it existed, which a reader treats as "not known" rather than as either answer.
 	 */
-	passwordSet: t.Optional(t.Boolean())
+	passwordSet: t.Optional(t.Boolean()),
+	/*
+	 * Upstream accounts the person disconnected themselves, which a sign-in through a linked provider must not
+	 * connect again until they do (specs/120 R9). Only `lib/end_users/service.ts` writes it and trims it to the
+	 * newest 50 first; `maxItems` is the schema's backstop. Barred from administrative reads by `presentUser`.
+	 */
+	connectionsDeclined: t.Optional(
+		t.Array(t.Object({ serviceId: t.String(), upstreamId: t.String() }), {
+			maxItems: 50
+		})
+	)
 });
 export type User = Static<typeof User>;
 
@@ -256,6 +266,8 @@ export type EndUserPatch = Partial<
 		| 'profile'
 		| 'lockedLocally'
 		| 'passwordSet'
+		/* Only `lib/end_users/service.ts` writes it, for the person's own disconnect and reconnect (specs/120). */
+		| 'connectionsDeclined'
 	>
 >;
 
@@ -899,6 +911,12 @@ export const AdminAuditEntry = t.Object({
 	/* The connected service, and the connected account, an action changed (specs/117). Opaque ids, nothing personal. */
 	serviceId: t.Optional(t.Union([t.String(), t.Null()])),
 	connectedAccountId: t.Optional(t.Union([t.String(), t.Null()])),
+	/*
+	 * The sign-in provider a connected service is now linked to, null for none, and the service whose link went with
+	 * a deleted provider (specs/120). Ids an administrator gave, naming nothing personal.
+	 */
+	signInProviderId: t.Optional(t.Union([t.String(), t.Null()])),
+	unlinked: t.Optional(t.Union([t.String(), t.Null()])),
 	/*
 	 * An address change (`bucket.address.change`): the slug or hostname the bucket answered at, and the one it
 	 * answers at now, null for none. Addresses are public, unlike field values. Entries written before these

@@ -50,6 +50,9 @@ interface ServiceView {
 	identifier: string;
 	/* The applications allowed to obtain a person's tokens here, once that person allows them. */
 	applications: string[];
+	/* The sign-in provider whose sign-ins also connect accounts here, and those that could be (specs/120). */
+	signInProvider?: { id: string; displayName: string };
+	linkableSignInProviders: { id: string; displayName: string }[];
 }
 
 interface CatalogueEntry {
@@ -83,6 +86,7 @@ interface ServiceForm {
 	scopes: string[];
 	displayName?: string;
 	applications: string[];
+	signInProviderId?: string;
 }
 
 const MASK = '********';
@@ -148,6 +152,7 @@ function updateBody(form: ServiceForm, service: ServiceView) {
 	return {
 		scopes: form.scopes,
 		applications: form.applications,
+		signInProviderId: form.signInProviderId ?? null,
 		...(trimmed(form.displayName)
 			? { displayName: trimmed(form.displayName) }
 			: {}),
@@ -188,8 +193,22 @@ function formOf(service: ServiceView): ServiceForm {
 		clientSecret: MASK,
 		scopes: service.scopes,
 		displayName: service.displayName,
-		applications: service.applications
+		applications: service.applications,
+		...(service.signInProvider
+			? { signInProviderId: service.signInProvider.id }
+			: {})
 	};
+}
+
+/* The linked provider first, so it stays selectable even if a later edit made it unmatchable. */
+function signInOptions(service: ServiceView) {
+	const listed = service.linkableSignInProviders;
+	const current = service.signInProvider;
+	const all =
+		current && !listed.some((item) => item.id === current.id)
+			? [current, ...listed]
+			: listed;
+	return all.map((item) => ({ value: item.id, label: item.displayName }));
 }
 
 function providerOf(service: ServiceView): string {
@@ -715,6 +734,19 @@ function ServiceEditor({
 						options={exchangeOptions(applications, service?.applications)}
 					/>
 				</Form.Item>
+				{service && (
+					<Form.Item
+						name="signInProviderId"
+						label="Keep tokens when people sign in with"
+						extra="A sign-in through this provider also connects the person's account here, so they need not connect it separately. Only a sign-in provider at the same provider with the same client ID can be chosen. If an organisation refuses these extra scopes, the sign-in is retried once without them; an organisation that blocks them on the provider's own page cannot be retried, so unlink for such organisations."
+					>
+						<Select
+							allowClear
+							placeholder="None"
+							options={signInOptions(service)}
+						/>
+					</Form.Item>
+				)}
 			</Form>
 		</Drawer>
 	);

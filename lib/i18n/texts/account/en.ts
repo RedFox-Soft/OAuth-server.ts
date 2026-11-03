@@ -117,6 +117,7 @@ export const en = {
 		'You will go to {service} to sign in and allow access. {app} will then be able to use the account. You can withdraw this on your account page at any time.',
 	linkConnectButton: 'Connect {service} and allow {app}',
 	linkConnectAnother: 'Connect another {service} account',
+	connectedAtSignIn: 'Connected when you signed in with {provider}.',
 	linkLimit:
 		'You have connected as many {service} accounts as you can. You can let {app} use one of them instead.',
 	linkConsentOne: 'Let {app} use your {service} account {account}?',

@@ -9,6 +9,15 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+### Added
+
+- **Connected accounts from sign-in** (spec 120) — an administrator can link a project's sign-in provider to one of
+  its connected services (same provider and client id; not Slack), so signing in through that provider also connects
+  the person's account there, with the service's scopes asked at sign-in and the consent screen never forced. Agents
+  still need the person's permission; a refused or paused sign-in connects nothing, a fault never blocks a sign-in, a
+  provider refusing the extra scopes gets one retry without them, and a person's own disconnect holds against later
+  sign-ins. The account page and console say how each account was connected.
+
 ## [1.4.0] - 2026-11-03
 
 A token vault for agents: people connect their accounts at the services a project declares, and an agent obtains a

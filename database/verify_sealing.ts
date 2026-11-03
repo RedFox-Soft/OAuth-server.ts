@@ -30,7 +30,7 @@ export interface SealingFixture {
 	smtp: SmtpSettingsStoreInstance;
 	secret: (name: Singleton) => SecretStoreInstance;
 	model: (
-		name: 'Client' | 'TotpEnrollment'
+		name: 'Client' | 'TotpEnrollment' | 'FederationState'
 	) => ModelAdapter<Record<string, unknown>>;
 	forget: (documentName: string) => Promise<void>;
 }
@@ -178,6 +178,30 @@ export async function verifySealing(
 		600
 	);
 
+	/* A linked sign-in's tokens between its legs (specs/120): one sealed leaf nested two levels down. */
+	const handoffId = `sealing-handoff-${stamp}`;
+	const handoffTokens = JSON.stringify({
+		accessToken: `kept-${stamp}`,
+		tokenType: 'Bearer'
+	});
+	await fixture.model('FederationState').upsert(
+		handoffId,
+		{
+			stage: 'complete',
+			interactionUid: `sealing-interaction-${stamp}`,
+			accountId: enrolled._id,
+			kept: {
+				serviceId: 'sealing-service',
+				upstreamId: 'sealing-upstream',
+				label: 'sealing',
+				requestedScopes: ['openid'],
+				tokens: handoffTokens
+			},
+			exp: Math.floor(Date.now() / 1000) + 300
+		},
+		300
+	);
+
 	const kid = `sealing-${stamp}`;
 	const jwk = rsaKey(kid);
 	await fixture.keys.createIfAbsent({
@@ -272,6 +296,36 @@ export async function verifySealing(
 				(await fixture.model('TotpEnrollment').find(enrolmentId))?.secret,
 			`sealed-pending-${stamp}`,
 			`late-pending-${stamp}`
+		);
+
+		await compareAndSet(
+			'signInTokenInTransit',
+			'signInTokenInTransit',
+			(target) =>
+				target.kind === 'signInTokenInTransit' &&
+				target.id === handoffId &&
+				target.accountId === enrolled._id,
+			handoffTokens,
+			async () => {
+				const record = await fixture.model('FederationState').find(handoffId);
+				const kept = record?.kept as { tokens?: unknown } | undefined;
+				return kept?.tokens;
+			},
+			`sealed-handoff-${stamp}`,
+			`late-handoff-${stamp}`
+		);
+
+		/* The person's own declines (specs/120 R9): an array set on the person's document and read back whole. */
+		const declined = [
+			{ serviceId: 'sealing-service', upstreamId: `u-${stamp}` }
+		];
+		await users.update(enrolled._id, { connectionsDeclined: declined });
+		const withDeclines = await users.find(enrolled._id);
+		check(
+			'a person’s declined connections are stored and read back as written',
+			JSON.stringify(withDeclines?.connectionsDeclined) ===
+				JSON.stringify(declined),
+			shown(withDeclines?.connectionsDeclined)
 		);
 
 		/* ---- the SMTP password, read back through the settings store, which reads the nested leaf ---- */
@@ -459,6 +513,7 @@ export async function verifySealing(
 	} finally {
 		await fixture.model('Client').destroy(clientId);
 		await fixture.model('TotpEnrollment').destroy(enrolmentId);
+		await fixture.model('FederationState').destroy(handoffId);
 		await fixture.keys.destroyByBucket(bucket._id);
 		await users.destroy(enrolled._id);
 		await users.destroy(unenrolled._id);

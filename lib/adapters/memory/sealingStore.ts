@@ -182,6 +182,22 @@ export class SealingStore implements SealingStoreInstance {
 					}
 				}
 				return leaves;
+			case 'signInTokenInTransit':
+				for (const [id, record] of modelRecords('FederationState')) {
+					const kept = record.kept;
+					if (
+						typeof kept === 'object' &&
+						kept !== null &&
+						typeof (kept as { tokens?: unknown }).tokens === 'string' &&
+						typeof record.accountId === 'string'
+					) {
+						leaves.push({
+							target: { kind, id, accountId: record.accountId },
+							value: (kept as { tokens: string }).tokens
+						});
+					}
+				}
+				return leaves;
 			case 'dpopNonceSecret':
 			case 'errorOriginSalt': {
 				const value = await this.sources.secret(kind).read();
@@ -290,6 +306,14 @@ export class SealingStore implements SealingStoreInstance {
 					.find((candidate) => candidate._id === target.id);
 				if (!record || !same(record[target.field], observed)) return false;
 				await store.put({ ...record, [target.field]: next as string });
+				return true;
+			}
+			case 'signInTokenInTransit': {
+				const record = getStorage().get(`FederationState:${target.id}`);
+				if (typeof record !== 'object' || Array.isArray(record)) return false;
+				const kept = record.kept as { tokens?: unknown } | undefined;
+				if (!kept || !same(kept.tokens, observed)) return false;
+				record.kept = { ...kept, tokens: next };
 				return true;
 			}
 			case 'dpopNonceSecret':

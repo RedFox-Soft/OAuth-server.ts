@@ -181,7 +181,9 @@ The console warns about two setups that confuse people. An agent sees the same w
 
 **Disable…** keeps the provider's credentials, so taking it out of service during an incident costs
 nothing to undo. Deleting it removes its credentials, and also every link to it. A provider created
-later under the same id is a new provider, and nobody's account is linked to it. To detach one person
+later under the same id is a new provider, and nobody's account is linked to it. A provider linked to a
+[connected service](/docs/administer/connected-services/#connecting-at-sign-in) loses that link too; the accounts
+its sign-ins connected stay. To detach one person
 from an upstream identity without touching the provider, **Remove** the link under **Identity links** on
 the person's **Sign-in methods** tab; their next federated sign-in then goes through the steps above
 again.

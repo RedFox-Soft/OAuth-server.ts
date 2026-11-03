@@ -17,6 +17,12 @@ import { upstreamMetadata } from 'lib/federation/upstream.js';
 import { authorizationUrl, supportsPkce } from 'lib/federation/flow.js';
 import { findEnabledProvider } from 'lib/federation/providers.js';
 import { consumeHandoff, openPending } from 'lib/federation/state.js';
+import {
+	keepRequest,
+	serviceKeepingFor
+} from 'lib/connected_services/link_signin.js';
+import { activeKeyring } from 'lib/sealing/keyring.js';
+import { keepFromSignIn } from 'lib/connected_services/accounts.js';
 import { settlePendingLink } from 'lib/federation/pending_link.js';
 import {
 	federationExpiredPage,
@@ -1690,11 +1696,19 @@ export const ui = new Elysia()
 				throw err;
 			}
 
+			/*
+			 * A provider linked to a connected service also asks for the service's scopes (specs/120 R4), and only
+			 * while a keyring is in use: without one nothing could be kept, so nothing more is asked.
+			 */
+			const keeping = activeKeyring()
+				? serviceKeepingFor(bucket, provider.id)
+				: undefined;
 			const secrets = await openPending({
 				interactionUid: uid,
 				bucketId,
 				providerId: provider.id,
-				withPkce: supportsPkce(metadata, provider)
+				withPkce: supportsPkce(metadata, provider),
+				...(keeping ? { keepFor: keeping.id } : {})
 			});
 
 			return Response.redirect(
@@ -1704,7 +1718,8 @@ export const ui = new Elysia()
 					provider,
 					metadata,
 					secrets,
-					await issuingBucket(bucketId)
+					await issuingBucket(bucketId),
+					keeping ? keepRequest(keeping) : undefined
 				),
 				303
 			);
@@ -1785,6 +1800,18 @@ export const ui = new Elysia()
 					...(handoff.upstream ? { upstream: handoff.upstream } : {})
 				}
 			};
+			/*
+			 * Only on this path, where the sign-in completes for this account (specs/120 R7): the password and
+			 * verification doors above return first, so a paused sign-in keeps nothing.
+			 */
+			if (handoff.kept) {
+				await keepFromSignIn({
+					bucketId,
+					accountId: user._id,
+					providerId: handoff.upstream?.providerId,
+					kept: handoff.kept
+				});
+			}
 			await settlePendingLink(interaction.payload, bucketId);
 			return resume(interaction, cookie, { route, request });
 		},

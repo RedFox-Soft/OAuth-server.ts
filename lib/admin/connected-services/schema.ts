@@ -41,6 +41,8 @@ const IdentitySourceBody = t.Union([
  * Which fields each kind needs is the service's to check (lib/admin/connected-services/service.ts), with an answer
  * that names the field.
  */
+const SignInProviderId = t.String({ minLength: 1, maxLength: 200 });
+
 export const CreateServiceBody = t.Object(
 	{
 		kind: t.Union([
@@ -71,7 +73,9 @@ export const CreateServiceBody = t.Object(
 		scopes: t.Optional(ScopeList),
 		/* Required except for a catalogue service, which is named after its provider unless given one. */
 		displayName: t.Optional(DisplayName),
-		applications: t.Optional(Applications)
+		applications: t.Optional(Applications),
+		/* The sign-in provider whose sign-ins also keep this service's tokens (specs/120). */
+		signInProviderId: t.Optional(SignInProviderId)
 	},
 	{ additionalProperties: false }
 );
@@ -91,6 +95,8 @@ export const UpdateServiceBody = t.Object(
 		identity: t.Optional(IdentitySourceBody),
 		revocationEndpoint: t.Optional(Url),
 		applications: t.Optional(Applications),
+		/* `null` removes the link (specs/120). */
+		signInProviderId: t.Optional(t.Union([SignInProviderId, t.Null()])),
 		kind: t.Optional(t.String()),
 		catalogueId: t.Optional(t.String()),
 		issuer: t.Optional(t.String()),

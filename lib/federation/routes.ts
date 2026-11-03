@@ -25,7 +25,12 @@ import {
 } from './pages.js';
 import { findEnabledProvider } from './providers.js';
 import { resolveFederatedAccount } from './resolve.js';
-import { consumePending, openHandoff } from './state.js';
+import { consumePending, openHandoff, openPending } from './state.js';
+import { authorizationUrl, supportsPkce } from './flow.js';
+import { DiscoveryError } from './discovery.js';
+import { upstreamMetadata } from './upstream.js';
+import type { FederationStatePayload } from './types.js';
+import { keptFromSignIn } from '../connected_services/accounts.js';
 import { completeTry } from './try.js';
 import type { Language } from '../i18n/languages.js';
 import { languageOfRequest } from '../i18n/request.js';
@@ -106,6 +111,61 @@ async function returnLanguage(
 	return interaction?.payload.language ?? languageOfRequest(request).language;
 }
 
+/*
+ * A provider's ways of refusing the extra scopes a linked sign-in asked for (specs/120 R10). `access_denied` is not
+ * here: it is also how a person's own cancel comes back, and a cancelled sign-in must not start again by itself.
+ */
+const SCOPE_REFUSALS = new Set([
+	'invalid_scope',
+	'consent_required',
+	'interaction_required'
+]);
+
+function retriesWithoutKeeping(pending: FederationStatePayload): boolean {
+	return pending.keepFor !== undefined && pending.retried !== true;
+}
+
+/*
+ * The one retry: the same interaction sent to the provider again with the sign-in's own scopes, marked so a second
+ * refusal ends as any refusal does. Keeping tokens must never cost a person their sign-in.
+ */
+async function retryWithoutKeeping(
+	pending: FederationStatePayload,
+	uid: string,
+	error: string,
+	language: Language
+): Promise<Response> {
+	const bucketId = pending.bucketId ?? '';
+	const found = await getBucketStore().find(bucketId);
+	const bucket = found && !isScheduledForDeletion(found) ? found : null;
+	const provider = findEnabledProvider(bucket, pending.providerId ?? '');
+	if (!bucket || !provider) return federationInactivePage(language);
+	let metadata;
+	try {
+		metadata = await upstreamMetadata(provider);
+	} catch (err) {
+		if (err instanceof DiscoveryError) return federationUpstreamPage(language);
+		throw err;
+	}
+	const secrets = await openPending({
+		interactionUid: uid,
+		bucketId,
+		providerId: provider.id,
+		withPkce: supportsPkce(metadata, provider),
+		retried: true
+	});
+	eventBus.emit('federation.keep.retried', { providerId: provider.id, error });
+	return Response.redirect(
+		authorizationUrl(
+			provider,
+			metadata,
+			secrets,
+			await issuingBucket(bucketId)
+		),
+		303
+	);
+}
+
 async function completeReturn(params: ReturnParams, request: Request) {
 	/*
 	 * The state is spent first, whatever happens next — including when the provider reports an error.
@@ -146,6 +206,9 @@ async function completeReturn(params: ReturnParams, request: Request) {
 		 * which also keeps every byte of the provider's `error_description` off the page.
 		 */
 		if (params.error) {
+			if (retriesWithoutKeeping(pending) && SCOPE_REFUSALS.has(params.error)) {
+				return retryWithoutKeeping(pending, uid, params.error, language);
+			}
 			return Response.redirect(
 				buildUILoginPath(uid, NOTICE_FEDERATION_ABORTED),
 				303
@@ -180,9 +243,19 @@ async function completeReturn(params: ReturnParams, request: Request) {
 				nonce: pending.nonce,
 				codeVerifier: pending.codeVerifier,
 				/* RFC 9207: which issuer says it answered, compared by the identity layer. */
-				iss: params.iss
+				iss: params.iss,
+				keep: pending.keepFor !== undefined
 			});
 		} catch (err) {
+			/* Microsoft reports a refused API scope at redemption: `invalid_grant`, sub-error `consent_required`. */
+			if (
+				err instanceof IdentityError &&
+				err.upstream?.error === 'invalid_grant' &&
+				err.upstream.suberror === 'consent_required' &&
+				retriesWithoutKeeping(pending)
+			) {
+				return retryWithoutKeeping(pending, uid, 'consent_required', language);
+			}
 			if (err instanceof IdentityError) {
 				/*
 				 * One response per stage, and the reason goes to the event bus rather than to the console:
@@ -291,10 +364,24 @@ async function completeReturn(params: ReturnParams, request: Request) {
 		 * A fresh single-use value, and a *relative* redirect: same-site is what makes the strict interaction
 		 * cookie arrive on the next hop, which is the whole reason this three-hop shape exists.
 		 */
+		/*
+		 * Only here, on the path that signs the account in, and never on the password door above: tokens are kept
+		 * only for a sign-in that completes for this person (specs/120 R7), and leg three keeps them after it does.
+		 */
+		const kept = pending.keepFor
+			? await keptFromSignIn({
+					bucket,
+					providerId: provider.id,
+					serviceId: pending.keepFor,
+					tokenResponse: identity.tokenResponse,
+					nonce: pending.nonce
+				})
+			: undefined;
 		const ref = await openHandoff({
 			interactionUid: uid,
 			accountId: resolution.account._id,
-			upstream
+			upstream,
+			...(kept ? { kept } : {})
 		});
 		return Response.redirect(buildUIFederationCompletePath(uid, ref), 303);
 	}

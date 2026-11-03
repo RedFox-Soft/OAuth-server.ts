@@ -93,16 +93,21 @@ export const presentUser = <
 		totp?: { enrolledAt: Date };
 		userNameKey?: string;
 		externalIdKey?: string;
+		connectionsDeclined?: unknown;
 	}
 >(
 	user: T
 ) => {
-	/* The derived keys are index material, not facts about the person; they stay with the store. */
+	/*
+	 * The derived keys are index material, not facts about the person; they stay with the store. So does the list of
+	 * accounts the person disconnected themselves (specs/120): their choice, which no administrator acts on.
+	 */
 	const {
 		password: _password,
 		totp,
 		userNameKey: _userNameKey,
 		externalIdKey: _externalIdKey,
+		connectionsDeclined: _connectionsDeclined,
 		...safe
 	} = user;
 	return {

@@ -191,6 +191,30 @@ const writers: Record<
 		return (target) =>
 			target.kind === 'connectedAccountToken' &&
 			target.id === 'sealed-connected-account';
+	},
+	async signInTokenInTransit() {
+		await adapter('FederationState').upsert(
+			'sealed-handoff',
+			{
+				stage: 'complete',
+				interactionUid: 'sealed-interaction',
+				accountId: 'handoff-person',
+				kept: {
+					serviceId: 'sealed-service',
+					upstreamId: 'upstream-1',
+					label: 'person@example.com',
+					requestedScopes: ['openid'],
+					tokens: JSON.stringify({
+						accessToken: 'kept-access-token',
+						tokenType: 'Bearer'
+					})
+				},
+				exp: Math.floor(Date.now() / 1000) + 300
+			},
+			300
+		);
+		return (target) =>
+			target.kind === 'signInTokenInTransit' && target.id === 'sealed-handoff';
 	}
 };
 

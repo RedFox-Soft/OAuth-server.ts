@@ -37,14 +37,18 @@ export async function profileApiIdentity(
 	if (request.iss !== undefined && request.iss !== request.provider.issuer) {
 		throw new IdentityError('rejected', 'issuer_mismatch');
 	}
-	const token = await exchangeForApiToken(request, protocol.tokenEndpoint);
-	return READERS[protocol.reader](token);
+	const { token, answer } = await exchangeForApiToken(
+		request,
+		protocol.tokenEndpoint
+	);
+	const identity = await READERS[protocol.reader](token);
+	return request.keep ? { ...identity, tokenResponse: answer } : identity;
 }
 
 async function exchangeForApiToken(
 	request: IdentityRequest,
 	tokenEndpoint: string
-): Promise<string> {
+): Promise<{ token: string; answer: Record<string, unknown> }> {
 	const { provider, code, bucket, codeVerifier } = request;
 
 	const body = new URLSearchParams({
@@ -95,7 +99,8 @@ async function exchangeForApiToken(
 		throw new IdentityError('upstream', 'token response is not an object');
 	}
 
-	const token = (parsed as Record<string, unknown>).access_token;
+	const answer = parsed as Record<string, unknown>;
+	const token = answer.access_token;
 	if (typeof token !== 'string' || token.length === 0) {
 		/*
 		 * `rejected` rather than `upstream`: the endpoint answered, and what it said was that this exchange
@@ -103,5 +108,5 @@ async function exchangeForApiToken(
 		 */
 		throw new IdentityError('rejected', 'no access token');
 	}
-	return token;
+	return { token, answer };
 }

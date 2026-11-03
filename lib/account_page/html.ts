@@ -237,6 +237,8 @@ export interface ServiceRowView {
 	scopes: readonly string[];
 	missingScopes: readonly string[];
 	connectedAt: string;
+	/* The sign-in provider whose sign-in connected it (specs/120), by name. */
+	signedInWith?: string;
 	status: 'connected' | 'needs_reconnection';
 	/* The applications that may use it, and those the person could let (specs/118 R8). */
 	agents: readonly { clientId: string; name: string; lastUsedAt?: number }[];
@@ -330,7 +332,7 @@ function serviceRow(
 	return `<section aria-labelledby="${id}" style="border-top:1px solid ${foxVar('box-border')}; padding:16px 0;">
 <h2 id="${id}" style="font-size:18px; margin:0; overflow-wrap:anywhere;">${esc(row.serviceName)}: ${esc(row.label)}</h2>
 ${scopes}${missing}${status}
-<p style="${MUTED} margin:8px 0 0;">${htmlWith(T.connectedAt, { date: stamp(new Date(row.connectedAt), frame.language) })}</p>
+<p style="${MUTED} margin:8px 0 0;">${htmlWith(T.connectedAt, { date: stamp(new Date(row.connectedAt), frame.language) })}${row.signedInWith ? `<br/>${htmlWith(T.connectedAtSignIn, { provider: row.signedInWith })}` : ''}</p>
 ${agentsOf(row, frame, xsrf)}
 <p style="margin:8px 0 0;"><a href="${esc(disconnectHref)}" style="${DANGER_LINK}">${esc(T.disconnect)}<span style="position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0);">: ${esc(row.label)}</span></a></p>
 </section>`;

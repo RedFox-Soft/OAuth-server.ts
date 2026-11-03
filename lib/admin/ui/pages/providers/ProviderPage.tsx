@@ -356,6 +356,8 @@ export function ProviderPage({
 									</Link>
 								</>
 							)}
+							{provider.keepsTokensFor &&
+								` · Also connects accounts at ${provider.keepsTokensFor.displayName}`}
 						</>
 					) : undefined
 				}

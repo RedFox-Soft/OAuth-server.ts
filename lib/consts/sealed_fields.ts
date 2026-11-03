@@ -20,7 +20,8 @@ export type SealKind =
 	| 'dpopNonceSecret'
 	| 'errorOriginSalt'
 	| 'connectedServiceSecret'
-	| 'connectedAccountToken';
+	| 'connectedAccountToken'
+	| 'signInTokenInTransit';
 
 export interface SealedField {
 	kind: SealKind;
@@ -102,6 +103,16 @@ export const SEALED_FIELDS: readonly SealedField[] = [
 		area: 'connectedAccounts',
 		path: '{refreshToken,accessToken}',
 		owner: "a person's account at a connected service"
+	},
+	/*
+	 * A linked sign-in's tokens between the provider's answer and the end of the sign-in (specs/120 R7): five
+	 * minutes at most, and, like the account tokens, never written while no keyring is in use.
+	 */
+	{
+		kind: 'signInTokenInTransit',
+		area: 'FederationState',
+		path: 'kept.tokens',
+		owner: 'a sign-in in progress'
 	}
 ];
 
@@ -188,7 +199,8 @@ export type SealTarget =
 			/* Not in the binding: carried so the console can link the repair to the person (specs/117 FR-027). */
 			bucketId: string;
 			accountId: string;
-	  };
+	  }
+	| { kind: 'signInTokenInTransit'; id: string; accountId: string };
 
 export const CONNECTED_ACCOUNT_TOKEN_FIELDS = [
 	'refreshToken',
@@ -226,5 +238,7 @@ export function bindingOf(target: SealTarget): string {
 			return `userBuckets/${target.bucketId}/connectedServices/${target.serviceId}/clientSecret`;
 		case 'connectedAccountToken':
 			return `connectedAccounts/${target.id}/${target.field}`;
+		case 'signInTokenInTransit':
+			return `FederationState/${target.id}/${target.accountId}/kept.tokens`;
 	}
 }

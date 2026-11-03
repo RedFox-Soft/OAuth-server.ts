@@ -154,6 +154,33 @@ export class SealingStore implements SealingStoreInstance {
 				}
 				return leaves;
 			}
+			case 'signInTokenInTransit': {
+				const handoffs = await this.collection('FederationState')
+					.find(
+						{ 'payload.kept.tokens': { $type: 'string' } },
+						{
+							projection: {
+								'payload.kept.tokens': 1,
+								'payload.accountId': 1
+							}
+						}
+					)
+					.toArray();
+				for (const handoff of handoffs) {
+					const payload = isRecord(handoff.payload) ? handoff.payload : {};
+					const kept = isRecord(payload.kept) ? payload.kept : {};
+					if (
+						typeof kept.tokens === 'string' &&
+						typeof payload.accountId === 'string'
+					) {
+						leaves.push({
+							target: { kind, id: handoff._id, accountId: payload.accountId },
+							value: kept.tokens
+						});
+					}
+				}
+				return leaves;
+			}
 			case 'smtpPassword': {
 				const found = await db
 					.collection(STORE_AREAS.serviceConfig)
@@ -323,6 +350,13 @@ export class SealingStore implements SealingStoreInstance {
 				const result = await this.collection('TotpEnrollment').updateOne(
 					{ _id: target.uid, 'payload.secret': text(observed) },
 					{ $set: { 'payload.secret': text(next) } }
+				);
+				return result.matchedCount === 1;
+			}
+			case 'signInTokenInTransit': {
+				const result = await this.collection('FederationState').updateOne(
+					{ _id: target.id, 'payload.kept.tokens': text(observed) },
+					{ $set: { 'payload.kept.tokens': text(next) } }
 				);
 				return result.matchedCount === 1;
 			}

@@ -26,6 +26,7 @@ export async function oidcIdentity(
 	const { provider, code, bucket, nonce, codeVerifier } = request;
 
 	let idToken: string | undefined;
+	let tokenResponse: Record<string, unknown>;
 	let metadata;
 	try {
 		metadata = await discover(provider.issuer);
@@ -40,16 +41,16 @@ export async function oidcIdentity(
 	assertResponseIssuer(request.iss, metadata);
 
 	try {
-		idToken = await exchangeCode(
+		({ idToken, response: tokenResponse } = await exchangeCode(
 			provider,
 			metadata,
 			code,
 			bucket,
 			codeVerifier
-		);
+		));
 	} catch (err) {
 		if (err instanceof ExchangeError) {
-			throw new IdentityError('upstream', err.reason);
+			throw new IdentityError('upstream', err.reason, err.upstream);
 		}
 		throw err;
 	}
@@ -85,7 +86,8 @@ export async function oidcIdentity(
 
 	return {
 		subject: assertion.subject,
-		claims: withFallbackAddress(provider, assertion.claims)
+		claims: withFallbackAddress(provider, assertion.claims),
+		...(request.keep ? { tokenResponse } : {})
 	};
 }
 
