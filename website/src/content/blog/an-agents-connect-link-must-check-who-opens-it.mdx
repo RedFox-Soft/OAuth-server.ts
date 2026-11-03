@@ -1,0 +1,326 @@
+---
+title: An agent's connect link must check who opens it
+description: >-
+  An agent hands a person a link to connect an account. If the link works for whoever opens it, a
+  forwarded link connects the wrong account to the wrong agent.
+publishedAt: '2026-11-03'
+tags: [mcp, agents, connected-accounts, security]
+---
+
+An AI agent called Repo Helper needs to read a person's GitHub repositories. It has no access yet, so
+it writes in the chat: "Open this link to connect your GitHub account." The person clicks. They sign in
+to GitHub and approve. Then they go back to the chat. Repo Helper tries again, and this time it gets a
+token for GitHub.
+
+Now put a second person into the same story. Mallory asks her own copy of Repo Helper for the same
+thing and gets the same kind of link. She does not open it. She sends it to her colleague Alice with a
+note: "Can you connect this for the team?" Alice opens the link. She is already signed in to GitHub,
+so approving takes two clicks. But the link was made for Mallory. So Alice's GitHub account is now
+connected to Mallory's agent, and Mallory's agent can read Alice's private repositories.
+
+Nothing in that story is broken in the usual sense. Every redirect went where it should. Every token
+was genuine. GitHub saw a real sign-in by the real Alice. One step is missing: a question nobody asked
+when the link was opened. Is the person in this browser the person this link was made for?
+
+This post is about that question. I build an authorization server, FoxAuth. Since version 1.4.0 it
+hands agents links like this one. Before building it, I read how five other products handle the same
+link. Only one of them documents a check of the person who opens it. MCP (Model Context Protocol) is
+the protocol many agents use to reach tools. Its specification requires this check, and it describes
+this exact attack.
+
+## A connect link joins two identities, and whoever opens it supplies the second {#two-identities}
+
+A connect link has one job: to join two identities. The first is the person in your own system, the
+user the agent works for. The second is that person's account at another service, for example GitHub.
+
+The link is created when the agent asks for it. At that moment the server knows the first identity,
+because the agent's request names the person. The server cannot know the second identity yet. The
+second identity arrives later, from the browser that opens the link: whoever signs in to GitHub in
+that browser supplies it.
+
+So if the link does not check who opens it, the person who opens it decides what gets joined. That
+can go wrong in two directions. The opening story is the right half of the picture below, with you in
+Alice's place.
+
+<svg viewBox="0 0 800 330" width="100%" role="img" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">
+  <title>Two ways a link that anyone can open goes wrong. On the left, a link made for you is opened by Mallory, and Mallory's GitHub account is joined to your agent. On the right, a link made for Mallory is opened by you, and your GitHub account is joined to Mallory's agent.</title>
+  <defs>
+    <marker id="cl-arrow-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--diagram-line, #555)"/></marker>
+  </defs>
+  <text x="200" y="28" text-anchor="middle" font-size="15" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">Your link reaches someone else</text>
+  <text x="600" y="28" text-anchor="middle" font-size="15" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">Someone else's link reaches you</text>
+  <line x1="400" y1="45" x2="400" y2="315" stroke="var(--diagram-line, #555)" stroke-width="1" stroke-dasharray="4 4"/>
+  <rect x="60" y="50" width="280" height="50" rx="8" fill="none" stroke="var(--diagram-fg, #1a1a1a)" stroke-width="1.5"/>
+  <text x="200" y="72" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">Link made for you,</text>
+  <text x="200" y="90" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">on behalf of your agent</text>
+  <line x1="200" y1="100" x2="200" y2="143" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#cl-arrow-a)"/>
+  <text x="212" y="127" font-size="13" fill="var(--diagram-line, #555)">opened by Mallory</text>
+  <rect x="60" y="145" width="280" height="50" rx="8" fill="none" stroke="var(--diagram-fg, #1a1a1a)" stroke-width="1.5"/>
+  <text x="200" y="167" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">Mallory's browser signs in</text>
+  <text x="200" y="185" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">to Mallory's GitHub account</text>
+  <line x1="200" y1="195" x2="200" y2="238" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#cl-arrow-a)"/>
+  <rect x="60" y="240" width="280" height="50" rx="8" fill="none" stroke="var(--diagram-accent, #d9480f)" stroke-width="2"/>
+  <text x="200" y="262" text-anchor="middle" font-size="14" fill="var(--diagram-accent, #d9480f)">Your agent now writes to</text>
+  <text x="200" y="280" text-anchor="middle" font-size="14" fill="var(--diagram-accent, #d9480f)">Mallory's repositories</text>
+  <rect x="460" y="50" width="280" height="50" rx="8" fill="none" stroke="var(--diagram-fg, #1a1a1a)" stroke-width="1.5"/>
+  <text x="600" y="72" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">Link made for Mallory,</text>
+  <text x="600" y="90" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">on behalf of her agent</text>
+  <line x1="600" y1="100" x2="600" y2="143" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#cl-arrow-a)"/>
+  <text x="612" y="127" font-size="13" fill="var(--diagram-line, #555)">opened by you</text>
+  <rect x="460" y="145" width="280" height="50" rx="8" fill="none" stroke="var(--diagram-fg, #1a1a1a)" stroke-width="1.5"/>
+  <text x="600" y="167" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">Your browser signs in</text>
+  <text x="600" y="185" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">to your GitHub account</text>
+  <line x1="600" y1="195" x2="600" y2="238" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#cl-arrow-a)"/>
+  <rect x="460" y="240" width="280" height="50" rx="8" fill="none" stroke="var(--diagram-accent, #d9480f)" stroke-width="2"/>
+  <text x="600" y="262" text-anchor="middle" font-size="14" fill="var(--diagram-accent, #d9480f)">Mallory's agent now reads</text>
+  <text x="600" y="280" text-anchor="middle" font-size="14" fill="var(--diagram-accent, #d9480f)">your repositories</text>
+</svg>
+
+On the left, your link reaches someone else. Perhaps you pasted it into a shared channel, forwarded
+it by mistake, or left it in a chat log. Whoever opens it connects their own GitHub account to your
+agent. From then on your agent writes to their repositories. It may copy your private data there,
+believing the account is yours.
+
+On the right, someone else's link reaches you. You connect your own account to their agent. This is
+the direction phishing uses, because the attacker decides when the link is sent and what the message
+around it says.
+
+Both directions come from the same mistake. The link trusted that the right person would open it.
+
+## A short lifetime and single use do not stop a forwarded link {#short-lifetime}
+
+The usual protection for such links is to make them expire quickly, to let them be used only once, or
+both. Here is what each product's documentation says, as of November 2026:
+
+| Product                                                                                                                              | How long the link lives                    | Documented check of who opens it                                           |
+| ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------ | -------------------------------------------------------------------------- |
+| [Composio](https://docs.composio.dev/docs/authentication/manually-authenticating)                                                    | 10 minutes to finish connecting            | None; the developer is told the callback alone is not proof of ownership   |
+| [Nango](https://nango.dev/docs/reference/backend/http-api/connect/sessions/create)                                                   | 30 minutes; "can be used as a magic link"  | None                                                                       |
+| [Pipedream Connect](https://pipedream.com/docs/connect/managed-auth/connect-link)                                                    | 4 hours; the docs suggest email or SMS     | None                                                                       |
+| [Auth0 Token Vault](https://auth0.com/docs/secure/call-apis-on-users-behalf/token-vault/connected-accounts-for-token-vault)          | A 5-minute session                         | The agent never gets the link; at the end, same session and same device   |
+| [Arcade](https://docs.arcade.dev/guides/user-facing-agents/secure-auth-production)                                                   | Not documented                             | Yes: before the account is saved, the developer confirms the user         |
+
+The table records only what the documentation says. A product may check more than it documents, but a
+developer building on it cannot count on that.
+
+Neither protection stops the attack in the opening story. Mallory chooses when to send the link, so
+she can ask for a fresh one a minute before she sends it. A link that works only once does not help
+either. Alice is the first and only person to use it. The link works exactly as designed. It is simply
+used by the wrong person.
+
+Auth0 avoids the problem in another way. In Auth0's design, the agent never sees a link at all. The
+application the person is using asks for the link with the person's own access token, and sends the
+person to it. When the person comes back, the application completes the connection. At that point
+Auth0 checks that the request belongs to the same signed-in session and comes from the same device.
+
+That works when the agent lives inside one web application with one browser session. It does not work
+for an agent in a chat client, in a terminal, or in an MCP host, the program (such as a desktop chat
+app) that connects an agent to its tools. There, the only way to reach the person is to show them an
+address.
+
+## Check the person at the moment the link is opened {#check-on-open}
+
+The [MCP specification](https://modelcontextprotocol.io/specification/2025-11-25/client/elicitation)
+says so directly. An MCP server can ask the program in front of the person to show them an address.
+The specification calls this a URL elicitation. Its security section tells the opening story almost
+step by step: the attacker gets a link, tricks another user into opening it, and the victim's tokens
+end up tied to the attacker's identity. Its rule follows: the server "MUST verify the identity of the
+user who opens the URL before accepting information". Its example does not send the person straight
+to the other service. It sends them to a page on the MCP server itself. That page compares the user
+signed in there with the user the request came from.
+
+FoxAuth works the same way. Repo Helper holds an access token that FoxAuth issued for one person. It
+presents that token to ask for the same person's GitHub token. If the person has not connected GitHub,
+or has not allowed this agent to use it, FoxAuth refuses. The refusal carries a link made for that
+person.
+
+The link points at a page in the person's project. A project in FoxAuth is a set of people and the
+applications they sign in to, with its own sign-in page. When the link is opened, the server goes down
+a short list of checks before it shows anything:
+
+<svg viewBox="0 0 800 480" width="100%" role="img" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">
+  <title>The checks made when a connect link is opened, in order. A code this server did not issue, or a link that is no longer open, gets the same 404 page for every reason. If nobody is signed in, the person signs in and comes back to the link. If someone other than the person the link was made for is signed in, a page says so and nothing changes. If the sign-in is older than fifteen minutes, the person signs in again. Only then does the page offer what the link was made for: connect, allow, or reconnect.</title>
+  <defs>
+    <marker id="cl-arrow-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--diagram-line, #555)"/></marker>
+    <marker id="cl-arrow-c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--diagram-accent, #d9480f)"/></marker>
+  </defs>
+  <rect x="30" y="20" width="400" height="50" rx="8" fill="none" stroke="var(--diagram-fg, #1a1a1a)" stroke-width="1.5"/>
+  <text x="230" y="50" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">1. Issued by this server and still open?</text>
+  <rect x="30" y="110" width="400" height="50" rx="8" fill="none" stroke="var(--diagram-fg, #1a1a1a)" stroke-width="1.5"/>
+  <text x="230" y="140" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">2. Is anyone signed in to the project?</text>
+  <rect x="30" y="200" width="400" height="50" rx="8" fill="none" stroke="var(--diagram-accent, #d9480f)" stroke-width="2"/>
+  <text x="230" y="230" text-anchor="middle" font-size="14" fill="var(--diagram-accent, #d9480f)">3. The person the link was made for?</text>
+  <rect x="30" y="290" width="400" height="50" rx="8" fill="none" stroke="var(--diagram-fg, #1a1a1a)" stroke-width="1.5"/>
+  <text x="230" y="320" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">4. Signed in within the last 15 minutes?</text>
+  <rect x="30" y="380" width="400" height="60" rx="8" fill="none" stroke="var(--diagram-fg, #1a1a1a)" stroke-width="1.5"/>
+  <text x="230" y="405" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">5. Offer what the link was made for:</text>
+  <text x="230" y="425" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">connect, allow, or reconnect</text>
+  <line x1="230" y1="70" x2="230" y2="108" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#cl-arrow-b)"/>
+  <text x="242" y="94" font-size="12" fill="var(--diagram-line, #555)">yes</text>
+  <line x1="230" y1="160" x2="230" y2="198" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#cl-arrow-b)"/>
+  <text x="242" y="184" font-size="12" fill="var(--diagram-line, #555)">yes</text>
+  <line x1="230" y1="250" x2="230" y2="288" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#cl-arrow-b)"/>
+  <text x="242" y="274" font-size="12" fill="var(--diagram-line, #555)">yes</text>
+  <line x1="230" y1="340" x2="230" y2="378" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#cl-arrow-b)"/>
+  <text x="242" y="364" font-size="12" fill="var(--diagram-line, #555)">yes</text>
+  <line x1="430" y1="45" x2="488" y2="45" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#cl-arrow-b)"/>
+  <text x="459" y="38" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">no</text>
+  <text x="500" y="41" font-size="13" fill="var(--diagram-fg, #1a1a1a)">404, the same page</text>
+  <text x="500" y="58" font-size="13" fill="var(--diagram-fg, #1a1a1a)">for every reason</text>
+  <line x1="430" y1="135" x2="488" y2="135" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#cl-arrow-b)"/>
+  <text x="459" y="128" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">no</text>
+  <text x="500" y="131" font-size="13" fill="var(--diagram-fg, #1a1a1a)">Sign in, then come</text>
+  <text x="500" y="148" font-size="13" fill="var(--diagram-fg, #1a1a1a)">back to the link</text>
+  <line x1="430" y1="225" x2="488" y2="225" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5" marker-end="url(#cl-arrow-c)"/>
+  <text x="459" y="218" text-anchor="middle" font-size="12" fill="var(--diagram-accent, #d9480f)">no</text>
+  <text x="500" y="221" font-size="13" fill="var(--diagram-accent, #d9480f)">403: made for another</text>
+  <text x="500" y="238" font-size="13" fill="var(--diagram-accent, #d9480f)">account; nothing changes</text>
+  <line x1="430" y1="315" x2="488" y2="315" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#cl-arrow-b)"/>
+  <text x="459" y="308" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">no</text>
+  <text x="500" y="320" font-size="13" fill="var(--diagram-fg, #1a1a1a)">Sign in again</text>
+</svg>
+
+1. Is the code at the end of the link one this server issued, and is the link still open? A code that
+   is unknown, expired, declined by the person, or replaced by a newer link gets the same 404 page. So
+   someone guessing codes learns nothing about which links exist.
+2. Is anyone signed in to the project? If not, the person signs in first and then returns to the link.
+3. Is the signed-in person the one the link was made for? If not, the page says the link was made for
+   another account, and nothing changes. The server also emits an event about the refusal, which an
+   operator can subscribe to.
+4. Did that person sign in within the last fifteen minutes? If not, they sign in again. A browser left
+   signed in on a shared computer is not enough to connect an account.
+5. Only now does the page offer what the link was made for. There are three possibilities: connect
+   GitHub and let this agent use it, let this agent use a GitHub account that is already connected, or
+   reconnect an account whose GitHub access stopped working.
+
+Replay the opening story with these checks. Alice opens Mallory's link. Alice is signed in, but she is
+not Mallory, so check 3 stops her and nothing is connected. Now suppose Mallory gets hold of Alice's
+link instead. Check 2 or check 3 stops her, because she cannot sign in as Alice.
+
+The refusal itself is an ordinary OAuth error from the token endpoint, the address where applications
+ask FoxAuth for tokens. Repo Helper asks for the person's GitHub token with a token exchange (RFC
+8693): it sends the person's access token and names GitHub as the audience. Abridged, the exchange
+looks like this when the person has not connected GitHub yet:
+
+```http
+POST /token HTTP/1.1
+Authorization: Basic …
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=urn:ietf:params:oauth:grant-type:token-exchange
+&subject_token=…the person's access token…
+&subject_token_type=urn:ietf:params:oauth:token-type:access_token
+&requested_token_type=urn:ietf:params:oauth:token-type:access_token
+&audience=…GitHub's identifier in this project…
+```
+
+```http
+HTTP/1.1 400 Bad Request
+Content-Type: application/json
+Cache-Control: no-store
+
+{
+	"error": "invalid_grant",
+	"error_description": "the person has not connected a GitHub account",
+	"reason": "connect_required",
+	"connect_uri": "https://auth.example.com/account/services/link/q3Jx…",
+	"connect_id": "c6m2…",
+	"connect_expires_in": 1800,
+	"connect_message": "Open this link to connect your GitHub account and let Repo Helper use it."
+}
+```
+
+`connect_expires_in` is in seconds: 1800 is the thirty-minute lifetime discussed below.
+
+Often the program that asks for the GitHub token is not the agent itself but an MCP server the agent
+calls. That MCP server passes the link on unchanged. For a client on the 2025-11-25 version of MCP, it
+fails the tool call with error code -32042. That code means: show the person these addresses, then try
+again. `connect_id` becomes the `elicitationId`:
+
+```json
+{
+	"code": -32042,
+	"message": "Open this link to connect your GitHub account and let Repo Helper use it.",
+	"data": {
+		"elicitations": [
+			{
+				"mode": "url",
+				"elicitationId": "c6m2…",
+				"url": "https://auth.example.com/account/services/link/q3Jx…",
+				"message": "Open this link to connect your GitHub account and let Repo Helper use it."
+			}
+		]
+	}
+}
+```
+
+## The link carries no sign-in, so only its own person can use it {#no-sign-in}
+
+The code at the end of the link is 32 random bytes, far too many possibilities to guess. The code
+only points to a record on the server. The record says which project, which person, which agent and
+which service the link is for, and whether it asks to connect, to allow or to reconnect. The code does
+not sign anyone in, and it says nothing about the person.
+
+The MCP specification forbids putting a credential in the link. An address shown this way must not
+contain credentials, and it must not be "pre-authenticated": opening it must not by itself sign anyone
+in as the person.
+
+A code that only points to a record is what makes check 3 possible. A pre-authenticated link would
+carry Mallory's signed-in session inside it, so whoever opened it would act as Mallory. A plain code
+forces the page to ask the browser who is there. The answer comes from that person's own sign-in.
+
+A plain code also changes what a leak costs. Suppose a link is pasted into a public channel. A
+stranger who opens it reaches a sign-in they cannot pass, and that is all. The link still expires
+after thirty minutes, because a request nobody finishes should not wait forever. That lifetime is
+housekeeping. It is not what protects the person.
+
+The server keeps one link per person, agent and service. An agent that asks again gets the same link
+while it is open. So an agent that retries does not fill the person's chat with several links that all
+still work. The link is replaced only when what it asks for changes, for example from "connect" to
+"allow"; the old code then leads to the 404 page.
+
+## The agent learns the outcome by asking again {#ask-again}
+
+When the person has finished, the page tells them to go back to the agent. It does not redirect them
+anywhere. A link that sends the browser on to an address the agent chose would be one more way to
+phish.
+
+The agent finds out the result by repeating its token request. Once the person has connected GitHub
+and allowed the agent, the next request returns the token. Until then, it returns the same refusal and
+the same link.
+
+MCP moved in the same direction. The [2026-07-28
+version](https://modelcontextprotocol.io/specification/2026-07-28/changelog) removed the notification
+that told the client an elicitation was complete. Now "the client learns the outcome of an out-of-band
+interaction by retrying the original request". So the agent needs no address for the server to call
+back, and no separate status endpoint to check.
+
+## When you need this check, and when you can rely on something else {#when-to-check}
+
+You need the check whenever the link leaves the place where you already know who the person is. That
+covers chat clients, terminal agents and MCP hosts. It covers any case where the link can be copied,
+forwarded, or opened on another device. In all of these, the address is the only thing that reaches
+the person. So the page behind it has to find out who arrived.
+
+You can rely on something else when the agent runs inside your own web application, and the link
+never leaves the browser session it was created in. Then the session already tells you who the
+person is, as in Auth0's design. Even there, check at the end that the same user came back.
+
+Keep a short lifetime in either case. It clears away requests nobody finished. It just does not keep
+the wrong person out.
+
+The check also has a limit. It proves who the person is in FoxAuth. It does not prove which GitHub
+account that person picks. If the person's browser is still signed in to someone else's GitHub, for
+example on a shared computer, the person can connect that account without noticing. Their account
+page lists each connected account by its name at GitHub, so they can spot the mistake there. No check
+on the server can spot it for them.
+
+What I have not done yet: run this against a real MCP client that displays URL elicitations. The
+server side is covered by tests over HTTP and was walked through in a browser. Turning the refusal into
+an elicitation takes a few lines in your own MCP server. But I have not yet watched a client show the
+link to a person and then retry by itself.
+
+To set this up, [Connected services](/docs/administer/connected-services/#the-persons-link) describes
+the refusal and the link in full, including how to relay it to both versions of MCP. If you are new
+to MCP authorization, [Your MCP server must check who a token is
+for](/blog/your-mcp-server-is-an-oauth-resource-server/) covers the token side.

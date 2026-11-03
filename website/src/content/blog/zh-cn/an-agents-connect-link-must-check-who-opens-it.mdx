@@ -1,0 +1,224 @@
+---
+title: 智能体的连接链接必须核实是谁打开的
+description: 智能体把一个连接账户的链接交给用户。如果链接对任何打开它的人都有效，被转发的链接就会把错误的账户连接到错误的智能体上。
+source: c6504993293e
+---
+
+有一个名叫 Repo Helper 的 AI 智能体（agent），它需要读取某个人在 GitHub 上的代码仓库。它还没有访问权限，于是在聊天里写道：「打开这个链接，连接你的 GitHub 账户。」这个人点开了链接。他登录 GitHub，点了同意。然后他回到聊天。Repo Helper 再试一次，这次它拿到了一个 GitHub 令牌（token），也就是访问 GitHub 用的凭据。
+
+现在，往同一个故事里加入第二个人。Mallory 向她自己的 Repo Helper 提出同样的请求，也拿到了同样的一个链接。她没有打开它。她把链接发给同事 Alice，并附上一句话：「你能帮团队连接一下吗？」Alice 打开了链接。她已经登录了 GitHub，所以点两下就完成了同意。但这个链接是为 Mallory 生成的。于是，Alice 的 GitHub 账户现在连接到了 Mallory 的智能体上。Mallory 的智能体可以读取 Alice 的私有仓库了。
+
+在通常意义上，这个故事里没有任何东西出故障。每一次重定向都去了该去的地方。每一个令牌都是真的。GitHub 看到的，是真正的 Alice 的一次真实登录。缺的只是一步：链接被打开时，没有人问过一个问题。这个浏览器里的人，是这个链接所针对的那个人吗？
+
+这篇文章讲的就是这个问题。我在开发一个授权服务器，名叫 FoxAuth。授权服务器就是负责签发令牌的服务器。从 1.4.0 版起，FoxAuth 会给智能体发这样的链接。动手开发之前，我看了另外五个产品是怎样处理这种链接的。其中只有一个在文档里写明，会检查打开链接的人。MCP（Model Context Protocol）是许多智能体用来调用工具的协议。它的规范要求做这项检查，而且描述的正是这种攻击。
+
+## 连接链接把两个身份连在一起，第二个身份由打开它的人提供 {#two-identities}
+
+连接链接只有一个任务：把两个身份连在一起。第一个身份是你自己系统里的那个人，也就是智能体为之工作的用户。第二个身份是这个人在另一个服务上的账户，例如 GitHub 账户。
+
+链接是在智能体申请时生成的。这时服务器知道第一个身份，因为智能体的请求指明了是哪个人。服务器还不可能知道第二个身份。第二个身份要等到后来，由打开链接的那个浏览器带来：谁在这个浏览器里登录 GitHub，谁就提供了第二个身份。
+
+所以，如果链接不检查是谁打开了它，那么连上的是什么，就由打开它的人决定。这可能从两个方向出错。开头的故事是下图的右半边，只是你站在了 Alice 的位置上。
+
+<svg viewBox="0 0 800 330" width="100%" role="img" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">
+  <title>谁都能打开的链接会从两个方向出错。左边：为你生成的链接被 Mallory 打开，Mallory 的 GitHub 账户被连接到你的智能体上。右边：为 Mallory 生成的链接被你打开，你的 GitHub 账户被连接到 Mallory 的智能体上。</title>
+  <defs>
+    <marker id="cl-arrow-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--diagram-line, #555)"/></marker>
+  </defs>
+  <text x="200" y="28" text-anchor="middle" font-size="15" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">你的链接落到了别人手里</text>
+  <text x="600" y="28" text-anchor="middle" font-size="15" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">别人的链接落到了你手里</text>
+  <line x1="400" y1="45" x2="400" y2="315" stroke="var(--diagram-line, #555)" stroke-width="1" stroke-dasharray="4 4"/>
+  <rect x="60" y="50" width="280" height="50" rx="8" fill="none" stroke="var(--diagram-fg, #1a1a1a)" stroke-width="1.5"/>
+  <text x="200" y="72" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">为你生成的链接，</text>
+  <text x="200" y="90" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">代表你的智能体</text>
+  <line x1="200" y1="100" x2="200" y2="143" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#cl-arrow-a)"/>
+  <text x="212" y="127" font-size="13" fill="var(--diagram-line, #555)">被 Mallory 打开</text>
+  <rect x="60" y="145" width="280" height="50" rx="8" fill="none" stroke="var(--diagram-fg, #1a1a1a)" stroke-width="1.5"/>
+  <text x="200" y="167" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">Mallory 的浏览器登录</text>
+  <text x="200" y="185" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">Mallory 的 GitHub 账户</text>
+  <line x1="200" y1="195" x2="200" y2="238" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#cl-arrow-a)"/>
+  <rect x="60" y="240" width="280" height="50" rx="8" fill="none" stroke="var(--diagram-accent, #d9480f)" stroke-width="2"/>
+  <text x="200" y="262" text-anchor="middle" font-size="14" fill="var(--diagram-accent, #d9480f)">你的智能体从此写入</text>
+  <text x="200" y="280" text-anchor="middle" font-size="14" fill="var(--diagram-accent, #d9480f)">Mallory 的代码仓库</text>
+  <rect x="460" y="50" width="280" height="50" rx="8" fill="none" stroke="var(--diagram-fg, #1a1a1a)" stroke-width="1.5"/>
+  <text x="600" y="72" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">为 Mallory 生成的链接，</text>
+  <text x="600" y="90" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">代表她的智能体</text>
+  <line x1="600" y1="100" x2="600" y2="143" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#cl-arrow-a)"/>
+  <text x="612" y="127" font-size="13" fill="var(--diagram-line, #555)">被你打开</text>
+  <rect x="460" y="145" width="280" height="50" rx="8" fill="none" stroke="var(--diagram-fg, #1a1a1a)" stroke-width="1.5"/>
+  <text x="600" y="167" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">你的浏览器登录</text>
+  <text x="600" y="185" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">你的 GitHub 账户</text>
+  <line x1="600" y1="195" x2="600" y2="238" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#cl-arrow-a)"/>
+  <rect x="460" y="240" width="280" height="50" rx="8" fill="none" stroke="var(--diagram-accent, #d9480f)" stroke-width="2"/>
+  <text x="600" y="262" text-anchor="middle" font-size="14" fill="var(--diagram-accent, #d9480f)">Mallory 的智能体从此读取</text>
+  <text x="600" y="280" text-anchor="middle" font-size="14" fill="var(--diagram-accent, #d9480f)">你的代码仓库</text>
+</svg>
+
+左边是你的链接落到了别人手里。也许你把它贴进了一个共享频道，也许误转发了，也许它留在了某段聊天记录里。打开它的人，会把自己的 GitHub 账户连接到你的智能体上。从那以后，你的智能体会往他们的仓库里写东西。它以为那个账户是你的，所以可能把你的私密数据复制过去。
+
+右边是别人的链接落到了你手里。你把自己的账户连接到了他们的智能体上。钓鱼（phishing）攻击用的就是这个方向，因为什么时候发链接、链接旁边配什么话，都由攻击者决定。
+
+两个方向都出自同一个错误：链接相信打开它的会是对的人。
+
+## 有效期短、只能用一次，都挡不住被转发的链接 {#short-lifetime}
+
+保护这类链接的常见做法是：让它很快过期，或者只允许使用一次，或者两者都用。下面是截至 2026 年 11 月，各产品文档里的说法：
+
+| 产品 | 链接的有效期 | 文档中写明的打开者检查 |
+| --- | --- | --- |
+| [Composio](https://docs.composio.dev/docs/authentication/manually-authenticating) | 必须在 10 分钟内完成连接 | 无；文档提醒开发者，仅凭回调不能证明账户归属 |
+| [Nango](https://nango.dev/docs/reference/backend/http-api/connect/sessions/create) | 30 分钟；文档称它「可以当作魔法链接使用」（can be used as a magic link） | 无 |
+| [Pipedream Connect](https://pipedream.com/docs/connect/managed-auth/connect-link) | 4 小时；文档建议通过电子邮件或短信发送 | 无 |
+| [Auth0 Token Vault](https://auth0.com/docs/secure/call-apis-on-users-behalf/token-vault/connected-accounts-for-token-vault) | 一个 5 分钟的会话 | 智能体永远拿不到链接；最后检查是否为同一会话、同一设备 |
+| [Arcade](https://docs.arcade.dev/guides/user-facing-agents/secure-auth-production) | 文档未说明 | 有：保存账户之前，由开发者确认用户身份 |
+
+这张表只记录文档里写了什么。某个产品实际检查的可能比文档写的多，但基于它做开发的人不能指望这一点。
+
+这两种保护都挡不住开头故事里的攻击。什么时候发链接由 Mallory 决定，所以她可以在发送前一分钟再要一个新链接。只能用一次的链接同样没用。Alice 是第一个、也是唯一一个使用它的人。链接完全按设计工作，只是被错误的人用了。
+
+Auth0 用另一种方式避开了这个问题。在 Auth0 的设计里，智能体根本看不到链接。这个人正在使用的应用，拿着这个人自己的访问令牌去申请链接，再把这个人送到链接上。这个人回来后，由应用完成连接。这时 Auth0 会检查两件事：这个请求是否属于同一个已登录的会话，以及是否来自同一台设备。
+
+如果智能体运行在一个网页应用里，只有一个浏览器会话，这种做法是可行的。但如果智能体在聊天客户端里、在终端里，或者在 MCP 宿主里，这种做法就行不通了。MCP 宿主是把智能体和它的工具连接起来的程序，例如桌面聊天应用。在这些地方，能找到这个人的唯一办法，就是给他看一个地址。
+
+## 在链接被打开的那一刻核实这个人 {#check-on-open}
+
+[MCP 规范](https://modelcontextprotocol.io/specification/2025-11-25/client/elicitation)直接写明了这一点。MCP 服务器可以请这个人面前的程序给他显示一个地址。规范把这叫作 URL 征询（URL elicitation）。规范的安全章节几乎一步一步地讲了开头那个故事：攻击者拿到一个链接，诱骗另一个用户打开它，结果受害者的令牌被绑定到了攻击者的身份上。接着是规则：服务器「必须（MUST）在接受信息之前，验证打开该 URL 的用户的身份」。规范的示例不会把这个人直接送到另一个服务。它把这个人送到 MCP 服务器自己的一个页面上。这个页面会比较两个用户：在这里登录的用户，和发起请求的用户。
+
+FoxAuth 的做法相同。Repo Helper 持有一个 FoxAuth 为某个人签发的访问令牌。它出示这个令牌，申请同一个人的 GitHub 令牌。如果这个人还没有连接 GitHub，或者还没有允许这个智能体使用它，FoxAuth 就会拒绝。拒绝里带着一个为这个人生成的链接。
+
+链接指向这个人所在项目里的一个页面。FoxAuth 中的项目，是一组人加上他们登录使用的应用，有自己的登录页面。链接被打开时，服务器先依次做几项简短的检查，然后才显示任何内容：
+
+<svg viewBox="0 0 800 480" width="100%" role="img" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">
+  <title>连接链接被打开时依次进行的检查。不是本服务器签发的代码，或者已经失效的链接，无论原因是什么，得到的都是同一个 404 页面。如果没有人登录，这个人先登录，再回到链接。如果登录的人不是链接所针对的那个人，页面会说明这一点，并且什么都不会改变。如果登录发生在十五分钟以前，这个人要重新登录。到这时，页面才提供链接本来要做的事：连接、允许或重新连接。</title>
+  <defs>
+    <marker id="cl-arrow-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--diagram-line, #555)"/></marker>
+    <marker id="cl-arrow-c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--diagram-accent, #d9480f)"/></marker>
+  </defs>
+  <rect x="30" y="20" width="400" height="50" rx="8" fill="none" stroke="var(--diagram-fg, #1a1a1a)" stroke-width="1.5"/>
+  <text x="230" y="50" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">1. 由本服务器签发，并且仍然有效？</text>
+  <rect x="30" y="110" width="400" height="50" rx="8" fill="none" stroke="var(--diagram-fg, #1a1a1a)" stroke-width="1.5"/>
+  <text x="230" y="140" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">2. 有人登录了这个项目吗？</text>
+  <rect x="30" y="200" width="400" height="50" rx="8" fill="none" stroke="var(--diagram-accent, #d9480f)" stroke-width="2"/>
+  <text x="230" y="230" text-anchor="middle" font-size="14" fill="var(--diagram-accent, #d9480f)">3. 登录者是链接所针对的那个人吗？</text>
+  <rect x="30" y="290" width="400" height="50" rx="8" fill="none" stroke="var(--diagram-fg, #1a1a1a)" stroke-width="1.5"/>
+  <text x="230" y="320" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">4. 是在最近 15 分钟内登录的吗？</text>
+  <rect x="30" y="380" width="400" height="60" rx="8" fill="none" stroke="var(--diagram-fg, #1a1a1a)" stroke-width="1.5"/>
+  <text x="230" y="405" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">5. 提供链接本来要做的事：</text>
+  <text x="230" y="425" text-anchor="middle" font-size="14" fill="var(--diagram-fg, #1a1a1a)">连接、允许或重新连接</text>
+  <line x1="230" y1="70" x2="230" y2="108" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#cl-arrow-b)"/>
+  <text x="242" y="94" font-size="12" fill="var(--diagram-line, #555)">是</text>
+  <line x1="230" y1="160" x2="230" y2="198" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#cl-arrow-b)"/>
+  <text x="242" y="184" font-size="12" fill="var(--diagram-line, #555)">是</text>
+  <line x1="230" y1="250" x2="230" y2="288" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#cl-arrow-b)"/>
+  <text x="242" y="274" font-size="12" fill="var(--diagram-line, #555)">是</text>
+  <line x1="230" y1="340" x2="230" y2="378" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#cl-arrow-b)"/>
+  <text x="242" y="364" font-size="12" fill="var(--diagram-line, #555)">是</text>
+  <line x1="430" y1="45" x2="488" y2="45" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#cl-arrow-b)"/>
+  <text x="459" y="38" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">否</text>
+  <text x="500" y="41" font-size="13" fill="var(--diagram-fg, #1a1a1a)">404：无论什么原因，</text>
+  <text x="500" y="58" font-size="13" fill="var(--diagram-fg, #1a1a1a)">都是同一个页面</text>
+  <line x1="430" y1="135" x2="488" y2="135" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#cl-arrow-b)"/>
+  <text x="459" y="128" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">否</text>
+  <text x="500" y="131" font-size="13" fill="var(--diagram-fg, #1a1a1a)">先登录，</text>
+  <text x="500" y="148" font-size="13" fill="var(--diagram-fg, #1a1a1a)">再回到这个链接</text>
+  <line x1="430" y1="225" x2="488" y2="225" stroke="var(--diagram-accent, #d9480f)" stroke-width="1.5" marker-end="url(#cl-arrow-c)"/>
+  <text x="459" y="218" text-anchor="middle" font-size="12" fill="var(--diagram-accent, #d9480f)">否</text>
+  <text x="500" y="221" font-size="13" fill="var(--diagram-accent, #d9480f)">403：链接属于另一个账户；</text>
+  <text x="500" y="238" font-size="13" fill="var(--diagram-accent, #d9480f)">什么都不改变</text>
+  <line x1="430" y1="315" x2="488" y2="315" stroke="var(--diagram-line, #555)" stroke-width="1.5" marker-end="url(#cl-arrow-b)"/>
+  <text x="459" y="308" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">否</text>
+  <text x="500" y="320" font-size="13" fill="var(--diagram-fg, #1a1a1a)">重新登录</text>
+</svg>
+
+1. 链接末尾的代码是不是本服务器签发的？链接是否仍然有效？代码未知、已过期、被这个人拒绝，或者已被更新的链接取代，得到的都是同一个 404 页面。所以，靠猜代码的人无从得知哪些链接存在。
+2. 有人登录了这个项目吗？如果没有，这个人先登录，然后回到链接。
+3. 登录的人是不是链接所针对的那个人？如果不是，页面会说明这个链接是为另一个账户生成的，并且什么都不会改变。服务器还会发出一个关于这次拒绝的事件，运营者可以订阅它。
+4. 这个人是否在最近十五分钟内登录过？如果没有，就要重新登录。共享电脑上一个一直保持登录的浏览器，不足以连接账户。
+5. 到这时，页面才提供链接本来要做的事。有三种情况：连接 GitHub 并让这个智能体使用它；让这个智能体使用一个已经连接好的 GitHub 账户；或者重新连接一个 GitHub 访问权限已经失效的账户。
+
+用这些检查重演开头的故事。Alice 打开了 Mallory 的链接。Alice 处于登录状态，但她不是 Mallory，所以第 3 项检查拦住了她，什么也没有连接。再反过来，假设 Mallory 拿到了 Alice 的链接。第 2 项或第 3 项检查会拦住她，因为她无法以 Alice 的身份登录。
+
+拒绝本身是令牌端点返回的一个普通 OAuth 错误。令牌端点是应用向 FoxAuth 申请令牌的地址。Repo Helper 通过令牌交换（token exchange，RFC 8693）申请这个人的 GitHub 令牌：它发送这个人的访问令牌，并把 GitHub 指定为受众（audience），也就是令牌要用在哪里。如果这个人还没有连接 GitHub，这次交换大致如下（有删节）：
+
+```http
+POST /token HTTP/1.1
+Authorization: Basic …
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=urn:ietf:params:oauth:grant-type:token-exchange
+&subject_token=…the person's access token…
+&subject_token_type=urn:ietf:params:oauth:token-type:access_token
+&requested_token_type=urn:ietf:params:oauth:token-type:access_token
+&audience=…GitHub's identifier in this project…
+```
+
+```http
+HTTP/1.1 400 Bad Request
+Content-Type: application/json
+Cache-Control: no-store
+
+{
+	"error": "invalid_grant",
+	"error_description": "the person has not connected a GitHub account",
+	"reason": "connect_required",
+	"connect_uri": "https://auth.example.com/account/services/link/q3Jx…",
+	"connect_id": "c6m2…",
+	"connect_expires_in": 1800,
+	"connect_message": "Open this link to connect your GitHub account and let Repo Helper use it."
+}
+```
+
+`connect_expires_in` 的单位是秒：1800 就是下文要谈的三十分钟有效期。
+
+申请 GitHub 令牌的程序往往不是智能体本身，而是智能体调用的某个 MCP 服务器。这个 MCP 服务器把链接原样转交。如果客户端用的是 2025-11-25 版的 MCP，MCP 服务器就让这次工具调用以错误码 -32042 失败。这个错误码的意思是：把这些地址显示给这个人，然后再试一次。`connect_id` 变成 `elicitationId`：
+
+```json
+{
+	"code": -32042,
+	"message": "Open this link to connect your GitHub account and let Repo Helper use it.",
+	"data": {
+		"elicitations": [
+			{
+				"mode": "url",
+				"elicitationId": "c6m2…",
+				"url": "https://auth.example.com/account/services/link/q3Jx…",
+				"message": "Open this link to connect your GitHub account and let Repo Helper use it."
+			}
+		]
+	}
+}
+```
+
+## 链接本身不带登录状态，所以只有它所属的那个人能用 {#no-sign-in}
+
+链接末尾的代码是 32 个随机字节，可能的取值多到根本猜不出来。这个代码只指向服务器上的一条记录。记录写明这个链接属于哪个项目、哪个人、哪个智能体、哪个服务，以及它要做的是连接、允许还是重新连接。代码不会让任何人登录，也不包含关于这个人的任何信息。
+
+MCP 规范禁止在链接里放凭据。以这种方式显示的地址不得包含凭据，也不得是「预先认证的」（pre-authenticated）：仅仅打开它，不能让任何人以这个人的身份登录。
+
+正因为代码只指向一条记录，第 3 项检查才做得到。预先认证的链接会把 Mallory 的登录会话装在里面，于是无论谁打开它，都会以 Mallory 的身份行事。普通的代码则迫使页面去问浏览器：现在是谁在这里？答案来自那个人自己的登录。
+
+普通的代码也改变了泄露的代价。假设一个链接被贴进了公开频道。打开它的陌生人会遇到一个他过不去的登录，仅此而已。链接仍然会在三十分钟后过期，因为没人完成的请求不应该永远挂着。这个有效期只是日常清理，保护这个人的并不是它。
+
+服务器为每一组「人、智能体、服务」只保留一个链接。链接有效期间，智能体再次申请，拿到的还是同一个链接。所以，反复重试的智能体不会在这个人的聊天里塞满好几个都还能用的链接。只有当链接要做的事变了，例如从「连接」变成「允许」，链接才会被替换；旧代码随后会通向 404 页面。
+
+## 智能体再问一次，就知道了结果 {#ask-again}
+
+这个人完成之后，页面会告诉他回到智能体那里。页面不会把他重定向到任何地方。如果链接把浏览器送往智能体选定的某个地址，那就又多了一条钓鱼的途径。
+
+智能体通过重复它的令牌请求来得知结果。一旦这个人连接了 GitHub 并允许了这个智能体，下一次请求就会返回令牌。在那之前，请求返回的还是同样的拒绝和同一个链接。
+
+MCP 也朝同一个方向做了修改。[2026-07-28 版](https://modelcontextprotocol.io/specification/2026-07-28/changelog)删除了一条通知；这条通知原本用来告诉客户端某次征询已经完成。现在，「客户端通过重试原来的请求，得知带外交互的结果」。带外交互是指发生在 MCP 连接之外的交互，例如在浏览器里打开链接。所以，智能体既不需要一个供服务器回调的地址，也不需要另外查询一个状态端点。
+
+## 什么时候需要这项检查，什么时候可以依靠别的东西 {#when-to-check}
+
+只要链接离开了你已经知道这个人是谁的地方，你就需要这项检查。聊天客户端、终端里的智能体和 MCP 宿主都属于这种情况。任何链接可能被复制、转发或在另一台设备上打开的场景，也都属于这种情况。在这些场景里，唯一能到达这个人的就是那个地址。所以，地址背后的页面必须弄清楚来的是谁。
+
+如果智能体运行在你自己的网页应用里，而且链接从不离开生成它的那个浏览器会话，你就可以依靠别的东西。这时会话本身已经告诉你这个人是谁，就像 Auth0 的设计那样。即便如此，也要在最后检查回来的是不是同一个用户。
+
+无论哪种情况，都要保留较短的有效期。它会清掉没人完成的请求，只是挡不住错误的人。
+
+这项检查也有局限。它证明的是这个人在 FoxAuth 里的身份，证明不了这个人选了哪个 GitHub 账户。如果这个人的浏览器里登录的还是别人的 GitHub，例如在共享电脑上，他可能在没察觉的情况下连接了那个账户。他的账户页面会按 GitHub 上的名字列出每个已连接的账户，所以他可以在那里发现这个错误。服务器上的任何检查都无法替他发现。
+
+我还没做的一件事：在一个真正会显示 URL 征询的 MCP 客户端上运行这一套。服务器一侧有基于 HTTP 的测试覆盖，我也在浏览器里完整走过一遍。在你自己的 MCP 服务器里，把拒绝变成一次征询只需要几行代码。但我还没有亲眼看到某个客户端把链接显示给一个人，然后自己重试。
+
+要配置这项功能，可以看英文文档 [Connected services（已连接的服务）](/docs/administer/connected-services/#the-persons-link)。它完整描述了拒绝和链接，包括怎样把它们转交给两个版本的 MCP。如果你刚接触 MCP 授权，[MCP 服务器必须检查令牌是给谁的](/zh-cn/blog/your-mcp-server-is-an-oauth-resource-server/)讲的是令牌这一侧。
