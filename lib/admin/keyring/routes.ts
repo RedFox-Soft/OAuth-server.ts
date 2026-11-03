@@ -53,21 +53,18 @@ export const keyringRoutes = new Elysia({ name: 'admin-keyring' })
 		},
 		{ response: { 201: KeyringGeneratedResponse } }
 	)
-	.post(
-		'/admin/api/keyring/backup-confirmation',
-		async ({ admin, set }) => {
-			const ctx = assertAuth(admin);
-			assertSuperAdmin(ctx);
-			const store = getKeyringStateStore();
-			const state = await store.read();
-			if (!activeKeyring() && !state?.generated) {
-				throw new AdminError(409, 'no keyring has been generated or supplied');
-			}
-			await recordAdminAudit(ctx, 'keyring.backup.confirm', 'keyring');
-			await store.patch({
-				backupConfirmed: { at: new Date().toISOString(), by: ctx.userId }
-			});
-			set.status = 204;
-			return null;
+	.post('/admin/api/keyring/backup-confirmation', async ({ admin, set }) => {
+		const ctx = assertAuth(admin);
+		assertSuperAdmin(ctx);
+		const store = getKeyringStateStore();
+		const state = await store.read();
+		if (!activeKeyring() && !state?.generated) {
+			throw new AdminError(409, 'no keyring has been generated or supplied');
 		}
-	);
+		await recordAdminAudit(ctx, 'keyring.backup.confirm', 'keyring');
+		await store.patch({
+			backupConfirmed: { at: new Date().toISOString(), by: ctx.userId }
+		});
+		set.status = 204;
+		return null;
+	});
