@@ -669,6 +669,40 @@ What an operator sees afterwards:
 - **The registration settings explain themselves**: accepting a URL as a client identifier is described as the
   path MCP recommends, and dynamic registration as the one it deprecates.
 
+### Then 1.4.0
+
+1.4.0 carries two schema migrations, which the usual `db:migrate` step applies, and `db:setup` provisions the new
+storage areas for connected services. The first migration cannot be undone, so take a backup first. Check these
+before upgrading:
+
+- **How the server learns a caller's address changed.** `rateLimit.trustedProxy` is replaced by
+  `clientAddress.source`. The migration chooses `fly` for an instance in use and `direct` where the old setting was
+  off. On Fly.io there is nothing to do. Anywhere else, open **Settings → Sign-in & abuse** after the upgrade: the
+  card there shows the address the server sees for you and warns when the choice does not fit. See
+  [Behind a reverse proxy](/docs/deploy/reverse-proxy/).
+- **Two reports to FoxTrust are on by default.** A daily anonymous usage report and an hourly report of the
+  addresses that attack the instance. Each has its own switch under **Settings → Integrations**, and every field
+  either carries is listed under [Usage reporting](/docs/reference/telemetry/) and
+  [Attack reporting](/docs/reference/attack-reports/). If you do not want them sent, turn them off as soon as the new
+  version is up: the first attack report can leave within five minutes.
+- **RSA keys shorter than 2048 bits are refused**, in an application's key set and among the server's own keys.
+  Replace any such key first.
+- **One address may ask for at most 10 emails an hour**: password resets, sign-ups and verification resends,
+  across every project (`mail.requestsPerCallerPerHour`). Raise it if many people sign up from one office address.
+
+What an operator sees afterwards:
+
+- **Encryption at rest.** Nothing changes until a keyring is in use. The **Keys** page warns while there is none;
+  [Upgrading an existing install](#upgrading-to-a-keyring) says how to start. Back the keyring up apart from the
+  database. Docker Compose users take the new compose file, which adds the keyring volume.
+- **Connected services**, a new tab on each project: people connect their accounts at the services you declare, and
+  agents you list obtain their tokens there by token exchange, with the person's consent. See
+  [Connected services](/docs/administer/connected-services/). Declaring a service needs a keyring in use.
+- **Every ID token carries `auth_time`, `acr` and `session_expiry`**, whether or not the request asked.
+- **The IPSIE SL1 profile switch** (`ipsieSl1.enabled`, off), with a readiness card that lists what stands in the
+  way. See [Turn on the IPSIE SL1 profile](/docs/administer/ipsie-sl1-profile/).
+- **Every response asks search engines not to index it** (`X-Robots-Tag: noindex, nofollow`).
+
 ## Check readiness and the issuer after the restart {#after-the-restart}
 
 ```bash

@@ -9,6 +9,13 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-03
+
+A token vault for agents: people connect their accounts at the services a project declares, and an agent obtains a
+person's token there by token exchange, with a link to hand the person when something is missing. Stored secrets are
+encrypted at rest once a keyring is in use. Before upgrading, check how the server learns a caller's address, and
+note that two reports to FoxTrust are on by default. Two migrations, the first irreversible: take a backup.
+
 ### Added
 
 - **Connected services** (spec 117) — a project declares the services its people may connect their accounts at
@@ -2240,7 +2247,8 @@ found`. The refusal text existed and never ran: the call that delivered it sat i
 - The DPoP nonce secret is self-provisioned at startup, making the requireNonce-without-secret 500
   state unrepresentable (spec 014)
 
-[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.0.1...v1.1.0
