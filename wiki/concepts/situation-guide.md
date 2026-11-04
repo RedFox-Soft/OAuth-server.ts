@@ -150,9 +150,11 @@ stamped against `lib/consts/situation_guide.ts` itself ([[site-translations]]). 
 (`website/src/i18n/guide-texts.ts:95`) fails the build when a translation lacks an id or has a different number of
 steps, so a situation added in `lib/` cannot ship half-translated. Agent prompts stay English in every language.
 
-## Gotcha: a local colour override
+## The console's blue
 
-The console's primary button colour fails 4.5:1 contrast on the guide's backgrounds, so the guide overrides it
-inside its own scope with antd's internal `--ant-btn-color-base`, `-hover` and `-active` names
-(`lib/admin/ui/pages/guide/SequenceDiagram.tsx:470`). Those are not a public API; an antd upgrade that renames
-them would silently restore the failing colour, and nothing tests it. Check the guide's buttons when bumping antd.
+antd's default primary, `#1677ff`, is 4.1:1 behind a primary button's white label. Since 2026-11-04 the whole console
+uses `#0958d9` (6.2:1), with a hover of `#1668dc` (5.2:1) rather than antd's lighter one (3.0:1), set once as theme
+tokens in `lib/admin/ui/frame/ConsoleRoot.tsx` (`CONSOLE_TOKENS`); the precompiled antd.css reads them through its CSS
+variables. It is the blue the end-user pages already used (`lib/html/theme/palette.ts`). Until then the guide
+overrode the colour in its own scope through antd's internal `--ant-btn-color-*` names; that override is gone, so
+nothing here depends on antd's private variable names any more.

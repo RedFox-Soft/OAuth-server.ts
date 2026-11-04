@@ -352,3 +352,5 @@ Operations:
 ## [2026-11-03] update | [[situation-guide]] — final-review fixes: `needs.anyOf` (the MCP answer needs CIMD or registration), `planLimit` from `needs.room`, the own-address answer gated on `changeAddress`, plan marks lead to the project's Plan card, `me` reloaded by the guide and after a settings save, `needsAddress` for application and API targets, `?declare=1` through `useQueryOffer`, `?situation=custom` opens the full form, short default application names; the "why this shape" reasons corrected to the design's. [[application-page]] default name.
 
 ## [2026-11-04] update | [[situation-guide]] — phase 2 built: the site page `/docs/guide/` in three languages from the docs export, Cloud marks computed on the site, `/admin/start` as the site's door, chips as links for keyboard reach; [[site-translations]]: the `guideSituations` group is stamped against a file in `lib/`.
+
+## [2026-11-04] update | [[situation-guide]] — the console's primary blue is `#0958d9` everywhere (theme tokens in `ConsoleRoot.tsx`), so the guide's local override of antd's internal button variables is removed.

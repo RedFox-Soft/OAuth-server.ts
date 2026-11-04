@@ -19,7 +19,10 @@ export const CLOUD_SIGN_UP_REL = 'nofollow';
  * The flags switched on at auth.foxauth.dev, so the Features page can mark the cards a cloud project gets. Not read
  * from production at build time — the site builds without credentials — so it is checked by hand: last read from
  * production's settings on 2026-10-16, after clientCredentials, revocation, introspection, backchannelLogout,
- * deviceFlow, clientIdMetadataDocument, dpop and par were switched on. Change this when production changes.
+ * deviceFlow, clientIdMetadataDocument, dpop and par were switched on. Re-checked on 2026-11-04 against what
+ * production's discovery document and /mcp metadata show (registration, CIBA, the JWT bearer grant, RAR and ID-JAG
+ * off); the switches discovery does not reveal (federation, SCIM, plans) were not re-read. Change this when
+ * production changes.
  * Operator-only switches (the error store, Sentry) are left out: a tenant never sees them.
  */
 export const CLOUD_FLAGS_ON: ReadonlySet<string> = new Set([

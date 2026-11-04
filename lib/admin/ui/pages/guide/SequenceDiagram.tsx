@@ -466,9 +466,6 @@ const CSS = `
   .guide-dia.picking.anim .st.on { opacity: 1; }
 }
 .guide-scope .ant-typography.ant-typography-secondary { color: var(--gd-muted); }
-.guide-scope a.ant-typography, .guide-scope a.ant-typography:hover, .guide-scope a:not(.ant-btn), .guide-scope a:not(.ant-btn):hover { color: var(--gd-accent); }
-.guide-scope .ant-btn.ant-btn-color-primary.ant-btn-variant-solid { --ant-btn-color-base: var(--gd-accent); --ant-btn-color-hover: var(--gd-accent-hover); --ant-btn-color-active: var(--gd-accent-hover); }
-.guide-scope .ant-tabs .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn { color: var(--gd-accent); }
 `;
 
 /* The diagram's palette, from the antd token: also read by the legend's keys, so they match the drawing. */
@@ -483,10 +480,7 @@ export function useDiagramPalette(): CSSProperties {
 		'--gd-card': token.colorBgContainer,
 		'--gd-surface': token.colorBgContainer,
 		'--gd-surface-2': token.colorFillTertiary,
-		// The active shade, not the base one: white numbers and accent text stay readable on and beside it.
-		'--gd-accent': token.colorPrimaryActive,
-		// antd lightens a primary button under the pointer, below 4.5:1 behind white text; the guide's stay dark.
-		'--gd-accent-hover': token.colorPrimaryActive,
+		'--gd-accent': token.colorPrimary,
 		'--gd-accent-soft': token.colorPrimaryBg,
 		'--gd-on-accent': token.colorTextLightSolid,
 		'--gd-ink': token.colorText,

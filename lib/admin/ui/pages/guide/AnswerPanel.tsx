@@ -400,9 +400,7 @@ function PreviewMock({ sees }: { sees: GuidePreview }) {
 				textAlign: 'center',
 				fontSize: 12,
 				fontWeight: 600,
-				background: primary
-					? token.colorPrimaryActive
-					: token.colorFillTertiary,
+				background: primary ? token.colorPrimary : token.colorFillTertiary,
 				color: primary ? token.colorTextLightSolid : token.colorText
 			}}
 		>
