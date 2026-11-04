@@ -1,0 +1,411 @@
+---
+import MiniScreen from './MiniScreen.astro';
+import Part from './Part.astro';
+import Scene from './Scene.astro';
+import english from '../../i18n/messages/guide/en.ts';
+import type { GuideSituationEntry } from '../../data/export.ts';
+import type { GuideSituationTexts } from '../../i18n/guide-texts.ts';
+import {
+	CLOUD_SIGN_UP_REL,
+	WAITLIST_ADDRESS,
+	WAITLIST_SUBJECT
+} from '../../data/cloud.ts';
+import type { LocaleKey } from '../../data/seo.ts';
+import { cloudMark, startHref } from '../../data/guide.ts';
+
+/*
+ * The top of every answer, the page's whole promise in three frames: "Your problem" (the parts without FoxAuth, a red
+ * mark on the one with the problem), "With FoxAuth" (the same parts, FoxAuth where it really stands, a check where the
+ * mark was) and "What you get" (the screen the person meets), then the one button. Only an answer FoxAuth Cloud can
+ * set up gets the accent button; the others get their honest route, a plan or your own server, as a secondary one.
+ *
+ * The strip lays itself out by its own width: three across when there is room for three, the two pictures side by
+ * side with what you get under them in an answer column, and one under the other on a phone.
+ */
+interface Props {
+	situation: GuideSituationEntry;
+	texts: GuideSituationTexts;
+	t: typeof english;
+	pricingHref: string;
+	ownServerHref: string;
+	locale: LocaleKey;
+}
+const {
+	situation: s,
+	texts,
+	t,
+	pricingHref,
+	ownServerHref,
+	locale
+} = Astro.props;
+const a = t.answer;
+const mark = cloudMark(s.needs);
+const actionLabel =
+	s.action.kind === 'open' && texts.actionLabel ? texts.actionLabel : a.setUp;
+/* A paid-plan answer asks for the plan in one step: the waitlist's mail, its subject naming the answer (in English, for the inbox). */
+const planSubject = `${WAITLIST_SUBJECT}: ${s.title}${locale === 'en' ? '' : ` [${locale}]`}`;
+const planHref = `mailto:${WAITLIST_ADDRESS}?subject=${encodeURIComponent(planSubject)}`;
+/* The frames share the width by how many parts each draws, so a four-part picture is not squeezed beside a two. */
+const weight = (scene: GuideSituationEntry['scene']['problem']) =>
+	Math.max(2, scene.row.length);
+const cta =
+	'g-cta inline-flex min-h-12 max-w-full items-center justify-center gap-2 rounded-control px-5 py-2.5 text-center text-base font-semibold no-underline transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500';
+---
+
+<div class="g-strip-wrap">
+<div
+	class="g-strip"
+	role="group"
+	aria-label={t.strip.label}
+	style={`--g-w1: ${weight(s.scene.problem)}fr; --g-w2: ${weight(s.scene.solution)}fr`}
+>
+	<figure class="g-frame g-frame--problem">
+		<div class="g-frame-h">
+			<span class="g-frame-n" aria-hidden="true">1</span>{t.strip.problem}
+		</div>
+		<div class="g-frame-pic">
+			<Scene scene={s.scene.problem} labels={texts.lanes} />
+		</div>
+		<figcaption class="g-frame-cap">{texts.problemCaption}</figcaption>
+	</figure>
+	<span class="g-turn g-turn--1" aria-hidden="true">&rarr;</span>
+	<figure class="g-frame g-frame--fix">
+		<div class="g-frame-h">
+			<span class="g-frame-n" aria-hidden="true">2</span>{t.strip.fix}
+		</div>
+		<div class="g-frame-pic">
+			<Scene
+				scene={s.scene.solution}
+				labels={texts.lanes}
+			/>
+		</div>
+		<figcaption class="g-frame-cap">{texts.fixCaption}</figcaption>
+	</figure>
+	<span class="g-turn g-turn--2" aria-hidden="true">&rarr;</span>
+	<div class="g-frame g-frame--get">
+		<div class="g-frame-h">
+			<span class="g-frame-n" aria-hidden="true">3</span>{t.strip.get}
+		</div>
+		<div class="g-get-cta">
+			{
+				mark === 'ready' && (
+					<a
+						href={startHref(s)}
+						rel={CLOUD_SIGN_UP_REL}
+						class:list={[
+							cta,
+							'bg-accent-500 text-gray-950 shadow-sm hover:bg-accent-400 active:bg-accent-600'
+						]}
+					>
+						<span>{actionLabel}</span>
+						<span aria-hidden="true">&rarr;</span>
+					</a>
+				)
+			}
+			{
+				mark !== 'ready' && (
+					<a
+						href={mark === 'notOnFree' ? planHref : ownServerHref}
+						class:list={[
+							cta,
+							'border border-gray-300 bg-white text-gray-900 hover:border-gray-400 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800'
+						]}
+					>
+						<Part
+							part={mark === 'notOnFree' ? 'cloud' : 'server'}
+							class="size-5"
+							strokeWidth={2}
+						/>
+						<span>{mark === 'notOnFree' ? a.requestPlan : a.ownServerRoute}</span>
+					</a>
+				)
+			}
+			<p class="g-cta-sub">
+				{
+					mark === 'ready'
+						? `${a.destination} ${a.destinationSub}`
+						: mark === 'notOnFree'
+							? a.notOnFree
+							: s.needs.role === 'super'
+								? a.ownServerSuper
+								: a.ownServerFlag
+				}
+				{
+					mark === 'notOnFree' && (
+						<>
+							{' '}
+							<a href={pricingHref} class="g-cta-link">
+								{a.seePlans}
+							</a>
+						</>
+					)
+				}
+			</p>
+		</div>
+		<div class="g-get-pic">
+			{
+				s.sees.kind === 'none' ? (
+					<ul class="g-result">
+						{texts.sees.map((line) => (
+							<li>
+								<span class="g-result-dot">
+									<Part strokeWidth={3} />
+								</span>
+								<span>{line}</span>
+							</li>
+						))}
+					</ul>
+				) : (
+					<MiniScreen kind={s.sees.kind} t={t.mini} />
+				)
+			}
+		</div>
+		{
+			s.sees.kind !== 'none' && (
+				<ul class="g-get-lines">
+					{texts.sees.map((line) => (
+						<li>{line}</li>
+					))}
+				</ul>
+			)
+		}
+	</div>
+</div>
+</div>
+
+<style is:global>
+	.g-strip-wrap {
+		container: strip / inline-size;
+		margin-top: 0.75rem;
+	}
+	.g-strip {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr);
+		grid-template-areas: 'problem' 'turn1' 'fix' 'turn2' 'get';
+	}
+	.g-frame--problem {
+		grid-area: problem;
+	}
+	.g-frame--fix {
+		grid-area: fix;
+	}
+	.g-frame--get {
+		grid-area: get;
+	}
+	.g-turn--1 {
+		grid-area: turn1;
+	}
+	.g-turn--2 {
+		grid-area: turn2;
+	}
+	.g-frame {
+		display: flex;
+		min-width: 0;
+		flex-direction: column;
+		margin: 0;
+		padding: 0.625rem 0.75rem 0.75rem;
+		--g-frame-bg: var(--g-get-bg);
+		border: 1px solid var(--g-border);
+		border-radius: var(--radius-card);
+		background: var(--g-frame-bg);
+	}
+	.g-frame--problem {
+		--g-frame-bg: var(--g-problem-bg);
+	}
+	.g-frame--fix {
+		--g-frame-bg: var(--g-fix-bg);
+		border-color: var(--g-fix-border);
+	}
+	.g-frame-h {
+		--g-frame-accent: var(--g-text-2);
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		font-size: 0.6875rem;
+		font-weight: 700;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+		color: var(--g-frame-accent);
+	}
+	.g-frame--problem .g-frame-h {
+		--g-frame-accent: var(--g-deny-ink);
+	}
+	.g-frame--fix .g-frame-h {
+		--g-frame-accent: var(--g-fox-ink);
+	}
+	.g-frame-n {
+		display: grid;
+		flex: none;
+		place-items: center;
+		width: 1.125rem;
+		height: 0.75rem;
+		border-radius: 999px;
+		background: var(--g-frame-accent);
+		color: var(--g-num-on);
+		font-size: 0.625rem;
+		letter-spacing: 0;
+	}
+	.g-frame-pic {
+		display: flex;
+		flex: 1;
+		align-items: center;
+		padding-block: 0.375rem 0.25rem;
+	}
+	.g-frame-cap {
+		margin-top: auto;
+		font-size: 0.8125rem;
+		font-weight: 500;
+		line-height: 1.4;
+		text-align: center;
+		text-wrap: balance;
+		color: var(--g-text);
+	}
+	.g-turn {
+		display: grid;
+		place-items: center;
+		height: 1.125rem;
+		color: var(--g-fox-border);
+		font-size: 1.125rem;
+		font-weight: 700;
+		line-height: 1;
+		transform: rotate(90deg);
+	}
+
+	/* What you get: the screen, the button, and the lines that name what is on the screen. */
+	.g-frame--get {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr);
+		grid-template-areas: 'head' 'cta' 'pic' 'lines';
+		align-content: start;
+		gap: 0.75rem;
+	}
+	.g-frame--get > .g-frame-h {
+		grid-area: head;
+	}
+	.g-get-pic {
+		grid-area: pic;
+		display: flex;
+		align-items: flex-start;
+		justify-content: center;
+		min-width: 0;
+	}
+	.g-get-lines {
+		grid-area: lines;
+		display: grid;
+		gap: 0.25rem;
+		padding-inline-start: 1rem;
+		list-style: disc;
+		font-size: 0.8125rem;
+		line-height: 1.4;
+		color: var(--g-text-2);
+	}
+	.g-get-lines li::marker {
+		color: var(--g-fox-border);
+	}
+	.g-get-cta {
+		grid-area: cta;
+		display: flex;
+		min-width: 0;
+		flex-direction: column;
+		align-items: stretch;
+		gap: 0.375rem;
+	}
+	.g-cta-sub {
+		font-size: 0.75rem;
+		line-height: 1.4;
+		color: var(--g-text-3);
+	}
+	.g-cta-link {
+		font-weight: 500;
+		color: var(--g-link);
+		text-decoration: underline;
+		text-underline-offset: 2px;
+	}
+	.g-result {
+		display: grid;
+		width: 100%;
+		max-width: 20rem;
+		gap: 0.5rem;
+		padding: 0.75rem;
+		border: 1px dashed var(--g-tile-border);
+		border-radius: 0.75rem;
+		background: var(--g-ms-bg);
+		font-size: 0.8125rem;
+		line-height: 1.4;
+		color: var(--g-text);
+	}
+	.g-result li {
+		display: grid;
+		grid-template-columns: 1.125rem minmax(0, 1fr);
+		gap: 0.5rem;
+		align-items: start;
+	}
+	.g-result-dot {
+		display: grid;
+		place-items: center;
+		width: 1.125rem;
+		height: 1.125rem;
+		margin-top: 0.0625rem;
+		border-radius: 999px;
+		background: var(--g-good);
+		color: var(--g-on-good);
+	}
+	.g-result-dot .g-glyph {
+		width: 0.6875rem;
+		height: 0.6875rem;
+	}
+
+	/* An answer column: the two pictures side by side, what you get under them with the button beside the screen. */
+	@container strip (min-width: 32rem) {
+		.g-frame-pic {
+			padding-block: 0.875rem 0.5rem;
+		}
+		.g-strip {
+			grid-template-columns: minmax(0, var(--g-w1)) 1.25rem minmax(0, var(--g-w2));
+			grid-template-areas: 'problem turn1 fix' 'get get get';
+			row-gap: 0.75rem;
+		}
+		.g-turn {
+			height: auto;
+			transform: none;
+		}
+		.g-turn--2 {
+			display: none;
+		}
+		.g-frame--get {
+			grid-template-columns: minmax(0, 15rem) minmax(0, 1fr);
+			grid-template-areas: 'head head' 'pic .' 'pic lines' 'pic cta' 'pic .';
+			grid-template-rows: auto 1fr auto auto 1fr;
+			column-gap: 1.25rem;
+			row-gap: 1rem;
+		}
+		.g-get-pic {
+			justify-content: flex-start;
+		}
+		.g-get-cta {
+			align-items: flex-start;
+		}
+	}
+	/* Room for three across: the strip reads left to right, and the button closes it under the screen. */
+	@container strip (min-width: 54rem) {
+		.g-strip {
+			grid-template-columns: minmax(0, var(--g-w1)) 1.25rem minmax(0, var(--g-w2)) 1.25rem minmax(0, 3fr);
+			grid-template-areas: 'problem turn1 fix turn2 get';
+		}
+		.g-turn--2 {
+			display: grid;
+		}
+		.g-frame--get {
+			grid-template-columns: minmax(0, 1fr);
+			grid-template-areas: 'head' 'pic' 'cta' 'lines';
+			grid-template-rows: none;
+		}
+		.g-get-pic {
+			justify-content: center;
+		}
+		.g-get-cta {
+			align-self: auto;
+			align-items: stretch;
+		}
+	}
+</style>

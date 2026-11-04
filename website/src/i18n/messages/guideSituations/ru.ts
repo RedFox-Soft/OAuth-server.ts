@@ -4,7 +4,7 @@ import type { GuideTexts } from '../../guide-texts.ts';
  * \u00AD is a soft hyphen. A lane is about 52 px wide on a phone, and not every browser hyphenates Russian, so a
  * long word in a lane or a step label gets its break point by hand.
  */
-export const source = '6bc488a45fbb';
+export const source = 'f5b0967bc097';
 
 export default {
 	questions: {
@@ -71,6 +71,8 @@ export default {
 				'Ваш сервер хранит секрет и обменивает одноразовый код на токены. Поэтому такой вход самый простой и самый безопасный.',
 			protocol:
 				'OpenID Connect · Authorization Code + PKCE · client_secret_basic · refresh-токены',
+			problemCaption: 'Ваш сервер хранит пароли всех людей.',
+			fixCaption: 'Пароль видит только FoxAuth.',
 			lanes: { person: 'Человек', server: 'Ваш сервер', fox: 'FoxAuth' },
 			steps: [
 				{
@@ -114,6 +116,8 @@ export default {
 				'Секрет здесь хранить негде, поэтому вход защищает PKCE. Это одноразовая проверочная строка, которую знает только эта вкладка браузера.',
 			protocol:
 				'OpenID Connect · Authorization Code + PKCE · публичное приложение · refresh-токены',
+			problemCaption: 'Секрет в коде для браузера виден всем.',
+			fixCaption: 'Одноразовая проверка заменяет секрет.',
 			lanes: {
 				person: 'Человек',
 				spa: 'Прило\u00ADжение в брау\u00ADзере',
@@ -164,6 +168,8 @@ export default {
 				'Вход открывается в системном браузере, а код возвращается в ваше приложение на локальный адрес, на любой порт.',
 			protocol:
 				'OpenID Connect · Authorization Code + PKCE · возврат на loopback-адрес (RFC 8252)',
+			problemCaption: 'Приложение видит пароль человека.',
+			fixCaption: 'Вход открывается в браузере, которому человек доверяет.',
 			lanes: {
 				person: 'Человек',
 				app: 'Ваше прило\u00ADжение',
@@ -207,6 +213,8 @@ export default {
 			sentence:
 				'Устройство показывает короткий код, а человек входит на своём телефоне.',
 			protocol: 'OAuth 2.0 Device Authorization Grant (RFC 8628)',
+			problemCaption: 'Пароль приходится вводить пультом от телевизора.',
+			fixCaption: 'Короткий код подтверждается на телефоне.',
 			lanes: {
 				tv: 'ТВ или устройство',
 				fox: 'FoxAuth',
@@ -249,6 +257,8 @@ export default {
 			sentence:
 				'Программа входит сама, со своим ID и секретом, и получает токен на своё имя.',
 			protocol: 'OAuth 2.1 · Client Credentials',
+			problemCaption: 'Один общий ключ, у которого нет срока действия.',
+			fixCaption: 'Короткоживущие токены заменяют общий ключ.',
 			lanes: { job: 'Ваша программа', fox: 'FoxAuth', api: 'Ваш API' },
 			steps: [
 				{
@@ -281,6 +291,8 @@ export default {
 				'Объявите API в своём проекте, и FoxAuth впишет его в каждый токен как получателя. Токен, выданный для другого API, будет отклонён.',
 			protocol:
 				'OAuth 2.0 Resource Indicators (RFC 8707) · токены с привязкой к аудитории · интроспекция (RFC 7662) · отзыв (RFC 7009)',
+			problemCaption: 'Ваш API принимает любой токен.',
+			fixCaption: 'Ваш API принимает только свои токены.',
 			lanes: {
 				webapp: 'Ваше прило\u00ADжение',
 				fox: 'FoxAuth',
@@ -320,6 +332,8 @@ export default {
 				'Сторонний разработчик регистрирует приложение сам, одним запросом. Изменить или удалить его он может токеном, который получил в ответ.',
 			protocol:
 				'Dynamic Client Registration (RFC 7591) · Registration Management (RFC 7592)',
+			problemCaption: 'Вы сами выдаёте ключ каждому разработчику.',
+			fixCaption: 'Разработчики сами регистрируют свои приложения.',
 			lanes: {
 				dev: 'Стороннее прило\u00ADжение',
 				fox: 'FoxAuth',
@@ -360,6 +374,8 @@ export default {
 				'Объявите свой MCP-сервер в проекте, и агент подключится после входа человека, без регистрации. Агент представляется адресом собственного описания.',
 			protocol:
 				'MCP Authorization · OAuth 2.1 · Protected Resource Metadata · Client ID Metadata Document',
+			problemCaption: 'Ваш MCP-сервер открыт для всех.',
+			fixCaption: 'Токен работает только на вашем сервере.',
 			lanes: {
 				person: 'Человек',
 				agent: 'ИИ-агент',
@@ -409,6 +425,8 @@ export default {
 			sentence:
 				'Человек один раз подключает свой аккаунт. После этого агент получает доступ через FoxAuth и сам ничьих токенов не хранит.',
 			protocol: 'OAuth 2.0 Token Exchange (RFC 8693) · хранилище токенов',
+			problemCaption: 'Агент хранит ключи от Google-аккаунта человека.',
+			fixCaption: 'Токены хранит FoxAuth, а не агент.',
 			lanes: {
 				person: 'Человек',
 				agent: 'ИИ-агент',
@@ -454,6 +472,8 @@ export default {
 			sentence:
 				'Агент делает в FoxAuth то же, что вы делаете в консоли: с теми же правами, с теми же проверками и без особого входа.',
 			protocol: 'MCP · защищённый ресурс OAuth 2.1',
+			problemCaption: 'Агент получает ключ со всеми правами.',
+			fixCaption: 'Агент действует только с вашими правами.',
 			lanes: { you: 'Вы', agent: 'ИИ-агент', fox: 'FoxAuth' },
 			steps: [
 				{
@@ -498,6 +518,8 @@ export default {
 			sentence:
 				'Человек входит с аккаунтом, который у него уже есть. Ваше приложение не меняется, потому что по-прежнему общается только с FoxAuth.',
 			protocol: 'OpenID Connect · федерация',
+			problemCaption: 'Людям приходится придумывать ещё один пароль.',
+			fixCaption: 'Вход одной кнопкой, с аккаунтом, который уже есть.',
 			lanes: {
 				person: 'Человек',
 				webapp: 'Ваше прило\u00ADжение',
@@ -547,6 +569,8 @@ export default {
 			sentence:
 				'Включите регистрацию, и на странице входа появится ссылка «Зарегистрироваться». Или приглашайте людей сами со страницы Users.',
 			protocol: 'OpenID Connect · email_verified',
+			problemCaption: 'Каждый аккаунт создают вручную.',
+			fixCaption: 'Люди регистрируются сами или принимают приглашение.',
 			lanes: { person: 'Человек', fox: 'FoxAuth', mail: 'Почта' },
 			steps: [
 				{
@@ -587,6 +611,8 @@ export default {
 			sentence:
 				'После пароля человек вводит шестизначный код из приложения-аутентификатора. Для всего проекта это включается одним переключателем.',
 			protocol: 'TOTP (RFC 6238)',
+			problemCaption: 'Чтобы войти, хватает украденного пароля.',
+			fixCaption: 'Нужен ещё и код с телефона.',
 			lanes: {
 				person: 'Человек',
 				fox: 'FoxAuth',
@@ -630,6 +656,8 @@ export default {
 			sentence:
 				'Страница входа находится на собственном адресе проекта. Это путь вроде /yourshop или поддомен вроде yourshop на этом сервере. Суперадминистратор может вместо этого разместить её на вашем домене, например login.yourshop.com, и для человека это будет ваш сайт.',
 			protocol: 'Свой issuer у каждого проекта',
+			problemCaption: 'Вход проходит на чужом адресе.',
+			fixCaption: 'Вход проходит на вашем собственном адресе.',
 			lanes: { person: 'Человек', domain: 'Ваш адрес', fox: 'FoxAuth' },
 			steps: [
 				{
@@ -664,6 +692,8 @@ export default {
 			sentence:
 				'Когда человек выходит из одного вашего приложения, FoxAuth завершает его сессию. Затем FoxAuth сообщает об этом всем остальным приложениям, где был человек, чтобы они тоже выполнили выход.',
 			protocol: 'OIDC RP-Initiated Logout · OIDC Back-Channel Logout',
+			problemCaption: 'После выхода другие приложения остаются открытыми.',
+			fixCaption: 'Один выход доходит до каждого приложения.',
 			lanes: {
 				person: 'Человек',
 				webapp: 'Ваше прило\u00ADжение',
@@ -709,6 +739,8 @@ export default {
 			sentence:
 				'Задайте приложению логотип и основной цвет, и страницы входа покажут их. Страницы бывают на английском, русском или упрощённом китайском.',
 			protocol: 'OpenID Connect ui_locales · логотип · основной цвет',
+			problemCaption: 'Страница входа выглядит как чужая.',
+			fixCaption: 'Ваш логотип, ваш цвет и язык самого человека.',
 			lanes: {
 				person: 'Человек',
 				webapp: 'Ваше прило\u00ADжение',
@@ -751,10 +783,11 @@ export default {
 			sentence:
 				'У каждого проекта есть страница аккаунта. На ней перечислены приложения, у которых есть доступ к аккаунту вошедшего человека, и любое из них можно удалить.',
 			protocol: 'Управление выданными разрешениями для конечных пользователей',
+			problemCaption: 'Люди не видят, каким приложениям открыт их аккаунт.',
+			fixCaption: 'Люди видят каждое приложение и удаляют любое из них.',
 			lanes: {
 				person: 'Человек',
-				fox: 'FoxAuth',
-				webapp: 'Ваше прило\u00ADжение'
+				fox: 'FoxAuth'
 			},
 			steps: [
 				{
@@ -791,6 +824,8 @@ export default {
 				'С DPoP каждый токен работает только вместе со свежим доказательством, подписанным ключом, который никогда не покидает ваше приложение. Поэтому одну лишь копию токена отклонят.',
 			protocol:
 				'DPoP (RFC 9449) · токены с привязкой к сертификату mTLS (RFC 8705)',
+			problemCaption: 'Скопированный токен работает у кого угодно.',
+			fixCaption: 'Токен работает только с ключом вашего приложения.',
 			lanes: {
 				webapp: 'Ваше прило\u00ADжение',
 				fox: 'FoxAuth',
@@ -829,6 +864,9 @@ export default {
 			sentence:
 				'Добавьте провайдера входа компании: любой провайдер OpenID или каталог Microsoft одной организации. Ваше приложение при этом не меняется.',
 			protocol: 'OpenID Connect · федерация',
+			problemCaption:
+				'Ваше приложение хранит пароли, которые ИТ-отдел компании не может отозвать.',
+			fixCaption: 'Сотрудники входят через аккаунт своей компании.',
 			lanes: {
 				employee: 'Сотруд\u00ADник',
 				webapp: 'Ваше прило\u00ADжение',
@@ -871,6 +909,8 @@ export default {
 			sentence:
 				'Подключение SCIM позволяет каталогу компании создавать, изменять и деактивировать людей в вашем проекте. Ваши приложения по-прежнему спрашивают FoxAuth, кому можно войти.',
 			protocol: 'SCIM 2.0 (RFC 7644)',
+			problemCaption: 'Каждого человека добавляют и удаляют вручную.',
+			fixCaption: 'Каталог компании сам добавляет и удаляет людей.',
 			lanes: {
 				dir: 'Каталог компании',
 				fox: 'FoxAuth',
@@ -913,6 +953,9 @@ export default {
 			sentence:
 				'Распределите людей по группам проекта, и ваше приложение получит их в поле groups токена. По ним оно решит, что показать.',
 			protocol: 'OpenID Connect · claim groups',
+			problemCaption:
+				'Ваше приложение не знает, в каком отделе работает человек.',
+			fixCaption: 'Отдел уже указан в токене.',
 			lanes: {
 				person: 'Человек',
 				webapp: 'Ваше прило\u00ADжение',
@@ -947,6 +990,8 @@ export default {
 			sentence:
 				'Деактивируйте человека в FoxAuth или позвольте провайдеру компании самому завершить все его сессии.',
 			protocol: 'Okta Universal Logout · OIDC Back-Channel Logout',
+			problemCaption: 'Человек ушёл, а доступ у него остался.',
+			fixCaption: 'Одно изменение закрывает доступ везде.',
 			lanes: {
 				itadmin: 'ИТ-отдел',
 				idp: 'Okta или Entra ID',
@@ -985,6 +1030,8 @@ export default {
 			sentence:
 				'Провайдер компании выдаёт агенту утверждение (assertion), а FoxAuth обменивает его на токен. Так доступ остаётся под контролем компании.',
 			protocol: 'ID-JAG · OAuth 2.0 Token Exchange (RFC 8693) · JWT bearer',
+			problemCaption: 'Нажать «Разрешить» некому.',
+			fixCaption: 'Компания сама ручается за своих агентов.',
 			lanes: {
 				agent: 'ИИ-агент',
 				idp: 'Okta или Entra ID',
@@ -1027,6 +1074,8 @@ export default {
 				'Ваше приложение запрашивает одно подробно описанное действие. Экран согласия показывает именно его, а токен несёт это действие и ничего больше.',
 			protocol:
 				'Rich Authorization Requests (RFC 9396) · authorization_details',
+			problemCaption: 'Одно «да» разрешает гораздо больше, чем имелось в виду.',
+			fixCaption: 'Человек одобряет одно конкретное действие.',
 			lanes: {
 				webapp: 'Ваше прило\u00ADжение',
 				fox: 'FoxAuth',
@@ -1071,6 +1120,8 @@ export default {
 			sentence:
 				'Запрос приходит человеку на телефон, а токен получает система, которая этот запрос отправила.',
 			protocol: 'OpenID Connect CIBA',
+			problemCaption: 'Клиенты называют свой пароль вслух.',
+			fixCaption: 'Клиент подтверждает на своём телефоне.',
 			lanes: {
 				operator: 'Система колл-центра',
 				fox: 'FoxAuth',
@@ -1108,6 +1159,9 @@ export default {
 			sentence:
 				'Профиль IPSIE SL1 включается одним переключателем, а проверка готовности заранее показывает, что изменится.',
 			protocol: 'IPSIE SL1 · DPoP (RFC 9449) · PKCE',
+			problemCaption: 'Никто не знает, какие правила действуют на самом деле.',
+			fixCaption:
+				'Сначала проверка готовности, потом один строгий переключатель.',
 			lanes: { security: 'Служба безопасности', fox: 'FoxAuth' },
 			steps: [
 				{
@@ -1143,6 +1197,8 @@ export default {
 			sentence:
 				'Проектами владеют команды, и доступ даёт только членство в команде. Каждое изменение попадает в журнал, который никто не может отредактировать.',
 			protocol: 'Неизменяемый журнал аудита',
+			problemCaption: 'Все работают под одной учётной записью администратора.',
+			fixCaption: 'Каждой команде доступны только её проекты.',
 			lanes: { team: 'Команда', project: 'Проект', audit: 'Журнал аудита' },
 			steps: [
 				{
@@ -1174,6 +1230,8 @@ export default {
 			sentence:
 				'Зарегистрируйте инструмент как приложение в проекте администраторов, и поле groups назовёт команды администратора.',
 			protocol: 'OpenID Connect · claim groups',
+			problemCaption: 'Внутренний инструмент может открыть кто угодно.',
+			fixCaption: 'Войти могут только ваши администраторы.',
 			lanes: {
 				admin: 'Админи\u00ADстратор',
 				tool: 'Внутренний инструмент',
@@ -1209,6 +1267,8 @@ export default {
 			sentence:
 				'Добавьте провайдера компании в проект администраторов, и страница входа в консоль предложит его. FoxAuth при этом следит, чтобы консоль никогда не закрыла вход сама себе.',
 			protocol: 'OpenID Connect · федерация для входа в консоль',
+			problemCaption: 'Для консоли нужен отдельный пароль.',
+			fixCaption: 'Администраторы входят через SSO своей компании.',
 			lanes: {
 				admin: 'Админи\u00ADстратор',
 				fox: 'FoxAuth',

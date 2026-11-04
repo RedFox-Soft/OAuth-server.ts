@@ -54,12 +54,26 @@ import {
 } from '../consts/attack_report_fields.js';
 
 import {
+	GUIDE_EXAMPLES,
 	GUIDE_FLAG_SETTINGS,
 	GUIDE_QUESTIONS,
 	GUIDE_SITUATIONS,
+	type GuidePart,
 	type GuideQuestion,
-	type GuideSituation
+	type GuideSituation,
+	type ProblemMark
 } from '../consts/situation_guide.js';
+import {
+	GUIDE_FIXED,
+	GUIDE_MARKS,
+	GUIDE_PARTS,
+	type Glyph
+} from '../situation_guide/parts.js';
+import { sceneOf, type Scene } from '../situation_guide/scene.js';
+import {
+	GUIDE_ACTOR_PARTS,
+	optionPartsOf
+} from '../situation_guide/options.js';
 
 /*
  * What the website builds its Reference section from. Assembled from the tables the server already
@@ -107,6 +121,10 @@ export type ExportedSituation = Omit<GuideSituation, 'preset' | 'action'> & {
 	readonly action:
 		| { readonly kind: 'form' }
 		| { readonly kind: 'open'; readonly label: string };
+	/* The two pictures, worked out by the rule the console draws by, so the site keeps no picture rule of its own. */
+	readonly scene: { readonly problem: Scene; readonly solution: Scene };
+	/* The parts its option in the chooser shows, by the same rule. */
+	readonly optionParts: readonly GuidePart[];
 };
 
 export interface DocsExport {
@@ -156,6 +174,13 @@ export interface DocsExport {
 		readonly situations: readonly ExportedSituation[];
 		/* The setting each guide flag is read from, so the site names and links the real key. */
 		readonly flagSettings: Readonly<Record<string, string>>;
+		/* The drawings the scenes name, and the example names the drawn screens use. */
+		readonly parts: Readonly<Record<GuidePart, Glyph>>;
+		readonly marks: Readonly<Record<ProblemMark, Glyph>>;
+		readonly fixed: Glyph;
+		/* Question 1's options: each actor and what it works at. */
+		readonly actorParts: typeof GUIDE_ACTOR_PARTS;
+		readonly examples: typeof GUIDE_EXAMPLES;
 	};
 	/* What the hourly attack report carries (specs/114), from the declaration the server counts and builds by. */
 	readonly attackReports: {
@@ -257,7 +282,9 @@ function exportSituation(situation: GuideSituation): ExportedSituation {
 		action:
 			action.kind === 'open'
 				? { kind: 'open', label: action.label }
-				: { kind: 'form' }
+				: { kind: 'form' },
+		scene: sceneOf(situation),
+		optionParts: optionPartsOf(situation)
 	};
 }
 
@@ -321,7 +348,12 @@ export function buildDocsExport(stamp: DocsExportStamp): DocsExport {
 		situationGuide: {
 			questions: GUIDE_QUESTIONS,
 			situations: GUIDE_SITUATIONS.map(exportSituation),
-			flagSettings: { ...GUIDE_FLAG_SETTINGS }
+			flagSettings: { ...GUIDE_FLAG_SETTINGS },
+			parts: GUIDE_PARTS,
+			marks: GUIDE_MARKS,
+			fixed: GUIDE_FIXED,
+			actorParts: GUIDE_ACTOR_PARTS,
+			examples: GUIDE_EXAMPLES
 		},
 		attackReports: {
 			destination: ATTACK_DESTINATION,

@@ -1,0 +1,75 @@
+---
+import Part from './Part.astro';
+import type { CloudMark } from '../../data/guide.ts';
+
+/*
+ * Whether FoxAuth Cloud sets an answer up, as a glyph and a word, the same on the answer, its option and its row in
+ * the table: a check for ready, a server for your own server, the cloud for a paid plan. The word carries the meaning;
+ * the glyph lets the three be told apart at a glance down a column.
+ */
+interface Props {
+	mark: CloudMark;
+	label: string;
+	size?: 'sm' | 'md';
+}
+const { mark, label, size = 'sm' } = Astro.props;
+---
+
+<span class:list={['g-status', `g-status--${mark}`, `g-status--${size}`]}>
+	{
+		mark === 'ready' ? (
+			<span class="g-status-dot">
+				<Part strokeWidth={3} />
+			</span>
+		) : (
+			<Part part={mark === 'ownServer' ? 'server' : 'cloud'} strokeWidth={2} />
+		)
+	}
+	<span>{label}</span>
+</span>
+
+<style is:global>
+	.g-status {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.3rem;
+		min-width: 0;
+		border-radius: 999px;
+		font-weight: 500;
+		line-height: 1.2;
+		color: var(--g-text-2);
+	}
+	.g-status .g-glyph {
+		flex: none;
+		width: 0.875rem;
+		height: 0.875rem;
+	}
+	.g-status--sm {
+		font-size: 0.6875rem;
+	}
+	.g-status--md {
+		padding: 0.15rem 0.6rem 0.15rem 0.35rem;
+		font-size: 0.75rem;
+		background: var(--g-chip-bg);
+	}
+	.g-status--ready {
+		color: var(--g-ready-ink);
+	}
+	.g-status--md.g-status--ready {
+		background: var(--g-ready-bg);
+	}
+	.g-status-dot {
+		flex: none;
+		display: grid;
+		place-items: center;
+		width: 0.875rem;
+		height: 0.875rem;
+		border-radius: 999px;
+		background: var(--g-ready-dot);
+		color: var(--g-ready-dot-ink);
+	}
+	.g-status-dot .g-glyph {
+		width: 0.625rem;
+		height: 0.625rem;
+	}
+</style>

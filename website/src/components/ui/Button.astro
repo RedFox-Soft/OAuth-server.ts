@@ -11,13 +11,27 @@ interface Props {
 	 */
 	type?: 'button' | 'submit';
 	rel?: string;
+	/*
+	 * Lets a long label wrap onto a second line instead of overflowing: the height becomes a minimum. For buttons
+	 * whose label is translated and may run a third longer than English on a phone.
+	 */
+	wrap?: boolean;
 }
-const { href, variant = 'primary', size = 'md', type, rel } = Astro.props;
+const {
+	href,
+	variant = 'primary',
+	size = 'md',
+	type,
+	rel,
+	wrap = false
+} = Astro.props;
 const asButton = type !== undefined || href === undefined;
 const Tag = asButton ? 'button' : 'a';
 const base =
-	'inline-flex items-center justify-center gap-2 break-keep text-center rounded-control font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500';
-const sizes = { md: 'h-10 px-4 text-sm', lg: 'h-12 px-6 text-base' };
+	'inline-flex items-center justify-center gap-2 text-center rounded-control font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500';
+const sizes = wrap
+	? { md: 'min-h-10 max-w-full px-4 py-2 text-sm', lg: 'min-h-12 max-w-full px-6 py-2.5 text-base' }
+	: { md: 'h-10 break-keep px-4 text-sm', lg: 'h-12 break-keep px-6 text-base' };
 const variants = {
 	primary:
 		'bg-accent-500 text-gray-950 hover:bg-accent-400 active:bg-accent-600',

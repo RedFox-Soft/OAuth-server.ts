@@ -30,10 +30,25 @@ are built from the same data.
 ## One declaration
 
 Every question, situation, step, diagram lane, prompt and target is plain, import-free data in
-`lib/consts/situation_guide.ts` (`GUIDE_QUESTIONS` :171, `GUIDE_SITUATIONS` :320). The console renders it, the
+`lib/consts/situation_guide.ts` (`GUIDE_QUESTIONS` :237, `GUIDE_SITUATIONS` :386). The console renders it, the
 availability function reads it, and the docs export hands the same list to the site (`situationGuide`,
-`lib/docs_export/build.ts:321`), so the console and the site cannot drift. The chooser for a new application takes its preset titles and descriptions from the same entries
+`lib/docs_export/build.ts:348`), so the console and the site cannot drift. The chooser for a new application takes its preset titles and descriptions from the same entries
 (`[[application-page]]`).
+
+## The pictures: one rule, and FoxAuth where it really is
+
+Every answer is drawn twice from its own data: "Your problem" and "With FoxAuth" (`sceneOf`,
+`lib/situation_guide/scene.ts:284`). Each lane names a `part` (person, browser, server, agent, company, …), and each
+situation names its `problem`: the lane it sits on, one of five marks (password, secret, open, copy, missing) and a
+caption, with `lanes` to override which parts the problem picture shows (`lib/consts/situation_guide.ts:193`). The
+parts are SVG path data in `lib/situation_guide/parts.ts`, with no text inside, so every label is HTML and translates.
+
+The rule that matters is where FoxAuth stands. In most answers it stands **beside** the path: it hands the client a
+token, and the client calls its own API or MCP server directly. The first drafts drew FoxAuth between the client and
+the API, which reads as a gateway every call passes through, and that is not what the server is. FoxAuth is drawn in
+the **middle** only when an outside party sends something to it (an identity provider, a company directory, Google
+for a connected account): the rule reads the steps, not a list of situations (`scene.ts:142`). The spec proves that no
+answer ever links FoxAuth to the resource a client calls, and that every situation can be drawn.
 
 ## Why this shape
 
@@ -138,8 +153,28 @@ link did not promise.
 where someone starts who does not yet know which docs page they need, and it first shipped under `/docs/` with the
 docs sidebar, which read as one more manual page (moved 2026-11-04). It renders every answer into the HTML and lets two radio groups and
 CSS `:has()` pick the visible one, so the page works with scripts off; one small script keeps `#s=<id>` / `#e=<id>`
-in the address, copies the agent prompt and replays the diagram. The chips under the questions are links to
+in the address, copies the agent prompt, steps and replays the diagram, and below 1024 px scrolls to the answer after
+a choice in question 2 (not question 1, whose next step is question 2 just under it). The chips under the questions are links to
 `#answer-<id>`, not radios: in one radio group with the second question, Tab reached only one of the two.
+
+Since 2026-11-04 the page is split from 1024 px, the questions left and the answer right and sticky, and every
+answer opens with a strip of three frames: "Your problem", "With FoxAuth" and "What you get", with the one button in
+the third (`website/src/components/guide/Strip.astro`). The two pictures are the scenes `lib/situation_guide/scene.ts`
+works out, layout included: `placement` (`beside` puts FoxAuth's one node in `above`, off the row the client calls
+its resource along; `middle` is one row in lane order), `row`, `above`, an `arc` level on each link that skips a
+neighbour on the row, and the solution's `fixed`, the lane that carries the check. `fixed` is left out where the
+problem's lane is outside the reader's control or touches a refused (`broken`) link, so the thief in `bound` and the
+person who left in `scim` never get a check; until the final review (2026-11-04) each renderer put the check on the
+problem's lane itself. A page only turns that into sizes (`Scene.astro`, and the console's `Scene.tsx`, which reads the
+same fields), so no page keeps a picture rule. The options' small pictures come from the same place:
+`optionPartsOf` and `GUIDE_ACTOR_PARTS` in `lib/situation_guide/options.ts`, exported per situation as
+`optionParts` and as `actorParts`. The strip lays itself out by its own width (container queries), so the same answer
+is three across, two plus one, or stacked. Only a ready answer gets the accent button; a paid-plan answer gets a
+secondary "Ask for a paid plan" (the waitlist's mail, its subject naming the answer) and an own-server answer the
+Docker Compose page. The options and the expert table carry the same status glyph and word as the answer
+(`Status.astro`). "What you get" draws the screen the answer's `sees.kind` names, with `GUIDE_EXAMPLES`; `signUp`,
+`serviceConsent` (the outside service, Google) and `adminConsent` (the agent in FoxAuth's own console) exist so that
+no screen contradicts the lines under it.
 
 Its marks are read for FoxAuth Cloud, not computed from a live instance (`cloudMark`, `website/src/data/guide.ts:42`):
 "own server" when a switch is off on Cloud (`CLOUD_FLAGS_ON` in `website/src/data/cloud.ts`, checked by hand against
@@ -149,8 +184,23 @@ setting each switch names comes from the export (`flagSettings`), never rebuilt 
 
 Russian and Chinese texts live on the site by situation, lane and answer id (`messages/guideSituations/`), and are
 stamped against `lib/consts/situation_guide.ts` itself ([[site-translations]]). `guideTextsFor`
-(`website/src/i18n/guide-texts.ts:95`) fails the build when a translation lacks an id or has a different number of
+(`website/src/i18n/guide-texts.ts:100`) fails the build when a translation lacks an id or has a different number of
 steps, so a situation added in `lib/` cannot ship half-translated. Agent prompts stay English in every language.
+
+## The console draws the same pictures
+
+Since 2026-11-04 the console's answer (`lib/admin/ui/pages/guide/AnswerPanel.tsx`) opens with the same strip, drawn
+by `Scene.tsx` straight from `sceneOf` and `GUIDE_PARTS` (the console bundle imports lib; the site gets the same
+result through the export): only the pixel math of `Scene.astro` is repeated there, never a picture rule or a path.
+The strip is three across from 720 px of panel width, the two pictures beside each other with what you get under
+them from 480 px, and one column below that (container queries, so the Overview's card agrees). Colours are antd
+tokens through `useDiagramPalette`, FoxAuth's part in the console primary rather than the site's orange. The button
+stays the console's own (`actionFor`), under the strip, followed by a "Next:" link to `?s=` / `?e=` of the same
+page; the diagram's lane heads carry their parts. The options, tasks and table rows show a glyph and a word read
+off the same `actionFor` (`statusOf` in `targets.ts`): Ready, Switched off, Own server, Not on your plan, Plan limit
+reached, Needs an address, Needs a right, so the mark cannot disagree with the button. These words are for this
+viewer on this server, unlike the site's, which are read for FoxAuth Cloud. "What the person will see" is gone as a
+section of its own: its screen and lines are the strip's third frame.
 
 ## The console's blue
 

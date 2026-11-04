@@ -1,11 +1,16 @@
 ---
+import Part from './Part.astro';
+import Status from './Status.astro';
+import Thumb from './Thumb.astro';
 import RichText from '../RichText.astro';
 import english from '../../i18n/messages/guide/en.ts';
-import type {
-	GuideQuestionEntry,
-	GuideSituationEntry
+import {
+	loadExport,
+	type GuideQuestionEntry,
+	type GuideSituationEntry
 } from '../../data/export.ts';
 import type { GuideTexts } from '../../i18n/guide-texts.ts';
+import { cloudMark } from '../../data/guide.ts';
 
 /*
  * The first tab's two questions, as plain radio groups, and its common tasks, as links. Question 1 only decides which
@@ -13,96 +18,110 @@ import type { GuideTexts } from '../../i18n/guide-texts.ts';
  * to its answer (`#answer-<id>`), so each is its own tab stop and a radio group never mixes the two kinds. With
  * scripts off the choice works through CSS and `:target` (see Guide.astro); the script turns a task's link into the
  * tab's choice, and adds the memory of each actor's last answer and the address.
+ *
+ * Question 1's options are drawn as the actor with what it works at; question 2's options and the tasks show their
+ * answer's parts. Both come from lib/situation_guide/options.ts through the export, so the page chooses no drawing.
+ * Each answer's option also says whether FoxAuth Cloud sets it up.
  */
 interface Props {
 	questions: GuideQuestionEntry[];
 	chips: GuideSituationEntry[];
+	situations: ReadonlyMap<string, GuideSituationEntry>;
 	texts: GuideTexts;
 	t: typeof english;
 	actor: string;
 	chosen: string;
 }
-const { questions, chips, texts, t, actor, chosen } = Astro.props;
+const { questions, chips, situations, texts, t, actor, chosen } = Astro.props;
 
-const option =
-	'flex min-w-0 cursor-pointer items-start gap-3 rounded-control border border-gray-200 bg-white p-3 transition-colors hover:border-accent-500 has-[:checked]:border-accent-500 has-[:checked]:bg-accent-50 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent-500 dark:border-gray-700 dark:bg-gray-800 dark:has-[:checked]:border-accent-400 dark:has-[:checked]:bg-accent-950';
-const radio = 'mt-1 size-4 shrink-0 accent-accent-600';
+const actorParts = loadExport().situationGuide.actorParts;
+
 const legend =
-	'mb-3 flex items-center gap-2 p-0 text-base font-semibold text-gray-950 dark:text-white';
+	'mb-2 flex items-center gap-2 p-0 text-[0.9375rem] font-semibold text-gray-950 dark:text-white';
 const number =
-	'grid size-6 shrink-0 place-items-center rounded-full bg-gray-900 text-xs font-bold text-gray-50 dark:bg-gray-100 dark:text-gray-900';
+	'grid size-[1.375rem] shrink-0 place-items-center rounded-full bg-gray-900 text-xs font-bold text-gray-50 dark:bg-gray-100 dark:text-gray-900';
 ---
 
-<div class="flex flex-col gap-8">
+<div class="flex flex-col gap-5">
 	<fieldset class="m-0 min-w-0 border-0 p-0">
 		<legend class={legend}>
 			<span class={number} aria-hidden="true">1</span>
 			{t.questions.first}
 		</legend>
-		<div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+		<div class="g-opts g-opts--actors">
 			{
-				questions.map((q) => (
-					<label class={option}>
-						<input
-							type="radio"
-							name="guide-actor"
-							id={`g-actor-${q.actor}`}
-							value={q.actor}
-							checked={q.actor === actor}
-							class={radio}
-						/>
-						<span class="min-w-0">
-							<span class="block font-semibold text-gray-950 dark:text-white">
-								{texts.questions[q.actor].title}
+				questions.map((q) => {
+					const [main, at] = actorParts[q.actor];
+					return (
+						<label class="g-opt g-opt--actor">
+							<input
+								type="radio"
+								name="guide-actor"
+								id={`g-actor-${q.actor}`}
+								value={q.actor}
+								checked={q.actor === actor}
+								class="g-radio"
+							/>
+							<span class="g-actor" aria-hidden="true">
+								<Part part={main} strokeWidth={1.5} />
+								<span class="g-actor-at">
+									<Part part={at} strokeWidth={1.75} />
+								</span>
 							</span>
-							<span class="hidden text-sm text-gray-600 sm:block dark:text-gray-400">
-								{texts.questions[q.actor].sub}
+							<span class="g-opt-text">
+								<span class="g-opt-t">{texts.questions[q.actor].title}</span>
+								<span class="g-opt-s">{texts.questions[q.actor].sub}</span>
 							</span>
-						</span>
-					</label>
-				))
+						</label>
+					);
+				})
 			}
 		</div>
 	</fieldset>
 
 	{
 		questions.map((q) => (
-			<fieldset
-				class="g-q2 m-0 min-w-0 border-0 p-0"
-				id={`g-q2-${q.actor}`}
-			>
+			<fieldset class="g-q2 m-0 min-w-0 border-0 p-0" id={`g-q2-${q.actor}`}>
 				<legend class={legend}>
 					<span class={number} aria-hidden="true">
 						2
 					</span>
 					{texts.questions[q.actor].second}
 				</legend>
-				<div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-					{q.answers.map((answer, i) => (
-						<label class={option}>
-							<input
-								type="radio"
-								name="guide-product"
-								id={`g-s-${answer.answer}`}
-								value={answer.answer}
-								checked={answer.answer === chosen}
-								class:list={[radio, `g-ans-${q.actor}`]}
-								data-actor={q.actor}
-								data-first={i === 0 ? '' : undefined}
-							/>
-							<span class="min-w-0">
-								<span class="block font-semibold text-gray-950 dark:text-white">
-									{texts.questions[q.actor].answers[answer.answer]?.title}
+				<div class="g-opts g-opts--answers">
+					{q.answers.map((answer, i) => {
+						const situation = situations.get(answer.answer);
+						const mark = situation ? cloudMark(situation.needs) : 'ready';
+						return (
+							<label class="g-opt g-opt--answer">
+								<input
+									type="radio"
+									name="guide-product"
+									id={`g-s-${answer.answer}`}
+									value={answer.answer}
+									checked={answer.answer === chosen}
+									class:list={['g-radio', `g-ans-${q.actor}`]}
+									data-actor={q.actor}
+									data-first={i === 0 ? '' : undefined}
+								/>
+								<span class="g-opt-top">
+									<Thumb parts={situation?.optionParts ?? ['fox']} />
+									<Status mark={mark} label={t.status[mark]} />
 								</span>
-								<span class="block text-sm text-gray-600 dark:text-gray-400">
-									{texts.questions[q.actor].answers[answer.answer]?.sub}
+								<span class="g-opt-text">
+									<span class="g-opt-t">
+										{texts.questions[q.actor].answers[answer.answer]?.title}
+									</span>
+									<span class="g-opt-s">
+										{texts.questions[q.actor].answers[answer.answer]?.sub}
+									</span>
 								</span>
-							</span>
-						</label>
-					))}
+							</label>
+						);
+					})}
 				</div>
 				{q.actor === 'agent' && (
-					<p class="mt-3 text-sm text-gray-700 dark:text-gray-300">
+					<p class="mt-2 text-[0.8125rem] leading-snug text-gray-700 dark:text-gray-300">
 						<RichText text={t.questions.agentNative} />
 					</p>
 				)}
@@ -113,31 +132,29 @@ const number =
 	<div class="min-w-0">
 		<p
 			id="g-more-tasks"
-			class="mb-1 text-base font-semibold text-gray-950 dark:text-white"
+			class="text-[0.9375rem] font-semibold text-gray-950 dark:text-white"
 		>
 			{t.questions.moreTasks}
 		</p>
-		<p class="mb-3 text-sm text-gray-600 dark:text-gray-400">
+		<p class="mt-0.5 text-[0.8125rem] text-gray-600 dark:text-gray-400">
 			{t.questions.moreTasksSub}
 		</p>
-		<ul
-			aria-labelledby="g-more-tasks"
-			class="m-0 flex list-none flex-wrap gap-2 p-0"
-		>
+		<ul aria-labelledby="g-more-tasks" class="g-tasks">
 			{
-				chips.map((chip) => (
-					<li class="m-0 min-w-0 max-w-full">
-						<a
-							href={`#answer-${chip.id}`}
-							data-chip={chip.id}
-							class="g-chip inline-flex min-w-0 max-w-full items-center rounded-full border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 no-underline transition-colors hover:border-accent-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-						>
-							<span class="min-w-0 [overflow-wrap:anywhere]">
-								{texts.situations[chip.id]?.title}
-							</span>
-						</a>
-					</li>
-				))
+				chips.map((chip) => {
+					const mark = cloudMark(chip.needs);
+					return (
+						<li class="m-0 min-w-0">
+							<a href={`#answer-${chip.id}`} data-chip={chip.id} class="g-chip">
+								<Thumb parts={chip.optionParts} size="sm" />
+								<span class="g-opt-text">
+									<span class="g-chip-t">{texts.situations[chip.id]?.title}</span>
+									<Status mark={mark} label={t.status[mark]} />
+								</span>
+							</a>
+						</li>
+					);
+				})
 			}
 		</ul>
 		<p class="g-target-hint mt-3 text-sm text-gray-700 dark:text-gray-300">

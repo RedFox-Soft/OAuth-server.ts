@@ -143,4 +143,26 @@ describe('documentation export', () => {
 			}
 		}
 	});
+
+	/**
+	 * @proves The site is given both pictures of every guide answer and its option, and a drawing for every part and mark in them.
+	 */
+	it('exports both scenes of every guide situation, with a drawing for each part and mark they show', () => {
+		const { situations, parts, marks } = out.situationGuide;
+		for (const situation of situations) {
+			const { problem, solution } = situation.scene;
+			expect(problem.mark?.at).toBe(situation.problem.at);
+			expect(solution.nodes.length).toBe(situation.lanes.length);
+			for (const node of [...problem.nodes, ...solution.nodes]) {
+				expect(parts[node.part].paths.length).toBeGreaterThan(0);
+			}
+			expect(marks[situation.problem.mark].paths.length).toBeGreaterThan(0);
+			expect(situation.optionParts.length).toBeGreaterThan(0);
+			for (const part of situation.optionParts)
+				expect(parts[part].paths.length).toBeGreaterThan(0);
+		}
+		for (const pair of Object.values(out.situationGuide.actorParts))
+			for (const part of pair)
+				expect(parts[part].paths.length).toBeGreaterThan(0);
+	});
 });

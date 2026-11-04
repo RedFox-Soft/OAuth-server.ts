@@ -1,0 +1,35 @@
+---
+import {
+	loadExport,
+	type GuideMarkName,
+	type GuidePartName
+} from '../../data/export.ts';
+
+/*
+ * One drawing of the guide, from the docs export (lib/situation_guide/parts.ts): a part, a problem mark, or the check
+ * that replaces a mark. The page keeps no drawing of its own. Decoration: a label beside it says the same in words.
+ */
+interface Props {
+	part?: GuidePartName;
+	mark?: GuideMarkName;
+	class?: string;
+	strokeWidth?: number;
+}
+const { part, mark, class: className, strokeWidth = 1.75 } = Astro.props;
+const guide = loadExport().situationGuide;
+const glyph = part ? guide.parts[part] : mark ? guide.marks[mark] : guide.fixed;
+---
+
+<svg
+	viewBox={glyph.viewBox}
+	fill="none"
+	stroke="currentColor"
+	stroke-width={strokeWidth}
+	stroke-linecap="round"
+	stroke-linejoin="round"
+	aria-hidden="true"
+	focusable="false"
+	class:list={['g-glyph', className]}
+>
+	{glyph.paths.map((d) => <path d={d} />)}
+</svg>

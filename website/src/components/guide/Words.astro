@@ -1,0 +1,29 @@
+---
+/*
+ * A short label whose words each stay whole while they fit the line. A browser fills a line greedily, so a soft
+ * hyphen in the data ("Ваше прило-жение") would split a word that fits the next line whole; as one inline block per
+ * word, a word breaks, at its soft hyphen, only when it is wider than the column itself.
+ */
+interface Props {
+	text: string;
+}
+const words = Astro.props.text.split(' ').filter((word) => word.length > 0);
+---
+
+{
+	words.map((word, i) => (
+		<>
+			{i > 0 && ' '}
+			<span class="g-word">{word}</span>
+		</>
+	))
+}
+
+<style is:global>
+	.g-word {
+		display: inline-block;
+		max-width: 100%;
+		hyphens: manual;
+		overflow-wrap: break-word;
+	}
+</style>

@@ -1,42 +1,43 @@
 import type { MouseEvent, ReactNode } from 'react';
-import {
-	Alert,
-	Button,
-	Card,
-	Col,
-	Flex,
-	Row,
-	Tag,
-	Typography,
-	theme
-} from 'antd';
+import { Alert, Button, Card, Flex, Tag, Typography } from 'antd';
 import { CopyOutlined, ExportOutlined } from '@ant-design/icons';
-import type {
-	GuidePreview,
-	GuideSituation
+import {
+	GUIDE_EXAMPLES,
+	guideSituation,
+	type GuidePreview,
+	type GuideSituation
 } from '../../../../consts/situation_guide.js';
 import {
 	renderPrompt,
 	type GuideViewer
 } from '../../../../situation_guide/availability.js';
 import { useFeedback } from '../../frame/feedback.js';
-import { useNavigate } from '../../frame/router.js';
+import { useInstanceHost } from '../../frame/instance.js';
+import { Link, useNavigate } from '../../frame/router.js';
 import { bucketHref } from '../../frame/routes.js';
 import { FEATURE_LABEL, limitReachedText } from '../../planText.js';
 import { situation as presetOf } from '../applications/situations.js';
 import { PLAN_CARD_ID } from '../BucketPlanCard.js';
+import { Glyph, StatusMark } from './Part.js';
+import { PictureStyles, Strip } from './Scene.js';
 import { SequenceDiagram, useDiagramPalette } from './SequenceDiagram.js';
-import { actionFor, leavesConsole, type GuideAction } from './targets.js';
+import {
+	actionFor,
+	leavesConsole,
+	statusOf,
+	type GuideAction
+} from './targets.js';
 
 /*
- * One guide answer, whole: what the situation is, how it is solved, the one button that sets it up, how it runs
- * step by step, what the person will see, what the form fills in, the limits, and a prompt for an agent.
+ * One guide answer, whole: what the situation is, then the problem, the fix and what the person gets in three
+ * pictures (Scene.tsx, drawn from lib/situation_guide/scene.ts as the site draws them), the one button that sets it
+ * up, what usually comes next, how it runs step by step, what the form fills in, the limits, and a prompt for an agent.
  *
  * A situation is never hidden for a viewer who cannot set it up here: the answer is shown in full and only its
  * button changes (`actionFor`), so nobody is offered a form the route would refuse.
  *
- * `compact` keeps the parts that decide, the limits among them, and drops the reference ones (what the person sees,
- * what is filled in), for a place that shows the answer inside another page.
+ * `compact` keeps the parts that decide, the pictures and the limits among them, and drops the reference one (what is
+ * filled in), for a place that shows the answer inside another page.
  */
 
 type Persona = 'person' | 'program' | 'agent' | 'enterprise';
@@ -373,136 +374,214 @@ function Action({
 }
 
 /*
- * A drawn hint of the screen, not a screenshot: it is decoration, so it is hidden from assistive technology and the
- * lines under it say the same in words.
+ * A drawn hint of the screen the person meets, not a screenshot, with the guide's example names (GUIDE_EXAMPLES): the
+ * app is Acme Notes, the company Acme Corp, the agent Claude, the outside service Google; an agent managing FoxAuth
+ * itself meets this console instead of the app. The same screens the site draws (MiniScreen.astro), in the console's
+ * colours. Decoration, hidden from assistive technology: the lines beside it say the same in words.
  */
-function PreviewMock({ sees }: { sees: GuidePreview }) {
-	const { token } = theme.useToken();
-	if (sees.kind === 'none') return null;
-	const field = (text: string) => (
-		<div
-			style={{
-				border: `1px solid ${token.colorBorder}`,
-				borderRadius: 4,
-				padding: '3px 8px',
-				color: token.colorTextTertiary,
-				fontSize: 12
-			}}
-		>
-			{text}
+function MiniScreen({ kind }: { kind: Exclude<GuidePreview['kind'], 'none'> }) {
+	const consoleHost = useInstanceHost();
+	const examples = GUIDE_EXAMPLES;
+	const host =
+		kind === 'adminConsent'
+			? consoleHost
+			: `auth.${examples.app.toLowerCase().replaceAll(' ', '-')}.app`;
+	const deny = <div className="gs-ms-b s">Deny</div>;
+	const allow = <div className="gs-ms-b p">Allow</div>;
+	const asks = (part: 'agent' | 'cloud', who: string, what: string) => (
+		<div className="gs-ms-who">
+			<Glyph part={part} />
+			<span>
+				<b>{who}</b>
+				<span className="gs-ms-t">{what}</span>
+			</span>
 		</div>
 	);
-	const button = (text: string, primary = true) => (
-		<div
-			style={{
-				borderRadius: 4,
-				padding: '4px 8px',
-				textAlign: 'center',
-				fontSize: 12,
-				fontWeight: 600,
-				background: primary ? token.colorPrimary : token.colorFillTertiary,
-				color: primary ? token.colorTextLightSolid : token.colorText
-			}}
-		>
-			{text}
-		</div>
+	const scopes = (items: string[]) => (
+		<ul className="gs-ms-perm">
+			{items.map((scope) => (
+				<li key={scope}>
+					<Glyph strokeWidth={2.5} />
+					{scope}
+				</li>
+			))}
+		</ul>
 	);
-	const heading = (text: string) => (
-		<div style={{ fontWeight: 600, fontSize: 13, color: token.colorText }}>
-			{text}
-		</div>
-	);
-	const body: Record<Exclude<GuidePreview['kind'], 'none'>, ReactNode> = {
+	const body: Record<typeof kind, ReactNode> = {
 		signIn: (
 			<>
-				{heading('Sign in to Your app')}
-				{field('Email')}
-				{field('Password')}
-				{button('Sign in')}
-				{button('Continue with Google', false)}
+				<div className="gs-ms-h">Sign in</div>
+				<div className="gs-ms-f">Email</div>
+				<div className="gs-ms-f">Password</div>
+				<div className="gs-ms-b p">Sign in</div>
+				<div className="gs-ms-or">or</div>
+				<div className="gs-ms-b s">Continue with Google</div>
+			</>
+		),
+		signUp: (
+			<>
+				<div className="gs-ms-h">Create an account</div>
+				<div className="gs-ms-f">Email</div>
+				<div className="gs-ms-f">Password</div>
+				<div className="gs-ms-b p">Create account</div>
+				<div className="gs-ms-t gs-ms-center">
+					Already have an account? Sign in
+				</div>
+			</>
+		),
+		companySignIn: (
+			<>
+				<div className="gs-ms-h">Sign in</div>
+				<div className="gs-ms-b p icon">
+					<Glyph
+						part="company"
+						strokeWidth={2}
+					/>
+					<span>
+						Continue with <b>{examples.company}</b>
+					</span>
+				</div>
+				<div className="gs-ms-or">or</div>
+				<div className="gs-ms-f">Email</div>
+				<div className="gs-ms-f">Password</div>
 			</>
 		),
 		consent: (
 			<>
-				{heading('Your app asks for access')}
-				<div style={{ fontSize: 12, color: token.colorTextSecondary }}>
-					It will act on your behalf.
+				<div className="gs-ms-h">An app asks for access</div>
+				<div className="gs-ms-t">It will act on your behalf.</div>
+				<div className="gs-ms-row">
+					{deny}
+					{allow}
 				</div>
-				<Flex gap={6}>
-					<div style={{ flex: 1 }}>{button('Deny', false)}</div>
-					<div style={{ flex: 1 }}>{button('Allow')}</div>
-				</Flex>
+			</>
+		),
+		agentConsent: (
+			<>
+				{asks('agent', examples.agent, 'asks to act on your behalf')}
+				{scopes(['Read your notes', 'Add new notes'])}
+				<div className="gs-ms-row">
+					{deny}
+					{allow}
+				</div>
+			</>
+		),
+		adminConsent: (
+			<>
+				{asks('agent', examples.agent, 'asks to act as you')}
+				{scopes([
+					'See your projects and applications',
+					'Create and change applications'
+				])}
+				<div className="gs-ms-row">
+					{deny}
+					{allow}
+				</div>
+			</>
+		),
+		serviceConsent: (
+			<>
+				{asks('cloud', examples.service, 'Connect your account')}
+				<div className="gs-ms-t">
+					Your agent can then use it on your behalf, through FoxAuth.
+				</div>
+				<div className="gs-ms-row">
+					<div className="gs-ms-b s">Cancel</div>
+					<div className="gs-ms-b p">Connect</div>
+				</div>
 			</>
 		),
 		deviceCode: (
 			<>
-				{heading('Type the code from the screen')}
-				<div
-					style={{
-						fontFamily: token.fontFamilyCode,
-						fontSize: 16,
-						letterSpacing: 2,
-						textAlign: 'center',
-						color: token.colorText
-					}}
-				>
-					WDJB-MJHT
+				<div className="gs-ms-who">
+					<Glyph part="tv" />
+					<span className="gs-ms-t">Type the code from the screen</span>
 				</div>
-				{button('Next')}
+				<div className="gs-ms-code">WDJB-MJHT</div>
+				<div className="gs-ms-b p">Next</div>
 			</>
 		),
 		approve: (
 			<>
-				{heading('Approve a request?')}
-				<div style={{ fontSize: 12, color: token.colorTextSecondary }}>
-					Who is asking, and for what.
+				<div className="gs-ms-who">
+					<Glyph part="phone" />
+					<span className="gs-ms-h">Approve a request?</span>
 				</div>
-				<Flex gap={6}>
-					<div style={{ flex: 1 }}>{button('Decline', false)}</div>
-					<div style={{ flex: 1 }}>{button('Approve')}</div>
-				</Flex>
+				<div className="gs-ms-t">Who is asking, and for what.</div>
+				<div className="gs-ms-row">
+					<div className="gs-ms-b s">Decline</div>
+					<div className="gs-ms-b p">Approve</div>
+				</div>
 			</>
 		)
 	};
 	return (
 		<div
+			className="gs-ms"
 			aria-hidden="true"
-			style={{
-				maxWidth: 260,
-				border: `1px solid ${token.colorBorderSecondary}`,
-				borderRadius: 8,
-				overflow: 'hidden',
-				background: token.colorBgContainer
-			}}
 		>
-			<div
-				style={{
-					display: 'flex',
-					gap: 4,
-					padding: '5px 8px',
-					background: token.colorFillQuaternary,
-					borderBottom: `1px solid ${token.colorBorderSecondary}`
-				}}
-			>
-				{[0, 1, 2].map((i) => (
-					<span
-						key={i}
-						style={{
-							width: 7,
-							height: 7,
-							borderRadius: 999,
-							background: token.colorTextQuaternary
-						}}
-					/>
-				))}
+			<div className="gs-ms-bar">
+				<span className="gs-ms-dots">
+					<i />
+					<i />
+					<i />
+				</span>
+				<span className="gs-ms-host">{kind === 'approve' ? '' : host}</span>
 			</div>
-			<Flex
-				vertical
-				gap={6}
-				style={{ padding: 12 }}
-			>
-				{body[sees.kind]}
-			</Flex>
+			<div className="gs-ms-in">
+				{kind === 'adminConsent' ? (
+					<div className="gs-ms-brand">
+						<span className="gs-ms-logo fox">
+							<Glyph
+								part="fox"
+								strokeWidth={2}
+							/>
+						</span>
+						<span>FoxAuth administration</span>
+					</div>
+				) : (
+					kind !== 'approve' &&
+					kind !== 'deviceCode' && (
+						<div className="gs-ms-brand">
+							<span className="gs-ms-logo">{examples.app.slice(0, 1)}</span>
+							<span>{examples.app}</span>
+						</div>
+					)
+				)}
+				{body[kind]}
+			</div>
+		</div>
+	);
+}
+
+/* The strip's third frame: the screen and the lines that name what is on it, or a checklist where there is no screen. */
+function WhatYouGet({ sees }: { sees: GuidePreview }) {
+	if (sees.kind === 'none') {
+		return (
+			<div className="gs-get">
+				<ul className="gs-result">
+					{sees.lines.map((line) => (
+						<li key={line}>
+							<span className="gs-result-dot">
+								<Glyph strokeWidth={3} />
+							</span>
+							<span>{line}</span>
+						</li>
+					))}
+				</ul>
+			</div>
+		);
+	}
+	return (
+		<div className="gs-get">
+			<div className="gs-get-pic">
+				<MiniScreen kind={sees.kind} />
+			</div>
+			<ul className="gs-get-lines">
+				{sees.lines.map((line) => (
+					<li key={line}>{line}</li>
+				))}
+			</ul>
 		</div>
 	);
 }
@@ -618,12 +697,14 @@ export function GuideAnswer({
 		}
 	};
 	const persona = personaOf(s);
+	const next = s.next ? guideSituation(s.next) : undefined;
 
 	return (
 		<Card
 			className="guide-scope"
 			style={palette}
 		>
+			<PictureStyles />
 			<Flex
 				vertical
 				gap={20}
@@ -632,11 +713,22 @@ export function GuideAnswer({
 					vertical
 					gap={8}
 				>
-					<div>
-						<Tag color={persona === 'enterprise' ? 'purple' : 'blue'}>
+					<Flex
+						wrap
+						gap={8}
+						align="center"
+					>
+						<Tag
+							color={persona === 'enterprise' ? 'purple' : 'blue'}
+							style={{ marginInlineEnd: 0 }}
+						>
 							{PERSONA[persona]}
 						</Tag>
-					</div>
+						<StatusMark
+							status={statusOf(action, scheduled)}
+							size="md"
+						/>
+					</Flex>
 					<Typography.Title
 						level={4}
 						style={{ margin: 0 }}
@@ -647,12 +739,31 @@ export function GuideAnswer({
 						{s.sentence}
 					</Typography.Paragraph>
 				</Flex>
+				<Strip
+					situation={s}
+					get={<WhatYouGet sees={s.sees} />}
+				/>
 				<Action
 					bucketId={bucketId}
 					action={action}
 					viewer={viewer}
 					scheduled={scheduled}
 				/>
+				{next && (
+					<Link
+						href={`${bucketHref(bucketId, 'guide')}?${next.tab === 'enterprise' ? 'e' : 's'}=${encodeURIComponent(next.id)}`}
+						className="gs-next"
+					>
+						<span className="gs-next-k">Next:</span>
+						<span className="gs-next-t">{next.title}</span>
+						<span
+							aria-hidden="true"
+							className="gs-next-arrow"
+						>
+							→
+						</span>
+					</Link>
+				)}
 				<Flex
 					vertical
 					gap={8}
@@ -670,36 +781,7 @@ export function GuideAnswer({
 						title={s.title}
 					/>
 				</Flex>
-				{!compact && (
-					<Row gutter={[24, 20]}>
-						<Col
-							xs={24}
-							md={12}
-						>
-							<Flex
-								vertical
-								gap={8}
-							>
-								<Typography.Title
-									level={5}
-									style={{ margin: 0 }}
-								>
-									What the person will see
-								</Typography.Title>
-								<PreviewMock sees={s.sees} />
-								<Bullets items={s.sees.lines} />
-							</Flex>
-						</Col>
-						{s.preset && (
-							<Col
-								xs={24}
-								md={12}
-							>
-								<FilledIn s={s} />
-							</Col>
-						)}
-					</Row>
-				)}
+				{!compact && s.preset && <FilledIn s={s} />}
 				{s.goodToKnow.length > 0 && (
 					<Flex
 						vertical

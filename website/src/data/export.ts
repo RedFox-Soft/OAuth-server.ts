@@ -66,6 +66,56 @@ const GuideQuestion = z.object({
 	)
 });
 
+const GuidePart = z.enum([
+	'person',
+	'laptop',
+	'browser',
+	'server',
+	'phone',
+	'tv',
+	'clock',
+	'agent',
+	'api',
+	'company',
+	'directory',
+	'fox',
+	'cloud',
+	'mail',
+	'authenticator',
+	'globe',
+	'team',
+	'audit',
+	'thief'
+]);
+
+const ProblemMark = z.enum(['password', 'secret', 'open', 'copy', 'missing']);
+
+const Glyph = z.object({ viewBox: z.string(), paths: z.array(z.string()) });
+
+/* A picture of a guide answer, worked out by lib/situation_guide/scene.ts. */
+const GuideScene = z.object({
+	placement: z.enum(['beside', 'middle']),
+	row: z.array(z.string()),
+	above: z.array(z.string()),
+	nodes: z.array(
+		z.object({
+			lane: z.string(),
+			part: GuidePart,
+			role: z.enum(['actor', 'client', 'resource', 'fox', 'outside'])
+		})
+	),
+	links: z.array(
+		z.object({
+			from: z.string(),
+			to: z.string(),
+			kind: z.enum(['direct', 'token', 'broken']),
+			arc: z.number().int().min(1).optional()
+		})
+	),
+	mark: z.object({ at: z.string(), kind: ProblemMark }).optional(),
+	fixed: z.string().optional()
+});
+
 const GuideSituation = z.object({
 	id: z.string(),
 	tab: z.enum(['product', 'enterprise']),
@@ -91,7 +141,8 @@ const GuideSituation = z.object({
 				'agent',
 				'outside',
 				'company'
-			])
+			]),
+			part: GuidePart
 		})
 	),
 	steps: z.array(
@@ -103,8 +154,27 @@ const GuideSituation = z.object({
 			style: z.enum(['request', 'redirect', 'token', 'refusal']).optional()
 		})
 	),
+	problem: z.object({
+		at: z.string(),
+		mark: ProblemMark,
+		caption: z.string().min(1),
+		lanes: z.array(z.string()).optional()
+	}),
+	fixCaption: z.string().min(1),
+	next: z.string().optional(),
 	sees: z.object({
-		kind: z.enum(['signIn', 'consent', 'deviceCode', 'approve', 'none']),
+		kind: z.enum([
+			'signIn',
+			'signUp',
+			'companySignIn',
+			'consent',
+			'agentConsent',
+			'adminConsent',
+			'serviceConsent',
+			'deviceCode',
+			'approve',
+			'none'
+		]),
 		lines: z.array(z.string())
 	}),
 	needs: z.object({
@@ -122,7 +192,9 @@ const GuideSituation = z.object({
 	}),
 	goodToKnow: z.array(z.string()),
 	prompt: z.string(),
-	first: z.boolean().optional()
+	first: z.boolean().optional(),
+	scene: z.object({ problem: GuideScene, solution: GuideScene }),
+	optionParts: z.array(GuidePart).min(1)
 });
 
 export const DocsExportSchema = z.object({
@@ -206,7 +278,21 @@ export const DocsExportSchema = z.object({
 		questions: z.array(GuideQuestion),
 		situations: z.array(GuideSituation).min(1),
 		/* The setting each guide flag is read from (GUIDE_FLAG_SETTINGS). */
-		flagSettings: z.record(z.string(), z.string())
+		flagSettings: z.record(z.string(), z.string()),
+		/* The drawings the scenes name (lib/situation_guide/parts.ts) and the drawn screens' example names. */
+		parts: z.record(GuidePart, Glyph),
+		marks: z.record(ProblemMark, Glyph),
+		fixed: Glyph,
+		actorParts: z.record(
+			z.enum(['person', 'program', 'agent']),
+			z.tuple([GuidePart, GuidePart])
+		),
+		examples: z.object({
+			app: z.string(),
+			company: z.string(),
+			agent: z.string(),
+			service: z.string()
+		})
 	}),
 	/* The hourly attack report (specs/114), from the declaration the server counts and builds by. */
 	attackReports: z.object({
@@ -244,6 +330,9 @@ export type EndpointEntry = z.infer<typeof Endpoint>;
 export type McpToolEntry = z.infer<typeof McpTool>;
 export type GuideQuestionEntry = z.infer<typeof GuideQuestion>;
 export type GuideSituationEntry = z.infer<typeof GuideSituation>;
+export type GuideSceneEntry = z.infer<typeof GuideScene>;
+export type GuidePartName = z.infer<typeof GuidePart>;
+export type GuideMarkName = z.infer<typeof ProblemMark>;
 
 let cached: DocsExport | undefined;
 

@@ -1,0 +1,358 @@
+---
+import Part from './Part.astro';
+import Words from './Words.astro';
+import type { GuideSceneEntry } from '../../data/export.ts';
+
+/*
+ * One picture of an answer, "Your problem" or "With FoxAuth", drawn from the scene lib/situation_guide/scene.ts worked
+ * out (through the docs export), layout included: which nodes stand on the row and which above it, and which links
+ * arc at what level. This page only turns that into sizes, and the console's Scene.tsx
+ * (lib/admin/ui/pages/guide/) repeats the same sizing in React: a change to the geometry here is made there too.
+ *
+ * - the row's nodes are columns of one grid, each a part in a tile with its label under it in HTML;
+ * - a node above the row (FoxAuth beside the path) stands over the middle of the row nodes it links to, its label
+ *   beside its tile;
+ * - a straight link runs centre to centre, under the tiles; an arc leaves the top of one tile and lands on the top of
+ *   the other, high enough to clear the tiles and their marks between.
+ *
+ * The lines are an SVG stretched to the width (x in thousandths, y in pixels, strokes unscaled), so the picture
+ * follows the column without a script. The mark sits on the part with the problem; in the solution the same part
+ * carries the check. The whole picture is decoration: its frame's caption says the same in words.
+ */
+interface Props {
+	scene: GuideSceneEntry;
+	labels: Record<string, string>;
+}
+const { scene, labels } = Astro.props;
+/* The solution's check, where lib/situation_guide/scene.ts puts it (never on a party the fix refuses). */
+const fixedAt = scene.fixed;
+
+const TILE = 40;
+/* How far an arc clears the tile tops at its middle: over the marks (8 px proud) at level 1, a step more per level. */
+const clearance = (level: number) => 16 + (level - 1) * 12;
+/* A cubic with both handles at one height peaks at three quarters of it. */
+const handle = (level: number) => clearance(level) / 0.75;
+
+const byLane = new Map(scene.nodes.map((node) => [node.lane, node]));
+const row = scene.row.flatMap((lane) => byLane.get(lane) ?? []);
+const above = scene.above.flatMap((lane) => byLane.get(lane) ?? []);
+const n = Math.max(1, row.length);
+const indexOf = new Map(row.map((node, i) => [node.lane, i]));
+const columnX = (i: number) => (i + 0.5) / n;
+const levels = Math.max(0, ...scene.links.map((l) => l.arc ?? 0));
+
+const rowTop =
+	above.length > 0
+		? TILE + Math.max(30, levels > 0 ? clearance(levels) + 14 : 0)
+		: levels > 0
+			? clearance(levels) + 4
+			: 0;
+const rowY = rowTop + TILE / 2;
+const aboveY = TILE / 2;
+const height = rowY + 2;
+
+/* A node above the row stands over the middle of the row nodes it links to. */
+const aboveX = new Map(
+	above.map((node) => {
+		const xs = scene.links
+			.flatMap((l) =>
+				l.from === node.lane ? [l.to] : l.to === node.lane ? [l.from] : []
+			)
+			.filter((lane) => indexOf.has(lane))
+			.map((lane) => columnX(indexOf.get(lane) ?? 0));
+		const x = xs.length > 0 ? xs.reduce((a, b) => a + b, 0) / xs.length : 0.5;
+		return [node.lane, x];
+	})
+);
+
+const pointOf = (lane: string): { x: number; y: number } | undefined => {
+	const i = indexOf.get(lane);
+	if (i !== undefined) return { x: columnX(i), y: rowY };
+	const x = aboveX.get(lane);
+	return x === undefined ? undefined : { x, y: aboveY };
+};
+
+const drawn = scene.links.flatMap((l) => {
+	const a = pointOf(l.from);
+	const b = pointOf(l.to);
+	if (!a || !b) return [];
+	if (l.arc !== undefined) {
+		const top = rowTop;
+		const up = top - handle(l.arc);
+		return [
+			{
+				kind: l.kind,
+				d: `M${a.x * 1000} ${top}C${a.x * 1000} ${up} ${b.x * 1000} ${up} ${b.x * 1000} ${top}`,
+				mid: { x: (a.x + b.x) / 2, y: top - clearance(l.arc) }
+			}
+		];
+	}
+	return [
+		{
+			kind: l.kind,
+			d: `M${a.x * 1000} ${a.y}L${b.x * 1000} ${b.y}`,
+			mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
+		}
+	];
+});
+
+const mark = scene.mark;
+const pct = (x: number) => `${(x * 100).toFixed(3)}%`;
+---
+
+<div
+	class:list={['g-scene', above.length > 0 && 'g-scene--beside']}
+	style={`--n: ${n}; --row-top: ${rowTop}px`}
+	aria-hidden="true"
+>
+	<svg
+		class="g-scene-links"
+		viewBox={`0 0 1000 ${height}`}
+		preserveAspectRatio="none"
+		style={`height: ${height}px`}
+	>
+		{
+			drawn.map((line) => (
+				<path
+					d={line.d}
+					class={`g-link g-link--${line.kind}`}
+					vector-effect="non-scaling-stroke"
+				/>
+			))
+		}
+	</svg>
+	{
+		drawn
+			.filter((line) => line.kind !== 'direct')
+			.map((line) => (
+				<span
+					class={`g-link-${line.kind === 'token' ? 'chip' : 'cut'}`}
+					style={`left: ${pct(line.mid.x)}; top: ${line.mid.y}px`}
+				>
+					{line.kind === 'broken' && '×'}
+				</span>
+			))
+	}
+	{
+		above.map((node) => {
+			const x = aboveX.get(node.lane) ?? 0.5;
+			return (
+				<span
+					class:list={[
+						'g-node',
+						`g-node--${node.role}`,
+						'g-node--above',
+						x > 0.6 && 'g-node--above-start'
+					]}
+					style={`left: ${pct(x)}`}
+				>
+					<span class="g-tile">
+						<Part part={node.part} />
+					</span>
+					<span class="g-node-label">
+						<Words text={labels[node.lane] ?? node.lane} />
+					</span>
+				</span>
+			);
+		})
+	}
+	<div class="g-scene-row">
+		{
+			row.map((node) => (
+				<span
+					class:list={[
+						'g-node',
+						`g-node--${node.role}`,
+						mark?.at === node.lane && 'g-node--bad',
+						fixedAt === node.lane && 'g-node--good'
+					]}
+				>
+					<span class="g-tile">
+						<Part part={node.part} />
+						{mark?.at === node.lane && (
+							<span class="g-badge g-badge--bad">
+								<Part mark={mark.kind} strokeWidth={2.5} />
+							</span>
+						)}
+						{fixedAt === node.lane && (
+							<span class="g-badge g-badge--good">
+								<Part strokeWidth={3} />
+							</span>
+						)}
+					</span>
+					<span class="g-node-label">
+						<Words text={labels[node.lane] ?? node.lane} />
+					</span>
+				</span>
+			))
+		}
+	</div>
+</div>
+
+<style is:global>
+	.g-scene {
+		container-type: inline-size;
+		position: relative;
+		width: 100%;
+		max-width: calc(var(--n) * 6.5rem);
+		margin-inline: auto;
+	}
+	.g-scene-links {
+		position: absolute;
+		inset: 0 0 auto 0;
+		width: 100%;
+		max-width: none;
+		overflow: visible;
+		pointer-events: none;
+	}
+	.g-link {
+		fill: none;
+		stroke: var(--g-arrow);
+		stroke-width: 2;
+		stroke-linecap: round;
+	}
+	.g-link--token {
+		stroke: var(--g-token);
+		stroke-width: 4;
+	}
+	.g-link--broken {
+		stroke: var(--g-deny);
+		stroke-dasharray: 5 5;
+	}
+	.g-link-chip,
+	.g-link-cut {
+		position: absolute;
+		z-index: 2;
+		transform: translate(-50%, -50%);
+	}
+	.g-link-chip {
+		width: 1.375rem;
+		height: 0.75rem;
+		border-radius: 999px;
+		background: var(--g-token);
+		box-shadow: 0 0 0 2px var(--g-frame-bg);
+	}
+	.g-link-chip::after {
+		content: '';
+		position: absolute;
+		inset: 0.1875rem 0.375rem;
+		border-radius: 999px;
+		background: var(--g-frame-bg);
+		opacity: 0.85;
+	}
+	.g-link-cut {
+		display: grid;
+		place-items: center;
+		width: 1.125rem;
+		height: 1.125rem;
+		border: 2px solid var(--g-deny);
+		border-radius: 999px;
+		background: var(--g-frame-bg);
+		color: var(--g-deny);
+		font-size: 0.875rem;
+		font-weight: 700;
+		line-height: 1;
+	}
+	.g-scene-row {
+		position: relative;
+		z-index: 1;
+		display: grid;
+		grid-template-columns: repeat(var(--n), minmax(0, 1fr));
+		column-gap: 0.25rem;
+		padding-top: var(--row-top);
+	}
+	.g-node {
+		display: flex;
+		min-width: 0;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.3rem;
+		text-align: center;
+	}
+	.g-node--above {
+		position: absolute;
+		z-index: 1;
+		top: 0;
+		display: block;
+		transform: translateX(-50%);
+	}
+	.g-node--above > .g-node-label {
+		position: absolute;
+		top: 50%;
+		left: calc(100% + 0.75rem);
+		max-width: none;
+		transform: translateY(-50%);
+		white-space: nowrap;
+	}
+	.g-node--above-start > .g-node-label {
+		right: calc(100% + 0.75rem);
+		left: auto;
+	}
+	.g-tile {
+		position: relative;
+		display: grid;
+		place-items: center;
+		width: 2.5rem;
+		height: 2.5rem;
+		border: 1.5px solid var(--g-tile-border);
+		border-radius: 0.625rem;
+		background: var(--g-tile);
+		color: var(--g-ink);
+	}
+	.g-tile > .g-glyph {
+		width: 1.5rem;
+		height: 1.5rem;
+	}
+	.g-node--fox .g-tile {
+		border: 2px solid var(--g-fox-border);
+		background: var(--g-fox-bg);
+		color: var(--g-fox-icon);
+		box-shadow: 0 0 0 4px var(--g-fox-ring);
+	}
+	.g-node--outside .g-tile {
+		border-style: dashed;
+		border-color: var(--g-outside);
+	}
+	.g-node--bad .g-tile {
+		border-color: var(--g-deny);
+	}
+	.g-node--good .g-tile {
+		border-color: var(--g-good);
+	}
+	.g-badge {
+		position: absolute;
+		top: -0.5rem;
+		right: -0.625rem;
+		display: grid;
+		place-items: center;
+		width: 1.375rem;
+		height: 1.375rem;
+		border-radius: 999px;
+		box-shadow: 0 0 0 2px var(--g-frame-bg);
+	}
+	.g-badge .g-glyph {
+		width: 0.875rem;
+		height: 0.875rem;
+	}
+	.g-badge--bad {
+		background: var(--g-deny);
+		color: var(--g-on-deny);
+	}
+	.g-badge--good {
+		background: var(--g-good);
+		color: var(--g-on-good);
+	}
+	.g-node-label {
+		max-width: 100%;
+		/* A size down in a narrow column, so a long word still fits it whole (about six and a half letters per em). */
+		font-size: clamp(0.6875rem, 100cqi / var(--n) / 6.4, 0.75rem);
+		line-height: 1.25;
+		color: var(--g-text-2);
+		/* Each word is its own block (Words.astro), so a soft hyphen splits only a word wider than the column. */
+		overflow-wrap: break-word;
+	}
+	.g-node--fox .g-node-label {
+		font-weight: 600;
+		color: var(--g-fox-ink);
+	}
+</style>

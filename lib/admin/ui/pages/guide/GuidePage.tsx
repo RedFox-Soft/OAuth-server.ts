@@ -24,14 +24,23 @@ import {
 	guideSelection,
 	type GuideViewer
 } from '../../../../situation_guide/availability.js';
+import { optionPartsOf } from '../../../../situation_guide/options.js';
 import type { BucketCan } from '../../frame/can.js';
 import { useMe } from '../../frame/me.js';
 import { Link, useNavigate, useRoute } from '../../frame/router.js';
 import { bucketHref } from '../../frame/routes.js';
 import type { BucketSummary, BucketView } from '../bucketView.js';
 import { GoButton, GuideAnswer } from './AnswerPanel.js';
+import { ActorThumb, StatusMark, Thumb } from './Part.js';
+import { PictureStyles } from './Scene.js';
 import { DiagramStyles, useDiagramPalette } from './SequenceDiagram.js';
-import { DOCS_ORIGIN, actionFor, leavesConsole } from './targets.js';
+import {
+	DOCS_ORIGIN,
+	actionFor,
+	leavesConsole,
+	statusOf,
+	type GuideStatus
+} from './targets.js';
 import { guideViewerOf } from './viewer.js';
 
 /*
@@ -48,6 +57,10 @@ const CSS = `
 .guide-options .ant-radio-wrapper-checked.guide-option { border-color: var(--gd-accent); background: var(--gd-accent-soft); }
 .guide-options .guide-option:has(input:focus-visible) { outline: 2px solid var(--gd-accent); outline-offset: 2px; }
 .guide-option .guide-sub { display: block; color: var(--gd-muted); font-size: 12px; }
+.guide-option .guide-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 6px; margin-bottom: 6px; }
+.guide-option .guide-side { display: flex; align-items: center; gap: 10px; }
+.guide-chip.ant-btn { display: inline-flex; align-items: center; gap: 8px; padding: 4px 10px 4px 4px; }
+.guide-chip .guide-chip-t { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
 .guide-legend-q { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 15px; margin-bottom: 10px; padding: 0; border: 0; }
 .guide-legend-q .n { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 999px; background: var(--gd-ink); color: var(--gd-on-ink); font-size: 12px; font-weight: 800; }
 .guide-fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
@@ -67,6 +80,11 @@ const CSS = `
   .guide-company { padding: 12px; }
 }
 `;
+
+/* The small picture on each answer's option, read off the answer's own scenes (lib/situation_guide/options.ts). */
+const OPTION_PARTS = new Map(
+	GUIDE_SITUATIONS.map((s) => [s.id, optionPartsOf(s)])
+);
 
 /* What the second question preselects for each answer to the first: its first answer. */
 const FIRST_ANSWER = Object.fromEntries(
@@ -145,11 +163,46 @@ function reveal(el: HTMLElement | null) {
 	el.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
 }
 
-function OptionLabel({ title, sub }: { title: string; sub?: string }) {
-	return (
+/*
+ * An option's words, with its answer's picture and status over them (question 2, the company's list) or the actor's
+ * drawing beside them (question 1).
+ */
+function OptionLabel({
+	title,
+	sub,
+	situationId,
+	status,
+	actor
+}: {
+	title: string;
+	sub?: string;
+	situationId?: string;
+	status?: GuideStatus;
+	actor?: GuideActor;
+}) {
+	const words = (
 		<span>
 			<Typography.Text strong>{title}</Typography.Text>
 			{sub && <span className="guide-sub">{sub}</span>}
+		</span>
+	);
+	if (actor) {
+		return (
+			<span className="guide-side">
+				<ActorThumb actor={actor} />
+				{words}
+			</span>
+		);
+	}
+	return (
+		<span>
+			{situationId && (
+				<span className="guide-top">
+					<Thumb parts={OPTION_PARTS.get(situationId) ?? ['fox']} />
+					{status && <StatusMark status={status} />}
+				</span>
+			)}
+			{words}
 		</span>
 	);
 }
@@ -277,6 +330,9 @@ export function GuidePage({
 		summary
 	});
 	const issuer = bucket.issuer ?? null;
+	const scheduled = Boolean(bucket.deletion);
+	const statusFor = (s: GuideSituation | undefined) =>
+		s ? statusOf(actionFor(bucketId, s, viewer, issuer), scheduled) : undefined;
 
 	const chooseProduct = (next: Product) => {
 		setState((current) => ({ ...current, product: next }));
@@ -340,6 +396,7 @@ export function GuidePage({
 							<OptionLabel
 								title={q.title}
 								sub={q.sub}
+								actor={q.actor}
 							/>
 						</Radio>
 					))}
@@ -372,6 +429,8 @@ export function GuidePage({
 							<OptionLabel
 								title={a.title}
 								sub={a.sub}
+								situationId={a.answer}
+								status={statusFor(guideSituation(a.answer))}
 							/>
 						</Radio>
 					))}
@@ -403,24 +462,35 @@ export function GuidePage({
 					wrap
 					gap={8}
 				>
-					{CHIPS.map((s) => (
-						<Button
-							key={s.id}
-							size="small"
-							type={product.chip === s.id ? 'primary' : 'default'}
-							aria-pressed={product.chip === s.id}
-							onClick={() => {
-								chooseProduct(productAt(product, s.id));
-							}}
-							style={{
-								whiteSpace: 'normal',
-								height: 'auto',
-								textAlign: 'start'
-							}}
-						>
-							{s.title}
-						</Button>
-					))}
+					{CHIPS.map((s) => {
+						const status = statusFor(s);
+						return (
+							<Button
+								key={s.id}
+								className="guide-chip"
+								type={product.chip === s.id ? 'primary' : 'default'}
+								ghost={product.chip === s.id}
+								aria-pressed={product.chip === s.id}
+								onClick={() => {
+									chooseProduct(productAt(product, s.id));
+								}}
+								style={{
+									whiteSpace: 'normal',
+									height: 'auto',
+									textAlign: 'start'
+								}}
+							>
+								<Thumb
+									parts={OPTION_PARTS.get(s.id) ?? ['fox']}
+									small
+								/>
+								<span className="guide-chip-t">
+									<span>{s.title}</span>
+									{status && <StatusMark status={status} />}
+								</span>
+							</Button>
+						);
+					})}
 				</Flex>
 			</Flex>
 			<div
@@ -433,7 +503,7 @@ export function GuidePage({
 						situation={productSituation}
 						viewer={viewer}
 						issuer={issuer}
-						scheduled={Boolean(bucket.deletion)}
+						scheduled={scheduled}
 					/>
 				)}
 			</div>
@@ -487,6 +557,8 @@ export function GuidePage({
 										sub={
 											s.first ? 'Usually together with the other' : undefined
 										}
+										situationId={s.id}
+										status={statusFor(s)}
 									/>
 								</Radio>
 							))}
@@ -504,7 +576,7 @@ export function GuidePage({
 						situation={enterpriseSituation}
 						viewer={viewer}
 						issuer={issuer}
-						scheduled={Boolean(bucket.deletion)}
+						scheduled={scheduled}
 					/>
 				)}
 			</div>
@@ -519,6 +591,7 @@ export function GuidePage({
 			style={palette}
 		>
 			<DiagramStyles />
+			<PictureStyles />
 			<style dangerouslySetInnerHTML={{ __html: CSS }} />
 			<Tabs
 				activeKey={state.tab}
@@ -592,7 +665,11 @@ export function GuidePage({
 													gap={2}
 												>
 													<span>{s.title}</span>
-													<span>
+													<Flex
+														wrap
+														gap={8}
+														align="center"
+													>
 														<Tag
 															color={s.tab === 'enterprise' ? 'purple' : 'blue'}
 															style={{ marginInlineEnd: 0 }}
@@ -601,7 +678,13 @@ export function GuidePage({
 																? 'Enterprise'
 																: 'Your product'}
 														</Tag>
-													</span>
+														<StatusMark
+															status={statusOf(
+																actionFor(bucketId, s, viewer, issuer),
+																scheduled
+															)}
+														/>
+													</Flex>
 												</Flex>
 											)
 										},

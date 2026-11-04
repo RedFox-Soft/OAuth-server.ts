@@ -1,0 +1,25 @@
+---
+import Part from './Part.astro';
+import type { GuidePartName } from '../../data/export.ts';
+
+/*
+ * The small picture on an option of the chooser: its answer's parts (lib/situation_guide/options.ts, through the
+ * export), joined by a short line. Decoration: the option's title says the same in words.
+ */
+interface Props {
+	parts: readonly GuidePartName[];
+	size?: 'md' | 'sm';
+}
+const { parts, size = 'md' } = Astro.props;
+---
+
+<span class:list={['g-thumb', size === 'sm' && 'g-thumb--sm']} aria-hidden="true">
+	{
+		parts.map((part, i) => (
+			<>
+				{i > 0 && <i class="g-thumb-link" />}
+				<Part part={part} />
+			</>
+		))
+	}
+</span>

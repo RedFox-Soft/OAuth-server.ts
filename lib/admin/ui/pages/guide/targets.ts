@@ -1,4 +1,5 @@
 import type {
+	GuidePart,
 	GuideSituation,
 	GuideTarget
 } from '../../../../consts/situation_guide.js';
@@ -104,4 +105,40 @@ export function actionFor(
 		label: s.action.kind === 'form' ? 'Set this up' : s.action.label,
 		href: targetHref(bucketId, target, issuer)
 	};
+}
+
+/*
+ * What an answer's button does for this viewer, in one word and a glyph, for the answer, its option and its row in the
+ * table: read off `actionFor`, so the mark and the button cannot disagree. `scheduled`: the project is read-only
+ * until it is restored, which is what a missing right then means.
+ */
+export interface GuideStatus {
+	tone: 'ready' | 'closed';
+	glyph: GuidePart | 'fixed';
+	word: string;
+}
+
+export function statusOf(action: GuideAction, scheduled: boolean): GuideStatus {
+	if (action.kind === 'go')
+		return { tone: 'ready', glyph: 'fixed', word: 'Ready' };
+	if (action.kind === 'needsAddress') {
+		return { tone: 'closed', glyph: 'globe', word: 'Needs an address' };
+	}
+	const availability = action.availability;
+	switch (availability.state) {
+		case 'switchedOff':
+			return { tone: 'closed', glyph: 'server', word: 'Switched off' };
+		case 'notOnPlan':
+			return { tone: 'closed', glyph: 'cloud', word: 'Not on your plan' };
+		case 'planLimit':
+			return { tone: 'closed', glyph: 'cloud', word: 'Plan limit reached' };
+		case 'ownServer':
+			return { tone: 'closed', glyph: 'server', word: 'Own server' };
+		case 'askSuperAdmin':
+			return { tone: 'closed', glyph: 'team', word: 'Super administrator' };
+		case 'needsRight':
+			return scheduled
+				? { tone: 'closed', glyph: 'clock', word: 'Scheduled for deletion' }
+				: { tone: 'closed', glyph: 'team', word: 'Needs a right' };
+	}
 }

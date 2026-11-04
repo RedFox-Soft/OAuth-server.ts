@@ -5,8 +5,10 @@
  *   `#answer-<id>` link (a common task, the expert table), chooses that answer and its tab; a common task is marked
  *   `aria-current` and takes the place of question 2's answer until a radio is chosen again;
  * - question 1 remembers each actor's answer to question 2, so going back and forth keeps what was chosen;
- * - "Copy prompt" and "Show the steps again", which are hidden until this script marks the page ready;
- * - on a phone, the answer is brought into view after a choice.
+ * - "Copy prompt" and the diagram's controls (the previous step, the next step, show again), which are hidden until
+ *   this script marks the page ready;
+ * - below the split, the answer is brought into view after a choice; in the split, an answer taller than the window
+ *   stays in view by its bottom rather than its top.
  */
 
 type Tab = 'product' | 'enterprise';
@@ -118,7 +120,7 @@ function init(root: HTMLElement) {
 
 	const reveal = (el: HTMLElement | null, always = false) => {
 		if (!el) return;
-		if (!always && !window.matchMedia('(max-width: 767px)').matches) return;
+		if (!always && !window.matchMedia('(max-width: 1023px)').matches) return;
 		if (!always && el.getBoundingClientRect().top < window.innerHeight * 0.6)
 			return;
 		const reduced = window.matchMedia(
@@ -172,7 +174,19 @@ function init(root: HTMLElement) {
 			if (actor) remembered[actor] = input.value;
 		}
 		writeAddress();
-		if (input.name !== 'guide-tab') reveal(answerOf(root, currentTab(root)));
+	});
+
+	/*
+	 * Choosing an answer, or pressing the one already chosen, brings it into view on a phone. Question 1 does not: the
+	 * reader's next step is question 2, just under it.
+	 */
+	root.addEventListener('click', (event) => {
+		const input = event.target;
+		if (
+			input instanceof HTMLInputElement &&
+			(input.name === 'guide-product' || input.name === 'guide-enterprise')
+		)
+			reveal(answerOf(root, currentTab(root)));
 	});
 
 	/* A link inside the page to an answer (a common task, the expert table, "the same case as"). */
@@ -191,13 +205,43 @@ function init(root: HTMLElement) {
 		readAddress('always');
 	});
 
+	/* The step the arrows are on, picked out in the diagram and the list; none means every step at once. */
+	const setStep = (answer: HTMLElement, step: number | null) => {
+		const items = [...answer.querySelectorAll<HTMLElement>('.g-steps > li')];
+		if (step === null) delete answer.dataset.step;
+		else answer.dataset.step = String(step);
+		items.forEach((item, i) => {
+			if (step === i + 1) item.setAttribute('aria-current', 'step');
+			else item.removeAttribute('aria-current');
+		});
+	};
+
 	root.addEventListener('click', (event) => {
 		const target = event.target instanceof Element ? event.target : null;
 		const answer = target?.closest('.g-answer');
 		if (!(answer instanceof HTMLElement)) return;
 
+		const prev = target?.closest('[data-step-prev]');
+		const next = target?.closest('[data-step-next]');
+		if (prev || next) {
+			const count = answer.querySelectorAll('.g-steps > li').length;
+			const current = Number(answer.dataset.step ?? 0);
+			const step = next
+				? current >= count
+					? 1
+					: current + 1
+				: current <= 1
+					? count
+					: current - 1;
+			setStep(answer, step);
+			return;
+		}
+
 		if (target?.closest('[data-replay]')) {
-			const moving = answer.querySelectorAll<HTMLElement>('.g-row, .g-line');
+			setStep(answer, null);
+			const moving = answer.querySelectorAll<HTMLElement>(
+				'.g-row, .g-line, .g-badge, .g-node--fox, .g-link-chip'
+			);
 			for (const el of moving) el.style.animation = 'none';
 			answer.getBoundingClientRect();
 			for (const el of moving) el.style.animation = '';
@@ -225,6 +269,23 @@ function init(root: HTMLElement) {
 			refused();
 		}
 	});
+
+	/*
+	 * In the split the answer is sticky. One taller than the window would hide its end for as long as the questions
+	 * scroll beside it, so it sticks by its bottom instead: a top offset that is the window less its height.
+	 */
+	const answers = root.querySelector<HTMLElement>('[data-answers]');
+	const header = document.querySelector<HTMLElement>('header');
+	const stick = () => {
+		if (!answers) return;
+		const top = (header?.offsetHeight ?? 0) + 16;
+		const room = window.innerHeight - answers.offsetHeight - 16;
+		answers.style.setProperty('--g-sticky-top', `${Math.min(top, room)}px`);
+	};
+	if (answers && 'ResizeObserver' in window) {
+		new ResizeObserver(stick).observe(answers);
+		window.addEventListener('resize', stick);
+	}
 
 	readAddress('never');
 	root.dataset.ready = '';

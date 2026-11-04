@@ -1,6 +1,6 @@
 import type { GuideTexts } from '../../guide-texts.ts';
 
-export const source = '6bc488a45fbb';
+export const source = 'f5b0967bc097';
 
 export default {
 	questions: {
@@ -52,6 +52,8 @@ export default {
 				'你的服务器保存一个密钥，并用一次性授权码换取令牌，所以这是最简单也最安全的登录方式。',
 			protocol:
 				'OpenID Connect · Authorization Code + PKCE · client_secret_basic · 刷新令牌',
+			problemCaption: '你的服务器保存着所有人的密码。',
+			fixCaption: '只有 FoxAuth 能看到密码。',
 			lanes: { person: '用户', server: '你的服务器', fox: 'FoxAuth' },
 			steps: [
 				{ label: '点击“登录”', text: '用户在你的网站上点击“登录”。' },
@@ -89,6 +91,8 @@ export default {
 				'浏览器里没有地方保存密钥，所以由 PKCE 保护登录：它是一个只有当前浏览器标签页知道的一次性校验字符串。',
 			protocol:
 				'OpenID Connect · Authorization Code + PKCE · 公开应用 · 刷新令牌',
+			problemCaption: '浏览器代码里的密钥谁都能看到。',
+			fixCaption: '一次性校验取代了密钥。',
 			lanes: {
 				person: '用户',
 				spa: '你的浏览器应用',
@@ -130,6 +134,8 @@ export default {
 				'登录在系统浏览器中打开，授权码通过一个本地地址回到你的应用，任何端口都可以。',
 			protocol:
 				'OpenID Connect · Authorization Code + PKCE · 回环重定向（RFC 8252）',
+			problemCaption: '应用能看到用户的密码。',
+			fixCaption: '登录在用户信任的浏览器中打开。',
 			lanes: { person: '用户', app: '你的应用', fox: 'FoxAuth' },
 			steps: [
 				{ label: '开始登录', text: '用户点击“登录”，或者运行你的登录命令。' },
@@ -159,6 +165,8 @@ export default {
 			title: '电视或没有键盘的设备',
 			sentence: '设备显示一个简短的代码，用户在手机上登录。',
 			protocol: 'OAuth 2.0 Device Authorization Grant (RFC 8628)',
+			problemCaption: '要用电视遥控器输入密码。',
+			fixCaption: '一个简短的代码，在手机上确认。',
 			lanes: { tv: '电视或设备', fox: 'FoxAuth', phone: '用户的手机' },
 			steps: [
 				{ label: '请求代码', text: '设备向 FoxAuth 请求一个登录代码。' },
@@ -190,6 +198,8 @@ export default {
 			title: '程序调用你的 API，没有人参与',
 			sentence: '程序用自己的 ID 和密钥自行登录，并以自己的名义获得令牌。',
 			protocol: 'OAuth 2.1 · Client Credentials',
+			problemCaption: '一把永不过期的共享密钥。',
+			fixCaption: '短期令牌取代了共享密钥。',
 			lanes: { job: '你的程序', fox: 'FoxAuth', api: '你的 API' },
 			steps: [
 				{ label: 'ID + 密钥', text: '程序出示自己的 ID 和密钥。' },
@@ -213,6 +223,8 @@ export default {
 				'在项目中声明这个 API，FoxAuth 就会把它作为接收方写进每个令牌，因此发给其他 API 的令牌会被拒绝。',
 			protocol:
 				'OAuth 2.0 Resource Indicators (RFC 8707) · 绑定受众的令牌 · 内省（RFC 7662）· 撤销（RFC 7009）',
+			problemCaption: '你的 API 接受任何令牌。',
+			fixCaption: '你的 API 只接受发给自己的令牌。',
 			lanes: {
 				webapp: '你的应用',
 				fox: 'FoxAuth',
@@ -248,6 +260,8 @@ export default {
 				'外部开发者用一个请求自行注册应用，之后用返回的令牌修改或删除它。',
 			protocol:
 				'Dynamic Client Registration (RFC 7591) · Registration Management (RFC 7592)',
+			problemCaption: '你要亲手给每个开发者发密钥。',
+			fixCaption: '开发者自己注册应用。',
 			lanes: { dev: '其他开发者的应用', fox: 'FoxAuth', person: '用户' },
 			steps: [
 				{ label: '自行注册', text: '开发者的应用把自己的信息发送到注册地址。' },
@@ -278,6 +292,8 @@ export default {
 				'在项目中声明你的 MCP 服务器，用户登录后智能体就能连接，无需注册：智能体用自己描述文档的地址来介绍自己。',
 			protocol:
 				'MCP Authorization · OAuth 2.1 · Protected Resource Metadata · Client ID Metadata Document',
+			problemCaption: '你的 MCP 服务器谁都能访问。',
+			fixCaption: '令牌只在你的服务器上有效。',
 			lanes: {
 				person: '用户',
 				agent: 'AI 智能体',
@@ -321,6 +337,8 @@ export default {
 			sentence:
 				'用户只需连接一次自己的账户。之后智能体通过 FoxAuth 获得访问权限，自己不保存任何人的令牌。',
 			protocol: 'OAuth 2.0 Token Exchange (RFC 8693) · 令牌保管库',
+			problemCaption: '智能体握着用户的 Google 钥匙。',
+			fixCaption: '令牌由 FoxAuth 保管，而不是智能体。',
 			lanes: {
 				person: '用户',
 				agent: 'AI 智能体',
@@ -363,6 +381,8 @@ export default {
 			sentence:
 				'智能体在 FoxAuth 中做的事和你在控制台中做的一样，权限相同，检查相同，没有任何特殊入口。',
 			protocol: 'MCP · OAuth 2.1 受保护资源',
+			problemCaption: '智能体拿到一把拥有全部权限的密钥。',
+			fixCaption: '智能体只拥有你的权限。',
 			lanes: { you: '你', agent: 'AI 智能体', fox: 'FoxAuth' },
 			steps: [
 				{ label: '“创建一个应用”', text: '你用日常语言向智能体提出要求。' },
@@ -398,6 +418,8 @@ export default {
 			sentence:
 				'用户用已有的账户登录。你的应用无需任何改动，因为它仍然只与 FoxAuth 通信。',
 			protocol: 'OpenID Connect · 联合登录',
+			problemCaption: '用户又得想一个新密码。',
+			fixCaption: '点一个按钮，用已有的账户登录。',
 			lanes: {
 				person: '用户',
 				webapp: '你的应用',
@@ -432,6 +454,8 @@ export default {
 			sentence:
 				'开启注册后，登录页面会出现“立即注册”链接。你也可以在 Users 页面亲自邀请用户。',
 			protocol: 'OpenID Connect · email_verified',
+			problemCaption: '每个账户都要手工创建。',
+			fixCaption: '用户自己注册，或者接受邀请。',
 			lanes: { person: '用户', fox: 'FoxAuth', mail: '收件箱' },
 			steps: [
 				{ label: '创建账户', text: '用户点击“立即注册”，并输入电子邮件地址。' },
@@ -460,6 +484,8 @@ export default {
 			sentence:
 				'输入密码后，用户还要输入身份验证器应用中的六位验证码。一个开关就能为整个项目开启它。',
 			protocol: 'TOTP (RFC 6238)',
+			problemCaption: '偷到密码就能登录。',
+			fixCaption: '还需要手机上的验证码。',
 			lanes: { person: '用户', fox: 'FoxAuth', totp: '身份验证器' },
 			steps: [
 				{ label: '密码', text: '用户输入密码。' },
@@ -487,6 +513,8 @@ export default {
 			sentence:
 				'登录页面位于你项目自己的地址上：一个路径，例如 /yourshop，或者本服务器上的一个子域名，例如 yourshop。超级管理员也可以改为把它放在你自己的域名上，例如 login.yourshop.com，这样在用户看来，它就是你的网站。',
 			protocol: '每个项目一个签发者',
+			problemCaption: '登录发生在别人的地址上。',
+			fixCaption: '登录发生在你自己的地址上。',
 			lanes: { person: '用户', domain: '你的地址', fox: 'FoxAuth' },
 			steps: [
 				{
@@ -518,6 +546,8 @@ export default {
 			sentence:
 				'当用户退出你的某个应用时，FoxAuth 会结束用户的会话，并通知用户用过的其他每个应用，以便它们也将用户登出。',
 			protocol: 'OIDC RP-Initiated Logout · OIDC Back-Channel Logout',
+			problemCaption: '退出登录后，其他应用仍然处于登录状态。',
+			fixCaption: '一次退出，所有应用都退出。',
 			lanes: {
 				person: '用户',
 				webapp: '你的应用',
@@ -551,6 +581,8 @@ export default {
 			sentence:
 				'为你的应用设置徽标和主色，登录页面就会带上它们，并以英文、俄文或简体中文显示。',
 			protocol: 'OpenID Connect ui_locales · 徽标 · 主色',
+			problemCaption: '登录页面看起来像别人的。',
+			fixCaption: '你的徽标、你的颜色、用户的语言。',
 			lanes: { person: '用户', webapp: '你的应用', fox: 'FoxAuth' },
 			steps: [
 				{ label: '点击“登录”', text: '用户在你的应用中点击“登录”。' },
@@ -585,7 +617,9 @@ export default {
 			sentence:
 				'每个项目都有一个账户页面，列出能访问当前登录用户的应用，用户可以移除其中任何一个。',
 			protocol: '面向最终用户的授权管理',
-			lanes: { person: '用户', fox: 'FoxAuth', webapp: '你的应用' },
+			problemCaption: '用户看不到哪些应用能访问自己的账户。',
+			fixCaption: '用户能看到每个应用，并能移除任何一个。',
+			lanes: { person: '用户', fox: 'FoxAuth' },
 			steps: [
 				{ label: '打开 /account/apps', text: '用户打开你项目的账户页面。' },
 				{ label: '有访问权限的应用', text: 'FoxAuth 列出能访问其账户的应用。' },
@@ -608,6 +642,8 @@ export default {
 			sentence:
 				'使用 DPoP 时，每个令牌都必须配合一个新的证明才能使用。证明由一把从不离开你的应用的密钥签名，所以单独复制走的令牌会被拒绝。',
 			protocol: 'DPoP (RFC 9449) · mTLS 证书绑定令牌（RFC 8705）',
+			problemCaption: '复制走的令牌谁都能用。',
+			fixCaption: '令牌只能配合你的应用的密钥使用。',
 			lanes: {
 				webapp: '你的应用',
 				fox: 'FoxAuth',
@@ -638,6 +674,8 @@ export default {
 			sentence:
 				'添加公司的身份提供商，可以是任何 OpenID 提供商，也可以是某个组织的 Microsoft 目录。你的应用无需任何改动。',
 			protocol: 'OpenID Connect · 联合登录',
+			problemCaption: '你的应用保存着公司 IT 无法收回的密码。',
+			fixCaption: '员工用公司账户登录。',
 			lanes: {
 				employee: '员工',
 				webapp: '你的应用',
@@ -668,6 +706,8 @@ export default {
 			sentence:
 				'有了 SCIM 连接，公司的目录就能在你的项目中创建、修改和停用人员，而你的应用仍然向 FoxAuth 询问谁可以登录。',
 			protocol: 'SCIM 2.0 (RFC 7644)',
+			problemCaption: '每个人都要手工添加和移除。',
+			fixCaption: '公司的目录自动添加和移除人员。',
 			lanes: { dir: '公司目录', fox: 'FoxAuth', employee: '员工' },
 			steps: [
 				{
@@ -697,6 +737,8 @@ export default {
 			sentence:
 				'把人员放进项目的用户组，你的应用就会在令牌的 groups 字段中拿到这些用户组，并决定显示什么。',
 			protocol: 'OpenID Connect · groups 声明',
+			problemCaption: '你的应用不知道用户属于哪个部门。',
+			fixCaption: '部门信息随令牌一起到达。',
 			lanes: { person: '用户', webapp: '你的应用', fox: 'FoxAuth' },
 			steps: [
 				{ label: '登录', text: 'Anna 登录你的应用。' },
@@ -716,6 +758,8 @@ export default {
 			sentence:
 				'在 FoxAuth 中停用此人，或者让公司的身份提供商自动将此人从所有地方登出。',
 			protocol: 'Okta Universal Logout · OIDC Back-Channel Logout',
+			problemCaption: '有人已经离职，访问权限却还开着。',
+			fixCaption: '改一处，所有地方的访问都关闭。',
 			lanes: {
 				itadmin: '公司 IT',
 				idp: 'Okta 或 Entra ID',
@@ -743,6 +787,8 @@ export default {
 			sentence:
 				'公司的身份提供商给智能体一个断言，FoxAuth 用它换出一个令牌，所以访问权限始终由公司掌控。',
 			protocol: 'ID-JAG · OAuth 2.0 Token Exchange (RFC 8693) · JWT bearer',
+			problemCaption: '没有人在场点击“允许”。',
+			fixCaption: '公司为自己的智能体担保。',
 			lanes: {
 				agent: 'AI 智能体',
 				idp: 'Okta 或 Entra ID',
@@ -773,6 +819,8 @@ export default {
 				'你的应用请求一项描述详尽的操作，授权同意页面准确显示这项操作，令牌也只携带这项操作。',
 			protocol:
 				'Rich Authorization Requests (RFC 9396) · authorization_details',
+			problemCaption: '一次同意放行的远远超出本意。',
+			fixCaption: '用户只批准一项具体的操作。',
 			lanes: {
 				webapp: '你的应用',
 				fox: 'FoxAuth',
@@ -810,6 +858,8 @@ export default {
 			title: '在手机上批准',
 			sentence: '请求送到用户的手机上，发起请求的系统拿到令牌。',
 			protocol: 'OpenID Connect CIBA',
+			problemCaption: '客户要把密码大声说出来。',
+			fixCaption: '客户在自己的手机上批准。',
 			lanes: { operator: '呼叫中心系统', fox: 'FoxAuth', client: '客户的手机' },
 			steps: [
 				{ label: '为 Anna 确认', text: '呼叫中心系统请求 Anna 批准。' },
@@ -826,6 +876,8 @@ export default {
 			sentence:
 				'IPSIE SL1 规范只需一个开关就能启用。在此之前，就绪检查会先显示哪些地方会改变。',
 			protocol: 'IPSIE SL1 · DPoP (RFC 9449) · PKCE',
+			problemCaption: '没人说得清哪些规则真正在执行。',
+			fixCaption: '先做就绪检查，再打开一个严格开关。',
 			lanes: { security: '安全团队', fox: 'FoxAuth' },
 			steps: [
 				{ label: '就绪检查', text: '你运行就绪检查。' },
@@ -849,6 +901,8 @@ export default {
 			sentence:
 				'项目归团队所有。只有成员身份能授予访问权限。每项更改都会写入一份任何人都无法编辑的日志。',
 			protocol: '不可篡改的审计日志',
+			problemCaption: '所有人共用一个管理员账户。',
+			fixCaption: '每个团队只能访问自己的项目。',
 			lanes: { team: '团队', project: '项目', audit: '审计日志' },
 			steps: [
 				{ label: '拥有', text: '支付团队拥有自己的项目。' },
@@ -868,6 +922,8 @@ export default {
 			sentence:
 				'把这个工具注册为管理员项目中的应用，groups 字段就会写出管理员所在的团队。',
 			protocol: 'OpenID Connect · groups 声明',
+			problemCaption: '任何人都能打开内部工具。',
+			fixCaption: '只有你的管理员能进入。',
 			lanes: { admin: '管理员', tool: '内部工具', fox: 'FoxAuth' },
 			steps: [
 				{ label: '打开工具', text: '管理员打开内部工具。' },
@@ -887,6 +943,8 @@ export default {
 			sentence:
 				'把公司的身份提供商添加到管理员项目，控制台的登录页面就会提供它，同时 FoxAuth 确保控制台永远不会把自己锁住。',
 			protocol: 'OpenID Connect · 控制台联合登录',
+			problemCaption: '控制台需要一个单独的密码。',
+			fixCaption: '管理员用公司的登录方式进入控制台。',
 			lanes: { admin: '管理员', fox: 'FoxAuth', idp: 'Okta 或 Entra ID' },
 			steps: [
 				{

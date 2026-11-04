@@ -50,5 +50,12 @@ export const CLOUD_FLAGS_ON: ReadonlySet<string> = new Set([
  */
 export const CLOUD_FREE_FEATURES: ReadonlySet<string> = new Set<string>([]);
 
+/*
+ * Where a request for a paid plan goes, and the subject the team's inbox sorts it by: the waitlist form's fallback
+ * and the guide's "Ask for a paid plan" both write this mail. The subject stays English in every language.
+ */
+export const WAITLIST_ADDRESS = 'hello@foxauth.dev';
+export const WAITLIST_SUBJECT = 'FoxAuth Cloud paid plans waitlist';
+
 /* The console of FoxAuth Cloud: what a prompt names, and where the guide's buttons lead. */
 export const CLOUD_CONSOLE = 'https://auth.foxauth.dev/admin';

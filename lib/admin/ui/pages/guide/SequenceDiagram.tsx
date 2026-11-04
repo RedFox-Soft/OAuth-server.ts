@@ -10,11 +10,14 @@ import { Button, Flex, theme } from 'antd';
 import { PlayCircleOutlined } from '@ant-design/icons';
 import type {
 	GuideLane,
+	GuidePart,
 	GuideStep
 } from '../../../../consts/situation_guide.js';
+import { GUIDE_PARTS } from '../../../../situation_guide/parts.js';
 
 /*
- * One renderer for every guide diagram: the lanes across the top, the steps as numbered arrows down, in one visual
+ * One renderer for every guide diagram: the lanes across the top, each headed by its part (the drawing the answer's
+ * pictures give that lane) and its name, the steps as numbered arrows down, in one visual
  * vocabulary (FoxAuth always the accent, a service outside the reader's control dashed, a refusal red and dashed).
  * Every colour is a custom property set from the antd token, so the diagram wears whatever theme the console has.
  *
@@ -137,6 +140,8 @@ interface Box {
 	h: number;
 	tone: Tone;
 	texts: Text[];
+	/* The lane's part (lib/situation_guide/parts.ts), drawn `size` wide from its top-left corner. */
+	icon?: { part: GuidePart; x: number; y: number; size: number };
 }
 
 interface StepShape {
@@ -176,12 +181,15 @@ function across(
 	const boxW = Math.min(laneW - 6, 168);
 	const headFs = narrow ? 11 : 12.5;
 	const headLh = headFs + 3;
+	// Each head carries its lane's part over its name, the drawing the answer's pictures use for that lane.
+	const iconSize = narrow ? 16 : 18;
+	const textTop = 8 + iconSize + 2;
 	const heads = lanes.map((l) =>
 		wrapLabel(l.label, boxW - 10, headFs, 700, measure)
 	);
 	const fits = laneW >= 72 && heads.every((h) => !h.broken);
 	const maxHeadLines = Math.max(1, ...heads.map((h) => h.lines.length));
-	const headH = 10 + maxHeadLines * headLh + 8;
+	const headH = textTop + maxHeadLines * headLh + 8;
 	const fs = narrow ? 11 : 12.5;
 	const lh = fs + 3;
 	const cx = (i: number) => PAD + laneW * (i + 0.5);
@@ -297,10 +305,16 @@ function across(
 					tone: toneOf(l),
 					texts: (heads[i]?.lines ?? []).map((text, k) => ({
 						x,
-						y: 10 + (k + 1) * headLh - 3,
+						y: textTop + (k + 1) * headLh - 3,
 						anchor: 'middle' as const,
 						text
 					})),
+					icon: {
+						part: l.part,
+						x: x - iconSize / 2,
+						y: 7,
+						size: iconSize
+					},
 					life: { x, y1: headH - 4, y2: H - 2 }
 				};
 			}),
@@ -328,25 +342,39 @@ function stacked(
 	const byId = new Map(lanes.map((l) => [l.id, l]));
 	const chip = (laneId: string, x: number, y: number): Box => {
 		const lane = byId.get(laneId);
+		// The lane's part stands at the chip's left, and its name is centred in the rest.
+		const icon = 14;
+		const inset = 6 + icon;
 		const { lines } = wrapLabel(
 			lane?.label ?? laneId,
-			chipW - 12,
+			chipW - 12 - inset,
 			headFs,
 			700,
 			measure
 		);
+		const h = Math.max(icon + 10, lines.length * headLh + 10);
 		return {
 			x,
 			y,
 			w: chipW,
-			h: lines.length * headLh + 10,
+			h,
 			tone: toneOf(lane),
 			texts: lines.map((text, k) => ({
-				x: x + chipW / 2,
-				y: y + 5 + (k + 1) * headLh - 3,
+				x: x + inset + (chipW - inset) / 2,
+				y: y + (h - lines.length * headLh) / 2 + (k + 1) * headLh - 3,
 				anchor: 'middle',
 				text
-			}))
+			})),
+			...(lane
+				? {
+						icon: {
+							part: lane.part,
+							x: x + 6,
+							y: y + (h - icon) / 2,
+							size: icon
+						}
+					}
+				: {})
 		};
 	};
 	const shapes: StepShape[] = [];
@@ -363,10 +391,14 @@ function stacked(
 			...t,
 			y: t.y + (rowH - left.h) / 2
 		}));
+		if (left.icon) {
+			left.icon = { ...left.icon, y: left.icon.y + (rowH - left.h) / 2 };
+		}
 		if (right) {
 			const shift = (rowH - right.h) / 2;
 			right.y = y + shift;
 			right.texts = right.texts.map((t) => ({ ...t, y: t.y + shift }));
+			if (right.icon) right.icon = { ...right.icon, y: right.icon.y + shift };
 		}
 		const my = y + rowH / 2;
 		const ax1 = PAD + chipW;
@@ -423,6 +455,8 @@ const CSS = `
 .guide-dia .box.fox { fill: var(--gd-accent-soft); stroke: var(--gd-accent); stroke-width: 1.6; }
 .guide-dia .box.outside { stroke: var(--gd-life); stroke-dasharray: 4 3; }
 .guide-dia .box-t { fill: var(--gd-fg); font-weight: 700; }
+.guide-dia .box-i { fill: none; stroke: var(--gd-fg); stroke-linecap: round; stroke-linejoin: round; }
+.guide-dia .box-i.fox { stroke: var(--gd-accent); }
 .guide-dia .life { stroke: var(--gd-life); stroke-width: 1.2; stroke-dasharray: 3 5; }
 .guide-dia .life.fox { stroke: var(--gd-accent); opacity: 0.55; }
 .guide-dia .arr { stroke: var(--gd-arrow); stroke-width: 1.8; fill: none; }
@@ -485,7 +519,19 @@ export function useDiagramPalette(): CSSProperties {
 		'--gd-on-accent': token.colorTextLightSolid,
 		'--gd-ink': token.colorText,
 		'--gd-on-ink': token.colorBgContainer,
-		'--gd-deny': token.colorErrorActive
+		'--gd-deny': token.colorErrorActive,
+		// The pictures' own (Scene.tsx): the frames, FoxAuth's ring, the fixed part and the example app's logo.
+		'--gd-line-2': token.colorBorderSecondary,
+		'--gd-accent-border': token.colorPrimaryBorder,
+		'--gd-accent-ring': token.colorPrimaryBgHover,
+		'--gd-ready-ink': token.colorPrimaryTextActive,
+		// antd's error text (#ff4d4f) is 3.0:1 on the frames' layout grey; red-7 is 5.1:1, so a refusal stays readable.
+		'--gd-deny-ink': token.red7,
+		'--gd-good': token.colorSuccessActive,
+		'--gd-problem-bg': token.colorBgLayout,
+		'--gd-shadow': token.boxShadowTertiary,
+		'--gd-mono': token.fontFamilyCode,
+		'--gd-app': token.cyan8
 	} as CSSProperties;
 }
 
@@ -748,6 +794,20 @@ function BoxShape({ box, size }: { box: Box; size: number }) {
 				height={box.h}
 				rx="8"
 			/>
+			{box.icon && (
+				<g
+					className={`box-i ${box.tone}`}
+					transform={`translate(${String(box.icon.x)} ${String(box.icon.y)}) scale(${String(box.icon.size / 24)})`}
+					strokeWidth={1.75}
+				>
+					{GUIDE_PARTS[box.icon.part].paths.map((d) => (
+						<path
+							key={d}
+							d={d}
+						/>
+					))}
+				</g>
+			)}
 			{box.texts.map((t, k) => (
 				<text
 					key={`t${String(k)}`}

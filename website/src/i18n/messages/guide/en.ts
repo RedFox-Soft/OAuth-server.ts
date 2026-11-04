@@ -1,20 +1,21 @@
 import { rich } from '../../types.ts';
 
 /*
- * The words of the "What do you need?" page around the answers: headings, labels, buttons and the legend. The answers
- * themselves (titles, sentences, diagram labels and steps) come from the guide data, through guide-texts.ts.
+ * The words of the "What do you need?" page around the answers: headings, labels, buttons and the diagram key. The
+ * answers themselves (titles, sentences, captions, diagram labels and steps) come from the guide data, through
+ * guide-texts.ts.
  */
 export default {
 	title: 'What do you need?',
 	description:
 		'Answer two questions and see which sign-in setup fits: what happens step by step, what the person sees, and one button that sets it up.',
-	lead: 'Answer two questions about your product, or pick what your customer’s company asks for. The answer below shows what happens, step by step. One button sets it up in your project on FoxAuth Cloud.',
+	lead: 'Two questions, one picture, and one button that sets it up.',
 	tabs: {
 		legend: 'Which part of the guide',
-		product: 'Your product: sign-in for people and agents',
-		productShort: 'Your product',
-		enterprise: 'Your customer is a company (Enterprise)',
-		enterpriseShort: 'Enterprise'
+		product: 'Your product',
+		productSub: 'sign-in for people and agents',
+		enterprise: 'Enterprise',
+		enterpriseSub: 'your customer is a company'
 	},
 	questions: {
 		first: 'Who is acting?',
@@ -47,6 +48,17 @@ export default {
 			yourApp: 'Your app with FoxAuth'
 		}
 	},
+	status: {
+		ready: 'Ready on Cloud',
+		ownServer: 'Own server',
+		notOnFree: 'Paid plan'
+	},
+	strip: {
+		label: 'The problem, the fix, and what you get',
+		problem: 'Your problem',
+		fix: 'With FoxAuth',
+		get: 'What you get'
+	},
 	answer: {
 		persona: {
 			person: 'A person',
@@ -62,16 +74,16 @@ export default {
 		setUp: 'Set this up',
 		destination: 'Opens in FoxAuth Cloud, in your project.',
 		destinationSub: 'You sign in first, or create a free account.',
-		ownServerFlag: 'FoxAuth Cloud has this switched off.',
+		ownServerFlag:
+			'FoxAuth Cloud has this switched off. Your own server has it.',
 		ownServerSuper:
 			'This needs a super administrator, and on FoxAuth Cloud nobody is one. On your own server, a super administrator sets it up.',
-		runOwnServer: rich('How to run your own server: ', {
-			link: 'Run with Docker Compose',
-			href: '/docs/get-started/docker-compose/'
-		}),
+		ownServerRoute: 'Run your own server',
 		notOnFree:
 			'The Free plan on FoxAuth Cloud does not include this. Paid plans are in development, and your own server has it today.',
 		seePlans: 'See the plans',
+		requestPlan: 'Ask for a paid plan',
+		next: 'Next:',
 		selfHostedFlags: 'On your own server, switch on in Settings:',
 		selfHostedAnyOf: 'On your own server, switch on one of these in Settings:',
 		selfHostedNone: 'On your own server, this needs no setting switched on.',
@@ -81,8 +93,9 @@ export default {
 		and: 'and',
 		or: 'or',
 		steps: 'How it works, step by step',
-		replay: 'Show the steps again',
-		sees: 'What the person will see',
+		prevStep: 'Previous step',
+		nextStep: 'Next step',
+		replay: 'Show again',
 		goodToKnow: 'Good to know',
 		underTheHood: 'Under the hood:',
 		prompt: 'Prompt for your agent',
@@ -95,17 +108,45 @@ export default {
 	},
 	mini: {
 		signIn: {
-			heading: 'Sign in to Your app',
+			heading: 'Sign in',
 			email: 'Email',
 			password: 'Password',
 			submit: 'Sign in',
+			or: 'or',
 			provider: 'Continue with Google'
 		},
+		signUp: {
+			heading: 'Create an account',
+			submit: 'Create account',
+			haveAccount: 'Already have an account? Sign in'
+		},
+		companySignIn: {
+			before: 'Continue with ',
+			after: ''
+		},
 		consent: {
-			heading: 'Your app asks for access',
+			heading: 'An app asks for access',
 			body: 'It will act on your behalf.',
 			deny: 'Deny',
 			allow: 'Allow'
+		},
+		agentConsent: {
+			asks: 'asks to act on your behalf',
+			scopes: ['Read your notes', 'Add new notes']
+		},
+		adminConsent: {
+			brand: 'FoxAuth administration',
+			asks: 'asks to act as you',
+			scopes: [
+				'See your projects and applications',
+				'Create and change applications'
+			]
+		},
+		serviceConsent: {
+			connect: 'Connect your account',
+			body: 'Your agent can then use it on your behalf, through FoxAuth.',
+			cancel: 'Cancel',
+			allow: 'Connect'
 		},
 		deviceCode: {
 			heading: 'Type the code from the screen',
@@ -120,19 +161,13 @@ export default {
 		}
 	},
 	legend: {
-		heading: 'How to read the diagrams',
-		summary: 'Show the legend',
-		fox: 'FoxAuth is always the coloured box.',
-		plain: 'A plain box is you, your code or the person.',
-		outside:
-			'A dashed box is a service outside your control, or your customer’s company.',
-		redirect:
-			'A dashed arrow sends the person’s browser on to another address.',
-		token: 'A thick arrow carries a token.',
-		refusal: 'A red dashed arrow is a refusal.',
-		self: 'A step inside one box happens there, with no message sent.',
-		numbers:
-			'The steps are numbered, and the list under each diagram says the same in words.'
+		fox: 'FoxAuth',
+		outside: 'Outside your control',
+		request: 'A message',
+		redirect: 'The browser is sent on',
+		token: 'Carries a token',
+		refusal: 'A refusal',
+		self: 'Happens inside one box'
 	},
 	all: {
 		heading: 'All situations',

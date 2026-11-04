@@ -356,3 +356,13 @@ Operations:
 ## [2026-11-04] update | [[situation-guide]] — the console's primary blue is `#0958d9` everywhere (theme tokens in `ConsoleRoot.tsx`), so the guide's local override of antd's internal button variables is removed.
 
 ## [2026-11-04] update | [[situation-guide]] — the site page moved from `/docs/guide/` to `/guide/` on the marketing layout: inside the docs it read as one more manual page; the home page's link to it is a callout block, since an unstyled hero link did not read as a link.
+
+## [2026-11-04] update | [[situation-guide]] — the site page is split from 1024 px and every answer opens with the problem, the fix and what you get in pictures, drawn from the exported scenes; status marks on options and table rows; the phone scrolls to the answer after question 2.
+
+## [2026-11-04] update | [[situation-guide]] — the scene carries its layout (`placement`, `row`, `above`, arc levels) and the options' parts come from `lib/situation_guide/options.ts`, so no page keeps a picture rule; three preview kinds (`signUp`, `serviceConsent`, `adminConsent`) match their answers' lines.
+
+## [2026-11-04] update | [[situation-guide]] — the console's answer draws the same three pictures from `sceneOf` and `GUIDE_PARTS` (`Scene.tsx`, `Part.tsx`), its lanes carry their parts, its options carry a status glyph and word read off `actionFor`, and okta and scim link to each other with "Next:".
+
+## [2026-11-04] update | [[situation-guide]] — the picture rule: parts per lane, a problem per situation, FoxAuth beside the path unless an outside party sends to it; the console's refusal red is red-7 for contrast.
+
+## [2026-11-04] fix | [[situation-guide]] — the solution scene carries `fixed` (the lane with the check), never a refused or outside party; both renderers read it; signup's problem picture draws only the person; stale line citations corrected.

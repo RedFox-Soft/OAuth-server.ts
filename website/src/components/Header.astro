@@ -31,13 +31,13 @@ const links = await Promise.all(
 	].map(async (link) => ({ ...link, href: await localizedHref(link.href, locale) }))
 );
 const linkClass =
-	'rounded-control px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-accent-50 hover:text-accent-700 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-accent-200';
+	'rounded-control px-3 py-2 lg:px-2 xl:px-3 text-sm font-medium text-gray-700 transition-colors hover:bg-accent-50 hover:text-accent-700 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-accent-200';
 ---
 
 <header
 	class="sticky top-0 z-30 border-b border-gray-200 bg-white/90 backdrop-blur dark:border-gray-800 dark:bg-gray-950/90"
 >
-	<div class="mx-auto flex max-w-6xl items-center gap-4 px-6 py-2.5">
+	<div class="mx-auto flex max-w-6xl items-center gap-4 px-6 py-2.5 lg:gap-2 xl:gap-4">
 		<Brand
 			size={40}
 			href={localizedRoute('/', locale)}
@@ -45,13 +45,24 @@ const linkClass =
 
 		{/*
 		 * The inline menu from `lg` up, not `md`: at 768 px the five links, the language links and the button did
-		 * not fit one row, and every page scrolled sideways (807 px in English, 1018 px in Russian).
+		 * not fit one row, and every page scrolled sideways (807 px in English, 1018 px in Russian). Between `lg` and
+		 * `xl` the links and gaps are tighter and GitHub waits for `xl` (it stays in the footer): at 1024 px the
+		 * Russian row was 1042 px wide, and 3 px too wide still beside a classic scrollbar.
 		 */}
 		<nav
 			aria-label={t.ariaMain}
 			class="ml-auto hidden items-center gap-1 lg:flex"
 		>
-			{links.map((link) => <a href={link.href} class={linkClass}>{link.label}</a>)}
+			{
+				links.map((link) => (
+					<a
+						href={link.href}
+						class:list={[linkClass, link.href.startsWith('https://') && 'lg:hidden xl:block']}
+					>
+						{link.label}
+					</a>
+				))
+			}
 		</nav>
 
 		<LanguageSwitch
@@ -60,7 +71,7 @@ const linkClass =
 		/>
 
 		{/* Hidden on a phone, where the logo, this button and the menu did not fit one row; the menu carries it. */}
-		<div class="ml-auto hidden sm:block lg:ml-2">
+		<div class="ml-auto hidden shrink-0 sm:block lg:ml-2">
 			<Button
 				href={CLOUD_SIGN_UP}
 				rel={CLOUD_SIGN_UP_REL}

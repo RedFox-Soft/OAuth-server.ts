@@ -101,9 +101,32 @@ export type GuideTarget =
 	/* A foxauth.dev path. */
 	| { docs: string };
 
+/* The drawing a lane is shown as. The drawings are in lib/situation_guide/parts.ts. */
+export type GuidePart =
+	| 'person'
+	| 'laptop'
+	| 'browser'
+	| 'server'
+	| 'phone'
+	| 'tv'
+	| 'clock'
+	| 'agent'
+	| 'api'
+	| 'company'
+	| 'directory'
+	| 'fox'
+	| 'cloud'
+	| 'mail'
+	| 'authenticator'
+	| 'globe'
+	| 'team'
+	| 'audit'
+	| 'thief';
+
 export interface GuideLane {
 	id: string;
 	label: string;
+	/* The diagram's colours read this; `part` is the drawing. */
 	kind:
 		| 'person'
 		| 'browser'
@@ -113,7 +136,19 @@ export interface GuideLane {
 		| 'agent'
 		| 'outside'
 		| 'company';
+	part: GuidePart;
 }
+
+/* What is wrong without FoxAuth, drawn as a mark on the part that has the problem. */
+export type ProblemMark = 'password' | 'secret' | 'open' | 'copy' | 'missing';
+
+/* The names the drawn screens use, said once so the site and the console show the same example. */
+export const GUIDE_EXAMPLES = {
+	app: 'Acme Notes',
+	company: 'Acme Corp',
+	agent: 'Claude',
+	service: 'Google'
+} as const;
 
 export interface GuideStep {
 	from: string;
@@ -124,7 +159,23 @@ export interface GuideStep {
 }
 
 export interface GuidePreview {
-	kind: 'signIn' | 'consent' | 'deviceCode' | 'approve' | 'none';
+	/*
+	 * `companySignIn` is a sign-in page with a button for the company (GUIDE_EXAMPLES.company); `agentConsent` a
+	 * consent page that names the agent (GUIDE_EXAMPLES.agent) and what it may do in the app; `adminConsent` the same
+	 * for the agent acting in FoxAuth's own console; `serviceConsent` the page that connects the person's account at
+	 * an outside service (GUIDE_EXAMPLES.service) to the app; `signUp` the form that creates an account.
+	 */
+	kind:
+		| 'signIn'
+		| 'signUp'
+		| 'companySignIn'
+		| 'consent'
+		| 'agentConsent'
+		| 'adminConsent'
+		| 'serviceConsent'
+		| 'deviceCode'
+		| 'approve'
+		| 'none';
 	lines: string[];
 }
 
@@ -138,6 +189,21 @@ export interface GuideSituation {
 	protocol: string;
 	lanes: GuideLane[];
 	steps: GuideStep[];
+	/* The first picture: the lane with the problem, its mark, and about six plain words. */
+	problem: {
+		at: LaneId;
+		mark: ProblemMark;
+		caption: string;
+		/*
+		 * The lanes the problem picture draws, where the rule in lib/situation_guide/scene.ts would draw a part of
+		 * the fix or leave out the party the caption is about.
+		 */
+		lanes?: LaneId[];
+	};
+	/* The second picture's words: what FoxAuth changes, as plainly. */
+	fixCaption: string;
+	/* The situation that usually comes next, on the same tab. */
+	next?: string;
 	sees: GuidePreview;
 	/* For an application situation, the console preset it applies. */
 	preset?: SituationId;
@@ -250,43 +316,43 @@ export const GUIDE_QUESTIONS: readonly GuideQuestion[] = [
  * accent and `outside` is a service the reader does not control.
  */
 const LANES = {
-	person: { label: 'Person', kind: 'person' },
-	server: { label: 'Your server', kind: 'app' },
-	spa: { label: 'Your browser app', kind: 'browser' },
-	app: { label: 'Your app', kind: 'app' },
-	webapp: { label: 'Your app', kind: 'browser' },
-	fox: { label: 'FoxAuth', kind: 'fox' },
-	api: { label: 'Your API', kind: 'api' },
-	otherapi: { label: 'Another API', kind: 'outside' },
-	tv: { label: 'TV or device', kind: 'app' },
-	phone: { label: 'Person’s phone', kind: 'app' },
-	job: { label: 'Your program', kind: 'app' },
-	agent: { label: 'AI agent', kind: 'agent' },
-	mcp: { label: 'Your MCP server', kind: 'api' },
-	google: { label: 'Google, GitHub, Slack', kind: 'outside' },
-	googleOnly: { label: 'Google', kind: 'outside' },
-	you: { label: 'You', kind: 'person' },
-	mail: { label: 'Inbox', kind: 'outside' },
-	totp: { label: 'Authenticator app', kind: 'outside' },
-	domain: { label: 'Your address', kind: 'browser' },
-	idp: { label: 'Okta or Entra ID', kind: 'company' },
-	dir: { label: 'Company directory', kind: 'company' },
-	employee: { label: 'Employee', kind: 'person' },
-	apps: { label: 'Your apps', kind: 'browser' },
-	operator: { label: 'Call centre system', kind: 'app' },
-	client: { label: 'Customer’s phone', kind: 'person' },
-	team: { label: 'Team', kind: 'person' },
-	project: { label: 'Project', kind: 'fox' },
-	audit: { label: 'Audit trail', kind: 'fox' },
-	tool: { label: 'Internal tool', kind: 'browser' },
-	admin: { label: 'Administrator', kind: 'person' },
-	itadmin: { label: 'Company IT', kind: 'company' },
-	security: { label: 'Security team', kind: 'person' },
-	dev: { label: 'Another developer’s app', kind: 'outside' },
-	thief: { label: 'Someone with a copy', kind: 'outside' }
+	person: { label: 'Person', kind: 'person', part: 'person' },
+	server: { label: 'Your server', kind: 'app', part: 'server' },
+	spa: { label: 'Your browser app', kind: 'browser', part: 'browser' },
+	app: { label: 'Your app', kind: 'app', part: 'laptop' },
+	webapp: { label: 'Your app', kind: 'browser', part: 'browser' },
+	fox: { label: 'FoxAuth', kind: 'fox', part: 'fox' },
+	api: { label: 'Your API', kind: 'api', part: 'api' },
+	otherapi: { label: 'Another API', kind: 'outside', part: 'api' },
+	tv: { label: 'TV or device', kind: 'app', part: 'tv' },
+	phone: { label: 'Person’s phone', kind: 'app', part: 'phone' },
+	job: { label: 'Your program', kind: 'app', part: 'clock' },
+	agent: { label: 'AI agent', kind: 'agent', part: 'agent' },
+	mcp: { label: 'Your MCP server', kind: 'api', part: 'api' },
+	google: { label: 'Google, GitHub, Slack', kind: 'outside', part: 'cloud' },
+	googleOnly: { label: 'Google', kind: 'outside', part: 'cloud' },
+	you: { label: 'You', kind: 'person', part: 'person' },
+	mail: { label: 'Inbox', kind: 'outside', part: 'mail' },
+	totp: { label: 'Authenticator app', kind: 'outside', part: 'authenticator' },
+	domain: { label: 'Your address', kind: 'browser', part: 'globe' },
+	idp: { label: 'Okta or Entra ID', kind: 'company', part: 'company' },
+	dir: { label: 'Company directory', kind: 'company', part: 'directory' },
+	employee: { label: 'Employee', kind: 'person', part: 'person' },
+	apps: { label: 'Your apps', kind: 'browser', part: 'browser' },
+	operator: { label: 'Call centre system', kind: 'app', part: 'laptop' },
+	client: { label: 'Customer’s phone', kind: 'person', part: 'phone' },
+	team: { label: 'Team', kind: 'person', part: 'team' },
+	project: { label: 'Project', kind: 'fox', part: 'fox' },
+	audit: { label: 'Audit trail', kind: 'fox', part: 'audit' },
+	tool: { label: 'Internal tool', kind: 'browser', part: 'browser' },
+	admin: { label: 'Administrator', kind: 'person', part: 'person' },
+	itadmin: { label: 'Company IT', kind: 'company', part: 'company' },
+	security: { label: 'Security team', kind: 'person', part: 'team' },
+	dev: { label: 'Another developer’s app', kind: 'outside', part: 'laptop' },
+	thief: { label: 'Someone with a copy', kind: 'outside', part: 'thief' }
 } as const satisfies Record<string, Omit<GuideLane, 'id'>>;
 
-type LaneId = keyof typeof LANES;
+export type LaneId = keyof typeof LANES;
 
 function lanes(...ids: LaneId[]): GuideLane[] {
 	return ids.map((id) => ({ id, ...LANES[id] }));
@@ -370,6 +436,12 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 				'Your server starts a session, and the person is in.'
 			)
 		],
+		problem: {
+			at: 'server',
+			mark: 'password',
+			caption: 'Your server stores everyone’s passwords.'
+		},
+		fixCaption: 'Only FoxAuth ever sees the password.',
 		sees: {
 			kind: 'signIn',
 			lines: [
@@ -445,6 +517,12 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 				'Your app calls your API with the access token.'
 			)
 		],
+		problem: {
+			at: 'spa',
+			mark: 'secret',
+			caption: 'A secret in browser code is public.'
+		},
+		fixCaption: 'A one-time check replaces the secret.',
 		sees: {
 			kind: 'signIn',
 			lines: [
@@ -515,6 +593,12 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 				'token'
 			)
 		],
+		problem: {
+			at: 'app',
+			mark: 'password',
+			caption: 'The app sees the person’s password.'
+		},
+		fixCaption: 'Sign-in opens in a browser they trust.',
 		sees: {
 			kind: 'signIn',
 			lines: [
@@ -581,6 +665,12 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 				'token'
 			)
 		],
+		problem: {
+			at: 'tv',
+			mark: 'password',
+			caption: 'Typing a password with a TV remote.'
+		},
+		fixCaption: 'A short code, confirmed on a phone.',
 		sees: {
 			kind: 'deviceCode',
 			lines: [
@@ -640,6 +730,12 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 				'Your API checks the token’s signature against the project’s public keys. It does not call FoxAuth on every request.'
 			)
 		],
+		problem: {
+			at: 'job',
+			mark: 'secret',
+			caption: 'One shared key that never expires.'
+		},
+		fixCaption: 'Short-lived tokens replace the shared key.',
 		sees: {
 			kind: 'none',
 			lines: ['Nobody sees a screen: no person signs in']
@@ -698,6 +794,12 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 				'refusal'
 			)
 		],
+		problem: {
+			at: 'api',
+			mark: 'open',
+			caption: 'Your API accepts any token at all.'
+		},
+		fixCaption: 'Your API takes only its own tokens.',
 		sees: {
 			kind: 'none',
 			lines: ['Nobody sees a screen: this is between programs']
@@ -752,6 +854,12 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 				'Later the app changes or removes its own registration with the management token.'
 			)
 		],
+		problem: {
+			at: 'dev',
+			mark: 'secret',
+			caption: 'You hand every developer a key yourself.'
+		},
+		fixCaption: 'Developers register their apps themselves.',
 		sees: {
 			kind: 'consent',
 			lines: [
@@ -824,8 +932,14 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 				'The agent works with your server on the person’s behalf.'
 			)
 		],
+		problem: {
+			at: 'mcp',
+			mark: 'open',
+			caption: 'Your MCP server is open to anyone.'
+		},
+		fixCaption: 'The token works only at your server.',
 		sees: {
-			kind: 'consent',
+			kind: 'agentConsent',
 			lines: [
 				'The sign-in page, then a consent page',
 				'It names the agent and your MCP server',
@@ -892,8 +1006,14 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 				'The agent reads mail, creates a task or posts in a channel as the person.'
 			)
 		],
+		problem: {
+			at: 'agent',
+			mark: 'password',
+			caption: 'The agent holds the person’s Google keys.'
+		},
+		fixCaption: 'FoxAuth keeps the tokens, not the agent.',
 		sees: {
-			kind: 'consent',
+			kind: 'serviceConsent',
 			lines: [
 				'A page that names the service, for example Google',
 				'The person connects the account and agrees',
@@ -963,8 +1083,14 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 				'The agent gets the answer and tells you what was done.'
 			)
 		],
+		problem: {
+			at: 'agent',
+			mark: 'secret',
+			caption: 'The agent gets a key with every right.'
+		},
+		fixCaption: 'The agent acts with your rights only.',
 		sees: {
-			kind: 'consent',
+			kind: 'adminConsent',
 			lines: [
 				'The administrator sign-in page',
 				'A page that names the agent asking to act as you'
@@ -1043,6 +1169,12 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 				'token'
 			)
 		],
+		problem: {
+			at: 'webapp',
+			mark: 'password',
+			caption: 'People must invent yet another password.'
+		},
+		fixCaption: 'One button, for an account they already have.',
 		sees: {
 			kind: 'signIn',
 			lines: [
@@ -1097,8 +1229,15 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 				'The address is marked verified: your app gets email_verified = true.'
 			)
 		],
+		problem: {
+			at: 'person',
+			mark: 'missing',
+			caption: 'Every account is created by hand.',
+			lanes: ['person']
+		},
+		fixCaption: 'People sign up, or accept an invitation.',
 		sees: {
-			kind: 'signIn',
+			kind: 'signUp',
 			lines: [
 				'A “Create an account” link on the sign-in page',
 				'A form for the address and a password',
@@ -1153,6 +1292,13 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 				'token'
 			)
 		],
+		problem: {
+			at: 'person',
+			mark: 'password',
+			caption: 'A stolen password is enough to get in.',
+			lanes: ['person']
+		},
+		fixCaption: 'A code from the phone is needed too.',
 		sees: {
 			kind: 'signIn',
 			lines: [
@@ -1211,6 +1357,12 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 				'The person signs in on a page with your address.'
 			)
 		],
+		problem: {
+			at: 'domain',
+			mark: 'missing',
+			caption: 'Sign-in happens on someone else’s address.'
+		},
+		fixCaption: 'Sign-in happens on your own address.',
 		sees: {
 			kind: 'signIn',
 			lines: ['The sign-in page, with your address in the address bar']
@@ -1271,6 +1423,12 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 				'redirect'
 			)
 		],
+		problem: {
+			at: 'apps',
+			mark: 'open',
+			caption: 'Signing out leaves the other apps open.'
+		},
+		fixCaption: 'One sign-out reaches every app.',
 		sees: {
 			kind: 'none',
 			lines: [
@@ -1330,6 +1488,12 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 				'The person signs in on a page that looks like your product.'
 			)
 		],
+		problem: {
+			at: 'webapp',
+			mark: 'missing',
+			caption: 'The sign-in page looks like someone else’s.'
+		},
+		fixCaption: 'Your logo, your colour, their language.',
 		sees: {
 			kind: 'signIn',
 			lines: [
@@ -1362,7 +1526,7 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 		sentence:
 			'Every project has an account page that lists the apps holding access to the signed-in person, and they can remove any of them.',
 		protocol: 'Grant management for end users',
-		lanes: lanes('person', 'fox', 'webapp'),
+		lanes: lanes('person', 'fox'),
 		steps: [
 			step(
 				'person',
@@ -1385,6 +1549,12 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 				'refusal'
 			)
 		],
+		problem: {
+			at: 'person',
+			mark: 'missing',
+			caption: 'People cannot see which apps reach them.'
+		},
+		fixCaption: 'People see every app, and remove any.',
 		sees: {
 			kind: 'none',
 			lines: [
@@ -1443,6 +1613,12 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 				'refusal'
 			)
 		],
+		problem: {
+			at: 'thief',
+			mark: 'copy',
+			caption: 'A copied token works for anyone.'
+		},
+		fixCaption: 'A token works only with your app’s key.',
 		sees: {
 			kind: 'none',
 			lines: ['Nobody sees a screen: this is between your app and your API']
@@ -1496,8 +1672,15 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 			),
 			step('fox', 'webapp', 'Tokens', 'Your app gets ordinary tokens.', 'token')
 		],
+		problem: {
+			at: 'webapp',
+			mark: 'password',
+			caption: 'Your app keeps passwords company IT cannot close.'
+		},
+		fixCaption: 'Employees sign in with their company account.',
+		next: 'scim',
 		sees: {
-			kind: 'signIn',
+			kind: 'companySignIn',
 			lines: [
 				'A button with the company’s name on the sign-in page',
 				'Then the company’s own sign-in page, and back'
@@ -1563,6 +1746,14 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 				'refusal'
 			)
 		],
+		problem: {
+			at: 'employee',
+			mark: 'missing',
+			caption: 'Every person is added and removed by hand.',
+			lanes: ['dir', 'employee']
+		},
+		fixCaption: 'The company’s directory adds and removes people.',
+		next: 'okta',
 		sees: {
 			kind: 'none',
 			lines: [
@@ -1616,6 +1807,12 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 				'Your app opens the finance section for Anna.'
 			)
 		],
+		problem: {
+			at: 'webapp',
+			mark: 'missing',
+			caption: 'Your app cannot tell the person’s department.'
+		},
+		fixCaption: 'The department arrives in the token.',
 		sees: {
 			kind: 'none',
 			lines: ['Nobody sees a screen: the groups arrive in the token']
@@ -1669,6 +1866,12 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 				'Your apps receive a sign-out notice.'
 			)
 		],
+		problem: {
+			at: 'apps',
+			mark: 'open',
+			caption: 'Someone left, and their access is still open.'
+		},
+		fixCaption: 'One change closes access everywhere.',
 		sees: {
 			kind: 'none',
 			lines: ['The person is signed out of every app, with no page to see']
@@ -1725,6 +1928,13 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 			),
 			step('agent', 'api', 'Works', 'The agent calls your API.')
 		],
+		problem: {
+			at: 'agent',
+			mark: 'missing',
+			caption: 'No person is there to click Allow.',
+			lanes: ['agent', 'api']
+		},
+		fixCaption: 'The company vouches for its own agents.',
 		sees: {
 			kind: 'none',
 			lines: ['Nobody sees a consent screen: the company has already decided']
@@ -1785,6 +1995,13 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 				'Your payment API reads the details from the token and carries them out.'
 			)
 		],
+		problem: {
+			at: 'api',
+			mark: 'open',
+			caption: 'One yes allows far more than was meant.',
+			lanes: ['person', 'webapp', 'api']
+		},
+		fixCaption: 'The person approves one exact action.',
 		sees: {
 			kind: 'approve',
 			lines: [
@@ -1837,6 +2054,13 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 				'token'
 			)
 		],
+		problem: {
+			at: 'client',
+			mark: 'password',
+			caption: 'Customers say their password out loud.',
+			lanes: ['client', 'operator']
+		},
+		fixCaption: 'The customer approves on their own phone.',
 		sees: {
 			kind: 'approve',
 			lines: [
@@ -1886,6 +2110,12 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 				'The rules now apply to every application.'
 			)
 		],
+		problem: {
+			at: 'security',
+			mark: 'missing',
+			caption: 'Nobody can tell which rules are enforced.'
+		},
+		fixCaption: 'A readiness check, then one strict switch.',
 		sees: {
 			kind: 'none',
 			lines: ['A readiness report in the console, before anything changes']
@@ -1938,6 +2168,12 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 				'Nobody can change or delete an entry.'
 			)
 		],
+		problem: {
+			at: 'team',
+			mark: 'copy',
+			caption: 'Everyone shares one administrator account.'
+		},
+		fixCaption: 'Each team reaches only its own projects.',
 		sees: {
 			kind: 'none',
 			lines: ['The trail in the console: who changed what, and when']
@@ -1993,6 +2229,12 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 				'The tool opens itself to the teams it trusts.'
 			)
 		],
+		problem: {
+			at: 'tool',
+			mark: 'open',
+			caption: 'Anyone can open the internal tool.'
+		},
+		fixCaption: 'Only your administrators get in.',
 		sees: {
 			kind: 'signIn',
 			lines: ['The administrators’ sign-in page, then back to the tool']
@@ -2051,8 +2293,15 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 				'The administrator is in the console.'
 			)
 		],
+		problem: {
+			at: 'admin',
+			mark: 'password',
+			caption: 'The console needs a password of its own.',
+			lanes: ['admin', 'idp']
+		},
+		fixCaption: 'Administrators use their company sign-in.',
 		sees: {
-			kind: 'signIn',
+			kind: 'companySignIn',
 			lines: [
 				'The console’s sign-in page with a button for the company',
 				'Then the company’s own sign-in page, and back'

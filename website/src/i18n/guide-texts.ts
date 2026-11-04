@@ -21,6 +21,9 @@ export interface GuideSituationTexts {
 	title: string;
 	sentence: string;
 	protocol?: string;
+	/* The words under the two pictures: what is wrong without FoxAuth, and what it changes. */
+	problemCaption: string;
+	fixCaption: string;
 	lanes: Record<string, string>;
 	steps: { label: string; text: string }[];
 	sees: string[];
@@ -63,6 +66,8 @@ export function guideTextsFromExport(exported: GuideExport): GuideTexts {
 			title: situation.title,
 			sentence: situation.sentence,
 			protocol: situation.protocol,
+			problemCaption: situation.problem.caption,
+			fixCaption: situation.fixCaption,
 			lanes: Object.fromEntries(situation.lanes.map((l) => [l.id, l.label])),
 			steps: situation.steps.map((s) => ({ label: s.label, text: s.text })),
 			sees: situation.sees.lines,
@@ -133,6 +138,13 @@ export function guideTextsFor(
 			throw new Error(
 				`guideSituations/${locale}: situation "${id}" is missing`
 			);
+		}
+		for (const field of ['problemCaption', 'fixCaption'] as const) {
+			if (!translated[field]) {
+				throw new Error(
+					`guideSituations/${locale}: situation "${id}" has no ${field}`
+				);
+			}
 		}
 		for (const lane of Object.keys(base.lanes)) {
 			if (!translated.lanes?.[lane]) {

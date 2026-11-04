@@ -1,14 +1,15 @@
 ---
 import Site from '../layouts/Site.astro';
-import Section from '../components/ui/Section.astro';
 import StaleTranslationNotice from '../components/StaleTranslationNotice.astro';
-import Card from '../components/ui/Card.astro';
 import Button from '../components/ui/Button.astro';
+import Part from '../components/guide/Part.astro';
+import Status from '../components/guide/Status.astro';
+import Thumb from '../components/guide/Thumb.astro';
 import Questions from '../components/guide/Questions.astro';
 import AnswerPanel from '../components/guide/AnswerPanel.astro';
 import ExpertTable from '../components/guide/ExpertTable.astro';
 import { loadExport } from '../data/export.ts';
-import { DEFAULT_ANSWER } from '../data/guide.ts';
+import { DEFAULT_ANSWER, cloudMark } from '../data/guide.ts';
 import { guideTextsFor } from '../i18n/guide-texts.ts';
 import { localizedHref } from '../i18n/locale.ts';
 import { isStale, messagesFor } from '../i18n/messages.ts';
@@ -18,10 +19,11 @@ import type { LocaleKey } from '../data/seo.ts';
 /*
  * "What do you need?": the console's situation guide, on the site at /guide/ (a page of its own, not inside the docs:
  * it is where someone starts who does not yet know which docs page they need), from the same data (lib/consts/situation_guide.ts
- * through the docs export). Two tabs; on the first, two questions and the common tasks, on the second the company's
- * requests; one answer below, chosen by radio buttons. Every answer is in the HTML, and CSS shows the chosen one, so
- * the page works with scripts off; the script (components/guide/guide.ts) adds the address and the buttons that need
- * it.
+ * through the docs export). From 1024 px the page is split: the questions on the left, compact enough that both fit
+ * on the first screen, and the answer on the right, which stays in view. Two tabs; on the first, two questions and
+ * the common tasks, on the second the company's requests. Every answer is in the HTML, and CSS shows the chosen one,
+ * so the page works with scripts off; the script (components/guide/guide.ts) adds the address, the step controls,
+ * copying, and on a phone the scroll to the answer after a choice.
  */
 interface Props {
 	locale: LocaleKey;
@@ -37,6 +39,12 @@ for (const id of [DEFAULT_ANSWER.product, DEFAULT_ANSWER.enterprise]) {
 	if (!byId.has(id))
 		throw new Error(`The guide's default answer "${id}" is not a situation`);
 }
+for (const s of situations) {
+	if (s.next && !byId.has(s.next))
+		throw new Error(
+			`The guide's answer "${s.id}" names "${s.next}" as next, which is no situation`
+		);
+}
 const productDefault = byId.get(DEFAULT_ANSWER.product);
 const defaultActor = productDefault?.ask?.actor ?? questions[0]?.actor ?? 'person';
 
@@ -46,8 +54,15 @@ const enterprise = [
 	...situations.filter((s) => s.tab === 'enterprise' && !s.first)
 ];
 
-const pricingHref = await localizedHref('/pricing/', locale);
-const firstClient = await localizedHref('/docs/get-started/first-client/', locale);
+const pricingHref = `${await localizedHref('/pricing/', locale)}#cloud`;
+const ownServerHref = await localizedHref(
+	'/docs/get-started/docker-compose/',
+	locale
+);
+const firstClient = await localizedHref(
+	'/docs/get-started/first-client/',
+	locale
+);
 
 /*
  * Which answer CSS shows: the one whose radio is checked, on the tab whose radio is checked. Generated, because a
@@ -57,8 +72,20 @@ const firstClient = await localizedHref('/docs/get-started/first-client/', local
  * A common task is a link, not a radio. With the script, choosing one unchecks question 2 and names the task on the
  * root (`data-chip`); without it, the task's answer is the `:target` and wins until the reader leaves it, since a
  * radio cannot change the address (the hint under the tasks links back to the questions).
+ *
+ * The step a reader points at, or steps to with the arrows (`data-step` on the answer), picks out its arrow and its
+ * line in the list; the other rows fade.
  */
 const actors = questions.map((q) => q.actor);
+const mostSteps = Math.max(...situations.map((s) => s.steps.length));
+const stepRules = Array.from({ length: mostSteps }, (_, i) => {
+	const k = i + 1;
+	return (
+		`.g-answer:is([data-step="${k}"],:has(.g-steps>li:nth-child(${k}):hover)) .g-row:not(:nth-child(${k})){opacity:.28}` +
+		`.g-answer:is([data-step="${k}"],:has(.g-steps>li:nth-child(${k}):hover)) .g-row:nth-child(${k}) .g-label{box-shadow:0 0 0 3px var(--g-fox-ring);border-color:var(--g-fox-border)}` +
+		`.g-answer[data-step="${k}"] .g-steps>li:nth-child(${k}){background:var(--g-sel-bg);box-shadow:inset 3px 0 0 var(--g-fox-border)}`
+	);
+});
 const showRules = [
 	...actors.map(
 		(actor) =>
@@ -70,7 +97,7 @@ const showRules = [
 			: s.ask
 				? `.guide:has(#g-tab-product:checked):has(#g-s-${s.id}:checked) #answer-${s.id}{display:block}`
 				: `.guide[data-chip=${s.id}]:has(#g-tab-product:checked) #answer-${s.id}{display:block}` +
-					`.guide:not([data-ready]):has(#answer-${s.id}:target) .g-chip[data-chip=${s.id}]{background:var(--color-accent-500);border-color:var(--color-accent-500);color:var(--color-gray-950)}`
+					`.guide:not([data-ready]):has(#answer-${s.id}:target) .g-chip[data-chip=${s.id}]{border-color:var(--g-sel-border);background:var(--g-sel-bg);box-shadow:inset 0 0 0 1px var(--g-sel-border)}`
 	),
 	...actors.flatMap((actor) =>
 		actors
@@ -80,11 +107,9 @@ const showRules = [
 					`.guide:has(#g-tab-product:checked):has(#g-actor-${actor}:checked):has(.g-ans-${other}:checked) .g-answer[data-tab=product]:not(:target){display:none!important}` +
 					`.guide:has(#g-tab-product:checked):has(#g-actor-${actor}:checked):has(.g-ans-${other}:checked) .g-pick{display:block}`
 			)
-	)
+	),
+	...stepRules
 ].join('\n');
-
-const tabLabel =
-	'flex min-w-0 cursor-pointer flex-col justify-center rounded-control border-2 px-4 py-3 text-sm font-semibold transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent-500 sm:text-base';
 ---
 
 <Site
@@ -92,262 +117,324 @@ const tabLabel =
 	description={t.description}
 	locale={locale}
 >
-	<Section narrow>
+	<div class="mx-auto max-w-6xl px-4 pb-16 pt-6 sm:px-6 lg:pt-8">
 		<div class="guide" data-guide>
-			<h1 class="text-4xl font-[650] leading-[1.15] tracking-tight text-balance">
-				{t.title}
-			</h1>
-			<p class="mt-5 text-lg text-gray-700 dark:text-gray-300">{t.lead}</p>
-			{
-				(isStale('guide', locale) || isStale('guideSituations', locale)) && (
-					<StaleTranslationNotice
-						locale={locale}
-						english="/guide/"
-						class="mt-4"
-					/>
-				)
-			}
+			<div class="g-layout">
+				<div class="g-left">
+					<h1 class="g-h1">{t.title}</h1>
+					<p class="g-lead">{t.lead}</p>
+					{
+						(isStale('guide', locale) ||
+							isStale('guideSituations', locale)) && (
+							<StaleTranslationNotice
+								locale={locale}
+								english="/guide/"
+								class="mt-3"
+							/>
+						)
+					}
 
-			<fieldset class="mt-6 min-w-0 border-0 p-0">
-				<legend class="sr-only">{t.tabs.legend}</legend>
-				<div class="grid grid-cols-2 gap-2">
-					<label
-						class:list={[
-							tabLabel,
-							'border-gray-200 bg-white text-gray-900 hover:border-accent-500 has-[:checked]:border-accent-500 has-[:checked]:bg-accent-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:has-[:checked]:border-accent-400 dark:has-[:checked]:bg-accent-950'
-						]}
-					>
-						<input
-							type="radio"
-							name="guide-tab"
-							id="g-tab-product"
-							value="product"
-							checked
-							class="sr-only"
-						/>
-						<span class="hidden sm:inline">{t.tabs.product}</span>
-						<span class="sm:hidden">{t.tabs.productShort}</span>
-					</label>
-					<label
-						class:list={[
-							tabLabel,
-							'border-dashed border-gray-400 bg-white text-gray-900 hover:border-accent-500 has-[:checked]:border-accent-600 has-[:checked]:bg-accent-50 dark:border-gray-500 dark:bg-gray-800 dark:text-gray-100 dark:has-[:checked]:border-accent-400 dark:has-[:checked]:bg-accent-950'
-						]}
-					>
-						<input
-							type="radio"
-							name="guide-tab"
-							id="g-tab-enterprise"
-							value="enterprise"
-							class="sr-only"
-						/>
-						<span class="hidden sm:inline">{t.tabs.enterprise}</span>
-						<span class="sm:hidden">{t.tabs.enterpriseShort}</span>
-					</label>
-				</div>
-			</fieldset>
-
-			<div class="g-panel mt-8" id="g-panel-product">
-				<Questions
-					questions={questions}
-					chips={chips}
-					texts={texts}
-					t={t}
-					actor={defaultActor}
-					chosen={DEFAULT_ANSWER.product}
-				/>
-			</div>
-
-			<div class="g-panel mt-8" id="g-panel-enterprise">
-				<div
-					class="rounded-card border-2 border-dashed border-accent-500 bg-accent-50 p-4 sm:p-6 dark:border-accent-400 dark:bg-gray-900"
-				>
-					<p
-						class="text-sm font-semibold uppercase tracking-wide text-accent-700 dark:text-accent-200"
-					>
-						{t.enterprise.tag}
-					</p>
-					<h2
-						id="enterprise"
-						class="mt-2 text-xl font-[650] leading-snug tracking-tight text-balance text-gray-950 dark:text-white"
-					>
-						{t.enterprise.heading}
-					</h2>
-					<p class="mt-2 text-gray-700 dark:text-gray-300">{t.enterprise.lead}</p>
-
-					<div
-						aria-hidden="true"
-						class="mt-4 grid grid-cols-1 items-center gap-3 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]"
-					>
-						<div
-							class="grid grid-cols-3 gap-2 rounded-control border border-dashed border-gray-500 p-2 text-center text-xs font-semibold text-gray-800 dark:border-gray-400 dark:text-gray-200"
-						>
-							<span class="min-w-0 rounded bg-white px-1 py-2 [overflow-wrap:anywhere] dark:bg-gray-800"
-								>{t.enterprise.picture.employees}</span
-							>
-							<span class="min-w-0 rounded bg-white px-1 py-2 [overflow-wrap:anywhere] dark:bg-gray-800"
-								>{t.enterprise.picture.idp}</span
-							>
-							<span class="min-w-0 rounded bg-white px-1 py-2 [overflow-wrap:anywhere] dark:bg-gray-800"
-								>{t.enterprise.picture.directory}</span
-							>
-						</div>
-						<span
-							class="text-center text-2xl leading-none text-accent-700 sm:rotate-0 dark:text-accent-300"
-							><span class="hidden sm:inline">&rarr;</span><span class="sm:hidden">&darr;</span></span
-						>
-						<div
-							class="rounded-control border-2 border-accent-500 bg-white px-3 py-3 text-center text-sm font-semibold text-gray-900 dark:border-accent-400 dark:bg-gray-800 dark:text-gray-100"
-						>
-							{t.enterprise.picture.yourApp}
-						</div>
-					</div>
-
-					<fieldset class="mt-6 min-w-0 border-0 p-0">
-						<legend class="mb-1 p-0 text-base font-semibold text-gray-950 dark:text-white">
-							{t.enterprise.legend}
-						</legend>
-						<p class="mb-3 text-sm text-gray-700 dark:text-gray-300">
-							{t.enterprise.together}
-						</p>
-						<div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-							{
-								enterprise.map((s) => (
-									<label class="flex min-w-0 cursor-pointer items-start gap-3 rounded-control border border-gray-200 bg-white p-3 transition-colors hover:border-accent-500 has-[:checked]:border-accent-500 has-[:checked]:bg-accent-100 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent-500 dark:border-gray-700 dark:bg-gray-800 dark:has-[:checked]:border-accent-400 dark:has-[:checked]:bg-accent-950">
-										<input
-											type="radio"
-											name="guide-enterprise"
-											id={`g-e-${s.id}`}
-											value={s.id}
-											checked={s.id === DEFAULT_ANSWER.enterprise}
-											class="mt-1 size-4 shrink-0 accent-accent-600"
-										/>
-										<span class="min-w-0">
-											<span class="block font-semibold text-gray-950 dark:text-white">
-												{texts.situations[s.id]?.title}
-											</span>
-											{s.first && (
-												<span class="block text-sm text-gray-600 dark:text-gray-400">
-													{t.enterprise.togetherTag}
-												</span>
-											)}
-										</span>
-									</label>
-								))
-							}
+					<fieldset class="mt-4 min-w-0 border-0 p-0">
+						<legend class="sr-only">{t.tabs.legend}</legend>
+						<div class="g-tabs">
+							<label class="g-tab">
+								<input
+									type="radio"
+									name="guide-tab"
+									id="g-tab-product"
+									value="product"
+									checked
+									class="g-radio"
+								/>
+								<Part part="person" />
+								<span class="min-w-0">
+									<span class="g-tab-t">{t.tabs.product}</span>
+									<span class="g-tab-s">{t.tabs.productSub}</span>
+								</span>
+							</label>
+							<label class="g-tab">
+								<input
+									type="radio"
+									name="guide-tab"
+									id="g-tab-enterprise"
+									value="enterprise"
+									class="g-radio"
+								/>
+								<Part part="company" />
+								<span class="min-w-0">
+									<span class="g-tab-t">{t.tabs.enterprise}</span>
+									<span class="g-tab-s">{t.tabs.enterpriseSub}</span>
+								</span>
+							</label>
 						</div>
 					</fieldset>
+
+					<div class="g-panel mt-5" id="g-panel-product">
+						<Questions
+							questions={questions}
+							chips={chips}
+							situations={byId}
+							texts={texts}
+							t={t}
+							actor={defaultActor}
+							chosen={DEFAULT_ANSWER.product}
+						/>
+					</div>
+
+					<div class="g-panel mt-5" id="g-panel-enterprise">
+						<h2
+							id="enterprise"
+							class="text-[1.0625rem] font-[650] leading-snug tracking-tight text-balance text-gray-950 dark:text-white"
+						>
+							{t.enterprise.heading}
+						</h2>
+						<p class="mt-1 text-[0.875rem] text-gray-700 dark:text-gray-300">
+							{t.enterprise.lead}
+						</p>
+						<div class="g-ent-pic" aria-hidden="true">
+							<div class="g-ent-zone">
+								<span class="g-ent-zl">{t.enterprise.tag}</span>
+								<div class="g-ent-row">
+									<span class="g-mini">
+										<span class="g-mini-t">
+											<Part part="team" />
+										</span>
+										{t.enterprise.picture.employees}
+									</span>
+									<span class="g-mini">
+										<span class="g-mini-t">
+											<Part part="company" />
+										</span>
+										{t.enterprise.picture.idp}
+									</span>
+									<span class="g-mini">
+										<span class="g-mini-t">
+											<Part part="directory" />
+										</span>
+										{t.enterprise.picture.directory}
+									</span>
+								</div>
+							</div>
+							<span class="g-ent-arrow">&rarr;</span>
+							<span class="g-mini g-mini--fox">
+								<span class="g-mini-t">
+									<Part part="fox" />
+								</span>
+								{t.enterprise.picture.yourApp}
+							</span>
+						</div>
+
+						<fieldset class="mt-4 min-w-0 border-0 p-0">
+							<legend class="mb-1 p-0 text-[0.9375rem] font-semibold text-gray-950 dark:text-white">
+								{t.enterprise.legend}
+							</legend>
+							<p class="mb-2 text-[0.8125rem] text-gray-700 dark:text-gray-300">
+								{t.enterprise.together}
+							</p>
+							<div class="g-opts g-opts--ent">
+								{
+									enterprise.map((s) => {
+										const mark = cloudMark(s.needs);
+										return (
+											<label class="g-opt g-opt--ent">
+												<input
+													type="radio"
+													name="guide-enterprise"
+													id={`g-e-${s.id}`}
+													value={s.id}
+													checked={s.id === DEFAULT_ANSWER.enterprise}
+													class="g-radio"
+												/>
+												<Thumb parts={s.optionParts} />
+												<span class="g-opt-text">
+													<span class="g-opt-t">{texts.situations[s.id]?.title}</span>
+													<span class="g-opt-tags">
+														{s.first && (
+															<span class="g-together">{t.enterprise.togetherTag}</span>
+														)}
+														<Status mark={mark} label={t.status[mark]} />
+													</span>
+												</span>
+											</label>
+										);
+									})
+								}
+							</div>
+						</fieldset>
+					</div>
+				</div>
+
+				<div class="g-answers" data-answers>
+					<p class="g-pick">{t.questions.pickSecond}</p>
+					{
+						situations.map((s) => {
+							const situationTexts = texts.situations[s.id];
+							return situationTexts ? (
+								<AnswerPanel
+									situation={s}
+									texts={situationTexts}
+									nextTitle={
+										s.next ? texts.situations[s.next]?.title : undefined
+									}
+									t={t}
+									pricingHref={pricingHref}
+									ownServerHref={ownServerHref}
+									locale={locale}
+								/>
+							) : null;
+						})
+					}
 				</div>
 			</div>
 
-			<div class="mt-8">
-				<p
-					class="g-pick rounded-control border border-dashed border-gray-400 p-4 text-gray-700 dark:border-gray-500 dark:text-gray-300"
-				>
-					{t.questions.pickSecond}
-				</p>
-				{
-					situations.map((s) => {
-						const situationTexts = texts.situations[s.id];
-						return situationTexts ? (
-							<AnswerPanel
-								situation={s}
-								texts={situationTexts}
-								t={t}
-								pricingHref={pricingHref}
-							/>
-						) : null;
-					})
-				}
-			</div>
-
-			<h2
-				id="how-to-read"
-				class="mt-10 text-lg font-semibold text-gray-950 dark:text-white"
-			>
-				{t.legend.heading}
-			</h2>
-			<details
-				class="mt-3 rounded-control border border-gray-200 dark:border-gray-700"
-			>
-				<summary
-					class="cursor-pointer px-4 py-3 text-sm font-semibold text-gray-900 focus-visible:outline-2 focus-visible:outline-accent-500 dark:text-gray-100"
-				>
-					{t.legend.summary}
-				</summary>
-				<ul
-					class="flex list-none flex-col gap-3 border-t border-gray-200 p-4 text-sm text-gray-800 dark:border-gray-700 dark:text-gray-200"
-				>
-					<li class="grid grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-3">
-						<span class="g-key g-key--fox"></span>{t.legend.fox}
-					</li>
-					<li class="grid grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-3">
-						<span class="g-key"></span>{t.legend.plain}
-					</li>
-					<li class="grid grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-3">
-						<span class="g-key g-key--outside"></span>{t.legend.outside}
-					</li>
-					<li class="grid grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-3">
-						<span class="g-key g-key--redirect"></span>{t.legend.redirect}
-					</li>
-					<li class="grid grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-3">
-						<span class="g-key g-key--token"></span>{t.legend.token}
-					</li>
-					<li class="grid grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-3">
-						<span class="g-key g-key--refusal"></span>{t.legend.refusal}
-					</li>
-					<li class="grid grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-3">
-						<span class="g-key g-key--self"></span>{t.legend.self}
-					</li>
-					<li>{t.legend.numbers}</li>
-				</ul>
-			</details>
-
-			<h2
-				id="all-situations"
-				class="mt-8 text-lg font-semibold text-gray-950 dark:text-white"
-			>
-				{t.all.heading}
-			</h2>
-			<p class="mt-1 text-sm text-gray-700 dark:text-gray-300">{t.all.caption}</p>
-			<details
-				class="mt-3 rounded-control border border-gray-200 dark:border-gray-700"
-			>
-				<summary
-					class="cursor-pointer px-4 py-3 text-sm font-semibold text-gray-900 focus-visible:outline-2 focus-visible:outline-accent-500 dark:text-gray-100"
-				>
-					{t.all.summary} ({situations.length})
-				</summary>
-				<div class="border-t border-gray-200 px-4 pb-4 dark:border-gray-700">
-					<ExpertTable situations={situations} texts={texts} t={t} />
-				</div>
-			</details>
-
-			<div class="mt-8">
-				<Card>
+			<div class="g-after">
+				<div class="g-nf">
 					<h2
 						id="nothing-fits"
-						class="text-lg font-semibold text-gray-950 dark:text-white"
+						class="text-base font-semibold text-gray-950 dark:text-white"
 					>
 						{t.nothingFits.heading}
 					</h2>
-					<p class="mt-2 text-gray-700 dark:text-gray-300">{t.nothingFits.body}</p>
+					<p class="mt-1.5 text-sm text-gray-700 dark:text-gray-300">
+						{t.nothingFits.body}
+					</p>
 					<div class="mt-4 flex flex-wrap gap-2">
-						<Button href={firstClient} variant="secondary">
+						<Button href={firstClient} variant="secondary" wrap>
 							{t.nothingFits.firstClient}
 						</Button>
-						<Button href="/docs/reference/settings/" variant="secondary">
+						<Button href="/docs/reference/settings/" variant="secondary" wrap>
 							{t.nothingFits.settings}
 						</Button>
 					</div>
-				</Card>
+				</div>
+				<div class="min-w-0">
+					<h2
+						id="all-situations"
+						class="text-base font-semibold text-gray-950 dark:text-white"
+					>
+						{t.all.heading}
+					</h2>
+					<p class="mt-1 text-sm text-gray-700 dark:text-gray-300">
+						{t.all.caption}
+					</p>
+					<details class="g-all">
+						<summary>
+							{t.all.summary} ({situations.length})
+						</summary>
+						<div class="px-4 pb-4">
+							<ExpertTable situations={situations} texts={texts} t={t} />
+						</div>
+					</details>
+				</div>
 			</div>
 			<style is:inline set:html={showRules}></style>
 		</div>
-	</Section>
+	</div>
 </Site>
 
 <style is:global>
+	/* The guide's colours: every picture, frame and option reads these, so the dark scheme is one block. */
+	.guide {
+		--g-surface: #fff;
+		--g-border: var(--color-gray-200);
+		--g-border-strong: var(--color-gray-300);
+		--g-muted: var(--color-gray-50);
+		--g-muted-strong: var(--color-gray-100);
+		--g-text: var(--color-gray-900);
+		--g-text-strong: var(--color-gray-950);
+		--g-text-2: var(--color-gray-700);
+		--g-text-3: var(--color-gray-600);
+		--g-link: var(--color-accent-800);
+		--g-ink: var(--color-gray-800);
+		--g-tile: #fff;
+		--g-tile-border: var(--color-gray-300);
+		--g-fox-bg: var(--color-accent-50);
+		--g-fox-border: var(--color-accent-500);
+		--g-fox-icon: var(--color-accent-700);
+		--g-fox-ink: var(--color-accent-800);
+		--g-fox-ring: rgb(240 90 35 / 0.14);
+		--g-fox-lane: rgb(240 90 35 / 0.06);
+		--g-outside: var(--color-gray-500);
+		--g-life: var(--color-gray-200);
+		--g-arrow: var(--color-gray-600);
+		--g-token: var(--color-accent-700);
+		--g-token-ink: var(--color-accent-800);
+		--g-deny: #dc2626;
+		--g-deny-ink: #b91c1c;
+		--g-on-deny: #fff;
+		--g-good: #15803d;
+		--g-on-good: #fff;
+		--g-num-bg: var(--color-gray-900);
+		--g-num-text: var(--color-gray-50);
+		--g-num-on: #fff;
+		--g-sel-bg: var(--color-accent-50);
+		--g-sel-border: var(--color-accent-500);
+		--g-chip-bg: var(--color-gray-100);
+		--g-ready-bg: var(--color-accent-100);
+		--g-ready-ink: var(--color-accent-900);
+		--g-ready-dot: var(--color-accent-700);
+		--g-ready-dot-ink: #fff;
+		--g-ms-bg: #fff;
+		--g-ms-border: var(--color-gray-300);
+		--g-problem-bg: var(--color-gray-50);
+		--g-fix-bg: var(--color-accent-50);
+		--g-fix-border: var(--color-accent-200);
+		--g-get-bg: #fff;
+		--g-tabs-bg: var(--color-gray-100);
+	}
+	/* A marketing page: no theme attribute is ever stamped, so the reader's system setting decides. */
+	@media (prefers-color-scheme: dark) {
+		.guide {
+			--g-surface: var(--color-gray-900);
+			--g-border: var(--color-gray-700);
+			--g-border-strong: var(--color-gray-600);
+			--g-muted: var(--color-gray-800);
+			--g-muted-strong: var(--color-gray-700);
+			--g-text: var(--color-gray-100);
+			--g-text-strong: #fff;
+			--g-text-2: var(--color-gray-300);
+			--g-text-3: var(--color-gray-400);
+			--g-link: var(--color-accent-200);
+			--g-ink: var(--color-gray-100);
+			--g-tile: var(--color-gray-800);
+			--g-tile-border: var(--color-gray-600);
+			--g-fox-bg: #3a2114;
+			--g-fox-border: var(--color-accent-400);
+			--g-fox-icon: var(--color-accent-300);
+			--g-fox-ink: var(--color-accent-200);
+			--g-fox-ring: rgb(249 126 58 / 0.2);
+			--g-fox-lane: rgb(249 126 58 / 0.08);
+			--g-outside: var(--color-gray-400);
+			--g-life: var(--color-gray-700);
+			--g-arrow: var(--color-gray-400);
+			--g-token: var(--color-accent-300);
+			--g-token-ink: var(--color-accent-200);
+			--g-deny: #f87171;
+			--g-deny-ink: #fca5a5;
+			--g-on-deny: var(--color-gray-950);
+			--g-good: #4ade80;
+			--g-on-good: var(--color-gray-950);
+			--g-num-bg: var(--color-gray-100);
+			--g-num-text: var(--color-gray-900);
+			--g-num-on: var(--color-gray-950);
+			--g-sel-bg: rgb(249 126 58 / 0.12);
+			--g-sel-border: var(--color-accent-400);
+			--g-chip-bg: var(--color-gray-800);
+			--g-ready-bg: rgb(249 126 58 / 0.16);
+			--g-ready-ink: var(--color-accent-200);
+			--g-ready-dot: var(--color-accent-300);
+			--g-ready-dot-ink: var(--color-gray-950);
+			--g-ms-bg: var(--color-gray-950);
+			--g-ms-border: var(--color-gray-700);
+			--g-problem-bg: var(--color-gray-950);
+			--g-fix-bg: #241812;
+			--g-fix-border: var(--color-accent-900);
+			--g-get-bg: var(--color-gray-950);
+			--g-tabs-bg: var(--color-gray-900);
+		}
+	}
+
+	/* What shows: the chosen tab's panel, question 2 of the chosen actor and the chosen answer (rules below the page). */
 	.guide .g-panel,
 	.guide .g-q2,
 	.guide .g-answer,
@@ -359,7 +446,7 @@ const tabLabel =
 	.guide:has(#g-tab-enterprise:checked) #g-panel-enterprise {
 		display: block;
 	}
-	/* With scripts off, the expert table's `#answer-<id>` link shows that answer whatever the radios say. */
+	/* With scripts off, an `#answer-<id>` link (a task, the table, "Next") shows that answer whatever the radios say. */
 	.guide:not([data-ready]) .g-answer:target {
 		display: block !important;
 	}
@@ -369,11 +456,6 @@ const tabLabel =
 	}
 	.guide:not([data-ready]):has(.g-answer[data-tab='product']:target) .g-target-hint {
 		display: block;
-	}
-	.guide .g-chip[aria-current='true'] {
-		background: var(--color-accent-500);
-		border-color: var(--color-accent-500);
-		color: var(--color-gray-950);
 	}
 	.guide:not([data-ready]) .g-needs-js {
 		display: none !important;
@@ -390,41 +472,508 @@ const tabLabel =
 		}
 	}
 
-	.g-key {
-		display: inline-block;
-		width: 2.5rem;
+	/* The split: questions left, the answer right and in view. */
+	.g-layout {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr);
+		gap: 1.5rem;
+	}
+	@media (min-width: 1024px) {
+		.g-layout {
+			grid-template-columns: 22.5rem minmax(0, 1fr);
+			align-items: start;
+			column-gap: 2rem;
+		}
+		.g-answers {
+			position: sticky;
+			top: var(--g-sticky-top, 4.75rem);
+		}
+	}
+	.g-left,
+	.g-answers {
+		min-width: 0;
+	}
+	.g-h1 {
+		font-size: 1.75rem;
+		font-weight: 650;
+		line-height: 1.12;
+		letter-spacing: -0.03em;
+		text-wrap: balance;
+		color: var(--g-text-strong);
+	}
+	.g-lead {
+		margin-top: 0.375rem;
+		font-size: 0.9375rem;
+		line-height: 1.45;
+		color: var(--g-text-2);
+	}
+	@media (min-width: 1024px) {
+		.g-h1 {
+			font-size: 2.25rem;
+		}
+		.g-lead {
+			font-size: 1rem;
+		}
+	}
+	.g-pick {
+		padding: 1rem;
+		border: 1px dashed var(--g-border-strong);
+		border-radius: var(--radius-card);
+		color: var(--g-text-2);
+	}
+
+	/* A radio is drawn by its label: the input stays focusable and clickable over the whole option. */
+	.g-radio {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		margin: 0;
+		opacity: 0;
+		cursor: pointer;
+	}
+
+	/* The tabs, as one segmented control. */
+	.g-tabs {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+		gap: 4px;
+		padding: 4px;
+		border-radius: calc(var(--radius-control) + 4px);
+		background: var(--g-tabs-bg);
+	}
+	@media (prefers-color-scheme: dark) {
+		.g-tabs {
+			border: 1px solid var(--color-gray-800);
+		}
+	}
+	.g-tab {
+		position: relative;
+		display: flex;
+		min-width: 0;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.45rem 0.6rem;
+		border-radius: var(--radius-control);
+		color: var(--g-text-2);
+		cursor: pointer;
+	}
+	.g-tab > .g-glyph {
+		flex: none;
+		width: 1.25rem;
 		height: 1.25rem;
-		border: 1.5px solid var(--g-lane-border);
-		border-radius: 0.375rem;
-		background: var(--g-lane-bg);
 	}
-	.g-key--fox {
-		border-color: var(--g-fox-border);
+	.g-tab-t {
+		display: block;
+		font-size: 0.875rem;
+		font-weight: 600;
+		line-height: 1.25;
+		color: var(--g-text);
+	}
+	.g-tab-s {
+		display: block;
+		font-size: 0.75rem;
+		line-height: 1.3;
+		color: var(--g-text-3);
+	}
+	.g-tab:hover {
+		background: rgb(255 255 255 / 0.5);
+	}
+	.g-tab:has(:checked) {
+		background: var(--g-surface);
+		box-shadow:
+			0 1px 2px rgb(31 28 25 / 0.1),
+			0 0 0 1px var(--g-border);
+		color: var(--g-fox-icon);
+	}
+	.g-tab:has(:focus-visible),
+	.g-opt:has(:focus-visible) {
+		outline: 2px solid var(--color-accent-500);
+		outline-offset: 2px;
+	}
+	@media (prefers-color-scheme: dark) {
+		.g-tab:hover {
+			background: rgb(255 255 255 / 0.04);
+		}
+		.g-tab:has(:checked) {
+			background: var(--color-gray-800);
+		}
+	}
+
+	/* Options: one control card for every question. */
+	.g-opts {
+		display: grid;
+		gap: 0.375rem;
+	}
+	.g-opts--actors {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+	.g-opts--answers {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+	.g-opts--answers > :last-child:nth-child(odd) {
+		grid-column: 1 / -1;
+	}
+	.g-opts--ent {
+		grid-template-columns: minmax(0, 1fr);
+	}
+	.g-opt {
+		position: relative;
+		display: flex;
+		min-width: 0;
+		flex-direction: column;
+		gap: 0.375rem;
+		padding: 0.5rem 0.625rem 0.5625rem;
+		border: 1px solid var(--g-border);
+		border-radius: var(--radius-card);
+		background: var(--g-surface);
+		transition:
+			border-color 0.15s,
+			background-color 0.15s;
+		cursor: pointer;
+	}
+	.g-opt:hover {
+		border-color: var(--g-border-strong);
+	}
+	.g-opt:has(:checked) {
+		border-color: var(--g-sel-border);
+		background: var(--g-sel-bg);
+		box-shadow: inset 0 0 0 1px var(--g-sel-border);
+	}
+	.g-opt-text {
+		display: flex;
+		min-width: 0;
+		flex-direction: column;
+		gap: 0.125rem;
+	}
+	.g-opt-t {
+		font-size: 0.84375rem;
+		font-weight: 600;
+		line-height: 1.25;
+		color: var(--g-text);
+		overflow-wrap: break-word;
+	}
+	.g-opt-s {
+		font-size: 0.75rem;
+		line-height: 1.3;
+		color: var(--g-text-3);
+		overflow-wrap: break-word;
+	}
+	.g-opt--actor {
+		align-items: center;
+		padding-top: 0.625rem;
+		text-align: center;
+	}
+	.g-actor {
+		position: relative;
+		display: grid;
+		place-items: center;
+		width: 3.25rem;
+		height: 2.75rem;
+		color: var(--g-ink);
+	}
+	.g-actor > .g-glyph {
+		width: 2.375rem;
+		height: 2.375rem;
+	}
+	.g-actor-at {
+		position: absolute;
+		right: -0.125rem;
+		bottom: -0.25rem;
+		display: grid;
+		place-items: center;
+		width: 1.5rem;
+		height: 1.5rem;
+		border: 1.5px solid var(--g-tile-border);
+		border-radius: 0.4rem;
+		background: var(--g-surface);
+		color: var(--g-fox-icon);
+	}
+	.g-actor-at .g-glyph {
+		width: 1rem;
+		height: 1rem;
+	}
+	.g-opt:has(:checked) .g-actor-at {
+		border-color: var(--g-sel-border);
+	}
+	.g-opt-top {
+		display: flex;
+		min-width: 0;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.25rem 0.375rem;
+	}
+	.g-thumb {
+		display: inline-flex;
+		flex: none;
+		align-items: center;
+		gap: 0.1875rem;
+		height: 1.75rem;
+		padding: 0 0.375rem;
+		border-radius: 0.375rem;
+		background: var(--g-muted);
+		color: var(--g-ink);
+	}
+	.g-thumb .g-glyph {
+		width: 1.125rem;
+		height: 1.125rem;
+	}
+	.g-thumb-link {
+		width: 0.375rem;
+		height: 1.5px;
+		border-radius: 2px;
+		background: var(--g-arrow);
+	}
+	.g-opt:has(:checked) .g-thumb {
+		background: var(--g-surface);
+		color: var(--g-fox-icon);
+	}
+	.g-opt--ent {
+		flex-direction: row;
+		align-items: center;
+		gap: 0.625rem;
+		padding: 0.4375rem 0.625rem 0.4375rem 0.4375rem;
+	}
+	.g-opt--ent .g-thumb {
+		height: 2rem;
+		min-width: 2.5rem;
+		justify-content: center;
+	}
+	.g-opt-tags {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.125rem 0.5rem;
+	}
+	.g-together {
+		padding: 0 0.45rem;
+		border-radius: 999px;
+		background: var(--g-ready-bg);
+		color: var(--g-ready-ink);
+		font-size: 0.6875rem;
+		font-weight: 600;
+		line-height: 1.5;
+	}
+	@media (max-width: 479px) {
+		.g-opts--actors {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+		.g-opts--actors > :last-child {
+			grid-column: 1 / -1;
+			flex-direction: row;
+			text-align: start;
+			gap: 0.75rem;
+		}
+	}
+
+	/* The common tasks: small tiles, each with the parts of its answer. */
+	.g-tasks {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 0.375rem;
+		margin-top: 0.625rem;
+	}
+	.g-chip {
+		display: flex;
+		height: 100%;
+		min-width: 0;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 0.375rem;
+		padding: 0.45rem 0.55rem;
+		border: 1px solid var(--g-border);
+		border-radius: var(--radius-control);
+		background: var(--g-surface);
+		color: var(--g-text);
+		text-decoration: none;
+		transition: border-color 0.15s;
+	}
+	.g-chip:hover {
+		border-color: var(--g-border-strong);
+	}
+	.g-chip:focus-visible {
+		outline: 2px solid var(--color-accent-500);
+		outline-offset: 2px;
+	}
+	.guide .g-chip[aria-current='true'] {
+		border-color: var(--g-sel-border);
+		background: var(--g-sel-bg);
+		box-shadow: inset 0 0 0 1px var(--g-sel-border);
+	}
+	.g-thumb--sm {
+		height: 1.625rem;
+		padding: 0 0.3125rem;
+	}
+	.g-thumb--sm .g-glyph {
+		width: 1rem;
+		height: 1rem;
+	}
+	.g-chip-t {
+		font-size: 0.8125rem;
+		font-weight: 500;
+		line-height: 1.25;
+		overflow-wrap: break-word;
+	}
+
+	/* The Enterprise intro: the customer's company on the left, your app with FoxAuth on the right. */
+	.g-ent-pic {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto 5rem;
+		align-items: center;
+		gap: 0.5rem;
+		margin-top: 0.875rem;
+	}
+	.g-ent-zone {
+		padding: 0.375rem 0.5rem 0.5rem;
+		border: 1.5px dashed var(--g-outside);
+		border-radius: var(--radius-card);
+	}
+	.g-ent-zl {
+		display: block;
+		margin-bottom: 0.375rem;
+		font-size: 0.6875rem;
+		font-weight: 600;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		color: var(--g-text-3);
+	}
+	.g-ent-row {
+		display: grid;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 0.25rem;
+	}
+	.g-mini {
+		display: flex;
+		min-width: 0;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.25rem;
+		font-size: 0.6875rem;
+		line-height: 1.2;
+		text-align: center;
+		color: var(--g-text-2);
+		overflow-wrap: break-word;
+		hyphens: manual;
+	}
+	.g-mini-t {
+		display: grid;
+		place-items: center;
+		width: 2.25rem;
+		height: 2.25rem;
+		border: 1.5px dashed var(--g-outside);
+		border-radius: 0.5rem;
+		background: var(--g-tile);
+		color: var(--g-ink);
+	}
+	.g-mini-t .g-glyph {
+		width: 1.25rem;
+		height: 1.25rem;
+	}
+	.g-mini--fox .g-mini-t {
+		border: 2px solid var(--g-fox-border);
 		background: var(--g-fox-bg);
+		color: var(--g-fox-icon);
 	}
-	.g-key--outside {
-		border-style: dashed;
-		border-color: var(--g-outside-border);
+	.g-mini--fox {
+		font-weight: 600;
+		color: var(--g-fox-ink);
 	}
-	.g-key--redirect,
-	.g-key--token,
-	.g-key--refusal {
-		height: 0;
-		border: 0;
-		border-radius: 0;
-		background: none;
-		border-top: 2px dashed var(--g-arrow);
+	.g-ent-arrow {
+		margin-bottom: 1rem;
+		color: var(--g-fox-border);
+		font-size: 1.125rem;
+		font-weight: 700;
 	}
-	.g-key--token {
-		border-top: 3.5px solid var(--g-arrow);
+	@media (max-width: 1023px) {
+		.g-ent-pic {
+			display: none;
+		}
 	}
-	.g-key--refusal {
-		border-top: 2.5px dashed var(--g-deny);
+
+	/* Under the split: nothing fits, and the table of every situation. */
+	.g-after {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr);
+		gap: 1.5rem;
+		margin-top: 2.5rem;
 	}
-	.g-key--self {
-		border: 1.5px dashed var(--g-arrow);
-		border-radius: 0.375rem;
-		background: none;
+	@media (min-width: 1024px) {
+		.g-after {
+			grid-template-columns: 22.5rem minmax(0, 1fr);
+			align-items: start;
+			column-gap: 2rem;
+		}
+	}
+	.g-nf {
+		padding: 1.25rem;
+		border: 1px solid var(--g-border);
+		border-radius: var(--radius-card);
+		background: var(--g-surface);
+	}
+	.g-all {
+		margin-top: 0.75rem;
+		border: 1px solid var(--g-border);
+		border-radius: var(--radius-card);
+		background: var(--g-surface);
+	}
+	.g-all > summary {
+		padding: 0.75rem 1rem;
+		border-radius: var(--radius-card);
+		font-size: 0.875rem;
+		font-weight: 600;
+		color: var(--g-text);
+		cursor: pointer;
+	}
+	.g-all > summary:focus-visible {
+		outline: 2px solid var(--color-accent-500);
+	}
+
+	/* Motion, only when the reader allows it, and once: the final state is what the page draws first. */
+	@media (prefers-reduced-motion: no-preference) {
+		.g-answer {
+			animation: g-fade 0.22s ease-out;
+		}
+		.g-frame--problem .g-badge {
+			animation: g-pop 0.35s cubic-bezier(0.3, 1.6, 0.5, 1) 0.15s both;
+		}
+		.g-frame--fix .g-node--fox {
+			animation: g-drop 0.4s ease-out 0.25s both;
+		}
+		.g-frame--fix .g-link-chip {
+			animation: g-fade 0.3s ease-out 0.55s both;
+		}
+		.g-frame--fix .g-badge {
+			animation: g-pop 0.35s cubic-bezier(0.3, 1.6, 0.5, 1) 0.7s both;
+		}
+	}
+	@keyframes g-fade {
+		from {
+			opacity: 0;
+		}
+		to {
+			opacity: 1;
+		}
+	}
+	@keyframes g-pop {
+		from {
+			transform: scale(0.3);
+			opacity: 0;
+		}
+		to {
+			transform: none;
+			opacity: 1;
+		}
+	}
+	@keyframes g-drop {
+		from {
+			translate: 0 -0.375rem;
+			opacity: 0;
+		}
+		to {
+			translate: 0 0;
+			opacity: 1;
+		}
 	}
 </style>
 
