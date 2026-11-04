@@ -117,10 +117,7 @@ export function stripLocale(route: string): string {
  * canonical rather than saying `noindex` (src/route-middleware.ts says why).
  */
 export const TRANSLATED_DOCS: readonly string[] = ['/docs/get-started/'];
-export const TRANSLATED_DOCS_EXACT: readonly string[] = [
-	'/docs/',
-	'/docs/guide/'
-];
+export const TRANSLATED_DOCS_EXACT: readonly string[] = ['/docs/'];
 
 export function isDocsFallback(route: string): boolean {
 	const normalised = normaliseRoute(route);
@@ -157,6 +154,7 @@ const SECTION_PREFIXES: ReadonlyArray<readonly [string, SectionName]> = [
 	['/docs/get-started/', 'Start here'],
 	['/docs/', 'Documentation'],
 	['/compare/', 'Compare'],
+	['/guide/', 'Start here'],
 	['/blog/', 'Blog'],
 	['/features/', 'Product'],
 	['/pricing/', 'Product'],
@@ -251,6 +249,12 @@ export const STRUCTURED_COVERAGE: readonly CoverageEntry[] = [
 		requires: ['FAQPage'],
 		reason:
 			'The licensing and cost questions readers actually ask; no structured price, which would outlive the terms it describes.'
+	},
+	{
+		prefix: '/guide/',
+		requires: [],
+		reason:
+			'An interactive chooser: two questions and one answer shown at a time, not an article or a list of claims.'
 	},
 	{
 		prefix: '/features/',

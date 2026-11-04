@@ -103,22 +103,25 @@ const rows = steps.map((step, i) => {
 		--g-num-text: var(--color-gray-50);
 		--g-highlight: var(--color-accent-100);
 	}
-	[data-theme='dark'] .guide {
-		--g-surface: var(--color-gray-800);
-		--g-lane-bg: var(--color-gray-800);
-		--g-lane-border: var(--color-gray-600);
-		--g-lane-text: var(--color-gray-100);
-		--g-fox-bg: var(--color-accent-950);
-		--g-fox-border: var(--color-accent-400);
-		--g-fox-text: var(--color-accent-100);
-		--g-outside-border: var(--color-gray-400);
-		--g-life: var(--color-gray-700);
-		--g-arrow: var(--color-gray-400);
-		--g-deny: #f87171;
-		--g-label: var(--color-gray-100);
-		--g-num-bg: var(--color-gray-100);
-		--g-num-text: var(--color-gray-900);
-		--g-highlight: var(--color-accent-950);
+	/* A marketing page: no theme attribute is ever stamped, so the reader's system setting decides. */
+	@media (prefers-color-scheme: dark) {
+		.guide {
+			--g-surface: var(--color-gray-800);
+			--g-lane-bg: var(--color-gray-800);
+			--g-lane-border: var(--color-gray-600);
+			--g-lane-text: var(--color-gray-100);
+			--g-fox-bg: var(--color-accent-950);
+			--g-fox-border: var(--color-accent-400);
+			--g-fox-text: var(--color-accent-100);
+			--g-outside-border: var(--color-gray-400);
+			--g-life: var(--color-gray-700);
+			--g-arrow: var(--color-gray-400);
+			--g-deny: #f87171;
+			--g-label: var(--color-gray-100);
+			--g-num-bg: var(--color-gray-100);
+			--g-num-text: var(--color-gray-900);
+			--g-highlight: var(--color-accent-950);
+		}
 	}
 
 	.g-diagram {

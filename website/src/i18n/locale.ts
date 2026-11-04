@@ -55,6 +55,7 @@ function isDocsRoute(route: string): boolean {
 export const TRANSLATED_PAGES: readonly string[] = [
 	'/',
 	'/features/',
+	'/guide/',
 	'/pricing/',
 	'/contact/',
 	'/compare/',

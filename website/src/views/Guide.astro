@@ -1,5 +1,7 @@
 ---
-import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import Site from '../layouts/Site.astro';
+import Section from '../components/ui/Section.astro';
+import StaleTranslationNotice from '../components/StaleTranslationNotice.astro';
 import Card from '../components/ui/Card.astro';
 import Button from '../components/ui/Button.astro';
 import Questions from '../components/guide/Questions.astro';
@@ -9,12 +11,13 @@ import { loadExport } from '../data/export.ts';
 import { DEFAULT_ANSWER } from '../data/guide.ts';
 import { guideTextsFor } from '../i18n/guide-texts.ts';
 import { localizedHref } from '../i18n/locale.ts';
-import { messagesFor } from '../i18n/messages.ts';
+import { isStale, messagesFor } from '../i18n/messages.ts';
 import english from '../i18n/messages/guide/en.ts';
 import type { LocaleKey } from '../data/seo.ts';
 
 /*
- * "What do you need?": the console's situation guide, on the site, from the same data (lib/consts/situation_guide.ts
+ * "What do you need?": the console's situation guide, on the site at /guide/ (a page of its own, not inside the docs:
+ * it is where someone starts who does not yet know which docs page they need), from the same data (lib/consts/situation_guide.ts
  * through the docs export). Two tabs; on the first, two questions and the common tasks, on the second the company's
  * requests; one answer below, chosen by radio buttons. Every answer is in the HTML, and CSS shows the chosen one, so
  * the page works with scripts off; the script (components/guide/guide.ts) adds the address and the buttons that need
@@ -84,259 +87,267 @@ const tabLabel =
 	'flex min-w-0 cursor-pointer flex-col justify-center rounded-control border-2 px-4 py-3 text-sm font-semibold transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent-500 sm:text-base';
 ---
 
-<StarlightPage
-	frontmatter={{
-		title: t.title,
-		description: t.description,
-		tableOfContents: false
-	}}
+<Site
+	title={`${t.title} | FoxAuth`}
+	description={t.description}
+	locale={locale}
 >
-	<div class="guide not-content" data-guide>
-		<p class="text-lg text-gray-700 dark:text-gray-300">{t.lead}</p>
-
-		<fieldset class="mt-6 min-w-0 border-0 p-0">
-			<legend class="sr-only">{t.tabs.legend}</legend>
-			<div class="grid grid-cols-2 gap-2">
-				<label
-					class:list={[
-						tabLabel,
-						'border-gray-200 bg-white text-gray-900 hover:border-accent-500 has-[:checked]:border-accent-500 has-[:checked]:bg-accent-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:has-[:checked]:border-accent-400 dark:has-[:checked]:bg-accent-950'
-					]}
-				>
-					<input
-						type="radio"
-						name="guide-tab"
-						id="g-tab-product"
-						value="product"
-						checked
-						class="sr-only"
-					/>
-					<span class="hidden sm:inline">{t.tabs.product}</span>
-					<span class="sm:hidden">{t.tabs.productShort}</span>
-				</label>
-				<label
-					class:list={[
-						tabLabel,
-						'border-dashed border-gray-400 bg-white text-gray-900 hover:border-accent-500 has-[:checked]:border-accent-600 has-[:checked]:bg-accent-50 dark:border-gray-500 dark:bg-gray-800 dark:text-gray-100 dark:has-[:checked]:border-accent-400 dark:has-[:checked]:bg-accent-950'
-					]}
-				>
-					<input
-						type="radio"
-						name="guide-tab"
-						id="g-tab-enterprise"
-						value="enterprise"
-						class="sr-only"
-					/>
-					<span class="hidden sm:inline">{t.tabs.enterprise}</span>
-					<span class="sm:hidden">{t.tabs.enterpriseShort}</span>
-				</label>
-			</div>
-		</fieldset>
-
-		<div class="g-panel mt-8" id="g-panel-product">
-			<Questions
-				questions={questions}
-				chips={chips}
-				texts={texts}
-				t={t}
-				actor={defaultActor}
-				chosen={DEFAULT_ANSWER.product}
-			/>
-		</div>
-
-		<div class="g-panel mt-8" id="g-panel-enterprise">
-			<div
-				class="rounded-card border-2 border-dashed border-accent-500 bg-accent-50 p-4 sm:p-6 dark:border-accent-400 dark:bg-gray-900"
-			>
-				<p
-					class="text-sm font-semibold uppercase tracking-wide text-accent-700 dark:text-accent-200"
-				>
-					{t.enterprise.tag}
-				</p>
-				<h2
-					id="enterprise"
-					class="mt-2 text-xl font-[650] leading-snug tracking-tight text-balance text-gray-950 dark:text-white"
-				>
-					{t.enterprise.heading}
-				</h2>
-				<p class="mt-2 text-gray-700 dark:text-gray-300">{t.enterprise.lead}</p>
-
-				<div
-					aria-hidden="true"
-					class="mt-4 grid grid-cols-1 items-center gap-3 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]"
-				>
-					<div
-						class="grid grid-cols-3 gap-2 rounded-control border border-dashed border-gray-500 p-2 text-center text-xs font-semibold text-gray-800 dark:border-gray-400 dark:text-gray-200"
-					>
-						<span class="min-w-0 rounded bg-white px-1 py-2 [overflow-wrap:anywhere] dark:bg-gray-800"
-							>{t.enterprise.picture.employees}</span
-						>
-						<span class="min-w-0 rounded bg-white px-1 py-2 [overflow-wrap:anywhere] dark:bg-gray-800"
-							>{t.enterprise.picture.idp}</span
-						>
-						<span class="min-w-0 rounded bg-white px-1 py-2 [overflow-wrap:anywhere] dark:bg-gray-800"
-							>{t.enterprise.picture.directory}</span
-						>
-					</div>
-					<span
-						class="text-center text-2xl leading-none text-accent-700 sm:rotate-0 dark:text-accent-300"
-						><span class="hidden sm:inline">&rarr;</span><span class="sm:hidden">&darr;</span></span
-					>
-					<div
-						class="rounded-control border-2 border-accent-500 bg-white px-3 py-3 text-center text-sm font-semibold text-gray-900 dark:border-accent-400 dark:bg-gray-800 dark:text-gray-100"
-					>
-						{t.enterprise.picture.yourApp}
-					</div>
-				</div>
-
-				<fieldset class="mt-6 min-w-0 border-0 p-0">
-					<legend class="mb-1 p-0 text-base font-semibold text-gray-950 dark:text-white">
-						{t.enterprise.legend}
-					</legend>
-					<p class="mb-3 text-sm text-gray-700 dark:text-gray-300">
-						{t.enterprise.together}
-					</p>
-					<div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-						{
-							enterprise.map((s) => (
-								<label class="flex min-w-0 cursor-pointer items-start gap-3 rounded-control border border-gray-200 bg-white p-3 transition-colors hover:border-accent-500 has-[:checked]:border-accent-500 has-[:checked]:bg-accent-100 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent-500 dark:border-gray-700 dark:bg-gray-800 dark:has-[:checked]:border-accent-400 dark:has-[:checked]:bg-accent-950">
-									<input
-										type="radio"
-										name="guide-enterprise"
-										id={`g-e-${s.id}`}
-										value={s.id}
-										checked={s.id === DEFAULT_ANSWER.enterprise}
-										class="mt-1 size-4 shrink-0 accent-accent-600"
-									/>
-									<span class="min-w-0">
-										<span class="block font-semibold text-gray-950 dark:text-white">
-											{texts.situations[s.id]?.title}
-										</span>
-										{s.first && (
-											<span class="block text-sm text-gray-600 dark:text-gray-400">
-												{t.enterprise.togetherTag}
-											</span>
-										)}
-									</span>
-								</label>
-							))
-						}
-					</div>
-				</fieldset>
-			</div>
-		</div>
-
-		<div class="mt-8">
-			<p
-				class="g-pick rounded-control border border-dashed border-gray-400 p-4 text-gray-700 dark:border-gray-500 dark:text-gray-300"
-			>
-				{t.questions.pickSecond}
-			</p>
+	<Section narrow>
+		<div class="guide" data-guide>
+			<h1 class="text-4xl font-[650] leading-[1.15] tracking-tight text-balance">
+				{t.title}
+			</h1>
+			<p class="mt-5 text-lg text-gray-700 dark:text-gray-300">{t.lead}</p>
 			{
-				situations.map((s) => {
-					const situationTexts = texts.situations[s.id];
-					return situationTexts ? (
-						<AnswerPanel
-							situation={s}
-							texts={situationTexts}
-							t={t}
-							pricingHref={pricingHref}
-						/>
-					) : null;
-				})
+				(isStale('guide', locale) || isStale('guideSituations', locale)) && (
+					<StaleTranslationNotice
+						locale={locale}
+						english="/guide/"
+						class="mt-4"
+					/>
+				)
 			}
-		</div>
 
-		<h2
-			id="how-to-read"
-			class="mt-10 text-lg font-semibold text-gray-950 dark:text-white"
-		>
-			{t.legend.heading}
-		</h2>
-		<details
-			class="mt-3 rounded-control border border-gray-200 dark:border-gray-700"
-		>
-			<summary
-				class="cursor-pointer px-4 py-3 text-sm font-semibold text-gray-900 focus-visible:outline-2 focus-visible:outline-accent-500 dark:text-gray-100"
-			>
-				{t.legend.summary}
-			</summary>
-			<ul
-				class="flex list-none flex-col gap-3 border-t border-gray-200 p-4 text-sm text-gray-800 dark:border-gray-700 dark:text-gray-200"
-			>
-				<li class="grid grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-3">
-					<span class="g-key g-key--fox"></span>{t.legend.fox}
-				</li>
-				<li class="grid grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-3">
-					<span class="g-key"></span>{t.legend.plain}
-				</li>
-				<li class="grid grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-3">
-					<span class="g-key g-key--outside"></span>{t.legend.outside}
-				</li>
-				<li class="grid grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-3">
-					<span class="g-key g-key--redirect"></span>{t.legend.redirect}
-				</li>
-				<li class="grid grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-3">
-					<span class="g-key g-key--token"></span>{t.legend.token}
-				</li>
-				<li class="grid grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-3">
-					<span class="g-key g-key--refusal"></span>{t.legend.refusal}
-				</li>
-				<li class="grid grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-3">
-					<span class="g-key g-key--self"></span>{t.legend.self}
-				</li>
-				<li>{t.legend.numbers}</li>
-			</ul>
-		</details>
-
-		<h2
-			id="all-situations"
-			class="mt-8 text-lg font-semibold text-gray-950 dark:text-white"
-		>
-			{t.all.heading}
-		</h2>
-		<p class="mt-1 text-sm text-gray-700 dark:text-gray-300">{t.all.caption}</p>
-		<details
-			class="mt-3 rounded-control border border-gray-200 dark:border-gray-700"
-		>
-			<summary
-				class="cursor-pointer px-4 py-3 text-sm font-semibold text-gray-900 focus-visible:outline-2 focus-visible:outline-accent-500 dark:text-gray-100"
-			>
-				{t.all.summary} ({situations.length})
-			</summary>
-			<div class="border-t border-gray-200 px-4 pb-4 dark:border-gray-700">
-				<ExpertTable situations={situations} texts={texts} t={t} />
-			</div>
-		</details>
-
-		<div class="mt-8">
-			<Card>
-				<h2
-					id="nothing-fits"
-					class="text-lg font-semibold text-gray-950 dark:text-white"
-				>
-					{t.nothingFits.heading}
-				</h2>
-				<p class="mt-2 text-gray-700 dark:text-gray-300">{t.nothingFits.body}</p>
-				<div class="mt-4 flex flex-wrap gap-2">
-					<Button href={firstClient} variant="secondary">
-						{t.nothingFits.firstClient}
-					</Button>
-					<Button href="/docs/reference/settings/" variant="secondary">
-						{t.nothingFits.settings}
-					</Button>
+			<fieldset class="mt-6 min-w-0 border-0 p-0">
+				<legend class="sr-only">{t.tabs.legend}</legend>
+				<div class="grid grid-cols-2 gap-2">
+					<label
+						class:list={[
+							tabLabel,
+							'border-gray-200 bg-white text-gray-900 hover:border-accent-500 has-[:checked]:border-accent-500 has-[:checked]:bg-accent-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:has-[:checked]:border-accent-400 dark:has-[:checked]:bg-accent-950'
+						]}
+					>
+						<input
+							type="radio"
+							name="guide-tab"
+							id="g-tab-product"
+							value="product"
+							checked
+							class="sr-only"
+						/>
+						<span class="hidden sm:inline">{t.tabs.product}</span>
+						<span class="sm:hidden">{t.tabs.productShort}</span>
+					</label>
+					<label
+						class:list={[
+							tabLabel,
+							'border-dashed border-gray-400 bg-white text-gray-900 hover:border-accent-500 has-[:checked]:border-accent-600 has-[:checked]:bg-accent-50 dark:border-gray-500 dark:bg-gray-800 dark:text-gray-100 dark:has-[:checked]:border-accent-400 dark:has-[:checked]:bg-accent-950'
+						]}
+					>
+						<input
+							type="radio"
+							name="guide-tab"
+							id="g-tab-enterprise"
+							value="enterprise"
+							class="sr-only"
+						/>
+						<span class="hidden sm:inline">{t.tabs.enterprise}</span>
+						<span class="sm:hidden">{t.tabs.enterpriseShort}</span>
+					</label>
 				</div>
-			</Card>
+			</fieldset>
+
+			<div class="g-panel mt-8" id="g-panel-product">
+				<Questions
+					questions={questions}
+					chips={chips}
+					texts={texts}
+					t={t}
+					actor={defaultActor}
+					chosen={DEFAULT_ANSWER.product}
+				/>
+			</div>
+
+			<div class="g-panel mt-8" id="g-panel-enterprise">
+				<div
+					class="rounded-card border-2 border-dashed border-accent-500 bg-accent-50 p-4 sm:p-6 dark:border-accent-400 dark:bg-gray-900"
+				>
+					<p
+						class="text-sm font-semibold uppercase tracking-wide text-accent-700 dark:text-accent-200"
+					>
+						{t.enterprise.tag}
+					</p>
+					<h2
+						id="enterprise"
+						class="mt-2 text-xl font-[650] leading-snug tracking-tight text-balance text-gray-950 dark:text-white"
+					>
+						{t.enterprise.heading}
+					</h2>
+					<p class="mt-2 text-gray-700 dark:text-gray-300">{t.enterprise.lead}</p>
+
+					<div
+						aria-hidden="true"
+						class="mt-4 grid grid-cols-1 items-center gap-3 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]"
+					>
+						<div
+							class="grid grid-cols-3 gap-2 rounded-control border border-dashed border-gray-500 p-2 text-center text-xs font-semibold text-gray-800 dark:border-gray-400 dark:text-gray-200"
+						>
+							<span class="min-w-0 rounded bg-white px-1 py-2 [overflow-wrap:anywhere] dark:bg-gray-800"
+								>{t.enterprise.picture.employees}</span
+							>
+							<span class="min-w-0 rounded bg-white px-1 py-2 [overflow-wrap:anywhere] dark:bg-gray-800"
+								>{t.enterprise.picture.idp}</span
+							>
+							<span class="min-w-0 rounded bg-white px-1 py-2 [overflow-wrap:anywhere] dark:bg-gray-800"
+								>{t.enterprise.picture.directory}</span
+							>
+						</div>
+						<span
+							class="text-center text-2xl leading-none text-accent-700 sm:rotate-0 dark:text-accent-300"
+							><span class="hidden sm:inline">&rarr;</span><span class="sm:hidden">&darr;</span></span
+						>
+						<div
+							class="rounded-control border-2 border-accent-500 bg-white px-3 py-3 text-center text-sm font-semibold text-gray-900 dark:border-accent-400 dark:bg-gray-800 dark:text-gray-100"
+						>
+							{t.enterprise.picture.yourApp}
+						</div>
+					</div>
+
+					<fieldset class="mt-6 min-w-0 border-0 p-0">
+						<legend class="mb-1 p-0 text-base font-semibold text-gray-950 dark:text-white">
+							{t.enterprise.legend}
+						</legend>
+						<p class="mb-3 text-sm text-gray-700 dark:text-gray-300">
+							{t.enterprise.together}
+						</p>
+						<div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+							{
+								enterprise.map((s) => (
+									<label class="flex min-w-0 cursor-pointer items-start gap-3 rounded-control border border-gray-200 bg-white p-3 transition-colors hover:border-accent-500 has-[:checked]:border-accent-500 has-[:checked]:bg-accent-100 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent-500 dark:border-gray-700 dark:bg-gray-800 dark:has-[:checked]:border-accent-400 dark:has-[:checked]:bg-accent-950">
+										<input
+											type="radio"
+											name="guide-enterprise"
+											id={`g-e-${s.id}`}
+											value={s.id}
+											checked={s.id === DEFAULT_ANSWER.enterprise}
+											class="mt-1 size-4 shrink-0 accent-accent-600"
+										/>
+										<span class="min-w-0">
+											<span class="block font-semibold text-gray-950 dark:text-white">
+												{texts.situations[s.id]?.title}
+											</span>
+											{s.first && (
+												<span class="block text-sm text-gray-600 dark:text-gray-400">
+													{t.enterprise.togetherTag}
+												</span>
+											)}
+										</span>
+									</label>
+								))
+							}
+						</div>
+					</fieldset>
+				</div>
+			</div>
+
+			<div class="mt-8">
+				<p
+					class="g-pick rounded-control border border-dashed border-gray-400 p-4 text-gray-700 dark:border-gray-500 dark:text-gray-300"
+				>
+					{t.questions.pickSecond}
+				</p>
+				{
+					situations.map((s) => {
+						const situationTexts = texts.situations[s.id];
+						return situationTexts ? (
+							<AnswerPanel
+								situation={s}
+								texts={situationTexts}
+								t={t}
+								pricingHref={pricingHref}
+							/>
+						) : null;
+					})
+				}
+			</div>
+
+			<h2
+				id="how-to-read"
+				class="mt-10 text-lg font-semibold text-gray-950 dark:text-white"
+			>
+				{t.legend.heading}
+			</h2>
+			<details
+				class="mt-3 rounded-control border border-gray-200 dark:border-gray-700"
+			>
+				<summary
+					class="cursor-pointer px-4 py-3 text-sm font-semibold text-gray-900 focus-visible:outline-2 focus-visible:outline-accent-500 dark:text-gray-100"
+				>
+					{t.legend.summary}
+				</summary>
+				<ul
+					class="flex list-none flex-col gap-3 border-t border-gray-200 p-4 text-sm text-gray-800 dark:border-gray-700 dark:text-gray-200"
+				>
+					<li class="grid grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-3">
+						<span class="g-key g-key--fox"></span>{t.legend.fox}
+					</li>
+					<li class="grid grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-3">
+						<span class="g-key"></span>{t.legend.plain}
+					</li>
+					<li class="grid grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-3">
+						<span class="g-key g-key--outside"></span>{t.legend.outside}
+					</li>
+					<li class="grid grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-3">
+						<span class="g-key g-key--redirect"></span>{t.legend.redirect}
+					</li>
+					<li class="grid grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-3">
+						<span class="g-key g-key--token"></span>{t.legend.token}
+					</li>
+					<li class="grid grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-3">
+						<span class="g-key g-key--refusal"></span>{t.legend.refusal}
+					</li>
+					<li class="grid grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-3">
+						<span class="g-key g-key--self"></span>{t.legend.self}
+					</li>
+					<li>{t.legend.numbers}</li>
+				</ul>
+			</details>
+
+			<h2
+				id="all-situations"
+				class="mt-8 text-lg font-semibold text-gray-950 dark:text-white"
+			>
+				{t.all.heading}
+			</h2>
+			<p class="mt-1 text-sm text-gray-700 dark:text-gray-300">{t.all.caption}</p>
+			<details
+				class="mt-3 rounded-control border border-gray-200 dark:border-gray-700"
+			>
+				<summary
+					class="cursor-pointer px-4 py-3 text-sm font-semibold text-gray-900 focus-visible:outline-2 focus-visible:outline-accent-500 dark:text-gray-100"
+				>
+					{t.all.summary} ({situations.length})
+				</summary>
+				<div class="border-t border-gray-200 px-4 pb-4 dark:border-gray-700">
+					<ExpertTable situations={situations} texts={texts} t={t} />
+				</div>
+			</details>
+
+			<div class="mt-8">
+				<Card>
+					<h2
+						id="nothing-fits"
+						class="text-lg font-semibold text-gray-950 dark:text-white"
+					>
+						{t.nothingFits.heading}
+					</h2>
+					<p class="mt-2 text-gray-700 dark:text-gray-300">{t.nothingFits.body}</p>
+					<div class="mt-4 flex flex-wrap gap-2">
+						<Button href={firstClient} variant="secondary">
+							{t.nothingFits.firstClient}
+						</Button>
+						<Button href="/docs/reference/settings/" variant="secondary">
+							{t.nothingFits.settings}
+						</Button>
+					</div>
+				</Card>
+			</div>
+			<style is:inline set:html={showRules}></style>
 		</div>
-		<style is:inline set:html={showRules}></style>
-	</div>
-</StarlightPage>
+	</Section>
+</Site>
 
 <style is:global>
-	/* Starlight underlines every link in a docs page; a button is not a link in the text. */
-	.guide a.rounded-control {
-		text-decoration: none;
-	}
 	.guide .g-panel,
 	.guide .g-q2,
 	.guide .g-answer,

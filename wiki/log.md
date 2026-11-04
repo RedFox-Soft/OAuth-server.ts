@@ -354,3 +354,5 @@ Operations:
 ## [2026-11-04] update | [[situation-guide]] — phase 2 built: the site page `/docs/guide/` in three languages from the docs export, Cloud marks computed on the site, `/admin/start` as the site's door, chips as links for keyboard reach; [[site-translations]]: the `guideSituations` group is stamped against a file in `lib/`.
 
 ## [2026-11-04] update | [[situation-guide]] — the console's primary blue is `#0958d9` everywhere (theme tokens in `ConsoleRoot.tsx`), so the guide's local override of antd's internal button variables is removed.
+
+## [2026-11-04] update | [[situation-guide]] — the site page moved from `/docs/guide/` to `/guide/` on the marketing layout: inside the docs it read as one more manual page; the home page's link to it is a callout block, since an unstyled hero link did not read as a link.

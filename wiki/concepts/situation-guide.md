@@ -24,7 +24,7 @@ A page in every project's console (`What do you need?`, route `bucket.guide`, `l
 that answers "I want X, what do I set up here?" for a person who does not know the protocol's words. It lists
 situations ("sign people in to my web app", "let an AI agent call my API", "federate with Okta"), draws the
 sequence of what happens, gives an agent prompt, and ends in one button that opens the right page or form. Phase 1
-(the console) and phase 2 (the public page at foxauth.dev `/docs/guide/`, in English, Russian and Chinese)
+(the console) and phase 2 (the public page at foxauth.dev `/guide/`, in English, Russian and Chinese)
 are built from the same data.
 
 ## One declaration
@@ -134,7 +134,9 @@ link did not promise.
 
 ## The site page
 
-`/docs/guide/` (`website/src/views/Guide.astro`) renders every answer into the HTML and lets two radio groups and
+`/guide/` (`website/src/views/Guide.astro`) is a page of its own on the marketing layout, not a docs page: it is
+where someone starts who does not yet know which docs page they need, and it first shipped under `/docs/` with the
+docs sidebar, which read as one more manual page (moved 2026-11-04). It renders every answer into the HTML and lets two radio groups and
 CSS `:has()` pick the visible one, so the page works with scripts off; one small script keeps `#s=<id>` / `#e=<id>`
 in the address, copies the agent prompt and replays the diagram. The chips under the questions are links to
 `#answer-<id>`, not radios: in one radio group with the second question, Tab reached only one of the two.
