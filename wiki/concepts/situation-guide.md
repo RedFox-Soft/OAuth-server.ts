@@ -50,6 +50,25 @@ the **middle** only when an outside party sends something to it (an identity pro
 for a connected account): the rule reads the steps, not a list of situations (`scene.ts:142`). The spec proves that no
 answer ever links FoxAuth to the resource a client calls, and that every situation can be drawn.
 
+## Keeping the guide true
+
+The guide is only useful while it matches the server, and no test can tell that a feature has no situation or that
+a situation describes what a feature no longer does. So the rule (AGENTS.md, **The situation guide**) is that the
+change which adds, changes or removes something a person sets up also touches the guide.
+
+- **Added.** Declare a situation in `GUIDE_SITUATIONS`: its place in the two questions (`ask`) or a chip, `lanes` (an
+  existing lane with its `part`, or a new one in `LANES`), `steps`, `sees`, `needs` (the flags, the plan feature, the
+  role, the room), `action`, `goodToKnow`, `prompt`, a `problem` (the lane, one of five marks, a caption) and a
+  `fixCaption`. Add its Russian and Chinese texts and stamp both files.
+- **Changed.** Correct every field the change makes false. A renamed setting goes in `GUIDE_FLAG_SETTINGS`; a moved
+  console form, in the situation's `action.target`; a preset change, in `lib/admin/ui/pages/applications/situations.ts`.
+- **Removed.** Remove the situation, and any `next` that names it, from both languages too.
+
+What fails if this is skipped half-way: `test/situation_guide/scene.spec.ts` (a situation that cannot be drawn),
+`availability.spec.ts` (a flag that is not a real setting), `presets.spec.ts` (a form the route refuses), and the
+site build (`guideTextsFor`, a translation that lacks an id or a field). What never fails: a situation that is
+missing, or one whose words have stopped being true.
+
 ## Why this shape
 
 Three concepts were mocked up and critiqued on 2026-11-03. Concept A, a gallery of about 13 recipe cards,

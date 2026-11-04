@@ -174,6 +174,12 @@ Each rule is the part that is easy to break. Read the named page before changing
   is ever recognised metadata. In the console an application is edited only on its own page, and a
   "situation" is a console preset, never an API field. → `client-identity-from-database.md`,
   `client-registration-attributes.md`, `mcp-server-authorization.md`, `application-page.md`
+- **The situation guide** — every situation in "What do you need?" is declared once, in
+  `lib/consts/situation_guide.ts`, and the console and the site both draw from it. A change that adds, changes or
+  removes something a person sets up (a grant, a setting, a console form, a provider kind, a plan feature) adds,
+  corrects or removes its situation in the same change: its steps, prompt, problem, captions and needs, and the
+  Russian and Chinese texts in `website/src/i18n/messages/guideSituations/`, re-stamped. The tests catch a
+  situation that is incomplete, not one that is missing or no longer true. → `situation-guide.md`
 - **Names at the edge** — what a person or an agent reads says project, team and group; code and storage say
   bucket, administrator group and bucket group. Rename only at the edge (paths, fields, tool names, words),
   through explicit projections — never a generic key rewriter, since customer data passes through the same
@@ -270,6 +276,8 @@ what holds for every spec (a 5 s bound per case, no real network).
 4. Declare a storage area in `lib/consts/storage_inventory.ts` if the grant needs persistence — both provisioning scripts read it, and the drift guard fails until it is there.
 5. Write tests under `test/<name>/` with a matching `*.config.ts`.
 6. Correct any wiki page the grant falsifies, and add one if it carries a decision worth keeping. No guard fails for this — see **LLM Wiki** below.
+7. Add, correct or remove its situation in the "What do you need?" guide (`lib/consts/situation_guide.ts`), as
+   **The situation guide** above says.
 
 ## Adding an administrative operation
 
@@ -288,6 +296,8 @@ The admin routes are the definition; the MCP surface follows from them. Read
 5. Run `bun test test/mcp/ test/admin/` — the parity, audit-classification, argument-collision and
    secrecy guards will tell you what you missed.
 6. Correct any wiki page the operation falsifies. Nothing fails if you skip it.
+7. Add, correct or remove its situation in the "What do you need?" guide (`lib/consts/situation_guide.ts`), as
+   **The situation guide** above says.
 
 ## Adding a new endpoint
 
@@ -300,6 +310,8 @@ The admin routes are the definition; the MCP surface follows from them. Read
    declared with `refusedParam(name)`. Nothing fails if you forget.
    → `wiki/concepts/unknown-request-parameters.md`
 6. Correct any wiki page the endpoint falsifies, and add one if it carries a decision worth keeping.
+7. Add, correct or remove its situation in the "What do you need?" guide (`lib/consts/situation_guide.ts`), as
+   **The situation guide** above says.
 
 ## The website
 
