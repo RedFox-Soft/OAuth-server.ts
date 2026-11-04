@@ -2,7 +2,7 @@ import { rich } from '../../types.ts';
 import type english from './en.ts';
 import type { HomeFacts } from './en.ts';
 
-export const source = '5591b93e2441';
+export const source = 'a47e9f8cd394';
 
 const plural = new Intl.PluralRules('ru');
 
@@ -24,6 +24,8 @@ export default {
 		getStarted: 'Запустить у себя',
 		freeAccount: 'Создать бесплатную учётную запись',
 		github: 'Открыть на GitHub',
+		guideLead: 'Не знаете, какая настройка вам нужна?',
+		guideLink: 'Ответьте на два вопроса',
 		specifications: '30 спецификаций',
 		freeUsers: '1 000 000 MAU бесплатно',
 		quickstartCaption: 'Две команды и вкладка браузера',

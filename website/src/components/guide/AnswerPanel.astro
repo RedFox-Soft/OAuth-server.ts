@@ -1,0 +1,272 @@
+---
+import Badge from '../ui/Badge.astro';
+import Button from '../ui/Button.astro';
+import Card from '../ui/Card.astro';
+import RichText from '../RichText.astro';
+import MiniScreen from './MiniScreen.astro';
+import SequenceDiagram from './SequenceDiagram.astro';
+import english from '../../i18n/messages/guide/en.ts';
+import type { GuideSituationEntry } from '../../data/export.ts';
+import type { GuideSituationTexts } from '../../i18n/guide-texts.ts';
+import { CLOUD_SIGN_UP_REL } from '../../data/cloud.ts';
+import {
+	cloudMark,
+	personaOf,
+	renderPrompt,
+	settingHref,
+	settingKey,
+	startHref
+} from '../../data/guide.ts';
+
+/*
+ * One answer, complete: what it is, whether FoxAuth Cloud can set it up and the button that does, the diagram and its
+ * steps in words, the screen the person meets, the limits, the prompt for a coding agent and, last, the protocol.
+ * Every answer is in the page; the questions above decide which one is shown.
+ */
+interface Props {
+	situation: GuideSituationEntry;
+	texts: GuideSituationTexts;
+	t: typeof english;
+	pricingHref: string;
+}
+const { situation: s, texts, t, pricingHref } = Astro.props;
+const a = t.answer;
+const id = s.id;
+const mark = cloudMark(s.needs);
+const persona = personaOf(s);
+const flags = s.needs.flags ?? [];
+const anyOf = s.needs.anyOf ?? [];
+const superOnly = s.needs.role === 'super';
+const actionLabel =
+	s.action.kind === 'open' && texts.actionLabel ? texts.actionLabel : a.setUp;
+/*
+ * What a self-hosted instance switches on: every one of `flags` (joined with "and"), and one of `anyOf` (joined with
+ * "or"), each its own sentence so the two are never read as one list.
+ */
+const own = mark === 'ownServer';
+const switches = [
+	...(flags.length > 0
+		? [
+				{
+					lead: own ? a.switchFlags : a.selfHostedFlags,
+					keys: flags,
+					joiner: a.and
+				}
+			]
+		: []),
+	...(anyOf.length > 0
+		? [
+				{
+					lead:
+						flags.length > 0
+							? a.alsoAnyOf
+							: own
+								? a.switchAnyOf
+								: a.selfHostedAnyOf,
+					keys: anyOf,
+					joiner: a.or
+				}
+			]
+		: [])
+];
+const settingLink =
+	'font-mono text-sm font-medium text-accent-700 underline-offset-2 [overflow-wrap:anywhere] hover:underline dark:text-accent-200';
+---
+
+<article
+	id={`answer-${id}`}
+	class="g-answer scroll-mt-24"
+	data-tab={s.tab}
+	data-id={id}
+	aria-labelledby={`answer-${id}-title`}
+>
+	<Card>
+		<div class="flex flex-wrap gap-2">
+			<Badge>{a.persona[persona]}</Badge>
+			<Badge tone={mark === 'ready' ? 'accent' : 'neutral'}
+				>{a.marks[mark]}</Badge
+			>
+		</div>
+		<h2
+			id={`answer-${id}-title`}
+			class="mt-3 text-2xl font-[650] leading-tight tracking-tight text-balance text-gray-950 dark:text-white"
+		>
+			{texts.title}
+		</h2>
+		<p class="mt-2 text-base text-gray-700 dark:text-gray-300">
+			{texts.sentence}
+		</p>
+
+		<div
+			class="mt-5 rounded-control border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900"
+		>
+			{
+				mark === 'ready' && (
+					<div class="flex flex-col items-start gap-2">
+						<Button href={startHref(s)} rel={CLOUD_SIGN_UP_REL}>
+							{actionLabel}
+						</Button>
+						<p class="text-sm text-gray-700 dark:text-gray-300">
+							{a.destination} {a.destinationSub}
+						</p>
+					</div>
+				)
+			}
+			{
+				mark === 'notOnFree' && (
+					<div class="flex flex-col items-start gap-2">
+						<p class="text-sm text-gray-800 dark:text-gray-200">
+							{a.notOnFree}
+						</p>
+						<Button href={pricingHref} variant="secondary">
+							{a.seePlans}
+						</Button>
+					</div>
+				)
+			}
+			{
+				mark === 'ownServer' && (
+					<div class="flex flex-col gap-2 text-sm text-gray-800 dark:text-gray-200">
+						<p>{superOnly ? a.ownServerSuper : a.ownServerFlag}</p>
+						{switches.map((line) => (
+							<p>
+								{line.lead}
+								{line.keys.map((flag, i) => (
+									<>
+										{i > 0 && ` ${line.joiner}`}{' '}
+										<a class={settingLink} href={settingHref(flag)}>
+											{settingKey(flag)}
+										</a>
+									</>
+								))}
+							</p>
+						))}
+						<p class="text-gray-700 dark:text-gray-300">
+							<RichText text={a.runOwnServer} />
+						</p>
+					</div>
+				)
+			}
+			{
+				mark !== 'ownServer' && (
+					<div class="mt-3 flex flex-col gap-1 border-t border-gray-200 pt-3 text-sm text-gray-700 dark:border-gray-700 dark:text-gray-300">
+						{switches.length === 0 && <p>{a.selfHostedNone}</p>}
+						{switches.map((line) => (
+							<p>
+								{line.lead}
+								{line.keys.map((flag, i) => (
+									<>
+										{i > 0 && ` ${line.joiner}`}{' '}
+										<a class={settingLink} href={settingHref(flag)}>
+											{settingKey(flag)}
+										</a>
+									</>
+								))}
+							</p>
+						))}
+					</div>
+				)
+			}
+		</div>
+
+		<div class="mt-6 flex flex-wrap items-center justify-between gap-2">
+			<h3
+				id={`answer-${id}-steps`}
+				class="text-lg font-semibold text-gray-950 dark:text-white"
+			>
+				{a.steps}
+			</h3>
+			<button
+				type="button"
+				data-replay
+				class="g-needs-js cursor-pointer rounded-control border-0 bg-transparent px-2 py-1 text-sm font-medium text-accent-700 hover:bg-accent-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 dark:text-accent-200 dark:hover:bg-gray-700"
+			>
+				{a.replay}
+			</button>
+		</div>
+		<SequenceDiagram
+			lanes={s.lanes}
+			steps={s.steps}
+			laneLabels={texts.lanes}
+			stepLabels={texts.steps.map((step) => step.label)}
+		/>
+		<ol
+			class="g-steps mt-2 flex list-none flex-col gap-1.5 p-0 text-sm text-gray-800 dark:text-gray-200"
+		>
+			{
+				texts.steps.map((step, i) => (
+					<li class="grid grid-cols-[1.5rem_minmax(0,1fr)] gap-2 rounded px-1 py-0.5 hover:bg-gray-50 dark:hover:bg-gray-700">
+						<span class="font-semibold text-gray-600 dark:text-gray-400">
+							{i + 1}.
+						</span>
+						<span>{step.text}</span>
+					</li>
+				))
+			}
+		</ol>
+
+		<div class="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2">
+			<div class="min-w-0">
+				<h3
+					id={`answer-${id}-sees`}
+					class="text-lg font-semibold text-gray-950 dark:text-white"
+				>
+					{a.sees}
+				</h3>
+				<div class="mt-3 flex flex-col gap-3">
+					<MiniScreen kind={s.sees.kind} t={t.mini} />
+					<ul
+						class="list-disc ps-5 text-sm text-gray-800 marker:text-gray-500 dark:text-gray-200"
+					>
+						{texts.sees.map((line) => <li>{line}</li>)}
+					</ul>
+				</div>
+			</div>
+			{
+				texts.goodToKnow.length > 0 && (
+					<div class="min-w-0">
+						<h3
+							id={`answer-${id}-good`}
+							class="text-lg font-semibold text-gray-950 dark:text-white"
+						>
+							{a.goodToKnow}
+						</h3>
+						<ul class="mt-3 flex list-disc flex-col gap-1.5 ps-5 text-sm text-gray-800 marker:text-gray-500 dark:text-gray-200">
+							{texts.goodToKnow.map((line) => (
+								<li>{line}</li>
+							))}
+						</ul>
+					</div>
+				)
+			}
+		</div>
+
+		<details
+			class="g-prompt mt-6 rounded-control border border-gray-200 dark:border-gray-700"
+		>
+			<summary
+				class="cursor-pointer px-4 py-2.5 text-sm font-semibold text-gray-900 focus-visible:outline-2 focus-visible:outline-accent-500 dark:text-gray-100"
+			>
+				{a.prompt}
+			</summary>
+			<div class="border-t border-gray-200 px-4 pb-4 pt-3 dark:border-gray-700">
+				<p class="text-sm text-gray-700 dark:text-gray-300">{a.promptNote}</p>
+				<pre
+					data-prompt
+					class="mt-3 max-h-72 overflow-auto whitespace-pre-wrap rounded bg-gray-100 p-3 font-mono text-xs leading-relaxed text-gray-900 [overflow-wrap:anywhere] dark:bg-gray-950 dark:text-gray-100">{renderPrompt(s.prompt)}</pre>
+				<div class="g-needs-js mt-3 flex flex-wrap items-center gap-3">
+					<Button type="button" variant="secondary">
+						<span data-copy data-copied={a.copied}>{a.copy}</span>
+					</Button>
+					<span data-copy-failed hidden class="text-sm text-gray-700 dark:text-gray-300"
+						>{a.copyFailed}</span
+					>
+				</div>
+			</div>
+		</details>
+
+		<p class="mt-4 text-xs text-gray-600 dark:text-gray-400">
+			{`${a.underTheHood} ${texts.protocol ?? s.protocol}`}
+		</p>
+	</Card>
+</article>

@@ -53,12 +53,12 @@ describe('creating an application from a situation', () => {
 	for (const situation of SITUATIONS) {
 		const { expand } = situation;
 		if (!expand) continue;
-		it(`creates "${situation.title}" for a local development address with the settings it promises`, async () => {
+		it(`creates "${situation.id}" for a local development address with the settings it promises`, async () => {
 			const expansion = expand(situation.devAddress ?? 'http://localhost:3000');
 			const applications = client.admin.api.projects({ id: projectId }).clients;
 
 			const created = await applications.post(
-				{ clientName: situation.title, ...expansion },
+				{ clientName: situation.id, ...expansion },
 				{ headers: { cookie } }
 			);
 			expect(created.status).toBe(201);

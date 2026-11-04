@@ -118,7 +118,7 @@ export default defineConfig({
 			// duplicate static route — Astro warns today and says it becomes a hard error later.
 			disable404Route: true,
 			// Everything excluded here is a src/pages/**/*.astro route rather than docs-collection
-			// Markdown/MDX: the six Reference pages, the three root documents rendered from the
+			// Markdown/MDX: the six Reference pages, the situation guide, the three root documents rendered from the
 			// repository's own CHANGELOG/SECURITY/LICENSE, and the marketing pages (features,
 			// pricing, compare, contact). starlight-links-validator only instruments
 			// the markdown/MDX processor, so it never has heading data for such a route and
@@ -134,6 +134,7 @@ export default defineConfig({
 					errorOnFallbackPages: false,
 					exclude: localePrefixed([
 						'/docs/reference/**',
+						'/docs/guide/',
 						'/changelog/',
 						'/security/',
 						'/license/',

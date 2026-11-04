@@ -1,5 +1,5 @@
 import { LOCALES, type LocaleKey } from '../data/seo.ts';
-import { sourceHash } from './source-hash.ts';
+import { englishSourceOf, sourceHash } from './source-hash.ts';
 import { isRich } from './types.ts';
 
 /*
@@ -107,5 +107,5 @@ export function isStale(group: string, locale: LocaleKey): boolean {
 	if (locale === 'en') return false;
 	const module = modules[modulePath(group, locale)];
 	if (!module) return false;
-	return module.source !== sourceHash(`src/i18n/messages/${group}/en.ts`);
+	return module.source !== sourceHash(englishSourceOf(group));
 }

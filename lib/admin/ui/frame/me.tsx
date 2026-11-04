@@ -8,6 +8,7 @@ import {
 } from 'react';
 import type { AdminMeView } from '../../me_view.js';
 import type { PlanRights } from '../../../plans/rights.js';
+import type { GuideFlag } from '../../../consts/situation_guide.js';
 import { request } from './request.js';
 
 /*
@@ -31,7 +32,12 @@ export interface MeCan {
 	teams?: PlanRights['teams'];
 }
 
-export type Me = AdminMeView & { verified?: boolean; can?: MeCan };
+export type Me = AdminMeView & {
+	verified?: boolean;
+	can?: MeCan;
+	/* Which instance switches are on: the same for every administrator, and never secret. */
+	features?: Record<GuideFlag, boolean>;
+};
 
 interface MeValue {
 	me: Me | null;

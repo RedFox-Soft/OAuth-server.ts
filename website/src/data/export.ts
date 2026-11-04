@@ -54,6 +54,77 @@ const McpTool = z
 	})
 	.loose();
 
+const GuideFlag = z.string();
+
+const GuideQuestion = z.object({
+	actor: z.enum(['person', 'program', 'agent']),
+	title: z.string(),
+	sub: z.string(),
+	second: z.string(),
+	answers: z.array(
+		z.object({ answer: z.string(), title: z.string(), sub: z.string() })
+	)
+});
+
+const GuideSituation = z.object({
+	id: z.string(),
+	tab: z.enum(['product', 'enterprise']),
+	ask: z
+		.object({
+			actor: z.enum(['person', 'program', 'agent']),
+			answer: z.string()
+		})
+		.optional(),
+	title: z.string(),
+	sentence: z.string(),
+	protocol: z.string(),
+	lanes: z.array(
+		z.object({
+			id: z.string(),
+			label: z.string(),
+			kind: z.enum([
+				'person',
+				'browser',
+				'app',
+				'api',
+				'fox',
+				'agent',
+				'outside',
+				'company'
+			])
+		})
+	),
+	steps: z.array(
+		z.object({
+			from: z.string(),
+			to: z.string(),
+			label: z.string(),
+			text: z.string(),
+			style: z.enum(['request', 'redirect', 'token', 'refusal']).optional()
+		})
+	),
+	sees: z.object({
+		kind: z.enum(['signIn', 'consent', 'deviceCode', 'approve', 'none']),
+		lines: z.array(z.string())
+	}),
+	needs: z.object({
+		flags: z.array(GuideFlag).optional(),
+		anyOf: z.array(GuideFlag).optional(),
+		planFeature: z
+			.enum(['enterpriseSignIn', 'customSlug', 'customDomain'])
+			.optional(),
+		room: z.enum(['applications', 'apis', 'connectedServices']).optional(),
+		role: z.enum(['edit', 'manageUsers', 'changeAddress', 'super']).optional()
+	}),
+	action: z.object({
+		kind: z.enum(['form', 'open']),
+		label: z.string().optional()
+	}),
+	goodToKnow: z.array(z.string()),
+	prompt: z.string(),
+	first: z.boolean().optional()
+});
+
 export const DocsExportSchema = z.object({
 	schemaVersion: z.literal(1),
 	version: z.string(),
@@ -130,6 +201,13 @@ export const DocsExportSchema = z.object({
 			z.object({ key: z.string(), reason: z.string() })
 		)
 	}),
+	/* The "What do you need?" guide: the console and the site read one declaration. */
+	situationGuide: z.object({
+		questions: z.array(GuideQuestion),
+		situations: z.array(GuideSituation).min(1),
+		/* The setting each guide flag is read from (GUIDE_FLAG_SETTINGS). */
+		flagSettings: z.record(z.string(), z.string())
+	}),
 	/* The hourly attack report (specs/114), from the declaration the server counts and builds by. */
 	attackReports: z.object({
 		destination: z.string(),
@@ -164,6 +242,8 @@ export type DocsExport = z.infer<typeof DocsExportSchema>;
 export type SettingEntry = z.infer<typeof Setting>;
 export type EndpointEntry = z.infer<typeof Endpoint>;
 export type McpToolEntry = z.infer<typeof McpTool>;
+export type GuideQuestionEntry = z.infer<typeof GuideQuestion>;
+export type GuideSituationEntry = z.infer<typeof GuideSituation>;
 
 let cached: DocsExport | undefined;
 

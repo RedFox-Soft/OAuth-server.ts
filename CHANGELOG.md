@@ -18,6 +18,11 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   provider refusing the extra scopes gets one retry without them, and a person's own disconnect holds against later
   sign-ins. The account page and console say how each account was connected.
 
+- **"What do you need?" guide** — two plain questions lead to the setup a person needs, drawn step by step, with one
+  button that opens the right form already filled in. It is in every project's console and on foxauth.dev in English,
+  Russian and Chinese, from one declaration; an answer the project cannot use yet says why (a setting off, the plan,
+  a missing right) instead of disappearing. The home page and the docs link to it.
+
 ## [1.4.0] - 2026-11-03
 
 A token vault for agents: people connect their accounts at the services a project declares, and an agent obtains a

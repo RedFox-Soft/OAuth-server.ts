@@ -39,7 +39,8 @@ const href = {
 	endpoints: await localizedHref('/docs/reference/endpoints/', locale),
 	protectMcp: await localizedHref('/docs/get-started/protect-your-mcp-server/', locale),
 	mcpTools: await localizedHref('/docs/reference/mcp-tools/', locale),
-	docs: await localizedHref('/docs/', locale)
+	docs: await localizedHref('/docs/', locale),
+	guide: await localizedHref('/docs/guide/', locale)
 };
 
 const stepRoutes = [
@@ -176,6 +177,9 @@ server ← { "appliedKeys": ["deviceFlow.enabled"],
 						size="lg">{t.hero.github}</Button
 					>
 				</div>
+				<p class="mt-4 text-base text-gray-700 dark:text-gray-300">
+					{t.hero.guideLead} <a href={href.guide}>{t.hero.guideLink}</a>
+				</p>
 				<p class="mt-6 flex flex-wrap items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
 					<Badge tone="accent">{t.hero.specifications}</Badge>
 					<Badge tone="accent">{t.hero.freeUsers}</Badge>

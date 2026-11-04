@@ -39,3 +39,13 @@ export const CLOUD_FLAGS_ON: ReadonlySet<string> = new Set([
 	'cors.enabled',
 	'rateLimit.enabled'
 ]);
+
+/*
+ * The plan features the Free plan includes, so the guide can mark an answer "Not on the Free plan". Free has none of
+ * them: no enterprise sign-in, custom slug or custom domain (checked against production on 2026-10-18, as above).
+ * Change this when the Free plan changes.
+ */
+export const CLOUD_FREE_FEATURES: ReadonlySet<string> = new Set<string>([]);
+
+/* The console of FoxAuth Cloud: what a prompt names, and where the guide's buttons lead. */
+export const CLOUD_CONSOLE = 'https://auth.foxauth.dev/admin';

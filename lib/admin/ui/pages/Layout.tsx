@@ -50,6 +50,7 @@ import { Keys } from './Keys.js';
 import { McpClients } from './McpClients.js';
 import { Audit } from './Audit.js';
 import { Errors } from './Errors.js';
+import { StartPage } from './guide/StartPage.js';
 import { Usage } from './Usage.js';
 import { UsageBucketHistory } from './UsageBucketHistory.js';
 import { ADMIN_BUCKET_ID } from '../../consts.js';
@@ -58,6 +59,7 @@ const { Sider, Header, Content } = AntLayout;
 
 const BUCKET_TABS: Partial<Record<PageKey, BucketTab>> = {
 	'bucket.overview': 'overview',
+	'bucket.guide': 'guide',
 	'bucket.applications': 'applications',
 	'bucket.apis': 'apis',
 	'bucket.users': 'users',
@@ -345,6 +347,8 @@ export function Layout() {
 				return <Groups currentUserId={me?.userId ?? null} />;
 			case 'audit':
 				return <Audit />;
+			case 'start':
+				return <StartPage />;
 			case 'usage':
 				return <Usage superAdmin={can.instance} />;
 			case 'usage.bucket':

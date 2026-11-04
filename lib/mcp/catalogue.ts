@@ -217,7 +217,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: [],
 		summary:
-			'The administrator this agent is acting as: their id, email, whether they are a super administrator, and the teams they belong to. `can` states what they may create — `createProject`, `addressForms` (the address forms they may give a project: `path`, `subdomain` and, for a super administrator, `host`; the first is the one to offer by default), `createTeam` — and `instance`, whether the instance-wide operations are theirs. While plans are enforced it also states what the plan still allows them: `nameSlug` (false when a new project is given a generated address name, so `slug` must be left out of project_create), `projects` and `teams` (`count` against `max`; null when unlimited).'
+			'The administrator this agent is acting as: their id, email, whether they are a super administrator, and the teams they belong to. `can` states what they may create — `createProject`, `addressForms` (the address forms they may give a project: `path`, `subdomain` and, for a super administrator, `host`; the first is the one to offer by default), `createTeam` — and `instance`, whether the instance-wide operations are theirs. While plans are enforced it also states what the plan still allows them: `nameSlug` (false when a new project is given a generated address name, so `slug` must be left out of project_create), `projects` and `teams` (`count` against `max`; null when unlimited). `features` states which instance switches are on, for example `deviceFlow` or `mcp`: what the instance offers as it is now, the same for every administrator.'
 	},
 	{
 		tool: 'resource_list',

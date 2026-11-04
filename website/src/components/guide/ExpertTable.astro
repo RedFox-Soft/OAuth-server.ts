@@ -1,0 +1,68 @@
+---
+import Badge from '../ui/Badge.astro';
+import english from '../../i18n/messages/guide/en.ts';
+import type { GuideSituationEntry } from '../../data/export.ts';
+import type { GuideTexts } from '../../i18n/guide-texts.ts';
+import { cloudMark } from '../../data/guide.ts';
+
+/*
+ * Every situation in one table, for a reader who already knows the protocol they want. Each title links to its answer
+ * by `#answer-<id>`, which shows it with scripts off too.
+ */
+interface Props {
+	situations: GuideSituationEntry[];
+	texts: GuideTexts;
+	t: typeof english;
+}
+const { situations, texts, t } = Astro.props;
+---
+
+<div class="mt-4 overflow-x-auto">
+	<table class="w-full table-fixed border-collapse text-left text-sm">
+		<colgroup>
+			<col class="w-[40%]" />
+			<col class="w-[38%]" />
+			<col class="w-[22%]" />
+		</colgroup>
+		<thead>
+			<tr class="border-b border-gray-300 dark:border-gray-600">
+				<th scope="col" class="py-2 pe-3 font-semibold text-gray-950 dark:text-white"
+					>{t.all.situation}</th
+				>
+				<th scope="col" class="py-2 pe-3 font-semibold text-gray-950 dark:text-white"
+					>{t.all.protocol}</th
+				>
+				<th scope="col" class="py-2 font-semibold text-gray-950 dark:text-white"
+					>{t.all.mark}</th
+				>
+			</tr>
+		</thead>
+		<tbody>
+			{
+				situations.map((s) => (
+					<tr class="border-b border-gray-200 align-top dark:border-gray-700">
+						<td class="py-2 pe-3 [overflow-wrap:anywhere]">
+							<a
+								href={`#answer-${s.id}`}
+								class="font-medium text-accent-700 underline-offset-2 hover:underline dark:text-accent-200"
+							>
+								{texts.situations[s.id]?.title}
+							</a>
+							<span class="mt-1 block text-xs text-gray-600 dark:text-gray-400">
+								{s.tab === 'enterprise' ? t.all.enterprise : t.all.product}
+							</span>
+						</td>
+						<td class="py-2 pe-3 text-gray-700 [overflow-wrap:anywhere] dark:text-gray-300">
+							{texts.situations[s.id]?.protocol ?? s.protocol}
+						</td>
+						<td class="py-2">
+							<Badge tone={cloudMark(s.needs) === 'ready' ? 'accent' : 'neutral'}>
+								{t.answer.marks[cloudMark(s.needs)]}
+							</Badge>
+						</td>
+					</tr>
+				))
+			}
+		</tbody>
+	</table>
+</div>

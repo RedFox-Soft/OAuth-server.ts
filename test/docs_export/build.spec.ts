@@ -5,6 +5,10 @@ import { buildDocsExport } from 'lib/docs_export/build.ts';
 import { SETTINGS_CATALOG } from 'lib/admin/settings/catalog.ts';
 import { mcpCatalogue, excludedConsoleOperations } from 'lib/mcp/catalogue.ts';
 import { auditedAdminRoutes } from 'lib/consts/admin_audit_routes.ts';
+import {
+	GUIDE_QUESTIONS,
+	GUIDE_SITUATIONS
+} from 'lib/consts/situation_guide.ts';
 import { ADDON_SEAMS } from 'lib/addon/seams.ts';
 import {
 	alwaysAvailablePrefixes,
@@ -113,5 +117,30 @@ describe('documentation export', () => {
 
 	it('exports the environment inventory', () => {
 		expect(out.environment.map((v) => v.name)).toContain('ISSUER');
+	});
+
+	/**
+	 * @proves The site is given every situation the console offers, so the two lists cannot drift.
+	 */
+	it('exports every guide situation without the console-only fields', () => {
+		const { situations, questions } = out.situationGuide;
+		expect(situations.map((s) => s.id)).toEqual(
+			GUIDE_SITUATIONS.map((s) => s.id)
+		);
+		expect(questions).toEqual([...GUIDE_QUESTIONS]);
+		expect(situations.find((s) => s.id === 'okta')?.needs.planFeature).toBe(
+			'enterpriseSignIn'
+		);
+		for (const situation of situations) {
+			expect(situation).not.toHaveProperty('preset');
+			expect(situation.action).not.toHaveProperty('target');
+			expect(situation.lanes.every((l) => l.label.length > 0)).toBe(true);
+			for (const flag of [
+				...(situation.needs.flags ?? []),
+				...(situation.needs.anyOf ?? [])
+			]) {
+				expect(out.situationGuide.flagSettings[flag]).toBeString();
+			}
+		}
 	});
 });

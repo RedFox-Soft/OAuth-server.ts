@@ -12,6 +12,7 @@ import { meCan } from './auth/can.js';
 import { meView } from './me_view.js';
 import { ADMIN_BUCKET_ID } from './consts.js';
 import { planRightsOf } from '../plans/rights.js';
+import { guideFeatures } from '../situation_guide/features.js';
 
 /*
  * Who the caller is, as the admin plane resolved them: id, email, whether a super administrator, bucket
@@ -45,7 +46,8 @@ export const meRoutes = new Elysia({ name: 'admin-me' })
 		return {
 			...meView(ctx),
 			verified: account?.verified === true,
-			can: { ...meCan(ctx), ...(await planRightsOf(ctx)) }
+			can: { ...meCan(ctx), ...(await planRightsOf(ctx)) },
+			features: guideFeatures()
 		};
 	})
 	/*

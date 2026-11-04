@@ -25,6 +25,20 @@ export function siteRoot(): string {
 	return root;
 }
 
+/*
+ * A message group whose English is not `<group>/en.ts`. The guide's English lives in lib/ because the
+ * console reads the same declaration; a translation stamped against that file goes stale the moment
+ * the console's wording changes. Paths are relative to website/.
+ */
+export const ENGLISH_SOURCE: Record<string, string> = {
+	guideSituations: '../lib/consts/situation_guide.ts'
+};
+
+/** The English file a message group's translations are made from. */
+export function englishSourceOf(group: string): string {
+	return ENGLISH_SOURCE[group] ?? `src/i18n/messages/${group}/en.ts`;
+}
+
 export function hashText(text: string): string {
 	return createHash('sha256')
 		.update(text.replace(/\r\n/g, '\n'))

@@ -2,7 +2,7 @@ import { rich } from '../../types.ts';
 import type english from './en.ts';
 import type { HomeFacts } from './en.ts';
 
-export const source = '5591b93e2441';
+export const source = 'a47e9f8cd394';
 
 export default {
 	title: 'FoxAuth：面向智能体时代的授权服务器',
@@ -15,6 +15,8 @@ export default {
 		getStarted: '自己运行',
 		freeAccount: '创建免费账户',
 		github: '在 GitHub 上查看',
+		guideLead: '不确定需要哪种配置？',
+		guideLink: '回答两个问题',
 		specifications: '30 项规范',
 		freeUsers: '1,000,000 MAU 免费',
 		quickstartCaption: '两条命令，一个浏览器标签页',

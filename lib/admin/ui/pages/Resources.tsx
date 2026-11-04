@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
 	Table,
 	Button,
@@ -25,7 +25,7 @@ import { useFeedback } from '../frame/feedback.js';
 import { useConfirm } from '../frame/confirm.js';
 import { AreaToolbar } from '../frame/AreaToolbar.js';
 import { RowActions } from '../frame/RowActions.js';
-import { useRoute } from '../frame/router.js';
+import { useQueryOffer } from '../frame/queryOffer.js';
 import { EmptyState, LoadFailed } from '../frame/states.js';
 import { atLimit, type PlanView } from '../planText.js';
 import {
@@ -381,9 +381,12 @@ export function Resources({
 	const confirm = useConfirm();
 	const [connecting, setConnecting] = useState<ResourceView | null>(null);
 	const [applications, setApplications] = useState<ExchangeCandidate[]>([]);
-	/* "My MCP server or API" in New application lands here with ?declare=1 (spec 107): open the form once, if allowed. */
-	const declareRequested = useRoute().query.get('declare') === '1';
-	const declareOffered = useRef(false);
+	/*
+	 * "My MCP server or API" in New application, and the guide's "Set this up", land here with ?declare=1 (spec 107):
+	 * open the form once, when the New button would be offered.
+	 */
+	const offerDeclare = useQueryOffer('declare');
+	const room = atLimit(plan, 'apis') === null;
 
 	const scopesValue = useWatched(form, 'scopes') ?? '';
 	const ttlValue = useWatched(form, 'accessTokenTTL') ?? 900;
@@ -403,8 +406,7 @@ export function Resources({
 					setLoadFailed(null);
 					const mayDeclare =
 						canEdit && (result.data.namespace === 'project' || superAdmin);
-					if (declareRequested && mayDeclare && !declareOffered.current) {
-						declareOffered.current = true;
+					if (offerDeclare(mayDeclare && room) === '1') {
 						setMode('create');
 						setEditing(null);
 						form.resetFields();
@@ -416,7 +418,7 @@ export function Resources({
 				}
 				setLoading(false);
 			}),
-		[base, canEdit, superAdmin, declareRequested, form]
+		[base, canEdit, superAdmin, room, offerDeclare, form]
 	);
 	function load() {
 		setLoading(true);

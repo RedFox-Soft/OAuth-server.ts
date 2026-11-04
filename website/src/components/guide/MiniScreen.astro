@@ -1,0 +1,77 @@
+---
+import english from '../../i18n/messages/guide/en.ts';
+
+/*
+ * A drawn hint of the screen the person meets, not a screenshot. It is decoration: hidden from assistive technology,
+ * because the lines beside it say the same in words.
+ */
+interface Props {
+	kind: 'signIn' | 'consent' | 'deviceCode' | 'approve' | 'none';
+	t: (typeof english)['mini'];
+}
+const { kind, t } = Astro.props;
+
+const field =
+	'rounded border border-gray-300 px-2 py-1 text-xs text-gray-600 dark:border-gray-600 dark:text-gray-300';
+const primary =
+	'rounded bg-accent-500 px-2 py-1 text-center text-xs font-semibold text-gray-950';
+const secondary =
+	'rounded bg-gray-100 px-2 py-1 text-center text-xs font-semibold text-gray-900 dark:bg-gray-700 dark:text-gray-100';
+const heading = 'text-sm font-semibold text-gray-900 dark:text-gray-100';
+const body = 'text-xs text-gray-600 dark:text-gray-300';
+---
+
+{
+	kind !== 'none' && (
+		<div
+			aria-hidden="true"
+			class="w-full max-w-64 overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-600 dark:bg-gray-900"
+		>
+			<div class="flex gap-1 border-b border-gray-200 bg-gray-50 px-2 py-1.5 dark:border-gray-600 dark:bg-gray-800">
+				<span class="size-1.5 rounded-full bg-gray-400" />
+				<span class="size-1.5 rounded-full bg-gray-400" />
+				<span class="size-1.5 rounded-full bg-gray-400" />
+			</div>
+			<div class="flex flex-col gap-1.5 p-3">
+				{kind === 'signIn' && (
+					<>
+						<div class={heading}>{t.signIn.heading}</div>
+						<div class={field}>{t.signIn.email}</div>
+						<div class={field}>{t.signIn.password}</div>
+						<div class={primary}>{t.signIn.submit}</div>
+						<div class={secondary}>{t.signIn.provider}</div>
+					</>
+				)}
+				{kind === 'consent' && (
+					<>
+						<div class={heading}>{t.consent.heading}</div>
+						<div class={body}>{t.consent.body}</div>
+						<div class="grid grid-cols-2 gap-1.5">
+							<div class={secondary}>{t.consent.deny}</div>
+							<div class={primary}>{t.consent.allow}</div>
+						</div>
+					</>
+				)}
+				{kind === 'deviceCode' && (
+					<>
+						<div class={heading}>{t.deviceCode.heading}</div>
+						<div class="text-center font-mono text-base tracking-widest text-gray-900 dark:text-gray-100">
+							{t.deviceCode.code}
+						</div>
+						<div class={primary}>{t.deviceCode.submit}</div>
+					</>
+				)}
+				{kind === 'approve' && (
+					<>
+						<div class={heading}>{t.approve.heading}</div>
+						<div class={body}>{t.approve.body}</div>
+						<div class="grid grid-cols-2 gap-1.5">
+							<div class={secondary}>{t.approve.decline}</div>
+							<div class={primary}>{t.approve.approve}</div>
+						</div>
+					</>
+				)}
+			</div>
+		</div>
+	)
+}

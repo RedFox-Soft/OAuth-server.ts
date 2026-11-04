@@ -35,7 +35,14 @@ type Blocker = () => Promise<boolean>;
 interface RouterValue {
 	location: Location;
 	resolved: Resolved;
-	navigate: (href: string, options?: { replace?: boolean }) => Promise<boolean>;
+	/*
+	 * `scroll: false` keeps the reader where they are: for a page that keeps its own state in the query (the guide's
+	 * answer), so the address changes under them without the page jumping to the top.
+	 */
+	navigate: (
+		href: string,
+		options?: { replace?: boolean; scroll?: boolean }
+	) => Promise<boolean>;
 	/* Registers a check that may refuse a navigation; returns the function that removes it. */
 	block: (blocker: Blocker) => () => void;
 }
@@ -91,13 +98,13 @@ export function RouterProvider({
 	}, []);
 
 	const navigate = useCallback(
-		async (to: string, options?: { replace?: boolean }) => {
+		async (to: string, options?: { replace?: boolean; scroll?: boolean }) => {
 			if (to === readLocation()) return true;
 			if (!(await allowed())) return false;
 			if (options?.replace) window.history.replaceState(null, '', to);
 			else window.history.pushState(null, '', to);
 			notify();
-			window.scrollTo(0, 0);
+			if (options?.scroll !== false) window.scrollTo(0, 0);
 			return true;
 		},
 		[allowed]

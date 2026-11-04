@@ -31,7 +31,7 @@ had nobody to sign in. Market research and four critiques are in `specs/app-conn
 `lib/admin/ui/pages/applications/situations.ts` declares the situations — web app with a server, single-page app,
 mobile/desktop/CLI, device without a keyboard, service calling your API, "My MCP server or API", and "Configure
 everything yourself". A situation only **expands into the existing create-route fields** (`expand(devAddress)`); the
-server never learns which one was chosen and nothing stores it. Rejected alternative: a `template` input on the admin
+server never learns which one was chosen and nothing stores it. Each preset's title and description are the situation guide's (the `GUIDE_SITUATIONS` entry whose `preset` matches), so the chooser and the guide ([[situation-guide]]) cannot drift; only "My MCP server or API" and "Configure everything yourself" keep their words in `SituationChooser.tsx`. A name left blank becomes the preset's short `defaultName` ("Web app", "Backend service"), not that title (corrected 2026-11-03: the guide's titles are sentences, and the name shows on the consent page). Rejected alternative: a `template` input on the admin
 route/MCP tool — a later change to a template's defaults would silently change what scripts and agents create, and a
 second creation path is what broke Zitadel's and authentik's consoles. The page describes an application from its
 stored settings (`describe()` in `blocks.ts`), because one an agent created has no situation.

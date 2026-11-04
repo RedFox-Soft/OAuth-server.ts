@@ -109,13 +109,24 @@ const ROOM = {
 	}
 } as const;
 
+export type PlanRoom = keyof typeof ROOM;
+
+/* The sentence for a full limit, for a screen that already knows it is full (the situation guide). */
+export function limitReachedText(
+	planName: string,
+	max: number,
+	kind: PlanRoom
+): string {
+	const { one, many } = ROOM[kind];
+	return `This project is on the ${planName} plan, which allows ${countText(max)} ${max === 1 ? one : many}. Ask for a larger plan to add more.`;
+}
+
 export function atLimit(
 	plan: PlanView | null | undefined,
-	kind: keyof typeof ROOM
+	kind: PlanRoom
 ): string | null {
 	if (!plan) return null;
-	const { limit, one, many } = ROOM[kind];
-	const max = plan.limits[limit];
+	const max = plan.limits[ROOM[kind].limit];
 	if (max === null || plan.usage[kind] < max) return null;
-	return `This project is on the ${plan.name} plan, which allows ${countText(max)} ${max === 1 ? one : many}. Ask for a larger plan to add more.`;
+	return limitReachedText(plan.name, max, kind);
 }

@@ -15,6 +15,7 @@ import { meView } from './me_view.js';
 import { meCan } from './auth/can.js';
 import { ISSUER } from '../configs/env.js';
 import { planRightsOf } from '../plans/rights.js';
+import { guideFeatures } from '../situation_guide/features.js';
 import { callerAddressOf } from '../helpers/caller_address.js';
 
 /*
@@ -118,7 +119,8 @@ async function consolePage({
 			needsSetup: false,
 			me: {
 				...meView(admin),
-				can: { ...meCan(admin), ...(await planRightsOf(admin)) }
+				can: { ...meCan(admin), ...(await planRightsOf(admin)) },
+				features: guideFeatures()
 			},
 			path,
 			instanceHost

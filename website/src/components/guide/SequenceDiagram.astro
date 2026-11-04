@@ -1,0 +1,361 @@
+---
+import type { GuideSituationEntry } from '../../data/export.ts';
+
+/*
+ * One diagram for every answer: the lanes across the top, one row per step, each step an arrow from lane to lane.
+ * Plain HTML and CSS, so it renders with scripts off and every colour comes from a custom property set on `.guide`.
+ * The lanes are columns of one grid (`minmax(0,1fr)` each), so a long label wraps instead of widening the page. The
+ * rows are decoration for sighted readers; the numbered list after it says the same in words.
+ *
+ * The rows appear one after another by CSS animation, which starts again whenever the answer is shown; a reader who
+ * asks for reduced motion gets them all at once.
+ */
+interface Props {
+	lanes: GuideSituationEntry['lanes'];
+	steps: GuideSituationEntry['steps'];
+	laneLabels: Record<string, string>;
+	stepLabels: string[];
+}
+const { lanes, steps, laneLabels, stepLabels } = Astro.props;
+
+const toneOf = (kind: string) =>
+	kind === 'fox'
+		? 'fox'
+		: kind === 'outside' || kind === 'company'
+			? 'outside'
+			: 'plain';
+const index = new Map(lanes.map((lane, i) => [lane.id, i]));
+
+const rows = steps.map((step, i) => {
+	const a = index.get(step.from) ?? 0;
+	const b = index.get(step.to) ?? 0;
+	const lo = Math.min(a, b);
+	const span = Math.abs(a - b) + 1;
+	const direction = a < b ? 'right' : a > b ? 'left' : 'self';
+	return {
+		n: i + 1,
+		label: stepLabels[i] ?? step.label,
+		style: step.style ?? 'request',
+		direction,
+		column: `${lo + 1} / span ${span}`,
+		span
+	};
+});
+---
+
+<div
+	class="g-diagram"
+	style={`--lanes: ${lanes.length}`}
+	aria-hidden="true"
+	data-diagram
+>
+	<div class="g-lanes">
+		{
+			lanes.map((lane) => (
+				<div class={`g-lane g-lane--${toneOf(lane.kind)}`}>
+					{laneLabels[lane.id] ?? lane.label}
+				</div>
+			))
+		}
+	</div>
+	<ol class="g-rows">
+		{
+			rows.map((row) => (
+				<li
+					class:list={[
+						'g-row',
+						`g-${row.style}`,
+						`g-${row.direction}`,
+					]}
+					style={`--i: ${row.n - 1}`}
+				>
+					<div
+						class="g-arrow"
+						style={`grid-column: ${row.column}; --span: ${row.span}`}
+					>
+						<span class="g-label">
+							<span class="g-num">{row.n}</span>
+							{row.label}
+						</span>
+						{row.direction !== 'self' && <span class="g-line" />}
+					</div>
+				</li>
+			))
+		}
+	</ol>
+</div>
+
+<style is:global>
+	.guide {
+		--g-surface: #fff;
+		--g-lane-bg: #fff;
+		--g-lane-border: var(--color-gray-300);
+		--g-lane-text: var(--color-gray-900);
+		--g-fox-bg: var(--color-accent-50);
+		--g-fox-border: var(--color-accent-500);
+		--g-fox-text: var(--color-accent-900);
+		--g-outside-border: var(--color-gray-500);
+		--g-life: var(--color-gray-300);
+		--g-arrow: var(--color-gray-500);
+		--g-deny: #dc2626;
+		--g-label: var(--color-gray-900);
+		--g-num-bg: var(--color-gray-900);
+		--g-num-text: var(--color-gray-50);
+		--g-highlight: var(--color-accent-100);
+	}
+	[data-theme='dark'] .guide {
+		--g-surface: var(--color-gray-800);
+		--g-lane-bg: var(--color-gray-800);
+		--g-lane-border: var(--color-gray-600);
+		--g-lane-text: var(--color-gray-100);
+		--g-fox-bg: var(--color-accent-950);
+		--g-fox-border: var(--color-accent-400);
+		--g-fox-text: var(--color-accent-100);
+		--g-outside-border: var(--color-gray-400);
+		--g-life: var(--color-gray-700);
+		--g-arrow: var(--color-gray-400);
+		--g-deny: #f87171;
+		--g-label: var(--color-gray-100);
+		--g-num-bg: var(--color-gray-100);
+		--g-num-text: var(--color-gray-900);
+		--g-highlight: var(--color-accent-950);
+	}
+
+	.g-diagram {
+		margin-block: 0.75rem;
+	}
+	.g-lanes,
+	.g-row {
+		display: grid;
+		grid-template-columns: repeat(var(--lanes), minmax(0, 1fr));
+	}
+	.g-lanes {
+		gap: 0.375rem;
+	}
+	.g-lane {
+		min-width: 0;
+		padding: 0.375rem 0.25rem;
+		border: 1.5px solid var(--g-lane-border);
+		border-radius: var(--radius-control);
+		background: var(--g-lane-bg);
+		color: var(--g-lane-text);
+		font-size: 0.8125rem;
+		font-weight: 600;
+		line-height: 1.25;
+		text-align: center;
+		/* `anywhere`, not `break-word`: only it lowers the min-content width, so a long word cannot push past its lane. */
+		overflow-wrap: anywhere;
+		hyphens: auto;
+		display: grid;
+		place-items: center;
+	}
+	.g-lane--fox {
+		border-color: var(--g-fox-border);
+		background: var(--g-fox-bg);
+		color: var(--g-fox-text);
+	}
+	.g-lane--outside {
+		border-style: dashed;
+		border-color: var(--g-outside-border);
+	}
+
+	/* The lifelines: one thin line down the middle of every lane, drawn once behind all the rows. */
+	.g-rows {
+		list-style: none;
+		margin: 0;
+		padding: 0.25rem 0 0.5rem;
+		background-image: linear-gradient(
+			90deg,
+			transparent calc(50% - 0.5px),
+			var(--g-life) calc(50% - 0.5px),
+			var(--g-life) calc(50% + 0.5px),
+			transparent calc(50% + 0.5px)
+		);
+		background-size: calc(100% / var(--lanes)) 100%;
+		background-repeat: repeat-x;
+	}
+	.g-rows > li {
+		margin: 0;
+		padding-block: 0.375rem;
+	}
+	.g-row {
+		animation: g-step-in 0.4s ease-out both;
+		animation-delay: calc(var(--i) * 0.6s + 0.15s);
+	}
+	.g-arrow {
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.25rem;
+		color: var(--g-arrow);
+		transition: opacity 0.15s;
+	}
+	.g-refusal .g-arrow {
+		color: var(--g-deny);
+	}
+	.g-label {
+		max-width: 100%;
+		padding: 0.0625rem 0.375rem;
+		border-radius: 0.375rem;
+		background: var(--g-surface);
+		color: var(--g-label);
+		font-size: 0.8125rem;
+		line-height: 1.3;
+		text-align: center;
+		overflow-wrap: anywhere;
+	}
+	.g-num {
+		display: inline-grid;
+		place-items: center;
+		min-width: 1.15rem;
+		height: 1.15rem;
+		margin-inline-end: 0.25rem;
+		border-radius: 999px;
+		background: var(--g-num-bg);
+		color: var(--g-num-text);
+		font-size: 0.6875rem;
+		font-weight: 700;
+		vertical-align: 0.0625rem;
+	}
+	.g-self .g-label {
+		border: 1.5px dashed currentColor;
+	}
+
+	/* The arrow runs from the middle of its first lane to the middle of its last: half a lane in from each edge. */
+	.g-line {
+		position: relative;
+		align-self: stretch;
+		height: 0;
+		margin-inline: calc(100% / var(--span) / 2);
+		border-top: 2px solid currentColor;
+	}
+	.g-redirect .g-line {
+		border-top-style: dashed;
+	}
+	.g-token .g-line {
+		border-top-width: 3.5px;
+	}
+	.g-refusal .g-line {
+		border-top-style: dashed;
+		border-top-width: 2.5px;
+	}
+	.g-line::after {
+		content: '';
+		position: absolute;
+		top: -6px;
+		border-block: 5px solid transparent;
+	}
+	.g-token .g-line::after {
+		top: -6.75px;
+	}
+	.g-right .g-line::after {
+		right: -2px;
+		border-left: 9px solid currentColor;
+	}
+	.g-left .g-line::after {
+		left: -2px;
+		border-right: 9px solid currentColor;
+	}
+	.g-right .g-line {
+		animation: g-draw 0.4s ease-out both;
+		transform-origin: left;
+	}
+	.g-left .g-line {
+		animation: g-draw 0.4s ease-out both;
+		transform-origin: right;
+	}
+	.g-row .g-line {
+		animation-delay: calc(var(--i) * 0.6s + 0.15s);
+	}
+
+	@keyframes g-step-in {
+		from {
+			opacity: 0;
+			transform: translateY(-0.25rem);
+		}
+		to {
+			opacity: 1;
+			transform: none;
+		}
+	}
+	@keyframes g-draw {
+		from {
+			transform: scaleX(0);
+		}
+		to {
+			transform: scaleX(1);
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.g-row,
+		.g-row .g-line {
+			animation: none;
+		}
+	}
+
+	/* Pointing at a step in the list picks out its arrow. */
+	.g-answer:has(.g-steps > li:hover) .g-arrow {
+		opacity: 0.3;
+	}
+	.g-answer:has(.g-steps > li:nth-child(1):hover)
+		.g-row:nth-child(1)
+		.g-arrow,
+	.g-answer:has(.g-steps > li:nth-child(2):hover)
+		.g-row:nth-child(2)
+		.g-arrow,
+	.g-answer:has(.g-steps > li:nth-child(3):hover)
+		.g-row:nth-child(3)
+		.g-arrow,
+	.g-answer:has(.g-steps > li:nth-child(4):hover)
+		.g-row:nth-child(4)
+		.g-arrow,
+	.g-answer:has(.g-steps > li:nth-child(5):hover)
+		.g-row:nth-child(5)
+		.g-arrow,
+	.g-answer:has(.g-steps > li:nth-child(6):hover)
+		.g-row:nth-child(6)
+		.g-arrow,
+	.g-answer:has(.g-steps > li:nth-child(7):hover)
+		.g-row:nth-child(7)
+		.g-arrow,
+	.g-answer:has(.g-steps > li:nth-child(8):hover)
+		.g-row:nth-child(8)
+		.g-arrow {
+		opacity: 1;
+	}
+	.g-answer:has(.g-steps > li:nth-child(1):hover)
+		.g-row:nth-child(1)
+		.g-label,
+	.g-answer:has(.g-steps > li:nth-child(2):hover)
+		.g-row:nth-child(2)
+		.g-label,
+	.g-answer:has(.g-steps > li:nth-child(3):hover)
+		.g-row:nth-child(3)
+		.g-label,
+	.g-answer:has(.g-steps > li:nth-child(4):hover)
+		.g-row:nth-child(4)
+		.g-label,
+	.g-answer:has(.g-steps > li:nth-child(5):hover)
+		.g-row:nth-child(5)
+		.g-label,
+	.g-answer:has(.g-steps > li:nth-child(6):hover)
+		.g-row:nth-child(6)
+		.g-label,
+	.g-answer:has(.g-steps > li:nth-child(7):hover)
+		.g-row:nth-child(7)
+		.g-label,
+	.g-answer:has(.g-steps > li:nth-child(8):hover)
+		.g-row:nth-child(8)
+		.g-label {
+		background: var(--g-highlight);
+		font-weight: 600;
+	}
+
+	@media (max-width: 30rem) {
+		.g-lane,
+		.g-label {
+			font-size: 0.75rem;
+		}
+	}
+</style>

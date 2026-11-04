@@ -117,7 +117,10 @@ export function stripLocale(route: string): string {
  * canonical rather than saying `noindex` (src/route-middleware.ts says why).
  */
 export const TRANSLATED_DOCS: readonly string[] = ['/docs/get-started/'];
-export const TRANSLATED_DOCS_EXACT: readonly string[] = ['/docs/'];
+export const TRANSLATED_DOCS_EXACT: readonly string[] = [
+	'/docs/',
+	'/docs/guide/'
+];
 
 export function isDocsFallback(route: string): boolean {
 	const normalised = normaliseRoute(route);

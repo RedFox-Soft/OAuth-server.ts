@@ -25,6 +25,7 @@ import { ScheduledBanner } from './ScheduledBanner.js';
 import { SignInTab, signInKey } from './signin/SignInTab.js';
 import { OutsideServersPanel } from './OutsideServersPanel.js';
 import { ConnectedServicesPanel } from './ConnectedServicesPanel.js';
+import { GuidePage } from './guide/GuidePage.js';
 
 /*
  * Said once, above an area the caller may look at but not change, instead of a page of controls that
@@ -47,6 +48,7 @@ function ReadOnlyNotice() {
  */
 export type BucketTab =
 	| 'overview'
+	| 'guide'
 	| 'applications'
 	| 'apis'
 	| 'users'
@@ -62,6 +64,7 @@ export type BucketTab =
 
 const TABS: { key: BucketTab; segment?: string; label: string }[] = [
 	{ key: 'overview', label: 'Overview' },
+	{ key: 'guide', segment: 'guide', label: 'What do you need?' },
 	{ key: 'applications', segment: 'applications', label: 'Applications' },
 	{ key: 'apis', segment: 'apis', label: 'APIs' },
 	{ key: 'users', segment: 'users', label: 'Users' },
@@ -90,7 +93,12 @@ const TABS: { key: BucketTab; segment?: string; label: string }[] = [
 
 /* Whether the caller may open an area at all; the others are open to anyone who can read the bucket. */
 function tabAllowed(key: BucketTab, can: BucketCan): boolean {
-	if (key === 'overview' || key === 'settings' || key === 'signIn') {
+	if (
+		key === 'overview' ||
+		key === 'guide' ||
+		key === 'settings' ||
+		key === 'signIn'
+	) {
 		return can.read;
 	}
 	/*
@@ -138,7 +146,18 @@ export function BucketDetail({
 	// Every state write follows an await, so the mount effect calls this without setting `loading` first.
 	const fetchBucket = useCallback(async () => {
 		try {
-			const b = await request<BucketView>('GET', base);
+			/*
+			 * Together, so the plan is known when the bucket is: a panel that opens a create form from the address
+			 * waits for the plan (`planKnown` below), and waiting for a second round trip would be felt on every visit.
+			 */
+			const [b, s, scope] = await Promise.all([
+				request<BucketView>('GET', base),
+				request<BucketSummary>('GET', `${base}/summary`),
+				request<{ available: { id: string; name: string }[] }>(
+					'GET',
+					'/admin/api/scope'
+				)
+			]);
 			if (!b.ok) {
 				setLoadStatus(b.status);
 				setLoadMessage(b.error.message);
@@ -146,13 +165,6 @@ export function BucketDetail({
 			}
 			setLoadStatus(null);
 			setBucket(b.data);
-			const [s, scope] = await Promise.all([
-				request<BucketSummary>('GET', `${base}/summary`),
-				request<{ available: { id: string; name: string }[] }>(
-					'GET',
-					'/admin/api/scope'
-				)
-			]);
 			setSummary(s.ok ? s.data : null);
 			setSummaryFailed(!s.ok);
 			if (scope.ok) {
@@ -234,6 +246,13 @@ export function BucketDetail({
 	 * plan but is never limited by it, and a tenant reads none while plans are off.
 	 */
 	const heldTo = me?.superAdmin === true ? null : (summary?.plan ?? null);
+	/*
+	 * A panel that opens its create form from the address (`?situation=`, `?declare=1`, `?add=`) judges the plan's
+	 * room once, at its first load; mounted before the plan is known it would read "no limit" and open a form the
+	 * route then refuses with a plan_limit. A failed summary counts as known: the route still decides.
+	 */
+	const planKnown =
+		me?.superAdmin === true || summary !== null || summaryFailed;
 
 	return (
 		<>
@@ -305,6 +324,21 @@ export function BucketDetail({
 					onChanged={() => void load()}
 				/>
 			)}
+			{bucket &&
+				!tabRefused &&
+				shownTab === 'guide' &&
+				// The plan decides some answers' buttons: wait for it rather than offer a button that then changes.
+				(planKnown ? (
+					<GuidePage
+						bucket={bucket}
+						summary={summary}
+						can={can}
+						superAdmin={me?.superAdmin === true}
+						features={me?.features}
+					/>
+				) : (
+					<Skeleton active />
+				))}
 			{bucket && !tabRefused && shownTab === 'settings' && (
 				<BucketSettings
 					bucket={bucket}
@@ -323,7 +357,7 @@ export function BucketDetail({
 					onSaved={() => void load()}
 				/>
 			)}
-			{bucket && !tabRefused && shownTab === 'applications' && (
+			{bucket && planKnown && !tabRefused && shownTab === 'applications' && (
 				<Clients
 					bucketId={bucketId}
 					writable={can.edit && !bucket.deletion}
@@ -338,7 +372,7 @@ export function BucketDetail({
 					exchangeOn={bucket.assertionGrants?.tokenExchange === true}
 				/>
 			)}
-			{bucket && !tabRefused && shownTab === 'apis' && (
+			{bucket && planKnown && !tabRefused && shownTab === 'apis' && (
 				<Resources
 					bucketId={bucketId}
 					bucketName={bucket.name}
@@ -380,7 +414,7 @@ export function BucketDetail({
 					onChanged={() => void load()}
 				/>
 			)}
-			{bucket && !tabRefused && shownTab === 'providers' && (
+			{bucket && planKnown && !tabRefused && shownTab === 'providers' && (
 				<FederationPanel
 					key={federationKey}
 					bucket={bucket}
@@ -404,12 +438,17 @@ export function BucketDetail({
 					}}
 				/>
 			)}
-			{bucket && !tabRefused && shownTab === 'connectedServices' && (
-				<ConnectedServicesPanel
-					bucketId={bucketId}
-					canEdit={can.edit}
-				/>
-			)}
+			{bucket &&
+				planKnown &&
+				!tabRefused &&
+				shownTab === 'connectedServices' && (
+					<ConnectedServicesPanel
+						bucketId={bucketId}
+						canEdit={can.edit}
+						plan={heldTo}
+						onChanged={() => void load()}
+					/>
+				)}
 			{bucket && !tabRefused && shownTab === 'keys' && (
 				<BucketKeysPanel
 					bucket={bucket}

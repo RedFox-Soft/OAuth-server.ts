@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import { LOCALE_DEFINITIONS, type LocaleKey } from '../../src/data/seo.ts';
-import { siteRoot } from '../../src/i18n/source-hash.ts';
+import { englishSourceOf, siteRoot } from '../../src/i18n/source-hash.ts';
 
 /*
  * What a translation is, and which English file it was made from. One definition, read by both the
@@ -66,7 +66,7 @@ export function translationOf(path: string): Translation | undefined {
 		if (!isTranslatedLocale(locale)) return undefined;
 		return {
 			file,
-			english: `src/i18n/messages/${parts[3]}/en.ts`,
+			english: englishSourceOf(parts[3]),
 			locale,
 			kind: 'messages'
 		};

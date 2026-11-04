@@ -27,6 +27,7 @@ import { useLeaveGuard } from '../frame/router.js';
 import { PageHeader } from '../frame/PageHeader.js';
 import { request } from '../frame/request.js';
 import { useFeedback } from '../frame/feedback.js';
+import { useMe } from '../frame/me.js';
 import { LoadFailed, NoMatch } from '../frame/states.js';
 
 /*
@@ -62,6 +63,7 @@ export function Settings() {
 	const [failed, setFailed] = useState<string | null>(null);
 	const [saving, setSaving] = useState(false);
 	const feedback = useFeedback();
+	const { reload: reloadMe } = useMe();
 	const [pane, setPane] = useState<SettingDomain | null>(null);
 	const [query, setQuery] = useState('');
 
@@ -149,6 +151,8 @@ export function Settings() {
 				return;
 			}
 			apply(result.data);
+			// The console's `me` states the guide's switches; a saved switch changes what it says.
+			void reloadMe();
 			feedback.done(
 				dirty.length === 1
 					? 'Setting saved.'

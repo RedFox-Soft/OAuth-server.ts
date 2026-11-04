@@ -27,7 +27,7 @@ describe('the configuration block', () => {
 	for (const situation of SITUATIONS) {
 		const { expand } = situation;
 		if (!expand) continue;
-		it(`never puts the secret under a browser-exposed name for "${situation.title}"`, () => {
+		it(`never puts the secret under a browser-exposed name for "${situation.id}"`, () => {
 			const expansion = expand(situation.devAddress ?? 'http://localhost:3000');
 			const block = envBlock(
 				{
@@ -61,7 +61,7 @@ describe('the copy for an AI agent', () => {
 	for (const situation of SITUATIONS) {
 		const { expand } = situation;
 		if (!expand) continue;
-		it(`carries the values and no secret for "${situation.title}", even right after creation`, () => {
+		it(`carries the values and no secret for "${situation.id}", even right after creation`, () => {
 			const expansion = expand(situation.devAddress ?? 'http://localhost:3000');
 			const confidential = expansion.tokenEndpointAuthMethod !== 'none';
 			const text = agentBlock(

@@ -18,6 +18,8 @@ import { UNASSIGNED_GROUP_ID, reservedOf } from '../../consts.js';
 import type { BucketSummary, BucketView } from './bucketView.js';
 import { RecentChanges } from '../frame/RecentChanges.js';
 import { BucketPlanCard } from './BucketPlanCard.js';
+import { OverviewGuide } from './guide/OverviewGuide.js';
+import { useMe } from '../frame/me.js';
 
 /*
  * A bucket's landing page (specs/081): what needs attention, how to connect an application to it, how people
@@ -65,6 +67,7 @@ export function BucketOverview({
 	onChanged: () => void;
 }) {
 	const navigate = useNavigate();
+	const { me } = useMe();
 	const special = reservedOf(bucket._id);
 	/*
 	 * The connections, for two items: the held one, so the item opens the page that can end the hold (specs/084
@@ -215,21 +218,6 @@ export function BucketOverview({
 			)
 		});
 	}
-	if (!special && applications === 0) {
-		attention.push({
-			key: 'unused',
-			type: 'info',
-			title: 'No application signs in here yet.',
-			action: (
-				<Button
-					size="small"
-					onClick={() => void navigate(bucketHref(bucket._id, 'applications'))}
-				>
-					Open Applications
-				</Button>
-			)
-		});
-	}
 	if (bucket.addressForm === 'unaddressed') {
 		attention.push({
 			key: 'address',
@@ -306,6 +294,16 @@ export function BucketOverview({
 					action={item.action}
 				/>
 			))}
+
+			{!special && applications === 0 && (
+				<OverviewGuide
+					bucket={bucket}
+					summary={summary}
+					can={can}
+					superAdmin={superAdmin}
+					features={me?.features}
+				/>
+			)}
 
 			<Row gutter={[16, 16]}>
 				<Col

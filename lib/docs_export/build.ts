@@ -53,6 +53,14 @@ import {
 	PROBE_PATHS
 } from '../consts/attack_report_fields.js';
 
+import {
+	GUIDE_FLAG_SETTINGS,
+	GUIDE_QUESTIONS,
+	GUIDE_SITUATIONS,
+	type GuideQuestion,
+	type GuideSituation
+} from '../consts/situation_guide.js';
+
 /*
  * What the website builds its Reference section from. Assembled from the tables the server already
  * keeps as data and guards with drift tests — the settings catalogue, the route classification, the
@@ -94,6 +102,13 @@ export interface McpToolExport extends Omit<
 	readonly querySchema: Record<string, unknown> | null;
 }
 
+/* The console's own target and preset mean nothing to the site, so they stay out of the contract. */
+export type ExportedSituation = Omit<GuideSituation, 'preset' | 'action'> & {
+	readonly action:
+		| { readonly kind: 'form' }
+		| { readonly kind: 'open'; readonly label: string };
+};
+
 export interface DocsExport {
 	readonly schemaVersion: 1;
 	readonly version: string;
@@ -134,6 +149,13 @@ export interface DocsExport {
 		readonly rangeLabels: readonly string[];
 		readonly reportedSettings: readonly { key: string; label: string }[];
 		readonly unreportedSettings: readonly { key: string; reason: string }[];
+	};
+	/* The "What do you need?" guide, from the data the console renders it from. */
+	readonly situationGuide: {
+		readonly questions: readonly GuideQuestion[];
+		readonly situations: readonly ExportedSituation[];
+		/* The setting each guide flag is read from, so the site names and links the real key. */
+		readonly flagSettings: Readonly<Record<string, string>>;
 	};
 	/* What the hourly attack report carries (specs/114), from the declaration the server counts and builds by. */
 	readonly attackReports: {
@@ -228,6 +250,17 @@ function exportTool(tool: McpTool): McpToolExport {
 	};
 }
 
+function exportSituation(situation: GuideSituation): ExportedSituation {
+	const { preset: _preset, action, ...rest } = situation;
+	return {
+		...rest,
+		action:
+			action.kind === 'open'
+				? { kind: 'open', label: action.label }
+				: { kind: 'form' }
+	};
+}
+
 /* A bucket-scoped route is the same endpoint at a tenant's address; the reference lists each once. */
 function atBareAddress(route: { path: string }): boolean {
 	return !route.path.includes(':bucket');
@@ -284,6 +317,11 @@ export function buildDocsExport(stamp: DocsExportStamp): DocsExport {
 			unreportedSettings: Object.entries(UNREPORTED_SETTINGS).map(
 				([key, reason]) => ({ key, reason })
 			)
+		},
+		situationGuide: {
+			questions: GUIDE_QUESTIONS,
+			situations: GUIDE_SITUATIONS.map(exportSituation),
+			flagSettings: { ...GUIDE_FLAG_SETTINGS }
 		},
 		attackReports: {
 			destination: ATTACK_DESTINATION,

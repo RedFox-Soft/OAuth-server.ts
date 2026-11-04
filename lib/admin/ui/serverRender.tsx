@@ -2,6 +2,7 @@ import { renderToString } from 'react-dom/server';
 import { StrictMode } from 'react';
 import type { AdminMeView } from '../me_view.js';
 import type { MeCan } from '../auth/can.js';
+import type { GuideFlag } from '../../consts/situation_guide.js';
 import { ConsoleRoot } from './frame/ConsoleRoot.js';
 import { htmlResponse } from '../../html/csp.js';
 import { versionedAsset } from '../../html/versionedAsset.js';
@@ -15,7 +16,9 @@ export interface AdminShellProps {
 	 * With `can`, so the first render offers what the server will accept: the address forms a team may choose
 	 * depend on a live setting (specs/101), and no fallback in the browser can guess them.
 	 */
-	me: (AdminMeView & { can?: MeCan }) | null;
+	me:
+		| (AdminMeView & { can?: MeCan; features?: Record<GuideFlag, boolean> })
+		| null;
 	/* The address asked for, path and query: the router's first render, on both sides. */
 	path?: string;
 	/*

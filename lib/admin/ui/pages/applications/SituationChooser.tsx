@@ -19,11 +19,37 @@ import {
 	devAddressProblem,
 	originOf,
 	type Situation,
-	type SituationGroup
+	type SituationGroup,
+	type SituationId
 } from './situations.js';
 import { buildBody, DEFAULT_VALUES, type FormValues } from './clientForm.js';
 import { ClientFormFields } from './ClientFormFields.js';
 import { handOff } from './handOff.js';
+import { GUIDE_SITUATIONS } from '../../../../consts/situation_guide.js';
+
+/* The two chooser-only options are no situation of the guide, so no guide entry carries their words. */
+const OTHER_WORDS: Partial<
+	Record<SituationId, { title: string; description: string }>
+> = {
+	resource: {
+		title: 'My MCP server or API',
+		description:
+			'Not an application: you declare it so this project issues tokens for it, and Claude, Cursor or your own apps connect to it.'
+	},
+	custom: {
+		title: 'Configure everything yourself',
+		description: 'Every setting, as the protocol names it.'
+	}
+};
+
+/* What a preset is called and says is the guide's: one list, so the chooser and the guide cannot drift apart. */
+function wordsOf(situation: Situation): { title: string; description: string } {
+	const guide = GUIDE_SITUATIONS.find((g) => g.preset === situation.id);
+	return (
+		(guide && { title: guide.title, description: guide.sentence }) ??
+		OTHER_WORDS[situation.id] ?? { title: situation.id, description: '' }
+	);
+}
 
 const GROUPS: { group: SituationGroup; title: string }[] = [
 	{ group: 'people', title: 'People sign in to it' },
@@ -54,25 +80,47 @@ export function SituationChooser({
 	bucketId,
 	open,
 	onClose,
-	siblings
+	siblings,
+	initial
 }: {
 	bucketId: string;
 	open: boolean;
 	onClose: () => void;
 	/* Other applications with browser origins, for the full form's copy-from list. */
 	siblings: { label: string; origins: string[] }[];
+	/*
+	 * The situation the guide chose: the dialog opens at the second step with it applied. Read when the component
+	 * mounts (the page remounts it per request); `custom` opens the full form, and any other that is not an
+	 * application preset opens the first step.
+	 */
+	initial?: SituationId;
 }) {
 	const navigate = useNavigate();
 	const feedback = useFeedback();
-	const [chosen, setChosen] = useState<Situation | null>(null);
-	const [full, setFull] = useState(false);
+	const preset = SITUATIONS.find((s) => s.id === initial && s.expand);
+	/* The guide's "Open the full form" asks for `custom`: the full form itself, as choosing it in step 1 opens. */
+	const custom =
+		initial === 'custom'
+			? SITUATIONS.find((s) => s.id === 'custom')
+			: undefined;
+	const [chosen, setChosen] = useState<Situation | null>(
+		preset ?? custom ?? null
+	);
+	const [full, setFull] = useState(custom !== undefined);
 	const [saving, setSaving] = useState(false);
 	const [apis, setApis] = useState<DeclaredApi[] | null>(null);
 	/*
 	 * What each step's form opens with. Given as initial values rather than written into the form: a form is not
 	 * mounted until its step renders, and a write before that reaches nothing.
 	 */
-	const [detailsInitial, setDetailsInitial] = useState<Details>({});
+	const [detailsInitial, setDetailsInitial] = useState<Details>(
+		preset
+			? {
+					devAddress: preset.devAddress,
+					...derived(preset, preset.devAddress ?? '')
+				}
+			: {}
+	);
 	const [fullInitial, setFullInitial] = useState<FormValues>(DEFAULT_VALUES);
 	const [details] = Form.useForm<Details>();
 	const [form] = Form.useForm<FormValues>();
@@ -179,7 +227,10 @@ export function SituationChooser({
 		const expansion = chosen.expand(values.devAddress ?? '');
 		await create(
 			{
-				clientName: values.clientName?.trim() || chosen.title,
+				clientName:
+					values.clientName?.trim() ||
+					chosen.defaultName ||
+					wordsOf(chosen).title,
 				...expansion,
 				...(values.redirectUri !== undefined
 					? { redirectUris: values.redirectUri ? [values.redirectUri] : [] }
@@ -234,12 +285,12 @@ export function SituationChooser({
 									}
 								}}
 							>
-								<Typography.Text strong>{s.title}</Typography.Text>
+								<Typography.Text strong>{wordsOf(s).title}</Typography.Text>
 								<Typography.Paragraph
 									type="secondary"
 									style={{ margin: '4px 0' }}
 								>
-									{s.description}
+									{wordsOf(s).description}
 								</Typography.Paragraph>
 								<Typography.Text
 									type="secondary"
@@ -284,14 +335,14 @@ export function SituationChooser({
 			onFinish={(values) => void submitSituation(values)}
 		>
 			<Typography.Paragraph type="secondary">
-				{chosen.title} — {chosen.footnote}
+				{wordsOf(chosen).title} — {chosen.footnote}
 			</Typography.Paragraph>
 			<Form.Item
 				name="clientName"
 				label="Name"
 				extra="Shown in this console and on the consent page."
 			>
-				<Input placeholder={chosen.title} />
+				<Input placeholder={chosen.defaultName ?? wordsOf(chosen).title} />
 			</Form.Item>
 			{chosen.devAddress !== undefined && (
 				<Form.Item
@@ -451,7 +502,9 @@ export function SituationChooser({
 
 	return (
 		<Modal
-			title={chosen ? `New application: ${chosen.title}` : 'New application'}
+			title={
+				chosen ? `New application: ${wordsOf(chosen).title}` : 'New application'
+			}
 			open={open}
 			onCancel={close}
 			footer={footerFor()}

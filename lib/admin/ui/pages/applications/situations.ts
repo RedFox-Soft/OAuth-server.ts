@@ -37,14 +37,17 @@ export interface Expansion {
 export interface Situation {
 	id: SituationId;
 	group: SituationGroup;
-	title: string;
-	description: string;
 	/* The protocol it implies, small and grey: it teaches the vocabulary without asking for it. */
 	footnote: string;
 	/* Present for the situations whose callback follows from where the app runs during development. */
 	devAddress?: string;
 	/* Absent for the two that create no application from a template: an API is declared, "custom" is the form. */
 	expand?: (devAddress: string) => Expansion;
+	/*
+	 * The application's name when the form's is left blank: a short noun, because it is shown wherever the
+	 * application is named, the consent page among them, where a sentence from the guide would read oddly.
+	 */
+	defaultName?: string;
 }
 
 const DEVICE_CODE: GrantType = 'urn:ietf:params:oauth:grant-type:device_code';
@@ -58,9 +61,7 @@ export const SITUATIONS: readonly Situation[] = [
 	{
 		id: 'server',
 		group: 'people',
-		title: 'Web app with a server',
-		description:
-			'Next.js, Nuxt, SvelteKit, Express, Django, Rails, Laravel — your server can keep a secret.',
+		defaultName: 'Web app',
 		footnote: 'Confidential · code + PKCE · refresh tokens',
 		devAddress: 'http://localhost:3000',
 		expand: (dev) => ({
@@ -75,9 +76,7 @@ export const SITUATIONS: readonly Situation[] = [
 	{
 		id: 'spa',
 		group: 'people',
-		title: 'Single-page app',
-		description:
-			'React, Vue, Angular or Svelte built with Vite, with no server of yours in the sign-in path.',
+		defaultName: 'Single-page app',
 		footnote: 'Public · code + PKCE · refresh tokens · browser origin',
 		devAddress: 'http://localhost:5173',
 		/*
@@ -96,9 +95,7 @@ export const SITUATIONS: readonly Situation[] = [
 	{
 		id: 'native',
 		group: 'people',
-		title: 'Mobile, desktop or command-line app',
-		description:
-			"iOS, Android, Electron, a CLI — or an AI agent that runs on the user's machine.",
+		defaultName: 'Mobile or desktop app',
 		footnote: 'Public · code + PKCE · any loopback port',
 		// RFC 8252 §7.3: a loopback redirect is matched on any port, so one registration serves every run.
 		expand: () => ({
@@ -113,8 +110,7 @@ export const SITUATIONS: readonly Situation[] = [
 	{
 		id: 'device',
 		group: 'people',
-		title: 'TV or device without a keyboard',
-		description: 'The person signs in on their phone with a short code.',
+		defaultName: 'TV app',
 		footnote: 'Public · device code',
 		expand: () => ({
 			applicationType: 'native',
@@ -128,9 +124,7 @@ export const SITUATIONS: readonly Situation[] = [
 	{
 		id: 'service',
 		group: 'machine',
-		title: 'Service calling your API',
-		description:
-			'A backend job, cron task or agent with its own credentials, with no user involved.',
+		defaultName: 'Backend service',
 		footnote: 'Confidential · client credentials',
 		expand: () => ({
 			applicationType: 'web',
@@ -144,16 +138,11 @@ export const SITUATIONS: readonly Situation[] = [
 	{
 		id: 'resource',
 		group: 'resource',
-		title: 'My MCP server or API',
-		description:
-			'Not an application: you declare it so this project issues tokens for it, and Claude, Cursor or your own apps connect to it.',
 		footnote: 'Declared on the APIs tab'
 	},
 	{
 		id: 'custom',
 		group: 'people',
-		title: 'Configure everything yourself',
-		description: 'Every setting, as the protocol names it.',
 		footnote: 'Full form'
 	}
 ];

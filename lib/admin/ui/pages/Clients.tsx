@@ -8,12 +8,14 @@ import { AreaToolbar } from '../frame/AreaToolbar.js';
 import { RowActions, type RowAction } from '../frame/RowActions.js';
 import { EmptyState, LoadFailed } from '../frame/states.js';
 import { Link, useNavigate } from '../frame/router.js';
+import { useQueryOffer } from '../frame/queryOffer.js';
 import { applicationHref } from '../frame/routes.js';
 import { atLimit, type PlanView } from '../planText.js';
 import type { ClientRow, ClientView } from './applications/clientForm.js';
 import { describe, lastUsedText } from './applications/blocks.js';
 import { handOff } from './applications/handOff.js';
 import { SituationChooser } from './applications/SituationChooser.js';
+import { SITUATIONS, type SituationId } from './applications/situations.js';
 
 /*
  * A project's applications (specs/099, spec 107). Each one is edited on its own page; this list finds them, creates
@@ -38,6 +40,11 @@ export function Clients({
 	const [loading, setLoading] = useState(true);
 	const [loadFailed, setLoadFailed] = useState<string | null>(null);
 	const [choosing, setChoosing] = useState(false);
+	/* The guide's "Set this up" arrives with ?situation=<id>: open the dialog once, at that situation. */
+	const [requested, setRequested] = useState<SituationId | undefined>();
+	const offerSituation = useQueryOffer('situation');
+	/* The New button's own limit check, so the address alone never opens a form the route refuses. */
+	const room = atLimit(plan, 'applications') === null;
 	const feedback = useFeedback();
 	const confirm = useConfirm();
 	const navigate = useNavigate();
@@ -50,12 +57,17 @@ export function Clients({
 				if (result.ok) {
 					setRows(result.data);
 					setLoadFailed(null);
+					const wanted = offerSituation(writable && room);
+					if (wanted !== null) {
+						setRequested(SITUATIONS.find((s) => s.id === wanted)?.id);
+						setChoosing(true);
+					}
 				} else {
 					setLoadFailed(result.error.message);
 				}
 				setLoading(false);
 			}),
-		[base]
+		[base, writable, room, offerSituation]
 	);
 	function load() {
 		setLoading(true);
@@ -243,6 +255,8 @@ export function Clients({
 			)}
 			{writable && (
 				<SituationChooser
+					key={requested ?? 'chooser'}
+					initial={requested}
 					bucketId={bucketId}
 					open={choosing}
 					onClose={() => setChoosing(false)}

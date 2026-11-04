@@ -25,6 +25,12 @@ function used(count: number | null, max: number | null, unit: string): string {
 }
 
 /*
+ * The card's element id. The situation guide's "See the project's plan" arrives at the Overview with this as the
+ * hash; the router does not scroll to a hash, so the card brings itself into view when it mounts under one.
+ */
+export const PLAN_CARD_ID = 'plan';
+
+/*
  * A project's plan on its Overview (specs/102): each limit beside what the project uses of it, a warning at 80% and
  * at 100% so nobody meets a limit first as a refusal, and what the plan includes. A super administrator moves the
  * project to another plan here; the select is the plan in force until the move is confirmed and saved.
@@ -48,6 +54,12 @@ export function BucketPlanCard({
 		null
 	);
 	const [saving, setSaving] = useState(false);
+
+	useEffect(() => {
+		if (window.location.hash === `#${PLAN_CARD_ID}`) {
+			document.getElementById(PLAN_CARD_ID)?.scrollIntoView({ block: 'start' });
+		}
+	}, []);
 
 	useEffect(() => {
 		if (!canSetPlan) return;
@@ -94,6 +106,7 @@ export function BucketPlanCard({
 
 	return (
 		<Card
+			id={PLAN_CARD_ID}
 			title={`Plan: ${plan.name}`}
 			extra={
 				canSetPlan && plans ? (

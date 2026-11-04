@@ -46,7 +46,7 @@ alternate on every docs page, translated or not; `website/src/route-middleware.t
 alternates and **names the English page as its canonical** (also `og:url`, the TechArticle and the `.md`
 alternate, `website/src/components/StarlightHead.astro:20`), and prunes every other page's alternates to the
 languages it exists in, so the generated Reference pages declare none. `isDocsFallback`
-(`website/src/data/seo.ts:122`) is the one definition the sitemap filter and the verifier share; the verifier
+(`website/src/data/seo.ts:125`) is the one definition the sitemap filter and the verifier share; the verifier
 expects a fallback's canonical to be the English URL, and a page whose canonical is elsewhere is not indexable
 (`website/scripts/seo/collect.ts:415`).
 
@@ -73,11 +73,16 @@ The blog's single publication path holds a post back in **every** language until
 ## Freshness: hashes, not git dates
 
 A translation records `source`, the first 12 hex digits of SHA-256 over its English file with CRLF normalised to LF
-(`website/src/i18n/source-hash.ts:28`). A stale translation shows "the English version is newer" and is listed by
+(`website/src/i18n/source-hash.ts:42`). A stale translation shows "the English version is newer" and is listed by
 `bun run seo`; it warns and never fails, like an aged comparison. Hashes rather than commit dates because they work
 on a shallow checkout and do not mark everything stale after a rename or a CRLF round-trip. `bun run i18n:stamp`
 records a new hash after re-translating — never to silence the warning. It quotes an all-digit hash, which YAML
 would otherwise read as a number and the schema reject.
+
+One group has no English file on the site: `guideSituations`, the situation guide's texts, whose English is
+`lib/consts/situation_guide.ts`. `ENGLISH_SOURCE` (`website/src/i18n/source-hash.ts:33`) maps it there, and stamping,
+freshness and the page's stale notice all ask `englishSourceOf`, so an edit anywhere in that file (a prompt included)
+marks both translations stale.
 
 ## The build checks that know about languages
 

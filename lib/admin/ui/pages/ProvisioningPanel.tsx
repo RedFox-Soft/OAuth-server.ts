@@ -16,6 +16,7 @@ import { request } from '../frame/request.js';
 import { RowActions, type RowAction } from '../frame/RowActions.js';
 import { LoadFailed } from '../frame/states.js';
 import { Link, useNavigate } from '../frame/router.js';
+import { useQueryOffer } from '../frame/queryOffer.js';
 import { connectionHref } from '../frame/routes.js';
 import type { BucketView } from './bucketView.js';
 import {
@@ -70,6 +71,8 @@ export function ProvisioningPanel({
 	const [wizard, setWizard] = useState(false);
 	// A provider connected from the empty state: the provider wizard, opened at the tile chosen.
 	const [connectProvider, setConnectProvider] = useState<string | null>(null);
+	/* The guide's "Set this up" arrives with ?new=1: open the wizard once, when the New button would be offered. */
+	const offerNew = useQueryOffer('new');
 
 	// Every state write follows an await, so the mount effect calls this without setting `loading` first.
 	const fetchConnections = useCallback(async () => {
@@ -96,11 +99,14 @@ export function ProvisioningPanel({
 				setProviders(federation.data);
 				setGuidance(catalogue.ok ? (catalogue.data.providers ?? []) : []);
 				onConnections?.(connections.data);
+				const bound = new Set(connections.data.map((c) => c.providerId));
+				const hasFree = federation.data.some((f) => !bound.has(f.id));
+				if (offerNew(canEdit && hasFree) === '1') setWizard(true);
 			}
 		} finally {
 			setLoading(false);
 		}
-	}, [bucketId, onConnections]);
+	}, [bucketId, onConnections, canEdit, offerNew]);
 	useEffect(() => {
 		void fetchConnections();
 	}, [fetchConnections, refreshKey]);

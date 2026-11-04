@@ -22,6 +22,7 @@ export type Section =
 export type PageKey =
 	| 'buckets'
 	| 'bucket.overview'
+	| 'bucket.guide'
 	| 'bucket.applications'
 	| 'bucket.application'
 	| 'bucket.application.settings'
@@ -57,6 +58,7 @@ export type PageKey =
 	| 'administrators.settings'
 	| 'usage'
 	| 'usage.bucket'
+	| 'start'
 	| 'settings'
 	| 'keys'
 	| 'agentAccess'
@@ -84,6 +86,13 @@ export const ROUTES: readonly RouteSpec[] = [
 		pattern: ['projects', ':project'],
 		section: 'projects',
 		area: 'Overview'
+	},
+	/* "What do you need?": a situation, how it is solved, and the one button that sets it up. */
+	{
+		key: 'bucket.guide',
+		pattern: ['projects', ':project', 'guide'],
+		section: 'projects',
+		area: 'What do you need?'
 	},
 	/*
 	 * What the bucket holds besides its people (specs/099): its applications (OAuth clients) and its APIs
@@ -341,6 +350,8 @@ export const ROUTES: readonly RouteSpec[] = [
 		section: 'faults',
 		instance: true
 	},
+	/* The site's door: any signed-in person, sent on to the guide in their own project. */
+	{ key: 'start', pattern: ['start'], section: null },
 	{
 		key: 'acceptInvitation',
 		pattern: ['accept-invitation'],
@@ -384,7 +395,12 @@ function administratorsRedirects(
 				['provisioning', ''],
 				['outside-servers', ''],
 				['connected-services', ''],
-				['keys', '']
+				['keys', ''],
+				/*
+				 * The guide: every answer's button there would be closed, since this project's rights are closed to
+				 * everyone; its own applications live under Administrators.
+				 */
+				['guide', 'applications']
 			] as const
 		).map(([from, to]) => ({
 			pattern: [root, 'admin', from],

@@ -17,6 +17,8 @@ export default {
 		getStarted: 'Run it yourself',
 		freeAccount: 'Create a free account',
 		github: 'View on GitHub',
+		guideLead: 'Not sure which setup you need?',
+		guideLink: 'Answer two questions',
 		specifications: '30 specifications',
 		freeUsers: '1,000,000 MAU free',
 		quickstartCaption: 'Two commands and a browser tab',

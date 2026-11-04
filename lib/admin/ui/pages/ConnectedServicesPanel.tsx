@@ -10,6 +10,7 @@ import {
 	Radio,
 	Select,
 	Table,
+	Tooltip,
 	Typography
 } from 'antd';
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
@@ -17,6 +18,8 @@ import { request } from '../frame/request.js';
 import { useFeedback } from '../frame/feedback.js';
 import { useConfirm } from '../frame/confirm.js';
 import { Link } from '../frame/router.js';
+import { useQueryOffer } from '../frame/queryOffer.js';
+import { atLimit, type PlanView } from '../planText.js';
 import {
 	applicationName,
 	exchangeOptions,
@@ -221,10 +224,16 @@ function providerOf(service: ServiceView): string {
 
 export function ConnectedServicesPanel({
 	bucketId,
-	canEdit
+	canEdit,
+	plan,
+	onChanged
 }: {
 	bucketId: string;
 	canEdit: boolean;
+	/* The plan the caller is held to (specs/102); null when nothing limits them. */
+	plan?: PlanView | null;
+	/* A service was added or deleted: the project's counts, and so its plan's use, changed. */
+	onChanged?: () => void;
 }) {
 	const projectBase = `/admin/api/projects/${encodeURIComponent(bucketId)}`;
 	const base = `${projectBase}/connected-services`;
@@ -242,6 +251,10 @@ export function ConnectedServicesPanel({
 	const [keyringInUse, setKeyringInUse] = useState<boolean | null>(null);
 
 	const [version, setVersion] = useState(0);
+	/* The guide's "Set this up" arrives with ?add=1: open the form once, when the Add button would be offered. */
+	const offerAdd = useQueryOffer('add');
+	const full = atLimit(plan, 'connectedServices');
+	const room = full === null;
 	const reload = () => setVersion((current) => current + 1);
 
 	useEffect(() => {
@@ -255,6 +268,10 @@ export function ConnectedServicesPanel({
 			if (!live) return;
 			if (clients.ok) setApplications(clients.data);
 			if (keyring.ok) setKeyringInUse(keyring.data.state === 'in-use');
+			const keyringOk = !keyring.ok || keyring.data.state === 'in-use';
+			if (offerAdd(canEdit && keyringOk && list.ok && room) === '1') {
+				setEditing('new');
+			}
 			if (list.ok) {
 				setServices(list.data.services);
 				setCallbackUri(list.data.callbackUri);
@@ -267,7 +284,7 @@ export function ConnectedServicesPanel({
 		return () => {
 			live = false;
 		};
-	}, [base, projectBase, feedback, version]);
+	}, [base, projectBase, feedback, version, canEdit, room, offerAdd]);
 
 	async function remove(service: ServiceView) {
 		const agreed = await confirm('connectedService.delete', {
@@ -289,6 +306,7 @@ export function ConnectedServicesPanel({
 			return;
 		}
 		feedback.done(`${service.displayName} deleted.`);
+		onChanged?.();
 		reload();
 	}
 
@@ -298,13 +316,16 @@ export function ConnectedServicesPanel({
 			extra={
 				canEdit &&
 				keyringInUse !== false && (
-					<Button
-						type="primary"
-						icon={<PlusOutlined />}
-						onClick={() => setEditing('new')}
-					>
-						Add
-					</Button>
+					<Tooltip title={full ?? undefined}>
+						<Button
+							type="primary"
+							icon={<PlusOutlined />}
+							disabled={!room}
+							onClick={() => setEditing('new')}
+						>
+							Add
+						</Button>
+					</Tooltip>
 				)
 			}
 		>
@@ -414,6 +435,7 @@ export function ConnectedServicesPanel({
 					onClose={() => setEditing(null)}
 					onSaved={() => {
 						setEditing(null);
+						onChanged?.();
 						reload();
 					}}
 				/>

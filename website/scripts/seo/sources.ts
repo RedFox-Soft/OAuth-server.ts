@@ -40,6 +40,7 @@ const ROUTE_DATA: Record<string, string[]> = {
 	'/docs/reference/addon-seams/': ['lib/addon/seams.ts'],
 	'/docs/reference/environment/': ['lib/configs/env.ts'],
 	'/docs/reference/telemetry/': ['lib/consts/telemetry_fields.ts'],
+	'/docs/guide/': ['lib/consts/situation_guide.ts'],
 	'/changelog/': ['CHANGELOG.md'],
 	'/security/': ['SECURITY.md'],
 	'/license/': ['LICENSE', 'NOTICE']
@@ -75,7 +76,8 @@ const MESSAGE_GROUPS: Record<string, string[]> = {
 	'/pricing/': ['pricing'],
 	'/contact/': ['contact'],
 	'/compare/': ['compare', 'compareCards'],
-	'/blog/': ['blog']
+	'/blog/': ['blog'],
+	'/docs/guide/': ['guide']
 };
 
 /*

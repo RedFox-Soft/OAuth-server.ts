@@ -6,6 +6,7 @@ import { useFeedback } from '../frame/feedback.js';
 import { RowActions } from '../frame/RowActions.js';
 import { LoadFailed } from '../frame/states.js';
 import { Link, useNavigate } from '../frame/router.js';
+import { useQueryOffer } from '../frame/queryOffer.js';
 import { providerHref } from '../frame/routes.js';
 import type { BucketView } from './bucketView.js';
 import {
@@ -13,7 +14,11 @@ import {
 	type Guidance,
 	type PresentedProvider
 } from './providers/providerTypes.js';
-import { ProviderTiles, ProviderWizard } from './providers/ProviderWizard.js';
+import {
+	OTHER_PROVIDER,
+	ProviderTiles,
+	ProviderWizard
+} from './providers/ProviderWizard.js';
 import { FederationOffNotice } from './providers/FederationOffNotice.js';
 import { BrandConflictTags } from './providers/BrandConflictNotice.js';
 import { brandNameOf } from './providers/brandName.js';
@@ -58,6 +63,8 @@ export function FederationPanel({
 	const [loadFailure, setLoadFailure] = useState<string | null>(null);
 	// The wizard, and the provider a tile chose to open it at (undefined: open at the first step).
 	const [wizard, setWizard] = useState<{ start?: string } | null>(null);
+	/* The guide's "Set this up" arrives with ?add=<catalogue id>, or ?add=oidc for any other OpenID provider. */
+	const offerAdd = useQueryOffer('add');
 
 	// Every state write follows an await, so the mount effect calls this without setting `loading` first.
 	const fetchProviders = useCallback(async () => {
@@ -85,7 +92,17 @@ export function FederationPanel({
 			} else {
 				setLoadFailure(null);
 				setRows(providers.data);
-				setGuidance(catalogue.data.providers ?? []);
+				const entries = catalogue.data.providers ?? [];
+				setGuidance(entries);
+				const wanted = offerAdd(canEdit);
+				if (wanted !== null) {
+					const entry = entries.find((g) => g.catalogueId === wanted);
+					if (entry?.alreadyConnected && entry.existingProviderId) {
+						void navigate(providerHref(bucketId, entry.existingProviderId));
+					} else if (entry || wanted === 'oidc') {
+						setWizard({ start: entry ? wanted : OTHER_PROVIDER });
+					}
+				}
 				setBound(
 					new Map(
 						(connections.ok ? connections.data : []).map((c) => [
@@ -98,7 +115,7 @@ export function FederationPanel({
 		} finally {
 			setLoading(false);
 		}
-	}, [bucketId]);
+	}, [bucketId, canEdit, offerAdd, navigate]);
 	useEffect(() => {
 		void fetchProviders();
 	}, [fetchProviders]);
