@@ -19,3 +19,10 @@ export const BEHIND_PROXY_CALLBACK_PATH = '/_foxauth/callback';
  */
 export const BEHIND_PROXY_CHECK_BASE = '/verify';
 export const BEHIND_PROXY_CHECK_ROUTE = `${BEHIND_PROXY_CHECK_BASE}/:appId`;
+
+/*
+ * The check a proxy makes for an API whose tokens it checks (specs/123), one level deeper than an app's so no app id
+ * can ever name an API, and the protected-resource metadata the project serves for that API.
+ */
+export const BEHIND_PROXY_API_CHECK_ROUTE = `${BEHIND_PROXY_CHECK_BASE}/api/:checkId`;
+export const BEHIND_PROXY_API_METADATA_ROUTE = `${BEHIND_PROXY_API_CHECK_ROUTE}/metadata`;

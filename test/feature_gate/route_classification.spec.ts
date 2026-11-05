@@ -229,7 +229,9 @@ describe('route classification', () => {
 			 * are separate routes: this one reaches storage, and an unmetered route that reaches storage
 			 * is an unauthenticated amplifier onto the datastore.
 			 */
-			'GET /ready'
+			'GET /ready',
+			/* An API's protected-resource metadata the project serves (specs/123 R5): unauthenticated and reaching storage. */
+			'GET /verify/api/:checkId/metadata'
 		];
 
 		// The platform probes this every 30s. A refused health check takes the machine out of the proxy.
@@ -259,7 +261,9 @@ describe('route classification', () => {
 				'PATCH /scim/v2/Groups/:groupId',
 				'DELETE /scim/v2/Groups/:groupId',
 				/* Limited per app inside its plugin (specs/122 R3): one proxy's address carries a whole office. */
-				'ALL /verify/:appId'
+				'ALL /verify/:appId',
+				/* The same for an API whose tokens the proxy checks, per API (specs/123 R11). */
+				'ALL /verify/api/:checkId'
 			])
 		];
 

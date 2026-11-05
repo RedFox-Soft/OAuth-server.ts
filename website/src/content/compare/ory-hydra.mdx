@@ -9,6 +9,8 @@ sources:
   - https://www.ory.com/docs/oauth2-oidc/device-authorization
   - https://www.ory.com/docs/kratos/social-signin/get-tokens
   - https://www.ory.com/docs/oathkeeper
+  - https://www.ory.com/docs/oathkeeper/pipeline/authn
+  - https://www.ory.com/docs/oathkeeper/api-access-rules
 bottomLine: 'Pick Ory Hydra if you already have an identity system and want a hardened, Apache-licensed OAuth server sitting in front of it. Pick FoxAuth if you would rather not build a login and consent application before issuing your first token.'
 chooseThem:
   - 'You already run your own user store and login UI, and want an OAuth server that stays out of it.'
@@ -214,6 +216,20 @@ groups:
         verdict: us
         why: 'With Ory this is a second product, Oathkeeper, to deploy and configure beside Hydra. Here it comes with the authorization server.'
         note: 'The Oathkeeper documentation says its access control decision API "works with most (if not all) modern API gateways and reverse proxies" and that Oathkeeper "can be used standalone."'
+      - dimension: Token and per-tool scope checks at your proxy
+        us:
+          {
+            status: yes,
+            text: 'Your Caddy, Traefik or nginx asks the project to check the bearer token for an API or an MCP server: signature, issuer, audience and lifetime. For an MCP server, a table in the console names the scopes each tool needs, and a client that lacks one is told every scope the tool needs. The project serves the protected resource metadata, so the server behind the proxy needs no auth code. On every plan.'
+          }
+        them:
+          {
+            status: no,
+            text: 'Not in Hydra. Ory Oathkeeper, a separate Ory product, checks a JWT or asks for token introspection at the proxy, with a required scope and audience per access rule. A rule matches a request by URL and method only.'
+          }
+        verdict: us
+        why: 'Oathkeeper checks tokens and scopes per URL, but it is a second product to deploy, and every MCP call is a POST to the same URL, so its rules cannot tell one tool from another. FoxAuth reads the tool from the MCP headers and ships with the authorization server.'
+        note: 'The Oathkeeper authenticator page says the jwt authenticator''s "`required_scope` ([]string) validates the scope of the JWT"; an access rule''s match has "url" and "methods".'
       - dimension: Licence
         us:
           {

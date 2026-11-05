@@ -29,6 +29,34 @@ const ScopeDescriptionBody = t.Object(
 
 const ScopeDescriptions = t.Record(t.String(), ScopeDescriptionBody);
 
+/*
+ * Who checks the tokens the API receives (specs/123). The rules a closed schema cannot state usefully — an https
+ * identifier for the proxy, a project with an address of its own — are the handler's, so the refusal names them.
+ */
+const CheckedBy = t.Union([t.Literal('server'), t.Literal('proxy')]);
+
+/*
+ * An API's tools table, replaced whole. Bounds a schema can say are said here; which scopes a row may name, and
+ * that names are unique, are the handler's (lib/resources/tools_table.ts), which names the offending row.
+ */
+const ToolsTableBody = t.Object(
+	{
+		rows: t.Array(
+			t.Object(
+				{
+					name: t.String({ minLength: 1, maxLength: 128 }),
+					scopes: t.Array(t.String())
+				},
+				{ additionalProperties: false }
+			),
+			{ maxItems: 200 }
+		),
+		otherTools: t.Union([t.Literal('refuse'), t.Literal('token')]),
+		withoutMethod: t.Union([t.Literal('refuse'), t.Literal('token')])
+	},
+	{ additionalProperties: false }
+);
+
 export const CreateResourceBody = t.Object(
 	{
 		identifier: t.String({ minLength: 1 }),
@@ -39,7 +67,8 @@ export const CreateResourceBody = t.Object(
 		accessTokenTTL: t.Optional(
 			t.Number({ minimum: 30, maximum: 86400, multipleOf: 1 })
 		),
-		trailingSlashSignificant: t.Optional(t.Boolean())
+		trailingSlashSignificant: t.Optional(t.Boolean()),
+		checkedBy: t.Optional(CheckedBy)
 	},
 	/*
 	 * Closed on purpose, and not the framework default. TypeBox objects admit unknown keys unless told
@@ -75,7 +104,9 @@ export const UpdateResourceBody = t.Object(
 		 */
 		exchangedBy: t.Optional(
 			t.Union([t.String({ minLength: 1, maxLength: 512 }), t.Null()])
-		)
+		),
+		checkedBy: t.Optional(CheckedBy),
+		tools: t.Optional(ToolsTableBody)
 	},
 	/*
 	 * Closed for a sharper reason than the body above: with unknown keys admitted, a caller naming

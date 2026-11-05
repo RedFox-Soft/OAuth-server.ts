@@ -16,6 +16,7 @@ sources:
   - https://www.keycloak.org/securing-apps/token-exchange
   - https://www.keycloak.org/docs/latest/server_development/index.html
   - https://www.keycloak.org/2020/08/sunsetting-louketo-project.adoc.html
+  - https://oauth2-proxy.github.io/oauth2-proxy/configuration/overview
 bottomLine: 'Pick Keycloak if you need SAML, LDAP federation or certified FAPI today. FoxAuth is the better fit for a team that writes TypeScript, wants OAuth 2.1 behaviour as the default, or wants an AI agent administering the server through the same audited path a human uses.'
 chooseThem:
   - 'You need SAML as well as OpenID Connect.'
@@ -281,6 +282,20 @@ groups:
         verdict: us
         why: 'With Keycloak a separate proxy service such as OAuth2 Proxy runs beside it for this. Here the authorization server answers the proxy itself.'
         note: 'The Keycloak blog, 21 August 2020: "After careful consideration, we have decided to pull the plug on Louketo and start the EOL procedure." It suggests OAuth2 Proxy "as a replacement".'
+      - dimension: Token and per-tool scope checks at your proxy
+        us:
+          {
+            status: yes,
+            text: 'Your Caddy, Traefik or nginx asks the project to check the bearer token for an API or an MCP server: signature, issuer, audience and lifetime. For an MCP server, a table in the console names the scopes each tool needs, and a client that lacks one is told every scope the tool needs. The project serves the protected resource metadata, so the server behind the proxy needs no auth code. On every plan.'
+          }
+        them:
+          {
+            status: no,
+            text: "No check endpoint for a proxy. Keycloak's MCP guide leaves the token check to the MCP server and describes scopes for the whole server, such as mcp:tools. The separate OAuth2 Proxy project can let a verified JWT bearer token through, with no option to require scopes."
+          }
+        verdict: us
+        why: 'With Keycloak the MCP server checks its tokens in its own code, or a separate proxy checks the signature and audience only. Here the authorization server answers your proxy, the scopes each tool needs included.'
+        note: 'The Keycloak MCP guide says "An MCP server MUST validate that tokens presented to them were specifically issued for their use." OAuth2 Proxy''s --skip-jwt-bearer-tokens "will skip requests that have verified JWT bearer tokens".'
   - label: Licence and cost
     rows:
       - dimension: Licence

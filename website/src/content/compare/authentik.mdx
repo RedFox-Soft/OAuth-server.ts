@@ -9,6 +9,7 @@ sources:
   - https://docs.goauthentik.io/add-secure-apps/providers/oauth2/device_code/
   - https://docs.goauthentik.io/users-sources/sources/protocols/oauth/
   - https://docs.goauthentik.io/add-secure-apps/providers/proxy/forward_auth/
+  - https://docs.goauthentik.io/add-secure-apps/providers/proxy/header_authentication/
 bottomLine: 'Pick authentik if you are replacing an SSO estate that speaks SAML, LDAP or RADIUS as well as OIDC. If the applications are your own and what you need is an OAuth 2.1 authorization server with the banking-grade profiles and no enterprise tier to buy, pick FoxAuth.'
 chooseThem:
   - 'Your estate has applications that speak SAML, LDAP or RADIUS alongside OpenID Connect.'
@@ -175,6 +176,20 @@ groups:
         verdict: even
         why: 'Both let your own proxy ask before a request reaches the app. authentik can cover a whole domain with one sign-in and runs the check in an outpost; FoxAuth answers from the server itself, with a rule for each path.'
         note: 'The forward-auth page says "Single-application mode works for one application hosted on its own domain or subdomain" and that forward auth "relies on the authentik outpost only to check authentication and authorization."'
+      - dimension: Token and per-tool scope checks at your proxy
+        us:
+          {
+            status: yes,
+            text: 'Your Caddy, Traefik or nginx asks the project to check the bearer token for an API or an MCP server: signature, issuer, audience and lifetime. For an MCP server, a table in the console names the scopes each tool needs, and a client that lacks one is told every scope the tool needs. The project serves the protected resource metadata, so the server behind the proxy needs no auth code. On every plan.'
+          }
+        them:
+          {
+            status: yes,
+            text: 'The proxy provider accepts a bearer token at the outpost: a JWT issued for that proxy provider, with access decided by the policies bound to the application. Scopes, and a rule for each MCP tool, are not documented.'
+          }
+        verdict: us
+        why: "Both can check a bearer token at your proxy. authentik expects a token issued for its proxy provider and decides by the application's policies; FoxAuth checks the tokens issued for your API itself, and the scopes each tool needs."
+        note: 'The header authentication page says "The token must be a JWT token issued for the proxy provider" and "Access control uses the policies bound to the application being accessed."'
       - dimension: Licence
         us:
           {

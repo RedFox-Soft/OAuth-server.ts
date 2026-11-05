@@ -16,6 +16,11 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   project's `/verify/<appId>` before each request; people sign in with the project's own sign-in and the app receives
   `X-Auth-*` headers and a signed statement. The console shows them in Applications with ready-made proxy snippets
   and an access check. Re-run `db:setup` or `db:setup:pg` to provision the new storage areas.
+- **Token checks for an API at your proxy, tool by tool** (spec 123, issue #57 part 2). An API can answer "Who checks
+  tokens?" with your proxy: Caddy, Traefik or nginx then asks the project's `/verify/api/<checkId>` before each
+  request, the project checks the bearer token as the API would and serves the API's metadata, and the API receives
+  `X-Auth-Subject`, `X-Auth-Client` and `X-Auth-Scope`. For an MCP server, a Tools table names the scopes each tool
+  needs; a missing one is refused with `insufficient_scope`. Tokens bound to a key are refused at the proxy.
 
 ### Fixed
 

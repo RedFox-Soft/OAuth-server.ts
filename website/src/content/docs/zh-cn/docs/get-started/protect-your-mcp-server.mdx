@@ -1,7 +1,7 @@
 ---
 title: 用 OAuth 保护 MCP 服务器
 description: 十分钟内把你的 MCP 服务器变成 OAuth 2.1 受保护资源：在 FoxAuth 中声明、发布元数据、校验令牌，并验证两种结果。
-source: d9006bf04d89
+source: 9455181a825f
 sidebar:
   order: 6
 ---
@@ -18,6 +18,16 @@ import { Steps, Aside } from '@astrojs/starlight/components';
 >
 	一个带有管理员账户的运行中实例（[创建第一个管理员](/zh-cn/docs/get-started/first-admin/)），以及一个你自己的项目（[注册第一个客户端](/zh-cn/docs/get-started/first-client/)介绍了这一步）。你的
 	MCP 服务器可以只是一个桩（stub）；目前它除了响应 HTTP 之外什么都不用做。
+</Aside>
+
+<Aside
+	type="tip"
+	title="完全不写授权代码"
+>
+	如果你的 MCP 服务器位于 Caddy、Traefik 或 nginx 后面，可以改由代理请 FoxAuth
+	检查每个令牌，包括每个工具需要的权限（scope）。这样你的 MCP
+	服务器就不需要本页的任何代码。请看[在代理处保护 MCP
+	服务器](/zh-cn/docs/get-started/protect-an-mcp-server-at-your-proxy/)。
 </Aside>
 
 ## 1. 将你的 MCP 服务器声明为资源 {#1-declare-your-mcp-server-as-a-resource}

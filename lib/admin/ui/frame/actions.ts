@@ -52,6 +52,16 @@ export const ACTIONS = {
 		title: (t) => `Remove ${t} from this project?`,
 		okText: 'Remove'
 	},
+	/*
+	 * An API's tools table, checked by the operator's proxy (specs/123 FR-022). Asked only when the change lets a
+	 * token do more, listing each widening; narrowing is saved at once, as with the rules of an app behind a proxy.
+	 */
+	'resource.tools.widen': {
+		class: 'C2',
+		title: (t) => `Let tokens for ${t} do more?`,
+		okText: 'Save changes',
+		cancelText: 'Keep editing'
+	},
 
 	'bucket.create': { class: 'C0' },
 	'bucket.edit': { class: 'C0' },

@@ -19,15 +19,27 @@ export interface ResourceConnection {
 	metadataUrl: string | null;
 	/* The `WWW-Authenticate` value of a 401 (RFC 9728 §5.1); null with `metadataUrl`. */
 	challenge: string | null;
+	/*
+	 * Where the proxy checks the tokens and where the project serves the metadata, when the proxy checks them
+	 * (specs/123); null when the API's own server does, as it serves its own metadata then.
+	 */
+	check: { verifyUrl: string; metadataUrl: string } | null;
 }
 
 export function resourceConnection(
 	resource: { identifier: string; scopes: readonly string[] },
-	issuer: string
+	issuer: string,
+	/* The proxy's check address, when the proxy checks this API's tokens. */
+	checkUrl: string | null = null
 ): ResourceConnection {
-	const metadataUrl = URL.canParse(resource.identifier)
-		? pathInserted(new URL(resource.identifier))
+	const check = checkUrl
+		? { verifyUrl: checkUrl, metadataUrl: `${checkUrl}/metadata` }
 		: null;
+	const metadataUrl =
+		check?.metadataUrl ??
+		(URL.canParse(resource.identifier)
+			? pathInserted(new URL(resource.identifier))
+			: null);
 	return {
 		issuer,
 		audience: resource.identifier,
@@ -38,6 +50,7 @@ export function resourceConnection(
 			bearer_methods_supported: ['header']
 		},
 		metadataUrl,
-		challenge: metadataUrl ? `Bearer resource_metadata="${metadataUrl}"` : null
+		challenge: metadataUrl ? `Bearer resource_metadata="${metadataUrl}"` : null,
+		check
 	};
 }

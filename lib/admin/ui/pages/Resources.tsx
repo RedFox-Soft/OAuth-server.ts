@@ -13,6 +13,7 @@ import {
 	Tag,
 	Checkbox,
 	Tooltip,
+	Radio,
 	type FormInstance
 } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
@@ -33,6 +34,9 @@ import {
 	exchangeOptions,
 	type ExchangeCandidate
 } from './applications/exchange.js';
+import type { ToolsTableView } from '../../../behind_proxy/tools.js';
+import { ProxyConnect } from './resources/ProxyConnect.js';
+import { ToolsDrawer } from './resources/ToolsDrawer.js';
 
 /*
  * A bucket's APIs — its declared protected resources: the audiences this server will mint tokens for on
@@ -62,6 +66,13 @@ const TOKEN_FORMAT_OPTIONS = [
 
 type ScopeKind = 'see' | 'act';
 
+type CheckedBy = 'server' | 'proxy';
+
+const CHECKED_BY_OPTIONS: { label: string; value: CheckedBy }[] = [
+	{ label: 'Your server', value: 'server' },
+	{ label: 'Your proxy', value: 'proxy' }
+];
+
 interface ResourceView {
 	identifier: string;
 	name: string;
@@ -72,6 +83,9 @@ interface ResourceView {
 	trailingSlashSignificant: boolean;
 	/* The application that exchanges the access tokens this API receives for people's upstream tokens (specs/118). */
 	exchangedBy?: string;
+	/* Whether the API's own server checks its tokens (spec 107) or the operator's proxy asks this project (specs/123). */
+	checkedBy: CheckedBy;
+	tools?: ToolsTableView;
 	/* What the API itself must serve and check, as the server states it (spec 107). */
 	connection?: {
 		issuer: string;
@@ -79,6 +93,8 @@ interface ResourceView {
 		metadata: Record<string, unknown>;
 		metadataUrl: string | null;
 		challenge: string | null;
+		/* Where the proxy asks and where the project serves the metadata; null unless the proxy checks. */
+		check: { verifyUrl: string; metadataUrl: string } | null;
 	};
 }
 
@@ -106,6 +122,7 @@ interface FormValues {
 	// InputNumber answers null once the operator clears it.
 	accessTokenTTL: number | null;
 	trailingSlashSignificant: boolean;
+	checkedBy: CheckedBy;
 	/* Edit only; '' for none. */
 	exchangedBy?: string;
 }
@@ -116,7 +133,8 @@ const DEFAULT_VALUES: FormValues = {
 	scopes: '',
 	tokenFormat: 'jwt',
 	accessTokenTTL: 900,
-	trailingSlashSignificant: false
+	trailingSlashSignificant: false,
+	checkedBy: 'server'
 };
 
 function splitScopes(raw: string): string[] {
@@ -188,6 +206,8 @@ interface Vouching {
 	step?: 'challenge' | 'path_inserted' | 'root';
 	reason?: string;
 	expectedIssuer: string;
+	/* The project serves the metadata itself, for an API its proxy checks (specs/123 R5): nothing was fetched. */
+	servedByProject?: boolean;
 }
 
 const STEP_LABEL: Record<NonNullable<Vouching['step']>, string> = {
@@ -230,6 +250,15 @@ function VouchingCell({ url }: { url: string }) {
 
 	if (checking) return <Tag>checking…</Tag>;
 	if (!vouching) return <Tag>unavailable</Tag>;
+	if (vouching.servedByProject) {
+		return (
+			<Tooltip
+				title={`Your proxy checks this API's tokens, and this project serves its metadata, naming ${vouching.expectedIssuer}.`}
+			>
+				<Tag color="green">Served by the project</Tag>
+			</Tooltip>
+		);
+	}
 	const detail =
 		vouching.status === 'vouched'
 			? `Found through ${STEP_LABEL[vouching.step ?? 'path_inserted']}.`
@@ -380,6 +409,7 @@ export function Resources({
 	const feedback = useFeedback();
 	const confirm = useConfirm();
 	const [connecting, setConnecting] = useState<ResourceView | null>(null);
+	const [toolsOf, setToolsOf] = useState<ResourceView | null>(null);
 	const [applications, setApplications] = useState<ExchangeCandidate[]>([]);
 	/*
 	 * "My MCP server or API" in New application, and the guide's "Set this up", land here with ?declare=1 (spec 107):
@@ -391,6 +421,7 @@ export function Resources({
 	const scopesValue = useWatched(form, 'scopes') ?? '';
 	const ttlValue = useWatched(form, 'accessTokenTTL') ?? 900;
 	const formatValue = useWatched(form, 'tokenFormat') ?? 'jwt';
+	const checkedByValue = useWatched(form, 'checkedBy') ?? 'server';
 
 	// Every state write follows an await, so the mount effect calls this without setting
 	// `loading` first; `load` is the reload, which does.
@@ -445,6 +476,8 @@ export function Resources({
 	}, [bucketBase]);
 	const editingExchangedBy =
 		rows.find((row) => row.identifier === editing)?.exchangedBy ?? '';
+	const editingCheckedBy =
+		rows.find((row) => row.identifier === editing)?.checkedBy ?? 'server';
 
 	function openCreateModal() {
 		setMode('create');
@@ -465,6 +498,7 @@ export function Resources({
 			tokenFormat: row.tokenFormat,
 			accessTokenTTL: row.accessTokenTTL,
 			trailingSlashSignificant: row.trailingSlashSignificant,
+			checkedBy: row.checkedBy,
 			exchangedBy: row.exchangedBy ?? ''
 		});
 		setOpen(true);
@@ -491,7 +525,8 @@ export function Resources({
 							: {}),
 						tokenFormat: values.tokenFormat,
 						accessTokenTTL: values.accessTokenTTL ?? undefined,
-						trailingSlashSignificant: values.trailingSlashSignificant
+						trailingSlashSignificant: values.trailingSlashSignificant,
+						checkedBy: values.checkedBy
 					}
 				: {
 						name: values.name,
@@ -500,6 +535,10 @@ export function Resources({
 						scopeDescriptions,
 						tokenFormat: values.tokenFormat,
 						accessTokenTTL: values.accessTokenTTL ?? undefined,
+						// Sent only when it changed, so the audit records a change of who checks only when there was one.
+						...(values.checkedBy !== editingCheckedBy
+							? { checkedBy: values.checkedBy }
+							: {}),
 						...(exchangedBy !== editingExchangedBy
 							? { exchangedBy: exchangedBy || null }
 							: {})
@@ -664,6 +703,11 @@ export function Resources({
 										<Typography.Text strong>{row.name}</Typography.Text>
 									)}
 									<Typography.Text code>{identifier}</Typography.Text>
+									{row.checkedBy === 'proxy' && (
+										<Typography.Text type="secondary">
+											Tokens checked by your proxy
+										</Typography.Text>
+									)}
 									{row.exchangedBy && (
 										<Typography.Text type="secondary">
 											Tokens exchanged by{' '}
@@ -748,6 +792,12 @@ export function Resources({
 														onClick: () => openEditModal(row)
 													},
 													{
+														key: 'tools',
+														label: 'Tools…',
+														group: 'edit',
+														onClick: () => setToolsOf(row)
+													},
+													{
 														key: 'remove',
 														label: 'Remove',
 														group: 'danger',
@@ -771,10 +821,31 @@ export function Resources({
 				width={720}
 				destroyOnHidden
 			>
-				{connecting?.connection && (
-					<ResourceConnectionDetails connection={connecting.connection} />
-				)}
+				{connecting?.connection &&
+					(connecting.connection.check ? (
+						<ProxyConnect
+							identifier={connecting.identifier}
+							check={connecting.connection.check}
+						/>
+					) : (
+						<ResourceConnectionDetails connection={connecting.connection} />
+					))}
 			</Modal>
+
+			{toolsOf && (
+				<ToolsDrawer
+					url={`${base}/${encodeURIComponent(toolsOf.identifier)}`}
+					name={toolsOf.name}
+					scopes={toolsOf.scopes}
+					tools={toolsOf.tools}
+					checkedBy={toolsOf.checkedBy}
+					onClose={() => setToolsOf(null)}
+					onSaved={() => {
+						setToolsOf(null);
+						void load();
+					}}
+				/>
+			)}
 
 			<Modal
 				open={open}
@@ -825,6 +896,20 @@ export function Resources({
 							description="It is the audience of every token already issued for this resource. Replacing it means removing this declaration and making a new one."
 						/>
 					)}
+					<Form.Item
+						name="checkedBy"
+						label="Who checks tokens?"
+						extra={
+							checkedByValue === 'proxy'
+								? 'Your proxy (Caddy, Traefik or nginx) asks this project about each request’s token, and this project serves the API’s metadata. The API needs an https identifier and no code of its own for this.'
+								: 'Your API checks each token itself and serves its own metadata. Connect lists what it must check.'
+						}
+					>
+						<Radio.Group
+							options={CHECKED_BY_OPTIONS}
+							optionType="button"
+						/>
+					</Form.Item>
 					<Form.Item
 						name="name"
 						label="Name"
@@ -926,20 +1011,41 @@ export function Resources({
 							/>
 						</Form.Item>
 					)}
-					<Alert
-						type="info"
-						showIcon
-						title={
-							formatValue === 'jwt'
-								? `Revocation takes up to ${describeWindow(ttlValue)}`
-								: 'Revocation is immediate'
-						}
-						description={
-							formatValue === 'jwt'
-								? 'A self-contained token is verified against this server’s published keys with no request back, so your resource needs no credentials of its own — and a revoked token stays valid until it expires. Shorten the lifetime to narrow that window.'
-								: 'An opaque token is checked back with this server on every request, so revocation is immediate. Your resource needs credentials of its own and token introspection must be enabled.'
-						}
-					/>
+					{/*
+					 * FR-012: the check does not look a self-contained token's grant up on every request, so at the proxy
+					 * a revoked one keeps working until it expires. Said here, where the format and lifetime are chosen.
+					 */}
+					{checkedByValue === 'proxy' ? (
+						<Alert
+							type={formatValue === 'jwt' ? 'warning' : 'info'}
+							showIcon
+							title={
+								formatValue === 'jwt'
+									? `A revoked token keeps working at your proxy for up to ${describeWindow(ttlValue)}`
+									: 'Revocation is immediate'
+							}
+							description={
+								formatValue === 'jwt'
+									? 'Your proxy accepts a self-contained token until it expires, even after it is revoked. For an API your proxy checks, choose opaque tokens, or keep the lifetime short.'
+									: 'The check looks each opaque token up in this project, so a revoked token is refused on the next request. Neither your proxy nor your API needs credentials for it.'
+							}
+						/>
+					) : (
+						<Alert
+							type="info"
+							showIcon
+							title={
+								formatValue === 'jwt'
+									? `Revocation takes up to ${describeWindow(ttlValue)}`
+									: 'Revocation is immediate'
+							}
+							description={
+								formatValue === 'jwt'
+									? 'A self-contained token is verified against this server’s published keys with no request back, so your resource needs no credentials of its own — and a revoked token stays valid until it expires. Shorten the lifetime to narrow that window.'
+									: 'An opaque token is checked back with this server on every request, so revocation is immediate. Your resource needs credentials of its own and token introspection must be enabled.'
+							}
+						/>
+					)}
 				</Form>
 			</Modal>
 		</>

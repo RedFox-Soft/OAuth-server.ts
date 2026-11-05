@@ -34,6 +34,7 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 		tokenFormat?: 'jwt' | 'opaque';
 		accessTokenTTL?: number;
 		trailingSlashSignificant?: boolean;
+		checkedBy?: 'server' | 'proxy';
 	}): Promise<ProtectedResource> {
 		const now = new Date();
 		const resource: ProtectedResource = {
@@ -49,6 +50,7 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 			tokenFormat: data.tokenFormat ?? 'jwt',
 			accessTokenTTL: data.accessTokenTTL ?? 900,
 			trailingSlashSignificant: data.trailingSlashSignificant ?? false,
+			...(data.checkedBy ? { checkedBy: data.checkedBy } : {}),
 			createdAt: now,
 			updatedAt: now
 		};

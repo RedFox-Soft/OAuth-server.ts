@@ -1,6 +1,12 @@
 import { Elysia } from 'elysia';
 
-import { BEHIND_PROXY_CHECK_ROUTE } from '../consts/behind_proxy.js';
+import {
+	BEHIND_PROXY_API_CHECK_ROUTE,
+	BEHIND_PROXY_API_METADATA_ROUTE,
+	BEHIND_PROXY_CHECK_ROUTE
+} from '../consts/behind_proxy.js';
+import { answerApiCheck } from './api_check.js';
+import { answerApiMetadata } from './api_metadata.js';
 import { answerCheck } from './check.js';
 
 /*
@@ -11,8 +17,18 @@ import { answerCheck } from './check.js';
  * one would refuse the other (the app runs `strictPath`). No body is read, so none is parsed: a proxy may send the
  * check with the original method and whatever content type it carried.
  */
-export const behindProxyRoutes = new Elysia({ name: 'behind-proxy' }).all(
-	BEHIND_PROXY_CHECK_ROUTE,
-	({ params, request, route }) => answerCheck({ params, request, route }),
-	{ parse: 'none' }
-);
+export const behindProxyRoutes = new Elysia({ name: 'behind-proxy' })
+	.all(
+		BEHIND_PROXY_CHECK_ROUTE,
+		({ params, request, route }) => answerCheck({ params, request, route }),
+		{ parse: 'none' }
+	)
+	/* The same for an API whose tokens the proxy checks (specs/123), and the metadata its 401 points to. */
+	.all(
+		BEHIND_PROXY_API_CHECK_ROUTE,
+		({ params, request, route }) => answerApiCheck({ params, request, route }),
+		{ parse: 'none' }
+	)
+	.get(BEHIND_PROXY_API_METADATA_ROUTE, ({ params, request }) =>
+		answerApiMetadata({ params, request })
+	);

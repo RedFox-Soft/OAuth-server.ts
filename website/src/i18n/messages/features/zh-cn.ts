@@ -1,6 +1,6 @@
 import type english from './en.ts';
 
-export const source = '21c9b738daa2';
+export const source = '504999d92190';
 
 export default {
 	title: 'OAuth 2.1 与 OIDC 功能',
@@ -201,6 +201,10 @@ export default {
 				behindProxy: {
 					title: '通过你的代理，在 Web 应用前加上登录',
 					body: '把没有自带登录的应用（例如 Grafana 或内部看板）放在你的代理后面。Caddy、Traefik 或 nginx 会就每个请求询问项目：尚未登录的人会被送到项目的登录页面，其余请求则转发给应用，并通过 X-Auth-* 请求头告诉应用这个人是谁。每个路径的规则指定哪些用户组可以打开它。应用无需改动，也不需要开启任何开关。'
+				},
+				proxyApi: {
+					title: '在你的代理处检查令牌和每个工具的权限',
+					body: '把 MCP 服务器或其他 API 放在 Caddy、Traefik 或 nginx 后面。对于每个请求，代理都会请项目检查 bearer 令牌：签名、签发者、受众和有效期。对于 MCP 服务器，控制台中的一张表指定每个工具需要哪些权限（scope），缺少权限的客户端会被准确告知需要申请哪些权限。受保护资源元数据由项目自己发布，所以代理后面的服务器不需要任何授权代码。也不需要开启任何开关。'
 				},
 				clientIdMetadataDocument: {
 					title: '客户端身份文档',

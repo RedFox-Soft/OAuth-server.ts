@@ -47,6 +47,8 @@ export interface VouchingStatus {
 	readonly step?: VouchingStep;
 	readonly reason?: VouchingReason;
 	readonly expectedIssuer: string;
+	/* The project serves this API's metadata itself, because its proxy checks the tokens (specs/123). */
+	readonly servedByProject?: true;
 }
 
 /* RFC 9728 §3.1: the well-known segment goes between the host and the resource's path. */

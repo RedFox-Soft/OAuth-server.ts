@@ -10,6 +10,7 @@ sources:
   - https://zitadel.com/docs/guides/integrate/login-ui/external-login
   - https://zitadel.com/docs/guides/integrate/token-exchange
   - https://zitadel.com/docs/examples/identity-proxy/oauth2-proxy
+  - https://zitadel.com/docs/examples/secure-api/go
 bottomLine: 'Pick Zitadel if you need SAML or a managed cloud with an enterprise contract behind it. Pick FoxAuth for OAuth 2.1 behaviour by default, the banking-grade profiles that Zitadel does not document, and a licence other than AGPL.'
 chooseThem:
   - 'You need SAML 2.0 as well as OpenID Connect.'
@@ -184,6 +185,20 @@ groups:
         verdict: us
         why: 'With ZITADEL a separate proxy service runs beside it for this. Here the authorization server answers your own proxy itself.'
         note: 'The ZITADEL guide says "OAuth2-proxy is a project which allows services to delegate the authentication flow to a IDP, for example ZITADEL".'
+      - dimension: Token and per-tool scope checks at your proxy
+        us:
+          {
+            status: yes,
+            text: 'Your Caddy, Traefik or nginx asks the project to check the bearer token for an API or an MCP server: signature, issuer, audience and lifetime. For an MCP server, a table in the console names the scopes each tool needs, and a client that lacks one is told every scope the tool needs. The project serves the protected resource metadata, so the server behind the proxy needs no auth code. On every plan.'
+          }
+        them:
+          {
+            status: no,
+            text: "No check endpoint for a proxy. ZITADEL's API examples check each token in the API's own code, by introspection through its SDK, with roles checked per endpoint. Its OAuth2 Proxy guide covers browser sign-in."
+          }
+        verdict: us
+        why: 'With ZITADEL the API or MCP server carries the token check and its rules in its own code. Here your proxy asks the authorization server, and the rule for each tool is a table in the console.'
+        note: 'The Go example says "This will handle the OAuth 2.0 introspection request including authentication using JWT with Private Key using our Go SDK."'
       - dimension: Managed hosting
         us:
           {

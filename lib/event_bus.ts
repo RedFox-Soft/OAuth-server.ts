@@ -32,6 +32,7 @@ import type {
 	Outcome as BehindProxyOutcome,
 	Reason as BehindProxyReason
 } from './behind_proxy/decide.ts';
+import type { ApiReason as BehindProxyApiReason } from './behind_proxy/answers.ts';
 import type { Client } from './models/client.ts';
 import type { AccessToken } from './models/access_token.ts';
 import type { AuthorizationCode } from './models/authorization_code.ts';
@@ -254,6 +255,21 @@ export type ServerEvents = ModelEvents &
 				reason: BehindProxyReason;
 				rule: string | null;
 				accountId: string | null;
+			}
+		];
+		/*
+		 * A check a proxy made for an API whose tokens it checks (specs/123 R15), once the API is known and the
+		 * request is for its host. Identifiers only: never the token or a forwarded header. `tool` is the decoded
+		 * `Mcp-Name` of a tool call, or null.
+		 */
+		'behind_proxy.api_decision': [
+			{
+				bucketId: string;
+				resource: string;
+				outcome: 'allow' | 'refuse';
+				reason: BehindProxyApiReason;
+				tool: string | null;
+				clientId: string | null;
 			}
 		];
 	};

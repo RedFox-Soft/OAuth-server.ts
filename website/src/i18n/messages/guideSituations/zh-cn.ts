@@ -1,6 +1,6 @@
 import type { GuideTexts } from '../../guide-texts.ts';
 
-export const source = '38195e17799b';
+export const source = '5577eda3074a';
 
 export default {
 	questions: {
@@ -500,6 +500,69 @@ export default {
 				'Connect 步骤会给出 Caddy、Traefik 或 nginx 的配置，可以直接粘贴。',
 				'每个路径都可以开放给选定用户组的成员、项目中的所有人、任何人，或者不开放给任何人。',
 				'不需要开启任何开关，所有方案都可以使用。'
+			]
+		},
+		mcpproxy: {
+			title: '无需授权代码即可保护 MCP 服务器',
+			sentence:
+				'把你的 MCP 服务器放在你的代理后面。对于每个请求，代理都会请 FoxAuth 检查令牌以及该工具需要的权限（scope），所以服务器本身不需要任何授权代码。',
+			protocol:
+				'Forward auth · MCP Authorization · OAuth 2.1 · Protected Resource Metadata (RFC 9728)',
+			problemCaption: '在你写好授权代码之前，MCP 服务器谁都能访问。',
+			fixCaption: '你的代理检查每个令牌和每个工具。',
+			lanes: {
+				person: '用户',
+				agent: 'AI 智能体',
+				proxy: '你的代理',
+				mcp: '你的 MCP 服务器',
+				fox: 'FoxAuth'
+			},
+			steps: [
+				{
+					label: '调用工具',
+					text: '智能体调用你的 MCP 服务器。请求先到达你的代理。'
+				},
+				{
+					label: '询问项目',
+					text: '在 MCP 服务器看到请求之前，你的代理先请项目检查这个请求。'
+				},
+				{
+					label: '401：到 FoxAuth 登录',
+					text: '现在还没有令牌。项目回答 401 并指明自己，你的代理把这个回答转给智能体。'
+				},
+				{
+					label: '登录并允许',
+					text: '用户登录，并看到是哪个智能体在请求访问。'
+				},
+				{
+					label: '用于你的服务器的令牌',
+					text: '项目签发一个只对你的 MCP 服务器有效的令牌。'
+				},
+				{
+					label: '带着令牌调用',
+					text: '智能体带着令牌再次调用这个工具。'
+				},
+				{
+					label: '可以，允许这个工具',
+					text: '项目检查令牌以及这个工具需要的权限，然后回答“可以”。'
+				},
+				{
+					label: '带上 X-Auth-* 请求头',
+					text: '你的代理把请求转给 MCP 服务器，并在 X-Auth-* 请求头中说明调用者是谁、拥有哪些权限。'
+				}
+			],
+			sees: [
+				'登录页面，然后是授权同意页面',
+				'页面写出了智能体和你的 MCP 服务器',
+				'用户选择允许或拒绝'
+			],
+			goodToKnow: [
+				'声明 API 时，在“Who checks tokens?”处选择“Your proxy”。这个 API 的 Connect 会给出 Caddy、Traefik 或 nginx 的配置，可以直接粘贴。',
+				'API 那一行的 Tools… 用来设置每个工具需要哪些权限。缺少权限的客户端会被准确告知需要申请哪些权限。',
+				'智能体要查找的描述文档（protected resource metadata）由项目自己发布，所以你的 MCP 服务器不需要为登录提供任何东西。',
+				'被撤销的令牌在代理处仍然有效，直到它过期，除非这个 API 签发的是不透明（opaque）令牌。请把令牌有效期设得短一些。',
+				'绑定到密钥的令牌（DPoP 或证书）会被代理拒绝，因为代理无法检查这个密钥。',
+				'确保只能通过你的代理访问 MCP 服务器。任何能登录这个项目的人都能获得它的令牌。所有方案都可以使用。'
 			]
 		},
 		signup: {

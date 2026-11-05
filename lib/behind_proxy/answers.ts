@@ -15,7 +15,26 @@ export type AnswerReason =
 	| 'reserved_path'
 	| 'signing_in'
 	| 'signed_in'
-	| 'signed_out';
+	| 'signed_out'
+	/* The API check (specs/123 contracts/api-check.md). */
+	| ApiReason;
+
+export type ApiReason =
+	| 'allowed'
+	| 'preflight'
+	| 'missing_token'
+	| 'invalid_token'
+	| 'bound_token_unsupported'
+	| 'insufficient_scope'
+	| 'tool_unnamed'
+	| 'tool_not_listed'
+	| 'old_client'
+	| 'bad_mcp_header'
+	| 'not_found'
+	| 'missing_forwarded'
+	| 'unsafe_value'
+	| 'rate_limited'
+	| 'server_error';
 
 export function answer(
 	status: number,

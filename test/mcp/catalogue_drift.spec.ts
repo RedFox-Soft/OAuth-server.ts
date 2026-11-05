@@ -283,7 +283,9 @@ describe('MCP tool catalogue', () => {
 			'behind_proxy_app_update',
 			'client_update',
 			'federation_provider_create',
-			'federation_provider_update'
+			'federation_provider_update',
+			/* Who checks an API's tokens, and which scopes each of its tools needs at the proxy (specs/123). */
+			'resource_update'
 		]);
 		for (const tool of sometimes) {
 			expect(mayBeHigh(tool)).toBe(true);

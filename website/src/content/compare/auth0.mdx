@@ -19,6 +19,7 @@ sources:
   - https://auth0.com/pricing
   - https://auth0.com/docs/secure/call-apis-on-users-behalf/token-vault/access-token-exchange-with-token-vault
   - https://auth0.com/docs/quickstart/webapp/nginx-plus
+  - https://auth0.com/ai/docs/mcp/get-started/authorization-for-your-mcp-server
 bottomLine: 'Auth0 is the better pick when you want identity as a service with an SLA this week, with social connections and a FAPI certification you can hand to a reviewer. FoxAuth is the better pick when the data has to live in your own database, when the per-user bill is the problem, or when you need the banking-grade profiles without an Enterprise add-on.'
 chooseThem:
   - 'You do not want to run anything, and you need an SLA today.'
@@ -278,6 +279,20 @@ groups:
         verdict: us
         why: 'Auth0 needs NGINX Plus or a separate proxy service for this, and its guide sets no rule per path or per group. Here Caddy, Traefik or open-source nginx ask the server, and a rule for each path names the groups.'
         note: 'The Auth0 NGINX Plus quickstart says "you need to install the nginx-plus-module-njs module for NGINX Plus."'
+      - dimension: Token and per-tool scope checks at your proxy
+        us:
+          {
+            status: yes,
+            text: 'Your Caddy, Traefik or nginx asks the project to check the bearer token for an API or an MCP server: signature, issuer, audience and lifetime. For an MCP server, a table in the console names the scopes each tool needs, and a client that lacks one is told every scope the tool needs. The project serves the protected resource metadata, so the server behind the proxy needs no auth code. On every plan.'
+          }
+        them:
+          {
+            status: no,
+            text: "No check endpoint for a proxy. Auth0's MCP guide has the MCP server verify each token itself. Scopes named after tools, such as tool:whoami, are defined on the API in Auth0, and the sample server decides in its own code which tools a person sees."
+          }
+        verdict: us
+        why: "With Auth0 the token check and the rule for each tool live in the MCP server's own code. Here the proxy asks the authorization server, and the rule for each tool is a table in the console."
+        note: 'The Auth0 guide says "Your MCP server verifies this token" and defines the scopes `tool:whoami` and `tool:greet`.'
   - label: Licence and cost
     rows:
       - dimension: Licence

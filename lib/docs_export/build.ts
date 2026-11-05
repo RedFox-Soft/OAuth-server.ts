@@ -75,6 +75,7 @@ import {
 	optionPartsOf
 } from '../situation_guide/options.js';
 import {
+	API_IDENTITY_HEADERS,
 	IDENTITY_HEADERS,
 	PROXY_KINDS,
 	recipeFor,
@@ -197,6 +198,12 @@ export interface DocsExport {
 		readonly example: RecipeValues;
 		readonly identityHeaders: readonly string[];
 		readonly recipes: readonly { kind: ProxyKind; text: string }[];
+		/* The same for an API whose tokens the proxy checks (specs/123). */
+		readonly api: {
+			readonly example: RecipeValues;
+			readonly identityHeaders: readonly string[];
+			readonly recipes: readonly { kind: ProxyKind; text: string }[];
+		};
 	};
 	/* What the hourly attack report carries (specs/114), from the declaration the server counts and builds by. */
 	readonly attackReports: {
@@ -297,6 +304,13 @@ const RECIPE_EXAMPLE: RecipeValues = {
 	appAddress: 'https://grafana.example.com'
 };
 
+/* The same for an API whose tokens the proxy checks (specs/123): an MCP server at mcp.example.com. */
+const API_RECIPE_EXAMPLE: RecipeValues = {
+	verifyUrl: 'https://auth.example.com/acme/verify/api/<checkId>',
+	appAddress: 'https://mcp.example.com/mcp',
+	target: 'api'
+};
+
 function exportSituation(situation: GuideSituation): ExportedSituation {
 	const { preset: _preset, action, ...rest } = situation;
 	return {
@@ -387,7 +401,21 @@ export function buildDocsExport(stamp: DocsExportStamp): DocsExport {
 					'%3CappId%3E',
 					'<appId>'
 				)
-			}))
+			})),
+			api: {
+				example: {
+					verifyUrl: API_RECIPE_EXAMPLE.verifyUrl,
+					appAddress: API_RECIPE_EXAMPLE.appAddress
+				},
+				identityHeaders: [...API_IDENTITY_HEADERS],
+				recipes: PROXY_KINDS.map((kind) => ({
+					kind,
+					text: recipeFor(kind, API_RECIPE_EXAMPLE).replaceAll(
+						'%3CcheckId%3E',
+						'<checkId>'
+					)
+				}))
+			}
 		},
 		attackReports: {
 			destination: ATTACK_DESTINATION,

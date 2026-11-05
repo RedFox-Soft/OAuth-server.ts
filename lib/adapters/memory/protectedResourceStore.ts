@@ -28,6 +28,7 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 		tokenFormat?: 'jwt' | 'opaque';
 		accessTokenTTL?: number;
 		trailingSlashSignificant?: boolean;
+		checkedBy?: 'server' | 'proxy';
 	}): Promise<ProtectedResource> {
 		const _id = declarationId(data.namespace, data.identifier);
 		if (this.resources.has(_id)) {
@@ -48,6 +49,7 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 			tokenFormat: data.tokenFormat ?? 'jwt',
 			accessTokenTTL: data.accessTokenTTL ?? 900,
 			trailingSlashSignificant: data.trailingSlashSignificant ?? false,
+			...(data.checkedBy ? { checkedBy: data.checkedBy } : {}),
 			createdAt: now,
 			updatedAt: now
 		};

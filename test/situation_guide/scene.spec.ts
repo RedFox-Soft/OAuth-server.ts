@@ -77,7 +77,8 @@ describe('the guide pictures', () => {
 			'service',
 			'mcp',
 			'signup',
-			'behindproxy'
+			'behindproxy',
+			'mcpproxy'
 		]) {
 			const { solution } = sceneOf(situation(id));
 			const isFox = solution.nodes.map((node) => node.role === 'fox');
@@ -107,24 +108,29 @@ describe('the guide pictures', () => {
 		});
 	});
 
-	it('draws a web app behind a proxy with the proxy as its own part that asks FoxAuth, and FoxAuth never linked to the app', () => {
-		const { solution } = sceneOf(situation('behindproxy'));
-		const proxy = solution.nodes.find((node) => node.role === 'proxy');
-		expect(proxy?.part).toBe('proxy');
-		expect(solution.placement).toBe('beside');
-		const fox = solution.nodes.find((node) => node.role === 'fox');
-		expect(fox).toBeDefined();
-		expect(joins(solution, fox?.lane ?? '', proxy?.lane ?? '')).toBeDefined();
-		for (const app of solution.nodes.filter(
-			(node) => node.role === 'resource'
-		)) {
-			expect(joins(solution, fox?.lane ?? '', app.lane)).toBeUndefined();
-			expect(joins(solution, proxy?.lane ?? '', app.lane)).toMatchObject({
-				kind: 'direct'
-			});
+	it.each(['behindproxy', 'mcpproxy'])(
+		'draws %s with the proxy as its own part that asks FoxAuth, and FoxAuth never linked to what stands behind it',
+		(id) => {
+			const { solution } = sceneOf(situation(id));
+			const proxy = solution.nodes.find((node) => node.role === 'proxy');
+			expect(proxy?.part).toBe('proxy');
+			expect(solution.placement).toBe('beside');
+			const fox = solution.nodes.find((node) => node.role === 'fox');
+			expect(fox).toBeDefined();
+			expect(joins(solution, fox?.lane ?? '', proxy?.lane ?? '')).toBeDefined();
+			for (const app of solution.nodes.filter(
+				(node) => node.role === 'resource'
+			)) {
+				expect(joins(solution, fox?.lane ?? '', app.lane)).toBeUndefined();
+				expect(joins(solution, proxy?.lane ?? '', app.lane)).toMatchObject({
+					kind: 'direct'
+				});
+			}
+			expect(solution.nodes.some((node) => node.role === 'resource')).toBe(
+				true
+			);
 		}
-		expect(solution.nodes.some((node) => node.role === 'resource')).toBe(true);
-	});
+	);
 
 	it('draws FoxAuth between the two parties where it carries the exchange', () => {
 		for (const [id, a, b] of [
@@ -191,7 +197,8 @@ describe('the guide pictures, laid out', () => {
 			'mcp',
 			'device',
 			'service',
-			'behindproxy'
+			'behindproxy',
+			'mcpproxy'
 		])
 			expect(sceneOf(situation(id)).solution.placement).toBe('beside');
 		for (const id of ['okta', 'connected'])

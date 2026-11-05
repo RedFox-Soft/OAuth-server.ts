@@ -3,19 +3,24 @@ import { Code } from '@astrojs/starlight/components';
 import { loadExport } from '../data/export.ts';
 
 /*
- * One proxy's configuration for an app behind a proxy, as the console's Connect step builds it
- * (lib/behind_proxy/recipes.ts), for the example addresses the docs export carries. The page never
- * keeps a copy of its own, so the site cannot show a recipe the console does not give (FR-034).
+ * One proxy's configuration, as the console's Connect step builds it (lib/behind_proxy/recipes.ts),
+ * for the example addresses the docs export carries: for an app people sign in to (`target="app"`,
+ * the default) or for an API whose tokens the proxy checks (`target="api"`). The page never keeps a
+ * copy of its own, so the site cannot show a recipe the console does not give (FR-034).
  */
 interface Props {
 	kind: 'caddy' | 'traefik' | 'nginx';
+	target?: 'app' | 'api';
 }
-const { kind } = Astro.props;
+const { kind, target = 'app' } = Astro.props;
 
-const recipe = loadExport().behindProxy.recipes.find((r) => r.kind === kind);
+const behindProxy = loadExport().behindProxy;
+const recipes =
+	target === 'api' ? behindProxy.api.recipes : behindProxy.recipes;
+const recipe = recipes.find((r) => r.kind === kind);
 if (!recipe) {
 	throw new Error(
-		`generated/docs-export.json has no ${kind} recipe; run \`bun run generate\``
+		`generated/docs-export.json has no ${kind} recipe for ${target === 'api' ? 'an API' : 'an app'}; run \`bun run generate\``
 	);
 }
 
@@ -24,7 +29,7 @@ const LANG = { caddy: 'txt', traefik: 'yaml', nginx: 'nginx' } as const;
 const TITLE = {
 	caddy: 'Caddyfile',
 	traefik: 'Traefik dynamic configuration',
-	nginx: 'nginx server block'
+	nginx: target === 'api' ? 'nginx configuration' : 'nginx server block'
 } as const;
 ---
 

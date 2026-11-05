@@ -310,7 +310,20 @@ export const DocsExportSchema = z.object({
 					text: z.string().min(1)
 				})
 			)
-			.length(3)
+			.length(3),
+		/* The same for an API whose tokens the proxy checks (specs/123). */
+		api: z.object({
+			example: z.object({ verifyUrl: z.string(), appAddress: z.string() }),
+			identityHeaders: z.array(z.string()).min(1),
+			recipes: z
+				.array(
+					z.object({
+						kind: z.enum(['caddy', 'traefik', 'nginx']),
+						text: z.string().min(1)
+					})
+				)
+				.length(3)
+		})
 	}),
 	/* The hourly attack report (specs/114), from the declaration the server counts and builds by. */
 	attackReports: z.object({

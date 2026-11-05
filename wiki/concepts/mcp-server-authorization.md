@@ -4,7 +4,7 @@ title: 'Authorization for MCP servers'
 tags: [architecture, contract, gotcha, config]
 sources: [oauth-server-codebase]
 created: 2026-09-08
-updated: 2026-10-22
+updated: 2026-11-05
 graph:
   node_type: concept
 ---
@@ -20,6 +20,11 @@ operator using it for their own MCP server, and both were fixed by turning code 
 a third-party resource meant writing an addon override in this repository. And a client belonging to no
 old-style Project (a retired project; since spec 099: to no project) fell through to the hard-coded `redfox`
 project — the Default project — which is what the README's compatibility note recorded.
+
+Since spec 123 a declared API may also hand the checking of its tokens to the operator's reverse proxy
+(`checkedBy: 'proxy'`). The project then serves the API's protected-resource metadata itself, so such an API
+serves no metadata and checks no token; per-tool scopes for an MCP server go in its tools table. See
+[[token-checks-at-your-proxy]].
 
 A project is stored as a bucket (`UserBucket`); the code keeps that name, and the console and the admin API
 have said "project" since spec 100. Since spec 099 a declared resource — an **API** in the console — belongs

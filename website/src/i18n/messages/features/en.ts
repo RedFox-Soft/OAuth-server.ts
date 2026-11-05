@@ -205,6 +205,10 @@ export default {
 					title: 'Sign-in in front of a web app, through your proxy',
 					body: 'Put an app with no sign-in of its own, such as Grafana or an internal dashboard, behind your proxy. Caddy, Traefik or nginx asks the project about every request, sends a person who has not signed in to the project’s sign-in page, and passes the request on with who the person is in X-Auth-* headers. A rule for each path names the groups that may open it. The app needs no change, and there is no flag to switch on.'
 				},
+				proxyApi: {
+					title: 'Token and per-tool scope checks at your proxy',
+					body: 'Put an MCP server or another API behind Caddy, Traefik or nginx. On every request the proxy asks the project to check the bearer token: its signature, issuer, audience and lifetime. For an MCP server, a table in the console says which scopes each tool needs, and a client that lacks one is told exactly which scopes to ask for. The project serves the protected resource metadata itself, so the server behind the proxy needs no auth code. There is no flag to switch on.'
+				},
 				clientIdMetadataDocument: {
 					title: 'Client identity documents',
 					body: 'A client_id can be an HTTPS URL that names a JSON document describing the client. The server retrieves and validates the document on demand and never stores it. The MCP authorization specification names this mechanism first for a client with no prior relationship to the server.'

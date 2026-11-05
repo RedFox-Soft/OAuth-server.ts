@@ -1,0 +1,226 @@
+---
+title: Protect an MCP server at your proxy
+description: Let your Caddy, Traefik or nginx proxy ask FoxAuth to check every token, and the scopes each tool needs, so your MCP server needs no auth code.
+sidebar:
+  order: 8
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import ProxyRecipe from '../../../../components/ProxyRecipe.astro';
+
+An MCP server that checks tokens itself needs code for it. It fetches the project's keys, checks each token, answers
+`401` with the right header, and publishes a document that tells agents where to sign in. [Protect your MCP server
+with OAuth](/docs/get-started/protect-your-mcp-server/) walks through that code. This page shows a way to skip it.
+
+Your reverse proxy (Caddy, Traefik or nginx) stands in front of the MCP server. Before each request reaches the
+server, the proxy asks your FoxAuth project to check it. The project checks the token, and the scopes the called tool
+needs. Only a request that passes reaches your MCP server. A scope is one named permission a token carries, such as
+`files:read`.
+
+This page takes about ten minutes if your proxy already serves the MCP server.
+
+<Aside
+	type="note"
+	title="What you need first"
+>
+	A running instance with an administrator account ([Create the first
+	administrator](/docs/get-started/first-admin/)) and a project of your own
+	([Register your first client](/docs/get-started/first-client/) walks that).
+	The MCP server must be served over `https` by a proxy you can configure. Agent
+	hosts must be able to identify themselves to the project: see [Let an agent
+	host identify
+	itself](/docs/get-started/protect-your-mcp-server/#4-let-an-agent-host-identify-itself).
+</Aside>
+
+## What the proxy checks {#what-the-proxy-checks}
+
+For every request, the proxy calls the project's check, at an address such as
+`https://auth.example.com/acme/verify/api/<checkId>`. The check reads the token from the request's
+`Authorization: Bearer` header. It accepts the token only when everything an MCP server would check holds:
+
+- the project's own keys signed it;
+- the project issued it;
+- it was issued for this MCP server and no other (its audience);
+- it has not expired, and its start time has passed;
+- it is an access token, not an ID token.
+
+The project can also issue opaque tokens: a random string with nothing readable inside. The check looks such a token
+up in the project and accepts it only while it is unexpired and not revoked.
+
+A request with no token, or with a token that fails, gets `401`. Its `WWW-Authenticate` header names a document that
+tells the agent where to sign in. That document is the protected resource metadata (RFC 9728), and the project serves
+it for you. Your MCP server serves nothing for sign-in.
+
+## 1. Declare the API with "Your proxy" {#declare-the-api}
+
+1. Open your project and choose its **APIs** tab, then **New resource**.
+2. Fill in:
+   - **Resource identifier**: the address agents call, such as `https://mcp.example.com/mcp`. It must be an `https`
+     address, because the check compares its host with the host the proxy reports.
+   - **Name**: what people see on the consent page.
+   - **Scopes**: the permissions your tools tell apart, such as `files:read`, `files:write` and `files:delete`.
+   - **Who checks tokens?**: choose **Your proxy**.
+3. Look at the token settings. A revoked self-contained token keeps working at the proxy until it expires (see
+   [Revoked tokens](#revocation) below). So choose **Opaque**, or keep the lifetime short.
+
+You can switch an existing API to **Your proxy** in its edit form too. Tokens issued before the switch keep working
+until they expire.
+
+## 2. Configure your proxy {#configure-your-proxy}
+
+Choose **Connect** on the API's row. It shows the check's address, the metadata address and the configuration for
+your proxy, with your addresses filled in. Copy it from there. The examples below are the same text, built by the
+same code, for an MCP server at `https://mcp.example.com/mcp` in a project at `https://auth.example.com/acme`. Your
+API's check id takes the place of `<checkId>`.
+
+Each configuration does three things:
+
+- It sends every request to the check first, with the request's original method and host.
+- It removes any `X-Auth-*` header the client sent, so nobody can pretend to be someone else.
+- It passes the request to your MCP server with the headers the check answered. The `Authorization` header goes on
+  untouched.
+
+The MCP server itself is assumed to listen on `127.0.0.1:8080`. Replace that with its real address.
+
+### Caddy {#caddy}
+
+<ProxyRecipe
+	kind="caddy"
+	target="api"
+/>
+
+The `route` block keeps the order as written. Without it, Caddy would remove the `X-Auth-*` headers after the check
+had set them. When the check refuses, `forward_auth` passes its answer back to the client, headers included.
+
+### Traefik {#traefik}
+
+<ProxyRecipe
+	kind="traefik"
+	target="api"
+/>
+
+This is a dynamic configuration for the file provider. `authResponseHeadersRegex` removes every `X-Auth-*` header
+the client sent and copies the ones the check answered. When the check refuses, Traefik passes its whole answer back.
+
+### nginx {#nginx}
+
+<ProxyRecipe
+	kind="nginx"
+	target="api"
+/>
+
+nginx's `auth_request` understands only three answers: allowed, `401` and `403`. On a `401`, nginx passes the
+check's `WWW-Authenticate` header to the client by itself. On a `403` it does not, so the `map` at the top adds it
+back. That header is how a client learns which scopes a tool needs. The `map` belongs in the `http` context, which a
+file in `conf.d` already is. Add your certificate lines where the comment says.
+
+## 3. Keep the MCP server reachable only through your proxy {#reachable-only-through-the-proxy}
+
+The check protects only the requests that pass through your proxy. A request that reaches the MCP server another way
+skips it, and the server would trust any `X-Auth-*` header it carried.
+
+So make the MCP server listen only where the proxy can reach it: on `127.0.0.1`, on a private network, or behind a
+firewall rule that admits only the proxy.
+
+## 4. What your MCP server receives {#what-your-server-receives}
+
+When a request is let through, the proxy adds these headers:
+
+| Header           | What it holds                                                                                                                            |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `X-Auth-Subject` | Who the token speaks for: the token's `sub`. For a machine token, it is the client's id.                                                 |
+| `X-Auth-Client`  | The id of the client that holds the token, such as the agent host.                                                                       |
+| `X-Auth-Scope`   | The token's scopes, separated by spaces.                                                                                                 |
+| `X-Auth-Reason`  | A short code for the decision: `allowed`, or `preflight` for a browser's CORS check, which carries no token and gets the others empty.   |
+| `Authorization`  | The original token, untouched. A server that trades it for the person's tokens at another service needs it. It may also check it itself. |
+
+## 5. Say which scopes each tool needs {#tools}
+
+Without a tools table, any valid token may call any tool. To set one, choose **Tools…** on the API's row.
+
+An MCP client following the MCP specification of 2026-07-28 names what it does in two headers: `Mcp-Method` (such as
+`tools/call`) and `Mcp-Name` (the tool). The check reads them, so the table can say which scopes each tool needs:
+
+| Tool           | Scopes it needs               |
+| -------------- | ----------------------------- |
+| `search_files` | `files:read`                  |
+| `delete_file`  | `files:write`, `files:delete` |
+
+You pick the scopes from the API's own scopes. With this table:
+
+- A call to `delete_file` with a token that holds only `files:write` gets `403`. Its `WWW-Authenticate` header says
+  `error="insufficient_scope"` and lists every scope the tool needs, `files:write files:delete`. A client can then ask
+  for exactly those.
+- Listing the tools (`tools/list`) needs only a valid token, so a client can always see what it may call.
+- A `tools/call` that names no tool is refused.
+- Tool names match exactly: `Delete_File` is not `delete_file`.
+
+Two choices sit under the table:
+
+- **Any other tool**: a tool the table does not list is refused, or needs only a valid token. Refused is the default.
+- **Clients too old to say which tool they call**: a client that sends no `Mcp-Method`, or speaks a protocol older
+  than 2026-07-28, is refused by default. You can let them in, but then they can call any tool.
+
+### What the table does not cover {#what-the-table-does-not-cover}
+
+- Reading a resource (`resources/read`) and getting a prompt (`prompts/get`) need only a valid token. The table
+  names tools only.
+- The proxy sees the headers, not the body. Your MCP server must still refuse a request whose `Mcp-Name` header and
+  body name different tools. The MCP specification asks servers to do this, and it is why older clients are refused
+  by default: their servers do not compare the two.
+
+## Limits to know {#limits}
+
+### A revoked token works until it expires {#revocation}
+
+A self-contained token carries everything the check needs, so the check does not ask the project whether it was
+revoked. Asking would put a database read on every call. A revoked self-contained token therefore keeps working at
+the proxy until it expires. The default lifetime is fifteen minutes. If you need revocation to work at once, issue
+opaque tokens: the check looks each one up, so a revoked token is refused on the next request.
+
+### Tokens bound to a key are refused {#bound-tokens}
+
+Some tokens work only together with a key the client holds, through DPoP or a client certificate (mTLS). The proof
+of the key belongs to the request the client sent to your MCP server, and the proxy passes on only headers. So the
+check cannot prove the key, and it refuses such tokens with `401` and the reason `bound_token_unsupported`. It does
+not accept them as plain tokens.
+
+### Refusals carry no CORS headers {#cors}
+
+A browser lets a page on another site read an answer only when the answer carries CORS headers. The check's `401`
+and `403` carry none. So a browser-based MCP client cannot read `WWW-Authenticate` from a refusal, unless your proxy
+adds CORS headers to errors. A browser's CORS check itself (`OPTIONS` with `Access-Control-Request-Method`) carries
+no token and is let through, so your MCP server answers it.
+
+### Anyone who can sign in to the project can get a token {#who-can-get-a-token}
+
+This mode checks the token, not who the person is. Anyone who can sign in to the project can get a token for this
+API, and limiting it to groups is not part of this mode. To limit who may call it, limit who can sign in to the
+project.
+
+## 6. Check that it works {#check-that-it-works}
+
+1. Call your MCP server with no token:
+
+   ```sh
+   curl -i https://mcp.example.com/mcp -X POST \
+     -H 'content-type: application/json' \
+     -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+   ```
+
+   You should get `401` with a `WWW-Authenticate: Bearer resource_metadata="…"` header. If you get your MCP
+   server's own answer, the request did not pass through the check.
+
+2. Open the address from `resource_metadata`. Its `resource` is your API's identifier, and `authorization_servers`
+   names your project.
+
+3. Point your agent host at your MCP server. It reads that document, signs the person in at the project, and comes
+   back with a token. The same call now reaches your server, with the `X-Auth-*` headers.
+
+There is nothing to switch on, and it is on every plan.
+
+<Aside type="tip">
+	A web app people open in a browser, with no sign-in of its own, goes behind
+	the proxy differently. See [Put sign-in in front of a web
+	app](/docs/get-started/put-sign-in-in-front-of-a-web-app/).
+</Aside>

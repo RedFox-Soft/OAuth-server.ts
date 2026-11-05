@@ -19,7 +19,9 @@ is the endpoint the proxy calls. An *app session* is a person's session at one a
 
 ## One endpoint serves everything
 
-`/verify/:appId` is the only route (`lib/consts/behind_proxy.ts:20-21`). It is mounted bare and beneath `/:bucket`,
+`/verify/:appId` is the only route for apps (`lib/consts/behind_proxy.ts:20-21`). Since spec 123, an API whose
+tokens the proxy checks has its own check one level deeper, `/verify/api/:checkId`, so no app id can name an API
+(see [[token-checks-at-your-proxy]]). It is mounted bare and beneath `/:bucket`,
 like every other bucket-scoped surface (`lib/index.ts:283-284`), and with `.all`, because the method of the check
 means nothing: the original method is read from `X-Forwarded-Method` (`lib/behind_proxy/routes.ts:14-18`). No body
 is parsed (`parse: 'none'`). The project is chosen by the address of the check; the path names the app.
@@ -257,6 +259,7 @@ awaited, and a failure is captured, not answered (`usage.ts:21-102`).
 
 ## Related
 
+- [[token-checks-at-your-proxy]] — the same check for an API's bearer tokens and MCP tools (spec 123).
 - [[project-is-an-issuer]] — the host-from-`Host` rule this endpoint is the one exception to.
 - [[cookie-path-scoping]] — why the set and the expiry share one attribute writer.
 - [[connected-apps-page]], [[scim-provisioning]] — the other two synthesized, never-stored clients.

@@ -1439,6 +1439,25 @@ export const ScopeDescription = t.Object({
 });
 export type ScopeDescription = Static<typeof ScopeDescription>;
 
+/*
+ * An API's tools table (specs/123): each listed MCP tool needs every scope of its row; a tool the table does not
+ * list, and a client too old to say which method it calls, are refused unless the administrator chose otherwise.
+ */
+export const ToolsTable = t.Object(
+	{
+		rows: t.Array(
+			t.Object(
+				{ name: t.String(), scopes: t.Array(t.String()) },
+				{ additionalProperties: false }
+			)
+		),
+		otherTools: t.Union([t.Literal('refuse'), t.Literal('token')]),
+		withoutMethod: t.Union([t.Literal('refuse'), t.Literal('token')])
+	},
+	{ additionalProperties: false }
+);
+export type ToolsTable = Static<typeof ToolsTable>;
+
 export const ProtectedResource = t.Object({
 	_id: t.String(),
 	namespace: t.String(),
@@ -1478,6 +1497,14 @@ export const ProtectedResource = t.Object({
 	 * that does not say otherwise, because the MCP specification asks for the slash-free form.
 	 */
 	trailingSlashSignificant: t.Boolean(),
+	/*
+	 * Who checks the tokens this API receives (specs/123): its own server, as spec 107 describes and as every API
+	 * declared before did, or the operator's proxy, which then asks the project before passing a request on.
+	 * Absent means the server.
+	 */
+	checkedBy: t.Optional(t.Union([t.Literal('server'), t.Literal('proxy')])),
+	/* Which scopes each MCP tool needs when the proxy checks the tokens; absent or with no rows, none beyond a valid token. */
+	tools: t.Optional(ToolsTable),
 	createdAt: t.Date(),
 	updatedAt: t.Date()
 });
@@ -1486,7 +1513,13 @@ export type ProtectedResource = Static<typeof ProtectedResource>;
 export type ProtectedResourcePatch = Partial<
 	Pick<
 		ProtectedResource,
-		'name' | 'scopes' | 'scopeDescriptions' | 'tokenFormat' | 'accessTokenTTL'
+		| 'name'
+		| 'scopes'
+		| 'scopeDescriptions'
+		| 'tokenFormat'
+		| 'accessTokenTTL'
+		| 'checkedBy'
+		| 'tools'
 	>
 > & {
 	/* `null` removes the API's exchanging application (specs/118 R3). */
@@ -1505,6 +1538,7 @@ export interface ProtectedResourceStoreInstance {
 		tokenFormat?: 'jwt' | 'opaque';
 		accessTokenTTL?: number;
 		trailingSlashSignificant?: boolean;
+		checkedBy?: 'server' | 'proxy';
 	}): Promise<ProtectedResource>;
 	find(
 		namespace: string,

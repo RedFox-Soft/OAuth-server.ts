@@ -11,7 +11,11 @@ import {
 	resolveAdmin,
 	type AdminContext
 } from '../auth/rbac.js';
-import type { ProtectedResource, UserBucket } from '../../adapters/types.js';
+import type {
+	ProtectedResource,
+	ToolsTable,
+	UserBucket
+} from '../../adapters/types.js';
 import { loadBucketForEdit, loadBucketForUsers } from '../buckets/access.js';
 import { recordAdminAudit } from '../audit/record.js';
 import { canonicalizeResourceIdentifier } from '../../resources/canonical.js';
@@ -44,6 +48,11 @@ import { isUniqueValueTaken } from '../../adapters/conflicts.js';
 import { ROOT_DECLARATION_REFUSAL } from './refusals.js';
 import { mayDeclareIn } from '../auth/can.js';
 import { assertApiRoom } from '../../plans/enforce.js';
+import { DEFAULT_BUCKET_ID } from '../consts.js';
+import { isAddressable } from '../auth/bucketAddress.js';
+import { apiCheckUrlOf } from '../../behind_proxy/api_address.js';
+import { orphanedBy, validateToolsTable } from '../../resources/tools_table.js';
+import type { VouchingStatus } from '../../resources/vouching.js';
 
 /*
  * Declared protected resources: the audiences this server will mint tokens for, each belonging to one
@@ -219,19 +228,59 @@ async function tokensIssuer(bucket: UserBucket): Promise<string> {
 		: issuerFor(await issuingBucket(namespace));
 }
 
-/* A declaration as the edge names it (specs/100), with what the API it declares must serve and check (spec 107). */
+/*
+ * A declaration as the edge names it (specs/100), with what the API it declares must serve and check (spec 107), or,
+ * when the proxy checks its tokens, where the proxy asks and where the project serves its metadata (specs/123).
+ */
 function resourceView(
 	{ bucketId, ...rest }: ProtectedResource,
-	issuer: string
-): Omit<ProtectedResource, 'bucketId'> & {
+	issuer: string,
+	bucket: UserBucket
+): Omit<ProtectedResource, 'bucketId' | 'checkedBy'> & {
 	projectId: string;
+	checkedBy: 'server' | 'proxy';
 	connection: ResourceConnection;
 } {
 	return {
 		...rest,
+		checkedBy: rest.checkedBy ?? 'server',
 		projectId: bucketId,
-		connection: resourceConnection(rest, issuer)
+		connection: resourceConnection(
+			rest,
+			issuer,
+			rest.checkedBy === 'proxy' ? apiCheckUrlOf(bucket, rest.identifier) : null
+		)
 	};
+}
+
+/*
+ * Whether the proxy may check this API's tokens (specs/123 R10). It needs a host to compare with what the proxy
+ * reports, so an https address; and its project needs an address of its own, because a check at the root answers
+ * for the project served there and nothing else.
+ */
+function assertProxyCheckable(bucket: UserBucket, identifier: string): void {
+	if (!identifier.startsWith('https://')) {
+		throw new AdminError(
+			400,
+			`an API checked by your proxy must be identified by its https address, not ${identifier}`,
+			{ field: 'checkedBy' }
+		);
+	}
+	if (bucket._id !== DEFAULT_BUCKET_ID && !isAddressable(bucket)) {
+		throw new AdminError(
+			400,
+			'this project has no address of its own for your proxy to call; give it one first',
+			{ field: 'checkedBy' }
+		);
+	}
+}
+
+function acceptedTools(tools: ToolsTable, scopes: readonly string[]) {
+	const result = validateToolsTable(tools, scopes);
+	if (!result.ok) {
+		throw new AdminError(400, result.message, { field: 'tools' });
+	}
+	return result.tools;
 }
 
 function scopeOf(bucket: UserBucket, namespace: string) {
@@ -267,7 +316,9 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 		const issuer = await tokensIssuer(bucket);
 		return {
 			namespace: namespace === ROOT_NAMESPACE ? 'root' : 'project',
-			resources: resources.map((resource) => resourceView(resource, issuer))
+			resources: resources.map((resource) =>
+				resourceView(resource, issuer, bucket)
+			)
 		};
 	})
 	.post(
@@ -287,6 +338,7 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 					: acceptedScopeDescriptions(body.scopeDescriptions, scopes);
 			const namespace = namespaceOf(bucket);
 			assertMayWrite(ctx, namespace);
+			if (body.checkedBy === 'proxy') assertProxyCheckable(bucket, identifier);
 
 			/*
 			 * Checked before the audit write so a refused declaration leaves no entry describing a change
@@ -318,10 +370,11 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 					...(scopeDescriptions ? { scopeDescriptions } : {}),
 					tokenFormat: body.tokenFormat,
 					accessTokenTTL: body.accessTokenTTL,
-					trailingSlashSignificant: body.trailingSlashSignificant
+					trailingSlashSignificant: body.trailingSlashSignificant,
+					checkedBy: body.checkedBy
 				});
 				set.status = 201;
-				return resourceView(resource, await tokensIssuer(bucket));
+				return resourceView(resource, await tokensIssuer(bucket), bucket);
 			} catch (error) {
 				/*
 				 * The primary key refused it between the read above and this write. A conflict rather than a
@@ -346,7 +399,8 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 			const bucket = await loadBucketForUsers(ctx, params.id);
 			return resourceView(
 				await loadResource(bucket, params.resourceId),
-				await tokensIssuer(bucket)
+				await tokensIssuer(bucket),
+				bucket
 			);
 		}
 	)
@@ -366,6 +420,14 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 			const bucket = await loadBucketForUsers(ctx, params.id);
 			const resource = await loadResource(bucket, params.resourceId);
 			const expectedIssuer = await tokensIssuer(bucket);
+			/* The project serves this API's metadata itself (specs/123 R5), naming its own issuer: nothing to fetch. */
+			if (resource.checkedBy === 'proxy') {
+				return {
+					status: 'vouched',
+					expectedIssuer,
+					servedByProject: true
+				} satisfies VouchingStatus;
+			}
 			return checkVouching(resource.identifier, expectedIssuer, {
 				trailingSlashSignificant: resource.trailingSlashSignificant
 			});
@@ -394,6 +456,21 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 			if (scopeDescriptions && !attributes.includes('scopeDescriptions')) {
 				attributes.push('scopeDescriptions');
 			}
+			const tools =
+				body.tools === undefined
+					? undefined
+					: acceptedTools(body.tools, effectiveScopes);
+			if (scopes !== undefined && body.tools === undefined) {
+				const orphan = orphanedBy(existing.tools, effectiveScopes);
+				if (orphan) {
+					throw new AdminError(
+						400,
+						`the tool ${orphan.tool} needs ${orphan.scope}; change its row in Tools first`,
+						{ field: 'scopes' }
+					);
+				}
+			}
+			if (body.checkedBy === 'proxy') assertProxyCheckable(bucket, identifier);
 			if (typeof body.exchangedBy === 'string') {
 				const why = await whyCannotExchange(bucket, body.exchangedBy);
 				if (why) throw new AdminError(400, why, { field: 'exchangedBy' });
@@ -406,7 +483,9 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 				attributes,
 				...(body.exchangedBy !== undefined
 					? { to: body.exchangedBy ?? '' }
-					: {})
+					: body.checkedBy !== undefined
+						? { to: body.checkedBy }
+						: {})
 			});
 
 			const updated = await getProtectedResourceStore().update(
@@ -415,10 +494,13 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 				{
 					...body,
 					...(scopes === undefined ? {} : { scopes }),
-					...(scopeDescriptions === undefined ? {} : { scopeDescriptions })
+					...(scopeDescriptions === undefined ? {} : { scopeDescriptions }),
+					...(tools === undefined ? {} : { tools })
 				}
 			);
-			return updated && resourceView(updated, await tokensIssuer(bucket));
+			return (
+				updated && resourceView(updated, await tokensIssuer(bucket), bucket)
+			);
 		},
 		{ body: UpdateResourceBody }
 	)

@@ -1295,6 +1295,101 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 		)
 	},
 	{
+		id: 'mcpproxy',
+		tab: 'product',
+		title: 'Protect an MCP server without auth code',
+		sentence:
+			'Put your MCP server behind your proxy. The proxy asks FoxAuth to check the token on each request, and the scopes the tool needs, so the server itself needs no auth code.',
+		protocol:
+			'Forward auth · MCP Authorization · OAuth 2.1 · Protected Resource Metadata (RFC 9728)',
+		lanes: lanes('person', 'agent', 'proxy', 'mcp', 'fox'),
+		steps: [
+			step(
+				'agent',
+				'proxy',
+				'Calls a tool',
+				'The agent calls your MCP server. The request reaches your proxy first.'
+			),
+			step(
+				'proxy',
+				'fox',
+				'Asks the project',
+				'Your proxy asks the project to check the request, before your MCP server sees it.'
+			),
+			step(
+				'proxy',
+				'agent',
+				'401: sign in at FoxAuth',
+				'There is no token yet. The project answers 401 and names itself, and your proxy passes the answer back.',
+				'refusal'
+			),
+			step(
+				'person',
+				'fox',
+				'Signs in, allows',
+				'The person signs in and sees which agent is asking for access.'
+			),
+			step(
+				'fox',
+				'agent',
+				'Token for your server',
+				'The project issues a token that works only for your MCP server.',
+				'token'
+			),
+			step(
+				'agent',
+				'proxy',
+				'Calls with the token',
+				'The agent calls the tool again, with the token.'
+			),
+			step(
+				'fox',
+				'proxy',
+				'Yes, the tool is allowed',
+				'The project checks the token and the scopes this tool needs, and answers yes.'
+			),
+			step(
+				'proxy',
+				'mcp',
+				'With X-Auth-* headers',
+				'Your proxy passes the request on, with who is calling and their scopes in X-Auth-* headers.'
+			)
+		],
+		problem: {
+			at: 'mcp',
+			mark: 'open',
+			caption: 'Your MCP server is open until you write auth code.'
+		},
+		fixCaption: 'Your proxy checks every token and every tool.',
+		sees: {
+			kind: 'agentConsent',
+			lines: [
+				'The sign-in page, then a consent page',
+				'It names the agent and your MCP server',
+				'The person allows or refuses'
+			]
+		},
+		needs: {
+			anyOf: ['clientIdMetadataDocument', 'registration'],
+			room: 'apis',
+			role: 'edit'
+		},
+		action: { kind: 'form', target: { area: 'apis', query: { declare: '1' } } },
+		goodToKnow: [
+			'When you declare the API, answer “Who checks tokens?” with “Your proxy”. Its Connect gives the configuration for Caddy, Traefik or nginx, ready to paste.',
+			'Tools… on the API’s row says which scopes each tool needs. A client that lacks one is told exactly which scopes to ask for.',
+			'The project publishes the description agents look for (the protected resource metadata), so your MCP server serves nothing for sign-in.',
+			'A revoked token keeps working at the proxy until it expires, unless the API issues opaque tokens. Keep the lifetime short.',
+			'Tokens bound to a key (DPoP or a certificate) are refused at the proxy, because the proxy cannot check the key.',
+			'Make sure your MCP server is reachable only through your proxy. Anyone who can sign in to the project can get a token for it. It is on every plan.'
+		],
+		prompt: prompt(
+			'Check tokens for my MCP server at https://mcp.example.com/mcp in my reverse proxy (work out Caddy, Traefik or nginx from my configuration), so the server needs no auth code.\nDeclare it in FoxAuth as an API whose tokens the proxy checks (checkedBy proxy), with its scopes. Then set its tools table: each tool and the scopes it needs. Add the configuration its Connect gives to my proxy.',
+			'resource_declare with checkedBy proxy, then resource_update with tools',
+			'Make sure the MCP server is reachable only through the proxy, so nobody can reach it without the check.'
+		)
+	},
+	{
 		id: 'signup',
 		tab: 'product',
 		title: 'People create their own account, or come by invitation',

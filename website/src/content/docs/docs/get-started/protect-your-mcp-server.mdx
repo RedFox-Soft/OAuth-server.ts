@@ -28,6 +28,16 @@ Compose](/docs/get-started/docker-compose/) adds about two more.
 	answer HTTP.
 </Aside>
 
+<Aside
+	type="tip"
+	title="No auth code at all"
+>
+	If your MCP server sits behind Caddy, Traefik or nginx, the proxy can ask
+	FoxAuth to check every token instead, including the scopes each tool needs.
+	Your MCP server then needs none of the code on this page. See [Protect an MCP
+	server at your proxy](/docs/get-started/protect-an-mcp-server-at-your-proxy/).
+</Aside>
+
 ## 1. Declare your MCP server as a resource
 
 Declare it in a project that has an address of its own: a path like `/acme`, a subdomain like

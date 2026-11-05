@@ -2,7 +2,9 @@ import type { ApplicationConfigType } from 'lib/configs/application.js';
 import { routeNames } from './param_list.js';
 import {
 	BEHIND_PROXY_CHECK_BASE,
-	BEHIND_PROXY_CHECK_ROUTE
+	BEHIND_PROXY_CHECK_ROUTE,
+	BEHIND_PROXY_API_CHECK_ROUTE,
+	BEHIND_PROXY_API_METADATA_ROUTE
 } from './behind_proxy.js';
 import {
 	SCIM_BASE_PATH,
@@ -324,7 +326,10 @@ const bareAlwaysAvailableRoutes: readonly AlwaysAvailableRoute[] = [
 	 * The check a proxy makes for an app behind it (specs/122 R4). No instance switch: the endpoint does nothing
 	 * until a project declares an app, and a switch would only add a setting that protects nothing.
 	 */
-	{ method: 'ALL', path: BEHIND_PROXY_CHECK_ROUTE }
+	{ method: 'ALL', path: BEHIND_PROXY_CHECK_ROUTE },
+	/* The same for an API (specs/123), and the metadata the project serves for it: public, like any RFC 9728 document. */
+	{ method: 'ALL', path: BEHIND_PROXY_API_CHECK_ROUTE },
+	{ method: 'GET', path: BEHIND_PROXY_API_METADATA_ROUTE }
 ];
 
 /*
@@ -599,7 +604,11 @@ const bareRateRoutes: readonly RateRoute[] = [
 	 * Exempt for SCIM's reason (specs/122 R3): every person behind one proxy reaches this from the proxy's one
 	 * address, so a per-origin allowance would refuse a whole office at once. Limited per app inside the plugin.
 	 */
-	{ method: 'ALL', path: BEHIND_PROXY_CHECK_ROUTE, rate: 'exempt' }
+	{ method: 'ALL', path: BEHIND_PROXY_CHECK_ROUTE, rate: 'exempt' },
+	/* For the same reason, limited per API inside the plugin (specs/123 R11). */
+	{ method: 'ALL', path: BEHIND_PROXY_API_CHECK_ROUTE, rate: 'exempt' },
+	/* Unauthenticated and reaching storage, like `/ready`: public, never exempt. */
+	{ method: 'GET', path: BEHIND_PROXY_API_METADATA_ROUTE, rate: 'public' }
 ];
 
 /* Same derivation, same reason. */

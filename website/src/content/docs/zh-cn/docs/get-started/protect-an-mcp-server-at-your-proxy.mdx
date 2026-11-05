@@ -1,0 +1,178 @@
+---
+title: 在代理处保护 MCP 服务器
+description: 让 Caddy、Traefik 或 nginx 代理请 FoxAuth 检查每个令牌以及每个工具需要的权限，MCP 服务器无需任何授权代码。
+source: 4e3dbf6acecf
+sidebar:
+  order: 8
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import ProxyRecipe from '../../../../../components/ProxyRecipe.astro';
+
+自己检查令牌的 MCP 服务器需要为此编写代码：获取项目的密钥，检查每个令牌，用正确的请求头回答 `401`，还要发布一份告诉智能体去哪里登录的文档。[用 OAuth 保护 MCP 服务器](/zh-cn/docs/get-started/protect-your-mcp-server/)讲解了这些代码。本页介绍一种可以省掉它们的方式。
+
+你的反向代理（Caddy、Traefik 或 nginx）站在 MCP 服务器前面。每个请求到达服务器之前，代理都会先请你的 FoxAuth 项目检查它。项目检查令牌，以及被调用的工具需要的权限。只有通过检查的请求才会到达你的 MCP 服务器。权限（scope）是令牌携带的一项有名称的许可，例如 `files:read`。
+
+如果你的代理已经在为 MCP 服务器提供服务，整个过程大约需要十分钟。
+
+<Aside
+	type="note"
+	title="事先需要准备的"
+>
+	一个带有管理员账户的运行中实例（见[创建第一个管理员](/zh-cn/docs/get-started/first-admin/)），以及一个你自己的项目（[注册第一个客户端](/zh-cn/docs/get-started/first-client/)介绍了这一步）。MCP
+	服务器必须通过一个你可以配置的代理以 `https` 提供服务。智能体宿主（agent
+	host）必须能够向项目标识自己，见[让智能体宿主标识自己](/zh-cn/docs/get-started/protect-your-mcp-server/#4-let-an-agent-host-identify-itself)。
+</Aside>
+
+## 代理检查什么 {#what-the-proxy-checks}
+
+对于每个请求，代理都会调用项目的检查地址，例如 `https://auth.example.com/acme/verify/api/<checkId>`。检查从请求的 `Authorization: Bearer` 请求头中读取令牌。只有当 MCP 服务器本来要检查的每一项都满足时，它才接受这个令牌：
+
+- 令牌由项目自己的密钥签名；
+- 令牌由这个项目签发；
+- 令牌是为这个 MCP 服务器签发的，而不是为其他服务器（即它的受众）；
+- 令牌没有过期，生效时间也已经到了；
+- 它是访问令牌，而不是 ID 令牌。
+
+项目也可以签发不透明（opaque）令牌：一个随机字符串，里面没有任何可读的内容。检查会在项目中查找这种令牌，只有在它没有过期、也没有被撤销时才接受。
+
+没有令牌或令牌未通过检查的请求会得到 `401`。响应中的 `WWW-Authenticate` 响应头会指向一份文档，告诉智能体去哪里登录。这份文档叫作受保护资源元数据（protected resource metadata，RFC 9728），由项目替你发布。你的 MCP 服务器不需要为登录提供任何东西。
+
+## 1. 用“Your proxy”声明 API {#declare-the-api}
+
+1. 打开你的项目，选择 **APIs** 标签页，然后点击 **New resource**。
+2. 填写：
+   - **Resource identifier**：智能体调用的地址，例如 `https://mcp.example.com/mcp`。它必须是 `https` 地址，因为检查会把它的主机与代理报告的主机进行比较。
+   - **Name**：用户在授权同意页面上看到的名称。
+   - **Scopes**：你的工具所区分的权限，例如 `files:read`、`files:write` 和 `files:delete`。
+   - **Who checks tokens?**：选择 **Your proxy**。
+3. 看一下令牌设置。被撤销的自包含令牌在代理处仍然有效，直到它过期（见下文的[被撤销的令牌](#revocation)）。所以请选择 **Opaque**，或者把有效期设得短一些。
+
+你也可以在现有 API 的编辑表单中把它切换为 **Your proxy**。切换之前签发的令牌在过期之前仍然有效。
+
+## 2. 配置你的代理 {#configure-your-proxy}
+
+在 API 那一行点击 **Connect**。它会显示检查地址、元数据地址，以及已经填好你的地址的代理配置。请从那里复制。下面的示例是同一段文字，由同一段代码生成，对应的是项目地址为 `https://auth.example.com/acme`、MCP 服务器地址为 `https://mcp.example.com/mcp` 的情况。`<checkId>` 处会是你的 API 的检查 ID。
+
+每份配置都做三件事：
+
+- 先把每个请求连同它原来的方法和主机发送给检查。
+- 删除客户端发来的所有 `X-Auth-*` 请求头，这样谁也无法冒充别人。
+- 把请求连同检查返回的请求头一起转给你的 MCP 服务器。`Authorization` 请求头原样转发。
+
+这里假设 MCP 服务器本身监听 `127.0.0.1:8080`。请把它换成真实地址。
+
+### Caddy {#caddy}
+
+<ProxyRecipe
+	kind="caddy"
+	target="api"
+/>
+
+`route` 块会保持指令的书写顺序。没有它，Caddy 会在检查设置好 `X-Auth-*` 请求头之后又把它们删掉。检查拒绝时，`forward_auth` 会把检查的回答连同响应头一起返回给客户端。
+
+### Traefik {#traefik}
+
+<ProxyRecipe
+	kind="traefik"
+	target="api"
+/>
+
+这是给文件提供程序（file provider）用的动态配置。`authResponseHeadersRegex` 会删除客户端发来的所有 `X-Auth-*` 请求头，并复制检查返回的那些。检查拒绝时，Traefik 会把检查的完整回答返回给客户端。
+
+### nginx {#nginx}
+
+<ProxyRecipe
+	kind="nginx"
+	target="api"
+/>
+
+nginx 的 `auth_request` 只理解三种回答：允许、`401` 和 `403`。遇到 `401` 时，nginx 会自己把检查返回的 `WWW-Authenticate` 响应头转给客户端；遇到 `403` 时则不会，所以开头的 `map` 会把它加回去。客户端正是从这个请求头得知某个工具需要哪些权限。`map` 必须放在 `http` 上下文中，而 `conf.d` 里的文件本来就在这个上下文中。请在注释所指的位置加上证书配置。
+
+## 3. 确保只能通过你的代理访问 MCP 服务器 {#reachable-only-through-the-proxy}
+
+检查只保护经过你的代理的请求。绕过代理到达 MCP 服务器的请求不会经过检查，而服务器会相信它携带的任何 `X-Auth-*` 请求头。
+
+所以，请让 MCP 服务器只在代理能访问到的地方监听：`127.0.0.1`、私有网络，或者只放行代理的防火墙规则之后。
+
+## 4. 你的 MCP 服务器会收到什么 {#what-your-server-receives}
+
+请求被放行时，代理会加上这些请求头：
+
+| 请求头           | 内容                                                                                                     |
+| ---------------- | -------------------------------------------------------------------------------------------------------- |
+| `X-Auth-Subject` | 令牌代表的是谁：令牌的 `sub`。对于没有用户参与的机器令牌，它是客户端的 ID。                              |
+| `X-Auth-Client`  | 持有令牌的客户端的 ID，例如智能体宿主。                                                                  |
+| `X-Auth-Scope`   | 令牌的权限，以空格分隔。                                                                                 |
+| `X-Auth-Reason`  | 表示决定的简短代码：`allowed`，或者浏览器 CORS 检查时的 `preflight`。CORS 检查不带令牌，其他请求头为空。 |
+| `Authorization`  | 原样转发的令牌。需要用它换取用户在其他服务上的令牌的服务器会用到它。服务器也可以自己再检查一遍。         |
+
+## 5. 指定每个工具需要哪些权限 {#tools}
+
+没有工具表时，任何有效令牌都可以调用任何工具。要设置工具表，请在 API 那一行点击 **Tools…**。
+
+遵循 2026-07-28 版 MCP 规范的 MCP 客户端会用两个请求头说明它要做什么：`Mcp-Method`（例如 `tools/call`）和 `Mcp-Name`（工具名）。检查会读取这两个请求头，所以工具表可以指定每个工具需要哪些权限：
+
+| 工具           | 需要的权限                    |
+| -------------- | ----------------------------- |
+| `search_files` | `files:read`                  |
+| `delete_file`  | `files:write`, `files:delete` |
+
+权限只能从 API 自己的权限中选择。使用这张表时：
+
+- 用只含 `files:write` 的令牌调用 `delete_file`，会得到 `403`。它的 `WWW-Authenticate` 响应头写有 `error="insufficient_scope"`，并列出这个工具需要的所有权限 `files:write files:delete`。客户端可以据此准确申请这些权限。
+- 列出工具（`tools/list`）只需要有效令牌，所以客户端总能看到自己可以调用什么。
+- 没有指明工具的 `tools/call` 会被拒绝。
+- 工具名必须完全一致：`Delete_File` 和 `delete_file` 是不同的名字。
+
+工具表下面有两个选项：
+
+- **Any other tool**：表中没有列出的工具，要么被拒绝，要么只需要有效令牌。默认是拒绝。
+- **Clients too old to say which tool they call**：不发送 `Mcp-Method`、或者使用早于 2026-07-28 的协议版本的客户端，默认会被拒绝。你可以放行它们，但这样它们就能调用任何工具。
+
+### 工具表不覆盖的内容 {#what-the-table-does-not-cover}
+
+- 读取资源（`resources/read`）和获取提示词（`prompts/get`）只需要有效令牌。工具表只针对工具。
+- 代理看得到请求头，看不到请求体。你的 MCP 服务器仍然必须拒绝 `Mcp-Name` 请求头与请求体所指工具不一致的请求。MCP 规范要求服务器这样做，这也是旧客户端默认被拒绝的原因：它们对应的服务器不会比较这两者。
+
+## 需要了解的限制 {#limits}
+
+### 被撤销的令牌在过期前仍然有效 {#revocation}
+
+自包含令牌带有检查所需的一切，所以检查不会去问项目它是否已被撤销。如果去问，每次调用都要多读一次数据库。因此，被撤销的自包含令牌在代理处仍然有效，直到它过期。默认有效期是十五分钟。如果你需要撤销立即生效，请签发不透明令牌：检查会逐个查找它们，被撤销的令牌在下一个请求时就会被拒绝。
+
+### 绑定到密钥的令牌会被拒绝 {#bound-tokens}
+
+有些令牌只能与客户端持有的某个密钥一起使用，方式是 DPoP 或客户端证书（mTLS）。持有密钥的证明属于客户端发给你的 MCP 服务器的那个请求，而代理只转发请求头。所以检查无法证明密钥，它会以 `401` 和原因 `bound_token_unsupported` 拒绝这类令牌，而不会把它们当作普通令牌接受。
+
+### 拒绝的回答不带 CORS 响应头 {#cors}
+
+只有当回答带有 CORS 响应头时，浏览器才允许另一个网站的页面读取它。检查返回的 `401` 和 `403` 不带这些请求头。所以，运行在浏览器中的 MCP 客户端无法从拒绝的回答中读取 `WWW-Authenticate`，除非你的代理为错误回答加上 CORS 响应头。浏览器自己的 CORS 检查（带有 `Access-Control-Request-Method` 的 `OPTIONS`）不带令牌，会被放行，由你的 MCP 服务器来回答。
+
+### 任何能登录项目的人都能获得令牌 {#who-can-get-a-token}
+
+这种模式检查的是令牌，而不是这个人是谁。任何能登录这个项目的人都能获得这个 API 的令牌，这种模式也不支持按用户组限制。要限制谁可以调用它，请限制谁可以登录这个项目。
+
+## 6. 确认它能正常工作 {#check-that-it-works}
+
+1. 不带令牌调用你的 MCP 服务器：
+
+   ```sh
+   curl -i https://mcp.example.com/mcp -X POST \
+     -H 'content-type: application/json' \
+     -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+   ```
+
+   你应该得到 `401`，并带有 `WWW-Authenticate: Bearer resource_metadata="…"` 响应头。如果得到的是 MCP 服务器自己的回答，说明请求没有经过检查。
+
+2. 打开 `resource_metadata` 中的地址。其中的 `resource` 是你的 API 标识符，`authorization_servers` 指向你的项目。
+
+3. 让你的智能体宿主连接你的 MCP 服务器。它会读取这份文档，在项目中让用户登录，然后带着令牌回来。同样的调用现在会到达你的服务器，并带上 `X-Auth-*` 请求头。
+
+不需要开启任何开关，所有方案都可以使用。
+
+<Aside type="tip">
+	用户在浏览器中打开的、没有自带登录的 Web 应用，放到代理后面的方式不同。请看[在
+	Web
+	应用前加上登录](/zh-cn/docs/get-started/put-sign-in-in-front-of-a-web-app/)。
+</Aside>
