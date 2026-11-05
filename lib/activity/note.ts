@@ -7,6 +7,7 @@ import { captureFault } from '../error_store/capture.js';
 import { now } from './clock.js';
 import { dayOf } from './periods.js';
 import { kindOf } from './kinds.js';
+import type { ActivityKind } from '../adapters/types.js';
 import {
 	JWT_BEARER_GRANT,
 	JWT_DPOP_GRANT
@@ -15,7 +16,8 @@ import {
 /*
  * Records that a successful grant was activity of an end user in their bucket (specs/076). Called once, by
  * `executeGrant`, after the handler resolved — the one place every token issued on a person's behalf
- * passes — and never awaited there: counting must never slow a token request or fail one (FR-008).
+ * passes — and never awaited there: counting must never slow a token request or fail one (FR-008). The one
+ * sign-in that issues no token, at an app behind a proxy, calls `markActivity` below instead (specs/122).
  *
  * A direct call rather than an `eventBus` listener: the bus is a synchronous emitter, so a listener that
  * threw would fail a request whose tokens were already saved, and nothing would see an async listener's
@@ -36,9 +38,41 @@ export function noteActivity(oidc: OIDCContext<TokenParams>): void {
 	const account = oidc.entities.Account;
 	// No account: a client acting for itself (client_credentials), which is nobody's activity (FR-005).
 	if (!account) return;
+	markActivity(account, kindOf(oidc.params.grant_type, signInOf(oidc)), {
+		route: '/token',
+		method: 'POST',
+		clientId: oidc.entities.Client?.clientId ?? null
+	});
+}
 
+/*
+ * The account as `findAccount` resolved it: the bucket is the one it read the person from, never one carried on
+ * an artifact.
+ */
+export interface ActiveAccount {
+	bucketId: string;
+	accountId: string;
+	provisioned: boolean;
+}
+
+/* Where the activity happened, for the fault recorded when it could not be counted. */
+export interface ActivitySource {
+	route: string;
+	method: string;
+	clientId: string | null;
+}
+
+/*
+ * The one writer of activity, never awaited by its caller. `noteActivity` reaches it for every grant; a sign-in
+ * that issues no token at all — an app behind a proxy, whose code the check redeems in-process (specs/122
+ * FR-026) — reaches it directly, so it counts as the same sign-in a token request would have.
+ */
+export function markActivity(
+	account: ActiveAccount,
+	kind: ActivityKind,
+	source: ActivitySource
+): void {
 	const at = now();
-	const kind = kindOf(oidc.params.grant_type, signInOf(oidc));
 	const { bucketId, accountId, provisioned } = account;
 	const key = `${bucketId}|${dayOf(at)}|${accountId}|${kind}`;
 	if (recorded.has(key)) return;
@@ -63,17 +97,17 @@ export function noteActivity(oidc: OIDCContext<TokenParams>): void {
 				console.error('activity not recorded', { bucketId, error });
 				captureFault({
 					surface: 'oauth',
-					route: '/token',
-					method: 'POST',
+					route: source.route,
+					method: source.method,
 					/*
-					 * The class of the fault, not the status of the response, which was 200: the tokens were issued.
+					 * The class of the fault, not the status of the response, which succeeded: the sign-in happened.
 					 * The headers are empty on purpose — the fault is the datastore's, none of the request's headers
 					 * would help diagnose it, and `OIDCContext` keeps them private.
 					 */
 					status: 500,
 					errorCode: 'activity_not_recorded',
 					error,
-					clientId: oidc.entities.Client?.clientId ?? null,
+					clientId: source.clientId,
 					headers: new Headers()
 				});
 			})

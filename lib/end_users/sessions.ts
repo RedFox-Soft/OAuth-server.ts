@@ -5,6 +5,7 @@ import { Grant } from '../models/grant.js';
 import { Session } from '../models/session.js';
 import epochTime from '../helpers/epoch_time.js';
 import { isAccountPageClient } from '../account_page/client.js';
+import { isBehindProxyClient } from '../behind_proxy/client.js';
 
 /*
  * Where one person is signed in, as an administrator reads it (specs/089): one row per application, read from
@@ -94,14 +95,19 @@ function dateOfSeconds(epochSeconds: number | undefined): Date | null {
 }
 
 /*
- * The person's grants per application, without the bucket's connected-apps page client: signing in to one's
- * own account page leaves a grant behind (every authorization does), and it is not an application the person
- * connected anything to (specs/095 R3).
+ * The built-in clients a person never connected anything to: the bucket's connected-apps page client (specs/095
+ * R3) and its proxy client (specs/122 R5). Signing in through either leaves a grant behind, as every authorization
+ * does, but neither holds a token a person could take back; an app behind a proxy is left by signing out of it.
  */
+function isBuiltInClient(clientId: string): boolean {
+	return isAccountPageClient(clientId) || isBehindProxyClient(clientId);
+}
+
+/* The person's grants per application, without the built-in clients above. */
 function grantsByClient(grants: readonly Grant[]): Map<string, Grant[]> {
 	const byClient = new Map<string, Grant[]>();
 	for (const grant of grants) {
-		if (isAccountPageClient(grant.payload.clientId)) continue;
+		if (isBuiltInClient(grant.payload.clientId)) continue;
 		const list = byClient.get(grant.payload.clientId) ?? [];
 		list.push(grant);
 		byClient.set(grant.payload.clientId, list);
@@ -160,8 +166,7 @@ export async function applicationSessions(
 		const holdsGrant = Object.entries(
 			session.payload.authorizations ?? {}
 		).some(
-			([clientId, a]) =>
-				a.grantId !== undefined && !isAccountPageClient(clientId)
+			([clientId, a]) => a.grantId !== undefined && !isBuiltInClient(clientId)
 		);
 		if (!holdsGrant) {
 			rows.push({

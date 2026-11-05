@@ -26,6 +26,9 @@ export type PageKey =
 	| 'bucket.applications'
 	| 'bucket.application'
 	| 'bucket.application.settings'
+	| 'bucket.behindProxy'
+	| 'bucket.behindProxy.access'
+	| 'bucket.behindProxy.settings'
 	| 'bucket.apis'
 	| 'bucket.users'
 	| 'bucket.user'
@@ -117,6 +120,28 @@ export const ROUTES: readonly RouteSpec[] = [
 	{
 		key: 'bucket.application.settings',
 		pattern: ['projects', ':project', 'applications', ':client', 'settings'],
+		section: 'projects',
+		area: 'Applications'
+	},
+	/*
+	 * One app behind the operator's proxy (specs/122): the bare address is its Connect tab, the checklist an
+	 * administrator comes back to while wiring the proxy. Listed with the applications, so the menu says Applications.
+	 */
+	{
+		key: 'bucket.behindProxy',
+		pattern: ['projects', ':project', 'behind-proxy', ':app'],
+		section: 'projects',
+		area: 'Applications'
+	},
+	{
+		key: 'bucket.behindProxy.access',
+		pattern: ['projects', ':project', 'behind-proxy', ':app', 'access'],
+		section: 'projects',
+		area: 'Applications'
+	},
+	{
+		key: 'bucket.behindProxy.settings',
+		pattern: ['projects', ':project', 'behind-proxy', ':app', 'settings'],
 		section: 'projects',
 		area: 'Applications'
 	},
@@ -585,6 +610,16 @@ export function applicationHref(
 	tab?: 'settings'
 ): string {
 	const base = `${bucketHref(bucketId, 'applications')}/${encodeURIComponent(clientId)}`;
+	return tab ? `${base}/${tab}` : base;
+}
+
+/* An app behind the operator's proxy; without a tab, its Connect tab. */
+export function behindProxyHref(
+	bucketId: string,
+	appId: string,
+	tab?: 'access' | 'settings'
+): string {
+	const base = `${bucketHref(bucketId, 'behind-proxy')}/${encodeURIComponent(appId)}`;
 	return tab ? `${base}/${tab}` : base;
 }
 

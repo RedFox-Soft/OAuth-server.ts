@@ -11,6 +11,7 @@ import { reservedOf } from '../../consts.js';
 import { useMe } from '../frame/me.js';
 import { BucketOverview } from './BucketOverview.js';
 import { Clients } from './Clients.js';
+import { BehindProxyTable } from './behind-proxy/BehindProxyTable.js';
 import { Resources } from './Resources.js';
 import { BucketSettings } from './BucketSettings.js';
 import type { BucketSummary, BucketView } from './bucketView.js';
@@ -358,12 +359,18 @@ export function BucketDetail({
 				/>
 			)}
 			{bucket && planKnown && !tabRefused && shownTab === 'applications' && (
-				<Clients
-					bucketId={bucketId}
-					writable={can.edit && !bucket.deletion}
-					plan={heldTo}
-					onChanged={() => void load()}
-				/>
+				<>
+					<Clients
+						bucketId={bucketId}
+						writable={can.edit && !bucket.deletion}
+						plan={heldTo}
+						onChanged={() => void load()}
+					/>
+					<BehindProxyTable
+						bucketId={bucketId}
+						writable={can.edit && !bucket.deletion}
+					/>
+				</>
 			)}
 			{bucket && !tabRefused && shownTab === 'outsideServers' && (
 				<OutsideServersPanel

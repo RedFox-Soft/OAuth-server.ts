@@ -159,6 +159,16 @@ export const GUIDE_PARTS: Readonly<Record<GuidePart, Glyph>> = {
 			'M7.75 7.5h8.5',
 			'M4.75 20.25c0-4 3.25-6.75 7.25-6.75s7.25 2.75 7.25 6.75'
 		]
+	},
+	/* A gate a request passes through: the reader's reverse proxy. */
+	proxy: {
+		viewBox: GRID,
+		paths: [
+			'M9.5 3.5h5a1.5 1.5 0 0 1 1.5 1.5v14a1.5 1.5 0 0 1 -1.5 1.5h-5a1.5 1.5 0 0 1 -1.5 -1.5v-14a1.5 1.5 0 0 1 1.5 -1.5z',
+			'M12 8v8',
+			'M2.5 12h5.5M16 12h5.5',
+			'M19 9.5l2.5 2.5l-2.5 2.5'
+		]
 	}
 };
 

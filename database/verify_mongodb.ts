@@ -9,6 +9,7 @@ import {
 } from './verify_end_user_identity.js';
 import { verifyProvisioningConnections } from './verify_provisioning_connections.js';
 import { verifyOutsideServers } from './verify_outside_servers.js';
+import { verifyBehindProxy } from './verify_behind_proxy.js';
 import { verifyAdminSessionsByUser } from './verify_admin_sessions.js';
 import { verifyBucketGroups } from './verify_bucket_groups.js';
 import { verifyActivity } from './verify_activity.js';
@@ -62,6 +63,7 @@ const {
 	TelemetryStateStore,
 	AdminAuditStore,
 	AdminSessionStore,
+	BehindProxyAppStore,
 	BucketGroupStore,
 	BucketKeysStore,
 	ContainerOwnershipStore,
@@ -709,6 +711,11 @@ await verifyProvisioningConnections(new ProvisioningConnectionStore(), check);
 await verifyOutsideServers(
 	new OutsideAuthorizationServerStore(),
 	adapter('AssertionUsage'),
+	check
+);
+await verifyBehindProxy(
+	new BehindProxyAppStore(),
+	adapter('BehindProxySession'),
 	check
 );
 

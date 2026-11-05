@@ -28,7 +28,9 @@ const toneOf = (kind: string) =>
 		? 'fox'
 		: kind === 'outside' || kind === 'company'
 			? 'outside'
-			: 'plain';
+			: kind === 'proxy'
+				? 'proxy'
+				: 'plain';
 const index = new Map(lanes.map((lane, i) => [lane.id, i]));
 
 const rows = steps.map((step, i) => {
@@ -53,6 +55,7 @@ const used = new Set(
 const keys = [
 	...(lanes.some((l) => toneOf(l.kind) === 'fox') ? ['fox'] : []),
 	...(lanes.some((l) => toneOf(l.kind) === 'outside') ? ['outside'] : []),
+	...(lanes.some((l) => toneOf(l.kind) === 'proxy') ? ['proxy'] : []),
 	...(['request', 'redirect', 'token', 'refusal', 'self'] as const).filter(
 		(key) => used.has(key)
 	)
@@ -62,15 +65,17 @@ const keyText = (key: string): string =>
 		? legend.fox
 		: key === 'outside'
 			? legend.outside
-			: key === 'redirect'
-				? legend.redirect
-				: key === 'token'
-					? legend.token
-					: key === 'refusal'
-						? legend.refusal
-						: key === 'self'
-							? legend.self
-							: legend.request;
+			: key === 'proxy'
+				? legend.proxy
+				: key === 'redirect'
+					? legend.redirect
+					: key === 'token'
+						? legend.token
+						: key === 'refusal'
+							? legend.refusal
+							: key === 'self'
+								? legend.self
+								: legend.request;
 ---
 
 <div
@@ -181,6 +186,9 @@ const keyText = (key: string): string =>
 	}
 	.g-lane--outside > .g-glyph {
 		color: var(--g-outside);
+	}
+	.g-lane--proxy {
+		border: 3px double var(--g-ink);
 	}
 
 	.g-body {
@@ -432,6 +440,12 @@ const keyText = (key: string): string =>
 	.g-key--outside {
 		border: 1.5px dashed var(--g-outside);
 		background: transparent;
+	}
+	.g-key--proxy {
+		width: 0.875rem;
+		height: 0.875rem;
+		border: 3px double var(--g-ink);
+		border-radius: 0.2rem;
 	}
 	.g-key--self {
 		width: 1.25rem;

@@ -10,6 +10,10 @@ import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 The server speaks plaintext HTTP on port 3000 and does not terminate TLS. Anywhere other than a
 laptop, something in front of it almost always does.
 
+This page is about running FoxAuth itself behind a proxy; to make your proxy ask FoxAuth before it lets anyone into
+another web app, see [Put sign-in in front of a web app](/docs/get-started/put-sign-in-in-front-of-a-web-app/), whose
+check reads `X-Forwarded-Host` only to compare it with that app's address, never to choose a project.
+
 ## Four things to get right
 
 **TLS terminates at the proxy.** Bind the server's port to loopback (or to a private network) so

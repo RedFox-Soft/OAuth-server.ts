@@ -68,7 +68,13 @@ export function grantTypeAllowed(
  * here, which is the same trade RFC 8252 §8.10 makes.
  */
 type Provenance = Partial<
-	Pick<Client, 'bucketId' | 'accountPageBucketId' | 'provisioningConnectionId'>
+	Pick<
+		Client,
+		| 'bucketId'
+		| 'accountPageBucketId'
+		| 'behindProxyBucketId'
+		| 'provisioningConnectionId'
+	>
 >;
 
 /*

@@ -85,7 +85,8 @@ const GuidePart = z.enum([
 	'globe',
 	'team',
 	'audit',
-	'thief'
+	'thief',
+	'proxy'
 ]);
 
 const ProblemMark = z.enum(['password', 'secret', 'open', 'copy', 'missing']);
@@ -101,7 +102,7 @@ const GuideScene = z.object({
 		z.object({
 			lane: z.string(),
 			part: GuidePart,
-			role: z.enum(['actor', 'client', 'resource', 'fox', 'outside'])
+			role: z.enum(['actor', 'client', 'resource', 'fox', 'outside', 'proxy'])
 		})
 	),
 	links: z.array(
@@ -140,7 +141,8 @@ const GuideSituation = z.object({
 				'fox',
 				'agent',
 				'outside',
-				'company'
+				'company',
+				'proxy'
 			]),
 			part: GuidePart
 		})
@@ -293,6 +295,22 @@ export const DocsExportSchema = z.object({
 			agent: z.string(),
 			service: z.string()
 		})
+	}),
+	/*
+	 * The proxy configuration for an app behind a proxy (specs/122), for example addresses, built by the function the
+	 * console's Connect step uses: the recipe page shows exactly what an administrator is given.
+	 */
+	behindProxy: z.object({
+		example: z.object({ verifyUrl: z.string(), appAddress: z.string() }),
+		identityHeaders: z.array(z.string()).min(1),
+		recipes: z
+			.array(
+				z.object({
+					kind: z.enum(['caddy', 'traefik', 'nginx']),
+					text: z.string().min(1)
+				})
+			)
+			.length(3)
 	}),
 	/* The hourly attack report (specs/114), from the declaration the server counts and builds by. */
 	attackReports: z.object({

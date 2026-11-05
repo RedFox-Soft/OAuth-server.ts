@@ -165,6 +165,20 @@ export const DECLARED_PLAINTEXT: readonly { field: string; reason: string }[] =
 			field: 'passwordLogin',
 			reason:
 				'whether a project offers password sign-in: a setting, not a secret'
+		},
+		/*
+		 * Sign-in in front of an app behind a proxy (specs/122 R6). A session there needs no entry: its record id
+		 * is the SHA-256 of the cookie value, a digest and not a secret, and the value itself is never stored.
+		 */
+		{
+			field: 'codeVerifier',
+			reason:
+				'the PKCE verifier of a sign-in in progress (BehindProxySignIn, and FederationState for an upstream provider): server-only, single use, gone in ten minutes, and useless without the code the browser carries'
+		},
+		{
+			field: 'markerDigest',
+			reason:
+				'a digest of the browser marker of a sign-in in progress (BehindProxySignIn): already irreversible, and gone in ten minutes'
 		}
 	];
 

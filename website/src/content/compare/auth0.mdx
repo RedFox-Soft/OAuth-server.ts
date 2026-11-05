@@ -2,7 +2,7 @@
 title: FoxAuth compared with Auth0
 competitor: Auth0
 description: Auth0 is a managed identity service billed per monthly active user. FoxAuth is a server you run yourself or use on a free cloud plan.
-lastChecked: '2026-11-02'
+lastChecked: '2026-11-05'
 sources:
   - https://auth0.com/docs/get-started/authentication-and-authorization-flow/authorization-code-flow-with-pkce
   - https://auth0.com/docs/secure/highly-regulated-identity
@@ -18,6 +18,7 @@ sources:
   - https://auth0.com/docs/get-started/auth0-mcp-server
   - https://auth0.com/pricing
   - https://auth0.com/docs/secure/call-apis-on-users-behalf/token-vault/access-token-exchange-with-token-vault
+  - https://auth0.com/docs/quickstart/webapp/nginx-plus
 bottomLine: 'Auth0 is the better pick when you want identity as a service with an SLA this week, with social connections and a FAPI certification you can hand to a reviewer. FoxAuth is the better pick when the data has to live in your own database, when the per-user bill is the problem, or when you need the banking-grade profiles without an Enterprise add-on.'
 chooseThem:
   - 'You do not want to run anything, and you need an SLA today.'
@@ -263,6 +264,20 @@ groups:
         verdict: us
         why: 'FoxAuth takes the standard RFC 8693 request, asks the person about each agent, and limits connected services only on the Free cloud plan. Auth0 counts Token Vault per plan, but runs it for you, as a managed service with an SLA.'
         note: 'The grant type is "urn:auth0:params:oauth:grant-type:token-exchange:federated-connection-access-token"; the AI Agents add-on unlocks "Unlimited Token Vault".'
+      - dimension: Sign-in in front of a web app through your proxy
+        us:
+          {
+            status: yes,
+            text: 'An app with no sign-in of its own goes behind your Caddy, Traefik or nginx. The proxy asks the project about every request, a rule for each path names the groups that may open it, and the app receives who the person is in X-Auth-* headers. The console gives the proxy configuration. Nothing else to run, and on every plan.'
+          }
+        them:
+          {
+            status: no,
+            text: 'No check endpoint for a proxy. Auth0 documents NGINX Plus, the commercial nginx, as the OpenID Connect relying party in front of an app, through its njs module, passing the sub and email claims on.'
+          }
+        verdict: us
+        why: 'Auth0 needs NGINX Plus or a separate proxy service for this, and its guide sets no rule per path or per group. Here Caddy, Traefik or open-source nginx ask the server, and a rule for each path names the groups.'
+        note: 'The Auth0 NGINX Plus quickstart says "you need to install the nginx-plus-module-njs module for NGINX Plus."'
   - label: Licence and cost
     rows:
       - dimension: Licence

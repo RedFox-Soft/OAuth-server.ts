@@ -9,6 +9,14 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+### Added
+
+- **Sign-in in front of a web app, through your proxy** (spec 122, issue #57 part 1). A project can hold apps behind
+  your proxy: an address plus path rules naming which groups may open which part. Caddy, Traefik or nginx asks the
+  project's `/verify/<appId>` before each request; people sign in with the project's own sign-in and the app receives
+  `X-Auth-*` headers and a signed statement. The console shows them in Applications with ready-made proxy snippets
+  and an access check. Re-run `db:setup` or `db:setup:pg` to provision the new storage areas.
+
 ### Fixed
 
 - **A DPoP proof without a usable `htu` is refused** with `invalid_dpop_proof` (spec 121). It was read as no proof at

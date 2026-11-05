@@ -20,6 +20,7 @@ import { BASE_METADATA_KEYS } from './wire.ts';
 import { rootKeys } from '../../keys/issuer_keys.js';
 import { connectionClientRecord } from '../../provisioning/client.js';
 import { accountPageClientRecord } from '../../account_page/client.js';
+import { behindProxyClientRecord } from '../../behind_proxy/client.js';
 import { sl1, sl1ClientViolations, sl1Exempt } from '../../sl1/rules.ts';
 import { unreadableFieldsOf } from '../../sealing/decorators.js';
 
@@ -128,12 +129,13 @@ export async function tryFindClient(
 	 * metadata-document branch below gives: a stored record always wins, so no stored client can be
 	 * shadowed by a connection — and a stored id is server-generated, so none can claim the `scim-` prefix
 	 * on purpose either. A bucket's connected-applications page client is synthesized the same way, after
-	 * both (lib/account_page/client.ts).
+	 * both (lib/account_page/client.ts), and a bucket's proxy client after that (lib/behind_proxy/client.ts).
 	 */
 	const properties =
 		(await adapter('Client').find(id)) ??
 		(await connectionClientRecord(id)) ??
-		(await accountPageClientRecord(id));
+		(await accountPageClientRecord(id)) ??
+		(await behindProxyClientRecord(id));
 	if (!properties) {
 		/*
 		 * A `client_id` that is an https URL naming a document describing the client, resolved by

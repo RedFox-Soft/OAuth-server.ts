@@ -17,7 +17,12 @@ import type {
  * provider, the company's provider or directory) as well as to someone else.
  */
 
-export type SceneRole = 'actor' | 'client' | 'resource' | 'fox' | 'outside';
+/*
+ * `proxy` is the reader's reverse proxy in front of an app with no sign-in of its own: it asks FoxAuth about each
+ * request and passes it to the app, so the app is its resource and FoxAuth stands beside the proxy, never on the path.
+ */
+export type SceneRole =
+	'actor' | 'client' | 'resource' | 'fox' | 'outside' | 'proxy';
 
 export interface SceneNode {
 	lane: string;
@@ -70,7 +75,8 @@ const ROLE_BY_KIND: Readonly<Record<GuideLane['kind'], SceneRole>> = {
 	api: 'resource',
 	fox: 'fox',
 	outside: 'outside',
-	company: 'outside'
+	company: 'outside',
+	proxy: 'proxy'
 };
 
 const pairKey = (a: string, b: string) => (a < b ? `${a} ${b}` : `${b} ${a}`);
@@ -130,7 +136,10 @@ function nodeOf(lane: GuideLane, holders: ReadonlySet<string>): SceneNode {
 	return {
 		lane: lane.id,
 		part: lane.part,
-		role: role !== 'fox' && holders.has(lane.id) ? 'client' : role
+		role:
+			role !== 'fox' && role !== 'proxy' && holders.has(lane.id)
+				? 'client'
+				: role
 	};
 }
 

@@ -648,7 +648,9 @@ describe('content security policy: no page escapes the constructor', () => {
 			// The constructor itself.
 			'lib/html/csp.ts',
 			// Reads the *request's* Accept header to choose a body; builds no response.
-			'lib/shared/authorization_error_handler.ts'
+			'lib/shared/authorization_error_handler.ts',
+			// Reads the forwarded request's Accept header to tell a page navigation; its pages are plainPage's.
+			'lib/behind_proxy/check.ts'
 		]);
 
 		const offenders: string[] = [];

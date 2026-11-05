@@ -187,6 +187,9 @@ describe('MCP tool catalogue', () => {
 			/* Removes a second factor from an account that administers the instance. */
 			'admin_totp_clear',
 			'admin_update',
+			/* Puts a web app in reach of the project's people, or signs everyone out of one (specs/122). */
+			'behind_proxy_app_create',
+			'behind_proxy_app_delete',
 			'client_delete',
 			'client_secret_rotate',
 			/* Disconnects every account people connected at it, and revokes their tokens (specs/117). */
@@ -276,6 +279,8 @@ describe('MCP tool catalogue', () => {
 	it('names every tool that is high-consequence for some arguments, each argument one the tool takes', () => {
 		const sometimes = mcpCatalogue.filter((t) => t.highWhenSets !== undefined);
 		expect(sometimes.map((t) => t.tool).sort()).toEqual([
+			/* Who may open which path of an app behind a proxy, and which host the rules guard (specs/122). */
+			'behind_proxy_app_update',
 			'client_update',
 			'federation_provider_create',
 			'federation_provider_update'

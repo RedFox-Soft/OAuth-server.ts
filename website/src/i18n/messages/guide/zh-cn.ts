@@ -1,7 +1,7 @@
 import { rich } from '../../types.ts';
 import type english from './en.ts';
 
-export const source = 'a9ee14bcf758';
+export const source = 'ad08f33f804e';
 
 export default {
 	title: '你需要什么？',
@@ -154,6 +154,7 @@ export default {
 	legend: {
 		fox: 'FoxAuth',
 		outside: '不受你控制',
+		proxy: '你的反向代理',
 		request: '一条消息',
 		redirect: '浏览器被转到别处',
 		token: '携带令牌',

@@ -7,7 +7,7 @@ import { useConfirm } from '../frame/confirm.js';
 import { AreaToolbar } from '../frame/AreaToolbar.js';
 import { RowActions, type RowAction } from '../frame/RowActions.js';
 import { EmptyState, LoadFailed } from '../frame/states.js';
-import { Link, useNavigate } from '../frame/router.js';
+import { Link, useNavigate, useRoute } from '../frame/router.js';
 import { useQueryOffer } from '../frame/queryOffer.js';
 import { applicationHref } from '../frame/routes.js';
 import { atLimit, type PlanView } from '../planText.js';
@@ -45,6 +45,8 @@ export function Clients({
 	const offerSituation = useQueryOffer('situation');
 	/* The New button's own limit check, so the address alone never opens a form the route refuses. */
 	const room = atLimit(plan, 'applications') === null;
+	/* An app behind a proxy is not an OAuth application and no plan counts it, so the limit never withholds it. */
+	const uncounted = useRoute().query.get('situation') === 'behindProxy';
 	const feedback = useFeedback();
 	const confirm = useConfirm();
 	const navigate = useNavigate();
@@ -57,7 +59,7 @@ export function Clients({
 				if (result.ok) {
 					setRows(result.data);
 					setLoadFailed(null);
-					const wanted = offerSituation(writable && room);
+					const wanted = offerSituation(writable && (room || uncounted));
 					if (wanted !== null) {
 						setRequested(SITUATIONS.find((s) => s.id === wanted)?.id);
 						setChoosing(true);
@@ -67,7 +69,7 @@ export function Clients({
 				}
 				setLoading(false);
 			}),
-		[base, writable, room, offerSituation]
+		[base, writable, room, uncounted, offerSituation]
 	);
 	function load() {
 		setLoading(true);

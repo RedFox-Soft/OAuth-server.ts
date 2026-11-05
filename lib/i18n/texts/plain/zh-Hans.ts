@@ -144,5 +144,19 @@ export const zhHans: PlainTexts = {
 			title: '密码登录不可用',
 			body: '此应用通过您的身份提供商为您登录。此处没有需要输入、重置或注册的密码。'
 		}
+	},
+	behindProxy: {
+		denied: {
+			title: '您无法打开 {host}',
+			signedInAs: '当前登录账户：{email}',
+			otherAccount: '使用其他账户',
+			reason: '原因：{reason}，时间：{time}'
+		},
+		signInFailed: {
+			title: '登录 {host} 未完成',
+			body: '请重新打开该应用以重新开始。',
+			tryAgain: '重新登录',
+			reason: '原因：{reason}，时间：{time}'
+		}
 	}
 };

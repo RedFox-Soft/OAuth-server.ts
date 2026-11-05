@@ -7,6 +7,7 @@ import {
 	ProvisioningConnectionStore as MemoryProvisioningConnectionStore,
 	ProvisioningRefusalStore as MemoryProvisioningRefusalStore,
 	OutsideAuthorizationServerStore as MemoryOutsideAuthorizationServerStore,
+	BehindProxyAppStore as MemoryBehindProxyAppStore,
 	ConnectedAccountStore as MemoryConnectedAccountStore,
 	BucketGroupStore as MemoryBucketGroupStore,
 	ContainerOwnershipStore as MemoryContainerOwnershipStore,
@@ -53,6 +54,8 @@ import type {
 	ProvisioningRefusalStoreInstance,
 	OutsideAuthorizationServerStoreConstructor,
 	OutsideAuthorizationServerStoreInstance,
+	BehindProxyAppStoreConstructor,
+	BehindProxyAppStoreInstance,
 	ConnectedAccountStoreConstructor,
 	ConnectedAccountStoreInstance,
 	BucketGroupStoreConstructor,
@@ -117,6 +120,8 @@ let ProvisioningRefusalStoreClass: ProvisioningRefusalStoreConstructor =
 	MemoryProvisioningRefusalStore;
 let OutsideAuthorizationServerStoreClass: OutsideAuthorizationServerStoreConstructor =
 	MemoryOutsideAuthorizationServerStore;
+let BehindProxyAppStoreClass: BehindProxyAppStoreConstructor =
+	MemoryBehindProxyAppStore;
 let ConnectedAccountStoreClass: ConnectedAccountStoreConstructor =
 	MemoryConnectedAccountStore;
 let BucketGroupStoreClass: BucketGroupStoreConstructor = MemoryBucketGroupStore;
@@ -185,6 +190,7 @@ if (backend === 'postgres') {
 	ProvisioningRefusalStoreClass = postgres.ProvisioningRefusalStore;
 	OutsideAuthorizationServerStoreClass =
 		postgres.OutsideAuthorizationServerStore;
+	BehindProxyAppStoreClass = postgres.BehindProxyAppStore;
 	ConnectedAccountStoreClass = postgres.ConnectedAccountStore;
 	BucketGroupStoreClass = postgres.BucketGroupStore;
 	ContainerOwnershipStoreClass = postgres.ContainerOwnershipStore;
@@ -226,6 +232,7 @@ if (backend === 'mongodb') {
 	ProvisioningRefusalStoreClass = mongodb.ProvisioningRefusalStore;
 	OutsideAuthorizationServerStoreClass =
 		mongodb.OutsideAuthorizationServerStore;
+	BehindProxyAppStoreClass = mongodb.BehindProxyAppStore;
 	ConnectedAccountStoreClass = mongodb.ConnectedAccountStore;
 	BucketGroupStoreClass = mongodb.BucketGroupStore;
 	ContainerOwnershipStoreClass = mongodb.ContainerOwnershipStore;
@@ -506,6 +513,18 @@ export function getOutsideAuthorizationServerStore(): OutsideAuthorizationServer
 }
 
 /*
+ * Apps behind a proxy (specs/122). No memo in front of it, for the reason the outside-server store has none:
+ * a removed app or a changed rule must take effect on the very next check.
+ */
+let behindProxyAppStoreSingleton: BehindProxyAppStoreInstance | null = null;
+export function getBehindProxyAppStore(): BehindProxyAppStoreInstance {
+	if (!behindProxyAppStoreSingleton) {
+		behindProxyAppStoreSingleton = new BehindProxyAppStoreClass();
+	}
+	return behindProxyAppStoreSingleton;
+}
+
+/*
  * People's accounts at connected services (specs/117), behind the decorator that seals both tokens and refuses
  * a write while no keyring is in use. The raw store is what the in-memory encryption pass reads.
  */
@@ -701,6 +720,7 @@ export function resetStoresForTests(): void {
 	protectedResourceStoreSingleton = null;
 	provisioningRefusalStoreSingleton = null;
 	outsideAuthorizationServerStoreSingleton = null;
+	behindProxyAppStoreSingleton = null;
 	rawConnectedAccountStoreSingleton = null;
 	connectedAccountStoreSingleton = null;
 	bucketGroupStoreSingleton = null;

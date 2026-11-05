@@ -6,7 +6,14 @@
  */
 
 export type SituationId =
-	'server' | 'spa' | 'native' | 'device' | 'service' | 'resource' | 'custom';
+	| 'server'
+	| 'spa'
+	| 'native'
+	| 'device'
+	| 'service'
+	| 'resource'
+	| 'behindProxy'
+	| 'custom';
 
 export type SituationGroup = 'people' | 'machine' | 'resource';
 
@@ -41,7 +48,10 @@ export interface Situation {
 	footnote: string;
 	/* Present for the situations whose callback follows from where the app runs during development. */
 	devAddress?: string;
-	/* Absent for the two that create no application from a template: an API is declared, "custom" is the form. */
+	/*
+	 * Absent for the ones that create no application from a template: an API is declared, an app behind a proxy has
+	 * a form of its own, "custom" is the full form.
+	 */
 	expand?: (devAddress: string) => Expansion;
 	/*
 	 * The application's name when the form's is left blank: a short noun, because it is shown wherever the
@@ -139,6 +149,11 @@ export const SITUATIONS: readonly Situation[] = [
 		id: 'resource',
 		group: 'resource',
 		footnote: 'Declared on the APIs tab'
+	},
+	{
+		id: 'behindProxy',
+		group: 'people',
+		footnote: 'Caddy, Traefik or nginx asks this project who may open it.'
 	},
 	{
 		id: 'custom',

@@ -1842,6 +1842,96 @@ export interface OutsideAuthorizationServerStoreConstructor {
 }
 
 /*
+ * Who a path rule of an app behind a proxy admits (specs/122): members of any of these bucket groups, anyone
+ * signed in to the project, anyone at all, or no one. Groups are named by id, as an outside server's rule names
+ * them, so a rename changes nothing and a group deleted since matches nobody. `public` with `subtree: false`
+ * covers its exact path only.
+ */
+export const BehindProxyWho = t.Union([
+	t.Object({
+		kind: t.Literal('groups'),
+		groupIds: t.Array(t.String(), { minItems: 1, maxItems: 50 })
+	}),
+	t.Object({ kind: t.Literal('project') }),
+	t.Object({ kind: t.Literal('public'), subtree: t.Boolean() }),
+	t.Object({ kind: t.Literal('none') })
+]);
+export type BehindProxyWho = Static<typeof BehindProxyWho>;
+
+/* A path as entered (canonical, no trailing slash); exactly one rule of an app is for `/`. */
+export const BehindProxyRule = t.Object({
+	path: t.String({ maxLength: 512 }),
+	who: BehindProxyWho
+});
+export type BehindProxyRule = Static<typeof BehindProxyRule>;
+
+/*
+ * A web app a project puts sign-in in front of through the operator's own proxy (specs/122). Belongs to its
+ * bucket for life and goes with it. `address` is the canonical origin (lib/behind_proxy/address.ts) and is unique
+ * per bucket — the datastore's unique index, not a route's lookup, is what makes that hold. The four dates are
+ * the console's checklist: the first three are written once, `lastAskedAt` at most once a minute.
+ */
+export const BehindProxyApp = t.Object({
+	_id: t.String(),
+	bucketId: t.String(),
+	name: t.String({ minLength: 1, maxLength: 100 }),
+	address: t.String(),
+	proxyKind: t.Union([
+		t.Literal('caddy'),
+		t.Literal('traefik'),
+		t.Literal('nginx')
+	]),
+	rules: t.Array(BehindProxyRule, { maxItems: 50 }),
+	firstAskedAt: t.Optional(t.Date()),
+	firstSignInAt: t.Optional(t.Date()),
+	firstAllowedAt: t.Optional(t.Date()),
+	lastAskedAt: t.Optional(t.Date()),
+	createdAt: t.Date(),
+	updatedAt: t.Date()
+});
+export type BehindProxyApp = Static<typeof BehindProxyApp>;
+
+/* What an administrator changes. `rules` is replaced as a whole; `updatedAt` is the store's to set. */
+export type BehindProxyAppPatch = Partial<
+	Pick<BehindProxyApp, 'name' | 'address' | 'proxyKind' | 'rules'>
+>;
+
+/*
+ * The checklist's dates, as a check or a sign-in reports them. Each `first*` is written only where none is
+ * recorded, so the first time stays the first; `lastAskedAt` is written as given. Throttling is the caller's.
+ */
+export type BehindProxyAppUsage = Partial<
+	Pick<
+		BehindProxyApp,
+		'firstAskedAt' | 'firstSignInAt' | 'firstAllowedAt' | 'lastAskedAt'
+	>
+>;
+
+export interface BehindProxyAppStoreInstance {
+	listByBucket(bucketId: string): Promise<BehindProxyApp[]>;
+	find(id: string): Promise<BehindProxyApp | null>;
+	/* Throws `UniqueValueTaken` (field `address`) when the bucket already holds an app at this address. */
+	create(record: BehindProxyApp): Promise<BehindProxyApp>;
+	/*
+	 * Answers the changed app, or `null` when there is none. Throws `UniqueValueTaken` (field `address`) when the
+	 * new address is another app's of the same bucket.
+	 */
+	update(
+		id: string,
+		patch: BehindProxyAppPatch
+	): Promise<BehindProxyApp | null>;
+	delete(id: string): Promise<void>;
+	/* Answers the ids removed, so the bucket-delete route can end each app's sessions after. */
+	destroyByBucket(bucketId: string): Promise<string[]>;
+	/* Writes the checklist's dates alone, so a request's bookkeeping never races an administrator's edit. */
+	noteUsage(id: string, fields: BehindProxyAppUsage): Promise<void>;
+}
+
+export interface BehindProxyAppStoreConstructor {
+	new (): BehindProxyAppStoreInstance;
+}
+
+/*
  * People's accounts at connected services (specs/117). Every read is scoped to a project, so an id that
  * belongs to another project reads as absent. The `destroyBy*` methods return the records they removed, so
  * the caller can ask each provider to revoke what it issued.

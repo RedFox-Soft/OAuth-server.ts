@@ -14,6 +14,7 @@ import {
 } from '../../admin/consts.js';
 import { isAddressable } from '../../admin/auth/bucketAddress.js';
 import { bucketIdOfAccountPageClient } from '../../account_page/client.js';
+import { bucketIdOfBehindProxyClient } from '../../behind_proxy/client.js';
 import { InvalidClientAuth, UnauthorizedClient } from '../../helpers/errors.js';
 
 /*
@@ -117,6 +118,7 @@ export async function assertClientServedHere(
 
 	const pinned =
 		bucketIdOfAccountPageClient(clientId) ??
+		bucketIdOfBehindProxyClient(clientId) ??
 		pinnedBucketOf(await storedBucketOf(clientId));
 	if (!pinned || pinned === addressed._id) return;
 

@@ -163,6 +163,7 @@ export default {
 	legend: {
 		fox: 'FoxAuth',
 		outside: 'Outside your control',
+		proxy: 'Your reverse proxy',
 		request: 'A message',
 		redirect: 'The browser is sent on',
 		token: 'Carries a token',

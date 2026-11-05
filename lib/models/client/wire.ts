@@ -90,7 +90,9 @@ export const BASE_METADATA_KEYS = [
 	 * A bucket's connected-applications page client, synthesized and never stored (lib/account_page/client.ts).
 	 * A base key so no registration or document can claim to be one.
 	 */
-	'accountPageBucketId'
+	'accountPageBucketId',
+	/* A bucket's proxy client (specs/122), synthesized the same way (lib/behind_proxy/client.ts). */
+	'behindProxyBucketId'
 ];
 
 const CANONICAL_ONLY = new Set(BASE_METADATA_KEYS);

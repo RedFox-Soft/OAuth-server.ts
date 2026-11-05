@@ -1,6 +1,7 @@
 import {
 	adapter,
 	getActivityStore,
+	getBehindProxyAppStore,
 	getBucketGroupStore,
 	getBucketKeysStore,
 	getBucketStore,
@@ -30,6 +31,7 @@ import { AdminError, type AdminContext } from '../auth/rbac.js';
 import { forgetBucketAddresses } from '../auth/bucketAddress.js';
 import { groupLabel } from '../groups/label.js';
 import { destroyBucketAccounts } from '../../connected_services/accounts.js';
+import { endSessionsOfApps } from '../behind-proxy/service.js';
 
 /* Who is destroying the bucket: an administrator's Delete now, or the server when the thirty days ran out. */
 export type DestroyingActor =
@@ -218,6 +220,11 @@ async function destroyClaimed(
 	for (const provider of claimed.federation) {
 		await forgetAssertionUsage(providerUsageKey(id, provider.id));
 	}
+	/*
+	 * Its apps behind a proxy (specs/122), and every session people held at them: the sessions were swept with
+	 * the accounts above already, so this is for a session whose person outlived the sweep in a failed area.
+	 */
+	await endSessionsOfApps(await getBehindProxyAppStore().destroyByBucket(id));
 	/*
 	 * Its people's connected accounts (specs/117), revoked at each provider in the background with the services the
 	 * record still holds. Not swept with the accounts above: that sweep follows account ownership, and connected

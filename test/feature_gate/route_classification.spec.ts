@@ -257,7 +257,9 @@ describe('route classification', () => {
 				'GET /scim/v2/Groups/:groupId',
 				'PUT /scim/v2/Groups/:groupId',
 				'PATCH /scim/v2/Groups/:groupId',
-				'DELETE /scim/v2/Groups/:groupId'
+				'DELETE /scim/v2/Groups/:groupId',
+				/* Limited per app inside its plugin (specs/122 R3): one proxy's address carries a whole office. */
+				'ALL /verify/:appId'
 			])
 		];
 

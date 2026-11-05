@@ -29,9 +29,24 @@ type Refined = {
 	jwks?: { keys: Array<Record<string, unknown>> };
 };
 
+/*
+ * Markers of a synthesized client declared here rather than in ClientSchema. A further ClientSchema member took the
+ * app chain in lib/index.ts past TypeScript's instantiation limit (TS2589); validation needs no schema entry for
+ * them, because it picks the base keys (wire.ts) and ClientSchema admits members it does not name.
+ */
+type Synthesized = {
+	/*
+	 * The end-user bucket whose apps behind a proxy this client signs people in to, when it is that bucket's
+	 * built-in proxy client (specs/122). Synthesized from the bucket and its apps on every resolution and never
+	 * stored (lib/behind_proxy/client.ts); its code is redeemed only by the check endpoint.
+	 */
+	behindProxyBucketId?: string;
+};
+
 /* The attributes of a validated client, camelCase: ClientSchema's, with the closed sets named. */
 export type ClientData = Omit<Static<typeof ClientSchema>, keyof Refined> &
-	Refined;
+	Refined &
+	Synthesized;
 
 /* Readonly all the way down, because a validated client is frozen all the way down. */
 type DeepReadonly<T> = T extends (infer U)[]

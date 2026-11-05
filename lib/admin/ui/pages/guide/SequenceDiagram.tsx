@@ -118,11 +118,12 @@ function clamp(v: number, lo: number, hi: number): number {
 	return lo > hi ? (lo + hi) / 2 : Math.max(lo, Math.min(hi, v));
 }
 
-type Tone = 'plain' | 'fox' | 'outside';
+type Tone = 'plain' | 'fox' | 'outside' | 'proxy';
 
 function toneOf(lane: GuideLane | undefined): Tone {
 	if (lane?.kind === 'fox') return 'fox';
 	if (lane?.kind === 'outside' || lane?.kind === 'company') return 'outside';
+	if (lane?.kind === 'proxy') return 'proxy';
 	return 'plain';
 }
 
@@ -454,6 +455,7 @@ const CSS = `
 .guide-dia .box { fill: var(--gd-surface); stroke: var(--gd-line); stroke-width: 1.2; }
 .guide-dia .box.fox { fill: var(--gd-accent-soft); stroke: var(--gd-accent); stroke-width: 1.6; }
 .guide-dia .box.outside { stroke: var(--gd-life); stroke-dasharray: 4 3; }
+.guide-dia .box.proxy { stroke: var(--gd-ink); stroke-width: 2.4; }
 .guide-dia .box-t { fill: var(--gd-fg); font-weight: 700; }
 .guide-dia .box-i { fill: none; stroke: var(--gd-fg); stroke-linecap: round; stroke-linejoin: round; }
 .guide-dia .box-i.fox { stroke: var(--gd-accent); }

@@ -2,7 +2,7 @@
 title: FoxAuth compared with Keycloak
 competitor: Keycloak
 description: You can run Keycloak and FoxAuth yourself, and FoxAuth also has a free cloud plan. They differ in runtime, storage, scope and protocol defaults.
-lastChecked: '2026-11-02'
+lastChecked: '2026-11-05'
 sources:
   - https://www.keycloak.org/securing-apps/oidc-layers
   - https://www.keycloak.org/securing-apps/mcp-authz-server
@@ -15,6 +15,7 @@ sources:
   - https://github.com/keycloak/keycloak
   - https://www.keycloak.org/securing-apps/token-exchange
   - https://www.keycloak.org/docs/latest/server_development/index.html
+  - https://www.keycloak.org/2020/08/sunsetting-louketo-project.adoc.html
 bottomLine: 'Pick Keycloak if you need SAML, LDAP federation or certified FAPI today. FoxAuth is the better fit for a team that writes TypeScript, wants OAuth 2.1 behaviour as the default, or wants an AI agent administering the server through the same audited path a human uses.'
 chooseThem:
   - 'You need SAML as well as OpenID Connect.'
@@ -266,6 +267,20 @@ groups:
         verdict: us
         why: 'Keycloak hands out the token that a sign-in or an account link stored, with a per-client list in v2 but no consent from the person and no refresh. FoxAuth adds the person’s consent per agent, refreshing and keep-alive, behind a standard RFC 8693 request.'
         note: 'For internal-to-external exchange the token exchange guide says "Identity brokering APIs can be used instead", and the server development guide says stored tokens "can be re-established by either logging in again through the provider".'
+      - dimension: Sign-in in front of a web app through your proxy
+        us:
+          {
+            status: yes,
+            text: 'An app with no sign-in of its own goes behind your Caddy, Traefik or nginx. The proxy asks the project about every request, a rule for each path names the groups that may open it, and the app receives who the person is in X-Auth-* headers. The console gives the proxy configuration. Nothing else to run, and on every plan.'
+          }
+        them:
+          {
+            status: no,
+            text: 'No check endpoint for a proxy. Keycloak Gatekeeper, later Louketo Proxy, was ended in 2020, and the Keycloak team pointed to the separate OAuth2 Proxy project instead.'
+          }
+        verdict: us
+        why: 'With Keycloak a separate proxy service such as OAuth2 Proxy runs beside it for this. Here the authorization server answers the proxy itself.'
+        note: 'The Keycloak blog, 21 August 2020: "After careful consideration, we have decided to pull the plug on Louketo and start the EOL procedure." It suggests OAuth2 Proxy "as a replacement".'
   - label: Licence and cost
     rows:
       - dimension: Licence

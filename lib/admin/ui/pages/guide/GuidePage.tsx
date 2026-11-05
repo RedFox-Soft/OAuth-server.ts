@@ -70,6 +70,7 @@ const CSS = `
 .guide-key { display: inline-block; flex-shrink: 0; width: 28px; height: 18px; border-radius: 5px; border: 1.5px solid var(--gd-line); background: var(--gd-surface); }
 .guide-key.fox { border-color: var(--gd-accent); background: var(--gd-accent-soft); }
 .guide-key.outside { border-style: dashed; border-color: var(--gd-life); }
+.guide-key.proxy { border: 2.5px double var(--gd-ink); }
 .guide-key.redirect { height: 0; border: 0; border-top: 2px dashed var(--gd-arrow); border-radius: 0; background: none; }
 .guide-key.token { height: 0; border: 0; border-top: 3px solid var(--gd-arrow); border-radius: 0; background: none; }
 .guide-key.refusal { height: 0; border: 0; border-top: 2.5px dashed var(--gd-deny); border-radius: 0; background: none; }
@@ -242,6 +243,10 @@ function Legend() {
 		[
 			'outside',
 			'A dashed box is a service outside your control, or your customer’s company.'
+		],
+		[
+			'proxy',
+			'A box with a double border is your reverse proxy, which every request to your app passes through.'
 		],
 		[
 			'redirect',

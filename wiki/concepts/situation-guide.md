@@ -4,7 +4,7 @@ title: 'The situation guide: a "What do you need?" page, one declaration, never 
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-11-03
-updated: 2026-11-04
+updated: 2026-11-05
 graph:
   node_type: concept
   relationships:
@@ -30,25 +30,32 @@ are built from the same data.
 ## One declaration
 
 Every question, situation, step, diagram lane, prompt and target is plain, import-free data in
-`lib/consts/situation_guide.ts` (`GUIDE_QUESTIONS` :237, `GUIDE_SITUATIONS` :386). The console renders it, the
+`lib/consts/situation_guide.ts` (`GUIDE_QUESTIONS` :242, `GUIDE_SITUATIONS` :394). The console renders it, the
 availability function reads it, and the docs export hands the same list to the site (`situationGuide`,
-`lib/docs_export/build.ts:348`), so the console and the site cannot drift. The chooser for a new application takes its preset titles and descriptions from the same entries
+`lib/docs_export/build.ts:370`), so the console and the site cannot drift. The chooser for a new application takes its preset titles and descriptions from the same entries
 (`[[application-page]]`).
 
 ## The pictures: one rule, and FoxAuth where it really is
 
 Every answer is drawn twice from its own data: "Your problem" and "With FoxAuth" (`sceneOf`,
-`lib/situation_guide/scene.ts:284`). Each lane names a `part` (person, browser, server, agent, company, …), and each
+`lib/situation_guide/scene.ts:293`). Each lane names a `part` (person, browser, server, agent, company, …), and each
 situation names its `problem`: the lane it sits on, one of five marks (password, secret, open, copy, missing) and a
-caption, with `lanes` to override which parts the problem picture shows (`lib/consts/situation_guide.ts:193`). The
+caption, with `lanes` to override which parts the problem picture shows (`lib/consts/situation_guide.ts:198`). The
 parts are SVG path data in `lib/situation_guide/parts.ts`, with no text inside, so every label is HTML and translates.
 
 The rule that matters is where FoxAuth stands. In most answers it stands **beside** the path: it hands the client a
 token, and the client calls its own API or MCP server directly. The first drafts drew FoxAuth between the client and
 the API, which reads as a gateway every call passes through, and that is not what the server is. FoxAuth is drawn in
 the **middle** only when an outside party sends something to it (an identity provider, a company directory, Google
-for a connected account): the rule reads the steps, not a list of situations (`scene.ts:142`). The spec proves that no
+for a connected account): the rule reads the steps, not a list of situations (`scene.ts:151`). The spec proves that no
 answer ever links FoxAuth to the resource a client calls, and that every situation can be drawn.
+
+An app with no sign-in of its own behind the reader's reverse proxy (`behindproxy`, specs/122) brought a lane kind,
+part and scene role of its own, `proxy`, so the proxy is drawn as a separate part between the browser and the app,
+with a double border in both the console and the site. The app is the proxy's resource, so the same rule keeps FoxAuth
+linked to the proxy and never to the app, and `scene.spec.ts` says so for this answer by name. The site's recipe page
+for it reads the proxy configurations from the docs export (`behindProxy`), built by `lib/behind_proxy/recipes.ts`,
+the function the console's Connect step uses.
 
 ## Keeping the guide true
 

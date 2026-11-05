@@ -40,7 +40,7 @@ async function subjectThere(
  * algorithm, so the default every verifier supports applies (constitution, Principle VI). A project holding no
  * RSA key signs with what it has; its published set says which.
  */
-function algorithmOf(available: readonly string[] | undefined): string {
+export function algorithmOf(available: readonly string[] | undefined): string {
 	/*
 	 * IPSIE Common Requirements §3.3 forbids RS256 while the SL1 profile is on; turning the profile on requires a PS256
 	 * signer at every issuer (lib/sl1/readiness.ts), and a project created under it is given one.

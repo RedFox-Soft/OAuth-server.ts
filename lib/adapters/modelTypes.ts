@@ -3,6 +3,10 @@ import type { AccessTokenPayloadType } from '../models/access_token.js';
 import type { AssertionUsagePayload } from '../assertions/usage.js';
 import type { AuthorizationCodePayloadType } from '../models/authorization_code.js';
 import type { BackchannelAuthenticationRequestPayloadType } from '../models/backchannel_authentication_request.js';
+import type {
+	BehindProxySessionPayload,
+	BehindProxySignInPayload
+} from '../behind_proxy/payloads.js';
 import type { ClientCredentialsPayload } from '../models/client_credentials.js';
 import type { ClientLogoPayload } from '../models/client/logo.js';
 import type { ClientUsagePayload } from '../models/client/usage.js';
@@ -59,6 +63,8 @@ export interface ModelPayloadByName {
 	AssertionUsage: AssertionUsagePayload;
 	AuthorizationCode: AuthorizationCodePayloadType;
 	BackchannelAuthenticationRequest: BackchannelAuthenticationRequestPayloadType;
+	BehindProxySession: BehindProxySessionPayload;
+	BehindProxySignIn: BehindProxySignInPayload;
 	Client: StoredClient;
 	ClientCredentials: ClientCredentialsPayload;
 	ClientLogo: ClientLogoPayload;

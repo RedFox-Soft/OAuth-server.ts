@@ -2,12 +2,13 @@
 title: FoxAuth compared with authentik
 competitor: authentik
 description: authentik is a self-hosted identity provider covering SAML, LDAP and RADIUS as well as OIDC. FoxAuth does OAuth 2.1 only, with the banking-grade profiles.
-lastChecked: '2026-11-02'
+lastChecked: '2026-11-05'
 sources:
   - https://github.com/goauthentik/authentik
   - https://docs.goauthentik.io/install-config/install/docker-compose/
   - https://docs.goauthentik.io/add-secure-apps/providers/oauth2/device_code/
   - https://docs.goauthentik.io/users-sources/sources/protocols/oauth/
+  - https://docs.goauthentik.io/add-secure-apps/providers/proxy/forward_auth/
 bottomLine: 'Pick authentik if you are replacing an SSO estate that speaks SAML, LDAP or RADIUS as well as OIDC. If the applications are your own and what you need is an OAuth 2.1 authorization server with the banking-grade profiles and no enterprise tier to buy, pick FoxAuth.'
 chooseThem:
   - 'Your estate has applications that speak SAML, LDAP or RADIUS alongside OpenID Connect.'
@@ -160,6 +161,20 @@ groups:
         verdict: us
         why: 'authentik documents the upstream tokens only while a sign-in runs. FoxAuth keeps them, refreshes them, and hands them to the agents that an administrator and the person both allowed.'
         note: 'The OAuth source page describes `token` as "A Python dictionary containing the OAuth tokens for this login."'
+      - dimension: Sign-in in front of a web app through your proxy
+        us:
+          {
+            status: yes,
+            text: 'An app with no sign-in of its own goes behind your Caddy, Traefik or nginx. The proxy asks the project about every request, a rule for each path names the groups that may open it, and the app receives who the person is in X-Auth-* headers. The console gives the proxy configuration. Nothing else to run, and on every plan.'
+          }
+        them:
+          {
+            status: yes,
+            text: 'The proxy provider in forward-auth mode, for one application or for every application under a domain, with configuration templates for nginx, Traefik, Caddy, Envoy and HAProxy. The check runs in an authentik outpost.'
+          }
+        verdict: even
+        why: 'Both let your own proxy ask before a request reaches the app. authentik can cover a whole domain with one sign-in and runs the check in an outpost; FoxAuth answers from the server itself, with a rule for each path.'
+        note: 'The forward-auth page says "Single-application mode works for one application hosted on its own domain or subdomain" and that forward auth "relies on the authentik outpost only to check authentication and authorization."'
       - dimension: Licence
         us:
           {

@@ -4,7 +4,7 @@ title: 'Monthly active users per project'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-10-10
-updated: 2026-10-15
+updated: 2026-11-05
 ---
 
 # Monthly active users per project
@@ -25,7 +25,10 @@ where they carried `bucketId`, `buckets`, `activeBuckets`, `bucketIds` and `grou
 ## What counts, and why that definition
 
 Activity is a token issued on the person's behalf, recorded at one place: `noteActivity(oidc)` in
-`executeGrant` (`lib/actions/grants/index.ts:102`). Auth0, Entra External ID, Supabase, FusionAuth and
+`executeGrant` (`lib/actions/grants/index.ts:102`). The one exception is a sign-in that issues no token at all:
+an app behind a proxy (spec 122) redeems its code in-process and calls the same writer, `markActivity`
+(`lib/activity/note.ts`), from `lib/behind_proxy/sign_in.ts`, with the account `findAccount` resolved and the
+code's sign-in kind, so a person who only ever uses such an app still counts. Auth0, Entra External ID, Supabase, FusionAuth and
 ZITADEL all count token issuance, refresh and silent authentication included; counting interactive sign-ins
 only would make an application living on long refresh tokens look unused. Every edge case then falls out
 with no rule of its own: a failed, throttled or abandoned sign-in issued nothing; a sign-in whose code is

@@ -4,7 +4,7 @@ title: "Client identity from the database"
 tags: [contract, architecture, oauth]
 sources: [oauth-server-codebase]
 created: 2026-07-31
-updated: 2026-10-15
+updated: 2026-11-05
 graph:
   node_type: concept
 ---
@@ -137,10 +137,13 @@ registered for an algorithm or method the profile forbids resolves as unknown. T
 and the federation and outside-server configuration read with `tryFindClient(id, { administering: true })`,
 so an administrator always sees the record they have to put right.
 
-Two clients are synthesized in code on every resolution, after the stored read and before the document branch
-(`lib/models/client/validate.ts:132`): a SCIM connection's `scim-<id>` ([[scim-provisioning]]) and, since spec
-095, a project's connected-apps page client `account.<bucketId>` ([[connected-apps-page]]). A stored record always
-wins over both, and registration refuses the `account.` prefix outright.
+Three clients are synthesized in code on every resolution, after the stored read and before the document branch
+(`lib/models/client/validate.ts:131-138`). They are a SCIM connection's `scim-<id>` ([[scim-provisioning]]); since spec
+095, a project's connected-apps page client `account.<bucketId>` ([[connected-apps-page]]); and since spec 122
+(2026-11-05), a project's proxy client `proxy.<bucketId>`. The proxy client exists only while the project has an
+app behind a proxy, and never for the administrators' project. Its codes are redeemed only in-process by the check,
+and `/token` refuses them ([[behind-your-proxy]]). A stored record always wins over all three, and registration
+refuses the `account.` and `proxy.` prefixes outright (`lib/models/client/register.ts:147-153`).
 
 The three shapes have one conversion each (`lib/models/client/projection.ts`): `fromWire` from a
 registration body to a record, `toStored` from a validated client back to one, `toWire` to the

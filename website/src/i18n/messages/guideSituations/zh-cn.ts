@@ -1,6 +1,6 @@
 import type { GuideTexts } from '../../guide-texts.ts';
 
-export const source = 'f5b0967bc097';
+export const source = '38195e17799b';
 
 export default {
 	questions: {
@@ -447,6 +447,59 @@ export default {
 				'你需要从提供商的控制台获取一个 ID 和一个密钥。',
 				'Free 方案中的 Microsoft 登录接受任何组织的账户。如果只允许某一家公司目录中的账户登录，请看面向企业的部分。',
 				'你的应用不需要任何改动。'
+			]
+		},
+		behindproxy: {
+			title: '没有自带登录的 Web 应用',
+			sentence:
+				'把应用放在你的代理后面。每个请求到达应用之前，代理都会先询问 FoxAuth。用户登录你的项目，应用本身不需要改动。',
+			protocol: 'Forward auth · OpenID Connect · Authorization Code + PKCE',
+			problemCaption: '任何知道地址的人都能进入。',
+			fixCaption: '你的代理只放行你选定的人。',
+			lanes: {
+				browser: '用户的浏览器',
+				proxy: '你的代理',
+				proxied: '你的应用',
+				fox: 'FoxAuth'
+			},
+			steps: [
+				{ label: '打开应用', text: '用户打开你的应用。请求先到达你的代理。' },
+				{
+					label: '询问项目',
+					text: '在应用看到请求之前，你的代理先询问项目这个请求能否通过。'
+				},
+				{
+					label: '转到登录页',
+					text: '用户还没有登录，所以项目把浏览器转到它的登录页面。'
+				},
+				{
+					label: '登录',
+					text: '用户登录项目。如果之前已经登录过，这一步会自动完成。'
+				},
+				{
+					label: '返回 /_foxauth/callback',
+					text: '项目把浏览器送回你的应用地址上的 /_foxauth/callback，并在那里设置应用的登录 cookie。'
+				},
+				{
+					label: '是的，这是 Anna',
+					text: '在下一个请求中，项目按你为这个路径设置的规则进行检查，然后回答“可以”，并说明这个人是谁。'
+				},
+				{
+					label: '带上 X-Auth-* 请求头',
+					text: '你的代理把请求放行到应用，并在 X-Auth-* 请求头中带上用户的 ID、邮箱和用户组。'
+				}
+			],
+			sees: [
+				'第一次时，显示项目的登录页面',
+				'之后照常打开你的应用',
+				'没有权限的人会看到一个说明原因的页面'
+			],
+			goodToKnow: [
+				'确保只能通过你的代理访问应用。绕过代理到达应用的请求不会经过检查。',
+				'你的应用不需要改动。它可以从 X-Auth-* 请求头中读取用户是谁。',
+				'Connect 步骤会给出 Caddy、Traefik 或 nginx 的配置，可以直接粘贴。',
+				'每个路径都可以开放给选定用户组的成员、项目中的所有人、任何人，或者不开放给任何人。',
+				'不需要开启任何开关，所有方案都可以使用。'
 			]
 		},
 		signup: {

@@ -100,7 +100,9 @@ function merge(...results: readonly CascadeResult[]): CascadeResult {
 
 /*
  * Every sign-in session belonging to this account, and nothing else — what a password reset owes the user
- * whose credential just changed.
+ * whose credential just changed. That is the project session and the person's sessions at apps behind a proxy
+ * (specs/122): an app session follows the person, not the project session, so a reset that left it would leave
+ * whoever had the old password inside the app.
  *
  * Lives here rather than at the call site so the swept field still comes from the declaration and the area
  * name stays with the two others this module already knows. It is deliberately neither a narrowed
@@ -108,22 +110,27 @@ function merge(...results: readonly CascadeResult[]): CascadeResult {
  * principal owns, a reset sweeps sessions, and conflating the two is how a password change would start
  * destroying consent records.
  */
+const SESSION_AREAS = ['Session', 'BehindProxySession'];
+
 export async function endSessionsForAccount(
 	accountId: string
 ): Promise<CascadeResult> {
-	const area = areaNamed('Session');
-	const field = area.owners.account;
-	if (field === null) {
-		/* Unreachable while the inventory declares Session account-owned; a loud stop beats a silent no-op. */
-		throw new Error('the Session area declares no account owner to sweep by');
-	}
-
-	return runSweeps([
-		{
-			area: area.name,
-			run: () => adapter(area.name).destroyByOwner(field, accountId)
-		}
-	]);
+	return runSweeps(
+		SESSION_AREAS.map((name) => {
+			const area = areaNamed(name);
+			const field = area.owners.account;
+			if (field === null) {
+				/* Unreachable while the inventory declares both account-owned; a loud stop beats a silent no-op. */
+				throw new Error(
+					`the ${name} area declares no account owner to sweep by`
+				);
+			}
+			return {
+				area: area.name,
+				run: () => adapter(area.name).destroyByOwner(field, accountId)
+			};
+		})
+	);
 }
 
 /*

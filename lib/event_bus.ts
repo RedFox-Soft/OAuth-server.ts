@@ -28,6 +28,10 @@ import EventEmitter from 'node:events';
  * handler that silently never runs or reads `undefined`.
  */
 import type { OIDCContext } from './helpers/oidc_context.ts';
+import type {
+	Outcome as BehindProxyOutcome,
+	Reason as BehindProxyReason
+} from './behind_proxy/decide.ts';
 import type { Client } from './models/client.ts';
 import type { AccessToken } from './models/access_token.ts';
 import type { AuthorizationCode } from './models/authorization_code.ts';
@@ -236,6 +240,20 @@ export type ServerEvents = ModelEvents &
 				serviceId: string;
 				connectId: string;
 				cause: 'other_person' | 'changed';
+			}
+		];
+		/*
+		 * A check a proxy made for an app behind it (specs/122 R16), once its app is known. Identifiers only: never
+		 * the forwarded host, path or a cookie. `rule` is the path of the rule that decided, or null.
+		 */
+		'behind_proxy.decision': [
+			{
+				bucketId: string;
+				appId: string;
+				outcome: BehindProxyOutcome;
+				reason: BehindProxyReason;
+				rule: string | null;
+				accountId: string | null;
 			}
 		];
 	};

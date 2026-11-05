@@ -74,6 +74,12 @@ const BODIES: Record<string, Record<string, unknown>> = {
 		applications: [],
 		rules: []
 	},
+	behind_proxy_app_create: {
+		name: 'Gated',
+		address: 'https://gated.example.com',
+		proxyKind: 'caddy',
+		rootGroups: ['any-group']
+	},
 	project_plan_set: { planId: 'free' },
 	plan_create: {
 		id: 'gated',
@@ -128,7 +134,7 @@ describe('every high-consequence tool is gated', () => {
 		 * membership is named in catalogue_drift rather than counted here.
 		 */
 		expect(HIGH.length).toBeGreaterThan(0);
-		expect(HIGH.length).toBe(46);
+		expect(HIGH.length).toBe(48);
 	});
 
 	it.each(HIGH.map((t) => [t.tool, t] as const))(

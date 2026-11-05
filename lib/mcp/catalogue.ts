@@ -80,6 +80,10 @@ import {
 	CreateOutsideServerBody,
 	UpdateOutsideServerBody
 } from '../admin/outside-servers/schema.js';
+import {
+	CreateBehindProxyAppBody,
+	UpdateBehindProxyAppBody
+} from '../admin/behind-proxy/schema.js';
 
 /*
  * THE published surface of the administrative MCP control plane: one entry per tool, mapped to the one
@@ -609,6 +613,32 @@ const catalogue = [
 		pathParams: ['id', 'serverId'],
 		summary:
 			'One outside authorization server connection of a project. A group a rule names that has since been deleted is shown with a null name and matches nobody.'
+	},
+	{
+		tool: 'behind_proxy_app_list',
+		method: 'GET',
+		path: '/admin/api/projects/:id/behind-proxy',
+		action: null,
+		consequence: 'read',
+		superAdminOnly: false,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			"The web apps a project puts sign-in in front of through the operator's own reverse proxy (forward auth): each app's address, which proxy it is set up for, its rules of who may open which paths, the verifyUrl the proxy must call, and whether the proxy has called it yet. signUpsOpen says that a rule for everyone in the project admits anyone who signs up."
+	},
+	{
+		tool: 'behind_proxy_app_get',
+		method: 'GET',
+		path: '/admin/api/projects/:id/behind-proxy/:appId',
+		action: null,
+		consequence: 'read',
+		superAdminOnly: false,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id', 'appId'],
+		summary:
+			'One app behind a proxy, as behind_proxy_app_list describes it. A group a rule names that has since been deleted is shown with a null name and admits nobody.'
 	},
 	{
 		tool: 'provisioning_hold_get',
@@ -1812,6 +1842,49 @@ const catalogue = [
 		pathParams: ['id', 'serverId'],
 		summary:
 			'Disconnect an outside authorization server: the project stops vouching for its people there at once. ID-JAGs already issued live out their few minutes.'
+	},
+	{
+		tool: 'behind_proxy_app_create',
+		method: 'POST',
+		path: '/admin/api/projects/:id/behind-proxy',
+		action: 'behindproxy.create',
+		/* High: it puts a web app in reach of the project's people, decided by rules this call sets. */
+		consequence: 'high',
+		superAdminOnly: false,
+		bodySchema: CreateBehindProxyAppBody,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			"Put sign-in in front of a web app through the operator's own reverse proxy (Caddy, Traefik or nginx forward auth). address is the app's https origin; a path, query or fragment is dropped, and an IP address is refused. rootGroups names the project groups whose members may open the app at all — at least one. The answer's verifyUrl is what the proxy must call for every request; narrower rules per path are set afterwards with behind_proxy_app_update."
+	},
+	{
+		tool: 'behind_proxy_app_update',
+		method: 'PATCH',
+		path: '/admin/api/projects/:id/behind-proxy/:appId',
+		action: 'behindproxy.update',
+		consequence: 'ordinary',
+		superAdminOnly: false,
+		bodySchema: UpdateBehindProxyAppBody,
+		querySchema: null,
+		pathParams: ['id', 'appId'],
+		/* Who may open which path, and which host the rules guard: either can let a stranger in. */
+		highWhenSets: ['rules', 'address'],
+		summary:
+			"Rename an app behind a proxy, change its address or proxy kind, or replace its rules. rules replaces the whole list and must keep exactly one rule for /; each path is a plain path such as /admin (no ?, #, *, %, ; or backslash, compared ignoring letter case), at most 50 rules. A rule's who is groups (with project group ids), project (everyone in the project), public (no sign-in; subtree: true covers every path beneath) or none. The most specific rule decides a request."
+	},
+	{
+		tool: 'behind_proxy_app_delete',
+		method: 'DELETE',
+		path: '/admin/api/projects/:id/behind-proxy/:appId',
+		action: 'behindproxy.delete',
+		/* High: the proxy's checks for it fail at once, and everyone signed in to it is signed out. */
+		consequence: 'high',
+		superAdminOnly: false,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id', 'appId'],
+		summary:
+			"Remove an app behind a proxy and end every session people hold at it. The proxy's checks for it are refused from then on, so the app is unreachable through the proxy until it is set up again."
 	},
 	{
 		tool: 'provisioning_credential_issue',

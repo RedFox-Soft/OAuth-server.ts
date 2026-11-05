@@ -2,13 +2,14 @@
 title: FoxAuth compared with Zitadel
 competitor: Zitadel
 description: Zitadel is a multi-tenant identity platform with SAML and a managed cloud. FoxAuth is a smaller OAuth 2.1 server with the banking-grade profiles built in.
-lastChecked: '2026-11-02'
+lastChecked: '2026-11-05'
 sources:
   - https://github.com/zitadel/zitadel
   - https://zitadel.com/self-hosted
   - https://zitadel.com/docs
   - https://zitadel.com/docs/guides/integrate/login-ui/external-login
   - https://zitadel.com/docs/guides/integrate/token-exchange
+  - https://zitadel.com/docs/examples/identity-proxy/oauth2-proxy
 bottomLine: 'Pick Zitadel if you need SAML or a managed cloud with an enterprise contract behind it. Pick FoxAuth for OAuth 2.1 behaviour by default, the banking-grade profiles that Zitadel does not document, and a licence other than AGPL.'
 chooseThem:
   - 'You need SAML 2.0 as well as OpenID Connect.'
@@ -169,6 +170,20 @@ groups:
         verdict: us
         why: 'Zitadel documents the upstream token only inside a sign-in. FoxAuth keeps it, refreshes it, and hands it to the agents that an administrator and the person both allowed.'
         note: 'The external login guide shows the provider’s accessToken in the answer to retrieving an identity provider intent, and its use there is creating a session or linking a user.'
+      - dimension: Sign-in in front of a web app through your proxy
+        us:
+          {
+            status: yes,
+            text: 'An app with no sign-in of its own goes behind your Caddy, Traefik or nginx. The proxy asks the project about every request, a rule for each path names the groups that may open it, and the app receives who the person is in X-Auth-* headers. The console gives the proxy configuration. Nothing else to run, and on every plan.'
+          }
+        them:
+          {
+            status: no,
+            text: 'No check endpoint for a proxy. ZITADEL documents running the separate OAuth2 Proxy project in front of the app, with ZITADEL as its OpenID Connect provider.'
+          }
+        verdict: us
+        why: 'With ZITADEL a separate proxy service runs beside it for this. Here the authorization server answers your own proxy itself.'
+        note: 'The ZITADEL guide says "OAuth2-proxy is a project which allows services to delegate the authentication flow to a IDP, for example ZITADEL".'
       - dimension: Managed hosting
         us:
           {

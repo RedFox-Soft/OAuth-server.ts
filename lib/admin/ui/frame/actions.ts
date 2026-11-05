@@ -261,6 +261,27 @@ export const ACTIONS = {
 		okText: 'Disconnect'
 	},
 
+	/*
+	 * Apps behind the operator's proxy (specs/122). A change of rules is asked only when it lets more people in,
+	 * judged by the access that results, and lists each widening; making the root or a whole subtree public asks
+	 * for the word instead. Narrowing is saved at once: protection is quick, widening takes effort. Deleting makes
+	 * the proxy refuse every request to the app's address.
+	 */
+	'behindProxy.create': { class: 'C0' },
+	'behindProxy.edit': { class: 'C0' },
+	'behindProxy.rules.widen': {
+		class: 'C2',
+		title: (t) => `Change who can open ${t}?`,
+		okText: 'Save changes',
+		cancelText: 'Keep editing'
+	},
+	'behindProxy.rules.public': { class: 'C3', word: 'public' },
+	'behindProxy.delete': {
+		class: 'C2',
+		title: (t) => `Delete ${t}?`,
+		okText: 'Delete app'
+	},
+
 	/* Connected services (specs/117): deleting one disconnects every account people connected at it. */
 	'connectedService.create': { class: 'C0' },
 	'connectedService.edit': { class: 'C0' },

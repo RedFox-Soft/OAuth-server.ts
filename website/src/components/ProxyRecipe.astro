@@ -1,0 +1,35 @@
+---
+import { Code } from '@astrojs/starlight/components';
+import { loadExport } from '../data/export.ts';
+
+/*
+ * One proxy's configuration for an app behind a proxy, as the console's Connect step builds it
+ * (lib/behind_proxy/recipes.ts), for the example addresses the docs export carries. The page never
+ * keeps a copy of its own, so the site cannot show a recipe the console does not give (FR-034).
+ */
+interface Props {
+	kind: 'caddy' | 'traefik' | 'nginx';
+}
+const { kind } = Astro.props;
+
+const recipe = loadExport().behindProxy.recipes.find((r) => r.kind === kind);
+if (!recipe) {
+	throw new Error(
+		`generated/docs-export.json has no ${kind} recipe; run \`bun run generate\``
+	);
+}
+
+/* Shiki has no Caddyfile grammar; plain text avoids a build warning per page. */
+const LANG = { caddy: 'txt', traefik: 'yaml', nginx: 'nginx' } as const;
+const TITLE = {
+	caddy: 'Caddyfile',
+	traefik: 'Traefik dynamic configuration',
+	nginx: 'nginx server block'
+} as const;
+---
+
+<Code
+	code={recipe.text}
+	lang={LANG[kind]}
+	title={TITLE[kind]}
+/>

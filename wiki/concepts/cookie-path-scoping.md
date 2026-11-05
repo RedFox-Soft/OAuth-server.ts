@@ -4,7 +4,7 @@ title: "A cookie's Path is part of its identity"
 tags: [contract, gotcha, architecture]
 sources: [oauth-server-codebase]
 created: 2026-08-27
-updated: 2026-10-15
+updated: 2026-11-05
 graph:
   node_type: concept
   relationships:
@@ -151,6 +151,14 @@ origin from the issuer's, and no cookie here sets `Domain`, so the instance host
 The connected-apps page's pending sign-in cookie, `_account_apps` (spec 095), follows the rule from birth: it
 lives on the page's own path (`/account/apps` or `/<slug>/account/apps`), and the set and the clear derive that
 path from one function (`pagePath`, `lib/account_page/session.ts:137`) — see [[connected-apps-page]].
+
+Since spec 122 (2026-11-05) the server also sets cookies on hosts that are not its own. An app behind a proxy
+gets two cookies on the app's host, its session `__Host-foxauth-<appId>` and the sign-in marker
+`__Host-foxauth-signin-<appId>` ([[behind-your-proxy]]). They follow the same rule. One function writes the
+attributes (`Path=/; Secure; HttpOnly; SameSite=Lax`) for both the set and the expiry
+(`cookieHeader`, `lib/behind_proxy/session.ts:35-45`). The statement above still holds: **still no `Domain`**. The
+`__Host-` prefix makes the browser refuse one, because a parent-domain cookie would send an app's session to every
+sibling host.
 
 ## Why the existing test could not see it
 

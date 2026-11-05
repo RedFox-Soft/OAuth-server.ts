@@ -341,6 +341,7 @@ const CSS = `
 .gs-tile > .gs-glyph { width: 24px; height: 24px; }
 .gs-node.fox .gs-tile { border: 2px solid var(--gd-accent); background: var(--gd-accent-soft); color: var(--gd-accent); box-shadow: 0 0 0 4px var(--gd-accent-ring); }
 .gs-node.outside .gs-tile { border-style: dashed; border-color: var(--gd-life); }
+.gs-node.proxy .gs-tile { border: 2.5px double var(--gd-ink); }
 .gs-node.bad .gs-tile { border-color: var(--gd-deny); }
 .gs-node.good .gs-tile { border-color: var(--gd-good); }
 .gs-badge { position: absolute; top: -8px; right: -10px; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 999px; box-shadow: 0 0 0 2px var(--gs-frame-bg); color: var(--gd-on-accent); }

@@ -1,6 +1,10 @@
 import type { ApplicationConfigType } from 'lib/configs/application.js';
 import { routeNames } from './param_list.js';
 import {
+	BEHIND_PROXY_CHECK_BASE,
+	BEHIND_PROXY_CHECK_ROUTE
+} from './behind_proxy.js';
+import {
 	SCIM_BASE_PATH,
 	SCIM_METADATA_BUCKET_ROUTE,
 	SCIM_METADATA_ROUTE,
@@ -89,7 +93,8 @@ export const bucketScopedPaths: readonly string[] = [
 	routeNames.account_apps_callback,
 	routeNames.account_services,
 	routeNames.account_services_callback,
-	routeNames.account_services_link
+	routeNames.account_services_link,
+	BEHIND_PROXY_CHECK_BASE
 ];
 
 /* RFC 8414 §3 places the well-known segment before the issuer's path, so these two cannot be produced
@@ -314,7 +319,12 @@ const bareAlwaysAvailableRoutes: readonly AlwaysAvailableRoute[] = [
 	{ method: 'POST', path: routeNames.account_services },
 	{ method: 'GET', path: routeNames.account_services_callback },
 	{ method: 'GET', path: routeNames.account_services_link },
-	{ method: 'POST', path: routeNames.account_services_link }
+	{ method: 'POST', path: routeNames.account_services_link },
+	/*
+	 * The check a proxy makes for an app behind it (specs/122 R4). No instance switch: the endpoint does nothing
+	 * until a project declares an app, and a switch would only add a setting that protects nothing.
+	 */
+	{ method: 'ALL', path: BEHIND_PROXY_CHECK_ROUTE }
 ];
 
 /*
@@ -584,7 +594,12 @@ const bareRateRoutes: readonly RateRoute[] = [
 		method,
 		path,
 		rate: 'exempt' as const
-	}))
+	})),
+	/*
+	 * Exempt for SCIM's reason (specs/122 R3): every person behind one proxy reaches this from the proxy's one
+	 * address, so a per-origin allowance would refuse a whole office at once. Limited per app inside the plugin.
+	 */
+	{ method: 'ALL', path: BEHIND_PROXY_CHECK_ROUTE, rate: 'exempt' }
 ];
 
 /* Same derivation, same reason. */
@@ -649,7 +664,10 @@ export function rateClassForRequest(
 	}
 
 	for (const route of rateRoutes) {
-		if (route.method === method && patternMatchesPath(route.path, pathname)) {
+		if (
+			methodMatches(route.method, method) &&
+			patternMatchesPath(route.path, pathname)
+		) {
 			return route.rate;
 		}
 	}
@@ -680,6 +698,11 @@ export function classifyRoutePattern(
 		return 'always';
 	}
 	return undefined;
+}
+
+/* A route mounted with `.all` is declared under Elysia's `ALL` and answers every method. */
+function methodMatches(declared: string, method: string): boolean {
+	return declared === method || declared === 'ALL';
 }
 
 /*

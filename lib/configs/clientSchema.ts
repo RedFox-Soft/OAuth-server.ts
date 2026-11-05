@@ -239,6 +239,11 @@ export const ClientSchema = t.Object({
 	accountPageBucketId: t.Optional(t.String()),
 
 	/*
+	 * behindProxyBucketId, a bucket's proxy client (specs/122), is declared beside the client type instead
+	 * (lib/models/client/types.ts): one more member here takes the app chain past TS2589.
+	 */
+
+	/*
 	 * The remaining members describe the full shape of a *validated* client
 	 * object: the schema engine (lib/models/client/schema.ts) projects the
 	 * recognised snake_case metadata onto these camelCased properties. They are

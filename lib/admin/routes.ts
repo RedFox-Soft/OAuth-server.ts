@@ -18,6 +18,7 @@ import { federationAdminRoutes } from './federation/routes.js';
 import { connectedServiceAdminRoutes } from './connected-services/routes.js';
 import { endUserRoutes } from './users-end/routes.js';
 import { outsideServerRoutes } from './outside-servers/routes.js';
+import { behindProxyRoutes } from './behind-proxy/routes.js';
 import { administratorApplicationRoutes } from './administrator-applications/routes.js';
 import { provisioningRoutes } from './provisioning/routes.js';
 import { provisioningHoldRoutes } from './provisioning/holds.js';
@@ -148,3 +149,5 @@ adminApiRoutes.use(clientAddressSettingsRoutes);
 adminApiRoutes.use(keyringRoutes);
 // Connected services (specs/117), for the same reason.
 adminApiRoutes.use(connectedServiceAdminRoutes);
+// Apps behind a proxy (specs/122), for the same reason.
+adminApiRoutes.use(behindProxyRoutes);

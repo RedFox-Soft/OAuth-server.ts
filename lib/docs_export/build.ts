@@ -74,6 +74,13 @@ import {
 	GUIDE_ACTOR_PARTS,
 	optionPartsOf
 } from '../situation_guide/options.js';
+import {
+	IDENTITY_HEADERS,
+	PROXY_KINDS,
+	recipeFor,
+	type ProxyKind,
+	type RecipeValues
+} from '../behind_proxy/recipes.js';
 
 /*
  * What the website builds its Reference section from. Assembled from the tables the server already
@@ -182,6 +189,15 @@ export interface DocsExport {
 		readonly actorParts: typeof GUIDE_ACTOR_PARTS;
 		readonly examples: typeof GUIDE_EXAMPLES;
 	};
+	/*
+	 * The proxy configuration for an app behind a proxy (specs/122), built for example addresses by the function the
+	 * console's Connect step uses, so the site's recipe page shows the same text an administrator is given.
+	 */
+	readonly behindProxy: {
+		readonly example: RecipeValues;
+		readonly identityHeaders: readonly string[];
+		readonly recipes: readonly { kind: ProxyKind; text: string }[];
+	};
 	/* What the hourly attack report carries (specs/114), from the declaration the server counts and builds by. */
 	readonly attackReports: {
 		readonly destination: string;
@@ -275,6 +291,12 @@ function exportTool(tool: McpTool): McpToolExport {
 	};
 }
 
+/* The addresses the site's recipes are shown for: a project named acme on auth.example.com, and the app at grafana. */
+const RECIPE_EXAMPLE: RecipeValues = {
+	verifyUrl: 'https://auth.example.com/acme/verify/<appId>',
+	appAddress: 'https://grafana.example.com'
+};
+
 function exportSituation(situation: GuideSituation): ExportedSituation {
 	const { preset: _preset, action, ...rest } = situation;
 	return {
@@ -354,6 +376,18 @@ export function buildDocsExport(stamp: DocsExportStamp): DocsExport {
 			fixed: GUIDE_FIXED,
 			actorParts: GUIDE_ACTOR_PARTS,
 			examples: GUIDE_EXAMPLES
+		},
+		behindProxy: {
+			example: { ...RECIPE_EXAMPLE },
+			identityHeaders: [...IDENTITY_HEADERS],
+			/* The placeholder is read back as written: a URL percent-encodes `<`, and a real app id needs no encoding. */
+			recipes: PROXY_KINDS.map((kind) => ({
+				kind,
+				text: recipeFor(kind, RECIPE_EXAMPLE).replaceAll(
+					'%3CappId%3E',
+					'<appId>'
+				)
+			}))
 		},
 		attackReports: {
 			destination: ATTACK_DESTINATION,

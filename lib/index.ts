@@ -61,6 +61,7 @@ import { federationBackChannelLogout } from './upstream_signals/back_channel_log
 import { accountPageRoutes } from './account_page/routes.js';
 import { accountServicesRoutes } from './account_page/services_routes.js';
 import { accountLinkRoutes } from './account_page/link_routes.js';
+import { behindProxyRoutes } from './behind_proxy/routes.js';
 import { globalTokenRevocation } from './upstream_signals/global_token_revocation.js';
 import { verificationRoutes } from './routes/verification.js';
 import { passwordResetRoutes } from './routes/password_reset.js';
@@ -275,6 +276,12 @@ elysia.group('/:bucket', (bucketScoped) =>
 // Where an agent's connect link leads (specs/119), the same way.
 elysia.use(accountLinkRoutes);
 elysia.group('/:bucket', (bucketScoped) => bucketScoped.use(accountLinkRoutes));
+/*
+ * The check a reverse proxy makes before passing a request to an app behind it (specs/122), the same way: the
+ * project is named by the address, as at every other endpoint, and never by the forwarded host.
+ */
+elysia.use(behindProxyRoutes);
+elysia.group('/:bucket', (bucketScoped) => bucketScoped.use(behindProxyRoutes));
 
 /*
  * Binding the port, and the one startup failure this module can report.

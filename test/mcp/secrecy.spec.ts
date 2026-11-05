@@ -373,7 +373,8 @@ describe('MCP surface leaks no secrets', () => {
 			project_activity_get: { id: seeded.bucketId },
 			project_summary_get: { id: seeded.bucketId },
 			project_user_list: { id: seeded.bucketId },
-			federation_provider_list: { id: seeded.bucketId }
+			federation_provider_list: { id: seeded.bucketId },
+			behind_proxy_app_list: { id: seeded.bucketId }
 		};
 
 		// Driven from the catalogue: every published read is swept, including ones added later.

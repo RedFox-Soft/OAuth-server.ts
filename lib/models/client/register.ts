@@ -7,6 +7,7 @@ import { rootKeys } from '../../keys/issuer_keys.js';
 import { InvalidClientMetadata } from '../../helpers/errors.ts';
 import { LOOPBACKS } from '../../consts/client_attributes.js';
 import { isAccountPageClient } from '../../account_page/client.js';
+import { isBehindProxyClient } from '../../behind_proxy/client.js';
 import {
 	SIGNED_RESPONSES,
 	sl1,
@@ -139,10 +140,15 @@ export async function registerClient(
 	const client = validateClient(record);
 
 	/*
-	 * The prefix of a bucket's connected-applications page client (specs/095). No generated id can carry it,
-	 * but a deployment may supply its own id factory, and a stored record would shadow the page's client.
+	 * The prefix of a bucket's connected-applications page client (specs/095), and of its proxy client
+	 * (specs/122). No generated id can carry either, but a deployment may supply its own id factory, and a
+	 * stored record would shadow the built-in client.
 	 */
-	if (store && isAccountPageClient(client.clientId)) {
+	if (
+		store &&
+		(isAccountPageClient(client.clientId) ||
+			isBehindProxyClient(client.clientId))
+	) {
 		throw new InvalidClientMetadata('client_id is reserved');
 	}
 

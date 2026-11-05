@@ -103,6 +103,8 @@ export const MODEL_AREAS = [
 	'AssertionUsage',
 	'AuthorizationCode',
 	'BackchannelAuthenticationRequest',
+	'BehindProxySession',
+	'BehindProxySignIn',
 	'Client',
 	'ClientCredentials',
 	'ClientLogo',
@@ -167,6 +169,11 @@ export const STORE_AREAS = {
 	 * is derived from the project and the issuer, so one connection per issuer per project is the primary key.
 	 */
 	outsideAuthorizationServers: 'outsideAuthorizationServers',
+	/*
+	 * The web apps a project puts sign-in in front of through the operator's own proxy (specs/122). One app per
+	 * address per project is the unique `{bucketId, address}` index, not a rule a route has to remember.
+	 */
+	behindProxyApps: 'behindProxyApps',
 	/*
 	 * People's accounts at the services their project lets them connect (specs/117), with the upstream tokens
 	 * sealed. The `_id` is derived from the project, the service, the person and the upstream account, so a
@@ -329,6 +336,26 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 		EXPIRES_AT,
 		byAccountAndClient,
 		[grantId]
+	),
+	/*
+	 * A person's session at one app behind a proxy (specs/122 R6), keyed by the SHA-256 of the cookie value.
+	 * Account-owned, so every lock, deactivation, sign-out and deletion of the person ends it with no code of its
+	 * own; it expires one session lifetime after the sign-in, with no sliding. `appId` is indexed because deleting
+	 * an app ends its sessions, and a check accepts a session only for its own app.
+	 */
+	modelArea('BehindProxySession', EXPIRES_AT, byAccount, [
+		{ key: { 'payload.appId': 1 } }
+	]),
+	/*
+	 * A sign-in in front of an app, between the start and the callback: ten minutes, single use, sent as the
+	 * OAuth `state`. Point-read by id only, so no index beyond the expiry one.
+	 */
+	modelArea(
+		'BehindProxySignIn',
+		EXPIRES_AT,
+		unowned(
+			'a sign-in in progress names no person yet; reaped on its own ten-minute expiry'
+		)
 	),
 	/*
 	 * The one model area that is never reaped. Clients are upserted with no TTL argument
@@ -682,6 +709,23 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 			'owned by a bucket, which is not a principal; cascaded by the bucket-delete route'
 		),
 		[{ key: { bucketId: 1 } }]
+	),
+	/*
+	 * Never reaped: an app that expired on its own would stop a project's people reaching a web app with nothing
+	 * to say why. Owned by a bucket, which is not a principal, so the bucket-delete route cascades it. `bucketId`
+	 * serves the console's list and the implicit client's redirect URIs; the unique `{bucketId, address}` is what
+	 * keeps two apps of one project off one address under a concurrent write. A check reads by `_id`.
+	 */
+	storeArea(
+		STORE_AREAS.behindProxyApps,
+		null,
+		unowned(
+			'owned by a bucket, which is not a principal; cascaded by the bucket-delete route'
+		),
+		[
+			{ key: { bucketId: 1 } },
+			{ key: { bucketId: 1, address: 1 }, unique: true }
+		]
 	),
 	/*
 	 * Never reaped: a token that expired upstream is still the person's connection until they or an

@@ -28,6 +28,8 @@ export async function redirectUrisVouchedFor(client: Client): Promise<boolean> {
 	}
 	/* Derived by this server from the bucket's own address: nobody but the server put it there. */
 	if (client.accountPageBucketId) return true;
+	/* Derived from the addresses of the bucket's apps, which only an administrator writes (specs/122). */
+	if (client.behindProxyBucketId) return true;
 	return Boolean(await adapter('Client').find(client.clientId));
 }
 

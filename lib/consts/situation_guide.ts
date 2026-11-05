@@ -121,12 +121,16 @@ export type GuidePart =
 	| 'globe'
 	| 'team'
 	| 'audit'
-	| 'thief';
+	| 'thief'
+	| 'proxy';
 
 export interface GuideLane {
 	id: string;
 	label: string;
-	/* The diagram's colours read this; `part` is the drawing. */
+	/*
+	 * The diagram's colours read this; `part` is the drawing. `proxy` is the reader's own reverse proxy, the gate every
+	 * request to an app behind it passes through: drawn apart so a picture never shows FoxAuth on that path.
+	 */
 	kind:
 		| 'person'
 		| 'browser'
@@ -135,7 +139,8 @@ export interface GuideLane {
 		| 'fox'
 		| 'agent'
 		| 'outside'
-		| 'company';
+		| 'company'
+		| 'proxy';
 	part: GuidePart;
 }
 
@@ -349,7 +354,10 @@ const LANES = {
 	itadmin: { label: 'Company IT', kind: 'company', part: 'company' },
 	security: { label: 'Security team', kind: 'person', part: 'team' },
 	dev: { label: 'Another developer’s app', kind: 'outside', part: 'laptop' },
-	thief: { label: 'Someone with a copy', kind: 'outside', part: 'thief' }
+	thief: { label: 'Someone with a copy', kind: 'outside', part: 'thief' },
+	browser: { label: 'Person’s browser', kind: 'person', part: 'browser' },
+	proxy: { label: 'Your proxy', kind: 'proxy', part: 'proxy' },
+	proxied: { label: 'Your app', kind: 'api', part: 'server' }
 } as const satisfies Record<string, Omit<GuideLane, 'id'>>;
 
 export type LaneId = keyof typeof LANES;
@@ -1197,6 +1205,93 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 		prompt: prompt(
 			'Add sign-in through Google to my FoxAuth project.\nTell me where in Google Cloud Console to create the OAuth client and which callback address to give it, then connect it in FoxAuth.',
 			'federation_provider_create for Google'
+		)
+	},
+	{
+		id: 'behindproxy',
+		tab: 'product',
+		title: 'A web app with no sign-in of its own',
+		sentence:
+			'Put the app behind your proxy. The proxy asks FoxAuth about each request before it reaches the app, so people sign in to your project and the app does not change.',
+		protocol: 'Forward auth · OpenID Connect · Authorization Code + PKCE',
+		lanes: lanes('browser', 'proxy', 'proxied', 'fox'),
+		steps: [
+			step(
+				'browser',
+				'proxy',
+				'Opens the app',
+				'The person opens your app. The request reaches your proxy first.'
+			),
+			step(
+				'proxy',
+				'fox',
+				'Asks the project',
+				'Your proxy asks the project whether this request may go through, before the app sees it.'
+			),
+			step(
+				'fox',
+				'browser',
+				'Sends to sign-in',
+				'Nobody is signed in yet, so the project sends the browser to its sign-in page.',
+				'redirect'
+			),
+			step(
+				'browser',
+				'fox',
+				'Signs in',
+				'The person signs in to the project, or is already signed in to it.'
+			),
+			step(
+				'fox',
+				'browser',
+				'Back to /_foxauth/callback',
+				'The project sends the browser back to /_foxauth/callback on your app’s own address, and the app’s sign-in cookie is set there.',
+				'redirect'
+			),
+			step(
+				'fox',
+				'proxy',
+				'Yes, this is Anna',
+				'On the next request the project checks your rules for that path and answers yes, with who the person is.'
+			),
+			step(
+				'proxy',
+				'proxied',
+				'With X-Auth-* headers',
+				'Your proxy lets the request through to your app, with the person’s id, email and groups in X-Auth-* headers.'
+			)
+		],
+		problem: {
+			at: 'proxied',
+			mark: 'open',
+			caption: 'Anyone who finds the address gets in.'
+		},
+		fixCaption: 'Your proxy lets in only the people you choose.',
+		sees: {
+			kind: 'signIn',
+			lines: [
+				'The project’s sign-in page, the first time',
+				'Then your app, as before',
+				'Someone not allowed sees a page that says so'
+			]
+		},
+		preset: 'behindProxy',
+		needs: { role: 'edit' },
+		action: {
+			kind: 'form',
+			target: { area: 'applications', query: { situation: 'behindProxy' } }
+		},
+		goodToKnow: [
+			'Make sure the app is reachable only through your proxy. A request that reaches it another way skips the check.',
+			'Your app does not change. It can read who the person is from the X-Auth-* headers.',
+			'The Connect step gives the configuration for Caddy, Traefik or nginx, ready to paste.',
+			'Each path can be open to the members of chosen groups, to everyone in the project, to anyone, or to no one.',
+			'There is nothing to switch on, and it is on every plan.'
+		],
+		prompt: prompt(
+			'Put sign-in in front of my web app at https://app.example.com, behind my reverse proxy (work out Caddy, Traefik or nginx from my configuration). Only members of the group I name may open it.\nCreate the app behind the proxy in FoxAuth, then add the configuration it gives to my proxy.',
+			'behind_proxy_app_create',
+			'Make sure the app is reachable only through the proxy, so nobody can reach it without the check.'
 		)
 	},
 	{

@@ -4,7 +4,7 @@ title: "Per-origin rate limiting"
 tags: [architecture, config, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-28
-updated: 2026-10-13
+updated: 2026-11-05
 graph:
   node_type: concept
   relationships:
@@ -116,6 +116,12 @@ tenants' traffic from a few addresses. They are limited per **connection** insid
 and a request whose credential fails is charged per origin there with the `strict` bounds — so the
 exemption moves the limit rather than removing it. It also gives the 429 SCIM's own error shape, which a
 refusal thrown here, before routing, never could. See [[scim-provisioning]].
+
+Since spec 122 (2026-11-05) the check a proxy makes for an app behind it (`/verify/:appId`, every method) is
+`exempt` for the same reason (`lib/consts/route_classification.ts:598-602`): everyone behind one proxy arrives
+from the proxy's address. It is limited per app inside its own module, and a check naming no app is charged
+with the strict failed-credential bounds (`lib/behind_proxy/rate_limit.ts:26-77`). Since then `rateClassForRequest`
+also matches a route declared under Elysia's `ALL` (`methodMatches`). See [[behind-your-proxy]].
 
 Every `OPTIONS` is `public` on the method alone. A preflight never reaches the route table —
 `corsPreflight` short-circuits it — and charging it to the class of the request it precedes would

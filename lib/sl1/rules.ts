@@ -15,20 +15,23 @@ export function sl1(): boolean {
 type ClientProvenance = {
 	readonly bucketId?: string;
 	readonly accountPageBucketId?: string;
+	readonly behindProxyBucketId?: string;
 	readonly provisioningConnectionId?: string;
 };
 
 /*
  * The clients the profile's client rules do not reach. The administrators' project holds the console and the
  * administrators' MCP client — the server's own, whose loopback `http` redirect an agent on the operator's machine
- * needs. A project's account page asks `/auth` with `response_type=none` and never receives a token. A SCIM
+ * needs. A project's account page asks `/auth` with `response_type=none` and never receives a token; its proxy
+ * client's code is redeemed in-process by the check endpoint, which mints no token from it (specs/122 R5). A SCIM
  * connection's client reaches only the SCIM endpoint, which IPSIE's SCIM profile governs and SL1 does not. The
- * profile's default signing algorithm still applies to all three.
+ * profile's default signing algorithm still applies to all four.
  */
 export function sl1Exempt(client: ClientProvenance): boolean {
 	return (
 		client.bucketId === ADMIN_BUCKET_ID ||
 		client.accountPageBucketId !== undefined ||
+		client.behindProxyBucketId !== undefined ||
 		client.provisioningConnectionId !== undefined
 	);
 }

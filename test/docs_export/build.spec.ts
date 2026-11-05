@@ -10,6 +10,7 @@ import {
 	GUIDE_SITUATIONS
 } from 'lib/consts/situation_guide.ts';
 import { ADDON_SEAMS } from 'lib/addon/seams.ts';
+import { PROXY_KINDS, recipeFor } from 'lib/behind_proxy/recipes.ts';
 import {
 	alwaysAvailablePrefixes,
 	alwaysAvailableRoutes,
@@ -164,5 +165,24 @@ describe('documentation export', () => {
 		for (const pair of Object.values(out.situationGuide.actorParts))
 			for (const part of pair)
 				expect(parts[part].paths.length).toBeGreaterThan(0);
+	});
+
+	/*
+	 * The site's recipe page and the console's Connect step must show one text (FR-034): for every proxy the console
+	 * offers, the export carries what Connect would show for the example addresses, the placeholder app id aside.
+	 */
+	it('exports, for every proxy, the configuration the console gives for the same addresses', () => {
+		const { example, recipes } = out.behindProxy;
+		expect(recipes.map((recipe) => recipe.kind)).toEqual([...PROXY_KINDS]);
+		const appId = 'bp0example';
+		const real = {
+			verifyUrl: example.verifyUrl.replace('<appId>', appId),
+			appAddress: example.appAddress
+		};
+		for (const recipe of recipes) {
+			expect(recipe.text.replaceAll('<appId>', appId)).toBe(
+				recipeFor(recipe.kind, real)
+			);
+		}
 	});
 });

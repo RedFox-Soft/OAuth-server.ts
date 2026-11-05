@@ -2,6 +2,7 @@ import { Elysia, t, type Static } from 'elysia';
 import { issuerFor } from 'lib/configs/issuer.js';
 import {
 	InvalidClient,
+	InvalidGrant,
 	UnauthorizedClient,
 	UnsupportedGrantType
 } from '../helpers/errors.js';
@@ -111,6 +112,17 @@ export const tokenAction = new Elysia()
 			if (!grantTypeAllowed(client, grantType)) {
 				throw new UnauthorizedClient(
 					'requested grant type is not allowed for this client'
+				);
+			}
+
+			/*
+			 * A project's proxy client signs people in to its apps behind a proxy, and its codes are redeemed only by
+			 * the check, in-process (specs/122 R5, FR-023). Here a code of it would be a session turned into tokens the
+			 * app's people never asked for, so it is refused as a grant this endpoint cannot redeem.
+			 */
+			if (client.behindProxyBucketId !== undefined) {
+				throw new InvalidGrant(
+					'codes issued for an app behind a proxy are redeemed only by its check'
 				);
 			}
 

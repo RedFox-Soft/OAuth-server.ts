@@ -590,6 +590,30 @@ const routes = [
 	},
 
 	/*
+	 * The web apps a project puts sign-in in front of through the operator's own proxy (specs/122). The entries
+	 * name the app, the project travels as the scope. `behindproxy` is the word people read in the trail, with no
+	 * hyphen and no stored segment it is a prefix of.
+	 */
+	{
+		action: 'behindproxy.create',
+		method: 'POST',
+		path: '/admin/api/projects/:id/behind-proxy',
+		targetType: 'BehindProxyApp'
+	},
+	{
+		action: 'behindproxy.update',
+		method: 'PATCH',
+		path: '/admin/api/projects/:id/behind-proxy/:appId',
+		targetType: 'BehindProxyApp'
+	},
+	{
+		action: 'behindproxy.delete',
+		method: 'DELETE',
+		path: '/admin/api/projects/:id/behind-proxy/:appId',
+		targetType: 'BehindProxyApp'
+	},
+
+	/*
 	 * Upstream federation providers. `targetType` is the bucket, because a provider has no identity outside
 	 * the bucket it belongs to — it is an element of that bucket's document, and an entry naming only
 	 * `acme-sso` would not say whose.

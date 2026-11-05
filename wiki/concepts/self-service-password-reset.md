@@ -137,8 +137,9 @@ nothing resends anything. The same `update()` writes the password hash, `passwor
 
 ## Sessions, and nothing more
 
-`endSessionsForAccount` (in `lib/helpers/cascade.ts`) sweeps the `Session` area by its **declared** owner
-field, reusing the deletion engine's mechanism rather than adding a second invalidation path. It is
+`endSessionsForAccount` (in `lib/helpers/cascade.ts`) sweeps the `Session` area — and, since spec 122, the
+person's sessions at apps behind a proxy (`BehindProxySession`), which follow the person rather than the project
+session — by their **declared** owner field, reusing the deletion engine's mechanism rather than adding a second invalidation path. It is
 deliberately neither a narrowed `cascadeForAccount` nor something that one is rebuilt on: a deletion sweeps
 everything a principal owns, a reset sweeps sessions. Tokens and grants keep their own lifetimes — see
 [[deletion-and-revocation]] for why revocation and consent are separate ideas.

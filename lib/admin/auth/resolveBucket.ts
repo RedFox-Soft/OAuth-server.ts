@@ -9,6 +9,7 @@ import { namespaceOf } from '../../resources/namespace.js';
 import type { RequestBucket } from '../../configs/issuer.js';
 import { MCP_RESOURCE } from '../../mcp/consts.js';
 import { bucketIdOfAccountPageClient } from '../../account_page/client.js';
+import { bucketIdOfBehindProxyClient } from '../../behind_proxy/client.js';
 
 /*
  * Which user bucket a request signs a user into, in order:
@@ -58,6 +59,9 @@ export async function resolveBucketForRequest(
 	 */
 	const pageBucket = clientId && bucketIdOfAccountPageClient(clientId);
 	if (pageBucket) return pageBucket;
+	/* A bucket's proxy client (specs/122) belongs to the bucket its id names, for the same reason. */
+	const proxyBucket = clientId && bucketIdOfBehindProxyClient(clientId);
+	if (proxyBucket) return proxyBucket;
 
 	if (clientId) {
 		const pinned = pinnedBucketOf(await storedBucketOf(clientId));

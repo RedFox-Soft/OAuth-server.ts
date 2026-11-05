@@ -4,7 +4,7 @@ title: 'A project is a tenant with its own issuer'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-09-15
-updated: 2026-10-22
+updated: 2026-11-05
 graph:
   node_type: concept
   relationships:
@@ -100,7 +100,10 @@ Everything below about slugs continues to hold; a hostname simply takes the same
 rules. Three consequences are specific to the host form. Since spec 101 they hold for a subdomain project as
 well, since it also has an origin of its own (`hasOwnOrigin`, `lib/configs/issuer.ts:145`). The request's host is read in one place
 (`hostOfRequest`), from `Host` and never `X-Forwarded-Host`, because that header is attacker-settable
-and here it selects the tenant. A host-addressed project needs only the single well-known location, since
+and here it selects the tenant. Spec 122 (2026-11-05) added one documented exception, which still selects nothing.
+The check a proxy makes for an app behind it reads `X-Forwarded-Host` only to compare it with the address of
+the app it already chose from its own address and path. A mismatch is a refusal (`sameHost`,
+`lib/behind_proxy/check.ts:285-300`; [[behind-your-proxy]]). A host-addressed project needs only the single well-known location, since
 its issuer is an origin with no path and the two specifications stop disagreeing. And an interaction now
 records the project it began at, because `/ui/*` is served from one origin for every path-addressed
 project but a hostname makes the origin a real boundary — without the record, an interaction begun at one

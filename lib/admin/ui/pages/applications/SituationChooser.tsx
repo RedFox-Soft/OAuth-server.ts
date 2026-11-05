@@ -26,6 +26,7 @@ import { buildBody, DEFAULT_VALUES, type FormValues } from './clientForm.js';
 import { ClientFormFields } from './ClientFormFields.js';
 import { handOff } from './handOff.js';
 import { GUIDE_SITUATIONS } from '../../../../consts/situation_guide.js';
+import { CreateFields, type CreateValues } from '../behind-proxy/CreateForm.js';
 
 /* The two chooser-only options are no situation of the guide, so no guide entry carries their words. */
 const OTHER_WORDS: Partial<
@@ -97,7 +98,10 @@ export function SituationChooser({
 }) {
 	const navigate = useNavigate();
 	const feedback = useFeedback();
-	const preset = SITUATIONS.find((s) => s.id === initial && s.expand);
+	/* An app behind a proxy has a form of its own, which the guide's "Set this up" opens at once too. */
+	const preset = SITUATIONS.find(
+		(s) => s.id === initial && (s.expand || s.id === 'behindProxy')
+	);
 	/* The guide's "Open the full form" asks for `custom`: the full form itself, as choosing it in step 1 opens. */
 	const custom =
 		initial === 'custom'
@@ -124,6 +128,7 @@ export function SituationChooser({
 	const [fullInitial, setFullInitial] = useState<FormValues>(DEFAULT_VALUES);
 	const [details] = Form.useForm<Details>();
 	const [form] = Form.useForm<FormValues>();
+	const [proxied] = Form.useForm<CreateValues>();
 	const devAddress = Form.useWatch('devAddress', details);
 
 	const base = `/admin/api/projects/${encodeURIComponent(bucketId)}`;
@@ -167,6 +172,7 @@ export function SituationChooser({
 			return;
 		}
 		setChosen(situation);
+		if (situation.id === 'behindProxy') return;
 		if (situation.id === 'custom') {
 			setFullInitial(DEFAULT_VALUES);
 			setFull(true);
@@ -326,7 +332,23 @@ export function SituationChooser({
 		</Flex>
 	);
 
-	const step2 = chosen && !full && (
+	const behindProxy = chosen?.id === 'behindProxy';
+
+	const stepBehindProxy = behindProxy && (
+		<>
+			<Typography.Paragraph type="secondary">
+				{wordsOf(chosen).title} — {chosen.footnote}
+			</Typography.Paragraph>
+			<CreateFields
+				bucketId={bucketId}
+				form={proxied}
+				onBusy={setSaving}
+				onCreated={close}
+			/>
+		</>
+	);
+
+	const step2 = chosen && !full && !behindProxy && (
 		<Form<Details>
 			key={chosen.id}
 			form={details}
@@ -493,9 +515,15 @@ export function SituationChooser({
 				type="primary"
 				loading={saving}
 				disabled={noApis}
-				onClick={() => (full ? form.submit() : details.submit())}
+				onClick={() =>
+					behindProxy
+						? proxied.submit()
+						: full
+							? form.submit()
+							: details.submit()
+				}
 			>
-				Create application
+				{behindProxy ? 'Create app' : 'Create application'}
 			</Button>
 		];
 	}
@@ -512,6 +540,7 @@ export function SituationChooser({
 			destroyOnHidden
 		>
 			{!chosen && step1}
+			{stepBehindProxy}
 			{step2}
 			{stepFull}
 		</Modal>

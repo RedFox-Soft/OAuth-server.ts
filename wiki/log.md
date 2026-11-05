@@ -370,3 +370,13 @@ Operations:
 ## [2026-11-04] update | [[situation-guide]] — keeping the guide true: a change that adds, changes or removes something a person sets up updates its situation in the same change (rule in AGENTS.md, checklist here, and what the tests do and do not catch).
 
 ## [2026-11-05] fix | [[admin-console-signin]] — the callback shows a refused sign-in by its own code after the state check instead of a 422; a session whose remembered grant ran out gets a fresh trusted grant for a consent-skipping client instead of access_denied.
+
+## [2026-11-05] update | [[admin-mcp-control-plane]] — spec 122 adds the five `behind_proxy_app_*` tools (148 tools, 48 high); `behind_proxy_app_update` is high when it sets `rules` or `address`.
+
+## [2026-11-05] update | [[error-store-capture-sites]] — spec 122 adds an eighth capture site: the check a proxy makes for an app behind it answers a fault 500 in its own shape and records it there.
+
+## [2026-11-05] update | [[monthly-active-users]] — spec 122: a sign-in at an app behind a proxy issues no token, so its in-process code redemption counts the person through `markActivity`, the writer `noteActivity` now delegates to.
+
+## [2026-11-05] update | [[self-service-password-reset]] — spec 122: `endSessionsForAccount` also sweeps `BehindProxySession`, so a password reset ends the person's sessions at apps behind a proxy.
+
+## [2026-11-05] create | [[behind-your-proxy]] — spec 122: apps behind the operator's proxy (forward auth): one `/verify/:appId` endpoint with relayed `/_foxauth/*` paths, the forwarded-host comparison, `__Host-` cookies with no `Domain` (owner decision), the account-owned app session, the `proxy.<bucketId>` client, the headers, path rules, rate limit, console and known limitations. Corrected [[cookie-path-scoping]] (`__Host-` cookies on an app's host, still no `Domain`), [[project-is-an-issuer]] (the one `X-Forwarded-Host` exception), [[client-identity-from-database]] (three synthesized clients, `proxy.` prefix refused), [[end-user-support]] (the proxy client is never a row), [[per-origin-rate-limiting]] and [[caller-address]] (the exempt check and its caller), and the [[monthly-active-users]] index line (`markActivity`).

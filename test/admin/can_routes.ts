@@ -373,6 +373,45 @@ export const statedRightRoutes: readonly StatedRightRoute[] = [
 		path: `${BUCKET}/outside-authorization-servers/:serverId`
 	},
 
+	/* Apps behind a proxy (specs/122): read with the project's people, changed with the project. */
+	{
+		on: 'bucket',
+		flag: 'manageUsers',
+		method: 'GET',
+		path: `${BUCKET}/behind-proxy`
+	},
+	{
+		on: 'bucket',
+		flag: 'manageUsers',
+		method: 'GET',
+		path: `${BUCKET}/behind-proxy/:appId`
+	},
+	{
+		on: 'bucket',
+		flag: 'edit',
+		method: 'POST',
+		path: `${BUCKET}/behind-proxy`,
+		body: {
+			name: 'Probe',
+			address: 'https://probe.example',
+			proxyKind: 'caddy',
+			rootGroups: []
+		}
+	},
+	{
+		on: 'bucket',
+		flag: 'edit',
+		method: 'PATCH',
+		path: `${BUCKET}/behind-proxy/:appId`,
+		body: {}
+	},
+	{
+		on: 'bucket',
+		flag: 'edit',
+		method: 'DELETE',
+		path: `${BUCKET}/behind-proxy/:appId`
+	},
+
 	/* Connected services (specs/117): read with the project's people, changed with the project. */
 	{
 		on: 'bucket',

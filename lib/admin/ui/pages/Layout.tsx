@@ -38,6 +38,10 @@ import {
 	ApplicationPage,
 	type ApplicationTab
 } from './applications/ApplicationPage.js';
+import {
+	BehindProxyPage,
+	type BehindProxyTab
+} from './behind-proxy/BehindProxyPage.js';
 import { Groups } from './Groups.js';
 import { ScopeSwitcher } from './ScopeSwitcher.js';
 import { Buckets } from './Buckets.js';
@@ -103,6 +107,13 @@ const CONNECTION_TABS: Partial<Record<PageKey, ConnectionTab>> = {
 const APPLICATION_TABS: Partial<Record<PageKey, ApplicationTab>> = {
 	'bucket.application': 'connect',
 	'bucket.application.settings': 'settings'
+};
+
+/* One app behind the operator's proxy (specs/122); the bare address is its Connect tab. */
+const BEHIND_PROXY_TABS: Partial<Record<PageKey, BehindProxyTab>> = {
+	'bucket.behindProxy': 'connect',
+	'bucket.behindProxy.access': 'access',
+	'bucket.behindProxy.settings': 'settings'
 };
 
 /*
@@ -283,6 +294,17 @@ export function Layout() {
 					bucketId={route.params.project ?? ''}
 					clientId={route.params.client ?? ''}
 					tab={applicationTab}
+				/>
+			);
+		}
+		const behindProxyTab = BEHIND_PROXY_TABS[route.key];
+		if (behindProxyTab) {
+			return (
+				<BehindProxyPage
+					key={`${route.params.project ?? ''}/${route.params.app ?? ''}`}
+					bucketId={route.params.project ?? ''}
+					appId={route.params.app ?? ''}
+					tab={behindProxyTab}
 				/>
 			);
 		}

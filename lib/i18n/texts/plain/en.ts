@@ -150,5 +150,20 @@ export const en = {
 			title: 'Password sign-in is not available',
 			body: 'This application signs you in through your identity provider. There is no password to enter, reset, or register here.'
 		}
+	},
+	/* An app behind the operator's proxy (specs/122): the pages the proxy shows in the app's place. */
+	behindProxy: {
+		denied: {
+			title: "You can't open {host}",
+			signedInAs: 'Signed in as {email}',
+			otherAccount: 'Use another account',
+			reason: 'Reason: {reason}, at {time}'
+		},
+		signInFailed: {
+			title: 'Sign-in to {host} did not finish',
+			body: 'Open the app again to start over.',
+			tryAgain: 'Sign in again',
+			reason: 'Reason: {reason}, at {time}'
+		}
 	}
 } as const;

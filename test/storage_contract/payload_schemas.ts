@@ -18,6 +18,10 @@ import { AccessTokenPayload } from 'lib/models/access_token.js';
 import { AssertionUsagePayload } from 'lib/assertions/usage.js';
 import { AuthorizationCodePayload } from 'lib/models/authorization_code.js';
 import { BackchannelAuthenticationRequestPayload } from 'lib/models/backchannel_authentication_request.js';
+import {
+	BehindProxySessionPayload,
+	BehindProxySignInPayload
+} from 'lib/behind_proxy/payloads.js';
 import { ClientCredentialsPayload } from 'lib/models/client_credentials.js';
 import { ClientLogoPayload } from 'lib/models/client/logo.js';
 import { ClientUsagePayload } from 'lib/models/client/usage.js';
@@ -61,6 +65,8 @@ export const PAYLOAD_SCHEMAS: Readonly<
 	AssertionUsage: AssertionUsagePayload,
 	AuthorizationCode: AuthorizationCodePayload,
 	BackchannelAuthenticationRequest: BackchannelAuthenticationRequestPayload,
+	BehindProxySession: BehindProxySessionPayload,
+	BehindProxySignIn: BehindProxySignInPayload,
 	ClientCredentials: ClientCredentialsPayload,
 	ClientLogo: ClientLogoPayload,
 	ClientUsage: ClientUsagePayload,

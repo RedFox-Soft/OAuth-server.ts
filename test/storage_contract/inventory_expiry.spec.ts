@@ -21,6 +21,16 @@ const REAPED_ON_EXPIRES_AT = [
 	'AccessToken',
 	'AuthorizationCode',
 	'BackchannelAuthenticationRequest',
+	/*
+	 * A person's session at an app behind a proxy (specs/122). Expiry is the control: a session that never
+	 * expired would let one sign-in open the app for good.
+	 */
+	'BehindProxySession',
+	/*
+	 * A sign-in in front of an app between its start and its callback. Expiry is the control: a record that
+	 * outlived its ten minutes would be a callback anyone holding the state could still complete.
+	 */
+	'BehindProxySignIn',
 	'ClientCredentials',
 	/*
 	 * A connect flow in flight (specs/117). Expiry is the control: a flow that outlived its ten minutes would be
@@ -140,6 +150,11 @@ const PERMANENT = [
 	 * would stop a project's agents reaching an outside MCP server with nothing to say why.
 	 */
 	'outsideAuthorizationServers',
+	/*
+	 * An app behind a proxy lives until an administrator removes it or its project goes. An expiry here would
+	 * stop a project's people reaching a web app with nothing to say why.
+	 */
+	'behindProxyApps',
 	/* A connected account is the person's until they, an administrator or a deletion removes it (specs/117). */
 	'connectedAccounts',
 	/*

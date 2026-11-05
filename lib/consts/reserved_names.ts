@@ -26,6 +26,8 @@ export const RESERVED_BUCKET_NAMES: readonly string[] = [
 	'userinfo',
 	'backchannel',
 	'global-token-revocation',
+	// The check a proxy makes for an app behind it (specs/122): a bucket named `verify` would lose `/verify/auth` to it.
+	'verify',
 	/*
 	 * The default bucket's SCIM endpoint is `/scim/v2`. A bucket named `scim` would serve its own at
 	 * `/scim/scim/v2` — not a collision the router gets wrong, but an address an operator would misread as

@@ -2,12 +2,13 @@
 title: FoxAuth compared with Ory Hydra
 competitor: Ory Hydra
 description: Ory Hydra is an OAuth 2.0 and OpenID Connect server that delegates login to an app you write. FoxAuth ships the login, consent and admin screens itself.
-lastChecked: '2026-11-02'
+lastChecked: '2026-11-05'
 sources:
   - https://github.com/ory/hydra
   - https://www.ory.com/docs/hydra/self-hosted/quickstart
   - https://www.ory.com/docs/oauth2-oidc/device-authorization
   - https://www.ory.com/docs/kratos/social-signin/get-tokens
+  - https://www.ory.com/docs/oathkeeper
 bottomLine: 'Pick Ory Hydra if you already have an identity system and want a hardened, Apache-licensed OAuth server sitting in front of it. Pick FoxAuth if you would rather not build a login and consent application before issuing your first token.'
 chooseThem:
   - 'You already run your own user store and login UI, and want an OAuth server that stays out of it.'
@@ -199,6 +200,20 @@ groups:
         verdict: us
         why: 'With Hydra, keeping and handing out upstream tokens is code you write around Kratos or your own store. FoxAuth ships the store, both consents and the refresh.'
         note: 'Kratos returns them as "initial_access_token", "initial_refresh_token" and "initial_id_token", only from the sign-up or the linking of a provider.'
+      - dimension: Sign-in in front of a web app through your proxy
+        us:
+          {
+            status: yes,
+            text: 'An app with no sign-in of its own goes behind your Caddy, Traefik or nginx. The proxy asks the project about every request, a rule for each path names the groups that may open it, and the app receives who the person is in X-Auth-* headers. The console gives the proxy configuration. Nothing else to run, and on every plan.'
+          }
+        them:
+          {
+            status: no,
+            text: 'Not in Hydra. Ory Oathkeeper, a separate Ory product, is an identity and access proxy whose decision API works with nginx and other gateways.'
+          }
+        verdict: us
+        why: 'With Ory this is a second product, Oathkeeper, to deploy and configure beside Hydra. Here it comes with the authorization server.'
+        note: 'The Oathkeeper documentation says its access control decision API "works with most (if not all) modern API gateways and reverse proxies" and that Oathkeeper "can be used standalone."'
       - dimension: Licence
         us:
           {

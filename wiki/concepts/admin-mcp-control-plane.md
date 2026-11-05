@@ -19,7 +19,8 @@ as a bucket group, `BucketGroup`). So the `bucket_*` tools are `project_*`, `buc
 high-consequence, until spec 102 added the plan tools: 123 then, 41 of them high-consequence ([[plans]]).
 Later specs added reads and writes; after spec 116 added `keyring_status_get` (2026-10-29) the catalogue
 published 135 tools, 44 of them declared high-consequence; spec 117 added the eight connected-service tools
-(2026-11-02), two of them high (`connected_service_delete`, `connected_account_delete`): 143 tools, 46 high. Before spec 099, `project_*` tools such as `project_create` and `project_bucket_assign`
+(2026-11-02), two of them high (`connected_service_delete`, `connected_account_delete`): 143 tools, 46 high; spec 122 added the five `behind_proxy_app_*` tools (2026-11-05),
+create and delete high and update high when it sets `rules` or `address`: 148 tools, 48 high. Before spec 099, `project_*` tools such as `project_create` and `project_bucket_assign`
 administered the old Project entity, now called a retired project; where this page names them it says so.
 
 An AI agent administers this instance over MCP at `POST /mcp`, as an OAuth 2.1 protected resource of
@@ -300,7 +301,8 @@ Spec 088 added four tools and two exclusions:
 following injected instructions could otherwise add an address of its own to a live application's redirect URIs
 in one ordinary call and receive its people's codes. The confirmation binds the exact arguments, so a token for
 one redirect list cannot be spent on another. Data, not a predicate, like `highWhen`; the drift guard checks
-every named argument exists on the tool.
+every named argument exists on the tool. `behind_proxy_app_update` (specs/122) uses it too: high when it sets
+`rules` or `address`, which decide who reaches an app behind a proxy and which host its rules guard.
 
 Neither identity may fall back to a placeholder, and both once did. `principalId` defaulted to `''` when
 `whoami` failed and `viaClientId` to `''` when `authInfo` carried no client — either turns that binding

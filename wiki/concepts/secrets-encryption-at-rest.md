@@ -34,12 +34,14 @@ a person's TOTP secret and a pending enrolment's, the DPoP nonce secret and the 
 test `totp` is an object (both backends' user stores) and the `StoredJWK` schema `documentOf` checks inside the
 stores keep working. No secret is used in a query or an index, so randomised encryption breaks no lookup.
 
-**Deliberately plaintext** (`DECLARED_PLAINTEXT`, `lib/consts/sealed_fields.ts:98`), each with its reason:
+**Deliberately plaintext** (`DECLARED_PLAINTEXT`, `lib/consts/sealed_fields.ts:127`), each with its reason:
 
 - **The pairwise identifier salt.** Encrypting it gains almost nothing against a database copy, which already
   holds every account. A lost key would change every relying party's `sub` for ever, turning a recoverable
   loss into an unrecoverable one. Ory Hydra keeps it in configuration instead, which is the way to revisit it.
 - **Digests and password hashes**, which are already irreversible.
+- **A sign-in's PKCE verifier and browser-marker digest** (`BehindProxySignIn`, `lib/behind_proxy/payloads.ts`): server-only, single
+  use, gone in ten minutes. A proxy app session's record id is the cookie value's SHA-256, never the value.
 
 `test/sealing/inventory_sweep.spec.ts` fails for a secret-looking schema field that is in neither list.
 

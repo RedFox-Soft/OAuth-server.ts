@@ -4,7 +4,7 @@ title: 'End-user support: invitations on the reset challenge, mark verified, ses
 tags: [architecture, contract, gotcha, security]
 sources: [oauth-server-codebase]
 created: 2026-10-12
-updated: 2026-10-15
+updated: 2026-11-05
 graph:
   node_type: concept
   relationships:
@@ -68,6 +68,9 @@ offline grant outlives its session.
   until spec 095 they were read as seconds, which dated access no session held some fifty thousand years ahead.
 - The project's connected-apps page client is never a row: signing in to one's own account page leaves a grant,
   as every authorization does, and it is not an application (`grantsByClient`, `lib/end_users/sessions.ts:101`).
+  Since spec 122 the same holds for the project's proxy client `proxy.<bucketId>` (`isBuiltInClient`,
+  `sessions.ts:102-104`). A person's sessions at apps behind a proxy are records of their own, not grants
+  ([[behind-your-proxy]]).
   The person's own page reads the same grants ([[connected-apps-page]]).
 - **Last token issued** is the newest stored refresh or access token of the grant. JWT access tokens are never
   stored, so the console names it honestly and says a token an app checks by itself is invisible here.

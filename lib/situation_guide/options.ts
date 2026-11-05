@@ -21,9 +21,10 @@ export const GUIDE_ACTOR_PARTS: Readonly<
 
 /*
  * The parts an option for this answer shows, read off the answer's own pictures rather than kept per answer: the part
- * that has the problem, and the party outside your control the fix involves, in the order the answer's lanes run. An
- * answer of question 2 leaves out the part of the actor already chosen in question 1 (every agent answer would
- * otherwise start with the agent); what is left empty is FoxAuth itself, as in the administrative MCP.
+ * that has the problem, and the party outside your control the fix involves (or the proxy it works through), in the
+ * order the answer's lanes run. An answer of question 2 leaves out the part of the actor already chosen in question 1
+ * (every agent answer would otherwise start with the agent); what is left empty is FoxAuth itself, as in the
+ * administrative MCP.
  */
 export function optionPartsOf(situation: GuideSituation): GuidePart[] {
 	const { problem, solution } = sceneOf(situation);
@@ -31,7 +32,9 @@ export function optionPartsOf(situation: GuideSituation): GuidePart[] {
 		? GUIDE_ACTOR_PARTS[situation.ask.actor][0]
 		: undefined;
 	const at = problem.nodes.find((node) => node.lane === problem.mark?.at);
-	const outside = solution.nodes.find((node) => node.role === 'outside');
+	const outside = solution.nodes.find(
+		(node) => node.role === 'outside' || node.role === 'proxy'
+	);
 	const order = new Map(situation.lanes.map((lane, i) => [lane.id, i]));
 	const picked = [at, outside]
 		.filter((node) => node !== undefined)

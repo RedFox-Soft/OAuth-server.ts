@@ -4,7 +4,7 @@ title: 'The caller address and the per-caller mail limit'
 tags: [architecture, security, contract, gotcha, config]
 sources: [oauth-server-codebase]
 created: 2026-10-28
-updated: 2026-10-29
+updated: 2026-11-05
 ---
 
 # The caller address and the per-caller mail limit
@@ -13,6 +13,11 @@ Every address-based decision attributes a request to one address: the [[per-orig
 failed-credential charges at SCIM and the upstream signals, the error store's recorded origin, and the mail
 limit. Spec 115 made that one function, `callerAddressOf` (`lib/helpers/caller_address.ts:170`), because the
 old answer could be chosen by the caller.
+
+Since spec 122 (2026-11-05) one caller narrows its answer. The check a proxy makes for an app behind it is
+always called by the proxy, and a trusted proxy's `X-Forwarded-For` names the person it is asking about. So
+`checkCallerOf` replaces an address resolved from that header with the connection it arrived on
+(`lib/behind_proxy/rate_limit.ts:59-70`; [[behind-your-proxy]]).
 
 ## The defect it replaced
 

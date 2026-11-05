@@ -1,0 +1,147 @@
+---
+title: Put sign-in in front of a web app
+description: Protect a web app that has no sign-in of its own, such as Grafana, with your Caddy, Traefik or nginx proxy and a FoxAuth project. No change to the app.
+sidebar:
+  order: 7
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import ProxyRecipe from '../../../../components/ProxyRecipe.astro';
+
+Some web apps have no sign-in of their own: a dashboard, an internal tool, an admin page someone wrote in an
+afternoon. Anyone who finds the address can open them. You can fix that without touching the app. Put it behind your
+proxy, and let the proxy ask FoxAuth about every request before the request reaches the app.
+
+This way of working is called **forward auth**. Your reverse proxy (Caddy, Traefik or nginx) stands in front of the
+app. For each request, it asks your FoxAuth project whether the request may go through. A person who has not signed
+in is sent to the project's sign-in page. A person who may open the page is let through, and the app is told who
+they are. A person who may not open it sees a page that says so.
+
+This page takes about ten minutes if your proxy already serves the app.
+
+<Aside
+	type="note"
+	title="What you need first"
+>
+	A running instance with an administrator account ([Create the first
+	administrator](/docs/get-started/first-admin/)), a project with people in it,
+	and at least one group of those people. The app must be served over `https` by
+	a proxy you can configure.
+</Aside>
+
+## 1. Create the app in the console {#create-the-app}
+
+1. Open your project and choose its **Applications** tab, then **New application**.
+2. Choose **A web app with no sign-in of its own**.
+3. Fill in four things:
+   - **Name**: how the console names the app.
+   - **Address**: the app's own `https` address, such as `https://grafana.example.com`. Only the scheme, the host and
+     a port are kept. If you paste an address with a path or a query, the form drops them and says so.
+   - **Who can open it**: one or more groups. Only their members may open the app at all. You can open parts of it to
+     other people later.
+   - **Proxy**: Caddy, Traefik or nginx. This only chooses which configuration the next step shows first.
+
+The app appears in its own table on the Applications tab. Its page has three parts: **Connect**, **Access** and
+**Settings**.
+
+## 2. Configure your proxy {#configure-your-proxy}
+
+**Connect** shows the configuration for your proxy, with your project's address and your app's id filled in. Copy
+it from there. The examples below are the same text, built by the same code, for an app at
+`https://grafana.example.com` in a project at `https://auth.example.com/acme`. Your app's id takes the place of
+`<appId>`.
+
+Each configuration does three things:
+
+- It sends every request to the check at `https://auth.example.com/acme/verify/<appId>` first, with the request's
+  original method, host and path. The check refuses a request that does not say all three.
+- It removes any `X-Auth-*` header the browser sent, so nobody can pretend to be someone else.
+- It passes the request to the app, with the headers the check answered.
+
+The app itself is assumed to listen on `127.0.0.1:8080`. Replace that with its real address.
+
+### Caddy {#caddy}
+
+<ProxyRecipe kind="caddy" />
+
+The `route` block keeps the order as written. Without it, Caddy would remove the `X-Auth-*` headers after the check
+had set them.
+
+### Traefik {#traefik}
+
+<ProxyRecipe kind="traefik" />
+
+This is a dynamic configuration for the file provider. `authResponseHeadersRegex` removes every `X-Auth-*` header
+the browser sent and copies the ones the check answered. `preserveLocationHeader` keeps the sign-in redirect
+pointing at the project.
+
+### nginx {#nginx}
+
+<ProxyRecipe kind="nginx" />
+
+nginx's `auth_request` understands only three answers: allowed, not signed in and refused. So the check is asked for
+a status only, and the sign-in redirect and the denial page come from a second call. That call is made for the error
+page and for the paths under `/_foxauth/`, which belong to the sign-in. Add your certificate lines where the comment
+says.
+
+## 3. Keep the app reachable only through your proxy {#reachable-only-through-the-proxy}
+
+The check protects only the requests that pass through your proxy. A request that reaches the app another way skips
+it, and the app would trust any `X-Auth-*` header it carried.
+
+So make the app listen only where the proxy can reach it: on `127.0.0.1`, on a private network, or behind a firewall
+rule that admits only the proxy. Connect repeats this, because it is the one part FoxAuth cannot do for you.
+
+If the app can check a signature, it can also stop depending on this. See `X-Auth-Assertion` below.
+
+## 4. What your app receives {#what-your-app-receives}
+
+When a request is let through, the proxy adds these headers:
+
+| Header             | What it holds                                                                                                                                                                       |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `X-Auth-User`      | The person's identifier in the project. It never changes, so use it as the key for the person.                                                                                      |
+| `X-Auth-Email`     | The person's email address.                                                                                                                                                         |
+| `X-Auth-Groups`    | The identifiers of the person's groups, separated by commas. Match on these, not on group names: a name can change.                                                                 |
+| `X-Auth-Assertion` | The same facts, signed with the project's key. It is a JWT whose audience is your app's address and which is valid for 60 seconds. It also carries the group names.                 |
+| `X-Auth-Reason`    | A short code for the decision, such as `allowed`. Refusals carry one too, for example `not_in_group` or `no_session`, so your proxy's access log shows why someone was turned away. |
+
+On a path that is open to anyone, the first four headers are present but empty.
+
+An app that verifies `X-Auth-Assertion` against the keys the project publishes at its `jwks_uri` knows the facts came
+from the project. It no longer has to trust that every request came through the proxy.
+
+## 5. Check that it works {#check-that-it-works}
+
+Connect shows four steps, each with the time it first happened:
+
+1. The app was created.
+2. The proxy asked this project about the app.
+3. Someone signed in through the proxy.
+4. Someone got through.
+
+Open the app in a private browser window. You should land on the project's sign-in page, and after signing in, back
+on the page you asked for. If step 2 stays empty, the proxy is not sending the check. If Connect names a host that is
+not your app's address, the proxy is not passing the original host.
+
+To sign out of the app, open `/_foxauth/sign_out` on the app's own address.
+
+## Choose who opens which part {#access-rules}
+
+**Access** lists one rule per path, as a tree. A rule says who may open its path and everything under it:
+
+- the members of one or more groups;
+- everyone the project lets sign in;
+- anyone, without signing in (only for `GET` and `HEAD`, and only for that exact path unless you also open
+  everything under it);
+- no one.
+
+The longest path that matches decides, so the order of the rules never matters. A rule for `/admin` covers
+`/admin/users` too, and `/Admin/users` as well. Before a save that lets more people in anywhere, the console lists
+what widens and asks you to confirm. The access check on the same tab tells you whether a person would get in at a
+given address, now and after you save.
+
+<Aside type="tip">
+	Running FoxAuth itself behind a proxy is a different task. That is covered in
+	[Behind a reverse proxy](/docs/deploy/reverse-proxy/).
+</Aside>

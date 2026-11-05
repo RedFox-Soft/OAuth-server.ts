@@ -4,7 +4,7 @@ title: 'Error store capture sites'
 tags: [architecture, gotcha, contract]
 sources: [oauth-server-codebase]
 created: 2026-08-26
-updated: 2026-10-10
+updated: 2026-11-05
 graph:
   node_type: concept
   relationships:
@@ -18,7 +18,7 @@ graph:
 
 # Error store capture sites
 
-Recorded faults are captured in **seven** places, and the reason for the first two is easy to get
+Recorded faults are captured in **eight** places, and the reason for the first two is easy to get
 backwards. (Two until 2026-10-01; the third is a fault delivered to a client by redirect, below. The
 fourth, since 2026-10-06 and spec 070, is the SCIM plugin's own `onError` in `lib/scim/index.ts`: the global
 handler stands aside for every SCIM route by route key, so a fault rendered in SCIM's error shape is
@@ -35,7 +35,11 @@ request *succeeded*: recording that a person was active is fire-and-forget after
 failure is filed with `status: 500` as the fault's class while the response was a 200, under `oauth` /
 `/token` with `errorCode: 'activity_not_recorded'` and empty headers — the fault is the datastore's, and
 `OIDCContext` keeps the request's headers private. It also logs unconditionally, because an undercount must be
-visible even with recording off — see [[monthly-active-users]].)
+visible even with recording off — see [[monthly-active-users]]. The eighth, since 2026-11-05 and spec 122, is the
+check a proxy makes for an app behind it (`lib/behind_proxy/check.ts`, `answerCheck`): the proxy passes a request on
+for any `2xx`, so every answer, a fault's included, must carry `X-Auth-Reason` and `Cache-Control: no-store` in the
+check's own plain shape; a fault is answered `500` there and filed under `oauth` with `errorCode:
+'behind_proxy_fault'`.)
 
 `errorHandler` in `lib/shared/authorization_error_handler.ts` stands aside for admin-plane errors — but
 it keys that on the `adminPlane` **marker**, which only a deliberate `AdminError` carries. So:

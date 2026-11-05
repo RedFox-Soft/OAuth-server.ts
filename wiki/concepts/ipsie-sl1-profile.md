@@ -4,7 +4,7 @@ title: "The IPSIE SL1 profile switch: what it enforces, what it needs, what it l
 tags: [oauth, oidc, config, contract, security]
 sources: [oauth-server-codebase]
 created: 2026-10-23
-updated: 2026-10-23
+updated: 2026-11-05
 graph:
   node_type: concept
   relationships:
@@ -123,10 +123,12 @@ readiness does not list them, but the profile still refuses them at use.
 - **The administrators' project.** It holds the console and the administrators' MCP client. That client's loopback
   `http` redirect serves an agent on the operator's machine.
 - **A project's account page.** It asks `/auth` with `response_type=none` and never receives a token.
+- **A project's proxy client** (`proxy.<bucketId>`, spec 122, added 2026-11-05). Its code is redeemed in-process by
+  the check endpoint of an app behind a proxy, which mints no token from it (`lib/behind_proxy/client.ts`).
 - **A SCIM connection's client.** Its token reaches only the SCIM endpoint, which SL1 does not govern, and directory
   services hold no DPoP keys.
 
-The PS256 default still applies to all three, and the console verifies its own ID tokens in the algorithm its client
+The PS256 default still applies to all four, and the console verifies its own ID tokens in the algorithm its client
 resolves to (`lib/admin/auth/verifyIdToken.ts:101`).
 
 Administrators always see a refused client. The console, the agent and the federation and outside-server

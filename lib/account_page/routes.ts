@@ -29,6 +29,7 @@ import {
 	connectLinkUrl,
 	isAccountPageClient
 } from './client.js';
+import { isBehindProxyClient } from '../behind_proxy/client.js';
 import {
 	confirmationPage,
 	listPage,
@@ -310,9 +311,15 @@ export const accountPageRoutes = new Elysia({ name: 'account-page' })
 			).some((application) => application.clientId === clientId);
 			/*
 			 * One answer for an application that does not exist, one the person never connected and one already
-			 * gone, so the response says nothing about any of them. The page's own client is not an application.
+			 * gone, so the response says nothing about any of them. The page's own client is not an application, and
+			 * neither is the proxy client (specs/122): an app behind a proxy is left by signing out of it.
 			 */
-			if (!clientId || isAccountPageClient(clientId) || !holding) {
+			if (
+				!clientId ||
+				isAccountPageClient(clientId) ||
+				isBehindProxyClient(clientId) ||
+				!holding
+			) {
 				return seeOther(`${pagePath}?gone=1`);
 			}
 

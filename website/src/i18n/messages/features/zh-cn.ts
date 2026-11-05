@@ -1,6 +1,6 @@
 import type english from './en.ts';
 
-export const source = '58a92ddd3532';
+export const source = '21c9b738daa2';
 
 export default {
 	title: 'OAuth 2.1 与 OIDC 功能',
@@ -197,6 +197,10 @@ export default {
 				mcpAuthorization: {
 					title: '为你自己的 MCP 服务器提供授权',
 					body: '把第三方 MCP 服务器声明为某个项目的受保护资源，FoxAuth 就会签发受众恰好是该资源的令牌，无需修改 FoxAuth 的代码，也无需重启。在拥有独立地址的项目中，声明不需要资源方提供任何东西：资源可以是内部服务、运行在 localhost 上，甚至尚未部署。其他租户也可以声明同一个 URL，而不会影响你的声明。令牌默认是自包含的，资源方用所属项目公开的密钥即可验证，无需持有自己的凭据。'
+				},
+				behindProxy: {
+					title: '通过你的代理，在 Web 应用前加上登录',
+					body: '把没有自带登录的应用（例如 Grafana 或内部看板）放在你的代理后面。Caddy、Traefik 或 nginx 会就每个请求询问项目：尚未登录的人会被送到项目的登录页面，其余请求则转发给应用，并通过 X-Auth-* 请求头告诉应用这个人是谁。每个路径的规则指定哪些用户组可以打开它。应用无需改动，也不需要开启任何开关。'
 				},
 				clientIdMetadataDocument: {
 					title: '客户端身份文档',

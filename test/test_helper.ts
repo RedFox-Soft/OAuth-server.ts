@@ -39,6 +39,10 @@ import {
 	setScimRateLimitClock
 } from '../lib/scim/rate_limit.ts';
 import { setRateLimitClock } from '../lib/plugins/rateLimit.ts';
+import {
+	resetCheckRateLimiter,
+	setCheckRateBoundsForTests
+} from '../lib/behind_proxy/rate_limit.ts';
 import { clearDocumentCache } from '../lib/client_metadata_document/cache.ts';
 import { forgetAllDiscovery } from '../lib/federation/discovery.ts';
 import { forgetKeySets } from '../lib/federation/jwks.ts';
@@ -525,6 +529,8 @@ function forgetProcessState(): void {
 	setUnauthenticatedChargeClock(null);
 	resetScimRateLimiter();
 	setScimRateLimitClock(null);
+	resetCheckRateLimiter();
+	setCheckRateBoundsForTests(null);
 	setRateLimitClock(null);
 	clearDocumentCache();
 	forgetAllDiscovery();
