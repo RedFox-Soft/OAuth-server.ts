@@ -1,6 +1,16 @@
-import { describe, it, expect, beforeAll, beforeEach } from 'bun:test';
+import { hash, randomUUID } from 'node:crypto';
+import {
+	describe,
+	it,
+	expect,
+	beforeAll,
+	beforeEach,
+	afterEach
+} from 'bun:test';
+import { SignJWT, exportJWK, generateKeyPair } from 'jose';
 
 import bootstrap from '../test_helper.js';
+import { eventBus } from 'lib/event_bus.js';
 import { elysia } from 'lib/index.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
@@ -33,14 +43,15 @@ import { createAdministrator } from '../administrators.ts';
 
 let rpcId = 0;
 
-async function callMcp(token: string) {
+async function callMcp(token: string, dpop?: string) {
 	const res = await elysia.handle(
 		new Request(`http://e.ly${MCP_ROUTE}`, {
 			method: 'POST',
 			headers: {
 				'content-type': 'application/json',
 				accept: 'application/json, text/event-stream',
-				authorization: `Bearer ${token}`
+				authorization: `${dpop ? 'DPoP' : 'Bearer'} ${token}`,
+				...(dpop ? { dpop } : {})
 			},
 			body: JSON.stringify({
 				jsonrpc: '2.0',
@@ -67,9 +78,33 @@ async function tokenFor(bound: boolean) {
 	return await at.save();
 }
 
+/*
+ * Well formed in every respect but `htu`, so a refusal can only be about the URL the proof names. `null`
+ * leaves the claim out.
+ */
+async function proofWithHtu(token: string, htu: unknown) {
+	const { publicKey, privateKey } = await generateKeyPair('ES256', {
+		extractable: true
+	});
+	return new SignJWT({
+		...(htu === null ? {} : { htu }),
+		htm: 'POST',
+		ath: hash('sha256', token, 'base64url')
+	})
+		.setProtectedHeader({
+			alg: 'ES256',
+			typ: 'dpop+jwt',
+			jwk: await exportJWK(publicKey)
+		})
+		.setJti(randomUUID())
+		.setIssuedAt()
+		.sign(privateKey);
+}
+
 /**
  * @proves A sender-constrained token presented without its proof is refused at the agent
- * surface, whatever the DPoP flag says.
+ * surface, whatever the DPoP flag says, and a proof that names no usable URL is refused rather
+ * than ignored.
  */
 describe('sender-constrained tokens on the MCP surface', () => {
 	beforeAll(async () => {
@@ -96,5 +131,36 @@ describe('sender-constrained tokens on the MCP surface', () => {
 		// token safe to accept unproven, and the binding on the token still has to be honoured.
 		ApplicationConfig['dpop.enabled'] = false;
 		expect(await callMcp(await tokenFor(true))).toBe(401);
+	});
+
+	describe('a proof without a usable htu', () => {
+		const reasons: string[] = [];
+		const listener = ({ reason }: { reason: string }) => {
+			reasons.push(reason);
+		};
+
+		beforeEach(() => {
+			ApplicationConfig['dpop.enabled'] = true;
+			reasons.length = 0;
+			eventBus.on('mcp.auth.error', listener);
+		});
+
+		afterEach(() => {
+			eventBus.off('mcp.auth.error', listener);
+		});
+
+		it('a proof without htu is refused, with the DPoP failure as the recorded reason', async () => {
+			const token = await tokenFor(false);
+			expect(await callMcp(token, await proofWithHtu(token, null))).toBe(401);
+			expect(reasons).toEqual(['dpop_failed']);
+		});
+
+		it('a proof whose htu is not a URL is refused, with the DPoP failure as the recorded reason', async () => {
+			const token = await tokenFor(false);
+			expect(await callMcp(token, await proofWithHtu(token, 'not a url'))).toBe(
+				401
+			);
+			expect(reasons).toEqual(['dpop_failed']);
+		});
 	});
 });

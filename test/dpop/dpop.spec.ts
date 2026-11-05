@@ -53,16 +53,20 @@ async function DPoP(
 		accessToken,
 		nonce,
 		htu = `${ISSUER}/userinfo`,
-		htm = 'GET'
+		htm = 'GET',
+		iat
 	}: {
 		accessToken?: string;
 		nonce?: string;
-		htu?: string;
+		// `null` leaves the claim out: a proof that names no URL is a shape the server must refuse, and any
+		// other value is sent as given, so a malformed one can be too.
+		htu?: unknown;
 		htm?: 'GET' | 'POST';
+		iat?: number;
 	} = {}
 ) {
 	return new SignJWT({
-		htu,
+		...(htu === null ? {} : { htu }),
 		htm,
 		nonce,
 		ath: accessToken ? ath(accessToken) : undefined
@@ -73,7 +77,7 @@ async function DPoP(
 			jwk: await exportJWK(keypair.publicKey)
 		})
 		.setJti(nanoid())
-		.setIssuedAt()
+		.setIssuedAt(iat)
 		.sign(keypair.privateKey);
 }
 
@@ -543,6 +547,76 @@ describe('features.dPoP', () => {
 					);
 				});
 			}
+		});
+
+		describe('a proof without a usable htu', () => {
+			async function tokenBoundTo(jkt?: string) {
+				const at = new AccessToken({
+					accountId: setup.getAccountId(),
+					grantId: setup.getGrantId(),
+					client: await Client.find('client'),
+					scope: 'openid'
+				});
+				if (jkt) at.setThumbprint('jkt', jkt);
+				return at.save();
+			}
+
+			async function expectRefused(
+				res: Awaited<ReturnType<typeof agent.userinfo.get>>,
+				error_description: string
+			) {
+				if (!res.error) throw new Error('expected error response');
+				expect(res.error.status).toBe(401);
+				expect(res.error.value).toEqual({
+					error: 'invalid_dpop_proof',
+					error_description
+				});
+				const challenge = getHeader(res.response, 'www-authenticate');
+				expect(challenge).toMatch(/^DPoP /);
+				expect(challenge).toMatch(/error="invalid_dpop_proof"/);
+			}
+
+			it('a proof without htu is refused with 401 invalid_dpop_proof', async function () {
+				const token = await tokenBoundTo(thumbprint);
+				await expectRefused(
+					await agent.userinfo.get({
+						headers: {
+							authorization: `DPoP ${token}`,
+							dpop: await DPoP(keypair, { accessToken: token, htu: null })
+						}
+					}),
+					'DPoP proof must have a htu string property'
+				);
+			});
+
+			it('a DPoP header whose proof lacks htu is refused, not served as a Bearer call', async function () {
+				const token = await tokenBoundTo();
+				await expectRefused(
+					await agent.userinfo.get({
+						headers: {
+							authorization: `DPoP ${token}`,
+							dpop: await DPoP(keypair, { accessToken: token, htu: null })
+						}
+					}),
+					'DPoP proof must have a htu string property'
+				);
+			});
+
+			it('a proof whose htu is not a URL is refused with 401 invalid_dpop_proof', async function () {
+				const token = await tokenBoundTo();
+				await expectRefused(
+					await agent.userinfo.get({
+						headers: {
+							authorization: `DPoP ${token}`,
+							dpop: await DPoP(keypair, {
+								accessToken: token,
+								htu: 'not a url'
+							})
+						}
+					}),
+					'DPoP proof htu is not a valid URL'
+				);
+			});
 		});
 
 		it('returns claims over POST when the proof names POST', async function () {
@@ -1549,6 +1623,217 @@ describe('features.dPoP', () => {
 				error: 'invalid_dpop_proof',
 				error_description: 'invalid DPoP key binding'
 			});
+		});
+	});
+
+	/*
+	 * RFC 9449 §4.2 makes `htu` a claim every proof MUST carry, and §4.3 has the server check it. A proof
+	 * without a usable one was once read as no proof at all, which skipped every later check and let the
+	 * token endpoint and PAR issue an unbound token to a client that believed it was binding one.
+	 */
+	describe('a proof without a usable htu', () => {
+		const missing = {
+			error: 'invalid_dpop_proof',
+			error_description: 'DPoP proof must have a htu string property'
+		};
+		const unparsable = {
+			error: 'invalid_dpop_proof',
+			error_description: 'DPoP proof htu is not a valid URL'
+		};
+
+		async function clientCredentials(dpop: string) {
+			return agent.token.post(
+				{ grant_type: 'client_credentials' },
+				{
+					headers: {
+						...AuthorizationRequest.basicAuthHeader('client', 'secret'),
+						dpop
+					}
+				}
+			);
+		}
+
+		it('a proof without htu is refused with invalid_dpop_proof and no token is issued', async function () {
+			const { error } = await clientCredentials(
+				await DPoP(keypair, { htu: null, htm: 'POST' })
+			);
+			if (!error) throw new Error('expected error response');
+			expect(error.status).toBe(400);
+			expect(error.value).toEqual(missing);
+		});
+
+		it('a proof whose htu is not a URL is refused and no token is issued', async function () {
+			const { error } = await clientCredentials(
+				await DPoP(keypair, { htu: 'not a url', htm: 'POST' })
+			);
+			if (!error) throw new Error('expected error response');
+			expect(error.status).toBe(400);
+			expect(error.value).toEqual(unparsable);
+		});
+
+		it.each([
+			['a number', 42],
+			['an object', {}],
+			['an empty string', '']
+		])(
+			'a proof whose htu is %s is refused and no token is issued',
+			async function (_shape, htu) {
+				const { error } = await clientCredentials(
+					await DPoP(keypair, { htu, htm: 'POST' })
+				);
+				if (!error) throw new Error('expected error response');
+				expect(error.status).toBe(400);
+				expect(error.value).toEqual(missing);
+			}
+		);
+
+		it('a proof whose htu carries a query and a fragment is accepted and a token is issued', async function () {
+			const { data, status } = await clientCredentials(
+				await DPoP(keypair, { htu: `${ISSUER}/token?x=1#f`, htm: 'POST' })
+			);
+			expect(status).toBe(200);
+			expect(data).toHaveProperty('token_type', 'DPoP');
+		});
+
+		it('a stale proof without htu is still refused after the client retries with the nonce it was given', async function () {
+			const first = await clientCredentials(
+				await DPoP(keypair, { htu: null, htm: 'POST', iat: epochTime() - 301 })
+			);
+			if (!first.error) throw new Error('expected error response');
+			expect(first.error.status).toBe(400);
+			expect(first.error.value).toHaveProperty('error', 'use_dpop_nonce');
+			const nonce = getHeader(first.response, 'dpop-nonce');
+
+			const retry = await clientCredentials(
+				await DPoP(keypair, { htu: null, htm: 'POST', nonce })
+			);
+			if (!retry.error) throw new Error('expected error response');
+			expect(retry.error.status).toBe(400);
+			expect(retry.error.value).toEqual(missing);
+		});
+
+		it('the code is still redeemable with a valid proof after a refusal for a proof without htu', async function () {
+			const auth = new AuthorizationRequest({
+				scope: 'openid offline_access',
+				prompt: 'consent'
+			});
+			const authorization = await agent.auth.get({
+				query: auth.params,
+				headers: { cookie }
+			});
+			expect(authorization.status).toBe(303);
+			const code = locationParameter(
+				getHeader(authorization.response, 'location'),
+				'code'
+			);
+			const exchange = async (dpop: string) =>
+				agent.token.post(
+					{
+						grant_type: 'authorization_code',
+						code_verifier: auth.code_verifier,
+						code,
+						redirect_uri: 'https://client.example.com/cb'
+					},
+					{ headers: { ...auth.basicAuthHeader, dpop } }
+				);
+
+			const refused = await exchange(
+				await DPoP(keypair, { htu: null, htm: 'POST' })
+			);
+			if (!refused.error) throw new Error('expected error response');
+			expect(refused.error.status).toBe(400);
+			expect(refused.error.value).toEqual(missing);
+
+			const redeemed = await exchange(
+				await DPoP(keypair, { htu: `${ISSUER}/token`, htm: 'POST' })
+			);
+			expect(redeemed.status).toBe(200);
+			expect(redeemed.data).toHaveProperty('token_type', 'DPoP');
+		});
+
+		it('the refresh token still redeems after a refusal for a proof without htu', async function () {
+			const auth = new AuthorizationRequest({
+				scope: 'openid offline_access',
+				prompt: 'consent'
+			});
+			const authorization = await agent.auth.get({
+				query: auth.params,
+				headers: { cookie }
+			});
+			expect(authorization.status).toBe(303);
+			const issued = await agent.token.post(
+				{
+					grant_type: 'authorization_code',
+					code_verifier: auth.code_verifier,
+					code: locationParameter(
+						getHeader(authorization.response, 'location'),
+						'code'
+					),
+					redirect_uri: 'https://client.example.com/cb'
+				},
+				{
+					headers: {
+						...auth.basicAuthHeader,
+						dpop: await DPoP(keypair, { htu: `${ISSUER}/token`, htm: 'POST' })
+					}
+				}
+			);
+			if (!issued.data?.refresh_token)
+				throw new Error('expected a refresh token');
+			const refresh_token = issued.data.refresh_token;
+			const refresh = async (dpop: string) =>
+				agent.token.post(
+					{ grant_type: 'refresh_token', refresh_token },
+					{ headers: { ...auth.basicAuthHeader, dpop } }
+				);
+
+			const refused = await refresh(
+				await DPoP(keypair, { htu: null, htm: 'POST' })
+			);
+			if (!refused.error) throw new Error('expected error response');
+			expect(refused.error.status).toBe(400);
+			expect(refused.error.value).toEqual(missing);
+
+			const redeemed = await refresh(
+				await DPoP(keypair, { htu: `${ISSUER}/token`, htm: 'POST' })
+			);
+			expect(redeemed.status).toBe(200);
+		});
+
+		async function pushedRequest(dpop: string) {
+			const code_verifier = randomBytes(32).toString('base64url');
+			return agent.par.post(
+				{
+					response_type: 'code',
+					client_id: 'client',
+					code_challenge_method: 'S256',
+					code_challenge: hash('sha256', code_verifier, 'base64url')
+				},
+				{
+					headers: {
+						...AuthorizationRequest.basicAuthHeader('client', 'secret'),
+						dpop
+					}
+				}
+			);
+		}
+
+		it('a proof without htu is refused at PAR and no request URI is created', async function () {
+			const { error } = await pushedRequest(
+				await DPoP(keypair, { htu: null, htm: 'POST' })
+			);
+			if (!error) throw new Error('expected error response');
+			expect(error.status).toBe(400);
+			expect(error.value).toEqual(missing);
+		});
+
+		it('a proof whose htu is not a URL is refused at PAR', async function () {
+			const { error } = await pushedRequest(
+				await DPoP(keypair, { htu: 'not a url', htm: 'POST' })
+			);
+			if (!error) throw new Error('expected error response');
+			expect(error.status).toBe(400);
+			expect(error.value).toEqual(unparsable);
 		});
 	});
 

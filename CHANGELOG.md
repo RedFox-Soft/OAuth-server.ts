@@ -9,6 +9,12 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A DPoP proof without a usable `htu` is refused** with `invalid_dpop_proof` (spec 121). It was read as no proof at
+  all, so the token and PAR endpoints issued an unbound token to a client that meant to bind one, and the IPSIE SL1
+  profile refused it as missing.
+
 ## [1.5.0] - 2026-11-05
 
 Signing in through a project's provider can also connect the person's account at a service linked to it, and a

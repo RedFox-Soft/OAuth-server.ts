@@ -62,6 +62,21 @@ describe('access tokens under the IPSIE SL1 profile', () => {
 		}
 	});
 
+	it('a proof without htu is refused as invalid, not as missing', async () => {
+		const body = await answer(
+			await tokenRequest(
+				{ grant_type: 'client_credentials' },
+				{
+					client: 'sl1-machine',
+					secret: 'sl1-machine-secret',
+					dpop: await proof(keypair, { htu: null })
+				}
+			)
+		);
+		expect(body.error).toBe('invalid_dpop_proof');
+		expect(body.error_description).not.toContain('not provided');
+	});
+
 	it('binds an authorization code exchange to the proof, and userinfo accepts the token with it', async () => {
 		const issued = await signedIn(setup, keypair, {
 			client: 'sl1-web',

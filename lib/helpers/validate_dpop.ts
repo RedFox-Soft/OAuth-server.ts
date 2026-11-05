@@ -96,10 +96,14 @@ export async function dpopValidate(
 
 		{
 			if (typeof payload.htu !== 'string' || !payload.htu) {
-				return;
+				throw new InvalidDpopProof(
+					'DPoP proof must have a htu string property'
+				);
 			}
 			const actual = URL.parse(payload.htu);
-			if (!actual) return;
+			if (!actual) {
+				throw new InvalidDpopProof('DPoP proof htu is not a valid URL');
+			}
 			actual.hash = '';
 			actual.search = '';
 

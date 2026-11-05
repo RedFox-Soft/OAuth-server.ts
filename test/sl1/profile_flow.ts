@@ -105,10 +105,15 @@ export async function proof(
 		htu = `${ISSUER}/token`,
 		htm = 'POST',
 		accessToken
-	}: { htu?: string; htm?: string; accessToken?: string } = {}
+	}: {
+		// `null` leaves the claim out, for a proof that names no URL.
+		htu?: string | null;
+		htm?: string;
+		accessToken?: string;
+	} = {}
 ) {
 	return new SignJWT({
-		htu,
+		...(htu === null ? {} : { htu }),
 		htm,
 		...(accessToken
 			? {
