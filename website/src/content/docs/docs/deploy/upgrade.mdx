@@ -703,6 +703,21 @@ What an operator sees afterwards:
   way. See [Turn on the IPSIE SL1 profile](/docs/administer/ipsie-sl1-profile/).
 - **Every response asks search engines not to index it** (`X-Robots-Tag: noindex, nofollow`).
 
+### Then 1.5.0
+
+1.5.0 carries no schema migration, no new storage area and no new setting that is on by default. There is nothing
+to check before upgrading.
+
+What an operator sees afterwards:
+
+- **Connected accounts from sign-in.** A connected service can be linked to one of the project's sign-in providers
+  that uses the same client id, so signing in through that provider also connects the person's account there. See
+  [Connected services](/docs/administer/connected-services/).
+- **The "What do you need?" guide** in every project's console, and on the site at [/guide/](/guide/).
+- **Applications that skip consent sign in again two weeks after the first time**, the console included. Before,
+  the sign-in outlived the grant it remembered and was refused with `access_denied`, which the console showed as
+  `422 Property 'code' is missing`. A refused console sign-in now shows its own reason.
+
 ## Check readiness and the issuer after the restart {#after-the-restart}
 
 ```bash

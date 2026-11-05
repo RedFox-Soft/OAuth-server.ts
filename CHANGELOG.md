@@ -9,6 +9,12 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-05
+
+Signing in through a project's provider can also connect the person's account at a service linked to it, and a
+"What do you need?" guide leads from two plain questions to the setup a person needs. Applications that skip
+consent, the console included, sign in again two weeks after the first time. No migration.
+
 ### Added
 
 - **Connected accounts from sign-in** (spec 120) — an administrator can link a project's sign-in provider to one of
@@ -2268,7 +2274,8 @@ found`. The refusal text existed and never ran: the call that delivered it sat i
 - The DPoP nonce secret is self-provisioned at startup, making the requireNonce-without-secret 500
   state unrepresentable (spec 014)
 
-[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.1.0...v1.2.0
