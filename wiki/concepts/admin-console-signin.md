@@ -4,7 +4,7 @@ title: 'Admin console sign-in'
 tags: [architecture, contract, gotcha, oidc]
 sources: [oauth-server-codebase]
 created: 2026-08-04
-updated: 2026-10-15
+updated: 2026-11-05
 graph:
   node_type: concept
 ---
@@ -103,6 +103,24 @@ attacker-triggerable, so an unconditional log line per refusal is a log-amplific
 the same reasoning that keeps the audit trail's writes behind authorization
 ([[admin-audit-trail]]), one severity tier down. Sign-in is also **not** audited, for the same reason
 `POST /admin/api/logout` is not: session lifecycle, not a state-changing administrative action.
+
+## A refused sign-in comes back with `error`, not `code`
+
+Until 2026-11-05 the callback's query schema required `code`, so an authorization response carrying
+`error` (RFC 6749 §4.1.2.1) was rejected by validation and the operator read
+`422 Property 'code' is missing` instead of the refusal. The callback now accepts `error` and
+`error_description` and throws the refusal by its own code (`errorForCode`), which the shared error page
+renders. It does so only **after** the state check: before it, the description is whoever wrote the link's,
+shown on a page of this console (`lib/admin/auth/login.ts`, `test/admin/login_flow.spec.ts`).
+
+What surfaced it was a refusal the console should never get. A provider session is renewed by every request
+(`Session.save`, `lib/models/session.ts:151`) while a grant runs out fourteen days after it was given
+(`ttl.Grant`, `lib/configs/liveTime.ts`). For a client that skips consent — the console is one —
+`loadExistingGrant` (`lib/addon/account.ts`) returned nothing when the session's remembered grant id named
+no grant, instead of creating the trusted grant it creates when there is no id. The pipeline then held an
+empty grant with no consent screen to fill it and refused with `access_denied`
+(`lib/actions/authorization/interactions.ts:102`), on prod a fortnight after an operator's first sign-in. A
+remembered id that names nothing is now the same state as no id (`test/consent_waiver/consent_waiver.spec.ts`).
 
 ## Signing out must end two sessions, not one
 

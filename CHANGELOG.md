@@ -23,6 +23,13 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   Russian and Chinese, from one declaration; an answer the project cannot use yet says why (a setting off, the plan,
   a missing right) instead of disappearing. The home page and the docs link to it.
 
+### Fixed
+
+- **Signing in to an application that skips consent works again two weeks after the first sign-in**, the console
+  included. The sign-in outlived the grant it remembered, and the server refused with `access_denied` instead of
+  granting afresh. The console also shows a refused sign-in by its own code instead of
+  `422 Property 'code' is missing`. No migration.
+
 ## [1.4.0] - 2026-11-03
 
 A token vault for agents: people connect their accounts at the services a project declares, and an agent obtains a

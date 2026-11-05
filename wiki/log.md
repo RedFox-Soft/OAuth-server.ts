@@ -368,3 +368,5 @@ Operations:
 ## [2026-11-04] fix | [[situation-guide]] — the solution scene carries `fixed` (the lane with the check), never a refused or outside party; both renderers read it; signup's problem picture draws only the person; stale line citations corrected.
 
 ## [2026-11-04] update | [[situation-guide]] — keeping the guide true: a change that adds, changes or removes something a person sets up updates its situation in the same change (rule in AGENTS.md, checklist here, and what the tests do and do not catch).
+
+## [2026-11-05] fix | [[admin-console-signin]] — the callback shows a refused sign-in by its own code after the state check instead of a 422; a session whose remembered grant ran out gets a fresh trusted grant for a consent-skipping client instead of access_denied.

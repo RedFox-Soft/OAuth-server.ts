@@ -8,6 +8,7 @@ import {
 	expiredSessionCookieAttributes
 } from './session.js';
 import { IdTokenRejected, verifyAdminIdToken } from './verifyIdToken.js';
+import { errorForCode } from '../../helpers/errors.js';
 import { eventBus } from '../../event_bus.js';
 import { routeNames, sessionCookieName } from '../../consts/param_list.js';
 import { Session } from '../../models/session.js';
@@ -127,6 +128,19 @@ export const adminLogin = new Elysia({ name: 'admin-login' })
 				set.status = 400;
 				return { error: 'invalid_state', message: 'state mismatch' };
 			}
+			/*
+			 * A refused sign-in comes back here with `error` and no `code` (RFC 6749 §4.1.2.1). Shown on the shared
+			 * error page by its own code, and only after the state check: before it, the text is whoever wrote the
+			 * link's, on a page of this console.
+			 */
+			if (query.error !== undefined || query.code === undefined) {
+				throw errorForCode(
+					query.error ?? 'invalid_request',
+					query.error === undefined
+						? 'the authorization response carries neither a code nor an error'
+						: query.error_description
+				);
+			}
 			const res = await fetch(`${ISSUER}${routeNames.token}`, {
 				method: 'POST',
 				headers: { 'content-type': 'application/x-www-form-urlencoded' },
@@ -192,8 +206,11 @@ export const adminLogin = new Elysia({ name: 'admin-login' })
 			// The provider appends `iss` (RFC 9207 authorization-response issuer
 			// identifier) to the redirect; the app runs with `normalize: false`, so a
 			// strict { code, state } schema would 422 on the extra param. Accept it.
+			// `code` is optional because a refusal carries `error` in its place.
 			query: t.Object({
-				code: t.String(),
+				code: t.Optional(t.String()),
+				error: t.Optional(t.String()),
+				error_description: t.Optional(t.String()),
 				state: t.String(),
 				iss: t.Optional(t.String())
 			})

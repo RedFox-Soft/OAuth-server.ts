@@ -129,6 +129,57 @@ describe('admin OIDC login (BFF)', () => {
 		expect(res.status).toBe(400);
 	});
 
+	/* Whatever the error page rendered, as text: Eden has already read the body. */
+	function bodyOf(value: unknown): string {
+		return typeof value === 'string' ? value : JSON.stringify(value);
+	}
+
+	/* Starts a sign-in and returns its `admin_oauth` cookie pair and the state it was sent with. */
+	async function startedSignIn() {
+		const login = await agent.admin.login.get();
+		const params = new URL(getHeader(login.response, 'location')).searchParams;
+		return {
+			cookie: cookiePair(login.response.headers.getSetCookie(), 'admin_oauth'),
+			state: present(params.get('state'), 'a state parameter')
+		};
+	}
+
+	it('the authorization server’s refusal is shown by its own code and description', async () => {
+		const { cookie, state } = await startedSignIn();
+
+		const res = await agent.admin.callback.get({
+			query: {
+				error: 'access_denied',
+				error_description: 'End-User denied consent',
+				state,
+				iss: 'http://e.ly'
+			},
+			headers: { cookie, accept: 'text/html' }
+		});
+
+		expect(res.status).toBe(400);
+		const page = bodyOf(res.error?.value);
+		expect(page).toContain('access_denied');
+		expect(page).toContain('End-User denied consent');
+		expect(page).not.toContain('Property');
+	});
+
+	it('a refusal arriving with a state this browser did not start shows none of its text', async () => {
+		const { cookie } = await startedSignIn();
+
+		const res = await agent.admin.callback.get({
+			query: {
+				error: 'access_denied',
+				error_description: 'Call +1 555 0100 to restore your account',
+				state: 'not-this-browsers'
+			},
+			headers: { cookie, accept: 'text/html' }
+		});
+
+		expect(res.status).toBe(400);
+		expect(bodyOf(res.error?.value)).not.toContain('555 0100');
+	});
+
 	it('callback exchanges the code, sets a session, and /me reports a super administrator', async () => {
 		// Drive the real /admin/login to obtain the signed admin_oauth cookie and
 		// the matching state, so the callback's CSRF check passes.

@@ -8,6 +8,7 @@ import bootstrap, {
 	type Setup
 } from '../test_helper.js';
 import { AuthorizationRequest } from 'test/AuthorizationRequest.js';
+import { TestAdapter } from 'test/models.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { getProtectedResourceStore } from 'lib/adapters/index.ts';
 import { DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
@@ -93,6 +94,29 @@ describe('a client that skips consent, signing into a bucket', () => {
 			'tenant-app',
 			'https://tenant.example.com/cb',
 			cookie,
+			TENANT_RESOURCE
+		);
+
+		expect(callback.searchParams.get('error')).toBeNull();
+		expect(callback.searchParams.get('code')).toBeTruthy();
+	});
+
+	/*
+	 * A sign-in outlives the grant it remembers: the session is renewed by every request, the grant runs out
+	 * fourteen days after it was given. An expired grant is gone from the store, which is what this stages.
+	 */
+	it('skips consent after the grant the sign-in remembers has run out', async () => {
+		const signedIn = await setup.login({
+			accountId: 'tenant-user',
+			bucketId: TENANT_BUCKET,
+			scope: 'openid'
+		});
+		await TestAdapter.for('Grant').destroy(setup.getGrantId('tenant-app'));
+
+		const callback = await authorizeSilently(
+			'tenant-app',
+			'https://tenant.example.com/cb',
+			signedIn,
 			TENANT_RESOURCE
 		);
 

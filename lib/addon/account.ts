@@ -157,8 +157,14 @@ export async function loadExistingGrant(oidc: OIDCContext) {
 	const grantId =
 		oidc.result?.consent?.grantId || oidc.session.grantIdFor(clientId);
 
-	if (grantId) {
-		const existing = await Grant.tryFind(grantId);
+	/*
+	 * A grant id the session remembers is a hint, not a grant: the session is renewed by every request and
+	 * the grant runs out on its own clock, so an id that names nothing is the same state as no id. Returning
+	 * nothing for it instead left a consent-not-required client with an empty grant and no consent screen to
+	 * fill it, and every sign-in a fortnight after the first was refused with access_denied.
+	 */
+	const existing = grantId ? await Grant.tryFind(grantId) : undefined;
+	if (existing) {
 		/*
 		 * A grant established before the client stopped requiring consent is persisted with
 		 * `trusted: false`, and every filtered getter then narrows to what that grant happens to hold —
@@ -167,7 +173,7 @@ export async function loadExistingGrant(oidc: OIDCContext) {
 		 * is re-derived here rather than frozen at the moment the grant was created. Not persisted: the
 		 * derivation is free on every load, and writing on every authorization is not.
 		 */
-		if (existing && (await consentWaived(oidc))) {
+		if (await consentWaived(oidc)) {
 			existing.payload.trusted = true;
 		}
 		return existing;
